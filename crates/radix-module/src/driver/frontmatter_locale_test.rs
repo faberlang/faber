@@ -7,6 +7,7 @@ use crate::codegen::Target;
 use crate::driver::Config;
 use crate::driver::ModuleCompileRequest;
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_uses_frontmatter_locale_for_lexing() {
     let config = Config::default().with_target(Target::HirRust);
@@ -43,6 +44,7 @@ fn broken(int value) → int {
     assert!(diagnostic.phase.to_string().contains("analysis"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_frontmatter_locale_overrides_session_pack() {
     let config = Config::default()
@@ -62,6 +64,7 @@ fn compile_frontmatter_locale_overrides_session_pack() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn explicit_session_pack_wins_over_frontmatter_locale() {
     // An explicitly marked session pack (CLI `--locale` semantics) is
@@ -119,6 +122,7 @@ fn locale_unknown_diagnostic_carries_the_locale_id_it_names() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_frontmatter_without_locale_falls_back_to_session() {
     let config = Config::default()

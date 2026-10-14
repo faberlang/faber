@@ -11,6 +11,7 @@ const BARE_LITERAL: &str =
 const HOLE_LITERAL: &str =
     "+++\nlocale = \"en\"\n+++\n\nmain {\n    const set<int> s ← _ [1, 2]\n    print s.length()\n}\n";
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn inferred_set_cell_bare_literal_builds_the_set() {
     let session = test_session(Target::HirRust);
@@ -18,6 +19,7 @@ fn inferred_set_cell_bare_literal_builds_the_set() {
     assert!(result.success(), "bare set literal must typecheck: {:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn inferred_set_cell_hole_literal_builds_the_set() {
     let session = test_session(Target::HirRust);

@@ -41,16 +41,19 @@ fn rejects(source: &str, issue: &str, found: Option<&str>) {
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn list_right_operand_accepts() {
     accepts("incipit { fixum lista<numerus> xs ← [1, 2]\n nota 1 ∈ xs }");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn set_right_operand_accepts() {
     accepts("incipit { varia copia<numerus> xs ← vacua\n nota 1 ∈ xs }");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn map_right_operand_tests_keys() {
     accepts("incipit { fixum tabula<textus, numerus> m ← {\"a\": 1}\n nota \"a\" ∈ m }");

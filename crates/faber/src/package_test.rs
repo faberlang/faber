@@ -11,16 +11,19 @@ use super::{
     build_browser_product_static_assets, config_with_locale, emit_generated_crate,
     emit_generated_crate_with_runtime_plan, invoke_cargo_build, library_resolver_from_config,
     package_host_selection_diagnostic, read_manifest, use_package_compiler_from_args,
-    validate_manifest, verify_library_binding_shapes, verify_library_bindings,
-    with_lowered_package_mir,
+    validate_manifest, verify_library_bindings, with_lowered_package_mir,
 };
+#[cfg(feature = "hir-rust")]
+use super::verify_library_binding_shapes;
 use super::{cmd::use_package_compiler, faber_analysis_seams, faber_emission_seams};
 use radix::program::analyze::AnalyzedProgram;
 use radix::program::discovery::{
     BuildLayout, PackageSpec, discover_build_layout, sanitize_crate_name,
 };
+#[cfg(feature = "hir-go")]
+use radix::program::emit::compile_package_result;
 use radix::program::emit::{
-    compile_package as compile_package_compiler, compile_package_result,
+    compile_package as compile_package_compiler,
     package_rust_runtime_plan as package_rust_runtime_plan_compiler,
 };
 use radix::program::test_source_filter::TestSourceFilter;
@@ -186,11 +189,16 @@ use radix::module::hir::{
 };
 use radix::module::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, RunnerError, Value};
 use std::fs;
+#[cfg(feature = "hir-go")]
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
+#[cfg(feature = "hir-go")]
+use std::process::Stdio;
+#[cfg(feature = "hir-go")]
 use std::thread;
 
+#[cfg(feature = "hir-ts")]
 use super::product::inject_product_failure_at;
 use super::test_support::{TestDir, test_temp_dir};
 
@@ -210,6 +218,7 @@ fn may_skip_missing_tool_on(is_linux: bool, require_toolchains: bool) -> bool {
     is_linux && !require_toolchains
 }
 
+#[cfg(feature = "hir-rust")]
 fn may_skip_missing_tool() -> bool {
     may_skip_missing_tool_on(
         cfg!(target_os = "linux"),
@@ -227,6 +236,7 @@ fn missing_tool_with(may_skip: bool, tool: &str, proof: &str, old_failure: &str)
     panic!("{old_failure}");
 }
 
+#[cfg(feature = "hir-rust")]
 fn missing_tool(tool: &str, proof: &str, old_failure: &str) {
     missing_tool_with(may_skip_missing_tool(), tool, proof, old_failure);
 }
@@ -440,6 +450,7 @@ fn manifest_target_command_probe() {
     }
 }
 
+#[cfg(feature = "hir-fhir")]
 #[test]
 fn package_check_refuses_the_manifest_target_build_refuses() {
     let dir = test_temp_dir("check-build-target-refusal");
@@ -700,6 +711,7 @@ fn compile_package_reports_unresolved_external_imports() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_accepts_empty_source_as_noop() {
     let dir = test_temp_dir("empty-source");
@@ -713,6 +725,7 @@ fn compile_package_accepts_empty_source_as_noop() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_rust_emit_contains_arm_cape_throw() {
     let dir = test_temp_dir("package-cape-emit");
@@ -749,6 +762,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_rust_cli_emit_contains_arm_cape_throw() {
     let dir = test_temp_dir("package-cape-cli-emit");
@@ -786,6 +800,7 @@ main args args {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_library_imports_without_local_modules() {
     let dir = test_temp_dir("norma-json-import");
@@ -836,6 +851,7 @@ main {
     assert!(!output.code.contains("crate::norma::json"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn build_package_resolves_norma_json_facade_roundtrip() {
     let dir = test_temp_dir("norma-json-build-roundtrip");
@@ -966,6 +982,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_prefers_locked_norma_interfaces_over_library_home_without_dependency() {
     let dir = test_temp_dir("locked-norma-platform-default");
@@ -1062,6 +1079,7 @@ main {
     assert!(!output.code.contains("fallback_label"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_emits_rustfmt_clean_generated_main_for_multifile_package() {
     let dir = test_temp_dir("rustfmt-clean-multifile-package");
@@ -2366,16 +2384,19 @@ main {
     assert!(reached);
 }
 
+#[cfg(feature = "mir-llvm")]
 #[test]
 fn package_mir_json_corpus_emits_verifier_valid_llvm() {
     assert_package_corpus_llvm_smoke("json/json.fab", "package-json-corpus");
 }
 
+#[cfg(feature = "mir-llvm")]
 #[test]
 fn package_mir_stage4b_instans_emits_verifier_valid_llvm() {
     assert_package_corpus_llvm_smoke("instans/instans.fab", "package-stage4b-instans");
 }
 
+#[cfg(feature = "mir-llvm")]
 fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
     let entry = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../corpus")
@@ -4584,6 +4605,7 @@ main {
     assert_eq!(host.stdout_lines, vec!["amor".to_owned()]);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_field_names_default_preserves_source_spelling() {
     let dir = test_temp_dir("rust-field-names-preserve");
@@ -4627,6 +4649,7 @@ main {
 /// a genus and a discretio variant print their construction literal (D2.8,
 /// rd4a/pr3), so the source spelling legitimately survives inside the `Debug`
 /// `write!` format string. Any other occurrence is an un-renamed identifier.
+#[cfg(feature = "hir-rust")]
 fn assert_source_field_name_only_in_print_literal(code: &str, source_name: &str) {
     for line in code.lines().filter(|line| line.contains(source_name)) {
         assert!(
@@ -4636,6 +4659,7 @@ fn assert_source_field_name_only_in_print_literal(code: &str, source_name: &str)
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_field_names_snake_case_manifest_policy_renames_generated_fields() {
     let dir = test_temp_dir("rust-field-names-snake-case");
@@ -4693,6 +4717,7 @@ main {
     assert_source_field_name_only_in_print_literal(&output.code, "nomenLongum");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_field_names_snake_case_manifest_policy_rejects_field_collisions() {
     let dir = test_temp_dir("rust-field-names-snake-case-collision");
@@ -4740,6 +4765,7 @@ main {
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_field_names_snake_case_manifest_policy_renames_variant_fields() {
     let dir = test_temp_dir("rust-field-names-snake-case-variant");
@@ -4990,6 +5016,7 @@ fn summa(tf32[2] x) → f32 {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_text_native_body() {
     let dir = test_temp_dir("norma-chorda-import");
@@ -5029,6 +5056,7 @@ main {
     assert!(!output.code.contains("panic!(\"unimplemented\")"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_type_only_norma_file_namespace_import() {
     let dir = test_temp_dir("norma-net-endpoint-import");
@@ -5077,6 +5105,7 @@ main {
     ));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_type_only_local_file_namespace_import() {
     let dir = test_temp_dir("local-type-only-import");
@@ -5133,6 +5162,7 @@ class Thing {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_preserves_file_stem_named_type_under_import_alias() {
     let library_home = test_temp_dir("alias-stem-type-library_home");
@@ -5185,6 +5215,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_text_diducta_native_body() {
     let dir = test_temp_dir("norma-chorda-diducta-import");
@@ -5226,6 +5257,7 @@ main {
     assert!(!output.code.contains("faber::frame::sermo_open"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_chorda_retenta_filters_codegen() {
     let dir = test_temp_dir("norma-chorda-retenta-filters");
@@ -5275,6 +5307,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_tensor_native_body() {
     let dir = test_temp_dir("norma-tensor-import");
@@ -5311,6 +5344,7 @@ main {
     assert!(!output.code.contains("norma::tensor::flatten"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_omits_nondum_norma_text_functions_from_output() {
     let dir = test_temp_dir("norma-chorda-mixed");
@@ -5348,6 +5382,7 @@ main {
     assert!(output.code.contains("pub(crate) fn encode"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_emits_norma_text_encode() {
     let dir = test_temp_dir("norma-text-encode");
@@ -5377,6 +5412,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_emits_norma_toml_parse() {
     let dir = test_temp_dir("norma-toml-import");
@@ -5405,6 +5441,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_value_native_navigation_body() {
     let dir = test_temp_dir("norma-value-native-nav");
@@ -5447,6 +5484,7 @@ main {
     assert!(!output.code.contains("norma::value::require_string"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_value_exige_claves_native_body() {
     let dir = test_temp_dir("norma-value-exige-claves");
@@ -5487,6 +5525,7 @@ main {
     assert!(!output.code.contains("norma::value::require_strings"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_fs_explora_contract() {
     let dir = test_temp_dir("norma-solum-explora-contract");
@@ -5521,6 +5560,7 @@ main {
     assert!(!output.code.contains("norma::fs::glob"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_console_ad_wrapped_imports() {
     let dir = test_temp_dir("norma-consolum-ad-import");
@@ -5574,6 +5614,7 @@ main {
 /// through `norma:fault`, carries one). An output sink returns
 /// `Result<(), fault::IoFault>`, so it never produces that `Err` shape; a
 /// regression that lowered a sink through `format!` would still fail here.
+#[cfg(feature = "hir-rust")]
 fn assert_format_macro_only_in_expected_sites(code: &str) {
     for line in code.lines().filter(|line| line.contains("format!(")) {
         assert!(
@@ -5601,6 +5642,7 @@ fn assert_format_macro_only_in_expected_sites(code: &str) {
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn consolum_eot4_native_output_sinks_canonical() {
     let dir = test_temp_dir("consolum-eot4-canonical");
@@ -5668,6 +5710,7 @@ main {
     assert_format_macro_only_in_expected_sites(&output.code);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn consolum_eot4_native_output_sinks_la_surface() {
     let dir = test_temp_dir("consolum-eot4-la");
@@ -5737,6 +5780,7 @@ incipit {
     assert_format_macro_only_in_expected_sites(&output.code);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn consolum_eot4_input_values_canonical() {
     let dir = test_temp_dir("consolum-eot4-input-canonical");
@@ -5787,6 +5831,7 @@ main {
     assert!(!output.code.contains("println!"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn consolum_eot4_input_values_la_surface() {
     let dir = test_temp_dir("consolum-eot4-input-la");
@@ -5901,6 +5946,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_fs_ad_wrapped_imports() {
     let dir = test_temp_dir("norma-solum-ad-import");
@@ -5946,6 +5992,7 @@ async_main {
     assert!(!output.code.contains("crate::norma::hal::fs"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_process_ad_wrapped_imports() {
     let dir = test_temp_dir("norma-processus-ad-import");
@@ -5990,6 +6037,7 @@ main {
     assert!(!output.code.contains("crate::norma::hal::process"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_time_ad_wrapped_imports() {
     let dir = test_temp_dir("norma-tempus-ad-import");
@@ -6037,6 +6085,7 @@ async_main {
     assert!(!output.code.contains("crate::norma::hal::time"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_random_ad_wrapped_imports() {
     let dir = test_temp_dir("norma-aleator-ad-import");
@@ -6186,6 +6235,7 @@ main {{
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_fixture_runs_norma_http_runtime_against_local_server() {
     let dir = test_temp_dir("norma-http-fixture");
@@ -6459,6 +6509,7 @@ main {}
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_keeps_relative_norma_paths_as_local_imports() {
     let dir = test_temp_dir("relative-norma-path");
@@ -6527,6 +6578,7 @@ main {}
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn dual_norma_format_imports_scope_provenance_by_binding() {
     let dir = test_temp_dir("norma-json-csv-provenance");
@@ -6591,6 +6643,7 @@ main {
     assert!(!output.code.contains("norma::json::parse"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_preserves_norma_runtime_types_and_failable_calls() {
     let dir = test_temp_dir("norma-runtime-type-and-failable-calls");
@@ -6717,6 +6770,7 @@ async_main {
     assert!(!item.elide_rust_decl);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn aliased_norma_http_import_lowers_by_provider_identity() {
     let dir = test_temp_dir("aliased-norma-http-lowering");
@@ -6789,6 +6843,7 @@ fn resolved_library_module_shape_can_describe_future_sqlite_without_rust_metadat
     assert!(module.interface_path.ends_with("sqlite/transactio.fab"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_relative_input_from_current_working_directory() {
     let dir = test_temp_dir("relative-input");
@@ -6809,6 +6864,7 @@ fn compile_package_resolves_relative_input_from_current_working_directory() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_mounts_wildcard_imported_cli_commands() {
     let dir = test_temp_dir("cli-mount");
@@ -6899,6 +6955,7 @@ fn run() args args {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_mounted_handlers_can_access_root_globals() {
     let dir = test_temp_dir("cli-mount-root-global");
@@ -7111,6 +7168,7 @@ fn two() {}
     )));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_does_not_expose_unmounted_imported_cli_modules() {
     let dir = test_temp_dir("cli-unmounted");
@@ -7161,6 +7219,7 @@ fn compile_package_rejects_import_cycles() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_supports_manifest_example() {
     let dir = test_temp_dir("manifest");
@@ -7209,6 +7268,7 @@ name = "minimal"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_discovers_faber_toml_from_directory() {
     let dir = test_temp_dir("manifest-dir");
@@ -7235,6 +7295,7 @@ entry = "main.fab"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn binding_manifest_verifies_bodyless_declarations_and_shim() {
     let dir = test_temp_dir("binding-manifest-valid");
@@ -7671,6 +7732,7 @@ entry = "main.fab"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn discover_package_accepts_package_root_source_dot() {
     let dir = test_temp_dir("manifest-dot-source");
@@ -7894,6 +7956,7 @@ kind = "lib"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_uses_manifest_reader_locale_default_pack() {
     let dir = test_temp_dir("manifest-reader-locale");
@@ -7926,6 +7989,7 @@ locale = "zh-Hans"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_uses_installed_reader_locale_pack_without_package_pack() {
     let dir = test_temp_dir("manifest-installed-reader-locale");
@@ -7966,6 +8030,7 @@ locale = "zh-Hans"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -8136,6 +8201,7 @@ fn probe() → bool {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_uses_manifest_locale_pack_path() {
     let dir = test_temp_dir("manifest-reader-pack");
@@ -8248,6 +8314,7 @@ locale = "zh-Hans"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn thai_reader_locale_example_compiles_from_manifest() {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -8447,6 +8514,7 @@ fn run() {}
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_exports_imported_module_functions_to_entry() {
     let dir = test_temp_dir("package-import-function");
@@ -8506,6 +8574,7 @@ fn saluta(string nomen) → string {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_calls_top_level_function_through_file_namespace_alias() {
     let dir = test_temp_dir("package-file-namespace-function");
@@ -8804,6 +8873,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn build_package_routes_duplicate_stem_file_namespace_imports_by_path() {
     let dir = test_temp_dir("package-file-namespace-duplicate-stems");
@@ -8856,6 +8926,7 @@ fn label() → string {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn build_package_supplies_namespace_metadata_to_non_entry_modules() {
     let dir = test_temp_dir("package-file-namespace-non-entry");
@@ -8906,6 +8977,7 @@ fn adde(int left, int right) → int {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn build_package_keeps_duplicate_qualified_type_names_namespace_scoped() {
     let dir = test_temp_dir("package-file-namespace-duplicate-types");
@@ -8960,6 +9032,7 @@ class Thing {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_calls_file_function_through_file_namespace_alias() {
     let dir = test_temp_dir("package-file-namespace-function");
@@ -9041,6 +9114,7 @@ fn publicum() → string {
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_exports_publica_function_through_file_namespace_alias() {
     let dir = test_temp_dir("package-publica-file-namespace-function");
@@ -9330,6 +9404,7 @@ entry = "main.fab"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn direct_non_manifest_entry_under_manifest_keeps_explicit_entry() {
     let dir = test_temp_dir("layout-explicit-entry-parent-manifest");
@@ -9395,6 +9470,7 @@ fn build_layout_never_produces_faber_target_nested_path() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn linked_library_emit_skips_entry_file_layouts_without_manifest() {
     let dir = test_temp_dir("linked-library-no-manifest");
@@ -9416,6 +9492,7 @@ fn linked_library_emit_skips_entry_file_layouts_without_manifest() {
 // Phase 2: Generated crate writer tests (no Cargo invocation)
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn emit_generated_crate_writes_cargo_toml_and_main_rs_under_target_faber() {
     // The runtime is a path dependency on the named repository root.
@@ -9659,6 +9736,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_runtime_plan_selects_faber_and_tokio_without_text_sniff() {
     // Phase 3: Cargo runtime deps must come from HIR/plan facts, never
@@ -9718,6 +9796,7 @@ entry = "main.fab"
     assert!(cargo_toml.contains("tokio = { version = "));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_runtime_plan_drives_tokio_dependency_without_source_scan() {
     let pkg = test_temp_dir("runtime-plan-async-entry");
@@ -9829,6 +9908,7 @@ fn package_host_routes_fail_closed_with_and_without_native_host() {
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn generated_package_norma_json_facade_defers_runtime_codec() {
     let pkg = test_temp_dir("package-norma-json-formal-facade");
@@ -9900,6 +9980,7 @@ main {
 // Transitive library imports (norma: closure + interface provenance)
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "hir-rust")]
 fn repo_norma_source_file(relative_path: &str) -> PathBuf {
     radix::program::library_home()
         .expect("library home resolves in-tree")
@@ -9915,6 +9996,7 @@ fn write_temp_library_fixture(dir: &Path, relative_path: &str, source: &str) {
     fs::write(path, source).expect("write library fixture");
 }
 
+#[cfg(feature = "hir-rust")]
 fn seed_temp_library_text(library_home: &Path) {
     let source = repo_norma_source_file("text");
     let dest = library_home.join("norma/src/text.fab");
@@ -10065,6 +10147,7 @@ main {
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 fn transitive_test_diagnostic_facts(
     result: &radix::module::CompileResult,
 ) -> Vec<(Option<&str>, Option<&str>)> {
@@ -10075,6 +10158,7 @@ fn transitive_test_diagnostic_facts(
         .collect()
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn transitive_nested_lista_lista_textus_typechecks() {
     let library_home = test_temp_dir("transitive-nested-lista-library_home");
@@ -10112,6 +10196,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn transitive_import_text_via_fixture_library_compiles() {
     let library_home = test_temp_dir("transitive-chorda-library_home");
@@ -10247,6 +10332,7 @@ main {
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn transitive_library_diamond_dedupes_shared_dependency() {
     let library_home = test_temp_dir("transitive-diamond-library_home");
@@ -10406,6 +10492,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn publica_library_import_surfaces_as_nested_namespace_binding() {
     let library_home = test_temp_dir("publica-reexport-library_home");
@@ -10505,6 +10592,7 @@ main {
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn transitive_csv_text_closure_compiles_with_mixed_provenance() {
     let dir = test_temp_dir("transitive-csv-chorda");
@@ -10562,6 +10650,7 @@ main {
     assert!(!cargo.contains("norma = { path = "));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn transitive_csv_solve_empty_input_returns_vacua() {
     let dir = test_temp_dir("transitive-csv-empty");
@@ -10587,6 +10676,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn transitive_csv_solve_preserves_trailing_row() {
     let dir = test_temp_dir("transitive-csv-trailing");
@@ -10627,6 +10717,7 @@ fn use_package_compiler_keeps_rust_and_metal_fab_on_package_path() {
     assert!(!use_package_compiler(Target::HirTypeScript, fab, false));
 }
 
+#[cfg(feature = "mir-metal")]
 const EMIT_METAL_KERNEL_MODULE: &str = r#"+++
 locale = "en"
 +++
@@ -10638,6 +10729,7 @@ fn linear<size M, size K, size N>(tensor<f32, [M, K]> x, tensor<f32, [K, N]> w, 
 }
 "#;
 
+#[cfg(feature = "mir-metal")]
 const EMIT_METAL_HOST_CONSUMER: &str = r#"+++
 locale = "en"
 +++
@@ -10727,6 +10819,7 @@ entry = "main.fab"
     assert!(a.nodes.iter().any(|n| n.id.starts_with("rust:entry:")));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 #[ignore = "native library link e2e builds generated Rust; run with ignored integration checks"]
 fn g4_native_library_links_into_application_build() {
@@ -10888,6 +10981,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn g4_relative_lock_paths_resolve_against_app_package_root() {
     // Lock package_root/interface_root may be relative to the app that owns
@@ -11043,6 +11137,7 @@ entry = "main.fab"
     )));
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn g6_go3_single_entry_cli_package_compiles_and_go_builds() {
     let dir = test_temp_dir("g6-go3-true");
@@ -11118,6 +11213,7 @@ main args args exit 0 {
     assert_eq!(status.code(), Some(0), "true-style binary should exit 0");
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 
 fn g6_go4_multi_module_namespace_package_builds() {
@@ -11206,6 +11302,7 @@ main args args exit 0 {
     assert_eq!(status.code(), Some(0));
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn g6_consolum_shim_dedupes_across_units() {
     let dir = test_temp_dir("g6-consolum-dedupe");
@@ -11276,6 +11373,7 @@ main args args exit 0 {
     assert_eq!(status.code(), Some(0));
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn g6_go4_func_name_collision_fails_closed() {
     let dir = test_temp_dir("g6-go4-collision");
@@ -11331,6 +11429,7 @@ main args args exit 0 {
     );
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn g6_consolum_shim_supports_full_stdio_surface() {
     let dir = test_temp_dir("g6-consolum-surface");
@@ -11446,6 +11545,7 @@ main args args exit 0 {
 // compile calls must not exchange module output.
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "hir-go")]
 fn write_go_module_package(dir: &Path, pkg_name: &str, func_name: &str) {
     fs::create_dir_all(dir.join("src")).expect("src");
     fs::write(
@@ -11485,6 +11585,7 @@ main args args exit 0 {{
     .expect("entry");
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn go_compile_failed_call_carries_no_modules_and_leaves_no_side_channel() {
     // Two non-entry modules exporting the same function name fail closed at
@@ -11552,6 +11653,7 @@ main args args exit 0 {
     );
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
     let a = test_temp_dir("go-fbr-a");
@@ -11606,6 +11708,7 @@ fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
     );
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn go_compile_modules_stay_scoped_across_non_go_compiles() {
     let go_dir = test_temp_dir("go-fbr-scope");
@@ -11652,6 +11755,7 @@ entry = "main.fab"
     );
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn go_compile_concurrent_calls_do_not_exchange_modules() {
     let a = test_temp_dir("go-fbr-conc-a");
@@ -12368,6 +12472,7 @@ fn write_static_asset_roots(root: &Path) {
     fs::create_dir_all(root.join("public")).expect("public");
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web3_builds_controllers_json_and_browser_esm() {
     if Command::new("tsc").arg("--version").output().is_err() {
@@ -12604,6 +12709,7 @@ fn helper(d.Scope scope) → void {
     assert!(diagnostic_has_issue(&err, "product_controller_missing"));
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web3_builds_tela_origin_controllers_json_and_browser_esm() {
     // web-mig U2: a consumer that imports `tela:web` / `tela:dom` (instead of
@@ -12730,6 +12836,7 @@ fn helper(d.Scope scope) → void {}
     assert!(diagnostic_has_issue(&err, "product_controller_missing"));
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web3_rewrites_unresolved_def_controller_typescript() {
     // Imported nominal types (e.g. `dom.FrameState`, `dom.SubmitOptions`) have
@@ -12792,6 +12899,7 @@ fn submit_controller(d.Scope scope) → void {
 // FBR-P2-005: atomic browser product publication (Stage 3)
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "hir-ts")]
 fn assert_no_product_staging_temps(app: &Path, out_name: &str) {
     let prefix_tmp = format!(".{out_name}.faber.tmp-");
     let prefix_old = format!(".{out_name}.faber.old-");
@@ -12804,6 +12912,7 @@ fn assert_no_product_staging_temps(app: &Path, out_name: &str) {
     }
 }
 
+#[cfg(feature = "hir-ts")]
 fn sample_web_app() -> (TestDir, PathBuf) {
     let root = test_temp_dir("g10-web3-transaction");
     let lib = root.join("tela-lib");
@@ -12831,6 +12940,7 @@ fn shell(d.Scope scope) → void {
     (root, app)
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web3_failed_rebuild_keeps_previous_product_usable() {
     if Command::new("tsc").arg("--version").output().is_err() {
@@ -12896,6 +13006,7 @@ fn g10_web3_failed_rebuild_keeps_previous_product_usable() {
     assert_no_product_staging_temps(&app, "dist");
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web3_first_build_failure_leaves_no_partial_product() {
     if Command::new("tsc").arg("--version").output().is_err() {
@@ -13371,6 +13482,7 @@ fn simple_loss(
     );
 }
 
+#[cfg(feature = "device")]
 #[test]
 fn package_mir_runs_library_imported_companion_end_to_end() {
     // SEM004 + LIB-MIR seam: a consumer importing `testgrad:gradient` calls
@@ -13625,6 +13737,7 @@ main {
     assert_eq!(host.stdout_lines, vec!["9".to_owned()]);
 }
 
+#[cfg(feature = "device")]
 #[test]
 fn package_mir_runs_library_imported_companion_with_sub_companion() {
     // LIB-MIR blocker regression: a library primal that calls an unannotated
@@ -13724,6 +13837,7 @@ main {
     );
 }
 
+#[cfg(feature = "device")]
 #[test]
 fn package_mir_two_library_imports_with_nested_import_executes() {
     // Mirrors the real gradus consumer shape: two imports, the first library
@@ -13881,6 +13995,7 @@ fn web4_emit_crate(entry: &Path) -> (BuildLayout, super::RustRuntimePlan, String
     (layout, plan, code)
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn web4_lib_kind_package_emits_a_library_crate() {
     let pkg = web4_library_package("web4-lib-kind");
@@ -13903,6 +14018,7 @@ fn web4_lib_kind_package_emits_a_library_crate() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn web4_manifestless_file_without_entry_point_emits_a_library_crate() {
     let pkg = test_temp_dir("web4-no-main");
@@ -13918,6 +14034,7 @@ fn web4_manifestless_file_without_entry_point_emits_a_library_crate() {
     assert!(!src.join("main.rs").exists());
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn web4_file_with_entry_point_stays_a_binary_crate() {
     let pkg = test_temp_dir("web4-with-main");

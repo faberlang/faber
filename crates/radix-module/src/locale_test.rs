@@ -1565,6 +1565,7 @@ fn en_empty_named_binding_rhs_claims_as_marker() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn marker_named_bindings_warn_under_en_and_la_packs() {
     for (locale, source, issue) in [

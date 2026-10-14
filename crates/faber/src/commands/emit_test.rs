@@ -17,10 +17,17 @@ const CONSTS: &str = "+++\nlocale = \"en\"\n+++\n\n@ public\nconst int BASE = 5\
 
 const CONSTS_PRINTING: &str = "+++\nlocale = \"en\"\n+++\n\n@ public\nfn shout() \u{2192} int {\n    print 1\n    return 7\n}\n";
 
+#[cfg(feature = "hir-ts")]
 const COMPTIME_CONSUMER: &str = "+++\nlocale = \"en\"\n+++\n\nimport from \"./consts\" consts\n\nconst int G = comptime {\n    return consts.seven()\n}\n\nmain {\n    print G\n}\n";
 
 const FORBIDDEN_CONSUMER: &str = "+++\nlocale = \"en\"\n+++\n\nimport from \"./consts\" consts\n\nconst int G = comptime {\n    return consts.shout()\n}\n\nmain {\n    print G\n}\n";
 
+#[cfg(all(
+    feature = "hir-ts",
+    feature = "hir-go",
+    feature = "hir-python",
+    feature = "mir-wasm"
+))]
 const PLAIN_CONSUMER: &str = "+++\nlocale = \"en\"\n+++\n\nimport from \"./consts\" consts\n\nconst int D = consts.BASE * 2\n\nmain {\n    print D\n}\n";
 
 const UNDEFINED_NAME: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    print nomen_inexistens\n}\n";
@@ -78,6 +85,7 @@ fn fixture(dir: &Path, name: &str, source: &str) -> std::path::PathBuf {
     path
 }
 
+#[cfg(all(feature = "hir-ts", feature = "hir-go"))]
 #[test]
 fn emit_retry_folds_imported_comptime_for_ts_and_go() {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -147,6 +155,7 @@ fn emit_retry_skips_package_analysis_for_unrelated_error() {
     );
 }
 
+#[cfg(all(feature = "hir-ts", feature = "hir-go", feature = "hir-python", feature = "mir-wasm"))]
 #[test]
 fn emit_retry_matches_single_file_output_for_plain_imports() {
     let dir = tempfile::tempdir().expect("temp dir");
@@ -242,6 +251,7 @@ fn emit_retry_reports_forbidden_effect_once() {
     );
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn package_analysis_bindings_skip_non_wgsl_targets() {
     let dir = tempfile::tempdir().expect("temp dir");

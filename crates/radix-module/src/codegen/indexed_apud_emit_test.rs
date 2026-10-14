@@ -40,6 +40,7 @@ fn emit(target: Target, source: &str) -> String {
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_enumerates_lista_and_destructures_composite_keys() {
     let lista = emit(Target::HirRust, LISTA);
@@ -50,6 +51,7 @@ fn rust_enumerates_lista_and_destructures_composite_keys() {
     assert!(composite.contains("let (l_regio, l_annus) = "), "{composite}");
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn go_keys_composite_maps_by_comparable_array() {
     let lista = emit(Target::HirGo, LISTA);
@@ -64,6 +66,7 @@ fn go_keys_composite_maps_by_comparable_array() {
     assert!(composite.contains("rt.TupleParts("), "{composite}");
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn ts_builds_value_keyed_tuple_map() {
     let lista = emit(Target::HirTypeScript, LISTA);

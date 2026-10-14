@@ -311,6 +311,7 @@ functio loss() → numerus {
     }));
 }
 
+#[cfg(feature = "mir-wasm")]
 #[test]
 fn radix_lane_hir_direct_allows_explicit_mir_backed_target() {
     let source = r#"
@@ -341,6 +342,7 @@ functio direct() → numerus {
     assert!(output.code.contains(r#"(func $direct (export "direct")"#));
 }
 
+#[cfg(feature = "mir-wasm")]
 #[test]
 fn radix_lane_air_reaches_mir_backed_target_through_air() {
     let source = r#"
@@ -410,6 +412,7 @@ functio loss() → numerus {
     );
 }
 
+#[cfg(feature = "mir-wasm")]
 #[test]
 fn radix_lane_air_purity_no_longer_rejected_by_lane_check() {
     // `@ pure` on an AIR-lane function no longer triggers LANE001.
@@ -445,6 +448,7 @@ functio loss() → numerus {
     );
 }
 
+#[cfg(feature = "mir-llvm")]
 #[test]
 fn radix_lane_mir_reaches_mir_backed_target_policy() {
     let source = r#"
@@ -474,6 +478,7 @@ functio sum(numerus a, numerus b) → numerus {
 
 // -- target policy / modular word CLI gate --
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn go_target_policy_runs_for_programs_without_cli() {
     // F-047: non-Rust/Go targets must not silently skip target-policy dispatch.
@@ -486,6 +491,7 @@ fn go_target_policy_runs_for_programs_without_cli() {
     assert!(result.success(), "Go should compile simple incipit: {:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn go_cli_program_accepts_modular_word() {
     // D11.6 U6go: the Go modular-word gate is lifted on the CLI-program path
@@ -511,6 +517,7 @@ incipit argumenta args {
     );
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn go_program_accepts_modular_word() {
     let session = test_session(Target::HirGo);
@@ -520,6 +527,7 @@ fn go_program_accepts_modular_word() {
     assert!(result.success(), "Go with modulus must compile: {:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn typescript_target_policy_does_not_silently_fail() {
     // F-047 regression: the old _ => {} catch-all silently swallowed
@@ -539,6 +547,7 @@ fn typescript_target_policy_does_not_silently_fail() {
 
 // -- basic compile success --
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_rust_success_emits_output() {
     let session = test_session(Target::HirRust);
@@ -563,6 +572,7 @@ fn compile_faber_success_emits_output() {
     assert!(result.output.is_some(), "expected some output, got none");
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn compile_typescript_success_emits_output() {
     let session = test_session(Target::HirTypeScript);
@@ -596,6 +606,7 @@ fn typescript_output_preserves_diagnostic_severity() {
 
 // -- backward integration --
 
+#[cfg(feature = "mir-llvm")]
 #[test]
 fn air_lane_backward_generation_merges_companion_into_mir_program() {
     let source = r#"
@@ -642,6 +653,7 @@ functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
 
 // -- MIR / codegen diagnostics --
 
+#[cfg(feature = "mir-llvm")]
 #[test]
 fn mir_lowering_error_carries_source_span() {
     let session = test_session(Target::MirLlvm);
@@ -866,6 +878,7 @@ incipit {
     assert!(result.output.is_none(), "promoted warning must stop codegen output");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn deny_all_does_not_promote_two_operand_concat() {
     use crate::driver::{Config, Session, WarnPolicy};
@@ -911,6 +924,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn deny_all_does_not_promote_pure_variable_chain() {
     use crate::driver::{Config, Session, WarnPolicy};
@@ -1030,6 +1044,7 @@ functio _auxilium() → numerus { redde 1 }
 incipit { nota _auxilium() }
 ";
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn leading_underscore_is_warning_by_default() {
     use crate::driver::{Config, Session};

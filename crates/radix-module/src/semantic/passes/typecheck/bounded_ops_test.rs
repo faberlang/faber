@@ -6,6 +6,7 @@ use super::test_support::{assert_accepts_la, assert_rejects_with_issue_la};
 const EXACT_EQ_ISSUE: &str = "equality_exact_types_required";
 const FAILABLE_ISSUE: &str = "failable_call_requires_handler";
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bounded_ops_longitudo_and_vacua_are_len_not_capacity() {
     assert_accepts_la(
@@ -39,6 +40,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bounded_ops_accipe_and_sectio_typecheck() {
     assert_accepts_la(
@@ -113,6 +115,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bounded_ops_appende_propagates_on_textus_channel() {
     assert_accepts_la(
@@ -144,6 +147,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bounded_ops_equality_ignores_spare_slots() {
     // Same initialized prefix, independently converted so spare `len..N` is

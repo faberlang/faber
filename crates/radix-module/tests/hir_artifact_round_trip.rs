@@ -214,6 +214,7 @@ fn run_round_trip(fixture_path: &str, session: &Session, surface: &KeywordSurfac
 /// fixture would expose it.
 ///
 /// F23: Swift excluded from library-import (import emission not yet supported).
+#[cfg(all(feature = "hir-rust", feature = "hir-ts", feature = "hir-go", feature = "hir-swift"))]
 #[test]
 fn hir_artifact_round_trip_library_import() {
     let config = Config::default().with_dev_locale_root();
@@ -234,6 +235,7 @@ fn hir_artifact_round_trip_library_import() {
 /// (minus F23 exclusions).
 ///
 /// F23: Swift excluded from generics (Param type not yet supported).
+#[cfg(all(feature = "hir-rust", feature = "hir-ts", feature = "hir-go", feature = "hir-swift"))]
 #[test]
 fn hir_artifact_round_trip_all() {
     let config = Config::default().with_dev_locale_root();

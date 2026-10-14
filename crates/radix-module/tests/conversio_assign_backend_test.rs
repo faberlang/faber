@@ -101,7 +101,7 @@ fn emit_swift(source: &str) -> String {
     }
 }
 
-#[cfg(any(feature = "hir-rust", feature = "hir-ts"))]
+#[cfg(any(feature = "hir-rust", feature = "hir-ts", feature = "hir-faber"))]
 fn count_occurrences(haystack: &str, needle: &str) -> usize {
     haystack.matches(needle).count()
 }

@@ -5,11 +5,13 @@
 
 use super::library_resolver_from_config;
 use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
+#[cfg(feature = "hir-rust")]
 use radix::module::Output;
 use radix::module::driver::Config;
 use radix::module::locale::LocalePack;
 use radix::program::analyze::AnalysisSeams;
 use radix::program::discovery::PackageSpec;
+#[cfg(feature = "hir-rust")]
 use radix::program::emit::{
     compile_package as compile_package_direct,
     compile_package_with_test_options as compile_package_with_test_options_direct,
@@ -24,10 +26,12 @@ fn seams() -> AnalysisSeams {
     crate::package::faber_analysis_seams()
 }
 
+#[cfg(feature = "hir-rust")]
 fn compile_with_faber_seams(config: &Config, input: &Path) -> radix::module::CompileResult {
     compile_package_direct(config, input, &crate::package::faber_emission_seams())
 }
 
+#[cfg(feature = "hir-rust")]
 fn compile_with_test_options(
     config: &Config,
     input: &Path,
@@ -434,6 +438,7 @@ fn proba_filter_include_selects_only_matching_proba() {
     assert_eq!(proba_names, vec!["math.proba".to_owned()]);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_build_path_ignores_adjacent_proba() {
     let dir = test_temp_dir("proba-build-ignore");
@@ -454,6 +459,7 @@ this is not valid faber
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_test_path_includes_proba_with_helpers() {
     let dir = test_temp_dir("proba-compile-test");
@@ -535,6 +541,7 @@ fn norma_src_proba_is_discovered_beside_product_sources() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn norma_style_proba_loads_with_local_product_import() {
     // Mirrors norma/src layout: product .fab + colocated .proba importing it.

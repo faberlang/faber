@@ -425,6 +425,7 @@ fn display_tokens_survive_the_fhir_round_trip() {
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn selective_import_rust_emit_is_identical_after_load() {
     // Pins the emitted form: an unused private selective import is not
@@ -1674,7 +1675,8 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
 
 #[test]
 fn struct_field_type_sites_remap_to_struct_owner_once() {
-    use crate::hir::serialize::{from_analyzed, normalize_presentation_witnesses};
+    use crate::hir::presentation_witness::normalize_presentation_witnesses;
+    use crate::hir::serialize::from_analyzed;
     use radix_hir::{HirItemKind, HirOwnerRef, HirTypeSite, HirTypeSlot};
 
     let source = "class Point {\n    var int x\n    var int y\n}\n\
@@ -1747,6 +1749,7 @@ fn struct_field_type_sites_remap_to_struct_owner_once() {
     );
 }
 
+#[cfg(all(feature = "hir-rust", feature = "hir-ts", feature = "hir-go", feature = "hir-swift"))]
 #[test]
 fn hir_artifact_round_trip_acceptance() {
     // Source matching the hello-world fixture.
@@ -1795,7 +1798,7 @@ fn hir_artifact_round_trip_acceptance() {
     }
 }
 
-#[cfg(feature = "runner")]
+#[cfg(all(feature = "runner", feature = "hir-rust"))]
 #[test]
 fn runtime_tensor_shape_boundary_survives_fhir_round_trip_and_recovers() {
     use crate::codegen::{Target, generate_from_analyzed};
@@ -1973,6 +1976,7 @@ fn tensor_edge_policy_facts_survive_fhir_round_trip() {
     assert_eq!(provider.shape_obligations, unit.shape_obligations);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn imported_tensor_policy_callback_identity_survives_fhir_round_trip() {
     use crate::codegen::{Target, generate_from_analyzed};

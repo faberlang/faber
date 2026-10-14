@@ -136,6 +136,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_regex_conversio_compiles_through_the_runtime_constructor() {
     // RD-1/RD-9: the conversion is the one compile point and it is failable;

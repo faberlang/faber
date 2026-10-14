@@ -7,9 +7,18 @@ fn has(path: &str) -> bool {
         .any(|(relative, _)| *relative == path)
 }
 
+/// The in-tree Rust runtime manifest. `build.rs` embeds a runtime root only
+/// when the tree has it (a checkout without the target runtimes has none).
+fn in_tree_rust_runtime() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtime/rust/Cargo.toml")
+}
+
 #[test]
 fn table_carries_runtime_and_host_abi_manifests() {
-    assert!(has("runtime/rust/Cargo.toml"));
+    assert_eq!(
+        has("runtime/rust/Cargo.toml"),
+        in_tree_rust_runtime().is_file()
+    );
     assert!(has("crates/radix-abi/Cargo.toml"));
     assert!(
         EMBEDDED_RUNTIME
@@ -25,12 +34,14 @@ fn embedded_root_materializes_once_and_matches_in_tree_sources() {
     // An explicit cache directory, not the process-wide env var: other tests
     // resolve the runtime concurrently and must not see this temp dir.
     let root = embedded_runtime_root_in(cache.path()).expect("embedded root");
-    assert!(is_support_runtime_root(&root));
-    let in_tree = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtime/rust/Cargo.toml");
-    assert_eq!(
-        fs::read(root.join("runtime/rust/Cargo.toml")).expect("extracted"),
-        fs::read(in_tree).expect("in-tree"),
-    );
+    let in_tree = in_tree_rust_runtime();
+    assert_eq!(is_support_runtime_root(&root), in_tree.is_file());
+    if in_tree.is_file() {
+        assert_eq!(
+            fs::read(root.join("runtime/rust/Cargo.toml")).expect("extracted"),
+            fs::read(in_tree).expect("in-tree"),
+        );
+    }
     assert!(root.join("crates/radix-abi/Cargo.toml").is_file());
 
     // Norma travels with the binary: a relocated root (a temp cache, no

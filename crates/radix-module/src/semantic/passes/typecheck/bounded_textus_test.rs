@@ -12,6 +12,7 @@ fn rust_code(result: crate::CompileResult) -> String {
     output.code
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bounded_textus_scalar_index_emits_o1_ascii_one() {
     let result = compile_and_get_result_la(
@@ -87,6 +88,7 @@ incipit {
 /// Go carries bounded text as plain Go text with the capacity erased at the
 /// type and checked at conversions (need, sb425): it no longer
 /// declines with `go_type_unsupported`.
+#[cfg(feature = "hir-go")]
 #[test]
 fn bounded_textus_is_carried_on_go() {
     let source = r"functio probe(textus<32> xs) → ascii<1> {

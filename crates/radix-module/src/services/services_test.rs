@@ -56,6 +56,7 @@ fn compile_shader_contract_source_fixture() -> crate::CompileResult {
     compile_cli_path(&shader_contract_source_fixture_path(), false, crate::codegen::Target::MirWgsl)
 }
 
+#[cfg(feature = "mir-wgsl")]
 fn wgsl_output_reflection(result: crate::CompileResult) -> (String, crate::mir::MirGpuReflection) {
     let output = result.output.expect("wgsl output");
     let crate::Output::WgslText(wgsl_output) = &output else {
@@ -80,6 +81,7 @@ fn assert_json_object_keys(value: &serde_json::Value, expected: &[&str]) {
     assert_eq!(actual, expected, "json object keys");
 }
 
+#[cfg(all(feature = "hir-rust", feature = "hir-ts"))]
 #[test]
 fn cmd_targets_rust_scena_typescript_capabilities() {
     let rust = target_capabilities(crate::codegen::Target::HirRust);
@@ -260,6 +262,7 @@ fn faber_surface_fhir_row_is_package_and_run_capable() {
     );
 }
 
+#[cfg(feature = "mir-llvm")]
 #[test]
 fn cmd_targets_llvm_host_and_llvm_text_keep_separate_rows() {
     // The emit-only llvm-text row keeps run/package off the radix surface;
@@ -690,6 +693,7 @@ functio add_one(f32 x) → f32 {
     (json, reflection)
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_top_level_string_fields() {
     let (json, _reflection) = gpu_reflection_fixture();
@@ -712,6 +716,7 @@ fn emit_reflection_json_top_level_string_fields() {
     assert!(json.contains(r#""dispatch_size""#), "{json}");
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_kernel_metadata() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -726,6 +731,7 @@ fn emit_reflection_json_kernel_metadata() {
     assert_eq!(kernel["launch"]["shader_stage"], serde_json::json!("compute"));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_pipeline_layout() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -750,6 +756,7 @@ fn emit_reflection_json_pipeline_layout() {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_bind_group_resource_metadata_arrays() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -775,6 +782,7 @@ fn emit_reflection_json_bind_group_resource_metadata_arrays() {
     assert_eq!(bg["buffer_binding_type_count"], serde_json::json!(3));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_bind_group_buffer_metadata() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -790,6 +798,7 @@ fn emit_reflection_json_bind_group_buffer_metadata() {
     assert_eq!(bg["min_binding_size_count"], serde_json::json!(3));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_bind_group_dynamic_offset_flags() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -801,6 +810,7 @@ fn emit_reflection_json_bind_group_dynamic_offset_flags() {
     assert_eq!(bg["offset_mode_entry_count"], serde_json::json!(3));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_bind_group_offset_mode_summaries() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -814,6 +824,7 @@ fn emit_reflection_json_bind_group_offset_mode_summaries() {
     assert_eq!(bg["has_only_dynamic_offsets"], serde_json::json!(false));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_bind_group_non_dynamic_offset_details() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -828,6 +839,7 @@ fn emit_reflection_json_bind_group_non_dynamic_offset_details() {
     assert_eq!(bg["non_dynamic_offset_layout_entry_index_count"], serde_json::json!(3));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_bind_group_dynamic_offset_details() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -842,6 +854,7 @@ fn emit_reflection_json_bind_group_dynamic_offset_details() {
     assert_eq!(bg["dynamic_offset_layout_entry_index_count"], serde_json::json!(0));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_bind_group_indexes_and_sources() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -859,6 +872,7 @@ fn emit_reflection_json_bind_group_indexes_and_sources() {
     assert_eq!(bg["layout_entry_count"], serde_json::json!(3));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_layout_entries_input() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -875,6 +889,7 @@ fn emit_reflection_json_layout_entries_input() {
     assert_eq!(entries[0]["source_name"], serde_json::json!("x"));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_layout_entries_output() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -891,6 +906,7 @@ fn emit_reflection_json_layout_entries_output() {
     assert_eq!(entries[1]["source_name"], serde_json::Value::Null);
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_bindings_input() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -917,6 +933,7 @@ fn emit_reflection_json_bindings_input() {
     assert_eq!(b["has_dynamic_offset"], serde_json::json!(false));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_bindings_output() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -933,6 +950,7 @@ fn emit_reflection_json_bindings_output() {
     assert_eq!(b["has_dynamic_offset"], serde_json::json!(false));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_webgpu_adapter_top_level_keys() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -960,6 +978,7 @@ fn emit_reflection_json_webgpu_adapter_top_level_keys() {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_webgpu_pipeline_layout_descriptor() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -978,6 +997,7 @@ fn emit_reflection_json_webgpu_pipeline_layout_descriptor() {
     assert_eq!(pd["bind_group_layout_index_count"], serde_json::json!(1));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_webgpu_descriptor_counts() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -991,6 +1011,7 @@ fn emit_reflection_json_webgpu_descriptor_counts() {
     assert_eq!(webgpu["bind_group_descriptor_index_count"], serde_json::json!(1));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_webgpu_bind_group_layout_descriptor() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -1014,6 +1035,7 @@ fn emit_reflection_json_webgpu_bind_group_layout_descriptor() {
     assert_eq!(ld["entry_count"], serde_json::json!(3));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_webgpu_layout_entry_input() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -1052,6 +1074,7 @@ fn emit_reflection_json_webgpu_layout_entry_input() {
     assert_eq!(le["source_name"], serde_json::json!("x"));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_webgpu_layout_entry_output() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -1089,6 +1112,7 @@ fn emit_reflection_json_webgpu_layout_entry_output() {
     assert_eq!(le["source_name"], serde_json::Value::Null);
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_webgpu_bind_group_descriptor() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -1112,6 +1136,7 @@ fn emit_reflection_json_webgpu_bind_group_descriptor() {
     assert_eq!(bgd["entry_count"], serde_json::json!(3));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_webgpu_bind_group_entry_input() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -1165,6 +1190,7 @@ fn emit_reflection_json_webgpu_bind_group_entry_input() {
     assert_eq!(entry["source_name"], serde_json::json!("x"));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_webgpu_bind_group_entry_output() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -1217,6 +1243,7 @@ fn emit_reflection_json_webgpu_bind_group_entry_output() {
     assert_eq!(entry["source_name"], serde_json::Value::Null);
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_webgpu_dispatch_and_builtins() {
     let (_json, reflection) = gpu_reflection_fixture();
@@ -1234,6 +1261,7 @@ fn emit_reflection_json_webgpu_dispatch_and_builtins() {
     assert_eq!(kernel["launch"]["called_builtins"], serde_json::json!([]));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn gpu_builtin_emit_reflection_json_serializes_source_names_for_builtin_inputs() {
     let source = r"
@@ -1301,6 +1329,7 @@ functio copy(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 global_invocat
     }
 }
 
+#[cfg(feature = "mir-metal")]
 #[test]
 fn emit_reflection_json_serializes_metal_target_contract() {
     let reflection = crate::mir::MirGpuReflection { kernels: Vec::new(), pipeline: None };
@@ -1349,6 +1378,7 @@ fn validate_wgsl_with_naga(source: &str, fixture_name: &str) {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_serializes_vertex_input_layout_fact() {
     let vertex = crate::mir::MirKernelReflection::vertex_entry(
@@ -1389,6 +1419,7 @@ fn emit_reflection_json_serializes_vertex_input_layout_fact() {
     assert_eq!(input["stride_bytes"], serde_json::json!(12));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn shader_contract_source_vertex_entry_emits_wgsl_contract() {
     let result = compile_shader_contract_source_fixture();
@@ -1407,6 +1438,7 @@ fn shader_contract_source_vertex_entry_emits_wgsl_contract() {
     assert!(wgsl.contains("@builtin(position) position: vec4<f32>"));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn shader_contract_source_vertex_entry_validates_with_naga() {
     let result = compile_shader_contract_source_fixture();
@@ -1420,6 +1452,7 @@ fn shader_contract_source_vertex_entry_validates_with_naga() {
     validate_wgsl_with_naga(&wgsl, "shader-contract-source-vertex-entry");
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn shader_contract_source_vertex_entry_emits_validated_wgsl_through_cli_path() {
     let result = compile_shader_contract_source_fixture();
@@ -1454,6 +1487,7 @@ fn shader_contract_source_vertex_entry_emits_validated_wgsl_through_cli_path() {
     validate_wgsl_with_naga(&wgsl_output.code, "shader-contract-cli-path-vertex-entry");
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_vertex_names_ignore_assertion_message_text() {
     let source = include_str!("../fixtures/shader-contract-source-facts.fab")
@@ -1512,6 +1546,7 @@ fn assert_shader_contract_vertex_source_variant_rejects(source: &str, issue: &st
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_annotation_payload() {
     let source = include_str!("../fixtures/shader-contract-source-facts.fab")
@@ -1520,6 +1555,7 @@ fn wgsl_text_source_vertex_entry_rejects_annotation_payload() {
     assert_shader_contract_vertex_source_variant_rejects(&source, "mir_wgsl_vertex_source_annotation_payload");
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_parameters() {
     let source = include_str!("../fixtures/shader-contract-source-facts.fab").replace(
@@ -1530,6 +1566,7 @@ fn wgsl_text_source_vertex_entry_rejects_parameters() {
     assert_shader_contract_vertex_source_variant_rejects(&source, "mir_wgsl_vertex_source_params");
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_non_vacuum_return() {
     // The source body now lowers far enough for WGSL entry validation to report
@@ -1542,6 +1579,7 @@ fn wgsl_text_source_vertex_entry_rejects_non_vacuum_return() {
     assert_shader_contract_vertex_source_variant_rejects(&source, "mir_wgsl_vertex_source_return");
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_error_type() {
     let source = include_str!("../fixtures/shader-contract-source-facts.fab").replace(
@@ -1580,6 +1618,7 @@ fn wgsl_text_source_vertex_entry_accepts_non_empty_body() {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_missing_layout_facts() {
     let source = r"
@@ -1600,6 +1639,7 @@ functio lonely_vertex() → vacuum {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_layout_without_position() {
     let source = include_str!("../fixtures/shader-contract-source-facts.fab").replace(
@@ -1652,6 +1692,7 @@ fn wgsl_text_source_vertex_entry_rejects_duplicate_layout_location() {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn shader_contract_vertex_layout_facts_extracted_correctly() {
     // U2's identity-resolved ingestion extracts the three vertex-layout
@@ -1686,6 +1727,7 @@ fn shader_contract_vertex_layout_facts_extracted_correctly() {
     assert_eq!(inputs[2].step_mode, crate::mir::MirInputStepMode::Vertex);
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn shader_contract_vertex_layout_reflection_json_matches_pinned_shape() {
     // JSON pin: the generic shader-contract path must serialize to the frozen
@@ -1785,6 +1827,7 @@ fn shader_contract_vertex_layout_reflection_json_matches_pinned_shape() {
     assert_eq!(vertex_layouts[2]["attributes"][0]["source_name"], serde_json::json!("uv"));
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_json_serializes_deferred_gpu_builtin_facts() {
     let mut types = crate::semantic::TypeTable::new();
@@ -1874,6 +1917,7 @@ fn emit_reflection_json_serializes_deferred_gpu_builtin_facts() {
     assert_eq!(inputs[2]["layout"], serde_json::json!("u32"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn emit_reflection_json_rejects_non_gpu_output() {
     let result = compile_cli_source("main.fab", "incipit {}", crate::codegen::Target::HirRust);
@@ -2077,6 +2121,7 @@ function f0 -> ty#1 {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_annotation_payload() {
     let source = r#"
@@ -2097,6 +2142,7 @@ functio bad_fragment() → vacuum {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_parameters() {
     let source = r"
@@ -2117,6 +2163,7 @@ functio bad_fragment(numerus x) → vacuum {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_non_vacuum_return() {
     let source = r"
@@ -2138,6 +2185,7 @@ functio bad_fragment() → numerus {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_error_type() {
     let source = r"
@@ -2183,6 +2231,7 @@ functio ok_fragment() → vacuum {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 fn assert_wgsl_body_reads_uv(fixture: &str, name: &str, source: &str) {
     let (_td, file) = temp_fab(name, source);
     let path = PathBuf::from(&file);
@@ -2202,6 +2251,7 @@ fn assert_wgsl_body_reads_uv(fixture: &str, name: &str, source: &str) {
     validate_wgsl_with_naga(&wgsl_output.code, fixture);
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_fragment_body_reads_uv() {
     assert_wgsl_body_reads_uv(
@@ -2211,6 +2261,7 @@ fn wgsl_text_fragment_body_reads_uv() {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_vertex_body_reads_uv() {
     assert_wgsl_body_reads_uv(
@@ -2220,6 +2271,7 @@ fn wgsl_text_vertex_body_reads_uv() {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_multiple_entries() {
     let source = r"

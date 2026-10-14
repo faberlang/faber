@@ -9,6 +9,7 @@ use crate::test_support::{assert_compile_fails_with_issue, test_session};
 const HOLE_LIST: &str =
     "+++\nlocale = \"en\"\n+++\n\nmain {\n    const list<_> a ← list<_>[1, 2]\n    print a.length()\n}\n";
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn partial_hole_list_compiles() {
     let session = test_session(Target::HirRust);
@@ -27,6 +28,7 @@ fn partial_hole_list_runs_on_the_mir_runner() {
 
 const HOLE_TUPLE: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    const tuple<_, string> t \u{2190} tuple<_, string>[1, \"x\"]\n    print t[1]\n}\n";
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn partial_hole_tuple_compiles() {
     let session = test_session(Target::HirRust);

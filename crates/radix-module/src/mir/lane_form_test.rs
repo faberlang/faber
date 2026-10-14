@@ -254,6 +254,7 @@ fn lane_id_and_grid_arithmetic_are_u32_while_binders_stay_int() {
 /// Gpu-reset C4-2g: the lane-form `copy` passes the device admission gate
 /// (its linear address is bounded by an extent-product condition) and reaches
 /// the Metal lane emitter (C4-2f), which emits it.
+#[cfg(feature = "mir-metal")]
 #[test]
 fn lane_form_copy_is_admitted_and_emits_on_metal() {
     let msl = crate::mir::test_support::compile_metal_text(&english(COPY))

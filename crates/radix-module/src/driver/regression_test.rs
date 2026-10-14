@@ -218,6 +218,7 @@ fn faber_output_prefers_compact_closure_syntax() {
     assert!(!output.code.contains("clausura numerus x"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compact_fac_closure_body_typechecks_with_redde() {
     let session = test_session(Target::HirRust);
@@ -277,6 +278,7 @@ fn contextual_compact_fac_closure_rejects_redde_without_local_return_type() {
     );
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn compact_fac_closure_accepts_iace_with_explicit_error_channel() {
     let session = test_session(Target::HirTypeScript);
@@ -382,6 +384,7 @@ fn legacy_block_closure_rejects_redde_without_explicit_return_type() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn legacy_block_closure_body_typechecks_with_redde() {
     let session = test_session(Target::HirRust);
@@ -439,6 +442,7 @@ incipit {
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn itera_de_array_index_no_longer_leaves_infer_types() {
     let session = test_session(Target::HirRust);
@@ -457,6 +461,7 @@ fn itera_de_array_index_no_longer_leaves_infer_types() {
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn itera_ab_range_no_longer_leaves_infer_types() {
     let session = test_session(Target::HirRust);
@@ -474,6 +479,7 @@ fn itera_ab_range_no_longer_leaves_infer_types() {
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn itera_ab_inclusive_range_glyph_compiles() {
     let session = test_session(Target::HirRust);
@@ -509,6 +515,7 @@ fn deferred_local_assignment_can_drive_inference() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_supports_extended_binary_operators() {
     let session = test_session(Target::HirRust);
@@ -529,6 +536,7 @@ fn compile_supports_extended_binary_operators() {
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_supports_extended_unary_operators() {
     let session = test_session(Target::HirRust);
@@ -552,6 +560,7 @@ fn compile_supports_extended_unary_operators() {
 
 // ── proba lowering ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_lowers_top_level_proba_to_rust_test_function() {
     let session = test_session(Target::HirRust);
@@ -571,6 +580,7 @@ incipit {}"#;
     assert!(output.code.contains("fn proba_"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_lowers_proba_omit_and_futurum_as_ignored_tests() {
     let session = test_session(Target::HirRust);
@@ -629,6 +639,7 @@ fn compile_lowers_probandum_nested_cases_without_lowering_errors() {
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_probandum_hooks_scope_local_to_suite_and_omnia_to_nested() {
     let session = test_session(Target::HirRust);
@@ -706,6 +717,7 @@ genus Point {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn typed_constructor_uses_type_namespace_after_value_shadowing() {
     let session = test_session(Target::HirRust);
@@ -727,6 +739,7 @@ functio main() → vacuum {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn object_destructured_aliases_can_be_used_in_arithmetic() {
     let session = test_session(Target::HirRust);
@@ -792,6 +805,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn repeated_owned_calls_no_longer_report_use_after_move() {
     let session = test_session(Target::HirRust);
@@ -830,6 +844,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn assignment_and_tempta_flow_no_longer_report_use_after_move() {
     let session = test_session(Target::HirRust);
@@ -860,6 +875,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() {
     let session = test_session(Target::HirRust);
@@ -900,6 +916,7 @@ fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() 
 
 // ── typed vacua / context-free vacua ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn typed_vacua_inhabits_declared_empty_collections() {
     let session = test_session(Target::HirRust);
@@ -936,6 +953,7 @@ fn context_free_vacua_requires_declared_type() {
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn cursor_iteration_accumulator_from_empty_array_no_longer_reports_inference_error() {
     let session = test_session(Target::HirRust);
@@ -964,6 +982,7 @@ incipit {
 
 // ── optional chain / nullable ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn optional_chain_no_longer_reports_lowering_stub() {
     let session = test_session(Target::HirRust);
@@ -989,6 +1008,7 @@ incipit {
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_emits_option_map_and_and_then_for_optional_chain() {
     let session = test_session(Target::HirRust);
@@ -1075,6 +1095,7 @@ incipit {
 
 // ── optional coalesce / nullable fields ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_emits_coalesce_unwrap() {
     let session = test_session(Target::HirRust);
@@ -1090,6 +1111,7 @@ fn rust_output_emits_coalesce_unwrap() {
     assert!(output.code.contains(".unwrap_or("));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_wraps_sponte_fields_in_verte_struct_literals() {
     let session = test_session(Target::HirRust);
@@ -1158,6 +1180,7 @@ incipit {
 
 // ── ignotum / type system ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn ignotum_callee_no_longer_reports_not_callable() {
     let session = test_session(Target::HirRust);
@@ -1200,6 +1223,7 @@ incipit {
     }));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn ordo_exemplum_no_longer_reports_elige_literal_error() {
     let session = test_session(Target::HirRust);
@@ -1255,6 +1279,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn nullable_union_type_forms_are_canonicalized() {
     let session = test_session(Target::HirRust);
@@ -1325,6 +1350,7 @@ fn degenerate_nihil_only_union_is_rejected() {
 
 // ── additional regression / unused/feature-gated tests ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn array_method_call_no_longer_reports_non_struct_member_error() {
     let session = test_session(Target::HirRust);
@@ -1338,6 +1364,7 @@ fn array_method_call_no_longer_reports_non_struct_member_error() {
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn interface_method_call_no_longer_reports_non_struct_member_error() {
     let session = test_session(Target::HirRust);
@@ -1360,6 +1387,7 @@ incipit {
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compact_inferred_closure_argument_uses_expected_method_signature() {
     let session = test_session(Target::HirRust);
@@ -1464,6 +1492,7 @@ incipit {
 
 // ── misc: quidlibet, conversio type params, verte_vel ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn quidlibet_container_annotation_no_longer_reports_unknown_type() {
     let session = test_session(Target::HirRust);
@@ -1482,6 +1511,7 @@ fn quidlibet_container_annotation_no_longer_reports_unknown_type() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn conversio_type_params_no_longer_report_unknown_type() {
     let session = test_session(Target::HirRust);
@@ -1500,6 +1530,7 @@ fn conversio_type_params_no_longer_report_unknown_type() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn verte_vel_no_longer_reports_invalid_cast() {
     let session = test_session(Target::HirRust);
@@ -1524,6 +1555,7 @@ fn verte_vel_no_longer_reports_invalid_cast() {
 
 // ── Rust output patterns ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_converts_textus_literals_to_owned_strings() {
     let session = test_session(Target::HirRust);
@@ -1559,6 +1591,7 @@ incipit {
     assert!(output.code.contains("unwrap_or(\"x\".to_string())"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_wraps_optional_local_initializers_in_some() {
     let session = test_session(Target::HirRust);
@@ -1579,6 +1612,7 @@ fn rust_output_wraps_optional_local_initializers_in_some() {
     assert!(output.code.contains("let l_maybe: Option<String> = None;"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_or_for_option_coalesce() {
     let session = test_session(Target::HirRust);
@@ -1595,6 +1629,7 @@ fn rust_output_uses_or_for_option_coalesce() {
     assert!(output.code.contains(".or("));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_debug_format_for_collection_scribe() {
     let session = test_session(Target::HirRust);
@@ -1609,6 +1644,7 @@ fn rust_output_uses_debug_format_for_collection_scribe() {
     assert!(output.code.contains("println!(\"{l_names:?}\");"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_scalar_display_helpers_for_scribe() {
     let session = test_session(Target::HirRust);
@@ -1632,6 +1668,7 @@ fn rust_output_uses_scalar_display_helpers_for_scribe() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_avoids_redundant_parentheses_in_common_contexts() {
     let session = test_session(Target::HirRust);
@@ -1664,6 +1701,7 @@ incipit {
     assert!(!user_code.contains("sum((x * 2), (x + 1))"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_normalizes_relative_import_paths() {
     let session = test_session(Target::HirRust);
@@ -1687,6 +1725,7 @@ incipit {
     assert!(!output.code.contains(".::"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn ego_field_access_no_longer_reports_non_struct_member_error() {
     let session = test_session(Target::HirRust);
@@ -1707,6 +1746,7 @@ incipit {
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn typed_array_index_assignment_no_longer_reports_assignment_type_mismatch() {
     let session = test_session(Target::HirRust);
@@ -1728,6 +1768,7 @@ fn typed_array_index_assignment_no_longer_reports_assignment_type_mismatch() {
 
 // ── format/scriptum emission ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_format_macro_for_scriptum() {
     let session = test_session(Target::HirRust);
@@ -1742,6 +1783,7 @@ fn rust_output_uses_format_macro_for_scriptum() {
     assert!(output.code.contains("println!(\"valor: {l_value}\");"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_zero_based_numbered_scriptum_placeholders() {
     let session = test_session(Target::HirRust);
@@ -1761,6 +1803,7 @@ fn rust_output_uses_zero_based_numbered_scriptum_placeholders() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_string_literal_format_application() {
     let session = test_session(Target::HirRust);
@@ -1775,6 +1818,7 @@ fn rust_output_uses_string_literal_format_application() {
     assert!(output.code.contains("println!(\"valor: {l_value}\");"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_numbered_string_literal_format_application() {
     let session = test_session(Target::HirRust);
@@ -1794,6 +1838,7 @@ fn rust_output_uses_numbered_string_literal_format_application() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_supports_unicode_textus_index_and_range_slice() {
     let session = test_session(Target::HirRust);
@@ -1812,6 +1857,7 @@ fn rust_output_supports_unicode_textus_index_and_range_slice() {
     assert!(output.code.contains("faber::textus::char_window("));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_compile_accepts_explicit_infer_type_marker() {
     let session = test_session(Target::HirRust);
@@ -1967,6 +2013,7 @@ fn hir_smoke_regression_guard_typescript_rejects_mangled_emit() {
 /// rejected by the then-current compiler (`SEM010`). The restriction no longer
 /// exists; this test pins the positive behavior so the gate stays open and a
 /// factored `forward` call remains legal inside a training loop.
+#[cfg(feature = "mir-llvm")]
 #[test]
 fn tensor_returning_function_call_in_itera_loop_compiles() {
     let source = r"

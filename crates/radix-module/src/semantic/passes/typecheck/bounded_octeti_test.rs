@@ -12,6 +12,7 @@ fn rust_code(result: crate::CompileResult) -> String {
     output.code
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bounded_octeti_is_not_bare_octeti_and_keeps_n_in_emit() {
     let result = compile_and_get_result_la(
@@ -37,6 +38,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bounded_octeti_scalar_index_is_o1_live_byte() {
     let result = compile_and_get_result_la(
@@ -64,6 +66,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bounded_octeti_conversions_follow_d7() {
     let diagnostics = analyze_and_get_diagnostics_la(
@@ -158,6 +161,7 @@ incipit {
 /// Go carries bounded octeti as a plain byte slice with the capacity erased at
 /// the type and checked at conversions (need, sb425): it no longer
 /// declines with `go_type_unsupported`.
+#[cfg(feature = "hir-go")]
 #[test]
 fn bounded_octeti_is_carried_on_go() {
     let source = r"functio probe(lista<b8, 8> xs) → u8 {

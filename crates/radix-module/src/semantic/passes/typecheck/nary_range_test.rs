@@ -119,6 +119,7 @@ functio zip(lista<numerus> xs, lista<numerus> ys) → vacuum {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_target_emits_the_range_product_through_the_driver() {
     // NR-4 settled contract: the Rust target emits the Cartesian product as

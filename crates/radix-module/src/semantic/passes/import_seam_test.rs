@@ -212,6 +212,7 @@ fn different_package_roots_are_cross_seam() {
     assert_eq!(seam_from_flag(false), ImportSeam::CrossPackage);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn module_analysis_does_not_derive_contracts_from_path_name() {
     let (_td, root) = temp_dir("fail-closed");

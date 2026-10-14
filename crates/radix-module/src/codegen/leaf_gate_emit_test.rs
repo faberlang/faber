@@ -23,6 +23,7 @@ fn issue_values(result: &crate::CompileResult) -> Vec<String> {
         .collect()
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_admits_inline_fs_leaf() {
     let result = compile(Target::HirRust, INLINE_FS);
