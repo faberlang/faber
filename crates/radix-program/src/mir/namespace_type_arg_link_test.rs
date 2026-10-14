@@ -412,3 +412,55 @@ fn package_mir_links_generic_failable_namespace_call() {
         )
     });
 }
+
+const NORMA_FS_READ_FILE_MAIN: &str = r#"import from "norma:fs" fs
+
+main {
+    print fs.read_file<string>("/definitely/not/here")
+}
+"#;
+
+/// `norma:fs.read_file<string>` is a failable generic library export
+/// (`T ⇥ fault.IoFault`, with the union interned from the library's own
+/// second-level `norma:fault` import). Called from a package `main` with a
+/// spelled type argument, the package must link and lower with no
+/// link/typecheck diagnostic.
+#[test]
+fn package_mir_links_norma_fs_read_file_generic_failable() {
+    let dir = crate::test_support::test_temp_dir("norma-fs-read-file");
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "norma-fs-read-file"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("main.fab"), NORMA_FS_READ_FILE_MAIN).expect("write main.fab");
+    let entry = src.join("main.fab");
+
+    let result = with_lowered_package_mir(
+        &Config::default(),
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        |_| {},
+    );
+    if let Err(diagnostics) = &result {
+        let facts = diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+            .collect::<Vec<_>>();
+        panic!("norma:fs read_file package must lower, got {facts:?}");
+    }
+}
