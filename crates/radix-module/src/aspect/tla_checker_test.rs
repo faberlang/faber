@@ -6,7 +6,7 @@
 use super::{HirAspectTlaModule, TlaAspectChecker, TlaAspectCheckerConfig, check_tla_modules};
 use crate::aspect::verifier::HirAspectCheckStatus;
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn temp_work_dir(name: &str) -> (tempfile::TempDir, PathBuf) {
     let dir = crate::test_support::test_temp_dir(name);
@@ -146,8 +146,8 @@ fn hir_aspect_checker_env_paths_are_canonicalized_before_work_dir_use() {
     let checker_work = work_dir.join("checker-work");
     let jar = relative_to_cwd(&work_dir.join("tla2tools.jar")).into_os_string();
     let java = relative_to_cwd(&bin_dir.join("java")).into_os_string();
-    let config = TlaAspectCheckerConfig::from_env_values(&checker_work, &jar, &java)
-        .expect("relative env paths should canonicalize");
+    let config = TlaAspectCheckerConfig::from_paths(&checker_work, Path::new(&jar), Path::new(&java))
+        .expect("relative tool paths should canonicalize");
 
     assert!(config.tla_tools_jar.is_absolute());
     assert!(config.java_bin.is_absolute());
@@ -169,7 +169,7 @@ fn hir_aspect_checker_keeps_bare_java_command_from_env() {
 
     let checker_work = work_dir.join("checker-work");
     let java = OsString::from("java");
-    let config = TlaAspectCheckerConfig::from_env_values(&checker_work, jar.as_os_str(), &java)
+    let config = TlaAspectCheckerConfig::from_paths(&checker_work, &jar, Path::new(&java))
         .expect("absolute jar and bare java should configure");
 
     assert_eq!(config.java_bin, PathBuf::from("java"));
@@ -182,10 +182,10 @@ fn hir_aspect_checker_reports_invalid_tlc_jar_env_path() {
     let checker_work = work_dir.join("checker-work");
     let missing_jar = work_dir.join("missing-tla2tools.jar");
     let java = OsString::from("java");
-    let err = TlaAspectCheckerConfig::from_env_values(&checker_work, missing_jar.as_os_str(), &java)
+    let err = TlaAspectCheckerConfig::from_paths(&checker_work, &missing_jar, Path::new(&java))
         .expect_err("missing jar path should report a config error");
 
-    assert!(err.contains("FABER_TLA_TLC_JAR path"));
+    assert!(err.contains("--tla-jar path"));
     assert!(err.contains("missing-tla2tools.jar"));
 }
 
@@ -197,10 +197,10 @@ fn hir_aspect_checker_reports_invalid_pathful_java_env_path() {
 
     let checker_work = work_dir.join("checker-work");
     let missing_java = work_dir.join("bin/missing-java");
-    let err = TlaAspectCheckerConfig::from_env_values(&checker_work, jar.as_os_str(), missing_java.as_os_str())
+    let err = TlaAspectCheckerConfig::from_paths(&checker_work, &jar, &missing_java)
         .expect_err("missing pathful java path should report a config error");
 
-    assert!(err.contains("FABER_TLA_JAVA_BIN path"));
+    assert!(err.contains("--java-bin path"));
     assert!(err.contains("missing-java"));
 }
 
@@ -228,7 +228,15 @@ fn hir_aspect_checker_rejects_invalid_module_names() {
 #[test]
 fn hir_aspect_checker_tlc_integration_runs_when_env_is_set() {
     let (_td, tmp) = temp_work_dir("tlc-integration");
-    let Ok(Some(config)) = TlaAspectCheckerConfig::from_env(tmp) else {
+    // Test-side env probe: the library takes explicit paths; the test reads
+    // the developer's local TLC settings itself and skips when unset.
+    let Some(jar) = std::env::var_os("FABER_TLA_TLC_JAR") else {
+        return;
+    };
+    let java = std::env::var_os("FABER_TLA_JAVA_BIN").unwrap_or_else(|| "java".into());
+    let jar = PathBuf::from(jar);
+    let java = PathBuf::from(java);
+    let Ok(config) = TlaAspectCheckerConfig::from_paths(&tmp, &jar, &java) else {
         return;
     };
     let module = module(

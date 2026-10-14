@@ -8,7 +8,7 @@ use crate::aspect::{
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Config, Session};
 
-const TLC_JAR_UNSET_SUMMARY: &str = "FABER_TLA_TLC_JAR is not set";
+const TLC_JAR_UNSET_SUMMARY: &str = "no TLC jar was given (pass --tla-jar)";
 
 #[derive(Debug)]
 pub struct VerifySourceResult {
