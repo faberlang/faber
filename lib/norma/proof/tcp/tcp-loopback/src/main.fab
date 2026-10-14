@@ -9,6 +9,10 @@ locale = "en"
 # caelum:hauri (read_bytes), caelum:locus / caelum:remotus (endpoints), and
 # caelum:claude (close). The kernel backlog completes connect before accept,
 # so one thread is enough: no second process and no fixed port.
+#
+# Error paths: a connect to a closed listener faults ConnectionRefused, a
+# second listen on a live port faults AddrInUse, and listen_tls with absent
+# PEM paths faults NotFound.
 
 import from "norma:net" net
 import from "norma:net/listener" listener
@@ -68,6 +72,80 @@ main {
 
     peer.close()
     server.close()
+
+    # caelum:necte on a released port: open a listener, take its port, close
+    # it, then connect. The fault crosses as the ConnectionRefused variant.
+    const listener.Listener closed_server ← net.listen(0)
+    const int closed_port ← closed_server.port()
+    assert closed_port ≻ 0
+    closed_server.close()
+    var bool refused ← false
+    do {
+        net.connect("127.0.0.1", closed_port, false)
+        assert false panic "connect to a closed listener succeeded"
+    }
+    catch err {
+        match err {
+            case ConnectionRefused const path {
+                assert path.length() ≻ 0
+                refused ← true
+            }
+            default {
+                assert false panic "connect fault was not ConnectionRefused"
+            }
+        }
+    }
+    assert refused
+
+    # caelum:ausculta on a live port: a second listen on the port held by A
+    # faults AddrInUse; A stays open until the fault is observed.
+    const listener.Listener holder ← net.listen(0)
+    const int holder_port ← holder.port()
+    assert holder_port ≻ 0
+    var bool in_use ← false
+    do {
+        net.listen(holder_port)
+        assert false panic "second listen on a live port succeeded"
+    }
+    catch err {
+        match err {
+            case AddrInUse const path {
+                assert path.length() ≻ 0
+                in_use ← true
+            }
+            default {
+                assert false panic "second listen fault was not AddrInUse"
+            }
+        }
+    }
+    assert in_use
+    holder.close()
+
+    # caelum:ausculta with TLS: absent PEM paths fault NotFound before any
+    # handshake. The TLS success path (live listener plus handshake) is proved
+    # by the package-manager program: a real handshake needs
+    # PEM material from lib/norma/proof/integration/gen-test-certs at run time.
+    var bool tls_faulted ← false
+    do {
+        net.listen_tls(0, "/nonexistent/cert.pem", "/nonexistent/key.pem")
+        assert false panic "listen_tls with absent PEM files succeeded"
+    }
+    catch err {
+        match err {
+            case NotFound const path {
+                assert path.length() ≻ 0
+                tls_faulted ← true
+            }
+            case InvalidArgument const path {
+                assert path.length() ≻ 0
+                tls_faulted ← true
+            }
+            default {
+                assert false panic "listen_tls fault was neither NotFound nor InvalidArgument"
+            }
+        }
+    }
+    assert tls_faulted
 
     print "tcp-loopback-ok"
 }
