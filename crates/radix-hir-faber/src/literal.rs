@@ -18,10 +18,11 @@
 //! HIR carries an explicit delimiter kind. Quoted text is written from interned
 //! payloads without full escape reconstruction.
 
-use crate::surface::KeywordSurface;
+use crate::surface::{KeywordSurface, TypeBindingKind};
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{DefId, HirLiteral, HirObjectField, HirObjectKey};
 use radix_lexer::{Symbol, TokenKind};
+use radix_types::Primitive;
 use rustc_hash::FxHashMap;
 
 /// Key/value separator for genus vs JSON object-field spellings.
@@ -152,14 +153,43 @@ impl super::FaberCodegen<'_> {
                 self.write_json_valor(value, writer);
             }
             HirLiteral::Regex(pattern, _flags) => {
-                self.write_quoted_symbol(*pattern, writer);
-                writer.write(" ↦ regex");
+                writer.write(surface.type_surface(TypeBindingKind::Primitive(Primitive::Regex)));
+                writer.write(" /");
+                self.write_regex_body(*pattern, writer);
+                writer.write("/");
             }
             HirLiteral::Bool(value) => {
                 writer.write(surface.contextual_keyword(if *value { "verum" } else { "falsum" }));
             }
             HirLiteral::Nil => writer.write(surface.contextual_keyword("nulla")),
         }
+    }
+
+    /// Write the raw body of an inline regex literal (`/…/`).
+    ///
+    /// Ruling d381ae56: the HIR pattern is the raw slash-literal body, so a
+    /// `/` whose preceding backslash run is even is written as `\/`, while
+    /// `\/` already in the pattern stays unchanged and `\\` counts as an
+    /// escaped backslash rather than escaping a following `/`.
+    fn write_regex_body(&self, pattern: Symbol, writer: &mut CodeWriter) {
+        let text = self.interner.resolve(pattern);
+        let mut body = String::with_capacity(text.len());
+        let mut escaped = false;
+        for ch in text.chars() {
+            if escaped {
+                body.push(ch);
+                escaped = false;
+            } else if ch == '\\' {
+                body.push(ch);
+                escaped = true;
+            } else if ch == '/' {
+                body.push('\\');
+                body.push(ch);
+            } else {
+                body.push(ch);
+            }
+        }
+        writer.write(&body);
     }
 
     /// Emit a `textus` literal, preferring guillemets when `"..."` would break.
