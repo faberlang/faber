@@ -151,6 +151,7 @@ fn emit_crates_do_not_spawn_toolchains() {
 #[test]
 fn allowlisted_and_out_of_scope_surfaces_still_spawn() {
     let workspace = workspace();
+    let full_tree = workspace.join("crates/radix-hir-rust").is_dir();
     for rel in [
         "crates/faber-leaf/src/process.rs",
         "crates/radix-hir-python/src/golden.rs",
@@ -160,14 +161,13 @@ fn allowlisted_and_out_of_scope_surfaces_still_spawn() {
         "crates/radix-module/src/aspect/tla_checker.rs",
         "crates/exempla/src/exempla_e2e/llvm_runtime.rs",
     ] {
-        // A tree without the whole crate (the public export ships a subset of
-        // crates) has no surface to check. A crate that is present must still
-        // carry the file.
-        let crate_dir: PathBuf = Path::new(rel).iter().take(2).collect();
-        if !workspace.join(&crate_dir).is_dir() {
+        let path = workspace.join(rel);
+        // The public export ships a subset of files and no private crates.
+        // There an absent surface is policy, not a stale entry; in the full
+        // tree every listed file must exist.
+        if !full_tree && !path.exists() {
             continue;
         }
-        let path = workspace.join(rel);
         let content = fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {rel}: {err}"));
         let scrubbed = radix_hygiene::scrub_rust_source(&content);
         assert!(
