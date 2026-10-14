@@ -313,12 +313,14 @@ fn dangling_provenance_identity_fails_closed() {
 #[test]
 fn dangling_resolved_use_local_fails_closed() {
     let mut artifact = stub_artifact();
-    artifact.resolved_uses.push(crate::artifact::ResolvedUseWire {
-        key: crate::artifact::ResolvedUseKeyWire::Portable("pkg::item".to_string()),
-        kind: crate::artifact::ResolvedUseKindWire::Path,
-        enclosing: None,
-        local: Some(DefId(999_999)),
-    });
+    artifact
+        .resolved_uses
+        .push(crate::artifact::ResolvedUseWire {
+            key: crate::artifact::ResolvedUseKeyWire::Portable("pkg::item".to_string()),
+            kind: crate::artifact::ResolvedUseKindWire::Path,
+            enclosing: None,
+            local: Some(DefId(999_999)),
+        });
     let err = crate::decode(&postcard::to_allocvec(&artifact).expect("encode"))
         .expect_err("dangling resolved-use local DefId must fail closed");
     assert!(
