@@ -18,7 +18,7 @@ use crate::locale::TypeBindingKind;
 use crate::parser::{ParseError, ParseErrorKind, parse};
 use crate::semantic::{CollectionKind, Primitive, SemanticError, SemanticErrorKind, TensorFamilyKind};
 use crate::syntax::{BindingPattern, ExprKind, StmtKind};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 
 fn temp_pack_path(label: &str) -> (tempfile::TempDir, PathBuf) {
@@ -2494,6 +2494,11 @@ fn identical_to_en_path(pack: &str) -> PathBuf {
     identical_to_en_dir().join(format!("{pack}.toml"))
 }
 
+/// `locale/absent-rows-budget.toml`, one shrink-only absent-row budget per pack.
+fn absent_rows_budget_path() -> PathBuf {
+    crate::locale::workspace_locale_root().join("absent-rows-budget.toml")
+}
+
 #[derive(serde::Deserialize)]
 struct IdenticalToEnFile {
     #[serde(default)]
@@ -2838,6 +2843,57 @@ fn locale_pack_completeness_identical_to_en_exemptions_must_stay_live() {
         "stale exemptions in {}:\n  {}",
         identical_to_en_dir().display(),
         stale.join("\n  ")
+    );
+}
+
+/// `locale/absent-rows-budget.toml`.
+#[derive(serde::Deserialize)]
+struct AbsentRowsBudgetFile {
+    budget: BTreeMap<String, usize>,
+}
+
+/// A translated pack's absent-row count must equal its recorded budget.
+///
+/// The budget file is exact and shrink-only: over budget is unrecorded
+/// translation debt, and under budget means a translation landed without
+/// lowering the number in the same change. The `en` pack is the comparison
+/// source and `la` is outside the gate, matching the identical-to-en gate.
+#[test]
+fn locale_pack_completeness_translated_packs_have_no_unbudgeted_absent_rows() {
+    let path = absent_rows_budget_path();
+    let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {}: {err:?}", path.display()));
+    let parsed: AbsentRowsBudgetFile =
+        toml::from_str(&source).unwrap_or_else(|err| panic!("parse {}: {err:?}", path.display()));
+    let en_pack = owned_pack("en");
+    let mut failures = Vec::new();
+    for locale in TRANSLATED_PACKS {
+        let Some(&budget) = parsed.budget.get(*locale) else {
+            panic!("{} has no budget entry for {locale}", path.display());
+        };
+        let pack = owned_pack(locale);
+        let absent = fields_absent_from_pack(&pack, &en_pack);
+        let actual = absent.len();
+        if let Err(err) = budget_verdict(actual, budget) {
+            let mut failure = format!("{locale}: {err}");
+            if actual > budget {
+                let keys: Vec<String> = absent
+                    .iter()
+                    .take(20)
+                    .map(|(code, issue, field)| match issue {
+                        Some(issue) => format!("{code}.issues.{issue}.{field}"),
+                        None => format!("{code}.{field}"),
+                    })
+                    .collect();
+                failure.push_str(&format!("\n    {}", keys.join("\n    ")));
+            }
+            failures.push(failure);
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "translated packs have unbudgeted absent rows against {}:\n  {}",
+        path.display(),
+        failures.join("\n  ")
     );
 }
 
