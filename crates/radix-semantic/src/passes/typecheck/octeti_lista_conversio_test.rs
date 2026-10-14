@@ -4,7 +4,9 @@ use crate::test_support;
 
 #[test]
 fn octeti_to_lista_u8_accepts() {
-    test_support::assert_accepts_la("functio bridge(lista<b8> o) → lista<u8> { redde o ↦ lista<u8> }");
+    test_support::assert_accepts_la(
+        "functio bridge(lista<b8> o) → lista<u8> { redde o ↦ lista<u8> }",
+    );
 }
 
 #[test]
@@ -14,7 +16,9 @@ fn octeti_literal_to_lista_u8_accepts() {
 
 #[test]
 fn lista_u8_to_octeti_still_accepts() {
-    test_support::assert_accepts_la("functio from_list(lista<u8> b) → lista<b8> { redde b ↦ lista<b8> }");
+    test_support::assert_accepts_la(
+        "functio from_list(lista<u8> b) → lista<b8> { redde b ↦ lista<b8> }",
+    );
 }
 
 #[test]
