@@ -2573,6 +2573,26 @@ parameters without rendering. Safe for bound SQL/URL payloads; do not use
 Block `textus` uses guillemets `«...»`. The heavy quotation-mark
 pair is retired (too visually close to `"` in many fonts).
 
+#### Escapes
+
+Every literal form accepts exactly these escapes after a backslash, and
+anything else is a compile error:
+
+| Form | Own-delimiter escape | Shared escapes |
+| --- | --- | --- |
+| `"..."` | `\"` | `\\`, `\n`, `\t`, `\r`, `\u{H…}` |
+| `«...»` | `\»` | `\\`, `\n`, `\t`, `\r`, `\u{H…}` |
+| `` `...` `` | `` \` `` | `\\`, `\n`, `\t`, `\r`, `\u{H…}` |
+| `'...'` | `\'` | `\\`, `\n`, `\t`, `\r`, `\u{H…}` (`≤ 7F`) |
+
+`\u{H…}` is 1–6 hex digits naming a Unicode scalar; inside `'...'` it is
+limited to `7F`. Anything else after a backslash is a compile error (LEX003
+`unknown_escape` for `"..."`, `«...»` and backtick forms, SEM011
+`ascii_literal_invalid_escape` for `'...'`). A literal escapes its own
+delimiter and not another literal's; `\0` and `\xHH` do not exist (`\u{0}`
+writes NUL). A regex pattern in `"..."` doubles its backslashes
+(`"\\d+" ↦ regex`).
+
 Implementation status (2026-10-11):
 
 - Shipped: `"..."`, `«...»` block `textus`, `'...'` → `ascii`, `` `...` `` → `forma`, `|...|` → `octeti`, `{ ... }` → `json`, text/ascii `↦ regex`, and the inline regex literals `regex /.../` and `_ /.../`.
