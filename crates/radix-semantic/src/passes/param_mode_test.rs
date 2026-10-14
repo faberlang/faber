@@ -5,7 +5,7 @@
 //! fn-type params), and the marked type carries the mode. Parameter prefixes
 //! are retired at the parser boundary.
 
-use crate::test_support::{analyze_ok, analyze_source, issue};
+use crate::test_support::{analyze_ok_la, analyze_source_la, issue};
 use crate::{SemanticMutability, Type};
 
 /// Pull the first `Clausura` from the implicit entry block of the fixture.
@@ -25,7 +25,7 @@ fn first_clausura_params(hir: &radix_hir::HirModule) -> &Vec<radix_hir::HirParam
 
 #[test]
 fn closure_params_derive_modes_from_type_position_markers() {
-    let fixture = analyze_ok(
+    let fixture = analyze_ok_la(
         r"
 incipit {
     fixum _ f ← (de lista<numerus> a, in lista<numerus> b, own lista<numerus> c, copy lista<numerus> d) ∴ a
@@ -61,7 +61,7 @@ incipit {
 
 #[test]
 fn unmarked_closure_params_stay_owned() {
-    let fixture = analyze_ok(
+    let fixture = analyze_ok_la(
         r"
 incipit {
     fixum _ f ← (lista<numerus> a, numerus n) ∴ n
@@ -76,7 +76,7 @@ incipit {
 
 #[test]
 fn fn_type_params_grow_mode_slots() {
-    let fixture = analyze_ok(
+    let fixture = analyze_ok_la(
         r"
 typus Handler = (de textus, own lista<numerus>, numerus) → vacuum
 ",
@@ -100,7 +100,7 @@ typus Handler = (de textus, own lista<numerus>, numerus) → vacuum
 
 #[test]
 fn parameter_prefix_is_a_parse_error() {
-    let result = analyze_source(
+    let result = analyze_source_la(
         r"
 functio legacy(ex lista<numerus> values) → vacuum {
     redde
@@ -116,7 +116,7 @@ functio legacy(ex lista<numerus> values) → vacuum {
 
 #[test]
 fn scalar_ref_and_mut_parameter_markers_are_admitted() {
-    let result = analyze_ok(
+    let result = analyze_ok_la(
         r"
 functio read(de numerus value) → numerus {
     redde value
@@ -153,7 +153,7 @@ functio bump(in numerus value) → vacuum {
 #[test]
 fn scalar_own_and_copy_parameter_markers_remain_rejected() {
     for marker in ["own", "copy"] {
-        let result = analyze_source(&format!(
+        let result = analyze_source_la(&format!(
             "functio reject({marker} numerus value) → vacuum {{ redde }}"
         ));
         assert!(
@@ -169,7 +169,7 @@ fn scalar_own_and_copy_parameter_markers_remain_rejected() {
 
 #[test]
 fn scalar_function_type_mut_marker_is_admitted() {
-    let fixture = analyze_ok(
+    let fixture = analyze_ok_la(
         r"
 typus Handler = (in numerus) → vacuum
 ",

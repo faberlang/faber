@@ -4,7 +4,7 @@
 //! `mut`/`own`, and genus-field transitivity. Unmarked code stays on the
 //! MU-1 baseline tests.
 
-use crate::test_support::{analyze_ok, assert_rejects_with_issue};
+use crate::test_support::{analyze_ok_la, assert_rejects_with_issue_la};
 use crate::{
     ISSUE_ASSIGN_THROUGH_REF, ISSUE_MUTATING_RECEIVER_THROUGH_REF,
     ISSUE_REF_TO_MUT_OR_OWN_POSITION, SemanticMutability, Type,
@@ -12,7 +12,7 @@ use crate::{
 
 #[test]
 fn ref_list_read_methods_are_legal() {
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 incipit {
     fixum de lista<numerus> xs ← [1, 2, 3]
@@ -24,7 +24,7 @@ incipit {
 
 #[test]
 fn ref_list_mutating_receiver_rejects() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 incipit {
     fixum de lista<numerus> xs ← [1, 2, 3]
@@ -37,7 +37,7 @@ incipit {
 
 #[test]
 fn unmarked_list_mutating_receiver_stays_legal() {
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 incipit {
     varia lista<numerus> xs ← vacua
@@ -49,7 +49,7 @@ incipit {
 
 #[test]
 fn projection_assignment_through_ref_rejects() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 incipit {
     fixum de lista<numerus> xs ← [1, 2, 3]
@@ -62,7 +62,7 @@ incipit {
 
 #[test]
 fn unmarked_projection_assignment_stays_legal() {
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
@@ -74,7 +74,7 @@ incipit {
 
 #[test]
 fn ref_to_mut_position_rejects() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 functio poke(in lista<numerus> xs) → vacuum {
     xs.appende(4)
@@ -90,7 +90,7 @@ incipit {
 
 #[test]
 fn ref_to_own_position_rejects() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 functio take(own lista<numerus> xs) → vacuum {
     nota xs.longitudo()
@@ -106,7 +106,7 @@ incipit {
 
 #[test]
 fn unmarked_into_mut_param_stays_legal() {
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 functio poke(in lista<numerus> xs) → vacuum {
     xs.appende(4)
@@ -121,7 +121,7 @@ incipit {
 
 #[test]
 fn genus_field_projection_is_a_ref_view() {
-    let result = analyze_ok(
+    let result = analyze_ok_la(
         r"
 genus Persona {
     varia lista<numerus> amici
@@ -161,7 +161,7 @@ fn field_expr_ty(expr: &radix_hir::HirExpression) -> Option<crate::TypeId> {
 
 #[test]
 fn genus_field_mutating_receiver_rejects() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 genus Persona {
     varia lista<numerus> amici
@@ -177,7 +177,7 @@ incipit {
 
 #[test]
 fn genus_field_projection_assignment_rejects() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 genus Persona {
     varia lista<numerus> amici

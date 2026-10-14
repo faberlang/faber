@@ -13,7 +13,9 @@
 
 use crate::PassConfig;
 use crate::insere::{InsereFiles, InsereSource};
-use crate::test_support::{analyze_source, analyze_source_with_config, assert_rejects_with_issue};
+use crate::test_support::{
+    analyze_source_la, analyze_source_with_config_la, assert_rejects_with_issue_la,
+};
 use radix_hir::{HirConst, HirExpressionKind, HirItemKind, HirLiteral};
 use radix_target::Target;
 
@@ -23,7 +25,7 @@ fn constant(source: &str, name: &str) -> HirConst {
 }
 
 fn constant_with(source: &str, name: &str, config: PassConfig) -> HirConst {
-    let fixture = analyze_source_with_config(source, config);
+    let fixture = analyze_source_with_config_la(source, config);
     assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
     let hir = fixture.result.hir.as_ref().expect("hir");
     hir.items
@@ -94,16 +96,16 @@ fn constants_read_each_other_in_dependency_order() {
 
 #[test]
 fn fixum_constant_initializer_faults_keep_their_identity() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "fixum u8 A = 200\nfixum u8 B = A + 100\n",
         "constant_arithmetic_overflow",
     );
-    assert_rejects_with_issue("fixum numerus D = 1 / 0\n", "constant_division_by_zero");
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la("fixum numerus D = 1 / 0\n", "constant_division_by_zero");
+    assert_rejects_with_issue_la(
         "functio f() → numerus { redde 1 }\nfixum numerus W = f()\n",
         "constant_initializer_not_constant",
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "fixum numerus A = B + 1\nfixum numerus B = A + 1\n",
         "constant_cycle",
     );
@@ -131,19 +133,19 @@ fn underscore_infers_text_and_bool() {
 
 #[test]
 fn a_runtime_store_at_top_level_stays_top_level_binding() {
-    assert_rejects_with_issue("fixum numerus N ← 4\n", "top_level_binding");
-    assert_rejects_with_issue("fixum _ N ← 4\n", "top_level_binding");
-    assert_rejects_with_issue("varia numerus N ← 4\n", "top_level_binding");
+    assert_rejects_with_issue_la("fixum numerus N ← 4\n", "top_level_binding");
+    assert_rejects_with_issue_la("fixum _ N ← 4\n", "top_level_binding");
+    assert_rejects_with_issue_la("varia numerus N ← 4\n", "top_level_binding");
 }
 
 #[test]
 fn varia_with_equals_stays_a_named_parse_error() {
-    assert_rejects_with_issue("varia numerus N = 4\n", "varia_compile_time_initializer");
+    assert_rejects_with_issue_la("varia numerus N = 4\n", "varia_compile_time_initializer");
 }
 
 #[test]
 fn publica_annotated_fixum_constant_keeps_its_annotation() {
-    let fixture = analyze_source("@ publica\nfixum numerus N = 4\n");
+    let fixture = analyze_source_la("@ publica\nfixum numerus N = 4\n");
     assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
     let hir = fixture.result.hir.as_ref().expect("hir");
     let item = hir
@@ -156,7 +158,7 @@ fn publica_annotated_fixum_constant_keeps_its_annotation() {
 
 #[test]
 fn block_level_fixum_equals_stays_a_local() {
-    let fixture = analyze_source("incipit {\n    fixum numerus N = 3\n    nota N\n}\n");
+    let fixture = analyze_source_la("incipit {\n    fixum numerus N = 3\n    nota N\n}\n");
     assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
     let hir = fixture.result.hir.as_ref().expect("hir");
     assert!(
@@ -221,7 +223,7 @@ fn insere_initializer_is_admitted_on_a_fixum_constant() {
 #[test]
 fn insere_on_a_fixum_constant_keeps_the_declared_type_rule() {
     let fixture =
-        analyze_source_with_config("fixum numerus N = insere \"nuntius.txt\"\n", embed_config());
+        analyze_source_with_config_la("fixum numerus N = insere \"nuntius.txt\"\n", embed_config());
     assert!(
         fixture.diagnostics.iter().any(|err| {
             err.kind == crate::SemanticErrorKind::InsereInvalid

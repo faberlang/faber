@@ -3,12 +3,12 @@
 //! Each declaration kind warns once, at the declared identifier; uses of the
 //! name do not warn again; a bare `_` never warns.
 
-use crate::test_support::analyze_source;
+use crate::test_support::analyze_source_la;
 use crate::{SemanticError, SemanticErrorKind, WarningKind};
 use radix_diagnostics::DiagnosticArg;
 
 fn underscore_findings(source: &str) -> Vec<SemanticError> {
-    analyze_source(source)
+    analyze_source_la(source)
         .diagnostics
         .iter()
         .filter(|diag| diag.kind == SemanticErrorKind::Warning(WarningKind::LeadingUnderscore))
@@ -98,7 +98,7 @@ fn enum_member_warns_as_constant() {
 #[test]
 fn enum_without_leading_underscore_never_warns() {
     let source = "ordo Color { Red, Green }";
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(result.is_ok(), "{:?}", result.diagnostics);
     assert!(underscore_findings(source).is_empty());
 }
@@ -131,7 +131,7 @@ fn top_level_const_warns_as_constant_and_local_const_as_local() {
 fn bare_hole_never_warns() {
     let source = "incipit {\n    fixum lista<numerus> triplex ← [1, 2, 3]\n    \
         fixum [_, medius, _] ← triplex\n    fixum _ x ← medius\n    nota x\n}";
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(result.is_ok(), "{:?}", result.diagnostics);
     assert!(underscore_findings(source).is_empty());
 }
@@ -140,7 +140,7 @@ fn bare_hole_never_warns() {
 fn plain_names_never_warn() {
     let source = "functio duplex(numerus n) → numerus { redde n * 2 }\n\
         incipit { fixum numerus n_x ← duplex(2)\n nota n_x }";
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(result.is_ok(), "{:?}", result.diagnostics);
     assert!(underscore_findings(source).is_empty());
 }
