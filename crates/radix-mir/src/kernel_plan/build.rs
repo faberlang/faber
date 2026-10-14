@@ -18,8 +18,9 @@ use super::validate::{
 use crate::abi::{CollectionOpContract, MirKernelSignature};
 use crate::{
     MirCollectionOp, MirConstant, MirFunction, MirKernelResourceAccess, MirKernelResourceRole,
-    MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall, MirScalarLayout,
-    MirStatementKind, MirValidationContext, MirValueKind, MirWorkgroupSize,
+    MirLayoutKind, MirLocalId, MirOperand, MirPlace, MirPlaceBase, MirRuntimeCall, MirScalarLayout,
+    MirStatement, MirStatementKind, MirTempId, MirTerminatorKind, MirValidationContext,
+    MirValueKind, MirWorkgroupSize,
 };
 
 /// Whether a kernel signature's **result-tuple contract** is coherent for
@@ -1425,10 +1426,53 @@ fn layer_norm_const_facts(
     true
 }
 
+/// Whether `place` names the whole temporary `temp` (no projections).
+fn is_whole_temp_place(place: &MirPlace, temp: MirTempId) -> bool {
+    place.projections.is_empty() && place.base == MirPlaceBase::Temp(temp)
+}
+
+/// Whether `statement` writes the whole temporary `temp` as a destination
+/// (const/non-const `Assign`, call destination, or construct destination).
+fn statement_writes_whole_temp(statement: &MirStatement, temp: MirTempId) -> bool {
+    match &statement.kind {
+        MirStatementKind::Assign { place, .. } => is_whole_temp_place(place, temp),
+        MirStatementKind::Call { destination, .. }
+        | MirStatementKind::RuntimeCall { destination, .. } => destination
+            .as_ref()
+            .is_some_and(|place| is_whole_temp_place(place, temp)),
+        MirStatementKind::Construct { destination, .. } => is_whole_temp_place(destination, temp),
+    }
+}
+
+/// Whether `terminator` writes the whole temporary `temp` as a destination
+/// or error place. `TryCall` is the only terminator that writes places.
+fn terminator_writes_whole_temp(terminator: &MirTerminatorKind, temp: MirTempId) -> bool {
+    match terminator {
+        MirTerminatorKind::TryCall {
+            destination,
+            error_place,
+            ..
+        } => {
+            is_whole_temp_place(error_place, temp)
+                || destination
+                    .as_ref()
+                    .is_some_and(|place| is_whole_temp_place(place, temp))
+        }
+        MirTerminatorKind::Return(_)
+        | MirTerminatorKind::ReturnError(_)
+        | MirTerminatorKind::Goto(_)
+        | MirTerminatorKind::Branch { .. }
+        | MirTerminatorKind::Switch { .. }
+        | MirTerminatorKind::Unreachable => false,
+    }
+}
+
 /// Resolve a literal constant operand, including the single const-temp
 /// materialization the source frontend uses for floating-point literals.
 /// The resolver stays typed and local: it does not infer values from names or
-/// arbitrary expressions, and ambiguous/multi-assignment temps fail closed.
+/// arbitrary expressions, and ambiguous/multi-assignment temps fail closed —
+/// any other whole-temp write (call/construct destination or `try` place) on
+/// the temp disqualifies it.
 #[must_use]
 pub fn literal_const_operand(function: &MirFunction, operand: &MirOperand) -> Option<MirConstant> {
     if let MirOperand::Constant(constant) = operand {
@@ -1447,18 +1491,25 @@ pub fn literal_const_operand(function: &MirFunction, operand: &MirOperand) -> Op
     let mut found = None;
     for block in &function.blocks {
         for statement in &block.statements {
-            let MirStatementKind::Assign { place, value } = &statement.kind else {
+            if !statement_writes_whole_temp(statement, temp) {
                 continue;
-            };
-            if place.projections.is_empty() && place.base == MirPlaceBase::Temp(temp) {
-                let MirValueKind::Operand(MirOperand::Constant(constant)) = &value.kind else {
-                    return None;
-                };
-                if found.is_some() {
-                    return None;
-                }
-                found = Some(constant);
             }
+            // Any whole-temp writer must be the one constant assign; a call
+            // destination, construct destination, or non-const assign fails
+            // closed.
+            let MirStatementKind::Assign { value, .. } = &statement.kind else {
+                return None;
+            };
+            let MirValueKind::Operand(MirOperand::Constant(constant)) = &value.kind else {
+                return None;
+            };
+            if found.is_some() {
+                return None;
+            }
+            found = Some(constant);
+        }
+        if terminator_writes_whole_temp(&block.terminator.kind, temp) {
+            return None;
         }
     }
     found.cloned()

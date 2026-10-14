@@ -3268,3 +3268,93 @@ fn batched_softmax_expanded_mask_requires_trailing_mapping() {
         }
     }
 }
+
+// --- D-29: literal_const_operand writer scan ---
+
+/// A one-block function with a single temp and no locals, for the
+/// `literal_const_operand` writer-scan tests.
+fn literal_const_scan_function(
+    statements: Vec<MirStatement>,
+    terminator: MirTerminatorKind,
+) -> MirFunction {
+    let ty = MirType::semantic(radix_types::TypeId(0));
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: Vec::new(),
+        temps: vec![crate::MirTemp {
+            id: crate::MirTempId(0),
+            ty,
+            span: test_span(),
+        }],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements,
+            terminator: MirTerminator {
+                kind: terminator,
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
+/// `place ← float` as a constant `Assign` statement.
+fn literal_const_assign(place: MirPlace, value: f64) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Assign {
+            place,
+            value: crate::MirValue {
+                id: crate::MirValueId(0),
+                kind: crate::MirValueKind::Operand(MirOperand::Constant(MirConstant::Float(value))),
+                ty: MirType::semantic(radix_types::TypeId(0)),
+                span: test_span(),
+            },
+        },
+        span: test_span(),
+    }
+}
+
+/// D-29: a temp assigned a constant but also written as a `Call`
+/// destination is ambiguous and must fail closed.
+#[test]
+fn literal_const_operand_rejects_temp_with_second_writer() {
+    let temp = crate::MirTempId(0);
+    let function = literal_const_scan_function(
+        vec![
+            literal_const_assign(MirPlace::temp(temp), 1.0),
+            MirStatement {
+                kind: MirStatementKind::Call {
+                    destination: Some(MirPlace::temp(temp)),
+                    callee: crate::MirCallee::Function(MirFunctionId(0)),
+                    args: Vec::new(),
+                },
+                span: test_span(),
+            },
+        ],
+        MirTerminatorKind::Return(None),
+    );
+    assert_eq!(literal_const_operand(&function, &MirOperand::Temp(temp)), None);
+}
+
+/// The control case: exactly one constant `Assign` still resolves.
+#[test]
+fn literal_const_operand_resolves_single_assign() {
+    let temp = crate::MirTempId(0);
+    let function = literal_const_scan_function(
+        vec![literal_const_assign(MirPlace::temp(temp), 1.0)],
+        MirTerminatorKind::Return(None),
+    );
+    assert!(matches!(
+        literal_const_operand(&function, &MirOperand::Temp(temp)),
+        Some(MirConstant::Float(value)) if value.to_bits() == 1.0f64.to_bits()
+    ));
+}
