@@ -16,8 +16,19 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Source session for the Latin-authored fixtures here: pin the built-in
+/// Latin pack so a source with no frontmatter lexes as Latin regardless of
+/// the process-wide `RADIX_DEFAULT_CODE_LOCALE` staging switch.
+fn latin_source_session() -> Session {
+    Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_locale_pack(crate::locale::latin_locale_pack()),
+    )
+}
+
 fn emit_once(source: &str) -> String {
-    let session = Session::new(Config::default().with_dev_locale_root());
+    let session = latin_source_session();
     let emit_pack = crate::locale::latin_locale_pack();
     let result = reemit_faber(&session, &emit_pack, "fidelity.fab", source);
     assert!(
@@ -1232,11 +1243,7 @@ fn record_field_order_is_not_a_meaning_change() {
     // same program.
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/cli/cli.fab");
     let source = &fs::read_to_string(&path).expect("read corpus/cli/cli.fab");
-    let session = Session::new(
-        Config::default()
-            .with_target(Target::HirFaber)
-            .with_dev_locale_root(),
-    );
+    let session = latin_source_session();
     let la = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
         .expect("installed la pack");
     let result = reemit_faber(&session, &la, "record-order.fab", source);
@@ -1267,7 +1274,7 @@ const FLOAT_SLOT_INTEGER_SOURCE: &str = "genus Intervallum {\n    fixum fractus 
 /// the same float, so conversion must succeed in every locale.
 #[test]
 fn integer_literal_in_float_slot_converts_to_every_locale() {
-    let session = Session::new(Config::default().with_dev_locale_root());
+    let session = latin_source_session();
     for id in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
         let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(id))
             .unwrap_or_else(|error| panic!("installed {id} pack should load: {error:?}"));
@@ -1443,7 +1450,7 @@ fn inferred_constructor_at_an_optional_slot_reemits_as_the_hole() {
 #[test]
 fn first_match_over_array_literal_reemits_with_meaning_intact() {
     let source = "functio elige() → fractus ∪ nihil {\n    redde primus_quem([1.0, -2.0, 3.0], ubi x { x ≻ 0.0 })\n}\n";
-    let session = Session::new(Config::default().with_dev_locale_root());
+    let session = latin_source_session();
     let emit_pack = crate::locale::latin_locale_pack();
     let result = reemit_faber(&session, &emit_pack, "first_match.fab", source);
     assert!(
