@@ -162,3 +162,34 @@ fn connect_to_a_closed_port_names_the_address() {
     assert_eq!(error.kind(), LeafErrorKind::ConnectionRefused);
     assert_eq!(error.path(), format!("127.0.0.1:{port}"));
 }
+
+#[test]
+fn leaf_kind_words_are_distinct_and_pascal_case() {
+    let words = LeafErrorKind::ALL.map(LeafErrorKind::word);
+    for word in words {
+        let first = word.chars().next().expect("kind word is never empty");
+        assert!(first.is_ascii_uppercase(), "{word}");
+        assert!(!word.contains('_'), "{word}");
+        assert!(!word.contains(' '), "{word}");
+    }
+    for (index, left) in words.iter().enumerate() {
+        for right in &words[index + 1..] {
+            assert_ne!(left, right);
+        }
+    }
+}
+
+#[test]
+fn leaf_facts_carry_kind_word_and_path_only() {
+    let error = LeafError::from_io(
+        "solum:lege",
+        "/nonexistent/x",
+        &io::Error::from(io::ErrorKind::NotFound),
+    );
+    assert_eq!(error.facts(), ("NotFound", "/nonexistent/x"));
+    let (word, path) = error.facts();
+    assert!(!word.contains("os error"), "{word}");
+    assert!(!path.contains("os error"), "{path}");
+    assert!(!word.contains("solum"), "{word}");
+    assert!(!path.contains("solum"), "{path}");
+}
