@@ -233,6 +233,46 @@ fn vide_writes_stderr_and_nota_writes_stdout() {
 }
 
 #[test]
+fn repeated_numbered_hole_reads_one_argument() {
+    // Operator ruling 2026-10-13: `"§0, §0, §0, and §1"("her", "me")`
+    // renders `her, her, her, and me` — a numbered hole selects its argument
+    // by number, and the same number may appear any number of times. The
+    // template carries more holes than values; nothing may panic and no
+    // value may be consumed positionally.
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::{Primitive, TypeTable};
+
+    let types = TypeTable::new();
+    let textus = MirType::semantic(types.primitive(Primitive::Textus));
+    let span = Span::default();
+    let mut interner = Interner::new();
+    let template = interner.intern("§0, §0, §0, and §1");
+    let her = interner.intern("her");
+    let me = interner.intern("me");
+    let program = MirProgram::new();
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    let rendered = runner
+        .eval_runtime_call(
+            &MirRuntimeCall {
+                intrinsic: MirIntrinsic::FormatString { template },
+                args: vec![
+                    MirOperand::Constant(MirConstant::String(her)),
+                    MirOperand::Constant(MirConstant::String(me)),
+                ],
+                return_ty: textus,
+            },
+            span,
+        )
+        .expect("format call should execute");
+    drop(runner);
+    assert_eq!(rendered, Value::Str("her, her, her, and me".to_owned()));
+}
+
+#[test]
 fn converts_numeric_array_to_octeti_in_one_step() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
