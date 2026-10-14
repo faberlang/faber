@@ -2390,6 +2390,40 @@ main {
 }
 
 #[test]
+fn missing_file_read_is_caught_on_the_runner() {
+    let dir = temp_dir("missing-file-read-caught");
+    let missing = dir.join("absent.txt");
+    let source = r#"import from "norma:fs" fs
+import from "norma:fault" fault
+
+main {
+    do {
+        const string body ← fs.read_file<string>("__PATH__")
+        print body
+    }
+    catch err {
+        print "caught"
+    }
+}
+"#
+    .replace("__PATH__", missing.to_str().expect("utf8 path"));
+    let source = write_single_file("missing-file-read-caught", &source);
+
+    let (stdout, stderr, ok) = run_faber(&["run", source.to_str().expect("utf8 source path")]);
+
+    assert!(
+        ok,
+        "missing-file read must be caught on the runner:\n{stderr}"
+    );
+    assert_eq!(stdout, "caught\n");
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: CLI stderr is the renderer contract for this integration test.
+    assert!(
+        !stderr.contains("No such file"),
+        "the catch arm must consume the IoFault, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn run_norma_process_argumenta_reads_host_argv() {
     let package = temp_dir("norma-processus-bridge");
     let src = package.join("src");
