@@ -627,6 +627,16 @@ pub struct RunArgs {
     #[arg(long = "stats-file", value_name = "PATH")]
     pub stats_file: Option<PathBuf>,
 
+    /// Seed for the runner's map/set iteration-order shuffle; 0 turns it off;
+    /// default is a random seed per run
+    #[arg(long = "shuffle-seed", value_name = "N")]
+    pub shuffle_seed: Option<u64>,
+
+    /// Print developer diagnostics on stderr (device driver counters); never
+    /// changes program output
+    #[arg(long)]
+    pub debug: bool,
+
     /// Promote all warning diagnostics to errors
     #[arg(long)]
     pub deny_warnings: bool,
@@ -690,6 +700,11 @@ pub struct TestArgs {
     /// `[device] device` > `auto`.
     #[arg(long = "device", value_enum, value_name = "DEVICE")]
     pub device: Option<DeviceChoice>,
+
+    /// Environment name that `solum_in` modifiers match, in addition to the
+    /// OS name.
+    #[arg(long = "solum-in", value_name = "NAME")]
+    pub solum_in: Option<String>,
 
     /// Promote all warning diagnostics to errors
     #[arg(long)]

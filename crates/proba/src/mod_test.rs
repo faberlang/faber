@@ -711,20 +711,13 @@ proba "gated" solum_in "proba-u10-absent-env" {
 
 #[test]
 fn solum_in_match_helper_covers_env_os_and_var() {
-    assert!(super::solum_in_matches_in(
-        "ci",
-        Some("ci"),
-        "linux",
-        |_| None
-    ));
-    assert!(!super::solum_in_matches_in("ci", None, "linux", |_| None));
-    assert!(super::solum_in_matches_in("linux", None, "linux", |_| None));
-    assert!(super::solum_in_matches_in("ci", None, "macos", |name| {
-        (name == "CI").then(|| "true".to_owned())
-    }));
-    assert!(super::solum_in_matches_in("CI", None, "macos", |name| {
-        (name == "CI").then(|| "1".to_owned())
-    }));
+    assert!(super::solum_in_matches_in("ci", Some("ci"), "linux"));
+    assert!(!super::solum_in_matches_in("ci", None, "linux"));
+    assert!(super::solum_in_matches_in("linux", None, "linux"));
+    // No process environment is consulted: an unrelated name does not match,
+    // even if a variable of that name happens to exist.
+    assert!(!super::solum_in_matches_in("ci", None, "macos"));
+    assert!(!super::solum_in_matches_in("CI", None, "macos"));
 }
 
 #[test]

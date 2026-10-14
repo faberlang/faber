@@ -43,6 +43,14 @@ pub(super) fn cmd_run(args: RunArgs) {
         std::process::exit(1);
     }
 
+    if let Some(seed) = args.shuffle_seed {
+        let _ = radix::module::mir::configure_shuffle_seed(seed);
+    }
+    #[cfg(all(feature = "device-runtime", target_os = "macos"))]
+    if args.debug {
+        radix_device_metal::set_report_counters(true);
+    }
+
     // N1.1 precedence: CLI `--device` > manifest `[device] device` > `auto`.
     // An invalid manifest value fails closed with a structured diagnostic
     // (never silently ignored).

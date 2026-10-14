@@ -432,39 +432,34 @@ fn execution_plan(
     }
 }
 
-/// `solum_in "name"` runs only in that named environment.
-///
-/// Match order: `FABER_SOLUM_IN` exact value, then `std::env::consts::OS`,
-/// then a process env var of the same name (also tried uppercased).
-fn solum_in_matches(requested: &str) -> bool {
-    solum_in_matches_in(
-        requested,
-        std::env::var("FABER_SOLUM_IN").ok().as_deref(),
-        std::env::consts::OS,
-        |name| std::env::var(name).ok(),
-    )
+/// The environment name that `solum_in` modifiers match in addition to the
+/// OS name. `faber test --solum-in` sets it once; the helper performs no
+/// environment access of its own.
+static SOLUM_IN_ENV: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Set the environment name that `solum_in` modifiers match in addition to
+/// `std::env::consts::OS`. Called by `faber test --solum-in`.
+pub fn set_solum_in_environment(name: &str) {
+    let mut configured = SOLUM_IN_ENV
+        .lock()
+        .expect("solum-in environment lock poisoned");
+    *configured = Some(name.to_owned());
 }
 
-fn solum_in_matches_in(
-    requested: &str,
-    faber_solum_in: Option<&str>,
-    os: &str,
-    env_get: impl Fn(&str) -> Option<String>,
-) -> bool {
-    if faber_solum_in == Some(requested) {
-        return true;
-    }
-    if requested == os {
-        return true;
-    }
-    if env_get(requested).is_some_and(|value| !value.is_empty()) {
-        return true;
-    }
-    let upper = requested.to_ascii_uppercase();
-    if upper != requested {
-        return env_get(&upper).is_some_and(|value| !value.is_empty());
-    }
-    false
+/// `solum_in "name"` runs only in that named environment.
+///
+/// Match order: the name configured through [`set_solum_in_environment`],
+/// then `std::env::consts::OS`.
+fn solum_in_matches(requested: &str) -> bool {
+    let configured = SOLUM_IN_ENV
+        .lock()
+        .expect("solum-in environment lock poisoned")
+        .clone();
+    solum_in_matches_in(requested, configured.as_deref(), std::env::consts::OS)
+}
+
+fn solum_in_matches_in(requested: &str, configured: Option<&str>, os: &str) -> bool {
+    requested == os || configured == Some(requested)
 }
 
 /// Optional harness-style substring filter on case display path (`suite/name`).

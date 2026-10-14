@@ -305,6 +305,27 @@ fn cli_parses_run_stats_sinks_and_rejects_profile_name() {
 }
 
 #[test]
+fn run_accepts_shuffle_seed_and_debug_flags() {
+    let cli = Cli::try_parse_from(["faber", "run", "--shuffle-seed", "0", "--debug", "x.fab"])
+        .expect("parse run shuffle-seed and debug");
+    let Some(crate::cli::Command::Run(args)) = cli.command else {
+        panic!("expected run subcommand");
+    };
+    assert_eq!(args.shuffle_seed, Some(0));
+    assert!(args.debug);
+}
+
+#[test]
+fn test_accepts_solum_in_flag() {
+    let cli = Cli::try_parse_from(["faber", "test", "--solum-in", "ci"])
+        .expect("parse test --solum-in");
+    let Some(crate::cli::Command::Test(args)) = cli.command else {
+        panic!("expected test subcommand");
+    };
+    assert_eq!(args.solum_in.as_deref(), Some("ci"));
+}
+
+#[test]
 fn cli_leaves_build_target_unset_when_omitted() {
     let build = Cli::try_parse_from(["faber", "build", "pkg"]).expect("parse build");
     let Some(crate::cli::Command::Build(args)) = build.command else {
