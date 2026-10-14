@@ -53,6 +53,7 @@ pub use source::{PeeledSource, SourceFile, SourceLoadError, peel_raw_source, sou
 pub use target_bindings::TargetBindings;
 
 use crate::CompileResult;
+use crate::codegen::input::{CodegenAnalysis, CodegenProvider};
 use crate::codegen::{self, Target};
 use crate::diagnostics::DiagnosticConvert;
 use crate::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase, Severity, Span, locale_unknown_spec};
@@ -3264,6 +3265,185 @@ impl AnalyzedModule {
     }
 }
 
+/// Codegen-facing view of one analyzed module (C-D1a).
+///
+/// The driver owns this implementation; codegen reads the same facts through
+/// [`CodegenAnalysis`] without naming `AnalyzedModule`. Every accessor borrows
+/// the unit's own arena, so emission never copies or re-derives a fact.
+impl CodegenAnalysis for AnalyzedModule {
+    fn interner(&self) -> &Interner {
+        &self.interner
+    }
+
+    fn types(&self) -> &semantic::TypeTable {
+        &self.types
+    }
+
+    fn hir(&self) -> &HirModule {
+        &self.hir
+    }
+
+    fn resolver(&self) -> &Resolver {
+        &self.resolver
+    }
+
+    fn function_facts(&self) -> &semantic::FunctionFactTable {
+        &self.function_facts
+    }
+
+    fn presentation(&self) -> &HirPresentation {
+        &self.presentation
+    }
+
+    fn diagnostics(&self) -> &[Diagnostic] {
+        &self.diagnostics
+    }
+
+    fn libraries(&self) -> &LibraryRegistry {
+        &self.libraries
+    }
+
+    fn tensor_edge_policies(&self) -> &radix_hir::TensorEdgePolicyTable {
+        &self.tensor_edge_policies
+    }
+
+    fn resolved_uses(&self) -> &semantic::ResolvedUseIndex {
+        &self.resolved_uses
+    }
+
+    fn gpu_builtins(&self) -> &[(DefId, radix_types::MirKernelBuiltin)] {
+        &self.gpu_builtins
+    }
+
+    fn shape_obligations(&self) -> &semantic::ShapeObligationTable {
+        &self.shape_obligations
+    }
+
+    fn provenance(&self) -> &semantic::FunctionProvenanceTable {
+        &self.provenance
+    }
+
+    fn display_tokens(&self) -> &crate::runtime_contract::display_tokens::DisplayTokens {
+        &self.display_tokens
+    }
+
+    fn provider(&self, import_path: &str) -> Option<CodegenProvider<'_>> {
+        match self.provider_units.get(import_path)? {
+            CarriedProviderUnit::Failed { message } => Some(CodegenProvider::Failed { message: message.clone() }),
+            carried @ CarriedProviderUnit::Unit(_) => {
+                let guard = carried.lock_unit()?;
+                Some(CodegenProvider::Unit(Box::new(provider_analysis_unit(guard))))
+            }
+        }
+    }
+
+    fn provider_keys(&self) -> Vec<String> {
+        self.provider_units.units.keys().cloned().collect()
+    }
+}
+
+/// Owned codegen view of one locked provider unit (C-D1a).
+///
+/// [`CodegenAnalysis::provider`] hands the provider walk a value that owns the
+/// guard, so the walk boxes this wrapper. Provider units carry only the
+/// program, symbol/type arenas, resolver, dispatch facts, shape guards, and
+/// diagnostics; provider emission passes defaults for the remaining facts, so
+/// those accessors answer with the same empty defaults the emitter uses.
+struct ProviderAnalysisUnit<'a> {
+    guard: ProviderUnitGuard<'a>,
+    presentation: HirPresentation,
+    libraries: LibraryRegistry,
+    function_facts: semantic::FunctionFactTable,
+    resolved_uses: semantic::ResolvedUseIndex,
+    provenance: semantic::FunctionProvenanceTable,
+    display_tokens: crate::runtime_contract::display_tokens::DisplayTokens,
+}
+
+/// Build the owned view of one locked provider unit.
+fn provider_analysis_unit(guard: ProviderUnitGuard<'_>) -> ProviderAnalysisUnit<'_> {
+    ProviderAnalysisUnit {
+        guard,
+        presentation: empty_presentation(),
+        libraries: LibraryRegistry::default(),
+        function_facts: semantic::FunctionFactTable::default(),
+        resolved_uses: semantic::ResolvedUseIndex::default(),
+        provenance: semantic::FunctionProvenanceTable::default(),
+        display_tokens: crate::runtime_contract::display_tokens::DisplayTokens::latin(),
+    }
+}
+
+impl CodegenAnalysis for ProviderAnalysisUnit<'_> {
+    fn interner(&self) -> &Interner {
+        &self.guard.interner
+    }
+
+    fn types(&self) -> &semantic::TypeTable {
+        &self.guard.types
+    }
+
+    fn hir(&self) -> &HirModule {
+        &self.guard.hir
+    }
+
+    fn resolver(&self) -> &Resolver {
+        &self.guard.resolver
+    }
+
+    fn function_facts(&self) -> &semantic::FunctionFactTable {
+        &self.function_facts
+    }
+
+    fn presentation(&self) -> &HirPresentation {
+        &self.presentation
+    }
+
+    fn diagnostics(&self) -> &[Diagnostic] {
+        &self.guard.diagnostics
+    }
+
+    fn libraries(&self) -> &LibraryRegistry {
+        &self.libraries
+    }
+
+    fn tensor_edge_policies(&self) -> &radix_hir::TensorEdgePolicyTable {
+        &self.guard.tensor_edge_policies
+    }
+
+    fn resolved_uses(&self) -> &semantic::ResolvedUseIndex {
+        &self.resolved_uses
+    }
+
+    fn gpu_builtins(&self) -> &[(DefId, radix_types::MirKernelBuiltin)] {
+        &[]
+    }
+
+    fn shape_obligations(&self) -> &semantic::ShapeObligationTable {
+        &self.guard.shape_obligations
+    }
+
+    fn provenance(&self) -> &semantic::FunctionProvenanceTable {
+        &self.provenance
+    }
+
+    fn display_tokens(&self) -> &crate::runtime_contract::display_tokens::DisplayTokens {
+        &self.display_tokens
+    }
+
+    fn provider(&self, import_path: &str) -> Option<CodegenProvider<'_>> {
+        match self.guard.nested.get(import_path)? {
+            CarriedProviderUnit::Failed { message } => Some(CodegenProvider::Failed { message: message.clone() }),
+            carried @ CarriedProviderUnit::Unit(_) => {
+                let guard = carried.lock_unit()?;
+                Some(CodegenProvider::Unit(Box::new(provider_analysis_unit(guard))))
+            }
+        }
+    }
+
+    fn provider_keys(&self) -> Vec<String> {
+        self.guard.nested.units.keys().cloned().collect()
+    }
+}
+
 /// Source graphics metadata admitted through the ordinary frontend before MIR-backed emission.
 ///
 /// Contract facts are the generic [`radix_mir::shader_contract`] records,
@@ -4784,3 +4964,7 @@ mod wgsl_bound_params_tests;
 #[cfg(feature = "mir-wgsl")]
 #[path = "wgsl_bound_bindings_test.rs"]
 mod wgsl_bound_bindings_tests;
+
+#[cfg(test)]
+#[path = "codegen_analysis_test.rs"]
+mod codegen_analysis_tests;

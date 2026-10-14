@@ -35,6 +35,7 @@ pub mod go;
 #[cfg(feature = "hir-haskell")]
 pub mod haskell;
 pub(crate) mod hygiene;
+pub mod input;
 mod names;
 pub mod needs;
 #[cfg(feature = "hir-odin")]
