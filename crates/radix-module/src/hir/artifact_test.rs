@@ -537,6 +537,28 @@ fn transparent_alias_annotation_survives_the_fhir_round_trip() {
 }
 
 #[test]
+fn union_alias_annotation_survives_the_fhir_round_trip() {
+    // `type Valor = int ∪ string` is a transparent alias whose annotation
+    // finalizes to a union body at the HIR site. The authored `Named` head
+    // must still load once the alias-to-body fact is the witness.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = include_str!("../../../../corpus/unio/unio.fab");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "union-alias.fab", source, AnalyzeRequest::default())
+        .expect("union alias fixture analyzes");
+    let artifact = from_analyzed(&original, "union-alias", "union-alias.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize union alias artifact");
+    load_fhir(&bytes).expect("union alias artifact must load");
+}
+
+#[test]
 fn inferred_constructor_map_survives_the_fhir_round_trip() {
     // `_ { … }` is an inferred constructor: the authored hole is resolved to
     // the site's expected type, and HIR materializes no node for the hole
