@@ -213,6 +213,9 @@ mod ordering_test;
 pub mod ordo_conversio;
 pub mod pattern;
 pub mod range;
+#[cfg(test)]
+#[path = "record_anon_test.rs"]
+mod record_anon_test;
 pub mod reduction;
 #[cfg(test)]
 #[path = "reduction_test.rs"]
