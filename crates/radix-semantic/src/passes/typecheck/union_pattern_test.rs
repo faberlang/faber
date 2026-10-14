@@ -29,7 +29,7 @@ fn same_module_union_match_binds_named_arms_and_payload() {
     // uvf-u1 done_when (b): same-module union `match` with named arms +
     // payload bindings checks green. The scrutinee is a union value; the arm
     // binds the payload field and the arm body uses it.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"discretio Eventum {
     Ictus { numerus vis },
     Sonitus
@@ -53,7 +53,7 @@ incipit {
 #[test]
 fn same_module_union_match_missing_variant_still_errors() {
     // uvf-u1 done_when (d): a genuinely-missing variant name still errors.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"discretio Eventum { Ictus, Sonitus }
 
 functio describe(Eventum e) → textus {
@@ -112,7 +112,7 @@ fn token_union_interface() -> FileInterface {
 }
 
 fn analyze_consumer(source: &str) -> crate::test_support::AnalyzedFixture {
-    crate::test_support::analyze_source_with_import_contract(
+    crate::test_support::analyze_source_with_import_contract_la(
         source,
         BTreeMap::from([(
             "token".to_owned(),
@@ -126,7 +126,7 @@ fn analyze_consumer(source: &str) -> crate::test_support::AnalyzedFixture {
 }
 
 /// Run the consumer analysis and return the flat diagnostic list (errors and
-/// warnings), matching `driver::analyze_source`-style test consumers.
+/// warnings), matching `driver::analyze_source_la`-style test consumers.
 fn analyze_consumer_diagnostics(source: &str) -> Vec<crate::SemanticError> {
     analyze_consumer(source).diagnostics.clone()
 }
@@ -217,7 +217,7 @@ fn enum_match_behavior_unchanged() {
     // uvf-u1 done_when (e): existing enum match behavior is a regression
     // surface — named arms and missing-variant errors behave as before on an
     // `ordo`.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"ordo Colores {
     Rubrum,
     Viride
@@ -230,7 +230,7 @@ functio describe(Colores c) → textus {
     }
 }"#,
     );
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"ordo Colores { Rubrum, Viride }
 
 functio describe(Colores c) → textus {
@@ -252,7 +252,7 @@ fn rejects_qualified_pattern_with_unknown_prefix() {
     // CG2-R07 mirror: a leading path segment that is not a real qualifier
     // must reject — `casu missing.A.X { }` must never silently bind the
     // local `A.X` as a pattern.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"discretio A { X }
 
 functio f(A a) → textus {
@@ -273,7 +273,7 @@ incipit {
 fn rejects_qualified_pattern_with_non_namespace_prefix() {
     // CG2-R07 mirror: a value binding in prefix position is not a namespace —
     // the path must reject rather than resolve the penultimate local union.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"discretio A { X }
 
 functio f(A a) → textus {
@@ -291,7 +291,7 @@ functio f(A a) → textus {
 fn allows_exact_local_qualified_pattern() {
     // CG2-R07 mirror regression pin: the exact local qualifier `casu A.X { }`
     // still resolves through the local union's parent.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"discretio A { X }
 
 functio f(A a) → textus {
@@ -399,7 +399,7 @@ fn rejects_elige_casu_value_with_unknown_prefix() {
     // path segments must resolve the leading path as a real qualifier — a
     // fully-unknown prefix like `casu missing.A.X { }` must reject as an
     // unknown variant, never silently bind the local `A.X`.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"discretio A { X }
 
 functio f(A a) → textus {
@@ -422,7 +422,7 @@ fn rejects_elige_casu_value_with_non_namespace_prefix() {
     // CG2-R07 expression-position mirror: a value binding in prefix position
     // is not a namespace — the casu value must reject rather than silently
     // bind the local union's variant through the bare-name fallback.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"discretio A { X }
 
 functio f(A a) → textus {
@@ -446,7 +446,7 @@ incipit {
 fn allows_exact_local_qualified_elige_casu_value() {
     // CG2-R07 expression-position regression pin: the exact local qualifier
     // `casu A.X { }` still resolves through the local union's parent.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"discretio A { X }
 
 functio f(A a) → textus {
@@ -492,7 +492,7 @@ fn elige_casu_reject_raises_resolve_stage_unknown_variant() {
     // check while the lowering check survived, so the lowering error alone
     // masked the regression and `missing.A.X` was silently resolved as an
     // expression through the bare-name fallback.
-    let diagnostics = test_support::compile_and_get_diagnostics(
+    let diagnostics = test_support::compile_and_get_diagnostics_la(
         r#"discretio A { X }
 
 functio f(A a) → textus {
@@ -521,7 +521,7 @@ incipit {
 // binding environment.
 #[test]
 fn or_pattern_accepts_payload_free_and_identical_payload_bindings() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"discretio Eventum {
     Ictus { numerus vis },
     Tactus { numerus vis },
@@ -549,7 +549,7 @@ functio quiet(Eventum e) → vacuum {
 
 #[test]
 fn or_pattern_rejects_mismatched_binding_names() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"discretio Eventum { Ictus { numerus vis }, Tactus { numerus vis } }
 
 functio describe(Eventum e) → textus {
@@ -563,7 +563,7 @@ functio describe(Eventum e) → textus {
 
 #[test]
 fn or_pattern_rejects_mismatched_binding_types() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"discretio Eventum { Ictus { numerus vis }, Verbum { textus vis } }
 
 functio describe(Eventum e) → textus {

@@ -72,14 +72,14 @@ incipit {
 
 #[test]
 fn direct_call_of_a_nondum_function_is_refused() {
-    let result = test_support::analyze_source(DIRECT_CALL);
+    let result = test_support::analyze_source_la(DIRECT_CALL);
     assert!(result.is_err());
     assert_refused_once(&result, "later", Some("pending host dispatch"));
 }
 
 #[test]
 fn nondum_function_used_as_a_value_is_refused() {
-    let result = test_support::analyze_source(
+    let result = test_support::analyze_source_la(
         r#"
 @ nondum "pending host dispatch"
 functio later(textus s) → textus
@@ -96,7 +96,7 @@ incipit {
 
 #[test]
 fn nondum_function_passed_as_an_argument_is_refused() {
-    let result = test_support::analyze_source(
+    let result = test_support::analyze_source_la(
         r#"
 @ nondum "pending host dispatch"
 functio later(textus s) → textus
@@ -116,7 +116,7 @@ incipit {
 
 #[test]
 fn every_use_is_refused_separately() {
-    let result = test_support::analyze_source(
+    let result = test_support::analyze_source_la(
         r#"
 @ nondum "later"
 functio later(textus s) → textus
@@ -138,7 +138,7 @@ fn a_gate_without_a_target_refuses_on_every_target() {
         Target::HirGo,
         Target::MirFmir,
     ] {
-        let result = test_support::analyze_source_for_target(DIRECT_CALL, target);
+        let result = test_support::analyze_source_for_target_la(DIRECT_CALL, target);
         assert_eq!(
             refusals(&result).len(),
             1,
@@ -160,16 +160,16 @@ incipit {
     nota later("x")
 }
 "#;
-    let on_rust = test_support::analyze_source_for_target(source, Target::HirRust);
+    let on_rust = test_support::analyze_source_for_target_la(source, Target::HirRust);
     assert_refused_once(&on_rust, "later", Some("rust only"));
 
-    let on_ts = test_support::analyze_source_for_target(source, Target::HirTypeScript);
+    let on_ts = test_support::analyze_source_for_target_la(source, Target::HirTypeScript);
     assert!(on_ts.is_ok(), "diagnostics: {:?}", on_ts.diagnostics);
 }
 
 #[test]
 fn a_nondum_function_with_a_body_is_refused_when_used() {
-    let result = test_support::analyze_source(
+    let result = test_support::analyze_source_la(
         r#"
 @ nondum "withdrawn"
 functio later(textus s) → textus {
@@ -186,7 +186,7 @@ incipit {
 
 #[test]
 fn a_gate_without_a_reason_carries_no_reason_arg() {
-    let result = test_support::analyze_source(
+    let result = test_support::analyze_source_la(
         r#"
 @ nondum
 functio later(textus s) → textus
@@ -201,7 +201,7 @@ incipit {
 
 #[test]
 fn braced_gate_form_is_refused() {
-    let result = test_support::analyze_source(
+    let result = test_support::analyze_source_la(
         r#"
 @ nondum { ratio = "braced" }
 functio later(textus s) → textus
@@ -221,7 +221,7 @@ fn an_unreferenced_nondum_declaration_compiles() {
         "@ nondum \"later\"\nfunctio later(textus s) → textus { redde s }\n\nincipit { tacet }\n",
         "@ nondum\nfunctio later() → numerus\n",
     ] {
-        let result = test_support::analyze_source(source);
+        let result = test_support::analyze_source_la(source);
         assert!(result.is_ok(), "{source}: {:?}", result.diagnostics);
         assert!(
             result.diagnostics.is_empty(),
@@ -233,7 +233,7 @@ fn an_unreferenced_nondum_declaration_compiles() {
 
 #[test]
 fn an_unmarked_function_beside_a_nondum_one_still_compiles() {
-    let result = test_support::analyze_source(
+    let result = test_support::analyze_source_la(
         r#"
 @ nondum "later"
 functio later(textus s) → textus
@@ -313,7 +313,7 @@ fn analyze_with_provider(
         ("mod".to_owned(), provider(gates.clone())),
         ("./mod".to_owned(), provider(gates)),
     ]);
-    test_support::analyze_source_with_config(source, config)
+    test_support::analyze_source_with_config_la(source, config)
 }
 
 fn analyze_import(source: &str, gates: Vec<InterfaceUnavailable>) -> AnalyzedFixture {
@@ -473,7 +473,7 @@ fn with_main(main: &str) -> String {
 
 #[test]
 fn instance_call_of_a_nondum_method_is_refused() {
-    let result = test_support::analyze_source(&with_main("    n.mitte(\"x\")"));
+    let result = test_support::analyze_source_la(&with_main("    n.mitte(\"x\")"));
     assert!(result.is_err());
     assert_refused_once(&result, "Nexus.mitte", Some("pending host dispatch"));
 }
@@ -492,19 +492,19 @@ genus Nexus {
     }
 }
 "#;
-    let result = test_support::analyze_source(source);
+    let result = test_support::analyze_source_la(source);
     assert_refused_once(&result, "Nexus.mitte", Some("pending host dispatch"));
 }
 
 #[test]
 fn a_nondum_method_does_not_block_its_siblings() {
-    let result = test_support::analyze_source(&with_main("    nota n.lege()"));
+    let result = test_support::analyze_source_la(&with_main("    nota n.lege()"));
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
 
 #[test]
 fn a_declared_but_uncalled_nondum_method_compiles() {
-    let result = test_support::analyze_source(&with_main("    nota n.nomen"));
+    let result = test_support::analyze_source_la(&with_main("    nota n.nomen"));
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
 
@@ -525,10 +525,10 @@ incipit {
     n.mitte("x")
 }
 "#;
-    let on_rust = test_support::analyze_source_for_target(source, Target::HirRust);
+    let on_rust = test_support::analyze_source_for_target_la(source, Target::HirRust);
     assert_refused_once(&on_rust, "Nexus.mitte", Some("rust only"));
 
-    let on_ts = test_support::analyze_source_for_target(source, Target::HirTypeScript);
+    let on_ts = test_support::analyze_source_for_target_la(source, Target::HirTypeScript);
     assert!(on_ts.is_ok(), "diagnostics: {:?}", on_ts.diagnostics);
 }
 
@@ -555,7 +555,7 @@ incipit {
     a.mitte()
 }
 "#;
-    let result = test_support::analyze_source(source);
+    let result = test_support::analyze_source_la(source);
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
 
@@ -590,7 +590,7 @@ functio f({union} x) {{
 }}
 "#
         );
-        let result = test_support::analyze_source(&source);
+        let result = test_support::analyze_source_la(&source);
         assert_refused_once(&result, "Nexus.mitte", Some("pending"));
     }
 }
@@ -648,7 +648,7 @@ fn analyze_imported_genus(
         BTreeMap::from([("Nexus".to_owned(), VisibilityTier::Publica)]),
     )]);
     config.file_interfaces = BTreeMap::from([("nexus".to_owned(), socket_interface(gates))]);
-    test_support::analyze_source_with_config(
+    test_support::analyze_source_with_config_la(
         &format!(
             "importa ex \"./nexus\" nexus\n\nincipit {{\n    varia nexus.Nexus n ← nexus.Nexus {{ }}\n{body}\n}}"
         ),

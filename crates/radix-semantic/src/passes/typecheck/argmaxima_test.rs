@@ -5,11 +5,13 @@
 //! (`radix-mir-runner/src/arg_extremum_test.rs`).
 
 use crate::Type;
-use crate::test_support::{analyze_ok, assert_accepts, assert_rejects_with_issue, entry_local_tys};
+use crate::test_support::{
+    analyze_ok_la, assert_accepts_la, assert_rejects_with_issue_la, entry_local_tys,
+};
 
 #[test]
 fn argmaxima_resolves_on_numeric_lista_as_numerus_option() {
-    let unit = analyze_ok(
+    let unit = analyze_ok_la(
         r"incipit {
     fixum lista<fractus> xs ← vacua
     fixum numerus ∪ nihil winner ← xs.argmaxima()
@@ -28,7 +30,7 @@ fn argmaxima_resolves_on_numeric_lista_as_numerus_option() {
 
 #[test]
 fn argmaxima_empty_result_composes_with_vel() {
-    assert_accepts(
+    assert_accepts_la(
         r"incipit {
     fixum lista<fractus> xs ← vacua
     fixum numerus literal ← xs.argmaxima() vel 0
@@ -44,7 +46,7 @@ fn argmaxima_empty_result_composes_with_vel() {
 
 #[test]
 fn argminima_mirrors_argmaxima_on_numeric_lista() {
-    let unit = analyze_ok(
+    let unit = analyze_ok_la(
         r"incipit {
     fixum lista<fractus> xs ← vacua
     fixum numerus ∪ nihil winner ← xs.argminima()
@@ -62,7 +64,7 @@ fn argminima_mirrors_argmaxima_on_numeric_lista() {
 
 #[test]
 fn argmaxima_rejects_non_numeric_lista_elements() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"incipit {
     fixum lista<textus> xs ← vacua
     fixum numerus ∪ nihil winner ← xs.argmaxima()
@@ -70,7 +72,7 @@ fn argmaxima_rejects_non_numeric_lista_elements() {
 }",
         "numeric_lista_elements_required",
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"incipit {
     fixum lista<textus> xs ← vacua
     fixum numerus ∪ nihil winner ← xs.argminima()

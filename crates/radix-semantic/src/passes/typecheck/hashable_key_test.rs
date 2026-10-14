@@ -7,7 +7,7 @@
 use crate::test_support;
 
 fn assert_rejects(source: &str, issue: &str) {
-    let result = test_support::analyze_source(source);
+    let result = test_support::analyze_source_la(source);
     let err = result
         .diagnostics
         .iter()
@@ -101,7 +101,7 @@ genus Index {
 
 #[test]
 fn hashable_keys_accept() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 genus Locus {
     fixum textus regio

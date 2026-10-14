@@ -8,7 +8,7 @@ use crate::test_support;
 
 #[test]
 fn bracket_list_reads_and_writes_tuple_key_entry() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"
 incipit {
     varia tabula<iuncta<textus, numerus>, numerus> m ← vacua
@@ -22,7 +22,7 @@ incipit {
 
 #[test]
 fn bracket_list_with_wrong_part_count_rejects() {
-    let result = test_support::analyze_source(
+    let result = test_support::analyze_source_la(
         r#"
 incipit {
     varia tabula<iuncta<textus, numerus>, numerus> m ← vacua
@@ -41,7 +41,7 @@ incipit {
 
 #[test]
 fn bracket_list_with_wrong_part_type_rejects() {
-    let result = test_support::analyze_source(
+    let result = test_support::analyze_source_la(
         r#"
 incipit {
     varia tabula<iuncta<textus, numerus>, numerus> m ← vacua
