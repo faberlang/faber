@@ -27,6 +27,8 @@ fn run_args(path: PathBuf, device: Option<DeviceChoice>) -> RunArgs {
         threads: None,
         stats: false,
         stats_file: None,
+        shuffle_seed: None,
+        debug: false,
         deny_warnings: false,
         deny: Vec::new(),
         args: Vec::new(),

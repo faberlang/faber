@@ -46,6 +46,9 @@ struct RunMetadata {
 /// Discover, select, and run proba cases exclusively on the MIR runner.
 pub(super) fn cmd_test(args: &TestArgs) {
     crate::commands::validate_deny_codes(&args.deny);
+    if let Some(name) = args.solum_in.as_deref() {
+        proba::set_solum_in_environment(name);
+    }
     // Package discovery requires absolute inputs; absolutizing here (same seam
     // as the package build/check/run routes) keeps `.`, relative, and absolute
     // paths resolving to one package root (rdx-s05-1).
