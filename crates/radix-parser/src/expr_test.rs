@@ -14,7 +14,7 @@ use crate::test_support::{
 use radix_diagnostics::Span;
 use radix_syntax::{
     AssignOp, BinOp, CallDefaultExpr, ConversioTarget, Expr, ExprKind, FiguraExpr, JsonValue,
-    Literal, NonNullKind, OptionalChainKind, RangeKind, StmtKind, TypeExprKind,
+    Literal, NonNullKind, OptionalChainKind, RangeKind, StmtKind, TypeExprKind, TypeFormLevel,
 };
 
 fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeExpr {
@@ -921,6 +921,45 @@ fn record_field_list_hole_constructor_parses() {
         panic!("expected ratio construction object");
     };
     assert_eq!(object.fields.len(), 2);
+}
+
+#[test]
+fn bare_field_literal_is_marked_and_hole_constructor_is_not() {
+    // Operator ruling 2026-10-14: the bare `{ field = value }` literal is a
+    // hole with a record default; `_ { field = value }` is a hole with none.
+    // The parser records the difference on the `Verte` target's form so the
+    // checker can default only the bare literal.
+    let result = parse_ok_la("incipit { fixum _ a ← { x = 1 }\n fixum _ b ← _ { x = 1 } }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let radix_syntax::IfBody::Block(block) = &incipit.body else {
+        panic!("expected block body");
+    };
+    let StmtKind::Var(bare_var) = &block.statements[0].kind else {
+        panic!("expected bare binding");
+    };
+    let bare_init = bare_var.init.as_deref().expect("bare initializer");
+    let ExprKind::Verte(bare_verte) = &bare_init.kind else {
+        panic!(
+            "expected bare field literal to be Verte, got {:?}",
+            bare_init.kind
+        );
+    };
+    assert_eq!(bare_verte.ty.form, TypeFormLevel::BARE_LITERAL);
+
+    let StmtKind::Var(hole_var) = &block.statements[1].kind else {
+        panic!("expected hole binding");
+    };
+    let hole_init = hole_var.init.as_deref().expect("hole initializer");
+    let ExprKind::Verte(hole_verte) = &hole_init.kind else {
+        panic!(
+            "expected hole constructor to be Verte, got {:?}",
+            hole_init.kind
+        );
+    };
+    assert_eq!(hole_verte.ty.form, TypeFormLevel::LONG);
 }
 
 #[test]

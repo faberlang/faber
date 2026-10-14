@@ -1532,6 +1532,17 @@ impl Lowerer<'_> {
             false,
         );
         self.allow_bare_generic_construction = previous_bare_generic_construction;
+        // Operator ruling 2026-10-14: a bare `{ field = value }` literal leaves
+        // its type slot out, so its inferred target is a hole WITH a default —
+        // the field-shaped record. An explicit `_ { … }` hole (form `LONG`)
+        // is unmarked and keeps failing closed without an expected type.
+        if matches!(verte.ty.kind, radix_syntax::TypeExprKind::Infer)
+            && verte.ty.form == radix_syntax::TypeFormLevel::BARE_LITERAL
+            && let crate::Type::Infer(var) = self.types.get(target)
+        {
+            let var = *var;
+            self.types.mark_default_record_hole(var);
+        }
         // WHY: `{} ∷ Genus` is the same value as `Genus {}` (constructor =
         // type + shape; the bare literal takes the ascribed cell type), so the
         // empty bare JSON object literal ascribed to a genus lowers as a
