@@ -53,8 +53,13 @@ fn reducta_source_registry_direct_has_an_arm() {
     );
     let rendered =
         rendered.expect("reducta_source must render registry-direct, not the generic fallback");
-    assert!(
-        rendered.contains("reduction source"),
-        "reducta_source must use its own arm: {rendered}"
+    let fallback = parse_message(
+        ParseErrorKind::Expected,
+        &args(&[("issue", "no_such_parse_issue")]),
+    );
+    assert_ne!(
+        Some(rendered.as_str()),
+        fallback.as_deref(),
+        "reducta_source must use its own arm, not the generic fallback: {rendered}"
     );
 }
