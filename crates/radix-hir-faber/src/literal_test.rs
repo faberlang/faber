@@ -94,6 +94,22 @@ fn finite_float_literals_keep_decimal_convention() {
 }
 
 #[test]
+fn textus_literal_with_escaped_quotes_stays_in_quotes() {
+    let mut interner = Interner::new();
+    let sym = interner.intern(r#"a \"b\""#);
+    let rendered = render_with_interner(&HirLiteral::String(sym), &interner, &LatinSurface);
+    assert_eq!(rendered, r#""a \"b\"""#);
+}
+
+#[test]
+fn textus_literal_with_unescaped_quote_uses_guillemets() {
+    let mut interner = Interner::new();
+    let sym = interner.intern(r#"a "b""#);
+    let rendered = render_with_interner(&HirLiteral::String(sym), &interner, &LatinSurface);
+    assert_eq!(rendered, "«a \"b\"»");
+}
+
+#[test]
 fn regex_literal_emits_slash_form_in_locale_word() {
     let mut interner = Interner::new();
     let escaped = interner.intern(r"\d+\/x");
