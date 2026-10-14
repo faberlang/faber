@@ -43,7 +43,7 @@ impl Parser {
     /// attaches to the branch body being parsed, which preserves error-handling
     /// scope for nested `sin` chains.
     pub(super) fn parse_si_stmt(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_ident(TokenKind::Si, "expected 'si'")?;
+        self.expect_keyword_ident(TokenKind::Si)?;
         Ok(StmtKind::Si(self.parse_si_tail()?))
     }
 
@@ -64,7 +64,7 @@ impl Parser {
             if self.eat_keyword_ident(TokenKind::Secus) {
                 Some(self.parse_secus_stmt(leading_trivia)?)
             } else {
-                self.expect_keyword_ident(TokenKind::Sin, "expected 'sin'")?;
+                self.expect_keyword_ident(TokenKind::Sin)?;
                 Some(SecusClause::Sin {
                     stmt: Box::new(self.parse_si_tail()?),
                     leading_trivia,
@@ -142,7 +142,7 @@ impl Parser {
     /// GRAMMAR:
     ///   dum-stmt := `dum` expr if-body [`cape` ident block]
     pub(super) fn parse_dum_stmt(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_ident(TokenKind::Dum, "expected 'dum'")?;
+        self.expect_keyword_ident(TokenKind::Dum)?;
 
         let cond = Box::new(self.parse_expression()?);
         let body = self.parse_ergo_body()?;
@@ -165,7 +165,7 @@ impl Parser {
     /// product); `de` stays unary. Source/binder arity and range membership
     /// are semantic laws, not parse decisions.
     pub(super) fn parse_itera_stmt(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_ident(TokenKind::Itera, "expected 'itera'")?;
+        self.expect_keyword_ident(TokenKind::Itera)?;
 
         let mode = if self.eat_keyword_ident(TokenKind::Ex) {
             IteraMode::Ex
@@ -298,7 +298,7 @@ impl Parser {
     /// `discerne` prevents destructuring-only syntax from leaking into value
     /// dispatch.
     pub(super) fn parse_elige_stmt(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_ident(TokenKind::Elige, "expected 'elige'")?;
+        self.expect_keyword_ident(TokenKind::Elige)?;
 
         let expr = Box::new(self.parse_expression()?);
 
@@ -352,7 +352,7 @@ impl Parser {
     /// variant sets. A comma between subjects, and a subject that is not a
     /// path, are named migration diagnostics.
     pub(super) fn parse_discerne_stmt(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_ident(TokenKind::Discerne, "expected 'discerne'")?;
+        self.expect_keyword_ident(TokenKind::Discerne)?;
 
         let exhaustive = self.eat_discerne_exhaustive_marker();
         let subjects = self.parse_discerne_subjects()?;
@@ -519,13 +519,13 @@ impl Parser {
     /// GRAMMAR:
     ///   custodi-stmt := `custodi` '{' (`si` expr if-body)+ '}'
     pub(super) fn parse_custodi_stmt(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_ident(TokenKind::Custodi, "expected 'custodi'")?;
+        self.expect_keyword_ident(TokenKind::Custodi)?;
         self.expect_issue(&TokenKind::LBrace, "custodi_body_start")?;
 
         let mut clauses = Vec::new();
 
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
-            self.expect_keyword_ident(TokenKind::Si, "expected 'si'")?;
+            self.expect_keyword_ident(TokenKind::Si)?;
             let start = self.current_span();
             let cond = Box::new(self.parse_expression()?);
             let body = self.parse_ergo_body()?;
@@ -551,7 +551,7 @@ impl Parser {
     }
 
     pub(super) fn parse_fac_construct(&mut self, allow_while: bool) -> Result<FacStmt, ParseError> {
-        self.expect_keyword_ident(TokenKind::Fac, "expected 'fac'")?;
+        self.expect_keyword_ident(TokenKind::Fac)?;
 
         let omnia = self.eat_keyword_ident(TokenKind::Omnia);
         let body = self.parse_block()?;
@@ -593,7 +593,7 @@ impl Parser {
     /// GRAMMAR:
     ///   redde-stmt := `redde` [`expr`]
     pub(super) fn parse_redde_stmt(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_ident(TokenKind::Redde, "expected 'redde'")?;
+        self.expect_keyword_ident(TokenKind::Redde)?;
 
         let value = if !self.is_at_end()
             && !self.check(&TokenKind::RBrace)
@@ -613,7 +613,7 @@ impl Parser {
     ///   rumpe-stmt := `rumpe`
     pub(super) fn parse_rumpe_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let span = self.current_span();
-        self.expect_keyword_ident(TokenKind::Rumpe, "expected 'rumpe'")?;
+        self.expect_keyword_ident(TokenKind::Rumpe)?;
         Ok(StmtKind::Rumpe(RumpeStmt { span }))
     }
 
@@ -623,7 +623,7 @@ impl Parser {
     ///   perge-stmt := `perge`
     pub(super) fn parse_perge_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let span = self.current_span();
-        self.expect_keyword_ident(TokenKind::Perge, "expected 'perge'")?;
+        self.expect_keyword_ident(TokenKind::Perge)?;
         Ok(StmtKind::Perge(PergeStmt { span }))
     }
 
@@ -634,7 +634,7 @@ impl Parser {
     /// accepts `cede` in initializer, argument, or return-value positions.
     pub(super) fn parse_cede_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_ident(TokenKind::Cede, "expected 'cede'")?;
+        self.expect_keyword_ident(TokenKind::Cede)?;
         let expr = self.parse_expression()?;
         let span = start.merge(expr.span);
         let id = self.next_id();
@@ -662,7 +662,7 @@ impl Parser {
     ///   iace val si cond  desugars to  si cond { iace val }
     pub(super) fn parse_iace_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_ident(TokenKind::Iace, "expected 'iace'")?;
+        self.expect_keyword_ident(TokenKind::Iace)?;
         let value = Box::new(self.parse_expression()?);
 
         // Guard: only consume `si` when it directly follows the value
@@ -708,7 +708,7 @@ impl Parser {
     ///   mori `"msg"` si cond  desugars to  si cond { mori `"msg"` }
     pub(super) fn parse_mori_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_ident(TokenKind::Mori, "expected 'mori'")?;
+        self.expect_keyword_ident(TokenKind::Mori)?;
         let value = Box::new(self.parse_expression()?);
 
         // Guard: only consume `si` when it directly follows the value
@@ -744,7 +744,7 @@ impl Parser {
     /// Parse `tacet`.
     pub(super) fn parse_tacet_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let span = self.current_span();
-        self.expect_keyword_ident(TokenKind::Tacet, "expected 'tacet'")?;
+        self.expect_keyword_ident(TokenKind::Tacet)?;
         Ok(StmtKind::Tacet(TacetStmt { span }))
     }
 
@@ -762,7 +762,7 @@ impl Parser {
     /// condition is a message missing its `mori` particle; it is rejected
     /// rather than parsed as a separate statement that silently drops it.
     pub(super) fn parse_adfirma_stmt(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_ident(TokenKind::Adfirma, "expected 'adfirma'")?;
+        self.expect_keyword_ident(TokenKind::Adfirma)?;
 
         let cond = Box::new(self.parse_expression()?);
 
@@ -798,7 +798,7 @@ impl Parser {
     /// Leftover `secus` / `else` is rejected. Lowering desugars the node to
     /// `si non (cond) { iace err }`.
     pub(super) fn parse_require_stmt(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_ident(TokenKind::Requirit, "expected 'requirit'")?;
+        self.expect_keyword_ident(TokenKind::Requirit)?;
 
         let cond = Box::new(self.parse_expression()?);
 
@@ -824,7 +824,7 @@ impl Parser {
     /// Same `iace` particle and mandatory error payload as `requirit`.
     /// Lowering desugars the node to `si (cond) { iace err }`.
     pub(super) fn parse_reject_stmt(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword_ident(TokenKind::Reice, "expected 'reice'")?;
+        self.expect_keyword_ident(TokenKind::Reice)?;
 
         let cond = Box::new(self.parse_expression()?);
 
@@ -945,7 +945,7 @@ impl Parser {
     /// Statement-level `ad` is not a valid statement form; use expression-form `ad`.
     pub(super) fn parse_ad_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let keyword_span = self.current_span();
-        self.expect_keyword_ident(TokenKind::Ad, "expected 'ad'")?;
+        self.expect_keyword_ident(TokenKind::Ad)?;
         Err(Self::invalid_statement_error_at(
             keyword_span,
             "ad",
@@ -971,7 +971,7 @@ impl Parser {
     ///   field := ident [`ut` ident]
     pub(super) fn parse_extract_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_ident(TokenKind::Ex, "expected 'ex'")?;
+        self.expect_keyword_ident(TokenKind::Ex)?;
 
         let source = Box::new(self.parse_expression()?);
 

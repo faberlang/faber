@@ -3627,6 +3627,15 @@ message = "ต้องมี '[' หลัง 'apud'"
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "ต้องมี ']' หลังพิกัด 'apud'"
 
+[diagnostics.PARSE001.issues.expected_keyword]
+message = "ต้องมี '{keyword}'"
+
+[diagnostics.PARSE001.issues.reducta_source]
+message = "ต้องมี reduction source หลัง reduction operator"
+
+[diagnostics.PARSE001.issues.lege_lineam]
+message = "ต้องมี '{lege}' หรือ '{lineam}'"
+
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี elige"
 

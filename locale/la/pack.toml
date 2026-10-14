@@ -4868,6 +4868,15 @@ message = "expected '[' after 'apud'"
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "expected ']' after the 'apud' coordinates"
 
+[diagnostics.PARSE001.issues.expected_keyword]
+message = "expected '{keyword}'"
+
+[diagnostics.PARSE001.issues.reducta_source]
+message = "expected a reduction source after the reduction operator"
+
+[diagnostics.PARSE001.issues.lege_lineam]
+message = "expected '{lege}' or '{lineam}'"
+
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "expected an opening brace for the elige body"
 

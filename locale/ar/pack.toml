@@ -3615,6 +3615,15 @@ message = "مطلوب '[' بعد 'apud'"
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "مطلوب ']' بعد إحداثيات 'apud'"
 
+[diagnostics.PARSE001.issues.expected_keyword]
+message = "مطلوب '{keyword}'"
+
+[diagnostics.PARSE001.issues.reducta_source]
+message = "مطلوب مصدر الاختزال بعد معامل الاختزال"
+
+[diagnostics.PARSE001.issues.lege_lineam]
+message = "مطلوب '{lege}' أو '{lineam}'"
+
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "مطلوب قوس فتح لجسم elige"
 

@@ -3615,6 +3615,15 @@ message = "'apud' 后需要 '['"
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "'apud' 坐标后需要 ']'"
 
+[diagnostics.PARSE001.issues.expected_keyword]
+message = "需要 '{keyword}'"
+
+[diagnostics.PARSE001.issues.reducta_source]
+message = "reduction 运算符之后需要 reduction 源"
+
+[diagnostics.PARSE001.issues.lege_lineam]
+message = "需要 '{lege}' 或 '{lineam}'"
+
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "elige 主体需要以花括号开始"
 
