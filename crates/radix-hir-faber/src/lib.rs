@@ -28,6 +28,9 @@ mod closure_body_emit_test;
 mod fac_omnia_emit_test;
 
 #[cfg(test)]
+mod nondum_availability_emit_test;
+
+#[cfg(test)]
 mod comma_law_test;
 
 #[cfg(test)]
