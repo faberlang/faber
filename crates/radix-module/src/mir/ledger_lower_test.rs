@@ -51,6 +51,89 @@ main {
 }
 
 #[test]
+fn ledger_run_loop_follows_insertion_order() {
+    let source = r#"+++
+locale = "en"
++++
+main {
+    var ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
+    for from x at [name] const count {
+        print name
+    }
+}
+"#;
+    let mut host = BufferHost::default();
+    match run_source(&session(), "ledger-run-order.fab", source, &mut host) {
+        Ok(()) => assert_eq!(host.stdout_lines, ["b", "a", "c"]),
+        other => panic!("expected the ledger program to lower, validate and run, got {other:?}"),
+    }
+}
+
+#[test]
+fn ledger_run_update_keeps_position() {
+    let source = r#"+++
+locale = "en"
++++
+main {
+    var ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
+    x["a"] ← 10
+    for from x at [name] const count {
+        print "§=§"(name, count)
+    }
+}
+"#;
+    let mut host = BufferHost::default();
+    match run_source(&session(), "ledger-run-update.fab", source, &mut host) {
+        Ok(()) => assert_eq!(host.stdout_lines, ["b=2", "a=10", "c=3"]),
+        other => panic!("expected the ledger program to lower, validate and run, got {other:?}"),
+    }
+}
+
+#[test]
+fn ledger_run_remove_then_add_appends() {
+    let source = r#"+++
+locale = "en"
++++
+main {
+    var ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
+    x.delete("b")
+    x.put("b", 7)
+    for from x at [name] const count {
+        print name
+    }
+}
+"#;
+    let mut host = BufferHost::default();
+    match run_source(&session(), "ledger-run-remove-add.fab", source, &mut host) {
+        Ok(()) => assert_eq!(host.stdout_lines, ["a", "c", "b"]),
+        other => panic!("expected the ledger program to lower, validate and run, got {other:?}"),
+    }
+}
+
+#[test]
+fn ledger_run_map_unaffected() {
+    let source = r#"+++
+locale = "en"
++++
+main {
+    var map<string, int> x ← { "b": 2, "a": 1, "c": 3 }
+    for from x at [name] const count {
+        print name
+    }
+}
+"#;
+    let mut host = BufferHost::default();
+    match run_source(&session(), "ledger-run-map.fab", source, &mut host) {
+        Ok(()) => {
+            let mut keys = host.stdout_lines;
+            keys.sort();
+            assert_eq!(keys, ["a", "b", "c"]);
+        }
+        other => panic!("expected the map program to lower, validate and run, got {other:?}"),
+    }
+}
+
+#[test]
 fn ledger_run_index_store_and_put_delete() {
     let source = r#"+++
 locale = "en"

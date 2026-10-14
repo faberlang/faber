@@ -2792,6 +2792,20 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
                 Ok(Value::Map(Rc::new(RefCell::new(prepared))))
             }
+            Value::Ledger(cell) => {
+                // A ledger's insertion order is part of its observable surface
+                // (O6): rebuild the prepared entries in the same slot order.
+                let entries = cell
+                    .borrow()
+                    .iter()
+                    .map(|(key, item)| (key.clone(), item.clone()))
+                    .collect::<Vec<_>>();
+                let mut prepared = LedgerValue::new();
+                for (key, item) in entries {
+                    prepared.insert(key, self.prepare_tensor_escape(item, span)?);
+                }
+                Ok(Value::Ledger(Rc::new(RefCell::new(prepared))))
+            }
             Value::Record(fields, order) => {
                 let fields = fields.borrow().clone();
                 let mut prepared = FxHashMap::default();
@@ -4429,9 +4443,22 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 crate::shuffle::shuffle_unordered(&mut items);
                 Ok(Value::Array(Rc::new(RefCell::new(items))))
             }
+            Value::Ledger(cell) => {
+                // O6: a ledger iterates in insertion order on every target;
+                // the unordered-map shuffle never applies to it.
+                let items = if values {
+                    cell.borrow().values().cloned().collect::<Vec<_>>()
+                } else {
+                    cell.borrow()
+                        .keys()
+                        .map(MapKey::to_value)
+                        .collect::<Vec<_>>()
+                };
+                Ok(Value::Array(Rc::new(RefCell::new(items))))
+            }
             _ => Err(RunnerError::internal(
                 span,
-                format!("{label} receiver is not map"),
+                format!("{label} receiver is not map or ledger"),
             )),
         }
     }
