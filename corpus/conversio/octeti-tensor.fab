@@ -47,10 +47,10 @@ locale = "en"
 #   chunked from_le_bytes / from_be_bytes; TypeScript, Go and Swift decline by name.
 
 main {
-    const bytes le_bytes ← |00 00 80 3f 00 00 00 40|
-    const bytes be_bytes ← |3f 80 00 00 40 00 00 00|
-    const bytes grid_bytes ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40|
-    const bytes short_bytes ← |00 00 80|
+    const list<b8> le_bytes ← |00 00 80 3f 00 00 00 40|
+    const list<b8> be_bytes ← |3f 80 00 00 40 00 00 00|
+    const list<b8> grid_bytes ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40|
+    const list<b8> short_bytes ← |00 00 80|
 
     const tensor<f32, [2]> le ← le_bytes ↦ tensor<f32, [2]> via Le
     const tensor<f32, [2]> be ← be_bytes ↦ tensor<f32, [2]> via Be

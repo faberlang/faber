@@ -67,7 +67,7 @@ main {
     print pc
 
     # Bytes decode to text; one byte converts through a window.
-    const bytes raw ← |68 69 ff|
+    const list<b8> raw ← |68 69 ff|
     const string hi ← raw[0‥2] ↦ string ⊥ "?"
     print hi
     const string broken ← raw ↦ string ⊥ "?"

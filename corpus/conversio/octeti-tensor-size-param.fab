@@ -54,7 +54,7 @@ fn runtime_extent(int value) → int {
     return value
 }
 
-fn decode<size N>(tensor<f32, [N]> proto, bytes raw) → tensor<f32, [N]> ⇥ string {
+fn decode<size N>(tensor<f32, [N]> proto, list<b8> raw) → tensor<f32, [N]> ⇥ string {
     return raw ↦ tensor<f32, [N]> via Le
 }
 
@@ -62,7 +62,7 @@ main {
     const int n ← runtime_extent(3)
     const list<f32> values ← [1.0, 2.0, 3.0]
     const tensor<f32, [size n]> proto ← values ↦ tensor<f32, [size n]>
-    const bytes raw ← |00 00 80 3f 00 00 00 40 00 00 40 40|
+    const list<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40|
 
     do {
         const tensor<f32, [size n]> decoded ← decode(proto, raw)
@@ -75,7 +75,7 @@ main {
         print "unexpected"
     }
 
-    const bytes short_raw ← |00 00 80 3f 00 00 00 40|
+    const list<b8> short_raw ← |00 00 80 3f 00 00 00 40|
     do {
         const tensor<f32, [size n]> bad ← decode(proto, short_raw)
         print bad[[0]]

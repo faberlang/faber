@@ -53,8 +53,8 @@ fn runtime_extent(int value) → int {
 
 main {
     const int n ← runtime_extent(3)
-    const bytes raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
-    const bytes short_raw ← |00 00 80 3f 00 00 00 40|
+    const list<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
+    const list<b8> short_raw ← |00 00 80 3f 00 00 00 40|
 
     const tensor<f32, [2, size n]> grid ← raw ↦ tensor<f32, [2, size n]> via Le
     const list<int, _> dims ← grid.shape()

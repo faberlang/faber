@@ -47,8 +47,8 @@ functio runtime_extent(numerus value) → numerus {
 
 incipit {
     fixum numerus n ← runtime_extent(3)
-    fixum octeti raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
-    fixum octeti short_raw ← |00 00 80 3f 00 00 00 40|
+    fixum lista<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
+    fixum lista<b8> short_raw ← |00 00 80 3f 00 00 00 40|
 
     fixum tensor<f32, [2, magnitudo n]> grid ← raw ↦ tensor<f32, [2, magnitudo n]> via Le
     fixum lista<numerus, 2> dims ← grid.magnitudines()

@@ -47,7 +47,7 @@ functio runtime_extent(numerus value) → numerus {
     redde value
 }
 
-functio decode<magnitudo N>(tensor<f32, [N]> proto, octeti raw) → tensor<f32, [N]> ⇥ textus {
+functio decode<magnitudo N>(tensor<f32, [N]> proto, lista<b8> raw) → tensor<f32, [N]> ⇥ textus {
     redde raw ↦ tensor<f32, [N]> via Le
 }
 
@@ -55,7 +55,7 @@ incipit {
     fixum numerus n ← runtime_extent(3)
     fixum lista<f32> values ← [1.0, 2.0, 3.0]
     fixum tensor<f32, [magnitudo n]> proto ← values ↦ tensor<f32, [magnitudo n]>
-    fixum octeti raw ← |00 00 80 3f 00 00 00 40 00 00 40 40|
+    fixum lista<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40|
 
     fac {
         fixum tensor<f32, [magnitudo n]> decoded ← decode(proto, raw)
@@ -68,7 +68,7 @@ incipit {
         nota "unexpected"
     }
 
-    fixum octeti short_raw ← |00 00 80 3f 00 00 00 40|
+    fixum lista<b8> short_raw ← |00 00 80 3f 00 00 00 40|
     fac {
         fixum tensor<f32, [magnitudo n]> bad ← decode(proto, short_raw)
         nota bad[[0]]
