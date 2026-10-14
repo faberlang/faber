@@ -435,3 +435,54 @@ fn wrapped_source_into_var_all_fresh_is_accepted() {
         "functio f(bivalens c) → numerus {\n    varia lista<numerus> ys ← c ✓ [1] ✗ [2]\n    redde ys.longitudo()\n}\nincipit { }",
     );
 }
+
+// ── Aggregates holding containers (7b471d14-8): a tuple or union that holds a
+// container shares that container's state, so a plain `var T y ← x` from an
+// unmarked parameter is SEM065 just like a bare container. A scalar-only
+// aggregate still copies by value and stays legal.
+
+fn assert_aggregate_into_var_rejected(source: &str) {
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn shareable_payload_tuple_with_list_into_var_is_rejected() {
+    assert_aggregate_into_var_rejected(
+        "functio prend(de iuncta<lista<numerus>, numerus> p) → numerus {\n    varia iuncta<lista<numerus>, numerus> q ← p\n    redde 0\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn shareable_payload_union_with_list_into_var_is_rejected() {
+    assert_aggregate_into_var_rejected(
+        "functio prend(lista<numerus> ∪ numerus p) → numerus {\n    varia lista<numerus> ∪ numerus q ← p\n    redde 0\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn shareable_payload_tuple_of_scalars_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "functio prend(de iuncta<numerus, numerus> p) → numerus {\n    varia iuncta<numerus, numerus> q ← p\n    redde 0\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn shareable_payload_union_of_scalars_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "functio prend(numerus ∪ fractus p) → numerus {\n    varia numerus ∪ fractus q ← p\n    redde 0\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn shareable_payload_generic_param_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "functio prend<T>(T p) → numerus {\n    varia T q ← p\n    redde 0\n}\nincipit { }",
+    );
+}
