@@ -25,10 +25,10 @@ use super::tensor_edge::{
     resolve_custom_value,
 };
 use super::value::{
-    GradientStorage, MapKey, TensorEdgeOp, TensorInverseMap, TensorValue, Value, as_text_str,
-    coordinate_fits, format_template_shaped, inverse_view_coordinate, modular_operand,
-    modular_word_reduce, modular_word_result, round_float, uint_width_checked_add, values_equal,
-    width_checked_add,
+    GradientStorage, LedgerValue, MapKey, TensorEdgeOp, TensorInverseMap, TensorValue, Value,
+    as_text_str, coordinate_fits, format_template_shaped, inverse_view_coordinate,
+    modular_operand, modular_word_reduce, modular_word_result, round_float,
+    uint_width_checked_add, values_equal, width_checked_add,
 };
 use super::{
     CallOutcome, RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH, RUNNER_LISTA_LENGTH_MISMATCH, Runner,
@@ -630,13 +630,25 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Ok(Value::Record(Rc::new(RefCell::new(map)), written))
             }
             MirAggregateKind::Map => {
-                let mut map = FxHashMap::default();
                 let MirAggregateFields::Keyed(entries) = &aggregate.fields else {
                     return Err(RunnerError::internal(
                         span,
                         "map construct requires keyed fields",
                     ));
                 };
+                // WHY: a ledger literal lowers to the same keyed aggregate as a
+                // map; the aggregate type keeps insertion order so a duplicate
+                // key retains its first position with the later value.
+                if matches!(self.types.get(aggregate.ty.semantic_id()), Type::Ledger(_, _)) {
+                    let mut ledger = LedgerValue::new();
+                    for entry in entries {
+                        let key = self.eval_operand(&entry.key, span)?.to_key(span)?;
+                        let value = self.eval_operand(&entry.value, span)?;
+                        ledger.insert(key, value);
+                    }
+                    return Ok(Value::Ledger(Rc::new(RefCell::new(ledger))));
+                }
+                let mut map = FxHashMap::default();
                 for entry in entries {
                     let key = self.eval_operand(&entry.key, span)?.to_key(span)?;
                     let value = self.eval_operand(&entry.value, span)?;
@@ -1066,6 +1078,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     )
                     | (Value::Array(_), Type::Array(_) | Type::BoundedArray { .. })
                     | (Value::Map(_), Type::Map(_, _))
+                    | (Value::Ledger(_), Type::Ledger(_, _))
                     | (Value::Set(_), Type::Set(_))
                     | (
                         Value::Instans(_),
@@ -1202,6 +1215,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     Value::Array(cell) => cell.borrow().len(),
                     Value::Cursor(cursor) => self.cursor_step_length(&cursor, span)?,
                     Value::Map(cell) => cell.borrow().len(),
+                    Value::Ledger(cell) => cell.borrow().len(),
                     Value::Set(cell) => cell.borrow().len(),
                     Value::Tensor(cell) => cell.borrow().shape.len(),
                     Value::Str(text) => text.chars().count(),
@@ -1785,6 +1799,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         cell.borrow_mut().insert(key.to_key(span)?, value);
                         Ok(Value::Unit)
                     }
+                    Value::Ledger(cell) => {
+                        cell.borrow_mut().insert(key.to_key(span)?, value);
+                        Ok(Value::Unit)
+                    }
                     _ => Err(RunnerError::internal(span, "put receiver is not map")),
                 }
             }
@@ -1798,6 +1816,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     Value::Map(cell) => {
                         let map_key = key.to_key(span)?;
                         Ok(Value::Bool(cell.borrow_mut().remove(&map_key).is_some()))
+                    }
+                    Value::Ledger(cell) => {
+                        let ledger_key = key.to_key(span)?;
+                        Ok(Value::Bool(cell.borrow_mut().remove(&ledger_key).is_some()))
                     }
                     Value::Set(cell) => {
                         let set_key = key.to_key(span)?;
@@ -4558,6 +4580,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .cloned()
                     .ok_or_else(|| RunnerError::internal(span, "tabula missing key"))
             }
+            Value::Ledger(cell) => {
+                let key = index.to_key(span)?;
+                cell.borrow()
+                    .get(&key)
+                    .cloned()
+                    .ok_or_else(|| RunnerError::internal(span, "tabula missing key"))
+            }
             // Scalar flat-lane index over a tensor (itera ex element gather);
             // tensors define every lane by construction, so bounds are the
             // only failure mode.
@@ -4578,7 +4607,14 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         index: &Value,
         span: Span,
     ) -> Result<Value, RunnerError> {
-        if let Value::Map(cell) = receiver {
+        if let Value::Map(cell) = &receiver {
+            return Ok(cell
+                .borrow()
+                .get(&index.to_key(span)?)
+                .cloned()
+                .unwrap_or(Value::Nil));
+        }
+        if let Value::Ledger(cell) = &receiver {
             return Ok(cell
                 .borrow()
                 .get(&index.to_key(span)?)
@@ -4759,6 +4795,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Value::Array(cell) => Ok(cell.borrow().iter().any(|item| values_equal(item, &needle))),
             Value::Set(cell) => Ok(cell.borrow().contains(&needle.to_key(span)?)),
             Value::Map(cell) => Ok(cell.borrow().contains_key(&needle.to_key(span)?)),
+            Value::Ledger(cell) => Ok(cell.borrow().contains_key(&needle.to_key(span)?)),
             text @ (Value::Str(_) | Value::Ascii(_)) => {
                 let (Some(text), Some(needle)) = (as_text_str(text), as_text_str(needle)) else {
                     return Err(RunnerError::internal(span, "contains needle is not textus"));

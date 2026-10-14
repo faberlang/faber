@@ -3055,6 +3055,11 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         cell.borrow_mut().insert(key, assigned);
                         Ok(Value::Map(cell))
                     }
+                    Value::Ledger(cell) => {
+                        let key = index.to_key(span)?;
+                        cell.borrow_mut().insert(key, assigned);
+                        Ok(Value::Ledger(cell))
+                    }
                     // A device-form kernel stores through a tensor place with one scalar
                     // linear index (`_1[%2] = v`); the tensor handle is shared, so the
                     // write lands in the caller's storage.

@@ -30,3 +30,44 @@ main {
         other => panic!("expected the ledger program to lower, validate and run, got {other:?}"),
     }
 }
+
+#[test]
+fn ledger_run_length_has_get() {
+    let source = r#"+++
+locale = "en"
++++
+main {
+    var ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
+    print x.length()
+    print x.has("c")
+    print x.has("zz")
+}
+"#;
+    let mut host = BufferHost::default();
+    match run_source(&session(), "ledger-run-length.fab", source, &mut host) {
+        Ok(()) => assert_eq!(host.stdout_lines, ["3", "true", "false"]),
+        other => panic!("expected the ledger program to lower, validate and run, got {other:?}"),
+    }
+}
+
+#[test]
+fn ledger_run_index_store_and_put_delete() {
+    let source = r#"+++
+locale = "en"
++++
+main {
+    var ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
+    x["a"] ← 10
+    x.put("d", 4)
+    x.delete("b")
+    print x.length()
+    print x["a"]
+}
+"#;
+    let mut host = BufferHost::default();
+    match run_source(&session(), "ledger-run-store.fab", source, &mut host) {
+        Ok(()) => assert_eq!(host.stdout_lines, ["3", "10"]),
+        other => panic!("expected the ledger program to lower, validate and run, got {other:?}"),
+    }
+}
+
