@@ -259,3 +259,14 @@ fn package_analysis_config_keeps_the_pack_explicit() {
         "without a pack there is no explicit selection"
     );
 }
+
+#[test]
+fn merge_library_target_bindings_on_no_roots_is_empty() {
+    let (bindings, diagnostics) = emit::merge_library_target_bindings(
+        &std::collections::BTreeSet::new(),
+        &Target::MirWgsl.to_string(),
+    );
+    assert!(bindings.functions.is_empty(), "no roots bind no functions");
+    assert!(bindings.types.is_empty(), "no roots bind no types");
+    assert!(diagnostics.is_empty(), "no roots load no diagnostics");
+}
