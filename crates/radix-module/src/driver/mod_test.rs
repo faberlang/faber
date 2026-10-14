@@ -999,6 +999,8 @@ fn call_argument_type_mismatch_renders_code_file_line_and_expected_got() {
 // Nested under this hub so children resolve helpers via `super::`
 // (`zh_locale_pack`, `rust_output`, `compile_rust_source_with_rustc`, …).
 
+#[path = "class_literal_errors_test.rs"]
+mod class_literal_errors_tests;
 #[path = "cli_codegen_test.rs"]
 mod cli_codegen_tests;
 #[path = "compile_interaction_test.rs"]
