@@ -117,3 +117,47 @@ fn from_spelling_rejects_non_canonical_input() {
         );
     }
 }
+
+/// Every target declares availability spellings, and the only spelling
+/// shared across targets is the deliberate LLVM family sharing between
+/// `MirLlvm` and `MirLlvmHost`. A duplicate inside one slice also fails:
+/// sharing is only legal between the two LLVM variants.
+#[test]
+fn availability_spellings_cover_every_target() {
+    let mut seen: Vec<(&'static str, Target)> = Vec::new();
+    for target in Target::ALL {
+        let spellings = target.availability_spellings();
+        assert!(
+            !spellings.is_empty(),
+            "target {target} must declare at least one availability spelling"
+        );
+        for &spelling in spellings {
+            for (existing, owner) in &seen {
+                if *existing != spelling {
+                    continue;
+                }
+                let llvm_share = *owner != *target
+                    && matches!(owner, Target::MirLlvm | Target::MirLlvmHost)
+                    && matches!(target, Target::MirLlvm | Target::MirLlvmHost);
+                assert!(
+                    llvm_share,
+                    "spelling '{spelling}' is shared by {owner} and {target}"
+                );
+            }
+            seen.push((spelling, *target));
+        }
+    }
+}
+
+/// The Rust and Wasm gates keep their historical spellings after the table
+/// moved out of the semantic checker.
+#[test]
+fn availability_spellings_pin_rust_and_wasm() {
+    let rust = Target::HirRust.availability_spellings();
+    assert!(rust.contains(&"rs"), "rust spellings: {rust:?}");
+    assert!(rust.contains(&"rust"), "rust spellings: {rust:?}");
+    assert!(
+        Target::MirWasm.availability_spellings().contains(&"wat"),
+        "wasm spellings must include wat"
+    );
+}
