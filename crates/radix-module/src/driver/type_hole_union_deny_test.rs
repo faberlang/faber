@@ -53,7 +53,11 @@ fn has_code_as_warning(result: &CompileResult, code: &str) -> bool {
 fn baseline_source_emits_both_hole_warnings() {
     // Sanity on the analysis path (stops before codegen): the fixture really
     // carries WARN016 + WARN017 as warnings, which the deny tests promote.
-    let session = Session::new(Config::default().with_target(Target::HirRust).with_latin_locale());
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirRust)
+            .with_latin_locale(),
+    );
     let diagnostics = match analyze_source(&session, "test.fab", WARN016_WARN017_SOURCE, AnalyzeRequest::default()) {
         Ok(unit) => unit.diagnostics,
         Err(diags) => diags,

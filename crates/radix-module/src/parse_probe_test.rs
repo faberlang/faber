@@ -1,4 +1,3 @@
-
 /// The built-in Latin (`la`) reader pack: the canonical surface the parser
 /// tests below are written in.
 fn la_pack() -> crate::locale::LocalePack {

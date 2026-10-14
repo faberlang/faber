@@ -1,6 +1,8 @@
 //! BB-6R oracle: bounded `octeti<N>` identity, D7 bridges, O(1) byte index.
 
-use super::test_support::{analyze_and_get_diagnostics_la, compile_and_get_result_la, compile_for_target_and_get_result_la};
+use super::test_support::{
+    analyze_and_get_diagnostics_la, compile_and_get_result_la, compile_for_target_and_get_result_la,
+};
 use crate::codegen::Target;
 
 fn rust_code(result: crate::CompileResult) -> String {

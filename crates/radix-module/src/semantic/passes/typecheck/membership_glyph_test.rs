@@ -10,7 +10,12 @@ use crate::hir::{HirBinOp, HirExpressionKind, HirStatementKind};
 use crate::{Compiler, Config, Target};
 
 fn compile(source: &str) -> crate::CompileResult {
-    Compiler::new(Config::default().with_target(Target::HirRust).with_latin_locale()).compile_str("test.fab", source)
+    Compiler::new(
+        Config::default()
+            .with_target(Target::HirRust)
+            .with_latin_locale(),
+    )
+    .compile_str("test.fab", source)
 }
 
 /// The resolved operator of every `fixum _ ← <binary>` local in the entry block.

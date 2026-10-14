@@ -43,7 +43,11 @@ fn former_kernel_import_is_unknown() {
 
 #[test]
 fn kernel_glob_import_rejects_unknown_module_early() {
-    let session = Session::new(Config::default().with_target(Target::HirRust).with_latin_locale());
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirRust)
+            .with_latin_locale(),
+    );
     let source = r#"
 importa ex "faber:*" faber
 

@@ -11,7 +11,6 @@ use crate::parser::parse;
 use crate::semantic::SemanticErrorKind;
 use crate::test_support::args_have_no_legacy_message;
 
-
 /// The built-in Latin (`la`) reader pack: the canonical surface the parser
 /// tests below are written in.
 fn la_pack() -> crate::locale::LocalePack {

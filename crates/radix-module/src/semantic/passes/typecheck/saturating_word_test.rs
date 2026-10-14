@@ -8,7 +8,11 @@ use crate::driver::AnalyzeRequest;
 use crate::{Config, Target};
 
 fn analyze_diagnostics(source: &str) -> Vec<crate::Diagnostic> {
-    let session = crate::driver::Session::new(Config::default().with_target(Target::HirRust).with_latin_locale());
+    let session = crate::driver::Session::new(
+        Config::default()
+            .with_target(Target::HirRust)
+            .with_latin_locale(),
+    );
     match crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()) {
         Ok(unit) => unit.diagnostics,
         Err(diagnostics) => diagnostics,
@@ -312,7 +316,12 @@ incipit {
 fn saturating_word_rust_codegen_computes_a_single_operation_exactly() {
     // Ruling 3: even one operation is exact `i128` arithmetic; the return
     // store is the only clamp. No native `saturating_*` method is emitted.
-    let result = Compiler::new(Config::default().with_target(Target::HirRust).with_latin_locale()).compile_str(
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::HirRust)
+            .with_latin_locale(),
+    )
+    .compile_str(
         "test.fab",
         r"
 functio add(saturatus<i16> x, saturatus<i16> y) → saturatus<i16> {
@@ -349,7 +358,12 @@ fn saturating_word_rust_codegen_clamps_a_chain_once_at_its_root() {
     // d11-6 ruling 3 (U9): a chain is exact `i128` arithmetic with one clamp,
     // never a saturating method per step. This replaces the pre-U9 pin of
     // `i16::saturating_{add,sub,mul,neg}` on `-((x + y) - (x * y))`.
-    let result = Compiler::new(Config::default().with_target(Target::HirRust).with_latin_locale()).compile_str(
+    let result = Compiler::new(
+        Config::default()
+            .with_target(Target::HirRust)
+            .with_latin_locale(),
+    )
+    .compile_str(
         "test.fab",
         r"
 functio mix(saturatus<i16> x, saturatus<i16> y) → saturatus<i16> {

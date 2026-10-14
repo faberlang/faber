@@ -18,7 +18,6 @@ use crate::test_support::args_have_no_legacy_message;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-
 /// The built-in Latin (`la`) reader pack: the canonical surface these tests
 /// are written in.
 fn la_pack() -> crate::locale::LocalePack {
@@ -243,8 +242,8 @@ fn module_analysis_does_not_derive_contracts_from_path_name() {
         None,
         "path-shaped analyze_source must not install namespace exports"
     );
-    let compile_str =
-        crate::Compiler::new(crate::driver::Config::default().with_latin_locale()).compile_str(&consumer.display().to_string(), &source);
+    let compile_str = crate::Compiler::new(crate::driver::Config::default().with_latin_locale())
+        .compile_str(&consumer.display().to_string(), &source);
     match &compile_str.output {
         Some(crate::Output::Rust(out)) => {
             assert!(
@@ -315,7 +314,13 @@ fn check_same_package(member: &str) -> crate::services::CheckDiagnosticsResult {
     let consumer = root.join("src/consumer.fab");
     fs::write(&consumer, consumer_source("./probe", "probe", member)).expect("consumer");
     let source = fs::read_to_string(&consumer).expect("read");
-    check_diagnostics_for_source_with_locale_pack(&consumer.display().to_string(), &source, false, Some(&la_pack()), None)
+    check_diagnostics_for_source_with_locale_pack(
+        &consumer.display().to_string(),
+        &source,
+        false,
+        Some(&la_pack()),
+        None,
+    )
 }
 
 fn check_cross_package(member: &str) -> crate::services::CheckDiagnosticsResult {

@@ -10,7 +10,6 @@ use crate::services::{CheckDiagnosticsResult, check_diagnostics_for_source_with_
 use std::fs;
 use std::path::{Path, PathBuf};
 
-
 /// The built-in Latin (`la`) reader pack: the canonical surface these tests
 /// are written in.
 fn la_pack() -> crate::locale::LocalePack {

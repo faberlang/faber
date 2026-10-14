@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 
 use crate::import_resolve::library_home_test_support;
 
-
 /// The built-in Latin (`la`) reader pack: the canonical surface these tests
 /// are written in.
 fn la_pack() -> crate::locale::LocalePack {

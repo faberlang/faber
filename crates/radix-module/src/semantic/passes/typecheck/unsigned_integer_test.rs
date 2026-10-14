@@ -11,11 +11,20 @@ use crate::{Config, Target};
 
 #[cfg(feature = "hir-rust")]
 fn compile(source: &str) -> crate::CompileResult {
-    Compiler::new(Config::default().with_target(Target::HirRust).with_latin_locale()).compile_str("test.fab", source)
+    Compiler::new(
+        Config::default()
+            .with_target(Target::HirRust)
+            .with_latin_locale(),
+    )
+    .compile_str("test.fab", source)
 }
 
 fn analyze_diagnostics(source: &str) -> Vec<crate::Diagnostic> {
-    let session = crate::driver::Session::new(Config::default().with_target(Target::HirRust).with_latin_locale());
+    let session = crate::driver::Session::new(
+        Config::default()
+            .with_target(Target::HirRust)
+            .with_latin_locale(),
+    );
     match crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()) {
         Ok(unit) => unit.diagnostics,
         Err(diagnostics) => diagnostics,
