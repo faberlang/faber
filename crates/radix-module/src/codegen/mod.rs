@@ -925,17 +925,17 @@ fn generate_odin_from_analyzed(
 /// the O(consumers × providers) re-analysis ends.
 #[cfg(feature = "hir-rust")]
 fn emit_provider_modules(
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn crate::codegen::input::CodegenAnalysis,
     emitted_tensor_policy_providers: &mut rustc_hash::FxHashSet<String>,
 ) -> Result<Vec<(String, String, std::collections::BTreeSet<String>)>, CodegenError> {
     use std::collections::BTreeMap;
 
     let mut modules = BTreeMap::new();
     map_provider_modules(
-        &analysis.hir,
-        &analysis.interner,
-        &analysis.resolver,
-        &analysis.provider_units,
+        analysis.hir(),
+        analysis.interner(),
+        analysis.resolver(),
+        analysis,
         emitted_tensor_policy_providers,
         &mut modules,
     )?;
@@ -963,7 +963,7 @@ fn map_provider_modules(
     hir: &crate::hir::HirModule,
     interner: &crate::lexer::Interner,
     resolver: &crate::semantic::Resolver,
-    view: &crate::driver::ProviderUnitView,
+    owner: &dyn crate::codegen::input::CodegenAnalysis,
     emitted_tensor_policy_providers: &mut rustc_hash::FxHashSet<String>,
     modules: &mut std::collections::BTreeMap<String, (String, std::collections::BTreeSet<String>)>,
 ) -> Result<(), CodegenError> {
@@ -983,34 +983,32 @@ fn map_provider_modules(
             if modules.contains_key(&module_name) {
                 continue;
             }
-            let Some(carried) = view.get(import_path) else {
-                return Err(CodegenError {
-                    message: format!(
-                        "cannot resolve provider import `{import_path}` for Rust module emission: \
-                         no analyzed provider unit is carried for this import"
-                    ),
-                    args: vec![
-                        DiagnosticArg::new("issue", "provider_import_resolution_failed"),
-                        DiagnosticArg::new("import_path", import_path),
-                    ],
-                });
-            };
-            let Some(provider) = carried.lock_unit() else {
-                // `lock_unit` yields `None` only for a failed-carriage marker.
-                let message = match carried {
-                    crate::driver::CarriedProviderUnit::Failed { message } => message.as_str(),
-                    crate::driver::CarriedProviderUnit::Unit(_) => "is carried without an analyzed unit",
-                };
-                return Err(CodegenError {
-                    message: format!("provider module `{module_name}` {message}"),
-                    args: vec![
-                        DiagnosticArg::new("issue", "provider_module_analysis_failed"),
-                        DiagnosticArg::new("module", module_name.clone()),
-                    ],
-                });
+            let provider = match owner.provider(import_path) {
+                None => {
+                    return Err(CodegenError {
+                        message: format!(
+                            "cannot resolve provider import `{import_path}` for Rust module emission: \
+                             no analyzed provider unit is carried for this import"
+                        ),
+                        args: vec![
+                            DiagnosticArg::new("issue", "provider_import_resolution_failed"),
+                            DiagnosticArg::new("import_path", import_path),
+                        ],
+                    });
+                }
+                Some(crate::codegen::input::CodegenProvider::Failed { message }) => {
+                    return Err(CodegenError {
+                        message: format!("provider module `{module_name}` {message}"),
+                        args: vec![
+                            DiagnosticArg::new("issue", "provider_module_analysis_failed"),
+                            DiagnosticArg::new("module", module_name.clone()),
+                        ],
+                    });
+                }
+                Some(crate::codegen::input::CodegenProvider::Unit(provider)) => provider,
             };
             if provider
-                .diagnostics
+                .diagnostics()
                 .iter()
                 .any(radix_diagnostics::Diagnostic::is_error)
             {
@@ -1028,14 +1026,14 @@ fn map_provider_modules(
             // exist. The `contains_key` guard above only skips modules already
             // emitted; a cyclic import ends at the missing-carriage error.
             map_provider_modules(
-                &provider.hir,
-                &provider.interner,
-                &provider.resolver,
-                &provider.nested,
+                provider.hir(),
+                provider.interner(),
+                provider.resolver(),
+                &*provider,
                 emitted_tensor_policy_providers,
                 modules,
             )?;
-            emit_provider_module_code(&provider, &module_name, emitted_tensor_policy_providers, modules)?;
+            emit_provider_module_code(&*provider, &module_name, emitted_tensor_policy_providers, modules)?;
         }
     }
 
@@ -1043,26 +1041,26 @@ fn map_provider_modules(
 }
 
 #[cfg(feature = "hir-rust")]
-fn emit_provider_module_code<'a>(
-    provider: &crate::driver::ProviderUnitGuard<'a>,
+fn emit_provider_module_code(
+    provider: &dyn crate::codegen::input::CodegenAnalysis,
     module_name: &str,
     emitted_tensor_policy_providers: &mut rustc_hash::FxHashSet<String>,
     modules: &mut std::collections::BTreeMap<String, (String, std::collections::BTreeSet<String>)>,
 ) -> Result<(), CodegenError> {
     let namespace_info = rust::build_file_import_namespaces(
-        &provider.hir,
-        &provider.interner,
-        &rust::ResolverImportsBridge(&provider.resolver),
+        provider.hir(),
+        provider.interner(),
+        &rust::ResolverImportsBridge(provider.resolver()),
     );
-    let callback_identities = imported_tensor_edge_policy_callback_identities(&provider.resolver, &provider.interner);
+    let callback_identities = imported_tensor_edge_policy_callback_identities(provider.resolver(), provider.interner());
     let mut policy_identity_codegen =
-        rust::RustCodegen::new_with_types(&provider.hir, &provider.interner, &provider.types);
+        rust::RustCodegen::new_with_types(provider.hir(), provider.interner(), provider.types());
     policy_identity_codegen.set_imported_namespace_type_paths(namespace_info.type_paths.clone());
     let mut provider_emit_rows = Vec::new();
-    for provider_impl in &provider.tensor_edge_policies.provider_impls {
+    for provider_impl in &provider.tensor_edge_policies().provider_impls {
         let Some(key) = policy_identity_codegen.tensor_edge_policy_provider_key(
             provider_impl,
-            &provider.types,
+            provider.types(),
             Some(module_name),
         )?
         else {
@@ -1072,21 +1070,21 @@ fn emit_provider_module_code<'a>(
             provider_emit_rows.push(*provider_impl);
         }
     }
-    let shape_obligations = rust::rust_shape_obligations(&provider.shape_obligations);
+    let shape_obligations = rust::rust_shape_obligations(provider.shape_obligations());
     // Declaration-only `@ nondum` provider functions have nothing to emit.
     let provider_hir = provider
-        .hir
-        .without_unavailable_declarations(&provider.interner);
+        .hir()
+        .without_unavailable_declarations(provider.interner());
     let module_out = radix_hir_rust::generate_with_library_registry_test_selection_and_imports(
         radix_hir_rust::ModuleGenerationRequest {
             hir: &provider_hir,
-            types: &provider.types,
-            interner: &provider.interner,
+            types: provider.types(),
+            interner: provider.interner(),
             libraries: &radix_hir::LibraryRegistry::default(),
             test_selection: None,
             function_facts: None,
             shape_obligations: Some(&shape_obligations),
-            tensor_edge_policies: Some(&provider.tensor_edge_policies),
+            tensor_edge_policies: Some(provider.tensor_edge_policies()),
             tensor_edge_policy_provider_impls_to_emit: Some(&provider_emit_rows),
             tensor_edge_policy_callback_identities: &callback_identities,
             module_mode: true,
@@ -1102,7 +1100,7 @@ fn emit_provider_module_code<'a>(
     // The provider's emitted signatures (not its Faber declarations)
     // decide importer call-site unwrapping: `ad`-verb functions emit
     // `Result` even without a declared `⇥` channel.
-    let failable_exports = radix_hir_rust::provider_failable_export_names(&provider.hir, &provider.interner);
+    let failable_exports = radix_hir_rust::provider_failable_export_names(provider.hir(), provider.interner());
     modules.insert(module_name.to_owned(), (module_out.code, failable_exports));
     Ok(())
 }
@@ -1234,15 +1232,18 @@ pub fn generate_go_cli(
 ///
 /// Also the whole-package `radix-program` build paths (`wasm.rs`, `llvm.rs`)
 /// call this through the unit's [`crate::driver::AnalyzedModule`].
-pub fn reject_unsupported_leaves(analysis: &crate::driver::AnalyzedModule, target: Target) -> Result<(), CodegenError> {
+pub fn reject_unsupported_leaves(
+    analysis: &dyn crate::codegen::input::CodegenAnalysis,
+    target: Target,
+) -> Result<(), CodegenError> {
     let mut routes = Vec::new();
     collect_analysis_ad_routes(analysis, &mut routes);
     radix_codegen_shared::reject_unsupported_leaf(&routes, target)
 }
 
-fn collect_analysis_ad_routes(analysis: &crate::driver::AnalyzedModule, routes: &mut Vec<String>) {
-    collect_module_ad_routes(&analysis.hir, &analysis.interner, &analysis.resolver, routes);
-    collect_provider_ad_routes(&analysis.provider_units, routes);
+fn collect_analysis_ad_routes(analysis: &dyn crate::codegen::input::CodegenAnalysis, routes: &mut Vec<String>) {
+    collect_module_ad_routes(analysis.hir(), analysis.interner(), analysis.resolver(), routes);
+    collect_provider_ad_routes(analysis, routes);
 }
 
 fn collect_module_ad_routes(
@@ -1260,13 +1261,13 @@ fn collect_module_ad_routes(
     }
 }
 
-fn collect_provider_ad_routes(view: &crate::driver::ProviderUnitView, routes: &mut Vec<String>) {
-    for unit in view.units.values() {
-        let Some(guard) = unit.lock_unit() else {
+fn collect_provider_ad_routes(owner: &dyn crate::codegen::input::CodegenAnalysis, routes: &mut Vec<String>) {
+    for key in owner.provider_keys() {
+        let Some(crate::codegen::input::CodegenProvider::Unit(unit)) = owner.provider(&key) else {
             continue;
         };
-        collect_module_ad_routes(&guard.hir, &guard.interner, &guard.resolver, routes);
-        collect_provider_ad_routes(&guard.nested, routes);
+        collect_module_ad_routes(unit.hir(), unit.interner(), unit.resolver(), routes);
+        collect_provider_ad_routes(&*unit, routes);
     }
 }
 
