@@ -24,3 +24,21 @@ fn partial_hole_list_runs_on_the_mir_runner() {
     run_source(&session, "partial-hole-list-run.fab", HOLE_LIST, &mut host).expect("list element hole runs");
     assert_eq!(host.stdout_lines, ["2"], "both elements are in the list");
 }
+
+const HOLE_TUPLE: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    const tuple<_, string> t \u{2190} tuple<_, string>[1, \"x\"]\n    print t[1]\n}\n";
+
+#[test]
+fn partial_hole_tuple_compiles() {
+    let session = test_session(Target::HirRust);
+    let result = compile(&session, "partial-hole-tuple.fab", HOLE_TUPLE, ModuleCompileRequest::default());
+    assert!(result.success(), "tuple element hole must typecheck: {:?}", result.diagnostics);
+}
+
+#[test]
+fn partial_hole_tuple_runs_on_the_mir_runner() {
+    use crate::mir::{BufferHost, run_source};
+    let session = test_session(Target::HirTypeScript);
+    let mut host = BufferHost::default();
+    run_source(&session, "partial-hole-tuple-run.fab", HOLE_TUPLE, &mut host).expect("tuple element hole runs");
+    assert_eq!(host.stdout_lines, ["x"], "the second tuple element is the string");
+}
