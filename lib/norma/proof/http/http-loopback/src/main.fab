@@ -2,9 +2,9 @@
 locale = "en"
 +++
 
-# http-loopback: listener lifecycle plus one live GET exchange over an
-# ephemeral loopback port. The client call is a stored promise started before
-# the accept; the accepted request is answered before the await so both ends
+# http-loopback: listener lifecycle plus live GET and POST exchanges over an
+# ephemeral loopback port. Each client call is a stored promise started before
+# its accept; the accepted request is answered before the await so both ends
 # meet without a second process, a fixed port, or a port file.
 
 import from "norma:http/client" client
@@ -19,6 +19,11 @@ fn fetch_get(string url) async → response.Response ⇥ fault.IoFault {
     if request_headers.append("x-client", "loop") {
     }
     return client.get_with(url, request_headers)
+}
+
+# Client half of the second exchange: one POST carrying `post-body`.
+fn fetch_post(string url, string body) async → response.Response ⇥ fault.IoFault {
+    return client.post(url, body)
 }
 
 async_main {
@@ -48,8 +53,27 @@ async_main {
     assert proof not is none
     assert (proof ↦ string) ≡ "yes"
 
+    # Second exchange on the same listener: POST with a body.
+    const promise<response.Response ⇥ fault.IoFault> pending_post ← fetch_post(base + "/submit", "post-body")
+
+    const server.Incoming incoming_post ← server.accept_incoming(handle)
+    assert incoming_post.req.method ≡ "POST"
+    assert incoming_post.req.path ≡ "/submit"
+    assert incoming_post.req.body ≡ "post-body"
+
+    var headers.Headers post_headers ← headers.empty()
+    if post_headers.append("x-proof", "posted") {
+    }
+    server.reply(incoming_post, 201, post_headers, "created-body")
+
+    const response.Response got_post ↢ pending_post
+    assert got_post.status ≡ 201
+    assert got_post.body ≡ "created-body"
+    const string ∪ none posted ← got_post.header("x-proof")
+    assert posted not is none
+    assert (posted ↦ string) ≡ "posted"
+
     const void stopped ↤ call 'http:stop' (handle)
 
-    # next: POST
     print "http-loopback-ok"
 }
