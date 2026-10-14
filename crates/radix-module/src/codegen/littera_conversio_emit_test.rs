@@ -55,8 +55,8 @@ fn go_emits_littera_rows() {
     assert!(code.contains("fmt.Sprint(42)"), "{code}");
     assert!(code.contains("return rune('0' + v)"), "{code}");
     assert!(code.contains("return int(v - '0')"), "{code}");
-    assert!(code.contains("v := []rune(t)"), "{code}");
-    assert!(code.contains("uint32(d)"), "{code}");
+    assert!(code.contains("v := []rune(l_t)"), "{code}");
+    assert!(code.contains("uint32(l_d)"), "{code}");
     assert!(code.contains("(v >= 0xD800 && v <= 0xDFFF)"), "{code}");
     assert!(code.contains("append([]byte(nil), __xs[__s:__e]...)"), "{code}");
 }
@@ -80,6 +80,6 @@ fn swift_emits_littera_rows() {
     assert!(code.contains("Unicode.Scalar(UInt8(48 + v))"), "{code}");
     assert!(code.contains("guard v >= 48, v <= 57"), "{code}");
     assert!(code.contains(".unicodeScalars); guard scalars.count == 1"), "{code}");
-    assert!(code.contains("(d).value"), "{code}");
+    assert!(code.contains("(l_d).value"), "{code}");
     assert!(code.contains("let s = Unicode.Scalar(UInt32(v))"), "{code}");
 }
