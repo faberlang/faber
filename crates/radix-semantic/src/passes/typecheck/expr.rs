@@ -259,9 +259,15 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// Whether `expr` is an inferred-constructor hole `_ { … }`: a `Verte`
-    /// whose target is the unresolved hole, with fields or constant entries.
+    /// Whether `expr` is an inferred-constructor hole: `_ { … }` (a `Verte`
+    /// whose target is the unresolved hole, with fields or constant entries)
+    /// or a bare bracket literal `[ … ]`. The bare literal is sugar for the
+    /// hole form (operator ruling 2026-10-10), so it solves from a typed cell
+    /// and raises the multi-member-union error exactly as `_ [ … ]` does.
     fn is_inferred_constructor_hole(&self, expr: &HirExpression) -> bool {
+        if matches!(expr.kind, HirExpressionKind::Array(_)) {
+            return true;
+        }
         let HirExpressionKind::Verte {
             source,
             target,
