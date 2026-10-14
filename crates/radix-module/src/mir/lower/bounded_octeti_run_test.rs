@@ -145,3 +145,55 @@ fn bounded_octeti_endian_read_follows_the_hint() {
             .expect("runs");
     assert_eq!(lines, ["258", "513"]);
 }
+
+/// `octeti<N>[lo‥hi]` is an `octeti` window (semantic access.rs), so the
+/// window feeds the same `↦ T via Le|Be` conversion as an unbounded carrier.
+fn window_round_trip_body(ty: &str, width: usize, value: &str, hint: &str) -> String {
+    format!(
+        "const {ty} n ← {value}\nconst bytes<{width}> o ← n ↦ bytes<{width}> via {hint}\nconst {ty} back ← o[0‥{width}] ↦ {ty} via {hint}\nprint back"
+    )
+}
+
+#[test]
+fn bounded_octeti_window_reads_back_through_le() {
+    let lines = run(&window_round_trip_body("u16", 2, "258", "Le")).expect("runs");
+    assert_eq!(lines, ["258"]);
+}
+
+#[test]
+fn bounded_octeti_window_all_widths_round_trip() {
+    for (ty, width, value) in [
+        ("i16", 2, "-2"),
+        ("u16", 2, "65535"),
+        ("i32", 4, "-123456"),
+        ("u32", 4, "4000000000"),
+        ("i64", 8, "-9000000000000000000"),
+        ("u64", 8, "18000000000000000000"),
+        ("f32", 4, "1.5"),
+        ("f64", 8, "-0.25"),
+    ] {
+        for hint in ["Le", "Be"] {
+            let lines = run(&window_round_trip_body(ty, width, value, hint))
+                .unwrap_or_else(|error| panic!("{ty} via {hint} must run: {error:?}"));
+            assert_eq!(lines, [value], "{ty} via {hint}");
+        }
+    }
+}
+
+#[test]
+fn bounded_octeti_window_inner_slice() {
+    let lines = run(
+        "const bytes raw ← |00 01 02 00|\nconst bytes<4> o ← raw ↦ bytes<4>\nprint o[1‥3] ↦ u16 via Be",
+    )
+    .expect("runs");
+    assert_eq!(lines, ["258"]);
+}
+
+#[test]
+fn bounded_octeti_scalar_index_still_reads_a_byte() {
+    let lines = run(
+        "const bytes raw ← |07 08|\nconst bytes<2> o ← raw ↦ bytes<2>\nconst u8 first ← o[1]\nprint first",
+    )
+    .expect("runs");
+    assert_eq!(lines, ["8"]);
+}
