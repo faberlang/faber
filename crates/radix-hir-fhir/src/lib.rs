@@ -30,6 +30,7 @@ mod test_support;
 mod widen_node_test;
 
 pub use artifact::*;
+pub use artifact::DisplayTokensWire;
 pub use decode::{decode, encode};
 pub use error::HirArtifactError;
 // FPF-5: the MessagePack package codecs are the live `.fhirpkg` wire

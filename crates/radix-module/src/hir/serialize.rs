@@ -8,8 +8,9 @@ use crate::driver::AnalyzedModule;
 use radix_hir::visit::{HirVisitor, walk_expr, walk_item, walk_method, walk_pattern};
 use radix_hir_fhir::{
     CaptureFactWire, CaptureModeWire, CliCommandWire, CliDefaultWire, CliExitWire, CliModeWire, CliOperandWire,
-    CliOptionWire, CliProgramWire, CliTypeWire, FunctionFactTableWire, FunctionFactWire, FunctionProvenanceTableWire,
-    FunctionProvenanceWire, GpuBuiltinWire, HirArtifact, KernelExtentConditionWire, KernelNumericPolicyWire,
+    CliOptionWire, CliProgramWire, CliTypeWire, DisplayTokensWire, FunctionFactTableWire, FunctionFactWire,
+    FunctionProvenanceTableWire, FunctionProvenanceWire, GpuBuiltinWire, HirArtifact, KernelExtentConditionWire,
+    KernelNumericPolicyWire,
     KernelPrimitiveWire, KernelRangeExprWire, KernelRequirementFailureWire, KernelRequirementWire,
     KernelRequirementsWire, KernelTargetRequirementWire, KernelTargetWire, KernelTrappingStoreWire,
     KernelValueRangeWire, KernelWidthRequirementWire, LastUseWire, RadixBackwardWire, RadixLaneEntryWire,
@@ -89,6 +90,12 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
         shape_obligations: shape_obligations_wire(&unit.shape_obligations),
         kernel_requirements: kernel_requirements_wire(&unit.kernel_requirements),
         tensor_edge_policies: tensor_edge_policies_wire(&unit.tensor_edge_policies),
+        display_tokens: DisplayTokensWire {
+            true_: unit.display_tokens.true_.clone(),
+            false_: unit.display_tokens.false_.clone(),
+            none: unit.display_tokens.none.clone(),
+            tuple: unit.display_tokens.tuple.clone(),
+        },
     }
 }
 

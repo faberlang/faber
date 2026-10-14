@@ -460,6 +460,15 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
     unit.provider_units = provider_units;
     unit.shape_obligations = map_shape_obligations(artifact.shape_obligations);
     unit.kernel_requirements = map_kernel_requirements(artifact.kernel_requirements);
+    // Program display tokens follow the unit's code locale (schema v44):
+    // restore the words the author's locale prints so a loaded unit does not
+    // fall back to the Latin defaults.
+    unit.display_tokens = crate::runtime_contract::display_tokens::DisplayTokens {
+        true_: artifact.display_tokens.true_,
+        false_: artifact.display_tokens.false_,
+        none: artifact.display_tokens.none,
+        tuple: artifact.display_tokens.tuple,
+    };
     Ok(unit)
 }
 

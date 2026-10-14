@@ -87,7 +87,7 @@ fn malformed_rejects_garbage_bytes() {
 /// Construct a minimal valid HirArtifact for loader tests.
 fn minimal_test_artifact() -> HirArtifact {
     use radix_hir::{HirFunction, HirId, HirItem, HirItemKind, HirModule, LibraryRegistry};
-    use radix_hir_fhir::{FunctionFactTableWire, ResolverSnapshot, SCHEMA_VERSION, SourceIdentity};
+    use radix_hir_fhir::{DisplayTokensWire, FunctionFactTableWire, ResolverSnapshot, SCHEMA_VERSION, SourceIdentity};
 
     let types = TypeTable::new();
     let item = HirItem {
@@ -149,6 +149,12 @@ fn minimal_test_artifact() -> HirArtifact {
         shape_obligations: radix_hir_fhir::ShapeObligationTableWire::default(),
         kernel_requirements: radix_hir_fhir::KernelRequirementsWire::default(),
         tensor_edge_policies: radix_hir_fhir::TensorEdgePolicyTableWire::default(),
+        display_tokens: DisplayTokensWire {
+            true_: "true".to_string(),
+            false_: "false".to_string(),
+            none: "none".to_string(),
+            tuple: "tuple".to_string(),
+        },
     }
 }
 
@@ -381,6 +387,37 @@ fn resolved_use_locals_survive_the_fhir_round_trip() {
         original.resolved_uses.locals_used(),
         "loaded resolved-use index must index exactly the local defs direct analysis indexes"
     );
+}
+
+#[test]
+fn display_tokens_survive_the_fhir_round_trip() {
+    // The unit's print words follow the code locale; a loaded artifact must
+    // keep the author's locale tokens instead of the Latin loader default.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let en_source = "+++\nlocale = \"en\"\n+++\n\nfn salve() { }";
+    let la_source = "+++\nlocale = \"la\"\n+++\n\nfunctio salve() { }";
+    let session = Session::new(Config::default().with_dev_locale_root().with_target(Target::HirRust));
+
+    for (name, source) in [("display-en.faber", en_source), ("display-la.faber", la_source)] {
+        let original = analyze_source(&session, name, source, AnalyzeRequest::default())
+            .expect("display-token fixture analyzes");
+        let artifact = from_analyzed(&original, name, name);
+        let bytes = postcard::to_allocvec(&artifact).expect("serialize display-token artifact");
+        let loaded = load_fhir(&bytes).expect("display-token artifact must load");
+
+        assert_eq!(
+            loaded.display_tokens, original.display_tokens,
+            "loaded display tokens must match the analyzed unit for {name}"
+        );
+        if name == "display-en.faber" {
+            assert_eq!(loaded.display_tokens.true_, "true");
+        } else {
+            assert_eq!(loaded.display_tokens.true_, "verum");
+        }
+    }
 }
 
 #[test]
@@ -1325,6 +1362,7 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
         shape_obligations: crate::hir::serialize::from_analyzed(unit, "x", "x").shape_obligations,
         kernel_requirements: crate::hir::serialize::from_analyzed(unit, "x", "x").kernel_requirements,
         tensor_edge_policies: crate::hir::serialize::from_analyzed(unit, "x", "x").tensor_edge_policies,
+        display_tokens: crate::hir::serialize::from_analyzed(unit, "x", "x").display_tokens,
     }
 }
 

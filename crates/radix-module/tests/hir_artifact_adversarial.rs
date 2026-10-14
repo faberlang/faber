@@ -119,6 +119,12 @@ fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
         shape_obligations: radix_hir_fhir::ShapeObligationTableWire::default(),
         kernel_requirements: Default::default(),
         tensor_edge_policies: Default::default(),
+        display_tokens: radix_hir_fhir::DisplayTokensWire {
+            true_: "true".to_string(),
+            false_: "false".to_string(),
+            none: "none".to_string(),
+            tuple: "tuple".to_string(),
+        },
     }
 }
 

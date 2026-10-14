@@ -621,7 +621,10 @@ pub struct FunctionProvenanceTableWire {
 /// use's unit-local `DefId` (`ResolvedUseWire::local`) so a loaded artifact
 /// rebuilds the resolved-use local index exactly like direct analysis instead
 /// of counting every import binding as used; schema-v42 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 43;
+/// Version 44 carries the four program display tokens (`true`, `false`,
+/// `none`, `tuple`) of the unit's code locale so a loaded unit prints the
+/// words the author's locale prints; schema-v43 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 44;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -944,6 +947,26 @@ pub enum ProviderCarriageEntryWire {
     },
 }
 
+/// Portable program display tokens of the unit's code locale (schema v44).
+///
+/// The words a program prints for a `bivalens`, the null value, and a tuple
+/// head follow the code locale, so an English unit loaded from an artifact
+/// must keep printing `true`/`false`/`none`/`tuple` instead of falling back
+/// to the Latin defaults. Kept in the format crate (not
+/// `radix-runtime-contract`) so artifact loading stays free of runtime
+/// dependencies.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DisplayTokensWire {
+    /// Printed for a true `bivalens`.
+    pub true_: String,
+    /// Printed for a false `bivalens`.
+    pub false_: String,
+    /// Printed for the null value.
+    pub none: String,
+    /// Printed as the head of a tuple.
+    pub tuple: String,
+}
+
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///
 /// Owns every rehydratable fact family produced by analysis so a single
@@ -1036,6 +1059,9 @@ pub struct HirArtifact {
 
     /// Resolved edge-policy dispatch and generic provider facts (schema v33).
     pub tensor_edge_policies: TensorEdgePolicyTableWire,
+
+    /// Program display tokens of the unit's code locale (schema v44).
+    pub display_tokens: DisplayTokensWire,
 }
 
 // ---------------------------------------------------------------------------

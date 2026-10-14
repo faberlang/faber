@@ -198,8 +198,10 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // the legacy `Summa` and `Extremum` variants in favor of `Reduction`; schema 38
     // adds `HirTypeSlot::TypedZero`; schema 39 adds
     // `HirPresentation::empty_dense_ids`; schema 43 carries
-    // `ResolvedUseWire::local` (the unit-local def of each resolved use).
-    assert_eq!(SCHEMA_VERSION, 43);
+    // `ResolvedUseWire::local` (the unit-local def of each resolved use);
+    // schema 44 carries the unit's program display tokens (`true`, `false`,
+    // `none`, `tuple`) so a loaded unit prints the author's code-locale words.
+    assert_eq!(SCHEMA_VERSION, 44);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────
