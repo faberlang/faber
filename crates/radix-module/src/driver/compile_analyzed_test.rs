@@ -3,9 +3,7 @@
 //! the same source analyzed separately, then handed to the seam, must agree
 //! on output.
 
-use super::{
-    AnalyzeRequest, Config, ModuleCompileRequest, Session, analyze_source, compile, compile_analyzed,
-};
+use super::{AnalyzeRequest, Config, ModuleCompileRequest, Session, analyze_source, compile, compile_analyzed};
 
 #[test]
 fn compile_analyzed_matches_compile() {
