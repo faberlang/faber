@@ -160,6 +160,13 @@ fn allowlisted_and_out_of_scope_surfaces_still_spawn() {
         "crates/radix-module/src/aspect/tla_checker.rs",
         "crates/exempla/src/exempla_e2e/llvm_runtime.rs",
     ] {
+        // A tree without the whole crate (the public export ships a subset of
+        // crates) has no surface to check. A crate that is present must still
+        // carry the file.
+        let crate_dir: PathBuf = Path::new(rel).iter().take(2).collect();
+        if !workspace.join(&crate_dir).is_dir() {
+            continue;
+        }
         let path = workspace.join(rel);
         let content = fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {rel}: {err}"));
         let scrubbed = radix_hygiene::scrub_rust_source(&content);
