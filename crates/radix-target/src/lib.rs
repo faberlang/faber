@@ -244,6 +244,26 @@ impl Target {
         Target::MirFmirBundle,
     ];
 
+    /// The current device backends, in report order.
+    ///
+    /// Kernel requirement reports are indexed by this list, so the order
+    /// (AMD, Metal, WGSL) is load-bearing and must not change.
+    pub const DEVICE_TARGETS: [Self; 3] = [Self::MirAmd, Self::MirMetal, Self::MirWgsl];
+
+    /// Whether this target is one of the portable device backends
+    /// ([`Self::DEVICE_TARGETS`]).
+    #[must_use]
+    pub fn is_device_target(self) -> bool {
+        Self::DEVICE_TARGETS.contains(&self)
+    }
+
+    /// Whether this target lowers wrapping kernel integers. Metal and WGSL
+    /// support wrapping 32-bit integers in kernels; AMD does not.
+    #[must_use]
+    pub fn supports_wrapping_kernel_integers(self) -> bool {
+        matches!(self, Self::MirMetal | Self::MirWgsl)
+    }
+
     /// Feature that enables this target when it is feature-gated.
     #[must_use]
     pub fn required_feature(self) -> Option<&'static str> {
