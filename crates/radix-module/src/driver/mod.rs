@@ -283,14 +283,16 @@ pub struct ModuleCompileRequest {
 /// This is the user-facing driver contract used by CLIs and package tooling
 /// when they want emitted target code. It delegates the shared front half to
 /// [`analyze_source`] so callers that only need HIR, type tables, or CLI
-/// analysis can stop before backend generation.
+/// analysis can stop before backend generation, and the analysis-to-output
+/// tail to [`compile_analyzed`], which is also public for callers that
+/// already hold an analyzed module.
 ///
 /// Errors from any phase are returned as diagnostics with no output. Warnings
 /// collected before codegen are preserved on success.
 #[must_use]
 pub fn compile(session: &Session, name: &str, source: &str, request: ModuleCompileRequest) -> CompileResult {
     let ModuleCompileRequest { contract, package_identities, provider_units } = request;
-    let mut analysis = match analyze_source(session, name, source, AnalyzeRequest { cli_program: None, contract }) {
+    let analysis = match analyze_source(session, name, source, AnalyzeRequest { cli_program: None, contract }) {
         Ok(mut analysis) => {
             analysis.package_import_identities = package_identities;
             analysis.provider_units = provider_units;
@@ -301,6 +303,24 @@ pub fn compile(session: &Session, name: &str, source: &str, request: ModuleCompi
             return CompileResult { output: None, diagnostics };
         }
     };
+    compile_analyzed(session, name, source, analysis)
+}
+
+/// Compile an already-analyzed module to output.
+///
+/// This is the analysis-to-output tail of [`compile`]: the warn policy, the
+/// CLI-program handoff, and backend generation, run over an [`AnalyzedModule`]
+/// from [`analyze_source`] (or loaded from an artifact). The result is
+/// identical to [`compile`] on the same analyzed facts, so callers that
+/// analyzed through a different route hand the module here instead of
+/// re-running the front half. The source text stays part of the contract: it
+/// only feeds diagnostic source context and CLI-program lowering.
+///
+/// Errors are returned as diagnostics with no output. Warnings collected
+/// before codegen are preserved on success.
+#[must_use]
+pub fn compile_analyzed(session: &Session, name: &str, source: &str, analyzed: AnalyzedModule) -> CompileResult {
+    let mut analysis = analyzed;
 
     // Promote warnings to errors per the session's deny policy before any
     // downstream path assembles a CompileResult from analysis.diagnostics.
@@ -4741,6 +4761,10 @@ mod enum_variant_slot_tests;
 #[cfg(test)]
 #[path = "print_text_kind_test.rs"]
 mod print_text_kind_tests;
+
+#[cfg(test)]
+#[path = "compile_analyzed_test.rs"]
+mod compile_analyzed_tests;
 
 #[cfg(test)]
 #[cfg(feature = "mir-wgsl")]
