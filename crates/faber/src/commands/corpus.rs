@@ -172,6 +172,15 @@ impl Case {
             .as_ref()
             .ok_or_else(|| format!("{}: case has no expectation to compare", self.id))
     }
+
+    /// Bound for a case's setup phases: emit, build, verify, and format.
+    ///
+    /// `timeout` (from `timeout_secs`) bounds the run phase only. A case may pin a
+    /// short run bound to probe a hanging program; setup phases keep the default
+    /// bound, or the case's own bound when it is larger.
+    fn setup_timeout(&self) -> Duration {
+        self.timeout.max(Duration::from_secs(CASE_TIMEOUT_SECS))
+    }
 }
 
 /// A child process that did not produce an output within its bound.

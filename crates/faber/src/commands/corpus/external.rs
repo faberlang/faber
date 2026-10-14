@@ -506,7 +506,7 @@ fn run_case(
                 .args(&emit_args[1..])
                 .current_dir(&case.dir),
             Stdio::null(),
-            case.timeout,
+            case.setup_timeout(),
         );
         let emit_ms = ms(emitting);
         let output = match emitted {
@@ -566,7 +566,7 @@ fn run_case(
     row["timing_ms"]["emit"] = json!(emit_ms);
     if !recipe.build.is_empty() {
         let building = Instant::now();
-        let build = run_command(&recipe.build, &paths, &case_dir, None, case.timeout);
+        let build = run_command(&recipe.build, &paths, &case_dir, None, case.setup_timeout());
         let build_ms = ms(building);
         *build_total_ms += build_ms;
         row["timing_ms"]["build"] = json!(build_ms);
