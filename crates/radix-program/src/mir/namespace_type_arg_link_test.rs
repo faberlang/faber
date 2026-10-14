@@ -789,10 +789,10 @@ fn package_mir_norma_fs_read_file_main_is_try_call() {
 /// (so its failure row applies), so the conversion statement lives in the
 /// helper the instantiated `read_file` calls, not in its own blocks. The
 /// probe (`docs/audits/pumpfix-review1-f5-c-probe.md`) shows the one
-/// `read_file` instance is already `T = textus` and its `TryCall` callee
-/// carries the `Convert` whose target is the interned `textus`.
+/// `read_file<string>` body is now substituted (`T = textus`) and its
+/// `TryCall` callee carries the `Convert` whose target is the interned
+/// `textus`.
 #[test]
-#[ignore = "pumpfix-gfd594086: read_file<string> body convert target not substituted"]
 fn package_mir_norma_fs_read_file_string_body_converts_to_textus() {
     let dir = crate::test_support::test_temp_dir("norma-fs-read-file-string-body");
     let entry = write_norma_fs_read_file_package(dir.as_ref());
