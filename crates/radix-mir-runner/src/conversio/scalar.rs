@@ -618,9 +618,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         params
             .iter()
             .find_map(|param| match self.interner.resolve(*param) {
-                "Hex" => Some(16),
-                "Bin" => Some(2),
-                "Oct" => Some(8),
+                "hex" | "Hex" => Some(16),
+                "bin" | "Bin" => Some(2),
+                "oct" | "Oct" => Some(8),
                 _ => None,
             })
     }

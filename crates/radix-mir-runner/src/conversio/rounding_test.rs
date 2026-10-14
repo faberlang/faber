@@ -2,6 +2,35 @@
 
 use super::rounding::RoundingMode::{self, Ceil, Floor, HalfEven, Trunc};
 
+#[test]
+fn lowercase_rounding_words() {
+    // The conversion policy words are canonically lower case; the retired
+    // title-case spelling stays dual-accepted for one phase and maps to the
+    // same mode.
+    for (lower, title) in [
+        ("floor", "Floor"),
+        ("ceil", "Ceil"),
+        ("half_even", "HalfEven"),
+        ("trunc", "Trunc"),
+    ] {
+        let lower_mode = RoundingMode::from_hint(lower).unwrap_or_else(|| panic!("{lower}"));
+        let title_mode = RoundingMode::from_hint(title).unwrap_or_else(|| panic!("{title}"));
+        assert_eq!(lower_mode, title_mode, "{lower} vs {title}");
+        for value in [2.5, 3.5, -2.5, -0.5, 0.5, 3.7, -3.7] {
+            assert_eq!(
+                lower_mode.round_float(value),
+                title_mode.round_float(value),
+                "{lower} {value}"
+            );
+        }
+        assert_eq!(
+            lower_mode.round_quotient(25, 10),
+            title_mode.round_quotient(25, 10),
+            "{lower} quotient"
+        );
+    }
+}
+
 fn quotients(mode: RoundingMode, numerator: i128, denominator: i128) -> Option<i128> {
     mode.round_quotient(numerator, denominator)
 }
