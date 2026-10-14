@@ -364,23 +364,34 @@ pub(super) fn execute(
         rows[job.index] = Some(value);
     }
     let mut passed = 0;
+    let mut rejected = 0;
     let mut expected_failures = 0;
     let mut failed = 0;
     let mut not_applicable = 0;
-    for value in rows.into_iter().flatten() {
+    for (index, row) in rows.into_iter().enumerate() {
+        let Some(mut value) = row else {
+            fail(&format!(
+                "no result recorded for canonical case {}",
+                cases[index].id
+            ))
+        };
+        if value["status"] == "expected-fail" {
+            value["status"] = json!(cases[index].relabel_expected_fail("expected-fail"));
+        }
         match value["status"].as_str() {
             Some("pass") => passed += 1,
+            Some("rejected") => rejected += 1,
             Some("expected-fail") => expected_failures += 1,
             Some("not-applicable") => not_applicable += 1,
             _ => failed += 1,
         }
         println!("{value}");
     }
-    let status = summary_status(passed, expected_failures, failed);
+    let status = summary_status(passed + rejected, expected_failures, failed);
     println!(
         "{}",
         json!({"schema":1,"type":"summary","target":"canonical",
-        "cases":cases.len(),"passed":passed,"expected_failures":expected_failures,
+        "cases":cases.len(),"passed":passed,"rejected":rejected,"expected_failures":expected_failures,
         "not_applicable":not_applicable,"failed":failed,"status":status,
         "lint":{"command":lint_command,"exit":lint_exit,"cargo_invocations":usize::from(!members.is_empty())},
         "timing_ms":{"discover":discover_ms,"lint":lint_ms,"total":ms(started)}})
