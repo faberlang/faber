@@ -2302,6 +2302,53 @@ functio probe(P p) → P {
     );
 }
 
+// A generic constructor-like call can leave its result carrying an inference
+// hole (`mk(1)` is `Box<?>` until something constrains `?`). Ascribing the
+// result to `Box<numerus>` states the missing witness; it is a refinement of
+// the same genus, not an unprovable nominal pair.
+
+#[test]
+fn verte_ascription_accepts_inferred_generic_result() {
+    test_support::assert_accepts(
+        r"
+genus Box<T> {
+    varia T v
+}
+
+functio mk<T>(T x) → Box<T> {
+    redde Box<T> { v = x }
+}
+
+incipit {
+    fixum Box<numerus> b ← mk(1) ∷ Box<numerus>
+    nota b
+}
+",
+    );
+}
+
+// The no-argument form leaves the witness entirely to the ascription:
+// `mk()` has no argument to solve `T`, so `∷ Box<numerus>` is the only
+// statement of the fact.
+
+#[test]
+fn verte_ascription_accepts_inferred_generic_result_no_argument() {
+    test_support::assert_accepts(
+        r"
+genus Box<T> { }
+
+functio mk<T>() → Box<T> {
+    redde Box<T> { }
+}
+
+incipit {
+    fixum Box<numerus> b ← mk() ∷ Box<numerus>
+    nota b
+}
+",
+    );
+}
+
 #[test]
 fn verte_ascription_accepts_narrowed_variant() {
     test_support::assert_accepts(

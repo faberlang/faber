@@ -3808,6 +3808,14 @@ impl TypeChecker<'_> {
         if self.nominal_declares_interface(source_ty, target_ty) {
             return;
         }
+        // A generic constructor-like call can reach this law with its witness
+        // still unsolved (`mk(1)` is `Box<?>` until something names `?`). The
+        // ascription is the statement that names it, so unifying the applied
+        // arguments proves the pair and refines the result. A trial failure is
+        // rolled back and the ordinary rejection below still fires.
+        if self.verte_inferred_source_refines(source_ty, target_ty, span) {
+            return;
+        }
         let found = self.format_union_constituent_type(source_ty);
         let expected = self.format_union_constituent_type(target_ty);
         self.error_issue_with_args(
@@ -3816,6 +3824,100 @@ impl TypeChecker<'_> {
             span,
             &[("found", found), ("expected", expected)],
         );
+    }
+
+    /// Whether an ascription source still carrying an inference hole is
+    /// refined into `target` by unifying the applied arguments.
+    ///
+    /// The source of a generic constructor-like call (`mk(1)` typed `Box<?>`)
+    /// reaches the nominal law carrying the call-site infer id inside the
+    /// applied arguments, even when the witness is already solved; `Box<?>` and
+    /// `Box<numerus>` are then table-distinct although the ascription is the
+    /// plain refinement that names the witness. The trial runs through the
+    /// ordinary assignment unification so the difference is bridged and genuine
+    /// mismatches (different genus bases, unrelated witnesses) still fail: on
+    /// failure both the diagnostics and the substitutions are rolled back and
+    /// the caller rejects as before.
+    fn verte_inferred_source_refines(
+        &mut self,
+        source: TypeId,
+        target: TypeId,
+        span: radix_lexer::Span,
+    ) -> bool {
+        if !self.verte_type_has_inference_hole(source) {
+            return false;
+        }
+        let errors_before = self.errors.len();
+        let substitutions_before = self.substitutions.borrow().clone();
+        self.unify_assign_issue(source, target, span, ISSUE_NOMINAL_ASCRIPTION_NOT_PROVABLE);
+        if self.errors.len() == errors_before {
+            return true;
+        }
+        self.errors.truncate(errors_before);
+        *self.substitutions.borrow_mut() = substitutions_before;
+        self.occurs_cache.clear();
+        false
+    }
+
+    /// Whether an applied source type still holds an inference id in an
+    /// argument position.
+    ///
+    /// The id is inspected raw, without substitution resolution: a generic
+    /// call's result keeps the call-site infer id even after the witness has
+    /// been solved, so `Box<?>` is table-distinct from `Box<numerus>` although
+    /// `?` already names `numerus`. That stale id is the only difference
+    /// unification must bridge, and a source with no infer id at all is a
+    /// plain nominal pair the law judges as before. Container and applied
+    /// argument shapes are walked so a nested stale id is caught too.
+    fn verte_type_has_inference_hole(&self, ty: TypeId) -> bool {
+        let mut seen = FxHashSet::default();
+        self.verte_type_has_inference_hole_inner(ty, &mut seen)
+    }
+
+    fn verte_type_has_inference_hole_inner(
+        &self,
+        ty: TypeId,
+        seen: &mut FxHashSet<TypeId>,
+    ) -> bool {
+        if !seen.insert(ty) {
+            return false;
+        }
+        match self.types.get(ty) {
+            Type::Infer(_) => true,
+            Type::Array(inner)
+            | Type::BoundedArray { element: inner, .. }
+            | Type::Set(inner)
+            | Type::Tensor(inner, _)
+            | Type::Sparsa(inner, _)
+            | Type::Matrix(inner, _)
+            | Type::Vector(inner, _)
+            | Type::Atomic(inner)
+            | Type::Intervallum(inner)
+            | Type::Option(inner) => self.verte_type_has_inference_hole_inner(*inner, seen),
+            Type::Map(key, value) | Type::Ledger(key, value) => {
+                self.verte_type_has_inference_hole_inner(*key, seen)
+                    || self.verte_type_has_inference_hole_inner(*value, seen)
+            }
+            Type::Ref(_, inner) | Type::Alias(_, inner) => {
+                self.verte_type_has_inference_hole_inner(*inner, seen)
+            }
+            Type::Union(types) => types
+                .iter()
+                .any(|member| self.verte_type_has_inference_hole_inner(*member, seen)),
+            Type::Tuple(types) => types
+                .iter()
+                .any(|member| self.verte_type_has_inference_hole_inner(*member, seen)),
+            Type::Applied(base, args) => {
+                self.verte_type_has_inference_hole_inner(*base, seen)
+                    || args.iter().any(|arg| match arg {
+                        radix_types::AppliedArg::Type(id) => {
+                            self.verte_type_has_inference_hole_inner(*id, seen)
+                        }
+                        radix_types::AppliedArg::Size(_) => false,
+                    })
+            }
+            _ => false,
+        }
     }
 
     /// Whether `source` is one of `target`'s closed-set variants. A binding
