@@ -131,9 +131,10 @@ fn real_source_chain_shares_one_buffer_by_host_value_and_survives_renaming() {
     assert!(calls[0].ends_with("(_0, _1)") && calls[1].ends_with("(_1, _2)"), "{dump}");
 
     // R2: the `mut` output is bound at argument position 1 of `first`; the
-    // consumer's input is argument position 0 of `second`.
-    let first = buffer_ids(&program, "first");
-    let second = buffer_ids(&program, "second");
+    // consumer's input is argument position 0 of `second`. Entry names are
+    // compiler-owned `k<id>` (ca2499dc-3.1), in program order.
+    let first = buffer_ids(&program, "k0");
+    let second = buffer_ids(&program, "k1");
     assert_eq!(first.len(), 2, "first(a, mut o): {first:?}\n{dump}");
     assert_eq!(second.len(), 2, "second(src, mut dst): {second:?}\n{dump}");
     assert_eq!(

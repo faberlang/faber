@@ -4532,9 +4532,11 @@ functio privata_helper(f32 value) → f32 {
 
     assert_eq!(program.kernels.len(), 1, "only the public named kernel is admitted");
     let admitted = &program.kernels[0];
+    // ca2499dc-3.1: the admitted entry carries the compiler-owned `k<id>`
+    // spelling; the source name survives only as decoration.
     assert_eq!(
-        admitted.entry, "publica_entry",
-        "the public named kernel must be the selected entry"
+        admitted.entry, "k0",
+        "the public named kernel is the selected entry under its k<id> name"
     );
 }
 
