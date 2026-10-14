@@ -60,7 +60,7 @@ mod evaluation {
     use super::{AnalyzedModule, Diagnostic};
     use crate::diagnostics::DiagnosticConvert;
     use crate::semantic::passes::praefixum::{
-        ImportedCallee, ImportedEffects, ImportedReference, ImportedReferenceKind, PraefixumSite, imported_references,
+        ImportedCallee, ImportedEffects, ImportedReference, PraefixumSite, imported_references,
     };
     use crate::semantic::{self, SemanticError, SemanticErrorKind};
     use radix_hir::visit::{HirVisitorMut, walk_local_mut};
@@ -123,7 +123,7 @@ mod evaluation {
     /// reach an import.
     ///
     /// Each site, in evaluation order, first sends its import references
-    /// (calls and data members of an import namespace) to `imports`: an
+    /// (calls, methods, and data members of an import namespace) to `imports`: an
     /// `Effect` is `praefixum_forbidden` with the call chain, an
     /// `Unavailable` is `praefixum_import_unavailable`. A site that passes
     /// goes to `run` as a scratch clone of the unit, filtered and holding the
@@ -166,9 +166,7 @@ mod evaluation {
         imports: &mut dyn ImportedEffects,
         run: &mut dyn FnMut(AnalyzedModule, DefId, Span) -> Result<Value, SemanticError>,
     ) -> Result<(), SemanticError> {
-        let references = imported_references(&unit.hir, &unit.types, site.def_id)
-            .into_iter()
-            .filter(|reference| reference.kind != ImportedReferenceKind::Method);
+        let references = imported_references(&unit.hir, &unit.types, site.def_id);
         for reference in references {
             match imports.callee(&reference) {
                 ImportedCallee::Pure => {}
@@ -217,12 +215,12 @@ mod evaluation {
     }
 
     /// The first import reference of a site that would need another
-    /// module's code: a call or a data member of an import namespace. A
-    /// method call never defers.
+    /// module's code: a call, a method of a genus declared elsewhere, or a
+    /// data member of an import namespace.
     fn first_import_reached(unit: &AnalyzedModule, site: DefId) -> Option<ImportedReference> {
         imported_references(&unit.hir, &unit.types, site)
             .into_iter()
-            .find(|reference| reference.kind != ImportedReferenceKind::Method)
+            .next()
     }
 
     /// `<binding>.<member>` for an import reference.
