@@ -2871,6 +2871,7 @@ fn is_builtin_type(name: &str) -> bool {
         name,
         "ascii"
             | "erratum"
+            | "trapped"
             | "forma"
             | "scrinium"
             | "status"
