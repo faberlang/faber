@@ -3658,10 +3658,6 @@ help = "materialize a lista of matrix cells with `↦ matrix<T, [R, C]>`; a lite
 message = "{valor} to regex conversion has no default pattern; use `{valor} ↦ string ↦ regex`"
 help = "convert {valor} to string before converting to regex"
 
-[diagnostics.SEM016.issues.regex_literal_invalid]
-message = "invalid regex literal: {detail}"
-help = "fix the regex pattern; the inline literal is compiled at check time"
-
 [diagnostics.SEM016.issues.valor_to_cursor_boundary]
 message = "{valor} to cursor conversion crosses the eager/lazy boundary; materialize via `{valor} ↦ {lista}` then `{lista} ↦ cursor`"
 help = "materialize the cursor through {lista} before crossing the boundary"
