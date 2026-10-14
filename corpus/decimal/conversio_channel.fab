@@ -1,0 +1,60 @@
++++
+term = "d64"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression", "conversio_expr", "cast_expr", "fac_stmt", "fac_block", "cape_clause", "call_expr", "call_suffix", "argument_list", "argument", "redde_stmt", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Integer ↦ d64 through a function error channel: the widening scales to the carrier when it fits, and an out-of-range integer fails into the ⇥ channel so the handled call prints `caught`."
+syntax = "n ↦ d64"
+related = ["↦", "⇥", "int", "d64"]
+locale = "en"
++++
+# =============================================================================
+# d64 — integer ↦ d64 takes the error channel
+# =============================================================================
+#
+# What this teaches:
+#   • integer → decimal — `n ↦ d64` scales the integer to the carrier, but
+#     the carrier has a range: 5 widens to `5`, while 92233720369 is out of
+#     range for the d64 carrier and the conversio fails into the function's
+#     own error channel (`⇥ string`), so the handled call prints `caught`.
+#   • The `do { } catch err { }` handler around the calls is what lets the
+#     conversio failure recover; the channel is part of the function type,
+#     so every call must sit inside a handler.
+#
+# The unhandled side is deliberately NOT taught here: a widen call outside a
+# channel handler traps (nonzero exit), and that trap is already pinned by
+# the Rust golden test
+# `decimal_golden_test::integer_to_d64_conversio_takes_the_error_channel_and_still_traps_outside`
+# in crates/radix-hir-go. A trapping exemplum would need separate
+# exit-code plumbing, so this exemplum pins only the handled path.
+#
+# Common mistakes:
+#   • expecting `92233720369` to widen — the scaled value does not fit the
+#     d64 carrier, and the failure goes to the channel, not to the value
+#
+# See also: ↦, ⇥, int, d64
+# =============================================================================
+
+# decimal — integer ↦ d64 through the error channel
+#
+# WHY: pins the error-channel ruling for the out-of-range integer
+# conversio end-to-end at the runner: the widening failure takes the
+# enclosing channel instead of trapping when the call is handled.
+#
+# EXPECTED OUTPUT:
+#   conversio_channel.expected — `5` then `caught`.
+
+fn widen(int n) → d64 ⇥ string {
+    return n ↦ d64
+}
+
+main {
+    do {
+        print widen(5)
+        print widen(92233720369)
+    }
+    catch err {
+        print "caught"
+    }
+}
