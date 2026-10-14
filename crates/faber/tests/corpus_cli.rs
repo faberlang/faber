@@ -771,6 +771,31 @@ fn corpus_canonical_reports_a_rejection_as_its_own_outcome() {
 }
 
 #[test]
+fn corpus_roundtrip_reports_a_rejection_as_its_own_outcome() {
+    let suite = probe_suite(
+        "\n[targets.roundtrip]\nmode = \"roundtrip\"\n",
+        "\n[targets.roundtrip]\noutcome = \"rejects\"\nphase = \"emit\"\ndiagnostic_contains = \"unknown_type\"\n",
+    );
+    fs::copy(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/typi/inf-prefix-error.fab"),
+        suite.path().join("cases/probe/main.fab"),
+    )
+    .expect("copy rejected source");
+    let rejected = run_corpus(suite.path(), "roundtrip");
+    assert!(
+        rejected.status.success(),
+        "{}",
+        String::from_utf8_lossy(&rejected.stdout)
+    );
+    let rows = records(&rejected.stdout);
+    assert_eq!(rows[0]["status"], "rejected");
+    let summary = rows.last().expect("summary");
+    assert_eq!(summary["rejected"], 1);
+    assert_eq!(summary["expected_failures"], 0);
+    assert_eq!(summary["failed"], 0);
+}
+
+#[test]
 fn corpus_known_failure_becoming_green_requires_reclassification() {
     let temp = tempfile::tempdir().expect("temporary suite");
     let case = temp.path().join("cases").join("probe");

@@ -88,6 +88,7 @@ pub(super) fn execute(
     };
     let prepare_ms = ms(preparation);
     let mut passed = 0;
+    let mut rejected = 0;
     let mut expected_failures = 0;
     let mut not_applicable = 0;
     let mut failed = 0;
@@ -127,22 +128,26 @@ pub(super) fn execute(
         }
     });
     output_rows.sort_by_key(|(index, _, _)| *index);
-    for (_, row, case_build_ms) in output_rows {
+    for (index, mut row, case_build_ms) in output_rows {
         build_ms += case_build_ms;
+        if row["status"] == "expected-fail" {
+            row["status"] = json!(cases[index].relabel_expected_fail("expected-fail"));
+        }
         match row["status"].as_str() {
             Some("pass") => passed += 1,
+            Some("rejected") => rejected += 1,
             Some("expected-fail") => expected_failures += 1,
             Some("not-applicable") => not_applicable += 1,
             _ => failed += 1,
         }
         println!("{row}");
     }
-    let status = summary_status(passed, expected_failures, failed);
+    let status = summary_status(passed + rejected, expected_failures, failed);
     println!(
         "{}",
         json!({
             "schema":1,"type":"summary","target":target,"cases":cases.len(),
-            "passed":passed,"expected_failures":expected_failures,
+            "passed":passed,"rejected":rejected,"expected_failures":expected_failures,
             "not_applicable":not_applicable,"failed":failed,
             "workers":workers,
             "status":status,
@@ -175,6 +180,7 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
     let second_session =
         Session::new(Config::default().with_resolved_locale_pack(emit_pack.clone()));
     let mut passed = 0;
+    let mut rejected = 0;
     let mut expected_failures = 0;
     let mut not_applicable = 0;
     let mut failed = 0;
@@ -251,9 +257,14 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
                     )
                 }
                 (Judged::KnownFail, None) if pinned_later.is_some() => {
-                    expected_failures += 1;
+                    let status = case.relabel_expected_fail("expected-fail");
+                    if status == "rejected" {
+                        rejected += 1;
+                    } else {
+                        expected_failures += 1;
+                    }
                     (
-                        "expected-fail",
+                        status,
                         Some("emit"),
                         Some(format!(
                             "known failure pinned at {} phase; roundtrip executes emit only",
@@ -276,8 +287,13 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
                         .as_deref()
                         .is_some_and(|fragment| reason.contains(fragment)) =>
                 {
-                    expected_failures += 1;
-                    ("expected-fail", Some("emit"), None)
+                    let status = case.relabel_expected_fail("expected-fail");
+                    if status == "rejected" {
+                        rejected += 1;
+                    } else {
+                        expected_failures += 1;
+                    }
+                    (status, Some("emit"), None)
                 }
                 (Judged::KnownFail, Some(reason)) => {
                     failed += 1;
@@ -309,12 +325,12 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
             })
         );
     }
-    let status = summary_status(passed, expected_failures, failed);
+    let status = summary_status(passed + rejected, expected_failures, failed);
     println!(
         "{}",
         json!({
             "schema":1,"type":"summary","target":target,"cases":cases.len(),
-            "passed":passed,"expected_failures":expected_failures,
+            "passed":passed,"rejected":rejected,"expected_failures":expected_failures,
             "not_applicable":not_applicable,"failed":failed,
             "workers":1,
             "status":status,
