@@ -1159,9 +1159,10 @@ impl Parser {
                 .any(|annotation| self.is_nondum_annotation(annotation));
             let parsed = self.parse_func_decl();
             let StmtKind::Func(func) = parsed? else {
-                return Err(Self::expected_issue_error(
+                return Err(self.expected_issue_with_keywords(
                     "expected_method_declaration",
                     self.current_span(),
+                    &["functio"],
                 ));
             };
             ClassMemberKind::Method(func)
@@ -2143,9 +2144,10 @@ impl Parser {
                 } else if self.eat_keyword_ident(TokenKind::Postparabit) {
                     PraeparaKind::Postparabit
                 } else {
-                    return Err(Self::expected_issue_error(
+                    return Err(self.expected_issue_with_keywords(
                         "expected_praepara_hook",
                         self.current_span(),
+                        &["praepara", "praeparabit", "postpara", "postparabit"],
                     ));
                 };
                 let all = self.eat_keyword_ident(TokenKind::Omnia);

@@ -2704,7 +2704,8 @@ fn assert_en_parse_error_issue(source: &str, issue: &str) {
     );
 }
 
-/// Minimal en surface for mutability-expectation args (`const`/`var`).
+/// Minimal en surface for mutability- and declaration-expectation args
+/// (`const`/`var`, `fn`, and the praepara hook family).
 struct SurfaceArgsPack;
 
 impl KeywordPack for SurfaceArgsPack {
@@ -2721,6 +2722,11 @@ impl KeywordPack for SurfaceArgsPack {
             "const" => Some("fixum"),
             "var" => Some("varia"),
             "fn" => Some("functio"),
+            "probandum" => Some("probandum"),
+            "setup" => Some("praepara"),
+            "async_setup" => Some("praeparabit"),
+            "teardown" => Some("postpara"),
+            "async_teardown" => Some("postparabit"),
             _ => None,
         }
     }
@@ -2730,6 +2736,11 @@ impl KeywordPack for SurfaceArgsPack {
             "fixum" => Some("const"),
             "varia" => Some("var"),
             "functio" => Some("fn"),
+            "probandum" => Some("probandum"),
+            "praepara" => Some("setup"),
+            "praeparabit" => Some("async_setup"),
+            "postpara" => Some("teardown"),
+            "postparabit" => Some("async_teardown"),
             _ => None,
         }
     }
@@ -2813,6 +2824,62 @@ fn parser_mutability_expectation_issue_carries_surface_args() {
     );
     assert_eq!(issue_arg(&plain_error, "fixum"), Some("fixum"));
     assert_eq!(issue_arg(&plain_error, "varia"), Some("varia"));
+}
+
+#[test]
+fn parser_praepara_hook_expectation_issue_carries_surface_args() {
+    // Two declaration expectations guard code no source reaches, so this
+    // pins each site's exact keyword list through the helper the sites call:
+    //
+    // - `parse_class_member`'s `expected_method_declaration` else-arm only
+    //   runs when `parse_func_decl` returns an `Ok` value that is not
+    //   `StmtKind::Func`; that parser has a single successful exit and always
+    //   builds `StmtKind::Func`, so the arm is unreachable.
+    // - `parse_probandum_body`'s `expected_praepara_hook` arm only runs after
+    //   `check_keyword_ident` matched one of the four hook identities and all
+    //   four `eat_keyword_ident` calls then missed; check and eat resolve the
+    //   same token through the same claim path, so that arm is unreachable.
+    //
+    // The args themselves stay load-bearing: the en pack rows render
+    // `{functio}`/`{praepara}`/... and must not hard-code Latin keywords into
+    // a non-Latin reader surface.
+    //
+    // Control: the pack claims the praepara family, and a `setup` hook parses
+    // through the same check/eat path the expectation guards.
+    let ok = parse_surface_args("probandum \"pack\" { setup { } }");
+    assert!(
+        ok.success(),
+        "praepara hook must parse on the en surface: {:?}",
+        ok.errors
+    );
+
+    let parser = surface_args_parser("setup");
+    let span = parser.current_span();
+
+    let method_error =
+        parser.expected_issue_with_keywords("expected_method_declaration", span, &["functio"]);
+    assert_eq!(
+        issue_arg(&method_error, "issue"),
+        Some("expected_method_declaration")
+    );
+    assert_eq!(issue_arg(&method_error, "functio"), Some("fn"));
+
+    let hook_error = parser.expected_issue_with_keywords(
+        "expected_praepara_hook",
+        span,
+        &["praepara", "praeparabit", "postpara", "postparabit"],
+    );
+    assert_eq!(
+        issue_arg(&hook_error, "issue"),
+        Some("expected_praepara_hook")
+    );
+    assert_eq!(issue_arg(&hook_error, "praepara"), Some("setup"));
+    assert_eq!(issue_arg(&hook_error, "praeparabit"), Some("async_setup"));
+    assert_eq!(issue_arg(&hook_error, "postpara"), Some("teardown"));
+    assert_eq!(
+        issue_arg(&hook_error, "postparabit"),
+        Some("async_teardown")
+    );
 }
 
 #[test]
