@@ -106,7 +106,14 @@ pub const AIR_REPORT_HEADER: &str =
 /// and a report over a broken module would be noise.
 #[must_use]
 pub fn advisory_rows(_name: &str, source: &str) -> Option<Vec<AirRow>> {
-    let lex_result = radix::module::lexer::lex(source);
+    // TEMPORARY STAGING: a pack-less source reads the
+    // no-locale default while `RADIX_DEFAULT_CODE_LOCALE=en`; unset keeps the
+    // historical pack-less (Latin) reading.
+    let code_pack = radix::module::driver::default_code_pack(&radix::module::driver::Config::default());
+    let lex_result = match code_pack.as_ref() {
+        Some(pack) => radix::module::lexer::lex_with_locale_pack(source, pack),
+        None => radix::module::lexer::lex(source),
+    };
     if !lex_result.success() {
         return None;
     }

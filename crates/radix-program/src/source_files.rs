@@ -228,6 +228,13 @@ pub fn load_package_source(
     let source_diagnostic_start = diagnostics.len();
     // WHY: a wrong-locale read hides behind this file's lex and parse errors.
     // The note is advisory only; it never changes the locale the file is read in.
+    // TEMPORARY STAGING: a source with no declared locale reads
+    // the no-locale default (`en` while `RADIX_DEFAULT_CODE_LOCALE=en`); unset
+    // keeps the pack-less (Latin) reading. The resolved pack also feeds analysis.
+    let locale_pack = match locale_pack {
+        Some(pack) => Some(pack),
+        None => radix_module::driver::default_code_pack(config),
+    };
     let other_locale_note = || {
         if locale_declared {
             return None;
