@@ -249,6 +249,23 @@ fn air_purity_tensor_method_receiver_issue_renders_through_the_catalog() {
     assert_eq!(help, super::AIR_PURITY_HELP);
 }
 
+/// Catalog help renders as Markdown, so the backticks inside every `Some(help)`
+/// must pair. An unclosed one leaks a broken code span into `faber explain`
+/// output (SEM059 shipped with exactly one before this gate).
+#[test]
+fn semantic_spec_help_backticks_are_balanced() {
+    for &kind in super::SEMANTIC_ERROR_KINDS {
+        let Some(help) = super::semantic_spec(kind).help else {
+            continue;
+        };
+        assert_eq!(
+            help.matches('`').count() % 2,
+            0,
+            "unbalanced backticks in semantic help for {kind:?}: {help:?}"
+        );
+    }
+}
+
 /// The five issues emitted through `reject(span, slug)` / `reject_with_arg`
 /// that had no `en` row each need their own catalog arm, for the same reason.
 #[test]
