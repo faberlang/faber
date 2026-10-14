@@ -2937,7 +2937,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         if let Some(cached) = cache.get(&symbol) {
             return cached.clone();
         }
-        let owned = self.interner.resolve(symbol).to_owned();
+        let owned = decode_ascii_payload(self.interner.resolve(symbol));
         cache.insert(symbol, owned.clone());
         owned
     }
@@ -3587,6 +3587,14 @@ fn fault_record_args(error: &RunnerError) -> Option<(String, String)> {
     ))
 }
 
+/// Decode a lexer `ascii` literal payload through the one escape table.
+///
+/// A checked program carries only payloads the typechecker already accepted,
+/// so a malformed payload cannot occur here; keep the raw text if it does.
+fn decode_ascii_payload(raw: &str) -> String {
+    radix_lexer::ascii_literal::decode_ascii_literal(raw).unwrap_or_else(|_| raw.to_owned())
+}
+
 fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Interner) -> bool {
     match (constant, value) {
         (MirConstant::Int(left), Value::Int(right)) => left == right,
@@ -3610,9 +3618,11 @@ fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Inter
         (MirConstant::String(symbol), Value::Str(right)) => {
             radix_lexer::textus_literal::decode_textus_literal(interner.resolve(*symbol)) == *right
         }
-        (MirConstant::Ascii(symbol), Value::Str(right)) => interner.resolve(*symbol) == right,
+        (MirConstant::Ascii(symbol), Value::Str(right)) => {
+            decode_ascii_payload(interner.resolve(*symbol)) == *right
+        }
         (MirConstant::Ascii(symbol), Value::Ascii(right)) => {
-            interner.resolve(*symbol).as_bytes() == [*right]
+            decode_ascii_payload(interner.resolve(*symbol)).as_bytes() == [*right]
         }
         (MirConstant::Regex { pattern, flags }, Value::Regex(right)) => {
             regex_pattern(

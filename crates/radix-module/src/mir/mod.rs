@@ -403,6 +403,9 @@ mod saturating_word_tests;
 mod sort_expr_tests;
 
 #[cfg(test)]
+#[path = "ascii_unicode_escape_test.rs"]
+mod ascii_unicode_escape_tests;
+#[cfg(test)]
 #[path = "tensor_lift_test.rs"]
 mod tensor_lift_tests;
 #[cfg(test)]
