@@ -1936,6 +1936,72 @@ main {
     );
 }
 
+/// pumpfix-gfd594086-2.3 (Unit 2.1 regression): fs.fab names `fault.IoFault`
+/// in `read_file_async`'s failure arm through its own provider-form
+/// `norma:fault` edge. A consumer that imports only `norma:fs` must still
+/// resolve that nominal — the transitive interface walk installs `fault`,
+/// and check must not surface an unresolved/unknown-type diagnostic naming
+/// `IoFault`.
+#[test]
+fn provider_edge_nominal_in_imported_signature_resolves_without_direct_import() {
+    let (_td, home) = temp_dir("provider-edge-nominal");
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"+++
+locale = "en"
++++
+
+import from "norma:fs" charta
+
+async_main {
+    await_const string body ← charta.read_file_async<string>("x.txt")
+    print body
+}
+"#,
+    )
+    .expect("write consumer");
+    let source = fs::read_to_string(&app).expect("read consumer");
+
+    let library_home = crate::import_resolve::in_tree_library_home().expect("<repo>/lib exists in the tree");
+    let _guard = LibraryHomeGuard::set(&library_home);
+
+    // (a) the imported fs interface's provider-form `norma:fault` edge must
+    // install the fault interface under its producer binding; without the
+    // transitive walk the signature nominal has no registration to resolve.
+    let contract = import_contract_for_file(&app, &source, None, None);
+    assert!(
+        contract.file_interfaces.contains_key("fault"),
+        "the fs.fab `norma:fault` edge must install transitively, got {:?}",
+        contract.file_interfaces.keys().collect::<Vec<_>>()
+    );
+
+    // (b) check must resolve the imported `IoFault` without a direct import.
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "fs-only consumer must typecheck against the provider-form `norma:fault` edge: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| format!("{:?}", (d.code, d.issue(), d.args.clone())).contains("IoFault")),
+        "IoFault in the imported fs signature must resolve without a direct \
+         `norma:fault` import; diagnostics={:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
 /// cds-u6 snapshot-nomen-collision (extension-lib `Scopulum` shape): two
 /// providers each export a same-named class and class-returning functions.
 /// Same-named local classes must not cascade-skip both providers' exports
