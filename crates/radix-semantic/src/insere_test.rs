@@ -74,6 +74,16 @@ fn textus_embed_folds_to_escaped_text_literal() {
 }
 
 #[test]
+fn textus_literal_payload_writes_nul_as_unicode_escape() {
+    let payload = crate::insere::textus_literal_payload("a\0b");
+    assert_eq!(payload, "a\\u{0}b");
+    assert_eq!(
+        radix_lexer::textus_literal::decode_textus_literal(&payload),
+        "a\0b"
+    );
+}
+
+#[test]
 fn textus_embed_rejects_invalid_utf8() {
     let config = config_with("bad.txt", InsereSource::Bytes(vec![0x66, 0xff, 0xfe]));
     rejects_with(
