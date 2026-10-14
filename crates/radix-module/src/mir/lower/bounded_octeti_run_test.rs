@@ -182,18 +182,14 @@ fn bounded_octeti_window_all_widths_round_trip() {
 
 #[test]
 fn bounded_octeti_window_inner_slice() {
-    let lines = run(
-        "const bytes raw ← |00 01 02 00|\nconst bytes<4> o ← raw ↦ bytes<4>\nprint o[1‥3] ↦ u16 via Be",
-    )
-    .expect("runs");
+    let lines = run("const bytes raw ← |00 01 02 00|\nconst bytes<4> o ← raw ↦ bytes<4>\nprint o[1‥3] ↦ u16 via Be")
+        .expect("runs");
     assert_eq!(lines, ["258"]);
 }
 
 #[test]
 fn bounded_octeti_scalar_index_still_reads_a_byte() {
-    let lines = run(
-        "const bytes raw ← |07 08|\nconst bytes<2> o ← raw ↦ bytes<2>\nconst u8 first ← o[1]\nprint first",
-    )
-    .expect("runs");
+    let lines = run("const bytes raw ← |07 08|\nconst bytes<2> o ← raw ↦ bytes<2>\nconst u8 first ← o[1]\nprint first")
+        .expect("runs");
     assert_eq!(lines, ["8"]);
 }

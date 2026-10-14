@@ -554,8 +554,14 @@ impl Validator<'_, '_> {
                 // `u8` cell. A scalar `octeti<N>[i]` still yields the `u8`
                 // element through the same element-type tables.
                 let octeti_window = view.length.is_some()
-                    && matches!(view.element, MirDeviceViewElement::Scalar(MirScalarLayout::U8))
-                    && matches!(self.type_kind(result_ty), Type::Primitive(Primitive::Octeti));
+                    && matches!(
+                        view.element,
+                        MirDeviceViewElement::Scalar(MirScalarLayout::U8)
+                    )
+                    && matches!(
+                        self.type_kind(result_ty),
+                        Type::Primitive(Primitive::Octeti)
+                    );
                 if result_layout.kind != expected && !octeti_window {
                     self.error(span, "device view projection element layout mismatch");
                 }
