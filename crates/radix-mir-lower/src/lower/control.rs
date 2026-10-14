@@ -4458,14 +4458,7 @@ impl FunctionBuilder<'_> {
         self.switch_to(after_id);
         if let Some((operand, err_ty)) = settle {
             let unit = MirType::semantic(self.types.primitive(Primitive::Vacuum));
-            self.lower_failable_call(
-                MirCallee::Value(operand),
-                Vec::new(),
-                unit,
-                err_ty,
-                None,
-                iter.span,
-            )?;
+            self.lower_failable_call(MirCallee::Value(operand), Vec::new(), unit, err_ty, None, iter.span)?;
         }
         Some(())
     }
