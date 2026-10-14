@@ -3712,6 +3712,14 @@ pub fn source_reads_as_other_locale(
 /// WHY: a wrong-locale read hides behind unknown-identifier errors. The note
 /// is advisory only; it never changes the locale the source was read in.
 fn note_other_locale_reading(session: &Session, name: &str, peeled: &PeeledSource, diagnostics: &mut Vec<Diagnostic>) {
+    // A pack resolved from a source declaration, a package manifest, or
+    // `--locale` is a caller decision, never a guess, so the failed-analysis
+    // advisory does not apply. Package analysis hands the per-file session a
+    // body with the frontmatter already stripped, so the declaration check
+    // below cannot see it; the explicit flag still can.
+    if session.config.locale_pack_explicit {
+        return;
+    }
     if peeled
         .frontmatter
         .as_ref()
