@@ -72,7 +72,15 @@ fn en_pack_maps_the_four_named_examples() {
 /// Technical names en keeps as identity rows and the translated packs keep
 /// too (algorithm and shader-domain identifiers with no settled native term).
 /// Every other canonical must carry a translated surface in every non-la pack.
-const KEPT_IDENTITY: &[&str] = &["rms_norm", "rope_norm", "gelu", "silu", "formata", "swizzle"];
+const KEPT_IDENTITY: &[&str] = &[
+    "rms_norm",
+    "rope_norm",
+    "rope_half",
+    "gelu",
+    "silu",
+    "formata",
+    "swizzle",
+];
 
 /// Every installed non-la reader pack owns a row for every registry canonical,
 /// and only the named technical identifiers may keep the Latin spelling.
