@@ -638,12 +638,22 @@ impl<'a> Lexer<'a> {
         self.emit_token(TokenKind::Error, start);
     }
 
-    /// Scan `/` as division or reject C-style comment openers with a migration hint.
+    /// Scan `/` as division, a regex body opener, or a rejected C-style comment.
     ///
     /// WHY: `//` and `/* */` are ubiquitous in other languages but are not Faber
     /// trivia. Emitting two `Slash` tokens leaves the parser reporting a useless
     /// "expected expression" at statement boundaries.
+    ///
+    /// Ruling d381ae56: when the previous emitted token is the regex type word
+    /// or `_`, the slash opens a raw regex body instead of dividing. The empty
+    /// body check runs before the C-style comment branch so `regex //` reports
+    /// `empty_regex_literal`, not a line comment.
     fn scan_slash(&mut self, start: u32) {
+        if self.previous_token_is_regex_type_word() {
+            self.scan_regex_body(start);
+            return;
+        }
+
         match self.cursor.peek() {
             Some('/') => {
                 self.cursor.advance();
@@ -674,6 +684,78 @@ impl<'a> Lexer<'a> {
             }
             _ => self.emit_token(TokenKind::Slash, start),
         }
+    }
+
+    /// Whether the token immediately before the current `/` opens a regex body.
+    ///
+    /// Only the regex type word or `_` qualifies. The type word is resolved
+    /// through the active pack: with a pack, its Latin identity must be
+    /// `regex`; without one, the spelling itself must be `regex`. An identifier
+    /// preceded by `.` is a member access, not the type word.
+    fn previous_token_is_regex_type_word(&self) -> bool {
+        let Some(previous) = self.tokens.last() else {
+            return false;
+        };
+        let sym = match previous.kind {
+            TokenKind::Underscore(_) => return true,
+            TokenKind::Ident(sym) => sym,
+            _ => return false,
+        };
+
+        if self.tokens.len() >= 2
+            && matches!(self.tokens[self.tokens.len() - 2].kind, TokenKind::Dot)
+        {
+            return false;
+        }
+
+        let text = self.interner.resolve(sym);
+        match self.locale_pack {
+            Some(pack) => pack.type_latin_key(text) == Some("regex"),
+            None => text == "regex",
+        }
+    }
+
+    /// Scan a raw `/.../` regex body opened by the type word or `_`.
+    ///
+    /// The body runs to the next unescaped `/` on the same line. A backslash
+    /// consumes the following character so `\/` does not terminate and stays
+    /// in the payload as authored. Newline or EOF before the closing slash
+    /// reports `unterminated_regex_literal`; an immediate closing slash reports
+    /// `empty_regex_literal` and emits [`TokenKind::Error`].
+    fn scan_regex_body(&mut self, start: u32) {
+        if self.cursor.peek() == Some('/') {
+            self.cursor.advance();
+            let issue = "empty_regex_literal";
+            self.emit_issue_error(LexErrorKind::UnterminatedString, start, issue);
+            self.emit_token(TokenKind::Error, start);
+            return;
+        }
+
+        let mut terminated = false;
+        loop {
+            match self.cursor.peek() {
+                None | Some('\n' | '\r') => {
+                    self.emit_issue_error(
+                        LexErrorKind::UnterminatedString,
+                        start,
+                        "unterminated_regex_literal",
+                    );
+                    break;
+                }
+                Some('\\') => self.skip_single_line_escape(),
+                Some('/') => {
+                    self.cursor.advance();
+                    terminated = true;
+                    break;
+                }
+                _ => {
+                    self.cursor.advance();
+                }
+            }
+        }
+
+        let sym = self.finish_delimited_literal(start, 1, 1, terminated);
+        self.emit_token(TokenKind::RegexString(sym), start);
     }
 
     // =========================================================================
@@ -1177,7 +1259,7 @@ fn is_ident_continue(c: char) -> bool {
 
 #[cfg(test)]
 #[path = "scan_test.rs"]
-mod tests;
+mod scan_test;
 
 #[cfg(test)]
 #[path = "unsigned_integer_test.rs"]

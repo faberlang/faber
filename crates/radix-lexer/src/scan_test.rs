@@ -2633,3 +2633,143 @@ fn membership_glyphs_in_comment_and_string_are_not_scanned() {
         result.tokens
     );
 }
+
+// ---------------------------------------------------------------------------
+// Inline regex literals (ruling d381ae56): `regex /pattern/` and `_ /pattern/`
+// open a raw body; a bare `/` in operand position stays division.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn regex_literal_after_type_word_lexes_raw_body() {
+    let result = lex("regex /a+/");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert!(matches!(result.tokens[0].kind, TokenKind::Ident(_)));
+    let TokenKind::RegexString(sym) = result.tokens[1].kind else {
+        panic!("expected RegexString, got {:?}", result.tokens[1].kind);
+    };
+    assert_eq!(result.interner.resolve(sym), "a+");
+}
+
+#[test]
+fn regex_literal_after_underscore_lexes_raw_body() {
+    let result = lex("_ /a+/");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert!(matches!(result.tokens[0].kind, TokenKind::Underscore(_)));
+    let TokenKind::RegexString(sym) = result.tokens[1].kind else {
+        panic!("expected RegexString, got {:?}", result.tokens[1].kind);
+    };
+    assert_eq!(result.interner.resolve(sym), "a+");
+}
+
+#[test]
+fn regex_literal_does_not_claim_bare_division() {
+    for source in ["x / 2", "n / regex_count"] {
+        let result = lex(source);
+        assert!(result.errors.is_empty(), "{source}: {:?}", result.errors);
+        assert!(
+            result.tokens.iter().any(|t| t.kind == TokenKind::Slash),
+            "{source}: expected a Slash token"
+        );
+        assert!(
+            !result
+                .tokens
+                .iter()
+                .any(|t| matches!(t.kind, TokenKind::RegexString(_))),
+            "{source}: no RegexString token expected"
+        );
+    }
+}
+
+#[test]
+fn regex_literal_keeps_escaped_slash_in_payload() {
+    let result = lex("regex /a\\/b/");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    let TokenKind::RegexString(sym) = result.tokens[1].kind else {
+        panic!("expected RegexString, got {:?}", result.tokens[1].kind);
+    };
+    assert_eq!(result.interner.resolve(sym), "a\\/b");
+}
+
+#[test]
+fn regex_literal_unterminated_reports_issue() {
+    let result = lex("regex /abc");
+    assert!(
+        result.errors.iter().any(|err| {
+            err.kind == LexErrorKind::UnterminatedString
+                && has_arg(err, "issue", "unterminated_regex_literal")
+        }),
+        "{:?}",
+        result.errors
+    );
+    assert!(
+        result
+            .tokens
+            .iter()
+            .any(|t| matches!(t.kind, TokenKind::RegexString(_))),
+        "an unterminated regex body still emits its token: {:?}",
+        result.tokens
+    );
+}
+
+#[test]
+fn regex_literal_empty_reports_issue() {
+    let result = lex("regex //");
+    assert!(
+        result.errors.iter().any(|err| {
+            err.kind == LexErrorKind::UnterminatedString
+                && has_arg(err, "issue", "empty_regex_literal")
+        }),
+        "{:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn regex_literal_member_identifier_stays_division() {
+    let result = lex("self.regex / 2");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert!(
+        result.tokens.iter().any(|t| t.kind == TokenKind::Slash),
+        "{:?}",
+        result.tokens
+    );
+    assert!(
+        !result
+            .tokens
+            .iter()
+            .any(|t| matches!(t.kind, TokenKind::RegexString(_))),
+        "{:?}",
+        result.tokens
+    );
+}
+
+/// Minimal pack: the localized regex type word is `expressio`.
+struct EnRegexTypePack;
+
+impl KeywordPack for EnRegexTypePack {
+    fn pack_id(&self) -> &'static str {
+        "en-regex-test"
+    }
+
+    fn keyword_token_kind(&self, _text: &str) -> Option<TokenKind> {
+        None
+    }
+
+    fn type_latin_key(&self, text: &str) -> Option<&str> {
+        (text == "expressio").then_some("regex")
+    }
+
+    fn keyword_suggestion(&self, _text: &str) -> Option<String> {
+        None
+    }
+}
+
+#[test]
+fn regex_literal_locale_pack_type_word_opens_body() {
+    let result = lex_with_locale_pack("expressio /a+/", &EnRegexTypePack);
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    let TokenKind::RegexString(sym) = result.tokens[1].kind else {
+        panic!("expected RegexString, got {:?}", result.tokens[1].kind);
+    };
+    assert_eq!(result.interner.resolve(sym), "a+");
+}
