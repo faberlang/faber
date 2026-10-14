@@ -1,0 +1,59 @@
++++
+term = "size law"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "size_param_list", "size_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "incipit_stmt", "fixum_decl", "redde_stmt", "call_expr", "call_suffix", "call_type_args", "call_type_arg", "argument_list", "argument", "member_suffix", "expression", "literal", "array_literal", "assignment", "place", "itera_stmt", "apud_clause", "nota_stmt", "spelled_lift"]
+category = "type"
+canonical = false
+summary = "A size is the exact naturals: an int lifts into one at a spelled, checked store, and a size reads back as an int."
+syntax = "const size N ← n"
+related = ["tensor", "size", "generic", "magnitudo"]
+locale = "en"
++++
+
+# =============================================================================
+# size law: lift at a spelled store, force by plain use, creator by size params.
+# =============================================================================
+#
+# What this teaches:
+#   • `const size N ← n` lifts a run-time int into a size at the declaration; the
+#     lift is checked (`≥ 0`) there and snapshots `n`, so the later `n ← n + 10`
+#     leaves `N` at 3
+#   • a size name reads as a plain int (`print N`, `N + 1`): the force is a safe
+#     widening and needs no spelling
+#   • `const size ROWS = 2` is the static form; it folds in extent positions
+#   • a size name sits in an extent position: `tf32[ROWS, N]`
+#   • a creator takes its extents as size parameters and the call lifts them
+#     with literals: `make<2, 3>()`
+#
+# See also: tensor, size, generic, magnitudo
+# =============================================================================
+
+fn runtime_extent(int value) → int {
+    return value
+}
+
+fn make<size H, size W>() → tf32[H, W] {
+    var tf32[H, W] out ← tf32[H, W] {}
+    out[[0, 0]] ← 7.5
+    return out
+}
+
+main {
+    var int n ← runtime_extent(3)
+    const size N ← n
+    n ← n + 10
+    print N
+    print n
+    print N + 1
+
+    const size ROWS = 2
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    const tf32[ROWS, N] grid ← flat ↦ tf32[ROWS, N]
+    print grid.shape().get(0)
+    print grid.shape().get(1)
+
+    const tf32[_, _] made ← make<2, 3>()
+    print made.shape().get(0)
+    print made.shape().get(1)
+    print made.flatten()
+}
