@@ -662,3 +662,57 @@ fn package_mir_norma_fs_read_file_main_is_try_call() {
     )
     .unwrap_or_else(|errors| panic!("norma:fs read_file package must lower, got {errors:?}"));
 }
+
+/// After instantiation with `T = string`, the instantiated `norma:fs`
+/// `read_file` body must convert its `solum:lege` result to the interned
+/// `textus` primitive, not leave a generic `Type::Param` conversion target.
+///
+/// Blocked upstream by pumpfix-gfd594086: the linked `read_file` body's
+/// provider call (`solum:lege`) currently resolves to `read_file` itself, so
+/// the package fails link validation before this probe can inspect the body.
+#[test]
+#[ignore = "pumpfix-gfd594086: read_file<string> body convert target not substituted"]
+fn package_mir_norma_fs_read_file_string_body_converts_to_textus() {
+    let dir = crate::test_support::test_temp_dir("norma-fs-read-file-string-body");
+    let entry = write_norma_fs_read_file_package(dir.as_ref());
+    let config = Config::default();
+
+    with_interpreted_lowered_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        |lowered| {
+            let program = lowered.validated.program();
+            let types = lowered.validated.validation().types.as_table();
+            let textus = types.primitive(Primitive::Textus);
+
+            let read_file = program
+                .functions
+                .iter()
+                .find(|function| {
+                    function
+                        .name
+                        .is_some_and(|name| lowered.interner.resolve(name) == "read_file")
+                })
+                .unwrap_or_else(|| {
+                    panic!("instantiated `read_file` must exist in the merged program")
+                });
+            assert!(
+                read_file
+                    .blocks
+                    .iter()
+                    .any(|block| block.statements.iter().any(|statement| matches!(
+                        &statement.kind,
+                        MirStatementKind::RuntimeCall { call, .. }
+                            if matches!(
+                                &call.intrinsic,
+                                MirIntrinsic::Convert(conversion)
+                                    if conversion.target_ty.semantic_id() == textus
+                            )
+                    ))),
+                "instantiated read_file must convert its result to the interned textus type"
+            );
+        },
+    )
+    .unwrap_or_else(|errors| panic!("norma:fs read_file package must lower, got {errors:?}"));
+}
