@@ -61,7 +61,7 @@ fn overlap_field_read_is_accepted_without_teaching_warning() {
 #[test]
 fn overlap_field_write_is_accepted() {
     test_support::assert_accepts(&figura(
-        "functio f(Figura x) → textus {\n    varia Figura y ← x\n    y.nomen ← \"z\"\n    redde y.nomen\n}",
+        "functio f(Figura x) → textus {\n    varia Figura y ← copy x\n    y.nomen ← \"z\"\n    redde y.nomen\n}",
     ));
 }
 

@@ -399,7 +399,10 @@ impl TypeChecker<'_> {
     ///
     /// `typus R = A ∪ B` and its unfolded union are the same type (BO-S-4
     /// alias transparency), so the member rule, refinement, and dead-test
-    /// warning all compare through this peel. A `Type::Enum` is the closed
+    /// warning all compare through this peel. A declared `copy`/`mut`/`own`
+    /// access marker on the receiver (`varia R y ← copy x`) is an acquisition
+    /// fact, not part of the value shape, so it peels too — like the struct
+    /// and interface receiver lookups. A `Type::Enum` is the closed
     /// variant union: each variant is represented as `Type::Struct` carrying
     /// the variant `DefId`, while payload fields remain in the checker tables.
     /// The `Option` rewrite a nihil union lowers to still returns `None` here;
@@ -409,7 +412,9 @@ impl TypeChecker<'_> {
         for _ in 0..8 {
             match self.types.get(current).clone() {
                 Type::Union(members) => return Some(members),
-                Type::Alias(_, inner) => current = self.resolve_inferred_type(inner),
+                Type::Ref(_, inner) | Type::Alias(_, inner) => {
+                    current = self.resolve_inferred_type(inner);
+                }
                 Type::Option(inner) => {
                     let mut members = match self.union_members_of(inner) {
                         Some(members) => members,
