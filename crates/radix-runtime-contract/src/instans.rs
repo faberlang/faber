@@ -19,7 +19,7 @@ const SECONDS_PER_HOUR: i64 = 3_600;
 const NANOS_PER_DAY: i64 = SECONDS_PER_HOUR * 24 * NANOS_PER_SECOND;
 
 /// Declared precision (`praecisio`) for an [`Instans`] value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum InstansPraecisio {
     /// Bare `instans` — second granularity (Unix time default).
     Secunda,
@@ -76,9 +76,11 @@ impl InstansPraecisio {
 
 /// Absolute instant stored as nanoseconds since Unix epoch.
 ///
-/// [`PartialEq`] compares at the value's declared precision — two `instans<ms>`
-/// operands are equal when their millisecond-truncated nanosecond forms match.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// [`PartialEq`] and [`Ord`] compare the stored `(nanos, praecisio)` pair, so
+/// `==` and `cmp` agree. The coarser-precision compare that ignores the finer
+/// operand's sub-precision digits is [`Instans::cmp_at_coarser`] (with its
+/// [`Instans::partial_cmp_at_coarser`] alias).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Instans {
     nanos: i64,
     praecisio: InstansPraecisio,
@@ -158,7 +160,9 @@ impl Instans {
         Some(self.cmp_at_coarser(other))
     }
 
-    fn cmp_at_coarser(self, other: Self) -> std::cmp::Ordering {
+    /// Three-way compare at the coarser operand precision; the only coarser compare.
+    #[must_use]
+    pub fn cmp_at_coarser(self, other: Self) -> std::cmp::Ordering {
         let praecisio = coarser_praecisio(self.praecisio, other.praecisio);
         let lhs = praecisio.truncate_nanos(self.nanos);
         let rhs = praecisio.truncate_nanos(other.nanos);
@@ -169,18 +173,6 @@ impl Instans {
     #[must_use]
     pub fn to_rfc3339(self) -> String {
         format_rfc3339_utc(self.nanos, self.praecisio)
-    }
-}
-
-impl PartialOrd for Instans {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Instans {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.cmp_at_coarser(*other)
     }
 }
 
@@ -411,3 +403,7 @@ fn civil_from_days(z: i64) -> (i32, u32, u32) {
     }
     (y, m, d)
 }
+
+#[cfg(test)]
+#[path = "instans_test.rs"]
+mod tests;
