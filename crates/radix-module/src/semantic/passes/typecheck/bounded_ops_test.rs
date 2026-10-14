@@ -13,7 +13,7 @@ fn bounded_ops_longitudo_and_vacua_are_len_not_capacity() {
     lista<numerus, 8> xs,
     textus<8> t,
     ascii<8> a,
-    octeti<8> o
+    lista<b8, 8> o
 ) → vacuum {
     fixum numerus n_xs ← xs.longitudo()
     fixum bivalens e_xs ← xs.vacua()
@@ -46,7 +46,7 @@ fn bounded_ops_accipe_and_sectio_typecheck() {
     lista<numerus, 8> xs,
     textus<8> t,
     ascii<8> a,
-    octeti<8> o
+    lista<b8, 8> o
 ) → vacuum {
     fixum numerus ∪ nihil got ← xs.accipe(0)
     fixum lista<numerus> slice ← xs.sectio(0, 2)
@@ -101,8 +101,8 @@ incipit {
     );
     assert_rejects_with_issue_la(
         r"functio grow() → vacuum {
-    varia octeti raw ← |61|
-    varia octeti<8> o ← raw ↦ octeti<8>
+    varia lista<b8> raw ← |61|
+    varia lista<b8, 8> o ← raw ↦ lista<b8, 8>
     o.appende(0x62 ∷ u8)
 }
 
@@ -133,8 +133,8 @@ functio grow_ascii() → vacuum ⇥ textus {
 }
 
 functio grow_octeti() → vacuum ⇥ textus {
-    varia octeti raw ← |61|
-    varia octeti<8> o ← raw ↦ octeti<8>
+    varia lista<b8> raw ← |61|
+    varia lista<b8, 8> o ← raw ↦ lista<b8, 8>
     o.appende(0x62 ∷ u8)
 }
 
@@ -173,9 +173,9 @@ fn bounded_ops_equality_ignores_spare_slots() {
     );
     assert_accepts_la(
         r"incipit {
-    fixum octeti raw ← |61 62|
-    fixum octeti<8> a ← raw ↦ octeti<8>
-    fixum octeti<8> b ← raw ↦ octeti<8>
+    fixum lista<b8> raw ← |61 62|
+    fixum lista<b8, 8> a ← raw ↦ lista<b8, 8>
+    fixum lista<b8, 8> b ← raw ↦ lista<b8, 8>
     si a ≡ b { nota 1 }
 }",
     );
@@ -214,7 +214,7 @@ incipit {
         EXACT_EQ_ISSUE,
     );
     assert_rejects_with_issue_la(
-        r"functio same(octeti<8> a, octeti<4> b) → bivalens {
+        r"functio same(lista<b8, 8> a, lista<b8, 4> b) → bivalens {
     redde a ≡ b
 }
 
