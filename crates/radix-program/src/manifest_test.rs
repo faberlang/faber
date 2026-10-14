@@ -140,6 +140,20 @@ fn projection_applies_defaults() {
 }
 
 #[test]
+fn library_home_paths_key_parses_and_defaults_to_none() {
+    let manifest: FaberManifest = toml::from_str(
+        "[package]\nname = \"demo\"\n\n[paths]\nsource = \"src\"\nlibrary_home = \"../libs\"\n",
+    )
+    .expect("library_home key parses");
+    assert_eq!(manifest.paths.library_home.as_deref(), Some("../libs"));
+
+    let manifest: FaberManifest =
+        toml::from_str("[package]\nname = \"demo\"\n\n[paths]\nsource = \"src\"\n")
+            .expect("paths without library_home parses");
+    assert!(manifest.paths.library_home.is_none());
+}
+
+#[test]
 fn projection_rejects_unknown_compiler_fields() {
     let err = toml::from_str::<FaberManifest>(
         r#"
