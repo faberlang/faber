@@ -6762,3 +6762,29 @@ fn functions_without_value_operands_record_no_assign_results() {
         "no Value operand, so no per-Assign value record"
     );
 }
+
+#[test]
+fn fault_text_channel_receives_text() {
+    let fault = Some(("NotFound".into(), "/x".into()));
+    let message = "NotFound /x".to_owned();
+    assert_eq!(
+        failure_channel_value(&Primitive::Textus, fault.clone(), message.clone()),
+        Value::Str("NotFound /x".into()),
+        "a textus channel receives the failure text, not the fault map"
+    );
+    assert_eq!(
+        failure_channel_value(&Primitive::Ignotum, fault.clone(), message.clone()),
+        routes::fault_record_value("NotFound", "/x"),
+        "an ignotum channel receives the fault record map"
+    );
+    assert_eq!(
+        failure_channel_value(&Primitive::Valor, fault, message),
+        routes::fault_record_value("NotFound", "/x"),
+        "a valor channel receives the fault record map"
+    );
+    assert_eq!(
+        failure_channel_value(&Primitive::Textus, None, "NotFound /x".into()),
+        Value::Str("NotFound /x".into()),
+        "without fault facts, a textus channel still receives the text"
+    );
+}
