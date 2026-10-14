@@ -371,7 +371,7 @@ kind = "bin"
     fs::write(dir.join("faber.toml"), manifest).expect("write faber.toml");
     fs::write(
         src.join("main.fab"),
-        "import from \"norma:fs\" fs\n\nfn scinde(string s) → int {\n    const list<string> partes ← fs.read_lines(s)\n    return partes.length()\n}\n\nmain {\n    print scinde(\"a,b,c\")\n}\n",
+        "import from \"norma:fs\" fs\n\nfn scinde(string s) → bool {\n    return fs.exists(s)\n}\n\nmain {\n    print scinde(\"a,b,c\")\n}\n",
     )
     .expect("write main.fab");
     src.join("main.fab")
