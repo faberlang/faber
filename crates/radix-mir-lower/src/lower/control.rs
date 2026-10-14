@@ -3863,24 +3863,24 @@ impl FunctionBuilder<'_> {
     /// operand's temp, so a generator call nested in arguments or bound to a
     /// name first keeps its materializing read. An async cursor is retyped to
     /// the `lista<T>` read the walk indexes, which replaces the drain snapshot.
+    /// Returns the marked call's generator callee when the stream was marked,
+    /// and `None` otherwise.
     fn mark_stepped_cursor_stream(
         &mut self,
         collection: &MirOperand,
         kind: &CollectionIteraKind,
         mode: HirIteraMode,
-    ) -> bool {
+    ) -> Option<DefId> {
         let element = match kind {
             CollectionIteraKind::Array(element)
             | CollectionIteraKind::Cursor(element)
             | CollectionIteraKind::AsyncCursor(element) => *element,
-            _ => return false,
+            _ => return None,
         };
         let (HirIteraMode::Ex, MirOperand::Temp(temp), Some(current)) = (mode, collection, self.current) else {
-            return false;
+            return None;
         };
-        let Some(array) = self.types.find_array(element) else {
-            return false;
-        };
+        let array = self.types.find_array(element)?;
         let array_ty = MirType::semantic(array);
         let Some(MirStatement {
             kind:
@@ -3891,15 +3891,16 @@ impl FunctionBuilder<'_> {
             ..
         }) = self.block_mut(current).statements.last_mut()
         else {
-            return false;
+            return None;
         };
         if *destination != MirPlace::temp(*temp) {
-            return false;
+            return None;
         }
+        let callee = stream.callee;
         stream.stepped = true;
         *return_ty = array_ty;
         self.temps[temp.0 as usize].ty = array_ty;
-        true
+        Some(callee)
     }
 
     /// Whether the walk reads a conversation's content frames
@@ -4147,7 +4148,9 @@ impl FunctionBuilder<'_> {
         let collection = self.lower_expr_value(iter.iter)?;
         // D6.6: a direct generator call feeding `itera ex` is walked stepwise,
         // so a suspending backend resumes the producer once per step.
-        let stepped = self.mark_stepped_cursor_stream(&collection, &collection_kind, iter.mode);
+        let stepped_callee =
+            self.mark_stepped_cursor_stream(&collection, &collection_kind, iter.mode);
+        let stepped = stepped_callee.is_some();
         let (collection, collection_ty) = match &collection_kind {
             CollectionIteraKind::Cursor(element) | CollectionIteraKind::AsyncCursor(element) if stepped => (
                 collection,
