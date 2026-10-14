@@ -576,8 +576,8 @@ fn lista_copia_conversio_emits_swift_set_and_array_initializers() {
         panic!("expected Swift output");
     };
     let code = output.code;
-    assert!(code.contains("= Set(xs)"), "expected Set(xs), got:\n{code}");
-    assert!(code.contains("= Array(s)"), "expected Array(s), got:\n{code}");
+    assert!(code.contains("= Set(l_xs)"), "expected Set(l_xs), got:\n{code}");
+    assert!(code.contains("= Array(l_s)"), "expected Array(l_s), got:\n{code}");
     assert!(!code.contains("as!"), "no trapping cast, got:\n{code}");
 }
 
