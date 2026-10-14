@@ -511,6 +511,68 @@ fn inferred_constructor_map_survives_the_fhir_round_trip() {
     load_fhir(&bytes).expect("inferred constructor artifact must load");
 }
 
+#[test]
+fn fhir_artifact_keeps_inferred_set_literal_hole() {
+    // `_ [1, 2]` at a set cell is an inferred constructor: typecheck rewrites
+    // it to the `array ↦ set` conversion while keeping the literal's node id,
+    // and lowering's authored `_` record stays at that node's
+    // `AscriptionTarget` slot. The artifact boundary must keep the hole record
+    // rather than fail the validator with `unknown_type_slot` or drop it.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+    use radix_hir::{HirOwnerRef, HirTypeFormHead, HirTypeSlot};
+
+    let source = "+++\nlocale = \"en\"\n+++\n\nmain {\n    const set<int> s ← _ [1, 2]\n    print s.length()\n}\n";
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "inferred-set-literal.fab", source, AnalyzeRequest::default())
+        .expect("inferred set-literal fixture analyzes");
+    let artifact = from_analyzed(&original, "inferred-set-literal", "inferred-set-literal.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize inferred set-literal artifact");
+    // The validator must recognize the inferred-constructor ascription site.
+    // The separate hole-slot legality check may still reject an `_` record at
+    // a non-`Declared` slot (tracked separately), but the failure must never
+    // be an unknown type slot.
+    match load_fhir(&bytes) {
+        Ok(_) => {}
+        Err(HirArtifactError::InvalidPresentation { issue, .. }) => {
+            assert_ne!(
+                issue, "unknown_type_slot",
+                "an inferred set-literal AscriptionTarget site must be registered"
+            );
+        }
+        Err(error) => panic!("inferred set-literal artifact must not fail structurally, got {error:?}"),
+    }
+
+    // Read the wire form back to pin that the authored hole record itself is
+    // serialized, not dropped: the loader's decode already proved the wire is
+    // structurally sound above.
+    let wire: HirArtifact =
+        postcard::from_bytes(&bytes).expect("serialized inferred set-literal artifact must round-trip");
+    let presentation = &wire.presentation;
+    let holes: Vec<_> = presentation
+        .authored_types
+        .iter()
+        .filter(|authored| {
+            matches!(authored.form.head, HirTypeFormHead::Infer)
+                && matches!(authored.site.slot, HirTypeSlot::AscriptionTarget)
+                && matches!(
+                    authored.site.owner,
+                    HirOwnerRef::Hir(id) if presentation.inferred_constructor_ids.contains(&id)
+                )
+        })
+        .collect();
+    assert_eq!(
+        holes.len(),
+        1,
+        "round-tripped presentation must keep the inferred set-literal hole at its AscriptionTarget site"
+    );
+}
+
 // ── U2.3: fail-closed error path tests ────────────────────────────────
 
 #[test]
