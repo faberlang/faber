@@ -228,7 +228,7 @@ fn praefixum_imports_library_printing_callee_names_the_library_hop() {
     write(
         dir,
         "main.fab",
-        "import from \"norma:console\" console\n\nfn probe() {\n    console.write_line(\"x\")\n}\n\nmain {\n    print 0\n}\n",
+        "import from \"norma:console\" console\n\nfn probe() {\n    do {\n        console.write_line(\"x\")\n    } catch err {\n    }\n}\n\nmain {\n    print 0\n}\n",
     );
     let (program, bodies) = analyze_with_library_bodies(dir);
     let (id, node) = program.node_by_path(&dir.join("main.fab")).unwrap();
