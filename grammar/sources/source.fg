@@ -1502,10 +1502,12 @@ iuncta_expr := 'iuncta' type_arguments '[' argument_list? ']'
 # hole (`_ { … }`), or braces alone, which imply the hole — the cell supplies
 # the type (operator ruling 2026-10-10). The bare form claims only when the
 # head member is an `IDENTIFIER = value` init, so empty braces and quoted
-# members stay a json_literal.
+# members stay a json_literal. A stated type before a keyed literal builds
+# that type (`json { … }`, `map<K, V> { … }`), a bare keyed literal needs a
+# typed cell (operator ruling 2026-10-10, need).
 json_literal := '{' (json_member (',' json_member)*)? '}'
 json_member  := STRING ':' json_value
-typed_constructor := type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | hole_type json_literal | '{' field_list '}' construction_source?
+typed_constructor := type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | type_annotation json_literal | hole_type json_literal | '{' field_list '}' construction_source?
 field_list := field_init (',' field_init)*
 field_init := (field_key '=' expression) | IDENTIFIER
 field_key := IDENTIFIER | STRING | '[' expression ']'
