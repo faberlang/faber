@@ -457,6 +457,94 @@ fn authored_type_artifact() -> crate::artifact::HirArtifact {
     artifact
 }
 
+/// Artifact with one declared local whose finalized type is
+/// `lista<element>` and whose authored form is the zero-argument semantic
+/// spelling.
+fn zero_arg_array_artifact(element: Type) -> crate::artifact::HirArtifact {
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let element_ty = types.intern(element);
+    let array_ty = types.array(element_ty);
+    let local_def = DefId(USER_DEF_ID_BASE + 20);
+    artifact.interner = vec!["main".to_owned(), "test".to_owned(), "b".to_owned()];
+    let radix_hir::HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub artifact item must be a function");
+    };
+    function.body = Some(HirBlock::simple(
+        vec![HirStatement {
+            id: HirId(1),
+            kind: HirStatementKind::Local(radix_hir::HirLocal {
+                def_id: local_def,
+                name: Symbol(2),
+                ty: Some(array_ty),
+                init: None,
+                mutable: false,
+                is_await: false,
+                runtime_provided: false,
+                await_store: None,
+                size_decl: false,
+                size_static: false,
+            }),
+            span: Span::default(),
+        }],
+        None,
+        Span::default(),
+    ));
+    artifact.types = types.snapshot();
+    artifact.presentation.authored_types = vec![radix_hir::HirAuthoredTypeUse {
+        site: radix_hir::HirTypeSite {
+            owner: radix_hir::HirOwnerRef::Def(local_def),
+            slot: radix_hir::HirTypeSlot::Declared,
+        },
+        form: radix_hir::HirTypeForm {
+            ty: array_ty,
+            head: radix_hir::HirTypeFormHead::Semantic(TypeFormLevel::LONG),
+            args: Vec::new(),
+            label: None,
+        },
+    }];
+    artifact
+}
+
+#[test]
+fn zero_argument_u8_array_form_validates() {
+    // `octeti`'s semantic witness is the byte-list array; the zero-argument
+    // authored form is accepted for the u8 element in either byte spelling.
+    let byte_spellings = [
+        Type::Bits(radix_types::BitsWidth::B8),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8),
+    ];
+    for element in byte_spellings {
+        let artifact = zero_arg_array_artifact(element.clone());
+        crate::decode(&crate::encode(&artifact).expect("encode u8-array artifact")).unwrap_or_else(
+            |err| panic!("zero-argument u8 array {element:?} must validate: {err:?}"),
+        );
+    }
+}
+
+#[test]
+fn zero_argument_non_u8_array_form_fails_closed() {
+    let rejected_elements = [
+        Type::Primitive(Primitive::Textus),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16),
+    ];
+    for element in rejected_elements {
+        let artifact = zero_arg_array_artifact(element.clone());
+        let err = crate::decode(&crate::encode(&artifact).expect("encode non-u8-array artifact"))
+            .expect_err("a zero-argument non-u8 array form must fail closed");
+        assert!(
+            matches!(
+                err,
+                crate::error::HirArtifactError::InvalidPresentation {
+                    issue: "array_argument_arity",
+                    ..
+                }
+            ),
+            "zero-argument array over {element:?} must fail with array_argument_arity: {err:?}"
+        );
+    }
+}
+
 #[test]
 fn authored_types_v9_round_trip_preserves_nested_forms() {
     let artifact = authored_type_artifact();

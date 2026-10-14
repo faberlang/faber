@@ -447,6 +447,26 @@ fn validate_size_arg(
     Ok(())
 }
 
+/// Whether `element` is the u8 byte element the `octeti` word names.
+///
+/// The producer interns the byte-list element either as the raw 8-bit word
+/// (`b8`, the seeded `octeti_list`) or as the sized unsigned numeric
+/// (`numerus<u8>`, the octeti type-identity bridge), so both spell the same
+/// u8 element; a wider width or another primitive is a different array.
+fn is_octeti_byte_element(
+    types: &radix_types::TypeTableSnapshot,
+    element: radix_types::TypeId,
+) -> bool {
+    matches!(
+        types.types().get(element.0 as usize),
+        Some(radix_types::Type::Bits(radix_types::BitsWidth::B8))
+            | Some(radix_types::Type::SizedNumeric(
+                radix_types::Primitive::Numerus,
+                radix_types::NumericWidth::U8
+            ))
+    )
+}
+
 fn validate_short_numeric_child(
     arg: &radix_hir::HirTypeFormArg,
     site: &radix_hir::HirTypeSite,
@@ -634,6 +654,17 @@ fn validate_type_form(
                     }
                 }
                 radix_types::Type::Array(element) => {
+                    // `octeti` is authored as the zero-argument primitive word
+                    // while its semantic witness is the byte-list array
+                    // `lista<b8>`. The u8 element is the octeti/list identity,
+                    // not a missing authored argument; every other element
+                    // type and every other level still needs the one argument.
+                    if form.args.is_empty()
+                        && level.0 == 0
+                        && is_octeti_byte_element(types, *element)
+                    {
+                        return Ok(());
+                    }
                     if form.args.len() != 1 {
                         return Err(type_presentation_issue("array_argument_arity", site));
                     }
