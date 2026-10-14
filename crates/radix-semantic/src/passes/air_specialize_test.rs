@@ -1,10 +1,10 @@
 use super::*;
-use crate::test_support::analyze_source_for_target;
+use crate::test_support::analyze_source_for_target_la;
 use radix_target::Target;
 
 #[test]
 fn concrete_shape_call_gets_a_pre_air_instance() {
-    let fixture = analyze_source_for_target(
+    let fixture = analyze_source_for_target_la(
         r#"
 @ radix lane "air"
 functio generic_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
@@ -55,7 +55,7 @@ incipit {
 
 #[test]
 fn equal_air_instance_keys_are_deduplicated_and_distinct_sizes_survive() {
-    let fixture = analyze_source_for_target(
+    let fixture = analyze_source_for_target_la(
         r#"
 @ radix lane "air"
 functio generic_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
@@ -98,7 +98,7 @@ incipit {
 
 #[test]
 fn nested_inferred_air_call_uses_the_enclosing_concrete_binding() {
-    let fixture = analyze_source_for_target(
+    let fixture = analyze_source_for_target_la(
         r#"
 @ radix lane "air"
 functio inner<magnitudo N>(tensor<f32, [N]> x) → f32 {
@@ -160,7 +160,7 @@ incipit {
 
 #[test]
 fn generic_rope_method_argument_is_specialized_with_the_instance() {
-    let fixture = analyze_source_for_target(
+    let fixture = analyze_source_for_target_la(
         r#"
 @ radix lane "air"
 functio generic_rope<magnitudo D>(tf32[2, D] x, tf32[2, 4, 3] table) → tf32[2, D] {

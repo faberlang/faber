@@ -5,9 +5,14 @@
 //! Rust alias-bind emitter; these tests pin the semantic side (R1: unmarked
 //! binds alias, the access marker decides).
 
+fn latin_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("load Latin locale pack")
+}
+
 fn issues(body: &str) -> Vec<String> {
     let source = format!("incipit {{ }}\n{body}\n");
-    let lex = radix_lexer::lex(&source);
+    let lex = radix_lexer::lex_with_locale_pack(&source, &latin_pack());
     let mut parsed = radix_parser::parse(lex);
     assert!(parsed.success(), "parse: {:?}", parsed.errors);
     let program = parsed.program.take().expect("program");

@@ -8,7 +8,7 @@
 use crate::SemanticError;
 use crate::SemanticErrorKind;
 use crate::WarningKind;
-use crate::test_support::analyze_source;
+use crate::test_support::analyze_source_la;
 
 fn arg<'a>(diag: &'a SemanticError, name: &str) -> Option<&'a str> {
     diag.args
@@ -18,7 +18,7 @@ fn arg<'a>(diag: &'a SemanticError, name: &str) -> Option<&'a str> {
 }
 
 fn non_exhaustive(source: &str) -> Vec<SemanticError> {
-    analyze_source(source)
+    analyze_source_la(source)
         .diagnostics
         .iter()
         .filter(|diag| diag.kind == SemanticErrorKind::NonExhaustiveMatch)
@@ -27,7 +27,7 @@ fn non_exhaustive(source: &str) -> Vec<SemanticError> {
 }
 
 fn assert_clean(source: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     let facts: Vec<_> = result
         .diagnostics
         .iter()
@@ -45,7 +45,7 @@ fn assert_clean(source: &str) {
 
 /// A literal arm in `discerne` is refused: `discerne` matches closed sets only.
 fn assert_literal_arm_refused(source: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(
         result.diagnostics.iter().any(|diag| {
             diag.kind == SemanticErrorKind::TypeMismatch

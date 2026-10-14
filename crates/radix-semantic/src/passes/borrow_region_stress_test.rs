@@ -8,10 +8,10 @@
 //! `borrow_region_parity_test.rs`.
 
 use crate::SemanticErrorKind;
-use crate::test_support::{analyze_source, issue};
+use crate::test_support::{analyze_source_la, issue};
 
 fn assert_accepted(source: &str, label: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(
         !result.diagnostics.iter().any(|diagnostic| {
             diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
@@ -26,7 +26,7 @@ fn assert_accepted(source: &str, label: &str) {
 }
 
 fn assert_write_conflict(source: &str, label: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
             diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
