@@ -1,0 +1,31 @@
++++
+locale = "en"
++++
+
+# stdio-tty: the three TTY probe routes report non-interactive streams.
+#
+# The corpus runner redirects all three streams, so stdin (consolum:audit),
+# stdout (consolum:loquitur) and stderr (consolum:admonet) must each read as
+# false. Probing twice checks the predicate is stable; TTY predicates are
+# sync-only, so there are no async twins to exercise here.
+
+import from "norma:console" console
+
+main {
+    const bool in_first ← console.stdin_is_tty()
+    const bool in_second ← console.stdin_is_tty()
+    assert in_first ≡ in_second
+    assert in_first ≡ false
+
+    const bool out_first ← console.stdout_is_tty()
+    const bool out_second ← console.stdout_is_tty()
+    assert out_first ≡ out_second
+    assert out_first ≡ false
+
+    const bool err_first ← console.stderr_is_tty()
+    const bool err_second ← console.stderr_is_tty()
+    assert err_first ≡ err_second
+    assert err_first ≡ false
+
+    console.write_line("stdio-tty-ok")
+}
