@@ -546,8 +546,9 @@ main {}",
     );
 }
 
+/// 2026-10-13 ruling: a kernel parameter is a device buffer, so `←` cannot re-point it.
 #[test]
-fn r6_a_kernel_arrow_into_the_mut_output_is_rejected() {
+fn r6_a_kernel_arrow_into_the_mut_output_is_rejected_by_ruling() {
     assert_rejects(
         r"@ kernel
 fn t(tf32[3, 3] a, mut tf32[3, 3] b) → void {

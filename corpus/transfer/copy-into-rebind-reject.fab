@@ -10,7 +10,7 @@ related = ["tensor", "⇇"]
 locale = "en"
 +++
 
-# R6 (provisional): a kernel parameter is a device buffer with no binding to rebind, so a whole-tensor `←` into a `mut` tensor parameter of a kernel is rejected; write `target ⇇ source`. On the host the same `←` is the ordinary rebind.
+# a kernel parameter is a device buffer with no binding to rebind, so a whole-tensor `←` into a `mut` tensor parameter of a kernel is rejected; write `target ⇇ source`. On the host the same `←` is the ordinary rebind.
 
 @ kernel
 fn fill(mut tf32[2, 2] target, tf32[2, 2] source) → void {
