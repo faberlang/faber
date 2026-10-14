@@ -980,6 +980,9 @@ fn nucleum_fragment_expansion_help(args: &[DiagnosticArg]) -> Option<String> {
         match arg_value(args, "kind").or_else(|| arg_value(args, "reason"))? {
             "depth" => "shorten the fragment call chain or split the entry",
             "nodes" => "reduce the composed body size under this @ nucleum entry",
+            "callsite_nodes" => {
+                "one fragment call site expands to too many nodes; split the callee or call it from fewer sites"
+            }
             "instances" => {
                 "reduce the number of concrete fragment instances composed into this entry"
             }
