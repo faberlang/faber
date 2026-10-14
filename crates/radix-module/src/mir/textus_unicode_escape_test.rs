@@ -6,7 +6,11 @@ use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, run_source};
 
 fn run(body: &str) -> Vec<String> {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = format!("incipit {{\n{body}\n}}\n");
     let mut host = BufferHost::default();
     run_source(&session, "textus-unicode-escape.fab", &source, &mut host)

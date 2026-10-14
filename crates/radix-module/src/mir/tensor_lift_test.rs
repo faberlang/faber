@@ -7,7 +7,11 @@ use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, run_source};
 
 fn run(body: &str) -> (Vec<String>, Vec<(String, String)>) {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = format!("{body}\n");
     let mut host = BufferHost::default();
     let errors = match run_source(&session, "lift.fab", &source, &mut host) {
@@ -367,7 +371,11 @@ nota m.planata()
 #[test]
 fn tensor_times_tensor_is_still_rejected_without_a_hint() {
     // K10 owns this decision; K4 pins the status quo.
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = "incipit {
 fixum tensor<f32, [2]> a ← [1.0, 2.0] ↦ tensor<f32, [2]>
 fixum tensor<f32, [2]> r ← a * a
