@@ -39,11 +39,10 @@ pub mod cli {
 /// Typed program-layer compilation and whole-program package APIs.
 pub mod program {
     pub use radix_module::program::{
-        FABER_LIBRARY_HOME_ENV, PreparedProgramModule, analyze_prepared_program_name,
-        analyze_prepared_program_path, compile_prepared_program_path,
-        configured_library_home_setting, explicit_locale_pack, find_package_root, library_home,
-        package_identity_facts_for_path, prepare_program_module, prepare_program_module_for_name,
-        set_configured_library_home,
+        PreparedProgramModule, analyze_prepared_program_name, analyze_prepared_program_path,
+        compile_prepared_program_path, configured_library_home_setting, explicit_locale_pack,
+        find_package_root, library_home, package_identity_facts_for_path, prepare_program_module,
+        prepare_program_module_for_name, set_configured_library_home,
     };
     pub use radix_module::{CompileResult, Compiler};
     #[cfg(feature = "mir-llvm")]

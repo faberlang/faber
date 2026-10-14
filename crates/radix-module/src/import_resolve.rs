@@ -1,10 +1,10 @@
 //! Resolve Faber import specifiers to filesystem paths for single-file check/emit.
 //!
 //! Supports relative paths, `norma:*`, and generic `provider:module` imports.
-//! The configured library home (`set_configured_library_home`, or temporarily
-//! `$FABER_LIBRARY_HOME`) supplies `<home>/<provider>/` (with optional
-//! top-level `faber.toml` `[`paths`].source`), falling back to the in-tree
-//! `<repo>/lib/<provider>/`.
+//! The configured library home (`--library-home` / `[paths] library_home`,
+//! via `set_configured_library_home`) supplies `<home>/<provider>/` (with
+//! optional top-level `faber.toml` `[`paths`].source`), falling back to the
+//! in-tree `<repo>/lib/<provider>/`.
 
 use rustc_hash::FxHashMap;
 use std::collections::BTreeMap;
@@ -13,15 +13,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use crate::driver::Session;
-
-/// Process-wide memo for the configured library home's production path
-/// (BO-D-1).
-///
-/// The env var cannot change during a compilation session, so the first
-/// provider import reads it once and every later call returns the cached
-/// value in O(1). The test-only thread-local override
-/// is checked before this cache, so test isolation is preserved.
-static LIBRARY_HOME_CACHE: OnceLock<Option<PathBuf>> = OnceLock::new();
 
 /// Process-wide configured library home: the CLI flag or
 /// `[paths].library_home` seam ([`set_configured_library_home`]).
@@ -72,9 +63,6 @@ pub(crate) fn clear_provider_name_memo() {
         memo.clear();
     }
 }
-
-/// Environment variable for installed provider roots (`<home>/<provider>/…`).
-pub const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
 
 /// Read the optional `[paths].source` root from a TOML manifest.
 #[must_use]
@@ -479,11 +467,11 @@ pub fn in_tree_library_home() -> Option<PathBuf> {
 }
 
 /// The configured library home: the process-wide setting
-/// ([`set_configured_library_home`]) or the `FABER_LIBRARY_HOME` env var (or,
-/// in tests, the thread-local override). `None` when nothing is configured.
+/// ([`set_configured_library_home`]) or, in tests, the thread-local override.
+/// `None` when nothing is configured.
 fn configured_library_home() -> Option<PathBuf> {
-    // Thread-local override (test-only): isolate compile_test env-var mutations
-    // so parallel vertex-source tests don't pick up a transient temp path.
+    // Thread-local override (test-only): keeps parallel vertex-source tests
+    // from picking up a transient temp path.
     #[cfg(test)]
     {
         if let Some(ref home) = library_home_test_support::get_thread_library_home()
@@ -493,21 +481,7 @@ fn configured_library_home() -> Option<PathBuf> {
         }
     }
     // Process-wide setting (CLI `--library-home` / `[paths].library_home`).
-    if let Some(home) = configured_library_home_setting()
-        && home.is_dir()
-    {
-        return Some(home);
-    }
-    // TEMPORARY: removed by need unit 9
-    // Production path: env-var check, memoized per process. The env var does
-    // not change during a compilation session.
-    LIBRARY_HOME_CACHE
-        .get_or_init(|| {
-            std::env::var_os(FABER_LIBRARY_HOME_ENV)
-                .map(PathBuf::from)
-                .filter(|home| home.is_dir())
-        })
-        .clone()
+    configured_library_home_setting().filter(|home| home.is_dir())
 }
 
 /// Library homes to search, in order: the configured home first, then the

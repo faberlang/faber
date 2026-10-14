@@ -1025,7 +1025,7 @@ pub fn provider_unit_for_target(
 /// Build namespace export names and typed file interfaces for a source file's imports.
 ///
 /// Resolves relative paths, `norma:*`, and other `provider:module` imports via
-/// [`FABER_LIBRARY_HOME_ENV`].
+/// the configured library home.
 pub(crate) fn import_contract_for_file(
     path: &Path,
     source: &str,
