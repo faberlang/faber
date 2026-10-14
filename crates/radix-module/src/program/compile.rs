@@ -1196,8 +1196,10 @@ pub(crate) fn import_contract_for_parsed_file(
 /// Collect file interfaces for the same-package imports of an imported
 /// module, transitively (MRL-4).
 ///
-/// Only relative (`./sibling`) and package-form (bare source-root) edges are
-/// followed: provider/library imports keep their own seam machinery.
+/// Relative (`./sibling`), provider-form (`norma:fault`), and package-form
+/// (bare source-root) edges are followed: the provider and package-form
+/// edges belong to the imported module's own AST, so only the shared
+/// traversal/absolute guards apply to them.
 /// `visited` guards cycles (a module diamond or a genuine import cycle both
 /// stop at the first visit). Interfaces are keyed by the producer-side
 /// binding; the caller decides precedence against the consumer's own
@@ -1234,14 +1236,17 @@ fn collect_transitive_same_package_interfaces(
         };
         let import_path = interner.resolve(decl.path);
         let is_relative = import_path.starts_with("./");
-        let is_package_form = !is_relative && !import_path.contains(':') && !import_path.starts_with('§');
-        if !is_relative && !is_package_form {
+        let is_provider_form = import_path
+            .split_once(':')
+            .is_some_and(|(provider, module)| !provider.is_empty() && !module.is_empty() && !module.contains(':'));
+        let is_package_form = !is_relative && !is_provider_form && !import_path.starts_with('§');
+        if !is_relative && !is_package_form && !is_provider_form {
             continue;
         }
         // Relative edges must match the consumer's own SEM006-validated
-        // scheme set; package-form edges belong to the imported module's own
-        // AST, which the consumer's SEM006 pass never revalidates — only the
-        // shared traversal/absolute guards apply there.
+        // scheme set; provider and package-form edges belong to the imported
+        // module's own AST, which the consumer's SEM006 pass never revalidates —
+        // only the shared traversal/absolute guards apply there.
         let path_allowed = if is_relative {
             import_contract_path_allowed(import_path, templates)
         } else {
@@ -1256,7 +1261,7 @@ fn collect_transitive_same_package_interfaces(
         // An unparsable transitive target contributes no interface here; the
         // module that directly imports it reports the named import-site
         // failure through its own contract walk.
-        let target = if is_relative {
+        let target = if !is_package_form {
             match cached_import_target(session, from_file, import_path, pack_key, pack_ref, templates) {
                 ImportTargetLookup::Parsed(target) => Some(target),
                 ImportTargetLookup::Unparsable(_) | ImportTargetLookup::Unresolved => None,
