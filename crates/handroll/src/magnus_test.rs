@@ -1103,6 +1103,91 @@ fn radix_render_matches_i128_and_round_trips() {
 }
 
 #[test]
+fn decimal_parse_matches_chunked_oracle() {
+    fn oracle(text: &str) -> Result<Magnus, MagnusError> {
+        let (neg, digits) = match text.as_bytes().first() {
+            Some(b'-') => (true, &text[1..]),
+            Some(b'+') => (false, &text[1..]),
+            _ => (false, text),
+        };
+        if digits.is_empty() {
+            return Err(MagnusError::Malformed);
+        }
+        super::parse_digits_chunked(digits.as_bytes(), 10).map(|mag| Magnus::from_parts(neg, mag))
+    }
+
+    let t = super::DECIMAL_PARSE_DC_THRESHOLD;
+    let mut g = Gen(0xDEC1_0A11);
+
+    // Long random strings: the divide-and-conquer path must equal the chunked oracle, and the
+    // sign distribution covers negative, positive and unsigned input.
+    for _ in 0..200 {
+        let len = 1 + usize::try_from(g.next() % 5000).unwrap();
+        let mut text = String::with_capacity(len + 1);
+        match g.next() % 6 {
+            0 | 1 => text.push('-'),
+            2 => text.push('+'),
+            _ => {}
+        }
+        for _ in 0..len {
+            text.push(char::from(b'0' + u8::try_from(g.next() % 10).unwrap()));
+        }
+        assert_eq!(Magnus::parse_decimal(&text), oracle(&text), "len {len}");
+    }
+
+    // Lengths straddling the switch threshold and the split-power boundaries.
+    for len in [
+        t - 1,
+        t,
+        t + 1,
+        2 * t,
+        2 * t + 1,
+        (9 << 7) - 1,
+        9 << 7,
+        (9 << 7) + 1,
+    ] {
+        let mut random = String::with_capacity(len);
+        for _ in 0..len {
+            random.push(char::from(b'0' + u8::try_from(g.next() % 10).unwrap()));
+        }
+        for text in [random, "9".repeat(len), format!("1{}", "0".repeat(len - 1))] {
+            assert_eq!(Magnus::parse_decimal(&text), oracle(&text), "len {len}");
+        }
+    }
+
+    // Leading zeros do not change the value; an all-zero magnitude is exactly zero.
+    let zeros = "0".repeat(t + 50);
+    let padded = format!("{zeros}7");
+    assert_eq!(Magnus::parse_decimal(&padded), oracle(&padded));
+    assert_eq!(Magnus::parse_decimal(&zeros), oracle(&zeros));
+    assert!(Magnus::parse_decimal(&zeros).unwrap().is_zero());
+
+    // Small cases, including a sign on a zero magnitude.
+    for text in ["5", "0", "-0"] {
+        assert_eq!(Magnus::parse_decimal(text), oracle(text));
+    }
+
+    // Malformed text fails identically to the oracle: empty and bare signs.
+    for text in ["", "-", "+"] {
+        assert_eq!(Magnus::parse_decimal(text), oracle(text));
+    }
+    // A non-digit at the start, middle and end, and a sign in the middle.
+    let len = t + 100;
+    let digits = "7".repeat(len);
+    for pos in [0, len / 2, len - 1] {
+        let mut bad = digits.clone();
+        bad.replace_range(pos..pos + 1, "x");
+        assert_eq!(oracle(&bad), Err(MagnusError::Malformed));
+        assert_eq!(Magnus::parse_decimal(&bad), oracle(&bad));
+    }
+    let mut bad = digits;
+    let mid = len / 2;
+    bad.replace_range(mid..mid + 1, "-");
+    assert_eq!(oracle(&bad), Err(MagnusError::Malformed));
+    assert_eq!(Magnus::parse_decimal(&bad), oracle(&bad));
+}
+
+#[test]
 fn malformed_text_is_rejected() {
     for bad in [
         "", "+", "-", " 1", "1 ", "1_0", "0x10", "12a", "--1", "+-1", "１２", "1.0", "\u{0}",
