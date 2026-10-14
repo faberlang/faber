@@ -51,7 +51,7 @@ pub(super) fn execute(
         let emitted = run_bounded(
             Command::new(faber).args(&argv[1..]).current_dir(&case.dir),
             Stdio::null(),
-            case.timeout,
+            case.setup_timeout(),
         );
         let emit_ms = ms(emitting);
         let emitted = match emitted {
@@ -167,7 +167,7 @@ pub(super) fn execute(
         let checked = run_bounded(
             Command::new("rustfmt").args(&fmt_argv[1..]),
             Stdio::null(),
-            case.timeout,
+            case.setup_timeout(),
         );
         let format_ms = ms(formatting);
         match checked {

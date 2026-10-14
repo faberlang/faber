@@ -1,5 +1,5 @@
 use super::{judge_run_output, judge_stale_build_pin, judge_unexecuted_pin};
-use crate::commands::corpus::{Case, Expected, Outcome, TargetExpectation};
+use crate::commands::corpus::{CASE_TIMEOUT_SECS, Case, Expected, Outcome, TargetExpectation};
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::{ExitStatus, Output};
@@ -104,4 +104,15 @@ fn run_output_compares_normalized_stdout_and_exact_stderr() {
     let (status, reason) = judge_run_output(&golden_case, &mismatched);
     assert_eq!(status, "fail");
     assert_eq!(reason.as_deref(), Some("stderr mismatch"));
+}
+
+#[test]
+fn setup_timeout_is_not_consumed_by_a_one_second_run_bound() {
+    let short = case(Outcome::Pass, None);
+    assert_eq!(short.timeout, Duration::from_secs(1));
+    assert_eq!(short.setup_timeout(), Duration::from_secs(CASE_TIMEOUT_SECS));
+
+    let mut long = case(Outcome::Pass, None);
+    long.timeout = Duration::from_secs(300);
+    assert_eq!(long.setup_timeout(), Duration::from_secs(300));
 }
