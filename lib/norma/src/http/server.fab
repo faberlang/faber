@@ -34,17 +34,26 @@ import from "norma:http/request" httpreq
 import from "norma:http/response" response
 import from "norma:http/chunked" chunked
 import from "norma:http/sse" sse
+import from "norma:fault" fault
+
+# A bare leaf `call ↦ T` failure crosses as the record (`valor`); this
+# same-file row converts it through the boundary row in `norma:fault`, so
+# every leaf call below reports on the declared `⇥ fault.IoFault` channel.
+@ conversion
+fn fault_from_value(value raw) → fault.IoFault {
+    return fault.io_fault_from(raw)
+}
 
 # Opaque listener handle from http:listen.
 @ public
 class Listener {
     var int handle = 0
 
-    fn accept() → Incoming {
+    fn accept() → Incoming ⇥ fault.IoFault {
         return accept_incoming(self.handle)
     }
 
-    fn stop() → void {
+    fn stop() → void ⇥ fault.IoFault {
         return call 'http:stop' (self.handle) ↦ void
     }
 
@@ -66,91 +75,91 @@ class Incoming {
 class Stream {
     var int writer = 0
 
-    fn write(bytes data) → void {
+    fn write(bytes data) → void ⇥ fault.IoFault {
         return write_chunk(self, data)
     }
 
-    fn write_event(sse.Event event) → void {
+    fn write_event(sse.Event event) → void ⇥ fault.IoFault {
         return send_event(self, event)
     }
 
-    fn finish(bool keep_alive) → void {
+    fn finish(bool keep_alive) → void ⇥ fault.IoFault {
         return finish_stream(self, keep_alive)
     }
 }
 
 # Bind a listener. The returned number is an opaque handle.
 @ public
-fn listen(list<value> args) → int {
+fn listen(list<value> args) → int ⇥ fault.IoFault {
     return call 'http:listen' (args) ↦ int
 }
 
 # Accept one request record from a listener. The returned valor contains the
 # provider request id plus method, path, headers, body, and connection fields.
 @ public
-fn accept(int handle) → value {
+fn accept(int handle) → value ⇥ fault.IoFault {
     return call 'http:accept' (handle) ↦ value
 }
 
 # Send one response using the request id and target-neutral status, headers,
 # and body values carried in `args`.
 @ public
-fn respond(list<value> args) → void {
+fn respond(list<value> args) → void ⇥ fault.IoFault {
     return call 'http:respond' (args) ↦ void
 }
 
 # Begin a chunked response. `args` is [request_id, status, headers].
 @ public
-fn respond_open(list<value> args) → int {
+fn respond_open(list<value> args) → int ⇥ fault.IoFault {
     return call 'http:respond_open' (args) ↦ int
 }
 
 # Write one payload. The provider wraps it as a chunk and blocks if the
 # peer is not reading (backpressure).
 @ public
-fn respond_chunk(list<value> args) → void {
+fn respond_chunk(list<value> args) → void ⇥ fault.IoFault {
     return call 'http:respond_chunk' (args) ↦ void
 }
 
 # Finish a chunked response. `args` is [writer, keep_alive].
 @ public
-fn respond_finish(list<value> args) → void {
+fn respond_finish(list<value> args) → void ⇥ fault.IoFault {
     return call 'http:respond_finish' (args) ↦ void
 }
 
 # Stop a listener and release its pending request state.
 @ public
-fn stop(int handle) → void {
+fn stop(int handle) → void ⇥ fault.IoFault {
     return call 'http:stop' (handle) ↦ void
 }
 
 @ public
-fn bind(int port) → Listener {
+fn bind(int port) → Listener ⇥ fault.IoFault {
     const int handle ← listen([port ↦ value])
     return Listener { handle = handle }
 }
 
 # Two-argument listen: text second item is bind_host (provider default body cap).
 @ public
-fn bind_at(int port, string host) → Listener {
+fn bind_at(int port, string host) → Listener ⇥ fault.IoFault {
     const int handle ← listen([port ↦ value, host ↦ value])
     return Listener { handle = handle }
 }
 
 @ public
-fn bind_limited(int port, int max_body_bytes) → Listener {
+fn bind_limited(int port, int max_body_bytes) → Listener ⇥ fault.IoFault {
     const int handle ← listen([port ↦ value, max_body_bytes ↦ value])
     return Listener { handle = handle }
 }
 
 @ public
-fn bind_full(int port, int max_body_bytes, string host) → Listener {
+fn bind_full(int port, int max_body_bytes, string host) → Listener ⇥ fault.IoFault {
     const int handle ← listen([port ↦ value, max_body_bytes ↦ value, host ↦ value])
     return Listener { handle = handle }
 }
 
 @ public
-fn bind_tls(int port, string cert, string key) → Listener {
+fn bind_tls(int port, string cert, string key) → Listener ⇥ fault.IoFault {
     const int handle ← call 'http:listen_tls' ([port ↦ value, cert ↦ value, key ↦ value]) ↦ int
     return Listener { handle = handle }
 }
@@ -184,7 +193,7 @@ fn incoming_of(value raw) → Incoming {
 }
 
 @ public
-fn accept_incoming(int handle) → Incoming {
+fn accept_incoming(int handle) → Incoming ⇥ fault.IoFault {
     return incoming_of(accept(handle))
 }
 
@@ -208,7 +217,7 @@ fn keep_alive_version(string version, headers.Headers headers) → bool {
 
 # One-shot reply. The provider writes content-length and closes.
 @ public
-fn reply(Incoming incoming, int status, headers.Headers headers, string body) → void {
+fn reply(Incoming incoming, int status, headers.Headers headers, string body) → void ⇥ fault.IoFault {
     const list<value> args ← [
         incoming.id ↦ value,
         status ↦ value,
@@ -219,13 +228,13 @@ fn reply(Incoming incoming, int status, headers.Headers headers, string body) �
 }
 
 @ public
-fn reply_with(Incoming incoming, response.Response response) → void {
+fn reply_with(Incoming incoming, response.Response response) → void ⇥ fault.IoFault {
     return reply(incoming, response.status, response.headers, response.body)
 }
 
 # Begin a chunked response. Caller writes frames then finish.
 @ public
-fn open(Incoming incoming, int status, headers.Headers headers) → Stream {
+fn open(Incoming incoming, int status, headers.Headers headers) → Stream ⇥ fault.IoFault {
     const list<value> args ← [
         incoming.id ↦ value,
         status ↦ value,
@@ -236,7 +245,7 @@ fn open(Incoming incoming, int status, headers.Headers headers) → Stream {
 
 # SSE helper: content-type text/event-stream, then chunked frames.
 @ public
-fn open_sse(Incoming incoming) → Stream {
+fn open_sse(Incoming incoming) → Stream ⇥ fault.IoFault {
     var headers.Headers head ← headers.empty()
     if head.append("Content-Type", "text/event-stream") {
     }
@@ -260,18 +269,18 @@ fn event_chunk(sse.Event event) → bytes {
 }
 
 @ public
-fn write_chunk(Stream stream, bytes data) → void {
+fn write_chunk(Stream stream, bytes data) → void ⇥ fault.IoFault {
     const list<value> args ← [stream.writer ↦ value, data ↦ value]
     return respond_chunk(args)
 }
 
 @ public
-fn send_event(Stream stream, sse.Event event) → void {
+fn send_event(Stream stream, sse.Event event) → void ⇥ fault.IoFault {
     return write_chunk(stream, event_bytes(event))
 }
 
 @ public
-fn finish_stream(Stream stream, bool keep_alive) → void {
+fn finish_stream(Stream stream, bool keep_alive) → void ⇥ fault.IoFault {
     const list<value> args ← [stream.writer ↦ value, keep_alive ↦ value]
     return respond_finish(args)
 }

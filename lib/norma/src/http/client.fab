@@ -27,6 +27,15 @@ locale = "en"
 
 import from "norma:http/headers" headers
 import from "norma:http/response" response
+import from "norma:fault" fault
+
+# A bare leaf `call ↦ T` failure crosses as the record (`valor`); this
+# same-file row converts it through the boundary row in `norma:fault`, so
+# every leaf call below reports on the declared `⇥ fault.IoFault` channel.
+@ conversion
+fn fault_from_value(value raw) → fault.IoFault {
+    return fault.io_fault_from(raw)
+}
 
 # Minimal origin-form split (scheme/host/port/path/query). No standalone
 # URL genus elsewhere — design killed that leaf for v1.
@@ -54,11 +63,11 @@ class Receive {
     var int status = 0
     var headers.Headers headers = headers.Headers { }
 
-    fn next() → Chunk {
+    fn next() → Chunk ⇥ fault.IoFault {
         return receive(self)
     }
 
-    fn next_n(int max_bytes) → Chunk {
+    fn next_n(int max_bytes) → Chunk ⇥ fault.IoFault {
         return receive_n(self, max_bytes)
     }
 }
@@ -160,115 +169,118 @@ fn headers_from_map(map<string, string> pairs) → headers.Headers {
 }
 
 @ public
-fn get(string url) → response.Response {
+fn get(string url) → response.Response ⇥ fault.IoFault {
     return no_body("http:get", 0, url, headers.empty())
 }
 
 @ public
-fn get_with(string url, headers.Headers headers) → response.Response {
+fn get_with(string url, headers.Headers headers) → response.Response ⇥ fault.IoFault {
     return no_body("http:get", 0, url, headers)
 }
 
 @ public
-fn get_on(Client client, string url) → response.Response {
+fn get_on(Client client, string url) → response.Response ⇥ fault.IoFault {
     return no_body("http:get", client.agent, url, headers.empty())
 }
 
 @ public
-fn post(string url, string body) → response.Response {
+fn post(string url, string body) → response.Response ⇥ fault.IoFault {
     return with_body("http:post", 0, url, headers.empty(), body)
 }
 
 @ public
-fn post_with(string url, headers.Headers headers, string body) → response.Response {
+fn post_with(string url, headers.Headers headers, string body) → response.Response ⇥ fault.IoFault {
     return with_body("http:post", 0, url, headers, body)
 }
 
 @ public
-fn post_on(Client client, string url, string body) → response.Response {
+fn post_on(Client client, string url, string body) → response.Response ⇥ fault.IoFault {
     return with_body("http:post", client.agent, url, headers.empty(), body)
 }
 
 @ public
-fn put(string url, string body) → response.Response {
+fn put(string url, string body) → response.Response ⇥ fault.IoFault {
     return with_body("http:put", 0, url, headers.empty(), body)
 }
 
 @ public
-fn put_with(string url, headers.Headers headers, string body) → response.Response {
+fn put_with(string url, headers.Headers headers, string body) → response.Response ⇥ fault.IoFault {
     return with_body("http:put", 0, url, headers, body)
 }
 
 @ public
-fn put_on(Client client, string url, string body) → response.Response {
+fn put_on(Client client, string url, string body) → response.Response ⇥ fault.IoFault {
     return with_body("http:put", client.agent, url, headers.empty(), body)
 }
 
 @ public
-fn delete(string url) → response.Response {
+fn delete(string url) → response.Response ⇥ fault.IoFault {
     return no_body("http:delete", 0, url, headers.empty())
 }
 
 @ public
-fn delete_with(string url, headers.Headers headers) → response.Response {
+fn delete_with(string url, headers.Headers headers) → response.Response ⇥ fault.IoFault {
     return no_body("http:delete", 0, url, headers)
 }
 
 @ public
-fn delete_on(Client client, string url) → response.Response {
+fn delete_on(Client client, string url) → response.Response ⇥ fault.IoFault {
     return no_body("http:delete", client.agent, url, headers.empty())
 }
 
 @ public
-fn patch(string url, string body) → response.Response {
+fn patch(string url, string body) → response.Response ⇥ fault.IoFault {
     return with_body("http:patch", 0, url, headers.empty(), body)
 }
 
 @ public
-fn patch_with(string url, headers.Headers headers, string body) → response.Response {
+fn patch_with(string url, headers.Headers headers, string body) → response.Response ⇥ fault.IoFault {
     return with_body("http:patch", 0, url, headers, body)
 }
 
 @ public
-fn patch_on(Client client, string url, string body) → response.Response {
+fn patch_on(Client client, string url, string body) → response.Response ⇥ fault.IoFault {
     return with_body("http:patch", client.agent, url, headers.empty(), body)
 }
 
 @ public
-fn send_request(string method, string url, map<string, string> pairs, string body) → response.Response {
+fn send_request(string method, string url, map<string, string> pairs, string body) → response.Response ⇥ fault.IoFault {
     return send(method, url, headers_from_map(pairs), body)
 }
 
 @ public
-fn send(string method, string url, headers.Headers headers, string body) → response.Response {
+fn send(string method, string url, headers.Headers headers, string body) → response.Response ⇥ fault.IoFault {
     return generic(0, method, url, headers, body)
 }
 
 @ public
-fn send_on(Client client, string method, string url, headers.Headers headers, string body) → response.Response {
+fn send_on(Client client, string method, string url, headers.Headers headers, string body) → response.Response ⇥ fault.IoFault {
     return generic(client.agent, method, url, headers, body)
 }
 
 # Open a streaming receive. The body is not buffered; pull chunks with
 # receive / Receive.next. Designed for text/event-stream consumption.
 @ public
-fn open(string method, string url, headers.Headers headers, string body) → Receive {
+fn open(string method, string url, headers.Headers headers, string body) → Receive ⇥ fault.IoFault {
     return open_stream(0, method, url, headers, body)
 }
 
 @ public
-fn open_on(Client client, string method, string url, headers.Headers headers, string body) → Receive {
+fn open_on(Client client, string method, string url, headers.Headers headers, string body) → Receive ⇥ fault.IoFault {
     return open_stream(client.agent, method, url, headers, body)
 }
 
+# A clean end of body is the leaf's `done` flag (an empty terminal chunk),
+# not a failure, so the return stays `Chunk`; `⇥ IoFault` carries only a
+# real crossing failure.
 @ public
-fn receive(Receive stream) → Chunk {
+fn receive(Receive stream) → Chunk ⇥ fault.IoFault {
     const list<value> args ↤ [stream.reader ↦ value]
     return chunk_of(call 'http:read' (args) ↦ value)
 }
 
 @ public
-fn receive_n(Receive stream, int max_bytes) → Chunk {
+fn receive_n(Receive stream, int max_bytes) → Chunk ⇥ fault.IoFault {
     const list<value> args ↤ [stream.reader ↦ value, max_bytes ↦ value]
     return chunk_of(call 'http:read' (args) ↦ value)
 }
@@ -281,7 +293,7 @@ fn require_url(string url, string verb) → void {
     return
 }
 
-fn no_body(string route, int agent, string url, headers.Headers headers) → response.Response {
+fn no_body(string route, int agent, string url, headers.Headers headers) → response.Response ⇥ fault.IoFault {
     require_url(url, route)
     var list<value> args ← []
     if agent ≻ 0 {
@@ -297,7 +309,7 @@ fn no_body(string route, int agent, string url, headers.Headers headers) → res
     return response_of(call 'http:delete' (args) ↦ value)
 }
 
-fn with_body(string route, int agent, string url, headers.Headers headers, string body) → response.Response {
+fn with_body(string route, int agent, string url, headers.Headers headers, string body) → response.Response ⇥ fault.IoFault {
     require_url(url, route)
     var list<value> args ← []
     if agent ≻ 0 {
@@ -317,13 +329,13 @@ fn with_body(string route, int agent, string url, headers.Headers headers, strin
     return response_of(call 'http:patch' (args) ↦ value)
 }
 
-fn generic(int agent, string method, string url, headers.Headers headers, string body) → response.Response {
+fn generic(int agent, string method, string url, headers.Headers headers, string body) → response.Response ⇥ fault.IoFault {
     require_url(url, "http:request")
     const value raw ← dispatch_generic("http:request", agent, method, url, headers, body)
     return response_of(raw)
 }
 
-fn open_stream(int agent, string method, string url, headers.Headers headers, string body) → Receive {
+fn open_stream(int agent, string method, string url, headers.Headers headers, string body) → Receive ⇥ fault.IoFault {
     require_url(url, "http:request_open")
     const value raw ← dispatch_generic("http:request_open", agent, method, url, headers, body)
     # Why: a carrier that is not {reader, status, headers} is a broken host
@@ -342,7 +354,7 @@ fn open_stream(int agent, string method, string url, headers.Headers headers, st
     }
 }
 
-fn dispatch_generic(string route, int agent, string method, string url, headers.Headers headers, string body) → value {
+fn dispatch_generic(string route, int agent, string method, string url, headers.Headers headers, string body) → value ⇥ fault.IoFault {
     var list<value> args ← []
     if agent ≻ 0 {
         args.append(agent ↦ value)
