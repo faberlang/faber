@@ -39,32 +39,32 @@ locale = "en"
 # Cross-ref: octeti/octeti.fab (literal syntax), lista/lista.fab (lista methods),
 # bits/ (b8), typi/sized-numerus.fab (u8).
 
-fn describe(bytes buf) → int {
+fn describe(list<b8> buf) → int {
     return buf.length()
 }
 
-fn firstByte(bytes buf) → u8 {
+fn firstByte(list<b8> buf) → u8 {
     const b8 raw ← buf.get(0) coalesce (0 ∷ b8)
     return raw ↦ u8
 }
 
-fn appendByte(mut bytes buf, u8 value) → bytes {
+fn appendByte(mut list<b8> buf, u8 value) → list<b8> {
     buf.append(value ↦ b8)
     return buf
 }
 
-fn fromNumbers() → bytes {
+fn fromNumbers() → list<b8> {
     # WHY: lista<u8> is a list of numbers; the same-width conversion makes
     # it a byte list with no clause.
     var list<u8> numbers ← empty
     numbers.append(0xde ∷ u8)
     numbers.append(0xad ∷ u8)
-    const bytes asBytes ← numbers ↦ list<b8>
+    const list<b8> asBytes ← numbers ↦ list<b8>
     return asBytes
 }
 
 main {
-    var bytes sig ← |de ad be ef|
+    var list<b8> sig ← |de ad be ef|
 
     # lista methods on an octeti receiver
     const int n ← describe(sig)
@@ -75,8 +75,8 @@ main {
 
     # a number appended as raw bits
     const u8 marker ← 0xff ∷ u8
-    const bytes grown ← appendByte(mut sig, marker)
+    const list<b8> grown ← appendByte(mut sig, marker)
     print grown.length()
-    const bytes crossed ← fromNumbers()
+    const list<b8> crossed ← fromNumbers()
     print crossed.length()
 }
