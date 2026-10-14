@@ -90,7 +90,6 @@ pub struct AbiPayload {
     pub surface: &'static str,
     pub symbols: Vec<NamedStr>,
     pub enums: Vec<EnumFamily>,
-    pub llvm_types: Vec<NamedStr>,
     pub statuses: Vec<NamedI32>,
     pub diagnostics: Vec<DiagnosticRow>,
 }
@@ -135,7 +134,6 @@ impl AbiPayload {
                     host_abi::GENUS_FIELD_POLICY_ROWS,
                 ),
             ],
-            llvm_types: named_str_rows(host_abi::LLVM_TYPE_ROWS),
             statuses: host_abi::STATUS_CODES
                 .iter()
                 .map(|(name, value)| NamedI32 { name, value: *value })

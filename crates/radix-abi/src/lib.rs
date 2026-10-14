@@ -419,24 +419,6 @@ abi_enum_family! {
     }
 }
 
-abi_string_family! {
-    LLVM_TYPE_ROWS {
-        LLVM_SLICE_TYPE = "%FaberRtSliceV1",
-        LLVM_SLICE_TYPE_DEFINITION = "%FaberRtSliceV1 = type { ptr, i64 }",
-        LLVM_EXIT_TYPE = "%FaberRtExitV1",
-        // The exit struct crosses the C boundary as a single register.
-        // LLVM's C-convention lowering of `{ i32, i32 }` splits the fields
-        // across w0/w1 on AArch64, while the rustc/clang caller packs both
-        // into x0. The named type is an `i64` carrying
-        // `process_code | (status.code << 32)`.
-        LLVM_EXIT_TYPE_DEFINITION = "%FaberRtExitV1 = type i64",
-        LLVM_PTR_RESULT_TYPE = "%FaberRtPtrResultV1",
-        LLVM_PTR_RESULT_TYPE_DEFINITION = "%FaberRtPtrResultV1 = type { i32, ptr }",
-        LLVM_STATUS_TYPE = "%FaberRtStatusV1",
-        LLVM_STATUS_TYPE_DEFINITION = "%FaberRtStatusV1 = type { i32 }",
-    }
-}
-
 abi_enum_family! {
     VALUE_KIND_ROWS: type FaberRtValueKindV1 = u32 {
         VALUE_KIND_I1 = 1,

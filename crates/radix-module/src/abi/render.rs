@@ -76,12 +76,6 @@ pub fn render_rust(payload: &AbiPayload) -> Result<String, serde_json::Error> {
         out.push('\n');
     }
 
-    out.push_str("// --- LLVM layout spellings ---\n");
-    for row in &payload.llvm_types {
-        writeln!(out, "pub const {}: &str = \"{}\";", row.name, row.value).ok();
-    }
-    out.push('\n');
-
     out.push_str("// --- Status codes (runtime wraps these in FaberRtStatusV1) ---\n");
     for row in &payload.statuses {
         writeln!(out, "pub const {}: i32 = {};", row.name, row.value).ok();
