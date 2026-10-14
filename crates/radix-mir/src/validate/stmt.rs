@@ -125,7 +125,7 @@ impl Validator<'_, '_> {
                 callee,
                 args,
             } => {
-                let sig = self.validate_callee(scope, callee, stmt.span);
+                let sig = self.validate_callee(scope, callee, stmt.span, false);
                 if let Some(sig) = &sig
                     && sig.error_ty.is_some()
                 {
@@ -273,7 +273,8 @@ impl Validator<'_, '_> {
         else {
             return;
         };
-        let sig = self.validate_callee(scope, callee, terminator.span);
+        let cursor_settle = self.is_cursor_settle_callee(scope, callee, args);
+        let sig = self.validate_callee(scope, callee, terminator.span, cursor_settle);
         let mut generic_bindings = GenericTypeBindings::default();
         let mut shape_bindings = MirShapeBindings::default();
         self.validate_call_args(
@@ -311,11 +312,16 @@ impl Validator<'_, '_> {
         // stage matches the plain-`Call` treatment of cross-unit
         // definitions. A never-resolvable def is caught downstream the
         // same way a plain `Call` to one is: by the runner/emitter.
-        if sig.is_none() && !matches!(callee, MirCallee::Definition { .. }) {
+        if sig.is_none() && !cursor_settle && !matches!(callee, MirCallee::Definition { .. }) {
             self.error(
                 terminator.span,
                 "try_call callee does not have a known failable signature",
             );
+        }
+        // The cursor-settle shape has no signature to compare against; its
+        // error place only needs to be a valid place (checked above).
+        if cursor_settle {
+            return;
         }
         match (sig.as_ref().and_then(|sig| sig.error_ty), error_place_ty) {
             (Some(error_ty), Some(place_ty)) => {

@@ -338,7 +338,7 @@ impl Validator<'_, '_> {
                 self.validate_operand(scope, index, span);
             }
             MirOptionChainLink::Call { callee, args } => {
-                let sig = self.validate_callee(scope, callee, span);
+                let sig = self.validate_callee(scope, callee, span, false);
                 let mut generic_bindings = GenericTypeBindings::default();
                 let mut shape_bindings = MirShapeBindings::default();
                 self.validate_call_args(
@@ -360,6 +360,7 @@ impl Validator<'_, '_> {
         scope: &FunctionScope<'_, '_>,
         callee: &MirCallee,
         span: Span,
+        cursor_settle: bool,
     ) -> Option<MirFunctionSignature> {
         match callee {
             MirCallee::Function(id) => {
@@ -381,12 +382,38 @@ impl Validator<'_, '_> {
                 let operand_ty = self.validate_operand(scope, value, span);
                 let sig = operand_ty
                     .and_then(|ty| self.signature_from_semantic_callable_type(ty.semantic_id()));
-                if operand_ty.is_some() && sig.is_none() {
+                let cursor_settle =
+                    cursor_settle && operand_ty.is_some_and(|ty| self.is_array_semantic_type(ty));
+                if operand_ty.is_some() && sig.is_none() && !cursor_settle {
                     self.error(span, "value callee is not callable");
                 }
                 sig
             }
         }
+    }
+
+    /// The lowering shape for a stepped-cursor settle: `mark_stepped_cursor_stream`
+    /// retypes the cursor-stream temp to its array type, so the `TryCall`
+    /// invokes a `lista<T>` value with no arguments. The cursor runtime carries
+    /// the failable contract; there is no callee signature to check. A plain
+    /// `Call` on the same value is still not callable.
+    pub(crate) fn is_cursor_settle_callee(
+        &self,
+        scope: &FunctionScope<'_, '_>,
+        callee: &MirCallee,
+        args: &[MirOperand],
+    ) -> bool {
+        if !args.is_empty() {
+            return false;
+        }
+        let MirCallee::Value(operand) = callee else {
+            return false;
+        };
+        direct_operand_type(scope, operand).is_some_and(|ty| self.is_array_semantic_type(ty))
+    }
+
+    fn is_array_semantic_type(&self, ty: MirType) -> bool {
+        matches!(self.type_kind(ty), Type::Array(_))
     }
 
     pub(crate) fn validate_closure_callee(
