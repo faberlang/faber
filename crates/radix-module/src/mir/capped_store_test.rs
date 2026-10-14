@@ -12,7 +12,11 @@ use crate::mir::{BufferHost, RunSourceError, run_source};
 const BIG: &str = "fixum numerus big ← 9223372036854775807\n";
 
 fn run(prelude: &str, body: &str) -> (Vec<String>, Vec<(String, String)>) {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = format!("{prelude}incipit {{\n{BIG}{body}\n}}\n");
     let mut host = BufferHost::default();
     let errors = match run_source(&session, "capped.fab", &source, &mut host) {

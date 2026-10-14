@@ -9,7 +9,11 @@ use crate::mir::{BufferHost, RunSourceError, run_source};
 use crate::semantic::passes::const_int_value;
 
 fn session() -> Session {
-    Session::new(Config::default().with_target(Target::HirTypeScript))
+    Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    )
 }
 
 fn program(expr: &str) -> String {

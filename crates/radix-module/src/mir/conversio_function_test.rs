@@ -8,7 +8,11 @@ use crate::driver::{Config, Session};
 use crate::mir::run_source;
 
 fn stdout(source: &str) -> Vec<String> {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let mut host = BufferHost::default();
     if let Err(error) = run_source(&session, "test.fab", source, &mut host) {
         match error {
