@@ -1,0 +1,50 @@
++++
+term = "guillemet"
+explains = ["guillemet"]
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "call_expr", "call_suffix", "member_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "literal"
+canonical = true
+summary = "Guillemet textus literals: quotes and apostrophes need no escape."
+syntax = "«<text>»"
+aliases = ["«...»"]
+related = ["string", "block-string", "textus"]
+locale = "en"
++++
+# =============================================================================
+# guillemet — « … » textus literals with unescaped quotes.
+# =============================================================================
+#
+# What this teaches:
+#   • a guillemet string needs no escape for a double quote or an apostrophe:
+#       «she said "hi" and it's fine»
+#   • template holes apply to guillemets too: «hello, §»("me")
+#   • the literal may span lines; \n and \t still decode
+#   • a raw » closes the literal, so a guillemet cannot contain »
+#
+# Common mistakes:
+#   • Writing \" or \' inside «...» — neither needs an escape.
+#   • Nesting guillemets — the first » closes the literal.
+#
+# See also: string, block-string, textus
+# =============================================================================
+
+# literalia/guillemet-quotes — « ... » literals
+#
+# GRAMMAR:
+#   blockStringLit :← '«' ... '»'
+#
+# EXPECTED OUTPUT:
+#   she said "hi" and it's fine
+#   hello, me
+#   line one
+#   line two
+#   tab<TAB>here
+
+main {
+    print «she said "hi" and it's fine»
+    print «hello, §»("me")
+    print «line one\nline two»
+    const string a ← «x "y" z»
+    print «tab\there»
+}
