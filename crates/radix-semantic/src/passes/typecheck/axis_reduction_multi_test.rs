@@ -18,7 +18,10 @@ fn result_shape(source: &str) -> Vec<i64> {
         "expected a tf32 element"
     );
     let IndexExpr::Tuple(dims) = unit.types.get_index(*shape) else {
-        panic!("expected a resolved shape, got {:?}", unit.types.get_index(*shape));
+        panic!(
+            "expected a resolved shape, got {:?}",
+            unit.types.get_index(*shape)
+        );
     };
     dims.iter()
         .map(|dim| match unit.types.get_index(*dim) {
