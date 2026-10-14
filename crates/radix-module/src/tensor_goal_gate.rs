@@ -36,7 +36,7 @@ pub fn run_types_gate() {
     // test) rather than an arena-wide pre-scan. The gate keeps verifying the
     // tensor intern shape; spelling-layer rejection is covered by codegen tests.
 
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let result = analyze_source(
         &session,
         "gate-tensor-decl.fab",
@@ -54,7 +54,7 @@ pub fn run_types_gate() {
 /// retired `numerus<f32>` spelling is not rejected with the expected wrapper
 /// diagnostic.
 pub fn run_convert_gate() {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
 
     let i32_ok = analyze_source(
         &session,

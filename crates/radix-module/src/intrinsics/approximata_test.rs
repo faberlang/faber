@@ -11,7 +11,7 @@ use radix_types::MirCollectionOp;
 
 #[cfg(feature = "hir-rust")]
 fn compile_rust(name: &str, source: &str) -> String {
-    let compiler = crate::Compiler::new(crate::Config::default());
+    let compiler = crate::Compiler::new(crate::Config::default().with_latin_locale());
     let result = compiler.compile_str(name, source);
     let Some(crate::Output::Rust(rust)) = result.output else {
         panic!("expected Rust output, got diagnostics: {:?}", result.diagnostics);
@@ -35,7 +35,7 @@ fn approximata_is_fractus_only_in_registry() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn fractus_approximata_typechecks_and_emits_abs_compare() {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let source = r"incipit {
     fixum fractus x ← 1.5
     fixum bivalens near ← x.approximata(1.51, 0.05)

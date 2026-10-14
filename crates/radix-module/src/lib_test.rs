@@ -27,7 +27,7 @@ fn compile_result_success_requires_output_and_no_errors() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compiler_compile_str_produces_output_for_valid_source() {
-    let compiler = Compiler::new(Config::default());
+    let compiler = Compiler::new(Config::default().with_latin_locale());
     let result = compiler.compile_str("test.fab", "incipit {}");
 
     assert!(result.success());
@@ -36,7 +36,7 @@ fn compiler_compile_str_produces_output_for_valid_source() {
 
 #[test]
 fn compiler_compile_reports_io_error_for_missing_file() {
-    let compiler = Compiler::new(Config::default());
+    let compiler = Compiler::new(Config::default().with_latin_locale());
     let result = compiler.compile(Path::new("/definitely/missing/faber_test_input.fab"));
 
     assert!(result.output.is_none());
@@ -57,7 +57,7 @@ fn compiler_compile_reports_io_error_for_missing_file() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compiler_emits_rust_runnable_cli_codegen_after_phase_03() {
-    let compiler = Compiler::new(Config::default());
+    let compiler = Compiler::new(Config::default().with_latin_locale());
     let result = compiler.compile_str(
         "cli.fab",
         r#"
@@ -79,7 +79,7 @@ fn shape_generic_tensor_reple_value_emits_filled_copy() {
     // E0308 regression: `param.reple(lr)` has a
     // SameAsReceiver semantic result, but the runtime mutator returns `()`.
     // A bound value must be a fresh filled copy, never `let x: Tensor = recv.reple(v);`.
-    let compiler = Compiler::new(Config::default());
+    let compiler = Compiler::new(Config::default().with_latin_locale());
     let result = compiler.compile_str(
         "generic-shape.fab",
         r"functio sgd_step<magnitudo Figura>(tensor<f32, Figura> param, tensor<f32, Figura> grad, f32 lr) → tensor<f32, Figura> {
@@ -111,7 +111,7 @@ fn tensor_reple_statement_stays_in_place() {
     // The dropped-value form of `reple`/`fill` is the documented in-place
     // mutator: `recv.reple(v);` mutates the receiver instead of filling a
     // discarded copy.
-    let compiler = Compiler::new(Config::default());
+    let compiler = Compiler::new(Config::default().with_latin_locale());
     let result = compiler.compile_str(
         "shape-fill.fab",
         r"incipit {

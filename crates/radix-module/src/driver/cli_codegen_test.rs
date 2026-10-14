@@ -3,14 +3,14 @@
 use super::compile;
 use crate::codegen::Target;
 use crate::driver::ModuleCompileRequest;
-use crate::test_support::test_session;
+use crate::test_support::test_session_la;
 
 // ── single-command CLI ──
 
 #[ignore = "slow: spawns cargo build of generated Rust binary; run with --ignored"]
 #[test]
 fn rust_single_command_cli_generates_compilable_parser_and_runtime_behavior() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"
 @ cli "tool"
 incipit argumenta args {
@@ -49,7 +49,7 @@ incipit argumenta args {
 #[ignore = "slow: spawns cargo build of generated Rust binary; run with --ignored"]
 #[test]
 fn rust_single_command_cli_reports_parse_errors() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"
 @ cli "tool"
 incipit argumenta args {
@@ -78,7 +78,7 @@ incipit argumenta args {
 #[ignore = "slow: spawns cargo build of generated Rust binary; run with --ignored"]
 #[test]
 fn rust_single_command_cli_supports_fixed_exitus() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"
 @ cli "tool"
 incipit argumenta args {
@@ -109,7 +109,7 @@ incipit {
 }"#;
     // CLI codegen is currently Rust-only; other targets should produce a clear error.
     for target in &[Target::HirTypeScript, Target::HirGo] {
-        let session = test_session(*target);
+        let session = test_session_la(*target);
         let result = compile(&session, "cli.fab", source, ModuleCompileRequest::default());
 
         assert!(!result.success(), "CLI should fail for {target:?}");
@@ -129,7 +129,7 @@ incipit {
 #[ignore = "slow: spawns cargo build of generated Rust binary; run with --ignored"]
 #[test]
 fn rust_subcommand_cli_dispatches_aliases_nested_commands_and_command_args() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"
 @ cli "tool"
 incipit {
@@ -209,7 +209,7 @@ functio config_set(textus key, textus value) {
 #[ignore = "slow: spawns cargo build of generated Rust binary; run with --ignored"]
 #[test]
 fn rust_subcommand_cli_prefers_longest_matching_command_path() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"
 @ cli "tool"
 incipit {
@@ -258,7 +258,7 @@ functio run_remote(textus host) {
 #[ignore = "slow: spawns cargo build of generated Rust binary; run with --ignored"]
 #[test]
 fn rust_subcommand_cli_sanitizes_generated_helper_names_without_changing_command_paths() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"
 @ cli "tool"
 incipit {
@@ -327,7 +327,7 @@ fn wasm_cli_program_routes_through_the_ordinary_emit_path() {
     // programs through the ordinary emit path instead of the previous
     // `cli_codegen_rust_only` rejection. The ten P1 CLI fixtures emit and
     // wasm-tools validate.
-    let session = test_session(Target::MirWasm);
+    let session = test_session_la(Target::MirWasm);
     let source = r#"@ cli "tool"
 incipit argumenta args {
   nota "ok"

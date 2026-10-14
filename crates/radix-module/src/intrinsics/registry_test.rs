@@ -118,7 +118,7 @@ incipit {
   nota keys
 }
 "#;
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let result = analyze_source(&session, "tabula-claves.fab", source, AnalyzeRequest::default());
     assert!(result.is_ok(), "tabula claves must typecheck: {:?}", result.err());
 }
@@ -143,7 +143,7 @@ incipit {
   nota values
 }
 "#;
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let result = analyze_source(&session, "tabula-valores.fab", source, AnalyzeRequest::default());
     assert!(result.is_ok(), "tabula valores must typecheck: {:?}", result.err());
 }
@@ -168,7 +168,7 @@ incipit {
   nota narrow
 }
 ";
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let result = analyze_source(&session, "intervallum-coercere.fab", source, AnalyzeRequest::default());
     assert!(result.is_ok(), "intervallum coercere must typecheck: {:?}", result.err());
 }
@@ -312,7 +312,7 @@ incipit {
   nota empty_flag
 }
 "#;
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let result = analyze_source(&session, "textus-vacua.fab", source, AnalyzeRequest::default());
     assert!(result.is_ok(), "textus vacua must typecheck: {:?}", result.err());
 }
@@ -456,7 +456,7 @@ fn regex_replace_and_text_escape_resolve_by_receiver() {
 }
 
 fn analyze_regex_replace(source: &str) -> Result<crate::driver::AnalyzedModule, Vec<radix_diagnostics::Diagnostic>> {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     analyze_source(&session, "regex-muta.fab", source, AnalyzeRequest::default())
 }
 

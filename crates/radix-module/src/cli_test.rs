@@ -6,13 +6,21 @@
 use super::{CliMode, CliType, analyze};
 use crate::diagnostics::DiagnosticConvert;
 use crate::diagnostics::{Diagnostic, DiagnosticArg};
-use crate::lexer::lex;
+use crate::lexer::lex_with_locale_pack;
 use crate::parser::parse;
 use crate::semantic::SemanticErrorKind;
 use crate::test_support::args_have_no_legacy_message;
 
+
+/// The built-in Latin (`la`) reader pack: the canonical surface the parser
+/// tests below are written in.
+fn la_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("installed la pack should load")
+}
+
 fn parse_program(source: &str) -> crate::parser::ParseResult {
-    let result = parse(lex(source));
+    let result = parse(lex_with_locale_pack(source, &la_pack()));
     assert!(
         result.errors.is_empty(),
         "expected parse success, got {:?}",

@@ -19,7 +19,8 @@ incipit {
 fn compile_with_policy(policy: WarnPolicy) -> CompileResult {
     let config = Config::default()
         .with_target(Target::HirRust)
-        .with_warn_policy(policy);
+        .with_warn_policy(policy)
+        .with_latin_locale();
     compile(
         &Session::new(config),
         "test.fab",

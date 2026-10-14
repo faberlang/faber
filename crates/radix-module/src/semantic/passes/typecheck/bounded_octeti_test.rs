@@ -1,6 +1,6 @@
 //! BB-6R oracle: bounded `octeti<N>` identity, D7 bridges, O(1) byte index.
 
-use super::test_support::{analyze_and_get_diagnostics, compile_and_get_result, compile_for_target_and_get_result};
+use super::test_support::{analyze_and_get_diagnostics_la, compile_and_get_result_la, compile_for_target_and_get_result_la};
 use crate::codegen::Target;
 
 fn rust_code(result: crate::CompileResult) -> String {
@@ -12,7 +12,7 @@ fn rust_code(result: crate::CompileResult) -> String {
 
 #[test]
 fn bounded_octeti_is_not_bare_octeti_and_keeps_n_in_emit() {
-    let result = compile_and_get_result(
+    let result = compile_and_get_result_la(
         r"functio probe(octeti<8> bounded, octeti unbounded) → vacuum {
     nota bounded
     nota unbounded
@@ -37,7 +37,7 @@ incipit {
 
 #[test]
 fn bounded_octeti_scalar_index_is_o1_live_byte() {
-    let result = compile_and_get_result(
+    let result = compile_and_get_result_la(
         r"functio probe(octeti<8> xs) → u8 {
     redde xs[0]
 }
@@ -64,7 +64,7 @@ incipit {
 
 #[test]
 fn bounded_octeti_conversions_follow_d7() {
-    let diagnostics = analyze_and_get_diagnostics(
+    let diagnostics = analyze_and_get_diagnostics_la(
         r"typus OctetiOcto = octeti<8>
 
 functio bridges(octeti<8> bounded, octeti unbounded) → vacuum {
@@ -83,7 +83,7 @@ incipit {
         "diagnostics: {diagnostics:?}"
     );
 
-    let implicit = analyze_and_get_diagnostics(
+    let implicit = analyze_and_get_diagnostics_la(
         r"functio assign(octeti unbounded) → vacuum {
     fixum octeti<8> bounded ← unbounded
     nota bounded
@@ -98,7 +98,7 @@ incipit {
         "octeti<8> ≠ octeti: implicit assignment must fail, got: {implicit:?}"
     );
 
-    let result = compile_and_get_result(
+    let result = compile_and_get_result_la(
         r"functio bridges(octeti<8> bounded, octeti unbounded) → vacuum {
     fixum octeti widened ← bounded ↦ octeti
     fixum octeti<8> narrowed ← unbounded ↦ octeti<8>
@@ -132,7 +132,7 @@ incipit {
     nota 0
 }";
     for target in [Target::HirTypeScript] {
-        let result = compile_for_target_and_get_result(source, target);
+        let result = compile_for_target_and_get_result_la(source, target);
         assert!(!result.success(), "target {target:?} must reject bounded octeti");
         assert!(
             result
@@ -165,7 +165,7 @@ fn bounded_octeti_is_carried_on_go() {
 incipit {
     nota 0
 }";
-    let result = compile_for_target_and_get_result(source, Target::HirGo);
+    let result = compile_for_target_and_get_result_la(source, Target::HirGo);
     assert!(result.success(), "Go must carry bounded octeti: {:?}", result.diagnostics);
     let code = match &result.output {
         Some(crate::Output::Go(output)) => output.code.as_str(),

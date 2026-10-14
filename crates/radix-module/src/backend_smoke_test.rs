@@ -11,7 +11,7 @@ use crate::driver::{Config, ModuleCompileRequest, Session, compile};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 fn emit_rust_from_faber(source: &str) -> String {
-    let session = Session::new(Config::default().with_target(Target::HirRust));
+    let session = Session::new(Config::default().with_target(Target::HirRust).with_latin_locale());
     let result = compile(&session, "smoke.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "{:?}", result.diagnostics);
     let Some(crate::Output::Rust(output)) = result.output else {
@@ -21,7 +21,7 @@ fn emit_rust_from_faber(source: &str) -> String {
 }
 
 fn emit_llvm_from_faber(source: &str) -> String {
-    let session = Session::new(Config::default().with_target(Target::MirLlvm));
+    let session = Session::new(Config::default().with_target(Target::MirLlvm).with_latin_locale());
     let result = compile(&session, "smoke.fab", source, ModuleCompileRequest::default());
     let Some(crate::Output::LlvmText(output)) = result.output else {
         panic!("expected LLVM text output: {:?}", result.diagnostics);

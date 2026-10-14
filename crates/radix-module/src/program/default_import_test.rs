@@ -9,6 +9,14 @@ use std::path::{Path, PathBuf};
 
 use crate::import_resolve::library_home_test_support;
 
+
+/// The built-in Latin (`la`) reader pack: the canonical surface these tests
+/// are written in.
+fn la_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("installed la pack should load")
+}
+
 fn temp_dir(label: &str) -> (tempfile::TempDir, PathBuf) {
     let dir = crate::test_support::test_temp_dir(&format!("default-import-{label}"));
     let path = dir.path().to_path_buf();
@@ -21,7 +29,13 @@ const GEO_WITHOUT_REGIO: &str = "@ publica\nfunctio unum() → numerus {\n    re
 fn check(dir: &Path, app: &str) -> Vec<Option<String>> {
     let path = dir.join("app.fab");
     fs::write(&path, app).expect("app");
-    let result = crate::services::check_diagnostics_for_source(&path.display().to_string(), app, false);
+    let result = crate::services::check_diagnostics_for_source_with_locale_pack(
+        &path.display().to_string(),
+        app,
+        false,
+        Some(&la_pack()),
+        None,
+    );
     result
         .diagnostics
         .iter()
@@ -124,7 +138,7 @@ fn driver_analysis_binds_declared_regio_name() {
     let app = "importa ex \"./geo\"\n\nincipit {\n    nota geometria.unum()\n}\n";
     let path = dir.join("app.fab");
     fs::write(&path, app).expect("app");
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let analysis = crate::program::analyze_prepared_program_path(&session, &path, app);
     assert!(
         analysis.is_ok(),

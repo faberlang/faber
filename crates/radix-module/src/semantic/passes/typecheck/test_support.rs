@@ -13,6 +13,9 @@
 //!   stop before codegen). Use when codegen would reject but the typecheck
 //!   result is the subject under test.
 //!
+//! Every source-taking helper has an `_la` sibling that installs the built-in
+//! Latin reader pack explicitly; Latin test sources call that sibling.
+//!
 //! Some assertion helpers are intentionally provided for future tests;
 //! `#[allow(dead_code)]` avoids noise until callers materialize.
 
@@ -28,20 +31,44 @@ use crate::{CompileResult, Compiler, Config};
 /// File name used for diagnostic identity in compile/analyse calls.
 const TEST_NAME: &str = "test.fab";
 
+fn config_for(target: Target) -> Config {
+    Config::default().with_target(target)
+}
+
+fn latin_config_for(target: Target) -> Config {
+    Config::default().with_target(target).with_latin_locale()
+}
+
 // ---------------------------------------------------------------------------
 // Compile path (full pipeline: parse → lower → typecheck → codegen)
 // ---------------------------------------------------------------------------
 
+fn compile_with_config(config: Config, source: &str) -> CompileResult {
+    Compiler::new(config).compile_str(TEST_NAME, source)
+}
+
 /// Run the full compiler pipeline with the default Rust target.
 #[must_use]
 pub fn compile_and_get_result(source: &str) -> CompileResult {
-    Compiler::new(Config::default().with_target(Target::HirRust)).compile_str(TEST_NAME, source)
+    compile_with_config(config_for(Target::HirRust), source)
+}
+
+/// [`compile_and_get_result`] reading the source with the Latin reader pack.
+#[must_use]
+pub fn compile_and_get_result_la(source: &str) -> CompileResult {
+    compile_with_config(latin_config_for(Target::HirRust), source)
 }
 
 /// Run the full compiler pipeline for a specific backend target.
 #[must_use]
 pub fn compile_for_target_and_get_result(source: &str, target: Target) -> CompileResult {
-    Compiler::new(Config::default().with_target(target)).compile_str(TEST_NAME, source)
+    compile_with_config(config_for(target), source)
+}
+
+/// [`compile_for_target_and_get_result`] reading the source with the Latin pack.
+#[must_use]
+pub fn compile_for_target_and_get_result_la(source: &str, target: Target) -> CompileResult {
+    compile_with_config(latin_config_for(target), source)
 }
 
 /// Run the full compiler pipeline and return raw diagnostics.
@@ -50,9 +77,23 @@ pub fn compile_and_get_diagnostics(source: &str) -> Vec<Diagnostic> {
     compile_and_get_result(source).diagnostics
 }
 
+/// [`compile_and_get_diagnostics`] reading the source with the Latin pack.
+#[must_use]
+pub fn compile_and_get_diagnostics_la(source: &str) -> Vec<Diagnostic> {
+    compile_and_get_result_la(source).diagnostics
+}
+
 // ---------------------------------------------------------------------------
 // Analysis path (parse → lower → typecheck; no codegen)
 // ---------------------------------------------------------------------------
+
+fn analyze_with_config(config: Config, source: &str) -> Vec<Diagnostic> {
+    let session = driver::Session::new(config);
+    match driver::analyze_source(&session, TEST_NAME, source, AnalyzeRequest::default()) {
+        Ok(unit) => unit.diagnostics,
+        Err(diagnostics) => diagnostics,
+    }
+}
 
 /// Run analysis (typecheck only, no codegen) and return diagnostics.
 ///
@@ -60,16 +101,17 @@ pub fn compile_and_get_diagnostics(source: &str) -> Vec<Diagnostic> {
 /// `Err(Vec<Diagnostic>)` arms so callers always receive a flat list.
 #[must_use]
 pub fn analyze_and_get_diagnostics(source: &str) -> Vec<Diagnostic> {
-    let session = driver::Session::new(Config::default().with_target(Target::HirRust));
-    match driver::analyze_source(&session, TEST_NAME, source, AnalyzeRequest::default()) {
-        Ok(unit) => unit.diagnostics,
-        Err(diagnostics) => diagnostics,
-    }
+    analyze_with_config(config_for(Target::HirRust), source)
 }
 
-/// Analyze and return the unit when typecheck produced no errors.
-pub fn analyze_ok(source: &str) -> AnalyzedModule {
-    let session = driver::Session::new(Config::default().with_target(Target::HirRust));
+/// [`analyze_and_get_diagnostics`] reading the source with the Latin pack.
+#[must_use]
+pub fn analyze_and_get_diagnostics_la(source: &str) -> Vec<Diagnostic> {
+    analyze_with_config(latin_config_for(Target::HirRust), source)
+}
+
+fn analyze_ok_with_config(config: Config, source: &str) -> AnalyzedModule {
+    let session = driver::Session::new(config);
     let unit = driver::analyze_source(&session, TEST_NAME, source, AnalyzeRequest::default()).expect("analyze");
     assert!(
         !unit.diagnostics.iter().any(Diagnostic::is_error),
@@ -77,6 +119,16 @@ pub fn analyze_ok(source: &str) -> AnalyzedModule {
         unit.diagnostics
     );
     unit
+}
+
+/// Analyze and return the unit when typecheck produced no errors.
+pub fn analyze_ok(source: &str) -> AnalyzedModule {
+    analyze_ok_with_config(config_for(Target::HirRust), source)
+}
+
+/// [`analyze_ok`] reading the source with the Latin pack.
+pub fn analyze_ok_la(source: &str) -> AnalyzedModule {
+    analyze_ok_with_config(latin_config_for(Target::HirRust), source)
 }
 
 /// TypeIds of `incipit` locals, in source order.
@@ -96,16 +148,40 @@ pub fn entry_local_tys(unit: &AnalyzedModule) -> Vec<TypeId> {
 // Compile-path assertions
 // ---------------------------------------------------------------------------
 
+fn assert_result_accepts(result: &CompileResult) {
+    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+}
+
 /// Compile with the default Rust target and assert success (no error diagnostics).
 pub fn assert_accepts(source: &str) {
-    let result = compile_and_get_result(source);
-    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+    assert_result_accepts(&compile_and_get_result(source));
+}
+
+/// [`assert_accepts`] reading the source with the Latin pack.
+pub fn assert_accepts_la(source: &str) {
+    assert_result_accepts(&compile_and_get_result_la(source));
 }
 
 /// Compile for a specific target and assert success.
 pub fn assert_accepts_for_target(source: &str, target: Target) {
-    let result = compile_for_target_and_get_result(source, target);
-    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+    assert_result_accepts(&compile_for_target_and_get_result(source, target));
+}
+
+/// [`assert_accepts_for_target`] reading the source with the Latin pack.
+pub fn assert_accepts_for_target_la(source: &str, target: Target) {
+    assert_result_accepts(&compile_for_target_and_get_result_la(source, target));
+}
+
+fn assert_rejects_result_with_issue(result: &CompileResult, issue: &str) {
+    assert!(!result.success(), "expected failure, got: {:?}", result.diagnostics);
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.is_error() && diag.issue() == Some(issue)),
+        "expected diagnostic issue {issue:?}, got: {:?}",
+        result.diagnostics
+    );
 }
 
 /// Compile with the default Rust target, assert failure, and assert at least
@@ -113,37 +189,26 @@ pub fn assert_accepts_for_target(source: &str, target: Target) {
 ///
 /// Does **not** match warnings — only diagnostics where `is_error()` is true.
 pub fn assert_rejects_with_issue(source: &str, issue: &str) {
-    let result = compile_and_get_result(source);
-    assert!(!result.success(), "expected failure, got: {:?}", result.diagnostics);
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|diag| diag.is_error() && diag.issue() == Some(issue)),
-        "expected diagnostic issue {issue:?}, got: {:?}",
-        result.diagnostics
-    );
+    assert_rejects_result_with_issue(&compile_and_get_result(source), issue);
+}
+
+/// [`assert_rejects_with_issue`] reading the source with the Latin pack.
+pub fn assert_rejects_with_issue_la(source: &str, issue: &str) {
+    assert_rejects_result_with_issue(&compile_and_get_result_la(source), issue);
 }
 
 /// Compile for a specific target, assert failure, and assert an ERROR
 /// diagnostic carries the given issue tag.
 pub fn assert_rejects_with_issue_for_target(source: &str, target: Target, issue: &str) {
-    let result = compile_for_target_and_get_result(source, target);
-    assert!(!result.success(), "expected failure, got: {:?}", result.diagnostics);
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|diag| diag.is_error() && diag.issue() == Some(issue)),
-        "expected diagnostic issue {issue:?}, got: {:?}",
-        result.diagnostics
-    );
+    assert_rejects_result_with_issue(&compile_for_target_and_get_result(source, target), issue);
 }
 
-/// Compile with the default Rust target and assert at least one non-error
-/// (warning) diagnostic carries the given issue tag.
-pub fn assert_warns_with_issue(source: &str, issue: &str) {
-    let result = compile_and_get_result(source);
+/// [`assert_rejects_with_issue_for_target`] reading the source with the Latin pack.
+pub fn assert_rejects_with_issue_for_target_la(source: &str, target: Target, issue: &str) {
+    assert_rejects_result_with_issue(&compile_for_target_and_get_result_la(source, target), issue);
+}
+
+fn assert_warns_result_with_issue(result: &CompileResult, issue: &str) {
     assert!(
         result
             .diagnostics
@@ -154,20 +219,36 @@ pub fn assert_warns_with_issue(source: &str, issue: &str) {
     );
 }
 
+/// Compile with the default Rust target and assert at least one non-error
+/// (warning) diagnostic carries the given issue tag.
+pub fn assert_warns_with_issue(source: &str, issue: &str) {
+    assert_warns_result_with_issue(&compile_and_get_result(source), issue);
+}
+
+/// [`assert_warns_with_issue`] reading the source with the Latin pack.
+pub fn assert_warns_with_issue_la(source: &str, issue: &str) {
+    assert_warns_result_with_issue(&compile_and_get_result_la(source), issue);
+}
+
 // ---------------------------------------------------------------------------
 // Analysis-path assertions
 // ---------------------------------------------------------------------------
 
-/// Run analysis-only and assert no error diagnostics.
-pub fn assert_analysis_accepts(source: &str) {
-    let diagnostics = analyze_and_get_diagnostics(source);
+fn assert_diagnostics_accept(diagnostics: &[Diagnostic]) {
     assert!(!diagnostics.iter().any(Diagnostic::is_error), "diagnostics: {diagnostics:?}");
 }
 
-/// Run analysis-only, assert at least one error diagnostic, and assert an
-/// error diagnostic carries the given issue tag.
-pub fn assert_analysis_rejects_with_issue(source: &str, issue: &str) {
-    let diagnostics = analyze_and_get_diagnostics(source);
+/// Run analysis-only and assert no error diagnostics.
+pub fn assert_analysis_accepts(source: &str) {
+    assert_diagnostics_accept(&analyze_and_get_diagnostics(source));
+}
+
+/// [`assert_analysis_accepts`] reading the source with the Latin pack.
+pub fn assert_analysis_accepts_la(source: &str) {
+    assert_diagnostics_accept(&analyze_and_get_diagnostics_la(source));
+}
+
+fn assert_diagnostics_reject_with_issue(diagnostics: &[Diagnostic], issue: &str) {
     assert!(
         diagnostics.iter().any(Diagnostic::is_error),
         "expected failure, got: {diagnostics:?}"
@@ -178,6 +259,17 @@ pub fn assert_analysis_rejects_with_issue(source: &str, issue: &str) {
             .any(|diag| diag.is_error() && diag.issue() == Some(issue)),
         "expected diagnostic issue {issue:?}, got: {diagnostics:?}",
     );
+}
+
+/// Run analysis-only, assert at least one error diagnostic, and assert an
+/// error diagnostic carries the given issue tag.
+pub fn assert_analysis_rejects_with_issue(source: &str, issue: &str) {
+    assert_diagnostics_reject_with_issue(&analyze_and_get_diagnostics(source), issue);
+}
+
+/// [`assert_analysis_rejects_with_issue`] reading the source with the Latin pack.
+pub fn assert_analysis_rejects_with_issue_la(source: &str, issue: &str) {
+    assert_diagnostics_reject_with_issue(&analyze_and_get_diagnostics_la(source), issue);
 }
 
 // ---------------------------------------------------------------------------

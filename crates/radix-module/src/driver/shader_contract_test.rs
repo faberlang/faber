@@ -1,11 +1,11 @@
 use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, ModuleCompileRequest, analyze_source, compile};
 use crate::mir::MirKernelShaderStage;
-use crate::test_support::test_session;
+use crate::test_support::test_session_la;
 
 fn compile_source(source: &str) -> crate::CompileResult {
     compile(
-        &test_session(Target::MirWgsl),
+        &test_session_la(Target::MirWgsl),
         "shader_contract.fab",
         source,
         ModuleCompileRequest::default(),
@@ -315,7 +315,7 @@ adfirma bound_resource_binding_matches(1, 2, "tex") mori "tex binding"
 "#
     );
     let analysis = analyze_source(
-        &test_session(Target::MirWgsl),
+        &test_session_la(Target::MirWgsl),
         "shader_contract.fab",
         &source,
         AnalyzeRequest::default(),

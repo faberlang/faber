@@ -4,13 +4,13 @@
 use super::compile;
 use crate::codegen::Target;
 use crate::driver::ModuleCompileRequest;
-use crate::test_support::test_session;
+use crate::test_support::test_session_la;
 
 // ── conversio glyph form ──
 
 #[test]
 fn conversio_glyph_form_compiles_to_parse() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum textus raw ← "22"
   fixum _ n ← raw ↦ numerus
@@ -25,7 +25,7 @@ fn conversio_glyph_form_compiles_to_parse() {
 
 #[test]
 fn conversio_of_a_literal_emits_its_value() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum _ n ← "22" ↦ numerus
   nota n
@@ -40,7 +40,7 @@ fn conversio_of_a_literal_emits_its_value() {
 
 #[test]
 fn conversio_emits_parse_not_as_cast() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum textus raw ← "22"
   fixum _ n ← raw ↦ numerus
@@ -56,7 +56,7 @@ fn conversio_emits_parse_not_as_cast() {
 
 #[test]
 fn conversio_with_recovery_emits_unwrap_or() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum _ n ← "bad" ↦ numerus ⊥ 0
   nota n
@@ -70,7 +70,7 @@ fn conversio_with_recovery_emits_unwrap_or() {
 
 #[test]
 fn conversio_to_textus_emits_to_string() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   fixum _ n ← 42
   fixum _ s ← n ↦ textus
@@ -87,7 +87,7 @@ fn conversio_to_textus_emits_to_string() {
 
 #[test]
 fn textus_to_octeti_conversio_emits_into_bytes() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum _ s ← "hi"
   fixum _ b ← s ↦ octeti
@@ -101,7 +101,7 @@ fn textus_to_octeti_conversio_emits_into_bytes() {
 
 #[test]
 fn octeti_to_textus_conversio_emits_from_utf8_with_expect() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   fixum _ b ← |68 69|
   fixum _ s ← b ↦ textus
@@ -120,7 +120,7 @@ fn octeti_to_textus_conversio_emits_from_utf8_with_expect() {
 
 #[test]
 fn octeti_to_textus_conversio_with_recovery_emits_unwrap_or() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum _ b ← |ff|
   fixum _ s ← b ↦ textus ⊥ "?"
@@ -137,7 +137,7 @@ fn octeti_to_textus_conversio_with_recovery_emits_unwrap_or() {
 
 #[test]
 fn ascii_octeti_conversio_emits_correct_lowering() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   fixum _ a ← 'hi'
   fixum _ b ← a ↦ octeti
@@ -163,7 +163,7 @@ fn ascii_octeti_conversio_emits_correct_lowering() {
 fn fractus_to_numerus_conversio_emits_checked_truncation() {
     // D1.11: float → integer `↦ via Trunc` truncates toward zero and fails when the value is
     // NaN, ±Inf, or out of the target range — never a saturating `as` cast.
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit { fixum _ n ← 3.7 ↦ numerus via Trunc }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -182,7 +182,7 @@ fn fractus_to_numerus_conversio_emits_checked_truncation() {
 
 #[test]
 fn fractus_to_bivalens_conversio_emits_nonzero_check() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit { fixum _ b ← 1.5 ↦ bivalens }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -192,7 +192,7 @@ fn fractus_to_bivalens_conversio_emits_nonzero_check() {
 
 #[test]
 fn bivalens_to_numerus_conversio_emits_bool_cast() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit { fixum _ n ← verum ↦ numerus }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -202,7 +202,7 @@ fn bivalens_to_numerus_conversio_emits_bool_cast() {
 
 #[test]
 fn bivalens_to_fractus_conversio_emits_conditional_literals() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit { fixum _ f ← verum ↦ fractus }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -215,7 +215,7 @@ fn bivalens_to_fractus_conversio_emits_conditional_literals() {
 
 #[test]
 fn ascii_to_bivalens_conversio_emits_is_empty() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit { fixum _ b ← 'hi' ↦ bivalens }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -225,7 +225,7 @@ fn ascii_to_bivalens_conversio_emits_is_empty() {
 
 #[test]
 fn instans_narrow_conversio_emits_ad_praecisionem() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "functio narrow(instans<ns> t) → instans { redde t ↦ instans }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -240,7 +240,7 @@ fn instans_narrow_conversio_emits_ad_praecisionem() {
 
 #[test]
 fn valor_to_lista_conversio_emits_from_valor() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   fixum valor v ← [1, 2, 3]
   fixum lista<numerus> xs ← v ↦ lista<numerus>
@@ -256,7 +256,7 @@ fn valor_to_lista_conversio_emits_from_valor() {
 
 #[test]
 fn valor_to_tabula_conversio_emits_from_valor() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum valor v ← { "a": 1 } ↦ valor
   fixum tabula<textus, numerus> m ← v ↦ tabula<textus, numerus>
@@ -272,7 +272,7 @@ fn valor_to_tabula_conversio_emits_from_valor() {
 
 #[test]
 fn genus_to_valor_conversio_emits_tabula_boxing() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"genus Point { varia numerus x varia numerus y }
 incipit {
   fixum Point pt ← Point { x = 1, y = 2 }
@@ -289,7 +289,7 @@ incipit {
 
 #[test]
 fn lista_to_valor_conversio_emits_from() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   fixum lista<numerus> xs ← [1, 2]
   fixum valor v ← xs ↦ valor
@@ -305,7 +305,7 @@ fn lista_to_valor_conversio_emits_from() {
 
 #[test]
 fn octeti_to_valor_conversio_emits_byte_list_boxing() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   fixum octeti bytes ← |de ad|
   fixum valor v ← bytes ↦ valor
@@ -321,7 +321,7 @@ fn octeti_to_valor_conversio_emits_byte_list_boxing() {
 
 #[test]
 fn valor_to_numerus_conversio_emits_from_valor() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   fixum valor v ← 42
   fixum numerus n ← v ↦ numerus
@@ -338,7 +338,7 @@ fn valor_to_numerus_conversio_emits_from_valor() {
 
 #[test]
 fn valor_to_fractus_conversio_emits_from_valor_with_widen() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   fixum valor v ← 7
   fixum fractus f ← v ↦ fractus
@@ -354,7 +354,7 @@ fn valor_to_fractus_conversio_emits_from_valor_with_widen() {
 
 #[test]
 fn valor_to_octeti_conversio_emits_octeti_match() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"
 incipit {
     fixum valor body ← {} ↦ valor
@@ -374,7 +374,7 @@ incipit {
 
 #[test]
 fn valor_to_textus_conversio_emits_from_valor() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum valor v ← "1979-05-27T07:32:00Z"
   fixum textus s ← v ↦ textus
@@ -390,7 +390,7 @@ fn valor_to_textus_conversio_emits_from_valor() {
 
 #[test]
 fn valor_to_numerus_conversio_with_recovery_emits_unwrap_or() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum valor v ← "bad"
   fixum numerus n ← v ↦ numerus ⊥ 0
@@ -406,7 +406,7 @@ fn valor_to_numerus_conversio_with_recovery_emits_unwrap_or() {
 
 #[test]
 fn valor_to_instans_conversio_emits_try_from_valor() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum valor v ← "1979-05-27T07:32:00Z"
   fixum instans<ms> t ← v ↦ instans<ms>
@@ -422,7 +422,7 @@ fn valor_to_instans_conversio_emits_try_from_valor() {
 
 #[test]
 fn instans_fine_to_coarse_assignment_rejects_without_conversio() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     crate::test_support::assert_compile_fails_with_issue(
         &session,
         "test.fab",
@@ -433,7 +433,7 @@ fn instans_fine_to_coarse_assignment_rejects_without_conversio() {
 
 #[test]
 fn scalar_text_order_emits_str_compare() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit { si 'a' ≤ 'z' { nota \"ok\" } }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -447,7 +447,7 @@ fn scalar_text_order_emits_str_compare() {
 #[test]
 fn whole_string_text_order_emits_str_compare() {
     // D1.6: UTF-8 byte order is code-point order, so `&str` compare is exact.
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "functio prior(textus a, textus b) → bivalens { redde a ≺ b }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -460,7 +460,7 @@ fn whole_string_text_order_emits_str_compare() {
 
 #[test]
 fn instans_cross_precision_compare_emits_partial_cmp_at_coarser() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "functio before(instans<ns> fine, instans<ms> coarse) → bivalens { redde fine ≺ coarse }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -473,7 +473,7 @@ fn instans_cross_precision_compare_emits_partial_cmp_at_coarser() {
 
 #[test]
 fn instans_to_textus_conversio_emits_to_rfc3339() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "functio wire(instans t) → textus { redde t ↦ textus }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -488,7 +488,7 @@ fn instans_to_textus_conversio_emits_to_rfc3339() {
 
 #[test]
 fn lista_to_copia_conversio_emits_hashset_collect() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit { fixum _ s ← [1, 2, 2] ↦ copia<numerus> }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -501,7 +501,7 @@ fn lista_to_copia_conversio_emits_hashset_collect() {
 
 #[test]
 fn copia_to_lista_conversio_emits_vec_collect() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  varia copia<numerus> s ← vacua\n  s.adde(1)\n  fixum _ xs ← s ↦ lista<numerus>\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -514,7 +514,7 @@ fn copia_to_lista_conversio_emits_vec_collect() {
 
 #[test]
 fn named_lista_to_copia_conversio_clones_source_before_consuming() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  fixum lista<numerus> xs ← [1, 2, 2]\n  fixum _ s ← xs ↦ copia<numerus>\n  fixum _ n ← xs.longitudo()\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -527,7 +527,7 @@ fn named_lista_to_copia_conversio_clones_source_before_consuming() {
 
 #[test]
 fn named_copia_to_lista_conversio_clones_source_before_consuming() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  varia copia<numerus> s ← vacua\n  s.adde(1)\n  fixum _ xs ← s ↦ lista<numerus>\n  fixum _ ys ← s ↦ lista<numerus>\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -542,7 +542,7 @@ fn named_copia_to_lista_conversio_clones_source_before_consuming() {
 
 #[test]
 fn lista_copia_conversio_emits_swift_set_and_array_initializers() {
-    let session = test_session(Target::HirSwift);
+    let session = test_session_la(Target::HirSwift);
     let source = "incipit {\n  fixum lista<numerus> xs ← [1, 2, 2]\n  fixum copia<numerus> s ← xs ↦ copia<numerus>\n  fixum lista<numerus> ys ← s ↦ lista<numerus>\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -557,7 +557,7 @@ fn lista_copia_conversio_emits_swift_set_and_array_initializers() {
 
 #[test]
 fn rvalue_lista_to_copia_conversio_moves_without_clone() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit { fixum _ s ← [1, 2, 2] ↦ copia<numerus> }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -570,7 +570,7 @@ fn rvalue_lista_to_copia_conversio_moves_without_clone() {
 
 #[test]
 fn tensor_to_lista_conversio_emits_planata() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  fixum tensor<numerus, []> t ← vacua\n  fixum _ xs ← t ↦ lista<numerus>\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -579,7 +579,7 @@ fn tensor_to_lista_conversio_emits_planata() {
 }
 
 fn assert_lista_to_tensor_conversio_rust_emit(source: &str, must_contain: &[&str], must_not_contain: &[&str]) {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
@@ -620,7 +620,7 @@ fn rectangular_lista_literal_to_tensor_conversio_emits_flat_structa() {
 
 #[test]
 fn tabula_to_lista_keys_conversio_emits_keys_cloned() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum tabula<textus, numerus> m ← { "a": 1, "b": 2 }
   fixum _ ks ← m ↦ lista<textus>
@@ -636,7 +636,7 @@ fn tabula_to_lista_keys_conversio_emits_keys_cloned() {
 
 #[test]
 fn tabula_to_lista_values_conversio_emits_values_cloned() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum tabula<textus, numerus> m ← { "a": 1, "b": 2 }
   fixum _ vs ← m ↦ lista<numerus>
@@ -654,7 +654,7 @@ fn tabula_to_lista_values_conversio_emits_values_cloned() {
 
 #[test]
 fn tensor_numerus_to_fractus_conversio_emits_convert_elements() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  fixum tensor<numerus, []> a ← vacua\n  fixum _ b ← a ↦ tensor<fractus, []>\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -667,7 +667,7 @@ fn tensor_numerus_to_fractus_conversio_emits_convert_elements() {
 
 #[test]
 fn tensor_fractus_to_numerus_conversio_emits_convert_elements() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  fixum tensor<fractus, []> b ← vacua\n  fixum _ a ← b ↦ tensor<numerus, []>\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -680,7 +680,7 @@ fn tensor_fractus_to_numerus_conversio_emits_convert_elements() {
 
 #[test]
 fn tensor_numerus_i32_to_i64_conversio_emits_convert_elements() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  fixum tensor<i32, []> a ← vacua\n  fixum _ b ← a ↦ tensor<i64, []>\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -693,7 +693,7 @@ fn tensor_numerus_i32_to_i64_conversio_emits_convert_elements() {
 
 #[test]
 fn tensor_element_width_lattice_codegen_matrix() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     for from in crate::semantic::tensor_element_lattice::SPECS {
         for to in crate::semantic::tensor_element_lattice::SPECS {
             if !crate::semantic::tensor_element_lattice::needs_convert_elements(
@@ -718,7 +718,7 @@ fn tensor_element_width_lattice_codegen_matrix() {
 
 #[test]
 fn verte_static_ascription_emits_as_cast() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   fixum f32 n ← 1.5
   fixum _ f ← n ∷ fractus

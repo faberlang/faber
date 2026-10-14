@@ -10,14 +10,21 @@ use crate::diagnostics::Diagnostic;
 use crate::diagnostics::DiagnosticConvert;
 use crate::driver::AnalyzeRequest;
 use crate::lexer::INLINE_COMMENT_ISSUE;
-use crate::lexer::lex;
+use crate::lexer::lex_with_locale_pack;
 use crate::parser::{ParseErrorKind, ParseResult, parse};
 use crate::test_support::args_have_no_legacy_message;
+
+/// The built-in Latin (`la`) reader pack: the canonical surface the parser
+/// tests below are written in.
+fn la_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("installed la pack should load")
+}
 
 /// Convenience wrapper: parse source that is expected to succeed.
 #[allow(dead_code)]
 fn parse_ok(source: &str) -> ParseResult {
-    let result = parse(lex(source));
+    let result = parse(lex_with_locale_pack(source, &la_pack()));
     assert!(result.success(), "expected clean parse, got errors: {:?}", result.errors);
     result
 }
@@ -29,7 +36,7 @@ fn parse_ok(source: &str) -> ParseResult {
 #[test]
 fn conversio_vel_fallback_reports_migration_diagnostic() {
     let source = r#"fixum _ n ← "bad" ↦ numerus vel 0"#;
-    let result = parse(lex(source));
+    let result = parse(lex_with_locale_pack(source, &la_pack()));
     let err = result
         .errors
         .iter()
@@ -53,7 +60,7 @@ fn conversio_vel_fallback_reports_migration_diagnostic() {
 // =============================================================================
 
 fn assert_retired_prefix_predicate(source: &str, predicate: &str, replacement: &str) {
-    let result = parse(lex(source));
+    let result = parse(lex_with_locale_pack(source, &la_pack()));
     let err = result
         .errors
         .iter()
@@ -83,7 +90,7 @@ fn assert_retired_prefix_predicate(source: &str, predicate: &str, replacement: &
 }
 
 fn assert_semantic_rejection(source: &str) {
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let result = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default());
     let Some(diags) = result.err() else {
         panic!("expected semantic rejection, got ok for: {source}")
@@ -98,7 +105,7 @@ fn assert_call_form_constructor_rejected(source: &str) {
     // The type-expression head is claimed by the parser as a typed-zero
     // constructor, so the retired call form is refused at parse time: a
     // constructor is not callable.
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let result = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default());
     let Some(diags) = result.err() else {
         panic!("expected rejection, got ok for: {source}")
@@ -140,7 +147,7 @@ fn postfix_array_variable_type_is_rejected() {
 #[test]
 fn expression_ad_rejects_block_form() {
     let source = r"fixum _ s ← ad 'runtime:echo' { }";
-    let result = parse(lex(source));
+    let result = parse(lex_with_locale_pack(source, &la_pack()));
     let err = result
         .errors
         .iter()
@@ -166,7 +173,7 @@ fn expression_ad_rejects_block_form() {
 #[test]
 fn json_literal_rejects_bare_identifier_key() {
     let source = r"fixum _ v ← { name: 1 }";
-    let result = parse(lex(source));
+    let result = parse(lex_with_locale_pack(source, &la_pack()));
     let err = result
         .errors
         .iter()
@@ -189,7 +196,7 @@ fn json_literal_rejects_bare_identifier_key() {
 fn json_literal_rejects_faber_keywords_as_values() {
     // verum/falsum/nihil are Faber keywords; JSON wants true/false/null.
     let source = r#"fixum _ v ← { "x": verum }"#;
-    let result = parse(lex(source));
+    let result = parse(lex_with_locale_pack(source, &la_pack()));
     let err = result
         .errors
         .iter()
@@ -273,7 +280,7 @@ const BRACE_INLINE_FIXTURE: &str = "functio f() → vacuum { fixum numerus x ←
 
 #[test]
 fn parser_bridge_normalizes_inline_comment_as_lex_diagnostic() {
-    let parse_result = parse(lex(BRACE_INLINE_FIXTURE));
+    let parse_result = parse(lex_with_locale_pack(BRACE_INLINE_FIXTURE, &la_pack()));
     assert!(!parse_result.success());
 
     let diagnostic = Diagnostic::from_parse_error("inline.fab", BRACE_INLINE_FIXTURE, &parse_result.errors[0]);
@@ -297,7 +304,7 @@ fn parser_bridge_normalizes_inline_comment_as_lex_diagnostic() {
 
 #[test]
 fn rejects_bare_sparsa() {
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let result = crate::driver::analyze_source(
         &session,
         "bare-sparsa.fab",
@@ -325,7 +332,7 @@ fn rejects_bare_sparsa() {
 #[test]
 fn retired_sic_conditional_reports_conditional_sic_removed() {
     let source = "fixum _ v ← c sic 1 secus 2";
-    let result = parse(lex(source));
+    let result = parse(lex_with_locale_pack(source, &la_pack()));
     let err = result
         .errors
         .iter()

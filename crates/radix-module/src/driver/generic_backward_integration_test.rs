@@ -29,7 +29,7 @@ use crate::driver::{
 use crate::mir::MirLoweringOptions;
 use crate::mir::lower_analyzed_unit;
 use crate::semantic::IndexExpr;
-use crate::test_support::test_session;
+use crate::test_support::test_session_la;
 
 /// Unwrap a driver bundle result, panicking with the codegen error message
 /// (`SpannedCodegenError` carries no `Debug` impl).
@@ -86,7 +86,7 @@ incipit {
 }
 "
     );
-    let session = test_session(Target::MirLlvm);
+    let session = test_session_la(Target::MirLlvm);
     let mut analysis = analyze_source(&session, "generic_backward_concrete.fab", &source, AnalyzeRequest::default())
         .expect("concrete generic backward reduction should analyze cleanly");
 
@@ -116,7 +116,7 @@ incipit {
 
 #[test]
 fn unresolved_generic_backward_template_is_not_executable() {
-    let session = test_session(Target::MirLlvm);
+    let session = test_session_la(Target::MirLlvm);
     let mut analysis = analyze_source(
         &session,
         "generic_backward_unresolved.fab",
@@ -146,7 +146,7 @@ fn unresolved_generic_backward_template_is_not_executable() {
 
 #[test]
 fn generic_backward_primal_is_deferred_without_a_concrete_call() {
-    let session = test_session(Target::MirLlvm);
+    let session = test_session_la(Target::MirLlvm);
     let mut analysis = analyze_source(
         &session,
         "generic_backward.fab",
@@ -164,7 +164,7 @@ fn generic_backward_primal_is_deferred_without_a_concrete_call() {
 
 #[test]
 fn generic_backward_template_stays_out_of_executable_mir() {
-    let session = test_session(Target::MirLlvm);
+    let session = test_session_la(Target::MirLlvm);
     let mut analysis = analyze_source(
         &session,
         "generic_backward_package_template.fab",
@@ -220,7 +220,7 @@ functio gradientes_simple_loss<magnitudo R, magnitudo C>(
 }
 "#;
 
-    let session = test_session(Target::MirLlvm);
+    let session = test_session_la(Target::MirLlvm);
     let mut analysis = analyze_source(&session, "generic_wrapper.fab", source, AnalyzeRequest::default())
         .expect("generic wrapper calling the generic companion must typecheck (OQ4)");
 
@@ -259,7 +259,7 @@ incipit {
 }
 "#;
 
-    let session = test_session(Target::MirLlvm);
+    let session = test_session_la(Target::MirLlvm);
     let mut analysis = analyze_source(&session, "generic_broadcast.fab", source, AnalyzeRequest::default())
         .expect("generic broadcast primal should analyze cleanly");
 
@@ -319,7 +319,7 @@ functio lane_sum(tensor<f32, [4]> x) → f32 {
 }
 "#;
 
-    let session = test_session(Target::MirLlvm);
+    let session = test_session_la(Target::MirLlvm);
     let mut analysis = analyze_source(&session, "unroll_lane_sum.fab", source, AnalyzeRequest::default())
         .expect("full-prefix unrolled range loop must analyze (SEM059.itera_loop flipped)");
 
@@ -383,7 +383,7 @@ incipit {
 }
 "#;
 
-    let session = test_session(Target::MirLlvm);
+    let session = test_session_la(Target::MirLlvm);
     let mut analysis = analyze_source(&session, "generic_unroll_lane_sum.fab", source, AnalyzeRequest::default())
         .expect("generic full-prefix range must analyze after concrete specialization");
     let lowered = expect_codegen_ok(
@@ -426,7 +426,7 @@ incipit {
 "#;
 
     let result = analyze_source(
-        &test_session(Target::MirLlvm),
+        &test_session_la(Target::MirLlvm),
         "generic_unroll_over_budget.fab",
         source,
         AnalyzeRequest::default(),
@@ -471,7 +471,7 @@ incipit {
 }
 "#;
 
-    let session = test_session(Target::MirLlvm);
+    let session = test_session_la(Target::MirLlvm);
     let mut analysis = analyze_source(&session, "generic_masked_mean.fab", source, AnalyzeRequest::default())
         .expect("generic caller-mask AIR instance must analyze cleanly");
     let bundle = expect_codegen_ok(
@@ -534,7 +534,7 @@ functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
 }
 "#;
 
-    let session = test_session(Target::MirLlvm);
+    let session = test_session_la(Target::MirLlvm);
     let mut analysis = analyze_source(&session, "unroll_masked_mean.fab", source, AnalyzeRequest::default())
         .expect("mask-mode unrolled range loop must analyze");
 

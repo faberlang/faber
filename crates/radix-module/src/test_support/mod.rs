@@ -90,6 +90,20 @@ pub fn test_session(target: Target) -> Session {
     Session::new(Config::default().with_target(target).with_dev_locale_root())
 }
 
+/// [`test_session`] with the built-in Latin (`la`) reader pack installed.
+///
+/// Tests whose source is the canonical Latin surface pick this session
+/// explicitly instead of relying on the pack-less default.
+#[must_use]
+pub fn test_session_la(target: Target) -> Session {
+    Session::new(
+        Config::default()
+            .with_target(target)
+            .with_dev_locale_root()
+            .with_latin_locale(),
+    )
+}
+
 /// Cargo-managed temp root for test fixtures: `<target-dir>/tmp/`.
 ///
 /// All test temp data must live under the cargo target tree so `cargo clean`

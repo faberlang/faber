@@ -3,12 +3,20 @@
 //! Contract: each target rejects syntax it cannot represent; supported syntax passes without target diagnostics.
 
 use super::*;
-use crate::lexer::lex;
+use crate::lexer::lex_with_locale_pack;
 use crate::parser::parse;
 
 /// Parse a source string into a program, or panic.
+
+/// The built-in Latin (`la`) reader pack: the canonical surface the parser
+/// tests below are written in.
+fn la_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("installed la pack should load")
+}
+
 fn parse_program(source: &str) -> (Program, crate::lexer::Interner) {
-    let result = parse(lex(source));
+    let result = parse(lex_with_locale_pack(source, &la_pack()));
     assert!(result.success(), "parse errors: {:?}", result.errors);
     (result.program.expect("program"), result.interner)
 }

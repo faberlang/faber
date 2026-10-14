@@ -1,6 +1,6 @@
 //! BB-5R oracle: bounded `textus<N>` identity, scalar access, and D7 bridges.
 
-use super::test_support::{analyze_and_get_diagnostics, compile_and_get_result, compile_for_target_and_get_result};
+use super::test_support::{analyze_and_get_diagnostics_la, compile_and_get_result_la, compile_for_target_and_get_result_la};
 use crate::codegen::Target;
 
 fn rust_code(result: crate::CompileResult) -> String {
@@ -12,7 +12,7 @@ fn rust_code(result: crate::CompileResult) -> String {
 
 #[test]
 fn bounded_textus_scalar_index_emits_o1_ascii_one() {
-    let result = compile_and_get_result(
+    let result = compile_and_get_result_la(
         r"functio probe(textus<32> xs) → ascii<1> {
     redde xs[0]
 }
@@ -39,7 +39,7 @@ incipit {
 
 #[test]
 fn bounded_textus_conversions_follow_d7() {
-    let diagnostics = analyze_and_get_diagnostics(
+    let diagnostics = analyze_and_get_diagnostics_la(
         r"typus TextusOcto = textus<8>
 
 functio bridges(textus<8> bounded, textus unbounded) → vacuum {
@@ -69,7 +69,7 @@ incipit {
     nota 0
 }";
     for target in [Target::HirTypeScript] {
-        let result = compile_for_target_and_get_result(source, target);
+        let result = compile_for_target_and_get_result_la(source, target);
         assert!(!result.success(), "target {target:?} must reject bounded textus");
         assert!(
             result
@@ -94,7 +94,7 @@ fn bounded_textus_is_carried_on_go() {
 incipit {
     nota 0
 }";
-    let result = compile_for_target_and_get_result(source, Target::HirGo);
+    let result = compile_for_target_and_get_result_la(source, Target::HirGo);
     assert!(result.success(), "Go must carry bounded textus: {:?}", result.diagnostics);
     let code = match &result.output {
         Some(crate::Output::Go(output)) => output.code.as_str(),
