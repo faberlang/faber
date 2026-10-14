@@ -1,7 +1,9 @@
 //! Blocking stdio leaf. Serves Latin `consolum:*` routes. No console handle.
 //!
-//! `print` is a language statement, not this leaf. EOF on `read_line` is an
-//! empty string (locked with the N2 acceptance proba).
+//! `print` is a language statement, not this leaf. EOF on `read_line` is still
+//! an empty string (locked with the N2 acceptance proba); Norma distinguishes
+//! EOF from a blank line by calling the non-consuming `consolum:desinit`
+//! probe first.
 
 #[cfg(test)]
 #[path = "stdio_test.rs"]
@@ -32,6 +34,7 @@ const ROUTES: &[&str] = &[
     "consolum:audit",
     "consolum:loquitur",
     "consolum:admonet",
+    "consolum:desinit",
 ];
 
 /// Whether `route` belongs to this leaf. Pure name lookup; runs no handler.
@@ -53,6 +56,7 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
         "consolum:audit" => stdin_is_tty(args),
         "consolum:loquitur" => stdout_is_tty(args),
         "consolum:admonet" => stderr_is_tty(args),
+        "consolum:desinit" => stdin_ended(args),
         _ => return None,
     };
     Some(result)
@@ -167,20 +171,40 @@ fn read_bytes(args: &[Arg]) -> Result<Reply, LeafError> {
 fn read_line(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "consolum:lege";
     empty_ok(ROUTE, args)?;
+    let mut stdin = io::stdin().lock();
+    read_line_from(&mut stdin)
+        .map(Reply::Str)
+        .map_err(|err| LeafError::from_io(ROUTE, "", &err))
+}
+
+/// Read one line from `reader`, stripping one trailing `\n` and then one
+/// trailing `\r`. At EOF this returns an empty string.
+fn read_line_from<R: BufRead>(reader: &mut R) -> io::Result<String> {
     let mut line = String::new();
-    match io::stdin().lock().read_line(&mut line) {
-        Ok(0) => Ok(Reply::Str(String::new())),
-        Ok(_) => {
-            if line.ends_with('\n') {
-                line.pop();
-                if line.ends_with('\r') {
-                    line.pop();
-                }
-            }
-            Ok(Reply::Str(line))
+    let read = reader.read_line(&mut line)?;
+    if read > 0 && line.ends_with('\n') {
+        line.pop();
+        if line.ends_with('\r') {
+            line.pop();
         }
-        Err(err) => Err(LeafError::from_io(ROUTE, "", &err)),
     }
+    Ok(line)
+}
+
+/// Non-consuming end-of-input probe: blocks until a byte arrives or the
+/// stream closes, then reports whether stdin has no more bytes. `fill_buf`
+/// consumes nothing, so a following `read_line` still sees the pending input.
+fn stdin_ended(args: &[Arg]) -> Result<Reply, LeafError> {
+    const ROUTE: &str = "consolum:desinit";
+    empty_ok(ROUTE, args)?;
+    let mut stdin = io::stdin().lock();
+    input_ended(&mut stdin)
+        .map(Reply::Bool)
+        .map_err(|err| LeafError::from_io(ROUTE, "", &err))
+}
+
+fn input_ended<R: BufRead>(reader: &mut R) -> io::Result<bool> {
+    Ok(reader.fill_buf()?.is_empty())
 }
 
 fn write_bytes(args: &[Arg]) -> Result<Reply, LeafError> {
