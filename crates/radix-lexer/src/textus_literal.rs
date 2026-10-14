@@ -71,7 +71,7 @@ fn decode_escapes(raw: &str, strict: bool) -> Result<String, TextusLiteralError>
 }
 
 /// Read `{H…}` after `\u`; `chars` advances only when the escape is well formed.
-fn unicode_escape(chars: &mut std::str::Chars<'_>) -> Option<char> {
+pub(crate) fn unicode_escape(chars: &mut std::str::Chars<'_>) -> Option<char> {
     const MAX_DIGITS: usize = 6;
 
     let mut ahead = chars.clone();
