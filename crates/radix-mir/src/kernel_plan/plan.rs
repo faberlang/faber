@@ -346,7 +346,11 @@ pub struct RopePlan {
     /// row rotates at its own position via the rank-2 `[rows, dim/2]`
     /// cos/sin tables. The mode is a typed fact of the kernel — the table
     /// operand shapes (rank-2 = per-row, rank-1 `[dim/2]` = single-position),
-    /// never inferred from text (A3).
+    /// never inferred from text (A3). Always `true` today because
+    /// single-position mode is not built yet; the flag is an unfinished
+    /// feature, not a dead flag (operator ruling 2026-10-13, need,
+    /// finding G-04). Do not delete it; gpu-reset decides whether
+    /// single-position mode exists.
     pub per_row: bool,
     /// The row count (per-row mode; the table row stride — each row's
     /// `dim/2`-entry angle segment). Zero in single-position mode.

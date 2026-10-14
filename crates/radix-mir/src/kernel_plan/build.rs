@@ -1622,6 +1622,10 @@ fn rope_plan_facts(
     if table_dims != [expected_rows, expected_pairs, 3] {
         return None;
     }
+    // WHY: `per_row` is always true today because single-position mode is
+    // not built yet; the flag is an unfinished feature, not a dead flag
+    // (operator ruling 2026-10-13, need, finding G-04). gpu-reset
+    // decides whether single-position mode exists; do not delete the flag.
     Some((pos, dim, width, true, expected_rows))
 }
 
