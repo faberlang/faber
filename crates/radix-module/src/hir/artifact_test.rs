@@ -489,6 +489,35 @@ fn octeti_zero_argument_type_form_survives_the_fhir_round_trip() {
 }
 
 #[test]
+fn closure_parameter_hole_survives_the_fhir_round_trip() {
+    // `_ m` is a closure parameter whose type the compiler infers from the
+    // call; the authored hole is recorded at a `ClosureParameter` site with
+    // the inferred witness. That is a legal hole slot, not an information-free
+    // hole the artifact must drop.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = concat!(
+        "+++\nlocale = \"en\"\n+++\n\n",
+        "main {\n",
+        "    const regex word \u{2190} \"[a-z]+\" \u{21a6} regex\n",
+        "    print word.replace(\"ab cd e\", _ m \u{2234} m.text())\n",
+        "}\n",
+    );
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "replace-closure.fab", source, AnalyzeRequest::default())
+        .expect("replace-closure fixture analyzes");
+    let artifact = from_analyzed(&original, "replace-closure", "replace-closure.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize replace-closure artifact");
+    load_fhir(&bytes).expect("replace-closure artifact must load");
+}
+
+#[test]
 fn transparent_alias_annotation_survives_the_fhir_round_trip() {
     // A transparent type alias used as an annotation (`type Signum = int`)
     // lowers to its resolved body at the HIR site while the authored form
