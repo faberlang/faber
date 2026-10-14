@@ -206,6 +206,14 @@ fn packet_facts_for(partition: &HostPartition) -> ArtifactPacketFacts {
     }
 }
 
+/// The compiler-owned neutral device entry of the fixture's single member
+/// kernel: `k<function id>`, here `k1` (ruling ca2499dc). Source spellings
+/// such as `scale_kernel` are decoration and never appear in device entry
+/// facts.
+fn fixture_kernel_entry(partition: &HostPartition) -> String {
+    partition.device_program.kernels[0].entry.clone()
+}
+
 /// The completeness gate result for the vertical fixture, exactly as the
 /// product path runs it.
 fn vertical_bundles(types: &mut TypeTable, interner: &mut Interner) -> Vec<RegionPreparationFacts> {
@@ -240,7 +248,7 @@ fn completeness_gate_derives_the_full_preparation_bundle() {
         region.members,
         vec![MemberKernel {
             kernel: MirFunctionId(1),
-            entry: "scale_kernel".to_owned(),
+            entry: fixture_kernel_entry(&partition),
         }]
     );
 
@@ -315,12 +323,12 @@ fn completeness_gate_fails_closed_on_missing_packet_entrypoint_symbol() {
             region: 1,
             kernel: MirFunctionId(1),
             entry,
-        }) if entry == "scale_kernel"
+        }) if entry == fixture_kernel_entry(&partition)
     ));
 
     // An empty emitted symbol is equally a completeness failure.
     packet.entrypoint_symbols.push(EntrypointSymbolFact {
-        entry: "scale_kernel".to_owned(),
+        entry: fixture_kernel_entry(&partition),
         symbol: String::new(),
     });
     assert!(matches!(
@@ -344,7 +352,7 @@ fn completeness_gate_fails_closed_on_missing_packet_reflection() {
             region: 1,
             kernel: MirFunctionId(1),
             entry,
-        }) if entry == "scale_kernel"
+        }) if entry == fixture_kernel_entry(&partition)
     ));
 
     // A reflection whose declared resource bindings disagree with the typed
