@@ -460,12 +460,18 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     /// True when any statement or terminator call targets a generic definition
     /// (the same guard `rewrite_for_call` applies). Cheap seed predicate; the
     /// scan phase re-walks matching functions for exact call-site metadata.
+    /// A `cursor_stream` runtime call names its generic generator through the
+    /// intrinsic's `DefId`, not a `MirCallee`, so it is matched here too.
     fn function_has_generic_callee(&self, function: &MirFunction) -> bool {
         function.blocks.iter().any(|block| {
             block.statements.iter().any(|statement| {
                 matches!(
                     &statement.kind,
                     MirStatementKind::Call { callee, .. } if self.is_generic_callee(callee)
+                ) || matches!(
+                    &statement.kind,
+                    MirStatementKind::RuntimeCall { call, .. }
+                        if self.is_generic_cursor_stream(&call.intrinsic)
                 )
             }) || matches!(
                 &block.terminator.kind,
@@ -504,7 +510,34 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                             });
                         }
                     }
-                    MirStatementKind::RuntimeCall { .. } | MirStatementKind::Construct { .. } => {}
+                    MirStatementKind::RuntimeCall { call, .. } => {
+                        // A generic generator call is not a `MirCallee`; its
+                        // template sits in the intrinsic. Instantiating it
+                        // here leaves the intrinsic's `DefId` in place: the
+                        // concrete instance keeps the template source, so the
+                        // runner's `DefId` index resolves it to the instance.
+                        // The destination is the cursor carrier, not the
+                        // template's element return type, so it is not a type
+                        // witness; the arguments bind the instance.
+                        if let MirIntrinsic::CursorStream(stream) = &call.intrinsic
+                            && self.generic_param_order.contains_key(&stream.callee)
+                        {
+                            let location = CallLocation::Statement(statement_index);
+                            sites.push(CallSite {
+                                function: function.id,
+                                block_index,
+                                location: location.clone(),
+                                destination: None,
+                                callee: MirCallee::Definition { source: stream.callee, type_args: Vec::new() },
+                                args: call.args.clone(),
+                                error_place: None,
+                                span: statement.span,
+                                scope: scope.clone(),
+                                shape_check: shape_check_before_call(function, block_index, &location, &call.args),
+                            });
+                        }
+                    }
+                    MirStatementKind::Construct { .. } => {}
                 }
             }
 
@@ -533,6 +566,13 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         matches!(
             callee,
             MirCallee::Definition { source, .. } if self.generic_param_order.contains_key(source)
+        )
+    }
+
+    fn is_generic_cursor_stream(&self, intrinsic: &MirIntrinsic) -> bool {
+        matches!(
+            intrinsic,
+            MirIntrinsic::CursorStream(stream) if self.generic_param_order.contains_key(&stream.callee)
         )
     }
 
