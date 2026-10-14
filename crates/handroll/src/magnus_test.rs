@@ -113,6 +113,99 @@ fn prop_mul_large_then_div_recovers_operand() {
     }
 }
 
+// ---- Karatsuba multiply: randomized equality with the schoolbook oracle -------------------
+
+/// Exactly `count` random limbs, normalized so the high limb is nonzero (or the value is zero).
+fn random_limbs_exact(g: &mut Gen, count: usize) -> Vec<u32> {
+    let mut limbs: Vec<u32> = (0..count).map(|_| super::lo(g.next())).collect();
+    super::trim(&mut limbs);
+    limbs
+}
+
+/// A random normalized magnitude of 1..=max limbs (zero appears when every limb trims away).
+fn random_limbs(g: &mut Gen, max: usize) -> Vec<u32> {
+    let count = usize::try_from(g.next() % u64::try_from(max).unwrap()).unwrap() + 1;
+    random_limbs_exact(g, count)
+}
+
+#[test]
+fn karatsuba_equals_schoolbook() {
+    let threshold = super::KARATSUBA_THRESHOLD;
+    let all_ones = vec![u32::MAX; 2 * threshold + 3];
+    let edges: [(Vec<u32>, Vec<u32>); 5] = [
+        (Vec::new(), all_ones.clone()),
+        (all_ones.clone(), Vec::new()),
+        (vec![u32::MAX], all_ones.clone()),
+        (all_ones.clone(), vec![u32::MAX]),
+        (vec![u32::MAX; threshold], vec![u32::MAX; threshold + 1]),
+    ];
+    for (a, b) in &edges {
+        let got = super::mul_mag(a, b);
+        let want = super::mul_mag_schoolbook(a, b);
+        assert_eq!(got, want, "edge {a:?} * {b:?}");
+    }
+    // Fixed-seed sweep: both operands land anywhere in 1..=200 limbs, so the lengths stride
+    // the threshold and its multiples, balanced and unequal.
+    let mut g = Gen(0xC6A1_0362);
+    for round in 0..1200 {
+        let a = if round % 4 == 0 {
+            vec![u32::MAX; 1 + round % (2 * threshold + 1)]
+        } else {
+            random_limbs(&mut g, 200)
+        };
+        let b = if round % 5 == 0 {
+            vec![u32::MAX; 1 + round % (2 * threshold + 1)]
+        } else {
+            random_limbs(&mut g, 200)
+        };
+        let got = super::mul_mag(&a, &b);
+        let want = super::mul_mag_schoolbook(&a, &b);
+        assert_eq!(got, want, "round {round}: {a:?} * {b:?}");
+    }
+    // The exact lengths around the crossover.
+    for &(la, lb) in &[
+        (threshold - 1, threshold - 1),
+        (threshold, threshold),
+        (threshold + 1, threshold + 1),
+        (threshold, 1),
+        (2 * threshold, threshold),
+        (2 * threshold + 1, threshold + 1),
+        (threshold + 7, 2 * threshold + 9),
+        (7 * threshold, 3 * threshold),
+    ] {
+        let a = random_limbs_exact(&mut g, la);
+        let b = random_limbs_exact(&mut g, lb);
+        let got = super::mul_mag(&a, &b);
+        let want = super::mul_mag_schoolbook(&a, &b);
+        assert_eq!(got, want, "{la} x {lb} limbs");
+    }
+}
+
+// ---- timing oracle (--release), reused by the later inf-conversion units -------------------
+
+#[test]
+#[ignore = "timing oracle: run with --release -- --ignored --nocapture"]
+fn magnus_scaling() {
+    let mut g = Gen(0x5CA1_AB1E);
+    for shift in 10..=16 {
+        let count = 1_usize << shift;
+        let a = random_limbs_exact(&mut g, count);
+        let b = random_limbs_exact(&mut g, count);
+        let mut samples = Vec::with_capacity(5);
+        for _ in 0..5 {
+            let started = std::time::Instant::now();
+            let product = super::mul_mag(&a, &b);
+            samples.push(started.elapsed());
+            std::hint::black_box(&product);
+        }
+        samples.sort_unstable();
+        println!(
+            "magnus_scaling mul 2^{shift} limbs: median {:?} min {:?} max {:?}",
+            samples[2], samples[0], samples[4]
+        );
+    }
+}
+
 #[test]
 fn prop_div_mod_floor_match_i128() {
     let mut g = Gen(3);
