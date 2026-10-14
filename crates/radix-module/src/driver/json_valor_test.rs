@@ -30,14 +30,13 @@ fn json_valor_literal_typechecks_as_valor_without_errors() {
 }
 
 #[test]
-fn json_valor_literal_empty_object_typechecks_as_valor() {
+fn json_valor_literal_empty_object_without_cell_is_named_error() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n    fixum _ e ← {}\n    nota e\n}";
-    let result = compile(&session, "empty.fab", source, ModuleCompileRequest::default());
-    assert!(
-        result.success(),
-        "expected empty object to typecheck, got: {:?}",
-        result.diagnostics
+    assert_compile_fails_with_issue(
+        &session,
+        "empty.fab",
+        "incipit {\n    fixum _ e ← {}\n    nota e\n}",
+        "inferred_constructor_no_expected_type",
     );
 }
 

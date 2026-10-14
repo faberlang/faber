@@ -1007,6 +1007,8 @@ mod cli_codegen_tests;
 mod compile_interaction_tests;
 #[path = "conversio_test.rs"]
 mod conversio_tests;
+#[path = "empty_literal_cell_test.rs"]
+mod empty_literal_cell_tests;
 #[path = "frontmatter_locale_test.rs"]
 mod frontmatter_locale_tests;
 #[path = "inferred_set_cell_test.rs"]
