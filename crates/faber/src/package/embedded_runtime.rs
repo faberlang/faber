@@ -14,9 +14,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 include!(concat!(env!("OUT_DIR"), "/runtime_embedded.rs"));
 
-/// Cache-directory override for the extracted runtime.
-pub(crate) const CACHE_HOME_ENV: &str = "FABER_CACHE_HOME";
-
 const COMPLETE_MARKER: &str = ".faber-runtime-complete";
 
 /// Repository-shaped root holding the embedded runtime sources, extracted on
@@ -37,9 +34,6 @@ fn embedded_runtime_root_in(parent: &Path) -> Option<PathBuf> {
 
 fn cache_dir() -> PathBuf {
     let nonempty = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
-    if let Some(dir) = nonempty(CACHE_HOME_ENV) {
-        return PathBuf::from(dir);
-    }
     if let Some(dir) = nonempty("XDG_CACHE_HOME") {
         return PathBuf::from(dir).join("faber");
     }
