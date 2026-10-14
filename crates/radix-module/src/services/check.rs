@@ -57,10 +57,43 @@ pub fn check_diagnostics_for_source_with_locale_pack(
             result.diagnostics.insert(0, note);
         }
     }
+    result.diagnostics = normalize_locale002_notes(result.diagnostics);
     result
 }
 
-fn source_declares_locale(name: &str, source: &str) -> bool {
+/// Keep one LOCALE002 note per file and hoist those notes ahead of the other
+/// diagnostics.
+///
+/// WHY: the wrong-locale reading explains the very errors it hides behind, so
+/// it must be reported once, first; a second keyword-level LOCALE002 for the
+/// same file repeats the reading instead of adding a fact, so it is dropped.
+#[must_use]
+pub fn normalize_locale002_notes(
+    diagnostics: Vec<crate::diagnostics::Diagnostic>,
+) -> Vec<crate::diagnostics::Diagnostic> {
+    let mut notes = Vec::new();
+    let mut rest = Vec::new();
+    let mut noted_files = std::collections::BTreeSet::new();
+    for diagnostic in diagnostics {
+        if diagnostic.code == Some("LOCALE002") {
+            if noted_files.insert(diagnostic.file.clone()) {
+                notes.push(diagnostic);
+            }
+        } else {
+            rest.push(diagnostic);
+        }
+    }
+    notes.extend(rest);
+    notes
+}
+
+/// Whether `source` declares its reader locale in `+++` frontmatter.
+///
+/// WHY: the wrong-locale advisory may only claim the source "has no declared
+/// locale" when that is true. Callers that assemble diagnostics outside this
+/// service use the same peel to suppress the note for declared sources.
+#[must_use]
+pub fn source_declares_locale(name: &str, source: &str) -> bool {
     crate::driver::peel_raw_source(name, source)
         .ok()
         .and_then(|peeled| {
