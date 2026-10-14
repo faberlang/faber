@@ -1,8 +1,8 @@
 //! Unit tests for the D19.6 test-only shuffle (companion to `shuffle.rs`).
 //!
-//! `shuffle_unordered` reads a process-cached env var, so exercising two
+//! `shuffle_unordered` reads a process-cached seed, so exercising two
 //! different seeds within one test binary goes through the pure `permute`
-//! helper directly rather than mutating the environment mid-run.
+//! helper directly rather than reconfiguring the process mid-run.
 
 use super::shuffle::permute;
 
@@ -74,12 +74,10 @@ fn permutation_is_a_rearrangement_not_a_data_mutation() {
 }
 
 #[test]
-fn seed_resolution_unset_is_random_zero_is_off_number_is_pinned() {
-    use super::shuffle::resolve_seed;
-    assert_eq!(resolve_seed(Some("0")), None, "0 turns the shuffle off");
-    assert_eq!(resolve_seed(Some("7")), Some(7));
-    assert!(resolve_seed(None).is_some(), "unset shuffles by default");
-    assert!(resolve_seed(Some("not a number")).is_some());
+fn seed_from_flag_zero_is_off_number_is_pinned() {
+    use super::shuffle::seed_from_flag;
+    assert_eq!(seed_from_flag(0), None, "0 turns the shuffle off");
+    assert_eq!(seed_from_flag(7), Some(7));
 }
 
 #[test]

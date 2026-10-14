@@ -40,6 +40,7 @@ pub fn reset_execution_state() {
     faber_leaf::reset_execution_state();
 }
 pub use routes::serve_route;
+pub use shuffle::configure_shuffle_seed;
 pub use stats::{FunctionStats, IntrinsicStats, RunnerStats};
 pub use value::{FieldOrder, MapKey, Value};
 
