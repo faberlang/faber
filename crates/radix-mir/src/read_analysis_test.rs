@@ -338,3 +338,109 @@ fn temp_directly_read_traces_extent_read_of_temp() {
         "a temp read only by a TensorExtent must count as directly read"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Index-operand reads: a `MirProjection::Index` carries a live operand in
+// operand and destination positions alike.
+// ---------------------------------------------------------------------------
+
+/// Single-block function shape for the index-operand tests: local 1 is the
+/// projected base and temp 0 is the read under test.
+fn index_operand_function(statements: Vec<MirStatement>, terminator: MirTerminator) -> MirFunction {
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: vec![MirLocal {
+            id: MirLocalId(1),
+            name: None,
+            ty: MirType::semantic(TypeId(0)),
+            mutable: false,
+            span: Span::default(),
+        }],
+        temps: vec![MirTemp {
+            id: MirTempId(0),
+            ty: MirType::semantic(TypeId(0)),
+            span: Span::default(),
+        }],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements,
+            terminator,
+            span: Span::default(),
+        }],
+        return_ty: MirType::semantic(TypeId(0)),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    }
+}
+
+/// The `Local(1)[Index(Temp(0))]` place every index-operand test projects.
+fn index_operand_place() -> MirPlace {
+    MirPlace {
+        base: MirPlaceBase::Local(MirLocalId(1)),
+        projections: vec![MirProjection::Index(MirOperand::Temp(MirTempId(0)))],
+    }
+}
+
+fn return_none_terminator() -> MirTerminator {
+    MirTerminator {
+        kind: MirTerminatorKind::Return(None),
+        span: Span::default(),
+    }
+}
+
+#[test]
+fn index_operand_temp_counts_in_returned_place() {
+    let terminator = MirTerminator {
+        kind: MirTerminatorKind::Return(Some(MirOperand::Place(index_operand_place()))),
+        span: Span::default(),
+    };
+    let function = index_operand_function(Vec::new(), terminator);
+    assert!(temp_directly_read(&function, MirTempId(0)));
+}
+
+#[test]
+fn index_operand_temp_counts_in_assign_destination() {
+    let statement = MirStatement {
+        kind: MirStatementKind::Assign {
+            place: index_operand_place(),
+            value: test_value(MirValueKind::Operand(MirOperand::Constant(
+                MirConstant::Int(0),
+            ))),
+        },
+        span: Span::default(),
+    };
+    let function = index_operand_function(vec![statement], return_none_terminator());
+    assert!(temp_directly_read(&function, MirTempId(0)));
+}
+
+#[test]
+fn index_operand_temp_counts_in_call_destination() {
+    let mut call = test_call(MirCallee::Function(MirFunctionId(0)), Vec::new());
+    let MirStatementKind::Call { destination, .. } = &mut call.kind else {
+        panic!("test_call builds a Call statement");
+    };
+    *destination = Some(index_operand_place());
+    let function = index_operand_function(vec![call], return_none_terminator());
+    assert!(temp_directly_read(&function, MirTempId(0)));
+}
+
+#[test]
+fn index_operand_temp_bare_destination_stays_a_write() {
+    let statement = MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::temp(MirTempId(0)),
+            value: test_value(MirValueKind::Operand(MirOperand::Constant(
+                MirConstant::Int(0),
+            ))),
+        },
+        span: Span::default(),
+    };
+    let function = index_operand_function(vec![statement], return_none_terminator());
+    assert!(!temp_directly_read(&function, MirTempId(0)));
+}

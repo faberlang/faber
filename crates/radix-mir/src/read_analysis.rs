@@ -19,7 +19,10 @@
 //! - `Option`/`Closure` values and `Keyed` aggregate keys count
 //!   (`kernel_decomposition`'s narrow walker did not descend into them);
 //! - terminators cover `Return(Some)`, `ReturnError`, `Branch`, `Switch`,
-//!   and `TryCall`.
+//!   and `TryCall`;
+//! - a place's `Index` projections count as reads of their operand in
+//!   operand positions and in statement/terminator destinations alike (the
+//!   destination's base slot stays a write).
 //! Broader reads are the conservative direction: a destination that reads
 //! more is less likely to be skipped as dead, so no value that was kept is
 //! ever dropped. The consumers' test suites and the exempla corpus prove the
@@ -28,8 +31,8 @@
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirCallee, MirCollectionOp, MirFunction,
     MirIntrinsic, MirLocalId, MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirPlaceBase,
-    MirRuntimeCall, MirStatement, MirStatementKind, MirTempId, MirTerminatorKind, MirValue,
-    MirValueKind,
+    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTempId, MirTerminatorKind,
+    MirValue, MirValueKind,
 };
 use rustc_hash::FxHashSet;
 
@@ -441,16 +444,35 @@ pub(crate) fn temp_directly_read(function: &MirFunction, temp: MirTempId) -> boo
     false
 }
 
-/// Whether a statement reads the given temp in any operand or value position
-/// (the statement's own destination is a write, never a read).
+/// Whether a statement reads the given temp in any operand or value position,
+/// or through an index operand of its destination place (the destination's
+/// base slot is a write, never a read).
 fn statement_reads_temp(statement: &MirStatement, temp: MirTempId) -> bool {
     match &statement.kind {
-        MirStatementKind::Assign { value, .. } => value_reads_temp(value, temp),
-        MirStatementKind::Call { callee, args, .. } => {
-            callee_reads_temp(callee, temp) || operand_list_reads_temp(args, temp)
+        MirStatementKind::Assign { place, value } => {
+            place_index_reads_temp(place, temp) || value_reads_temp(value, temp)
         }
-        MirStatementKind::RuntimeCall { call, .. } => operand_list_reads_temp(&call.args, temp),
-        MirStatementKind::Construct { aggregate, .. } => aggregate_reads_temp(aggregate, temp),
+        MirStatementKind::Call {
+            destination,
+            callee,
+            args,
+        } => {
+            destination
+                .as_ref()
+                .is_some_and(|place| place_index_reads_temp(place, temp))
+                || callee_reads_temp(callee, temp)
+                || operand_list_reads_temp(args, temp)
+        }
+        MirStatementKind::RuntimeCall { destination, call } => {
+            destination
+                .as_ref()
+                .is_some_and(|place| place_index_reads_temp(place, temp))
+                || operand_list_reads_temp(&call.args, temp)
+        }
+        MirStatementKind::Construct {
+            destination,
+            aggregate,
+        } => place_index_reads_temp(destination, temp) || aggregate_reads_temp(aggregate, temp),
     }
 }
 
@@ -526,14 +548,26 @@ fn option_chain_link_reads_temp(link: &MirOptionChainLink, temp: MirTempId) -> b
     }
 }
 
-/// Whether a terminator reads the given temp.
+/// Whether a terminator reads the given temp, including index operands of a
+/// `TryCall` destination and error place.
 fn terminator_reads_temp(terminator: &MirTerminatorKind, temp: MirTempId) -> bool {
     match terminator {
         MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
             operand_reads_temp(operand, temp)
         }
-        MirTerminatorKind::TryCall { callee, args, .. } => {
-            callee_reads_temp(callee, temp) || operand_list_reads_temp(args, temp)
+        MirTerminatorKind::TryCall {
+            destination,
+            callee,
+            args,
+            error_place,
+            ..
+        } => {
+            destination
+                .as_ref()
+                .is_some_and(|place| place_index_reads_temp(place, temp))
+                || place_index_reads_temp(error_place, temp)
+                || callee_reads_temp(callee, temp)
+                || operand_list_reads_temp(args, temp)
         }
         MirTerminatorKind::Return(None)
         | MirTerminatorKind::Goto(_)
@@ -562,12 +596,32 @@ fn operand_list_reads_temp(operands: &[MirOperand], temp: MirTempId) -> bool {
         .any(|operand| operand_reads_temp(operand, temp))
 }
 
-/// Whether an operand reads the given temp as a plain base slot. A value id
-/// was already scanned at its defining statement; a constant reads nothing.
+/// Whether a place's index projections read the given temp. Field, variant
+/// field, closure capture, shared-cell, lane, and matrix-cell projections
+/// address storage and read nothing; only [`MirProjection::Index`] carries a
+/// live operand. Nested places recurse through [`operand_reads_temp`].
+fn place_index_reads_temp(place: &MirPlace, temp: MirTempId) -> bool {
+    place.projections.iter().any(|projection| match projection {
+        MirProjection::Index(operand) => operand_reads_temp(operand, temp),
+        MirProjection::Field(_)
+        | MirProjection::VariantField { .. }
+        | MirProjection::ClosureCapture { .. }
+        | MirProjection::SharedCell
+        | MirProjection::VectorLane(_)
+        | MirProjection::MatrixCell { .. } => false,
+    })
+}
+
+/// Whether an operand reads the given temp: a bare temp, a place whose base
+/// is the temp, or a place whose index projections read it. A value id was
+/// already scanned at its defining statement; a constant reads nothing.
 fn operand_reads_temp(operand: &MirOperand, temp: MirTempId) -> bool {
     match operand {
         MirOperand::Temp(t) => *t == temp,
-        MirOperand::Place(place) => matches!(place.base, MirPlaceBase::Temp(t) if t == temp),
+        MirOperand::Place(place) => {
+            matches!(place.base, MirPlaceBase::Temp(t) if t == temp)
+                || place_index_reads_temp(place, temp)
+        }
         MirOperand::Value(_) | MirOperand::Constant(_) => false,
     }
 }
