@@ -1225,3 +1225,36 @@ fn ledger_value_eq_map_ignores_order() {
     let right = Value::Map(Rc::new(RefCell::new(second)));
     assert!(values_equal(&left, &right));
 }
+
+#[test]
+fn ledger_value_display_follows_insertion_order() {
+    let interner = radix_lexer::Interner::new();
+    let empty = rustc_hash::FxHashMap::default();
+    let order = FieldOrder::new(&empty, &empty);
+    let value = ledger_value_eq_fixture(&[("b", 2), ("a", 1), ("c", 3)]);
+    assert_eq!(
+        value.display(&interner, order, Span::default()).unwrap(),
+        r#"{"b": 2, "a": 1, "c": 3}"#
+    );
+}
+
+#[test]
+fn ledger_value_display_after_remove_and_readd() {
+    let interner = radix_lexer::Interner::new();
+    let empty = rustc_hash::FxHashMap::default();
+    let order = FieldOrder::new(&empty, &empty);
+    let mut ledger = LedgerValue::new();
+    ledger.insert(MapKey::Str("a".to_owned()), Value::Int(1));
+    ledger.insert(MapKey::Str("b".to_owned()), Value::Int(2));
+    ledger.insert(MapKey::Str("c".to_owned()), Value::Int(3));
+    assert_eq!(
+        ledger.remove(&MapKey::Str("b".to_owned())),
+        Some(Value::Int(2))
+    );
+    ledger.insert(MapKey::Str("b".to_owned()), Value::Int(7));
+    let value = Value::Ledger(Rc::new(RefCell::new(ledger)));
+    assert_eq!(
+        value.display(&interner, order, Span::default()).unwrap(),
+        r#"{"a": 1, "c": 3, "b": 7}"#
+    );
+}
