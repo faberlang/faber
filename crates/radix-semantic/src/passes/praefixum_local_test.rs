@@ -17,7 +17,7 @@
 
 use super::praefixum::{PraefixumSiteKind, evaluation_order, sites};
 use crate::SemanticError;
-use crate::test_support::{analyze_source, assert_rejects_with_issue, issue};
+use crate::test_support::{analyze_source_la, assert_rejects_with_issue_la, issue};
 
 fn arg<'a>(err: &'a SemanticError, name: &str) -> Option<&'a str> {
     err.args
@@ -27,7 +27,7 @@ fn arg<'a>(err: &'a SemanticError, name: &str) -> Option<&'a str> {
 }
 
 fn rejection(source: &str, expected: &str) -> SemanticError {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     result
         .diagnostics
         .iter()
@@ -37,7 +37,7 @@ fn rejection(source: &str, expected: &str) -> SemanticError {
 }
 
 fn assert_clean(source: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
 
@@ -64,11 +64,11 @@ fn local_site_works_in_a_function_a_method_and_a_nested_body() {
 
 #[test]
 fn runtime_store_stays_outside_a_constant() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "incipit {\n    fixum numerus n ← praefixum {\n        redde 1\n    }\n}\n",
         "praefixum_outside_constant",
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "incipit {\n    varia numerus n ← 0\n    n ← praefixum {\n        redde 1\n    }\n}\n",
         "praefixum_outside_constant",
     );
@@ -76,7 +76,7 @@ fn runtime_store_stays_outside_a_constant() {
 
 #[test]
 fn praefixum_as_an_operand_stays_outside_a_constant() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "incipit {\n    fixum numerus n = 1 + praefixum {\n        redde 1\n    }\n}\n",
         "praefixum_outside_constant",
     );
@@ -211,7 +211,7 @@ fn a_local_body_may_not_open_ad() {
 
 #[test]
 fn local_sites_follow_the_module_sites_and_nested_run_first() {
-    let fixture = analyze_source(
+    let fixture = analyze_source_la(
         "fixum numerus M = praefixum {\n    redde 1\n}\n\
          functio f() → numerus {\n    fixum numerus a = praefixum {\n        fixum numerus b = praefixum {\n            redde 2\n        }\n        redde b + 1\n    }\n    redde a\n}\n\
          incipit {\n    nota f()\n}\n",
@@ -234,7 +234,7 @@ fn local_sites_follow_the_module_sites_and_nested_run_first() {
 
 #[test]
 fn a_caller_waits_for_the_local_site_inside_its_callee() {
-    let fixture = analyze_source(
+    let fixture = analyze_source_la(
         "fixum numerus SUMMA = praefixum {\n    redde ima()\n}\n\
          functio ima() → numerus {\n    fixum numerus k = praefixum {\n        redde 4\n    }\n    redde k * 2\n}\n\
          incipit {\n    nota SUMMA\n}\n",
@@ -251,7 +251,7 @@ fn a_caller_waits_for_the_local_site_inside_its_callee() {
 
 #[test]
 fn a_local_site_that_reads_its_own_caller_is_a_cycle() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "fixum numerus SUMMA = praefixum {\n    redde ima()\n}\n\
          functio ima() → numerus {\n    fixum numerus k = praefixum {\n        redde SUMMA\n    }\n    redde k\n}\n",
         "constant_cycle",

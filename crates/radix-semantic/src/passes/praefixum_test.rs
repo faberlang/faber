@@ -13,7 +13,7 @@
 
 use super::praefixum::evaluation_order;
 use crate::SemanticError;
-use crate::test_support::{analyze_source, assert_rejects_with_issue, issue};
+use crate::test_support::{analyze_source_la, assert_rejects_with_issue_la, issue};
 
 fn arg<'a>(err: &'a SemanticError, name: &str) -> Option<&'a str> {
     err.args
@@ -24,7 +24,7 @@ fn arg<'a>(err: &'a SemanticError, name: &str) -> Option<&'a str> {
 
 /// The single error diagnostic carrying `expected`.
 fn rejection(source: &str, expected: &str) -> SemanticError {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     result
         .diagnostics
         .iter()
@@ -35,7 +35,7 @@ fn rejection(source: &str, expected: &str) -> SemanticError {
 
 #[test]
 fn loop_body_with_callee_is_accepted() {
-    let result = analyze_source(
+    let result = analyze_source_la(
         "functio quadratum(numerus n) → numerus {\n    redde n * n\n}\n\
          fixum numerus SUMMA = praefixum {\n    varia numerus s ← 0\n    \
          itera ab 1‥4 fixum i {\n        s ← s + quadratum(i)\n    }\n    redde s\n}\n",
@@ -45,7 +45,7 @@ fn loop_body_with_callee_is_accepted() {
 
 #[test]
 fn result_must_type_check_as_the_declared_type() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "fixum numerus N = praefixum {\n    redde \"non numerus\"\n}\n",
         "return_type_mismatch",
     );
@@ -53,7 +53,7 @@ fn result_must_type_check_as_the_declared_type() {
 
 #[test]
 fn praefixum_outside_a_static_is_rejected() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "incipit {\n    fixum numerus n ← praefixum {\n        redde 1\n    }\n}\n",
         "praefixum_outside_constant",
     );
@@ -104,7 +104,7 @@ fn output_is_forbidden() {
 
 #[test]
 fn self_reference_is_a_cycle() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "fixum numerus A = praefixum {\n    redde A + 1\n}\n",
         "constant_cycle",
     );
@@ -112,7 +112,7 @@ fn self_reference_is_a_cycle() {
 
 #[test]
 fn cycle_through_a_callee_is_rejected() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "functio lege_a() → numerus {\n    redde A\n}\n\
          fixum numerus A = praefixum {\n    redde lege_a() + 1\n}\n",
         "constant_cycle",
@@ -121,7 +121,7 @@ fn cycle_through_a_callee_is_rejected() {
 
 #[test]
 fn evaluation_order_follows_static_reads() {
-    let fixture = analyze_source(
+    let fixture = analyze_source_la(
         "fixum numerus B = praefixum {\n    redde A * 2\n}\n\
          fixum numerus C = A + 1\n\
          fixum numerus A = praefixum {\n    redde 3\n}\n",
@@ -148,7 +148,7 @@ mod imported {
         InterfaceTypeSnapshot,
     };
     use crate::passes::visibility_annotation::VisibilityTier::Publica;
-    use crate::test_support::{AnalyzedFixture, analyze_source_with_import_contract};
+    use crate::test_support::{AnalyzedFixture, analyze_source_with_import_contract_la};
     use crate::{DefId, Primitive};
     use radix_hir::{HirItemKind, HirModule};
     use radix_lexer::Interner;
@@ -182,7 +182,7 @@ mod imported {
             .into_iter()
             .map(|name| (name.to_owned(), Publica))
             .collect();
-        let fixture = analyze_source_with_import_contract(
+        let fixture = analyze_source_with_import_contract_la(
             source,
             BTreeMap::from([("ns".to_owned(), exports)]),
             BTreeMap::from([("ns".to_owned(), interface)]),

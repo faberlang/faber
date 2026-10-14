@@ -21,7 +21,7 @@ fn diagnostic_facts(diagnostics: &[SemanticError]) -> Vec<(SemanticErrorKind, Op
 }
 
 fn assert_rejects(source: &str) {
-    let result = crate::test_support::analyze_source(source);
+    let result = crate::test_support::analyze_source_la(source);
     assert!(result.is_err(), "expected semantic rejection");
     assert!(
         result.diagnostics.iter().any(is_return_path_error),
@@ -31,7 +31,7 @@ fn assert_rejects(source: &str) {
 }
 
 fn assert_accepts(source: &str) {
-    let result = crate::test_support::analyze_source(source);
+    let result = crate::test_support::analyze_source_la(source);
     let other_errors: Vec<_> = result
         .diagnostics
         .iter()
@@ -308,7 +308,7 @@ fn diagnostic_uses_missing_return_kind() {
     // The diagnostic reuses the `MissingReturn` kind / `SEM033` code rather
     // than introducing a new variant, so tooling that matches on the code
     // keeps working.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         "functio f(bivalens b) → numerus { si b ergo redde 1 }",
     );
     let diag = result

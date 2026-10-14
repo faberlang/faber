@@ -4,11 +4,11 @@
 //! sources usable. Own transfer remains consuming, and nested markers stay
 //! rejected at the type boundary.
 
-use crate::test_support::{analyze_ok, assert_rejects_with_issue};
+use crate::test_support::{analyze_ok_la, assert_rejects_with_issue_la};
 
 #[test]
 fn copy_bind_is_independent_and_source_stays_live() {
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 incipit {
     fixum lista<numerus> source ← [1, 2, 3]
@@ -22,7 +22,7 @@ incipit {
 
 #[test]
 fn copy_assignment_leaves_source_live() {
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 incipit {
     fixum lista<numerus> source ← own [1, 2, 3]
@@ -36,7 +36,7 @@ incipit {
 
 #[test]
 fn copy_parameter_entry_leaves_caller_source_live() {
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 functio append(copy lista<numerus> xs) → vacuum {
     varia lista<numerus> local ← copy xs
@@ -53,7 +53,7 @@ incipit {
 
 #[test]
 fn copy_bind_through_to_own_parameter_is_explicit() {
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 functio take(own lista<numerus> xs) → vacuum {
     nota xs.longitudo()
@@ -70,7 +70,7 @@ incipit {
 
 #[test]
 fn nested_access_marker_rejects_with_structured_issue() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "incipit { fixum lista<copy numerus> xs }",
         "nested_access_marker",
     );
@@ -78,5 +78,5 @@ fn nested_access_marker_rejects_with_structured_issue() {
 
 #[test]
 fn copy_expression_form_does_not_exist() {
-    assert_rejects_with_issue("incipit { nota copy([1, 2, 3]) }", "undefined_name");
+    assert_rejects_with_issue_la("incipit { nota copy([1, 2, 3]) }", "undefined_name");
 }

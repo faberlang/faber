@@ -5,12 +5,13 @@
 //! on the MU-1 baseline tests.
 
 use crate::test_support::{
-    analyze_ok, analyze_source, analyze_source_with_config, assert_rejects_with_issue, issue,
+    analyze_ok_la, analyze_source_la, analyze_source_with_config_la, assert_rejects_with_issue_la,
+    issue,
 };
 use crate::{ISSUE_MUT_LOCAL, PassConfig};
 
 fn assert_language_rejects(source: &str, expected: &str) {
-    let result = analyze_source_with_config(source, PassConfig::base());
+    let result = analyze_source_with_config_la(source, PassConfig::base());
     assert!(
         !result.is_ok(),
         "language analysis expected {expected:?}, got: {:?}",
@@ -27,7 +28,7 @@ fn assert_language_rejects(source: &str, expected: &str) {
 }
 
 fn assert_language_accepts(source: &str) {
-    let result = analyze_source_with_config(source, PassConfig::base());
+    let result = analyze_source_with_config_la(source, PassConfig::base());
     assert!(
         result.is_ok(),
         "language analysis expected acceptance, got: {:?}",
@@ -36,7 +37,7 @@ fn assert_language_accepts(source: &str) {
 }
 
 fn assert_has_issue(source: &str, expected: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(
         result
             .diagnostics
@@ -49,7 +50,7 @@ fn assert_has_issue(source: &str, expected: &str) {
 
 #[test]
 fn mut_local_parses_with_discouraged_warning() {
-    let result = analyze_ok(
+    let result = analyze_ok_la(
         r"
 incipit {
     varia in lista<numerus> xs ← [1, 2, 3]
@@ -69,7 +70,7 @@ incipit {
 
 #[test]
 fn mut_param_does_not_warn_as_a_local() {
-    let result = analyze_ok(
+    let result = analyze_ok_la(
         r"
 functio poke(in lista<numerus> xs) → vacuum {
     xs.appende(4)
@@ -92,7 +93,7 @@ incipit {
 
 #[test]
 fn mut_local_then_use_source_is_sem052() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
@@ -118,7 +119,7 @@ incipit {
 
 #[test]
 fn two_mut_locals_from_one_source_conflict() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
@@ -146,7 +147,7 @@ incipit {
 
 #[test]
 fn mut_local_then_write_source_is_sem052() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
@@ -161,7 +162,7 @@ incipit {
 
 #[test]
 fn ref_local_then_mut_local_conflicts() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
@@ -177,7 +178,7 @@ incipit {
 
 #[test]
 fn overlapping_mut_args_conflict() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 functio swap(in lista<numerus> a, in lista<numerus> b) → vacuum {
     a.appende(1)
@@ -207,7 +208,7 @@ incipit {
 
 #[test]
 fn sequential_mut_param_use_stays_legal() {
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 functio poke(in lista<numerus> xs) → vacuum {
     xs.appende(4)
@@ -223,7 +224,7 @@ incipit {
 
 #[test]
 fn unmarked_alias_is_not_an_exclusive_borrow() {
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
@@ -246,7 +247,7 @@ incipit {
 ",
         ISSUE_MUT_LOCAL,
     );
-    let result = analyze_source(
+    let result = analyze_source_la(
         r"
 incipit {
     varia in lista<numerus> xs ← [1, 2, 3]
@@ -279,7 +280,7 @@ incipit {
 
 #[test]
 fn scalar_assignment_between_mut_params_retains_no_borrow() {
-    let _ = analyze_ok(MUT_SCALAR_SWAP);
+    let _ = analyze_ok_la(MUT_SCALAR_SWAP);
     assert_language_accepts(MUT_SCALAR_SWAP);
     let source = r"
 functio copy_then_set(in numerus a, in numerus b) → vacuum {
@@ -292,7 +293,7 @@ incipit {
     copy_then_set(in x, in y)
 }
 ";
-    let _ = analyze_ok(source);
+    let _ = analyze_ok_la(source);
     assert_language_accepts(source);
 }
 
@@ -312,7 +313,7 @@ incipit {
     rotate(in x, in y, in z)
 }
 ";
-    let _ = analyze_ok(source);
+    let _ = analyze_ok_la(source);
     assert_language_accepts(source);
 }
 
@@ -329,13 +330,13 @@ incipit {
     swap(in x, in x)
 }
 ";
-    assert_rejects_with_issue(source, "mutable_borrow_conflict");
+    assert_rejects_with_issue_la(source, "mutable_borrow_conflict");
     assert_language_rejects(source, "mutable_borrow_conflict");
 }
 
 #[test]
 fn borrow_conflict_names_the_place_whose_borrow_is_live() {
-    let result = analyze_source(
+    let result = analyze_source_la(
         r"
 functio swap(in numerus a, in numerus b) → vacuum {
     a ← b
@@ -371,12 +372,12 @@ incipit {
     nota small
 }
 ";
-    assert_rejects_with_issue(source, "mut_argument_type_mismatch");
+    assert_rejects_with_issue_la(source, "mut_argument_type_mismatch");
 }
 
 #[test]
 fn exact_width_cell_passed_to_mut_param_is_accepted() {
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 functio setit(in u8 x) → vacuum {
     x ← 200
@@ -388,7 +389,7 @@ incipit {
 }
 ",
     );
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 functio setit(in numerus x) → vacuum {
     x ← 300
