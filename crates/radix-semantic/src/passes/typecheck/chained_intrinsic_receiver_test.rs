@@ -2,7 +2,7 @@
 //! call result checks under a non-la reader pack.
 //!
 //! The numeric-twin probe checks the receiver of a twin-named method
-//! (`added`, `subtract`, `multiply`, ...) to learn its type. A checked
+//! (`added`, `subtracted`, `multiplied`, ...) to learn its type. A checked
 //! intrinsic call writes its canonical method symbol back to the HIR, so a
 //! second check of the same receiver saw the canonical Latin spelling under
 //! the en pack and rejected it as `unknown_method`. The probe now hands its
@@ -31,7 +31,7 @@ fn accepted_in_en(source: &str) {
 fn vector_added_then_multiply_chain_checks() {
     accepted_in_en(
         "fn t(vector<f32, 4> a, vector<f32, 4> b, vector<f32, 4> c) → vector<f32, 4> {
-    return a.added(b).multiply(c)
+    return a.added(b).multiplied(c)
 }",
     );
 }
@@ -40,7 +40,7 @@ fn vector_added_then_multiply_chain_checks() {
 fn vector_subtract_then_multiply_chain_checks() {
     accepted_in_en(
         "fn t(vector<f32, 4> a, vector<f32, 4> b) → vector<f32, 4> {
-    return a.subtract(b).multiply(b)
+    return a.subtracted(b).multiplied(b)
 }",
     );
 }
@@ -49,7 +49,7 @@ fn vector_subtract_then_multiply_chain_checks() {
 fn vector_chain_through_alias_spelling_checks() {
     accepted_in_en(
         "fn t(vf32[4] a, vf32[4] b, vf32[4] c) → vf32[4] {
-    return a.multiply(b).added(c).subtract(a)
+    return a.multiplied(b).added(c).subtracted(a)
 }",
     );
 }
@@ -58,7 +58,7 @@ fn vector_chain_through_alias_spelling_checks() {
 fn vector_chain_ending_in_a_scalar_result_checks() {
     accepted_in_en(
         "fn t(vector<f32, 4> a, vector<f32, 4> b) → f32 {
-    return a.added(b).multiply(b).dot(a)
+    return a.added(b).multiplied(b).dot(a)
 }",
     );
 }
