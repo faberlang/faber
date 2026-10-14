@@ -558,9 +558,7 @@ fn generate_rust_from_analyzed(
     feature = "hir-python",
     feature = "hir-haskell"
 ))]
-pub(crate) fn display_tokens_for_module(
-    analysis: &dyn CodegenAnalysis,
-) -> radix_codegen_shared::names::DisplayTokens {
+pub(crate) fn display_tokens_for_module(analysis: &dyn CodegenAnalysis) -> radix_codegen_shared::names::DisplayTokens {
     analysis.display_tokens().clone()
 }
 
@@ -695,10 +693,7 @@ fn register_go_cross_file_defids(
 }
 
 #[cfg(feature = "hir-go")]
-fn generate_go_from_analyzed(
-    analysis: &dyn CodegenAnalysis,
-    hir: &HirModule,
-) -> Result<crate::Output, CodegenError> {
+fn generate_go_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) -> Result<crate::Output, CodegenError> {
     let mut r#gen = go::GoCodegen::new(hir, analysis.types(), analysis.interner());
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
     r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
@@ -807,10 +802,7 @@ fn go_imported_generators(
 }
 
 #[cfg(not(feature = "hir-go"))]
-fn generate_go_from_analyzed(
-    _analysis: &dyn CodegenAnalysis,
-    _hir: &HirModule,
-) -> Result<crate::Output, CodegenError> {
+fn generate_go_from_analyzed(_analysis: &dyn CodegenAnalysis, _hir: &HirModule) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirGo))
 }
 
@@ -940,10 +932,7 @@ fn generate_fortran_from_analyzed(
 }
 
 #[cfg(feature = "hir-odin")]
-fn generate_odin_from_analyzed(
-    analysis: &dyn CodegenAnalysis,
-    hir: &HirModule,
-) -> Result<crate::Output, CodegenError> {
+fn generate_odin_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) -> Result<crate::Output, CodegenError> {
     let r#gen = odin::OdinCodegen::new(hir, analysis.interner());
     let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Odin(crate::OdinOutput { code: output.code }))
