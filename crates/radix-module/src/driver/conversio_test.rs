@@ -34,7 +34,7 @@ fn conversio_of_a_literal_emits_its_value() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output.code.contains("let n: i64 = 22_i64;"));
+    assert!(output.code.contains("let l_n: i64 = 22_i64;"));
     assert!(!output.code.contains(".parse::<i64>()"));
 }
 
