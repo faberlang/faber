@@ -86,7 +86,7 @@ fn ts_throws_on_an_unhandled_failable_call_in_main() {
     assert_eq!(main.matches(unwrap).count(), 4, "check, two risky, one method:\n{main}");
     assert!(main.contains("})(check(1))"), "{main}");
     assert!(main.contains("})(risky(2))"), "{main}");
-    assert!(main.contains("})(k.nimm(1))"), "{main}");
+    assert!(main.contains("})(l_k.nimm(1))"), "{main}");
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn swift_aborts_on_an_unhandled_failable_call_in_main() {
     let main = main_body(&code, "struct Main");
     assert!(main.contains("try! check(n: 1)"), "{main}");
     assert!(main.contains("try! risky(n: 2)"), "{main}");
-    assert!(main.contains("try! k.nimm(n: 1)"), "{main}");
+    assert!(main.contains("try! l_k.nimm(n: 1)"), "{main}");
 }
 
 #[test]
