@@ -229,7 +229,7 @@ fn numerus_list_binding_takes_a_u64_element_as_a_checked_store() {
 fn rms_norm_typechecks_with_axis_epsilon_and_gamma_peer() {
     accepts(
         r"functio norm(tf32[2, 8] x, tf32[8] gamma) → tf32[2, 8] {
-    redde x.rms_norm(1, 1e-5, gamma)
+    redde x.rms_norm(axis 1, 1e-5, gamma)
 }",
     );
 }
