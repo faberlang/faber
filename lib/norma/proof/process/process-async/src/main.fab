@@ -1,0 +1,31 @@
++++
+locale = "en"
++++
+
+# N3 process leaf: processus:exsequetur (exec_async). Output must match under
+# `faber run` and a `faber build` Rust binary.
+
+import from "norma:process" process
+import from "norma:fault" fault
+
+# Mirror of the Norma wrapper boundary: declare the IoFault channel locally so
+# the caught call has a named union error type.
+fn exit_faulted() → string ⇥ fault.IoFault {
+    return process.exec_async("exit 3")
+}
+
+main {
+    assert process.exec_async("printf proof-ok") ≡ "proof-ok"
+
+    # A non-zero exit is a fault, not a value: the call must be caught.
+    var bool caught ← false
+    do {
+        const string _ ← exit_faulted()
+    }
+    catch err {
+        caught ← true
+    }
+    assert caught
+
+    print "process-async-ok"
+}
