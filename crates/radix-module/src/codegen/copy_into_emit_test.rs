@@ -91,7 +91,7 @@ fn rust_emits_the_write_values_carrier() {
         panic!("Rust must emit a copy-into: {:?}", result.diagnostics);
     };
     assert!(
-        output.code.contains("(*out).write_values(&("),
+        output.code.contains("(*p_out).write_values(&("),
         "the copy-into is the runtime's write_values call:\n{}",
         output.code
     );
