@@ -366,7 +366,7 @@ impl LibraryResolver {
         self.library_home.clone().ok_or_else(|| {
             LibraryResolveError::LibraryHomeMissing {
                 specifier: specifier.to_owned(),
-                hint: "set FABER_LIBRARY_HOME to a directory containing provider repos, such as <home>/gradus/src (the faber binary embeds norma and needs no home for it)".to_string(),
+                hint: "pass --library-home <DIR> (or set [paths] library_home in faber.toml) to a directory containing provider repos, such as <home>/gradus/src (the faber binary embeds norma and needs no home for it)".to_string(),
             }
         })
     }

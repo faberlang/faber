@@ -75,7 +75,7 @@ fn resolve_missing_library_home_when_no_home() {
     assert!(matches!(
         err,
         LibraryResolveError::LibraryHomeMissing { hint, .. }
-            if hint.contains("FABER_LIBRARY_HOME")
+            if hint.contains("--library-home")
     ));
 }
 

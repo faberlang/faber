@@ -41,17 +41,6 @@ fn reader_locale_example_root(locale: &str) -> PathBuf {
         .join(locale)
 }
 
-/// Offline support root: the repository root holding `runtime/rust`.
-fn support_root() -> PathBuf {
-    let root = repo_root();
-    assert!(
-        root.join("runtime/rust/Cargo.toml").exists(),
-        "could not find runtime/rust under {}",
-        root.display()
-    );
-    root
-}
-
 /// Library home holding Norma: the in-tree `lib/` (`lib/norma/src`).
 fn norma_library_home() -> PathBuf {
     let home = repo_root().join("lib");
@@ -411,16 +400,12 @@ fn build_reader_locale_accepts_direct_entry_file_input() {
 "#,
     );
 
-    let workspace = support_root();
-    let (stdout, stderr, ok) = run_faber_with_env(
-        &[
-            "build",
-            "--locale",
-            "zh-Hans",
-            source.to_str().expect("utf8 source path"),
-        ],
-        &[("FABER_SUPPORT_PATH_OVERRIDE", &workspace)],
-    );
+    let (stdout, stderr, ok) = run_faber(&[
+        "build",
+        "--locale",
+        "zh-Hans",
+        source.to_str().expect("utf8 source path"),
+    ]);
 
     assert!(ok, "single-file build with reader locale failed:\n{stderr}");
     let binary = PathBuf::from(stdout.trim());
@@ -1167,11 +1152,13 @@ incipit {
     let (build_stdout, build_stderr, build_ok) = run_faber_with_env(
         &[
             "build",
+            "--library-home",
+            library_home.to_str().expect("utf8"),
             "--target",
             "fmir-bin",
             package.to_str().expect("utf8 package path"),
         ],
-        &[("FABER_LIBRARY_HOME", &library_home)],
+        &[],
     );
     assert!(build_ok, "fmir-bin build failed:\n{build_stderr}");
     let entrypoint = PathBuf::from(build_stdout.trim());
