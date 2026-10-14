@@ -2547,6 +2547,10 @@ help = "写 `x ↦ int via Floor`、`via Ceil`、`via HalfEven`（平局取偶�
 message = "`via Bits` 已弃用：位模式保存在 bN 标记中，不由提示选择"
 help = "写 `x ↦ b32` 把浮点读作其位模式（按宽度为 b16、b32 或 b64），写 `b32 ↦ f32` 构造一个；数字中保存的模式先经过其标记，如 `u16 ↦ b16 ↦ f16`"
 
+[diagnostics.SEM016.issues.conversio_map_key_not_textus]
+message = "与 valor 互相转换的 map 键必须是 textus"
+help = "用 textus 键写 map；转换从不解析键，类上的 `@ json` 定义 wire 映射"
+
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "从 octeti 到 bivalens 的 conversion 没有 default meaning"
 help = "使用 chorda 或显式 byte conversion helpers"

@@ -2547,6 +2547,10 @@ help = "寫 `x ↦ int via Floor`、`via Ceil`、`via HalfEven`（平手取偶�
 message = "`via Bits` 已停用：位元模式由 bN 標記保存，而非由提示選取"
 help = "寫 `x ↦ b32` 以將浮點數讀成其位元模式（依寬度為 b16、b32 或 b64），寫 `b32 ↦ f32` 以建構浮點數；保存在數字中的模式會先經過其標記，例如 `u16 ↦ b16 ↦ f16`"
 
+[diagnostics.SEM016.issues.conversio_map_key_not_textus]
+message = "與 valor 互相轉換的 map 索引鍵必須是 textus"
+help = "以 textus 索引鍵撰寫 map；轉換從不解析索引鍵，類別上的 `@ json` 定義 wire 對應"
+
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "從 octeti 轉換為 bivalens 沒有預設意義；請解碼為 textus，或明確比較位元組"
 help = "使用 chorda 或明確的位元組轉換輔助工具"

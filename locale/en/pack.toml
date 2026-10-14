@@ -3767,6 +3767,10 @@ help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the eve
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
 help = "write `x ↦ b32` to read a float as its bit pattern (b16, b32 or b64 by width) and `b32 ↦ f32` to build one; a pattern held in a number goes through its marker first, as in `u16 ↦ b16 ↦ f16`"
 
+[diagnostics.SEM016.issues.conversio_map_key_not_textus]
+message = "a map key converted to or from value must be text"
+help = "write the map with `string` keys; a conversion never parses keys, and `@ json` on a class defines the wire mapping"
+
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "conversion from bytes to bool has no default meaning; decode to string or compare bytes explicitly"
 help = "use chorda or explicit byte conversion helpers"
