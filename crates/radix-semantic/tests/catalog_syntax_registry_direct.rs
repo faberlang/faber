@@ -45,6 +45,72 @@ fn lege_lineam_registry_direct_names_both_particles() {
     );
 }
 
+/// Render one issue registry-direct and prove it does not fall through to the
+/// unknown-issue fallback. Text assertions stay out of this file; the issue
+/// identity plus the Some/None split is the contract.
+fn assert_registry_direct_arm(issue: &'static str, arg_pairs: &[(&'static str, &'static str)]) {
+    let mut pairs = vec![("issue", issue)];
+    pairs.extend_from_slice(arg_pairs);
+    let rendered = parse_message(ParseErrorKind::Expected, &args(&pairs))
+        .unwrap_or_else(|| panic!("{issue} must render registry-direct"));
+    let fallback = parse_message(
+        ParseErrorKind::Expected,
+        &args(&[("issue", "no_such_parse_issue")]),
+    );
+    assert_ne!(
+        Some(rendered.as_str()),
+        fallback.as_deref(),
+        "{issue} must use its own arm, not the generic fallback: {rendered}"
+    );
+}
+
+#[test]
+fn expected_mutability_keyword_registry_direct_has_an_arm() {
+    assert_registry_direct_arm(
+        "expected_mutability_keyword",
+        &[("fixum", "fixum"), ("varia", "varia")],
+    );
+}
+
+#[test]
+fn expected_method_declaration_registry_direct_has_an_arm() {
+    assert_registry_direct_arm("expected_method_declaration", &[("functio", "functio")]);
+}
+
+#[test]
+fn expected_praepara_hook_registry_direct_has_an_arm() {
+    assert_registry_direct_arm(
+        "expected_praepara_hook",
+        &[
+            ("praepara", "praepara"),
+            ("praeparabit", "praeparabit"),
+            ("postpara", "postpara"),
+            ("postparabit", "postparabit"),
+        ],
+    );
+}
+
+#[test]
+fn expected_scribe_keyword_registry_direct_has_an_arm() {
+    assert_registry_direct_arm(
+        "expected_scribe_keyword",
+        &[
+            ("scribe", "scribe"),
+            ("vide", "vide"),
+            ("mone", "mone"),
+            ("nota", "nota"),
+        ],
+    );
+}
+
+#[test]
+fn expected_incipit_keyword_registry_direct_has_an_arm() {
+    assert_registry_direct_arm(
+        "expected_incipit_keyword",
+        &[("incipit", "incipit"), ("incipiet", "incipiet")],
+    );
+}
+
 #[test]
 fn reducta_source_registry_direct_has_an_arm() {
     let rendered = parse_message(

@@ -5583,7 +5583,7 @@ message = "expected a string literal"
 help = "put a quoted string literal here"
 
 [diagnostics.PARSE001.issues.expected_mutability_keyword]
-message = "expected 'fixum' or 'varia'"
+message = "expected '{fixum}' or '{varia}'"
 help = "start the declaration with a mutability keyword"
 
 [diagnostics.PARSE001.issues.await_binding_requires_name]
@@ -5592,23 +5592,23 @@ help = "bind '↢' to a single name; destructuring uses '←'"
 
 [diagnostics.PARSE001.issues.expected_method_declaration]
 message = "expected a method declaration"
-help = "write the method as a 'functio' declaration"
+help = "write the method as a '{functio}' declaration"
 
 [diagnostics.PARSE001.issues.expected_praepara_hook]
-message = "expected a 'praepara' hook"
-help = "write 'praepara', 'praeparabit', 'postpara' or 'postparabit'"
+message = "expected a '{praepara}' hook"
+help = "write '{praepara}', '{praeparabit}', '{postpara}' or '{postparabit}'"
 
 [diagnostics.PARSE001.issues.expected_lane_value]
 message = "expected a string literal or identifier"
 help = "write the lane value as a quoted string or a bare name"
 
 [diagnostics.PARSE001.issues.expected_scribe_keyword]
-message = "expected a 'scribe' keyword"
-help = "write 'scribe', 'vide', 'mone' or 'nota'"
+message = "expected a '{scribe}' keyword"
+help = "write '{scribe}', '{vide}', '{mone}' or '{nota}'"
 
 [diagnostics.PARSE001.issues.expected_incipit_keyword]
-message = "expected 'incipit' or 'incipiet'"
-help = "start the entry point with 'incipit' or 'incipiet'"
+message = "expected '{incipit}' or '{incipiet}'"
+help = "start the entry point with '{incipit}' or '{incipiet}'"
 
 [diagnostics.PARSE001.issues.enum_member_value_number]
 message = "expected a number after '='"

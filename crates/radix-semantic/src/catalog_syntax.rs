@@ -602,6 +602,40 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
                 let lineam = quote_arg(args, "lineam")?;
                 return Some(format!("expected {lege} or {lineam}"));
             }
+            "expected_mutability_keyword" => {
+                let fixum = quote_arg(args, "fixum")?;
+                let varia = quote_arg(args, "varia")?;
+                return Some(format!("expected {fixum} or {varia}"));
+            }
+            "expected_method_declaration" => {
+                let functio = quote_arg(args, "functio")?;
+                return Some(format!(
+                    "expected a method declaration; write the method as a {functio} declaration"
+                ));
+            }
+            "expected_praepara_hook" => {
+                let praepara = quote_arg(args, "praepara")?;
+                let praeparabit = quote_arg(args, "praeparabit")?;
+                let postpara = quote_arg(args, "postpara")?;
+                let postparabit = quote_arg(args, "postparabit")?;
+                return Some(format!(
+                    "expected a {praepara} hook; write {praepara}, {praeparabit}, {postpara} or {postparabit}"
+                ));
+            }
+            "expected_scribe_keyword" => {
+                let scribe = quote_arg(args, "scribe")?;
+                let vide = quote_arg(args, "vide")?;
+                let mone = quote_arg(args, "mone")?;
+                let nota = quote_arg(args, "nota")?;
+                return Some(format!(
+                    "expected a {scribe} keyword; write {scribe}, {vide}, {mone} or {nota}"
+                ));
+            }
+            "expected_incipit_keyword" => {
+                let incipit = quote_arg(args, "incipit")?;
+                let incipiet = quote_arg(args, "incipiet")?;
+                return Some(format!("expected {incipit} or {incipiet}"));
+            }
             "reducta_source" => {
                 return Some("expected a reduction source after the reduction operator".to_owned());
             }
