@@ -1,7 +1,30 @@
 //! `faber emit -t faber` policy wrapper.
 
+use std::path::Path;
+
 use crate::cli::FaberCliTarget;
 use radix::services::EmitCommand;
+
+// ST2-2.10: number of package analyses the retry seam entered on this thread.
+//
+// A test seam: the single-file -> package-analysis hand-off runs once and only
+// when the structured import issue is present, and the unit proves the branch
+// by reading this counter instead of inspecting message text. Thread-local so
+// the parallel test threads never observe each other's entries.
+#[cfg(test)]
+thread_local! {
+    static PACKAGE_ANALYSIS_ENTRIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn package_analysis_entries() -> usize {
+    PACKAGE_ANALYSIS_ENTRIES.with(std::cell::Cell::get)
+}
+
+#[cfg(test)]
+pub(crate) fn reset_package_analysis_entries() {
+    PACKAGE_ANALYSIS_ENTRIES.with(|entries| entries.set(0));
+}
 
 pub fn cmd_emit_faber(command: EmitCommand, format: bool, linter: bool) {
     if command.package {
@@ -107,6 +130,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
             command.module_name.as_deref(),
         )
     };
+    let result = retry_single_file_via_package_analysis(&command, code_pack.as_ref(), result);
 
     faber_cli::postprocess::print_diagnostics(
         &result.diagnostics,
@@ -162,6 +186,125 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
         linter,
     );
     print!("{code}");
+}
+
+/// ST2-2.10: when the single-file route refused an import-reaching
+/// `comptime` initializer (`praefixum_import_unavailable`), run the package
+/// analysis once over the same input and emit the entry module from that
+/// analysis.
+///
+/// The issue is the structured identity, never prose; the retry runs once and
+/// its result, success or failure, replaces the single-file result. Any other
+/// diagnostic and any stdin, directory or non-`.fab` input keeps today's path.
+pub(super) fn retry_single_file_via_package_analysis(
+    command: &EmitCommand,
+    code_pack: Option<&radix::module::locale::LocalePack>,
+    single_file: radix::CompileResult,
+) -> radix::CompileResult {
+    let Some(path) = retry_input_path(command) else {
+        return single_file;
+    };
+    if single_file.output.is_some() {
+        return single_file;
+    }
+    if !single_file
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.issue() == Some("praefixum_import_unavailable"))
+    {
+        return single_file;
+    }
+    emit_through_package_analysis(command, code_pack, path)
+}
+
+/// The `.fab` path a retry may act on: stdin, an empty input and directories
+/// stay on the single-file route.
+fn retry_input_path(command: &EmitCommand) -> Option<&Path> {
+    let first = command.input.first()?;
+    if first.is_empty() || first == "-" {
+        return None;
+    }
+    let path = Path::new(first.as_str());
+    if path.extension().and_then(std::ffi::OsStr::to_str) != Some("fab") {
+        return None;
+    }
+    if path.is_dir() {
+        return None;
+    }
+    Some(path)
+}
+
+/// Emit the input's entry module through the package analysis (ST2-2.10).
+///
+/// The package analysis evaluates the deferred `comptime` sites against the
+/// linked local import closure; the entry node's analyzed module then travels
+/// the same analysis-to-output tail as the single-file route, with the
+/// command's target, reader pack, output mode and module name.
+pub(super) fn emit_through_package_analysis(
+    command: &EmitCommand,
+    code_pack: Option<&radix::module::locale::LocalePack>,
+    input: &Path,
+) -> radix::CompileResult {
+    #[cfg(test)]
+    PACKAGE_ANALYSIS_ENTRIES.with(|entries| entries.set(entries.get() + 1));
+
+    // Package discovery requires an absolute input: a raw `c.fab` lexically
+    // resolves its package root to the empty path and refuses every local
+    // import as `package_import_escape`.
+    let input = faber_cli::package::absolutize_path(input);
+    let config = package_analysis_config(command, code_pack);
+    let mut package = match radix::program::analyze::analyze_package(
+        &config,
+        &input,
+        &faber_cli::package::faber_analysis_seams(),
+    ) {
+        Ok(package) => package,
+        Err(diagnostics) => return radix::CompileResult { output: None, diagnostics },
+    };
+    let source = match std::fs::read_to_string(&input) {
+        Ok(source) => source,
+        Err(err) => {
+            return radix::CompileResult {
+                output: None,
+                diagnostics: vec![
+                    radix::module::diagnostics::Diagnostic::io_error(&input, &err)
+                        .with_code("IO001")
+                        .with_arg("issue", "source_read_failed"),
+                ],
+            };
+        }
+    };
+    let Some(entry) = package.entry.clone() else {
+        return radix::CompileResult { output: None, diagnostics: package.diagnostics };
+    };
+    let Some(node) = package.nodes.remove(&entry) else {
+        return radix::CompileResult { output: None, diagnostics: package.diagnostics };
+    };
+    let name = input.display().to_string();
+    let session = radix::driver::Session::new(config);
+    let mut result = radix::driver::compile_analyzed(&session, &name, &source, node.analysis);
+    result.diagnostics.extend(package.diagnostics);
+    result
+}
+
+/// The single-file route's `Config` shape, rebuilt for the retry: target,
+/// output mode, module name and non-explicit reader pack.
+fn package_analysis_config(
+    command: &EmitCommand,
+    code_pack: Option<&radix::module::locale::LocalePack>,
+) -> radix::driver::Config {
+    let config = radix::driver::Config::default()
+        .with_target(command.target)
+        .with_output_mode(command.output_mode)
+        .with_dev_locale_root();
+    let config = match &command.module_name {
+        Some(name) => config.with_module_name(Some(name.clone())),
+        None => config,
+    };
+    match code_pack {
+        Some(pack) => config.with_locale_pack(pack.clone()),
+        None => config,
+    }
 }
 
 pub fn is_faber_emit(target: FaberCliTarget) -> bool {

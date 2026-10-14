@@ -27,6 +27,9 @@ mod doctor;
 #[path = "doctor_test.rs"]
 mod doctor_test;
 mod emit;
+#[cfg(test)]
+#[path = "emit_test.rs"]
+mod emit_test;
 mod explain;
 mod field_modifier_codemod;
 mod format;
