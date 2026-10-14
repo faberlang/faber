@@ -505,6 +505,24 @@ main args args {
 }
 "#;
 
+const NORMA_FS_READ_FILE_LITERAL_IN_CLI_MAIN: &str = r#"import from "norma:fs" fs
+
+@ cli "tool"
+@ operand string root
+main args args {
+    print fs.read_file<string>("/definitely/not/here")
+}
+"#;
+
+const NORMA_FS_READ_FILE_CLI_OPERAND_PRINT_ONLY_MAIN: &str = r#"import from "norma:fs" fs
+
+@ cli "tool"
+@ operand string root
+main args args {
+    print args.root
+}
+"#;
+
 /// `norma:fs.read_file<string>` is a failable generic library export
 /// (`T ⇥ fault.IoFault`, with the union interned from the library's own
 /// second-level `norma:fault` import). Called from a package `main` with a
@@ -598,6 +616,108 @@ kind = "bin"
             .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
             .collect::<Vec<_>>();
         panic!("norma:fs read_file operand package must lower, got {facts:?}");
+    }
+}
+
+/// A CLI `main` whose `@ operand` is declared but whose body calls
+/// `norma:fs.read_file<string>` with a literal must link and validate. The
+/// sibling operand probe isolates the `Struct` operand; this probe isolates
+/// the call path in a CLI-programmed main (P1).
+#[test]
+#[ignore = "pumpfix-gdde13951: call argument type mismatch (arg 0: expected textus, got Struct(DefId(2000000073)))"]
+fn package_mir_links_norma_fs_read_file_literal_in_cli_main_validates() {
+    let dir = crate::test_support::test_temp_dir("norma-fs-read-file-literal-in-cli-main");
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "norma-fs-read-file-literal-in-cli-main"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("main.fab"), NORMA_FS_READ_FILE_LITERAL_IN_CLI_MAIN)
+        .expect("write main.fab");
+    let entry = src.join("main.fab");
+
+    let argumenta = vec!["/definitely/not/here".to_owned()];
+    let result = with_prepared_package_mir(
+        &Config::default(),
+        &entry,
+        &argumenta,
+        &crate::test_support::test_mir_seams(),
+        |_, _| Ok(()),
+    );
+    if let Err(diagnostics) = &result {
+        let facts = diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+            .collect::<Vec<_>>();
+        panic!(
+            "norma:fs read_file literal-in-cli-main package must lower, got {facts:?}\n{diagnostics:#?}"
+        );
+    }
+}
+
+/// A CLI `main` whose declared `@ operand string root` is only printed must
+/// link and validate. This probe narrows whether the `Struct` operand reaches
+/// the `textus` call parameter or is already mistyped at the operand surface
+/// (P2).
+#[test]
+fn package_mir_cli_operand_print_only_validates() {
+    let dir = crate::test_support::test_temp_dir("norma-fs-read-file-cli-operand-print-only");
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "norma-fs-read-file-cli-operand-print-only"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(
+        src.join("main.fab"),
+        NORMA_FS_READ_FILE_CLI_OPERAND_PRINT_ONLY_MAIN,
+    )
+    .expect("write main.fab");
+    let entry = src.join("main.fab");
+
+    let argumenta = vec!["/definitely/not/here".to_owned()];
+    let result = with_prepared_package_mir(
+        &Config::default(),
+        &entry,
+        &argumenta,
+        &crate::test_support::test_mir_seams(),
+        |_, _| Ok(()),
+    );
+    if let Err(diagnostics) = &result {
+        let facts = diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+            .collect::<Vec<_>>();
+        panic!(
+            "norma:fs cli operand print-only package must lower, got {facts:?}\n{diagnostics:#?}"
+        );
     }
 }
 
