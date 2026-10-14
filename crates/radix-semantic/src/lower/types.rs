@@ -1062,6 +1062,8 @@ impl Lowerer<'_> {
             // keeps its dynamic row-map special case).
             crate::locale::TypeBindingKind::Relational(_) => None,
             crate::locale::TypeBindingKind::Ratio => Some(self.lower_ratio_type(params)),
+            // `erratum<T>` identity lowering lands in the follow-up unit.
+            crate::locale::TypeBindingKind::Erratum => None,
             // Conversation-family names lower through the builtin frame
             // structs by their canonical Latin name in `lower_named_type`.
             crate::locale::TypeBindingKind::Frame(_) => None,

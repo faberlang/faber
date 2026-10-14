@@ -874,6 +874,7 @@ fn latin_type_surface(kind: TypeBindingKind) -> &'static str {
             RelationalTypeKind::Census => "census",
         },
         TypeBindingKind::Ratio => "ratio",
+        TypeBindingKind::Erratum => "erratum",
         TypeBindingKind::Frame(kind) => kind.latin(),
     }
 }
@@ -1038,6 +1039,9 @@ pub enum TypeBindingKind {
     Relational(RelationalTypeKind),
     /// Labeled ad-hoc aggregate (`ratio<label: T, …>` → `Type::Record`).
     Ratio,
+    /// Compiler-owned error carrier `erratum<T>` (en `error`): the generic
+    /// payload genus a `⇥ T` channel names.
+    Erratum,
     /// Compiler-owned conversation family (`sermo`, `scrinium`, and the
     /// `meus`/`tuus` directional views). The view rows also spell the sermo
     /// view methods `s.meus<T>()` / `s.tuus<T>()` (DECISIONS D6.16).
@@ -2540,6 +2544,7 @@ fn type_binding_kind_for_key(key: &str) -> Option<TypeBindingKind> {
         "series" => return Some(TypeBindingKind::Relational(RelationalTypeKind::Series)),
         "census" => return Some(TypeBindingKind::Relational(RelationalTypeKind::Census)),
         "ratio" => return Some(TypeBindingKind::Ratio),
+        "erratum" => return Some(TypeBindingKind::Erratum),
         "sermo" => return Some(TypeBindingKind::Frame(FrameTypeKind::Sermo)),
         "scrinium" => return Some(TypeBindingKind::Frame(FrameTypeKind::Scrinium)),
         "meus" => return Some(TypeBindingKind::Frame(FrameTypeKind::Meus)),

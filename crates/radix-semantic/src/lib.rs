@@ -1122,7 +1122,9 @@ fn register_locale_pack_type_spellings(
         // `fn send` or `fn wrap` must not collide with a type alias.
         if matches!(
             binding.kind,
-            TypeBindingKind::Frame(_) | TypeBindingKind::TensorEdgePolicy(_)
+            TypeBindingKind::Frame(_)
+                | TypeBindingKind::TensorEdgePolicy(_)
+                | TypeBindingKind::Erratum
         ) {
             continue;
         }
@@ -1149,6 +1151,7 @@ fn register_locale_pack_type_spellings(
                 | TypeBindingKind::ByteWord
                 | TypeBindingKind::Relational(_)
                 | TypeBindingKind::Ratio
+                | TypeBindingKind::Erratum
                 | TypeBindingKind::Frame(_)
                 | TypeBindingKind::TensorEdgePolicy(_) => None,
             };
