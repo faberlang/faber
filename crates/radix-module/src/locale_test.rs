@@ -2669,6 +2669,43 @@ exemplars = ["./exemplars/salve-munde.vi.fab"]
     assert_eq!(fields_absent_from_pack(&complete, &en_pack), Vec::new());
 }
 
+/// The verdict for a pack's absent-row count against its exact budget.
+///
+/// The budget is exact: it may only go down, and it must be lowered in the
+/// same change that translates rows. Under budget is therefore an error too,
+/// not harmless slack.
+fn budget_verdict(actual: usize, budget: usize) -> Result<(), String> {
+    match actual.cmp(&budget) {
+        std::cmp::Ordering::Equal => Ok(()),
+        std::cmp::Ordering::Greater => Err(format!(
+            "pack is over its absent-rows budget: {actual} absent rows against a budget of {budget}"
+        )),
+        std::cmp::Ordering::Less => Err(format!("lower the budget to {actual}")),
+    }
+}
+
+#[test]
+fn absent_rows_budget_equal_is_ok() {
+    assert_eq!(budget_verdict(7, 7), Ok(()));
+}
+
+#[test]
+fn absent_rows_budget_actual_over_budget_is_err() {
+    let err = budget_verdict(6, 5).expect_err("over budget must be an error");
+    assert!(
+        err.contains('6') && err.contains('5'),
+        "error should name both numbers: {err:?}"
+    );
+    assert!(err.contains("over"), "error should say the pack is over budget: {err:?}");
+}
+
+#[test]
+fn absent_rows_budget_actual_under_budget_is_err() {
+    let err = budget_verdict(3, 5).expect_err("under budget must be an error");
+    // The budget is exact: it may only go down, and the fix is to lower it.
+    assert!(err.contains("lower the budget to 3"), "error should say how to fix it: {err:?}");
+}
+
 /// A translated pack must not carry diagnostics text copied from `en`.
 ///
 /// Equality with `en` is tolerated only through `locale/identical-to-en/<pack>.toml`,
