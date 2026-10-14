@@ -593,13 +593,37 @@ fn finish_device_run(
 
 /// Resolve the effective device selection for `faber run`: the shared
 /// precedence (CLI > manifest > `auto`) lives in
-/// [`package::resolve_device_selection`]. A stats request is permitted with any
-/// selection: a dispatching run reports host rows only (gpu-reset C2-U6c, D4).
+/// [`package::resolve_device_selection`], then the `--threads` route contract
+/// is enforced (need, CD-1): a worker count is valid only when the
+/// resolved selection is the CPU device. Any other route fails closed before
+/// launch rather than silently ignoring the count; there is no `[device]
+/// threads` manifest key. A stats request is permitted with any selection: a
+/// dispatching run reports host rows only (gpu-reset C2-U6c, D4).
 fn resolve_route_selection(
     args: &RunArgs,
     input_path: &Path,
 ) -> Result<DeviceSelection, Box<Diagnostic>> {
-    package::resolve_device_selection(args.device, input_path)
+    let selection = package::resolve_device_selection(args.device, input_path)?;
+    ensure_threads_cpu_route(args.threads, selection)?;
+    Ok(selection)
+}
+
+/// Fail closed when `--threads N` is given with a resolved selection other
+/// than the CPU device (need, CD-1). The count configures CPU
+/// workers only; it is never silently ignored, and there is no `[device]
+/// threads` manifest key.
+fn ensure_threads_cpu_route(
+    threads: Option<u32>,
+    selection: DeviceSelection,
+) -> Result<(), Box<Diagnostic>> {
+    if threads.is_none() || selection == DeviceSelection::Cpu {
+        return Ok(());
+    }
+    Err(Box::new(
+        faber_cli::package_diagnostic_error("`--threads` is valid only with `--device cpu`")
+            .with_arg("issue", "E_THREADS_REQUIRES_CPU")
+            .with_arg("device", selection.spelling()),
+    ))
 }
 
 /// Render route diagnostics with their stable host codes (N1.4). The
@@ -614,6 +638,7 @@ fn eprint_route_diagnostics(diagnostics: &[Diagnostic]) {
                 Some(code)
                     if code.starts_with("E_DEVICE_")
                         || code.starts_with("E_BACKEND_")
+                        || code.starts_with("E_THREADS_")
                         || code.starts_with("E_NO_") =>
                 {
                     eprintln!("error: {code}: {}", diag.message);
