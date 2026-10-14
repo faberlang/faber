@@ -21,21 +21,21 @@ class Socket {
     var int id = 0
 
     # A clean close is an empty read today (not a `Closed` error).
-    fn read_bytes(int n optional) → bytes ∪ none ⇥ fault.IoFault {
+    fn read_bytes(int n optional) → list<b8> ∪ none ⇥ fault.IoFault {
         return socket_read(self, n)
     }
 
     @ future
-    fn read_bytes_async(int n optional) → bytes ∪ none ⇥ fault.IoFault {
+    fn read_bytes_async(int n optional) → list<b8> ∪ none ⇥ fault.IoFault {
         return socket_read(self, n)
     }
 
-    fn write_bytes(bytes data) → void ⇥ fault.IoFault {
+    fn write_bytes(list<b8> data) → void ⇥ fault.IoFault {
         return socket_write(self, data)
     }
 
     @ future
-    fn write_bytes_async(bytes data) → void ⇥ fault.IoFault {
+    fn write_bytes_async(list<b8> data) → void ⇥ fault.IoFault {
         return socket_write(self, data)
     }
 
@@ -52,18 +52,18 @@ class Socket {
     }
 }
 
-fn socket_read(Socket socket, int n optional) → bytes ∪ none ⇥ fault.IoFault {
+fn socket_read(Socket socket, int n optional) → list<b8> ∪ none ⇥ fault.IoFault {
     if n is none {
-        const bytes data ← call 'caelum:hauri' (socket.id) ↦ bytes
+        const list<b8> data ← call 'caelum:hauri' (socket.id) ↦ list<b8>
         if data.length() ≡ 0 then return null
         return data
     }
-    const bytes data ← call 'caelum:hauri' ([socket.id, n coalesce 0]) ↦ bytes
+    const list<b8> data ← call 'caelum:hauri' ([socket.id, n coalesce 0]) ↦ list<b8>
     if data.length() ≡ 0 then return null
     return data
 }
 
-fn socket_write(Socket socket, bytes data) → void ⇥ fault.IoFault {
+fn socket_write(Socket socket, list<b8> data) → void ⇥ fault.IoFault {
     return call 'caelum:funde' ([socket.id ↦ value, data ↦ value]) ↦ void
 }
 

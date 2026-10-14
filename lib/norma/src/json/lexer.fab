@@ -53,7 +53,7 @@ fn is_terminator(string c) → bool {
 # JSON strings may not contain an unescaped U+0000..U+001F codepoint.
 @ public
 fn is_control(string c) → bool {
-    const bytes encoded ← c ↦ bytes
+    const list<b8> encoded ← c ↦ list<b8>
     if encoded.length() ≢ 1 then return false
     return (encoded.get(0) coalesce (32 ∷ b8)) ≺ (32 ∷ b8)
 }
@@ -72,7 +72,7 @@ fn escape_char(string c) → string ∪ none {
     if c ≡ "\r" then return "\\r"
     if c ≡ "\t" then return "\\t"
     if is_control(c) {
-        const bytes encoded ← c ↦ bytes
+        const list<b8> encoded ← c ↦ list<b8>
         const int code ← (encoded.get(0) coalesce (0 ∷ b8)) ↦ u8 ↦ int
         if code ≡ 8 then return "\\b"
         if code ≡ 12 then return "\\f"
@@ -92,7 +92,7 @@ fn needs_escape(string c) → bool {
 # Render an unnamed U+0000..U+001F control code as a JSON Unicode escape.
 @ public
 fn control_escape(string c) → string {
-    const bytes encoded ← c ↦ bytes
+    const list<b8> encoded ← c ↦ list<b8>
     const int code ← (encoded.get(0) coalesce (0 ∷ b8)) ↦ u8 ↦ int
     return "\u00§§"(hex_digit(code / 16), hex_digit(code % 16))
 }
@@ -118,8 +118,8 @@ fn unescape_char(string s) → string ∪ none {
     if s ≡ "n" then return "\n"
     if s ≡ "r" then return "\r"
     if s ≡ "t" then return "\t"
-    if s ≡ "b" then return ([8] ↦ bytes) ↦ string ⊥ ""
-    if s ≡ "f" then return ([12] ↦ bytes) ↦ string ⊥ ""
+    if s ≡ "b" then return ([8] ↦ list<b8>) ↦ string ⊥ ""
+    if s ≡ "f" then return ([12] ↦ list<b8>) ↦ string ⊥ ""
     return null
 }
 

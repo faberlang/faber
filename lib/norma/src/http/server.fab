@@ -75,7 +75,7 @@ class Incoming {
 class Stream {
     var int writer = 0
 
-    fn write(bytes data) → void ⇥ fault.IoFault {
+    fn write(list<b8> data) → void ⇥ fault.IoFault {
         return write_chunk(self, data)
     }
 
@@ -256,20 +256,20 @@ fn open_sse(Incoming incoming) → Stream ⇥ fault.IoFault {
 
 # One SSE event as payload bytes. O(1) in the current event; nothing retained.
 @ public
-fn event_bytes(sse.Event event) → bytes {
-    return sse.stringify(event) ↦ bytes
+fn event_bytes(sse.Event event) → list<b8> {
+    return sse.stringify(event) ↦ list<b8>
 }
 
 # Pure composition: one event as a complete chunked body (last-chunk included).
 # Streaming I/O uses event_bytes + respond_chunk instead so the provider can
 # frame incrementally and apply backpressure per write.
 @ public
-fn event_chunk(sse.Event event) → bytes {
+fn event_chunk(sse.Event event) → list<b8> {
     return chunked.encode(event_bytes(event))
 }
 
 @ public
-fn write_chunk(Stream stream, bytes data) → void ⇥ fault.IoFault {
+fn write_chunk(Stream stream, list<b8> data) → void ⇥ fault.IoFault {
     const list<value> args ← [stream.writer ↦ value, data ↦ value]
     return respond_chunk(args)
 }
@@ -361,8 +361,8 @@ fn headers_from_carrier(value raw) → headers.Headers {
     }
 }
 
-# Accept bodies arrive as octeti. `value ↦ bytes` is a recorded radix
-# codegen gap (H6 gate); text bodies still decode. Octeti stays empty.
+# Accept bodies arrive as list<b8>. `value ↦ list<b8>` is a recorded radix
+# codegen gap (H6 gate); text bodies still decode. list<b8> stays empty.
 fn body_text(value raw) → string {
     if raw is none then return ""
     # Guarded by the `is` test, so the default never applies.
