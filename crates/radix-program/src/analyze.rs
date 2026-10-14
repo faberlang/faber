@@ -27,7 +27,7 @@ pub const PACKAGE_TEST_ANALYSIS_BUDGET: Duration = Duration::from_secs(30);
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::{
     AnalyzeRequest, AnalyzedModule, CarriedProviderUnit, Config, ModuleImportContract,
-    PackageKernelTemplateAdmissions, ProviderUnitView, Session,
+    PackageKernelTemplateAdmissions, ProviderUnit, ProviderUnitView, Session,
     analyze_source_with_kernel_template_admissions,
 };
 use radix_module::lexer::Interner;
@@ -785,6 +785,14 @@ fn analyze_package_spec_with_deadline(
                 diagnostics.extend(deferred_diagnostics);
                 continue;
             }
+            // ST2-2.8: later importers of this module must carry the analysis
+            // the hook just evaluated. A fresh provider re-analysis refuses
+            // the import-reaching site this run already folded, so the
+            // evaluated unit (with its own nested view) is the carriage.
+            provider_carriage_minted.insert(
+                file.path.clone(),
+                carried_provider_unit_from_evaluated(analysis.clone()),
+            );
         }
 
         nodes.insert(
@@ -875,6 +883,35 @@ fn analyze_package_spec_with_deadline(
 fn holds_deferred_praefixum(analysis: &AnalyzedModule) -> bool {
     radix_module::semantic::passes::praefixum::evaluation_order(&analysis.hir, &analysis.types)
         .is_ok_and(|sites| !sites.is_empty())
+}
+
+/// Reduce a module the package hook evaluated to the carried provider unit
+/// later import edges share (ST2-2.8): the same facts
+/// [`provider_unit_for_target`] carries, taken from this run's analysis
+/// instead of a re-analysis that cannot see the deferred evaluation.
+#[cfg(feature = "runner")]
+fn carried_provider_unit_from_evaluated(analysis: AnalyzedModule) -> CarriedProviderUnit {
+    let AnalyzedModule {
+        hir,
+        types,
+        interner,
+        resolver,
+        tensor_edge_policies,
+        shape_obligations,
+        diagnostics,
+        provider_units,
+        ..
+    } = analysis;
+    CarriedProviderUnit::Unit(std::sync::Arc::new(std::sync::Mutex::new(ProviderUnit {
+        hir,
+        types,
+        interner,
+        resolver,
+        tensor_edge_policies,
+        shape_obligations,
+        diagnostics,
+        nested: provider_units,
+    })))
 }
 
 /// Merge the `@ ad` routes of every analyzed package module and every
