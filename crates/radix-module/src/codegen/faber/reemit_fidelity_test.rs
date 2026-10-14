@@ -1521,3 +1521,10 @@ fn first_match_over_array_literal_reemits_with_meaning_intact() {
         "first-match head kept: {emitted}"
     );
 }
+
+#[test]
+fn retired_octeti_word_revalidates_as_list_b8() {
+    let code = assert_idempotent("functio f(octeti b) → octeti { redde b }\n");
+    assert!(code.contains("lista<b8>"), "retired octeti must re-emit as list<b8>:\n{code}");
+    assert!(!code.contains("octeti"), "retired octeti must not survive re-emission:\n{code}");
+}

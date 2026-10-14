@@ -22,7 +22,7 @@ use radix_hir::{
     HirTypeSlot,
 };
 use radix_syntax::TypeFormLevel;
-use radix_types::{AppliedArg, Primitive, Type, TypeId};
+use radix_types::{AppliedArg, BitsWidth, Primitive, Type, TypeId};
 use rustc_hash::FxHashMap;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -638,6 +638,22 @@ fn emitted_level(analysis: &AnalyzedModule, form: &HirTypeForm, level: TypeFormL
 }
 
 fn type_form_signature(analysis: &AnalyzedModule, form: &HirTypeForm) -> String {
+    // WHY: ruling d477c76d retires `octeti` / `octeti<N>`; `lista<b8>` is the
+    // only spelling (bounded: `lista<b8, N>`). The authored retired word and
+    // its canonical `list<b8>` spelling lower to the same type, so both share
+    // one fingerprint regardless of head level or authored arguments.
+    match analysis.types.get(form.ty) {
+        Type::BoundedOcteti { capacity } => {
+            return format!(
+                "byte-buffer-bounded({})[]",
+                crate::semantic::format_figura(*capacity, &analysis.types, &analysis.interner)
+            );
+        }
+        Type::Array(element) if matches!(analysis.types.get(*element), Type::Bits(BitsWidth::B8)) => {
+            return "byte-buffer[]".to_owned();
+        }
+        _ => {}
+    }
     let head = match &form.head {
         HirTypeFormHead::Semantic(level) => format!(
             "semantic(level={},shape={})",
