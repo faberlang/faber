@@ -23,6 +23,15 @@ locale = "en"
 # - Future (exec_async): async, returns promise
 # - Environment uses read_env (read) - simple and consistent
 
+import from "norma:fault" fault
+
+# Boundary row: the leaf's `{kind, path}` crossing record becomes the
+# declared IoFault; the reporting bodies stay canonical `call` one-liners.
+@ conversion
+fn io_fault(value raw) → fault.IoFault {
+    return fault.io_fault_from(raw)
+}
+
 
 # =============================================================================
 # TYPES
@@ -46,7 +55,7 @@ class Subprocess {
 # Spawn attached process. The leaf returns the pid; Norma wraps `Subprocess`.
 # Param named `args` because `argumenta` is TokenKind::Argumenta.
 @ public
-fn spawn(list<string> args) → Subprocess {
+fn spawn(list<string> args) → Subprocess ⇥ fault.IoFault {
     const int child ← call 'processus:genera' (args) ↦ int
     return Subprocess { pid = child }
 }
@@ -61,7 +70,7 @@ fn spawn(list<string> args) → Subprocess {
 
 # Block until the child exits; returns its exit code (-1 if signal-killed)
 @ public
-fn wait(Subprocess child) → int {
+fn wait(Subprocess child) → int ⇥ fault.IoFault {
     return call 'processus:exspecta' (child.pid) ↦ int
 }
 
@@ -73,7 +82,7 @@ fn wait(Subprocess child) → int {
 
 # Kill the child process
 @ public
-fn kill(Subprocess child) → void {
+fn kill(Subprocess child) → void ⇥ fault.IoFault {
     return call 'processus:neca' (child.pid) ↦ void
 }
 
@@ -90,7 +99,7 @@ fn kill(Subprocess child) → void {
 # lista<string | nihil | tabula> is untyped, so they stay off the
 # surface until a later typed record (R1: one meaning).
 @ public
-fn detach(list<string> args) → int {
+fn detach(list<string> args) → int ⇥ fault.IoFault {
     return call 'processus:dimitte' (args) ↦ int
 }
 
@@ -98,7 +107,7 @@ fn detach(list<string> args) → int {
 # No shell is involved; args[0] is the executable and the remaining elements
 # are passed as literal argv entries.
 @ public
-fn capture(list<string> args) → value {
+fn capture(list<string> args) → value ⇥ fault.IoFault {
     return call 'processus:captura' (args) ↦ value
 }
 
@@ -111,13 +120,13 @@ fn capture(list<string> args) → value {
 
 # Execute shell command, block until complete, return stdout (sync)
 @ public
-fn exec(string command) → string {
+fn exec(string command) → string ⇥ fault.IoFault {
     return call 'processus:exsequi' (command) ↦ string
 }
 
 # Execute shell command, return stdout when complete (async route; Faber blocks)
 @ public
-fn exec_async(string command) → string {
+fn exec_async(string command) → string ⇥ fault.IoFault {
     return call 'processus:exsequetur' (command) ↦ string
 }
 
@@ -130,7 +139,7 @@ fn exec_async(string command) → string {
 
 # Read environment variable (Imperativus: fails when unset; set-to-empty → "")
 @ public
-fn read_env(string name) → string {
+fn read_env(string name) → string ∪ none {
     return call 'processus:lege' (name) ↦ string
 }
 
@@ -156,7 +165,7 @@ fn cwd() → string {
 
 # Change current working directory
 @ public
-fn chdir(string path) → void {
+fn chdir(string path) → void ⇥ fault.IoFault {
     return call 'processus:muta' (path) ↦ void
 }
 
