@@ -3637,6 +3637,26 @@ message = "مطلوب مصدر الاختزال بعد معامل الاختزا
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "مطلوب '{lege}' أو '{lineam}'"
 
+[diagnostics.PARSE001.issues.expected_mutability_keyword]
+message = "مطلوب '{fixum}' أو '{varia}'"
+help = "ابدأ التعريف بكلمة مفتاحية للقابلية للتغيير"
+
+[diagnostics.PARSE001.issues.expected_method_declaration]
+message = "مطلوب تصريح دالة"
+help = "اكتب الدالة كتصريح '{functio}'"
+
+[diagnostics.PARSE001.issues.expected_praepara_hook]
+message = "مطلوب خطاف '{praepara}'"
+help = "اكتب '{praepara}' أو '{praeparabit}' أو '{postpara}' أو '{postparabit}'"
+
+[diagnostics.PARSE001.issues.expected_scribe_keyword]
+message = "مطلوب كلمة مفتاحية '{scribe}'"
+help = "اكتب '{scribe}' أو '{vide}' أو '{mone}' أو '{nota}'"
+
+[diagnostics.PARSE001.issues.expected_incipit_keyword]
+message = "مطلوب '{incipit}' أو '{incipiet}'"
+help = "ابدأ نقطة الدخول بـ '{incipit}' أو '{incipiet}'"
+
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "مطلوب قوس فتح لجسم elige"
 

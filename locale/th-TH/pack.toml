@@ -3649,6 +3649,26 @@ message = "ต้องมี reduction source หลัง reduction operator"
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "ต้องมี '{lege}' หรือ '{lineam}'"
 
+[diagnostics.PARSE001.issues.expected_mutability_keyword]
+message = "ต้องมี '{fixum}' หรือ '{varia}'"
+help = "เริ่ม declaration ด้วยคำสำคัญบอกความเปลี่ยนแปลง"
+
+[diagnostics.PARSE001.issues.expected_method_declaration]
+message = "ต้องมี method declaration"
+help = "เขียน method เป็น declaration '{functio}'"
+
+[diagnostics.PARSE001.issues.expected_praepara_hook]
+message = "ต้องมีฮุก '{praepara}'"
+help = "เขียน '{praepara}', '{praeparabit}', '{postpara}' หรือ '{postparabit}'"
+
+[diagnostics.PARSE001.issues.expected_scribe_keyword]
+message = "ต้องมีคำสำคัญ '{scribe}'"
+help = "เขียน '{scribe}', '{vide}', '{mone}' หรือ '{nota}'"
+
+[diagnostics.PARSE001.issues.expected_incipit_keyword]
+message = "ต้องมี '{incipit}' หรือ '{incipiet}'"
+help = "เริ่มจุดเข้าด้วย '{incipit}' หรือ '{incipiet}'"
+
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี elige"
 
