@@ -2248,6 +2248,19 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         args: &[MirOperand],
         span: Span,
     ) -> Result<CallOutcome, RunnerError> {
+        // d32b3558-3.4: a stepped generator walk settles through a TryCall
+        // whose callee operand still holds the cursor value (the temp is typed
+        // as the materialized lista but carries the lazy carrier). The settle
+        // is not a function call: it hands back the error the cursor raised
+        // (if any), or succeeds with unit so the walk ends normally.
+        if let MirCallee::Value(operand) = callee
+            && let Value::Cursor(cursor) = self.eval_operand(operand, span)?
+        {
+            return Ok(match cursor.take_raised() {
+                Some(raised) => CallOutcome::Err(raised),
+                None => CallOutcome::Ok(Value::Unit),
+            });
+        }
         let (func_id, closure_environment) = match callee {
             MirCallee::Closure(closure) => {
                 let Some(environment) = self
