@@ -539,3 +539,50 @@ fn itera_method_source_binder_fresh_local_is_accepted() {
         "functio f() → numerus {\n    varia tabula<textus, lista<numerus>> p ← vacua\n    itera ex p.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
     );
 }
+
+// ── `→ de T` call results beyond one free function with one `de` parameter
+// (7b471d14-10): a method call's `de` result hands back the receiver's state,
+// and a free function with several `de` parameters of the returned payload
+// type may hand back any of them. Every candidate root the callee exposes is
+// a possible source, so any read-only candidate makes the bind a shared
+// read-only alias (SEM065). A plain `→ T` result stays a fresh value.
+
+#[test]
+fn de_result_alias_method_call_receiver_over_parameter_is_rejected() {
+    let source = "genus Custos {\n    varia lista<numerus> res\n    functio sume() → de lista<numerus> {\n        redde ego.res\n    }\n}\nfunctio f(Custos p) → numerus {\n    varia lista<numerus> y ← p.sume()\n    redde y.longitudo()\n}\nincipit { }";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn de_result_alias_free_function_two_de_params_over_parameter_is_rejected() {
+    let source = "functio pick(de lista<numerus> a, de lista<numerus> b) → de lista<numerus> {\n    redde a\n}\nfunctio f(lista<numerus> xs) → numerus {\n    fixum lista<numerus> clean ← [1, 2]\n    varia lista<numerus> y ← pick(xs, clean)\n    redde y.longitudo()\n}\nincipit { }";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn de_result_alias_free_function_two_de_params_over_fresh_locals_is_accepted() {
+    test_support::assert_accepts(
+        "functio pick(de lista<numerus> a, de lista<numerus> b) → de lista<numerus> {\n    redde a\n}\nfunctio f() → numerus {\n    varia lista<numerus> a ← [1]\n    varia lista<numerus> b ← [2]\n    varia lista<numerus> y ← pick(a, b)\n    redde y.longitudo()\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn de_result_alias_method_call_over_fresh_receiver_is_accepted() {
+    test_support::assert_accepts(
+        "genus Custos {\n    varia lista<numerus> res\n    functio sume() → de lista<numerus> {\n        redde ego.res\n    }\n}\nfunctio f() → numerus {\n    varia Custos p ← Custos { res = [1, 2] }\n    varia lista<numerus> y ← p.sume()\n    redde y.longitudo()\n}\nincipit { }",
+    );
+}
