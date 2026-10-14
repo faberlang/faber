@@ -766,6 +766,46 @@ fn go_imported_constants(
     reads.found
 }
 
+/// Imported lazy generator callees called as `module.member(..)` in `hir`.
+#[cfg(feature = "hir-go")]
+#[allow(dead_code)]
+fn go_imported_generators(
+    analysis: &crate::driver::AnalyzedModule,
+    hir: &HirModule,
+) -> rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId> {
+    use crate::hir::HirExpressionKind;
+    use crate::hir::visit::HirVisitor;
+    struct Reads<'u> {
+        analysis: &'u crate::driver::AnalyzedModule,
+        found:
+            rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId>,
+    }
+    impl HirVisitor for Reads<'_> {
+        fn visit_expr(&mut self, expr: &crate::hir::HirExpression) {
+            if let HirExpressionKind::Call(callee, ..) = &expr.kind
+                && let HirExpressionKind::Field(object, member) = &callee.kind
+                && let HirExpressionKind::Path(module) = &object.kind
+                && let Some(namespace) = self.analysis.resolver.get_symbol(*module)
+                && namespace.kind == crate::semantic::SymbolKind::Module
+                && let Some(sig) = self
+                    .analysis
+                    .resolver
+                    .namespace_file_function_canonical(namespace.name, *member)
+                && sig.is_generator
+                && !sig.is_async
+                && sig.err.is_none()
+                && let radix_types::Type::Array(elem) = self.analysis.types.get(sig.ret)
+            {
+                self.found.insert((*module, *member), *elem);
+            }
+            crate::hir::visit::walk_expr(self, expr);
+        }
+    }
+    let mut reads = Reads { analysis, found: rustc_hash::FxHashMap::default() };
+    crate::hir::visit::walk_program(&mut reads, hir);
+    reads.found
+}
+
 #[cfg(not(feature = "hir-go"))]
 fn generate_go_from_analyzed(
     _analysis: &crate::driver::AnalyzedModule,
