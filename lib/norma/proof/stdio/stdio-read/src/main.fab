@@ -1,0 +1,30 @@
++++
+locale = "en"
++++
+
+# N3 stdio leaf sync routes through the Norma console wrappers.
+#
+# Covers consolum:lege (read_line) and consolum:hauri (read_bytes). stdout is
+# an exact golden; stdin is `alpha\nbeta\ngamma\n` so the two line reads and
+# the byte read see distinct data. hauri does ONE read of at most n bytes, so
+# only the first byte is pinned.
+
+import from "norma:console" console
+
+main {
+    const string ∪ none a ← console.read_line()
+    assert a not is none
+    const string first ↤ a
+    assert first ≡ "alpha"
+
+    const string ∪ none b ← console.read_line()
+    assert b not is none
+    const string second ↤ b
+    assert second ≡ "beta"
+
+    const list<b8> chunk ← console.read_bytes(3) coalesce ||
+    assert chunk.length() ≥ 1
+    assert (chunk.get(0) coalesce (0 ∷ b8)) ≡ 0x67
+
+    console.write_line("stdio-read-ok")
+}
