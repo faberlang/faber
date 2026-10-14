@@ -67,7 +67,7 @@ fn rejects_postfix_array_param_type() {
             && err
                 .args
                 .iter()
-                .any(|arg| arg.name == "expected" && arg.value == "identifier")
+                .any(|arg| arg.name == "issue" && arg.value == "expected_identifier")
     }));
 }
 

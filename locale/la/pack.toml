@@ -5010,3 +5010,11 @@ message = "expected ')' after the scriptum arguments"
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "vocabulum exspectabatur: '{expected}'"
 help = "scribe '{expected}' hic"
+
+[diagnostics.PARSE001.issues.expected_identifier]
+message = "nomen identificatoris exspectabatur"
+help = "scribe nomen identificatoris hic"
+
+[diagnostics.PARSE001.issues.expected_string_literal]
+message = "chorda litteralis exspectabatur"
+help = "scribe chordam litteralem hic"

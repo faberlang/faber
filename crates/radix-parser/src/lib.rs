@@ -1365,6 +1365,11 @@ impl Parser {
         ParseError::structured(ParseErrorKind::Expected, span).with_arg("expected", expected)
     }
 
+    /// Expectation failure that names its locale `issue` instead of prose.
+    fn expected_issue_error(issue: &'static str, span: Span) -> ParseError {
+        ParseError::structured(ParseErrorKind::Expected, span).with_arg("issue", issue)
+    }
+
     /// Trailing-comma diagnostic shared by every item-list separator.
     fn item_list_trailing_comma_error(span: Span, position: &'static str) -> ParseError {
         ParseError::structured(ParseErrorKind::Expected, span)
@@ -1612,7 +1617,7 @@ impl Parser {
         match token.kind {
             TokenKind::Ident(sym) | TokenKind::Underscore(sym) => Ok(Ident { name: sym, span }),
             TokenKind::Tag => Ok(self.keyword_ident("tag", span)),
-            _ => Err(Self::expected_error("identifier", span)),
+            _ => Err(Self::expected_issue_error("expected_identifier", span)),
         }
     }
 
@@ -1669,7 +1674,10 @@ impl Parser {
         if let Some(kind) = self.current_keyword_ident()
             && keyword_allowed_as_ident(owner, &kind).is_none()
         {
-            return Err(Self::expected_error("identifier", self.current_span()));
+            return Err(Self::expected_issue_error(
+                "expected_identifier",
+                self.current_span(),
+            ));
         }
         let token = self.advance();
         let span = token.span;
@@ -1682,7 +1690,7 @@ impl Parser {
                 if let Some(text) = keyword_allowed_as_ident(owner, kind) {
                     Ok(self.keyword_ident(text, span))
                 } else {
-                    Err(Self::expected_error("identifier", span))
+                    Err(Self::expected_issue_error("expected_identifier", span))
                 }
             }
         }
@@ -1705,7 +1713,10 @@ impl Parser {
         let token = self.advance();
         match &token.kind {
             TokenKind::String(sym) => Ok(*sym),
-            _ => Err(Self::expected_error("string literal", token.span)),
+            _ => Err(Self::expected_issue_error(
+                "expected_string_literal",
+                token.span,
+            )),
         }
     }
 }
@@ -1966,3 +1977,7 @@ mod selective_import_type_pattern_test;
 #[cfg(test)]
 #[path = "latin_type_seal_test.rs"]
 mod latin_type_seal_test;
+
+#[cfg(test)]
+#[path = "expected_issue_test.rs"]
+mod expected_issue_test;

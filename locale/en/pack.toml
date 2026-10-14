@@ -5542,3 +5542,11 @@ message = "expected ')' after the scriptum arguments"
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "expected keyword '{expected}'"
 help = "add '{expected}' here"
+
+[diagnostics.PARSE001.issues.expected_identifier]
+message = "expected an identifier"
+help = "put an identifier name here"
+
+[diagnostics.PARSE001.issues.expected_string_literal]
+message = "expected a string literal"
+help = "put a quoted string literal here"

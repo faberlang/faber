@@ -1979,14 +1979,14 @@ fn pd26_optional_non_null_postfix_matrix() {
     assert!(matches!(optional.chain, OptionalChainKind::Member(_)));
 
     for (source, arg_name, expected) in [
-        ("fixum _ value ← a?.", "expected", "identifier"),
+        ("fixum _ value ← a?.", "issue", "expected_identifier"),
         ("fixum _ value ← a?[0", "issue", "optional_index_end"),
         (
             "fixum _ value ← a?(1",
             "issue",
             "optional_call_arguments_end",
         ),
-        ("fixum _ value ← a!.", "expected", "identifier"),
+        ("fixum _ value ← a!.", "issue", "expected_identifier"),
         ("fixum _ value ← a![0", "issue", "non_null_index_end"),
         (
             "fixum _ value ← a!(1",
@@ -2006,7 +2006,7 @@ fn pd26_optional_non_null_postfix_matrix() {
                         .any(|arg| arg.name == arg_name && arg.value == expected)
             })
             .unwrap_or_else(|| panic!("expected {expected:?} error, got {:?}", result.errors));
-        let expected_span = if expected == "identifier" {
+        let expected_span = if expected == "expected_identifier" {
             span_for(source, if source.contains("?.") { "?." } else { "!." })
         } else {
             let end = u32::try_from(source.len()).unwrap();

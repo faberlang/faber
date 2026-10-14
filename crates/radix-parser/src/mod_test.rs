@@ -127,7 +127,7 @@ incipit argumenta args {}
                 && err
                     .args
                     .iter()
-                    .any(|arg| arg.name == "expected" && arg.value == "string literal")
+                    .any(|arg| arg.name == "issue" && arg.value == "expected_string_literal")
         })
         .expect("structured expected diagnostic");
 
@@ -149,7 +149,7 @@ fn bare_optio_annotation_expected_identifier() {
                 && err
                     .args
                     .iter()
-                    .any(|arg| arg.name == "expected" && arg.value == "identifier")
+                    .any(|arg| arg.name == "issue" && arg.value == "expected_identifier")
         })
         .expect("structured expected diagnostic");
 
@@ -807,13 +807,13 @@ fn rejects_malformed_itera_apud_clauses_with_structured_errors() {
         ),
         (
             r"itera ex m apud [] fixum cell { }",
-            "expected",
-            "identifier",
+            "issue",
+            "expected_identifier",
         ),
         (
             r"itera ex m apud [i,] fixum cell { }",
-            "expected",
-            "identifier",
+            "issue",
+            "expected_identifier",
         ),
     ] {
         let result = parse_program(source);
@@ -896,10 +896,7 @@ fn bare_cli_annotation_requires_string_default() {
 @ cli
 incipit argumenta args {}
 ",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "string literal",
-        },
+        ParseExpectation::Issue("expected_string_literal"),
     );
 }
 
@@ -924,10 +921,7 @@ fn bare_imperium_annotation_requires_string_default() {
 @ imperium
 functio run() {}
 ",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "string literal",
-        },
+        ParseExpectation::Issue("expected_string_literal"),
     );
 }
 
@@ -987,10 +981,7 @@ fn bare_optio_annotation_requires_identifier() {
         r"
 @ optio
 ",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "identifier",
-        },
+        ParseExpectation::Issue("expected_identifier"),
     );
 }
 
@@ -1001,10 +992,7 @@ fn optio_brevis_requires_string_literal() {
 @ optio output brevis
 incipit argumenta args {}
 ",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "string literal",
-        },
+        ParseExpectation::Issue("expected_string_literal"),
     );
 }
 
@@ -1015,10 +1003,7 @@ fn optio_longum_requires_string_literal() {
 @ optio output longum
 incipit argumenta args {}
 ",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "string literal",
-        },
+        ParseExpectation::Issue("expected_string_literal"),
     );
 }
 
@@ -1029,10 +1014,7 @@ fn optio_descriptio_requires_string_literal() {
 @ optio output descriptio
 incipit argumenta args {}
 ",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "string literal",
-        },
+        ParseExpectation::Issue("expected_string_literal"),
     );
 }
 
@@ -1043,10 +1025,7 @@ fn optio_typus_requires_identifier() {
 @ optio output typus
 {}
 ",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "identifier",
-        },
+        ParseExpectation::Issue("expected_identifier"),
     );
 }
 
@@ -1068,10 +1047,7 @@ fn operandus_requires_identifier_after_type() {
 @ operandus textus
 {}
 ",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "identifier",
-        },
+        ParseExpectation::Issue("expected_identifier"),
     );
 }
 
@@ -1082,10 +1058,7 @@ fn operandus_descriptio_requires_string_literal() {
 @ operandus textus input descriptio
 incipit argumenta args {}
 ",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "string literal",
-        },
+        ParseExpectation::Issue("expected_string_literal"),
     );
 }
 
@@ -2281,10 +2254,7 @@ fn malformed_json_negative_number_reports_structured_unexpected_error() {
 fn genus_field_colon_init_rejected() {
     assert_parse_error_matches(
         r"genus Point { numerus x : 0 }",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "identifier",
-        },
+        ParseExpectation::Issue("expected_identifier"),
     );
 }
 
@@ -2359,10 +2329,7 @@ fn proba_fragilis_modifier_requires_number() {
 fn proba_modifiers_must_follow_name() {
     assert_parse_error_matches(
         r#"proba solum tag "parser" "parses input" {}"#,
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "string literal",
-        },
+        ParseExpectation::Issue("expected_string_literal"),
     );
 }
 
@@ -2370,10 +2337,7 @@ fn proba_modifiers_must_follow_name() {
 fn probandum_modifiers_must_follow_name() {
     assert_parse_error_matches(
         r#"probandum solum tag "parser" "suite" {}"#,
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "string literal",
-        },
+        ParseExpectation::Issue("expected_string_literal"),
     );
 }
 
@@ -3941,10 +3905,7 @@ fn name_slots_accept_keyword_spellings_on_latin_surface() {
 fn legacy_question_mark_in_fixum_rejected() {
     assert_parse_error_matches(
         r"fixum textus? maybe ← nulla",
-        ParseExpectation::Arg {
-            name: "expected",
-            value: "identifier",
-        },
+        ParseExpectation::Issue("expected_identifier"),
     );
 }
 
