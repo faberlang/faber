@@ -94,6 +94,45 @@ fn mixed_carrier_equality_and_keys_are_value_canonical() {
 }
 
 #[test]
+fn mixed_carrier_list_equality_is_element_canonical() {
+    let int_cells = Value::Array(Rc::new(RefCell::new(vec![
+        Value::Int(222),
+        Value::Int(173),
+    ])));
+    let uint_cells = Value::Array(Rc::new(RefCell::new(vec![
+        Value::UInt(222),
+        Value::UInt(173),
+    ])));
+    assert!(values_equal(&int_cells, &uint_cells));
+    assert!(values_equal(&uint_cells, &int_cells));
+    assert!(!values_equal(
+        &Value::Array(Rc::new(RefCell::new(vec![Value::Int(1)]))),
+        &Value::Array(Rc::new(RefCell::new(vec![Value::UInt(2)])))
+    ));
+    assert!(!values_equal(
+        &Value::Array(Rc::new(RefCell::new(vec![Value::Int(1)]))),
+        &Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])))
+    ));
+    let nested_int = Value::Array(Rc::new(RefCell::new(vec![Value::Array(Rc::new(
+        RefCell::new(vec![Value::Int(1)]),
+    ))])));
+    let nested_uint = Value::Array(Rc::new(RefCell::new(vec![Value::Array(Rc::new(
+        RefCell::new(vec![Value::UInt(1)]),
+    ))])));
+    assert!(values_equal(&nested_int, &nested_uint));
+    assert!(values_equal(
+        &Value::Tuple(vec![Value::Int(1), Value::Str("a".to_owned())]),
+        &Value::Tuple(vec![Value::UInt(1), Value::Str("a".to_owned())])
+    ));
+    let vector_int = Value::Vector(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])));
+    let vector_uint = Value::Vector(Rc::new(RefCell::new(vec![Value::UInt(1), Value::UInt(2)])));
+    assert!(values_equal(&vector_int, &vector_uint));
+    assert!(values_equal(&vector_uint, &vector_int));
+    let nan_array = Value::Array(Rc::new(RefCell::new(vec![Value::Float(f64::NAN)])));
+    assert!(!values_equal(&nan_array, &nan_array));
+}
+
+#[test]
 fn mixed_integer_float_equality_uses_numeric_promotion() {
     assert!(values_equal(&Value::Int(1), &Value::Float(1.0)));
     assert!(values_equal(&Value::Float(1.0), &Value::UInt(1)));
