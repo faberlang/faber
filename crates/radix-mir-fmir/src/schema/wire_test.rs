@@ -17,7 +17,7 @@ fn reflection_carrier_content_round_trips_through_the_wire() {
     let reflection = FmirArtifactReflection {
         v: super::super::ARTIFACT_REFLECTION_VERSION,
         kernels: vec![FmirReflectedKernel {
-            function: "addita".to_owned(),
+            function: 7,
             entry_name: "addita".to_owned(),
             resources: vec![
                 FmirReflectedResource {

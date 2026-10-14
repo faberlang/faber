@@ -127,7 +127,7 @@ pub fn project_host_execution_v1(
             .ok_or(HostExecutionProjectionError::MissingPhysicalFact {
                 fact: "declared launch kernel",
             })?;
-        resolve_final_entry(artifact, &source_kernel.entry)?;
+        resolve_final_entry(artifact, source_kernel.function, &source_kernel.entry)?;
     }
     Err(HostExecutionProjectionError::MissingPhysicalFact {
         fact: "admitted physical allocation/view plan",
@@ -144,8 +144,15 @@ fn explicit_selection(selection: &FmirDeviceSelection) -> Option<String> {
     }
 }
 
-fn resolve_final_entry(
+/// Resolve the final artifact symbol for one device-program kernel row.
+///
+/// The typed function id is the identity (G-06): the reflection path matches
+/// `FmirReflectedKernel::function` against it. The logical entry text is
+/// carried only for the artifact's entrypoint symbol table, whose rows are
+/// resolved by the emitted logical entry name.
+pub(super) fn resolve_final_entry(
     artifact: &FmirDeviceArtifact,
+    function_id: u32,
     logical_entry: &str,
 ) -> Result<String, HostExecutionProjectionError> {
     if !artifact.entrypoints.is_empty() {
@@ -179,7 +186,7 @@ fn resolve_final_entry(
     let mut entries = reflection
         .kernels
         .iter()
-        .filter(|kernel| kernel.function == logical_entry)
+        .filter(|kernel| kernel.function == function_id)
         .map(|kernel| kernel.entry_name.clone());
     let Some(entry) = entries.next() else {
         return Err(HostExecutionProjectionError::MissingArtifactEntry {

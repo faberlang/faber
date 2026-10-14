@@ -227,10 +227,11 @@ pub struct FmirDeviceSymbol {
 /// CTO9-6 a). The reflection carrier rides its OWN nested version, admitted
 /// fail-closed **before field interpretation** (the `admit_device_section`
 /// pattern / the MD2-W1 sibling-field precedent) — independently of the
-/// artifact ABI version and the outer packet shape. The first carrier shape
-/// is v1; concrete Metal/CUDA reflection CONTENT lands with DDCP4 leaf
-/// conformance (a content extension bumps this ratchet, never silently).
-pub const ARTIFACT_REFLECTION_VERSION: u32 = 1;
+/// artifact ABI version and the outer packet shape. v1 carried the reflected
+/// kernel's function identity as text; v2 carries the typed `MirFunctionId`
+/// (G-06) — the shape change bumps this ratchet so an old image is refused
+/// honestly instead of decoding v1 text into the numeric field.
+pub const ARTIFACT_REFLECTION_VERSION: u32 = 2;
 
 /// The versioned typed reflection carrier of a device artifact (DDCP3-U0 (a)
 /// / CTO9-6 a): the FMIR mirror of the radix-mir `MirGpuReflection` surface
@@ -256,8 +257,9 @@ pub struct FmirArtifactReflection {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FmirReflectedKernel {
-    /// The kernel's stable function identity (typed, never name-derived).
-    pub function: String,
+    /// The kernel's stable function identity (typed `MirFunctionId`, never
+    /// name-derived).
+    pub function: u32,
     /// The emitted entry name.
     pub entry_name: String,
     /// Declared resource bindings (canonical order at hash time).
@@ -270,14 +272,10 @@ impl FmirArtifactReflection {
     /// identity-bearing fields — kernel function identity, emitted entry
     /// name, and declared resource name/binding.
     ///
-    /// WHY the version stays at [`ARTIFACT_REFLECTION_VERSION`]: the leaf
-    /// content fills the existing v1 carrier shape exactly; it does not
-    /// extend it (the DDCP3-U0 (a) ratchet rule — bump only on shape
-    /// extension, never on content fill). Both leaves today emit the kernel
-    /// unit's logical entry as the entry symbol (Metal: identity map; CUDA:
-    /// entry → emitted symbol), so the logical entry is the kernel's stable
-    /// function identity in the FMIR image — the mapping never derives it
-    /// from emitted text.
+    /// The kernel's stable identity is the typed MIR function id
+    /// ([`ARTIFACT_REFLECTION_VERSION`] v2): `function` is `kernel.function.0`,
+    /// never derived from the emitted entry text. `entry_name` remains the
+    /// emitted entry text, carried for emission/diagnostics.
     #[must_use]
     pub fn from_mir_reflection(reflection: &radix_mir::abi::MirGpuReflection) -> Self {
         Self {
@@ -294,7 +292,7 @@ impl FmirArtifactReflection {
 impl FmirReflectedKernel {
     fn from_mir_kernel(kernel: &radix_mir::abi::MirKernelReflection) -> Self {
         Self {
-            function: kernel.entry_name.clone(),
+            function: kernel.function.0,
             entry_name: kernel.entry_name.clone(),
             resources: kernel
                 .resources
@@ -505,8 +503,8 @@ impl FmirDeviceArtifact {
         });
         if let Some(reflection) = &mut self.reflection {
             reflection.kernels.sort_by(|left, right| {
-                (left.function.as_str(), left.entry_name.as_str())
-                    .cmp(&(right.function.as_str(), right.entry_name.as_str()))
+                (left.function, left.entry_name.as_str())
+                    .cmp(&(right.function, right.entry_name.as_str()))
             });
             for kernel in &mut reflection.kernels {
                 kernel.resources.sort_by(|left, right| {
