@@ -2568,14 +2568,20 @@ impl Parser {
     /// Two-token lookahead for the expression-position `ratio` constructor
     /// claim (mirrors the contextual reduction-head check): commit only when the tokens after
     /// `<` open a labeled element (`IDENT/Tag` then `:`), the same
-    /// `is_label` shape `parse_ratio_type_argument` requires. Anything else
-    /// (`ratio < 5`) is an ordinary identifier followed by a comparison.
+    /// `is_label` shape `parse_ratio_type_argument` requires, or the whole
+    /// field-list hole (`*` then `>`) followed by the construction braces.
+    /// Anything else (`ratio < 5`, `a * b`) is an ordinary identifier
+    /// followed by operators.
     fn ratio_constructor_head(&self) -> bool {
-        matches!(self.peek_at(1).kind, TokenKind::Ident(_) | TokenKind::Tag)
-            && matches!(self.peek_at(2).kind, TokenKind::Colon)
+        (matches!(self.peek_at(1).kind, TokenKind::Ident(_) | TokenKind::Tag)
+            && matches!(self.peek_at(2).kind, TokenKind::Colon))
+            || (matches!(self.peek_at(1).kind, TokenKind::Star)
+                && matches!(self.peek_at(2).kind, TokenKind::GtAscii)
+                && matches!(self.peek_at(3).kind, TokenKind::LBrace))
     }
 
-    /// Parse the ratio constructor claim: `ratio<label: T, …> { field = value, … }`.
+    /// Parse the ratio constructor claim: `ratio<label: T, …> { field = value, … }`
+    /// or the whole-field-list hole `ratio<*> { field = value, … }`.
     ///
     /// The head is claimed only in this angle-bracket slot, so ordinary
     /// bindings named `ratio` (or a pack surface like `record`) remain
@@ -2583,20 +2589,30 @@ impl Parser {
     /// the constructed type matches the annotation path under any reader pack.
     fn parse_ratio_constructor(&mut self, name: Ident) -> Result<ExprKind, ParseError> {
         let name = self.canonical_type_ident(name);
+        let head_span = name.span;
         self.expect_issue(&TokenKind::LtAscii, "ratio_type_arguments_start")?;
 
-        let mut type_args = Vec::new();
-        let mut labels = HashSet::new();
-        loop {
-            type_args.push(GenericArgExpr::Type(
-                self.parse_ratio_type_argument(&mut labels)?,
-            ));
-            if !self.consume_item_separator(&TokenKind::GtAscii, "ratio_type_arguments")? {
-                break;
+        let ty_kind = if self.check(&TokenKind::Star) {
+            // `ratio<*>`: the whole field list is the hole, solved from the
+            // braced shape; it stays the sole argument by construction.
+            self.advance();
+            self.expect_issue(&TokenKind::GtAscii, "ratio_type_arguments_end")?;
+            TypeExprKind::FieldListHole
+        } else {
+            let mut type_args = Vec::new();
+            let mut labels = HashSet::new();
+            loop {
+                type_args.push(GenericArgExpr::Type(
+                    self.parse_ratio_type_argument(&mut labels)?,
+                ));
+                if !self.consume_item_separator(&TokenKind::GtAscii, "ratio_type_arguments")? {
+                    break;
+                }
             }
-        }
-        self.expect_issue(&TokenKind::GtAscii, "ratio_type_arguments_end")?;
-        let type_span = name.span.merge(self.previous_span());
+            self.expect_issue(&TokenKind::GtAscii, "ratio_type_arguments_end")?;
+            TypeExprKind::Named(name, type_args)
+        };
+        let type_span = head_span.merge(self.previous_span());
 
         self.expect_issue(&TokenKind::LBrace, "ratio_fields_start")?;
         let mut fields = self.parse_object_fields()?;
@@ -2611,7 +2627,7 @@ impl Parser {
         let ty = TypeExpr {
             nullable: false,
             mode: None,
-            kind: TypeExprKind::Named(name, type_args),
+            kind: ty_kind,
             span: type_span,
             form: TypeFormLevel::LONG,
             iuncta_label: None,
