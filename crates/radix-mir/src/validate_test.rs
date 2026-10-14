@@ -2256,6 +2256,125 @@ fn value_callee_not_callable_rejected() {
     );
 }
 
+/// The lowering shape for a stepped-cursor settle: the cursor-stream temp was
+/// retyped to its array type (`mark_stepped_cursor_stream`) and is invoked
+/// with no arguments as a `TryCall`. The cursor runtime carries the failable
+/// contract, so no signature exists for the callee.
+fn array_value_callee_fixture(types: &mut TypeTable, try_call: bool) -> MirProgram {
+    let element = types.primitive(Primitive::Numerus);
+    let array = MirType::semantic(types.array(element));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let textus = MirType::semantic(types.primitive(Primitive::Textus));
+    let cursor = || MirCallee::Value(MirOperand::Temp(crate::MirTempId(0)));
+    let mut blocks = vec![MirBlock {
+        id: MirBlockId(0),
+        statements: if try_call {
+            Vec::new()
+        } else {
+            vec![MirStatement {
+                kind: MirStatementKind::Call {
+                    destination: None,
+                    callee: cursor(),
+                    args: vec![],
+                },
+                span: Span::default(),
+            }]
+        },
+        terminator: MirTerminator {
+            kind: if try_call {
+                MirTerminatorKind::TryCall {
+                    destination: Some(MirPlace::temp(crate::MirTempId(1))),
+                    callee: cursor(),
+                    args: vec![],
+                    ok_block: MirBlockId(1),
+                    error_place: MirPlace {
+                        base: MirPlaceBase::Local(MirLocalId(0)),
+                        projections: Vec::new(),
+                    },
+                    error_block: MirBlockId(2),
+                }
+            } else {
+                MirTerminatorKind::Return(None)
+            },
+            span: Span::default(),
+        },
+        span: Span::default(),
+    }];
+    if try_call {
+        for id in [MirBlockId(1), MirBlockId(2)] {
+            blocks.push(MirBlock {
+                id,
+                statements: Vec::new(),
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            });
+        }
+    }
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: Vec::new(),
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: vacuum,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![
+                crate::MirTemp {
+                    id: crate::MirTempId(0),
+                    ty: array,
+                    span: Span::default(),
+                },
+                crate::MirTemp {
+                    id: crate::MirTempId(1),
+                    ty: vacuum,
+                    span: Span::default(),
+                },
+            ],
+            blocks,
+            return_ty: vacuum,
+            error_ty: Some(textus),
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
+/// The array-typed cursor temp settles through `TryCall` without a signature;
+/// the error place only has to be a valid place.
+#[test]
+fn try_call_on_array_value_callee_is_accepted_as_cursor_settle() {
+    let mut types = TypeTable::new();
+    let program = array_value_callee_fixture(&mut types, true);
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "expected cursor-settle TryCall acceptance, got: {errors:?}"
+    );
+}
+
+/// Only the cursor-settle `TryCall` shape is exempt: a plain `Call` on the
+/// same array value is still not callable.
+#[test]
+fn plain_call_on_array_value_callee_is_still_rejected() {
+    let mut types = TypeTable::new();
+    let program = array_value_callee_fixture(&mut types, false);
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("not callable")),
+        "expected 'not callable' error for array Value callee, got: {errors:?}"
+    );
+}
+
 // -----------------------------------------------------------------------
 // F-028 – gradient arity-only → add minimal type/handle checks
 // -----------------------------------------------------------------------
