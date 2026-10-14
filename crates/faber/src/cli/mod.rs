@@ -7,7 +7,7 @@ pub use emit::{EmitArgs, FaberCliTarget};
 use faber_cli::package::DeviceChoice;
 use std::path::PathBuf;
 
-const FABER_AFTER_HELP: &str = include_str!("../../docs/help/faber-after-help.md");
+const FABER_AFTER_HELP: &str = include_str!("../../help/faber-after-help.md");
 
 const CHECK_LONG_ABOUT: &str = "\
 Run semantic analysis on a file or package.
