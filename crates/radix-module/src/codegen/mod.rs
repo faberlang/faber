@@ -414,7 +414,7 @@ pub fn generate_from_analyzed_with_options(
                 r#gen.set_library_registry(&analysis.libraries);
                 r#gen.set_gpu_builtins(&ts_gpu_builtins(&analysis.gpu_builtins));
                 r#gen.set_intrinsic_surface(&ts_surface);
-                register_cross_file_defids(&mut r#gen, hir, &analysis.resolver);
+                register_cross_file_defids(&mut r#gen, hir, &analysis.resolver, &analysis.libraries);
                 let output = r#gen.generate(hir, &analysis.types, &module_interner)?;
                 Ok(crate::Output::TypeScript(crate::TypeScriptOutput { code: output.code }))
             }
@@ -578,6 +578,10 @@ pub(crate) fn display_tokens_for_module(
 #[path = "display_tokens_test.rs"]
 mod display_tokens_test;
 
+#[cfg(all(test, feature = "hir-ts", feature = "hir-go"))]
+#[path = "cross_locale_import_names_test.rs"]
+mod cross_locale_import_names_test;
+
 /// Register cross-file `DefIds` from sibling module imports into the TS codegen.
 ///
 /// When a package file imports another local file (`importa ex "./bridge"`),
@@ -590,8 +594,19 @@ mod display_tokens_test;
 /// Transitive library leaves (no consumer HIR binding) are the rust DEFID001
 /// class: facade signatures name those types, so they must land in the emit
 /// table even when the consumer never wrote `import from "leaf"`.
+///
+/// The interface's member is the consumer-locale surface spelling; the
+/// exporting unit declares the canonical spelling, so every registration maps
+/// through [`Resolver::imported_export_canonical_name`] exactly as the Rust
+/// backend does. Library items keep their library-registry spelling: the
+/// bindingless walk skips them so a file interface cannot shadow `libraries`.
 #[cfg(feature = "hir-ts")]
-fn register_cross_file_defids(r#gen: &mut ts::TsCodegen<'_>, hir: &HirModule, resolver: &crate::semantic::Resolver) {
+fn register_cross_file_defids(
+    r#gen: &mut ts::TsCodegen<'_>,
+    hir: &HirModule,
+    resolver: &crate::semantic::Resolver,
+    libraries: &crate::hir::LibraryRegistry,
+) {
     for item in &hir.items {
         let crate::hir::HirItemKind::Import(import) = &item.kind else {
             continue;
@@ -602,13 +617,18 @@ fn register_cross_file_defids(r#gen: &mut ts::TsCodegen<'_>, hir: &HirModule, re
                 continue;
             }
             for export in resolver.imported_file_type_exports(binding) {
-                r#gen.register_external_def(export.def_id, export.member, binding);
+                let canonical = resolver.imported_export_canonical_name(binding, export.member);
+                r#gen.register_external_def(export.def_id, canonical, binding);
             }
         }
     }
     for namespace in resolver.file_interface_namespaces() {
         for export in resolver.imported_file_type_exports(namespace) {
-            r#gen.register_named_def(export.def_id, export.member);
+            if libraries.items.contains_key(&export.def_id) {
+                continue;
+            }
+            let canonical = resolver.imported_export_canonical_name(namespace, export.member);
+            r#gen.register_named_def(export.def_id, canonical);
         }
     }
 }
@@ -637,8 +657,19 @@ fn ts_gpu_builtins(
 /// would be unresolvable during code generation. The flattened Go package
 /// declares the imported items in a sibling file, so registering the exported
 /// member name is enough for the reference to resolve.
+///
+/// The interface's member is the consumer-locale surface spelling; the
+/// exporting unit declares the canonical spelling, so every registration maps
+/// through [`Resolver::imported_export_canonical_name`] exactly as the Rust
+/// backend does. Library items keep their library-registry spelling: the
+/// bindingless walk skips them so a file interface cannot shadow `libraries`.
 #[cfg(feature = "hir-go")]
-fn register_go_cross_file_defids(r#gen: &mut go::GoCodegen<'_>, hir: &HirModule, resolver: &crate::semantic::Resolver) {
+fn register_go_cross_file_defids(
+    r#gen: &mut go::GoCodegen<'_>,
+    hir: &HirModule,
+    resolver: &crate::semantic::Resolver,
+    libraries: &crate::hir::LibraryRegistry,
+) {
     for item in &hir.items {
         let crate::hir::HirItemKind::Import(import) = &item.kind else {
             continue;
@@ -649,13 +680,18 @@ fn register_go_cross_file_defids(r#gen: &mut go::GoCodegen<'_>, hir: &HirModule,
                 continue;
             }
             for export in resolver.imported_file_type_exports(binding) {
-                r#gen.register_external_def(export.def_id, export.member);
+                let canonical = resolver.imported_export_canonical_name(binding, export.member);
+                r#gen.register_external_def(export.def_id, canonical);
             }
         }
     }
     for namespace in resolver.file_interface_namespaces() {
         for export in resolver.imported_file_type_exports(namespace) {
-            r#gen.register_external_def(export.def_id, export.member);
+            if libraries.items.contains_key(&export.def_id) {
+                continue;
+            }
+            let canonical = resolver.imported_export_canonical_name(namespace, export.member);
+            r#gen.register_external_def(export.def_id, canonical);
         }
     }
 }
@@ -670,7 +706,7 @@ fn generate_go_from_analyzed(
     r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     r#gen.set_library_registry(&analysis.libraries);
     r#gen.set_imported_constants(go_imported_constants(analysis, hir));
-    register_go_cross_file_defids(&mut r#gen, hir, &analysis.resolver);
+    register_go_cross_file_defids(&mut r#gen, hir, &analysis.resolver, &analysis.libraries);
     let mut statics = rustc_hash::FxHashMap::default();
     for (def_id, fields, _, _) in analysis.resolver.imported_file_structs() {
         for field in fields {
