@@ -1705,6 +1705,10 @@ help = "fix the AST construct for lowering"
 message = "template application has {actual} arguments but template has {expected} holes"
 help = "match the argument count to the template hole count"
 
+[diagnostics.SEM008.issues.template_hole_index_gap]
+message = "numbered hole §{index} is never filled; the numbers must cover every position from §0"
+help = "renumber the holes without a gap, or remove the unused argument"
+
 [diagnostics.SEM008.issues.template_type_args]
 message = "template application does not accept type arguments"
 help = "fix the AST construct for lowering"
