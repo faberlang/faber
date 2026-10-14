@@ -5,17 +5,17 @@
 //! Tests assert diagnostic code, issue and args only, never prose. Acceptance is
 //! checked on the analysis path: `∉` has no emitter until unit 3b.
 
-use super::test_support::{analyze_ok, assert_analysis_accepts as assert_accepts};
+use super::test_support::{analyze_ok_la, assert_analysis_accepts_la as assert_accepts};
 use crate::hir::{HirBinOp, HirExpressionKind, HirStatementKind};
 use crate::{Compiler, Config, Target};
 
 fn compile(source: &str) -> crate::CompileResult {
-    Compiler::new(Config::default().with_target(Target::HirRust)).compile_str("test.fab", source)
+    Compiler::new(Config::default().with_target(Target::HirRust).with_latin_locale()).compile_str("test.fab", source)
 }
 
 /// The resolved operator of every `fixum _ ← <binary>` local in the entry block.
 fn resolved_ops(source: &str) -> Vec<HirBinOp> {
-    let unit = analyze_ok(source);
+    let unit = analyze_ok_la(source);
     let entry = unit.hir.entry.as_ref().expect("incipit");
     entry
         .statements

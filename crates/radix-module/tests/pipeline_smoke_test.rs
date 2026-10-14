@@ -67,7 +67,7 @@ functio add_one(f32 x) → f32 {
 #[cfg(feature = "mir-llvm")]
 #[test]
 fn llvm_text_emits_nonempty_output() {
-    let session = Session::new(Config::default().with_target(Target::MirLlvm));
+    let session = Session::new(Config::default().with_target(Target::MirLlvm).with_latin_locale());
     let result = compile(&session, "smoke.fab", ADD_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
@@ -80,7 +80,7 @@ fn llvm_text_emits_nonempty_output() {
 #[cfg(feature = "mir-llvm")]
 #[test]
 fn llvm_text_contains_function_definition() {
-    let session = Session::new(Config::default().with_target(Target::MirLlvm));
+    let session = Session::new(Config::default().with_target(Target::MirLlvm).with_latin_locale());
     let result = compile(&session, "smoke.fab", ADD_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
@@ -97,7 +97,7 @@ fn llvm_text_contains_function_definition() {
 #[cfg(feature = "mir-llvm")]
 #[test]
 fn llvm_text_emits_nonempty_for_incipit() {
-    let session = Session::new(Config::default().with_target(Target::MirLlvm));
+    let session = Session::new(Config::default().with_target(Target::MirLlvm).with_latin_locale());
     let result = compile(&session, "smoke.fab", INCIPIT_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
@@ -116,7 +116,7 @@ fn llvm_text_emits_nonempty_for_incipit() {
 #[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_emits_nonempty_output() {
-    let session = Session::new(Config::default().with_target(Target::MirWgsl));
+    let session = Session::new(Config::default().with_target(Target::MirWgsl).with_latin_locale());
     let result = compile(&session, "smoke.fab", KERNEL_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
@@ -129,7 +129,7 @@ fn wgsl_text_emits_nonempty_output() {
 #[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_contains_fn_declaration() {
-    let session = Session::new(Config::default().with_target(Target::MirWgsl));
+    let session = Session::new(Config::default().with_target(Target::MirWgsl).with_latin_locale());
     let result = compile(&session, "smoke.fab", KERNEL_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
@@ -145,7 +145,7 @@ fn wgsl_text_contains_fn_declaration() {
 #[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_includes_reflection() {
-    let session = Session::new(Config::default().with_target(Target::MirWgsl));
+    let session = Session::new(Config::default().with_target(Target::MirWgsl).with_latin_locale());
     let result = compile(&session, "smoke.fab", KERNEL_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
@@ -160,7 +160,7 @@ fn wgsl_text_includes_reflection() {
 #[cfg(feature = "mir-metal")]
 #[test]
 fn metal_text_emits_nonempty_output() {
-    let session = Session::new(Config::default().with_target(Target::MirMetal));
+    let session = Session::new(Config::default().with_target(Target::MirMetal).with_latin_locale());
     let result = compile(&session, "smoke.fab", KERNEL_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
@@ -173,7 +173,7 @@ fn metal_text_emits_nonempty_output() {
 #[cfg(feature = "mir-metal")]
 #[test]
 fn metal_text_contains_kernel_declaration() {
-    let session = Session::new(Config::default().with_target(Target::MirMetal));
+    let session = Session::new(Config::default().with_target(Target::MirMetal).with_latin_locale());
     let result = compile(&session, "smoke.fab", KERNEL_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
@@ -191,7 +191,7 @@ fn metal_text_contains_kernel_declaration() {
 #[cfg(feature = "mir-wasm")]
 #[test]
 fn wasm_text_emits_nonempty_output() {
-    let session = Session::new(Config::default().with_target(Target::MirWasm));
+    let session = Session::new(Config::default().with_target(Target::MirWasm).with_latin_locale());
     let result = compile(&session, "smoke.fab", ADD_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
@@ -204,7 +204,7 @@ fn wasm_text_emits_nonempty_output() {
 #[cfg(feature = "mir-wasm")]
 #[test]
 fn wasm_text_contains_module() {
-    let session = Session::new(Config::default().with_target(Target::MirWasm));
+    let session = Session::new(Config::default().with_target(Target::MirWasm).with_latin_locale());
     let result = compile(&session, "smoke.fab", ADD_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 
@@ -222,7 +222,7 @@ fn wasm_text_contains_module() {
 #[cfg(feature = "mir-sexp")]
 #[test]
 fn sexp_text_emits_nonempty_output() {
-    let session = Session::new(Config::default().with_target(Target::MirSexp));
+    let session = Session::new(Config::default().with_target(Target::MirSexp).with_latin_locale());
     let result = compile(&session, "smoke.fab", ADD_SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
 

@@ -6,9 +6,17 @@
 //! importer may still set every field in a construction literal.
 
 use crate::import_resolve::library_home_test_support;
-use crate::services::{CheckDiagnosticsResult, check_diagnostics_for_source};
+use crate::services::{CheckDiagnosticsResult, check_diagnostics_for_source_with_locale_pack};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+
+/// The built-in Latin (`la`) reader pack: the canonical surface these tests
+/// are written in.
+fn la_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("installed la pack should load")
+}
 
 fn temp_dir(label: &str) -> (tempfile::TempDir, PathBuf) {
     let dir = crate::test_support::test_temp_dir(&format!("member-privacy-{label}"));
@@ -70,7 +78,7 @@ fn check_same_package(line: &str) -> CheckDiagnosticsResult {
     let path = root.join("src/consumer.fab");
     let source = consumer("./probe", line);
     fs::write(&path, &source).expect("consumer");
-    check_diagnostics_for_source(&path.display().to_string(), &source, false)
+    check_diagnostics_for_source_with_locale_pack(&path.display().to_string(), &source, false, Some(&la_pack()), None)
 }
 
 fn check_cross_package(line: &str) -> CheckDiagnosticsResult {
@@ -80,7 +88,7 @@ fn check_cross_package(line: &str) -> CheckDiagnosticsResult {
     let source = consumer("probe:probe", line);
     fs::write(&path, &source).expect("app");
     let _guard = LibraryHomeGuard::set(&home);
-    check_diagnostics_for_source(&path.display().to_string(), &source, false)
+    check_diagnostics_for_source_with_locale_pack(&path.display().to_string(), &source, false, Some(&la_pack()), None)
 }
 
 fn assert_issue(result: &CheckDiagnosticsResult, issue: &str) {

@@ -1,14 +1,14 @@
 //! BB-8R pins: shared ops, prefix equality, and overflow alternate exit
 //! across `lista<T, N>`, `textus<N>`, `ascii<N>`, and `octeti<N>`.
 
-use super::test_support::{assert_accepts, assert_rejects_with_issue};
+use super::test_support::{assert_accepts_la, assert_rejects_with_issue_la};
 
 const EXACT_EQ_ISSUE: &str = "equality_exact_types_required";
 const FAILABLE_ISSUE: &str = "failable_call_requires_handler";
 
 #[test]
 fn bounded_ops_longitudo_and_vacua_are_len_not_capacity() {
-    assert_accepts(
+    assert_accepts_la(
         r"functio probe(
     lista<numerus, 8> xs,
     textus<8> t,
@@ -41,7 +41,7 @@ incipit {
 
 #[test]
 fn bounded_ops_accipe_and_sectio_typecheck() {
-    assert_accepts(
+    assert_accepts_la(
         r"functio probe(
     lista<numerus, 8> xs,
     textus<8> t,
@@ -68,7 +68,7 @@ incipit {
 
 #[test]
 fn bounded_ops_appende_requires_alternate_exit() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         // D17.8: `incipit` (main) is exempt; the rule applies in a helper.
         r"functio grow() → vacuum {
     varia lista<numerus, 8> xs ← vacua
@@ -76,7 +76,7 @@ fn bounded_ops_appende_requires_alternate_exit() {
 }",
         FAILABLE_ISSUE,
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r#"functio grow() → vacuum {
     varia textus raw ← "ab"
     varia textus<8> t ← raw ↦ textus<8>
@@ -88,7 +88,7 @@ incipit {
 }"#,
         FAILABLE_ISSUE,
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"functio grow() → vacuum {
     varia ascii<8> a ← 'ab'
     a.appende('c')
@@ -99,7 +99,7 @@ incipit {
 }",
         FAILABLE_ISSUE,
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"functio grow() → vacuum {
     varia octeti raw ← |61|
     varia octeti<8> o ← raw ↦ octeti<8>
@@ -115,7 +115,7 @@ incipit {
 
 #[test]
 fn bounded_ops_appende_propagates_on_textus_channel() {
-    assert_accepts(
+    assert_accepts_la(
         r#"functio grow_lista() → vacuum ⇥ textus {
     varia lista<numerus, 8> xs ← vacua
     xs.appende(1)
@@ -148,7 +148,7 @@ incipit {
 fn bounded_ops_equality_ignores_spare_slots() {
     // Same initialized prefix, independently converted so spare `len..N` is
     // unread (carrier PartialEq is prefix-only). Typecheck accepts `≡`.
-    assert_accepts(
+    assert_accepts_la(
         r"incipit {
     fixum lista<numerus> raw ← [1, 2]
     fixum lista<numerus, 8> a ← raw ↦ lista<numerus, 8>
@@ -156,7 +156,7 @@ fn bounded_ops_equality_ignores_spare_slots() {
     si a ≡ b { nota 1 }
 }",
     );
-    assert_accepts(
+    assert_accepts_la(
         r#"incipit {
     fixum textus raw ← "ab"
     fixum textus<8> a ← raw ↦ textus<8>
@@ -164,14 +164,14 @@ fn bounded_ops_equality_ignores_spare_slots() {
     si a ≡ b { nota 1 }
 }"#,
     );
-    assert_accepts(
+    assert_accepts_la(
         r"incipit {
     fixum ascii<8> a ← 'ab'
     fixum ascii<8> b ← 'ab'
     si a ≡ b { nota 1 }
 }",
     );
-    assert_accepts(
+    assert_accepts_la(
         r"incipit {
     fixum octeti raw ← |61 62|
     fixum octeti<8> a ← raw ↦ octeti<8>
@@ -183,7 +183,7 @@ fn bounded_ops_equality_ignores_spare_slots() {
 
 #[test]
 fn bounded_ops_equality_stays_same_n() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"functio same(lista<numerus, 8> a, lista<numerus, 4> b) → bivalens {
     redde a ≡ b
 }
@@ -193,7 +193,7 @@ incipit {
 }",
         EXACT_EQ_ISSUE,
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"functio same(textus<8> a, textus<4> b) → bivalens {
     redde a ≡ b
 }
@@ -203,7 +203,7 @@ incipit {
 }",
         EXACT_EQ_ISSUE,
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"functio same(ascii<8> a, ascii<4> b) → bivalens {
     redde a ≡ b
 }
@@ -213,7 +213,7 @@ incipit {
 }",
         EXACT_EQ_ISSUE,
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"functio same(octeti<8> a, octeti<4> b) → bivalens {
     redde a ≡ b
 }

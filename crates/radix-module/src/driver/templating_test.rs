@@ -5,13 +5,13 @@ use super::compile;
 use crate::codegen::Target;
 use crate::diagnostics::DiagnosticArg;
 use crate::driver::ModuleCompileRequest;
-use crate::test_support::{assert_compile_fails_with_args, assert_compile_fails_with_issue, test_session};
+use crate::test_support::{assert_compile_fails_with_args, assert_compile_fails_with_issue, test_session_la};
 
 // ── template / forma / scriptum ──
 
 #[test]
 fn backtick_template_captures_forma_without_rendering() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum textus accountId ← "acct-1"
   fixum textus plan ← "pro"
@@ -31,7 +31,7 @@ fn backtick_template_captures_forma_without_rendering() {
 
 #[test]
 fn bare_backtick_template_produces_empty_params() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   fixum _ q ← `select 1`
   nota q.template
@@ -45,7 +45,7 @@ fn bare_backtick_template_produces_empty_params() {
 
 #[test]
 fn forma_reused_textus_param_is_borrowed_not_moved() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum textus t ← "x"
   fixum _ first ← `§`(t)
@@ -65,7 +65,7 @@ fn forma_reused_textus_param_is_borrowed_not_moved() {
 
 #[test]
 fn quoted_template_still_renders_via_scriptum() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum textus name ← "Mundus"
   fixum textus message ← "Hello, §!"(name)
@@ -80,7 +80,7 @@ fn quoted_template_still_renders_via_scriptum() {
 
 #[test]
 fn compile_lowers_scriptum_expression() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum _ name ← "Marcus"
   fixum _ msg ← scriptum("salve, §!", name)
@@ -95,7 +95,7 @@ fn compile_lowers_scriptum_expression() {
 
 #[test]
 fn block_string_literal_uses_guillemets() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  fixum _ quote ← «he said \"salve\"»\n  nota quote\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -106,7 +106,7 @@ fn block_string_literal_uses_guillemets() {
 
 #[test]
 fn block_string_opener_glyphs_are_rejected() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  fixum _ quote ← ❝he said \"salve\"❞\n  nota quote\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -122,7 +122,7 @@ fn block_string_opener_glyphs_are_rejected() {
 
 #[test]
 fn guillemet_block_string_template_renders_via_scriptum() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  fixum _ code ← 200\n  fixum _ label ← \"ok\"\n  fixum _ msg ← «status: § (§)»(code, label)\n  nota msg\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -136,7 +136,7 @@ fn guillemet_block_string_template_renders_via_scriptum() {
 #[ignore = "slow: spawns external toolchain smoke (cargo/go/tsc); run with --ignored"]
 #[test]
 fn ascii_literal_compiles_to_faber_ascii() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  fixum _ route ← 'pg:query'\n  nota route\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -148,7 +148,7 @@ fn ascii_literal_compiles_to_faber_ascii() {
 
 #[test]
 fn ascii_literal_rejects_non_ascii_content() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     assert_compile_fails_with_args(
         &session,
         "test.fab",
@@ -162,7 +162,7 @@ fn ascii_literal_rejects_non_ascii_content() {
 
 #[test]
 fn ascii_literal_rejects_template_application() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     assert_compile_fails_with_args(
         &session,
         "test.fab",
@@ -173,7 +173,7 @@ fn ascii_literal_rejects_template_application() {
 
 #[test]
 fn ascii_widens_to_textus() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  fixum _ route ← 'pg:query'\n  fixum textus shown ← route\n  nota shown\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -184,7 +184,7 @@ fn ascii_widens_to_textus() {
 
 #[test]
 fn textus_to_ascii_conversio_emits_try_from_textus() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  fixum _ raw ← \"ok\"\n  fixum ascii token ← raw ↦ ascii\n  nota token\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -197,7 +197,7 @@ fn textus_to_ascii_conversio_emits_try_from_textus() {
 
 #[test]
 fn octeti_literal_compiles_to_vec_u8() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  fixum octeti sig ← |de ad be ef|\n  fixum octeti empty_octeti ← ||\n  nota sig\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -209,7 +209,7 @@ fn octeti_literal_compiles_to_vec_u8() {
 
 #[test]
 fn octeti_literal_rejects_odd_hex_digit_count() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     assert_compile_fails_with_args(
         &session,
         "test.fab",
@@ -220,7 +220,7 @@ fn octeti_literal_rejects_odd_hex_digit_count() {
 
 #[test]
 fn octeti_literal_rejects_invalid_hex_character() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     assert_compile_fails_with_args(
         &session,
         "test.fab",
@@ -234,7 +234,7 @@ fn octeti_literal_rejects_invalid_hex_character() {
 
 #[test]
 fn octeti_literal_rejects_template_application() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     assert_compile_fails_with_args(
         &session,
         "test.fab",
@@ -245,7 +245,7 @@ fn octeti_literal_rejects_template_application() {
 
 #[test]
 fn octeti_literal_matches_in_elige_pattern() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   fixum _ bytes ← |deadbeef|
   elige bytes {
@@ -268,7 +268,7 @@ fn octeti_literal_matches_in_elige_pattern() {
 
 #[test]
 fn octetus_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     // `accipe` is the optional read (`b8 ∪ nihil`), and an optional into a plain
     // cell is SEM010 optional_into_plain_cell (sb300 1d034eee1e, need),
     // so each read is coalesced with a b8 default.
@@ -295,7 +295,7 @@ fn octetus_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
 
 #[test]
 fn octetus_builtin_rejects_width_parameters() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit { fixum octetus<i32> x ← 1 }";
     let result = compile(&session, "octet_params.fab", source, ModuleCompileRequest::default());
     assert!(!result.success(), "expected octetus<i32> to be rejected, got success");
@@ -305,7 +305,7 @@ fn octetus_builtin_rejects_width_parameters() {
 
 #[test]
 fn bare_assignment_rejects_valor_to_concrete_targets() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     for (name, source) in [
         ("valor-to-numerus.fab", "incipit {\n  fixum numerus n ← { \"a\": 1 }\n}"),
         ("valor-to-textus.fab", "incipit {\n  fixum textus s ← { \"a\": 1 }\n}"),
@@ -319,7 +319,7 @@ fn bare_assignment_rejects_valor_to_concrete_targets() {
 
 #[test]
 fn bare_assignment_rejects_scalar_narrowing() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     assert_compile_fails_with_issue(
         &session,
         "fractus-to-numerus.fab",
@@ -336,7 +336,7 @@ fn bare_assignment_rejects_scalar_narrowing() {
 
 #[test]
 fn bare_assignment_rejects_json_tabula_shape_mismatches() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     for (name, source, issue) in [
         (
             "f8-null-to-numerus.fab",
@@ -365,7 +365,7 @@ fn bare_assignment_rejects_json_tabula_shape_mismatches() {
 
 #[test]
 fn explicit_assignment_rejects_numeric_narrowing() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     assert_compile_fails_with_issue(
         &session,
         "explicit-fractus-to-numerus.fab",
@@ -376,7 +376,7 @@ fn explicit_assignment_rejects_numeric_narrowing() {
 
 #[test]
 fn bare_assignment_keeps_implicit_widening() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     for (name, source) in [
         ("numerus-to-valor.fab", "incipit {\n  fixum valor v ← 5\n}"),
         ("textus-to-valor.fab", "incipit {\n  fixum valor v ← \"str\"\n}"),
@@ -397,7 +397,7 @@ fn bare_assignment_keeps_implicit_widening() {
 
 #[test]
 fn bare_json_literal_does_not_implicitly_assign_to_valor() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     assert_compile_fails_with_issue(
         &session,
         "json-direct-valor.fab",

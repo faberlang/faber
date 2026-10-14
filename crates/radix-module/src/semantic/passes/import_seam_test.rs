@@ -13,10 +13,18 @@ use crate::driver::AnalyzeRequest;
 use crate::import_resolve::library_home_test_support;
 use crate::semantic::SemanticErrorKind;
 use crate::semantic::passes::visibility_annotation::VisibilityTier;
-use crate::services::check_diagnostics_for_source;
+use crate::services::check_diagnostics_for_source_with_locale_pack;
 use crate::test_support::args_have_no_legacy_message;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+
+/// The built-in Latin (`la`) reader pack: the canonical surface these tests
+/// are written in.
+fn la_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("installed la pack should load")
+}
 
 fn temp_dir(label: &str) -> (tempfile::TempDir, PathBuf) {
     let dir = crate::test_support::test_temp_dir(&format!("import-seam-{label}"));
@@ -183,7 +191,7 @@ fn same_package_root_is_same_seam() {
     let from = root.join("src/consumer.fab");
     let target = root.join("src/probe.fab");
     fs::write(&from, "importa ex \"./probe\" probe\n").expect("consumer");
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     assert!(crate::import_resolve::same_package(&session, &from, &target));
     assert_eq!(seam_from_flag(true), ImportSeam::SamePackage);
 }
@@ -196,7 +204,7 @@ fn different_package_roots_are_cross_seam() {
     write_target_lib(&probe, "probe");
     let app = home.join("app.fab");
     fs::write(&app, "importa ex \"probe:probe\" probe\n").expect("app");
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     assert!(!crate::import_resolve::same_package(
         &session,
         &app,
@@ -213,7 +221,7 @@ fn module_analysis_does_not_derive_contracts_from_path_name() {
     let consumer = root.join("src/consumer.fab");
     fs::write(&consumer, consumer_source("./probe", "probe", "aperta")).expect("consumer");
     let source = fs::read_to_string(&consumer).expect("read");
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let prepared = crate::program::compile::prepare_program_module(&consumer, &source, &session)
         .expect("program helper builds contracts from the path");
     assert!(
@@ -236,7 +244,7 @@ fn module_analysis_does_not_derive_contracts_from_path_name() {
         "path-shaped analyze_source must not install namespace exports"
     );
     let compile_str =
-        crate::Compiler::new(crate::driver::Config::default()).compile_str(&consumer.display().to_string(), &source);
+        crate::Compiler::new(crate::driver::Config::default().with_latin_locale()).compile_str(&consumer.display().to_string(), &source);
     match &compile_str.output {
         Some(crate::Output::Rust(out)) => {
             assert!(
@@ -278,7 +286,7 @@ incipit {
         home.display()
     );
     let _guard = LibraryHomeGuard::set(&home);
-    let result = crate::Compiler::new(crate::driver::Config::default()).compile(&app);
+    let result = crate::Compiler::new(crate::driver::Config::default().with_latin_locale()).compile(&app);
     assert!(
         result.success(),
         "nested norma:valor single-file HirRust must compile: {:?}",
@@ -307,7 +315,7 @@ fn check_same_package(member: &str) -> crate::services::CheckDiagnosticsResult {
     let consumer = root.join("src/consumer.fab");
     fs::write(&consumer, consumer_source("./probe", "probe", member)).expect("consumer");
     let source = fs::read_to_string(&consumer).expect("read");
-    check_diagnostics_for_source(&consumer.display().to_string(), &source, false)
+    check_diagnostics_for_source_with_locale_pack(&consumer.display().to_string(), &source, false, Some(&la_pack()), None)
 }
 
 fn check_cross_package(member: &str) -> crate::services::CheckDiagnosticsResult {
@@ -319,7 +327,7 @@ fn check_cross_package(member: &str) -> crate::services::CheckDiagnosticsResult 
     fs::write(&app, consumer_source("probe:probe", "probe", member)).expect("app");
     let source = fs::read_to_string(&app).expect("read");
     let _guard = LibraryHomeGuard::set(&home);
-    check_diagnostics_for_source(&app.display().to_string(), &source, false)
+    check_diagnostics_for_source_with_locale_pack(&app.display().to_string(), &source, false, Some(&la_pack()), None)
 }
 
 #[test]

@@ -1,13 +1,13 @@
 //! BB-9 pins: warn only for scalar indexing of unbounded `textus`.
 
-use super::test_support::analyze_and_get_diagnostics;
+use super::test_support::analyze_and_get_diagnostics_la;
 use crate::diagnostics::{Diagnostic, DiagnosticArg};
 
 const WARNING_CODE: &str = "WARN022";
 const WARNING_ISSUE: &str = "unbounded_textus_index";
 
 fn warning_for(source: &str) -> Diagnostic {
-    let diagnostics = analyze_and_get_diagnostics(source);
+    let diagnostics = analyze_and_get_diagnostics_la(source);
     let warning = diagnostics
         .into_iter()
         .find(|diagnostic| diagnostic.code == Some(WARNING_CODE) && diagnostic.issue() == Some(WARNING_ISSUE))
@@ -22,7 +22,7 @@ fn warning_for(source: &str) -> Diagnostic {
 }
 
 fn assert_no_warning(source: &str) {
-    let diagnostics = analyze_and_get_diagnostics(source);
+    let diagnostics = analyze_and_get_diagnostics_la(source);
     assert!(
         !diagnostics
             .iter()

@@ -710,7 +710,7 @@ fn probe_air_gaps(registry_gaps: &BTreeSet<String>) -> BTreeSet<String> {
 
 #[test]
 fn bijection_ratchet_equals_probe_derived_gap_set() {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     run_family_controls(&session);
     let registry_gaps = probe_registry_gaps(&session);
 

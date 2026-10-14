@@ -4,7 +4,7 @@
 use super::compile;
 use crate::codegen::Target;
 use crate::driver::ModuleCompileRequest;
-use crate::test_support::test_session;
+use crate::test_support::test_session_la;
 
 // ── Test 1: Two backward-annotated functions ──
 
@@ -27,7 +27,7 @@ functio loss_b(tf32[5] a, tf32[5] b) → fractus {
 "#;
 
     let result = compile(
-        &test_session(Target::MirLlvm),
+        &test_session_la(Target::MirLlvm),
         "backward.fab",
         source,
         ModuleCompileRequest::default(),
@@ -85,7 +85,7 @@ functio forward(tf32[5] x, tf32[5] y) → tf32[5] {
 "#;
 
     let result = compile(
-        &test_session(Target::MirLlvm),
+        &test_session_la(Target::MirLlvm),
         "backward.fab",
         source,
         ModuleCompileRequest::default(),
@@ -141,7 +141,7 @@ functio plain(tf32[5] x) → tf32[5] {
 "#;
 
     let result = compile(
-        &test_session(Target::MirLlvm),
+        &test_session_la(Target::MirLlvm),
         "backward.fab",
         source,
         ModuleCompileRequest::default(),
@@ -204,7 +204,7 @@ functio mean(tf32[5] x, tf32[5] y) → fractus {
 "#;
 
     let result = compile(
-        &test_session(Target::MirLlvm),
+        &test_session_la(Target::MirLlvm),
         "backward.fab",
         source,
         ModuleCompileRequest::default(),
@@ -274,7 +274,7 @@ functio multi(tf32[5] x, tf32[5] y) → fractus {
 "#;
 
     let result = compile(
-        &test_session(Target::MirLlvm),
+        &test_session_la(Target::MirLlvm),
         "backward.fab",
         source,
         ModuleCompileRequest::default(),
@@ -367,7 +367,7 @@ incipit {
 "#;
 
     let result = compile(
-        &test_session(Target::MirLlvm),
+        &test_session_la(Target::MirLlvm),
         "backward.fab",
         source,
         ModuleCompileRequest::default(),
@@ -433,7 +433,7 @@ functio callee(tf32[5] a, tf32[5] b) → tf32[5] {
 "#;
 
     let result = compile(
-        &test_session(Target::MirLlvm),
+        &test_session_la(Target::MirLlvm),
         "backward.fab",
         source,
         ModuleCompileRequest::default(),

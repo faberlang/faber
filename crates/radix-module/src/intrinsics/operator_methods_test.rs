@@ -12,7 +12,7 @@ use crate::semantic::{Primitive, Type, TypeTable};
 
 #[cfg(feature = "hir-rust")]
 fn compile_rust(name: &str, source: &str) -> String {
-    let compiler = crate::Compiler::new(crate::Config::default());
+    let compiler = crate::Compiler::new(crate::Config::default().with_latin_locale());
     let result = compiler.compile_str(name, source);
     let Some(crate::Output::Rust(rust)) = result.output else {
         panic!("expected Rust output, got diagnostics: {:?}", result.diagnostics);
@@ -21,7 +21,7 @@ fn compile_rust(name: &str, source: &str) -> String {
 }
 
 fn rejects_imperativus_on_fixum(source: &str) {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let result = analyze_source(&session, "operator_methods.fab", source, AnalyzeRequest::default());
     let Err(diagnostics) = result else {
         panic!("expected typecheck failure for fixum imperativus receiver");
@@ -170,7 +170,7 @@ fn rejects_imperativus_coniunge_on_fixum_receiver() {
 
 #[test]
 fn accepts_imperativus_on_in_parameter_receiver() {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let source = r"functio bump(in fractus acc) → vacuum {
     acc.adde(1.0)
 }
@@ -186,7 +186,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn potentia_receiver_codegen_uses_ieee_powf() {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let source = r"incipit {
     fixum fractus b ← -2.0
     fixum fractus r ← b.potentia(2.0)
@@ -256,7 +256,7 @@ incipit {
 
 #[test]
 fn rejects_shift_operator_on_fractus_receiver() {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let result = analyze_source(
         &session,
         "shift-fractus.fab",
@@ -280,7 +280,7 @@ fn rejects_shift_operator_on_fractus_receiver() {
 
 #[test]
 fn rejects_bitwise_operator_on_fractus_receiver() {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let result = analyze_source(
         &session,
         "bitwise-fractus.fab",

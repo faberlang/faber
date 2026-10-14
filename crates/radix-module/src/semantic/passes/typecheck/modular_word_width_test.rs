@@ -12,16 +12,16 @@ use crate::{Config, Target};
 
 #[cfg(feature = "hir-rust")]
 fn compile(source: &str) -> crate::CompileResult {
-    Compiler::new(Config::default().with_target(Target::HirRust)).compile_str("test.fab", source)
+    Compiler::new(Config::default().with_target(Target::HirRust).with_latin_locale()).compile_str("test.fab", source)
 }
 
 #[cfg(feature = "hir-faber")]
 fn compile_for_target(source: &str, target: Target) -> crate::CompileResult {
-    Compiler::new(Config::default().with_target(target)).compile_str("test.fab", source)
+    Compiler::new(Config::default().with_target(target).with_latin_locale()).compile_str("test.fab", source)
 }
 
 fn analyze_diagnostics(source: &str) -> Vec<crate::Diagnostic> {
-    let session = crate::driver::Session::new(Config::default().with_target(Target::HirRust));
+    let session = crate::driver::Session::new(Config::default().with_target(Target::HirRust).with_latin_locale());
     match crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()) {
         Ok(unit) => unit.diagnostics,
         Err(diagnostics) => diagnostics,
