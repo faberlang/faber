@@ -288,18 +288,16 @@ impl TypeChecker<'_> {
         // A wrapper passes its value's state through unchanged, so any
         // read-only root among the value branches is enough to reject; when
         // the initializer is a bare call (no place roots at all), a
-        // `de`-declared returned borrow (`→ de T`) hands back the state of
-        // the argument at its single matching `de` parameter. A plain
-        // (`→ T`) call result is a fresh owned value and stays legal.
-        let root = match Self::place_roots(init)
+        // `de`-declared returned borrow (`→ de T`) may hand back the state of
+        // any of the callee's matching `de` arguments or, for a method, its
+        // receiver. A plain (`→ T`) call result is a fresh owned value and
+        // stays legal.
+        let Some(root) = Self::place_roots(init)
             .into_iter()
+            .chain(self.call_result_alias_roots(init))
             .find(|root| self.is_read_only_root(*root))
-        {
-            Some(root) => root,
-            None => match self.call_result_alias_root(init) {
-                Some(root) if self.is_read_only_root(root) => root,
-                _ => return,
-            },
+        else {
+            return;
         };
         let name_of = |checker: &Self, symbol: Option<Symbol>| {
             symbol
@@ -343,44 +341,83 @@ impl TypeChecker<'_> {
             || (self.lookup_binding(root).is_none() && self.consts.contains_key(&root))
     }
 
-    /// The place a `de`-returning call hands back, when that place is the
-    /// call's only possible source: the result type is a `ref` view (`→ de T`)
-    /// and the callee has exactly one `de` parameter of the returned payload
-    /// type. A plain (owned) call result is a fresh value, not an alias; a
-    /// call with several `de` parameters of that type is ambiguous without the
-    /// callee body, so both stay accepted here.
-    fn call_result_alias_root(&self, init: &HirExpression) -> Option<radix_hir::DefId> {
-        let HirExpressionKind::Call(callee, _, args, _) = &init.kind else {
-            return None;
+    /// Every place a `de`-returning call can hand back.
+    ///
+    /// The result type must be a `ref` view (`→ de T`) of a shareable payload;
+    /// a plain (owned) call result is a fresh value, not an alias, and
+    /// contributes no root. For a free function the candidates are the
+    /// arguments at the callee's `de` parameters of the returned payload type.
+    /// A method is not in `self.functions` (methods live in the struct and
+    /// interface tables), so its signature is resolved from the receiver type;
+    /// its `de` parameters are candidates too, and so is the receiver, whose
+    /// state a method result can hand back.
+    fn call_result_alias_roots(&self, init: &HirExpression) -> Vec<radix_hir::DefId> {
+        let Some(result_ty) = init.ty else {
+            return Vec::new();
         };
-        let HirExpressionKind::Path(callee_def) = &callee.kind else {
-            return None;
-        };
-        let result_ty = self.resolve_inferred_type(init.ty?);
+        let result_ty = self.resolve_inferred_type(result_ty);
         let (marker, payload) = self.types.peel_access_marker(result_ty);
         if !matches!(marker, Some(crate::AccessMarker::Ref)) || !self.is_shareable_payload(payload)
         {
-            return None;
+            return Vec::new();
         }
-        let sig = self.functions.get(callee_def)?;
-        let mut candidates = sig.params.iter().enumerate().filter(|(_, param)| {
-            param.mode == SemanticParamMode::Ref
-                && self.types.equals(
-                    self.types
-                        .peel_access_marker(self.resolve_inferred_type(param.ty))
-                        .1,
-                    payload,
-                )
-        });
-        let (index, _) = candidates.next()?;
-        if candidates.next().is_some() {
-            return None;
+        match &init.kind {
+            HirExpressionKind::Call(callee, _, args, _) => {
+                let HirExpressionKind::Path(callee_def) = &callee.kind else {
+                    return Vec::new();
+                };
+                let Some(sig) = self.functions.get(callee_def) else {
+                    return Vec::new();
+                };
+                self.de_param_alias_roots(&sig.params, args, payload)
+            }
+            HirExpressionKind::MethodCall(receiver, method, _, args, _) => {
+                let Some(receiver_ty) = receiver.ty else {
+                    return Vec::new();
+                };
+                let receiver_ty = self.resolve_inferred_type(receiver_ty);
+                let Some(sig) = self.lookup_method_signature(receiver_ty, *method) else {
+                    return Vec::new();
+                };
+                let mut roots = self.de_param_alias_roots(&sig.params, args, payload);
+                if let Some(root) = Self::place_root(receiver) {
+                    roots.push(root);
+                }
+                roots
+            }
+            _ => Vec::new(),
         }
-        let arg = args.get(index)?;
-        if arg.spread {
-            return None;
-        }
-        Self::place_root(&arg.expr)
+    }
+
+    /// The argument places at a callee's `de` parameters whose type matches
+    /// the returned payload. A call argument that is not a place (or is a
+    /// spread) contributes no root.
+    fn de_param_alias_roots(
+        &self,
+        params: &[ParamType],
+        args: &[radix_hir::HirCallArg],
+        payload: TypeId,
+    ) -> Vec<radix_hir::DefId> {
+        params
+            .iter()
+            .enumerate()
+            .filter(|(_, param)| {
+                param.mode == SemanticParamMode::Ref
+                    && self.types.equals(
+                        self.types
+                            .peel_access_marker(self.resolve_inferred_type(param.ty))
+                            .1,
+                        payload,
+                    )
+            })
+            .filter_map(|(index, _)| {
+                let arg = args.get(index)?;
+                if arg.spread {
+                    return None;
+                }
+                Self::place_root(&arg.expr)
+            })
+            .collect()
     }
 
     /// A loop binder aliases its iterated source: when the source reads a
