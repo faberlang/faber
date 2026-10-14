@@ -3331,6 +3331,15 @@ help = "استخدم `_` إذا كان type واحد فقط مقصودا"
 message = "union hole `∪` حُل إلى type واحد `{type}`"
 help = "استخدم `_` إذا كان type واحد فقط مقصودا"
 
+[diagnostics.WARN034]
+message = "هذه السلسلة تُهرّب `\\\"`؛ اكتبها بـ «…»، فلا حاجة إلى أي تهريب"
+help = "استخدم «...» للنص الذي يحتوي على علامات اقتباس"
+
+[diagnostics.WARN034.issues.prefer_guillemet_for_quote]
+message = "هذه السلسلة تُهرّب `\\\"`؛ اكتبها بـ «…»، فلا حاجة إلى أي تهريب"
+help = "استخدم «...» للنص الذي يحتوي على علامات اقتباس"
+
+
 [llm]
 system_prompt_snippet = "Emit Arabic reader-locale Faber using Arabic keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged and keep source in logical order."
 exemplars = ["./exemplars/salve-munde.ar.fab"]

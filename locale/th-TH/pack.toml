@@ -3343,6 +3343,15 @@ help = "ใช้ `_` ถ้าตั้งใจให้เป็น type เ�
 message = "union hole `∪` แก้เป็น type เดียว `{type}`"
 help = "ใช้ `_` ถ้าตั้งใจให้เป็น type เดียวเท่านั้น"
 
+[diagnostics.WARN034]
+message = "สตริงนี้หลบอักขระ `\\\"`; เขียนด้วย «…» ซึ่งไม่ต้องหลบอักขระใด ๆ"
+help = "ใช้ «...» กับข้อความที่มีเครื่องหมายคำพูด"
+
+[diagnostics.WARN034.issues.prefer_guillemet_for_quote]
+message = "สตริงนี้หลบอักขระ `\\\"`; เขียนด้วย «…» ซึ่งไม่ต้องหลบอักขระใด ๆ"
+help = "ใช้ «...» กับข้อความที่มีเครื่องหมายคำพูด"
+
+
 [llm]
 system_prompt_snippet = "Emit Thai reader-locale Faber using Thai keywords for declarations, control flow, loops, returns, booleans, common primitive types, and lista/tabula collections. Keep Faber glyph syntax unchanged."
 exemplars = ["./exemplars/salve-munde.th-TH.fab"]

@@ -3343,6 +3343,15 @@ help = "यदि केवल एक type अभिप्रेत है त�
 message = "union hole `∪` एक type `{type}` में हल हुआ"
 help = "यदि केवल एक type अभिप्रेत है तो `_` उपयोग करें"
 
+[diagnostics.WARN034]
+message = "यह स्ट्रिंग `\\\"` को एस्केप करती है; इसे «…» में लिखें, किसी एस्केप की ज़रूरत नहीं"
+help = "उद्धरण चिह्नों वाले पाठ के लिए «...» का उपयोग करें"
+
+[diagnostics.WARN034.issues.prefer_guillemet_for_quote]
+message = "यह स्ट्रिंग `\\\"` को एस्केप करती है; इसे «…» में लिखें, किसी एस्केप की ज़रूरत नहीं"
+help = "उद्धरण चिह्नों वाले पाठ के लिए «...» का उपयोग करें"
+
+
 [llm]
 system_prompt_snippet = "Emit Hindi reader-locale Faber using Hindi keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged."
 exemplars = ["./exemplars/salve-munde.hi.fab"]

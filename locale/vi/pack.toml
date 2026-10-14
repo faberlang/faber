@@ -3331,6 +3331,15 @@ help = "dùng `_` nếu chỉ một type được chủ đích"
 message = "union hole `∪` đã giải thành type đơn `{type}`"
 help = "dùng `_` nếu chỉ một type được chủ đích"
 
+[diagnostics.WARN034]
+message = "chuỗi này thoát `\\\"`; hãy viết bằng «…», không cần thoát ký tự nào"
+help = "dùng «...» cho văn bản chứa dấu trích dẫn"
+
+[diagnostics.WARN034.issues.prefer_guillemet_for_quote]
+message = "chuỗi này thoát `\\\"`; hãy viết bằng «…», không cần thoát ký tự nào"
+help = "dùng «...» cho văn bản chứa dấu trích dẫn"
+
+
 [llm]
 system_prompt_snippet = "Emit Vietnamese reader-locale Faber using Vietnamese keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged and preserve Vietnamese tone marks."
 exemplars = ["./exemplars/salve-munde.vi.fab"]

@@ -5179,6 +5179,14 @@ help = "convert the index with `x ↦ 0‥N` to carry its range, or read with `g
 message = "an index inside a kernel could not be proven in range; it stays checked (one compare per lane, fatal on a miss)"
 help = "convert the index with `x ↦ 0‥N` to carry its range, or read with `get`"
 
+[diagnostics.WARN034]
+message = "this string escapes `\\\"`; write it with «…», which needs no escapes"
+help = "use «...» for text that contains quote characters"
+
+[diagnostics.WARN034.issues.prefer_guillemet_for_quote]
+message = "this string escapes `\\\"`; write it with «…», which needs no escapes"
+help = "use «...» for text that contains quote characters"
+
 
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "or-pattern alternatives must bind the same names and types"
