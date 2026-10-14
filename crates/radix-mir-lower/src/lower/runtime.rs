@@ -1254,7 +1254,7 @@ impl FunctionBuilder<'_> {
     }
 
     /// Tensor glyphs route through the collection-op intrinsic seam exactly
-    /// like the method twins (`a.matmul(b)` / `a.multiplica(b)`): the registry
+    /// like the method twins (`a.matmul(b)` / `a.multiplicata(b)`): the registry
     /// row is resolved by receiver type + name + arity, then lowered to a
     /// `MirIntrinsic::Collection` runtime call.
     fn lower_glyph_collection_op(
@@ -5352,9 +5352,9 @@ fn vector_method_kind(method_name: &str) -> Option<VectorMethodKind> {
         "normalizata" => Some(VectorMethodKind::Normalizata),
         "crea" => Some(VectorMethodKind::Crea),
         "addita" => Some(VectorMethodKind::Elementwise(MirLaneOp::Add)),
-        "subtrahe" => Some(VectorMethodKind::Elementwise(MirLaneOp::Sub)),
-        "multiplica" => Some(VectorMethodKind::Elementwise(MirLaneOp::Mul)),
-        "divida" => Some(VectorMethodKind::Elementwise(MirLaneOp::Div)),
+        "subtracta" => Some(VectorMethodKind::Elementwise(MirLaneOp::Sub)),
+        "multiplicata" => Some(VectorMethodKind::Elementwise(MirLaneOp::Mul)),
+        "divisa" => Some(VectorMethodKind::Elementwise(MirLaneOp::Div)),
         _ => None,
     }
 }
@@ -5362,9 +5362,9 @@ fn vector_method_kind(method_name: &str) -> Option<VectorMethodKind> {
 fn matrix_method_kind(method_name: &str) -> Option<MirLaneOp> {
     match method_name {
         "addita" => Some(MirLaneOp::Add),
-        "subtrahe" => Some(MirLaneOp::Sub),
-        "multiplica" => Some(MirLaneOp::Mul),
-        "divida" => Some(MirLaneOp::Div),
+        "subtracta" => Some(MirLaneOp::Sub),
+        "multiplicata" => Some(MirLaneOp::Mul),
+        "divisa" => Some(MirLaneOp::Div),
         _ => None,
     }
 }
@@ -5373,7 +5373,7 @@ fn matrix_method_kind(method_name: &str) -> Option<MirLaneOp> {
 /// combinations without a supported lowering (callers fail them closed).
 ///
 /// The names are the shipped method twins (`productum`/`transversum`/
-/// `matmul`/`applica`/`multiplica`), so glyph lowering reuses the exact
+/// `matmul`/`applica`/`multiplicata`), so glyph lowering reuses the exact
 /// vector/matrix/tensor machinery those methods already prove.
 fn glyph_method_name(op: HirBinOp, lhs_ty: &Type, rhs_ty: &Type) -> Option<&'static str> {
     match (op, lhs_ty, rhs_ty) {
@@ -5385,16 +5385,16 @@ fn glyph_method_name(op: HirBinOp, lhs_ty: &Type, rhs_ty: &Type) -> Option<&'sta
         (HirBinOp::Cross, Type::Vector(..), Type::Vector(..)) => Some("transversum"),
         (HirBinOp::Hadamard, Type::Vector(..), Type::Vector(..))
         | (HirBinOp::Hadamard, Type::Matrix(..), Type::Matrix(..))
-        | (HirBinOp::Hadamard, Type::Tensor(..), Type::Tensor(..)) => Some("multiplica"),
+        | (HirBinOp::Hadamard, Type::Tensor(..), Type::Tensor(..)) => Some("multiplicata"),
         (HirBinOp::HadamardDiv, Type::Vector(..), Type::Vector(..))
-        | (HirBinOp::HadamardDiv, Type::Matrix(..), Type::Matrix(..)) => Some("divida"),
-        (HirBinOp::HadamardDiv, Type::Tensor(..), Type::Tensor(..)) => Some("divisio"),
+        | (HirBinOp::HadamardDiv, Type::Matrix(..), Type::Matrix(..))
+        | (HirBinOp::HadamardDiv, Type::Tensor(..), Type::Tensor(..)) => Some("divisa"),
         (HirBinOp::Add, Type::Vector(..), Type::Vector(..))
         | (HirBinOp::Add, Type::Matrix(..), Type::Matrix(..))
         | (HirBinOp::Add, Type::Tensor(..), Type::Tensor(..)) => Some("addita"),
         (HirBinOp::Sub, Type::Vector(..), Type::Vector(..))
         | (HirBinOp::Sub, Type::Matrix(..), Type::Matrix(..))
-        | (HirBinOp::Sub, Type::Tensor(..), Type::Tensor(..)) => Some("subtrahe"),
+        | (HirBinOp::Sub, Type::Tensor(..), Type::Tensor(..)) => Some("subtracta"),
         _ => None,
     }
 }
