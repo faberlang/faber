@@ -556,6 +556,72 @@ fn node_budget_fails_closed() {
 }
 
 #[test]
+fn callsite_node_budget_fails_closed() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let inner = identity_fragment(2, FRAGMENT_INNER, ty);
+    let outer = function(
+        1,
+        FRAGMENT,
+        vec![param(0, ty)],
+        ty,
+        vec![MirLocal { id: MirLocalId(1), name: None, ty, mutable: false, span: test_span() }],
+        vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![call_stmt(
+                Some(MirPlace::local(MirLocalId(1))),
+                MirFunctionId(2),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+            )],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(MirLocalId(1))))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        None,
+    );
+    let entry = entry_calling(1, 1, ty, Vec::new(), Vec::new());
+    let mut functions = vec![entry, outer, inner];
+    let budget = ExpansionBudget { max_cloned_nodes_per_root_callsite: 1, ..ExpansionBudget::DOCUMENTED_DEFAULTS };
+    let errors = compose(&mut functions, &[], &roles(), budget, None, &launch_entries());
+    let err = errors
+        .iter()
+        .find(|err| err.issue == ISSUE_EXPANSION && err.reason == "callsite_nodes")
+        .unwrap_or_else(|| panic!("callsite node cap must fail closed, got {errors:?}"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "limit" && arg.value == "1")
+    );
+    assert!(err.args.iter().any(|arg| arg.name == "observed"));
+    assert!(err.args.iter().any(|arg| arg.name == "chain"));
+}
+
+#[test]
+fn callsite_node_budget_is_per_root_site() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let (locals, block) = sequential_calls_block(2, 1);
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, ty)],
+        ty,
+        locals,
+        vec![block],
+        Some(MirKernelShaderStage::Compute),
+    );
+    let mut functions = vec![entry, identity_fragment(1, FRAGMENT, ty)];
+    // An identity expansion clones three nodes; each sibling root site gets
+    // its own allowance, so two sites compose under a cap of three.
+    let budget = ExpansionBudget { max_cloned_nodes_per_root_callsite: 3, ..ExpansionBudget::DOCUMENTED_DEFAULTS };
+    let errors = compose(&mut functions, &[], &roles(), budget, None, &launch_entries());
+    assert!(errors.is_empty(), "each root call site gets its own budget: {errors:?}");
+    assert_eq!(fragment_call_count(&functions), 0);
+}
+
+#[test]
 fn instance_budget_fails_closed() {
     let mut types = TypeTable::new();
     let ty = f32_ty(&mut types);

@@ -14,6 +14,7 @@
 //! Documented budget defaults (starting anchors; head-cto confirms on land):
 //! - depth 16
 //! - `65_536` cloned MIR nodes per `Entry`
+//! - `32_768` cloned MIR nodes per root call site
 //! - `1_024` concrete instances per `Entry`
 //! - 1 inline per call site
 
@@ -41,6 +42,7 @@ pub const ISSUE_EXPANSION: &str = "nucleum_fragment_expansion";
 pub struct ExpansionBudget {
     pub max_depth: u32,
     pub max_cloned_nodes_per_entry: u32,
+    pub max_cloned_nodes_per_root_callsite: u32,
     pub max_concrete_instances: u32,
     pub max_inlines_per_callsite: u32,
 }
@@ -49,6 +51,7 @@ impl ExpansionBudget {
     pub const DOCUMENTED_DEFAULTS: Self = Self {
         max_depth: 16,
         max_cloned_nodes_per_entry: 65_536,
+        max_cloned_nodes_per_root_callsite: 32_768,
         max_concrete_instances: 1_024,
         max_inlines_per_callsite: 1,
     };
@@ -573,7 +576,7 @@ impl CompositionPass<'_> {
             .get(&site.block_id)
             .and_then(|block| block.site(site.stmt_index))
             .cloned()
-            .unwrap_or_else(|| Nesting { depth: 0, chain: Rc::clone(root) });
+            .unwrap_or_else(|| Nesting { depth: 0, chain: Rc::clone(root), root_site: 0 });
         let depth = enclosing.depth.saturating_add(1);
         let mut chain = enclosing.chain.as_ref().clone();
         chain.push(callee.id);
@@ -588,6 +591,28 @@ impl CompositionPass<'_> {
                 site.span,
                 account.nodes.saturating_add(cloned_nodes),
                 pass.budget.max_cloned_nodes_per_entry,
+                &chain,
+            );
+            return false;
+        }
+        let root_site = if enclosing.depth == 0 {
+            account.next_root = account.next_root.saturating_add(1);
+            account.next_root
+        } else {
+            enclosing.root_site
+        };
+        let site_nodes = account
+            .root_nodes
+            .get(&root_site)
+            .copied()
+            .unwrap_or(0)
+            .saturating_add(cloned_nodes);
+        if site_nodes > pass.budget.max_cloned_nodes_per_root_callsite {
+            pass.push_expansion(
+                "callsite_nodes",
+                site.span,
+                site_nodes,
+                pass.budget.max_cloned_nodes_per_root_callsite,
                 &chain,
             );
             return false;
@@ -628,8 +653,9 @@ impl CompositionPass<'_> {
         account.nodes = account.nodes.saturating_add(cloned_nodes);
         account.instances = account.instances.saturating_add(1);
         account.sites.insert(site_key, inlines);
+        account.root_nodes.insert(root_site, site_nodes);
         pass.inlined.insert(callee.id);
-        let spliced = Nesting { depth, chain: Rc::new(chain) };
+        let spliced = Nesting { depth, chain: Rc::new(chain), root_site };
         if let Some(function) = pass.function(caller_id) {
             splice_nesting(nesting, function, site, &new_blocks, &spliced);
         }
@@ -1125,6 +1151,9 @@ struct InlineBlocks {
 struct Nesting {
     depth: u32,
     chain: Rc<Vec<MirFunctionId>>,
+    /// Root call site this code is charged to; 0 for the entry's own
+    /// statements before any root site has been allocated.
+    root_site: u32,
 }
 
 /// Per-block nesting, parallel to the block's statements plus its terminator.
@@ -1135,7 +1164,7 @@ struct BlockNesting {
 
 impl BlockNesting {
     fn root(statements: usize, root: &Rc<Vec<MirFunctionId>>) -> Self {
-        let at_root = Nesting { depth: 0, chain: Rc::clone(root) };
+        let at_root = Nesting { depth: 0, chain: Rc::clone(root), root_site: 0 };
         Self { statements: vec![at_root.clone(); statements], terminator: at_root }
     }
 
@@ -1230,11 +1259,16 @@ struct Account {
     /// Per-caller expansion steps; the key omits the caller id because one
     /// `Account` never spans two expansion roots.
     sites: FxHashMap<(MirFunctionId, MirBlockId, u32), u32>,
+    /// Next root call-site id; ids stay stable for the life of the account so
+    /// nested sites can charge back to the site that pulled them in.
+    next_root: u32,
+    /// Cloned nodes charged to each root call site and everything it pulled in.
+    root_nodes: FxHashMap<u32, u32>,
 }
 
 impl Account {
     fn new() -> Self {
-        Self { nodes: 0, instances: 0, sites: FxHashMap::default() }
+        Self { nodes: 0, instances: 0, sites: FxHashMap::default(), next_root: 0, root_nodes: FxHashMap::default() }
     }
 }
 
