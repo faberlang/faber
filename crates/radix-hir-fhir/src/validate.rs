@@ -537,8 +537,11 @@ fn validate_named_form(
         check_symbol(*symbol)?;
     }
 
-    let (witness_def, applied_args) = named_witness(types, form.ty)
-        .ok_or_else(|| type_presentation_issue("named_witness_not_named", site))?;
+    let (witness_def, applied_args) = match named_witness(types, form.ty) {
+        Some(witness) => witness,
+        None if transparent_alias_body_witness(types, path_def, form.ty) => (path_def, Vec::new()),
+        None => return Err(type_presentation_issue("named_witness_not_named", site)),
+    };
     if witness_def != path_def {
         return Err(type_presentation_issue(
             "named_witness_definition_mismatch",
@@ -584,6 +587,26 @@ fn validate_named_form(
         }
     }
     Ok(())
+}
+
+/// Whether the artifact's type table records `path_def` as an alias whose
+/// resolved body is exactly `body`.
+///
+/// A transparent type alias annotation is finalized at its HIR site to the
+/// aliased body, so the authored `Named` head names the alias while the site
+/// witness carries no `Type::Alias` wrapper. The recorded alias-to-body fact
+/// is the witness for that body; absent it the form still fails closed.
+fn transparent_alias_body_witness(
+    types: &radix_types::TypeTableSnapshot,
+    path_def: radix_types::DefId,
+    body: radix_types::TypeId,
+) -> bool {
+    types.types().iter().any(|ty| {
+        let radix_types::Type::Alias(def, alias_body) = ty else {
+            return false;
+        };
+        *def == path_def && *alias_body == body
+    })
 }
 
 fn named_witness(

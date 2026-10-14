@@ -489,6 +489,54 @@ fn octeti_zero_argument_type_form_survives_the_fhir_round_trip() {
 }
 
 #[test]
+fn transparent_alias_annotation_survives_the_fhir_round_trip() {
+    // A transparent type alias used as an annotation (`type Signum = int`)
+    // lowers to its resolved body at the HIR site while the authored form
+    // keeps the alias's Named head. The artifact boundary must pair that
+    // authored head with a witness the validator accepts.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = concat!(
+        "+++\nlocale = \"en\"\n+++\n\n",
+        "type Signum = int\n",
+        "type Cognomen = string\n",
+        "type Viget = bool\n",
+        "type Nomina = list<string>\n",
+        "type Puncta = list<int>\n",
+        "type Index = map<string, int>\n",
+        "type NomenOptivum = string \u{222a} none\n\n",
+        "main {\n",
+        "    const Signum signum \u{2190} 42\n",
+        "    const Cognomen cognomen \u{2190} \"Marcus\"\n",
+        "    const Viget viget \u{2190} true\n",
+        "    const Nomina sodales \u{2190} [\"Gaius\", \"Lucius\", \"Titus\"]\n",
+        "    const Puncta puncta \u{2190} [100, 95, 87]\n",
+        "    const Index index \u{2190} { \"a\": 1 }\n",
+        "    const NomenOptivum nomen \u{2190} null\n",
+        "    print signum\n",
+        "    print cognomen\n",
+        "    print viget\n",
+        "    print sodales\n",
+        "    print puncta\n",
+        "    print index\n",
+        "    print nomen\n",
+        "}\n",
+    );
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "transparent-alias.fab", source, AnalyzeRequest::default())
+        .expect("transparent alias fixture analyzes");
+    let artifact = from_analyzed(&original, "transparent-alias", "transparent-alias.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize transparent alias artifact");
+    load_fhir(&bytes).expect("transparent alias artifact must load");
+}
+
+#[test]
 fn inferred_constructor_map_survives_the_fhir_round_trip() {
     // `_ { … }` is an inferred constructor: the authored hole is resolved to
     // the site's expected type, and HIR materializes no node for the hole
