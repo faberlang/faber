@@ -1597,3 +1597,33 @@ functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
         "{errors:?}"
     );
 }
+
+#[test]
+fn copy_marked_tensor_receiver_keeps_tensor_method_admission() {
+    // `copy x` puts the copy access marker on the local's declared tensor
+    // type; receiver admission must see through it. The loop is the AIR
+    // accumulator form (a bare `varia` outside an unrolled loop is rejected
+    // independently by `mutable_varia`).
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio f(tensor<f32, [4]> x) → f32 {
+    varia tensor<f32, [4]> acc ← copy x
+    itera ab 0‥4 fixum i {
+        acc ← acc + x
+    }
+    redde acc.media()
+}
+"#,
+    );
+    assert!(
+        !has_air_issue(&errors, "tensor_method_receiver"),
+        "{errors:?}"
+    );
+    assert!(
+        !errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::AirPurityViolation),
+        "{errors:?}"
+    );
+}

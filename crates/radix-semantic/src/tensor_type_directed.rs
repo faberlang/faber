@@ -25,7 +25,10 @@ pub const TENSOR_FORMA_VALUE_ARGS_MSG: &str =
     "formata does not accept value arguments; use grid.forma(shape) for runtime reshape";
 
 fn normalized_type(ty: TypeId, types: &TypeTable) -> &Type {
-    match types.get(ty) {
+    // Peel aliases and the declared access marker (`ref`/`mut`/`own`/`copy`)
+    // so a copy-marked tensor local still normalizes to its tensor payload.
+    let (_, payload) = types.peel_access_marker(ty);
+    match types.get(payload) {
         Type::Alias(_, inner) => normalized_type(*inner, types),
         other => other,
     }
