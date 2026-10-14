@@ -2,6 +2,7 @@
 //! HIR target parity (Rust, canonical Faber, FMIR run) from a loaded artifact.
 
 use super::*;
+#[cfg(feature = "hir-rust")]
 use crate::package::library_resolver_from_config;
 use crate::package::test_support::{diagnostic_has_arg, test_temp_dir};
 use radix::program::analyze::AnalyzedProgram;

@@ -9,24 +9,27 @@ use super::cmd::compile_package_metal_text;
 #[cfg(feature = "hir-rust")]
 use super::verify_library_binding_shapes;
 use super::{
-    ManifestProductEmit, ManifestProductKind, config_with_locale, emit_generated_crate,
-    emit_generated_crate_with_runtime_plan, invoke_cargo_build, library_resolver_from_config,
-    package_host_selection_diagnostic, read_manifest, use_package_compiler_from_args,
-    validate_manifest, verify_library_bindings, with_lowered_package_mir,
+    ManifestProductEmit, ManifestProductKind, config_with_locale, library_resolver_from_config,
+    read_manifest, use_package_compiler_from_args, validate_manifest, verify_library_bindings,
+    with_lowered_package_mir,
 };
 #[cfg(feature = "hir-ts")]
 use super::{build_browser_product, build_browser_product_static_assets};
 use super::{cmd::use_package_compiler, faber_analysis_seams, faber_emission_seams};
-use radix::program::analyze::AnalyzedProgram;
-use radix::program::discovery::{
-    BuildLayout, PackageSpec, discover_build_layout, sanitize_crate_name,
+#[cfg(feature = "hir-rust")]
+use super::{
+    emit_generated_crate, emit_generated_crate_with_runtime_plan, invoke_cargo_build,
+    package_host_selection_diagnostic,
 };
+use radix::program::analyze::AnalyzedProgram;
+#[cfg(feature = "hir-rust")]
+use radix::program::discovery::discover_build_layout;
+use radix::program::discovery::{BuildLayout, PackageSpec, sanitize_crate_name};
+use radix::program::emit::compile_package as compile_package_compiler;
 #[cfg(feature = "hir-go")]
 use radix::program::emit::compile_package_result;
-use radix::program::emit::{
-    compile_package as compile_package_compiler,
-    package_rust_runtime_plan as package_rust_runtime_plan_compiler,
-};
+#[cfg(feature = "hir-rust")]
+use radix::program::emit::package_rust_runtime_plan as package_rust_runtime_plan_compiler;
 use radix::program::test_source_filter::TestSourceFilter;
 use std::collections::BTreeMap;
 fn analyze_with_faber_seams(
@@ -52,6 +55,7 @@ fn compile_go_with_faber_seams(
     compile_package_result(config, input, &faber_emission_seams())
 }
 
+#[cfg(feature = "hir-rust")]
 fn runtime_plan_with_faber_seams(
     config: &Config,
     input: &Path,
@@ -180,6 +184,7 @@ fn run_mir_artifact_for_faber<H: Host + ?Sized>(
         host,
     )
 }
+#[cfg(feature = "hir-rust")]
 use radix::module::Output;
 use radix::module::codegen::Target;
 use radix::module::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
@@ -673,6 +678,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     pack
 }
 
+#[cfg(feature = "hir-rust")]
 fn compile_emit_build_run(entry: &Path) -> String {
     let code = compile_package_rust_code(entry);
     let layout = discover_build_layout(entry).expect("layout");
@@ -683,6 +689,7 @@ fn compile_emit_build_run(entry: &Path) -> String {
     String::from_utf8(run.stdout).expect("stdout utf8")
 }
 
+#[cfg(feature = "hir-rust")]
 fn compile_package_rust_code(entry: &Path) -> String {
     let result = compile_with_faber_seams(&Config::default(), entry);
     assert!(
@@ -937,6 +944,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 #[ignore = "json runtime e2e builds generated Rust; run with ignored integration checks"]
 fn run_package_validates_norma_json_object_array_roundtrip() {
@@ -9318,6 +9326,7 @@ fn sanitize_crate_name_handles_mixed_case_punctuation_and_digits() {
     assert_eq!(sanitize_crate_name("a/b\\c"), "a-b-c");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn discover_build_layout_supports_manifest_file_input() {
     let dir = test_temp_dir("layout-manifest-file");
@@ -9345,6 +9354,7 @@ version = "0.2.0"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn discover_build_layout_supports_directory_with_manifest() {
     let dir = test_temp_dir("layout-dir-manifest");
@@ -9367,6 +9377,7 @@ name = "dir-pkg"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn direct_entry_file_under_manifest_uses_package_root_and_manifest_name() {
     let dir = test_temp_dir("layout-entry-parent-manifest");
@@ -9448,6 +9459,7 @@ entry = "main.fab"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn discover_build_layout_supports_entry_file_input_and_falls_back_to_dir_name() {
     let dir = test_temp_dir("layout-entry-no-manifest");
@@ -9554,6 +9566,7 @@ entry = "main.fab"
     assert!(!layout.generated_crate_root.join("target").exists());
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_runtime_plan_keeps_runtime_only_routes_hostless() {
     let pkg = test_temp_dir("runtime-plan-runtime-only");
@@ -9583,6 +9596,7 @@ entry = "main.fab"
     assert!(!plan.needs_tokio);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_runtime_plan_inline_ad_leaf_needs_no_host() {
     // core-norma N2: solum:lege is the shared fs leaf. Inline ad without
@@ -9620,6 +9634,7 @@ entry = "main.fab"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_runtime_plan_served_route_needs_no_host() {
     // A3/U4: a route served by a Faber `@ ad` handler is tier 1, so it is
@@ -9654,6 +9669,7 @@ entry = "main.fab"
     assert!(package_host_selection_diagnostic(&plan, &pkg.join("faber.toml")).is_none());
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_runtime_plan_requires_host_for_host_only_routes() {
     // Host-only (not builtin) routes still require [target.rust] host.
@@ -9692,6 +9708,7 @@ entry = "main.fab"
     ));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_runtime_plan_collects_library_ad_routes_without_host() {
     // Dual-backend honesty (S1-U3): norma-wrapped ad must appear in
@@ -9860,6 +9877,7 @@ fn emit_generated_crate_works_without_manifest_using_fallback_name() {
     assert!(cargo.contains(&format!("name = \"{}\"", layout.binary_name())));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_host_routes_fail_closed_with_and_without_native_host() {
     // The native host route and its providers were dropped (single-repo-
@@ -11139,6 +11157,7 @@ entry = "main.fab"
     )));
 }
 
+#[cfg(feature = "hir-rust")]
 #[cfg(feature = "hir-go")]
 #[test]
 fn g6_go3_single_entry_cli_package_compiles_and_go_builds() {
@@ -11217,7 +11236,7 @@ main args args exit 0 {
 
 #[cfg(feature = "hir-go")]
 #[test]
-
+#[cfg(feature = "hir-rust")]
 fn g6_go4_multi_module_namespace_package_builds() {
     let dir = test_temp_dir("g6-go4-multi");
     fs::create_dir_all(dir.join("src")).expect("src");
@@ -11304,6 +11323,7 @@ main args args exit 0 {
     assert_eq!(status.code(), Some(0));
 }
 
+#[cfg(feature = "hir-rust")]
 #[cfg(feature = "hir-go")]
 #[test]
 fn g6_consolum_shim_dedupes_across_units() {
@@ -11431,6 +11451,7 @@ main args args exit 0 {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[cfg(feature = "hir-go")]
 #[test]
 fn g6_consolum_shim_supports_full_stdio_surface() {
@@ -14001,6 +14022,7 @@ locale = "en"
 }
 
 /// Emit `entry` through the production plan + snapshot path and return the layout.
+#[cfg(feature = "hir-rust")]
 fn web4_emit_crate(entry: &Path) -> (BuildLayout, super::RustRuntimePlan, String) {
     let plan = runtime_plan_with_faber_seams(&Config::default(), entry).expect("runtime plan");
     let code = compile_package_rust_code(entry);
@@ -14065,6 +14087,7 @@ fn web4_file_with_entry_point_stays_a_binary_crate() {
     assert!(!src.join("lib.rs").exists());
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 #[ignore = "builds generated Rust; run with ignored integration checks"]
 fn web4_lib_kind_package_cargo_builds_to_an_rlib() {

@@ -1,4 +1,5 @@
 use super::*;
+#[cfg(feature = "hir-rust")]
 use crate::package::runtime_sources::is_support_runtime_root;
 
 fn has(path: &str) -> bool {
@@ -28,6 +29,7 @@ fn table_carries_runtime_and_host_abi_manifests() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn embedded_root_materializes_once_and_matches_in_tree_sources() {
     let cache = tempfile::tempdir().expect("tempdir");
