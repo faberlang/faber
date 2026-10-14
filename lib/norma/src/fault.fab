@@ -1,0 +1,67 @@
++++
+locale = "en"
++++
+
+# fault.fab - I/O Fault Union
+#
+# Etymology: fault — the failed I/O crossing, materialized as a value;
+# Latin locale spelling `culpa`.
+#
+# The Norma I/O error is a discriminated union: one variant per leaf error
+# kind, each carrying only the data that belongs to it — no message text, no
+# kind field. Variant names are the kind words of the native leaf error.
+
+import from "norma:value" value
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+# One failed I/O crossing, one variant per leaf kind.
+# `path` is the path (or address) the program passed.
+@ public
+union IoFault {
+    NotFound { string path },
+    Permission { string path },
+    NotADirectory { string path },
+    IsADirectory { string path },
+    InvalidArgument { string path },
+    AlreadyExists { string path },
+    TimedOut { string path },
+    ConnectionRefused { string path },
+    ConnectionReset { string path },
+    AddrInUse { string path },
+    Io { string path },
+    Closed,
+    Unset,
+    Unavailable,
+    Cancelled
+}
+
+# =============================================================================
+# CONVERSION
+# =============================================================================
+
+# Build the fault from a crossing record: the `kind` word selects the variant
+# and `path` fills its payload; an unknown kind word falls back to Io.
+@ public
+fn io_fault_from(value raw) → IoFault {
+    const string kind ← value.get(raw, "kind") ↦ string ⊥ ""
+    const string p ← value.get(raw, "path") ↦ string ⊥ ""
+    if kind ≡ "NotFound" then return variant NotFound { path = p } ∷ IoFault
+    if kind ≡ "Permission" then return variant Permission { path = p } ∷ IoFault
+    if kind ≡ "NotADirectory" then return variant NotADirectory { path = p } ∷ IoFault
+    if kind ≡ "IsADirectory" then return variant IsADirectory { path = p } ∷ IoFault
+    if kind ≡ "InvalidArgument" then return variant InvalidArgument { path = p } ∷ IoFault
+    if kind ≡ "AlreadyExists" then return variant AlreadyExists { path = p } ∷ IoFault
+    if kind ≡ "TimedOut" then return variant TimedOut { path = p } ∷ IoFault
+    if kind ≡ "ConnectionRefused" then return variant ConnectionRefused { path = p } ∷ IoFault
+    if kind ≡ "ConnectionReset" then return variant ConnectionReset { path = p } ∷ IoFault
+    if kind ≡ "AddrInUse" then return variant AddrInUse { path = p } ∷ IoFault
+    if kind ≡ "Io" then return variant Io { path = p } ∷ IoFault
+    if kind ≡ "Closed" then return variant Closed ∷ IoFault
+    if kind ≡ "Unset" then return variant Unset ∷ IoFault
+    if kind ≡ "Unavailable" then return variant Unavailable ∷ IoFault
+    if kind ≡ "Cancelled" then return variant Cancelled ∷ IoFault
+    return variant Io { path = p } ∷ IoFault
+}
