@@ -33,6 +33,7 @@ use super::keywords::{keyword_specs, keyword_token_kind};
 use super::token::{Span, Symbol, Token, TokenKind};
 use super::{LexError, LexErrorKind, LexResult, LocaleSuggestion, MixedScriptAdvisory};
 use crate::KeywordPack;
+use crate::textus_literal::{TextDelimiter, first_invalid_escape};
 use radix_diagnostics::DiagnosticArg;
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
@@ -516,6 +517,35 @@ impl<'a> Lexer<'a> {
         self.interner.intern_raw(text)
     }
 
+    /// Emit one `LEX003 unknown_escape` diagnostic for the first escape in the
+    /// literal's payload the delimiter does not allow.
+    ///
+    /// Only terminated literals are checked: recovery text has no reliable
+    /// payload boundary, and the unterminated literal already has its own
+    /// diagnostic. The token is still emitted either way.
+    fn check_literal_escapes(
+        &mut self,
+        start: u32,
+        sym: Symbol,
+        delimiter: TextDelimiter,
+        terminated: bool,
+    ) {
+        if !terminated {
+            return;
+        }
+        let Some((_, escape)) = first_invalid_escape(self.interner.resolve(sym), delimiter) else {
+            return;
+        };
+        self.emit_error(
+            LexErrorKind::EscapeInvalid,
+            start,
+            vec![
+                DiagnosticArg::new("issue", "unknown_escape"),
+                DiagnosticArg::new("escape", escape.to_string()),
+            ],
+        );
+    }
+
     /// Skip one shallow escape sequence (`\` plus the next source character).
     fn skip_escaped_char(&mut self) {
         self.cursor.advance();
@@ -829,6 +859,7 @@ impl<'a> Lexer<'a> {
         }
 
         let sym = self.finish_delimited_literal(start, 1, 1, terminated);
+        self.check_literal_escapes(start, sym, TextDelimiter::Backtick, terminated);
         self.emit_token(TokenKind::BacktickString(sym), start);
     }
 
@@ -902,6 +933,7 @@ impl<'a> Lexer<'a> {
         }
 
         let sym = self.finish_delimited_literal(start, 1, 1, terminated);
+        self.check_literal_escapes(start, sym, TextDelimiter::Quote, terminated);
         self.emit_token(TokenKind::String(sym), start);
     }
 
@@ -939,6 +971,7 @@ impl<'a> Lexer<'a> {
         #[allow(clippy::cast_possible_truncation)]
         let close_len = '»'.len_utf8() as u32;
         let sym = self.finish_delimited_literal(start, open_len, close_len, terminated);
+        self.check_literal_escapes(start, sym, TextDelimiter::Guillemet, terminated);
         self.emit_token(TokenKind::String(sym), start);
     }
 

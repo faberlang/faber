@@ -8,7 +8,7 @@
 use super::{HOMOGLYPH_ISSUE, INLINE_COMMENT_ISSUE, Interner};
 use crate::{
     KeywordPack, KeywordScope, LexErrorKind, LexResult, TokenKind, keyword_specs, lex,
-    lex_with_locale_pack, lookup_keyword_spec,
+    lex_with_locale_pack, lookup_keyword_spec, textus_literal::decode_textus_literal,
 };
 
 fn has_arg(err: &crate::LexError, name: &str, value: &str) -> bool {
@@ -2772,4 +2772,52 @@ fn regex_literal_locale_pack_type_word_opens_body() {
         panic!("expected RegexString, got {:?}", result.tokens[1].kind);
     };
     assert_eq!(result.interner.resolve(sym), "a+");
+}
+
+// =============================================================================
+// LEX003 — Unknown escapes in delimited literals
+// =============================================================================
+
+#[test]
+fn unknown_escape_quote_emits_lex003() {
+    let result = lex(r#""a\qb""#);
+    assert_eq!(result.errors.len(), 1, "errors: {:?}", result.errors);
+    assert_eq!(result.errors[0].kind, LexErrorKind::EscapeInvalid);
+    assert!(has_arg(&result.errors[0], "issue", "unknown_escape"));
+    assert!(matches!(result.tokens[0].kind, TokenKind::String(_)));
+}
+
+#[test]
+fn unknown_escape_guillemet_emits_lex003() {
+    let result = lex(r#"«a\"b»"#);
+    assert_eq!(result.errors.len(), 1, "errors: {:?}", result.errors);
+    assert_eq!(result.errors[0].kind, LexErrorKind::EscapeInvalid);
+    assert!(has_arg(&result.errors[0], "issue", "unknown_escape"));
+    assert!(matches!(result.tokens[0].kind, TokenKind::String(_)));
+}
+
+#[test]
+fn unknown_escape_backtick_emits_lex003() {
+    let result = lex(r#"`a\"b`"#);
+    assert_eq!(result.errors.len(), 1, "errors: {:?}", result.errors);
+    assert_eq!(result.errors[0].kind, LexErrorKind::EscapeInvalid);
+    assert!(has_arg(&result.errors[0], "issue", "unknown_escape"));
+    assert!(matches!(
+        result.tokens[0].kind,
+        TokenKind::BacktickString(_)
+    ));
+}
+
+#[test]
+fn unknown_escape_guillemet_own_delimiter_is_valid() {
+    let result = lex(r#"«a\»b»"#);
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert_eq!(decode_textus_literal(first_string_payload(&result)), "a»b");
+}
+
+#[test]
+fn unknown_escape_quote_own_delimiter_is_valid() {
+    let result = lex(r#""a\"b""#);
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert_eq!(decode_textus_literal(first_string_payload(&result)), "a\"b");
 }
