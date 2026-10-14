@@ -4094,6 +4094,10 @@ help = "write a literal axis such as `axis 1`; the result shape depends on it"
 message = "the axis is outside the rank of the tensor"
 help = "use an axis from 0 up to one less than the rank"
 
+[diagnostics.SEM010.issues.axis_reduction_repeated]
+message = "the same axis is named more than once in the reduction"
+help = "remove the repeated axis; each axis may appear once"
+
 [diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
 message = "an axis reduction is built for tensors of rank 2 to 8 only"
 help = "reduce a tensor of rank 2 to 8 with literal dimensions, or write the explicit reduction with `reducta ... per [...]`"

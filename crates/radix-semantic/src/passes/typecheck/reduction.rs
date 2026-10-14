@@ -36,6 +36,7 @@ const MAX_AXIS_REDUCTION_RANK: usize = 8;
 const ISSUE_AXIS_REDUCTION_RANK_UNSUPPORTED: &str = "axis_reduction_rank_unsupported";
 const ISSUE_AXIS_REDUCTION_NOT_CONSTANT: &str = "axis_reduction_not_constant";
 const ISSUE_AXIS_REDUCTION_OUT_OF_RANGE: &str = "axis_reduction_out_of_range";
+const ISSUE_AXIS_REDUCTION_REPEATED: &str = "axis_reduction_repeated";
 const ISSUE_AXIS_REDUCTION_EXTENT_UNKNOWN: &str = "axis_reduction_extent_unknown";
 const ISSUE_AXIS_REDUCTION_MEAN_REQUIRES_FLOAT: &str = "axis_reduction_mean_requires_float";
 
@@ -55,10 +56,13 @@ impl TypeChecker<'_> {
     /// the coordinates other than `n` in order, and `t.mean(axis n)` is that
     /// grouped sum divided by the extent of the removed axis. The axis is a
     /// compile-time constant in `0..rank`; the result is the receiver shape
-    /// with that axis removed. Need: a `mean` over an integer element
-    /// sums exactly in the element family and converts the summed tensor to
-    /// `fractus` before the division, matching the scalar `.mean()`; a float
-    /// element keeps its own width.
+    /// with that axis removed. Need item 6: several axes ride the
+    /// rest form (`t.sum(axis n0, axis n1, ...)`), each numbered in the source
+    /// tensor; order does not matter, a repeated axis is refused, and `mean`
+    /// divides by the product of the removed extents. Need: a `mean`
+    /// over an integer element sums exactly in the element family and converts
+    /// the summed tensor to `fractus` before the division, matching the scalar
+    /// `.mean()`; a float element keeps its own width.
     pub(super) fn desugar_axis_reduction(&mut self, expr: &mut HirExpression) -> AxisReduction {
         let HirExpressionKind::MethodCall(receiver, name, type_args, args, conversion) =
             &mut expr.kind
@@ -67,10 +71,12 @@ impl TypeChecker<'_> {
         };
         if !type_args.is_empty()
             || conversion.is_some()
-            || args.len() != 1
-            || args[0].marker != Some(radix_hir::HirArgMarker::Axis)
-            || args[0].spread
-            || args[0].name.is_some()
+            || args.is_empty()
+            || args.iter().any(|arg| {
+                arg.marker != Some(radix_hir::HirArgMarker::Axis)
+                    || arg.spread
+                    || arg.name.is_some()
+            })
         {
             return AxisReduction::NotApplicable;
         }
@@ -121,30 +127,56 @@ impl TypeChecker<'_> {
                 return AxisReduction::Refused;
             }
         };
-        let axis_expr = &args[0].expr;
-        // Need: a named compile-time integer binding (an immutable
-        // `const int` local or a module constant) is a constant axis; a
-        // run-time variable has no recorded value and stays refused.
-        let Some(axis) =
-            super::integer_range::const_int_value_resolved(axis_expr, &self.const_int_values)
-        else {
+        let rank = dims.len();
+        // Every axis is numbered in the source tensor. Order does not matter
+        // and a repeated number is a named error; the removed set is kept in
+        // source order only for the extent product.
+        let mut axes: Vec<usize> = Vec::with_capacity(args.len());
+        for arg in args.iter() {
+            // Need: a named compile-time integer binding (an
+            // immutable `const int` local or a module constant) is a constant
+            // axis; a run-time variable has no recorded value and stays
+            // refused.
+            let Some(axis) = super::integer_range::const_int_value_resolved(
+                &arg.expr,
+                &self.const_int_values,
+            ) else {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_AXIS_REDUCTION_NOT_CONSTANT,
+                    arg.span,
+                );
+                return AxisReduction::Refused;
+            };
+            if !(0..rank as i128).contains(&axis) {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_AXIS_REDUCTION_OUT_OF_RANGE,
+                    arg.span,
+                );
+                return AxisReduction::Refused;
+            }
+            let axis = axis as usize;
+            if axes.contains(&axis) {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_AXIS_REDUCTION_REPEATED,
+                    arg.span,
+                );
+                return AxisReduction::Refused;
+            }
+            axes.push(axis);
+        }
+        // Removing every axis would leave a rank-zero result; the closed
+        // family covers rank 2 to 8, not the scalar collapse.
+        if axes.len() >= rank {
             self.error_issue(
                 SemanticErrorKind::TypeMismatch,
-                ISSUE_AXIS_REDUCTION_NOT_CONSTANT,
-                args[0].span,
-            );
-            return AxisReduction::Refused;
-        };
-        if !(0..dims.len() as i128).contains(&axis) {
-            self.error_issue(
-                SemanticErrorKind::TypeMismatch,
-                ISSUE_AXIS_REDUCTION_OUT_OF_RANGE,
-                args[0].span,
+                ISSUE_AXIS_REDUCTION_RANK_UNSUPPORTED,
+                span,
             );
             return AxisReduction::Refused;
         }
-        let axis = axis as usize;
-        let rank = dims.len();
         let mut divisor = None;
         // An integer-element `mean` converts after the exact integer sum; a
         // float element keeps its own type.
@@ -160,19 +192,33 @@ impl TypeChecker<'_> {
                 );
                 return AxisReduction::Refused;
             }
-            match self.types.get_index(dims[axis]) {
-                IndexExpr::Literal(count) => divisor = Some(*count),
-                _ => {
-                    self.error_issue(
-                        SemanticErrorKind::TypeMismatch,
-                        ISSUE_AXIS_REDUCTION_EXTENT_UNKNOWN,
-                        span,
-                    );
-                    return AxisReduction::Refused;
+            let mut product: u64 = 1;
+            for &axis in &axes {
+                match self.types.get_index(dims[axis]) {
+                    IndexExpr::Literal(count) => {
+                        let Some(next) = product.checked_mul(*count) else {
+                            self.error_issue(
+                                SemanticErrorKind::TypeMismatch,
+                                ISSUE_AXIS_REDUCTION_EXTENT_UNKNOWN,
+                                span,
+                            );
+                            return AxisReduction::Refused;
+                        };
+                        product = next;
+                    }
+                    _ => {
+                        self.error_issue(
+                            SemanticErrorKind::TypeMismatch,
+                            ISSUE_AXIS_REDUCTION_EXTENT_UNKNOWN,
+                            span,
+                        );
+                        return AxisReduction::Refused;
+                    }
                 }
             }
+            divisor = Some(product);
         }
-        let kept: Vec<usize> = (0..rank).filter(|&index| index != axis).collect();
+        let kept: Vec<usize> = (0..rank).filter(|index| !axes.contains(index)).collect();
         let result_shape = if let [only] = kept[..] {
             dims[only]
         } else {
