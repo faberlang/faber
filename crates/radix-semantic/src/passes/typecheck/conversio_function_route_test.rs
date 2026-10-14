@@ -3,7 +3,7 @@
 //! function's signature (`⇥ E` makes `↦ B` failable, usable with `⊥` or
 //! propagation). Typecheck records the function on the `Conversio` node.
 
-use crate::test_support::{analyze_ok, analyze_source, assert_rejects_with_issue, issue};
+use crate::test_support::{analyze_ok_la, analyze_source_la, assert_rejects_with_issue_la, issue};
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{HirConversioRoute, HirExpression, HirExpressionKind};
 
@@ -25,7 +25,7 @@ impl HirVisitor for RouteCollector {
 }
 
 fn function_route_failable(source: &str) -> bool {
-    let result = analyze_ok(source);
+    let result = analyze_ok_la(source);
     let mut collector = RouteCollector::default();
     collector.visit_program(result.hir.as_ref().expect("hir"));
     let [HirConversioRoute::Function { failable, .. }] = collector.routes.as_slice() else {
@@ -65,7 +65,7 @@ fn registered_pair_serves_explicit_conversio() {
 
 #[test]
 fn conversio_function_used_through_arrow_is_not_unused() {
-    let result = analyze_source(&format!(
+    let result = analyze_source_la(&format!(
         "{TEMPERATURES}incipit {{\n    fixum Fahrenheit f ← Celsius {{ gradus = 100.0 }} ↦ Fahrenheit\n    nota f.gradus\n}}"
     ));
     assert!(result.is_ok(), "{:?}", result.diagnostics);
@@ -100,7 +100,7 @@ fn failable_pair_without_default_or_channel_is_rejected() {
     // D17.8: one rule for every failable `↦`, so the issue is
     // `failable_conversio_requires_handler`; `incipit` (main) is exempt, so
     // the site lives in a helper.
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &format!(
             "{FAILABLE}functio lege(Mensura m) → Positiva {{\n    redde m ↦ Positiva\n}}\nincipit {{ nota 1 }}"
         ),
@@ -110,14 +110,14 @@ fn failable_pair_without_default_or_channel_is_rejected() {
 
 #[test]
 fn failable_pair_in_main_is_exempt() {
-    let _ = analyze_ok(&format!(
+    let _ = analyze_ok_la(&format!(
         "{FAILABLE}incipit {{\n    fixum Positiva p ← Mensura {{ valor = 1 }} ↦ Positiva\n    nota p.valor\n}}"
     ));
 }
 
 #[test]
 fn registered_pairs_never_chain() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &format!(
             "{TEMPERATURES}genus Kelvin {{ varia fractus gradus }}
 @ conversio

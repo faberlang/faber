@@ -11,14 +11,14 @@
 
 use crate::Primitive;
 use crate::test_support::{
-    analyze_ok, analyze_source, assert_accepts, assert_rejects_with_issue, entry_local_tys,
+    analyze_ok_la, analyze_source_la, assert_accepts_la, assert_rejects_with_issue_la, entry_local_tys,
 };
 
 const ISSUE: &str = "optional_into_plain_cell";
 
 /// The second `incipit` local must be a single-level optional of `numerus`.
 fn assert_single_level_numerus_optional(source: &str, local: usize) {
-    let unit = analyze_ok(source);
+    let unit = analyze_ok_la(source);
     let tys = entry_local_tys(&unit);
     let ty = tys[local];
     let inner = unit
@@ -67,7 +67,7 @@ fn map_get_over_optional_value_is_one_optional() {
 
 #[test]
 fn list_get_over_optional_element_stores_into_optional_cell() {
-    assert_accepts(
+    assert_accepts_la(
         r"incipit {
     fixum lista<numerus ∪ nihil> xs ← [1, nulla, 3]
     varia numerus ∪ nihil a ← xs.accipe(0)
@@ -79,7 +79,7 @@ fn list_get_over_optional_element_stores_into_optional_cell() {
 
 #[test]
 fn map_get_over_optional_value_stores_into_optional_cell() {
-    assert_accepts(
+    assert_accepts_la(
         r#"incipit {
     fixum tabula<textus, numerus ∪ nihil> m ← { "a": 1 }
     fixum numerus ∪ nihil a ← m.accipe("a")
@@ -90,7 +90,7 @@ fn map_get_over_optional_value_stores_into_optional_cell() {
 
 #[test]
 fn list_get_over_optional_element_into_plain_cell_is_rejected_once() {
-    let result = analyze_source(
+    let result = analyze_source_la(
         r"incipit {
     fixum lista<numerus ∪ nihil> xs ← [1, nulla, 3]
     fixum numerus a ← xs.accipe(0)
@@ -107,7 +107,7 @@ fn list_get_over_optional_element_into_plain_cell_is_rejected_once() {
 
 #[test]
 fn map_get_over_optional_value_into_plain_cell_is_rejected() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r#"incipit {
     fixum tabula<textus, numerus ∪ nihil> m ← { "a": 1 }
     fixum numerus a ← m.accipe("a")
@@ -119,7 +119,7 @@ fn map_get_over_optional_value_into_plain_cell_is_rejected() {
 
 #[test]
 fn list_get_over_optional_element_composes_with_vel() {
-    assert_accepts(
+    assert_accepts_la(
         r"incipit {
     fixum lista<numerus ∪ nihil> xs ← [1, nulla, 3]
     fixum numerus a ← xs.accipe(1) vel 7
@@ -130,7 +130,7 @@ fn list_get_over_optional_element_composes_with_vel() {
 
 #[test]
 fn list_get_over_optional_element_narrows_once() {
-    assert_accepts(
+    assert_accepts_la(
         r"incipit {
     fixum lista<numerus ∪ nihil> xs ← [1, nulla, 3]
     fixum _ a ← xs.accipe(0)

@@ -13,7 +13,7 @@ use radix_types::numeric_width::numerus_integer_width;
 /// that local's integer width.
 fn width_of(decls: &str, expr: &str) -> Option<NumericWidth> {
     let source = format!("incipit {{\n{decls}\nfixum _ r ← {expr}\n}}\n");
-    let result = test_support::analyze_ok(&source);
+    let result = test_support::analyze_ok_la(&source);
     let tys = entry_local_tys(&result);
     let ty = *tys.last().expect("locals");
     numerus_integer_width(&result.types, ty)
@@ -72,7 +72,7 @@ fn sixty_four_bit_cap_keeps_the_sign() {
 fn untyped_constants_default_to_int() {
     let ten = width_of("", "10 - 100");
     assert_eq!(ten, Some(I64));
-    let result = test_support::analyze_ok("incipit {\nfixum _ d ← 10 - 100\n}\n");
+    let result = test_support::analyze_ok_la("incipit {\nfixum _ d ← 10 - 100\n}\n");
     let ty = entry_local_tys(&result)[0];
     assert!(matches!(
         result.types.get(ty),
@@ -84,14 +84,14 @@ fn untyped_constants_default_to_int() {
 
 #[test]
 fn integer_constant_slot_takes_its_type() {
-    let result = test_support::analyze_ok("incipit {\nfixum u8 d ← 10 + 20\n}\n");
+    let result = test_support::analyze_ok_la("incipit {\nfixum u8 d ← 10 + 20\n}\n");
     let ty = entry_local_tys(&result)[0];
     assert_eq!(numerus_integer_width(&result.types, ty), Some(U8));
 }
 
 #[test]
 fn collection_literal_of_constants_is_lista_of_int() {
-    let result = test_support::analyze_ok("incipit {\nfixum _ xs ← [1, 2, 3]\n}\n");
+    let result = test_support::analyze_ok_la("incipit {\nfixum _ xs ← [1, 2, 3]\n}\n");
     let ty = entry_local_tys(&result)[0];
     let (Type::Array(elem) | Type::BoundedArray { element: elem, .. }) = result.types.get(ty)
     else {
@@ -111,13 +111,13 @@ fn branch_join_is_the_smallest_type_holding_both() {
 
 #[test]
 fn float_beside_integer_constant_accepts() {
-    test_support::assert_analysis_accepts("functio f(f64 x) → f64 {\n    redde x + 1\n}\n");
-    test_support::assert_analysis_accepts("functio f(f32 x) → f32 {\n    redde 2 * x\n}\n");
+    test_support::assert_analysis_accepts_la("functio f(f64 x) → f64 {\n    redde x + 1\n}\n");
+    test_support::assert_analysis_accepts_la("functio f(f32 x) → f32 {\n    redde 2 * x\n}\n");
 }
 
 #[test]
 fn inexact_integer_constant_beside_float_rejects() {
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         "functio f(f64 x) → f64 {\n    redde x + 9007199254740993\n}\n",
         "float_constant_inexact",
     );
@@ -125,11 +125,11 @@ fn inexact_integer_constant_beside_float_rejects() {
 
 #[test]
 fn typed_integer_beside_float_rejects() {
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         "functio f(f64 x, i64 n) → f64 {\n    redde x + n\n}\n",
         "numeric_family_crossing_requires_conversio",
     );
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         "functio f(i32 n, f32 x) → f32 {\n    redde n * x\n}\n",
         "numeric_family_crossing_requires_conversio",
     );
@@ -137,7 +137,7 @@ fn typed_integer_beside_float_rejects() {
 
 #[test]
 fn float_constant_beside_integer_rejects() {
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         "functio f(i32 n) → numerus {\n    redde n + 1.5\n}\n",
         "numeric_family_crossing_requires_conversio",
     );
@@ -145,7 +145,7 @@ fn float_constant_beside_integer_rejects() {
 
 #[test]
 fn decimal_beside_integer_rejects() {
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         "functio f(d64 d, i32 n) {\n    fixum _ r ← d + n\n}\n",
         "numeric_family_crossing_requires_conversio",
     );
@@ -153,19 +153,19 @@ fn decimal_beside_integer_rejects() {
 
 #[test]
 fn float_and_decimal_widths_join_by_the_lattice() {
-    test_support::assert_analysis_accepts("functio f(f32 x, f64 y) → f64 {\n    redde x + y\n}\n");
-    test_support::assert_analysis_accepts("functio f(d64 x, d64 y) → d64 {\n    redde x + y\n}\n");
+    test_support::assert_analysis_accepts_la("functio f(f32 x, f64 y) → f64 {\n    redde x + y\n}\n");
+    test_support::assert_analysis_accepts_la("functio f(d64 x, d64 y) → d64 {\n    redde x + y\n}\n");
 }
 
 #[test]
 fn u64_with_signed_typed_operand_rejects() {
     for op in ["+", "-", "*", "/", "%"] {
-        test_support::assert_analysis_rejects_with_issue(
+        test_support::assert_analysis_rejects_with_issue_la(
             &format!("functio f(u64 a, i32 b) {{\n    fixum _ r ← a {op} b\n}}\n"),
             "u64_signed_arithmetic_requires_conversion",
         );
     }
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         "functio f(i64 a, u64 b) {\n    fixum _ r ← a + b\n}\n",
         "u64_signed_arithmetic_requires_conversion",
     );
@@ -174,7 +174,7 @@ fn u64_with_signed_typed_operand_rejects() {
 #[test]
 fn u64_with_signed_bitwise_operand_rejects() {
     for op in ["∧", "∨", "⊻"] {
-        test_support::assert_analysis_rejects_with_issue(
+        test_support::assert_analysis_rejects_with_issue_la(
             &format!("functio f(u64 a, i32 b) {{\n    fixum _ r ← a {op} b\n}}\n"),
             "u64_signed_arithmetic_requires_conversion",
         );
@@ -183,7 +183,7 @@ fn u64_with_signed_bitwise_operand_rejects() {
 
 #[test]
 fn u64_with_constants_is_not_an_error() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         "functio f(u64 a) {\n    fixum _ r ← a - 1\n    fixum _ s ← a + -5\n}\n",
     );
 }
@@ -191,24 +191,24 @@ fn u64_with_constants_is_not_an_error() {
 #[test]
 fn u64_range_endpoint_beside_signed_typed_endpoint_rejects() {
     for (a, b) in [("u64 a", "numerus b"), ("i32 a", "u64 b")] {
-        test_support::assert_analysis_rejects_with_issue(
+        test_support::assert_analysis_rejects_with_issue_la(
             &format!("functio f({a}, {b}) {{\n    fixum _ r ← a‥b\n}}\n"),
             "u64_signed_arithmetic_requires_conversion",
         );
     }
-    test_support::assert_analysis_accepts("functio f(u64 a) {\n    fixum _ r ← 0‥a\n}\n");
+    test_support::assert_analysis_accepts_la("functio f(u64 a) {\n    fixum _ r ← 0‥a\n}\n");
 }
 
 #[test]
 fn modular_and_saturating_words_keep_their_ring() {
     let decls = "fixum modulus<u8> a ← 200\nfixum modulus<u8> b ← 100";
     let source = format!("incipit {{\n{decls}\nfixum _ r ← a + b\n}}\n");
-    let result = test_support::analyze_ok(&source);
+    let result = test_support::analyze_ok_la(&source);
     let ty = *entry_local_tys(&result).last().unwrap();
     assert!(matches!(result.types.get(ty), Type::ModularWord(U8)));
     let decls = "fixum saturatus<u8> a ← 200\nfixum saturatus<u8> b ← 100";
     let source = format!("incipit {{\n{decls}\nfixum _ r ← a + b\n}}\n");
-    let result = test_support::analyze_ok(&source);
+    let result = test_support::analyze_ok_la(&source);
     let ty = *entry_local_tys(&result).last().unwrap();
     assert!(matches!(result.types.get(ty), Type::SaturatingWord(U8)));
 }
@@ -232,15 +232,15 @@ fn integer_widths_beyond_i8_are_reachable() {
 
 #[test]
 fn strict_equality_takes_an_integer_constant_by_value() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         "functio even(numerus n) → bivalens {\n    redde n % 2 ≡ 0\n}\n",
     );
-    test_support::assert_analysis_accepts("functio p(u8 a) → bivalens {\n    redde a ≡ 200\n}\n");
+    test_support::assert_analysis_accepts_la("functio p(u8 a) → bivalens {\n    redde a ≡ 200\n}\n");
     // A constant the width cannot hold compares exactly and is simply false
     // (ruling 22); it is not a type error.
-    test_support::assert_analysis_accepts("functio p(u8 a) → bivalens {\n    redde a ≡ 300\n}\n");
+    test_support::assert_analysis_accepts_la("functio p(u8 a) → bivalens {\n    redde a ≡ 300\n}\n");
     // Typed operands of different widths stay exact-type only.
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         "functio p(u8 a, u16 b) → bivalens {\n    redde a ≡ b\n}\n",
         "equality_exact_types_required",
     );
@@ -255,10 +255,10 @@ fn range_endpoints_join_like_a_binary_pair() {
         "functio p(u8 x) {\n    itera ab (x + x - 398)‥3 fixum i {\n        nota i\n    }\n}\n",
         "functio p(u8 x) {\n    itera ab x‥(x + x) fixum i {\n        nota i\n    }\n}\n",
     ] {
-        test_support::assert_analysis_accepts(source);
+        test_support::assert_analysis_accepts_la(source);
     }
     // A family crossing is still an error.
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         "functio p(u8 x, fractus f) {\n    itera ab 0‥f fixum i {\n        nota i\n    }\n}\n",
         "equality_exact_types_required",
     );

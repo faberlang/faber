@@ -58,7 +58,7 @@ impl HirVisitor for Widens<'_> {
 }
 
 fn widens_of(source: &str) -> Vec<Widened> {
-    let fixture = test_support::analyze_ok(source);
+    let fixture = test_support::analyze_ok_la(source);
     let hir = fixture.hir.as_ref().expect("hir");
     let mut visitor = Widens {
         types: &fixture.types,
@@ -197,7 +197,7 @@ fn an_inf_operand_joins_a_bounded_one_with_each_keeping_its_own_type() {
 #[test]
 fn the_operand_keeps_its_declared_type_not_the_slot() {
     let fixture =
-        test_support::analyze_ok("incipit {\nfixum u64 u ← 5\nfixum inf w ← u\nnota w\n}\n");
+        test_support::analyze_ok_la("incipit {\nfixum u64 u ← 5\nfixum inf w ← u\nnota w\n}\n");
     let hir = fixture.hir.as_ref().expect("hir");
     let mut seen = None;
     struct Probe<'a>(&'a TypeTable, &'a mut Option<Type>);
