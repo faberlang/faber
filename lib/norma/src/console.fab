@@ -51,13 +51,21 @@ fn read_bytes_async(int byte_length) → list<b8> ∪ none {
 # Read line from stdin (sync, blocks until newline)
 @ public
 fn read_line() → string ∪ none {
+    if input_ended() then return null
     return call 'consolum:lege' ↦ string
 }
 
 # Read line from stdin (async route; Faber blocks on the frame)
 @ public
 fn read_line_async() → string ∪ none {
+    if input_ended() then return null
     return call 'consolum:leget' ↦ string
+}
+
+# True only at end of input, never for a blank line. Blocks until a byte
+# arrives or stdin closes; consumes nothing.
+fn input_ended() → bool {
+    return call 'consolum:desinit' ↦ bool
 }
 
 # =========================================================================

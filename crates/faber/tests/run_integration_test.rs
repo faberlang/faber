@@ -2615,6 +2615,62 @@ main {
     assert_no_generated_rust(&package);
 }
 
+#[test]
+fn run_console_read_line_eof_is_none_and_blank_line_is_present() {
+    // EOF is `none`; a blank line stays a present "" (not EOF). The loop
+    // must end at end of input, not at a line cap: before the fix `read_line`
+    // always returned a present string and the guard stopped it at 10.
+    let package = temp_dir("norma-console-read-line-eof");
+    let src = package.join("src");
+    fs::create_dir_all(&src).expect("create src");
+    fs::write(
+        package.join("faber.toml"),
+        r#"
+[package]
+name = "norma-console-read-line-eof"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        src.join("main.fab"),
+        r#"import from "norma:console" const read_line
+
+main {
+    var int lines ← 0
+    var bool done ← false
+    while (not done) and lines ≺ 10 {
+        const string ∪ none line ← read_line()
+        if line is none {
+            done ← true
+        }
+        if not done {
+            lines ← lines + 1
+        }
+    }
+    print lines
+}
+"#,
+    )
+    .expect("write entry");
+
+    let (stdout, stderr, ok) = run_faber_with_stdin(
+        &["run", package.to_str().expect("utf8 package path")],
+        b"A\n\nB\n",
+    );
+
+    assert!(ok, "norma:console read_line EOF probe failed:\n{stderr}");
+    assert_eq!(
+        stdout.trim(),
+        "3",
+        "two text lines and one blank line are present; the loop ends on EOF"
+    );
+    assert_no_generated_rust(&package);
+}
+
 /// d11-6 G1 repair: a constant argument that fits a narrow parameter is a
 /// valid MIR call argument (MIR types the constant as plain `numerus`).
 #[test]
