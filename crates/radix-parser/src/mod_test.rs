@@ -2705,7 +2705,8 @@ fn assert_en_parse_error_issue(source: &str, issue: &str) {
 }
 
 /// Minimal en surface for mutability- and declaration-expectation args
-/// (`const`/`var`, `fn`, and the praepara hook family).
+/// (`const`/`var`, `fn`, the praepara hook family, and the scribe/incipit
+/// statement family).
 struct SurfaceArgsPack;
 
 impl KeywordPack for SurfaceArgsPack {
@@ -2727,6 +2728,12 @@ impl KeywordPack for SurfaceArgsPack {
             "async_setup" => Some("praeparabit"),
             "teardown" => Some("postpara"),
             "async_teardown" => Some("postparabit"),
+            "write" => Some("scribe"),
+            "debug" => Some("vide"),
+            "warn" => Some("mone"),
+            "print" => Some("nota"),
+            "main" => Some("incipit"),
+            "async_main" => Some("incipiet"),
             _ => None,
         }
     }
@@ -2741,6 +2748,12 @@ impl KeywordPack for SurfaceArgsPack {
             "praeparabit" => Some("async_setup"),
             "postpara" => Some("teardown"),
             "postparabit" => Some("async_teardown"),
+            "scribe" => Some("write"),
+            "vide" => Some("debug"),
+            "mone" => Some("warn"),
+            "nota" => Some("print"),
+            "incipit" => Some("main"),
+            "incipiet" => Some("async_main"),
             _ => None,
         }
     }
@@ -2880,6 +2893,57 @@ fn parser_praepara_hook_expectation_issue_carries_surface_args() {
         issue_arg(&hook_error, "postparabit"),
         Some("async_teardown")
     );
+}
+
+#[test]
+fn parser_scribe_incipit_expectation_issues_carry_surface_args() {
+    // `parse_stmt` routes to `parse_scribe_stmt`/`parse_incipit_stmt` only
+    // after `current_keyword_ident` already matched one of the family's
+    // keywords, and each parser consumes that same identity through the same
+    // claim path, so the miss branches are defensive (unreachable from
+    // source). This pins each site's exact keyword list and the pack surface
+    // the helper records: the en pack rows render
+    // `{scribe}`/`{vide}`/`{incipit}`/... and must not hard-code Latin
+    // keywords into a non-Latin reader surface.
+    //
+    // Control: the pack claims the statement families, and valid statements
+    // parse through the same check/eat path the expectations guard.
+    let scribe_ok = parse_surface_args("write \"pack\"");
+    assert!(
+        scribe_ok.success(),
+        "scribe statement must parse on the en surface: {:?}",
+        scribe_ok.errors
+    );
+    let incipit_ok = parse_surface_args("main { }");
+    assert!(
+        incipit_ok.success(),
+        "incipit statement must parse on the en surface: {:?}",
+        incipit_ok.errors
+    );
+
+    let mut scribe_parser = surface_args_parser("numerus x");
+    let Err(scribe_error) = scribe_parser.parse_scribe_stmt() else {
+        panic!("non-keyword cursor must not parse as a scribe statement");
+    };
+    assert_eq!(
+        issue_arg(&scribe_error, "issue"),
+        Some("expected_scribe_keyword")
+    );
+    assert_eq!(issue_arg(&scribe_error, "scribe"), Some("write"));
+    assert_eq!(issue_arg(&scribe_error, "vide"), Some("debug"));
+    assert_eq!(issue_arg(&scribe_error, "mone"), Some("warn"));
+    assert_eq!(issue_arg(&scribe_error, "nota"), Some("print"));
+
+    let mut incipit_parser = surface_args_parser("numerus x");
+    let Err(incipit_error) = incipit_parser.parse_incipit_stmt() else {
+        panic!("non-keyword cursor must not parse as an incipit statement");
+    };
+    assert_eq!(
+        issue_arg(&incipit_error, "issue"),
+        Some("expected_incipit_keyword")
+    );
+    assert_eq!(issue_arg(&incipit_error, "incipit"), Some("main"));
+    assert_eq!(issue_arg(&incipit_error, "incipiet"), Some("async_main"));
 }
 
 #[test]
