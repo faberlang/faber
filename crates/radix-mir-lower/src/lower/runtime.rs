@@ -651,8 +651,8 @@ impl FunctionBuilder<'_> {
                 return self.lower_tensor_limes(receiver, args, expr);
             }
         }
-        if method_name == "rope_norm" {
-            return self.lower_tensor_rope_norm(receiver, method, generic_args, args, expr);
+        if method_name == "rope_norm" || method_name == "rope_half" {
+            return self.lower_tensor_rope(receiver, method, &method_name, generic_args, args, expr);
         }
         if let Some(lowered) = self.lower_sermo_method(receiver, &method_name, args, expr) {
             return Some(lowered);
@@ -997,14 +997,19 @@ impl FunctionBuilder<'_> {
         Some(value)
     }
 
-    /// Lower the clean-break `rope_norm<dim>(pos, rope_table)` surface to the
-    /// MIR `[x, pos, dim, rope_table]` collection contract. A concrete generic argument
-    /// becomes an integer constant; a generic template carries the compiler-
-    /// owned symbolic shape-size constant until MIR monomorphization binds it.
-    fn lower_tensor_rope_norm(
+    /// Lower the clean-break `rope_norm<dim>(pos, rope_table)` and
+    /// `rope_half<dim>(pos, rope_table)` surfaces to the shared MIR
+    /// `[x, pos, dim, rope_table]` collection contract, emitting exactly the
+    /// MIR collection op the intrinsic registry selected for `method_name`
+    /// (`TensorRope` consecutive pairs, `TensorRopeHalf` half-split pairs). A
+    /// concrete generic argument becomes an integer constant; a generic
+    /// template carries the compiler-owned symbolic shape-size constant until
+    /// MIR monomorphization binds it.
+    fn lower_tensor_rope(
         &mut self,
         receiver: &HirExpression,
         method: Symbol,
+        method_name: &str,
         generic_args: &[TypeId],
         args: &[HirCallArg],
         expr: &HirExpression,
@@ -1012,49 +1017,49 @@ impl FunctionBuilder<'_> {
         let Some(op) = self.collection_method_op(receiver, method, args, expr.span) else {
             self.errors.push(MirError::unsupported(
                 expr.span,
-                "rope_norm method is not admitted for this receiver",
+                format!("{method_name} method is not admitted for this receiver"),
             ));
             return None;
         };
-        let MirCollectionOp::TensorRope = op else {
+        let (MirCollectionOp::TensorRope | MirCollectionOp::TensorRopeHalf) = op else {
             self.errors.push(MirError::unsupported(
                 expr.span,
-                "rope_norm is not backed by the TensorRope MIR collection",
+                format!("{method_name} is not backed by a TensorRope MIR collection"),
             ));
             return None;
         };
         let [pos, rope_table] = args else {
             self.errors.push(MirError::validation(
                 expr.span,
-                "rope_norm requires a position and an explicit rope table argument",
+                format!("{method_name} requires a position and an explicit rope table argument"),
             ));
             return None;
         };
         let receiver = self.lower_expr_value(receiver)?;
         let pos = self.lower_expr_value(&pos.expr)?;
         let rope_table = self.lower_expr_value(&rope_table.expr)?;
-        let dim = self.lower_rope_dim(generic_args, expr.span)?;
+        let dim = self.lower_rope_dim(method_name, generic_args, expr.span)?;
         let ty = self.expr_ty(expr)?;
         Some(self.runtime_call_value(
-            MirIntrinsic::Collection(MirCollectionOp::TensorRope),
+            MirIntrinsic::Collection(op),
             vec![receiver, pos, dim, rope_table],
             ty,
             expr.span,
         ))
     }
 
-    fn lower_rope_dim(&mut self, generic_args: &[TypeId], span: Span) -> Option<MirOperand> {
+    fn lower_rope_dim(&mut self, method_name: &str, generic_args: &[TypeId], span: Span) -> Option<MirOperand> {
         let Some(&generic_arg) = generic_args.first() else {
             self.errors.push(MirError::validation(
                 span,
-                "rope_norm requires one concrete magnitudo generic argument",
+                format!("{method_name} requires one concrete magnitudo generic argument"),
             ));
             return None;
         };
         let Type::Param(symbol) = self.types.get(generic_arg) else {
             self.errors.push(MirError::validation(
                 span,
-                "rope_norm generic dimension is not a magnitudo argument",
+                format!("{method_name} generic dimension is not a magnitudo argument"),
             ));
             return None;
         };
@@ -1075,8 +1080,10 @@ impl FunctionBuilder<'_> {
             let id = IndexId(ordinal as u32);
             matches!(self.types.get_index(id), IndexExpr::Param(found) if *found == *symbol).then_some(id)
         }) else {
-            self.errors
-                .push(MirError::validation(span, "rope_norm generic dimension has no shape witness"));
+            self.errors.push(MirError::validation(
+                span,
+                format!("{method_name} generic dimension has no shape witness"),
+            ));
             return None;
         };
         Some(MirOperand::Constant(MirConstant::ShapeSize { shape, axis: None }))

@@ -4929,6 +4929,11 @@ mod rope_norm_intrinsic_tests;
 
 #[cfg(test)]
 #[cfg(feature = "device")]
+#[path = "rope_half_intrinsic_test.rs"]
+mod rope_half_intrinsic_tests;
+
+#[cfg(test)]
+#[cfg(feature = "device")]
 #[path = "causal_softmax_intrinsic_test.rs"]
 mod causal_softmax_intrinsic_tests;
 
