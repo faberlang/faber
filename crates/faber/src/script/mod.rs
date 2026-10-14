@@ -10,6 +10,8 @@ mod trap;
 #[cfg(feature = "runner")]
 use radix::module::codegen::Target;
 #[cfg(feature = "runner")]
+use radix::module::diagnostics::Diagnostic;
+#[cfg(feature = "runner")]
 use radix::module::driver::Session;
 #[cfg(feature = "runner")]
 use radix::module::mir::run_source as radix_run_source;
@@ -73,7 +75,14 @@ pub fn run_with_session(
     let mut run_error = None::<RunSourceError>;
 
     let exit_result = trap::run_trapped(AssertUnwindSafe(|| {
-        if let Err(error) = radix_run_source(session, name, source, &mut trap_host) {
+        // Library-importing units need provider bodies, which only the
+        // package route links; the single-source runner refuses them.
+        let result = if source_declares_non_kernel_import(name, source) {
+            run_as_package_source(session, name, source, &mut trap_host)
+        } else {
+            radix_run_source(session, name, source, &mut trap_host)
+        };
+        if let Err(error) = result {
             run_error = Some(error);
         }
     }));
@@ -86,6 +95,62 @@ pub fn run_with_session(
         Ok(code) => Ok(code),
         Err(payload) => std::panic::resume_unwind(payload),
     }
+}
+
+/// Removes a scratch package directory when its run ends, including on the
+/// `HostTrap` unwind raised by an interpreted `process.exit_process`.
+#[cfg(feature = "runner")]
+struct ScratchPackageDir(std::path::PathBuf);
+
+#[cfg(feature = "runner")]
+impl Drop for ScratchPackageDir {
+    fn drop(&mut self) {
+        // Best effort: a leftover scratch directory must not mask the run result.
+        std::fs::remove_dir_all(&self.0).ok();
+    }
+}
+
+/// Run `source` through the package route so imported library bodies link.
+///
+/// An on-disk `name` is used as the entry directly; an in-memory name such as
+/// [`EMBED_SOURCE_NAME`] gets a fresh scratch directory holding `main.fab`,
+/// removed when the run ends.
+#[cfg(feature = "runner")]
+fn run_as_package_source(
+    session: &Session,
+    name: &str,
+    source: &str,
+    host: &mut dyn Host,
+) -> Result<(), RunSourceError> {
+    let path = std::path::Path::new(name);
+    if path.is_file() {
+        return radix::program::mir::run_package_mir(
+            &session.config,
+            path,
+            &faber_cli::package::mir::faber_mir_seams(),
+            host,
+        )
+        .map_err(RunSourceError::Frontend);
+    }
+
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_nanos());
+    let dir = std::env::temp_dir().join(format!("faber-script-{}-{}", std::process::id(), nanos));
+    std::fs::create_dir(&dir)
+        .map_err(|err| RunSourceError::Frontend(vec![Diagnostic::io_error(&dir, &err)]))?;
+    let scratch = ScratchPackageDir(dir);
+    let entry = scratch.0.join("main.fab");
+    std::fs::write(&entry, source)
+        .map_err(|err| RunSourceError::Frontend(vec![Diagnostic::io_error(&entry, &err)]))?;
+    radix::program::mir::run_package_mir(
+        &session.config,
+        &entry,
+        &faber_cli::package::mir::faber_mir_seams(),
+        host,
+    )
+    .map_err(RunSourceError::Frontend)
+    // `scratch` drops here (or while unwinding a `HostTrap`), removing `dir`.
 }
 
 /// Whether `source` declares an import outside the kernel namespace: such a
