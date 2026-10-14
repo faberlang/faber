@@ -2463,6 +2463,9 @@ fn run_norma_console_selective_imports_are_byte_exact() {
     // EOT-4R: interpreted lane executes the consolum contract through
     // selective imports. Captured stdout is byte-identical to the
     // concatenated payloads (write_partial, write_bytes, read_line).
+    // The writes report on the error channel, so each closure declares its
+    // own `⇥ fault.IoFault`; `read_line` is `string ∪ none` and is narrowed
+    // at the call site.
     let package = temp_dir("norma-consolum-eot4r");
     let src = package.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -2481,13 +2484,14 @@ entry = "main.fab"
     fs::write(
         src.join("main.fab"),
         r#"import from "norma:console" const write_partial, write_bytes, read_line
+import from "norma:fault" fault
 
 main {
-  const _ partial ← (string msg) → void ∴ write_partial(msg)
-  const _ out_bytes ← (bytes data) → void ∴ write_bytes(data)
+  const _ partial ← (string msg) → void ⇥ fault.IoFault ∴ write_partial(msg)
+  const _ out_bytes ← (bytes data) → void ⇥ fault.IoFault ∴ write_bytes(data)
   partial("P")
   out_bytes(|41|)
-  partial(read_line())
+  partial(read_line() coalesce "")
 }
 "#,
     )
