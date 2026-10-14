@@ -832,7 +832,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Type::Primitive(Primitive::Textus | Primitive::Ascii) => {
                 Some(Value::Str(String::new()))
             }
-            Type::Primitive(Primitive::Octeti) => Some(Value::Octeti(Vec::new())),
+            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => {
+                Some(Value::Octeti(Vec::new()))
+            }
             Type::Array(_) => Some(Value::Array(Rc::new(RefCell::new(Vec::new())))),
             Type::Map(_, _) => Some(Value::Map(Rc::new(RefCell::new(
                 rustc_hash::FxHashMap::default(),

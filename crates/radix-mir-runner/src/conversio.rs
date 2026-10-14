@@ -267,6 +267,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Type::BoundedTextus { capacity } => {
                 self.convert_to_bounded_textus(value, *capacity, recovery, span)
             }
+            Type::BoundedOcteti { capacity } => {
+                self.convert_to_bounded_octeti(value, *capacity, recovery, span)
+            }
             Type::Primitive(Primitive::Regex) => self.convert_to_regex(value, recovery, span),
             Type::Primitive(Primitive::Json) => self.convert_to_json(value, recovery, span),
             Type::Primitive(Primitive::Valor) => self.convert_to_valor(value, source_ty, span),

@@ -81,6 +81,9 @@ mod package_instantiate;
 mod place;
 
 #[cfg(test)]
+#[path = "lower/bounded_octeti_run_test.rs"]
+mod bounded_octeti_run_tests;
+#[cfg(test)]
 #[path = "lower/bounded_textus_run_test.rs"]
 mod bounded_textus_run_tests;
 #[cfg(test)]

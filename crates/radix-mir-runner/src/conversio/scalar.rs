@@ -1313,6 +1313,43 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// `octeti ↦ octeti<N>`: the store-time capacity check. The value stays a
+    /// byte vector; a source longer than `N` fails the conversion with the
+    /// Rust carrier's text (`OctetiN::try_from_octeti`), and `⊥` recovery
+    /// supplies the fallback. A `lista<b8>` source gathers its byte patterns,
+    /// as the bulk byte rows do. (`appende` on a bounded buffer has no
+    /// capacity check on the runner yet; out of scope here.)
+    pub(crate) fn convert_to_bounded_octeti(
+        &mut self,
+        value: Value,
+        capacity: radix_types::IndexId,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let IndexExpr::Literal(capacity) = self.types.get_index(capacity) else {
+            return Err(RunnerError::internal(
+                span,
+                "bounded octeti requires a literal capacity",
+            ));
+        };
+        let capacity = usize::try_from(*capacity).unwrap_or(usize::MAX);
+        let bytes = match value {
+            Value::Octeti(bytes) => bytes,
+            Value::Array(items) => bytes_of_list(&items.borrow(), span)?,
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("bounded octeti conversio requires an octeti source, got {other:?}"),
+                ));
+            }
+        };
+        if bytes.len() > capacity {
+            self.recover_or_fail(recovery, span, "octeti to bounded octeti conversion failed")
+        } else {
+            Ok(Value::Octeti(bytes))
+        }
+    }
+
     pub(crate) fn convert_to_ascii(
         &mut self,
         value: Value,
