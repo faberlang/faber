@@ -6,15 +6,15 @@
 use crate::test_support;
 
 fn accepts(source: &str) {
-    test_support::assert_accepts(source);
+    test_support::assert_accepts_la(source);
 }
 
 fn rejects(source: &str, issue: &str) {
-    test_support::assert_rejects_with_issue(source, issue);
+    test_support::assert_rejects_with_issue_la(source, issue);
 }
 
 fn rejects_any(source: &str) {
-    let result = test_support::analyze_source(source);
+    let result = test_support::analyze_source_la(source);
     assert!(
         !result.is_ok(),
         "expected failure for {source:?}, got: {:?}",
@@ -189,7 +189,7 @@ fn refused_bits_literal_reports_once_without_cascade() {
         "incipit { fixum b16 x ← 0x1ffff }",
         "incipit { fixum b8 x ← -1 }",
     ] {
-        let issues: Vec<String> = test_support::analyze_source(source)
+        let issues: Vec<String> = test_support::analyze_source_la(source)
             .diagnostics
             .iter()
             .filter(|d| d.is_error())

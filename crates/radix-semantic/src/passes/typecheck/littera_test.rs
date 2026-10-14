@@ -12,7 +12,7 @@ const INIT_MISMATCH: &str = "initializer_annotation_mismatch";
 
 #[test]
 fn ascii_scalar_index_binds_littera() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(ascii s) → vacuum {
     fixum littera c ← s[0]
     nota c
@@ -22,7 +22,7 @@ fn ascii_scalar_index_binds_littera() {
 
 #[test]
 fn ascii_scalar_index_is_not_ascii_one() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio f(ascii s) → vacuum {
     fixum ascii<1> c ← s[0]
     nota c
@@ -33,7 +33,7 @@ fn ascii_scalar_index_is_not_ascii_one() {
 
 #[test]
 fn bounded_ascii_scalar_index_binds_littera() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(ascii<4> s) → vacuum {
     fixum littera c ← s[1]
     nota c
@@ -44,7 +44,7 @@ fn bounded_ascii_scalar_index_binds_littera() {
 /// F5 held: `textus[i]` keeps today's `ascii<1>` row.
 #[test]
 fn textus_scalar_index_keeps_ascii_one() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(textus s) → vacuum {
     fixum ascii<1> c ← s[0]
     nota c
@@ -54,7 +54,7 @@ fn textus_scalar_index_keeps_ascii_one() {
 
 #[test]
 fn itera_ex_textus_binds_littera() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(textus s) → vacuum {
     itera ex s fixum c {
         fixum littera x ← c
@@ -66,7 +66,7 @@ fn itera_ex_textus_binds_littera() {
 
 #[test]
 fn itera_ex_textus_element_is_not_ascii_one() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio f(textus s) → vacuum {
     itera ex s fixum c {
         fixum ascii<1> x ← c
@@ -79,7 +79,7 @@ fn itera_ex_textus_element_is_not_ascii_one() {
 
 #[test]
 fn itera_ex_ascii_binds_littera() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(ascii s) → vacuum {
     itera ex s fixum c {
         fixum littera x ← c
@@ -91,7 +91,7 @@ fn itera_ex_ascii_binds_littera() {
 
 #[test]
 fn textus_cursor_yields_littera() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(textus s) → cursor<littera> {
     redde s.cursor()
 }",
@@ -100,7 +100,7 @@ fn textus_cursor_yields_littera() {
 
 #[test]
 fn ascii_cursor_yields_littera() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(ascii s) → cursor<littera> {
     redde s.cursor()
 }",
@@ -109,7 +109,7 @@ fn ascii_cursor_yields_littera() {
 
 #[test]
 fn littera_equals_char_literal_either_side() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(textus s) → numerus {
     varia numerus n ← 0
     itera ex s fixum c {
@@ -124,7 +124,7 @@ fn littera_equals_char_literal_either_side() {
 
 #[test]
 fn littera_orders_against_char_literal() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(littera c) → bivalens {
     redde c ≥ 'a' et c ≤ 'z'
 }",
@@ -133,7 +133,7 @@ fn littera_orders_against_char_literal() {
 
 #[test]
 fn littera_equality_with_textus_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio f(littera c, textus t) → bivalens {
     redde c ≡ t
 }",
@@ -143,7 +143,7 @@ fn littera_equality_with_textus_rejects() {
 
 #[test]
 fn ascii_one_widens_to_littera() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit {
     fixum littera c ← 'x'
     nota c
@@ -153,7 +153,7 @@ fn ascii_one_widens_to_littera() {
 
 #[test]
 fn multi_char_ascii_does_not_widen_to_littera() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {
     fixum littera c ← 'xy'
     nota c
@@ -164,7 +164,7 @@ fn multi_char_ascii_does_not_widen_to_littera() {
 
 #[test]
 fn littera_widens_to_textus() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(littera c) → textus {
     fixum textus t ← c
     redde t
@@ -174,7 +174,7 @@ fn littera_widens_to_textus() {
 
 #[test]
 fn textus_does_not_narrow_to_littera() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio f(textus t) → vacuum {
     fixum littera c ← t
     nota c
@@ -185,7 +185,7 @@ fn textus_does_not_narrow_to_littera() {
 
 #[test]
 fn littera_converts_to_textus() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(littera c) → textus {
     redde c ↦ textus
 }",
@@ -196,7 +196,7 @@ fn littera_converts_to_textus() {
 /// names both replacements (`b8` raw bits, `u8` number) in every pack.
 #[test]
 fn octetus_is_retired_with_named_issue() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio f(octetus b) → vacuum {
     nota b
 }",
@@ -207,7 +207,7 @@ fn octetus_is_retired_with_named_issue() {
 /// Need (ruling B9): the `octeti` word resolves to `lista<b8>`.
 #[test]
 fn octeti_resolves_to_lista_b8() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(octeti b) → vacuum {
     fixum lista<b8> c ← b
     nota c
@@ -217,7 +217,7 @@ fn octeti_resolves_to_lista_b8() {
 
 #[test]
 fn octeti_elements_are_b8() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(octeti b) → vacuum {
     itera ex b fixum x {
         fixum b8 y ← x
@@ -231,7 +231,7 @@ fn octeti_elements_are_b8() {
 /// because they are one type (`octeti` is exactly `lista<b8>`).
 #[test]
 fn octeti_is_exactly_lista_b8() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio f(octeti a, lista<b8> b) → bivalens {
     redde a ≡ b
 }",
@@ -240,7 +240,7 @@ fn octeti_is_exactly_lista_b8() {
 
 #[test]
 fn textus_cursor_is_not_cursor_of_ascii_one() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio f(textus s) → vacuum {
     fixum cursor<ascii<1>> k ← s.cursor()
     nota k

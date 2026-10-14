@@ -3,13 +3,13 @@
 //! prefix, fail-closed overflow). The landed AEU-5 `lista<T,N> ↦ tensor<T,[N]>`
 //! row is pinned by `lista_tensor_conversio` tests — cited, not duplicated.
 
-use crate::test_support::{assert_accepts, assert_rejects_with_issue};
+use crate::test_support::{assert_accepts_la, assert_rejects_with_issue_la};
 
 // --- ascii<N> ↦ textus ------------------------------------------------------
 
 #[test]
 fn ascii8_to_textus_accepts() {
-    assert_accepts(
+    assert_accepts_la(
         "functio s(ascii<8> b) → textus {
     redde b ↦ textus
 }",
@@ -20,7 +20,7 @@ fn ascii8_to_textus_accepts() {
 
 #[test]
 fn bounded_textus_to_textus_accepts() {
-    assert_accepts(
+    assert_accepts_la(
         "functio s(textus<4> t) → textus {
     redde t ↦ textus
 }",
@@ -31,7 +31,7 @@ fn bounded_textus_to_textus_accepts() {
 
 #[test]
 fn ascii4_to_ascii8_resize_grow_accepts() {
-    assert_accepts(
+    assert_accepts_la(
         "functio s(ascii<4> b) → ascii<8> {
     redde b ↦ ascii<8>
 }",
@@ -40,7 +40,7 @@ fn ascii4_to_ascii8_resize_grow_accepts() {
 
 #[test]
 fn ascii8_to_ascii4_resize_shrink_accepts() {
-    assert_accepts(
+    assert_accepts_la(
         "functio s(ascii<8> b) → ascii<4> {
     redde b ↦ ascii<4>
 }",
@@ -49,7 +49,7 @@ fn ascii8_to_ascii4_resize_shrink_accepts() {
 
 #[test]
 fn ascii8_to_ascii8_identity_accepts() {
-    assert_accepts(
+    assert_accepts_la(
         "functio s(ascii<8> b) → ascii<8> {
     redde b ↦ ascii<8>
 }",
@@ -60,7 +60,7 @@ fn ascii8_to_ascii8_identity_accepts() {
 
 #[test]
 fn ascii_literal_over_capacity_rejects() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "incipit {
     fixum _ s ← 'alpha' ↦ ascii<4>
 }",
@@ -70,7 +70,7 @@ fn ascii_literal_over_capacity_rejects() {
 
 #[test]
 fn textus_literal_over_capacity_rejects() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "incipit {
     fixum _ t ← \"abcdef\" ↦ textus<4>
 }",

@@ -2,7 +2,7 @@
 //! compile error when the exponent is a constant, and never an error on a
 //! `fractus` receiver (IEEE `pow`).
 
-use super::test_support::{assert_accepts, assert_rejects_with_issue};
+use super::test_support::{assert_accepts_la, assert_rejects_with_issue_la};
 
 const ISSUE: &str = "potentia_exponent_negative";
 
@@ -14,20 +14,20 @@ fn constant_negative_exponent_on_an_integer_receiver_is_a_compile_error() {
         "incipit {\nfixum u8 two ← 2\nnota two.potentia(-3)\n}\n",
         "incipit {\nfixum i16 two ← 2\nnota two.potentia(1 - 2)\n}\n",
     ] {
-        assert_rejects_with_issue(source, ISSUE);
+        assert_rejects_with_issue_la(source, ISSUE);
     }
 }
 
 #[test]
 fn non_negative_and_non_constant_exponents_are_accepted() {
-    assert_accepts(
+    assert_accepts_la(
         "incipit {\nfixum numerus two ← 2\nfixum numerus k ← -1\nnota two.potentia(0)\nnota two.potentia(3)\nnota two.potentia(k)\n}\n",
     );
 }
 
 #[test]
 fn fractus_receiver_keeps_a_negative_exponent() {
-    assert_accepts(
+    assert_accepts_la(
         "incipit {\nfixum fractus half ← 2.0\nnota half.potentia(-1.0)\nnota half.potentia(-1)\n}\n",
     );
 }
