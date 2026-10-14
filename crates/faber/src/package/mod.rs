@@ -120,6 +120,28 @@ use radix::program::library::{LibraryInterfaceCache, LibraryResolver, LockedLibr
 use std::path::{Path, PathBuf};
 pub use test_route::{analyze_package_for_tests, test_source_filter_for_input};
 
+/// Materialized repository-shaped root for the runtime embedded in this binary.
+///
+/// The `faber` binary links this crate as `faber_cli`, so its command handlers
+/// cannot see `pub(crate)` items; this is the cross-crate seam for corpus
+/// suites that build against the embedded runtime.
+#[must_use]
+pub fn embedded_runtime_root() -> Option<PathBuf> {
+    embedded_runtime::embedded_runtime_root()
+}
+
+/// The first environment variable set that forces a checkout runtime over the
+/// embedded one, if any. Consumed by `faber corpus` embedded-only suites.
+#[must_use]
+pub fn checkout_runtime_override() -> Option<&'static str> {
+    [
+        crate::library::FABER_LIBRARY_HOME_ENV,
+        runtime_sources::SUPPORT_PATH_OVERRIDE_ENV,
+    ]
+    .into_iter()
+    .find(|name| std::env::var_os(name).is_some_and(|value| !value.is_empty()))
+}
+
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 routing).
 /// BUG-F585D081: all manifest-backed routes share the manifest's target,
 /// including its implicit default; caller defaults apply only without a manifest.

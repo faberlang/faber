@@ -34,6 +34,8 @@ struct SuiteManifest {
     version: u32,
     cases_dir: PathBuf,
     #[serde(default)]
+    embedded_only: bool,
+    #[serde(default)]
     targets: BTreeMap<String, SuiteTarget>,
     #[serde(default)]
     roots: BTreeMap<String, PathBuf>,
@@ -287,8 +289,18 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
         if args.expected.is_some() {
             fail("--expected applies only to a single input");
         }
-        load_suite(&input, &args.target).unwrap_or_else(|message| fail(&message))
+        let mut suite = load_suite(&input, &args.target).unwrap_or_else(|message| fail(&message));
+        if let Some(filter) = args.filter.as_deref() {
+            suite.cases.retain(|case| case.id.contains(filter));
+            if suite.cases.is_empty() {
+                fail(&format!("no cases match filter {filter:?}"));
+            }
+        }
+        suite
     } else {
+        if args.filter.is_some() {
+            fail("--filter applies only to a suite");
+        }
         if args.target != "runner" {
             fail("non-runner targets require a suite with a target recipe");
         }
@@ -449,6 +461,13 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
     if suite.version != 1 {
         return Err(format!("unsupported corpus.toml version {}", suite.version));
     }
+    if suite.embedded_only {
+        if let Some(name) = package::checkout_runtime_override() {
+            return Err(format!(
+                "embedded_only suite refuses {name}: the embedded runtime is used instead of the checkout"
+            ));
+        }
+    }
     let roots = resolve_suite_roots(root, suite.roots)?;
     let cases_root = relative_path(root, &suite.cases_dir)?;
     if !cases_root.is_dir() {
@@ -482,26 +501,48 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
         if target == "gpu" && recipe.mode.as_deref() != Some("gpu") {
             return Err("gpu target requires [targets.gpu] mode = \"gpu\"".to_owned());
         }
-        if matches!(target, "rust" | "canonical") && recipe.runtime.is_none() {
-            return Err(format!(
-                "{target} target requires [targets.{target}] runtime in corpus.toml"
-            ));
-        }
-        if let Some(configured) = recipe.runtime.as_deref() {
-            let path = if configured.is_absolute() {
-                configured.to_path_buf()
-            } else {
-                root.join(configured)
-            };
-            if !path.is_dir() {
-                return Err(format!("target runtime is missing: {}", path.display()));
+        if matches!(target, "rust" | "canonical") && suite.embedded_only {
+            if recipe.runtime.is_some() {
+                return Err(format!(
+                    "embedded_only suite must not set [targets.{target}] runtime in corpus.toml"
+                ));
             }
-            if matches!(target, "rust" | "canonical") && !path.join("Cargo.toml").is_file() {
-                return Err(format!("Rust runtime crate is missing: {}", path.display()));
+            let path = package::embedded_runtime_root()
+                .ok_or_else(|| {
+                    format!(
+                        "embedded_only {target} target requires an embedded runtime, which is unavailable"
+                    )
+                })?
+                .join("runtime/rust");
+            if !path.join("Cargo.toml").is_file() {
+                return Err(format!(
+                    "embedded_only embedded runtime is missing Cargo.toml: {}",
+                    path.display()
+                ));
             }
-            recipe.runtime = Some(path.canonicalize().map_err(|error| {
-                format!("cannot resolve target runtime {}: {error}", path.display())
-            })?);
+            recipe.runtime = Some(path);
+        } else {
+            if matches!(target, "rust" | "canonical") && recipe.runtime.is_none() {
+                return Err(format!(
+                    "{target} target requires [targets.{target}] runtime in corpus.toml"
+                ));
+            }
+            if let Some(configured) = recipe.runtime.as_deref() {
+                let path = if configured.is_absolute() {
+                    configured.to_path_buf()
+                } else {
+                    root.join(configured)
+                };
+                if !path.is_dir() {
+                    return Err(format!("target runtime is missing: {}", path.display()));
+                }
+                if matches!(target, "rust" | "canonical") && !path.join("Cargo.toml").is_file() {
+                    return Err(format!("Rust runtime crate is missing: {}", path.display()));
+                }
+                recipe.runtime = Some(path.canonicalize().map_err(|error| {
+                    format!("cannot resolve target runtime {}: {error}", path.display())
+                })?);
+            }
         }
         Some(recipe)
     } else {

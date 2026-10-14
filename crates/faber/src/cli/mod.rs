@@ -385,6 +385,10 @@ pub struct CorpusArgs {
     /// Golden stdout file for a single input (defaults to its .expected sidecar)
     #[arg(long, value_name = "PATH")]
     pub expected: Option<PathBuf>,
+
+    /// Only run suite cases whose id contains this substring
+    #[arg(long, value_name = "SUBSTRING")]
+    pub filter: Option<String>,
 }
 
 /// Shared source-input grammar for phase inspection commands.
