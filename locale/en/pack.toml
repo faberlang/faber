@@ -741,6 +741,14 @@ help = "write {adfirma} cond {mori} message"
 message = "expected `←` with a value, or `=` with a natural-number literal, after the `{size_param}` name"
 help = "write `← <value>` for a runtime lift or `= <literal>` for a static size"
 
+[diagnostics.PARSE001.issues.item_list_missing_separator]
+message = "items in a list must be separated; a separator is missing before this item"
+help = "put a comma between items (`et` between patterns)"
+
+[diagnostics.PARSE001.issues.item_list_trailing_comma]
+message = "a list may not end with a comma before its closing delimiter"
+help = "remove the comma before the closing delimiter"
+
 [diagnostics.PARSE002]
 message = "unexpected token"
 help = "remove or reposition the unexpected token"

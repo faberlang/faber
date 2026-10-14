@@ -459,6 +459,14 @@ help = "استخدم '{iace}' للحمل القابل للاسترداد"
 message = "'{secus}' ليست الجزيئة على {adfirma}"
 help = "استخدم '{mori}' لرسالة الذعر الاختيارية"
 
+[diagnostics.PARSE001.issues.item_list_missing_separator]
+message = "يجب فصل عناصر القائمة؛ الفاصل مفقود قبل هذا العنصر"
+help = "ضع فاصلة بين العناصر ('{et}' بين الأنماط)"
+
+[diagnostics.PARSE001.issues.item_list_trailing_comma]
+message = "لا يجوز أن تنتهي القائمة بفاصلة قبل الفاصل الختامي"
+help = "أزل الفاصلة قبل الفاصل الختامي"
+
 [diagnostics.PARSE002]
 message = "رمز غير متوقع"
 help = "أزل الرمز أو انقله إلى موضع صحيح"

@@ -459,6 +459,14 @@ help = "recoverable payload के लिए '{iace}' का उपयोग क
 message = "'{secus}' {adfirma} पर particle नहीं है"
 help = "वैकल्पिक panic संदेश के लिए '{mori}' का उपयोग करें"
 
+[diagnostics.PARSE001.issues.item_list_missing_separator]
+message = "सूची के आइटम अलग होने चाहिए; इस आइटम से पहले विभाजक अनुपस्थित है"
+help = "आइटमों के बीच अल्पविराम लगाएं ('{et}' पैटर्न के बीच)"
+
+[diagnostics.PARSE001.issues.item_list_trailing_comma]
+message = "सूची अपने समापन सीमांकक से पहले अल्पविराम पर समाप्त नहीं हो सकती"
+help = "समापन सीमांकक से पहले का अल्पविराम हटाएं"
+
 [diagnostics.PARSE002]
 message = "अनपेक्षित token"
 help = "अनपेक्षित token हटाएं या उसका स्थान बदलें"

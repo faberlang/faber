@@ -459,6 +459,14 @@ help = "用 '{iace}' 寫出可恢復載荷"
 message = "'{secus}' 不是 {adfirma} 的 particle"
 help = "用 '{mori}' 寫出可選 panic 訊息"
 
+[diagnostics.PARSE001.issues.item_list_missing_separator]
+message = "列表中的項目必須以分隔符隔開；此項目之前缺少分隔符"
+help = "在項目之間加逗號（模式之間用 '{et}'）"
+
+[diagnostics.PARSE001.issues.item_list_trailing_comma]
+message = "列表不得在結束定界符之前以逗號結尾"
+help = "刪除結束定界符之前的逗號"
+
 [diagnostics.PARSE002]
 message = "非預期標記"
 help = "刪除該標記，或將它移到正確位置"

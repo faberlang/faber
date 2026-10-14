@@ -2260,6 +2260,38 @@ fn every_installed_pack_renders_fac_cape_after_dum() {
     }
 }
 
+/// The parser's item-list separator issues (`item_list_missing_separator`,
+/// `item_list_trailing_comma`) are live at every list site; a pack without a
+/// row renders the base PARSE001 text plus the missing-row marker. Every
+/// installed pack owns both rows and renders without that marker.
+#[test]
+fn item_list_separator_issue_rows_exist_in_every_installed_pack() {
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let owned = owned_pack(locale);
+        let issues = &owned.diagnostics["PARSE001"].issues;
+        for issue in ["item_list_missing_separator", "item_list_trailing_comma"] {
+            assert!(issues.contains_key(issue), "{locale} must own PARSE001.{issue}");
+        }
+        let diagnostic = parse_diagnostic(
+            ParseErrorKind::Expected,
+            vec![
+                diagnostic_arg("issue", "item_list_missing_separator"),
+                diagnostic_arg("family", "item_list"),
+                diagnostic_arg("position", "call_arguments"),
+            ],
+        );
+        let rendered = installed_pack(locale)
+            .render_diagnostic_text(&diagnostic)
+            .unwrap_or_else(|err| panic!("{locale} template should render: {err:?}"))
+            .unwrap_or_else(|| panic!("{locale} PARSE001 row should exist"));
+        assert!(
+            !rendered.message.contains("locale pack missing row"),
+            "{locale}: {}",
+            rendered.message
+        );
+    }
+}
+
 /// Assert every installed pack owns `code.issue` and renders it with its own
 /// spellings of the named keyword identities.
 fn assert_every_installed_pack_renders_issue(kind: ParseErrorKind, code: &str, issue: &str, keywords: &[&str]) {
