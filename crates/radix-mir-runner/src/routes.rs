@@ -204,7 +204,10 @@ fn leaf_error_value(error: &leaf::LeafError) -> Value {
     let mut map = FxHashMap::default();
     map.insert(MapKey::Str("kind".to_owned()), Value::Str(kind.to_owned()));
     map.insert(MapKey::Str("path".to_owned()), Value::Str(path.to_owned()));
-    map.insert(MapKey::Str("text".to_owned()), Value::Str(error.to_string()));
+    map.insert(
+        MapKey::Str("text".to_owned()),
+        Value::Str(error.to_string()),
+    );
     Value::Map(Rc::new(RefCell::new(map)))
 }
 

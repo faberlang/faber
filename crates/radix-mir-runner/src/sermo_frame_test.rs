@@ -209,6 +209,14 @@ fn failed_leaf_reply_carries_kind_and_path_facts() {
     // The leaf's own Display text still reaches the error as its message.
     assert_eq!(error.message, expected);
     // Identity facts survive as structured args; prose is never asserted.
-    assert!(error.args.contains(&("leaf_kind".to_owned(), "NotFound".to_owned())));
-    assert!(error.args.contains(&("leaf_path".to_owned(), PATH.to_owned())));
+    assert!(
+        error
+            .args
+            .contains(&("leaf_kind".to_owned(), "NotFound".to_owned()))
+    );
+    assert!(
+        error
+            .args
+            .contains(&("leaf_path".to_owned(), PATH.to_owned()))
+    );
 }
