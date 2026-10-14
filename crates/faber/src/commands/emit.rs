@@ -315,7 +315,7 @@ pub(super) fn emit_through_package_analysis(
 }
 
 /// The single-file route's `Config` shape, rebuilt for the retry: target,
-/// output mode, module name and explicit reader pack.
+/// output mode, module name and non-explicit reader pack.
 pub(super) fn package_analysis_config(
     command: &EmitCommand,
     code_pack: Option<&radix::module::locale::LocalePack>,
@@ -329,7 +329,7 @@ pub(super) fn package_analysis_config(
         None => config,
     };
     match code_pack {
-        Some(pack) => config.with_resolved_locale_pack(pack.clone()),
+        Some(pack) => config.with_locale_pack(pack.clone()),
         None => config,
     }
 }
