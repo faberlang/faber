@@ -3341,7 +3341,7 @@ help = "dùng «...» cho văn bản chứa dấu trích dẫn"
 
 
 [llm]
-system_prompt_snippet = "Emit Vietnamese reader-locale Faber using Vietnamese keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged and preserve Vietnamese tone marks."
+system_prompt_snippet = "Emit Vietnamese reader-locale Faber using Vietnamese keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged and preserve Vietnamese tone marks. Khi một chuỗi chứa ký tự trích dẫn (\" hoặc '), hãy viết nó bằng «…»: guillemet không cần ký tự thoát nào."
 exemplars = ["./exemplars/salve-munde.vi.fab"]
 
 # [intrinsics] — canonical (Latin) intrinsic name -> this pack's surface spelling.

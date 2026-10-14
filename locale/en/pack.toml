@@ -238,7 +238,7 @@ meus = "send"
 tuus = "recv"
 
 [llm]
-system_prompt_snippet = "Write Faber code using LLM-optimized English keywords (fn, let, const, if, else, match, return, etc.) with invariant structural glyphs (←, →, ∴). Type-first declarations: fn greet(string msg) → string { return msg }"
+system_prompt_snippet = "Write Faber code using LLM-optimized English keywords (fn, let, const, if, else, match, return, etc.) with invariant structural glyphs (←, →, ∴). Type-first declarations: fn greet(string msg) → string { return msg } When a string contains a quote character (\" or '), write it with «…»: guillemets need no escapes."
 exemplars = ["./exemplars/salve-munde.en.fab"]
 
 # -----------------------------------------------------------------------------

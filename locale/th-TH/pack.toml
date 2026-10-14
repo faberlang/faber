@@ -3353,7 +3353,7 @@ help = "ใช้ «...» กับข้อความที่มีเคร
 
 
 [llm]
-system_prompt_snippet = "Emit Thai reader-locale Faber using Thai keywords for declarations, control flow, loops, returns, booleans, common primitive types, and lista/tabula collections. Keep Faber glyph syntax unchanged."
+system_prompt_snippet = "Emit Thai reader-locale Faber using Thai keywords for declarations, control flow, loops, returns, booleans, common primitive types, and lista/tabula collections. Keep Faber glyph syntax unchanged. เมื่อสตริงมีอักขระเครื่องหมายคำพูด (\" หรือ ') ให้เขียนด้วย «…»: กิลเลอเมต์ไม่ต้องใช้การหลีกอักขระใด ๆ"
 exemplars = ["./exemplars/salve-munde.th-TH.fab"]
 
 # [intrinsics] — canonical (Latin) intrinsic name -> this pack's surface spelling.

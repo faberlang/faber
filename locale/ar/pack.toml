@@ -3341,7 +3341,7 @@ help = "استخدم «...» للنص الذي يحتوي على علامات ا
 
 
 [llm]
-system_prompt_snippet = "Emit Arabic reader-locale Faber using Arabic keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged and keep source in logical order."
+system_prompt_snippet = "Emit Arabic reader-locale Faber using Arabic keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged and keep source in logical order. عندما يحتوي النص على علامة اقتباس (\" أو ')، اكتبه باستخدام «…»: لا تحتاج علامات الاقتباس المعقوفة إلى أي تهريب."
 exemplars = ["./exemplars/salve-munde.ar.fab"]
 
 # [intrinsics] — canonical (Latin) intrinsic name -> this pack's surface spelling.

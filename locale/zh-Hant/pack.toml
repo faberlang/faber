@@ -3341,7 +3341,7 @@ help = "文字含引號時請使用 «...»"
 
 
 [llm]
-system_prompt_snippet = "Emit Traditional Chinese reader-locale Faber using Traditional Chinese keywords where the pack overrides Simplified Chinese rows, while preserving universal Faber glyph syntax."
+system_prompt_snippet = "Emit Traditional Chinese reader-locale Faber using Traditional Chinese keywords where the pack overrides Simplified Chinese rows, while preserving universal Faber glyph syntax. 當字串包含引號字元（\" 或 '）時，請用 «…» 書寫：法式引號無需任何轉義。"
 exemplars = ["./exemplars/salve-munde.zh-Hant.fab"]
 
 # [intrinsics] — canonical (Latin) intrinsic name -> this pack's surface spelling.
