@@ -356,6 +356,43 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// An empty bare `{}` or `[]` with no typed cell is the double hole
+    /// (operator ruling 2026-10-10): an empty literal has no contents, so it
+    /// has no default to fall back on. A typed cell keeps the literal's
+    /// ordinary construction (json/map entries, list element type, class
+    /// defaults). Returns `Some(error_type)` when the object is settled here;
+    /// an empty array stays a list so the finalize pass reports its element
+    /// hole as before.
+    fn reject_empty_literal_without_cell(
+        &mut self,
+        expr: &HirExpression,
+        expected: Option<TypeId>,
+    ) -> Option<TypeId> {
+        let empty_object = matches!(
+            &expr.kind,
+            HirExpressionKind::Literal(HirLiteral::JsonValor(radix_syntax::JsonValue::Object(
+                members
+            ))) if members.is_empty()
+        );
+        let empty_array = matches!(
+            &expr.kind,
+            HirExpressionKind::Array(elements) if elements.is_empty()
+        );
+        if !empty_object && !empty_array {
+            return None;
+        }
+        if expected.is_some_and(|ty| !self.is_infer(self.resolve_inferred_type(ty))) {
+            return None;
+        }
+        self.invalid_conversion(
+            super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
+            expr.span,
+        );
+        // `{}` has no later backstop diagnostic, so settle it on the error
+        // type. `[]` keeps its element hole for the existing finalize error.
+        empty_object.then_some(self.error_type)
+    }
+
     /// `_ { … }` content shape. The hole before braces builds the expected
     /// type, and the contents must match what that type takes: ENTRIES
     /// (`"key": value`) build a map or a `json` value exactly as the bare
@@ -630,6 +667,10 @@ impl TypeChecker<'_> {
                 return slot;
             }
         };
+        if let Some(settled) = self.reject_empty_literal_without_cell(expr, expected) {
+            self.pending_conversion = saved_pending_conversion;
+            return settled;
+        }
         if let Some(settled) = self.desugar_inferred_constructor_shape(expr, expected) {
             self.pending_conversion = saved_pending_conversion;
             return settled;
