@@ -19,6 +19,8 @@ fn case(args: &[&str]) -> Case {
             reason: None,
             expect: None,
             timeout_secs: None,
+            known_fail_why: None,
+            rejects: false,
         },
         timeout: Duration::from_secs(1),
     }
