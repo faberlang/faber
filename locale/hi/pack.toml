@@ -640,16 +640,16 @@ message = "conversio recovery के लिए ⊥ उपयोग करें"
 help = "⊥ उपयोग करें; vel केवल nullish coalescing के लिए है"
 
 [diagnostics.PARSE030.issues.conversio_via_missing_hint]
-message = "`via` के बाद convert hint आवश्यक है"
-help = "via के ठीक बाद hint का नाम लिखें, जैसे `x ↦ u32 via Hex`; hints हैं Hex, Bin, Oct, Be, Le, और Code"
+message = "`via` के बाद रूपांतरण संकेत आवश्यक है"
+help = "via के ठीक बाद संकेत का नाम लिखें, जैसे `x ↦ u32 via Hex`; संकेत हैं Hex, Bin, Oct, Be, Le, और Code"
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
-message = "convert hint एक type argument नहीं है"
-help = "hint को target के बाद via clause के रूप में लिखें: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+message = "रूपांतरण संकेत कोई प्रकार तर्क नहीं है"
+help = "संकेत को लक्ष्य के बाद via उपवाक्य के रूप में लिखें: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
-message = "convert hint target के बाद angle brackets में नहीं आता"
-help = "hint को target के बाद via clause के रूप में लिखें: `octeti<16> via Le`"
+message = "रूपांतरण संकेत लक्ष्य के बाद कोणीय कोष्ठकों में नहीं आता"
+help = "संकेत को लक्ष्य के बाद via उपवाक्य के रूप में लिखें: `octeti<16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "अभिव्यक्ति अपेक्षित है"
@@ -1008,20 +1008,20 @@ message = "tabulae के लिए दो type parameters आवश्यक �
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.saturating_word_width_required]
-message = "saturating type को ठीक एक integer width चाहिए"
-help = "saturating type एक integer width के साथ लिखें, जैसे saturating<u8> या saturating<i16>"
+message = "saturating प्रकार को ठीक एक पूर्णांक चौड़ाई चाहिए"
+help = "saturating प्रकार को एक पूर्णांक चौड़ाई के साथ लिखें, जैसे saturating<u8> या saturating<i16>"
 
 [diagnostics.SEM008.issues.saturating_word_width_shape]
-message = "saturating width एक bare integer width marker होना चाहिए"
-help = "u8 या i16 जैसा bare integer width marker उपयोग करें"
+message = "saturating चौड़ाई एक सादा पूर्णांक चौड़ाई चिह्न होना चाहिए"
+help = "u8 या i16 जैसा सादा पूर्णांक चौड़ाई चिह्न उपयोग करें"
 
 [diagnostics.SEM008.issues.trapping_word_width_required]
-message = "trapping type को ठीक एक width चाहिए"
-help = "trapping type एक width के साथ लिखें, जैसे trapping<u8> या trapping<i64>"
+message = "trapping प्रकार को ठीक एक चौड़ाई चाहिए"
+help = "trapping प्रकार को एक चौड़ाई के साथ लिखें, जैसे trapping<u8> या trapping<i64>"
 
 [diagnostics.SEM008.issues.trapping_word_width_shape]
-message = "trapping width एक bare width marker होना चाहिए"
-help = "u8 या i64 जैसा bare width marker उपयोग करें"
+message = "trapping चौड़ाई एक सादा चौड़ाई चिह्न होना चाहिए"
+help = "u8 या i64 जैसा सादा चौड़ाई चिह्न उपयोग करें"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' लिखे हुए posture '{written_posture}' से टकराता है"
@@ -2536,12 +2536,12 @@ message = "the Code hint converts only littera ↦ u32 via Code (read a code poi
 help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Code a number converts to its digits"
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
-message = "`{hint}` convert hint नहीं है"
-help = "via के बाद Hex, Bin, Oct, Be, Le, या Code में से एक उपयोग करें; Floor, Ceil, HalfEven और Trunc केवल integer में convert किए गए float या decimal के हैं"
+message = "`{hint}` रूपांतरण संकेत नहीं है"
+help = "via के बाद Hex, Bin, Oct, Be, Le, या Code में से एक उपयोग करें; Floor, Ceil, HalfEven और Trunc केवल पूर्णांक में रूपांतरित float या decimal के हैं"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
-message = "यह conversion target कोई convert hint नहीं लेता"
-help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+message = "यह रूपांतरण लक्ष्य कोई रूपांतरण संकेत नहीं लेता"
+help = "via उपवाक्य हटाएं; केवल numeric, ascii, littera, vector, और octeti<N> लक्ष्य संकेत लेते हैं"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "float या decimal rounding का नाम दिए बिना integer में convert नहीं होता"
@@ -3636,7 +3636,7 @@ message = "'apud' coordinates के बाद ']' अपेक्षित ह�
 message = "'{keyword}' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.reducta_source]
-message = "reduction operator के बाद reduction source अपेक्षित है"
+message = "रिडक्शन संक्रिया के बाद रिडक्शन स्रोत अपेक्षित है"
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "'{lege}' या '{lineam}' अपेक्षित है"
