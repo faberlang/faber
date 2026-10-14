@@ -642,10 +642,21 @@ fn validate_type_form(
     check_type(form.ty)?;
     match &form.head {
         radix_hir::HirTypeFormHead::Infer | radix_hir::HirTypeFormHead::UnionHole => {
-            if !matches!(
-                root_slot,
-                radix_hir::HirTypeSlot::Declared | radix_hir::HirTypeSlot::DiscardBinding
-            ) {
+            // A `_` hole is legal at a binding cell. An inferred constructor
+            // or typed-constructor ascription (`_ { … }`, `{ … } ∷ T`) also
+            // records its authored hole at the expression's materialized
+            // `AscriptionTarget` slot; the root-witness check has already
+            // pinned that slot's type to the HIR node's resolved type, so the
+            // hole carries no further presentation fact there. Other slots
+            // still fail closed.
+            let legal = match root_slot {
+                radix_hir::HirTypeSlot::Declared | radix_hir::HirTypeSlot::DiscardBinding => true,
+                radix_hir::HirTypeSlot::AscriptionTarget => {
+                    matches!(form.head, radix_hir::HirTypeFormHead::Infer)
+                }
+                _ => false,
+            };
+            if !legal {
                 return Err(type_presentation_issue("hole_in_illegal_slot", site));
             }
             if !form.args.is_empty() {
