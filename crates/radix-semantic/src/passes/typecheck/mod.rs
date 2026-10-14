@@ -521,6 +521,10 @@ pub(crate) struct TypeChecker<'a> {
     /// Node ids of inferred-constructor holes `_ { … }` the checker rewrote,
     /// handed to the presentation sidecar when the check finishes.
     pub(super) inferred_constructor_ids: Vec<HirId>,
+    /// Authored axis and method of each `t.sum(axis n)` / `t.mean(axis n)`
+    /// expansion, keyed by the expanded node id; handed to
+    /// the presentation sidecar so emission can restore the authored call.
+    pub(super) axis_sugar: Vec<radix_hir::HirAxisSugar>,
 
     /// Type-alias declaration parameter names keyed by alias def-id, in
     /// declaration order. Populated from HIR items so applied alias types
@@ -821,6 +825,7 @@ pub(crate) fn typecheck_with_config(
         presentation
             .inferred_constructor_ids
             .append(&mut checker.inferred_constructor_ids);
+        presentation.axis_sugar.append(&mut checker.axis_sugar);
     }
     shape_obligations.clone_from(&checker.shape_obligations);
     tensor_edge_policies.clone_from(&checker.tensor_edge_policies);
@@ -899,6 +904,7 @@ impl<'a> TypeChecker<'a> {
             axis_reduction_results: FxHashMap::default(),
             empty_dense_ids: Vec::new(),
             inferred_constructor_ids: Vec::new(),
+            axis_sugar: Vec::new(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
             unavailable_functions: FxHashMap::default(),
@@ -1138,6 +1144,10 @@ mod access_operand_test;
 #[cfg(test)]
 #[path = "axis_marker_test.rs"]
 mod axis_marker_test;
+
+#[cfg(test)]
+#[path = "axis_sugar_test.rs"]
+mod axis_sugar_test;
 
 #[cfg(test)]
 #[path = "imported_generic_enum_test.rs"]
