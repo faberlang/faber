@@ -23,9 +23,9 @@ locale = "en"
 #   • The sum is exact — `list<u8> + list<u8>` stores into a `list<u16>`; the range
 #     check happens only at the store (a `list<u8>` target would trap)
 #   • A `list<T, N>` has `len` live elements and N slots: an operator pairs the
-#     `len` elements, so a list shorter than N works, and two bounded lists with
-#     different `len` leave through the recoverable path (like `append` past
-#     capacity), which `do … catch` handles in a caller with a `⇥` channel
+#     `len` elements, so a list shorter than N works, but two bounded lists with
+#     different live lengths stop the program — an operator dies, while the
+#     method form `added` reports on `⇥`
 #   • Different capacities (`list<T, 4> + list<T, 8>`) are a check-time error;
 #     convert one operand with `↦`
 #
@@ -61,7 +61,7 @@ fn quotients(list<int> xs, list<int> ys) → list<int> {
     return xs ⊘ ys
 }
 
-fn total(list<f32, 4> x, list<f32, 4> y) → int ⇥ string {
+fn total(list<f32, 4> x, list<f32, 4> y) → int {
     const list<f32, 4> sum ← x + y
     return sum.length()
 }
@@ -98,16 +98,5 @@ main {
     print sum
     print sum.length()
     print 10.0 - p
-    var list<f32, 4> r ← empty
-    r.append(1.0)
-    r.append(2.0)
-    r.append(3.0)
-    do {
-        print total(p, q)
-        print total(p, r)
-        print "not reached"
-    }
-    catch err {
-        print "lengths differ"
-    }
+    print total(p, q)
 }
