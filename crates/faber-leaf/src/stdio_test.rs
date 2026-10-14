@@ -1,4 +1,4 @@
-use super::{Arg, Reply, is_route, serve};
+use super::{Arg, Reply, input_ended, is_route, read_line_from, serve};
 
 #[test]
 fn route_list_matches_serve() {
@@ -72,5 +72,48 @@ fn read_bytes_rejects_negative_length() {
     let error = serve("consolum:hauri", &[Arg::Int(-1)])
         .expect("route")
         .expect_err("negative");
+    assert_eq!(error.kind(), crate::LeafErrorKind::InvalidArgument);
+}
+
+#[test]
+fn input_ended_is_true_only_for_empty_input() {
+    use std::io::Cursor;
+
+    let mut empty = Cursor::new(b"".to_vec());
+    assert!(input_ended(&mut empty).expect("probe"));
+
+    let mut blank = Cursor::new(b"\n".to_vec());
+    assert!(!input_ended(&mut blank).expect("probe"));
+
+    let mut text = Cursor::new(b"x".to_vec());
+    assert!(!input_ended(&mut text).expect("probe"));
+    assert_eq!(read_line_from(&mut text).expect("read"), "x");
+}
+
+#[test]
+fn blank_line_is_not_end_of_input() {
+    use std::io::Cursor;
+
+    let mut reader = Cursor::new(b"\n".to_vec());
+    assert!(!input_ended(&mut reader).expect("probe"));
+    assert_eq!(read_line_from(&mut reader).expect("read"), "");
+    assert!(input_ended(&mut reader).expect("probe"));
+}
+
+#[test]
+fn read_line_from_strips_crlf_and_reads_unterminated_last_line() {
+    use std::io::Cursor;
+
+    let mut reader = Cursor::new(b"a\r\nb".to_vec());
+    assert_eq!(read_line_from(&mut reader).expect("read"), "a");
+    assert_eq!(read_line_from(&mut reader).expect("read"), "b");
+    assert!(input_ended(&mut reader).expect("probe"));
+}
+
+#[test]
+fn desinit_rejects_arguments() {
+    let error = serve("consolum:desinit", &[Arg::Int(1)])
+        .expect("route")
+        .expect_err("arity");
     assert_eq!(error.kind(), crate::LeafErrorKind::InvalidArgument);
 }
