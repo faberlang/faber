@@ -426,143 +426,149 @@ call_marker ::= 'से' | 'में' | 'स्वामित्व' | 'प्
 template_argument ::= 'फैलाओ'? IDENTIFIER ':' expression
 # [208] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'सत्य' | 'असत्य' | 'शून्यवत्' | '∞' | 'nan'
-# [209] primary
-primary ::= IDENTIFIER | literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
-# [210] ad_expr
+# [209] regex_literal
+regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
+# [210] primary
+primary ::= IDENTIFIER | literal | regex_literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
+# [211] ad_expr
 ad_expr ::= 'सेवा' ASCII_STRING ad_opener?
-# [211] ad_opener
+# [212] ad_opener
 ad_opener ::= '(' expression ')'
-# [212] array_literal
+# [213] array_literal
 array_literal ::= '[' array_element_list? ']'
-# [213] array_element_list
+# [214] array_element_list
 array_element_list ::= array_element (',' array_element)*
-# [214] array_element
+# [215] array_element
 array_element ::= argument | '_'
-# [215] iuncta_expr
+# [216] iuncta_expr
 iuncta_expr ::= 'टपल' type_arguments '[' argument_list? ']'
-# [216] json_literal
+# [217] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [217] json_member
+# [218] json_member
 json_member ::= STRING ':' json_value
-# [218] typed_constructor
+# [219] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | hole_type json_literal | '{' field_list '}' construction_source?
-# [219] field_list
+# [220] field_list
 field_list ::= field_init (',' field_init)*
-# [220] field_init
+# [221] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [221] field_key
+# [222] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [222] construction_source
+# [223] construction_source
 construction_source ::= 'सेवन' call_expr
-# [223] json_value
+# [224] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [224] json_object
+# [225] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [225] json_array
+# [226] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [226] json_string
+# [227] json_string
 json_string ::= STRING
-# [227] json_number
+# [228] json_number
 json_number ::= NUMBER
-# [228] finge_expr
+# [229] finge_expr
 finge_expr ::= 'गढ़ो' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [229] qualified_ident
+# [230] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [230] praefixum_expr
+# [231] praefixum_expr
 praefixum_expr ::= 'उपसर्ग' block_stmt
-# [231] scriptum_expr
+# [232] scriptum_expr
 scriptum_expr ::= 'लिखित' '(' STRING (',' expression)* ')'
-# [232] lege_expr
+# [233] lege_expr
 lege_expr ::= 'पढ़ो' 'पंक्ति'?
-# [233] first_match_expr
+# [234] first_match_expr
 first_match_expr ::= 'प्रथम_मेल' '(' expression apud_clause? ',' 'जहाँ' IDENTIFIER block_stmt ')'
-# [234] reducta_expr
+# [235] reducta_expr
 reducta_expr ::= 'समेटो' 'द्वारा' reducta_op 'सेवन' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [235] reducta_op
+# [236] reducta_op
 reducta_op ::= 'योग' | 'गुणनफल' | 'अधिकतम' | 'न्यूनतम' | 'argmax' | 'argmin' | 'सभी' | 'कोई' | 'गिनती'
-# [236] reducta_group
+# [237] reducta_group
 reducta_group ::= 'अनुसार' expression
-# [237] reducta_body
+# [238] reducta_body
 reducta_body ::= ('स्थिर' | 'चर') IDENTIFIER block_stmt
-# [238] reducta_identity
+# [239] reducta_identity
 reducta_identity ::= 'डिफ़ॉल्ट' expression
-# [239] sort_expr
+# [240] sort_expr
 sort_expr ::= 'क्रमबद्ध_करो' 'द्वारा' sort_direction ('सेवन' | 'से') expression sort_body?
-# [240] sort_direction
+# [241] sort_direction
 sort_direction ::= 'आरोही' | 'अवरोही'
-# [241] sort_body
+# [242] sort_body
 sort_body ::= ('स्थिर' | 'चर') IDENTIFIER block_stmt
-# [242] filum_clause
+# [243] filum_clause
 filum_clause ::= 'धागा' IDENTIFIER
-# [243] capta_expr
+# [244] capta_expr
 capta_expr ::= 'जाल' block_stmt
-# [244] object_pattern
+# [245] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [245] pattern_property
+# [246] pattern_property
 pattern_property ::= 'बाकी'? IDENTIFIER ('रूपमें' IDENTIFIER)?
-# [246] array_pattern
+# [247] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [247] array_pattern_element
+# [248] array_pattern_element
 array_pattern_element ::= '_' | 'बाकी'? IDENTIFIER
-# [248] nota_stmt
+# [249] nota_stmt
 nota_stmt ::= ('दिखाओ' | 'देखो' | 'चेताओ' | 'लिखो') expression (',' expression)*
-# [249] entry_header
+# [250] entry_header
 entry_header ::= ('तर्क' IDENTIFIER)? ('निर्गम' expression)?
-# [250] incipit_stmt
+# [251] incipit_stmt
 incipit_stmt ::= 'आरंभ' entry_header block_stmt
-# [251] incipiet_stmt
+# [252] incipiet_stmt
 incipiet_stmt ::= 'आरंभasync' entry_header block_stmt
-# [252] probandum_decl
+# [253] probandum_decl
 probandum_decl ::= 'परीक्षणसमूह' STRING proba_modifier* '{' probandum_body '}'
-# [253] probandum_body
+# [254] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [254] proba_stmt
+# [255] proba_stmt
 proba_stmt ::= 'परीक्षण' STRING proba_modifier* block_stmt
-# [255] proba_modifier
+# [256] proba_modifier
 proba_modifier ::= 'अपेक्षित_विफलता' | 'छोड़ो' STRING | 'लंबित' STRING | 'केवल' | 'टैग' STRING | 'समय' NATURAL | 'मापो' | 'पुनरावृत्ति' NATURAL | 'नाज़ुक' NATURAL | 'केवलमें' STRING
-# [256] praepara_block
+# [257] praepara_block
 praepara_block ::= ('पूर्वतैयार' | 'पूर्वतैयारasync' | 'पश्चतैयार' | 'पश्चतैयारasync') 'सभी'? block_stmt
-# [257] fac_stmt
+# [258] fac_stmt
 fac_stmt ::= 'करो' block_stmt cape_clause? ('जबतक' expression)?
-# [258] IDENTIFIER
+# [259] IDENTIFIER
 IDENTIFIER ::=
-# [259] NUMBER
+# [260] NUMBER
 NUMBER ::=
-# [260] NATURAL
+# [261] NATURAL
 NATURAL ::=
-# [261] STRING
+# [262] STRING
 STRING ::=
-# [262] ASCII_STRING
+# [263] ASCII_STRING
 ASCII_STRING ::=
-# [263] BACKTICK_STRING
+# [264] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [264] OCTETI_STRING
+# [265] OCTETI_STRING
 OCTETI_STRING ::=
-# [265] NEWLINE
+# [266] REGEX_TYPE_WORD
+REGEX_TYPE_WORD ::=
+# [267] REGEX_BODY
+REGEX_BODY ::=
+# [268] NEWLINE
 NEWLINE ::=
-# [266] WIDTH_MARKER
+# [269] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [267] LISTA_WIDTH_SUGAR
+# [270] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [268] TENSOR_WIDTH_SUGAR
+# [271] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [269] SPARSA_WIDTH_SUGAR
+# [272] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [270] VECTOR_WIDTH_SUGAR
+# [273] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [271] MATRIX_WIDTH_SUGAR
+# [274] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [272] FRONTMATTER_DELIMITER
+# [275] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [273] TOML_LINES
+# [276] TOML_LINES
 TOML_LINES ::=
-# [274] ANNOTATION_NAME
+# [277] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [275] ANNOTATION_FIELD_NAME
+# [278] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [276] NON_NEWLINE_TOKEN
+# [279] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [277] NO_NEWLINE
+# [280] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -577,6 +583,8 @@ NO_NEWLINE ::=
 | [`ASCII_STRING`](#ascii-string) | `#ascii-string` | capture-pending |
 | [`BACKTICK_STRING`](#backtick-string) | `#backtick-string` | capture-pending |
 | [`OCTETI_STRING`](#octeti-string) | `#octeti-string` | capture-pending |
+| [`REGEX_TYPE_WORD`](#regex-type-word) | `#regex-type-word` | capture-pending |
+| [`REGEX_BODY`](#regex-body) | `#regex-body` | capture-pending |
 | [`NEWLINE`](#newline) | `#newline` | capture-pending |
 | [`WIDTH_MARKER`](#width-marker) | `#width-marker` | capture-pending |
 | [`LISTA_WIDTH_SUGAR`](#lista-width-sugar) | `#lista-width-sugar` | capture-pending |
@@ -798,6 +806,7 @@ NO_NEWLINE ::=
 | [`call_marker`](#call-marker) | `#call-marker` | live |
 | [`template_argument`](#template-argument) | `#template-argument` | live |
 | [`literal`](#literal) | `#literal` | live |
+| [`regex_literal`](#regex-literal) | `#regex-literal` | live |
 | [`primary`](#primary) | `#primary` | live |
 | [`ad_expr`](#ad-expr) | `#सेवा-expr` | live |
 | [`ad_opener`](#ad-opener) | `#सेवा-opener` | live |
@@ -862,6 +871,8 @@ driver. `capture-pending` rows intentionally carry no invented token shape.
 | `ASCII_STRING` | `capture-pending` | scan.rs scan_ascii_string; single-quoted; TokenKind::AsciiString |
 | `BACKTICK_STRING` | `capture-pending` | scan.rs scan_backtick_string; backtick forma template; TokenKind::BacktickString |
 | `OCTETI_STRING` | `capture-pending` | scan.rs scan_octeti_string; pipe-delimited hex; TokenKind::OctetiString |
+| `REGEX_TYPE_WORD` | `capture-pending` | the file locale's regex type word (English `regex`); the lexer opens a raw body at `/` only after this spelling or `_`; not a lexer token |
+| `REGEX_BODY` | `capture-pending` | scan.rs scan_slash; raw body between slashes, only after the regex type word or `_`; TokenKind::RegexString |
 | `NEWLINE` | `capture-pending` | scan.rs scan_line_break; LF or CRLF; TokenKind::Newline |
 | `WIDTH_MARKER` | `capture-pending` | parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d64 (numerus and exactus), f16/bf16/f32/f64 (fractus only); every integer width i8…u64 (modulus and saturatus; no d64, no float); integer widths and d64 (exactus; a float width is `trapping_float_not_implemented`); the unbounded integer marker `inf` (numerus, exactus, modulus and saturatus all name the same type; locale-invariant, not a keyword; never prefixed sugar; not a float width; not a tensor, sparsa, vector or matrix element; host-only, so no kernel or AIR-lane position takes it); not a lexer token |
 | `LISTA_WIDTH_SUGAR` | `capture-pending` | parser type-position l + WIDTH_MARKER; not a lexer token |
@@ -2535,7 +2546,9 @@ They are not interchangeable synonyms.
 | `` `...` `` | `forma` | captured templates; `(...)` captures |
 | `{ ... }` | `json` | compile-time object-rooted JSON document (`:` inside) |
 | `\|...\|` | `octeti` | compile-time hex bytes |
-| `"..." ↦ regex` | `regex` | compiled pattern from text conversion |
+| `"..." ↦ regex` | `regex` | compiled pattern from dynamic text (conversion) |
+| `regex /.../` | `regex` | inline raw pattern literal (locale regex type word) |
+| `_ /.../` | `regex` | inferred inline raw pattern literal |
 | `[ ... ]` | `lista<T>` | Faber list (not JSON array, not bytes) |
 
 `§` (U+00A7) is a template hole in Unicode forms (`"`, `«`, `` ` ``).
@@ -2553,10 +2566,9 @@ parameters without rendering. Safe for bound SQL/URL payloads; do not use
 Block `textus` uses guillemets `«...»`. The heavy quotation-mark
 pair is retired (too visually close to `"` in many fonts).
 
-Implementation status (2026-06-30):
+Implementation status (2026-10-11):
 
-- Shipped: `"..."`, `«...»` block `textus`, `'...'` → `ascii`, `` `...` `` → `forma`, `|...|` → `octeti`, `{ ... }` → `json`, and text/ascii `↦ regex`.
-- Pending factory delivery: slash-delimited `/.../` regex literals.
+- Shipped: `"..."`, `«...»` block `textus`, `'...'` → `ascii`, `` `...` `` → `forma`, `|...|` → `octeti`, `{ ... }` → `json`, text/ascii `↦ regex`, and the inline regex literals `regex /.../` and `_ /.../`.
 
 Inline block example:
 
@@ -2774,13 +2786,20 @@ the import alias, and the `∷` cast is a full type annotation
 
 `∷` remains the general postfix ascription in `cast`. Rendered text templates
 (`STRING '(' argumentList ')'`) and captured `forma` templates
-(`BACKTICK_STRING '(' argumentList ')'`) use the ordinary call suffix. Regex
-construction uses the ordinary conversio grammar: `(STRING | ASCII_STRING) '↦'
-'regex'`.
+(`BACKTICK_STRING '(' argumentList ')'`) use the ordinary call suffix.
 
-Slash-delimited regex literals are not active grammar yet. `/` lexes as the
-division operator, while `//` and `/* ... */` are rejected as invalid comments.
-Use `"..." ↦ regex` for compiled regex values.
+The inline regex literal is the file locale's regex type word followed by a
+slash-delimited raw body (`regex /pattern/`), or `_` followed by the body when
+the expected slot supplies the type (`_ /pattern/`). A bare `/pattern/` is not
+legal: the lexer opens a body only when the previous significant token is the
+regex type word or `_`, so any other `/` in operand position stays the division
+operator (or a parse error), and a binding named `regex` used as the left
+operand of a division is written `(regex) / 2`. The body is raw to the next
+unescaped `/` on the same line: `\/` writes a literal slash, Faber processes no
+other backslash escape, an empty pattern (`//`) is rejected, and there are no
+suffix flags (use the inline `(?i)` form). The literal is checked at `faber
+check` and is infallible once accepted. `"..." ↦ regex` (and `ascii ↦ regex`)
+remains the compiled-pattern conversion for dynamic text.
 
 ---
 
@@ -3031,7 +3050,6 @@ typing, and lowering work is complete; each row records that state.
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | Multi-subject `मिलाओ` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |
-| Slash-delimited regex literals | pending; use `"…" ↦ regex` |
 
 ---
 
