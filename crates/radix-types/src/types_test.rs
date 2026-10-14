@@ -1942,6 +1942,29 @@ fn bounded_forms_are_distinct_from_bare_primitives_and_each_other() {
 }
 
 #[test]
+fn bounded_array_of_b8_is_bounded_octeti() {
+    // Need: `lista<b8, N>` is the bounded byte buffer. Its element
+    // is raw bits, so the bounded list lowers to `Type::BoundedOcteti`
+    // rather than an element-typed bounded array.
+    let mut types = TypeTable::new();
+    let b8 = types.bits(BitsWidth::B8);
+    let n8 = types.intern_index(IndexExpr::Literal(8));
+    let n16 = types.intern_index(IndexExpr::Literal(16));
+
+    let byte_list = types.bounded_array(b8, n8);
+    let buffer = types.bounded_octeti(n8);
+    assert_eq!(byte_list, buffer);
+
+    let u8_sized = types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
+    let numeric_list = types.bounded_array(u8_sized, n8);
+    assert_ne!(numeric_list, buffer);
+    assert!(matches!(types.get(numeric_list), Type::BoundedArray { .. }));
+
+    let other_capacity = types.bounded_array(b8, n16);
+    assert_ne!(other_capacity, byte_list);
+}
+
+#[test]
 fn lista_accepts_one_or_two_applied_arguments() {
     assert_eq!(CollectionKind::Lista.arity(), 1);
     assert!(CollectionKind::Lista.accepts_arity(1));

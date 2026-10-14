@@ -913,7 +913,14 @@ impl TypeTable {
     }
 
     /// Allocate a `lista<T, N>` bounded array. Distinct from unbounded [`Type::Array`].
+    ///
+    /// A bounded list of raw bits (`b8`) is the bounded byte buffer and
+    /// lowers to [`Type::BoundedOcteti`]; every other
+    /// element type interns a [`Type::BoundedArray`].
     pub fn bounded_array(&mut self, element: TypeId, capacity: IndexId) -> TypeId {
+        if matches!(self.get(element), Type::Bits(BitsWidth::B8)) {
+            return self.bounded_octeti(capacity);
+        }
         self.intern(Type::BoundedArray { element, capacity })
     }
 
