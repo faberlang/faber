@@ -141,17 +141,18 @@ const EXPECTED: &[(&str, Variant, Classification)] = &[
         Variant::WithAdmissions,
         Classification::FailClosed,
     ),
-    // Format/convert single-source compile (locale-faithful emit).
+    // Format/convert single-source compile (locale-faithful emit); moved
+    // here from codegen/faber/compile.rs by C-D1a (driver/faber_format).
     (
-        "crates/radix-module/src/codegen/faber/compile.rs",
+        "crates/radix-module/src/driver/faber_format/compile.rs",
         Variant::Bare,
         Classification::FailClosed,
     ),
     // Emitted-output revalidation (fmt-revalidation-gate): re-analyzes the
     // emitted single unit through the same standalone pipeline as the
-    // format compile above.
+    // format compile above; moved with it to driver/faber_format.
     (
-        "crates/radix-module/src/codegen/faber/compile.rs",
+        "crates/radix-module/src/driver/faber_format/compile.rs",
         Variant::Bare,
         Classification::FailClosed,
     ),
