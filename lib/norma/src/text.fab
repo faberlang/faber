@@ -442,23 +442,23 @@ fn index_of(string s, string needle) → int {
 }
 
 # =========================================================================
-# MECHANICAL TRIO (UTF-8 textus ↔ octeti)
+# MECHANICAL TRIO (UTF-8 textus ↔ list<b8>)
 # =========================================================================
 
 # Name: encode (Latin locale: pange) from pangere, "to fasten" or "to compose."
 # Morphologia: Imperativus mechanical verb shared with structured codecs.
-# Why: Materialize textus as UTF-8 octeti for outward or storable byte form.
+# Why: Materialize textus as UTF-8 list<b8> for outward or storable byte form.
 @ public
-fn encode(string s) → bytes {
-    return s ↦ bytes
+fn encode(string s) → list<b8> {
+    return s ↦ list<b8>
 }
 
 # Name: decode (Latin locale: solve) from solvere, "to loosen" or "to untangle."
 # Morphologia: Imperativus mechanical verb paired with encode.
-# Why: Interpret UTF-8 octeti as textus.
+# Why: Interpret UTF-8 list<b8> as textus.
 # Edge: Invalid UTF-8 throws through the backing runtime.
 @ public
-fn decode(bytes data) → string ⇥ string {
+fn decode(list<b8> data) → string ⇥ string {
     return data ↦ string
 }
 
@@ -467,7 +467,7 @@ fn decode(bytes data) → string ⇥ string {
 # exit propagation.
 # Why: Decode UTF-8 when possible and return nihil on invalid bytes.
 @ public
-fn try_decode(bytes data) → string ∪ none {
+fn try_decode(list<b8> data) → string ∪ none {
     do {
         return data ↦ string
     }

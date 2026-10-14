@@ -33,14 +33,14 @@ fn io_fault(value raw) → fault.IoFault {
 
 # Draw bytes from stdin (sync)
 @ public
-fn read_bytes(int byte_length) → bytes ∪ none {
-    return call 'consolum:hauri' (byte_length) ↦ bytes
+fn read_bytes(int byte_length) → list<b8> ∪ none {
+    return call 'consolum:hauri' (byte_length) ↦ list<b8>
 }
 
 # Draw bytes from stdin (async route; Faber blocks on the frame)
 @ public
-fn read_bytes_async(int byte_length) → bytes ∪ none {
-    return call 'consolum:hauriet' (byte_length) ↦ bytes
+fn read_bytes_async(int byte_length) → list<b8> ∪ none {
+    return call 'consolum:hauriet' (byte_length) ↦ list<b8>
 }
 
 # =========================================================================
@@ -66,16 +66,16 @@ fn read_line_async() → string ∪ none {
 # Maps to: fs.writeSync(1, data) / process.stdout.write
 
 # Pour bytes to stdout (sync)
-# Opener must be valor (SEM010); cast octeti → valor like solum.funde.
+# Opener must be valor (SEM010); cast list<b8> → valor like solum.funde.
 @ public
-fn write_bytes(bytes data) → void ⇥ fault.IoFault {
+fn write_bytes(list<b8> data) → void ⇥ fault.IoFault {
     return call 'consolum:funde' (data ↦ value) ↦ void
 }
 
 # Pour bytes to stdout (async route; Faber blocks)
 @ public
 @ future
-fn write_bytes_async(bytes data) → void ⇥ fault.IoFault {
+fn write_bytes_async(list<b8> data) → void ⇥ fault.IoFault {
     return call 'consolum:funde' (data ↦ value) ↦ void
 }
 
