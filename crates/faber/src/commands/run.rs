@@ -373,12 +373,15 @@ fn script_package_config(
 
 /// Whether `path` routes through the package-MIR runner rather than the
 /// single-source runner: manifest-backed or directory packages, or a
-/// manifestless `.fab` file that declares a non-kernel import.
+/// manifestless `.fab` file that declares a non-kernel, non-`norma:` import.
+/// `norma:` imports are linked by `script::run_with_session`.
 pub(super) fn is_package_interpret_input(path: &Path) -> bool {
     package::is_manifest_backed_or_directory_package_input(path)
         || manifestless_file_declares_non_kernel_import(path)
 }
 
+/// Whether a manifestless `.fab` file declares an import outside the kernel
+/// and outside `norma:`, which `script::run_with_session` links itself.
 fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
     if !is_single_fab_file(path) {
         return false;
@@ -411,7 +414,8 @@ fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
         let radix::module::syntax::StmtKind::Import(import) = &statement.kind else {
             return false;
         };
-        !radix::module::kernel::is_kernel_import_path(parse.interner.resolve(import.path))
+        let path = parse.interner.resolve(import.path);
+        !radix::module::kernel::is_kernel_import_path(path) && !path.starts_with("norma:")
     })
 }
 
