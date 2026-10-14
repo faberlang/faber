@@ -1352,6 +1352,9 @@ fn attached_doc_lines(trivia: &[Trivia]) -> Vec<Symbol> {
 #[path = "ascribed_literal_test.rs"]
 mod ascribed_literal_test;
 #[cfg(test)]
+#[path = "regex_literal_test.rs"]
+mod regex_literal_test;
+#[cfg(test)]
 #[path = "authored_form_test.rs"]
 mod authored_form_test;
 #[cfg(test)]

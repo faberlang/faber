@@ -29,6 +29,7 @@ pub(crate) fn literal_to_hir(
         Literal::String(value) => Ok(HirLiteral::String(*value)),
         Literal::Ascii(value) => Ok(HirLiteral::Ascii(*value)),
         Literal::Octeti(value) => Ok(HirLiteral::Octeti(*value)),
+        Literal::Regex(pattern) => Ok(HirLiteral::Regex(*pattern, None)),
         Literal::JsonValor(value) => Ok(HirLiteral::JsonValor(value.clone())),
         Literal::Bool(value) => Ok(HirLiteral::Bool(*value)),
         Literal::Nil => Ok(HirLiteral::Nil),
