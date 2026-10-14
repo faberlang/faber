@@ -75,7 +75,10 @@ fn rust_aborts_on_an_unhandled_failable_call_in_main() {
     let main = main_body(&code, "fn main()");
     assert!(main.contains("faber::trap::ok(check(1), faber::Trap::FailableCall)"), "{main}");
     assert!(main.contains("faber::trap::ok(risky(2), faber::Trap::FailableCall)"), "{main}");
-    assert!(main.contains("faber::trap::ok(l_k.nimm(1), faber::Trap::FailableCall)"), "{main}");
+    assert!(
+        main.contains("faber::trap::ok(l_k.nimm(1), faber::Trap::FailableCall)"),
+        "{main}"
+    );
 }
 
 #[test]
