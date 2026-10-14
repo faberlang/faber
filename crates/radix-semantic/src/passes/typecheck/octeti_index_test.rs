@@ -7,23 +7,23 @@ use crate::test_support;
 #[test]
 fn octeti_scalar_index_accepts_as_numerus_u8() {
     // The element is a `b8`; a `u8` is reached only by `↦ u8`.
-    test_support::assert_accepts("functio at(octeti b, numerus i) → b8 { redde b[i] }");
-    test_support::assert_accepts("functio at(octeti b, numerus i) → u8 { redde b[i] ↦ u8 }");
+    test_support::assert_accepts("functio at(lista<b8> b, numerus i) → b8 { redde b[i] }");
+    test_support::assert_accepts("functio at(lista<b8> b, numerus i) → u8 { redde b[i] ↦ u8 }");
     test_support::assert_rejects_with_issue(
-        "functio at(octeti b, numerus i) → u8 { redde b[i] }",
+        "functio at(lista<b8> b, numerus i) → u8 { redde b[i] }",
         "return_type_mismatch",
     );
 }
 
 #[test]
 fn octeti_range_index_accepts_as_octeti() {
-    test_support::assert_accepts("functio win(octeti b) → octeti { redde b[0‥4] }");
+    test_support::assert_accepts("functio win(lista<b8> b) → lista<b8> { redde b[0‥4] }");
 }
 
 #[test]
 fn octeti_index_rejects_textus_key() {
     test_support::assert_rejects_with_issue(
-        r#"functio at(octeti b) → b8 { redde b["x"] }"#,
+        r#"functio at(lista<b8> b) → b8 { redde b["x"] }"#,
         "array_index_must_be_numerus",
     );
 }
@@ -72,12 +72,12 @@ fn window_over_a_number_rejects() {
 #[test]
 fn octeti_literal_static_range_oob_rejects() {
     test_support::assert_rejects_with_issue(
-        "functio win() → octeti { redde |de ad be ef|[0‥5] }",
+        "functio win() → lista<b8> { redde |de ad be ef|[0‥5] }",
         "octeti_index_out_of_bounds",
     );
 }
 
 #[test]
 fn octeti_literal_in_bounds_range_accepts() {
-    test_support::assert_accepts("functio win() → octeti { redde |de ad be ef|[0‥4] }");
+    test_support::assert_accepts("functio win() → lista<b8> { redde |de ad be ef|[0‥4] }");
 }

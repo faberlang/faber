@@ -5,21 +5,21 @@ use crate::test_support;
 #[test]
 fn octeti_window_to_u32_be_accepts() {
     test_support::assert_accepts_la(
-        "functio win(octeti corpus) → u32 { redde corpus[0‥4] ↦ u32 via Be }",
+        "functio win(lista<b8> corpus) → u32 { redde corpus[0‥4] ↦ u32 via Be }",
     );
 }
 
 #[test]
 fn octeti_window_to_i32_be_accepts() {
     test_support::assert_accepts_la(
-        "functio win(octeti corpus) → i32 { redde corpus[0‥4] ↦ i32 via Be }",
+        "functio win(lista<b8> corpus) → i32 { redde corpus[0‥4] ↦ i32 via Be }",
     );
 }
 
 #[test]
 fn octeti_window_to_u32_le_accepts() {
     test_support::assert_accepts_la(
-        "functio win(octeti corpus) → u32 { redde corpus[0‥4] ↦ u32 via Le }",
+        "functio win(lista<b8> corpus) → u32 { redde corpus[0‥4] ↦ u32 via Le }",
     );
 }
 
@@ -71,28 +71,28 @@ fn four_byte_window_mismatches_u16() {
 #[test]
 fn octeti_window_to_f32_be_accepts() {
     test_support::assert_accepts_la(
-        "functio win(octeti corpus) → f32 { redde corpus[0‥4] ↦ f32 via Be }",
+        "functio win(lista<b8> corpus) → f32 { redde corpus[0‥4] ↦ f32 via Be }",
     );
 }
 
 #[test]
 fn octeti_window_to_f32_le_accepts() {
     test_support::assert_accepts_la(
-        "functio win(octeti corpus) → f32 { redde corpus[0‥4] ↦ f32 via Le }",
+        "functio win(lista<b8> corpus) → f32 { redde corpus[0‥4] ↦ f32 via Le }",
     );
 }
 
 #[test]
 fn octeti_window_to_f64_be_accepts() {
     test_support::assert_accepts_la(
-        "functio win(octeti corpus) → f64 { redde corpus[0‥8] ↦ f64 via Be }",
+        "functio win(lista<b8> corpus) → f64 { redde corpus[0‥8] ↦ f64 via Be }",
     );
 }
 
 #[test]
 fn octeti_window_to_f64_le_accepts() {
     test_support::assert_accepts_la(
-        "functio win(octeti corpus) → f64 { redde corpus[0‥8] ↦ f64 via Le }",
+        "functio win(lista<b8> corpus) → f64 { redde corpus[0‥8] ↦ f64 via Le }",
     );
 }
 
