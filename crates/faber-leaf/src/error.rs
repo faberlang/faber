@@ -66,6 +66,12 @@ impl LeafErrorKind {
             LeafErrorKind::Cancelled => "Cancelled",
         }
     }
+
+    /// The Faber spelling of this kind, as the Norma `IoFault` variant name.
+    #[must_use]
+    pub fn variant_name(self) -> &'static str {
+        self.word()
+    }
 }
 
 /// One failed leaf call.
