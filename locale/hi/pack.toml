@@ -3627,6 +3627,15 @@ message = "'apud' के बाद '[' अपेक्षित है"
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "'apud' coordinates के बाद ']' अपेक्षित है"
 
+[diagnostics.PARSE001.issues.expected_keyword]
+message = "'{keyword}' अपेक्षित है"
+
+[diagnostics.PARSE001.issues.reducta_source]
+message = "reduction operator के बाद reduction source अपेक्षित है"
+
+[diagnostics.PARSE001.issues.lege_lineam]
+message = "'{lege}' या '{lineam}' अपेक्षित है"
+
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "elige body के लिए एक opening brace अपेक्षित है"
 
