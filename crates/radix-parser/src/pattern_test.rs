@@ -2,16 +2,14 @@
 //!
 //! Contract: each pattern form parses to the expected `Pattern` variant.
 
-use crate::parse;
-use crate::test_support::parse_ok;
-use radix_lexer::lex;
+use crate::test_support::parse_ok_la;
 use radix_syntax::{
     FiguraExpr, GenericArgExpr, IfBody, Pattern, PatternBind, StmtKind, TypeExprKind,
 };
 
 #[test]
 fn parses_path_patterns_with_binding_lists_and_et_separators() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         r"
 discerne event {
     casu Result.Ok fixum payload, error et _ ergo redde payload
@@ -51,7 +49,7 @@ discerne event {
 
 #[test]
 fn parses_type_pattern_atoms_and_null_member() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         "genus Formal { varia textus greeting }\nfunctio f(Formal ∪ nihil u) → vacuum {\n    discerne u {\n        casu Formal fixum f { tacet }\n        casu nihil { tacet }\n    }\n}",
     );
     let program = result.program.as_ref().expect("program");
@@ -70,7 +68,7 @@ fn parses_type_pattern_atoms_and_null_member() {
 /// bare width marker (and fused sugar) must be a type pattern, not a binding.
 #[test]
 fn bare_width_markers_are_type_patterns() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         "functio f(u8 ∪ textus u) → vacuum {\n    discerne u {\n        casu u8 fixum b { tacet }\n        casu textus { tacet }\n    }\n}",
     );
     let program = result.program.as_ref().expect("program");
@@ -90,7 +88,7 @@ fn bare_width_markers_are_type_patterns() {
 
 #[test]
 fn parses_width_hole_and_tensor_figure_patterns() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         r"
 incipit {
     discerne value {
@@ -139,7 +137,7 @@ fn derived_width_pattern_bounds_parse_for_semantic_rejection() {
     // the parser carries `N+1` as a size term; width patterns are rejected over
     // a closed set by `discerne_pattern_not_in_closed_set` (radix-semantic
     // `derived_width_list_pattern_is_rejected`).
-    let result = parse_ok("incipit { discerne value { casu lista<numerus, N+1> ergo tacet } }");
+    let result = parse_ok_la("incipit { discerne value { casu lista<numerus, N+1> ergo tacet } }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(stmt) = &program.statements[0].kind else {
         panic!("expected incipit");
@@ -164,7 +162,7 @@ fn derived_width_pattern_bounds_parse_for_semantic_rejection() {
 
 #[test]
 fn parses_ascii_and_octeti_literal_patterns() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         r"
 discerne sig {
     casu 'pg:query' ergo redde 1
@@ -203,7 +201,7 @@ fn discerne_patterns(result: &crate::ParseResult) -> &[Pattern] {
 fn leading_minus_before_a_number_is_a_negated_literal_pattern() {
     // D22.2: the lexer never produces a signed number, so the pattern parser
     // owns the sign for integer, decimal, and infinity literals.
-    let result = parse_ok("discerne n {\n    casu -1 et -2.5 et -∞ { tacet }\n}");
+    let result = parse_ok_la("discerne n {\n    casu -1 et -2.5 et -∞ { tacet }\n}");
     let patterns = discerne_patterns(&result);
     assert_eq!(patterns.len(), 3);
     assert!(matches!(
@@ -222,7 +220,7 @@ fn leading_minus_before_a_number_is_a_negated_literal_pattern() {
 
 #[test]
 fn minus_before_a_non_number_is_not_a_pattern() {
-    let result = parse(lex("discerne n {\n    casu -x { tacet }\n}"));
+    let result = crate::test_support::parse_program_la("discerne n {\n    casu -x { tacet }\n}");
     assert!(!result.success(), "`-x` must not parse as a pattern");
 }
 
@@ -230,7 +228,7 @@ fn minus_before_a_non_number_is_not_a_pattern() {
 fn nonnumerus_in_pattern_position_is_a_nan_literal_not_a_binding() {
     // D22.3: the NaN keyword claims the literal slot so lowering can reject
     // it, instead of silently binding a catch-all name.
-    let result = parse_ok("discerne x {\n    casu nonnumerus { tacet }\n}");
+    let result = parse_ok_la("discerne x {\n    casu nonnumerus { tacet }\n}");
     let patterns = discerne_patterns(&result);
     assert!(matches!(
         &patterns[0],
@@ -241,7 +239,7 @@ fn nonnumerus_in_pattern_position_is_a_nan_literal_not_a_binding() {
 #[test]
 fn or_alternative_arm_parses_as_one_pattern() {
     let result =
-        parse_ok("discerne color {\n    casu Color.Rubrum aut Color.Caeruleum { tacet }\n}");
+        parse_ok_la("discerne color {\n    casu Color.Rubrum aut Color.Caeruleum { tacet }\n}");
     let patterns = discerne_patterns(&result);
     let Pattern::Or(alternatives) = &patterns[0] else {
         panic!("expected or pattern");
@@ -254,7 +252,7 @@ fn or_alternative_arm_parses_as_one_pattern() {
 #[test]
 fn or_alternative_arm_accepts_negated_literals_and_subject_separators() {
     let result =
-        parse_ok("discerne left et right {\n    casu -1 aut -2 et -3 aut -4 ergo tacet\n}");
+        parse_ok_la("discerne left et right {\n    casu -1 aut -2 et -3 aut -4 ergo tacet\n}");
     let patterns = discerne_patterns(&result);
     assert_eq!(patterns.len(), 2);
     assert!(matches!(patterns[0], Pattern::Or(ref alternatives) if alternatives.len() == 2));

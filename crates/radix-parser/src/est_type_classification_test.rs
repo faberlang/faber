@@ -5,12 +5,12 @@
 //! turns out to be a value is rejected in semantic analysis, where the imported
 //! file's interface is available.
 
-use crate::{ParseResult, parse};
-use radix_lexer::lex;
+use crate::ParseResult;
+use crate::test_support::parse_program_la;
 use radix_syntax::{ExprKind, StmtKind, TypeExprKind};
 
 fn parse_source(source: &str) -> ParseResult {
-    parse(lex(source))
+    parse_program_la(source)
 }
 
 /// The RHS classification of the single `redde <test>` in the source.

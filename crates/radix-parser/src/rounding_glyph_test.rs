@@ -2,11 +2,11 @@
 //!. `⌈x⌋` records `PARSE030 ceiling_floor_delimiters` and
 //! still parses (as nearest) so recovery continues.
 
-use super::{ParseResult, parse};
-use radix_lexer::lex;
+use super::ParseResult;
+use crate::test_support::parse_program_la;
 
 fn parse_source(source: &str) -> ParseResult {
-    parse(lex(source))
+    parse_program_la(source)
 }
 
 #[test]

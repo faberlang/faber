@@ -3,12 +3,12 @@
 //! Contract: leading `#` comments and blank lines attach as `Trivia` on the following statement;
 //! comments immediately before a block's `}` or before EOF attach to the block/program end boundary.
 
-use crate::{ParseErrorKind, parse};
-use radix_lexer::lex;
+use crate::ParseErrorKind;
+use crate::test_support::parse_program_la;
 use radix_syntax::{CommentLine, SecusClause, StmtKind, Trivia};
 
 fn parse_source(source: &str) -> crate::ParseResult {
-    parse(lex(source))
+    parse_program_la(source)
 }
 
 fn comment_lines(trivia: &[Trivia]) -> Vec<&CommentLine> {

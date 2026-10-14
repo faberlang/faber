@@ -5,7 +5,7 @@
 //! source (missing separator, trailing comma, or an inserted declaration-block
 //! comma). Fixed-shape sites reject with their existing targeted issues.
 
-use crate::test_support::{parse_ok, parse_program};
+use crate::test_support::{parse_ok_la, parse_program_la};
 
 const CS1_ROWS: u8 = 37;
 
@@ -452,7 +452,7 @@ fn comma_law_matrix_covers_every_cs1_parser_site() {
 fn comma_law_matrix_accept_cases_parse() {
     for case in CASES {
         if matches!(case.expect, Expect::Accept) {
-            let _ = parse_ok(case.source);
+            let _ = parse_ok_la(case.source);
         }
     }
 }
@@ -461,7 +461,7 @@ fn comma_law_matrix_accept_cases_parse() {
 fn comma_law_matrix_reject_cases_match_family() {
     let mut failures = Vec::new();
     for case in CASES {
-        let result = parse_program(case.source);
+        let result = parse_program_la(case.source);
         let ok = match case.expect {
             Expect::Accept => continue,
             Expect::Trailing(position) => {
