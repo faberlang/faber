@@ -4,15 +4,20 @@ use super::{
     AccessFact, AccessFactTable, DeadSourceReason, analyze_access_facts,
     analyze_access_facts_with_types,
 };
-use crate::test_support::analyze_ok;
+use crate::test_support::analyze_ok_la;
 use crate::{AnalyzedApplication, AnalyzedApplicationParts, PassConfig};
 use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirId, HirLocal, HirModule, HirStatement,
     HirStatementKind,
 };
 
+fn la_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("load Latin locale pack")
+}
+
 fn local_rows(source: &str) -> (radix_hir::HirModule, Vec<HirLocal>) {
-    let fixture = analyze_ok(source);
+    let fixture = analyze_ok_la(source);
     let hir = fixture
         .result
         .hir
@@ -32,7 +37,7 @@ fn local_rows(source: &str) -> (radix_hir::HirModule, Vec<HirLocal>) {
 }
 
 fn typed_local_rows(source: &str) -> (radix_hir::HirModule, crate::TypeTable, Vec<HirLocal>) {
-    let fixture = analyze_ok(source);
+    let fixture = analyze_ok_la(source);
     let hir = fixture
         .result
         .hir
@@ -279,8 +284,9 @@ fn admitted_constructor_shapes_are_fresh() {
 
 #[test]
 fn analyzed_application_carries_access_facts() {
-    let mut parsed = radix_parser::parse(radix_lexer::lex(
+    let mut parsed = radix_parser::parse(radix_lexer::lex_with_locale_pack(
         "incipit { fixum lista<numerus> fresh ← [1, 2, 3] }",
+        &la_pack(),
     ));
     assert!(parsed.success(), "parse errors: {:?}", parsed.errors);
     let program = parsed.program.take().expect("program");

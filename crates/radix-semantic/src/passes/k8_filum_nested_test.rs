@@ -4,17 +4,17 @@
 //! Latin fixtures use the test parser's explicit Latin surface. Rejections
 //! must be independence diagnostics, never incidental parse/type errors.
 
-use crate::test_support::analyze_source;
+use crate::test_support::analyze_source_la;
 
 const ISSUE: &str = "filum_independence_unproven";
 
 fn accepted(source: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
 fn rejected(source: &str, reason: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(!errors.is_empty(), "body unexpectedly certified");
     assert!(

@@ -5,17 +5,17 @@
 //! decline. Tensor parameters carry storage roots by mode (see the section
 //! below).
 
-use crate::test_support::{analyze_source, assert_rejects_with_issue};
+use crate::test_support::{analyze_source_la, assert_rejects_with_issue_la};
 
 const ISSUE: &str = "filum_independence_unproven";
 
 fn accepted(source: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
 fn rejected(source: &str, reason: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(!errors.is_empty(), "body unexpectedly certified");
     assert!(
@@ -210,7 +210,7 @@ fn unmarked_params_are_read_only_and_never_overlap_a_mut_param() {
         &format!("in {GRID} out, {GRID} left, {GRID} src"),
         "out[i] ← left[i + 1] + src[i + 2]",
     ));
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &kernel_fn(
             &format!("{GRID} left, {GRID} src"),
             "left[i] ← value + src[i]",
@@ -263,7 +263,7 @@ incipit {{
 
 #[test]
 fn write_through_a_read_param_is_a_borrow_error_not_an_independence_one() {
-    let result = analyze_source(&with_src(&format!("in {GRID} out"), "src[i] ← value"));
+    let result = analyze_source_la(&with_src(&format!("in {GRID} out"), "src[i] ← value"));
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
         errors
@@ -291,7 +291,7 @@ incipit {{
     kernel(in grid, alias)
 }}"
     );
-    let result = analyze_source(&source);
+    let result = analyze_source_la(&source);
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
         errors

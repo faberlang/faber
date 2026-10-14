@@ -13,7 +13,7 @@
 //! - no `Insere` node survives analysis.
 
 use crate::insere::{InsereFiles, InsereRejection, InsereSource};
-use crate::test_support::{analyze_source_with_config, issue};
+use crate::test_support::{analyze_source_with_config_la, issue};
 use crate::{PassConfig, SemanticErrorKind};
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{HirExpression, HirExpressionKind, HirLiteral};
@@ -32,7 +32,7 @@ fn text_config() -> PassConfig {
 }
 
 fn rejects_with(source: &str, config: PassConfig, expected: &str) {
-    let fixture = analyze_source_with_config(source, config);
+    let fixture = analyze_source_with_config_la(source, config);
     assert!(
         fixture.diagnostics.iter().any(|err| {
             err.kind == SemanticErrorKind::InsereInvalid && issue(err) == Some(expected)
@@ -71,7 +71,7 @@ impl HirVisitor for Scan<'_> {
 }
 
 fn survivors(source: &str, config: PassConfig) -> Survivors {
-    let fixture = analyze_source_with_config(source, config);
+    let fixture = analyze_source_with_config_la(source, config);
     assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
     let hir = fixture.result.hir.as_ref().expect("hir");
     let mut scan = Scan {
@@ -139,7 +139,8 @@ fn embed_in_a_hole_slot_requires_a_type() {
 
 #[test]
 fn embed_into_a_non_file_slot_is_one_error() {
-    let fixture = analyze_source_with_config("fixum numerus N = insere \"n.txt\"\n", text_config());
+    let fixture =
+        analyze_source_with_config_la("fixum numerus N = insere \"n.txt\"\n", text_config());
     let errors: Vec<_> = fixture
         .diagnostics
         .iter()
@@ -166,7 +167,7 @@ fn embed_outside_a_constant_initializer_is_rejected() {
 fn praefixum_default_of_an_instance_field_is_checked_for_purity() {
     // The one initializer surface includes `praefixum` for `fixum`/`varia`
     // fields, so its body answers to the same purity rule as a static's.
-    let fixture = analyze_source_with_config(
+    let fixture = analyze_source_with_config_la(
         "genus G {\n    varia textus v = praefixum {\n        nota \"x\"\n        redde \"y\"\n    }\n}\n",
         PassConfig::for_target(Target::HirRust),
     );

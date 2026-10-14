@@ -6,19 +6,19 @@
 //! and its reads and writes meet the rules of the enclosing body. Anything
 //! the analysis cannot see through keeps the named decline.
 
-use crate::test_support::{analyze_source, assert_accepts, assert_rejects_with_issue};
+use crate::test_support::{analyze_source_la, assert_accepts_la, assert_rejects_with_issue_la};
 use std::fmt::Write;
 
 const ISSUE: &str = "filum_independence_unproven";
 const GRID: &str = "tensor<f32, [4]>";
 
 fn accepted(source: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
 fn rejected(source: &str, reason: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(!errors.is_empty(), "body unexpectedly certified");
     assert!(
@@ -145,7 +145,7 @@ functio both(in tensor<f32, [4]> left, in tensor<f32, [4]> right, numerus at) �
     right[at] ← 2.0
 }
 ";
-    let result = analyze_source(&kernel(both, "both(in out, in out, i)"));
+    let result = analyze_source_la(&kernel(both, "both(in out, in out, i)"));
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
         errors.iter().any(|d| d
@@ -226,7 +226,7 @@ functio copy(tensor<f32, [4]> to, tensor<f32, [4]> from, numerus at) → vacuum 
     to[at] ← from[at + 1]
 }
 ";
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &kernel(copy, "copy(out, src, i)"),
         "assign_to_nonmut_tensor_param",
     );
@@ -394,7 +394,7 @@ functio swap(in tensor<f32, [4]> target, de tensor<f32, [4]> other) → vacuum {
     target ← other
 }
 ";
-    let result = analyze_source(&kernel(swap, "swap(in out, src)"));
+    let result = analyze_source_la(&kernel(swap, "swap(in out, src)"));
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
         errors.iter().any(|d| {
@@ -418,7 +418,7 @@ functio square(f32 x) → f32 { redde x * x }
 
 #[test]
 fn reduction_term_may_call_a_pure_private_helper() {
-    assert_accepts(&format!(
+    assert_accepts_la(&format!(
         r"{SQUARE}
 @ nucleum
 functio k(tensor<f32, [32]> xs) → f32 {{
@@ -426,7 +426,7 @@ functio k(tensor<f32, [32]> xs) → f32 {{
 }}
 "
     ));
-    assert_accepts(&format!(
+    assert_accepts_la(&format!(
         r"{SQUARE}
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
@@ -438,7 +438,7 @@ functio k(tensor<f32, [4]> xs) → f32 {{
 
 #[test]
 fn reduction_term_may_call_a_helper_that_reads_a_tensor() {
-    assert_accepts(
+    assert_accepts_la(
         r"
 @ nucleum
 functio at(de tensor<f32, [4]> t, numerus j) → f32 { redde t[j] }
@@ -452,7 +452,7 @@ functio k(tensor<f32, [4]> xs, tensor<f32, [4]> ys) → f32 {
 
 #[test]
 fn reduction_term_calling_a_host_function_is_still_rejected() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 functio host(f32 x) → f32 { redde x }
 @ nucleum
@@ -466,7 +466,7 @@ functio k(tensor<f32, [32]> xs) → f32 {
 
 #[test]
 fn reduction_term_may_call_a_public_kernel() {
-    assert_accepts(
+    assert_accepts_la(
         r"
 @ nucleum
 @ publica
@@ -481,7 +481,7 @@ functio k(tensor<f32, [32]> xs) → f32 {
 
 #[test]
 fn reduction_term_may_call_a_helper_that_calls_a_helper() {
-    assert_accepts(&format!(
+    assert_accepts_la(&format!(
         r"{SQUARE}
 @ nucleum
 functio speed(f32 x) → f32 {{ redde square(x) + 1.0 }}
@@ -511,7 +511,7 @@ functio k(tensor<f32, [32]> xs) → f32 ⇥ textus {
 
 #[test]
 fn reduction_term_helper_that_writes_is_rejected() {
-    let result = analyze_source(
+    let result = analyze_source_la(
         r"
 @ nucleum
 functio dirty(in tensor<f32, [32]> t, f32 x) → f32 {
@@ -538,7 +538,7 @@ functio k(in tensor<f32, [32]> xs) → f32 {
 
 #[test]
 fn reduction_term_helper_with_a_host_call_inside_is_rejected() {
-    let result = analyze_source(
+    let result = analyze_source_la(
         r"
 functio host(f32 x) → f32 { redde x }
 @ nucleum
@@ -702,7 +702,7 @@ incipit {
 #[test]
 fn edge_view_of_an_unmarked_param_cannot_launder_a_write() {
     // Writing the unmarked tensor directly is rejected before any view matters.
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 functio k(tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
     itera ex src apud [i] filum lane fixum value {
@@ -744,7 +744,7 @@ fn failable_helper_is_admitted_in_a_lane_body() {
 fn failable_helper_without_a_failing_caller_stays_a_named_error() {
     // The failure has no handler in the lane body and the kernel cannot
     // propagate it: it must not disappear.
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &kernel(FAILABLE, "out[i] ← h(value)"),
         "failable_call_requires_handler",
     );
