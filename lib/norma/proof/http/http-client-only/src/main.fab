@@ -1,0 +1,55 @@
++++
+locale = "en"
++++
+
+# http-client-only: agent construction, URL split, listen/port/stop, and the
+# refused-connection fault from http:get against a just-stopped port.
+# The live two-ended request/response matrix lives in a later package; this
+# one proves the client surface and the listener lifecycle on one thread.
+
+import from "norma:http/client" client
+import from "norma:fault" fault
+
+main {
+    # http:agent — reusable session and timed session both yield live handles.
+    const client.Client session ← client.session()
+    assert session.agent ≻ 0
+    const client.Client timed ← client.session_timeout(1500)
+    assert timed.agent ≻ 0
+
+    # split — scheme, host, port, path, query.
+    const client.Url parsed ← client.split("http://127.0.0.1:8080/a/b?x=1")
+    assert parsed.scheme ≡ "http"
+    assert parsed.host ≡ "127.0.0.1"
+    assert parsed.port ≡ 8080
+    assert parsed.path ≡ "/a/b"
+    assert parsed.query ≡ "x=1"
+
+    # http:listen on port 0 picks an ephemeral port; http:port reports it.
+    const int handle ↤ call 'http:listen' ([0 ↦ value])
+    const int port ↤ call 'http:port' (handle)
+    assert port ≻ 0
+    const void stopped ↤ call 'http:stop' (handle)
+
+    # http:get against the stopped port faults with ConnectionRefused.
+    const string url ← "http://127.0.0.1:§/"(port)
+    var bool refused ← false
+    do {
+        client.get(url)
+        assert false panic "http:get against a stopped port succeeded"
+    }
+    catch err {
+        match err {
+            case ConnectionRefused const path {
+                assert path.length() ≻ 0
+                refused ← true
+            }
+            default {
+                assert false panic "http:get fault was not ConnectionRefused"
+            }
+        }
+    }
+    assert refused
+
+    print "http-client-only-ok"
+}
