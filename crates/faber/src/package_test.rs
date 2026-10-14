@@ -738,13 +738,13 @@ main {
 
     let code = compile_package_rust_code(&entry);
     let start = code
-        .find("fn classify(x: i64) -> String")
+        .find("fn classify(p_x: i64) -> String")
         .expect("classify signature");
     let function = code
         .get(start..code.find("\nfn main").expect("main signature"))
         .expect("classify function span");
     assert!(
-        !function.contains("fn classify(x: i64) -> Result") && !function.contains(".expect("),
+        !function.contains("fn classify(p_x: i64) -> Result") && !function.contains(".expect("),
         "package emit must contain the arm throw instead of exposing a Result signature/expect:\n{code}"
     );
 }
@@ -775,13 +775,13 @@ main args args {
 
     let code = compile_package_rust_code(&entry);
     let start = code
-        .find("fn classify(x: i64) -> String")
+        .find("fn classify(p_x: i64) -> String")
         .expect("CLI classify signature");
     let function = code
         .get(start..code.find("\nfn main").expect("CLI main signature"))
         .expect("CLI classify function span");
     assert!(
-        !function.contains("fn classify(x: i64) -> Result") && !function.contains(".expect("),
+        !function.contains("fn classify(p_x: i64) -> Result") && !function.contains(".expect("),
         "CLI package emit must preserve the contained arm-cape signature:\n{code}"
     );
 }
@@ -4798,7 +4798,7 @@ main {
     };
 
     assert!(output.code.contains("nomen_longum: String"));
-    assert!(output.code.contains("nomen_longum: captum"));
+    assert!(output.code.contains("nomen_longum: l_captum"));
     assert_source_field_name_only_in_print_literal(&output.code, "nomenLongum");
 }
 
@@ -5072,11 +5072,9 @@ main {
     assert!(output.code.contains("pub mod net"));
     assert!(output.code.contains("pub mod endpoint"));
     assert!(output.code.contains("pub struct Endpoint"));
-    assert!(
-        output.code.contains(
-            "let endpoint: crate::net::endpoint::Endpoint = crate::net::endpoint::Endpoint"
-        )
-    );
+    assert!(output.code.contains(
+        "let l_endpoint: crate::net::endpoint::Endpoint = crate::net::endpoint::Endpoint"
+    ));
 }
 
 #[test]
@@ -5131,7 +5129,7 @@ class Thing {
     assert!(
         output
             .code
-            .contains("let item: crate::thing::Thing = crate::thing::Thing")
+            .contains("let l_item: crate::thing::Thing = crate::thing::Thing")
     );
 }
 
@@ -5183,7 +5181,7 @@ main {
     assert!(
         output
             .code
-            .contains("let item: crate::Thing::Thing = crate::Thing::Thing")
+            .contains("let l_item: crate::Thing::Thing = crate::Thing::Thing")
     );
 }
 
@@ -6634,7 +6632,7 @@ main {
         panic!("expected rust output");
     };
     assert!(!output.code.contains("use faber::Valor as valor;"));
-    assert!(output.code.contains("let tree: faber::Valor"));
+    assert!(output.code.contains("let l_tree: faber::Valor"));
     assert!(
         output.code.contains("crate::json::parse") || output.code.contains("json::parse"),
         "expected json::parse in generated code"
@@ -6944,7 +6942,7 @@ fn run() args args {
     assert!(output.code.contains("pub verbose: bool"));
     assert!(
         output.code.contains(
-            "println!(\"{}\", faber::display::bivalens_with(args.verbose, &faber::display::DisplayTokens { true_: \"true\", false_: \"false\", none: \"none\", tuple: \"tuple\" }));"
+            "println!(\"{}\", faber::display::bivalens_with(p_args.verbose, &faber::display::DisplayTokens { true_: \"true\", false_: \"false\", none: \"none\", tuple: \"tuple\" }));"
         ),
         "{}",
         output.code
@@ -7980,8 +7978,8 @@ fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
     let (locale, path, function, binding, greeting) = (
         "zh-Hans",
         "zh-Hans",
-        "fn 迎接(访客: String) -> String",
-        "let 欢迎语: String",
+        "fn 迎接(p_访客: String) -> String",
+        "let l_欢迎语: String",
         "欢迎光临",
     );
     let example = root.join(path);
@@ -8263,34 +8261,34 @@ fn thai_reader_locale_example_compiles_from_manifest() {
         panic!("expected generated Rust output");
     };
     let rust = output.code;
-    assert!(rust.contains("fn ต้อนรับ(who: String) -> String"));
+    assert!(rust.contains("fn ต้อนรับ(p_who: String) -> String"));
     let line_binding = rust
         .lines()
-        .find(|l| l.contains("let line"))
+        .find(|l| l.contains("let l_line"))
         .unwrap_or_default()
         .to_owned();
-    assert!(line_binding.contains("format!(\"ขอต้อนรับ, {who}!\")"));
-    assert!(rust.contains("fn สอบผ่าน(mark: i64) -> bool"));
-    assert!(rust.contains("if mark >= 90"));
+    assert!(line_binding.contains("format!(\"ขอต้อนรับ, {p_who}!\")"));
+    assert!(rust.contains("fn สอบผ่าน(p_mark: i64) -> bool"));
+    assert!(rust.contains("if p_mark >= 90"));
     assert!(rust.contains("return true;"));
     assert!(rust.contains("return false;"));
-    assert!(rust.contains("fn นับคะแนน(marks: Vec<i64>) -> i64"));
-    assert!(rust.contains("for mark in 0..((marks).len() as i64)"));
+    assert!(rust.contains("fn นับคะแนน(p_marks: Vec<i64>) -> i64"));
+    assert!(rust.contains("for l_mark in 0..((p_marks).len() as i64)"));
     assert!(rust.contains("continue;"));
     assert!(rust.contains("break;"));
-    assert!(rust.contains("fn ลดลง(start: i64) -> i64"));
-    assert!(rust.contains("while current > 0"));
-    assert!(rust.contains("let mark: i64 = 77;"));
-    assert!(rust.contains("let marks: Vec<i64> = vec!["));
+    assert!(rust.contains("fn ลดลง(p_start: i64) -> i64"));
+    assert!(rust.contains("while l_current > 0"));
+    assert!(rust.contains("let l_mark: i64 = 77;"));
+    assert!(rust.contains("let l_marks: Vec<i64> = vec!["));
     // Display tokens are the Thai pack's own words (`verum`/`falsum`/`iuncta`
     // keywords and the `nihil` type row), emitted as Rust string literals.
     assert!(
         rust.contains(
-            r#"faber::display::bivalens_with(สอบผ่าน(mark), &faber::display::DisplayTokens { true_: "จร\u{e34}ง", false_: "เท\u{e47}จ", none: "น\u{e31}ล", tuple: "ท\u{e39}เพ\u{e34}ล" })"#
+            r#"faber::display::bivalens_with(สอบผ่าน(l_mark), &faber::display::DisplayTokens { true_: "จร\u{e34}ง", false_: "เท\u{e47}จ", none: "น\u{e31}ล", tuple: "ท\u{e39}เพ\u{e34}ล" })"#
         ),
         "{rust}"
     );
-    assert!(rust.contains("นับคะแนน(marks.clone())"));
+    assert!(rust.contains("นับคะแนน(l_marks.clone())"));
     assert!(rust.contains("ลดลง(4)"));
 }
 
