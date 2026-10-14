@@ -157,6 +157,10 @@ mod swift_contract_call_label_test;
 #[path = "approx_integer_run_test.rs"]
 mod approx_integer_run_test;
 
+#[cfg(all(test, feature = "hir-swift"))]
+#[path = "swift_keyword_names_run_test.rs"]
+mod swift_keyword_names_run_test;
+
 #[cfg(all(
     test,
     feature = "hir-rust",
