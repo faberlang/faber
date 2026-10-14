@@ -254,6 +254,96 @@ fn promissum_failable_instantiation_finds_interned() {
 }
 
 #[test]
+fn generic_failable_function_type_instantiates_with_error_half() {
+    // Regression: `fn<T>(string) → T ⇥ E` must keep its error half through
+    // generic instantiation. Only the ret type is generic here; dropping
+    // `err` would silently erase the call's failure channel.
+    let mut types = TypeTable::new();
+    let t = types.intern(Type::Param(Symbol(60)));
+    let string = types.primitive(Primitive::Textus);
+    let err = types.primitive(Primitive::Numerus);
+
+    let generic = types.intern(Type::Func(FuncSig {
+        type_params: Vec::new(),
+        params: vec![ParamType {
+            ty: string,
+            mode: SemanticParamMode::Owned,
+            optional: false,
+            sponte: false,
+        }],
+        ret: t,
+        err: Some(err),
+        is_async: false,
+        is_generator: false,
+    }));
+
+    // Read-only path: the concrete signature is already interned.
+    let concrete = types.intern(Type::Func(FuncSig {
+        type_params: Vec::new(),
+        params: vec![ParamType {
+            ty: string,
+            mode: SemanticParamMode::Owned,
+            optional: false,
+            sponte: false,
+        }],
+        ret: string,
+        err: Some(err),
+        is_async: false,
+        is_generator: false,
+    }));
+
+    let mut bindings = MirGenericBindings::default();
+    bindings.insert(Symbol(60), MirType::semantic(string));
+
+    let resolved = instantiate_existing_generic_type(
+        &types,
+        MirType::semantic(generic),
+        &bindings,
+        Span::default(),
+    )
+    .expect("generic failable function instantiation must resolve against the interned type");
+    assert_eq!(resolved.semantic_id(), concrete);
+    match types.get(resolved.semantic_id()) {
+        Type::Func(sig) => assert_eq!(sig.err, Some(err)),
+        other => panic!("expected Func, got {other:?}"),
+    }
+
+    // Interning path: the concrete signature is not pre-interned.
+    let mut fresh = TypeTable::new();
+    let fresh_t = fresh.intern(Type::Param(Symbol(60)));
+    let fresh_string = fresh.primitive(Primitive::Textus);
+    let fresh_err = fresh.primitive(Primitive::Numerus);
+    let fresh_generic = fresh.intern(Type::Func(FuncSig {
+        type_params: Vec::new(),
+        params: vec![ParamType {
+            ty: fresh_string,
+            mode: SemanticParamMode::Owned,
+            optional: false,
+            sponte: false,
+        }],
+        ret: fresh_t,
+        err: Some(fresh_err),
+        is_async: false,
+        is_generator: false,
+    }));
+    let mut fresh_bindings = MirGenericBindings::default();
+    fresh_bindings.insert(Symbol(60), MirType::semantic(fresh_string));
+
+    let interned = instantiate_generic_type_with_shapes(
+        &mut fresh,
+        MirType::semantic(fresh_generic),
+        &fresh_bindings,
+        &MirShapeBindings::default(),
+        Span::default(),
+    )
+    .expect("generic failable function interning instantiation must succeed");
+    match fresh.get(interned.semantic_id()) {
+        Type::Func(sig) => assert_eq!(sig.err, Some(fresh_err)),
+        other => panic!("expected Func, got {other:?}"),
+    }
+}
+
+#[test]
 fn bounded_ascii_instantiation_finds_interned() {
     // Same latent gap as PromissumFailable: BoundedAscii was missing from
     // type_matches_candidate, so Convert-to-ascii<N> failed MIR instantiate
