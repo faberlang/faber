@@ -32,7 +32,7 @@ fn describe_arg(unit: &test_support::AnalyzedFixture, kind: &HirExpressionKind) 
 }
 
 fn scriptum_application(source: &str) -> (String, Vec<String>) {
-    let unit = test_support::analyze_ok(source);
+    let unit = test_support::analyze_ok_la(source);
     let init = entry_init(&unit);
     let HirExpressionKind::Scriptum(template, args) = &init.kind else {
         panic!("expected Scriptum, got {:?}", init.kind);
@@ -46,7 +46,7 @@ fn scriptum_application(source: &str) -> (String, Vec<String>) {
 }
 
 fn literal_text(source: &str) -> String {
-    let unit = test_support::analyze_ok(source);
+    let unit = test_support::analyze_ok_la(source);
     let init = entry_init(&unit);
     let HirExpressionKind::Literal(HirLiteral::String(symbol)) = &init.kind else {
         panic!("expected string literal, got {:?}", init.kind);
@@ -55,7 +55,7 @@ fn literal_text(source: &str) -> String {
 }
 
 fn forma_template_text(source: &str) -> String {
-    let unit = test_support::analyze_ok(source);
+    let unit = test_support::analyze_ok_la(source);
     let init = entry_init(&unit);
     let HirExpressionKind::Verte {
         entries: Some(entries),
@@ -79,7 +79,7 @@ fn forma_template_text(source: &str) -> String {
 }
 
 fn forma_capture(source: &str) -> (String, Vec<String>) {
-    let unit = test_support::analyze_ok(source);
+    let unit = test_support::analyze_ok_la(source);
     let init = entry_init(&unit);
     let HirExpressionKind::Verte {
         entries: Some(entries),
@@ -254,7 +254,7 @@ incipit {
 
 #[test]
 fn repeated_numbered_hole_with_duplicate_values_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
     fixum textus out ← "§0, §0, §0, and §1"("her", "her", "her", "me")
@@ -267,7 +267,7 @@ incipit {
 
 #[test]
 fn gap_in_numbered_holes_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
     fixum textus out ← "§0 and §2"("a", "b", "c")
@@ -276,7 +276,7 @@ incipit {
 "#,
         "template_application_arity_mismatch",
     );
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
     fixum textus out ← "§0 and §2"("a", "b")
@@ -289,7 +289,7 @@ incipit {
 
 #[test]
 fn under_arity_template_application_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
     fixum textus out ← "§ §"("x")
@@ -302,7 +302,7 @@ incipit {
 
 #[test]
 fn over_arity_template_application_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
     fixum textus out ← "§"("x", "y")
@@ -315,7 +315,7 @@ incipit {
 
 #[test]
 fn unknown_label_at_call_site_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
     fixum textus out ← "§{greet} world"(other: "salve")
@@ -328,7 +328,7 @@ incipit {
 
 #[test]
 fn duplicate_named_hole_at_application_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
     fixum textus out ← "§{a} §{a}"("x", "y")
@@ -341,7 +341,7 @@ incipit {
 
 #[test]
 fn mixed_labeled_and_positional_actuals_are_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
     fixum textus out ← "§{a} §"("x", a: "y")
@@ -354,7 +354,7 @@ incipit {
 
 #[test]
 fn unfillable_named_hole_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
     fixum textus out ← "§{a} §{b}"(a: "x", extra: "y")
@@ -367,7 +367,7 @@ incipit {
 
 #[test]
 fn labeled_actual_on_ordinary_call_is_rejected_at_parse() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 functio f(textus x) → textus {
     redde x
@@ -383,7 +383,7 @@ incipit {
 
 #[test]
 fn scriptum_keyword_is_not_arity_checked() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"
 incipit {
     fixum textus out ← scriptum("§ §", "x")
@@ -476,7 +476,7 @@ incipit {
 /// fixture also pads the shorter call spelling so corresponding HIR spans have
 /// equal offsets; only interner-assigned Symbol ids need canonicalization.
 fn canonical_hir_dump(source: &str) -> String {
-    let unit = test_support::analyze_ok(source);
+    let unit = test_support::analyze_ok_la(source);
     let hir = unit.hir.as_ref().expect("hir");
     canonicalize_symbol_ids(&format!("{hir:#?}"), &unit)
 }

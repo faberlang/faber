@@ -16,6 +16,7 @@ use radix_parser::parse;
 use radix_target::Target;
 
 use crate::file_interface::FileInterface;
+use crate::locale::LocalePack;
 use crate::passes::visibility_annotation::VisibilityTier;
 use crate::{PassConfig, SemanticError, SemanticResult, TypeId};
 use radix_lexer::Interner;
@@ -85,6 +86,9 @@ pub fn analyze_source_with_config(source: &str, config: PassConfig) -> AnalyzedF
             pack as &dyn radix_lexer::KeywordPack,
         ))
     } else {
+        if std::env::var("RADIX_DEFAULT_CODE_LOCALE").as_deref() == Ok("en") {
+            panic!("pack-less analysis: pick a locale (use the _la helpers)");
+        }
         parse(lex(source))
     };
     if !parsed.errors.is_empty() {
@@ -297,4 +301,184 @@ pub fn compile_and_get_diagnostics(source: &str) -> Vec<SemanticError> {
 #[must_use]
 pub fn compile_for_target_and_get_result(source: &str, target: Target) -> AnalyzedFixture {
     analyze_source_for_target(source, target)
+}
+
+// ---------------------------------------------------------------------------
+// Latin (`la`) reader-pack variants
+// ---------------------------------------------------------------------------
+//
+// Latin test sources name their reader locale explicitly (operator ruling
+// 2026-10-11): a pack-less call no longer exists. Each `_la` sibling installs
+// the built-in `la` pack and then runs the same pipeline as its pack-less twin.
+
+/// Load the built-in Latin (`la`) reader pack used by the `_la` helpers.
+fn latin_pack() -> LocalePack {
+    LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("load Latin locale pack")
+}
+
+/// Parse source with the `la` pack and run the semantic pipeline for `target`.
+#[must_use]
+pub fn analyze_source_for_target_la(source: &str, target: Target) -> AnalyzedFixture {
+    analyze_source_with_config_la(source, PassConfig::for_target(target))
+}
+
+/// Parse source with the `la` pack and the historical Rust-shaped pass config.
+#[must_use]
+pub fn analyze_source_la(source: &str) -> AnalyzedFixture {
+    analyze_source_for_target_la(source, Target::HirRust)
+}
+
+/// Parse source with the `la` pack and an explicit [`PassConfig`].
+#[must_use]
+pub fn analyze_source_with_config_la(source: &str, mut config: PassConfig) -> AnalyzedFixture {
+    config.locale_pack = Some(latin_pack());
+    analyze_source_with_config(source, config)
+}
+
+/// Analyze with the `la` pack and caller-supplied namespace exports and file interfaces.
+#[must_use]
+pub fn analyze_source_with_import_contract_la(
+    source: &str,
+    namespace_exports: BTreeMap<String, BTreeMap<String, VisibilityTier>>,
+    file_interfaces: BTreeMap<String, FileInterface>,
+) -> AnalyzedFixture {
+    let mut config = PassConfig::for_target(Target::HirRust);
+    config.namespace_exports = namespace_exports;
+    config.file_interfaces = file_interfaces;
+    analyze_source_with_config_la(source, config)
+}
+
+/// Analyze with the `la` pack and assert no error diagnostics.
+#[must_use]
+pub fn analyze_ok_la(source: &str) -> AnalyzedFixture {
+    let result = analyze_source_la(source);
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+    result
+}
+
+/// Assert `la` analysis succeeds (no error diagnostics).
+pub fn assert_accepts_la(source: &str) {
+    let result = analyze_source_la(source);
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+}
+
+/// Assert `la` analysis succeeds for a specific target.
+pub fn assert_accepts_for_target_la(source: &str, target: Target) {
+    let result = analyze_source_for_target_la(source, target);
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+}
+
+/// Assert `la` analysis fails for `target` with an error diagnostic carrying `issue`.
+pub fn assert_rejects_with_issue_for_target_la(source: &str, target: Target, expected: &str) {
+    let result = analyze_source_for_target_la(source, target);
+    assert!(
+        !result.is_ok(),
+        "expected failure, got: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| err.is_error() && issue(err) == Some(expected)),
+        "expected diagnostic issue {expected:?}, got: {:?}",
+        result.diagnostics
+    );
+}
+
+/// Assert `la` analysis fails with an error diagnostic carrying `issue`.
+pub fn assert_rejects_with_issue_la(source: &str, expected: &str) {
+    let result = analyze_source_la(source);
+    assert!(
+        !result.is_ok(),
+        "expected failure, got: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| err.is_error() && issue(err) == Some(expected)),
+        "expected diagnostic issue {expected:?}, got: {:?}",
+        result.diagnostics
+    );
+}
+
+/// Assert `la` analysis fails with an error diagnostic whose args equal `args`.
+pub fn assert_rejects_with_args_la(source: &str, args: &[DiagnosticArg]) {
+    let result = analyze_source_la(source);
+    assert!(
+        !result.is_ok(),
+        "expected failure, got: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| err.is_error() && err.args == args),
+        "expected diagnostic with args {args:?}, got: {:?}",
+        result.diagnostics
+    );
+}
+
+/// Assert `la` analysis emits a warning carrying `issue`.
+pub fn assert_warns_with_issue_la(source: &str, expected: &str) {
+    let result = analyze_source_la(source);
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| !err.is_error() && issue(err) == Some(expected)),
+        "expected warning with issue {expected:?}, got: {:?}",
+        result.diagnostics
+    );
+}
+
+/// `la` analysis-path alias of [`assert_accepts_la`].
+pub fn assert_analysis_accepts_la(source: &str) {
+    assert_accepts_la(source);
+}
+
+/// `la` analysis-path alias of [`assert_rejects_with_issue_la`].
+pub fn assert_analysis_rejects_with_issue_la(source: &str, expected: &str) {
+    assert_rejects_with_issue_la(source, expected);
+}
+
+/// Diagnostics from `la` analysis (errors and warnings).
+#[must_use]
+pub fn analyze_and_get_diagnostics_la(source: &str) -> Vec<SemanticError> {
+    analyze_source_la(source).diagnostics.clone()
+}
+
+/// `la` compile-path alias: analysis only, no backend.
+#[must_use]
+pub fn compile_and_get_result_la(source: &str) -> AnalyzedFixture {
+    analyze_source_la(source)
+}
+
+/// `la` compile-path alias: analysis diagnostics only.
+#[must_use]
+pub fn compile_and_get_diagnostics_la(source: &str) -> Vec<SemanticError> {
+    analyze_and_get_diagnostics_la(source)
+}
+
+/// `la` compile-path alias for a specific target.
+#[must_use]
+pub fn compile_for_target_and_get_result_la(source: &str, target: Target) -> AnalyzedFixture {
+    analyze_source_for_target_la(source, target)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::analyze_ok_la;
+
+    #[test]
+    fn la_helpers_read_latin() {
+        let unit = analyze_ok_la(
+            "incipit {\n    fixum [caput, ceteri cauda] \u{2190} [1, 2, 3, 4, 5]\n    nota caput\n    nota cauda\n}\n",
+        );
+        assert!(unit.is_ok(), "diagnostics: {:?}", unit.diagnostics);
+    }
 }
