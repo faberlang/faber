@@ -256,7 +256,7 @@ pub use radix_codegen_shared::conversio_arm::{
     conversio_arm_mark_fallback, conversio_arm_take,
 };
 
-use crate::codegen::input::CodegenAnalysis;
+use crate::codegen::input::{CodegenAnalysis, CodegenProvider};
 use crate::diagnostics::DiagnosticArg;
 use crate::hir::HirModule;
 use crate::lexer::Interner;
@@ -473,27 +473,24 @@ pub fn generate_from_analyzed_with_options(
 }
 
 #[cfg(feature = "hir-rust")]
-fn generate_rust_from_analyzed(
-    analysis: &crate::driver::AnalyzedModule,
-    hir: &HirModule,
-) -> Result<crate::Output, CodegenError> {
-    reject_rust_unsupported_types(&analysis.types)?;
+fn generate_rust_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) -> Result<crate::Output, CodegenError> {
+    reject_rust_unsupported_types(analysis.types())?;
 
     let mut namespace_info =
-        rust::build_file_import_namespaces(hir, &analysis.interner, &rust::ResolverImportsBridge(&analysis.resolver));
-    let callback_identities = imported_tensor_edge_policy_callback_identities(&analysis.resolver, &analysis.interner);
+        rust::build_file_import_namespaces(hir, analysis.interner(), &rust::ResolverImportsBridge(analysis.resolver()));
+    let callback_identities = imported_tensor_edge_policy_callback_identities(analysis.resolver(), analysis.interner());
     let mut emitted_tensor_policy_providers = rustc_hash::FxHashSet::default();
-    let mut policy_identity_codegen = rust::RustCodegen::new_with_types(hir, &analysis.interner, &analysis.types);
+    let mut policy_identity_codegen = rust::RustCodegen::new_with_types(hir, analysis.interner(), analysis.types());
     policy_identity_codegen.set_imported_namespace_type_paths(namespace_info.type_paths.clone());
-    for provider in &analysis.tensor_edge_policies.provider_impls {
-        if let Some(key) = policy_identity_codegen.tensor_edge_policy_provider_key(provider, &analysis.types, None)? {
+    for provider in &analysis.tensor_edge_policies().provider_impls {
+        if let Some(key) = policy_identity_codegen.tensor_edge_policy_provider_key(provider, analysis.types(), None)? {
             emitted_tensor_policy_providers.insert(key);
         }
     }
     let provider_modules = emit_provider_modules(analysis, &mut emitted_tensor_policy_providers)?;
-    let gpu_builtins = rust::rust_gpu_builtins(&analysis.gpu_builtins);
-    let function_facts = rust::rust_function_facts(&analysis.function_facts);
-    let used_imports = rust::used_import_defs(&analysis.resolved_uses);
+    let gpu_builtins = rust::rust_gpu_builtins(analysis.gpu_builtins());
+    let function_facts = rust::rust_function_facts(analysis.function_facts());
+    let used_imports = rust::used_import_defs(analysis.resolved_uses());
 
     // Provider-emitted signatures decide importer call-site
     // unwrapping: an `ad`-verb provider function emits `Result`
@@ -517,16 +514,16 @@ fn generate_rust_from_analyzed(
             effects.is_failable = true;
         }
     }
-    let mut r#gen = rust::RustCodegen::new_with_types(hir, &analysis.interner, &analysis.types);
+    let mut r#gen = rust::RustCodegen::new_with_types(hir, analysis.interner(), analysis.types());
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
-    r#gen.set_shape_obligations(rust::rust_shape_obligations(&analysis.shape_obligations));
-    r#gen.set_tensor_edge_policy_table(Some(&analysis.tensor_edge_policies));
+    r#gen.set_shape_obligations(rust::rust_shape_obligations(analysis.shape_obligations()));
+    r#gen.set_tensor_edge_policy_table(Some(analysis.tensor_edge_policies()));
     r#gen.set_tensor_edge_policy_callback_identities(callback_identities.iter().cloned());
     r#gen.set_gpu_builtins(&gpu_builtins);
     r#gen.set_function_facts(&function_facts);
     r#gen.set_used_import_defs(&used_imports);
     r#gen.set_imported_namespace_info(namespace_info);
-    let mut output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
+    let mut output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
 
     if !provider_modules.is_empty() {
         let mut module_block = String::new();
@@ -548,7 +545,7 @@ fn generate_rust_from_analyzed(
 
 #[cfg(not(feature = "hir-rust"))]
 fn generate_rust_from_analyzed(
-    _analysis: &crate::driver::AnalyzedModule,
+    _analysis: &dyn CodegenAnalysis,
     _hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirRust))
@@ -1255,7 +1252,8 @@ pub fn generate_go_cli(
 /// provider units (Norma wrappers live there on single-file emit).
 ///
 /// Also the whole-package `radix-program` build paths (`wasm.rs`, `llvm.rs`)
-/// call this through the unit's [`crate::driver::AnalyzedModule`].
+/// call this through the unit's [`crate::codegen::input::CodegenAnalysis`]
+/// implementation (the analyzed-module carrier coerces).
 pub fn reject_unsupported_leaves(
     analysis: &dyn crate::codegen::input::CodegenAnalysis,
     target: Target,
@@ -1265,9 +1263,13 @@ pub fn reject_unsupported_leaves(
     radix_codegen_shared::reject_unsupported_leaf(&routes, target)
 }
 
-fn collect_analysis_ad_routes(analysis: &dyn crate::codegen::input::CodegenAnalysis, routes: &mut Vec<String>) {
+fn collect_analysis_ad_routes(analysis: &dyn CodegenAnalysis, routes: &mut Vec<String>) {
     collect_module_ad_routes(analysis.hir(), analysis.interner(), analysis.resolver(), routes);
-    collect_provider_ad_routes(analysis, routes);
+    for key in analysis.provider_keys() {
+        if let Some(CodegenProvider::Unit(unit)) = analysis.provider(&key) {
+            collect_analysis_ad_routes(&*unit, routes);
+        }
+    }
 }
 
 fn collect_module_ad_routes(
@@ -1282,16 +1284,6 @@ fn collect_module_ad_routes(
         if !routes.iter().any(|existing| existing == route) {
             routes.push(route.to_owned());
         }
-    }
-}
-
-fn collect_provider_ad_routes(owner: &dyn crate::codegen::input::CodegenAnalysis, routes: &mut Vec<String>) {
-    for key in owner.provider_keys() {
-        let Some(crate::codegen::input::CodegenProvider::Unit(unit)) = owner.provider(&key) else {
-            continue;
-        };
-        collect_module_ad_routes(unit.hir(), unit.interner(), unit.resolver(), routes);
-        collect_provider_ad_routes(&*unit, routes);
     }
 }
 
