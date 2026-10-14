@@ -467,8 +467,11 @@ impl TypeChecker<'_> {
 
     /// The registry classifies a promoted method as the collection `Values`
     /// view: its result is an array over the receiver's own values, not a
-    /// fresh copy. The catalog is the authority; the reader pack's localized
-    /// surface resolves to the same row, as in `check_intrinsic_method_call`.
+    /// fresh copy. The catalog is the authority; the lookup is pack-first,
+    /// as in `check_intrinsic_method_call`: under a non-`la` pack only the
+    /// active pack's surface spelling resolves (the canonical Latin name is
+    /// not a legal method), while the `la` pack or no pack matches the
+    /// canonical registry name.
     fn is_receiver_values_view(&self, method: Symbol, arg_count: usize) -> bool {
         let Some(interner) = self.interner else {
             return false;
@@ -478,10 +481,12 @@ impl TypeChecker<'_> {
             entry.arg_count == arg_count
                 && radix_intrinsics::mir_collection_op(entry)
                     == Some(radix_types::MirCollectionOp::Values)
-                && (entry.faber_name == name
-                    || self
-                        .locale_pack
-                        .is_some_and(|pack| pack.intrinsic_surface(entry.faber_name) == name))
+                && match self.locale_pack {
+                    Some(pack) if pack.metadata.id != "la" => {
+                        pack.intrinsic_surface(entry.faber_name) == name
+                    }
+                    _ => entry.faber_name == name,
+                }
         })
     }
 
