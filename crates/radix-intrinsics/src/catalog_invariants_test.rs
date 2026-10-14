@@ -475,6 +475,49 @@ fn air_ratchet_rows_are_absent_from_the_tensor_catalog() {
     }
 }
 
+/// G-02 (need, point C): the copy-out elementwise methods on the
+/// Vector, Matrix and Tensor receivers use the perfect (passive) forms that
+/// the Numeric family already spells. The imperative forms stay Numeric-only.
+#[test]
+fn vector_matrix_tensor_copy_out_elementwise_methods_use_perfect_forms() {
+    let receivers = [
+        IntrinsicReceiver::Vector,
+        IntrinsicReceiver::Matrix,
+        IntrinsicReceiver::Tensor,
+    ];
+    for receiver in receivers {
+        for name in ["subtracta", "multiplicata", "divisa"] {
+            let entry = lookup_method(receiver, name, 1)
+                .unwrap_or_else(|| panic!("{receiver:?} `{name}` row must exist"));
+            assert_eq!(
+                entry.return_kind,
+                IntrinsicReturnKind::SameAsReceiver,
+                "{receiver:?} `{name}` must stay copy-out"
+            );
+        }
+    }
+    for receiver in [IntrinsicReceiver::Vector, IntrinsicReceiver::Matrix] {
+        for name in ["subtrahe", "multiplica", "divida"] {
+            assert!(
+                lookup_method(receiver, name, 1).is_none(),
+                "{receiver:?} must not keep imperative `{name}`"
+            );
+        }
+    }
+    for name in ["subtrahe", "multiplica", "divisio"] {
+        assert!(
+            lookup_method(IntrinsicReceiver::Tensor, name, 1).is_none(),
+            "Tensor must not keep old `{name}`"
+        );
+    }
+    for name in ["divida", "divisa"] {
+        assert!(
+            lookup_method(IntrinsicReceiver::Numeric, name, 1).is_some(),
+            "Numeric must keep `{name}`"
+        );
+    }
+}
+
 // PD-9: the five keyed lookups must stay byte-identical to the catalog's
 // linear-scan semantics. The references below mirror the pre-index scan
 // bodies exactly; catalog rows carry no `PartialEq`, so results are compared

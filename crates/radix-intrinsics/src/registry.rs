@@ -857,7 +857,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(
         Tensor,
-        "subtrahe",
+        "subtracta",
         1,
         &[IntrinsicParamKind::TensorPeer],
         SameAsReceiver,
@@ -865,7 +865,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(
         Tensor,
-        "multiplica",
+        "multiplicata",
         1,
         &[IntrinsicParamKind::TensorPeer],
         SameAsReceiver,
@@ -873,7 +873,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(
         Tensor,
-        "divisio",
+        "divisa",
         1,
         &[IntrinsicParamKind::TensorPeer],
         SameAsReceiver,
@@ -1172,7 +1172,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(
         Matrix,
-        "subtrahe",
+        "subtracta",
         1,
         &[IntrinsicParamKind::ReceiverSelf],
         SameAsReceiver,
@@ -1180,7 +1180,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(
         Matrix,
-        "multiplica",
+        "multiplicata",
         1,
         &[IntrinsicParamKind::ReceiverSelf],
         SameAsReceiver,
@@ -1188,7 +1188,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(
         Matrix,
-        "divida",
+        "divisa",
         1,
         &[IntrinsicParamKind::ReceiverSelf],
         SameAsReceiver,
@@ -1244,7 +1244,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(
         Vector,
-        "subtrahe",
+        "subtracta",
         1,
         &[IntrinsicParamKind::ReceiverSelf],
         SameAsReceiver,
@@ -1252,7 +1252,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(
         Vector,
-        "multiplica",
+        "multiplicata",
         1,
         &[IntrinsicParamKind::ReceiverSelf],
         SameAsReceiver,
@@ -1260,7 +1260,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(
         Vector,
-        "divida",
+        "divisa",
         1,
         &[IntrinsicParamKind::ReceiverSelf],
         SameAsReceiver,

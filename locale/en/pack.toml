@@ -379,11 +379,10 @@ magnitudines = "shape"
 nonnihil = "count_nonzero"
 ponde = "set"
 
-# tensor (33) — longitudo / magnitudines / accipe / addita / subtrahe /
-# multiplica / nega / summa / ponde / sectio shared with earlier families.
+# tensor (33) — longitudo / magnitudines / accipe / addita / subtracta /
+# multiplicata / nega / summa / ponde / sectio shared with earlier families.
 forma = "reshape"
 addita_bias = "added_bias"
-divisio = "divide"
 matmul = "matmul"
 media = "mean"
 reple = "fill"
@@ -419,11 +418,11 @@ materialize = "materialize"
 # English owns a distinct surface name for it.
 formata = "formata"
 
-# matrix (7) — addita / subtrahe / multiplica / divida / matmul / inversa
+# matrix (7) — addita / subtracta / multiplicata / divisa / matmul / inversa
 # shared with earlier families.
 applica = "apply"
 
-# vector (10) — addita / subtrahe / multiplica / divida / longitudo / crea
+# vector (10) — addita / subtracta / multiplicata / divisa / longitudo / crea
 # shared with earlier families.
 productum = "dot"
 transversum = "cross"
