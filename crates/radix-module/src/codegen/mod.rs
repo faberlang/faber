@@ -958,20 +958,13 @@ fn generate_odin_from_analyzed(
 /// the O(consumers × providers) re-analysis ends.
 #[cfg(feature = "hir-rust")]
 fn emit_provider_modules(
-    analysis: &dyn crate::codegen::input::CodegenAnalysis,
+    analysis: &dyn CodegenAnalysis,
     emitted_tensor_policy_providers: &mut rustc_hash::FxHashSet<String>,
 ) -> Result<Vec<(String, String, std::collections::BTreeSet<String>)>, CodegenError> {
     use std::collections::BTreeMap;
 
     let mut modules = BTreeMap::new();
-    map_provider_modules(
-        analysis.hir(),
-        analysis.interner(),
-        analysis.resolver(),
-        analysis,
-        emitted_tensor_policy_providers,
-        &mut modules,
-    )?;
+    map_provider_modules(analysis, emitted_tensor_policy_providers, &mut modules)?;
     Ok(modules
         .into_iter()
         .map(|(name, (code, failable))| (name, code, failable))
@@ -993,30 +986,27 @@ fn emit_provider_modules(
 /// previous disk-based path failed too.
 #[cfg(feature = "hir-rust")]
 fn map_provider_modules(
-    hir: &crate::hir::HirModule,
-    interner: &crate::lexer::Interner,
-    resolver: &crate::semantic::Resolver,
-    owner: &dyn crate::codegen::input::CodegenAnalysis,
+    analysis: &dyn CodegenAnalysis,
     emitted_tensor_policy_providers: &mut rustc_hash::FxHashSet<String>,
     modules: &mut std::collections::BTreeMap<String, (String, std::collections::BTreeSet<String>)>,
 ) -> Result<(), CodegenError> {
     use crate::hir::HirItemKind;
 
-    for item in &hir.items {
+    for item in &analysis.hir().items {
         let HirItemKind::Import(import) = &item.kind else {
             continue;
         };
-        let import_path = interner.resolve(import.path);
+        let import_path = analysis.interner().resolve(import.path);
         for import_item in &import.items {
             let binding = import_item.alias.unwrap_or(import_item.name);
-            if !resolver.namespace_has_file_interface(binding) {
+            if !analysis.resolver().namespace_has_file_interface(binding) {
                 continue;
             }
-            let module_name = interner.resolve(binding).replace('-', "_");
+            let module_name = analysis.interner().resolve(binding).replace('-', "_");
             if modules.contains_key(&module_name) {
                 continue;
             }
-            let provider = match owner.provider(import_path) {
+            let provider = match analysis.provider(import_path) {
                 None => {
                     return Err(CodegenError {
                         message: format!(
@@ -1058,14 +1048,7 @@ fn map_provider_modules(
             // namespace calls then target `crate::<module>::…` paths that
             // exist. The `contains_key` guard above only skips modules already
             // emitted; a cyclic import ends at the missing-carriage error.
-            map_provider_modules(
-                provider.hir(),
-                provider.interner(),
-                provider.resolver(),
-                &*provider,
-                emitted_tensor_policy_providers,
-                modules,
-            )?;
+            map_provider_modules(&*provider, emitted_tensor_policy_providers, modules)?;
             emit_provider_module_code(&*provider, &module_name, emitted_tensor_policy_providers, modules)?;
         }
     }
