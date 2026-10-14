@@ -42,6 +42,29 @@ impl ObjectFieldStyle {
     }
 }
 
+/// Whether a raw `textus` payload cannot be re-lexed inside `"..."`.
+///
+/// The interned payload keeps escapes as written, so the scan is backslash
+/// aware: a backslash consumes the following character, which makes `\"` an
+/// escaped quote rather than a terminator. Quotes fail on an unescaped `"`, on
+/// a line break, and on `\»`, which is a valid guillemet escape rather than a
+/// quote one.
+fn textus_needs_guillemets(text: &str) -> bool {
+    let mut chars = text.chars();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '\\' => {
+                if chars.next() == Some('»') {
+                    return true;
+                }
+            }
+            '"' | '\n' | '\r' => return true,
+            _ => {}
+        }
+    }
+    false
+}
+
 impl super::FaberCodegen<'_> {
     /// Write one genus/struct field (`field = value`).
     pub(super) fn write_genus_field(
@@ -195,7 +218,7 @@ impl super::FaberCodegen<'_> {
     /// Emit a `textus` literal, preferring guillemets when `"..."` would break.
     pub(super) fn write_textus_literal(&self, sym: Symbol, writer: &mut CodeWriter) {
         let text = self.interner.resolve(sym);
-        if text.contains('\n') || text.contains('"') {
+        if textus_needs_guillemets(text) {
             writer.write("«");
             writer.write_raw(text);
             writer.write("»");
