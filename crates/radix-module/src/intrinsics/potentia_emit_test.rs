@@ -29,7 +29,7 @@ fn swift_float_potentia_is_foundation_pow() {
     let crate::Output::Swift(out) = compile(Target::HirSwift, FLOAT_POW) else {
         panic!("expected Swift output");
     };
-    assert!(out.code.contains("pow(b, 0.5)"), "{}", out.code);
+    assert!(out.code.contains("pow(l_b, 0.5)"), "{}", out.code);
     assert!(out.code.contains("pow(2.0, 3.0)"), "{}", out.code);
     assert!(!out.code.contains(".potentia("), "{}", out.code);
     assert!(out.code.contains("import Foundation"), "pow needs Foundation:\n{}", out.code);
