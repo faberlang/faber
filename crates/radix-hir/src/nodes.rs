@@ -1093,6 +1093,7 @@ pub struct HirLocal {
     /// Static `const size N = 3` (compile-time natural) versus the runtime
     /// `←` lift; only meaningful when `size_decl` is set. Serde-defaulted so
     /// older interface snapshots keep loading.
+    #[serde(default)]
     pub size_static: bool,
 }
 
