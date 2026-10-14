@@ -54,6 +54,12 @@ pub(super) fn cmd_run(args: RunArgs) {
         }
     };
 
+    // The flag is accepted on the CPU route; say once, before launch, that
+    // the count cannot configure anything yet.
+    if let Some(note) = threads_no_effect_note(args.threads, selection) {
+        eprintln!("{note}");
+    }
+
     interpret_path(
         &input_path,
         &args.args,
@@ -612,6 +618,26 @@ fn resolve_route_selection(
     let selection = package::resolve_device_selection(args.device, input_path)?;
     ensure_threads_cpu_route(args.threads, selection)?;
     Ok(selection)
+}
+
+/// The stderr note printed once per run when `--threads N` is accepted on
+/// the CPU device but cannot configure anything yet: the CPU device runs on
+/// the reference route until the worker device lands.
+const THREADS_NO_EFFECT_NOTE: &str =
+    "note: --threads has no effect yet: the cpu device runs on the reference route";
+
+/// Decide the one visibility note for an accepted `--threads N` on the CPU
+/// route. Pure so the rule is testable without launching a program: a count
+/// reaches here only with the CPU selection ([`ensure_threads_cpu_route`]
+/// fails closed everywhere else), where the reference route ignores it.
+fn threads_no_effect_note(
+    threads: Option<u32>,
+    selection: DeviceSelection,
+) -> Option<&'static str> {
+    if threads.is_some() && selection == DeviceSelection::Cpu {
+        return Some(THREADS_NO_EFFECT_NOTE);
+    }
+    None
 }
 
 /// Fail closed when `--threads N` is given with a resolved selection other

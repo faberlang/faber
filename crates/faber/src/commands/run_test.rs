@@ -405,6 +405,19 @@ fn run_threads_passes_on_the_cpu_route() {
 }
 
 #[test]
+fn threads_no_effect_note_marks_only_the_accepted_cpu_count() {
+    assert_eq!(
+        threads_no_effect_note(Some(4), DeviceSelection::Cpu),
+        Some(THREADS_NO_EFFECT_NOTE)
+    );
+    assert_eq!(threads_no_effect_note(None, DeviceSelection::Cpu), None);
+    assert_eq!(
+        threads_no_effect_note(Some(4), DeviceSelection::Reference),
+        None
+    );
+}
+
+#[test]
 fn run_threads_clap_accepts_positive_and_rejects_zero() {
     let parsed = <crate::cli::Cli as clap::Parser>::try_parse_from([
         "faber",
