@@ -297,7 +297,9 @@ fn constructor_excludes_private_named_helpers_from_device_program() {
         "only the public entry has a kernel row"
     );
     assert_eq!(program.kernels[0].function, MirFunctionId(1));
-    assert_eq!(program.kernels[0].entry, "public_entry");
+    // ca2499dc: the entry is the compiler-owned `k<function id>`; the
+    // author's `public_entry` spelling never reaches device source.
+    assert_eq!(program.kernels[0].entry, "k1");
     assert_eq!(
         program.launches.len(),
         1,
@@ -377,7 +379,8 @@ fn constructor_returns_program_and_semantics_from_validated_mir() {
     .expect("the constructor derives the device program");
 
     assert_eq!(device_program.kernels.len(), 1);
-    assert_eq!(device_program.kernels[0].entry, "scale_kernel");
+    // ca2499dc: entries are the neutral `k<function id>`, not the source name.
+    assert_eq!(device_program.kernels[0].entry, "k1");
     assert_eq!(device_program.launches.len(), 1);
     assert_eq!(device_program.results.len(), 1);
     assert_eq!(semantics.values.len(), 2);
@@ -467,15 +470,9 @@ fn device_program_composed_body_materializes_four_generic_children() {
         .iter()
         .map(|kernel| kernel.entry.as_str())
         .collect();
-    assert_eq!(
-        entries,
-        [
-            "composed_mlp__0",
-            "composed_mlp__1",
-            "composed_mlp__2",
-            "composed_mlp__3",
-        ]
-    );
+    // The fixture function is `MirFunctionId(0)`; ca2499dc makes each
+    // subchain entry the neutral `k<function id>__<subchain index>`.
+    assert_eq!(entries, ["k0__0", "k0__1", "k0__2", "k0__3"]);
     for (kernel, wants_matmul) in program.kernels.iter().zip([true, true, false, true]) {
         let plan_matches = if wants_matmul {
             matches!(kernel.plan, CollectionKernelPlan::TiledMatMul(_))
@@ -642,7 +639,8 @@ fn constructor_decomposes_multi_recipe_body_into_subchain_kernels() {
     let softmax_kernel = program
         .kernels
         .iter()
-        .find(|kernel| kernel.entry == "mixio__1")
+        // ca2499dc: function 1's second subchain is `k1__1`.
+        .find(|kernel| kernel.entry == "k1__1")
         .expect("the softmax subchain kernel exists");
     assert!(matches!(
         softmax_kernel.plan,
@@ -1038,8 +1036,9 @@ fn constructor_aliases_param_updates_and_gradients() {
         let step_kernel = program
             .kernels
             .iter()
-            .find(|kernel| kernel.entry == "train_step")
+            .find(|kernel| kernel.function == MirFunctionId(STEP_FN))
             .expect("the train_step kernel exists");
+        assert_eq!(step_kernel.entry, "k2", "the step entry is neutral k<id>");
 
         // The trainable param `w` projects to ONE buffer with a read slot and
         // a write slot in the step kernel (the in-place update).
@@ -1078,8 +1077,12 @@ fn constructor_aliases_param_updates_and_gradients() {
         let forward_kernel = program
             .kernels
             .iter()
-            .find(|kernel| kernel.entry == "loss")
+            .find(|kernel| kernel.function == MirFunctionId(FORWARD_FN))
             .expect("the forward kernel exists");
+        assert_eq!(
+            forward_kernel.entry, "k1",
+            "the forward entry is neutral k<id>"
+        );
         let forward_reads: Vec<_> = forward_kernel
             .resources
             .iter()
@@ -1098,8 +1101,12 @@ fn constructor_aliases_param_updates_and_gradients() {
         let companion_kernel = program
             .kernels
             .iter()
-            .find(|kernel| kernel.entry == "loss_backward")
+            .find(|kernel| kernel.function == MirFunctionId(COMPANION_FN))
             .expect("the companion kernel exists");
+        assert_eq!(
+            companion_kernel.entry, "k3",
+            "the companion entry is neutral k<id>"
+        );
         let gw_buffer = step_kernel
             .resources
             .iter()
