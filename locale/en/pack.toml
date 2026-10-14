@@ -5538,3 +5538,7 @@ message = "expected '(' after 'scriptum'"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "expected ')' after the scriptum arguments"
+
+[diagnostics.PARSE001.issues.expected_keyword]
+message = "expected keyword '{expected}'"
+help = "add '{expected}' here"

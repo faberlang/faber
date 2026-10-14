@@ -1328,12 +1328,20 @@ impl Parser {
     }
 
     /// Require the current word to be the given keyword identity.
-    fn expect_keyword_ident(&mut self, identity: TokenKind, msg: &str) -> Result<(), ParseError> {
+    ///
+    /// The failure names the `expected_keyword` issue so the renderer reaches
+    /// the catalog row instead of falling back to the bare PARSE001 prose.
+    fn expect_keyword(&mut self, identity: TokenKind) -> Result<(), ParseError> {
+        let expected = keyword_spelling_for_token(&identity);
         if self.check_keyword_ident(identity) {
             self.advance();
             Ok(())
         } else {
-            Err(self.expected_message_error(msg))
+            Err(
+                ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                    .with_arg("issue", "expected_keyword")
+                    .with_arg("expected", expected.unwrap_or("")),
+            )
         }
     }
 
@@ -1355,12 +1363,6 @@ impl Parser {
 
     fn expected_error(expected: &'static str, span: Span) -> ParseError {
         ParseError::structured(ParseErrorKind::Expected, span).with_arg("expected", expected)
-    }
-
-    fn expected_message_error(&self, message: &str) -> ParseError {
-        let expected = message.strip_prefix("expected ").unwrap_or(message);
-        ParseError::structured(ParseErrorKind::Expected, self.current_span())
-            .with_arg("expected", expected)
     }
 
     /// Trailing-comma diagnostic shared by every item-list separator.

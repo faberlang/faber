@@ -1835,7 +1835,7 @@ impl Parser {
             _ => return Err(self.reducta_operator_error("reducta_unknown_operator")),
         };
         self.advance();
-        self.expect_keyword_ident(TokenKind::Ex, "expected reduction source")?;
+        self.expect_keyword(TokenKind::Ex)?;
         // Captured before the source parses (see `parse_sort_expr`): a loop
         // head's `fixum name {` binder is not this expression's body.
         let body_barred = self.sort_body_barred_at == Some(self.expression_contexts);
@@ -2037,7 +2037,7 @@ impl Parser {
         let start = self.current_span();
         let head = self.interner.resolve(sym).to_owned();
         self.advance();
-        self.expect_keyword_ident(TokenKind::Ex, "expected reduction source")?;
+        self.expect_keyword(TokenKind::Ex)?;
         let _source = self.parse_expression()?;
         if self.eat_keyword_ident(TokenKind::Apud) {
             self.parse_apud_clause()?;
@@ -2691,7 +2691,7 @@ impl Parser {
 
     fn parse_variant_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_ident(TokenKind::Finge, "expected 'finge'")?;
+        self.expect_keyword(TokenKind::Finge)?;
 
         // Qualified variant path: `finge Bonum { … }` or `finge pkg.Bonum { … }`
         // (imported union under an alias). Terminal segment names the variant.
@@ -2745,7 +2745,7 @@ impl Parser {
     /// Parse iuncta tuple construction: `iuncta<A, B> [a, b]`.
     fn parse_iuncta_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_ident(TokenKind::Iuncta, "expected 'iuncta'")?;
+        self.expect_keyword(TokenKind::Iuncta)?;
 
         self.expect_issue(&TokenKind::LtAscii, "iuncta_type_arguments_start")?;
         let type_args = self.finish_iuncta_type_args_list()?;
@@ -2774,7 +2774,7 @@ impl Parser {
 
     fn parse_clausura_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_ident(TokenKind::Clausura, "expected 'clausura'")?;
+        self.expect_keyword(TokenKind::Clausura)?;
 
         let mut params = Vec::new();
         loop {
@@ -2978,7 +2978,7 @@ impl Parser {
     /// `parse_clausura_expr`). This function must not consume a `{` block.
     fn parse_ad_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_ident(TokenKind::Ad, "expected 'ad'")?;
+        self.expect_keyword(TokenKind::Ad)?;
         let id = self.next_id();
 
         let path = match &self.peek().kind {
@@ -3629,7 +3629,7 @@ impl Parser {
         let TokenKind::Ident(symbol) = self.peek().kind else {
             return Err(self.expected_expression_error("scriptum"));
         };
-        self.expect_keyword_ident(TokenKind::Scriptum, "expected 'scriptum'")?;
+        self.expect_keyword(TokenKind::Scriptum)?;
         self.expect_issue(&TokenKind::LParen, "scriptum_start")?;
 
         let template = self.parse_string()?;
@@ -3683,7 +3683,7 @@ impl Parser {
         let line = if self.eat_keyword_ident(TokenKind::Lineam) {
             true
         } else {
-            self.expect_keyword_ident(TokenKind::Lege, "expected 'lege' or 'lineam'")?;
+            self.expect_keyword(TokenKind::Lege)?;
             false
         };
 
@@ -3708,7 +3708,7 @@ impl Parser {
     ///   praefixum-expr := `praefixum` block
     fn parse_praefixum_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_ident(TokenKind::Praefixum, "expected 'praefixum'")?;
+        self.expect_keyword(TokenKind::Praefixum)?;
         if self.check(&TokenKind::LParen) {
             return Err(self.invalid_expression_error("praefixum_expression_form_retired"));
         }
@@ -3751,7 +3751,7 @@ impl Parser {
     /// early-success form attaches here — those belong to `fac` and open row 1.
     fn parse_trap_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        self.expect_keyword_ident(TokenKind::Trap, "expected 'capta'")?;
+        self.expect_keyword(TokenKind::Trap)?;
         let body = self.parse_block()?;
         let span = start.merge(self.previous_span());
         let id = self.next_id();
