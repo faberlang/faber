@@ -94,12 +94,12 @@ fn shape_generic_tensor_reple_value_emits_filled_copy() {
         panic!("expected Rust output");
     };
     assert!(
-        output.code.contains("crea(&param.magnitudines()"),
+        output.code.contains("crea(&p_param.magnitudines()"),
         "reple in value position must construct a fresh filled tensor, got:\n{}",
         output.code
     );
     assert!(
-        !output.code.contains("= param.reple(") && !output.code.contains("param.clone()"),
+        !output.code.contains("= p_param.reple(") && !output.code.contains("p_param.clone()"),
         "reple value must never be a bare in-place call or an aliasing clone (E0308 / fill-aliasing), got:\n{}",
         output.code
     );
@@ -128,12 +128,12 @@ fn tensor_reple_statement_stays_in_place() {
     assert!(
         // `reple` is fallible (an edge view is read-only), so the in-place call
         // carries its handled outcome: `faber::trap::ok_static(t.reple(4.0));`.
-        output.code.contains("faber::trap::ok_static(t.reple(4.0))"),
+        output.code.contains("faber::trap::ok_static(l_t.reple(4.0))"),
         "statement reple must stay the in-place mutator, got:\n{}",
         output.code
     );
     assert!(
-        !output.code.contains("t.clone()"),
+        !output.code.contains("l_t.clone()"),
         "statement reple must not clone the receiver, got:\n{}",
         output.code
     );
