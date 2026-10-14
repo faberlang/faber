@@ -562,6 +562,10 @@ help = "check numeric separators and base prefixes"
 message = "invalid escape sequence"
 help = "use a supported escape sequence or escape the backslash"
 
+[diagnostics.LEX003.issues.unknown_escape]
+message = "unknown escape `\\{escape}`; a literal escapes only its own delimiter, backslash, n, t, r and u{...}"
+help = "remove the backslash, or write `\\\\` for a backslash"
+
 [diagnostics.LEX004]
 message = "unexpected character"
 help = "remove the character or escape it if it should be literal"
