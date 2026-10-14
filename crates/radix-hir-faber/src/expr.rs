@@ -206,6 +206,20 @@ impl super::FaberCodegen<'_> {
                 {
                     writer.write("_ ");
                 }
+                // A bracket literal the checker rewrote into the
+                // `array ↦ set` conversion: print the authored bracket form —
+                // `_ [ … ]` when the hole's type form sits under this node id,
+                // the bare `[ … ]` otherwise — never the conversion spelling.
+                HirExpressionKind::Conversio { source, .. } => {
+                    if self.authored_type_forms.contains_key(&HirTypeSite {
+                        owner: HirOwnerRef::Hir(expr.id),
+                        slot: HirTypeSlot::AscriptionTarget,
+                    }) {
+                        writer.write("_ ");
+                    }
+                    self.write_expr_prec(source, parent_prec, names, surface, writer);
+                    return;
+                }
                 _ => {}
             }
         }
