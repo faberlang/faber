@@ -1784,12 +1784,14 @@ impl Parser {
         let error_count = self.errors.len();
         match self.parse_type() {
             Ok(ty) if self.errors.len() == error_count && Self::is_extent_type(&ty) => Some(ty),
-            // A collection word is claimed only as `list<..> {}`; anything
-            // else keeps `<` as the ASCII comparison.
+            // A collection word is claimed as `list<..> {}` or as the stated
+            // bracket constructor `list<..> [ … ]`; anything else keeps `<`
+            // as the ASCII comparison.
             Ok(ty)
                 if self.errors.len() == error_count
-                    && self.check(&TokenKind::LBrace)
-                    && self.peek_at(1).kind == TokenKind::RBrace =>
+                    && (self.check(&TokenKind::LBracket)
+                        || (self.check(&TokenKind::LBrace)
+                            && self.peek_at(1).kind == TokenKind::RBrace)) =>
             {
                 Some(ty)
             }
@@ -2179,8 +2181,28 @@ impl Parser {
                 None => self.parse_type()?,
             };
             // `list<T, N> {}` is not claimed: only tensor, vector and matrix
-            // types have a typed zero.
+            // types have a typed zero. A collection head followed by `[` is
+            // the stated bracket constructor instead, with the element list
+            // as its `verte` target.
             if long_form && !Self::is_extent_type(&ty) {
+                if self.check(&TokenKind::LBracket) {
+                    self.advance();
+                    let elements = self.parse_array_elements()?;
+                    self.expect_issue(&TokenKind::RBracket, "typed_constructor_elements_end")?;
+                    let array = Expr {
+                        id: self.next_id(),
+                        kind: ExprKind::Array(ArrayExpr { elements }),
+                        span: ty.span.merge(self.previous_span()),
+                    };
+                    return Ok(Expr {
+                        id: self.next_id(),
+                        kind: ExprKind::Verte(VerteExpr {
+                            expr: Box::new(array),
+                            ty,
+                        }),
+                        span: start.merge(self.previous_span()),
+                    });
+                }
                 return Err(
                     ParseError::structured(ParseErrorKind::ExpressionInvalid, start)
                         .with_arg("issue", "constructor_type_not_claimed"),

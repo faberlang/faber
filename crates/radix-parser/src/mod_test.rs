@@ -2125,6 +2125,57 @@ functio facere(vector<f32, 3> lanes) → Gen<3> {
 }
 
 #[test]
+fn parses_list_hole_bracket_constructor() {
+    // `lista<_>[1, 2]` is a stated bracket constructor: the collection head
+    // claims the `[ … ]` element list and the array becomes the `verte`
+    // target, instead of `lista` falling back to an identifier and `<` to a
+    // comparison.
+    let result = parse_ok(
+        r"
+functio facere() → lista<numerus> {
+    redde lista<_>[1, 2]
+}
+",
+    );
+
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function declaration");
+    };
+    let Some(body) = &func.body else {
+        panic!("expected function body");
+    };
+    let StmtKind::Redde(ret) = &body.statements[0].kind else {
+        panic!(
+            "expected return statement, got {:?}",
+            body.statements[0].kind
+        );
+    };
+    let ret_value = ret.value.as_deref().expect("return value");
+    let ExprKind::Verte(verte) = &ret_value.kind else {
+        panic!("expected verte constructor, got {:?}", ret_value.kind);
+    };
+    let ExprKind::Array(array) = &verte.expr.kind else {
+        panic!("expected array target, got {:?}", verte.expr.kind);
+    };
+    assert_eq!(array.elements.len(), 2);
+    let TypeExprKind::Named(head, params) = &verte.ty.kind else {
+        panic!("expected named applied head, got {:?}", verte.ty.kind);
+    };
+    assert_eq!(symbol_name(&result, head.name), "lista");
+    assert_eq!(params.len(), 1);
+
+    // The empty-brace collection head stays unclaimed (no typed zero).
+    assert_parse_error_issue(
+        "functio facere() → lista<numerus> { redde lista<numerus> {} }",
+        "constructor_type_not_claimed",
+    );
+}
+
+#[test]
 fn parses_qualified_applied_generic_typed_constructor() {
     let result = parse_ok(
         r"
