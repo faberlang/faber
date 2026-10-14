@@ -68,7 +68,7 @@ fn swift_lowers_every_function_to_the_foundation_free_function() {
                 other => other.name(),
             };
             assert!(
-                out.code.contains(&format!("Foundation.{expected}(x)")),
+                out.code.contains(&format!("Foundation.{expected}(p_x)")),
                 "{} {ty}:\n{}",
                 function.name(),
                 out.code
@@ -120,7 +120,7 @@ fn rust_f32_computes_in_f64_and_rounds_back() {
         };
         assert!(
             out.code
-                .contains(&format!("((x as f64).{}() as f32)", function.name())),
+                .contains(&format!("((p_x as f64).{}() as f32)", function.name())),
             "{}:\n{}",
             function.name(),
             out.code
