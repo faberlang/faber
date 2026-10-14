@@ -2883,6 +2883,30 @@ impl FunctionBuilder<'_> {
 
         let explicit_type_args = type_args.iter().copied().map(MirType::semantic).collect();
 
+        // Linked generator export: a `fiunt` function rewritten to a
+        // synthetic definition id is absent from this unit's
+        // `function_generator` registry (the id is allocated after
+        // analysis). The callee's HIR type is the only remaining source of
+        // generator-ness; without the cursor-stream intrinsic a plain `Call`
+        // destination (the cursor carrier) mismatches the callee's declared
+        // element return type at MIR validation.
+        if !self
+            .context
+            .function_generator
+            .get(def_id)
+            .copied()
+            .unwrap_or(false)
+            && self.callable_is_generator(callee)
+        {
+            self.emit_call_shape_check(expr.id, &lowered_args, 0, expr.span)?;
+            return Some(self.runtime_call_value(
+                MirIntrinsic::CursorStream(radix_mir::MirCursorStream { callee: *def_id, stepped: false }),
+                lowered_args,
+                ty,
+                expr.span,
+            ));
+        }
+
         // Package-MIR failable-call fallback: a callee rewritten to a
         // synthetic definition id (the faber linker's `Path(synthetic)` for a
         // linked library export) is absent from this unit's `function_errors`
@@ -2898,6 +2922,7 @@ impl FunctionBuilder<'_> {
                 .get(def_id)
                 .copied()
                 .unwrap_or(false)
+            && !self.callable_is_generator(callee)
             && let Some(error_ty) = self.callable_error_ty(callee)
         {
             let callee = MirCallee::definition_with_type_args(*def_id, explicit_type_args);
@@ -3075,6 +3100,17 @@ impl FunctionBuilder<'_> {
             }
         }
         callee.ty.and_then(|ty| error_ty(self.types, ty))
+    }
+
+    pub(super) fn callable_is_generator(&self, callee: &HirExpression) -> bool {
+        fn is_generator(types: &TypeTable, ty: TypeId) -> bool {
+            match types.get(ty) {
+                Type::Func(signature) => signature.is_generator,
+                Type::Alias(_, inner) => is_generator(types, *inner),
+                _ => false,
+            }
+        }
+        callee.ty.is_some_and(|ty| is_generator(self.types, ty))
     }
 
     // consumes callee and args into MIR statements
