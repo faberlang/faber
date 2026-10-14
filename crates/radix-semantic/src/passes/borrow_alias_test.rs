@@ -78,16 +78,9 @@ fn contract_alias_of_de_param_allows_non_mutating_call() {
 }
 
 #[test]
-fn varia_contract_alias_of_de_param_rejects_mut_param_call() {
+fn fixum_contract_alias_of_de_param_rejects_mut_param_call() {
     assert_rejected(
         "functio f(de Quadratum q) → numerus { fixum Crescens c ← q\n varia numerus k ← 1\n c.adde(k)\n redde 1 }",
-    );
-}
-
-#[test]
-fn varia_contract_alias_of_de_param_allows_non_mutating_call() {
-    assert_accepted(
-        "functio f(de Quadratum q) → numerus { fixum Crescens c ← q\n redde c.mensura() }",
     );
 }
 
