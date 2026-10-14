@@ -1369,12 +1369,6 @@ fn run_function_dispatching<H: Host + ?Sized>(
     {
         return Err(vec![kernel_refused(function.span)]);
     }
-    if let Some((function, reason)) = program.functions.iter().find_map(|function| {
-        function_unsupported_bounded_carrier(function, context.types.as_table())
-            .map(|reason| (function, reason))
-    }) {
-        return Err(vec![RunnerError::unsupported(function.span, reason)]);
-    }
     let mut runner = Runner::new(program, context, context.types.as_table(), interner, host);
     runner.step_limit = step_limit;
     runner.deadline = deadline;
@@ -1469,36 +1463,6 @@ pub fn evaluate_function<H: Host + ?Sized>(
         Some(Value::Unit) | None => Err(EvaluationFailure::NoValue),
         Some(value) => Ok(value),
     }
-}
-
-fn function_unsupported_bounded_carrier(
-    function: &MirFunction,
-    types: &TypeTable,
-) -> Option<&'static str> {
-    let label = |ty: radix_mir::MirType| match types.get(ty.semantic_id()) {
-        Type::BoundedOcteti { .. } => Some("bounded octeti runner carrier"),
-        _ => None,
-    };
-    function
-        .params
-        .iter()
-        .find_map(|param| label(param.ty))
-        .or_else(|| label(function.return_ty))
-        .or_else(|| function.error_ty.and_then(label))
-        .or_else(|| function.locals.iter().find_map(|local| label(local.ty)))
-        .or_else(|| function.temps.iter().find_map(|temp| label(temp.ty)))
-        .or_else(|| {
-            function.blocks.iter().find_map(|block| {
-                block
-                    .statements
-                    .iter()
-                    .find_map(|statement| match &statement.kind {
-                        MirStatementKind::Assign { value, .. } => label(value.ty),
-                        MirStatementKind::RuntimeCall { call, .. } => label(call.return_ty),
-                        MirStatementKind::Call { .. } | MirStatementKind::Construct { .. } => None,
-                    })
-            })
-        })
 }
 
 /// Gaussian Error Linear Unit using the tanh approximation:

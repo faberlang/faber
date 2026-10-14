@@ -1050,7 +1050,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     )
                     | (
                         Value::Octeti(_),
-                        Type::Primitive(Primitive::Octeti) | Type::Array(_)
+                        Type::Primitive(Primitive::Octeti)
+                            | Type::Array(_)
+                            | Type::BoundedOcteti { .. }
                     )
                     | (Value::Array(_), Type::Array(_) | Type::BoundedArray { .. })
                     | (Value::Map(_), Type::Map(_, _))
