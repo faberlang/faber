@@ -49,8 +49,8 @@ impl TypeChecker<'_> {
             // Recovery: the source already carries a diagnostic.
             Type::Error => self.error_type,
             Type::Array(inner) if ex => inner,
-            Type::Map(_, value) if ex => value,
-            Type::Map(key, _) => key,
+            Type::Map(_, value) | Type::Ledger(_, value) if ex => value,
+            Type::Map(key, _) | Type::Ledger(key, _) => key,
             Type::Cursor(inner) | Type::AsyncCursor(inner, _) if ex => inner,
             Type::Cursor(_) | Type::AsyncCursor(_, _) => {
                 self.error_issue(
@@ -129,6 +129,7 @@ fn is_iterable_kind(kind: &Type) -> bool {
             | Type::BoundedStack { .. }
             | Type::Set(_)
             | Type::Map(_, _)
+            | Type::Ledger(_, _)
             | Type::Tensor(_, _)
             | Type::Matrix(_, _)
             | Type::Vector(_, _)

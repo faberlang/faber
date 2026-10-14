@@ -851,7 +851,7 @@ fn collect_value_parameter_extents(
         | Type::BoundedOcteti { capacity } => {
             check_index(*capacity, seen_indices, out);
         }
-        Type::Map(key, value) => {
+        Type::Map(key, value) | Type::Ledger(key, value) => {
             check_type(*key, seen_types, seen_indices, out);
             check_type(*value, seen_types, seen_indices, out);
         }
