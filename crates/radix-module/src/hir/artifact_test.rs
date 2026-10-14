@@ -487,6 +487,29 @@ fn octeti_zero_argument_type_form_survives_the_fhir_round_trip() {
     load_fhir(&bytes).expect("octeti artifact must load");
 }
 
+#[test]
+fn inferred_constructor_map_survives_the_fhir_round_trip() {
+    // `_ { … }` is an inferred constructor: the authored hole is resolved to
+    // the site's expected type, and HIR materializes no node for the hole
+    // itself. The artifact boundary must drop the information-free hole
+    // record rather than fail the validator with `unknown_type_slot`.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = "+++\nlocale = \"en\"\n+++\n\nfn pondus() \u{2192} map<string, int> {\n    return _ { \"x\": 7, \"y\": 9 }\n}\n";
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "inferred-constructor-map.fab", source, AnalyzeRequest::default())
+        .expect("inferred constructor map fixture analyzes");
+    let artifact = from_analyzed(&original, "inferred-constructor-map", "inferred-constructor-map.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize inferred constructor artifact");
+    load_fhir(&bytes).expect("inferred constructor artifact must load");
+}
+
 // ── U2.3: fail-closed error path tests ────────────────────────────────
 
 #[test]

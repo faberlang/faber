@@ -488,6 +488,15 @@ pub(crate) fn normalize_presentation_witnesses(
             normalize_type_form(&mut authored.form, expected, types);
         }
     }
+    // An authored `_` hole at a position HIR never materializes (for example
+    // the target of an inferred constructor `_ { … }`) carries no presentation
+    // information: the resolved cell type is the HIR node's fact. Drop it here
+    // so the artifact validator does not reject the hole's site as unknown. A
+    // non-hole record with an unknown site is a producer-side integrity defect
+    // and is left for the validator to fail closed.
+    presentation.authored_types.retain(|authored| {
+        registry.sites.contains_key(&authored.site) || !matches!(authored.form.head, radix_hir::HirTypeFormHead::Infer)
+    });
 }
 
 /// The validator's field inventory names a struct field by its containing
