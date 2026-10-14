@@ -459,6 +459,14 @@ help = "ใช้ '{iace}' สำหรับ recoverable payload"
 message = "'{secus}' ไม่ใช่ particle ของ {adfirma}"
 help = "ใช้ '{mori}' สำหรับข้อความ panic ที่เลือกได้"
 
+[diagnostics.PARSE001.issues.item_list_missing_separator]
+message = "รายการในลิสต์ต้องถูกคั่นด้วยตัวคั่น; ตัวคั่นก่อนรายการนี้หายไป"
+help = "ใส่เครื่องหมายจุลภาคระหว่างรายการ ('{et}' ระหว่างแพตเทิร์น)"
+
+[diagnostics.PARSE001.issues.item_list_trailing_comma]
+message = "ลิสต์ต้องไม่ลงท้ายด้วยเครื่องหมายจุลภาคก่อนตัวปิด"
+help = "ลบเครื่องหมายจุลภาคก่อนตัวปิด"
+
 [diagnostics.PARSE002]
 message = "พบโทเค็นที่ไม่คาดคิด"
 help = "ลบหรือย้ายโทเค็นที่ไม่คาดคิด"

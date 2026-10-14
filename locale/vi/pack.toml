@@ -459,6 +459,14 @@ help = "dùng '{iace}' cho recoverable payload"
 message = "'{secus}' không phải particle trên {adfirma}"
 help = "dùng '{mori}' cho thông điệp panic tùy chọn"
 
+[diagnostics.PARSE001.issues.item_list_missing_separator]
+message = "các mục trong danh sách phải được ngăn cách; thiếu dấu phân cách trước mục này"
+help = "đặt dấu phẩy giữa các mục ('{et}' giữa các mẫu)"
+
+[diagnostics.PARSE001.issues.item_list_trailing_comma]
+message = "danh sách không được kết thúc bằng dấu phẩy trước dấu đóng"
+help = "xóa dấu phẩy trước dấu đóng"
+
 [diagnostics.PARSE002]
 message = "token không mong đợi"
 help = "xóa hoặc chuyển token không mong đợi đến vị trí đúng"
