@@ -2544,10 +2544,11 @@ fn bounded_types_print_via_the_surface() {
         (types.bounded_array(numerus, four), "list<numerus, 4>"),
         (types.bounded_textus(four), "text<4>"),
         (types.bounded_ascii(four), "ascii<4>"),
-        (types.bounded_octeti(four), "octeti<4>"),
+        (types.bounded_octeti(four), "list<b8, 4>"),
     ];
     let latin_bounded_array = types.bounded_array(numerus, four);
     let latin_bounded_textus = types.bounded_textus(four);
+    let latin_bounded_octeti = types.bounded_octeti(four);
     let codegen = FaberCodegen::new(&types, &interner);
     for (type_id, expected) in cases {
         assert_eq!(
@@ -2564,6 +2565,47 @@ fn bounded_types_print_via_the_surface() {
     assert_eq!(
         codegen.type_to_faber(latin_bounded_textus, &names, &LatinSurface),
         "textus<4>"
+    );
+    assert_eq!(
+        codegen.type_to_faber(latin_bounded_octeti, &names, &LatinSurface),
+        "lista<b8, 4>"
+    );
+}
+
+#[test]
+fn bare_b8_list_and_bounded_buffer_render_as_list_forms() {
+    // Ruling d477c76d retires the `octeti`/`bytes` word: a raw-bit buffer is
+    // a list of `b8`, bounded or not, and re-emits through the collection
+    // surface.
+    let mut types = TypeTable::new();
+    let names = FxHashMap::default();
+    let interner = Interner::new();
+    let four = types.intern_index(radix_types::IndexExpr::Literal(4));
+    let b8 = types.intern(Type::Bits(BitsWidth::B8));
+    let bare_list = types.array(b8);
+    let bounded = types.bounded_octeti(four);
+    let primitive_octeti = types.primitive(Primitive::Octeti);
+    let codegen = FaberCodegen::new(&types, &interner);
+
+    assert_eq!(
+        codegen.type_to_faber(bare_list, &names, &LocalizedTypeSurface),
+        "list<b8>"
+    );
+    assert_eq!(
+        codegen.type_to_faber(bounded, &names, &LocalizedTypeSurface),
+        "list<b8, 4>"
+    );
+    assert_eq!(
+        codegen.type_to_faber(primitive_octeti, &names, &LocalizedTypeSurface),
+        "list<b8>"
+    );
+    assert_eq!(
+        codegen.type_to_faber(bare_list, &names, &LatinSurface),
+        "lista<b8>"
+    );
+    assert_eq!(
+        codegen.type_to_faber(bounded, &names, &LatinSurface),
+        "lista<b8, 4>"
     );
 }
 

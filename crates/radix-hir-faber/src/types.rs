@@ -46,6 +46,13 @@ impl super::FaberCodegen<'_> {
         let ty = self.types.get(type_id);
 
         match ty {
+            // Ruling d477c76d retires the `octeti`/`bytes` word: a raw-bit
+            // buffer is a list of `b8`, bounded or not.
+            Type::Primitive(Primitive::Octeti) => format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                BitsWidth::B8.faber_marker()
+            ),
             Type::Primitive(prim) => surface
                 .type_surface(TypeBindingKind::Primitive(*prim))
                 .to_owned(),
@@ -349,9 +356,12 @@ impl super::FaberCodegen<'_> {
             Type::BoundedAscii { capacity } => {
                 self.bounded_primitive_head(Primitive::Ascii, *capacity, surface)
             }
-            Type::BoundedOcteti { capacity } => {
-                self.bounded_primitive_head(Primitive::Octeti, *capacity, surface)
-            }
+            Type::BoundedOcteti { capacity } => format!(
+                "{}<{}, {}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                BitsWidth::B8.faber_marker(),
+                self.format_figura(*capacity, surface)
+            ),
         }
     }
 
@@ -632,6 +642,14 @@ impl super::FaberCodegen<'_> {
         let ty = self.types.get(form.ty);
         match ty {
             Type::Error => Ok("<error>".to_owned()),
+            Type::Primitive(Primitive::Octeti) => {
+                Self::expect_no_form_args(form)?;
+                Ok(format!(
+                    "{}<{}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                    BitsWidth::B8.faber_marker()
+                ))
+            }
             Type::Primitive(prim) => {
                 Self::expect_no_form_args(form)?;
                 Ok(surface
@@ -699,17 +717,25 @@ impl super::FaberCodegen<'_> {
             }
             Type::BoundedOcteti { capacity } => {
                 Self::expect_no_form_args(form)?;
-                Ok(self.bounded_primitive_head(Primitive::Octeti, *capacity, surface))
+                Ok(format!(
+                    "{}<{}, {}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                    BitsWidth::B8.faber_marker(),
+                    self.format_figura(*capacity, surface)
+                ))
             }
-            // The authored word `octeti` (en `bytes`) witnesses `lista<b8>`
-            // and carries no type argument (need, ruling B9).
+            // An authored empty-arg array form witnesses the retired
+            // `octeti`/`bytes` word (ruling d477c76d); it re-emits as the
+            // list form.
             Type::Array(element)
                 if form.args.is_empty()
                     && matches!(self.types.get(*element), Type::Bits(BitsWidth::B8)) =>
             {
-                Ok(surface
-                    .type_surface(TypeBindingKind::Primitive(Primitive::Octeti))
-                    .to_owned())
+                Ok(format!(
+                    "{}<{}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                    BitsWidth::B8.faber_marker()
+                ))
             }
             Type::Array(_) => Ok(format!(
                 "{}<{}>",
