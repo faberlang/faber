@@ -14,6 +14,19 @@ locale = "en"
 # async caller posture. Text, bytes, and lines use distinct public operations.
 
 import from "norma:value" value
+import from "norma:fault" fault
+
+# =============================================================================
+# BOUNDARY
+# =============================================================================
+
+# The leaf crossing record crosses as `value`; this row turns it into the
+# declared fault. A `@ conversion` row does not cross a file interface, so the
+# importer re-declares it here and delegates to the norma:fault boundary.
+@ conversion
+fn io_fault_from(value raw) → fault.IoFault {
+    return fault.io_fault_from(raw)
+}
 
 # =============================================================================
 # TYPES
@@ -47,7 +60,7 @@ class FileStatus {
 # Read entire file as text (sync)
 @ public
 @ radix type T mut string list<string> bytes
-fn read_file<T>(string path) → T {
+fn read_file<T>(string path) → T ⇥ fault.IoFault {
     return call 'solum:lege' (path) ↦ T
 }
 
@@ -55,7 +68,7 @@ fn read_file<T>(string path) → T {
 @ public
 @ radix type T mut string list<string> bytes
 @ future
-fn read_file_async<T>(string path) → T {
+fn read_file_async<T>(string path) → T ⇥ fault.IoFault {
     return call 'solum:lege' (path) ↦ T
 }
 
@@ -66,27 +79,27 @@ fn read_file_async<T>(string path) → T {
 
 # Draw entire file as bytes (sync)
 @ public
-fn read_bytes(string path) → bytes {
+fn read_bytes(string path) → bytes ⇥ fault.IoFault {
     return call 'solum:hauri' (path) ↦ bytes
 }
 
 # Draw entire file as bytes (async route; Faber blocks on the frame)
 @ future
 @ public
-fn read_bytes_async(string path) → bytes {
+fn read_bytes_async(string path) → bytes ⇥ fault.IoFault {
     return call 'solum:hauriet' (path) ↦ bytes
 }
 
 # Draw a bounded byte range from a file.
 @ public
-fn read_range(string path, int offset, int length) → bytes {
+fn read_range(string path, int offset, int length) → bytes ⇥ fault.IoFault {
     const list<value> args ← [path ↦ value, offset ↦ value, length ↦ value]
     return call 'solum:partem' (args) ↦ bytes
 }
 
 # Find a text byte pattern within a bounded file range, or -1 when absent.
 @ public
-fn find(string path, string pattern, int offset, int length) → int {
+fn find(string path, string pattern, int offset, int length) → int ⇥ fault.IoFault {
     const list<value> args ← [path ↦ value, pattern ↦ value, offset ↦ value, length ↦ value]
     return call 'solum:inveni' (args) ↦ int
 }
@@ -98,14 +111,14 @@ fn find(string path, string pattern, int offset, int length) → int {
 
 # Pluck lines from file (sync)
 @ public
-fn read_lines(string path) → list<string> {
+fn read_lines(string path) → list<string> ⇥ fault.IoFault {
     return call 'solum:carpe' (path) ↦ list<string>
 }
 
 # Pluck lines from file (async route; Faber blocks on the frame)
 @ future
 @ public
-fn read_lines_async(string path) → list<string> {
+fn read_lines_async(string path) → list<string> ⇥ fault.IoFault {
     return call 'solum:carpiet' (path) ↦ list<string>
 }
 
@@ -116,14 +129,14 @@ fn read_lines_async(string path) → list<string> {
 
 # Write text to file, overwrites existing (sync)
 @ public
-fn write_file(string path, string data) → void {
+fn write_file(string path, string data) → void ⇥ fault.IoFault {
     return call 'solum:scribe' ([path, data]) ↦ void
 }
 
 # Write text to file, overwrites existing (async route; Faber blocks)
 @ future
 @ public
-fn write_file_async(string path, string data) → void {
+fn write_file_async(string path, string data) → void ⇥ fault.IoFault {
     return call 'solum:scribet' ([path, data]) ↦ void
 }
 
@@ -134,7 +147,7 @@ fn write_file_async(string path, string data) → void {
 
 # Pour bytes to file, overwrites existing (sync)
 @ public
-fn write_bytes(string path, bytes data) → void {
+fn write_bytes(string path, bytes data) → void ⇥ fault.IoFault {
     const list<value> args ← [path ↦ value, data ↦ value]
     return call 'solum:funde' (args) ↦ void
 }
@@ -142,7 +155,7 @@ fn write_bytes(string path, bytes data) → void {
 # Pour bytes to file with async caller materialization.
 @ public
 @ future
-fn write_bytes_async(string path, bytes data) → void {
+fn write_bytes_async(string path, bytes data) → void ⇥ fault.IoFault {
     const list<value> args ← [path ↦ value, data ↦ value]
     return call 'solum:funde' (args) ↦ void
 }
@@ -154,14 +167,14 @@ fn write_bytes_async(string path, bytes data) → void {
 
 # Append text to file (sync)
 @ public
-fn append(string path, string data) → void {
+fn append(string path, string data) → void ⇥ fault.IoFault {
     return call 'solum:appone' ([path, data]) ↦ void
 }
 
 # Append text to file (async route; Faber blocks)
 @ future
 @ public
-fn append_async(string path, string data) → void {
+fn append_async(string path, string data) → void ⇥ fault.IoFault {
     return call 'solum:apponet' ([path, data]) ↦ void
 }
 
@@ -209,13 +222,13 @@ fn is_symlink(string path) → bool {
 
 # File size in bytes.
 @ public
-fn byte_length(string path) → int {
+fn byte_length(string path) → int ⇥ fault.IoFault {
     return call 'solum:mensura' (path) ↦ int
 }
 
 # Permission/mode bits as a numeric value.
 @ public
-fn mode(string path) → int {
+fn mode(string path) → int ⇥ fault.IoFault {
     return call 'solum:modus' (path) ↦ int
 }
 
@@ -247,14 +260,14 @@ fn status_from(value raw) → FileStatus {
 
 # Get file details (sync). lstat: does not follow the last symlink.
 @ public
-fn stat(string path) → FileStatus {
+fn stat(string path) → FileStatus ⇥ fault.IoFault {
     return status_from(call 'solum:status' (path) ↦ value)
 }
 
 # Get file details (async route; Faber blocks on the same leaf).
 @ future
 @ public
-fn stat_async(string path) → FileStatus {
+fn stat_async(string path) → FileStatus ⇥ fault.IoFault {
     return status_from(call 'solum:status_async' (path) ↦ value)
 }
 
@@ -265,20 +278,20 @@ fn stat_async(string path) → FileStatus {
 
 # Follow symlink to get target path (sync)
 @ public
-fn read_link(string path) → string {
+fn read_link(string path) → string ⇥ fault.IoFault {
     return call 'solum:sequere' (path) ↦ string
 }
 
 # Follow symlink to get target path (async route; Faber blocks)
 @ future
 @ public
-fn read_link_async(string path) → string {
+fn read_link_async(string path) → string ⇥ fault.IoFault {
     return call 'solum:sequetur' (path) ↦ string
 }
 
 # Create a symbolic link pointing from destinatio to fons.
 @ public
-fn create_link(string source, string destination) → void {
+fn create_link(string source, string destination) → void ⇥ fault.IoFault {
     return call 'solum:vincula' ([source, destination]) ↦ void
 }
 
@@ -290,14 +303,14 @@ fn create_link(string source, string destination) → void {
 
 # Delete file (sync)
 @ public
-fn delete(string path) → void {
+fn delete(string path) → void ⇥ fault.IoFault {
     return call 'solum:dele' (path) ↦ void
 }
 
 # Delete file (async route; Faber blocks)
 @ future
 @ public
-fn delete_async(string path) → void {
+fn delete_async(string path) → void ⇥ fault.IoFault {
     return call 'solum:delet' (path) ↦ void
 }
 
@@ -308,14 +321,14 @@ fn delete_async(string path) → void {
 
 # Copy file (sync)
 @ public
-fn copy(string source, string destination) → void {
+fn copy(string source, string destination) → void ⇥ fault.IoFault {
     return call 'solum:copy' ([source, destination]) ↦ void
 }
 
 # Copy file (async route; Faber blocks)
 @ future
 @ public
-fn copy_async(string source, string destination) → void {
+fn copy_async(string source, string destination) → void ⇥ fault.IoFault {
     return call 'solum:copy_async' ([source, destination]) ↦ void
 }
 
@@ -326,14 +339,14 @@ fn copy_async(string source, string destination) → void {
 
 # Rename or move file (sync)
 @ public
-fn rename(string source, string destination) → void {
+fn rename(string source, string destination) → void ⇥ fault.IoFault {
     return call 'solum:renomina' ([source, destination]) ↦ void
 }
 
 # Rename or move file (async route; Faber blocks)
 @ future
 @ public
-fn rename_async(string source, string destination) → void {
+fn rename_async(string source, string destination) → void ⇥ fault.IoFault {
     return call 'solum:renominabit' ([source, destination]) ↦ void
 }
 
@@ -344,20 +357,20 @@ fn rename_async(string source, string destination) → void {
 
 # Touch file - create or update mtime (sync)
 @ public
-fn touch(string path) → void {
+fn touch(string path) → void ⇥ fault.IoFault {
     return call 'solum:tange' (path) ↦ void
 }
 
 # Touch file - create or update mtime (async route; Faber blocks)
 @ future
 @ public
-fn touch_async(string path) → void {
+fn touch_async(string path) → void ⇥ fault.IoFault {
     return call 'solum:tanget' (path) ↦ void
 }
 
 # Set permission/mode bits.
 @ public
-fn set_mode(string path, int mode) → void {
+fn set_mode(string path, int mode) → void ⇥ fault.IoFault {
     const list<value> args ← [path ↦ value, mode ↦ value]
     return call 'solum:modum' (args) ↦ void
 }
@@ -369,14 +382,14 @@ fn set_mode(string path, int mode) → void {
 
 # Create directory (sync)
 @ public
-fn create_dir(string path) → void {
+fn create_dir(string path) → void ⇥ fault.IoFault {
     return call 'solum:crea' (path) ↦ void
 }
 
 # Create directory (async route; Faber blocks)
 @ future
 @ public
-fn create_dir_async(string path) → void {
+fn create_dir_async(string path) → void ⇥ fault.IoFault {
     return call 'solum:creabit' (path) ↦ void
 }
 
@@ -387,14 +400,14 @@ fn create_dir_async(string path) → void {
 
 # List directory contents (sync)
 @ public
-fn list_dir(string path) → list<string> {
+fn list_dir(string path) → list<string> ⇥ fault.IoFault {
     return call 'solum:enumera' (path) ↦ list<string>
 }
 
 # List directory contents (async route; Faber blocks)
 @ future
 @ public
-fn list_dir_async(string path) → list<string> {
+fn list_dir_async(string path) → list<string> ⇥ fault.IoFault {
     return call 'solum:enumerabit' (path) ↦ list<string>
 }
 
@@ -405,14 +418,14 @@ fn list_dir_async(string path) → list<string> {
 
 # Prune directory tree (sync)
 @ public
-fn remove_tree(string path) → void {
+fn remove_tree(string path) → void ⇥ fault.IoFault {
     return call 'solum:amputa' (path) ↦ void
 }
 
 # Prune directory tree (async route; Faber blocks)
 @ future
 @ public
-fn remove_tree_async(string path) → void {
+fn remove_tree_async(string path) → void ⇥ fault.IoFault {
     return call 'solum:amputabit' (path) ↦ void
 }
 
@@ -493,9 +506,14 @@ fn glob(string root, string pattern) → list<string> ⇥ string {
         var list<string> proximos ← []
         if segment ≡ "*" {
             for from candidatos const base {
-                const list<string> entries ← list_dir(base)
-                for from entries const entry {
-                    proximos.append(join_two(base, entry))
+                do {
+                    const list<string> entries ← list_dir(base)
+                    for from entries const entry {
+                        proximos.append(join_two(base, entry))
+                    }
+                }
+                catch err {
+                    throw "glob: cannot list §"(base)
                 }
             }
         }
