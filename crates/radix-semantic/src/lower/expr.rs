@@ -1044,24 +1044,28 @@ impl Lowerer<'_> {
 
         // A numbered hole `§N` addresses argument N, so repeated numbers share
         // one value. The template needs `max + 1` actuals, each position must be
-        // read, and a supplied value must not go unread.
+        // read, and a supplied value must not go unread. A gap in the numbering
+        // is not an arity defect, even when the argument count happens to
+        // match: name the first unread position instead of the count.
         let (required_slots, distinct_slots) = analysis.value_slots();
-        if lowered.len() != required_slots {
+        if distinct_slots < required_slots
+            && let Some(index) = analysis.first_unread_slot()
+        {
+            self.error_with_args_at(
+                vec![
+                    DiagnosticArg::new("issue", "template_hole_index_gap"),
+                    DiagnosticArg::new("index", index.to_string()),
+                    DiagnosticArg::new("actual", lowered.len().to_string()),
+                ],
+                call_span,
+            );
+            ok = false;
+        } else if lowered.len() != required_slots {
             self.error_with_args_at(
                 vec![
                     DiagnosticArg::new("issue", "template_application_arity_mismatch"),
                     DiagnosticArg::new("actual", lowered.len().to_string()),
                     DiagnosticArg::new("expected", required_slots.to_string()),
-                ],
-                call_span,
-            );
-            ok = false;
-        } else if distinct_slots < required_slots {
-            self.error_with_args_at(
-                vec![
-                    DiagnosticArg::new("issue", "template_application_arity_mismatch"),
-                    DiagnosticArg::new("actual", lowered.len().to_string()),
-                    DiagnosticArg::new("expected", distinct_slots.to_string()),
                 ],
                 call_span,
             );

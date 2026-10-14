@@ -274,7 +274,7 @@ incipit {
     nota out
 }
 "#,
-        "template_application_arity_mismatch",
+        "template_hole_index_gap",
     );
     test_support::assert_rejects_with_issue_la(
         r#"
@@ -283,7 +283,7 @@ incipit {
     nota out
 }
 "#,
-        "template_application_arity_mismatch",
+        "template_hole_index_gap",
     );
 }
 
