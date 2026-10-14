@@ -103,7 +103,7 @@ incipit {
         _ => "",
     };
     assert!(
-        code.contains("func probe(xs string)"),
+        code.contains("func probe(p_xs string)"),
         "bounded textus must be a plain Go string parameter, got: {code}"
     );
 }
