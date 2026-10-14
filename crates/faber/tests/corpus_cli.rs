@@ -1156,3 +1156,150 @@ fn corpus_does_not_report_an_all_inapplicable_run_as_green() {
         assert_eq!(summary["status"], "no-applicable-cases", "{target}");
     }
 }
+
+/// A runner-only suite case with no output assertions, for filter tests.
+fn check_only_case(suite: &std::path::Path, name: &str) {
+    let case = suite.join("cases").join(name);
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::copy(smoke_case(), case.join("main.fab")).expect("copy source");
+    fs::write(
+        case.join("case.toml"),
+        format!(
+            "version = 1\nid = \"{name}\"\ninput = \"main.fab\"\n\n[expect]\ncheck_only = true\n\n[targets.runner]\noutcome = \"pass\"\n"
+        ),
+    )
+    .expect("write case manifest");
+}
+
+fn corpus_error_message(output: &std::process::Output) -> String {
+    records(&output.stdout)[0]["message"]
+        .as_str()
+        .expect("corpus error message")
+        .to_owned()
+}
+
+#[test]
+fn corpus_filter_selects_matching_cases() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    check_only_case(temp.path(), "alpha");
+    check_only_case(temp.path(), "beta");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n",
+    )
+    .expect("write suite manifest");
+
+    let filtered = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner", "--filter", "alpha"])
+        .arg(temp.path())
+        .output()
+        .expect("run filtered suite");
+    assert!(
+        filtered.status.success(),
+        "{}",
+        String::from_utf8_lossy(&filtered.stdout)
+    );
+    let rows = records(&filtered.stdout);
+    assert_eq!(rows[0]["case"], "alpha");
+    let summary = rows.last().expect("summary");
+    assert_eq!(summary["cases"], 1);
+    assert_eq!(summary["passed"], 1);
+
+    let none = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args([
+            "corpus",
+            "--target",
+            "runner",
+            "--filter",
+            "zzz-no-such-case",
+        ])
+        .arg(temp.path())
+        .output()
+        .expect("run non-matching filter");
+    assert!(!none.status.success(), "a non-matching filter must fail");
+    assert!(corpus_error_message(&none).contains("no cases match"));
+
+    let single = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--filter", "alpha"])
+        .arg(smoke_case())
+        .output()
+        .expect("run filter on a single input");
+    assert!(
+        !single.status.success(),
+        "--filter must reject a single input"
+    );
+    assert!(corpus_error_message(&single).contains("--filter applies only to a suite"));
+}
+
+#[test]
+fn corpus_embedded_only_refuses_library_home_env() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    check_only_case(temp.path(), "smoke");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\nembedded_only = true\n",
+    )
+    .expect("write suite manifest");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(temp.path())
+        .env("FABER_LIBRARY_HOME", "/nonexistent-faber-library-home")
+        .env_remove("FABER_SUPPORT_PATH_OVERRIDE")
+        .output()
+        .expect("run embedded-only suite under a library home");
+    assert!(
+        !output.status.success(),
+        "embedded_only must refuse FABER_LIBRARY_HOME"
+    );
+    assert!(
+        corpus_error_message(&output).contains("embedded_only"),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn corpus_embedded_only_rust_builds_against_materialized_runtime() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let cache = tempfile::tempdir().expect("temporary cache");
+    let case = temp.path().join("cases/smoke");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::copy(smoke_case(), case.join("main.fab")).expect("copy source");
+    fs::copy(
+        smoke_case().with_extension("expected"),
+        case.join("main.expected"),
+    )
+    .expect("copy source golden");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\nid = \"smoke\"\ninput = \"main.fab\"\n\n[expect]\nstdout = \"main.expected\"\n\n[targets.rust]\noutcome = \"pass\"\n",
+    )
+    .expect("write case manifest");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\nembedded_only = true\n\n[targets.rust]\n",
+    )
+    .expect("write suite manifest");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "rust"])
+        .arg(temp.path())
+        .env("FABER_CACHE_HOME", cache.path())
+        .env_remove("FABER_LIBRARY_HOME")
+        .env_remove("FABER_SUPPORT_PATH_OVERRIDE")
+        .output()
+        .expect("run embedded-only Rust suite");
+    assert!(
+        output.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let rows = records(&output.stdout);
+    let summary = rows.last().expect("summary");
+    assert_eq!(summary["target"], "rust");
+    assert_eq!(summary["passed"], 1);
+    assert_eq!(summary["failed"], 0);
+}
