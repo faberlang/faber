@@ -179,6 +179,29 @@ fn bits_markers_render_bare_at_short_and_long_in_both_locales() {
     }
 }
 
+/// An authored empty-argument list form is the retired `octeti`/`bytes`
+/// word; it re-emits as the raw-bit list (ruling d477c76d).
+#[test]
+fn empty_arg_b8_list_form_renders_as_list_form() {
+    use radix_types::BitsWidth;
+    let mut types = TypeTable::new();
+    let interner = Interner::new();
+    let list_ty = types.bits(BitsWidth::B8);
+    let list_ty = types.array(list_ty);
+    let form = semantic_form(TypeFormLevel::LONG, list_ty, Vec::new());
+    let forms = vec![(declared_site(1), form.clone()), (declared_site(2), form)];
+    let mut codegen = FaberCodegen::new(&types, &interner);
+    codegen.authored_type_forms = forms.into_iter().collect();
+    assert_eq!(
+        render_at(&codegen, &declared_site(1), list_ty, &LaSurface),
+        "lista<b8>"
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(2), list_ty, &EnSurface),
+        "list<b8>"
+    );
+}
+
 /// An authored `iuncta` element label rides the child form and re-emits as
 /// `label: type`; unlabeled slots keep the bare spelling.
 #[test]
@@ -878,7 +901,8 @@ fn locale_projection_changes_vocabulary_and_preserves_levels() {
 fn registry_renders_special_and_sized_heads() {
     let mut fx = fixture();
 
-    // `octeti` is its own primitive: L0-only (delivery Settled Decision 1).
+    // A raw-bit buffer is a `lista<b8>`; the `octeti` word is retired
+    // (ruling d477c76d). L0-only (delivery Settled Decision 1).
     let octeti = fx.types.primitive(Primitive::Octeti);
     let octeti_codegen = codegen_with_forms(
         &fx,
@@ -889,7 +913,7 @@ fn registry_renders_special_and_sized_heads() {
     );
     assert_eq!(
         render_at(&octeti_codegen, &declared_site(1), octeti, &LaSurface),
-        "octeti"
+        "lista<b8>"
     );
 
     // modulus<u32>: contextual keyword + unsigned width marker.
