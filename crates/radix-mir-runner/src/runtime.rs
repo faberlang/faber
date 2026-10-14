@@ -1681,13 +1681,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorRope => self.tensor_rope(args, span, false),
             MirCollectionOp::TensorRopeHalf => self.tensor_rope(args, span, true),
             MirCollectionOp::TensorGather => self.tensor_gather(args, span),
-            // GI3-1: the causal masked-row softmax op is admitted on the
-            // plan surface with NO runner body — the CPU-oracle semantics
-            // (masked stable row softmax) are a recorded residual
-            // (gi3-contract.md); executing it fails closed with the honest
-            // unsupported diagnostic, never a silent pass.
             MirCollectionOp::TensorCausalMaskedSoftmax => {
-                Err(RunnerError::unsupported(span, "causal masked softmax"))
+                self.tensor_causal_masked_softmax(args, span)
             }
             // R-PACK-01 packed kernels have no CPU-runner body. The
             // interpreter fails closed with a named diagnostic — never a
@@ -3420,6 +3415,56 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             let base = b * last_dim;
             let row = row_softmax(&values, base, last_dim, RowSoftmaxAccess::Safe, span)?;
             out_data.extend(row.into_iter().map(Value::Float));
+        }
+        tensor_value_kind(out_data, tensor_kind(&tensor), shape, span)
+    }
+
+    /// Causal masked-row softmax (GI3-1): row `i` of a rank-2 score matrix is
+    /// a numerically stable softmax over columns `0..=i`; entries above the
+    /// diagonal are exactly zero. No mask tensor operand — the causal
+    /// structure is the recipe's semantics.
+    fn tensor_causal_masked_softmax(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(
+                span,
+                "tensor causal masked softmax arity",
+            ));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let shape = tensor.borrow().shape.clone();
+        let [rows, cols] = shape.as_slice() else {
+            return Err(RunnerError::internal(
+                span,
+                "tensor causal masked softmax requires a rank-2 tensor",
+            ));
+        };
+        if *rows <= 0 || *cols <= 0 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor causal masked softmax requires positive dimensions",
+            ));
+        }
+        let (rows, cols) = (*rows as usize, *cols as usize);
+
+        let values = self.tensor_logical_values(&tensor, span)?;
+        let mut out_data = Vec::with_capacity(values.len());
+        for row_index in 0..rows {
+            let visible = (row_index + 1).min(cols);
+            let row = row_softmax(
+                &values,
+                row_index * cols,
+                visible,
+                RowSoftmaxAccess::Safe,
+                span,
+            )?;
+            out_data.extend(row.into_iter().map(Value::Float));
+            for _ in visible..cols {
+                out_data.push(Value::Float(0.0));
+            }
         }
         tensor_value_kind(out_data, tensor_kind(&tensor), shape, span)
     }
