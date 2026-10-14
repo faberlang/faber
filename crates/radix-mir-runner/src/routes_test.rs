@@ -3,6 +3,8 @@
 
 use super::*;
 use crate::host::BufferHost;
+use crate::value::LedgerValue;
+use std::{cell::RefCell, rc::Rc};
 
 fn lista(items: Vec<Value>) -> Value {
     Value::Array(Rc::new(RefCell::new(items)))
@@ -15,6 +17,20 @@ fn byte_list(bytes: &[u8]) -> Value {
 fn serve(route: &str, opener: &Value) -> Result<Vec<Value>, Value> {
     let mut host = BufferHost::default();
     serve_route(&mut host, route, opener, Span::default()).expect("leaf route")
+}
+
+#[test]
+fn ledger_value_to_arg_keeps_insertion_order() {
+    let mut ledger = LedgerValue::new();
+    for (key, text) in [("b", "2"), ("a", "1"), ("c", "3")] {
+        ledger.insert(MapKey::Str(key.to_owned()), Value::Str(text.to_owned()));
+    }
+    let arg = value_to_arg(&Value::Ledger(Rc::new(RefCell::new(ledger))));
+    let Some(Arg::Map(fields)) = arg else {
+        panic!("ledger did not convert to a map argument");
+    };
+    let names: Vec<&str> = fields.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(names, ["b", "a", "c"]);
 }
 
 #[test]

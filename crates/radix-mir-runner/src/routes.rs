@@ -134,6 +134,19 @@ fn value_to_arg(value: &Value) -> Option<Arg> {
             }
             Some(Arg::Map(fields))
         }
+        Value::Ledger(ledger) => {
+            let mut fields = Vec::new();
+            for (key, value) in ledger.borrow().iter() {
+                let MapKey::Str(name) = key else {
+                    continue;
+                };
+                let Value::Str(text) = value else {
+                    continue;
+                };
+                fields.push((name.clone(), text.clone()));
+            }
+            Some(Arg::Map(fields))
+        }
         other => octeti_bytes(other).map(Arg::Bytes),
     }
 }

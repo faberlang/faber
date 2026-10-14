@@ -839,6 +839,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Type::Map(_, _) => Some(Value::Map(Rc::new(RefCell::new(
                 rustc_hash::FxHashMap::default(),
             )))),
+            Type::Ledger(_, _) => Some(Value::Ledger(Rc::new(RefCell::new(
+                crate::value::LedgerValue::default(),
+            )))),
             Type::Set(_) => Some(Value::Set(Rc::new(RefCell::new(
                 rustc_hash::FxHashSet::default(),
             )))),
