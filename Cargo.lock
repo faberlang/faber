@@ -396,6 +396,7 @@ dependencies = [
  "postcard",
  "proba",
  "radix",
+ "radix-codegen-shared",
  "radix-hygiene",
  "radix-mir",
  "radix-mir-fmir",

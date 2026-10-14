@@ -1,5 +1,6 @@
 //! Verify explicit corpus cases against a selected execution target.
 
+#[cfg(feature = "hir-rust")]
 mod canonical;
 mod external;
 #[cfg(feature = "mir-llvm")]
@@ -7,6 +8,7 @@ mod gpu;
 #[cfg(test)]
 #[path = "corpus_runner_test.rs"]
 mod runner_test;
+#[cfg(feature = "hir-rust")]
 mod rust;
 
 use crate::cli::CorpusArgs;
@@ -377,41 +379,55 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
         .unwrap_or_else(|error| fail(&format!("cannot locate faber executable: {error}")));
 
     if args.target == "rust" {
-        rust::execute(
-            &suite.cases,
-            &input,
-            suite
-                .recipe
-                .as_ref()
-                .and_then(|item| item.runtime.as_deref())
-                .unwrap_or_else(|| fail("rust target requires [targets.rust] runtime")),
-            &faber,
-            discover_ms,
-            started,
-        );
-        return;
+        #[cfg(not(feature = "hir-rust"))]
+        fail("the rust corpus target requires the faber hir-rust feature");
+        #[cfg(feature = "hir-rust")]
+        {
+            rust::execute(
+                &suite.cases,
+                &input,
+                suite
+                    .recipe
+                    .as_ref()
+                    .and_then(|item| item.runtime.as_deref())
+                    .unwrap_or_else(|| fail("rust target requires [targets.rust] runtime")),
+                &faber,
+                discover_ms,
+                started,
+            );
+            return;
+        }
     }
     if args.target == "canonical" {
-        canonical::execute(
-            &suite.cases,
-            &input,
-            suite
-                .recipe
-                .as_ref()
-                .and_then(|item| item.runtime.as_deref())
-                .unwrap_or_else(|| fail("canonical target requires [targets.canonical] runtime")),
-            &faber,
-            discover_ms,
-            started,
-        );
-        return;
+        #[cfg(not(feature = "hir-rust"))]
+        fail("the canonical corpus target requires the faber hir-rust feature");
+        #[cfg(feature = "hir-rust")]
+        {
+            canonical::execute(
+                &suite.cases,
+                &input,
+                suite
+                    .recipe
+                    .as_ref()
+                    .and_then(|item| item.runtime.as_deref())
+                    .unwrap_or_else(|| {
+                        fail("canonical target requires [targets.canonical] runtime")
+                    }),
+                &faber,
+                discover_ms,
+                started,
+            );
+            return;
+        }
     }
     if args.target == "gpu" {
-        #[cfg(feature = "mir-llvm")]
-        gpu::execute(&suite.cases, &input, discover_ms, started);
         #[cfg(not(feature = "mir-llvm"))]
         fail("the gpu corpus target requires the faber mir-llvm feature");
-        return;
+        #[cfg(feature = "mir-llvm")]
+        {
+            gpu::execute(&suite.cases, &input, discover_ms, started);
+            return;
+        }
     }
     if args.target != "runner" {
         external::execute(

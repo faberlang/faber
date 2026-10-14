@@ -39,7 +39,8 @@ fn main() {
     embed_runtime(&manifest_dir.join("../.."), &out_dir);
 }
 
-/// Repository-relative roots whose files the binary carries.
+/// Repository-relative roots whose files the binary carries. A root absent
+/// from the tree (a checkout without the target runtimes) is not embedded.
 const RUNTIME_ROOTS: &[&str] = &[
     "runtime/rust",
     "runtime/go",
@@ -66,6 +67,9 @@ fn embed_runtime(repo_root: &Path, out_dir: &Path) {
     let mut files = Vec::new();
     for root in RUNTIME_ROOTS {
         let dir = repo_root.join(root);
+        if !dir.is_dir() {
+            continue;
+        }
         println!("cargo:rerun-if-changed={}", dir.display());
         collect_runtime_files(&dir, &mut files);
     }

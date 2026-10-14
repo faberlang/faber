@@ -705,7 +705,6 @@ pub use routes::{
     run_package_fmir_text_image, run_package_fmir_text_image_with_selection,
 };
 
-#[cfg(feature = "mir-fmir")]
 pub mod test_support;
 
 #[cfg(test)]

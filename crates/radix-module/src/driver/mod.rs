@@ -4949,7 +4949,7 @@ mod type_hole_union_deny_tests;
 #[path = "member_visibility_deny_test.rs"]
 mod member_visibility_deny_tests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mir-amd"))]
 #[path = "amd_target_test.rs"]
 mod amd_target_tests;
 

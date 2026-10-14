@@ -46,6 +46,7 @@ pub mod hygiene;
 pub mod ident;
 pub mod leaf_gate;
 pub mod ledger_gate;
+pub mod library_module;
 pub mod list_window_gate;
 pub mod lista_lift_gate;
 pub mod names;
