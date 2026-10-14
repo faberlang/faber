@@ -28,6 +28,9 @@ pub struct LoadedPackageSource {
     pub body_byte_offset: u32,
     pub frontmatter: Option<FileFrontmatter>,
     pub locale_pack: Option<radix_module::locale::LocalePack>,
+    /// A locale is declared by `--locale`, the manifest, or the source
+    /// frontmatter; the product default is not a declaration.
+    pub locale_declared: bool,
     pub program: Program,
     pub interner: Interner,
 }
@@ -331,6 +334,7 @@ pub fn load_package_source(
         body_byte_offset,
         frontmatter,
         locale_pack,
+        locale_declared,
         program,
         interner,
     })

@@ -114,6 +114,12 @@ pub struct PackageFile {
     /// Reader pack selected for this file before lexing. `None` is the
     /// compiler's Latin fallback when the product seam supplies no pack.
     pub locale_pack: Option<radix_module::locale::LocalePack>,
+    /// Whether this file's pack came from a source declaration, the package
+    /// manifest, or `--locale` rather than the product default. The per-file
+    /// analysis re-wrap installs a declared pack as an explicit caller
+    /// selection; an undeclared default stays second-guessable by the
+    /// wrong-locale advisory.
+    pub locale_declared: bool,
     pub program: radix_module::syntax::Program,
     pub interner: radix_module::lexer::Interner,
     /// Direct `norma:` (and future provider) imports declared in this package file.
