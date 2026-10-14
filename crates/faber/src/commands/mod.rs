@@ -42,6 +42,9 @@ pub(crate) mod format_test;
 pub mod host;
 pub(crate) mod init;
 mod model;
+#[cfg(test)]
+#[path = "regex_literal_format_test.rs"]
+mod regex_literal_format_test;
 #[cfg(feature = "runner")]
 mod run;
 #[cfg(feature = "runner")]
