@@ -1452,8 +1452,9 @@ entry = "main.fab"
 locale = "la"
 +++
 importa ex "norma:fs" solum
+importa ex "norma:fault" fault
 
-functio tange_paths(lista<textus> paths) → vacuum {
+functio tange_paths(lista<textus> paths) → vacuum ⇥ fault.IoFault {
     itera ex paths fixum path {
         solum.tange(path)
     }
