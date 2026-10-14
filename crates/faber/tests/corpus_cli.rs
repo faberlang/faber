@@ -945,6 +945,70 @@ fn runtime_recipe(target: &str) -> String {
 }
 
 #[test]
+fn corpus_loader_accepts_rejects_and_known_fail_why() {
+    let rejection_source =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/typi/inf-prefix-error.fab");
+    let with_rejection_source = |suite: &tempfile::TempDir| {
+        fs::copy(&rejection_source, suite.path().join("cases/probe/main.fab"))
+            .expect("copy rejection source");
+    };
+
+    let rejects = "\n[targets.runner]\noutcome = \"rejects\"\nphase = \"run\"\ndiagnostic_contains = \"SEM002:unknown_type\"\n";
+    let suite = probe_suite("", rejects);
+    with_rejection_source(&suite);
+    let output = run_corpus(suite.path(), "runner");
+    assert!(
+        output.status.success(),
+        "a rejects row must load and pass: {}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let known_fail = "\n[targets.runner]\noutcome = \"known-fail\"\nphase = \"run\"\ndiagnostic_contains = \"SEM002:unknown_type\"\nknown_fail_why = \"the checker refuses unknown types\"\n";
+    let suite = probe_suite("", known_fail);
+    with_rejection_source(&suite);
+    let output = run_corpus(suite.path(), "runner");
+    assert!(
+        output.status.success(),
+        "a known-fail row with a reason must load and pass: {}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let rejects_with_why = "\n[targets.runner]\noutcome = \"rejects\"\nphase = \"run\"\ndiagnostic_contains = \"SEM002:unknown_type\"\nknown_fail_why = \"x\"\n";
+    let suite = probe_suite("", rejects_with_why);
+    let output = run_corpus(suite.path(), "runner");
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "a reason on a rejection must be refused"
+    );
+    assert!(
+        records(&output.stdout)[0]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("known_fail_why")),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+
+    let empty_why = "\n[targets.runner]\noutcome = \"known-fail\"\nphase = \"run\"\ndiagnostic_contains = \"SEM002:unknown_type\"\nknown_fail_why = \"\"\n";
+    let suite = probe_suite("", empty_why);
+    let output = run_corpus(suite.path(), "runner");
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "an empty known_fail_why must be refused"
+    );
+    assert!(
+        records(&output.stdout)[0]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("known_fail_why")),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
 fn corpus_rejects_pins_the_target_cannot_judge_instead_of_panicking() {
     let known_fail = |target: &str, phase: &str, kind: &str| {
         format!(

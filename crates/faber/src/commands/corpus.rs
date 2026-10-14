@@ -118,6 +118,9 @@ struct TargetExpectation {
     reason: Option<String>,
     expect: Option<RawExpected>,
     timeout_secs: Option<u64>,
+    known_fail_why: Option<String>,
+    #[serde(skip)]
+    rejects: bool,
 }
 
 #[derive(Clone, Copy, Deserialize)]
@@ -126,6 +129,7 @@ enum Outcome {
     Pass,
     KnownFail,
     NotApplicable,
+    Rejects,
 }
 
 /// An [`Outcome`] that a target actually judges; `NotApplicable` cases are
@@ -140,7 +144,7 @@ impl Outcome {
     fn judged(self) -> Option<Judged> {
         match self {
             Self::Pass => Some(Judged::Pass),
-            Self::KnownFail => Some(Judged::KnownFail),
+            Self::KnownFail | Self::Rejects => Some(Judged::KnownFail),
             Self::NotApplicable => None,
         }
     }
@@ -447,6 +451,8 @@ fn single_case(input: &Path, explicit: Option<&Path>) -> Result<Case, String> {
             reason: None,
             expect: None,
             timeout_secs: None,
+            known_fail_why: None,
+            rejects: false,
         },
         timeout: Duration::from_secs(CASE_TIMEOUT_SECS),
     })
@@ -690,11 +696,35 @@ fn load_case(
             .and_then(|group| group.get(target))
             .cloned()
     });
-    let Some(expectation) = expectation else {
+    let Some(mut expectation) = expectation else {
         return Err(format!(
             "{id}: target {target} has no expectation from the case or group"
         ));
     };
+    if matches!(expectation.outcome, Outcome::Rejects) {
+        expectation.rejects = true;
+        expectation.outcome = Outcome::KnownFail;
+    }
+    if expectation.rejects && expectation.known_fail_why.is_some() {
+        return Err(format!(
+            "{id}: known_fail_why is not allowed on a rejects case; a rejection needs no reason"
+        ));
+    }
+    if !expectation.rejects
+        && !matches!(expectation.outcome, Outcome::KnownFail)
+        && expectation.known_fail_why.is_some()
+    {
+        return Err(format!(
+            "{id}: known_fail_why is only allowed on a known-fail case"
+        ));
+    }
+    if expectation
+        .known_fail_why
+        .as_deref()
+        .is_some_and(|why| why.trim().is_empty())
+    {
+        return Err(format!("{id}: known_fail_why must not be empty"));
+    }
     let base_expect = resolve_expected_patch(manifest.expect.take(), manifest_dir)?;
     let target_expect = resolve_expected_patch(expectation.expect.clone(), manifest_dir)?;
     let expect = if rooted
