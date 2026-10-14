@@ -3439,9 +3439,11 @@ fn declared_surface_hits(lex_result: &lexer::LexResult) -> usize {
 }
 
 /// The built-in locale whose keywords match `source` better than `baseline`,
-/// the pack the source was read with (`None` is the Latin reading).
+/// the pack the source was read with. A missing baseline falls back to the
+/// configured no-locale default ([`default_code_pack`]).
 fn detect_other_locale(config: &Config, source: &str, baseline: Option<&LocalePack>) -> Option<&'static str> {
-    let baseline_hits = declared_surface_hits(&match baseline {
+    let baseline_pack = baseline.cloned().or_else(|| default_code_pack(config));
+    let baseline_hits = declared_surface_hits(&match baseline_pack.as_ref() {
         Some(pack) => lexer::lex_with_locale_pack(source, pack),
         None => lexer::lex(source),
     });
@@ -3738,6 +3740,22 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
     })
 }
 
+/// The reader pack a source with no declared locale is read with.
+///
+/// TEMPORARY STAGING: resolves the `en` pack only while
+/// `RADIX_DEFAULT_CODE_LOCALE` equals `en`; it returns `None` in every other
+/// state, so an unset variable keeps the historical pack-less (Latin) lexing
+/// byte for byte. This is the single place the no-locale default is decided;
+/// the final unit of need deletes the switch and makes `en`
+/// unconditional here.
+#[must_use]
+pub fn default_code_pack(config: &Config) -> Option<LocalePack> {
+    if !std::env::var("RADIX_DEFAULT_CODE_LOCALE").is_ok_and(|value| value == DEFAULT_CODE_LOCALE_ID) {
+        return None;
+    }
+    resolve_frontmatter_locale_pack(config, DEFAULT_CODE_LOCALE_ID).ok()
+}
+
 struct ParsedSourceBody<'a> {
     body: &'a str,
     program: Program,
@@ -3748,13 +3766,13 @@ struct ParsedSourceBody<'a> {
 }
 
 /// Resolve the reader pack for a peeled source body: frontmatter locale >
-/// session config > Latin default.
+/// session config > no-locale default ([`default_code_pack`]).
 ///
 /// Shared by the analysis front end and the forma author path so both honor a
 /// source's `+++ locale = "…" +++` declaration (e.g. the English exempla
 /// corpus). Pushes diagnostics and returns `Err(())` when the frontmatter
 /// locale key is malformed or the declared pack cannot be loaded; `Ok(None)`
-/// means no pack (Latin default lexing).
+/// means no pack (pack-less lexing).
 pub(crate) fn resolve_peeled_lex_pack(
     session: &Session,
     peeled: &PeeledSource,
@@ -3786,7 +3804,11 @@ pub(crate) fn resolve_peeled_lex_pack(
                 Err(())
             }
         },
-        None => Ok(session.config.locale_pack.clone()),
+        None => Ok(session
+            .config
+            .locale_pack
+            .clone()
+            .or_else(|| default_code_pack(&session.config))),
     }
 }
 
@@ -4691,6 +4713,10 @@ mod rms_norm_intrinsic_tests;
 #[cfg(feature = "device")]
 #[path = "rope_norm_intrinsic_test.rs"]
 mod rope_norm_intrinsic_tests;
+
+#[cfg(test)]
+#[path = "default_code_locale_test.rs"]
+mod default_code_locale_tests;
 
 #[cfg(test)]
 #[path = "type_hole_union_deny_test.rs"]

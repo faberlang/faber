@@ -62,9 +62,10 @@ pub fn lex_inspection_for_source(name: &str, source: &str) -> SourceInspection {
 }
 
 /// Lex the peeled body under the file's own frontmatter reader locale, as check
-/// and compile do; no frontmatter locale keeps the canonical Latin surface.
+/// and compile do; no frontmatter locale falls back to the no-locale default.
 fn lex_reader_surface(source_file: &crate::driver::SourceFile) -> crate::lexer::LexResult {
-    let pack = crate::program::compile::frontmatter_locale_pack_from_frontmatter(source_file.frontmatter.as_ref());
+    let pack = crate::program::compile::frontmatter_locale_pack_from_frontmatter(source_file.frontmatter.as_ref())
+        .or_else(|| crate::driver::default_code_pack(&crate::driver::Config::default()));
     match pack.as_ref() {
         Some(pack) => crate::lexer::lex_with_locale_pack(source_file.content.as_str(), pack),
         None => crate::lexer::lex(source_file.content.as_str()),
