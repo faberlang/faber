@@ -3910,7 +3910,7 @@ impl TypeChecker<'_> {
     /// unification must bridge, and a source with no infer id at all is a
     /// plain nominal pair the law judges as before. Container and applied
     /// argument shapes are walked so a nested stale id is caught too.
-    fn verte_type_has_inference_hole(&self, ty: TypeId) -> bool {
+    pub(super) fn verte_type_has_inference_hole(&self, ty: TypeId) -> bool {
         let mut seen = FxHashSet::default();
         self.verte_type_has_inference_hole_inner(ty, &mut seen)
     }
