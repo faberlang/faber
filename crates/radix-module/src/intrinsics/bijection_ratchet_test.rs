@@ -306,11 +306,11 @@ fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>
         // Row gather selects rows of a `[rows, D]` table by a `tensor<u32, [n]>` id vector.
         "Tensor.gather/1" => (Some(format!("{sugar}[4, 3] r, tensor<u32, [4]> ids")), vec!["ids".into()]),
         "Tensor.matmul/1" => (Some(format!("{sugar}[2, 3] r, {sugar}[3, 2] p")), vec!["p".into()]),
-        "Tensor.rms_norm/3" => (None, vec!["0".into(), el.clone(), "r".into()]),
+        "Tensor.rms_norm/3" => (None, vec!["axis 0".into(), el.clone(), "r".into()]),
         "Tensor.rope_norm/2" => (Some(format!("{sugar}[2, 4, 3] r")), vec!["0".into(), "r".into()]),
-        "Tensor.laminatio/2" => (None, vec!["0".into(), el.clone()]),
-        "Tensor.laminatio/3" => (None, vec!["0".into(), el.clone(), "r".into()]),
-        "Tensor.laminatio/4" => (None, vec!["0".into(), el.clone(), "r".into(), "r".into()]),
+        "Tensor.laminatio/2" => (None, vec!["axis 0".into(), el.clone()]),
+        "Tensor.laminatio/3" => (None, vec!["axis 0".into(), el.clone(), "r".into()]),
+        "Tensor.laminatio/4" => (None, vec!["axis 0".into(), el.clone(), "r".into(), "r".into()]),
         "Tensor.crux_entropia/1" => (None, vec!["r".into()]),
         // Matrix-vector application takes a conformable vector operand.
         "Matrix.applica/1" => (Some("matrix<fractus, [2, 2]> r, vf32[2] v".to_string()), vec!["v".into()]),
