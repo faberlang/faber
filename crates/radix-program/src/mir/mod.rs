@@ -41,6 +41,11 @@ pub(crate) mod image;
 pub(crate) mod link;
 pub(crate) mod lower;
 pub(crate) mod manifest;
+#[cfg(feature = "runner")]
+mod praefixum_link;
+#[cfg(all(test, feature = "runner"))]
+#[path = "praefixum_link_test.rs"]
+mod praefixum_link_test;
 pub(crate) mod remap;
 
 #[cfg(test)]
