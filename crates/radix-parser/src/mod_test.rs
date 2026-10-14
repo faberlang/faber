@@ -5289,6 +5289,12 @@ fn const_size_declaration_parses_and_bare_or_var_forms_are_rejected() {
 /// Parses a `tabula` binding with `init` as its initializer and hands the
 /// initializer expression kind to `check`.
 fn with_inferred_constructor_init(init: &str, check: impl FnOnce(&ExprKind)) {
+    with_inferred_constructor_init_result(init, |_, kind| check(kind));
+}
+
+/// [`with_inferred_constructor_init`] plus the parse result, so checks can
+/// resolve member-key and type-head symbols.
+fn with_inferred_constructor_init_result(init: &str, check: impl FnOnce(&ParseResult, &ExprKind)) {
     let result = parse_ok(&format!(
         "incipit {{ fixum tabula<textus, numerus> m ← {init} }}"
     ));
@@ -5302,7 +5308,7 @@ fn with_inferred_constructor_init(init: &str, check: impl FnOnce(&ExprKind)) {
     let StmtKind::Var(var) = &block.statements[0].kind else {
         panic!("expected binding");
     };
-    check(&var.init.as_deref().expect("initializer").kind);
+    check(&result, &var.init.as_deref().expect("initializer").kind);
 }
 
 #[test]
@@ -5350,5 +5356,80 @@ fn bare_field_literal_parses_as_hole_verte_over_object() {
         };
         assert!(matches!(verte.ty.kind, TypeExprKind::Infer));
         assert!(matches!(verte.expr.kind, ExprKind::Object(_)));
+    });
+}
+
+#[test]
+fn stated_keyed_constructor_json_parses_as_ascription_of_json_literal() {
+    with_inferred_constructor_init_result("json { \"x\": 10 }", |result, kind| {
+        let ExprKind::Verte(verte) = kind else {
+            panic!("expected Verte");
+        };
+        let TypeExprKind::Named(head, args) = &verte.ty.kind else {
+            panic!("expected named type head");
+        };
+        assert_eq!(symbol_name(result, head.name), "json");
+        assert!(args.is_empty(), "json takes no type arguments");
+        let ExprKind::Literal(Literal::JsonValor(JsonValue::Object(members))) = &verte.expr.kind
+        else {
+            panic!("keyed entries must be the bare-literal JSON members");
+        };
+        let keys: Vec<&str> = members
+            .iter()
+            .map(|member| symbol_name(result, member.key))
+            .collect();
+        assert_eq!(keys, ["x"]);
+    });
+}
+
+#[test]
+fn stated_keyed_constructor_map_parses_with_type_arguments() {
+    with_inferred_constructor_init_result("map<string, int> { \"a\": 1 }", |result, kind| {
+        let ExprKind::Verte(verte) = kind else {
+            panic!("expected Verte");
+        };
+        let TypeExprKind::Named(head, args) = &verte.ty.kind else {
+            panic!("expected named type head");
+        };
+        assert_eq!(symbol_name(result, head.name), "map");
+        assert_eq!(args.len(), 2, "map carries key and value type arguments");
+        let arg_names: Vec<&str> = args
+            .iter()
+            .map(|arg| match &generic_arg_type(arg).kind {
+                TypeExprKind::Named(name, _) => symbol_name(result, name.name),
+                other => panic!("expected named type argument, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(arg_names, ["string", "int"]);
+        let ExprKind::Literal(Literal::JsonValor(JsonValue::Object(members))) = &verte.expr.kind
+        else {
+            panic!("keyed entries must be the bare-literal JSON members");
+        };
+        let keys: Vec<&str> = members
+            .iter()
+            .map(|member| symbol_name(result, member.key))
+            .collect();
+        assert_eq!(keys, ["a"]);
+    });
+}
+
+#[test]
+fn stated_keyed_constructor_keeps_field_form() {
+    with_inferred_constructor_init_result("Point { x = 1 }", |result, kind| {
+        let ExprKind::Verte(verte) = kind else {
+            panic!("expected Verte");
+        };
+        let TypeExprKind::Named(head, args) = &verte.ty.kind else {
+            panic!("expected named type head");
+        };
+        assert_eq!(symbol_name(result, head.name), "Point");
+        assert!(args.is_empty());
+        let ExprKind::Object(object) = &verte.expr.kind else {
+            panic!("named field construction must keep the object node");
+        };
+        let radix_syntax::ObjectKey::Ident(field) = &object.fields[0].key else {
+            panic!("expected an identifier field key");
+        };
+        assert_eq!(symbol_name(result, field.name), "x");
     });
 }

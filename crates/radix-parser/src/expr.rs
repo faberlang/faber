@@ -2613,9 +2613,14 @@ impl Parser {
                 }
             }
         }
-        if (path.len() == 1 && type_params.is_empty())
+        // `Type { "k": v, … }` is the stated keyed constructor: the same
+        // `Verte`/JSON-literal node the ascription `{ "k": v } ∷ Type`
+        // parses to. The quoted-key plus colon lookahead keeps the `=` field
+        // form with the object-constructor branch below.
+        let keyed_entries = self.looks_like_keyed_constructor_entries();
+        if (path.len() == 1 && type_params.is_empty() && !keyed_entries)
             || !self.check(&TokenKind::LBrace)
-            || !self.looks_like_typed_constructor_fields()
+            || !(keyed_entries || self.looks_like_typed_constructor_fields())
         {
             self.restore(checkpoint);
             return Ok(None);
@@ -2629,17 +2634,20 @@ impl Parser {
         if !type_params.is_empty() {
             type_span = type_span.merge(self.previous_span());
         }
+        let object_start = self.current_span();
         self.advance();
-        let mut fields = self.parse_object_fields()?;
-        self.expect_issue(&TokenKind::RBrace, "type_constructor_fields_end")?;
-        self.parse_construction_source(&mut fields)?;
-        let object = Expr {
-            id: self.next_id(),
-            kind: ExprKind::Object(ObjectExpr { fields }),
-            span: type_span.merge(self.previous_span()),
-        };
         let kind = if path.len() == 1 {
-            TypeExprKind::Named(path.remove(0), type_params)
+            let head = path.remove(0);
+            // The ascription head canonicalizes through the reader pack, so
+            // the stated spelling must produce the same type identity (the
+            // keyed form is the ascription's source). Qualified paths keep
+            // their authored namespace spelling.
+            let head = if keyed_entries {
+                self.canonical_type_ident(head)
+            } else {
+                head
+            };
+            TypeExprKind::Named(head, type_params)
         } else {
             TypeExprKind::Qualified(path, type_params)
         };
@@ -2650,6 +2658,26 @@ impl Parser {
             span: type_span,
             form: TypeFormLevel::LONG,
             iuncta_label: None,
+        };
+        if keyed_entries {
+            let literal = self.parse_json_literal()?;
+            let source = Expr {
+                id: self.next_id(),
+                kind: literal,
+                span: object_start.merge(self.previous_span()),
+            };
+            return Ok(Some(ExprKind::Verte(VerteExpr {
+                expr: Box::new(source),
+                ty,
+            })));
+        }
+        let mut fields = self.parse_object_fields()?;
+        self.expect_issue(&TokenKind::RBrace, "type_constructor_fields_end")?;
+        self.parse_construction_source(&mut fields)?;
+        let object = Expr {
+            id: self.next_id(),
+            kind: ExprKind::Object(ObjectExpr { fields }),
+            span: type_span.merge(self.previous_span()),
         };
         Ok(Some(ExprKind::Verte(VerteExpr {
             expr: Box::new(object),
@@ -3544,6 +3572,16 @@ impl Parser {
             expr: Box::new(object),
             ty,
         }))
+    }
+
+    /// Keyed-entries lookahead for the `{` at the cursor: the first member
+    /// token is a quoted key followed by `:`. That is JSON member grammar, so
+    /// the block is the bare literal of the stated keyed constructor; the
+    /// `name = value` field form stays with the typed-constructor lookahead.
+    fn looks_like_keyed_constructor_entries(&self) -> bool {
+        matches!(self.peek().kind, TokenKind::LBrace)
+            && matches!(self.peek_at(1).kind, TokenKind::String(_))
+            && matches!(self.peek_at(2).kind, TokenKind::Colon)
     }
 
     fn looks_like_typed_constructor_fields(&self) -> bool {
