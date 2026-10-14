@@ -23,6 +23,8 @@ mod runtime;
 pub mod sermo;
 #[cfg(test)]
 mod shape_size_test;
+#[cfg(test)]
+mod regex_literal_raw_test;
 pub(crate) mod shuffle;
 pub mod stats;
 pub mod store;
@@ -2744,13 +2746,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 }
             }
             MirConstant::Regex { pattern, flags } => {
-                // WHY: the pattern symbol is the raw string-literal source; a
-                // `textus ↦ regex` conversion must see the decoded textus value
-                // (mirrors `MirConstant::String`), so `\\d+` is `\d+`.
+                // WHY: the pattern symbol is the raw regex body; slash bodies
+                // receive no Faber backslash processing. A `textus ↦ regex`
+                // conversion decodes the textus constant through
+                // `MirConstant::String` on its own path.
                 let pattern = regex_pattern(
-                    &radix_lexer::textus_literal::decode_textus_literal(
-                        self.interner.resolve(*pattern),
-                    ),
+                    self.interner.resolve(*pattern),
                     flags.map(|flags| self.interner.resolve(flags)),
                 );
                 let program = RegexProgram::compile(&pattern).map_err(|payload| {
@@ -3668,7 +3669,7 @@ fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Inter
         }
         (MirConstant::Regex { pattern, flags }, Value::Regex(right)) => {
             regex_pattern(
-                &radix_lexer::textus_literal::decode_textus_literal(interner.resolve(*pattern)),
+                interner.resolve(*pattern),
                 flags.map(|flags| interner.resolve(flags)),
             ) == right.pattern()
         }
