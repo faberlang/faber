@@ -1,0 +1,62 @@
++++
+term = "literal"
+kind = "literal"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "conversio_expr", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "expression", "primary", "regex_literal", "literal", "nota_stmt"]
+category = "regex"
+canonical = false
+summary = "The inline regex literal is the regex type word then a slash-delimited raw body, or an underscore with the body when the slot supplies the type; the text conversion form still exists."
+syntax = "regex /<pattern>/"
+related = ["regex", "↦", "find"]
+locale = "en"
++++
+# =============================================================================
+# literal — the inline regex literal
+# =============================================================================
+#
+# What this teaches:
+#   • `regex /pattern/` is the inline literal: the file locale's regex type
+#     word, then a slash-delimited body read raw to the next unescaped `/`
+#   • `_ /pattern/` is the inferred form: the underscore opener takes the
+#     expected type from the binding slot, so `const _ name ← _ /…/` works
+#   • only `\/` is processed by Faber; every other backslash reaches the
+#     engine unchanged, the body never spans a line, and `//` is rejected
+#   • the text conversion `"pattern" ↦ regex` still exists for a pattern
+#     built at run time
+#
+# Common mistakes:
+#   • writing a bare `/pattern/`: without the type word or `_`, the `/` stays
+#     the division operator (or a parse error), so a binding named `regex`
+#     used as a left operand of a division is written `(regex) / 2`
+#   • reading the body as a Faber string: `\d` reaches the engine as `\d`
+#
+# See also: regex, ↦, find.
+# =============================================================================
+
+# literal — the two spellings and the text form
+#
+# regex /pattern/, _ /pattern/   -- regex
+#
+# EXPECTED OUTPUT:
+#   The match text of the inline literal, the match text of the inferred
+#   literal under `(?i)`, that the escaped-slash literal matches "a/b", and
+#   that the text form built at run time matches "42".
+
+main {
+    # the inline literal: the type word, then the raw body
+    const regex digits ← regex /\d+/
+    const _ hit ← digits.find("order 42 placed")
+    print hit!.text()
+
+    # the inferred form: `_ /pattern/` takes the type from the binding slot
+    const _ word ← _ /(?i)[a-z]+/
+    const _ shout ← word.find("HELLO there")
+    print shout!.text()
+
+    # an escaped slash: `\/` writes one `/`; no other escape is processed
+    const regex slash ← regex /a\/b/
+    print slash.matches("a/b")
+
+    # the text form still exists: build the pattern at run time
+    const regex dynamic ← "\\d+" ↦ regex
+    print dynamic.matches("42")
+}
