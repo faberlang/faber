@@ -320,6 +320,7 @@ functio config_ssl_verify(bivalens enabled) {
     assert!(out.contains("myhost"), "expected host: {out}");
 }
 
+#[cfg(feature = "mir-wasm")]
 #[test]
 fn wasm_cli_program_routes_through_the_ordinary_emit_path() {
     // wasm-host-parity P1 residual: the shared MIR CLI-program lowering is

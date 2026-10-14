@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/itera/loop-shape-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/loop-shape-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "loop_collection_shape_change"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "loop_collection_shape_change"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "loop_collection_shape_change"

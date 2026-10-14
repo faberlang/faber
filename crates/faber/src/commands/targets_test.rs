@@ -3,6 +3,7 @@ use crate::cli::FaberCliTarget;
 use clap::ValueEnum;
 
 /// The compiled feature set of a hir-rust-only small build.
+#[cfg(feature = "hir-rust")]
 fn small_compiled() -> BTreeSet<&'static str> {
     ["hir-rust"].into_iter().collect()
 }
@@ -10,6 +11,7 @@ fn small_compiled() -> BTreeSet<&'static str> {
 /// Features of the experimental, default-off novelty targets (BASIC, Pascal,
 /// COBOL, Fortran, Odin). They are outside `full-targets`, so the default test build
 /// lists their rows as `available=no`.
+#[cfg(all(feature = "full-targets", feature = "hir-rust"))]
 const EXPERIMENTAL_DEFAULT_OFF: [&str; 5] = [
     "mir-basic",
     "hir-pascal",
@@ -18,6 +20,7 @@ const EXPERIMENTAL_DEFAULT_OFF: [&str; 5] = [
     "hir-odin",
 ];
 
+#[cfg(feature = "hir-rust")]
 fn row<'a>(rows: &'a [TargetRow], name: &str) -> &'a TargetRow {
     rows.iter()
         .find(|r| r.name == name)
@@ -120,6 +123,7 @@ fn fmir_family_rows_share_the_fmir_feature_override() {
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn small_build_reports_only_compiled_capabilities() {
     let rows = target_rows(&small_compiled()).expect("every CLI target maps to a faber feature");
@@ -166,6 +170,7 @@ fn small_build_reports_only_compiled_capabilities() {
     }
 }
 
+#[cfg(all(feature = "full-targets", feature = "hir-rust"))]
 #[test]
 fn default_build_reports_full_surface() {
     // The test binary builds under default features (full-targets), so the
@@ -222,6 +227,7 @@ fn default_build_reports_full_surface() {
     }
 }
 
+#[cfg(all(feature = "full-targets", feature = "hir-rust"))]
 #[test]
 fn rendered_table_contains_capability_rows_under_full_build() {
     let table = rendered_targets_table().expect("every CLI target maps to a faber feature");
@@ -243,6 +249,7 @@ fn rendered_table_contains_capability_rows_under_full_build() {
     }
 }
 
+#[cfg(all(feature = "full-targets", feature = "hir-rust"))]
 #[test]
 fn every_row_feature_is_compiled_in_the_default_test_build() {
     // The test binary builds under default features (full-targets): every

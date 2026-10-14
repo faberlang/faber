@@ -42,6 +42,7 @@ fn sample_dependencies() -> Vec<PackageDependencyWire> {
     }]
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_round_trip_two_modules() {
     let main = analyze("main.fab", &sample_source("salve"));

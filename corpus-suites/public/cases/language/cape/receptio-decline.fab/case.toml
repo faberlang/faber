@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/cape/receptio-decline.fab"
+group = "language"
+input_root = "corpus"
+input = "cape/receptio-decline.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM059.rethrow_in_recovery"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM059.rethrow_in_recovery"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM059:dum_loop"

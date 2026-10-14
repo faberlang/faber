@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/meta/nondum-method.fab"
+group = "language"
+input_root = "corpus"
+input = "meta/nondum-method.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

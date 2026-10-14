@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tabula/composite-key.fab"
+group = "language"
+input_root = "corpus"
+input = "tabula/composite-key.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

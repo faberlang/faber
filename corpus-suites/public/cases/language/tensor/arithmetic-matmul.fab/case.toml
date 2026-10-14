@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/arithmetic-matmul.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/arithmetic-matmul.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

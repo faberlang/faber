@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/mutabilitas/ref-genus-field.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/ref-genus-field.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM056.mutating_receiver_through_ref"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM056.mutating_receiver_through_ref"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM056:mutating_receiver_through_ref"

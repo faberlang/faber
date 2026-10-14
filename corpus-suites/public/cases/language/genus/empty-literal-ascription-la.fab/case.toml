@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/genus/empty-literal-ascription-la.fab"
+group = "language"
+input_root = "corpus"
+input = "genus/empty-literal-ascription-la.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

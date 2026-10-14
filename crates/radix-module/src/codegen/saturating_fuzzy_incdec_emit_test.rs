@@ -54,6 +54,7 @@ fn emit(target: Target, source: &str) -> String {
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_saturating_division_is_exact_floor_division() {
     let code = emit(Target::HirRust, SATURATING);
@@ -62,6 +63,7 @@ fn rust_saturating_division_is_exact_floor_division() {
     assert!(!code.contains("saturatus division failed"), "{code}");
 }
 
+#[cfg(feature = "hir-swift")]
 #[test]
 fn swift_saturating_division_is_exact_floor_division() {
     let code = emit(Target::HirSwift, SATURATING);
@@ -70,6 +72,7 @@ fn swift_saturating_division_is_exact_floor_division() {
     assert!(!code.contains("dividedReportingOverflow"), "{code}");
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn go_saturating_division_by_zero_uses_the_integer_text() {
     let code = emit(Target::HirGo, SATURATING);
@@ -81,6 +84,7 @@ fn go_saturating_division_by_zero_uses_the_integer_text() {
     assert!(!code.contains("saturatus division failed"), "{code}");
 }
 
+#[cfg(all(feature = "hir-rust", feature = "hir-swift", feature = "hir-go"))]
 #[test]
 fn decimal_fuzzy_operand_is_unscaled_on_every_backend() {
     let rust = emit(Target::HirRust, FUZZY);
@@ -91,6 +95,7 @@ fn decimal_fuzzy_operand_is_unscaled_on_every_backend() {
     assert!(go.contains("rt.DecF64(rt.DecOf("), "{go}");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_list_element_inc_dec_is_one_checked_store() {
     let code = emit(Target::HirRust, INC_DEC);
@@ -101,6 +106,7 @@ fn rust_list_element_inc_dec_is_one_checked_store() {
     assert!(!code.contains(").cloned(), faber::Trap::ListaIndex) += 1"), "{code}");
 }
 
+#[cfg(feature = "hir-swift")]
 #[test]
 fn swift_list_element_inc_dec_binds_the_index_once() {
     let code = emit(Target::HirSwift, INC_DEC);

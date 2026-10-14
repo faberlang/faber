@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/meta/iacit.fab"
+group = "language"
+input_root = "corpus"
+input = "meta/iacit.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

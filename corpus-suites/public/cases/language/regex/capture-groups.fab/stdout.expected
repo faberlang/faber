@@ -1,0 +1,7 @@
+grp-alternation:|b|none|b
+grp-optional:|b|none
+grp-noncapture:|ab|b
+grp-nested-alt:|ac|a|none
+grp-leftmost-first:|abcd|a|bcd|
+grp-lazy:|aaa|a|aa
+grp-count-24:|abcdefghijk|a|b|c|d|e|f|g|h|i|j|k

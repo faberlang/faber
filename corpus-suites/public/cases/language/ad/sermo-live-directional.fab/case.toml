@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/ad/sermo-live-directional.fab"
+group = "language"
+input_root = "corpus"
+input = "ad/sermo-live-directional.fab"
+
+
+[expect]
+check_only = true

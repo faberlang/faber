@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/si/nidificatus.fab"
+group = "language"
+input_root = "corpus"
+input = "si/nidificatus.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

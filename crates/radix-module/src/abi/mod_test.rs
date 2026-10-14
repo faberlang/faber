@@ -162,7 +162,8 @@ fn rust_render_emits_compilable_constants() {
     assert!(rust.contains("pub const SYMBOL_PROGRAM_ENTRY: &str = \"__faber_program_entry_v1\";"));
     assert!(rust.contains("pub type FaberRtValueKindV1 = u32;"));
     assert!(rust.contains("pub const VALUE_KIND_I64: FaberRtValueKindV1 = 4;"));
-    assert!(rust.contains("pub const LLVM_SLICE_TYPE: &str = \"%FaberRtSliceV1\";"));
+    // LLVM type spellings are LLVM-backend facts and live in radix-mir-llvm (Faber 2 A7).
+    assert!(!rust.contains("LLVM_SLICE_TYPE"));
     assert!(rust.contains("pub const STATUS_OK: i32 = 0;"));
     assert!(rust.contains("pub const STATUS_UNSUPPORTED: i32 = 4;"));
     assert!(rust.contains("pub const DIAGNOSTIC_SYMBOLS_V1: &[(&str, &str, &str)] = &["));

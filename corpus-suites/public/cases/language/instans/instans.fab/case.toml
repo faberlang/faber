@@ -1,0 +1,16 @@
+version = 1
+id = "corpus/instans/instans.fab"
+group = "language"
+input_root = "corpus"
+input = "instans/instans.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+stdout_contains = "1979-05-27T07:32:00Z"
+check_only = false

@@ -1,0 +1,9 @@
+version = 1
+id = "product/contract-import"
+group = "product"
+input_root = "product"
+input = "contract-import"
+
+
+[expect]
+check_only = true

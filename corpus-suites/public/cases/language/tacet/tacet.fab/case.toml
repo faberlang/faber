@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tacet/tacet.fab"
+group = "language"
+input_root = "corpus"
+input = "tacet/tacet.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -7,7 +7,7 @@
 //! It embeds the `faber explain` reference: every corpus exemplum whose
 //! frontmatter declares `explains = [...]`, plus `legacy-redirects.toml`.
 //!
-//! It embeds the runtime support sources (`runtime/*`, `crates/radix-host-abi`)
+//! It embeds the runtime support sources (`runtime/*`, `crates/radix-abi`)
 //! so an installed binary can materialize a path-dependency root, and the
 //! Norma library (`lib/norma` source, locale packs and manifests) so an
 //! installed binary resolves `norma:*` without a checkout.
@@ -39,14 +39,15 @@ fn main() {
     embed_runtime(&manifest_dir.join("../.."), &out_dir);
 }
 
-/// Repository-relative roots whose files the binary carries.
+/// Repository-relative roots whose files the binary carries. A root absent
+/// from the tree (a checkout without the target runtimes) is not embedded.
 const RUNTIME_ROOTS: &[&str] = &[
     "runtime/rust",
     "runtime/go",
     "runtime/typescript",
     "runtime/swift",
     "runtime/llvm",
-    "crates/radix-host-abi",
+    "crates/radix-abi",
     "crates/faber-leaf",
     "lib/norma/src",
     "lib/norma/locale",
@@ -66,6 +67,9 @@ fn embed_runtime(repo_root: &Path, out_dir: &Path) {
     let mut files = Vec::new();
     for root in RUNTIME_ROOTS {
         let dir = repo_root.join(root);
+        if !dir.is_dir() {
+            continue;
+        }
         println!("cargo:rerun-if-changed={}", dir.display());
         collect_runtime_files(&dir, &mut files);
     }

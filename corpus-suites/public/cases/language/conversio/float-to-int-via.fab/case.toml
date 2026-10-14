@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/float-to-int-via.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/float-to-int-via.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

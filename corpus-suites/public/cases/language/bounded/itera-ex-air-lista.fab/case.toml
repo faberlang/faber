@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/bounded/itera-ex-air-lista.fab"
+group = "language"
+input_root = "corpus"
+input = "bounded/itera-ex-air-lista.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM059.itera_loop"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM059.itera_loop"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM059:itera_loop"

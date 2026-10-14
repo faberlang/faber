@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/figendum/figendum.fab"
+group = "language"
+input_root = "corpus"
+input = "figendum/figendum.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

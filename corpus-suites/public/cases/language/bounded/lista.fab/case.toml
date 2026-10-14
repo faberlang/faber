@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/bounded/lista.fab"
+group = "language"
+input_root = "corpus"
+input = "bounded/lista.fab"
+
+
+[expect]
+check_only = true

@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/commune/commune.fab"
+group = "language"
+input_root = "corpus"
+input = "commune/commune.fab"
+
+
+[expect]
+check_only = true

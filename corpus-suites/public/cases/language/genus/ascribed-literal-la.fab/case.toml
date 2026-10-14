@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/genus/ascribed-literal-la.fab"
+group = "language"
+input_root = "corpus"
+input = "genus/ascribed-literal-la.fab"
+
+
+[expect]
+check_only = true

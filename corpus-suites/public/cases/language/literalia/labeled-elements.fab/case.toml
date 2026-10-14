@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/literalia/labeled-elements.fab"
+group = "language"
+input_root = "corpus"
+input = "literalia/labeled-elements.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

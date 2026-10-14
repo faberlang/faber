@@ -4,12 +4,16 @@
 //! extract emitted text or structured diagnostic facts. Target-specific binding
 //! assertions stay in each `*_text_test.rs` module.
 
+#[cfg(feature = "mir-metal")]
+use crate::MetalTextOutput;
+#[cfg(feature = "mir-wgsl")]
+use crate::WgslTextOutput;
 use crate::codegen::Target;
 use crate::diagnostics::Diagnostic;
 use crate::driver::ModuleCompileRequest;
 use crate::driver::compile;
 use crate::test_support::test_session;
-use crate::{CompileResult, MetalTextOutput, Output, WgslTextOutput};
+use crate::{CompileResult, Output};
 
 /// Format one diagnostic with code, issue, and named args (MIR probe error strings).
 #[must_use]
@@ -74,6 +78,7 @@ pub fn compile_target_text_expect_failure(target: Target, name: &str, source: &s
 /// # Errors
 ///
 /// Returns joined diagnostic facts as a string when compilation fails.
+#[cfg(feature = "mir-wgsl")]
 pub fn compile_wgsl_text_output(source: &str) -> Result<WgslTextOutput, String> {
     compile_target_typed_output(Target::MirWgsl, "wgsl.fab", source)
 }
@@ -83,6 +88,7 @@ pub fn compile_wgsl_text_output(source: &str) -> Result<WgslTextOutput, String> 
 /// # Errors
 ///
 /// Returns joined diagnostic facts as a string when compilation fails.
+#[cfg(feature = "mir-wgsl")]
 pub fn compile_wgsl_text(source: &str) -> Result<String, String> {
     compile_wgsl_text_output(source).map(|output| output.code)
 }
@@ -92,6 +98,7 @@ pub fn compile_wgsl_text(source: &str) -> Result<String, String> {
 /// # Errors
 ///
 /// Returns joined diagnostic facts as a string when compilation fails.
+#[cfg(feature = "mir-metal")]
 pub fn compile_metal_text_output(source: &str) -> Result<MetalTextOutput, String> {
     compile_target_typed_output(Target::MirMetal, "metal.fab", source)
 }
@@ -101,25 +108,30 @@ pub fn compile_metal_text_output(source: &str) -> Result<MetalTextOutput, String
 /// # Errors
 ///
 /// Returns joined diagnostic facts as a string when compilation fails.
+#[cfg(feature = "mir-metal")]
 pub fn compile_metal_text(source: &str) -> Result<String, String> {
     compile_metal_text_output(source).map(|output| output.code)
 }
 
+#[cfg(feature = "mir-llvm")]
 #[must_use]
 pub fn compile_llvm_text(source: &str) -> String {
     compile_target_text_or_panic(Target::MirLlvm, "llvm.fab", source)
 }
 
+#[cfg(feature = "mir-wasm")]
 #[must_use]
 pub fn compile_wasm_text(source: &str) -> String {
     compile_target_text_or_panic(Target::MirWasm, "wasm.fab", source)
 }
 
+#[cfg(feature = "mir-wasm")]
 #[must_use]
 pub fn compile_wasm_text_error(source: &str) -> String {
     compile_target_text_expect_failure(Target::MirWasm, "wasm.fab", source)
 }
 
+#[cfg(any(feature = "mir-wgsl", feature = "mir-metal"))]
 fn compile_target_typed_output<T>(target: Target, name: &str, source: &str) -> Result<T, String>
 where
     T: TargetTextOutput,
@@ -133,18 +145,24 @@ where
 
 fn target_code(target: Target, output: Option<Output>) -> Option<String> {
     match (target, output?) {
+        #[cfg(feature = "mir-wgsl")]
         (Target::MirWgsl, Output::WgslText(output)) => Some(output.code),
+        #[cfg(feature = "mir-metal")]
         (Target::MirMetal, Output::MetalText(output)) => Some(output.code),
+        #[cfg(feature = "mir-wasm")]
         (Target::MirWasm, Output::WasmText(output)) => Some(output.code),
+        #[cfg(feature = "mir-llvm")]
         (Target::MirLlvm, Output::LlvmText(output)) => Some(output.code),
         _ => None,
     }
 }
 
+#[cfg(any(feature = "mir-wgsl", feature = "mir-metal"))]
 trait TargetTextOutput: Sized {
     fn from_output(output: Option<Output>) -> Option<Self>;
 }
 
+#[cfg(feature = "mir-wgsl")]
 impl TargetTextOutput for WgslTextOutput {
     fn from_output(output: Option<Output>) -> Option<Self> {
         match output? {
@@ -154,6 +172,7 @@ impl TargetTextOutput for WgslTextOutput {
     }
 }
 
+#[cfg(feature = "mir-metal")]
 impl TargetTextOutput for MetalTextOutput {
     fn from_output(output: Option<Output>) -> Option<Self> {
         match output? {

@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/implendum/implendum-dispatch.fab"
+group = "language"
+input_root = "corpus"
+input = "implendum/implendum-dispatch.fab"
+
+
+[expect]
+check_only = true

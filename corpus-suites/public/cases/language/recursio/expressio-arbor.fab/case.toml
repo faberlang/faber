@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/recursio/expressio-arbor.fab"
+group = "language"
+input_root = "corpus"
+input = "recursio/expressio-arbor.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

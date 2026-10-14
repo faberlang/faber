@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/mutabilitas/own-param-writable.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/own-param-writable.fab"
+
+
+[expect]
+check_only = true

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/implet/implet.fab"
+group = "language"
+input_root = "corpus"
+input = "implet/implet.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

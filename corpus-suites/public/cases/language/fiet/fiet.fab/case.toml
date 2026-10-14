@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/fiet/fiet.fab"
+group = "language"
+input_root = "corpus"
+input = "fiet/fiet.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

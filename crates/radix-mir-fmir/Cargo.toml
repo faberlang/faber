@@ -3,7 +3,7 @@ name = "radix-mir-fmir"
 version = "0.84.0"
 edition = "2024"
 description = "Portable MIR package image (FMIR) schema, codec, and validation for Radix"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
@@ -16,7 +16,7 @@ handroll = { path = "../handroll" }
 toml = "1.1.2"
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 # DDCP4-U4 shared conformance fixture: drives ONE canonical DeviceProgram
 # through BOTH leaf emitters. The dev-dependency cycle (the leaves depend on
 # radix-mir-fmir) is the cargo-supported test-only exception.

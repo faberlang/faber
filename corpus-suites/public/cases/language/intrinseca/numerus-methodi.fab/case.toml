@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/intrinseca/numerus-methodi.fab"
+group = "language"
+input_root = "corpus"
+input = "intrinseca/numerus-methodi.fab"
+
+
+[expect]
+check_only = true

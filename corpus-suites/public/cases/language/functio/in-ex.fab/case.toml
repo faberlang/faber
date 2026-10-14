@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/functio/in-ex.fab"
+group = "language"
+input_root = "corpus"
+input = "functio/in-ex.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

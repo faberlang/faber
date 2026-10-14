@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/rounding-glyphs-la.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/rounding-glyphs-la.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

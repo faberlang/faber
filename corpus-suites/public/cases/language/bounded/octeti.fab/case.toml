@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/bounded/octeti.fab"
+group = "language"
+input_root = "corpus"
+input = "bounded/octeti.fab"
+
+
+[expect]
+check_only = true

@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/tensor/edge-views.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/edge-views.fab"
+
+
+[expect]
+check_only = true

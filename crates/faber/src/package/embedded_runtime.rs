@@ -1,7 +1,8 @@
 //! Runtime support sources carried in the `faber` binary.
 //!
 //! `build.rs` embeds every file under `runtime/{rust,go,typescript,swift,llvm}`
-//! and `crates/radix-host-abi` (runtime/llvm depends on it by relative path).
+//! and `crates/radix-abi` (runtime/llvm depends on it by relative path); a
+//! root the tree does not have is not embedded.
 //! An installed binary has no repository checkout, so
 //! [`embedded_runtime_root`] materializes the table once under a cache
 //! directory and returns it as a repository-shaped root: generated manifests

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/sort/set-asc-desc.fab"
+group = "language"
+input_root = "corpus"
+input = "sort/set-asc-desc.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

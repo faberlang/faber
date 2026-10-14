@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/bounded/exact-bound-lattice.fab"
+group = "language"
+input_root = "corpus"
+input = "bounded/exact-bound-lattice.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

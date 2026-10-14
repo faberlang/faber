@@ -27,6 +27,7 @@ fn emit(target: Target, source: &str) -> String {
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_checks_the_awaited_value_after_the_await() {
     let code = emit(Target::HirRust, NARROWING);
@@ -36,6 +37,7 @@ fn rust_checks_the_awaited_value_after_the_await() {
     );
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn go_checks_the_awaited_value() {
     let code = emit(Target::HirGo, NARROWING);
@@ -45,6 +47,7 @@ fn go_checks_the_awaited_value() {
     );
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn typescript_checks_the_value_after_await() {
     let code = emit(Target::HirTypeScript, NARROWING);
@@ -58,6 +61,7 @@ fn typescript_checks_the_value_after_await() {
     assert!(!code.contains("v < lo || v > hi"), "{code}");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn an_assignable_await_bind_emits_no_check() {
     let source = r"

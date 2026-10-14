@@ -1,0 +1,14 @@
+version = 1
+id = "corpus/bounded/conversio-lista-to-bounded-lista.fab"
+group = "language"
+input_root = "corpus"
+input = "bounded/conversio-lista-to-bounded-lista.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "faberscript unsupported: runtime conversio to bounded lista"

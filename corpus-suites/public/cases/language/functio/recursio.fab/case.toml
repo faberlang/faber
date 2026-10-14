@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/functio/recursio.fab"
+group = "language"
+input_root = "corpus"
+input = "functio/recursio.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

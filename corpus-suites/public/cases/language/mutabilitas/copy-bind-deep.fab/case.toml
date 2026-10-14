@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/mutabilitas/copy-bind-deep.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/copy-bind-deep.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

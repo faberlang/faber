@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/itera/ergo-body.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/ergo-body.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,19 @@
+version = 1
+id = "corpus/integratio/destructura-sparsa.fab"
+group = "language"
+input_root = "corpus"
+input = "integratio/destructura-sparsa.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "known-fail"
+phase = "emit"
+diagnostic_contains = "invalid MIR: aggregate spread type mismatch"
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "invalid MIR: aggregate spread type mismatch"

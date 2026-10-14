@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tacebit/tacebit.fab"
+group = "language"
+input_root = "corpus"
+input = "tacebit/tacebit.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tabula/tabula.fab"
+group = "language"
+input_root = "corpus"
+input = "tabula/tabula.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -12,20 +12,36 @@ use std::path::{Path, PathBuf};
 
 use crate::input_shape::locale_without_package_error;
 
+#[cfg(feature = "hir-rust")]
 use super::cargo::{
     emit_generated_crate_with_runtime_plan, invoke_cargo_build, invoke_cargo_build_library,
     lock_generated_crate_build,
 };
+#[cfg(any(
+    feature = "hir-rust",
+    feature = "hir-go",
+    feature = "hir-ts",
+    feature = "mir-wasm"
+))]
+use super::discover_build_layout as discover_package_layout;
 #[cfg(feature = "hir-go")]
 use super::go_build::{GoBuildLayout, emit_go_module_with_postprocess, invoke_go_build};
+#[cfg(feature = "hir-rust")]
 use super::manifest::FaberManifest;
 use super::manifest_build_target_for_input;
+#[cfg(feature = "hir-rust")]
+use super::package_host_selection_diagnostic;
+#[cfg(any(feature = "hir-rust", feature = "hir-ts"))]
+use super::read_manifest;
 #[cfg(feature = "mir-llvm")]
 use super::{LlvmHostProfile, build_host_program};
-use super::{
-    MANIFEST_FILE, config_with_locale, discover_build_layout as discover_package_layout,
-    package_host_selection_diagnostic, read_manifest,
-};
+use super::{MANIFEST_FILE, config_with_locale};
+#[cfg(any(
+    feature = "hir-rust",
+    feature = "hir-go",
+    feature = "hir-ts",
+    feature = "mir-wasm"
+))]
 use radix::program::discovery::BuildLayout;
 
 /// Layout for a package-mode build of `input`.
@@ -34,6 +50,12 @@ use radix::program::discovery::BuildLayout;
 /// with no `faber.toml` above it has no package of its own: its generated
 /// project and `target/` go under `out_dir`, never into the source directory.
 /// The layout's `package_root` and `manifest_path` still name the source side.
+#[cfg(any(
+    feature = "hir-rust",
+    feature = "hir-go",
+    feature = "hir-ts",
+    feature = "mir-wasm"
+))]
 fn discover_build_layout(
     input: &Path,
     out_dir: &Path,
@@ -53,6 +75,12 @@ fn discover_build_layout(
 
 /// True for a regular source file that is not a manifest and has no
 /// `faber.toml` in any ancestor directory.
+#[cfg(any(
+    feature = "hir-rust",
+    feature = "hir-go",
+    feature = "hir-ts",
+    feature = "mir-wasm"
+))]
 fn is_manifestless_single_file(input: &Path) -> bool {
     input.is_file()
         && input.file_name().and_then(|name| name.to_str()) != Some(MANIFEST_FILE)
@@ -397,6 +425,8 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
         }
     }
 
+    // WHY: browser products are TypeScript-target builds (private backend).
+    #[cfg(feature = "hir-ts")]
     if is_package && target == Target::HirTypeScript {
         let layout = match discover_build_layout(&input_path, &command.out_dir) {
             Ok(l) => l,
@@ -488,6 +518,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
 
     // Package Rust builds own a generated crate under target/faber/ and let
     // Cargo place artifacts in sibling debug/release directories.
+    #[cfg(feature = "hir-rust")]
     if is_package && target == Target::HirRust {
         let layout = match discover_build_layout(&input_path, &command.out_dir) {
             Ok(l) => l,
@@ -560,6 +591,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
     // Single-file Rust builds that need the `faber` runtime / tokio (from HIR facts,
     // not emitted-text sniffing) emit a generated Cargo crate under
     // `target/faber/`. Programs without those deps keep the bare `.rs` path.
+    #[cfg(feature = "hir-rust")]
     if target == Target::HirRust {
         match single_file_rust_runtime_plan(&config, &input_path) {
             Ok(plan) if plan.requires_generated_crate() => {
@@ -604,6 +636,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
 
 /// Emit the generated crate with its runtime plan and delegate binary
 /// production to Cargo, returning the produced binary path.
+#[cfg(feature = "hir-rust")]
 fn emit_crate_and_build(
     layout: &BuildLayout,
     code: &str,
@@ -682,21 +715,6 @@ fn single_file_rust_runtime_plan(
         // A file with no entry point cannot be a binary crate: build a library.
         library_crate: analysis.hir.entry.is_none(),
     })
-}
-
-#[cfg(not(feature = "hir-rust"))]
-fn single_file_rust_runtime_plan(
-    _config: &radix::module::Config,
-    input_path: &Path,
-) -> Result<super::RustRuntimePlan, Vec<radix::module::Diagnostic>> {
-    Err(vec![
-        crate::package_diagnostic_error(
-            "target `rust` is not available in this faber build; rebuild with feature `hir-rust`",
-        )
-        .with_file(input_path.display().to_string())
-        .with_arg("issue", "package_target_unavailable")
-        .with_arg("target", "rust"),
-    ])
 }
 
 /// Resolve the build target: an explicit CLI target wins, otherwise the

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/ad/serve-plain.fab"
+group = "language"
+input_root = "corpus"
+input = "ad/serve-plain.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

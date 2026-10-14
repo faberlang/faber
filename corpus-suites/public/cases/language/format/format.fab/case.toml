@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/format/format.fab"
+group = "language"
+input_root = "corpus"
+input = "format/format.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

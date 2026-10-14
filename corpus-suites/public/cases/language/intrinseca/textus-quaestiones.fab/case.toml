@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/intrinseca/textus-quaestiones.fab"
+group = "language"
+input_root = "corpus"
+input = "intrinseca/textus-quaestiones.fab"
+
+
+[expect]
+check_only = true

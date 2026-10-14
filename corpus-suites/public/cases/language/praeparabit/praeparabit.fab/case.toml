@@ -1,0 +1,19 @@
+version = 1
+id = "corpus/praeparabit/praeparabit.fab"
+group = "language"
+input_root = "corpus"
+input = "praeparabit/praeparabit.fab"
+
+
+[expect]
+check_only = true
+
+[targets.roundtrip]
+outcome = "known-fail"
+phase = "emit"
+diagnostic_contains = "canonical Faber output would drop source construct `hook:Praeparabit:all=false`"
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "no entry function in MIR program"

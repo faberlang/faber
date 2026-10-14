@@ -1,0 +1,4 @@
+\d+
+(?i)[a-z]+
+rejected: syntax
+rejected: lookahead

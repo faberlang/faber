@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/fac/fac-dum.fab"
+group = "language"
+input_root = "corpus"
+input = "fac/fac-dum.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

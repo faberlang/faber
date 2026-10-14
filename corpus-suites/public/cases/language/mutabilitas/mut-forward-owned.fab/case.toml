@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/mutabilitas/mut-forward-owned.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/mut-forward-owned.fab"
+
+
+[expect]
+check_only = true

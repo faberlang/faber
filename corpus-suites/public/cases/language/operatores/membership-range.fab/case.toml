@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/operatores/membership-range.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/membership-range.fab"
+
+
+[expect]
+check_only = true

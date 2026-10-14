@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/membrum/membrum.fab"
+group = "language"
+input_root = "corpus"
+input = "membrum/membrum.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

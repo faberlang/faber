@@ -3,7 +3,7 @@ name = "radix-hir-faber"
 version = "0.84.0"
 edition = "2024"
 description = "Canonical Faber HIR re-emission backend for the Radix compiler"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
@@ -17,7 +17,7 @@ radix-types = { path = "../radix-types" }
 rustc-hash = "2"
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 radix-parser = { path = "../radix-parser" }
 
 [lints.clippy]

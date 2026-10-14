@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/itera/apud-rank3.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/apud-rank3.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

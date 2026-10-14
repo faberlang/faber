@@ -709,6 +709,7 @@ fn probe_air_gaps(registry_gaps: &BTreeSet<String>) -> BTreeSet<String> {
     gaps
 }
 
+#[cfg(feature = "device")]
 #[test]
 fn bijection_ratchet_equals_probe_derived_gap_set() {
     let session = Session::new(Config::default().with_latin_locale());

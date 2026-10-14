@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/itera/cape-admit.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/cape-admit.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

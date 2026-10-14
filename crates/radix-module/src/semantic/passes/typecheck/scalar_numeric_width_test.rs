@@ -265,6 +265,7 @@ functio add(modulus<u32> x, u32 y) → modulus<u32> {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn modular_word_compares_with_numerus_by_value() {
     // d11-6 rulings 12, 22: a comparison stores nothing, so a word beside a
@@ -281,6 +282,7 @@ functio constant(modulus<u8> a) → bivalens {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn saturating_word_compares_with_numerus_and_constants_by_value() {
     test_support::assert_accepts_la(

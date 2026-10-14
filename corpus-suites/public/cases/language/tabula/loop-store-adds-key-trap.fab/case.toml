@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/tabula/loop-store-adds-key-trap.fab"
+group = "language"
+input_root = "corpus"
+input = "tabula/loop-store-adds-key-trap.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "map changed size during iteration"
+check_only = false

@@ -3,7 +3,7 @@ name = "radix-hir"
 version = "0.84.0"
 edition = "2024"
 description = "HIR nodes and visitors for the Radix compiler"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
@@ -19,5 +19,5 @@ workspace = true
 
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 serde_json = "1"

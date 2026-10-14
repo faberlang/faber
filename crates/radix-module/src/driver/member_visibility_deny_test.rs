@@ -29,6 +29,7 @@ fn compile_with_policy(policy: WarnPolicy) -> CompileResult {
     )
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn member_publica_is_a_warning_by_default() {
     let result = compile_with_policy(WarnPolicy::default());

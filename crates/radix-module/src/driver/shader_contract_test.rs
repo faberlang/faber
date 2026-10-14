@@ -1,3 +1,6 @@
+// The shader contract is a WGSL-target contract: every case compiles to WGSL.
+#![cfg(feature = "mir-wgsl")]
+
 use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, ModuleCompileRequest, analyze_source, compile};
 use crate::mir::MirKernelShaderStage;

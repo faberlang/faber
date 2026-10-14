@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/intrinseca/fractus-rotundatio.fab"
+group = "language"
+input_root = "corpus"
+input = "intrinseca/fractus-rotundatio.fab"
+
+
+[expect]
+check_only = true

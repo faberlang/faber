@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/summa/extrema-ex-retired.fab"
+group = "language"
+input_root = "corpus"
+input = "summa/extrema-ex-retired.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "reducta_legacy_head"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "reducta_legacy_head"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "reducta_legacy_head"

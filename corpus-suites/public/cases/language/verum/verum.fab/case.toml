@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/verum/verum.fab"
+group = "language"
+input_root = "corpus"
+input = "verum/verum.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

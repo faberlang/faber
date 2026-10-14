@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/decimal/conversio_channel.fab"
+group = "language"
+input_root = "corpus"
+input = "decimal/conversio_channel.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

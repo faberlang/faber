@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/clausura/error-channel.fab"
+group = "language"
+input_root = "corpus"
+input = "clausura/error-channel.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

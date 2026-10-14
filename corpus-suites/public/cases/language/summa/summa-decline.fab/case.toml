@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/summa/summa-decline.fab"
+group = "language"
+input_root = "corpus"
+input = "summa/summa-decline.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM010.reducta_term_type_non_scalar"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM010.reducta_term_type_non_scalar"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM010:reducta_filum_requires_nucleum_kernel"

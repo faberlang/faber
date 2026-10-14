@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/nota/gradus.fab"
+group = "language"
+input_root = "corpus"
+input = "nota/gradus.fab"
+
+
+[expect]
+check_only = true

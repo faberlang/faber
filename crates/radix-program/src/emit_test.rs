@@ -74,6 +74,7 @@ entry = "main.fab"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_multi_unit_sibling_exports_resolve_via_package_index() {
     // FBR-P2-007: Rust sibling export resolution must use one package-wide
@@ -222,6 +223,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_package_deduplicates_imported_tensor_edge_policy_providers() {
     let dir = temp_dir("tensor-edge-policy-provider-dedup");

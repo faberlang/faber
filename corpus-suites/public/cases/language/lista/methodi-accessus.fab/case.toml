@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/lista/methodi-accessus.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/methodi-accessus.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

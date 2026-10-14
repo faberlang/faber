@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/format/decimal.fab"
+group = "language"
+input_root = "corpus"
+input = "format/decimal.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

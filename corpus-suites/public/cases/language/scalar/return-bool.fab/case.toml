@@ -1,0 +1,14 @@
+version = 1
+id = "corpus/scalar/return-bool.fab"
+group = "language"
+input_root = "corpus"
+input = "scalar/return-bool.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "no entry function in MIR program"

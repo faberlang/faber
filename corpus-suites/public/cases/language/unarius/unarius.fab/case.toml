@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/unarius/unarius.fab"
+group = "language"
+input_root = "corpus"
+input = "unarius/unarius.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

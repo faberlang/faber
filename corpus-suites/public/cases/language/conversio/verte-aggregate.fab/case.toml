@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/verte-aggregate.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/verte-aggregate.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

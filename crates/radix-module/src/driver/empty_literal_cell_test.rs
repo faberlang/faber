@@ -57,6 +57,7 @@ fn empty_list_argument_without_cell_is_named_error() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn typed_empty_cells_accept_empty_literals() {
     let session = test_session(Target::HirRust);

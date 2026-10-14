@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/elige/negative-patterns.fab"
+group = "language"
+input_root = "corpus"
+input = "elige/negative-patterns.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

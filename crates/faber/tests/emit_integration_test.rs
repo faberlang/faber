@@ -112,6 +112,7 @@ entry = "main.fab"
     package
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_wgsl_text_on_single_fab_file_succeeds() {
     let kernel = corpus_root().join("vector/kernel.fab");
@@ -128,6 +129,7 @@ fn emit_wgsl_text_on_single_fab_file_succeeds() {
     );
 }
 
+#[cfg(feature = "mir-llvm")]
 #[test]
 fn emit_llvm_text_on_single_fab_file_succeeds() {
     let source = corpus_root().join("incipit/salve-munde.fab");
@@ -144,6 +146,7 @@ fn emit_llvm_text_on_single_fab_file_succeeds() {
     );
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn emit_reflection_prints_wgsl_sidecar_json() {
     let kernel = corpus_root().join("vector/kernel.fab");
@@ -176,6 +179,7 @@ fn emit_faber_target_routes_to_canonical_faber_output() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn package_emit_honors_output_path() {
     let package = write_basic_package(
@@ -311,6 +315,7 @@ fn check_reader_locale_accepts_manifest_file_input() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn emit_reader_locale_accepts_direct_entry_file_input() {
     let example = reader_locale_example_root("th-TH");
@@ -330,6 +335,7 @@ fn emit_reader_locale_accepts_direct_entry_file_input() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn emit_reader_locale_accepts_manifest_file_input() {
     let example = reader_locale_example_root("th-TH");

@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/typus/typus.fab"
+group = "language"
+input_root = "corpus"
+input = "typus/typus.fab"
+
+
+[expect]
+check_only = true

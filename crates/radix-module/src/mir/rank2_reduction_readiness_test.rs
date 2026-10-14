@@ -37,6 +37,7 @@ fn readiness_matrix_covers_rank2_and_reductions_across_requested_paths() {
     }
 }
 
+#[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_rows_match_native_systems_checked_debt() {
     for family in [
@@ -60,6 +61,7 @@ fn wgsl_rows_match_native_systems_checked_debt() {
     assert!(!capabilities.package);
 }
 
+#[cfg(feature = "mir-llvm")]
 #[test]
 fn llvm_rows_match_import_probe_only_operation_floor() {
     for family in [

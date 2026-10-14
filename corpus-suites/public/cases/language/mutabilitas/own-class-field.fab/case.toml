@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/mutabilitas/own-class-field.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/own-class-field.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

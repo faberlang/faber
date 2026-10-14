@@ -33,6 +33,7 @@ pub mod binding;
 mod binding_manifest;
 #[cfg(feature = "hir-rust")]
 mod binding_probe;
+#[cfg(feature = "hir-rust")]
 mod cargo;
 mod cmd;
 pub(crate) mod composite_plan;
@@ -47,7 +48,7 @@ mod fhir;
 mod go_build;
 #[cfg(feature = "device-runtime")]
 mod host_factory;
-#[cfg_attr(not(feature = "hir-rust"), path = "library_link_unavailable.rs")]
+#[cfg(feature = "hir-rust")]
 mod library_link;
 #[cfg(feature = "mir-llvm")]
 mod llvm_host;
@@ -57,21 +58,26 @@ pub mod mir;
 #[cfg(test)]
 // WHY: packed-projection seam has no production caller yet; exercised by packed_projection_test.rs
 mod packed_projection;
+#[cfg(feature = "hir-ts")]
 mod product;
+#[cfg(feature = "hir-rust")]
 mod runtime_dependency;
+#[cfg(any(feature = "hir-rust", feature = "hir-go", feature = "hir-ts"))]
 mod runtime_sources;
 #[cfg(feature = "hir-rust")]
 mod rust_runtime_dependency;
+mod temp_dir;
 mod test_route;
 
 #[cfg(feature = "hir-rust")]
 #[cfg(test)]
 pub(crate) use binding::verify_library_binding_shapes;
 pub use binding::{load_target_bindings, verify_library_bindings};
+#[cfg(feature = "hir-rust")]
 pub(crate) use cargo::{
     RustRuntimePlan, package_host_selection_diagnostic, rust_runtime_plan_for_package,
-    unique_temp_sibling,
 };
+#[cfg(feature = "hir-rust")]
 #[cfg(test)]
 pub(crate) use cargo::{
     emit_generated_crate_with_runtime_plan, invoke_cargo_build, invoke_cargo_build_library,
@@ -81,6 +87,7 @@ pub(crate) use cargo::{
 // `invoke_cargo_test` has no consumer in bin, lib, or tests (body retained,
 // deletion is S09-4's fix); `emit_generated_crate` is consumed only by
 // `package_test.rs`, hence the cfg(test) gate.
+#[cfg(feature = "hir-rust")]
 #[cfg(test)]
 pub use cargo::emit_generated_crate;
 pub use cmd::{
@@ -109,8 +116,10 @@ pub use manifest::{manifest_device_choice, resolve_device_selection};
 pub use mir::run_fmir_image_bytes_with_stdio;
 #[cfg(feature = "runner")]
 pub use mir::with_lowered_package_mir;
+#[cfg(feature = "hir-ts")]
 pub(crate) use product::build_browser_product_with_postprocess;
 #[cfg(test)]
+#[cfg(feature = "hir-ts")]
 pub(crate) use product::{build_browser_product, build_browser_product_static_assets};
 use radix::module::codegen::Target;
 use radix::module::diagnostics::Diagnostic;
@@ -118,6 +127,7 @@ use radix::module::driver::Config;
 use radix::program::discovery::PackageSpec;
 use radix::program::library::{LibraryInterfaceCache, LibraryResolver, LockedLibraryPackage};
 use std::path::{Path, PathBuf};
+pub(crate) use temp_dir::unique_temp_sibling;
 pub use test_route::{analyze_package_for_tests, test_source_filter_for_input};
 
 /// Materialized repository-shaped root for the runtime embedded in this binary.
@@ -421,6 +431,7 @@ pub(crate) fn library_cache_with_config(config: &Config) -> LibraryInterfaceCach
     LibraryInterfaceCache::with_config(config).with_locale_loader(load_locale_pack_for_input)
 }
 
+#[cfg(feature = "hir-rust")]
 pub(crate) fn library_cache_default() -> LibraryInterfaceCache {
     LibraryInterfaceCache::default().with_locale_loader(load_locale_pack_for_input)
 }

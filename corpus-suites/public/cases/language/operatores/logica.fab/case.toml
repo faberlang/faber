@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/logica.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/logica.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

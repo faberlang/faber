@@ -80,6 +80,7 @@ fn corpus_accepts_package_directory_with_entry_golden() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_runs_pilot_suite_across_source_package_and_rejection_cases() {
     let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-suites/pilot");
@@ -308,6 +309,7 @@ fn corpus_suite_pins_expected_stdout_mismatch_as_known_failure() {
     );
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn corpus_external_target_pins_a_nonzero_exit_without_diagnostics() {
     let temp = tempfile::tempdir().expect("temporary suite");
@@ -416,6 +418,7 @@ fn corpus_suite_rejects_rooted_input_path_traversal() {
     assert!(String::from_utf8_lossy(&output.stdout).contains("case path must stay relative"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_rust_pilot_builds_once_and_checks_generated_binaries() {
     let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-suites/pilot");
@@ -494,6 +497,7 @@ fn corpus_rust_pilot_builds_once_and_checks_generated_binaries() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_rust_never_runs_a_stale_executable_after_build_failure() {
     let temp = tempfile::tempdir().expect("temporary suite");
@@ -566,6 +570,7 @@ fn corpus_rust_never_runs_a_stale_executable_after_build_failure() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_rust_replaces_stable_executable_when_emitted_program_changes() {
     let temp = tempfile::tempdir().expect("temporary suite");
@@ -626,6 +631,7 @@ fn corpus_rust_replaces_stable_executable_when_emitted_program_changes() {
     assert_eq!(rows[0]["artifact"]["state"], "updated");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_rust_rejects_a_wrong_golden_after_building() {
     let temp = tempfile::tempdir().expect("temporary suite");
@@ -658,6 +664,7 @@ fn corpus_rust_rejects_a_wrong_golden_after_building() {
     assert_eq!(rows[1]["build"]["cargo_invocations"], 1);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_rust_known_failure_becoming_green_requires_reclassification() {
     let temp = tempfile::tempdir().expect("temporary suite");
@@ -703,6 +710,7 @@ fn corpus_rust_known_failure_becoming_green_requires_reclassification() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_rust_reports_a_rejection_as_its_own_outcome() {
     let temp = tempfile::tempdir().expect("temporary suite");
@@ -745,6 +753,7 @@ fn corpus_rust_reports_a_rejection_as_its_own_outcome() {
     assert_eq!(summary["build"]["cargo_invocations"], 0);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_canonical_reports_a_rejection_as_its_own_outcome() {
     let suite = probe_suite(
@@ -916,6 +925,7 @@ fn corpus_requires_each_case_to_classify_the_selected_target() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_external_recipe_builds_and_checks_the_program_golden() {
     let temp = tempfile::tempdir().expect("temporary suite");
@@ -1025,6 +1035,7 @@ fn missing_tool_fails_off_linux_without_opt_out() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_does_not_report_an_all_inapplicable_target_as_green() {
     // The gpu target refuses to run at all without `llvm-as`/`opt`; off the
@@ -1248,6 +1259,7 @@ fn corpus_rejects_pins_the_target_cannot_judge_instead_of_panicking() {
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_rust_and_canonical_emit_known_failure_cannot_hide_an_unexpected_pass() {
     for target in ["rust", "canonical"] {
@@ -1270,6 +1282,7 @@ fn corpus_rust_and_canonical_emit_known_failure_cannot_hide_an_unexpected_pass()
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_rust_and_canonical_emit_pass_without_a_diagnostic_fragment() {
     for target in ["rust", "canonical"] {
@@ -1336,6 +1349,7 @@ fn corpus_times_out_a_hanging_case_and_kills_its_descendants() {
     assert!(!alive(), "the timed-out case's descendant must be killed");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_does_not_report_an_all_inapplicable_run_as_green() {
     let not_applicable = |target: &str| {
@@ -1467,6 +1481,7 @@ fn corpus_embedded_only_refuses_library_home_env() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_embedded_only_rust_builds_against_materialized_runtime() {
     let temp = tempfile::tempdir().expect("temporary suite");

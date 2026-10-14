@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/bits/bits-bulk-la.fab"
+group = "language"
+input_root = "corpus"
+input = "bits/bits-bulk-la.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

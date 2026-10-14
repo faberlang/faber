@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/clausura/failable-in-closure.fab"
+group = "language"
+input_root = "corpus"
+input = "clausura/failable-in-closure.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

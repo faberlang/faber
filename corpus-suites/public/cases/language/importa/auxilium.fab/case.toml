@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/importa/auxilium.fab"
+group = "language"
+input_root = "corpus"
+input = "importa/auxilium.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

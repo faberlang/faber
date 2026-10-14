@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/rumpe/rumpe-top-level-error.fab"
+group = "language"
+input_root = "corpus"
+input = "rumpe/rumpe-top-level-error.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM030.break_outside_breakable"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM030.break_outside_breakable"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM030:break_outside_breakable"

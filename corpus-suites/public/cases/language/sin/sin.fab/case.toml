@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/sin/sin.fab"
+group = "language"
+input_root = "corpus"
+input = "sin/sin.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

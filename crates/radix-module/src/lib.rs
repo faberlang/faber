@@ -83,6 +83,7 @@ pub mod intrinsics;
 pub mod kernel;
 pub mod lexer;
 pub mod live_tuus_cursor;
+#[cfg(feature = "mir-llvm")]
 pub mod llvm_host;
 pub mod locale;
 #[cfg(feature = "mir-core")]

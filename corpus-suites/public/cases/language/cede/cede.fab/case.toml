@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/cede/cede.fab"
+group = "language"
+input_root = "corpus"
+input = "cede/cede.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

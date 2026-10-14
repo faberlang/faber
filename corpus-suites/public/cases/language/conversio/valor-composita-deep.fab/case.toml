@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/valor-composita-deep.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/valor-composita-deep.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

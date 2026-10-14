@@ -8,6 +8,7 @@ use crate::test_support::test_session;
 
 // ── reader-pack integration ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_uses_locale_pack_for_keyword_lexing() {
     let config = Config::default()
@@ -20,6 +21,7 @@ fn compile_uses_locale_pack_for_keyword_lexing() {
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_accepts_en_require_surface_with_alternate_exit() {
     let pack_path = crate::locale::workspace_locale_pack_path("en");
@@ -60,6 +62,7 @@ fn compile_rejects_en_require_in_arrowless_function() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_en_empty_marker_and_is_empty_intrinsic() {
     // en-pack-surface-fidelity V-1: the empty-collection marker is `empty`,
@@ -107,6 +110,7 @@ fn compile_en_vacua_marker_rejected() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_la_vacua_marker_untouched() {
     let pack = crate::locale::latin_locale_pack();
@@ -160,6 +164,7 @@ fn compile_rejects_undeclared_latin_keyword_in_grammar_position() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_uses_locale_pack_for_primitive_type_surface() {
     let config = Config::default()
@@ -231,6 +236,7 @@ fn deny_warnings_does_not_escalate_undeclared_latin_keyword_failure() {
 
 // ── S2-U2 keyword proof matrix: Latin as ordinary identifier ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_latin_spelling_usable_as_ordinary_identifier_under_pack() {
     // S2-U2 proof (b): an undeclared Latin spelling under a non-`la` pack is
@@ -279,6 +285,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_identity_row_accepts_canonical_spelling_under_pack() {
     // S2-U2 proof (c): an explicit identity row (`canonical == surface`)
@@ -321,6 +328,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_latin_keywords_under_la_and_no_pack() {
     // S2-U2 proof (d): `la` and no-pack stay registry-direct — the canonical
@@ -346,6 +354,7 @@ fn compile_latin_keywords_under_la_and_no_pack() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_recognizes_localized_tokenless_batch_a_keywords() {
     // Batch A made `modulus`/`iuncta` tokenless. Under a reader pack their
@@ -389,6 +398,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_recognizes_localized_tokenless_batch_b_keywords() {
     // Batch B made the builtin I/O words tokenless. Under a reader pack their
@@ -436,6 +446,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_recognizes_localized_tokenless_batch_d_keywords() {
     // Batch D made the logical operators tokenless. Under a reader pack their
@@ -484,6 +495,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_recognizes_localized_tokenless_batch_e_keywords() {
     // Batch E made the declaration introducers tokenless. Under a reader pack
@@ -526,6 +538,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_recognizes_localized_tokenless_batch_f_keywords() {
     // Batch F made the control-flow keywords tokenless. Under a reader pack
@@ -579,6 +592,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_recognizes_localized_tokenless_batch_g_keywords() {
     // Batch G (the long tail) made these words tokenless. Under a reader pack
@@ -617,6 +631,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_exact_tokenless_spellings_do_not_suggest_reader002() {
     // Regression (P1): an exact declared keyword/type spelling is not a
@@ -674,6 +689,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_one_letter_parameter_names_do_not_suggest_reader002() {
     let pack_path = crate::locale::workspace_locale_pack_path("en");
@@ -709,6 +725,7 @@ main {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_localized_est_type_check_resolves_primitive_type() {
     // Regression (P2): `est <type>` with a fully localized primitive type
@@ -754,6 +771,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_accepts_exempla_metadata_in_frontmatter() {
     let session = test_session(Target::HirRust);
@@ -762,6 +780,7 @@ fn compile_accepts_exempla_metadata_in_frontmatter() {
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_strips_frontmatter_before_analysis() {
     let session = test_session(Target::HirRust);
@@ -812,6 +831,7 @@ fn compile_rejects_c_style_line_comment() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_accepts_frontmatter_only_file() {
     let session = test_session(Target::HirRust);
@@ -911,6 +931,7 @@ fn compile_rejects_redde_without_explicit_return_type() {
     );
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn compile_accepts_effect_only_failable_function_without_return_arrow() {
     let session = test_session(Target::HirTypeScript);
@@ -924,6 +945,7 @@ fn compile_accepts_effect_only_failable_function_without_return_arrow() {
 
 // ── nondum interface method checks ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_rejects_nondum_interface_method_for_target() {
     let session = test_session(Target::HirRust);
@@ -951,6 +973,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_rejects_target_only_nondum_interface_method_for_target() {
     let session = test_session(Target::HirRust);
@@ -1014,6 +1037,7 @@ fn incipit_argumenta_compiles_for_faber_target() {
     assert!(result.output.is_some(), "expected Faber output from Faber re-emission");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn custodi_multi_guard_emits_guards_in_source_order() {
     let session = test_session(Target::HirRust);
@@ -1068,6 +1092,7 @@ fn ergo_iace_mori_and_tacet_compile_for_faber_target() {
 
 // ── target-specific feature gating ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_target_accepts_fac_cape_and_iace() {
     let session = test_session(Target::HirRust);
@@ -1090,6 +1115,7 @@ incipit {
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_target_accepts_si_cape_attachments() {
     let session = test_session(Target::HirRust);
@@ -1118,6 +1144,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_target_accepts_elige_cape_attachments() {
     let session = test_session(Target::HirRust);
@@ -1140,6 +1167,7 @@ incipit {
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_target_accepts_lege_expression() {
     let session = test_session(Target::HirRust);
@@ -1191,6 +1219,7 @@ fn sed_expression_fails_with_generic_unknown_identifier() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn warning_only_semantic_diagnostics_still_emit_output() {
     let session = test_session(Target::HirRust);
@@ -1363,6 +1392,7 @@ fn slash_block_comment_is_not_faber_syntax() {
 
 // ── finge / ad legacy / destructuring ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_accepts_finge_variant_construction() {
     let session = test_session(Target::HirRust);
@@ -1400,6 +1430,7 @@ fn rejects_statement_level_legacy_ad_string_route() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_accepts_array_and_ex_destructuring_bindings() {
     let session = test_session(Target::HirRust);
@@ -1420,6 +1451,7 @@ incipit {
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn enum_member_access_no_longer_reports_unknown_identifier() {
     let session = test_session(Target::HirRust);
@@ -1481,6 +1513,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_accepts_param_alias_binding() {
     let session = test_session(Target::HirRust);
@@ -1597,6 +1630,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn import_alias_usage_no_longer_reports_unknown_identifier() {
     let session = test_session(Target::HirRust);
@@ -1617,6 +1651,7 @@ fn import_alias_usage_no_longer_reports_unknown_identifier() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn duplicate_import_module_bindings_no_longer_report_duplicate_definition() {
     let session = test_session(Target::HirRust);
@@ -1662,6 +1697,7 @@ incipit {
 
 // ── ex object varia reassignment ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn ex_object_varia_bindings_accept_same_type_reassignment() {
     let session = test_session(Target::HirRust);
@@ -1716,6 +1752,7 @@ fn compile_with_installed_pack(locale: &str, source: &str) -> crate::CompileResu
     compile(&session, "test.fab", source, ModuleCompileRequest::default())
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_valid_identifier_near_keyword_draws_no_locale002() {
     // `clamp` is within the edit-distance threshold of an English keyword, but

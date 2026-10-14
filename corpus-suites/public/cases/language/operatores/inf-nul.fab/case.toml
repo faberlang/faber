@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/operatores/inf-nul.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/inf-nul.fab"
+
+
+[expect]
+check_only = true

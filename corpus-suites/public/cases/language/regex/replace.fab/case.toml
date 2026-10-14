@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/regex/replace.fab"
+group = "language"
+input_root = "corpus"
+input = "regex/replace.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,14 @@
+version = 1
+id = "corpus/ad/async-solum-leget.fab"
+group = "language"
+input_root = "corpus"
+input = "ad/async-solum-leget.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "invalid MIR: destination type mismatch"

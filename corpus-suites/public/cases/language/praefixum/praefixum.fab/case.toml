@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/praefixum/praefixum.fab"
+group = "language"
+input_root = "corpus"
+input = "praefixum/praefixum.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

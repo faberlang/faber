@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/runtime-extent-use.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/runtime-extent-use.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

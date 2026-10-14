@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/operatores/policy-float.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/policy-float.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "does not fit in `f32` (declaration of `u`)"
+check_only = false

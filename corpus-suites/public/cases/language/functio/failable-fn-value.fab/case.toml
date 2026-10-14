@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/functio/failable-fn-value.fab"
+group = "language"
+input_root = "corpus"
+input = "functio/failable-fn-value.fab"
+
+
+[expect]
+check_only = true

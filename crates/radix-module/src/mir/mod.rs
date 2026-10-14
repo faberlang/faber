@@ -75,7 +75,14 @@ mod kernel_get_set_test;
 #[path = "kernel_throw_test.rs"]
 mod kernel_throw_test;
 
-#[cfg(test)]
+#[cfg(all(
+    test,
+    feature = "mir-sexp",
+    feature = "mir-wasm",
+    feature = "mir-metal",
+    feature = "mir-llvm",
+    feature = "mir-wgsl"
+))]
 #[path = "device_block_erase_test.rs"]
 mod device_block_erase_test;
 
@@ -323,7 +330,7 @@ mod copy_conversio_tests;
 #[cfg(test)]
 #[path = "copy_duplicate_test.rs"]
 mod copy_duplicate_tests;
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(test, target_os = "macos", feature = "mir-metal"))]
 #[path = "copy_into_device_test.rs"]
 mod copy_into_device_tests;
 #[cfg(test)]

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/mutabilitas/const-into-mut.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/const-into-mut.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

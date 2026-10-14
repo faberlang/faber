@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/lista/ordina-clavis.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/ordina-clavis.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

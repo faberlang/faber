@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/itera/sort-source-reject-en.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/sort-source-reject-en.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "itera_source_sort_reduce_unbound"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "itera_source_sort_reduce_unbound"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "itera_source_sort_reduce_unbound"

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/ordo/ordo-conversio.fab"
+group = "language"
+input_root = "corpus"
+input = "ordo/ordo-conversio.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

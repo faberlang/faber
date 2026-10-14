@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/octeti/octeti.fab"
+group = "language"
+input_root = "corpus"
+input = "octeti/octeti.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

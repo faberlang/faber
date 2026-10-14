@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/adfirma/adfirma.fab"
+group = "language"
+input_root = "corpus"
+input = "adfirma/adfirma.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

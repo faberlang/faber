@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/tensor/batched-view-matmul.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/batched-view-matmul.fab"
+
+
+[expect]
+check_only = true

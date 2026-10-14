@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/itera-ex-rank1.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/itera-ex-rank1.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/mutabilitas/ref-read.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/ref-read.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

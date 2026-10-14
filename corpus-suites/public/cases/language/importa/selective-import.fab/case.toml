@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/importa/selective-import.fab"
+group = "language"
+input_root = "corpus"
+input = "importa/selective-import.fab"
+
+
+[expect]
+check_only = true

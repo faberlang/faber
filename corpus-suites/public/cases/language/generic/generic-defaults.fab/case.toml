@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/generic/generic-defaults.fab"
+group = "language"
+input_root = "corpus"
+input = "generic/generic-defaults.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

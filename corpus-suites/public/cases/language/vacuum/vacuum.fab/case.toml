@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/vacuum/vacuum.fab"
+group = "language"
+input_root = "corpus"
+input = "vacuum/vacuum.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

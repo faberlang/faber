@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/argumenta/argumenta-raw-la.fab"
+group = "language"
+input_root = "corpus"
+input = "argumenta/argumenta-raw-la.fab"
+
+
+[expect]
+check_only = true

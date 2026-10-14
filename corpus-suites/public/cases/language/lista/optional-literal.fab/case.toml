@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/lista/optional-literal.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/optional-literal.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

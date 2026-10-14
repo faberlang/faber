@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/cape/fac-omnia.fab"
+group = "language"
+input_root = "corpus"
+input = "cape/fac-omnia.fab"
+
+
+[expect]
+check_only = true

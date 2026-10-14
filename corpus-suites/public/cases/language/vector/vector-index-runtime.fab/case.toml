@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/vector/vector-index-runtime.fab"
+group = "language"
+input_root = "corpus"
+input = "vector/vector-index-runtime.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

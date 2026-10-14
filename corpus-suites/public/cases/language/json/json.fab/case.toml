@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/json/json.fab"
+group = "language"
+input_root = "corpus"
+input = "json/json.fab"
+
+
+[expect]
+check_only = true

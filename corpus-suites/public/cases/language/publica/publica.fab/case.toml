@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/publica/publica.fab"
+group = "language"
+input_root = "corpus"
+input = "publica/publica.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

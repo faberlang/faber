@@ -67,6 +67,7 @@ fn bare_bracket_literal_into_multi_member_union_is_ambiguous() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bare_bracket_literal_into_optional_list_still_builds_the_list() {
     let session = test_session(Target::HirRust);

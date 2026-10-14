@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/summa/reducta-filum-en.fab"
+group = "language"
+input_root = "corpus"
+input = "summa/reducta-filum-en.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

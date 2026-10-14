@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/iace/iace-si-guard.fab"
+group = "language"
+input_root = "corpus"
+input = "iace/iace-si-guard.fab"
+
+
+[expect]
+check_only = true

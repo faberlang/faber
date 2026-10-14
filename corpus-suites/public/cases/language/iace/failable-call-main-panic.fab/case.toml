@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/iace/failable-call-main-panic.fab"
+group = "language"
+input_root = "corpus"
+input = "iace/failable-call-main-panic.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "negative input"
+check_only = false

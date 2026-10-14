@@ -3,7 +3,7 @@ name = "radix-mir-runner"
 version = "0.84.0"
 edition = "2024"
 description = "In-process MIR runner for Faber scripting"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
@@ -27,7 +27,7 @@ stacker = "0.1"
 toml = "1"
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 tempfile = "3"
 
 [lints.clippy]

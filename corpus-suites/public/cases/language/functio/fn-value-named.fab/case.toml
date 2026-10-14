@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/functio/fn-value-named.fab"
+group = "language"
+input_root = "corpus"
+input = "functio/fn-value-named.fab"
+
+
+[expect]
+check_only = true

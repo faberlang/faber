@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/scriptum/scriptum.fab"
+group = "language"
+input_root = "corpus"
+input = "scriptum/scriptum.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

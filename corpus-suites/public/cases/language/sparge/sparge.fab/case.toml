@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/sparge/sparge.fab"
+group = "language"
+input_root = "corpus"
+input = "sparge/sparge.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

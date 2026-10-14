@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/arithmetic-reduction.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/arithmetic-reduction.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

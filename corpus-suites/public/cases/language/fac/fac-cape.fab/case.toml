@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/fac/fac-cape.fab"
+group = "language"
+input_root = "corpus"
+input = "fac/fac-cape.fab"
+
+
+[expect]
+check_only = true

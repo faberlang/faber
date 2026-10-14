@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/fiunt/pigritia.fab"
+group = "language"
+input_root = "corpus"
+input = "fiunt/pigritia.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

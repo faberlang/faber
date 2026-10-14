@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/clamp-families.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/clamp-families.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

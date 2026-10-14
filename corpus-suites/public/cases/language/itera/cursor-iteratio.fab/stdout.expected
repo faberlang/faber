@@ -1,0 +1,10 @@
+Sync cursor iteration:
+  numerus: 0
+  numerus: 1
+  numerus: 2
+Sync collected:
+[0, 2, 4, 6, 8]
+Async cursor iteration:
+  async numerus: 0
+  async numerus: 1
+  async numerus: 2

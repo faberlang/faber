@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/matrix/lift-compare.fab"
+group = "language"
+input_root = "corpus"
+input = "matrix/lift-compare.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

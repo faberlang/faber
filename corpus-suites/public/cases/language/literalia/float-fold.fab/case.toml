@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/literalia/float-fold.fab"
+group = "language"
+input_root = "corpus"
+input = "literalia/float-fold.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

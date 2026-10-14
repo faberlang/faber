@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/generic-sdpa-call.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/generic-sdpa-call.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

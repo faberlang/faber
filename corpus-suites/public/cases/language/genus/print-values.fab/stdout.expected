@@ -1,0 +1,19 @@
+Rec { ok = true, opt = 3, c = 'q', a = "abc", u = "q", names = ["a", "b"], price = 0.1, ratio = 0.1 }
+Rec { ok = false, opt = none, c = 'z', a = "xyz", u = "z", names = [], price = 2, ratio = 0.25 }
+Vacuus {}
+Node.Leaf { v = 1 }
+Node.Finis
+Signum.Alpha
+Color.Red
+Shape.Dot { kind = 1 }
+Shape.Circle { kind = 2, r = 1.5 }
+["a", "b"]
+['x', 'y']
+["q", "abc"]
+[0, 1, 2]
+[true, false]
+hello
+q
+q
+7
+true

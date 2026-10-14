@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/descriptio/descriptio.fab"
+group = "language"
+input_root = "corpus"
+input = "descriptio/descriptio.fab"
+
+
+[expect]
+check_only = true

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/valor-genus.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/valor-genus.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -3,11 +3,11 @@ name = "radix-runtime-contract"
 version = "0.84.0"
 edition = "2024"
 description = "Radix-owned runtime contract (display, instans, tensor shape math)"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 
 # Bundled into the faber core-support archive, which ships crate roots
 # without the radix workspace root manifest. Keep lints self-contained so

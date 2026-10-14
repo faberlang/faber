@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/transfer/copy-into-rebind-host.fab"
+group = "language"
+input_root = "corpus"
+input = "transfer/copy-into-rebind-host.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

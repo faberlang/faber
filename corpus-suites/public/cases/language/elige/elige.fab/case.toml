@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/elige/elige.fab"
+group = "language"
+input_root = "corpus"
+input = "elige/elige.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

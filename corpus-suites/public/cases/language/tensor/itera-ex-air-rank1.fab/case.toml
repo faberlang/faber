@@ -1,0 +1,19 @@
+version = 1
+id = "corpus/tensor/itera-ex-air-rank1.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/itera-ex-air-rank1.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "known-fail"
+phase = "emit"
+diagnostic_contains = "@ radix lane \"air\" requires a MIR-backed target"
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "TARGETLANE001:lane_requires_mir_backed_target"

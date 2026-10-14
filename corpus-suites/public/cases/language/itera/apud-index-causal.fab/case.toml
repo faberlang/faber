@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/itera/apud-index-causal.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/apud-index-causal.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

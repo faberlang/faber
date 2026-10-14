@@ -1,0 +1,14 @@
+[package]
+name = "radix-abi"
+version = "0.84.0"
+edition = "2024"
+description = "Radix-owned host ABI contract table (runtime symbol names and layout spellings)"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lints]
+workspace = true
+
+
+[dev-dependencies]
+radix-hygiene = { path = "../radix-hygiene" }

@@ -8,6 +8,7 @@ use crate::test_support::test_session_la;
 
 // ── conversio glyph form ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn conversio_glyph_form_compiles_to_parse() {
     let session = test_session_la(Target::HirRust);
@@ -23,6 +24,7 @@ fn conversio_glyph_form_compiles_to_parse() {
     assert!(output.code.contains(".parse::<i64>().unwrap()"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn conversio_of_a_literal_emits_its_value() {
     let session = test_session_la(Target::HirRust);
@@ -38,6 +40,7 @@ fn conversio_of_a_literal_emits_its_value() {
     assert!(!output.code.contains(".parse::<i64>()"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn conversio_emits_parse_not_as_cast() {
     let session = test_session_la(Target::HirRust);
@@ -54,6 +57,7 @@ fn conversio_emits_parse_not_as_cast() {
     assert!(!output.code.contains(" as i64"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn conversio_with_recovery_emits_unwrap_or() {
     let session = test_session_la(Target::HirRust);
@@ -68,6 +72,7 @@ fn conversio_with_recovery_emits_unwrap_or() {
     assert!(output.code.contains(".parse::<i64>().unwrap_or(0)"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn conversio_to_textus_emits_to_string() {
     let session = test_session_la(Target::HirRust);
@@ -85,6 +90,7 @@ fn conversio_to_textus_emits_to_string() {
 
 // ── textus / octeti conversio ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn textus_to_octeti_conversio_emits_into_bytes() {
     let session = test_session_la(Target::HirRust);
@@ -99,6 +105,7 @@ fn textus_to_octeti_conversio_emits_into_bytes() {
     assert!(code.contains(".into_bytes()"), "expected into_bytes, got:\n{code}");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn octeti_to_textus_conversio_emits_from_utf8_with_expect() {
     let session = test_session_la(Target::HirRust);
@@ -118,6 +125,7 @@ fn octeti_to_textus_conversio_emits_from_utf8_with_expect() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn octeti_to_textus_conversio_with_recovery_emits_unwrap_or() {
     let session = test_session_la(Target::HirRust);
@@ -135,6 +143,7 @@ fn octeti_to_textus_conversio_with_recovery_emits_unwrap_or() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn ascii_octeti_conversio_emits_correct_lowering() {
     let session = test_session_la(Target::HirRust);
@@ -159,6 +168,7 @@ fn ascii_octeti_conversio_emits_correct_lowering() {
 
 // ── scalar conversio ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn fractus_to_numerus_conversio_emits_checked_truncation() {
     // D1.11: float → integer `↦ via Trunc` truncates toward zero and fails when the value is
@@ -180,6 +190,7 @@ fn fractus_to_numerus_conversio_emits_checked_truncation() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn fractus_to_bivalens_conversio_emits_nonzero_check() {
     let session = test_session_la(Target::HirRust);
@@ -190,6 +201,7 @@ fn fractus_to_bivalens_conversio_emits_nonzero_check() {
     assert!(code.contains(" != 0.0"), "expected nonzero check, got:\n{code}");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bivalens_to_numerus_conversio_emits_bool_cast() {
     let session = test_session_la(Target::HirRust);
@@ -200,6 +212,7 @@ fn bivalens_to_numerus_conversio_emits_bool_cast() {
     assert!(code.contains(" as i64"), "expected bool cast, got:\n{code}");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bivalens_to_fractus_conversio_emits_conditional_literals() {
     let session = test_session_la(Target::HirRust);
@@ -213,6 +226,7 @@ fn bivalens_to_fractus_conversio_emits_conditional_literals() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn ascii_to_bivalens_conversio_emits_is_empty() {
     let session = test_session_la(Target::HirRust);
@@ -223,6 +237,7 @@ fn ascii_to_bivalens_conversio_emits_is_empty() {
     assert!(code.contains(".is_empty()"), "expected is_empty truthiness, got:\n{code}");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn instans_narrow_conversio_emits_ad_praecisionem() {
     let session = test_session_la(Target::HirRust);
@@ -238,6 +253,7 @@ fn instans_narrow_conversio_emits_ad_praecisionem() {
 
 // ── valor conversio codegen ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn valor_to_lista_conversio_emits_from_valor() {
     let session = test_session_la(Target::HirRust);
@@ -254,6 +270,7 @@ fn valor_to_lista_conversio_emits_from_valor() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn valor_to_tabula_conversio_emits_from_valor() {
     let session = test_session_la(Target::HirRust);
@@ -270,6 +287,7 @@ fn valor_to_tabula_conversio_emits_from_valor() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn genus_to_valor_conversio_emits_tabula_boxing() {
     let session = test_session_la(Target::HirRust);
@@ -287,6 +305,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn lista_to_valor_conversio_emits_from() {
     let session = test_session_la(Target::HirRust);
@@ -303,6 +322,7 @@ fn lista_to_valor_conversio_emits_from() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn octeti_to_valor_conversio_emits_byte_list_boxing() {
     let session = test_session_la(Target::HirRust);
@@ -319,6 +339,7 @@ fn octeti_to_valor_conversio_emits_byte_list_boxing() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn valor_to_numerus_conversio_emits_from_valor() {
     let session = test_session_la(Target::HirRust);
@@ -336,6 +357,7 @@ fn valor_to_numerus_conversio_emits_from_valor() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn valor_to_fractus_conversio_emits_from_valor_with_widen() {
     let session = test_session_la(Target::HirRust);
@@ -352,6 +374,7 @@ fn valor_to_fractus_conversio_emits_from_valor_with_widen() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn valor_to_octeti_conversio_emits_octeti_match() {
     let session = test_session_la(Target::HirRust);
@@ -374,6 +397,7 @@ incipit {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn valor_to_textus_conversio_emits_from_valor() {
     let session = test_session_la(Target::HirRust);
@@ -390,6 +414,7 @@ fn valor_to_textus_conversio_emits_from_valor() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn valor_to_numerus_conversio_with_recovery_emits_unwrap_or() {
     let session = test_session_la(Target::HirRust);
@@ -406,6 +431,7 @@ fn valor_to_numerus_conversio_with_recovery_emits_unwrap_or() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn valor_to_instans_conversio_emits_try_from_valor() {
     let session = test_session_la(Target::HirRust);
@@ -433,6 +459,7 @@ fn instans_fine_to_coarse_assignment_rejects_without_conversio() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn scalar_text_order_emits_str_compare() {
     let session = test_session_la(Target::HirRust);
@@ -446,6 +473,7 @@ fn scalar_text_order_emits_str_compare() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn whole_string_text_order_emits_str_compare() {
     // D1.6: UTF-8 byte order is code-point order, so `&str` compare is exact.
@@ -460,6 +488,7 @@ fn whole_string_text_order_emits_str_compare() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn instans_cross_precision_compare_emits_partial_cmp_at_coarser() {
     let session = test_session_la(Target::HirRust);
@@ -473,6 +502,7 @@ fn instans_cross_precision_compare_emits_partial_cmp_at_coarser() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn instans_cross_precision_approx_eq_emits_partial_cmp_at_coarser() {
     let session = test_session_la(Target::HirRust);
@@ -486,6 +516,7 @@ fn instans_cross_precision_approx_eq_emits_partial_cmp_at_coarser() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn instans_cross_precision_approx_not_eq_emits_partial_cmp_at_coarser() {
     let session = test_session_la(Target::HirRust);
@@ -499,6 +530,7 @@ fn instans_cross_precision_approx_not_eq_emits_partial_cmp_at_coarser() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn instans_to_textus_conversio_emits_to_rfc3339() {
     let session = test_session_la(Target::HirRust);
@@ -514,6 +546,7 @@ fn instans_to_textus_conversio_emits_to_rfc3339() {
 
 // ── collection conversio ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn lista_to_copia_conversio_emits_hashset_collect() {
     let session = test_session_la(Target::HirRust);
@@ -527,6 +560,7 @@ fn lista_to_copia_conversio_emits_hashset_collect() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn copia_to_lista_conversio_emits_vec_collect() {
     let session = test_session_la(Target::HirRust);
@@ -540,6 +574,7 @@ fn copia_to_lista_conversio_emits_vec_collect() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn named_lista_to_copia_conversio_clones_source_before_consuming() {
     let session = test_session_la(Target::HirRust);
@@ -553,6 +588,7 @@ fn named_lista_to_copia_conversio_clones_source_before_consuming() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn named_copia_to_lista_conversio_clones_source_before_consuming() {
     let session = test_session_la(Target::HirRust);
@@ -568,6 +604,7 @@ fn named_copia_to_lista_conversio_clones_source_before_consuming() {
     );
 }
 
+#[cfg(feature = "hir-swift")]
 #[test]
 fn lista_copia_conversio_emits_swift_set_and_array_initializers() {
     let session = test_session_la(Target::HirSwift);
@@ -583,6 +620,7 @@ fn lista_copia_conversio_emits_swift_set_and_array_initializers() {
     assert!(!code.contains("as!"), "no trapping cast, got:\n{code}");
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rvalue_lista_to_copia_conversio_moves_without_clone() {
     let session = test_session_la(Target::HirRust);
@@ -596,6 +634,7 @@ fn rvalue_lista_to_copia_conversio_moves_without_clone() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn tensor_to_lista_conversio_emits_planata() {
     let session = test_session_la(Target::HirRust);
@@ -619,6 +658,7 @@ fn assert_lista_to_tensor_conversio_rust_emit(source: &str, must_contain: &[&str
     }
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn lista_to_tensor_conversio_emits_structa() {
     assert_lista_to_tensor_conversio_rust_emit(
@@ -628,6 +668,7 @@ fn lista_to_tensor_conversio_emits_structa() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn shaped_lista_to_tensor_conversio_emits_literal_shape() {
     assert_lista_to_tensor_conversio_rust_emit(
@@ -637,6 +678,7 @@ fn shaped_lista_to_tensor_conversio_emits_literal_shape() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rectangular_lista_literal_to_tensor_conversio_emits_flat_structa() {
     assert_lista_to_tensor_conversio_rust_emit(
@@ -646,6 +688,7 @@ fn rectangular_lista_literal_to_tensor_conversio_emits_flat_structa() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn tabula_to_lista_keys_conversio_emits_keys_cloned() {
     let session = test_session_la(Target::HirRust);
@@ -662,6 +705,7 @@ fn tabula_to_lista_keys_conversio_emits_keys_cloned() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn tabula_to_lista_values_conversio_emits_values_cloned() {
     let session = test_session_la(Target::HirRust);
@@ -680,6 +724,7 @@ fn tabula_to_lista_values_conversio_emits_values_cloned() {
 
 // ── tensor element width lattice ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn tensor_numerus_to_fractus_conversio_emits_convert_elements() {
     let session = test_session_la(Target::HirRust);
@@ -693,6 +738,7 @@ fn tensor_numerus_to_fractus_conversio_emits_convert_elements() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn tensor_fractus_to_numerus_conversio_emits_convert_elements() {
     let session = test_session_la(Target::HirRust);
@@ -706,6 +752,7 @@ fn tensor_fractus_to_numerus_conversio_emits_convert_elements() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn tensor_numerus_i32_to_i64_conversio_emits_convert_elements() {
     let session = test_session_la(Target::HirRust);
@@ -719,6 +766,7 @@ fn tensor_numerus_i32_to_i64_conversio_emits_convert_elements() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn tensor_element_width_lattice_codegen_matrix() {
     let session = test_session_la(Target::HirRust);
@@ -744,6 +792,7 @@ fn tensor_element_width_lattice_codegen_matrix() {
 
 // ── static ascription ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn verte_static_ascription_emits_as_cast() {
     let session = test_session_la(Target::HirRust);

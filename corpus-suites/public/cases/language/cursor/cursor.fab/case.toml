@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/cursor/cursor.fab"
+group = "language"
+input_root = "corpus"
+input = "cursor/cursor.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

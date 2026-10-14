@@ -1,0 +1,9 @@
+version = 1
+id = "product/proba-canary"
+group = "product"
+input_root = "product"
+input = "proba-canary"
+
+
+[expect]
+check_only = true

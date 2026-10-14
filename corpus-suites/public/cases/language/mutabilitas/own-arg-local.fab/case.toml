@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/mutabilitas/own-arg-local.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/own-arg-local.fab"
+
+
+[expect]
+check_only = true

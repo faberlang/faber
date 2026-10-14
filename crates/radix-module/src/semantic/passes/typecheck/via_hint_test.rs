@@ -190,6 +190,7 @@ fn splice(frame: &str, conversion: &str) -> String {
         .replace("}}", "}")
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn every_hint_row_compiles_through_the_via_clause() {
     for row in ROWS {
@@ -228,6 +229,7 @@ fn the_retired_type_argument_is_rejected_under_the_english_surface() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn every_hint_routes_under_the_english_surface() {
     for source in [
@@ -267,6 +269,7 @@ fn a_plain_conversion_carries_no_hint() {
     assert!(hints[0].1.is_empty());
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn the_default_binds_after_the_via_clause() {
     let code = rust_code(latin_config(), r"functio f(textus s) → i32 { redde s ↦ i32 via Hex ⊥ 7 }");
@@ -357,6 +360,7 @@ fn via_without_a_hint_is_a_parse_error_issue() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn via_stays_an_ordinary_name_in_a_program_that_also_uses_the_clause() {
     let code = rust_code(

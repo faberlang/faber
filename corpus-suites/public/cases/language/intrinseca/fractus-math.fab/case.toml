@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/intrinseca/fractus-math.fab"
+group = "language"
+input_root = "corpus"
+input = "intrinseca/fractus-math.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

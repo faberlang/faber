@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/ratio/ratio.fab"
+group = "language"
+input_root = "corpus"
+input = "ratio/ratio.fab"
+
+
+[expect]
+check_only = true

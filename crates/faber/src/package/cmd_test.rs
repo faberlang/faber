@@ -1,12 +1,17 @@
-use super::{
-    discover_build_layout, is_manifestless_single_file, target_feature_unavailable_message,
-};
+use super::target_feature_unavailable_message;
+#[cfg(feature = "hir-rust")]
+use super::{discover_build_layout, is_manifestless_single_file};
+#[cfg(feature = "hir-rust")]
 use crate::package::cargo::{RustRuntimePlan, emit_generated_crate_with_runtime_plan};
+#[cfg(feature = "hir-rust")]
 use crate::package::test_support::test_temp_dir;
 use radix::module::codegen::Target;
+#[cfg(feature = "hir-rust")]
 use std::collections::BTreeSet;
+#[cfg(feature = "hir-rust")]
 use std::fs;
 
+#[cfg(feature = "hir-rust")]
 fn dir_entries(dir: &std::path::Path) -> BTreeSet<String> {
     fs::read_dir(dir)
         .expect("read dir")
@@ -20,6 +25,7 @@ fn dir_entries(dir: &std::path::Path) -> BTreeSet<String> {
         .collect()
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn single_file_build_layout_lives_under_out_dir_not_beside_source() {
     let source_dir = test_temp_dir("single-src");
@@ -50,6 +56,7 @@ fn single_file_build_layout_lives_under_out_dir_not_beside_source() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn manifest_backed_package_keeps_its_own_target_tree() {
     let package = test_temp_dir("single-pkg");

@@ -393,10 +393,11 @@ dependencies = [
  "faber-leaf",
  "flate2",
  "handroll",
- "hygiene-ratchet",
  "postcard",
  "proba",
  "radix",
+ "radix-codegen-shared",
+ "radix-hygiene",
  "radix-mir",
  "radix-mir-fmir",
  "radix-mir-runner",
@@ -413,8 +414,8 @@ name = "faber-leaf"
 version = "0.1.0"
 dependencies = [
  "httparse",
- "hygiene-ratchet",
  "libc",
+ "radix-hygiene",
  "rustls",
  "rustls-pemfile",
  "tungstenite",
@@ -525,7 +526,7 @@ dependencies = [
 name = "handroll"
 version = "0.1.0"
 dependencies = [
- "hygiene-ratchet",
+ "radix-hygiene",
 ]
 
 [[package]]
@@ -578,13 +579,6 @@ name = "httparse"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87"
-
-[[package]]
-name = "hygiene-ratchet"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
 
 [[package]]
 name = "indexmap"
@@ -758,8 +752,8 @@ dependencies = [
 name = "proba"
 version = "0.1.0"
 dependencies = [
- "hygiene-ratchet",
  "radix",
+ "radix-hygiene",
  "radix-mir-runner",
 ]
 
@@ -832,18 +826,25 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 name = "radix"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
+ "radix-hygiene",
  "radix-module",
  "radix-program",
+]
+
+[[package]]
+name = "radix-abi"
+version = "0.84.0"
+dependencies = [
+ "radix-hygiene",
 ]
 
 [[package]]
 name = "radix-codegen-shared"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
  "radix-diagnostics",
  "radix-hir",
+ "radix-hygiene",
  "radix-lexer",
  "radix-runtime-contract",
  "radix-target",
@@ -855,7 +856,7 @@ dependencies = [
 name = "radix-diagnostics"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
+ "radix-hygiene",
  "serde",
 ]
 
@@ -863,8 +864,8 @@ dependencies = [
 name = "radix-hir"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
  "postcard",
+ "radix-hygiene",
  "radix-lexer",
  "radix-syntax",
  "radix-types",
@@ -877,10 +878,10 @@ dependencies = [
 name = "radix-hir-faber"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
  "radix-codegen-shared",
  "radix-diagnostics",
  "radix-hir",
+ "radix-hygiene",
  "radix-lexer",
  "radix-parser",
  "radix-semantic",
@@ -893,9 +894,9 @@ dependencies = [
 name = "radix-hir-fhir"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
  "postcard",
  "radix-hir",
+ "radix-hygiene",
  "radix-lexer",
  "radix-syntax",
  "radix-types",
@@ -904,17 +905,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "radix-host-abi"
-version = "0.84.0"
+name = "radix-hygiene"
+version = "0.1.0"
 dependencies = [
- "hygiene-ratchet",
+ "serde_json",
 ]
 
 [[package]]
 name = "radix-intrinsics"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
+ "radix-hygiene",
  "radix-types",
 ]
 
@@ -922,9 +923,9 @@ dependencies = [
 name = "radix-lexer"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
  "proptest",
  "radix-diagnostics",
+ "radix-hygiene",
  "rustc-hash",
  "serde",
  "unicode-ident",
@@ -937,10 +938,10 @@ name = "radix-mir"
 version = "0.84.0"
 dependencies = [
  "handroll",
- "hygiene-ratchet",
  "radix-codegen-shared",
  "radix-diagnostics",
  "radix-hir",
+ "radix-hygiene",
  "radix-lexer",
  "radix-runtime-contract",
  "radix-syntax",
@@ -955,9 +956,9 @@ name = "radix-mir-fmir"
 version = "0.84.0"
 dependencies = [
  "handroll",
- "hygiene-ratchet",
  "postcard",
  "radix-hir",
+ "radix-hygiene",
  "radix-lexer",
  "radix-mir",
  "radix-types",
@@ -971,10 +972,10 @@ name = "radix-mir-lower"
 version = "0.84.0"
 dependencies = [
  "handroll",
- "hygiene-ratchet",
  "radix-codegen-shared",
  "radix-diagnostics",
  "radix-hir",
+ "radix-hygiene",
  "radix-intrinsics",
  "radix-lexer",
  "radix-mir",
@@ -991,9 +992,9 @@ version = "0.84.0"
 dependencies = [
  "faber-leaf",
  "handroll",
- "hygiene-ratchet",
  "radix-codegen-shared",
  "radix-hir",
+ "radix-hygiene",
  "radix-lexer",
  "radix-mir",
  "radix-runtime-contract",
@@ -1013,16 +1014,16 @@ version = "0.84.0"
 dependencies = [
  "ariadne",
  "handroll",
- "hygiene-ratchet",
  "insta",
  "metal",
  "postcard",
+ "radix-abi",
  "radix-codegen-shared",
  "radix-diagnostics",
  "radix-hir",
  "radix-hir-faber",
  "radix-hir-fhir",
- "radix-host-abi",
+ "radix-hygiene",
  "radix-intrinsics",
  "radix-lexer",
  "radix-mir",
@@ -1048,8 +1049,8 @@ dependencies = [
 name = "radix-parser"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
  "radix-diagnostics",
+ "radix-hygiene",
  "radix-lexer",
  "radix-syntax",
  "radix-types",
@@ -1060,9 +1061,9 @@ name = "radix-program"
 version = "0.1.0"
 dependencies = [
  "handroll",
- "hygiene-ratchet",
  "postcard",
  "radix-codegen-shared",
+ "radix-hygiene",
  "radix-mir",
  "radix-mir-fmir",
  "radix-mir-lower",
@@ -1079,18 +1080,18 @@ dependencies = [
 name = "radix-runtime-contract"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
+ "radix-hygiene",
 ]
 
 [[package]]
 name = "radix-semantic"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
  "radix",
  "radix-diagnostics",
  "radix-hir",
  "radix-hir-fhir",
+ "radix-hygiene",
  "radix-intrinsics",
  "radix-lexer",
  "radix-parser",
@@ -1110,7 +1111,7 @@ dependencies = [
 name = "radix-syntax"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
+ "radix-hygiene",
  "radix-lexer",
  "serde",
 ]
@@ -1119,7 +1120,7 @@ dependencies = [
 name = "radix-target"
 version = "0.84.0"
 dependencies = [
- "hygiene-ratchet",
+ "radix-hygiene",
 ]
 
 [[package]]
@@ -1127,7 +1128,7 @@ name = "radix-types"
 version = "0.84.0"
 dependencies = [
  "handroll",
- "hygiene-ratchet",
+ "radix-hygiene",
  "radix-lexer",
  "radix-syntax",
  "rand 0.8.8",

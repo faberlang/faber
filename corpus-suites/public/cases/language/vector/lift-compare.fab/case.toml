@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/vector/lift-compare.fab"
+group = "language"
+input_root = "corpus"
+input = "vector/lift-compare.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

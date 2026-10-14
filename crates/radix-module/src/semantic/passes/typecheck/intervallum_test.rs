@@ -345,6 +345,7 @@ fn intervallum_inter_overlapping_codegen() {
 /// The method `inter` (en `intersect`) is untouched by the retirement of the
 /// membership words: the Latin spelling checks, and the English reader knows
 /// only `intersect` (`inter` is not an en intervallum method).
+#[cfg(feature = "hir-rust")]
 #[test]
 fn intervallum_intersection_method_spellings_survive_the_membership_retirement() {
     let latin = r"incipit {

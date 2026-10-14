@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/textus/index-unicode.fab"
+group = "language"
+input_root = "corpus"
+input = "textus/index-unicode.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

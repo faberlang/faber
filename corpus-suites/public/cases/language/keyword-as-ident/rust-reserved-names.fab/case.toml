@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/keyword-as-ident/rust-reserved-names.fab"
+group = "language"
+input_root = "corpus"
+input = "keyword-as-ident/rust-reserved-names.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

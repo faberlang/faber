@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/ubique/ubique.fab"
+group = "language"
+input_root = "corpus"
+input = "ubique/ubique.fab"
+
+
+[expect]
+check_only = true

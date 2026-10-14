@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/genus/literal.fab"
+group = "language"
+input_root = "corpus"
+input = "genus/literal.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

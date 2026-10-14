@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/await-assignment/await-assignment.fab"
+group = "language"
+input_root = "corpus"
+input = "await-assignment/await-assignment.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

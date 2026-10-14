@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/intrinseca/empty-and-is-empty.fab"
+group = "language"
+input_root = "corpus"
+input = "intrinseca/empty-and-is-empty.fab"
+
+
+[expect]
+check_only = true

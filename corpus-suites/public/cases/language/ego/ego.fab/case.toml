@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/ego/ego.fab"
+group = "language"
+input_root = "corpus"
+input = "ego/ego.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

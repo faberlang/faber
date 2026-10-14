@@ -183,6 +183,7 @@ fn inf_value_flow_still_lowers_to_mir() {
 
 /// Every HIR backend rejects a module that names `inf`, by one named issue
 /// carrying the type and the target.
+#[cfg(all(feature = "hir-swift", feature = "hir-haskell"))]
 #[test]
 fn every_hir_backend_fails_closed_with_a_named_diagnostic() {
     for (target, name) in [
@@ -199,6 +200,7 @@ fn every_hir_backend_fails_closed_with_a_named_diagnostic() {
 }
 
 /// The Rust backend carries `inf` as `faber::Magnus` (inf U6r).
+#[cfg(feature = "hir-rust")]
 #[test]
 fn the_rust_backend_carries_inf() {
     let result = compile_for_target_and_get_result(INF_FILE, Target::HirRust);
@@ -206,6 +208,7 @@ fn the_rust_backend_carries_inf() {
 }
 
 /// Go carries `inf` as `*big.Int` (inf track U6g): the module compiles.
+#[cfg(feature = "hir-go")]
 #[test]
 fn the_go_backend_carries_inf() {
     for source in [INF_FILE, INF_BIG_LITERAL] {
@@ -216,6 +219,7 @@ fn the_go_backend_carries_inf() {
 
 /// Python carries `inf` as its own unbounded `int` (inf track U6p): the module
 /// compiles.
+#[cfg(feature = "hir-python")]
 #[test]
 fn the_python_backend_carries_inf() {
     for source in [INF_FILE, INF_BIG_LITERAL] {
@@ -225,6 +229,7 @@ fn the_python_backend_carries_inf() {
 }
 
 /// TypeScript carries `inf` as native `bigint` (U6t): the module compiles.
+#[cfg(feature = "hir-ts")]
 #[test]
 fn typescript_carries_inf_as_bigint() {
     let result = compile_for_target_and_get_result(INF_FILE, Target::HirTypeScript);

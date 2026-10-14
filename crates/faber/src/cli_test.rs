@@ -63,6 +63,7 @@ fn cli_parses_targets_subcommand() {
     assert!(matches!(cli.command, Some(crate::cli::Command::Targets)));
 }
 
+#[cfg(all(feature = "full-targets", feature = "hir-rust"))]
 #[test]
 fn targets_table_reports_capability_truth_for_the_default_build() {
     // The cli_test binary builds under default features (full-targets): the

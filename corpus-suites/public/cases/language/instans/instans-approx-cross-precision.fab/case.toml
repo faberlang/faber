@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/instans/instans-approx-cross-precision.fab"
+group = "language"
+input_root = "corpus"
+input = "instans/instans-approx-cross-precision.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

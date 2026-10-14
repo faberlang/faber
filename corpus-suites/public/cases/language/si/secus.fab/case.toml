@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/si/secus.fab"
+group = "language"
+input_root = "corpus"
+input = "si/secus.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

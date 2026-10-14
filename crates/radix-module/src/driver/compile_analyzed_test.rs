@@ -5,6 +5,7 @@
 
 use super::{AnalyzeRequest, Config, ModuleCompileRequest, Session, analyze_source, compile, compile_analyzed};
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_analyzed_matches_compile() {
     // One source without an entry block (backend generation) and one with

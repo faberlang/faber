@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/mixed-ordering-join.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/mixed-ordering-join.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

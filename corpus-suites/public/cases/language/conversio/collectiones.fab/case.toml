@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/collectiones.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/collectiones.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

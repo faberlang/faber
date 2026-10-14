@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/itera/nidificatus.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/nidificatus.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

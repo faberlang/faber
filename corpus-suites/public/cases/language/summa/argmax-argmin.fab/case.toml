@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/summa/argmax-argmin.fab"
+group = "language"
+input_root = "corpus"
+input = "summa/argmax-argmin.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/futura/futura.fab"
+group = "language"
+input_root = "corpus"
+input = "futura/futura.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

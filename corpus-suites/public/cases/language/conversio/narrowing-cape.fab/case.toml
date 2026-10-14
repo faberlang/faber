@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/narrowing-cape.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/narrowing-cape.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

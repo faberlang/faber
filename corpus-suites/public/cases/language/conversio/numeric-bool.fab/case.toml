@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/numeric-bool.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/numeric-bool.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -8,17 +8,21 @@
 
 use super::library_resolver_from_config;
 use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
+#[cfg(feature = "hir-rust")]
 use radix::module::Output;
 use radix::module::driver::Config;
 use radix::program::analyze::AnalysisSeams;
 use radix::program::discovery::PackageSpec;
+use radix::program::emit::compile_package as compile_package_direct;
+#[cfg(feature = "hir-rust")]
 use radix::program::emit::{
-    compile_package as compile_package_direct,
     compile_package_with_test_options as compile_package_with_test_options_direct,
     compile_package_with_test_selection as compile_package_with_test_selection_direct,
 };
+#[cfg(feature = "hir-rust")]
 use radix::program::frontmatter::RustTestSelection as TestSelection;
 use radix::program::library::LibraryResolver;
+#[cfg(feature = "hir-rust")]
 use radix::program::test_source_filter::TestSourceFilter;
 use std::fs;
 use std::path::Path;
@@ -31,6 +35,7 @@ fn compile_with_faber_seams(config: &Config, input: &Path) -> radix::module::Com
     compile_package_direct(config, input, &crate::package::faber_emission_seams())
 }
 
+#[cfg(feature = "hir-rust")]
 fn compile_with_test_selection(
     config: &Config,
     input: &Path,
@@ -44,6 +49,7 @@ fn compile_with_test_selection(
     )
 }
 
+#[cfg(feature = "hir-rust")]
 fn compile_with_test_options(
     config: &Config,
     input: &Path,
@@ -275,6 +281,7 @@ main {}
 // Frontmatter group / module tree
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_honors_group_frontmatter_for_module_tree() {
     let dir = test_temp_dir("frontmatter-group");
@@ -325,6 +332,7 @@ fn answer() → int {
 // Frontmatter test selection defaults
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_applies_entry_frontmatter_test_selection_defaults() {
     let dir = test_temp_dir("frontmatter-test-defaults");
@@ -385,6 +393,7 @@ main {}
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_cli_test_selection_overrides_entry_frontmatter_defaults() {
     let dir = test_temp_dir("frontmatter-test-cli-override");
@@ -508,6 +517,7 @@ main { print "comment-frontmatter" }
 // Library packages without paths.entry
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_lib_package_without_entry_synthesizes_harness_for_proba() {
     let dir = test_temp_dir("lib-no-entry-proba");

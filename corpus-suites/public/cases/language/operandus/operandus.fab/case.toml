@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operandus/operandus.fab"
+group = "language"
+input_root = "corpus"
+input = "operandus/operandus.fab"
+
+args = ["input.txt", "extra.txt"]
+
+[expect]
+check_only = true

@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/tensor/shape-holes.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/shape-holes.fab"
+
+
+[expect]
+check_only = true

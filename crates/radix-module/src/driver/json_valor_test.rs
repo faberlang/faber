@@ -9,6 +9,7 @@ use crate::test_support::{assert_compile_fails_with_args, assert_compile_fails_w
 
 // ── JSON valor literal typecheck ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn json_valor_literal_typechecks_as_valor_without_errors() {
     let session = test_session_la(Target::HirRust);
@@ -68,6 +69,7 @@ fn json_valor_literal_rejects_duplicate_keys_in_nested_object() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn json_valor_literal_distinct_keys_in_different_objects_are_not_duplicates() {
     let session = test_session_la(Target::HirRust);
@@ -95,6 +97,7 @@ fn json_valor_literal_round_trips_through_faber_codegen() {
 
 // ── JSON valor → tabula<K,V> ascribe ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn json_valor_ascribed_to_tabula_emits_real_hashmap_constant() {
     let session = test_session_la(Target::HirRust);
@@ -161,6 +164,7 @@ fn json_valor_ascribed_to_tabula_rejects_nested_value_when_v_is_not_valor() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn json_valor_ascribed_to_tabula_valor_values_lower_to_fabervalue() {
     let session = test_session_la(Target::HirRust);

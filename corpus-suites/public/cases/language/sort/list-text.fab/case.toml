@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/sort/list-text.fab"
+group = "language"
+input_root = "corpus"
+input = "sort/list-text.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

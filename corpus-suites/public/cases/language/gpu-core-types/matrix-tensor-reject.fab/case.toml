@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/gpu-core-types/matrix-tensor-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "gpu-core-types/matrix-tensor-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM010.return_type_mismatch"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM010.return_type_mismatch"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM010:expression_type_mismatch"

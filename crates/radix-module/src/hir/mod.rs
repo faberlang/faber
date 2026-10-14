@@ -36,6 +36,7 @@ mod lower;
 mod nodes;
 #[cfg(feature = "hir-fhir")]
 pub mod package;
+pub(crate) mod presentation_witness;
 #[cfg(feature = "hir-fhir")]
 pub mod serialize;
 pub mod visit;

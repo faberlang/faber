@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/vide/vide.fab"
+group = "language"
+input_root = "corpus"
+input = "vide/vide.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

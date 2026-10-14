@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/erratur/erratur.fab"
+group = "language"
+input_root = "corpus"
+input = "erratur/erratur.fab"
+
+
+[expect]
+check_only = true

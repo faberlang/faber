@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/in/in.fab"
+group = "language"
+input_root = "corpus"
+input = "in/in.fab"
+
+
+[expect]
+check_only = true

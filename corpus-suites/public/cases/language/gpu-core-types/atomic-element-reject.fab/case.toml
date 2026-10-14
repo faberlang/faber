@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/gpu-core-types/atomic-element-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "gpu-core-types/atomic-element-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM008.atomic_element"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM008.atomic_element"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM008:atomic_element"

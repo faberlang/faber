@@ -1,6 +1,6 @@
 #![allow(clippy::absurd_extreme_comparisons)]
 
-use hygiene_ratchet::{
+use radix_hygiene::{
     Budgets, ScanConfig, assert_budgets, assert_companion_tests_use_cfg_path_module_convention,
 };
 use std::path::Path;
@@ -36,14 +36,14 @@ const BUDGETS: Budgets = Budgets {
 #[test]
 fn production_hygiene_budgets() {
     let cfg = config();
-    let files = hygiene_ratchet::collect_production_files(&cfg);
-    let counts = hygiene_ratchet::count_budgets(&files, cfg.subtract_self_expect);
+    let files = radix_hygiene::collect_production_files(&cfg);
+    let counts = radix_hygiene::count_budgets(&files, cfg.subtract_self_expect);
     assert_budgets(counts, BUDGETS);
 }
 
 #[test]
 fn companion_tests_use_cfg_path_module_convention() {
     let cfg = config();
-    let files = hygiene_ratchet::collect_production_files(&cfg);
+    let files = radix_hygiene::collect_production_files(&cfg);
     assert_companion_tests_use_cfg_path_module_convention(&files);
 }

@@ -1,0 +1,15 @@
+version = 1
+id = "corpus/implet/implet-orderable.fab"
+group = "language"
+input_root = "corpus"
+input = "implet/implet-orderable.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.roundtrip]
+outcome = "known-fail"
+phase = "emit"
+diagnostic_contains = "SEM002.unknown_type"

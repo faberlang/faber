@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/ascii-format.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/ascii-format.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

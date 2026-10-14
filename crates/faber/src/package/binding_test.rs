@@ -1,7 +1,9 @@
 use std::fs;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::{verify_library_binding_shapes, verify_library_bindings};
+#[cfg(feature = "hir-rust")]
+use super::verify_library_binding_shapes;
+use super::verify_library_bindings;
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -45,6 +47,7 @@ fn has_issue(diagnostics: &[radix::module::diagnostics::Diagnostic], issue: &str
         .any(|diagnostic| diagnostic.args.contains(&expected))
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compiler_analysis_handles_annotations_multiline_signatures_and_next_line_bodies() {
     let root = test_package(
@@ -227,6 +230,7 @@ fn parent_escaping_source_path_is_rejected() {
     ));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn dot_source_library_with_bindings_verifies() {
     // FBR-P1-001 scope update: `paths.source = "."` is a supported contract,
@@ -263,6 +267,7 @@ path = "rust/shim.rs"
     assert_eq!(result.bindings, 1);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn src_source_library_with_bindings_still_verifies() {
     // Regression lock: the default `src` layout keeps verifying after
@@ -421,14 +426,17 @@ fn all_local_functions_without_bindings() {
 // export-visibility rule. A marked declaration is a binding contract; an
 // unmarked one is module-private, so a manifest row naming it matches nothing.
 
+#[cfg(feature = "hir-rust")]
 const LIGATA_BINDINGS: &str = r#"[functions."fixture:api.ligata"]
 symbol = "crate::shim::ligata"
 
 [shim]
 path = "rust/shim.rs"
 "#;
+#[cfg(feature = "hir-rust")]
 const LIGATA_SHIM: &str = "pub fn ligata(via: String) -> Result<String, String> { Ok(via) }\n";
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn marked_bodyless_binding_declaration_is_a_binding_contract() {
     let root = test_package(
@@ -442,6 +450,7 @@ fn marked_bodyless_binding_declaration_is_a_binding_contract() {
     assert_eq!(report.bindings, 1);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn unmarked_bodyless_binding_declaration_is_module_private() {
     let root = test_package(

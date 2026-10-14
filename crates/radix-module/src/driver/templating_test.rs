@@ -9,6 +9,7 @@ use crate::test_support::{assert_compile_fails_with_args, assert_compile_fails_w
 
 // ── template / forma / scriptum ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn backtick_template_captures_forma_without_rendering() {
     let session = test_session_la(Target::HirRust);
@@ -29,6 +30,7 @@ fn backtick_template_captures_forma_without_rendering() {
     assert!(output.code.contains("faber::Valor::from"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bare_backtick_template_produces_empty_params() {
     let session = test_session_la(Target::HirRust);
@@ -43,6 +45,7 @@ fn bare_backtick_template_produces_empty_params() {
     assert!(output.code.contains("vec![]") || output.code.contains("Vec::new()"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn forma_reused_textus_param_is_borrowed_not_moved() {
     let session = test_session_la(Target::HirRust);
@@ -63,6 +66,7 @@ fn forma_reused_textus_param_is_borrowed_not_moved() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn quoted_template_still_renders_via_scriptum() {
     let session = test_session_la(Target::HirRust);
@@ -78,6 +82,7 @@ fn quoted_template_still_renders_via_scriptum() {
     assert!(output.code.contains("format!"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn compile_lowers_scriptum_expression() {
     let session = test_session_la(Target::HirRust);
@@ -93,6 +98,7 @@ fn compile_lowers_scriptum_expression() {
 
 // ── block strings (guillemets) ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn block_string_literal_uses_guillemets() {
     let session = test_session_la(Target::HirRust);
@@ -120,6 +126,7 @@ fn block_string_opener_glyphs_are_rejected() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn guillemet_block_string_template_renders_via_scriptum() {
     let session = test_session_la(Target::HirRust);
@@ -171,6 +178,7 @@ fn ascii_literal_rejects_template_application() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn ascii_widens_to_textus() {
     let session = test_session_la(Target::HirRust);
@@ -182,6 +190,7 @@ fn ascii_widens_to_textus() {
     assert!(output.code.contains(".to_textus()"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn textus_to_ascii_conversio_emits_try_from_textus() {
     let session = test_session_la(Target::HirRust);
@@ -195,6 +204,7 @@ fn textus_to_ascii_conversio_emits_try_from_textus() {
 
 // ── octeti literal ──
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn octeti_literal_compiles_to_vec_u8() {
     let session = test_session_la(Target::HirRust);
@@ -243,6 +253,7 @@ fn octeti_literal_rejects_template_application() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn octeti_literal_matches_in_elige_pattern() {
     let session = test_session_la(Target::HirRust);
@@ -266,6 +277,7 @@ fn octeti_literal_matches_in_elige_pattern() {
 // id; it now proves the u8 lowering of the number and the retirement of the
 // word.
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn octetus_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
     let session = test_session_la(Target::HirRust);
@@ -377,6 +389,7 @@ fn explicit_assignment_rejects_numeric_narrowing() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn bare_assignment_keeps_implicit_widening() {
     let session = test_session_la(Target::HirRust);

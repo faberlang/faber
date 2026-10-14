@@ -4,6 +4,7 @@ use crate::Compiler;
 use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn lege_corpus_still_checks() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/lege/lege.fab");

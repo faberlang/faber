@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/itera/intervallum.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/intervallum.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

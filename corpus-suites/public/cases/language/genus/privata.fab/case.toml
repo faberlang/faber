@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/genus/privata.fab"
+group = "language"
+input_root = "corpus"
+input = "genus/privata.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

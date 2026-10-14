@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/typi/sized-family-error.fab"
+group = "language"
+input_root = "corpus"
+input = "typi/sized-family-error.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "PARSE040.numeric_wrapper_retired"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "PARSE040.numeric_wrapper_retired"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "PARSE040:numeric_wrapper_retired"
