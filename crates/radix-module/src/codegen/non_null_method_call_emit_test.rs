@@ -120,7 +120,11 @@ incipit {
     nota xs!.inverte()
 }
 ";
-    let session = Session::new(Config::default().with_target(Target::HirGo).with_latin_locale());
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirGo)
+            .with_latin_locale(),
+    );
     let result = crate::driver::compile(&session, "non-null-go-reject.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(
