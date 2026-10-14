@@ -335,12 +335,15 @@ impl Validator<'_, '_> {
                 self.require_numerus_index(index, span, "bounded array index is not numerus");
                 Some(MirType::semantic(element))
             }
-            // Route B (AEU-7): scalar bounded buffer element gathers — the
-            // `octeti<N>[i]` → `numerus<u8>` and `ascii<N>[i]` /
-            // `textus<N>[i]` → `ascii<1>` rows (D14 / D17). Like the lista
-            // arm, the lowerer emits only constant lanes below len, so the
-            // non-ASCII trap row can never fire from a dead slot.
-            Type::BoundedOcteti { .. } | Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => {
+            // Route B (AEU-7): scalar bounded text buffer element gathers —
+            // the `ascii<N>[i]` / `textus<N>[i]` → `ascii<1>` rows (D14 /
+            // D17). Like the lista arm, the lowerer emits only constant lanes
+            // below len, so the non-ASCII trap row can never fire from a dead
+            // slot. `octeti<N>` is not here: a range index over it is the same
+            // `octeti` window as the unbounded carrier (see below), and a
+            // scalar read routes through `project_octeti_index` with the
+            // element-type tables.
+            Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => {
                 self.require_numerus_index(index, span, "bounded buffer index is not numerus");
                 match crate::ty::index_projection_result_ty(base_ty, self.context.types.as_table())
                 {
@@ -377,7 +380,9 @@ impl Validator<'_, '_> {
                 Some(MirType::semantic(value))
             }
             Type::Primitive(Primitive::Textus) => self.project_textus_index(index, span),
-            Type::Primitive(Primitive::Octeti) => self.project_octeti_index(base_ty, index, span),
+            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => {
+                self.project_octeti_index(base_ty, index, span)
+            }
             Type::Tuple(elements) => self.project_index_tuple(&elements, index, span),
             _ => {
                 self.error(span, "index projection base is not indexable");
@@ -544,7 +549,14 @@ impl Validator<'_, '_> {
                     MirDeviceViewElement::Scalar(scalar) => MirLayoutKind::Scalar(scalar),
                     MirDeviceViewElement::Vector(vector) => MirLayoutKind::DeviceVector(vector),
                 };
-                if result_layout.kind != expected {
+                // `octeti<N>[lo‥hi]` is an `octeti` window: the static byte
+                // buffer projects to the opaque unbounded carrier, not to its
+                // `u8` cell. A scalar `octeti<N>[i]` still yields the `u8`
+                // element through the same element-type tables.
+                let octeti_window = view.length.is_some()
+                    && matches!(view.element, MirDeviceViewElement::Scalar(MirScalarLayout::U8))
+                    && matches!(self.type_kind(result_ty), Type::Primitive(Primitive::Octeti));
+                if result_layout.kind != expected && !octeti_window {
                     self.error(span, "device view projection element layout mismatch");
                 }
             }
