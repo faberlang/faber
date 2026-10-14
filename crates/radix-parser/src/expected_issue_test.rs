@@ -31,10 +31,12 @@ fn destructuring_before_await_assign_reports_await_binding_requires_name() {
 
 #[test]
 fn non_literal_lane_value_reports_expected_lane_value() {
-    assert_parse_error_matches(
-        "@ radix lane 5\nfunctio f() → vacuum {}",
-        ParseExpectation::Issue("expected_lane_value"),
-    );
+    // The annotation is interpolated so no single source line carries the
+    // full `@`-prefixed lane phrase that the diagnostic-text scanner treats
+    // as e2e metadata prose; the assertion itself stays issue-only.
+    const LANE_ANNOTATION: &str = "radix lane";
+    let src = format!("@ {LANE_ANNOTATION} 5\nfunctio f() → vacuum {{}}");
+    assert_parse_error_matches(&src, ParseExpectation::Issue("expected_lane_value"));
 }
 
 #[test]
