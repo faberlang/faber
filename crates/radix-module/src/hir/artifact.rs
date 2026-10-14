@@ -144,6 +144,7 @@ fn map_resolved_use(wire: ResolvedUseWire) -> ResolvedUse {
         key: map_resolved_use_key(wire.key),
         kind: map_resolved_use_kind(wire.kind),
         enclosing: wire.enclosing,
+        local: wire.local,
     }
 }
 

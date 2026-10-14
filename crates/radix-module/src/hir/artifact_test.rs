@@ -324,11 +324,17 @@ fn loader_resolved_use_index_rebuilt() {
     let mut artifact = minimal_test_artifact();
     let def_id = radix_types::DefId(0); // matches the single item's def_id
     artifact.resolved_uses = vec![
-        ResolvedUseWire { key: ResolvedUseKeyWire::Local(def_id), kind: ResolvedUseKindWire::Call, enclosing: None },
+        ResolvedUseWire {
+            key: ResolvedUseKeyWire::Local(def_id),
+            kind: ResolvedUseKindWire::Call,
+            enclosing: None,
+            local: None,
+        },
         ResolvedUseWire {
             key: ResolvedUseKeyWire::Portable("pkg::func".to_string()),
             kind: ResolvedUseKindWire::ImportBinding,
             enclosing: None,
+            local: None,
         },
     ];
     let bytes = serialize_artifact(&artifact);
@@ -346,6 +352,68 @@ fn loader_resolved_use_index_rebuilt() {
     let portable_uses: Vec<_> = unit.resolved_uses.uses_of_portable("pkg::func").collect();
     assert_eq!(portable_uses.len(), 1);
     assert_eq!(portable_uses[0].kind, ResolvedUseKind::ImportBinding);
+}
+
+#[test]
+fn resolved_use_locals_survive_the_fhir_round_trip() {
+    // The loaded resolved-use index must index the same local defs as direct
+    // analysis: import-binding records stay declaration facts (never counted
+    // as local uses), and a portable-keyed use keeps its unit-local binding.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = include_str!("../../../../corpus/importa/selective-import.fab");
+    let session = Session::new(Config::default().with_dev_locale_root().with_target(Target::HirRust));
+    let original = analyze_source(&session, "selective-import.fab", source, AnalyzeRequest::default())
+        .expect("selective import fixture analyzes");
+
+    let artifact = from_analyzed(&original, "selective-import", "selective-import.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize selective-import artifact");
+    let loaded = load_fhir(&bytes).expect("selective-import artifact must load");
+
+    assert_eq!(
+        loaded.resolved_uses.locals_used(),
+        original.resolved_uses.locals_used(),
+        "loaded resolved-use index must index exactly the local defs direct analysis indexes"
+    );
+}
+
+#[test]
+fn selective_import_rust_emit_is_identical_after_load() {
+    // Pins the emitted form: an unused private selective import is not
+    // emitted, as direct generation does today. The loaded pipeline used to
+    // emit `use crate::console::write_bytes as output_bytes;` for it because
+    // every import counted as used after `load_fhir`.
+    use crate::codegen::{Target, generate_from_analyzed};
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = include_str!("../../../../corpus/importa/selective-import.fab");
+    let session = Session::new(Config::default().with_dev_locale_root().with_target(Target::HirRust));
+    let direct = analyze_source(&session, "selective-import.fab", source, AnalyzeRequest::default())
+        .expect("selective import fixture analyzes");
+
+    let latin = crate::locale::latin_locale_pack();
+    let surface = crate::locale::KeywordSurface::new(&latin);
+    let direct_code =
+        output_code(&generate_from_analyzed(Target::HirRust, &direct, &surface).expect("direct Rust codegen"))
+            .to_owned();
+    assert!(
+        !direct_code.contains("use crate::console::write_bytes as output_bytes;"),
+        "direct generation must drop unused private selective imports"
+    );
+
+    let artifact = from_analyzed(&direct, "selective-import", "selective-import.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize selective-import artifact");
+    let loaded = load_fhir(&bytes).expect("selective-import artifact must load");
+    let loaded_output = generate_from_analyzed(Target::HirRust, &loaded, &surface).expect("loaded Rust codegen");
+    let loaded_code = output_code(&loaded_output);
+
+    assert_eq!(
+        direct_code, loaded_code,
+        "Rust emit must be identical after the FHIR round-trip"
+    );
 }
 
 // ── U2.3: fail-closed error path tests ────────────────────────────────
@@ -1173,6 +1241,7 @@ fn resolved_use_to_wire(u: &crate::semantic::ResolvedUse) -> radix_hir_fhir::Res
             crate::semantic::ResolvedUseKind::ImportBinding => radix_hir_fhir::ResolvedUseKindWire::ImportBinding,
         },
         enclosing: u.enclosing,
+        local: u.local,
     }
 }
 
