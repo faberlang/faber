@@ -1,0 +1,16 @@
+{
+  "targets": {
+    "runner": {
+      "outcome": "known-fail",
+      "phase": "run",
+      "diagnostic_contains": "ordinary call callee is failable; use try_call",
+      "reason": "The runner rejects norma:net during package instantiation: the failable caelum leaf calls inside the @ future listen_async/connect_async/accept_async bodies lower as ordinary calls, so MIR never reaches the loopback flow."
+    },
+    "rust": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "found future",
+      "reason": "Rust emit drops .await from the awaited receiver methods accept_async, write_bytes_async, and read_bytes_async, and passes the optional connect_async secure argument as Some(false) into a generated bool parameter, so the crate fails cargo build with E0308."
+    }
+  }
+}
