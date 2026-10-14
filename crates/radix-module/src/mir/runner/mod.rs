@@ -6,7 +6,8 @@
 
 pub use radix_mir_runner::{
     BufferHost, Host, RUNNER_KERNEL_REFUSED_ISSUE, RunnerDispatchStatus, RunnerError, RunnerKernelPolicy,
-    RunnerRunOutcome, RunnerStats, StdioHost, Value, classify_runner_lowerability, reset_execution_state, run_entry,
+    RunnerRunOutcome, RunnerStats, StdioHost, Value, classify_runner_lowerability, configure_shuffle_seed,
+    reset_execution_state, run_entry,
     run_entry_with_kernel_policy, run_entry_with_stats, run_entry_with_stats_and_kernel_policy, run_function,
     run_function_with_kernel_policy, run_function_with_limits, run_function_with_limits_and_kernel_policy,
     run_function_with_stats_and_limits, run_function_with_stats_and_limits_and_kernel_policy,

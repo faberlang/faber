@@ -10,9 +10,9 @@
 //! snapshots are permuted, ON BY DEFAULT, so a program that depends on hash
 //! order fails in the runner the way it would on a target.
 //!
-//! `RADIX_RUNNER_SHUFFLE_SEED` controls it:
-//! - unset (or not a number): a random seed per process;
-//! - `<n>` (n > 0): that seed, reproducing one order;
+//! [`configure_shuffle_seed`] controls it:
+//! - unconfigured: a random seed per process;
+//! - `n` (n > 0): that seed, reproducing one order;
 //! - `0`: shuffle OFF, the natural hash order.
 
 use std::sync::OnceLock;
@@ -26,15 +26,22 @@ thread_local! {
     static OVERRIDE: std::cell::Cell<Option<Option<u64>>> = const { std::cell::Cell::new(None) };
 }
 
-/// Maps the raw `RADIX_RUNNER_SHUFFLE_SEED` value to a seed: absent or
-/// unparsable is a random per-process seed, `0` is off, any other number is
-/// that seed.
-pub(crate) fn resolve_seed(raw: Option<&str>) -> Option<u64> {
-    match raw.and_then(|value| value.trim().parse::<u64>().ok()) {
-        Some(0) => None,
-        Some(seed) => Some(seed),
-        None => Some(random_seed()),
+/// Maps a shuffle-seed flag value to a seed: `0` is shuffle off, any other
+/// value is that seed.
+pub(crate) fn seed_from_flag(value: u64) -> Option<u64> {
+    match value {
+        0 => None,
+        seed => Some(seed),
     }
+}
+
+/// Configures the process shuffle seed from an explicit caller-supplied value
+/// (`0` = off). Returns `true` when this is the first call; a later call leaves
+/// the seed set by the first in place (first call wins), so a nested
+/// configuration cannot silently re-seed a running process.
+#[must_use]
+pub fn configure_shuffle_seed(value: u64) -> bool {
+    SEED.set(seed_from_flag(value)).is_ok()
 }
 
 /// A per-process random non-zero seed from the standard library's randomly
@@ -47,13 +54,14 @@ fn random_seed() -> u64 {
     seed.max(1)
 }
 
-/// Reads `RADIX_RUNNER_SHUFFLE_SEED` once per process and caches it.
+/// Reads the configured seed once per process and caches it; unconfigured
+/// means a random seed per process.
 fn shuffle_seed() -> Option<u64> {
     #[cfg(test)]
     if let Some(forced) = OVERRIDE.with(std::cell::Cell::get) {
         return forced;
     }
-    *SEED.get_or_init(|| resolve_seed(std::env::var("RADIX_RUNNER_SHUFFLE_SEED").ok().as_deref()))
+    *SEED.get_or_init(|| Some(random_seed()))
 }
 
 /// Runs `body` with the shuffle seed pinned on this thread (`None` = off).
@@ -76,7 +84,7 @@ fn splitmix64(state: u64) -> u64 {
 }
 
 /// Permutes `items` in place via Fisher-Yates under the process shuffle seed
-/// (random unless `RADIX_RUNNER_SHUFFLE_SEED` pins it); a no-op when the seed
+/// (random unless [`configure_shuffle_seed`] pins it); a no-op when the seed
 /// is `0` (off). Call this at every point a `copia`/`tabula` snapshot becomes an
 /// observable sequence (map/set → array conversion, key/value snapshots,
 /// display formatting) so no corpus exemplum can quietly pin the runner's
@@ -89,9 +97,9 @@ pub(crate) fn shuffle_unordered<T>(items: &mut [T]) {
 }
 
 /// Pure Fisher-Yates permutation, seed as a plain argument rather than the
-/// process-wide cached env var. Split out so a unit test can compare two
-/// seeds directly without needing two separate process invocations (the env
-/// var is read once and cached for the process's lifetime).
+/// process-wide configured seed. Split out so a unit test can compare two
+/// seeds directly without needing two separate process invocations (the
+/// process seed is cached for the process's lifetime).
 pub(crate) fn permute<T>(items: &mut [T], seed: u64) {
     if items.len() < 2 {
         return;
