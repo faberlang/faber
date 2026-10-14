@@ -75,7 +75,10 @@ fn empty_generic_rows_reject_angle_brackets_and_declared_rows_are_explicit() {
     assert_eq!(limes.generic_arity(), 1);
     assert_eq!(limes.generic[0].sort, GenericParamSort::Typus);
     for entry in INTRINSICS {
-        if matches!(entry.faber_name, "formata" | "rope_norm" | "rope_half" | "limes") {
+        if matches!(
+            entry.faber_name,
+            "formata" | "rope_norm" | "rope_half" | "limes"
+        ) {
             continue;
         }
         assert!(
