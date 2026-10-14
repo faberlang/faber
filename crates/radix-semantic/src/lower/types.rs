@@ -1064,6 +1064,9 @@ impl Lowerer<'_> {
             crate::locale::TypeBindingKind::Ratio => Some(self.lower_ratio_type(params)),
             // `erratum<T>` identity lowering lands in the follow-up unit.
             crate::locale::TypeBindingKind::Erratum => None,
+            // `trapped<R, T>` lowers by its canonical registry name until the
+            // trap unit wires the localized spelling through.
+            crate::locale::TypeBindingKind::Trapped => None,
             // Conversation-family names lower through the builtin frame
             // structs by their canonical Latin name in `lower_named_type`.
             crate::locale::TypeBindingKind::Frame(_) => None,

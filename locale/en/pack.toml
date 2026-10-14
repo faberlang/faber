@@ -234,6 +234,7 @@ ratio = "record"
 # the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
 sermo = "channel"
 scrinium = "frame"
+trapped = "trapped"
 meus = "send"
 tuus = "recv"
 
