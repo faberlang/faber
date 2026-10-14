@@ -2155,10 +2155,23 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let Some(error_ty) = function.error_ty else {
             return Err(error);
         };
-        if !matches!(
-            self.types.get(error_ty.semantic_id()),
-            Type::Primitive(Primitive::Textus | Primitive::Ignotum)
-        ) {
+        // A leaf failure carries `fault_kind`: its payload is the two-entry
+        // fault record, which also crosses into the dynamic `valor` carrier.
+        // Every other failure keeps the text payload and its textus/ignotum
+        // alternate exit.
+        let fault = fault_record_args(&error);
+        let accepts_payload = if fault.is_some() {
+            matches!(
+                self.types.get(error_ty.semantic_id()),
+                Type::Primitive(Primitive::Textus | Primitive::Ignotum | Primitive::Valor)
+            )
+        } else {
+            matches!(
+                self.types.get(error_ty.semantic_id()),
+                Type::Primitive(Primitive::Textus | Primitive::Ignotum)
+            )
+        };
+        if !accepts_payload {
             return Err(RunnerError::internal(
                 error.span,
                 "recoverable runtime failure requires textus-compatible alternate-exit type",
@@ -2166,7 +2179,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
 
         self.return_value = None;
-        self.return_error = Some(Value::Str(error.message));
+        self.return_error = Some(match fault {
+            Some((kind, path)) => routes::fault_record_value(&kind, &path),
+            None => Value::Str(error.message),
+        });
         self.pop_frame();
         Ok(StatementOutcome::FrameReturned)
     }
@@ -3560,6 +3576,16 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             | MirBinOp::Shr => int_bitwise_binop(left, right, op, width, span),
         }
     }
+}
+
+/// The `kind`/`path` facts a leaf-failure diagnostic carries, when it has
+/// them. The path defaults to empty so a record is always two entries.
+fn fault_record_args(error: &RunnerError) -> Option<(String, String)> {
+    let kind = error.arg("fault_kind")?;
+    Some((
+        kind.to_owned(),
+        error.arg("fault_path").unwrap_or_default().to_owned(),
+    ))
 }
 
 fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Interner) -> bool {

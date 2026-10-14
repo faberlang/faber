@@ -208,11 +208,11 @@ impl Drop for Conversation {
 
 /// Text of an `error` terminal's data, as `close()` reports it (`⇥ textus`).
 ///
-/// A leaf-failure map carries its rendered text in the runner-internal `text`
-/// entry; every other data shape renders exactly as before.
+/// A leaf-failure record renders as its kind and path; every other data shape
+/// renders exactly as before.
 fn error_text(data: &Value) -> String {
-    if let Some(text) = leaf_error_text(data) {
-        return text;
+    if let Some((kind, path)) = leaf_error_facts(data) {
+        return fault_message(&kind, &path);
     }
     match data {
         Value::Str(text) => text.clone(),
@@ -223,14 +223,13 @@ fn error_text(data: &Value) -> String {
     }
 }
 
-/// The runner-internal `text` entry of a leaf-failure map, when present.
-fn leaf_error_text(data: &Value) -> Option<String> {
-    let Value::Map(entries) = data else {
-        return None;
-    };
-    match entries.borrow().get(&MapKey::Str("text".to_owned())) {
-        Some(Value::Str(text)) => Some(text.clone()),
-        _ => None,
+/// The `<kind> <path>` message of a leaf-failure record; the path is omitted
+/// when empty. Platform text never enters it.
+fn fault_message(kind: &str, path: &str) -> String {
+    if path.is_empty() {
+        kind.to_owned()
+    } else {
+        format!("{kind} {path}")
     }
 }
 
@@ -619,16 +618,19 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     ),
                 ))
             }
-            // WHY: the error terminal already carries the producer's own text
-            // (a leaf error's route, path and OS message), so that text is the
-            // message. The issue identity stays the stable conversion issue:
-            // it must not vary with the path or the OS wording.
+            // WHY: a leaf failure crosses as its kind and path facts, never
+            // as platform text; the message is those two facts joined. The
+            // issue identity stays the stable conversion issue: it must not
+            // vary with the kind or the path.
             (Some(SermoTerminal::Error(data)), _) => {
                 let mut error = RunnerError::conversion(span, "sermo reply conversion failed");
-                error.message = error_text(data);
-                if let Some((kind, path)) = leaf_error_facts(data) {
-                    error.args.push(("leaf_kind".to_owned(), kind));
-                    error.args.push(("leaf_path".to_owned(), path));
+                match leaf_error_facts(data) {
+                    Some((kind, path)) => {
+                        error.message = fault_message(&kind, &path);
+                        error.args.push(("fault_kind".to_owned(), kind));
+                        error.args.push(("fault_path".to_owned(), path));
+                    }
+                    None => error.message = error_text(data),
                 }
                 Err(error)
             }

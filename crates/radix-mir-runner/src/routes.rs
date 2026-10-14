@@ -14,7 +14,7 @@ use std::rc::Rc;
 /// Answer a raw route, or `None` when the route is not served here.
 ///
 /// `Some(Ok(items))` carries the content items; `Some(Err(data))` is an
-/// `error` terminal whose data is the kernel error message.
+/// `error` terminal whose data is the leaf's failure record (`kind`/`path`).
 pub fn serve_route<H: Host + ?Sized>(
     host: &mut H,
     route: &str,
@@ -193,21 +193,24 @@ fn reply_to_value(reply: Reply) -> Option<Value> {
     }
 }
 
-/// The failure terminal's data: the leaf's `kind` and `path` facts beside the
-/// runner-internal `text` (the leaf's `Display`) that current consumers print.
+/// The failure terminal's data: the leaf's `kind` and `path` facts, and
+/// nothing else.
 ///
-/// WHY: kind and path must survive to `sermo_items` as diagnostic args while
-/// `text` keeps every message byte-for-byte. `text` is runner-internal: only
-/// `sermo::error_text` reads it, and it must never surface as a program field.
+/// WHY: kind and path are the whole crossing record; the leaf's `Display`
+/// text is platform prose and stays in the leaf's local frame.
 fn leaf_error_value(error: &leaf::LeafError) -> Value {
-    let (kind, path) = error.facts();
+    fault_record_value(error.kind().variant_name(), error.path())
+}
+
+/// The two-entry `kind`/`path` failure record, shared by the leaf route and
+/// `Runner::propagate_runtime_failure`.
+///
+/// `kind` is the Norma `IoFault` variant name; `path` may be empty when the
+/// failure carries no path. No other entry is part of the record.
+pub(crate) fn fault_record_value(kind: &str, path: &str) -> Value {
     let mut map = FxHashMap::default();
     map.insert(MapKey::Str("kind".to_owned()), Value::Str(kind.to_owned()));
     map.insert(MapKey::Str("path".to_owned()), Value::Str(path.to_owned()));
-    map.insert(
-        MapKey::Str("text".to_owned()),
-        Value::Str(error.to_string()),
-    );
     Value::Map(Rc::new(RefCell::new(map)))
 }
 
