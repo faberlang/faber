@@ -1322,6 +1322,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         }
                     }
                     Value::Octeti(mut bytes) => {
+                        if let Some(capacity) = self.collection_capacity(receiver_operand, span)?
+                            && bytes.len() >= capacity
+                        {
+                            return Err(RunnerError::internal_with_issue(
+                                span,
+                                "bounded collection push at capacity",
+                                "runner_collection_push_capacity",
+                            ));
+                        }
                         bytes.push(byte_from_value(&item, span)?);
                         // F-086: when the receiver is a Place, write back so
                         // the mutation persists in the frame; otherwise return
@@ -4255,8 +4264,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     // COLLECTION HELPERS
 
     /// Read a literal capacity from a direct collection place. MIR values do
-    /// not carry their semantic type, so bounded queue/stack/list push uses
-    /// the active function's place declaration as the capacity witness.
+    /// not carry their semantic type, so bounded queue/stack/list/octeti push
+    /// uses the active function's place declaration as the capacity witness.
     fn collection_capacity(
         &self,
         operand: &MirOperand,
@@ -4284,7 +4293,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let capacity = match self.types.get(ty) {
             Type::BoundedArray { capacity, .. }
             | Type::BoundedQueue { capacity, .. }
-            | Type::BoundedStack { capacity, .. } => *capacity,
+            | Type::BoundedStack { capacity, .. }
+            | Type::BoundedOcteti { capacity } => *capacity,
             _ => return Ok(None),
         };
         let IndexExpr::Literal(capacity) = self.types.get_index(capacity) else {
