@@ -704,6 +704,48 @@ fn corpus_rust_known_failure_becoming_green_requires_reclassification() {
 }
 
 #[test]
+fn corpus_rust_reports_a_rejection_as_its_own_outcome() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/probe");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        format!(
+            "version = 1\ncases_dir = \"cases\"\n\n[targets.rust]\nruntime = {}\n",
+            toml::Value::String(rust_runtime().display().to_string())
+        ),
+    )
+    .expect("write suite");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"main.fab\"\n\n[targets.rust]\noutcome = \"rejects\"\nphase = \"emit\"\ndiagnostic_contains = \"SEM002:unknown_type\"\n",
+    )
+    .expect("write case");
+    fs::copy(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/typi/inf-prefix-error.fab"),
+        case.join("main.fab"),
+    )
+    .expect("copy rejected source");
+    let rejected = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "rust"])
+        .arg(temp.path())
+        .output()
+        .expect("run rejection case");
+    assert!(
+        rejected.status.success(),
+        "{}",
+        String::from_utf8_lossy(&rejected.stdout)
+    );
+    let rows = records(&rejected.stdout);
+    assert_eq!(rows[0]["status"], "rejected");
+    let summary = rows.last().expect("summary");
+    assert_eq!(summary["rejected"], 1);
+    assert_eq!(summary["expected_failures"], 0);
+    assert_eq!(summary["failed"], 0);
+    assert_eq!(summary["build"]["cargo_invocations"], 0);
+}
+
+#[test]
 fn corpus_known_failure_becoming_green_requires_reclassification() {
     let temp = tempfile::tempdir().expect("temporary suite");
     let case = temp.path().join("cases").join("probe");
