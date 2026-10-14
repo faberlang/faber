@@ -716,11 +716,19 @@ impl super::FaberCodegen<'_> {
                 Ok(self.bounded_primitive_head(Primitive::Ascii, *capacity, surface))
             }
             Type::BoundedOcteti { capacity } => {
-                Self::expect_no_form_args(form)?;
+                // Ruling d477c76d spells the bounded byte buffer `lista<b8, N>`,
+                // so the live authored form carries the `b8` type child; the
+                // retired `octeti<N>`/`bytes<N>` word carried none. Both
+                // re-emit as the list form.
+                let element = if form.args.is_empty() {
+                    BitsWidth::B8.faber_marker().to_owned()
+                } else {
+                    self.single_type_form_child(form, names, surface)?
+                };
                 Ok(format!(
                     "{}<{}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
-                    BitsWidth::B8.faber_marker(),
+                    element,
                     self.format_figura(*capacity, surface)
                 ))
             }
