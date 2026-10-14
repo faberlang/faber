@@ -5,7 +5,7 @@
 //! infallible). Typecheck records the row on the `Conversio` node so every
 //! backend lowers the same decision.
 
-use crate::test_support::{analyze_ok, assert_rejects_with_issue};
+use crate::test_support::{analyze_ok_la, assert_rejects_with_issue_la};
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{HirConversioRoute, HirExpression, HirExpressionKind, HirOrdoRow};
 
@@ -27,7 +27,7 @@ impl HirVisitor for RouteCollector {
 }
 
 fn routes(source: &str) -> Vec<HirConversioRoute> {
-    let result = analyze_ok(source);
+    let result = analyze_ok_la(source);
     let mut collector = RouteCollector::default();
     collector.visit_program(result.hir.as_ref().expect("hir"));
     collector.routes
@@ -93,7 +93,7 @@ fn numerus_to_ordo_propagates_through_a_textus_channel() {
 
 #[test]
 fn numerus_to_ordo_propagation_requires_a_textus_channel() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &format!("{COLOR}functio lege(numerus n) → Color ⇥ numerus {{ redde n ↦ Color }}"),
         "conversio_failure_channel_textus_required",
     );
@@ -101,11 +101,11 @@ fn numerus_to_ordo_propagation_requires_a_textus_channel() {
 
 #[test]
 fn infallible_ordo_rows_reject_a_default() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &format!("{COLOR}incipit {{ fixum numerus n ← Color.viridis ↦ numerus ⊥ 0\n nota n }}"),
         "ordo_conversio_recovery_unsupported",
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &format!("{COLOR}incipit {{ fixum textus s ← Color.viridis ↦ textus ⊥ \"x\"\n nota s }}"),
         "ordo_conversio_recovery_unsupported",
     );
@@ -114,11 +114,11 @@ fn infallible_ordo_rows_reject_a_default() {
 #[test]
 fn string_valued_ordo_has_no_numeric_rows() {
     let source = "ordo Via { domus = \"home\", opus = \"work\" }\n";
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &format!("{source}incipit {{ fixum numerus n ← Via.opus ↦ numerus\n nota n }}"),
         "ordo_conversio_string_member",
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &format!("{source}incipit {{ fixum Via v ← 1 ↦ Via ⊥ Via.domus\n nota 1 }}"),
         "ordo_conversio_string_member",
     );
@@ -131,11 +131,11 @@ fn string_valued_ordo_has_no_numeric_rows() {
 
 #[test]
 fn other_ordo_pairs_stay_unsupported() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &format!("{COLOR}incipit {{ fixum fractus f ← Color.viridis ↦ fractus\n nota f }}"),
         "unsupported_conversio",
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &format!(
             "{COLOR}incipit {{ fixum Color c ← \"viridis\" ↦ Color ⊥ Color.rubrum\n nota 1 }}"
         ),
@@ -145,7 +145,7 @@ fn other_ordo_pairs_stay_unsupported() {
 
 #[test]
 fn discretio_has_no_ordo_rows() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "discretio Figura { Circulus { fractus r } }\nfunctio f(Figura x) → numerus { redde x ↦ numerus }",
         "unsupported_conversio",
     );
@@ -153,7 +153,7 @@ fn discretio_has_no_ordo_rows() {
 
 #[test]
 fn conversio_assign_through_an_ordo_row_fails_closed() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &format!("{COLOR}incipit {{ varia numerus n ← 0\n n ↤ Color.viridis\n nota n }}"),
         "conversio_assign_route_unsupported",
     );

@@ -4,7 +4,7 @@
 use radix_diagnostics::DiagnosticArg;
 
 fn accepts(source: &str) {
-    let result = crate::test_support::analyze_source(source);
+    let result = crate::test_support::analyze_source_la(source);
     assert!(
         result.is_ok(),
         "expected typecheck ok: {:?}",
@@ -13,7 +13,7 @@ fn accepts(source: &str) {
 }
 
 fn rejects_with_issue(source: &str, issue: &str) {
-    let result = crate::test_support::analyze_source(source);
+    let result = crate::test_support::analyze_source_la(source);
     assert!(
         !result.is_ok(),
         "expected typecheck failure, but source was accepted"

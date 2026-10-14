@@ -7,7 +7,7 @@ use crate::passes::typecheck::test_support;
 
 #[test]
 fn conversio_rejects_struct_to_numerus() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 genus Foo { varia numerus n }
 
@@ -21,17 +21,17 @@ functio bad(Foo f) → numerus {
 
 #[test]
 fn textus_to_regex_conversio_typechecks() {
-    test_support::assert_accepts(r#"incipit { fixum _ r ← "\d+" ↦ regex }"#);
+    test_support::assert_accepts_la(r#"incipit { fixum _ r ← "\d+" ↦ regex }"#);
 }
 
 #[test]
 fn ascii_to_regex_conversio_typechecks_via_textus_widening() {
-    test_support::assert_accepts(r"incipit { fixum _ r ← '(?g)\\d+' ↦ regex }");
+    test_support::assert_accepts_la(r"incipit { fixum _ r ← '(?g)\\d+' ↦ regex }");
 }
 
 #[test]
 fn regex_conversio_rejects_recovery_slot() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"incipit { fixum _ r ← "\d[" ↦ regex ⊥ "\d+" }"#,
         "regex_recovery_unsupported",
     );
@@ -43,17 +43,17 @@ fn regex_literal_pattern_has_no_length_cap() {
     // check-time length policy on the literal.
     let pattern = "a".repeat(1100);
     let source = format!(r#"incipit {{ fixum _ r ← "{pattern}" ↦ regex }}"#);
-    test_support::assert_accepts(&source);
+    test_support::assert_accepts_la(&source);
 }
 
 #[test]
 fn regex_conversio_dynamic_source_with_text_channel_typechecks() {
-    test_support::assert_accepts(r"functio f(textus pat) → regex ⇥ textus { redde pat ↦ regex }");
+    test_support::assert_accepts_la(r"functio f(textus pat) → regex ⇥ textus { redde pat ↦ regex }");
 }
 
 #[test]
 fn conversio_recovery_type_mismatch_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"incipit { fixum _ n ← "x" ↦ numerus ⊥ "string" }"#,
         "conversio_recovery_type_mismatch",
     );
@@ -61,7 +61,7 @@ fn conversio_recovery_type_mismatch_rejects() {
 
 #[test]
 fn intervallum_clamp_operand_type_mismatch_rejects_with_structured_issue_arg() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"incipit { fixum _ clamped ← "x" ↦ 0‥10 }"#,
         "intervallum_clamp_operand_type_mismatch",
     );
@@ -69,7 +69,7 @@ fn intervallum_clamp_operand_type_mismatch_rejects_with_structured_issue_arg() {
 
 #[test]
 fn bare_fallible_conversio_requires_textus_alternate_exit() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio parse(valor v) → instans ⇥ numerus {
     redde v ↦ instans
@@ -81,7 +81,7 @@ functio parse(valor v) → instans ⇥ numerus {
 
 #[test]
 fn inline_conversio_recovery_allows_non_textus_alternate_exit() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio parse(valor v, instans epoch) → instans ⇥ numerus {
     redde v ↦ instans ⊥ epoch
@@ -92,7 +92,7 @@ functio parse(valor v, instans epoch) → instans ⇥ numerus {
 
 #[test]
 fn valor_to_sized_numerus_direct_extraction_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio parse(valor v) → u8 ⇥ textus {
     redde v ↦ u8
@@ -103,7 +103,7 @@ functio parse(valor v) → u8 ⇥ textus {
 
 #[test]
 fn valor_to_sized_fractus_direct_extraction_rejects_until_width_policy_exists() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio parse(valor v) → f32 {
     redde v ↦ f32
@@ -115,7 +115,7 @@ functio parse(valor v) → f32 {
 
 #[test]
 fn valor_to_sized_numeric_lista_extraction_rejects_until_runtime_trait_exists() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 incipit {
     fixum valor v ← [1, 2]
@@ -128,7 +128,7 @@ incipit {
 
 #[test]
 fn valor_to_genus_sized_fractus_field_rejects_until_width_policy_exists() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 genus Sample {
     varia f32 ratio
@@ -145,7 +145,7 @@ incipit {
 
 #[test]
 fn infallible_conversio_allows_non_textus_alternate_exit() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio widen(numerus n) → fractus ⇥ numerus {
     redde n ↦ fractus
@@ -156,7 +156,7 @@ functio widen(numerus n) → fractus ⇥ numerus {
 
 #[test]
 fn truthiness_conversio_allows_non_textus_alternate_exit() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio truthy(textus s) → bivalens ⇥ numerus {
     redde s ↦ bivalens
@@ -173,7 +173,7 @@ fn truthiness_conversio_rejects_recovery_slot() {
         "\"\" ↦ bivalens ⊥ verum",
         "'no' ↦ bivalens ⊥ verum",
     ] {
-        test_support::assert_rejects_with_issue(
+        test_support::assert_rejects_with_issue_la(
             &format!("incipit {{ fixum _ b ← {source} }}"),
             "bivalens_recovery_unsupported",
         );
@@ -182,17 +182,17 @@ fn truthiness_conversio_rejects_recovery_slot() {
 
 #[test]
 fn textus_to_octeti_conversio_typechecks() {
-    test_support::assert_accepts(r#"incipit { fixum _ b ← "hi" ↦ octeti }"#);
+    test_support::assert_accepts_la(r#"incipit { fixum _ b ← "hi" ↦ octeti }"#);
 }
 
 #[test]
 fn octeti_to_textus_conversio_typechecks() {
-    test_support::assert_accepts(r"incipit { fixum _ s ← |68 69| ↦ textus }");
+    test_support::assert_accepts_la(r"incipit { fixum _ s ← |68 69| ↦ textus }");
 }
 
 #[test]
 fn lista_numerus_to_textus_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  fixum lista<numerus> a ← [72, 105]\n  fixum _ s ← a ↦ textus\n}",
         "lista_to_textus_unsupported",
     );
@@ -200,7 +200,7 @@ fn lista_numerus_to_textus_conversio_rejects() {
 
 #[test]
 fn lista_textus_to_textus_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  fixum lista<textus> a ← [\"x\", \"y\"]\n  fixum _ s ← a ↦ textus\n}",
         "lista_to_textus_unsupported",
     );
@@ -208,7 +208,7 @@ fn lista_textus_to_textus_conversio_rejects() {
 
 #[test]
 fn bounded_lista_to_bounded_textus_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  fixum lista<numerus> base ← [1, 2]\n  fixum lista<numerus, 8> raw ← base ↦ lista<numerus, 8>\n  fixum textus<8> out ← raw ↦ textus<8>\n}",
         "lista_to_textus_unsupported",
     );
@@ -216,33 +216,33 @@ fn bounded_lista_to_bounded_textus_conversio_rejects() {
 
 #[test]
 fn bounded_textus_conversio_accepts_inline_recovery() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio s(textus<4> t) → textus {\n  redde t ↦ textus ⊥ \"fallback\"\n}",
     );
 }
 
 #[test]
 fn octeti_variable_to_textus_conversio_stays_legal() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit {\n  fixum octeti b ← |68 69|\n  fixum _ s ← b ↦ textus\n}",
     );
 }
 
 #[test]
 fn ascii_octeti_conversio_roundtrip_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit {\n  fixum _ b ← 'hi' ↦ octeti\n  fixum _ a ← b ↦ ascii\n}",
     );
 }
 
 #[test]
 fn octeti_textus_recovery_typechecks() {
-    test_support::assert_accepts(r#"incipit { fixum _ s ← |ff| ↦ textus ⊥ "?" }"#);
+    test_support::assert_accepts_la(r#"incipit { fixum _ s ← |ff| ↦ textus ⊥ "?" }"#);
 }
 
 #[test]
 fn fractus_to_octeti_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum _ b ← 1.5 ↦ octeti }",
         "numeric_to_octeti_unspecified",
     );
@@ -250,7 +250,7 @@ fn fractus_to_octeti_conversio_rejects() {
 
 #[test]
 fn bivalens_to_octeti_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum _ b ← verum ↦ octeti }",
         "numeric_to_octeti_unspecified",
     );
@@ -258,7 +258,7 @@ fn bivalens_to_octeti_conversio_rejects() {
 
 #[test]
 fn octeti_to_fractus_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum _ f ← |00| ↦ fractus }",
         "octeti_to_fractus_unspecified",
     );
@@ -482,7 +482,7 @@ fn primitive_conversio_matrix_cases() -> &'static [ConversioMatrixCase] {
 
 #[test]
 fn instans_cross_precision_equality_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
     redde fine ≡ coarse
@@ -494,7 +494,7 @@ functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
 
 #[test]
 fn instans_cross_precision_ordering_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio before(instans fine, instans<ms> coarse) → bivalens {
     redde fine ≺ coarse
@@ -506,7 +506,7 @@ functio before(instans fine, instans<ms> coarse) → bivalens {
 #[test]
 fn primitive_conversio_matrix_typecheck() {
     for case in primitive_conversio_matrix_cases() {
-        let result = test_support::compile_and_get_result(case.source);
+        let result = test_support::compile_and_get_result_la(case.source);
         match case.expect {
             MatrixExpect::Accepts => {
                 assert!(result.is_ok(), "{}: {:?}", case.name, result.diagnostics);
@@ -529,45 +529,45 @@ fn primitive_conversio_matrix_typecheck() {
 
 #[test]
 fn lista_to_copia_conversio_typechecks() {
-    test_support::assert_accepts("incipit { fixum _ s ← [1, 2, 2] ↦ copia<numerus> }");
+    test_support::assert_accepts_la("incipit { fixum _ s ← [1, 2, 2] ↦ copia<numerus> }");
 }
 
 #[test]
 fn copia_to_lista_conversio_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit {\n  varia copia<numerus> s ← vacua\n  s.adde(1)\n  fixum _ xs ← s ↦ lista<numerus>\n}",
     );
 }
 
 #[test]
 fn tensor_to_lista_conversio_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit {\n  fixum tensor<numerus, []> t ← vacua\n  fixum _ xs ← t ↦ lista<numerus>\n}",
     );
 }
 
 #[test]
 fn lista_to_tensor_conversio_typechecks() {
-    test_support::assert_accepts("incipit { fixum _ t ← [1, 2, 3] ↦ tensor<numerus, [3]> }");
+    test_support::assert_accepts_la("incipit { fixum _ t ← [1, 2, 3] ↦ tensor<numerus, [3]> }");
 }
 
 #[test]
 fn shaped_lista_to_tensor_conversio_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit { fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]\n  fixum tf32[2, 2] t ← flat ↦ tf32[2, 2] }",
     );
 }
 
 #[test]
 fn rectangular_lista_literal_to_tensor_conversio_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit { fixum tf32[2, 2] t ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2] }",
     );
 }
 
 #[test]
 fn rectangular_lista_literal_to_tensor_conversio_rejects_ragged_rows() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum _ t ← [[1.0, 2.0], [3.0]] ↦ tf32[2, 2] }",
         "rectangular_lista_literal_row_length",
     );
@@ -575,7 +575,7 @@ fn rectangular_lista_literal_to_tensor_conversio_rejects_ragged_rows() {
 
 #[test]
 fn rectangular_lista_literal_to_tensor_conversio_rejects_shape_mismatch() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum _ t ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[3, 3] }",
         "rectangular_lista_literal_shape",
     );
@@ -583,7 +583,7 @@ fn rectangular_lista_literal_to_tensor_conversio_rejects_shape_mismatch() {
 
 #[test]
 fn sparse_tensor_conversio_typechecks_both_directions() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
   fixum tf32[2, 2] dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tf32[2, 2]
   fixum sf32[2, 2] sparse ← dense ↦ sf32[2, 2]
@@ -595,7 +595,7 @@ fn sparse_tensor_conversio_typechecks_both_directions() {
 
 #[test]
 fn sparse_tensor_conversio_rejects_shape_change() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"incipit {
   fixum tf32[2, 2] dense ← vacua
   fixum sf32[4] sparse ← dense ↦ sf32[4]
@@ -607,7 +607,7 @@ fn sparse_tensor_conversio_rejects_shape_change() {
 
 #[test]
 fn sparse_tensor_conversio_rejects_element_change() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"incipit {
   fixum tf32[2] dense ← vacua
   fixum sf64[2] sparse ← dense ↦ sf64[2]
@@ -619,7 +619,7 @@ fn sparse_tensor_conversio_rejects_element_change() {
 
 #[test]
 fn sparse_to_lista_conversio_rejects_as_ambiguous() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"incipit {
   fixum sf32[2] sparse ← vacua
   fixum lista<f32> values ← sparse ↦ lista<f32>
@@ -631,7 +631,7 @@ fn sparse_to_lista_conversio_rejects_as_ambiguous() {
 
 #[test]
 fn nested_lista_variable_to_tensor_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum lista<lista<f32>> rows ← [[1.0, 2.0], [3.0, 4.0]]\n  fixum _ t ← rows ↦ tf32[2, 2] }",
         "lista_to_tensor_nested",
     );
@@ -639,19 +639,19 @@ fn nested_lista_variable_to_tensor_conversio_rejects() {
 
 #[test]
 fn lista_to_cursor_conversio_typechecks() {
-    test_support::assert_accepts("incipit { fixum _ c ← [1, 2, 3] ↦ cursor<numerus> }");
+    test_support::assert_accepts_la("incipit { fixum _ c ← [1, 2, 3] ↦ cursor<numerus> }");
 }
 
 #[test]
 fn cursor_to_lista_conversio_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit { fixum _ xs ← [1, 2, 3] ↦ cursor<numerus> ↦ lista<numerus> }",
     );
 }
 
 #[test]
 fn tabula_to_lista_keys_conversio_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"incipit {
   fixum tabula<textus, numerus> m ← { "a": 1, "b": 2 }
   fixum _ ks ← m ↦ lista<textus>
@@ -661,7 +661,7 @@ fn tabula_to_lista_keys_conversio_typechecks() {
 
 #[test]
 fn tabula_to_lista_values_conversio_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"incipit {
   fixum tabula<textus, numerus> m ← { "a": 1, "b": 2 }
   fixum _ vs ← m ↦ lista<numerus>
@@ -671,7 +671,7 @@ fn tabula_to_lista_values_conversio_typechecks() {
 
 #[test]
 fn lista_to_tabula_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum _ m ← [1, 2] ↦ tabula<textus, numerus> }",
         "lista_to_tabula_unsupported",
     );
@@ -681,7 +681,7 @@ fn lista_to_tabula_conversio_rejects() {
 fn array_ascription_to_generic_map_key_rejects() {
     // Operator ruling (2026-09-21, total): an array is not a map, so an
     // array-to-map ascription is rejected whatever the key type is.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"functio selecta<K, V>() → tabula<K, V> {
   redde [] ∷ tabula<K, V>
 }",
@@ -692,7 +692,7 @@ fn array_ascription_to_generic_map_key_rejects() {
 #[test]
 fn generic_genus_field_array_ascription_to_generic_map_key_rejects() {
     // The norma `SortedMap<K, V>` shape: a generic class field default.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"genus SortedMap<K, V> {
   varia tabula<K, V> entries = [] ∷ tabula<K, V>
 }",
@@ -703,7 +703,7 @@ fn generic_genus_field_array_ascription_to_generic_map_key_rejects() {
 #[test]
 fn lista_source_ascription_to_generic_map_key_rejects() {
     // The rule keys on the source's container family, not on literal syntax.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"functio selecta<K, V>(lista<numerus> src) → tabula<K, V> {
   redde src ∷ tabula<K, V>
 }",
@@ -714,7 +714,7 @@ fn lista_source_ascription_to_generic_map_key_rejects() {
 #[test]
 fn array_ascription_to_holed_map_key_rejects() {
     // `tabula<_, V>` leaves the key uninferred: same array-to-map family.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum tabula<_, numerus> m ← [] ∷ tabula<_, numerus> }",
         "array_ascription_to_map",
     );
@@ -726,7 +726,7 @@ fn index_keyed_array_ascription_to_map_rejects() {
     // should be allowed by treating the indexes as the key values, it's
     // still a conversion." Index-keyedness does not make the ascription
     // true.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum tabula<numerus, numerus> m ← [] ∷ tabula<numerus, numerus> }",
         "array_ascription_to_map",
     );
@@ -735,7 +735,7 @@ fn index_keyed_array_ascription_to_map_rejects() {
 #[test]
 fn concrete_key_array_ascription_to_map_rejects() {
     // Totality is not about genericity: a concrete key is rejected too.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum tabula<textus, numerus> m ← [] ∷ tabula<textus, numerus> }",
         "array_ascription_to_map",
     );
@@ -745,7 +745,7 @@ fn concrete_key_array_ascription_to_map_rejects() {
 fn fractus_key_array_ascription_to_map_rejects() {
     // Any concrete key family is the same rejection; the rule is not a
     // textus special case.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum tabula<fractus, numerus> m ← [] ∷ tabula<fractus, numerus> }",
         "array_ascription_to_map",
     );
@@ -755,7 +755,7 @@ fn fractus_key_array_ascription_to_map_rejects() {
 fn sized_integer_key_array_ascription_to_map_rejects() {
     // A sized integer key is as index-keyed as bare numerus, and the ruling
     // rejects the index-keyed reading itself.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum tabula<u32, numerus> m ← [] ∷ tabula<u32, numerus> }",
         "array_ascription_to_map",
     );
@@ -768,7 +768,7 @@ fn shape_matching_array_ascription_to_tensor_rejects() {
     // array matches with the internal structure of the tensor", which the
     // source does not establish (signed-to-unsigned cast analogy, operator
     // ruling 2026-09-21).
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum tensor<fractus, [2, 2]> t ← [[1.0, 0.0], [0.0, 2.0]] ∷ tensor<fractus, [2, 2]> }",
         "array_ascription_to_tensor",
     );
@@ -778,7 +778,7 @@ fn shape_matching_array_ascription_to_tensor_rejects() {
 fn flat_array_ascription_to_tensor_rejects() {
     // Total over shapes: a flat, exact-length literal is the same
     // cross-container-kind conversion.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum tensor<numerus, [3]> t ← [1, 2, 3] ∷ tensor<numerus, [3]> }",
         "array_ascription_to_tensor",
     );
@@ -788,7 +788,7 @@ fn flat_array_ascription_to_tensor_rejects() {
 fn shape_mismatched_array_ascription_to_tensor_rejects() {
     // The rejection is unconditional: a disagreeing shape does not get a
     // gentler ruling than an agreeing one — both are conversions.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum tensor<numerus, [8]> t ← [1, 2, 3] ∷ tensor<numerus, [8]> }",
         "array_ascription_to_tensor",
     );
@@ -798,7 +798,7 @@ fn shape_mismatched_array_ascription_to_tensor_rejects() {
 fn empty_array_ascription_to_tensor_rejects() {
     // The norma tensor.fab shape: `[]` is a definite array literal, so the
     // rule fires even with nothing to shape-match.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum tensor<fractus, [8]> t ← [] ∷ tensor<fractus, [8]> }",
         "array_ascription_to_tensor",
     );
@@ -809,7 +809,7 @@ fn lista_source_ascription_to_tensor_rejects() {
     // As on the map side, the rule keys on the source's container family,
     // not on literal syntax: a typed lista identifier is a definite
     // cross-family source (bounded lista included).
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"functio selecta(lista<fractus, 4> src) → tensor<fractus, [4]> {
   redde src ∷ tensor<fractus, [4]>
 }",
@@ -821,7 +821,7 @@ fn lista_source_ascription_to_tensor_rejects() {
 fn unresolved_source_ascription_to_tensor_typechecks() {
     // The boundary that is not a loophole: an identifier or unresolved-type
     // source is exactly what ascription is for, so the rule must not fire.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"functio asserta<T>(T raw) → tensor<fractus, [8]> {
   redde raw ∷ tensor<fractus, [8]>
 }",
@@ -833,7 +833,7 @@ fn sanctioned_empty_and_keyed_map_construction_typechecks() {
     // `vacua` is the la-pack marker (`empty` is its en twin, covered by the
     // corpus); the keyed literal and the empty object literal stay the typed
     // construction paths.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"incipit {
   fixum tabula<textus, numerus> a ← vacua
   fixum tabula<textus, numerus> b ← { "alpha": 1 }
@@ -844,14 +844,14 @@ fn sanctioned_empty_and_keyed_map_construction_typechecks() {
 
 #[test]
 fn array_ascription_to_lista_still_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit { fixum lista<numerus> xs ← [1, 2, 3] ∷ lista<numerus> }",
     );
 }
 
 #[test]
 fn sync_to_promissum_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum _ p ← 42 ↦ promissum<numerus> }",
         "promissum_target_boundary",
     );
@@ -859,7 +859,7 @@ fn sync_to_promissum_conversio_rejects() {
 
 #[test]
 fn promissum_to_sync_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"functio takesPromissum(promissum<numerus> p) → numerus {
   fixum _ n ← p ↦ numerus
   redde n
@@ -870,7 +870,7 @@ fn promissum_to_sync_conversio_rejects() {
 
 #[test]
 fn copia_to_tabula_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  varia copia<numerus> s ← vacua\n  fixum _ m ← s ↦ tabula<textus, numerus>\n}",
         "cross_collection_unsupported",
     );
@@ -971,21 +971,21 @@ fn collection_conversio_matrix_cases() -> &'static [CollectionMatrixCase] {
 
 #[test]
 fn tensor_numerus_to_fractus_conversio_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit {\n  fixum tensor<numerus, []> a ← vacua\n  fixum _ b ← a ↦ tensor<fractus, []>\n}",
     );
 }
 
 #[test]
 fn tensor_fractus_to_numerus_conversio_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit {\n  fixum tensor<fractus, []> b ← vacua\n  fixum _ a ← b ↦ tensor<numerus, []>\n}",
     );
 }
 
 #[test]
 fn tensor_to_scalar_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  fixum tensor<numerus, []> t ← vacua\n  fixum _ n ← t ↦ numerus\n}",
         "tensor_to_scalar_unsupported",
     );
@@ -993,7 +993,7 @@ fn tensor_to_scalar_conversio_rejects() {
 
 #[test]
 fn scalar_to_tensor_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  fixum _ t ← 42 ↦ tensor<numerus, []>\n}",
         "scalar_to_tensor_unsupported",
     );
@@ -1049,7 +1049,7 @@ fn tensor_conversio_matrix_cases() -> &'static [TensorMatrixCase] {
 #[test]
 fn tensor_conversio_matrix_typecheck() {
     for case in tensor_conversio_matrix_cases() {
-        let result = test_support::compile_and_get_result(case.source);
+        let result = test_support::compile_and_get_result_la(case.source);
         match case.expect {
             MatrixExpect::Accepts => {
                 assert!(result.is_ok(), "{}: {:?}", case.name, result.diagnostics);
@@ -1073,7 +1073,7 @@ fn tensor_conversio_matrix_typecheck() {
 #[test]
 fn collection_conversio_matrix_typecheck() {
     for case in collection_conversio_matrix_cases() {
-        let result = test_support::compile_and_get_result(case.source);
+        let result = test_support::compile_and_get_result_la(case.source);
         match case.expect {
             MatrixExpect::Accepts => {
                 assert!(result.is_ok(), "{}: {:?}", case.name, result.diagnostics);
@@ -1098,7 +1098,7 @@ fn collection_conversio_matrix_typecheck() {
 fn matrix_conversio_materialization_accepts_nested_lista_literal() {
     // Semantic-only: Rust host still rejects matrix codegen until a host
     // representation exists; materialize is admitted at typecheck/MIR.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio identitas() → matrix<f32, [2, 2]> {
     redde [[1.0, 0.0], [0.0, 1.0]] ↦ matrix<f32, [2, 2]>
@@ -1116,7 +1116,7 @@ functio identitas() → matrix<f32, [2, 2]> {
 fn matrix_conversio_materialization_accepts_runtime_lista_source() {
     // S0-G9: a runtime `lista<T>` materializes into a literal matrix shape;
     // the element type is the static contract, the extent is runtime.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio cast(lista<f32> flat) → matrix<f32, [2, 2]> {
     redde flat ↦ matrix<f32, [2, 2]>
@@ -1129,7 +1129,7 @@ functio cast(lista<f32> flat) → matrix<f32, [2, 2]> {
 fn matrix_conversio_materialization_accepts_runtime_lista_parametric_shape() {
     // S0-G9: dimension-neutral construction — a parametric matrix shape has
     // no statically known extent, so a runtime lista source is the shape.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio cast<magnitudo R, magnitudo C>(lista<f32> flat) → matrix<f32, [R, C]> {
     redde flat ↦ matrix<f32, [R, C]>
@@ -1142,7 +1142,7 @@ functio cast<magnitudo R, magnitudo C>(lista<f32> flat) → matrix<f32, [R, C]> 
 fn matrix_conversio_materialization_rejects_nested_lista_element_mismatch() {
     // A nested `lista<lista<f32>>` source has row-list elements, not matrix
     // cells; the element mismatch rejects even though the source is a lista.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio cast(lista<lista<f32>> cells) → matrix<f32, [2, 2]> {
     redde cells ↦ matrix<f32, [2, 2]>
@@ -1155,7 +1155,7 @@ functio cast(lista<lista<f32>> cells) → matrix<f32, [2, 2]> {
 #[test]
 fn matrix_conversio_materialization_rejects_literal_source_parametric_shape() {
     // A literal source cannot be matched to unknown parametric dims.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio cast<magnitudo R, magnitudo C>() → matrix<f32, [R, C]> {
     redde [[1.0, 2.0], [3.0, 4.0]] ↦ matrix<f32, [R, C]>
@@ -1171,7 +1171,7 @@ functio cast<magnitudo R, magnitudo C>() → matrix<f32, [R, C]> {
 fn symbolic_rank_two_lista_to_tensor_pin_typechecks() {
     // A declared `[T, D]` target is a known-shape pin, not an inference: the
     // generic gathers its result through `↦` at its own symbolic sizes.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio college<magnitudo V, magnitudo D, magnitudo T>(tensor<f32, [V, D]> mensa, lista<numerus> indices) → tensor<f32, [T, D]> ⇥ textus {
     redde (mensa ↦ lista<f32>) ↦ tensor<f32, [T, D]>
@@ -1182,7 +1182,7 @@ functio college<magnitudo V, magnitudo D, magnitudo T>(tensor<f32, [V, D]> mensa
 
 #[test]
 fn symbolic_rank_one_lista_to_tensor_pin_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio columna<magnitudo N>(lista<f32> plana) → tensor<f32, [N]> ⇥ textus {
     redde plana ↦ tensor<f32, [N]>
@@ -1193,7 +1193,7 @@ functio columna<magnitudo N>(lista<f32> plana) → tensor<f32, [N]> ⇥ textus {
 
 #[test]
 fn symbolic_lista_to_tensor_pin_rejects_element_mismatch() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio college<magnitudo T, magnitudo D>(lista<numerus> plana) → tensor<f32, [T, D]> {
     redde plana ↦ tensor<f32, [T, D]>
@@ -1207,7 +1207,7 @@ functio college<magnitudo T, magnitudo D>(lista<numerus> plana) → tensor<f32, 
 fn literal_lista_to_symbolic_tensor_target_rejects() {
     // A rectangular literal cannot prove a parametric shape; the pin stays
     // reserved for flat sources whose count the runtime checks.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio college<magnitudo T, magnitudo D>() → tensor<f32, [T, D]> {
     redde [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [T, D]>
@@ -1221,44 +1221,44 @@ functio college<magnitudo T, magnitudo D>() → tensor<f32, [T, D]> {
 
 #[test]
 fn sermo_materialize_to_vacuum_typechecks() {
-    test_support::assert_accepts(r#"incipit { fixum _ v ← ad 'runtime:echo' ("salve") ↦ vacuum }"#);
+    test_support::assert_accepts_la(r#"incipit { fixum _ v ← ad 'runtime:echo' ("salve") ↦ vacuum }"#);
 }
 
 #[test]
 fn sermo_materialize_to_textus_typechecks() {
-    test_support::assert_accepts(r#"incipit { fixum _ t ← ad 'runtime:echo' ("salve") ↦ textus }"#);
+    test_support::assert_accepts_la(r#"incipit { fixum _ t ← ad 'runtime:echo' ("salve") ↦ textus }"#);
 }
 
 #[test]
 fn sermo_materialize_to_octeti_typechecks() {
-    test_support::assert_accepts(r#"incipit { fixum _ o ← ad 'runtime:echo' ("salve") ↦ octeti }"#);
+    test_support::assert_accepts_la(r#"incipit { fixum _ o ← ad 'runtime:echo' ("salve") ↦ octeti }"#);
 }
 
 #[test]
 fn sermo_materialize_to_valor_typechecks() {
-    test_support::assert_accepts(r#"incipit { fixum _ v ← ad 'runtime:echo' ("salve") ↦ valor }"#);
+    test_support::assert_accepts_la(r#"incipit { fixum _ v ← ad 'runtime:echo' ("salve") ↦ valor }"#);
 }
 
 #[test]
 fn sermo_materialize_to_numerus_typechecks() {
-    test_support::assert_accepts(r"incipit { fixum _ n ← ad 'runtime:echo' (5) ↦ numerus }");
+    test_support::assert_accepts_la(r"incipit { fixum _ n ← ad 'runtime:echo' (5) ↦ numerus }");
 }
 
 #[test]
 fn sermo_materialize_to_bivalens_typechecks() {
-    test_support::assert_accepts(r"incipit { fixum _ b ← ad 'runtime:echo' (verum) ↦ bivalens }");
+    test_support::assert_accepts_la(r"incipit { fixum _ b ← ad 'runtime:echo' (verum) ↦ bivalens }");
 }
 
 #[test]
 fn sermo_materialize_to_lista_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"incipit { fixum _ xs ← ad 'runtime:echo' ("salve") ↦ lista<textus> }"#,
     );
 }
 
 #[test]
 fn sermo_materialize_to_type_param_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"
 functio collige<T>(textus via) → T {
     redde ad 'runtime:echo' (via) ↦ T
@@ -1274,7 +1274,7 @@ incipit {
 
 #[test]
 fn sermo_materialize_rejects_tabula() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"incipit { fixum _ m ← ad 'runtime:echo' ("salve") ↦ tabula<textus, numerus> }"#,
         "sermo_materialize_target_unsupported",
     );
@@ -1282,7 +1282,7 @@ fn sermo_materialize_rejects_tabula() {
 
 #[test]
 fn sermo_materialize_rejects_tensor() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"incipit { fixum _ t ← ad 'runtime:echo' ("salve") ↦ tensor<numerus, [2]> }"#,
         "sermo_materialize_target_unsupported",
     );
@@ -1291,17 +1291,17 @@ fn sermo_materialize_rejects_tensor() {
 #[test]
 fn regex_literal_pattern_empty_accepts() {
     // Boundary: 0-byte pattern.
-    test_support::assert_accepts(r#"incipit { fixum _ r ← "" ↦ regex }"#);
+    test_support::assert_accepts_la(r#"incipit { fixum _ r ← "" ↦ regex }"#);
 }
 
 #[test]
 fn octeti_empty_literal_typechecks() {
-    test_support::assert_accepts("incipit { fixum _ b ← || ↦ octeti }");
+    test_support::assert_accepts_la("incipit { fixum _ b ← || ↦ octeti }");
 }
 
 #[test]
 fn sermo_materialize_rejects_copia() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"incipit { fixum _ s ← ad 'runtime:echo' ("salve") ↦ copia<textus> }"#,
         "sermo_materialize_target_unsupported",
     );
@@ -1310,7 +1310,7 @@ fn sermo_materialize_rejects_copia() {
 #[test]
 fn sermo_materialization_in_textus_channel_is_rejected() {
     // A bare `sermo ↦ T` fails with the leaf record (`valor`), not text.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 functio materialize() → textus ⇥ textus {
     redde ad 'runtime:echo' ("salve") ↦ textus
@@ -1322,7 +1322,7 @@ functio materialize() → textus ⇥ textus {
 
 #[test]
 fn sermo_materialization_in_unknown_channel_checks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"
 functio materialize() → textus ⇥ ignotum {
     redde ad 'runtime:echo' ("salve") ↦ textus
@@ -1333,7 +1333,7 @@ functio materialize() → textus ⇥ ignotum {
 
 #[test]
 fn sermo_materialization_with_value_row_into_declared_error_type_checks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"
 discretio Fault { Absens }
 
@@ -1353,7 +1353,7 @@ functio materialize() → textus ⇥ Fault {
 
 #[test]
 fn conversio_assign_accepts_mutable_local_place() {
-    test_support::assert_accepts("incipit {\n  varia numerus count ← 0\n  count ↤ \"42\"\n}");
+    test_support::assert_accepts_la("incipit {\n  varia numerus count ← 0\n  count ↤ \"42\"\n}");
 }
 
 #[test]
@@ -1361,7 +1361,7 @@ fn conversio_assign_rejects_immutable_binding_after_init() {
     // A `fixum` local after its single initializer is not a valid place
     // (write-once); the definite-assignment `immutable_second_assignment`
     // issue is expected once the form routes through `Assign`.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  fixum numerus count ← 0\n  count ↤ \"42\"\n}",
         "immutable_second_assignment",
     );
@@ -1372,7 +1372,7 @@ fn conversio_assign_rejects_inference_hole_destination() {
     // The destination type must be resolved before conversion checking;
     // `fixum _ xs ← []` leaves an element inference hole that cannot name a
     // conversion target.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  fixum _ xs ← []\n  xs ↤ \"2\"\n}",
         "conversio_assign_inference_hole_destination",
     );
@@ -1380,7 +1380,7 @@ fn conversio_assign_rejects_inference_hole_destination() {
 
 #[test]
 fn conversio_assign_rejects_unsupported_route() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  fixum json j ↤ \"x\"\n}",
         "unsupported_conversio",
     );
@@ -1390,21 +1390,21 @@ fn conversio_assign_rejects_unsupported_route() {
 fn conversio_assign_accepts_recovery_before_storage() {
     // `⊥ fallback` types before storage: the fallback satisfies the same
     // target-type rule as explicit `↦` recovery.
-    test_support::assert_accepts("incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⊥ 0\n}");
+    test_support::assert_accepts_la("incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⊥ 0\n}");
 }
 
 #[test]
 fn conversio_assign_accepts_right_associated_chain() {
     // Inner converts to `b`'s type, then the inner result converts to `a`'s
     // type — both textus→numerus.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit {\n  varia numerus a ← 0\n  varia numerus b ← 0\n  a ↤ b ↤ \"42\"\n}",
     );
 }
 
 #[test]
 fn conversio_assign_accepts_field_place() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"
 genus Persona { varia textus nomen varia numerus aetas }
 functio muta() → numerus ⇥ textus {
@@ -1419,7 +1419,7 @@ functio muta() → numerus ⇥ textus {
 #[test]
 fn conversio_assign_accepts_indexed_place() {
     // Nontrivial place: an indexed element of a mutable list.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"
 functio muta() → numerus ⇥ textus {
     varia lista<numerus> xs ← [1, 2]
@@ -1434,7 +1434,7 @@ functio muta() → numerus ⇥ textus {
 fn conversio_assign_typed_fixum_initializer_accepts() {
     // Typed declaration init: convert to the written type, then initialize
     // the binding. This is not post-declaration reassignment.
-    test_support::assert_accepts("incipit {\n  fixum numerus answer ↤ \"42\"\n}");
+    test_support::assert_accepts_la("incipit {\n  fixum numerus answer ↤ \"42\"\n}");
 }
 
 #[test]
@@ -1445,13 +1445,13 @@ fn conversio_assign_typed_fixum_item_scope_initializer_rejects_as_top_level_bind
     // no longer exists, so the same source must now be rejected outright,
     // and a conversion-directed initializer is not compile-time evaluable
     // (D5.9), so there is no `generis` static equivalent to redirect to.
-    test_support::assert_rejects_with_issue(r#"fixum numerus n ↤ "42""#, "top_level_binding");
+    test_support::assert_rejects_with_issue_la(r#"fixum numerus n ↤ "42""#, "top_level_binding");
 }
 
 #[test]
 fn conversio_assign_untyped_fixum_initializer_rejects() {
     // `fixum _` has no written type → no concrete conversion target.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  fixum _ answer ↤ \"42\"\n}",
         "conversio_assign_requires_concrete_type",
     );
@@ -1460,7 +1460,7 @@ fn conversio_assign_untyped_fixum_initializer_rejects() {
 #[test]
 fn conversio_assign_sit_initializer_rejects() {
     // `sit` is an inferred binding (≡ `fixum _`) → no concrete target.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  sit answer ↤ \"42\"\n}",
         "conversio_assign_requires_concrete_type",
     );
@@ -1469,7 +1469,7 @@ fn conversio_assign_sit_initializer_rejects() {
 #[test]
 fn conversio_assign_untyped_destructuring_initializer_rejects() {
     // Untyped destructuring patterns have no concrete conversion target.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  fixum { field } ↤ \"x\"\n}",
         "conversio_assign_requires_concrete_type",
     );
@@ -1483,7 +1483,7 @@ fn conversio_assign_awaited_binding_initializer_rejects() {
         "incipit {\n  figendum numerus n ↤ \"42\"\n}",
         "incipit {\n  variandum numerus n ↤ \"42\"\n}",
     ] {
-        test_support::assert_rejects_with_issue(source, "conversio_assign_await_unsupported");
+        test_support::assert_rejects_with_issue_la(source, "conversio_assign_await_unsupported");
     }
 }
 
@@ -1492,11 +1492,11 @@ fn conversio_assign_recovery_typed_before_storage() {
     // `⊥ fallback` is typed against the resolved destination type through the
     // same target-type rule as explicit `↦` recovery — a wrong-typed fallback
     // rejects before any store.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⊥ \"fallback\"\n}",
         "conversio_recovery_type_mismatch",
     );
-    test_support::assert_accepts("incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⊥ 0\n}");
+    test_support::assert_accepts_la("incipit {\n  varia numerus count ← 0\n  count ↤ \"x\" ⊥ 0\n}");
 }
 
 #[test]
@@ -1505,11 +1505,11 @@ fn conversio_assign_routes_through_live_tuus_cursor_escape_no_bypass() {
     // destination reassigned via `↤` is the same `live_tuus_cursor_reassign`
     // error as ordinary `←`, and a live cursor source copied through `↤`
     // into a non-live path is the same `live_tuus_cursor_copy` error.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  fixum sermo s ← ad 'runtime:echo' (\"salve\")\n  fixum tuus<textus> t ← s.tuus<textus>()\n  fixum cursor<scrinium<textus>> c ← t.cursor()\n  c ↤ t.cursor()\n}",
         "live_tuus_cursor_reassign",
     );
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n  fixum sermo s ← ad 'runtime:echo' (\"salve\")\n  fixum tuus<textus> t ← s.tuus<textus>()\n  fixum cursor<scrinium<textus>> c2\n  c2 ↤ t.cursor()\n}",
         "live_tuus_cursor_copy",
     );
@@ -1557,7 +1557,7 @@ fn conversion_registry_builtin_shadow_conflict_reports_dual_spans() {
 // CTR-02: registered-row failure-channel composition
 // =============================================================================
 //
-// The full `analyze_source` pipeline builds its own resolver with no enrolled
+// The full `analyze_source_la` pipeline builds its own resolver with no enrolled
 // rows (standalone-function enrollment lands with CTR-04), so the
 // registry-backed contract below is proven by driving `TypeChecker` directly
 // against a hand-seeded coherence registry. Under test (delivery CTR-02):
@@ -2119,7 +2119,7 @@ fn verte_ascription_rejects_runtime_narrowing_into_sized_numerus() {
     // DECISIONS D1.11 probe: `n ∷ int<u8>` on a run-time `n` compiled and
     // printed 300 — a u8 holding 300. F3: a value change is a `↦`
     // conversion, never a `∷` fact.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio probe(numerus n) → u8 {
     redde n ∷ u8
@@ -2133,7 +2133,7 @@ functio probe(numerus n) → u8 {
 fn verte_ascription_rejects_literal_over_target_width() {
     // D1.11: a literal the target cannot hold (`300 ∷ int<u8>`) is a
     // compile error, not a silent cast.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"incipit { fixum u8 b ← 300 ∷ u8 }",
         "numeric_ascription_requires_conversion",
     );
@@ -2141,7 +2141,7 @@ fn verte_ascription_rejects_literal_over_target_width() {
 
 #[test]
 fn verte_ascription_rejects_float_precision_loss() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio narrow(fractus x) → f32 {
     redde x ∷ f32
@@ -2153,7 +2153,7 @@ functio narrow(fractus x) → f32 {
 
 #[test]
 fn verte_ascription_rejects_int_float_crossing() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio relabel(numerus n) → fractus {
     redde n ∷ fractus
@@ -2167,7 +2167,7 @@ functio relabel(numerus n) → fractus {
 fn verte_ascription_rejects_runtime_float_into_integer() {
     // D1.11 (fi4): a run-time float cannot be proven to be an integer in
     // range; the conversion is `x ↦ numerus`, which fails or takes `⊥`.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio truncate(fractus x) → numerus {
     redde x ∷ numerus
@@ -2175,7 +2175,7 @@ functio truncate(fractus x) → numerus {
 ",
         "numeric_ascription_requires_conversion",
     );
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio truncate(fractus x) → u8 {
     redde x ∷ u8
@@ -2189,7 +2189,7 @@ functio truncate(fractus x) → u8 {
 fn verte_ascription_rejects_float_literal_into_integer() {
     // Ruling 20's constant rule: a float literal states a float, even when
     // it is an exact integer; `3.0 ∷ numerus` is a conversion.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"incipit { fixum numerus n ← 3.0 ∷ numerus }",
         "numeric_ascription_requires_conversion",
     );
@@ -2197,7 +2197,7 @@ fn verte_ascription_rejects_float_literal_into_integer() {
 
 #[test]
 fn verte_ascription_accepts_float_literal_rounding_to_target_width() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
     fixum f32 rounded ← 0.1 ∷ f32
     fixum f32 precise ← 0.7978845608028654 ∷ f32
@@ -2207,7 +2207,7 @@ fn verte_ascription_accepts_float_literal_rounding_to_target_width() {
 
 #[test]
 fn verte_ascription_rejects_float_literal_overflow_to_infinity() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"incipit { fixum f32 overflow ← 1e39 ∷ f32 }",
         "numeric_ascription_requires_conversion",
     );
@@ -2217,26 +2217,26 @@ fn verte_ascription_rejects_float_literal_overflow_to_infinity() {
 fn verte_ascription_keeps_provable_numeric_facts() {
     // The F3 fact cases: an in-range literal, i32→i64, f32→f64, and a
     // float literal the target width holds exactly.
-    test_support::assert_accepts(r"incipit { fixum u8 port ← 42 ∷ u8 }");
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(r"incipit { fixum u8 port ← 42 ∷ u8 }");
+    test_support::assert_accepts_la(
         r"
 functio widen(i32 n) → numerus {
     redde n ∷ numerus
 }
 ",
     );
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio widen_fractus(f32 x) → fractus {
     redde x ∷ fractus
 }
 ",
     );
-    test_support::assert_accepts(r"incipit { fixum f32 two ← 2.5 ∷ f32 }");
+    test_support::assert_accepts_la(r"incipit { fixum f32 two ← 2.5 ∷ f32 }");
 }
 #[test]
 fn verte_ascription_keeps_modular_widening() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio probe(modulus<u8> m) → modulus<u32> {
     redde m ∷ modulus<u32>
@@ -2251,7 +2251,7 @@ functio probe(modulus<u8> m) → modulus<u32> {
 
 #[test]
 fn verte_ascription_rejects_unrelated_genus_pair() {
-    test_support::assert_rejects_with_args(
+    test_support::assert_rejects_with_args_la(
         r"
 genus P { varia numerus x }
 
@@ -2271,7 +2271,7 @@ functio probe(P p) → Q {
 
 #[test]
 fn verte_ascription_rejects_foreign_interface() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 implendum Nominatum {
     functio plenum() → textus
@@ -2291,7 +2291,7 @@ functio probe(Civis civis) → Nominatum {
 
 #[test]
 fn verte_ascription_accepts_same_genus() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 genus P { varia numerus x }
 
@@ -2309,7 +2309,7 @@ functio probe(P p) → P {
 
 #[test]
 fn verte_ascription_accepts_inferred_generic_result() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 genus Box<T> {
     varia T v
@@ -2333,7 +2333,7 @@ incipit {
 
 #[test]
 fn verte_ascription_accepts_inferred_generic_result_no_argument() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 genus Box<T> { }
 
@@ -2351,7 +2351,7 @@ incipit {
 
 #[test]
 fn verte_ascription_accepts_narrowed_variant() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 discretio Forma {
     Circulus { numerus r },
@@ -2376,7 +2376,7 @@ functio probe(Forma f) → Forma {
 
 #[test]
 fn verte_ascription_accepts_narrowed_variant_est_refinement() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 discretio Forma {
     Circulus { numerus r },
@@ -2393,7 +2393,7 @@ functio probe(Forma f) → Forma {
 
 #[test]
 fn verte_ascription_accepts_declared_interface_conformance() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"
 implendum Nominatum {
     functio plenum() → textus
@@ -2418,7 +2418,7 @@ incipit {
 
 #[test]
 fn verte_ascription_accepts_alias_to_same_genus() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 genus Civis { varia textus nomen }
 
@@ -2436,7 +2436,7 @@ functio probe(Civis civis) → Cives {
 
 #[test]
 fn policy_word_conversio_needs_no_recovery_or_channel() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio narrow(numerus x, d64 d) → modulus<u8> {
     fixum modulus<u8> a ← x ↦ modulus<u8>
@@ -2455,7 +2455,7 @@ functio narrow(numerus x, d64 d) → modulus<u8> {
 #[test]
 fn policy_word_conversio_rejects_recovery_slot() {
     for target in ["modulus<u8>", "saturatus<u8>"] {
-        test_support::assert_rejects_with_issue(
+        test_support::assert_rejects_with_issue_la(
             &format!("incipit {{ fixum numerus x ← 300\nfixum _ b ← x ↦ {target} ⊥ 0 }}"),
             "word_conversio_recovery_unsupported",
         );
@@ -2471,7 +2471,7 @@ fn policy_word_conversio_rejects_float_and_text_sources() {
         ("\"7\"", "modulus<u8>", "unsupported_conversio"),
         ("\"7\"", "saturatus<u8>", "unsupported_conversio"),
     ] {
-        test_support::assert_rejects_with_issue(
+        test_support::assert_rejects_with_issue_la(
             &format!("incipit {{ fixum _ b ← {source} ↦ {target} }}"),
             issue,
         );
@@ -2481,7 +2481,7 @@ fn policy_word_conversio_rejects_float_and_text_sources() {
 #[test]
 fn policy_word_conversio_accepts_a_rounded_float_source() {
     for target in ["modulus<u8>", "saturatus<u8>"] {
-        test_support::assert_accepts(&format!(
+        test_support::assert_accepts_la(&format!(
             "incipit {{ fixum _ b ← 1.5 ↦ {target} via Floor }}"
         ));
     }
@@ -2493,13 +2493,13 @@ fn via_lowercase_policy_words_accepted() {
         r#"incipit { fixum _ n ← "ff" ↦ u32 via hex }"#,
         "functio f(octeti corpus) → f32 { redde corpus[0‥4] ↦ f32 via le }",
     ] {
-        test_support::assert_accepts(source);
+        test_support::assert_accepts_la(source);
     }
     for target in ["modulus<u8>", "saturatus<u8>"] {
-        test_support::assert_accepts(&format!(
+        test_support::assert_accepts_la(&format!(
             "incipit {{ fixum _ b ← 1.5 ↦ {target} via floor }}"
         ));
-        test_support::assert_accepts(&format!(
+        test_support::assert_accepts_la(&format!(
             "incipit {{ fixum _ c ← 1.5 ↦ {target} via half_even }}"
         ));
     }
@@ -2507,7 +2507,7 @@ fn via_lowercase_policy_words_accepted() {
 
 #[test]
 fn numeric_narrowing_conversio_requires_textus_alternate_exit() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio narrow(numerus n) → u8 ⇥ numerus {
     redde n ↦ u8
@@ -2519,7 +2519,7 @@ functio narrow(numerus n) → u8 ⇥ numerus {
 
 #[test]
 fn float_to_integer_conversio_requires_textus_alternate_exit() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio trunc(fractus x) → numerus ⇥ numerus {
     redde x ↦ numerus via Trunc
@@ -2531,7 +2531,7 @@ functio trunc(fractus x) → numerus ⇥ numerus {
 
 #[test]
 fn numeric_narrowing_conversio_accepts_textus_alternate_exit() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio narrow(numerus n) → u8 ⇥ textus {
     redde n ↦ u8
@@ -2542,7 +2542,7 @@ functio narrow(numerus n) → u8 ⇥ textus {
 
 #[test]
 fn numeric_narrowing_conversio_with_recovery_accepts_non_textus_exit() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio narrow(numerus n) → u8 ⇥ numerus {
     redde n ↦ u8 ⊥ 0
@@ -2553,7 +2553,7 @@ functio narrow(numerus n) → u8 ⇥ numerus {
 
 #[test]
 fn wrapping_conversio_accepts_non_textus_alternate_exit() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio wrap(numerus n) → modulus<u8> ⇥ numerus {
     redde n ↦ modulus<u8>
@@ -2564,7 +2564,7 @@ functio wrap(numerus n) → modulus<u8> ⇥ numerus {
 
 #[test]
 fn numeric_widening_conversio_accepts_non_textus_alternate_exit() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio widen(u8 n) → numerus ⇥ numerus {
     redde n ↦ numerus
@@ -2575,7 +2575,7 @@ functio widen(u8 n) → numerus ⇥ numerus {
 
 #[test]
 fn constant_fitting_conversio_accepts_non_textus_alternate_exit() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio konst() → u8 ⇥ numerus {
     redde 200 ↦ u8
@@ -2590,7 +2590,7 @@ fn empty_list_conversio_to_valor_requires_element_annotation() {
     varia tabula<textus, valor> raw ← {}
     raw.pone("headers", [] ↦ valor)
 }"#;
-    let analyzed = test_support::analyze_source(source);
+    let analyzed = test_support::analyze_source_la(source);
     let errors: Vec<_> = analyzed
         .diagnostics
         .iter()
@@ -2609,7 +2609,7 @@ fn empty_list_conversio_to_valor_requires_element_annotation() {
 
 #[test]
 fn empty_list_conversio_typed_source_accepts() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
     fixum lista<valor> headers ← vacua
     fixum valor packed ← headers ↦ valor
@@ -2620,7 +2620,7 @@ fn empty_list_conversio_typed_source_accepts() {
 
 #[test]
 fn empty_list_conversio_element_ascription_accepts() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
     fixum valor packed ← ([] ∷ lista<textus>) ↦ valor
     nota packed
@@ -2630,7 +2630,7 @@ fn empty_list_conversio_element_ascription_accepts() {
 
 #[test]
 fn empty_list_conversio_later_element_constraint_accepts() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
     varia _ headers ← []
     headers.appende(1)
@@ -2642,7 +2642,7 @@ fn empty_list_conversio_later_element_constraint_accepts() {
 
 #[test]
 fn empty_list_conversio_nonempty_source_accepts() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r#"incipit {
     fixum valor packed ← ["content-type"] ↦ valor
     nota packed

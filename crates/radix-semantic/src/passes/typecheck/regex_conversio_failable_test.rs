@@ -7,7 +7,7 @@
 //! Literal and dynamic sources take the same path (no literal fold, no
 //! pattern length cap). Assertions are structured (code, issue, args).
 
-use crate::test_support::{self, analyze_source, assert_accepts, assert_rejects_with_issue};
+use crate::test_support::{self, analyze_source_la, assert_accepts_la, assert_rejects_with_issue_la};
 
 const ISSUE: &str = "failable_conversio_requires_handler";
 
@@ -19,7 +19,7 @@ fn arg<'a>(err: &'a crate::SemanticError, name: &str) -> Option<&'a str> {
 }
 
 fn assert_unhandled(source: &str, expected_source: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     let err = result
         .diagnostics
         .iter()
@@ -46,12 +46,12 @@ fn literal_pattern_in_plain_function_requires_handler() {
 
 #[test]
 fn ascii_pattern_in_plain_function_requires_handler() {
-    assert_rejects_with_issue(r"functio f() → regex { redde '\\d+' ↦ regex }", ISSUE);
+    assert_rejects_with_issue_la(r"functio f() → regex { redde '\\d+' ↦ regex }", ISSUE);
 }
 
 #[test]
 fn fac_cape_handles_dynamic_and_literal_patterns() {
-    assert_accepts(
+    assert_accepts_la(
         r#"functio f(textus pat) → numerus {
     fac {
         fixum _ a ← pat ↦ regex
@@ -66,7 +66,7 @@ fn fac_cape_handles_dynamic_and_literal_patterns() {
 
 #[test]
 fn textus_error_channel_handles_dynamic_and_literal_patterns() {
-    assert_accepts(
+    assert_accepts_la(
         r#"functio f(textus pat) → regex ⇥ textus { redde pat ↦ regex }
 functio g() → regex ⇥ textus { redde "\\d+" ↦ regex }"#,
     );
@@ -74,7 +74,7 @@ functio g() → regex ⇥ textus { redde "\\d+" ↦ regex }"#,
 
 #[test]
 fn incipit_frame_is_exempt() {
-    assert_accepts(
+    assert_accepts_la(
         r#"incipit {
     fixum textus pat ← "a+"
     fixum _ a ← pat ↦ regex
@@ -85,7 +85,7 @@ fn incipit_frame_is_exempt() {
 
 #[test]
 fn recovery_slot_stays_rejected() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r#"incipit { fixum textus p ← "a"
     fixum _ r ← p ↦ regex ⊥ p ↦ regex }"#,
         "regex_recovery_unsupported",

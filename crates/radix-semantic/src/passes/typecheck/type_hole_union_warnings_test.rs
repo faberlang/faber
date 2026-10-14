@@ -45,7 +45,7 @@ fn count_checker_issue(checker: &TypeChecker<'_>, issue: &str) -> usize {
 
 #[test]
 fn underscore_hole_solved_to_multi_member_union_warns_warn016() {
-    let diagnostics = test_support::analyze_and_get_diagnostics(
+    let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 typus Valor = numerus ∪ textus
 incipit {
@@ -75,7 +75,7 @@ incipit {
 fn named_alias_of_multi_member_union_does_not_hide_warn016() {
     // Goal req 12: a named alias of a multi-member union is still multi-member
     // after alias peeling — `_` solved through the alias warns WARN016.
-    let diagnostics = test_support::analyze_and_get_diagnostics(
+    let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 typus Valor = numerus ∪ textus
 functio f() → Valor {
@@ -104,7 +104,7 @@ incipit {
 
 #[test]
 fn union_hole_solved_monomorphically_warns_warn017() {
-    let diagnostics = test_support::analyze_and_get_diagnostics(
+    let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 incipit {
     fixum ∪ only ← 1
@@ -137,7 +137,7 @@ incipit {
 fn nullable_union_never_fires_warn016() {
     // Goal req 10: `T ∪ nihil` (canonical `Type::Option`) counts as ONE
     // inhabitant — `_` solved to it must not warn.
-    let diagnostics = test_support::analyze_and_get_diagnostics(
+    let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r#"
 incipit {
     fixum textus ∪ nihil opt ← "s"
@@ -165,7 +165,7 @@ incipit {
 #[test]
 fn explicit_union_annotation_fires_neither_warning() {
     // Goal req 11: explicit `A ∪ B` annotations are never holes.
-    let diagnostics = test_support::analyze_and_get_diagnostics(
+    let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 incipit {
     fixum numerus ∪ textus named ← 1
@@ -197,7 +197,7 @@ incipit {
 fn unsolved_union_hole_is_cannot_infer_union_type_error() {
     // Goal req 7: an underdetermined `∪` hole is a missing-annotation error.
     // A struct field with no flows into its `∪` hole leaves it unsolved.
-    let diagnostics = test_support::analyze_and_get_diagnostics(
+    let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 genus G {
     varia ∪ x
@@ -233,7 +233,7 @@ fn shared_hole_across_decl_and_init_emits_single_warning() {
     // Without the per-`InferVar` warned-set, `a` would warn WARN017 twice
     // (decl + expr) and `b` twice. Both holes are solved monomorphically →
     // exactly two WARN017 total, one per hole variable.
-    let diagnostics = test_support::analyze_and_get_diagnostics(
+    let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 incipit {
     fixum ∪ a ← 1
@@ -295,7 +295,7 @@ fn nested_union_hole_solved_monomorphically_warns_warn017() {
 
 #[test]
 fn ordinary_underscore_holes_produce_no_hole_warnings() {
-    let diagnostics = test_support::analyze_and_get_diagnostics(
+    let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 incipit {
     fixum _ n ← 3

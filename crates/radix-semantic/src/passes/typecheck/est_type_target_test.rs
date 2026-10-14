@@ -65,7 +65,7 @@ fn analyze(source: &str) -> test_support::AnalyzedFixture {
         ("Canis".to_owned(), VisibilityTier::Publica),
         ("NOMEN".to_owned(), VisibilityTier::Publica),
     ]);
-    test_support::analyze_source_with_import_contract(
+    test_support::analyze_source_with_import_contract_la(
         source,
         BTreeMap::from([
             ("aux".to_owned(), tiers.clone()),

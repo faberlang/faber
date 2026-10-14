@@ -8,7 +8,7 @@ use crate::test_support;
 
 #[test]
 fn decimal_to_integer_cross_family_rejects_at_assignment() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio c(d64 a) → i64 { redde a }",
         "return_type_mismatch",
     );
@@ -16,7 +16,7 @@ fn decimal_to_integer_cross_family_rejects_at_assignment() {
 
 #[test]
 fn integer_to_decimal_cross_family_rejects_at_assignment() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio c(i64 a) → d64 { redde a }",
         "return_type_mismatch",
     );
@@ -25,7 +25,7 @@ fn integer_to_decimal_cross_family_rejects_at_assignment() {
 #[test]
 fn decimal_to_fractus_cross_family_rejects_at_assignment() {
     // D3 owns the explicit-↦ conversio row; bare flow must reject today.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio c(d64 a) → f64 { redde a }",
         "return_type_mismatch",
     );
@@ -35,7 +35,7 @@ fn decimal_to_fractus_cross_family_rejects_at_assignment() {
 
 #[test]
 fn decimal_scalar_bracket_index_rejects_with_teaching_issue() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"functio pick(tf32[16] input, d64 id) → f32 {
     redde input[id]
 }",
@@ -45,7 +45,7 @@ fn decimal_scalar_bracket_index_rejects_with_teaching_issue() {
 
 #[test]
 fn integer_scalar_bracket_index_still_accepts() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"functio pick(tf32[16] input, i32 id) → f32 {
     redde input[id]
 }",
@@ -56,7 +56,7 @@ fn integer_scalar_bracket_index_still_accepts() {
 
 #[test]
 fn tensor_media_over_decimal_element_rejects_with_teaching_issue() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"incipit {
   fixum tensor<d64, [3]> grid ← vacua
   fixum f64 mean ← grid.media()
@@ -68,7 +68,7 @@ fn tensor_media_over_decimal_element_rejects_with_teaching_issue() {
 
 #[test]
 fn tensor_media_over_integer_numerus_still_returns_f64() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
   fixum tensor<numerus, [3]> grid ← vacua
   fixum f64 mean ← grid.media()
@@ -81,7 +81,7 @@ fn tensor_media_over_integer_numerus_still_returns_f64() {
 
 #[test]
 fn radix_text_parse_into_decimal_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio p(textus s) → d64 { redde s ↦ d64 via Hex }",
         "decimal_radix_hint_rejected",
     );
@@ -89,12 +89,12 @@ fn radix_text_parse_into_decimal_rejects() {
 
 #[test]
 fn radix_text_parse_into_integer_still_accepts() {
-    test_support::assert_accepts("functio p(textus s) → u32 ⇥ textus { redde s ↦ u32 via Hex }");
+    test_support::assert_accepts_la("functio p(textus s) → u32 ⇥ textus { redde s ↦ u32 via Hex }");
 }
 
 #[test]
 fn ascii_format_pack_from_decimal_source_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio p(d64 n) → ascii<8> { redde n ↦ ascii<8> via Hex }",
         "decimal_radix_hint_rejected",
     );
@@ -102,14 +102,14 @@ fn ascii_format_pack_from_decimal_source_rejects() {
 
 #[test]
 fn ascii_format_pack_from_integer_source_still_accepts() {
-    test_support::assert_accepts("incipit { fixum ascii<2> hex ← 255 ↦ ascii<2> via Hex }");
+    test_support::assert_accepts_la("incipit { fixum ascii<2> hex ← 255 ↦ ascii<2> via Hex }");
 }
 
 // --- wrong site class: endian hints (Be/Le) ---
 
 #[test]
 fn endian_unpack_into_decimal_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio win(octeti corpus) → d64 { redde corpus[0‥4] ↦ d64 via Be }",
         "decimal_endianness_hint_rejected",
     );
@@ -117,7 +117,7 @@ fn endian_unpack_into_decimal_rejects() {
 
 #[test]
 fn endian_unpack_into_integer_still_accepts() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio win(octeti corpus) → u32 { redde corpus[0‥4] ↦ u32 via Be }",
     );
 }
@@ -126,11 +126,11 @@ fn endian_unpack_into_integer_still_accepts() {
 
 #[test]
 fn via_bits_on_a_decimal_is_the_retirement_diagnostic() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio bits(d64 n) → f32 { redde n ↦ f32 via Bits }",
         "conversio_via_bits_retired",
     );
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio bits(f32 x) → d64 { redde x ↦ d64 via Bits }",
         "conversio_via_bits_retired",
     );

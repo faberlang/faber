@@ -1,4 +1,4 @@
-use crate::test_support::analyze_source;
+use crate::test_support::analyze_source_la;
 
 fn prefix() -> &'static str {
     r#"functio make<magnitudo H, magnitudo W>() → numerus { redde 1 }
@@ -10,7 +10,7 @@ incipit {
 
 #[test]
 fn slot_lift_runtime_value_is_captured() {
-    let result = analyze_source(&format!(
+    let result = analyze_source_la(&format!(
         "{}    fixum numerus a ← make<3, magnitudo w>()\n}}",
         prefix()
     ));
@@ -30,7 +30,7 @@ fn slot_lift_runtime_value_is_captured() {
 
 #[test]
 fn slot_lift_bare_value_name_has_did_you_mean() {
-    let result = analyze_source(&format!(
+    let result = analyze_source_la(&format!(
         "{}    fixum numerus a ← make<3, w>()\n}}",
         prefix()
     ));
@@ -51,6 +51,6 @@ functio forward<magnitudo W>() → numerus { redde make<3, W>() }
 incipit {
     fixum numerus a ← make<3, 4>()
 }"#;
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(result.is_ok(), "{:?}", result.diagnostics);
 }
