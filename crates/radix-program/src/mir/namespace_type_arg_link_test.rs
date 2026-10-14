@@ -572,7 +572,6 @@ kind = "bin"
 /// argument is a CLI-planned operand field (`args.root`) rather than a
 /// literal.
 #[test]
-#[ignore = "pumpfix-gdde13951: call argument type mismatch (arg 0: expected textus, got Struct(DefId(2000000073)))"]
 fn package_mir_links_norma_fs_read_file_operand_arg_validates() {
     let dir = crate::test_support::test_temp_dir("norma-fs-read-file-operand");
     let src = dir.join("src");
@@ -624,7 +623,6 @@ kind = "bin"
 /// sibling operand probe isolates the `Struct` operand; this probe isolates
 /// the call path in a CLI-programmed main (P1).
 #[test]
-#[ignore = "pumpfix-gdde13951: call argument type mismatch (arg 0: expected textus, got Struct(DefId(2000000073)))"]
 fn package_mir_links_norma_fs_read_file_literal_in_cli_main_validates() {
     let dir = crate::test_support::test_temp_dir("norma-fs-read-file-literal-in-cli-main");
     let src = dir.join("src");
