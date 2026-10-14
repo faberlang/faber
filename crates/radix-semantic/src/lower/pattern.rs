@@ -504,6 +504,10 @@ pub fn lower_literal(lowerer: &mut Lowerer, lit: &Literal, span: Span) -> HirPat
             lowerer.error("json_valor_pattern");
             HirLiteral::Nil
         }
+        Literal::Regex(_) => {
+            lowerer.error("regex_literal_pattern");
+            HirLiteral::Nil
+        }
         Literal::Forma(_) => {
             lowerer.error("forma_literal_pattern");
             HirLiteral::Nil

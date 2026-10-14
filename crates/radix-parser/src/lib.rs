@@ -1098,6 +1098,7 @@ impl Parser {
                 | TokenKind::AsciiString(_)
                 | TokenKind::BacktickString(_)
                 | TokenKind::OctetiString(_)
+                | TokenKind::RegexString(_)
                 | TokenKind::LParen
                 | TokenKind::LBrace
                 | TokenKind::LBracket
@@ -1831,6 +1832,10 @@ mod comparison_ascii_retired_test;
 #[cfg(test)]
 #[path = "neq_glyph_retired_test.rs"]
 mod neq_glyph_retired_test;
+
+#[cfg(test)]
+#[path = "regex_literal_test.rs"]
+mod regex_literal_test;
 
 #[cfg(test)]
 #[path = "rounding_glyph_test.rs"]

@@ -997,6 +997,7 @@ impl Parser {
                 | TokenKind::AsciiString(_)
                 | TokenKind::BacktickString(_)
                 | TokenKind::OctetiString(_)
+                | TokenKind::RegexString(_)
                 | TokenKind::LParen
                 | TokenKind::LBracket
                 | TokenKind::LBrace
@@ -2215,6 +2216,25 @@ impl Parser {
             });
         }
         let id = self.next_id();
+
+        // `regex /pattern/` (the locale's regex type word) and `_ /pattern/`:
+        // the lexer emits `RegexString` only directly after the type word or
+        // `_`, so the pair claims this literal slot before any identifier or
+        // inferred-expression handling. A `RegexString` anywhere else stays the
+        // fallback arm's `expected expression` error.
+        if matches!(
+            self.peek().kind,
+            TokenKind::Ident(_) | TokenKind::Underscore(_)
+        ) && let TokenKind::RegexString(pattern) = self.peek_at(1).kind
+        {
+            self.advance();
+            self.advance();
+            return Ok(Expr {
+                id,
+                kind: ExprKind::Literal(Literal::Regex(pattern)),
+                span: start.merge(self.previous_span()),
+            });
+        }
 
         let kind = match self.peek().kind.clone() {
             TokenKind::Integer(n) => {

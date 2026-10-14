@@ -1336,6 +1336,9 @@ pub enum Literal {
     Ascii(Symbol),
     Forma(Symbol),
     Octeti(Symbol),
+    /// Inline regex literal body (`regex /…/` or `_ /…/`): the raw pattern
+    /// text between the slashes, exactly as authored, with no suffix flags.
+    Regex(Symbol),
     /// Compile-time JSON object literal. Bare `{ ... }` in expression position
     /// parses to this; the payload is the parsed constant JSON tree, typed
     /// `json` at semantic time unless an explicit `tabula<K,V>` target is supplied.
