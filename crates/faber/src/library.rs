@@ -3,7 +3,7 @@
 //! `RP2c`: the resolver family (specifier → interface file) moved to
 //! `radix-program` with the explicit-input posture — `radix-program` never
 //! reads the ambient environment. This module keeps the faber-owned ambient
-//! discovery seam — `FABER_LIBRARY_HOME` env reading and the Norma library
+//! discovery seam — the configured library home and the Norma library
 //! embedded in the binary — and constructs the explicit resolver inputs the
 //! compiler crate requires.
 
@@ -17,20 +17,17 @@ use radix::program::library::LibraryResolver;
 
 use crate::package::embedded_runtime::embedded_runtime_root;
 
-pub const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
-
 /// Well-known sibling library names doctor always reports (found or not).
 ///
 /// The faber lib artifact does not call doctor/check-library; the binary does.
 pub const KNOWN_LIBRARIES: &[&str] = &["norma", "triga", "gradus", "tela"];
 
-/// How the library home was selected. The `--library-home` flag or the
-/// manifest `[paths] library_home` wins; otherwise env, otherwise the `lib/`
-/// the binary materializes from its embedded Norma sources.
+/// How the library home was selected. The configured home — the
+/// `--library-home` flag or the manifest `[paths] library_home` — wins over
+/// the `lib/` the binary materializes from its embedded Norma sources.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LibraryHomeSource {
     Configured,
-    Env,
     Embedded,
 }
 
@@ -38,7 +35,6 @@ impl LibraryHomeSource {
     pub fn as_key(self) -> &'static str {
         match self {
             Self::Configured => "configured",
-            Self::Env => "env",
             Self::Embedded => "embedded",
         }
     }
@@ -89,8 +85,9 @@ impl LibraryAvailability {
     }
 }
 
-/// Build a resolver from the ambient library home: an explicit
-/// `FABER_LIBRARY_HOME`, or the embedded `lib/` (holds `norma/`).
+/// Build a resolver from the ambient library home: the configured home
+/// (`--library-home` / `[paths] library_home`), or the embedded `lib/`
+/// (holds `norma/`).
 pub(crate) fn default_library_resolver() -> LibraryResolver {
     LibraryResolver::with_optional_home(default_library_home())
 }
@@ -155,13 +152,6 @@ pub fn resolved_library_home() -> Option<ResolvedLibraryHome> {
         return Some(ResolvedLibraryHome {
             path,
             source: LibraryHomeSource::Configured,
-        });
-    }
-
-    if let Some(value) = std::env::var_os(FABER_LIBRARY_HOME_ENV) {
-        return Some(ResolvedLibraryHome {
-            path: PathBuf::from(value),
-            source: LibraryHomeSource::Env,
         });
     }
 

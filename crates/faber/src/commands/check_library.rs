@@ -59,7 +59,7 @@ impl CheckLibraryError {
                 format!("error: '{name}' is not a valid library provider name")
             }
             Self::MissingLibraryHome => {
-                "error: no library home; pass --library-home <DIR> (or set [paths] library_home in faber.toml) to a directory containing provider checkouts".to_owned()
+                "error: no library home; pass --library-home or set [paths] library_home in faber.toml to a directory containing provider checkouts".to_owned()
             }
             Self::UnknownProvider { name, home } => {
                 format!(
