@@ -4115,6 +4115,18 @@ help = "remove the repeated axis; each axis may appear once"
 message = "an axis reduction is built for tensors of rank 2 to 8 only"
 help = "reduce a tensor of rank 2 to 8 with literal dimensions, or write the explicit reduction with `reducta ... per [...]`"
 
+[diagnostics.SEM010.issues.expanded_axis_out_of_range]
+message = "the axis is outside the range of the expanded tensor"
+help = "use an axis from 0 up to the rank of the source tensor; the new dimension is inserted there"
+
+[diagnostics.SEM010.issues.expanded_axis_not_constant]
+message = "the axis of an expansion must be a compile-time constant"
+help = "write a literal axis such as `axis 1`"
+
+[diagnostics.SEM010.issues.expanded_axis_rank_mismatch]
+message = "an expansion with `axis` adds exactly one dimension"
+help = "give a target shape list whose length is the source rank plus one"
+
 [diagnostics.SEM010.issues.reducta_group_keys_not_literal]
 message = "the grouping keys of a multi-key grouped reduction must be a bracketed list of key expressions written in place"
 help = "write `per [i, j]` with the keys spelled out; a list held in a variable or a spread cannot name the result axes"

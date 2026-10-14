@@ -707,6 +707,12 @@ impl TypeChecker<'_> {
             self.pending_conversion = saved_pending_conversion;
             return self.error_type;
         }
+        // Need: `t.expande([...], axis n)` marks the new dimension of
+        // a broadcast-back; invalid target rank and axis are named errors.
+        if let super::expanded_axis::ExpandedAxis::Refused = self.desugar_expanded_axis(expr) {
+            self.pending_conversion = saved_pending_conversion;
+            return self.error_type;
+        }
         // SOFTAXIS: `t.softmax(axis n)` may name the last axis
         // explicitly; the marker is cleared before the call is checked.
         if let super::reduction::SoftmaxAxis::Refused = self.desugar_softmax_axis(expr) {
