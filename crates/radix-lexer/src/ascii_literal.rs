@@ -21,7 +21,7 @@ pub enum AsciiLiteralError {
 /// scalars, or unescaped control characters.
 pub fn decode_ascii_literal(raw: &str) -> Result<String, AsciiLiteralError> {
     let mut decoded = String::new();
-    let mut chars = raw.chars().peekable();
+    let mut chars = raw.chars();
 
     while let Some(ch) = chars.next() {
         if ch == '\\' {
@@ -34,6 +34,15 @@ pub fn decode_ascii_literal(raw: &str) -> Result<String, AsciiLiteralError> {
                 'n' => '\n',
                 't' => '\t',
                 'r' => '\r',
+                'u' => {
+                    let Some(scalar) = crate::textus_literal::unicode_escape(&mut chars) else {
+                        return Err(AsciiLiteralError::InvalidEscape);
+                    };
+                    if scalar as u32 > 0x7F {
+                        return Err(AsciiLiteralError::InvalidEscape);
+                    }
+                    scalar
+                }
                 _ => return Err(AsciiLiteralError::InvalidEscape),
             };
             decoded.push(scalar);

@@ -253,3 +253,26 @@ fn bounded_ascii_equivalence_stays_same_type_only() {
         EXACT_EQ_ISSUE,
     );
 }
+
+/// `'\u{41}'` uses the shared unicode escape table in ascii literals (unit 74d26a84).
+#[test]
+fn ascii_unicode_escape_in_ascii_literal_checks() {
+    accepts(
+        r"incipit {
+    fixum ascii a ← '\u{41}'
+    nota a
+}",
+    );
+}
+
+/// `'\u{E9}'` is above 7F and fails closed as the existing invalid-escape issue.
+#[test]
+fn ascii_unicode_escape_above_7f_is_invalid_escape() {
+    rejects_with_issue(
+        r"incipit {
+    fixum ascii a ← '\u{E9}'
+    nota a
+}",
+        "ascii_literal_invalid_escape",
+    );
+}
