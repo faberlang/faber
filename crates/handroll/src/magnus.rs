@@ -25,8 +25,8 @@
 //! comparison are O(n); `*` is Karatsuba O(n^1.585) above `KARATSUBA_THRESHOLD` limbs and
 //! schoolbook O(n·m) below; `/ %` are divide-and-conquer (Burnikel-Ziegler) above
 //! `DIVMOD_THRESHOLD` divisor limbs and Knuth Algorithm D O(n·m) below; `potentia` is
-//! O(M(n·e) · log e); decimal parse and render are O(n²); radix 2/8/16 render is O(n). Hashing
-//! is O(n).
+//! O(M(n·e) · log e); decimal render is O(n²); decimal parse is O(M(n) log n) above
+//! `DECIMAL_PARSE_DC_THRESHOLD` digits; radix 2/8/16 render is O(n). Hashing is O(n).
 
 use std::cmp::Ordering;
 use std::fmt;
@@ -44,6 +44,10 @@ const KARATSUBA_THRESHOLD: usize = 32;
 /// division costs about `M(n) · log n` instead of O(n²). Above `KARATSUBA_THRESHOLD`, so the
 /// recursive path's own products are sub-quadratic.
 const DIVMOD_THRESHOLD: usize = 40;
+
+/// Digit count above which decimal parse switches from chunked O(n²) to the recursive split;
+/// below it the chunked path wins.
+const DECIMAL_PARSE_DC_THRESHOLD: usize = 512;
 
 /// Why a `Magnus` operation failed. Every variant is a value-level failure the caller maps to
 /// its own trap or `⇥`; none is a resource-exhaustion abort.
@@ -589,6 +593,74 @@ fn u128_limbs(x: u128) -> Vec<u32> {
     v
 }
 
+/// Chunked text-to-limbs parse shared by every radix: consumes as many digits per small
+/// multiply as fit a `u32` multiplier. O(n²) in the digit count. This stays the production path
+/// for radix 2/8/16 and short decimal, and is the equality oracle for the recursive split.
+fn parse_digits_chunked(digits: &[u8], base: u32) -> Result<Vec<u32>, MagnusError> {
+    // Digits consumed per limb multiply: the largest k with base^k <= u32::MAX.
+    let mut per_chunk = 1_usize;
+    let mut chunk_mult = u64::from(base);
+    while u32::try_from(chunk_mult * u64::from(base)).is_ok() {
+        chunk_mult *= u64::from(base);
+        per_chunk += 1;
+    }
+    let mut mag: Vec<u32> = Vec::new();
+    for chunk in digits.chunks(per_chunk) {
+        let mut value = 0_u32;
+        let mut mult = 1_u32;
+        for &byte in chunk {
+            let digit = char::from(byte)
+                .to_digit(base)
+                .ok_or(MagnusError::Malformed)?;
+            value = value * base + digit;
+            mult *= base;
+        }
+        mul_small_add(&mut mag, mult, value);
+    }
+    Ok(mag)
+}
+
+/// Parse a sign-stripped decimal digit string by recursive divide and conquer: the value equals
+/// `high · 10^low_len + low` with the low half sized to a precomputed power of ten, so the work
+/// follows M(n) log n instead of the chunked path's O(n²).
+fn parse_decimal_dc(digits: &[u8]) -> Result<Vec<u32>, MagnusError> {
+    // Reject non-digits up front so the error matches the chunked path exactly.
+    if digits.iter().any(|byte| !byte.is_ascii_digit()) {
+        return Err(MagnusError::Malformed);
+    }
+    // pows[i] = 10^(9·2^i), extended past the top-level split exponent so every recursive
+    // split finds its power (a sub-slice's exponent never exceeds the whole input's).
+    let mut pows: Vec<Vec<u32>> = vec![vec![1_000_000_000]];
+    let mut i = 0_usize;
+    while 9 * (1_usize << i) < digits.len() {
+        pows.push(mul_mag(&pows[i], &pows[i]));
+        i += 1;
+    }
+    Ok(parse_decimal_split(digits, &pows))
+}
+
+/// Recursive half of [`parse_decimal_dc`]; `digits` are validated decimal ASCII.
+fn parse_decimal_split(digits: &[u8], pows: &[Vec<u32>]) -> Vec<u32> {
+    if digits.len() <= DECIMAL_PARSE_DC_THRESHOLD {
+        // The all-decimal scan passed, so the chunked parse cannot fail.
+        return parse_digits_chunked(digits, 10).unwrap_or_default();
+    }
+    // Largest k with 9·2^k below the length; `pows` always reaches that index.
+    let mut k = 0_usize;
+    while 9 * (1_usize << (k + 1)) < digits.len() {
+        k += 1;
+    }
+    let low_len = 9 * (1_usize << k);
+    let (high, low) = digits.split_at(digits.len() - low_len);
+    // Both halves are non-empty; leading zeros in `low` are harmless.
+    let mut out = add_mag(
+        &mul_mag(&parse_decimal_split(high, pows), &pows[k]),
+        &parse_decimal_split(low, pows),
+    );
+    trim(&mut out);
+    out
+}
+
 // ---------------------------------------------------------------------------------------------
 // construction
 // ---------------------------------------------------------------------------------------------
@@ -665,7 +737,8 @@ impl Magnus {
     }
 
     /// Parse optional `+`/`-` then digits of `radix` (either case; no prefix, no separators,
-    /// any length). Same acceptance as `i64::from_str_radix`, unbounded. O(n²) for decimal.
+    /// any length). Same acceptance as `i64::from_str_radix`, unbounded. Decimal parse is
+    /// O(M(n) log n) above `DECIMAL_PARSE_DC_THRESHOLD` digits.
     ///
     /// # Errors
     /// [`MagnusError::Malformed`] for empty text, a bare sign, or a non-digit.
@@ -678,27 +751,11 @@ impl Magnus {
         if digits.is_empty() {
             return Err(MagnusError::Malformed);
         }
-        let base = radix.base();
-        // Digits consumed per limb multiply: the largest k with base^k <= u32::MAX.
-        let mut per_chunk = 1_usize;
-        let mut chunk_mult = u64::from(base);
-        while u32::try_from(chunk_mult * u64::from(base)).is_ok() {
-            chunk_mult *= u64::from(base);
-            per_chunk += 1;
-        }
-        let mut mag: Vec<u32> = Vec::new();
-        for chunk in digits.chunks(per_chunk) {
-            let mut value = 0_u32;
-            let mut mult = 1_u32;
-            for &byte in chunk {
-                let digit = char::from(byte)
-                    .to_digit(base)
-                    .ok_or(MagnusError::Malformed)?;
-                value = value * base + digit;
-                mult *= base;
-            }
-            mul_small_add(&mut mag, mult, value);
-        }
+        let mag = if radix == Radix::Dec && digits.len() > DECIMAL_PARSE_DC_THRESHOLD {
+            parse_decimal_dc(digits)?
+        } else {
+            parse_digits_chunked(digits, radix.base())?
+        };
         Ok(Magnus::from_parts(neg, mag))
     }
 
