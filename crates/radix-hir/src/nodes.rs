@@ -1196,6 +1196,34 @@ pub fn reduction_group_keys(group: &HirExpression) -> Vec<&HirExpression> {
     }
 }
 
+/// Indices into `coordinates` of the coordinates a grouped reduction reduces.
+///
+/// WHY: a source coordinate is KEPT when it appears as a plain key, every
+/// other coordinate is REDUCED. A bare coordinate name such as `pro [i]`
+/// lowers to `HirExpressionKind::Path(DefId)`; a composed key (an index
+/// expression, a field read) names no coordinate and keeps them all. The
+/// returned indices are ascending.
+#[must_use]
+pub fn reduction_reduced_coordinates(
+    coordinates: &[(DefId, Symbol)],
+    group: &HirExpression,
+) -> Vec<usize> {
+    let keys = reduction_group_keys(group);
+    coordinates
+        .iter()
+        .enumerate()
+        .filter_map(|(index, (coordinate, _name))| {
+            let kept = keys.iter().any(|key| {
+                matches!(
+                    key.kind,
+                    HirExpressionKind::Path(key_def) if key_def == *coordinate
+                )
+            });
+            (!kept).then_some(index)
+        })
+        .collect()
+}
+
 /// Function or method call argument.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirCallArg {
