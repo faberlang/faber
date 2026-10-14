@@ -338,7 +338,7 @@ fn chain_emits_conversion_on_ts() {
     // preserve the inner result without extra machinery.
     let code =
         emit_ts("incipit {\n  varia numerus a ← 0\n  varia numerus b ← 0\n  a ↤ b ↤ \"42\"\n  nota a\n  nota b\n}");
-    assert!(code.contains("a = b = "), "ts must emit the chained store:\n{code}");
+    assert!(code.contains("l_a = l_b = "), "ts must emit the chained store:\n{code}");
     assert!(
         code.contains("Number(") || code.contains("parseInt("),
         "ts chain must convert the inner text→numeric link:\n{code}"
