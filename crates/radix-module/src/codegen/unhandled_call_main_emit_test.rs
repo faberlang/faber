@@ -75,7 +75,7 @@ fn rust_aborts_on_an_unhandled_failable_call_in_main() {
     let main = main_body(&code, "fn main()");
     assert!(main.contains("faber::trap::ok(check(1), faber::Trap::FailableCall)"), "{main}");
     assert!(main.contains("faber::trap::ok(risky(2), faber::Trap::FailableCall)"), "{main}");
-    assert!(main.contains("faber::trap::ok(k.nimm(1), faber::Trap::FailableCall)"), "{main}");
+    assert!(main.contains("faber::trap::ok(l_k.nimm(1), faber::Trap::FailableCall)"), "{main}");
 }
 
 #[test]
@@ -98,11 +98,11 @@ fn go_panics_on_an_unhandled_failable_call_in_main() {
         "{main}"
     );
     assert!(
-        main.contains("x := func() int { v, err := risky(2); if err != nil { panic(err) }; return v }()"),
+        main.contains("l_x := func() int { v, err := risky(2); if err != nil { panic(err) }; return v }()"),
         "{main}"
     );
     assert!(
-        main.contains("func() int { v, err := k.Nimm(1); if err != nil { panic(err) }; return v }()"),
+        main.contains("func() int { v, err := l_k.Nimm(1); if err != nil { panic(err) }; return v }()"),
         "{main}"
     );
 }
