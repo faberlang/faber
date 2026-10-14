@@ -2043,6 +2043,7 @@ matrix and the numeric model; this file states only the language.
 | `matrix<T, [R, C]>` | register-class numeric matrix with exactly two static dimensions (not buffer-backed and not a tensor alias) |
 | `atomic<T>` | storage-sensitive atomic cell; v1 accepts `i32` / `u32` elements only and access must go through atomic methods |
 | `sparsa<T, Figura>` | sparse homogeneous buffer whose shape `Figura` is part of the type (element type and rank static; extents compile-time today, run-time-bindable once K14 lands — admitted, scheduled, not shipped); omitted coordinates equal zero; numeric methods require numeric element types |
+| `trapped<R, T>` | built-in discriminated union of a `فخ` capture boundary: `returned` carries `value: R`, the block's trailing expression, and `thrown` carries `error: T`, the error type or union of error types that can escape; `R` and `T` are separate slots, so a `string` success with a `string` error is legal; read it with an ordinary `طابق` (en `match`) |
 
 A `figura` is `_`, a natural number, a size identifier, or a bracketed list of nested figura values; empty `[]` is rank-0. Dimension arithmetic admits addition or subtraction of natural constants and division by positive natural constants: `[N-1]`, `[D/2]`, and `[(D-2)/3]`. Division binds more tightly than addition or subtraction. Size division is exact, so a negative extent, zero divisor, or nonintegral result is invalid; it does not use ordinary integer floor division. Bare `tensor<T>` is incomplete — use `tensor<T, []>` for rank-0 or `tensor<T, _>` to infer shape. A spelled lift marks a run-time extent: `size N` (la `حجم N`) takes a name, a natural, or a parenthesized figura term (`size (n - 1)`); the extent binds at run time and its value is checked at the store that observes it.
 
@@ -2719,11 +2720,14 @@ maps to an integer.
 
 **Capture boundary (`فخ`):** `فخ { … }` (en `trap`) is an expression
 that runs its block and reifies the error channel into a value. The block's
-trailing expression is the success value; the result type is the union of the
-success type and every error type that can escape the body (failable calls
-and `ارم` payloads), so a failure inside the block becomes a value instead of
-propagating. When the success and error types coincide the union cannot tell
-them apart, and the form is rejected. `فخ` claims its spelling only in expression-primary position
+trailing expression is the success value `R`; the error type `T` is the error
+type, or the union of error types, that can escape the body (failable calls
+and `ارم` payloads). The result is `trapped<R, T>`, a built-in discriminated
+union with two variants: `returned`, whose field `value` holds `R`, and
+`thrown`, whose field `error` holds `T`. It is read with an ordinary
+`طابق` (en `match`); `R` and `T` are separate slots, so a `string`
+success with a `string` error is legal, and the earlier bare-union result form
+is gone. `التقط` (en `catch`) is unchanged and binds the payload. `فخ` claims its spelling only in expression-primary position
 directly followed by `{`, so `فخ(…)` calls and bare identifier uses keep
 their ordinary meaning. No `التقط` clause, `طالما` tail, or early-success form
 attaches to it — those belong to `افعل`.
