@@ -1,0 +1,18 @@
++++
+locale = "en"
++++
+
+# N3 stdio leaf: TTY probes plus a write. Output must match under
+# `faber run` and a `faber build` Rust binary.
+
+import from "norma:console" console
+
+main {
+    const bool out ← console.stdout_is_tty()
+    const bool err ← console.stderr_is_tty()
+    const bool inn ← console.stdin_is_tty()
+    assert out ≡ console.stdout_is_tty()
+    assert err ≡ console.stderr_is_tty()
+    assert inn ≡ console.stdin_is_tty()
+    console.write_line("stdio-ok")
+}

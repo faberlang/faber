@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Generate the throwaway TLS material the NA1 / NA2 acceptance programs load:
+# a test CA (ca.pem), a localhost server certificate (cert.pem), and the
+# server private key (key.pem), written into the directory given as $1.
+#
+# The server certificate is a leaf signed by the CA; rustls rejects a CA
+# certificate used as the server certificate. The client trusts ca.pem, so
+# the pair must stay matched.
+#
+# Usage: gen-test-certs <directory>
+#
+# Never commit the output: .gitignore ignores *.pem and *.key.
+
+set -euo pipefail
+
+dir=${1:-}
+if [[ -z "$dir" ]]; then
+    echo "usage: gen-test-certs <directory>" >&2
+    exit 2
+fi
+mkdir -p "$dir"
+
+work=$(mktemp -d)
+trap 'rm -f "$work/ca.key" "$work/server.csr" "$work/openssl.cnf"; rmdir "$work" 2>/dev/null || true' EXIT
+
+cat > "$work/openssl.cnf" <<'EOF'
+[req]
+distinguished_name = dn
+prompt = no
+
+[dn]
+CN = na-test-ca
+
+[v3_ca]
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+
+[v3_server]
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = IP:127.0.0.1,DNS:localhost
+EOF
+
+openssl req -x509 -sha256 -newkey rsa:2048 -nodes -days 3650 \
+    -config "$work/openssl.cnf" -extensions v3_ca \
+    -keyout "$work/ca.key" -out "$dir/ca.pem" \
+    -subj "/CN=na-test-ca" 2>/dev/null
+
+openssl req -new -sha256 -newkey rsa:2048 -nodes \
+    -config "$work/openssl.cnf" \
+    -keyout "$dir/key.pem" -out "$work/server.csr" \
+    -subj "/CN=127.0.0.1" 2>/dev/null
+
+openssl x509 -req -sha256 -days 3650 \
+    -in "$work/server.csr" \
+    -CA "$dir/ca.pem" -CAkey "$work/ca.key" -set_serial 1 \
+    -extfile "$work/openssl.cnf" -extensions v3_server \
+    -out "$dir/cert.pem" 2>/dev/null
+
+echo "wrote $dir/ca.pem, $dir/cert.pem, $dir/key.pem"

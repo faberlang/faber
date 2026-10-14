@@ -1,0 +1,28 @@
++++
+locale = "en"
++++
+
+# N2 remainder: stdio, process, clock, entropy on both runtimes.
+# Output must match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:process" process
+import from "norma:time" time
+import from "norma:random" random
+
+main {
+    time.sleep(0)
+    const int before ← time.monotonic()
+    const int after ← time.monotonic()
+    assert after ≥ before
+    random.seed(7)
+    const int first ← random.random_int(1, 9)
+    random.seed(7)
+    const int second ← random.random_int(1, 9)
+    assert first ≡ second
+    const string id ← random.uuid()
+    assert id.length() ≡ 36
+    assert process.pid() ≻ 0
+    assert process.cwd().length() ≻ 0
+    assert process.exec("printf leaves-ok") ≡ "leaves-ok"
+    print "leaves-ok"
+}

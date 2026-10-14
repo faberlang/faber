@@ -1,0 +1,15 @@
++++
+locale = "en"
++++
+
+# N2 fs discovery: write a file, read it back, print it.
+# Output must match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:fs" fs
+
+main {
+    const string dir ← fs.temp_dir()
+    const string path ← fs.join([dir, "core-norma-fs-roundtrip.txt"])
+    fs.write_file(path, "roundtrip-ok")
+    print fs.read_file<string>(path)
+}

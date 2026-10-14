@@ -1,0 +1,73 @@
++++
+locale = "en"
++++
+
+# N4a: text, encoding, toml, and hmac on both runtimes.
+
+import from "norma:text" text
+import from "norma:encoding" encoding
+import from "norma:toml" toml
+import from "norma:value" value
+import from "norma:crypto" crypto
+
+main {
+    const list<string> parts ← text.split_n("a=b=c", "=", 2)
+    assert parts.length() ≡ 2
+    assert (parts.get(0) coalesce "") ≡ "a"
+    assert (parts.get(1) coalesce "") ≡ "b=c"
+    assert text.collapse_spaces("a  b   c") ≡ "a b c"
+    const ascii narrowed ← text.to_ascii("Hi")
+    assert (narrowed ↦ string) ≡ "Hi"
+    assert text.try_to_ascii("π") is none
+    const bytes raw ← text.encode("Salve")
+    assert text.decode(raw) ≡ "Salve"
+    assert text.try_decode(|ff|) is none
+
+    assert encoding.hex(|61 62 63|) ≡ "616263"
+    assert encoding.hex(encoding.decode_hex("616263")) ≡ "616263"
+    assert encoding.try_decode_hex("zz") is none
+    assert encoding.base64(|61 62 63|) ≡ "YWJj"
+    assert encoding.hex(encoding.decode_base64("YWJj")) ≡ "616263"
+    assert encoding.url("hello world") ≡ "hello+world"
+    assert encoding.decode_url("hello+world") ≡ "hello world"
+    assert encoding.encode_url_component("a&b=c") ≡ "a%26b%3Dc"
+    assert encoding.decode_url_component("a%26b%3Dc") ≡ "a&b=c"
+
+    const value doc ← toml.parse("name = \"faber\"\nversion = 1\n")
+    assert value.is_map(doc)
+    assert (value.get(doc, "name") ↦ string ⊥ "") ≡ "faber"
+    assert (value.get(doc, "version") ↦ int ⊥ 0) ≡ 1
+    const string wire ← toml.stringify(doc)
+    const value again ← toml.parse(wire)
+    assert (value.get(again, "name") ↦ string ⊥ "") ≡ "faber"
+    assert toml.try_parse("!!!") is none
+
+    const value bins ← toml.parse("[[bin]]\nname = \"x\"\n\n[[bin]]\nname = \"y\"\n")
+    const value bin_list ← value.get(bins, "bin")
+    assert value.is_list(bin_list)
+    assert value.is_map(value.get_index(bin_list, 0))
+    assert value.is_map(value.get_index(bin_list, 1))
+    assert (value.get(value.get_index(bin_list, 0), "name") ↦ string ⊥ "") ≡ "x"
+    assert (value.get(value.get_index(bin_list, 1), "name") ↦ string ⊥ "") ≡ "y"
+
+    const value underscored ← toml.parse("x = 1_000\n")
+    assert (value.get(underscored, "x") ↦ int ⊥ 0) ≡ 1000
+
+    const value roundtrip ← toml.parse(toml.stringify(toml.parse("[[bin]]\nname = \"x\"\n\n[[bin]]\nname = \"y\"\n")))
+    const value round_bins ← value.get(roundtrip, "bin")
+    assert value.is_list(round_bins)
+    assert (value.get(value.get_index(round_bins, 0), "name") ↦ string ⊥ "") ≡ "x"
+    assert (value.get(value.get_index(round_bins, 1), "name") ↦ string ⊥ "") ≡ "y"
+    assert toml.try_parse("x = 1_\n") is none
+    assert toml.try_parse("x = 1__0\n") is none
+
+    const value fruit ← toml.parse("[[fruit]]\nname = \"apple\"\n[fruit.physical]\ncolor = \"red\"\n")
+    const value fruit0 ← value.get_index(value.get(fruit, "fruit"), 0)
+    assert (value.get(fruit0, "name") ↦ string ⊥ "") ≡ "apple"
+    assert (value.get(value.get(fruit0, "physical"), "color") ↦ string ⊥ "") ≡ "red"
+
+    const bytes mac ← crypto.hmac("hmac-sha256", text.encode("key"), text.encode("data"))
+    assert encoding.hex(mac) ≡ "5031fe3d989c6d1537a013fa6e739da23463fdaec3b70137d828e36ace221bd0"
+
+    print "n4a-ok"
+}

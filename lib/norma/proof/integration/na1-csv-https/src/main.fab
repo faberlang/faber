@@ -1,0 +1,97 @@
++++
+locale = "en"
++++
+
+# NA1: CSV → JSON → HTTPS POST → file. Serve and client are separate
+# processes because leaves are blocking (one-thread accept vs POST).
+# Generate ca.pem / cert.pem / key.pem in this directory first:
+# ../gen-test-certs .
+
+import from "norma:csv" csv
+import from "norma:json" json
+import from "norma:fs" fs
+import from "norma:process" process
+import from "norma:time" time
+import from "norma:http/server" server
+import from "norma:http/client" client
+import from "norma:http/headers" headers
+import from "norma:http/response" response
+
+fn port_path() → string {
+    return fs.join([fs.temp_dir(), "na1-port"])
+}
+
+fn is_serve() → bool {
+    const list<string> args ← process.argv()
+    if args.length() ≡ 0 then return false
+    return (args.get(0) coalesce "") ≡ "serve"
+}
+
+fn run_serve() → void {
+    const server.Listener listener ← server.bind_tls(0, "cert.pem", "key.pem")
+    const int port ← listener.port()
+    assert port ≻ 0
+    fs.write_file(port_path(), port ↦ string)
+    const server.Incoming incoming ← listener.accept()
+    assert incoming.req.method ≡ "POST"
+    server.reply(incoming, 200, headers.empty(), incoming.req.body)
+    listener.stop()
+}
+
+fn wait_port() → string {
+    const string path ← port_path()
+    var int spins ← 0
+    while not fs.exists(path) {
+        time.sleep(50)
+        spins ← spins + 1
+        if spins ≻ 200 {
+            panic "na1: port file missing"
+        }
+    }
+    return fs.read_file<string>(path)
+}
+
+fn run_client() → void {
+    const string csv_text ← "name,age\nalice,30"
+    const string csv_path ← fs.join([fs.temp_dir(), "na1-input.csv"])
+    fs.write_file(csv_path, csv_text)
+    const string loaded ← fs.read_file<string>(csv_path)
+    const list<list<string>> rows ← csv.parse(loaded)
+    var string name ← ""
+    var string age ← ""
+    var int i ← 0
+    for from rows const row {
+        if i ≡ 1 {
+            name ← row.get(0) coalesce ""
+            age ← row.get(1) coalesce ""
+        }
+        i ← i + 1
+    }
+    assert name ≡ "alice"
+    assert age ≡ "30"
+    const string payload ← "{\"name\":\"alice\",\"age\":\"30\"}"
+    const json ∪ none parsed ← json.try_parse(payload)
+    assert parsed not is none
+    const json doc ↤ parsed
+    const string wire ← json.stringify(doc)
+    const string port ← wait_port()
+    const string url ← "https://127.0.0.1:§/json"(port)
+    const int agent ↤ call 'http:agent' ([60000 ↦ value, "ca.pem" ↦ value])
+    const client.Client session ← client.Client { agent = agent }
+    const response.Response reply ← client.post_on(session, url, wire)
+    assert reply.status ≡ 200
+    const string out_path ← fs.join([fs.temp_dir(), "na1-response.json"])
+    fs.write_file(out_path, reply.body)
+    const string saved ← fs.read_file<string>(out_path)
+    assert saved.length() ≻ 0
+    print "na1-ok"
+}
+
+main {
+    if is_serve() {
+        run_serve()
+    }
+    else {
+        run_client()
+    }
+}

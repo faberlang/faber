@@ -1,0 +1,85 @@
++++
+locale = "en"
++++
+
+# NA3: live core surfaces on one program. Zero @ unstable remains in
+# lib/norma (Q2 delete). @ future is caller posture, not a stub.
+
+import from "norma:text" text
+import from "norma:encoding" encoding
+import from "norma:csv" csv
+import from "norma:json" json
+import from "norma:toml" toml
+import from "norma:value" value
+import from "norma:crypto" crypto
+import from "norma:fs" fs
+import from "norma:process" process
+import from "norma:time" time
+import from "norma:math" math
+import from "norma:random" random
+import from "norma:console" console
+import from "norma:http/client" client
+import from "norma:http/server" server
+import from "norma:http/chunked" chunked
+import from "norma:http/sse" sse
+import from "norma:websocket" websocket
+import from "norma:net" net
+import from "norma:net/listener" listener
+
+main {
+    const list<string> parts ← text.split_n("a=b=c", "=", 2)
+    assert parts.length() ≡ 2
+    assert text.collapse_spaces("a  b   c") ≡ "a b c"
+    assert encoding.hex(|61 62 63|) ≡ "616263"
+    assert encoding.base64(|61 62 63|) ≡ "YWJj"
+
+    const list<list<string>> rows ← csv.parse("name,age\nalice,30")
+    assert rows.length() ≥ 2
+    const json ∪ none parsed ← json.try_parse("{\"n\":1}")
+    assert parsed not is none
+    const json doc ↤ parsed
+    assert json.stringify(doc).length() ≻ 0
+    const value tree ← toml.parse("name = \"faber\"\n")
+    assert value.is_map(tree)
+    const bytes mac ← crypto.hmac("hmac-sha256", text.encode("key"), text.encode("data"))
+    assert encoding.hex(mac) ≡ "5031fe3d989c6d1537a013fa6e739da23463fdaec3b70137d828e36ace221bd0"
+
+    const string dir ← fs.temp_dir()
+    const string path ← fs.join([dir, "na3-core.txt"])
+    fs.write_file(path, "ok")
+    assert fs.exists(path)
+    fs.delete(path)
+    assert process.argv().length() ≥ 0
+    const time.Ticker ticks ← time.interval(0)
+    assert (ticks.next() ↦ string).length() ≻ 0
+    assert math.add(1.0, 2.0) ≡ 3.0
+    random.seed(7)
+    assert random.random_int(1, 9) ≻ 0
+    console.write_partial("")
+
+    const bytes framed ← chunked.encode(|68|)
+    var bytes body ← |00|
+    do {
+        body ← chunked.decode(framed)
+    }
+    catch err {
+        panic "na3: chunked.decode: §"(err)
+    }
+    assert body ≡ |68|
+    const sse.Event event ← sse.Event { name = "ping", data = "one" }
+    assert sse.stringify(event).length() ≻ 0
+    const websocket.Socket unused ← websocket.Socket { id = 0 }
+    assert unused.id ≡ 0
+
+    const client.Url url ← client.split("https://127.0.0.1:443/json")
+    assert url.scheme ≡ "https"
+    assert url.host ≡ "127.0.0.1"
+    const server.Listener http_listener ← server.bind(0)
+    assert http_listener.port() ≻ 0
+    http_listener.stop()
+    const listener.Listener tcp ← net.listen(0)
+    assert tcp.port() ≻ 0
+    tcp.close()
+
+    print "na3-ok"
+}
