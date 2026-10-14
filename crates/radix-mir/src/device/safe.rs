@@ -27,7 +27,8 @@ use crate::visit::MirVisitor;
 use crate::{CapabilityGap, Lowerability};
 use crate::{
     MirAggregate, MirAggregateKind, MirCollectionOp, MirConstant, MirDeviceViewElement,
-    MirFunction, MirIntrinsic, MirLayoutKind, MirLayoutTable, MirLocal, MirOperand, MirParam,
+    MirFunction, MirIntrinsic, MirLayoutKind, MirLayoutTable, MirLiftOp, MirLocal, MirOperand,
+    MirParam,
     MirPlace, MirPlaceBase, MirProjection, MirRuntimeCall, MirScalarLayout, MirStatement,
     MirStatementKind, MirTemp, MirTensorLocusLayout, MirTensorStorageLayout, MirTerminator,
     MirTerminatorKind, MirType, MirValidationContext, MirValue, MirValueKind, ValidatedMir,
@@ -817,6 +818,29 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                                     | MirCollectionOp::TensorGelu,
                             )
                             | MirIntrinsic::FilumReduce(_),
+                        ..
+                    },
+                ..
+            } => {
+                crate::visit::walk_stmt(self, stmt);
+            }
+            // gpu-reset rule 15 K4 / need item 4: the pointwise
+            // tensor lifts (add/sub/mul/neg) are device-safe elementwise
+            // expressions — targets that lower the `Collection` pointwise
+            // set lower these through the same tensor-expr model. Every
+            // other `MirLiftOp` keeps the wildcard rejection below, and a
+            // target that has no lift lowering still fails closed in its
+            // own emit gate.
+            MirStatementKind::RuntimeCall {
+                call:
+                    MirRuntimeCall {
+                        intrinsic:
+                            MirIntrinsic::TensorLift(
+                                MirLiftOp::Add
+                                | MirLiftOp::Sub
+                                | MirLiftOp::Mul
+                                | MirLiftOp::Neg,
+                            ),
                         ..
                     },
                 ..
