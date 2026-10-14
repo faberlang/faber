@@ -506,7 +506,7 @@ const VIA_HINT_SOURCE: &str = r#"+++
 locale = "en"
 +++
 main {
-    const bytes raw ← |3c 00 00 00|
+    const list<b8> raw ← |3c 00 00 00|
     const char big ← 'A'
     const u16 a ← raw[0‥2] ↦ u16 via Le
     const f16 b ← a ↦ b16 ↦ f16
