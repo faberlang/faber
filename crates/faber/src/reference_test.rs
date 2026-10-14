@@ -61,8 +61,8 @@ fn embedded_registry_loads_canonical_and_legacy_entries() {
         registry.entries().len(),
         pack.term_count() + pack.legacy_redirects().len()
     );
-    // 196 explained terms plus 13 legacy redirects.
-    assert_eq!(registry.entries().len(), 209);
+    // 197 explained terms plus 13 legacy redirects.
+    assert_eq!(registry.entries().len(), 210);
     assert!(registry.lookup("functio").is_some());
     assert!(matches!(registry.lookup("=="), Some(Lookup::Legacy { .. })));
 }

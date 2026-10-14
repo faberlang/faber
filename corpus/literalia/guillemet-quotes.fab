@@ -7,7 +7,6 @@ category = "literal"
 canonical = true
 summary = "Guillemet textus literals: quotes and apostrophes need no escape."
 syntax = "«<text>»"
-aliases = ["«...»"]
 related = ["string", "block-string", "textus"]
 locale = "en"
 +++
