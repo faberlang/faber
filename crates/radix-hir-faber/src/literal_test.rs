@@ -1,6 +1,7 @@
 use super::*;
 use crate::surface::{KeywordSurface, TypeBindingKind};
 use radix_lexer::{Interner, TokenKind};
+use radix_types::Primitive;
 
 struct LatinSurface;
 
@@ -34,13 +35,39 @@ impl KeywordSurface for EnglishSurface {
     }
 }
 
-fn render(literal: &HirLiteral, surface: &impl KeywordSurface) -> String {
+fn render_with_interner(
+    literal: &HirLiteral,
+    interner: &Interner,
+    surface: &impl KeywordSurface,
+) -> String {
     let types = radix_types::TypeTable::new();
-    let interner = Interner::new();
-    let codegen = crate::FaberCodegen::new(&types, &interner);
+    let codegen = crate::FaberCodegen::new(&types, interner);
     let mut writer = CodeWriter::new();
     codegen.write_literal(literal, surface, &mut writer);
     writer.finish()
+}
+
+fn render(literal: &HirLiteral, surface: &impl KeywordSurface) -> String {
+    render_with_interner(literal, &Interner::new(), surface)
+}
+
+struct LocaleRegexSurface;
+
+impl KeywordSurface for LocaleRegexSurface {
+    fn keyword(&self, _kind: TokenKind) -> &'static str {
+        "keyword"
+    }
+
+    fn contextual_keyword(&self, key: &'static str) -> &str {
+        key
+    }
+
+    fn type_surface(&self, kind: TypeBindingKind) -> &'static str {
+        match kind {
+            TypeBindingKind::Primitive(Primitive::Regex) => "rgx",
+            _ => "type",
+        }
+    }
 }
 
 #[test]
@@ -64,6 +91,28 @@ fn non_finite_literals_round_trip_with_faber_spellings() {
 fn finite_float_literals_keep_decimal_convention() {
     assert_eq!(render(&HirLiteral::Float(7.0), &LatinSurface), "7.0");
     assert_eq!(render(&HirLiteral::Float(0.125), &LatinSurface), "0.125");
+}
+
+#[test]
+fn regex_literal_emits_slash_form_in_locale_word() {
+    let mut interner = Interner::new();
+    let escaped = interner.intern(r"\d+\/x");
+    let rendered = render_with_interner(
+        &HirLiteral::Regex(escaped, None),
+        &interner,
+        &LocaleRegexSurface,
+    );
+    assert_eq!(rendered, r"rgx /\d+\/x/");
+    assert!(!rendered.contains('↦'));
+
+    let bare = interner.intern("a/b");
+    let rendered = render_with_interner(
+        &HirLiteral::Regex(bare, None),
+        &interner,
+        &LocaleRegexSurface,
+    );
+    assert_eq!(rendered, r"rgx /a\/b/");
+    assert!(!rendered.contains('↦'));
 }
 
 #[test]
