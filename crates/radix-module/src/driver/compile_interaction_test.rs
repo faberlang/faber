@@ -1157,7 +1157,7 @@ fn rust_target_accepts_lege_expression() {
 #[cfg(feature = "hir-faber")]
 fn regex_conversio_no_longer_reports_unsupported_lowering_error() {
     let source = r#"incipit {
-  fixum _ pattern ← "(?g)\d+" ↦ regex
+  fixum _ pattern ← "(?g)\\d+" ↦ regex
   nota pattern
 }"#;
     let result = super::faber_emit("test.fab", source);
@@ -1167,7 +1167,7 @@ fn regex_conversio_no_longer_reports_unsupported_lowering_error() {
         panic!("expected faber output");
     };
     let code = output.code;
-    assert!(code.contains("\"(?g)\\d+\""));
+    assert!(code.contains("\"(?g)\\\\d+\""));
     assert!(code.contains("↦ regex"));
     assert!(result.diagnostics.iter().all(|d| {
         d.issue()
@@ -1178,7 +1178,7 @@ fn regex_conversio_no_longer_reports_unsupported_lowering_error() {
 #[test]
 fn sed_expression_fails_with_generic_unknown_identifier() {
     let session = test_session(Target::HirRust);
-    let source = r#"incipit { fixum _ r ← sed "\d+" g }"#;
+    let source = r#"incipit { fixum _ r ← sed "\\d+" g }"#;
     let result = compile(&session, "sed-retired.fab", source, ModuleCompileRequest::default());
     // `sed` is a plain identifier; the source fails with generic
     // unknown-identifier errors.
