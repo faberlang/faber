@@ -85,6 +85,9 @@ pub mod call;
 #[cfg(test)]
 #[path = "call_default_test.rs"]
 mod call_default_test;
+#[cfg(test)]
+#[path = "axis_reduction_multi_test.rs"]
+mod axis_reduction_multi_test;
 
 #[cfg(test)]
 #[path = "at_read_test.rs"]
