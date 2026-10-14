@@ -208,7 +208,10 @@ impl Parser {
         } else if self.eat_keyword_ident(TokenKind::Varia) {
             AstMutability::Mutable
         } else {
-            return Err(Self::expected_error("fixum or varia", self.current_span()));
+            return Err(Self::expected_issue_error(
+                "expected_mutability_keyword",
+                self.current_span(),
+            ));
         };
 
         if self.check_keyword_ident(TokenKind::Magnitudo) {
@@ -241,8 +244,8 @@ impl Parser {
             )
         } else if self.eat(&TokenKind::AwaitAssign) {
             if !matches!(binding, BindingPattern::Ident(_)) {
-                return Err(Self::expected_error(
-                    "named binding before '↢'",
+                return Err(Self::expected_issue_error(
+                    "await_binding_requires_name",
                     self.previous_span(),
                 ));
             }
@@ -1155,7 +1158,10 @@ impl Parser {
                 .any(|annotation| self.is_nondum_annotation(annotation));
             let parsed = self.parse_func_decl();
             let StmtKind::Func(func) = parsed? else {
-                return Err(Self::expected_error("functio", self.current_span()));
+                return Err(Self::expected_issue_error(
+                    "expected_method_declaration",
+                    self.current_span(),
+                ));
             };
             ClassMemberKind::Method(func)
         } else {
@@ -1457,7 +1463,8 @@ impl Parser {
                                 ParseErrorKind::Expected,
                                 self.current_span(),
                             )
-                            .with_arg("expected", "number"));
+                            .with_arg("expected", "number")
+                            .with_arg("issue", "enum_member_value_number"));
                         }
                     }
                     TokenKind::String(s) => {
@@ -1469,7 +1476,8 @@ impl Parser {
                             ParseErrorKind::Expected,
                             self.current_span(),
                         )
-                        .with_arg("expected", "value"));
+                        .with_arg("expected", "value")
+                        .with_arg("issue", "enum_member_value"));
                     }
                 }
             } else {
@@ -2134,7 +2142,10 @@ impl Parser {
                 } else if self.eat_keyword_ident(TokenKind::Postparabit) {
                     PraeparaKind::Postparabit
                 } else {
-                    return Err(Self::expected_error("praepara hook", self.current_span()));
+                    return Err(Self::expected_issue_error(
+                        "expected_praepara_hook",
+                        self.current_span(),
+                    ));
                 };
                 let all = self.eat_keyword_ident(TokenKind::Omnia);
                 let body = self.parse_block()?;
@@ -2839,10 +2850,7 @@ impl Parser {
         let token = self.advance();
         match &token.kind {
             TokenKind::String(sym) | TokenKind::Ident(sym) => Ok(*sym),
-            _ => Err(Self::expected_error(
-                "string literal or identifier",
-                token.span,
-            )),
+            _ => Err(Self::expected_issue_error("expected_lane_value", token.span)),
         }
     }
 
