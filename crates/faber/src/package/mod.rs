@@ -130,16 +130,14 @@ pub fn embedded_runtime_root() -> Option<PathBuf> {
     embedded_runtime::embedded_runtime_root()
 }
 
-/// The first environment variable set that forces a checkout runtime over the
+/// The environment variable set that forces a checkout runtime over the
 /// embedded one, if any. Consumed by `faber corpus` embedded-only suites.
 #[must_use]
 pub fn checkout_runtime_override() -> Option<&'static str> {
-    [
-        crate::library::FABER_LIBRARY_HOME_ENV,
-        runtime_sources::SUPPORT_PATH_OVERRIDE_ENV,
-    ]
-    .into_iter()
-    .find(|name| std::env::var_os(name).is_some_and(|value| !value.is_empty()))
+    let name = crate::library::FABER_LIBRARY_HOME_ENV;
+    std::env::var_os(name)
+        .is_some_and(|value| !value.is_empty())
+        .then_some(name)
 }
 
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 routing).
