@@ -1,0 +1,14 @@
+version = 1
+id = "corpus/vector/infer.fab"
+group = "language"
+input_root = "corpus"
+input = "vector/infer.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "no entry function in MIR program"

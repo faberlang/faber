@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/glyph-outer.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/glyph-outer.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

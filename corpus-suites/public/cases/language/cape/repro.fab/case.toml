@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/cape/repro.fab"
+group = "language"
+input_root = "corpus"
+input = "cape/repro.fab"
+
+
+[expect]
+check_only = true

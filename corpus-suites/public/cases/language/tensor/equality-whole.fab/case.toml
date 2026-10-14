@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/equality-whole.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/equality-whole.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

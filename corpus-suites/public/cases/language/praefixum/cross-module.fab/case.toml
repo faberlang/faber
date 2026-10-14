@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/praefixum/cross-module.fab"
+group = "language"
+input_root = "corpus"
+input = "praefixum/cross-module.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

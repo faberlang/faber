@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/importa/default-minimal.fab"
+group = "language"
+input_root = "corpus"
+input = "importa/default-minimal.fab"
+
+
+[expect]
+check_only = true

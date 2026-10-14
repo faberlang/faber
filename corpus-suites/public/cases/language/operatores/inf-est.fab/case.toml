@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/inf-est.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/inf-est.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

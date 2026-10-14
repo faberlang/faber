@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/mutabilitas/copy-param-writable.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/copy-param-writable.fab"
+
+
+[expect]
+check_only = true

@@ -1,0 +1,14 @@
+version = 1
+id = "corpus/gpu-core-types/atomic-operations.fab"
+group = "language"
+input_root = "corpus"
+input = "gpu-core-types/atomic-operations.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "no entry function in MIR program"

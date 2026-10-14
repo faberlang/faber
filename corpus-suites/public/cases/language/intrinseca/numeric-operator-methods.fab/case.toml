@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/intrinseca/numeric-operator-methods.fab"
+group = "language"
+input_root = "corpus"
+input = "intrinseca/numeric-operator-methods.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

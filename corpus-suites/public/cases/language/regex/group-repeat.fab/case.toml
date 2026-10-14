@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/regex/group-repeat.fab"
+group = "language"
+input_root = "corpus"
+input = "regex/group-repeat.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

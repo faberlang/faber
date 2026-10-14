@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/promissum/promissum.fab"
+group = "language"
+input_root = "corpus"
+input = "promissum/promissum.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

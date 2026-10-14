@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/summa/mean-sugar.fab"
+group = "language"
+input_root = "corpus"
+input = "summa/mean-sugar.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

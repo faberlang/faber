@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/vector/glyph-cross.fab"
+group = "language"
+input_root = "corpus"
+input = "vector/glyph-cross.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

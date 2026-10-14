@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/regex/literal.fab"
+group = "language"
+input_root = "corpus"
+input = "regex/literal.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

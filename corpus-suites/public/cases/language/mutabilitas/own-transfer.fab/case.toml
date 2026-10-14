@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/mutabilitas/own-transfer.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/own-transfer.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

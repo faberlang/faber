@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/tensor/affine-dimensions.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/affine-dimensions.fab"
+
+
+[expect]
+check_only = true

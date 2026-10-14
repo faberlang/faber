@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/ad/solum-lege-generic.fab"
+group = "language"
+input_root = "corpus"
+input = "ad/solum-lege-generic.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"

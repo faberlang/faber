@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/discerne/closed-set-decline.fab"
+group = "language"
+input_root = "corpus"
+input = "discerne/closed-set-decline.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM010.discerne_pattern_not_in_closed_set"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM010.discerne_pattern_not_in_closed_set"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM010:discerne_pattern_not_in_closed_set"

@@ -1,0 +1,9 @@
+version = 1
+id = "product/contract-import-wildcard"
+group = "product"
+input_root = "product"
+input = "contract-import-wildcard"
+
+
+[expect]
+check_only = true

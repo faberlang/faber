@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/itera/range-product-decline.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/range-product-decline.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM010.itera_range_mixed_source"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM010.itera_range_mixed_source"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM010:itera_range_source_binder_arity_mismatch"

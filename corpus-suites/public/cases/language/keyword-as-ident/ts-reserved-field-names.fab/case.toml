@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/keyword-as-ident/ts-reserved-field-names.fab"
+group = "language"
+input_root = "corpus"
+input = "keyword-as-ident/ts-reserved-field-names.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

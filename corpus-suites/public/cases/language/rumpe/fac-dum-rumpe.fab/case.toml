@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/rumpe/fac-dum-rumpe.fab"
+group = "language"
+input_root = "corpus"
+input = "rumpe/fac-dum-rumpe.fab"
+
+
+[expect]
+check_only = true

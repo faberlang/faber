@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/operatores/inf-json.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/inf-json.fab"
+
+
+[expect]
+check_only = true

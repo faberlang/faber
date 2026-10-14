@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/mutabilitas/mut-write-while-borrowed.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/mut-write-while-borrowed.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM052.write_while_borrowed"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM052.write_while_borrowed"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM052:write_while_borrowed"

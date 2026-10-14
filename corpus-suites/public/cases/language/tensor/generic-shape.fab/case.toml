@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/generic-shape.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/generic-shape.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

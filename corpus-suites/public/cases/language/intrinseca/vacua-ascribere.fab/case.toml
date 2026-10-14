@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/intrinseca/vacua-ascribere.fab"
+group = "language"
+input_root = "corpus"
+input = "intrinseca/vacua-ascribere.fab"
+
+
+[expect]
+check_only = true

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/rumpe/rumpe.fab"
+group = "language"
+input_root = "corpus"
+input = "rumpe/rumpe.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

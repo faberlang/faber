@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/function-types.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/function-types.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/discerne/discerne.fab"
+group = "language"
+input_root = "corpus"
+input = "discerne/discerne.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/regex/line-terminators.fab"
+group = "language"
+input_root = "corpus"
+input = "regex/line-terminators.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/transfer/copy-into-sink-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "transfer/copy-into-sink-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM020.copy_into_target_immutable"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM020.copy_into_target_immutable"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM012:transfer_sink_retired"

@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/operatores/potentia-negative-exponent.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/potentia-negative-exponent.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "numerus potentia failed: negative exponent"
+check_only = false

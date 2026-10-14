@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/summa/varia-binder.fab"
+group = "language"
+input_root = "corpus"
+input = "summa/varia-binder.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

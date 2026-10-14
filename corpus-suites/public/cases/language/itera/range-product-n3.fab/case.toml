@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/itera/range-product-n3.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/range-product-n3.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

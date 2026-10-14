@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/regex/reject-lookaround.fab"
+group = "language"
+input_root = "corpus"
+input = "regex/reject-lookaround.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

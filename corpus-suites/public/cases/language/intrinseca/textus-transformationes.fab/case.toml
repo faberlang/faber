@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/intrinseca/textus-transformationes.fab"
+group = "language"
+input_root = "corpus"
+input = "intrinseca/textus-transformationes.fab"
+
+
+[expect]
+check_only = true

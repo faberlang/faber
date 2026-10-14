@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/regex/dot-multiline.fab"
+group = "language"
+input_root = "corpus"
+input = "regex/dot-multiline.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

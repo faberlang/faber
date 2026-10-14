@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/sparsa/sparsa-codegen-smoke.fab"
+group = "language"
+input_root = "corpus"
+input = "sparsa/sparsa-codegen-smoke.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

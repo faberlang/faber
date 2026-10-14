@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/generic/call-size-args.fab"
+group = "language"
+input_root = "corpus"
+input = "generic/call-size-args.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

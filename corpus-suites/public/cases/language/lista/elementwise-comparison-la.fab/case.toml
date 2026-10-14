@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/lista/elementwise-comparison-la.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/elementwise-comparison-la.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

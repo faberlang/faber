@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/summa/no-apud.fab"
+group = "language"
+input_root = "corpus"
+input = "summa/no-apud.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/typi/inf-literal-range-error.fab"
+group = "language"
+input_root = "corpus"
+input = "typi/inf-literal-range-error.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM010.initializer_annotation_mismatch"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM010.initializer_annotation_mismatch"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM010:numerus_literal_out_of_range"

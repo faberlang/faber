@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/incipiet/incipiet.fab"
+group = "language"
+input_root = "corpus"
+input = "incipiet/incipiet.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

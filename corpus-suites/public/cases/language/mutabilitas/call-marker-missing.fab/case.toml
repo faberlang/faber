@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/mutabilitas/call-marker-missing.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/call-marker-missing.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM057.call_marker_missing"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM057.call_marker_missing"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM057:call_marker_missing"

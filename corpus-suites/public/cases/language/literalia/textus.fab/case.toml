@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/literalia/textus.fab"
+group = "language"
+input_root = "corpus"
+input = "literalia/textus.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

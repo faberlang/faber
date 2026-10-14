@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/cape/receptio.fab"
+group = "language"
+input_root = "corpus"
+input = "cape/receptio.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

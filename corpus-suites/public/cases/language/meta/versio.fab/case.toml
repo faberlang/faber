@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/meta/versio.fab"
+group = "language"
+input_root = "corpus"
+input = "meta/versio.fab"
+
+
+[expect]
+check_only = true

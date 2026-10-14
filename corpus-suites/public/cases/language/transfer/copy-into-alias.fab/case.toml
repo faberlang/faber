@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/transfer/copy-into-alias.fab"
+group = "language"
+input_root = "corpus"
+input = "transfer/copy-into-alias.fab"
+
+
+[expect]
+check_only = true

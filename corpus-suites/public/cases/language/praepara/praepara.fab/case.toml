@@ -1,0 +1,19 @@
+version = 1
+id = "corpus/praepara/praepara.fab"
+group = "language"
+input_root = "corpus"
+input = "praepara/praepara.fab"
+
+
+[expect]
+check_only = true
+
+[targets.roundtrip]
+outcome = "known-fail"
+phase = "emit"
+diagnostic_contains = "canonical Faber output would drop source construct `hook:Praepara:all=false`"
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "no entry function in MIR program"

@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/importa/imported-constant-index.fab"
+group = "language"
+input_root = "corpus"
+input = "importa/imported-constant-index.fab"
+
+
+[expect]
+check_only = true

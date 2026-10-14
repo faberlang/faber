@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/itera/filum-nested.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/filum-nested.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

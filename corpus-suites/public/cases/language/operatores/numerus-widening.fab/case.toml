@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/numerus-widening.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/numerus-widening.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

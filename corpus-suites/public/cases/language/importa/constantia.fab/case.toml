@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/importa/constantia.fab"
+group = "language"
+input_root = "corpus"
+input = "importa/constantia.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

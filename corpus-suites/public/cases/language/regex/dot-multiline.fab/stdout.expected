@@ -1,0 +1,18 @@
+dot-newline: n
+dot-newline-s: y
+dot-cr: y
+dot-lsep: y
+dot-nel: y
+dot-astral: y
+dot-astral-two: n
+dot-combining-one: n
+dot-combining-two: y
+anch-caret-nonmulti: n
+anch-caret-multi: y
+anch-dollar-multi: y
+anch-caret-multi-crlf: y
+anch-multi-empty-lines: y
+anch-multi-empty-text: y
+anch-multi-iter: (0,0) (2,2) (4,4)
+anch-dollar-iter: (1,1) (3,3) (4,4)
+flag-scoped-m: y

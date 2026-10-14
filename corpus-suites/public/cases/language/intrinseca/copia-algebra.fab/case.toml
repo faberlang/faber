@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/intrinseca/copia-algebra.fab"
+group = "language"
+input_root = "corpus"
+input = "intrinseca/copia-algebra.fab"
+
+
+[expect]
+check_only = true

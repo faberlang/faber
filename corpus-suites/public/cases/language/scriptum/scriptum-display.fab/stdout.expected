@@ -1,0 +1,15 @@
+yes=true
+no=false
+whole=2.0
+frac=2.5
+count=7
+word=hi
+computed=2.5
+negated=false
+literal=3.0
+true
+false
+2.0
+2.5
+7
+hi

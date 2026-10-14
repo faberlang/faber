@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/tensor/shape-holes-decline.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/shape-holes-decline.fab"
+
+
+[expect]
+check_only = true

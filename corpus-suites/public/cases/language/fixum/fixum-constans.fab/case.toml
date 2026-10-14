@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/fixum/fixum-constans.fab"
+group = "language"
+input_root = "corpus"
+input = "fixum/fixum-constans.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

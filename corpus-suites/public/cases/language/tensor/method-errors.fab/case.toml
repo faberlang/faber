@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/tensor/method-errors.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/method-errors.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "tensor conversion expected 4 elements, got 3"
+check_only = false

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/annotation-sugar/nucleum-fragment-braced.fab"
+group = "language"
+input_root = "corpus"
+input = "annotation-sugar/nucleum-fragment-braced.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

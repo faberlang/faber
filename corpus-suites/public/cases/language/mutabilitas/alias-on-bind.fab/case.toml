@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/mutabilitas/alias-on-bind.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/alias-on-bind.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

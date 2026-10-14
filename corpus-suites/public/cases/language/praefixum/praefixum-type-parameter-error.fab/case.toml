@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/praefixum/praefixum-type-parameter-error.fab"
+group = "language"
+input_root = "corpus"
+input = "praefixum/praefixum-type-parameter-error.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM064.praefixum_type_parameter"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM064.praefixum_type_parameter"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM064:praefixum_type_parameter"

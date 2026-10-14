@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/transfer/copy-into-rebind-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "transfer/copy-into-rebind-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM057.mut_tensor_param_rebind"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM057.mut_tensor_param_rebind"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM057:mut_tensor_param_rebind"

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/itera/apud-tabula.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/apud-tabula.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

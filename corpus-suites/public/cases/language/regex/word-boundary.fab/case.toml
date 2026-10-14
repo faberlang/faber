@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/regex/word-boundary.fab"
+group = "language"
+input_root = "corpus"
+input = "regex/word-boundary.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

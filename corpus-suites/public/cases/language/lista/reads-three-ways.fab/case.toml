@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/lista/reads-three-ways.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/reads-three-ways.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/generis/lectio-importata.fab"
+group = "language"
+input_root = "corpus"
+input = "generis/lectio-importata.fab"
+
+
+[expect]
+check_only = true

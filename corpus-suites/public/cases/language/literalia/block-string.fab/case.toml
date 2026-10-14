@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/literalia/block-string.fab"
+group = "language"
+input_root = "corpus"
+input = "literalia/block-string.fab"
+
+
+[expect]
+check_only = true

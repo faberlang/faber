@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/operatores/numerus-overflow-sizes.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/numerus-overflow-sizes.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "does not fit in `i8`"
+check_only = false

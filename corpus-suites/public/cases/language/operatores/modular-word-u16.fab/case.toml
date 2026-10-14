@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/modular-word-u16.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/modular-word-u16.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

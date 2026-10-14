@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/conversio/fallibilis.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/fallibilis.fab"
+
+
+[expect]
+check_only = true

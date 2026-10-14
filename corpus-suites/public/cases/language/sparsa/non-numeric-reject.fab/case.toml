@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/sparsa/non-numeric-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "sparsa/non-numeric-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM008.sparsa_element_non_numeric"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM008.sparsa_element_non_numeric"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM008:sparsa_element_non_numeric"

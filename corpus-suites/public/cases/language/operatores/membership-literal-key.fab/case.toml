@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/operatores/membership-literal-key.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/membership-literal-key.fab"
+
+
+[expect]
+check_only = true

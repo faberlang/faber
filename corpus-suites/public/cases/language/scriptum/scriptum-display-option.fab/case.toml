@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/scriptum/scriptum-display-option.fab"
+group = "language"
+input_root = "corpus"
+input = "scriptum/scriptum-display-option.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/arithmetic-elementwise.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/arithmetic-elementwise.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

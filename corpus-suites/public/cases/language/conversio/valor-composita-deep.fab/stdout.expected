@@ -1,0 +1,11 @@
+{"nomen": recta, "puncta": [{"x": 3, "y": 4}]}
+recta
+1
+{"basis": {"nomen": recta, "puncta": [{"x": 3, "y": 4}]}, "notae": [1, 2]}
+recta
+[{"x": 3, "y": 4}]
+1
+[1.0, 2.0]
+["none"]
+3
+[1.5, 2.5]

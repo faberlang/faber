@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/literalia/nihil.fab"
+group = "language"
+input_root = "corpus"
+input = "literalia/nihil.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/destructura/literal.fab"
+group = "language"
+input_root = "corpus"
+input = "destructura/literal.fab"
+
+
+[expect]
+check_only = true

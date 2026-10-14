@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/genus/creo.fab"
+group = "language"
+input_root = "corpus"
+input = "genus/creo.fab"
+
+
+[expect]
+check_only = true

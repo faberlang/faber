@@ -1,0 +1,6 @@
+Punctum { x = 1, nomen = "hello" }
+Vacuus {}
+Involucrum { p = Punctum { x = 1, nomen = "hello" }, gradus = [0, 1, 2], titulus = "t" }
+Nuntius.Pulsus { x = 1, y = "hello" }
+Nuntius.Finis
+hello

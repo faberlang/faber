@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/conversio.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/conversio.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

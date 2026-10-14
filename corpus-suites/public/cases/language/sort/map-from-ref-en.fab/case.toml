@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/sort/map-from-ref-en.fab"
+group = "language"
+input_root = "corpus"
+input = "sort/map-from-ref-en.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

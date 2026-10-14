@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/sparsa/conversio.fab"
+group = "language"
+input_root = "corpus"
+input = "sparsa/conversio.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

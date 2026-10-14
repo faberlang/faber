@@ -1,0 +1,5 @@
+caught direct narrowing
+caught propagated narrowing
+caught direct float overflow
+caught propagated NaN
+2

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/instans-valor-carrier.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/instans-valor-carrier.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

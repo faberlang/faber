@@ -1,0 +1,14 @@
+flag-i: accepted
+flag-m: accepted
+flag-s: accepted
+flag-x: accepted
+flag-neg-i: accepted
+flag-combo: accepted
+flag-combo-neg: accepted
+flag-x-match: y
+flag-x-space-lit: y
+flag-x-class-space: n
+flag-scoped-m: y
+flag-mid-pattern: y
+flag-mid-group: y
+flag-mid-group-leak: n

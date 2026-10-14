@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/modular-word-signed.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/modular-word-signed.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

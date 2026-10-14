@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/summa/summa-en-no-thread.fab"
+group = "language"
+input_root = "corpus"
+input = "summa/summa-en-no-thread.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

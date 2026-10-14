@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/lift-compare.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/lift-compare.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

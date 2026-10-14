@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/exitus/exitus.fab"
+group = "language"
+input_root = "corpus"
+input = "exitus/exitus.fab"
+
+
+[expect]
+check_only = true

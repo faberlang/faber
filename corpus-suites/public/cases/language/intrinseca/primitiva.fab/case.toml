@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/intrinseca/primitiva.fab"
+group = "language"
+input_root = "corpus"
+input = "intrinseca/primitiva.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

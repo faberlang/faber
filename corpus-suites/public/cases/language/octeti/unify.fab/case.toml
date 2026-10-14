@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/octeti/unify.fab"
+group = "language"
+input_root = "corpus"
+input = "octeti/unify.fab"
+
+
+[expect]
+check_only = true

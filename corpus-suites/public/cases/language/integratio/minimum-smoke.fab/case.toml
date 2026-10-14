@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/integratio/minimum-smoke.fab"
+group = "language"
+input_root = "corpus"
+input = "integratio/minimum-smoke.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

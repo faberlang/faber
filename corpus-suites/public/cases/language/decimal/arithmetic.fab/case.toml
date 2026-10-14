@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/decimal/arithmetic.fab"
+group = "language"
+input_root = "corpus"
+input = "decimal/arithmetic.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

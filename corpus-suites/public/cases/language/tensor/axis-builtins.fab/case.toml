@@ -1,0 +1,15 @@
+version = 1
+id = "corpus/tensor/axis-builtins.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/axis-builtins.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.roundtrip]
+outcome = "known-fail"
+phase = "emit"
+diagnostic_contains = "reducta_group_extent_unknown"

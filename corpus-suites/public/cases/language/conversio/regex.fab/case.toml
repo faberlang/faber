@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/regex.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/regex.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/literalia/optional-tuple.fab"
+group = "language"
+input_root = "corpus"
+input = "literalia/optional-tuple.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

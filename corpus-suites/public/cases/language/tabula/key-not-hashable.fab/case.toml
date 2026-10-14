@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/tabula/key-not-hashable.fab"
+group = "language"
+input_root = "corpus"
+input = "tabula/key-not-hashable.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM010.copia_element_not_hashable"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM010.copia_element_not_hashable"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM010:tabula_key_not_hashable"

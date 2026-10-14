@@ -1,0 +1,33 @@
+# CI for the public Faber repository (exported from the private development
+# repository; see scripta/export-public there). Builds faber, runs the
+# workspace tests and the public corpus suite on the reference runner.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build faber
+        run: cargo build --release -p faber
+      - name: Workspace tests
+        run: cargo test --workspace
+      - name: Public corpus suite on the runner
+        run: target/release/faber corpus corpus-suites/public --target runner > corpus-runner.jsonl
+      - name: Faber round trip
+        run: target/release/faber corpus corpus-suites/public --target roundtrip > corpus-roundtrip.jsonl

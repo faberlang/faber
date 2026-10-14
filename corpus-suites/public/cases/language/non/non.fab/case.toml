@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/non/non.fab"
+group = "language"
+input_root = "corpus"
+input = "non/non.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

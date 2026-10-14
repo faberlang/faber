@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/mori/mori.fab"
+group = "language"
+input_root = "corpus"
+input = "mori/mori.fab"
+
+
+[expect]
+check_only = true

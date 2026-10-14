@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/ad/sermo-conversio.fab"
+group = "language"
+input_root = "corpus"
+input = "ad/sermo-conversio.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

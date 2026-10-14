@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/conversio/octeti-lista.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/octeti-lista.fab"
+
+
+[expect]
+check_only = true

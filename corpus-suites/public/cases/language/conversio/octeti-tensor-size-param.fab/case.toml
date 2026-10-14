@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/octeti-tensor-size-param.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/octeti-tensor-size-param.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

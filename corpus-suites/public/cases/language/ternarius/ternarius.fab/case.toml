@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/ternarius/ternarius.fab"
+group = "language"
+input_root = "corpus"
+input = "ternarius/ternarius.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

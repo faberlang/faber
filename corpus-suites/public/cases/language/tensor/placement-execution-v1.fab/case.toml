@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/tensor/placement-execution-v1.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/placement-execution-v1.fab"
+
+
+[expect]
+check_only = true

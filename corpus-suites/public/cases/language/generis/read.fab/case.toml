@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/generis/read.fab"
+group = "language"
+input_root = "corpus"
+input = "generis/read.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

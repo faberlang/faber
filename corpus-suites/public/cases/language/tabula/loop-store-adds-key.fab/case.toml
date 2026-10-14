@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tabula/loop-store-adds-key.fab"
+group = "language"
+input_root = "corpus"
+input = "tabula/loop-store-adds-key.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

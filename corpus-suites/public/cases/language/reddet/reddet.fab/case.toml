@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/reddet/reddet.fab"
+group = "language"
+input_root = "corpus"
+input = "reddet/reddet.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

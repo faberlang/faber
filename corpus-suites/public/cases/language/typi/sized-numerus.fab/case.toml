@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/typi/sized-numerus.fab"
+group = "language"
+input_root = "corpus"
+input = "typi/sized-numerus.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

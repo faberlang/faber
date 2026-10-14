@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/sort/body-stable.fab"
+group = "language"
+input_root = "corpus"
+input = "sort/body-stable.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

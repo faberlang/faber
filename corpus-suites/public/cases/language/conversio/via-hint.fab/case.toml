@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/via-hint.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/via-hint.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

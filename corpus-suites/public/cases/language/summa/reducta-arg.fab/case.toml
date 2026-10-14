@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/summa/reducta-arg.fab"
+group = "language"
+input_root = "corpus"
+input = "summa/reducta-arg.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/protecta/protecta.fab"
+group = "language"
+input_root = "corpus"
+input = "protecta/protecta.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM018.protecta_reserved"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM018.protecta_reserved"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM018:protecta_reserved"

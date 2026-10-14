@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/bounded/itera-ex-air-scalar-buffers.fab"
+group = "language"
+input_root = "corpus"
+input = "bounded/itera-ex-air-scalar-buffers.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM059.runtime_conversion"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM059.runtime_conversion"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM059:runtime_conversion"

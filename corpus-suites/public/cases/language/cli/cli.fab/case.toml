@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/cli/cli.fab"
+group = "language"
+input_root = "corpus"
+input = "cli/cli.fab"
+
+args = ["greet", "Marcus"]
+
+[expect]
+check_only = true

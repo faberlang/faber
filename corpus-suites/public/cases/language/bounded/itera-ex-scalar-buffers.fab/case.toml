@@ -1,0 +1,14 @@
+version = 1
+id = "corpus/bounded/itera-ex-scalar-buffers.fab"
+group = "language"
+input_root = "corpus"
+input = "bounded/itera-ex-scalar-buffers.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "no entry function in MIR program"

@@ -1,0 +1,19 @@
+version = 1
+id = "corpus/conversio/tensor-data-edge.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/tensor-data-edge.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "known-fail"
+phase = "emit"
+diagnostic_contains = "invalid MIR: eligible lista-to-tensor conversio must lower to tensor_from_flat, not runtime convert"
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "invalid MIR: eligible lista-to-tensor conversio must lower to tensor_from_flat, not runtime convert"

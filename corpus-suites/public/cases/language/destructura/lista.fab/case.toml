@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/destructura/lista.fab"
+group = "language"
+input_root = "corpus"
+input = "destructura/lista.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

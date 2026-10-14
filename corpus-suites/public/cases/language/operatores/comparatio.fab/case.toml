@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/comparatio.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/comparatio.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

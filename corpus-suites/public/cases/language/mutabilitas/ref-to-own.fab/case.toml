@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/mutabilitas/ref-to-own.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/ref-to-own.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM057.ref_to_mut_or_own_position"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM057.ref_to_mut_or_own_position"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM057:ref_to_mut_or_own_position"

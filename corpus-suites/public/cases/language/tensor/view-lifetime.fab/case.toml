@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/tensor/view-lifetime.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/view-lifetime.fab"
+
+
+[expect]
+check_only = true

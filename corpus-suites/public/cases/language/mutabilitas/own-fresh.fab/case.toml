@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/mutabilitas/own-fresh.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/own-fresh.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

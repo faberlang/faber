@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/clausura/clausura.fab"
+group = "language"
+input_root = "corpus"
+input = "clausura/clausura.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

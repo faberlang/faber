@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/mutabilitas/call-marker.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/call-marker.fab"
+
+
+[expect]
+check_only = true

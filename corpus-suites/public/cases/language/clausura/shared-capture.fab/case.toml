@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/clausura/shared-capture.fab"
+group = "language"
+input_root = "corpus"
+input = "clausura/shared-capture.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

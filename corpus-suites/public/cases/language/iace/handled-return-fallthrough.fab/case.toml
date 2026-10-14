@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/iace/handled-return-fallthrough.fab"
+group = "language"
+input_root = "corpus"
+input = "iace/handled-return-fallthrough.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

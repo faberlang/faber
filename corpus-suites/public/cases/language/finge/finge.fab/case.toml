@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/finge/finge.fab"
+group = "language"
+input_root = "corpus"
+input = "finge/finge.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

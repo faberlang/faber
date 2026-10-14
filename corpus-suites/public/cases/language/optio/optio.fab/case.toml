@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/optio/optio.fab"
+group = "language"
+input_root = "corpus"
+input = "optio/optio.fab"
+
+
+[expect]
+check_only = true

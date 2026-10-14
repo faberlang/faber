@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/bits/bits-operations-la.fab"
+group = "language"
+input_root = "corpus"
+input = "bits/bits-operations-la.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

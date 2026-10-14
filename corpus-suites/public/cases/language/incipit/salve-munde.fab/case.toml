@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/incipit/salve-munde.fab"
+group = "language"
+input_root = "corpus"
+input = "incipit/salve-munde.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

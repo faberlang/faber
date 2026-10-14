@@ -1,0 +1,17 @@
+1
+3
+5
+7
+9
+exterior←0, interior←1
+exterior←0, interior←2
+exterior←0, interior←4
+exterior←0, interior←5
+exterior←1, interior←1
+exterior←1, interior←2
+exterior←1, interior←4
+exterior←1, interior←5
+exterior←2, interior←1
+exterior←2, interior←2
+exterior←2, interior←4
+exterior←2, interior←5

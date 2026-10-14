@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/lege/lege.fab"
+group = "language"
+input_root = "corpus"
+input = "lege/lege.fab"
+
+
+[expect]
+check_only = true

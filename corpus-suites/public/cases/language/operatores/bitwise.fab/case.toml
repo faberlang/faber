@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/bitwise.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/bitwise.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

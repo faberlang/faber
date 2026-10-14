@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/tensor/axis-builtins-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/axis-builtins-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "axis_reduction_out_of_range"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "axis_reduction_out_of_range"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "axis_reduction_out_of_range"

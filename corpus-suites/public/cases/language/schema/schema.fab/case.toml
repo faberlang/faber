@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/schema/schema.fab"
+group = "language"
+input_root = "corpus"
+input = "schema/schema.fab"
+
+
+[expect]
+check_only = true

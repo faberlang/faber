@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/tabula-lista.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/tabula-lista.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/ad/sermo-close.fab"
+group = "language"
+input_root = "corpus"
+input = "ad/sermo-close.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

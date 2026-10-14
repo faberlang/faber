@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/itera/lockstep-n2.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/lockstep-n2.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

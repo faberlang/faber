@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/optional-chain.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/optional-chain.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

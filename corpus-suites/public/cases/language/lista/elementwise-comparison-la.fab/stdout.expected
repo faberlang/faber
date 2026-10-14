@@ -1,0 +1,10 @@
+[verum, falsum, falsum]
+[falsum, verum, falsum]
+[verum, falsum, verum]
+[falsum, verum, verum]
+[falsum, falsum, verum]
+[verum, verum, falsum]
+[verum, falsum, verum]
+[falsum, verum, verum]
+[falsum, verum, verum]
+falsum

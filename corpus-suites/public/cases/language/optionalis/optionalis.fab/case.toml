@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/optionalis/optionalis.fab"
+group = "language"
+input_root = "corpus"
+input = "optionalis/optionalis.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

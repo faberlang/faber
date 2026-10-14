@@ -1,0 +1,9 @@
+version = 1
+id = "product/reader-locale/zh-Hans"
+group = "product"
+input_root = "product"
+input = "reader-locale/zh-Hans"
+
+
+[expect]
+check_only = true

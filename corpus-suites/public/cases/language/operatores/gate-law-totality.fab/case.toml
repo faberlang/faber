@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/gate-law-totality.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/gate-law-totality.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/sort/ref-list-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "sort/ref-list-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "sort_ref_requires_map"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "sort_ref_requires_map"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "sort_ref_requires_map"

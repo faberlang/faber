@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/lista-tensor-shaped.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/lista-tensor-shaped.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

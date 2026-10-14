@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/regex/anchors.fab"
+group = "language"
+input_root = "corpus"
+input = "regex/anchors.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

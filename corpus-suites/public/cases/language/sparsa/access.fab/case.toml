@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/sparsa/access.fab"
+group = "language"
+input_root = "corpus"
+input = "sparsa/access.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

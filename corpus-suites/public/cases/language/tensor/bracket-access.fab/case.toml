@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/bracket-access.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/bracket-access.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

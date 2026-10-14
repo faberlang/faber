@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/lista/elementwise-operators.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/elementwise-operators.fab"
+
+
+[expect]
+check_only = true

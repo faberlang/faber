@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/genus/inferred-constructor-json-zero.fab"
+group = "language"
+input_root = "corpus"
+input = "genus/inferred-constructor-json-zero.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

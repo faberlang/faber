@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/lista/methodi-copiae.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/methodi-copiae.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

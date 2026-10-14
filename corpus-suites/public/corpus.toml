@@ -1,0 +1,37 @@
+# Public corpus suite (Faber 2 campaign A7): the language and product cases
+# that ship in the public repository, on the targets a build from public
+# source provides. Generated cases: scripta/generate-corpus-suite.py --suite public.
+version = 1
+cases_dir = "cases"
+
+[roots]
+corpus = "../../corpus"
+product = "../../corpus-product"
+
+[targets.runner]
+
+[targets.roundtrip]
+mode = "roundtrip"
+
+[targets.mir]
+mode = "mir"
+
+[expectations.language.runner]
+outcome = "pass"
+
+[expectations.language.roundtrip]
+outcome = "pass"
+
+[expectations.language.mir]
+outcome = "pass"
+
+[expectations.product.runner]
+outcome = "pass"
+
+[expectations.product.roundtrip]
+outcome = "not-applicable"
+reason = "package source is not a single-file roundtrip input"
+
+[expectations.product.mir]
+outcome = "not-applicable"
+reason = "MIR text target is file-oriented; package coverage belongs to package targets"

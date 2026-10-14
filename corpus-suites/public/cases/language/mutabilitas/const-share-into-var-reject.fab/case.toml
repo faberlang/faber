@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/mutabilitas/const-share-into-var-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/const-share-into-var-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "const_shared_into_var"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "const_shared_into_var"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "const_shared_into_var"

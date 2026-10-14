@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/keyword-as-ident/print-binding.fab"
+group = "language"
+input_root = "corpus"
+input = "keyword-as-ident/print-binding.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

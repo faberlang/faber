@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/meta/reice.fab"
+group = "language"
+input_root = "corpus"
+input = "meta/reice.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/regex/unicode-classes.fab"
+group = "language"
+input_root = "corpus"
+input = "regex/unicode-classes.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

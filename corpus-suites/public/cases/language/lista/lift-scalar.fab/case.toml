@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/lista/lift-scalar.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/lift-scalar.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/incipit/functionibus.fab"
+group = "language"
+input_root = "corpus"
+input = "incipit/functionibus.fab"
+
+
+[expect]
+check_only = true
