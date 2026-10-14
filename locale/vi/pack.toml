@@ -3517,7 +3517,7 @@ message = "cần ']' để kết thúc pattern binding của mảng"
 message = "cần dấu ngoặc nhọn mở cho pattern binding của object"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
-message = "cần dấu ngoặc nhọn đóng đóng cho pattern binding của object"
+message = "cần dấu ngoặc nhọn đóng cho pattern binding của object"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
 message = "cần '(' trước các tham số của khai báo hàm"
