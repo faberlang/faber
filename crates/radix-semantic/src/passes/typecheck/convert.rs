@@ -816,6 +816,12 @@ impl TypeChecker<'_> {
             return error_ty;
         }
 
+        if let Some(result_ty) =
+            self.check_numeric_to_bounded_octeti_conversio(source_ty, target_resolved, params, span)
+        {
+            return result_ty;
+        }
+
         if let Some(error_ty) = self.check_rejected_primitive_conversio(
             source,
             source_ty,
@@ -1347,6 +1353,57 @@ impl TypeChecker<'_> {
         }
         self.invalid_conversion(ISSUE_UNSUPPORTED_CONVERSIO, span);
         Some(self.error_type)
+    }
+
+    /// `W ↦ octeti<N> via Be|Le` is the infallible write inverse of
+    /// `octeti ↦ W` (need, ruling E1). The byte length is exactly the
+    /// element width, so the row takes no `⊥` recovery and no failure channel.
+    /// A source without an exact endian width (`int`, `u8`/`i8`, `f16`,
+    /// `bf16`, policy floats) or a missing/foreign hint stays with
+    /// `numeric_to_octeti_unspecified`; a capacity that is not the literal
+    /// width is `octeti_endian_width_mismatch`. An 8-bit source is not built
+    /// (ruling B6: an 8-bit value has no byte order).
+    fn check_numeric_to_bounded_octeti_conversio(
+        &mut self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        params: &[Symbol],
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let Type::BoundedOcteti { capacity } = self
+            .types
+            .get(self.resolve_inferred_type(target_resolved))
+            .clone()
+        else {
+            return None;
+        };
+        if self.is_inf_type(source_ty)
+            || !matches!(
+                self.primitive_conversio_family(source_ty),
+                PrimitiveConversioFamily::Numerus | PrimitiveConversioFamily::Fractus
+            )
+        {
+            return None;
+        }
+        let Some(width) =
+            endian_read_width_bytes(self.types.get(self.resolve_inferred_type(source_ty)))
+        else {
+            self.invalid_conversion(ISSUE_NUMERIC_TO_OCTETI_UNSPECIFIED, span);
+            return Some(self.error_type);
+        };
+        if !self.conversio_has_endian_hint(params) {
+            self.invalid_conversion(ISSUE_NUMERIC_TO_OCTETI_UNSPECIFIED, span);
+            return Some(self.error_type);
+        }
+        let IndexExpr::Literal(capacity) = self.types.get_index(capacity).clone() else {
+            self.invalid_conversion(ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH, span);
+            return Some(self.error_type);
+        };
+        if usize::try_from(capacity) != Ok(width) {
+            self.invalid_conversion(ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH, span);
+            return Some(self.error_type);
+        }
+        Some(target_resolved)
     }
 
     /// `tensor<E, [d1, ..]> ↦ octeti via Be|Le` is the exact inverse of
