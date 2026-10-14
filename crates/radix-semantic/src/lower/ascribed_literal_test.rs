@@ -26,7 +26,7 @@ fn is_genus(types: &TypeTable, ty: crate::TypeId) -> bool {
 }
 
 fn assert_constructs_genus(source: &str, fields: usize) {
-    let unit = test_support::analyze_ok(source);
+    let unit = test_support::analyze_ok_la(source);
     let init = entry_init(&unit);
     let HirExpressionKind::Verte {
         target,
@@ -58,7 +58,7 @@ fn inferred_constructor_ascribed_to_genus_constructs_the_genus() {
 
 #[test]
 fn unknown_field_literal_ascribed_to_genus_is_named_error() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         &format!("{GENUS} incipit {{ fixum P p ← {{ bogus = 1 }} ∷ P nota p.x }}"),
         "unknown_field",
     );
@@ -67,7 +67,7 @@ fn unknown_field_literal_ascribed_to_genus_is_named_error() {
 #[test]
 fn missing_required_field_literal_ascribed_to_genus_is_named_error() {
     const REQUIRED: &str = "genus Q { varia numerus x varia numerus y = 0 }";
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         &format!("{REQUIRED} incipit {{ fixum Q q ← {{ y = 1 }} ∷ Q nota q.y }}"),
         "missing_required_struct_field",
     );
@@ -75,7 +75,7 @@ fn missing_required_field_literal_ascribed_to_genus_is_named_error() {
 
 #[test]
 fn quoted_key_literal_ascribed_to_genus_is_named_error() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         &format!("{GENUS} incipit {{ fixum P p ← {{ \"x\": 1 }} ∷ P nota p.x }}"),
         "inferred_constructor_entries_need_map",
     );
@@ -83,7 +83,7 @@ fn quoted_key_literal_ascribed_to_genus_is_named_error() {
 
 #[test]
 fn quoted_key_literal_ascribed_to_map_is_still_accepted() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit { fixum tabula<textus, numerus> m ← { \"a\": 1 } ∷ tabula<textus, numerus> nota m }",
     );
 }
