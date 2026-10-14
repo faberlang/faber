@@ -112,3 +112,33 @@ functio jobs() argumenta args {}
         assert!(option.flag, "{} did not lower as a flag", option.binding);
     }
 }
+
+#[test]
+fn cli_mode_marker_on_braced_option_type_is_unsupported_type_shape() {
+    let analysis = analyze_mounted(
+        r#"
+@ imperium "jobs"
+@ optio { binding = braced, longum = "braced", typus = de bivalens }
+functio jobs() argumenta args {}
+"#,
+        &["tool"],
+    );
+
+    let found = issues(&analysis);
+    assert!(found.contains(&"unsupported_type_shape"), "{found:?}");
+}
+
+#[test]
+fn cli_mode_marker_on_sugar_option_type_is_unsupported_type_shape() {
+    let analysis = analyze_mounted(
+        r#"
+@ imperium "jobs"
+@ optio sugar longum "sugar" typus de bivalens
+functio jobs() argumenta args {}
+"#,
+        &["tool"],
+    );
+
+    let found = issues(&analysis);
+    assert!(found.contains(&"unsupported_type_shape"), "{found:?}");
+}
