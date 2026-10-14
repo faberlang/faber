@@ -6,9 +6,10 @@
 
 #[cfg(feature = "mir-metal")]
 use super::cmd::compile_package_metal_text;
+#[cfg(feature = "hir-ts")]
+use super::{build_browser_product, build_browser_product_static_assets};
 use super::{
-    ManifestProductEmit, ManifestProductKind, build_browser_product,
-    build_browser_product_static_assets, config_with_locale, emit_generated_crate,
+    ManifestProductEmit, ManifestProductKind, config_with_locale, emit_generated_crate,
     emit_generated_crate_with_runtime_plan, invoke_cargo_build, library_resolver_from_config,
     package_host_selection_diagnostic, read_manifest, use_package_compiler_from_args,
     validate_manifest, verify_library_bindings, with_lowered_package_mir,
@@ -12147,6 +12148,7 @@ fn g10_web1_tela_package_exports_controller_contract() {
     assert_eq!(identity.export_name, "WebController");
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web2_product_static_assets_are_deterministic_and_manifested() {
     let dir = test_temp_dir("g10-web2-static-assets");
@@ -12205,6 +12207,7 @@ fn g10_web2_product_static_assets_are_deterministic_and_manifested() {
     assert!(first_manifest.contains("public/logo.svg"));
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web2_product_static_assets_fail_closed_on_missing_root_collision_and_stale_output() {
     let missing = test_temp_dir("g10-web2-missing-root");
@@ -12491,6 +12494,7 @@ import from "tela:web" web
 import from "tela:dom" d
 
 @ WebController { selector = "[data-faber=shell]" }
+#[cfg(feature = "hir-ts")]
 fn shell(d.Scope scope) → void {
   print d.require(scope, "button")
 }
@@ -12538,6 +12542,7 @@ fn shell(d.Scope scope) → void {
     );
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web3_rejects_duplicate_mount_and_invalid_selector() {
     let root = test_temp_dir("g10-web3-controller-rejects");
@@ -12555,6 +12560,7 @@ import from "tela:dom" d
 fn one(d.Scope scope) → void {}
 
 @ WebController { selector = "#shell" }
+#[cfg(feature = "hir-ts")]
 fn two(d.Scope scope) → void {}
 "##,
     );
@@ -12577,6 +12583,7 @@ import from "tela:web" web
 import from "tela:dom" d
 
 @ WebController { selector = "main shell" }
+#[cfg(feature = "hir-ts")]
 fn shell(d.Scope scope) → void {}
 "#,
     );
@@ -12594,6 +12601,7 @@ fn shell(d.Scope scope) → void {}
     ));
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web3_rejects_local_web_controller_shadowing() {
     // Package defines its own @annotatio WebController locally — no web:web import.
@@ -12653,6 +12661,7 @@ functio shell(Scope scope) → vacuum {}
     ));
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web3_rejects_local_scope_shadowing() {
     // Package imports tela:web legitimately for WebController, but defines its
@@ -12676,6 +12685,7 @@ fn g10_web3_rejects_local_scope_shadowing() {
     ));
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web3_rejects_missing_controllers() {
     // Package imports tela:web legitimately but declares no `@ WebController`
@@ -12693,6 +12703,7 @@ fn g10_web3_rejects_missing_controllers() {
 import from "tela:web" web
 import from "tela:dom" d
 
+#[cfg(feature = "hir-ts")]
 fn helper(d.Scope scope) → void {
   print d.require(scope, "button")
 }
@@ -12731,6 +12742,7 @@ import from "tela:web" web
 import from "tela:dom" d
 
 @ WebController { selector = "[data-faber=shell]" }
+#[cfg(feature = "hir-ts")]
 fn shell(d.Scope scope) → void {}
 "#,
     );
@@ -12767,6 +12779,7 @@ fn shell(d.Scope scope) → void {}
     assert_eq!(build.controllers.len(), 1);
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web3_rejects_local_web_controller_shadowing_with_tela_import() {
     // web-mig U2: a tela-importing package that defines its own local
@@ -12789,6 +12802,7 @@ class WebController {
 }
 
 @ WebController { selector = "#shell" }
+#[cfg(feature = "hir-ts")]
 fn shell(d.Scope scope) → void {}
 "##,
     );
@@ -12806,6 +12820,7 @@ fn shell(d.Scope scope) → void {}
     ));
 }
 
+#[cfg(feature = "hir-ts")]
 #[test]
 fn g10_web3_rejects_missing_controllers_with_tela_import() {
     // web-mig U2: a package imports tela:web + tela:dom legitimately but
@@ -12822,6 +12837,7 @@ fn g10_web3_rejects_missing_controllers_with_tela_import() {
 import from "tela:web" web
 import from "tela:dom" d
 
+#[cfg(feature = "hir-ts")]
 fn helper(d.Scope scope) → void {}
 "#,
     );
@@ -12866,6 +12882,7 @@ fn frame_controller(d.Scope scope) → void {
 }
 
 @ WebController { selector = "#submit-demo" }
+#[cfg(feature = "hir-ts")]
 fn submit_controller(d.Scope scope) → void {
   const d.Element form ← d.require(scope, ".submit-form")
   print d.on_submit(form, d.SubmitOptions { prevent_default = true }, (d.Element el) → void ∴ d.text_set(el, "submitted"))

@@ -57,6 +57,7 @@ pub mod mir;
 #[cfg(test)]
 // WHY: packed-projection seam has no production caller yet; exercised by packed_projection_test.rs
 mod packed_projection;
+#[cfg(feature = "hir-ts")]
 mod product;
 mod runtime_dependency;
 mod runtime_sources;
@@ -109,8 +110,10 @@ pub use manifest::{manifest_device_choice, resolve_device_selection};
 pub use mir::run_fmir_image_bytes_with_stdio;
 #[cfg(feature = "runner")]
 pub use mir::with_lowered_package_mir;
+#[cfg(feature = "hir-ts")]
 pub(crate) use product::build_browser_product_with_postprocess;
 #[cfg(test)]
+#[cfg(feature = "hir-ts")]
 pub(crate) use product::{build_browser_product, build_browser_product_static_assets};
 use radix::module::codegen::Target;
 use radix::module::diagnostics::Diagnostic;

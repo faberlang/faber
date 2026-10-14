@@ -397,6 +397,8 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
         }
     }
 
+    // WHY: browser products are TypeScript-target builds (private backend).
+    #[cfg(feature = "hir-ts")]
     if is_package && target == Target::HirTypeScript {
         let layout = match discover_build_layout(&input_path, &command.out_dir) {
             Ok(l) => l,
