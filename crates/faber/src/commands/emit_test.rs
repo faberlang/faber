@@ -155,7 +155,12 @@ fn emit_retry_skips_package_analysis_for_unrelated_error() {
     );
 }
 
-#[cfg(all(feature = "hir-ts", feature = "hir-go", feature = "hir-python", feature = "mir-wasm"))]
+#[cfg(all(
+    feature = "hir-ts",
+    feature = "hir-go",
+    feature = "hir-python",
+    feature = "mir-wasm"
+))]
 #[test]
 fn emit_retry_matches_single_file_output_for_plain_imports() {
     let dir = tempfile::tempdir().expect("temp dir");

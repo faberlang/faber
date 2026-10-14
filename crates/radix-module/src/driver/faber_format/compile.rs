@@ -81,7 +81,11 @@ pub fn reemit_faber(source_session: &Session, emit_pack: &LocalePack, name: &str
     // Reconcile finalized HIR witnesses before the emitter indexes authored
     // forms. This keeps direct re-emission on the same artifact contract as
     // the FHIR writer without changing the semantic analysis pass.
-    crate::hir::presentation_witness::normalize_presentation_witnesses(&analysis.hir, &mut analysis.presentation, &analysis.types);
+    crate::hir::presentation_witness::normalize_presentation_witnesses(
+        &analysis.hir,
+        &mut analysis.presentation,
+        &analysis.types,
+    );
 
     // An explicit reader pack drives a reader-locale emit: keywords localize
     // but glyph-shape sugar (e.g. template application `"…"(args)`) is kept.

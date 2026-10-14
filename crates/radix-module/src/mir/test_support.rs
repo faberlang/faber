@@ -4,15 +4,15 @@
 //! extract emitted text or structured diagnostic facts. Target-specific binding
 //! assertions stay in each `*_text_test.rs` module.
 
+#[cfg(feature = "mir-metal")]
+use crate::MetalTextOutput;
+#[cfg(feature = "mir-wgsl")]
+use crate::WgslTextOutput;
 use crate::codegen::Target;
 use crate::diagnostics::Diagnostic;
 use crate::driver::ModuleCompileRequest;
 use crate::driver::compile;
 use crate::test_support::test_session;
-#[cfg(feature = "mir-metal")]
-use crate::MetalTextOutput;
-#[cfg(feature = "mir-wgsl")]
-use crate::WgslTextOutput;
 use crate::{CompileResult, Output};
 
 /// Format one diagnostic with code, issue, and named args (MIR probe error strings).

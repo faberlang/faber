@@ -180,10 +180,8 @@ fn non_renderer_tests_do_not_assert_diagnostic_text() {
 fn diagnostic_text_scan_skips_symlinks_and_agent_dirs() {
     use std::os::unix::fs::symlink;
 
-    let base = std::env::temp_dir().join(format!(
-        "radix-hygiene-symlink-scan-{}",
-        std::process::id()
-    ));
+    let base =
+        std::env::temp_dir().join(format!("radix-hygiene-symlink-scan-{}", std::process::id()));
     let _ = fs::remove_dir_all(&base);
     let root = base.join("workspace");
     let outside = base.join("outside");

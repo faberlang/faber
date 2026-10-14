@@ -433,7 +433,11 @@ pub fn generate_from_analyzed_with_options(
         Target::HirFaber => {
             let imported_spellings = analysis.resolver.imported_spellings(&analysis.interner);
             let mut presentation = analysis.presentation.clone();
-            crate::hir::presentation_witness::normalize_presentation_witnesses(&analysis.hir, &mut presentation, &analysis.types);
+            crate::hir::presentation_witness::normalize_presentation_witnesses(
+                &analysis.hir,
+                &mut presentation,
+                &analysis.types,
+            );
             let mut by_def = imported_spellings.by_def;
             by_def.extend(
                 analysis

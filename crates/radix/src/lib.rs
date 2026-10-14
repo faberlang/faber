@@ -17,6 +17,8 @@ pub mod module {
         AnalyzeRequest, AnalyzedModule, ModuleCompileRequest, ModuleImportContract, TargetBindings,
         analyze_source,
     };
+    #[cfg(feature = "mir-llvm")]
+    pub use radix_module::llvm_host;
     #[cfg(feature = "mir-core")]
     pub use radix_module::mir;
     pub use radix_module::{
@@ -24,8 +26,6 @@ pub mod module {
         PythonOutput, RustOutput, Session, SwiftOutput, Target, TypeScriptOutput, WarnPolicy,
         apply_warn_policy, is_known_diagnostic_code,
     };
-    #[cfg(feature = "mir-llvm")]
-    pub use radix_module::llvm_host;
     pub use radix_module::{
         abi, aspect, builtins, cli_descriptor, codegen, diagnostics, driver, file_interface, hir,
         intrinsics, kernel, lexer, live_tuus_cursor, locale, parser, runtime_contract, semantic,

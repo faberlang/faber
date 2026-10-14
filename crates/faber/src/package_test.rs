@@ -6,16 +6,16 @@
 
 #[cfg(feature = "mir-metal")]
 use super::cmd::compile_package_metal_text;
-#[cfg(feature = "hir-ts")]
-use super::{build_browser_product, build_browser_product_static_assets};
+#[cfg(feature = "hir-rust")]
+use super::verify_library_binding_shapes;
 use super::{
     ManifestProductEmit, ManifestProductKind, config_with_locale, emit_generated_crate,
     emit_generated_crate_with_runtime_plan, invoke_cargo_build, library_resolver_from_config,
     package_host_selection_diagnostic, read_manifest, use_package_compiler_from_args,
     validate_manifest, verify_library_bindings, with_lowered_package_mir,
 };
-#[cfg(feature = "hir-rust")]
-use super::verify_library_binding_shapes;
+#[cfg(feature = "hir-ts")]
+use super::{build_browser_product, build_browser_product_static_assets};
 use super::{cmd::use_package_compiler, faber_analysis_seams, faber_emission_seams};
 use radix::program::analyze::AnalyzedProgram;
 use radix::program::discovery::{
