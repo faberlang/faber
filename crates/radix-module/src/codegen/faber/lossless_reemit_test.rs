@@ -20,14 +20,10 @@ fn pack(locale: &str) -> LocalePack {
 }
 
 fn reemit(source: &str, to: &str) -> String {
-    // Pin the Latin reader pack: `+++ locale = "…" +++` still wins, but a
-    // source with no frontmatter must not be lexed by the process-wide
-    // `RADIX_DEFAULT_CODE_LOCALE` staging switch another test toggles.
     let session = Session::new(
         Config::default()
             .with_target(Target::HirFaber)
-            .with_dev_locale_root()
-            .with_locale_pack(crate::locale::latin_locale_pack()),
+            .with_dev_locale_root(),
     );
     let result = reemit_faber(&session, &pack(to), "test.fab", source);
     assert!(

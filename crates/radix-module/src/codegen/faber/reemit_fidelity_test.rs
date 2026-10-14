@@ -16,15 +16,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Source session for the Latin-authored fixtures here: pin the built-in
-/// Latin pack so a source with no frontmatter lexes as Latin regardless of
-/// the process-wide `RADIX_DEFAULT_CODE_LOCALE` staging switch.
 fn latin_source_session() -> Session {
-    Session::new(
-        Config::default()
-            .with_dev_locale_root()
-            .with_locale_pack(crate::locale::latin_locale_pack()),
-    )
+    Session::new(Config::default().with_dev_locale_root())
 }
 
 fn emit_once(source: &str) -> String {
