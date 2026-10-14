@@ -1548,7 +1548,7 @@ incipit {
     assert!(
         output
             .code
-            .contains("let name: String = \"Marcus\".to_string();")
+            .contains("let l_name: String = \"Marcus\".to_string();")
     );
     assert!(output.code.contains("return \"yes\".to_string();"));
     assert!(
@@ -1574,9 +1574,9 @@ fn rust_output_wraps_optional_local_initializers_in_some() {
     assert!(
         output
             .code
-            .contains("let actualName: Option<String> = Some(\"Marcus\".to_string());")
+            .contains("let l_actualName: Option<String> = Some(\"Marcus\".to_string());")
     );
-    assert!(output.code.contains("let maybe: Option<String> = None;"));
+    assert!(output.code.contains("let l_maybe: Option<String> = None;"));
 }
 
 #[test]
@@ -1606,7 +1606,7 @@ fn rust_output_uses_debug_format_for_collection_scribe() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output.code.contains("println!(\"{names:?}\");"));
+    assert!(output.code.contains("println!(\"{l_names:?}\");"));
 }
 
 #[test]
@@ -1623,12 +1623,12 @@ fn rust_output_uses_scalar_display_helpers_for_scribe() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output.code.contains("faber::display::fractus(f)"));
-    assert!(output.code.contains("faber::display::bivalens(b)"));
+    assert!(output.code.contains("faber::display::fractus(l_f)"));
+    assert!(output.code.contains("faber::display::bivalens(l_b)"));
     assert!(
         output
             .code
-            .contains("faber::display::text_payload((a).as_ref())")
+            .contains("faber::display::text_payload((l_a).as_ref())")
     );
 }
 
@@ -1739,7 +1739,7 @@ fn rust_output_uses_format_macro_for_scriptum() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output.code.contains("println!(\"valor: {value}\");"));
+    assert!(output.code.contains("println!(\"valor: {l_value}\");"));
 }
 
 #[test]
@@ -1757,7 +1757,7 @@ fn rust_output_uses_zero_based_numbered_scriptum_placeholders() {
     assert!(
         output
             .code
-            .contains("println!(\"ordo: {second}, {first}\");")
+            .contains("println!(\"ordo: {l_second}, {l_first}\");")
     );
 }
 
@@ -1772,7 +1772,7 @@ fn rust_output_uses_string_literal_format_application() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output.code.contains("println!(\"valor: {value}\");"));
+    assert!(output.code.contains("println!(\"valor: {l_value}\");"));
 }
 
 #[test]
@@ -1790,7 +1790,7 @@ fn rust_output_uses_numbered_string_literal_format_application() {
     assert!(
         output
             .code
-            .contains("println!(\"ordo: {second}, {first}\");")
+            .contains("println!(\"ordo: {l_second}, {l_first}\");")
     );
 }
 
@@ -1841,8 +1841,8 @@ incipit {
     );
     let output = super::rust_output(result);
     assert!(output.code.contains("fn answer() -> i64"));
-    assert!(output.code.contains("let name: String"));
-    assert!(output.code.contains("let mut count: i64"));
+    assert!(output.code.contains("let l_name: String"));
+    assert!(output.code.contains("let mut l_count: i64"));
 }
 
 // ── smoke guards (slow, spawn external toolchains) ──
