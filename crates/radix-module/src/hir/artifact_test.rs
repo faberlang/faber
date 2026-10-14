@@ -364,7 +364,11 @@ fn resolved_use_locals_survive_the_fhir_round_trip() {
     use crate::hir::serialize::from_analyzed;
 
     let source = include_str!("../../../../corpus/importa/selective-import.fab");
-    let session = Session::new(Config::default().with_dev_locale_root().with_target(Target::HirRust));
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
     let original = analyze_source(&session, "selective-import.fab", source, AnalyzeRequest::default())
         .expect("selective import fixture analyzes");
 
@@ -390,7 +394,11 @@ fn selective_import_rust_emit_is_identical_after_load() {
     use crate::hir::serialize::from_analyzed;
 
     let source = include_str!("../../../../corpus/importa/selective-import.fab");
-    let session = Session::new(Config::default().with_dev_locale_root().with_target(Target::HirRust));
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
     let direct = analyze_source(&session, "selective-import.fab", source, AnalyzeRequest::default())
         .expect("selective import fixture analyzes");
 

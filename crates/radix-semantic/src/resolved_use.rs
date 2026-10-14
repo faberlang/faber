@@ -119,14 +119,12 @@ impl ResolvedUseIndex {
             // as used. A use site carries its local def even when its key
             // is portable; a local key without a carried def names the same
             // definition directly.
-            let local = use_site
-                .local
-                .or(match &use_site.key {
-                    ResolvedUseKey::Local(def) if use_site.kind != ResolvedUseKind::ImportBinding => {
-                        Some(*def)
-                    }
-                    _ => None,
-                });
+            let local = use_site.local.or(match &use_site.key {
+                ResolvedUseKey::Local(def) if use_site.kind != ResolvedUseKind::ImportBinding => {
+                    Some(*def)
+                }
+                _ => None,
+            });
             if let Some(def) = local {
                 by_local.entry(def).or_default().push(idx);
             }
