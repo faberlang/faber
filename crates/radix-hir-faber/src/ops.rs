@@ -35,6 +35,14 @@ impl super::FaberCodegen<'_> {
                 14
             }
             HirExpressionKind::Block(..) if self.hoisted_numeric_twin(expr).is_some() => 14,
+            // An authored axis-reduction call re-emits as a postfix method
+            // call, whatever the expansion node (`Reduction` for `summa`, the
+            // outer `Div` for `media`).
+            HirExpressionKind::Binary(..) | HirExpressionKind::Reduction { .. }
+                if self.axis_sugar_call(expr).is_some() =>
+            {
+                13
+            }
             HirExpressionKind::Assign(_, _) | HirExpressionKind::ConversioAssign { .. } => 1,
             // `⇇` sits between assignment and the ternary level: the target
             // and value are complete ternaries (parser locks it just above

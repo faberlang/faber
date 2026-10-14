@@ -640,6 +640,36 @@ fn empty_at_a_dense_slot_reemits_as_empty_in_each_locale() {
 }
 
 #[test]
+fn axis_sugar_reemits_as_authored() {
+    // Typecheck expands `t.sum(axis n)` / `t.mean(axis n)` into the grouped
+    // `__axis` reduction; the formatter must print the authored call and stay
+    // a fixed point.
+    let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+        .unwrap_or_else(|error| panic!("en pack loads: {error:?}"));
+    let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+    let emit = |input: &str| {
+        let result = reemit_faber(&session, &pack, "axis_sugar.fab", input);
+        assert!(
+            result.success(),
+            "{:?}",
+            result
+                .diagnostics
+                .iter()
+                .map(|diag| (diag.code, diag.issue()))
+                .collect::<Vec<_>>()
+        );
+        result.output.expect("emit should produce output").code
+    };
+    let source =
+        "fn f(tf32[2, 3] g) → void {\n    const tf32[3] d ← g.sum(axis 0)\n    const tf32[2] m ← g.mean(axis 1)\n}\n";
+    let first = emit(source);
+    assert!(first.contains("g.sum(axis 0)"), "authored sum axis must survive:\n{first}");
+    assert!(first.contains("g.mean(axis 1)"), "authored mean axis must survive:\n{first}");
+    assert!(!first.contains("__axis"), "the expansion must not leak:\n{first}");
+    assert_eq!(first, emit(&first), "re-emission must be idempotent");
+}
+
+#[test]
 fn itera_coordinates_survive_reemission() {
     // `itera ex src apud [i] fixum x` — the coordinate binding is
     // loop-visible; dropping it breaks bodies that reference it.

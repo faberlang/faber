@@ -275,6 +275,16 @@ impl super::FaberCodegen<'_> {
                     self.write_twin_call(receiver, canonical, argument, names, surface, writer);
                 }
             }
+            HirExpressionKind::Binary(..) | HirExpressionKind::Reduction { .. }
+                if self.axis_sugar_call(expr).is_some() =>
+            {
+                // Authored axis reduction (`t.summa(axis n)` /
+                // `t.media(axis n)`): typecheck kept the authored call's id on
+                // the expansion node; print the call, not the reduction.
+                if let Some((source, sugar)) = self.axis_sugar_call(expr) {
+                    self.write_axis_sugar_call(source, &sugar, names, surface, writer);
+                }
+            }
             HirExpressionKind::Binary(op, lhs, rhs) => {
                 let op_prec = self.binop_precedence(*op);
                 // Left operands of associative operators re-parse identically
@@ -2054,6 +2064,66 @@ impl super::FaberCodegen<'_> {
         }
     }
 
+    /// The authored axis-reduction call an expansion node carries: the `Sum`
+    /// rewrite records its `Reduction` node id, the `Mean` rewrite the outer
+    /// `Div` (whose numerator may sit behind the integer-element `Conversio`).
+    /// The returned receiver is the tensor the author wrote before the axis
+    /// list. `None` when the node no longer has that shape, so emission falls
+    /// back to the ordinary spelling.
+    pub(super) fn axis_sugar_call<'e>(
+        &self,
+        expr: &'e HirExpression,
+    ) -> Option<(&'e HirExpression, radix_hir::HirAxisSugar)> {
+        let sugar = self.axis_sugar.get(&expr.id)?.clone();
+        let reduction = match sugar.method {
+            radix_hir::HirAxisMethod::Mean => {
+                let radix_hir::HirExpressionKind::Binary(radix_hir::HirBinOp::Div, numerator, _) =
+                    &expr.kind
+                else {
+                    return None;
+                };
+                strip_conversio_wrappers(numerator)
+            }
+            radix_hir::HirAxisMethod::Sum
+            | radix_hir::HirAxisMethod::Max
+            | radix_hir::HirAxisMethod::Min => expr,
+        };
+        let radix_hir::HirExpressionKind::Reduction { source, .. } = &reduction.kind else {
+            return None;
+        };
+        Some((source, sugar))
+    }
+
+    /// `receiver.method(axis n)` for an authored axis-reduction call, in the
+    /// reader locale's surface spelling.
+    fn write_axis_sugar_call(
+        &self,
+        source: &HirExpression,
+        sugar: &radix_hir::HirAxisSugar,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        self.write_expr_prec(source, 13, names, surface, writer);
+        writer.write(".");
+        let canonical = match sugar.method {
+            radix_hir::HirAxisMethod::Sum => "summa",
+            radix_hir::HirAxisMethod::Mean => "media",
+            radix_hir::HirAxisMethod::Max => "maximus",
+            radix_hir::HirAxisMethod::Min => "minimus",
+        };
+        writer.write(
+            &surface
+                .intrinsic_surface(canonical)
+                .unwrap_or_else(|| canonical.to_owned()),
+        );
+        writer.write("(");
+        writer.write(surface.keyword(TokenKind::Axis));
+        writer.write(" ");
+        writer.write(&sugar.axis.to_string());
+        writer.write(")");
+    }
+
     /// The authored in-place twin call an effect-hoisted desugar wrapped in a
     /// block (`xs[f()].add(2)` desugars to a `__place` temporary plus the
     /// store): each temporary is inlined back into the store so re-emission
@@ -2332,6 +2402,15 @@ fn strip_store_wrappers(mut value: &HirExpression) -> &HirExpression {
             _ => return value,
         }
     }
+}
+
+/// Peel the checker's conversion node off an axis-sugar numerator: the
+/// integer-element `mean` converts the exact sum before dividing.
+fn strip_conversio_wrappers(mut expr: &HirExpression) -> &HirExpression {
+    while let HirExpressionKind::Conversio { source, .. } = &expr.kind {
+        expr = source;
+    }
+    expr
 }
 
 /// A copy of `expr` with each hoisted place temporary (`__placeN`) replaced
