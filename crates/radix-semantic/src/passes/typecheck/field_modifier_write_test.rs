@@ -101,7 +101,7 @@ fn figura(circulus: &str, quadratum: &str) -> String {
     format!(
         "genus Circulus {{\n    {circulus}textus nomen\n}}\n\n\
          genus Quadratum {{\n    {quadratum}textus nomen\n}}\n\n\
-         functio f(Circulus ∪ Quadratum x) {{\n    varia Circulus ∪ Quadratum y ← x\n    y.nomen ← \"z\"\n}}"
+         functio f(Circulus ∪ Quadratum x) {{\n    varia Circulus ∪ Quadratum y ← copy x\n    y.nomen ← \"z\"\n}}"
     )
 }
 
