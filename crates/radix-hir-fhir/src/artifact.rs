@@ -624,7 +624,10 @@ pub struct FunctionProvenanceTableWire {
 /// Version 44 carries the four program display tokens (`true`, `false`,
 /// `none`, `tuple`) of the unit's code locale so a loaded unit prints the
 /// words the author's locale prints; schema-v43 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 44;
+/// Version 45 adds `HirPresentation::axis_sugar` (which nodes typecheck
+/// expanded from an authored `t.sum(axis n)` / `t.mean(axis n)`, so the Faber
+/// re-emitter prints the call again); schema-v44 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 45;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

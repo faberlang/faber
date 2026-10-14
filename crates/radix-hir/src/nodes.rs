@@ -2331,6 +2331,15 @@ pub struct HirPresentation {
     #[serde(default)]
     pub inferred_constructor_ids: Vec<HirId>,
 
+    /// Ids of the expressions typecheck produced by expanding an authored
+    /// `t.sum(axis n)` / `t.mean(axis n)` (and the max/min twins) into the
+    /// grouped reduction expansion. The rewrite keeps the call's node id;
+    /// Faber re-emission prints the authored method call for exactly these
+    /// ids, so `faber format` stays surface-faithful instead of printing the
+    /// expansion.
+    #[serde(default)]
+    pub axis_sugar: Vec<HirAxisSugar>,
+
     /// Initializer-expression ids of wildcard-bound declarations
     /// (`fixum T _ ← expr`), which lower to bare expression statements.
     /// Emission restores the authored discard binding for exactly these.
@@ -2638,6 +2647,27 @@ pub struct HirDiscardBinding {
 
     pub mutable: bool,
     pub is_await: bool,
+}
+
+/// Authored axis-reduction sugar for one rewritten method call.
+///
+/// `id` is the node id of the expression typecheck expanded from the authored
+/// call; `axis` and `method` are the authored axis and reduction the expansion
+/// replaced.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirAxisSugar {
+    pub id: HirId,
+    pub axis: u32,
+    pub method: HirAxisMethod,
+}
+
+/// Reduction method of one authored axis-sugar call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirAxisMethod {
+    Sum,
+    Mean,
+    Max,
+    Min,
 }
 
 /// Authored facts for one destructuring declaration.
