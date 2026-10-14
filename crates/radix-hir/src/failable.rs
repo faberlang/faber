@@ -16,6 +16,9 @@
 //!   functions make callers failable, repeated to a fixed point.
 //! - `Handled` bodies, `capta` trap bodies, and the then-arm of an
 //!   arm-attached `cape` are contained: their throws do not escape.
+//! - A closure body is not a boundary: a throw or failable call inside a
+//!   closure marks the enclosing function failable, as in `function_facts`;
+//!   only `Handled`, `capta` and `cape` containment above suppress it.
 
 use crate::visit::{HirVisitor, walk_expr};
 use crate::{DefId, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirModule};
