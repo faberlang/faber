@@ -96,7 +96,9 @@ fn radix_hint_accept_row_stays_green() {
 
 #[test]
 fn typed_destination_conversio_assign_accepts_u16_to_f16() {
-    test_support::assert_accepts_la("incipit {\n  fixum u16 dbits ← 0x3E00\n  fixum f16 d ↤ dbits\n}");
+    test_support::assert_accepts_la(
+        "incipit {\n  fixum u16 dbits ← 0x3E00\n  fixum f16 d ↤ dbits\n}",
+    );
 }
 
 // --- CTR-02: channel contract for the builtin `Bits` rows ---

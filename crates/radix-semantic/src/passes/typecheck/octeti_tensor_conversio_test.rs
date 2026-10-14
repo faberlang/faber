@@ -2,7 +2,9 @@
 //! bit reinterpretation of the bytes. Assertions are on code, issue, and
 //! args; never on message text.
 
-use crate::test_support::{self, analyze_source_la, assert_accepts_la, assert_rejects_with_issue_la};
+use crate::test_support::{
+    self, analyze_source_la, assert_accepts_la, assert_rejects_with_issue_la,
+};
 use crate::{SemanticError, SemanticErrorKind};
 
 const UNSPECIFIED: &str = "octeti_to_tensor_unspecified";
@@ -131,7 +133,9 @@ fn handlers_cover_the_failable_conversion() {
 
 #[test]
 fn main_body_is_exempt_from_the_handler_rule() {
-    assert_accepts_la("incipit { fixum _ t ← |00 01 02 03 04 05 06 07| ↦ tensor<f32, [2]> via Le }");
+    assert_accepts_la(
+        "incipit { fixum _ t ← |00 01 02 03 04 05 06 07| ↦ tensor<f32, [2]> via Le }",
+    );
 }
 
 // --- rejected: hint -------------------------------------------------------

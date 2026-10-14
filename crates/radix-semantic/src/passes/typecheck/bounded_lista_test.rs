@@ -1,7 +1,9 @@
 //! BB-7R pins: `lista<T, N>` typechecks as `BoundedArray`, D6 appende overflow,
 //! and D7 conversions to/from unbounded `lista<T>`.
 
-use crate::test_support::{analyze_ok_la, assert_accepts_la, assert_rejects_with_issue_la, entry_local_tys};
+use crate::test_support::{
+    analyze_ok_la, assert_accepts_la, assert_rejects_with_issue_la, entry_local_tys,
+};
 use crate::{IndexExpr, Type};
 
 #[test]

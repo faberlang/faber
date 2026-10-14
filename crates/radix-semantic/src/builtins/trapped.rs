@@ -47,7 +47,10 @@ pub fn register(resolver: &mut Resolver, types: &mut TypeTable, interner: &mut I
     debug_assert!(defined.is_ok(), "builtin trapped registers exactly once");
     for variant in [RETURNED_VARIANT, THROWN_VARIANT] {
         let defined = resolver.define_variant(def_id, interner.intern(variant), Span::default());
-        debug_assert!(defined.is_some(), "builtin trapped defines each variant exactly once");
+        debug_assert!(
+            defined.is_some(),
+            "builtin trapped defines each variant exactly once"
+        );
     }
 }
 
