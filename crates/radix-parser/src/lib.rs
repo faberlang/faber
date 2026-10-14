@@ -2046,3 +2046,7 @@ mod latin_type_seal_test;
 #[cfg(test)]
 #[path = "expected_issue_test.rs"]
 mod expected_issue_test;
+
+#[cfg(test)]
+#[path = "emitted_issue_rows_test.rs"]
+mod emitted_issue_rows_test;
