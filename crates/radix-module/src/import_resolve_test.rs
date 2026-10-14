@@ -483,6 +483,51 @@ fn norma_resolves_from_tree_when_configured_home_lacks_it() {
     assert!(fake.starts_with(dir.path()), "{}", fake.display());
 }
 
+#[test]
+fn norma_fault_union_matches_by_variant() {
+    // The IoFault union crosses as an ordinary value: `io_fault_from` turns a
+    // parsed record into the variant named by `kind`, and a flat `match`
+    // handles it arm by arm. The app must check with no error diagnostics.
+    let dir = crate::test_support::test_temp_dir("norma-fault-union");
+    let app = dir.path().join("app.fab");
+    let source = r#"+++
+locale = "en"
++++
+
+import from "norma:fault" fault
+import from "norma:json" json
+
+main {
+    const json document ← json.parse(«{"kind":"NotFound","path":"/x"}»)
+    const value raw ← document ↦ value
+    const fault.IoFault got ← fault.io_fault_from(raw)
+    match got {
+        case NotFound const path {
+            print path
+        }
+        case Io const path {
+            print path
+        }
+        default {
+            print "other"
+        }
+    }
+}
+"#;
+    std::fs::write(&app, source).expect("write norma:fault app");
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), source, false);
+    assert!(
+        result.success,
+        "norma:fault union match must check without error diagnostics: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .filter(|diag| diag.is_error())
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+}
+
 // ── F-046: path traversal via template rest ─────────────────────────────────
 
 #[test]
