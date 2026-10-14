@@ -3,6 +3,9 @@ use super::air_tensor_intrinsics::is_allowed_tensor_intrinsic;
 const ADMITTED_INTRINSICS: &[&str] = &[
     "addita",
     "addita_bias",
+    "subtracta",
+    "multiplicata",
+    "divisa",
     "subtrahe",
     "multiplica",
     "divisio",
