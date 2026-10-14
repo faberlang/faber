@@ -5,6 +5,7 @@
 //! N5: HTTP/1.1 and WebSocket. Nothing is restored from `hosts`.
 
 mod error;
+mod sha256;
 mod value;
 
 pub mod clock;
