@@ -2644,11 +2644,24 @@ fn empty_list_conversio_element_ascription_accepts() {
 fn empty_list_conversio_later_element_constraint_accepts() {
     test_support::assert_accepts_la(
         r"incipit {
+    varia lista<numerus> headers ← []
+    headers.appende(1)
+    fixum valor packed ← headers ↦ valor
+    nota packed
+}",
+    );
+}
+
+#[test]
+fn empty_list_in_a_hole_cell_is_a_named_error_even_with_a_later_append() {
+    test_support::assert_rejects_with_issue_la(
+        r"incipit {
     varia _ headers ← []
     headers.appende(1)
     fixum valor packed ← headers ↦ valor
     nota packed
 }",
+        "inferred_constructor_no_expected_type",
     );
 }
 
