@@ -1,10 +1,10 @@
 //! Parser coverage for call-site access markers (`marker? expr`).
 
-use crate::test_support::parse_ok;
+use crate::test_support::parse_ok_la;
 use radix_syntax::{ExprKind, IfBody, StmtKind, TypeMode};
 
 fn call_args(source: &str) -> Vec<(Option<TypeMode>, bool)> {
-    let result = parse_ok(source);
+    let result = parse_ok_la(source);
     let program = result.program.as_ref().expect("program");
     let stmt = program.statements.last().expect("statement");
     let StmtKind::Incipit(entry) = &stmt.kind else {
@@ -68,7 +68,7 @@ fn marker_precedes_a_literal_or_list_argument() {
 }
 
 fn call_axis_flags(source: &str) -> Vec<(bool, Option<TypeMode>)> {
-    let result = parse_ok(source);
+    let result = parse_ok_la(source);
     let program = result.program.as_ref().expect("program");
     let stmt = program.statements.last().expect("statement");
     let StmtKind::Incipit(entry) = &stmt.kind else {
@@ -109,7 +109,7 @@ fn axis_word_stays_an_ordinary_identifier_without_a_following_operand() {
 
 #[test]
 fn axis_marker_parses_before_a_parameter_type() {
-    let result = parse_ok("functio f(tensor<f32, [2, 3]> t, axis numerus a) → vacuum {}");
+    let result = parse_ok_la("functio f(tensor<f32, [2, 3]> t, axis numerus a) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");

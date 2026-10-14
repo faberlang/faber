@@ -1,9 +1,9 @@
 //! Focused proofs for the two-family comma separator law.
 
-use crate::test_support::{parse_ok, parse_program};
+use crate::test_support::{parse_ok_la, parse_program_la};
 
 fn assert_issue(source: &str, issue: &str, position: &str) {
-    let result = parse_program(source);
+    let result = parse_program_la(source);
     assert!(
         result.errors.iter().any(|error| {
             error
@@ -40,7 +40,7 @@ fn discretio_payload_comma_is_targeted() {
 
 #[test]
 fn comma_less_discretio_payload_remains_lawful() {
-    let _ = parse_ok("discretio Color { Rubrum { numerus red numerus green } }");
+    let _ = parse_ok_la("discretio Color { Rubrum { numerus red numerus green } }");
 }
 
 #[test]

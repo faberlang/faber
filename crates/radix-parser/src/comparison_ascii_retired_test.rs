@@ -5,13 +5,13 @@
 //! (args `operator`, `glyph`) and still parses as the comparison so recovery
 //! continues. Tests assert code, issue and args only, never prose.
 
-use super::{ParseResult, parse};
-use radix_lexer::lex;
+use super::ParseResult;
+use crate::test_support::parse_program_la;
 
 const ISSUE: &str = "comparison_ascii_retired";
 
 fn parse_source(source: &str) -> ParseResult {
-    parse(lex(source))
+    parse_program_la(source)
 }
 
 /// The `(operator, glyph)` args of every retired-comparison error, in order.

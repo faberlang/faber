@@ -1,6 +1,6 @@
 //! Parser coverage for explicit call-site type arguments.
 
-use crate::test_support::parse_ok;
+use crate::test_support::parse_ok_la;
 use radix_syntax::{ExprKind, IfBody, StmtKind, TypeExprKind};
 
 fn first_call_expr(result: &crate::ParseResult) -> &radix_syntax::CallExpr {
@@ -31,7 +31,7 @@ fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeEx
 
 #[test]
 fn parses_explicit_type_args_on_direct_call() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         r#"incipit {
     fixum textus x ← id<textus>("salve")
 }"#,
@@ -46,7 +46,7 @@ fn parses_explicit_type_args_on_direct_call() {
 
 #[test]
 fn parses_explicit_type_args_on_member_call() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         r#"incipit {
     fixum textus x ← module.f<textus>("x")
 }"#,
@@ -61,7 +61,7 @@ fn parses_explicit_type_args_on_member_call() {
 
 #[test]
 fn parses_explicit_type_args_on_keyword_import_alias_method_call() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         r#"incipit {
     fixum textus x ← solum.lege<textus>("x")
 }"#,
@@ -76,7 +76,7 @@ fn parses_explicit_type_args_on_keyword_import_alias_method_call() {
 
 #[test]
 fn parses_explicit_type_args_on_receiver_method_call() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         r"incipit {
     fixum octeti frame ← receiver.method<octeti>()
 }",
@@ -91,7 +91,7 @@ fn parses_explicit_type_args_on_receiver_method_call() {
 
 #[test]
 fn comparison_expression_still_parses_as_binary() {
-    let result = crate::test_support::parse_recovering_ascii_comparison(
+    let result = crate::test_support::parse_recovering_ascii_comparison_la(
         r"incipit {
     fixum bivalens ok ← a < b
 }",
@@ -113,7 +113,7 @@ fn comparison_expression_still_parses_as_binary() {
 
 #[test]
 fn parses_multiple_type_args_on_direct_call() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         r"incipit {
     fixum bivalens ok ← convert<numerus, textus>(42)
 }",
@@ -134,7 +134,7 @@ fn parses_multiple_type_args_on_direct_call() {
 fn parses_natural_type_args_on_direct_call() {
     // gradus nn.fab: `return linear_from_raw<2, 2, 2>(raw_x, raw_w, raw_b)`
     // PARSE030.expected_expression when call-site typeArguments rejected NATURAL.
-    let result = parse_ok(
+    let result = parse_ok_la(
         r"incipit {
     fixum _ x ← linear_from_raw<2, 2, 2>(a, b, c)
 }",
@@ -155,7 +155,7 @@ fn parses_natural_type_args_on_direct_call() {
 
 #[test]
 fn parsers_call_without_type_args_has_empty_type_args() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         r#"incipit {
     fixum textus x ← greet("salve")
 }"#,
@@ -167,7 +167,7 @@ fn parsers_call_without_type_args_has_empty_type_args() {
 #[test]
 fn parses_double_less_than_as_comparison_not_broken_type_args() {
     // Regression: shift must not be parsed as call-site type arguments.
-    let result = parse_ok(
+    let result = parse_ok_la(
         r"incipit {
     fixum numerus x ← a ⇐ 2
 }",

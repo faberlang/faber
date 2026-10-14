@@ -6,11 +6,11 @@
 //! is legal at that position is lowering's decision, not the parser's.
 //! Without a following string the spelling stays an ordinary identifier.
 
-use crate::test_support::{parse_ok, parse_program, symbol_name};
+use crate::test_support::{parse_ok_la, parse_program_la, symbol_name};
 use radix_syntax::{ClassMemberKind, ExprKind, StmtKind};
 
 fn first_class_field_init_kind(source: &str) -> String {
-    let result = parse_ok(source);
+    let result = parse_ok_la(source);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Class(class) = &program.statements[0].kind else {
         panic!("expected genus");
@@ -23,7 +23,7 @@ fn first_class_field_init_kind(source: &str) -> String {
 
 #[test]
 fn module_constant_initializer_claims_insere() {
-    let result = parse_ok("fixum textus SCHEMA = insere \"schema.sql\"");
+    let result = parse_ok_la("fixum textus SCHEMA = insere \"schema.sql\"");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[0].kind else {
         panic!("expected constant var decl");
@@ -57,7 +57,7 @@ fn every_field_modifier_default_claims_insere() {
 
 #[test]
 fn block_level_constant_claims_insere() {
-    let result = parse_ok("incipit {\n    fixum textus x = insere \"a.txt\"\n}\n");
+    let result = parse_ok_la("incipit {\n    fixum textus x = insere \"a.txt\"\n}\n");
     assert!(format!("{:?}", result.program).contains("Insere("));
 }
 
@@ -65,13 +65,14 @@ fn block_level_constant_claims_insere() {
 fn insere_is_claimed_in_any_expression_position() {
     // Lowering rejects an embed outside a constant initializer; the parser
     // only recognizes the shape (keyword directly followed by a string).
-    let result = parse_ok("incipit {\n    varia textus x ← \"a\"\n    x ← insere \"a.txt\"\n}\n");
+    let result =
+        parse_ok_la("incipit {\n    varia textus x ← \"a\"\n    x ← insere \"a.txt\"\n}\n");
     assert!(format!("{:?}", result.program).contains("Insere("));
 }
 
 #[test]
 fn insere_stays_an_identifier_without_a_following_string() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         "fixum numerus insere = 3\nfixum numerus ALIUS = insere\nfunctio f() → numerus {\n    fixum numerus insere ← 4\n    redde insere\n}\n",
     );
     let program = result.program.as_ref().expect("program");
@@ -88,13 +89,13 @@ fn insere_stays_an_identifier_without_a_following_string() {
 
 #[test]
 fn insere_call_stays_a_call() {
-    let result = parse_ok("fixum numerus N = insere(3)");
+    let result = parse_ok_la("fixum numerus N = insere(3)");
     assert!(!format!("{:?}", result.program).contains("Insere("));
 }
 
 #[test]
 fn insere_without_a_string_path_is_not_an_embed_anywhere() {
     // A field default `insere x` is no embed; it fails as ordinary syntax.
-    let result = parse_program("genus G {\n    fixum textus s = insere x\n}\n");
+    let result = parse_program_la("genus G {\n    fixum textus s = insere x\n}\n");
     assert!(!result.success());
 }

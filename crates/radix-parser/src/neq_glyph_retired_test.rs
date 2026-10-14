@@ -3,13 +3,13 @@
 //! `PARSE030 neq_glyph_retired` (args `glyph`, `replacement`) and still parses
 //! as `NotEq` so recovery continues. Tests assert code, issue and args only.
 
-use super::{ParseResult, parse};
-use radix_lexer::lex;
+use super::ParseResult;
+use crate::test_support::parse_program_la;
 
 const ISSUE: &str = "neq_glyph_retired";
 
 fn parse_source(source: &str) -> ParseResult {
-    parse(lex(source))
+    parse_program_la(source)
 }
 
 /// The `(glyph, replacement)` args of every retired-glyph error, in order.

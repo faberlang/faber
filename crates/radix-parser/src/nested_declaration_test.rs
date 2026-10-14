@@ -7,7 +7,7 @@
 //! stays legal.
 
 use crate::ParseErrorKind;
-use crate::test_support::{has_arg, parse_ok, parse_program};
+use crate::test_support::{has_arg, parse_ok_la, parse_program_la};
 
 /// Each declaration form the rule covers, spelled as a complete top-level item.
 const DECLARATIONS: &[&str] = &[
@@ -22,7 +22,7 @@ const DECLARATIONS: &[&str] = &[
 
 /// Assert `source` fails with exactly one `declaration_not_top_level` error.
 fn assert_rejected_as_nested(source: &str) {
-    let result = parse_program(source);
+    let result = parse_program_la(source);
     let nested = result
         .errors
         .iter()
@@ -40,7 +40,7 @@ fn assert_rejected_as_nested(source: &str) {
 #[test]
 fn every_covered_declaration_parses_at_top_level() {
     for decl in DECLARATIONS {
-        let _ = parse_ok(decl);
+        let _ = parse_ok_la(decl);
     }
 }
 
@@ -76,14 +76,14 @@ fn annotated_nested_function_is_rejected() {
 
 #[test]
 fn method_inside_genus_stays_legal() {
-    let _ = parse_ok(
+    let _ = parse_ok_la(
         "genus Punctum {\n    varia numerus x\n    functio duplex() → numerus { redde 2 }\n}",
     );
 }
 
 #[test]
 fn statements_after_a_rejected_declaration_still_parse() {
-    let result = parse_program(
+    let result = parse_program_la(
         "incipit {\n    functio g() → numerus { redde 1 }\n    fixum numerus n ← 2\n}",
     );
     assert_eq!(result.errors.len(), 1, "errors: {:?}", result.errors);
