@@ -32,7 +32,7 @@ main {
 
     const _ value ← grid.get([0, 1])
     const _ absent ← grid.get([1, 2])
-    const _ count ← grid.nonzero_count()
+    const _ count ← grid.count_nonzero()
 
     const tf32[2, 3] dense ← grid.densify()
     print value, absent, count, dense.length()

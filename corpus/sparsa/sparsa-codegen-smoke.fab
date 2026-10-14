@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "Sparse tensor codegen smoke for longitudo and nonnihil calls."
-syntax = "sparsa<T, Figura>.length() | sparsa<T, Figura>.nonzero_count()"
+syntax = "sparsa<T, Figura>.length() | sparsa<T, Figura>.count_nonzero()"
 related = ["sparsa", "tensor", "vacua"]
 locale = "en"
 +++
@@ -26,6 +26,6 @@ locale = "en"
 main {
     const sparsa<float, [2, 3]> s ← empty
     const int len ← s.length()
-    const int count ← s.nonzero_count()
+    const int count ← s.count_nonzero()
     print len, count
 }
