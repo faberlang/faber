@@ -9,7 +9,11 @@ use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, run_source};
 
 fn session() -> Session {
-    Session::new(Config::default().with_target(Target::HirTypeScript))
+    Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    )
 }
 
 fn run_and_expect(name: &str, source: &str, expected: &[&str]) {

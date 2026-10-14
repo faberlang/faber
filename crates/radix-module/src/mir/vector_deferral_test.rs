@@ -9,7 +9,11 @@ use crate::driver::{AnalyzeRequest, Config, Session};
 use crate::mir::{BufferHost, RunSourceError, dump_analyzed_unit, run_source};
 
 fn session() -> Session {
-    Session::new(Config::default().with_target(Target::HirTypeScript))
+    Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    )
 }
 
 fn dump(source: &str) -> String {

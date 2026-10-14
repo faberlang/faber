@@ -11,7 +11,11 @@ use crate::driver::{Config, Session};
 use crate::mir::run_source;
 
 fn run_fixture_source(source: &str, host: &mut BufferHost) -> Result<(), Vec<RunnerError>> {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     run_source(&session, "test.fab", source, host).map_err(|error| match error {
         RunSourceError::Stepper(errors) => errors,
         RunSourceError::Frontend(diagnostics) => {
