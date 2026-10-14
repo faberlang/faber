@@ -47,6 +47,8 @@ use crate::library::{
     library_interface_declaration_surface, library_interface_export_surface,
     library_interface_has_module, library_interface_source, library_module_region_name,
 };
+#[cfg(feature = "runner")]
+use crate::praefixum_imports::PackageImportEffects;
 use crate::manifest::read_manifest;
 use crate::modules::module_segments_for_file;
 use crate::paths::normalize_path;
@@ -594,15 +596,21 @@ fn analyze_package_spec_with_deadline(
         // Per-file re-wrap (ARCH-U3): the file's own reader pack config keeps
         // the package run's memo identity, so targets shared across files
         // parse once for the whole package analysis.
-        let file_session = match file.locale_pack.as_ref() {
-            Some(pack) => session.re_wrap(
-                session
-                    .config
-                    .clone()
-                    .with_resolved_locale_pack(pack.clone()),
-            ),
-            None => session.re_wrap(session.config.clone()),
+        let file_config = match file.locale_pack.as_ref() {
+            Some(pack) => session
+                .config
+                .clone()
+                .with_resolved_locale_pack(pack.clone()),
+            None => session.config.clone(),
         };
+        // Gate J (ST2-2.7): the package hook below evaluates the sites that
+        // reach an import; without the runner leaf no driver evaluates them
+        // and every backend refuses the unevaluated initializer by name. This
+        // is the per-file session only: the provider-carriage session above
+        // never defers.
+        #[cfg(feature = "runner")]
+        let file_config = file_config.with_defer_imported_praefixum();
+        let file_session = session.re_wrap(file_config);
         // PKG-ADM: the file's own package export surface is the admission
         // fact for exported size-generic kernel templates — registered here,
         // before the per-unit orphan check, so a package API with no
@@ -704,6 +712,8 @@ fn analyze_package_spec_with_deadline(
         analyzed_interfaces_by_path.insert(file.path.clone(), file_interface.clone());
 
         diagnostics.extend(std::mem::take(&mut analysis.diagnostics));
+        // Hoisted above the deferred-site hook: the MIR lowering the hook
+        // runs reads the package import identities through the unit.
         analysis.package_import_identities = Some(package_import_identities_for_file(
             &spec,
             file,
@@ -711,6 +721,72 @@ fn analyze_package_spec_with_deadline(
             library_resolver,
         ));
         let module_id = ModuleId::for_spec(&spec, file.module_segments.clone());
+
+        // Gate J (ST2-2.7): when analysis deferred an import-reaching
+        // `comptime` site, the package layer evaluates it now, over the
+        // linked local import closure. Faber re-emission keeps the authored
+        // bodies and is never evaluated here.
+        //
+        // PERF: the per-site closure clone and link are confined to modules
+        // that defer a site (a module with no import-reaching comptime pays
+        // nothing); the fact that would change this is a package with many
+        // deferred sites measured slow, and the follow-up is one link per
+        // module instead of one per site.
+        #[cfg(feature = "runner")]
+        if file_session.config.target != radix_module::codegen::Target::HirFaber
+            && holds_deferred_praefixum(&analysis)
+        {
+            // The import-effect resolver answers from the analyzed nodes, so
+            // the unit under evaluation must appear there. This node is the
+            // template the final insertion below replaces with the evaluated
+            // analysis.
+            nodes.insert(
+                module_id.clone(),
+                AnalyzedProgramNode {
+                    path: file.path.clone(),
+                    module_segments: file.module_segments.clone(),
+                    is_entry,
+                    analysis: analysis.clone(),
+                    file_interface: file_interface.clone(),
+                    export_names: export_names.clone(),
+                    namespace_exports: namespace_exports.clone(),
+                    expanded_library_imports: file.expanded_library_imports.clone(),
+                },
+            );
+            let mut effects = PackageImportEffects::new(&nodes, &imports, module_id.clone());
+            let deferred = radix_module::driver::evaluate_deferred(
+                &mut analysis,
+                &file.path.display().to_string(),
+                &analysis_source,
+                &mut effects,
+                &mut |scratch, synthetic, span| {
+                    crate::mir::praefixum_link::run_deferred_site(
+                        &spec,
+                        &imports,
+                        &nodes,
+                        &module_id,
+                        scratch,
+                        &file.path,
+                        synthetic,
+                        span,
+                        &file_session.config,
+                        library_resolver,
+                        &mut library_cache,
+                    )
+                },
+            );
+            if let Err(mut deferred_diagnostics) = deferred {
+                nodes.remove(&module_id);
+                radix_module::driver::adjust_diagnostic_lines_for_body(
+                    &mut deferred_diagnostics,
+                    &file.raw_source,
+                    file.body_byte_offset,
+                );
+                diagnostics.extend(deferred_diagnostics);
+                continue;
+            }
+        }
+
         nodes.insert(
             module_id,
             AnalyzedProgramNode {
@@ -789,6 +865,16 @@ fn analyze_package_spec_with_deadline(
     }
 
     Ok((program, library_cache))
+}
+
+/// Whether the unit still holds a `Praefixum` initializer: analysis deferred
+/// at least one site because its body reaches an import (ST2-2.4). A module
+/// either defers all its sites or none, so one remaining site means every
+/// site of the unit is still for [`evaluate_deferred`](radix_module::driver::evaluate_deferred).
+#[cfg(feature = "runner")]
+fn holds_deferred_praefixum(analysis: &AnalyzedModule) -> bool {
+    radix_module::semantic::passes::praefixum::evaluation_order(&analysis.hir, &analysis.types)
+        .is_ok_and(|sites| !sites.is_empty())
 }
 
 /// Merge the `@ ad` routes of every analyzed package module and every
