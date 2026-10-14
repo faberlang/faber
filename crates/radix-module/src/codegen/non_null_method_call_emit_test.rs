@@ -25,7 +25,7 @@ incipit {
 ";
 
 fn compile(target: Target) -> crate::CompileResult {
-    let session = Session::new(Config::default().with_target(target));
+    let session = Session::new(Config::default().with_target(target).with_latin_locale());
     crate::driver::compile(&session, "non-null-call.fab", SOURCE, ModuleCompileRequest::default())
 }
 
@@ -120,7 +120,7 @@ incipit {
     nota xs!.inverte()
 }
 ";
-    let session = Session::new(Config::default().with_target(Target::HirGo));
+    let session = Session::new(Config::default().with_target(Target::HirGo).with_latin_locale());
     let result = crate::driver::compile(&session, "non-null-go-reject.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
     assert!(
