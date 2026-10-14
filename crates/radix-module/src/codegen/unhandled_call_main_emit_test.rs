@@ -48,7 +48,7 @@ incipit {
 ";
 
 fn compile(target: Target, source: &str) -> crate::CompileResult {
-    let session = Session::new(Config::default().with_target(target));
+    let session = Session::new(Config::default().with_latin_locale().with_target(target));
     crate::driver::compile(&session, "unhandled.fab", source, ModuleCompileRequest::default())
 }
 

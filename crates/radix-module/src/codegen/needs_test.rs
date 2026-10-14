@@ -12,8 +12,14 @@ use crate::semantic::{PassConfig, TypeTable, analyze};
 use std::collections::BTreeSet;
 
 #[cfg(feature = "hir-rust")]
+fn la_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("installed la pack should load")
+}
+
+#[cfg(feature = "hir-rust")]
 fn analyze_hir(source: &str) -> (HirModule, TypeTable) {
-    let lex = crate::lexer::lex(source);
+    let lex = crate::lexer::lex_with_locale_pack(source, &la_pack());
     let mut parsed = crate::parser::parse(lex);
     assert!(parsed.success(), "{:?}", parsed.errors);
     let program = parsed.program.take().expect("program");

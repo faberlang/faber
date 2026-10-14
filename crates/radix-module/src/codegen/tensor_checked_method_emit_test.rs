@@ -41,7 +41,8 @@ incipit {
 ";
 
 fn emit(target: Target) -> String {
-    let result = Compiler::new(Config::default().with_target(target)).compile_str("tensor_checked.fab", SOURCE);
+    let result = Compiler::new(Config::default().with_latin_locale().with_target(target))
+        .compile_str("tensor_checked.fab", SOURCE);
     match result.output {
         Some(Output::Rust(out)) => out.code,
         Some(Output::TypeScript(out)) => out.code,
