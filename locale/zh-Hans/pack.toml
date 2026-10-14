@@ -292,6 +292,10 @@ help = "检查 numeric separators 和 base prefixes"
 message = "无效转义序列"
 help = "使用受支持的转义序列，或转义反斜杠"
 
+[diagnostics.LEX003.issues.unknown_escape]
+message = "未知转义 `\\{escape}`；字面量只能转义其自身的定界符、反斜杠、n、t、r 和 u{...}"
+help = "移除反斜杠，或写 `\\\\` 表示反斜杠"
+
 [diagnostics.LEX004]
 message = "意外字符"
 help = "删除该字符，或在需要作为字面量时进行转义"
