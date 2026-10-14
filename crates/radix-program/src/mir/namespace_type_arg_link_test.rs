@@ -829,7 +829,10 @@ fn package_mir_norma_fs_read_file_string_body_converts_to_textus() {
                     MirTerminatorKind::TryCall {
                         callee: MirCallee::Function(callee),
                         ..
-                    } => program.functions.iter().find(|function| function.id == *callee),
+                    } => program
+                        .functions
+                        .iter()
+                        .find(|function| function.id == *callee),
                     _ => None,
                 })
                 .unwrap_or_else(|| {
