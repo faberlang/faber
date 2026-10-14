@@ -94,7 +94,7 @@ fn needs_escape(string c) → bool {
 fn control_escape(string c) → string {
     const list<b8> encoded ← c ↦ list<b8>
     const int code ← (encoded.get(0) coalesce (0 ∷ b8)) ↦ u8 ↦ int
-    return "\u00§§"(hex_digit(code / 16), hex_digit(code % 16))
+    return "\\u00§§"(hex_digit(code / 16), hex_digit(code % 16))
 }
 
 fn hex_digit(int digit) → string {
