@@ -2987,6 +2987,10 @@ help = "寫出字面軸，例如 `axis 1`；結果形狀取決於它"
 message = "該軸超出張量的秩"
 help = "使用從 0 到比秩小 1 的軸"
 
+[diagnostics.SEM010.issues.axis_reduction_repeated]
+message = "同一個軸在歸約中被多次指定"
+help = "刪除重複的軸；每個軸只能出現一次"
+
 [diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
 message = "軸歸約僅為秩 2 至 8 的張量而建"
 help = "對秩 2 至 8 的張量以字面維度歸約，或使用 `reducta ... per [...]` 寫出明確歸約"

@@ -2987,6 +2987,10 @@ help = "写出字面轴，例如 `axis 1`；结果形状取决于它"
 message = "轴超出张量的秩"
 help = "使用从 0 到秩减一的轴"
 
+[diagnostics.SEM010.issues.axis_reduction_repeated]
+message = "同一个轴在归约中被多次指定"
+help = "删除重复的轴；每个轴只能出现一次"
+
 [diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
 message = "轴归约仅针对秩 2 到 8 的张量"
 help = "对秩 2 到 8 且维度为字面的张量使用归约，或写成显式归约 `reducta ... per [...]`"

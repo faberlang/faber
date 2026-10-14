@@ -2987,6 +2987,10 @@ help = "viết một trục literal như `axis 1`; hình dạng kết quả ph�
 message = "trục nằm ngoài rank của tensor"
 help = "dùng một trục từ 0 đến nhỏ hơn rank một đơn vị"
 
+[diagnostics.SEM010.issues.axis_reduction_repeated]
+message = "cùng một trục được nêu nhiều hơn một lần trong phép rút gọn"
+help = "xóa trục bị lặp; mỗi trục chỉ được xuất hiện một lần"
+
 [diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
 message = "phép rút gọn theo trục chỉ được xây dựng cho tensor hạng 2 đến 8"
 help = "rút gọn tensor hạng 2 đến 8 với các chiều literal, hoặc viết phép rút gọn tường minh bằng `reducta ... per [...]`"
