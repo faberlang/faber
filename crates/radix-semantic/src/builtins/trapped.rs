@@ -71,14 +71,14 @@ pub fn def_id(resolver: &Resolver, interner: &mut Interner) -> Option<DefId> {
 /// syntax walk that could disagree with type lowering about what a type
 /// position is.
 fn is_applied(types: &TypeTable, def_id: DefId) -> bool {
-    (0..types.type_count()).any(|index| {
-        let Type::Applied(base, _) = types.get(TypeId(
-            u32::try_from(index).expect("type table index fits u32"),
-        )) else {
-            return false;
-        };
-        matches!(types.get(*base), Type::Enum(found) if *found == def_id)
-    })
+    (0..types.type_count())
+        .filter_map(|index| u32::try_from(index).ok())
+        .any(|index| {
+            let Type::Applied(base, _) = types.get(TypeId(index)) else {
+                return false;
+            };
+            matches!(types.get(*base), Type::Enum(found) if *found == def_id)
+        })
 }
 
 /// Append the builtin `trapped<R, T>` enum item to lowered HIR when a type
@@ -108,12 +108,12 @@ pub fn inject_hir_item(
         ty: types.intern(Type::Param(error_param)),
         span: Span::default(),
     };
-    let returned_def = resolver
-        .variant_child(def_id, interner.intern(RETURNED_VARIANT))
-        .expect("builtin trapped registers returned before injection");
-    let thrown_def = resolver
-        .variant_child(def_id, interner.intern(THROWN_VARIANT))
-        .expect("builtin trapped registers thrown before injection");
+    let (Some(returned_def), Some(thrown_def)) = (
+        resolver.variant_child(def_id, interner.intern(RETURNED_VARIANT)),
+        resolver.variant_child(def_id, interner.intern(THROWN_VARIANT)),
+    ) else {
+        return;
+    };
 
     items.push(HirItem {
         annotations: Vec::new(),
