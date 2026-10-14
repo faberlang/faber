@@ -48,6 +48,7 @@ fn macro_rows_keep_default_policy_unless_named() {
         (IntrinsicReceiver::Tensor, "ponde", 2),
         (IntrinsicReceiver::Tensor, "formata", 0),
         (IntrinsicReceiver::Tensor, "rope_norm", 2),
+        (IntrinsicReceiver::Tensor, "rope_half", 2),
         (IntrinsicReceiver::Tensor, "limes", 0),
     ]
     .into_iter()
@@ -74,7 +75,7 @@ fn empty_generic_rows_reject_angle_brackets_and_declared_rows_are_explicit() {
     assert_eq!(limes.generic_arity(), 1);
     assert_eq!(limes.generic[0].sort, GenericParamSort::Typus);
     for entry in INTRINSICS {
-        if matches!(entry.faber_name, "formata" | "rope_norm" | "limes") {
+        if matches!(entry.faber_name, "formata" | "rope_norm" | "rope_half" | "limes") {
             continue;
         }
         assert!(
@@ -134,6 +135,14 @@ fn lookup_generic_arity_distinguishes_empty_rows() {
         .expect("generic rope_norm row");
     assert_eq!(rope.generic[0].sort, GenericParamSort::Magnitudo);
     assert!(lookup_method_generic(IntrinsicReceiver::Tensor, "rope_norm", 0, 2).is_none());
+}
+
+#[test]
+fn rope_half_row_is_generic_over_dim() {
+    let rope = lookup_method_generic(IntrinsicReceiver::Tensor, "rope_half", 1, 2)
+        .expect("generic rope_half row");
+    assert_eq!(rope.generic[0].sort, GenericParamSort::Magnitudo);
+    assert!(lookup_method_generic(IntrinsicReceiver::Tensor, "rope_half", 0, 2).is_none());
 }
 
 #[test]
