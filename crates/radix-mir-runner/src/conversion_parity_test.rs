@@ -365,3 +365,52 @@ fn float_to_numerus_runtime_conversion_is_a_check() {
     );
     assert_eq!(run(&mut runner, &recovering, 3.7).unwrap(), Value::UInt(3));
 }
+
+/// P5: an unsupported bounded-list conversio reports a stable issue slug; a
+/// `Debug` dump of the target would carry `TypeId`/`IndexId`, which churn with
+/// any type-table edit.
+#[test]
+fn bounded_lista_conversio_unsupported_has_a_stable_issue() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{MirConversion, MirConversionFlavor, MirProgram, MirValidationContext};
+    use radix_types::{IndexExpr, Primitive, TypeTable};
+
+    let mut types = TypeTable::new();
+    let element = types.primitive(Primitive::Numerus);
+    let source_ty = types.intern(Type::Array(element));
+    let capacity = types.intern_index(IndexExpr::Literal(4));
+    let target_ty = types.intern(Type::BoundedArray { element, capacity });
+    let interner = Interner::new();
+    let program = MirProgram {
+        functions: vec![function(
+            0,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            radix_mir::MirType::semantic(target_ty),
+            None,
+        )],
+    };
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    let conversion = MirConversion {
+        store: None,
+        flavor: MirConversionFlavor::Runtime,
+        source_ty: radix_mir::MirType::semantic(source_ty),
+        target_ty: radix_mir::MirType::semantic(target_ty),
+        params: Vec::new(),
+        recovery: None,
+        struct_defaults: Vec::new(),
+    };
+    let error = runner
+        .eval_runtime_convert(&conversion, Value::Unit, span())
+        .expect_err("bounded lista has no runtime conversion carrier");
+    assert_eq!(
+        error.issue,
+        "runner_faberscript_unsupported_runtime_conversio_to_bounded_lista"
+    );
+}

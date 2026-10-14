@@ -319,6 +319,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             // cell then checks the result, as the end of the conversion row.
             Type::PolicyFloat(policy, width) => self
                 .convert_to_policy_float(value, source_ty, *policy, *width, params, recovery, span),
+            // A bounded-list target has no runtime conversion carrier. The
+            // feature name is a stable phrase: the target's `Debug` dump would
+            // carry `TypeId`/`IndexId`, which churn with any type-table edit.
+            Type::BoundedArray { .. } => Err(RunnerError::unsupported(
+                span,
+                "runtime conversio to bounded lista",
+            )),
             other => Err(RunnerError::unsupported(
                 span,
                 &format!("runtime conversio to {other:?}"),
