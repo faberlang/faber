@@ -870,6 +870,7 @@ dependencies = [
  "radix-types",
  "rustc-hash",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

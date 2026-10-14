@@ -200,8 +200,10 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // `HirPresentation::empty_dense_ids`; schema 43 carries
     // `ResolvedUseWire::local` (the unit-local def of each resolved use);
     // schema 44 carries the unit's program display tokens (`true`, `false`,
-    // `none`, `tuple`) so a loaded unit prints the author's code-locale words.
-    assert_eq!(SCHEMA_VERSION, 44);
+    // `none`, `tuple`) so a loaded unit prints the author's code-locale words;
+    // schema 45 adds `HirPresentation::axis_sugar` (the authored
+    // `t.sum(axis n)` / `t.mean(axis n)` calls typecheck expanded).
+    assert_eq!(SCHEMA_VERSION, 45);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

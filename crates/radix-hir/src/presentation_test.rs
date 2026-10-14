@@ -11,9 +11,9 @@
 //! - postcard round trips preserve the new data.
 
 use crate::nodes::{
-    DefId, HirBlock, HirBlockEnd, HirId, HirModuleEnd, HirOwnerRef, HirPresentation,
-    HirSourceAnchorId, HirStatement, HirStatementKind, HirTrivia, HirTriviaAttachment,
-    HirTriviaOwner, HirTriviaOwnerKind,
+    DefId, HirAxisMethod, HirAxisSugar, HirBlock, HirBlockEnd, HirId, HirModuleEnd, HirOwnerRef,
+    HirPresentation, HirSourceAnchorId, HirStatement, HirStatementKind, HirTrivia,
+    HirTriviaAttachment, HirTriviaOwner, HirTriviaOwnerKind,
 };
 use crate::visit::{HirVisitor, walk_block, walk_stmt};
 use radix_lexer::{Span, Symbol};
@@ -80,6 +80,7 @@ fn sample_presentation() -> HirPresentation {
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
+        axis_sugar: Vec::new(),
         discard_binding_stmts: Vec::new(),
         destructure_bindings: Vec::new(),
         await_assignment_bindings: Vec::new(),
@@ -317,6 +318,20 @@ fn postcard_round_trip_preserves_presentation_data() {
     );
     assert_eq!(restored.block_ends[0].id, HirSourceAnchorId(2));
     assert_eq!(restored.entry_start_anchor, Some(HirSourceAnchorId(1)));
+}
+
+/// JSON round trips preserve the authored axis-sugar facts.
+#[test]
+fn axis_sugar_round_trips_through_json() {
+    let mut original = sample_presentation();
+    original.axis_sugar.push(HirAxisSugar {
+        id: HirId(41),
+        axis: 1,
+        method: HirAxisMethod::Mean,
+    });
+    let json = serde_json::to_string(&original).expect("serialize presentation");
+    let restored: HirPresentation = serde_json::from_str(&json).expect("deserialize presentation");
+    assert_eq!(original, restored);
 }
 
 // --- authored type forms (ATF-2) ---
