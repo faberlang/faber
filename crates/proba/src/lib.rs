@@ -442,7 +442,7 @@ static SOLUM_IN_ENV: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(No
 pub fn set_solum_in_environment(name: &str) {
     let mut configured = SOLUM_IN_ENV
         .lock()
-        .expect("solum-in environment lock poisoned");
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     *configured = Some(name.to_owned());
 }
 
@@ -453,7 +453,7 @@ pub fn set_solum_in_environment(name: &str) {
 fn solum_in_matches(requested: &str) -> bool {
     let configured = SOLUM_IN_ENV
         .lock()
-        .expect("solum-in environment lock poisoned")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone();
     solum_in_matches_in(requested, configured.as_deref(), std::env::consts::OS)
 }
