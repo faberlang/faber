@@ -4750,6 +4750,15 @@ help = "convert the index with `x ↦ 0‥N` to carry its range, or read with `g
 message = "an index inside a kernel could not be proven in range; it stays checked (one compare per lane, fatal on a miss)"
 help = "convert the index with `x ↦ 0‥N` to carry its range, or read with `get`"
 
+[diagnostics.WARN034]
+message = "this string escapes `\\\"`; write it with «…», which needs no escapes"
+help = "use «...» for text that contains quote characters"
+
+[diagnostics.WARN034.issues.prefer_guillemet_for_quote]
+message = "this string escapes `\\\"`; write it with «…», which needs no escapes"
+help = "use «...» for text that contains quote characters"
+
+
 [llm]
 system_prompt_snippet = "Emit canonical Latin Faber source using the registered Latin keywords, canonical type spellings, and invariant glyph syntax."
 exemplars = ["./exemplars/salve-munde.la.fab"]

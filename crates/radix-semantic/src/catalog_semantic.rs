@@ -90,6 +90,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::ClosableInCycle,
     WarningKind::PositionalLaneParam,
     WarningKind::UnprovenKernelIndex,
+    WarningKind::PreferGuillemetQuote,
 ];
 
 // STABLE CODES
@@ -1440,6 +1441,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::UnprovenKernelIndex => DiagnosticSpec {
             code: "WARN033",
             help: Some("convert the index with `x ↦ 0‥N` to carry its range, or read with `get`"),
+        },
+        WarningKind::PreferGuillemetQuote => DiagnosticSpec {
+            code: "WARN034",
+            help: Some("write the string with «…»; guillemets need no escape for `\\\"` or `'`"),
         },
     }
 }

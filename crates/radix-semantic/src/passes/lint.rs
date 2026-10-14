@@ -42,6 +42,7 @@ use rustc_hash::FxHashSet;
 
 const ISSUE_EMPTY_MARKER_SHADOWING: &str = "empty_marker_shadowing";
 const ISSUE_EXPLICIT_IGNOTUM_ANNOTATION: &str = "explicit_ignotum_annotation";
+const ISSUE_PREFER_GUILLEMET_FOR_QUOTE: &str = "prefer_guillemet_for_quote";
 const ISSUE_PREFER_STRING_TEMPLATE: &str = "prefer_string_template";
 const ISSUE_SHADOWED_VARIABLE: &str = "shadowed_variable";
 const ISSUE_UNNECESSARY_CAST: &str = "unnecessary_cast";
@@ -661,6 +662,22 @@ impl<'a> LintContext<'a> {
         }
     }
 
+    /// WARN034: a `"…"` literal whose raw payload escapes a quote (`\"`)
+    /// reads better as a guillemet block, which needs no escape for `"` or
+    /// `'`. HIR cannot distinguish `"…"` from `«…»`; a guillemet literal
+    /// that still escapes a quote warns too.
+    fn check_guillemet_quote(&mut self, symbol: radix_lexer::Symbol, span: Span) {
+        if !has_escaped_quote(self.interner.resolve(symbol)) {
+            return;
+        }
+        self.warnings.push((
+            WarningKind::PreferGuillemetQuote,
+            ISSUE_PREFER_GUILLEMET_FOR_QUOTE,
+            span,
+            None,
+        ));
+    }
+
     /// Render one operand back to approximate source text for a suggestion.
     fn render_operand(&self, expr: &HirExpression) -> String {
         match &expr.kind {
@@ -692,6 +709,22 @@ fn add_chain_operands<'x>(expr: &'x HirExpression, operands: &mut Vec<&'x HirExp
         }
         _ => operands.push(expr),
     }
+}
+
+/// Whether a raw textus payload contains a `\"` escape. A backslash consumes
+/// the character that follows it, so `\\` stays a bare backslash and the quote
+/// after it is unescaped.
+fn has_escaped_quote(raw: &str) -> bool {
+    let mut chars = raw.chars();
+    while let Some(ch) = chars.next() {
+        if ch != '\\' {
+            continue;
+        }
+        if chars.next() == Some('"') {
+            return true;
+        }
+    }
+    false
 }
 
 /// Whether an operand is a string or ascii literal (threshold-B trigger and
@@ -769,6 +802,10 @@ impl HirVisitor for LintContext<'_> {
                 self.mark_place_mutated(target);
                 self.visit_expr(target);
                 self.visit_expr(value);
+            }
+            HirExpressionKind::Literal(HirLiteral::String(symbol)) => {
+                self.check_guillemet_quote(*symbol, expr.span);
+                walk_expr(self, expr);
             }
             // String-typed `+` chains: the outermost node of a left-spine run
             // evaluates the whole chain once; nested nodes defer to it.

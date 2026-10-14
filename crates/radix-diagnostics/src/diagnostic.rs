@@ -270,6 +270,10 @@ pub enum WarningKind {
     /// the warning suggests the range type (`x ↦ 0‥N`) and `get` (gpu-reset
     /// K11). Warn-only.
     UnprovenKernelIndex,
+    /// A `"…"` string literal escapes a quote (`\"`). A guillemet block
+    /// `«…»` wraps the same text with no escape needed for `"` or `'`.
+    /// Warn-only (operator proposal 4, 2026-10-13).
+    PreferGuillemetQuote,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.

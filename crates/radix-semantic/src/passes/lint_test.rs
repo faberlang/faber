@@ -1339,6 +1339,66 @@ fn warns_on_chain_with_ascii_literal_and_folds_text_into_suggestion() {
     assert_eq!(suggestion, Some("\"ab§\"(_)"));
 }
 
+// ---- GT-U1: PreferGuillemetQuote — `"…"` literals that escape `"` ----
+//
+// Operator proposal 4 (2026-10-13): a short string that escapes a quote
+// (`\"`) reads better as a guillemet block, which needs no escape for `"`
+// or `'`. Advisory only.
+
+#[test]
+fn warns_prefer_guillemet_for_quote_on_escaped_quote() {
+    let result = crate::test_support::analyze_source(
+        r#"
+incipit {
+    nota "say \"hi\""
+}
+"#,
+    );
+    let diagnostics = result.diagnostics.clone();
+    let warning = diagnostics
+        .iter()
+        .find(|diag| diag.issue() == Some("prefer_guillemet_for_quote"))
+        .unwrap_or_else(|| panic!("expected PreferGuillemetQuote warning, got: {diagnostics:?}"));
+    assert_eq!(crate::semantic_spec(warning.kind).code, "WARN034");
+}
+
+#[test]
+fn no_prefer_guillemet_for_quote_on_guillemet_literal() {
+    let result = crate::test_support::analyze_source(
+        r#"
+incipit {
+    nota «say "hi"»
+}
+"#,
+    );
+    let diagnostics = result.diagnostics.clone();
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("prefer_guillemet_for_quote")),
+        "guillemet text needs no escape and must not warn: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn no_prefer_guillemet_for_quote_on_plain_or_escaped_backslash() {
+    let result = crate::test_support::analyze_source(
+        r#"
+incipit {
+    nota "plain"
+    nota "back\\slash"
+}
+"#,
+    );
+    let diagnostics = result.diagnostics.clone();
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("prefer_guillemet_for_quote")),
+        "plain text and escaped backslashes must not warn: {diagnostics:?}"
+    );
+}
+
 // EOT-1: the lint surface must eventually see each selective item as an
 // ordinary local. Until EOT-2M installs those bindings, the source fixture
 // stops at the known parser/lowering issue `expected_expression`.

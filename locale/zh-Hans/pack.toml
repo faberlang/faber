@@ -3331,6 +3331,15 @@ help = "如果只意在一个类型，请使用 `_`"
 message = "union hole `∪` 被求解为单一类型 `{type}`"
 help = "如果只意在一个类型，请使用 `_`"
 
+[diagnostics.WARN034]
+message = "该字符串转义了 `\\\"`；请用 «…» 改写，无需任何转义"
+help = "文本含引号时请使用 «...»"
+
+[diagnostics.WARN034.issues.prefer_guillemet_for_quote]
+message = "该字符串转义了 `\\\"`；请用 «…» 改写，无需任何转义"
+help = "文本含引号时请使用 «...»"
+
+
 [llm]
 system_prompt_snippet = "Emit Simplified Chinese reader-locale Faber using Chinese keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged."
 exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
