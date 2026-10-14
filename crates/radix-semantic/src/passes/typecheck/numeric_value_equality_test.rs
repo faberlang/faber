@@ -58,13 +58,40 @@ incipit {
             expect: ValueEqualityExpect::Accepts,
         },
         ValueEqualityCase {
-            name: "instans_cross_approx_rejects",
+            name: "instans_cross_approx_accepts",
             source: r"
 functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
     redde fine ≅ coarse
 }
 ",
+            expect: ValueEqualityExpect::Accepts,
+        },
+        ValueEqualityCase {
+            name: "instans_cross_approx_not_eq_accepts",
+            source: r"
+functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
+    redde fine ≇ coarse
+}
+",
+            expect: ValueEqualityExpect::Accepts,
+        },
+        ValueEqualityCase {
+            name: "instans_cross_fuzzy_rejects",
+            source: r"
+functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
+    redde fine ≈ coarse
+}
+",
             expect: ValueEqualityExpect::RejectsIssue(NUMERIC_VALUE_EQ_ISSUE),
+        },
+        ValueEqualityCase {
+            name: "instans_cross_exact_rejects",
+            source: r"
+functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
+    redde fine ≡ coarse
+}
+",
+            expect: ValueEqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
         },
         ValueEqualityCase {
             name: "ascii_textus_approx_rejects",

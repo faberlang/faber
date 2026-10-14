@@ -503,12 +503,13 @@ impl TypeChecker<'_> {
         joined
     }
 
-    /// Allow cross-precision `instans` operands for ordering only.
+    /// Allow cross-precision `instans` operands for ordering and `≅`/`≇`.
     ///
     /// WHY: operands need not unify to one precision marker in the type table,
     /// so this only checks that both sides are `instans` and returns the
-    /// resolved rhs type; the caller discards it (ordering yields `bivalens`).
-    /// Equality uses [`Self::exact_equality_types`] instead.
+    /// resolved rhs type; the caller discards it (ordering yields `bivalens`,
+    /// and `≅`/`≇` compare at the coarser precision like ordering). Exact
+    /// `≡`/`≢` use [`Self::exact_equality_types`] instead.
     fn instans_join(&mut self, lhs: TypeId, rhs: TypeId, span: radix_lexer::Span) -> TypeId {
         let lhs_resolved = self.resolve_inferred_type(lhs);
         let rhs_resolved = self.resolve_inferred_type(rhs);
@@ -1548,6 +1549,13 @@ impl TypeChecker<'_> {
             && let Some(result) = self.check_approx_aggregate(op, lhs_ty, rhs_ty, lhs.span)
         {
             return result;
+        }
+        if matches!(op, HirBinOp::ApproxEq | HirBinOp::ApproxNotEq)
+            && self.is_instans(lhs_ty)
+            && self.is_instans(rhs_ty)
+        {
+            self.instans_join(lhs_ty, rhs_ty, lhs.span);
+            return self.bool_type();
         }
         if !self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty)
             && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
