@@ -1635,9 +1635,9 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `vacuum`   | void |
 | `numquam`  | never |
 | `ignotum`  | unknown |
-| `octeti`   | bytes |
+| `octeti`   | en `bytes`; the byte string, exactly `lista<b8>` |
 | `octeti<N>` | shipped; bounded byte buffer; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker. `octeti<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
-| `octetus`  | en `byte`; an exact alias of `u8` (D10.4) — arithmetic and `0x0A` comparisons use it directly. Fixed-width; rejects applied parameters. |
+| `octetus`  | retired: `SEM008 retired_byte_word`; write `b8` for a raw byte or `u8` for a numeric byte. |
 
 Bare `textus` / `ascii` / `octeti` remain the unbounded productions. The
 shipped forms `textus<N>`, `ascii<N>`, and `octeti<N>` take
@@ -1655,10 +1655,10 @@ the call boundary as a recoverable error, never a silent reshape. Type parameter
 layout, `vector` and `matrix` register shapes, and `atomic<T>` stay compile-time; a whole-shape `_` must still resolve its rank at
 compile time.
 
-**`octeti ≡ lista<octetus>` is a type-identity fact (D10.4), not mutual
-assignability**: the two names denote the same type for checking, `↦`, and
-every emitter, while `octeti` keeps its byte-buffer runtime representation
-(no element-boxing regression). `ascii<1>` is an ordinary ASCII string of
+**`octeti` is `lista<b8>`**: the word names the list of raw
+bytes; it is not a list of numbers, so `lista<b8>` converts to `lista<u8>`
+only with an explicit `↦` and never widens to `lista<int>` or `lista<b16>`.
+`ascii<1>` is an ordinary ASCII string of
 length one (the type of `'x'`), not a separate character type; it widens
 implicitly `ascii<1> → littera → textus` (D10.5), so `s[i] ≡ '\n'` keeps
 working across the chain.
