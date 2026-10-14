@@ -5,7 +5,9 @@ use super::*;
 use crate::package::library_resolver_from_config;
 use crate::package::test_support::{diagnostic_has_arg, test_temp_dir};
 use radix::program::analyze::AnalyzedProgram;
+#[cfg(feature = "hir-rust")]
 use radix::program::codegen::assemble_crate;
+#[cfg(feature = "hir-rust")]
 use radix::program::rust_target::generate_package_rust;
 
 fn analyze_with_faber_seams(
@@ -35,6 +37,7 @@ fn run_mir_with_faber_seams<H: radix::module::mir::Host + ?Sized>(
     )
 }
 
+#[cfg(feature = "hir-rust")]
 use faber_hir_rust::RustFieldNamePolicy;
 use radix::module::codegen::{Target, generate_from_analyzed};
 use radix::module::driver::Config;
@@ -428,6 +431,7 @@ fn build_load_round_trip_with_local_import() {
     assert_eq!(util.export_names, vec!["salutare".to_owned()]);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn local_library_locale_surface_resolves_through_package_loader() {
     let dir = test_temp_dir("fhir-local-locale");
@@ -509,6 +513,7 @@ fn local_library_locale_surface_resolves_through_package_loader() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn strict_pack_rejects_unlisted_canonical_member_spelling() {
     let dir = test_temp_dir("fhir-local-locale-strict");
@@ -545,6 +550,7 @@ fn strict_pack_rejects_unlisted_canonical_member_spelling() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn english_pack_resolves_source_library_and_norma_surfaces() {
     // 80b59a6c(a) / CTO e2ca2b57 F2: en pack has zero triga library_members;
@@ -698,6 +704,7 @@ fn load_rejects_missing_file_fail_closed() {
 // Stage 3: HIR target parity from a package artifact
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn loaded_package_rust_parity_matches_direct() {
     let dir = test_temp_dir("fhir-parity");
@@ -756,6 +763,7 @@ fn loaded_package_rust_parity_matches_direct() {
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn loaded_package_rust_parity_generics_patterns() {
     let dir = test_temp_dir("fhir-generics-parity");
@@ -1027,7 +1035,12 @@ fn loaded_package_library_import_unit_parity() {
     // is the store-backed Stage 5 path; the unit surface is source-free here.
     let latin = radix::module::locale::latin_locale_pack();
     let surface = radix::module::locale::KeywordSurface::new(&latin);
-    for target in [Target::HirRust, Target::HirFaber] {
+    let targets = [
+        #[cfg(feature = "hir-rust")]
+        Target::HirRust,
+        Target::HirFaber,
+    ];
+    for target in targets {
         let direct_code = output_code(
             &generate_from_analyzed(
                 target,
