@@ -16,8 +16,8 @@ pub enum HintKind {
 #[must_use]
 pub fn classify(name: &str) -> HintKind {
     match name {
-        "Be" => HintKind::Be,
-        "Le" => HintKind::Le,
+        "be" | "Be" => HintKind::Be,
+        "le" | "Le" => HintKind::Le,
         _ => HintKind::Other,
     }
 }
