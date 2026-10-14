@@ -17,14 +17,14 @@ mod host;
 pub mod inf;
 pub mod kernel_dispatch;
 pub mod kernel_lanes;
+#[cfg(test)]
+mod regex_literal_raw_test;
 mod regex_program;
 mod routes;
 mod runtime;
 pub mod sermo;
 #[cfg(test)]
 mod shape_size_test;
-#[cfg(test)]
-mod regex_literal_raw_test;
 pub(crate) mod shuffle;
 pub mod stats;
 pub mod store;
