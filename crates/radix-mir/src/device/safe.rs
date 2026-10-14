@@ -28,8 +28,7 @@ use crate::{CapabilityGap, Lowerability};
 use crate::{
     MirAggregate, MirAggregateKind, MirCollectionOp, MirConstant, MirDeviceViewElement,
     MirFunction, MirIntrinsic, MirLayoutKind, MirLayoutTable, MirLiftOp, MirLocal, MirOperand,
-    MirParam,
-    MirPlace, MirPlaceBase, MirProjection, MirRuntimeCall, MirScalarLayout, MirStatement,
+    MirParam, MirPlace, MirPlaceBase, MirProjection, MirRuntimeCall, MirScalarLayout, MirStatement,
     MirStatementKind, MirTemp, MirTensorLocusLayout, MirTensorStorageLayout, MirTerminator,
     MirTerminatorKind, MirType, MirValidationContext, MirValue, MirValueKind, ValidatedMir,
 };
