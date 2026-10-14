@@ -28,7 +28,7 @@ pub fn serve_route<H: Host + ?Sized>(
         let args = opener_leaf_args(opener);
         return Some(match leaf::serve(route, &args) {
             Some(Ok(reply)) => Ok(reply_to_values(reply)),
-            Some(Err(error)) => Err(Value::Str(error.to_string())),
+            Some(Err(error)) => Err(leaf_error_value(&error)),
             None => return None,
         });
     }
@@ -191,6 +191,21 @@ fn reply_to_value(reply: Reply) -> Option<Value> {
             items.into_iter().filter_map(reply_to_value).collect(),
         )))),
     }
+}
+
+/// The failure terminal's data: the leaf's `kind` and `path` facts beside the
+/// runner-internal `text` (the leaf's `Display`) that current consumers print.
+///
+/// WHY: kind and path must survive to `sermo_items` as diagnostic args while
+/// `text` keeps every message byte-for-byte. `text` is runner-internal: only
+/// `sermo::error_text` reads it, and it must never surface as a program field.
+fn leaf_error_value(error: &leaf::LeafError) -> Value {
+    let (kind, path) = error.facts();
+    let mut map = FxHashMap::default();
+    map.insert(MapKey::Str("kind".to_owned()), Value::Str(kind.to_owned()));
+    map.insert(MapKey::Str("path".to_owned()), Value::Str(path.to_owned()));
+    map.insert(MapKey::Str("text".to_owned()), Value::Str(error.to_string()));
+    Value::Map(Rc::new(RefCell::new(map)))
 }
 
 #[cfg(test)]

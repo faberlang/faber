@@ -161,13 +161,54 @@ fn failed_leaf_reply_raises_the_leaf_error_text() {
     // WHY: the leaf's own Display text is the ruled message of this error
     // (both runtimes print it), and the error carries it only as its message.
     // Comparing the whole error against the conversion error built by the same
-    // constructor pins the text together with code, issue, args and span.
+    // constructor pins the text together with code, issue, args and span. The
+    // leaf failure contributes kind and path as structured args alongside the
+    // conversion's own `detail`.
     let want = RunnerError {
         message: expected.clone(),
+        args: vec![
+            (
+                "detail".to_owned(),
+                "sermo reply conversion failed".to_owned(),
+            ),
+            ("leaf_kind".to_owned(), "NotFound".to_owned()),
+            ("leaf_path".to_owned(), PATH.to_owned()),
+        ],
         ..RunnerError::conversion(Span::default(), "sermo reply conversion failed")
     };
     assert_eq!(error, want);
     assert_eq!(error.issue, "runner_sermo_reply_conversion_failed");
     assert!(expected.contains(ROUTE), "{expected}");
     assert!(expected.contains(PATH), "{expected}");
+}
+
+#[test]
+fn failed_leaf_reply_carries_kind_and_path_facts() {
+    const ROUTE: &str = "solum:lege";
+    const PATH: &str = "/nonexistent/radix-error-channel/x";
+    let expected = faber_leaf::serve(ROUTE, &[faber_leaf::Arg::Str(PATH.to_owned())])
+        .expect("solum:lege is a leaf route")
+        .expect_err("a missing file must fail")
+        .to_string();
+
+    let fixture = fixture();
+    runner_over!(fixture, runner);
+    let Value::Sermo(sermo) = runner
+        .sermo_open(ROUTE.to_owned(), Span::default())
+        .expect("open leaf route")
+    else {
+        panic!("sermo_open did not return a sermo");
+    };
+    runner
+        .sermo_set_opener(&sermo, Value::Str(PATH.to_owned()), Span::default())
+        .expect("set opener");
+    let error = runner
+        .sermo_first_item(&sermo, Span::default())
+        .expect_err("a failed leaf reply must raise");
+
+    // The leaf's own Display text still reaches the error as its message.
+    assert_eq!(error.message, expected);
+    // Identity facts survive as structured args; prose is never asserted.
+    assert!(error.args.contains(&("leaf_kind".to_owned(), "NotFound".to_owned())));
+    assert!(error.args.contains(&("leaf_path".to_owned(), PATH.to_owned())));
 }
