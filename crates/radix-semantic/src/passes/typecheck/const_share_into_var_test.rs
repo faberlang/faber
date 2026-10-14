@@ -550,6 +550,42 @@ fn itera_method_source_binder_fresh_local_is_accepted() {
     );
 }
 
+/// 7b471d14-9 follow-up: `is_receiver_values_view` is pack-first exactly like
+/// `check_intrinsic_method_call`. Under a non-`la` pack the canonical Latin
+/// spelling is not a legal method, so it must not count as the Values view;
+/// only the active pack's surface spelling does.
+fn analyze_en(source: &str) -> test_support::AnalyzedFixture {
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("load English locale pack"),
+    );
+    test_support::analyze_source_with_config(source, config)
+}
+
+fn has_const_shared_into_var(result: &test_support::AnalyzedFixture) -> bool {
+    result.diagnostics.iter().any(|err| {
+        err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)
+    })
+}
+
+#[test]
+fn values_view_detection_is_pack_first() {
+    let en_values = "fn f(map<string, list<int>> p) → int {\n    for from p.values() const r {\n        var list<int> y ← r\n        y.append(1)\n    }\n    return 0\n}\nmain { }";
+    let en_valores = "fn f(map<string, list<int>> p) → int {\n    for from p.valores() const r {\n        var list<int> y ← r\n        y.append(1)\n    }\n    return 0\n}\nmain { }";
+
+    assert!(
+        has_const_shared_into_var(&analyze_en(en_values)),
+        "the en surface `values` is the Values view, so a binder over it must stay SEM065 {ISSUE}"
+    );
+    assert!(
+        !has_const_shared_into_var(&analyze_en(en_valores)),
+        "canonical Latin `valores` is not a method under the en pack, so it must not count as the Values view"
+    );
+}
+
 // ── `→ de T` call results beyond one free function with one `de` parameter
 // (7b471d14-10): a method call's `de` result hands back the receiver's state,
 // and a free function with several `de` parameters of the returned payload
