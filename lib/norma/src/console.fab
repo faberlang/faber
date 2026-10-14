@@ -16,6 +16,15 @@ locale = "en"
 # - Line and warning/debug output includes a newline.
 # - Partial output does not include a newline.
 
+import from "norma:fault" fault
+
+# Boundary row: the leaf's `{kind, path}` crossing record becomes the
+# declared IoFault; the reporting bodies stay canonical `call` one-liners.
+@ conversion
+fn io_fault(value raw) → fault.IoFault {
+    return fault.io_fault_from(raw)
+}
+
 
 # =========================================================================
 # STDIN - Bytes
@@ -24,13 +33,13 @@ locale = "en"
 
 # Draw bytes from stdin (sync)
 @ public
-fn read_bytes(int byte_length) → bytes {
+fn read_bytes(int byte_length) → bytes ∪ none {
     return call 'consolum:hauri' (byte_length) ↦ bytes
 }
 
 # Draw bytes from stdin (async route; Faber blocks on the frame)
 @ public
-fn read_bytes_async(int byte_length) → bytes {
+fn read_bytes_async(int byte_length) → bytes ∪ none {
     return call 'consolum:hauriet' (byte_length) ↦ bytes
 }
 
@@ -41,13 +50,13 @@ fn read_bytes_async(int byte_length) → bytes {
 
 # Read line from stdin (sync, blocks until newline)
 @ public
-fn read_line() → string {
+fn read_line() → string ∪ none {
     return call 'consolum:lege' ↦ string
 }
 
 # Read line from stdin (async route; Faber blocks on the frame)
 @ public
-fn read_line_async() → string {
+fn read_line_async() → string ∪ none {
     return call 'consolum:leget' ↦ string
 }
 
@@ -59,14 +68,14 @@ fn read_line_async() → string {
 # Pour bytes to stdout (sync)
 # Opener must be valor (SEM010); cast octeti → valor like solum.funde.
 @ public
-fn write_bytes(bytes data) → void {
+fn write_bytes(bytes data) → void ⇥ fault.IoFault {
     return call 'consolum:funde' (data ↦ value) ↦ void
 }
 
 # Pour bytes to stdout (async route; Faber blocks)
 @ public
 @ future
-fn write_bytes_async(bytes data) → void {
+fn write_bytes_async(bytes data) → void ⇥ fault.IoFault {
     return call 'consolum:funde' (data ↦ value) ↦ void
 }
 
@@ -78,13 +87,13 @@ fn write_bytes_async(bytes data) → void {
 
 # Write line to stdout with newline (sync)
 @ public
-fn write_line(string msg) → void {
+fn write_line(string msg) → void ⇥ fault.IoFault {
     return call 'consolum:scribe' (msg) ↦ void
 }
 
 # Write line to stdout with newline (async route; Faber blocks)
 @ public
-fn write_line_async(string msg) → void {
+fn write_line_async(string msg) → void ⇥ fault.IoFault {
     return call 'consolum:scribet' (msg) ↦ void
 }
 
@@ -96,13 +105,13 @@ fn write_line_async(string msg) → void {
 
 # Say text to stdout without newline (sync)
 @ public
-fn write_partial(string msg) → void {
+fn write_partial(string msg) → void ⇥ fault.IoFault {
     return call 'consolum:dic' (msg) ↦ void
 }
 
 # Say text to stdout without newline (async route; Faber blocks)
 @ public
-fn write_partial_async(string msg) → void {
+fn write_partial_async(string msg) → void ⇥ fault.IoFault {
     return call 'consolum:dicet' (msg) ↦ void
 }
 
@@ -114,13 +123,13 @@ fn write_partial_async(string msg) → void {
 
 # Warn line to stderr with newline (sync)
 @ public
-fn warn_line(string msg) → void {
+fn warn_line(string msg) → void ⇥ fault.IoFault {
     return call 'consolum:mone' (msg) ↦ void
 }
 
 # Warn line to stderr with newline (async route; Faber blocks)
 @ public
-fn warn_line_async(string msg) → void {
+fn warn_line_async(string msg) → void ⇥ fault.IoFault {
     return call 'consolum:monet' (msg) ↦ void
 }
 
@@ -132,13 +141,13 @@ fn warn_line_async(string msg) → void {
 
 # Debug line with newline (sync)
 @ public
-fn debug_line(string msg) → void {
+fn debug_line(string msg) → void ⇥ fault.IoFault {
     return call 'consolum:vide' (msg) ↦ void
 }
 
 # Debug line with newline (async route; Faber blocks)
 @ public
-fn debug_line_async(string msg) → void {
+fn debug_line_async(string msg) → void ⇥ fault.IoFault {
     return call 'consolum:videbit' (msg) ↦ void
 }
 
