@@ -55,8 +55,7 @@ pub fn reject_bits_type(types: &TypeTable, target: Target) -> Result<(), Codegen
     };
     Err(CodegenError {
         message: format!(
-            "the raw-bits type `{marker}` is not supported on the {target:?} target: \
-             only the Faber source emitter and the MIR runner implement it"
+            "the raw-bits type `{marker}` has no carrier on the {target:?} target"
         ),
         args: vec![
             DiagnosticArg::new("issue", ISSUE),
