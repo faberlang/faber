@@ -96,7 +96,7 @@ glyph = "/"
 codepoint = "U+002F"
 unicode_name = "SOLIDUS"
 role = "arithmetic"
-claiming_slots = ["multiplicative_expr"]
+claiming_slots = ["multiplicative_expr", "regex_literal"]
 
 [[glyphs]]
 glyph = ":"
@@ -848,6 +848,14 @@ BACKTICK_STRING ::=
 @status capture-pending
 OCTETI_STRING ::=
 
+# the file locale's regex type word (English `regex`); the lexer opens a raw body at `/` only after this spelling or `_`; not a lexer token
+@status capture-pending
+REGEX_TYPE_WORD ::=
+
+# scan.rs scan_slash; raw body between slashes, only after the regex type word or `_`; TokenKind::RegexString
+@status capture-pending
+REGEX_BODY ::=
+
 # scan.rs scan_line_break; LF or CRLF; TokenKind::Newline
 @status capture-pending
 NEWLINE ::=
@@ -1462,7 +1470,19 @@ template_argument := 'sparge'? IDENTIFIER ':' expression
 # is claimed only in the literal slot (a following `(` keeps it a call).
 literal := NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING
          | 'verum' | 'falsum' | 'nulla' | '∞' | 'nonnumerus'
-primary := IDENTIFIER | literal | 'ego'
+# The inline regex literal (ruling d381ae56): the file locale's regex type
+# word followed by a slash-delimited raw body, or `_` followed by the body
+# when the expected slot supplies the type. A bare `/pattern/` is not legal:
+# the lexer opens a body only when the previous significant token is the
+# regex type word or `_`, so any other `/` in operand position stays the
+# division operator (or a parse error), and a binding named `regex` used as
+# the left operand of a division is written `(regex) / 2`. The body is raw to
+# the next unescaped `/` on the same line: `\/` writes a literal slash, Faber
+# processes no other backslash escape, an empty pattern (`//`) is rejected,
+# and there are no suffix flags (the inline `(?i)` form is the spelling). The
+# literal is checked at `faber check` and is infallible once accepted.
+regex_literal := REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
+primary := IDENTIFIER | literal | regex_literal | 'ego'
          | array_literal | json_literal | typed_constructor | iuncta_expr
          | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr
          | first_match_expr

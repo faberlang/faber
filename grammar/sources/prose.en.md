@@ -1496,7 +1496,9 @@ They are not interchangeable synonyms.
 | `` `...` `` | `forma` | captured templates; `(...)` captures |
 | `{ ... }` | `json` | compile-time object-rooted JSON document (`:` inside) |
 | `\|...\|` | `octeti` | compile-time hex bytes |
-| `"..." ↦ regex` | `regex` | compiled pattern from text conversion |
+| `"..." ↦ regex` | `regex` | compiled pattern from dynamic text (conversion) |
+| `regex /.../` | `regex` | inline raw pattern literal (locale regex type word) |
+| `_ /.../` | `regex` | inferred inline raw pattern literal |
 | `[ ... ]` | `lista<T>` | Faber list (not JSON array, not bytes) |
 
 `§` (U+00A7) is a template hole in Unicode forms (`"`, `«`, `` ` ``).
@@ -1514,10 +1516,9 @@ parameters without rendering. Safe for bound SQL/URL payloads; do not use
 Block `textus` uses guillemets `«...»`. The heavy quotation-mark
 pair is retired (too visually close to `"` in many fonts).
 
-Implementation status (2026-06-30):
+Implementation status (2026-10-11):
 
-- Shipped: `"..."`, `«...»` block `textus`, `'...'` → `ascii`, `` `...` `` → `forma`, `|...|` → `octeti`, `{ ... }` → `json`, and text/ascii `↦ regex`.
-- Pending factory delivery: slash-delimited `/.../` regex literals.
+- Shipped: `"..."`, `«...»` block `textus`, `'...'` → `ascii`, `` `...` `` → `forma`, `|...|` → `octeti`, `{ ... }` → `json`, text/ascii `↦ regex`, and the inline regex literals `regex /.../` and `_ /.../`.
 
 Inline block example:
 
@@ -1735,13 +1736,20 @@ the import alias, and the `∷` cast is a full type annotation
 
 `∷` remains the general postfix ascription in `cast`. Rendered text templates
 (`STRING '(' argumentList ')'`) and captured `forma` templates
-(`BACKTICK_STRING '(' argumentList ')'`) use the ordinary call suffix. Regex
-construction uses the ordinary conversio grammar: `(STRING | ASCII_STRING) '↦'
-'regex'`.
+(`BACKTICK_STRING '(' argumentList ')'`) use the ordinary call suffix.
 
-Slash-delimited regex literals are not active grammar yet. `/` lexes as the
-division operator, while `//` and `/* ... */` are rejected as invalid comments.
-Use `"..." ↦ regex` for compiled regex values.
+The inline regex literal is the file locale's regex type word followed by a
+slash-delimited raw body (`regex /pattern/`), or `_` followed by the body when
+the expected slot supplies the type (`_ /pattern/`). A bare `/pattern/` is not
+legal: the lexer opens a body only when the previous significant token is the
+regex type word or `_`, so any other `/` in operand position stays the division
+operator (or a parse error), and a binding named `regex` used as the left
+operand of a division is written `(regex) / 2`. The body is raw to the next
+unescaped `/` on the same line: `\/` writes a literal slash, Faber processes no
+other backslash escape, an empty pattern (`//`) is rejected, and there are no
+suffix flags (use the inline `(?i)` form). The literal is checked at `faber
+check` and is infallible once accepted. `"..." ↦ regex` (and `ascii ↦ regex`)
+remains the compiled-pattern conversion for dynamic text.
 
 ---
 
@@ -1992,7 +2000,6 @@ typing, and lowering work is complete; each row records that state.
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | Multi-subject `discerne` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |
-| Slash-delimited regex literals | pending; use `"…" ↦ regex` |
 
 ---
 
