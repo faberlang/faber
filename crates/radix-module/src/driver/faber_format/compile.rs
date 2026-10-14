@@ -98,9 +98,9 @@ pub fn reemit_faber(source_session: &Session, emit_pack: &LocalePack, name: &str
             .resolver
             .generated_companion_spellings(&analysis.interner),
     );
-    match super::FaberCodegen::new(&analysis.types, &analysis.interner)
+    match crate::codegen::faber::FaberCodegen::new(&analysis.types, &analysis.interner)
         .with_imported_spellings(&imported_spellings.by_type, &by_def, &imported_spellings.by_def_pattern)
-        .generate(&analysis.hir, &analysis.presentation, &super::LocaleKeywordBridge(surface))
+        .generate(&analysis.hir, &analysis.presentation, &crate::codegen::faber::LocaleKeywordBridge(surface))
     {
         Ok(output) => {
             let output = FaberOutput { code: output.code };
@@ -933,10 +933,10 @@ pub fn emit_from_analyzed(
     let latin = latin_locale_pack();
     let surface = KeywordSurface::new(&latin);
     // No presentation sidecar on this loose entry: render trivia-free.
-    let output = super::FaberCodegen::new(types, interner).generate(
+    let output = crate::codegen::faber::FaberCodegen::new(types, interner).generate(
         hir,
-        &super::empty_presentation(),
-        &super::LocaleKeywordBridge(surface),
+        &crate::codegen::faber::empty_presentation(),
+        &crate::codegen::faber::LocaleKeywordBridge(surface),
     )?;
     Ok(FaberOutput { code: output.code })
 }

@@ -3,7 +3,7 @@
 //! `@ privata` / `@ interna` on a field or method is a checked visibility, so
 //! format and convert must keep it on every member in the target locale.
 
-use super::reemit_faber;
+use crate::driver::reemit_faber;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::locale::LocalePack;

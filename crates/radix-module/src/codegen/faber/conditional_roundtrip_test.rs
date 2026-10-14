@@ -4,7 +4,7 @@
 //! never a chained (nested) conditional, since the parser rejects nesting
 //! (D4.6) and emitted Faber must re-parse.
 
-use super::reemit_faber;
+use crate::driver::reemit_faber;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::locale::LocalePack;

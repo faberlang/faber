@@ -166,7 +166,7 @@ fn execute_roundtrip(_cases: &[Case], target: &str, _discover_ms: f64, _started:
 #[cfg(feature = "hir-faber")]
 fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: Instant) {
     use super::Judged;
-    use radix::module::codegen::faber::reemit_faber;
+    use radix::module::driver::reemit_faber;
     use radix::module::driver::{Config, Session};
     use radix::module::locale::latin_locale_pack;
 

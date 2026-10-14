@@ -163,7 +163,7 @@ fn fhir_core_renders_localized_surfaces_and_reparses_idempotently() {
         let pack = pack_for(locale);
         let config = Config::default().with_resolved_locale_pack(pack.clone());
         let session = Session::new(config);
-        let result = radix_module::codegen::faber::compile::reemit_faber(&session, &pack, "fhir-locale.re.fab", code);
+        let result = radix_module::driver::reemit_faber(&session, &pack, "fhir-locale.re.fab", code);
         assert!(
             result.success(),
             "{locale}: rendered output must reparse cleanly: {:?}\n{code}",

@@ -3,13 +3,6 @@
 
 pub use radix_hir_faber::{FaberCodegen, FaberOutput, empty_presentation};
 
-pub mod compile;
-mod meaning;
-pub use compile::{FaberReemitResult, emit_from_analyzed, reemit_faber};
-
-#[doc(hidden)]
-pub mod test_gate;
-
 #[cfg(test)]
 #[path = "convert_regression_test.rs"]
 mod convert_regression_test;

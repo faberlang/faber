@@ -3,8 +3,8 @@
 use super::format::{
     format_session, formatted_source_for_write, normalize_trailing_newline, source_for_compare,
 };
-use radix::module::codegen::faber::reemit_faber;
-use radix::module::codegen::faber::test_gate::{
+use radix::module::driver::reemit_faber;
+use radix::module::driver::faber_format::test_gate::{
     assert_canonical_idempotent_with_session, assert_canonical_reparses_with,
     canonical_format_once_with_session,
 };

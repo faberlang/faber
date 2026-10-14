@@ -11,7 +11,7 @@
 //! 4. **Full fan-out** — every input locale × every output locale (7×7 = 49 pairs)
 
 use crate::codegen::Target;
-use crate::codegen::faber::reemit_faber;
+use crate::driver::reemit_faber;
 use crate::driver::{Config, Session};
 use crate::locale::LocalePack;
 use crate::locale::TypeBindingKind;

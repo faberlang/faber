@@ -924,7 +924,7 @@ fn convert_construct_loss_diagnostic_carries_code_issue_and_construct() {
         .expect("hook fixture must resolve a session");
     let emit_pack = faber_cli::package::embedded_conversion_locale_pack("la").expect("la pack");
     let result =
-        radix::module::codegen::faber::reemit_faber(&session, &emit_pack, "lossy.fab", HOOK_SOURCE);
+        radix::module::driver::reemit_faber(&session, &emit_pack, "lossy.fab", HOOK_SOURCE);
     assert!(result.output.is_none(), "a lossy conversion writes nothing");
     let refusal = result
         .diagnostics

@@ -2,7 +2,7 @@
 //!
 //! Reads every `corpus-product/format/*.fab` fixture and formats it through
 //! the exact CLI path FR-2 will install: [`super::format::format_session`] +
-//! [`radix::module::codegen::faber::reemit_faber`] +
+//! [`radix::module::driver::reemit_faber`] +
 //! [`super::format::formatted_source_for_write`]. Output must match
 //! `*.format.expected`. Each fixture is idempotent, byte-stable, and
 //! re-parses under its own locale pack.
@@ -12,8 +12,8 @@
 #![cfg(feature = "hir-faber")]
 
 use super::format::{format_session, formatted_source_for_write};
-use radix::module::codegen::faber::reemit_faber;
-use radix::module::codegen::faber::test_gate::{
+use radix::module::driver::reemit_faber;
+use radix::module::driver::faber_format::test_gate::{
     assert_canonical_idempotent_with_session, lex_parse_with_pack,
 };
 use radix::module::lexer::TokenKind;

@@ -5,7 +5,7 @@
 //! pins name the carrier each backend must use.
 
 use crate::codegen::Target;
-use crate::codegen::faber::reemit_faber;
+use crate::driver::reemit_faber;
 use crate::driver::{Config, ModuleCompileRequest, Session, compile};
 
 const COMPOSITE: &str = r#"

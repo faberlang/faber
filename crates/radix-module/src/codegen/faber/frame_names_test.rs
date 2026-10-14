@@ -6,7 +6,7 @@
 //! else; and the HIR-backed Faber emitter re-spells the family per target
 //! pack, so la→en→la round-trips.
 
-use super::reemit_faber;
+use crate::driver::reemit_faber;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::locale::LocalePack;

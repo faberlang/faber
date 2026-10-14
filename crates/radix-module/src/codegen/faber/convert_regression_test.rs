@@ -6,7 +6,7 @@
 //! the converted output re-parses and typechecks under the en pack (the
 //! converted-output-compiles oracle).
 
-use super::reemit_faber;
+use crate::driver::reemit_faber;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::services::check_diagnostics_for_source_with_locale_pack;
