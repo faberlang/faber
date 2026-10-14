@@ -36,7 +36,17 @@ fn device_values(kernel_source: &str, inputs: &[&[f32]], output_len: usize) -> V
     let library = device
         .new_library_with_source(&output.code, &CompileOptions::new())
         .expect("the emitted Metal compiles on device");
-    let function = library.get_function("k", None).expect("kernel entry `k`");
+    // ca2499dc-3.1: the compiler names the entry `k<function id>`; take it
+    // from the emitted reflection instead of the author's `k` (decoration only).
+    let entry = output
+        .reflection
+        .as_ref()
+        .and_then(|reflection| reflection.kernels.first())
+        .map(|kernel| kernel.entry_name.as_str())
+        .expect("the Metal reflection names the kernel entry");
+    let function = library
+        .get_function(entry, None)
+        .expect("the reflected kernel entry");
     let pipeline = device
         .new_compute_pipeline_state_with_function(&function)
         .expect("pipeline builds");
