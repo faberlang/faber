@@ -18,6 +18,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -27,6 +28,9 @@ const CASE_TIMEOUT_SECS: u64 = 120;
 /// target prepare command. Those compile many members at once and legitimately outlast
 /// a single case.
 const SUITE_STEP_TIMEOUT: Duration = Duration::from_secs(600);
+/// Grace for the drain threads after the process group is killed: a descendant
+/// that called `setsid` escapes the group kill and can still hold a pipe.
+const DRAIN_GRACE: Duration = Duration::from_secs(2);
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -228,8 +232,9 @@ fn run_bounded(command: &mut Command, stdin: Stdio, limit: Duration) -> Result<O
     #[cfg(unix)]
     std::os::unix::process::CommandExt::process_group(command, 0);
     let mut child = command.spawn().map_err(ChildError::Io)?;
-    let stdout = drain(child.stdout.take());
-    let stderr = drain(child.stderr.take());
+    let (drained, receiver) = mpsc::channel();
+    drain(child.stdout.take(), 0, drained.clone());
+    drain(child.stderr.take(), 1, drained);
     let deadline = Instant::now() + limit;
     let status = loop {
         match child.try_wait() {
@@ -244,22 +249,62 @@ fn run_bounded(command: &mut Command, stdin: Stdio, limit: Duration) -> Result<O
             Err(error) => return Err(ChildError::Io(error)),
         }
     };
-    Ok(Output {
-        status,
-        stdout: stdout.join().unwrap_or_default(),
-        stderr: stderr.join().unwrap_or_default(),
-    })
+    // The deadline stays in force past the direct child's exit: a descendant that
+    // inherited a pipe keeps it open, so joining the drain threads could block
+    // until that descendant exits on its own.
+    let mut parts = [None, None];
+    if collect_drains(&receiver, &mut parts, deadline) {
+        return Ok(Output {
+            status,
+            stdout: parts[0].take().unwrap_or_default(),
+            stderr: parts[1].take().unwrap_or_default(),
+        });
+    }
+    // Pipes still open at the deadline. Kill the group — the leader's pgid stays
+    // valid while any member lives — then reap the child and give the drains a
+    // short grace. A descendant that called `setsid` escapes the kill and can
+    // still hold a pipe, so the detached drain threads are abandoned rather than
+    // joined; dropping the receiver makes their final send fail harmlessly.
+    kill_process_group(child.id());
+    child.wait().ok();
+    collect_drains(&receiver, &mut parts, Instant::now() + DRAIN_GRACE);
+    Err(ChildError::Timeout(limit))
 }
 
-/// Read a child pipe on its own thread so a chatty child cannot fill it and stall.
-fn drain(pipe: Option<impl Read + Send + 'static>) -> thread::JoinHandle<Vec<u8>> {
+/// Read a child pipe on its own detached thread so a chatty child cannot fill it
+/// and stall; the buffer goes to `drained` tagged by stream once EOF is reached.
+fn drain(
+    pipe: Option<impl Read + Send + 'static>,
+    which: usize,
+    drained: Sender<(usize, Vec<u8>)>,
+) {
     thread::spawn(move || {
         let mut bytes = Vec::new();
         if let Some(mut pipe) = pipe {
             pipe.read_to_end(&mut bytes).ok();
         }
-        bytes
-    })
+        drained.send((which, bytes)).ok();
+    });
+}
+
+/// Collect both drain results into `parts`, bounded by `deadline`. Returns whether
+/// both streams reported EOF in time.
+fn collect_drains(
+    receiver: &Receiver<(usize, Vec<u8>)>,
+    parts: &mut [Option<Vec<u8>>; 2],
+    deadline: Instant,
+) -> bool {
+    while parts[0].is_none() || parts[1].is_none() {
+        let now = Instant::now();
+        if now >= deadline {
+            return false;
+        }
+        match receiver.recv_timeout(deadline - now) {
+            Ok((which, bytes)) => parts[which] = Some(bytes),
+            Err(_) => return false,
+        }
+    }
+    true
 }
 
 #[cfg(unix)]
