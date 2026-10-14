@@ -57,9 +57,11 @@ incipit {
 }
 
 #[test]
-fn bounded_lista_length_mismatch_is_recoverable() {
-    // Two bounded lists of one type with different live lengths leave through
-    // the recoverable runtime-failure path (D6), like a push at capacity.
+fn bounded_lista_length_mismatch_is_fatal_even_under_a_handler() {
+    // Two bounded lists of one type with different live lengths stop the
+    // program: the operator dies and `catch` cannot take it (memo E3,
+    // ruling of 2026-10-08). `runner_failure` panics on success, so reaching
+    // the assertion already proves the handler did not run.
     let source = r#"
 functio pair(lista<f32, 4> x, lista<f32, 4> y) → numerus ⇥ textus {
     fixum lista<f32, 4> total ← x + y
@@ -85,7 +87,11 @@ incipit {
     nota "after"
 }
 "#;
-    assert_eq!(run(source), ["2", "caught", "after"]);
+    let failure = runner_failure(source);
+    assert!(
+        failure.contains("runner_bounded_lista_elementwise_length_mismatch"),
+        "{failure}"
+    );
 }
 
 #[test]

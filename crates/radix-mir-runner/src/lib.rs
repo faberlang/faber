@@ -2087,7 +2087,6 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                             if matches!(
                                 error.issue.as_str(),
                                 "runner_collection_push_capacity"
-                                    | RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH
                                     | RUNNER_JSON_PARSE_FAILED
                                     | "runner_tensor_shape_mismatch"
                                     | "runner_tensor_shape_invalid_extent"
