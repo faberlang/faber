@@ -243,7 +243,7 @@ fn emit_retry_reports_forbidden_effect_once() {
 }
 
 #[test]
-fn package_analysis_config_keeps_the_pack_explicit() {
+fn package_analysis_config_leaves_file_locale_declarations_in_charge() {
     let dir = tempfile::tempdir().expect("temp dir");
     let input = fixture(dir.path(), "c.fab", CONSTS);
     let command = emit_command(&input, Target::HirTypeScript);
@@ -251,11 +251,17 @@ fn package_analysis_config_keeps_the_pack_explicit() {
 
     let config = emit::package_analysis_config(&command, Some(&pack));
     assert!(
-        config.locale_pack_explicit,
-        "the retry config must install the resolved pack as an explicit selection"
+        !config.locale_pack_explicit,
+        "the retry config must leave each file's frontmatter locale in charge"
     );
     assert!(
-        !emit::package_analysis_config(&command, None).locale_pack_explicit,
-        "without a pack there is no explicit selection"
+        config.locale_pack.is_some(),
+        "the retry config still carries the resolved pack as the fallback"
+    );
+    assert!(
+        emit::package_analysis_config(&command, None)
+            .locale_pack
+            .is_none(),
+        "without a pack there is no reader pack to carry"
     );
 }
