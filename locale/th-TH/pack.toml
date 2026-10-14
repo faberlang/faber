@@ -292,6 +292,10 @@ help = "ตรวจตัวคั่นตัวเลขและคำนำ
 message = "ลำดับ escape ไม่ถูกต้อง"
 help = "ใช้ลำดับ escape ที่รองรับ หรือ escape backslash"
 
+[diagnostics.LEX003.issues.unknown_escape]
+message = "escape ที่ไม่รู้จัก `\\{escape}`; literal escape ได้เฉพาะตัวคั่นของตัวเอง, backslash, n, t, r และ u{...}"
+help = "ลบ backslash ออก หรือเขียน `\\\\` สำหรับ backslash"
+
 [diagnostics.LEX004]
 message = "พบอักขระที่ไม่คาดคิด"
 help = "ลบอักขระนี้ หรือ escape หากต้องการให้เป็นลิเทอรัล"
