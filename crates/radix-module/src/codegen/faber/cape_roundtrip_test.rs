@@ -6,8 +6,8 @@
 //! emitted body), and en→en format must agree with the round-tripped en so the
 //! handler attachment is preserved rather than moved to a stray statement.
 
-use crate::driver::reemit_faber;
 use crate::codegen::Target;
+use crate::driver::reemit_faber;
 use crate::driver::{Config, Session};
 use crate::locale::LocalePack;
 

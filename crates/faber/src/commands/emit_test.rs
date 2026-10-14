@@ -88,22 +88,32 @@ fn emit_retry_folds_imported_comptime_for_ts_and_go() {
         let command = emit_command(&consumer, target);
         let pack = code_pack(&command);
         let single = single_file_result(&command, pack.as_ref());
-        assert!(single.output.is_none(), "{target}: expected the single-file refusal");
         assert!(
-            issues(&single).iter().any(|issue| issue == "praefixum_import_unavailable"),
+            single.output.is_none(),
+            "{target}: expected the single-file refusal"
+        );
+        assert!(
+            issues(&single)
+                .iter()
+                .any(|issue| issue == "praefixum_import_unavailable"),
             "{target}: expected the structured import refusal, got {:?}",
             issues(&single)
         );
 
-        let retried =
-            emit::retry_single_file_via_package_analysis(&command, pack.as_ref(), single);
+        let retried = emit::retry_single_file_via_package_analysis(&command, pack.as_ref(), single);
         let retry_issues = issues(&retried);
-        let output = retried.output.unwrap_or_else(|| {
-            panic!("{target}: retry emitted nothing: {retry_issues:?}")
-        });
+        let output = retried
+            .output
+            .unwrap_or_else(|| panic!("{target}: retry emitted nothing: {retry_issues:?}"));
         let code = radix::services::output_code(output);
-        assert!(code.contains('7'), "{target}: folded constant missing from output:\n{code}");
-        assert!(!code.contains("seven()"), "{target}: output still calls seven:\n{code}");
+        assert!(
+            code.contains('7'),
+            "{target}: folded constant missing from output:\n{code}"
+        );
+        assert!(
+            !code.contains("seven()"),
+            "{target}: output still calls seven:\n{code}"
+        );
     }
 }
 
@@ -117,7 +127,10 @@ fn emit_retry_skips_package_analysis_for_unrelated_error() {
     let single = single_file_result(&command, pack.as_ref());
     assert!(single.output.is_none());
     let expected = issues(&single);
-    assert!(!expected.is_empty(), "expected single-file diagnostics from the undefined name");
+    assert!(
+        !expected.is_empty(),
+        "expected single-file diagnostics from the undefined name"
+    );
 
     emit::reset_package_analysis_entries();
     let retried = emit::retry_single_file_via_package_analysis(&command, pack.as_ref(), single);
@@ -163,14 +176,18 @@ fn emit_retry_matches_single_file_output_for_plain_imports() {
                     let package_issues = issues(&package);
                     let package_code = package.output.map(radix::services::output_code);
 
-                    let context =
-                        format!("{target} locale={locale:?} mode={output_mode:?} module={module_name:?}");
+                    let context = format!(
+                        "{target} locale={locale:?} mode={output_mode:?} module={module_name:?}"
+                    );
                     match (single_code, package_code) {
                         (Some(single_code), Some(package_code)) => {
                             assert_eq!(single_code, package_code, "parity for {context}");
                         }
                         (None, None) => {
-                            assert_eq!(single_issues, package_issues, "refusal parity for {context}");
+                            assert_eq!(
+                                single_issues, package_issues,
+                                "refusal parity for {context}"
+                            );
                         }
                         (single_code, package_code) => {
                             panic!(
@@ -197,19 +214,30 @@ fn emit_retry_reports_forbidden_effect_once() {
     let single = single_file_result(&command, pack.as_ref());
     assert!(single.output.is_none());
     assert!(
-        issues(&single).iter().any(|issue| issue == "praefixum_import_unavailable"),
+        issues(&single)
+            .iter()
+            .any(|issue| issue == "praefixum_import_unavailable"),
         "expected the single-file import refusal, got {:?}",
         issues(&single)
     );
 
     emit::reset_package_analysis_entries();
     let retried = emit::retry_single_file_via_package_analysis(&command, pack.as_ref(), single);
-    assert_eq!(emit::package_analysis_entries(), 1, "the retry runs exactly once");
+    assert_eq!(
+        emit::package_analysis_entries(),
+        1,
+        "the retry runs exactly once"
+    );
     assert!(retried.output.is_none());
     let forbidden = retried
         .diagnostics
         .iter()
         .filter(|diagnostic| diagnostic.issue() == Some("praefixum_forbidden"))
         .count();
-    assert_eq!(forbidden, 1, "expected one forbidden-effect diagnostic: {:?}", issues(&retried));
+    assert_eq!(
+        forbidden,
+        1,
+        "expected one forbidden-effect diagnostic: {:?}",
+        issues(&retried)
+    );
 }

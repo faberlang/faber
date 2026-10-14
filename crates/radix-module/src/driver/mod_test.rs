@@ -8,9 +8,9 @@
 
 use super::{AnalyzeRequest, ModuleCompileRequest, compile};
 use crate::codegen::Target;
+use crate::diagnostics::DiagnosticArg;
 #[cfg(feature = "hir-faber")]
 use crate::driver::reemit_faber;
-use crate::diagnostics::DiagnosticArg;
 #[cfg(feature = "hir-faber")]
 use crate::driver::{Config, Session};
 use crate::test_support::test_session;

@@ -100,8 +100,11 @@ pub fn reemit_faber(source_session: &Session, emit_pack: &LocalePack, name: &str
     );
     match crate::codegen::faber::FaberCodegen::new(&analysis.types, &analysis.interner)
         .with_imported_spellings(&imported_spellings.by_type, &by_def, &imported_spellings.by_def_pattern)
-        .generate(&analysis.hir, &analysis.presentation, &crate::codegen::faber::LocaleKeywordBridge(surface))
-    {
+        .generate(
+            &analysis.hir,
+            &analysis.presentation,
+            &crate::codegen::faber::LocaleKeywordBridge(surface),
+        ) {
         Ok(output) => {
             let output = FaberOutput { code: output.code };
             // Structure comes after revalidation so the emitted text is known to

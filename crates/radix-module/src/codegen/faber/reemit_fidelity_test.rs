@@ -5,8 +5,8 @@
 //! contracts: the emitted spelling for the construct under test, and
 //! idempotence (re-emitting the emitted source is byte-identical).
 
-use crate::driver::reemit_faber;
 use crate::Target;
+use crate::driver::reemit_faber;
 use crate::driver::{AnalyzeRequest, Config, ModuleImportContract, Session, analyze_source};
 use crate::file_interface::{FileExport, FileExportKind, FileInterface, InterfaceEnumVariant, InterfaceNominalExport};
 use crate::import_resolve::library_home_test_support;
@@ -420,8 +420,9 @@ locale = "la"
     );
 
     let shortened = output.replace("token.TokenKind.Palabra", "token.Palabra");
-    let diagnostic = crate::driver::faber_format::compile::revalidate_emitted_output(&session, &name, &shortened, &analysis, &latin)
-        .expect_err("shortened imported variant path must fail re-validation");
+    let diagnostic =
+        crate::driver::faber_format::compile::revalidate_emitted_output(&session, &name, &shortened, &analysis, &latin)
+            .expect_err("shortened imported variant path must fail re-validation");
     assert_eq!(diagnostic.code, Some("CODEGEN006"));
     assert_eq!(diagnostic.issue(), Some("variant_path_spelling_multiset_diverged"));
     assert_eq!(
@@ -471,9 +472,14 @@ fn canonical_revalidation_rejects_swapped_same_typed_sites() {
     let swapped = emitted
         .replace("lista<exactus<u32>> first", "lista<u32> first")
         .replace("lista<u32> second", "lista<exactus<u32>> second");
-    let diagnostic =
-        crate::driver::faber_format::compile::revalidate_emitted_output(&session, "swapped-sites.fab", &swapped, &analysis, &latin)
-            .expect_err("swapping same-typed authored forms must fail the occurrence-aware gate");
+    let diagnostic = crate::driver::faber_format::compile::revalidate_emitted_output(
+        &session,
+        "swapped-sites.fab",
+        &swapped,
+        &analysis,
+        &latin,
+    )
+    .expect_err("swapping same-typed authored forms must fail the occurrence-aware gate");
     assert_eq!(diagnostic.code, Some("CODEGEN006"));
     assert_eq!(diagnostic.issue(), Some("authored_type_form_map_diverged"));
 }
@@ -1109,8 +1115,14 @@ fn canonical_revalidation_refuses_an_emitter_that_changes_meaning() {
 
     // A deliberately broken emitter: same shape, same types, other meaning.
     let broken = emitted.replace("x + x", "x * x");
-    let diagnostic = crate::driver::faber_format::compile::revalidate_emitted_output(&session, "meaning.fab", &broken, &analysis, &latin)
-        .expect_err("an emitter that changes meaning must be refused");
+    let diagnostic = crate::driver::faber_format::compile::revalidate_emitted_output(
+        &session,
+        "meaning.fab",
+        &broken,
+        &analysis,
+        &latin,
+    )
+    .expect_err("an emitter that changes meaning must be refused");
     assert_eq!(diagnostic.code, Some("CODEGEN006"));
     assert_eq!(diagnostic.issue(), Some("hir_meaning_diverged"));
     assert_eq!(
@@ -1206,8 +1218,14 @@ fn closure_body_breakability_revalidation_rejects_added_fac_scope() {
     )
     .expect("analyze closure");
     let changed = "functio f() { () → numerus ∴ fac { redde 1 } }\n";
-    let diagnostic = crate::driver::faber_format::compile::revalidate_emitted_output(&session, "closure.fab", changed, &analysis, &latin)
-        .expect_err("adding a breakable closure scope changes HIR meaning");
+    let diagnostic = crate::driver::faber_format::compile::revalidate_emitted_output(
+        &session,
+        "closure.fab",
+        changed,
+        &analysis,
+        &latin,
+    )
+    .expect_err("adding a breakable closure scope changes HIR meaning");
     assert_eq!(diagnostic.code, Some("CODEGEN006"));
     assert_eq!(diagnostic.issue(), Some("hir_meaning_diverged"));
 }
@@ -1309,13 +1327,25 @@ fn float_literal_normalization_still_refuses_a_different_value() {
     )
     .expect("analyze float source");
     let faithful = emit_once(FLOAT_SLOT_INTEGER_SOURCE);
-    crate::driver::faber_format::compile::revalidate_emitted_output(&session, "float.fab", &faithful, &analysis, &latin)
-        .expect("the faithful re-emission is the same program");
+    crate::driver::faber_format::compile::revalidate_emitted_output(
+        &session,
+        "float.fab",
+        &faithful,
+        &analysis,
+        &latin,
+    )
+    .expect("the faithful re-emission is the same program");
     for (from, to) in [("255.0", "254.0"), ("÷ 2.0", "÷ 3.0")] {
         assert!(faithful.contains(from), "{faithful}");
         let changed = faithful.replace(from, to);
-        let diagnostic = crate::driver::faber_format::compile::revalidate_emitted_output(&session, "float.fab", &changed, &analysis, &latin)
-            .expect_err("a different float value changes meaning");
+        let diagnostic = crate::driver::faber_format::compile::revalidate_emitted_output(
+            &session,
+            "float.fab",
+            &changed,
+            &analysis,
+            &latin,
+        )
+        .expect_err("a different float value changes meaning");
         assert_eq!(diagnostic.issue(), Some("hir_meaning_diverged"), "{from}");
     }
 }

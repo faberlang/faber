@@ -5,8 +5,8 @@
 //! the authored initializer is printed as written. The constant needs no new
 //! backend code: Rust sees a plain `let` with the authored initializer.
 
-use crate::driver::reemit_faber;
 use crate::codegen::Target;
+use crate::driver::reemit_faber;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 use crate::locale::LocalePack;
 

@@ -7,8 +7,8 @@
 //! the construct survives in the emitted text itself — `hir_meaning_diverged`
 //! (the post-emit re-validation) must not be the only guard.
 
-use crate::driver::reemit_faber;
 use crate::codegen::Target;
+use crate::driver::reemit_faber;
 use crate::driver::{Config, Session};
 use crate::locale::LocalePack;
 

@@ -26,10 +26,10 @@
 //! parse result without a program, is converted into an explicit diagnostic so
 //! callers still receive the same failure surface.
 
-mod file_frontmatter;
-mod frontmatter;
 #[cfg(feature = "hir-faber")]
 pub mod faber_format;
+mod file_frontmatter;
+mod frontmatter;
 mod insere;
 mod praefixum;
 mod session;

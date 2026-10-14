@@ -4,8 +4,8 @@
 //! pack's `fixum` spelling (en `const`) and the authored initializer as
 //! written. The genus `generis` field keeps its modifier.
 
-use crate::driver::reemit_faber;
 use crate::codegen::Target;
+use crate::driver::reemit_faber;
 use crate::driver::{Config, Session};
 use crate::locale::LocalePack;
 

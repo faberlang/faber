@@ -259,7 +259,12 @@ pub(super) fn emit_through_package_analysis(
         &faber_cli::package::faber_analysis_seams(),
     ) {
         Ok(package) => package,
-        Err(diagnostics) => return radix::CompileResult { output: None, diagnostics },
+        Err(diagnostics) => {
+            return radix::CompileResult {
+                output: None,
+                diagnostics,
+            };
+        }
     };
     let source = match std::fs::read_to_string(&input) {
         Ok(source) => source,
@@ -275,10 +280,16 @@ pub(super) fn emit_through_package_analysis(
         }
     };
     let Some(entry) = package.entry.clone() else {
-        return radix::CompileResult { output: None, diagnostics: package.diagnostics };
+        return radix::CompileResult {
+            output: None,
+            diagnostics: package.diagnostics,
+        };
     };
     let Some(node) = package.nodes.remove(&entry) else {
-        return radix::CompileResult { output: None, diagnostics: package.diagnostics };
+        return radix::CompileResult {
+            output: None,
+            diagnostics: package.diagnostics,
+        };
     };
     let name = input.display().to_string();
     let session = radix::driver::Session::new(config);

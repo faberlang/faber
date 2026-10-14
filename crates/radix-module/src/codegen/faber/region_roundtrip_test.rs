@@ -6,8 +6,8 @@
 //! above the declaration as the module doc; a block separated from it by a
 //! blank line is a note.
 
-use crate::driver::reemit_faber;
 use crate::codegen::Target;
+use crate::driver::reemit_faber;
 use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::locale::LocalePack;
 

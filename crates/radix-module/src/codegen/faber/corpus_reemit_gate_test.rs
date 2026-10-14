@@ -16,8 +16,8 @@
 //! and owner; a listed file that starts passing fails the gate so the list
 //! stays honest.
 
-use crate::driver::reemit_faber;
 use crate::codegen::Target;
+use crate::driver::reemit_faber;
 use crate::driver::{Config, Session};
 use crate::locale::LocalePack;
 use std::collections::BTreeMap;
