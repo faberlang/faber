@@ -834,13 +834,63 @@ fn llvm_verifier_available() -> bool {
     probe("llvm-as") || probe("opt")
 }
 
+/// A missing external toolchain may skip a proof only on the Linux merge-lane
+/// gate (which has no ghc/go/python>=3.12/llvm-as/rustfmt toolchain) or when
+/// `FABER_ALLOW_MISSING_TOOLCHAIN` is set. The macOS gate treats these proofs
+/// as mandatory, so a missing tool there is a test failure.
+fn may_skip_missing_tool_on(is_linux: bool, opted_out: bool) -> bool {
+    is_linux || opted_out
+}
+
+fn may_skip_missing_tool() -> bool {
+    may_skip_missing_tool_on(
+        cfg!(target_os = "linux"),
+        std::env::var_os("FABER_ALLOW_MISSING_TOOLCHAIN").is_some(),
+    )
+}
+
+/// Print the visible skip line and return when the policy allows a skip;
+/// otherwise fail the proof with the message it carried before the env gates.
+fn missing_tool_with(may_skip: bool, tool: &str, proof: &str, old_failure: &str) {
+    if may_skip {
+        eprintln!("SKIPPED ({tool} missing): {proof}");
+        return;
+    }
+    panic!("{old_failure}");
+}
+
+fn missing_tool(tool: &str, proof: &str, old_failure: &str) {
+    missing_tool_with(may_skip_missing_tool(), tool, proof, old_failure);
+}
+
+#[test]
+fn missing_toolchain_skip_policy_is_linux_or_opt_out_only() {
+    assert!(!may_skip_missing_tool_on(false, false));
+    assert!(may_skip_missing_tool_on(true, false));
+    assert!(may_skip_missing_tool_on(false, true));
+}
+
+#[test]
+#[should_panic]
+fn missing_tool_fails_off_linux_without_opt_out() {
+    missing_tool_with(
+        false,
+        "llvm-as/opt",
+        "missing_tool_fails_off_linux_without_opt_out",
+        "llvm-as or opt is required: the gpu corpus target fails closed without an LLVM verifier",
+    );
+}
+
 #[test]
 fn corpus_does_not_report_an_all_inapplicable_target_as_green() {
-    // Env gate (same convention as the tsc/clang NVPTX gates in this crate):
-    // the gpu target refuses to run at all without `llvm-as`/`opt`, so the
-    // no-applicable-cases summary cannot be produced on this host.
+    // The gpu target refuses to run at all without `llvm-as`/`opt`; off the
+    // Linux gate that is a failure, not a silent skip.
     if !llvm_verifier_available() {
-        eprintln!("llvm-as/opt not found on PATH; skipping gpu inapplicability corpus test");
+        missing_tool(
+            "llvm-as/opt",
+            "corpus_does_not_report_an_all_inapplicable_target_as_green",
+            "llvm-as or opt is required: the gpu corpus target fails closed without an LLVM verifier",
+        );
         return;
     }
     let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-suites/pilot");
