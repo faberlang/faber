@@ -3649,6 +3649,26 @@ message = "रिडक्शन संक्रिया के बाद र�
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "'{lege}' या '{lineam}' अपेक्षित है"
 
+[diagnostics.PARSE001.issues.expected_mutability_keyword]
+message = "'{fixum}' या '{varia}' अपेक्षित है"
+help = "declaration को '{fixum}' या '{varia}' keyword से शुरू करें"
+
+[diagnostics.PARSE001.issues.expected_method_declaration]
+message = "method declaration अपेक्षित है"
+help = "method को '{functio}' declaration के रूप में लिखें"
+
+[diagnostics.PARSE001.issues.expected_praepara_hook]
+message = "'{praepara}' हुक अपेक्षित है"
+help = "'{praepara}', '{praeparabit}', '{postpara}' या '{postparabit}' लिखें"
+
+[diagnostics.PARSE001.issues.expected_scribe_keyword]
+message = "'{scribe}' keyword अपेक्षित है"
+help = "'{scribe}', '{vide}', '{mone}' या '{nota}' लिखें"
+
+[diagnostics.PARSE001.issues.expected_incipit_keyword]
+message = "'{incipit}' या '{incipiet}' अपेक्षित है"
+help = "entry point को '{incipit}' या '{incipiet}' से शुरू करें"
+
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "elige body के लिए एक opening brace अपेक्षित है"
 
