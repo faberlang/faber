@@ -266,6 +266,7 @@ fn cli_run_defaults_to_current_directory() {
         panic!("expected run subcommand");
     };
     assert_eq!(args.path, std::path::PathBuf::from("."));
+    assert!(args.threads.is_none());
     assert!(!args.deny_warnings);
     assert!(!args.stats);
     assert!(args.stats_file.is_none());

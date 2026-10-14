@@ -606,6 +606,15 @@ pub struct RunArgs {
     #[arg(long = "device", value_enum, value_name = "DEVICE")]
     pub device: Option<DeviceChoice>,
 
+    /// Worker count for the `cpu` device. The default is half the available
+    /// cores, minimum one. CPU workers run at reduced priority, below
+    /// interactive programs, whether the count is the default or given here.
+    /// Results are identical at any worker count. Valid only with
+    /// `--device cpu`; until the worker device lands `cpu` runs on the
+    /// reference route and the count has no effect.
+    #[arg(long = "threads", value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
+    pub threads: Option<u32>,
+
     /// Emit diagnostic runner statistics after a package run.
     #[arg(long)]
     pub stats: bool,

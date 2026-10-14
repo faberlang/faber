@@ -24,6 +24,7 @@ fn run_args(path: PathBuf, device: Option<DeviceChoice>) -> RunArgs {
         locale: None,
         diagnostics_locale: None,
         device,
+        threads: None,
         stats: false,
         stats_file: None,
         deny_warnings: false,
@@ -370,6 +371,63 @@ fn route_selection_allows_stats_with_auto_or_absent_device() {
             .expect("reference keeps the interpreted route"),
         DeviceSelection::Reference
     );
+}
+
+// ── `--threads` worker-count route contract (need, CD-1) ────────
+
+#[test]
+fn run_threads_requires_the_cpu_route() {
+    let dir = temp_dir("threads-requires-cpu");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, None);
+    let mut args = run_args(dir.clone(), Some(DeviceChoice::Reference));
+    args.threads = Some(2);
+    let err =
+        resolve_route_selection(&args, &dir).expect_err("threads with reference must fail closed");
+    assert_eq!(err.issue(), Some("E_THREADS_REQUIRES_CPU"));
+    assert!(
+        err.args
+            .contains(&DiagnosticArg::new("device", "reference"))
+    );
+}
+
+#[test]
+fn run_threads_passes_on_the_cpu_route() {
+    let dir = temp_dir("threads-cpu-route");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, None);
+    let mut args = run_args(dir.clone(), Some(DeviceChoice::Cpu));
+    args.threads = Some(2);
+    assert_eq!(
+        resolve_route_selection(&args, &dir).expect("threads with cpu passes"),
+        DeviceSelection::Cpu
+    );
+}
+
+#[test]
+fn run_threads_clap_accepts_positive_and_rejects_zero() {
+    let parsed = <crate::cli::Cli as clap::Parser>::try_parse_from([
+        "faber",
+        "run",
+        "x.fab",
+        "--threads",
+        "3",
+    ])
+    .expect("parse --threads 3");
+    let Some(crate::cli::Command::Run(args)) = parsed.command else {
+        panic!("expected run subcommand");
+    };
+    assert_eq!(args.threads, Some(3));
+
+    let error = <crate::cli::Cli as clap::Parser>::try_parse_from([
+        "faber",
+        "run",
+        "x.fab",
+        "--threads",
+        "0",
+    ])
+    .expect_err("--threads 0 is out of range");
+    assert_eq!(error.kind(), clap::error::ErrorKind::ValueValidation);
 }
 
 /// Drive the cargo-built `faber` binary (never PATH) for the process-level
