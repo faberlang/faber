@@ -324,7 +324,7 @@ fn package_mir_links_generic_caller_forwarding_type_args_to_namespace_callee() {
 const AIR_TYPEARG_UTIL: &str = r#"@ radix lane "air"
 @ public
 fn rope<size D>(tf32[2, D] x, tf32[2, 4, 3] table) → tf32[2, D] {
-    return x.rope_norm<D>(0, table)
+    return x.norm_rope<D>(0, table)
 }
 "#;
 
