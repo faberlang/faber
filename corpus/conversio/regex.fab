@@ -33,13 +33,13 @@ locale = "en"
 # `lookahead` for a construct the RE2 dialect does not have.
 
 main {
-    const string digitsWire ← "\d+"
+    const string digitsWire ← "\\d+"
     const regex digits ← digitsWire ↦ regex
     print digits
     const ascii wordWire ← '(?i)[a-z]+'
     const regex word ← wordWire ↦ regex
     print word
-    const string brokenWire ← "\d["
+    const string brokenWire ← "\\d["
     do {
         const regex broken ← brokenWire ↦ regex
         print broken
