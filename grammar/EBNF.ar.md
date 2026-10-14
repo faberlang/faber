@@ -2168,7 +2168,7 @@ entries in a different order are not equal.
 
 `copia` and `tabula` iterate in unspecified order. The order is not promised
 and not deliberately random; backends may differ. When order matters, sort
-explicitly, or use a `tabulae`. `≡` on these types stays structural and does
+explicitly with the sort expression (`رتب عبر تصاعدي من xs`; en `sort عبر asc from xs`, and `sort عبر asc ref m` for a map's keys), or use a `tabulae`. `≡` on these types stays structural and does
 not depend on order.
 
 **Set display.** `print`, a `§` hole in a template and a composite print show a
@@ -2785,7 +2785,7 @@ The old `المجموع من`, `الأقصى من`, and `الأدنى من` form
 
 The tensor method `.media()` (en `.mean()`) is not a reduction operator and has no `عبر` form. It is sugar over the sum reduction: `t.media()` is `t.المجموع() / count`, where `count` is the element count of `t` (en `t.mean()` is `t.sum() / count`). The grouped form `t.media(محور n)` is the grouped sum divided by the grouped count, elementwise. A mean is not a true reduction (two partial means do not combine; sums and counts do), so the reduction operator set stays the set of real reductions. An empty source is `0 / 0`, which follows the float rules and is not-a-number (NaN); it is not a no-value result and has no fallback.
 
-`رتب عبر <direction> (من | عن) source [(ثابت | متغير) x { أعد key }]` is the sort expression (en `sort عبر asc from xs`). `عبر` is mandatory and selects `تصاعدي` or `تنازلي` (en `asc`, `desc`). `من` (en `from`) orders a list, a set, or a map's values; `عن` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `رتب`, `تصاعدي`, and `تنازلي` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. Typecheck is not yet wired: the checker refuses the expression with `SEM010:sort_expression_not_typechecked`.
+`رتب عبر <direction> (من | عن) source [(ثابت | متغير) x { أعد key }]` is the sort expression (en `sort عبر asc from xs`). `عبر` is mandatory and selects `تصاعدي` or `تنازلي` (en `asc`, `desc`). `من` (en `from`) orders a list, a set, or a map's values; `عن` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `رتب`, `تصاعدي`, and `تنازلي` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. The checker types it (`sort_source_unordered` refuses a source with no natural order, such as a nested list with no body key; `sort_source_not_collection` refuses a non-collection; `sort_ref_requires_map` refuses a list or set under `عن`/`ref`; `sort_tensor_unsupported` refuses a tensor; `sort_key_unordered` refuses an unordered key; `sort_body_requires_redde` refuses a body with no `أعد`); a map under `عن`/`ref` yields its keys as `lista<K>`, a map or set under `من`/`from` its values; the list method `.sorted(key)` is retired (`sorted_key_retired`) in favour of this expression. It runs on the MIR runner and on the Rust, Go, TypeScript, Swift, LLVM, Wasm and Python emitters.
 
 `حرر` and `اقرأ`/`سطرا` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
