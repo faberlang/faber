@@ -441,8 +441,15 @@ fn library_home_memo_preserves_thread_override_precedence() {
     assert_eq!(library_home(), production);
 }
 
+/// Serializes the tests below that mutate the process-wide configured home,
+/// so their transient values cannot interleave.
+static CONFIGURED_LIBRARY_HOME_TEST_GUARD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn configured_library_home_setting_round_trips() {
+    let _guard = CONFIGURED_LIBRARY_HOME_TEST_GUARD
+        .lock()
+        .expect("configured-home test guard");
     let dir = crate::test_support::test_temp_dir("libhome-setting");
     let home = dir.path().to_path_buf();
 
@@ -451,6 +458,21 @@ fn configured_library_home_setting_round_trips() {
 
     set_configured_library_home(None);
     assert_eq!(configured_library_home_setting(), None);
+}
+
+#[test]
+fn configured_library_home_ignores_environment_variable() {
+    let _guard = CONFIGURED_LIBRARY_HOME_TEST_GUARD
+        .lock()
+        .expect("configured-home test guard");
+    let dir = crate::test_support::test_temp_dir("libhome-ignores-env");
+    let home = dir.path().to_path_buf();
+
+    set_configured_library_home(Some(home.clone()));
+    assert_eq!(configured_library_home_setting(), Some(home));
+
+    set_configured_library_home(None);
+    assert!(configured_library_home_setting().is_none());
 }
 
 // ── U6b: `norma:*` resolves from the in-tree `lib/` ──────────────────────────
