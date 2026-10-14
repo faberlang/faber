@@ -544,13 +544,15 @@ impl CaptureMutations {
 
 /// Collects, per enclosing function, the captures its nested closures demand.
 ///
-/// One walk over the function body tracks a closure depth. A name's
-/// declaration depth is recorded for function parameters (depth 0), locals,
-/// and closure parameters; a binding that belongs to a closure's own body
-/// therefore never counts as a capture of that closure. Loop binders and
-/// module items have no declaration record, so a reference from inside a
-/// closure (depth > 0) captures them while a reference from the function
-/// body itself does not.
+/// One walk over the function body tracks a closure depth. Every definition
+/// introduced along the way — function parameters (depth 0), locals, loop
+/// binders, pattern bindings, `cape` handler bindings, and closure parameters
+/// — is recorded through `visit_def` at the depth where it is declared, so a
+/// binder introduced inside a closure body is never a capture of that
+/// closure. Module items are never visited from a function body and so have
+/// no declaration record; a reference to one from inside a closure
+/// (depth > 0) captures it while a reference from the function body itself
+/// does not.
 ///
 /// Writes and moves are recorded with the depth at which they happen, so a
 /// capture's mode reflects only the work done by the closures that reference
@@ -632,6 +634,10 @@ impl ClosureCaptureCollector {
 }
 
 impl HirVisitor for ClosureCaptureCollector {
+    fn visit_def(&mut self, def_id: DefId, _name: Symbol) {
+        self.declared.insert(def_id, self.depth);
+    }
+
     fn visit_expr(&mut self, expr: &HirExpression) {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => self.note_use(*def_id),

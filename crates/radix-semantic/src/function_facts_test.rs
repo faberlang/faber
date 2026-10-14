@@ -629,6 +629,65 @@ incipit { }
 }
 
 #[test]
+fn closure_match_arm_binder_is_not_a_capture() {
+    // A binder introduced by a `discerne` arm belongs to the closure body,
+    // so reading it is not a capture; only the enclosing local is.
+    let captures = function_captures(
+        r#"
+functio matcher() → (numerus ∪ textus) → numerus {
+    fixum numerus extra ← 2
+    redde (numerus ∪ textus u) → numerus ∴ fac {
+        discerne u {
+            casu numerus fixum i {
+                redde i + extra
+            }
+            casu textus fixum s {
+                nota s
+                redde extra
+            }
+        }
+    }
+}
+incipit { }
+"#,
+        "matcher",
+    );
+    assert_eq!(
+        captures.len(),
+        1,
+        "only extra is captured; the arm binders belong to the closure: {captures:?}"
+    );
+    assert_eq!(captures[0].mode, CaptureMode::Read, "{captures:?}");
+}
+
+#[test]
+fn closure_cape_binder_is_not_a_capture() {
+    // The `cape err` binder belongs to the closure body, so reading it is not
+    // a capture; only the enclosing local is.
+    let captures = function_captures(
+        r#"
+functio guarded() → () → textus {
+    fixum textus fallback ← "fallback"
+    redde () → textus ∴ fac {
+        iace "boom"
+    } cape err {
+        nota err
+        redde fallback
+    }
+}
+incipit { }
+"#,
+        "guarded",
+    );
+    assert_eq!(
+        captures.len(),
+        1,
+        "only fallback is captured; err belongs to the closure: {captures:?}"
+    );
+    assert_eq!(captures[0].mode, CaptureMode::Read, "{captures:?}");
+}
+
+#[test]
 fn entry_row_captures_stay_empty() {
     let fixture = crate::test_support::analyze_ok(
         r#"
