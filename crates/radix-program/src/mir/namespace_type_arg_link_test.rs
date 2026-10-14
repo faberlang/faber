@@ -781,12 +781,16 @@ fn package_mir_norma_fs_read_file_main_is_try_call() {
 }
 
 /// After instantiation with `T = string`, the instantiated `norma:fs`
-/// `read_file` body must convert its `solum:lege` result to the interned
-/// `textus` primitive, not leave a generic `Type::Param` conversion target.
+/// `read_file` body must reach a conversion of its `solum:lege` result to
+/// the interned `textus` primitive, not leave a generic `Type::Param`
+/// conversion target.
 ///
-/// Blocked upstream by pumpfix-gfd594086: the linked `read_file` body's
-/// provider call (`solum:lege`) currently resolves to `read_file` itself, so
-/// the package fails link validation before this probe can inspect the body.
+/// A bare failable `sermo ↦ T` lowers through a synthetic conversion helper
+/// (so its failure row applies), so the conversion statement lives in the
+/// helper the instantiated `read_file` calls, not in its own blocks. The
+/// probe (`docs/audits/pumpfix-review1-f5-c-probe.md`) shows the one
+/// `read_file` instance is already `T = textus` and its `TryCall` callee
+/// carries the `Convert` whose target is the interned `textus`.
 #[test]
 #[ignore = "pumpfix-gfd594086: read_file<string> body convert target not substituted"]
 fn package_mir_norma_fs_read_file_string_body_converts_to_textus() {
@@ -813,6 +817,23 @@ fn package_mir_norma_fs_read_file_string_body_converts_to_textus() {
                 })
                 .unwrap_or_else(|| {
                     panic!("instantiated `read_file` must exist in the merged program")
+                });
+            // The `↦ T` conversion is emitted in the synthetic helper the
+            // failable `read_file` body calls, so inspect that callee: its
+            // `Convert` is the instantiated result conversion the
+            // `read_file` body itself no longer carries.
+            let read_file = read_file
+                .blocks
+                .iter()
+                .find_map(|block| match &block.terminator.kind {
+                    MirTerminatorKind::TryCall {
+                        callee: MirCallee::Function(callee),
+                        ..
+                    } => program.functions.iter().find(|function| function.id == *callee),
+                    _ => None,
+                })
+                .unwrap_or_else(|| {
+                    panic!("instantiated `read_file` must call its conversion helper")
                 });
             assert!(
                 read_file
