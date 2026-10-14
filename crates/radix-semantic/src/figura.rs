@@ -174,14 +174,17 @@ fn format_figura_at_precedence(
         IndexExpr::Literal(value) => value.to_string(),
         IndexExpr::Param(symbol) => interner.resolve(*symbol).to_owned(),
         IndexExpr::Runtime(source) => format!("<runtime:{source:?}>"),
+        IndexExpr::Affine { base, offset } if *offset == 0 => {
+            // An offset of zero is exactly its base: delegate both text and
+            // precedence so a parent never adds parentheses around it.
+            return format_figura_at_precedence(*base, types, interner, parent_precedence);
+        }
         IndexExpr::Affine { base, offset } => {
             let (base, _) = format_figura_at_precedence(*base, types, interner, 1);
             if *offset < 0 {
                 format!("{base} - {}", offset.unsigned_abs())
-            } else if *offset > 0 {
-                format!("{base} + {offset}")
             } else {
-                base
+                format!("{base} + {offset}")
             }
         }
         IndexExpr::Divide { numerator, divisor } => {
