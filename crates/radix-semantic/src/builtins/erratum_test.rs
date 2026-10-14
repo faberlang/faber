@@ -58,3 +58,21 @@ fn catch_binds_the_payload_of_a_textus_channel() {
         "catch must bind the payload textus, not a carrier or ignotum"
     );
 }
+
+#[test]
+fn erratum_identity_has_latin_key() {
+    use crate::locale::{KeywordSurface, TypeBindingKind};
+
+    assert_ne!(TypeBindingKind::Erratum, TypeBindingKind::Ratio);
+    assert_ne!(
+        TypeBindingKind::Erratum,
+        TypeBindingKind::Frame(crate::locale::FrameTypeKind::Sermo)
+    );
+    let pack = crate::locale::latin_locale_pack();
+    let surface = KeywordSurface::new(&pack);
+    assert_eq!(
+        surface.type_surface(TypeBindingKind::Erratum),
+        "erratum",
+        "the Latin fallback surface must expose the builtin erratum key"
+    );
+}
