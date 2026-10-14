@@ -2430,7 +2430,7 @@ fn locale_suggestion_filter_keeps_accent_matches_and_guesses_at_error_spans_only
 // cannot see a row whose text was copied from `en` unchanged, and two rulings
 // of 2026-10-13 lean on that distinction. The two tests below close the gap:
 // every diagnostics text field of a translated pack that still equals the
-// `en` text must carry an exemption in `locale/identical-to-en.toml`, and
+// `en` text must carry an exemption in its pack's `locale/identical-to-en/<pack>.toml`, and
 // every exemption must still be live. `la` is deliberately outside the gate:
 // it is the canonical Latin pack whose issue rows were English before the R12
 // range, so its rows are fallback data, not translation debt.
@@ -2440,9 +2440,14 @@ fn locale_suggestion_filter_keeps_accent_matches_and_guesses_at_error_spans_only
 /// pack except the `en` comparison source and the canonical `la`).
 const TRANSLATED_PACKS: &[&str] = &["ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
 
-/// `locale/identical-to-en.toml`, the shrink-only exemption list.
-fn identical_to_en_path() -> PathBuf {
-    crate::locale::workspace_locale_root().join("identical-to-en.toml")
+/// `locale/identical-to-en/`, holding one shrink-only exemption list per pack.
+fn identical_to_en_dir() -> PathBuf {
+    crate::locale::workspace_locale_root().join("identical-to-en")
+}
+
+/// `locale/identical-to-en/<pack>.toml`, one pack's shrink-only exemption list.
+fn identical_to_en_path(pack: &str) -> PathBuf {
+    identical_to_en_dir().join(format!("{pack}.toml"))
 }
 
 #[derive(serde::Deserialize)]
@@ -2464,11 +2469,25 @@ struct IdenticalToEnEntry {
 }
 
 fn load_identical_to_en_entries() -> Vec<IdenticalToEnEntry> {
-    let path = identical_to_en_path();
-    let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {}: {err:?}", path.display()));
-    let parsed: IdenticalToEnFile =
-        toml::from_str(&source).unwrap_or_else(|err| panic!("parse {}: {err:?}", path.display()));
-    parsed.entry
+    let mut entries = Vec::new();
+    for pack in TRANSLATED_PACKS {
+        let path = identical_to_en_path(pack);
+        let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {}: {err:?}", path.display()));
+        let parsed: IdenticalToEnFile =
+            toml::from_str(&source).unwrap_or_else(|err| panic!("parse {}: {err:?}", path.display()));
+        for entry in parsed.entry {
+            assert!(
+                entry.pack == *pack,
+                "{}: entry {} names pack {:?}, expected {:?}",
+                path.display(),
+                entry.code,
+                entry.pack,
+                pack
+            );
+            entries.push(entry);
+        }
+    }
+    entries
 }
 
 /// The two sanctioned reason classes for exemption entries.
@@ -2518,7 +2537,7 @@ fn fields_identical_to_en(pack: &LocalePack, en_pack: &LocalePack) -> Vec<(Strin
 
 /// A translated pack must not carry diagnostics text copied from `en`.
 ///
-/// Equality with `en` is tolerated only through `locale/identical-to-en.toml`,
+/// Equality with `en` is tolerated only through `locale/identical-to-en/<pack>.toml`,
 /// so copied English is always a recorded, reviewable decision. The list may
 /// only shrink: a translation must delete its entry.
 #[test]
@@ -2540,7 +2559,7 @@ fn locale_pack_completeness_translated_packs_do_not_ship_english_rows_unless_exe
     assert!(
         failures.is_empty(),
         "translated packs ship diagnostics text byte-equal to en without an exemption in {}:\n  {}",
-        identical_to_en_path().display(),
+        identical_to_en_dir().display(),
         failures.join("\n  ")
     );
 }
@@ -2614,7 +2633,7 @@ fn locale_pack_completeness_identical_to_en_exemptions_must_stay_live() {
     assert!(
         stale.is_empty(),
         "stale exemptions in {}:\n  {}",
-        identical_to_en_path().display(),
+        identical_to_en_dir().display(),
         stale.join("\n  ")
     );
 }
