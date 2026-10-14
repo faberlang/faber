@@ -12,10 +12,14 @@ use crate::locale::LocalePack;
 fn reemit(source: &str, to: &str) -> String {
     let pack = LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(to))
         .unwrap_or_else(|err| panic!("installed {to} pack should load: {err:?}"));
+    // Pin the Latin reader pack: `+++ locale = "…" +++` still wins, but a
+    // source with no frontmatter must not be lexed by the process-wide
+    // `RADIX_DEFAULT_CODE_LOCALE` staging switch another test toggles.
     let session = Session::new(
         Config::default()
             .with_target(Target::HirFaber)
-            .with_dev_locale_root(),
+            .with_dev_locale_root()
+            .with_locale_pack(crate::locale::latin_locale_pack()),
     );
     let result = reemit_faber(&session, &pack, "test.fab", source);
     assert!(
@@ -52,7 +56,8 @@ fn reemit_issues(source: &str) -> Vec<String> {
     let session = Session::new(
         Config::default()
             .with_target(Target::HirFaber)
-            .with_dev_locale_root(),
+            .with_dev_locale_root()
+            .with_locale_pack(crate::locale::latin_locale_pack()),
     );
     let result = reemit_faber(&session, &pack, "test.fab", source);
     result
