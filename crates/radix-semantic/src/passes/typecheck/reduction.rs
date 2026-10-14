@@ -6,7 +6,7 @@ use super::*;
 use crate::passes::fragment_definition::{
     is_allowed_device_method, is_device_value_type, struct_def_from_type,
 };
-use radix_hir::{HirCallArg, HirReductionOp};
+use radix_hir::{HirAxisMethod, HirAxisSugar, HirCallArg, HirReductionOp};
 use radix_lexer::Span;
 
 const ISSUE_REDUCTA_REQUIRES_SHAPED_ITERABLE: &str = "reducta_requires_shaped_iterable";
@@ -265,6 +265,21 @@ impl TypeChecker<'_> {
             identity: None,
             mutable: false,
         };
+        // Need: record the authored axis and method against the
+        // expanded node id (the `Reduction` for `sum`, the outer `Div` for
+        // `mean`) so presentation emission prints `t.summa(axis n)` again. A
+        // rest-form call records one entry per removed axis, in source order.
+        for &axis in &axes {
+            self.axis_sugar.push(HirAxisSugar {
+                id: expr.id,
+                axis: axis as u32,
+                method: if mean {
+                    HirAxisMethod::Mean
+                } else {
+                    HirAxisMethod::Sum
+                },
+            });
+        }
         expr.kind = match divisor {
             None => {
                 self.axis_reduction_results.insert(expr.id, result);
