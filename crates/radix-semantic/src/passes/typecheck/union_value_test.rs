@@ -55,7 +55,7 @@ fn token_union_interface() -> FileInterface {
 }
 
 fn analyze_consumer(source: &str) -> crate::test_support::AnalyzedFixture {
-    crate::test_support::analyze_source_with_import_contract(
+    crate::test_support::analyze_source_with_import_contract_la(
         source,
         BTreeMap::from([(
             "token".to_owned(),
@@ -243,7 +243,7 @@ incipit {
 fn same_module_union_value_references_regression_checks_green() {
     // done_when (e): existing same-module enum/union value behavior is
     // unchanged — the enum shorthand (`Eventum.Sonitus`) still binds.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"discretio Eventum {
     Ictus { numerus vis },
     Sonitus

@@ -8,7 +8,7 @@ use crate::SemanticErrorKind;
 const EXACT_EQ_ISSUE: &str = "equality_exact_types_required";
 
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
-    crate::test_support::analyze_source(source)
+    crate::test_support::analyze_source_la(source)
 }
 
 enum EqualityExpect {

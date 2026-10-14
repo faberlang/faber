@@ -44,7 +44,7 @@ impl HirVisitor for Collector {
 /// Analyze `source` (which must be accepted) and return its implicit stores
 /// in source order, with the analyzed table for type inspection.
 fn stores_of(source: &str) -> (Vec<Store>, test_support::AnalyzedFixture) {
-    let result = test_support::analyze_ok(source);
+    let result = test_support::analyze_ok_la(source);
     let hir = result.hir.as_ref().expect("hir");
     let mut collector = Collector::default();
     walk_program(&mut collector, hir);
@@ -65,12 +65,12 @@ fn entry(body: &str) -> String {
 }
 
 fn assert_rejected(source: &str) {
-    let result = test_support::analyze_source(source);
+    let result = test_support::analyze_source_la(source);
     assert!(!result.is_ok(), "expected a rejection");
 }
 
 fn assert_issue(source: &str, issue: &str) {
-    test_support::assert_rejects_with_issue(source, issue);
+    test_support::assert_rejects_with_issue_la(source, issue);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ impl HirVisitor for AwaitStores {
 }
 
 fn await_stores(source: &str) -> Vec<Option<HirStoreSite>> {
-    let result = test_support::analyze_ok(source);
+    let result = test_support::analyze_ok_la(source);
     let mut collector = AwaitStores::default();
     walk_program(&mut collector, result.hir.as_ref().expect("hir"));
     collector.0
@@ -557,5 +557,5 @@ fn provably_fitting_int_stores_carry_no_node() {
 fn bitnot_of_u64_is_accepted_into_an_int_slot() {
     // `¬u` keeps its sign at the cap, so it is `i64` and stores into `int`.
     let source = "incipit {\nvaria u64 u ← 5\nfixum numerus y ← ¬u\n}\n";
-    test_support::analyze_ok(source);
+    test_support::analyze_ok_la(source);
 }
