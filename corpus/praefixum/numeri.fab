@@ -1,0 +1,41 @@
++++
+term = "praefixum"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "fixum_decl", "functio_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "redde_stmt", "literal", "call_expr", "expression", "incipit_stmt", "nota_stmt"]
+category = "comptime"
+canonical = false
+summary = "Sibling module whose exported constant and pure function fold into an importer's comptime initializers."
+syntax = "@ public const <type> <name> = <expression>"
+related = ["praefixum", "importa"]
+locale = "en"
++++
+# =============================================================================
+# praefixum — Sibling module for cross-module comptime folding
+# =============================================================================
+#
+# What this teaches:
+#   • An exported `const` and an exported pure `fn` are visible to an importer
+#     inside its `comptime { … }` initializers as `module.NAME` and `module.fn()`.
+#
+# See also: praefixum, importa
+# =============================================================================
+
+# praefixum numeri — sibling module for praefixum/cross-module.fab
+#
+# `BASE` is exported with `@ public`; `septem` with `@ public { }`. The importer
+# folds `numeri.BASE + 1` and `numeri.septem()` at build time.
+#
+# EXPECTED OUTPUT:
+#   5 when run standalone.
+
+@ public
+const int BASE = 5
+
+@ public { }
+fn septem() → int {
+    return 7
+}
+
+main {
+    print BASE
+}

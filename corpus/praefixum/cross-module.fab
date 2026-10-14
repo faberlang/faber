@@ -1,0 +1,50 @@
++++
+term = "praefixum"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "named_import", "fixum_decl", "type_annotation", "owned_type", "base_type", "multiplicative_expr", "member_suffix", "praefixum_expr", "call_expr", "call_suffix", "argument_list", "incipit_stmt", "nota_stmt", "expression", "literal"]
+category = "comptime"
+canonical = false
+summary = "An importer's comptime constant folds an imported constant and a call to an imported pure function."
+syntax = "const <type> <name> = comptime { … return <namespace>.<CONST> + <expression> }"
+related = ["praefixum", "importa"]
+locale = "en"
++++
+# =============================================================================
+# praefixum — cross-module comptime initializers
+# =============================================================================
+#
+# What this teaches:
+#   • `module.NAME` of an exported constant and `module.fn()` of an exported
+#     pure function fold inside this module's `comptime { … }` initializers.
+#   • Both constants see the sibling module's value at build time; nothing is
+#     read from the importer at runtime.
+#
+# Common mistakes:
+#   • Expecting an imported function call to fold outside `comptime` — a plain
+#     `=` initializer still rejects it (`constant_initializer_not_constant`).
+#
+# See also: praefixum, importa
+# =============================================================================
+
+# praefixum cross-module — comptime over imported consts and calls
+#
+# Requires module layout: cross-module.fab imports numeri.fab (BASE is 5,
+# septem returns 7) in package or module mode.
+#
+# EXPECTED OUTPUT:
+#   cross-module.expected (6, 7)
+
+import from "./numeri" numeri
+
+const int A = comptime {
+    return numeri.BASE + 1
+}
+
+const int B = comptime {
+    return numeri.septem()
+}
+
+main {
+    print A
+    print B
+}
