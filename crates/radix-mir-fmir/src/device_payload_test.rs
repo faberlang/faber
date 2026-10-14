@@ -1535,7 +1535,7 @@ fn unknown_selection_is_representable_and_rejected_at_resolution() {
     // (it DECODES), and rejected honestly at selection resolution (no
     // compiled-in leaf matches), never silently remapped. DDCP3-U0 (f): an
     // explicit selection of an unknown backend now fails ADMISSION with
-    // `UnsupportedSelectedBackend` (selection resolution at the radix gate);
+    // `NonAdmittedSelectedBackend` (selection resolution at the radix gate);
     // unknown-backend ARTIFACTS are preserved-until-selection.
     let image = text_image_with_device(Some(sample_device_section()));
     let mut text = encode_text_image(&image).expect("encode text image");
@@ -1547,8 +1547,24 @@ fn unknown_selection_is_representable_and_rejected_at_resolution() {
         Err(FmirImageError::NonAdmittedSelectedBackend { backend }) => {
             assert_eq!(backend, "vulkan");
         }
-        other => panic!("expected UnsupportedSelectedBackend, got {other:?}"),
+        other => panic!("expected NonAdmittedSelectedBackend, got {other:?}"),
     }
+}
+
+#[test]
+fn non_admitted_artifact_backend_display_names_the_selection_variant() {
+    // The Display text is the only prose surface naming the fail-closed
+    // follow-up path; it must name the variant that actually exists.
+    let error = FmirImageError::NonAdmittedArtifactBackend { backend: "vulkan".into() };
+    let message = error.to_string();
+    assert!(
+        message.contains("NonAdmittedSelectedBackend"),
+        "the artifact-backend diagnostic must name the selection variant, got: {message}"
+    );
+    assert!(
+        !message.contains("UnsupportedSelectedBackend"),
+        "the artifact-backend diagnostic must not name a nonexistent variant, got: {message}"
+    );
 }
 
 #[test]
