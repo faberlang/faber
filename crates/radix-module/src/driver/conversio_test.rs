@@ -355,13 +355,15 @@ fn valor_to_fractus_conversio_emits_from_valor_with_widen() {
 #[test]
 fn valor_to_octeti_conversio_emits_octeti_match() {
     let session = test_session_la(Target::HirRust);
-    let source = r"
+    let source = r#"
 incipit {
-    fixum valor body ← {} ↦ valor
+    # Ruling 2026-10-10 (222376cb-4): a bare empty `{}` at an infer slot is
+    # the double hole, so the valor source carries a typed cell.
+    fixum valor body ← { "k": 1 } ↦ valor
     fixum octeti bytes ← body ↦ octeti
     nota bytes.longitudo()
 }
-";
+"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
