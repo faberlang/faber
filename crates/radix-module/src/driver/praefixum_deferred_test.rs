@@ -116,6 +116,18 @@ fn an_effect_is_forbidden_with_the_imported_hop_in_the_chain() {
 }
 
 #[test]
+fn praefixum_method_deferral_builtin_collection_body_is_unchanged() {
+    let unit = analyze_with(
+        "fixum numerus K = praefixum {\n    varia lista<numerus> xs ← vacua\n    \
+         xs.appende(10)\n    xs.appende(20)\n    redde xs.longitudo()\n}\n",
+        true,
+    )
+    .unwrap_or_else(|diagnostics| panic!("a builtin collection method is not an import: {diagnostics:?}"));
+    assert!(!is_unevaluated(&unit, "K"));
+    assert_eq!(int(&static_value(&unit, "K")), 2);
+}
+
+#[test]
 fn an_unavailable_answer_is_refused_by_name_and_never_runs() {
     let mut unit = deferred_unit();
     let mut imports = Stub::new(ImportedCallee::Unavailable);
