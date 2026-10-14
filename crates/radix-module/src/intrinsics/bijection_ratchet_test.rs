@@ -308,6 +308,7 @@ fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>
         "Tensor.matmul/1" => (Some(format!("{sugar}[2, 3] r, {sugar}[3, 2] p")), vec!["p".into()]),
         "Tensor.rms_norm/3" => (None, vec!["axis 0".into(), el.clone(), "r".into()]),
         "Tensor.rope_norm/2" => (Some(format!("{sugar}[2, 4, 3] r")), vec!["0".into(), "r".into()]),
+        "Tensor.rope_half/2" => (Some(format!("{sugar}[2, 4, 3] r")), vec!["0".into(), "r".into()]),
         "Tensor.laminatio/2" => (None, vec!["axis 0".into(), el.clone()]),
         "Tensor.laminatio/3" => (None, vec!["axis 0".into(), el.clone(), "r".into()]),
         "Tensor.laminatio/4" => (None, vec!["axis 0".into(), el.clone(), "r".into(), "r".into()]),
@@ -913,7 +914,6 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::TensorCreate,
         MirCollectionOp::TensorFromFlat,
         // Internal device vocabulary (target-lane owned).
-        MirCollectionOp::TensorRopeHalf,
         MirCollectionOp::TensorQuantizedMatMul,
         MirCollectionOp::TensorGroupedMatMul,
         MirCollectionOp::TensorBatchedAttention,
