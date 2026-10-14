@@ -94,6 +94,33 @@ fn answers_with(
         .collect()
 }
 
+/// Every method reference of the function `probe` in `main.fab`, each
+/// answered by a `PackageImportEffects` for that module with an empty library
+/// table.
+fn method_answers(program: &AnalyzedProgram, dir: &Path) -> Vec<ImportedCallee> {
+    let (id, node) = program.node_by_path(&dir.join("main.fab")).unwrap();
+    let probe = top_level_function(&node.analysis, "probe").expect("probe is declared");
+    let references: Vec<ImportedReference> =
+        imported_references(&node.analysis.hir, &node.analysis.types, probe)
+            .into_iter()
+            .filter(|reference| reference.kind == ImportedReferenceKind::Method)
+            .collect();
+    assert_eq!(
+        references.len(),
+        1,
+        "probe must reach exactly one method reference"
+    );
+    let mut effects = PackageImportEffects::new(&program.nodes, &program.imports, id.clone());
+    references
+        .iter()
+        .map(|reference| effects.callee(reference))
+        .collect()
+}
+
+const SIBLING_GENUS: &str = "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n";
+
+const MAIN_CALLS_METHOD: &str = "import from \"./consts\" consts\n\nfn probe() → int {\n    const consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n";
+
 const MAIN_CALLS_SEVEN: &str = "import from \"./consts\" consts\n\nfn probe() {\n    consts.seven()\n}\n\nmain {\n    print 0\n}\n";
 
 const MAIN_CALLS_MATH_ADD: &str = "import from \"norma:math\" math\n\nfn probe() → float {\n    return math.add(1.5, 2.5)\n}\n\nmain {\n    print 0\n}\n";
@@ -253,6 +280,65 @@ fn praefixum_imports_library_unknown_member_is_unavailable() {
     let mut effects = PackageImportEffects::new(&program.nodes, &program.imports, id.clone())
         .with_library_bodies(bodies);
     assert_eq!(effects.callee(&unknown), ImportedCallee::Unavailable);
+}
+
+#[test]
+fn praefixum_imports_method_pure_on_sibling_genus_is_pure() {
+    let dir = test_temp_dir("imports-method-pure");
+    let dir = dir.as_ref();
+    write(dir, "consts.fab", SIBLING_GENUS);
+    write(dir, "main.fab", MAIN_CALLS_METHOD);
+    let program = analyze(dir);
+    assert_eq!(method_answers(&program, dir), vec![ImportedCallee::Pure]);
+}
+
+#[test]
+fn praefixum_imports_method_printing_body_names_the_method_hop() {
+    let dir = test_temp_dir("imports-method-effect");
+    let dir = dir.as_ref();
+    write(
+        dir,
+        "consts.fab",
+        "@ public\nfn loud() {\n    print 1\n}\n\n@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        loud()\n        return self.n\n    }\n}\n",
+    );
+    write(dir, "main.fab", MAIN_CALLS_METHOD);
+    let program = analyze(dir);
+    let (id, node) = program.node_by_path(&dir.join("main.fab")).unwrap();
+    let probe = top_level_function(&node.analysis, "probe").unwrap();
+    let mut effects = PackageImportEffects::new(&program.nodes, &program.imports, id.clone());
+    let answer = function_effect(
+        &node.analysis.hir,
+        &node.analysis.types,
+        &node.analysis.interner,
+        probe,
+        &mut effects,
+    );
+    let ImportedCallee::Effect { effect, chain } = answer else {
+        panic!("expected one Effect answer");
+    };
+    assert_eq!(effect, EFFECT);
+    assert_eq!(
+        chain,
+        vec!["probe".to_owned(), "get".to_owned(), "loud".to_owned()]
+    );
+}
+
+#[test]
+fn praefixum_imports_method_ambiguous_genus_in_two_siblings_is_unavailable() {
+    let dir = test_temp_dir("imports-method-ambiguous");
+    let dir = dir.as_ref();
+    write(dir, "consts.fab", SIBLING_GENUS);
+    write(dir, "other.fab", SIBLING_GENUS);
+    write(
+        dir,
+        "main.fab",
+        "import from \"./consts\" consts\nimport from \"./other\" other\n\nfn probe() → int {\n    const consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n",
+    );
+    let program = analyze(dir);
+    assert_eq!(
+        method_answers(&program, dir),
+        vec![ImportedCallee::Unavailable]
+    );
 }
 
 /// The first import reference of `probe` in a program whose `probe` calls

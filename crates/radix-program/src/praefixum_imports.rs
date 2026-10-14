@@ -16,10 +16,11 @@
 //! analyzed library modules it may walk.
 //!
 //! The answer for anything not resolved is [`ImportedCallee::Unavailable`]: an
-//! unknown or unexported member, a bodyless library function, a method
-//! reference, a selective import, a library with no supplied body. A wrong
-//! `Pure` would be an unsound build, so `Pure` is only ever the answer for a
-//! proven pure function or a top-level constant.
+//! unknown or unexported member, a bodyless library function, a method whose
+//! genus has no unique sibling home or no such method there, a selective
+//! import, a library with no supplied body. A wrong `Pure` would be an unsound
+//! build, so `Pure` is only ever the answer for a proven pure function or a
+//! top-level constant.
 
 use crate::LibraryImportBinding;
 use crate::analyze::{AnalyzedProgramNode, ModuleGraph, ModuleId};
@@ -144,6 +145,9 @@ impl<'s> Scope<'s> {
 
     /// Answer one reference made by a package module.
     fn package(&mut self, module_id: &ModuleId, reference: &ImportedReference) -> ImportedCallee {
+        if reference.kind == ImportedReferenceKind::Method {
+            return self.method(module_id, reference);
+        }
         if let Some((target_id, target, member)) = self.sibling(module_id, reference) {
             return match reference.kind {
                 ImportedReferenceKind::Value => {
@@ -159,6 +163,8 @@ impl<'s> Scope<'s> {
                         None => ImportedCallee::Unavailable,
                     }
                 }
+                // Handled before the namespace lookup: a method receiver
+                // is a struct definition, never an import binding.
                 ImportedReferenceKind::Method => ImportedCallee::Unavailable,
             };
         }
@@ -179,6 +185,57 @@ impl<'s> Scope<'s> {
         };
         let member = node.analysis.interner.resolve(reference.member).to_owned();
         self.library_member(edge_key(import), &member, reference.kind)
+    }
+
+    /// Answer a method reference: the receiver's genus is declared in a
+    /// sibling module, and that module's export surface is what names it.
+    /// The method is looked up by name on the genus and judged like a
+    /// function of that module.
+    fn method(&mut self, module_id: &ModuleId, reference: &ImportedReference) -> ImportedCallee {
+        let Some(node) = self.nodes.get(module_id) else {
+            return ImportedCallee::Unavailable;
+        };
+        let Some(symbol) = node.analysis.resolver.get_symbol(reference.namespace) else {
+            return ImportedCallee::Unavailable;
+        };
+        let genus = node.analysis.interner.resolve(symbol.name).to_owned();
+        let Some((home_id, home)) = self.method_home(module_id, &genus) else {
+            return ImportedCallee::Unavailable;
+        };
+        let method = node.analysis.interner.resolve(reference.member).to_owned();
+        let Some(def_id) = genus_method(&home.analysis, &genus, &method) else {
+            return ImportedCallee::Unavailable;
+        };
+        self.function(Home::Package(home_id.clone()), def_id)
+    }
+
+    /// The unique local edge of `module_id` whose target exports `genus`.
+    /// None or more than one candidate leaves the genus without a home.
+    fn method_home(
+        &self,
+        module_id: &ModuleId,
+        genus: &str,
+    ) -> Option<(&'s ModuleId, &'s AnalyzedProgramNode)> {
+        let node = self.nodes.get(module_id)?;
+        let mut home: Option<(&'s ModuleId, &'s AnalyzedProgramNode)> = None;
+        for (binding, target_id) in self.imports.local_edges(module_id) {
+            if !node
+                .namespace_exports
+                .get(binding)
+                .is_some_and(|exports| exports.contains_key(genus))
+            {
+                continue;
+            }
+            let Some(target) = self.nodes.get(target_id) else {
+                continue;
+            };
+            match home {
+                Some((existing, _)) if existing == target_id => {}
+                Some(_) => return None,
+                None => home = Some((target_id, target)),
+            }
+        }
+        home
     }
 
     /// Answer one reference made by a library module.
@@ -285,9 +342,6 @@ impl<'s> Scope<'s> {
 
 impl ImportedEffects for Scope<'_> {
     fn callee(&mut self, reference: &ImportedReference) -> ImportedCallee {
-        if reference.kind == ImportedReferenceKind::Method {
-            return ImportedCallee::Unavailable;
-        }
         match self.from.clone() {
             Home::Package(module_id) => self.package(&module_id, reference),
             Home::Library(key) => self.library(&key, reference),
@@ -332,6 +386,24 @@ fn identity_key(identity: &LibraryIdentity) -> LibraryKey {
         LibraryProvider::Builtin(package) | LibraryProvider::Package(package) => package.clone(),
     };
     (package, identity.module_path.clone())
+}
+
+/// The definition of the method `method` on the genus `genus` declared in
+/// `analysis`'s HIR.
+fn genus_method(analysis: &AnalyzedModule, genus: &str, method: &str) -> Option<DefId> {
+    analysis.hir.items.iter().find_map(|item| {
+        let HirItemKind::Struct(strukt) = &item.kind else {
+            return None;
+        };
+        if analysis.interner.resolve(strukt.name) != genus {
+            return None;
+        }
+        strukt
+            .methods
+            .iter()
+            .find(|candidate| analysis.interner.resolve(candidate.func.name) == method)
+            .map(|candidate| candidate.def_id)
+    })
 }
 
 fn top_level_function(analysis: &AnalyzedModule, name: &str) -> Option<DefId> {
