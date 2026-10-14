@@ -338,3 +338,51 @@ fn praefixum_link_imported_genus_result_is_the_importers_own() {
         }
     }
 }
+
+#[test]
+fn praefixum_link_method_call_evaluates_to_literal() {
+    let dir = test_temp_dir("praefixum-link-method-literal");
+    let dir = dir.as_ref();
+    write(
+        dir,
+        "consts.fab",
+        "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n",
+    );
+    write(
+        dir,
+        "main.fab",
+        "import from \"./consts\" consts\n\n\
+         const int M = comptime {\n    const consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\n\
+         main {\n    print M\n}\n",
+    );
+    let package = analyze(dir);
+    let (_, node) = package.node_by_path(&dir.join("main.fab")).unwrap();
+    assert_eq!(int_literal(constant(node, "M")), 7);
+}
+
+#[test]
+fn praefixum_link_method_that_prints_is_forbidden() {
+    let dir = test_temp_dir("praefixum-link-method-effect");
+    let dir = dir.as_ref();
+    write(
+        dir,
+        "consts.fab",
+        "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        print 7\n        return self.n\n    }\n}\n",
+    );
+    write(
+        dir,
+        "main.fab",
+        "import from \"./consts\" consts\n\n\
+         const int M = comptime {\n    const consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\n\
+         main {\n    print M\n}\n",
+    );
+    let diagnostics = analyze_err(dir);
+    let diagnostic = sem064(&diagnostics, "praefixum_forbidden");
+    assert_eq!(arg(diagnostic, "name"), "M");
+    assert_eq!(arg(diagnostic, "effect"), "scribe");
+    assert!(
+        arg(diagnostic, "chain").contains("get"),
+        "chain names the method hop: {:?}",
+        arg(diagnostic, "chain")
+    );
+}
