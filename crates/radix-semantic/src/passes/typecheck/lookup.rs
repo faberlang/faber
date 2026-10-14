@@ -604,7 +604,11 @@ impl TypeChecker<'_> {
             HirLiteral::Ascii(sym) => self.check_ascii_literal(*sym, span, expected),
             HirLiteral::Octeti(sym) => self.check_octeti_literal(*sym, span),
             HirLiteral::JsonValor(value) => self.check_json_valor_literal(value, span, expected),
-            HirLiteral::Regex(sym, _) => self.check_regex_literal(*sym, span),
+            // Ruling d381ae56 (2026-10-14): the literal's contents are passed
+            // to the target's native regex engine unchecked; only the
+            // delimiters are the lexer's concern. The failable `↦ regex`
+            // conversion for dynamic text is unchanged.
+            HirLiteral::Regex(..) => self.regex_type(),
             HirLiteral::Bool(_) => self.bool_type(),
             HirLiteral::Nil => self.nil_type(),
         }

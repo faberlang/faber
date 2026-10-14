@@ -103,7 +103,6 @@ const ISSUE_CONVERSIO_FAILURE_CHANNEL_VALUE_REQUIRED: &str =
 const ISSUE_FAILABLE_CONVERSIO_REQUIRES_HANDLER: &str = "failable_conversio_requires_handler";
 const ISSUE_REGEX_OPERAND_UNSUPPORTED: &str = "regex_operand_unsupported";
 const ISSUE_REGEX_RECOVERY_UNSUPPORTED: &str = "regex_recovery_unsupported";
-const ISSUE_REGEX_LITERAL_INVALID: &str = "regex_literal_invalid";
 const ISSUE_UNSUPPORTED_CONVERSIO: &str = "unsupported_conversio";
 const ISSUE_RECORD_CONVERSION_REQUIRES_RECONSTRUCTION: &str =
     "record_conversion_requires_reconstruction";
@@ -532,23 +531,6 @@ fn rectangular_lista_literal_issue(error: RectangularListaLiteralError) -> &'sta
         RectangularListaLiteralError::NonLiteralLeaf => ISSUE_RECTANGULAR_LISTA_LITERAL_LEAF,
         RectangularListaLiteralError::AbsentLeafType
         | RectangularListaLiteralError::ElementMismatch => ISSUE_LISTA_TO_TENSOR_ELEMENT_MISMATCH,
-    }
-}
-
-/// One-line message of a `regex-syntax` parse failure for the `detail` arg.
-///
-/// `regex_syntax::Error` is `#[non_exhaustive]`; the parse and translate kinds
-/// both name the failure in one line, so prefer that over the located
-/// multi-line `Display` form.
-fn regex_parse_error_detail(error: &regex_syntax::Error) -> String {
-    match error {
-        regex_syntax::Error::Parse(parse) => parse.kind().to_string(),
-        regex_syntax::Error::Translate(translate) => translate.kind().to_string(),
-        _ => error
-            .to_string()
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" "),
     }
 }
 
@@ -3527,34 +3509,6 @@ impl TypeChecker<'_> {
             self.invalid_conversion(ISSUE_REGEX_RECOVERY_UNSUPPORTED, span);
         }
         None
-    }
-
-    /// Type of a `HirLiteral::Regex` (`regex /pattern/`, ruling d381ae56).
-    ///
-    /// The inline literal is infallible: its raw pattern compiles at check
-    /// time through the same engine family as the runtime `regex` crate, so a
-    /// malformed pattern is a `SEM016` `regex_literal_invalid` error here. The
-    /// failable `↦ regex` conversion stays for dynamic patterns.
-    pub fn check_regex_literal(&mut self, sym: Symbol, span: radix_lexer::Span) -> TypeId {
-        // WHY: the pattern is borrowed from the interner, so resolve to an
-        // owned text before the diagnostic body mutably borrows the checker.
-        let Some(pattern) = self
-            .interner
-            .map(|interner| interner.resolve(sym).to_owned())
-        else {
-            // Hand-built HIR without an interner has no resolvable text.
-            return self.regex_type();
-        };
-        if let Err(error) = regex_syntax::Parser::new().parse(&pattern) {
-            self.error_issue_with_args(
-                SemanticErrorKind::ConversionInvalid,
-                ISSUE_REGEX_LITERAL_INVALID,
-                span,
-                &[("detail", regex_parse_error_detail(&error))],
-            );
-            return self.error_type;
-        }
-        self.regex_type()
     }
 
     /// Checks `∷` / `verte` typed conversion and construction forms.

@@ -1097,7 +1097,6 @@ dependencies = [
  "radix-syntax",
  "radix-target",
  "radix-types",
- "regex-syntax",
  "rustc-hash",
  "serde",
  "serde_json",

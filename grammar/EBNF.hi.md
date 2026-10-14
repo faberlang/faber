@@ -2811,9 +2811,12 @@ operator (or a parse error), and a binding named `regex` used as the left
 operand of a division is written `(regex) / 2`. The body is raw to the next
 unescaped `/` on the same line: `\/` writes a literal slash, Faber processes no
 other backslash escape, an empty pattern (`//`) is rejected, and there are no
-suffix flags (use the inline `(?i)` form). The literal is checked at `faber
-check` and is infallible once accepted. `"..." ↦ regex` (and `ascii ↦ regex`)
-remains the compiled-pattern conversion for dynamic text.
+suffix flags (use the inline `(?i)` form). The literal types as `regex` and its
+body is passed to the target's native regex engine unchecked: Faber defines no
+pattern subset and performs no compile-time validation of the contents, exactly
+as when a pattern was a plain `textus`. `"..." ↦ regex` (and `ascii ↦ regex`)
+remains the compiled-pattern conversion for dynamic text, which fails at
+runtime on a pattern the target engine rejects.
 
 ---
 

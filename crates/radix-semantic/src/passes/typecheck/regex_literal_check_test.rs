@@ -1,18 +1,17 @@
-//! Inline regex literals are validated at check time (ruling d381ae56 point 3).
+//! Inline regex literal contents are not validated at check time
+//! (operator ruling d381ae56, amended 2026-10-14).
 //!
-//! `regex /pattern/` is infallible: its raw pattern compiles at `faber check`
-//! through the same engine family as the Rust runtime `regex` crate, so a
-//! malformed pattern fails with `SEM016` `regex_literal_invalid`. The failable
-//! `↦ regex` conversion for dynamic patterns is unchanged. Assertions are
-//! structured (issue names), never message text.
+//! `regex /pattern/` types as `regex`; its raw body is passed to the target's
+//! native engine unchecked, exactly as when a pattern was a plain `textus`.
+//! Only the delimiters are the lexer's concern. The failable `↦ regex`
+//! conversion for dynamic patterns is unchanged. Assertions are structured
+//! (acceptance), never message text.
 
-use crate::test_support::{assert_accepts, assert_rejects_with_issue};
-
-const ISSUE: &str = "regex_literal_invalid";
+use crate::test_support::assert_accepts;
 
 #[test]
-fn malformed_literal_pattern_fails_check() {
-    assert_rejects_with_issue(r"incipit { fixum regex r ← regex /(/ }", ISSUE);
+fn unbalanced_pattern_literal_is_accepted() {
+    assert_accepts(r"incipit { fixum regex r ← regex /(/ }");
 }
 
 #[test]
@@ -23,6 +22,14 @@ fn valid_literal_pattern_passes_check() {
 #[test]
 fn inline_flag_literal_pattern_passes_check() {
     assert_accepts(r"incipit { fixum regex r ← regex /(?i)\d+/ }");
+}
+
+#[test]
+fn engine_specific_patterns_pass_check_unchecked() {
+    // Lookahead and a backreference: legal in some target engines, rejected
+    // by the Rust engine; the checker does not inspect the body.
+    assert_accepts(r"incipit { fixum regex a ← regex /(?=a)b/ }");
+    assert_accepts(r"incipit { fixum regex b ← regex /(a)\1/ }");
 }
 
 #[test]

@@ -41,7 +41,6 @@ radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-syntax = { path = "../radix-syntax" }
 radix-target = { path = "../radix-target" }
 radix-types = { path = "../radix-types" }
-regex-syntax = "0.8"
 rustc-hash = "2"
 serde_json = "1"
 toml = "1.1.2"
