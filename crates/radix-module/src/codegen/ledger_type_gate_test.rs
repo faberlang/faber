@@ -92,8 +92,9 @@ fn en_ledger_spelling_resolves_as_a_parameter_and_a_return_type() {
 
 #[cfg(feature = "hir-faber")]
 #[test]
-fn en_ledger_print_is_refused_by_name() {
-    let (_, issues) = en_compile("fn f(ledger<string, int> l) {\n    print l\n}\n");
+fn en_ledger_conversion_is_refused_by_name() {
+    let (_, issues) =
+        en_compile("fn f(ledger<string, int> l) → ledger<string, int> {\n    return l ↦ ledger<string, int>\n}\n");
     assert!(
         issues
             .iter()

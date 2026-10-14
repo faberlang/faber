@@ -127,20 +127,29 @@ fn ledger_ops_loop_shape_change_still_refused() {
 }
 
 #[test]
-fn ledger_ops_equality_still_refused() {
-    rejects_with_issue(
-        &compile(
-            "functio f(tabulae<textus, numerus> a, tabulae<textus, numerus> b) → bivalens {\n    redde a ≡ b\n}\n",
-        ),
-        "ledger_operation_not_implemented",
-    );
+fn ledger_equality_typechecks() {
+    accepts(&compile(
+        "functio f(tabulae<textus, numerus> a, tabulae<textus, numerus> b) → bivalens {\n    redde a ≡ b\n}\n",
+    ));
+    accepts(&compile(
+        "functio f(tabulae<textus, numerus> a, tabulae<textus, numerus> b) → bivalens {\n    redde a ≢ b\n}\n",
+    ));
 }
 
 #[test]
-fn ledger_ops_print_still_refused() {
+fn ledger_print_and_interpolation_typecheck() {
+    accepts(&compile(
+        "functio f(tabulae<textus, numerus> l) {\n    nota l\n}\n",
+    ));
+}
+
+#[test]
+fn ledger_equality_against_map_is_refused() {
     rejects_with_issue(
-        &compile("functio f(tabulae<textus, numerus> l) {\n    nota l\n}\n"),
-        "ledger_operation_not_implemented",
+        &compile(
+            "functio f(tabulae<textus, numerus> a, tabula<textus, numerus> b) → bivalens {\n    redde a ≡ b\n}\n",
+        ),
+        "equality_exact_types_required",
     );
 }
 
