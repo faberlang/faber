@@ -202,6 +202,53 @@ fn diagnostic_has_arg(diag: &Diagnostic, name: &'static str, value: impl Into<St
     diag.args.contains(&DiagnosticArg::new(name, value))
 }
 
+/// A missing external toolchain may skip a proof only on the Linux merge-lane
+/// gate (which has no ghc/go/python>=3.12/llvm-as/rustfmt toolchain) or when
+/// `FABER_ALLOW_MISSING_TOOLCHAIN` is set. The macOS gate treats these proofs
+/// as mandatory, so a missing tool there is a test failure.
+fn may_skip_missing_tool_on(is_linux: bool, opted_out: bool) -> bool {
+    is_linux || opted_out
+}
+
+fn may_skip_missing_tool() -> bool {
+    may_skip_missing_tool_on(
+        cfg!(target_os = "linux"),
+        std::env::var_os("FABER_ALLOW_MISSING_TOOLCHAIN").is_some(),
+    )
+}
+
+/// Print the visible skip line and return when the policy allows a skip;
+/// otherwise fail the proof with the message it carried before the env gates.
+fn missing_tool_with(may_skip: bool, tool: &str, proof: &str, old_failure: &str) {
+    if may_skip {
+        eprintln!("SKIPPED ({tool} missing): {proof}");
+        return;
+    }
+    panic!("{old_failure}");
+}
+
+fn missing_tool(tool: &str, proof: &str, old_failure: &str) {
+    missing_tool_with(may_skip_missing_tool(), tool, proof, old_failure);
+}
+
+#[test]
+fn missing_toolchain_skip_policy_is_linux_or_opt_out_only() {
+    assert!(!may_skip_missing_tool_on(false, false));
+    assert!(may_skip_missing_tool_on(true, false));
+    assert!(may_skip_missing_tool_on(false, true));
+}
+
+#[test]
+#[should_panic]
+fn missing_tool_fails_off_linux_without_opt_out() {
+    missing_tool_with(
+        false,
+        "rustfmt",
+        "missing_tool_fails_off_linux_without_opt_out",
+        "rustfmt is required by this proof (was: expect(\"rustfmt\"))",
+    );
+}
+
 #[test]
 fn executed_lane_analysis_target_seam_is_single_valued() {
     // TARGETLANE001 / BUG-F585D081: single-valued precedence is explicit
@@ -1057,15 +1104,19 @@ fn label() → string {
     let layout = discover_build_layout(&entry).expect("layout");
     emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
 
-    // Env gate (same convention as the tsc gate in this file): rustfmt must be
-    // a working toolchain — a rustup shim with no configured default toolchain
-    // fails `--version`. The emission assertions above are toolchain-free.
+    // rustfmt must be a working toolchain where this proof is mandatory — a
+    // rustup shim with no configured default toolchain fails `--version`. The
+    // emission assertions above are toolchain-free.
     if !Command::new("rustfmt")
         .arg("--version")
         .output()
         .is_ok_and(|output| output.status.success())
     {
-        eprintln!("rustfmt not available; skipping rustfmt-clean emission test");
+        missing_tool(
+            "rustfmt",
+            "package_emits_rustfmt_clean_generated_main_for_multifile_package",
+            "rustfmt is required by this proof (was: expect(\"rustfmt\"))",
+        );
         return;
     }
     let rustfmt = Command::new("rustfmt")
@@ -10974,14 +11025,17 @@ main args args exit 0 {
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &[]).expect("emit go");
-    // Env gate (same convention as the tsc/clang NVPTX gates in this crate):
-    // the assertions above are toolchain-free; the native build needs `go`.
+    // The assertions above are toolchain-free; the native build needs `go`.
     if !Command::new("go")
         .arg("version")
         .output()
         .is_ok_and(|output| output.status.success())
     {
-        eprintln!("go not found on PATH; skipping go build");
+        missing_tool(
+            "go",
+            "g6_go3_single_entry_cli_package_compiles_and_go_builds",
+            "go is required by this proof (was: expect(\"go build\"))",
+        );
         return;
     }
     let binary = super::invoke_go_build(&go_layout).expect("go build");
@@ -11064,14 +11118,17 @@ main args args exit 0 {
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit go");
-    // Env gate (same convention as the tsc/clang NVPTX gates in this crate):
-    // the assertions above are toolchain-free; the native build needs `go`.
+    // The assertions above are toolchain-free; the native build needs `go`.
     if !Command::new("go")
         .arg("version")
         .output()
         .is_ok_and(|output| output.status.success())
     {
-        eprintln!("go not found on PATH; skipping go build");
+        missing_tool(
+            "go",
+            "g6_go4_multi_module_namespace_package_builds",
+            "go is required by this proof (was: expect(\"go build\"))",
+        );
         return;
     }
     let binary = super::invoke_go_build(&go_layout).expect("go build");
@@ -11269,14 +11326,17 @@ main args args exit 0 {
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
-    // Env gate (same convention as the tsc/clang NVPTX gates in this crate):
-    // the assertions above are toolchain-free; the native build needs `go`.
+    // The assertions above are toolchain-free; the native build needs `go`.
     if !Command::new("go")
         .arg("version")
         .output()
         .is_ok_and(|output| output.status.success())
     {
-        eprintln!("go not found on PATH; skipping go build consolum surface");
+        missing_tool(
+            "go",
+            "g6_consolum_shim_supports_full_stdio_surface",
+            "go is required by this proof (was: expect(\"go build consolum surface\"))",
+        );
         return;
     }
     let binary = super::invoke_go_build(&go_layout).expect("go build consolum surface");
