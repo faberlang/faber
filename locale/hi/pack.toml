@@ -3353,7 +3353,7 @@ help = "उद्धरण चिह्नों वाले पाठ के �
 
 
 [llm]
-system_prompt_snippet = "Emit Hindi reader-locale Faber using Hindi keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged."
+system_prompt_snippet = "Emit Hindi reader-locale Faber using Hindi keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged. जब किसी स्ट्रिंग में उद्धरण चिह्न (\" या ') हो, तो उसे «…» से लिखें: गुइलेमे को किसी एस्केप की आवश्यकता नहीं होती।"
 exemplars = ["./exemplars/salve-munde.hi.fab"]
 
 # [intrinsics] — canonical (Latin) intrinsic name -> this pack's surface spelling.
