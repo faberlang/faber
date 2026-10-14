@@ -41,7 +41,7 @@ main {
     const int n ← 42
     const value scalar ← n ↦ value
     print scalar
-    const bytes bytes ← |de ad|
+    const list<b8> bytes ← |de ad|
     const value boxedBytes ← bytes ↦ value
     print boxedBytes
     const list<int> numeri ← [1, 2]

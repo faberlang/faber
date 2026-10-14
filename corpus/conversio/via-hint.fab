@@ -57,7 +57,7 @@ locale = "en"
 #   argument; the clause is a spelling, not a new row.
 
 main {
-    const bytes raw ← |3c 00|
+    const list<b8> raw ← |3c 00|
 
     # Endian unpack of an exact-width window.
     const u16 little ← raw[0‥2] ↦ u16 via Le

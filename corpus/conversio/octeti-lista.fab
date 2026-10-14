@@ -39,9 +39,9 @@ locale = "en"
 #   HIR-direct Rust emits a one-pass Vec<u8> copy. MIR-stepper agrees.
 
 main {
-    const bytes raw ← |de ad be ef|
+    const list<b8> raw ← |de ad be ef|
     const list<u8> asList ← raw ↦ list<u8>
-    const bytes back ← asList ↦ bytes
+    const list<b8> back ← asList ↦ list<b8>
     print asList.length()
     print back.length()
 }

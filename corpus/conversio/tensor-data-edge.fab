@@ -43,11 +43,11 @@ locale = "en"
 # Float bits become values via IEEE field extract + power-of-two scaling
 # (no bit-reinterpret primitive — same seam as gradus dequant `_f32le`).
 
-fn byteAt(bytes buf, int off) → int {
+fn byteAt(list<b8> buf, int off) → int {
     return buf.get(off) coalesce 0 ∷ b8 ↦ u8 ↦ int
 }
 
-fn leU32(bytes buf, int off) → int {
+fn leU32(list<b8> buf, int off) → int {
     const int b0 ← byteAt(buf, off)
     const int b1 ← byteAt(buf, off + 1)
     const int b2 ← byteAt(buf, off + 2)
@@ -74,7 +74,7 @@ fn powerTwo(int n) → float {
     return result
 }
 
-fn f32le(bytes buf, int off) → f32 {
+fn f32le(list<b8> buf, int off) → f32 {
     const int raw ← leU32(buf, off)
     const int sign ← (raw ⇒ 31) % 2
     const int exp ← (raw ⇒ 23) % 256
@@ -92,7 +92,7 @@ fn f32le(bytes buf, int off) → f32 {
     return signFactor * power * (1.0 + fracRatio) ↦ f32
 }
 
-fn decodeFlat(bytes buf, int off, int count) → list<f32> {
+fn decodeFlat(list<b8> buf, int off, int count) → list<f32> {
     var list<f32> out ← empty
     var int i ← 0
     while i ≺ count {
@@ -104,7 +104,7 @@ fn decodeFlat(bytes buf, int off, int count) → list<f32> {
 
 main {
     # 8-byte LE dim header + 16 × f32le 1.0
-    const bytes fixture ← |02 00 00 00 08 00 00 00 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f|
+    const list<b8> fixture ← |02 00 00 00 08 00 00 00 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f|
     const int dim0 ← leU32(fixture, 0)
     const int dim1 ← leU32(fixture, 4)
     const list<f32> flat ← decodeFlat(fixture, 8, dim0 * dim1)
