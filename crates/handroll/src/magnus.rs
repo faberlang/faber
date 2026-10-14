@@ -22,15 +22,21 @@
 //! (the MIR runner's `RUNNER_INF_BIT_CEILING`) that want a fault instead of thrashing.
 //!
 //! Complexity, with `n` and `m` the operand limb counts: `+ - ⇐ ⇒` and bitwise ops and
-//! comparison are O(n); `*` is schoolbook O(n·m) (no Karatsuba); `/ %` are Knuth Algorithm D,
-//! O(n·m); `potentia` is O(M(n·e) · log e); decimal parse and render are O(n²); radix 2/8/16
-//! render is O(n). Hashing is O(n).
+//! comparison are O(n); `*` is Karatsuba O(n^1.585) above `KARATSUBA_THRESHOLD` limbs and
+//! schoolbook O(n·m) below; `/ %` are Knuth Algorithm D, O(n·m); `potentia` is
+//! O(M(n·e) · log e); decimal parse and render are O(n²); radix 2/8/16 render is O(n). Hashing
+//! is O(n).
 
 use std::cmp::Ordering;
 use std::fmt;
 
 const LIMB_BITS: usize = 32;
 const BASE: u64 = 1 << 32;
+
+/// Limb count below which `mul_mag` runs the schoolbook product directly; at or above it the
+/// balanced Karatsuba split takes over, where the three half-size products beat the one
+/// full-size loop. Lopsided operands (one more than twice the other) stay schoolbook.
+const KARATSUBA_THRESHOLD: usize = 32;
 
 /// Why a `Magnus` operation failed. Every variant is a value-level failure the caller maps to
 /// its own trap or `⇥`; none is a resource-exhaustion abort.
@@ -160,7 +166,83 @@ fn sub_mag(a: &[u32], b: &[u32]) -> Vec<u32> {
     out
 }
 
+/// Schoolbook O(n·m) product used as `mul_mag`'s base and lopsided case.
+fn mul_mag_small(a: &[u32], b: &[u32]) -> Vec<u32> {
+    if a.is_empty() || b.is_empty() {
+        return Vec::new();
+    }
+    let mut out = vec![0_u32; a.len() + b.len()];
+    for (i, &x) in a.iter().enumerate() {
+        let mut carry = 0_u64;
+        for (j, &y) in b.iter().enumerate() {
+            let cur = u64::from(out[i + j]) + u64::from(x) * u64::from(y) + carry;
+            out[i + j] = lo(cur);
+            carry = hi(cur).into();
+        }
+        out[i + b.len()] = lo(carry);
+    }
+    trim(&mut out);
+    out
+}
+
+/// Exact product of two magnitudes. Karatsuba for balanced operands of at least
+/// `KARATSUBA_THRESHOLD` limbs; schoolbook otherwise (and for lopsided operands, where the
+/// extra half-size products would cost more than they save).
 fn mul_mag(a: &[u32], b: &[u32]) -> Vec<u32> {
+    let (a, b) = if a.len() >= b.len() { (a, b) } else { (b, a) };
+    if b.is_empty() {
+        return Vec::new();
+    }
+    if b.len() < KARATSUBA_THRESHOLD || a.len() > 2 * b.len() {
+        return mul_mag_small(a, b);
+    }
+    let split = a.len() / 2;
+    let (a_lo, a_hi) = a.split_at(split);
+    let (b_lo, b_hi) = b.split_at(split);
+    let z0 = mul_mag(a_lo, b_lo);
+    let z2 = mul_mag(a_hi, b_hi);
+    let a_sum = add_mag(a_lo, a_hi);
+    let b_sum = add_mag(b_lo, b_hi);
+    // z1 = (a_lo + a_hi)(b_lo + b_hi) - z0 - z2 >= 0; the two subtractions are exact.
+    let z1 = sub_mag(&sub_mag(&mul_mag(&a_sum, &b_sum), &z0), &z2);
+    let mut out = z0;
+    add_shifted(&mut out, &z1, split);
+    add_shifted(&mut out, &z2, 2 * split);
+    trim(&mut out);
+    out
+}
+
+/// `acc += addend * BASE^shift`, extending `acc` when the shifted sum needs more limbs.
+fn add_shifted(acc: &mut Vec<u32>, addend: &[u32], shift: usize) {
+    if addend.is_empty() {
+        return;
+    }
+    if acc.len() < shift + addend.len() {
+        acc.resize(shift + addend.len(), 0);
+    }
+    let mut carry = 0_u64;
+    for (i, &limb) in addend.iter().enumerate() {
+        let cur = u64::from(acc[shift + i]) + u64::from(limb) + carry;
+        acc[shift + i] = lo(cur);
+        carry = cur >> 32;
+    }
+    let mut i = shift + addend.len();
+    while carry != 0 {
+        if i == acc.len() {
+            acc.push(lo(carry));
+            break;
+        }
+        let cur = u64::from(acc[i]) + carry;
+        acc[i] = lo(cur);
+        carry = cur >> 32;
+        i += 1;
+    }
+}
+
+/// The pre-Karatsuba schoolbook `mul_mag`, frozen verbatim as the equality oracle for the
+/// Karatsuba path (and compiled only for tests).
+#[cfg(test)]
+fn mul_mag_schoolbook(a: &[u32], b: &[u32]) -> Vec<u32> {
     if a.is_empty() || b.is_empty() {
         return Vec::new();
     }
