@@ -89,6 +89,58 @@ kind = "bin"
     src.join("main.fab")
 }
 
+// The failable sibling shape: a generic export whose error half is a
+// declared union (the fault type of `norma:fs.read_file<T>`), with a bare
+// `↦ T` conversion body. The synthetic namespace callee must carry the
+// export signature's error half so the call lowers as a try-call.
+const TYPEARG_FAILABLE_UTIL: &str = r"@ public
+union Fault {
+    Broken { string path }
+}
+
+@ public
+@ radix type T mut string list<string> bytes
+fn read<T>(string path) → T ⇥ Fault {
+    return path ↦ T
+}
+";
+
+const TYPEARG_FAILABLE_MAIN: &str = r#"import from "./util" * as utilModule
+
+fn run() → string ⇥ utilModule.Fault {
+    return utilModule.read<string>("x")
+}
+
+main {
+    print "ok"
+}
+"#;
+
+fn write_failable_typearg_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "ns-typearg-failable"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("util.fab"), TYPEARG_FAILABLE_UTIL).expect("write util.fab");
+    fs::write(src.join("main.fab"), TYPEARG_FAILABLE_MAIN).expect("write main.fab");
+    src.join("main.fab")
+}
+
 fn literal_dims(
     types: &radix_types::TypeTable,
     shape: radix_module::semantic::IndexId,
@@ -172,6 +224,30 @@ fn package_mir_links_explicit_type_arg_namespace_call() {
         panic!(
             "explicit type-arg namespace call must link, got {:?}",
             errors
+        )
+    });
+}
+
+#[test]
+fn package_mir_links_generic_failable_namespace_call_with_error_type() {
+    // The `norma:fs.read_file<T>` shape: a generic sibling export with a
+    // declared union error type. The synthetic callee must carry the export
+    // signature's error half, or the try-call edge (and the error channel)
+    // is lost in package MIR.
+    let dir = crate::test_support::test_temp_dir("ns-typearg-failable");
+    let entry = write_failable_typearg_package(dir.as_ref());
+    let config = Config::default();
+
+    with_interpreted_lowered_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        |_lowered| {},
+    )
+    .unwrap_or_else(|errors| {
+        panic!(
+            "generic failable namespace call with a declared error type must link, got {:?}",
+            errors.iter().map(|diag| diag.issue()).collect::<Vec<_>>()
         )
     });
 }
