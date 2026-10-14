@@ -47,7 +47,7 @@ fn parse_value(string wire, int start) → cursor.ScanResult ⇥ string {
     const string c ← wire.slice(index, index + 1)
     if c ≡ "{" then return parse_object(wire, index)
     if c ≡ "[" then return parse_array(wire, index)
-    if c ≡ «\"» then return parse_string(wire, index)
+    if c ≡ «"» then return parse_string(wire, index)
     if c ≡ "t" then return parse_keyword(wire, index, "true", true ↦ value)
     if c ≡ "f" then return parse_keyword(wire, index, "false", false ↦ value)
     if c ≡ "n" then return parse_keyword(wire, index, "null", null ↦ value)
@@ -74,7 +74,7 @@ fn parse_object(string wire, int start) → cursor.ScanResult ⇥ string {
     var int index ← lexer.skip_whitespace(wire, start + 1)
     if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "}" then return result(fields ↦ value, index + 1)
     while index ≺ wire.length() {
-        if wire.slice(index, index + 1) ≢ «\"» {
+        if wire.slice(index, index + 1) ≢ «"» {
             throw "expected JSON object key at position §"(index)
         }
         const cursor.ScanResult key_scan ← parse_string(wire, index)
@@ -128,7 +128,7 @@ fn parse_string(string wire, int start) → cursor.ScanResult ⇥ string {
     var int index ← start + 1
     while index ≺ wire.length() {
         const string c ← wire.slice(index, index + 1)
-        if c ≡ «\"» then return result(decoded ↦ value, index + 1)
+        if c ≡ «"» then return result(decoded ↦ value, index + 1)
         if c ≢ "\\" {
             if lexer.is_control(c) {
                 throw "unescaped control character at position §"(index)

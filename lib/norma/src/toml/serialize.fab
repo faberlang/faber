@@ -35,12 +35,12 @@ fn as_float(value node) → float {
 }
 
 fn quote(string s) → string {
-    var string out ← «\"»
+    var string out ← «"»
     var int i ← 0
     while i ≺ s.length() {
         const string c ← s.slice(i, i + 1)
-        if c ≡ «\"» {
-            out ← out + «\\\"»
+        if c ≡ «"» {
+            out ← out + «\\"»
         }
         elif c ≡ "\\" {
             out ← out + "\\\\"
@@ -59,7 +59,7 @@ fn quote(string s) → string {
         }
         i ← i + 1
     }
-    return out + «\"»
+    return out + «"»
 }
 
 fn is_bare_key(string key) → bool {

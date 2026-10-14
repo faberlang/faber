@@ -131,7 +131,7 @@ fn hex_value(string c) → int ∪ none {
 }
 
 fn unescape(string letter) → string ∪ none {
-    if letter ≡ «\"» then return «\"»
+    if letter ≡ «"» then return «"»
     if letter ≡ "\\" then return "\\"
     if letter ≡ "b" then return ([8] ↦ bytes) ↦ string ⊥ ""
     if letter ≡ "f" then return ([12] ↦ bytes) ↦ string ⊥ ""
@@ -146,7 +146,7 @@ fn parse_basic_string(string wire, int start) → cursor.Scan ⇥ string {
     var int index ← start + 1
     while index ≺ wire.length() {
         const string c ← wire.slice(index, index + 1)
-        if c ≡ «\"» then return result(out ↦ value, index + 1)
+        if c ≡ «"» then return result(out ↦ value, index + 1)
         if c ≡ "\n" then throw "norma:toml.parse: unterminated string"
         if c ≡ "\\" {
             if index + 1 ≥ wire.length() then throw "norma:toml.parse: truncated escape"
@@ -203,7 +203,7 @@ fn parse_key(string wire, int start) → cursor.Scan ⇥ string {
     const int index ← skip_space(wire, start)
     if index ≥ wire.length() then throw "norma:toml.parse: expected key"
     const string c ← wire.slice(index, index + 1)
-    if c ≡ «\"» then return parse_basic_string(wire, index)
+    if c ≡ «"» then return parse_basic_string(wire, index)
     if c ≡ "'" then return parse_literal_string(wire, index)
     if not is_bare(c) then throw "norma:toml.parse: expected key"
     var int end ← index
@@ -406,7 +406,7 @@ fn parse_value(string wire, int start) → cursor.Scan ⇥ string {
     const int index ← skip_space(wire, start)
     if index ≥ wire.length() then throw "norma:toml.parse: expected value"
     const string c ← wire.slice(index, index + 1)
-    if c ≡ «\"» then return parse_basic_string(wire, index)
+    if c ≡ «"» then return parse_basic_string(wire, index)
     if c ≡ "'" then return parse_literal_string(wire, index)
     if c ≡ "[" then return parse_array(wire, index)
     if c ≡ "{" then return parse_inline_table(wire, index)

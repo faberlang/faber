@@ -38,9 +38,9 @@ locale = "en"
 #   Cross-ref scriptum/scriptum.fab for § template application.
 
 main {
-    const regex digits ← "\d+" ↦ regex
+    const regex digits ← "\\d+" ↦ regex
     print digits
-    const regex word ← "(?i)\w+" ↦ regex
+    const regex word ← "(?i)\\w+" ↦ regex
     print word
 
     # Template application → textus, then conversio to regex (dynamic path segments)

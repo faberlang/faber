@@ -66,7 +66,7 @@ fn is_control(string c) → bool {
 
 @ public
 fn escape_char(string c) → string ∪ none {
-    if c ≡ «\"» then return «\\\"»
+    if c ≡ «"» then return «\\"»
     if c ≡ "\\" then return "\\\\"
     if c ≡ "\n" then return "\\n"
     if c ≡ "\r" then return "\\r"
@@ -84,7 +84,7 @@ fn escape_char(string c) → string ∪ none {
 # named controls use escape_char; unnamed controls use control_escape.
 @ public
 fn needs_escape(string c) → bool {
-    if c ≡ «\"» or c ≡ "\\" then return true
+    if c ≡ «"» or c ≡ "\\" then return true
     if escape_char(c) not is none then return true
     return is_control(c)
 }
@@ -112,7 +112,7 @@ fn hex_digit(int digit) → string {
 
 @ public
 fn unescape_char(string s) → string ∪ none {
-    if s ≡ «\"» then return «\"»
+    if s ≡ «"» then return «"»
     if s ≡ "\\" then return "\\"
     if s ≡ "/" then return "/"
     if s ≡ "n" then return "\n"
