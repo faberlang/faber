@@ -193,3 +193,45 @@ fn leaf_facts_carry_kind_word_and_path_only() {
     assert!(!word.contains("solum"), "{word}");
     assert!(!path.contains("solum"), "{path}");
 }
+
+#[test]
+fn variant_name_covers_every_kind() {
+    let table = [
+        (LeafErrorKind::NotFound, "NotFound"),
+        (LeafErrorKind::Permission, "Permission"),
+        (LeafErrorKind::NotADirectory, "NotADirectory"),
+        (LeafErrorKind::IsADirectory, "IsADirectory"),
+        (LeafErrorKind::InvalidArgument, "InvalidArgument"),
+        (LeafErrorKind::AlreadyExists, "AlreadyExists"),
+        (LeafErrorKind::TimedOut, "TimedOut"),
+        (LeafErrorKind::ConnectionRefused, "ConnectionRefused"),
+        (LeafErrorKind::ConnectionReset, "ConnectionReset"),
+        (LeafErrorKind::AddrInUse, "AddrInUse"),
+        (LeafErrorKind::Io, "Io"),
+        (LeafErrorKind::Closed, "Closed"),
+        (LeafErrorKind::Unset, "Unset"),
+        (LeafErrorKind::Unavailable, "Unavailable"),
+        (LeafErrorKind::Cancelled, "Cancelled"),
+    ];
+    assert_eq!(table.len(), LeafErrorKind::ALL.len());
+    for (kind, expected) in table {
+        assert_eq!(kind.variant_name(), expected, "{kind:?}");
+    }
+    let names = LeafErrorKind::ALL.map(LeafErrorKind::variant_name);
+    for (index, left) in names.iter().enumerate() {
+        for right in &names[index + 1..] {
+            assert_ne!(left, right, "{left} appears twice");
+        }
+    }
+}
+
+#[test]
+fn from_io_not_found_names_the_variant_and_keeps_the_path() {
+    let error = LeafError::from_io(
+        "solum:lege",
+        "/p",
+        &io::Error::new(io::ErrorKind::NotFound, "x"),
+    );
+    assert_eq!(error.kind().variant_name(), "NotFound");
+    assert_eq!(error.path(), "/p");
+}
