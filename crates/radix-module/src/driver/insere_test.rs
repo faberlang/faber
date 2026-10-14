@@ -187,7 +187,7 @@ fn faber_reemission_prints_the_embed_not_the_bytes() {
         panic!("expected faber output");
     };
     assert!(out.code.contains("fixum textus S = insere \"x.txt\""), "{}", out.code);
-    assert!(out.code.contains("fixum octeti B = insere \"x.bin\""), "{}", out.code);
+    assert!(out.code.contains("fixum lista<b8> B = insere \"x.bin\""), "{}", out.code);
     assert!(out.code.contains("generis textus T = insere \"x.txt\""), "{}", out.code);
     assert!(!out.code.contains("salve"), "{}", out.code);
 }
