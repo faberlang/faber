@@ -641,6 +641,13 @@ impl TypeChecker<'_> {
             // trap hole — same funnel.
             ErrorSink::Trap(var) => self.trap_sink_type(var),
         }) else {
+            // D17.8: an unhandled failure directly in `main {}` / `async_main {}`
+            // panics — the same main-frame exemption `reject_failable_call`
+            // applies to a bare failable call. Helpers and closures clear the
+            // frame and stay errors.
+            if self.in_main_frame {
+                return;
+            }
             self.error_issue(
                 SemanticErrorKind::TypeMismatch,
                 ISSUE_AWAIT_FAILABLE_REQUIRES_ALTERNATE_EXIT,
