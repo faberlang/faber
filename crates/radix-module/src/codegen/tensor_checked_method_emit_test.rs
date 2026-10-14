@@ -72,16 +72,16 @@ fn rust_tensor_method_forms_use_the_checked_carrier_call() {
 fn typescript_tensor_method_forms_use_the_checked_carrier_call() {
     let code = emit(Target::HirTypeScript);
     assert!(
-        code.contains("grid.accipeChecked([0, 1])"),
+        code.contains("p_grid.accipeChecked([0, 1])"),
         "an in-range literal call is unwrapped to a plain value:\n{code}"
     );
     assert!(
-        code.contains("throw { __faberFail: true, error: r.error }; } return r.value; })(grid.accipeChecked(idx))"),
+        code.contains("throw { __faberFail: true, error: r.error }; } return r.value; })(p_grid.accipeChecked(p_idx))"),
         "a `⇥ textus` function propagates the accipe error:\n{code}"
     );
-    assert!(code.contains("grid.pondeChecked(idx, v)"), "{code}");
+    assert!(code.contains("p_grid.pondeChecked(p_idx, p_v)"), "{code}");
     assert!(
-        code.contains("r.ok ? r.value : d())(grid.accipeChecked(idx), () => 7)"),
+        code.contains("r.ok ? r.value : d())(p_grid.accipeChecked(p_idx), () => 7)"),
         "the default is lazy and used only on failure:\n{code}"
     );
     assert!(
@@ -95,14 +95,14 @@ fn typescript_tensor_method_forms_use_the_checked_carrier_call() {
 fn go_tensor_method_forms_use_the_checked_carrier_call() {
     let code = emit(Target::HirGo);
     assert!(
-        code.contains("v, err := grid.AccipeChecked([]int{0, 1}); if err != nil { panic(err) }"),
+        code.contains("v, err := p_grid.AccipeChecked([]int{0, 1}); if err != nil { panic(err) }"),
         "an in-range literal call is a plain value:\n{code}"
     );
     assert!(
-        code.contains("got, err := grid.AccipeChecked(idx)\n    if err != nil {\n        return 0, err\n    }"),
+        code.contains("l_got, err := p_grid.AccipeChecked(p_idx)\n    if err != nil {\n        return 0, err\n    }"),
         "a `⇥ textus` function propagates the accipe error:\n{code}"
     );
-    assert!(code.contains("(*grid).PondeChecked(idx, v)"), "{code}");
+    assert!(code.contains("(*p_grid).PondeChecked(p_idx, p_v)"), "{code}");
     assert!(
         code.contains("if err != nil { return 7.0 }"),
         "the default is returned only on failure:\n{code}"
