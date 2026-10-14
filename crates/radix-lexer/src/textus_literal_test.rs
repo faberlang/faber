@@ -2,7 +2,16 @@
 //! Proves: basic escapes, `\u{…}` scalar escapes, unknown escape passthrough,
 //! boundary cases (trailing backslash, empty string).
 
-use crate::textus_literal::{TextusLiteralError, decode_textus_literal, try_decode_textus_literal};
+use crate::textus_literal::{
+    TextDelimiter, TextusLiteralError, decode_textus_literal, first_invalid_escape,
+    try_decode_textus_literal,
+};
+
+const DELIMITERS: [TextDelimiter; 3] = [
+    TextDelimiter::Quote,
+    TextDelimiter::Guillemet,
+    TextDelimiter::Backtick,
+];
 
 #[test]
 fn decode_plain_text_passthrough() {
@@ -123,4 +132,120 @@ fn decode_keeps_malformed_unicode_escape_as_written() {
     assert_eq!(decode_textus_literal(r"\u{"), r"\u{");
     assert_eq!(decode_textus_literal(r"\u{D800}"), r"\u{D800}");
     assert_eq!(decode_textus_literal(r"\u00e9\n"), "\\u00e9\n");
+}
+
+#[test]
+fn first_invalid_escape_unknown_letter_rejected_for_all_delimiters() {
+    for delimiter in DELIMITERS {
+        assert_eq!(first_invalid_escape(r"\q", delimiter), Some((0, 'q')));
+    }
+}
+
+#[test]
+fn first_invalid_escape_quote_valid_only_for_quote() {
+    assert_eq!(first_invalid_escape(r#"a\"b"#, TextDelimiter::Quote), None);
+    assert_eq!(
+        first_invalid_escape(r#"a\"b"#, TextDelimiter::Guillemet),
+        Some((1, '"'))
+    );
+    assert_eq!(
+        first_invalid_escape(r#"a\"b"#, TextDelimiter::Backtick),
+        Some((1, '"'))
+    );
+}
+
+#[test]
+fn first_invalid_escape_guillemet_valid_only_for_guillemet() {
+    assert_eq!(
+        first_invalid_escape(r"a\»b", TextDelimiter::Guillemet),
+        None
+    );
+    assert_eq!(
+        first_invalid_escape(r"a\»b", TextDelimiter::Quote),
+        Some((1, '»'))
+    );
+    assert_eq!(
+        first_invalid_escape(r"a\»b", TextDelimiter::Backtick),
+        Some((1, '»'))
+    );
+}
+
+#[test]
+fn first_invalid_escape_backtick_valid_only_for_backtick() {
+    assert_eq!(first_invalid_escape(r"a\`b", TextDelimiter::Backtick), None);
+    assert_eq!(
+        first_invalid_escape(r"a\`b", TextDelimiter::Quote),
+        Some((1, '`'))
+    );
+    assert_eq!(
+        first_invalid_escape(r"a\`b", TextDelimiter::Guillemet),
+        Some((1, '`'))
+    );
+}
+
+#[test]
+fn first_invalid_escape_apostrophe_rejected_for_all_delimiters() {
+    for delimiter in DELIMITERS {
+        assert_eq!(first_invalid_escape(r"\'", delimiter), Some((0, '\'')));
+    }
+}
+
+#[test]
+fn first_invalid_escape_nul_rejected_for_all_delimiters() {
+    for delimiter in DELIMITERS {
+        assert_eq!(first_invalid_escape(r"\0", delimiter), Some((0, '0')));
+    }
+}
+
+#[test]
+fn first_invalid_escape_unicode_scalar_is_valid() {
+    for delimiter in DELIMITERS {
+        assert_eq!(first_invalid_escape(r"\u{41}", delimiter), None);
+    }
+}
+
+#[test]
+fn first_invalid_escape_surrogate_is_invalid() {
+    for delimiter in DELIMITERS {
+        assert_eq!(first_invalid_escape(r"\u{D800}", delimiter), Some((0, 'u')));
+    }
+}
+
+#[test]
+fn first_invalid_escape_malformed_unicode_is_invalid() {
+    for delimiter in DELIMITERS {
+        assert_eq!(first_invalid_escape(r"\u{", delimiter), Some((0, 'u')));
+    }
+}
+
+#[test]
+fn first_invalid_escape_trailing_backslash_is_invalid() {
+    for delimiter in DELIMITERS {
+        assert_eq!(first_invalid_escape(r"abc\", delimiter), Some((3, '\\')));
+    }
+}
+
+#[test]
+fn first_invalid_escape_double_backslash_is_valid() {
+    for delimiter in DELIMITERS {
+        assert_eq!(first_invalid_escape(r"\\", delimiter), None);
+    }
+}
+
+#[test]
+fn first_invalid_escape_reports_backslash_byte_offset() {
+    assert_eq!(
+        first_invalid_escape("é\\q", TextDelimiter::Quote),
+        Some((2, 'q'))
+    );
+}
+
+#[test]
+fn decode_guillemet_escape() {
+    assert_eq!(decode_textus_literal("a\\»b"), "a»b");
+}
+
+#[test]
+fn decode_backtick_escape() {
+    assert_eq!(decode_textus_literal("a\\`b"), "a`b");
 }
