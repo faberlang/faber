@@ -122,8 +122,7 @@ fn named_const_axis_matches_the_literal_axis() {
 
 #[test]
 fn mutable_named_axis_stays_not_constant() {
-    let rejected =
-        issues_tf32("    var int k ← 1\n    const tf32[2] rows ← grid.sum(axis k)");
+    let rejected = issues_tf32("    var int k ← 1\n    const tf32[2] rows ← grid.sum(axis k)");
     assert!(
         rejected
             .iter()
