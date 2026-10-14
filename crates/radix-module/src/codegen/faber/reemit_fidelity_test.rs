@@ -583,9 +583,10 @@ fn littera_code_via_clause_round_trips() {
 #[test]
 fn register_target_via_clause_round_trips() {
     // A register target keeps its hint in the clause, not as a bracketed tail.
-    let code = assert_idempotent("functio out(vector<u32, 4> v) → octeti<16> {\n    redde v ↦ octeti<16> via Le\n}\n");
+    let code =
+        assert_idempotent("functio out(vector<u32, 4> v) → lista<b8, 16> {\n    redde v ↦ lista<b8, 16> via Le\n}\n");
     assert!(
-        code.contains("↦ octeti<16> via Le"),
+        code.contains("↦ lista<b8, 16> via Le"),
         "register hint must re-emit as a via clause:\n{code}"
     );
 }
