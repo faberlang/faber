@@ -1523,12 +1523,15 @@ impl Lowerer<'_> {
         self.allow_bare_generic_construction = previous_bare_generic_construction;
         // Operator ruling 2026-10-14: a bare `{ field = value }` literal leaves
         // its type slot out, so its inferred target is a hole WITH a default —
-        // the field-shaped record. An explicit `_ { … }` hole (form `LONG`)
-        // is unmarked and keeps failing closed without an expected type.
-        if matches!(verte.ty.kind, radix_syntax::TypeExprKind::Infer)
-            && verte.ty.form == radix_syntax::TypeFormLevel::BARE_LITERAL
-            && let crate::Type::Infer(var) = self.types.get(target)
-        {
+        // the field-shaped record. The stated `record<*>` head is the same
+        // whole-field-list hole and solves from the shape the same way; an
+        // explicit `_ { … }` hole (form `LONG`) is unmarked and keeps failing
+        // closed without an expected type.
+        let record_defaults_from_shape =
+            matches!(verte.ty.kind, radix_syntax::TypeExprKind::FieldListHole)
+                || (matches!(verte.ty.kind, radix_syntax::TypeExprKind::Infer)
+                    && verte.ty.form == radix_syntax::TypeFormLevel::BARE_LITERAL);
+        if record_defaults_from_shape && let crate::Type::Infer(var) = self.types.get(target) {
             let var = *var;
             self.types.mark_default_record_hole(var);
         }
