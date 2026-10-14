@@ -31,9 +31,9 @@ ruling = "6a13d711"
 # =============================================================================
 
 main {
-    const bytes raw ← |61 62|
-    const bytes<8> a ← raw ↦ bytes<8>
-    const bytes<8> b ← raw ↦ bytes<8>
+    const list<b8> raw ← |61 62|
+    const list<b8, 8> a ← raw ↦ list<b8, 8>
+    const list<b8, 8> b ← raw ↦ list<b8, 8>
     const int n ← a.length()
     const bool vacant ← a.is_empty()
     print n

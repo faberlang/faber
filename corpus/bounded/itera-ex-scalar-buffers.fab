@@ -37,7 +37,7 @@ no_expected = "declaration-only"
 # runs in the runner, while the bytes<N>/string<N> carriers stay compile-only
 # (the runner overlay declines the bounded octeti/textus carriers).
 
-fn visit_bytes(bytes<8> xs) → void {
+fn visit_bytes(list<b8, 8> xs) → void {
     for from xs const b {
         print b
     }

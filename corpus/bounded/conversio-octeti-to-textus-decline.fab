@@ -21,6 +21,6 @@ locale = "en"
 #   • assuming byte decoding is the same as a bounded-width copy — decoding
 #     needs an explicit octeti/textus library route, not this conversion.
 
-fn widen(bytes<8> raw) → string {
+fn widen(list<b8, 8> raw) → string {
     return raw ↦ string
 }
