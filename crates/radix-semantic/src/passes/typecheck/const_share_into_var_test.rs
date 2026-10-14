@@ -486,3 +486,56 @@ fn shareable_payload_generic_param_into_var_is_accepted() {
         "functio prend<T>(T p) → numerus {\n    varia T q ← p\n    redde 0\n}\nincipit { }",
     );
 }
+
+// ── Method-call sources (7b471d14-9): a promoted collection method whose
+// registry row is the `Values` view (`tabula.valores`) yields an array over
+// the receiver's own values, so a binder over it aliases the receiver exactly
+// like a binder over a place rooted in the receiver. A scalar-yielding method
+// (`claves`), a scalar element, and a receiver that is not a read-only place
+// all stay accepted.
+
+fn assert_method_source_into_var_rejected(source: &str) {
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn itera_method_source_binder_valores_over_parameter_is_rejected() {
+    assert_method_source_into_var_rejected(
+        "functio f(tabula<textus, lista<numerus>> p) → numerus {\n    itera ex p.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn itera_method_source_binder_valores_over_const_local_is_rejected() {
+    assert_method_source_into_var_rejected(
+        "incipit {\n    fixum tabula<textus, lista<numerus>> p ← vacua\n    itera ex p.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n}",
+    );
+}
+
+#[test]
+fn itera_method_source_binder_scalar_element_is_accepted() {
+    test_support::assert_accepts(
+        "functio f(tabula<textus, numerus> p) → numerus {\n    itera ex p.valores() fixum r {\n        varia numerus y ← r\n        y ← y + 1\n    }\n    redde 0\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn itera_method_source_binder_claves_scalar_keys_is_accepted() {
+    test_support::assert_accepts(
+        "functio f(tabula<textus, lista<numerus>> p) → numerus {\n    itera ex p.claves() fixum k {\n        varia textus t ← k\n        nota t\n    }\n    redde 0\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn itera_method_source_binder_fresh_local_is_accepted() {
+    test_support::assert_accepts(
+        "functio f() → numerus {\n    varia tabula<textus, lista<numerus>> p ← vacua\n    itera ex p.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
+    );
+}

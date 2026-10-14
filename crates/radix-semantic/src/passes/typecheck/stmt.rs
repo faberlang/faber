@@ -375,11 +375,16 @@ impl TypeChecker<'_> {
     /// A loop binder aliases its iterated source: when the source reads a
     /// read-only place, the binder is read-only too, so a later `varia y ← r`
     /// shares const state and is SEM065.
+    ///
+    /// A method-call source can alias its receiver the same way: the map
+    /// `valores` view yields an array over the receiver's own value slots, so
+    /// a binder over `p.valores()` aliases `p` exactly as a binder over a
+    /// place rooted in `p` does.
     fn mark_read_only_itera_binder(&mut self, expr: &HirExpression) {
         let HirExpressionKind::Itera { binding, iter, .. } = &expr.kind else {
             return;
         };
-        let Some(root) = Self::place_root(iter) else {
+        let Some(root) = self.itera_source_alias_root(iter) else {
             return;
         };
         if self.is_read_only_root(root) {
@@ -391,6 +396,45 @@ impl TypeChecker<'_> {
                 self.read_only_param_roots.insert(*binding);
             }
         }
+    }
+
+    /// The root of the place an `itera` source aliases, when it aliases one.
+    ///
+    /// A bare place chain is the place itself. A promoted collection method
+    /// whose registry row is the `Values` view (`tabula.valores`) returns an
+    /// array over the receiver's own values, so the receiver's root is the
+    /// aliased place too.
+    fn itera_source_alias_root(&self, iter: &HirExpression) -> Option<radix_hir::DefId> {
+        if let Some(root) = Self::place_root(iter) {
+            return Some(root);
+        }
+        let HirExpressionKind::MethodCall(receiver, method, _, args, _) = &iter.kind else {
+            return None;
+        };
+        if !self.is_receiver_values_view(*method, args.len()) {
+            return None;
+        }
+        Self::place_root(receiver)
+    }
+
+    /// The registry classifies a promoted method as the collection `Values`
+    /// view: its result is an array over the receiver's own values, not a
+    /// fresh copy. The catalog is the authority; the reader pack's localized
+    /// surface resolves to the same row, as in `check_intrinsic_method_call`.
+    fn is_receiver_values_view(&self, method: Symbol, arg_count: usize) -> bool {
+        let Some(interner) = self.interner else {
+            return false;
+        };
+        let name = interner.resolve(method);
+        radix_intrinsics::INTRINSICS.iter().any(|entry| {
+            entry.arg_count == arg_count
+                && radix_intrinsics::mir_collection_op(entry)
+                    == Some(radix_types::MirCollectionOp::Values)
+                && (entry.faber_name == name
+                    || self
+                        .locale_pack
+                        .is_some_and(|pack| pack.intrinsic_surface(entry.faber_name) == name))
+        })
     }
 
     /// A container or genus instance: a value a plain bind shares rather than
