@@ -6186,6 +6186,10 @@ fn value_needs_tensor_escape_preparation(value: &Value) -> bool {
             .borrow()
             .values()
             .any(value_needs_tensor_escape_preparation),
+        Value::Ledger(ledger) => ledger
+            .borrow()
+            .values()
+            .any(value_needs_tensor_escape_preparation),
         Value::Record(fields, _) | Value::Struct(_, fields) | Value::EnumVariant(_, fields) => {
             fields
                 .borrow()
