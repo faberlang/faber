@@ -195,8 +195,14 @@ fn binding_kind_classifies_params_locals_and_declarations() {
 fn prefixed_binding_name_adds_kind_prefix() {
     assert_eq!(PARAM_PREFIX, "p_");
     assert_eq!(LOCAL_PREFIX, "l_");
-    assert_eq!(prefixed_binding_name(BindingKind::Param, "float"), "p_float");
-    assert_eq!(prefixed_binding_name(BindingKind::Local, "float"), "l_float");
+    assert_eq!(
+        prefixed_binding_name(BindingKind::Param, "float"),
+        "p_float"
+    );
+    assert_eq!(
+        prefixed_binding_name(BindingKind::Local, "float"),
+        "l_float"
+    );
     assert_eq!(
         prefixed_binding_name(BindingKind::Param, "p_float"),
         "p_p_float"

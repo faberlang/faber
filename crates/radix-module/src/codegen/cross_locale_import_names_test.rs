@@ -12,8 +12,8 @@
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, ModuleImportContract, Session};
 use crate::file_interface::{
-    FileExport, FileExportKind, FileInterface, InterfaceLibraryIdentity, InterfaceStructExport,
-    InterfaceStructField, InterfaceTypeSnapshot,
+    FileExport, FileExportKind, FileInterface, InterfaceLibraryIdentity, InterfaceStructExport, InterfaceStructField,
+    InterfaceTypeSnapshot,
 };
 use crate::locale::{latin_locale_pack, merge_library_locale_packs};
 use crate::semantic::Primitive;
@@ -60,7 +60,11 @@ fn socket_interface() -> FileInterface {
 fn la_consumer_session(target: Target) -> Session {
     let mut pack = latin_locale_pack();
     merge_library_locale_packs(&mut pack, [norma_library_root()]).expect("merge la member fragment");
-    Session::new(Config::default().with_target(target).with_resolved_locale_pack(pack))
+    Session::new(
+        Config::default()
+            .with_target(target)
+            .with_resolved_locale_pack(pack),
+    )
 }
 
 /// The consumer names the imported struct by its `la` surface spelling.
@@ -90,11 +94,7 @@ fn compile_consumer(target: Target) -> crate::CompileResult {
     let session = la_consumer_session(target);
     let request = ModuleCompileRequest { contract: la_consumer_contract(), ..ModuleCompileRequest::default() };
     let result = crate::driver::compile(&session, "consumer.fab", LA_CONSUMER_SOURCE, request);
-    assert!(
-        result.success(),
-        "la consumer should compile: {:?}",
-        result.diagnostics
-    );
+    assert!(result.success(), "la consumer should compile: {:?}", result.diagnostics);
     result
 }
 
