@@ -102,6 +102,9 @@ mod contract_bound;
 mod contract_bound_test;
 pub mod control;
 pub mod convert;
+#[cfg(test)]
+#[path = "copy_marked_operand_test.rs"]
+mod copy_marked_operand_test;
 mod empty_dense;
 #[cfg(test)]
 #[path = "enum_access_honesty_test.rs"]
