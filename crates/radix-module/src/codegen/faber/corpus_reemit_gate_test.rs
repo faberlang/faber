@@ -92,8 +92,8 @@ fn strip_frontmatter(source: &str) -> &str {
         .unwrap_or(source)
 }
 
-/// Multiset of witnesses the meaning fingerprint cannot see: `"…"` literals,
-/// `#` comment lines (trimmed), and `@ name` annotation heads.
+/// Multiset of witnesses the meaning fingerprint cannot see: `"…"`/`«…»`
+/// literals, `#` comment lines (trimmed), and `@ name` annotation heads.
 fn string_literals(source: &str) -> BTreeMap<String, usize> {
     let mut counts = BTreeMap::new();
     let chars: Vec<char> = strip_frontmatter(source).chars().collect();
@@ -123,17 +123,21 @@ fn string_literals(source: &str) -> BTreeMap<String, usize> {
                 *counts.entry(format!("annotation:{head}")).or_insert(0) += 1;
                 i = j;
             }
-            '"' => {
-                let start = i;
+            '"' | '«' => {
+                let close = if chars[i] == '"' { '"' } else { '»' };
                 i += 1;
-                while i < chars.len() && chars[i] != '"' {
+                let start = i;
+                while i < chars.len() && chars[i] != close {
                     if chars[i] == '\\' {
                         i += 1;
                     }
                     i += 1;
                 }
-                let literal: String = chars[start..(i + 1).min(chars.len())].iter().collect();
-                *counts.entry(literal).or_insert(0) += 1;
+                // The literal's text is the witness, not its delimiters: the
+                // emitter canonicalizes between `"…"` and `«…»` by content
+                // (guillemets when the text holds `"` or a newline).
+                let literal: String = chars[start..i.min(chars.len())].iter().collect();
+                *counts.entry(format!("literal:{literal}")).or_insert(0) += 1;
                 i += 1;
             }
             _ => i += 1,
