@@ -33,7 +33,7 @@ class Tab {
         }
         return total
     }
-    static bytes DATA = embed "generis.expected"
+    static list<b8> DATA = embed "generis.expected"
     var int w = 1
 }
 

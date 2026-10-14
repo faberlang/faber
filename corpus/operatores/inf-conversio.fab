@@ -41,7 +41,7 @@ locale = "en"
 #   inf-conversio.expected — one result per print.
 
 # One line of hex per byte string, so the byte order is visible.
-fn dump(bytes buf) → string {
+fn dump(list<b8> buf) → string {
     var string line ← ""
     for range 0‥buf.length() const i {
         const u8 piece ← buf.get(i) coalesce 0 ∷ b8 ↦ u8
@@ -51,19 +51,19 @@ fn dump(bytes buf) → string {
 }
 
 fn encode_be(inf value) → string {
-    return dump(value ↦ bytes via Be)
+    return dump(value ↦ list<b8> via Be)
 }
 
 fn encode_le(inf value) → string {
-    return dump(value ↦ bytes via Le)
+    return dump(value ↦ list<b8> via Le)
 }
 
 fn round_be(inf value) → inf {
-    return value ↦ bytes via Be ↦ inf via Be
+    return value ↦ list<b8> via Be ↦ inf via Be
 }
 
 fn round_le(inf value) → inf {
-    return value ↦ bytes via Le ↦ inf via Le
+    return value ↦ list<b8> via Le ↦ inf via Le
 }
 
 main {
@@ -109,8 +109,8 @@ main {
     print round_le(big_negative)
 
     # 4. Decoding fixed bytes: `ff 7f` is -129, `00 80` is 128.
-    const bytes pattern ← |ff 7f|
-    const bytes padded ← |00 80|
+    const list<b8> pattern ← |ff 7f|
+    const list<b8> padded ← |00 80|
     print pattern ↦ inf via Be
     print padded ↦ inf via Be
     print pattern ↦ inf via Le
