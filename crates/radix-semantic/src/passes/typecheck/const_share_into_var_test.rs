@@ -71,3 +71,222 @@ fn module_constant_scalar_into_var_is_accepted() {
         "fixum numerus N = 2\nincipit {\n    varia numerus b ← N\n    b ← b + 1\n    nota b\n}",
     );
 }
+
+#[test]
+fn const_genus_shared_into_var_is_rejected() {
+    let source = "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    fixum Custos c ← Custos { res = [1, 2] }\n    varia Custos d ← c\n    nota d\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn const_genus_field_shared_into_var_is_rejected() {
+    let source = "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    fixum Custos c ← Custos { res = [1, 2] }\n    varia lista<numerus> ys ← c.res\n    ys.appende(3)\n    nota c\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn module_constant_genus_field_shared_into_var_is_rejected() {
+    let source = "genus Custos {\n    varia lista<numerus> res\n}\nfixum Custos C = Custos { res = [1, 2] }\nincipit {\n    varia lista<numerus> ys ← C.res\n    ys.appende(3)\n    nota C\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn call_result_of_const_list_shared_into_var_is_rejected() {
+    let source = "functio pick(de lista<numerus> xs) → de lista<numerus> {\n    redde xs\n}\nincipit {\n    fixum lista<numerus> xs ← [1, 2]\n    varia lista<numerus> ys ← pick(xs)\n    ys.appende(3)\n    nota ys\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn const_nested_list_element_shared_into_var_is_rejected() {
+    let source = "incipit {\n    fixum lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs fixum r {\n        varia lista<numerus> ys ← r\n        ys.appende(3)\n        nota ys\n    }\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn plain_owned_call_result_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "functio pick(lista<numerus> xs) → lista<numerus> {\n    redde xs\n}\nincipit {\n    fixum lista<numerus> xs ← [1, 2]\n    varia lista<numerus> ys ← pick(xs)\n    ys.appende(3)\n    nota ys\n}",
+    );
+}
+
+#[test]
+fn var_nested_list_element_shared_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "incipit {\n    varia lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs fixum r {\n        varia lista<numerus> ys ← r\n        nota ys\n    }\n}",
+    );
+}
+
+#[test]
+fn const_genus_copy_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    fixum Custos c ← Custos { res = [1, 2] }\n    varia Custos d ← copy c\n    nota d\n}",
+    );
+}
+
+#[test]
+fn const_list_own_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "incipit {\n    fixum lista<numerus> xs ← [1]\n    varia lista<numerus> ys ← own xs\n    ys.appende(2)\n    nota ys\n}",
+    );
+}
+
+#[test]
+fn const_text_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "incipit {\n    fixum textus s ← \"salve\"\n    varia textus t ← s\n    nota t\n}",
+    );
+}
+
+#[test]
+fn const_to_const_share_is_accepted() {
+    test_support::assert_accepts(
+        "incipit {\n    fixum lista<numerus> xs ← [1, 2]\n    fixum lista<numerus> ys ← xs\n    nota ys\n}",
+    );
+}
+
+#[test]
+fn de_param_genus_shared_into_var_is_rejected() {
+    let source = "genus Punctum {\n    varia numerus x\n}\nfunctio prend(de Punctum q) → vacuum {\n    varia Punctum b ← q\n    nota b.x\n}\nincipit { }";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn de_param_list_shared_into_var_is_rejected() {
+    let source = "functio prend(de lista<numerus> xs) → numerus {\n    varia lista<numerus> ys ← xs\n    redde ys.longitudo()\n}\nincipit { }";
+    let result = test_support::analyze_source(source);
+    let found = result
+        .diagnostics
+        .iter()
+        .find(|err| {
+            matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+                && test_support::issue(err) == Some(ISSUE)
+        })
+        .unwrap_or_else(|| panic!("expected SEM065 {ISSUE}, got {:?}", result.diagnostics));
+    assert!(
+        found
+            .args
+            .iter()
+            .any(|arg| arg.name == "source" && arg.value == "parameter"),
+        "expected source=parameter, got {:?}",
+        found.args
+    );
+}
+
+#[test]
+fn unmarked_param_genus_shared_into_var_is_rejected() {
+    let source = "genus Punctum {\n    varia numerus x\n}\nfunctio prend(Punctum q) → vacuum {\n    varia Punctum b ← q\n    nota b.x\n}\nincipit { }";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn de_param_const_alias_is_accepted() {
+    test_support::assert_accepts(
+        "genus Punctum {\n    varia numerus x\n}\nfunctio prend(de Punctum q) → numerus {\n    fixum Punctum b ← q\n    redde b.x\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn de_param_copy_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "genus Punctum {\n    varia numerus x\n}\nfunctio prend(de Punctum q) → numerus {\n    varia Punctum b ← copy q\n    redde b.x\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn in_param_genus_shared_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "genus Punctum {\n    varia numerus x\n}\nfunctio prend(in Punctum q) → numerus {\n    varia Punctum b ← q\n    redde b.x\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn de_param_scalar_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "functio prend(de numerus n) → numerus {\n    varia numerus m ← n\n    redde m\n}\nincipit { }",
+    );
+}
+
+/// The catalog help renderer (`semantic_help`), through the real emitted args.
+fn rendered_sem065_help(source: &str) -> String {
+    let result = test_support::analyze_source(source);
+    let err = result
+        .diagnostics
+        .iter()
+        .find(|err| {
+            matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+                && test_support::issue(err) == Some(ISSUE)
+        })
+        .unwrap_or_else(|| panic!("expected SEM065 {ISSUE}, got {:?}", result.diagnostics));
+    crate::catalog_semantic::semantic_help(err.kind, &err.args)
+        .unwrap_or_else(|| panic!("catalog renders SEM065 help, args {:?}", err.args))
+}
+
+#[test]
+fn parameter_source_help_names_copy_only() {
+    let help = rendered_sem065_help(
+        "functio prend(de lista<numerus> xs) → numerus {\n    varia lista<numerus> ys ← xs\n    redde ys.longitudo()\n}\nincipit { }",
+    );
+    assert!(help.contains("copy"), "parameter help names copy: {help}");
+    assert!(
+        !help.contains("own"),
+        "parameter help must not name own (own of a read-only parameter is SEM057): {help}"
+    );
+}
+
+#[test]
+fn const_local_source_help_names_copy_and_own() {
+    let help = rendered_sem065_help(
+        "incipit {\n    fixum lista<numerus> xs ← [1]\n    varia lista<numerus> ys ← xs\n    ys.appende(2)\n    nota xs\n}",
+    );
+    assert!(help.contains("copy"), "const help names copy: {help}");
+    assert!(help.contains("own"), "const help names own: {help}");
+}

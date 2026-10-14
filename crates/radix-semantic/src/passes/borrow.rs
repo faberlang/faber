@@ -841,11 +841,33 @@ impl<'a> BorrowChecker<'a> {
         receiver: &HirExpression,
         method: radix_lexer::Symbol,
     ) -> Option<Vec<ParamType>> {
-        let class = super::method_receiver_mutation::class_def(self.types, receiver.ty?)?;
+        let class = self.receiver_class_def(receiver.ty?)?;
         if let Some(params) = self.method_params.get(&(class, method)) {
             return Some(params.clone());
         }
         self.imported_method_params.get(&(class, method)).cloned()
+    }
+
+    /// Definition a receiver type names for method lookup: the genus behind
+    /// it, or the contract (`implendum`) when the receiver is contract-typed.
+    ///
+    /// `method_receiver_mutation::class_def` reports genera only, so an
+    /// imported contract receiver (`Type::Interface`) would miss the
+    /// contract's own parameter row seeded by `index_imported_methods`.
+    fn receiver_class_def(&self, ty: TypeId) -> Option<DefId> {
+        super::method_receiver_mutation::class_def(self.types, ty)
+            .or_else(|| Self::contract_def(self.types, ty))
+    }
+
+    /// Contract definition behind a receiver type, peeling the same access
+    /// markers, aliases, and generic applications `class_def` peels.
+    fn contract_def(types: &TypeTable, ty: TypeId) -> Option<DefId> {
+        match types.get(ty) {
+            Type::Interface(def) => Some(*def),
+            Type::Ref(_, inner) | Type::Alias(_, inner) => Self::contract_def(types, *inner),
+            Type::Applied(base, _) => Self::contract_def(types, *base),
+            _ => None,
+        }
     }
 
     fn check_args_against(&mut self, params: &[ParamType], rust_sim: bool, args: &[HirCallArg]) {
@@ -1542,15 +1564,72 @@ impl<'a> BorrowChecker<'a> {
         }
     }
 
-    /// The bindings whose storage a binding names: itself plus its aliases.
+    /// The bindings whose storage a binding names: itself plus every binding
+    /// that names the same storage. `bind_alias_roots` rows point from a
+    /// binding to the places it was bound from, so the reverse edges are
+    /// walked too: `x ← b` and `b ← a` put `x`, `b` and `a` in one set no
+    /// matter which of them a conflict check starts from.
     fn storage_names(&self, def_id: DefId) -> FxHashSet<DefId> {
-        let mut names = self
-            .bind_alias_roots
-            .get(&def_id)
-            .cloned()
-            .unwrap_or_default();
+        let mut names = FxHashSet::default();
+        let mut pending = vec![def_id];
         names.insert(def_id);
+        while let Some(name) = pending.pop() {
+            if let Some(roots) = self.bind_alias_roots.get(&name) {
+                for root in roots {
+                    if names.insert(*root) {
+                        pending.push(*root);
+                    }
+                }
+            }
+            for (holder, roots) in &self.bind_alias_roots {
+                if roots.contains(&name) && names.insert(*holder) {
+                    pending.push(*holder);
+                }
+            }
+        }
         names
+    }
+
+    /// The place whose live borrow conflicts with a use, write or new borrow
+    /// of `def_id` by `acting`: another name of the same storage that is
+    /// flagged borrowed or carries a live region borrow. `mutable_only`
+    /// selects the read rule (only a flagged mutable borrow blocks a read).
+    /// Region borrows conflict only when they are mutable: a shared view or
+    /// `ref` borrow of an alias is the memory-independence pass's question,
+    /// and the one-directional alias check this detection mirrors only ever
+    /// treated a mutable borrow as a conflict. A region borrow held by
+    /// `acting` itself is that binding's own borrow and does not conflict
+    /// with it.
+    fn conflicting_borrow_on_storage(
+        &self,
+        def_id: DefId,
+        acting: DefId,
+        mutable_only: bool,
+    ) -> Option<DefId> {
+        for name in self.storage_names(def_id) {
+            let Some(state) = self.states.get(&name) else {
+                continue;
+            };
+            if state.mutable {
+                return Some(name);
+            }
+            if !mutable_only && state.shared > 0 {
+                return Some(name);
+            }
+            for tracked in &state.region_borrows {
+                if tracked.borrower == acting {
+                    continue;
+                }
+                if !self.tracked_region_live(tracked.source, tracked.borrower) {
+                    continue;
+                }
+                if !matches!(tracked.kind, BorrowKind::Mutable) {
+                    continue;
+                }
+                return Some(tracked.source);
+            }
+        }
+        None
     }
 
     /// The storage names of a set of view-origin roots: every root plus the
@@ -2178,11 +2257,7 @@ impl<'a> BorrowChecker<'a> {
             self.conflict(ISSUE_USE_WHILE_MUTABLY_BORROWED, def_id, span);
             return;
         }
-        let mutably_borrowed_alias = self
-            .storage_names(def_id)
-            .into_iter()
-            .find(|name| self.states.get(name).is_some_and(|state| state.mutable));
-        if let Some(name) = mutably_borrowed_alias {
+        if let Some(name) = self.conflicting_borrow_on_storage(def_id, def_id, true) {
             self.conflict(ISSUE_USE_WHILE_MUTABLY_BORROWED, name, span);
         }
     }
@@ -2230,6 +2305,8 @@ impl<'a> BorrowChecker<'a> {
         }
         if state.mutable || state.shared > 0 || region_any_live {
             self.conflict(ISSUE_WRITE_WHILE_BORROWED, def_id, span);
+        } else if let Some(name) = self.conflicting_borrow_on_storage(def_id, def_id, false) {
+            self.conflict(ISSUE_WRITE_WHILE_BORROWED, name, span);
         }
     }
 
@@ -2267,6 +2344,8 @@ impl<'a> BorrowChecker<'a> {
         span: radix_lexer::Span,
     ) {
         let (region_mut_live, _) = self.region_liveness(def_id);
+        let alias_conflict =
+            borrower.and_then(|acting| self.conflicting_borrow_on_storage(def_id, acting, true));
         let state = self.states.entry(def_id).or_default();
         if state.moved {
             // Use-after-consume is language policy even without Rust lifetime.
@@ -2287,6 +2366,10 @@ impl<'a> BorrowChecker<'a> {
         }
         if state.mutable || region_mut_live {
             self.conflict(ISSUE_SHARED_BORROW_CONFLICT, def_id, span);
+            return;
+        }
+        if let Some(name) = alias_conflict {
+            self.conflict(ISSUE_SHARED_BORROW_CONFLICT, name, span);
             return;
         }
         if let Some(borrower) = borrower {
@@ -2317,6 +2400,8 @@ impl<'a> BorrowChecker<'a> {
 
     fn borrow_mut_with(&mut self, def_id: DefId, borrower: Option<DefId>, span: radix_lexer::Span) {
         let (_, region_any_live) = self.region_liveness(def_id);
+        let alias_conflict =
+            borrower.and_then(|acting| self.conflicting_borrow_on_storage(def_id, acting, false));
         let state = self.states.entry(def_id).or_default();
         if state.moved {
             self.error(
@@ -2336,6 +2421,10 @@ impl<'a> BorrowChecker<'a> {
         }
         if state.mutable || state.shared > 0 || region_any_live {
             self.conflict(ISSUE_MUTABLE_BORROW_CONFLICT, def_id, span);
+            return;
+        }
+        if let Some(name) = alias_conflict {
+            self.conflict(ISSUE_MUTABLE_BORROW_CONFLICT, name, span);
             return;
         }
         if let Some(borrower) = borrower {

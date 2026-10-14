@@ -1686,3 +1686,81 @@ fn uint_constant_argument_binds_the_sized_u64_witness() {
         "a uint constant argument must bind the sized u64 witness, not plain numerus"
     );
 }
+
+/// A-133: one failed size-only explicit type argument reports exactly one
+/// diagnostic. The explicit NATURAL arg `9` never interns an
+/// `IndexExpr::Literal(9)` in this fixture, so `explicit_shape_witness` fails
+/// closed; the witness helper and its caller used to each push a `MirError`
+/// for the same failure (the helper's specific "unresolved type parameter"
+/// plus the caller's own "does not match parameter kind").
+#[test]
+fn failed_size_only_explicit_type_arg_reports_once() {
+    const SOURCE: DefId = DefId(88);
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let nine = interner.intern("9");
+    let explicit_nine = MirType::semantic(types.intern(Type::Param(nine)));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let template = MirFunction {
+        id: MirFunctionId(0),
+        source: Some(SOURCE),
+        name: None,
+        params: Vec::new(),
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: Vec::new(),
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let mut program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(1),
+            source: None,
+            name: None,
+            params: Vec::new(),
+            locals: Vec::new(),
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Call {
+                        destination: None,
+                        callee: MirCallee::Definition { source: SOURCE, type_args: vec![explicit_nine] },
+                        args: Vec::new(),
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let generic_params = vec![(
+        SOURCE,
+        vec![MirGenericParam { name: Symbol(701), is_shape: true, runtime_witness: None }],
+    )];
+
+    let errors =
+        instantiate_merged_generic_calls(&mut program, &[template], &generic_params, &mut types, &interner, None)
+            .expect_err("a NATURAL size argument with no interned extent must fail closed");
+
+    assert_eq!(
+        errors.len(),
+        1,
+        "one failed explicit size argument reports exactly once: {errors:?}"
+    );
+    assert_eq!(
+        errors[0].issue, "invalid_mir_generic_call_signature_has_unresolved_type_parameter",
+        "the more specific witness diagnostic wins: {errors:?}"
+    );
+}

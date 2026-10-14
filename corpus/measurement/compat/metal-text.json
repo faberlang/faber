@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 430
+    "analyzable": 432
   },
   "terms": [
     {
@@ -373,7 +373,7 @@
       "term": "genus",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 16
+      "analyzable": 18
     },
     {
       "term": "iace",

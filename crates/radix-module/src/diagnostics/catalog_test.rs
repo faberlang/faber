@@ -142,9 +142,11 @@ fn parse_error_codes_are_stable() {
     }
 }
 
-#[test]
-fn semantic_error_codes_are_stable() {
-    let cases = [
+/// The kind-to-code stability table for semantic errors, shared by the
+/// stability test and the catalog-coverage test so a new catalog row cannot
+/// be added without an entry here (and vice versa).
+fn semantic_code_table() -> Vec<(SemanticErrorKind, &'static str)> {
+    vec![
         (SemanticErrorKind::VariableUndefined, "SEM001"),
         (SemanticErrorKind::TypeUndefined, "SEM002"),
         (SemanticErrorKind::FunctionUndefined, "SEM003"),
@@ -190,15 +192,41 @@ fn semantic_error_codes_are_stable() {
         (SemanticErrorKind::TopLevelBindingForbidden, "SEM062"),
         (SemanticErrorKind::MemberInaccessible, "SEM063"),
         (SemanticErrorKind::PraefixumInvalid, "SEM064"),
-    ];
-    for (kind, expected_code) in &cases {
-        let spec = semantic_spec(*kind);
+        (SemanticErrorKind::ConstSharedIntoVar, "SEM065"),
+    ]
+}
+
+#[test]
+fn semantic_error_codes_are_stable() {
+    for (kind, expected_code) in semantic_code_table() {
+        let spec = semantic_spec(kind);
         assert_eq!(
-            spec.code, *expected_code,
-            "semantic_spec({:?}) code mismatch: expected {}, got {}",
-            kind, expected_code, spec.code
+            spec.code, expected_code,
+            "semantic_spec({kind:?}) code mismatch: expected {expected_code}, got {}",
+            spec.code
         );
     }
+}
+
+#[test]
+fn semantic_stability_table_covers_every_catalog_code() {
+    let table: HashSet<&str> = semantic_code_table()
+        .iter()
+        .map(|(_, code)| *code)
+        .collect();
+    let catalog: HashSet<&str> = all_specs()
+        .iter()
+        .map(|spec| spec.code)
+        .filter(|code| code.starts_with("SEM"))
+        .collect();
+    let missing_from_table: Vec<&&str> = catalog.difference(&table).collect();
+    let absent_from_catalog: Vec<&&str> = table.difference(&catalog).collect();
+    assert!(
+        missing_from_table.is_empty() && absent_from_catalog.is_empty(),
+        "semantic stability table and catalog SEM codes diverge: \
+         in catalog, missing from table {missing_from_table:?}; \
+         in table, absent from catalog {absent_from_catalog:?}"
+    );
 }
 
 #[test]

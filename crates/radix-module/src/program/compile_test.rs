@@ -197,6 +197,7 @@ fn imported_shapes() → matrix<f32, [3, 3]> {
                 mode: SemanticParamMode::Owned,
                 optional: false,
                 sponte: false,
+                axis: false,
             },
             InterfaceParam {
                 ty: InterfaceTypeSnapshot::Vector(
@@ -206,6 +207,7 @@ fn imported_shapes() → matrix<f32, [3, 3]> {
                 mode: SemanticParamMode::Owned,
                 optional: false,
                 sponte: false,
+                axis: false,
             },
         ]
     );

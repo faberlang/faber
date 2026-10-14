@@ -307,6 +307,14 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
     {
         return Some("use an ordinary loop, or prove own-coordinate writes and same-coordinate reads of written storage without loop-carried locals or hidden effects".to_owned());
     }
+    if kind == SemanticErrorKind::TypeMismatch
+        && arg_value(args, "issue") == Some("nominal_ascription_not_provable")
+    {
+        return Some(
+            "make the source type match the target, declare the contract in `implet`, or convert explicitly with `↦`"
+                .to_owned(),
+        );
+    }
     match kind {
         SemanticErrorKind::AirPurityViolation => semantic_air_purity_help(args),
         SemanticErrorKind::ConflictingVisibility => semantic_conflicting_visibility_help(args),
@@ -324,6 +332,7 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         SemanticErrorKind::ImportAbsent => semantic_import_not_found_help(args),
         SemanticErrorKind::VariableUndefined => semantic_undefined_variable_help(args),
         SemanticErrorKind::ArityMismatch => semantic_wrong_arity_help(args),
+        SemanticErrorKind::ConstSharedIntoVar => semantic_const_shared_into_var_help(args),
         SemanticErrorKind::Warning(WarningKind::MonomorphicHoleSolvedToUnion) => {
             semantic_monomorphic_hole_solved_to_union_help(args)
         }
@@ -1105,6 +1114,21 @@ fn semantic_undefined_member_help(args: &[DiagnosticArg]) -> Option<String> {
 // HIR LOWERING
 
 // ASSIGNMENT AND OWNERSHIP
+
+/// Help for SEM065 `const_shared_into_var`.
+///
+/// `source` is `parameter` when the read-only root is a `ref`/unmarked
+/// parameter, and `constant` otherwise (a `const` local or module constant).
+/// `← own x` of a read-only parameter is itself SEM057
+/// `own_argument_unmarked_parameter`, so the parameter help must name only
+/// `← copy x`.
+fn semantic_const_shared_into_var_help(args: &[DiagnosticArg]) -> Option<String> {
+    Some(if arg_value(args, "source") == Some("parameter") {
+        "write `← copy x` for an independent value".to_owned()
+    } else {
+        "write `← copy x` for an independent value, or `← own x` to take it over".to_owned()
+    })
+}
 
 // TYPE MISMATCH
 

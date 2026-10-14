@@ -212,6 +212,11 @@ impl TypeChecker<'_> {
                         is_async: method.posture.is_async(),
                         is_generator: method.posture.is_stream(),
                     },
+                    axis: method
+                        .params
+                        .iter()
+                        .map(|param| param.mode == radix_hir::HirParamMode::Axis)
+                        .collect(),
                     availability: method.availability.clone(),
                     span: method.span,
                 },

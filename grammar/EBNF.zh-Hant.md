@@ -1158,6 +1158,33 @@ use a top-level function.
   slot that must be assigned exactly once before any read; a second assignment is
   rejected. The definite-assignment pass (semantic Phase 3a) enforces this.
 
+#### Sharing on bind (`const` is deep)
+
+A plain `←` bind into a writable name shares the source value; `拷貝` and
+`擁有` are the two legal ways to detach it. Binding a shareable payload — a
+collection or a genus value, including an `Option` or alias of one — from a
+read-only source (a `定值` local or a module constant) into a writable
+`變值` name is `SEM065` `const_shared_into_var`; scalars bind by value and
+are always legal.
+
+| Binding (target `變值 b`) | `定值` / module-constant source | `變值` source |
+| -------------------------- | -------------------------------- | -------------- |
+| `變值 T b ← a` | SEM065 for a shareable payload; scalars bind by value | accepted — `b` shares `a`; writes through `b` land in `a` |
+| `變值 T b ← 拷貝 a` (en `拷貝`) | accepted — `b` is an independent value | accepted — independent value |
+| `變值 T b ← 擁有 a` (en `擁有`) | accepted as a takeover; a later use of `a` rejects the bind with SEM057 `unmarked_into_own` | same rule |
+| `取自 a 變值 x, 其餘 r` (en `from a var x, rest r`) | per binder, the plain-share rule applies to the field's payload: a shareable field of a read-only source is SEM065, scalar fields bind by value; the `其餘` binder shares the whole source, so a shareable source is SEM065 too | accepted — each binder shares its field, `其餘` shares the whole source; the source evaluates once |
+
+- An immutable target never triggers SEM065: `定值 T b ← a` is accepted for
+  every source.
+- An unmarked or `從`/`ref` parameter source is outside SEM065; the borrow
+  pass tracks the alias and refuses in-place mutation through it (for example
+  `append` on such an alias is SEM020
+  `imperativus_operator_method_requires_varia_receiver`). Rebinding the alias
+  with `←` is always allowed — `←` rebinds a name.
+- `擁有` moves an exclusive source immediately (a later use is SEM050
+  `use_after_move`); an unmarked or read-only source is tentatively accepted
+  as provably dead, and the bind is rejected if the source is used later.
+
 ### Module-level constants
 
 A module declares values only as compile-time constants: `定值 T X = e` at the
@@ -2201,6 +2228,14 @@ Patterns are flat. A `分支` arm names one variant and binds its fields, or nam
 value; it does not match inside those fields. Nested patterns are left out for
 simplicity, not because they cannot be checked: a `比對` inside an arm is
 two flat exhaustive switches.
+
+An arm names a member of the scrutinee's closed set. A bare name that is not a
+member is rejected (`SEM010 discerne_arm_not_member`); it never becomes a
+binding, and the diagnostic names the set's members and the nearest member
+spelling when one is close. `_` matches anything, and `預設` is the default
+arm; those are the only two wildcards. How the parser classifies an arm name
+internally (a type name, a variant name, or a plain identifier) is not part of
+the language.
 
 A negative number pattern is written with a leading minus (`分支 -1`,
 `分支 -∞`). The lexer never signs a number, so the pattern claims the sign;

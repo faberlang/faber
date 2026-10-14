@@ -63,7 +63,7 @@ fn copy_list_converts_to_wider_list() {
 #[test]
 fn plain_list_converts_to_bytes() {
     let source = en("fn mk(list<u8> table) → bytes {
-    var list<u8> b ← table
+    const list<u8> b ← table
     return b ↦ bytes
 }
 main {

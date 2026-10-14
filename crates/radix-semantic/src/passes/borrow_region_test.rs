@@ -937,6 +937,52 @@ incipit { }
     ));
 }
 
+#[test]
+fn returned_borrow_with_two_regions_of_different_provenance_is_incoherent() {
+    let result = analyze_source(
+        r"
+functio duo(tf32[2, 2] a, tf32[2, 2] b, bivalens cond) → de tf32[2, 2] {
+    fixum de tf32[2, 2] view ← cond ✓ a.transpone() ✗ b.transpone()
+    redde view
+}
+incipit { }
+",
+    );
+    let hir = result
+        .hir
+        .as_ref()
+        .unwrap_or_else(|| panic!("analysis must succeed: {:?}", result.diagnostics));
+    let access_facts = result.access_facts.as_ref().expect("access facts");
+    let regions =
+        borrow_region::analyze_with_interner(hir, &result.types, access_facts, &result.interner)
+            .expect("regions");
+
+    // The conditional binds `view` from both sources, so the returned
+    // borrower owns two regions. The reduction must treat that the way it
+    // treats a second `redde`: every region contributes a relationship, and
+    // provenance that cannot agree is incoherent.
+    let mut borrowers: Vec<radix_hir::DefId> = regions
+        .regions()
+        .iter()
+        .map(|region| region.borrower)
+        .collect();
+    borrowers.sort_by_key(|def_id| def_id.0);
+    borrowers.dedup();
+    assert_eq!(
+        regions.regions().len(),
+        2,
+        "fixture must bind the returned view from two sources"
+    );
+    assert_eq!(borrowers.len(), 1, "both regions must share the borrower");
+
+    let error = borrow_region::reduce(hir, &result.types, Some(&regions))
+        .expect_err("two provenance sources for one returned borrower must be incoherent");
+    assert!(matches!(
+        error,
+        borrow_region::ProvenanceError::Incoherent { .. }
+    ));
+}
+
 /// A module whose only executable content is the hand-built `entry` block.
 fn module_with_entry(entry: HirBlock) -> radix_hir::HirModule {
     radix_hir::HirModule {

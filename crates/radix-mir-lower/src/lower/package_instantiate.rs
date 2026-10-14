@@ -524,6 +524,17 @@ struct PendingCall {
     scope: FunctionTypeScope,
 }
 
+/// A-133: outcome of an explicit size witness lookup in package linking.
+/// `Found` carries the resolved index; `MissingReported` means the lookup
+/// already pushed the more specific diagnostic, so the caller must not repeat
+/// it; `MissingUnreported` leaves the kind-mismatch diagnostic to the caller,
+/// so one failed argument reports exactly once.
+enum ExplicitShapeWitness {
+    Found(radix_semantic::IndexId),
+    MissingReported,
+    MissingUnreported,
+}
+
 impl PackageInstantiate<'_> {
     fn index_existing_instances(&mut self, functions: &[MirFunction]) {
         for function in functions {
@@ -833,12 +844,16 @@ impl PackageInstantiate<'_> {
                 // Size-only generics: NATURAL typeArguments bind magnitudo
                 // params; a caller-owned symbolic `Param` resolves through
                 // the calling instance's shape bindings (GSF-1 forwarding).
-                let Some(index) = self.explicit_shape_witness(concrete, parent_shapes, span) else {
-                    self.errors.push(MirError::validation(
-                        span,
-                        "generic call type argument does not match parameter kind",
-                    ));
-                    return false;
+                let index = match self.explicit_shape_witness(concrete, parent_shapes, span) {
+                    ExplicitShapeWitness::Found(index) => index,
+                    ExplicitShapeWitness::MissingReported => return false,
+                    ExplicitShapeWitness::MissingUnreported => {
+                        self.errors.push(MirError::validation(
+                            span,
+                            "generic call type argument does not match parameter kind",
+                        ));
+                        return false;
+                    }
                 };
                 shape_bindings.insert(param.name, canonical_index(self.types, index));
             }
@@ -872,29 +887,33 @@ impl PackageInstantiate<'_> {
         concrete: MirType,
         parent_shapes: &MirShapeBindings,
         span: Span,
-    ) -> Option<radix_semantic::IndexId> {
+    ) -> ExplicitShapeWitness {
         let Type::Param(sym) = self.types.get(concrete.semantic_id()) else {
-            return None;
+            return ExplicitShapeWitness::MissingUnreported;
         };
         let sym = *sym;
         if let Some(value) = radix_types::parse_natural_capacity(self.interner.resolve(sym)) {
-            let index = find_literal_index(self.types, value);
-            if index.is_none() {
+            return match find_literal_index(self.types, value) {
+                Some(index) => ExplicitShapeWitness::Found(index),
+                None => {
+                    self.errors.push(MirError::validation(
+                        span,
+                        "generic call signature has unresolved type parameter",
+                    ));
+                    ExplicitShapeWitness::MissingReported
+                }
+            };
+        }
+        match parent_shapes.get(&sym).copied() {
+            Some(index) => ExplicitShapeWitness::Found(index),
+            None => {
                 self.errors.push(MirError::validation(
                     span,
-                    "generic call signature has unresolved type parameter",
+                    "generic call type argument does not match parameter kind",
                 ));
+                ExplicitShapeWitness::MissingReported
             }
-            return index;
         }
-        let index = parent_shapes.get(&sym).copied();
-        if index.is_none() {
-            self.errors.push(MirError::validation(
-                span,
-                "generic call type argument does not match parameter kind",
-            ));
-        }
-        index
     }
 
     pub fn key_from_bindings(

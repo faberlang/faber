@@ -98,6 +98,9 @@ impl TypeChecker<'_> {
             // value (OWN-A). Unmarked and `ref` stay read-only.
             let mutable =
                 matches!(param.mode, HirParamMode::In) || self.types.is_exclusive_value(param.ty);
+            if !mutable {
+                self.read_only_param_roots.insert(param.def_id);
+            }
             self.warn_union_annotation_guardrails(param.ty, param.span);
             self.check_hashable_keys(param.ty, param.span);
             self.record_binding_name(param.def_id, param.name);

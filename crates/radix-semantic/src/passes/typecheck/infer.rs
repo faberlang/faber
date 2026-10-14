@@ -465,10 +465,23 @@ impl TypeChecker<'_> {
                 let inner = self.unify_with_policy(a, b, span, issue, policy);
                 return self.types.array(inner);
             }
+            (Type::Queue(a), Type::Queue(b)) => {
+                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                return self.types.queue(inner);
+            }
+            (Type::Stack(a), Type::Stack(b)) => {
+                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                return self.types.stack(inner);
+            }
             (Type::Map(ka, va), Type::Map(kb, vb)) => {
                 let key = self.unify_with_policy(ka, kb, span, issue, policy);
                 let value = self.unify_with_policy(va, vb, span, issue, policy);
                 return self.types.map(key, value);
+            }
+            (Type::Ledger(ka, va), Type::Ledger(kb, vb)) => {
+                let key = self.unify_with_policy(ka, kb, span, issue, policy);
+                let value = self.unify_with_policy(va, vb, span, issue, policy);
+                return self.types.ledger(key, value);
             }
             (Type::Set(a), Type::Set(b)) => {
                 let inner = self.unify_with_policy(a, b, span, issue, policy);
@@ -507,6 +520,24 @@ impl TypeChecker<'_> {
                     .map(|(from, to)| self.unify_with_policy(from, to, span, issue, policy))
                     .collect();
                 return self.types.tuple(elements);
+            }
+            (Type::Intersection(from), Type::Intersection(to)) => {
+                return self.unify_intersection_members(from, to, span, issue, policy);
+            }
+            // `T ∩ Contract` after call-site substitution is an intersection
+            // whose `T` position is a fresh inference hole. Bind the hole to
+            // the source and check the remaining nominal members through the
+            // ordinary assignment path, exactly as `lista<T>` binds its
+            // element. Without an inference hole the conformance pre-check
+            // already covers the intersection, so the guard keeps this arm
+            // out of plain structural joins.
+            (_, Type::Intersection(members))
+                if members.iter().any(|member| {
+                    self.infer_var_of(self.resolve_inferred_type(*member))
+                        .is_some()
+                }) =>
+            {
+                return self.unify_into_destination_intersection(left, members, span, issue);
             }
             (Type::Record(from), Type::Record(to)) => {
                 if from.len() != to.len() {
@@ -636,6 +667,42 @@ impl TypeChecker<'_> {
                 };
                 return self.types.bounded_array(element, capacity);
             }
+            (
+                Type::BoundedQueue {
+                    element: ea,
+                    capacity: ca,
+                },
+                Type::BoundedQueue {
+                    element: eb,
+                    capacity: cb,
+                },
+            ) => {
+                let element = self.unify_with_policy(ea, eb, span, issue, policy);
+                let Ok(capacity) =
+                    super::tensor_index::unify_tensor_shape_indices(self, ca, cb, span)
+                else {
+                    return self.error_type;
+                };
+                return self.types.bounded_queue(element, capacity);
+            }
+            (
+                Type::BoundedStack {
+                    element: ea,
+                    capacity: ca,
+                },
+                Type::BoundedStack {
+                    element: eb,
+                    capacity: cb,
+                },
+            ) => {
+                let element = self.unify_with_policy(ea, eb, span, issue, policy);
+                let Ok(capacity) =
+                    super::tensor_index::unify_tensor_shape_indices(self, ca, cb, span)
+                else {
+                    return self.error_type;
+                };
+                return self.types.bounded_stack(element, capacity);
+            }
             (Type::Atomic(inner_a), Type::Atomic(inner_b)) => {
                 let inner = self.unify_with_policy(inner_a, inner_b, span, issue, policy);
                 return self.types.atomic(inner);
@@ -666,6 +733,60 @@ impl TypeChecker<'_> {
 
         self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
         self.error_type
+    }
+
+    /// Unify two canonical intersection member lists position by position.
+    ///
+    /// `TypeTable::intern` sorts members by `TypeId` ordinal, so the generic
+    /// call-site substitution (`T ∩ Contract` → `Infer ∩ Contract`) leaves the
+    /// fresh hole in the same sorted position as the concrete argument's
+    /// member it must bind to.
+    fn unify_intersection_members(
+        &mut self,
+        from: Vec<TypeId>,
+        to: Vec<TypeId>,
+        span: radix_lexer::Span,
+        issue: &'static str,
+        policy: UnifyPolicy,
+    ) -> TypeId {
+        if from.len() != to.len() {
+            self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+            return self.error_type;
+        }
+        let mut members = Vec::with_capacity(from.len());
+        for (from_member, to_member) in from.into_iter().zip(to) {
+            let unified = self.unify_with_policy(from_member, to_member, span, issue, policy);
+            if unified == self.error_type {
+                return self.error_type;
+            }
+            members.push(unified);
+        }
+        self.types.intern(Type::Intersection(members))
+    }
+
+    /// Bind the inference holes of a destination intersection from `source`,
+    /// and check the nominal members as ordinary assignment destinations.
+    fn unify_into_destination_intersection(
+        &mut self,
+        source: TypeId,
+        members: Vec<TypeId>,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) -> TypeId {
+        let mut unified = Vec::with_capacity(members.len());
+        for member in members {
+            let resolved = self.resolve_inferred_type(member);
+            if let Some(var) = self.infer_var_of(resolved) {
+                unified.push(self.bind_infer_with_diagnostic(var, source, span, issue));
+                continue;
+            }
+            let checked = self.unify_assign_issue(source, resolved, span, issue);
+            if checked == self.error_type {
+                return self.error_type;
+            }
+            unified.push(checked);
+        }
+        self.types.intern(Type::Intersection(unified))
     }
 
     /// Unify paired arguments of two same-base `Type::Applied` entries.

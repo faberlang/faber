@@ -444,6 +444,20 @@ pub struct InterfaceCallable {
     pub device: Option<InterfaceDeviceContract>,
 }
 
+impl InterfaceCallable {
+    /// Record which parameters carry the `axis` marker, in declaration order.
+    ///
+    /// A [`FuncSig`] collapses `axis` into [`SemanticParamMode::Owned`], so a
+    /// producer holding the lowered declaration applies the separable flag
+    /// after snapshotting: the interface record keeps it and the importer's
+    /// echo rule can check imported calls like local ones.
+    pub fn set_axis_params(&mut self, axis: &[bool]) {
+        for (param, axis) in self.params.iter_mut().zip(axis) {
+            param.axis = *axis;
+        }
+    }
+}
+
 /// Portable `limes<P>()` obligation on one exported generic type parameter.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InterfaceTensorEdgePolicyRequirement {
@@ -589,6 +603,12 @@ pub struct InterfaceParam {
     /// Whether the parameter is a source `sponte` slot (accepts an optional
     /// argument), as opposed to a merely defaulted, omittable parameter.
     pub sponte: bool,
+    /// Whether the parameter is declared with the `axis` marker (need
+    /// bc775857). Semantic `mode` collapses `axis` to `Owned` (the parameter
+    /// is an ordinary int inside the body), so the echo rule needs this
+    /// separable fact to ride the exported parameter record across a file
+    /// interface; otherwise an imported call skips the `axis` echo check.
+    pub axis: bool,
 }
 
 /// Nominal type identity that must not be guessed during Stage 1 import.
@@ -1618,6 +1638,10 @@ fn snapshot_interface_callable_inner(
                     mode: param.mode,
                     optional: param.optional,
                     sponte: param.sponte,
+                    // Producers with source access overwrite this from the
+                    // declaration's `axis` marker (`set_axis_params`); a
+                    // `FuncSig` alone cannot carry the marker.
+                    axis: false,
                 })
             })
             .collect::<FileInterfaceResult<Vec<_>>>()?,
