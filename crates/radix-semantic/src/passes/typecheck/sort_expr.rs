@@ -49,7 +49,7 @@ pub(super) fn check_sort_expr(
     let kind = match checker.types.get(dispatch) {
         Type::Array(element) | Type::BoundedArray { element, .. } => SortSource::Array(*element),
         Type::Set(element) => SortSource::Set(*element),
-        Type::Map(key, value) => SortSource::Map(*key, *value),
+        Type::Map(key, value) | Type::Ledger(key, value) => SortSource::Map(*key, *value),
         Type::Tensor(..) | Type::Matrix(..) | Type::Sparsa(..) => SortSource::Tensor,
         _ => SortSource::Other,
     };

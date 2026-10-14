@@ -297,7 +297,9 @@ impl TypeChecker<'_> {
             Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
                 Some((Some(elem), None, None))
             }
-            Type::Map(key, value) => Some((None, Some(key), Some(value))),
+            Type::Map(key, value) | Type::Ledger(key, value) => {
+                Some((None, Some(key), Some(value)))
+            }
             Type::Tuple(_elements) => {
                 // Without the index expression we cannot validate a constant
                 // value or determine which element is accessed. Return error
@@ -477,7 +479,7 @@ impl TypeChecker<'_> {
         if let Some(field_ty) = self.nuntius_field_type(object_ty, name) {
             return field_ty;
         }
-        if let Type::Map(_, value_ty) = self.types.get(resolved) {
+        if let Type::Map(_, value_ty) | Type::Ledger(_, value_ty) = self.types.get(resolved) {
             return *value_ty;
         }
         if let Type::Record(fields) = self.types.get(resolved) {
@@ -674,7 +676,9 @@ impl TypeChecker<'_> {
         if let Some(field_ty) = self.nuntius_field_type(member, name) {
             return Some(field_ty);
         }
-        if let Type::Map(_, value_ty) = self.types.get(self.resolve_inferred_type(member)) {
+        if let Type::Map(_, value_ty) | Type::Ledger(_, value_ty) =
+            self.types.get(self.resolve_inferred_type(member))
+        {
             return Some(*value_ty);
         }
         if let Type::Record(fields) = self.types.get(self.resolve_inferred_type(member)) {
@@ -1021,7 +1025,7 @@ impl TypeChecker<'_> {
             .types
             .peel_access_marker(self.resolve_inferred_type(object_ty))
             .1;
-        let Type::Map(key, _) = self.types.get(map_ty).clone() else {
+        let (Type::Map(key, _) | Type::Ledger(key, _)) = self.types.get(map_ty).clone() else {
             return None;
         };
         let mut peeled = key;

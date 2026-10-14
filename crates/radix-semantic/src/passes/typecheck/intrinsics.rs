@@ -106,7 +106,7 @@ impl IntrinsicTypeContext {
                 value: None,
                 receiver_ty: Some(resolved),
             },
-            Type::Map(key, value) => Self {
+            Type::Map(key, value) | Type::Ledger(key, value) => Self {
                 inner: None,
                 key: Some(*key),
                 value: Some(*value),
@@ -140,9 +140,21 @@ impl IntrinsicTypeContext {
     }
 }
 
+/// Intrinsic receiver families for a resolved receiver type.
+///
+/// A ledger (`tabulae<K, V>`) is the insertion-ordered twin of a map
+/// (`tabula<K, V>`): it shares the map's `Tabula` registry rows, so it keeps
+/// every method name and per-family locale word without a second table.
+fn receiver_families(receiver_ty: &Type) -> &'static [IntrinsicReceiver] {
+    match receiver_ty {
+        Type::Ledger(..) => &[IntrinsicReceiver::Tabula],
+        _ => receivers_for_type(receiver_ty),
+    }
+}
+
 /// Whether the receiver type can ever host compiler-owned intrinsics.
 pub(super) fn receiver_supports_intrinsics(receiver_ty: &Type) -> bool {
-    !receivers_for_type(receiver_ty).is_empty()
+    !receiver_families(receiver_ty).is_empty()
 }
 
 /// Intern catalog generic names into GPD descriptors.
@@ -177,8 +189,17 @@ fn lookup_intrinsic_row(
     method: &str,
     arg_count: usize,
 ) -> Option<&'static MethodIntrinsic> {
-    lookup_method_for_type(receiver_ty, method, arg_count).or_else(|| {
-        receivers_for_type(receiver_ty)
+    // A ledger dispatches through its map twin so the arity-checked primary
+    // lookup sees the shared `Tabula` rows.
+    let ledger_twin;
+    let lookup_ty = if let Type::Ledger(key, value) = receiver_ty {
+        ledger_twin = Type::Map(*key, *value);
+        &ledger_twin
+    } else {
+        receiver_ty
+    };
+    lookup_method_for_type(lookup_ty, method, arg_count).or_else(|| {
+        receiver_families(receiver_ty)
             .iter()
             .find_map(|family| lookup_method_named(*family, method))
             .filter(|entry| !entry.generic.is_empty())
@@ -278,7 +299,7 @@ pub(super) fn check_intrinsic_method_call(
         let resolved = checker.types.get(payload_ty);
         match checker.locale_pack {
             Some(pack) if pack.metadata.id != "la" => {
-                if let Some(canonical) = receivers_for_type(resolved)
+                if let Some(canonical) = receiver_families(resolved)
                     .iter()
                     .find_map(|family| pack.intrinsic_canonical(*family, method_name.as_str()))
                     && let Some(canonical_entry) =

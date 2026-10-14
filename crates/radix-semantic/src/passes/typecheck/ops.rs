@@ -1014,7 +1014,7 @@ impl TypeChecker<'_> {
             | Type::Atomic(inner)
             | Type::Intervallum(inner)
             | Type::Option(inner) => self.destination_type_has_inference_hole_inner(*inner, seen),
-            Type::Map(key, value) => {
+            Type::Map(key, value) | Type::Ledger(key, value) => {
                 self.destination_type_has_inference_hole_inner(*key, seen)
                     || self.destination_type_has_inference_hole_inner(*value, seen)
             }
@@ -2493,7 +2493,7 @@ impl TypeChecker<'_> {
             Type::Array(elem) | Type::Set(elem) | Type::BoundedArray { element: elem, .. } => {
                 Some(*elem)
             }
-            Type::Map(key, _) => Some(*key),
+            Type::Map(key, _) | Type::Ledger(key, _) => Some(*key),
             _ => None,
         };
         let unresolved = match probed {
@@ -2508,7 +2508,7 @@ impl TypeChecker<'_> {
             Type::Array(elem) | Type::Set(elem) | Type::BoundedArray { element: elem, .. } => {
                 self.unify_assign_issue(lhs_ty, elem, lhs_span, MEMBERSHIP_OPERAND_TYPE_MISMATCH);
             }
-            Type::Map(key, _) => {
+            Type::Map(key, _) | Type::Ledger(key, _) => {
                 self.unify_assign_issue(lhs_ty, key, lhs_span, MEMBERSHIP_OPERAND_TYPE_MISMATCH);
             }
             Type::Primitive(Primitive::Textus | Primitive::Ascii)
