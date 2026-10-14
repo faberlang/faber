@@ -201,16 +201,17 @@ impl Parser {
     /// conversion target before the right side is converted. `fixum _`,
     /// `sit`, and untyped destructuring have no concrete destination and are
     /// rejected with a structured diagnostic.
-    fn parse_var_decl(&mut self) -> Result<StmtKind, ParseError> {
+    pub(super) fn parse_var_decl(&mut self) -> Result<StmtKind, ParseError> {
         let keyword = self.current_word();
         let mutability = if self.eat_keyword_ident(TokenKind::Fixum) {
             AstMutability::Immutable
         } else if self.eat_keyword_ident(TokenKind::Varia) {
             AstMutability::Mutable
         } else {
-            return Err(Self::expected_issue_error(
+            return Err(self.expected_issue_with_keywords(
                 "expected_mutability_keyword",
                 self.current_span(),
+                &["fixum", "varia"],
             ));
         };
 
