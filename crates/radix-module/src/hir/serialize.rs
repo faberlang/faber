@@ -19,7 +19,7 @@ use radix_hir_fhir::{
     TensorEdgePolicyTableWire, TensorShiftContextWire,
 };
 use radix_types::{AppliedArg, Type, TypeId, TypeTable};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 
 // ── Entry point ───────────────────────────────────────────────────────────
@@ -531,11 +531,15 @@ fn remap_struct_field_sites(hir: &radix_hir::HirModule, presentation: &mut radix
 struct TypeSiteRegistry {
     sites: FxHashMap<radix_hir::HirTypeSite, TypeId>,
     current_expr: Option<radix_hir::HirId>,
+    inferred_constructor_ids: FxHashSet<radix_hir::HirId>,
 }
 
 impl TypeSiteRegistry {
     fn build(hir: &radix_hir::HirModule, presentation: &radix_hir::HirPresentation) -> Self {
         let mut registry = Self::default();
+        registry
+            .inferred_constructor_ids
+            .extend(presentation.inferred_constructor_ids.iter().copied());
         radix_hir::visit::walk_program(&mut registry, hir);
         for discard in &presentation.discard_binding_stmts {
             if let Some(ty) = discard.ty {
@@ -747,6 +751,19 @@ impl HirVisitor for TypeSiteRegistry {
                     radix_hir::HirTypeSlot::ConversionTarget,
                     *ty,
                 );
+                // An inferred constructor rewritten to a set-cell conversion
+                // keeps the literal's node id and the lowering's authored `_`
+                // record at the ascription slot. Register that site so the
+                // presentation record survives reconciliation and the emitter
+                // can print the hole.
+                if self.inferred_constructor_ids.contains(&expr.id) {
+                    register_site(
+                        &mut self.sites,
+                        radix_hir::HirOwnerRef::Hir(expr.id),
+                        radix_hir::HirTypeSlot::AscriptionTarget,
+                        *ty,
+                    );
+                }
             }
             radix_hir::HirExpressionKind::TypeCheck { ty, .. } => register_site(
                 &mut self.sites,
