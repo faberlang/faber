@@ -133,3 +133,49 @@ main {{
         .unwrap_or_else(|errors| panic!("sermo fault program should run: {errors:?}"));
     assert_eq!(host.stdout_lines, [MISSING.to_owned()]);
 }
+
+#[test]
+fn generic_sermo_success_returns_the_value_through_the_failable_channel() {
+    let path = std::env::temp_dir().join("pumpfix-g77c071f7-generic-read.txt");
+    std::fs::write(&path, "bridge-ok").expect("write generic read fixture");
+    let source = program(&format!(
+        r#"
+union Fault {{
+    NotFound {{
+        string path
+    }},
+    Other
+}}
+
+@ conversion
+fn fault_from(value raw) → Fault {{
+    do {{
+        const map<string, value> record ← raw ↦ map<string, value>
+        const string kind ← record["kind"] ↦ string
+        const string path ← record["path"] ↦ string
+        if kind ≡ "NotFound" {{
+            return variant NotFound {{ path = path }}
+        }}
+        return variant Other
+    }} catch err {{
+        return variant Other
+    }}
+}}
+
+@ radix type T mut string list<string> bytes
+fn read<T>(string p) → T ⇥ Fault {{
+    return call 'solum:lege' (p) ↦ T
+}}
+
+main {{
+    const string text ← read<string>("{}")
+    print text
+}}
+"#,
+        path.display()
+    ));
+    let mut host = BufferHost::default();
+    run_host("sermo-fault-generic-success.fab", &source, &mut host)
+        .unwrap_or_else(|errors| panic!("sermo fault program should run: {errors:?}"));
+    assert_eq!(host.stdout_lines, ["bridge-ok".to_owned()]);
+}
