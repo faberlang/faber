@@ -2556,6 +2556,12 @@ They are not interchangeable synonyms.
 its template and may use a keyword spelling under the contextual law. Named
 holes are not available in `ascii` literals, where `§` remains forbidden.
 
+A numbered hole `§N` means argument N; the same number may appear any number
+of times and one value serves all of them. A template needs max(N)+1 values,
+and every number below the highest must be read by some hole (an unread value
+is `template_application_arity_mismatch`). Plain `§` holes stay positional,
+one value each.
+
 **Rendered templates** (`textus`): `"..."(...)` and `«...»(...)` lower to
 `حرر("...", args...)`.
 
@@ -2606,6 +2612,8 @@ String literal call syntax is the canonical source form for format-template appl
 "§{greet} world"(greet: "salve")
 "status: § (§)"(sample_status(), "ok")
 "status: §1 (§0)"("ok", sample_status())
+# Renders "her, her, her, and me".
+"§0, §0, §0, and §1"("her", "me")
 ```
 
 The position law counts named and anonymous holes together in order of
@@ -2613,6 +2621,12 @@ appearance: "§{greet} §" = `[greet: 0, anonymous: 1]`. Named labels are
 erased at lowering, so "§{greet} world"(greet: "salve") lowers identically
 to the positional form `"§ world"("salve")` and its canonical
 `حرر("§ world", "salve")` form.
+
+A numbered hole `§N` means argument N; the same number may appear any number
+of times and one value serves all of them. A template needs max(N)+1 values,
+and every number below the highest must be read by some hole (an unread value
+is `template_application_arity_mismatch`). Plain `§` holes stay positional,
+one value each.
 
 This lowers to the compiler's `حرر("...", args...)` form. Use the string-template form in ordinary source; reserve `حرر(...)` for explicit desugaring examples and compiler-facing documentation.
 
