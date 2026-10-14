@@ -16,8 +16,8 @@ use crate::file_interface::{
     InterfaceTypeSnapshot,
 };
 use crate::hir::HirItemKind;
-use crate::semantic::passes::visibility_annotation::{VisibilityTier, member_visibility};
 use crate::semantic::numeric_width::BitsWidth;
+use crate::semantic::passes::visibility_annotation::{VisibilityTier, member_visibility};
 use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode, Type};
 use crate::syntax::{
     Annotation, AnnotationFieldValue, AnnotationKind, AstParamMode, ClassDecl, ClassMemberKind, ExprKind, FiguraExpr,
