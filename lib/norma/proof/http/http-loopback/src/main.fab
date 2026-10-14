@@ -1,0 +1,14 @@
++++
+locale = "en"
++++
+
+# http-loopback: listener lifecycle skeleton over an ephemeral loopback port.
+async_main {
+    const int handle ↤ call 'http:listen' ([0 ↦ value])
+    const int port ↤ call 'http:port' (handle)
+    assert port ≻ 0
+    const void stopped ↤ call 'http:stop' (handle)
+
+    # next: GET exchange
+    print "http-loopback-ok"
+}
