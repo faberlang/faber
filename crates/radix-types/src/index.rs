@@ -320,6 +320,13 @@ pub fn compute_cotangent_reduction_axes(
             is_literal_one(res_dims[pos - res_pad], types)
         };
 
+        // A broadcast result is never smaller than its operand: a result dim
+        // of one against a non-one operand dim (including a left-padded
+        // result against a present operand dim) is not compatible.
+        if res_dim_is_one && !op_dim_is_one {
+            return None;
+        }
+
         if op_dim_is_one && !res_dim_is_one {
             if pos < op_pad {
                 continue;

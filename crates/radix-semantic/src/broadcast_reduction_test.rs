@@ -102,7 +102,7 @@ fn incompatible_shapes_test() {
     let op = tuple(&mut types, &[five_val]);
     let res = tuple(&mut types, &[one_val]);
     let axes = compute_cotangent_reduction_axes(op, res, &types);
-    assert_eq!(axes, Some(vec![]));
+    assert_eq!(axes, None);
 }
 
 #[test]
@@ -190,6 +190,28 @@ fn single_element_broadcast_no_reduction() {
     let res = tuple(&mut types, &[one_val]);
     let axes = compute_cotangent_reduction_axes(op, res, &types);
     assert_eq!(axes, Some(vec![]));
+}
+
+#[test]
+fn operand_larger_than_result_is_not_broadcast_compatible() {
+    let mut types = make_types();
+    let n_val = n_dim(&mut types);
+    let m_val = m_dim(&mut types);
+    let op = tuple(&mut types, &[n_val, m_val]);
+    let res = tuple(&mut types, &[m_val]);
+    let axes = compute_cotangent_reduction_axes(op, res, &types);
+    assert_eq!(axes, None);
+}
+
+#[test]
+fn non_one_operand_dim_against_one_result_dim_is_incompatible() {
+    let mut types = make_types();
+    let n_val = n_dim(&mut types);
+    let one_val = one_dim(&mut types);
+    let op = tuple(&mut types, &[n_val]);
+    let res = tuple(&mut types, &[one_val]);
+    let axes = compute_cotangent_reduction_axes(op, res, &types);
+    assert_eq!(axes, None);
 }
 
 #[test]
