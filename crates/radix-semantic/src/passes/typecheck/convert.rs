@@ -3227,15 +3227,15 @@ impl TypeChecker<'_> {
                     return true;
                 };
                 let mode = self.interner.and_then(|interner| {
-                    params.iter().find_map(|param| {
-                        match interner.resolve(*param) {
+                    params
+                        .iter()
+                        .find_map(|param| match interner.resolve(*param) {
                             "floor" | "Floor" => Some("floor"),
                             "ceil" | "Ceil" => Some("ceil"),
                             "half_even" | "HalfEven" => Some("half_even"),
                             "trunc" | "Trunc" => Some("trunc"),
                             _ => None,
-                        }
-                    })
+                        })
                 });
                 !target_range.is_some_and(|range| float_rounding_fits(value, mode, range))
             }

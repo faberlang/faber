@@ -309,7 +309,18 @@ fn ascii_format_hints_are_hex_bin_oct_only() {
 
 #[test]
 fn conversio_policy_word_lowercase() {
-    for word in ["le", "be", "hex", "bin", "oct", "code", "floor", "ceil", "trunc", "half_even"] {
+    for word in [
+        "le",
+        "be",
+        "hex",
+        "bin",
+        "oct",
+        "code",
+        "floor",
+        "ceil",
+        "trunc",
+        "half_even",
+    ] {
         assert_eq!(
             crate::numeric_width::conversio_policy_word(word),
             Some(word),
