@@ -2547,6 +2547,128 @@ fn fields_identical_to_en(pack: &LocalePack, en_pack: &LocalePack) -> Vec<(Strin
     identical
 }
 
+/// Every diagnostics text field of `en_pack` that `pack` does not have, as
+/// `(code, issue, field)` triples, sorted for a deterministic report.
+///
+/// `issue` is `None` for a code's base row. A missing code row reports its
+/// base `message` (and `help` when `en` has one) plus every issue row of that
+/// code; a missing issue row reports its `message` (and `help` when `en` has
+/// one). A row that exists but drops `help` reports only that field: `message`
+/// is not optional in the pack shape, so a present row never lacks it.
+fn fields_absent_from_pack(pack: &LocalePack, en_pack: &LocalePack) -> Vec<(String, Option<String>, String)> {
+    let mut absent = Vec::new();
+    for (code, en_template) in &en_pack.diagnostics {
+        let template = pack.diagnostics.get(code);
+        let rows = std::iter::once((None, en_template)).chain(
+            en_template
+                .issues
+                .iter()
+                .map(|(issue, row)| (Some(issue.as_str()), row)),
+        );
+        for (issue, en_row) in rows {
+            let row = match issue {
+                Some(issue) => template.and_then(|template| template.issues.get(issue)),
+                None => template,
+            };
+            let Some(row) = row else {
+                absent.push((code.clone(), issue.map(str::to_string), "message".to_string()));
+                if en_row.help.is_some() {
+                    absent.push((code.clone(), issue.map(str::to_string), "help".to_string()));
+                }
+                continue;
+            };
+            if en_row.help.is_some() && row.help.is_none() {
+                absent.push((code.clone(), issue.map(str::to_string), "help".to_string()));
+            }
+        }
+    }
+    absent.sort();
+    absent
+}
+
+#[test]
+fn fields_absent_from_pack_reports_missing_issue_row_and_missing_help() {
+    let en_pack = LocalePack::from_toml_str(
+        r#"
+[pack]
+id = "en"
+fallback = ["la"]
+
+[diagnostics.PARSE011]
+message = "expected function name"
+help = "add a function name"
+
+[diagnostics.PARSE011.issues.dropped_row]
+message = "issue row without help"
+
+[diagnostics.PARSE011.issues.dropped_help]
+message = "issue row with help"
+help = "issue help text"
+
+[llm]
+system_prompt_snippet = "emit English reader-locale Faber"
+exemplars = ["./exemplars/salve-munde.en.fab"]
+"#,
+    )
+    .expect("en fixture pack should validate");
+
+    // The translated pack keeps the complete code row and only
+    // `dropped_help`'s message: exactly two absences.
+    let translated = LocalePack::from_toml_str(
+        r#"
+[pack]
+id = "th-TH"
+fallback = ["la"]
+
+[diagnostics.PARSE011]
+message = "ข้อความหลัก"
+help = "ความช่วยเหลือหลัก"
+
+[diagnostics.PARSE011.issues.dropped_help]
+message = "ข้อความปัญหา"
+
+[llm]
+system_prompt_snippet = "emit Thai reader-locale Faber"
+exemplars = ["./exemplars/salve-munde.th-TH.fab"]
+"#,
+    )
+    .expect("translated fixture pack should validate");
+
+    assert_eq!(
+        fields_absent_from_pack(&translated, &en_pack),
+        vec![
+            ("PARSE011".to_string(), Some("dropped_help".to_string()), "help".to_string()),
+            ("PARSE011".to_string(), Some("dropped_row".to_string()), "message".to_string()),
+        ]
+    );
+
+    let complete = LocalePack::from_toml_str(
+        r#"
+[pack]
+id = "vi"
+fallback = ["la"]
+
+[diagnostics.PARSE011]
+message = "thông báo chính"
+help = "trợ giúp chính"
+
+[diagnostics.PARSE011.issues.dropped_row]
+message = "hàng vấn đề không có trợ giúp"
+
+[diagnostics.PARSE011.issues.dropped_help]
+message = "hàng vấn đề có trợ giúp"
+help = "trợ giúp vấn đề"
+
+[llm]
+system_prompt_snippet = "emit Vietnamese reader-locale Faber"
+exemplars = ["./exemplars/salve-munde.vi.fab"]
+"#,
+    )
+    .expect("complete fixture pack should validate");
+
+    assert_eq!(fields_absent_from_pack(&complete, &en_pack), Vec::new());
+}
+
 /// A translated pack must not carry diagnostics text copied from `en`.
 ///
 /// Equality with `en` is tolerated only through `locale/identical-to-en/<pack>.toml`,
