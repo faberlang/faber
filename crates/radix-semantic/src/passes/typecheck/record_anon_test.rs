@@ -50,6 +50,13 @@ fn refuses_with(source: &str, issue: &str) {
 }
 
 #[test]
+fn bare_literal_without_cell_is_a_record() {
+    accepts(
+        "main {\n    const _ p ← { g = 1.0, w = 2 }\n    print p.g\n    const int n ← p.w\n    print n\n}\n",
+    );
+}
+
+#[test]
 fn underscore_hole_constructor_still_needs_a_cell() {
     refuses_with(
         "main {\n    const _ p ← _ { g = 1.0 }\n}\n",

@@ -286,6 +286,66 @@ impl TypeChecker<'_> {
                 ))
     }
 
+    /// Operator ruling 2026-10-14: the anonymous object IS `record`. A bare
+    /// `{ field = value }` literal leaves its type slot unsolved, and the
+    /// lowering marks that hole with [`TypeTable::mark_default_record_hole`];
+    /// this builds the `record` the literal's own fields shape and writes it
+    /// back into `*target`. Returns `None` — with nothing checked — unless the
+    /// target is that marked hole and every entry is a named key with an
+    /// explicit value, so `_ { … }` (no default) and `{}` fall through to the
+    /// caller's fail-closed no-expected-type error. A field whose value stays
+    /// an unresolved hole, or a repeated key, reports the same named error.
+    fn check_default_record_literal(
+        &mut self,
+        target: &mut TypeId,
+        entries: &mut [HirObjectField],
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if entries.is_empty()
+            || !self
+                .types
+                .is_default_record_hole(self.resolve_inferred_type(*target))
+        {
+            return None;
+        }
+        // Shape gate before any checking so a `None` return leaves no side
+        // effects: plain named keys only, each with an explicit value.
+        let mut named = Vec::with_capacity(entries.len());
+        for entry in entries.iter_mut() {
+            let name = match &entry.key {
+                HirObjectKey::Ident(name) | HirObjectKey::String(name) => *name,
+                HirObjectKey::Computed(_) | HirObjectKey::Spread(_) => return None,
+            };
+            let value = entry.value.as_mut()?;
+            named.push((name, value));
+        }
+        let mut fields = Vec::with_capacity(named.len());
+        let mut seen = Vec::with_capacity(named.len());
+        for (name, value) in named {
+            let checked = self.check_expr(value);
+            let value_ty = self.resolve_inferred_type(checked);
+            if self.is_infer(value_ty) {
+                self.invalid_conversion(
+                    super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
+                    span,
+                );
+                return Some(self.error_type);
+            }
+            if seen.contains(&name) {
+                self.invalid_conversion(
+                    super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
+                    value.span,
+                );
+                return Some(self.error_type);
+            }
+            seen.push(name);
+            fields.push((name, value_ty));
+        }
+        let record_ty = self.types.record(fields);
+        *target = record_ty;
+        Some(record_ty)
+    }
+
     /// The type an inferred constructor builds when the slot is a union.
     /// `T ∪ none` builds `T` (operator ruling 2026-10-09): the hole behaves as
     /// if the slot were `T` alone. Several non-none members are ambiguous and
@@ -890,6 +950,15 @@ impl TypeChecker<'_> {
                     match expected.map(|ty| self.resolve_inferred_type(ty)) {
                         Some(ty) if !self.is_infer(ty) => *target = ty,
                         _ => {
+                            // Bare `{ field = value }` with no typed cell: the
+                            // anonymous object IS `record` (operator ruling
+                            // 2026-10-14). Values are checked here, so the arm
+                            // returns without re-checking through `check_verte`.
+                            if let Some(record_ty) = entries.as_deref_mut().and_then(|fields| {
+                                self.check_default_record_literal(target, fields, expr.span)
+                            }) {
+                                return record_ty;
+                            }
                             self.invalid_conversion(
                                 super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
                                 expr.span,
