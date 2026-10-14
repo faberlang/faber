@@ -1,0 +1,10 @@
+{
+  "targets": {
+    "rust": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "E0573",
+      "reason": "Rust emit turns the caught statement-level processus:exsequi and processus:captura calls into Ok::<(), crate::fault::IoFault::Unavailable>(()), naming a fault variant where a type is required, so the generated crate fails to compile."
+    }
+  }
+}

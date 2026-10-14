@@ -1,0 +1,48 @@
++++
+locale = "en"
++++
+
+# N3 process leaf: the shell exec and argv capture routes.
+#
+# processus:exsequi — process.exec runs `sh -c <command>` and returns stdout;
+# a non-zero exit status faults the route with an IoFault.
+# processus:captura — process.capture runs an argv vector directly (no shell)
+# and returns a value carrier whose children are stdout, status, and stderr.
+
+import from "norma:process" process
+import from "norma:value" value
+
+main {
+    # exec success: stdout comes back verbatim.
+    do {
+        assert process.exec("printf proof-ok") ≡ "proof-ok"
+    }
+    catch err {
+        assert false panic "process.exec success path faulted"
+    }
+
+    # exec failure: `exit 3` is a non-zero status, so the route faults and
+    # the enclosing catch intercepts it.
+    var bool caught ← false
+    do {
+        process.exec("exit 3")
+    }
+    catch err {
+        caught ← true
+    }
+    assert caught
+
+    # capture success: argv exec, and the carrier exposes stdout and status.
+    do {
+        const value captured ← process.capture(["printf", "proof-ok"])
+        const string out ← value.get(captured, "stdout") ↦ string ⊥ ""
+        const int status ← value.get(captured, "status") ↦ int ⊥ -1
+        assert out ≡ "proof-ok"
+        assert status ≡ 0
+    }
+    catch err {
+        assert false panic "process.capture success path faulted"
+    }
+
+    print "process-exec-ok"
+}
