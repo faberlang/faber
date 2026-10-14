@@ -280,6 +280,19 @@ impl BufferHost {
     }
 }
 
+/// The environment name of a `processus:lege` opener: one plain string
+/// argument, passed either bare or as a one-element list.
+fn process_env_name(opener: &Value) -> Option<String> {
+    match opener {
+        Value::Str(name) => Some(name.clone()),
+        Value::Array(items) => match items.borrow().as_slice() {
+            [Value::Str(name)] => Some(name.clone()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 impl Host for BufferHost {
     fn sermo_route(
         &mut self,
@@ -292,6 +305,16 @@ impl Host for BufferHost {
         // which would leak the test runner's cwd into the host contract.
         if route == "processus:sedes" {
             return Some(Ok(vec![Value::Str(self.cwd.clone())]));
+        }
+        // WHY: `with_env` is the sandbox's virtual environment; a seeded name
+        // answers from the host map so a test never has to mutate the real
+        // process env. An unseeded read falls through to the shared leaf,
+        // which is the product `read_env` route.
+        if route == "processus:lege"
+            && let Some(name) = process_env_name(opener)
+            && let Some(value) = self.env.get(&name)
+        {
+            return Some(Ok(vec![Value::Str(value.clone())]));
         }
         super::routes::serve_route(self, route, opener, span)
     }
