@@ -5,18 +5,26 @@ locale = "en"
 
 # net/listener.fab — TCP listener
 
+import from "norma:fault" fault
 import from "norma:net/connection" connection
+
+# Boundary row: a leaf failure crosses as the `{kind, path}` record and this
+# `@ conversion` row turns it into the typed `IoFault` at the `⇥` edge.
+@ conversion
+fn fault_from(value raw) → fault.IoFault {
+    return fault.io_fault_from(raw)
+}
 
 @ public
 class Listener {
     var int id = 0
 
-    fn accept() → connection.Socket {
+    fn accept() → connection.Socket ⇥ fault.IoFault {
         return listener_accept(self)
     }
 
     @ future
-    fn accept_async() → connection.Socket {
+    fn accept_async() → connection.Socket ⇥ fault.IoFault {
         return listener_accept(self)
     }
 
@@ -29,7 +37,7 @@ class Listener {
     }
 }
 
-fn listener_accept(Listener listener) → connection.Socket {
+fn listener_accept(Listener listener) → connection.Socket ⇥ fault.IoFault {
     const int child ← call 'caelum:accipe' (listener.id) ↦ int
     return connection.Socket { id = child }
 }

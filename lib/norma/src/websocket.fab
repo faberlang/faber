@@ -8,15 +8,24 @@ locale = "en"
 # Leaves: websocket:connect, websocket:accept, websocket:send,
 # websocket:receive, websocket:close.
 
+import from "norma:fault" fault
+
+# Boundary row: a leaf failure crosses as the `{kind, path}` record and this
+# `@ conversion` row turns it into the typed `IoFault` at the `⇥` edge.
+@ conversion
+fn fault_from(value raw) → fault.IoFault {
+    return fault.io_fault_from(raw)
+}
+
 @ public
 class Socket {
     var int id = 0
 
-    fn send(string text) → void {
+    fn send(string text) → void ⇥ fault.IoFault {
         return send_text(self, text)
     }
 
-    fn receive() → string {
+    fn receive() → string ∪ none ⇥ fault.IoFault {
         return receive_text(self)
     }
 
@@ -26,33 +35,36 @@ class Socket {
 }
 
 @ public
-fn connect(string url) → Socket {
+fn connect(string url) → Socket ⇥ fault.IoFault {
     const int id ↤ call 'websocket:connect' ([url ↦ value])
     return Socket { id = id }
 }
 
 @ public
-fn connect_tls(string url, string ca_path) → Socket {
+fn connect_tls(string url, string ca_path) → Socket ⇥ fault.IoFault {
     const int id ↤ call 'websocket:connect' ([url ↦ value, ca_path ↦ value])
     return Socket { id = id }
 }
 
 @ public
-fn accept(string request_id) → Socket {
+fn accept(string request_id) → Socket ⇥ fault.IoFault {
     const int id ↤ call 'websocket:accept' ([request_id ↦ value])
     return Socket { id = id }
 }
 
 @ public
-fn send_text(Socket socket, string text) → void {
+fn send_text(Socket socket, string text) → void ⇥ fault.IoFault {
     return call 'websocket:send' ([socket.id ↦ value, text ↦ value]) ↦ void
 }
 
+# A clean close is a `done` frame today (not a `Closed` error).
 @ public
-fn receive_text(Socket socket) → string {
-    const value raw ↤ call 'websocket:receive' ([socket.id ↦ value])
+fn receive_text(Socket socket) → string ∪ none ⇥ fault.IoFault {
+    const value raw ← call 'websocket:receive' ([socket.id ↦ value]) ↦ value
     do {
         const map<string, value> fields ↤ raw
+        const bool done ← fields["done"] ↦ bool ⊥ false
+        if done then return null
         return fields["text"] ↦ string
     }
     catch err {
