@@ -162,6 +162,17 @@ struct Case {
 }
 
 impl Case {
+    /// Rejections share the known-fail judge but stay a distinct outcome: the
+    /// compiled artifact failing on purpose is the tested behavior, not a
+    /// known breakage parked in the expected-failure bucket.
+    pub(super) fn relabel_expected_fail(&self, status: &'static str) -> &'static str {
+        if status == "expected-fail" && self.target.rejects {
+            "rejected"
+        } else {
+            status
+        }
+    }
+
     /// The diagnostic fragment a diagnostic known-fail pins. Validation guarantees it;
     /// a miss is reported as a case failure, never a panic.
     fn known_fragment(&self) -> Result<&str, String> {
@@ -374,6 +385,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
     }
 
     let mut passed = 0;
+    let mut rejected = 0;
     let mut expected_failures = 0;
     let mut not_applicable = 0;
     let mut failed = 0;
@@ -381,13 +393,14 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
         let result = run_case(case, &faber);
         match result["status"].as_str() {
             Some("pass") => passed += 1,
+            Some("rejected") => rejected += 1,
             Some("expected-fail") => expected_failures += 1,
             Some("not-applicable") => not_applicable += 1,
             _ => failed += 1,
         }
         println!("{result}");
     }
-    let status = summary_status(passed, expected_failures, failed);
+    let status = summary_status(passed + rejected, expected_failures, failed);
     println!(
         "{}",
         json!({
@@ -396,6 +409,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
             "target": args.target,
             "cases": suite.cases.len(),
             "passed": passed,
+            "rejected": rejected,
             "expected_failures": expected_failures,
             "not_applicable": not_applicable,
             "failed": failed,
@@ -1000,7 +1014,10 @@ fn run_case(case: &Case, faber: &Path) -> Value {
     let comparing = Instant::now();
     let (status, reason) = match outcome {
         Judged::Pass => judge_pass(case, expected_stdout, expected_stderr, &output),
-        Judged::KnownFail => judge_known_fail(case, expected_stdout, &output),
+        Judged::KnownFail => {
+            let (status, reason) = judge_known_fail(case, expected_stdout, &output);
+            (case.relabel_expected_fail(status), reason)
+        }
     };
     let compare_ms = ms(comparing);
     json!({
