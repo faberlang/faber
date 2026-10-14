@@ -1163,3 +1163,50 @@ fn int_width_markers_pin_negative_fixint_and_signed_classes() {
         "int64 bottom i64::MIN",
     );
 }
+
+#[test]
+fn msgpack_rejects_dangling_resolved_use_local() {
+    // U2.3 / 8dcb8a8f: `ResolvedUseWire.local` must clear the DefId gate — a
+    // unit-local id absent from the decoded arena fails closed instead of
+    // silently counting an import as a resolved use.
+    let mut artifact = stub_artifact();
+    artifact
+        .resolved_uses
+        .push(crate::artifact::ResolvedUseWire {
+            key: crate::artifact::ResolvedUseKeyWire::Portable("pkg::item".to_string()),
+            kind: crate::artifact::ResolvedUseKindWire::Path,
+            enclosing: None,
+            local: Some(DefId(999_999)),
+        });
+    let bytes = encode_msgpack(&artifact).expect("encode artifact with dangling local");
+    match decode_msgpack(&bytes) {
+        Err(MsgpackError::Invalid(HirArtifactError::DanglingIndex { kind: "DefId", .. })) => {}
+        other => panic!("expected dangling DefId rejection, got {other:?}"),
+    }
+}
+
+#[test]
+fn msgpack_resolved_use_local_round_trips() {
+    // A Portable path row with a live unit-local DefId and an ImportBinding
+    // row without one both survive the codec and the integrity gate.
+    let mut artifact = stub_artifact();
+    artifact
+        .resolved_uses
+        .push(crate::artifact::ResolvedUseWire {
+            key: crate::artifact::ResolvedUseKeyWire::Portable("pkg::used".to_string()),
+            kind: crate::artifact::ResolvedUseKindWire::Path,
+            enclosing: None,
+            local: Some(DefId(0)),
+        });
+    artifact
+        .resolved_uses
+        .push(crate::artifact::ResolvedUseWire {
+            key: crate::artifact::ResolvedUseKeyWire::Portable("pkg::imported".to_string()),
+            kind: crate::artifact::ResolvedUseKindWire::ImportBinding,
+            enclosing: None,
+            local: None,
+        });
+    let bytes = encode_msgpack(&artifact).expect("encode artifact with resolved-use locals");
+    let decoded = decode_msgpack(&bytes).expect("valid resolved-use locals must round-trip");
+    assert_eq!(decoded.resolved_uses, artifact.resolved_uses);
+}
