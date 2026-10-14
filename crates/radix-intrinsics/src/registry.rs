@@ -1028,7 +1028,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(
         Tensor,
-        "causal_softmax",
+        "softmax_causal",
         0,
         &[],
         SameAsReceiver,
