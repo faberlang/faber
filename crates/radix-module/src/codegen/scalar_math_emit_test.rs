@@ -14,7 +14,7 @@ fn source(function: &str, ty: &str) -> String {
 }
 
 fn compile(target: Target, source: &str) -> crate::CompileResult {
-    Compiler::new(Config::default().with_target(target)).compile_str("scalar_math.fab", source)
+    Compiler::new(Config::default().with_latin_locale().with_target(target)).compile_str("scalar_math.fab", source)
 }
 
 fn failure_diagnostics(target: Target, source: &str) -> Vec<crate::Diagnostic> {
