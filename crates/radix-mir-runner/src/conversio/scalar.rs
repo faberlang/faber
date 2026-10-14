@@ -980,6 +980,11 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 }
                 Value::Map(Rc::new(RefCell::new(out)))
             }
+            // WHY: an `instans` field of a `@ json` genus boxes as its RFC3339
+            // textus (parity with Rust codegen `.to_rfc3339()`); the JSON
+            // carrier must stay JSON-native so Faber-side serializers see a
+            // textus node, not an instans the wire encoder cannot spell.
+            Value::Instans(value) => Value::Str(value.to_rfc3339()),
             other => other,
         })
     }
