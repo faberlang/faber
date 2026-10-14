@@ -845,7 +845,19 @@ impl TypeChecker<'_> {
                         }
                     }
                 }
-                self.check_verte(source, *target, entries.as_mut(), expected, expr.span)
+                let checked =
+                    self.check_verte(source, *target, entries.as_mut(), expected, expr.span);
+                // WHY: the authored target of `list<_>[1, 2]` keeps the
+                // unsolved hole id while the element checks bind it in the
+                // substitution table. Lowering reads this field, not the
+                // expression type finalization rewrites, so write the solved
+                // canonical shape back. The memoized cache may hold the
+                // pre-solve shape, so drop it first.
+                if self.verte_type_has_inference_hole(*target) {
+                    self.canonical_cache.clear();
+                    *target = self.canonicalize_type(*target);
+                }
+                checked
             }
             // An implicit store node is the checker's own output; re-checking
             // it re-derives the slot type and never re-runs `↦` admission.

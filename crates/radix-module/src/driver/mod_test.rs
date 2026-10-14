@@ -1011,6 +1011,8 @@ mod frontmatter_locale_tests;
 mod inferred_set_cell_tests;
 #[path = "json_valor_test.rs"]
 mod json_valor_tests;
+#[path = "partial_hole_test.rs"]
+mod partial_hole_tests;
 #[path = "regression_test.rs"]
 mod regression_tests;
 #[path = "templating_test.rs"]
