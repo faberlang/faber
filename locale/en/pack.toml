@@ -411,7 +411,7 @@ transpone = "transpose"
 expande = "expanded"
 disloco = "shift"
 limes = "limes"
-laminatio = "layer_norm"
+laminatio = "norm_layer"
 materialize = "materialize"
 # `formata` is a static type-directed view; keep the canonical spelling until
 # English owns a distinct surface name for it.
