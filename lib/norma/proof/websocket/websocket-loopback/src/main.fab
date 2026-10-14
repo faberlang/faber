@@ -1,0 +1,47 @@
++++
+locale = "en"
++++
+
+# websocket-loopback: both ends of one WebSocket upgrade and echo exchange in
+# one program on an ephemeral 127.0.0.1 port. The server side runs as an async
+# generator task, so http:accept blocks on its own thread while main connects:
+# websocket.connect sends the upgrade request, websocket.accept completes the
+# handshake, the ping/pong exchange runs, and the client closes so the
+# server's next receive observes the peer close as none (reported as "nil").
+
+import from "norma:http/server" server
+import from "norma:websocket" websocket
+import from "norma:fault" fault
+
+fn serve(server.Listener listener) async_generator → string ⇥ fault.IoFault {
+    const server.Incoming incoming ← listener.accept()
+    const string path ← incoming.req.path
+    const websocket.Socket sock ← websocket.accept(incoming.id)
+    const string got ← sock.receive() coalesce "nil"
+    sock.send("pong")
+    const string tail ← sock.receive() coalesce "nil"
+    sock.close()
+    yield "§|§|§"(path, got, tail)
+}
+
+main {
+    const server.Listener listener ← server.bind(0)
+    const int port ← listener.port()
+    assert port ≻ 0
+
+    const _ pending ← serve(listener)
+
+    const websocket.Socket client ← websocket.connect("ws://127.0.0.1:§/chat"(port))
+    client.send("ping")
+    const string ∪ none reply ← client.receive()
+    const string pong ← reply coalesce "nil"
+    assert pong ≡ "pong"
+    client.close()
+
+    for from pending const seen {
+        assert seen ≡ "/chat|ping|nil"
+    }
+
+    listener.stop()
+    print "websocket-loopback-ok"
+}
