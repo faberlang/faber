@@ -35,7 +35,9 @@
 //! `Rc` of an unreleased conversation releases it exactly then (the runner is
 //! reference counted), and any error it carried is lost.
 
-use super::{CallOutcome, Host, MirBlockId, MirFunctionId, Runner, RunnerError, Value, write_slot};
+use super::{
+    CallOutcome, Host, MapKey, MirBlockId, MirFunctionId, Runner, RunnerError, Value, write_slot,
+};
 use crate::conversio::MissingFieldPolicy;
 use crate::cursor::{GeneratorCursor, GeneratorStep};
 use radix_hir::DefId;
@@ -205,7 +207,13 @@ impl Drop for Conversation {
 }
 
 /// Text of an `error` terminal's data, as `close()` reports it (`⇥ textus`).
+///
+/// A leaf-failure map carries its rendered text in the runner-internal `text`
+/// entry; every other data shape renders exactly as before.
 fn error_text(data: &Value) -> String {
+    if let Some(text) = leaf_error_text(data) {
+        return text;
+    }
     match data {
         Value::Str(text) => text.clone(),
         Value::Int(value) => value.to_string(),
@@ -213,6 +221,35 @@ fn error_text(data: &Value) -> String {
         Value::Bool(value) => value.to_string(),
         other => format!("{other:?}"),
     }
+}
+
+/// The runner-internal `text` entry of a leaf-failure map, when present.
+fn leaf_error_text(data: &Value) -> Option<String> {
+    let Value::Map(entries) = data else {
+        return None;
+    };
+    match entries.borrow().get(&MapKey::Str("text".to_owned())) {
+        Some(Value::Str(text)) => Some(text.clone()),
+        _ => None,
+    }
+}
+
+/// The `kind` / `path` facts of a leaf-failure terminal, when the terminal is
+/// the map `routes::leaf_error_value` builds.
+fn leaf_error_facts(data: &Value) -> Option<(String, String)> {
+    let Value::Map(entries) = data else {
+        return None;
+    };
+    let entries = entries.borrow();
+    let kind = match entries.get(&MapKey::Str("kind".to_owned())) {
+        Some(Value::Str(kind)) => kind.clone(),
+        _ => return None,
+    };
+    let path = match entries.get(&MapKey::Str("path".to_owned())) {
+        Some(Value::Str(path)) => path.clone(),
+        _ => return None,
+    };
+    Some((kind, path))
 }
 
 impl<H: Host + ?Sized> Runner<'_, H> {
@@ -589,6 +626,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             (Some(SermoTerminal::Error(data)), _) => {
                 let mut error = RunnerError::conversion(span, "sermo reply conversion failed");
                 error.message = error_text(data);
+                if let Some((kind, path)) = leaf_error_facts(data) {
+                    error.args.push(("leaf_kind".to_owned(), kind));
+                    error.args.push(("leaf_path".to_owned(), path));
+                }
                 Err(error)
             }
             (Some(SermoTerminal::Cancel), _) => Err(RunnerError::conversion(
