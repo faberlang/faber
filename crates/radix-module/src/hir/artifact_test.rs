@@ -465,6 +465,28 @@ fn selective_import_rust_emit_is_identical_after_load() {
     );
 }
 
+#[test]
+fn octeti_zero_argument_type_form_survives_the_fhir_round_trip() {
+    // `octeti` is authored as a zero-argument primitive spelling, but its
+    // finalized semantic witness is the byte-list array type. The FHIR
+    // validator must accept the authored/semantic pairing.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = "fixum octeti b = |de ad|\n\nincipit {\n    nota b\n}\n";
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original =
+        analyze_source(&session, "octeti.fab", source, AnalyzeRequest::default()).expect("octeti fixture analyzes");
+    let artifact = from_analyzed(&original, "octeti", "octeti.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize octeti artifact");
+    load_fhir(&bytes).expect("octeti artifact must load");
+}
+
 // ── U2.3: fail-closed error path tests ────────────────────────────────
 
 #[test]
