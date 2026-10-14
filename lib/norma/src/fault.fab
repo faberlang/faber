@@ -32,10 +32,10 @@ union IoFault {
     ConnectionReset { string path },
     AddrInUse { string path },
     Io { string path },
-    Closed,
-    Unset,
-    Unavailable,
-    Cancelled
+    Closed { string path },
+    Unset { string path },
+    Unavailable { string path },
+    Cancelled { string path }
 }
 
 # =============================================================================
@@ -45,6 +45,7 @@ union IoFault {
 # Build the fault from a crossing record: the `kind` word selects the variant
 # and `path` fills its payload; an unknown kind word falls back to Io.
 @ public
+@ conversion
 fn io_fault_from(value raw) → IoFault {
     const string kind ← value.get(raw, "kind") ↦ string ⊥ ""
     const string p ← value.get(raw, "path") ↦ string ⊥ ""
@@ -59,9 +60,9 @@ fn io_fault_from(value raw) → IoFault {
     if kind ≡ "ConnectionReset" then return variant ConnectionReset { path = p } ∷ IoFault
     if kind ≡ "AddrInUse" then return variant AddrInUse { path = p } ∷ IoFault
     if kind ≡ "Io" then return variant Io { path = p } ∷ IoFault
-    if kind ≡ "Closed" then return variant Closed ∷ IoFault
-    if kind ≡ "Unset" then return variant Unset ∷ IoFault
-    if kind ≡ "Unavailable" then return variant Unavailable ∷ IoFault
-    if kind ≡ "Cancelled" then return variant Cancelled ∷ IoFault
+    if kind ≡ "Closed" then return variant Closed { path = p } ∷ IoFault
+    if kind ≡ "Unset" then return variant Unset { path = p } ∷ IoFault
+    if kind ≡ "Unavailable" then return variant Unavailable { path = p } ∷ IoFault
+    if kind ≡ "Cancelled" then return variant Cancelled { path = p } ∷ IoFault
     return variant Io { path = p } ∷ IoFault
 }
