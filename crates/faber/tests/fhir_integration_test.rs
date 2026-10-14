@@ -45,13 +45,12 @@ fn run_faber_status(args: &[&str]) -> (String, String, std::process::ExitStatus)
 
 fn run_faber_clean_room(args: &[&str]) -> (String, String, bool) {
     // The child inherits this process's environment; the clean-room gate must
-    // not see a dev library home or Rust toolchain on PATH.
+    // not see a Rust toolchain on PATH.
     let mut command = Command::new(env!("CARGO_BIN_EXE_faber"));
     command
         .args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .env_remove("FABER_LIBRARY_HOME")
         .env("PATH", "/usr/bin:/bin");
     let mut child = command.spawn().expect("spawn faber in clean room");
 

@@ -1,5 +1,5 @@
 //! ON-R12 regression: a `LibraryHomeMissing` failure must render its full
-//! message — the specifier and the FABER_LIBRARY_HOME setup hint — and a
+//! message — the specifier and the --library-home setup hint — and a
 //! position that exists in the file it names. Guards against the coded
 //! empty-body form `error[PKG001:missing_library_home]: <file>:<byte>`,
 //! where the renderer drops the message and the byte offset masquerades as
@@ -79,7 +79,7 @@ fn library_home_missing_renders_message_hint_and_real_line() {
         "rendered header must name the specifier: {rendered}"
     );
     assert!(
-        header.contains("FABER_LIBRARY_HOME"),
+        header.contains("--library-home"),
         "rendered header must carry the setup hint: {rendered}"
     );
     let expected_line = source[..decl.span.start as usize]
