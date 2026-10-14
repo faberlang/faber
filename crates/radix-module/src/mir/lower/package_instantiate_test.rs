@@ -57,6 +57,7 @@ fn substitute_function_rewrites_generic_call_type_args() {
         imported_devices: ImportedDeviceIndex::default(),
         device_registrations: Vec::new(),
         registered_device_keys: FxHashSet::default(),
+        synthetic_templates: FxHashMap::default(),
     };
     let mut bindings = MirGenericBindings::default();
     bindings.insert(symbol, concrete);
@@ -1455,6 +1456,7 @@ fn runtime_shape_key_distinguishes_caller_formal_axes_from_local_bindings() {
         imported_devices: ImportedDeviceIndex::default(),
         device_registrations: Vec::new(),
         registered_device_keys: FxHashSet::default(),
+        synthetic_templates: FxHashMap::default(),
     };
     let params = vec![MirGenericParam { name: height, is_shape: true, runtime_witness: Some(formal_witness) }];
 
