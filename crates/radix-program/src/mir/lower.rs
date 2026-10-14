@@ -4269,6 +4269,7 @@ fn prune_unreachable_library_functions(
             // contiguous, so re-index the kept functions before merging.
             reindex_function_ids(
                 &mut library.program,
+                &mut library.templates,
                 &mut library.environments,
                 &mut library.device_function_metadata,
                 &mut library.display_tokens,
@@ -4305,8 +4306,17 @@ fn prune_unreachable_library_functions(
 /// new ids through the same map. The caller has already dropped the rows of
 /// pruned functions; a row whose key is not a program function (a generic
 /// template's row) keeps its key.
+///
+/// `templates` are the unit's extracted generic templates. Their own ids are
+/// outside the program (the template is not a program function), so they are
+/// not remapped; their `MirCallee::Function` references must be, because a
+/// template's callee can name a surviving synthetic helper whose program id
+/// just moved. Leaving those stale lets a template call the compacted id of
+/// an unrelated function — or, after the merge shift, the mono-instance id
+/// itself.
 fn reindex_function_ids(
     program: &mut MirProgram,
+    templates: &mut [MirFunction],
     environments: &mut [MirClosureEnvironment],
     device_function_metadata: &mut MirDeviceFunctionMetadataMap,
     display_tokens: &mut radix_mir::MirDisplayTokens,
@@ -4331,6 +4341,14 @@ fn reindex_function_ids(
     for function in &mut program.functions {
         function.id = remap[&function.id];
         for block in &mut function.blocks {
+            for statement in &mut block.statements {
+                remap_statement_function_ids(statement, &remap);
+            }
+            remap_terminator_function_ids(&mut block.terminator, &remap);
+        }
+    }
+    for template in templates {
+        for block in &mut template.blocks {
             for statement in &mut block.statements {
                 remap_statement_function_ids(statement, &remap);
             }
