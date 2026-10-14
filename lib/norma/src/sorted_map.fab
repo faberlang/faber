@@ -48,7 +48,7 @@ locale = "en"
 @ public
 class SortedMap<K, V> {
     var list<K> index = []
-    var map<K, V> entries = {} ∷ map<K, V>
+    var map<K, V> entries = empty
 
     # =========================================================================
     # STATE (nominal / present predicate)
