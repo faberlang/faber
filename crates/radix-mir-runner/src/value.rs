@@ -1423,7 +1423,17 @@ impl Value {
                 display_tabula_struct(*def, fields, interner, order, span, float_width)?
             }
             Value::Record(fields, written) => {
-                display_json_object(&fields.borrow(), written, None, interner, order, span)?
+                if order.dynamic {
+                    display_json_object(&fields.borrow(), written, None, interner, order, span)?
+                } else {
+                    display_anonymous_construction(
+                        &fields.borrow(),
+                        written,
+                        interner,
+                        order,
+                        span,
+                    )?
+                }
             }
             Value::EnumVariant(def, fields) => {
                 let declared = order.variants.get(def).map_or(&[][..], Vec::as_slice);
@@ -1794,6 +1804,30 @@ fn display_construction(
         });
     }
     Ok(format!("{name} {{ {} }}", parts.join(", ")))
+}
+
+/// Render a `record` value as an anonymous construction literal: `{ field =
+/// value, ... }` in written order, each field through [`display_element`] (the
+/// value's default type, since a record has no declared field metadata). A
+/// record with no fields prints `{}`. A value shown through a `valor`/`json`
+/// carrier keeps the JSON-shaped display (see [`display_json_object`]).
+fn display_anonymous_construction(
+    fields: &FxHashMap<Symbol, Value>,
+    written: &[Symbol],
+    interner: &Interner,
+    order: FieldOrder<'_>,
+    span: Span,
+) -> Result<String, RunnerError> {
+    let mut parts = Vec::new();
+    for (symbol, value) in ordered_field_rows(fields, written, interner) {
+        let field = interner.resolve(*symbol);
+        let val_str = display_element(value, interner, order, span, None)?;
+        parts.push(format!("{field} = {val_str}"));
+    }
+    if parts.is_empty() {
+        return Ok("{}".to_owned());
+    }
+    Ok(format!("{{ {} }}", parts.join(", ")))
 }
 
 /// A value inside a composite (list element or construction-literal field):
