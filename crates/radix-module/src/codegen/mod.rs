@@ -147,6 +147,10 @@ mod float_integer_conversio_emit_test;
 #[path = "swift_contract_call_label_test.rs"]
 mod swift_contract_call_label_test;
 
+#[cfg(all(test, feature = "hir-swift"))]
+#[path = "swift_record_hole_test.rs"]
+mod swift_record_hole_test;
+
 #[cfg(all(
     test,
     feature = "hir-rust",
