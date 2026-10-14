@@ -1032,8 +1032,8 @@ pub fn tensor_method_requires_numeric_element(method_name: &str) -> bool {
         // numeric element type, same element gate as the general `addita`.
         "addita"
             | "addita_bias"
-            | "subtrahe"
-            | "multiplica"
+            | "subtracta"
+            | "multiplicata"
             | "maximus"
             | "minimus"
             | "matmul"
