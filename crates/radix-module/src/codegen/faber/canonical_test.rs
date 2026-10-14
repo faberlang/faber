@@ -1353,8 +1353,8 @@ fn emits_regex_literals_with_flags() {
     };
 
     let code = generate_faber(&program, &types, &interner);
-    assert!(code.contains("\"\\d+\""));
-    assert!(code.contains("↦ regex"));
+    assert!(code.contains("regex /\\d+/"));
+    assert!(!code.contains("↦ regex"));
 }
 
 #[test]
