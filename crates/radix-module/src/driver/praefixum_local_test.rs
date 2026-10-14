@@ -175,7 +175,7 @@ fn reemit_keeps_the_local_body_even_under_a_default_target_session() {
     // session; the evaluating targets would print the literal in the body's
     // place, because a block-level constant keeps no authored copy.
     let session = Session::new(Config::default().with_dev_locale_root());
-    let result = crate::codegen::faber::reemit_faber(
+    let result = crate::driver::reemit_faber(
         &session,
         &crate::locale::latin_locale_pack(),
         "praefixum_local.fab",

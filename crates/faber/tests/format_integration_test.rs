@@ -1,6 +1,6 @@
 //! Subprocess checks for `faber format --stdout` (requires built `faber` binary).
 
-use radix::module::codegen::faber::test_gate::assert_canonical_reparses_with;
+use radix::module::driver::faber_format::test_gate::assert_canonical_reparses_with;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};

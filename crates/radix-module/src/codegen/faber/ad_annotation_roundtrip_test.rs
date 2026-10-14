@@ -1,7 +1,7 @@
 //! Reader-locale round trip for the compiler-owned `@ ad '<route>'` handler
 //! annotation (en `@ call '<route>'`).
 
-use super::reemit_faber;
+use crate::driver::reemit_faber;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::locale::LocalePack;

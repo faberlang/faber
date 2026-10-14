@@ -50,7 +50,7 @@ fn emit_en(source: &str) -> String {
             .with_resolved_locale_pack(pack.clone())
             .with_dev_locale_root(),
     );
-    let result = crate::codegen::faber::reemit_faber(&session, &pack, "set-format.fab", source);
+    let result = crate::driver::reemit_faber(&session, &pack, "set-format.fab", source);
     assert!(
         result.success(),
         "format must succeed: {:?}",

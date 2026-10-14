@@ -4,7 +4,7 @@
 //! the target locale (`const` / `var` / `static` in en). An unmarked field
 //! is a parse error (D5c), so every re-emitted field carries its modifier.
 
-use super::reemit_faber;
+use crate::driver::reemit_faber;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::locale::LocalePack;

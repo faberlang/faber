@@ -28,6 +28,8 @@
 
 mod file_frontmatter;
 mod frontmatter;
+#[cfg(feature = "hir-faber")]
+pub mod faber_format;
 mod insere;
 mod praefixum;
 mod session;
@@ -39,6 +41,8 @@ mod target_bindings;
 mod target_policy;
 
 pub use crate::semantic::{AnalyzedModuleApplicationView, PackageImportIdentities};
+#[cfg(feature = "hir-faber")]
+pub use faber_format::{FaberReemitResult, emit_from_analyzed, reemit_faber};
 pub use file_frontmatter::{FileFrontmatter, parse_file_frontmatter};
 pub use frontmatter::{FrontmatterError, SplitFrontmatter, split_frontmatter};
 #[cfg(feature = "runner")]

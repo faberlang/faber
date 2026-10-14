@@ -268,7 +268,7 @@ pub(super) fn convert_single_doc(
             return Err(());
         }
     };
-    let result = radix::module::codegen::faber::reemit_faber(&session, &emit_pack, &name, source);
+    let result = radix::module::driver::reemit_faber(&session, &emit_pack, &name, source);
     let had_error = result
         .diagnostics
         .iter()
@@ -351,7 +351,7 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
         );
         return Err(());
     };
-    let result = radix::module::codegen::faber::reemit_faber(&session, emit_pack, &name, source);
+    let result = radix::module::driver::reemit_faber(&session, emit_pack, &name, source);
 
     let had_error = result
         .diagnostics

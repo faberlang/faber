@@ -159,7 +159,7 @@ fn canonical_reemits_schema_decl() {
             .with_resolved_locale_pack(pack.clone())
             .with_dev_locale_root(),
     );
-    let result = crate::codegen::faber::reemit_faber(&session, &pack, "schema_test.fab", PERSONA_BREVIS);
+    let result = crate::driver::reemit_faber(&session, &pack, "schema_test.fab", PERSONA_BREVIS);
     assert!(result.success(), "canonical emit failed: {:?}", result.diagnostics);
     let code = result.output.expect("canonical output").code;
     assert!(code.contains("schema PersonaBrevis"));

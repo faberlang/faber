@@ -9,7 +9,7 @@
 use super::{AnalyzeRequest, ModuleCompileRequest, compile};
 use crate::codegen::Target;
 #[cfg(feature = "hir-faber")]
-use crate::codegen::faber::reemit_faber;
+use crate::driver::reemit_faber;
 use crate::diagnostics::DiagnosticArg;
 #[cfg(feature = "hir-faber")]
 use crate::driver::{Config, Session};
@@ -102,7 +102,7 @@ pub(crate) fn faber_roundtrip(source: &str) -> String {
 }
 
 #[cfg(feature = "hir-faber")]
-pub(crate) fn faber_emit(name: &str, source: &str) -> crate::codegen::faber::FaberReemitResult {
+pub(crate) fn faber_emit(name: &str, source: &str) -> crate::driver::FaberReemitResult {
     let pack = crate::locale::latin_locale_pack();
     let session = Session::new(
         Config::default()

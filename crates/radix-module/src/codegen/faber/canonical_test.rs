@@ -1478,7 +1478,7 @@ fn localized_adfirma_message_uses_each_locale_surface() {
         let pack_path = crate::locale::workspace_locale_pack_path(locale);
         let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed locale pack should load");
         let session = crate::driver::Session::new(crate::driver::Config::default().with_locale_pack(pack));
-        let result = super::compile::reemit_faber(
+        let result = crate::driver::reemit_faber(
             &session,
             session
                 .config
@@ -1507,7 +1507,7 @@ fn localized_emit_consults_locale_pack_surface() {
 
     let config = crate::driver::Config::default().with_locale_pack(pack);
     let session = crate::driver::Session::new(config);
-    let result = super::compile::reemit_faber(
+    let result = crate::driver::reemit_faber(
         &session,
         session
             .config
@@ -1537,7 +1537,7 @@ fn canonical_emit_preserves_legacy_posture_annotation_without_duplicate_word() {
     let pack = crate::locale::latin_locale_pack();
     let session = crate::driver::Session::new(crate::driver::Config::default().with_locale_pack(pack.clone()));
     let result =
-        super::compile::reemit_faber(&session, &pack, "legacy-posture.fab", "@ futura\nfunctio f() → vacuum { }\n");
+        crate::driver::reemit_faber(&session, &pack, "legacy-posture.fab", "@ futura\nfunctio f() → vacuum { }\n");
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = result.output.expect("emit should produce output").code;
@@ -1564,7 +1564,7 @@ fn stream() async_generator → int {
   yield value
 }
 ";
-    let result = super::compile::reemit_faber(
+    let result = crate::driver::reemit_faber(
         &session,
         session
             .config
@@ -1623,7 +1623,7 @@ fn localized_emit_round_trips_under_same_pack() {
 ";
 
     // First canonical pass over localized source.
-    let first = super::compile::reemit_faber(
+    let first = crate::driver::reemit_faber(
         &session,
         session
             .config
@@ -1644,7 +1644,7 @@ fn localized_emit_round_trips_under_same_pack() {
 
     // Second pass: re-emit the localized output. Lossless round-trip requires the
     // localized spellings re-lex to the same token kinds, yielding identical output.
-    let second = super::compile::reemit_faber(
+    let second = crate::driver::reemit_faber(
         &session,
         session
             .config
@@ -1800,11 +1800,11 @@ fn canonical_round_trip(source: &str) -> (String, String) {
             .with_resolved_locale_pack(pack.clone())
             .with_dev_locale_root(),
     );
-    let result = super::compile::reemit_faber(&session, &pack, "conversio-assign.fab", source);
+    let result = crate::driver::reemit_faber(&session, &pack, "conversio-assign.fab", source);
     assert!(result.success(), "canonical emit failed: {:?}", result.diagnostics);
     let first = result.output.expect("output").code;
     canonical_lex_parse(&first);
-    let second = super::compile::reemit_faber(&session, &pack, "conversio-assign.fab", &first);
+    let second = crate::driver::reemit_faber(&session, &pack, "conversio-assign.fab", &first);
     assert!(second.success(), "re-parse should compile: {:?}", second.diagnostics);
     let second_code = second.output.expect("output").code;
     assert_eq!(first, second_code, "canonical(canonical(x)) must equal canonical(x)");
