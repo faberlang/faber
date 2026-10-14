@@ -10,6 +10,7 @@ use crate::SemanticErrorKind;
 use crate::test_support;
 
 const ISSUE: &str = "const_shared_into_var";
+const MUTATING_RECEIVER_ISSUE: &str = "imperativus_operator_method_requires_varia_receiver";
 
 #[test]
 fn const_list_shared_into_var_is_rejected() {
@@ -336,5 +337,42 @@ fn itera_binder_source_over_const_local_is_constant() {
         source_arg.value, "constant",
         "itera binder over a const local is a constant source: {:?}",
         found.args
+    );
+}
+
+/// Reassigning a `varia` local from an unmarked read-only parameter is not
+/// guarded by SEM065: `check_local` runs `reject_read_only_share_into_var`
+/// only at a declaration, and the assignment installs `ys` as an alias of the
+/// read-only parameter. The shared alias is caught one step later, when a
+/// write goes through it (`ys.appende(1)` here): SEM020 `ImmutableAssignment`
+/// with the mutating-receiver issue. SEM065 is not the guard for reassignment,
+/// so no second diagnostic is emitted at `ys ← xs`.
+#[test]
+fn reassign_from_parameter_is_rejected() {
+    let source = "functio f(lista<numerus> xs) → numerus {\n    varia lista<numerus> ys ← []\n    ys ← xs\n    ys.appende(1)\n    redde ys.longitudo()\n}\nincipit { }";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ImmutableAssignment)
+            && test_support::issue(err) == Some(MUTATING_RECEIVER_ISSUE)),
+        "expected SEM020 {MUTATING_RECEIVER_ISSUE}, got {:?}",
+        result.diagnostics
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|err| matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)),
+        "SEM065 is not the guard for reassignment, got {:?}",
+        result.diagnostics
+    );
+}
+
+/// `← copy xs` is the legal spelling: the copy is independent, so `ys` stays
+/// a fresh writable local and `ys.appende(1)` is accepted.
+#[test]
+fn reassign_from_parameter_copy_is_accepted() {
+    test_support::assert_accepts(
+        "functio f(lista<numerus> xs) → numerus {\n    varia lista<numerus> ys ← []\n    ys ← copy xs\n    ys.appende(1)\n    redde ys.longitudo()\n}\nincipit { }",
     );
 }
