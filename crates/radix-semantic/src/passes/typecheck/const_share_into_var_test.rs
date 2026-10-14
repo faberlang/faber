@@ -376,3 +376,62 @@ fn reassign_from_parameter_copy_is_accepted() {
         "functio f(lista<numerus> xs) → numerus {\n    varia lista<numerus> ys ← []\n    ys ← copy xs\n    ys.appende(1)\n    redde ys.longitudo()\n}\nincipit { }",
     );
 }
+
+// ── Wrapped sources (7b471d14-7): a wrapper around the initializer must not
+// hide a read-only root. `place_roots` walks every branch that can supply the
+// value: both `Si` branch tails (the `c ✓ a ✗ b` conditional expression), both
+// `vel` coalesce operands, the inner of a `∷` ascription, and a block tail.
+//
+// Parentheses lower through `ExprKind::Paren` to the inner expression, so
+// `(xs)` is the plain `Path(xs)` node by the time typecheck sees it and is
+// already covered by `place_root`; the test below pins that erasure.
+//
+// A bare source `Block` cannot be written in initializer position in the
+// current surface (braces are JSON literals), so the `Block` arm is exercised
+// through the conditional branch tails, which lower to blocks.
+
+fn assert_wrapped_source_into_var_rejected(source: &str) {
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn wrapped_source_into_var_parenthesized_parameter_is_rejected() {
+    assert_wrapped_source_into_var_rejected(
+        "functio f(lista<numerus> xs) → numerus {\n    varia lista<numerus> ys ← (xs)\n    redde ys.longitudo()\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn wrapped_source_into_var_coalesce_parameter_is_rejected() {
+    assert_wrapped_source_into_var_rejected(
+        "functio f(lista<numerus> xs) → numerus {\n    varia lista<numerus> ∪ nihil maybe ← nulla\n    varia lista<numerus> ys ← maybe vel xs\n    redde ys.longitudo()\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn wrapped_source_into_var_ascription_parameter_is_rejected() {
+    assert_wrapped_source_into_var_rejected(
+        "functio f(lista<numerus> xs) → numerus {\n    varia lista<numerus> ys ← xs ∷ lista<numerus>\n    redde ys.longitudo()\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn wrapped_source_into_var_conditional_parameter_is_rejected() {
+    assert_wrapped_source_into_var_rejected(
+        "functio f(lista<numerus> xs) → numerus {\n    fixum bivalens c ← verum\n    varia lista<numerus> ys ← c ✓ xs ✗ [2]\n    redde ys.longitudo()\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn wrapped_source_into_var_all_fresh_is_accepted() {
+    test_support::assert_accepts(
+        "functio f(bivalens c) → numerus {\n    varia lista<numerus> ys ← c ✓ [1] ✗ [2]\n    redde ys.longitudo()\n}\nincipit { }",
+    );
+}
