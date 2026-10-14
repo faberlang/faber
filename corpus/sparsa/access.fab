@@ -40,7 +40,7 @@ main {
 
     const f32 stored ← grid.get([0, 1])
     const f32 absent ← grid.get([1, 2])
-    const int count ← grid.nonzero_count()
+    const int count ← grid.count_nonzero()
 
     print stored, absent, count
 }

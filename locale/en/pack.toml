@@ -317,7 +317,7 @@ differentia = "difference"
 intersectio = "intersection"
 subcopia = "is_subset"
 supercopia = "is_superset"
-symmetrica = "symmetric_difference"
+symmetrica = "difference_symmetric"
 unio = "union"
 
 # ascii (1) — method surface; do not retarget [types] cursor = "iterator".
@@ -375,7 +375,7 @@ trunca = "truncate"
 # sparsa (6) — accipe / longitudo shared with lista above.
 densata = "densify"
 magnitudines = "shape"
-nonnihil = "nonzero_count"
+nonnihil = "count_nonzero"
 ponde = "set"
 
 # tensor (33) — longitudo / magnitudines / accipe / addita / subtrahe /

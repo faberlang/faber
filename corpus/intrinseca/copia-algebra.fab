@@ -29,7 +29,7 @@ locale = "en"
 # symmetrica, subcopia, supercopia.
 #
 # GRAMMAR:
-#   a.union(b) | a.intersection(b) | a.difference(b) | a.symmetric_difference(b)
+#   a.union(b) | a.intersection(b) | a.difference(b) | a.difference_symmetric(b)
 #   a.is_subset(b) | a.is_superset(b)
 #
 # Set operations return new copia<T> values; operands are not mutated.
@@ -53,7 +53,7 @@ main {
     const set<int> omnes ← primi.union(pares)
     const set<int> communia ← primi.intersection(pares)
     const set<int> reliqua ← primi.difference(pares)
-    const set<int> disiuncta ← primi.symmetric_difference(pares)
+    const set<int> disiuncta ← primi.difference_symmetric(pares)
     const bool subcopiaest ← communia.is_subset(omnes)
     const bool supercopiaest ← omnes.is_superset(communia)
 

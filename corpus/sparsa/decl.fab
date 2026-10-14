@@ -44,5 +44,5 @@ main {
     const sparsa<f32, [2, 3]> empty ← empty
     const sparsa<f32, [2, 3]> roundtrip ← identity(empty)
 
-    print roundtrip.length(), roundtrip.nonzero_count()
+    print roundtrip.length(), roundtrip.count_nonzero()
 }
