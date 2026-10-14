@@ -668,6 +668,13 @@ impl super::FaberCodegen<'_> {
                 // contextual keyword (`unstable` under `en`, `nondum` under
                 // `la`); a hardcoded Latin spelling fails PARSE018 on re-parse.
                 writer.write(surface.contextual_keyword("nondum"));
+                if target.is_none() && reason.is_none() {
+                    // Bare `@ nondum` is the legal spelling when neither field
+                    // is authored; an empty braced record is not the canonical
+                    // shape and would print noise (`{  }`) after the keyword.
+                    writer.newline();
+                    return;
+                }
                 writer.write(" { ");
                 if let Some(target) = target {
                     writer.write("target = ");
