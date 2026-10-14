@@ -428,6 +428,51 @@ fn magnus_scaling() {
             samples[2], samples[0], samples[4]
         );
     }
+    // Limb-to-text conversion at the same digit widths. The nine-digit peel is the quadratic
+    // baseline and is measured at the two smaller widths only; the recursive split is the new
+    // path.
+    for shift in 16..=18 {
+        let digits = 1_usize << shift;
+        let mut text = String::with_capacity(digits);
+        text.push(char::from(b'1' + u8::try_from(g.next() % 9).unwrap()));
+        for _ in 1..digits {
+            text.push(char::from(b'0' + u8::try_from(g.next() % 10).unwrap()));
+        }
+        let value = dec(&text);
+        let mut samples = Vec::with_capacity(5);
+        for _ in 0..5 {
+            let started = std::time::Instant::now();
+            let rendered = value.to_string_radix(Radix::Dec);
+            samples.push(started.elapsed());
+            std::hint::black_box(&rendered);
+        }
+        samples.sort_unstable();
+        println!(
+            "magnus_scaling render-decimal 2^{shift} digits: median {:?} min {:?} max {:?}",
+            samples[2], samples[0], samples[4]
+        );
+    }
+    for shift in 16..=17 {
+        let digits = 1_usize << shift;
+        let mut text = String::with_capacity(digits);
+        text.push(char::from(b'1' + u8::try_from(g.next() % 9).unwrap()));
+        for _ in 1..digits {
+            text.push(char::from(b'0' + u8::try_from(g.next() % 10).unwrap()));
+        }
+        let value = Magnus::parse_decimal(&text).unwrap();
+        let mut samples = Vec::with_capacity(5);
+        for _ in 0..5 {
+            let started = std::time::Instant::now();
+            let rendered = super::render_decimal_peel(&value.mag);
+            samples.push(started.elapsed());
+            std::hint::black_box(&rendered);
+        }
+        samples.sort_unstable();
+        println!(
+            "magnus_scaling render-decimal-peel 2^{shift} digits: median {:?} min {:?} max {:?}",
+            samples[2], samples[0], samples[4]
+        );
+    }
 }
 
 #[test]
@@ -1227,6 +1272,110 @@ fn decimal_parse_matches_chunked_oracle() {
     bad.replace_range(mid..mid + 1, "-");
     assert_eq!(oracle(&bad), Err(MagnusError::Malformed));
     assert_eq!(Magnus::parse_decimal(&bad), oracle(&bad));
+}
+
+#[test]
+fn decimal_render_matches_peel_oracle() {
+    /// The pre-split decimal render, with the sign the caller would prepend.
+    fn peel_oracle(x: &Magnus) -> String {
+        let text = super::render_decimal_peel(&x.mag);
+        if x.neg { format!("-{text}") } else { text }
+    }
+
+    let t = super::DECIMAL_RENDER_DC_THRESHOLD;
+    let mut g = Gen(0xDEC1_0A14);
+
+    // Randomized magnitudes whose limb counts straddle the split threshold, signed both ways;
+    // every third value is all-ones limbs, which parks it on a power boundary.
+    for round in 0..400 {
+        let count = match round % 6 {
+            0 => t - 1,
+            1 => t,
+            2 => t + 1,
+            3 => 2 * t,
+            4 => 3 * t + round % 7,
+            _ => {
+                let spread = usize::try_from(g.next() % u64::try_from(2 * t).unwrap()).unwrap();
+                t + 1 + spread
+            }
+        };
+        let mag = if round % 3 == 0 {
+            vec![u32::MAX; count]
+        } else {
+            random_limbs_exact(&mut g, count)
+        };
+        let x = Magnus::from_parts(g.next() & 1 == 1, mag);
+        assert_eq!(x.to_string(), peel_oracle(&x), "random {round}");
+        assert_eq!(
+            x.to_string_radix(Radix::Dec),
+            peel_oracle(&x),
+            "random {round}"
+        );
+    }
+
+    // Decimal-text widths straddling the nine-digit chunk boundaries too, so the low half is
+    // sometimes zero-padded and sometimes full width.
+    for len in [
+        1_usize, 8, 9, 10, 17, 18, 19, 36, 37, 512, 513, 1023, 1024, 1025, 2047, 2048,
+    ] {
+        let mut text = String::with_capacity(len);
+        text.push('1');
+        for _ in 1..len {
+            text.push(char::from(b'0' + u8::try_from(g.next() % 10).unwrap()));
+        }
+        for signed in [text.clone(), format!("-{text}")] {
+            let x = Magnus::parse_decimal(&signed).unwrap();
+            assert_eq!(x.to_string(), signed, "text len {len}");
+            assert_eq!(x.to_string(), peel_oracle(&x), "text len {len}");
+        }
+    }
+
+    // Edges: zero, ±1, 10^k and 10^k − 1 through k = 2000 (past every split width), and the
+    // i64/u64 boundaries.
+    for (x, want) in [
+        (Magnus::zero(), "0".to_owned()),
+        (Magnus::one(), "1".to_owned()),
+        (m(-1), "-1".to_owned()),
+        (m(i128::from(i64::MIN)), i64::MIN.to_string()),
+        (m(i128::from(i64::MAX)), i64::MAX.to_string()),
+        (Magnus::from_u64(u64::MAX), u64::MAX.to_string()),
+        (-Magnus::from_u64(u64::MAX), format!("-{}", u64::MAX)),
+    ] {
+        assert_eq!(x.to_string(), want, "boundary {want}");
+        assert_eq!(x.to_string(), peel_oracle(&x), "boundary {want}");
+    }
+    for k in 0..=2000 {
+        let power = dec(&format!("1{}", "0".repeat(k)));
+        let power_text = format!("1{}", "0".repeat(k));
+        assert_eq!(power.to_string(), power_text, "10^{k}");
+        assert_eq!(power.to_string(), peel_oracle(&power), "10^{k}");
+        assert_eq!(
+            (-power.clone()).to_string(),
+            format!("-{power_text}"),
+            "-10^{k}"
+        );
+        assert_eq!(
+            (-power.clone()).to_string(),
+            peel_oracle(&-power.clone()),
+            "-10^{k}"
+        );
+        if k > 0 {
+            let minus = &power - &Magnus::one();
+            let minus_text = "9".repeat(k);
+            assert_eq!(minus.to_string(), minus_text, "10^{k} - 1");
+            assert_eq!(minus.to_string(), peel_oracle(&minus), "10^{k} - 1");
+            assert_eq!(
+                (-minus.clone()).to_string(),
+                format!("-{minus_text}"),
+                "-(10^{k} - 1)"
+            );
+            assert_eq!(
+                (-minus.clone()).to_string(),
+                peel_oracle(&-minus.clone()),
+                "-(10^{k} - 1)"
+            );
+        }
+    }
 }
 
 #[test]

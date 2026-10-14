@@ -25,7 +25,8 @@
 //! comparison are O(n); `*` is Karatsuba O(n^1.585) above `KARATSUBA_THRESHOLD` limbs and
 //! schoolbook O(n·m) below; `/ %` are divide-and-conquer (Burnikel-Ziegler) above
 //! `DIVMOD_THRESHOLD` divisor limbs and Knuth Algorithm D O(n·m) below; `potentia` is
-//! O(M(n·e) · log e); decimal render is O(n²); decimal parse is O(M(n) log n) above
+//! O(M(n·e) · log e); decimal render is O(M(n) log n) above `DECIMAL_RENDER_DC_THRESHOLD`
+//! limbs and O(n²) below (the nine-digit peel); decimal parse is O(M(n) log n) above
 //! `DECIMAL_PARSE_DC_THRESHOLD` digits; radix 2/8/16 render is O(n). Hashing is O(n).
 
 use std::cmp::Ordering;
@@ -48,6 +49,11 @@ const DIVMOD_THRESHOLD: usize = 40;
 /// Digit count above which decimal parse switches from chunked O(n²) to the recursive split;
 /// below it the chunked path wins.
 const DECIMAL_PARSE_DC_THRESHOLD: usize = 512;
+
+/// Limb count above which decimal render switches from the nine-digit peel O(n²) to the
+/// recursive split by `10^(9·2^k)`; below it the peel wins. Roughly the parse threshold's
+/// decimal magnitude (54 limbs is a little over 500 digits).
+const DECIMAL_RENDER_DC_THRESHOLD: usize = 54;
 
 /// Why a `Magnus` operation failed. Every variant is a value-level failure the caller maps to
 /// its own trap or `⇥`; none is a resource-exhaustion abort.
@@ -768,7 +774,8 @@ impl Magnus {
     }
 
     /// Render in `radix`: lowercase digits, no prefix, a leading `-` for negatives (the exact
-    /// inverse of [`Magnus::parse_radix`]). O(n²) for decimal, O(n) for radix 2/8/16.
+    /// inverse of [`Magnus::parse_radix`]). Decimal is O(M(n) log n) above
+    /// `DECIMAL_RENDER_DC_THRESHOLD` limbs and O(n²) below; radix 2/8/16 is O(n).
     #[must_use]
     pub fn to_string_radix(&self, radix: Radix) -> String {
         let digits = self.digits_radix(radix);
@@ -784,21 +791,7 @@ impl Magnus {
             return "0".to_owned();
         }
         if radix == Radix::Dec {
-            // Peel nine decimal digits at a time.
-            let mut rest = self.mag.clone();
-            let mut chunks: Vec<u32> = Vec::new();
-            while !rest.is_empty() {
-                chunks.push(divmod_small_in_place(&mut rest, 1_000_000_000));
-            }
-            let mut out = String::new();
-            for (i, chunk) in chunks.iter().rev().enumerate() {
-                let digits = chunk.to_string();
-                if i > 0 {
-                    out.push_str(&"0".repeat(9 - digits.len()));
-                }
-                out.push_str(&digits);
-            }
-            return out;
+            return render_decimal(&self.mag);
         }
         let bits_per_digit = match radix {
             Radix::Bin => 1,
@@ -817,6 +810,74 @@ impl Magnus {
         }
         out
     }
+}
+
+/// Nine-decimal-digit peel: O(n²) in the limb count. It stays the base case below
+/// [`DECIMAL_RENDER_DC_THRESHOLD`] limbs and is the equality oracle for the recursive split
+/// (`decimal_render_matches_peel_oracle`).
+fn render_decimal_peel(mag: &[u32]) -> String {
+    if mag.is_empty() {
+        return "0".to_owned();
+    }
+    let mut rest = mag.to_vec();
+    let mut chunks: Vec<u32> = Vec::new();
+    while !rest.is_empty() {
+        chunks.push(divmod_small_in_place(&mut rest, 1_000_000_000));
+    }
+    let mut out = String::new();
+    for (i, chunk) in chunks.iter().rev().enumerate() {
+        let digits = chunk.to_string();
+        if i > 0 {
+            out.push_str(&"0".repeat(9 - digits.len()));
+        }
+        out.push_str(&digits);
+    }
+    out
+}
+
+/// Decimal render: the nine-digit peel below [`DECIMAL_RENDER_DC_THRESHOLD`] limbs, otherwise a
+/// recursive split at the largest `10^(9·2^k)` below the value. Each split divides with
+/// `divmod_mag` and zero-pads the low half to the split width, so the cost follows M(n) log n
+/// instead of the peel's O(n²).
+fn render_decimal(mag: &[u32]) -> String {
+    if mag.len() <= DECIMAL_RENDER_DC_THRESHOLD {
+        return render_decimal_peel(mag);
+    }
+    // pows[i] = 10^(9·2^i), squared until the top power exceeds `mag`; every recursive split
+    // finds its power in this table because a sub-value stays below the power that split it.
+    let mut pows: Vec<Vec<u32>> = vec![vec![1_000_000_000]];
+    while pows
+        .last()
+        .is_some_and(|top| cmp_mag(top, mag) != Ordering::Greater)
+    {
+        let last = &pows[pows.len() - 1];
+        let next = mul_mag(last, last);
+        pows.push(next);
+    }
+    render_decimal_split(mag, &pows)
+}
+
+/// Recursive half of [`render_decimal`]; `pows` is the power table built for the top value,
+/// truncated to the powers at or below the current split.
+fn render_decimal_split(mag: &[u32], pows: &[Vec<u32>]) -> String {
+    if mag.len() <= DECIMAL_RENDER_DC_THRESHOLD {
+        return render_decimal_peel(mag);
+    }
+    // Largest `pows[k]` at or below `mag`. `render_decimal` only stops squaring after a power
+    // exceeds the value, and every value this large is above `pows[0] = 10^9`, so `k` exists.
+    let mut k = pows.len() - 1;
+    while cmp_mag(&pows[k], mag) == Ordering::Greater {
+        k -= 1;
+    }
+    let (high, low) = divmod_mag(mag, &pows[k]);
+    let low_len = 9_usize << k;
+    let mut out = render_decimal_split(&high, &pows[..k]);
+    let low_text = render_decimal_split(&low, &pows[..k]);
+    if low_text.len() < low_len {
+        out.push_str(&"0".repeat(low_len - low_text.len()));
+    }
+    out.push_str(&low_text);
+    out
 }
 
 impl From<i64> for Magnus {
