@@ -5018,3 +5018,39 @@ help = "scribe nomen identificatoris hic"
 [diagnostics.PARSE001.issues.expected_string_literal]
 message = "chorda litteralis exspectabatur"
 help = "scribe chordam litteralem hic"
+
+[diagnostics.PARSE001.issues.expected_mutability_keyword]
+message = "vocabulum mutabilitatis exspectabatur"
+help = "exordire declarationem vocabulo mutabilitatis"
+
+[diagnostics.PARSE001.issues.await_binding_requires_name]
+message = "nomen vinculi exspectabatur ante '↢'"
+help = "vincula '↢' ad nomen unum; forma destructions utitur '←'"
+
+[diagnostics.PARSE001.issues.expected_method_declaration]
+message = "declaratio methodi exspectabatur"
+help = "scribe methodum ut declarationem 'functio'"
+
+[diagnostics.PARSE001.issues.expected_praepara_hook]
+message = "uncus 'praepara' exspectabatur"
+help = "scribe 'praepara', 'praeparabit', 'postpara' vel 'postparabit'"
+
+[diagnostics.PARSE001.issues.expected_lane_value]
+message = "chorda litteralis vel nomen identificatoris exspectabatur"
+help = "scribe valorem viae ut chordam aut nomen nudum"
+
+[diagnostics.PARSE001.issues.expected_scribe_keyword]
+message = "vocabulum 'scribe' exspectabatur"
+help = "scribe 'scribe', 'vide', 'mone' vel 'nota'"
+
+[diagnostics.PARSE001.issues.expected_incipit_keyword]
+message = "vocabulum 'incipit' vel 'incipiet' exspectabatur"
+help = "exordire punctum introitus cum 'incipit' vel 'incipiet'"
+
+[diagnostics.PARSE001.issues.enum_member_value_number]
+message = "numerus post '=' exspectabatur"
+help = "scribe numerum integrum post '=' aut tolle '='"
+
+[diagnostics.PARSE001.issues.enum_member_value]
+message = "valor membri enumerationis exspectabatur"
+help = "scribe numerum integrum aut chordam post '='"

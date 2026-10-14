@@ -1361,10 +1361,6 @@ impl Parser {
         }
     }
 
-    fn expected_error(expected: &'static str, span: Span) -> ParseError {
-        ParseError::structured(ParseErrorKind::Expected, span).with_arg("expected", expected)
-    }
-
     /// Expectation failure that names its locale `issue` instead of prose.
     fn expected_issue_error(issue: &'static str, span: Span) -> ParseError {
         ParseError::structured(ParseErrorKind::Expected, span).with_arg("issue", issue)

@@ -857,7 +857,10 @@ impl Parser {
         } else if self.eat_keyword_ident(TokenKind::Nota) {
             ScribeKind::Nota
         } else {
-            return Err(Self::expected_error("scribe", self.current_span()));
+            return Err(Self::expected_issue_error(
+                "expected_scribe_keyword",
+                self.current_span(),
+            ));
         };
 
         let mut args = Vec::new();
@@ -885,8 +888,8 @@ impl Parser {
         } else if self.eat_keyword_ident(TokenKind::Incipiet) {
             true
         } else {
-            return Err(Self::expected_error(
-                "incipit or incipiet",
+            return Err(Self::expected_issue_error(
+                "expected_incipit_keyword",
                 self.current_span(),
             ));
         };
