@@ -51,7 +51,7 @@ main {
     # Cryptographic generation
     # -----------------------------------------------------------------------
     do {
-        const bytes val ← aleator.random_bytes(16)
+        const list<b8> val ← aleator.random_bytes(16)
         assert val.length() ≡ 16
     }
     catch err {
@@ -60,7 +60,7 @@ main {
 
     # Edge: n = 0 returns empty bytes
     do {
-        const bytes val ← aleator.random_bytes(0)
+        const list<b8> val ← aleator.random_bytes(0)
         assert val.length() ≡ 0
     }
     catch err {

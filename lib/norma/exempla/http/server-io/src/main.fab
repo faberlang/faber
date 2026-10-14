@@ -34,14 +34,14 @@ fn arg_at(int index, string fallback) → string {
 }
 
 # 64 KiB payload via doubling — O(n) copies, not per-byte concat.
-fn stall_frame() → bytes {
+fn stall_frame() → list<b8> {
     var string block ← "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     var int i ← 0
     while i ≺ 10 {
         block ← block + block
         i ← i + 1
     }
-    return block ↦ bytes
+    return block ↦ list<b8>
 }
 
 main {
@@ -64,7 +64,7 @@ main {
     const server.Stream stream ← server.open_sse(incoming)
 
     if mode ≡ "stall" {
-        const bytes frame ← stall_frame()
+        const list<b8> frame ← stall_frame()
         print "frame-bytes"
         print frame.length()
         var int i ← 0
