@@ -254,6 +254,10 @@ pub fn lex_message(kind: LexErrorKind, args: &[DiagnosticArg]) -> Option<String>
                 Some("unterminated backtick template literal".to_owned())
             }
             "unterminated_octeti_literal" => Some("unterminated octeti literal".to_owned()),
+            "unterminated_regex_literal" => Some("unterminated regex literal".to_owned()),
+            "empty_regex_literal" => {
+                Some("empty regex literal; write a pattern between the slashes".to_owned())
+            }
             "unterminated_string_literal" => Some("unterminated string literal".to_owned()),
             "newline_in_string_literal" => {
                 Some("unterminated string literal (newline in string)".to_owned())

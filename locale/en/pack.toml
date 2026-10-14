@@ -511,6 +511,14 @@ help = "close the string literal before the end of the line or file"
 message = "unterminated bytes literal"
 help = "close the string literal before the end of the line or file"
 
+[diagnostics.LEX001.issues.unterminated_regex_literal]
+message = "unterminated regex literal"
+help = "close the regex literal before the end of the line or file"
+
+[diagnostics.LEX001.issues.empty_regex_literal]
+message = "empty regex literal; write a pattern between the slashes"
+help = "write a pattern between the slashes"
+
 [diagnostics.LEX001.issues.unterminated_string_literal]
 message = "unterminated string literal"
 help = "close the string literal before the end of the line or file"

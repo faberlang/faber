@@ -103,6 +103,13 @@ pub enum TokenKind {
     BacktickString(Symbol),
     /// Pipe-delimited `|...|` hex payload interned without delimiters.
     OctetiString(Symbol),
+    /// Raw `/.../` regex body interned without the slashes.
+    ///
+    /// Emitted only directly after the regex type word or `_` (ruling
+    /// d381ae56): a bare `/` in operand position stays division. Backslash
+    /// escapes are kept as authored (`\/` stays `\/`) because the backend
+    /// receives the body source bytes.
+    RegexString(Symbol),
 
     // === Keywords: Declarations ===
     Columna,
