@@ -21,12 +21,12 @@ pub(crate) enum RoundingMode {
 }
 
 impl RoundingMode {
-    fn from_hint(name: &str) -> Option<Self> {
+    pub(super) fn from_hint(name: &str) -> Option<Self> {
         match name {
-            "Floor" => Some(Self::Floor),
-            "Ceil" => Some(Self::Ceil),
-            "HalfEven" => Some(Self::HalfEven),
-            "Trunc" => Some(Self::Trunc),
+            "floor" | "Floor" => Some(Self::Floor),
+            "ceil" | "Ceil" => Some(Self::Ceil),
+            "half_even" | "HalfEven" => Some(Self::HalfEven),
+            "trunc" | "Trunc" => Some(Self::Trunc),
             _ => None,
         }
     }
