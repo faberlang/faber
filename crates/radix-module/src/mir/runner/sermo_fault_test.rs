@@ -178,3 +178,71 @@ main {{
         .unwrap_or_else(|errors| panic!("sermo fault program should run: {errors:?}"));
     assert_eq!(host.stdout_lines, ["bridge-ok".to_owned()]);
 }
+
+/// e71f077f-4: a registered conversion row that is itself failable
+/// (`⇥ E`) must be applied on the propagation edge with `try_call`, so the
+/// row's own failure reaches the same alternate exit. `matched_kind` is the
+/// raw `kind` the row throws `Perit` for; any other kind returns `Absens`.
+fn failable_row_source(matched_kind: &str) -> String {
+    program(&format!(
+        r#"
+union Fault {{ Absens, Perit }}
+
+fn kind_of(value raw) → string {{
+    do {{
+        const map<string, value> record ← raw ↦ map<string, value>
+        const string kind ← record["kind"] ↦ string
+        return kind
+    }} catch err {{
+        return ""
+    }}
+}}
+
+@ conversion
+fn convert_error(value raw) → Fault ⇥ Fault {{
+    if kind_of(raw) ≡ "{matched_kind}" {{
+        throw variant Perit
+    }}
+    return variant Absens
+}}
+
+fn read(string p) → string ⇥ Fault {{
+    return call 'solum:lege' (p) ↦ string
+}}
+
+main {{
+    do {{
+        const string text ← read("/nonexistent/e71f077f/failable-row.txt")
+        print text
+    }} catch err {{
+        match err {{
+            case Absens {{
+                print "absens"
+            }}
+            case Perit {{
+                print "perit"
+            }}
+        }}
+    }}
+}}
+"#
+    ))
+}
+
+#[test]
+fn failable_row_error_is_the_propagated_fault() {
+    let source = failable_row_source("NotFound");
+    let mut host = BufferHost::default();
+    run_host("sermo-fault-failable-row-error.fab", &source, &mut host)
+        .unwrap_or_else(|errors| panic!("failable conversion row should run: {errors:?}"));
+    assert_eq!(host.stdout_lines, ["perit".to_owned()]);
+}
+
+#[test]
+fn failable_row_success_value_is_the_propagated_fault() {
+    let source = failable_row_source("Never");
+    let mut host = BufferHost::default();
+    run_host("sermo-fault-failable-row-success.fab", &source, &mut host)
+        .unwrap_or_else(|errors| panic!("failable conversion row should run: {errors:?}"));
+    assert_eq!(host.stdout_lines, ["absens".to_owned()]);
+}
