@@ -7,7 +7,11 @@ use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, run_source};
 
 fn run(body: &str) -> (Vec<String>, Vec<(String, String)>) {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = format!("incipit {{\n{body}\n}}\n");
     let mut host = BufferHost::default();
     let errors = match run_source(&session, "exact.fab", &source, &mut host) {
@@ -281,7 +285,11 @@ fn cap_typed_sum_is_checked_at_argument_and_return_stores() {
     let id =
         "functio id(numerus x) → numerus { redde x }\nfunctio add(numerus x, numerus y) → numerus { redde x + y }\n";
     let run_module = |main: &str| {
-        let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+        let session = Session::new(
+            Config::default()
+                .with_target(Target::HirTypeScript)
+                .with_latin_locale(),
+        );
         let source = format!("{id}incipit {{\n{CAP_MAX}nota \"a\"\n{main}\n}}\n");
         let mut host = BufferHost::default();
         match run_source(&session, "cap.fab", &source, &mut host) {
@@ -304,7 +312,11 @@ fn cap_typed_sum_is_checked_at_argument_and_return_stores() {
     assert_eq!(errors[0].0, "implicit_store_out_of_range");
     assert!(errors[0].1.contains("(return)"), "{}", errors[0].1);
     // A sum that fits still flows through every store.
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = format!("{id}incipit {{\nnota add(40, 2)\n}}\n");
     let mut host = BufferHost::default();
     run_source(&session, "cap.fab", &source, &mut host).expect("a fitting sum runs");
@@ -382,7 +394,11 @@ fn word_slot_constants_at_the_64_bit_edges() {
 #[test]
 fn word_parameter_takes_a_constant_argument() {
     let functions = "functio f(saturatus<u64> a) → saturatus<u64> { redde a }\nfunctio g(modulus<u8> a) → modulus<u8> { redde a }\n";
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let program = format!("{functions}incipit {{\nnota f(18446744073709551615)\nnota g(5)\n}}\n");
     let mut host = BufferHost::default();
     run_source(&session, "exact.fab", &program, &mut host).expect("runs");
@@ -404,7 +420,11 @@ fn negated_i64_min_constant_fits_every_64_bit_slot() {
         ok("fixum saturatus<i64> x ← -9223372036854775809\nnota x"),
         ["-9223372036854775808"]
     );
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = "incipit {\nfixum numerus z ← -9223372036854775809\nnota z\n}\n";
     let mut host = BufferHost::default();
     assert!(run_source(&session, "exact.fab", source, &mut host).is_err());
@@ -416,7 +436,11 @@ fn summa_at_the_cap_is_a_checked_store() {
     // `int` checks the store; a small sum returns fine.
     let functions = "functio total(tensor<i64, [3]> a) → numerus {\n  redde reducta via summa ex a fixum s {\n    redde s\n  }\n}\n";
     let run_total = |values: &str| {
-        let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+        let session = Session::new(
+            Config::default()
+                .with_target(Target::HirTypeScript)
+                .with_latin_locale(),
+        );
         let source = format!(
             "{functions}incipit {{\nfixum lista<i64> v ← [{values}]\nnota \"a\"\nnota total(v ↦ tensor<i64, [3]>)\n}}\n"
         );
@@ -438,7 +462,11 @@ fn summa_at_the_cap_is_a_checked_store() {
 #[test]
 fn reducta_summa_widens_narrow_integer_terms_before_accumulating() {
     // Ruling 21 types an integer sum at the 64-bit cap before the final store.
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = "functio total(tensor<i8, [2]> a) → numerus {\n  redde reducta via summa ex a\n}\n\
                   incipit {\nfixum tensor<i8, [2]> a ← [100, 100] ↦ tensor<i8, [2]>\nnota total(a)\n}\n";
     let mut host = BufferHost::default();
@@ -449,7 +477,11 @@ fn reducta_summa_widens_narrow_integer_terms_before_accumulating() {
 
 #[test]
 fn grouped_reducta_summa_widens_narrow_integer_terms_before_accumulating() {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = "functio grouped(tensor<i8, [2]> values, tensor<numerus, [2]> keys) → tensor<i64, [1]> {\n  redde reducta via summa ex values apud [i] pro keys[i]\n}\n\
                   incipit {\nfixum tensor<i8, [2]> values ← [100, 100] ↦ tensor<i8, [2]>\nfixum tensor<numerus, [2]> keys ← [0, 0] ↦ tensor<numerus, [2]>\nnota grouped(values, keys)\n}\n";
     let mut host = BufferHost::default();
@@ -464,7 +496,11 @@ fn summa_accumulates_exactly_and_checks_at_the_store() {
     // only the store of the result into its slot applies the slot policy.
     let functions = "functio total(tensor<i64, [3]> a) → numerus {\n  redde reducta via summa ex a fixum s {\n    redde s\n  }\n}\n";
     let run_total = |values: &str| {
-        let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+        let session = Session::new(
+            Config::default()
+                .with_target(Target::HirTypeScript)
+                .with_latin_locale(),
+        );
         let source =
             format!("{functions}incipit {{\nfixum lista<i64> v ← [{values}]\nnota total(v ↦ tensor<i64, [3]>)\n}}\n");
         let mut host = BufferHost::default();
@@ -583,7 +619,11 @@ fn potentia_is_exact_and_range_typed() {
 }
 
 fn run_module(source: &str) -> (Vec<String>, Vec<(String, String)>) {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let mut host = BufferHost::default();
     let errors = match run_source(&session, "place.fab", source, &mut host) {
         Ok(()) => Vec::new(),
@@ -645,7 +685,11 @@ fn in_place_twin_on_an_effectful_place_traps_at_the_store() {
 fn in_place_twin_yields_no_value() {
     // ss1a: the imperative form mutates and returns nothing, so it is not an
     // initializer.
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = "incipit {\nvaria numerus x ← 1\nfixum numerus y ← x.adde(1)\nnota y\n}\n";
     let mut host = BufferHost::default();
     let Err(RunSourceError::Frontend(diagnostics)) = run_source(&session, "value.fab", source, &mut host) else {

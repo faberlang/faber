@@ -15,7 +15,11 @@ use crate::mir::{
 use std::fmt::Write;
 
 fn session() -> Session {
-    Session::new(Config::default().with_target(Target::HirTypeScript))
+    Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    )
 }
 
 fn initializer_shape(source: &str, function_name: &str, names: &[&str]) -> Vec<String> {
