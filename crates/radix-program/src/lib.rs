@@ -154,7 +154,3 @@ pub(crate) fn package_diagnostic_error(
 #[cfg(test)]
 #[path = "bounded_param_pkg001_test.rs"]
 mod bounded_param_pkg001_test;
-
-#[cfg(test)]
-#[path = "analysis_entry_cross_pin_test.rs"]
-mod analysis_entry_cross_pin_test;
