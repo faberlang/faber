@@ -6,8 +6,8 @@
 #![cfg(test)]
 
 use crate::artifact::{
-    FunctionFactTableWire, FunctionProvenanceTableWire, HirArtifact, ResolverSnapshot,
-    SCHEMA_VERSION, SourceIdentity,
+    DisplayTokensWire, FunctionFactTableWire, FunctionProvenanceTableWire, HirArtifact,
+    ResolverSnapshot, SCHEMA_VERSION, SourceIdentity,
 };
 use radix_hir::{
     HirFunction, HirId, HirItem, HirItemKind, HirModule, HirModuleEnd, HirPresentation,
@@ -112,6 +112,12 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         shape_obligations: crate::artifact::ShapeObligationTableWire::default(),
         kernel_requirements: crate::artifact::KernelRequirementsWire::default(),
         tensor_edge_policies: crate::artifact::TensorEdgePolicyTableWire::default(),
+        display_tokens: DisplayTokensWire {
+            true_: "true".to_string(),
+            false_: "false".to_string(),
+            none: "none".to_string(),
+            tuple: "tuple".to_string(),
+        },
     }
 }
 
