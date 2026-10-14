@@ -835,17 +835,17 @@ fn llvm_verifier_available() -> bool {
 }
 
 /// A missing external toolchain may skip a proof only on the Linux merge-lane
-/// gate (which has no ghc/go/python>=3.12/llvm-as/rustfmt toolchain) or when
-/// `FABER_ALLOW_MISSING_TOOLCHAIN` is set. The macOS gate treats these proofs
+/// gate (which has no ghc/go/python>=3.12/llvm-as/rustfmt toolchain) and only
+/// when `FABER_REQUIRE_TOOLCHAINS` is unset. The macOS gate treats these proofs
 /// as mandatory, so a missing tool there is a test failure.
-fn may_skip_missing_tool_on(is_linux: bool, opted_out: bool) -> bool {
-    is_linux || opted_out
+fn may_skip_missing_tool_on(is_linux: bool, require_toolchains: bool) -> bool {
+    is_linux && !require_toolchains
 }
 
 fn may_skip_missing_tool() -> bool {
     may_skip_missing_tool_on(
         cfg!(target_os = "linux"),
-        std::env::var_os("FABER_ALLOW_MISSING_TOOLCHAIN").is_some(),
+        std::env::var_os("FABER_REQUIRE_TOOLCHAINS").is_some(),
     )
 }
 
@@ -864,10 +864,11 @@ fn missing_tool(tool: &str, proof: &str, old_failure: &str) {
 }
 
 #[test]
-fn missing_toolchain_skip_policy_is_linux_or_opt_out_only() {
+fn missing_toolchain_skip_policy_is_linux_without_require_only() {
     assert!(!may_skip_missing_tool_on(false, false));
     assert!(may_skip_missing_tool_on(true, false));
-    assert!(may_skip_missing_tool_on(false, true));
+    assert!(!may_skip_missing_tool_on(true, true));
+    assert!(!may_skip_missing_tool_on(false, true));
 }
 
 #[test]
