@@ -747,7 +747,6 @@ kind = "bin"
 /// generic library call, so the interpreted lowering of `main` must keep the
 /// error half and carry a try-call terminator, not a plain call.
 #[test]
-#[ignore = "pumpfix-gfd594086: read_file<string> in main lowers as a plain Call"]
 fn package_mir_norma_fs_read_file_main_is_try_call() {
     let dir = crate::test_support::test_temp_dir("norma-fs-read-file-try-call");
     let entry = write_norma_fs_read_file_package(dir.as_ref());
@@ -758,16 +757,16 @@ fn package_mir_norma_fs_read_file_main_is_try_call() {
         &entry,
         &crate::test_support::test_mir_seams(),
         |lowered| {
-            let main = lowered
-                .validated
-                .program()
-                .functions
-                .iter()
-                .find(|function| {
-                    function
-                        .name
-                        .is_some_and(|name| lowered.interner.resolve(name) == "main")
-                })
+            // The `main {}` entry lowers to the source-less, nameless entry
+            // function (backends spell it `incipit`), so locate it by the same
+            // shape `MirNames` uses rather than by a `main` symbol.
+            let names = radix_mir::MirNames::new(
+                lowered.validated.program(),
+                lowered.validated.validation().types.as_table(),
+                &lowered.interner,
+            );
+            let main = names
+                .explicit_entry_function()
                 .unwrap_or_else(|| panic!("`main` must exist in the merged program"));
             assert!(
                 main.blocks.iter().any(|block| matches!(
