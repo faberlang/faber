@@ -672,12 +672,34 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     RunnerError::conversion(span, "valor to instans conversion failed")
                 })
             }
+            // A dynamic `valor` byte extracts as the unsigned `bN` cell it
+            // stands for; a negative or too-wide integer is recoverable
+            //.
+            Type::Bits(width) => {
+                let pattern = match value {
+                    Value::UInt(pattern) => pattern,
+                    Value::Int(value) if value >= 0 => value.cast_unsigned(),
+                    _ => {
+                        return Err(RunnerError::conversion(
+                            span,
+                            "valor to bits conversion failed",
+                        ));
+                    }
+                };
+                if !bits_pattern_fits_width(pattern, *width) {
+                    return Err(RunnerError::conversion(
+                        span,
+                        "valor to bits conversion failed",
+                    ));
+                }
+                Ok(Value::UInt(pattern))
+            }
             Type::Array(element) => {
                 // A host byte value extracts as the `lista<b8>` it stands
                 // for.
                 if matches!(value, Value::Octeti(_))
                     && matches!(
-                        self.types.get(*element),
+                        self.types.get(self.resolve_conversion_target(*element)),
                         Type::Bits(radix_types::BitsWidth::B8)
                     )
                 {
@@ -861,6 +883,11 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Err(RunnerError::conversion(span, message))
         }
     }
+}
+
+/// Whether an unsigned `bN` pattern fits `width` (64 bits holds any `u64`).
+fn bits_pattern_fits_width(pattern: u64, width: radix_types::BitsWidth) -> bool {
+    width.bits() == 64 || pattern < (1u64 << width.bits())
 }
 
 fn lista_to_tensor_shape(target_ty: TypeId, types: &TypeTable, flat_len: usize) -> Vec<i64> {
