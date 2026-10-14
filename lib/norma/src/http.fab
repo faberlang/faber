@@ -36,6 +36,7 @@ import from "norma:http/response" response
 import from "norma:http/chunked" chunked
 import from "norma:http/server" server
 import from "norma:http/client" client
+import from "norma:fault" fault
 
 
 # =========================================================================
@@ -44,37 +45,37 @@ import from "norma:http/client" client
 
 @ public
 @ future
-fn get(string url) → response.Response {
+fn get(string url) → response.Response ⇥ fault.IoFault {
     return client.get(url)
 }
 
 @ public
 @ future
-fn post(string url, string body) → response.Response {
+fn post(string url, string body) → response.Response ⇥ fault.IoFault {
     return client.post(url, body)
 }
 
 @ public
 @ future
-fn put(string url, string body) → response.Response {
+fn put(string url, string body) → response.Response ⇥ fault.IoFault {
     return client.put(url, body)
 }
 
 @ public
 @ future
-fn delete(string url) → response.Response {
+fn delete(string url) → response.Response ⇥ fault.IoFault {
     return client.delete(url)
 }
 
 @ public
 @ future
-fn patch(string url, string body) → response.Response {
+fn patch(string url, string body) → response.Response ⇥ fault.IoFault {
     return client.patch(url, body)
 }
 
 @ public
 @ future
-fn send_request(string method, string url, map<string, string> headers, string body) → response.Response {
+fn send_request(string method, string url, map<string, string> headers, string body) → response.Response ⇥ fault.IoFault {
     return client.send_request(method, url, headers, body)
 }
 
@@ -84,12 +85,12 @@ fn session() → client.Client {
 }
 
 @ public
-fn open_request(string method, string url, headers.Headers headers, string body) → client.Receive {
+fn open_request(string method, string url, headers.Headers headers, string body) → client.Receive ⇥ fault.IoFault {
     return client.open(method, url, headers, body)
 }
 
 @ public
-fn receive(client.Receive stream) → client.Chunk {
+fn receive(client.Receive stream) → client.Chunk ⇥ fault.IoFault {
     return client.receive(stream)
 }
 
@@ -99,47 +100,47 @@ fn receive(client.Receive stream) → client.Chunk {
 # =========================================================================
 
 @ public
-fn listen(list<value> args) → int {
+fn listen(list<value> args) → int ⇥ fault.IoFault {
     return server.listen(args)
 }
 
 @ public
-fn accept(int handle) → value {
+fn accept(int handle) → value ⇥ fault.IoFault {
     return server.accept(handle)
 }
 
 @ public
-fn respond(list<value> args) → void {
+fn respond(list<value> args) → void ⇥ fault.IoFault {
     return server.respond(args)
 }
 
 @ public
-fn respond_open(list<value> args) → int {
+fn respond_open(list<value> args) → int ⇥ fault.IoFault {
     return server.respond_open(args)
 }
 
 @ public
-fn respond_chunk(list<value> args) → void {
+fn respond_chunk(list<value> args) → void ⇥ fault.IoFault {
     return server.respond_chunk(args)
 }
 
 @ public
-fn respond_finish(list<value> args) → void {
+fn respond_finish(list<value> args) → void ⇥ fault.IoFault {
     return server.respond_finish(args)
 }
 
 @ public
-fn stop(int handle) → void {
+fn stop(int handle) → void ⇥ fault.IoFault {
     return server.stop(handle)
 }
 
 @ public
-fn bind(int port) → server.Listener {
+fn bind(int port) → server.Listener ⇥ fault.IoFault {
     return server.bind(port)
 }
 
 @ public
-fn bind_tls(int port, string cert, string key) → server.Listener {
+fn bind_tls(int port, string cert, string key) → server.Listener ⇥ fault.IoFault {
     return server.bind_tls(port, cert, key)
 }
 
