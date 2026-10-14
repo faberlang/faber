@@ -1791,6 +1791,10 @@ help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 message = "matmul يتطلب rank-2 tensor receiver مع tuple shape"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
+[diagnostics.SEM010.issues.nominal_ascription_not_provable]
+message = "`∷` ينص على حقيقة يستطيع المترجم إثباتها؛ '{found}' ليس '{expected}' ولا توجد علاقة {implet} معلنة"
+help = "اجعل نوع المصدر مطابقًا للهدف، أو أعلن العقد في {implet}، أو حوّل صراحةً باستخدام `↦`"
+
 [diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands يجب أن تكون أنواعها متطابقة؛ استخدم ↦ للتحويل الصريح"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"

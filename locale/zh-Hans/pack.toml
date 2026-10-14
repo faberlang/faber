@@ -1791,6 +1791,10 @@ help = "使表达式类型与期望类型一致"
 message = "matmul 需要 rank-2 tensor receiver 且为 tuple shape"
 help = "使表达式类型与期望类型一致"
 
+[diagnostics.SEM010.issues.nominal_ascription_not_provable]
+message = "`∷` 断言编译器可证明的事实；'{found}' 不是 '{expected}'，且未声明任何 {implet} 关系"
+help = "使源类型与目标类型一致，在 {implet} 中声明契约，或使用 `↦` 显式转换"
+
 [diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands 必须类型完全一致；请用 ↦ 显式转换"
 help = "使表达式类型与期望类型一致"

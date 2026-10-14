@@ -1791,6 +1791,10 @@ help = "使運算式型別符合預期型別"
 message = "matmul 需要具有 tuple 形狀的秩為 2 張量接收者"
 help = "使運算式型別符合預期型別"
 
+[diagnostics.SEM010.issues.nominal_ascription_not_provable]
+message = "`∷` 斷言編譯器可證明的事實；'{found}' 不是 '{expected}'，且未宣告任何 {implet} 關係"
+help = "使來源型別與目標型別一致，在 {implet} 中宣告契約，或使用 `↦` 明確轉換"
+
 [diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
 message = "數值算術運算元必須具有相同型別；使用 ↦ 進行明確轉換"
 help = "使運算式型別符合預期型別"

@@ -211,6 +211,18 @@ fn locale_pack_completeness_all_installed_packs_own_scaffold_surface_keys() {
     }
 }
 
+/// `SEM010.nominal_ascription_not_provable` is emitted with `{found}`,
+/// `{expected}` and `{implet}`. A pack without its own row silently falls back
+/// to the base `SEM010` row (or to `la` through `inherits`), so the issue row
+/// must exist in every installed pack. Presence only is asserted here; the row
+/// text belongs to translation review.
+#[test]
+fn locale_pack_completeness_nominal_ascription_row_in_every_pack() {
+    for locale in ["la", "en", "th-TH", "ar", "zh-Hans", "zh-Hant", "vi", "hi"] {
+        assert_issue_template(&owned_pack(locale), "SEM010", "nominal_ascription_not_provable");
+    }
+}
+
 #[test]
 fn latin_pack_projects_existing_registries() {
     let pack = latin_locale_pack();

@@ -311,7 +311,7 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         && arg_value(args, "issue") == Some("nominal_ascription_not_provable")
     {
         return Some(
-            "make the source type match the target, declare the contract in `implet`, or convert explicitly with `↦`"
+            "make the source type match the target, declare the contract on the genus, or convert explicitly with `↦`"
                 .to_owned(),
         );
     }
