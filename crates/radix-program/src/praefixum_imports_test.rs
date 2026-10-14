@@ -1,6 +1,8 @@
-//! ST2-2.6: `PackageImportEffects` answers import-effect questions over the
-//! analyzed nodes of temp packages. Assertions are on the answer's shape
-//! (`Pure`, `Effect` effect and chain, `Unavailable`), never on prose.
+//! ST2-2.6 / ST2-2.11: `PackageImportEffects` answers import-effect questions
+//! over the analyzed nodes of temp packages, including library callees when
+//! the caller supplies the analyzed library bodies. Assertions are on the
+//! answer's shape (`Pure`, `Effect` effect and chain, `Unavailable`), never on
+//! prose.
 
 use super::*;
 use crate::analyze::{AnalyzedProgram, analyze_package};
@@ -31,18 +33,58 @@ fn analyze(dir: &Path) -> AnalyzedProgram {
     analyze_package(&config, dir, &seams.analysis).unwrap()
 }
 
+/// Analyze `dir` and also load the analyzed bodies of every expanded library
+/// import into a resolver table (the deferral hook's library snapshot).
+fn analyze_with_library_bodies(dir: &Path) -> (AnalyzedProgram, LibraryBodies) {
+    let seams = test_mir_seams();
+    let config = Config::default()
+        .with_target((seams.executed_lane_target)(&Config::default(), dir).unwrap())
+        .with_library_home(library_home());
+    let (program, mut cache) =
+        crate::analyze::analyze_package_retaining_library_cache(&config, dir, &seams.analysis)
+            .unwrap();
+    let mut bodies = LibraryBodies::new();
+    for node in program.nodes.values() {
+        for import in &node.expanded_library_imports {
+            let Ok(analysis) = crate::library::library_cached_analysis(
+                import,
+                &program.library_resolver,
+                &mut cache,
+            ) else {
+                continue;
+            };
+            bodies.insert(
+                (import.module.package.clone(), import.module.module_path.clone()),
+                analysis.clone(),
+            );
+        }
+    }
+    (program, bodies)
+}
+
 fn write(dir: &Path, name: &str, source: &str) {
     fs::write(dir.join(name), source).unwrap();
 }
 
 /// Every import reference of the function `probe` in `main.fab`, each answered
-/// by a `PackageImportEffects` for that module.
+/// by a `PackageImportEffects` for that module with an empty library table.
 fn answers(program: &AnalyzedProgram, dir: &Path) -> Vec<ImportedCallee> {
+    answers_with(program, dir, &LibraryBodies::new())
+}
+
+/// Every import reference of the function `probe` in `main.fab`, answered by
+/// a `PackageImportEffects` holding `bodies` as its library table.
+fn answers_with(
+    program: &AnalyzedProgram,
+    dir: &Path,
+    bodies: &LibraryBodies,
+) -> Vec<ImportedCallee> {
     let (id, node) = program.node_by_path(&dir.join("main.fab")).unwrap();
-    let probe = top_level_function(node, "probe").expect("probe is declared");
+    let probe = top_level_function(&node.analysis, "probe").expect("probe is declared");
     let references = imported_references(&node.analysis.hir, &node.analysis.types, probe);
     assert!(!references.is_empty(), "probe must reach an import");
-    let mut effects = PackageImportEffects::new(&program.nodes, &program.imports, id.clone());
+    let mut effects = PackageImportEffects::new(&program.nodes, &program.imports, id.clone())
+        .with_library_bodies(bodies.clone());
     references
         .iter()
         .map(|reference| effects.callee(reference))
@@ -50,6 +92,8 @@ fn answers(program: &AnalyzedProgram, dir: &Path) -> Vec<ImportedCallee> {
 }
 
 const MAIN_CALLS_SEVEN: &str = "import from \"./consts\" consts\n\nfn probe() {\n    consts.seven()\n}\n\nmain {\n    print 0\n}\n";
+
+const MAIN_CALLS_MATH_ADD: &str = "import from \"norma:math\" math\n\nfn probe() → float {\n    return math.add(1.5, 2.5)\n}\n\nmain {\n    print 0\n}\n";
 
 #[test]
 fn pure_callee_is_pure() {
@@ -123,7 +167,7 @@ fn sibling_constant_value_is_pure() {
 }
 
 #[test]
-fn library_binding_is_unavailable() {
+fn praefixum_imports_library_without_bodies_is_unavailable() {
     let dir = test_temp_dir("imports-library");
     let dir = dir.as_ref();
     write(
@@ -135,11 +179,84 @@ fn library_binding_is_unavailable() {
     assert_eq!(answers(&program, dir), vec![ImportedCallee::Unavailable]);
 }
 
+#[test]
+fn praefixum_imports_library_pure_callee_is_pure() {
+    let dir = test_temp_dir("imports-library-pure");
+    let dir = dir.as_ref();
+    write(dir, "main.fab", MAIN_CALLS_MATH_ADD);
+    let (program, bodies) = analyze_with_library_bodies(dir);
+    assert_eq!(
+        answers_with(&program, dir, &bodies),
+        vec![ImportedCallee::Pure]
+    );
+}
+
+#[test]
+fn praefixum_imports_library_printing_callee_names_the_library_hop() {
+    let dir = test_temp_dir("imports-library-effect");
+    let dir = dir.as_ref();
+    write(
+        dir,
+        "main.fab",
+        "import from \"norma:console\" console\n\nfn probe() {\n    console.write_line(\"x\")\n}\n\nmain {\n    print 0\n}\n",
+    );
+    let (program, bodies) = analyze_with_library_bodies(dir);
+    let (id, node) = program.node_by_path(&dir.join("main.fab")).unwrap();
+    let probe = top_level_function(&node.analysis, "probe").unwrap();
+    let mut effects = PackageImportEffects::new(&program.nodes, &program.imports, id.clone())
+        .with_library_bodies(bodies);
+    let answer = function_effect(
+        &node.analysis.hir,
+        &node.analysis.types,
+        &node.analysis.interner,
+        probe,
+        &mut effects,
+    );
+    let ImportedCallee::Effect { effect, chain } = answer else {
+        panic!("expected one Effect answer");
+    };
+    assert_eq!(
+        chain,
+        vec!["probe".to_owned(), "console.write_line".to_owned()]
+    );
+    assert!(!effect.is_empty());
+}
+
+#[test]
+fn praefixum_imports_library_unknown_member_is_unavailable() {
+    let dir = test_temp_dir("imports-library-unknown");
+    let dir = dir.as_ref();
+    write(dir, "main.fab", MAIN_CALLS_MATH_ADD);
+    let (program, bodies) = analyze_with_library_bodies(dir);
+    let (id, reference) = first_reference(&program, dir);
+    let (_, main) = program.node_by_path(&dir.join("main.fab")).unwrap();
+    let probe = top_level_function(&main.analysis, "probe").unwrap();
+    let probe_name = match &main
+        .analysis
+        .hir
+        .items
+        .iter()
+        .find(|item| item.def_id == probe)
+        .unwrap()
+        .kind
+    {
+        HirItemKind::Function(function) => function.name,
+        _ => unreachable!(),
+    };
+    let unknown = ImportedReference {
+        member: probe_name,
+        ..reference
+    };
+    let mut effects = PackageImportEffects::new(&program.nodes, &program.imports, id.clone())
+        .with_library_bodies(bodies);
+    assert_eq!(effects.callee(&unknown), ImportedCallee::Unavailable);
+}
+
 /// The first import reference of `probe` in a program whose `probe` calls
 /// `consts.seven()`, plus a symbol that no sibling exports (`probe` itself).
 fn first_reference(program: &AnalyzedProgram, dir: &Path) -> (ModuleId, ImportedReference) {
     let (id, node) = program.node_by_path(&dir.join("main.fab")).unwrap();
-    let probe = top_level_function(node, "probe").unwrap();
+    let probe = top_level_function(&node.analysis, "probe").unwrap();
     let references = imported_references(&node.analysis.hir, &node.analysis.types, probe);
     (id.clone(), references[0])
 }
@@ -166,7 +283,7 @@ fn unknown_member_and_method_references_are_unavailable() {
         .hir
         .items
         .iter()
-        .find(|item| item.def_id == top_level_function(main, "probe").unwrap())
+        .find(|item| item.def_id == top_level_function(&main.analysis, "probe").unwrap())
         .unwrap()
         .kind
     {
