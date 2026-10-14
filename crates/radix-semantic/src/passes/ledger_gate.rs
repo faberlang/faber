@@ -1,16 +1,19 @@
-//! Refusal of every operation on a ledger value until the ledger operations
-//! land (need, unit L1).
+//! Refusal of every ledger operation that has not landed yet
+//! (need, units L1 and L2a).
 //!
 //! The ledger type `tabulae<K, V>` (en `ledger<K, V>`) is a built-in
-//! insertion-ordered map. This layer admits the type in every type slot a map
-//! is accepted in, and nothing else: a name that holds a ledger may be passed,
-//! returned and stored, but a literal, an index, a loop, a method call, a
-//! conversion, an equality test or a print of a ledger value is refused by one
-//! named issue, `ledger_operation_not_implemented`, so nothing half-works.
+//! insertion-ordered map. The type is admitted in every type slot a map
+//! accepts, and a brace literal, `empty`, or a declaration/assignment from
+//! one at a ledger cell typechecks like its map twin. Every other operation
+//! on a ledger value — an index, a loop, a method call, a conversion, an
+//! equality test or a print — is refused by one named issue,
+//! `ledger_operation_not_implemented`, so nothing half-works.
 
 use crate::{SemanticError, SemanticErrorKind, Type, TypeId, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_program};
-use radix_hir::{HirConversioTarget, HirExpression, HirExpressionKind, HirLocal, HirModule};
+use radix_hir::{
+    HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral, HirLocal, HirModule,
+};
 
 const ISSUE: &str = "ledger_operation_not_implemented";
 
@@ -79,6 +82,16 @@ impl Gate<'_> {
         )
     }
 
+    /// A brace literal or the empty collection: the constructors this unit
+    /// admits at a ledger cell. Every other [`Self::constructs`] shape stays
+    /// refused until the matching ledger operations land.
+    fn literal_or_empty(expr: &HirExpression) -> bool {
+        matches!(
+            expr.kind,
+            HirExpressionKind::Vacua | HirExpressionKind::Literal(HirLiteral::JsonValor(_))
+        )
+    }
+
     fn operand(&self, expr: &HirExpression) -> bool {
         self.is_ledger(expr.ty)
     }
@@ -108,13 +121,11 @@ impl Gate<'_> {
             }
             HirExpressionKind::Sort { source, .. } => self.operand(source),
             HirExpressionKind::Assign(target, value) => {
-                self.operand(target) && Self::constructs(value)
+                self.operand(target) && Self::constructs(value) && !Self::literal_or_empty(value)
             }
             HirExpressionKind::Array(_)
             | HirExpressionKind::Struct(..)
-            | HirExpressionKind::Tuple(..)
-            | HirExpressionKind::Vacua
-            | HirExpressionKind::Literal(_) => self.is_ledger(expr.ty),
+            | HirExpressionKind::Tuple(..) => self.is_ledger(expr.ty),
             _ => false,
         }
     }
@@ -125,6 +136,7 @@ impl HirVisitor for Gate<'_> {
         if let Some(init) = &local.init
             && self.is_ledger(local.ty)
             && Self::constructs(init)
+            && !Self::literal_or_empty(init)
         {
             self.errors.push(
                 SemanticError::structured(SemanticErrorKind::TypeMismatch, init.span)

@@ -908,7 +908,9 @@ impl TypeChecker<'_> {
             return self.json_type();
         };
         let resolved = self.resolve_inferred_type(expected);
-        let Type::Map(key_ty, value_ty) = self.types.get(resolved).clone() else {
+        let (Type::Map(key_ty, value_ty) | Type::Ledger(key_ty, value_ty)) =
+            self.types.get(resolved).clone()
+        else {
             return self.json_type();
         };
 

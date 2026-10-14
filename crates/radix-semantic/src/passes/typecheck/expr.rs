@@ -142,7 +142,7 @@ fn itera_apud_coordinates(
 ) -> IteraApud {
     let index_types = match types.get(dispatch_ty) {
         Type::Array(_) => vec![numerus],
-        Type::Map(key, _) => {
+        Type::Map(key, _) | Type::Ledger(key, _) => {
             let mut peeled = *key;
             while let Type::Alias(_, inner) = types.get(peeled) {
                 peeled = *inner;
@@ -400,7 +400,7 @@ impl TypeChecker<'_> {
             }
             return None;
         };
-        let is_map = matches!(self.types.get(concrete), Type::Map(..));
+        let is_map = matches!(self.types.get(concrete), Type::Map(..) | Type::Ledger(..));
         let json = self.json_type();
         if entry_form {
             if !(is_map || concrete == json) {
@@ -1317,6 +1317,7 @@ impl TypeChecker<'_> {
                     | Type::Stack(_)
                     | Type::BoundedStack { .. }
                     | Type::Map(_, _)
+                    | Type::Ledger(_, _)
                     | Type::Set(_)
                     | Type::Tensor(..)
                     | Type::Sparsa(..)
@@ -1357,6 +1358,7 @@ impl TypeChecker<'_> {
             | Type::Stack(_)
             | Type::BoundedStack { .. }
             | Type::Map(_, _)
+            | Type::Ledger(_, _)
             | Type::Set(_) => {
                 return resolved;
             }

@@ -101,6 +101,11 @@ impl TypeChecker<'_> {
                 let value = self.canonicalize_type(value);
                 self.types.map(key, value)
             }
+            Type::Ledger(key, value) => {
+                let key = self.canonicalize_type(key);
+                let value = self.canonicalize_type(value);
+                self.types.ledger(key, value)
+            }
             Type::Set(inner) => {
                 let inner = self.canonicalize_type(inner);
                 self.types.set(inner)
@@ -387,7 +392,7 @@ impl TypeChecker<'_> {
         match self.types.get(ty) {
             Type::InferUnion(_) => true,
             Type::Array(inner) => self.type_has_unsolved_union_hole(*inner),
-            Type::Map(key, value) => {
+            Type::Map(key, value) | Type::Ledger(key, value) => {
                 self.type_has_unsolved_union_hole(*key) || self.type_has_unsolved_union_hole(*value)
             }
             Type::Set(inner) => self.type_has_unsolved_union_hole(*inner),
@@ -545,7 +550,7 @@ impl TypeChecker<'_> {
                 }
             }
             Type::Array(inner) => self.collect_hole_shape_warnings(inner, span),
-            Type::Map(key, value) => {
+            Type::Map(key, value) | Type::Ledger(key, value) => {
                 self.collect_hole_shape_warnings(key, span);
                 self.collect_hole_shape_warnings(value, span);
             }

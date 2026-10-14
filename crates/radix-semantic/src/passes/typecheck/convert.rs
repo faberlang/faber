@@ -3405,8 +3405,8 @@ impl TypeChecker<'_> {
                 }
                 None
             }
-            Type::Map(key_ty, value_ty) => Some(
-                self.check_verte_map_target(entries, key_ty, value_ty, span)
+            Type::Map(key_ty, value_ty) | Type::Ledger(key_ty, value_ty) => Some(
+                self.check_verte_map_target(entries, key_ty, value_ty, span, target_resolved)
                     .unwrap_or(target_resolved),
             ),
             Type::Record(fields) => {
@@ -3636,7 +3636,10 @@ impl TypeChecker<'_> {
         let json_literal_source = matches!(
             &source.kind,
             HirExpressionKind::Literal(HirLiteral::JsonValor(_))
-        ) && matches!(self.types.get(effective_target), Type::Map(..));
+        ) && matches!(
+            self.types.get(effective_target),
+            Type::Map(..) | Type::Ledger(..)
+        );
         let map_slot_list_source = list_target
             && matches!(&source.kind, HirExpressionKind::Array(_))
             && self.list_slot_carries_map(effective_target);
@@ -4185,7 +4188,8 @@ impl TypeChecker<'_> {
 
     fn slot_carries_map(&self, slot: TypeId) -> bool {
         let slot = self.resolve_inferred_type(slot);
-        matches!(self.types.get(slot), Type::Map(..)) || self.list_slot_carries_map(slot)
+        matches!(self.types.get(slot), Type::Map(..) | Type::Ledger(..))
+            || self.list_slot_carries_map(slot)
     }
 
     fn slot_carries_optional(&self, slot: TypeId) -> bool {
@@ -4298,6 +4302,7 @@ impl TypeChecker<'_> {
         key_ty: TypeId,
         value_ty: TypeId,
         span: radix_lexer::Span,
+        target_resolved: TypeId,
     ) -> Option<TypeId> {
         let mut inferred_values = Vec::new();
         for field in entries {
@@ -4322,7 +4327,8 @@ impl TypeChecker<'_> {
                         .get(self.resolve_inferred_type(spread_ty))
                         .clone()
                     {
-                        Type::Map(spread_key_ty, spread_value_ty) => {
+                        Type::Map(spread_key_ty, spread_value_ty)
+                        | Type::Ledger(spread_key_ty, spread_value_ty) => {
                             self.unify_join(
                                 spread_key_ty,
                                 key_ty,
@@ -4385,7 +4391,16 @@ impl TypeChecker<'_> {
             [single] => *single,
             _ => self.types.intern(Type::Union(inferred_values)),
         };
-        Some(self.types.map(key_ty, inferred_value_ty))
+        Some(
+            if matches!(
+                self.types.get(self.resolve_inferred_type(target_resolved)),
+                Type::Ledger(..)
+            ) {
+                self.types.ledger(key_ty, inferred_value_ty)
+            } else {
+                self.types.map(key_ty, inferred_value_ty)
+            },
+        )
     }
 }
 

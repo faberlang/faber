@@ -61,7 +61,7 @@ fn ledger_index_and_method_are_refused_by_name() {
 }
 
 #[test]
-fn ledger_loop_literal_and_print_are_refused_by_name() {
+fn ledger_loop_and_print_are_refused_by_name() {
     rejects_with_issue(
         &compile(
             "functio f(tabulae<textus, numerus> l) {\n    itera ex l fixum v {\n        nota v\n    }\n}\n",
@@ -69,11 +69,48 @@ fn ledger_loop_literal_and_print_are_refused_by_name() {
         "ledger_operation_not_implemented",
     );
     rejects_with_issue(
-        &compile("functio f() {\n    fixum tabulae<textus, numerus> l ← {}\n}\n"),
+        &compile("functio f(tabulae<textus, numerus> l) {\n    nota l\n}\n"),
         "ledger_operation_not_implemented",
     );
+}
+
+#[test]
+fn ledger_literal_brace_and_empty_typecheck() {
+    accepts(&compile(
+        "functio f() {\n    varia tabulae<textus, numerus> x ← { \"b\": 2, \"a\": 1 }\n}\n",
+    ));
+    accepts(&compile(
+        "functio f() {\n    varia tabulae<textus, numerus> x ← {}\n}\n",
+    ));
+    accepts(&compile(
+        "functio f() {\n    varia tabulae<textus, numerus> x ← vacua\n}\n",
+    ));
+}
+
+#[test]
+fn ledger_literal_assignment_typechecks() {
+    accepts(&compile(
+        "functio f() {\n    varia tabulae<textus, numerus> x ← vacua\n    x ← { \"a\": 1 }\n}\n",
+    ));
+    accepts(&compile(
+        "functio f() {\n    varia tabulae<textus, numerus> x ← { \"a\": 1 }\n    x ← vacua\n}\n",
+    ));
+}
+
+#[test]
+fn ledger_literal_map_to_ledger_stays_a_mismatch() {
     rejects_with_issue(
-        &compile("functio f(tabulae<textus, numerus> l) {\n    nota l\n}\n"),
+        &compile(
+            "functio f() {\n    varia tabula<textus, numerus> m ← { \"a\": 1 }\n    varia tabulae<textus, numerus> x ← m\n}\n",
+        ),
+        "initializer_annotation_mismatch",
+    );
+}
+
+#[test]
+fn ledger_literal_index_still_refused() {
+    rejects_with_issue(
+        &compile("functio f(tabulae<textus, numerus> l) → numerus {\n    redde l[\"a\"]\n}\n"),
         "ledger_operation_not_implemented",
     );
 }
