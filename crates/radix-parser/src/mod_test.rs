@@ -8,7 +8,7 @@ use crate::test_support::{
     assert_parse_error_matches, has_arg, parse_ok, parse_program, span_for, symbol_name,
     test_span_between,
 };
-use crate::{ParseErrorKind, ParseResult, parse};
+use crate::{ParseError, ParseErrorKind, ParseResult, parse};
 use radix_lexer::{KeywordPack, TokenKind, lex_with_locale_pack};
 use radix_syntax::{
     AnnotationKind, AstMutability, AstParamMode, AwaitBindingForm, BindingPattern, CallablePosture,
@@ -2702,6 +2702,117 @@ fn assert_en_parse_error_issue(source: &str, issue: &str) {
         result.errors.iter().any(|err| has_arg(err, "issue", issue)),
         "expected en-surface parse error issue {issue:?}, got {errors:?}"
     );
+}
+
+/// Minimal en surface for mutability-expectation args (`const`/`var`).
+struct SurfaceArgsPack;
+
+impl KeywordPack for SurfaceArgsPack {
+    fn pack_id(&self) -> &'static str {
+        "en-surface-args"
+    }
+
+    fn keyword_token_kind(&self, _text: &str) -> Option<TokenKind> {
+        None
+    }
+
+    fn keyword_latin_key(&self, text: &str) -> Option<&str> {
+        match text {
+            "const" => Some("fixum"),
+            "var" => Some("varia"),
+            "fn" => Some("functio"),
+            _ => None,
+        }
+    }
+
+    fn keyword_spelling(&self, latin_key: &str) -> Option<&str> {
+        match latin_key {
+            "fixum" => Some("const"),
+            "varia" => Some("var"),
+            "functio" => Some("fn"),
+            _ => None,
+        }
+    }
+
+    fn keyword_suggestion(&self, _text: &str) -> Option<String> {
+        None
+    }
+}
+
+fn parse_surface_args(source: &str) -> ParseResult {
+    parse(lex_with_locale_pack(source, &SurfaceArgsPack))
+}
+
+/// Value of the named structured diagnostic arg, if present.
+fn issue_arg<'a>(err: &'a ParseError, name: &str) -> Option<&'a str> {
+    err.args
+        .iter()
+        .find(|arg| arg.name == name)
+        .map(|arg| arg.value.as_str())
+}
+
+/// Parser over `source` under [`SurfaceArgsPack`], keeping the reader maps the
+/// lexer recorded (the same wiring `parse_with_options` installs).
+fn surface_args_parser(source: &str) -> crate::Parser {
+    let lexed = lex_with_locale_pack(source, &SurfaceArgsPack);
+    assert!(
+        lexed.errors.is_empty(),
+        "surface-args source must lex cleanly: {:?}",
+        lexed.errors
+    );
+    crate::Parser::new_with_reader_identities(
+        lexed.tokens,
+        lexed.interner,
+        crate::ParseOptions::default(),
+        lexed.reader_keyword_latin_keys,
+        lexed.reader_keyword_surfaces,
+        lexed.reader_type_latin_keys,
+        lexed.reader_type_surfaces,
+        lexed.keyword_surface,
+    )
+}
+
+/// Parser over `source` on the plain Latin surface (no reader pack).
+fn plain_parser(source: &str) -> crate::Parser {
+    let lexed = radix_lexer::lex(source);
+    crate::Parser::new(lexed.tokens, lexed.interner, crate::ParseOptions::default())
+}
+
+#[test]
+fn parser_mutability_expectation_issue_carries_surface_args() {
+    // Control: the pack surface installs the reader maps the expectation path
+    // reads, and a valid `const` declaration parses through them.
+    let ok = parse_surface_args("const _ x = 1");
+    assert!(
+        ok.success(),
+        "const declaration must parse on the en surface: {:?}",
+        ok.errors
+    );
+
+    // `parse_stmt` routes to `parse_var_decl` only when the current word
+    // already claims `fixum`/`varia`, so the defensive miss branch is reached
+    // by calling the declaration parser at a non-keyword cursor.
+    let mut parser = surface_args_parser("numerus x");
+    let Err(error) = parser.parse_var_decl() else {
+        panic!("non-keyword cursor must not parse as a var declaration");
+    };
+    assert_eq!(
+        issue_arg(&error, "issue"),
+        Some("expected_mutability_keyword")
+    );
+    assert_eq!(issue_arg(&error, "fixum"), Some("const"));
+    assert_eq!(issue_arg(&error, "varia"), Some("var"));
+
+    let mut plain = plain_parser("numerus x");
+    let Err(plain_error) = plain.parse_var_decl() else {
+        panic!("non-keyword cursor must not parse as a var declaration");
+    };
+    assert_eq!(
+        issue_arg(&plain_error, "issue"),
+        Some("expected_mutability_keyword")
+    );
+    assert_eq!(issue_arg(&plain_error, "fixum"), Some("fixum"));
+    assert_eq!(issue_arg(&plain_error, "varia"), Some("varia"));
 }
 
 #[test]

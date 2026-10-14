@@ -1411,6 +1411,26 @@ impl Parser {
         ParseError::structured(ParseErrorKind::Expected, span).with_arg("issue", issue)
     }
 
+    /// Expectation failure whose prose names candidate keywords in the active
+    /// reader surface.
+    ///
+    /// Each Latin keyword becomes a named arg carrying
+    /// [`Parser::keyword_surface`]'s spelling, so a pack row can render
+    /// `{fixum}`/`{varia}` (and similar) instead of hard-coding Latin words
+    /// into a non-Latin reader locale.
+    fn expected_issue_with_keywords(
+        &self,
+        issue: &'static str,
+        span: Span,
+        keywords: &[&'static str],
+    ) -> ParseError {
+        let mut error = Self::expected_issue_error(issue, span);
+        for latin in keywords {
+            error = error.with_arg(latin, self.keyword_surface(latin));
+        }
+        error
+    }
+
     /// Trailing-comma diagnostic shared by every item-list separator.
     fn item_list_trailing_comma_error(span: Span, position: &'static str) -> ParseError {
         ParseError::structured(ParseErrorKind::Expected, span)
