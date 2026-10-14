@@ -93,7 +93,7 @@ pub fn textus_literal_payload(text: &str) -> String {
             '\n' => payload.push_str("\\n"),
             '\r' => payload.push_str("\\r"),
             '\t' => payload.push_str("\\t"),
-            '\0' => payload.push_str("\\0"),
+            '\0' => payload.push_str("\\u{0}"),
             other => payload.push(other),
         }
     }
