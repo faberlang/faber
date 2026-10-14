@@ -41,7 +41,7 @@ fn python_float_potentia_is_the_ieee_pow_helper() {
     let crate::Output::Python(out) = compile(Target::HirPython, FLOAT_POW) else {
         panic!("expected Python output");
     };
-    assert!(out.code.contains("_faber_fpow(b, 0.5)"), "{}", out.code);
+    assert!(out.code.contains("_faber_fpow(l_b, 0.5)"), "{}", out.code);
     assert!(!out.code.contains(".potentia("), "{}", out.code);
 }
 
