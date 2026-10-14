@@ -201,6 +201,10 @@ mod discerne_closed_set_test;
 #[cfg(test)]
 #[path = "empty_dense_test.rs"]
 mod empty_dense_test;
+pub mod expanded_axis;
+#[cfg(test)]
+#[path = "expanded_axis_test.rs"]
+mod expanded_axis_test;
 #[cfg(test)]
 #[path = "kernel_index_warning_test.rs"]
 mod kernel_index_warning_test;
