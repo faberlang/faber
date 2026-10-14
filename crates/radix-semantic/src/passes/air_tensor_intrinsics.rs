@@ -16,6 +16,12 @@ const ALLOWED_TENSOR_INTRINSICS: &[&str] = &[
     "subtracta",
     "multiplicata",
     "divisa",
+    // Old spellings stay admitted until the Tensor registry rows are renamed
+    // (ruling C of need): the allowlist is a superset of both
+    // generations.
+    "subtrahe",
+    "multiplica",
+    "divisio",
     "nega",
     "summa",
     "media",
