@@ -68,6 +68,36 @@ pub(super) fn merge_library_target_bindings(
     (merged, load_errors)
 }
 
+/// The library package root for one resolved interface path: the nearest
+/// ancestor directory (the file's own directory first) that holds the package
+/// manifest (`package::MANIFEST_FILE`, not visible from the binary crate).
+/// `None` when no ancestor does.
+#[allow(dead_code)]
+pub(super) fn library_root_of_interface(interface_path: &Path) -> Option<std::path::PathBuf> {
+    interface_path
+        .ancestors()
+        .find(|ancestor| ancestor.join("faber.toml").is_file())
+        .map(Path::to_path_buf)
+}
+
+/// Every library package root reachable through an analyzed program's
+/// expanded library imports, deduped by directory. Imports whose interface
+/// path has no manifest ancestor are skipped.
+#[allow(dead_code)]
+pub(super) fn library_package_roots(
+    package: &radix::program::analyze::AnalyzedProgram,
+) -> std::collections::BTreeSet<std::path::PathBuf> {
+    let mut roots = std::collections::BTreeSet::new();
+    for node in package.nodes.values() {
+        for import in &node.expanded_library_imports {
+            if let Some(root) = library_root_of_interface(&import.module.interface_path) {
+                roots.insert(root);
+            }
+        }
+    }
+    roots
+}
+
 /// Single-file `wgsl-text` emit: each imported library's `[target.wgsl-text]`
 /// bindings (read by Faber, opaque to the compiler) are merged and installed.
 /// A manifest that cannot be read is reported as an error diagnostic.

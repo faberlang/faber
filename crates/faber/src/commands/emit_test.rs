@@ -267,6 +267,23 @@ fn package_analysis_config_leaves_file_locale_declarations_in_charge() {
 }
 
 #[test]
+fn library_root_of_interface_finds_the_manifest_directory() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let root = dir.path().join("provider");
+    let source = root.join("src");
+    std::fs::create_dir_all(&source).expect("create source dir");
+    std::fs::write(root.join("faber.toml"), "[package]\n").expect("write manifest");
+    let interface = source.join("x.fab");
+    std::fs::write(&interface, "").expect("write interface");
+
+    assert_eq!(
+        emit::library_root_of_interface(&interface),
+        Some(root),
+        "the manifest directory is the library package root"
+    );
+}
+
+#[test]
 fn merge_library_target_bindings_on_no_roots_is_empty() {
     let (bindings, diagnostics) = emit::merge_library_target_bindings(
         &std::collections::BTreeSet::new(),
