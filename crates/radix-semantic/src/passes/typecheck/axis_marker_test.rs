@@ -46,6 +46,38 @@ incipit { }";
 }
 
 #[test]
+fn axis_builtin_rms_norm_axis_marker_accepted() {
+    let source = r"functio norm(tf32[2, 8] x, tf32[8] gamma) → tf32[2, 8] {
+    redde x.rms_norm(axis 1, 1e-5, gamma)
+}";
+    let _ = analyze_ok(source);
+}
+
+#[test]
+fn axis_builtin_laminatio_axis_marker_accepted() {
+    let source = r"functio norm(tf32[2, 8] x, tf32[8] gamma, tf32[8] beta) → tf32[2, 8] {
+    redde x.laminatio(axis 1, 1e-5, gamma, beta)
+}";
+    let _ = analyze_ok(source);
+}
+
+#[test]
+fn axis_builtin_misplaced_marker_refused() {
+    let source = r"functio norm(tf32[2, 8] x, tf32[8] gamma) → tf32[2, 8] {
+    redde x.rms_norm(1, axis 1e-5, gamma)
+}";
+    assert_rejects_with_issue(source, "axis_marker_unexpected");
+}
+
+#[test]
+fn axis_builtin_bare_axis_still_accepted() {
+    let source = r"functio norm(tf32[2, 8] x, tf32[8] gamma) → tf32[2, 8] {
+    redde x.rms_norm(1, 1e-5, gamma)
+}";
+    let _ = analyze_ok(source);
+}
+
+#[test]
 fn axis_marker_parameter_is_a_plain_int_inside() {
     let source = "functio rows(axis numerus a) → numerus {\n    fixum numerus b ← a * 2\n    redde b + a\n}\nincipit {\n    fixum numerus x ← rows(axis 2)\n}";
     let _ = analyze_ok(source);
