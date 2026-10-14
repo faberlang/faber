@@ -2504,7 +2504,6 @@ main args args {
 }
 
 #[test]
-#[ignore = "pumpfix-gdde13951-1.1.1.3 un-ignores this once the compile path is fixed"]
 fn package_mir_norma_fs_read_file_generic_failable_in_main_runs() {
     let dir = test_temp_dir("package-mir-solum-read-file-generic-failable-main");
     let entry = dir.join("main.fab");
