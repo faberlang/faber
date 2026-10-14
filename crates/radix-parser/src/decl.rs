@@ -2850,7 +2850,10 @@ impl Parser {
         let token = self.advance();
         match &token.kind {
             TokenKind::String(sym) | TokenKind::Ident(sym) => Ok(*sym),
-            _ => Err(Self::expected_issue_error("expected_lane_value", token.span)),
+            _ => Err(Self::expected_issue_error(
+                "expected_lane_value",
+                token.span,
+            )),
         }
     }
 
