@@ -520,6 +520,9 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
             "remove the `⊥` default; a conversion into wrapping or saturating cannot fail".to_owned(),
         ),
         "regex_operand_unsupported" => Some("convert textus or ascii values to regex".to_owned()),
+        "regex_literal_invalid" => Some(
+            "fix the regex pattern; the inline literal is compiled at check time".to_owned(),
+        ),
         "record_conversion_requires_reconstruction" => {
             Some("reconstruct by writing `Type { field = value, … }` instead of converting with `↦`".to_owned())
         }
