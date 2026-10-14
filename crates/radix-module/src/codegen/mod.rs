@@ -777,8 +777,7 @@ fn go_imported_generators(
     use crate::hir::visit::HirVisitor;
     struct Reads<'u> {
         analysis: &'u crate::driver::AnalyzedModule,
-        found:
-            rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId>,
+        found: rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId>,
     }
     impl HirVisitor for Reads<'_> {
         fn visit_expr(&mut self, expr: &crate::hir::HirExpression) {
