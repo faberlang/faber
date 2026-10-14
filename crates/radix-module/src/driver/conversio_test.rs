@@ -492,8 +492,7 @@ fn instans_cross_precision_approx_not_eq_emits_partial_cmp_at_coarser() {
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
-        code.contains(".partial_cmp_at_coarser(")
-            && code.contains("!= Some(std::cmp::Ordering::Equal)"),
+        code.contains(".partial_cmp_at_coarser(") && code.contains("!= Some(std::cmp::Ordering::Equal)"),
         "expected coarser-precision instans approx-not-eq compare, got:\n{code}"
     );
 }
