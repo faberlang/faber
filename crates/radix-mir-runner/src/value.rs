@@ -2901,6 +2901,11 @@ pub fn values_equal(left: &Value, right: &Value) -> bool {
             let mut chars = b.chars();
             chars.next() == Some(*a) && chars.next().is_none()
         }
+        // A ledger's insertion order is part of its value (L2e.1): entries
+        // compare slot-by-slot through [`LedgerValue::eq`]. `Rc::ptr_eq`
+        // short-circuits the same cell before either side is borrowed, so a
+        // shared ledger is never borrowed twice here.
+        (Value::Ledger(a), Value::Ledger(b)) => Rc::ptr_eq(a, b) || *a.borrow() == *b.borrow(),
         _ => left == right,
     }
 }

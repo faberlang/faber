@@ -1181,3 +1181,47 @@ fn ledger_value_equality_is_order_sensitive() {
     assert_eq!(first, same);
     assert_ne!(first, second);
 }
+
+/// Build a `Value::Ledger` from `(key, value)` pairs in the given insertion
+/// order; `values_equal` fixtures for the L2e.1 order-sensitive equality.
+fn ledger_value_eq_fixture(pairs: &[(&str, i64)]) -> Value {
+    let mut ledger = LedgerValue::new();
+    for (key, value) in pairs {
+        ledger.insert(MapKey::Str((*key).to_owned()), Value::Int(*value));
+    }
+    Value::Ledger(Rc::new(RefCell::new(ledger)))
+}
+
+#[test]
+fn ledger_value_eq_same_order_is_equal() {
+    let left = ledger_value_eq_fixture(&[("b", 1), ("a", 2)]);
+    let right = ledger_value_eq_fixture(&[("b", 1), ("a", 2)]);
+    assert!(values_equal(&left, &right));
+}
+
+#[test]
+fn ledger_value_eq_different_order_is_unequal() {
+    let left = ledger_value_eq_fixture(&[("b", 1), ("a", 2)]);
+    let right = ledger_value_eq_fixture(&[("a", 2), ("b", 1)]);
+    assert!(!values_equal(&left, &right));
+}
+
+#[test]
+fn ledger_value_eq_different_value_is_unequal() {
+    let left = ledger_value_eq_fixture(&[("b", 1), ("a", 2)]);
+    let right = ledger_value_eq_fixture(&[("b", 1), ("a", 3)]);
+    assert!(!values_equal(&left, &right));
+}
+
+#[test]
+fn ledger_value_eq_map_ignores_order() {
+    let mut first = rustc_hash::FxHashMap::default();
+    first.insert(MapKey::Str("b".to_owned()), Value::Int(1));
+    first.insert(MapKey::Str("a".to_owned()), Value::Int(2));
+    let mut second = rustc_hash::FxHashMap::default();
+    second.insert(MapKey::Str("a".to_owned()), Value::Int(2));
+    second.insert(MapKey::Str("b".to_owned()), Value::Int(1));
+    let left = Value::Map(Rc::new(RefCell::new(first)));
+    let right = Value::Map(Rc::new(RefCell::new(second)));
+    assert!(values_equal(&left, &right));
+}
