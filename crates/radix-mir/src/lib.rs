@@ -162,8 +162,7 @@ pub use generic::{
 };
 pub use host_partition::{
     HostPartition, HostPartitionError, derive_host_partition,
-    derive_partition_record_with_metadata, kernel_entry_name, kernel_entry_suffix,
-    unique_kernel_entry_name,
+    derive_partition_record_with_metadata, kernel_entry_name, unique_kernel_entry_name,
 };
 pub use inference_blocker_matrix::{
     InferenceBlockerKind, InferenceBlockerRow, InferenceBlockerStatus, InferenceNonClaim,

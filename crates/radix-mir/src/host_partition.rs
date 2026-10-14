@@ -604,51 +604,18 @@ pub fn kernel_entry_name(function: &MirFunction, interner: &Interner) -> String 
     )
 }
 
-/// The specialization suffix of one kernel function within `program`.
-///
-/// Every specialization of a generic kernel is its own MIR function with the
-/// same source name, so the bare name is not an identity. The compute-stage
-/// functions that share one name are ordered by function id (lowering order,
-/// stable across runs): the first has no suffix, the n-th (n >= 1) has
-/// `__v<n>`.
-#[must_use]
-pub fn kernel_entry_suffix(program: &MirProgram, function: &MirFunction) -> String {
-    let Some(name) = function.name else {
-        return String::new();
-    };
-    let ordinal = program
-        .functions
-        .iter()
-        .filter(|other| {
-            other.name == Some(name)
-                && other.shader_stage == Some(crate::MirKernelShaderStage::Compute)
-                && other.id < function.id
-        })
-        .count();
-    if ordinal == 0 {
-        String::new()
-    } else {
-        format!("__v{ordinal}")
-    }
-}
-
-/// The entry name of one kernel function, unique across `program` and safe in
-/// C++-family device source: the source name mangled against the device
-/// reserved words ([`radix_codegen_shared::mangle_device_ident`]) plus the
-/// [`kernel_entry_suffix`]. The Metal emitter derives its entry names from the
-/// same two pieces, so the artifact, the reflection and the device program
-/// agree on every entry.
+/// The entry name of one kernel function, unique across `program`: `k` plus
+/// the decimal function id. The id is compiler-owned and stable across runs,
+/// so the name is deterministic, unique and never derived from the author's
+/// source spelling (ca2499dc). Two specializations of one generic kernel are
+/// distinct MIR functions with distinct ids, so they get distinct entries.
 #[must_use]
 pub fn unique_kernel_entry_name(
-    program: &MirProgram,
+    _program: &MirProgram,
     function: &MirFunction,
-    interner: &Interner,
+    _interner: &Interner,
 ) -> String {
-    format!(
-        "{}{}",
-        radix_codegen_shared::mangle_device_ident(&kernel_entry_name(function, interner)),
-        kernel_entry_suffix(program, function)
-    )
+    format!("k{}", function.id.0)
 }
 
 /// Resolve a call statement's callee to the MIR function ids it may refer to.
