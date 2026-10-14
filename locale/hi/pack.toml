@@ -2999,6 +2999,10 @@ help = "`axis 1` जैसा literal axis लिखें; result shape उस 
 message = "axis tensor के rank के बाहर है"
 help = "0 से rank से एक कम तक का axis उपयोग करें"
 
+[diagnostics.SEM010.issues.axis_reduction_repeated]
+message = "reduction में एक ही axis एक से अधिक बार आया है"
+help = "दोहराया गया axis हटाएँ; हर axis केवल एक बार आ सकता है"
+
 [diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
 message = "axis reduction केवल rank 2 से 8 के tensors के लिए बना है"
 help = "rank 2 से 8 के tensor को literal dimensions के साथ reduce करें, या `reducta ... per [...]` के साथ स्पष्ट reduction लिखें"
