@@ -2424,6 +2424,43 @@ main {
 }
 
 #[test]
+fn uncaught_missing_file_read_prints_fault_code() {
+    let dir = temp_dir("uncaught-missing-file-read-fault-code");
+    let missing = dir.join("absent.txt");
+    let source = r#"import from "norma:fs" fs
+
+main {
+    const string body ← fs.read_file<string>("__PATH__")
+    print body
+}
+"#
+    .replace("__PATH__", missing.to_str().expect("utf8 path"));
+    let source = write_single_file("uncaught-missing-file-read-fault-code", &source);
+
+    let (stdout, stderr, ok) = run_faber(&["run", source.to_str().expect("utf8 source path")]);
+
+    assert!(
+        !ok,
+        "an uncaught missing-file read must end the run:\n{stderr}"
+    );
+    assert_eq!(stdout, "");
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: CLI stderr is the renderer contract for this integration test.
+    assert!(
+        stderr.contains("ERR001"),
+        "an uncaught compiler-managed fault must print its stable code, got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains(missing.to_str().expect("utf8 path")),
+        "the fault message must keep the path payload, got:\n{stderr}"
+    );
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: CLI stderr is the renderer contract for this integration test.
+    assert!(
+        !stderr.contains("No such file"),
+        "platform prose must not cross into the fault message, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn missing_file_read_matches_not_found_with_its_path() {
     let dir = temp_dir("missing-file-read-not-found-path");
     let missing = dir.join("absent.txt");

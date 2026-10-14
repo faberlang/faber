@@ -95,6 +95,16 @@ fn row_softmax(
     Ok(exps.into_iter().map(|exp_val| exp_val / exp_sum).collect())
 }
 
+/// The stable `ERRnnn` code for a lowering display name (`"<Family>.<Variant>"`).
+///
+/// The code is the fault's locale-independent identity; the variant word after
+/// it stays in the program's code locale. A name outside the registry has no
+/// code and keeps the plain display.
+fn fault_code_for_display_name(name: &str) -> Option<&'static str> {
+    let (family, variant) = name.split_once('.')?;
+    radix_runtime_contract::fault_codes::fault_code(family, variant)
+}
+
 impl<H: super::Host + ?Sized> Runner<'_, H> {
     // RUNTIME CALL DISPATCH
 
@@ -1154,8 +1164,22 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "panic runtime arity"));
         };
         let message = self.eval_operand(arg, span)?;
+        // A compiler-managed fault value carries its stable code ahead of the
+        // variant display; the variant word and its data stay unchanged.
+        let fault_code = match &message {
+            Value::EnumVariant(def, _) => self
+                .context
+                .display_names
+                .get(def)
+                .and_then(|name| fault_code_for_display_name(name)),
+            _ => None,
+        };
         let message = self.prepare_tensor_escape(message, span)?;
         let message = message.display(self.interner, self.field_order(), span)?;
+        let message = match fault_code {
+            Some(code) => format!("{code} {message}"),
+            None => message,
+        };
         self.host.abort(&message);
     }
 
