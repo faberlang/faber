@@ -2414,3 +2414,34 @@ fn check_wrong_locale_source_reports_detected_locale_on_file_route() {
 fn check_wrong_locale_source_reports_detected_locale_on_command_route() {
     assert_wrong_locale_reported_first("command-line", "main { print 1 }");
 }
+
+#[test]
+fn check_wrong_locale_source_reports_locales002_once_and_first() {
+    // The reading note must not be doubled by a keyword-level LOCALE002 for
+    // the same file, and it must precede the errors it explains.
+    let result = check_diagnostics_for_source("once.fab", "main { print 1 }", false);
+    assert!(!result.success, "diagnostics: {:?}", result.diagnostics);
+    let notes: Vec<usize> = result
+        .diagnostics
+        .iter()
+        .enumerate()
+        .filter_map(|(index, diagnostic)| {
+            (diagnostic.code == Some("LOCALE002")).then_some(index)
+        })
+        .collect();
+    assert_eq!(notes.len(), 1, "diagnostics: {:?}", result.diagnostics);
+    assert_eq!(
+        radix_semantic::arg_value(&result.diagnostics[notes[0]].args, "issue"),
+        Some("source_reads_as_other_locale")
+    );
+    let first_error = result
+        .diagnostics
+        .iter()
+        .position(crate::diagnostics::Diagnostic::is_error)
+        .expect("the wrong-locale read must still fail");
+    assert!(
+        notes[0] < first_error,
+        "diagnostics: {:?}",
+        result.diagnostics
+    );
+}

@@ -111,3 +111,56 @@ fn eslint_output_rejects_unusable_json() {
         "{wrong_output_type}"
     );
 }
+
+/// One LOCALE002 note per file, printed ahead of the errors it explains: a
+/// second keyword-level note for the same file is dropped, other files keep
+/// their own note. Asserts codes, files, and issue names — never message text.
+#[test]
+fn normalize_locale002_keeps_one_note_per_file_first() {
+    use radix::module::diagnostics::Diagnostic;
+
+    let note = |file: &str| {
+        Diagnostic::warning("note")
+            .with_code("LOCALE002")
+            .with_arg("issue", "source_reads_as_other_locale")
+            .with_file(file.to_owned())
+    };
+    let diagnostics = vec![
+        Diagnostic::error("unknown identifier")
+            .with_code("SEM001")
+            .with_file("a.fab"),
+        note("a.fab"),
+        Diagnostic::error("undefined name")
+            .with_code("SEM008")
+            .with_file("a.fab"),
+        note("a.fab"),
+        note("b.fab"),
+    ];
+
+    let normalized = super::normalize_locale002_notes(diagnostics);
+
+    let locale002: Vec<&str> = normalized
+        .iter()
+        .filter(|diagnostic| diagnostic.code.as_deref() == Some("LOCALE002"))
+        .map(|diagnostic| diagnostic.file.as_str())
+        .collect();
+    assert_eq!(locale002, vec!["a.fab", "b.fab"]);
+    assert_eq!(normalized[0].code.as_deref(), Some("LOCALE002"));
+    assert_eq!(
+        normalized[0].issue().as_deref(),
+        Some("source_reads_as_other_locale")
+    );
+    assert!(
+        normalized
+            .iter()
+            .take(2)
+            .all(|diagnostic| !diagnostic.is_error()),
+        "notes come first: {normalized:?}"
+    );
+    let errors: Vec<&str> = normalized
+        .iter()
+        .filter(|diagnostic| diagnostic.is_error())
+        .filter_map(|diagnostic| diagnostic.code.as_deref())
+        .collect();
+    assert_eq!(errors, vec!["SEM001", "SEM008"]);
+}

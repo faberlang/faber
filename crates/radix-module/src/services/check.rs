@@ -57,7 +57,32 @@ pub fn check_diagnostics_for_source_with_locale_pack(
             result.diagnostics.insert(0, note);
         }
     }
+    result.diagnostics = normalize_locale002_notes(result.diagnostics);
     result
+}
+
+/// Keep one LOCALE002 note per file and hoist those notes ahead of the other
+/// diagnostics.
+///
+/// WHY: the wrong-locale reading explains the very errors it hides behind, so
+/// it must be reported once, first; a second keyword-level LOCALE002 for the
+/// same file repeats the reading instead of adding a fact.
+#[must_use]
+pub fn normalize_locale002_notes(
+    diagnostics: Vec<crate::diagnostics::Diagnostic>,
+) -> Vec<crate::diagnostics::Diagnostic> {
+    let mut notes = Vec::new();
+    let mut rest = Vec::new();
+    let mut noted_files = std::collections::BTreeSet::new();
+    for diagnostic in diagnostics {
+        if diagnostic.code.as_deref() == Some("LOCALE002") && noted_files.insert(diagnostic.file.clone()) {
+            notes.push(diagnostic);
+        } else {
+            rest.push(diagnostic);
+        }
+    }
+    notes.extend(rest);
+    notes
 }
 
 fn source_declares_locale(name: &str, source: &str) -> bool {

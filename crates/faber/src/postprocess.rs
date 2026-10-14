@@ -49,6 +49,32 @@ pub fn write_output_artifact(
     write_artifact_contents(path, code);
 }
 
+/// Keep one LOCALE002 note per file and hoist those notes ahead of the other
+/// diagnostics.
+///
+/// WHY: the package and eval routes assemble their diagnostics inside the
+/// compiler driver without the check service's normalization, so the
+/// wrong-locale reading can trail the errors it explains. The note must be
+/// reported once, first; a second keyword-level LOCALE002 for the same file
+/// repeats the reading instead of adding a fact.
+#[must_use]
+pub fn normalize_locale002_notes(
+    diagnostics: Vec<radix::module::diagnostics::Diagnostic>,
+) -> Vec<radix::module::diagnostics::Diagnostic> {
+    let mut notes = Vec::new();
+    let mut rest = Vec::new();
+    let mut noted_files = std::collections::BTreeSet::new();
+    for diagnostic in diagnostics {
+        if diagnostic.code.as_deref() == Some("LOCALE002") && noted_files.insert(diagnostic.file.clone()) {
+            notes.push(diagnostic);
+        } else {
+            rest.push(diagnostic);
+        }
+    }
+    notes.extend(rest);
+    notes
+}
+
 /// Print diagnostics using Faber-owned presentation.
 pub fn print_diagnostics(
     diagnostics: &[radix::module::diagnostics::Diagnostic],

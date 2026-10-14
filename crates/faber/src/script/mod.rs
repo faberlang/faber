@@ -95,7 +95,9 @@ pub fn print_run_source_error(error: &RunSourceError) {
         RunSourceError::Frontend(diagnostics) => {
             // Same renderer as `faber check`, so a coded advisory such as
             // LOCALE002 shows its code and issue instead of bare message text.
-            for diag in diagnostics {
+            // One LOCALE002 per file, ahead of the errors it explains.
+            let ordered = faber_cli::postprocess::normalize_locale002_notes(diagnostics.clone());
+            for diag in &ordered {
                 eprintln!("{}", radix::module::diagnostics::render_plain(diag));
             }
         }
