@@ -328,9 +328,10 @@ pub struct RmsNormalizationPlan {
 
 /// Rotary-position-embedding recipe plan (GI3-1: name frozen in this unit,
 /// S6-N1 precedent). llama-arch NORM consecutive-pair rotation: pairs
-/// `(x[2k], x[2k+1])` with `theta[k] = pos·freq_base^(−2k/dim)`,
-/// `freq_base` frozen at 100000 (v1 source constant); elements beyond `dim`
-/// on the last axis are preserved unrotated.
+/// `(x[2k], x[2k+1])` with `theta[k] = pos·freq_base^(−2k/dim)`, where
+/// `freq_base` is whatever the caller used to build the explicit rope table
+/// operand (the operand carries the base; the compiler holds no constant);
+/// elements beyond `dim` on the last axis are preserved unrotated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RopePlan {
     /// Position (from the const operand). Single-position mode only — in

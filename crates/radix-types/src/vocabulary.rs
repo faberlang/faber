@@ -319,10 +319,14 @@ pub enum MirCollectionOp {
     TensorRmsNorm,
     /// llama-arch NORM consecutive-pair rotary position embedding (the CCI-1
     /// `rope_norm` source contract): pairs `(x[2k], x[2k+1])` with
-    /// `theta[k] = pos·freq_base^(−2k/dim)`, `freq_base` frozen at 100000
-    /// (v1 source constant). `pos` + `dim` are trailing const operands
-    /// (`[x, pos, dim]`); elements beyond `dim` on the last axis are
-    /// preserved. Odd/overlarge `dim` fail closed at the source surface.
+    /// `theta[k] = pos·freq_base^(−2k/dim)`, where `freq_base` is whatever
+    /// the caller used to build the explicit rope table operand — the
+    /// operand carries the base; the compiler holds no constant. `pos` +
+    /// `dim` are trailing const operands and the caller-built
+    /// `[rows, dim/2, 3]` (angle, cos, sin) table is the sole angle source
+    /// (`[x, pos, dim, rope_table]`); elements beyond `dim` on the last
+    /// axis are preserved. Odd/overlarge `dim` fail closed at the source
+    /// surface.
     TensorRope,
     /// Qwen2 / GPT-NeoX `rotate_half` rotary embedding: pairs
     /// `(x[k], x[k + dim/2])` with the same `theta[k]` tables as
