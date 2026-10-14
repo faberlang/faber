@@ -989,6 +989,14 @@ fn read_and_parse_library_interface(
         peeled.frontmatter.as_ref(),
         library_cache.locale_loader,
     )?;
+    // TEMPORARY STAGING: with no declared locale the interface
+    // reads the no-locale default (`en` while `RADIX_DEFAULT_CODE_LOCALE=en`);
+    // unset keeps the pack-less Latin identity fallback. The resolved pack is
+    // cached so interface analysis reads the same surface.
+    let locale_pack = match locale_pack {
+        Some(pack) => Some(pack),
+        None => radix_module::driver::default_code_pack(&radix_module::driver::Config::default()),
+    };
     // Library interfaces may declare bodyless functions bound by target manifests (G4).
     let tokens = match locale_pack.as_ref() {
         Some(pack) => radix_module::lexer::lex_with_locale_pack(peeled.body, pack),
