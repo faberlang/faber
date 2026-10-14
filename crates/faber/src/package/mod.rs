@@ -134,7 +134,7 @@ pub fn embedded_runtime_root() -> Option<PathBuf> {
 /// embedded one, if any. Consumed by `faber corpus` embedded-only suites.
 #[must_use]
 pub fn checkout_runtime_override() -> Option<&'static str> {
-    let name = crate::library::FABER_LIBRARY_HOME_ENV;
+    let name = "FABER_LIBRARY_HOME";
     std::env::var_os(name)
         .is_some_and(|value| !value.is_empty())
         .then_some(name)
