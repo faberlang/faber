@@ -728,6 +728,75 @@ fn hole_at_non_hole_type_slot_fails_closed() {
             ..
         }
     ));
+
+    let mut artifact = authored_type_artifact();
+    artifact.presentation.authored_types[1].form.head = radix_hir::HirTypeFormHead::Infer;
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("return hole must fail closed");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::InvalidPresentation {
+            issue: "hole_in_illegal_slot",
+            ..
+        }
+    ));
+}
+
+/// A closure parameter written `_ m` records its authored hole at the
+/// parameter's `ClosureParameter` slot; the compiler infers the parameter
+/// type from the call and the root-witness check pins the recorded witness,
+/// so the hole is legal there. A declared-parameter hole still fails closed
+/// through [`hole_at_non_hole_type_slot_fails_closed`].
+#[test]
+fn closure_parameter_hole_type_slot_loads() {
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let ty = types.primitive(Primitive::Numerus);
+    artifact.types = types.snapshot();
+    let param_def = DefId(USER_DEF_ID_BASE + 2);
+    let closure = HirExpression {
+        id: HirId(1),
+        kind: HirExpressionKind::Clausura(
+            vec![HirParam {
+                def_id: param_def,
+                name: Symbol(1),
+                ty,
+                mode: HirParamMode::Owned,
+                optional: false,
+                sponte: false,
+                default: None,
+                span: Span::default(),
+            }],
+            None,
+            None,
+            Box::new(lit(2, 0)),
+        ),
+        ty: None,
+        span: Span::default(),
+    };
+    stub_function(&mut artifact).body = Some(HirBlock::simple(
+        vec![HirStatement {
+            id: HirId(3),
+            kind: HirStatementKind::Expr(closure),
+            span: Span::default(),
+        }],
+        None,
+        Span::default(),
+    ));
+    artifact.presentation.authored_types = vec![radix_hir::HirAuthoredTypeUse {
+        site: radix_hir::HirTypeSite {
+            owner: radix_hir::HirOwnerRef::Def(param_def),
+            slot: radix_hir::HirTypeSlot::ClosureParameter(0),
+        },
+        form: radix_hir::HirTypeForm {
+            ty,
+            head: radix_hir::HirTypeFormHead::Infer,
+            args: Vec::new(),
+            label: None,
+        },
+    }];
+    let bytes = encode(&artifact).expect("encode artifact");
+    decode(&bytes).expect("a closure-parameter hole is a legal authored hole");
 }
 
 #[test]

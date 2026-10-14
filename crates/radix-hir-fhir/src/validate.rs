@@ -645,13 +645,15 @@ fn validate_type_form(
             // A `_` hole is legal at a binding cell. An inferred constructor
             // or typed-constructor ascription (`_ { … }`, `{ … } ∷ T`) also
             // records its authored hole at the expression's materialized
-            // `AscriptionTarget` slot; the root-witness check has already
-            // pinned that slot's type to the HIR node's resolved type, so the
-            // hole carries no further presentation fact there. Other slots
-            // still fail closed.
+            // `AscriptionTarget` slot, and a closure parameter written `_ m`
+            // records its hole at the parameter's `ClosureParameter` slot; in
+            // both cases the root-witness check has already pinned that slot's
+            // type to the HIR node's resolved type, so the hole carries no
+            // further presentation fact there. Other slots still fail closed.
             let legal = match root_slot {
                 radix_hir::HirTypeSlot::Declared | radix_hir::HirTypeSlot::DiscardBinding => true,
-                radix_hir::HirTypeSlot::AscriptionTarget => {
+                radix_hir::HirTypeSlot::AscriptionTarget
+                | radix_hir::HirTypeSlot::ClosureParameter(_) => {
                     matches!(form.head, radix_hir::HirTypeFormHead::Infer)
                 }
                 _ => false,
