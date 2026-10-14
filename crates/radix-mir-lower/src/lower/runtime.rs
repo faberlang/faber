@@ -2997,6 +2997,26 @@ impl FunctionBuilder<'_> {
             .copied()
     }
 
+    /// The registered `valor → E` row that materializes a bare `sermo ↦ T`
+    /// failure into the enclosing `⇥ E` channel, when the conversion source is
+    /// a conversation handle and the registry enrolls one. The row's call is
+    /// wired on the failable conversion's error edge by [`Self::lower_failable_call`].
+    fn sermo_failure_row(&self, source_ty: TypeId) -> Option<DefId> {
+        let sermo_def = self.context.sermo_def?;
+        match self.normalized_type(source_ty) {
+            Type::Struct(def_id) if *def_id == sermo_def => {}
+            Type::Applied(base, _)
+                if matches!(self.types.get(*base), Type::Struct(def_id) if *def_id == sermo_def) => {}
+            _ => return None,
+        }
+        let destination = self.error_ty?;
+        let value_ty = self.types.primitive(Primitive::Valor);
+        self.context
+            .conversion_rows
+            .get(&ConversionPair::new(value_ty, destination.semantic_id()))
+            .copied()
+    }
+
     // consumes type_args and args into MIR statements
     pub(super) fn lower_definition_call(
         &mut self,
@@ -3769,6 +3789,36 @@ impl FunctionBuilder<'_> {
                 handler,
                 span: expr.span,
             }));
+        }
+        // A bare failable `sermo ↦ T` materialization failure crosses as the
+        // leaf's `{kind, path}` record (`valor`). When the declared `⇥ E`
+        // channel cannot carry that record but the registry enrolls a
+        // `valor → E` row, the conversion runs in a synthetic `⇥ valor`
+        // helper and the failable-call edge applies the row, exactly as a
+        // failable call's declared-channel row does (CTR-02). An active
+        // `capta` trap or `cape` handler above owns the edge and keeps the
+        // bare conversion.
+        if lowered_recovery.is_none()
+            && implicit.is_none()
+            && self.traps.is_empty()
+            && let Some(row) = self.sermo_failure_row(source_type_id)
+        {
+            let param_tys: Vec<MirType> = std::iter::once(conversion_source_ty)
+                .chain(shape.as_ref().map(|(_, ty)| *ty))
+                .collect();
+            let args: Vec<MirOperand> = std::iter::once(source)
+                .chain(shape.map(|(operand, _)| operand))
+                .collect();
+            let value_ty = MirType::semantic(self.types.primitive(Primitive::Valor));
+            let helper = self.push_conversio_helper(&param_tys, target, params, ty, value_ty, expr.span);
+            return self.lower_failable_call(
+                MirCallee::Function(helper),
+                args,
+                ty,
+                value_ty,
+                Some(row),
+                expr.span,
+            );
         }
         let result = self.runtime_call_value(
             MirIntrinsic::Convert(MirConversion {

@@ -30,6 +30,10 @@ mod itera_inf_tests;
 mod route_serve_tests;
 
 #[cfg(test)]
+#[path = "sermo_fault_test.rs"]
+mod sermo_fault_tests;
+
+#[cfg(test)]
 #[path = "http_route_test.rs"]
 mod http_route_tests;
 
