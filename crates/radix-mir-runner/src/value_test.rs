@@ -1110,3 +1110,74 @@ fn deep_copy_of_a_tensor_does_not_share_backing_storage() {
         &copy_cell.borrow().data
     ));
 }
+
+#[test]
+fn ledger_value_insert_order_and_update_keeps_position() {
+    let mut ledger = LedgerValue::new();
+    ledger.insert(MapKey::Str("b".to_owned()), Value::Int(1));
+    ledger.insert(MapKey::Str("a".to_owned()), Value::Int(2));
+    ledger.insert(MapKey::Str("c".to_owned()), Value::Int(3));
+    ledger.insert(MapKey::Str("a".to_owned()), Value::Int(20));
+
+    let keys: Vec<String> = ledger.keys().map(MapKey::document_key).collect();
+    assert_eq!(keys, vec!["b", "a", "c"]);
+    assert_eq!(
+        ledger.get(&MapKey::Str("a".to_owned())),
+        Some(&Value::Int(20))
+    );
+    assert_eq!(ledger.len(), 3);
+}
+
+#[test]
+fn ledger_value_remove_then_insert_appends() {
+    let mut ledger = LedgerValue::new();
+    ledger.insert(MapKey::Str("a".to_owned()), Value::Int(1));
+    ledger.insert(MapKey::Str("b".to_owned()), Value::Int(2));
+    ledger.insert(MapKey::Str("c".to_owned()), Value::Int(3));
+    assert_eq!(
+        ledger.remove(&MapKey::Str("b".to_owned())),
+        Some(Value::Int(2))
+    );
+
+    ledger.insert(MapKey::Str("b".to_owned()), Value::Int(9));
+    let keys: Vec<String> = ledger.keys().map(MapKey::document_key).collect();
+    assert_eq!(keys, vec!["a", "c", "b"]);
+    assert_eq!(ledger.len(), 3);
+    assert_eq!(
+        ledger.get(&MapKey::Str("b".to_owned())),
+        Some(&Value::Int(9))
+    );
+}
+
+#[test]
+fn ledger_value_compacts_holes() {
+    let mut ledger = LedgerValue::new();
+    for index in 0..8 {
+        ledger.insert(MapKey::UInt(index), Value::UInt(index));
+    }
+    for index in [1_u64, 3, 5, 6, 7] {
+        assert!(ledger.remove(&MapKey::UInt(index)).is_some());
+    }
+
+    let keys: Vec<String> = ledger.keys().map(MapKey::document_key).collect();
+    assert_eq!(keys, vec!["0", "2", "4"]);
+    assert_eq!(ledger.len(), 3);
+    for index in [0_u64, 2, 4] {
+        assert_eq!(ledger.get(&MapKey::UInt(index)), Some(&Value::UInt(index)));
+    }
+}
+
+#[test]
+fn ledger_value_equality_is_order_sensitive() {
+    let mut first = LedgerValue::new();
+    first.insert(MapKey::Str("a".to_owned()), Value::Int(1));
+    first.insert(MapKey::Str("b".to_owned()), Value::Int(2));
+
+    let mut second = LedgerValue::new();
+    second.insert(MapKey::Str("b".to_owned()), Value::Int(2));
+    second.insert(MapKey::Str("a".to_owned()), Value::Int(1));
+
+    let same = first.clone();
+    assert_eq!(first, same);
+    assert_ne!(first, second);
+}

@@ -279,6 +279,8 @@ pub enum Value {
     /// Register-class matrix: row-major flat cells matching `MatrixCell { row, column }`.
     Matrix(Rc<RefCell<MatrixValue>>),
     Map(Rc<RefCell<FxHashMap<MapKey, Value>>>),
+    /// Insertion-ordered `tabulae<K, V>` (L2d.1); see [`LedgerValue`].
+    Ledger(Rc<RefCell<LedgerValue>>),
     Set(Rc<RefCell<FxHashSet<MapKey>>>),
     /// Anonymous record: unordered fields plus the order they were written
     /// in the record construct (display order).
@@ -1206,6 +1208,118 @@ impl MapKey {
     }
 }
 
+/// Insertion-ordered ledger (`tabulae<K, V>`): the native map from key to
+/// slot number plus an array of entries in insertion order. Removal leaves a
+/// hole in the array; holes are dropped, and slots renumbered, when the table
+/// rebuilds. The slot number is never visible to a program, and order is part
+/// of a ledger's equality.
+#[derive(Debug, Clone, Default)]
+pub struct LedgerValue {
+    index: FxHashMap<MapKey, usize>,
+    entries: Vec<Option<(MapKey, Value)>>,
+    live: usize,
+}
+
+impl LedgerValue {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            index: FxHashMap::default(),
+            entries: Vec::new(),
+            live: 0,
+        }
+    }
+
+    /// Insert or replace: an existing key keeps its slot, a new key is pushed
+    /// at the end.
+    pub fn insert(&mut self, key: MapKey, value: Value) {
+        if let Some(&slot) = self.index.get(&key) {
+            self.entries[slot] = Some((key, value));
+            return;
+        }
+        self.index.insert(key.clone(), self.entries.len());
+        self.entries.push(Some((key, value)));
+        self.live += 1;
+    }
+
+    #[must_use]
+    pub fn get(&self, key: &MapKey) -> Option<&Value> {
+        let slot = *self.index.get(key)?;
+        self.entries.get(slot)?.as_ref().map(|(_, value)| value)
+    }
+
+    #[must_use]
+    pub fn contains_key(&self, key: &MapKey) -> bool {
+        self.index.contains_key(key)
+    }
+
+    /// Remove a key: its slot becomes a hole and the key is dropped from the
+    /// index. Holes over half the entry array trigger a compaction.
+    pub fn remove(&mut self, key: &MapKey) -> Option<Value> {
+        let slot = self.index.remove(key)?;
+        let (_, value) = self.entries.get_mut(slot)?.take()?;
+        self.live -= 1;
+        let holes = self.entries.len() - self.live;
+        if holes > self.entries.len() / 2 {
+            self.compact();
+        }
+        Some(value)
+    }
+
+    /// Drop holes and renumber every remaining slot.
+    fn compact(&mut self) {
+        let entries = std::mem::take(&mut self.entries);
+        self.entries = entries.into_iter().flatten().map(Some).collect();
+        let mut index = FxHashMap::default();
+        for (slot, entry) in self.entries.iter().enumerate() {
+            if let Some((key, _)) = entry {
+                index.insert(key.clone(), slot);
+            }
+        }
+        self.index = index;
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.live
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.live == 0
+    }
+
+    /// Live entries in slot (insertion) order.
+    pub fn iter(&self) -> impl Iterator<Item = (&MapKey, &Value)> {
+        self.entries
+            .iter()
+            .filter_map(Option::as_ref)
+            .map(|(key, value)| (key, value))
+    }
+
+    /// Live keys in slot (insertion) order.
+    pub fn keys(&self) -> impl Iterator<Item = &MapKey> {
+        self.entries
+            .iter()
+            .filter_map(Option::as_ref)
+            .map(|(key, _)| key)
+    }
+
+    /// Live values in slot (insertion) order.
+    pub fn values(&self) -> impl Iterator<Item = &Value> {
+        self.entries
+            .iter()
+            .filter_map(Option::as_ref)
+            .map(|(_, value)| value)
+    }
+}
+
+impl PartialEq for LedgerValue {
+    fn eq(&self, other: &Self) -> bool {
+        self.live == other.live && self.iter().eq(other.iter())
+    }
+}
+
 impl Value {
     /// Deep duplicate for the `copy` access marker (D-6): every container,
     /// genus, and record cell reachable from `self` is rebuilt, so no storage
@@ -1292,6 +1406,19 @@ impl Value {
                         .collect()
                 },
                 FxHashMap::default,
+            ),
+            Value::Ledger(rc) => cell(
+                rc,
+                memo,
+                Value::Ledger,
+                |ledger, m| {
+                    let mut copied = LedgerValue::new();
+                    for (key, value) in ledger.iter() {
+                        copied.insert(key.clone(), value.deep_copy_memo(m));
+                    }
+                    copied
+                },
+                LedgerValue::new,
             ),
             Value::Set(rc) => Value::Set(Rc::new(RefCell::new(rc.borrow().clone()))),
             Value::Record(rc, written) => {
@@ -1419,6 +1546,9 @@ impl Value {
             Value::Map(entries) => {
                 display_tabula_map(&entries.borrow(), interner, order, span, float_width)?
             }
+            Value::Ledger(_) => {
+                return Err(RunnerError::unsupported(span, "ledger display"));
+            }
             Value::Struct(def, fields) => {
                 display_tabula_struct(*def, fields, interner, order, span, float_width)?
             }
@@ -1501,6 +1631,7 @@ impl Value {
             Value::Array(cell) => cell.borrow().is_empty(),
             Value::Tensor(cell) => cell.borrow().is_empty(),
             Value::Map(cell) => cell.borrow().is_empty(),
+            Value::Ledger(cell) => cell.borrow().is_empty(),
             Value::Set(cell) => cell.borrow().is_empty(),
             Value::Str(value) => value.is_empty(),
             Value::Ascii(_) => false,
