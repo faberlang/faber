@@ -106,3 +106,62 @@ fn scalar_to_octeti_unbounded_target_rejects() {
         "numeric_to_octeti_unspecified",
     );
 }
+
+// --- `lista<b8, N>` is the bounded buffer spelling ----------
+
+#[test]
+fn lista_b8_n_write_row_all_widths_accept() {
+    for (ty, width) in [
+        ("u16", 2),
+        ("i16", 2),
+        ("u32", 4),
+        ("i32", 4),
+        ("f32", 4),
+        ("u64", 8),
+        ("i64", 8),
+        ("f64", 8),
+    ] {
+        for hint in ["Le", "Be"] {
+            let source = format!(
+                "functio w({ty} n) → lista<b8, {width}> {{ redde n ↦ lista<b8, {width}> via {hint} }}"
+            );
+            test_support::assert_accepts_la(&source);
+        }
+    }
+}
+
+#[test]
+fn lista_b8_n_write_row_without_hint_rejects() {
+    test_support::assert_rejects_with_issue_la(
+        "functio w(u16 n) → lista<b8, 2> { redde n ↦ lista<b8, 2> }",
+        "numeric_to_octeti_unspecified",
+    );
+}
+
+#[test]
+fn lista_b8_n_write_row_capacity_mismatch_rejects() {
+    test_support::assert_rejects_with_issue_la(
+        "functio w(u16 n) → lista<b8, 4> { redde n ↦ lista<b8, 4> via Le }",
+        "octeti_endian_width_mismatch",
+    );
+}
+
+#[test]
+fn lista_b8_n_u8_source_has_no_row() {
+    test_support::assert_rejects_with_issue_la(
+        "functio w(u8 n) → lista<b8, 1> { redde n ↦ lista<b8, 1> via Le }",
+        "numeric_to_octeti_unspecified",
+    );
+}
+
+#[test]
+fn lista_b8_one_byte_is_b8_conversion() {
+    test_support::assert_accepts_la("functio w(u8 n) → b8 { redde n ↦ b8 }");
+    test_support::assert_accepts_la("functio w(i8 n) → b8 { redde n ↦ b8 }");
+}
+
+#[test]
+fn lista_b8_n_is_octeti_n() {
+    test_support::assert_accepts_la("functio w(octeti<2> o) → lista<b8, 2> { redde o }");
+    test_support::assert_accepts_la("functio w(lista<b8, 2> o) → octeti<2> { redde o }");
+}
