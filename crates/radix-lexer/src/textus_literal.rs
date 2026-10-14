@@ -13,6 +13,22 @@ pub enum TextusLiteralError {
     InvalidUnicodeEscape,
 }
 
+/// Delimiter that owns a literal's escape contract.
+///
+/// A literal accepts only its own delimiter after a backslash (`\"` inside
+/// `"…"`, `\»` inside `«…»`, ``\` `` inside a backtick template); the other
+/// two delimiters are ordinary unknown escapes and are rejected by
+/// [`first_invalid_escape`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextDelimiter {
+    /// `"…"` short string.
+    Quote,
+    /// `«…»` guillemet block string.
+    Guillemet,
+    /// Backtick-delimited string template.
+    Backtick,
+}
+
 /// Decode the lexer payload of a `textus` literal.
 ///
 /// The lexer keeps delimiter matching shallow; this phase owns the source escape
@@ -36,6 +52,45 @@ pub fn try_decode_textus_literal(raw: &str) -> Result<String, TextusLiteralError
     decode_escapes(raw, true)
 }
 
+/// Find the first escape sequence in `raw` the delimiter does not allow.
+///
+/// After a backslash the only valid continuations are `\\`, the literal's own
+/// delimiter, `n`, `t`, `r`, and `u{…}` with 1–6 hex digits naming a Unicode
+/// scalar. Anything else is invalid, including a trailing backslash.
+///
+/// Returns the byte offset of the offending backslash and the character that
+/// made the escape invalid (the backslash itself when nothing follows it).
+#[must_use]
+pub fn first_invalid_escape(raw: &str, delimiter: TextDelimiter) -> Option<(usize, char)> {
+    let own = match delimiter {
+        TextDelimiter::Quote => '"',
+        TextDelimiter::Guillemet => '»',
+        TextDelimiter::Backtick => '`',
+    };
+
+    let mut chars = raw.char_indices();
+    while let Some((offset, ch)) = chars.next() {
+        if ch != '\\' {
+            continue;
+        }
+        let Some((_, escaped)) = chars.next() else {
+            return Some((offset, '\\'));
+        };
+        if escaped == 'u' {
+            let mut rest = raw[offset + ch.len_utf8() + escaped.len_utf8()..].chars();
+            if unicode_escape(&mut rest).is_none() {
+                return Some((offset, 'u'));
+            }
+            continue;
+        }
+        let allowed = matches!(escaped, '\\' | 'n' | 't' | 'r') || escaped == own;
+        if !allowed {
+            return Some((offset, escaped));
+        }
+    }
+    None
+}
+
 fn decode_escapes(raw: &str, strict: bool) -> Result<String, TextusLiteralError> {
     let mut decoded = String::new();
     let mut chars = raw.chars();
@@ -49,6 +104,8 @@ fn decode_escapes(raw: &str, strict: bool) -> Result<String, TextusLiteralError>
             match next {
                 '\\' => decoded.push('\\'),
                 '"' => decoded.push('"'),
+                '»' => decoded.push('»'),
+                '`' => decoded.push('`'),
                 'n' => decoded.push('\n'),
                 't' => decoded.push('\t'),
                 'r' => decoded.push('\r'),
