@@ -13,5 +13,8 @@ pub use radix_types::numeric_width::*;
 /// integer-family target takes one (the checker owns the source rule).
 #[must_use]
 pub fn is_float_rounding_hint(marker: &str) -> bool {
-    matches!(marker, "Floor" | "Ceil" | "HalfEven" | "Trunc")
+    matches!(
+        marker,
+        "floor" | "Floor" | "ceil" | "Ceil" | "half_even" | "HalfEven" | "trunc" | "Trunc"
+    )
 }

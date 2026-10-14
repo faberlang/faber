@@ -465,9 +465,9 @@ fn integer_width_range(width: NumericWidth) -> Option<(i128, i128)> {
 /// hint rounds toward zero, as the runner does.
 fn float_rounding_fits(value: f64, mode: Option<&str>, (lo, hi): (i128, i128)) -> bool {
     let rounded = match mode {
-        Some("Floor") => value.floor(),
-        Some("Ceil") => value.ceil(),
-        Some("HalfEven") => value.round_ties_even(),
+        Some("floor") | Some("Floor") => value.floor(),
+        Some("ceil") | Some("Ceil") => value.ceil(),
+        Some("half_even") | Some("HalfEven") => value.round_ties_even(),
         _ => value.trunc(),
     };
     rounded.is_finite() && (lo..=hi).contains(&(rounded as i128))
@@ -1852,7 +1852,7 @@ impl TypeChecker<'_> {
         };
         params
             .iter()
-            .any(|param| matches!(interner.resolve(*param), "Be" | "Le"))
+            .any(|param| matches!(interner.resolve(*param), "be" | "Be" | "le" | "Le"))
     }
 
     /// Need: the rounding rule of `↦`. A float or decimal source into
@@ -1873,9 +1873,13 @@ impl TypeChecker<'_> {
             params
                 .iter()
                 .find_map(|param| match interner.resolve(*param) {
+                    "floor" => Some("floor"),
                     "Floor" => Some("Floor"),
+                    "ceil" => Some("ceil"),
                     "Ceil" => Some("Ceil"),
+                    "half_even" => Some("half_even"),
                     "HalfEven" => Some("HalfEven"),
+                    "trunc" => Some("trunc"),
                     "Trunc" => Some("Trunc"),
                     _ => None,
                 })
@@ -1921,8 +1925,10 @@ impl TypeChecker<'_> {
         params
             .iter()
             .find_map(|param| match interner.resolve(*param) {
-                "Hex" | "Bin" | "Oct" => Some(ISSUE_DECIMAL_RADIX_HINT_REJECTED),
-                "Be" | "Le" => Some(ISSUE_DECIMAL_ENDIAN_HINT_REJECTED),
+                "hex" | "Hex" | "bin" | "Bin" | "oct" | "Oct" => {
+                    Some(ISSUE_DECIMAL_RADIX_HINT_REJECTED)
+                }
+                "be" | "Be" | "le" | "Le" => Some(ISSUE_DECIMAL_ENDIAN_HINT_REJECTED),
                 _ => None,
             })
     }
@@ -2017,9 +2023,9 @@ impl TypeChecker<'_> {
         params
             .iter()
             .find_map(|param| match interner.resolve(*param) {
-                "Hex" => Some(16),
-                "Bin" => Some(2),
-                "Oct" => Some(8),
+                "hex" | "Hex" => Some(16),
+                "bin" | "Bin" => Some(2),
+                "oct" | "Oct" => Some(8),
                 _ => None,
             })
     }
@@ -3222,8 +3228,13 @@ impl TypeChecker<'_> {
                 };
                 let mode = self.interner.and_then(|interner| {
                     params.iter().find_map(|param| {
-                        let name = interner.resolve(*param);
-                        matches!(name, "Floor" | "Ceil" | "HalfEven" | "Trunc").then_some(name)
+                        match interner.resolve(*param) {
+                            "floor" | "Floor" => Some("floor"),
+                            "ceil" | "Ceil" => Some("ceil"),
+                            "half_even" | "HalfEven" => Some("half_even"),
+                            "trunc" | "Trunc" => Some("trunc"),
+                            _ => None,
+                        }
                     })
                 });
                 !target_range.is_some_and(|range| float_rounding_fits(value, mode, range))

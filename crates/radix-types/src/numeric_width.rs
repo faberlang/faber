@@ -422,13 +422,39 @@ pub fn decimal_text_to_scaled(text: &str) -> Option<(i128, i32)> {
 /// radix either.
 #[must_use]
 pub fn is_conversio_radix_hint(marker: &str) -> bool {
-    matches!(marker, "Hex" | "Bin" | "Oct" | "Be" | "Le") || is_code_point_hint(marker)
+    matches!(
+        marker,
+        "hex" | "Hex" | "bin" | "Bin" | "oct" | "Oct" | "be" | "Be" | "le" | "Le"
+    ) || is_code_point_hint(marker)
 }
 
 /// D10.6 code-point hint: `'A' ↦ u32 via Code` and `65 ↦ littera via Code`.
 #[must_use]
 pub fn is_code_point_hint(marker: &str) -> bool {
-    marker == "Code"
+    marker == "code" || marker == "Code"
+}
+
+/// Canonical lower-case key the parser stores for a `via` policy word.
+///
+/// The ten conversion policy words (`le`, `be`, `hex`, `bin`, `oct`, `code`,
+/// `floor`, `ceil`, `trunc`, `half_even`) are matched internally by this key;
+/// locale packs map each locale's surface word to it. The retired title-case
+/// spellings are not canonical and return `None`.
+#[must_use]
+pub fn conversio_policy_word(name: &str) -> Option<&'static str> {
+    match name {
+        "le" => Some("le"),
+        "be" => Some("be"),
+        "hex" => Some("hex"),
+        "bin" => Some("bin"),
+        "oct" => Some("oct"),
+        "code" => Some("code"),
+        "floor" => Some("floor"),
+        "ceil" => Some("ceil"),
+        "trunc" => Some("trunc"),
+        "half_even" => Some("half_even"),
+        _ => None,
+    }
 }
 
 /// Ascii format-pack hints: `n ↦ ascii<N> via Hex|Bin|Oct`.
@@ -437,7 +463,7 @@ pub fn is_code_point_hint(marker: &str) -> bool {
 /// rules, never ascii digit bases. The type argument of a bounded family stays capacity.
 #[must_use]
 pub fn is_ascii_format_hint(marker: &str) -> bool {
-    matches!(marker, "Hex" | "Bin" | "Oct")
+    matches!(marker, "hex" | "Hex" | "bin" | "Bin" | "oct" | "Oct")
 }
 
 /// Standalone width-marker type sugar (`f32` → `fractus<f32>`, `i64` → `numerus<i64>`).

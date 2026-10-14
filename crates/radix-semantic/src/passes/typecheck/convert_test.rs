@@ -2488,6 +2488,24 @@ fn policy_word_conversio_accepts_a_rounded_float_source() {
 }
 
 #[test]
+fn via_lowercase_policy_words_accepted() {
+    for source in [
+        r#"incipit { fixum _ n ← "ff" ↦ u32 via hex }"#,
+        "functio f(octeti corpus) → f32 { redde corpus[0‥4] ↦ f32 via le }",
+    ] {
+        test_support::assert_accepts(source);
+    }
+    for target in ["modulus<u8>", "saturatus<u8>"] {
+        test_support::assert_accepts(&format!(
+            "incipit {{ fixum _ b ← 1.5 ↦ {target} via floor }}"
+        ));
+        test_support::assert_accepts(&format!(
+            "incipit {{ fixum _ c ← 1.5 ↦ {target} via half_even }}"
+        ));
+    }
+}
+
+#[test]
 fn numeric_narrowing_conversio_requires_textus_alternate_exit() {
     test_support::assert_rejects_with_issue(
         r"

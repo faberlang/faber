@@ -307,6 +307,25 @@ fn ascii_format_hints_are_hex_bin_oct_only() {
     assert!(!is_conversio_radix_hint("Bits"));
 }
 
+#[test]
+fn conversio_policy_word_lowercase() {
+    for word in ["le", "be", "hex", "bin", "oct", "code", "floor", "ceil", "trunc", "half_even"] {
+        assert_eq!(
+            crate::numeric_width::conversio_policy_word(word),
+            Some(word),
+            "{word} is the canonical lower-case policy word"
+        );
+    }
+    for word in ["Hex", "Floor", "HalfEven", "bits"] {
+        assert_eq!(
+            crate::numeric_width::conversio_policy_word(word),
+            None,
+            "{word} is not canonical"
+        );
+    }
+    assert!(is_conversio_radix_hint("hex"));
+}
+
 // S03-1: lowering failures cross the producer boundary as typed issues, not
 // prose that downstream tables re-parse into a diagnostic identity.
 use crate::numeric_width::{
