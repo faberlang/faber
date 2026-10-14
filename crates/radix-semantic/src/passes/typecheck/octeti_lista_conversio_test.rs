@@ -4,7 +4,7 @@ use crate::test_support;
 
 #[test]
 fn octeti_to_lista_u8_accepts() {
-    test_support::assert_accepts_la("functio bridge(octeti o) → lista<u8> { redde o ↦ lista<u8> }");
+    test_support::assert_accepts_la("functio bridge(lista<b8> o) → lista<u8> { redde o ↦ lista<u8> }");
 }
 
 #[test]
@@ -14,7 +14,7 @@ fn octeti_literal_to_lista_u8_accepts() {
 
 #[test]
 fn lista_u8_to_octeti_still_accepts() {
-    test_support::assert_accepts_la("functio from_list(lista<u8> b) → octeti { redde b ↦ octeti }");
+    test_support::assert_accepts_la("functio from_list(lista<u8> b) → lista<b8> { redde b ↦ lista<b8> }");
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn octeti_to_lista_unsized_numerus_rejects() {
 #[test]
 fn numeric_to_octeti_unspecified_unchanged() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { fixum _ b ← 42 ↦ octeti }",
+        "incipit { fixum _ b ← 42 ↦ lista<b8> }",
         "numeric_to_octeti_unspecified",
     );
 }
@@ -59,7 +59,7 @@ fn scalar_to_octeti_all_widths_and_endians_accept() {
     ] {
         for hint in ["Le", "Be"] {
             let source = format!(
-                "functio w({ty} n) → octeti<{width}> {{ redde n ↦ octeti<{width}> via {hint} }}"
+                "functio w({ty} n) → lista<b8, {width}> {{ redde n ↦ lista<b8, {width}> via {hint} }}"
             );
             test_support::assert_accepts_la(&source);
         }
@@ -69,7 +69,7 @@ fn scalar_to_octeti_all_widths_and_endians_accept() {
 #[test]
 fn scalar_to_octeti_without_endian_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "functio w(u16 n) → octeti<2> { redde n ↦ octeti<2> }",
+        "functio w(u16 n) → lista<b8, 2> { redde n ↦ lista<b8, 2> }",
         "numeric_to_octeti_unspecified",
     );
 }
@@ -77,7 +77,7 @@ fn scalar_to_octeti_without_endian_rejects() {
 #[test]
 fn scalar_to_octeti_capacity_mismatch_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "functio w(u16 n) → octeti<4> { redde n ↦ octeti<4> via Le }",
+        "functio w(u16 n) → lista<b8, 4> { redde n ↦ lista<b8, 4> via Le }",
         "octeti_endian_width_mismatch",
     );
 }
@@ -85,7 +85,7 @@ fn scalar_to_octeti_capacity_mismatch_rejects() {
 #[test]
 fn scalar_to_octeti_unsized_numerus_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "functio w(numerus n) → octeti<2> { redde n ↦ octeti<2> via Le }",
+        "functio w(numerus n) → lista<b8, 2> { redde n ↦ lista<b8, 2> via Le }",
         "numeric_to_octeti_unspecified",
     );
 }
@@ -94,7 +94,7 @@ fn scalar_to_octeti_unsized_numerus_rejects() {
 fn scalar_to_octeti_u8_source_rejects() {
     // Ruling B6: an 8-bit value has no byte order, so the row is not built.
     test_support::assert_rejects_with_issue_la(
-        "functio w(u8 n) → octeti<1> { redde n ↦ octeti<1> via Le }",
+        "functio w(u8 n) → lista<b8, 1> { redde n ↦ lista<b8, 1> via Le }",
         "numeric_to_octeti_unspecified",
     );
 }
@@ -102,7 +102,7 @@ fn scalar_to_octeti_u8_source_rejects() {
 #[test]
 fn scalar_to_octeti_unbounded_target_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "functio w(u16 n) → octeti { redde n ↦ octeti via Le }",
+        "functio w(u16 n) → lista<b8> { redde n ↦ lista<b8> via Le }",
         "numeric_to_octeti_unspecified",
     );
 }
@@ -162,6 +162,6 @@ fn lista_b8_one_byte_is_b8_conversion() {
 
 #[test]
 fn lista_b8_n_is_octeti_n() {
-    test_support::assert_accepts_la("functio w(octeti<2> o) → lista<b8, 2> { redde o }");
-    test_support::assert_accepts_la("functio w(lista<b8, 2> o) → octeti<2> { redde o }");
+    test_support::assert_accepts_la("functio w(lista<b8, 2> o) → lista<b8, 2> { redde o }");
+    test_support::assert_accepts_la("functio w(lista<b8, 2> o) → lista<b8, 2> { redde o }");
 }

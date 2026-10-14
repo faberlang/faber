@@ -9,7 +9,7 @@ use crate::test_support::{assert_accepts_la, assert_rejects_with_issue_la};
 #[test]
 fn octeti_window_16_to_vu32x4_be_accepts() {
     assert_accepts_la(
-        "functio win(octeti corpus) → vector<u32, 4> {
+        "functio win(lista<b8> corpus) → vector<u32, 4> {
     redde corpus[0‥16] ↦ vector<u32, 4> via Be
 }",
     );
@@ -18,7 +18,7 @@ fn octeti_window_16_to_vu32x4_be_accepts() {
 #[test]
 fn octeti_window_16_to_vu16x8_le_accepts() {
     assert_accepts_la(
-        "functio win(octeti corpus) → vector<u16, 8> {
+        "functio win(lista<b8> corpus) → vector<u16, 8> {
     redde corpus[0‥16] ↦ vector<u16, 8> via Le
 }",
     );
@@ -27,7 +27,7 @@ fn octeti_window_16_to_vu16x8_le_accepts() {
 #[test]
 fn octeti_window_8_to_vu32x2_be_accepts() {
     assert_accepts_la(
-        "functio win(octeti corpus) → vector<u32, 2> {
+        "functio win(lista<b8> corpus) → vector<u32, 2> {
     redde corpus[0‥8] ↦ vector<u32, 2> via Be
 }",
     );
@@ -45,7 +45,7 @@ fn octeti_literal_16_to_vu32x4_le_accepts() {
 #[test]
 fn octeti_window_without_endian_rejects() {
     assert_rejects_with_issue_la(
-        "functio win(octeti corpus) → vector<u32, 4> {
+        "functio win(lista<b8> corpus) → vector<u32, 4> {
     redde corpus[0‥16] ↦ vector<u32, 4>
 }",
         "octeti_to_vector_unspecified",
@@ -55,7 +55,7 @@ fn octeti_window_without_endian_rejects() {
 #[test]
 fn octeti_window_wrong_width_rejects() {
     assert_rejects_with_issue_la(
-        "functio win(octeti corpus) → vector<u32, 4> {
+        "functio win(lista<b8> corpus) → vector<u32, 4> {
     redde corpus[0‥12] ↦ vector<u32, 4> via Be
 }",
         "register_window_width_mismatch",
@@ -65,7 +65,7 @@ fn octeti_window_wrong_width_rejects() {
 #[test]
 fn octeti_window_u8_element_rejects() {
     assert_rejects_with_issue_la(
-        "functio win(octeti corpus) → vector<u8, 16> {
+        "functio win(lista<b8> corpus) → vector<u8, 16> {
     redde corpus[0‥16] ↦ vector<u8, 16> via Be
 }",
         "register_window_width_mismatch",
@@ -86,8 +86,8 @@ fn vector_u32x4_to_lista_accepts() {
 #[test]
 fn vector_u32x4_to_octeti_16_le_accepts() {
     assert_accepts_la(
-        "functio out(vector<u32, 4> v) → octeti<16> {
-    redde v ↦ octeti<16> via Le
+        "functio out(vector<u32, 4> v) → lista<b8, 16> {
+    redde v ↦ lista<b8, 16> via Le
 }",
     );
 }
@@ -95,8 +95,8 @@ fn vector_u32x4_to_octeti_16_le_accepts() {
 #[test]
 fn vector_u32x4_to_octeti_16_be_accepts() {
     assert_accepts_la(
-        "functio out(vector<u32, 4> v) → octeti<16> {
-    redde v ↦ octeti<16> via Be
+        "functio out(vector<u32, 4> v) → lista<b8, 16> {
+    redde v ↦ lista<b8, 16> via Be
 }",
     );
 }
@@ -104,8 +104,8 @@ fn vector_u32x4_to_octeti_16_be_accepts() {
 #[test]
 fn vector_to_octeti_without_endian_rejects() {
     assert_rejects_with_issue_la(
-        "functio out(vector<u32, 4> v) → octeti<16> {
-    redde v ↦ octeti<16>
+        "functio out(vector<u32, 4> v) → lista<b8, 16> {
+    redde v ↦ lista<b8, 16>
 }",
         "vector_to_octeti_unspecified",
     );
@@ -114,8 +114,8 @@ fn vector_to_octeti_without_endian_rejects() {
 #[test]
 fn vector_to_octeti_wrong_capacity_rejects() {
     assert_rejects_with_issue_la(
-        "functio out(vector<u32, 4> v) → octeti<8> {
-    redde v ↦ octeti<8> via Le
+        "functio out(vector<u32, 4> v) → lista<b8, 8> {
+    redde v ↦ lista<b8, 8> via Le
 }",
         "register_window_width_mismatch",
     );
