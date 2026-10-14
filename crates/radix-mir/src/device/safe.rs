@@ -60,6 +60,15 @@ const SHAPE_GENUS_PARAM_MUTABLE: &str = "device genus parameter: mutable (read-o
 const SHAPE_GENUS_PARAM_WRITE: &str = "device genus parameter: field write";
 const SHAPE_GENUS_PARAM_PROJECTION: &str =
     "device genus parameter: only a direct scalar or vector field read is admitted";
+/// C4-6b follow-up: a genus (struct) LOCAL or temp of a lane-form kernel,
+/// scalarized by the lane emitters (`<base>_f<field>`) into one target
+/// variable per field. Its fields must each be a value type the lane form
+/// admits; the parameter layout law does not apply to a scalarized value.
+const SHAPE_GENUS_LOCAL_GENERIC: &str = "device genus local: generic";
+const SHAPE_GENUS_LOCAL_OPAQUE: &str = "device genus local: opaque";
+const SHAPE_GENUS_LOCAL_UNKNOWN_FIELDS: &str = "device genus local: unknown fields";
+const SHAPE_GENUS_LOCAL_EMPTY: &str = "device genus local: empty genus";
+const SHAPE_GENUS_LOCAL_NESTED: &str = "device genus local: nested genus field";
 const SHAPE_ASYNC_GENERATOR_DEVICE_FN: &str = "async/generator device function";
 const SHAPE_DEVICE_MULTI_BLOCK_CFG: &str = "device multi-block control flow";
 /// gpu-reset C4-2e: a lane-form kernel (a Lane builtin parameter) whose CFG is
@@ -362,7 +371,6 @@ impl<'a> DeviceSafeClassifier<'a> {
             | Type::Intervallum(_)
             | Type::Option(_)
             | Type::Ref(_, _)
-            | Type::Struct(_)
             | Type::Enum(_)
             | Type::Interface(_)
             | Type::Func(_)
@@ -375,6 +383,15 @@ impl<'a> DeviceSafeClassifier<'a> {
             | Type::BoundedTextus { .. }
             | Type::BoundedAscii { .. }
             | Type::BoundedOcteti { .. } => {
+                self.record_policy(format!("device aggregate value type {semantic:?}"));
+            }
+            // gpu-reset C4-6b follow-up: a genus LOCAL or temp in a lane-form
+            // kernel is scalarized field-by-field by the lane emitters; only
+            // its fields need value-type admission (no memory layout).
+            Type::Struct(_) if self.in_lane_form_function => {
+                self.check_genus_local_type(ty);
+            }
+            Type::Struct(_) => {
                 self.record_policy(format!("device aggregate value type {semantic:?}"));
             }
             Type::Primitive(Primitive::Nihil) => self.record_policy(SHAPE_DEVICE_NIHIL_VALUE),
@@ -534,6 +551,53 @@ impl<'a> DeviceSafeClassifier<'a> {
         }
     }
 
+    /// C4-6b follow-up: a genus (struct) LOCAL or temp of a lane-form kernel
+    /// is scalarized by the lane emitters into one target variable per field
+    /// (`<base>_f<field>`), so it needs no memory layout and is admitted when
+    /// every declared field type is itself a value type the lane form admits
+    /// — `resolve_struct_layout` is not used here because a scalarized value
+    /// has no layout and A2's `Geo` (`vector<f32, 3>` fields) would be refused
+    /// by the parameter layout law.
+    fn check_genus_local_type(&mut self, ty: MirType) {
+        let Type::Struct(def_id) = self.types.get(ty.semantic_id()).clone() else {
+            return;
+        };
+        let validation = self.validation;
+        if validation
+            .struct_type_params
+            .get(&def_id)
+            .is_some_and(|params| !params.is_empty())
+        {
+            self.record_policy(SHAPE_GENUS_LOCAL_GENERIC);
+        }
+        if validation.opaque_structs.contains(&def_id) {
+            self.record_policy(SHAPE_GENUS_LOCAL_OPAQUE);
+        }
+        let Some(order) = validation.struct_field_order.get(&def_id) else {
+            self.record_policy(SHAPE_GENUS_LOCAL_UNKNOWN_FIELDS);
+            return;
+        };
+        if order.is_empty() {
+            self.record_policy(SHAPE_GENUS_LOCAL_EMPTY);
+            return;
+        }
+        let Some(fields) = validation.struct_fields.get(&def_id) else {
+            self.record_policy(SHAPE_GENUS_LOCAL_UNKNOWN_FIELDS);
+            return;
+        };
+        for name in order {
+            let Some(field_ty) = fields.get(name).copied() else {
+                self.record_policy(SHAPE_GENUS_LOCAL_UNKNOWN_FIELDS);
+                continue;
+            };
+            if matches!(self.types.get(field_ty.semantic_id()), Type::Struct(_)) {
+                self.record_policy(SHAPE_GENUS_LOCAL_NESTED);
+            } else {
+                self.check_device_type(field_ty);
+            }
+        }
+    }
+
     /// A write whose destination is rooted at a genus parameter is refused.
     fn check_genus_write(&mut self, stmt: &MirStatement) {
         let destination = match &stmt.kind {
@@ -563,6 +627,18 @@ impl<'a> DeviceSafeClassifier<'a> {
             if !admitted {
                 self.record_policy(SHAPE_GENUS_PARAM_PROJECTION);
             }
+            return;
+        }
+        // C4-6b follow-up: a scalarized genus local's field place (and a lane
+        // of a vector field) is exactly what the lane emitters' operand
+        // lowering handles (`<base>_f<field>[.lane]`); no other projection
+        // shape is admitted.
+        if self.in_lane_form_function
+            && matches!(
+                place.projections.as_slice(),
+                [MirProjection::Field(_)] | [MirProjection::Field(_), MirProjection::VectorLane(_)]
+            )
+        {
             return;
         }
         if !place.projections.iter().all(|projection| {
@@ -1076,7 +1152,13 @@ fn classify_construct_statement(
             aggregate.kind,
             MirAggregateKind::Array | MirAggregateKind::Tensor
         );
+    // C4-6b follow-up: a lane-form genus local construct is the scalarized
+    // per-field initialization the lane emitters emit; the aggregate's type
+    // is still classified through `visit_aggregate` -> `check_device_type`.
+    let lane_form_struct =
+        matches!(aggregate.kind, MirAggregateKind::Struct(_)) && classifier.in_lane_form_function;
     if !dead_fold_artifact
+        && !lane_form_struct
         && !matches!(
             aggregate.kind,
             MirAggregateKind::Vector | MirAggregateKind::Matrix | MirAggregateKind::Tuple
@@ -1231,6 +1313,13 @@ fn classify_device_function_slots(
                 classifier.check_device_type(MirType::semantic(*element));
             }
         }
+        // A genus RETURN is never a scalarizable local: the lane emitters
+        // scalarize locals, not returns, so it keeps the aggregate refusal
+        // even in lane form.
+        Type::Struct(_) => classifier.record_policy(format!(
+            "device aggregate value type {:?}",
+            classifier.types.get(function.return_ty.semantic_id())
+        )),
         _ => classifier.check_device_type(function.return_ty),
     }
     if let Some(error_ty) = function.error_ty

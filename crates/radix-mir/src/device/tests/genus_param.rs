@@ -7,10 +7,10 @@ use super::*;
 use crate::abi::{MirKernelResourceKind, MirKernelSignature};
 use crate::validate::ValidatedMir;
 use crate::{
-    MirBlock, MirBlockId, MirConstant, MirFunction, MirKernelShaderStage, MirLocal, MirLocalId,
-    MirOperand, MirParam, MirParamMode, MirPlace, MirProjection, MirStatement, MirStatementKind,
-    MirStructLayout, MirTerminator, MirTerminatorKind, MirValidationContext, MirValue, MirValueId,
-    MirValueKind,
+    MirAggregate, MirAggregateFields, MirAggregateKind, MirBlock, MirBlockId, MirConstant,
+    MirFunction, MirKernelShaderStage, MirLocal, MirLocalId, MirNamedOperand, MirOperand, MirParam,
+    MirParamMode, MirPlace, MirProjection, MirStatement, MirStatementKind, MirStructLayout,
+    MirTerminator, MirTerminatorKind, MirValidationContext, MirValue, MirValueId, MirValueKind,
 };
 use radix_hir::DefId;
 use radix_lexer::{Interner, Symbol};
@@ -35,6 +35,12 @@ enum Body {
     Write(usize),
     /// `local = p` (the whole genus used as a value)
     WholeCopy,
+    /// declare a mutable genus local, construct it field-by-field, then read
+    /// one field back into a `fields[0]`-typed local.
+    LocalConstructRead,
+    /// declare a mutable genus local only; its field types are the only
+    /// thing the gate sees (used when a nested field cannot be constructed).
+    LocalDeclare,
 }
 
 fn sym(index: usize) -> Symbol {
@@ -175,6 +181,74 @@ fn run(fields: &[Field], order: &str, body: Body, lane_form: bool) -> Run {
                 ),
             )]
         }
+        Body::LocalConstructRead => {
+            let local = MirLocalId(next);
+            locals.push(MirLocal {
+                id: local,
+                name: None,
+                ty: genus,
+                mutable: true,
+                span: test_span(),
+            });
+            next += 1;
+            let ty = MirType::semantic(field_ids[0]);
+            let field_local = MirLocalId(next);
+            locals.push(MirLocal {
+                id: field_local,
+                name: None,
+                ty,
+                mutable: true,
+                span: test_span(),
+            });
+            let field_local_place = MirPlace::local(field_local);
+            let named = (0..fields.len())
+                .map(|index| MirNamedOperand {
+                    name: sym(index),
+                    value: MirOperand::Place(field_local_place.clone()),
+                })
+                .collect();
+            vec![
+                assign(
+                    field_local_place.clone(),
+                    value(
+                        MirValueKind::Operand(MirOperand::Constant(MirConstant::Float(1.0))),
+                        ty,
+                    ),
+                ),
+                MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace::local(local),
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Struct(GENUS),
+                            ty: genus,
+                            fields: MirAggregateFields::Named(named),
+                        },
+                    },
+                    span: test_span(),
+                },
+                assign(
+                    field_local_place,
+                    value(
+                        MirValueKind::Operand(MirOperand::Place(MirPlace {
+                            base: crate::MirPlaceBase::Local(local),
+                            projections: vec![MirProjection::Field(sym(0))],
+                        })),
+                        ty,
+                    ),
+                ),
+            ]
+        }
+        Body::LocalDeclare => {
+            let local = MirLocalId(next);
+            locals.push(MirLocal {
+                id: local,
+                name: None,
+                ty: genus,
+                mutable: true,
+                span: test_span(),
+            });
+            Vec::new()
+        }
     };
     let function = MirFunction {
         id: MirFunctionId(0),
@@ -289,11 +363,62 @@ fn gate_refuses_a_field_write() {
 }
 
 #[test]
-fn gate_refuses_the_genus_used_as_a_whole_value() {
+fn gate_admits_a_genus_local_constructed_and_read_in_lane_form() {
+    let run = run(
+        &[Field::F32, Field::F32],
+        "im",
+        Body::LocalConstructRead,
+        true,
+    );
+    assert!(
+        run.gate.is_capable(),
+        "a constructed genus local and its field read must pass the gate: {:?}",
+        shapes(&run.gate)
+    );
+}
+
+#[test]
+fn gate_refuses_a_genus_local_outside_lane_form() {
+    let run = run(
+        &[Field::F32, Field::F32],
+        "im",
+        Body::LocalConstructRead,
+        false,
+    );
+    assert!(
+        shapes(&run.gate)
+            .iter()
+            .any(|shape| shape.starts_with("device aggregate value type")),
+        "got {:?}",
+        shapes(&run.gate)
+    );
+}
+
+#[test]
+fn gate_refuses_a_genus_local_with_a_nested_genus_field_by_name() {
+    let run = run(
+        &[Field::F32, Field::NestedGenus],
+        "im",
+        Body::LocalDeclare,
+        true,
+    );
+    assert!(
+        shapes(&run.gate).contains(&"device genus local: nested genus field".to_owned()),
+        "got {:?}",
+        shapes(&run.gate)
+    );
+}
+
+#[test]
+fn gate_refuses_a_whole_genus_parameter_copy_by_name() {
     let run = run(&PARAMS_LIKE, "gim", Body::WholeCopy, true);
     assert!(
-        !run.gate.is_capable(),
-        "a genus local / whole-value copy stays refused"
+        shapes(&run.gate).contains(
+            &"device genus parameter: only a direct scalar or vector field read is admitted"
+                .to_owned()
+        ),
+        "got {:?}",
+        shapes(&run.gate)
     );
 }
 
