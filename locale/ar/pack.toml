@@ -356,8 +356,8 @@ message = "مطلوب {expected}"
 help = "أضف {fixum} أو {varia} قبل اسم الربط"
 
 [diagnostics.PARSE001.issues.itera_de_requires_fixum]
-message = "itera de bindings are always const; use {expected}"
-help = "de binds an index or key, not a mutable element; use the const form"
+message = "ارتباطات itera de ثابتة دائما؛ استخدم {expected}"
+help = "اربط de فهرسا أو مفتاحا، وليس عنصرا قابلا للتغيير؛ استخدم صيغة fixum"
 
 [diagnostics.PARSE001.issues.duplicate_rest_pattern]
 message = "نمط rest محدد مسبقا"
@@ -496,8 +496,8 @@ message = "لا يمكن لـ schema أن يعلن method"
 help = "أعلن الـ method على genus بدلا من ذلك"
 
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
-message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
-help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+message = "علامة `{marker}` لم تعد توضع على الارتباط؛ بل توضع على القيمة"
+help = "اكتب `{keyword} T {name} ← {marker} value`؛ و`{name} ← {marker} value` اللاحق يعلّم القيمة بالطريقة نفسها، ويحتفظ المعامل بـ `{marker}` قبل نوعه"
 
 [diagnostics.PARSE011]
 message = "مطلوب اسم دالة بعد {functio}"
@@ -505,7 +505,7 @@ help = "أضف اسم الدالة بعد {functio}"
 
 [diagnostics.PARSE012]
 message = "مطلوب جسم دالة لتصريح {functio}"
-help = "add a '{block}' to the function declaration"
+help = "أضف '{block}' إلى تعريف الدالة"
 
 [diagnostics.PARSE013]
 message = "مطلوب اسم صنف بعد {genus}"
@@ -640,16 +640,16 @@ message = "استخدم ⊥ لاسترداد conversio"
 help = "استخدم ⊥؛ {vel} للـ nullish coalescing فقط"
 
 [diagnostics.PARSE030.issues.conversio_via_missing_hint]
-message = "`via` needs a convert hint after it"
-help = "name the hint right after via, as in `x ↦ u32 via Hex`; the hints are Hex, Bin, Oct, Be, Le, and Code"
+message = "`via` يحتاج تلميح تحويل بعده"
+help = "سمِّ التلميح مباشرة بعد via، مثل `x ↦ u32 via Hex`؛ والتلميحات هي Hex وBin وOct وBe وLe وCode"
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
-message = "a convert hint is not a type argument"
-help = "write the hint as a via clause after the target: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+message = "تلميح التحويل ليس معامل نوع"
+help = "اكتب التلميح كجملة via بعد الهدف: `u32 via Le`، `ascii<8> via Hex`، `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
-message = "a convert hint does not follow the target in angle brackets"
-help = "write the hint as a via clause after the target: `octeti<16> via Le`"
+message = "تلميح التحويل لا يتبع الهدف بين قوسين زاويين"
+help = "اكتب التلميح كجملة via بعد الهدف: `octeti<16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "تعبير مطلوب"
@@ -728,7 +728,7 @@ message = "الصيغة المغلّفة `{form}` للنوع العددي ملغ
 help = "اكتب `{bare}` بدلا من `{form}`؛ علامة العرض هي نوع بحد ذاتها"
 
 [diagnostics.PARSE040.issues.wrong_locale_type]
-message = "type '{type}' is not declared on this reader surface"
+message = "النوع '{type}' غير معلن على سطح القارئ هذا"
 help = "استخدم تهجئة النوع المعلنة في لغة القارئ هذه{?expected|: '|'}"
 
 [diagnostics.PARSE040.issues.est_value_literal_names_equality]
@@ -996,20 +996,20 @@ message = "{tabulae} يتطلب معاملي نوع"
 help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.saturating_word_width_required]
-message = "saturating type requires exactly one integer width"
-help = "write the saturating type with one integer width, such as saturating<u8> or saturating<i16>"
+message = "نوع saturating يتطلب عرضا صحيحا واحدا بالضبط"
+help = "اكتب نوع saturating بعرض صحيح واحد، مثل saturating<u8> أو saturating<i16>"
 
 [diagnostics.SEM008.issues.saturating_word_width_shape]
-message = "saturating width must be a bare integer width marker"
-help = "use a bare integer width marker such as u8 or i16"
+message = "عرض saturating يجب أن يكون علامة عرض صحيحة مجردة"
+help = "استخدم علامة عرض صحيحة مجردة مثل u8 أو i16"
 
 [diagnostics.SEM008.issues.trapping_word_width_required]
-message = "trapping type requires exactly one width"
-help = "write the trapping type with one width, such as trapping<u8> or trapping<i64>"
+message = "نوع trapping يتطلب عرضا واحدا بالضبط"
+help = "اكتب نوع trapping بعرض واحد، مثل trapping<u8> أو trapping<i64>"
 
 [diagnostics.SEM008.issues.trapping_word_width_shape]
-message = "trapping width must be a bare width marker"
-help = "use a bare width marker such as u8 or i64"
+message = "عرض trapping يجب أن يكون علامة عرض مجردة"
+help = "استخدم علامة عرض مجردة مثل u8 أو i64"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "يتعارض نمط الدالة في التعليق التوضيحي '{annotation_posture}' مع النمط المكتوب '{written_posture}'"
@@ -1032,12 +1032,12 @@ message = "{cursor} يتطلب معامل نوع واحدا"
 help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.queue_arity]
-message = "queue requires one or two type parameters"
-help = "use queue<T> or queue<T, N>"
+message = "queue يتطلب معامل نوع واحدا أو اثنين"
+help = "استخدم queue<T> أو queue<T, N>"
 
 [diagnostics.SEM008.issues.stack_arity]
-message = "stack requires one or two type parameters"
-help = "use stack<T> or stack<T, N>"
+message = "stack يتطلب معامل نوع واحدا أو اثنين"
+help = "استخدم stack<T> أو stack<T, N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "{discerne} {casu} يتطلب نمطا"
@@ -1492,12 +1492,12 @@ message = "عدم تطابق في النوع"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
 [diagnostics.SEM010.issues.sort_ref_requires_map]
-message = "`ref` sorts the keys of a map, so the source must be a map"
-help = "use `from` to sort the values of a list or a set, or sort a map with `ref`"
+message = "`ref` يفرز مفاتيح خريطة، لذا يجب أن يكون المصدر خريطة"
+help = "استخدم `from` لفرز قيم قائمة أو مجموعة، أو فرز خريطة بـ `ref`"
 
 [diagnostics.SEM010.issues.sort_tensor_unsupported]
-message = "a tensor cannot be the source of a sort expression"
-help = "convert the tensor to a list first, or use a library routine that ranks tensor scores"
+message = "لا يمكن أن يكون tensor مصدرا لتعبير فرز"
+help = "حوّل tensor أولا إلى قائمة، أو استخدم روتينا مكتبيا يرتب درجات tensor"
 
 [diagnostics.SEM010.issues.ledger_operation_not_implemented]
 message = "لا يمكن استخدام قيمة دفتر بعد: أنواع {tabulae} مقبولة في التصريحات ولا توجد أي عملية منفذة عليها"
@@ -1512,20 +1512,20 @@ message = "ورقة {leaf} غير مدعومة في هذا الهدف"
 help = "استخدم rust أو مشغّل MIR، أو احذف استدعاء {route}"
 
 [diagnostics.SEM010.issues.sort_source_unordered]
-message = "the elements have no natural order to sort by"
-help = "give the sort a body that returns an orderable key, such as a number, text or bool"
+message = "العناصر ليس لها ترتيب طبيعي للفرز به"
+help = "أعط الفرز جسما يعيد مفتاحا قابلا للترتيب، مثل رقم أو نص أو bool"
 
 [diagnostics.SEM010.issues.sort_key_unordered]
-message = "the sort key has no natural order"
-help = "return a number, text or bool from the sort body; a key is never a comparison"
+message = "مفتاح الفرز ليس له ترتيب طبيعي"
+help = "أعد رقما أو نصا أو bool من جسم الفرز؛ فالمفتاح ليس مقارنة أبدا"
 
 [diagnostics.SEM010.issues.sort_source_not_collection]
-message = "a sort expression needs a list, a set or a map as its source"
-help = "sort a list or a set with `from`, or a map with `from` (values) or `ref` (keys)"
+message = "تعبير الفرز يحتاج قائمة أو مجموعة أو خريطة كمصدر"
+help = "فرز قائمة أو مجموعة بـ `from`، أو خريطة بـ `from` (القيم) أو `ref` (المفاتيح)"
 
 [diagnostics.SEM010.issues.sort_body_requires_redde]
-message = "a sort body must return its key"
-help = "end the sort body with `return <key>`"
+message = "جسم الفرز يجب أن يعيد مفتاحه"
+help = "أنهِ جسم الفرز بـ `return <key>`"
 
 [diagnostics.SEM010.issues.argument_type_mismatch]
 message = "عدم تطابق في argument type"
@@ -1632,40 +1632,40 @@ message = "قد تكون القيمة {found} فارغة (none) ولا يمكن 
 help = "قدّم قيمة افتراضية باستخدام `coalesce`، أو ضيّق النوع أولا باستخدام `if x is not none`، أو استخدم القراءة القابلة للفشل `at`"
 
 [diagnostics.SEM010.issues.float_constant_inexact]
-message = "float constant is not exactly representable"
-help = "write a float literal, or a constant the float type holds exactly"
+message = "الثابت العائم غير قابل للتمثيل بدقة تامة"
+help = "اكتب حرفيا عائما، أو ثابتا يحمله النوع العائم بدقة تامة"
 
 [diagnostics.SEM010.issues.float_constant_out_of_range]
-message = "float constant is outside the finite range of the float type"
-help = "write a value the float type can hold, or use a wider float type"
+message = "الثابت العائم خارج المدى المنتهي للنوع العائم"
+help = "اكتب قيمة يستطيع النوع العائم حملها، أو استخدم نوعا عائما أعرض"
 
 [diagnostics.SEM010.issues.shift_count_negative]
-message = "shift count must not be negative"
-help = "write a shift count of zero or more"
+message = "عدد الإزاحات يجب ألا يكون سالبا"
+help = "اكتب عدد إزاحات يساوي صفرا أو أكثر"
 
 [diagnostics.SEM010.issues.potentia_exponent_negative]
-message = "an integer power cannot have a negative exponent"
-help = "write an exponent of zero or more, or use a `fractus` base for a fractional power"
+message = "القوة الصحيحة لا يمكن أن يكون لها أس سالب"
+help = "اكتب أسا يساوي صفرا أو أكثر، أو استخدم أساسا من `fractus` لقوة كسرية"
 
 [diagnostics.SEM010.issues.integer_quotient_to_float_requires_true_division]
-message = "integer quotient cannot be a float implicitly"
-help = "divide with `÷` to get a float quotient, or convert an operand explicitly with `↦`"
+message = "خارج قسمة صحيح لا يصبح عائما تلقائيا"
+help = "اقسم بـ `÷` للحصول على خارج قسمة عائم، أو حوّل أحد المعاملين صراحة بـ `↦`"
 
 [diagnostics.SEM010.issues.store_constant_out_of_range]
-message = "constant {value} does not fit {slot}"
-help = "write a value the slot holds"
+message = "الثابت {value} لا يتسع في {slot}"
+help = "اكتب قيمة تستوعبها الخانة"
 
 [diagnostics.SEM010.issues.numerus_literal_out_of_range]
-message = "integer literal is outside the numerus range"
-help = "write a value from -9223372036854775808 to 9223372036854775807, store a larger non-negative value in a `u64` slot, or declare the slot `inf` to hold any integer"
+message = "الحرفي الصحيح خارج مدى numerus"
+help = "اكتب قيمة من -9223372036854775808 إلى 9223372036854775807، أو خزّن قيمة أكبر غير سالبة في خانة `u64`، أو أعلن الخانة `inf` لتحمل أي عدد صحيح"
 
 [diagnostics.SEM010.issues.bits_literal_out_of_range]
 message = "literal لا يتسع في width البتات"
 help = "اكتب literal يتسع في width البتات، مثل 0xff لـ b8"
 
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
-message = "integer cannot convert to a float implicitly"
-help = "convert the integer explicitly with `↦`"
+message = "لا يمكن تحويل الصحيح إلى عائم تلقائيا"
+help = "حوّل العدد الصحيح صراحة بـ `↦`"
 
 [diagnostics.SEM010.issues.incompatible_return_types]
 message = "return types غير متوافقة"
@@ -1940,8 +1940,8 @@ message = "معامل القيمة {param} لا يمكن أن يشغل موضع 
 help = "عرّف معاملاً عاماً `<size {param}>` واستخدمه في المدى، أو اكتب الرفع `size {param}` حيث يُقصد رفع قيمة وقت التشغيل"
 
 [diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
-message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
-help = "keep caller and fragment lane bindings distinct"
+message = "ارتباط مسار المقطع '{fragment}' يتعارض مع ارتباط مسار المستدعي '{caller}'"
+help = "أبقِ ارتباطات مسار المستدعي ومقطع المسار متمايزة"
 
 [diagnostics.SEM011.issues.range_step_must_be_numeric]
 message = "range step يجب أن يكون numeric"
@@ -2044,16 +2044,16 @@ message = "numeric arithmetic operands يجب أن تكون أنواعها مت�
 help = "حول operands صراحة قبل تطبيق هذا العامل العددي"
 
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
-message = "u64 and a signed integer have no lossless join in arithmetic"
-help = "convert one side with `↦` so both operands are u64 or both are signed (`a ↦ i64`), or join them exactly with `a ↦ inf`"
+message = "لا يوجد جمع بلا فقدان بين u64 وعدد صحيح موقّع في الحساب"
+help = "حوّل أحد الجانبين بـ `↦` ليكون المعاملان u64 أو كليهما موقّعا (`a ↦ i64`)، أو اجمعهما بدقة تامة بـ `a ↦ inf`"
 
 [diagnostics.SEM011.issues.saturating_word_family_mismatch]
-message = "saturating integers cannot mix with other integer families in arithmetic"
-help = "convert the other operand to the same saturating width with `↦`; saturating, wrapping, and trapping integers never mix implicitly"
+message = "أعداد saturating لا يمكن أن تختلط مع عائلات الأعداد الصحيحة الأخرى في الحساب"
+help = "حوّل المعامل الآخر إلى عرض saturating نفسه بـ `↦`؛ فأعداد saturating وwrapping وtrapping لا تختلط تلقائيا أبدا"
 
 [diagnostics.SEM011.issues.numeric_family_crossing_requires_conversio]
-message = "integer, decimal and float operands cannot mix implicitly"
-help = "convert one operand explicitly with `↦`; a written constant may stand beside any number"
+message = "معاملات الصحيح والعشري والعائم لا يمكن أن تختلط تلقائيا"
+help = "حوّل أحد المعاملين صراحة بـ `↦`؛ فالثابت المكتوب يمكن أن يقف بجانب أي عدد"
 
 [diagnostics.SEM011.issues.ascii_literal_invalid_escape]
 message = "{ascii} literal يحتوي escape sequence غير صالح"
@@ -2496,16 +2496,16 @@ message = "conversion من {numerus} أو {fractus} أو {bivalens} إلى {octe
 help = "استخدم chorda أو explicit byte conversion helpers"
 
 [diagnostics.SEM016.issues.bits_conversion_width_mismatch]
-message = "a bN converts only to a number or bits type of the same width"
-help = "convert a bN only to an integer, float or bits type of the same width, such as b8 to u8 or b32 to f32"
+message = "bN يتحول فقط إلى نوع رقم أو بتات بالعرض نفسه"
+help = "حوّل bN فقط إلى نوع صحيح أو عائم أو بتات بالعرض نفسه، مثل b8 إلى u8 أو b32 إلى f32"
 
 [diagnostics.SEM016.issues.bits_via_clause_not_allowed]
-message = "a same-width bits conversion takes no via clause"
-help = "remove the via clause; a same-width bN conversion keeps the bit pattern and takes no hint"
+message = "تحويل البتات بالعرض نفسه لا يقبل جملة via"
+help = "أزل جملة via؛ فتحويل bN بالعرض نفسه يحتفظ بنمط البتات ولا يقبل تلميحا"
 
 [diagnostics.SEM016.issues.bits_via_clause_required]
-message = "a bits list conversion that changes the bit width needs a via Le or via Be clause"
-help = "write the byte order with the conversion, such as lista<b8> ↦ lista<u16> via Le; a same-width conversion takes no clause"
+message = "تحويل قائمة بتات يغيّر عرض البتات يحتاج جملة via Le أو via Be"
+help = "اكتب ترتيب البايتات مع التحويل، مثل lista<b8> ↦ lista<u16> via Le؛ والتحويل بالعرض نفسه لا يقبل جملة"
 
 [diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
 message = "conversion من {octeti} إلى {numerus} غير محدد (byte width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
@@ -2520,20 +2520,20 @@ message = "the Code hint converts only littera ↦ u32 via Code (read a code poi
 help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Code a number converts to its digits"
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
-message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
+message = "`{hint}` ليس تلميح تحويل"
+help = "استخدم واحدا من Hex أو Bin أو Oct أو Be أو Le أو Code بعد via؛ وFloor وCeil وHalfEven وTrunc تخص فقط عائما أو عشريا محولا إلى صحيح"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
-message = "this conversion target takes no convert hint"
+message = "هدف التحويل هذا لا يقبل تلميح تحويل"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
-message = "a float or decimal does not convert to an integer without naming the rounding"
-help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
+message = "العائم أو العشري لا يتحول إلى صحيح دون تسمية التقريب"
+help = "اكتب `x ↦ int via Floor` أو `via Ceil` أو `via HalfEven` (التعادل إلى الجار الزوجي) أو `via Trunc`؛ وموضع `↤` يقبل الجملة نفسها، `a ↤ x via Trunc`؛ أو قرّب أولا بـ ⌊x⌋ أو ⌈x⌉ أو ⌊x⌉ وحوّل النتيجة"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
-message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
-help = "write `x ↦ b32` to read a float as its bit pattern (b16, b32 or b64 by width) and `b32 ↦ f32` to build one; a pattern held in a number goes through its marker first, as in `u16 ↦ b16 ↦ f16`"
+message = "`via Bits` ملغى: نمط البتات يُحمل في علامة bN ولا يُختار بتلميح"
+help = "اكتب `x ↦ b32` لقراءة عائم كنمط بتاته (b16 أو b32 أو b64 حسب العرض) و`b32 ↦ f32` لبناء واحد؛ والنمط المحمول في رقم يمر بعلامته أولا، كما في `u16 ↦ b16 ↦ f16`"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "conversion من {octeti} إلى {bivalens} بلا default meaning؛ فك إلى {textus} أو قارن bytes صراحة"
@@ -2588,8 +2588,8 @@ message = "{regex} conversion يتطلب {textus} أو {ascii} operand"
 help = "حول {textus} أو {ascii} values إلى {regex}"
 
 [diagnostics.SEM016.issues.word_conversio_recovery_unsupported]
-message = "a conversion into wrapping or saturating cannot fail"
-help = "remove the `⊥` default; a conversion into wrapping or saturating cannot fail"
+message = "التحويل إلى wrapping أو saturating لا يمكن أن يفشل"
+help = "أزل القيمة الافتراضية `⊥`؛ فالتحويل إلى wrapping أو saturating لا يمكن أن يفشل"
 
 [diagnostics.SEM016.issues.regex_recovery_unsupported]
 message = "{regex} conversion لا يدعم recovery `⊥`؛ {regex} ليس له literal form، لذا لا توجد target-typed value للاستبدال"
@@ -2844,16 +2844,16 @@ message = "استخدام بعد النقل"
 help = "تجنب استخدام قيمة بعد نقلها"
 
 [diagnostics.SEM050.issues.use_after_own]
-message = "this name was given away as `own` and is used later"
-help = "pass `copy` to keep using the name"
+message = "هذا الاسم مُنح كـ `own` ويُستخدم لاحقا"
+help = "مرر `copy` لمواصلة استخدام الاسم"
 
 [diagnostics.SEM050.issues.moved_in_loop]
-message = "this value is moved on every iteration of the loop"
-help = "pass `copy`, or move a value created inside the loop"
+message = "هذه القيمة تُنقل في كل تكرار من الحلقة"
+help = "مرر `copy`، أو انقل قيمة منشأة داخل الحلقة"
 
 [diagnostics.SEM050.issues.moved_name_captured_by_closure]
-message = "this closure captured a name that was given away before the call"
-help = "call the closure before the move, or pass `copy`"
+message = "هذا الإغلاق أسر اسما مُنح قبل الاستدعاء"
+help = "استدعِ الإغلاق قبل النقل، أو مرر `copy`"
 
 [diagnostics.SEM051]
 message = "استعارة قيمة منقولة"
@@ -2912,12 +2912,12 @@ message = "لا يمكن الإسناد إلى `{de}` parameter"
 help = "صرح عن parameter كـ '{in}' إذا كان التعديل مقصودا"
 
 [diagnostics.SEM056.issues.mutating_receiver_through_ref]
-message = "cannot call a mutating receiver through a `ref` view"
-help = "drop the `ref` marker, or use a non-mutating method"
+message = "لا يمكن استدعاء مستقبِل معدِّل عبر عرض `ref`"
+help = "أسقط علامة `ref`، أو استخدم طريقة غير معدِّلة"
 
 [diagnostics.SEM056.issues.assign_through_ref]
-message = "cannot assign through a `ref` view"
-help = "drop the `ref` marker if mutation is intended"
+message = "لا يمكن الإسناد عبر عرض `ref`"
+help = "أسقط علامة `ref` إن كان التعديل مقصودا"
 
 [diagnostics.SEM057]
 message = "عدم تطابق parameter mode"
@@ -2928,104 +2928,104 @@ message = "لا يمكن تمرير `{de}` parameter إلى `{in}` أو `{ex}` p
 help = "طابق parameter modes بين caller و callee"
 
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
-message = "cannot pass a `ref` value to a `mut` or `own` position"
-help = "pass a `mut` or `own` value, or bind through `copy`"
+message = "لا يمكن تمرير قيمة `ref` إلى موضع `mut` أو `own`"
+help = "مرر قيمة `mut` أو `own`، أو اربط عبر `copy`"
 
 [diagnostics.SEM057.issues.own_argument_not_local_binding]
-message = "only a whole local binding can be passed as `own`"
-help = "pass `copy` to duplicate the field or element, or bind it to a local first"
+message = "لا يمكن تمرير سوى ارتباط محلي كامل كـ `own`"
+help = "مرر `copy` لتكرار الحقل أو العنصر، أو اربطه بمتغير محلي أولا"
 
 [diagnostics.SEM057.issues.own_argument_unmarked_parameter]
-message = "an unmarked parameter is shared read-only and cannot be given away as `own`"
-help = "pass `copy` to duplicate it, or declare the parameter `own`"
+message = "المعامل غير المعلَّم مشترك للقراءة فقط ولا يمكن منحه كـ `own`"
+help = "مرر `copy` لتكراره، أو أعلن المعامل `own`"
 
 [diagnostics.SEM057.issues.own_argument_module_constant]
-message = "a module constant cannot be given away as `own`"
-help = "pass `copy` to duplicate it"
+message = "ثابت الوحدة لا يمكن منحه كـ `own`"
+help = "مرر `copy` لتكراره"
 
 [diagnostics.SEM057.issues.own_argument_loop_binder]
-message = "a loop binder aliases a live element and cannot be given away as `own`"
-help = "pass `copy` to duplicate it"
+message = "ارتباط الحلقة يشير إلى عنصر حي ولا يمكن منحه كـ `own`"
+help = "مرر `copy` لتكراره"
 
 [diagnostics.SEM057.issues.call_marker_missing]
-message = "this argument needs the `{expected}` marker its parameter declares"
-help = "write the same access marker at the call as in the signature, for example `f(mut x)`"
+message = "هذا الوسيط يحتاج علامة `{expected}` التي يعلنها معامله"
+help = "اكتب علامة الوصول نفسها عند الاستدعاء كما في التوقيع، مثلا `f(mut x)`"
 
 [diagnostics.SEM057.issues.call_marker_mismatch]
-message = "this argument is marked `{found}` but its parameter is declared `{expected}`"
-help = "use the same access marker at the call as in the signature"
+message = "هذا الوسيط معلَّم `{found}` لكن معامله معلن `{expected}`"
+help = "استخدم علامة الوصول نفسها عند الاستدعاء كما في التوقيع"
 
 [diagnostics.SEM057.issues.call_marker_on_read_only]
-message = "a read-only parameter takes no `{found}` marker"
-help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
+message = "المعامل للقراءة فقط لا يقبل علامة `{found}`"
+help = "أزل العلامة، أو اكتب `ref`، وهي التهجئة الصريحة للافتراضي"
 
 [diagnostics.SEM010.issues.axis_reduction_extent_unknown]
-message = "the mean needs a compile-time extent on the axis it removes"
-help = "give the axis a literal extent, or write the grouped reduction and divide by the run-time count"
+message = "المتوسط يحتاج مدى معروفا وقت الترجمة على المحور الذي يزيله"
+help = "أعط المحور مدى حرفيا، أو اكتب الاختزال المجمّع واقسم على العدد وقت التشغيل"
 
 [diagnostics.SEM010.issues.axis_reduction_mean_requires_float]
-message = "the mean along an axis needs a floating-point element"
-help = "convert the tensor to a floating-point element type first, or use sum"
+message = "المتوسط على محور يحتاج عنصرا عائما"
+help = "حوّل tensor أولا إلى نوع عنصر عائم، أو استخدم sum"
 
 [diagnostics.SEM010.issues.axis_reduction_not_constant]
-message = "the axis of a reduction must be a compile-time constant"
-help = "write a literal axis such as `axis 1`; the result shape depends on it"
+message = "محور الاختزال يجب أن يكون ثابتا وقت الترجمة"
+help = "اكتب محورا حرفيا مثل `axis 1`؛ فشكل النتيجة يعتمد عليه"
 
 [diagnostics.SEM010.issues.axis_reduction_out_of_range]
-message = "the axis is outside the rank of the tensor"
-help = "use an axis from 0 up to one less than the rank"
+message = "المحور خارج رتبة tensor"
+help = "استخدم محورا من 0 حتى واحد أقل من الرتبة"
 
 [diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
-message = "an axis reduction is built for tensors of rank 2 to 8 only"
-help = "reduce a tensor of rank 2 to 8 with literal dimensions, or write the explicit reduction with `reducta ... per [...]`"
+message = "اختزال المحور مبني فقط لـ tensor من الرتبة 2 إلى 8"
+help = "اختزل tensor من الرتبة 2 إلى 8 بأبعاد حرفية، أو اكتب الاختزال الصريح بـ `reducta ... per [...]`"
 
 [diagnostics.SEM010.issues.reducta_group_keys_not_literal]
-message = "the grouping keys of a multi-key grouped reduction must be a bracketed list of key expressions written in place"
-help = "write `per [i, j]` with the keys spelled out; a list held in a variable or a spread cannot name the result axes"
+message = "مفاتيح التجميع في اختزال مجمّع متعدد المفاتيح يجب أن تكون قائمة بين قوسين بتعابير مفاتيح مكتوبة في موضعها"
+help = "اكتب `per [i, j]` بمفاتيح مذكورة صراحة؛ فقائمة محفوظة في متغير أو منشورة لا يمكنها تسمية محاور النتيجة"
 
 [diagnostics.SEM010.issues.reducta_group_rank_mismatch]
-message = "a grouped reduction with N keys produces a result tensor of rank N"
-help = "make the expected result tensor's rank equal the number of keys, or drop a key"
+message = "الاختزال المجمّع بـ N من المفاتيح ينتج tensor نتيجة من الرتبة N"
+help = "اجعل رتبة tensor النتيجة المتوقعة مساوية لعدد المفاتيح، أو أسقط مفتاحا"
 
 [diagnostics.SEM057.issues.axis_marker_required]
-message = "this argument is an `axis` argument and must be written with the `axis` marker"
-help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
+message = "هذا الوسيط وسيط `axis` ويجب كتابته بعلامة `axis`"
+help = "اكتب العلامة عند الاستدعاء كما يعلنها التوقيع، مثلا `f(axis 1)`"
 
 [diagnostics.SEM057.issues.axis_marker_unexpected]
-message = "the `axis` marker is written here but the parameter is not declared `axis`"
-help = "remove the `axis` marker, or declare the parameter `axis int`"
+message = "علامة `axis` مكتوبة هنا لكن المعامل غير معلن كـ `axis`"
+help = "أزل علامة `axis`، أو أعلن المعامل `axis int`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
-message = "cannot bind an unmarked value into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "لا يمكن ربط قيمة غير معلَّمة في `own`"
+help = "اربط عبر `copy` لتكرار المصدر"
 
 [diagnostics.SEM057.issues.ref_into_own]
-message = "cannot bind a `ref` value into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "لا يمكن ربط قيمة `ref` في `own`"
+help = "اربط عبر `copy` لتكرار المصدر"
 
 [diagnostics.SEM057.issues.mut_into_own]
-message = "cannot bind a `mut` value into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "لا يمكن ربط قيمة `mut` في `own`"
+help = "اربط عبر `copy` لتكرار المصدر"
 
 [diagnostics.SEM057.issues.field_into_own]
-message = "cannot bind a field projection into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "لا يمكن ربط إسقاط حقل في `own`"
+help = "اربط عبر `copy` لتكرار المصدر"
 
 [diagnostics.SEM057.issues.index_into_own]
-message = "cannot bind an index projection into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "لا يمكن ربط إسقاط فهرس في `own`"
+help = "اربط عبر `copy` لتكرار المصدر"
 
 [diagnostics.SEM057.issues.deref_into_own]
-message = "cannot bind a dereference into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "لا يمكن ربط إزالة مرجع في `own`"
+help = "اربط عبر `copy` لتكرار المصدر"
 
 [diagnostics.SEM057.issues.projection_into_own]
-message = "cannot bind a projection into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "لا يمكن ربط إسقاط في `own`"
+help = "اربط عبر `copy` لتكرار المصدر"
 
 [diagnostics.SEM057.issues.shared_into_own]
-message = "cannot bind a shared value into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "لا يمكن ربط قيمة مشتركة في `own`"
+help = "اربط عبر `copy` لتكرار المصدر"
 
 [diagnostics.SEM058]
 message = "استخدام قبل التهيئة"
@@ -3240,11 +3240,11 @@ message = "cast غير ضروري: type معروف مسبقا"
 help = "أزل الـ cast الزائد"
 
 [diagnostics.WARN007]
-message = "target no-op"
+message = "عملية هدف لا أثر لها"
 help = "أزل construct أو gate ب target"
 
 [diagnostics.WARN008]
-message = "unused mutable reference parameter"
+message = "معامل مرجعي قابل للتغيير غير مستخدم"
 help = "غير '{in}' إلى '{de}' إذا كان التعديل غير ضروري"
 
 [diagnostics.WARN008.issues.unused_in_parameter]
@@ -3252,7 +3252,7 @@ message = "`{in}` parameter لا يعدل أبدا؛ اعتبر `{de}`"
 help = "غير '{in}' إلى '{de}' إذا كان التعديل غير ضروري"
 
 [diagnostics.WARN009]
-message = "unused move parameter"
+message = "معامل نقل غير مستخدم"
 help = "غير '{ex}' إلى '{de}' إذا كان نقل الملكية غير ضروري"
 
 [diagnostics.WARN009.issues.unused_ex_parameter]
