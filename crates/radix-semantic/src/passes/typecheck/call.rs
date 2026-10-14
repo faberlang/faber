@@ -557,7 +557,7 @@ impl TypeChecker<'_> {
     /// called `axis <expr>`, and `axis <expr>` is refused for a plain
     /// parameter. Inside the function the parameter is an ordinary int, so
     /// passing it on writes the word again.
-    fn check_axis_marker(&mut self, arg: &HirCallArg, declared: bool) {
+    pub(super) fn check_axis_marker(&mut self, arg: &HirCallArg, declared: bool) {
         if arg.spread {
             return;
         }

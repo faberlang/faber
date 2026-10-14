@@ -238,6 +238,11 @@ pub struct MethodIntrinsic {
     /// compile-time `index_provably_out_of_bounds`. `None` on rows that are
     /// not failable or have no provable range.
     pub range_checked_arg: Option<usize>,
+    /// A row whose argument at this index is an `axis` marker slot (need
+    /// bc775857): the call declares it with the `axis` word, and the word on
+    /// any other argument is `axis_marker_unexpected`. `None` on rows with no
+    /// axis argument.
+    pub axis_arg: Option<usize>,
 }
 
 impl MethodIntrinsic {
@@ -265,6 +270,7 @@ macro_rules! intrinsic_row {
             value_arity_issue: None,
             failable: false,
             range_checked_arg: None,
+            axis_arg: None,
         }
     };
 }
@@ -922,6 +928,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         value_arity_issue: Some("tensor_formata_forbids_value_args"),
         failable: false,
         range_checked_arg: None,
+        axis_arg: None,
     },
     intrinsic!(Tensor, "planata", 0, &[], ArrayInner, collection TensorFlatten),
     // CCI-1: the bounded common-case intrinsic rows (RMSNorm, RoPE, row
@@ -937,18 +944,21 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         GatherShape,
         collection TensorGather
     ),
-    intrinsic!(
-        Tensor,
-        "rms_norm",
-        3,
-        &[
-            IntrinsicParamKind::NumerusIndex,
-            IntrinsicParamKind::Inner,
-            IntrinsicParamKind::TensorPeer,
-        ],
-        SameAsReceiver,
-        collection TensorRmsNorm
-    ),
+    MethodIntrinsic {
+        axis_arg: Some(0),
+        ..intrinsic!(
+            Tensor,
+            "rms_norm",
+            3,
+            &[
+                IntrinsicParamKind::NumerusIndex,
+                IntrinsicParamKind::Inner,
+                IntrinsicParamKind::TensorPeer,
+            ],
+            SameAsReceiver,
+            collection TensorRmsNorm
+        )
+    },
     MethodIntrinsic {
         receiver: IntrinsicReceiver::Tensor,
         faber_name: "rope_norm",
@@ -965,6 +975,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         value_arity_issue: Some("rope_norm_value_arity"),
         failable: false,
         range_checked_arg: None,
+        axis_arg: None,
     },
     intrinsic!(
         Tensor,
@@ -1023,39 +1034,48 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         collection TensorTranspose
     ),
-    intrinsic!(
-        Tensor,
-        "laminatio",
-        2,
-        &[IntrinsicParamKind::NumerusIndex, IntrinsicParamKind::Inner],
-        SameAsReceiver,
-        collection TensorLayerNorm
-    ),
-    intrinsic!(
-        Tensor,
-        "laminatio",
-        3,
-        &[
-            IntrinsicParamKind::NumerusIndex,
-            IntrinsicParamKind::Inner,
-            IntrinsicParamKind::TensorPeer,
-        ],
-        SameAsReceiver,
-        collection TensorLayerNorm
-    ),
-    intrinsic!(
-        Tensor,
-        "laminatio",
-        4,
-        &[
-            IntrinsicParamKind::NumerusIndex,
-            IntrinsicParamKind::Inner,
-            IntrinsicParamKind::TensorPeer,
-            IntrinsicParamKind::TensorPeer,
-        ],
-        SameAsReceiver,
-        collection TensorLayerNorm
-    ),
+    MethodIntrinsic {
+        axis_arg: Some(0),
+        ..intrinsic!(
+            Tensor,
+            "laminatio",
+            2,
+            &[IntrinsicParamKind::NumerusIndex, IntrinsicParamKind::Inner],
+            SameAsReceiver,
+            collection TensorLayerNorm
+        )
+    },
+    MethodIntrinsic {
+        axis_arg: Some(0),
+        ..intrinsic!(
+            Tensor,
+            "laminatio",
+            3,
+            &[
+                IntrinsicParamKind::NumerusIndex,
+                IntrinsicParamKind::Inner,
+                IntrinsicParamKind::TensorPeer,
+            ],
+            SameAsReceiver,
+            collection TensorLayerNorm
+        )
+    },
+    MethodIntrinsic {
+        axis_arg: Some(0),
+        ..intrinsic!(
+            Tensor,
+            "laminatio",
+            4,
+            &[
+                IntrinsicParamKind::NumerusIndex,
+                IntrinsicParamKind::Inner,
+                IntrinsicParamKind::TensorPeer,
+                IntrinsicParamKind::TensorPeer,
+            ],
+            SameAsReceiver,
+            collection TensorLayerNorm
+        )
+    },
     intrinsic!(
         Tensor,
         "materialize",
@@ -1113,6 +1133,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         value_arity_issue: Some("tensor_limes_value_arity"),
         failable: false,
         range_checked_arg: None,
+        axis_arg: None,
     },
     // matrix
     intrinsic!(
