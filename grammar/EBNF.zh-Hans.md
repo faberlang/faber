@@ -2168,7 +2168,7 @@ entries in a different order are not equal.
 
 `copia` and `tabula` iterate in unspecified order. The order is not promised
 and not deliberately random; backends may differ. When order matters, sort
-explicitly, or use a `tabulae`. `≡` on these types stays structural and does
+explicitly with the sort expression (`排序 经由 升序 取自 xs`; en `sort 经由 asc from xs`, and `sort 经由 asc ref m` for a map's keys), or use a `tabulae`. `≡` on these types stays structural and does
 not depend on order.
 
 **Set display.** `print`, a `§` hole in a template and a composite print show a
@@ -2785,7 +2785,7 @@ The old `求和 取自`, `最大 取自`, and `最小 取自` forms (English `su
 
 The tensor method `.media()` (en `.mean()`) is not a reduction operator and has no `经由` form. It is sugar over the sum reduction: `t.media()` is `t.求和() / count`, where `count` is the element count of `t` (en `t.mean()` is `t.sum() / count`). The grouped form `t.media(轴 n)` is the grouped sum divided by the grouped count, elementwise. A mean is not a true reduction (two partial means do not combine; sums and counts do), so the reduction operator set stays the set of real reductions. An empty source is `0 / 0`, which follows the float rules and is not-a-number (NaN); it is not a no-value result and has no fallback.
 
-`排序 经由 <direction> (取自 | 借自) source [(常量 | 变量) x { 返回 key }]` is the sort expression (en `sort 经由 asc from xs`). `经由` is mandatory and selects `升序` or `降序` (en `asc`, `desc`). `取自` (en `from`) orders a list, a set, or a map's values; `借自` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `排序`, `升序`, and `降序` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. Typecheck is not yet wired: the checker refuses the expression with `SEM010:sort_expression_not_typechecked`.
+`排序 经由 <direction> (取自 | 借自) source [(常量 | 变量) x { 返回 key }]` is the sort expression (en `sort 经由 asc from xs`). `经由` is mandatory and selects `升序` or `降序` (en `asc`, `desc`). `取自` (en `from`) orders a list, a set, or a map's values; `借自` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `排序`, `升序`, and `降序` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. The checker types it (`sort_source_unordered` refuses a source with no natural order, such as a nested list with no body key; `sort_source_not_collection` refuses a non-collection; `sort_ref_requires_map` refuses a list or set under `借自`/`ref`; `sort_tensor_unsupported` refuses a tensor; `sort_key_unordered` refuses an unordered key; `sort_body_requires_redde` refuses a body with no `返回`); a map under `借自`/`ref` yields its keys as `lista<K>`, a map or set under `取自`/`from` its values; the list method `.sorted(key)` is retired (`sorted_key_retired`) in favour of this expression. It runs on the MIR runner and on the Rust, Go, TypeScript, Swift, LLVM, Wasm and Python emitters.
 
 `格式化` and `读取`/`行` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
