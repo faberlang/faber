@@ -27,8 +27,8 @@ const ERROR_PARAM: &str = "T";
 ///
 /// `trapped` is reserved like `erratum`: user source cannot shadow it. The def
 /// id comes from the builtin low range, so user declaration ids stay stable.
-/// The variant names live only in the per-union namespace (`define_variant`),
-/// never as bare resolver symbols.
+/// The variant names live only in the per-union namespace
+/// (`define_builtin_variant`), never as bare resolver symbols.
 pub fn register(resolver: &mut Resolver, types: &mut TypeTable, interner: &mut Interner) {
     let name = interner.intern(TRAPPED_NAME);
     if resolver.lookup_type(name).is_some() {
@@ -46,7 +46,8 @@ pub fn register(resolver: &mut Resolver, types: &mut TypeTable, interner: &mut I
     });
     debug_assert!(defined.is_ok(), "builtin trapped registers exactly once");
     for variant in [RETURNED_VARIANT, THROWN_VARIANT] {
-        let defined = resolver.define_variant(def_id, interner.intern(variant), Span::default());
+        let defined =
+            resolver.define_builtin_variant(def_id, interner.intern(variant), Span::default());
         debug_assert!(
             defined.is_some(),
             "builtin trapped defines each variant exactly once"
