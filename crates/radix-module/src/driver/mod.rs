@@ -4927,6 +4927,11 @@ mod rms_norm_intrinsic_tests;
 mod rope_norm_intrinsic_tests;
 
 #[cfg(test)]
+#[cfg(feature = "device")]
+#[path = "causal_softmax_intrinsic_test.rs"]
+mod causal_softmax_intrinsic_tests;
+
+#[cfg(test)]
 #[path = "default_code_locale_test.rs"]
 mod default_code_locale_tests;
 
