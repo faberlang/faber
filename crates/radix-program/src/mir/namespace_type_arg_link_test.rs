@@ -326,3 +326,89 @@ fn package_mir_specializes_imported_air_rope_before_lowering() {
     )
     .unwrap_or_else(|errors| panic!("imported AIR rope package must lower, got {errors:?}"));
 }
+
+const FAILABLE_NAMESPACE_UTIL: &str = r"@ public
+fn pick<T>(T x) → T ⇥ string {
+    return x
+}
+";
+
+const FAILABLE_NAMESPACE_MAIN: &str = r#"import from "./util" * as utilModule
+
+fn main() → void {
+    do {
+        print utilModule.pick<string>("x")
+    }
+    catch err {
+        print "caught"
+    }
+}
+"#;
+
+fn write_failable_namespace_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "ns-failable-link"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("util.fab"), FAILABLE_NAMESPACE_UTIL).expect("write util.fab");
+    fs::write(src.join("main.fab"), FAILABLE_NAMESPACE_MAIN).expect("write main.fab");
+    src.join("main.fab")
+}
+
+/// A failable generic sibling export (`pick<T> → T ⇥ string`) is called from
+/// `main` with a spelled type argument. The namespace rewrite plus the
+/// synthetic-callee type recovery must keep the error half so the call lowers
+/// as a try-call edge in `main`, not as an ordinary call.
+#[test]
+fn package_mir_links_generic_failable_namespace_call() {
+    let dir = crate::test_support::test_temp_dir("ns-typearg-failable");
+    let entry = write_failable_namespace_package(dir.as_ref());
+    let config = Config::default();
+
+    with_interpreted_lowered_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        |lowered| {
+            let main = lowered
+                .validated
+                .program()
+                .functions
+                .iter()
+                .find(|function| {
+                    function
+                        .name
+                        .is_some_and(|name| lowered.interner.resolve(name) == "main")
+                })
+                .unwrap_or_else(|| panic!("`main` must exist in the merged program"));
+            assert!(
+                main.blocks.iter().any(|block| matches!(
+                    block.terminator.kind,
+                    MirTerminatorKind::TryCall { .. }
+                )),
+                "failable namespace call must lower to a try-call edge in main"
+            );
+        },
+    )
+    .unwrap_or_else(|errors| {
+        panic!(
+            "failable type-arg namespace call must link, got {:?}",
+            errors
+        )
+    });
+}
