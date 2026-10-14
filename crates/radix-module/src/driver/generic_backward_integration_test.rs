@@ -311,7 +311,7 @@ fn unrolled_full_prefix_range_loop_generates_companion_through_driver() {
 @ radix lane "air"
 @ radix backward "lane_sum_backward"
 functio lane_sum(tensor<f32, [4]> x) → f32 {
-    varia tensor<f32, [4]> acc ← x.nega().nega()
+    varia tensor<f32, [4]> acc ← copy x
     itera ab 0‥4 fixum i {
         acc ← acc + x
     }
@@ -369,7 +369,7 @@ fn generic_full_prefix_range_reaches_concrete_backward_companion() {
 @ radix lane "air"
 @ radix backward "generic_lane_sum_backward"
 functio generic_lane_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
-    varia tensor<f32, [N]> acc ← x.nega().nega()
+    varia tensor<f32, [N]> acc ← copy x
     itera ex x fixum value {
         acc ← acc + x
     }
@@ -456,7 +456,7 @@ fn generic_masked_route_reaches_concrete_backward_companion() {
 functio generic_masked_mean<magnitudo N>(
     tensor<f32, [N]> x, tensor<f32, [N]> mask
 ) → f32 {
-    varia tensor<f32, [N]> acc ← x.nega().nega()
+    varia tensor<f32, [N]> acc ← copy x
     itera ex x fixum value {
         acc ← acc + x
     }
@@ -526,7 +526,7 @@ fn unrolled_masked_route_generates_companion_through_driver() {
 @ radix lane "air"
 @ radix backward "masked_mean_backward"
 functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
-    varia tensor<f32, [4]> acc ← x.nega().nega()
+    varia tensor<f32, [4]> acc ← copy x
     itera ab 0‥4 fixum i {
         acc ← acc + x
     }
