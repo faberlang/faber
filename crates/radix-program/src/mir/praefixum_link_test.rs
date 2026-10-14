@@ -78,7 +78,9 @@ fn arg<'a>(diagnostic: &'a Diagnostic, name: &str) -> &'a str {
 
 /// The genus `DefId` of an expression whose declared type is a genus.
 fn struct_def(node: &AnalyzedProgramNode, expression: &HirExpression) -> DefId {
-    let ty = expression.ty.expect("the initializer carries a declared type");
+    let ty = expression
+        .ty
+        .expect("the initializer carries a declared type");
     match node.analysis.types.get(ty) {
         Type::Struct(def_id) => *def_id,
         other => panic!("expected a genus type, got {other:?}"),
@@ -228,7 +230,11 @@ fn praefixum_link_module_without_imports_is_untouched() {
 fn praefixum_link_imported_genus_result_is_the_importers_own() {
     let dir = test_temp_dir("praefixum-link-genus");
     let dir = dir.as_ref();
-    write(dir, "consts.fab", "@ public\nclass Box {\n    var int n\n}\n");
+    write(
+        dir,
+        "consts.fab",
+        "@ public\nclass Box {\n    var int n\n}\n",
+    );
     write(
         dir,
         "main.fab",
@@ -244,20 +250,26 @@ fn praefixum_link_imported_genus_result_is_the_importers_own() {
                 !matches!(value.kind, HirExpressionKind::Praefixum(_)),
                 "the imported-genus site must not stay deferred"
             );
-            let HirExpressionKind::Verte { entries: Some(entries), .. } = &value.kind else {
+            let HirExpressionKind::Verte {
+                entries: Some(entries),
+                ..
+            } = &value.kind
+            else {
                 panic!(
                     "outcome must be the refusal issue or a typed construction, got {:?}",
                     value.kind
                 );
             };
-            let n = entries.iter().find_map(|field| match (&field.key, &field.value) {
-                (radix_module::hir::HirObjectKey::Ident(name), Some(value))
-                    if node.analysis.interner.resolve(*name) == "n" =>
-                {
-                    Some(int_literal(value))
-                }
-                _ => None,
-            });
+            let n = entries
+                .iter()
+                .find_map(|field| match (&field.key, &field.value) {
+                    (radix_module::hir::HirObjectKey::Ident(name), Some(value))
+                        if node.analysis.interner.resolve(*name) == "n" =>
+                    {
+                        Some(int_literal(value))
+                    }
+                    _ => None,
+                });
             assert_eq!(n, Some(7));
             let def = struct_def(node, value);
             let (_, sibling) = package.node_by_path(&dir.join("consts.fab")).unwrap();
@@ -267,13 +279,18 @@ fn praefixum_link_imported_genus_result_is_the_importers_own() {
                 .items
                 .iter()
                 .find_map(|item| match &item.kind {
-                    HirItemKind::Struct(strukt) if sibling.analysis.interner.resolve(strukt.name) == "Box" => {
+                    HirItemKind::Struct(strukt)
+                        if sibling.analysis.interner.resolve(strukt.name) == "Box" =>
+                    {
                         Some(item.def_id)
                     }
                     _ => None,
                 })
                 .expect("the sibling declares Box");
-            assert_ne!(def, sibling_box, "a literal must never carry the sibling's DefId");
+            assert_ne!(
+                def, sibling_box,
+                "a literal must never carry the sibling's DefId"
+            );
         }
         Err(diagnostics) => {
             sem064(&diagnostics, "praefixum_result_not_literal");

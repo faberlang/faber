@@ -76,7 +76,8 @@ fn no_existing_fab_file_lexes_an_inline_regex_literal() {
 
 /// Whether `error` carries exactly this `issue` fact.
 fn has_issue(error: &LexError, issue: &str) -> bool {
-    error.args
+    error
+        .args
         .iter()
         .any(|arg| arg.name == "issue" && arg.value.as_str() == issue)
 }
@@ -98,7 +99,9 @@ fn collect_fab_files(dir: &Path, out: &mut Vec<PathBuf>) {
 
 /// One-based source line containing the byte `offset`.
 fn line_of(source: &str, offset: u32) -> u32 {
-    let end = usize::try_from(offset).unwrap_or(source.len()).min(source.len());
+    let end = usize::try_from(offset)
+        .unwrap_or(source.len())
+        .min(source.len());
     #[allow(clippy::cast_possible_truncation)]
     let line = source[..end].bytes().filter(|byte| *byte == b'\n').count() as u32 + 1;
     line

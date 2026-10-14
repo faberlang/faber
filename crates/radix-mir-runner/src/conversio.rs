@@ -269,13 +269,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 self.convert_to_bounded_textus(value, *capacity, recovery, span)
             }
             Type::BoundedOcteti { capacity } => {
-                if matches!(
-                    value,
-                    Value::Int(_) | Value::UInt(_) | Value::Float(_)
-                ) {
-                    self.convert_scalar_to_bounded_octeti(
-                        value, source_ty, *capacity, params, span,
-                    )
+                if matches!(value, Value::Int(_) | Value::UInt(_) | Value::Float(_)) {
+                    self.convert_scalar_to_bounded_octeti(value, source_ty, *capacity, params, span)
                 } else {
                     self.convert_to_bounded_octeti(value, *capacity, recovery, span)
                 }

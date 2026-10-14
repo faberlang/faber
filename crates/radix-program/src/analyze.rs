@@ -47,11 +47,11 @@ use crate::library::{
     library_interface_declaration_surface, library_interface_export_surface,
     library_interface_has_module, library_interface_source, library_module_region_name,
 };
-#[cfg(feature = "runner")]
-use crate::praefixum_imports::PackageImportEffects;
 use crate::manifest::read_manifest;
 use crate::modules::module_segments_for_file;
 use crate::paths::normalize_path;
+#[cfg(feature = "runner")]
+use crate::praefixum_imports::PackageImportEffects;
 use crate::source_files::{is_proba_source_path, load_package_source, package_source_files};
 use crate::test_source_filter::TestSourceFilter;
 use crate::{LibraryImportBinding, PackageFile};
