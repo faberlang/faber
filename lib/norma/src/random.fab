@@ -36,8 +36,8 @@ fn random_int(int min, int max) → int {
 
 # Random bytes (crypto-secure)
 @ public
-fn random_bytes(int n) → bytes {
-    return call 'aleator:octetos' (n) ↦ bytes
+fn random_bytes(int n) → list<b8> {
+    return call 'aleator:octetos' (n) ↦ list<b8>
 }
 
 # UUID v4 string (crypto-secure)

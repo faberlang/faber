@@ -52,7 +52,7 @@ fn map_of(value tree) → map<string, value> {
 
 fn byte_text(int code) → string {
     do {
-        return ([code] ↦ bytes) ↦ string
+        return ([code] ↦ list<b8>) ↦ string
     }
     catch err {
         panic err

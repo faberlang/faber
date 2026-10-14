@@ -59,14 +59,14 @@ class FileStatus {
 
 # Read entire file as text (sync)
 @ public
-@ radix type T mut string list<string> bytes
+@ radix type T mut string list<string> list<b8>
 fn read_file<T>(string path) → T ⇥ fault.IoFault {
     return call 'solum:lege' (path) ↦ T
 }
 
 # Read entire file as text with async caller materialization.
 @ public
-@ radix type T mut string list<string> bytes
+@ radix type T mut string list<string> list<b8>
 @ future
 fn read_file_async<T>(string path) → T ⇥ fault.IoFault {
     return call 'solum:lege' (path) ↦ T
@@ -79,22 +79,22 @@ fn read_file_async<T>(string path) → T ⇥ fault.IoFault {
 
 # Draw entire file as bytes (sync)
 @ public
-fn read_bytes(string path) → bytes ⇥ fault.IoFault {
-    return call 'solum:hauri' (path) ↦ bytes
+fn read_bytes(string path) → list<b8> ⇥ fault.IoFault {
+    return call 'solum:hauri' (path) ↦ list<b8>
 }
 
 # Draw entire file as bytes (async route; Faber blocks on the frame)
 @ future
 @ public
-fn read_bytes_async(string path) → bytes ⇥ fault.IoFault {
-    return call 'solum:hauriet' (path) ↦ bytes
+fn read_bytes_async(string path) → list<b8> ⇥ fault.IoFault {
+    return call 'solum:hauriet' (path) ↦ list<b8>
 }
 
 # Draw a bounded byte range from a file.
 @ public
-fn read_range(string path, int offset, int length) → bytes ⇥ fault.IoFault {
+fn read_range(string path, int offset, int length) → list<b8> ⇥ fault.IoFault {
     const list<value> args ← [path ↦ value, offset ↦ value, length ↦ value]
-    return call 'solum:partem' (args) ↦ bytes
+    return call 'solum:partem' (args) ↦ list<b8>
 }
 
 # Find a text byte pattern within a bounded file range, or -1 when absent.
@@ -147,7 +147,7 @@ fn write_file_async(string path, string data) → void ⇥ fault.IoFault {
 
 # Pour bytes to file, overwrites existing (sync)
 @ public
-fn write_bytes(string path, bytes data) → void ⇥ fault.IoFault {
+fn write_bytes(string path, list<b8> data) → void ⇥ fault.IoFault {
     const list<value> args ← [path ↦ value, data ↦ value]
     return call 'solum:funde' (args) ↦ void
 }
@@ -155,7 +155,7 @@ fn write_bytes(string path, bytes data) → void ⇥ fault.IoFault {
 # Pour bytes to file with async caller materialization.
 @ public
 @ future
-fn write_bytes_async(string path, bytes data) → void ⇥ fault.IoFault {
+fn write_bytes_async(string path, list<b8> data) → void ⇥ fault.IoFault {
     const list<value> args ← [path ↦ value, data ↦ value]
     return call 'solum:funde' (args) ↦ void
 }

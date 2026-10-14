@@ -26,7 +26,7 @@ fn alphabet() → string {
 }
 
 @ private
-fn byte_at(bytes data, int i) → int {
+fn byte_at(list<b8> data, int i) → int {
     return (data.get(i) coalesce (0 ∷ b8)) ↦ u8 ↦ int
 }
 
@@ -58,7 +58,7 @@ fn sextet(int bits) → string {
 
 # Encode bytes to base64 string
 @ public
-fn base64(bytes data) → string {
+fn base64(list<b8> data) → string {
     var string out ← ""
     var int i ← 0
     const int n ← data.length()
@@ -106,7 +106,7 @@ fn alphabet_index(string c) → int ∪ none {
 
 # Decode base64 string to bytes (throws on invalid input)
 @ public
-fn decode_base64(string data) → bytes ⇥ string {
+fn decode_base64(string data) → list<b8> ⇥ string {
     var list<int> sextets ← []
     var int i ← 0
     while i ≺ data.length() {
@@ -152,7 +152,7 @@ fn decode_base64(string data) → bytes ⇥ string {
 
 # Attempt to decode base64 (returns nihil on invalid input)
 @ public
-fn try_decode_base64(string data) → bytes ∪ none {
+fn try_decode_base64(string data) → list<b8> ∪ none {
     do {
         return decode_base64(data)
     }
@@ -167,7 +167,7 @@ fn try_decode_base64(string data) → bytes ∪ none {
 
 # Encode bytes to lowercase hex string
 @ public
-fn hex(bytes data) → string {
+fn hex(list<b8> data) → string {
     var string out ← ""
     var int i ← 0
     while i ≺ data.length() {
@@ -181,7 +181,7 @@ fn hex(bytes data) → string {
 
 # Decode hex string to bytes (throws on invalid input)
 @ public
-fn decode_hex(string data) → bytes ⇥ string {
+fn decode_hex(string data) → list<b8> ⇥ string {
     if data.length() % 2 ≢ 0 then throw "norma:encoding.decode_hex: odd digit count"
     var list<u8> out ← []
     var int i ← 0
@@ -197,7 +197,7 @@ fn decode_hex(string data) → bytes ⇥ string {
 
 # Attempt to decode hex (returns nihil on invalid input)
 @ public
-fn try_decode_hex(string data) → bytes ∪ none {
+fn try_decode_hex(string data) → list<b8> ∪ none {
     do {
         return decode_hex(data)
     }
@@ -216,7 +216,7 @@ fn is_unreserved(string c) → bool {
 }
 
 @ private
-fn percent_encode_bytes(bytes raw) → string {
+fn percent_encode_bytes(list<b8> raw) → string {
     var string out ← ""
     var int i ← 0
     while i ≺ raw.length() {
@@ -240,7 +240,7 @@ fn encode_form(string data, bool plus_space) → string {
             out ← out + c
         }
         else {
-            out ← out + percent_encode_bytes(c ↦ bytes)
+            out ← out + percent_encode_bytes(c ↦ list<b8>)
         }
         i ← i + 1
     }
@@ -272,7 +272,7 @@ fn decode_percent(string data, bool plus_space) → string ⇥ string {
             i ← i + 3
         }
         else {
-            const bytes raw ← c ↦ bytes
+            const list<b8> raw ← c ↦ list<b8>
             var int k ← 0
             while k ≺ raw.length() {
                 out.append((raw.get(k) coalesce (0 ∷ b8)) ↦ u8)
