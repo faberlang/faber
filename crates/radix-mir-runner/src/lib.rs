@@ -2177,11 +2177,16 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             ));
         }
 
+        // The channel decides the payload shape: only an ignotum/valor
+        // alternate exit carries the fault record map; a textus channel
+        // carries the failure text, like every other failure.
+        let primitive = match self.types.get(error_ty.semantic_id()) {
+            Type::Primitive(primitive) => *primitive,
+            _ => Primitive::Textus,
+        };
+
         self.return_value = None;
-        self.return_error = Some(match fault {
-            Some((kind, path)) => routes::fault_record_value(&kind, &path),
-            None => Value::Str(error.message),
-        });
+        self.return_error = Some(failure_channel_value(&primitive, fault, error.message));
         self.pop_frame();
         Ok(StatementOutcome::FrameReturned)
     }
@@ -3585,6 +3590,24 @@ fn fault_record_args(error: &RunnerError) -> Option<(String, String)> {
         kind.to_owned(),
         error.arg("fault_path").unwrap_or_default().to_owned(),
     ))
+}
+
+/// Shape the alternate-exit payload for a runtime failure.
+///
+/// Only an ignotum or valor channel receives the two-entry fault record;
+/// a textus channel receives the failure text itself, matching the payload
+/// every non-leaf failure keeps.
+fn failure_channel_value(
+    channel: &Primitive,
+    fault: Option<(String, String)>,
+    message: String,
+) -> Value {
+    match (fault, channel) {
+        (Some((kind, path)), Primitive::Ignotum | Primitive::Valor) => {
+            routes::fault_record_value(&kind, &path)
+        }
+        _ => Value::Str(message),
+    }
 }
 
 /// Decode a lexer `ascii` literal payload through the one escape table.
