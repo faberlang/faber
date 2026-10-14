@@ -1309,7 +1309,7 @@ impl BodyFacts<'_> {
                         .is_some_and(|element| integer_slot(element, self.types).is_some())
                 {
                     match method_name {
-                        "divisio" => {
+                        "divisa" => {
                             if !argument_ranges.first().is_some_and(excludes_zero) {
                                 self.failures.push(
                                     KernelRequirementFailure::DivideByZeroPossible {
@@ -1318,7 +1318,7 @@ impl BodyFacts<'_> {
                                 );
                             }
                         }
-                        "addita" | "subtrahe" | "multiplica" | "nega" => {}
+                        "addita" | "subtracta" | "multiplicata" | "nega" => {}
                         _ => {
                             return expr.ty.map_or_else(AbstractRange::unknown, |ty| {
                                 AbstractRange::from_type(ty, self.types)
@@ -1330,15 +1330,15 @@ impl BodyFacts<'_> {
                             .first()
                             .cloned()
                             .map(|right| binary_range(HirBinOp::Add, receiver_range, right)),
-                        "subtrahe" => argument_ranges
+                        "subtracta" => argument_ranges
                             .first()
                             .cloned()
                             .map(|right| binary_range(HirBinOp::Sub, receiver_range, right)),
-                        "multiplica" => argument_ranges
+                        "multiplicata" => argument_ranges
                             .first()
                             .cloned()
                             .map(|right| binary_range(HirBinOp::Mul, receiver_range, right)),
-                        "divisio" => argument_ranges
+                        "divisa" => argument_ranges
                             .first()
                             .cloned()
                             .map(|right| binary_range(HirBinOp::Div, receiver_range, right)),
@@ -1347,7 +1347,7 @@ impl BodyFacts<'_> {
                     }
                     .unwrap_or_else(AbstractRange::unknown);
                     let modular_ty = expr.ty.filter(|ty| is_modular_type(Some(*ty), self.types));
-                    if modular_ty.is_none() || method_name == "divisio" {
+                    if modular_ty.is_none() || method_name == "divisa" {
                         self.check_intermediate(expr.span, result.clone());
                     }
                     return if let Some(ty) = modular_ty {

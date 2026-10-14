@@ -218,7 +218,7 @@ fn tensor_division(
     tensor<wrapping<i32>, [4]> dividend,
     tensor<wrapping<i32>, [4]> divisor
 ) → void {
-    const tensor<wrapping<i32>, [4]> quotient ← dividend.divide(divisor)
+    const tensor<wrapping<i32>, [4]> quotient ← dividend.divided(divisor)
 }
 ",
     );
