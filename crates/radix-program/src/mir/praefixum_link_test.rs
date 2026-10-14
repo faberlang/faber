@@ -386,3 +386,88 @@ fn praefixum_link_method_that_prints_is_forbidden() {
         arg(diagnostic, "chain")
     );
 }
+
+/// ST2-2.11c: both sibling modules export a genus named `Box`, so the method
+/// resolver finds two candidate homes for the genus (and none for `get` in
+/// particular) and refuses the site as unavailable.
+#[test]
+fn praefixum_link_method_two_sibling_homes_is_unavailable() {
+    let dir = test_temp_dir("praefixum-link-two-sibling-homes");
+    let dir = dir.as_ref();
+    write(
+        dir,
+        "a.fab",
+        "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n",
+    );
+    write(
+        dir,
+        "b.fab",
+        "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n",
+    );
+    write(
+        dir,
+        "main.fab",
+        "import from \"./a\" a\nimport from \"./b\" b\n\n\
+         const int M = comptime {\n    const a.Box x ← a.Box { n = 7 }\n    return x.get()\n}\n\n\
+         main {\n    print M\n}\n",
+    );
+    let diagnostics = analyze_err(dir);
+    let matches: Vec<&Diagnostic> = diagnostics
+        .iter()
+        .filter(|diagnostic| {
+            diagnostic.code == Some("SEM064")
+                && diagnostic.issue() == Some("praefixum_import_unavailable")
+        })
+        .collect();
+    assert_eq!(
+        matches.len(),
+        1,
+        "two sibling homes must yield exactly one unavailable refusal: {diagnostics:?}"
+    );
+    assert_eq!(arg(matches[0], "name"), "M");
+}
+
+/// ST2-2.11c: a library callee is available only when the analyzed body of
+/// the library reaches the import-effect resolver. The package analysis hook
+/// supplies no library bodies, so the site is refused as unavailable; the
+/// evaluated-4.0 arm stays asserted for the day bodies are supplied.
+#[test]
+fn praefixum_link_library_callee_evaluates_or_is_unavailable() {
+    let dir = test_temp_dir("praefixum-link-library-callee");
+    let dir = dir.as_ref();
+    write(
+        dir,
+        "main.fab",
+        "import from \"norma:math\" math\n\n\
+         const float L = comptime {\n    return math.add(1.5, 2.5)\n}\n\n\
+         main {\n    print L\n}\n",
+    );
+    let seams = test_mir_seams();
+    match crate::analyze::analyze_package(&package_config(dir), dir, &seams.analysis) {
+        Ok(package) => {
+            let (_, node) = package.node_by_path(&dir.join("main.fab")).unwrap();
+            match &constant(node, "L").kind {
+                HirExpressionKind::Literal(HirLiteral::Float(value)) => {
+                    assert_eq!(*value, 4.0, "the library body evaluates math.add");
+                }
+                other => panic!("expected the evaluated float literal, got {other:?}"),
+            }
+        }
+        Err(diagnostics) => {
+            let matches: Vec<&Diagnostic> = diagnostics
+                .iter()
+                .filter(|diagnostic| {
+                    diagnostic.code == Some("SEM064")
+                        && diagnostic.issue() == Some("praefixum_import_unavailable")
+                })
+                .collect();
+            assert_eq!(
+                matches.len(),
+                1,
+                "an unresolved library callee yields exactly one refusal: {diagnostics:?}"
+            );
+            assert_eq!(arg(matches[0], "name"), "L");
+            assert_eq!(arg(matches[0], "callee"), "math.add");
+        }
+    }
+}
