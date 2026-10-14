@@ -26,9 +26,9 @@ use super::tensor_edge::{
 };
 use super::value::{
     GradientStorage, LedgerValue, MapKey, TensorEdgeOp, TensorInverseMap, TensorValue, Value,
-    as_text_str, coordinate_fits, format_template_shaped, inverse_view_coordinate,
-    modular_operand, modular_word_reduce, modular_word_result, round_float,
-    uint_width_checked_add, values_equal, width_checked_add,
+    as_text_str, coordinate_fits, format_template_shaped, inverse_view_coordinate, modular_operand,
+    modular_word_reduce, modular_word_result, round_float, uint_width_checked_add, values_equal,
+    width_checked_add,
 };
 use super::{
     CallOutcome, RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH, RUNNER_LISTA_LENGTH_MISMATCH, Runner,
@@ -639,7 +639,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // WHY: a ledger literal lowers to the same keyed aggregate as a
                 // map; the aggregate type keeps insertion order so a duplicate
                 // key retains its first position with the later value.
-                if matches!(self.types.get(aggregate.ty.semantic_id()), Type::Ledger(_, _)) {
+                if matches!(
+                    self.types.get(aggregate.ty.semantic_id()),
+                    Type::Ledger(_, _)
+                ) {
                     let mut ledger = LedgerValue::new();
                     for entry in entries {
                         let key = self.eval_operand(&entry.key, span)?.to_key(span)?;

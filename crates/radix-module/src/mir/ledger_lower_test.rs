@@ -70,4 +70,3 @@ main {
         other => panic!("expected the ledger program to lower, validate and run, got {other:?}"),
     }
 }
-
