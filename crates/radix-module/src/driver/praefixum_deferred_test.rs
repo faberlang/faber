@@ -9,13 +9,20 @@ use super::tests::{
     imported::{IMPORT, analyze_with, is_unevaluated},
     int, static_value,
 };
-use crate::driver::AnalyzedModule;
+use crate::driver::{AnalyzeRequest, AnalyzedModule, Config, ModuleImportContract, Session, analyze_source};
+use crate::file_interface::{
+    FileExport, FileExportKind, FileInterface, InterfaceCallable, InterfaceMethodExport, InterfaceStructExport,
+    InterfaceStructField, InterfaceTypeSnapshot,
+};
 use crate::hir::{DefId, HirItemKind};
+use crate::semantic::Primitive;
 use crate::semantic::passes::praefixum::{ImportedCallee, ImportedEffects, ImportedReference};
+use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::semantic::{SemanticError, SemanticErrorKind};
 use radix_diagnostics::Diagnostic;
 use radix_lexer::Span;
 use radix_mir_runner::Value;
+use std::collections::BTreeMap;
 
 /// Answers every import reference with one fixed answer, counting asks.
 struct Stub {
@@ -59,6 +66,103 @@ fn issue_of(diagnostics: &[Diagnostic]) -> &Diagnostic {
     assert_eq!(diagnostics.len(), 1, "diagnostics: {diagnostics:?}");
     assert_eq!(diagnostics[0].code, Some("SEM064"));
     &diagnostics[0]
+}
+
+/// A contract whose `consts` namespace exports one genus, `Box`, carrying a
+/// single public method `get`. `contract()` in `praefixum_test.rs` is private
+/// to `mod imported`, so this file builds its own.
+fn box_contract() -> ModuleImportContract {
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "Box".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: false,
+            implements: Vec::new(),
+            name: "Box".to_owned(),
+            params: Vec::new(),
+            fields: vec![InterfaceStructField {
+                name: "n".to_owned(),
+                ty: InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
+                optional: false,
+                required: true,
+                default: None,
+                modifier: None,
+                visibility: crate::syntax::MemberVisibility::Publica,
+            }],
+            methods: vec![InterfaceMethodExport {
+                name: "get".to_owned(),
+                callable: InterfaceCallable {
+                    type_params: Vec::new(),
+                    params: Vec::new(),
+                    ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
+                    err: None,
+                    is_async: false,
+                    is_generator: false,
+                    tensor_edge_policy_requirements: Vec::new(),
+                    device: None,
+                },
+                visibility: crate::syntax::MemberVisibility::Publica,
+                unavailable: Vec::new(),
+            }],
+            annotation_contract: None,
+        }),
+    });
+    let exports = BTreeMap::from([("Box".to_owned(), VisibilityTier::Publica)]);
+    ModuleImportContract {
+        namespace_exports: BTreeMap::from([("consts".to_owned(), exports)]),
+        file_interfaces: BTreeMap::from([("consts".to_owned(), interface)]),
+        ..ModuleImportContract::default()
+    }
+}
+
+fn analyze_box(source: &str) -> Result<AnalyzedModule, Vec<Diagnostic>> {
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_defer_imported_praefixum(),
+    );
+    analyze_source(
+        &session,
+        "praefixum.fab",
+        source,
+        AnalyzeRequest { cli_program: None, contract: box_contract() },
+    )
+}
+
+/// The body reaches an import only through a method on a genus this module
+/// does not declare; the genus literal itself is not an import reference.
+fn deferred_method_unit() -> AnalyzedModule {
+    let source = format!(
+        "{IMPORT}fixum numerus M = praefixum {{\n    fixum consts.Box b ← consts.Box {{ n = 7 }}\n    redde b.get()\n}}\n"
+    );
+    let unit = analyze_box(&source)
+        .unwrap_or_else(|diagnostics| panic!("method-only deferral is not an error: {diagnostics:?}"));
+    assert!(is_unevaluated(&unit, "M"));
+    unit
+}
+
+#[test]
+fn praefixum_method_deferral_method_only_body_defers() {
+    let mut unit = deferred_method_unit();
+    let mut imports = Stub::new(ImportedCallee::Pure);
+    let result = evaluate_with(&mut unit, &mut imports, &mut |_scratch, _function, _span| Ok(Value::Int(7)));
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(imports.asked, 1, "only the method reference is answered");
+    assert_eq!(int(&static_value(&unit, "M")), 7);
+}
+
+#[test]
+fn praefixum_method_deferral_unavailable_is_refused() {
+    let mut unit = deferred_method_unit();
+    let mut imports = Stub::new(ImportedCallee::Unavailable);
+    let diagnostics = evaluate_with(&mut unit, &mut imports, &mut |_scratch, _function, _span| {
+        panic!("an unavailable site must not run")
+    })
+    .expect_err("an unavailable import is a build error");
+    let diagnostic = issue_of(&diagnostics);
+    assert_eq!(diagnostic.issue(), Some("praefixum_import_unavailable"));
+    assert_eq!(arg(diagnostic, "name"), Some("M"));
+    assert!(is_unevaluated(&unit, "M"), "a refused site keeps its initializer");
 }
 
 #[test]
