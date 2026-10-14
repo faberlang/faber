@@ -5,6 +5,12 @@
       "phase": "run",
       "diagnostic_contains": "invalid MIR: destination type mismatch",
       "reason": "The runner's MIR lowering rejects the stored failable promise binding (promise<Response ⇥ IoFault>) that starts the loopback GET before the accept: the promise destination fails to type during MIR lowering, the same runner gap pinned for the async fs read wrappers. The exchange assertions are untouched."
+    },
+    "rust": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "E0562",
+      "reason": "Rust emit lowers the stored promise binding to a `let` with an `impl Future` type annotation, which cargo rejects with E0562 (a second E0308 wraps the already-optional header result in Some); the exchange assertions are untouched."
     }
   }
 }
