@@ -2303,6 +2303,48 @@ functio probe(P p) → P {
 }
 
 #[test]
+fn verte_ascription_accepts_narrowed_variant() {
+    test_support::assert_accepts(
+        r"
+discretio Forma {
+    Circulus { numerus r },
+    Quadratum { numerus s }
+}
+
+functio probe(Forma f) → Forma {
+    discerne f {
+        casu Circulus ut c { redde c ∷ Forma }
+        casu _ { redde f }
+    }
+}
+",
+    );
+}
+
+// A variant narrowed by `est` is the variant's own nominal
+// (`Type::Struct(variant_def)`), while its parent is the `discretio`
+// (`Type::Enum(enum_def)`). Ascribing the narrowed binding back to the parent
+// restates the membership the test already proved; it is not an unprovable
+// nominal pair (D1.11).
+
+#[test]
+fn verte_ascription_accepts_narrowed_variant_est_refinement() {
+    test_support::assert_accepts(
+        r"
+discretio Forma {
+    Circulus { numerus r },
+    Quadratum { numerus s }
+}
+
+functio probe(Forma f) → Forma {
+    adfirma f est Circulus
+    redde f ∷ Forma
+}
+",
+    );
+}
+
+#[test]
 fn verte_ascription_accepts_declared_interface_conformance() {
     test_support::assert_accepts(
         r#"

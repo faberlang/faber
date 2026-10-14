@@ -3778,10 +3778,12 @@ impl TypeChecker<'_> {
     /// Enforce DECISIONS D1.11 for `∷` between nominal types: the ascription
     /// must state a fact the compiler can prove. The proved facts are the same
     /// nominal type — a `type` alias resolves to its target before this runs —
-    /// and a genus ascribed to an interface its declaration names in `implet`
-    /// (D1.3). Class inheritance was removed (D8.1), so every other nominal
-    /// pair (class→class, enum→enum, interface→class) is unprovable and takes
-    /// the explicit `↦` conversion.
+    /// a variant ascribed to its own parent enum (the pattern/test that
+    /// narrowed it already proved the membership), and a genus ascribed to an
+    /// interface its declaration names in `implet` (D1.3). Class inheritance
+    /// was removed (D8.1), so every other nominal pair (class→class,
+    /// enum→enum, interface→class) is unprovable and takes the explicit `↦`
+    /// conversion.
     ///
     /// Constructor sources are construction, not ascription: their fields are
     /// checked against the target directly, so they are not this law's
@@ -3800,6 +3802,9 @@ impl TypeChecker<'_> {
         if self.nominal_def(source_ty).is_none() || self.nominal_def(target_ty).is_none() {
             return;
         }
+        if self.variant_belongs_to_enum(source_ty, target_ty) {
+            return;
+        }
         if self.nominal_declares_interface(source_ty, target_ty) {
             return;
         }
@@ -3811,6 +3816,21 @@ impl TypeChecker<'_> {
             span,
             &[("found", found), ("expected", expected)],
         );
+    }
+
+    /// Whether `source` is one of `target`'s closed-set variants. A binding
+    /// narrowed by `discerne`/`est` carries the variant's own nominal
+    /// (`Type::Struct(variant_def)`) while the parent is the `discretio`
+    /// (`Type::Enum(enum_def)`); the shared `variant_parent` table records
+    /// the membership, so it is the proof and no second table is needed.
+    fn variant_belongs_to_enum(&self, source: TypeId, target: TypeId) -> bool {
+        let Some(variant_def) = self.nominal_def(source) else {
+            return false;
+        };
+        let Some(enum_def) = self.enum_def_from_type(target) else {
+            return false;
+        };
+        self.variant_parent.get(&variant_def).copied() == Some(enum_def)
     }
 
     /// The struct/enum/interface declaration a resolved nominal type names,
