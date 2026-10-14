@@ -77,3 +77,59 @@ main {{
         .unwrap_or_else(|errors| panic!("sermo fault program should run: {errors:?}"));
     assert_eq!(host.stdout_lines, [MISSING.to_owned()]);
 }
+
+#[test]
+#[ignore = "pumpfix-g78d546f2-3.2.2: verifies generic `↦ T` keeps the valor→Fault row"]
+fn generic_sermo_failure_is_converted_to_the_declared_fault() {
+    const MISSING: &str = "/nonexistent/341d49e1-5/sermo-fault-generic.txt";
+    let source = program(&format!(
+        r#"
+union Fault {{
+    NotFound {{
+        string path
+    }},
+    Other
+}}
+
+@ conversion
+fn fault_from(value raw) → Fault {{
+    do {{
+        const map<string, value> record ← raw ↦ map<string, value>
+        const string kind ← record["kind"] ↦ string
+        const string path ← record["path"] ↦ string
+        if kind ≡ "NotFound" {{
+            return variant NotFound {{ path = path }}
+        }}
+        return variant Other
+    }} catch err {{
+        return variant Other
+    }}
+}}
+
+@ radix type T mut string list<string> bytes
+fn read<T>(string p) → T ⇥ Fault {{
+    return call 'solum:lege' (p) ↦ T
+}}
+
+main {{
+    do {{
+        const string text ← read<string>("{MISSING}")
+        print text
+    }} catch err {{
+        match err {{
+            case NotFound const path {{
+                print path
+            }}
+            case Other {{
+                print "other"
+            }}
+        }}
+    }}
+}}
+"#
+    ));
+    let mut host = BufferHost::default();
+    run_host("sermo-fault-generic.fab", &source, &mut host)
+        .unwrap_or_else(|errors| panic!("sermo fault program should run: {errors:?}"));
+    assert_eq!(host.stdout_lines, [MISSING.to_owned()]);
+}
