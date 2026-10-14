@@ -1,0 +1,25 @@
++++
+locale = "en"
++++
+
+# stdio-write — every write route on norma:console, in call order.
+#
+# Routes:
+#   consolum:scribe — console.write_line    (stdout + newline)
+#   consolum:dic    — console.write_partial (stdout, no newline)
+#   consolum:funde  — console.write_bytes   (raw bytes to stdout)
+#   consolum:mone   — console.warn_line     (stderr + newline)
+#   consolum:vide   — console.debug_line    (stderr + newline)
+
+import from "norma:console" console
+
+main {
+    console.write_line("line-one")
+    console.write_partial("partial-")
+    console.write_line("then-line")
+    const list<b8> bytes ← [0x68, 0x69, 0x0a]
+    console.write_bytes(bytes)
+    console.warn_line("warn-one")
+    console.debug_line("debug-one")
+    console.write_line("stdio-write-ok")
+}
