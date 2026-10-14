@@ -1,0 +1,39 @@
++++
+locale = "en"
++++
+
+# Clock leaf routes through the sync Norma wrappers.
+#
+# Covers: tempus:nunc (time.now), tempus:monotonicum (time.monotonic),
+# tempus:activum (time.active), and tempus:dormiet (time.sleep). The async
+# posture of tempus:dormiet lives in the sibling clock-routes-async package so
+# no pinned async failure can hide this sync coverage.
+
+import from "norma:time" time
+
+main {
+    # tempus:nunc: the wall clock advances and reports the current civil year.
+    const instant<ns> earlier ← time.now()
+    const instant<ns> later ← time.now()
+    assert later ≥ earlier
+    const instant seconds ← later ↦ instant
+    assert time.year(seconds) ≥ 2026
+
+    # tempus:monotonicum: the monotonic clock never decreases.
+    const int first ← time.monotonic()
+    const int second ← time.monotonic()
+    assert second ≥ first
+
+    # tempus:activum: process CPU time is never negative.
+    const int cpu ← time.active()
+    assert cpu ≥ 0
+
+    # tempus:dormiet: sleeping 5 ms moves the nanosecond monotonic clock at
+    # least 5 ms minus a 1 ms scheduling tolerance.
+    const int before ← time.monotonic()
+    time.sleep(5)
+    const int after ← time.monotonic()
+    assert after - before ≥ 4000000
+
+    print "norma/clock/clock-routes ok"
+}
