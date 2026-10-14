@@ -4015,6 +4015,10 @@ mod value_dense_test;
 mod softmax_rank_test;
 
 #[cfg(test)]
+#[path = "causal_softmax_test.rs"]
+mod causal_softmax_test;
+
+#[cfg(test)]
 #[path = "sermo_frame_test.rs"]
 mod sermo_frame_test;
 
