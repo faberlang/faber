@@ -243,6 +243,28 @@ fn emit_retry_reports_forbidden_effect_once() {
 }
 
 #[test]
+fn package_analysis_bindings_skip_non_wgsl_targets() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    fixture(dir.path(), "consts.fab", CONSTS);
+    let consumer = fixture(dir.path(), "c.fab", COMPTIME_CONSUMER);
+
+    let command = emit_command(&consumer, Target::HirTypeScript);
+    let pack = code_pack(&command);
+    let single = single_file_result(&command, pack.as_ref());
+    assert!(
+        single.output.is_none(),
+        "expected the single-file refusal before the retry"
+    );
+
+    let retried = emit::retry_single_file_via_package_analysis(&command, pack.as_ref(), single);
+    assert!(
+        retried.output.is_some(),
+        "a non-WGSL target must keep emitting through the retry: {:?}",
+        issues(&retried)
+    );
+}
+
+#[test]
 fn package_analysis_config_leaves_file_locale_declarations_in_charge() {
     let dir = tempfile::tempdir().expect("temp dir");
     let input = fixture(dir.path(), "c.fab", CONSTS);
