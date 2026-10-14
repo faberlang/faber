@@ -1,0 +1,16 @@
+{
+  "targets": {
+    "runner": {
+      "outcome": "known-fail",
+      "phase": "run",
+      "diagnostic_contains": "Unset",
+      "reason": "processus:lege (process.read_env) reports an unset variable as the leaf's fatal Unset error instead of the wrapper's declared none, so the required `unset_value is none` assertion aborts at run phase."
+    },
+    "rust": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "expected type, found variant",
+      "reason": "Rust emit writes the imported IoFault union's variant path into the handled do/catch Result ascription, so cargo build fails with E0573."
+    }
+  }
+}

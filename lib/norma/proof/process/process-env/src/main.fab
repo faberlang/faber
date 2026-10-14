@@ -1,0 +1,65 @@
++++
+locale = "en"
++++
+
+# Process leaf env/cwd/pid/argv routes through the Norma process wrappers.
+#
+# Covers: processus:identitas (pid), processus:argumenta (argv),
+# processus:lege (read_env set and unset), processus:sedes (cwd) and
+# processus:muta (chdir into the temp dir, back to the original, and a
+# nonexistent directory surfaced as a fault). Leaves nothing behind.
+
+import from "norma:process" process
+import from "norma:fs" fs
+
+main {
+    # processus:identitas: a live, positive pid, stable across calls.
+    const int first ← process.pid()
+    assert first ≻ 0
+    assert process.pid() ≡ first
+
+    # processus:argumenta: the leaf reports the program argument list.
+    assert process.argv().length() ≥ 0
+
+    # processus:lege: a set variable reads as text, an unset name reads none.
+    const string ∪ none path_value ← process.read_env("PATH")
+    assert path_value not is none
+    const string unset_name ← "FABER_PROOF_UNSET_§"(first)
+    const string ∪ none unset_value ← process.read_env(unset_name)
+    assert unset_value is none
+
+    # processus:sedes: the process dwells somewhere.
+    const string original ← process.cwd()
+    assert original.length() ≻ 0
+
+    # processus:muta: enter the temp dir, confirm where the leaf reports the
+    # process now dwells, then return to the original directory.
+    const string temp ← fs.temp_dir()
+    do {
+        process.chdir(temp)
+    }
+    catch err {
+        panic "process-env: chdir to temp dir failed"
+    }
+    assert process.cwd() ≡ temp
+    do {
+        process.chdir(original)
+    }
+    catch err {
+        panic "process-env: chdir back failed"
+    }
+    assert process.cwd() ≡ original
+
+    # processus:muta: a nonexistent directory is a fault, not a crash.
+    const string missing ← fs.join([temp, "faber-proof-missing-§"(first)])
+    var bool missing_failed ← false
+    do {
+        process.chdir(missing)
+    }
+    catch err {
+        missing_failed ← true
+    }
+    assert missing_failed
+
+    print "process-env-ok"
+}
