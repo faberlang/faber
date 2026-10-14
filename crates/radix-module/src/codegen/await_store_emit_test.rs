@@ -70,5 +70,5 @@ functio caller() fiet → vacuum {
     nota v
 }";
     let code = emit(Target::HirRust, source);
-    assert!(code.contains("let v: u8 = fetch().await;"), "{code}");
+    assert!(code.contains("let l_v: u8 = fetch().await;"), "{code}");
 }

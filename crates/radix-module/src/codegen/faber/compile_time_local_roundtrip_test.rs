@@ -72,6 +72,6 @@ fn rust_emits_an_ordinary_immutable_local() {
     let crate::Output::Rust(out) = result.output.expect("output") else {
         panic!("expected Rust output");
     };
-    assert!(out.code.contains("let k: i64 ="), "{}", out.code);
-    assert!(!out.code.contains("static K"), "{}", out.code);
+    assert!(out.code.contains("let l_k: i64 ="), "{}", out.code);
+    assert!(!out.code.contains("static l_k"), "{}", out.code);
 }
