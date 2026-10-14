@@ -433,7 +433,7 @@ fn body_text(value raw) → string {
     # Guarded by the `is` test, so the default never applies.
     if raw is string then return raw ↦ string ⊥ ""
     do {
-        const bytes data ↤ raw
+        const list<b8> data ↤ raw
         do {
             return data ↦ string
         }

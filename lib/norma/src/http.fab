@@ -170,7 +170,7 @@ fn response_of(int status, headers.Headers headers, string body) → response.Re
 }
 
 @ public
-fn encode_chunked(bytes data) → bytes {
+fn encode_chunked(list<b8> data) → list<b8> {
     return chunked.encode(data)
 }
 

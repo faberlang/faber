@@ -228,7 +228,7 @@ fn scalar_to_string(int scalar) → string ⇥ string {
         octets.append((128 + (scalar / 64) % 64) ↦ u8)
         octets.append((128 + scalar % 64) ↦ u8)
     }
-    const bytes encoded ← octets ↦ bytes
+    const list<b8> encoded ← octets ↦ list<b8>
     return encoded ↦ string
 }
 

@@ -133,8 +133,8 @@ fn hex_value(string c) → int ∪ none {
 fn unescape(string letter) → string ∪ none {
     if letter ≡ «"» then return «"»
     if letter ≡ "\\" then return "\\"
-    if letter ≡ "b" then return ([8] ↦ bytes) ↦ string ⊥ ""
-    if letter ≡ "f" then return ([12] ↦ bytes) ↦ string ⊥ ""
+    if letter ≡ "b" then return ([8] ↦ list<b8>) ↦ string ⊥ ""
+    if letter ≡ "f" then return ([12] ↦ list<b8>) ↦ string ⊥ ""
     if letter ≡ "n" then return "\n"
     if letter ≡ "r" then return "\r"
     if letter ≡ "t" then return "\t"
