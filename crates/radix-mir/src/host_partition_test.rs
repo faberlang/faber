@@ -207,6 +207,36 @@ fn derive_u11(types: &mut TypeTable, interner: &mut Interner) -> HostPartition {
     .expect("the U11 partition derives")
 }
 
+/// The device entry name is the compiler-owned `k<function id>`: never the
+/// author's source spelling (a reserved word such as `half` needs no
+/// mangling), and two functions that share one source name still get
+/// distinct entries because they carry distinct function ids.
+#[test]
+fn unique_kernel_entry_name_is_k_followed_by_function_id() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let f32_ty = f32(&mut types);
+    let program = MirProgram {
+        functions: vec![
+            kernel_unit(1, "half", f32_ty, &mut interner),
+            kernel_unit(2, "half", f32_ty, &mut interner),
+        ],
+    };
+
+    for function in &program.functions {
+        assert_eq!(
+            unique_kernel_entry_name(&program, function, &interner),
+            format!("k{}", function.id.0),
+            "the entry is k<function id>, never the source spelling"
+        );
+    }
+    assert_ne!(
+        unique_kernel_entry_name(&program, &program.functions[0], &interner),
+        unique_kernel_entry_name(&program, &program.functions[1], &interner),
+        "two functions with one source name get distinct entry names"
+    );
+}
+
 /// Resource identity + mutation rules survive: the derived [`DeviceProgram`]
 /// carries every storage-buffer resource of the kernel's semantic ABI —
 /// binding, access (the mutation rule fact, verbatim), element type, element
@@ -367,7 +397,7 @@ fn lifetimes_and_observation_facts_survive_to_device_program() {
 /// kernel (NGAB0-R1) — riding the versioned call ABI, and the typed facts
 /// (identity, lifetimes, mutation/observation rules) are what the compile-time
 /// gate consumed to accept the fixture. The kernel's identity fact on the
-/// device program is the carried logical entry name, never a text-derived
+/// device program is the compiler-owned entry name, never a text-derived
 /// symbol.
 #[test]
 fn boundary_abi_and_entry_identity_survive() {
@@ -396,8 +426,8 @@ fn boundary_abi_and_entry_identity_survive() {
         MirFunctionId(1)
     );
     assert_eq!(
-        partition.device_program.kernels[0].entry, "scale_kernel",
-        "the entry identity is the carried logical name, not a text-derived symbol"
+        partition.device_program.kernels[0].entry, "k1",
+        "the entry identity is the compiler-owned function-id name"
     );
     // No device program carries source text: the one String fact on the
     // kernel unit is the entry name (everything else is typed). The buffer
@@ -515,7 +545,7 @@ fn vector_arg_shape_survives_derive() {
 
     // The vector element-count fact survives into the derived device program.
     let kernel = &partition.device_program.kernels[0];
-    assert_eq!(kernel.entry, "vec_kernel");
+    assert_eq!(kernel.entry, "k1");
     assert_eq!(kernel.resources.len(), 2);
     assert_eq!(kernel.resources[0].version.element_count, 4);
     assert_eq!(kernel.resources[1].version.element_count, 4);
@@ -612,8 +642,8 @@ fn two_kernel_composition_derives_one_region() {
     // identities, ordered launches, and declared observations.
     let program = &partition.device_program;
     assert_eq!(program.kernels.len(), 2);
-    assert_eq!(program.kernels[0].entry, "scale_kernel");
-    assert_eq!(program.kernels[1].entry, "offset_kernel");
+    assert_eq!(program.kernels[0].entry, "k1");
+    assert_eq!(program.kernels[1].entry, "k3");
     assert_eq!(program.launches.len(), 2);
     assert_eq!(program.launches[0].kernel_index, 0);
     assert_eq!(program.launches[1].kernel_index, 1);
@@ -671,7 +701,7 @@ fn partition_record_carries_exact_membership_and_callsite_mapping() {
     let mut interner = Interner::new();
     let record = derive_u11_record(&mut types, &mut interner);
 
-    // Membership: the device kernel f1 (entry "scale_kernel") and the host
+    // Membership: the device kernel f1 (entry "k1") and the host
     // function f2 — exactly one role per function, nothing text-derived.
     assert_eq!(
         record.membership,
@@ -679,7 +709,7 @@ fn partition_record_carries_exact_membership_and_callsite_mapping() {
             PartitionMember {
                 function: MirFunctionId(1),
                 role: PartitionRole::Device,
-                entry: Some("scale_kernel".to_owned()),
+                entry: Some("k1".to_owned()),
             },
             PartitionMember {
                 function: MirFunctionId(2),
@@ -698,12 +728,12 @@ fn partition_record_carries_exact_membership_and_callsite_mapping() {
         vec![RegionRecord {
             region: 1,
             member_kernels: vec![MirFunctionId(1)],
-            member_entries: vec!["scale_kernel".to_owned()],
+            member_entries: vec!["k1".to_owned()],
         }]
     );
 
     // Callsite mapping: host f2, block 0, statement 0 → region 1 → kernel
-    // f1 / entry "scale_kernel".
+    // f1 / entry "k1".
     assert_eq!(
         record.callsites,
         vec![CallsiteRecord {
@@ -714,7 +744,7 @@ fn partition_record_carries_exact_membership_and_callsite_mapping() {
             },
             region: 1,
             member_kernels: vec![MirFunctionId(1)],
-            member_entries: vec!["scale_kernel".to_owned()],
+            member_entries: vec!["k1".to_owned()],
         }]
     );
 

@@ -40,7 +40,6 @@ pub mod bits_gate;
 pub mod breakable;
 pub mod conversio_arm;
 pub mod decimal;
-pub mod device_ident;
 pub mod frame;
 pub mod hints;
 pub mod hygiene;
@@ -308,7 +307,6 @@ pub use bits_gate::{
     is_byte_text_conversion, list_text_conversion, list_width_change, reject_bits_type,
     reject_list_text_conversion, reject_list_width_decode,
 };
-pub use device_ident::{MANGLE_PREFIX, is_device_reserved, mangle_device_ident};
 pub use ident::{
     SCALAR_LOOP_CANDIDATES, SCALAR_LOOP_FALLBACK, VALUE_JOIN_CANDIDATES, VALUE_JOIN_FALLBACK,
     output_resource_name, sanitize_ident, sanitize_rust_module_ident, unclaimed_name,
