@@ -89,3 +89,18 @@ fn ponde_list_variable_index_stays_failable() {
         "failable_call_requires_handler",
     );
 }
+
+#[test]
+fn generic_failable_call_in_main_may_abort_unhandled() {
+    let _ = test_support::analyze_ok(
+        "functio lege<T>(textus p) → T ⇥ textus {\n    iace p\n}\nincipit {\n    nota lege<textus>(\"x\")\n}\n",
+    );
+}
+
+#[test]
+fn generic_failable_call_in_helper_without_handler_is_rejected() {
+    test_support::assert_rejects_with_issue(
+        "functio lege<T>(textus p) → T ⇥ textus {\n    iace p\n}\nfunctio help() → vacuum {\n    nota lege<textus>(\"x\")\n}\n",
+        "failable_call_requires_handler",
+    );
+}
