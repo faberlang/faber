@@ -92,6 +92,30 @@ fn solum_funde_round_trips_a_nested_byte_list() {
 }
 
 #[test]
+fn leaf_failure_data_is_a_kind_path_record() {
+    const PATH: &str = "/nonexistent/radix-error-channel/x";
+    let failure =
+        serve("solum:lege", &Value::Str(PATH.to_owned())).expect_err("a missing file must fail");
+    let Value::Map(entries) = &failure else {
+        panic!("leaf failure data must be a kind/path map: {failure:?}");
+    };
+    let entries = entries.borrow();
+    assert_eq!(
+        entries.len(),
+        2,
+        "the record holds exactly kind and path: {entries:?}"
+    );
+    assert_eq!(
+        entries.get(&MapKey::Str("kind".to_owned())),
+        Some(&Value::Str("NotFound".to_owned()))
+    );
+    assert_eq!(
+        entries.get(&MapKey::Str("path".to_owned())),
+        Some(&Value::Str(PATH.to_owned()))
+    );
+}
+
+#[test]
 fn solum_hauri_reply_reaches_consolum_funde() {
     let path = std::env::temp_dir().join(format!("radix-routes-chain-{}.bin", std::process::id()));
     let path_text = path.to_string_lossy().into_owned();
