@@ -1108,9 +1108,10 @@ pub enum MirIntrinsic {
     /// pattern recognition over the body.
     ///
     /// Arguments: the source tensor operand; then, for
-    /// [`MirFilumForm::Grid`] only, one extent operand per source axis
-    /// (row-major, the `TensorExtent` temps the lane lowering assigned);
-    /// then the `coalesce` identity operand when the source wrote one.
+    /// [`MirFilumForm::Grid`] and [`MirFilumForm::Nested`], one extent
+    /// operand per source axis (row-major, the `TensorExtent` temps the lane
+    /// lowering assigned); then the `coalesce` identity operand when the
+    /// source wrote one.
     ///
     /// [`MirFilumForm::Declared`] is the ungrouped `sum` (SFR-5): the plan
     /// pass resolves it to
@@ -1118,6 +1119,9 @@ pub enum MirIntrinsic {
     /// [`MirFilumForm::Grid`] is the whole-grid reduction lane region
     /// (C4-8): the plan pass resolves it to
     /// [`crate::kernel_plan::CollectionKernelPlan::GridReduce`].
+    /// [`MirFilumForm::Nested`] is the reduction inside the BODY of a lane
+    /// region (gpu-reset rule 14.5); it validates like `Grid` but resolves
+    /// to no plan here — later lowering owns it.
     FilumReduce(MirFilumReduceOp),
     /// Deep duplicate-then-own for the `copy` access marker (mutability
     /// engine D-6): the lone argument is the source value; the result is an
@@ -1435,6 +1439,14 @@ pub enum MirFilumForm {
     /// function takes the `Lane` builtin; `lane_width` is the workgroup size
     /// and out-of-range lanes contribute the identity.
     Grid,
+    /// The reduction node inside the BODY of a lane region (gpu-reset rule
+    /// 14.5): a `thread lane` reduce nested in an outer `thread lane` loop.
+    /// One workgroup per outer coordinate; lanes stride the inner extent in
+    /// chunks of `lane_width`. No stage 2, no launch split, and no `Lane`
+    /// parameter of its own. Operands are exactly those of
+    /// [`MirFilumForm::Grid`] (source, one extent per axis, optional
+    /// identity, a function term's captures and function constant).
+    Nested,
 }
 
 impl MirFilumForm {
@@ -1444,6 +1456,7 @@ impl MirFilumForm {
         match self {
             Self::Declared => "declared",
             Self::Grid => "grid",
+            Self::Nested => "nested",
         }
     }
 }

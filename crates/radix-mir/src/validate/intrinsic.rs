@@ -459,7 +459,7 @@ impl Validator<'_, '_> {
                     MirFilumForm::Declared => {
                         self.require_arg_count(call.args.len(), 1, span, "filum sum runtime call");
                     }
-                    MirFilumForm::Grid => {
+                    MirFilumForm::Grid | MirFilumForm::Nested => {
                         let rank = op.coordinates.len();
                         // A function term appends its captures and the term
                         // function constant after the identity.
@@ -491,7 +491,9 @@ impl Validator<'_, '_> {
                     Type::Primitive(Primitive::Fractus)
                     | Type::SizedNumeric(Primitive::Fractus, _) => true,
                     Type::Primitive(Primitive::Numerus | Primitive::Bivalens)
-                    | Type::SizedNumeric(Primitive::Numerus, _) => op.form == MirFilumForm::Grid,
+                    | Type::SizedNumeric(Primitive::Numerus, _) => {
+                        matches!(op.form, MirFilumForm::Grid | MirFilumForm::Nested)
+                    }
                     _ => false,
                 };
                 if !scalar_result {
