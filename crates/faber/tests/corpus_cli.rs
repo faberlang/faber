@@ -1112,8 +1112,8 @@ fn corpus_times_out_a_hanging_case_and_kills_its_descendants() {
         .trim()
         .to_owned();
     let alive = || {
-        Command::new("kill")
-            .args(["-0", &pid])
+        Command::new("sh")
+            .args(["-c", "kill -0 \"$1\"", "sh", &pid])
             .output()
             .expect("probe child")
             .status
