@@ -44,6 +44,30 @@ fn report_locale_diagnostic(diagnostic: &radix::module::diagnostics::Diagnostic)
     std::process::exit(1);
 }
 
+/// Merge each library root's `[target.<spelling>]` bindings (read by Faber,
+/// opaque to the compiler) into one map, collecting load diagnostics from the
+/// roots that cannot be read.
+pub(super) fn merge_library_target_bindings(
+    roots: &std::collections::BTreeSet<std::path::PathBuf>,
+    target_spelling: &str,
+) -> (
+    radix::module::driver::TargetBindings,
+    Vec<radix::module::diagnostics::Diagnostic>,
+) {
+    let mut merged = radix::module::driver::TargetBindings::default();
+    let mut load_errors = Vec::new();
+    for root in roots {
+        match faber_cli::package::load_target_bindings(root, target_spelling) {
+            Ok(bindings) => {
+                merged.functions.extend(bindings.functions);
+                merged.types.extend(bindings.types);
+            }
+            Err(diagnostics) => load_errors.extend(diagnostics),
+        }
+    }
+    (merged, load_errors)
+}
+
 /// Single-file `wgsl-text` emit: each imported library's `[target.wgsl-text]`
 /// bindings (read by Faber, opaque to the compiler) are merged and installed.
 /// A manifest that cannot be read is reported as an error diagnostic.
@@ -54,16 +78,8 @@ fn compile_wgsl_with_library_bindings(
     let target_spelling = command.target.to_string();
     let load_errors = std::cell::RefCell::new(Vec::new());
     let resolve = |roots: &std::collections::BTreeSet<std::path::PathBuf>| {
-        let mut merged = radix::module::driver::TargetBindings::default();
-        for root in roots {
-            match faber_cli::package::load_target_bindings(root, &target_spelling) {
-                Ok(bindings) => {
-                    merged.functions.extend(bindings.functions);
-                    merged.types.extend(bindings.types);
-                }
-                Err(diagnostics) => load_errors.borrow_mut().extend(diagnostics),
-            }
-        }
+        let (merged, diagnostics) = merge_library_target_bindings(roots, &target_spelling);
+        load_errors.borrow_mut().extend(diagnostics);
         merged
     };
     let mut result = radix::services::compile_cli_input_with_library_bindings(
