@@ -5678,8 +5678,8 @@ fn consolum_eot4_input_values_canonical() {
 import from "norma:console" const read_line as line_reader, read_bytes as bytes_reader
 
 main {
-  const string line ← line_reader()
-  const bytes chunk ← bytes_reader(4)
+  const string line ← line_reader() coalesce ""
+  const bytes chunk ← bytes_reader(4) coalesce |00|
 }
 "#,
     )
@@ -5732,8 +5732,8 @@ importa ex "norma:console" fixum funde ut bytes_sink
 importa ex "norma:fs" fixum lege ut terra_lege
 
 incipit {
-  line_sink(line_reader())
-  bytes_sink(bytes_reader(4))
+  line_sink(line_reader() vel "")
+  bytes_sink(bytes_reader(4) vel |00|)
   line_sink(terra_lege("data.txt"))
 }
 "#,
