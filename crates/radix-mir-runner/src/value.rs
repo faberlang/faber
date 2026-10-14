@@ -1546,8 +1546,8 @@ impl Value {
             Value::Map(entries) => {
                 display_tabula_map(&entries.borrow(), interner, order, span, float_width)?
             }
-            Value::Ledger(_) => {
-                return Err(RunnerError::unsupported(span, "ledger display"));
+            Value::Ledger(entries) => {
+                display_ledger(&entries.borrow(), interner, order, span, float_width)?
             }
             Value::Struct(def, fields) => {
                 display_tabula_struct(*def, fields, interner, order, span, float_width)?
@@ -1781,6 +1781,31 @@ fn display_tabula_map(
     } else {
         crate::shuffle::shuffle_unordered(&mut rows);
     }
+    render_map_rows(&rows, interner, order, span, float_width)
+}
+
+/// A ledger (`tabulae<K, V>`) renders in slot (insertion) order: order is
+/// part of its value, so no sort or shuffle applies.
+fn display_ledger(
+    entries: &LedgerValue,
+    interner: &Interner,
+    order: FieldOrder<'_>,
+    span: Span,
+    float_width: Option<NumericWidth>,
+) -> Result<String, RunnerError> {
+    let rows: Vec<(&MapKey, &Value)> = entries.iter().collect();
+    render_map_rows(&rows, interner, order, span, float_width)
+}
+
+/// Render the rows of a map-shaped value in the order given: each row as
+/// `key: value`, the whole as `{row, row}`.
+fn render_map_rows(
+    rows: &[(&MapKey, &Value)],
+    interner: &Interner,
+    order: FieldOrder<'_>,
+    span: Span,
+    float_width: Option<NumericWidth>,
+) -> Result<String, RunnerError> {
     let mut parts = Vec::new();
     for (key, value) in rows {
         let key_str = match key {
