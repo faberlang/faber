@@ -23,6 +23,51 @@ pub enum LeafErrorKind {
     Cancelled,
 }
 
+impl LeafErrorKind {
+    /// Every kind, in declaration order.
+    pub const ALL: [LeafErrorKind; 15] = [
+        LeafErrorKind::NotFound,
+        LeafErrorKind::Permission,
+        LeafErrorKind::NotADirectory,
+        LeafErrorKind::IsADirectory,
+        LeafErrorKind::InvalidArgument,
+        LeafErrorKind::AlreadyExists,
+        LeafErrorKind::TimedOut,
+        LeafErrorKind::ConnectionRefused,
+        LeafErrorKind::ConnectionReset,
+        LeafErrorKind::AddrInUse,
+        LeafErrorKind::Io,
+        LeafErrorKind::Closed,
+        LeafErrorKind::Unset,
+        LeafErrorKind::Unavailable,
+        LeafErrorKind::Cancelled,
+    ];
+
+    /// The fixed identity word the crossing into Faber carries.
+    ///
+    /// These words are the Norma `IoFault` variant names; spelling is interface.
+    #[must_use]
+    pub fn word(self) -> &'static str {
+        match self {
+            LeafErrorKind::NotFound => "NotFound",
+            LeafErrorKind::Permission => "Permission",
+            LeafErrorKind::NotADirectory => "NotADirectory",
+            LeafErrorKind::IsADirectory => "IsADirectory",
+            LeafErrorKind::InvalidArgument => "InvalidArgument",
+            LeafErrorKind::AlreadyExists => "AlreadyExists",
+            LeafErrorKind::TimedOut => "TimedOut",
+            LeafErrorKind::ConnectionRefused => "ConnectionRefused",
+            LeafErrorKind::ConnectionReset => "ConnectionReset",
+            LeafErrorKind::AddrInUse => "AddrInUse",
+            LeafErrorKind::Io => "Io",
+            LeafErrorKind::Closed => "Closed",
+            LeafErrorKind::Unset => "Unset",
+            LeafErrorKind::Unavailable => "Unavailable",
+            LeafErrorKind::Cancelled => "Cancelled",
+        }
+    }
+}
+
 /// One failed leaf call.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LeafError {
@@ -51,6 +96,14 @@ impl LeafError {
     #[must_use]
     pub fn path(&self) -> &str {
         &self.path
+    }
+
+    /// The two facts a failure carries into Faber: kind word and path.
+    ///
+    /// Platform text never crosses; it stays in `source` for the local frame.
+    #[must_use]
+    pub fn facts(&self) -> (&'static str, &str) {
+        (self.kind.word(), self.path())
     }
 
     #[must_use]
