@@ -1,0 +1,134 @@
++++
+locale = "en"
++++
+
+# websocket-refused: the WebSocket client's failure surface on one thread:
+# a refused port, a non-ws URL, and the TLS CA path. The listener comes from
+# the http server wrapper (bind(0) / port() / stop()) so no fixed port is
+# needed and both ends live in this one program.
+#
+# Routes: http server bind/port/stop, websocket.connect, websocket.connect_tls.
+
+import from "norma:http/server" server
+import from "norma:websocket" websocket
+import from "norma:fault" fault
+
+# Local typed channels over the websocket client. Declaring the concrete
+# `⇥ fault.IoFault` here gives the call-site `do/catch` a resolved error union;
+# the imported wrapper's channel alone leaves the handled block's Rust error
+# type unresolved and the emitted crate does not build (E0573).
+fn connect_plain(string url) → websocket.Socket ⇥ fault.IoFault {
+    return websocket.connect(url)
+}
+
+fn connect_tls_here(string url, string ca_path) → websocket.Socket ⇥ fault.IoFault {
+    return websocket.connect_tls(url, ca_path)
+}
+
+# Bind an ephemeral port, read it, stop the listener, and return the now
+# closed port. A connect to it is refused by the kernel.
+fn stopped_port() → int {
+    var int port ← 0
+    do {
+        const server.Listener listener ← server.bind(0)
+        port ← listener.port()
+        assert port ≻ 0
+        listener.stop()
+    }
+    catch err {
+        panic "websocket-refused: bind/port/stop: §"(err)
+    }
+    return port
+}
+
+main {
+    # (1) A bound-then-stopped ephemeral port refuses the plaintext connect.
+    const int closed_port ← stopped_port()
+    var bool refused ← false
+    do {
+        connect_plain("ws://127.0.0.1:§/"(closed_port))
+        assert false panic "websocket.connect to a stopped port succeeded"
+    }
+    catch err {
+        match err {
+            case ConnectionRefused const path {
+                assert path.length() ≻ 0
+                refused ← true
+            }
+            default {
+                assert false panic "websocket.connect fault was not ConnectionRefused"
+            }
+        }
+    }
+    assert refused
+
+    # (2) A non-ws scheme is rejected before any socket is opened. The port
+    # in the URL is never connected to.
+    var bool invalid ← false
+    do {
+        connect_plain("http://127.0.0.1:1/")
+        assert false panic "websocket.connect accepted a non-ws URL"
+    }
+    catch err {
+        match err {
+            case InvalidArgument const path {
+                invalid ← true
+            }
+            default {
+                assert false panic "websocket.connect fault was not InvalidArgument"
+            }
+        }
+    }
+    assert invalid
+
+    # (3a) connect_tls against a live listener with a missing CA file: the TCP
+    # connection succeeds, then wrap_tls reads the CA path and faults NotFound
+    # before any TLS handshake. The listener is stopped at the end.
+    var bool ca_missing ← false
+    do {
+        const server.Listener live ← server.bind(0)
+        const int live_port ← live.port()
+        assert live_port ≻ 0
+        do {
+            connect_tls_here("wss://127.0.0.1:§/"(live_port), "/nonexistent/websocket-refused-ca.pem")
+            assert false panic "websocket.connect_tls with a missing CA file succeeded"
+        }
+        catch tls_err {
+            match tls_err {
+                case NotFound const path {
+                    assert path.length() ≻ 0
+                    ca_missing ← true
+                }
+                default {
+                    assert false panic "websocket.connect_tls fault was not NotFound"
+                }
+            }
+        }
+        live.stop()
+    }
+    catch err {
+        panic "websocket-refused: live bind/stop: §"(err)
+    }
+    assert ca_missing
+
+    # (3b) The same missing CA file against the stopped port: connect() runs
+    # before wrap_tls() reads the CA path, so the refused connect faults first.
+    var bool tls_refused ← false
+    do {
+        connect_tls_here("wss://127.0.0.1:§/"(closed_port), "/nonexistent/websocket-refused-ca.pem")
+        assert false panic "websocket.connect_tls to a stopped port succeeded"
+    }
+    catch err {
+        match err {
+            case ConnectionRefused const path {
+                tls_refused ← true
+            }
+            default {
+                assert false panic "websocket.connect_tls to a stopped port fault was not ConnectionRefused"
+            }
+        }
+    }
+    assert tls_refused
+
+    print "websocket-refused-ok"
+}
