@@ -122,3 +122,27 @@ fn frame_member_only_in_incipit_exitus_is_a_use() {
         "a frame member reachable only through the entry exitus must register the builtins"
     );
 }
+
+#[test]
+fn builtin_frame_symbols_are_defined_without_debug_assertions() {
+    let mut types = crate::TypeTable::new();
+    let mut resolver = crate::Resolver::new();
+    let mut interner = Interner::new();
+
+    super::register(&mut resolver, &mut types, &mut interner);
+
+    for name in ["scrinium", "status", "sermo", "meus", "tuus"] {
+        assert!(
+            resolver.lookup_type(interner.intern(name)).is_some(),
+            "builtin frame type must be resolvable after register"
+        );
+    }
+
+    let sermo = super::sermo_def_id(&resolver);
+    assert!(sermo.is_some(), "sermo builtin def id must be recorded");
+    assert_eq!(
+        resolver.lookup_type(interner.intern("sermo")),
+        super::sermo_def_id(&resolver),
+        "the sermo scope entry must agree with the recorded builtin def id"
+    );
+}
