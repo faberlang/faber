@@ -31,15 +31,20 @@ fn io_fault(value raw) → fault.IoFault {
 # =========================================================================
 # Maps to: fs.readSync(0, buffer) / async stdin read
 
-# Draw bytes from stdin (sync)
+# Draw bytes from stdin (sync). EOF is `none`; a zero-length read is a
+# present empty buffer, never EOF. The guard is skipped when byte_length is
+# not positive so a 0/negative length still reaches the leaf (which rejects
+# negative lengths as InvalidArgument).
 @ public
 fn read_bytes(int byte_length) → list<b8> ∪ none {
+    if byte_length ≻ 0 and input_ended() then return null
     return call 'consolum:hauri' (byte_length) ↦ list<b8>
 }
 
 # Draw bytes from stdin (async route; Faber blocks on the frame)
 @ public
 fn read_bytes_async(int byte_length) → list<b8> ∪ none {
+    if byte_length ≻ 0 and input_ended() then return null
     return call 'consolum:hauriet' (byte_length) ↦ list<b8>
 }
 

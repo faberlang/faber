@@ -2671,6 +2671,68 @@ main {
     assert_no_generated_rust(&package);
 }
 
+#[test]
+fn run_console_read_bytes_eof_is_none_and_zero_length_is_present() {
+    // EOF is `none`; a zero-length read stays a present empty buffer. Before
+    // the fix `read_bytes` always returned a present buffer, so the 4-byte
+    // loop ran to its 10-read cap instead of ending after "abcdef" (4 + 2).
+    let package = temp_dir("norma-console-read-bytes-eof");
+    let src = package.join("src");
+    fs::create_dir_all(&src).expect("create src");
+    fs::write(
+        package.join("faber.toml"),
+        r#"
+[package]
+name = "norma-console-read-bytes-eof"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        src.join("main.fab"),
+        r#"import from "norma:console" const read_bytes
+
+main {
+    var int reads ← 0
+    var bool done ← false
+    while (not done) and reads ≺ 10 {
+        const bytes ∪ none chunk ← read_bytes(4)
+        if chunk is none {
+            done ← true
+        }
+        if not done {
+            reads ← reads + 1
+        }
+    }
+    print reads
+    const bytes ∪ none zero ← read_bytes(0)
+    var bool absent ← false
+    if zero is none {
+        absent ← true
+    }
+    print absent
+}
+"#,
+    )
+    .expect("write entry");
+
+    let (stdout, stderr, ok) = run_faber_with_stdin(
+        &["run", package.to_str().expect("utf8 package path")],
+        b"abcdef",
+    );
+
+    assert!(ok, "norma:console read_bytes EOF probe failed:\n{stderr}");
+    assert_eq!(
+        stdout.lines().collect::<Vec<_>>(),
+        ["2", "false"],
+        "two partial reads (4 + 2) precede EOF; a zero-length read is present"
+    );
+    assert_no_generated_rust(&package);
+}
+
 /// d11-6 G1 repair: a constant argument that fits a narrow parameter is a
 /// valid MIR call argument (MIR types the constant as plain `numerus`).
 #[test]
