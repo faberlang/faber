@@ -110,7 +110,10 @@ fn run_output_compares_normalized_stdout_and_exact_stderr() {
 fn setup_timeout_is_not_consumed_by_a_one_second_run_bound() {
     let short = case(Outcome::Pass, None);
     assert_eq!(short.timeout, Duration::from_secs(1));
-    assert_eq!(short.setup_timeout(), Duration::from_secs(CASE_TIMEOUT_SECS));
+    assert_eq!(
+        short.setup_timeout(),
+        Duration::from_secs(CASE_TIMEOUT_SECS)
+    );
 
     let mut long = case(Outcome::Pass, None);
     long.timeout = Duration::from_secs(300);
