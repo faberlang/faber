@@ -88,6 +88,40 @@ pub fn run_with_session(
     }
 }
 
+/// Whether `source` declares an import outside the kernel namespace: such a
+/// unit needs provider library bodies, which only the package route links.
+#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(feature = "runner")]
+pub(crate) fn source_declares_non_kernel_import(name: &str, source: &str) -> bool {
+    let Ok(peeled) = radix::module::driver::peel_raw_source(name, source) else {
+        return false;
+    };
+    // TEMPORARY STAGING: the pack-less fallback reads the
+    // no-locale default while `RADIX_DEFAULT_CODE_LOCALE=en`; unset keeps the
+    // historical pack-less (Latin) reading.
+    let code_pack =
+        faber_cli::package::default_config_with_locale(radix::module::Target::HirTypeScript)
+            .ok()
+            .and_then(|config| config.locale_pack)
+            .or_else(|| {
+                radix::module::driver::default_code_pack(&radix::module::driver::Config::default())
+            });
+    let lex = match code_pack.as_ref() {
+        Some(pack) => radix::module::lexer::lex_with_locale_pack(peeled.body, pack),
+        None => radix::module::lexer::lex(peeled.body),
+    };
+    let parse = radix::module::parser::parse(lex);
+    let Some(program) = parse.program else {
+        return false;
+    };
+    program.statements.iter().any(|statement| {
+        let radix::module::syntax::StmtKind::Import(import) = &statement.kind else {
+            return false;
+        };
+        !radix::module::kernel::is_kernel_import_path(parse.interner.resolve(import.path))
+    })
+}
+
 /// Print [`RunSourceError`] diagnostics to stderr.
 #[cfg(feature = "runner")]
 pub fn print_run_source_error(error: &RunSourceError) {

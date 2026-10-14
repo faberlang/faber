@@ -1,3 +1,4 @@
+use crate::script::source_declares_non_kernel_import;
 use crate::script::{
     BufferHost, RunSourceError, interpret_source, print_run_source_error, run_named, run_source,
 };
@@ -188,4 +189,24 @@ main {
 ",
     );
     assert_eq!(vector_issue, lista_issue);
+}
+
+#[test]
+fn source_declares_non_kernel_import_classifies_imports() {
+    assert!(source_declares_non_kernel_import(
+        "<source>",
+        "import from \"norma:process\" process\n\nmain { print 1 }\n"
+    ));
+    assert!(source_declares_non_kernel_import(
+        "<source>",
+        "import from \"./thing\" thing\n\nmain { print 1 }\n"
+    ));
+    assert!(!source_declares_non_kernel_import(
+        "<source>",
+        "import from \"faber:processus\" processus\n\nmain { print 1 }\n"
+    ));
+    assert!(!source_declares_non_kernel_import(
+        "<source>",
+        "main { print 1 }\n"
+    ));
 }
