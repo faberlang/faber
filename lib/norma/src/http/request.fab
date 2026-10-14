@@ -160,7 +160,7 @@ fn hex_value(string c) → int {
 # bytes outside the printable ASCII range are left as `?`.
 fn byte_char(int n) → string {
     if n ≺ 32 or n ≻ 126 then return "?"
-    const string printable ← " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+    const string printable ← « !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~»
     return printable.slice(n - 32, n - 31)
 }
 
@@ -192,7 +192,7 @@ describe "request" {
 
     test "percent decoding keeps malformed and nonprintable bytes safe" {
         assert percent_decode("%20%21%7E") ≡ " !~"
-        assert percent_decode("%22") ≡ "\""
+        assert percent_decode("%22") ≡ «"»
         assert percent_decode("%5C") ≡ "\\"
         assert percent_decode("%00") ≡ "?"
         assert percent_decode("%G0%") ≡ "%G0%"
