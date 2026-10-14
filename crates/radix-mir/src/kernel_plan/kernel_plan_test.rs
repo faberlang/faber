@@ -3342,7 +3342,10 @@ fn literal_const_operand_rejects_temp_with_second_writer() {
         ],
         MirTerminatorKind::Return(None),
     );
-    assert_eq!(literal_const_operand(&function, &MirOperand::Temp(temp)), None);
+    assert_eq!(
+        literal_const_operand(&function, &MirOperand::Temp(temp)),
+        None
+    );
 }
 
 /// The control case: exactly one constant `Assign` still resolves.

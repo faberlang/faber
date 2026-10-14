@@ -54,9 +54,7 @@ pub fn reject_bits_type(types: &TypeTable, target: Target) -> Result<(), Codegen
         return Ok(());
     };
     Err(CodegenError {
-        message: format!(
-            "the raw-bits type `{marker}` has no carrier on the {target:?} target"
-        ),
+        message: format!("the raw-bits type `{marker}` has no carrier on the {target:?} target"),
         args: vec![
             DiagnosticArg::new("issue", ISSUE),
             DiagnosticArg::new("type", marker),

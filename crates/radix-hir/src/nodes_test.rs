@@ -193,7 +193,7 @@ fn hir_local_without_size_static_deserializes() {
         ("size_decl", FieldValue::Bool(original.size_decl)),
     ];
     let map = MapDeserializer::<_, ValueError>::new(entries.into_iter());
-    let restored = HirLocal::deserialize(map)
-        .expect("a snapshot without size_static must still deserialize");
+    let restored =
+        HirLocal::deserialize(map).expect("a snapshot without size_static must still deserialize");
     assert!(!restored.size_static);
 }
