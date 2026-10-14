@@ -3608,12 +3608,22 @@ impl TypeChecker<'_> {
         let map_slot_list_source = list_target
             && matches!(&source.kind, HirExpressionKind::Array(_))
             && self.list_slot_carries_map(effective_target);
+        // WHY: a `Verte` whose source is a JSON object literal names its data
+        // type even when no typed cell is present. A later unit makes an
+        // absent expected type on that source a named error, so the check must
+        // not pass `None`; a non-map expected type makes
+        // `check_json_valor_literal` return `json` exactly as `None` does.
+        let json_object_source = matches!(
+            &source.kind,
+            HirExpressionKind::Literal(HirLiteral::JsonValor(radix_syntax::JsonValue::Object(_)))
+        );
         let source_expected = (constructor_source
             || (empty_list_source && list_target)
             || optional_slot_list_source
             || json_literal_source
             || map_slot_list_source)
-            .then_some(effective_target);
+            .then_some(effective_target)
+            .or_else(|| json_object_source.then(|| self.json_type()));
         let source_ty = if matches!(
             self.types.get(effective_target),
             Type::ModularWord(_) | Type::SaturatingWord(_) | Type::PolicyFloat(_, _)
