@@ -2504,6 +2504,44 @@ main args args {
 }
 
 #[test]
+#[ignore = "pumpfix-gdde13951-1.1.1.3 un-ignores this once the compile path is fixed"]
+fn package_mir_norma_fs_read_file_generic_failable_in_main_runs() {
+    let dir = test_temp_dir("package-mir-solum-read-file-generic-failable-main");
+    let entry = dir.join("main.fab");
+    let payload = dir.join("payload.txt");
+    fs::write(&payload, "alpha").expect("write payload");
+    let payload_root = payload.to_string_lossy().into_owned();
+    fs::write(
+        &entry,
+        r#"
+import from "norma:fs" fs
+
+@ cli "tool"
+@ operand string root
+main args args {
+  print fs.read_file<string>(args.root)
+}
+"#,
+    )
+    .expect("write entry");
+
+    let mut host = BufferHost::with_argumenta(vec![payload_root]);
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
+
+    assert!(
+        result.is_ok(),
+        "expected generic failable read_file in main to run, got {:?}",
+        result
+            .err()
+            .unwrap_or_default()
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), format!("{diag:?}")))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(host.stdout_lines, vec!["alpha".to_owned()]);
+}
+
+#[test]
 fn package_mir_bridges_norma_fs_exscribe_renomina() {
     let dir = test_temp_dir("package-mir-solum-copy-rename");
     let entry = dir.join("main.fab");
