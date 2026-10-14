@@ -405,7 +405,7 @@ functio silu_op(tf32[2, 2] x) → tf32[2, 2] {
 }
 
 #[test]
-fn accepts_activatio_tanh_tensor_method_in_air_lane() {
+fn air_allowlist_admits_activatio_tanh_row() {
     // `activatio_tanh` is an AIR-lane allowlist row (`AirTensorOp::Tanh`),
     // but the source tensor catalog deliberately does not own it: a fixture
     // calling `x.activatio_tanh()` never typechecks (`unknown_method`), so
