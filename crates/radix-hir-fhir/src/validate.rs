@@ -3656,6 +3656,9 @@ pub(crate) fn validate_referential_integrity(
         if let Some(enclosing) = use_wire.enclosing {
             checks.check_def(enclosing)?;
         }
+        if let Some(local) = use_wire.local {
+            checks.check_def(local)?;
+        }
     }
 
     // 5. libraries: deep walk.

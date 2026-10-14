@@ -308,6 +308,50 @@ fn dangling_provenance_identity_fails_closed() {
     );
 }
 
+// ── F20 resolved-use wire validation ─────────────────────────────────────
+
+#[test]
+fn dangling_resolved_use_local_fails_closed() {
+    let mut artifact = stub_artifact();
+    artifact.resolved_uses.push(crate::artifact::ResolvedUseWire {
+        key: crate::artifact::ResolvedUseKeyWire::Portable("pkg::item".to_string()),
+        kind: crate::artifact::ResolvedUseKindWire::Path,
+        enclosing: None,
+        local: Some(DefId(999_999)),
+    });
+    let err = crate::decode(&postcard::to_allocvec(&artifact).expect("encode"))
+        .expect_err("dangling resolved-use local DefId must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::DanglingIndex { kind: "DefId", .. }
+        ),
+        "dangling resolved-use local must surface as a DefId DanglingIndex: {err:?}"
+    );
+}
+
+#[test]
+fn valid_resolved_use_local_round_trips() {
+    let mut artifact = stub_artifact();
+    artifact.resolved_uses = vec![
+        crate::artifact::ResolvedUseWire {
+            key: crate::artifact::ResolvedUseKeyWire::Portable("pkg::item".to_string()),
+            kind: crate::artifact::ResolvedUseKindWire::Path,
+            enclosing: None,
+            local: Some(DefId(0)),
+        },
+        crate::artifact::ResolvedUseWire {
+            key: crate::artifact::ResolvedUseKeyWire::Portable("pkg::other".to_string()),
+            kind: crate::artifact::ResolvedUseKindWire::ImportBinding,
+            enclosing: None,
+            local: None,
+        },
+    ];
+    let bytes = encode(&artifact).expect("encode artifact");
+    let decoded = decode(&bytes).expect("valid resolved-use local must round-trip");
+    assert_eq!(decoded.resolved_uses, artifact.resolved_uses);
+}
+
 fn authored_type_artifact() -> crate::artifact::HirArtifact {
     let mut artifact = stub_artifact();
     let mut types = TypeTable::new();
