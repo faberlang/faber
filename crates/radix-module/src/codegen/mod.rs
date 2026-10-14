@@ -703,6 +703,7 @@ fn generate_go_from_analyzed(
     r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     r#gen.set_library_registry(&analysis.libraries);
     r#gen.set_imported_constants(go_imported_constants(analysis, hir));
+    r#gen.set_imported_generators(go_imported_generators(analysis, hir));
     register_go_cross_file_defids(&mut r#gen, hir, &analysis.resolver, &analysis.libraries);
     let mut statics = rustc_hash::FxHashMap::default();
     for (def_id, fields, _, _) in analysis.resolver.imported_file_structs() {
@@ -768,7 +769,6 @@ fn go_imported_constants(
 
 /// Imported lazy generator callees called as `module.member(..)` in `hir`.
 #[cfg(feature = "hir-go")]
-#[allow(dead_code)]
 fn go_imported_generators(
     analysis: &crate::driver::AnalyzedModule,
     hir: &HirModule,
