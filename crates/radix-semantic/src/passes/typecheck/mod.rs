@@ -202,11 +202,11 @@ mod discerne_closed_set_test;
 #[path = "empty_dense_test.rs"]
 mod empty_dense_test;
 #[cfg(test)]
-#[path = "keyed_literal_test.rs"]
-mod keyed_literal_test;
-#[cfg(test)]
 #[path = "kernel_index_warning_test.rs"]
 mod kernel_index_warning_test;
+#[cfg(test)]
+#[path = "keyed_literal_test.rs"]
+mod keyed_literal_test;
 #[cfg(test)]
 #[path = "ordering_test.rs"]
 mod ordering_test;
