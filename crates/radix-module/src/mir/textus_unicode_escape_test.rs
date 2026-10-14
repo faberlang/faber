@@ -24,8 +24,23 @@ fn unicode_scalar_escape_prints_the_scalar() {
     assert_eq!(run(r#"nota "a\u{e9}b""#), ["a\u{e9}b"]);
 }
 
+// Need, ruling 2026-10-13: anything else after a backslash is a
+// compile error, so as-written text with a backslash is spelled with the
+// supported `\\` escape ("\\q" is the two characters backslash, q).
 #[test]
 fn malformed_unicode_escape_keeps_the_text_as_written() {
-    assert_eq!(run(r#"nota "\u{41""#), [r"\u{41"]);
-    assert_eq!(run(r#"nota "\q""#), [r"\q"]);
+    assert_eq!(run(r#"nota "\\u{41""#), [r"\u{41"]);
+    assert_eq!(run(r#"nota "\\q""#), [r"\q"]);
+}
+
+#[test]
+fn unknown_escape_is_rejected_by_the_runner() {
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
+    let source = String::from("incipit {\nnota \"\\q\"\n}\n");
+    let mut host = BufferHost::default();
+    assert!(run_source(&session, "textus-unicode-escape.fab", &source, &mut host).is_err());
 }
