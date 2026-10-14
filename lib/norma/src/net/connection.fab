@@ -5,28 +5,37 @@ locale = "en"
 
 # net/connection.fab — TCP socket (connected byte stream)
 
+import from "norma:fault" fault
 import from "norma:net/endpoint" endpoint
 import from "norma:value" value
+
+# Boundary row: a leaf failure crosses as the `{kind, path}` record and this
+# `@ conversion` row turns it into the typed `IoFault` at the `⇥` edge.
+@ conversion
+fn fault_from(value raw) → fault.IoFault {
+    return fault.io_fault_from(raw)
+}
 
 @ public
 class Socket {
     var int id = 0
 
-    fn read_bytes(int n optional) → bytes {
+    # A clean close is an empty read today (not a `Closed` error).
+    fn read_bytes(int n optional) → bytes ∪ none ⇥ fault.IoFault {
         return socket_read(self, n)
     }
 
     @ future
-    fn read_bytes_async(int n optional) → bytes {
+    fn read_bytes_async(int n optional) → bytes ∪ none ⇥ fault.IoFault {
         return socket_read(self, n)
     }
 
-    fn write_bytes(bytes data) → void {
+    fn write_bytes(bytes data) → void ⇥ fault.IoFault {
         return socket_write(self, data)
     }
 
     @ future
-    fn write_bytes_async(bytes data) → void {
+    fn write_bytes_async(bytes data) → void ⇥ fault.IoFault {
         return socket_write(self, data)
     }
 
@@ -43,14 +52,18 @@ class Socket {
     }
 }
 
-fn socket_read(Socket socket, int n optional) → bytes {
+fn socket_read(Socket socket, int n optional) → bytes ∪ none ⇥ fault.IoFault {
     if n is none {
-        return call 'caelum:hauri' (socket.id) ↦ bytes
+        const bytes data ← call 'caelum:hauri' (socket.id) ↦ bytes
+        if data.length() ≡ 0 then return null
+        return data
     }
-    return call 'caelum:hauri' ([socket.id, n coalesce 0]) ↦ bytes
+    const bytes data ← call 'caelum:hauri' ([socket.id, n coalesce 0]) ↦ bytes
+    if data.length() ≡ 0 then return null
+    return data
 }
 
-fn socket_write(Socket socket, bytes data) → void {
+fn socket_write(Socket socket, bytes data) → void ⇥ fault.IoFault {
     return call 'caelum:funde' ([socket.id ↦ value, data ↦ value]) ↦ void
 }
 
