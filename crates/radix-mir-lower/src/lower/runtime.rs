@@ -2988,14 +2988,41 @@ impl FunctionBuilder<'_> {
             return MirOperand::Temp(error_temp);
         };
         let converted = self.push_temp(destination_ty, span);
-        self.append_stmt(MirStatement {
-            kind: MirStatementKind::Call {
+        // EDGE: a conversion row that declares its own `⇥` channel is
+        // failable; applying it with an ordinary `Call` fails MIR validation
+        // (a failable callee needs a `try_call` edge). The row's own failure
+        // composes into the active sink — semantic analysis proved the row's
+        // error channel fits it (`check_registered_row_channel`) — so the
+        // row's error block returns the row error, and the caller terminates
+        // the returned ok-block with the converted value.
+        let Some(row_err_ty) = self.context.function_errors.get(&arm).copied() else {
+            self.append_stmt(MirStatement {
+                kind: MirStatementKind::Call {
+                    destination: Some(MirPlace::temp(converted)),
+                    callee: MirCallee::definition(arm),
+                    args: vec![MirOperand::Temp(error_temp)],
+                },
+                span,
+            });
+            return MirOperand::Temp(converted);
+        };
+        let ok_block = self.fresh_block(span);
+        let error_block = self.fresh_block(span);
+        let row_error_temp = self.push_temp(row_err_ty, span);
+        self.terminate_current(
+            MirTerminatorKind::TryCall {
                 destination: Some(MirPlace::temp(converted)),
                 callee: MirCallee::definition(arm),
                 args: vec![MirOperand::Temp(error_temp)],
+                ok_block,
+                error_place: MirPlace::temp(row_error_temp),
+                error_block,
             },
             span,
-        });
+        );
+        self.switch_to(error_block);
+        self.terminate_current(MirTerminatorKind::ReturnError(MirOperand::Temp(row_error_temp)), span);
+        self.switch_to(ok_block);
         MirOperand::Temp(converted)
     }
 
