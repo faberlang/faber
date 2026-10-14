@@ -9,7 +9,9 @@
 //!
 //! A genuine existing division whose left operand is a `regex` binding (or
 //! `_`) is listed in [`ALLOWED_DIVISIONS`] with a comment naming the file and
-//! line; nothing else may be skipped.
+//! line; nothing else may be skipped. The exemplar added by ruling d381ae56-7
+//! is listed in [`LITERAL_EXEMPLARS`]: it deliberately lexes `RegexString`
+//! tokens, but its regex issues are still fatal.
 
 use crate::{LexError, TokenKind, lex};
 use std::fs;
@@ -20,6 +22,12 @@ use std::path::{Path, PathBuf};
 /// add an entry only with a comment naming the binding and why the `/` is
 /// arithmetic.
 const ALLOWED_DIVISIONS: &[(&str, u32)] = &[];
+
+/// Exemplars that deliberately exercise the inline regex literal ruled by
+/// d381ae56-7. Their `RegexString` tokens are expected; their regex issues
+/// (`unterminated_regex_literal` / `empty_regex_literal`) are not, and are
+/// still reported by this census.
+const LITERAL_EXEMPLARS: &[&str] = &["corpus/regex/literal.fab"];
 
 /// Issue facts this census treats as a regex-literal regression.
 const REGEX_ISSUES: &[&str] = &["unterminated_regex_literal", "empty_regex_literal"];
@@ -50,7 +58,10 @@ fn no_existing_fab_file_lexes_an_inline_regex_literal() {
         let result = lex(&source);
         for token in &result.tokens {
             let line = line_of(&source, token.span.start);
-            if matches!(token.kind, TokenKind::RegexString(_)) && !allowed(&root, path, line) {
+            if matches!(token.kind, TokenKind::RegexString(_))
+                && !allowed(&root, path, line)
+                && !is_literal_exemplar(&root, path)
+            {
                 failures.push(format!("{}:{line}: RegexString token", path.display()));
             }
         }
@@ -109,9 +120,22 @@ fn line_of(source: &str, offset: u32) -> u32 {
 
 /// Whether this exact path and line is a consciously allowed division.
 fn allowed(root: &Path, path: &Path, line: u32) -> bool {
-    let relative = path.strip_prefix(root).unwrap_or(path);
-    let relative = relative.to_string_lossy().replace('\\', "/");
+    let relative = relative_path(root, path);
     ALLOWED_DIVISIONS
         .iter()
         .any(|(allowed_path, allowed_line)| *allowed_path == relative && *allowed_line == line)
+}
+
+/// Whether this path is the inline-regex-literal exemplar added by d381ae56-7.
+fn is_literal_exemplar(root: &Path, path: &Path) -> bool {
+    let relative = relative_path(root, path);
+    LITERAL_EXEMPLARS.contains(&relative.as_str())
+}
+
+/// Repo-relative, slash-separated path for comparing against census lists.
+fn relative_path(root: &Path, path: &Path) -> String {
+    path.strip_prefix(root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/")
 }
