@@ -64,17 +64,21 @@ fn axis_builtin_laminatio_axis_marker_accepted() {
 #[test]
 fn axis_builtin_misplaced_marker_refused() {
     let source = r"functio norm(tf32[2, 8] x, tf32[8] gamma) → tf32[2, 8] {
-    redde x.rms_norm(1, axis 1e-5, gamma)
+    redde x.rms_norm(axis 1, axis 1e-5, gamma)
 }";
     assert_rejects_with_issue(source, "axis_marker_unexpected");
 }
 
 #[test]
-fn axis_builtin_bare_axis_still_accepted() {
-    let source = r"functio norm(tf32[2, 8] x, tf32[8] gamma) → tf32[2, 8] {
+fn axis_builtin_bare_axis_is_required() {
+    let rms_norm = r"functio norm(tf32[2, 8] x, tf32[8] gamma) → tf32[2, 8] {
     redde x.rms_norm(1, 1e-5, gamma)
 }";
-    let _ = analyze_ok(source);
+    assert_rejects_with_issue(rms_norm, "axis_marker_required");
+    let laminatio = r"functio norm(tf32[2, 8] x, tf32[8] gamma, tf32[8] beta) → tf32[2, 8] {
+    redde x.laminatio(1, 1e-5, gamma, beta)
+}";
+    assert_rejects_with_issue(laminatio, "axis_marker_required");
 }
 
 #[test]

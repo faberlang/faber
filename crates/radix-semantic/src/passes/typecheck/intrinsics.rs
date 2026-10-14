@@ -62,12 +62,6 @@ pub(super) const ISSUE_ATOMIC_METHOD_REQUIRES_ATOMIC_RECEIVER: &str =
     "atomic_method_requires_atomic_receiver";
 pub(super) const ISSUE_UNSUPPORTED_ATOMIC_METHOD: &str = "unsupported_atomic_method";
 
-/// need stage 1: a built-in `axis_arg` slot still accepts a bare
-/// integer until the call-site sweep lands. Unit bc775857-5 flips this to
-/// `true`, turning on the required-marker direction for built-ins; the
-/// misplaced-marker direction is already live in both stages.
-const AXIS_MARKER_REQUIRED_FOR_BUILTINS: bool = false;
-
 /// Receiver element types needed to resolve intrinsic param/return shapes.
 #[derive(Debug, Clone, Copy)]
 struct IntrinsicTypeContext {
@@ -732,13 +726,10 @@ fn check_registered_intrinsic(
         checker.check_known_method_args(args, params, ret, span)
     };
     // need: a built-in row's `axis_arg` slot takes the `axis` marker
-    // word. Stage 1 (this unit) refuses a marker on any other argument; the
-    // required direction waits on unit bc775857-5, which flips the const.
+    // word. A bare argument there is refused; a marker on any other argument
+    // is refused too.
     for (index, arg) in args.iter().enumerate() {
         let declared = entry.axis_arg == Some(index);
-        if declared && !AXIS_MARKER_REQUIRED_FOR_BUILTINS {
-            continue;
-        }
         checker.check_axis_marker(arg, declared);
     }
     let result = if matches!(entry.return_kind, IntrinsicReturnKind::GenericTypus) {
