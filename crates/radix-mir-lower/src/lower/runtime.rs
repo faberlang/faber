@@ -315,12 +315,7 @@ impl FunctionBuilder<'_> {
             }),
             IndexExpr::Divide { .. } => Err("runtime shape division has a zero divisor".to_owned()),
             IndexExpr::Param(symbol) => {
-                let source = self.size_params.iter().find_map(|(def_id, name)| {
-                    (*name == symbol)
-                        .then(|| self.size_param_sources.get(def_id).copied())
-                        .flatten()
-                });
-                if let Some(source) = source {
+                if let Some(source) = self.size_param_source(symbol) {
                     return self.lower_shape_expr(
                         source,
                         arguments,
@@ -801,11 +796,15 @@ impl FunctionBuilder<'_> {
                 lowered_receiver.clone()
             };
             let expression_value = (receiver.id.0, lowered_receiver.clone());
+            // GSF-2: symbolic axes keep the finalizable ShapeSize term here;
+            // only a declared Runtime extent lowers to the TensorShapeSize
+            // read. Witnessed size parameters stay symbolic on this path.
             Some(self.lower_lista_to_tensor_shape_with_expression(
                 flat,
                 expr_ty.semantic_id(),
                 Some(&expression_value),
                 expr.span,
+                false,
             )?)
         } else {
             None
@@ -4228,7 +4227,7 @@ impl FunctionBuilder<'_> {
             Type::Array(element) => matches!(self.normalized_type(*element), Type::Bits(radix_types::BitsWidth::B8)),
             _ => false,
         };
-        octeti_source && index_contains_runtime_extent(self.types, *shape, &mut FxHashSet::default())
+        octeti_source && self.body_index_contains_runtime_extent(*shape, &mut FxHashSet::default(), true)
     }
 
     /// The shape operand of [`Self::is_octeti_runtime_extent_tensor`]: the
@@ -4240,13 +4239,26 @@ impl FunctionBuilder<'_> {
         target: TypeId,
         span: Span,
     ) -> Option<(MirOperand, MirType)> {
-        let shape = self.lower_lista_to_tensor_shape(source, target, span)?;
+        // The octeti row is the one lowering that reads a witnessed `size`
+        // parameter's tensor-axis witness at run time: the
+        // byte source carries no shape and the runner cannot read a run-time
+        // shape from the target type. Only this path resolves witnessed
+        // parameters as run-time extents.
+        let shape = self.lower_lista_to_tensor_shape_with_expression(source, target, None, span, true)?;
         let shape_ty = MirType::semantic(lista_numerus_type(self.types)?);
         Some((shape, shape_ty))
     }
 
+    /// The lista-source shape lowering shared by the `lista ↦ tensor` rows.
+    /// A declared `Runtime` extent lowers to a run-time `TensorShapeSize`
+    /// read; every symbolic axis — including a witnessed `size` parameter —
+    /// stays a `ShapeSize` term that package finalization substitutes for a
+    /// generic pin (GSF-2), so a witnessed parameter must not preempt it
+    /// with a run-time witness read the finalizer cannot fold. The octeti
+    /// row, which also reads witnessed parameters, goes through
+    /// [`Self::lower_octeti_tensor_shape`] instead.
     fn lower_lista_to_tensor_shape(&mut self, flat: MirOperand, target: TypeId, span: Span) -> Option<MirOperand> {
-        self.lower_lista_to_tensor_shape_with_expression(flat, target, None, span)
+        self.lower_lista_to_tensor_shape_with_expression(flat, target, None, span, false)
     }
 
     /// A target figura that is a single `list<int>` value name is a runtime
@@ -4280,6 +4292,7 @@ impl FunctionBuilder<'_> {
         target: TypeId,
         expression_value: Option<&(u32, MirOperand)>,
         span: Span,
+        witnessed_size_params: bool,
     ) -> Option<MirOperand> {
         let shape_type = lista_numerus_type(self.types).or_else(|| {
             self.errors.push(MirError::unsupported(
@@ -4331,31 +4344,34 @@ impl FunctionBuilder<'_> {
                         let dim = if let Some(direct) = direct {
                             direct
                         } else {
-                            let scalar =
-                                if index_contains_runtime_extent(self.types, dimension, &mut FxHashSet::default()) {
-                                    let mut shape_arguments = Vec::new();
-                                    let expression = match self.lower_shape_expr(
-                                        dimension,
-                                        &mut shape_arguments,
-                                        expression_value,
-                                        ShapeRelationBoundary::FunctionEntry,
-                                        0,
-                                    ) {
-                                        Ok(expression) => expression,
-                                        Err(message) => {
-                                            self.errors.push(MirError::unsupported(span, message));
-                                            return None;
-                                        }
-                                    };
-                                    self.runtime_call_value(
-                                        MirIntrinsic::TensorShapeSize(expression),
-                                        shape_arguments,
-                                        MirType::semantic(self.types.primitive(Primitive::Fractus)),
-                                        span,
-                                    )
-                                } else {
-                                    MirOperand::Constant(MirConstant::ShapeSize { shape, axis: Some(axis_id) })
+                            let scalar = if self.body_index_contains_runtime_extent(
+                                dimension,
+                                &mut FxHashSet::default(),
+                                witnessed_size_params,
+                            ) {
+                                let mut shape_arguments = Vec::new();
+                                let expression = match self.lower_shape_expr(
+                                    dimension,
+                                    &mut shape_arguments,
+                                    expression_value,
+                                    ShapeRelationBoundary::FunctionEntry,
+                                    0,
+                                ) {
+                                    Ok(expression) => expression,
+                                    Err(message) => {
+                                        self.errors.push(MirError::unsupported(span, message));
+                                        return None;
+                                    }
                                 };
+                                self.runtime_call_value(
+                                    MirIntrinsic::TensorShapeSize(expression),
+                                    shape_arguments,
+                                    MirType::semantic(self.types.primitive(Primitive::Fractus)),
+                                    span,
+                                )
+                            } else {
+                                MirOperand::Constant(MirConstant::ShapeSize { shape, axis: Some(axis_id) })
+                            };
                             let numerus = self.types.primitive(Primitive::Numerus);
                             self.runtime_call_value(
                                 MirIntrinsic::Convert(MirConversion {
@@ -5304,3 +5320,7 @@ fn vector_lane_operand(place: &MirPlace, lane: u8) -> MirOperand {
 pub(super) fn matrix_cell_operand(place: &MirPlace, row: u8, column: u8) -> MirOperand {
     projected_operand(place, MirProjection::MatrixCell { row, column })
 }
+
+#[cfg(test)]
+#[path = "octeti_tensor_size_param_test.rs"]
+mod octeti_tensor_size_param_test;

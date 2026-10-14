@@ -2785,9 +2785,22 @@ impl FunctionBuilder<'_> {
         span: Span,
     ) -> Option<MirOperand> {
         let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
-        let fields = if fields.is_empty() {
+        let fields = if fields.is_empty()
+            && self
+                .context
+                .variant_fields
+                .get(&variant)
+                .is_none_or(|declared| declared.is_empty())
+        {
+            // A unit variant probes as the empty ordered aggregate: its
+            // payload map is empty, so equality is variant identity.
             MirAggregateFields::Ordered(Vec::new())
         } else {
+            // A bare arm on a payload variant (`casu Moveo ut totum`) probes
+            // by re-reading every declared field from the scrutinee — the
+            // same aggregate a wildcard-destructuring arm builds. Runner
+            // equality on `EnumVariant` compares the payload map too, so an
+            // empty aggregate would never match a populated scrutinee.
             self.variant_pattern_probe_fields(variant, scrutinee_place, span)?
         };
         let variant = self.construct_temp(MirAggregateKind::EnumVariant(variant), fields, scrutinee_ty, span);
@@ -2866,6 +2879,13 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(span, "variant payload pattern fields"));
             return None;
         };
+        // A bare arm (`casu Moveo ut totum`) names the variant and binds none
+        // of its payload fields; the probe condition already routed on the
+        // variant identity, so there is nothing to bind. Semantic analysis
+        // admits this shape only under a whole-value alias.
+        if fields.is_empty() {
+            return Some(());
+        }
         if fields.len() != field_names.len() {
             self.errors
                 .push(MirError::unsupported(span, "variant payload pattern arity mismatch"));

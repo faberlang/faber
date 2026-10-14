@@ -1,0 +1,79 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "size_param_list", "size_param", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "spelled_lift", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "fac_block", "cape_clause", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Bulk typed reinterpretation of octeti as a tensor whose extent is a magnitudo parameter witnessed by a tensor argument axis."
+syntax = "<octeti> ↦ tensor<E, [N]> via Be|Le"
+related = ["↦", "octeti", "tensor", "magnitudo"]
+locale = "la"
++++
+# =============================================================================
+# ↦ — octeti as a tensor whose extent is a magnitudo parameter witnessed by the
+# tensor argument.
+# =============================================================================
+#
+# What this teaches:
+#   • A `magnitudo N` parameter in the target shape and a `tensor<f32, [N]>`
+#     argument that witnesses it: the extent is read from the argument's axis
+#     when the conversion runs, so the byte count is known only then.
+#   • Exact length — the byte count must equal `product(shape) * element width`
+#     for the extents as they are at run time; no truncation, no padding.
+#   • A wrong length is a recoverable failure: `fac { } cape err { }` handles
+#     it, exactly as it does for a literal extent.
+#
+# Common mistakes:
+#   • Naming a `magnitudo` parameter that no tensor argument witnesses — no
+#     lane can read a value for it, so the conversion is declined by name. A
+#     `magnitudo` parameter witnessed by a tensor argument axis works, as does
+#     an expression extent over an in-scope binding (`magnitudo (n - 1)`).
+#   • Omitting Be/Le — the byte order is never implied, for any element width.
+#
+# See also: ↦, octeti, tensor, magnitudo
+# =============================================================================
+
+
+# conversio — octeti ↦ tensor<E, [N]> via Be|Le
+#
+# EXPECTED stdout: see octeti-tensor-size-param-la.expected
+#
+# BACKEND:
+#   The runner and Rust both compare the byte length with the product of the
+#   extents when the conversion runs, reading the witnessed magnitudo
+#   parameter from the tensor argument. TypeScript, Go and Swift decline by name.
+
+functio runtime_extent(numerus value) → numerus {
+    redde value
+}
+
+functio decode<magnitudo N>(tensor<f32, [N]> proto, octeti raw) → tensor<f32, [N]> ⇥ textus {
+    redde raw ↦ tensor<f32, [N]> via Le
+}
+
+incipit {
+    fixum numerus n ← runtime_extent(3)
+    fixum lista<f32> values ← [1.0, 2.0, 3.0]
+    fixum tensor<f32, [magnitudo n]> proto ← values ↦ tensor<f32, [magnitudo n]>
+    fixum octeti raw ← |00 00 80 3f 00 00 00 40 00 00 40 40|
+
+    fac {
+        fixum tensor<f32, [magnitudo n]> decoded ← decode(proto, raw)
+        nota decoded[[0]]
+        nota decoded[[2]]
+        fixum lista<numerus, 1> dims ← proto.magnitudines()
+        nota dims
+    }
+    cape err {
+        nota "unexpected"
+    }
+
+    fixum octeti short_raw ← |00 00 80 3f 00 00 00 40|
+    fac {
+        fixum tensor<f32, [magnitudo n]> bad ← decode(proto, short_raw)
+        nota bad[[0]]
+    }
+    cape err {
+        nota "caught"
+    }
+}

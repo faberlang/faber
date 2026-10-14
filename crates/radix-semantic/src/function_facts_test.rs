@@ -394,6 +394,262 @@ fn function_fact_table_get_returns_expected_fact() {
 
 // ── FunctionFact equality ───────────────────────────────────────────────────
 
+// ── derived capture modes (A-174) ───────────────────────────────────────────
+
+/// Captures recorded for one named top-level function.
+fn function_captures(source: &str, wanted: &str) -> Vec<CaptureFact> {
+    let fixture = crate::test_support::analyze_ok(source);
+    let hir = fixture.result.hir.as_ref().expect("typed HIR");
+    let table = analyze_function_facts(hir, &fixture.result.types);
+    let def_id = hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            radix_hir::HirItemKind::Function(function)
+                if fixture.interner.resolve(function.name) == wanted =>
+            {
+                Some(item.def_id)
+            }
+            _ => None,
+        })
+        .expect("function item");
+    table
+        .get(def_id)
+        .expect("function fact row")
+        .captures
+        .clone()
+}
+
+#[test]
+fn mutating_closure_capture_records_mutate_mode() {
+    let captures = function_captures(
+        r#"
+functio counter() → () → numerus {
+    varia numerus c ← 0
+    redde () → numerus ∴ fac {
+        c ← c + 1
+        redde c
+    }
+}
+incipit { }
+"#,
+        "counter",
+    );
+    assert_eq!(captures.len(), 1, "closure captures c: {captures:?}");
+    assert_eq!(captures[0].mode, CaptureMode::Mutate, "{captures:?}");
+}
+
+#[test]
+fn mutating_loop_binder_capture_records_mutate_mode() {
+    let captures = function_captures(
+        r#"
+functio loops() → numerus {
+    varia numerus total ← 0
+    itera ex [1, 2, 3] varia v {
+        fixum _ f ← () → numerus ∴ fac {
+            v ← v + 10
+            redde v
+        }
+        total ← total + f()
+    }
+    redde total
+}
+incipit { }
+"#,
+        "loops",
+    );
+    assert_eq!(
+        captures.len(),
+        1,
+        "closure captures the loop binder v: {captures:?}"
+    );
+    assert_eq!(captures[0].mode, CaptureMode::Mutate, "{captures:?}");
+}
+
+#[test]
+fn moved_out_closure_capture_records_consume_mode() {
+    let captures = function_captures(
+        r#"
+functio eat(own lista<numerus> xs) → vacuum {
+    nota xs.longitudo()
+}
+functio demo() → vacuum {
+    varia lista<numerus> a ← [1, 2, 3]
+    fixum _ f ← () → vacuum ∴ eat(own a)
+}
+incipit { }
+"#,
+        "demo",
+    );
+    assert_eq!(
+        captures
+            .iter()
+            .filter(|capture| capture.mode == CaptureMode::Consume)
+            .count(),
+        1,
+        "the moved-out binding records one consume capture: {captures:?}"
+    );
+}
+
+#[test]
+fn read_only_closure_capture_records_read_mode() {
+    let captures = function_captures(
+        r#"
+functio peek() → () → numerus {
+    varia numerus n ← 1
+    redde () → numerus ∴ n
+}
+incipit { }
+"#,
+        "peek",
+    );
+    assert_eq!(captures.len(), 1, "closure captures n: {captures:?}");
+    assert_eq!(captures[0].mode, CaptureMode::Read, "{captures:?}");
+}
+
+// ── closure-body-derived captures (E2-4.5) ─────────────────────────────────
+
+#[test]
+fn write_outside_closure_leaves_read_capture_intact() {
+    let captures = function_captures(
+        r#"
+functio mixed() → () → numerus {
+    varia numerus n ← 1
+    fixum _ peek ← () → numerus ∴ n
+    n ← n + 2
+    redde peek
+}
+incipit { }
+"#,
+        "mixed",
+    );
+    assert_eq!(captures.len(), 1, "closure captures n: {captures:?}");
+    assert_eq!(
+        captures[0].mode,
+        CaptureMode::Read,
+        "the write after the closure is not the closure's demand: {captures:?}"
+    );
+}
+
+#[test]
+fn loop_binder_used_only_outside_closures_is_not_a_capture() {
+    let captures = function_captures(
+        r#"
+functio loose() → numerus {
+    varia numerus t ← 0
+    itera ex [1, 2] varia v {
+        t ← t + v
+    }
+    redde t
+}
+incipit { }
+"#,
+        "loose",
+    );
+    assert!(captures.is_empty(), "no closure, no captures: {captures:?}");
+}
+
+#[test]
+fn parameter_captured_by_closure_records_read_capture() {
+    let captures = function_captures(
+        r#"
+functio wraps(numerus m) → () → numerus {
+    redde () → numerus ∴ m
+}
+incipit { }
+"#,
+        "wraps",
+    );
+    assert_eq!(captures.len(), 1, "closure captures m: {captures:?}");
+    assert_eq!(captures[0].mode, CaptureMode::Read, "{captures:?}");
+}
+
+#[test]
+fn method_call_on_capture_inside_closure_records_mutate_mode() {
+    // No per-method mutation facts exist yet, so every method call on the
+    // captured name inside the referencing closure counts as a mutate —
+    // fail closed, matching the shared capture analysis.
+    let captures = function_captures(
+        r#"
+functio prober() → () → numerus {
+    varia lista<numerus> xs ← [1]
+    redde () → numerus ∴ xs.longitudo()
+}
+incipit { }
+"#,
+        "prober",
+    );
+    assert_eq!(captures.len(), 1, "closure captures xs: {captures:?}");
+    assert_eq!(captures[0].mode, CaptureMode::Mutate, "{captures:?}");
+}
+
+#[test]
+fn closure_local_used_only_inside_its_own_closure_is_not_a_capture() {
+    let captures = function_captures(
+        r#"
+functio outer() → () → numerus {
+    redde () → numerus ∴ fac {
+        varia numerus only ← 7
+        redde only
+    }
+}
+incipit { }
+"#,
+        "outer",
+    );
+    assert!(
+        captures.is_empty(),
+        "only is local to the closure: {captures:?}"
+    );
+}
+
+#[test]
+fn closure_local_captured_by_nested_closure_records_mutate_mode() {
+    let captures = function_captures(
+        r#"
+functio nest() → () → () → numerus {
+    redde () → () → numerus ∴ fac {
+        varia numerus inner ← 5
+        redde () → numerus ∴ fac {
+            inner ← inner + 1
+            redde inner
+        }
+    }
+}
+incipit { }
+"#,
+        "nest",
+    );
+    assert_eq!(
+        captures.len(),
+        1,
+        "the inner closure captures inner: {captures:?}"
+    );
+    assert_eq!(captures[0].mode, CaptureMode::Mutate, "{captures:?}");
+}
+
+#[test]
+fn entry_row_captures_stay_empty() {
+    let fixture = crate::test_support::analyze_ok(
+        r#"
+functio helper() → numerus {
+    redde 1
+}
+incipit {
+    fixum _ f ← () → numerus ∴ helper()
+}
+"#,
+    );
+    let hir = fixture.result.hir.as_ref().expect("typed HIR");
+    let table = analyze_function_facts(hir, &fixture.result.types);
+    let entry = table.entry.as_ref().expect("entry fact row");
+    assert!(
+        entry.captures.is_empty(),
+        "entry captures: {:?}",
+        entry.captures
+    );
+}
+
 #[test]
 fn function_fact_equality() {
     let a = FunctionFact::default();

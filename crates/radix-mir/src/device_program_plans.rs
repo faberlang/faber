@@ -202,18 +202,17 @@ pub fn kernel_plan_for_function_with_limit(
     {
         return Ok(None);
     }
-    // A single-lane kernel (no lane loop, one `mut` tensor) is a sequential
-    // body: its collection-op statements are scalar math too. The caller
-    // selects the `SingleLane` plan.
-    if MirKernelSignature::is_single_lane_form(function, validation) {
-        return Ok(None);
-    }
     // SFR-5 declared-recipe scan: a `FilumSum` declaration is the author-
     // stated recipe. The collection-op statement scan never sees it (the
     // declaration is not a collection op), so it resolves ahead of the op
     // scan; the source length `K` comes from the kernel signature's source
     // buffer — never guessed from the body. A second declared or recognized
     // recipe in the same body fails closed (one kernel, one recipe).
+    //
+    // The declared recipe resolves BEFORE the single-lane classification:
+    // `FilumReduce` is not a `MirCollectionOp`, so `is_single_lane_form`
+    // cannot see it, and a sequential single-lane early return here would
+    // swallow the recipe (SFR-5).
     let filum_declarations = filum_sum_declarations(function);
     if !filum_declarations.is_empty() {
         if filum_declarations.len() > 1 {
@@ -246,6 +245,12 @@ pub fn kernel_plan_for_function_with_limit(
             }
         }
         return Ok(Some(plan));
+    }
+    // A single-lane kernel (no lane loop, one `mut` tensor) is a sequential
+    // body: its collection-op statements are scalar math too. The caller
+    // selects the `SingleLane` plan.
+    if MirKernelSignature::is_single_lane_form(function, validation) {
+        return Ok(None);
     }
     // Live-recipe-statement census: the op scan below is deduplicated by op
     // kind, so two LIVE statements of the SAME recipe op would adopt ONE

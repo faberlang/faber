@@ -7,8 +7,8 @@
 use crate::{Type, TypeId, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
-    DefId, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirModule, HirParam,
-    HirStatementKind,
+    DefId, HirArgMarker, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirModule,
+    HirParam, HirStatement, HirStatementKind,
 };
 use radix_lexer::Symbol;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -19,13 +19,16 @@ use serde::{Deserialize, Serialize};
 pub enum CaptureMode {
     /// Read-only / shared use (`de` posture).
     Read,
-    /// Mutating use observed in the body (`in` posture).
+    /// Mutating use observed in a referencing closure body (`in` posture).
     Mutate,
     /// Consume/move demand (`ex` posture).
     Consume,
 }
 
-/// One captured local or parameter referenced from a closure body.
+/// One captured name referenced from a closure body nested inside the
+/// analyzed function: an enclosing local or parameter, a loop binder, or a
+/// module item, together with the strongest access mode any referencing
+/// closure demands.
 ///
 /// F9: included in wire shape because codegen backends read captured-variable
 /// facts for closure layout (closure struct fields, move detection, etc.).
@@ -54,7 +57,13 @@ pub struct FunctionFact {
     pub requires_await: bool,
     /// Direct callees by definition id (functions and resolved methods).
     pub call_edges: FxHashSet<DefId>,
-    /// Captures for closure-shaped bodies (empty for ordinary functions).
+    /// Captures demanded by the closures nested in this body, derived from
+    /// the closure bodies only (empty for functions without closures and for
+    /// the entry row). Each entry is a name declared outside the referencing
+    /// closure — a local or parameter of this function, a binding of an
+    /// enclosing closure, a loop binder, or a module item — used inside it;
+    /// the mode is the strongest access any referencing closure performs.
+    /// Writes outside the referencing closures do not affect the mode.
     pub captures: Vec<CaptureFact>,
     /// Declared parameter modes keyed by parameter def id.
     pub param_modes: FxHashMap<DefId, crate::SemanticParamMode>,
@@ -214,18 +223,29 @@ pub fn analyze_function_facts(hir: &HirModule, types: &TypeTable) -> FunctionFac
         });
     }
 
-    // Second pass: closure captures inside function bodies.
+    // Second pass: closure captures inside function bodies, derived from the
+    // closure bodies only (E2-4.5). A name is a capture when a nested closure
+    // references it from outside that closure's own body; its mode is the
+    // strongest access the referencing closures themselves perform — writes
+    // (assignment, compound assignment, increment/decrement, `⇇` target,
+    // method-call receiver) mutate, `own` moves consume, everything else
+    // reads. Writes outside the referencing closures — in the function body
+    // itself, or in a closure whose references do not reach past the
+    // declaration — do not affect the mode. No per-method mutation facts
+    // exist yet, so every method call on a captured name inside a referencing
+    // closure counts as a mutate: fail closed, matching the shared capture
+    // analysis. The entry row keeps no captures.
     for_each_hir_function(hir, |def_id, func| {
         let Some(body) = &func.body else {
             return;
         };
-        let mut collector = ClosureCaptureCollector {
-            bound: func.params.iter().map(|p| p.def_id).collect(),
-            captures: Vec::new(),
-        };
+        let mut collector = ClosureCaptureCollector::default();
+        for param in &func.params {
+            collector.declared.insert(param.def_id, 0);
+        }
         collector.visit_block(body);
         if let Some(fact) = table.by_def.get_mut(&def_id) {
-            fact.captures = collector.captures;
+            fact.captures = collector.finish();
         }
     });
 
@@ -455,40 +475,194 @@ impl HirVisitor for BodyVisitor<'_> {
     }
 }
 
+/// Write and move classes observed while walking a callable body.
+///
+/// `written` records assignment, conversion-assignment, increment/decrement,
+/// method-call receiver, and `⇇` copy-into roots. `moved` records `own`-marked
+/// call arguments. Both are keyed by the root binding definition.
+#[derive(Default)]
+pub(crate) struct CaptureMutations {
+    written: FxHashSet<DefId>,
+    moved: FxHashSet<DefId>,
+}
+
+impl CaptureMutations {
+    pub(crate) fn note_expr(&mut self, expr: &HirExpression) {
+        match &expr.kind {
+            HirExpressionKind::Assign(target, _)
+            | HirExpressionKind::ConversioAssign { target, .. } => self.note_place(target),
+            HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
+                self.note_place(receiver);
+                self.note_moves(args);
+            }
+            HirExpressionKind::Call(_, _, args, _) => self.note_moves(args),
+            HirExpressionKind::CopyInto { target, .. } => self.note_place(target),
+            _ => {}
+        }
+    }
+
+    pub(crate) fn note_stmt(&mut self, stmt: &HirStatement) {
+        if let HirStatementKind::IncDec(inc_dec) = &stmt.kind {
+            self.note_place(&inc_dec.target);
+        }
+    }
+
+    /// The strongest access mode the walked body demands directly: a move out
+    /// is a consume, any recorded write is a mutate, otherwise a read.
+    pub(crate) fn mode(&self, def_id: DefId) -> CaptureMode {
+        if self.moved.contains(&def_id) {
+            CaptureMode::Consume
+        } else if self.written.contains(&def_id) {
+            CaptureMode::Mutate
+        } else {
+            CaptureMode::Read
+        }
+    }
+
+    fn note_place(&mut self, place: &HirExpression) {
+        match &place.kind {
+            HirExpressionKind::Path(def_id) => {
+                self.written.insert(*def_id);
+            }
+            HirExpressionKind::Field(base, _) | HirExpressionKind::Index(base, _) => {
+                self.note_place(base);
+            }
+            _ => {}
+        }
+    }
+
+    fn note_moves(&mut self, args: &[radix_hir::HirCallArg]) {
+        for arg in args {
+            if arg.marker == Some(HirArgMarker::Own)
+                && let HirExpressionKind::Path(def_id) = &arg.expr.kind
+            {
+                self.moved.insert(*def_id);
+            }
+        }
+    }
+}
+
+/// Collects, per enclosing function, the captures its nested closures demand.
+///
+/// One walk over the function body tracks a closure depth. A name's
+/// declaration depth is recorded for function parameters (depth 0), locals,
+/// and closure parameters; a binding that belongs to a closure's own body
+/// therefore never counts as a capture of that closure. Loop binders and
+/// module items have no declaration record, so a reference from inside a
+/// closure (depth > 0) captures them while a reference from the function
+/// body itself does not.
+///
+/// Writes and moves are recorded with the depth at which they happen, so a
+/// capture's mode reflects only the work done by the closures that reference
+/// the name — never writes sitting elsewhere in the enclosing function.
+#[derive(Default)]
 struct ClosureCaptureCollector {
-    bound: FxHashSet<DefId>,
-    captures: Vec<CaptureFact>,
+    depth: u32,
+    declared: FxHashMap<DefId, u32>,
+    deepest_use: FxHashMap<DefId, u32>,
+    deepest_write: FxHashMap<DefId, u32>,
+    deepest_move: FxHashMap<DefId, u32>,
+}
+
+impl ClosureCaptureCollector {
+    fn note_use(&mut self, def_id: DefId) {
+        let deepest = self.deepest_use.entry(def_id).or_insert(self.depth);
+        *deepest = (*deepest).max(self.depth);
+    }
+
+    fn note_write(&mut self, place: &HirExpression) {
+        match &place.kind {
+            HirExpressionKind::Path(def_id) => {
+                let deepest = self.deepest_write.entry(*def_id).or_insert(self.depth);
+                *deepest = (*deepest).max(self.depth);
+            }
+            HirExpressionKind::Field(base, _) | HirExpressionKind::Index(base, _) => {
+                self.note_write(base);
+            }
+            _ => {}
+        }
+    }
+
+    fn note_moves(&mut self, args: &[radix_hir::HirCallArg]) {
+        for arg in args {
+            if arg.marker == Some(HirArgMarker::Own)
+                && let HirExpressionKind::Path(def_id) = &arg.expr.kind
+            {
+                let deepest = self.deepest_move.entry(*def_id).or_insert(self.depth);
+                *deepest = (*deepest).max(self.depth);
+            }
+        }
+    }
+
+    /// Captures: names referenced strictly deeper than their declaration,
+    /// each with the strongest access the referencing closures perform.
+    fn finish(self) -> Vec<CaptureFact> {
+        let Self {
+            declared,
+            deepest_use,
+            deepest_write,
+            deepest_move,
+            ..
+        } = self;
+        let mut captures: Vec<CaptureFact> = deepest_use
+            .into_iter()
+            .filter_map(|(def_id, used_at)| {
+                let declared_at = declared.get(&def_id).copied().unwrap_or(0);
+                (used_at > declared_at).then(|| {
+                    let mode = if deepest_move
+                        .get(&def_id)
+                        .is_some_and(|at| *at > declared_at)
+                    {
+                        CaptureMode::Consume
+                    } else if deepest_write
+                        .get(&def_id)
+                        .is_some_and(|at| *at > declared_at)
+                    {
+                        CaptureMode::Mutate
+                    } else {
+                        CaptureMode::Read
+                    };
+                    CaptureFact { def_id, mode }
+                })
+            })
+            .collect();
+        captures.sort_by_key(|capture| capture.def_id.0);
+        captures
+    }
 }
 
 impl HirVisitor for ClosureCaptureCollector {
     fn visit_expr(&mut self, expr: &HirExpression) {
         match &expr.kind {
-            HirExpressionKind::Path(def_id) => {
-                if !self.bound.contains(def_id) && self.captures.iter().all(|c| c.def_id != *def_id)
-                {
-                    self.captures.push(CaptureFact {
-                        def_id: *def_id,
-                        mode: CaptureMode::Read,
-                    });
-                }
-                walk_expr(self, expr);
+            HirExpressionKind::Path(def_id) => self.note_use(*def_id),
+            HirExpressionKind::Assign(target, _)
+            | HirExpressionKind::ConversioAssign { target, .. } => self.note_write(target),
+            HirExpressionKind::CopyInto { target, .. } => self.note_write(target),
+            HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
+                self.note_write(receiver);
+                self.note_moves(args);
             }
+            HirExpressionKind::Call(_, _, args, _) => self.note_moves(args),
             HirExpressionKind::Clausura(params, _, _, body) => {
-                let mut nested = self.bound.clone();
+                self.depth += 1;
                 for param in params {
-                    nested.insert(param.def_id);
+                    self.declared.insert(param.def_id, self.depth);
                 }
-                let previous = std::mem::replace(&mut self.bound, nested);
                 self.visit_expr(body);
-                self.bound = previous;
+                self.depth -= 1;
+                return;
             }
-            _ => walk_expr(self, expr),
+            _ => {}
         }
+        walk_expr(self, expr);
     }
 
     fn visit_stmt(&mut self, stmt: &radix_hir::HirStatement) {
+        if let HirStatementKind::IncDec(inc_dec) = &stmt.kind {
+            self.note_write(&inc_dec.target);
+        }
         if let HirStatementKind::Local(local) = &stmt.kind {
-            self.bound.insert(local.def_id);
+            self.declared.insert(local.def_id, self.depth);
         }
         radix_hir::visit::walk_stmt(self, stmt);
     }
