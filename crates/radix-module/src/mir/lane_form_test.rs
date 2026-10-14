@@ -260,5 +260,5 @@ fn lane_form_copy_is_admitted_and_emits_on_metal() {
         .unwrap_or_else(|error| panic!("lane-form copy must emit: {error}"));
     assert!(msl.contains("kernel void copy("), "{msl}");
     assert!(msl.contains("thread_position_in_grid"), "{msl}");
-    assert!(msl.contains("src_extent0"), "extent resources are declared: {msl}");
+    assert!(msl.contains("b0_extent0"), "extent resources are declared: {msl}");
 }
