@@ -252,6 +252,7 @@ pub use radix_codegen_shared::conversio_arm::{
     conversio_arm_mark_fallback, conversio_arm_take,
 };
 
+use crate::codegen::input::CodegenAnalysis;
 use crate::diagnostics::DiagnosticArg;
 use crate::hir::HirModule;
 use crate::lexer::Interner;
@@ -558,9 +559,9 @@ fn generate_rust_from_analyzed(
     feature = "hir-haskell"
 ))]
 pub(crate) fn display_tokens_for_module(
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
 ) -> radix_codegen_shared::names::DisplayTokens {
-    analysis.display_tokens.clone()
+    analysis.display_tokens().clone()
 }
 
 #[cfg(all(
@@ -695,18 +696,18 @@ fn register_go_cross_file_defids(
 
 #[cfg(feature = "hir-go")]
 fn generate_go_from_analyzed(
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
-    let mut r#gen = go::GoCodegen::new(hir, &analysis.types, &analysis.interner);
+    let mut r#gen = go::GoCodegen::new(hir, analysis.types(), analysis.interner());
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
-    r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
-    r#gen.set_library_registry(&analysis.libraries);
+    r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
+    r#gen.set_library_registry(analysis.libraries());
     r#gen.set_imported_constants(go_imported_constants(analysis, hir));
     r#gen.set_imported_generators(go_imported_generators(analysis, hir));
-    register_go_cross_file_defids(&mut r#gen, hir, &analysis.resolver, &analysis.libraries);
+    register_go_cross_file_defids(&mut r#gen, hir, analysis.resolver(), analysis.libraries());
     let mut statics = rustc_hash::FxHashMap::default();
-    for (def_id, fields, _, _) in analysis.resolver.imported_file_structs() {
+    for (def_id, fields, _, _) in analysis.resolver().imported_file_structs() {
         for field in fields {
             if field.modifier == Some(radix_syntax::FieldModifier::Generis)
                 && let Some(init) = field.init
@@ -716,7 +717,7 @@ fn generate_go_from_analyzed(
         }
     }
     r#gen.set_imported_static_fields(statics);
-    let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
+    let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Go(crate::GoOutput { code: output.code }))
 }
 
@@ -727,25 +728,25 @@ fn generate_go_from_analyzed(
 /// same value source as the MIR lowering's imported-constant map).
 #[cfg(feature = "hir-go")]
 fn go_imported_constants(
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
 ) -> rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), go::ImportedConst> {
     use crate::file_interface::InterfaceConstValue;
     use crate::hir::HirExpressionKind;
     use crate::hir::visit::HirVisitor;
     struct Reads<'u> {
-        analysis: &'u crate::driver::AnalyzedModule,
+        analysis: &'u dyn CodegenAnalysis,
         found: rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), go::ImportedConst>,
     }
     impl HirVisitor for Reads<'_> {
         fn visit_expr(&mut self, expr: &crate::hir::HirExpression) {
             if let HirExpressionKind::Field(object, member) = &expr.kind
                 && let HirExpressionKind::Path(module) = &object.kind
-                && let Some(namespace) = self.analysis.resolver.get_symbol(*module)
+                && let Some(namespace) = self.analysis.resolver().get_symbol(*module)
                 && namespace.kind == crate::semantic::SymbolKind::Module
                 && let Some(value) = self
                     .analysis
-                    .resolver
+                    .resolver()
                     .namespace_file_const_value_canonical(namespace.name, *member)
             {
                 let value = match value {
@@ -770,13 +771,13 @@ fn go_imported_constants(
 /// Imported lazy generator callees called as `module.member(..)` in `hir`.
 #[cfg(feature = "hir-go")]
 fn go_imported_generators(
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
 ) -> rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId> {
     use crate::hir::HirExpressionKind;
     use crate::hir::visit::HirVisitor;
     struct Reads<'u> {
-        analysis: &'u crate::driver::AnalyzedModule,
+        analysis: &'u dyn CodegenAnalysis,
         found: rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId>,
     }
     impl HirVisitor for Reads<'_> {
@@ -784,16 +785,16 @@ fn go_imported_generators(
             if let HirExpressionKind::Call(callee, ..) = &expr.kind
                 && let HirExpressionKind::Field(object, member) = &callee.kind
                 && let HirExpressionKind::Path(module) = &object.kind
-                && let Some(namespace) = self.analysis.resolver.get_symbol(*module)
+                && let Some(namespace) = self.analysis.resolver().get_symbol(*module)
                 && namespace.kind == crate::semantic::SymbolKind::Module
                 && let Some(sig) = self
                     .analysis
-                    .resolver
+                    .resolver()
                     .namespace_file_function_canonical(namespace.name, *member)
                 && sig.is_generator
                 && !sig.is_async
                 && sig.err.is_none()
-                && let radix_types::Type::Array(elem) = self.analysis.types.get(sig.ret)
+                && let radix_types::Type::Array(elem) = self.analysis.types().get(sig.ret)
             {
                 self.found.insert((*module, *member), *elem);
             }
@@ -807,7 +808,7 @@ fn go_imported_generators(
 
 #[cfg(not(feature = "hir-go"))]
 fn generate_go_from_analyzed(
-    _analysis: &crate::driver::AnalyzedModule,
+    _analysis: &dyn CodegenAnalysis,
     _hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirGo))
@@ -815,14 +816,14 @@ fn generate_go_from_analyzed(
 
 #[cfg(feature = "hir-swift")]
 fn generate_swift_from_analyzed(
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
     output_mode: OutputMode,
     module_name: Option<&str>,
 ) -> Result<crate::Output, CodegenError> {
-    let mut r#gen = swift::SwiftCodegen::new(hir, &analysis.types, &analysis.interner);
+    let mut r#gen = swift::SwiftCodegen::new(hir, analysis.types(), analysis.interner());
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
-    r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
+    r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
     r#gen.set_output_mode(
         match output_mode {
             OutputMode::Application => swift::OutputMode::Application,
@@ -830,13 +831,13 @@ fn generate_swift_from_analyzed(
         },
         module_name,
     );
-    let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
+    let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Swift(crate::SwiftOutput { code: output.code }))
 }
 
 #[cfg(not(feature = "hir-swift"))]
 fn generate_swift_from_analyzed(
-    _analysis: &crate::driver::AnalyzedModule,
+    _analysis: &dyn CodegenAnalysis,
     _hir: &HirModule,
     _output_mode: OutputMode,
     _module_name: Option<&str>,
@@ -846,19 +847,19 @@ fn generate_swift_from_analyzed(
 
 #[cfg(feature = "hir-python")]
 fn generate_python_from_analyzed(
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
-    let mut r#gen = python::PythonCodegen::new(hir, &analysis.types, &analysis.interner);
+    let mut r#gen = python::PythonCodegen::new(hir, analysis.types(), analysis.interner());
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
-    r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
-    let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
+    r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
+    let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Python(crate::PythonOutput { code: output.code }))
 }
 
 #[cfg(not(feature = "hir-python"))]
 fn generate_python_from_analyzed(
-    _analysis: &crate::driver::AnalyzedModule,
+    _analysis: &dyn CodegenAnalysis,
     _hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirPython))
@@ -866,17 +867,17 @@ fn generate_python_from_analyzed(
 
 #[cfg(feature = "hir-cobol")]
 fn generate_cobol_from_analyzed(
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
-    let r#gen = cobol::CobolCodegen::new(hir, &analysis.interner);
-    let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
+    let r#gen = cobol::CobolCodegen::new(hir, analysis.interner());
+    let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Cobol(crate::CobolOutput { code: output.code }))
 }
 
 #[cfg(not(feature = "hir-cobol"))]
 fn generate_cobol_from_analyzed(
-    _analysis: &crate::driver::AnalyzedModule,
+    _analysis: &dyn CodegenAnalysis,
     _hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirCobol))
@@ -884,19 +885,19 @@ fn generate_cobol_from_analyzed(
 
 #[cfg(feature = "hir-haskell")]
 fn generate_haskell_from_analyzed(
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
-    let mut r#gen = haskell::HaskellCodegen::new(hir, &analysis.interner);
+    let mut r#gen = haskell::HaskellCodegen::new(hir, analysis.interner());
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
-    r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
-    let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
+    r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
+    let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Haskell(crate::HaskellOutput { code: output.code }))
 }
 
 #[cfg(not(feature = "hir-haskell"))]
 fn generate_haskell_from_analyzed(
-    _analysis: &crate::driver::AnalyzedModule,
+    _analysis: &dyn CodegenAnalysis,
     _hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirHaskell))
@@ -904,17 +905,17 @@ fn generate_haskell_from_analyzed(
 
 #[cfg(feature = "hir-pascal")]
 fn generate_pascal_from_analyzed(
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
-    let r#gen = pascal::PascalCodegen::new(hir, &analysis.interner);
-    let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
+    let r#gen = pascal::PascalCodegen::new(hir, analysis.interner());
+    let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Pascal(crate::PascalOutput { code: output.code }))
 }
 
 #[cfg(not(feature = "hir-pascal"))]
 fn generate_pascal_from_analyzed(
-    _analysis: &crate::driver::AnalyzedModule,
+    _analysis: &dyn CodegenAnalysis,
     _hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirPascal))
@@ -922,17 +923,17 @@ fn generate_pascal_from_analyzed(
 
 #[cfg(feature = "hir-fortran")]
 fn generate_fortran_from_analyzed(
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
-    let r#gen = fortran::FortranCodegen::new(hir, &analysis.interner);
-    let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
+    let r#gen = fortran::FortranCodegen::new(hir, analysis.interner());
+    let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Fortran(crate::FortranOutput { code: output.code }))
 }
 
 #[cfg(not(feature = "hir-fortran"))]
 fn generate_fortran_from_analyzed(
-    _analysis: &crate::driver::AnalyzedModule,
+    _analysis: &dyn CodegenAnalysis,
     _hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirFortran))
@@ -940,17 +941,17 @@ fn generate_fortran_from_analyzed(
 
 #[cfg(feature = "hir-odin")]
 fn generate_odin_from_analyzed(
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
-    let r#gen = odin::OdinCodegen::new(hir, &analysis.interner);
-    let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
+    let r#gen = odin::OdinCodegen::new(hir, analysis.interner());
+    let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Odin(crate::OdinOutput { code: output.code }))
 }
 
 #[cfg(not(feature = "hir-odin"))]
 fn generate_odin_from_analyzed(
-    _analysis: &crate::driver::AnalyzedModule,
+    _analysis: &dyn CodegenAnalysis,
     _hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirOdin))
