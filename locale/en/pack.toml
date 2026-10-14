@@ -5416,6 +5416,16 @@ message = "expected '[' after 'apud'"
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "expected ']' after the 'apud' coordinates"
 
+[diagnostics.PARSE001.issues.expected_keyword]
+message = "expected keyword '{keyword}'"
+help = "add '{keyword}' here"
+
+[diagnostics.PARSE001.issues.reducta_source]
+message = "expected a reduction source after the reduction operator"
+
+[diagnostics.PARSE001.issues.lege_lineam]
+message = "expected '{lege}' or '{lineam}'"
+
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "expected an opening brace for the elige body"
 
@@ -5550,10 +5560,6 @@ message = "expected '(' after 'scriptum'"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "expected ')' after the scriptum arguments"
-
-[diagnostics.PARSE001.issues.expected_keyword]
-message = "expected keyword '{expected}'"
-help = "add '{expected}' here"
 
 [diagnostics.PARSE001.issues.expected_identifier]
 message = "expected an identifier"

@@ -1283,6 +1283,17 @@ impl Parser {
             .unwrap_or_else(|| "nihil".to_owned())
     }
 
+    /// Active surface spelling of a canonical Latin keyword (D23.2).
+    ///
+    /// Falls back to the canonical word when the active surface declares no
+    /// keyword rows (registry-direct Latin).
+    fn keyword_surface(&self, latin: &str) -> String {
+        self.reader_keyword_surfaces
+            .get(latin)
+            .cloned()
+            .unwrap_or_else(|| latin.to_owned())
+    }
+
     /// Active surface spelling of the null *value* literal (D23.2).
     ///
     /// The pack word whose identity is `nulla`; the canonical Latin `nulla`
@@ -1330,18 +1341,43 @@ impl Parser {
 
     /// Require the current word to be the given keyword identity.
     ///
-    /// The failure names the `expected_keyword` issue so the renderer reaches
-    /// the catalog row instead of falling back to the bare PARSE001 prose.
-    fn expect_keyword(&mut self, identity: TokenKind) -> Result<(), ParseError> {
-        let expected = keyword_spelling_for_token(&identity);
+    /// The diagnostic names the stable `expected_keyword` issue; the expected
+    /// word travels as a `keyword` arg in the active locale's spelling (the
+    /// canonical Latin word when the active surface declares no keyword rows),
+    /// so the renderer owns the prose.
+    fn expect_keyword_ident(&mut self, identity: TokenKind) -> Result<(), ParseError> {
+        // The static registry gives every keyword identity a canonical
+        // spelling; the fallback only guards non-keyword misuse.
+        let spelling = keyword_spelling_for_token(&identity);
+        if self.check_keyword_ident(identity) {
+            self.advance();
+            Ok(())
+        } else {
+            let keyword = spelling
+                .map(|latin| self.keyword_surface(latin))
+                .unwrap_or_else(|| "keyword".to_owned());
+            Err(
+                ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                    .with_arg("issue", "expected_keyword")
+                    .with_arg("keyword", keyword),
+            )
+        }
+    }
+
+    /// Require a keyword identity under a site-specific issue name (sites
+    /// whose prose says more than the bare expected keyword).
+    fn expect_keyword_issue(
+        &mut self,
+        identity: TokenKind,
+        issue: &'static str,
+    ) -> Result<(), ParseError> {
         if self.check_keyword_ident(identity) {
             self.advance();
             Ok(())
         } else {
             Err(
                 ParseError::structured(ParseErrorKind::Expected, self.current_span())
-                    .with_arg("issue", "expected_keyword")
-                    .with_arg("expected", expected.unwrap_or("")),
+                    .with_arg("issue", issue),
             )
         }
     }

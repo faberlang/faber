@@ -593,6 +593,18 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
             "adfirma_message_particle" => {
                 return Some("expected 'mori' before the adfirma message".to_owned());
             }
+            "expected_keyword" => {
+                let keyword = quote_arg(args, "keyword")?;
+                return Some(format!("expected {keyword}"));
+            }
+            "lege_lineam" => {
+                let lege = quote_arg(args, "lege")?;
+                let lineam = quote_arg(args, "lineam")?;
+                return Some(format!("expected {lege} or {lineam}"));
+            }
+            "reducta_source" => {
+                return Some("expected a reduction source after the reduction operator".to_owned());
+            }
             "itera_mode" | "allocator_kind" | "mutability_marker" => {
                 let expected = arg_value(args, "expected")?;
                 return Some(format!("expected {expected}"));

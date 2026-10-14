@@ -224,7 +224,7 @@ fn slot_helper_rejects_ordinary_identifier() {
 #[test]
 fn slot_helper_expect_errors_when_absent() {
     let mut parser = parser_over("nomine");
-    let result = parser.expect_keyword(TokenKind::Iuncta);
+    let result = parser.expect_keyword_ident(TokenKind::Iuncta);
     let err = result.expect_err("missing slot keyword must produce an error");
     assert!(
         err.args

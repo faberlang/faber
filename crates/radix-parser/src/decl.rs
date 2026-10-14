@@ -524,7 +524,7 @@ impl Parser {
     /// Parse `const size H ← expr` or `const size N = natural`.
     fn parse_size_decl(&mut self, mutability: AstMutability) -> Result<StmtKind, ParseError> {
         let size_span = self.current_span();
-        self.expect_keyword(TokenKind::Magnitudo)?;
+        self.expect_keyword_ident(TokenKind::Magnitudo)?;
         if mutability == AstMutability::Mutable {
             return Err(
                 ParseError::structured(ParseErrorKind::DeclarationInvalid, size_span)
@@ -556,7 +556,7 @@ impl Parser {
     /// Parse `sit` inferred immutable binding declarations.
     fn parse_sit_decl(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
-        self.expect_keyword(TokenKind::Sit)?;
+        self.expect_keyword_ident(TokenKind::Sit)?;
 
         if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
             return Err(
@@ -756,7 +756,7 @@ impl Parser {
     /// declarations.
     fn parse_func_decl(&mut self) -> Result<StmtKind, ParseError> {
         let nondum_declared = std::mem::take(&mut self.nondum_function_pending);
-        self.expect_keyword(TokenKind::Functio)?;
+        self.expect_keyword_ident(TokenKind::Functio)?;
 
         let name = self.parse_function_name()?;
         let type_params = self.parse_generic_params()?;
@@ -960,7 +960,7 @@ impl Parser {
     /// method parsing stays inside this module because member syntax shares
     /// declaration markers with top-level bindings and functions.
     fn parse_class_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword(TokenKind::Genus)?;
+        self.expect_keyword_ident(TokenKind::Genus)?;
 
         let name = self.parse_class_name()?;
         let type_params = self.parse_generic_params()?;
@@ -1203,7 +1203,7 @@ impl Parser {
     /// parsing, but they stop before bodies so the `AST` carries a contract rather
     /// than an implementation placeholder.
     fn parse_interface_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword(TokenKind::Implendum)?;
+        self.expect_keyword_ident(TokenKind::Implendum)?;
 
         let name = self.parse_decl_name()?;
         let type_params = self.parse_generic_params()?;
@@ -1216,7 +1216,7 @@ impl Parser {
             let annotations = self.parse_annotations()?;
             let start = self.current_span();
 
-            self.expect_keyword(TokenKind::Functio)?;
+            self.expect_keyword_ident(TokenKind::Functio)?;
             let method_name = self.parse_member_ident()?;
 
             self.expect_issue(&TokenKind::LParen, "interface_method_parameters_start")?;
@@ -1262,7 +1262,7 @@ impl Parser {
 
     /// Parse a type alias declaration.
     fn parse_type_alias_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword(TokenKind::Typus)?;
+        self.expect_keyword_ident(TokenKind::Typus)?;
         let name = self.parse_decl_name()?;
         let type_params = self.parse_generic_params()?;
         self.expect_issue(&TokenKind::Eq, "type_alias_value_separator")?;
@@ -1297,7 +1297,7 @@ impl Parser {
     /// inheritance (`schema_inheritance`), and nested column declarations
     /// (`schema_nested_column`) fail here at parse time.
     fn parse_schema_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword(TokenKind::Schema)?;
+        self.expect_keyword_ident(TokenKind::Schema)?;
         let name = self.parse_decl_name()?;
 
         // Grammar-level rejection: `sub`/`implet` inheritance syntax on a
@@ -1335,7 +1335,7 @@ impl Parser {
                 .with_arg("issue", "schema_inheritance"));
             }
 
-            self.expect_keyword(TokenKind::Columna)?;
+            self.expect_keyword_ident(TokenKind::Columna)?;
 
             // Nested column declaration: a `columna` keyword in the type slot
             // (`columna columna …`) means a column nested inside a column.
@@ -1405,7 +1405,7 @@ impl Parser {
     ///   enum-decl := `ordo` ident '{' enum-member* '}'
     ///   enum-member := ident ['=' (integer | string)]
     fn parse_enum_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword(TokenKind::Ordo)?;
+        self.expect_keyword_ident(TokenKind::Ordo)?;
         let name = self.parse_decl_name()?;
         self.reject_sum_type_implet()?;
 
@@ -1514,7 +1514,7 @@ impl Parser {
     ///   variant := ident [ { field* } ]
     ///   field := type ident
     fn parse_union_decl(&mut self) -> Result<StmtKind, ParseError> {
-        self.expect_keyword(TokenKind::Discretio)?;
+        self.expect_keyword_ident(TokenKind::Discretio)?;
         let name = self.parse_decl_name()?;
         let type_params = self.parse_generic_params()?;
         self.reject_sum_type_implet()?;
@@ -1694,7 +1694,7 @@ impl Parser {
     /// names a local module, stdlib interface, or invalid provider path.
     fn parse_import_decl(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
-        self.expect_keyword(TokenKind::Importa)?;
+        self.expect_keyword_ident(TokenKind::Importa)?;
 
         let (path, visibility, kind) = if self.check(&TokenKind::LBrace) {
             self.parse_import_record()?
@@ -1714,7 +1714,7 @@ impl Parser {
     fn parse_import_sugar(
         &mut self,
     ) -> Result<(radix_lexer::Symbol, Visibility, ImportKind), ParseError> {
-        self.expect_keyword(TokenKind::Ex)?;
+        self.expect_keyword_ident(TokenKind::Ex)?;
 
         let path = self.parse_string()?;
         let path_span = self.previous_span();
@@ -1736,7 +1736,7 @@ impl Parser {
         };
 
         let kind = if self.eat(&TokenKind::Star) {
-            self.expect_keyword(TokenKind::Ut)?;
+            self.expect_keyword_ident(TokenKind::Ut)?;
             let alias = self.parse_ident()?;
             ImportKind::Wildcard { alias }
         } else if self.check_keyword_ident(TokenKind::Fixum)
@@ -2101,7 +2101,7 @@ impl Parser {
     ///   probandum-body := (setup | proba | nested-probandum)*
     fn parse_probandum_decl(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
-        self.expect_keyword(TokenKind::Probandum)?;
+        self.expect_keyword_ident(TokenKind::Probandum)?;
 
         let name = self.parse_string()?;
         let modifiers = self.parse_test_modifiers()?;
@@ -2183,7 +2183,7 @@ impl Parser {
 
     fn parse_proba_case(&mut self) -> Result<ProbaCase, ParseError> {
         let start = self.current_span();
-        self.expect_keyword(TokenKind::Proba)?;
+        self.expect_keyword_ident(TokenKind::Proba)?;
 
         let name = self.parse_string()?;
 

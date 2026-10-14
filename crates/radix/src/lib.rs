@@ -76,9 +76,10 @@ pub mod services {
         VerifyCommand, VerifySourceResult, build_output_path, check_diagnostics_for_source,
         check_diagnostics_for_source_with_locale_pack, cli_ir_inspection_for_source,
         discoverable_targets, hir_inspection_for_source, hir_inspection_json,
-        insert_field_modifiers, lex_inspection_for_source, output_code,
-        parse_inspection_for_source, target_capabilities, target_capabilities_for_surface,
-        target_extension, target_leaves, target_leaves_label, target_name, verify_source,
+        insert_field_modifiers, lex_inspection_for_source, normalize_locale002_notes, output_code,
+        parse_inspection_for_source, source_declares_locale, target_capabilities,
+        target_capabilities_for_surface, target_extension, target_leaves, target_leaves_label,
+        target_name, verify_source,
     };
     #[cfg(feature = "mir-core")]
     pub use radix_module::services::{mir_output_for_source, output_reflection_json};

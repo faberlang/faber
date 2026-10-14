@@ -3615,6 +3615,15 @@ message = "cần '[' sau 'apud'"
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "cần ']' sau tọa độ 'apud'"
 
+[diagnostics.PARSE001.issues.expected_keyword]
+message = "cần '{keyword}'"
+
+[diagnostics.PARSE001.issues.reducta_source]
+message = "cần nguồn reduction sau toán tử reduction"
+
+[diagnostics.PARSE001.issues.lege_lineam]
+message = "cần '{lege}' hoặc '{lineam}'"
+
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "cần dấu ngoặc nhọn mở cho thân elige"
 
