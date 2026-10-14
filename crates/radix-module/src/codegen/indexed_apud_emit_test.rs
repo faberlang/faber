@@ -46,17 +46,17 @@ fn rust_enumerates_lista_and_destructures_composite_keys() {
     assert!(lista.contains(".iter().enumerate()"), "{lista}");
     let composite = emit(Target::HirRust, COMPOSITE);
     // The path key part clones so `east` survives its next use (E0382).
-    assert!(composite.contains("(east.clone(), 2024)"), "{composite}");
-    assert!(composite.contains("let (regio, annus) = "), "{composite}");
+    assert!(composite.contains("(l_east.clone(), 2024)"), "{composite}");
+    assert!(composite.contains("let (l_regio, l_annus) = "), "{composite}");
 }
 
 #[test]
 fn go_keys_composite_maps_by_comparable_array() {
     let lista = emit(Target::HirGo, LISTA);
-    assert!(lista.contains("for i, x := range xs"), "{lista}");
+    assert!(lista.contains("for l_i, l_x := range l_xs"), "{lista}");
     let composite = emit(Target::HirGo, COMPOSITE);
     assert!(
-        composite.contains("sales[rt.TupleKey([]any{string(east), int(2024)})] = 5"),
+        composite.contains("l_sales[rt.TupleKey([]any{string(l_east), int(2024)})] = 5"),
         "{composite}"
     );
     // T1-G8: the key helpers live in `faber/rt`; no per-file declaration.
@@ -67,13 +67,16 @@ fn go_keys_composite_maps_by_comparable_array() {
 #[test]
 fn ts_builds_value_keyed_tuple_map() {
     let lista = emit(Target::HirTypeScript, LISTA);
-    assert!(lista.contains("for (const [i, x] of (xs).entries())"), "{lista}");
+    assert!(lista.contains("for (const [l_i, l_x] of (l_xs).entries())"), "{lista}");
     let composite = emit(Target::HirTypeScript, COMPOSITE);
     assert!(
         composite.contains("new tuple.TupleMap<[string, number], number>()"),
         "{composite}"
     );
-    assert!(composite.contains("for (const [[regio, annus], v] of (sales))"), "{composite}");
+    assert!(
+        composite.contains("for (const [[l_regio, l_annus], l_v] of (l_sales))"),
+        "{composite}"
+    );
 }
 
 #[test]

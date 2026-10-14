@@ -50,18 +50,18 @@ fn main_body(code: &str, marker: &str) -> String {
 fn rust_emits_method_calls_on_the_asserted_payload() {
     let code = emit(Target::HirRust);
     let main = main_body(&code, "fn main()");
-    assert!(main.contains("let mut xs: Option<Vec<i64>>"), "{main}");
+    assert!(main.contains("let mut l_xs: Option<Vec<i64>>"), "{main}");
     // A mutating receiver borrows the stored value; a read borrows shared.
     assert!(
-        main.contains(r"faber::trap::some((xs).as_mut(), faber::Trap::Nonnull).push(3);"),
+        main.contains(r"faber::trap::some((l_xs).as_mut(), faber::Trap::Nonnull).push(3);"),
         "{main}"
     );
     assert!(
-        main.contains(r"faber::trap::some((xs).as_ref(), faber::Trap::Nonnull).len() as i64"),
+        main.contains(r"faber::trap::some((l_xs).as_ref(), faber::Trap::Nonnull).len() as i64"),
         "{main}"
     );
     assert!(
-        main.contains(r"faber::trap::some((t).as_ref(), faber::Trap::Nonnull).chars().count() as i64"),
+        main.contains(r"faber::trap::some((l_t).as_ref(), faber::Trap::Nonnull).chars().count() as i64"),
         "{main}"
     );
     assert!(!main.contains("length.clone()()"), "{main}");
@@ -70,23 +70,23 @@ fn rust_emits_method_calls_on_the_asserted_payload() {
 #[test]
 fn ts_emits_method_calls_on_the_asserted_payload() {
     let code = emit(Target::HirTypeScript);
-    assert!(code.contains("xs!.push(3);"), "{code}");
+    assert!(code.contains("l_xs!.push(3);"), "{code}");
     // A list length stays `.length`; a text length counts Unicode characters
     // on every target, so the asserted text payload is walked by code point.
-    assert!(code.contains("xs!.length"), "{code}");
-    assert!(code.contains("Array.from(t!).length"), "{code}");
-    assert!(!code.contains("t!.length"), "{code}");
+    assert!(code.contains("l_xs!.length"), "{code}");
+    assert!(code.contains("Array.from(l_t!).length"), "{code}");
+    assert!(!code.contains("l_t!.length"), "{code}");
     assert!(!code.contains(".length()"), "{code}");
 }
 
 #[test]
 fn go_emits_method_calls_through_the_pointer_storage() {
     let code = emit(Target::HirGo);
-    assert!(code.contains("(*xs) = append((*xs), 3)"), "{code}");
-    assert!(code.contains("len((*xs))"), "{code}");
-    assert!(code.contains("len([]rune((*t)))"), "{code}");
+    assert!(code.contains("(*l_xs) = append((*l_xs), 3)"), "{code}");
+    assert!(code.contains("len((*l_xs))"), "{code}");
+    assert!(code.contains("len([]rune((*l_t)))"), "{code}");
     // Indexing an optional list dereferences the pointer too.
-    assert!(code.contains("(*xs)[0]"), "{code}");
+    assert!(code.contains("(*l_xs)[0]"), "{code}");
     assert!(!code.contains(".Length()"), "{code}");
 }
 
