@@ -8,13 +8,13 @@
 //! the method body unchanged. A call the analysis cannot bind to one body, or
 //! whose arguments may overlap, keeps a named decline.
 
-use crate::test_support::{analyze_source, assert_accepts, assert_rejects_with_issue};
+use crate::test_support::{analyze_source_la, assert_accepts_la, assert_rejects_with_issue_la};
 
 const ISSUE: &str = "filum_independence_unproven";
 const GRID: &str = "tensor<f32, [4]>";
 
 fn accepted(source: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
@@ -26,7 +26,7 @@ fn has_reason(error: &crate::SemanticError, reason: &str) -> bool {
 }
 
 fn rejected(source: &str, reason: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(!errors.is_empty(), "body unexpectedly certified");
     assert!(
@@ -385,7 +385,7 @@ fn overlapping_mut_arguments_of_a_method_call_are_a_borrow_error() {
     // 1ce9ea98 hole 1), so two `in` arguments naming one tensor are rejected
     // there first. The filum pass still declines the same call on its own, so
     // both diagnostics are present; the second owner is not leaned on.
-    let result = analyze_source(&kernel(OVER_OUT, "s.both(in out, in out, i)"));
+    let result = analyze_source_la(&kernel(OVER_OUT, "s.both(in out, in out, i)"));
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
         errors
@@ -408,7 +408,7 @@ fn overlapping_mut_arguments_through_the_receiver_are_declined_by_the_pass() {
     // the receiver's field to the storage it holds, so it is the sole owner of
     // this spelling.
     let source = kernel(OVER_OUT, "s.both(in out, in s.data, i)");
-    let result = analyze_source(&source);
+    let result = analyze_source_la(&source);
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
         errors.iter().all(|d| d
@@ -442,7 +442,7 @@ fn receiver_field_overlapping_a_method_argument_is_declined() {
 
 #[test]
 fn function_call_with_aliased_mut_arguments_is_still_a_borrow_error() {
-    let result = analyze_source(&function_kernel(
+    let result = analyze_source_la(&function_kernel(
         r"
 @ nucleum
 functio both(in tensor<f32, [4]> left, in tensor<f32, [4]> right, numerus at) → vacuum {
@@ -550,7 +550,7 @@ functio k(in tensor<numerus, [4]> grid) → vacuum {
 
 #[test]
 fn reduction_term_may_call_a_method_kernel_that_reads() {
-    assert_accepts(&format!(
+    assert_accepts_la(&format!(
         r"{STENCIL}
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
@@ -563,7 +563,7 @@ functio k(tensor<f32, [4]> xs) → f32 {{
 
 #[test]
 fn reduction_term_may_call_a_public_kernel() {
-    assert_accepts(
+    assert_accepts_la(
         r"
 @ nucleum
 @ publica
@@ -578,7 +578,7 @@ functio k(tensor<f32, [32]> xs) → f32 {
 
 #[test]
 fn reduction_term_calling_a_host_function_is_still_rejected() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &format!(
             r"{STENCIL}
 functio host(f32 x) → f32 {{ redde x }}
@@ -594,7 +594,7 @@ functio k(tensor<f32, [4]> xs) → f32 {{
 
 #[test]
 fn reduction_term_calling_a_host_method_is_still_rejected() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         &format!(
             r"{STENCIL}
 @ nucleum
@@ -610,7 +610,7 @@ functio k(tensor<f32, [4]> xs) → f32 {{
 
 #[test]
 fn reduction_term_method_kernel_that_writes_is_rejected() {
-    let result = analyze_source(&format!(
+    let result = analyze_source_la(&format!(
         r"{STENCIL}
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
@@ -633,7 +633,7 @@ functio k(tensor<f32, [4]> xs) → f32 {{
 
 #[test]
 fn reduction_term_method_kernel_with_a_host_call_inside_is_rejected() {
-    let result = analyze_source(&format!(
+    let result = analyze_source_la(&format!(
         r"{LEAKY}
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{

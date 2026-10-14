@@ -74,11 +74,16 @@ fn combined_query_interface_is_implemented_by_fail_closed_provider() {
 use super::DerivedCapabilityQueries;
 use crate::AccessFactTable;
 use crate::function_facts::analyze_function_facts;
-use crate::test_support::analyze_ok;
+use crate::test_support::analyze_ok_la;
 use radix_lexer::Symbol;
 use radix_types::{
     IndexExpr, IndexVar, NumericWidth, Primitive as Prim, SemanticMutability, Type, TypeTable,
 };
+
+fn la_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("load Latin locale pack")
+}
 
 /// A query layer plus the owned authorities it borrows.
 struct Fixture {
@@ -95,7 +100,7 @@ impl std::ops::Deref for Fixture {
 /// Build the query layer over a locally-constructed `TypeTable` with empty
 /// authority rows.
 fn table_queries(types: TypeTable) -> Fixture {
-    let empty = analyze_ok("incipit { }");
+    let empty = analyze_ok_la("incipit { }");
     let hir = empty.result.hir.expect("hir");
     let types: &'static TypeTable = Box::leak(Box::new(types));
     let access: &'static AccessFactTable = Box::leak(Box::default());
@@ -113,7 +118,7 @@ fn table_queries(types: TypeTable) -> Fixture {
 /// Analyze Faber source and build the full derived query layer. The borrowed
 /// authorities are leaked test fixtures of one coherent snapshot.
 fn source_queries(source: &str) -> (Fixture, &'static radix_hir::HirModule, &'static TypeTable) {
-    let fixture = analyze_ok(source);
+    let fixture = analyze_ok_la(source);
     let crate::SemanticResult {
         hir,
         types,
@@ -792,13 +797,14 @@ incipit { }
 fn durable_provenance_answers_the_region_rows_through_the_application() {
     // SCR-04: the region rows answer from the durable summary carried by
     // AnalyzedApplication — never by re-running region inference.
-    let lex = radix_lexer::lex(
+    let lex = radix_lexer::lex_with_locale_pack(
         r"
 functio eadem(de lista<numerus> xs) → de lista<numerus> {
     redde xs
 }
 incipit { }
 ",
+        &la_pack(),
     );
     let mut parsed = radix_parser::parse(lex);
     assert!(parsed.success(), "parse: {:?}", parsed.errors);

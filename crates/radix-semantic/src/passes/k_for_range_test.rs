@@ -6,18 +6,18 @@
 //! body. The lockstep form keeps its decline. Every assertion is on the
 //! diagnostic code, issue and named reason arguments, never message text.
 
-use crate::test_support::analyze_source;
+use crate::test_support::analyze_source_la;
 
 const ISSUE: &str = "filum_independence_unproven";
 const CODE: &str = "SEM010";
 
 fn accepted(source: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
 fn rejected(source: &str, reason: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(!errors.is_empty(), "body unexpectedly certified");
     assert!(

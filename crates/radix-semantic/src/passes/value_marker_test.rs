@@ -1,12 +1,12 @@
 //! Value-side `copy`/`own` markers (operator ruling 2026-10-08): the marked
 //! initializer has the effect the binding-side spelling has on the declaration.
 
-use crate::test_support::{analyze_ok, assert_rejects_with_issue, entry_local_tys};
+use crate::test_support::{analyze_ok_la, assert_rejects_with_issue_la, entry_local_tys};
 use crate::{ISSUE_SCALAR_ACCESS_MARKER, SemanticMutability, Type};
 
 #[test]
 fn value_marker_copy_types_the_binding_as_a_copy_value() {
-    let result = analyze_ok(
+    let result = analyze_ok_la(
         r"
 incipit {
     fixum lista<numerus> a ← [1, 2, 3]
@@ -25,7 +25,7 @@ incipit {
 
 #[test]
 fn value_marker_own_types_the_binding_as_an_owned_value() {
-    let result = analyze_ok(
+    let result = analyze_ok_la(
         r"
 incipit {
     fixum lista<numerus> a ← own [1, 2, 3]
@@ -47,7 +47,7 @@ incipit {
 
 #[test]
 fn value_marker_own_use_after_transfer_is_rejected() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"
 incipit {
     fixum lista<numerus> a ← own [1, 2, 3]
@@ -62,7 +62,7 @@ incipit {
 
 #[test]
 fn value_marker_copy_assignment_checks() {
-    let _ = analyze_ok(
+    let _ = analyze_ok_la(
         r"
 incipit {
     fixum lista<numerus> c ← [1, 2, 3]
@@ -76,11 +76,11 @@ incipit {
 
 #[test]
 fn value_marker_copy_on_a_scalar_is_rejected() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "incipit { fixum numerus x ← 5\n fixum numerus y ← copy x }",
         ISSUE_SCALAR_ACCESS_MARKER,
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "incipit { fixum numerus x ← 5\n varia numerus y ← 1\n y ← copy x }",
         ISSUE_SCALAR_ACCESS_MARKER,
     );

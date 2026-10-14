@@ -3,18 +3,18 @@
 //! Latin fixtures use the test parser's explicit Latin surface. Rejections
 //! must be independence diagnostics, never incidental parse/type errors.
 
-use crate::test_support::{analyze_source, analyze_source_for_target};
+use crate::test_support::{analyze_source_for_target_la, analyze_source_la};
 use radix_target::Target;
 
 const ISSUE: &str = "filum_independence_unproven";
 
 fn accepted(source: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
 fn rejected(source: &str, reason: &str) {
-    let result = analyze_source(source);
+    let result = analyze_source_la(source);
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(!errors.is_empty(), "body unexpectedly certified");
     assert!(
@@ -41,7 +41,7 @@ fn own_coordinate_write_accepted() {
     let source = body("grid[i] ← value + 1");
     // The proof is not hidden behind the Rust borrow gate or a device context.
     for target in Target::ALL {
-        let result = analyze_source_for_target(&source, *target);
+        let result = analyze_source_for_target_la(&source, *target);
         assert!(result.success(), "{target:?}: {:?}", result.diagnostics);
     }
     accepted(&source.replace("incipit", "functio host() → vacuum"));

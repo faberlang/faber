@@ -11,8 +11,13 @@ use crate::{
 use radix_lexer::Interner;
 use radix_target::Target;
 
+fn la_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("load Latin locale pack")
+}
+
 fn analyze_parts(source: &str) -> (AnalyzedApplicationParts, Interner) {
-    let lex = radix_lexer::lex(source);
+    let lex = radix_lexer::lex_with_locale_pack(source, &la_pack());
     let mut parsed = radix_parser::parse(lex);
     assert!(
         parsed.success(),
