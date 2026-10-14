@@ -386,6 +386,48 @@ fn magnus_scaling() {
             samples[2], samples[0], samples[4]
         );
     }
+    // Text-to-limbs conversion at the sizes the inf width actually sees. The chunked path is
+    // O(n^2) and measurable at the two smaller sizes; the recursive split is the new path.
+    for shift in 16..=18 {
+        let digits = 1_usize << shift;
+        let mut text = String::with_capacity(digits);
+        text.push(char::from(b'1' + u8::try_from(g.next() % 9).unwrap()));
+        for _ in 1..digits {
+            text.push(char::from(b'0' + u8::try_from(g.next() % 10).unwrap()));
+        }
+        let mut samples = Vec::with_capacity(5);
+        for _ in 0..5 {
+            let started = std::time::Instant::now();
+            let result = Magnus::parse_decimal(&text);
+            samples.push(started.elapsed());
+            std::hint::black_box(&result);
+        }
+        samples.sort_unstable();
+        println!(
+            "magnus_scaling parse-decimal 2^{shift} digits: median {:?} min {:?} max {:?}",
+            samples[2], samples[0], samples[4]
+        );
+    }
+    for shift in 16..=17 {
+        let digits = 1_usize << shift;
+        let mut text = String::with_capacity(digits);
+        text.push(char::from(b'1' + u8::try_from(g.next() % 9).unwrap()));
+        for _ in 1..digits {
+            text.push(char::from(b'0' + u8::try_from(g.next() % 10).unwrap()));
+        }
+        let mut samples = Vec::with_capacity(5);
+        for _ in 0..5 {
+            let started = std::time::Instant::now();
+            let result = super::parse_digits_chunked(text.as_bytes(), 10);
+            samples.push(started.elapsed());
+            std::hint::black_box(&result);
+        }
+        samples.sort_unstable();
+        println!(
+            "magnus_scaling parse-decimal-chunked 2^{shift} digits: median {:?} min {:?} max {:?}",
+            samples[2], samples[0], samples[4]
+        );
+    }
 }
 
 #[test]
