@@ -247,15 +247,6 @@ pub use radix_codegen_shared::conversio_arm::{
     conversio_arm_mark_fallback, conversio_arm_take,
 };
 
-/// Output mode controlling access modifiers and entry-point emission.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OutputMode {
-    /// Emit a runnable application with `@main` entry point (default).
-    Application,
-    /// Emit a library module with `public` declarations and no `@main`.
-    Library,
-}
-
 use crate::diagnostics::DiagnosticArg;
 use crate::hir::HirModule;
 use crate::lexer::Interner;
@@ -268,8 +259,9 @@ use crate::semantic::{NumericWidth, Primitive, Type, TypeId};
 
 /// Compilation-target identity lives in the neutral `radix-target` crate;
 /// re-exported here for path stability (`crate::codegen::Target`,
-/// `radix::Target`, `radix_module::codegen::Target`).
-pub use radix_target::{Leaf, Target};
+/// `crate::codegen::OutputMode`, `radix::Target`,
+/// `radix_module::codegen::Target`).
+pub use radix_target::{Leaf, OutputMode, Target};
 
 fn unavailable_target_error(target: Target) -> CodegenError {
     let feature = target.required_feature().unwrap_or("full-targets");

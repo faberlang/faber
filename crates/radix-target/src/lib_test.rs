@@ -1,4 +1,4 @@
-use super::Target;
+use super::{OutputMode, Target};
 
 /// One arm per variant, no wildcard: adding a `Target` variant fails
 /// this function's compilation, forcing the variant into the walk;
@@ -192,4 +192,11 @@ fn availability_spellings_pin_rust_and_wasm() {
         Target::MirWasm.availability_spellings().contains(&"wat"),
         "wasm spellings must include wat"
     );
+}
+
+/// The two output modes are distinct values: generation paths compare them
+/// directly (`OutputMode::Library` selects public declarations, no `@main`).
+#[test]
+fn output_mode_variants_are_distinct() {
+    assert_ne!(OutputMode::Application, OutputMode::Library);
 }

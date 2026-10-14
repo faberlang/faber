@@ -114,6 +114,15 @@ pub enum Target {
     MirFmirBundle,
 }
 
+/// Output mode controlling access modifiers and entry-point emission.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputMode {
+    /// Emit a runnable application with `@main` entry point (default).
+    Application,
+    /// Emit a library module with `public` declarations and no `@main`.
+    Library,
+}
+
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
