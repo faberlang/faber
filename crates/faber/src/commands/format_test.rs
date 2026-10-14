@@ -385,7 +385,7 @@ pub(crate) fn run_faber_format_stdout_with_args(args: &[&str]) -> String {
 /// product-default en pack is pack-authoritative).
 pub(crate) const VALID_BLOCK_SOURCE: &str = "+++\nlocale = \"la\"\n+++\nfunctio gradus(numerus x) → numerus {\n    si x ≻ 0 {\n        redde x\n    } sin x ≡ 0 {\n        redde 0\n    } secus {\n        redde 0 - x\n    }\n}\n";
 
-pub(crate) const EN_TYPES_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nfn pack(int n, float x, string name, bytes buf) → string {\n    const int count ← n\n    const float scale ← x\n    const string label ← name\n    const bytes payload ← buf\n    print count\n    print scale\n    print label\n    print payload.length()\n    return label\n}\n";
+pub(crate) const EN_TYPES_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nfn pack(int n, float x, string name, list<b8> buf) → string {\n    const int count ← n\n    const float scale ← x\n    const string label ← name\n    const list<b8> payload ← buf\n    print count\n    print scale\n    print label\n    print payload.length()\n    return label\n}\n";
 
 /// Need: `faber format --stdout` on an en-frontmatter source must
 /// keep English type spellings (the author engine relatinized them).
@@ -404,7 +404,7 @@ fn format_cli_en_source_keeps_english_types() {
         body.contains("int")
             && body.contains("float")
             && body.contains("string")
-            && body.contains("bytes"),
+            && body.contains("list<b8>"),
         "en format must keep English type spellings:\n{formatted}"
     );
     assert!(
@@ -519,7 +519,7 @@ fn format_stdin_en_source_keeps_english_surface() {
         .expect("split")
         .body;
     assert!(
-        body.contains("fn pack(int n, float x, string name, bytes buf)"),
+        body.contains("fn pack(int n, float x, string name, list<b8> buf)"),
         "en stdin format must keep the English surface:\n{stdout}"
     );
     assert!(

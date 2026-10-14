@@ -104,7 +104,7 @@ fn format_cmd_en_source_keeps_english_types() {
     let fixture = temp_root.join("pack.fab");
     fs::write(
         &fixture,
-        "+++\nlocale = \"en\"\n+++\nfn pack(int n, float x, string name, bytes buf) → string {\n    return name\n}\n",
+        "+++\nlocale = \"en\"\n+++\nfn pack(int n, float x, string name, list<b8> buf) → string {\n    return name\n}\n",
     )
     .expect("write en types fixture");
 
@@ -114,7 +114,7 @@ fn format_cmd_en_source_keeps_english_types() {
         body.contains("int")
             && body.contains("float")
             && body.contains("string")
-            && body.contains("bytes"),
+            && body.contains("list<b8>"),
         "en format must keep English type spellings:\n{formatted}"
     );
     assert!(

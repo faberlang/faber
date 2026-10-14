@@ -373,7 +373,7 @@ fn format_corpus_is_byte_exact_idempotent_and_reparses() {
             && !(body.contains("int")
                 && body.contains("float")
                 && body.contains("string")
-                && body.contains("bytes"))
+                && body.contains("list<b8>"))
         {
             failures.push(format!(
                 "{stem}: primitive en type spellings must stay English:\n{body}"
