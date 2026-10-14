@@ -258,8 +258,8 @@ impl Config {
     /// still wins, exactly like any other session default.
     #[must_use]
     pub fn with_latin_locale(mut self) -> Self {
-        let pack = super::resolve_frontmatter_locale_pack(&self, "la")
-            .unwrap_or_else(|_| crate::locale::latin_locale_pack());
+        let pack =
+            super::resolve_frontmatter_locale_pack(&self, "la").unwrap_or_else(|_| crate::locale::latin_locale_pack());
         self.locale_pack = Some(pack);
         self.locale_pack_explicit = false;
         self
