@@ -23,7 +23,8 @@
 //!
 //! Complexity, with `n` and `m` the operand limb counts: `+ - ⇐ ⇒` and bitwise ops and
 //! comparison are O(n); `*` is Karatsuba O(n^1.585) above `KARATSUBA_THRESHOLD` limbs and
-//! schoolbook O(n·m) below; `/ %` are Knuth Algorithm D, O(n·m); `potentia` is
+//! schoolbook O(n·m) below; `/ %` are divide-and-conquer (Burnikel-Ziegler) above
+//! `DIVMOD_THRESHOLD` divisor limbs and Knuth Algorithm D O(n·m) below; `potentia` is
 //! O(M(n·e) · log e); decimal parse and render are O(n²); radix 2/8/16 render is O(n). Hashing
 //! is O(n).
 
@@ -37,6 +38,12 @@ const BASE: u64 = 1 << 32;
 /// balanced Karatsuba split takes over, where the three half-size products beat the one
 /// full-size loop. Lopsided operands (one more than twice the other) stay schoolbook.
 const KARATSUBA_THRESHOLD: usize = 32;
+
+/// Divisor limb count below which `divmod_mag` runs Knuth Algorithm D directly; at or above it
+/// the recursive divide-and-conquer path (Burnikel-Ziegler shape) takes over, so a 2n-by-n
+/// division costs about `M(n) · log n` instead of O(n²). Above `KARATSUBA_THRESHOLD`, so the
+/// recursive path's own products are sub-quadratic.
+const DIVMOD_THRESHOLD: usize = 40;
 
 /// Why a `Magnus` operation failed. Every variant is a value-level failure the caller maps to
 /// its own trap or `⇥`; none is a resource-exhaustion abort.
@@ -356,6 +363,107 @@ fn divmod_knuth(u: &[u32], v: &[u32]) -> (Vec<u32>, Vec<u32>) {
     (q, r)
 }
 
+/// Divide-and-conquer magnitude division for divisors at or above `DIVMOD_THRESHOLD` limbs
+/// (Burnikel-Ziegler shape: base-2^32 block division with recursive 2n-by-n quotient steps).
+/// Any dividend length; `v` is non-zero. Returns trimmed `(quotient, remainder)`.
+fn divmod_dc(u: &[u32], v: &[u32]) -> (Vec<u32>, Vec<u32>) {
+    let shift = v[v.len() - 1].leading_zeros();
+    let vn = shl_small(v, shift, false);
+    let mut un = shl_small(u, shift, true);
+    let n = vn.len();
+    let blocks = un.len().div_ceil(n);
+    un.resize(blocks * n, 0);
+    let mut q = vec![0_u32; blocks * n];
+    let mut rem: Vec<u32> = Vec::new();
+    for block in (0..blocks).rev() {
+        // A = rem * BASE^n + the next base-BASE^n block of the normalized dividend.
+        let mut a: Vec<u32> = un[block * n..(block + 1) * n].to_vec();
+        a.extend_from_slice(&rem);
+        trim(&mut a);
+        let (q_block, r_block) = divmod_dc_2n1n(&a, &vn);
+        q[block * n..block * n + q_block.len()].copy_from_slice(&q_block);
+        rem = r_block;
+    }
+    let mut r = shr_small(&rem, shift);
+    trim(&mut q);
+    trim(&mut r);
+    (q, r)
+}
+
+/// `a / v` with `v.len() = n`, `a.len() <= 2n`, `a < v * BASE^n` and `v` normalized (top bit
+/// set), so the quotient fits in `n` limbs. The top three half-blocks give the high quotient
+/// half; the remainder plus the low half gives the low half.
+fn divmod_dc_2n1n(a: &[u32], v: &[u32]) -> (Vec<u32>, Vec<u32>) {
+    if cmp_mag(a, v) == Ordering::Less {
+        return (Vec::new(), a.to_vec());
+    }
+    let n = v.len();
+    if n <= DIVMOD_THRESHOLD {
+        return divmod_knuth(a, v);
+    }
+    if n % 2 == 1 {
+        // An odd divisor length cannot be halved exactly; multiply both operands by BASE and
+        // undo it on the remainder (the scaled remainder always ends in a zero limb).
+        let mut scaled_a = vec![0_u32];
+        scaled_a.extend_from_slice(a);
+        let mut scaled_v = vec![0_u32];
+        scaled_v.extend_from_slice(v);
+        let (q, scaled_r) = divmod_dc_2n1n(&scaled_a, &scaled_v);
+        let r = if scaled_r.is_empty() {
+            scaled_r
+        } else {
+            scaled_r[1..].to_vec()
+        };
+        return (q, r);
+    }
+    let m = n / 2;
+    let a_top = if a.len() > m { &a[m..] } else { &[] };
+    let a_low = if a.len() >= m { &a[..m] } else { a };
+    let (q_high, r_high) = divmod_dc_3n2n(a_top, v, m);
+    // rest = r_high * BASE^m + a_low, which is below v * BASE^m.
+    let mut rest = vec![0_u32; m];
+    rest.extend_from_slice(&r_high);
+    let mut rest = add_mag(&rest, a_low);
+    trim(&mut rest);
+    let (q_low, r) = divmod_dc_3n2n(&rest, v, m);
+    let mut q = vec![0_u32; m];
+    q.extend_from_slice(&q_high);
+    let mut q = add_mag(&q, &q_low);
+    trim(&mut q);
+    (q, r)
+}
+
+/// `a / v` with `v.len() = 2n`, `a.len() <= 3n`, `a < v * BASE^n` and `v` normalized, so the
+/// quotient is below `BASE^n`. Dividing the top `2n` limbs by the top half of `v` estimates the
+/// quotient within two; the low half of `v` corrects the remainder in place.
+fn divmod_dc_3n2n(a: &[u32], v: &[u32], n: usize) -> (Vec<u32>, Vec<u32>) {
+    if cmp_mag(a, v) == Ordering::Less {
+        return (Vec::new(), a.to_vec());
+    }
+    if n <= DIVMOD_THRESHOLD {
+        return divmod_knuth(a, v);
+    }
+    let a_top = if a.len() > n { &a[n..] } else { &[] };
+    let a_low = if a.len() >= n { &a[..n] } else { a };
+    let (mut q, r_high) = divmod_dc_2n1n(a_top, &v[n..]);
+    let mut r = vec![0_u32; n];
+    r.extend_from_slice(&r_high);
+    let mut r = add_mag(&r, a_low);
+    trim(&mut r);
+    // A = q * v + r - q * v_low; subtract the low-half product, borrowing whole divisors.
+    let correction = mul_mag(&q, &v[..n]);
+    while cmp_mag(&r, &correction) == Ordering::Less {
+        r = add_mag(&r, v);
+        q = sub_mag(&q, &[1]);
+    }
+    r = sub_mag(&r, &correction);
+    while cmp_mag(&r, v) != Ordering::Less {
+        r = sub_mag(&r, v);
+        q = add_mag(&q, &[1]);
+    }
+    (q, r)
+}
+
 /// Left shift by `bits < 32`; `grow` appends the carry-out limb.
 fn shl_small(a: &[u32], bits: u32, grow: bool) -> Vec<u32> {
     let mut out = Vec::with_capacity(a.len() + 1);
@@ -402,7 +510,10 @@ fn divmod_mag(u: &[u32], v: &[u32]) -> (Vec<u32>, Vec<u32>) {
         trim(&mut rem);
         return (q, rem);
     }
-    divmod_knuth(u, v)
+    if v.len() < DIVMOD_THRESHOLD {
+        return divmod_knuth(u, v);
+    }
+    divmod_dc(u, v)
 }
 
 fn shl_mag(a: &[u32], n: usize) -> Vec<u32> {
@@ -966,7 +1077,8 @@ impl Magnus {
     }
 
     /// Floor quotient and floor remainder together: `self == rhs * q + r` and `r` takes the
-    /// sign of `rhs` (or is zero). Knuth Algorithm D, O(n·m).
+    /// sign of `rhs` (or is zero). Divide-and-conquer above `DIVMOD_THRESHOLD` divisor limbs,
+    /// Knuth Algorithm D below.
     ///
     /// # Errors
     /// [`MagnusError::DivisionByZero`].
@@ -989,7 +1101,7 @@ impl Magnus {
         Ok((Magnus::from_parts(true, q), Magnus::from_parts(rhs.neg, r)))
     }
 
-    /// Floor quotient (`/`). O(n·m).
+    /// Floor quotient (`/`). See [`Magnus::div_mod_floor`] for the division algorithm.
     ///
     /// # Errors
     /// [`MagnusError::DivisionByZero`].
@@ -997,7 +1109,7 @@ impl Magnus {
         self.div_mod_floor(rhs).map(|(q, _)| q)
     }
 
-    /// Floor remainder (`%`), sign of the divisor. O(n·m).
+    /// Floor remainder (`%`), sign of the divisor. See [`Magnus::div_mod_floor`].
     ///
     /// # Errors
     /// [`MagnusError::DivisionByZero`].

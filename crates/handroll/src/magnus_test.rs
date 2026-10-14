@@ -3,6 +3,7 @@
 #![allow(clippy::float_cmp, clippy::many_single_char_names)]
 
 use super::{Magnus, MagnusError, Radix};
+use std::cmp::Ordering;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -181,6 +182,147 @@ fn karatsuba_equals_schoolbook() {
     }
 }
 
+// ---- divide-and-conquer division: randomized equality with the Knuth oracle -----------------
+
+/// The pre-divide-and-conquer dispatch: Knuth Algorithm D whenever the dividend reaches the
+/// divisor, the trivial zero quotient otherwise. `v.len() >= 2` is required.
+fn knuth_oracle(u: &[u32], v: &[u32]) -> (Vec<u32>, Vec<u32>) {
+    if super::cmp_mag(u, v) == Ordering::Less {
+        (Vec::new(), u.to_vec())
+    } else {
+        super::divmod_knuth(u, v)
+    }
+}
+
+/// Exactly `count` limbs with a non-zero top limb (a value-level normalized magnitude).
+fn random_fixed_limbs(g: &mut Gen, count: usize, top: u32) -> Vec<u32> {
+    let mut v: Vec<u32> = (0..count).map(|_| super::lo(g.next())).collect();
+    v[count - 1] = top | 1;
+    v
+}
+
+#[test]
+fn divmod_matches_knuth_oracle() {
+    let threshold = super::DIVMOD_THRESHOLD;
+    // Edge operands: zero, one, the all-ones limb, powers of BASE, all-ones lengths around the
+    // threshold, and a divisor with the longest possible normalization shift (top limb 1).
+    let mut edges: Vec<Vec<u32>> = vec![
+        Vec::new(),
+        vec![1],
+        vec![u32::MAX],
+        vec![0, 1],
+        vec![0, 0, 1],
+        vec![0xFFFF_FFFF; threshold - 1],
+        vec![0xFFFF_FFFF; threshold],
+        vec![0xFFFF_FFFF; threshold + 1],
+        vec![0xFFFF_FFFF; 2 * threshold],
+        vec![0xFFFF_FFFF; 2 * threshold + 1],
+    ];
+    let mut lead_one = vec![0_u32; threshold];
+    lead_one[threshold - 1] = 1; // BASE^(threshold-1): every limb below the top is zero
+    edges.push(lead_one.clone());
+    edges.push(super::add_mag(&lead_one, &[1]));
+    let mut half_zero = vec![0_u32; 2 * threshold];
+    half_zero[2 * threshold - 1] = 0x8000_0000; // low half all zero after the split
+    edges.push(half_zero);
+    edges.push(vec![u32::MAX; 4 * threshold + 3]);
+    for u in &edges {
+        for v in &edges {
+            if v.len() < 2 {
+                continue;
+            }
+            let got = super::divmod_mag(u, v);
+            let want = knuth_oracle(u, v);
+            assert_eq!(got, want, "edge {} / {} limbs", u.len(), v.len());
+            let (q, r) = got;
+            assert_eq!(super::add_mag(&super::mul_mag(&q, v), &r), *u);
+            assert!(super::cmp_mag(&r, v) == Ordering::Less);
+        }
+    }
+    // Fixed-seed sweep: the divisor strides the threshold (both parities, so the odd-length
+    // scaling path runs) and the dividend spans shorter, equal, and up to several blocks.
+    let mut g = Gen(0x1F3D_0D35);
+    for round in 0..1500 {
+        let v_limbs = match round % 8 {
+            0 => threshold - 1,
+            1 => threshold,
+            2 => threshold + 1,
+            3 => 2 * threshold - 1,
+            4 => 2 * threshold,
+            5 => 2 * threshold + 1,
+            6 => 3 * threshold + round % 7,
+            _ => 5 * threshold + round % (3 * threshold),
+        };
+        let top = match round % 4 {
+            0 => 1,
+            1 => 0x8000_0000,
+            2 => u32::MAX,
+            _ => super::lo(g.next()) | 1,
+        };
+        let mut v = random_fixed_limbs(&mut g, v_limbs, top);
+        if round % 3 == 0 {
+            // Zero limbs in the low half make the D3n2n low-half correction nontrivial.
+            for limb in v.iter_mut().take(v_limbs / 2).skip(1) {
+                *limb = 0;
+            }
+        }
+        let u_limbs = match round % 5 {
+            0 => v_limbs.saturating_sub(1 + usize::try_from(g.next() % 3).unwrap()),
+            1 => v_limbs,
+            2 => v_limbs + 1,
+            3 => 2 * v_limbs + usize::try_from(g.next() % 4).unwrap(),
+            _ => {
+                let spread =
+                    usize::try_from(g.next() % u64::try_from(v_limbs + 3).unwrap()).unwrap();
+                v_limbs + 1 + spread
+            }
+        };
+        let u_top = super::lo(g.next()) | 1;
+        let u = random_fixed_limbs(&mut g, u_limbs, u_top);
+        let got = super::divmod_mag(&u, &v);
+        let want = knuth_oracle(&u, &v);
+        assert_eq!(got, want, "round {round}: {} / {} limbs", u.len(), v.len());
+        let (q, r) = got;
+        assert_eq!(super::add_mag(&super::mul_mag(&q, &v), &r), u);
+        assert!(super::cmp_mag(&r, &v) == Ordering::Less);
+    }
+    // Deep sweep: `u == q*v + r` with `r < v` determines `(q, r)` uniquely, so the identity is
+    // a complete oracle without paying Knuth's quadratic cost at sizes that force many
+    // recursive halvings (and repeated odd-length scaling) on the divide-and-conquer path.
+    for (round, v_limbs) in [
+        641_usize, 1023, 1025, 2047, 2049, 3001, 4095, 4097, 5003, 8191, 9999,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let top = match round % 3 {
+            0 => 1,
+            1 => 0x8000_0000,
+            _ => super::lo(g.next()) | 1,
+        };
+        let mut v = random_fixed_limbs(&mut g, v_limbs, top);
+        if round % 2 == 0 {
+            for limb in v.iter_mut().take(v_limbs - 1).skip(1).step_by(2) {
+                *limb = 0;
+            }
+        }
+        for u_limbs in [v_limbs, 2 * v_limbs + 1, 2 * v_limbs - 1] {
+            let u_top = super::lo(g.next()) | 1;
+            let u = random_fixed_limbs(&mut g, u_limbs, u_top);
+            let (q, r) = super::divmod_mag(&u, &v);
+            assert_eq!(
+                super::add_mag(&super::mul_mag(&q, &v), &r),
+                u,
+                "deep {u_limbs} / {v_limbs} limbs"
+            );
+            assert!(
+                super::cmp_mag(&r, &v) == Ordering::Less,
+                "deep {u_limbs} / {v_limbs} limbs"
+            );
+        }
+    }
+}
+
 // ---- timing oracle (--release), reused by the later inf-conversion units -------------------
 
 #[test]
@@ -201,6 +343,46 @@ fn magnus_scaling() {
         samples.sort_unstable();
         println!(
             "magnus_scaling mul 2^{shift} limbs: median {:?} min {:?} max {:?}",
+            samples[2], samples[0], samples[4]
+        );
+    }
+    // Knuth Algorithm D baseline at the sizes where it is still measurable; the new path is
+    // the one under the 3.5 doubling bar, and the baseline is here only as the recorded before.
+    for shift in 10..=13 {
+        let count = 1_usize << shift;
+        let u_top = super::lo(g.next()) | 1;
+        let v_top = super::lo(g.next()) | 1;
+        let u = random_fixed_limbs(&mut g, 2 * count, u_top);
+        let v = random_fixed_limbs(&mut g, count, v_top);
+        let mut samples = Vec::with_capacity(5);
+        for _ in 0..5 {
+            let started = std::time::Instant::now();
+            let result = super::divmod_knuth(&u, &v);
+            samples.push(started.elapsed());
+            std::hint::black_box(&result);
+        }
+        samples.sort_unstable();
+        println!(
+            "magnus_scaling divmod-knuth 2^{shift} limbs: median {:?} min {:?} max {:?}",
+            samples[2], samples[0], samples[4]
+        );
+    }
+    for shift in 10..=16 {
+        let count = 1_usize << shift;
+        let u_top = super::lo(g.next()) | 1;
+        let v_top = super::lo(g.next()) | 1;
+        let u = random_fixed_limbs(&mut g, 2 * count, u_top);
+        let v = random_fixed_limbs(&mut g, count, v_top);
+        let mut samples = Vec::with_capacity(5);
+        for _ in 0..5 {
+            let started = std::time::Instant::now();
+            let result = super::divmod_mag(&u, &v);
+            samples.push(started.elapsed());
+            std::hint::black_box(&result);
+        }
+        samples.sort_unstable();
+        println!(
+            "magnus_scaling divmod 2^{shift} limbs: median {:?} min {:?} max {:?}",
             samples[2], samples[0], samples[4]
         );
     }
