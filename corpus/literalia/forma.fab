@@ -16,7 +16,7 @@ locale = "en"
 #
 # What this teaches:
 #   • backtick template syntax `template`(args) — captures template text and parameters into the builtin `forma` genus
-#   • indexed placeholders `§0` for repeated parameter references
+#   • indexed placeholders `§0` — an indexed hole selects its argument and may repeat with one value
 #   • templates without holes for static text
 #
 # Common mistakes:

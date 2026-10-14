@@ -45,4 +45,11 @@ main {
     # Forma capture accepts labels but stores only erased template text.
     const _ captured ← `where id = §{id}`(id: "42")
     print captured.template
+
+    # An indexed hole selects its argument and may repeat; one value serves all
+    # occurrences of its number.
+    print "§0, §0, §0, and §1"("her", "me")
+
+    # The selection follows the hole number, not left-to-right order.
+    print "§1 then §0"("a", "b")
 }
