@@ -205,9 +205,11 @@ fn failed_leaf_reply_carries_kind_and_path_facts() {
         .sermo_first_item(&sermo, Span::default())
         .expect_err("a failed leaf reply must raise");
 
-    // The crossing message is the record's kind and path, never platform text.
-    assert_eq!(error.message, format!("NotFound {PATH}"));
-    // Identity facts survive as structured args; prose is never asserted.
+    // The crossing record's kind and path survive as structured facts; the
+    // diagnostic identity is the issue plus the conversion code, never
+    // platform prose.
+    assert_eq!(error.issue, "runner_sermo_reply_conversion_failed");
+    assert_eq!(error.code, "runner_conversion");
     assert!(
         error
             .args
