@@ -19,5 +19,5 @@ workspace = true
 
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 serde_json = "1"

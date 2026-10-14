@@ -41,7 +41,7 @@ radix-semantic = { path = "../radix-semantic" }
 radix-hir-faber = { path = "../radix-hir-faber", optional = true }
 radix-mir = { path = "../radix-mir", optional = true }
 radix-mir-lower = { path = "../radix-mir-lower", optional = true }
-radix-host-abi = { path = "../radix-host-abi" }
+radix-abi = { path = "../radix-abi" }
 radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-mir-runner = { path = "../radix-mir-runner", optional = true }
 radix-parser = { path = "../radix-parser" }
@@ -65,7 +65,7 @@ wait-timeout = "0.2"
 tempfile = { version = "3", optional = true }
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 insta = "1"
 tempfile = "3"
 

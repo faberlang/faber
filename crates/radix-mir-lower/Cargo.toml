@@ -42,4 +42,4 @@ radix-types = { path = "../radix-types" }
 rustc-hash = "2"
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }

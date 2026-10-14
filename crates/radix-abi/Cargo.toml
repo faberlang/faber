@@ -1,5 +1,5 @@
 [package]
-name = "radix-host-abi"
+name = "radix-abi"
 version = "0.84.0"
 edition = "2024"
 description = "Radix-owned host ABI contract table (runtime symbol names and layout spellings)"
@@ -11,4 +11,4 @@ workspace = true
 
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }

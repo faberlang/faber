@@ -24,4 +24,4 @@ ts-import = ["radix-module/ts-import"]
 hir-lean = ["radix-module/hir-lean"]
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }

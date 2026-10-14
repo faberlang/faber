@@ -16,7 +16,7 @@ handroll = { path = "../handroll" }
 toml = "1.1.2"
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 # DDCP4-U4 shared conformance fixture: drives ONE canonical DeviceProgram
 # through BOTH leaf emitters. The dev-dependency cycle (the leaves depend on
 # radix-mir-fmir) is the cargo-supported test-only exception.

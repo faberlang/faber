@@ -49,7 +49,7 @@ unicode-ident = "1"
 serde = { version = "1.0.228", features = ["derive"] }
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 # CC-U4 census harness (tests/complexity_census.rs): in-process analysis
 # entries (driver single-unit + radix-program library cache). Dev-only edge,
 # so the leaf keeps its normal dependency direction.

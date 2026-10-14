@@ -35,7 +35,7 @@
 //! documented surface still contains its spawn so this documentation cannot
 //! silently rot; the lists only shrink.
 
-use hygiene_ratchet::{ScanConfig, collect_production_files, scan_command_new};
+use radix_hygiene::{ScanConfig, collect_production_files, scan_command_new};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -44,7 +44,7 @@ fn workspace() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
-        .expect("hygiene-ratchet lives under crates/")
+        .expect("radix-hygiene lives under crates/")
         .to_path_buf()
 }
 
@@ -162,7 +162,7 @@ fn allowlisted_and_out_of_scope_surfaces_still_spawn() {
     ] {
         let path = workspace.join(rel);
         let content = fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {rel}: {err}"));
-        let scrubbed = hygiene_ratchet::scrub_rust_source(&content);
+        let scrubbed = radix_hygiene::scrub_rust_source(&content);
         assert!(
             scrubbed.contains("Command::new"),
             "{rel} is documented as an allowlisted/out-of-scope spawn surface \

@@ -1,6 +1,6 @@
 #![allow(clippy::absurd_extreme_comparisons)]
 
-use hygiene_ratchet::{Budgets, ScanConfig, assert_budgets};
+use radix_hygiene::{Budgets, ScanConfig, assert_budgets};
 use std::fs;
 use std::path::Path;
 
@@ -28,19 +28,19 @@ const BUDGETS: Budgets = Budgets {
 #[test]
 fn production_hygiene_budgets() {
     let cfg = config();
-    let files = hygiene_ratchet::collect_production_files(&cfg);
-    let counts = hygiene_ratchet::count_budgets(&files, cfg.subtract_self_expect);
+    let files = radix_hygiene::collect_production_files(&cfg);
+    let counts = radix_hygiene::count_budgets(&files, cfg.subtract_self_expect);
     assert_budgets(counts, BUDGETS);
 }
 
 fn count_inline(src: &str) -> usize {
-    hygiene_ratchet::count_inline_test_modules(&hygiene_ratchet::scrub_rust_source(src))
+    radix_hygiene::count_inline_test_modules(&radix_hygiene::scrub_rust_source(src))
 }
 
 #[test]
 fn alphabetic_char_literals_do_not_swallow_following_code() {
     let source = "fn probe(input: &str) {\n    let (date, rest) = input.split_once('T').or_else(|| input.split_once('t'))?;\n    let _ = rest;\n    let _ = date;\n}\n";
-    let scrubbed = hygiene_ratchet::scrub_rust_source(source);
+    let scrubbed = radix_hygiene::scrub_rust_source(source);
 
     assert_eq!(scrubbed.matches("let _ =").count(), 2);
 }
@@ -50,7 +50,7 @@ fn raw_strings_with_inner_quotes_do_not_desynchronise_scrubbing() {
     // A raw string holding an odd number of inner quotes used to flip the
     // string state, hiding every later assertion in the file.
     let source = "fn a() { let _s = r#\"say \"hi\" and \" more\"#; }\nfn b() { assert!(d.message.contains(\"x\")); }\n";
-    let scrubbed = hygiene_ratchet::scrub_rust_source(source);
+    let scrubbed = radix_hygiene::scrub_rust_source(source);
 
     assert!(scrubbed.contains(".message.contains("));
     assert!(!scrubbed.contains("say"));
@@ -60,7 +60,7 @@ fn raw_strings_with_inner_quotes_do_not_desynchronise_scrubbing() {
 #[test]
 fn raw_strings_with_backslashes_and_byte_prefix_are_blanked() {
     let source = "fn a() { let _s = r\"a\\\"; let _t = br##\"x\"# y\"##; }\nfn b() { d.message.is_empty(); }\n";
-    let scrubbed = hygiene_ratchet::scrub_rust_source(source);
+    let scrubbed = radix_hygiene::scrub_rust_source(source);
 
     assert!(scrubbed.contains(".message.is_empty("));
     assert!(!scrubbed.contains(" y"));
@@ -70,7 +70,7 @@ fn raw_strings_with_backslashes_and_byte_prefix_are_blanked() {
 #[test]
 fn identifiers_ending_in_r_or_b_are_not_raw_string_prefixes() {
     let source = "fn a(bar: &str, car: u8) { let _x = bar; let _y = \"s\"; }\nfn b() { d.message.is_empty(); }\n";
-    let scrubbed = hygiene_ratchet::scrub_rust_source(source);
+    let scrubbed = radix_hygiene::scrub_rust_source(source);
 
     assert!(scrubbed.contains("bar: &str"));
     assert!(scrubbed.contains(".message.is_empty("));
@@ -79,7 +79,7 @@ fn identifiers_ending_in_r_or_b_are_not_raw_string_prefixes() {
 #[test]
 fn nested_block_comments_are_fully_blanked() {
     let source = "/* outer /* inner */ still comment */ fn a() { d.message.is_empty(); }\n";
-    let scrubbed = hygiene_ratchet::scrub_rust_source(source);
+    let scrubbed = radix_hygiene::scrub_rust_source(source);
 
     assert!(!scrubbed.contains("still"));
     assert!(scrubbed.contains(".message.is_empty("));
@@ -164,7 +164,7 @@ fn non_renderer_tests_do_not_assert_diagnostic_text() {
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
-        .expect("hygiene-ratchet lives under crates/");
+        .expect("radix-hygiene lives under crates/");
     let mut violations = Vec::new();
     collect_diagnostic_text_assertions(workspace, workspace, &mut violations);
 
@@ -181,7 +181,7 @@ fn diagnostic_text_scan_skips_symlinks_and_agent_dirs() {
     use std::os::unix::fs::symlink;
 
     let base = std::env::temp_dir().join(format!(
-        "hygiene-ratchet-symlink-scan-{}",
+        "radix-hygiene-symlink-scan-{}",
         std::process::id()
     ));
     let _ = fs::remove_dir_all(&base);
@@ -254,7 +254,7 @@ fn collect_diagnostic_text_assertions(root: &Path, dir: &Path, violations: &mut 
         let Ok(content) = fs::read_to_string(&path) else {
             continue;
         };
-        let scrubbed = hygiene_ratchet::scrub_rust_source(&content);
+        let scrubbed = radix_hygiene::scrub_rust_source(&content);
         let compact = scrubbed
             .chars()
             .filter(|ch| !ch.is_whitespace())
@@ -487,7 +487,7 @@ fn is_rust_test_file(path: &Path) -> bool {
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .and_then(Path::parent)
-            .expect("hygiene-ratchet lives under crates/"),
+            .expect("radix-hygiene lives under crates/"),
         path,
     )
     .starts_with("crates/exempla/src/exempla_e2e/")
@@ -505,7 +505,7 @@ fn is_rust_test_file(path: &Path) -> bool {
 /// triggers the scan is deleted, not kept as a precaution.
 fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
     let rel = display_relative(root, path);
-    rel == "crates/hygiene-ratchet/tests/hygiene.rs"
+    rel == "crates/radix-hygiene/tests/hygiene.rs"
         // Renderer contract: diagnostic render tests and pack-template
         // interpolation (issue-vs-code fallback, localized row resolution).
         || rel == "crates/radix-module/src/diagnostics/render_test.rs"

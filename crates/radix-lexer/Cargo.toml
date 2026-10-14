@@ -18,5 +18,5 @@ unicode-script = "0.5"
 workspace = true
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 proptest = "1.11.0"

@@ -57,7 +57,7 @@ flate2 = "1"
 [target.'cfg(target_os = "macos")'.dependencies]
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 tempfile = "3"
 
 [features]

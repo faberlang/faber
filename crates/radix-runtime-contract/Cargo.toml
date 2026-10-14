@@ -7,7 +7,7 @@ license = "MIT"
 publish = false
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 
 # Bundled into the faber core-support archive, which ships crate roots
 # without the radix workspace root manifest. Keep lints self-contained so

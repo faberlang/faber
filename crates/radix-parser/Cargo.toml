@@ -13,7 +13,7 @@ radix-diagnostics = { path = "../radix-diagnostics" }
 radix-types = { path = "../radix-types" }
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 
 [lints.clippy]
 # Group first at lower priority so per-lint allows below win package-wide.

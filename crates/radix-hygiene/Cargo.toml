@@ -1,5 +1,5 @@
 [package]
-name = "hygiene-ratchet"
+name = "radix-hygiene"
 version = "0.1.0"
 edition = "2024"
 description = "Shared production-code hygiene budget scanner for Faber workspace crates"

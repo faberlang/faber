@@ -10,7 +10,7 @@ publish = false
 serde = { version = "1.0.228", features = ["derive"] }
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 
 [lints]
 workspace = true

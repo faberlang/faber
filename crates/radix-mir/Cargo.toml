@@ -22,7 +22,7 @@ serde = { version = "1", features = ["derive"] }
 handroll = { path = "../handroll" }
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }
 # DDCP3-U3 (c): the partition/callsite record's serialization round-trip proof
 # (the record is a compiler artifact, serialized/round-tripped — a sibling-crate
 # precedent: radix-mir-fmir / radix-mir-llvm both depend on serde_json).

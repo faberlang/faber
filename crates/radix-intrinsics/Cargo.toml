@@ -17,4 +17,4 @@ match_same_arms = "allow"
 radix-types = { path = "../radix-types" }
 
 [dev-dependencies]
-hygiene-ratchet = { path = "../hygiene-ratchet" }
+radix-hygiene = { path = "../radix-hygiene" }

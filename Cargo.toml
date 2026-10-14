@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "crates/hygiene-ratchet",
+    "crates/radix-hygiene",
     "crates/handroll",
     "crates/faber-leaf",
     "crates/radix",
@@ -14,7 +14,7 @@ members = [
     "crates/radix-program",
     "crates/proba",
     "crates/radix-parser",
-    "crates/radix-host-abi",
+    "crates/radix-abi",
     "crates/radix-runtime-contract",
     "crates/radix-diagnostics",
     "crates/radix-hir",
@@ -35,7 +35,7 @@ resolver = "2"
 # faber-hir-rust) is never a default member and is reached only via explicit
 # `-p` selection.
 default-members = [
-    "crates/hygiene-ratchet",
+    "crates/radix-hygiene",
     "crates/handroll",
     "crates/radix",
     "crates/radix-module",
@@ -46,7 +46,7 @@ default-members = [
     "crates/radix-mir-fmir",
     "crates/radix-mir-runner",
     "crates/radix-parser",
-    "crates/radix-host-abi",
+    "crates/radix-abi",
     "crates/radix-runtime-contract",
     "crates/radix-diagnostics",
     "crates/radix-hir",

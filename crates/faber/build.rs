@@ -7,7 +7,7 @@
 //! It embeds the `faber explain` reference: every corpus exemplum whose
 //! frontmatter declares `explains = [...]`, plus `legacy-redirects.toml`.
 //!
-//! It embeds the runtime support sources (`runtime/*`, `crates/radix-host-abi`)
+//! It embeds the runtime support sources (`runtime/*`, `crates/radix-abi`)
 //! so an installed binary can materialize a path-dependency root, and the
 //! Norma library (`lib/norma` source, locale packs and manifests) so an
 //! installed binary resolves `norma:*` without a checkout.
@@ -46,7 +46,7 @@ const RUNTIME_ROOTS: &[&str] = &[
     "runtime/typescript",
     "runtime/swift",
     "runtime/llvm",
-    "crates/radix-host-abi",
+    "crates/radix-abi",
     "crates/faber-leaf",
     "lib/norma/src",
     "lib/norma/locale",

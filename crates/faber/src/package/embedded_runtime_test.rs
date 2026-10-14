@@ -10,7 +10,7 @@ fn has(path: &str) -> bool {
 #[test]
 fn table_carries_runtime_and_host_abi_manifests() {
     assert!(has("runtime/rust/Cargo.toml"));
-    assert!(has("crates/radix-host-abi/Cargo.toml"));
+    assert!(has("crates/radix-abi/Cargo.toml"));
     assert!(
         EMBEDDED_RUNTIME
             .iter()
@@ -31,7 +31,7 @@ fn embedded_root_materializes_once_and_matches_in_tree_sources() {
         fs::read(root.join("runtime/rust/Cargo.toml")).expect("extracted"),
         fs::read(in_tree).expect("in-tree"),
     );
-    assert!(root.join("crates/radix-host-abi/Cargo.toml").is_file());
+    assert!(root.join("crates/radix-abi/Cargo.toml").is_file());
 
     // Norma travels with the binary: a relocated root (a temp cache, no
     // checkout) carries the source, locale packs and manifests the library
