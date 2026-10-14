@@ -4148,8 +4148,7 @@ impl FunctionBuilder<'_> {
         let collection = self.lower_expr_value(iter.iter)?;
         // D6.6: a direct generator call feeding `itera ex` is walked stepwise,
         // so a suspending backend resumes the producer once per step.
-        let stepped_callee =
-            self.mark_stepped_cursor_stream(&collection, &collection_kind, iter.mode);
+        let stepped_callee = self.mark_stepped_cursor_stream(&collection, &collection_kind, iter.mode);
         let stepped = stepped_callee.is_some();
         let (collection, collection_ty) = match &collection_kind {
             CollectionIteraKind::Cursor(element) | CollectionIteraKind::AsyncCursor(element) if stepped => (
