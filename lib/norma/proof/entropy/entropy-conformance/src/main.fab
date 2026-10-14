@@ -1,0 +1,19 @@
++++
+locale = "en"
++++
+
+# N3 entropy leaf: seed, random_int, uuid. Output must match under
+# `faber run` and a `faber build` Rust binary.
+
+import from "norma:random" random
+
+main {
+    random.seed(7)
+    const int first ← random.random_int(1, 9)
+    random.seed(7)
+    const int second ← random.random_int(1, 9)
+    assert first ≡ second
+    const string id ← random.uuid()
+    assert id.length() ≡ 36
+    print "entropy-ok"
+}

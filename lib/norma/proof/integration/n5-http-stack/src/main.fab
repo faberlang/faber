@@ -1,0 +1,24 @@
++++
+locale = "en"
++++
+
+# N5: HTTP listen/port/stop on the leaf, plus client URL split.
+# Avoid `norma:http/server` here: it pulls `chunked.encode`, whose Rust
+# emit currently returns `&Vec<u8>` from a `Vec<u8>` function.
+
+import from "norma:http/client" client
+
+main {
+    const int handle ↤ call 'http:listen' ([0 ↦ value])
+    const int port ↤ call 'http:port' (handle)
+    assert port ≻ 0
+    const void stopped ↤ call 'http:stop' (handle)
+
+    const client.Url parsed ← client.split("https://127.0.0.1:443/json")
+    assert parsed.scheme ≡ "https"
+    assert parsed.host ≡ "127.0.0.1"
+    assert parsed.port ≡ 443
+    assert parsed.path ≡ "/json"
+
+    print "n5-ok"
+}

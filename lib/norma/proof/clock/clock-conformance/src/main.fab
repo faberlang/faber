@@ -1,0 +1,16 @@
++++
+locale = "en"
++++
+
+# N3 clock leaf: sleep and monotonic. Output must match under `faber run`
+# and a `faber build` Rust binary.
+
+import from "norma:time" time
+
+main {
+    time.sleep(0)
+    const int before ← time.monotonic()
+    const int after ← time.monotonic()
+    assert after ≥ before
+    print "clock-ok"
+}

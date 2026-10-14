@@ -1,0 +1,27 @@
++++
+locale = "en"
++++
+
+import from "norma:process" process
+import from "norma:time" time
+import from "norma:random" random
+
+describe "n2 leaves" {
+    test "clock sleep zero and monotonic do not go backwards" {
+        time.sleep(0)
+        const int before ← time.monotonic()
+        const int after ← time.monotonic()
+        assert after ≥ before
+    }
+
+    test "seeded random_int is deterministic" {
+        random.seed(7)
+        const int first ← random.random_int(1, 9)
+        random.seed(7)
+        assert random.random_int(1, 9) ≡ first
+    }
+
+    test "process exec returns stdout" {
+        assert process.exec("printf proba-ok") ≡ "proba-ok"
+    }
+}
