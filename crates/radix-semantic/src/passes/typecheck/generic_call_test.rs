@@ -3,7 +3,7 @@
 use radix_diagnostics::DiagnosticArg;
 
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
-    crate::test_support::analyze_source(source)
+    crate::test_support::analyze_source_la(source)
 }
 
 fn accepts(source: &str) {
@@ -279,7 +279,7 @@ incipit {
 
 #[test]
 fn mixed_hole_first_param_is_bare_numerus() {
-    let unit = crate::test_support::analyze_ok(
+    let unit = crate::test_support::analyze_ok_la(
         r#"functio both<A, B>(A a, B b) → A {
     redde a
 }
@@ -303,7 +303,7 @@ incipit {
 
 #[test]
 fn mixed_hole_second_param_solves_from_argument() {
-    let unit = crate::test_support::analyze_ok(
+    let unit = crate::test_support::analyze_ok_la(
         r#"functio both<A, B>(A a, B b) → B {
     redde b
 }
@@ -496,7 +496,7 @@ incipit {
     nota a
     nota b
 }";
-    let unit = crate::test_support::analyze_source(source);
+    let unit = crate::test_support::analyze_source_la(source);
     assert!(
         !unit.diagnostics.iter().any(crate::SemanticError::is_error),
         "diagnostics: {:?}",
@@ -904,7 +904,7 @@ fn math_namespace_interface() -> crate::file_interface::FileInterface {
 }
 
 fn analyze_math_consumer(source: &str) -> crate::test_support::AnalyzedFixture {
-    crate::test_support::analyze_source_with_import_contract(
+    crate::test_support::analyze_source_with_import_contract_la(
         source,
         BTreeMap::from([(
             "math".to_owned(),
@@ -1098,7 +1098,7 @@ fn namespace_call_without_import_surface_keeps_bare_driver_leniency() {
     // driver-owned (the import graph must propagate the target failure), not a
     // semantic guess from an absent contract. This test pins that the generic
     // repair does not turn contract absence into hard errors.
-    let unit = crate::test_support::analyze_source_with_import_contract(
+    let unit = crate::test_support::analyze_source_with_import_contract_la(
         r#"importa ex "./math" math
 
 functio _probe(tensor<f32, [4, 8]> a, tensor<f32, [4, 8]> b) → tensor<f32, [4, 8]> {

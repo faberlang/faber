@@ -7,7 +7,7 @@
 use radix_diagnostics::DiagnosticArg;
 
 fn rejects_with_issue(source: &str, issue: &str) {
-    let result = crate::test_support::analyze_source(source);
+    let result = crate::test_support::analyze_source_la(source);
     assert!(
         !result.is_ok(),
         "expected semantic failure, but source was accepted"
@@ -56,6 +56,6 @@ fn selected_gradient_fails_closed_in_typecheck() {
 fn gradient_fails_closed_before_target_emission() {
     // The fail-closed diagnostic must surface during analysis, so a gradient
     // program never reaches a backend as an untyped silent pass.
-    let result = crate::test_support::analyze_source(SELECTED_GRADIENT);
+    let result = crate::test_support::analyze_source_la(SELECTED_GRADIENT);
     assert!(result.is_err(), "gradient must not compile in Phase 2A");
 }

@@ -41,7 +41,7 @@ fn ascii_cursor_type_is_cursor_of_littera() {
 
 #[test]
 fn ascii_cursor_accepts_as_cursor_littera() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"functio walk(ascii s) → cursor<littera> {
     redde s.cursor()
 }",
@@ -50,7 +50,7 @@ fn ascii_cursor_accepts_as_cursor_littera() {
 
 #[test]
 fn itera_ex_ascii_cursor_binds_littera() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
     fixum ascii s ← 'ab'
     itera ex s.cursor() fixum c {
@@ -63,7 +63,7 @@ fn itera_ex_ascii_cursor_binds_littera() {
 
 #[test]
 fn ascii_cursor_collects_to_lista_littera() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
     fixum ascii s ← 'ab'
     fixum lista<littera> xs ← s.cursor() ↦ lista<littera>
@@ -74,7 +74,7 @@ fn ascii_cursor_collects_to_lista_littera() {
 
 #[test]
 fn ascii_cursor_collect_to_lista_textus_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"incipit {
     fixum ascii s ← 'ab'
     fixum lista<textus> xs ← s.cursor() ↦ lista<textus>
@@ -86,7 +86,7 @@ fn ascii_cursor_collect_to_lista_textus_rejects() {
 
 #[test]
 fn itera_de_ascii_cursor_requires_ex() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"incipit {
     fixum ascii s ← 'ab'
     itera de s.cursor() fixum c {

@@ -7,7 +7,7 @@
 use radix_diagnostics::DiagnosticArg;
 
 fn accepts(source: &str) {
-    let result = crate::test_support::analyze_source(source);
+    let result = crate::test_support::analyze_source_la(source);
     assert!(
         result.is_ok(),
         "expected typecheck ok: {:?}",
@@ -16,7 +16,7 @@ fn accepts(source: &str) {
 }
 
 fn rejects_with_issue(source: &str, issue: &str, op: &str) {
-    let result = crate::test_support::analyze_source(source);
+    let result = crate::test_support::analyze_source_la(source);
     assert!(
         !result.is_ok(),
         "expected typecheck failure, but source was accepted"
@@ -36,7 +36,7 @@ fn rejects_with_issue(source: &str, issue: &str, op: &str) {
 /// (`matmul_receiver_shape_must_be_tuple`, `incompatible_tensor_index`, …),
 /// which — like the `matmul` intrinsic path — carry no glyph `op` arg.
 fn rejects_with_contract_issue(source: &str, issue: &str) {
-    let result = crate::test_support::analyze_source(source);
+    let result = crate::test_support::analyze_source_la(source);
     assert!(
         !result.is_ok(),
         "expected typecheck failure, but source was accepted"

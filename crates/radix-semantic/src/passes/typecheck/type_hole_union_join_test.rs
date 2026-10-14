@@ -158,7 +158,7 @@ fn common_type_concrete_join_unchanged() {
 
 #[test]
 fn source_branch_join_accumulates_into_union_hole() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         r#"
 incipit {
     fixum numerus x ← 1
@@ -171,7 +171,7 @@ incipit {
 
 #[test]
 fn source_branch_join_homogeneous_under_concrete_expectation_unchanged() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         r"
 incipit {
     fixum numerus x ← 1
@@ -184,7 +184,7 @@ incipit {
 
 #[test]
 fn source_array_accumulates_into_union_hole_elements() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         r#"
 incipit {
     fixum lista<∪> xs ← [1, "x"]
@@ -196,7 +196,7 @@ incipit {
 
 #[test]
 fn source_array_accumulates_into_union_hole_with_spread() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         r"
 incipit {
     fixum lista<numerus> ys ← [1, 2]
@@ -209,7 +209,7 @@ incipit {
 
 #[test]
 fn source_array_underscore_hole_still_rejects_heterogeneous() {
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         r#"
 incipit {
     fixum lista<_> xs ← [1, "x"]
@@ -222,7 +222,7 @@ incipit {
 
 #[test]
 fn source_array_concrete_expected_rejects_heterogeneous() {
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         r#"
 incipit {
     fixum lista<numerus> xs ← [1, "x"]
@@ -235,7 +235,7 @@ incipit {
 
 #[test]
 fn source_array_concrete_expected_accepts_homogeneous() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         r"
 incipit {
     fixum lista<numerus> xs ← [1, 2]
@@ -247,7 +247,7 @@ incipit {
 
 #[test]
 fn source_branch_join_heterogeneous_without_hole_still_mismatches() {
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         r#"
 incipit {
     fixum numerus x ← 1

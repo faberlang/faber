@@ -6,7 +6,7 @@
 //! finalized HIR carries the bare `sermo` carrier every backend matches.
 
 use crate::test_support::{
-    analyze_source, assert_accepts, assert_rejects_with_issue, entry_local_tys,
+    analyze_source_la, assert_accepts_la, assert_rejects_with_issue_la, entry_local_tys,
 };
 use radix_types::Type;
 
@@ -25,11 +25,11 @@ fn program(handlers: &str, body: &str) -> String {
 }
 
 fn accepts(handlers: &str, body: &str) {
-    assert_accepts(&program(handlers, body));
+    assert_accepts_la(&program(handlers, body));
 }
 
 fn rejects(handlers: &str, body: &str, issue: &str) {
-    assert_rejects_with_issue(&program(handlers, body), issue);
+    assert_rejects_with_issue_la(&program(handlers, body), issue);
 }
 
 // ---- call-site typing and inference ----
@@ -239,7 +239,7 @@ fn host_route_stays_valor_valor() {
 
 #[test]
 fn bare_sermo_parameter_accepts_a_typed_conversation() {
-    assert_accepts(
+    assert_accepts_la(
         "@ ad 'x:y'\nfunctio f(textus n) → numerus { redde 1 }\n\
          functio lege(sermo s) → textus { redde s ↦ textus }\n\
          incipit {\n    nota lege(ad 'x:y' (\"a\"))\n}\n",
@@ -250,7 +250,7 @@ fn bare_sermo_parameter_accepts_a_typed_conversation() {
 
 #[test]
 fn finalized_hir_carries_the_bare_sermo_carrier() {
-    let result = analyze_source(&program(
+    let result = analyze_source_la(&program(
         TEXT_TO_NUM,
         "fixum _ s ← ad 'x:y' (\"a\")\nnota s ↦ numerus",
     ));

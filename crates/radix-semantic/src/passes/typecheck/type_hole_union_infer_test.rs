@@ -268,7 +268,7 @@ fn monomorphic_infer_path_is_unchanged() {
 
 #[test]
 fn source_union_hole_accepts_direct_flows() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         r"
 incipit {
     fixum ∪ x ← 42
@@ -283,7 +283,7 @@ incipit {
 
 #[test]
 fn source_union_hole_accepts_heterogeneous_direct_flows() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         r#"
 incipit {
     varia ∪ x ← 1
@@ -302,7 +302,7 @@ fn source_union_hole_accepts_hole_to_hole_merge() {
     // Under the U-02 accumulation direction the flow target's hole absorbs the
     // flow source's member set (left absorbs right), so the declared slot gets
     // its own direct flow before the hole-to-hole merge keeps both solved.
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         r#"
 incipit {
     fixum ∪ a ← 1
@@ -319,7 +319,7 @@ incipit {
 
 #[test]
 fn source_underscore_hole_path_is_unchanged() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         r"
 incipit {
     fixum _ r ← 1
@@ -355,7 +355,7 @@ fn type_pattern_constraint_reuses_union_accumulation() {
 
 #[test]
 fn source_param_hole_match_patterns_accumulate_union() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         r"
 functio probe(_ u) → vacuum {
     discerne u {
@@ -372,7 +372,7 @@ fn param_hole_writeback_materializes_solved_union_on_hir() {
     // N4a writeback: finalize rewrites ret/err/expr/local but not params, so
     // the solved union must be written back onto the HIR param slot for the
     // exported signature to show the solve (the N4b seam reads `param.ty`).
-    let result = test_support::analyze_ok(
+    let result = test_support::analyze_ok_la(
         r"
 functio probe(_ u) → vacuum {
     discerne u {
@@ -412,7 +412,7 @@ functio probe(_ u) → vacuum {
 
 #[test]
 fn source_param_hole_non_type_pattern_stays_unresolved() {
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         r#"
 functio probe(_ u) → vacuum {
     discerne u {

@@ -22,7 +22,7 @@ fn via_bits_is_retired_for_every_pair() {
         ("d64 n", "f32", "n ↦ f32 via Bits"),
         ("inf a", "f32", "a ↦ f32 via Bits"),
     ] {
-        test_support::assert_rejects_with_issue(
+        test_support::assert_rejects_with_issue_la(
             &format!("functio bits({param}) → {ret} {{ redde {body} }}"),
             RETIRED,
         );
@@ -48,35 +48,35 @@ fn retirement_help_names_the_bn_replacement() {
 
 #[test]
 fn float_to_pattern_is_the_bn_marker() {
-    test_support::assert_accepts("functio bits(f32 x) → b32 { redde x ↦ b32 }");
-    test_support::assert_accepts("functio bits(f64 x) → b64 { redde x ↦ b64 }");
-    test_support::assert_accepts("functio bits(f16 x) → b16 { redde x ↦ b16 }");
-    test_support::assert_accepts("functio bits(bf16 x) → b16 { redde x ↦ b16 }");
+    test_support::assert_accepts_la("functio bits(f32 x) → b32 { redde x ↦ b32 }");
+    test_support::assert_accepts_la("functio bits(f64 x) → b64 { redde x ↦ b64 }");
+    test_support::assert_accepts_la("functio bits(f16 x) → b16 { redde x ↦ b16 }");
+    test_support::assert_accepts_la("functio bits(bf16 x) → b16 { redde x ↦ b16 }");
 }
 
 #[test]
 fn pattern_to_float_is_the_bn_marker() {
-    test_support::assert_accepts("functio bits(b32 x) → f32 { redde x ↦ f32 }");
-    test_support::assert_accepts("functio bits(b64 x) → f64 { redde x ↦ f64 }");
-    test_support::assert_accepts("functio bits(b16 x) → f16 { redde x ↦ f16 }");
-    test_support::assert_accepts("functio bits(b16 x) → bf16 { redde x ↦ bf16 }");
+    test_support::assert_accepts_la("functio bits(b32 x) → f32 { redde x ↦ f32 }");
+    test_support::assert_accepts_la("functio bits(b64 x) → f64 { redde x ↦ f64 }");
+    test_support::assert_accepts_la("functio bits(b16 x) → f16 { redde x ↦ f16 }");
+    test_support::assert_accepts_la("functio bits(b16 x) → bf16 { redde x ↦ bf16 }");
 }
 
 #[test]
 fn number_holding_a_pattern_goes_through_its_marker() {
     // `u16 ↦ b16 ↦ f16`: the author says the u16 holds a pattern, then reads
     // it as a half float.
-    test_support::assert_accepts("functio bits(u16 n) → f16 { redde n ↦ b16 ↦ f16 }");
-    test_support::assert_accepts("functio bits(u16 n) → f32 { redde n ↦ b16 ↦ f16 ↦ f32 }");
-    test_support::assert_accepts("functio bits(u16 n) → bf16 { redde n ↦ b16 ↦ bf16 }");
-    test_support::assert_accepts("functio bits(u32 n) → f32 { redde n ↦ b32 ↦ f32 }");
-    test_support::assert_accepts("functio bits(u64 n) → f64 { redde n ↦ b64 ↦ f64 }");
-    test_support::assert_accepts("functio bits(f32 x) → u32 { redde x ↦ b32 ↦ u32 }");
+    test_support::assert_accepts_la("functio bits(u16 n) → f16 { redde n ↦ b16 ↦ f16 }");
+    test_support::assert_accepts_la("functio bits(u16 n) → f32 { redde n ↦ b16 ↦ f16 ↦ f32 }");
+    test_support::assert_accepts_la("functio bits(u16 n) → bf16 { redde n ↦ b16 ↦ bf16 }");
+    test_support::assert_accepts_la("functio bits(u32 n) → f32 { redde n ↦ b32 ↦ f32 }");
+    test_support::assert_accepts_la("functio bits(u64 n) → f64 { redde n ↦ b64 ↦ f64 }");
+    test_support::assert_accepts_la("functio bits(f32 x) → u32 { redde x ↦ b32 ↦ u32 }");
 }
 
 #[test]
 fn bit_width_must_match_the_float() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "functio bits(u16 n) → f32 { redde n ↦ b16 ↦ f32 }",
         "bits_conversion_width_mismatch",
     );
@@ -84,19 +84,19 @@ fn bit_width_must_match_the_float() {
 
 #[test]
 fn without_a_marker_value_conversion_stays() {
-    test_support::assert_accepts("functio val(u32 n) → f64 { redde n ↦ f64 }");
-    test_support::assert_accepts("functio val(u16 dbits) → f32 { redde dbits ↦ f32 }");
-    test_support::assert_accepts("functio val(u16 dbits) → f16 { redde dbits ↦ f16 }");
+    test_support::assert_accepts_la("functio val(u32 n) → f64 { redde n ↦ f64 }");
+    test_support::assert_accepts_la("functio val(u16 dbits) → f32 { redde dbits ↦ f32 }");
+    test_support::assert_accepts_la("functio val(u16 dbits) → f16 { redde dbits ↦ f16 }");
 }
 
 #[test]
 fn radix_hint_accept_row_stays_green() {
-    test_support::assert_accepts("incipit { fixum _ n ← \"ff\" ↦ u32 via Hex }");
+    test_support::assert_accepts_la("incipit { fixum _ n ← \"ff\" ↦ u32 via Hex }");
 }
 
 #[test]
 fn typed_destination_conversio_assign_accepts_u16_to_f16() {
-    test_support::assert_accepts("incipit {\n  fixum u16 dbits ← 0x3E00\n  fixum f16 d ↤ dbits\n}");
+    test_support::assert_accepts_la("incipit {\n  fixum u16 dbits ← 0x3E00\n  fixum f16 d ↤ dbits\n}");
 }
 
 // --- CTR-02: channel contract for the builtin `Bits` rows ---
@@ -115,9 +115,9 @@ use radix_target::Target;
 
 #[test]
 fn bn_reinterpretation_bare_arrow_needs_no_recovery_in_failable_function() {
-    test_support::assert_accepts("functio bits(f32 x) → b32 ⇥ textus { redde x ↦ b32 }");
-    test_support::assert_accepts("functio bits(f32 x) → b32 ⇥ numerus { redde x ↦ b32 }");
-    test_support::assert_accepts("functio bits(f64 x) → b64 ⇥ textus { redde x ↦ b64 }");
+    test_support::assert_accepts_la("functio bits(f32 x) → b32 ⇥ textus { redde x ↦ b32 }");
+    test_support::assert_accepts_la("functio bits(f32 x) → b32 ⇥ numerus { redde x ↦ b32 }");
+    test_support::assert_accepts_la("functio bits(f64 x) → b64 ⇥ textus { redde x ↦ b64 }");
 }
 
 #[test]
