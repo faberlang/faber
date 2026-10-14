@@ -1204,7 +1204,7 @@ base_type       := hole_type | function_type | width_type_sugar | ratio_type | f
 # (`promissum_alternate_uses_exit_arrow`). `promissum<T>` with no `⇥` is an
 # ordinary `qualified_type type_arguments`.
 failable_promissum_type := IDENTIFIER '<' type_annotation alternate_exit_clause '>'
-ratio_type      := 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
+ratio_type      := 'ratio' '<' ('*' | labeled_type_argument (',' labeled_type_argument)*) '>'
 hole_type       := '_'
 # `modulus` (en `wrapping`, the modular-word policy) is claimed as a type-name
 # head by the type parser, so `modulus<u32>` is an ordinary applied type
@@ -1504,7 +1504,13 @@ iuncta_expr := 'iuncta' type_arguments '[' argument_list? ']'
 # head member is an `IDENTIFIER = value` init, so empty braces and quoted
 # members stay a json_literal. A stated type before a keyed literal builds
 # that type (`json { … }`, `map<K, V> { … }`), a bare keyed literal needs a
-# typed cell (operator ruling 2026-10-10, need).
+# typed cell (operator ruling 2026-10-10, need). `*` is the
+# field-list hole: `record<*>` (la `ratio<*>`) is the whole field list, solved
+# from the shape. It is legal only as the sole argument of `record<...>`;
+# `record<g: f32, *>` is `ratio_field_list_hole_not_sole`, and `record<_>`
+# stays `ratio_type_arg_label_required`. A bare `{ field = value }` with no
+# typed cell is `record<*>` (a record), while `_ { ... }` has no default
+# (operator ruling 2026-10-14, need).
 # The stated bracket constructor takes only collection words: `lista<…> [ … ]`
 # builds the stated list from its elements (an `array_literal` body), and
 # `lista<_> [ … ]` infers the element type. A tensor, vector, or matrix type
