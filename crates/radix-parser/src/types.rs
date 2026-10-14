@@ -448,6 +448,20 @@ impl Parser {
         path: Vec<Ident>,
         name_str: &str,
     ) -> Result<TypeExprKind, ParseError> {
+        // `record<*>` (la `ratio<*>`) is the whole-field-list hole. The `*`
+        // is legal only as the sole argument, so anything other than `>`
+        // after it is a targeted error rather than a generic one.
+        if path.len() == 1 && name_str == "ratio" && self.check(&TokenKind::Star) {
+            self.advance();
+            if !self.check(&TokenKind::GtAscii) {
+                return Err(
+                    ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                        .with_arg("issue", "ratio_field_list_hole_not_sole"),
+                );
+            }
+            self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
+            return Ok(TypeExprKind::FieldListHole);
+        }
         let mut params = Vec::new();
         let mut labels = HashSet::new();
         loop {
@@ -848,6 +862,14 @@ impl Parser {
         &mut self,
         labels: &mut HashSet<Symbol>,
     ) -> Result<TypeExpr, ParseError> {
+        // A `*` here followed a labeled argument (`record<g: f32, *>`); the
+        // field-list hole is legal only as the sole argument.
+        if self.check(&TokenKind::Star) {
+            return Err(
+                ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                    .with_arg("issue", "ratio_field_list_hole_not_sole"),
+            );
+        }
         let is_label = matches!(self.peek().kind, TokenKind::Ident(_) | TokenKind::Tag)
             && matches!(self.peek_at(1).kind, TokenKind::Colon);
         if !is_label {
