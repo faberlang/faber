@@ -58,4 +58,4 @@ pub fn fault_code(family: &str, variant: &str) -> Option<&'static str> {
 
 #[cfg(test)]
 #[path = "fault_codes_test.rs"]
-mod fault_codes_test;
+mod tests;
