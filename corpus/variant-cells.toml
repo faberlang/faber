@@ -1110,6 +1110,16 @@ required = true
 decline = true
 
 [[cells]]
+id = "tensor-runtime-size.size-law"
+family = "tensor-runtime-size"
+cell = "const size lift at a checked store, force by plain use, size names in extents, creator with size parameters"
+status = "direct"
+exemplum = "tensor/size-law.fab"
+expected = true
+required = true
+note = "size-type Z4: lift is explicit and checked at the store; force is a read-only widening"
+
+[[cells]]
 id = "tensor-runtime-size.shape-holes"
 family = "tensor-runtime-size"
 cell = "shape-list holes infer from storage, source axes or expected shape"
