@@ -191,7 +191,7 @@ fn valor_octeti_body_extraction_emits_octeti_match() {
         dir.join("main.fab"),
         r"
 main {
-    const value body ← {} ↦ value
+    const value body ← |09| ↦ value
     const bytes payload ← body ↦ bytes
     print payload.length()
 }
