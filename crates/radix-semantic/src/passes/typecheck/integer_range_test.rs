@@ -153,8 +153,12 @@ fn decimal_beside_integer_rejects() {
 
 #[test]
 fn float_and_decimal_widths_join_by_the_lattice() {
-    test_support::assert_analysis_accepts_la("functio f(f32 x, f64 y) → f64 {\n    redde x + y\n}\n");
-    test_support::assert_analysis_accepts_la("functio f(d64 x, d64 y) → d64 {\n    redde x + y\n}\n");
+    test_support::assert_analysis_accepts_la(
+        "functio f(f32 x, f64 y) → f64 {\n    redde x + y\n}\n",
+    );
+    test_support::assert_analysis_accepts_la(
+        "functio f(d64 x, d64 y) → d64 {\n    redde x + y\n}\n",
+    );
 }
 
 #[test]
@@ -235,10 +239,14 @@ fn strict_equality_takes_an_integer_constant_by_value() {
     test_support::assert_analysis_accepts_la(
         "functio even(numerus n) → bivalens {\n    redde n % 2 ≡ 0\n}\n",
     );
-    test_support::assert_analysis_accepts_la("functio p(u8 a) → bivalens {\n    redde a ≡ 200\n}\n");
+    test_support::assert_analysis_accepts_la(
+        "functio p(u8 a) → bivalens {\n    redde a ≡ 200\n}\n",
+    );
     // A constant the width cannot hold compares exactly and is simply false
     // (ruling 22); it is not a type error.
-    test_support::assert_analysis_accepts_la("functio p(u8 a) → bivalens {\n    redde a ≡ 300\n}\n");
+    test_support::assert_analysis_accepts_la(
+        "functio p(u8 a) → bivalens {\n    redde a ≡ 300\n}\n",
+    );
     // Typed operands of different widths stay exact-type only.
     test_support::assert_analysis_rejects_with_issue_la(
         "functio p(u8 a, u16 b) → bivalens {\n    redde a ≡ b\n}\n",

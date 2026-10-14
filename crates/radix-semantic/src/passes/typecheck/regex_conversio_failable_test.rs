@@ -7,7 +7,9 @@
 //! Literal and dynamic sources take the same path (no literal fold, no
 //! pattern length cap). Assertions are structured (code, issue, args).
 
-use crate::test_support::{self, analyze_source_la, assert_accepts_la, assert_rejects_with_issue_la};
+use crate::test_support::{
+    self, analyze_source_la, assert_accepts_la, assert_rejects_with_issue_la,
+};
 
 const ISSUE: &str = "failable_conversio_requires_handler";
 

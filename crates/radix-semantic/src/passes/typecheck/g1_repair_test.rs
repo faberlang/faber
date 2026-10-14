@@ -211,7 +211,9 @@ fn constant_negative_shift_count_is_a_compile_error() {
 
 #[test]
 fn typed_and_nonnegative_shift_counts_are_accepted() {
-    assert_accepts_la("incipit {\nfixum u8 a ← 1\nfixum numerus k ← -1\nnota a ⇐ k\nnota a ⇐ 3\n}\n");
+    assert_accepts_la(
+        "incipit {\nfixum u8 a ← 1\nfixum numerus k ← -1\nnota a ⇐ k\nnota a ⇐ 3\n}\n",
+    );
 }
 
 // ---------------------------------------------------------------------------

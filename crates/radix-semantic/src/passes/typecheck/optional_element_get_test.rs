@@ -11,7 +11,8 @@
 
 use crate::Primitive;
 use crate::test_support::{
-    analyze_ok_la, analyze_source_la, assert_accepts_la, assert_rejects_with_issue_la, entry_local_tys,
+    analyze_ok_la, analyze_source_la, assert_accepts_la, assert_rejects_with_issue_la,
+    entry_local_tys,
 };
 
 const ISSUE: &str = "optional_into_plain_cell";

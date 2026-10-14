@@ -48,7 +48,9 @@ fn regex_literal_pattern_has_no_length_cap() {
 
 #[test]
 fn regex_conversio_dynamic_source_with_text_channel_typechecks() {
-    test_support::assert_accepts_la(r"functio f(textus pat) → regex ⇥ textus { redde pat ↦ regex }");
+    test_support::assert_accepts_la(
+        r"functio f(textus pat) → regex ⇥ textus { redde pat ↦ regex }",
+    );
 }
 
 #[test]
@@ -1221,22 +1223,30 @@ functio college<magnitudo T, magnitudo D>() → tensor<f32, [T, D]> {
 
 #[test]
 fn sermo_materialize_to_vacuum_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { fixum _ v ← ad 'runtime:echo' ("salve") ↦ vacuum }"#);
+    test_support::assert_accepts_la(
+        r#"incipit { fixum _ v ← ad 'runtime:echo' ("salve") ↦ vacuum }"#,
+    );
 }
 
 #[test]
 fn sermo_materialize_to_textus_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { fixum _ t ← ad 'runtime:echo' ("salve") ↦ textus }"#);
+    test_support::assert_accepts_la(
+        r#"incipit { fixum _ t ← ad 'runtime:echo' ("salve") ↦ textus }"#,
+    );
 }
 
 #[test]
 fn sermo_materialize_to_octeti_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { fixum _ o ← ad 'runtime:echo' ("salve") ↦ octeti }"#);
+    test_support::assert_accepts_la(
+        r#"incipit { fixum _ o ← ad 'runtime:echo' ("salve") ↦ octeti }"#,
+    );
 }
 
 #[test]
 fn sermo_materialize_to_valor_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { fixum _ v ← ad 'runtime:echo' ("salve") ↦ valor }"#);
+    test_support::assert_accepts_la(
+        r#"incipit { fixum _ v ← ad 'runtime:echo' ("salve") ↦ valor }"#,
+    );
 }
 
 #[test]
@@ -1246,7 +1256,9 @@ fn sermo_materialize_to_numerus_typechecks() {
 
 #[test]
 fn sermo_materialize_to_bivalens_typechecks() {
-    test_support::assert_accepts_la(r"incipit { fixum _ b ← ad 'runtime:echo' (verum) ↦ bivalens }");
+    test_support::assert_accepts_la(
+        r"incipit { fixum _ b ← ad 'runtime:echo' (verum) ↦ bivalens }",
+    );
 }
 
 #[test]
