@@ -4768,6 +4768,29 @@ fn kernel_plan_for_function_derives_distributed_sum_plan() {
 }
 
 #[test]
+fn nested_filum_form_is_never_a_declared_sum_plan() {
+    // gpu-reset rule 14.5 vocabulary: the nested lane-body form validates
+    // like Grid but must never be taken for a Declared plan.
+    assert_eq!(crate::MirFilumForm::Nested.name(), "nested");
+    let mut types = TypeTable::new();
+    let mut function = filum_function(&mut types);
+    let mut nested = filum_declaration(32);
+    nested.form = crate::MirFilumForm::Nested;
+    let MirStatementKind::RuntimeCall { call, .. } = &mut function.blocks[0].statements[0].kind
+    else {
+        panic!("filum function statement is a runtime call");
+    };
+    call.intrinsic = MirIntrinsic::FilumReduce(nested);
+    let signature = reduction_signature(1024, 32, 32);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation);
+    assert!(
+        !matches!(&derived, Ok(Some(CollectionKernelPlan::DistributedSum(_)))),
+        "a Nested filum node must not resolve to a DistributedSum plan, got {derived:?}"
+    );
+}
+
+#[test]
 fn distributed_sum_floor_is_the_tree_reduction_recipe() {
     // SFR-5 plan law: a backend with no native arm lowers the declared
     // distributed sum through the shared-memory tree floor — the floor facts
