@@ -291,6 +291,9 @@ mod abi_tests;
 #[path = "ai_workbench_stage5_test.rs"]
 mod ai_workbench_stage5_tests;
 #[cfg(test)]
+#[path = "axis_residual_run_test.rs"]
+mod axis_residual_run_tests;
+#[cfg(test)]
 #[path = "bits_conversio_run_test.rs"]
 mod bits_conversio_run_tests;
 #[cfg(test)]
