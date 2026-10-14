@@ -745,6 +745,57 @@ fn corpus_known_failure_becoming_green_requires_reclassification() {
 }
 
 #[test]
+fn corpus_runner_reports_a_rejection_as_its_own_outcome() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases").join("probe");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n",
+    )
+    .expect("write suite");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"main.fab\"\n\n[targets.runner]\noutcome = \"rejects\"\nphase = \"run\"\ndiagnostic_contains = \"SEM002:unknown_type\"\n",
+    )
+    .expect("write case");
+    fs::copy(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/typi/inf-prefix-error.fab"),
+        case.join("main.fab"),
+    )
+    .expect("copy rejected source");
+    let rejected = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(temp.path())
+        .output()
+        .expect("run rejection case");
+    assert!(
+        rejected.status.success(),
+        "{}",
+        String::from_utf8_lossy(&rejected.stdout)
+    );
+    let rows = records(&rejected.stdout);
+    assert_eq!(rows[0]["status"], "rejected");
+    let summary = rows.last().expect("summary");
+    assert_eq!(summary["rejected"], 1);
+    assert_eq!(summary["expected_failures"], 0);
+    assert_eq!(summary["failed"], 0);
+    assert_eq!(summary["status"], "pass");
+
+    fs::copy(smoke_case(), case.join("main.fab")).expect("replace with valid source");
+    let green = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(temp.path())
+        .output()
+        .expect("run unexpected pass");
+    assert!(!green.status.success());
+    assert_eq!(
+        records(&green.stdout)[0]["reason"],
+        "unexpected pass; update target expectation"
+    );
+}
+
+#[test]
 fn corpus_requires_each_case_to_classify_the_selected_target() {
     let temp = tempfile::tempdir().expect("temporary suite");
     let case = temp.path().join("cases").join("probe");
