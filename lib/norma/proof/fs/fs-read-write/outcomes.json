@@ -1,0 +1,10 @@
+{
+  "targets": {
+    "rust": {
+      "outcome": "known-fail",
+      "phase": "run",
+      "diagnostic_contains": "failable call failed: IoFault.InvalidArgument",
+      "reason": "The generated Rust leaf dispatch converts the solum:funde octeti argument to a numeric list, so write_bytes panics with IoFault.InvalidArgument; the runner dispatch accepts the same argument shape and passes."
+    }
+  }
+}

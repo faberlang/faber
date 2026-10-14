@@ -1,0 +1,56 @@
++++
+locale = "en"
++++
+
+# fs read/write leaf routes through the async-posture Norma wrappers.
+#
+# Covers: solum:scribet (write_file_async), solum:apponet (append_async),
+# solum:lege (read_file_async), solum:hauriet (read_bytes_async),
+# solum:carpiet (read_lines_async), and solum:funde (write_bytes_async shares
+# the sync bytes route). Every async call is bound with `await_const`; every
+# result is asserted against the bytes the program wrote. The byte-write round
+# trip runs last so a pinned byte-route gap on one target cannot hide the rest.
+
+import from "norma:fs" fs
+import from "norma:process" process
+
+async_main {
+    const string dir ← fs.temp_dir()
+    const string textPath ← fs.join([dir, "norma-fs-read-write-async-§.txt"(process.pid())])
+    const string appendPath ← fs.join([dir, "norma-fs-read-write-async-append-§.txt"(process.pid())])
+    const string linesPath ← fs.join([dir, "norma-fs-read-write-async-lines-§.txt"(process.pid())])
+    const string bytesPath ← fs.join([dir, "norma-fs-read-write-async-bytes-§.bin"(process.pid())])
+
+    # solum:scribet → solum:lege: async write, async read back exactly.
+    await_const void _ ← fs.write_file_async(textPath, "alpha\nbeta\n")
+    await_const string body ← fs.read_file_async<string>(textPath)
+    assert body ≡ "alpha\nbeta\n"
+
+    # solum:hauriet: draw the written text back as raw bytes.
+    await_const list<b8> textBytes ← fs.read_bytes_async(textPath)
+    assert textBytes ≡ |61 6c 70 68 61 0a 62 65 74 61 0a|
+
+    # solum:apponet: append twice through the async twin, read back.
+    await_const void _ ← fs.write_file_async(appendPath, "one")
+    await_const void _ ← fs.append_async(appendPath, "two")
+    await_const void _ ← fs.append_async(appendPath, "three")
+    await_const string appended ← fs.read_file_async<string>(appendPath)
+    assert appended ≡ "onetwothree"
+
+    # solum:carpiet: async line read keeps the trailing-newline shape.
+    await_const void _ ← fs.write_file_async(linesPath, "first\nsecond\n")
+    await_const list<string> lines ← fs.read_lines_async(linesPath)
+    assert lines ≡ (["first", "second"] ↦ list<string>)
+
+    fs.delete(textPath)
+    fs.delete(appendPath)
+    fs.delete(linesPath)
+
+    # solum:funde → solum:hauriet: async byte write shares the sync route.
+    await_const void _ ← fs.write_bytes_async(bytesPath, |de ad be ef|)
+    await_const list<b8> got ← fs.read_bytes_async(bytesPath)
+    assert got ≡ |de ad be ef|
+    fs.delete(bytesPath)
+
+    print "norma/fs/fs-read-write-async ok"
+}

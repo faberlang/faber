@@ -1,0 +1,72 @@
++++
+locale = "en"
++++
+
+# fs read/write leaf routes, sync public Norma wrappers.
+#
+# Covers: solum:scribe (write_file), solum:funde (write_bytes),
+# solum:appone (append), solum:lege (read_file), solum:hauri (read_bytes),
+# solum:partem (read_range; including a range past EOF), solum:inveni (find;
+# hit and miss), solum:carpe (read_lines; trailing newline and empty file).
+# Every route is asserted by reading the written bytes back, not by the call
+# returning. The byte-write round trip runs last so a pinned byte-route gap on
+# one target cannot hide the rest of the file.
+
+import from "norma:fs" fs
+import from "norma:process" process
+
+main {
+    const string dir ← fs.temp_dir()
+    const string textPath ← fs.join([dir, "norma-fs-read-write-§.txt"(process.pid())])
+    const string appendPath ← fs.join([dir, "norma-fs-read-write-append-§.txt"(process.pid())])
+    const string digitsPath ← fs.join([dir, "norma-fs-read-write-digits-§.txt"(process.pid())])
+    const string linesPath ← fs.join([dir, "norma-fs-read-write-lines-§.txt"(process.pid())])
+    const string emptyPath ← fs.join([dir, "norma-fs-read-write-empty-§.txt"(process.pid())])
+    const string bytesPath ← fs.join([dir, "norma-fs-read-write-bytes-§.bin"(process.pid())])
+
+    # solum:scribe → solum:lege: write text, read it back exactly.
+    fs.write_file(textPath, "alpha\nbeta\n")
+    assert fs.read_file<string>(textPath) ≡ "alpha\nbeta\n"
+
+    # solum:hauri: draw a written text file back as raw bytes.
+    assert fs.read_bytes(textPath) ≡ |61 6c 70 68 61 0a 62 65 74 61 0a|
+    assert fs.byte_length(textPath) ≡ 11
+
+    # solum:appone: append twice, read the concatenation back.
+    fs.write_file(appendPath, "one")
+    fs.append(appendPath, "two")
+    fs.append(appendPath, "three")
+    assert fs.read_file<string>(appendPath) ≡ "onetwothree"
+
+    # solum:partem: bounded range reads inside the file.
+    fs.write_file(digitsPath, "0123456789")
+    assert fs.read_range(digitsPath, 2, 3) ≡ |32 33 34|
+    # solum:partem: a range that starts before EOF but runs past it stops at EOF.
+    assert fs.read_range(digitsPath, 8, 100) ≡ |38 39|
+    # solum:partem: a range entirely past EOF reads zero bytes.
+    assert fs.read_range(digitsPath, 40, 4) ≡ ||
+
+    # solum:inveni: pattern hit reports the absolute offset, miss reports -1.
+    assert fs.find(digitsPath, "234", 0, 10) ≡ 2
+    assert fs.find(digitsPath, "xyz", 0, 10) ≡ -1
+
+    # solum:carpe: trailing newline does not add an empty final line.
+    fs.write_file(linesPath, "first\nsecond\n")
+    assert fs.read_lines(linesPath) ≡ (["first", "second"] ↦ list<string>)
+    # solum:carpe: an empty file yields zero lines.
+    fs.write_file(emptyPath, "")
+    assert fs.read_lines(emptyPath).length() ≡ 0
+
+    fs.delete(textPath)
+    fs.delete(appendPath)
+    fs.delete(digitsPath)
+    fs.delete(linesPath)
+    fs.delete(emptyPath)
+
+    # solum:funde → solum:hauri: write bytes, read them back exactly.
+    fs.write_bytes(bytesPath, |de ad be ef|)
+    assert fs.read_bytes(bytesPath) ≡ |de ad be ef|
+    fs.delete(bytesPath)
+
+    print "norma/fs/fs-read-write ok"
+}
