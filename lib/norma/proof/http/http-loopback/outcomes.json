@@ -1,0 +1,10 @@
+{
+  "targets": {
+    "runner": {
+      "outcome": "known-fail",
+      "phase": "run",
+      "diagnostic_contains": "invalid MIR: destination type mismatch",
+      "reason": "The runner's MIR lowering rejects the stored failable promise binding (promise<Response ⇥ IoFault>) that starts the loopback GET before the accept: the promise destination fails to type during MIR lowering, the same runner gap pinned for the async fs read wrappers. The exchange assertions are untouched."
+    }
+  }
+}
