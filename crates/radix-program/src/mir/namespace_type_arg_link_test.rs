@@ -496,6 +496,15 @@ main {
 }
 "#;
 
+const NORMA_FS_READ_FILE_OPERAND_MAIN: &str = r#"import from "norma:fs" fs
+
+@ cli "tool"
+@ operand string root
+main args args {
+    print fs.read_file<string>(args.root)
+}
+"#;
+
 /// `norma:fs.read_file<string>` is a failable generic library export
 /// (`T ⇥ fault.IoFault`, with the union interned from the library's own
 /// second-level `norma:fault` import). Called from a package `main` with a
@@ -538,5 +547,56 @@ kind = "bin"
             .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
             .collect::<Vec<_>>();
         panic!("norma:fs read_file package must lower, got {facts:?}");
+    }
+}
+
+/// The same failable generic library export must link and validate when the
+/// argument is a CLI-planned operand field (`args.root`) rather than a
+/// literal.
+#[test]
+#[ignore = "pumpfix-gdde13951: call argument type mismatch (arg 0: expected textus, got Struct(DefId(2000000073)))"]
+fn package_mir_links_norma_fs_read_file_operand_arg_validates() {
+    let dir = crate::test_support::test_temp_dir("norma-fs-read-file-operand");
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "norma-fs-read-file-operand"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("main.fab"), NORMA_FS_READ_FILE_OPERAND_MAIN).expect("write main.fab");
+    let entry = src.join("main.fab");
+
+    // `with_lowered_package_mir` supplies no argumenta, so a required
+    // `@ operand` never receives a value and the CLI plan fails before
+    // lowering (`package_mir_cli_surface_unsupported`, surface "CLI operand
+    // value"). Lower with the operand value supplied — the `cli_plan_test`
+    // call form — to reach the lowering/validation gate this test probes.
+    let argumenta = vec!["/definitely/not/here".to_owned()];
+    let result = with_prepared_package_mir(
+        &Config::default(),
+        &entry,
+        &argumenta,
+        &crate::test_support::test_mir_seams(),
+        |_, _| Ok(()),
+    );
+    if let Err(diagnostics) = &result {
+        let facts = diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+            .collect::<Vec<_>>();
+        panic!("norma:fs read_file operand package must lower, got {facts:?}");
     }
 }
