@@ -5,7 +5,11 @@ use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, AnalyzedModule, Config, Session};
 
 fn analyze(source: &str) -> AnalyzedModule {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     crate::driver::analyze_source(&session, "infinity.fab", source, AnalyzeRequest::default())
         .expect("analysis succeeds")
 }
@@ -30,7 +34,11 @@ fn non_finite_literals_lower_to_float_constants_and_neg_instruction() {
 
 #[test]
 fn non_finite_literals_run_as_ieee_float_values() {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(&session, "infinity.fab", SOURCE, &mut host)
         .unwrap_or_else(|error| panic!("non-finite constants must run: {error:?}"));

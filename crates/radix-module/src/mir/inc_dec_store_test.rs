@@ -39,7 +39,11 @@ fn cell(overrides: &str) -> String {
 }
 
 fn run(body: &str) -> (Vec<String>, Vec<(String, String)>) {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = format!("{CELL}incipit {{\n{body}\n}}\n");
     let mut host = BufferHost::default();
     let errors = match run_source(&session, "incdec.fab", &source, &mut host) {

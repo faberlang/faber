@@ -24,7 +24,11 @@ const FAMILY: [FamilyRow; 4] = [
 ];
 
 fn run(body: &str) -> Vec<String> {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = format!("incipit {{\n{body}\n}}\n");
     let mut host = BufferHost::default();
     match run_source(&session, "inf_approx.fab", &source, &mut host) {

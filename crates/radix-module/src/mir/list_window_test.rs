@@ -9,7 +9,11 @@ use crate::mir::run_source;
 
 fn run(source: &str) -> (Result<(), String>, Vec<String>) {
     let mut host = BufferHost::default();
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let result = run_source(&session, "test.fab", source, &mut host).map_err(|error| format!("{error:?}"));
     (result, host.stdout_lines)
 }
