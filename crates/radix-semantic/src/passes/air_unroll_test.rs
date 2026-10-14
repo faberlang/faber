@@ -855,7 +855,7 @@ fn nan_unsafe_unclamped_div_declines_with_causa() {
 @ radix lane "air"
 @ radix backward "div_backward"
 functio unsafe_div(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
-    varia tensor<f32, [4]> acc ← x.divisio(mask)
+    varia tensor<f32, [4]> acc ← x.divisa(mask)
     itera ab 0‥4 fixum i {
         acc ← acc + x
     }
@@ -873,7 +873,7 @@ fn nan_unsafe_div_under_verte_declines_with_causa() {
 @ radix lane "air"
 @ radix backward "div_verte_backward"
 functio unsafe_div_verte(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
-    varia tensor<f32, [4]> acc ← x.divisio(mask) ∷ tensor<f32, [4]>
+    varia tensor<f32, [4]> acc ← x.divisa(mask) ∷ tensor<f32, [4]>
     itera ab 0‥4 fixum i {
         acc ← acc + x
     }
@@ -891,7 +891,7 @@ fn nan_unsafe_div_under_conversio_declines_with_causa() {
 @ radix lane "air"
 @ radix backward "div_conversio_backward"
 functio unsafe_div_conversio(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
-    varia tensor<f32, [4]> acc ← x.divisio(mask) ↦ tensor<f32, [4]> ⊥ x
+    varia tensor<f32, [4]> acc ← x.divisa(mask) ↦ tensor<f32, [4]> ⊥ x
     itera ab 0‥4 fixum i {
         acc ← acc + x
     }

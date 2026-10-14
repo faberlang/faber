@@ -2118,9 +2118,9 @@ fn decline(span: Span, causa: &str) -> SemanticError {
 
 /// Function-level facts for the guard-as-mask admit (unit-3F).
 ///
-/// A tensor parameter that is never used as data (only as a `multiplica`
+/// A tensor parameter that is never used as data (only as a `multiplicata`
 /// operand, or unused beside a data tensor) is a mask operand. Mask mode
-/// then fail-closes on in-region construction, dead-lane-unsafe `divisio`,
+/// then fail-closes on in-region construction, dead-lane-unsafe `divisa`,
 /// and unmasked reduction exits.
 struct MaskAnalysis {
     mask_defs: FxHashSet<DefId>,
@@ -2282,7 +2282,7 @@ impl MaskCollector<'_> {
                 if is_fill_method(name) {
                     self.in_region_mask = true;
                 }
-                if name == "multiplica" {
+                if name == "multiplicata" {
                     if let Some(arg) = args.first() {
                         if self.is_fill_built(recv)
                             || self.is_fill_built(&arg.expr)
@@ -2294,7 +2294,7 @@ impl MaskCollector<'_> {
                     } else if self.is_fill_built(recv) || is_comparison(recv) {
                         self.in_region_mask = true;
                     }
-                } else if name == "divisio" {
+                } else if name == "divisa" {
                     self.note_data(recv);
                     let denom_ok = args
                         .first()
@@ -2352,7 +2352,7 @@ impl MaskCollector<'_> {
                 self.scan_expr(index);
             }
             // WHY: `air_purity` descends through casts and conversions, so a
-            // `divisio` or fill hidden under one still reaches the lane.
+            // `divisa` or fill hidden under one still reaches the lane.
             HirExpressionKind::Verte { source, .. } => self.scan_expr(source),
             HirExpressionKind::Conversio {
                 source, recovery, ..
@@ -2417,7 +2417,7 @@ fn is_masked_exit(
             .get(def)
             .is_some_and(|init| is_masked_exit(init, mask_defs, local_inits, interner)),
         HirExpressionKind::MethodCall(recv, method, _, args, _)
-            if interner.resolve(*method) == "multiplica" =>
+            if interner.resolve(*method) == "multiplicata" =>
         {
             is_mask_ref(recv, mask_defs, local_inits)
                 || args
