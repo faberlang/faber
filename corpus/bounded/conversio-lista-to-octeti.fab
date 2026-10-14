@@ -26,6 +26,6 @@ ruling = "6a13d711"
 main {
     const list<u8> base ← [1, 2]
     const list<u8, 8> raw ← base ↦ list<u8, 8>
-    const bytes<8> out ← raw ↦ bytes<8>
+    const list<b8, 8> out ← raw ↦ list<b8, 8>
     print out
 }

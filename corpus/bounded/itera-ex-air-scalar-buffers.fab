@@ -44,7 +44,7 @@ diagnostic = "SEM059:runtime_conversion"
 
 @ radix lane "air"
 fn full_bytes() → void {
-    const bytes<8> xs ← |de ad be ef ba dc fe ca| ↦ bytes<8>
+    const list<b8, 8> xs ← |de ad be ef ba dc fe ca| ↦ list<b8, 8>
     for from xs const b { }
 }
 

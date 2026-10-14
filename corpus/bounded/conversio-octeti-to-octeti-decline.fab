@@ -21,6 +21,6 @@ locale = "en"
 # Common mistakes:
 #   • expecting a bounded byte conversion to truncate or pad silently.
 
-fn resize(bytes<8> raw) → bytes<4> {
-    return raw ↦ bytes<4>
+fn resize(list<b8, 8> raw) → list<b8, 4> {
+    return raw ↦ list<b8, 4>
 }

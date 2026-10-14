@@ -21,6 +21,6 @@ locale = "en"
 # Common mistakes:
 #   • treating UTF-8 encoding as a width-only conversion.
 
-fn encode(string<8> raw) → bytes<8> {
-    return raw ↦ bytes<8>
+fn encode(string<8> raw) → list<b8, 8> {
+    return raw ↦ list<b8, 8>
 }
