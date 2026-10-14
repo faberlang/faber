@@ -12,7 +12,7 @@ const FAILABLE: &str = "functio f(numerus x) → numerus ⇥ textus {\n    redde
 
 #[test]
 fn call_default_has_the_success_type() {
-    let result = test_support::analyze_ok(&format!(
+    let result = test_support::analyze_ok_la(&format!(
         "{FAILABLE}incipit {{\n    fixum _ n ← f(1) ⊥ 0\n    nota n\n}}\n"
     ));
     let tys = entry_local_tys(&result);
@@ -28,14 +28,14 @@ fn call_default_has_the_success_type() {
 #[test]
 fn call_default_satisfies_the_handler_rule_outside_a_failable_function() {
     // The default is the handler: no `⇥`, `fac/cape` or `capta` needed.
-    let _ = test_support::analyze_ok(&format!(
+    let _ = test_support::analyze_ok_la(&format!(
         "{FAILABLE}functio g() → numerus {{\n    redde f(1) ⊥ 0\n}}\n"
     ));
 }
 
 #[test]
 fn call_default_on_method_call_checks() {
-    let _ = test_support::analyze_ok(concat!(
+    let _ = test_support::analyze_ok_la(concat!(
         "genus Fons {\n",
         "    functio lege(numerus x) → numerus ⇥ textus {\n        redde x\n    }\n",
         "}\n\n",
@@ -45,7 +45,7 @@ fn call_default_on_method_call_checks() {
 
 #[test]
 fn call_default_type_must_match_the_success_type() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         &format!("{FAILABLE}incipit {{\n    fixum _ n ← f(1) ⊥ \"zero\"\n    nota n\n}}\n"),
         "call_default_type_mismatch",
     );
@@ -53,7 +53,7 @@ fn call_default_type_must_match_the_success_type() {
 
 #[test]
 fn call_default_on_an_infallible_call_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         concat!(
             "functio g() → numerus {\n    redde 1\n}\n\n",
             "incipit {\n    fixum _ n ← g() ⊥ 0\n    nota n\n}\n",
@@ -66,7 +66,7 @@ fn call_default_on_an_infallible_call_is_rejected() {
 fn call_default_does_not_contain_a_failable_default() {
     // The default is evaluated outside the boundary: a failable call there
     // still needs its own handler.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         &format!("{FAILABLE}functio g() → numerus {{\n    redde f(1) ⊥ f(2)\n}}\n"),
         "failable_call_requires_handler",
     );
@@ -76,7 +76,7 @@ fn call_default_does_not_contain_a_failable_default() {
 
 #[test]
 fn vel_on_a_failable_call_is_rejected_toward_the_call_default() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         &format!("{FAILABLE}functio g() → numerus ⇥ textus {{\n    redde f(1) vel 0\n}}\n"),
         "coalesce_on_failable_call",
     );
@@ -84,7 +84,7 @@ fn vel_on_a_failable_call_is_rejected_toward_the_call_default() {
 
 #[test]
 fn vel_on_a_failable_tensor_accipe_is_rejected_even_in_main() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         concat!(
             "functio idx() → numerus {\n    redde 2\n}\n\n",
             "incipit {\n    varia tensor<f32, [4]> t ← vacua\n    fixum numerus i ← idx()\n",
@@ -97,12 +97,12 @@ fn vel_on_a_failable_tensor_accipe_is_rejected_even_in_main() {
 #[test]
 fn vel_on_an_infallible_or_optional_call_is_unchanged() {
     // An infallible call returning an optional keeps `vel`.
-    let _ = test_support::analyze_ok(concat!(
+    let _ = test_support::analyze_ok_la(concat!(
         "functio g(numerus x) → numerus ∪ nihil {\n    redde x\n}\n\n",
         "functio h() → numerus {\n    redde g(1) vel 0\n}\n",
     ));
     // A list element read (`T ∪ nihil`, not failable) keeps `vel`.
-    let _ = test_support::analyze_ok(concat!(
+    let _ = test_support::analyze_ok_la(concat!(
         "functio h(lista<numerus> xs) → numerus {\n    redde xs.accipe(1) vel 0\n}\n",
     ));
 }
@@ -113,7 +113,7 @@ fn vel_on_an_infallible_or_optional_call_is_unchanged() {
 fn directional_view_method_rejects_a_written_argument() {
     // `fini` takes no arguments: the argument is still typechecked, then the
     // shared arity rejection yields the error type.
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         concat!(
             "@ ad 'x:y'\n",
             "functio f(textus n) → numerus { redde 1 }\n\n",

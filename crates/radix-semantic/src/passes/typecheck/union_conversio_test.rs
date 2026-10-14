@@ -38,7 +38,7 @@ fn row_pair(fixture: &test_support::AnalyzedFixture) -> (crate::TypeId, crate::T
 
 #[test]
 fn marked_function_is_callable_by_name_and_enrolls_one_row() {
-    let fixture = test_support::analyze_source(&format!(
+    let fixture = test_support::analyze_source_la(&format!(
         "{VALID_ROW}\
 functio user() → Destinatio {{ redde ex_source(finge Failed {{}} ∷ Sourceum) }}
 "
@@ -63,7 +63,7 @@ functio user() → Destinatio {{ redde ex_source(finge Failed {{}} ∷ Sourceum)
 
 #[test]
 fn failable_call_propagation_resolves_the_enrolled_row() {
-    let fixture = test_support::analyze_source(&format!(
+    let fixture = test_support::analyze_source_la(&format!(
         "{VALID_ROW}\
 functio source() → vacuum ⇥ Sourceum {{}}
 functio target() → vacuum ⇥ Destinatio {{ redde source() }}
@@ -74,7 +74,7 @@ functio target() → vacuum ⇥ Destinatio {{ redde source() }}
 
 #[test]
 fn explicit_conversio_resolves_the_same_row() {
-    let fixture = test_support::analyze_source(&format!(
+    let fixture = test_support::analyze_source_la(&format!(
         "{VALID_ROW}\
 incipit {{ fixum Destinatio d ← finge Failed {{}} ∷ Sourceum ↦ Destinatio }}
 "
@@ -84,7 +84,7 @@ incipit {{ fixum Destinatio d ← finge Failed {{}} ∷ Sourceum ↦ Destinatio 
 
 #[test]
 fn self_pair_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "discretio Sourceum { Failed }\n@ conversio\nfunctio f(Sourceum err) → Sourceum { redde err }",
         "conversio_self_pair",
     );
@@ -92,7 +92,7 @@ fn self_pair_is_rejected() {
 
 #[test]
 fn generic_helper_cannot_key_a_row() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio\nfunctio f<T>(T err) → Destinatio { redde finge Converted {} ∷ Destinatio }",
         "conversio_generic_row",
     );
@@ -100,11 +100,11 @@ fn generic_helper_cannot_key_a_row() {
 
 #[test]
 fn signature_must_derive_one_ordered_pair() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio\nfunctio f(Sourceum a, Sourceum b) → Destinatio { redde finge Converted {} ∷ Destinatio }",
         "conversio_signature",
     );
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio\nfunctio f(Sourceum err) { redde err }",
         "conversio_signature",
     );
@@ -112,7 +112,7 @@ fn signature_must_derive_one_ordered_pair() {
 
 #[test]
 fn impure_body_fails_closed() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio\nfunctio f(Sourceum err) → Destinatio { varia textus t ← \"x\"  t ← \"y\"  redde finge Converted {} ∷ Destinatio }",
         "conversio_impure_body",
     );
@@ -120,7 +120,7 @@ fn impure_body_fails_closed() {
 
 #[test]
 fn duplicate_pair_carries_dual_spans() {
-    let fixture = test_support::analyze_source(
+    let fixture = test_support::analyze_source_la(
         "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio\nfunctio first(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }\n@ conversio\nfunctio second(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }",
     );
     let error = fixture
@@ -135,7 +135,7 @@ fn duplicate_pair_carries_dual_spans() {
 
 #[test]
 fn user_row_cannot_shadow_a_seeded_builtin_row() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "@ conversio\nfunctio f(textus s) → octeti { redde s ↦ octeti }",
         "conversio_registry_builtin_shadow",
     );
@@ -143,7 +143,7 @@ fn user_row_cannot_shadow_a_seeded_builtin_row() {
 
 #[test]
 fn competing_named_helpers_remain_legal() {
-    let fixture = test_support::analyze_source(
+    let fixture = test_support::analyze_source_la(
         "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio\nfunctio chosen(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }\nfunctio rival(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }",
     );
     assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
@@ -151,7 +151,7 @@ fn competing_named_helpers_remain_legal() {
 
 #[test]
 fn transitive_chain_stays_fail_closed_without_a_direct_row() {
-    let fixture = test_support::analyze_source(
+    let fixture = test_support::analyze_source_la(
         r"
 discretio A { Failed }
 discretio B { FromA }
@@ -189,7 +189,7 @@ functio target() → vacuum ⇥ C { redde source() }
 
 #[test]
 fn absent_direct_row_suggests_a_named_helper_when_available() {
-    let fixture = test_support::analyze_source(
+    let fixture = test_support::analyze_source_la(
         r"
 discretio A { Failed }
 discretio B { FromA }
@@ -265,7 +265,7 @@ fn orphan_ownership_rejects_both_ends_foreign() {
 
 #[test]
 fn builtin_rows_are_seeded_at_analysis_setup() {
-    let mut fixture = test_support::analyze_source("incipit { }");
+    let mut fixture = test_support::analyze_source_la("incipit { }");
     assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
     let textus = fixture.types.primitive(Primitive::Textus);
     let octeti = fixture.types.octeti_list();
@@ -281,7 +281,7 @@ fn builtin_rows_are_seeded_at_analysis_setup() {
 
 #[test]
 fn local_handler_keeps_original_error_type_and_does_not_convert() {
-    let fixture = test_support::analyze_source(&format!(
+    let fixture = test_support::analyze_source_la(&format!(
         "{VALID_ROW}\
 functio source() → vacuum ⇥ Sourceum {{}}
 functio target() → vacuum ⇥ Destinatio {{
@@ -307,7 +307,7 @@ functio source() → vacuum ⇥ Sourceum {{}}\n\
 functio target() → vacuum ⇥ Destinatio {{ requirit falsum iace source() }}"
         ),
     ] {
-        let fixture = test_support::analyze_source(&source);
+        let fixture = test_support::analyze_source_la(&source);
         assert!(!fixture.success(), "expected sink mismatch to reject");
         assert!(
             fixture

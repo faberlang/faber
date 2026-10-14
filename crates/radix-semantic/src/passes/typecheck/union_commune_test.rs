@@ -24,7 +24,7 @@ const SHAPE_ERROR: &str = r"discretio ShapeError {
 ";
 
 fn assert_checks_green(source: &str, label: &str) {
-    let fixture = test_support::analyze_source(source);
+    let fixture = test_support::analyze_source_la(source);
     let errors: Vec<_> = fixture
         .diagnostics
         .iter()
@@ -91,7 +91,7 @@ fn shape_error_interface() -> FileInterface {
 }
 
 fn analyze_consumer(source: &str) -> crate::test_support::AnalyzedFixture {
-    crate::test_support::analyze_source_with_import_contract(
+    crate::test_support::analyze_source_with_import_contract_la(
         source,
         BTreeMap::from([(
             "shape".to_owned(),
@@ -160,7 +160,7 @@ incipit {
 
 #[test]
 fn existing_union_without_commune_region_checks_identically() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"discretio Eventum {
     Ictus { numerus vis },
     Sonitus
@@ -177,7 +177,7 @@ incipit {
 
 #[test]
 fn construction_requires_commune_fields() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         &format!(
             r"{SHAPE_ERROR}
 incipit {{
@@ -192,7 +192,7 @@ incipit {{
 
 #[test]
 fn commune_field_on_genus_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"genus Box {
     @ commune
     varia textus message
@@ -208,7 +208,7 @@ incipit {
 
 #[test]
 fn commune_annotation_on_functio_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"@ commune
 functio f() → vacuum {
 }
@@ -219,7 +219,7 @@ functio f() → vacuum {
 
 #[test]
 fn duplicate_commune_field_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"discretio ShapeError {
     @ commune
     textus message
@@ -235,7 +235,7 @@ fn duplicate_commune_field_is_rejected() {
 
 #[test]
 fn variant_redeclaring_commune_field_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"discretio ShapeError {
     @ commune
     textus message
@@ -249,7 +249,7 @@ fn variant_redeclaring_commune_field_is_rejected() {
 
 #[test]
 fn variant_redeclaring_unannotated_region_field_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"discretio ShapeError {
     @ commune
     textus message
@@ -264,7 +264,7 @@ fn variant_redeclaring_unannotated_region_field_is_rejected() {
 
 #[test]
 fn commune_field_assignment_is_rejected() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         &format!(
             r#"{SHAPE_ERROR}
 incipit {{

@@ -2,12 +2,17 @@
 
 use crate::test_support::{self, AnalyzedFixture};
 use crate::{PassConfig, Type};
-use radix_lexer::lex;
+use radix_lexer::lex_with_locale_pack;
 use radix_parser::parse;
 use radix_target::Target;
 
+fn latin_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("load Latin locale pack")
+}
+
 fn analyze_cli(source: &str) -> AnalyzedFixture {
-    let mut parsed = parse(lex(source));
+    let mut parsed = parse(lex_with_locale_pack(source, &latin_pack()));
     assert!(
         parsed.errors.is_empty(),
         "parse errors: {:?}",
@@ -54,7 +59,7 @@ fn assert_cli_rejects_with_issue(source: &str, expected: &str) {
 
 #[test]
 fn ratio_annotation_and_construction_round_trip() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio first() → f32 {
     fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
@@ -66,7 +71,7 @@ functio first() → f32 {
 
 #[test]
 fn ratio_lowers_to_record() {
-    let result = test_support::analyze_ok(
+    let result = test_support::analyze_ok_la(
         r"
 incipit {
     fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
@@ -87,7 +92,7 @@ incipit {
 
 #[test]
 fn ratio_keyword_label_member_access_typechecks() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 functio first() → f32 {
     fixum ratio<fixum: f32> r ← ratio<fixum: f32> { fixum = 1.0 }
@@ -99,7 +104,7 @@ functio first() → f32 {
 
 #[test]
 fn ratio_unknown_field_access_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 functio bad() → f32 {
     fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
@@ -112,7 +117,7 @@ functio bad() → f32 {
 
 #[test]
 fn ratio_unknown_construction_field_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 incipit {
     fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0, w = 2.0 }
@@ -125,7 +130,7 @@ incipit {
 
 #[test]
 fn ratio_missing_construction_field_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 incipit {
     fixum ratio<g: f32, w: f32> r ← ratio<g: f32, w: f32> { g = 1.0 }
@@ -138,7 +143,7 @@ incipit {
 
 #[test]
 fn ratio_init_type_mismatch_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
     fixum ratio<g: f32> r ← ratio<g: f32> { g = "x" }
@@ -151,7 +156,7 @@ incipit {
 
 #[test]
 fn ratio_distinct_field_types_do_not_assign() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 incipit {
     fixum ratio<g: f32> a ← ratio<g: f32> { g = 1.0 }
@@ -165,7 +170,7 @@ incipit {
 
 #[test]
 fn ratio_does_not_assign_to_same_field_genus() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 genus P {
     varia f32 g
@@ -183,7 +188,7 @@ incipit {
 
 #[test]
 fn ratio_label_order_does_not_change_identity() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 incipit {
     fixum ratio<g: f32, w: f32> a ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 }
@@ -196,7 +201,7 @@ incipit {
 
 #[test]
 fn ratio_object_pattern_destructuring() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 incipit {
     fixum ratio<g: f32, w: f32> r ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 }
@@ -210,7 +215,7 @@ incipit {
 
 #[test]
 fn ratio_object_pattern_ceteri() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 incipit {
     fixum ratio<g: f32, w: f32> r ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 }
@@ -224,7 +229,7 @@ incipit {
 
 #[test]
 fn ratio_object_pattern_unknown_label_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 incipit {
     fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
@@ -238,7 +243,7 @@ incipit {
 
 #[test]
 fn ratio_to_genus_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 genus P {
     varia f32 g
@@ -256,7 +261,7 @@ incipit {
 
 #[test]
 fn genus_to_ratio_conversio_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"
 genus P {
     varia f32 g
@@ -274,7 +279,7 @@ incipit {
 
 #[test]
 fn identical_record_conversio_stays() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 typus R = ratio<g: f32>
 incipit {
@@ -288,7 +293,7 @@ incipit {
 
 #[test]
 fn ratio_identifier_binding_stays() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"
 incipit {
     fixum numerus ratio ← 3

@@ -5,12 +5,12 @@
 //! exercised by the MIR runner; this module pins semantic admission and the
 //! non-boolean callback rejection.
 
-use crate::test_support::{analyze_ok, assert_rejects_with_issue, entry_local_tys};
+use crate::test_support::{analyze_ok_la, assert_rejects_with_issue_la, entry_local_tys};
 use crate::{Primitive, Type};
 
 #[test]
 fn predicate_twins_accept_filtrata_shaped_lambdas_and_return_bool() {
-    let unit = analyze_ok(
+    let unit = analyze_ok_la(
         r"incipit {
     fixum lista<numerus> xs ← vacua
     fixum bivalens all_ok ← xs.omnia(numerus d ∴ d ≥ 0)
@@ -35,7 +35,7 @@ fn predicate_twins_accept_filtrata_shaped_lambdas_and_return_bool() {
 
 #[test]
 fn predicate_twins_accept_empty_list_contract_without_special_type_path() {
-    crate::test_support::assert_accepts(
+    crate::test_support::assert_accepts_la(
         r"functio check() → bivalens {
     fixum lista<numerus> xs ← vacua
     redde xs.omnia(numerus d ∴ d ≥ 0) et non xs.quilibet(numerus d ∴ d ≺ 0)
@@ -45,7 +45,7 @@ fn predicate_twins_accept_empty_list_contract_without_special_type_path() {
 
 #[test]
 fn predicate_twins_reuse_predicate_param_and_reject_non_bool_callback() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"functio numeric(numerus d) → numerus {
     redde d
 }
