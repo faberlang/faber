@@ -6,7 +6,11 @@ use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, run_source};
 
 fn ok(body: &str) -> Vec<String> {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = format!("incipit {{\n{body}\n}}\n");
     let mut host = BufferHost::default();
     match run_source(&session, "bits.fab", &source, &mut host) {
@@ -65,7 +69,11 @@ fn number_to_float_stays_a_value_conversion() {
 }
 
 fn refused(body: &str) -> String {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = format!("incipit {{\n{body}\n}}\n");
     let mut host = BufferHost::default();
     match run_source(&session, "bits.fab", &source, &mut host) {

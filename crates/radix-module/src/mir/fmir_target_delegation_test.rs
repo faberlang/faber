@@ -5,7 +5,7 @@
 //! are exercised by exempla (`tensor_package_*`), not here.
 
 use crate::codegen::Target;
-use crate::program::compile_cli_source;
+use crate::program::compile_cli_source_with_locale_pack;
 
 /// Minimal single-file unit — no package graph, no faber.toml, no sibling fixtures.
 const SMOKE: &str = r#"
@@ -17,7 +17,14 @@ incipit {
 #[test]
 fn fmir_targets_rejected_with_codegen001_on_single_file() {
     for target in [Target::MirFmir, Target::MirFmirBinary, Target::MirFmirBundle] {
-        let result = compile_cli_source("smoke.fab", SMOKE, target);
+        let result = compile_cli_source_with_locale_pack(
+            "smoke.fab",
+            SMOKE,
+            target,
+            Some(&crate::locale::latin_locale_pack()),
+            crate::codegen::OutputMode::Application,
+            None,
+        );
         assert!(!result.success(), "{target:?} must be rejected by radix (no Rust fallback)");
         let has_delegation = result
             .diagnostics

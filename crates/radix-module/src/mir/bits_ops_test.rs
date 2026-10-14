@@ -7,7 +7,11 @@ use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, run_source};
 
 fn run(body: &str) -> (Vec<String>, Vec<(String, String)>) {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let source = format!("incipit {{\n{body}\n}}\n");
     let mut host = BufferHost::default();
     let errors = match run_source(&session, "bits.fab", &source, &mut host) {
@@ -115,7 +119,11 @@ fn bits_print_as_hex_at_the_full_width() {
 }
 
 fn ok_program(source: &str) -> Vec<String> {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let mut host = BufferHost::default();
     run_source(&session, "bits.fab", source, &mut host).unwrap_or_else(|error| panic!("{source}: {error:?}"));
     host.stdout_lines
