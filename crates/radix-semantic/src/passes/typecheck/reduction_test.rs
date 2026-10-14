@@ -310,6 +310,31 @@ functio bad(tensor<f32, [2, 3]> g, numerus a) → tensor<f32, [2]> { redde g.sum
 }
 
 #[test]
+fn axis_reduction_named_integer_local_is_a_constant_axis() {
+    assert_accepts(
+        r"
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
+    fixum numerus k ← 1
+    redde g.summa(axis k)
+}
+",
+    );
+}
+
+#[test]
+fn axis_reduction_named_float_local_is_not_a_constant_axis() {
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
+    fixum fractus k ← 1
+    redde g.summa(axis k)
+}
+",
+        "axis_reduction_not_constant",
+    );
+}
+
+#[test]
 fn axis_reduction_drops_the_named_axis_from_a_rank_three_shape() {
     assert_accepts(
         r"

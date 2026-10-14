@@ -135,8 +135,12 @@ impl TypeChecker<'_> {
         }
         // Need: an immutable compile-time integer binding is a valid
         // `axis` argument. Record its exact value; a `var` binding is not
-        // recorded, so a named mutable axis stays the named refusal.
-        if !local.mutable {
+        // recorded, so a named mutable axis stays the named refusal. Only a
+        // binding with no declared type or an integer declared type is an
+        // integer binding: `fractus k ← 1` must not become a constant axis
+        // just because its initializer folds to an integer.
+        let declares_integer = local.ty.is_none_or(|ty| self.is_integer(ty));
+        if !local.mutable && declares_integer {
             let value = local.init.as_ref().and_then(|init| {
                 super::integer_range::const_int_value_resolved(init, &self.const_int_values)
             });
