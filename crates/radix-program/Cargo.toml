@@ -3,7 +3,7 @@ name = "radix-program"
 version = "0.1.0"
 edition = "2024"
 description = "Compiler-owned multi-file package compilation surface"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 # Private compiler workspace (local org layout). Not published with this crate.

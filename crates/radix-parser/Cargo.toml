@@ -3,7 +3,7 @@ name = "radix-parser"
 version = "0.84.0"
 edition = "2024"
 description = "Recursive-descent parser for Faber source"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]

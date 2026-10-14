@@ -3,7 +3,7 @@ name = "radix-semantic"
 version = "0.84.0"
 edition = "2024"
 description = "Semantic analysis for Faber: collection, resolution, HIR lowering, typecheck, post-typecheck analyses, and coupled source contracts"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [lints.clippy]
 # Carried from radix-module (whose semantic code was written under this

@@ -3,7 +3,7 @@ name = "radix-hir-fhir"
 version = "0.84.0"
 edition = "2024"
 description = "Portable analyzed-HIR artifact (FHIR) schema, codec, and validation for Radix"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]

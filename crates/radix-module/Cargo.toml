@@ -3,7 +3,7 @@ name = "radix-module"
 version = "0.84.0"
 edition = "2024"
 description = "Recursive descent compiler for Faber → Rust/Faber"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [lints.clippy]
 # Group first at lower priority so per-lint allows below win package-wide.

@@ -3,7 +3,7 @@ name = "radix-mir-lower"
 version = "0.84.0"
 edition = "2024"
 description = "HIR→MIR lowering for Faber: the analyzed-application lowering pass and its fragment composition"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [lints.clippy]

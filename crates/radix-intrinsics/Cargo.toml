@@ -3,7 +3,7 @@ name = "radix-intrinsics"
 version = "0.84.0"
 edition = "2024"
 description = "Neutral compiler-owned receiver intrinsic catalog"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [lints.clippy]
 # Group first at lower priority so per-lint allows below win package-wide

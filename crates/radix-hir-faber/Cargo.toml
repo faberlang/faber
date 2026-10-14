@@ -3,7 +3,7 @@ name = "radix-hir-faber"
 version = "0.84.0"
 edition = "2024"
 description = "Canonical Faber HIR re-emission backend for the Radix compiler"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]

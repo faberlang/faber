@@ -3,7 +3,7 @@ name = "radix-codegen-shared"
 version = "0.84.0"
 edition = "2024"
 description = "Shared codegen text utilities for the Radix compiler workspace"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]

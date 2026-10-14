@@ -3,7 +3,7 @@ name = "radix-target"
 version = "0.84.0"
 edition = "2024"
 description = "Neutral compilation-target identity: enum, spelling, feature gating"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [lints]
 workspace = true

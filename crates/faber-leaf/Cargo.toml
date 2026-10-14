@@ -3,7 +3,7 @@ name = "faber-leaf"
 version = "0.1.0"
 edition = "2024"
 description = "Native effect leaves shared by the Faber interpreter and generated Rust (core-norma N2)"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 # No hosts, no async runtime (campaign A2 / Q4 / Q5). rustls is TLS;

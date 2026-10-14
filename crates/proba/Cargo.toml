@@ -3,7 +3,7 @@ name = "proba"
 version = "0.1.0"
 edition = "2024"
 description = "Faber proba inventory and MIR-runner case execution"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 # The proba runner consumes compiler analysis and MIR values but does not own
