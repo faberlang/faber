@@ -11,7 +11,7 @@ fn small_compiled() -> BTreeSet<&'static str> {
 /// Features of the experimental, default-off novelty targets (BASIC, Pascal,
 /// COBOL, Fortran, Odin). They are outside `full-targets`, so the default test build
 /// lists their rows as `available=no`.
-#[cfg(feature = "full-targets")]
+#[cfg(all(feature = "full-targets", feature = "hir-rust"))]
 const EXPERIMENTAL_DEFAULT_OFF: [&str; 5] = [
     "mir-basic",
     "hir-pascal",
@@ -170,7 +170,7 @@ fn small_build_reports_only_compiled_capabilities() {
     }
 }
 
-#[cfg(feature = "full-targets")]
+#[cfg(all(feature = "full-targets", feature = "hir-rust"))]
 #[test]
 fn default_build_reports_full_surface() {
     // The test binary builds under default features (full-targets), so the
@@ -227,7 +227,7 @@ fn default_build_reports_full_surface() {
     }
 }
 
-#[cfg(feature = "full-targets")]
+#[cfg(all(feature = "full-targets", feature = "hir-rust"))]
 #[test]
 fn rendered_table_contains_capability_rows_under_full_build() {
     let table = rendered_targets_table().expect("every CLI target maps to a faber feature");
@@ -249,7 +249,7 @@ fn rendered_table_contains_capability_rows_under_full_build() {
     }
 }
 
-#[cfg(feature = "full-targets")]
+#[cfg(all(feature = "full-targets", feature = "hir-rust"))]
 #[test]
 fn every_row_feature_is_compiled_in_the_default_test_build() {
     // The test binary builds under default features (full-targets): every
