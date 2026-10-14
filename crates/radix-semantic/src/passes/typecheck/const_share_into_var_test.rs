@@ -290,3 +290,51 @@ fn const_local_source_help_names_copy_and_own() {
     assert!(help.contains("copy"), "const help names copy: {help}");
     assert!(help.contains("own"), "const help names own: {help}");
 }
+
+#[test]
+fn itera_binder_source_over_parameter_is_parameter() {
+    let source = "functio f(lista<lista<numerus>> xss) → numerus {\n    itera ex xss fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }";
+    let result = test_support::analyze_source(source);
+    let found = result
+        .diagnostics
+        .iter()
+        .find(|err| {
+            matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+                && test_support::issue(err) == Some(ISSUE)
+        })
+        .unwrap_or_else(|| panic!("expected SEM065 {ISSUE}, got {:?}", result.diagnostics));
+    let source_arg = found
+        .args
+        .iter()
+        .find(|arg| arg.name == "source")
+        .unwrap_or_else(|| panic!("expected source arg, got {:?}", found.args));
+    assert_eq!(
+        source_arg.value, "parameter",
+        "itera binder over a read-only parameter is a parameter source: {:?}",
+        found.args
+    );
+}
+
+#[test]
+fn itera_binder_source_over_const_local_is_constant() {
+    let source = "incipit {\n    fixum lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n}";
+    let result = test_support::analyze_source(source);
+    let found = result
+        .diagnostics
+        .iter()
+        .find(|err| {
+            matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+                && test_support::issue(err) == Some(ISSUE)
+        })
+        .unwrap_or_else(|| panic!("expected SEM065 {ISSUE}, got {:?}", result.diagnostics));
+    let source_arg = found
+        .args
+        .iter()
+        .find(|arg| arg.name == "source")
+        .unwrap_or_else(|| panic!("expected source arg, got {:?}", found.args));
+    assert_eq!(
+        source_arg.value, "constant",
+        "itera binder over a const local is a constant source: {:?}",
+        found.args
+    );
+}

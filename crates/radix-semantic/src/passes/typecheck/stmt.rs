@@ -381,6 +381,12 @@ impl TypeChecker<'_> {
         };
         if self.is_read_only_root(root) {
             self.const_locals.insert(*binding);
+            // A binder over a read-only parameter is itself parameter-rooted:
+            // a later `varia y ← r` must report `source = parameter`, not
+            // `constant` (and a nested binder over this one inherits it too).
+            if self.read_only_param_roots.contains(&root) {
+                self.read_only_param_roots.insert(*binding);
+            }
         }
     }
 
