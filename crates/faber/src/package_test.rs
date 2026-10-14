@@ -2497,7 +2497,7 @@ main args args {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue()))
+            .map(|diag| (diag.code, diag.issue(), format!("{diag:?}")))
             .collect::<Vec<_>>()
     );
     assert_eq!(host.stdout_lines, vec!["alpha".to_owned()]);
