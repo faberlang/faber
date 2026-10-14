@@ -573,8 +573,8 @@ fn genus_union_alias_survives_the_fhir_round_trip() {
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
-    let original = analyze_source(&session, "overlap.fab", source, AnalyzeRequest::default())
-        .expect("overlap fixture analyzes");
+    let original =
+        analyze_source(&session, "overlap.fab", source, AnalyzeRequest::default()).expect("overlap fixture analyzes");
     let artifact = from_analyzed(&original, "overlap", "overlap.fab");
     let bytes = postcard::to_allocvec(&artifact).expect("serialize overlap artifact");
     load_fhir(&bytes).expect("overlap artifact must load");
