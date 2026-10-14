@@ -1087,6 +1087,9 @@ impl PackageInstantiate<'_> {
         if !self.substitute_function(&mut instance, type_bindings, span) {
             return None;
         }
+        if !self.specialize_synthetic_callees(&mut instance, type_bindings, span) {
+            return None;
+        }
         if !self.resolve_tensor_limes_for_instance(key, &mut instance, span) {
             return None;
         }
@@ -1116,7 +1119,6 @@ impl PackageInstantiate<'_> {
     /// helper whose `Convert` still names `T`. Each offending helper is
     /// cloned once per instance, substituted, recursively specialized, and
     /// registered under a fresh id; the original param-bearing helper stays.
-    #[allow(dead_code)]
     fn specialize_synthetic_callees(
         &mut self,
         function: &mut MirFunction,
@@ -1141,7 +1143,6 @@ impl PackageInstantiate<'_> {
         true
     }
 
-    #[allow(dead_code)]
     fn specialize_synthetic_callee(
         &mut self,
         callee: &mut MirCallee,
