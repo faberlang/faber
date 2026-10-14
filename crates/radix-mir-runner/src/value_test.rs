@@ -398,6 +398,62 @@ fn record_displays_fields_in_written_order() {
     let text = record
         .display(&interner, FieldOrder::new(&empty, &empty), Span::default())
         .unwrap();
+    assert_eq!(text, r#"{ zed = 3, alpha = 1, mid = 2 }"#);
+}
+
+#[test]
+fn record_with_text_field_quotes_it() {
+    let mut interner = radix_lexer::Interner::new();
+    let (name, n) = (interner.intern("name"), interner.intern("n"));
+    let record = Value::Record(
+        field_map(&[(name, Value::Str("x".to_owned())), (n, Value::Int(3))]),
+        std::rc::Rc::from([name, n]),
+    );
+    let empty = rustc_hash::FxHashMap::default();
+    let text = record
+        .display(&interner, FieldOrder::new(&empty, &empty), Span::default())
+        .unwrap();
+    assert_eq!(text, r#"{ name = "x", n = 3 }"#);
+}
+
+#[test]
+fn empty_record_prints_empty_braces() {
+    let interner = radix_lexer::Interner::new();
+    let record = Value::Record(
+        field_map(&[]),
+        std::rc::Rc::from(Vec::<radix_lexer::Symbol>::new()),
+    );
+    let empty = rustc_hash::FxHashMap::default();
+    let text = record
+        .display(&interner, FieldOrder::new(&empty, &empty), Span::default())
+        .unwrap();
+    assert_eq!(text, "{}");
+}
+
+#[test]
+fn record_through_dynamic_carrier_keeps_json_shape() {
+    let mut interner = radix_lexer::Interner::new();
+    let (zed, alpha, mid) = (
+        interner.intern("zed"),
+        interner.intern("alpha"),
+        interner.intern("mid"),
+    );
+    let record = Value::Record(
+        field_map(&[
+            (alpha, Value::Int(1)),
+            (mid, Value::Int(2)),
+            (zed, Value::Int(3)),
+        ]),
+        std::rc::Rc::from([zed, alpha, mid]),
+    );
+    let empty = rustc_hash::FxHashMap::default();
+    let text = record
+        .display(
+            &interner,
+            FieldOrder::new(&empty, &empty).with_dynamic(true),
+            Span::default(),
+        )
+        .unwrap();
     assert_eq!(text, r#"{"zed": 3, "alpha": 1, "mid": 2}"#);
 }
 
