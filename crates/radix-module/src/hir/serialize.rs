@@ -1009,6 +1009,7 @@ fn resolved_use_to_wire(u: &crate::semantic::ResolvedUse) -> ResolvedUseWire {
             crate::semantic::ResolvedUseKind::ImportBinding => ResolvedUseKindWire::ImportBinding,
         },
         enclosing: u.enclosing,
+        local: u.local,
     }
 }
 

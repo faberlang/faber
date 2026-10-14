@@ -42,6 +42,13 @@ pub struct ResolvedUse {
     pub kind: ResolvedUseKind,
     /// Enclosing function/method def, when the use is inside a body.
     pub enclosing: Option<DefId>,
+    /// Unit-local definition the site resolves to, when one exists.
+    ///
+    /// Import-binding records leave this `None` (a binding site is never
+    /// itself a local use), so a loaded index can rebuild `by_local` exactly
+    /// like direct analysis: a portable key still names its local binding
+    /// here, and no import is counted as used merely for being declared.
+    pub local: Option<DefId>,
 }
 
 /// Index of resolved uses for one analyzed unit.
@@ -103,11 +110,25 @@ impl ResolvedUseIndex {
         let mut by_portable: FxHashMap<String, Vec<usize>> = FxHashMap::default();
 
         for (idx, use_site) in uses.iter().enumerate() {
-            if let ResolvedUseKey::Local(def) = &use_site.key {
-                by_local.entry(*def).or_default().push(idx);
-            }
             if let ResolvedUseKey::Portable(key) = &use_site.key {
                 by_portable.entry(key.clone()).or_default().push(idx);
+            }
+            // ImportBinding records are declaration facts, not uses: direct
+            // analysis indexes them only under `by_portable` (their `local`
+            // is `None`), so the rebuilt index must not count every import
+            // as used. A use site carries its local def even when its key
+            // is portable; a local key without a carried def names the same
+            // definition directly.
+            let local = use_site
+                .local
+                .or(match &use_site.key {
+                    ResolvedUseKey::Local(def) if use_site.kind != ResolvedUseKind::ImportBinding => {
+                        Some(*def)
+                    }
+                    _ => None,
+                });
+            if let Some(def) = local {
+                by_local.entry(def).or_default().push(idx);
             }
         }
 
@@ -147,6 +168,8 @@ impl ResolvedUseIndex {
         if let ResolvedUseKey::Portable(key) = &use_site.key {
             self.by_portable.entry(key.clone()).or_default().push(idx);
         }
+        let mut use_site = use_site;
+        use_site.local = local_def;
         self.uses.push(use_site);
     }
 }
@@ -172,6 +195,7 @@ pub fn analyze_resolved_uses(
                     key,
                     kind: ResolvedUseKind::ImportBinding,
                     enclosing: None,
+                    local: None,
                 });
             }
         }
@@ -281,6 +305,9 @@ impl UseVisitor<'_> {
                 key,
                 kind,
                 enclosing: self.enclosing,
+                // `push_with_local` stamps the local def; a portable key
+                // still names this unit-local binding.
+                local: None,
             },
         );
     }

@@ -410,6 +410,10 @@ pub struct ResolvedUseWire {
     pub key: ResolvedUseKeyWire,
     pub kind: ResolvedUseKindWire,
     pub enclosing: Option<DefId>,
+    /// Unit-local definition the site resolves to (`None` for import
+    /// bindings), so a loaded index rebuilds `by_local` exactly like direct
+    /// analysis instead of counting every import as used.
+    pub local: Option<DefId>,
 }
 
 // ---------------------------------------------------------------------------
@@ -613,8 +617,11 @@ pub struct FunctionProvenanceTableWire {
 /// closed. Version 42 carries a struct's declared `implet` contracts in the
 /// resolver file-interface snapshot (`FileExportSnapshot::Struct::implements`)
 /// so a loaded artifact still admits an imported struct into a contract-typed
-/// slot; schema-v41 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 42;
+/// slot; schema-v41 artifacts fail closed. Version 43 carries each resolved
+/// use's unit-local `DefId` (`ResolvedUseWire::local`) so a loaded artifact
+/// rebuilds the resolved-use local index exactly like direct analysis instead
+/// of counting every import binding as used; schema-v42 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 43;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
