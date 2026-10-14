@@ -274,19 +274,22 @@ impl TypeChecker<'_> {
         if marker.is_some() || !self.is_shareable_payload(payload) {
             return;
         }
-        let root = match Self::place_root(init) {
+        // A wrapper passes its value's state through unchanged, so any
+        // read-only root among the value branches is enough to reject; when
+        // the initializer is a bare call (no place roots at all), a
+        // `de`-declared returned borrow (`→ de T`) hands back the state of
+        // the argument at its single matching `de` parameter. A plain
+        // (`→ T`) call result is a fresh owned value and stays legal.
+        let root = match Self::place_roots(init)
+            .into_iter()
+            .find(|root| self.is_read_only_root(*root))
+        {
             Some(root) => root,
-            // A `de`-declared returned borrow (`→ de T`) hands back the state
-            // of the argument at its single matching `de` parameter. A plain
-            // (`→ T`) call result is a fresh owned value and stays legal.
             None => match self.call_result_alias_root(init) {
-                Some(root) => root,
-                None => return,
+                Some(root) if self.is_read_only_root(root) => root,
+                _ => return,
             },
         };
-        if !self.is_read_only_root(root) {
-            return;
-        }
         let name_of = |checker: &Self, symbol: Option<Symbol>| {
             symbol
                 .and_then(|symbol| checker.interner.map(|interner| interner.resolve(symbol)))
@@ -413,6 +416,49 @@ impl TypeChecker<'_> {
             | HirExpressionKind::Deref(object) => Self::place_root(object),
             _ => None,
         }
+    }
+
+    /// The local roots of every branch that can supply the value of `expr`.
+    ///
+    /// A wrapper does not copy the state its branches alias: both `Si` branch
+    /// tails (the `c ✓ a ✗ b` conditional expression and `sin` chains), both
+    /// coalesce operands, the inner of a `∷` ascription, and the tail
+    /// expression of a block hand their value through unchanged, so every
+    /// root is a candidate source for the binding.
+    fn place_roots(expr: &HirExpression) -> Vec<radix_hir::DefId> {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => vec![*def_id],
+            HirExpressionKind::Field(object, _)
+            | HirExpressionKind::Index(object, _)
+            | HirExpressionKind::Deref(object) => Self::place_roots(object),
+            HirExpressionKind::Si {
+                then_block,
+                else_block,
+                ..
+            } => {
+                let mut roots = Self::block_tail_roots(then_block);
+                if let Some(else_block) = else_block {
+                    roots.extend(Self::block_tail_roots(else_block));
+                }
+                roots
+            }
+            HirExpressionKind::Binary(HirBinOp::Coalesce, left, right) => {
+                let mut roots = Self::place_roots(left);
+                roots.extend(Self::place_roots(right));
+                roots
+            }
+            HirExpressionKind::Verte { source, .. } => Self::place_roots(source),
+            HirExpressionKind::Block(block) => Self::block_tail_roots(block),
+            _ => Vec::new(),
+        }
+    }
+
+    /// The place roots of a block's value, when the tail supplies one.
+    fn block_tail_roots(block: &HirBlock) -> Vec<radix_hir::DefId> {
+        block
+            .expr
+            .as_deref()
+            .map_or_else(Vec::new, Self::place_roots)
     }
 
     fn check_await_local(&mut self, local: &mut HirLocal) {
