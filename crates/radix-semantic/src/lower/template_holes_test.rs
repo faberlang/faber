@@ -327,7 +327,30 @@ incipit {
 }
 
 #[test]
-fn duplicate_named_hole_at_application_is_rejected() {
+fn repeated_label_application_takes_one_value() {
+    let labeled = scriptum_application(
+        r#"
+incipit {
+    fixum textus out ← "§{a} §{a}"(a: "x")
+    nota out
+}
+"#,
+    );
+    let positional = scriptum_application(
+        r#"
+incipit {
+    fixum textus out ← "§{a} §{a}"("x")
+    nota out
+}
+"#,
+    );
+    assert_eq!(labeled.0, "§0 §0");
+    assert_eq!(labeled.1, vec!["str:x".to_owned()]);
+    assert_eq!(labeled, positional);
+}
+
+#[test]
+fn repeated_label_with_a_second_value_is_rejected() {
     test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
@@ -335,8 +358,21 @@ incipit {
     nota out
 }
 "#,
-        "duplicate_template_hole_label",
+        "template_application_arity_mismatch",
     );
+}
+
+#[test]
+fn forma_repeated_label_takes_one_value() {
+    let template = forma_template_text(
+        r#"
+incipit {
+    fixum _ captured ← `§{a} or §{a}`(a: "v")
+    nota captured
+}
+"#,
+    );
+    assert_eq!(template, "§0 or §0");
 }
 
 #[test]

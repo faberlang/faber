@@ -1,9 +1,11 @@
 //! Position analysis for named and positional template holes.
 //!
 //! Template labels are a source-level alias for the existing positional hole
-//! domain.  This module deliberately does not know about the parser, AST, HIR,
-//! or a particular template consumer.  It scans the literal text and produces
-//! the positional form that existing consumers already understand.
+//! domain. A repeated label shares the first position it was assigned; it
+//! does not consume another value slot.  This module deliberately does not
+//! know about the parser, AST, HIR, or a particular template consumer.  It
+//! scans the literal text and produces the positional form that existing
+//! consumers already understand.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -31,10 +33,8 @@ pub struct TemplateHoleAnalysis {
     /// Holes in source order. Explicit indexes do not consume an automatic
     /// position, matching the existing `§`/`§N` consumers.
     pub holes: Vec<Hole>,
-    /// Each duplicated label appears once, in lexical order of its spelling.
-    pub duplicate_labels: Vec<String>,
-    /// The first position assigned to each label. Duplicate labels remain
-    /// reported in [`Self::duplicate_labels`].
+    /// The position assigned to each label. A repeated label keeps the first
+    /// position it was assigned.
     pub label_positions: BTreeMap<String, usize>,
     /// The template text with named-hole syntax erased to `§`/`§N` syntax.
     pub erased: String,
@@ -45,12 +45,6 @@ impl TemplateHoleAnalysis {
     #[must_use]
     pub fn label_position(&self, label: &str) -> Option<usize> {
         self.label_positions.get(label).copied()
-    }
-
-    /// Whether the template has no duplicate named-hole labels.
-    #[must_use]
-    pub fn labels_are_unique(&self) -> bool {
-        self.duplicate_labels.is_empty()
     }
 
     /// The positional value slots a template application must supply.
@@ -87,15 +81,17 @@ impl TemplateHoleAnalysis {
 ///
 /// Automatic holes (`§`) and named holes (`§{label}`) consume positions from
 /// the same zero-based counter. Explicit holes (`§N`) address `N` without
-/// advancing that counter. This preserves the established backend behavior for
-/// interleaved explicit and automatic holes, including `§1 §` → positions
-/// `[1, 0]`.
+/// advancing that counter. A repeated label addresses its first position
+/// without consuming another one. This preserves the established backend
+/// behavior for interleaved explicit and automatic holes, including `§1 §` →
+/// positions `[1, 0]`.
 #[must_use]
 pub fn analyze_template(template: &str) -> TemplateHoleAnalysis {
     let mut holes = Vec::new();
-    let mut duplicate_labels = BTreeSet::new();
     let mut label_positions = BTreeMap::new();
-    let mut erased = String::with_capacity(template.len());
+    let mut pieces = Vec::new();
+    let mut literal = String::new();
+    let mut repeated_label = false;
     let mut next_auto_position = 0usize;
     let mut cursor = 0usize;
 
@@ -104,28 +100,29 @@ pub fn analyze_template(template: &str) -> TemplateHoleAnalysis {
             break;
         };
         if character != '§' {
-            let next = cursor + character.len_utf8();
-            erased.push_str(&template[cursor..next]);
-            cursor = next;
+            literal.push(character);
+            cursor += character.len_utf8();
             continue;
         }
 
+        flush_literal(&mut pieces, &mut literal);
+
         let marker_end = cursor + character.len_utf8();
         if let Some((label, end)) = named_hole_at(template, marker_end) {
-            let position = next_auto_position;
-            next_auto_position = next_auto_position.saturating_add(1);
+            let position = if let Some(first) = label_positions.get(label) {
+                repeated_label = true;
+                *first
+            } else {
+                let position = next_auto_position;
+                next_auto_position = next_auto_position.saturating_add(1);
+                label_positions.insert(label.to_owned(), position);
+                position
+            };
             holes.push(Hole {
                 kind: HoleKind::Named(label.to_owned()),
                 position,
             });
-            if label_positions.contains_key(label) {
-                // Keep the first position in the public map while reporting
-                // every repeated spelling separately.
-                duplicate_labels.insert(label.to_owned());
-            } else {
-                label_positions.insert(label.to_owned(), position);
-            }
-            erased.push('§');
+            pieces.push(ErasePiece::Sequential(position));
             cursor = end;
             continue;
         }
@@ -136,8 +133,7 @@ pub fn analyze_template(template: &str) -> TemplateHoleAnalysis {
                 kind: HoleKind::Index(position),
                 position,
             });
-            erased.push('§');
-            erased.push_str(digits);
+            pieces.push(ErasePiece::Explicit(digits.to_owned()));
             cursor = end;
             continue;
         }
@@ -151,16 +147,59 @@ pub fn analyze_template(template: &str) -> TemplateHoleAnalysis {
             kind: HoleKind::Auto,
             position,
         });
-        erased.push('§');
+        pieces.push(ErasePiece::Sequential(position));
         cursor = marker_end;
     }
 
+    flush_literal(&mut pieces, &mut literal);
+    let erased = render_erased(&pieces, repeated_label);
+
     TemplateHoleAnalysis {
         holes,
-        duplicate_labels: duplicate_labels.into_iter().collect(),
         label_positions,
         erased,
     }
+}
+
+/// One erased-output fragment collected during the scan.
+///
+/// Erasure is rendered only after the whole template is scanned because a
+/// repeated label later in the text changes how every earlier sequential hole
+/// must be spelled.
+enum ErasePiece {
+    /// Literal source text copied through unchanged.
+    Literal(String),
+    /// `§`, `§{label}`, or a repeated label. Rendered as `§<position>` when the
+    /// template repeats a label, and as `§` otherwise.
+    Sequential(usize),
+    /// `§N`: the source digits are preserved.
+    Explicit(String),
+}
+
+fn flush_literal(pieces: &mut Vec<ErasePiece>, literal: &mut String) {
+    if !literal.is_empty() {
+        pieces.push(ErasePiece::Literal(std::mem::take(literal)));
+    }
+}
+
+fn render_erased(pieces: &[ErasePiece], repeated_label: bool) -> String {
+    let mut erased = String::new();
+    for piece in pieces {
+        match piece {
+            ErasePiece::Literal(text) => erased.push_str(text),
+            ErasePiece::Explicit(digits) => {
+                erased.push('§');
+                erased.push_str(digits);
+            }
+            ErasePiece::Sequential(position) => {
+                erased.push('§');
+                if repeated_label {
+                    erased.push_str(&position.to_string());
+                }
+            }
+        }
+    }
+    erased
 }
 
 /// Alias for callers that describe this operation as a scan.
