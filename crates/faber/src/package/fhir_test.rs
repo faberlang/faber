@@ -1000,10 +1000,26 @@ fn loaded_package_library_import_unit_parity() {
     let artifact = build_fhir_with_faber_seams(&config, &entry).expect("build FHIR package");
     let loaded = load_package_fhir(&artifact.package_path).expect("load FHIR package");
     assert_eq!(loaded.modules.len(), 1);
+    // The envelope carries the resolved library closure: the entry's direct
+    // `norma:fs` import plus `norma:fs`'s own `norma:value` / `norma:fault`
+    // provider imports, sorted by binding. The fixture stays a single direct
+    // `norma:fs` import; the nested rows are the transitive resolution.
+    let library_imports = loaded.modules[0]
+        .library_imports
+        .iter()
+        .map(|import| {
+            format!(
+                "{}:{}:{}",
+                import.binding,
+                import.package,
+                import.module.join("/")
+            )
+        })
+        .collect::<Vec<_>>();
     assert_eq!(
-        loaded.modules[0].library_imports.len(),
-        1,
-        "norma:fs library import survives the envelope"
+        library_imports,
+        ["fault:norma:fault", "fs:norma:fs", "value:norma:value"],
+        "norma:fs and its transitive provider imports survive the envelope"
     );
 
     // Per-unit codegen parity (Rust + canonical Faber) with the library
