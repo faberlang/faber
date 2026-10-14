@@ -136,8 +136,8 @@ fn check_library_cli_reports_selected_root() {
 
     let binary = faber_binary();
     let output = Command::new(&binary)
-        .args(["check-library", "norma"])
-        .env("FABER_LIBRARY_HOME", root.path())
+        .args(["check-library", "norma", "--library-home"])
+        .arg(root.path())
         .output()
         .expect("run check-library");
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -165,8 +165,8 @@ fn check_library_cli_unknown_name_exits_nonzero() {
     let root = tempfile::tempdir().expect("temp home");
     let binary = faber_binary();
     let output = Command::new(&binary)
-        .args(["check-library", "nope"])
-        .env("FABER_LIBRARY_HOME", root.path())
+        .args(["check-library", "nope", "--library-home"])
+        .arg(root.path())
         .output()
         .expect("run check-library");
     let stderr = String::from_utf8_lossy(&output.stderr);

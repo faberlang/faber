@@ -241,6 +241,8 @@ pub fn run() {
 }
 
 fn dispatch(command: Command) {
+    let (flag, probe) = command.library_home_inputs();
+    faber_cli::library::configure_library_home(flag.as_deref(), probe.as_deref());
     match command {
         Command::Build(args) => {
             reject_reader_locale_without_package(
@@ -273,7 +275,7 @@ fn dispatch(command: Command) {
         Command::Corpus(args) => cmd_corpus(&args),
         Command::Targets => cmd_targets(),
         Command::CheckLibrary(args) => cmd_check_library(args),
-        Command::Doctor => cmd_doctor(),
+        Command::Doctor(_) => cmd_doctor(),
         Command::Doc(args) => cmd_doc(&doc::DocCommand {
             input: args.input,
             json: args.json,

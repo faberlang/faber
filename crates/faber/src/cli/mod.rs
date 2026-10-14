@@ -20,8 +20,9 @@ without a faber.toml manifest is treated as a legacy package whose entry is
 <main.fab>; named libraries without that manifest use `faber check-library`
 instead.
 
-Library resolution: FABER_LIBRARY_HOME overrides the library home. Otherwise
-the Norma library embedded in the binary is used. `faber doctor` prints the
+Library resolution: --library-home (or `[paths] library_home` in faber.toml)
+overrides the library home. Otherwise the Norma library embedded in the binary
+is used. `faber doctor` prints the
 resolved home and per-library availability.
 
 Availability taxonomy: `norma` is the builtin identity row (LibraryProvider::Builtin);
@@ -61,9 +62,10 @@ would.
 const CHECK_LIBRARY_LONG_ABOUT: &str = "\
 Check a named library's complete interface graph from the library home.
 
-v1 resolves <name> from the library home only (FABER_LIBRARY_HOME, else
-the Norma library embedded in the binary). The source root mirrors the
-import resolver: top-level faber.toml if present, otherwise
+v1 resolves <name> from the library home only (--library-home or
+[paths] library_home, else the Norma library embedded in the binary). The
+source root mirrors the import resolver: top-level faber.toml if present,
+otherwise
 <home>/<name>/src. v1 does not parse
 cista.toml, does not discover CISTAE_HOME or faber.lock store roots, and
 does not replace `scripta/check-source` or run .proba tests.
@@ -94,6 +96,16 @@ ValidatedMir and stops before emit. Default output includes C0 sites.
 `--min-class C1` hides cheaper C-class sites; F and U buckets stay
 visible. `--json` emits the same records as a versioned machine contract.
 ";
+
+/// Library home selection shared by commands that resolve provider checkouts.
+#[derive(clap::Args, Debug, Default, Clone)]
+pub struct LibraryHomeArgs {
+    /// Directory holding provider checkouts such as `<DIR>/gradus/src`;
+    /// overrides `[paths] library_home` in faber.toml; norma needs none
+    /// (embedded)
+    #[arg(long = "library-home", value_name = "DIR")]
+    pub library_home: Option<PathBuf>,
+}
 
 /// Root parser for the `faber` binary.
 #[derive(Parser, Debug)]
@@ -140,7 +152,7 @@ pub enum Command {
     CheckLibrary(CheckLibraryArgs),
 
     /// Show resolved library home, probing provenance, and availability
-    Doctor,
+    Doctor(DoctorArgs),
 
     /// Report static runtime-cost classes over lowered MIR
     #[command(long_about = COST_LONG_ABOUT)]
@@ -219,6 +231,40 @@ pub enum Command {
     /// Manage this faber installation (update / uninstall)
     #[command(name = "self")]
     SelfManage(crate::commands::self_update::SelfManageArgs),
+}
+
+impl Command {
+    /// The `--library-home` flag value plus the path whose nearest `faber.toml`
+    /// may carry `[paths] library_home`. `None` means the command carries no
+    /// such input.
+    pub fn library_home_inputs(&self) -> (Option<PathBuf>, Option<PathBuf>) {
+        match self {
+            Self::Build(args) => (
+                args.library.library_home.clone(),
+                Some(PathBuf::from(&args.input)),
+            ),
+            Self::Check(args) => (
+                args.library.library_home.clone(),
+                args.input.first().map(PathBuf::from),
+            ),
+            Self::Emit(args) => (
+                args.library.library_home.clone(),
+                args.input.first().map(PathBuf::from),
+            ),
+            Self::Run(args) => (args.library.library_home.clone(), Some(args.path.clone())),
+            Self::Test(args) => (args.library.library_home.clone(), Some(args.path.clone())),
+            Self::CheckLibrary(args) => (args.library.library_home.clone(), None),
+            Self::Doctor(args) => (args.library.library_home.clone(), None),
+            _ => (None, None),
+        }
+    }
+}
+
+/// Arguments for `faber doctor`.
+#[derive(clap::Args, Debug, Default)]
+pub struct DoctorArgs {
+    #[command(flatten)]
+    pub library: LibraryHomeArgs,
 }
 
 /// Arguments for `faber doc`.
@@ -370,6 +416,9 @@ pub struct BuildArgs {
     /// Input file or package path
     #[arg(value_name = "INPUT")]
     pub input: String,
+
+    #[command(flatten)]
+    pub library: LibraryHomeArgs,
 }
 
 /// Arguments for `faber corpus`.
@@ -419,6 +468,9 @@ pub struct CheckLibraryArgs {
     /// Provider name resolved from the library home (`norma`, `triga`, …).
     /// v1 does not accept a path; use `faber check` for a package directory.
     pub name: String,
+
+    #[command(flatten)]
+    pub library: LibraryHomeArgs,
 }
 
 /// Arguments for `faber cost`.
@@ -510,6 +562,9 @@ pub struct CheckArgs {
 
     /// Input file or package path, or '-' / omitted for stdin
     pub input: Vec<String>,
+
+    #[command(flatten)]
+    pub library: LibraryHomeArgs,
 }
 
 /// Arguments for `faber init`.
@@ -584,6 +639,9 @@ pub struct RunArgs {
     /// Path to run (defaults to current directory)
     #[arg(default_value = ".")]
     pub path: PathBuf,
+
+    #[command(flatten)]
+    pub library: LibraryHomeArgs,
 
     /// Code locale used to select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]
@@ -683,6 +741,9 @@ pub struct TestArgs {
     /// Package path or single `.fab` / `.proba` file to test
     #[arg(default_value = ".")]
     pub path: PathBuf,
+
+    #[command(flatten)]
+    pub library: LibraryHomeArgs,
 
     /// Code locale used to select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]

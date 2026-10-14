@@ -124,7 +124,7 @@ Common flows:
     fragment. Converted output replaces or inserts its target `locale` key and
     retains unrelated frontmatter metadata.
 
-  Inspect resolved library home (FABER_LIBRARY_HOME or the in-tree lib/):
+  Inspect resolved library home (--library-home, [paths] library_home, or the embedded lib/):
     faber doctor
     faber check-library norma
 

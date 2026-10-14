@@ -21,6 +21,7 @@ fn temp_dir(label: &str) -> PathBuf {
 fn run_args(path: PathBuf, device: Option<DeviceChoice>) -> RunArgs {
     RunArgs {
         path,
+        library: crate::cli::LibraryHomeArgs::default(),
         locale: None,
         diagnostics_locale: None,
         device,

@@ -1187,7 +1187,23 @@ fn cli_defaults_emit_target_to_rust() {
 #[test]
 fn cli_parses_doctor_subcommand() {
     let cli = Cli::try_parse_from(["faber", "doctor"]).expect("parse doctor");
-    assert!(matches!(cli.command, Some(crate::cli::Command::Doctor)));
+    assert!(matches!(cli.command, Some(crate::cli::Command::Doctor(_))));
+}
+
+#[test]
+fn check_accepts_library_home_flag() {
+    let cli = Cli::try_parse_from(["faber", "check", "--library-home", "/x", "main.fab"])
+        .expect("parse check --library-home");
+    let Some(crate::cli::Command::Check(args)) = cli.command else {
+        panic!("expected check subcommand");
+    };
+    assert_eq!(
+        args.library.library_home.as_deref(),
+        Some(std::path::Path::new("/x"))
+    );
+    let (flag, probe) = crate::cli::Command::Check(args).library_home_inputs();
+    assert_eq!(flag.as_deref(), Some(std::path::Path::new("/x")));
+    assert_eq!(probe.as_deref(), Some(std::path::Path::new("main.fab")));
 }
 
 #[test]
@@ -1209,8 +1225,8 @@ fn check_long_help_discloses_library_resolution() {
     let help = check.render_long_help().to_string();
 
     assert!(
-        help.contains("FABER_LIBRARY_HOME"),
-        "check --help must name FABER_LIBRARY_HOME:\n{help}"
+        help.contains("--library-home"),
+        "check --help must name --library-home:\n{help}"
     );
     assert!(
         help.contains("embedded in the binary"),
