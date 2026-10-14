@@ -91,6 +91,12 @@ pub struct ManifestPaths {
     /// Entry module path, relative to `source`; required for binary packages.
     pub entry: Option<String>,
 
+    /// Directory holding provider checkouts (`<home>/gradus/src`, ...) for
+    /// `provider:module` imports; relative to the manifest. The
+    /// `--library-home` flag wins.
+    #[serde(default)]
+    pub library_home: Option<String>,
+
     /// Named import templates for `§name/rest` forms (values relative to package root).
     ///
     /// Example:
@@ -186,6 +192,7 @@ impl Default for ManifestPaths {
         Self {
             source: default_source_path(),
             entry: None,
+            library_home: None,
             templates: BTreeMap::new(),
         }
     }

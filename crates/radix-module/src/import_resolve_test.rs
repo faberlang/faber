@@ -441,6 +441,18 @@ fn library_home_memo_preserves_thread_override_precedence() {
     assert_eq!(library_home(), production);
 }
 
+#[test]
+fn configured_library_home_setting_round_trips() {
+    let dir = crate::test_support::test_temp_dir("libhome-setting");
+    let home = dir.path().to_path_buf();
+
+    set_configured_library_home(Some(home.clone()));
+    assert_eq!(configured_library_home_setting(), Some(home));
+
+    set_configured_library_home(None);
+    assert_eq!(configured_library_home_setting(), None);
+}
+
 // ── U6b: `norma:*` resolves from the in-tree `lib/` ──────────────────────────
 
 #[test]
