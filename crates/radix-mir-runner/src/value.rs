@@ -2931,6 +2931,17 @@ pub fn values_equal(left: &Value, right: &Value) -> bool {
         // short-circuits the same cell before either side is borrowed, so a
         // shared ledger is never borrowed twice here.
         (Value::Ledger(a), Value::Ledger(b)) => Rc::ptr_eq(a, b) || *a.borrow() == *b.borrow(),
+        // Collections compare elementwise through this same canonical helper:
+        // a converted bits list holds `UInt` cells while an equal-valued
+        // literal holds `Int` cells, so derived `PartialEq` would split them.
+        (Value::Array(a), Value::Array(b)) | (Value::Vector(a), Value::Vector(b)) => {
+            let a = a.borrow();
+            let b = b.borrow();
+            a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| values_equal(x, y))
+        }
+        (Value::Tuple(a), Value::Tuple(b)) => {
+            a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| values_equal(x, y))
+        }
         _ => left == right,
     }
 }
