@@ -96,3 +96,52 @@ fn scalar_to_bounded_octeti_all_widths_round_trip_le_and_be() {
         }
     }
 }
+
+/// `bytes<N> ↦ W via Le|Be` reads directly from the bounded carrier; no
+/// widening to unbounded `bytes` first. The capacity equals the scalar width,
+/// so this is a pure bit round trip.
+fn direct_round_trip_body(ty: &str, width: usize, value: &str, hint: &str) -> String {
+    format!(
+        "const {ty} n ← {value}\nconst bytes<{width}> o ← n ↦ bytes<{width}> via {hint}\nconst {ty} back ← o ↦ {ty} via {hint}\nprint back"
+    )
+}
+
+#[test]
+fn bounded_octeti_endian_read_u16_le_round_trips() {
+    let lines = run(&direct_round_trip_body("u16", 2, "258", "Le")).expect("runs");
+    assert_eq!(lines, ["258"]);
+}
+
+#[test]
+fn bounded_octeti_endian_read_u16_be_round_trips() {
+    let lines = run(&direct_round_trip_body("u16", 2, "258", "Be")).expect("runs");
+    assert_eq!(lines, ["258"]);
+}
+
+#[test]
+fn bounded_octeti_endian_read_all_widths_round_trip_le_and_be() {
+    for (ty, width, value) in [
+        ("i16", 2, "-2"),
+        ("u16", 2, "65535"),
+        ("i32", 4, "-123456"),
+        ("u32", 4, "4000000000"),
+        ("i64", 8, "-9000000000000000000"),
+        ("u64", 8, "18000000000000000000"),
+        ("f32", 4, "1.5"),
+        ("f64", 8, "-0.25"),
+    ] {
+        for hint in ["Le", "Be"] {
+            let lines = run(&direct_round_trip_body(ty, width, value, hint))
+                .unwrap_or_else(|error| panic!("{ty} via {hint} must run: {error:?}"));
+            assert_eq!(lines, [value], "{ty} via {hint}");
+        }
+    }
+}
+
+#[test]
+fn bounded_octeti_endian_read_follows_the_hint() {
+    let lines =
+        run("const bytes raw ← |01 02|\nconst bytes<2> b ← raw ↦ bytes<2>\nprint b ↦ u16 via Be\nprint b ↦ u16 via Le")
+            .expect("runs");
+    assert_eq!(lines, ["258", "513"]);
+}
