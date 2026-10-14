@@ -146,3 +146,22 @@ fn a_non_list_is_not_a_bounded_lista() {
         Value::Bool(false)
     );
 }
+
+#[test]
+fn fault_code_for_display_name_reads_the_registry() {
+    assert_eq!(
+        fault_code_for_display_name("IoFault.NotFound"),
+        Some("ERR001")
+    );
+    assert_eq!(
+        fault_code_for_display_name("IoFault.Permission"),
+        Some("ERR002")
+    );
+}
+
+#[test]
+fn fault_code_for_display_name_rejects_unregistered_shapes() {
+    assert_eq!(fault_code_for_display_name("IoFault.NoSuch"), None);
+    assert_eq!(fault_code_for_display_name("NotFound"), None);
+    assert_eq!(fault_code_for_display_name("Other.NotFound"), None);
+}
