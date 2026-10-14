@@ -597,10 +597,11 @@ fn analyze_package_spec_with_deadline(
         // the package run's memo identity, so targets shared across files
         // parse once for the whole package analysis.
         let file_config = match file.locale_pack.as_ref() {
-            Some(pack) => session
+            Some(pack) if file.locale_declared => session
                 .config
                 .clone()
                 .with_resolved_locale_pack(pack.clone()),
+            Some(pack) => session.config.clone().with_locale_pack(pack.clone()),
             None => session.config.clone(),
         };
         // Gate J (ST2-2.7): the package hook below evaluates the sites that
@@ -1298,6 +1299,7 @@ fn load_package_with_session(
             body_byte_offset: loaded.body_byte_offset,
             frontmatter: loaded.frontmatter,
             locale_pack: loaded.locale_pack,
+            locale_declared: loaded.locale_declared,
             program: loaded.program,
             interner: loaded.interner,
             library_imports: Vec::new(),

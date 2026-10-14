@@ -35,6 +35,7 @@ fn parse_file(path: PathBuf, source: &str) -> PackageFile {
         body_byte_offset: 0,
         frontmatter: None,
         locale_pack: None,
+        locale_declared: false,
         program: parse.program.expect("program"),
         interner: parse.interner,
         library_imports: Vec::new(),
