@@ -74,6 +74,37 @@ pub fn is_const_int(expr: &HirExpression) -> bool {
     const_int_exact(expr).is_some()
 }
 
+/// Exact `i128` value of an integer constant expression that may also name a
+/// recorded compile-time integer binding through `values`:
+/// an immutable `const int` local or a module constant. A bare `Path` reads
+/// its binding's recorded value; operators fold over operands resolved the
+/// same way, so `K + 1` works when `K` is a named constant. `None` when any
+/// operand is not an integer constant or a reference has no recorded value
+/// (a `var` binding, a runtime parameter).
+#[must_use]
+pub(crate) fn const_int_value_resolved(
+    expr: &HirExpression,
+    values: &rustc_hash::FxHashMap<radix_types::DefId, i128>,
+) -> Option<i128> {
+    match &expr.kind {
+        HirExpressionKind::Path(def_id) => values.get(def_id).copied(),
+        HirExpressionKind::Literal(HirLiteral::Int(value)) => i128::from(*value).into(),
+        HirExpressionKind::Literal(HirLiteral::BigInt(_)) => const_int_value(expr),
+        HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => {
+            const_int_value_resolved(inner, values)?.checked_neg()
+        }
+        HirExpressionKind::Unary(radix_hir::HirUnOp::BitNot, inner) => {
+            Some(!const_int_value_resolved(inner, values)?)
+        }
+        HirExpressionKind::Binary(op, lhs, rhs) => fold_const_i128(
+            *op,
+            const_int_value_resolved(lhs, values)?,
+            const_int_value_resolved(rhs, values)?,
+        ),
+        _ => None,
+    }
+}
+
 fn floor_div(a: i128, b: i128) -> Option<i128> {
     let q = a.checked_div(b)?;
     Some(if a % b != 0 && ((a < 0) != (b < 0)) {

@@ -473,6 +473,38 @@ impl TypeChecker<'_> {
             }
         }
 
+        // Need: module-level `const int K = ...` bindings are valid
+        // `axis` arguments. Values are not folded by `statica` until after
+        // typecheck, so fold here; references may precede their declaration,
+        // so iterate to a fixpoint. A cycle or a non-constant stays absent.
+        loop {
+            let mut progressed = false;
+            for item in &hir.items {
+                // Only a legal module constant (`const ... = ...`) qualifies;
+                // a top-level `var` or arrow binding is rejected elsewhere.
+                let HirItemKind::Constant(const_item) = &item.kind else {
+                    continue;
+                };
+                if const_item.statica.is_none() || const_item.mutable {
+                    continue;
+                }
+                if self.const_int_values.contains_key(&item.def_id) {
+                    continue;
+                }
+                let value = super::integer_range::const_int_value_resolved(
+                    &const_item.value,
+                    &self.const_int_values,
+                );
+                if let Some(value) = value {
+                    self.const_int_values.insert(item.def_id, value);
+                    progressed = true;
+                }
+            }
+            if !progressed {
+                break;
+            }
+        }
+
         // Contract kind checks run after every local genus and implendum is
         // collected so they are declaration-order independent.
         self.resolve_struct_implements();

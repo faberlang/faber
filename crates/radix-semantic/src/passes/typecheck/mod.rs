@@ -501,6 +501,10 @@ pub(crate) struct TypeChecker<'a> {
     /// so the fold keys on the binding; an affine extent over a static size
     /// that folds provably negative fails its lift obligation at the store.
     pub(crate) static_size_values: FxHashMap<radix_hir::DefId, u64>,
+    /// Exact values of compile-time integer bindings (immutable `const int`
+    /// locals and module constants), keyed by binding DefId. The `axis`
+    /// argument of an axis reduction accepts one of these.
+    pub(crate) const_int_values: FxHashMap<radix_hir::DefId, i128>,
     /// Node ids of expressions desugared from numeric twin methods (operator,
     /// assignment, or effect-hoisted block), handed to the presentation
     /// sidecar when the check finishes.
@@ -887,6 +891,7 @@ impl<'a> TypeChecker<'a> {
             tensor_edge_policy_runtime_params: FxHashSet::default(),
             compile_time_locals: FxHashSet::default(),
             static_size_values: FxHashMap::default(),
+            const_int_values: FxHashMap::default(),
             numeric_twin_ids: Vec::new(),
             axis_reduction_results: FxHashMap::default(),
             empty_dense_ids: Vec::new(),
