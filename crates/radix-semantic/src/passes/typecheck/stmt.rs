@@ -405,9 +405,9 @@ impl TypeChecker<'_> {
             Type::Option(inner) | Type::Alias(_, inner) => self.is_shareable_payload(*inner),
             // A tuple or union holding a shareable member aliases that
             // member's state; a scalar-only aggregate still copies.
-            Type::Tuple(members) | Type::Union(members) => {
-                members.iter().any(|member| self.is_shareable_payload(*member))
-            }
+            Type::Tuple(members) | Type::Union(members) => members
+                .iter()
+                .any(|member| self.is_shareable_payload(*member)),
             // A bare generic parameter may instantiate to a scalar, so it is
             // not shareable on its own; its container members are caught once
             // the instantiation is resolved.

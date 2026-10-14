@@ -399,11 +399,15 @@ fn display_tokens_survive_the_fhir_round_trip() {
 
     let en_source = "+++\nlocale = \"en\"\n+++\n\nfn salve() { }";
     let la_source = "+++\nlocale = \"la\"\n+++\n\nfunctio salve() { }";
-    let session = Session::new(Config::default().with_dev_locale_root().with_target(Target::HirRust));
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
 
     for (name, source) in [("display-en.faber", en_source), ("display-la.faber", la_source)] {
-        let original = analyze_source(&session, name, source, AnalyzeRequest::default())
-            .expect("display-token fixture analyzes");
+        let original =
+            analyze_source(&session, name, source, AnalyzeRequest::default()).expect("display-token fixture analyzes");
         let artifact = from_analyzed(&original, name, name);
         let bytes = postcard::to_allocvec(&artifact).expect("serialize display-token artifact");
         let loaded = load_fhir(&bytes).expect("display-token artifact must load");
