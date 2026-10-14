@@ -1109,6 +1109,77 @@ impl PackageInstantiate<'_> {
         Some(id)
     }
 
+    /// Specialize call sites whose callee is a synthetic, param-bearing
+    /// helper (`source == None`). `substitute_function` leaves
+    /// `MirCallee::Function(_)` untouched (`substitute_callee` only rewrites
+    /// `Definition` callees), so a generic instance would otherwise call a
+    /// helper whose `Convert` still names `T`. Each offending helper is
+    /// cloned once per instance, substituted, recursively specialized, and
+    /// registered under a fresh id; the original param-bearing helper stays.
+    #[allow(dead_code)]
+    fn specialize_synthetic_callees(
+        &mut self,
+        function: &mut MirFunction,
+        bindings: &MirGenericBindings,
+        span: Span,
+    ) -> bool {
+        let mut specialized: FxHashMap<MirFunctionId, MirFunctionId> = FxHashMap::default();
+        for block in &mut function.blocks {
+            for statement in &mut block.statements {
+                if let MirStatementKind::Call { callee, .. } = &mut statement.kind
+                    && !self.specialize_synthetic_callee(callee, bindings, span, &mut specialized)
+                {
+                    return false;
+                }
+            }
+            if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind
+                && !self.specialize_synthetic_callee(callee, bindings, span, &mut specialized)
+            {
+                return false;
+            }
+        }
+        true
+    }
+
+    #[allow(dead_code)]
+    fn specialize_synthetic_callee(
+        &mut self,
+        callee: &mut MirCallee,
+        bindings: &MirGenericBindings,
+        span: Span,
+        specialized: &mut FxHashMap<MirFunctionId, MirFunctionId>,
+    ) -> bool {
+        let MirCallee::Function(helper) = callee else {
+            return true;
+        };
+        let helper = *helper;
+        if let Some(&id) = specialized.get(&helper) {
+            *callee = MirCallee::Function(id);
+            return true;
+        }
+        let Some(candidate) = self.synthetic_templates.get(&helper) else {
+            return true;
+        };
+        let mut clone = candidate.clone();
+        let id = self.next_id;
+        self.next_id = MirFunctionId(self.next_id.0 + 1);
+        clone.id = id;
+        if !self.substitute_function(&mut clone, bindings, span) {
+            return false;
+        }
+        if !self.specialize_synthetic_callees(&mut clone, bindings, span) {
+            return false;
+        }
+        let shape_bindings = MirShapeBindings::default();
+        if !finalize_function(self.types, &mut clone, bindings, &shape_bindings, &mut self.errors) {
+            return false;
+        }
+        self.created.push(clone);
+        specialized.insert(helper, id);
+        *callee = MirCallee::Function(id);
+        true
+    }
+
     fn resolve_tensor_limes_for_instance(
         &mut self,
         key: &MirMonomorphizationKey,
