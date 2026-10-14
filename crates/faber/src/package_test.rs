@@ -11327,11 +11327,11 @@ main args args exit 0 {
     console.write_partial("notty")
   }
   console.write_line_async(":")
-  console.write_partial_async(console.read_line_async())
+  console.write_partial_async(console.read_line_async() coalesce "")
   console.write_line("")
-  const bytes sync_bytes ← console.read_bytes(4)
+  const bytes sync_bytes ← console.read_bytes(4) coalesce |00|
   console.write_bytes_async(sync_bytes)
-  const bytes async_bytes ← console.read_bytes_async(4)
+  const bytes async_bytes ← console.read_bytes_async(4) coalesce |00|
   console.write_bytes(async_bytes)
   console.warn_line_async("warn")
   console.debug_line_async("debug")
