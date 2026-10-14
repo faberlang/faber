@@ -1,0 +1,16 @@
+{
+  "targets": {
+    "runner": {
+      "outcome": "known-fail",
+      "phase": "run",
+      "diagnostic_contains": "failable_call_requires_handler",
+      "reason": "The runner route rejects fs-conformance during semantic analysis: the write_then_read helper's unhandled failable fs.write_file and fs.read_file calls emit SEM011 before execution."
+    },
+    "rust": {
+      "outcome": "known-fail",
+      "phase": "emit",
+      "diagnostic_contains": "failable_call_requires_handler",
+      "reason": "Rust emit rejects fs-conformance during semantic analysis: the write_then_read helper's unhandled failable fs.write_file and fs.read_file calls emit SEM011 before code generation."
+    }
+  }
+}
