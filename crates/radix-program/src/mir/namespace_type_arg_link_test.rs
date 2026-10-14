@@ -600,3 +600,65 @@ kind = "bin"
         panic!("norma:fs read_file operand package must lower, got {facts:?}");
     }
 }
+
+fn write_norma_fs_read_file_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "norma-fs-read-file"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("main.fab"), NORMA_FS_READ_FILE_MAIN).expect("write main.fab");
+    src.join("main.fab")
+}
+
+/// The `norma:fs.read_file<string>` call in a package `main` is a failable
+/// generic library call, so the interpreted lowering of `main` must keep the
+/// error half and carry a try-call terminator, not a plain call.
+#[test]
+#[ignore = "pumpfix-gfd594086: read_file<string> in main lowers as a plain Call"]
+fn package_mir_norma_fs_read_file_main_is_try_call() {
+    let dir = crate::test_support::test_temp_dir("norma-fs-read-file-try-call");
+    let entry = write_norma_fs_read_file_package(dir.as_ref());
+    let config = Config::default();
+
+    with_interpreted_lowered_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        |lowered| {
+            let main = lowered
+                .validated
+                .program()
+                .functions
+                .iter()
+                .find(|function| {
+                    function
+                        .name
+                        .is_some_and(|name| lowered.interner.resolve(name) == "main")
+                })
+                .unwrap_or_else(|| panic!("`main` must exist in the merged program"));
+            assert!(
+                main.blocks.iter().any(|block| matches!(
+                    block.terminator.kind,
+                    MirTerminatorKind::TryCall { .. }
+                )),
+                "norma:fs read_file call in main must lower to a try-call terminator"
+            );
+        },
+    )
+    .unwrap_or_else(|errors| panic!("norma:fs read_file package must lower, got {errors:?}"));
+}
