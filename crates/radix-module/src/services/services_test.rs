@@ -2425,9 +2425,7 @@ fn check_wrong_locale_source_reports_locales002_once_and_first() {
         .diagnostics
         .iter()
         .enumerate()
-        .filter_map(|(index, diagnostic)| {
-            (diagnostic.code == Some("LOCALE002")).then_some(index)
-        })
+        .filter_map(|(index, diagnostic)| (diagnostic.code == Some("LOCALE002")).then_some(index))
         .collect();
     assert_eq!(notes.len(), 1, "diagnostics: {:?}", result.diagnostics);
     assert_eq!(
@@ -2439,9 +2437,24 @@ fn check_wrong_locale_source_reports_locales002_once_and_first() {
         .iter()
         .position(crate::diagnostics::Diagnostic::is_error)
         .expect("the wrong-locale read must still fail");
-    assert!(
-        notes[0] < first_error,
-        "diagnostics: {:?}",
-        result.diagnostics
-    );
+    assert!(notes[0] < first_error, "diagnostics: {:?}", result.diagnostics);
+}
+
+/// A source whose `+++` frontmatter declares a locale draws no LOCALE002
+/// wrong-locale advisory: the note must not claim the source has no declared
+/// locale when it does. Asserts code and issue name — never message text.
+#[test]
+fn check_declared_locale_source_draws_no_locales002_note() {
+    let source = "+++\nlocale = \"en\"\n+++\n\nincipit { nota 1 }";
+    let result = check_diagnostics_for_source("declared.fab", source, false);
+    assert!(!result.success, "diagnostics: {:?}", result.diagnostics);
+    let notes: Vec<_> = result
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| {
+            diagnostic.code == Some("LOCALE002")
+                && radix_semantic::arg_value(&diagnostic.args, "issue") == Some("source_reads_as_other_locale")
+        })
+        .collect();
+    assert!(notes.is_empty(), "diagnostics: {:?}", result.diagnostics);
 }

@@ -49,30 +49,45 @@ pub fn write_output_artifact(
     write_artifact_contents(path, code);
 }
 
-/// Keep one LOCALE002 note per file and hoist those notes ahead of the other
-/// diagnostics.
+/// Drop LOCALE002 wrong-locale notes for sources that declare a locale.
 ///
 /// WHY: the package and eval routes assemble their diagnostics inside the
-/// compiler driver without the check service's normalization, so the
-/// wrong-locale reading can trail the errors it explains. The note must be
-/// reported once, first; a second keyword-level LOCALE002 for the same file
-/// repeats the reading instead of adding a fact.
+/// compiler driver, whose per-module analysis sees only the peeled body — the
+/// `+++` frontmatter is gone by the time the note is produced, so a source
+/// that declares `locale` can still draw a note claiming it has none. The
+/// note is advisory and the SEM errors already report the misread symbols, so
+/// suppression is the honest fix. A locale selected only by manifest or
+/// `--locale` (invisible in the file) is not detected here and keeps the note.
 #[must_use]
-pub fn normalize_locale002_notes(
+pub fn drop_declared_locale002_notes(
     diagnostics: Vec<radix::module::diagnostics::Diagnostic>,
 ) -> Vec<radix::module::diagnostics::Diagnostic> {
-    let mut notes = Vec::new();
-    let mut rest = Vec::new();
-    let mut noted_files = std::collections::BTreeSet::new();
-    for diagnostic in diagnostics {
-        if diagnostic.code.as_deref() == Some("LOCALE002") && noted_files.insert(diagnostic.file.clone()) {
-            notes.push(diagnostic);
-        } else {
-            rest.push(diagnostic);
-        }
+    let mut checked_files: std::collections::BTreeMap<String, bool> =
+        std::collections::BTreeMap::new();
+    diagnostics
+        .into_iter()
+        .filter(|diagnostic| {
+            if diagnostic.code != Some("LOCALE002")
+                || diagnostic.issue().as_deref() != Some("source_reads_as_other_locale")
+            {
+                return true;
+            }
+            let declares = checked_files
+                .entry(diagnostic.file.clone())
+                .or_insert_with(|| file_declares_locale(&diagnostic.file));
+            !*declares
+        })
+        .collect()
+}
+
+fn file_declares_locale(file: &str) -> bool {
+    let path = std::path::Path::new(file);
+    if !path.is_file() {
+        return false;
     }
-    notes.extend(rest);
-    notes
+    std::fs::read_to_string(path)
+        .map(|source| radix::services::source_declares_locale(file, &source))
+        .unwrap_or(false)
 }
 
 /// Print diagnostics using Faber-owned presentation.

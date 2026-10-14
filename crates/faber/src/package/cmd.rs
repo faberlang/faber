@@ -861,7 +861,8 @@ pub fn cmd_check_package(
         &input_path,
         &super::faber_analysis_seams(),
     );
-    diagnostics = crate::postprocess::normalize_locale002_notes(diagnostics);
+    diagnostics = radix::services::normalize_locale002_notes(diagnostics);
+    diagnostics = crate::postprocess::drop_declared_locale002_notes(diagnostics);
     radix::module::apply_warn_policy(&mut diagnostics, &config.warn_policy);
 
     let mut fatal_errors = 0usize;

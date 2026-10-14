@@ -137,7 +137,7 @@ fn normalize_locale002_keeps_one_note_per_file_first() {
         note("b.fab"),
     ];
 
-    let normalized = super::normalize_locale002_notes(diagnostics);
+    let normalized = radix::services::normalize_locale002_notes(diagnostics);
 
     let locale002: Vec<&str> = normalized
         .iter()
@@ -163,4 +163,40 @@ fn normalize_locale002_keeps_one_note_per_file_first() {
         .filter_map(|diagnostic| diagnostic.code.as_deref())
         .collect();
     assert_eq!(errors, vec!["SEM001", "SEM008"]);
+}
+
+/// A wrong-locale note for a file whose frontmatter declares a locale is
+/// dropped: the note must not claim the source "has no declared locale" when
+/// it does. Notes for files without a declared locale survive. Asserts codes
+/// and issue names — never message text.
+#[test]
+fn drop_declared_locale002_notes_suppresses_only_declared_sources() {
+    use radix::module::diagnostics::Diagnostic;
+
+    let guard = tempfile::tempdir().expect("tempdir");
+    let declared = guard.path().join("declared.fab");
+    std::fs::write(&declared, "+++\nlocale = \"en\"\n+++\n\nmain { print 1 }\n").expect("write");
+    let undeclared = guard.path().join("undeclared.fab");
+    std::fs::write(&undeclared, "main { print 1 }\n").expect("write");
+
+    let note_for = |file: &std::path::Path| {
+        Diagnostic::warning("note")
+            .with_code("LOCALE002")
+            .with_arg("issue", "source_reads_as_other_locale")
+            .with_file(file.display().to_string())
+    };
+    let diagnostics = vec![note_for(&declared), note_for(&undeclared)];
+
+    let kept = super::drop_declared_locale002_notes(diagnostics);
+
+    let files: Vec<&str> = kept
+        .iter()
+        .filter(|diagnostic| diagnostic.code.as_deref() == Some("LOCALE002"))
+        .map(|diagnostic| diagnostic.file.as_str())
+        .collect();
+    assert_eq!(files, vec![undeclared.display().to_string().as_str()]);
+    assert_eq!(
+        kept[0].issue().as_deref(),
+        Some("source_reads_as_other_locale")
+    );
 }
