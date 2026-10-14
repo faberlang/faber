@@ -98,6 +98,14 @@ pub struct TypeTable {
     /// `b64`). The `lista<b8>` the `octeti` word names is seeded without
     /// setting a bit, so a module that never writes a `bN` marker has none.
     authored_bits: u8,
+    /// Inferred holes left without a type slot by a bare `{ field = value }`
+    /// literal (operator ruling 2026-10-14).
+    ///
+    /// The parser marks the literal's `TypeFormLevel` so the checker can tell
+    /// it from an explicit `_ { … }` hole: the bare literal defaults to a
+    /// record shaped by its fields, the explicit hole does not. Transient
+    /// per-analysis fact; never serialized into a [`TypeTableSnapshot`].
+    default_record_holes: FxHashSet<u32>,
 
     /// Parent enum definition for each variant constructor [`DefId`].
     ///
@@ -216,6 +224,7 @@ impl TypeTable {
             find_equal_memo: RefCell::new(FxHashMap::default()),
             first_modular_word: None,
             authored_bits: 0,
+            default_record_holes: FxHashSet::default(),
             variant_parent: FxHashMap::default(),
             resolved_generic_calls: Vec::new(),
             ordering_contract: None,
@@ -382,6 +391,22 @@ impl TypeTable {
         &self.types[id.0 as usize]
     }
 
+    /// Mark `var` as an inferred hole that a bare `{ field = value }` literal
+    /// left without a type slot. The checker reads the mark to default the
+    /// hole to a record shaped by the literal's fields (operator ruling
+    /// 2026-10-14).
+    pub fn mark_default_record_hole(&mut self, var: InferVar) {
+        self.default_record_holes.insert(var.0);
+    }
+
+    /// Whether `ty` is an inference hole marked by a bare `{ field = value }`
+    /// literal (see [`Self::mark_default_record_hole`]). An explicit `_ { … }`
+    /// hole is unmarked and keeps failing closed without an expected type.
+    #[must_use]
+    pub fn is_default_record_hole(&self, ty: TypeId) -> bool {
+        matches!(self.get(ty), Type::Infer(var) if self.default_record_holes.contains(&var.0))
+    }
+
     #[must_use]
     pub fn type_count(&self) -> usize {
         self.types.len()
@@ -474,6 +499,7 @@ impl TypeTable {
             find_equal_memo: RefCell::new(FxHashMap::default()),
             first_modular_word,
             authored_bits,
+            default_record_holes: FxHashSet::default(),
             variant_parent: FxHashMap::default(),
             resolved_generic_calls: Vec::new(),
             ordering_contract: None,

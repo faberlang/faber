@@ -1789,6 +1789,13 @@ impl TypeFormLevel {
     pub const WRAPPING_INF: Self = Self(3);
     /// Explicit `saturating<inf>` / la `saturatus<inf>` head (see [`Self::WRAPPING_INF`]).
     pub const SATURATING_INF: Self = Self(4);
+    /// The type slot of a bare `{ field = value }` literal was left out
+    /// (implied hole with a default).
+    ///
+    /// Distinct from an explicit hole (`_ { field = value }`, form [`Self::LONG`]):
+    /// the bare form defaults to a record shaped by its fields, while an
+    /// explicit hole has no default and fails closed without an expected type.
+    pub const BARE_LITERAL: Self = Self(5);
 }
 
 #[derive(Debug, Clone)]

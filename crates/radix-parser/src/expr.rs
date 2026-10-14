@@ -2444,7 +2444,7 @@ impl Parser {
                 let hole_span = self.peek().span;
                 self.advance();
                 self.advance();
-                self.finish_inferred_field_constructor(hole_span)?
+                self.finish_inferred_field_constructor(hole_span, false)?
             }
 
             // Bare `{ field = value, … }`: the type slot is left out, which
@@ -2456,7 +2456,7 @@ impl Parser {
             {
                 let hole_span = self.peek().span;
                 self.advance();
-                self.finish_inferred_field_constructor(hole_span)?
+                self.finish_inferred_field_constructor(hole_span, true)?
             }
 
             // `_ [ a, b, … ]`: the inferred constructor with ELEMENTS. The
@@ -3605,10 +3605,14 @@ impl Parser {
 
     /// Finish `_ { field = value, … }` (or the bare `{ … }` form) once the
     /// opening brace is consumed: fields, closing brace, and the `Verte` node
-    /// with an `Infer` target.
+    /// with an `Infer` target. `bare` is `true` for the bare literal, whose
+    /// type slot was left out; that records [`TypeFormLevel::BARE_LITERAL`] so
+    /// the checker can default it to a record, while the explicit `_ { … }`
+    /// hole keeps [`TypeFormLevel::LONG`] and no default.
     fn finish_inferred_field_constructor(
         &mut self,
         hole_span: Span,
+        bare: bool,
     ) -> Result<ExprKind, ParseError> {
         let mut fields = self.parse_object_fields()?;
         self.expect_issue(&TokenKind::RBrace, "inferred_field_constructor_end")?;
@@ -3623,7 +3627,11 @@ impl Parser {
             mode: None,
             kind: TypeExprKind::Infer,
             span: hole_span,
-            form: TypeFormLevel::LONG,
+            form: if bare {
+                TypeFormLevel::BARE_LITERAL
+            } else {
+                TypeFormLevel::LONG
+            },
             iuncta_label: None,
         };
         Ok(ExprKind::Verte(VerteExpr {
