@@ -604,6 +604,71 @@ fn inferred_constructor_map_survives_the_fhir_round_trip() {
 }
 
 #[test]
+fn genus_ascribed_literal_survives_the_fhir_round_trip() {
+    // `{ flag = true } ∷ Calc` is a typed constructor whose `∷` ascription
+    // target is recorded at an expression slot, not a binding slot. The
+    // authored hole and the resolved witness must load.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = include_str!("../../../../corpus/genus/ascribed-literal.fab");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "ascribed-literal.fab", source, AnalyzeRequest::default())
+        .expect("genus ascribed-literal fixture analyzes");
+    let artifact = from_analyzed(&original, "ascribed-literal", "ascribed-literal.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize ascribed-literal artifact");
+    load_fhir(&bytes).expect("ascribed-literal artifact must load");
+}
+
+#[test]
+fn genus_inferred_constructor_survives_the_fhir_round_trip() {
+    // `_ { x = 7, y = 9 }` is an inferred constructor whose authored `_` hole
+    // is recorded at the site of the constructor expression, not a binding
+    // slot. The artifact boundary must carry the resolved witness and load.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = include_str!("../../../../corpus/genus/inferred-constructor.fab");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "inferred-constructor.fab", source, AnalyzeRequest::default())
+        .expect("genus inferred-constructor fixture analyzes");
+    let artifact = from_analyzed(&original, "inferred-constructor", "inferred-constructor.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize inferred-constructor artifact");
+    load_fhir(&bytes).expect("inferred-constructor artifact must load");
+}
+
+#[test]
+fn genus_inferred_constructor_optional_survives_the_fhir_round_trip() {
+    // Against an optional cell, `_ { … }` builds the non-optional format and
+    // is legal in binding, argument and return positions.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = include_str!("../../../../corpus/genus/inferred-constructor-optional.fab");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "inferred-constructor-optional.fab", source, AnalyzeRequest::default())
+        .expect("genus inferred-constructor-optional fixture analyzes");
+    let artifact = from_analyzed(&original, "inferred-constructor-optional", "inferred-constructor-optional.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize inferred-constructor-optional artifact");
+    load_fhir(&bytes).expect("inferred-constructor-optional artifact must load");
+}
+
+#[test]
 fn fhir_artifact_keeps_inferred_set_literal_hole() {
     // `_ [1, 2]` at a set cell is an inferred constructor: typecheck rewrites
     // it to the `array ↦ set` conversion while keeping the literal's node id,
