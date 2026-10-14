@@ -559,6 +559,28 @@ fn union_alias_annotation_survives_the_fhir_round_trip() {
 }
 
 #[test]
+fn genus_union_alias_survives_the_fhir_round_trip() {
+    // `type Figura = Circulus ∪ Quadratum` is a transparent alias whose
+    // annotation finalizes to a union of genus types at the HIR site. The
+    // authored `Named` head must load with the recorded alias-to-body fact.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = include_str!("../../../../corpus/unio/overlap.fab");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "overlap.fab", source, AnalyzeRequest::default())
+        .expect("overlap fixture analyzes");
+    let artifact = from_analyzed(&original, "overlap", "overlap.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize overlap artifact");
+    load_fhir(&bytes).expect("overlap artifact must load");
+}
+
+#[test]
 fn inferred_constructor_map_survives_the_fhir_round_trip() {
     // `_ { … }` is an inferred constructor: the authored hole is resolved to
     // the site's expected type, and HIR materializes no node for the hole
