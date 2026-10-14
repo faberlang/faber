@@ -450,13 +450,14 @@ impl TypeChecker<'_> {
         None
     }
 
-    /// `_ [ … ]` and a bare `[ … ]` against a tuple cell. The hole form
-    /// (`Verte` with an `Infer` target over an array) builds the expected
-    /// bracket type: a tuple cell makes the tuple, any other cell gets the
-    /// plain array literal (and its ordinary checking), and no expected type
-    /// is a named error. A bare array literal takes a tuple cell's type too
-    /// (the literal is a hole with a default; no cell leaves it a list).
-    /// Returns `Some(type)` when the node is settled here.
+    /// `_ [ … ]` and a bare `[ … ]` against a tuple or set cell. The hole
+    /// form (`Verte` with an `Infer` target over an array) builds the expected
+    /// bracket type: a tuple cell makes the tuple, a set cell makes the
+    /// `array ↦ set` conversion, any other cell gets the plain array literal
+    /// (and its ordinary checking), and no expected type is a named error. A
+    /// bare array literal takes a tuple or set cell's type too (the literal is
+    /// a hole with a default; no cell leaves it a list). Returns `Some(type)`
+    /// when the node is settled here.
     fn desugar_bracket_literal_shape(
         &mut self,
         expr: &mut HirExpression,
@@ -487,12 +488,34 @@ impl TypeChecker<'_> {
             );
             return Some(self.error_type);
         }
+        // A set cell takes the bracket literal as the source of the same
+        // `array ↦ set` conversion the authored `↦ set<T>` checks. The cells'
+        // elements are checked against the set's element type below; a spread
+        // element is not a plain element list, so it keeps the ordinary rule.
+        let set_target = concrete.and_then(|ty| match self.types.get(ty) {
+            Type::Set(elem) => Some((ty, *elem)),
+            _ => None,
+        });
+        let all_expr = |elements: &[HirArrayElement]| {
+            elements
+                .iter()
+                .all(|element| matches!(element, HirArrayElement::Expr(_)))
+        };
+        let set_literal = set_target.is_some()
+            && match &expr.kind {
+                HirExpressionKind::Verte { source, .. } => match &source.kind {
+                    HirExpressionKind::Array(elements) => all_expr(elements),
+                    _ => false,
+                },
+                HirExpressionKind::Array(elements) => all_expr(elements),
+                _ => false,
+            };
         let is_tuple = concrete.is_some_and(|ty| matches!(self.types.get(ty), Type::Tuple(_)));
-        if hole || is_tuple {
-            // The node is rewritten to an `Array` or `Tuple` and loses its
-            // authored shape; re-emission keys on this id to print `_ [ … ]`
-            // (the hole's type form survives under the node id) or the bare
-            // `[ … ]` the author wrote into a tuple cell.
+        if hole || is_tuple || set_literal {
+            // The node is rewritten to an `Array`, `Tuple`, or conversion and
+            // loses its authored shape; re-emission keys on this id to print
+            // `_ [ … ]` (the hole's type form survives under the node id), the
+            // bare `[ … ]` the author wrote, or the authored set literal.
             self.inferred_constructor_ids.push(expr.id);
         }
         if hole {
@@ -517,6 +540,34 @@ impl TypeChecker<'_> {
                 })
                 .collect();
             expr.kind = HirExpressionKind::Tuple(items, None);
+        }
+        if set_literal
+            && let Some((set_ty, elem_ty)) = set_target
+            && matches!(expr.kind, HirExpressionKind::Array(_))
+        {
+            // The array stays the conversion source, checked against the
+            // set's element type so each item is an element store and a wrong
+            // element is the ordinary element mismatch. The conversion keeps
+            // the literal's node id (the hole's authored form is keyed to it)
+            // and the fresh source id is its checked array child.
+            let mut source = HirExpression {
+                id: self.fresh_hir_id(),
+                kind: std::mem::replace(&mut expr.kind, HirExpressionKind::Error),
+                ty: None,
+                span: expr.span,
+            };
+            let array_ty = self.types.array(elem_ty);
+            self.check_expr_with_expected(&mut source, Some(array_ty));
+            expr.kind = HirExpressionKind::Conversio {
+                source: Box::new(source),
+                target: HirConversioTarget::Type(set_ty),
+                params: Vec::new(),
+                recovery: None,
+                route: None,
+                implicit: None,
+            };
+            expr.ty = Some(set_ty);
+            return Some(set_ty);
         }
         None
     }

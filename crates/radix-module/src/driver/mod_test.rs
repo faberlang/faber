@@ -1007,6 +1007,8 @@ mod compile_interaction_tests;
 mod conversio_tests;
 #[path = "frontmatter_locale_test.rs"]
 mod frontmatter_locale_tests;
+#[path = "inferred_set_cell_test.rs"]
+mod inferred_set_cell_tests;
 #[path = "json_valor_test.rs"]
 mod json_valor_tests;
 #[path = "regression_test.rs"]
