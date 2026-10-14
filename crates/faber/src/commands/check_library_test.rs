@@ -26,10 +26,10 @@ fn write_file(path: &Path, contents: &str) {
     std::fs::write(path, contents).expect("write file");
 }
 
-fn env_home(path: &Path) -> ResolvedLibraryHome {
+fn configured_home(path: &Path) -> ResolvedLibraryHome {
     ResolvedLibraryHome {
         path: path.to_path_buf(),
-        source: LibraryHomeSource::Env,
+        source: LibraryHomeSource::Configured,
     }
 }
 
@@ -48,7 +48,8 @@ fn check_library_src_fallback_ignores_garbage_cista_toml() {
     );
     write_file(&root.path().join("norma/src/solum.fab"), LIB_FAB);
 
-    let checkout = resolve_dev_library_from("norma", env_home(root.path())).expect("resolve norma");
+    let checkout =
+        resolve_dev_library_from("norma", configured_home(root.path())).expect("resolve norma");
     assert_eq!(checkout.root_rule, LibraryRootRule::SrcFallback);
     assert_eq!(checkout.source_root, root.path().join("norma/src"));
     assert_eq!(
@@ -76,7 +77,8 @@ fn check_library_uses_faber_toml_source_dot_not_src_fallback() {
     );
     write_file(&root.path().join("triga/math.fab"), LIB_FAB);
 
-    let checkout = resolve_dev_library_from("triga", env_home(root.path())).expect("resolve triga");
+    let checkout =
+        resolve_dev_library_from("triga", configured_home(root.path())).expect("resolve triga");
     assert_eq!(checkout.root_rule, LibraryRootRule::FaberToml);
     assert_eq!(checkout.source_root, root.path().join("triga"));
     assert_eq!(
@@ -103,7 +105,7 @@ fn check_library_malformed_faber_toml_does_not_fall_back_to_src() {
     );
     write_file(&root.path().join("triga/src/math.fab"), LIB_FAB);
 
-    let err = resolve_dev_library_from("triga", env_home(root.path()))
+    let err = resolve_dev_library_from("triga", configured_home(root.path()))
         .expect_err("malformed faber.toml must not src-fallback");
     assert!(matches!(err, CheckLibraryError::Diagnostic(_)));
 }
@@ -117,14 +119,15 @@ fn check_library_refuses_bin_package() {
     );
     write_file(&root.path().join("app/src/main.fab"), "main {}\n");
 
-    let err = resolve_dev_library_from("app", env_home(root.path())).expect_err("bin refused");
+    let err =
+        resolve_dev_library_from("app", configured_home(root.path())).expect_err("bin refused");
     assert!(matches!(err, CheckLibraryError::NotALibrary { .. }));
 }
 
 #[test]
 fn check_library_missing_provider_is_unknown() {
     let root = tempfile::tempdir().expect("temp home");
-    let err = resolve_dev_library_from("nope", env_home(root.path())).expect_err("missing");
+    let err = resolve_dev_library_from("nope", configured_home(root.path())).expect_err("missing");
     assert!(matches!(err, CheckLibraryError::UnknownProvider { .. }));
 }
 
