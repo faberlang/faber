@@ -415,6 +415,21 @@ fn cci1_additive_rows_preserve_existing_tensor_rows() {
     assert_eq!(mir_collection_op(activatio_softmax), Some(MirCollectionOp::TensorSoftmax));
 }
 
+/// e2133f3f: `causal_softmax` is the source spelling for the causal-masked
+/// softmax collection op — a method row, not a compiler-recognized
+/// `softmax(x + mask)` composition.
+#[test]
+fn causal_softmax_row_maps_to_tensor_causal_masked_softmax() {
+    let mut types = TypeTable::new();
+    let f32_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let shape = types.unspecified_shape();
+    let tensor_id = types.intern(Type::Tensor(f32_ty, shape));
+    let tensor_ty = types.get(tensor_id);
+
+    let row = lookup_method_for_type(tensor_ty, "causal_softmax", 0).expect("tensor causal_softmax");
+    assert_eq!(mir_collection_op(row), Some(MirCollectionOp::TensorCausalMaskedSoftmax));
+}
+
 #[test]
 fn regex_replace_and_text_escape_resolve_by_receiver() {
     let types = TypeTable::new();

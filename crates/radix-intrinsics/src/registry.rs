@@ -1028,6 +1028,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     intrinsic!(
         Tensor,
+        "causal_softmax",
+        0,
+        &[],
+        SameAsReceiver,
+        collection TensorCausalMaskedSoftmax
+    ),
+    intrinsic!(
+        Tensor,
         "transpone",
         0,
         &[],
