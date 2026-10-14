@@ -7,7 +7,10 @@
 use crate::ParseErrorKind;
 use crate::ParseResult;
 use crate::test_support::args_have_no_legacy_message;
-use crate::test_support::{assert_parse_error_issue_la, parse_ok_la, parse_program_la, span_for};
+use crate::test_support::{
+    assert_parse_error_issue_la, parse_ok_la, parse_program_la,
+    parse_recovering_ascii_comparison_la, span_for,
+};
 use radix_diagnostics::Span;
 use radix_syntax::{
     AssignOp, BinOp, CallDefaultExpr, ConversioTarget, Expr, ExprKind, FiguraExpr, JsonValue,
@@ -887,6 +890,59 @@ fn rejects_unlabeled_ratio_constructor_type_argument() {
         !result.success(),
         "unlabeled ratio constructor type argument must stay rejected, got {:?}",
         result.errors
+    );
+}
+
+#[test]
+fn record_field_list_hole_constructor_parses() {
+    // `ratio<*> { g = 1.0, w = 2 }` (en `record<*>`): the expression-
+    // position hole constructor is the same Verte node a labeled ratio
+    // constructor builds, with the type back at `FieldListHole`.
+    let result = parse_ok_la("incipit { fixum ratio<*> p ← ratio<*> { g = 1.0, w = 2 } }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let radix_syntax::IfBody::Block(block) = &incipit.body else {
+        panic!("expected block body");
+    };
+    let StmtKind::Var(var) = &block.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let init = var.init.as_deref().expect("initializer");
+    let ExprKind::Verte(verte) = &init.kind else {
+        panic!(
+            "expected ratio hole construction to be Verte, got {:?}",
+            init.kind
+        );
+    };
+    assert!(matches!(verte.ty.kind, TypeExprKind::FieldListHole));
+    let ExprKind::Object(object) = &verte.expr.kind else {
+        panic!("expected ratio construction object");
+    };
+    assert_eq!(object.fields.len(), 2);
+}
+
+#[test]
+fn ratio_comparison_is_not_a_hole_constructor() {
+    // `ratio < 5` has no `*`/`>`/`{` hole head, so the diversion stays a
+    // comparison (recovered from the retired ASCII spelling).
+    let result = parse_recovering_ascii_comparison_la("incipit { fixum bivalens b ← ratio < 5 }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let radix_syntax::IfBody::Block(block) = &incipit.body else {
+        panic!("expected block body");
+    };
+    let StmtKind::Var(var) = &block.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let init = var.init.as_deref().expect("initializer");
+    assert!(
+        matches!(init.kind, ExprKind::Binary(_)),
+        "expected comparison, got {:?}",
+        init.kind
     );
 }
 
