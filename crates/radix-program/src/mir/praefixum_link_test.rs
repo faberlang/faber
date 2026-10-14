@@ -147,6 +147,47 @@ fn praefixum_link_evaluates_chained_comptime_modules() {
 }
 
 #[test]
+fn praefixum_link_carried_provider_holds_evaluated_constant() {
+    let dir = test_temp_dir("praefixum-link-carried-provider");
+    let dir = dir.as_ref();
+    write(dir, "consts.fab", CONSTS);
+    write(
+        dir,
+        "c.fab",
+        "import from \"./consts\" consts\n\n\
+         @ public\nconst int G = comptime {\n    return consts.seven()\n}\n",
+    );
+    write(
+        dir,
+        "main.fab",
+        "import from \"./c\" c\n\n\
+         main {\n    print c.G\n}\n",
+    );
+    let package = analyze(dir);
+    let (_, a) = package.node_by_path(&dir.join("main.fab")).unwrap();
+    let carried = a
+        .analysis
+        .provider_units
+        .get("./c")
+        .expect("the entry carries a provider unit for ./c");
+    let unit = carried
+        .lock_unit()
+        .expect("c's carried provider unit is its evaluated analysis");
+    let value = unit
+        .hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            HirItemKind::Constant(konst) if unit.interner.resolve(konst.name) == "G" => {
+                Some(&konst.value)
+            }
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("c's carried unit declares G"));
+    assert_eq!(int_literal(value), 7);
+}
+
+#[test]
 fn praefixum_link_imported_callee_that_prints_is_forbidden() {
     let dir = test_temp_dir("praefixum-link-effect");
     let dir = dir.as_ref();
