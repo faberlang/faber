@@ -1,0 +1,49 @@
++++
+term = "instans"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "base_type", "type_arguments", "type_argument", "conversio_expr", "literal", "equality", "equality_tail", "comparison", "expression", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Approximate equality and ordering across instans precisions compare at the coarser precision; `≡` across precisions stays an error."
+syntax = "whole ≅ half | whole ≤ half | whole ≥ half | whole ≇ half"
+related = ["instans", "conversio"]
+locale = "en"
++++
+# =============================================================================
+# instans — Approximate equality and ordering across precisions
+# =============================================================================
+#
+# What this teaches:
+#   • `≅` across precisions means equal at the coarser precision: a
+#     whole-second instant and a millisecond instant in the same second match.
+#   • `≤` and `≥` likewise hold at the coarser precision.
+#   • `≇` is the negation of `≅`.
+#
+# Common mistakes:
+#   • Reading `≅` as `≡` — across precisions `≡` is still a compile error and
+#     is pinned elsewhere.
+#
+# See also: instans, conversio/instans
+# =============================================================================
+
+# instans — one second, two precisions
+#
+# EXPECTED stdout: see instans-approx-cross-precision.expected
+
+main {
+    # same second; the millisecond wire adds sub-second precision
+    const value secondWire ← "1979-05-27T07:32:00Z"
+    const value millisWire ← "1979-05-27T07:32:00.500Z"
+    const instant whole ← secondWire ↦ instant
+    const instant<ms> half ← millisWire ↦ instant<ms>
+
+    const bool approx ← whole ≅ half
+    const bool atMost ← whole ≤ half
+    const bool atLeast ← whole ≥ half
+    const bool distinct ← whole ≇ half
+
+    print approx
+    print atMost
+    print atLeast
+    print distinct
+}
