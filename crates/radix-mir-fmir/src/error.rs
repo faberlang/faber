@@ -433,7 +433,7 @@ fn fmt_artifact_encoding_mismatch(
 fn fmt_non_admitted_backend(f: &mut fmt::Formatter<'_>, backend: &str) -> fmt::Result {
     write!(
         f,
-        "FMIR device artifact backend `{backend}` is not a compiled-in leaf — representable on the packet and preserved-until-selection (DDCP3-U0 (f)); selection use fails closed with `UnsupportedSelectedBackend`, never silently dropped, remapped, or fallback-laned (contract §Unknown future backends)"
+        "FMIR device artifact backend `{backend}` is not a compiled-in leaf — representable on the packet and preserved-until-selection (DDCP3-U0 (f)); selection use fails closed with `NonAdmittedSelectedBackend`, never silently dropped, remapped, or fallback-laned (contract §Unknown future backends)"
     )
 }
 
