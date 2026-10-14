@@ -474,6 +474,9 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "conversio_via_bits_retired" => {
             Some("write `x ↦ b32` to read a float as its bit pattern (b16, b32 or b64 by width) and `b32 ↦ f32` to build one; a pattern held in a number goes through its marker first, as in `u16 ↦ b16 ↦ f16`".to_owned())
         }
+        "conversio_map_key_not_textus" => {
+            Some("write the map with `string` keys; a conversion never parses keys, and `@ json` on a class defines the wire mapping".to_owned())
+        }
         "code_hint_pair_mismatch" => {
             Some("Code reads a code point as littera ↦ u32 via Code or builds one as numerus ↦ littera via Code".to_owned())
         }

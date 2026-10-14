@@ -2547,6 +2547,10 @@ help = "اكتب `x ↦ int via Floor` أو `via Ceil` أو `via HalfEven` (ال
 message = "`via Bits` ملغى: نمط البتات يُحمل في علامة bN ولا يُختار بتلميح"
 help = "اكتب `x ↦ b32` لقراءة عائم كنمط بتاته (b16 أو b32 أو b64 حسب العرض) و`b32 ↦ f32` لبناء واحد؛ والنمط المحمول في رقم يمر بعلامته أولا، كما في `u16 ↦ b16 ↦ f16`"
 
+[diagnostics.SEM016.issues.conversio_map_key_not_textus]
+message = "مفتاح map عند التحويل من valor أو إليه يجب أن يكون textus"
+help = "اكتب map بمفاتيح textus؛ التحويل لا يحلل المفاتيح أبدا، و`@ json` على genus يحدد تخطيط wire"
+
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "conversion من {octeti} إلى {bivalens} بلا default meaning؛ فك إلى {textus} أو قارن bytes صراحة"
 help = "استخدم chorda أو explicit byte conversion helpers"

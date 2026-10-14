@@ -1630,3 +1630,7 @@ mod sermo_route_typing_test;
 #[cfg(test)]
 #[path = "pin_store_test.rs"]
 mod pin_store_test;
+
+#[cfg(test)]
+#[path = "valor_map_key_test.rs"]
+mod valor_map_key_test;

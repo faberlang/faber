@@ -2559,6 +2559,10 @@ help = "เขียน `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ก�
 message = "`via Bits` ถูกยกเลิกแล้ว: รูปแบบบิตเก็บไว้ในเครื่องหมาย bN ไม่ได้เลือกด้วย hint"
 help = "เขียน `x ↦ b32` เพื่ออ่าน float เป็นรูปแบบบิตของมัน (b16, b32 หรือ b64 ตามความกว้าง) และ `b32 ↦ f32` เพื่อสร้างขึ้นมา; รูปแบบที่เก็บในตัวเลขจะผ่านเครื่องหมายของมันก่อน ดังใน `u16 ↦ b16 ↦ f16`"
 
+[diagnostics.SEM016.issues.conversio_map_key_not_textus]
+message = "คีย์ map ที่แปลงจากหรือเป็น valor ต้องเป็น textus"
+help = "เขียน map ด้วยคีย์ textus; การแปลงไม่ parse คีย์ และ `@ json` บน class กำหนด wire mapping"
+
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "การแปลงจาก octeti เป็น bivalens ไม่มีความหมายเริ่มต้น; ถอดรหัสเป็น textus หรือเปรียบเทียบไบต์อย่างชัดเจน"
 help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"

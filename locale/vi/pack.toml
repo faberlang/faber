@@ -2547,6 +2547,10 @@ help = "viết `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (khi hòa chọ
 message = "`via Bits` đã bị loại bỏ: mẫu bit được giữ trong dấu bN, không được chọn bằng hint"
 help = "viết `x ↦ b32` để đọc một fractus dưới dạng mẫu bit của nó (b16, b32 hoặc b64 theo độ rộng) và `b32 ↦ f32` để dựng lại một mẫu; mẫu nằm trong một số phải đi qua dấu của nó trước, như trong `u16 ↦ b16 ↦ f16`"
 
+[diagnostics.SEM016.issues.conversio_map_key_not_textus]
+message = "khóa map được chuyển đổi từ hoặc sang valor phải là textus"
+help = "viết map với khóa textus; chuyển đổi không bao giờ parse khóa, và `@ json` trên class định nghĩa ánh xạ wire"
+
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "chuyển đổi từ octeti sang bivalens không có ý nghĩa mặc định; giải mã sang textus hoặc so sánh byte một cách rõ ràng"
 help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte rõ ràng"

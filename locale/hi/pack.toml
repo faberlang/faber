@@ -2559,6 +2559,10 @@ help = "`x ↦ int via Floor`, `via Ceil`, `via HalfEven` (बराबरी �
 message = "`via Bits` हटा दिया गया है: bit pattern bN marker में रखा जाता है, किसी hint से नहीं चुना जाता"
 help = "किसी float को उसके bit pattern के रूप में पढ़ने के लिए `x ↦ b32` लिखें (width के अनुसार b16, b32 या b64) और बनाने के लिए `b32 ↦ f32`; number में रखा pattern पहले अपने marker से जाता है, जैसे `u16 ↦ b16 ↦ f16`"
 
+[diagnostics.SEM016.issues.conversio_map_key_not_textus]
+message = "valor से या valor में बदली गई map कुंजी textus होनी चाहिए"
+help = "map को textus कुंजियों के साथ लिखें; रूपांतरण कुंजियों को कभी parse नहीं करता, और class पर `@ json` wire mapping परिभाषित करता है"
+
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "octeti से bivalens में रूपांतरण का कोई default अर्थ नहीं है; textus में decode करें या bytes की स्पष्ट तुलना करें"
 help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"

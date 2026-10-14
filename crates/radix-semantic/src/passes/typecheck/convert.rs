@@ -53,6 +53,7 @@ const ISSUE_VALOR_TO_CURSOR_BOUNDARY: &str = "valor_to_cursor_boundary";
 const ISSUE_VALOR_TO_PROMISSUM_BOUNDARY: &str = "valor_to_promissum_boundary";
 const ISSUE_PROMISSUM_TO_VALOR_BOUNDARY: &str = "promissum_to_valor_boundary";
 const ISSUE_CURSOR_TO_VALOR_BOUNDARY: &str = "cursor_to_valor_boundary";
+const ISSUE_CONVERSIO_MAP_KEY_NOT_TEXTUS: &str = "conversio_map_key_not_textus";
 const ISSUE_NUMERIC_TO_OCTETI_UNSPECIFIED: &str = "numeric_to_octeti_unspecified";
 const ISSUE_OCTETI_TO_NUMERUS_UNSPECIFIED: &str = "octeti_to_numerus_unspecified";
 const ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH: &str = "octeti_endian_width_mismatch";
@@ -1225,6 +1226,9 @@ impl TypeChecker<'_> {
                 Type::Promissum(_) | Type::PromissumFailable(_, _) => {
                     Some(ISSUE_VALOR_TO_PROMISSUM_BOUNDARY)
                 }
+                _ if self.valor_extraction_contains_non_textus_map_key(target_resolved) => {
+                    Some(ISSUE_CONVERSIO_MAP_KEY_NOT_TEXTUS)
+                }
                 _ => None,
             }
         } else if target_is_valor {
@@ -1233,6 +1237,9 @@ impl TypeChecker<'_> {
                     Some(ISSUE_PROMISSUM_TO_VALOR_BOUNDARY)
                 }
                 Type::Cursor(_) | Type::AsyncCursor(_, _) => Some(ISSUE_CURSOR_TO_VALOR_BOUNDARY),
+                _ if self.valor_extraction_contains_non_textus_map_key(source_resolved) => {
+                    Some(ISSUE_CONVERSIO_MAP_KEY_NOT_TEXTUS)
+                }
                 _ => None,
             }
         } else {
@@ -1273,6 +1280,66 @@ impl TypeChecker<'_> {
     fn valor_extraction_contains_unsupported_sized_numeric(&self, target: TypeId) -> bool {
         let mut seen = rustc_hash::FxHashSet::default();
         self.valor_extraction_type_needs_missing_width_runtime(target, false, &mut seen)
+    }
+
+    /// `valor ↦ tabula<K, V>` needs a textus key in both directions: a
+    /// conversion never parses keys, so a non-text key anywhere inside the
+    /// value being extracted is the same error (need, G-01a). The
+    /// walk mirrors [`Self::valor_extraction_type_needs_missing_width_runtime`]
+    /// so nested `lista<tabula<numerus, V>>` shapes cannot slip through.
+    fn valor_extraction_contains_non_textus_map_key(&self, ty: TypeId) -> bool {
+        let mut seen = rustc_hash::FxHashSet::default();
+        self.valor_extraction_type_has_non_textus_map_key(ty, &mut seen)
+    }
+
+    fn valor_extraction_type_has_non_textus_map_key(
+        &self,
+        ty: TypeId,
+        seen: &mut rustc_hash::FxHashSet<TypeId>,
+    ) -> bool {
+        let resolved = self.resolve_inferred_type(ty);
+        if !seen.insert(resolved) {
+            return false;
+        }
+
+        match self.types.get(resolved) {
+            Type::Map(key, value) => {
+                !self.is_textus(*key)
+                    || self.valor_extraction_type_has_non_textus_map_key(*value, seen)
+            }
+            Type::Array(inner)
+            | Type::Set(inner)
+            | Type::Tensor(inner, _)
+            | Type::Sparsa(inner, _)
+            | Type::Matrix(inner, _)
+            | Type::Vector(inner, _)
+            | Type::Option(inner)
+            | Type::Ref(_, inner)
+            | Type::Alias(_, inner)
+            | Type::Intervallum(inner)
+            | Type::Atomic(inner) => {
+                self.valor_extraction_type_has_non_textus_map_key(*inner, seen)
+            }
+            Type::Struct(def_id) => self.structs.get(def_id).is_some_and(|fields| {
+                fields
+                    .fields
+                    .values()
+                    .any(|field| self.valor_extraction_type_has_non_textus_map_key(field.ty, seen))
+            }),
+            Type::Union(types) => types
+                .iter()
+                .any(|ty| self.valor_extraction_type_has_non_textus_map_key(*ty, seen)),
+            Type::Applied(base, args) => {
+                self.valor_extraction_type_has_non_textus_map_key(*base, seen)
+                    || args.iter().any(|arg| match arg {
+                        radix_types::AppliedArg::Type(id) => {
+                            self.valor_extraction_type_has_non_textus_map_key(*id, seen)
+                        }
+                        radix_types::AppliedArg::Size(_) => false,
+                    })
+            }
+            _ => false,
+        }
     }
 
     fn valor_extraction_type_needs_missing_width_runtime(
