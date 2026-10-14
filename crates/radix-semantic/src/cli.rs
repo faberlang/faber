@@ -854,6 +854,10 @@ impl CliBuilder<'_> {
     }
 
     fn cli_type(&mut self, ty: &TypeExpr, span: Span) -> CliType {
+        if ty.mode.is_some() {
+            self.error(span, ISSUE_UNSUPPORTED_TYPE_SHAPE);
+            return CliType::Textus;
+        }
         match &ty.kind {
             TypeExprKind::Named(name, params) if params.is_empty() => {
                 self.named_cli_type(name.name, span)
