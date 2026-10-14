@@ -83,7 +83,6 @@ pub(super) fn library_root_of_interface(interface_path: &Path) -> Option<std::pa
 /// Every library package root reachable through an analyzed program's
 /// expanded library imports, deduped by directory. Imports whose interface
 /// path has no manifest ancestor are skipped.
-#[allow(dead_code)]
 pub(super) fn library_package_roots(
     package: &radix::program::analyze::AnalyzedProgram,
 ) -> std::collections::BTreeSet<std::path::PathBuf> {
@@ -96,6 +95,30 @@ pub(super) fn library_package_roots(
         }
     }
     roots
+}
+
+/// Install the library `[target.<spelling>]` bindings on the retry's Config.
+///
+/// The package-analysis retry re-emits the entry module after the single-file
+/// route refused an import-reaching `comptime`. Only WGSL consumes target
+/// bindings; every other target keeps the config untouched. A manifest that
+/// cannot be read fails the emit with its load diagnostics.
+pub(super) fn config_with_library_bindings(
+    config: radix::driver::Config,
+    command: &EmitCommand,
+    package: &radix::program::analyze::AnalyzedProgram,
+) -> Result<radix::driver::Config, Vec<radix::module::diagnostics::Diagnostic>> {
+    if command.target != radix::module::codegen::Target::MirWgsl {
+        return Ok(config);
+    }
+    let roots = library_package_roots(package);
+    let (bindings, diagnostics) =
+        merge_library_target_bindings(&roots, &command.target.to_string());
+    if diagnostics.is_empty() {
+        Ok(config.with_target_bindings(bindings))
+    } else {
+        Err(diagnostics)
+    }
 }
 
 /// Single-file `wgsl-text` emit: each imported library's `[target.wgsl-text]`
@@ -305,6 +328,15 @@ pub(super) fn emit_through_package_analysis(
         &faber_cli::package::faber_analysis_seams(),
     ) {
         Ok(package) => package,
+        Err(diagnostics) => {
+            return radix::CompileResult {
+                output: None,
+                diagnostics,
+            };
+        }
+    };
+    let config = match config_with_library_bindings(config, command, &package) {
+        Ok(config) => config,
         Err(diagnostics) => {
             return radix::CompileResult {
                 output: None,
