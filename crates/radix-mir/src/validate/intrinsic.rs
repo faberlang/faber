@@ -1129,7 +1129,9 @@ impl Validator<'_, '_> {
                 let Some(collection_ty) = first_arg_ty else {
                     return;
                 };
-                let Type::Map(key_ty, value_ty) = self.type_kind(collection_ty) else {
+                let (Type::Map(key_ty, value_ty) | Type::Ledger(key_ty, value_ty)) =
+                    self.type_kind(collection_ty)
+                else {
                     self.error(span, "collection put receiver is not a map");
                     return;
                 };
@@ -1169,7 +1171,7 @@ impl Validator<'_, '_> {
                     let value_ty = self.validate_operand(scope, value, span);
                     if let Some(value_ty) = value_ty {
                         let expected = match self.type_kind(collection_ty) {
-                            Type::Map(key, _) => Some((
+                            Type::Map(key, _) | Type::Ledger(key, _) => Some((
                                 MirType::semantic(*key),
                                 "collection delete key type mismatch",
                             )),
@@ -2999,8 +3001,12 @@ impl Validator<'_, '_> {
             return;
         };
         let element_ty = match self.type_kind(collection_ty) {
-            Type::Map(key, _) if matches!(op, MirCollectionOp::Keys) => *key,
-            Type::Map(_, value) if matches!(op, MirCollectionOp::Values) => *value,
+            Type::Map(key, _) | Type::Ledger(key, _) if matches!(op, MirCollectionOp::Keys) => *key,
+            Type::Map(_, value) | Type::Ledger(_, value)
+                if matches!(op, MirCollectionOp::Values) =>
+            {
+                *value
+            }
             _ => {
                 self.error(span, receiver_msg);
                 return;
