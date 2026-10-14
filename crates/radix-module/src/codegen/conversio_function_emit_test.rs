@@ -60,10 +60,10 @@ fn emit(target: Target, source: &str) -> String {
 #[test]
 fn rust_calls_the_conversio_function() {
     let code = emit(Target::HirRust, &format!("{DECLS}{USES}"));
-    assert!(code.contains("let f: Fahrenheit = adFahrenheit(Celsius {"), "{code}");
+    assert!(code.contains("let l_f: Fahrenheit = adFahrenheit(Celsius {"), "{code}");
     assert!(code.contains("}).unwrap_or_else(|_| Mensura {"), "{code}");
     let code = emit(Target::HirRust, &format!("{DECLS}{PROPAGATES}"));
-    assert!(code.contains("adMensuram(l.clone())?"), "{code}");
+    assert!(code.contains("adMensuram(p_l.clone())?"), "{code}");
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn go_calls_the_conversio_function() {
 #[test]
 fn ts_calls_the_conversio_function() {
     let code = emit(Target::HirTypeScript, &format!("{DECLS}{USES}"));
-    assert!(code.contains("const f: Fahrenheit = adFahrenheit("), "{code}");
+    assert!(code.contains("const l_f: Fahrenheit = adFahrenheit("), "{code}");
     assert!(code.contains("const __r = adMensuram("), "{code}");
     assert!(code.contains("return __r.ok ? __r.value : "), "{code}");
     let result = compile(Target::HirTypeScript, &format!("{DECLS}{PROPAGATES}"));
@@ -93,5 +93,5 @@ fn swift_calls_an_infallible_conversio_function() {
             "{DECLS}incipit {{\n    fixum Fahrenheit f ← Celsius {{ gradus = 1.0 }} ↦ Fahrenheit\n    nota f.gradus\n}}\n"
         ),
     );
-    assert!(code.contains("let f: Fahrenheit = adFahrenheit(c: Celsius("), "{code}");
+    assert!(code.contains("let l_f: Fahrenheit = adFahrenheit(c: Celsius("), "{code}");
 }

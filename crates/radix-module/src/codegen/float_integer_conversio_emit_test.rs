@@ -42,13 +42,13 @@ fn rust_checks_float_truncation_and_honors_recovery() {
         code.contains("faber::trap::some(") && code.contains("faber::Trap::OutOfRange(\"fractus\", \"numerus\")"),
         "{code}"
     );
-    assert!(!code.contains("d as u8"), "no saturating `as` cast: {code}");
+    assert!(!code.contains("l_d as u8"), "no saturating `as` cast: {code}");
 }
 
 #[test]
 fn go_checks_float_truncation_and_honors_recovery() {
     let code = emit(Target::HirGo);
-    assert!(code.contains("math.Trunc(float64(d))"), "{code}");
+    assert!(code.contains("math.Trunc(float64(l_d))"), "{code}");
     assert!(
         code.contains("math.IsNaN(v) || math.IsInf(v, 0) || v < 0.0 || v >= 256.0"),
         "{code}"
@@ -62,7 +62,7 @@ fn go_checks_float_truncation_and_honors_recovery() {
 fn ts_checks_float_truncation_and_honors_recovery() {
     let code = emit(Target::HirTypeScript);
     assert!(
-        code.contains("!Number.isFinite(__v) || __v < 0 || __v >= 256) ? 7 : __v)(Math.trunc(d))"),
+        code.contains("!Number.isFinite(__v) || __v < 0 || __v >= 256) ? 7 : __v)(Math.trunc(l_d))"),
         "{code}"
     );
     assert!(code.contains(&format!("throw new Error(\"{MESSAGE}\")")), "{code}");
@@ -75,9 +75,9 @@ fn swift_checks_float_truncation_and_honors_recovery() {
         code.contains("let t = v.rounded(.towardZero); guard t.isFinite, t >= 0.0, t < 256.0"),
         "{code}"
     );
-    assert!(code.contains("else { return 7 }; return UInt8(t) })(d)"), "{code}");
+    assert!(code.contains("else { return 7 }; return UInt8(t) })(l_d)"), "{code}");
     assert!(code.contains(&format!("fatalError(\"{MESSAGE}\")")), "{code}");
-    assert!(!code.contains("UInt8(d)"), "no trapping native initializer: {code}");
+    assert!(!code.contains("UInt8(l_d)"), "no trapping native initializer: {code}");
 }
 
 #[test]
@@ -87,8 +87,8 @@ fn python_checks_float_truncation_and_honors_recovery() {
         code.contains("def _faber_float_int(value, lo, hi, recover, mode=None):"),
         "{code}"
     );
-    assert!(code.contains("_faber_float_int(d, 0, 255, lambda: 7, \"trunc\")"), "{code}");
-    assert!(code.contains("_faber_float_int(d, 0, 255, None, \"trunc\")"), "{code}");
+    assert!(code.contains("_faber_float_int(l_d, 0, 255, lambda: 7, \"trunc\")"), "{code}");
+    assert!(code.contains("_faber_float_int(l_d, 0, 255, None, \"trunc\")"), "{code}");
     assert!(code.contains(&format!("raise FaberError(\"{MESSAGE}\")")), "{code}");
     assert!(code.contains("class FaberError(Exception):"), "{code}");
 }
