@@ -258,7 +258,18 @@ fn lane_id_and_grid_arithmetic_are_u32_while_binders_stay_int() {
 fn lane_form_copy_is_admitted_and_emits_on_metal() {
     let msl = crate::mir::test_support::compile_metal_text(&english(COPY))
         .unwrap_or_else(|error| panic!("lane-form copy must emit: {error}"));
-    assert!(msl.contains("kernel void copy("), "{msl}");
+    // ca2499dc-3.1: the compiler owns the device entry name; the author's
+    // `copy` is decoration only and the emitted entry is `k<function id>`.
+    let entry = msl
+        .split_once("kernel void ")
+        .map(|(_, rest)| rest)
+        .expect("the Metal source declares a kernel entry");
+    assert!(
+        entry
+            .strip_prefix('k')
+            .is_some_and(|id| id.starts_with(|c: char| c.is_ascii_digit())),
+        "the entry is k<id>: {msl}"
+    );
     assert!(msl.contains("thread_position_in_grid"), "{msl}");
     assert!(msl.contains("b0_extent0"), "extent resources are declared: {msl}");
 }
