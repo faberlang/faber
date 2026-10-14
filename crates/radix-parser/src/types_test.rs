@@ -2,14 +2,13 @@
 //!
 //! Contract: each type form produces the expected `TypeExprKind` variant or a structured diagnostic.
 
+use crate::ParseErrorKind;
 use crate::test_support::args_have_no_legacy_message;
-use crate::test_support::{parse_ok, parse_program};
-use crate::{ParseErrorKind, parse};
-use radix_lexer::lex;
+use crate::test_support::{parse_ok_la, parse_program_la};
 use radix_syntax::{ClassMemberKind, ExprKind, FiguraExpr, GenericArgExpr, StmtKind, TypeExprKind};
 
 fn parse_errors_include_issue(source: &str, kind: ParseErrorKind, issue: &str) {
-    let result = parse(lex(source));
+    let result = parse_program_la(source);
     let errors = result
         .errors
         .iter()
@@ -28,7 +27,7 @@ fn parse_errors_include_issue(source: &str, kind: ParseErrorKind, issue: &str) {
 }
 
 fn expect_expected_issue(source: &str, issue: &str) -> crate::ParseError {
-    let result = parse(lex(source));
+    let result = parse_program_la(source);
     let err = result
         .errors
         .into_iter()
@@ -56,7 +55,7 @@ fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeEx
 
 #[test]
 fn rejects_postfix_array_param_type() {
-    let result = parse(lex("functio sum(numerus[] items) → numerus { redde 0 }"));
+    let result = parse_program_la("functio sum(numerus[] items) → numerus { redde 0 }");
     assert!(
         !result.success(),
         "postfix array param type must be rejected, got {:?}",
@@ -74,7 +73,7 @@ fn rejects_postfix_array_param_type() {
 #[test]
 fn invalid_type_emits_vector_sugar_angle_bracket_form() {
     let source = "functio f(vf32<f32> value) → vacuum {}";
-    let result = parse(lex(source));
+    let result = parse_program_la(source);
     let err = result
         .errors
         .iter()
@@ -102,7 +101,7 @@ fn invalid_type_emits_vector_sugar_angle_bracket_form() {
 #[test]
 fn invalid_type_tensor_sugar_angle_form_carries_sugar_discriminator() {
     let source = "functio f(tf32<f32> value) → vacuum {}";
-    let result = parse(lex(source));
+    let result = parse_program_la(source);
     let err = result
         .errors
         .iter()
@@ -131,7 +130,7 @@ fn invalid_type_tensor_sugar_angle_form_carries_sugar_discriminator() {
 
 #[test]
 fn parses_own_and_copy_type_position_markers() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         "fixum lista<numerus> owned ← own vacua\nfixum lista<numerus> copied ← copy vacua",
     );
     let program = result.program.as_ref().expect("program");
@@ -153,7 +152,8 @@ fn parses_own_and_copy_type_position_markers() {
 
 #[test]
 fn parses_own_copy_markers_on_function_params() {
-    let result = parse_ok("functio f(own lista<numerus> xs, copy lista<numerus> ys) → vacuum {}");
+    let result =
+        parse_ok_la("functio f(own lista<numerus> xs, copy lista<numerus> ys) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -170,12 +170,12 @@ fn parses_own_copy_markers_on_function_params() {
 
 #[test]
 fn own_and_copy_remain_binding_names() {
-    let _ = parse_ok("incipit { fixum numerus own ← 1\n fixum numerus copy ← 2 }");
+    let _ = parse_ok_la("incipit { fixum numerus own ← 1\n fixum numerus copy ← 2 }");
 }
 
 #[test]
 fn parses_type_position_markers_on_fn_type_params() {
-    let result = parse_ok(
+    let result = parse_ok_la(
         "typus Handler = (de textus, in numerus, own lista<numerus>, copy textus) → vacuum",
     );
     let program = result.program.as_ref().expect("program");
@@ -205,7 +205,7 @@ fn parses_type_position_markers_on_fn_type_params() {
 
 #[test]
 fn parses_type_position_markers_on_closure_params() {
-    let result = parse_ok("fixum _ f ← (de textus x, own lista<numerus> xs) ∴ xs");
+    let result = parse_ok_la("fixum _ f ← (de textus x, own lista<numerus> xs) ∴ xs");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(binding) = &program.statements[0].kind else {
         panic!("expected fixum");
@@ -225,7 +225,7 @@ fn parses_type_position_markers_on_closure_params() {
 
 #[test]
 fn union_type_preserves_member_modes_when_flattening() {
-    let result = parse_ok("typus MaybeBorrow = de textus ∪ nihil");
+    let result = parse_ok_la("typus MaybeBorrow = de textus ∪ nihil");
     let program = result.program.as_ref().expect("program");
     let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
         panic!("expected type alias");
@@ -248,7 +248,7 @@ fn union_type_preserves_member_modes_when_flattening() {
 fn function_type_arrow_is_greedy_over_union_tail() {
     // The return type consumes `∪ nihil`, so the union sits inside the arrow
     // and the function type itself is not a union member.
-    let result = parse_ok("typus Probe = (numerus) → numerus ∪ nihil");
+    let result = parse_ok_la("typus Probe = (numerus) → numerus ∪ nihil");
     let program = result.program.as_ref().expect("program");
     let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
         panic!("expected type alias");
@@ -273,7 +273,7 @@ fn function_type_arrow_is_greedy_over_union_tail() {
 
 #[test]
 fn parses_tensor_with_literal_and_infer_figura() {
-    let result = parse_ok("functio f(tensor<f32, [2, 3]> value) → vacuum {}");
+    let result = parse_ok_la("functio f(tensor<f32, [2, 3]> value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -295,7 +295,7 @@ fn parses_tensor_with_literal_and_infer_figura() {
 
 #[test]
 fn parses_affine_tensor_dimensions_with_division_precedence() {
-    let result = parse_ok("functio f(tensor<f32, [N - 1, D / 2 + 3]> value) → vacuum {}");
+    let result = parse_ok_la("functio f(tensor<f32, [N - 1, D / 2 + 3]> value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -312,7 +312,7 @@ fn parses_affine_tensor_dimensions_with_division_precedence() {
 
 #[test]
 fn parses_atomic_with_single_element_type() {
-    let result = parse_ok("functio f(atomic<i32> cell) → vacuum {}");
+    let result = parse_ok_la("functio f(atomic<i32> cell) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -334,7 +334,7 @@ fn atomic_extra_type_parameter_emits_structured_expected_issue() {
 
 #[test]
 fn parses_lista_infer_element_hole() {
-    let result = parse_ok("functio f(lista<_> value) → vacuum {}");
+    let result = parse_ok_la("functio f(lista<_> value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -359,7 +359,7 @@ fn types_test_parses_queue_and_stack_bounded_type_forms() {
         ("typus X = stack<textus, 8>", "stack", &["textus", "8"]),
     ];
     for (source, type_name, expected_params) in cases {
-        let result = parse_ok(source);
+        let result = parse_ok_la(source);
         let program = result.program.as_ref().expect("program");
         let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
             panic!("expected type alias in {source}");
@@ -400,7 +400,7 @@ fn types_test_parses_proposed_bounded_type_forms() {
         ("typus X = octeti<8>", "octeti", &["8"]),
     ];
     for (source, type_name, expected_params) in cases {
-        let result = parse_ok(source);
+        let result = parse_ok_la(source);
         let program = result.program.as_ref().expect("program");
         let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
             panic!("expected type alias in {source}");
@@ -422,7 +422,7 @@ fn types_test_parses_proposed_bounded_type_forms() {
 
 #[test]
 fn parses_qualified_type_path() {
-    let result = parse_ok("functio f(terminus.Terminus value) → vacuum {}");
+    let result = parse_ok_la("functio f(terminus.Terminus value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -438,7 +438,7 @@ fn parses_qualified_type_path() {
 
 #[test]
 fn parses_tensor_with_infer_figura_hole() {
-    let result = parse_ok("functio f(tensor<f32, _> value) → vacuum {}");
+    let result = parse_ok_la("functio f(tensor<f32, _> value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -484,7 +484,7 @@ fn matrix_without_figura_emits_structured_expected_issue() {
 
 #[test]
 fn generic_applied_arg_preserves_literal_as_source_value() {
-    let result = parse_ok("typus Vector = Box<3>");
+    let result = parse_ok_la("typus Vector = Box<3>");
     let program = result.program.as_ref().expect("program");
     let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
         panic!("expected type alias");
@@ -500,7 +500,7 @@ fn generic_applied_arg_preserves_literal_as_source_value() {
 
 #[test]
 fn parses_tensor_sugar_with_infer_figura() {
-    let result = parse_ok("functio f(tf32 value) → vacuum {}");
+    let result = parse_ok_la("functio f(tf32 value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -517,7 +517,7 @@ fn parses_tensor_sugar_with_infer_figura() {
 
 #[test]
 fn parses_tensor_sugar_with_bracket_figura() {
-    let result = parse_ok("functio f(ti64[2, 3] value) → vacuum {}");
+    let result = parse_ok_la("functio f(ti64[2, 3] value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -538,7 +538,7 @@ fn parses_tensor_sugar_with_bracket_figura() {
 
 #[test]
 fn parses_vector_long_form() {
-    let result = parse_ok("functio f(vector<f32, 4> a) → vacuum {}");
+    let result = parse_ok_la("functio f(vector<f32, 4> a) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -556,7 +556,7 @@ fn parses_vector_long_form() {
 
 #[test]
 fn parses_vector_sugar_bracket_form() {
-    let result = parse_ok("functio f(vf32[4] b) → vacuum {}");
+    let result = parse_ok_la("functio f(vf32[4] b) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -576,7 +576,7 @@ fn parses_vector_sugar_bracket_form() {
 
 #[test]
 fn parses_matrix_long_form() {
-    let result = parse_ok("functio f(matrix<f32, [4, 4]> a) → vacuum {}");
+    let result = parse_ok_la("functio f(matrix<f32, [4, 4]> a) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -598,7 +598,7 @@ fn parses_matrix_long_form() {
 
 #[test]
 fn parses_matrix_sugar_bracket_form() {
-    let result = parse_ok("functio f(mf32[3, 2] b) → vacuum {}");
+    let result = parse_ok_la("functio f(mf32[3, 2] b) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -628,7 +628,7 @@ fn matrix_sugar_requires_bracket_shape() {
 
 #[test]
 fn parses_tensor_sugar_rank_zero_brackets() {
-    let result = parse_ok("functio f(tf32[] value) → vacuum {}");
+    let result = parse_ok_la("functio f(tf32[] value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -644,7 +644,7 @@ fn parses_tensor_sugar_rank_zero_brackets() {
 
 #[test]
 fn parses_sparsa_sugar_with_infer_figura() {
-    let result = parse_ok("functio f(sf32 value) → vacuum {}");
+    let result = parse_ok_la("functio f(sf32 value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -661,7 +661,7 @@ fn parses_sparsa_sugar_with_infer_figura() {
 
 #[test]
 fn parses_sparsa_sugar_with_bracket_figura() {
-    let result = parse_ok("functio f(si64[N] value) → vacuum {}");
+    let result = parse_ok_la("functio f(si64[N] value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -681,7 +681,7 @@ fn parses_sparsa_sugar_with_bracket_figura() {
 
 #[test]
 fn parses_sparsa_sugar_rank_zero_brackets() {
-    let result = parse_ok("functio f(sf64[] value) → vacuum {}");
+    let result = parse_ok_la("functio f(sf64[] value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -697,7 +697,7 @@ fn parses_sparsa_sugar_rank_zero_brackets() {
 
 #[test]
 fn parses_sparsa_sugar_unsigned_width() {
-    let result = parse_ok("functio f(su32[4] value) → vacuum {}");
+    let result = parse_ok_la("functio f(su32[4] value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -726,7 +726,7 @@ fn rejects_sparsa_sugar_angle_bracket_form() {
 
 #[test]
 fn parses_standalone_width_marker_type() {
-    let result = parse_ok("functio f(f32 value) → vacuum {}");
+    let result = parse_ok_la("functio f(f32 value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -749,7 +749,7 @@ fn rejects_tensor_sugar_angle_bracket_form() {
 
 #[test]
 fn parses_lista_sugar_unsigned_width() {
-    let result = parse_ok("functio f(lu32 rows) → vacuum {}");
+    let result = parse_ok_la("functio f(lu32 rows) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -767,7 +767,7 @@ fn parses_lista_sugar_unsigned_width() {
 
 #[test]
 fn parses_lista_sugar_float_width() {
-    let result = parse_ok("functio f(lf32 flat) → vacuum {}");
+    let result = parse_ok_la("functio f(lf32 flat) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -802,7 +802,7 @@ fn rejects_lista_sugar_bracket_suffix() {
 
 #[test]
 fn parses_sparsa_with_literal_figura() {
-    let result = parse_ok("functio f(sparsa<f32, [2, 3]> value) → vacuum {}");
+    let result = parse_ok_la("functio f(sparsa<f32, [2, 3]> value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -824,7 +824,7 @@ fn parses_sparsa_with_literal_figura() {
 
 #[test]
 fn parses_sparsa_with_infer_figura_hole() {
-    let result = parse_ok("functio f(sparsa<f32, _> value) → vacuum {}");
+    let result = parse_ok_la("functio f(sparsa<f32, _> value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -845,7 +845,7 @@ fn parses_sparsa_with_infer_figura_hole() {
 
 #[test]
 fn parses_iuncta_tuple_type_with_two_elements() {
-    let result = parse_ok("functio f(iuncta<textus, numerus> pair) → vacuum {}");
+    let result = parse_ok_la("functio f(iuncta<textus, numerus> pair) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -868,7 +868,7 @@ fn parses_iuncta_tuple_type_with_two_elements() {
 #[test]
 fn parses_labeled_and_unlabeled_iuncta_type_arguments() {
     let result =
-        parse_ok("functio f(iuncta<gx: textus, numerus, fixum: fractus> pair) → vacuum {}");
+        parse_ok_la("functio f(iuncta<gx: textus, numerus, fixum: fractus> pair) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -905,7 +905,7 @@ fn parses_labeled_and_unlabeled_iuncta_type_arguments() {
 
 #[test]
 fn parses_labeled_iuncta_infer_argument() {
-    let result = parse_ok("functio f(iuncta<loss: _, T> pair) → vacuum {}");
+    let result = parse_ok_la("functio f(iuncta<loss: _, T> pair) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -926,7 +926,7 @@ fn parses_labeled_iuncta_infer_argument() {
 #[test]
 fn rejects_duplicate_iuncta_labels_at_the_duplicate_label() {
     let source = "functio f(iuncta<gx: f32, gx: numerus> pair) → vacuum {}";
-    let result = parse_program(source);
+    let result = parse_program_la(source);
     let error = result
         .errors
         .iter()
@@ -947,7 +947,7 @@ fn rejects_duplicate_iuncta_labels_at_the_duplicate_label() {
 #[test]
 fn rejects_iuncta_label_spelling_on_call_site_type_arguments() {
     let source = "incipit { fixum _ x ← f<gx: numerus>(x) }";
-    let result = parse_program(source);
+    let result = parse_program_la(source);
     let colon = u32::try_from(source.find(':').expect("label colon")).expect("offset fits u32");
     // The failed type-argument attempt falls back to the (retired) ASCII
     // comparison, which reports first; the label error is the one at the colon.
@@ -961,7 +961,7 @@ fn rejects_iuncta_label_spelling_on_call_site_type_arguments() {
 
 #[test]
 fn unlabeled_iuncta_elements_are_not_spelled_with_an_underscore_label() {
-    let result = parse_program("functio f(iuncta<_: f32> pair) → vacuum {}");
+    let result = parse_program_la("functio f(iuncta<_: f32> pair) → vacuum {}");
     assert!(!result.success());
     assert!(
         result
@@ -977,7 +977,7 @@ fn labeled_iuncta_arity_cap_counts_labeled_elements() {
         .map(|index| format!("e{index}: u8"))
         .collect::<Vec<_>>()
         .join(", ");
-    let accepted = parse_ok(&format!("functio f(iuncta<{args}> many) → vacuum {{}}"));
+    let accepted = parse_ok_la(&format!("functio f(iuncta<{args}> many) → vacuum {{}}"));
     let program = accepted.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -991,7 +991,7 @@ fn labeled_iuncta_arity_cap_counts_labeled_elements() {
         .map(|index| format!("e{index}: u8"))
         .collect::<Vec<_>>()
         .join(", ");
-    let rejected = parse_program(&format!("functio f(iuncta<{args}> many) → vacuum {{}}"));
+    let rejected = parse_program_la(&format!("functio f(iuncta<{args}> many) → vacuum {{}}"));
     assert!(rejected.errors.iter().any(|error| {
         error.kind == ParseErrorKind::TypeInvalid
             && error
@@ -1003,7 +1003,7 @@ fn labeled_iuncta_arity_cap_counts_labeled_elements() {
 
 #[test]
 fn parses_promissum_failable_type_with_exit_arrow_channel() {
-    let result = parse_ok("functio f(promissum<numerus ⇥ textus> future) → vacuum {}");
+    let result = parse_ok_la("functio f(promissum<numerus ⇥ textus> future) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1034,7 +1034,7 @@ fn rejects_promissum_comma_alternate_type() {
 fn parses_iuncta_tuple_type_with_sixteen_elements() {
     // 16 elements — maximum allowed
     let source = "functio f(iuncta<u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8> many) → vacuum {}";
-    let result = parse_ok(source);
+    let result = parse_ok_la(source);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1057,7 +1057,7 @@ fn rejects_iuncta_with_seventeen_elements() {
 
 #[test]
 fn parses_iuncta_with_single_element() {
-    let result = parse_ok("functio f(iuncta<textus> single) → vacuum {}");
+    let result = parse_ok_la("functio f(iuncta<textus> single) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1072,7 +1072,7 @@ fn parses_iuncta_with_single_element() {
 #[test]
 fn parses_iuncta_with_nested_types() {
     let result =
-        parse_ok("functio f(iuncta<lista<textus>, iuncta<numerus, f32>> nested) → vacuum {}");
+        parse_ok_la("functio f(iuncta<lista<textus>, iuncta<numerus, f32>> nested) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1098,7 +1098,7 @@ fn parses_iuncta_with_nested_types() {
 
 #[test]
 fn parses_ratio_type_with_mandatory_labels_and_holes() {
-    let result = parse_ok("functio f(ratio<g: f32, w: _, fixum: fractus> value) → vacuum {}");
+    let result = parse_ok_la("functio f(ratio<g: f32, w: _, fixum: fractus> value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1134,7 +1134,7 @@ fn parses_ratio_type_with_mandatory_labels_and_holes() {
 
 #[test]
 fn parses_ratio_as_an_ordinary_binding_name() {
-    let _ = parse_ok("fixum numerus ratio ← 3\nfunctio f(f32 ratio) → vacuum {}");
+    let _ = parse_ok_la("fixum numerus ratio ← 3\nfunctio f(f32 ratio) → vacuum {}");
 }
 
 #[test]
@@ -1148,7 +1148,7 @@ fn rejects_unlabeled_ratio_type_argument_with_targeted_issue() {
 #[test]
 fn rejects_duplicate_ratio_labels_at_the_duplicate_label() {
     let source = "functio f(ratio<g: f32, g: numerus> value) → vacuum {}";
-    let result = parse_program(source);
+    let result = parse_program_la(source);
     let error = result
         .errors
         .iter()
@@ -1181,7 +1181,7 @@ fn rejects_trailing_comma_in_ratio_type_arguments() {
 
 #[test]
 fn parses_union_hole_binding_type() {
-    let result = parse_ok("fixum ∪ x ← 1");
+    let result = parse_ok_la("fixum ∪ x ← 1");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1192,7 +1192,7 @@ fn parses_union_hole_binding_type() {
 
 #[test]
 fn parses_union_hole_param_type() {
-    let result = parse_ok("functio f(∪ value) → vacuum {}");
+    let result = parse_ok_la("functio f(∪ value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1202,7 +1202,7 @@ fn parses_union_hole_param_type() {
 
 #[test]
 fn parses_union_hole_lista_element() {
-    let result = parse_ok("functio f(lista<∪> values) → vacuum {}");
+    let result = parse_ok_la("functio f(lista<∪> values) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1220,7 +1220,7 @@ fn parses_union_hole_lista_element() {
 
 #[test]
 fn parses_union_hole_return_type() {
-    let result = parse_ok("functio f() → ∪ { redde 1 }");
+    let result = parse_ok_la("functio f() → ∪ { redde 1 }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1232,7 +1232,7 @@ fn parses_union_hole_return_type() {
 #[test]
 fn parses_union_hole_function_parameter_slot() {
     // `(∪)` as a parameter slot inside a function-type annotation.
-    let result = parse_ok("functio f((∪) → numerus cb) → vacuum {}");
+    let result = parse_ok_la("functio f((∪) → numerus cb) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1246,7 +1246,7 @@ fn parses_union_hole_function_parameter_slot() {
 
 #[test]
 fn parses_union_hole_genus_field() {
-    let result = parse_ok("genus Panel { varia ∪ body }");
+    let result = parse_ok_la("genus Panel { varia ∪ body }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Class(class) = &program.statements[0].kind else {
         panic!("expected genus");
@@ -1260,7 +1260,7 @@ fn parses_union_hole_genus_field() {
 
 #[test]
 fn parses_union_hole_tabula_value_slot() {
-    let result = parse_ok("functio f(tabula<textus, ∪> m) → vacuum {}");
+    let result = parse_ok_la("functio f(tabula<textus, ∪> m) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1304,7 +1304,7 @@ fn rejects_union_hole_as_missing_binary_side() {
     // operator with a missing left side (`∪ B`). The hole consumes the whole
     // type expression, so the stray `B` is a structured parse error at the
     // enclosing grammar site.
-    let result = parse(lex("functio f(∪ B value) → vacuum {}"));
+    let result = parse_program_la("functio f(∪ B value) → vacuum {}");
     assert!(
         result
             .errors
@@ -1322,7 +1322,7 @@ fn rejects_union_hole_as_missing_binary_side() {
 #[test]
 fn union_hole_keeps_infer_and_binary_union_unchanged() {
     // `_` still parses as the monomorphic hole and may appear as a union member.
-    let result = parse_ok("functio f(_ ∪ textus value) → vacuum {}");
+    let result = parse_ok_la("functio f(_ ∪ textus value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1337,7 +1337,7 @@ fn union_hole_keeps_infer_and_binary_union_unchanged() {
     );
 
     // `A ∪ B` explicit unions keep their meaning.
-    let result = parse_ok("functio f(numerus ∪ textus value) → vacuum {}");
+    let result = parse_ok_la("functio f(numerus ∪ textus value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -1358,7 +1358,7 @@ fn union_hole_keeps_infer_and_binary_union_unchanged() {
 
 #[test]
 fn parses_intersection_chain_and_flattens() {
-    let result = parse_ok("typus All = A ∩ B ∩ C");
+    let result = parse_ok_la("typus All = A ∩ B ∩ C");
     let program = result.program.as_ref().expect("program");
     let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
         panic!("expected type alias");
@@ -1380,7 +1380,7 @@ fn parses_intersection_chain_and_flattens() {
 
 #[test]
 fn intersection_binds_tighter_than_union() {
-    let result = parse_ok("typus Mixed = A ∩ B ∪ C");
+    let result = parse_ok_la("typus Mixed = A ∩ B ∪ C");
     let program = result.program.as_ref().expect("program");
     let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
         panic!("expected type alias");
@@ -1400,7 +1400,7 @@ fn intersection_binds_tighter_than_union() {
 
 #[test]
 fn implements_clause_accepts_cap_separator() {
-    let result = parse_ok("genus Doc implet Readable ∩ Seekable {}");
+    let result = parse_ok_la("genus Doc implet Readable ∩ Seekable {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Class(class) = &program.statements[0].kind else {
         panic!("expected class");
@@ -1420,13 +1420,13 @@ fn implements_clause_accepts_cap_separator() {
 fn implements_clause_rejects_union_separator() {
     // R1: `∪` is not an implements item separator — disjunctive conformance is
     // not parseable, so it fails closed.
-    let result = parse(lex("genus Doc implet Readable ∪ Seekable {}"));
+    let result = parse_program_la("genus Doc implet Readable ∪ Seekable {}");
     assert!(!result.errors.is_empty(), "implements-∪ must not parse");
 }
 
 #[test]
 fn implements_clause_rejects_hole() {
-    let result = parse(lex("genus Doc implet _ {}"));
+    let result = parse_program_la("genus Doc implet _ {}");
     assert!(!result.errors.is_empty(), "implements hole must not parse");
 }
 
@@ -1435,7 +1435,7 @@ fn implements_clause_rejects_hole() {
 use radix_syntax::{TypeExpr, TypeFormLevel};
 
 fn binding_annotation(source: &str) -> TypeExpr {
-    let result = parse_ok(source);
+    let result = parse_ok_la(source);
     let program = result
         .program
         .as_ref()
