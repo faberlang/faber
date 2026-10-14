@@ -1832,10 +1832,23 @@ impl TypeChecker<'_> {
         params: &[Symbol],
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
-        let issue = match (
-            self.bytes_conversio_family(source_ty),
-            self.bytes_conversio_family(target_resolved),
-        ) {
+        let target_family = self.bytes_conversio_family(target_resolved);
+        // A bounded `octeti<N>` source is the read inverse of the write row
+        // (`W ↦ octeti<N> via Be|Le`): route it to the endian-decode rows when
+        // the target is a numeric scalar. Every other pair (bool, textus,
+        // ascii) keeps its ordinary family below.
+        let source_family = match self.types.get(self.resolve_inferred_type(source_ty)) {
+            Type::BoundedOcteti { .. }
+                if matches!(
+                    target_family,
+                    PrimitiveConversioFamily::Numerus | PrimitiveConversioFamily::Fractus
+                ) =>
+            {
+                PrimitiveConversioFamily::Octeti
+            }
+            _ => self.bytes_conversio_family(source_ty),
+        };
+        let issue = match (source_family, target_family) {
             (
                 PrimitiveConversioFamily::Numerus
                 | PrimitiveConversioFamily::Fractus
@@ -1848,10 +1861,10 @@ impl TypeChecker<'_> {
                     .then_some(ISSUE_NUMERIC_TO_OCTETI_UNSPECIFIED)
             }
             (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Numerus) => {
-                self.octeti_to_numerus_issue(source, target_resolved, params)
+                self.octeti_to_numerus_issue(source, source_ty, target_resolved, params)
             }
             (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Fractus) => {
-                self.octeti_to_fractus_issue(source, target_resolved, params)
+                self.octeti_to_fractus_issue(source, source_ty, target_resolved, params)
             }
             (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Bivalens) => {
                 Some(ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED)
@@ -1872,6 +1885,7 @@ impl TypeChecker<'_> {
     fn octeti_to_numerus_issue(
         &self,
         source: &HirExpression,
+        source_ty: TypeId,
         target_resolved: TypeId,
         params: &[Symbol],
     ) -> Option<&'static str> {
@@ -1888,7 +1902,10 @@ impl TypeChecker<'_> {
         };
         match self.static_octeti_window_len(source) {
             Some(got) if got != need => Some(ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH),
-            _ => None,
+            _ => match self.bounded_octeti_literal_capacity(source_ty) {
+                Some(capacity) if capacity < need => Some(ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH),
+                _ => None,
+            },
         }
     }
 
@@ -1898,6 +1915,7 @@ impl TypeChecker<'_> {
     fn octeti_to_fractus_issue(
         &self,
         source: &HirExpression,
+        source_ty: TypeId,
         target_resolved: TypeId,
         params: &[Symbol],
     ) -> Option<&'static str> {
@@ -1909,6 +1927,24 @@ impl TypeChecker<'_> {
         };
         match self.static_octeti_window_len(source) {
             Some(got) if got != need => Some(ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH),
+            _ => match self.bounded_octeti_literal_capacity(source_ty) {
+                Some(capacity) if capacity < need => Some(ISSUE_OCTETI_ENDIAN_WIDTH_MISMATCH),
+                _ => None,
+            },
+        }
+    }
+
+    /// Literal byte capacity of a bounded `octeti<N>` source. A read whose
+    /// target width exceeds the carrier capacity can never succeed: an
+    /// `octeti<2>` holds at most two bytes, so `↦ u32` fails closed at
+    /// typecheck. A capacity larger than `need` stays accepted (the live
+    /// length may equal `need`, checked at run time).
+    fn bounded_octeti_literal_capacity(&self, source_ty: TypeId) -> Option<usize> {
+        match self.types.get(self.resolve_inferred_type(source_ty)) {
+            Type::BoundedOcteti { capacity } => match self.types.get_index(*capacity) {
+                IndexExpr::Literal(capacity) => usize::try_from(*capacity).ok(),
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -2920,6 +2956,18 @@ impl TypeChecker<'_> {
         // handled by earlier specialized checks — don't block them here.
         if self.is_structural_or_collection_type(source)
             || self.is_structural_or_collection_type(target)
+        {
+            return true;
+        }
+
+        // Bounded `octeti<N>` → numeric scalar is the endian-decode read row
+        // vetted by `check_rejected_primitive_conversio` above; the fallback
+        // need not re-judge the family.
+        if matches!(self.types.get(source), Type::BoundedOcteti { .. })
+            && matches!(
+                self.primitive_conversio_family(target),
+                PrimitiveConversioFamily::Numerus | PrimitiveConversioFamily::Fractus
+            )
         {
             return true;
         }
