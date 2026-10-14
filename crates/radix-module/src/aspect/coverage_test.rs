@@ -70,7 +70,7 @@ fn hir_aspect_coverage_maps_checker_results_without_hiding_absence() {
         },
         check(
             HirAspectCheckStatus::ToolchainMissing,
-            "FABER_TLA_TLC_JAR does not point to a file",
+            "the TLC jar path does not point to a file",
         ),
         check(HirAspectCheckStatus::Error, "unexpected TLC output"),
     ];

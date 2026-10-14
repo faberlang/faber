@@ -10,7 +10,6 @@ use super::HirAspectReport;
 use super::HirAspectTlaModule;
 use super::tla::emit_tla_modules;
 use super::verifier::{HirAspectCheckResult, HirAspectCheckStatus, HirAspectEvidence, HirAspectVerifier};
-use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -41,28 +40,18 @@ pub struct TlaAspectCheckerConfig {
 }
 
 impl TlaAspectCheckerConfig {
-    /// Construct config from environment variables, returning `None` when
-    /// `FABER_TLA_TLC_JAR` is unset.
+    /// Construct config from explicit tool paths. A bare command name (e.g.
+    /// `java`) is kept as-is so its lookup stays with `PATH`; every other
+    /// path is canonicalized.
     ///
     /// # Errors
     ///
-    /// Returns an error string if the specified `FABER_TLA_TLC_JAR` or
-    /// `FABER_TLA_JAVA_BIN` paths are invalid or cannot be canonicalized.
-    // public API: callers choose move vs clone
-    pub fn from_env(work_dir: PathBuf) -> Result<Option<Self>, String> {
-        let Some(jar) = std::env::var_os("FABER_TLA_TLC_JAR") else {
-            return Ok(None);
-        };
-        let java = std::env::var_os("FABER_TLA_JAVA_BIN").unwrap_or_else(|| "java".into());
-        Self::from_env_values(&work_dir, &jar, &java).map(Some)
-    }
-
-    fn from_env_values(work_dir: &Path, jar: &OsStr, java: &OsStr) -> Result<Self, String> {
-        let jar = PathBuf::from(jar);
-        let java = PathBuf::from(java);
+    /// Returns an error string if the given jar or java paths are invalid or
+    /// cannot be canonicalized.
+    pub fn from_paths(work_dir: &Path, jar: &Path, java: &Path) -> Result<Self, String> {
         Ok(Self {
-            java_bin: normalize_java_bin(&java)?,
-            tla_tools_jar: canonicalize_env_path(&jar, "FABER_TLA_TLC_JAR")?,
+            java_bin: normalize_java_bin(java)?,
+            tla_tools_jar: canonicalize_tool_path(jar, "--tla-jar")?,
             work_dir: work_dir.to_path_buf(),
         })
     }
@@ -100,7 +89,7 @@ impl TlaAspectChecker {
             return HirAspectCheckResult::checker_unavailable("java executable is unavailable");
         }
         if !self.config.tla_tools_jar.is_file() {
-            return HirAspectCheckResult::checker_unavailable("FABER_TLA_TLC_JAR does not point to a file");
+            return HirAspectCheckResult::checker_unavailable("the TLC jar path does not point to a file");
         }
 
         let output = Command::new(&self.config.java_bin)
@@ -249,12 +238,12 @@ fn normalize_java_bin(path: &Path) -> Result<PathBuf, String> {
     if is_bare_command(path) {
         Ok(path.to_path_buf())
     } else {
-        canonicalize_env_path(path, "FABER_TLA_JAVA_BIN")
+        canonicalize_tool_path(path, "--java-bin")
     }
 }
 
-fn canonicalize_env_path(path: &Path, var: &'static str) -> Result<PathBuf, String> {
-    fs::canonicalize(path).map_err(|error| format!("{var} path `{}` is invalid: {error}", path.display()))
+fn canonicalize_tool_path(path: &Path, flag: &'static str) -> Result<PathBuf, String> {
+    fs::canonicalize(path).map_err(|error| format!("{flag} path `{}` is invalid: {error}", path.display()))
 }
 
 fn is_bare_command(path: &Path) -> bool {
