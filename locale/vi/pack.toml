@@ -2987,6 +2987,10 @@ help = "viết một trục literal như `axis 1`; hình dạng kết quả ph�
 message = "trục nằm ngoài rank của tensor"
 help = "dùng một trục từ 0 đến nhỏ hơn rank một đơn vị"
 
+[diagnostics.SEM010.issues.softmax_axis_not_last]
+message = "trục của softmax phải là trục cuối cùng"
+help = "softmax chuẩn hóa chỉ trên trục cuối cùng; hãy viết trục cuối cùng hoặc dùng dạng không có đối số"
+
 [diagnostics.SEM010.issues.axis_reduction_repeated]
 message = "cùng một trục được nêu nhiều hơn một lần trong phép rút gọn"
 help = "xóa trục bị lặp; mỗi trục chỉ được xuất hiện một lần"

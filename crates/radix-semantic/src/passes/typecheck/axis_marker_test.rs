@@ -86,3 +86,68 @@ fn axis_marker_parameter_is_a_plain_int_inside() {
     let source = "functio rows(axis numerus a) → numerus {\n    fixum numerus b ← a * 2\n    redde b + a\n}\nincipit {\n    fixum numerus x ← rows(axis 2)\n}";
     let _ = analyze_ok(source);
 }
+
+// --- SOFTAXIS: `softmax(axis n)` names the last axis only ---
+
+/// Every method call's surface name and argument count in analyzed HIR.
+struct MethodCallCollector {
+    calls: Vec<(radix_lexer::Symbol, usize)>,
+}
+
+impl radix_hir::visit::HirVisitor for MethodCallCollector {
+    fn visit_expr(&mut self, expr: &radix_hir::HirExpression) {
+        if let radix_hir::HirExpressionKind::MethodCall(_, name, _, args, _) = &expr.kind {
+            self.calls.push((*name, args.len()));
+        }
+        radix_hir::visit::walk_expr(self, expr);
+    }
+}
+
+#[test]
+fn softmax_axis_last_is_accepted_and_cleared() {
+    let source = r"functio rows(tf32[2, 8] x) → tf32[2, 8] {
+    redde x.activatio_softmax(axis 1)
+}";
+    let fixture = analyze_ok(source);
+    let mut collector = MethodCallCollector { calls: Vec::new() };
+    radix_hir::visit::walk_program(&mut collector, fixture.hir.as_ref().expect("hir"));
+    assert!(
+        collector.calls.iter().any(|(name, arity)| {
+            fixture.interner.resolve(*name) == "activatio_softmax" && *arity == 0
+        }),
+        "the explicit last axis clears to the bare call: {:?}",
+        collector.calls
+    );
+}
+
+#[test]
+fn softmax_axis_not_last_is_refused() {
+    let source = r"functio rows(tf32[2, 8] x) → tf32[2, 8] {
+    redde x.activatio_softmax(axis 0)
+}";
+    assert_rejects_with_issue(source, "softmax_axis_not_last");
+}
+
+#[test]
+fn softmax_axis_out_of_range_is_refused() {
+    let source = r"functio rows(tf32[2, 8] x) → tf32[2, 8] {
+    redde x.activatio_softmax(axis 2)
+}";
+    assert_rejects_with_issue(source, "axis_reduction_out_of_range");
+}
+
+#[test]
+fn softmax_axis_bare_call_stays_accepted() {
+    let source = r"functio rows(tf32[2, 8] x) → tf32[2, 8] {
+    redde x.activatio_softmax()
+}";
+    let _ = analyze_ok(source);
+}
+
+#[test]
+fn softmax_axis_rank_one_last_is_accepted() {
+    let source = r"functio vector(tf32[8] x) → tf32[8] {
+    redde x.activatio_softmax(axis 0)
+}";
+    let _ = analyze_ok(source);
+}
