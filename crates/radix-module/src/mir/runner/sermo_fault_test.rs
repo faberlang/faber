@@ -79,7 +79,6 @@ main {{
 }
 
 #[test]
-#[ignore = "pumpfix-g78d546f2-3.2.2.2.1 FAILS: runner_faberscript_unsupported_runtime_conversio_to_param_symbol_23"]
 fn generic_sermo_failure_is_converted_to_the_declared_fault() {
     const MISSING: &str = "/nonexistent/341d49e1-5/sermo-fault-generic.txt";
     let source = program(&format!(
