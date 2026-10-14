@@ -1,0 +1,56 @@
++++
+locale = "en"
++++
+
+# fs leaf async tree routes: the async twin of every fs-tree route.
+import from "norma:fs" fs
+import from "norma:process" process
+
+async_main {
+    const string root ← fs.join([fs.temp_dir(), "fs-tree-async-§"(process.pid())])
+
+    await_const void created ← fs.create_dir_async(root)
+    await_const bool rootExists ← fs.exists_async(root)
+    assert rootExists ≡ true
+
+    await_const fs.FileStatus rootStatus ← fs.stat_async(root)
+    assert rootStatus.is_directory ≡ true
+    assert rootStatus.is_symlink ≡ false
+
+    const string alpha ← fs.join([root, "alpha.txt"])
+    await_const void touched ← fs.touch_async(alpha)
+    await_const bool alphaExists ← fs.exists_async(alpha)
+    assert alphaExists ≡ true
+
+    const string beta ← fs.join([root, "beta.txt"])
+    await_const void copied ← fs.copy_async(alpha, beta)
+    await_const bool betaExists ← fs.exists_async(beta)
+    assert betaExists ≡ true
+
+    const string gamma ← fs.join([root, "gamma.txt"])
+    await_const void renamed ← fs.rename_async(beta, gamma)
+    await_const bool betaGone ← fs.exists_async(beta)
+    await_const bool gammaHere ← fs.exists_async(gamma)
+    assert betaGone ≢ true
+    assert gammaHere ≡ true
+
+    await_const list<string> entries ← fs.list_dir_async(root)
+    const list<string> names ← entries.sorted()
+    assert names.length() ≡ 2
+    assert names.contains("alpha.txt")
+    assert names.contains("gamma.txt")
+
+    await_const fs.FileStatus gammaStatus ← fs.stat_async(gamma)
+    assert gammaStatus.byte_length ≡ 0
+    assert gammaStatus.is_directory ≡ false
+
+    await_const void deleted ← fs.delete_async(gamma)
+    await_const bool gammaGone ← fs.exists_async(gamma)
+    assert gammaGone ≢ true
+
+    await_const void removed ← fs.remove_tree_async(root)
+    await_const bool rootGone ← fs.exists_async(root)
+    assert rootGone ≢ true
+
+    print "fs-tree-async-ok"
+}

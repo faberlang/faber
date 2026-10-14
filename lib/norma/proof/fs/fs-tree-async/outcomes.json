@@ -1,0 +1,10 @@
+{
+  "targets": {
+    "runner": {
+      "outcome": "known-fail",
+      "phase": "run",
+      "diagnostic_contains": "ordinary call callee is failable; use try_call",
+      "reason": "MIR lowering rejects the async wrappers during package instantiation: each failable solum leaf call inside a @ future wrapper body is lowered as an ordinary call, so fs-tree-async fails before execution."
+    }
+  }
+}

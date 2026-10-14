@@ -1,0 +1,39 @@
++++
+locale = "en"
++++
+
+# fs leaf probe routes: kind predicates plus byte_length/mode/stat metadata.
+# Predicates on a missing path return false; metadata probes run on a real file.
+import from "norma:fs" fs
+import from "norma:process" process
+
+main {
+    const string dir ← fs.temp_dir()
+    const string missing ← fs.join([dir, "fs-probe-missing-§.txt"(process.pid())])
+    assert fs.exists(missing) ≢ true
+    assert fs.is_directory(missing) ≢ true
+    assert fs.is_regular(missing) ≢ true
+    assert fs.is_readable(missing) ≢ true
+    assert fs.is_symlink(missing) ≢ true
+
+    const string path ← fs.join([dir, "fs-probe-§.txt"(process.pid())])
+    fs.write_file(path, "fs-probe")
+    assert fs.exists(path)
+    assert fs.is_directory(path) ≢ true
+    assert fs.is_regular(path)
+    assert fs.is_readable(path)
+    assert fs.is_symlink(path) ≢ true
+    assert fs.byte_length(path) ≡ 8
+    assert fs.mode(path) ≻ 0
+
+    const fs.FileStatus info ← fs.stat(path)
+    assert info.byte_length ≡ 8
+    assert info.is_directory ≡ false
+    assert info.is_symlink ≡ false
+    assert info.mode ≻ 0
+
+    fs.delete(path)
+    assert fs.exists(path) ≢ true
+
+    print "fs-probe-ok"
+}
