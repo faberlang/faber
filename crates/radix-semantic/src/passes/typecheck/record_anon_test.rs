@@ -63,3 +63,21 @@ fn underscore_hole_constructor_still_needs_a_cell() {
         "inferred_constructor_no_expected_type",
     );
 }
+
+#[test]
+fn bare_literal_against_field_list_hole_cell_is_a_record() {
+    accepts("main {\n    const record<*> p ← { g = 1.0, w = 2 }\n    print p.w\n}\n");
+}
+
+#[test]
+fn stated_field_list_hole_constructor_is_a_record() {
+    accepts("main {\n    const record<*> p ← record<*> { g = 1.0, w = 2 }\n    print p.w\n}\n");
+}
+
+#[test]
+fn record_field_read_is_checked() {
+    refuses_with(
+        "main {\n    const _ p ← { g = 1.0 }\n    print p.nope\n}\n",
+        "unknown_record_field",
+    );
+}
