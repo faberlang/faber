@@ -22,8 +22,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 
 /// The current device backends for which rule 18 defines portable admission.
-/// Keep this list exhaustive against the device emit targets in `radix-target`.
-pub const DEVICE_TARGETS: [Target; 3] = [Target::MirAmd, Target::MirMetal, Target::MirWgsl];
+/// Owned by [`Target`]; this alias keeps the module's report indexing surface.
+pub const DEVICE_TARGETS: [Target; 3] = Target::DEVICE_TARGETS;
 
 /// Full analysis result for the kernels declared in one source module.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -662,14 +662,14 @@ fn supports_width(target: Target, requirement: &KernelWidthRequirement) -> bool 
                 matches!(requirement.width, NumericWidth::I32 | NumericWidth::U32)
             }
             KernelNumericPolicy::Wrapping => {
-                matches!(target, Target::MirMetal | Target::MirWgsl)
+                target.supports_wrapping_kernel_integers()
                     && matches!(requirement.width, NumericWidth::I32 | NumericWidth::U32)
             }
             KernelNumericPolicy::PolicyFloat => false,
         },
         Primitive::Fractus => match requirement.width {
             NumericWidth::F32 => true,
-            NumericWidth::F16 => DEVICE_TARGETS.contains(&target),
+            NumericWidth::F16 => target.is_device_target(),
             _ => false,
         },
         _ => false,

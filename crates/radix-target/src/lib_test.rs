@@ -149,6 +149,38 @@ fn availability_spellings_cover_every_target() {
     }
 }
 
+/// The device backend list is exactly AMD, Metal, WGSL in that order:
+/// kernel requirement reports are indexed by it, so order is load-bearing.
+#[test]
+fn device_targets_are_the_three_device_backends() {
+    assert_eq!(
+        Target::DEVICE_TARGETS,
+        [Target::MirAmd, Target::MirMetal, Target::MirWgsl]
+    );
+    for target in Target::ALL {
+        let expected = Target::DEVICE_TARGETS.contains(target);
+        assert_eq!(
+            target.is_device_target(),
+            expected,
+            "is_device_target must agree with DEVICE_TARGETS for {target}"
+        );
+    }
+}
+
+/// Wrapping kernel integers are a Metal and WGSL capability; AMD is not a
+/// wrapping backend even though it is a device target.
+#[test]
+fn wrapping_kernel_integers_are_metal_and_wgsl_only() {
+    for target in Target::ALL {
+        let expected = matches!(target, Target::MirMetal | Target::MirWgsl);
+        assert_eq!(
+            target.supports_wrapping_kernel_integers(),
+            expected,
+            "wrapping-kernel-integer support mismatch for {target}"
+        );
+    }
+}
+
 /// The Rust and Wasm gates keep their historical spellings after the table
 /// moved out of the semantic checker.
 #[test]
