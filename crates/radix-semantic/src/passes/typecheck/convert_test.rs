@@ -1307,6 +1307,48 @@ fn sermo_materialize_rejects_copia() {
     );
 }
 
+#[test]
+fn sermo_materialization_in_textus_channel_is_rejected() {
+    // A bare `sermo ↦ T` fails with the leaf record (`valor`), not text.
+    test_support::assert_rejects_with_issue(
+        r#"
+functio materialize() → textus ⇥ textus {
+    redde ad 'runtime:echo' ("salve") ↦ textus
+}
+"#,
+        "conversio_failure_channel_value_required",
+    );
+}
+
+#[test]
+fn sermo_materialization_in_unknown_channel_checks() {
+    test_support::assert_accepts(
+        r#"
+functio materialize() → textus ⇥ ignotum {
+    redde ad 'runtime:echo' ("salve") ↦ textus
+}
+"#,
+    );
+}
+
+#[test]
+fn sermo_materialization_with_value_row_into_declared_error_type_checks() {
+    test_support::assert_accepts(
+        r#"
+discretio Fault { Absens }
+
+@ conversio
+functio ex_valore(valor raw) → Fault {
+    redde finge Absens {} ∷ Fault
+}
+
+functio materialize() → textus ⇥ Fault {
+    redde ad 'runtime:echo' ("salve") ↦ textus
+}
+"#,
+    );
+}
+
 // Conversion-directed assignment (`↤`)
 
 #[test]

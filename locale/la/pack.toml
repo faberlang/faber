@@ -3478,6 +3478,10 @@ help = "convert element widths explicitly before changing representation"
 message = "propagating conversio failure requires a `textus` alternate-exit channel"
 help = "declare the alternate-exit channel as textus or provide inline recovery"
 
+[diagnostics.SEM016.issues.conversio_failure_channel_value_required]
+message = "propagating a sermo materialization failure requires a `valor` alternate-exit channel"
+help = "declare the alternate-exit channel as valor, ignotum, or a registered valor conversion"
+
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "regex conversion requires textus or ascii operand"
 help = "convert textus or ascii values to regex"

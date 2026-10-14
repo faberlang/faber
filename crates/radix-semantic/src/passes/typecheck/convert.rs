@@ -98,6 +98,8 @@ const ISSUE_WORD_CONVERSIO_RECOVERY_UNSUPPORTED: &str = "word_conversio_recovery
 const ISSUE_REGEX_CONVERSION_OPERAND_TYPE_MISMATCH: &str = "regex_conversion_operand_type_mismatch";
 const ISSUE_CONVERSIO_FAILURE_CHANNEL_TEXTUS_REQUIRED: &str =
     "conversio_failure_channel_textus_required";
+const ISSUE_CONVERSIO_FAILURE_CHANNEL_VALUE_REQUIRED: &str =
+    "conversio_failure_channel_value_required";
 const ISSUE_FAILABLE_CONVERSIO_REQUIRES_HANDLER: &str = "failable_conversio_requires_handler";
 const ISSUE_REGEX_OPERAND_UNSUPPORTED: &str = "regex_operand_unsupported";
 const ISSUE_REGEX_RECOVERY_UNSUPPORTED: &str = "regex_recovery_unsupported";
@@ -715,9 +717,12 @@ impl TypeChecker<'_> {
             return result_ty;
         }
 
-        if let Some(result_ty) =
-            self.check_sermo_materialize_conversio(source_ty, target_resolved, span)
-        {
+        if let Some(result_ty) = self.check_sermo_materialize_conversio(
+            source_ty,
+            target_resolved,
+            recovery.is_none(),
+            span,
+        ) {
             if let Some(recovery) = recovery {
                 self.note_conversio_recovery_checked(recovery, target_resolved);
             }
@@ -1096,6 +1101,7 @@ impl TypeChecker<'_> {
         &mut self,
         source_ty: TypeId,
         target_resolved: TypeId,
+        propagates: bool,
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
         if !self.is_sermo_type(source_ty) {
@@ -1104,11 +1110,14 @@ impl TypeChecker<'_> {
         if self.check_typed_sermo_materialize(source_ty, target_resolved, span) == Some(false) {
             return Some(self.error_type);
         }
-        if self.is_sermo_materialize_target(target_resolved) {
-            return Some(target_resolved);
+        if !self.is_sermo_materialize_target(target_resolved) {
+            self.invalid_conversion(ISSUE_SERMO_MATERIALIZE_TARGET_UNSUPPORTED, span);
+            return Some(self.error_type);
         }
-        self.invalid_conversion(ISSUE_SERMO_MATERIALIZE_TARGET_UNSUPPORTED, span);
-        Some(self.error_type)
+        if propagates {
+            self.check_sermo_failure_channel(span);
+        }
+        Some(target_resolved)
     }
 
     fn is_sermo_type(&self, ty: TypeId) -> bool {
@@ -3048,6 +3057,65 @@ impl TypeChecker<'_> {
             return;
         }
         self.invalid_conversion(ISSUE_CONVERSIO_FAILURE_CHANNEL_TEXTUS_REQUIRED, span);
+    }
+
+    /// A bare failable `sermo ↦ T` materialization propagates the leaf failure
+    /// record (`valor`, holding `kind` and `path`), so the active alternate-exit
+    /// channel is admitted only when it can accept that payload: the `ignotum`
+    /// escape, a `valor` channel, or a registered `@ conversio` row from
+    /// `valor` to the declared channel type. The row's own `⇥ E` composes
+    /// through the use-site channel exactly as `reject_failable_call` does,
+    /// and its function is recorded on `pending_conversion` so lowering applies
+    /// it. Without an active channel the hard-failure posture stands: the
+    /// materialization panics (or is caught by a surrounding `fac`/`cape`).
+    pub(super) fn check_sermo_failure_channel(&mut self, span: radix_lexer::Span) {
+        let Some(error_ty) = self.current_error.map(|sink| match sink {
+            ErrorSink::Function(ty) | ErrorSink::Local(ty) => ty,
+            ErrorSink::Trap(var) => self.trap_sink_type(var),
+        }) else {
+            return;
+        };
+        let value_ty = self.types.primitive(Primitive::Valor);
+        // UT: a bare failable `↦` inside a `capta` accumulates its failure
+        // payload into the trap hole, exactly as a failable call's error type
+        // does (`reject_failable_call`).
+        if matches!(self.current_error, Some(ErrorSink::Trap(_))) {
+            self.unify_assign_issue(
+                value_ty,
+                error_ty,
+                span,
+                super::control::ISSUE_TRAP_MEMBER_TYPE_MISMATCH,
+            );
+            return;
+        }
+        let error_ty = self.resolve_inferred_type(error_ty);
+        if self.is_infer(error_ty) {
+            self.unify_assign_issue(
+                value_ty,
+                error_ty,
+                span,
+                ISSUE_CONVERSIO_FAILURE_CHANNEL_TYPE_MISMATCH,
+            );
+            return;
+        }
+        if matches!(
+            self.types.get(error_ty),
+            Type::Primitive(Primitive::Valor | Primitive::Ignotum)
+        ) {
+            return;
+        }
+        if let Some(row) = self.resolver.conversion_row_for(value_ty, error_ty)
+            && let Some(fn_id) = row.fn_def_id
+        {
+            if let Some(channel) = self.functions.get(&fn_id).and_then(|sig| sig.err)
+                && !self.check_registered_row_channel(channel, span)
+            {
+                return;
+            }
+            self.pending_conversion = Some(fn_id);
+            return;
+        }
+        self.invalid_conversion(ISSUE_CONVERSIO_FAILURE_CHANNEL_VALUE_REQUIRED, span);
     }
 
     /// Compose a registered row's declared `⇥ E` channel through the active

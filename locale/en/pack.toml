@@ -3801,6 +3801,10 @@ help = "convert element widths explicitly before changing representation"
 message = "propagating conversio failure requires a `string` alternate-exit channel"
 help = "declare the alternate-exit channel as string or provide inline recovery"
 
+[diagnostics.SEM016.issues.conversio_failure_channel_value_required]
+message = "propagating a sermo materialization failure requires a `value` alternate-exit channel"
+help = "declare the alternate-exit channel as value, unknown, or a registered value conversion"
+
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "regex conversion requires string or ascii operand"
 help = "convert string or ascii values to regex"
