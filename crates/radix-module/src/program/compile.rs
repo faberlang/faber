@@ -17,6 +17,7 @@ use crate::file_interface::{
 };
 use crate::hir::HirItemKind;
 use crate::semantic::passes::visibility_annotation::{VisibilityTier, member_visibility};
+use crate::semantic::numeric_width::BitsWidth;
 use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode, Type};
 use crate::syntax::{
     Annotation, AnnotationFieldValue, AnnotationKind, AstParamMode, ClassDecl, ClassMemberKind, ExprKind, FiguraExpr,
@@ -2326,6 +2327,13 @@ fn interface_type_from_type_expr(
                     "json" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Json)),
                     "valor" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Valor)),
                     "instans" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Instans)),
+                    // Raw-bits markers `bN` (ruling d477c76d): locale-neutral
+                    // like `u8`, so `lista<b8>` (the retired `octeti` word)
+                    // snapshots its element as Bits, never a guessed genus.
+                    "b8" => Some(InterfaceTypeSnapshot::Bits(BitsWidth::B8)),
+                    "b16" => Some(InterfaceTypeSnapshot::Bits(BitsWidth::B16)),
+                    "b32" => Some(InterfaceTypeSnapshot::Bits(BitsWidth::B32)),
+                    "b64" => Some(InterfaceTypeSnapshot::Bits(BitsWidth::B64)),
                     // Width sugar used in numeric modules.
                     "i8" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Numerus, NumericWidth::I8)),
                     "i16" => Some(InterfaceTypeSnapshot::SizedNumeric(Primitive::Numerus, NumericWidth::I16)),
