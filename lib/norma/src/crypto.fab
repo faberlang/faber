@@ -377,6 +377,9 @@ fn hmac(string alg, bytes key, bytes data) → bytes ⇥ string {
     else {
         throw "norma:crypto.hmac: algorithm must be hmac-sha256, hmac-sha384, or hmac-sha512"
     }
+    # SEM065: `key` is an unmarked read-only parameter and `bytes` is a
+    # shareable container payload, so `var` cannot bind it directly; the
+    # `copy` makes an independently mutable working key for the block branch.
     var bytes k ← copy key
     if k.length() ≻ block {
         k ← digest(hash, k)
