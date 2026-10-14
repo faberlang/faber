@@ -1,13 +1,14 @@
 //! Refusal of every ledger operation that has not landed yet
-//! (need, units L1, L2a and L2b).
+//! (need, units L1, L2a, L2b and L2e).
 //!
 //! The ledger type `tabulae<K, V>` (en `ledger<K, V>`) is a built-in
 //! insertion-ordered map. The type is admitted in every type slot a map
 //! accepts; a brace literal, `empty`, or a declaration/assignment from
 //! one at a ledger cell typechecks like its map twin, and so do the index
-//! read/store, the map methods, membership and the three loop forms.
-//! Equality, print/format, conversions, sort and the remaining wrapper
-//! operations are still refused by one named issue,
+//! read/store, the map methods, membership, the three loop forms, the
+//! exact equality test (`≡`/`≢`) and print/format (`nota`).
+//! Conversions, sort, the remaining wrapper operations and every
+//! non-equality binary are still refused by one named issue,
 //! `ledger_operation_not_implemented`, so nothing half-works.
 
 use crate::{SemanticError, SemanticErrorKind, Type, TypeId, TypeTable};
@@ -99,11 +100,11 @@ impl Gate<'_> {
 
     fn operates_on_ledger(&self, expr: &HirExpression) -> bool {
         match &expr.kind {
-            // Index reads/stores, method calls, membership and the loop forms
-            // typecheck on a ledger now (unit L2b), so only the operations
-            // that stay refused are named here: equality on a `Binary` other
-            // than `∈`/`∉`, print/format, conversions, sort and the remaining
-            // wrappers.
+            // Index reads/stores, method calls, membership, the loop forms,
+            // exact equality and print/format typecheck on a ledger now
+            // (units L2b and L2e), so only the operations that stay refused
+            // are named here: every non-equality `Binary`, conversions, sort
+            // and the remaining wrappers.
             HirExpressionKind::Binary(op, left, right)
                 if !matches!(
                     op,
@@ -111,17 +112,15 @@ impl Gate<'_> {
                         | HirBinOp::NotInRange
                         | HirBinOp::Between
                         | HirBinOp::NotBetween
+                        | HirBinOp::Eq
+                        | HirBinOp::NotEq
                 ) =>
             {
                 self.operand(left) || self.operand(right)
             }
             HirExpressionKind::OptionalChain(object, _)
             | HirExpressionKind::NonNull(object, _)
-            | HirExpressionKind::Unary(_, object)
-            | HirExpressionKind::Format { value: object, .. } => self.operand(object),
-            HirExpressionKind::Scribe(_, args) | HirExpressionKind::Scriptum(_, args) => {
-                args.iter().any(|arg| self.operand(arg))
-            }
+            | HirExpressionKind::Unary(_, object) => self.operand(object),
             HirExpressionKind::Conversio { source, target, .. } => {
                 self.operand(source)
                     || matches!(target, HirConversioTarget::Type(ty) if self.is_ledger(Some(*ty)))
