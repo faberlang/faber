@@ -1042,12 +1042,26 @@ impl Lowerer<'_> {
             }
         }
 
-        if lowered.len() != analysis.holes.len() {
+        // A numbered hole `§N` addresses argument N, so repeated numbers share
+        // one value. The template needs `max + 1` actuals, each position must be
+        // read, and a supplied value must not go unread.
+        let (required_slots, distinct_slots) = analysis.value_slots();
+        if lowered.len() != required_slots {
             self.error_with_args_at(
                 vec![
                     DiagnosticArg::new("issue", "template_application_arity_mismatch"),
                     DiagnosticArg::new("actual", lowered.len().to_string()),
-                    DiagnosticArg::new("expected", analysis.holes.len().to_string()),
+                    DiagnosticArg::new("expected", required_slots.to_string()),
+                ],
+                call_span,
+            );
+            ok = false;
+        } else if distinct_slots < required_slots {
+            self.error_with_args_at(
+                vec![
+                    DiagnosticArg::new("issue", "template_application_arity_mismatch"),
+                    DiagnosticArg::new("actual", lowered.len().to_string()),
+                    DiagnosticArg::new("expected", distinct_slots.to_string()),
                 ],
                 call_span,
             );

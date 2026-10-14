@@ -43,7 +43,7 @@ main {
           and plan = §
     `(tenantId, plan)
     print q.template
-    const forma indexed ← `where tenant_id = §0 or parent_tenant_id = §0`(tenantId, tenantId)
+    const forma indexed ← `where tenant_id = §0 or parent_tenant_id = §0`(tenantId)
     print indexed.template
     const forma bare ← `select 1`
     print bare.template
