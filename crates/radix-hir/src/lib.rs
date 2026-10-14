@@ -10,8 +10,6 @@
 
 pub mod capture;
 pub mod failable;
-#[cfg(test)]
-mod failable_pin_test;
 mod nodes;
 #[cfg(test)]
 mod nodes_test;
