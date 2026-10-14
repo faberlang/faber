@@ -469,34 +469,7 @@ impl TypeChecker<'_> {
     /// Whether an availability gate's target spelling names the backend this
     /// check runs for.
     pub(super) fn target_name_matches(&self, target: &str) -> bool {
-        match self.target {
-            radix_target::Target::MirStepper => matches!(target, "stepper" | "mir-stepper"),
-            radix_target::Target::HirRust => matches!(target, "rs" | "rust"),
-            radix_target::Target::HirFaber => matches!(target, "faber" | "fab"),
-            radix_target::Target::HirTypeScript => matches!(target, "ts" | "typescript"),
-            radix_target::Target::HirGo => matches!(target, "go"),
-            radix_target::Target::HirSwift => matches!(target, "swift"),
-            radix_target::Target::HirPython => matches!(target, "python"),
-            radix_target::Target::HirHaskell => matches!(target, "haskell"),
-            radix_target::Target::HirPascal => matches!(target, "pascal" | "pas"),
-            radix_target::Target::HirCobol => matches!(target, "cobol" | "cob"),
-            radix_target::Target::HirFortran => matches!(target, "fortran" | "f90"),
-            radix_target::Target::HirOdin => matches!(target, "odin"),
-            radix_target::Target::MirWasm => matches!(target, "wasm" | "wasm-text" | "wat"),
-            radix_target::Target::MirLlvm | radix_target::Target::MirLlvmHost => {
-                matches!(target, "llvm" | "llvm-host" | "llvm-text")
-            }
-            radix_target::Target::MirMetal => matches!(target, "metal" | "metal-text"),
-            radix_target::Target::MirAmd => matches!(target, "amd"),
-            radix_target::Target::MirWgsl => matches!(target, "wgsl" | "wgsl-text"),
-            radix_target::Target::MirSexp => matches!(target, "sexp" | "racket" | "lisp" | "rkt"),
-            radix_target::Target::MirBasic => matches!(target, "basic" | "bas"),
-            radix_target::Target::MirScena => matches!(target, "scena"),
-            radix_target::Target::MirFmir => matches!(target, "fmir-text"),
-            radix_target::Target::MirFmirBinary => matches!(target, "fmir"),
-            radix_target::Target::MirFmirBundle => matches!(target, "fmir-bin"),
-            radix_target::Target::HirFhir => matches!(target, "fhir"),
-        }
+        self.target.availability_spellings().contains(&target)
     }
 
     /// Extract the underlying struct definition from an ordinary receiver type.

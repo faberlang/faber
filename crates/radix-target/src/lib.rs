@@ -1,7 +1,8 @@
 //! Neutral compilation-target identity for Radix.
 //!
 //! Owns the [`Target`] enum, the variant universe ([`Target::ALL`]), its
-//! CLI spelling ([`fmt::Display`]), and the feature-gate mapping
+//! CLI spelling ([`fmt::Display`]), the availability-gate spelling table
+//! ([`Target::availability_spellings`]), and the feature-gate mapping
 //! ([`Target::required_feature`] / [`Target::is_available`]). Target
 //! identity is a std-only contract shared
 //! by semantic policy, the driver, services, and tests; it must not depend
@@ -167,6 +168,42 @@ impl Target {
             .iter()
             .copied()
             .find(|target| target.as_str() == spelling)
+    }
+
+    /// Spellings an availability gate (`@ nondum` / `@ unstable(target)`)
+    /// may use to name this backend.
+    ///
+    /// A backend describes itself here; the semantic checker must not keep
+    /// a second hand-typed table. `MirLlvm` and `MirLlvmHost` deliberately
+    /// share the LLVM spellings.
+    #[must_use]
+    pub fn availability_spellings(self) -> &'static [&'static str] {
+        match self {
+            Target::MirStepper => &["stepper", "mir-stepper"],
+            Target::HirRust => &["rs", "rust"],
+            Target::HirFaber => &["faber", "fab"],
+            Target::HirTypeScript => &["ts", "typescript"],
+            Target::HirGo => &["go"],
+            Target::HirSwift => &["swift"],
+            Target::HirPython => &["python"],
+            Target::HirHaskell => &["haskell"],
+            Target::HirPascal => &["pascal", "pas"],
+            Target::HirCobol => &["cobol", "cob"],
+            Target::HirFortran => &["fortran", "f90"],
+            Target::HirOdin => &["odin"],
+            Target::HirFhir => &["fhir"],
+            Target::MirWasm => &["wasm", "wasm-text", "wat"],
+            Target::MirLlvm | Target::MirLlvmHost => &["llvm", "llvm-host", "llvm-text"],
+            Target::MirMetal => &["metal", "metal-text"],
+            Target::MirAmd => &["amd"],
+            Target::MirWgsl => &["wgsl", "wgsl-text"],
+            Target::MirSexp => &["sexp", "racket", "lisp", "rkt"],
+            Target::MirBasic => &["basic", "bas"],
+            Target::MirScena => &["scena"],
+            Target::MirFmir => &["fmir-text"],
+            Target::MirFmirBinary => &["fmir"],
+            Target::MirFmirBundle => &["fmir-bin"],
+        }
     }
 
     /// Every variant of this enum, in declaration order — the single owned
