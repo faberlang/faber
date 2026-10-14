@@ -241,3 +241,21 @@ fn emit_retry_reports_forbidden_effect_once() {
         issues(&retried)
     );
 }
+
+#[test]
+fn package_analysis_config_keeps_the_pack_explicit() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let input = fixture(dir.path(), "c.fab", CONSTS);
+    let command = emit_command(&input, Target::HirTypeScript);
+    let pack = code_pack(&command).unwrap_or_else(radix::module::locale::latin_locale_pack);
+
+    let config = emit::package_analysis_config(&command, Some(&pack));
+    assert!(
+        config.locale_pack_explicit,
+        "the retry config must install the resolved pack as an explicit selection"
+    );
+    assert!(
+        !emit::package_analysis_config(&command, None).locale_pack_explicit,
+        "without a pack there is no explicit selection"
+    );
+}
