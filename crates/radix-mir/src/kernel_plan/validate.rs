@@ -1,7 +1,6 @@
 use super::plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, DistributedSumPlan,
-    GatherPlan, GroupedMatMulPlan, MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME,
-    MatMulPlan, OobPaddingPolicy, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
+    GatherPlan, GroupedMatMulPlan, MatMulPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
     RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan,
     TransposePlan, WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
 };
@@ -140,18 +139,10 @@ fn validate_shared_memory_sizing(layout: &SharedMemoryLayout) -> Result<(), Plan
     Ok(())
 }
 
-/// Whether the zero-fill policy covers every index in
-/// `[length, covered_until)`. The range is empty when `covered_until <= length`.
-fn oob_tail_covered(policy: &OobPaddingPolicy, length: u64, covered_until: u64) -> bool {
-    (length..covered_until).all(|index| policy.covers(index, length))
-}
-
-/// OOB-padding coverage (L12): the padding policy covers the tail of the
-/// last workgroup — global element indices `[length, workgroup_x * partials)`
-/// (at most `workgroup_x - 1` elements). `ZeroFill` covers every index at or
-/// beyond `length`, so the check pins the arithmetic that defines the padded
-/// range: the partial count must tile the tensor, or the dispatched grid
-/// would leave real elements inside the "padding" range.
+/// OOB-padding coverage (L12): the dispatched grid must not leave real
+/// elements inside the "padding" range, so the partial count must tile the
+/// tensor (`partials == ceil(length / workgroup_x)`). A zero workgroup or
+/// zero length dispatches an empty/garbage grid and is rejected here.
 fn validate_oob_padding_coverage(plan: &ReductionPlan) -> Result<(), PlanValidationError> {
     let workgroup_x = u64::from(plan.workgroup_x);
     if workgroup_x == 0 || plan.length == 0 {
@@ -168,16 +159,6 @@ fn validate_oob_padding_coverage(plan: &ReductionPlan) -> Result<(), PlanValidat
             covered_until: plan.partials.saturating_mul(workgroup_x),
         });
     }
-    // `covered_until - length < workgroup_x` here: the tail is at most one
-    // workgroup's lane span, so the scan is bounded by the workgroup size.
-    let covered_until = plan.partials.saturating_mul(workgroup_x);
-    if !oob_tail_covered(&plan.oob_padding, plan.length, covered_until) {
-        return Err(PlanValidationError::OobPaddingCoverage {
-            length: plan.length,
-            workgroup_x: plan.workgroup_x,
-            covered_until,
-        });
-    }
     Ok(())
 }
 
@@ -186,7 +167,7 @@ pub(super) fn validate_matmul_plan(plan: &MatMulPlan) -> Result<(), PlanValidati
     validate_matmul_batch_law(plan)?;
     validate_matmul_shared_memory(plan)?;
     validate_matmul_barrier_coverage(plan)?;
-    validate_matmul_oob_padding_coverage(plan)?;
+    validate_matmul_zero_dimension(plan)?;
     Ok(())
 }
 
@@ -581,21 +562,12 @@ fn validate_matmul_barrier_coverage(plan: &MatMulPlan) -> Result<(), PlanValidat
     Ok(())
 }
 
-/// OOB-padding coverage (L12 / L16): the zero-fill policy must cover the
-/// operand tile tails — the padded row/column/K spans the grid reaches past
-/// `M`, `N`, and `K` (`shared_a` reads `A[row][k_start + tx]`, `shared_b`
-/// reads `B[k_start + ty][col]`). The check pins the padded-extent
-/// arithmetic (`ceil(d / tile) * tile`) against the policy; a policy that
-/// leaves any index of the last tile uncovered fails here. Zero dimensions
-/// are rejected before the arithmetic (a zero dim dispatches an empty grid,
-/// and `div_ceil` by a zero tile must not run).
-///
-/// The shared-memory sizing check runs before this one and rejects tiles
-/// larger than ~90 slots, so the four tail loops are each bounded by the
-/// tile edge.
-fn validate_matmul_oob_padding_coverage(plan: &MatMulPlan) -> Result<(), PlanValidationError> {
-    // Run-time extents carry no literal numbers to cover; the body's own
-    // guards express the M, N and K tails (design note section 5).
+/// Matmul zero-dimension guard: runtime extents have no literal numbers to
+/// check; concrete plans must have positive M/K/N and a non-zero tile (a
+/// zero dimension dispatches an empty grid).
+fn validate_matmul_zero_dimension(plan: &MatMulPlan) -> Result<(), PlanValidationError> {
+    // Run-time extents carry no literal numbers; the body's own guards
+    // express the M, N and K bounds (design note section 5).
     if matches!(plan.dims, super::MatMulDims::Runtime { .. }) {
         return Ok(());
     }
@@ -605,37 +577,6 @@ fn validate_matmul_oob_padding_coverage(plan: &MatMulPlan) -> Result<(), PlanVal
             k: plan.k,
             n: plan.n,
             tile: plan.tile,
-        });
-    }
-    let tile = u64::from(plan.tile);
-    // shared_a holds A[row][k_start + tx]: the tail rows past M and the tail
-    // K columns past K are both out of bounds of the M×K left matrix.
-    let padded_m = plan.m.div_ceil(tile) * tile;
-    if !oob_tail_covered(&plan.oob_padding, plan.m, padded_m) {
-        return Err(PlanValidationError::MatMulOobPaddingCoverage {
-            buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
-            length: plan.m,
-            covered_until: padded_m,
-        });
-    }
-    let padded_k = plan.k.div_ceil(tile) * tile;
-    if !oob_tail_covered(&plan.oob_padding, plan.k, padded_k) {
-        return Err(PlanValidationError::MatMulOobPaddingCoverage {
-            buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
-            length: plan.k,
-            covered_until: padded_k,
-        });
-    }
-    // shared_b holds B[k_start + ty][col]: the tail columns past N are out
-    // of bounds of the K×N right matrix. Its tail K rows share the exact
-    // range and predicate as the shared_a K check above, so that check
-    // already covers them.
-    let padded_n = plan.n.div_ceil(tile) * tile;
-    if !oob_tail_covered(&plan.oob_padding, plan.n, padded_n) {
-        return Err(PlanValidationError::MatMulOobPaddingCoverage {
-            buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
-            length: plan.n,
-            covered_until: padded_n,
         });
     }
     Ok(())
@@ -683,8 +624,7 @@ pub enum PlanValidationError {
         expected_slots: u64,
     },
     /// Matmul requires positive M/K/N and a non-zero tile (a zero dimension
-    /// dispatches an empty grid and the padded-tile arithmetic would divide
-    /// by a zero tile).
+    /// dispatches an empty grid).
     MatMulZeroDimension { m: u64, k: u64, n: u64, tile: u32 },
     /// U1 head-axis batch law: both batch counts positive and the argument
     /// batch count dividing the receiver's (the prefix share).
@@ -696,12 +636,6 @@ pub enum PlanValidationError {
         batch: u64,
         width: u64,
         mask_count: u64,
-    },
-    /// The OOB padding policy does not cover a matmul operand tile tail.
-    MatMulOobPaddingCoverage {
-        buffer_name: String,
-        length: u64,
-        covered_until: u64,
     },
     /// Transpose requires positive source dims (a zero `M` or `N` dispatches
     /// an empty grid and the column-major remap would divide by zero).
@@ -850,14 +784,6 @@ impl fmt::Display for PlanValidationError {
             } => write!(
                 f,
                 "row-softmax batch law violated: batch={batch}, width={width}, mask_count={mask_count} (batch and width must be positive; a carried mask count must be positive and divide batch·width)"
-            ),
-            Self::MatMulOobPaddingCoverage {
-                buffer_name,
-                length,
-                covered_until,
-            } => write!(
-                f,
-                "matmul OOB padding coverage: {buffer_name} tail up to {covered_until} is not zero-filled against length {length}"
             ),
             Self::TransposeZeroDimension { m, n } => write!(
                 f,
