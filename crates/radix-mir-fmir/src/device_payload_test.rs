@@ -1555,7 +1555,9 @@ fn unknown_selection_is_representable_and_rejected_at_resolution() {
 fn non_admitted_artifact_backend_display_names_the_selection_variant() {
     // The Display text is the only prose surface naming the fail-closed
     // follow-up path; it must name the variant that actually exists.
-    let error = FmirImageError::NonAdmittedArtifactBackend { backend: "vulkan".into() };
+    let error = FmirImageError::NonAdmittedArtifactBackend {
+        backend: "vulkan".into(),
+    };
     let message = error.to_string();
     assert!(
         message.contains("NonAdmittedSelectedBackend"),
