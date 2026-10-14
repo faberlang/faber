@@ -503,6 +503,7 @@ fn named_consumer_proof_discovers_hot_function_conversion_and_cursor_rows() {
     );
 }
 
+#[cfg(feature = "device-runtime")]
 #[test]
 fn device_refusal_is_observed_before_launch_with_no_artifact() {
     // Device-bearing fixture (manifest-declared selection): the seam receives

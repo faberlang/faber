@@ -389,6 +389,7 @@ target = "fmir-text"
     assert_no_generated_rust(&package);
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn build_reader_locale_accepts_direct_entry_file_input() {
     let source = write_single_file(

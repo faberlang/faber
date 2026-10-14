@@ -20,6 +20,7 @@ fn dir_entries(dir: &std::path::Path) -> BTreeSet<String> {
         .collect()
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn single_file_build_layout_lives_under_out_dir_not_beside_source() {
     let source_dir = test_temp_dir("single-src");

@@ -9844,6 +9844,7 @@ entry = "main.fab"
     assert!(!cargo_toml.contains("../radix/hosts/macos-arm64"));
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn emit_generated_crate_works_without_manifest_using_fallback_name() {
     let pkg = test_temp_dir("emit-no-manifest");
