@@ -139,3 +139,24 @@ fn format_figura_keeps_arithmetic_precedence() {
     assert_eq!(format_figura(divide, &types, &interner), "(N - 1) / 2");
     assert_eq!(format_figura(plus_three, &types, &interner), "N / 2 + 3");
 }
+
+#[test]
+fn affine_zero_offset_prints_as_its_base_without_parens() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let n = types.intern_index(IndexExpr::Param(interner.intern("N")));
+
+    let zero_affine = types.intern_index(IndexExpr::Affine { base: n, offset: 0 });
+    let divide_zero = types.intern_index(IndexExpr::Divide {
+        numerator: zero_affine,
+        divisor: 2,
+    });
+    assert_eq!(format_figura(divide_zero, &types, &interner), "N / 2");
+
+    let plus_one = types.intern_index(IndexExpr::Affine { base: n, offset: 1 });
+    let divide_one = types.intern_index(IndexExpr::Divide {
+        numerator: plus_one,
+        divisor: 2,
+    });
+    assert_eq!(format_figura(divide_one, &types, &interner), "(N + 1) / 2");
+}
