@@ -287,6 +287,12 @@ impl Host for BufferHost {
         opener: &Value,
         span: Span,
     ) -> Option<Result<Vec<Value>, Value>> {
+        // WHY: `with_cwd` is the sandbox's virtual process state; the shared
+        // leaf answers `processus:sedes` from the ambient process directory,
+        // which would leak the test runner's cwd into the host contract.
+        if route == "processus:sedes" {
+            return Some(Ok(vec![Value::Str(self.cwd.clone())]));
+        }
         super::routes::serve_route(self, route, opener, span)
     }
 
