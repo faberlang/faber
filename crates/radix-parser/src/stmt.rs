@@ -857,9 +857,10 @@ impl Parser {
         } else if self.eat_keyword_ident(TokenKind::Nota) {
             ScribeKind::Nota
         } else {
-            return Err(Self::expected_issue_error(
+            return Err(self.expected_issue_with_keywords(
                 "expected_scribe_keyword",
                 self.current_span(),
+                &["scribe", "vide", "mone", "nota"],
             ));
         };
 
@@ -888,9 +889,10 @@ impl Parser {
         } else if self.eat_keyword_ident(TokenKind::Incipiet) {
             true
         } else {
-            return Err(Self::expected_issue_error(
+            return Err(self.expected_issue_with_keywords(
                 "expected_incipit_keyword",
                 self.current_span(),
+                &["incipit", "incipiet"],
             ));
         };
 
