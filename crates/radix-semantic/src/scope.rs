@@ -3561,6 +3561,35 @@ impl Resolver {
             return None;
         }
         let def_id = self.fresh_def_id();
+        self.insert_variant(def_id, parent_def_id, name, span);
+        Some(def_id)
+    }
+
+    /// Register a compiler-injected builtin variant under its parent identity.
+    ///
+    /// Same symbol and per-union bookkeeping as [`Self::define_variant`], but
+    /// the identity comes from the builtin low range
+    /// ([`Self::fresh_builtin_def_id`]), so builtin registration never burns a
+    /// user id and user declarations keep starting at [`USER_DEF_ID_BASE`].
+    ///
+    /// Returns `None` when the parent already owns a variant with this name.
+    pub fn define_builtin_variant(
+        &mut self,
+        parent_def_id: DefId,
+        name: LexSymbol,
+        span: Span,
+    ) -> Option<DefId> {
+        if self.variant_child(parent_def_id, name).is_some() {
+            return None;
+        }
+        let def_id = self.fresh_builtin_def_id();
+        self.insert_variant(def_id, parent_def_id, name, span);
+        Some(def_id)
+    }
+
+    /// Insert one variant row. The caller owns identity allocation so the user
+    /// and builtin counters stay disjoint.
+    fn insert_variant(&mut self, def_id: DefId, parent_def_id: DefId, name: LexSymbol, span: Span) {
         self.symbols.insert(
             def_id,
             Symbol {
@@ -3577,7 +3606,6 @@ impl Resolver {
             .entry((parent_def_id, name))
             .or_insert(def_id);
         self.variants_by_name.entry(name).or_default().push(def_id);
-        Some(def_id)
     }
 
     #[must_use]

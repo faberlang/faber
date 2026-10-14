@@ -8,6 +8,19 @@
 use crate::test_support::{assert_accepts, assert_rejects_with_issue};
 
 #[test]
+fn builtin_registration_keeps_user_ids_at_base() {
+    let mut types = crate::TypeTable::new();
+    let mut resolver = crate::Resolver::new();
+    let mut interner = radix_lexer::Interner::new();
+    crate::builtins::register(&mut resolver, &mut types, &mut interner);
+    assert_eq!(
+        resolver.fresh_def_id(),
+        crate::DefId(crate::scope::USER_DEF_ID_BASE),
+        "builtin registration must not consume user DefIds"
+    );
+}
+
+#[test]
 fn trapped_resolves_with_two_type_arguments() {
     assert_accepts("functio f(trapped<numerus, textus> t) → numerus {\n    redde 0\n}\n");
 }
