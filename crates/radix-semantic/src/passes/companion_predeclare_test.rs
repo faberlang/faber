@@ -7,8 +7,13 @@
 use crate::{PassConfig, SemanticError, SemanticErrorKind};
 use radix_target::Target;
 
+fn latin_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("load Latin locale pack")
+}
+
 fn analyze(source: &str) -> (crate::RadixLaneMetadata, Vec<SemanticError>) {
-    let lex = radix_lexer::lex(source);
+    let lex = radix_lexer::lex_with_locale_pack(source, &latin_pack());
     let mut parse = radix_parser::parse(lex);
     let program = parse.program.expect("parse");
     let config = PassConfig::for_target(Target::MirWasm);
@@ -27,7 +32,7 @@ functio mul_pair(numerus a, numerus b) → numerus {
     redde a + b
 }
 "#;
-    let lex = radix_lexer::lex(source);
+    let lex = radix_lexer::lex_with_locale_pack(source, &latin_pack());
     let mut parse = radix_parser::parse(lex);
     let program = parse.program.expect("parse");
     let mut types = crate::TypeTable::new();
@@ -134,7 +139,7 @@ functio f(numerus a) → numerus {
     redde a
 }
 "#;
-    let lex = radix_lexer::lex(source);
+    let lex = radix_lexer::lex_with_locale_pack(source, &latin_pack());
     let mut parse = radix_parser::parse(lex);
     let program = parse.program.expect("parse");
     let mut types = crate::TypeTable::new();

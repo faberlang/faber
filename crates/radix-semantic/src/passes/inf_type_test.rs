@@ -6,11 +6,11 @@
 //! arithmetic, literals and conversions are typed by U3 (`inf_typing_test.rs`).
 //! Every rejection asserts the structured `kind` and `issue`, never prose.
 
-use crate::test_support::{analyze_source, assert_accepts, assert_rejects_with_issue};
+use crate::test_support::{analyze_source_la, assert_accepts_la, assert_rejects_with_issue_la};
 use crate::{SemanticError, SemanticErrorKind};
 
 fn errors(source: &str) -> Vec<SemanticError> {
-    analyze_source(source)
+    analyze_source_la(source)
         .diagnostics
         .iter()
         .filter(|err| err.is_error())
@@ -40,7 +40,7 @@ fn arg<'a>(err: &'a SemanticError, name: &str) -> Option<&'a str> {
 
 #[test]
 fn inf_is_a_type_for_locals_params_returns_fields_and_list_elements() {
-    assert_accepts(
+    assert_accepts_la(
         r"
 genus Capsa {
     fixum inf a
@@ -66,7 +66,7 @@ incipit {
 
 #[test]
 fn the_four_spellings_are_one_type() {
-    assert_accepts(
+    assert_accepts_la(
         r"
 functio tere(inf a, exactus<inf> b, modulus<inf> c, saturatus<inf> d) → inf {
     fixum exactus<inf> e ← a
@@ -81,7 +81,7 @@ functio tere(inf a, exactus<inf> b, modulus<inf> c, saturatus<inf> d) → inf {
 
 #[test]
 fn numerus_inf_is_the_same_type_as_bare_inf() {
-    assert_accepts(
+    assert_accepts_la(
         r"
 functio tere(inf a) → inf {
     redde a
@@ -92,7 +92,7 @@ functio tere(inf a) → inf {
 
 #[test]
 fn a_constant_lands_in_an_inf_slot() {
-    assert_accepts(
+    assert_accepts_la(
         r"
 incipit {
     fixum inf x ← 0
@@ -106,7 +106,7 @@ incipit {
 
 #[test]
 fn a_u64_sized_literal_lands_in_an_inf_slot_but_not_a_signed_one() {
-    assert_accepts(
+    assert_accepts_la(
         r"
 incipit {
     fixum inf x ← 18446744073709551615
@@ -114,7 +114,7 @@ incipit {
 }
 ",
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "incipit { fixum i64 x ← 18446744073709551615\n nota x }\n",
         "store_constant_out_of_range",
     );
@@ -122,7 +122,7 @@ incipit {
 
 #[test]
 fn inf_values_join_in_lists_and_branches() {
-    assert_accepts(
+    assert_accepts_la(
         r"
 functio elige(bivalens b, inf x, inf y) → inf {
     redde b ✓ x ✗ y
@@ -141,7 +141,7 @@ incipit {
 #[test]
 fn every_bounded_integer_width_widens_into_inf() {
     for width in ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64"] {
-        assert_accepts(&format!(
+        assert_accepts_la(&format!(
             r"
 functio amplia({width} x) → inf {{
     fixum inf y ← x
@@ -157,7 +157,7 @@ functio amplia({width} x) → inf {{
 /// narrowing (a trap, never `⇥`), so the slot accepts it.
 #[test]
 fn an_inf_into_a_bounded_slot_is_the_implicit_checked_narrowing() {
-    assert_accepts(
+    assert_accepts_la(
         r"
 functio contrahe(inf x) → i64 {
     fixum i64 y ← x
@@ -169,7 +169,7 @@ functio contrahe(inf x) → i64 {
 
 #[test]
 fn inf_compares_and_is_still_an_ordinary_identifier() {
-    assert_accepts(
+    assert_accepts_la(
         r"
 functio minor(inf a, inf b) → bivalens {
     redde a ≺ b
@@ -201,7 +201,7 @@ fn prefixed_inf_spellings_are_not_types() {
 
 #[test]
 fn a_prefixed_inf_name_is_an_ordinary_identifier() {
-    assert_accepts(
+    assert_accepts_la(
         r"
 incipit {
     fixum numerus linf ← 1

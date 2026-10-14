@@ -10,10 +10,10 @@ use radix_hir::{
 use radix_target::Target;
 
 use crate::PassConfig;
-use crate::test_support::{AnalyzedFixture, analyze_source_with_config};
+use crate::test_support::{AnalyzedFixture, analyze_source_with_config_la};
 
 fn analyze(body: &str, config: PassConfig) -> AnalyzedFixture {
-    let result = analyze_source_with_config(&format!("incipit {{\n{body}\n}}\n"), config);
+    let result = analyze_source_with_config_la(&format!("incipit {{\n{body}\n}}\n"), config);
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
     result
 }

@@ -46,7 +46,7 @@ fn expect_structured_error<'a, T: DefiniteAssignmentDiagnostic>(
 
 #[test]
 fn rejects_read_of_uninitialized_local() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 incipit {
     fixum numerus value
@@ -68,7 +68,7 @@ incipit {
 
 #[test]
 fn allows_read_after_assignment() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 incipit {
     varia numerus value
@@ -82,7 +82,7 @@ incipit {
 
 #[test]
 fn allows_sponte_parameter_read_without_body_assignment() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(numerus value sponte) → numerus {
     redde value
@@ -94,7 +94,7 @@ functio pick(numerus value sponte) → numerus {
 
 #[test]
 fn rejects_read_before_assignment_in_branch() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens cond) → numerus {
     fixum numerus value
@@ -120,7 +120,7 @@ functio pick(bivalens cond) → numerus {
 fn rejects_read_after_conditional_assignment() {
     // TARGET: a binding assigned on only one branch must not read as initialized
     // after the join. This is the soundness case 3a previously missed.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens cond) → numerus {
     varia numerus value
@@ -146,7 +146,7 @@ functio pick(bivalens cond) → numerus {
 fn accepts_initialized_on_all_paths() {
     // TARGET: a binding assigned on both the then and else branches reads as
     // initialized after the join.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens cond) → numerus {
     varia numerus value
@@ -164,7 +164,7 @@ functio pick(bivalens cond) → numerus {
 #[test]
 fn rejects_read_after_partial_discerne_assignment() {
     // EDGE: only one discerne arm assigns the binding; the join must degrade.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens flag) → numerus {
     varia numerus value
@@ -191,7 +191,7 @@ functio pick(bivalens flag) → numerus {
 
 #[test]
 fn driver_accepts_initialized_local_with_initializer() {
-    let result = crate::test_support::analyze_source(r"incipit { fixum numerus n ← 1 nota n }");
+    let result = crate::test_support::analyze_source_la(r"incipit { fixum numerus n ← 1 nota n }");
     if result.is_err() {
         let errors = result.diagnostics.clone();
         panic!("expected initialized local to pass definite assignment: {errors:?}");
@@ -202,7 +202,7 @@ fn driver_accepts_initialized_local_with_initializer() {
 fn accepts_fixum_late_init_single_assignment() {
     // TARGET: `fixum` without an initializer may be assigned exactly once later,
     // then read. This is the deferred-init shape, unified with normal `fixum`.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens cond) → numerus {
     fixum numerus value
@@ -219,7 +219,7 @@ functio pick(bivalens cond) → numerus {
 
 #[test]
 fn rejects_second_assignment_to_fixum_with_initializer() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
     fixum numerus value ← 1
@@ -242,7 +242,7 @@ functio pick() → numerus {
 
 #[test]
 fn rejects_second_assignment_to_fixum_late_init() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
     fixum numerus value
@@ -266,7 +266,7 @@ functio pick() → numerus {
 
 #[test]
 fn accepts_varia_reassignment() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
     varia numerus value ← 1
@@ -286,7 +286,7 @@ functio pick() → numerus {
 fn rejects_reassignment_of_immutable_parameter() {
     // EDGE: owned/de/ex parameters are write-once and already initialized by the
     // caller; reassigning them in the body is a second assignment.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(numerus value) → numerus {
     value ← 2
@@ -310,7 +310,7 @@ functio pick(numerus value) → numerus {
 fn accepts_in_parameter_reassignment() {
     // EDGE: `in` parameters are mutable (they lower to Rust `mut` bindings) and
     // may be reassigned freely, unlike owned/de/ex parameters.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(in numerus value) → numerus {
     value ← value * 2
@@ -328,7 +328,7 @@ functio pick(in numerus value) → numerus {
 fn accepts_sit_deferred_init_single_assignment() {
     // TARGET: `sit x` (≡ `fixum _ x`) is the inferred deferred immutable. It may
     // be assigned exactly once later, then read.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens cond) → numerus {
     sit value
@@ -345,7 +345,7 @@ functio pick(bivalens cond) → numerus {
 
 #[test]
 fn rejects_second_assignment_to_sit_deferred_init() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
     sit value
@@ -369,7 +369,7 @@ functio pick() → numerus {
 
 #[test]
 fn rejects_read_before_fixum_late_init_assignment() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
     fixum numerus value
@@ -393,7 +393,7 @@ functio pick() → numerus {
 
 #[test]
 fn rejects_read_before_sit_deferred_init_assignment() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
     sit value
@@ -418,7 +418,7 @@ functio pick() → numerus {
 #[test]
 fn rejects_fixum_late_init_after_partial_branch_assignment() {
     // EDGE: fixum deferred init must be assigned on all paths before read.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens cond) → numerus {
     fixum numerus value
@@ -441,7 +441,7 @@ functio pick(bivalens cond) → numerus {
 
 #[test]
 fn rejects_sit_deferred_init_after_partial_branch_assignment() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens cond) → numerus {
     sit value
@@ -464,7 +464,7 @@ functio pick(bivalens cond) → numerus {
 
 #[test]
 fn rejects_second_assignment_to_sit_with_initializer() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
     sit value ← 1
@@ -489,7 +489,7 @@ functio pick() → numerus {
 fn rejects_postfix_increment_before_fixum_late_init() {
     // EDGE: postfix increment reads the binding first; deferred slots reject
     // that read before their single plain assignment.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
     fixum numerus total
@@ -512,7 +512,7 @@ functio pick() → numerus {
 
 #[test]
 fn rejects_second_postfix_increment_to_fixum_late_init() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
     fixum numerus total
@@ -538,7 +538,7 @@ functio pick() → numerus {
 fn accepts_fixum_late_init_assigned_inside_dum_loop() {
     // EDGE: path-insensitive 3a treats a `dum` body as having run once, so a
     // deferred fixum assigned inside the loop reads as initialized afterward.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
     fixum numerus value
@@ -555,7 +555,7 @@ functio pick() → numerus {
 
 #[test]
 fn driver_accepts_fixum_and_sit_deferred_init_in_incipit() {
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 incipit {
     fixum numerus typed
@@ -576,7 +576,7 @@ incipit {
 #[test]
 fn rejects_read_after_nested_branch_partial_init() {
     // EDGE: nested branches where only the inner si assigns the binding.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens outer, bivalens inner) → numerus {
     fixum numerus value
@@ -602,7 +602,7 @@ functio pick(bivalens outer, bivalens inner) → numerus {
 #[test]
 fn accepts_nested_all_paths_init() {
     // EDGE: nested branches with init on all paths.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens outer, bivalens inner) → numerus {
     varia numerus value
@@ -625,7 +625,7 @@ functio pick(bivalens outer, bivalens inner) → numerus {
 fn rejects_fixum_late_init_after_si_sin_partial_assignment() {
     // F-019 EDGE: fixum assigned in `si` branch only, not in `sin`;
     // the join must degrade to MaybeAssigned and reject the read.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens c1, bivalens c2) → numerus {
     fixum numerus value
@@ -650,7 +650,7 @@ functio pick(bivalens c1, bivalens c2) → numerus {
 fn rejects_fixum_late_init_after_sin_only_assignment() {
     // F-019 EDGE: fixum assigned only in `sin` branch, not in `si`;
     // the outer join must degrade to MaybeAssigned.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens c1, bivalens c2) → numerus {
     fixum numerus value
@@ -675,7 +675,7 @@ functio pick(bivalens c1, bivalens c2) → numerus {
 fn rejects_fixum_late_init_after_custodi_partial_assignment() {
     // F-019 EDGE: custodi guard section with one clause assigning and
     // another skipping; the sequential merge must degrade to MaybeAssigned.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens c1, bivalens c2) → numerus {
     fixum numerus value
@@ -703,7 +703,7 @@ functio pick(bivalens c1, bivalens c2) → numerus {
 fn rejects_varia_after_custodi_one_sided_assign() {
     // F-019 EDGE: varia declared without init, assigned in one custodi
     // clause only; the sequential merge must degrade.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens c1, bivalens c2) → numerus {
     varia numerus value
@@ -733,7 +733,7 @@ fn discerne_pattern_join_accepts_all_arms_initialized() {
     // introduce false positives — the fact that pattern bindings become
     // MaybeAssigned inside the join must not block reads of pre-existing
     // variables that are initialized on every arm.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r#"
 functio pick() → bivalens {
     sit value
@@ -759,7 +759,7 @@ functio pick() → bivalens {
 fn accepts_conversio_assign_single_fixum_late_init() {
     // NO-BYPASS (positive side): `↤` is a store, so a `fixum` deferred local
     // may receive its single value through `↤` exactly as through `←`.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r#"
 functio pick() → numerus ⇥ textus {
     fixum numerus value
@@ -778,7 +778,7 @@ functio pick() → numerus ⇥ textus {
 fn rejects_conversio_assign_second_assignment_to_fixum() {
     // NO-BYPASS: a second store through `↤` is a second assignment to a
     // write-once binding, matching the ordinary-assignment rule.
-    let result = crate::test_support::analyze_source(
+    let result = crate::test_support::analyze_source_la(
         r#"
 functio pick() → numerus {
     fixum numerus value ← 1

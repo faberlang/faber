@@ -7,8 +7,13 @@
 use crate::{PassConfig, SemanticError, SemanticErrorKind, Type};
 use radix_target::Target;
 
+fn latin_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("load Latin locale pack")
+}
+
 fn analyze_result(source: &str) -> crate::SemanticResult {
-    let lex = radix_lexer::lex(source);
+    let lex = radix_lexer::lex_with_locale_pack(source, &latin_pack());
     let mut parse = radix_parser::parse(lex);
     let program = parse.program.expect("parse");
     let config = PassConfig::for_target(Target::MirWasm);
@@ -16,7 +21,7 @@ fn analyze_result(source: &str) -> crate::SemanticResult {
 }
 
 fn analyze_errors(source: &str) -> Vec<SemanticError> {
-    let lex = radix_lexer::lex(source);
+    let lex = radix_lexer::lex_with_locale_pack(source, &latin_pack());
     let mut parse = radix_parser::parse(lex);
     let program = parse.program.expect("parse");
     let config = PassConfig::for_target(Target::MirWasm);
