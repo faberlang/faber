@@ -1803,6 +1803,10 @@ help = "अभिव्यक्ति का प्रकार अपेक्
 message = "matmul के लिए tuple आकार वाला rank-2 tensor रिसीवर आवश्यक है"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
+[diagnostics.SEM010.issues.nominal_ascription_not_provable]
+message = "`∷` एक तथ्य बताता है जिसे कंपाइलर सिद्ध कर सकता है; '{found}' '{expected}' नहीं है और कोई {implet} संबंध घोषित नहीं है"
+help = "स्रोत प्रकार को लक्ष्य से मिलाएँ, contract को {implet} में घोषित करें, या `↦` से स्पष्ट रूप से रूपांतरित करें"
+
 [diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
 message = "संख्यात्मक अंकगणितीय ऑपरेंड के प्रकार समान होने चाहिए; स्पष्ट रूप से परिवर्तित करने के लिए ↦ का उपयोग करें"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"

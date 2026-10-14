@@ -1791,6 +1791,10 @@ help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầ
 message = "matmul yêu cầu receiver tensor có shape tuple"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
+[diagnostics.SEM010.issues.nominal_ascription_not_provable]
+message = "`∷` khẳng định một sự thật mà trình biên dịch có thể chứng minh; '{found}' không phải là '{expected}' và không có quan hệ {implet} nào được khai báo"
+help = "làm cho kiểu nguồn khớp với kiểu đích, khai báo hợp đồng trong {implet}, hoặc chuyển đổi tường minh bằng `↦`"
+
 [diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
 message = "các toán hạng số học phải có kiểu giống hệt nhau; dùng ↦ để chuyển đổi rõ ràng"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
