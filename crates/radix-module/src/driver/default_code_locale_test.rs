@@ -31,7 +31,9 @@ impl Drop for CodeLocaleSwitch {
 }
 
 fn set_code_locale_switch(value: Option<&str>) -> CodeLocaleSwitch {
-    let lock = CODE_LOCALE_SWITCH_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let lock = CODE_LOCALE_SWITCH_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     // SAFETY: the returned guard holds the process-wide lock until after the
     // variable is cleared in its `Drop`.
     unsafe {
@@ -48,7 +50,11 @@ fn default_code_pack_en_when_switch_set() {
     {
         let _switch = set_code_locale_switch(Some("en"));
         let result = crate::services::check_diagnostics_for_source("main.fab", EN_SOURCE, false);
-        assert!(result.success, "en source must check under the switch: {:?}", result.diagnostics);
+        assert!(
+            result.success,
+            "en source must check under the switch: {:?}",
+            result.diagnostics
+        );
     }
     {
         let _switch = set_code_locale_switch(None);
