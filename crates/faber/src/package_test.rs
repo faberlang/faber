@@ -5529,15 +5529,38 @@ main {
     assert!(!output.code.contains("crate::norma::hal::console"));
 }
 
-/// Output sinks must not lower through `format!`. The one legitimate source of
-/// `format!(` in a package build is the generated `Debug` impl of a genus,
+/// Output sinks must not lower through `format!`. Two legitimate sources of
+/// `format!(` exist in a package build: the generated `Debug` impl of a genus,
 /// which prints its construction literal (D2.8, rd4a/pr3) — imported norma
-/// genera such as `scrinium` carry one, with `format!` for optional fields.
-fn assert_format_macro_only_in_print_literals(code: &str) {
+/// genera such as `scrinium` carry one, with `format!` for optional fields —
+/// and the `return Err(format!(...))` a failable string `throw` lowers to in a
+/// transitively imported module (`norma:value`'s `require_string`, reached
+/// through `norma:fault`, carries one). An output sink returns
+/// `Result<(), fault::IoFault>`, so it never produces that `Err` shape; a
+/// regression that lowered a sink through `format!` would still fail here.
+fn assert_format_macro_only_in_expected_sites(code: &str) {
     for line in code.lines().filter(|line| line.contains("format!(")) {
         assert!(
-            line.contains("write!(f, \""),
-            "format! outside a D2.8 construction-literal Debug impl: {line}"
+            line.contains("write!(f, \"") || line.trim_start().starts_with("return Err(format!("),
+            "format! outside a D2.8 construction-literal Debug impl or a failable throw: {line}"
+        );
+    }
+    for member in [
+        "write_partial",
+        "write_bytes",
+        "write_line",
+        "warn_line",
+        "debug_line",
+    ] {
+        let start = code
+            .find(&format!("fn {member}("))
+            .unwrap_or_else(|| panic!("expected generated sink fn {member}"));
+        let body = &code[start..];
+        let end = body.find("\n    }\n").unwrap_or(body.len());
+        assert!(
+            !body[..end].contains("format!("),
+            "output sink {member} lowered through format!:\n{}",
+            &body[..end]
         );
     }
 }
@@ -5550,14 +5573,19 @@ fn consolum_eot4_native_output_sinks_canonical() {
         &entry,
         r#"
 import from "norma:console" const write_partial as partial_sink, write_bytes as bytes_sink, write_line as line_sink, warn_line as warning_sink, debug_line as debug_sink
+import from "norma:fault" fault
 
-main {
+fn drain_sinks() → void ⇥ fault.IoFault {
   partial_sink("partial")
   partial_sink("chain")
   bytes_sink(|41 42|)
   line_sink("line")
   warning_sink("warning")
   debug_sink("debug")
+}
+
+main {
+  drain_sinks()
 }
 "#,
     )
@@ -5601,7 +5629,7 @@ main {
     }
 
     assert!(!output.code.contains("println!"));
-    assert_format_macro_only_in_print_literals(&output.code);
+    assert_format_macro_only_in_expected_sites(&output.code);
 }
 
 #[test]
@@ -5616,14 +5644,19 @@ importa ex "norma:console" fixum funde ut bytes_sink
 importa ex "norma:console" fixum scribe ut line_sink
 importa ex "norma:console" fixum mone ut warning_sink
 importa ex "norma:console" fixum vide ut debug_sink
+importa ex "norma:fault" fault
 
-incipit {
+functio drain_sinks() → vacuum ⇥ fault.IoFault {
   partial_sink("partial")
   partial_sink("chain")
   bytes_sink(|43 44|)
   line_sink("line")
   warning_sink("warning")
   debug_sink("debug")
+}
+
+incipit {
+  drain_sinks()
 }
 "#,
     )
@@ -5665,7 +5698,7 @@ incipit {
     }
 
     assert!(!output.code.contains("println!"));
-    assert_format_macro_only_in_print_literals(&output.code);
+    assert_format_macro_only_in_expected_sites(&output.code);
 }
 
 #[test]
