@@ -199,8 +199,15 @@ fn wasm_refuses_display_of_a_nested_list_of_bits_by_name() {
     );
     let result = crate::driver::compile(&session, "<test>", source, ModuleCompileRequest::default());
     assert!(result.output.is_none(), "{:?}", result.diagnostics);
-    let message = format!("{:?}", result.diagnostics);
-    assert!(message.contains("nested collection of raw bits"), "{message}");
+    let issue = "mir_wasm_bits_collection_display_unsupported";
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some(issue)),
+        "{:?}",
+        result.diagnostics
+    );
 }
 
 #[cfg(feature = "mir-sexp")]
