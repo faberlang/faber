@@ -41,6 +41,8 @@ struct CursorState {
     pulled: usize,
     /// Items read so far through the walk's index projection.
     read: usize,
+    /// Error raised through the cursor's `⇥` channel, handed out once.
+    raised: Option<Value>,
 }
 
 struct SermoSource {
@@ -66,6 +68,7 @@ impl GeneratorCursor {
             current: None,
             pulled: 0,
             read: 0,
+            raised: None,
         })))
     }
 
@@ -77,12 +80,21 @@ impl GeneratorCursor {
             current: None,
             pulled: 0,
             read: 0,
+            raised: None,
         })))
     }
 
     /// Whether the generator can still be resumed.
     pub(crate) fn is_live(&self) -> bool {
         self.0.borrow().frame.is_some()
+    }
+
+    /// The error raised through the cursor's `⇥` channel, handed out once.
+    // WHY: the consumer (the cursor error path) lands separately; the unit
+    // test pins the hand-out-once contract until then.
+    #[allow(dead_code)]
+    pub(crate) fn take_raised(&self) -> Option<Value> {
+        self.0.borrow_mut().raised.take()
     }
 
     /// Stepped index read: only the item most recently pulled is readable.
@@ -174,7 +186,11 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
         match self.generator_resume(cursor, span)? {
             GeneratorStep::Yield(item) => Ok(Some(item)),
-            GeneratorStep::Return | GeneratorStep::Raise(_) => Ok(None),
+            GeneratorStep::Return => Ok(None),
+            GeneratorStep::Raise(error) => {
+                cursor.0.borrow_mut().raised = Some(error);
+                Ok(None)
+            }
         }
     }
 
@@ -217,5 +233,24 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             Some(error) => GeneratorStep::Raise(error),
             None => GeneratorStep::Return,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn raised_error_is_handed_out_once() {
+        let cursor = GeneratorCursor(Rc::new(RefCell::new(CursorState {
+            frame: None,
+            sermo: None,
+            current: None,
+            pulled: 0,
+            read: 0,
+            raised: Some(Value::Str("nulla".to_owned())),
+        })));
+        assert_eq!(cursor.take_raised(), Some(Value::Str("nulla".to_owned())));
+        assert_eq!(cursor.take_raised(), None);
     }
 }
