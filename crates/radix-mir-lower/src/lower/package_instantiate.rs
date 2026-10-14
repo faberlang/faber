@@ -310,6 +310,15 @@ pub fn instantiate_merged_generic_calls_with_tensor_edge_policy(
             "package MIR function id space is exhausted",
         )]
     })?;
+    // Source-less synthetic functions that still carry generic params are
+    // collected before `state` borrows `types`, so later passes can key them
+    // without re-scanning the program.
+    let synthetic_templates: FxHashMap<MirFunctionId, MirFunction> = program
+        .functions
+        .iter()
+        .filter(|function| function.source.is_none() && super::monomorphize::function_contains_param(&*types, function))
+        .map(|function| (function.id, function.clone()))
+        .collect();
     let mut state = PackageInstantiate {
         types,
         interner,
@@ -318,6 +327,7 @@ pub fn instantiate_merged_generic_calls_with_tensor_edge_policy(
             .iter()
             .filter_map(|template| template.source.map(|source| (source, template.clone())))
             .collect(),
+        synthetic_templates,
         generic_params: generic_params.iter().cloned().collect(),
         tensor_limes_templates: tensor_edge_policy_metadata
             .generic_limes
@@ -468,6 +478,9 @@ pub struct PackageInstantiate<'a> {
     pub interner: &'a Interner,
     pub struct_metadata: Option<&'a PackageStructMetadata<'a>>,
     pub templates: FxHashMap<DefId, MirFunction>,
+    /// Source-less synthetic functions that still contain generic params,
+    /// keyed by their lowered function id.
+    pub synthetic_templates: FxHashMap<MirFunctionId, MirFunction>,
     pub generic_params: FxHashMap<DefId, Vec<MirGenericParam>>,
     pub tensor_limes_templates: FxHashMap<(DefId, radix_mir::MirTempId), MirTensorLimesTemplate>,
     pub tensor_edge_policy_providers: Vec<MirTensorEdgePolicyProvider>,
