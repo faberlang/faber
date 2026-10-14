@@ -173,7 +173,7 @@ fn projector_uses_reflection_for_the_final_entry_before_reporting_the_physical_g
     artifact.reflection = Some(FmirArtifactReflection {
         v: ARTIFACT_REFLECTION_VERSION,
         kernels: vec![FmirReflectedKernel {
-            function: "logical_kernel".to_owned(),
+            function: 0,
             entry_name: "mystery_backend_symbol".to_owned(),
             resources: Vec::new(),
         }],
@@ -184,6 +184,46 @@ fn projector_uses_reflection_for_the_final_entry_before_reporting_the_physical_g
         project_host_execution_v1(&device, &device.artifacts.artifact[0]),
         Err(HostExecutionProjectionError::MissingPhysicalFact { fact })
             if fact == "admitted physical allocation/view plan"
+    ));
+}
+
+#[test]
+fn reflected_kernel_resolves_by_function_id_not_entry_name() {
+    // G-06: the reflected kernel's identity is the typed function id. Two
+    // rows whose entry text collides with the other row's emitted symbol
+    // must still resolve to their own symbol by id — a name lookup would
+    // pick the wrong row or report a spurious ambiguity.
+    let mut device = device();
+    let artifact = &mut device.artifacts.artifact[0];
+    artifact.entrypoints.clear();
+    artifact.reflection = Some(FmirArtifactReflection {
+        v: ARTIFACT_REFLECTION_VERSION,
+        kernels: vec![
+            FmirReflectedKernel {
+                function: 1,
+                entry_name: "symbol_one".to_owned(),
+                resources: Vec::new(),
+            },
+            FmirReflectedKernel {
+                function: 2,
+                entry_name: "symbol_two".to_owned(),
+                resources: Vec::new(),
+            },
+        ],
+    });
+    artifact.packet_sha256 = artifact.compute_packet_sha256();
+
+    assert_eq!(
+        resolve_final_entry(artifact, 1, "symbol_two").expect("function 1 resolves"),
+        "symbol_one"
+    );
+    assert_eq!(
+        resolve_final_entry(artifact, 2, "symbol_one").expect("function 2 resolves"),
+        "symbol_two"
+    );
+    assert!(matches!(
+        resolve_final_entry(artifact, 3, "symbol_one"),
+        Err(HostExecutionProjectionError::MissingArtifactEntry { entry }) if entry == "symbol_one"
     ));
 }
 

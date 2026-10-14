@@ -1406,7 +1406,7 @@ fn reflection_round_trips_and_folds_into_packet_sha256() {
     let reflected = FmirArtifactReflection {
         v: crate::schema::ARTIFACT_REFLECTION_VERSION,
         kernels: vec![FmirReflectedKernel {
-            function: "add".to_owned(),
+            function: 1,
             entry_name: "add".to_owned(),
             resources: vec![FmirReflectedResource {
                 name: "buffer0".to_owned(),
@@ -1460,7 +1460,7 @@ fn reflection_content_folds_in_canonical_order_invariant() {
         v: crate::schema::ARTIFACT_REFLECTION_VERSION,
         kernels: vec![
             FmirReflectedKernel {
-                function: "add".to_owned(),
+                function: 1,
                 entry_name: "add".to_owned(),
                 resources: vec![
                     FmirReflectedResource {
@@ -1474,7 +1474,7 @@ fn reflection_content_folds_in_canonical_order_invariant() {
                 ],
             },
             FmirReflectedKernel {
-                function: "mul".to_owned(),
+                function: 2,
                 entry_name: "mul".to_owned(),
                 resources: vec![FmirReflectedResource {
                     name: "b".to_owned(),
@@ -1487,7 +1487,7 @@ fn reflection_content_folds_in_canonical_order_invariant() {
         v: crate::schema::ARTIFACT_REFLECTION_VERSION,
         kernels: vec![
             FmirReflectedKernel {
-                function: "mul".to_owned(),
+                function: 2,
                 entry_name: "mul".to_owned(),
                 resources: vec![FmirReflectedResource {
                     name: "b".to_owned(),
@@ -1495,7 +1495,7 @@ fn reflection_content_folds_in_canonical_order_invariant() {
                 }],
             },
             FmirReflectedKernel {
-                function: "add".to_owned(),
+                function: 1,
                 entry_name: "add".to_owned(),
                 resources: vec![
                     FmirReflectedResource {

@@ -66,12 +66,12 @@ pub fn packet_sha256_canonical(
         push_field(&mut canonical, "reflection-v", &reflection.v.to_le_bytes());
         let mut kernels: Vec<&FmirReflectedKernel> = reflection.kernels.iter().collect();
         kernels
-            .sort_unstable_by_key(|kernel| (kernel.function.as_str(), kernel.entry_name.as_str()));
+            .sort_unstable_by_key(|kernel| (kernel.function, kernel.entry_name.as_str()));
         for kernel in &kernels {
             push_field(
                 &mut canonical,
-                "reflected-kernel",
-                kernel.function.as_bytes(),
+                "reflected-function-id",
+                &kernel.function.to_le_bytes(),
             );
             push_field(
                 &mut canonical,
