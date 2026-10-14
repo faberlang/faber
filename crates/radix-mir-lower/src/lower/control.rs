@@ -4174,6 +4174,16 @@ impl FunctionBuilder<'_> {
             }
             _ => (collection, MirType::semantic(collection_semantic)),
         };
+        // D6.6: a failable generator's stepped walk still owns an error edge
+        // after the loop; the settle call reuses the ordinary failable-call
+        // routing instead of hand-rolling an error block.
+        let settle = stepped_callee.and_then(|callee| {
+            self.context
+                .function_errors
+                .get(&callee)
+                .copied()
+                .map(|err_ty| (collection.clone(), err_ty))
+        });
         let collection = self.materialize_operand_place(collection, collection_ty, iter.iter.span);
         if let CollectionIteraKind::Shaped { element, rank, literal, matrix } = &collection_kind {
             return self.lower_shaped_itera(&iter, collection, *element, *rank, literal.as_deref(), *matrix);
@@ -4446,6 +4456,17 @@ impl FunctionBuilder<'_> {
         self.terminate_current(MirTerminatorKind::Goto(cond_id), iter.span);
 
         self.switch_to(after_id);
+        if let Some((operand, err_ty)) = settle {
+            let unit = MirType::semantic(self.types.primitive(Primitive::Vacuum));
+            self.lower_failable_call(
+                MirCallee::Value(operand),
+                Vec::new(),
+                unit,
+                err_ty,
+                None,
+                iter.span,
+            )?;
+        }
         Some(())
     }
 
