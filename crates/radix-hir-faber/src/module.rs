@@ -94,6 +94,10 @@ pub struct FaberCodegen<'a> {
     /// these re-emit as `empty` rather than `Type {}`.
     pub(crate) empty_dense_ids: FxHashSet<radix_hir::HirId>,
     pub(crate) inferred_constructor_ids: FxHashSet<radix_hir::HirId>,
+    /// `HirId` → authored axis-reduction call facts for the expression
+    /// typecheck expanded from `t.summa(axis n)` / `t.media(axis n)`: those
+    /// nodes re-emit as the authored call, never the grouped reduction.
+    pub(crate) axis_sugar: FxHashMap<radix_hir::HirId, radix_hir::HirAxisSugar>,
     /// Initializer-expression ids of authored discard bindings (`fixum T _ ← e`)
     /// with their declaration facts, for re-emitting the binding.
     pub(crate) discard_bindings: FxHashMap<radix_hir::HirId, radix_hir::HirDiscardBinding>,
@@ -171,6 +175,7 @@ impl<'a> FaberCodegen<'a> {
             numeric_twin_ids: FxHashSet::default(),
             empty_dense_ids: FxHashSet::default(),
             inferred_constructor_ids: FxHashSet::default(),
+            axis_sugar: FxHashMap::default(),
             discard_bindings: FxHashMap::default(),
             destructure_bindings: FxHashMap::default(),
             await_assignment_bindings: FxHashSet::default(),
@@ -356,6 +361,11 @@ impl FaberCodegen<'_> {
             .inferred_constructor_ids
             .iter()
             .copied()
+            .collect();
+        self.axis_sugar = presentation
+            .axis_sugar
+            .iter()
+            .map(|sugar| (sugar.id, sugar.clone()))
             .collect();
         self.discard_bindings = presentation
             .discard_binding_stmts
