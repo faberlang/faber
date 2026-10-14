@@ -2087,9 +2087,14 @@ impl TypeChecker<'_> {
             return None;
         }
         // S0-G2: glyph operands are value-transparent through applied aliases
-        // — `Vector<3> ⊗ Vector<2>` dispatches on the builtin carriers.
+        // — `Vector<3> ⊗ Vector<2>` dispatches on the builtin carriers. The
+        // declared `copy`/`mut`/`own` access marker on a carrier (`varia
+        // tensor<f32, [2, 2]> acc ← copy w`) is an acquisition fact, not part
+        // of the value shape, so peel it like the call and access paths do.
         let lhs_resolved = self.value_carrier_type(lhs_ty);
         let rhs_resolved = self.value_carrier_type(rhs_ty);
+        let (_, lhs_resolved) = self.types.peel_access_marker(lhs_resolved);
+        let (_, rhs_resolved) = self.types.peel_access_marker(rhs_resolved);
         if self.is_infer(lhs_resolved) || self.is_infer(rhs_resolved) {
             self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, lhs.span);
             return None;
