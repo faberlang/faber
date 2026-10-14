@@ -204,7 +204,7 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
         },
         SemanticErrorKind::AirPurityViolation => DiagnosticSpec {
             code: "SEM059",
-            help: Some("keep `@ radix lane \"air\" functions in the accepted pure subset"),
+            help: Some("keep `@ radix lane \"air\"` functions in the accepted pure subset"),
         },
         SemanticErrorKind::ImmutableAssignment => DiagnosticSpec {
             code: "SEM020",
