@@ -11,7 +11,10 @@ mod reflection;
 mod targets;
 mod verify;
 
-pub use check::{CheckDiagnosticsResult, check_diagnostics_for_source, check_diagnostics_for_source_with_locale_pack, normalize_locale002_notes, source_declares_locale};
+pub use check::{
+    CheckDiagnosticsResult, check_diagnostics_for_source, check_diagnostics_for_source_with_locale_pack,
+    normalize_locale002_notes, source_declares_locale,
+};
 pub use commands::{BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
 pub use emit::{build_output_path, output_code};
 pub use field_modifier_codemod::{FieldModifierCodemod, insert_field_modifiers};
