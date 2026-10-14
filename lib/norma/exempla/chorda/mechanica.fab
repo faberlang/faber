@@ -20,7 +20,7 @@ locale = "en"
 import from "norma:chorda" chorda
 
 main {
-    const bytes hello ← chorda.encode("Salve")
+    const list<b8> hello ← chorda.encode("Salve")
     assert chorda.decode(hello) ≡ "Salve"
     assert chorda.decode(chorda.encode("")) ≡ ""
     assert chorda.decode(chorda.encode("π ≈ 3.14")) ≡ "π ≈ 3.14"
