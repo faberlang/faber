@@ -197,3 +197,63 @@ fn hir_local_without_size_static_deserializes() {
         HirLocal::deserialize(map).expect("a snapshot without size_static must still deserialize");
     assert!(!restored.size_static);
 }
+
+/// A grouped reduction keeps a source coordinate only when a plain key names
+/// it; index expressions and composite keys keep every coordinate.
+#[test]
+fn reduced_coordinates_are_those_not_kept_as_plain_keys() {
+    use super::{
+        HirArrayElement, HirExpression, HirExpressionKind, HirId, reduction_reduced_coordinates,
+    };
+    use radix_lexer::{Span, Symbol};
+    use radix_types::DefId;
+
+    fn path(id: u32, def: DefId) -> HirExpression {
+        HirExpression {
+            id: HirId(id),
+            kind: HirExpressionKind::Path(def),
+            ty: None,
+            span: Span::default(),
+        }
+    }
+
+    fn grouped(keys: Vec<HirExpression>) -> HirExpression {
+        HirExpression {
+            id: HirId(100),
+            kind: HirExpressionKind::Array(keys.into_iter().map(HirArrayElement::Expr).collect()),
+            ty: None,
+            span: Span::default(),
+        }
+    }
+
+    let i = DefId(1);
+    let j = DefId(2);
+    let coordinates = [(i, Symbol(1)), (j, Symbol(2))];
+
+    let only_i = grouped(vec![path(10, i)]);
+    assert_eq!(
+        reduction_reduced_coordinates(&coordinates, &only_i),
+        vec![1]
+    );
+
+    let both = grouped(vec![path(11, i), path(12, j)]);
+    assert_eq!(
+        reduction_reduced_coordinates(&coordinates, &both),
+        Vec::<usize>::new()
+    );
+
+    let indexed_key = HirExpression {
+        id: HirId(13),
+        kind: HirExpressionKind::Index(Box::new(path(14, i)), Box::new(path(15, j))),
+        ty: None,
+        span: Span::default(),
+    };
+    let indexed = grouped(vec![indexed_key]);
+    assert_eq!(
+        reduction_reduced_coordinates(&coordinates, &indexed),
+        vec![0, 1]
+    );
+
+    let lone = path(16, i);
+    assert_eq!(reduction_reduced_coordinates(&coordinates, &lone), vec![1]);
+}
