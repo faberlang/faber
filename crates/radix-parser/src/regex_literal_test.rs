@@ -2,8 +2,8 @@
 //! regex type word) and `_ /pattern/` parse to `Literal::Regex`; a bare `/` in
 //! operand position stays division.
 
-use crate::test_support::{parse_ok, symbol_name};
 use crate::ParseResult;
+use crate::test_support::{parse_ok, symbol_name};
 use radix_syntax::{BinOp, Expr, ExprKind, IfBody, Literal, Stmt, StmtKind};
 
 fn var_initializer(statement: &Stmt) -> &Expr {

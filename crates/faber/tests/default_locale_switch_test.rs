@@ -31,10 +31,7 @@ fn run_check_file(path: &Path, switch: Option<&str>) -> ExitStatus {
             command.env_remove(SWITCH);
         }
     }
-    command
-        .output()
-        .expect("run `faber check <file>`")
-        .status
+    command.output().expect("run `faber check <file>`").status
 }
 
 fn run_check_stdin(source: &str, switch: Option<&str>) -> ExitStatus {

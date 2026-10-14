@@ -54,7 +54,10 @@ fn analyze_with_library_bodies(dir: &Path) -> (AnalyzedProgram, LibraryBodies) {
                 continue;
             };
             bodies.insert(
-                (import.module.package.clone(), import.module.module_path.clone()),
+                (
+                    import.module.package.clone(),
+                    import.module.module_path.clone(),
+                ),
                 analysis.clone(),
             );
         }

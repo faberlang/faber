@@ -21,8 +21,8 @@
 //! `Pure` would be an unsound build, so `Pure` is only ever the answer for a
 //! proven pure function or a top-level constant.
 
-use crate::analyze::{AnalyzedProgramNode, ModuleGraph, ModuleId};
 use crate::LibraryImportBinding;
+use crate::analyze::{AnalyzedProgramNode, ModuleGraph, ModuleId};
 use radix_module::driver::AnalyzedModule;
 use radix_module::hir::{DefId, HirItemKind, LibraryIdentity, LibraryProvider};
 use radix_module::semantic::passes::praefixum::{
@@ -153,10 +153,12 @@ impl<'s> Scope<'s> {
                         ImportedCallee::Unavailable
                     }
                 }
-                ImportedReferenceKind::Call => match top_level_function(&target.analysis, &member) {
-                    Some(def_id) => self.function(Home::Package(target_id.clone()), def_id),
-                    None => ImportedCallee::Unavailable,
-                },
+                ImportedReferenceKind::Call => {
+                    match top_level_function(&target.analysis, &member) {
+                        Some(def_id) => self.function(Home::Package(target_id.clone()), def_id),
+                        None => ImportedCallee::Unavailable,
+                    }
+                }
                 ImportedReferenceKind::Method => ImportedCallee::Unavailable,
             };
         }

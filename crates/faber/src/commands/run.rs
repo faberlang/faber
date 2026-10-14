@@ -390,7 +390,9 @@ fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
     let code_pack = package::default_config_with_locale(radix::module::Target::HirTypeScript)
         .ok()
         .and_then(|config| config.locale_pack)
-        .or_else(|| radix::module::driver::default_code_pack(&radix::module::driver::Config::default()));
+        .or_else(|| {
+            radix::module::driver::default_code_pack(&radix::module::driver::Config::default())
+        });
     let lex = match code_pack.as_ref() {
         Some(pack) => radix::module::lexer::lex_with_locale_pack(peeled.body, pack),
         None => radix::module::lexer::lex(peeled.body),
