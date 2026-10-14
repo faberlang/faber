@@ -45,7 +45,7 @@ fn doctor_report_emits_structural_availability_keys() {
     let report = doctor_report_for(
         Path::new("/tmp/doctor-cwd").to_path_buf(),
         Some(root.path().to_path_buf()),
-        Some(LibraryHomeSource::Env),
+        Some(LibraryHomeSource::Configured),
     );
     let rendered = render_doctor_report(&report);
 
@@ -54,7 +54,7 @@ fn doctor_report_emits_structural_availability_keys() {
         kv(&rendered, "library_home"),
         root.path().display().to_string()
     );
-    assert_eq!(kv(&rendered, "library_home_source"), "env");
+    assert_eq!(kv(&rendered, "library_home_source"), "configured");
     assert_eq!(
         kv(&rendered, "library.norma.availability"),
         "cista-source-package"
@@ -79,7 +79,6 @@ fn doctor_cli_exits_zero_with_structural_keys() {
     let binary = faber_binary();
     let output = Command::new(&binary)
         .args(["doctor"])
-        .env_remove("FABER_LIBRARY_HOME")
         .output()
         .expect("run faber doctor");
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -110,8 +109,8 @@ fn doctor_cli_honors_explicit_library_home() {
 
     let binary = faber_binary();
     let output = Command::new(&binary)
-        .args(["doctor"])
-        .env("FABER_LIBRARY_HOME", root.path())
+        .args(["doctor", "--library-home"])
+        .arg(root.path())
         .output()
         .expect("run faber doctor");
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -125,7 +124,7 @@ fn doctor_cli_honors_explicit_library_home() {
         kv(&stdout, "library_home"),
         root.path().display().to_string()
     );
-    assert_eq!(kv(&stdout, "library_home_source"), "env");
+    assert_eq!(kv(&stdout, "library_home_source"), "configured");
     assert_eq!(
         kv(&stdout, "library.norma.availability"),
         "cista-source-package"

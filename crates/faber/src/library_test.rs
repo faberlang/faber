@@ -39,6 +39,21 @@ fn restore_env(key: &str, value: Option<std::ffi::OsString>) {
     }
 }
 
+struct ConfiguredHomeReset;
+
+impl ConfiguredHomeReset {
+    fn clear() -> Self {
+        radix::program::set_configured_library_home(None);
+        Self
+    }
+}
+
+impl Drop for ConfiguredHomeReset {
+    fn drop(&mut self) {
+        radix::program::set_configured_library_home(None);
+    }
+}
+
 #[test]
 fn embedded_library_home_holds_norma_when_home_unset() {
     let _guard = env_guard();
@@ -81,6 +96,51 @@ fn unset_home_records_embedded_provenance() {
     let resolved = resolved_library_home().expect("embedded home");
     assert_eq!(resolved.source, LibraryHomeSource::Embedded);
     assert!(resolved.path.join("norma/src/fs.fab").is_file());
+}
+
+#[test]
+fn configure_library_home_flag_wins_over_manifest() {
+    let _guard = env_guard();
+    let _configured = ConfiguredHomeReset::clear();
+
+    let root = tempfile::tempdir().expect("temp");
+    let package = root.path().join("pkg");
+    std::fs::create_dir_all(&package).expect("package dir");
+    std::fs::write(
+        package.join("faber.toml"),
+        "[paths]\nlibrary_home = \"manifest-home\"\n",
+    )
+    .expect("manifest");
+    let flag = root.path().join("flag-home");
+
+    configure_library_home(Some(flag.as_path()), Some(package.as_path()));
+
+    let resolved = resolved_library_home().expect("configured home");
+    assert_eq!(resolved.path, flag);
+    assert_eq!(resolved.source, LibraryHomeSource::Configured);
+    assert_eq!(LibraryHomeSource::Configured.as_key(), "configured");
+}
+
+#[test]
+fn configure_library_home_reads_manifest_paths_key() {
+    let _guard = env_guard();
+    let _configured = ConfiguredHomeReset::clear();
+
+    let root = tempfile::tempdir().expect("temp");
+    let package = root.path().join("pkg");
+    std::fs::create_dir_all(package.join("src")).expect("package src");
+    std::fs::write(
+        package.join("faber.toml"),
+        "[paths]\nlibrary_home = \"vendor/libs\"\n",
+    )
+    .expect("manifest");
+    let probe = package.join("src/main.fab");
+
+    configure_library_home(None, Some(probe.as_path()));
+
+    let resolved = resolved_library_home().expect("manifest home");
+    assert_eq!(resolved.path, package.join("vendor/libs"));
+    assert_eq!(resolved.source, LibraryHomeSource::Configured);
 }
 
 #[test]

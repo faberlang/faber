@@ -15,8 +15,8 @@ use radix::program::library::is_valid_provider_segment;
 
 use crate::cli::CheckLibraryArgs;
 use faber_cli::library::{
-    FABER_LIBRARY_HOME_ENV, LibraryRootRule, ResolvedLibraryHome, library_root_rule,
-    resolved_library_home, specifier_identity,
+    LibraryRootRule, ResolvedLibraryHome, library_root_rule, resolved_library_home,
+    specifier_identity,
 };
 
 /// Successful name→checkout resolution. Identity is not stored: callers that
@@ -59,9 +59,7 @@ impl CheckLibraryError {
                 format!("error: '{name}' is not a valid library provider name")
             }
             Self::MissingLibraryHome => {
-                format!(
-                    "error: no library home; set {FABER_LIBRARY_HOME_ENV} to a directory containing provider checkouts"
-                )
+                "error: no library home; pass --library-home <DIR> (or set [paths] library_home in faber.toml) to a directory containing provider checkouts".to_owned()
             }
             Self::UnknownProvider { name, home } => {
                 format!(

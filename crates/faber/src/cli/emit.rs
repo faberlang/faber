@@ -47,6 +47,9 @@ pub struct EmitArgs {
 
     /// Input file or package path, or '-' / omitted for stdin
     pub input: Vec<String>,
+
+    #[command(flatten)]
+    pub library: super::LibraryHomeArgs,
 }
 
 /// Target names accepted by `faber emit`.

@@ -24,10 +24,12 @@ pub const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
 /// The faber lib artifact does not call doctor/check-library; the binary does.
 pub const KNOWN_LIBRARIES: &[&str] = &["norma", "triga", "gradus", "tela"];
 
-/// How the library home was selected. Env wins; otherwise the `lib/` the
-/// binary materializes from its embedded Norma sources.
+/// How the library home was selected. The `--library-home` flag or the
+/// manifest `[paths] library_home` wins; otherwise env, otherwise the `lib/`
+/// the binary materializes from its embedded Norma sources.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LibraryHomeSource {
+    Configured,
     Env,
     Embedded,
 }
@@ -35,6 +37,7 @@ pub enum LibraryHomeSource {
 impl LibraryHomeSource {
     pub fn as_key(self) -> &'static str {
         match self {
+            Self::Configured => "configured",
             Self::Env => "env",
             Self::Embedded => "embedded",
         }
@@ -96,8 +99,65 @@ pub(crate) fn default_library_home() -> Option<PathBuf> {
     resolved_library_home().map(|home| home.path)
 }
 
+/// Configure the process-wide library home for this run.
+///
+/// Precedence: `flag` (the `--library-home` CLI flag), else the nearest
+/// `faber.toml`'s `[paths] library_home` walked up from `probe` (a directory,
+/// or a file's parent; the current directory when `probe` is `None`). A
+/// relative manifest path is joined onto the manifest directory. When nothing
+/// is chosen the process-wide setting is left untouched.
+pub fn configure_library_home(flag: Option<&Path>, probe: Option<&Path>) {
+    let chosen = flag
+        .map(Path::to_path_buf)
+        .or_else(|| manifest_library_home(probe));
+    if let Some(home) = chosen {
+        radix::program::set_configured_library_home(Some(home));
+    }
+}
+
+fn manifest_library_home(probe: Option<&Path>) -> Option<PathBuf> {
+    let start = probe_start_dir(probe)?;
+    for dir in start.ancestors() {
+        let manifest = dir.join("faber.toml");
+        if manifest.is_file() {
+            return manifest_paths_library_home(&manifest);
+        }
+    }
+    None
+}
+
+fn probe_start_dir(probe: Option<&Path>) -> Option<PathBuf> {
+    match probe {
+        None => std::env::current_dir().ok(),
+        Some(path) if path.is_dir() => Some(path.to_path_buf()),
+        Some(path) => match path.parent() {
+            Some(parent) if !parent.as_os_str().is_empty() => Some(parent.to_path_buf()),
+            _ => std::env::current_dir().ok(),
+        },
+    }
+}
+
+fn manifest_paths_library_home(manifest: &Path) -> Option<PathBuf> {
+    let text = std::fs::read_to_string(manifest).ok()?;
+    let value: toml::Value = toml::from_str(&text).ok()?;
+    let raw = value.get("paths")?.get("library_home")?.as_str()?;
+    let path = Path::new(raw);
+    if path.is_absolute() {
+        Some(path.to_path_buf())
+    } else {
+        Some(manifest.parent()?.join(path))
+    }
+}
+
 /// Ambient library home with provenance for doctor / check-library reporting.
 pub fn resolved_library_home() -> Option<ResolvedLibraryHome> {
+    if let Some(path) = radix::program::configured_library_home_setting() {
+        return Some(ResolvedLibraryHome {
+            path,
+            source: LibraryHomeSource::Configured,
+        });
+    }
+
     if let Some(value) = std::env::var_os(FABER_LIBRARY_HOME_ENV) {
         return Some(ResolvedLibraryHome {
             path: PathBuf::from(value),
