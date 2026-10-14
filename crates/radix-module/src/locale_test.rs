@@ -2484,6 +2484,13 @@ fn locale_suggestion_filter_keeps_accent_matches_and_guesses_at_error_spans_only
 /// pack except the `en` comparison source and the canonical `la`).
 const TRANSLATED_PACKS: &[&str] = &["ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
 
+/// Current exemption-entry count across `locale/identical-to-en/<pack>.toml`.
+///
+/// The list may only shrink: lower this constant in the same change that
+/// deletes an entry, and never raise it. `identical_to_en_entries_are_unique`
+/// closes the duplicate route into the same budget.
+const IDENTICAL_TO_EN_ENTRY_BUDGET: usize = 6;
+
 /// `locale/identical-to-en/`, holding one shrink-only exemption list per pack.
 fn identical_to_en_dir() -> PathBuf {
     crate::locale::workspace_locale_root().join("identical-to-en")
@@ -2537,6 +2544,73 @@ fn load_identical_to_en_entries() -> Vec<IdenticalToEnEntry> {
         }
     }
     entries
+}
+
+/// The verdict for the identical-to-en exemption list length against its
+/// budget. The list may only shrink, so fewer entries is fine and more is
+/// growth the gate must refuse.
+fn growth_verdict(entries: usize, budget: usize) -> Result<(), String> {
+    if entries > budget {
+        return Err(format!(
+            "identical-to-en list grew to {entries} entries against a budget of {budget}"
+        ));
+    }
+    Ok(())
+}
+
+#[test]
+fn identical_to_en_growth_equal_is_ok() {
+    assert_eq!(growth_verdict(6, 6), Ok(()));
+}
+
+#[test]
+fn identical_to_en_growth_one_more_is_err() {
+    let err = growth_verdict(7, 6).expect_err("growth must be an error");
+    assert!(
+        err.contains('7') && err.contains('6'),
+        "error should name both numbers: {err:?}"
+    );
+}
+
+#[test]
+fn identical_to_en_growth_fewer_is_ok() {
+    assert_eq!(growth_verdict(5, 6), Ok(()));
+}
+
+/// The exemption list is budgeted (`IDENTICAL_TO_EN_ENTRY_BUDGET`): adding an
+/// entry fails this gate until the constant is deliberately changed, and the
+/// constant may only go down as entries are deleted.
+#[test]
+fn locale_pack_completeness_identical_to_en_list_does_not_grow() {
+    let entries = load_identical_to_en_entries().len();
+    growth_verdict(entries, IDENTICAL_TO_EN_ENTRY_BUDGET).unwrap_or_else(|err| panic!("{err}"));
+}
+
+/// Two entries naming the same (pack, code, issue, field) are growth by
+/// another route: the second can never exempt a row the first does not, so a
+/// duplicate is dead weight that must fail before it lands.
+#[test]
+fn identical_to_en_entries_are_unique() {
+    let mut seen = BTreeSet::new();
+    let mut duplicates = Vec::new();
+    for entry in load_identical_to_en_entries() {
+        let name = format!(
+            "{} {} {} {}",
+            entry.pack,
+            entry.code,
+            entry.issue.as_deref().unwrap_or("-"),
+            entry.field
+        );
+        let key = (entry.pack, entry.code, entry.issue, entry.field);
+        if !seen.insert(key) {
+            duplicates.push(name);
+        }
+    }
+    assert!(
+        duplicates.is_empty(),
+        "identical-to-en entries repeat a (pack, code, issue, field): {}",
+        duplicates.join(", ")
+    );
 }
 
 /// The two sanctioned reason classes for exemption entries.
