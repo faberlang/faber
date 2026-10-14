@@ -2100,7 +2100,9 @@ fn zz_debug_presentation() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus");
     let source = std::fs::read_to_string(root.join("ad/serve-typed.fab")).unwrap();
     let session = Session::new(
-        Config::default().with_dev_locale_root().with_target(crate::codegen::Target::HirRust),
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(crate::codegen::Target::HirRust),
     );
     let unit = analyze_source(&session, "serve-typed.fab", &source, AnalyzeRequest::default()).expect("analyze");
     let mut artifact = from_analyzed(&unit, "serve-typed.fab", "serve-typed.fab");
@@ -2112,7 +2114,12 @@ fn zz_debug_presentation() {
             a.form.head = radix_hir::HirTypeFormHead::Named { def_id: radix_types::DefId(29), path: path.clone() };
         }
     }
-    println!("v1 keep-args named: {:?}", load_fhir(&postcard::to_allocvec(&v1).unwrap()).map(|_| ()).map_err(|e| e.to_string()));
+    println!(
+        "v1 keep-args named: {:?}",
+        load_fhir(&postcard::to_allocvec(&v1).unwrap())
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    );
     // Variant 2: Named head, drop args.
     let mut v2 = artifact.clone();
     for a in &mut v2.presentation.authored_types {
@@ -2121,7 +2128,12 @@ fn zz_debug_presentation() {
             a.form.args.clear();
         }
     }
-    println!("v2 drop-args named: {:?}", load_fhir(&postcard::to_allocvec(&v2).unwrap()).map(|_| ()).map_err(|e| e.to_string()));
+    println!(
+        "v2 drop-args named: {:?}",
+        load_fhir(&postcard::to_allocvec(&v2).unwrap())
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    );
     // Variant 3: Semantic head, drop args.
     let mut v3 = artifact.clone();
     for a in &mut v3.presentation.authored_types {
@@ -2129,6 +2141,11 @@ fn zz_debug_presentation() {
             a.form.args.clear();
         }
     }
-    println!("v3 drop-args semantic: {:?}", load_fhir(&postcard::to_allocvec(&v3).unwrap()).map(|_| ()).map_err(|e| e.to_string()));
+    println!(
+        "v3 drop-args semantic: {:?}",
+        load_fhir(&postcard::to_allocvec(&v3).unwrap())
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    );
     let _ = &mut artifact;
 }
