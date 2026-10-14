@@ -982,17 +982,6 @@ impl Lowerer<'_> {
             .collect();
 
         let mut ok = true;
-        for label in &analysis.duplicate_labels {
-            self.error_with_args_at(
-                vec![
-                    DiagnosticArg::new("issue", "duplicate_template_hole_label"),
-                    DiagnosticArg::new("label", label.clone()),
-                ],
-                call_span,
-            );
-            ok = false;
-        }
-
         let has_labeled = lowered.iter().any(|(label, _)| label.is_some());
         let has_unlabeled = lowered.iter().any(|(label, _)| label.is_none());
         if has_labeled && has_unlabeled {
