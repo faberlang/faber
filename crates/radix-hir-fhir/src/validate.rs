@@ -1007,7 +1007,35 @@ fn validate_authored_type_records(
 /// is valid iff it is a builtin (0 < d.0 < `USER_DEF_ID_BASE`) or it
 /// appears in this set. Per prep S2.
 fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId> {
-    collect_def_registry_for_parts(&artifact.hir, &artifact.libraries, &artifact.resolver)
+    let mut registry =
+        collect_def_registry_for_parts(&artifact.hir, &artifact.libraries, &artifact.resolver);
+    collect_carried_provider_defs(&artifact.provider_units, &mut registry);
+    registry
+}
+
+/// Count the definition sites owned by provider-carried units into the
+/// consumer's registry. A consumer's library-call signatures legitimately
+/// name nominal defs owned by a provider (for example `fault.IoFault` in the
+/// `err_ty` of an imported `fs` function), and those defs are absent from the
+/// consumer's own arenas and resolver snapshot. Without them the referential
+/// walk rejects valid consumer tables with a false `DanglingIndex`.
+fn collect_carried_provider_defs(
+    units: &std::collections::BTreeMap<String, crate::artifact::ProviderCarriageEntryWire>,
+    registry: &mut FxHashSet<radix_types::DefId>,
+) {
+    use crate::artifact::ProviderCarriageEntryWire;
+
+    for entry in units.values() {
+        let ProviderCarriageEntryWire::Unit(provider) = entry else {
+            continue;
+        };
+        registry.extend(collect_def_registry_for_parts(
+            &provider.hir,
+            &radix_hir::LibraryRegistry::default(),
+            &provider.resolver,
+        ));
+        collect_carried_provider_defs(&provider.nested, registry);
+    }
 }
 
 fn collect_def_registry_for_parts(
