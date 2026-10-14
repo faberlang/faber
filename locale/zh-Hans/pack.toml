@@ -356,8 +356,8 @@ message = "需要 {expected}"
 help = "在 binding 名称前添加 fixum 或 varia"
 
 [diagnostics.PARSE001.issues.itera_de_requires_fixum]
-message = "itera de bindings are always const; use {expected}"
-help = "de binds an index or key, not a mutable element; use the const form"
+message = "itera de bindings 始终是 const；请使用 {expected}"
+help = "de 绑定的是 index 或 key，不是 mutable element；请使用 const 形式"
 
 [diagnostics.PARSE001.issues.duplicate_rest_pattern]
 message = "rest pattern 已指定"
@@ -496,8 +496,8 @@ message = "schema 不能声明 method"
 help = "请在 genus 上声明 method"
 
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
-message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
-help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+message = "`{marker}` 标记不再放在 binding 上，而是放在值上"
+help = "写成 `{keyword} T {name} ← {marker} value`；后面的 `{name} ← {marker} value` 以同样方式标记该值，parameter 则把 `{marker}` 保留在类型之前"
 
 [diagnostics.PARSE011]
 message = "在 {functio} 后需要函数名"
@@ -505,7 +505,7 @@ help = "在 {functio} 后添加函数名"
 
 [diagnostics.PARSE012]
 message = "{functio} 声明需要函数体"
-help = "add a '{block}' to the function declaration"
+help = "在函数声明中添加 '{block}'"
 
 [diagnostics.PARSE013]
 message = "在 {genus} 后需要类名"
@@ -640,16 +640,16 @@ message = "使用 ⊥ 进行 conversio recovery"
 help = "使用 ⊥；vel 仅用于 nullish coalescing"
 
 [diagnostics.PARSE030.issues.conversio_via_missing_hint]
-message = "`via` needs a convert hint after it"
-help = "name the hint right after via, as in `x ↦ u32 via Hex`; the hints are Hex, Bin, Oct, Be, Le, and Code"
+message = "`via` 之后需要一个 convert hint"
+help = "把 hint 紧写在 via 之后，例如 `x ↦ u32 via Hex`；hint 有 Hex、Bin、Oct、Be、Le 和 Code"
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
-message = "a convert hint is not a type argument"
-help = "write the hint as a via clause after the target: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+message = "convert hint 不是 type argument"
+help = "把 hint 写成 target 之后的 via clause：`u32 via Le`、`ascii<8> via Hex`、`littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
-message = "a convert hint does not follow the target in angle brackets"
-help = "write the hint as a via clause after the target: `octeti<16> via Le`"
+message = "convert hint 不写在 target 之后的尖括号中"
+help = "把 hint 写成 target 之后的 via clause：`octeti<16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "需要表达式"
@@ -728,7 +728,7 @@ message = "`{form}` 是已废弃的数值类型写法"
 help = "写 `{bare}`，不要写 `{form}`；宽度标记本身就是类型"
 
 [diagnostics.PARSE040.issues.wrong_locale_type]
-message = "type '{type}' is not declared on this reader surface"
+message = "type '{type}' 未在此 reader surface 上声明"
 help = "使用此读者语言中声明的类型拼写{?expected|：'|'}"
 
 [diagnostics.PARSE040.issues.est_value_literal_names_equality]
@@ -1004,12 +1004,12 @@ message = "saturating 宽度必须是单独的整数宽度标记"
 help = "使用单独的整数宽度标记，如 u8 或 i16"
 
 [diagnostics.SEM008.issues.trapping_word_width_required]
-message = "trapping type requires exactly one width"
-help = "write the trapping type with one width, such as trapping<u8> or trapping<i64>"
+message = "trapping type 要求恰好一个 width"
+help = "为 trapping type 写一个 width，例如 trapping<u8> 或 trapping<i64>"
 
 [diagnostics.SEM008.issues.trapping_word_width_shape]
-message = "trapping width must be a bare width marker"
-help = "use a bare width marker such as u8 or i64"
+message = "trapping width 必须是单独的 width marker"
+help = "使用单独的 width marker，例如 u8 或 i64"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可调用项的注解姿态“{annotation_posture}”与书写的姿态“{written_posture}”冲突"
@@ -1032,12 +1032,12 @@ message = "cursor 需要一个 type parameter"
 help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.queue_arity]
-message = "queue requires one or two type parameters"
-help = "use queue<T> or queue<T, N>"
+message = "queue 需要一个或两个 type parameters"
+help = "使用 queue<T> 或 queue<T, N>"
 
 [diagnostics.SEM008.issues.stack_arity]
-message = "stack requires one or two type parameters"
-help = "use stack<T> or stack<T, N>"
+message = "stack 需要一个或两个 type parameters"
+help = "使用 stack<T> 或 stack<T, N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu 需要一个 pattern"
@@ -1492,12 +1492,12 @@ message = "类型不匹配"
 help = "使表达式类型与期望类型一致"
 
 [diagnostics.SEM010.issues.sort_ref_requires_map]
-message = "`ref` sorts the keys of a map, so the source must be a map"
-help = "use `from` to sort the values of a list or a set, or sort a map with `ref`"
+message = "`ref` 对 map 的 keys 排序，因此 source 必须是 map"
+help = "用 `from` 对 list 或 set 的值排序，或用 `ref` 对 map 排序"
 
 [diagnostics.SEM010.issues.sort_tensor_unsupported]
-message = "a tensor cannot be the source of a sort expression"
-help = "convert the tensor to a list first, or use a library routine that ranks tensor scores"
+message = "tensor 不能作为 sort 表达式的 source"
+help = "先把 tensor 转换为 list，或使用对 tensor scores 排序的 library routine"
 
 [diagnostics.SEM010.issues.ledger_operation_not_implemented]
 message = "ledger 值暂时不能使用：{tabulae} 类型可用于声明，但尚未实现对 ledger 值的任何操作"
@@ -1512,20 +1512,20 @@ message = "此目标不支持 {leaf} 叶片"
 help = "请使用 rust 或 MIR runner，或移除 {route} 调用"
 
 [diagnostics.SEM010.issues.sort_source_unordered]
-message = "the elements have no natural order to sort by"
-help = "give the sort a body that returns an orderable key, such as a number, text or bool"
+message = "这些 elements 没有可用于排序的自然顺序"
+help = "给 sort 一个返回可排序 key 的 body，例如 number、text 或 bool"
 
 [diagnostics.SEM010.issues.sort_key_unordered]
-message = "the sort key has no natural order"
-help = "return a number, text or bool from the sort body; a key is never a comparison"
+message = "sort key 没有自然顺序"
+help = "让 sort body 返回 number、text 或 bool；key 绝不是 comparison"
 
 [diagnostics.SEM010.issues.sort_source_not_collection]
-message = "a sort expression needs a list, a set or a map as its source"
-help = "sort a list or a set with `from`, or a map with `from` (values) or `ref` (keys)"
+message = "sort 表达式需要 list、set 或 map 作为 source"
+help = "对 list 或 set 用 `from` 排序，对 map 用 `from`（值）或 `ref`（keys）排序"
 
 [diagnostics.SEM010.issues.sort_body_requires_redde]
-message = "a sort body must return its key"
-help = "end the sort body with `return <key>`"
+message = "sort body 必须返回其 key"
+help = "用 `return <key>` 结束 sort body"
 
 [diagnostics.SEM010.issues.argument_type_mismatch]
 message = "argument 类型不匹配"
@@ -1636,24 +1636,24 @@ message = "浮点常量无法精确表示"
 help = "写成浮点字面量，或使用该浮点类型可精确表示的常量"
 
 [diagnostics.SEM010.issues.float_constant_out_of_range]
-message = "float constant is outside the finite range of the float type"
-help = "write a value the float type can hold, or use a wider float type"
+message = "float constant 超出该 float type 的有限范围"
+help = "写出该 float type 可容纳的值，或使用更宽的 float type"
 
 [diagnostics.SEM010.issues.shift_count_negative]
-message = "shift count must not be negative"
-help = "write a shift count of zero or more"
+message = "shift count 不能为负"
+help = "写大于等于零的 shift count"
 
 [diagnostics.SEM010.issues.potentia_exponent_negative]
-message = "an integer power cannot have a negative exponent"
-help = "write an exponent of zero or more, or use a `fractus` base for a fractional power"
+message = "integer power 的 exponent 不能为负"
+help = "写大于等于零的 exponent，或对 fractional power 使用 `fractus` base"
 
 [diagnostics.SEM010.issues.integer_quotient_to_float_requires_true_division]
-message = "integer quotient cannot be a float implicitly"
-help = "divide with `÷` to get a float quotient, or convert an operand explicitly with `↦`"
+message = "integer quotient 不能隐式成为 float"
+help = "用 `÷` 相除得到 float quotient，或用 `↦` 显式转换一个 operand"
 
 [diagnostics.SEM010.issues.store_constant_out_of_range]
-message = "constant {value} does not fit {slot}"
-help = "write a value the slot holds"
+message = "constant {value} 放不进 {slot}"
+help = "写出该 slot 可容纳的值"
 
 [diagnostics.SEM010.issues.numerus_literal_out_of_range]
 message = "整数字面量超出 numerus 的范围"
@@ -1940,8 +1940,8 @@ message = "值参数 {param} 不能占据签名的 extent 位置"
 help = "声明 `<size {param}>` 泛型参数并在 figura 中使用，或在需要运行时提升之处写出 `size {param}`"
 
 [diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
-message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
-help = "keep caller and fragment lane bindings distinct"
+message = "fragment lane binding '{fragment}' 与 caller lane binding '{caller}' 冲突"
+help = "让 caller 与 fragment lane bindings 保持不同"
 
 [diagnostics.SEM011.issues.range_step_must_be_numeric]
 message = "range step 必须是 numeric"
@@ -2044,16 +2044,16 @@ message = "numeric arithmetic operands 必须类型完全一致；请用 ↦ 显
 help = "在应用此 numeric 运算符之前显式转换 operands"
 
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
-message = "u64 and a signed integer have no lossless join in arithmetic"
-help = "convert one side with `↦` so both operands are u64 or both are signed (`a ↦ i64`), or join them exactly with `a ↦ inf`"
+message = "u64 与有符号 integer 在算术中没有无损 join"
+help = "用 `↦` 转换一侧，使两个 operands 都是 u64 或都是有符号数（`a ↦ i64`），或用 `a ↦ inf` 精确合并它们"
 
 [diagnostics.SEM011.issues.saturating_word_family_mismatch]
 message = "saturating 整数在算术中不能与其他整数族混用"
 help = "用 `↦` 把另一个操作数转换为同一 saturating 宽度；saturating、wrapping 与 trapping 整数从不隐式混用"
 
 [diagnostics.SEM011.issues.numeric_family_crossing_requires_conversio]
-message = "integer, decimal and float operands cannot mix implicitly"
-help = "convert one operand explicitly with `↦`; a written constant may stand beside any number"
+message = "integer、decimal 和 float operands 不能隐式混用"
+help = "用 `↦` 显式转换一个 operand；写出的 constant 可以与任何 number 并列"
 
 [diagnostics.SEM011.issues.ascii_literal_invalid_escape]
 message = "ascii literal 包含无效转义序列"
@@ -2496,16 +2496,16 @@ message = "从 numerus、fractus 或 bivalens 到 octeti 的 conversion 未指�
 help = "使用 chorda 或显式 byte conversion helpers"
 
 [diagnostics.SEM016.issues.bits_conversion_width_mismatch]
-message = "a bN converts only to a number or bits type of the same width"
-help = "convert a bN only to an integer, float or bits type of the same width, such as b8 to u8 or b32 to f32"
+message = "bN 只能转换为相同 width 的 number 或 bits type"
+help = "bN 只能转换为相同 width 的 integer、float 或 bits type，例如 b8 转 u8 或 b32 转 f32"
 
 [diagnostics.SEM016.issues.bits_via_clause_not_allowed]
-message = "a same-width bits conversion takes no via clause"
-help = "remove the via clause; a same-width bN conversion keeps the bit pattern and takes no hint"
+message = "相同 width 的 bits 转换不接受 via clause"
+help = "移除 via clause；相同 width 的 bN 转换保留 bit pattern，不接受 hint"
 
 [diagnostics.SEM016.issues.bits_via_clause_required]
-message = "a bits list conversion that changes the bit width needs a via Le or via Be clause"
-help = "write the byte order with the conversion, such as lista<b8> ↦ lista<u16> via Le; a same-width conversion takes no clause"
+message = "改变 bit width 的 bits list 转换需要 via Le 或 via Be clause"
+help = "在转换中写出 byte order，例如 lista<b8> ↦ lista<u16> via Le；相同 width 的转换不接受 clause"
 
 [diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
 message = "从 octeti 到 numerus 的 conversion 未指定"
@@ -2520,20 +2520,20 @@ message = "the Code hint converts only littera ↦ u32 via Code (read a code poi
 help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Code a number converts to its digits"
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
-message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
+message = "`{hint}` 不是 convert hint"
+help = "在 via 之后使用 Hex、Bin、Oct、Be、Le 或 Code 之一；Floor、Ceil、HalfEven 和 Trunc 只属于转换为 integer 的 float 或 decimal"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
-message = "this conversion target takes no convert hint"
+message = "此 conversion target 不接受 convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
-message = "a float or decimal does not convert to an integer without naming the rounding"
-help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
+message = "float 或 decimal 不指名 rounding 就不能转换为 integer"
+help = "写 `x ↦ int via Floor`、`via Ceil`、`via HalfEven`（平局取偶数邻值）或 `via Trunc`；`↤` 位置接受相同 clause，`a ↤ x via Trunc`；或先用 ⌊x⌋、⌈x⌉ 或 ⌊x⌉ 取整，再转换结果"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
-message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
-help = "write `x ↦ b32` to read a float as its bit pattern (b16, b32 or b64 by width) and `b32 ↦ f32` to build one; a pattern held in a number goes through its marker first, as in `u16 ↦ b16 ↦ f16`"
+message = "`via Bits` 已弃用：bit pattern 保存在 bN marker 中，不由 hint 选择"
+help = "写 `x ↦ b32` 把 float 读作其 bit pattern（按 width 为 b16、b32 或 b64），写 `b32 ↦ f32` 构造一个；number 中保存的 pattern 先经过其 marker，如 `u16 ↦ b16 ↦ f16`"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "从 octeti 到 bivalens 的 conversion 没有 default meaning"
@@ -2844,16 +2844,16 @@ message = "move 后使用"
 help = "避免在 value 被 move 之后再使用它"
 
 [diagnostics.SEM050.issues.use_after_own]
-message = "this name was given away as `own` and is used later"
-help = "pass `copy` to keep using the name"
+message = "此名称已作为 `own` 交出，之后又被使用"
+help = "传入 `copy` 以继续使用该名称"
 
 [diagnostics.SEM050.issues.moved_in_loop]
-message = "this value is moved on every iteration of the loop"
-help = "pass `copy`, or move a value created inside the loop"
+message = "此值在循环的每次 iteration 都被移动"
+help = "传入 `copy`，或移动在循环内创建的值"
 
 [diagnostics.SEM050.issues.moved_name_captured_by_closure]
-message = "this closure captured a name that was given away before the call"
-help = "call the closure before the move, or pass `copy`"
+message = "此 closure 捕获的名称在调用之前已被交出"
+help = "在 move 之前调用 closure，或传入 `copy`"
 
 [diagnostics.SEM051]
 message = "借用 moved value"
@@ -2912,12 +2912,12 @@ message = "不能向 `de` parameter 赋值"
 help = "若有意修改，请把 parameter 声明为 'in'"
 
 [diagnostics.SEM056.issues.mutating_receiver_through_ref]
-message = "cannot call a mutating receiver through a `ref` view"
-help = "drop the `ref` marker, or use a non-mutating method"
+message = "不能通过 `ref` view 调用 mutating receiver"
+help = "去掉 `ref` marker，或使用 non-mutating method"
 
 [diagnostics.SEM056.issues.assign_through_ref]
-message = "cannot assign through a `ref` view"
-help = "drop the `ref` marker if mutation is intended"
+message = "不能通过 `ref` view 进行 assignment"
+help = "如果要 mutation，请去掉 `ref` marker"
 
 [diagnostics.SEM057]
 message = "parameter mode 不匹配"
@@ -2928,104 +2928,104 @@ message = "不能把 `de` parameter 传给 `in` 或 `ex` position"
 help = "在 caller 与 callee 之间对齐 parameter modes"
 
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
-message = "cannot pass a `ref` value to a `mut` or `own` position"
-help = "pass a `mut` or `own` value, or bind through `copy`"
+message = "不能把 `ref` 值传给 `mut` 或 `own` position"
+help = "传入 `mut` 或 `own` 值，或通过 `copy` 绑定"
 
 [diagnostics.SEM057.issues.own_argument_not_local_binding]
-message = "only a whole local binding can be passed as `own`"
-help = "pass `copy` to duplicate the field or element, or bind it to a local first"
+message = "只有完整的 local binding 才能作为 `own` 传入"
+help = "传入 `copy` 以复制 field 或 element，或先把它绑定到 local"
 
 [diagnostics.SEM057.issues.own_argument_unmarked_parameter]
-message = "an unmarked parameter is shared read-only and cannot be given away as `own`"
-help = "pass `copy` to duplicate it, or declare the parameter `own`"
+message = "unmarked parameter 是共享只读的，不能作为 `own` 交出"
+help = "传入 `copy` 以复制它，或把 parameter 声明为 `own`"
 
 [diagnostics.SEM057.issues.own_argument_module_constant]
-message = "a module constant cannot be given away as `own`"
-help = "pass `copy` to duplicate it"
+message = "module constant 不能作为 `own` 交出"
+help = "传入 `copy` 以复制它"
 
 [diagnostics.SEM057.issues.own_argument_loop_binder]
-message = "a loop binder aliases a live element and cannot be given away as `own`"
-help = "pass `copy` to duplicate it"
+message = "loop binder 只是别名一个 live element，不能作为 `own` 交出"
+help = "传入 `copy` 以复制它"
 
 [diagnostics.SEM057.issues.call_marker_missing]
-message = "this argument needs the `{expected}` marker its parameter declares"
-help = "write the same access marker at the call as in the signature, for example `f(mut x)`"
+message = "此 argument 需要其 parameter 声明的 `{expected}` marker"
+help = "在调用处写出与 signature 相同的 access marker，例如 `f(mut x)`"
 
 [diagnostics.SEM057.issues.call_marker_mismatch]
-message = "this argument is marked `{found}` but its parameter is declared `{expected}`"
-help = "use the same access marker at the call as in the signature"
+message = "此 argument 标记为 `{found}`，但其 parameter 声明为 `{expected}`"
+help = "在调用处使用与 signature 相同的 access marker"
 
 [diagnostics.SEM057.issues.call_marker_on_read_only]
-message = "a read-only parameter takes no `{found}` marker"
-help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
+message = "read-only parameter 不接受 `{found}` marker"
+help = "移除 marker，或写 `ref`，这是默认值的显式写法"
 
 [diagnostics.SEM010.issues.axis_reduction_extent_unknown]
-message = "the mean needs a compile-time extent on the axis it removes"
-help = "give the axis a literal extent, or write the grouped reduction and divide by the run-time count"
+message = "mean 需要在其移除的 axis 上有 compile-time extent"
+help = "给 axis 一个 literal extent，或写成 grouped reduction，再除以 run-time count"
 
 [diagnostics.SEM010.issues.axis_reduction_mean_requires_float]
-message = "the mean along an axis needs a floating-point element"
-help = "convert the tensor to a floating-point element type first, or use sum"
+message = "沿 axis 的 mean 需要 floating-point element"
+help = "先把 tensor 转换为 floating-point element type，或使用 sum"
 
 [diagnostics.SEM010.issues.axis_reduction_not_constant]
-message = "the axis of a reduction must be a compile-time constant"
-help = "write a literal axis such as `axis 1`; the result shape depends on it"
+message = "reduction 的 axis 必须是 compile-time constant"
+help = "写 literal axis，例如 `axis 1`；result shape 取决于它"
 
 [diagnostics.SEM010.issues.axis_reduction_out_of_range]
-message = "the axis is outside the rank of the tensor"
-help = "use an axis from 0 up to one less than the rank"
+message = "axis 超出 tensor 的 rank"
+help = "使用从 0 到 rank 减一的 axis"
 
 [diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
-message = "an axis reduction is built for tensors of rank 2 to 8 only"
-help = "reduce a tensor of rank 2 to 8 with literal dimensions, or write the explicit reduction with `reducta ... per [...]`"
+message = "axis reduction 仅针对 rank 2 到 8 的 tensor"
+help = "对 rank 2 到 8 且维度为 literal 的 tensor 使用 reduce，或写成显式 reduction `reducta ... per [...]`"
 
 [diagnostics.SEM010.issues.reducta_group_keys_not_literal]
-message = "the grouping keys of a multi-key grouped reduction must be a bracketed list of key expressions written in place"
-help = "write `per [i, j]` with the keys spelled out; a list held in a variable or a spread cannot name the result axes"
+message = "multi-key grouped reduction 的 grouping keys 必须是就地写出的、带方括号的 key 表达式列表"
+help = "把 `per [i, j]` 的 keys 写出来；变量或 spread 中的 list 不能命名 result axes"
 
 [diagnostics.SEM010.issues.reducta_group_rank_mismatch]
-message = "a grouped reduction with N keys produces a result tensor of rank N"
-help = "make the expected result tensor's rank equal the number of keys, or drop a key"
+message = "带 N 个 keys 的 grouped reduction 产生 rank 为 N 的 result tensor"
+help = "让期望的 result tensor 的 rank 等于 keys 的数量，或删去一个 key"
 
 [diagnostics.SEM057.issues.axis_marker_required]
-message = "this argument is an `axis` argument and must be written with the `axis` marker"
-help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
+message = "此 argument 是 `axis` argument，必须用 `axis` marker 写出"
+help = "在调用处按 signature 声明写出 marker，例如 `f(axis 1)`"
 
 [diagnostics.SEM057.issues.axis_marker_unexpected]
-message = "the `axis` marker is written here but the parameter is not declared `axis`"
-help = "remove the `axis` marker, or declare the parameter `axis int`"
+message = "此处写了 `axis` marker，但 parameter 未声明为 `axis`"
+help = "移除 `axis` marker，或把 parameter 声明为 `axis int`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
-message = "cannot bind an unmarked value into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "不能把 unmarked 值绑定到 `own`"
+help = "通过 `copy` 绑定以复制 source"
 
 [diagnostics.SEM057.issues.ref_into_own]
-message = "cannot bind a `ref` value into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "不能把 `ref` 值绑定到 `own`"
+help = "通过 `copy` 绑定以复制 source"
 
 [diagnostics.SEM057.issues.mut_into_own]
-message = "cannot bind a `mut` value into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "不能把 `mut` 值绑定到 `own`"
+help = "通过 `copy` 绑定以复制 source"
 
 [diagnostics.SEM057.issues.field_into_own]
-message = "cannot bind a field projection into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "不能把 field projection 绑定到 `own`"
+help = "通过 `copy` 绑定以复制 source"
 
 [diagnostics.SEM057.issues.index_into_own]
-message = "cannot bind an index projection into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "不能把 index projection 绑定到 `own`"
+help = "通过 `copy` 绑定以复制 source"
 
 [diagnostics.SEM057.issues.deref_into_own]
-message = "cannot bind a dereference into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "不能把 dereference 绑定到 `own`"
+help = "通过 `copy` 绑定以复制 source"
 
 [diagnostics.SEM057.issues.projection_into_own]
-message = "cannot bind a projection into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "不能把 projection 绑定到 `own`"
+help = "通过 `copy` 绑定以复制 source"
 
 [diagnostics.SEM057.issues.shared_into_own]
-message = "cannot bind a shared value into `own`"
-help = "bind through `copy` to duplicate the source"
+message = "不能把 shared 值绑定到 `own`"
+help = "通过 `copy` 绑定以复制 source"
 
 [diagnostics.SEM058]
 message = "初始化前使用"
@@ -3036,7 +3036,7 @@ message = "使用了可能未初始化的 binding"
 help = "读取前先给 binding 赋值，或把 slot 声明为 `sponte`"
 
 [diagnostics.SEM059]
-message = "AIR purity violation"
+message = "AIR purity 违规"
 help = "把 `@ radix lane \"air\"` 函数保持在接受的 pure subset 之内"
 
 [diagnostics.SEM059.issues.async_function]
@@ -3240,7 +3240,7 @@ message = "不必要的 cast：类型已知"
 help = "删除多余的 cast"
 
 [diagnostics.WARN007]
-message = "target no-op"
+message = "target 空操作"
 help = "移除 construct 或按 target gate 它"
 
 [diagnostics.WARN008]
