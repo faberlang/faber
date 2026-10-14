@@ -277,12 +277,15 @@ fn octetus_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
     assert!(result.success(), "expected success, got: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
-        code.contains("fn firstByte(buf: Vec<u8>) -> u8"),
+        code.contains("fn firstByte(p_buf: Vec<u8>) -> u8"),
         "expected the u8 return and the byte-list param to lower to u8, got:\n{code}"
     );
-    assert!(code.contains("buf.get(0"), "expected accipe to lower to buf.get, got:\n{code}");
     assert!(
-        code.contains("sig.push(raw)"),
+        code.contains("p_buf.get(0"),
+        "expected accipe to lower to p_buf.get, got:\n{code}"
+    );
+    assert!(
+        code.contains("l_sig.push(l_raw)"),
         "expected appende to lower to push, got:\n{code}"
     );
     assert_compile_fails_with_issue(
