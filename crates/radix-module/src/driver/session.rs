@@ -243,6 +243,30 @@ impl Config {
         self
     }
 
+    /// Install the built-in Latin (`la`) reader pack as a session default.
+    ///
+    /// This is a test-support builder: production code never calls it. Tests
+    /// of the canonical Latin surface install the pack explicitly through
+    /// this helper instead of leaving the source pack-less.
+    ///
+    /// The pack resolves through the same frontmatter loader as a
+    /// source-declared locale, so it matches the shipped `locale/la/pack.toml`.
+    /// It is installed non-explicit, so a source's own frontmatter locale
+    /// still wins, exactly like any other session default.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `locale_root` is unset or the `la` pack fails to load.
+    #[must_use]
+    pub fn with_latin_locale(mut self) -> Self {
+        let pack = super::resolve_frontmatter_locale_pack(&self, "la").unwrap_or_else(|diagnostic| {
+            panic!("with_latin_locale: cannot load the built-in `la` reader pack: {diagnostic:?}")
+        });
+        self.locale_pack = Some(pack);
+        self.locale_pack_explicit = false;
+        self
+    }
+
     /// Install a resolved reader pack as an exact caller selection that wins
     /// over any source frontmatter locale (CLI `--locale` semantics).
     #[must_use]

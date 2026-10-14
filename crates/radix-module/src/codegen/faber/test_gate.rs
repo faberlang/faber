@@ -18,8 +18,8 @@ pub fn lex_parse(code: &str) -> Result<(), String> {
     lex_parse_with_pack(code, None)
 }
 
-/// Lex and parse Faber source under an explicit reader pack (Latin default
-/// when `None`), returning a human-readable error on failure.
+/// Lex and parse Faber source under an explicit reader pack (the no-locale
+/// default when `None`), returning a human-readable error on failure.
 ///
 /// Canonical-format output is emitted in the pack that lexed the input, so the
 /// re-parse gate must use that same pack: a Latin-default re-parse would reject
@@ -31,7 +31,10 @@ pub fn lex_parse(code: &str) -> Result<(), String> {
 pub fn lex_parse_with_pack(code: &str, pack: Option<&LocalePack>) -> Result<(), String> {
     let lex = match pack {
         Some(pack) => lexer::lex_with_locale_pack(code, pack),
-        None => lexer::lex(code),
+        None => match crate::driver::default_code_pack(&crate::driver::Config::default()) {
+            Some(pack) => lexer::lex_with_locale_pack(code, &pack),
+            None => lexer::lex(code),
+        },
     };
     if !lex.success() {
         return Err(format!("lex errors: {:?}", lex.errors));

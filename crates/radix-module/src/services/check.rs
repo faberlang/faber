@@ -94,7 +94,8 @@ fn check_source_deferring_locale(
     // parse with no diagnostics of substance.
     let mut resolved_pack = code_pack
         .map(ToOwned::to_owned)
-        .or_else(|| crate::program::compile::frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref()));
+        .or_else(|| crate::program::compile::frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref()))
+        .or_else(|| crate::driver::default_code_pack(&crate::driver::Config::default()));
 
     let lex_result = lex_check_source(body, resolved_pack.as_ref());
     collect_locale_diagnostics(&mut diagnostics, locale_candidates, name, body, &lex_result);
