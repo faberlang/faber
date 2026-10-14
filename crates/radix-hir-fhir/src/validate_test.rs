@@ -943,3 +943,86 @@ fn function_export_valid_generic_param_name_loads() {
     let bytes = encode(&artifact).expect("encode artifact");
     decode(&bytes).expect("a valid generic-param name must keep loading");
 }
+
+/// An inferred set-cell literal (`_ [ … ]`) is rewritten to a `Conversio`
+/// whose node id stays in `presentation.inferred_constructor_ids`. Lowering
+/// keeps the authored `_` record at that node's `AscriptionTarget` slot; the
+/// validator's site inventory must recognize the site (the serialize-side
+/// registry already keeps it). Without the id in the set the slot stays
+/// unknown, so the artifact still fails closed.
+#[test]
+fn inferred_constructor_ascription_site_is_registered() {
+    fn conversio_artifact() -> crate::artifact::HirArtifact {
+        let mut artifact = stub_artifact();
+        let mut types = TypeTable::new();
+        let target = types.intern(Type::Primitive(Primitive::Numerus));
+        artifact.types = types.snapshot();
+        let conversio = HirExpression {
+            id: HirId(1),
+            kind: HirExpressionKind::Conversio {
+                source: Box::new(lit(2, 0)),
+                target: radix_hir::HirConversioTarget::Type(target),
+                params: Vec::new(),
+                recovery: None,
+                route: None,
+                implicit: None,
+            },
+            ty: None,
+            span: Span::default(),
+        };
+        stub_function(&mut artifact).body = Some(HirBlock::simple(
+            vec![HirStatement {
+                id: HirId(3),
+                kind: HirStatementKind::Expr(conversio),
+                span: Span::default(),
+            }],
+            None,
+            Span::default(),
+        ));
+        artifact.presentation.authored_types = vec![radix_hir::HirAuthoredTypeUse {
+            site: radix_hir::HirTypeSite {
+                owner: radix_hir::HirOwnerRef::Hir(HirId(1)),
+                slot: radix_hir::HirTypeSlot::AscriptionTarget,
+            },
+            form: radix_hir::HirTypeForm {
+                ty: target,
+                head: radix_hir::HirTypeFormHead::Infer,
+                args: Vec::new(),
+                label: None,
+            },
+        }];
+        artifact
+    }
+
+    // Id in the set: the site resolves. The record is an `Infer` head at a
+    // non-hole slot, so it may still fail the separate hole-slot legality
+    // check; it must not fail as an unknown site.
+    let mut artifact = conversio_artifact();
+    artifact.presentation.inferred_constructor_ids = vec![HirId(1)];
+    match crate::decode(&crate::encode(&artifact).expect("encode")) {
+        Ok(_) => {}
+        Err(crate::error::HirArtifactError::InvalidPresentation { issue, .. }) => {
+            assert_ne!(
+                issue, "unknown_type_slot",
+                "an inferred-constructor ascription site must be registered"
+            );
+        }
+        Err(other) => panic!("registered site must not fail structurally: {other:?}"),
+    }
+
+    // Id absent from the set: the same record keeps the fail-closed unknown
+    // slot report.
+    let artifact = conversio_artifact();
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("an unregistered AscriptionTarget site must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::InvalidPresentation {
+                issue: "unknown_type_slot",
+                ..
+            }
+        ),
+        "unregistered ascription site must fail as unknown_type_slot: {err:?}"
+    );
+}

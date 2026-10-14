@@ -93,6 +93,7 @@ fn register_annotation_type_sites(
 struct TypeSiteCollector {
     sites: FxHashMap<radix_hir::HirTypeSite, radix_types::TypeId>,
     current_expr: Option<radix_hir::HirId>,
+    inferred_constructor_ids: FxHashSet<radix_hir::HirId>,
 }
 
 impl TypeSiteCollector {
@@ -100,6 +101,7 @@ impl TypeSiteCollector {
         Self {
             sites: FxHashMap::default(),
             current_expr: None,
+            inferred_constructor_ids: FxHashSet::default(),
         }
     }
 }
@@ -253,12 +255,27 @@ impl radix_hir::visit::HirVisitor for TypeSiteCollector {
             radix_hir::HirExpressionKind::Conversio {
                 target: radix_hir::HirConversioTarget::Type(ty),
                 ..
-            } => register_type_site(
-                &mut self.sites,
-                radix_hir::HirOwnerRef::Hir(expr.id),
-                radix_hir::HirTypeSlot::ConversionTarget,
-                *ty,
-            ),
+            } => {
+                register_type_site(
+                    &mut self.sites,
+                    radix_hir::HirOwnerRef::Hir(expr.id),
+                    radix_hir::HirTypeSlot::ConversionTarget,
+                    *ty,
+                );
+                // An inferred constructor rewritten to a set-cell conversion
+                // keeps the literal's node id and the lowering's authored `_`
+                // record at the ascription slot. Register that site so the
+                // presentation record is recognized here the same way the
+                // serialize registry keeps it on write.
+                if self.inferred_constructor_ids.contains(&expr.id) {
+                    register_type_site(
+                        &mut self.sites,
+                        radix_hir::HirOwnerRef::Hir(expr.id),
+                        radix_hir::HirTypeSlot::AscriptionTarget,
+                        *ty,
+                    );
+                }
+            }
             radix_hir::HirExpressionKind::TypeCheck { ty, .. } => register_type_site(
                 &mut self.sites,
                 radix_hir::HirOwnerRef::Hir(expr.id),
@@ -340,6 +357,13 @@ fn collect_type_site_registry(
     artifact: &HirArtifact,
 ) -> FxHashMap<radix_hir::HirTypeSite, radix_types::TypeId> {
     let mut collector = TypeSiteCollector::new();
+    collector.inferred_constructor_ids.extend(
+        artifact
+            .presentation
+            .inferred_constructor_ids
+            .iter()
+            .copied(),
+    );
     radix_hir::visit::walk_program(&mut collector, &artifact.hir);
     for discard in &artifact.presentation.discard_binding_stmts {
         if let Some(ty) = discard.ty {
