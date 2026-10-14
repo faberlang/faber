@@ -153,3 +153,75 @@ main {
         other => panic!("expected the ledger program to lower, validate and run, got {other:?}"),
     }
 }
+
+#[test]
+fn ledger_eq_same_order_is_equal() {
+    let source = r#"+++
+locale = "en"
++++
+main {
+    var ledger<string, int> a ← { "b": 2, "a": 1 }
+    var ledger<string, int> b ← { "b": 2, "a": 1 }
+    print a ≡ b
+}
+"#;
+    let mut host = BufferHost::default();
+    match run_source(&session(), "ledger-eq-same-order.fab", source, &mut host) {
+        Ok(()) => assert_eq!(host.stdout_lines, ["true"]),
+        other => panic!("expected the ledger equality program to lower, validate and run, got {other:?}"),
+    }
+}
+
+#[test]
+fn ledger_eq_different_order_is_unequal() {
+    let source = r#"+++
+locale = "en"
++++
+main {
+    var ledger<string, int> a ← { "b": 2, "a": 1 }
+    var ledger<string, int> b ← { "a": 1, "b": 2 }
+    print a ≡ b
+    print a ≢ b
+}
+"#;
+    let mut host = BufferHost::default();
+    match run_source(&session(), "ledger-eq-different-order.fab", source, &mut host) {
+        Ok(()) => assert_eq!(host.stdout_lines, ["false", "true"]),
+        other => panic!("expected the ledger equality program to lower, validate and run, got {other:?}"),
+    }
+}
+
+#[test]
+fn ledger_eq_map_ignores_order() {
+    let source = r#"+++
+locale = "en"
++++
+main {
+    var map<string, int> a ← { "b": 2, "a": 1 }
+    var map<string, int> b ← { "a": 1, "b": 2 }
+    print a ≡ b
+}
+"#;
+    let mut host = BufferHost::default();
+    match run_source(&session(), "ledger-eq-map.fab", source, &mut host) {
+        Ok(()) => assert_eq!(host.stdout_lines, ["true"]),
+        other => panic!("expected the map equality program to lower, validate and run, got {other:?}"),
+    }
+}
+
+#[test]
+fn ledger_eq_print_follows_insertion_order() {
+    let source = r#"+++
+locale = "en"
++++
+main {
+    var ledger<string, int> x ← { "b": 2, "a": 1 }
+    print x
+}
+"#;
+    let mut host = BufferHost::default();
+    match run_source(&session(), "ledger-eq-print-order.fab", source, &mut host) {
+        Ok(()) => assert_eq!(host.stdout_lines, ["{\"b\": 2, \"a\": 1}"]),
+        other => panic!("expected the ledger print program to lower, validate and run, got {other:?}"),
+    }
+}
