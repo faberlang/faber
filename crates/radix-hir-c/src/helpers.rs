@@ -12,6 +12,7 @@
 //! TARGET: c (GCC or Clang). `__int128` and `__builtin_mul_overflow` are
 //! extensions; `__extension__` keeps `-pedantic` quiet about the typedefs.
 
+use crate::ty::Elem;
 use std::collections::BTreeSet;
 
 /// One unit of support text. The variant order is the emission order, so a
@@ -26,6 +27,9 @@ pub(crate) enum Helper {
     IntText,
     ExactText,
     Join,
+    ListIndex,
+    Quote,
+    List(Elem, ListOp),
     Cap,
     Add,
     Sub,
@@ -45,28 +49,36 @@ impl Helper {
     /// Helpers this one calls or names.
     fn needs(self) -> &'static [Helper] {
         match self {
-            // The 64-bit fast-path helpers stand alone: plain `int64_t` and
-            // the overflow builtins.
+            // These stand alone: the 64-bit fast path is plain `int64_t` and
+            // the overflow builtins; a list part's needs depend on its element
+            // and operation (`list_needs`).
             Helper::Types
             | Helper::Trap
             | Helper::AddO
             | Helper::SubO
             | Helper::MulO
             | Helper::FdivI64
-            | Helper::FmodI64 => &[],
+            | Helper::FmodI64
+            | Helper::Quote
+            | Helper::List(_, _) => &[],
             Helper::Text => &[Helper::Types],
             Helper::Arena => &[Helper::Trap],
             Helper::Concat | Helper::IntText | Helper::Join => &[Helper::Arena],
             Helper::ExactText => &[Helper::Arena, Helper::Text],
-            Helper::Cap | Helper::Div | Helper::FitI64 => &[Helper::Types, Helper::Trap],
+            Helper::Cap | Helper::Div | Helper::FitI64 | Helper::ListIndex => {
+                &[Helper::Types, Helper::Trap]
+            }
             Helper::Add | Helper::Sub | Helper::Mul => &[Helper::Cap],
             Helper::Rem => &[Helper::Div],
             Helper::StoreI64 => &[Helper::Types, Helper::Text],
         }
     }
 
-    fn text(self) -> &'static str {
-        match self {
+    fn text(self) -> String {
+        if let Helper::List(elem, op) = self {
+            return list_part(elem, op);
+        }
+        let text = match self {
             Helper::Types => TYPES,
             Helper::Trap => TRAP,
             Helper::Text => TEXT,
@@ -75,6 +87,9 @@ impl Helper {
             Helper::IntText => INT_TEXT,
             Helper::ExactText => EXACT_TEXT,
             Helper::Join => JOIN,
+            Helper::ListIndex => LIST_INDEX,
+            Helper::Quote => QUOTE,
+            Helper::List(_, _) => "",
             Helper::Cap => CAP,
             Helper::Add => ADD,
             Helper::Sub => SUB,
@@ -88,7 +103,8 @@ impl Helper {
             Helper::MulO => MUL_O,
             Helper::FdivI64 => FDIV_I64,
             Helper::FmodI64 => FMOD_I64,
-        }
+        };
+        text.to_owned()
     }
 }
 
@@ -218,6 +234,245 @@ static const char *faber_join(faber_arena *arena, int count, ...) {
     return out;
 }
 ";
+
+/// The index check every list read and write shares, with the runner's two
+/// trap texts in the runner's order.
+const LIST_INDEX: &str = "\
+static int64_t faber_list_index(faber_i128 index, int64_t length) {
+    if (index < 0) {
+        faber_trap(\"expected non-negative numerus index\");
+    }
+    if (index >= length) {
+        faber_trap(\"array index out of bounds\");
+    }
+    return (int64_t)index;
+}
+";
+
+/// A text element as a list shows it: quoted, with the escapes the runner
+/// prints (Rust's debug form: `\"`, `\\`, `\n`, `\t`, `\r`, `\u{..}` for
+/// other control bytes; other bytes verbatim). Writes when `out` is not
+/// NULL; returns the length either way.
+const QUOTE: &str = "\
+static size_t faber_quote(char *out, const char *text) {
+    const unsigned char *cursor;
+    size_t at = 0;
+    for (cursor = (const unsigned char *)text; *cursor != 0; cursor++) {
+        char escape[8];
+        size_t length;
+        switch (*cursor) {
+        case '\"':
+            memcpy(escape, \"\\\\\\\"\", 3);
+            length = 2;
+            break;
+        case '\\\\':
+            memcpy(escape, \"\\\\\\\\\", 3);
+            length = 2;
+            break;
+        case '\\n':
+            memcpy(escape, \"\\\\n\", 3);
+            length = 2;
+            break;
+        case '\\t':
+            memcpy(escape, \"\\\\t\", 3);
+            length = 2;
+            break;
+        case '\\r':
+            memcpy(escape, \"\\\\r\", 3);
+            length = 2;
+            break;
+        default:
+            if (*cursor < 0x20 || *cursor == 0x7f) {
+                length = (size_t)snprintf(escape, sizeof escape, \"\\\\u{%x}\", (unsigned)*cursor);
+            } else {
+                escape[0] = (char)*cursor;
+                length = 1;
+            }
+            break;
+        }
+        if (out != NULL) {
+            memcpy(out + at, escape, length);
+        }
+        at += length;
+    }
+    return at;
+}
+";
+
+/// One operation of a list family. Every part comes from one template per
+/// operation, so the element kinds cannot drift, and only the parts a program
+/// uses are emitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum ListOp {
+    Struct,
+    New,
+    Of,
+    Push,
+    At,
+    Set,
+    Show,
+}
+
+/// The helpers one list part calls or names.
+fn list_needs(elem: Elem, op: ListOp) -> Vec<Helper> {
+    let own = |op| Helper::List(elem, op);
+    match op {
+        ListOp::Struct => Vec::new(),
+        ListOp::Of => vec![own(ListOp::New)],
+        ListOp::At | ListOp::Set => vec![own(ListOp::Struct), Helper::ListIndex],
+        ListOp::Show if elem == Elem::Text => {
+            vec![own(ListOp::Struct), Helper::Arena, Helper::Quote]
+        }
+        ListOp::New | ListOp::Push | ListOp::Show => vec![own(ListOp::Struct), Helper::Arena],
+    }
+}
+
+fn list_part(elem: Elem, op: ListOp) -> String {
+    let n = elem.suffix();
+    let t = elem.c_type();
+    match op {
+        ListOp::Struct => {
+            let text_type = if elem == Elem::Text {
+                "typedef const char *faber_text;\n\n"
+            } else {
+                ""
+            };
+            format!(
+                "{text_type}typedef struct faber_list_{n} {{
+    {t} *items;
+    int64_t len;
+    int64_t cap;
+}} faber_list_{n};
+"
+            )
+        }
+        ListOp::New => format!(
+            "static faber_list_{n} *faber_list_{n}_new(faber_arena *arena, int64_t capacity) {{
+    faber_list_{n} *list = faber_alloc(arena, sizeof *list);
+    list->items = capacity > 0 ? faber_alloc(arena, (size_t)capacity * sizeof *list->items) : NULL;
+    list->len = 0;
+    list->cap = capacity;
+    return list;
+}}
+"
+        ),
+        ListOp::Of => format!(
+            "static faber_list_{n} *faber_list_{n}_of(faber_arena *arena, int64_t count, const {t} *items) {{
+    faber_list_{n} *list = faber_list_{n}_new(arena, count);
+    memcpy(list->items, items, (size_t)count * sizeof *items);
+    list->len = count;
+    return list;
+}}
+"
+        ),
+        ListOp::Push => format!(
+            "static void faber_list_{n}_push(faber_arena *arena, faber_list_{n} *list, {t} item) {{
+    if (list->len == list->cap) {{
+        int64_t capacity = list->cap < 4 ? 4 : list->cap * 2;
+        {t} *items = faber_alloc(arena, (size_t)capacity * sizeof *items);
+        if (list->len > 0) {{
+            memcpy(items, list->items, (size_t)list->len * sizeof *items);
+        }}
+        list->items = items;
+        list->cap = capacity;
+    }}
+    list->items[list->len++] = item;
+}}
+"
+        ),
+        ListOp::At => format!(
+            "static {t} faber_list_{n}_at(const faber_list_{n} *list, faber_i128 index) {{
+    return list->items[faber_list_index(index, list->len)];
+}}
+"
+        ),
+        ListOp::Set => format!(
+            "static void faber_list_{n}_set(faber_list_{n} *list, faber_i128 index, {t} item) {{
+    list->items[faber_list_index(index, list->len)] = item;
+}}
+"
+        ),
+        ListOp::Show => list_show(elem),
+    }
+}
+
+/// How a list shows, as the runner prints it.
+fn list_show(elem: Elem) -> String {
+    let n = elem.suffix();
+    match elem {
+        Elem::Int => format!(
+            "static const char *faber_list_{n}_show(faber_arena *arena, const faber_list_{n} *list) {{
+    size_t capacity = 3 + (size_t)list->len * 22;
+    char *out = faber_alloc(arena, capacity);
+    size_t at = 0;
+    int64_t index;
+    out[at++] = '[';
+    for (index = 0; index < list->len; index++) {{
+        if (index > 0) {{
+            out[at++] = ',';
+            out[at++] = ' ';
+        }}
+        at += (size_t)snprintf(out + at, capacity - at, \"%\" PRId64, list->items[index]);
+    }}
+    out[at++] = ']';
+    out[at] = '\\0';
+    return out;
+}}
+"
+        ),
+        Elem::Text => format!(
+            "static const char *faber_list_{n}_show(faber_arena *arena, const faber_list_{n} *list) {{
+    size_t total = 3;
+    char *out;
+    size_t at = 0;
+    int64_t index;
+    for (index = 0; index < list->len; index++) {{
+        total += faber_quote(NULL, list->items[index]) + 4;
+    }}
+    out = faber_alloc(arena, total);
+    out[at++] = '[';
+    for (index = 0; index < list->len; index++) {{
+        if (index > 0) {{
+            out[at++] = ',';
+            out[at++] = ' ';
+        }}
+        out[at++] = '\"';
+        at += faber_quote(out + at, list->items[index]);
+        out[at++] = '\"';
+    }}
+    out[at++] = ']';
+    out[at] = '\\0';
+    return out;
+}}
+"
+        ),
+        Elem::Bool => format!(
+            "static const char *faber_list_{n}_show(faber_arena *arena, const faber_list_{n} *list, const char *yes, const char *no) {{
+    size_t yes_length = strlen(yes);
+    size_t no_length = strlen(no);
+    size_t width = yes_length > no_length ? yes_length : no_length;
+    char *out = faber_alloc(arena, 3 + (size_t)list->len * (width + 2));
+    size_t at = 0;
+    int64_t index;
+    out[at++] = '[';
+    for (index = 0; index < list->len; index++) {{
+        const char *word = list->items[index] ? yes : no;
+        size_t length = list->items[index] ? yes_length : no_length;
+        if (index > 0) {{
+            out[at++] = ',';
+            out[at++] = ' ';
+        }}
+        memcpy(out + at, word, length);
+        at += length;
+    }}
+    out[at++] = ']';
+    out[at] = '\\0';
+    return out;
+}}
+"
+        ),
+    }
+}
 
 /// Every operand of the arithmetic helpers is an `int64_t`, a literal of at
 /// most `UINT64_MAX`, or a capped result, so a sum or difference of two cannot
@@ -427,11 +682,19 @@ impl Support {
             Helper::Concat => &[Header::String],
             Helper::IntText => &[Header::Stdio],
             Helper::Join => &[Header::Stdarg, Header::String],
+            Helper::Quote | Helper::List(_, ListOp::Of | ListOp::Push | ListOp::Show) => {
+                &[Header::Stdio, Header::String]
+            }
             _ => &[],
         };
         self.headers.extend(headers.iter().copied());
         for dependency in helper.needs() {
             self.need(*dependency);
+        }
+        if let Helper::List(elem, op) = helper {
+            for dependency in list_needs(elem, op) {
+                self.need(dependency);
+            }
         }
     }
 
@@ -452,7 +715,7 @@ impl Support {
             out.push('\n');
         }
         for helper in &self.helpers {
-            out.push_str(helper.text());
+            out.push_str(&helper.text());
             out.push('\n');
         }
         out

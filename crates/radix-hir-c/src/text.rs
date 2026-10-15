@@ -147,6 +147,7 @@ impl Emitter<'_> {
                 let (yes, no) = (c_string(&tokens.true_)?, c_string(&tokens.false_)?);
                 Ok(format!("({} ? {yes} : {no})", operand.text))
             }
+            Value::List(elem) => self.show_list(&operand.text, elem),
             Value::Void => Err(unsupported("showing a call with no result")),
         }
     }

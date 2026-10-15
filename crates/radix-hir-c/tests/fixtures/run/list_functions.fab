@@ -1,0 +1,47 @@
++++
+locale = "en"
++++
+# A list passed to a function is the caller's list (binds alias, R1), and a
+# list built in a function outlives the call in main's arena.
+fn fill(mut list<int> xs, int count) {
+    var int i ← 0
+    while i ≺ count {
+        xs.append(i * i)
+        i ← i + 1
+    }
+}
+
+fn evens(int limit) → list<int> {
+    var list<int> out ← empty
+    var int i ← 0
+    while i ≺ limit {
+        if i % 2 ≡ 0 {
+            out.append(i)
+        }
+        i ← i + 1
+    }
+    return out
+}
+
+fn total(list<int> xs) → int {
+    var int sum ← 0
+    for from xs const x {
+        sum ← sum + x
+    }
+    return sum
+}
+
+main {
+    var list<int> squares ← empty
+    fill(mut squares, 6)
+    print squares, total(squares)
+    const list<int> e ← evens(9)
+    print e, e.length(), total(e)
+    var list<int> big ← empty
+    var int n ← 0
+    while n ≺ 1000 {
+        big.append(n)
+        n ← n + 1
+    }
+    print big.length(), big[999], total(big)
+}

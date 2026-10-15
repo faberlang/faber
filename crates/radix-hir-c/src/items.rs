@@ -147,13 +147,23 @@ impl Emitter<'_> {
         }
         let mut params = Vec::with_capacity(function.params.len());
         for param in &function.params {
-            if param.mode != HirParamMode::Owned {
-                return Err(unsupported("parameter access marker"));
-            }
             if param.optional || param.default.is_some() {
                 return Err(unsupported("optional parameter"));
             }
-            params.push(classify(self.types, param.ty)?);
+            let class = classify(self.types, param.ty)?;
+            // `ref` / `mut` on a list passes the caller's list pointer, which
+            // is what an unmarked list parameter passes too.
+            let list = matches!(class, Ty::List(_));
+            match param.mode {
+                HirParamMode::Owned => {}
+                HirParamMode::De | HirParamMode::In if list => {}
+                HirParamMode::De | HirParamMode::In | HirParamMode::Ex | HirParamMode::Axis => {
+                    return Err(unsupported(
+                        "parameter access marker on a scalar, own, or axis",
+                    ));
+                }
+            }
+            params.push(class);
         }
         let Some(ret_ty) = function.ret_ty else {
             return Err(unsupported("function without a resolved return type"));

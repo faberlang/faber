@@ -8,6 +8,8 @@ const LOOPS: &str = include_str!("../tests/fixtures/run/loops.c");
 const FUNCTIONS: &str = include_str!("../tests/fixtures/run/functions.c");
 const NARROWING: &str = include_str!("../tests/fixtures/run/narrowing.c");
 const TEXT: &str = include_str!("../tests/fixtures/run/text.c");
+const LISTS: &str = include_str!("../tests/fixtures/run/lists.c");
+const LIST_FUNCTIONS: &str = include_str!("../tests/fixtures/run/list_functions.c");
 
 #[test]
 fn scalars_program_is_pinned() {
@@ -460,4 +462,90 @@ fn the_arena_name_is_not_a_helper_prefix() {
     assert!(crate::mentions_arena("f(faber_a, 1)"));
     assert!(crate::mentions_arena("g(faber_a)"));
     assert!(!crate::mentions_arena("faber_add(x, y) faber_alloc"));
+}
+
+#[test]
+fn lists_program_is_pinned() {
+    let source = include_str!("../tests/fixtures/run/lists.fab");
+    let source = crate::test_support::program("lists.fab", source);
+    assert_eq!(source, LISTS);
+}
+
+#[test]
+fn list_functions_program_is_pinned() {
+    let source = include_str!("../tests/fixtures/run/list_functions.fab");
+    let source = crate::test_support::program("list_functions.fab", source);
+    assert_eq!(source, LIST_FUNCTIONS);
+}
+
+/// A list is a pointer to an arena-allocated struct, so a second binding
+/// shares it (R1), and only the list operations a program uses are emitted.
+#[test]
+fn lists_alias_and_emit_only_the_parts_used() {
+    let code = emitted(
+        "main {\n    var list<int> xs ← [1, 2]\n    var list<int> ys ← xs\n    ys.append(3)\n    print xs.length()\n}",
+    );
+    for line in [
+        "    faber_list_i64 *l_xs = faber_list_i64_of(faber_a, 2, (int64_t[]){INT64_C(1), INT64_C(2)});\n",
+        "    faber_list_i64 *l_ys = l_xs;\n",
+        "    faber_list_i64_push(faber_a, l_ys, INT64_C(3));\n",
+        "(l_xs)->len",
+    ] {
+        assert!(code.contains(line), "{line:?} missing in {code}");
+    }
+    for absent in [
+        "faber_list_i64_at",
+        "faber_list_i64_set",
+        "faber_list_i64_show",
+        "faber_list_text",
+        "faber_list_bool",
+    ] {
+        assert!(!code.contains(absent), "{absent} present in {code}");
+    }
+}
+
+#[test]
+fn list_index_reads_and_writes_are_checked() {
+    let code = emitted(
+        "main {\n    var list<int> xs ← [1, 2]\n    var int i ← 1\n    xs[i] ← 5\n    print xs[i - 1]\n}",
+    );
+    assert!(
+        code.contains("    faber_list_i64_set(l_xs, l_i, INT64_C(5));\n"),
+        "{code}"
+    );
+    assert!(
+        code.contains("faber_list_i64_at(l_xs, faber_sub(l_i, INT64_C(1)))"),
+        "{code}"
+    );
+    assert!(
+        code.contains("\"expected non-negative numerus index\""),
+        "{code}"
+    );
+    assert!(code.contains("\"array index out of bounds\""), "{code}");
+}
+
+#[test]
+fn iteration_walks_the_list_by_index() {
+    let code = emitted(
+        "main {\n    const list<string> names ← [\"a\", \"b\"]\n    for from names const n {\n        print n\n    }\n}",
+    );
+    for line in [
+        "        faber_list_text *const faber_t0 = l_names;\n",
+        "        for (faber_i0 = 0; faber_i0 < faber_t0->len; faber_i0++) {\n",
+        "            const char *const l_n = faber_t0->items[faber_i0];\n",
+    ] {
+        assert!(code.contains(line), "{line:?} missing in {code}");
+    }
+}
+
+#[test]
+fn a_mut_list_parameter_passes_the_callers_list() {
+    let code = emitted(
+        "fn add(mut list<int> xs) {\n    xs.append(1)\n}\nmain {\n    var list<int> ys ← empty\n    add(mut ys)\n    print ys\n}",
+    );
+    assert!(
+        code.contains("static void f_add(faber_arena *faber_a, faber_list_i64 *p_xs) {"),
+        "{code}"
+    );
+    assert!(code.contains("    f_add(faber_a, l_ys);\n"), "{code}");
 }

@@ -64,14 +64,6 @@ fn sized_integer_type() {
 }
 
 #[test]
-fn list_type() {
-    assert_eq!(
-        rejected("main {\n    const list<int> xs ← [1, 2]\n    print 1\n}"),
-        "list type"
-    );
-}
-
-#[test]
 fn write_output_is_not_print() {
     assert_eq!(
         rejected("main {\n    warn \"w\"\n}"),
@@ -109,5 +101,25 @@ fn generic_function() {
     assert_eq!(
         rejected("fn id<T>(T x) → T {\n    return x\n}\nmain {\n    print id(1)\n}"),
         "generic function"
+    );
+}
+
+#[test]
+fn nested_list_type() {
+    assert_eq!(
+        rejected("main {\n    const list<list<int>> grid ← [[1], [2]]\n    print grid\n}"),
+        "nested list type"
+    );
+}
+
+/// `mut int` would need a pointer to the caller's cell; only lists, which
+/// already alias, take an access marker in this subset.
+#[test]
+fn access_marker_on_a_scalar_parameter() {
+    assert_eq!(
+        rejected(
+            "fn bump(mut int x) {\n    x ← x + 1\n}\nmain {\n    var int n ← 1\n    bump(mut n)\n    print n\n}"
+        ),
+        "ref or mut access to a scalar"
     );
 }

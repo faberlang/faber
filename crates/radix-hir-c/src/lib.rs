@@ -23,6 +23,7 @@ mod error;
 mod expr;
 mod helpers;
 mod items;
+mod list;
 mod names;
 mod stmt;
 mod text;
@@ -196,6 +197,15 @@ impl Emitter<'_> {
             Ty::Int => self.support.need_ints(),
             Ty::Bool => self.support.need_bool(),
             Ty::Text => {}
+            Ty::List(elem) => {
+                self.support.need(crate::helpers::Helper::List(
+                    elem,
+                    crate::helpers::ListOp::Struct,
+                ));
+                if elem == crate::ty::Elem::Bool {
+                    self.support.need_bool();
+                }
+            }
         }
     }
 }

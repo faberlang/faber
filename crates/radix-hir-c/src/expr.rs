@@ -11,7 +11,7 @@
 use crate::Emitter;
 use crate::error::unsupported;
 use crate::helpers::Helper;
-use crate::ty::{Ty, classify};
+use crate::ty::{Elem, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{
     HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral, HirStoreKind,
@@ -42,6 +42,8 @@ pub(crate) enum Value {
     Truth,
     /// A call to a function with no result; only a statement holds one.
     Void,
+    /// A pointer to an arena-allocated list.
+    List(Elem),
 }
 
 impl From<Ty> for Value {
@@ -50,6 +52,7 @@ impl From<Ty> for Value {
             Ty::Int => Value::Int,
             Ty::Text => Value::Text,
             Ty::Bool => Value::Truth,
+            Ty::List(elem) => Value::List(elem),
         }
     }
 }
@@ -156,6 +159,15 @@ impl Emitter<'_> {
                 ..
             } => self.implicit_store(source, *slot, site),
             HirExpressionKind::Scriptum(template, args) => self.template(*template, args),
+            HirExpressionKind::Vacua => self.empty_list(expr),
+            HirExpressionKind::Array(elements) => self.list_literal(expr, elements),
+            HirExpressionKind::Index(base, index) => self.list_read(base, index),
+            HirExpressionKind::MethodCall(receiver, method, type_args, args, arm) => {
+                if !type_args.is_empty() || arm.is_some() {
+                    return Err(unsupported("generic or propagating method call"));
+                }
+                self.list_method(receiver, *method, args)
+            }
             HirExpressionKind::Call(callee, type_args, args, arm) => {
                 if !type_args.is_empty() || arm.is_some() {
                     return Err(unsupported("generic or propagating call"));
@@ -185,8 +197,17 @@ impl Emitter<'_> {
         }
         let mut operands = Vec::with_capacity(args.len());
         for (arg, param) in args.iter().zip(params) {
-            if arg.name.is_some() || arg.spread || arg.marker.is_some() {
-                return Err(unsupported("named, spread, or marked argument"));
+            if arg.name.is_some() || arg.spread {
+                return Err(unsupported("named or spread argument"));
+            }
+            let list_view = matches!(
+                arg.marker,
+                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
+            ) && matches!(param, Ty::List(_));
+            if arg.marker.is_some() && !list_view {
+                return Err(unsupported(
+                    "access marker on an argument that is not a list",
+                ));
             }
             let mut operand = self.expr(&arg.expr)?;
             // An argument carries no store node in HIR, but the runner checks
@@ -253,6 +274,9 @@ impl Emitter<'_> {
                 self.support.need_bool();
                 "bool "
             }
+            Value::List(Elem::Int) => "faber_list_i64 *",
+            Value::List(Elem::Text) => "faber_list_text *",
+            Value::List(Elem::Bool) => "faber_list_bool *",
             Value::Void => return String::new(),
         };
         let name = format!("faber_t{}", self.temps);
@@ -592,6 +616,7 @@ impl Emitter<'_> {
     ) -> Result<Operand, CodegenError> {
         match (class, value.value) {
             (Ty::Int, Value::Int) | (Ty::Text, Value::Text) | (Ty::Bool, Value::Truth) => Ok(value),
+            (Ty::List(slot), Value::List(elem)) if slot == elem => Ok(value),
             (Ty::Int, Value::Exact) if value.constant.is_some() => {
                 Err(unsupported("integer constant beyond i64"))
             }

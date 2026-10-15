@@ -14,6 +14,46 @@ pub(crate) enum Ty {
     Text,
     /// `bool`: C `bool` from `<stdbool.h>`.
     Bool,
+    /// `list<int>`, `list<string>` or `list<bool>`: a pointer to an
+    /// arena-allocated `faber_list_<elem>`, so every bind aliases (R1).
+    List(Elem),
+}
+
+/// The element kinds a list carries in this subset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Elem {
+    Int,
+    Text,
+    Bool,
+}
+
+impl Elem {
+    /// The suffix of the list family's C names (`faber_list_i64_push`).
+    pub(crate) fn suffix(self) -> &'static str {
+        match self {
+            Elem::Int => "i64",
+            Elem::Text => "text",
+            Elem::Bool => "bool",
+        }
+    }
+
+    /// The element's C type inside the list family.
+    pub(crate) fn c_type(self) -> &'static str {
+        match self {
+            Elem::Int => "int64_t",
+            Elem::Text => "faber_text",
+            Elem::Bool => "bool",
+        }
+    }
+
+    /// The scalar class an element reads as.
+    pub(crate) fn ty(self) -> Ty {
+        match self {
+            Elem::Int => Ty::Int,
+            Elem::Text => Ty::Text,
+            Elem::Bool => Ty::Bool,
+        }
+    }
 }
 
 impl Ty {
@@ -28,6 +68,8 @@ impl Ty {
             (Ty::Text, true) => format!("const char *{name}"),
             (Ty::Bool, false) => format!("const bool {name}"),
             (Ty::Bool, true) => format!("bool {name}"),
+            (Ty::List(elem), false) => format!("faber_list_{} *const {name}", elem.suffix()),
+            (Ty::List(elem), true) => format!("faber_list_{} *{name}", elem.suffix()),
         }
     }
 
@@ -37,6 +79,9 @@ impl Ty {
             Ty::Int => "int64_t",
             Ty::Text => "const char *",
             Ty::Bool => "bool",
+            Ty::List(Elem::Int) => "faber_list_i64 *",
+            Ty::List(Elem::Text) => "faber_list_text *",
+            Ty::List(Elem::Bool) => "faber_list_bool *",
         }
     }
 }
@@ -46,10 +91,23 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
     match types.get(ty) {
         Type::Alias(_, inner) => classify(types, *inner),
         Type::Ref(SemanticMutability::Copy, _) => Err(unsupported("copy marker")),
+        // A `ref` or `mut` view of a list is the same list pointer: a list
+        // already aliases (R1). A view of a scalar would need a pointer to the
+        // caller's cell, which this subset does not emit.
+        Type::Ref(_, inner) => match classify(types, *inner)? {
+            list @ Ty::List(_) => Ok(list),
+            _ => Err(unsupported("ref or mut access to a scalar")),
+        },
         Type::Primitive(Primitive::Numerus)
         | Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64) => Ok(Ty::Int),
         Type::Primitive(Primitive::Textus) => Ok(Ty::Text),
         Type::Primitive(Primitive::Bivalens) => Ok(Ty::Bool),
+        Type::Array(inner) => match classify(types, *inner)? {
+            Ty::Int => Ok(Ty::List(Elem::Int)),
+            Ty::Text => Ok(Ty::List(Elem::Text)),
+            Ty::Bool => Ok(Ty::List(Elem::Bool)),
+            Ty::List(_) => Err(unsupported("nested list type")),
+        },
         other => Err(unsupported(describe(other))),
     }
 }
@@ -75,7 +133,7 @@ fn describe(ty: &Type) -> &'static str {
         Type::ModularWord(_) | Type::SaturatingWord(_) | Type::PolicyFloat(..) => {
             "wrapping, saturating, or policy numeric type"
         }
-        Type::Array(_) | Type::BoundedArray { .. } => "list type",
+        Type::BoundedArray { .. } => "bounded list type",
         Type::Map(..) | Type::Ledger(..) => "map type",
         Type::Tensor(..)
         | Type::Vector(..)

@@ -9,8 +9,8 @@ use crate::{Emitter, Local};
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
 use radix_hir::{
-    HirBlock, HirExpression, HirExpressionKind, HirLocal, HirScribeKind, HirStatement,
-    HirStatementKind,
+    HirBlock, HirExpression, HirExpressionKind, HirIteraMode, HirLocal, HirScribeKind,
+    HirStatement, HirStatementKind,
 };
 use radix_types::Type;
 
@@ -155,7 +155,7 @@ impl Emitter<'_> {
     ) -> Result<(), CodegenError> {
         match &expr.kind {
             HirExpressionKind::Scribe(kind, args) => self.print(out, *kind, args),
-            HirExpressionKind::Call(..) => {
+            HirExpressionKind::Call(..) | HirExpressionKind::MethodCall(..) => {
                 let call = self.expr(expr)?;
                 let line = if call.value == Value::Void {
                     format!("{};", call.text)
@@ -173,6 +173,18 @@ impl Emitter<'_> {
                 else_block,
             } => self.si(out, cond, then_block, else_block.as_ref()),
             HirExpressionKind::Dum(cond, body) => self.dum(out, cond, body),
+            HirExpressionKind::Itera {
+                mode: HirIteraMode::Ex,
+                coordinates,
+                filum: None,
+                binding,
+                binding_name,
+                iter,
+                body,
+                mutable,
+            } if coordinates.is_empty() => {
+                self.itera(out, *binding, *binding_name, iter, body, *mutable)
+            }
             HirExpressionKind::Block(block) => {
                 self.line(out, "{");
                 self.block(out, block)?;
@@ -181,6 +193,77 @@ impl Emitter<'_> {
             }
             other => Err(unsupported(construct_name(other))),
         }
+    }
+
+    /// `for from xs const x { … }`: an index walk over the list, read once.
+    /// Typecheck forbids changing the list's shape inside the loop
+    /// (`loop_collection_shape_change`), so the length may be read each turn.
+    fn itera(
+        &mut self,
+        out: &mut String,
+        binding: radix_hir::DefId,
+        binding_name: radix_lexer::Symbol,
+        iter: &HirExpression,
+        body: &HirBlock,
+        mutable: bool,
+    ) -> Result<(), CodegenError> {
+        let list = self.expr(iter)?;
+        let Value::List(elem) = list.value else {
+            return Err(unsupported("iteration over a value that is not a list"));
+        };
+        let Some(kind) = self.names.binding_kind(binding) else {
+            return Err(unsupported(
+                "loop binding the name catalog does not classify",
+            ));
+        };
+        let raw = self.names.resolve_symbol(binding_name);
+        let name = self.scope.claim(&prefixed_binding_name(kind, raw));
+        let (source, index) = (
+            format!("faber_t{}", self.temps),
+            format!("faber_i{}", self.temps),
+        );
+        self.temps += 1;
+        let class = elem.ty();
+        self.need_class(class);
+        self.line(out, "{");
+        self.depth += 1;
+        self.line(
+            out,
+            &format!(
+                "faber_list_{} *const {source} = {};",
+                elem.suffix(),
+                list.text
+            ),
+        );
+        self.line(out, &format!("int64_t {index};"));
+        self.line(
+            out,
+            &format!("for ({index} = 0; {index} < {source}->len; {index}++) {{"),
+        );
+        self.depth += 1;
+        self.line(
+            out,
+            &format!(
+                "{} = {source}->items[{index}];",
+                class.declare(&name, mutable)
+            ),
+        );
+        self.depth -= 1;
+        self.locals.insert(
+            binding,
+            Local {
+                name,
+                ty: class,
+                constant: None,
+            },
+        );
+        self.loops += 1;
+        self.block(out, body)?;
+        self.loops -= 1;
+        self.line(out, "}");
+        self.depth -= 1;
+        self.line(out, "}");
+        Ok(())
     }
 
     fn condition(&mut self, cond: &HirExpression) -> Result<String, CodegenError> {
@@ -232,6 +315,11 @@ impl Emitter<'_> {
         place: &HirExpression,
         value: &HirExpression,
     ) -> Result<(), CodegenError> {
+        if let HirExpressionKind::Index(base, index) = &place.kind {
+            let line = self.list_write(base, index, value)?;
+            self.line(out, &line);
+            return Ok(());
+        }
         let HirExpressionKind::Path(def_id) = &place.kind else {
             return Err(unsupported("assignment to a place that is not a local"));
         };
@@ -300,6 +388,7 @@ impl Emitter<'_> {
                 // The module's locale words: `true` / `false` for an `en`
                 // program, `verum` / `falsum` for a `la` one.
                 Value::Truth => ("%s", format!("({} ? {yes} : {no})", value.text)),
+                Value::List(elem) => ("%s", self.show_list(&value.text, elem)?),
                 Value::Void => return Err(unsupported("printing a call with no result")),
             };
             specs.push(spec);
