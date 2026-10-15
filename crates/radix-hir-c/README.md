@@ -67,11 +67,13 @@ report. It checks the runtime first: `faber.h` compiles on its own and
 | text `+` and templates `"…§…"(args)` | `faber_concat` and one `faber_join` per template, in the arena. `§` shows the next argument, `§N` argument N; the split runs on the raw template before decoding, and each argument that is not a constant or a plain name is evaluated once, in order, before the join. Template escapes decode like ordinary strings (the runner prints them undecoded) |
 | `list<int>`, `list<string>`, `list<bool>` | a pointer to an arena-allocated `faber_list_<elem>`, so binds alias (R1); one helper per operation, emitted only when used: literals, `empty`, `length`, `is_empty`, `append`, checked `xs[i]` reads and writes with the runner's trap texts, `for from` iteration, display with the runner's escapes. `ref` / `mut` on a list parameter passes the same pointer |
 | genera (`class`) | an arena-allocated struct `g_<Name>` handled by pointer, so binds alias (R1); forward typedefs first; members `m_<name>` (a field may be a C keyword). Construction, from a struct literal or a typed object literal, allocates and then assigns the given fields in literal order and the omitted fields' defaults. Methods are `g_<Genus>_<method>` with the receiver `faber_self` after the arena. Display matches the runner (`Point { x = 1, tag = "p" }`), recursing into nested genera and lists. `ref` / `mut` on a genus parameter passes the same pointer |
+| `float` (binary64) | C `double`; arithmetic is plain C, bit-exact once fused multiply-add is off (the runtime's pragmas cover clang and gcc in every mode). Display matches the runner: integral values print their exact expansion and `.0`, others their shortest round-trip digits positionally, and `inf`, `-inf`, `NaN`. `%` floors with the divisor's sign; `÷` on integers traps on zero; `⌊x⌋` `⌈x⌉` `⌊x⌉` round (ties to even) and saturate to `int` as the runner does; an integer compared with a float compares true values. `list<float>` is a list family. Programs link `-lm` |
 | local names | the shared binding policy (`prefixed_binding_name`): `l_<name>`. Nothing C reserves starts with `l_`, so `char`, `goto`, `stdout` or `INT64_MAX` need no keyword table |
 
 ## Rejected by name
 
-Floats, absent options, sized integers, `inf`, text comparison, nested lists,
+`f32` and other float widths, policy floats, explicit `↦` conversions, absent
+options, sized integers, `inf`, text comparison, nested lists,
 other list methods, lists of genus, `ref` / `mut` on scalars, generic genera,
 contracts, static and optional fields, shorthand object-literal fields,
 bitwise operators, shifts, `for` loops, generic, async, device, error-channel
