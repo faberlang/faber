@@ -692,6 +692,7 @@ pub fn lower_analyzed_unit(
     types.ordering_contract = unit.types.ordering_contract;
     ensure_map_iteration_array_types(&mut types);
     ensure_itera_coordinate_array_types(unit.hir, &mut types);
+    ensure_enum_iteration_array_types(unit.hir, &mut types);
     ensure_tensor_bracket_index_array_types(unit.hir, &mut types);
     ensure_runtime_extent_shape_array_type(&mut types);
     if options.kernel_lowering == KernelLowering::Device {
@@ -1336,6 +1337,37 @@ fn ensure_itera_coordinate_array_types(hir: &radix_hir::HirModule, types: &mut T
             types.ensure_array(element);
             types.intern(Type::Option(element));
         }
+    }
+}
+
+/// An `itera ex` over an enum name walks the enum's declared members
+///. Lowering materializes that series as a `lista<Enum>` temp,
+/// so the list type is interned here, once, before function lowering begins
+/// (function lowering holds the type table immutably).
+fn ensure_enum_iteration_array_types(hir: &radix_hir::HirModule, types: &mut TypeTable) {
+    struct EnumIterationCollector<'a> {
+        types: &'a TypeTable,
+        elements: FxHashSet<TypeId>,
+    }
+
+    impl HirVisitor for EnumIterationCollector<'_> {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if let HirExpressionKind::Itera { iter, .. } = &expr.kind
+                && let Some(ty) = iter.ty
+                && matches!(self.types.get(ty), Type::Enum(_))
+            {
+                self.elements.insert(ty);
+            }
+            walk_expr(self, expr);
+        }
+    }
+
+    let mut collector = EnumIterationCollector { types, elements: FxHashSet::default() };
+    walk_program(&mut collector, hir);
+    let elements = std::mem::take(&mut collector.elements);
+    drop(collector);
+    for element in elements {
+        types.ensure_array(element);
     }
 }
 
