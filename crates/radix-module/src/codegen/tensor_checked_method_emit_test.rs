@@ -17,7 +17,7 @@ functio dynamica(tensor<f32, [2, 2]> grid, lista<numerus> idx) → f32 ⇥ textu
     redde got
 }
 
-functio pone(in tensor<f32, [2, 2]> grid, lista<numerus> idx, f32 v) → vacuum ⇥ textus {
+functio pone(varia tensor<f32, [2, 2]> grid, lista<numerus> idx, f32 v) → vacuum ⇥ textus {
     grid.ponde(idx, v)
 }
 
@@ -26,7 +26,7 @@ functio praefinita(tensor<f32, [2, 2]> grid, lista<numerus> idx) → f32 {
     redde got
 }
 
-functio cepit(in tensor<f32, [2, 2]> grid, lista<numerus> idx) → f32 {
+functio cepit(varia tensor<f32, [2, 2]> grid, lista<numerus> idx) → f32 {
     varia f32 r ← 0.0
     fac {
         r ← grid.accipe(idx)

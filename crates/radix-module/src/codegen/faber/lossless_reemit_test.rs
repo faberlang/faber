@@ -184,7 +184,7 @@ fn modifier_binding_keeps_its_own_kind_and_order() {
     let emitted = reemit(&source, "en");
     assert!(
         emitted.contains("fn run() options opts errors failure"),
-        "each binding keeps its modifier keyword, in authored order:\n{emitted}"
+        "each binding keeps its modifier keyword, varia authored order:\n{emitted}"
     );
 }
 

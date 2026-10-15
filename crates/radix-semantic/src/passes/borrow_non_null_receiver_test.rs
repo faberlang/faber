@@ -54,13 +54,13 @@ fn optional_alias_of_de_list_read_through_non_null_stays_legal() {
 fn in_param_written_through_non_null_is_not_unused_mut() {
     // `!` on a non-optional receiver is a pass-through assertion; the pop is
     // still a write to the `in` parameter, so no WARN008 'change to ref'.
-    let source = "functio f(in lista<numerus> xs) → vacuum {\n xs!.detrahe()\n}\nincipit { }";
+    let source = "functio f(varia lista<numerus> xs) → vacuum {\n xs!.detrahe()\n}\nincipit { }";
     assert_eq!(unused_mut_params(source), 0);
 }
 
 #[test]
 fn in_param_only_read_through_non_null_still_suggests_ref() {
     let source =
-        "functio f(in lista<numerus> xs) → numerus {\n redde xs!.longitudo()\n}\nincipit { }";
+        "functio f(varia lista<numerus> xs) → numerus {\n redde xs!.longitudo()\n}\nincipit { }";
     assert_eq!(unused_mut_params(source), 1);
 }

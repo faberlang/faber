@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "en empty-collection marker vs is_empty intrinsic in one file."
-syntax = "var list<T> xs ← empty"
+syntax = "mut list<T> xs ← empty"
 related = ["vacua"]
 locale = "en"
 +++

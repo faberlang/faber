@@ -28,7 +28,7 @@ fn closure_params_derive_modes_from_type_position_markers() {
     let fixture = analyze_ok_la(
         r"
 incipit {
-    sit f ← (de lista<numerus> a, in lista<numerus> b, own lista<numerus> c, copy lista<numerus> d) ∴ a
+    sit f ← (de lista<numerus> a, varia lista<numerus> b, own lista<numerus> c, copy lista<numerus> d) ∴ a
 }
 ",
     );
@@ -121,7 +121,7 @@ fn scalar_ref_and_mut_parameter_markers_are_admitted() {
 functio read(de numerus value) → numerus {
     redde value
 }
-functio bump(in numerus value) → vacuum {
+functio bump(varia numerus value) → vacuum {
     value ← value + 1
 }
 ",
@@ -171,7 +171,7 @@ fn scalar_own_and_copy_parameter_markers_remain_rejected() {
 fn scalar_function_type_mut_marker_is_admitted() {
     let fixture = analyze_ok_la(
         r"
-typus Handler = (in numerus) → vacuum
+typus Handler = (varia numerus) → vacuum
 ",
     );
     let signature = (0..fixture.types.type_count()).find_map(|index| {

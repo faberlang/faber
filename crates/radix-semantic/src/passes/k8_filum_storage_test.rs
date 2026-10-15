@@ -250,7 +250,7 @@ fn call_from_the_body_stays_declined_with_param_roots() {
 }}
 functio kernel(in {GRID} out, de {GRID} src) → vacuum {{
     itera ex src apud [i] filum lane fixum value {{
-        inner(in out)
+        inner(varia out)
         out[i] ← value
     }}
 }}
@@ -288,7 +288,7 @@ fn aliasing_call_is_a_borrow_error_while_the_kernel_is_certified() {
 incipit {{
     varia {GRID} grid ← ti64[4] {{}}
     varia {GRID} alias ← grid
-    kernel(in grid, alias)
+    kernel(varia grid, alias)
 }}"
     );
     let result = analyze_source_la(&source);

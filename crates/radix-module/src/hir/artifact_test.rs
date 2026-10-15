@@ -2415,7 +2415,7 @@ fn kernel_requirements_and_symbolic_extents_survive_fhir_round_trip() {
 @ publica
 functio copy_coordinate<magnitudo N>(
     tensor<f32, [N]> input,
-    in tensor<u32, [N]> output
+    varia tensor<u32, [N]> output
 ) → vacuum {
     itera ex input apud [i] fixum value {
         output[i] ← i
@@ -2424,8 +2424,8 @@ functio copy_coordinate<magnitudo N>(
 
 @ nucleum
 @ publica
-functio copy_four(tensor<f32, [4]> input, in tensor<u32, [4]> output) → vacuum {
-    copy_coordinate(input, in output)
+functio copy_four(tensor<f32, [4]> input, varia tensor<u32, [4]> output) → vacuum {
+    copy_coordinate(input, varia output)
 }
 ";
     let session = crate::driver::Session::new(crate::driver::Config::default());
@@ -2455,7 +2455,7 @@ fn kernel_requirements_wire_omits_rows_without_a_device_or_numeric_encoding() {
     let source = r"
 @ nucleum
 @ publica
-functio copy_four(tensor<f32, [4]> input, in tensor<u32, [4]> output) → vacuum {
+functio copy_four(tensor<f32, [4]> input, varia tensor<u32, [4]> output) → vacuum {
     itera ex input apud [i] fixum value {
         output[i] ← i
     }

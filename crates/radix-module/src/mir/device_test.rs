@@ -699,7 +699,7 @@ fn gpu_control_device_safe_rejects_scalar_return_goto_cycle() {
 fn gpu_control_device_safe_rejects_side_effecting_nested_indexed_loop_branch() {
     let source = r"
 @ nucleum
-functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
+functio fill(tf32[4] input, varia tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
     varia u32 side ← 0
     dum count ≺ 2 {
@@ -720,7 +720,7 @@ functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
 fn gpu_control_device_safe_rejects_side_effecting_nested_indexed_loop_control() {
     let source = r"
 @ nucleum
-functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
+functio fill(tf32[4] input, varia tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
     varia u32 side ← 0
     dum count ≺ 3 {

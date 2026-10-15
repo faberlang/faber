@@ -6,7 +6,7 @@ category = "collection"
 grammar = ["sort_expr", "sort_direction", "sort_body"]
 canonical = true
 +++
-# Floats use IEEE total order: -0.0 sorts before +0.0, in ascending order.
+# Floats use IEEE total order: -0.0 sorts before +0.0, varia ascending order.
 incipit {
     sit lista<f64> xs ← [2.5, 0.0, -1.5, -0.0, 1.0, 0.0, -0.0]
     nota ordinata via ascendens ex xs

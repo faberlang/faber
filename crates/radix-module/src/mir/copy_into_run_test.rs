@@ -65,14 +65,14 @@ nota t.planata()
 #[test]
 fn a_mut_parameter_is_written_in_place_and_visible_to_the_caller() {
     let out = ok(
-        "functio double(tensor<f32, [2, 2]> source, in tensor<f32, [2, 2]> out) → vacuum {
+        "functio double(tensor<f32, [2, 2]> source, varia tensor<f32, [2, 2]> out) → vacuum {
     out ⇇ source + source
 }
 
 incipit {
 sit tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
 varia tensor<f32, [2, 2]> b ← [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]>
-double(a, in b)
+double(a, varia b)
 nota b.planata()
 }",
     );
@@ -85,14 +85,14 @@ fn a_writable_field_target_is_written_in_place() {
     varia tensor<f32, [2, 2]> buf
 }
 
-functio fill(in Holder holder, tensor<f32, [2, 2]> source) → vacuum {
+functio fill(varia Holder holder, tensor<f32, [2, 2]> source) → vacuum {
     holder.buf ⇇ source
 }
 
 incipit {
 sit tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
 varia Holder h ← Holder { buf = [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]> }
-fill(in h, a)
+fill(varia h, a)
 nota h.buf.planata()
 }");
     assert_eq!(out, ["[1.0, 2.0, 3.0, 4.0]"]);

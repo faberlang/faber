@@ -84,7 +84,7 @@ fn accipe_accepts_lista_i32_index() {
 #[test]
 fn ponde_accepts_lista_u32_index() {
     accepts(
-        r"functio put(in tf32[16] output, u32 id, f32 v) → vacuum ⇥ textus {
+        r"functio put(varia tf32[16] output, u32 id, f32 v) → vacuum ⇥ textus {
     sit lista<u32> idx ← [id]
     output.ponde(idx, v)
 }",
@@ -190,7 +190,7 @@ fn accipe_rejects_bool_index_list() {
 #[test]
 fn ponde_rejects_float_index_list() {
     rejects_with_issue(
-        r"functio bad(in tf32[16] output, lista<f32> idx, f32 v) → vacuum {
+        r"functio bad(varia tf32[16] output, lista<f32> idx, f32 v) → vacuum {
     output.ponde(idx, v)
 }",
         REJECT_ISSUE,

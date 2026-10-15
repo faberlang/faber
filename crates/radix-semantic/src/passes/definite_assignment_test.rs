@@ -329,7 +329,7 @@ fn accepts_in_parameter_reassignment() {
     // may be reassigned freely, unlike owned/de/ex parameters.
     let result = crate::test_support::analyze_source_la(
         r"
-functio pick(in numerus value) → numerus {
+functio pick(varia numerus value) → numerus {
     value ← value * 2
     redde value
 }

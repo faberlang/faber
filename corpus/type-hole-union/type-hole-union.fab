@@ -19,7 +19,7 @@ locale = "en"
 #   • `_` is the monomorphic hole: it infers exactly ONE inhabitant type.
 #     `let count ← 3` solves `count : int`.
 #   • `∪` is the union hole: the slot accumulates a member type from every
-#     direct flow. `var ∪ mixed ← 1` then `mixed ← "salve"` solves
+#     direct flow. `mut ∪ mixed ← 1` then `mixed ← "salve"` solves
 #     `mixed : int ∪ string` without authoring the member list by hand.
 #   • `list<∪>` learns heterogeneous element types the same way:
 #     `list<∪> nodes ← [1, "two", 3]` solves to `list<int ∪ string>`.

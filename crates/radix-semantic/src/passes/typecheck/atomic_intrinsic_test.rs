@@ -34,7 +34,7 @@ fn rejects_with_issue(source: &str, issue: &str) {
 fn atomic_integer_methods_typecheck() {
     accepts(
         r"
-functio atomic_ops(in atomic<i32> cell, i32 value) → bivalens {
+functio atomic_ops(varia atomic<i32> cell, i32 value) → bivalens {
     sit i32 loaded ← cell.load()
     cell.store(value)
     sit i32 old ← cell.exchange(loaded)
@@ -48,7 +48,7 @@ functio atomic_ops(in atomic<i32> cell, i32 value) → bivalens {
 fn atomic_methods_reject_argument_mismatch() {
     rejects_with_issue(
         r#"
-functio atomic_ops(in atomic<u32> cell) → vacuum {
+functio atomic_ops(varia atomic<u32> cell) → vacuum {
     cell.store("bad")
 }
 "#,

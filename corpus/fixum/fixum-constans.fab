@@ -29,7 +29,7 @@ locale = "en"
 #   • `const int k = p + 1` where `p` is a parameter — SEM060
 #     `constant_initializer_not_constant`; a runtime value is stored with `←`.
 #   • `var int n = 3` — `var` is a runtime binding, so `=` is a parse error
-#     (`varia_compile_time_initializer`); write `var int n ← 3`.
+#     (`varia_compile_time_initializer`); write `mut int n ← 3`.
 #   • `const u8 d = 300` — the constant does not fit `u8`
 #     (`store_constant_out_of_range`).
 #

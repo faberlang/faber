@@ -915,7 +915,7 @@ fn device_callee_in_a_copy_into_value_is_recorded() {
 functio emit(tf32[4] x) → tf32[4] { redde x }
 
 @ nucleum
-functio k(tf32[4] x, in tf32[4] out) → vacuum {
+functio k(tf32[4] x, varia tf32[4] out) → vacuum {
     out ⇇ emit(x)
 }
 ",

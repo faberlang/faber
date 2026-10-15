@@ -58,7 +58,7 @@ fn structured_control_flow_in_a_kernel_loop_is_legal() {
         r"
 @ nucleum
 @ publica
-functio relu(tensor<f32, [8]> x, in tensor<f32, [8]> out) → vacuum {
+functio relu(tensor<f32, [8]> x, varia tensor<f32, [8]> out) → vacuum {
     itera ex x apud [i] fixum v {
         si v ≻ 0.0 {
             out[i] ← v
@@ -82,7 +82,7 @@ functio bump(f32 x) → f32 {
 
 @ nucleum
 @ publica
-functio caller(tensor<f32, [8]> x, in tensor<f32, [8]> out) → vacuum {
+functio caller(tensor<f32, [8]> x, varia tensor<f32, [8]> out) → vacuum {
     itera ex x apud [i] fixum v {
         out[i] ← bump(v)
     }
@@ -527,7 +527,7 @@ fn a_call_default_in_a_kernel_selects_a_value_and_is_legal() {
         r"
 @ nucleum
 @ publica
-functio k(tensor<f32, [8]> x, in tensor<f32, [8]> out) → vacuum {
+functio k(tensor<f32, [8]> x, varia tensor<f32, [8]> out) → vacuum {
     itera ex x apud [i] filum f fixum v {
         out[i] ← x.accipe([i + 1]) ⊥ 0.0
     }
@@ -763,7 +763,7 @@ functio k(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 global_invocation
 fn a_positional_trailing_u32_lane_parameter_of_any_name_warns() {
     for name in ["id", "i", "lane", "anything_at_all"] {
         let source = format!(
-            "@ nucleum\n@ publica\nfunctio copy(tensor<u32, [4]> input, in tensor<u32, [4]> output, u32 {name}) → vacuum {{\n    output[{name}] ← input[{name}]\n}}\n"
+            "@ nucleum\n@ publica\nfunctio copy(tensor<u32, [4]> input, varia tensor<u32, [4]> output, u32 {name}) → vacuum {{\n    output[{name}] ← input[{name}]\n}}\n"
         );
         let warnings = lane_warnings(&source);
         assert_eq!(warnings.len(), 1, "{name}: {warnings:?}");
@@ -814,7 +814,7 @@ fn a_compiler_bound_lane_parameter_is_unaffected() {
     let source = r"
 @ nucleum
 @ publica
-functio copy(tensor<u32, [4]> input, in tensor<u32, [4]> output, u32 i) → vacuum {
+functio copy(tensor<u32, [4]> input, varia tensor<u32, [4]> output, u32 i) → vacuum {
     output[i] ← input[i]
 }
 ";

@@ -129,7 +129,7 @@ fn accepts_explicit_argument_writes() {
     let report = check_source(
         r"
 @ nucleum fragment
-functio scale(in numerus value) → numerus {
+functio scale(varia numerus value) → numerus {
     value ← value * 2
     redde value
 }

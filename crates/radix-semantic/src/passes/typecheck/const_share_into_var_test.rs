@@ -245,7 +245,7 @@ fn de_param_copy_into_var_is_accepted() {
 #[test]
 fn in_param_genus_shared_into_var_is_accepted() {
     test_support::assert_accepts(
-        "genus Punctum {\n    varia numerus x\n}\nfunctio prend(in Punctum q) → numerus {\n    varia Punctum b ← q\n    redde b.x\n}\nincipit { }",
+        "genus Punctum {\n    varia numerus x\n}\nfunctio prend(varia Punctum q) → numerus {\n    varia Punctum b ← q\n    redde b.x\n}\nincipit { }",
     );
 }
 

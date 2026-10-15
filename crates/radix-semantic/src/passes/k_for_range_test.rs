@@ -46,9 +46,9 @@ functio gemv<magnitudo N, magnitudo K>(
     de tensor<f32, [N]> dom,
     de tensor<f32, [N, K]> w,
     de tensor<f32, [K]> x,
-    in tensor<f32, [N]> out,
-    in tensor<f32, [K]> tmp,
-    in tensor<numerus, [N]> lens,
+    varia tensor<f32, [N]> out,
+    varia tensor<f32, [K]> tmp,
+    varia tensor<numerus, [N]> lens,
     numerus n
 ) → vacuum {{
     itera ex dom apud [i] filum lane fixum e {{
@@ -68,7 +68,7 @@ functio gemv<magnitudo N, magnitudo K>(
     de tensor<f32, [N]> dom,
     de tensor<f32, [N, K]> w,
     de tensor<f32, [K]> x,
-    in tensor<f32, [N]> out
+    varia tensor<f32, [N]> out
 ) → vacuum {{
     varia f32 total ← 0.0
     itera ex dom apud [i] filum lane fixum e {{

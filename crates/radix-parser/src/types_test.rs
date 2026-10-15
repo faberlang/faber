@@ -175,7 +175,7 @@ fn own_and_copy_remain_binding_names() {
 #[test]
 fn parses_type_position_markers_on_fn_type_params() {
     let result = parse_ok_la(
-        "typus Handler = (de textus, in numerus, own lista<numerus>, copy textus) → vacuum",
+        "typus Handler = (de textus, varia numerus, own lista<numerus>, copy textus) → vacuum",
     );
     let program = result.program.as_ref().expect("program");
     let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {

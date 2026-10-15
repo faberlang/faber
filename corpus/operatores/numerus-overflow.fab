@@ -17,7 +17,7 @@ locale = "en"
 #   • Exact intermediates — `max + 1` is 9223372036854775808, one past the
 #     largest `int`; an expression is a number, not a 64-bit container, so it
 #     prints exactly and `max + 1 - 1` comes back to `max`.
-#   • Trap at the store — `var int stored ← max + 1` fails because the exact
+#   • Trap at the store — `mut int stored ← max + 1` fails because the exact
 #     value does not fit `int`; the program aborts with
 #     "9223372036854775808 does not fit in `i64`" and never wraps.
 #   • The exact range — intermediates may reach [−2⁶³, 2⁶⁴ − 1]; past it

@@ -58,12 +58,12 @@ fn non_own_coordinate_write_rejected() {
 fn hidden_mutating_call_write_rejected() {
     rejected(
         r"
-functio poke(in tensor<numerus, [4]> target) → vacuum { target[0] ← 9 }
+functio poke(varia tensor<numerus, [4]> target) → vacuum { target[0] ← 9 }
 incipit {
     varia tensor<numerus, [4]> grid ← vacua
     itera ex grid apud [i] filum lane fixum value {
         grid[i] ← value
-        poke(in grid)
+        poke(varia grid)
     }
 }",
         "unproved_call_effect",

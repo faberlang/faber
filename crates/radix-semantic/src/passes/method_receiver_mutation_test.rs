@@ -89,7 +89,7 @@ fn copy_parameter_rebound_to_var_accepts_mutation() {
 #[test]
 fn mut_parameter_accepts_mutating_method_call() {
     let _ = analyze_ok(&with_counter(
-        "functio f(in Contador c) → vacuum { c.cresce() }\nincipit { }\n",
+        "functio f(varia Contador c) → vacuum { c.cresce() }\nincipit { }\n",
     ));
 }
 

@@ -432,7 +432,7 @@ fn resolves_type_alias_to_builtin() {
 #[test]
 fn resolves_fn_type_param_modes_from_type_position() {
     let mut parsed = parse(lex(
-        "typus Handler = (de textus, in lista<numerus>, own lista<numerus>, copy lista<numerus>) → vacuum",
+        "typus Handler = (de textus, varia lista<numerus>, own lista<numerus>, copy lista<numerus>) → vacuum",
     ));
     assert!(
         parsed.errors.is_empty(),

@@ -16,7 +16,7 @@ locale = "en"
 # What this teaches:
 #   • Exact intermediates — `i8` arithmetic does not overflow at 8 bits:
 #     `127 + 1` is 128 as a number, and it prints as 128.
-#   • Trap at the store — `var i8 total ← max + uno()` fails because 128
+#   • Trap at the store — `mut i8 total ← max + uno()` fails because 128
 #     does not fit `i8`; the program aborts with
 #     "128 does not fit in `i8`" and never wraps.
 #   • Policy distinction — every numerus width traps at its store; only

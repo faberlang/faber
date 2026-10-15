@@ -171,13 +171,13 @@ fn rejects_imperativus_coniunge_on_fixum_receiver() {
 #[test]
 fn accepts_imperativus_on_in_parameter_receiver() {
     let session = Session::new(Config::default().with_latin_locale());
-    let source = r"functio bump(in fractus acc) → vacuum {
+    let source = r"functio bump(varia fractus acc) → vacuum {
     acc.adde(1.0)
 }
 
 incipit {
     varia fractus x ← 2.0
-    bump(in x)
+    bump(varia x)
 }";
     let result = analyze_source(&session, "in-imperativus.fab", source, AnalyzeRequest::default());
     assert!(result.is_ok(), "expected in-parameter imperativus to pass: {:?}", result.err());

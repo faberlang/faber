@@ -7,7 +7,7 @@
 
 use crate::test_support::{analyze_ok, analyze_source, assert_rejects_with_issue, issue};
 
-const DEFS: &str = "functio bump(in lista<numerus> xs) → vacuum { xs.appende(1) }\n\
+const DEFS: &str = "functio bump(varia lista<numerus> xs) → vacuum { xs.appende(1) }\n\
 functio eat(own lista<numerus> xs) → vacuum { nota xs.longitudo() }\n\
 functio dup(copy lista<numerus> xs) → vacuum { nota xs.longitudo() }\n\
 functio peek(lista<numerus> xs) → vacuum { nota xs.longitudo() }\n\
@@ -20,7 +20,7 @@ fn call(body: &str) -> String {
 
 #[test]
 fn matching_markers_are_accepted() {
-    let _ = analyze_ok(&call("bump(in a)"));
+    let _ = analyze_ok(&call("bump(varia a)"));
     let _ = analyze_ok(&call("eat(own a)"));
     let _ = analyze_ok(&call("dup(copy a)"));
 }
@@ -44,13 +44,13 @@ fn missing_marker_is_call_marker_missing() {
 fn wrong_marker_is_call_marker_mismatch() {
     assert_rejects_with_issue(&call("bump(own a)"), "call_marker_mismatch");
     assert_rejects_with_issue(&call("eat(copy a)"), "call_marker_mismatch");
-    assert_rejects_with_issue(&call("dup(in a)"), "call_marker_mismatch");
+    assert_rejects_with_issue(&call("dup(varia a)"), "call_marker_mismatch");
     assert_rejects_with_issue(&call("bump(de a)"), "call_marker_mismatch");
 }
 
 #[test]
 fn mutating_marker_on_read_only_param_is_rejected() {
-    assert_rejects_with_issue(&call("peek(in a)"), "call_marker_on_read_only");
+    assert_rejects_with_issue(&call("peek(varia a)"), "call_marker_on_read_only");
     assert_rejects_with_issue(&call("peek_ref(own a)"), "call_marker_on_read_only");
     assert_rejects_with_issue(&call("peek(copy a)"), "call_marker_on_read_only");
 }
@@ -77,7 +77,7 @@ fn diagnostic_names_expected_and_found_marker() {
 fn temporary_to_mut_param_is_not_writable_whatever_the_marker() {
     // The write would be lost: the writable-place rule (SEM020) rejects it
     // even when the marker agrees.
-    assert_rejects_with_issue(&call("bump(in make())"), "mut_argument_not_writable");
+    assert_rejects_with_issue(&call("bump(varia make())"), "mut_argument_not_writable");
     assert_rejects_with_issue(&call("bump(make())"), "call_marker_missing");
 }
 
@@ -90,7 +90,7 @@ fn temporary_with_matching_own_or_copy_marker_is_accepted() {
 }
 
 const GENUS: &str = "genus Box {\n    varia numerus n\n    \
-functio fill(in lista<numerus> ys) → vacuum { ys.appende(1) }\n    \
+functio fill(varia lista<numerus> ys) → vacuum { ys.appende(1) }\n    \
 functio take(own lista<numerus> ys) → vacuum { nota ys.longitudo() }\n    \
 functio look(lista<numerus> ys) → vacuum { nota ys.longitudo() }\n}\n";
 
@@ -102,14 +102,14 @@ fn method(body: &str) -> String {
 
 #[test]
 fn method_arguments_follow_the_signature_modes() {
-    let _ = analyze_ok(&method("b.fill(in a)"));
+    let _ = analyze_ok(&method("b.fill(varia a)"));
     let _ = analyze_ok(&method("b.take(own a)"));
     let _ = analyze_ok(&method("b.look(a)"));
     let _ = analyze_ok(&method("b.look(de a)"));
     assert_rejects_with_issue(&method("b.fill(a)"), "call_marker_missing");
     assert_rejects_with_issue(&method("b.take(a)"), "call_marker_missing");
-    assert_rejects_with_issue(&method("b.take(in a)"), "call_marker_mismatch");
-    assert_rejects_with_issue(&method("b.look(in a)"), "call_marker_on_read_only");
+    assert_rejects_with_issue(&method("b.take(varia a)"), "call_marker_mismatch");
+    assert_rejects_with_issue(&method("b.look(varia a)"), "call_marker_on_read_only");
 }
 
 #[test]
@@ -118,25 +118,25 @@ fn method_receiver_carries_no_marker_and_intrinsics_are_exempt() {
     let _ = analyze_ok(&method("nota a.longitudo()"));
 }
 
-const APPLY: &str = "functio apply((in lista<numerus>) → vacuum f, in lista<numerus> xs) → vacuum {\n    f(in xs)\n}\n";
+const APPLY: &str = "functio apply((varia lista<numerus>) → vacuum f, varia lista<numerus> xs) → vacuum {\n    f(varia xs)\n}\n";
 
 #[test]
 fn function_value_calls_use_the_function_type_modes() {
     let _ = analyze_ok(&format!(
-        "{DEFS}{APPLY}incipit {{\n    varia lista<numerus> a ← [1]\n    apply(bump, in a)\n}}"
+        "{DEFS}{APPLY}incipit {{\n    varia lista<numerus> a ← [1]\n    apply(bump, varia a)\n}}"
     ));
     for (call, issue) in [
         ("f(xs)", "call_marker_missing"),
         ("f(own xs)", "call_marker_mismatch"),
     ] {
         let source = format!(
-            "{DEFS}functio apply((in lista<numerus>) → vacuum f, in lista<numerus> xs) → vacuum {{\n    {call}\n}}\nincipit {{ }}"
+            "{DEFS}functio apply((varia lista<numerus>) → vacuum f, varia lista<numerus> xs) → vacuum {{\n    {call}\n}}\nincipit {{ }}"
         );
         assert_rejects_with_issue(&source, issue);
     }
     // The type declares no mode: any mutating marker is on a read-only slot.
     let source = format!(
-        "{DEFS}functio apply((lista<numerus>) → vacuum f, in lista<numerus> xs) → vacuum {{\n    f(in xs)\n}}\nincipit {{ }}"
+        "{DEFS}functio apply((lista<numerus>) → vacuum f, varia lista<numerus> xs) → vacuum {{\n    f(varia xs)\n}}\nincipit {{ }}"
     );
     assert_rejects_with_issue(&source, "call_marker_on_read_only");
     let source = format!(
@@ -147,9 +147,9 @@ fn function_value_calls_use_the_function_type_modes() {
 
 #[test]
 fn closure_values_use_their_declared_parameter_modes() {
-    let ok = "incipit {\n    varia lista<numerus> a ← [1]\n    sit g ← (in lista<numerus> ys) ∴ ys.appende(2)\n    g(in a)\n}";
+    let ok = "incipit {\n    varia lista<numerus> a ← [1]\n    sit g ← (varia lista<numerus> ys) ∴ ys.appende(2)\n    g(varia a)\n}";
     let _ = analyze_ok(ok);
-    let missing = "incipit {\n    varia lista<numerus> a ← [1]\n    sit g ← (in lista<numerus> ys) ∴ ys.appende(2)\n    g(a)\n}";
+    let missing = "incipit {\n    varia lista<numerus> a ← [1]\n    sit g ← (varia lista<numerus> ys) ∴ ys.appende(2)\n    g(a)\n}";
     assert_rejects_with_issue(missing, "call_marker_missing");
 }
 
@@ -157,10 +157,10 @@ fn closure_values_use_their_declared_parameter_modes() {
 fn function_typed_field_calls_use_the_function_type_modes() {
     let src = |call: &str| {
         format!(
-            "{DEFS}genus Hook {{\n    varia (in lista<numerus>) → vacuum act\n}}\nincipit {{\n    varia lista<numerus> a ← [1]\n    varia Hook h ← Hook {{ act = bump }}\n    {call}\n}}"
+            "{DEFS}genus Hook {{\n    varia (varia lista<numerus>) → vacuum act\n}}\nincipit {{\n    varia lista<numerus> a ← [1]\n    varia Hook h ← Hook {{ act = bump }}\n    {call}\n}}"
         )
     };
-    let _ = analyze_ok(&src("h.act(in a)"));
+    let _ = analyze_ok(&src("h.act(varia a)"));
     assert_rejects_with_issue(&src("h.act(a)"), "call_marker_missing");
 }
 

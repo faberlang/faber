@@ -76,12 +76,12 @@ incipit {
 fn ref_to_mut_position_rejects() {
     assert_rejects_with_issue_la(
         r"
-functio poke(in lista<numerus> xs) → vacuum {
+functio poke(varia lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
     sit de lista<numerus> a ← [1, 2, 3]
-    poke(in a)
+    poke(varia a)
 }
 ",
         ISSUE_REF_TO_MUT_OR_OWN_POSITION,
@@ -108,12 +108,12 @@ incipit {
 fn unmarked_into_mut_param_stays_legal() {
     let _ = analyze_ok_la(
         r"
-functio poke(in lista<numerus> xs) → vacuum {
+functio poke(varia lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
-    poke(in a)
+    poke(varia a)
 }
 ",
     );

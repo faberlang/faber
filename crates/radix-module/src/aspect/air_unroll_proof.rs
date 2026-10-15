@@ -253,7 +253,7 @@ theorem unrolledLanesMatchSource (lanes : List Int) :
       simp [unrolledStraightLine, laneBinding, UnrollStmt.laneValue, ih]
 
 /-- Source-order preservation: evaluating the spliced straight-line bindings
-consumes the same lane sequence, in the same order, with the same
+consumes the same lane sequence, varia the same order, with the same
 accumulator chain as the source loop. -/
 theorem unrollEvaluationPreservesSourceOrder (step : UnrollStep α) (lanes : List Int) (acc : α) :
     evalUnrolled step (unrolledStraightLine lanes) acc = sourceLaneLoop step lanes acc := by

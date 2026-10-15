@@ -7,13 +7,13 @@
 const PRELUDE: &str = r"
 implendum Crescens {
     functio cresce(numerus per) → vacuum
-    functio adde(in numerus k) → vacuum
+    functio adde(varia numerus k) → vacuum
     functio mensura() → numerus
 }
 genus Quadratum implet Crescens {
     varia numerus latus
     functio cresce(numerus per) → vacuum { ego.latus ← ego.latus + per }
-    functio adde(in numerus k) → vacuum { ego.latus ← ego.latus + k }
+    functio adde(varia numerus k) → vacuum { ego.latus ← ego.latus + k }
     functio mensura() → numerus { redde ego.latus * ego.latus }
 }
 genus Punctum { varia numerus x }
@@ -92,7 +92,7 @@ fn fixum_contract_alias_of_de_param_rejects_mut_param_call() {
 #[test]
 fn alias_of_de_param_passed_to_mut_param_is_rejected() {
     let found = issues(
-        "functio g(in Quadratum x) → vacuum { x.cresce(1) }\nfunctio f(de Quadratum q) → vacuum { sit Quadratum c ← q\n g(c) }",
+        "functio g(varia Quadratum x) → vacuum { x.cresce(1) }\nfunctio f(de Quadratum q) → vacuum { sit Quadratum c ← q\n g(c) }",
     );
     assert!(
         found.iter().any(|i| i == "de_to_in_or_ex_position"),

@@ -56,14 +56,14 @@ functio k(in {GRID} out, de {GRID} src) → vacuum {{
 
 const STORE: &str = r"
 @ nucleum
-functio store(in tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
+functio store(varia tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
     target[at] ← v
 }
 ";
 
 #[test]
 fn helper_writing_through_a_mut_param_at_the_loop_coordinate_is_accepted() {
-    accepted(&kernel(STORE, "store(in out, i, value + 1.0)"));
+    accepted(&kernel(STORE, "store(varia out, i, value + 1.0)"));
 }
 
 #[test]
@@ -111,19 +111,19 @@ functio read(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at] }
 fn helper_writing_at_another_coordinate_is_rejected() {
     let poke = r"
 @ nucleum
-functio poke(in tensor<f32, [4]> target, f32 v) → vacuum { target[0] ← v }
+functio poke(varia tensor<f32, [4]> target, f32 v) → vacuum { target[0] ← v }
 ";
     rejected(
-        &kernel(poke, "poke(in out, value)"),
+        &kernel(poke, "poke(varia out, value)"),
         "write_not_own_coordinate",
     );
     // A coordinate the analysis cannot map is not the own coordinate.
     let shifted = r"
 @ nucleum
-functio poke(in tensor<f32, [4]> target, numerus at, f32 v) → vacuum { target[at + 1] ← v }
+functio poke(varia tensor<f32, [4]> target, numerus at, f32 v) → vacuum { target[at + 1] ← v }
 ";
     rejected(
-        &kernel(shifted, "poke(in out, i, value)"),
+        &kernel(shifted, "poke(varia out, i, value)"),
         "write_not_own_coordinate",
     );
 }
@@ -131,7 +131,7 @@ functio poke(in tensor<f32, [4]> target, numerus at, f32 v) → vacuum { target[
 #[test]
 fn helper_argument_that_is_not_the_loop_coordinate_is_not_an_own_write() {
     rejected(
-        &kernel(STORE, "store(in out, 0, value)"),
+        &kernel(STORE, "store(varia out, 0, value)"),
         "write_not_own_coordinate",
     );
 }
@@ -140,12 +140,12 @@ fn helper_argument_that_is_not_the_loop_coordinate_is_not_an_own_write() {
 fn two_mut_params_given_one_tensor_are_a_borrow_error_not_an_independence_one() {
     let both = r"
 @ nucleum
-functio both(in tensor<f32, [4]> left, in tensor<f32, [4]> right, numerus at) → vacuum {
+functio both(varia tensor<f32, [4]> left, varia tensor<f32, [4]> right, numerus at) → vacuum {
     left[at] ← 1.0
     right[at] ← 2.0
 }
 ";
-    let result = analyze_source_la(&kernel(both, "both(in out, in out, i)"));
+    let result = analyze_source_la(&kernel(both, "both(varia out, varia out, i)"));
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
         errors.iter().any(|d| d
@@ -196,22 +196,22 @@ fn mut_helper_param_and_unmarked_reader_param_follow_the_caller_roots() {
     // independent; the helper's write still meets the neighbour-read rule.
     let copy = r"
 @ nucleum
-functio copy(in tensor<f32, [4]> to, tensor<f32, [4]> from, numerus at) → vacuum {
+functio copy(varia tensor<f32, [4]> to, tensor<f32, [4]> from, numerus at) → vacuum {
     to[at] ← from[at + 1]
 }
 ";
-    accepted(&kernel(copy, "copy(in out, src, i)"));
+    accepted(&kernel(copy, "copy(varia out, src, i)"));
     // Reading the written parameter's own neighbour through the helper's
     // other parameter would need the same storage twice, which the call-site
     // borrow rule owns; the helper reading its own `mut` parameter does not.
     let self_read = r"
 @ nucleum
-functio shift(in tensor<f32, [4]> to, numerus at) → vacuum {
+functio shift(varia tensor<f32, [4]> to, numerus at) → vacuum {
     to[at] ← to[at + 1]
 }
 ";
     rejected(
-        &kernel(self_read, "shift(in out, i)"),
+        &kernel(self_read, "shift(varia out, i)"),
         "written_storage_neighbor_read",
     );
 }
@@ -242,7 +242,7 @@ functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
     rejected(
         &kernel(
             &both,
-            "store(in out, i, value)\n        sit f32 next ← peek(out, i)",
+            "store(varia out, i, value)\n        sit f32 next ← peek(out, i)",
         ),
         "written_storage_neighbor_read",
     );
@@ -257,12 +257,12 @@ fn nested_helper_calls_are_accepted() {
     let nested = format!(
         "{STORE}
 @ nucleum
-functio outer(in tensor<f32, [4]> target, numerus at, f32 v) → vacuum {{
-    store(in target, at, v + 1.0)
+functio outer(varia tensor<f32, [4]> target, numerus at, f32 v) → vacuum {{
+    store(varia target, at, v + 1.0)
 }}
 "
     );
-    accepted(&kernel(&nested, "outer(in out, i, value)"));
+    accepted(&kernel(&nested, "outer(varia out, i, value)"));
 }
 
 #[test]
@@ -270,13 +270,13 @@ fn nested_helper_that_writes_elsewhere_is_rejected() {
     let nested = format!(
         "{STORE}
 @ nucleum
-functio outer(in tensor<f32, [4]> target, f32 v) → vacuum {{
-    store(in target, 0, v)
+functio outer(varia tensor<f32, [4]> target, f32 v) → vacuum {{
+    store(varia target, 0, v)
 }}
 "
     );
     rejected(
-        &kernel(&nested, "outer(in out, value)"),
+        &kernel(&nested, "outer(varia out, value)"),
         "write_not_own_coordinate",
     );
 }
@@ -359,11 +359,11 @@ functio leaky(f32 x) → f32 { redde host(x) }
 fn helper_with_a_parallel_loop_is_declined() {
     let looped = r"
 @ nucleum
-functio sweep(in tensor<f32, [4]> target) → vacuum {
+functio sweep(varia tensor<f32, [4]> target) → vacuum {
     itera ex target apud [j] filum inner fixum cell { target[j] ← cell }
 }
 ";
-    rejected(&kernel(looped, "sweep(in out)"), "unproved_loop_form");
+    rejected(&kernel(looped, "sweep(varia out)"), "unproved_loop_form");
 }
 
 // =============================================================================
@@ -390,11 +390,11 @@ functio ramp(f32 x) → f32 {
 fn helper_reassigning_a_tensor_parameter_is_declined() {
     let swap = r"
 @ nucleum
-functio swap(in tensor<f32, [4]> target, de tensor<f32, [4]> other) → vacuum {
+functio swap(varia tensor<f32, [4]> target, de tensor<f32, [4]> other) → vacuum {
     target ← other
 }
 ";
-    let result = analyze_source_la(&kernel(swap, "swap(in out, src)"));
+    let result = analyze_source_la(&kernel(swap, "swap(varia out, src)"));
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
         errors.iter().any(|d| {
@@ -514,13 +514,13 @@ fn reduction_term_helper_that_writes_is_rejected() {
     let result = analyze_source_la(
         r"
 @ nucleum
-functio dirty(in tensor<f32, [32]> t, f32 x) → f32 {
+functio dirty(varia tensor<f32, [32]> t, f32 x) → f32 {
     t[0] ← x
     redde x
 }
 @ nucleum
-functio k(in tensor<f32, [32]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] filum f fixum s { redde dirty(in xs, s) }
+functio k(varia tensor<f32, [32]> xs) → f32 {
+    redde reducta via summa ex xs apud [i] filum f fixum s { redde dirty(varia xs, s) }
 }
 ",
     );
@@ -623,7 +623,7 @@ fn opaque_effect_before_the_loop_still_poisons_the_function() {
 fn vector_component_of_the_element_binder_is_a_value_read() {
     accepted(
         r"
-functio k(de tensor<vector<f32, 4>, [4]> state, in tensor<f32, [4]> depth) → vacuum {
+functio k(de tensor<vector<f32, 4>, [4]> state, varia tensor<f32, [4]> depth) → vacuum {
     itera ex state apud [i] filum lane fixum c {
         depth[i] ← c[0]
     }
@@ -637,7 +637,7 @@ incipit {
 fn vector_tensor_written_in_place_still_rejects_neighbour_reads() {
     rejected(
         r"
-functio k(in tensor<vector<f32, 4>, [4]> state) → vacuum {
+functio k(varia tensor<vector<f32, 4>, [4]> state) → vacuum {
     itera ex state apud [i] filum lane fixum c {
         state[i] ← state[i + 1]
     }
@@ -669,7 +669,7 @@ fn edge_view_of_an_unwritten_tensor_is_accepted() {
     ));
     accepted(
         r"
-functio k(in tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
+functio k(varia tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
     sit tensor<f32, [4]> west ← src.disloco([1]).limes<reflexa>()
     itera ex src apud [i] filum lane fixum value {
         out[i] ← west[i] + value
@@ -686,7 +686,7 @@ fn edge_view_of_the_written_tensor_is_rejected() {
     // unmarked-write error, judges the view that reaches the written tensor.
     rejected(
         r"
-functio k(in tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
+functio k(varia tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
     varia tensor<f32, [4]> alias ← out
     sit tensor<f32, [4]> west ← alias.disloco([1]).limes<clampa>()
     itera ex src apud [i] filum lane fixum value {

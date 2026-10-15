@@ -372,7 +372,7 @@ incipit {
 fn lowers_atomic_methods_to_dedicated_mir_intrinsics() {
     let dump = dump_source(
         r"
-functio atomic_ops(in atomic<i32> cell, i32 value) → bivalens {
+functio atomic_ops(varia atomic<i32> cell, i32 value) → bivalens {
     sit i32 loaded ← cell.load()
     cell.store(value)
     sit i32 old ← cell.exchange(loaded)
@@ -428,14 +428,14 @@ fn lowers_function_params_as_mir_locals() {
 #[test]
 fn scalar_mut_param_preserves_in_mode_through_mir_lowering() {
     let source = r#"
-functio duplica(in numerus value) → vacuum {
+functio duplica(varia numerus value) → vacuum {
     value ← value * 2
 }
 
 incipit {
     nota "mutabile"
     varia numerus value ← 3
-    duplica(in value)
+    duplica(varia value)
     nota value
     nota "salve"
 }
@@ -1046,7 +1046,7 @@ fn lowers_postfix_increment_and_decrement() {
 fn lowers_postfix_increment_evaluates_index_once() {
     let dump = dump_source(
         r"functio f() → numerus { redde 0 }
-functio bump(in lista<numerus> xs) {
+functio bump(varia lista<numerus> xs) {
   xs[f()] ↑
 }",
     );
@@ -1185,7 +1185,7 @@ fn pair(Forma a, Forma b) → string {
 #[test]
 fn lowers_copy_into_to_one_tensor_copy_into_with_the_value_evaluated_once() {
     let dump = dump_source(
-        r"functio copy(tf32[3, 3] a, tf32[3, 3] b, in tf32[3, 3] out) → vacuum {
+        r"functio copy(tf32[3, 3] a, tf32[3, 3] b, varia tf32[3, 3] out) → vacuum {
     out ⇇ a + b
 }",
     );
@@ -1210,7 +1210,7 @@ fn lowers_copy_into_to_one_tensor_copy_into_with_the_value_evaluated_once() {
 #[test]
 fn lowers_copy_into_of_a_view_source_with_one_call() {
     let dump = dump_source(
-        r"functio copy(tf32[2, 3] a, in tf32[3, 2] out) → vacuum {
+        r"functio copy(tf32[2, 3] a, varia tf32[3, 2] out) → vacuum {
     out ⇇ a.transpone()
 }",
     );
@@ -3386,7 +3386,7 @@ functio muta() → numerus {
 fn lowers_tensor_bracket_access_to_tensor_runtime_ops() {
     let dump = dump_source(
         r"
-functio muta(tf32[4] input, in tf32[4] output, u32 id) → f32 {
+functio muta(tf32[4] input, varia tf32[4] output, u32 id) → f32 {
     sit f32 value ← input[id]
     output[id] ← value
     redde value
@@ -3444,7 +3444,7 @@ fn indexed_tensor_view_kernel_lowers_device_brackets_to_projections() {
     let dump = dump_source(
         r"
 @ nucleum
-functio copy(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
+functio copy(tf32[4] input, varia tf32[4] output, u32 id) → vacuum {
     output[id] ← input[id]
 }
 ",
@@ -5395,7 +5395,7 @@ functio describe(Resultatus<numerus> r) → textus {
 #[test]
 fn generic_rope_dim_lowers_to_symbolic_shape_size_operand() {
     let source = r"
-functio rope_q<T, magnitudo D, magnitudo d, magnitudo P>(tensor<T, [D, d]> input, tensor<T, [P, d, 3]> rota, in tensor<T, [D, d]> output) → vacuum {
+functio rope_q<T, magnitudo D, magnitudo d, magnitudo P>(tensor<T, [D, d]> input, tensor<T, [P, d, 3]> rota, varia tensor<T, [D, d]> output) → vacuum {
     output ⇇ input.rope_norm<d>(0, rota)
 }
 ";
@@ -7571,7 +7571,7 @@ fn a_device_function_lowers_copy_into_to_a_forwarding_store() {
 #[test]
 fn a_host_function_keeps_the_storage_preserving_copy_into() {
     let dump = dump_source(
-        r"functio copy(tf32[3, 3] a, in tf32[3, 3] out) → vacuum {
+        r"functio copy(tf32[3, 3] a, varia tf32[3, 3] out) → vacuum {
     out ⇇ a
 }",
     );

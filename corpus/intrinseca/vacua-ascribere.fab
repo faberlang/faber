@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "Empty-collection marker with an empty-named binding (null-like shadowing)."
-syntax = "var list<int> empty ← empty"
+syntax = "mut list<int> empty ← empty"
 related = ["vacua", "lista", "tabula", "copia"]
 locale = "en"
 +++
@@ -26,10 +26,10 @@ locale = "en"
 # =============================================================================
 #
 # GRAMMAR:
-#   var map<K,V> t ← empty
-#   var list<T> res ← empty
-#   var set<T> visi ← empty
-#   var list<int> empty ← empty   (binding legal; RHS is the marker)
+#   mut map<K,V> t ← empty
+#   mut list<T> res ← empty
+#   mut set<T> visi ← empty
+#   mut list<int> empty ← empty   (binding legal; RHS is the marker)
 #
 # EXPECTED OUTPUT:
 #   Smoke asserts exit 0 only.

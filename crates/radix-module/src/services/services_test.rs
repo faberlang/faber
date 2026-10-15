@@ -1267,7 +1267,7 @@ fn gpu_builtin_emit_reflection_json_serializes_source_names_for_builtin_inputs()
     let source = r"
 @ nucleum
 @ publica
-functio copy(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
+functio copy(tf32[4] input, varia tf32[4] output, u32 id) → vacuum {
     output[id] ← input[id]
 }
 ";

@@ -624,7 +624,7 @@ fn first_param_type(hir: &radix_hir::HirModule) -> TypeId {
 fn parameter_access_posture_is_proven_in_declaration_order() {
     let (queries, hir, _types) = source_queries(
         r"
-functio mistura(numerus plena, de numerus lecta, in numerus mutata) → numerus {
+functio mistura(numerus plena, de numerus lecta, varia numerus mutata) → numerus {
     redde plena
 }
 incipit { }
@@ -933,7 +933,7 @@ incipit {
 fn mut_marker_param_use_proves_mutable_place_laws() {
     let (queries, hir, _types) = source_queries(
         r"
-functio mutat(in numerus cella) → numerus {
+functio mutat(varia numerus cella) → numerus {
     redde cella
 }
 incipit { }
