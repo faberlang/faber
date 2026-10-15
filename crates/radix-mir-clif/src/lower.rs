@@ -1951,6 +1951,63 @@ impl FunctionLower<'_, '_> {
             (MirCollectionOp::Values, Rep::Map) => {
                 (self.call_runtime(&abi::MAP_VALUES, &[handle])?, Rep::List)
             }
+            (
+                MirCollectionOp::Uppercase | MirCollectionOp::Lowercase | MirCollectionOp::Trim,
+                Rep::Text,
+            ) => {
+                let mode = match op {
+                    MirCollectionOp::Uppercase => 0,
+                    MirCollectionOp::Lowercase => 1,
+                    _ => 2,
+                };
+                let mode = self.builder.ins().iconst(types::I32, mode);
+                (
+                    self.call_runtime(&abi::TEXT_MAP, &[handle, mode])?,
+                    Rep::Text,
+                )
+            }
+            (MirCollectionOp::StartsWith | MirCollectionOp::EndsWith, Rep::Text) => {
+                let [_, other] = args else {
+                    return Err(Decline::new("text test arity"));
+                };
+                let (other, other_rep) = self.scalar(other)?;
+                if other_rep != Rep::Text {
+                    return Err(Decline::new("text test operand"));
+                }
+                let mode = i64::from(op == MirCollectionOp::EndsWith);
+                let mode = self.builder.ins().iconst(types::I32, mode);
+                (
+                    self.call_runtime(&abi::TEXT_TEST, &[handle, other, mode])?,
+                    Rep::Bool,
+                )
+            }
+            (MirCollectionOp::Split, Rep::Text) => {
+                let [_, delimiter] = args else {
+                    return Err(Decline::new("split arity"));
+                };
+                let (delimiter, delimiter_rep) = self.scalar(delimiter)?;
+                if delimiter_rep != Rep::Text {
+                    return Err(Decline::new("split delimiter"));
+                }
+                (
+                    self.call_runtime(&abi::TEXT_SPLIT, &[handle, delimiter])?,
+                    Rep::List,
+                )
+            }
+            (MirCollectionOp::Replace, Rep::Text) => {
+                let [_, from, to] = args else {
+                    return Err(Decline::new("replace arity"));
+                };
+                let (from, from_rep) = self.scalar(from)?;
+                let (to, to_rep) = self.scalar(to)?;
+                if from_rep != Rep::Text || to_rep != Rep::Text {
+                    return Err(Decline::new("replace operands"));
+                }
+                (
+                    self.call_runtime(&abi::TEXT_REPLACE, &[handle, from, to])?,
+                    Rep::Text,
+                )
+            }
             (MirCollectionOp::AppendImmutable, Rep::List) => {
                 let [_, item] = args else {
                     return Err(Decline::new("append arity"));

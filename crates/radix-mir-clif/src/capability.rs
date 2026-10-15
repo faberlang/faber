@@ -599,6 +599,13 @@ impl MirVisitor for ClifCapability<'_> {
                             | MirCollectionOp::Keys
                             | MirCollectionOp::Values
                             | MirCollectionOp::AppendImmutable
+                            | MirCollectionOp::Uppercase
+                            | MirCollectionOp::Lowercase
+                            | MirCollectionOp::Trim
+                            | MirCollectionOp::StartsWith
+                            | MirCollectionOp::EndsWith
+                            | MirCollectionOp::Split
+                            | MirCollectionOp::Replace
                             | MirCollectionOp::Slice
                             | MirCollectionOp::Take
                             | MirCollectionOp::TakeLast

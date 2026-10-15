@@ -154,6 +154,30 @@ pub const LIST_REVERSE_IN_PLACE: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr],
     ret: None,
 };
+/// A transformed text: 0 uppercase, 1 lowercase, 2 trim.
+pub const TEXT_MAP: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_map",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+/// A text test against a second text: 0 starts-with, 1 ends-with.
+pub const TEXT_TEST: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_test",
+    params: &[Ptr, Ptr, I32],
+    ret: Some(I8),
+};
+/// A list of the pieces of a text between delimiters.
+pub const TEXT_SPLIT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_split",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// A text with every occurrence of one text replaced.
+pub const TEXT_REPLACE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_replace",
+    params: &[Ptr, Ptr, Ptr],
+    ret: Some(Ptr),
+};
 /// Key membership.
 pub const MAP_HAS: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_map_has",
@@ -451,6 +475,10 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     MAP_GET,
     MAP_GET_OPT,
     LIST_GET_OPT,
+    TEXT_MAP,
+    TEXT_TEST,
+    TEXT_SPLIT,
+    TEXT_REPLACE,
     LIST_APPENDED,
     LIST_SLICE,
     TEXT_SLICE,

@@ -159,11 +159,11 @@ fn text_local_is_capable() {
 }
 
 #[test]
-fn ascii_local_names_gap() {
+fn littera_local_names_gap() {
     let types = TypeTable::new();
     let program = single_function(FunctionShape {
         params: Vec::new(),
-        locals: vec![local(0, ty(&types, Primitive::Ascii))],
+        locals: vec![local(0, ty(&types, Primitive::Littera))],
         temps: Vec::new(),
         statements: Vec::new(),
         terminator: MirTerminatorKind::Return(None),
@@ -176,14 +176,14 @@ fn ascii_local_names_gap() {
     let verdict = classify_with_types(&program, &types);
     let gaps = verdict.gaps();
     assert_eq!(gaps.len(), 1, "one gap expected: {gaps:?}");
-    assert_eq!(gaps[0].shape(), "string value");
+    assert_eq!(gaps[0].shape(), "character value");
     assert_eq!(gaps[0].slug(), SLUG_CLIF_SUBSET);
 }
 
 #[test]
 fn gaps_keep_storage_order() {
     let types = TypeTable::new();
-    let string = ty(&types, Primitive::Ascii);
+    let string = ty(&types, Primitive::Littera);
     let instans = ty(&types, Primitive::Instans);
     let program = single_function(FunctionShape {
         params: vec![param(0, string)],
@@ -200,7 +200,11 @@ fn gaps_keep_storage_order() {
     let verdict = classify_with_types(&program, &types);
     let gaps = verdict.gaps();
     assert_eq!(gaps.len(), 2, "two gaps expected: {gaps:?}");
-    assert_eq!(gaps[0].shape(), "string value", "param walks before local");
+    assert_eq!(
+        gaps[0].shape(),
+        "character value",
+        "param walks before local"
+    );
     assert_eq!(gaps[1].shape(), "instans value");
 }
 

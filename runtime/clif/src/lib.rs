@@ -1170,6 +1170,78 @@ pub unsafe extern "C" fn __faber_clif_v1_list_reverse_in_place(list: *mut List) 
     unsafe { list_mut(list) }.items.reverse();
 }
 
+/// A transformed text: 0 uppercase, 1 lowercase, 2 trim.
+///
+/// # Safety
+///
+/// `handle` addresses a well-formed text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_map(handle: *const u8, mode: i32) -> *const u8 {
+    let text = text_str(unsafe { text_bytes(handle) });
+    let changed = match mode {
+        0 => text.to_uppercase(),
+        1 => text.to_lowercase(),
+        _ => text.trim().to_owned(),
+    };
+    text_new(changed.as_bytes())
+}
+
+/// A text test: 0 starts-with, 1 ends-with.
+///
+/// # Safety
+///
+/// Both handles address well-formed texts.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_test(
+    left: *const u8,
+    right: *const u8,
+    mode: i32,
+) -> i8 {
+    let left = text_str(unsafe { text_bytes(left) });
+    let right = text_str(unsafe { text_bytes(right) });
+    i8::from(if mode == 0 {
+        left.starts_with(&*right)
+    } else {
+        left.ends_with(&*right)
+    })
+}
+
+/// The pieces of a text between delimiters.
+///
+/// # Safety
+///
+/// Both handles address well-formed texts.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_split(
+    handle: *const u8,
+    delimiter: *const u8,
+) -> *mut List {
+    let text = text_str(unsafe { text_bytes(handle) });
+    let delimiter = text_str(unsafe { text_bytes(delimiter) });
+    let items = text
+        .split(&*delimiter)
+        .map(|part| (TAG_TEXT, text_new(part.as_bytes()) as i64))
+        .collect();
+    list_new_from(items)
+}
+
+/// A text with every occurrence of `from` replaced by `to`.
+///
+/// # Safety
+///
+/// All handles address well-formed texts.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_replace(
+    handle: *const u8,
+    from: *const u8,
+    to: *const u8,
+) -> *const u8 {
+    let text = text_str(unsafe { text_bytes(handle) });
+    let from = text_str(unsafe { text_bytes(from) });
+    let to = text_str(unsafe { text_bytes(to) });
+    text_new(text.replace(&*from, &to).as_bytes())
+}
+
 /// Abort with a text message, the runner's `abort: <message>` (D5).
 ///
 /// # Safety
