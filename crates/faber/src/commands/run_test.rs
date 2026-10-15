@@ -609,3 +609,66 @@ fn single_file_run_process_code_frontend_error_is_one() {
     let error = RunSourceError::Frontend(Vec::new());
     assert_eq!(single_file_run_process_code(Err(error)), 1);
 }
+
+// ── single-file @ cli operand binding ────────────────────
+
+/// The shared `@ cli` fixture both process-level tests run: a single file that
+/// must route through the same CLI analysis package mode uses.
+fn write_single_file_cli_tool(dir: &Path) -> PathBuf {
+    let entry = dir.join("tool.fab");
+    std::fs::write(
+        &entry,
+        "+++\nlocale = \"en\"\n+++\n\n@ cli \"greeter\"\n@ operand string who\nmain args args {\n  print args.who\n}\n",
+    )
+    .expect("write single-file @ cli tool");
+    entry
+}
+
+/// The single-file run must bind `@ cli` operands through the shared package
+/// CLI planning: `-- Anna` after the entry path reaches `args.who`.
+#[test]
+fn single_file_cli_run_binds_operands_after_double_dash() {
+    let dir = temp_dir("single-file-cli");
+    let entry = write_single_file_cli_tool(&dir);
+    let entry = entry.to_str().expect("UTF-8 entry path");
+
+    let output = Command::new(crate::commands::format_test::faber_binary())
+        .args(["run", entry, "--", "Anna"])
+        .output()
+        .expect("run faber binary");
+
+    assert!(
+        output.status.success(),
+        "single-file @ cli run must bind the operand: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "Anna\n");
+}
+
+/// A single-file `@ cli` run with no operand value must refuse, not silently
+/// run with an unbound operand. The identity is asserted by code and issue
+/// (reader-locale D7 renders the compact identity; message prose is a pack and
+/// `--diagnostics` render, never stderr text), naming the CLI surface the
+/// shared package planning rejected.
+#[test]
+fn single_file_cli_run_missing_operand_refuses_by_name() {
+    let dir = temp_dir("single-file-cli");
+    let entry = write_single_file_cli_tool(&dir);
+    let entry = entry.to_str().expect("UTF-8 entry path");
+
+    let output = Command::new(crate::commands::format_test::faber_binary())
+        .args(["run", entry])
+        .output()
+        .expect("run faber binary");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "a missing CLI operand must refuse, got stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert!(
+        stderr.contains("PKG001") && stderr.contains("package_mir_cli_surface_unsupported"),
+        "missing operand must refuse with the named CLI-surface diagnostic: {stderr}"
+    );
+}
