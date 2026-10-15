@@ -88,6 +88,7 @@ report. It checks the runtime first: `faber.h` compiles on its own and
 | `i8` `i16` `i32` `u8` `u16` `u32` `u64` | the plain C integer of that width. A read widens to `int64_t` (`u64`, which does not fit one, to an exact value), arithmetic is the exact helpers, and the only way into the cell is `faber_store_<w>` / `faber_fit_<w>`, which write the runner's `<n> does not fit in `<w>` (<position>)` for the store's position (declaration, assignment, `argument`, `return`, field). A constant in range needs no check. Lists of sized integers are rejected |
 | `value ∷ T` | the value, range-checked against `T` |
 | `print a, b` | one space-joined line when the runner joins: a literal text first with up to two more, or every argument has a shared rendering. A sized integer or a genus among them makes the runner (and so this target) print each argument on its own line |
+| `T ∪ none` over `int`, `bool`, `float`, text, lists and genera | text, lists and genera are pointers, so none is `NULL` and wrapping is the identity; `int`, `bool` and `float` are `faber_opt_i64` / `_bool` / `_f64` structs (`has`, `value`). `null`, `x is none`, `x not is none`, `x ≡ null`, `a coalesce b` (the fallback runs only for none), `x!` (aborts `unwrap of nihil`), `x!.field`, and a guard-narrowed read of the payload; printing shows the payload or the locale's none word |
 | local names | the shared binding policy (`prefixed_binding_name`): `l_<name>`. Nothing C reserves starts with `l_`, so `char`, `goto`, `stdout` or `INT64_MAX` need no keyword table |
 
 ## Rejected by name
@@ -114,5 +115,5 @@ fallback on intermediates that overflow `int64_t` but not the cap. `loops.fab` r
 jumps, the logical operators, and an unstored 2^63. The `trap_*.fab` fixtures
 trap at a store, a call argument, a division by zero, and an intermediate
 beyond the cap, and
-must exit 1 with the runner's partial stdout. `sized.fab`, `trap_sized.fab` and `trap_sized_argument.fab` run the width checks. `switch.fab` runs value dispatch including inside a loop that breaks. `control.fab` runs conditionals, `elif`, do-while with `continue` and `break`, increment, and text and boolean comparison; `trap_assert.fab` and `trap_increment.fab` abort and trap. `entry_args.fab` runs `main args` with none given (checked by hand with arguments). `tests/fixtures/reject/*.fab`
+must exit 1 with the runner's partial stdout. `optional.fab` runs the optional forms and a trapping unwrap. `sized.fab`, `trap_sized.fab` and `trap_sized_argument.fab` run the width checks. `switch.fab` runs value dispatch including inside a loop that breaks. `control.fab` runs conditionals, `elif`, do-while with `continue` and `break`, increment, and text and boolean comparison; `trap_assert.fab` and `trap_increment.fab` abort and trap. `entry_args.fab` runs `main args` with none given (checked by hand with arguments). `tests/fixtures/reject/*.fab`
 must fail with the named rejection.

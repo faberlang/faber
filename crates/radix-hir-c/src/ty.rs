@@ -59,9 +59,65 @@ impl IntWidth {
     }
 }
 
+/// What an optional (`T ∪ none`) carries. Text, lists and genera are already
+/// pointers, so `NULL` is their none; the scalars carry a presence flag in a
+/// small struct (`faber_opt_i64`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Inner {
+    Int,
+    Text,
+    Bool,
+    Float,
+    List(Elem),
+    Genus(DefId),
+}
+
+impl Inner {
+    /// The class of the value inside.
+    pub(crate) fn ty(self) -> Ty {
+        match self {
+            Inner::Int => Ty::Int,
+            Inner::Text => Ty::Text,
+            Inner::Bool => Ty::Bool,
+            Inner::Float => Ty::Float,
+            Inner::List(elem) => Ty::List(elem),
+            Inner::Genus(def_id) => Ty::Genus(def_id),
+        }
+    }
+
+    pub(crate) fn from_ty(ty: Ty) -> Option<Inner> {
+        match ty {
+            Ty::Int => Some(Inner::Int),
+            Ty::Text => Some(Inner::Text),
+            Ty::Bool => Some(Inner::Bool),
+            Ty::Float => Some(Inner::Float),
+            Ty::List(elem) => Some(Inner::List(elem)),
+            Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
+            Ty::Sized(_) | Ty::Opt(_) => None,
+        }
+    }
+
+    /// The value is a pointer and `NULL` means none.
+    pub(crate) fn is_pointer(self) -> bool {
+        matches!(self, Inner::Text | Inner::List(_) | Inner::Genus(_))
+    }
+
+    /// The runtime's option struct for a scalar.
+    pub(crate) fn scalar_struct(self) -> Option<&'static str> {
+        match self {
+            Inner::Int => Some("faber_opt_i64"),
+            Inner::Bool => Some("faber_opt_bool"),
+            Inner::Float => Some("faber_opt_f64"),
+            Inner::Text | Inner::List(_) | Inner::Genus(_) => None,
+        }
+    }
+}
+
 /// The classes the subset can carry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Ty {
+    /// `T ∪ none` over a class that has one.
+    Opt(Inner),
     /// Bare `int` (`i64`): C `int64_t`.
     Int,
     /// `i8`…`u64`: C `intN_t` / `uintN_t`, read as an `int64_t` (an exact
@@ -132,6 +188,10 @@ impl Ty {
         match self {
             Ty::Int => Some("int64_t"),
             Ty::Sized(width) => Some(width.c_type()),
+            Ty::Opt(Inner::Genus(_)) => None,
+            Ty::Opt(inner) => inner
+                .scalar_struct()
+                .or_else(|| inner.ty().builtin_c_type()),
             Ty::Text => Some("const char *"),
             Ty::Bool => Some("bool"),
             Ty::Float => Some("double"),
@@ -175,6 +235,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
         Type::Array(inner) => match classify(types, *inner)? {
             Ty::Int => Ok(Ty::List(Elem::Int)),
             Ty::Sized(_) => Err(unsupported("list of sized integers")),
+            Ty::Opt(_) => Err(unsupported("list of optionals")),
             Ty::Text => Ok(Ty::List(Elem::Text)),
             Ty::Bool => Ok(Ty::List(Elem::Bool)),
             Ty::Float => Ok(Ty::List(Elem::Float)),
@@ -182,6 +243,10 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             Ty::Genus(_) => Err(unsupported("list of genus")),
         },
         Type::Struct(def_id) => Ok(Ty::Genus(*def_id)),
+        Type::Option(inner) => match Inner::from_ty(classify(types, *inner)?) {
+            Some(inner) => Ok(Ty::Opt(inner)),
+            None => Err(unsupported("optional of a sized integer or an optional")),
+        },
         other => Err(unsupported(describe(other))),
     }
 }

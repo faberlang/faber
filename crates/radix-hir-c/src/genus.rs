@@ -43,6 +43,11 @@ pub(crate) struct Field {
 impl Emitter<'_> {
     /// The C spelling of a class.
     pub(crate) fn c_type(&self, ty: Ty) -> Result<String, CodegenError> {
+        // An optional genus is the genus's pointer, `NULL` for none.
+        let ty = match ty {
+            Ty::Opt(crate::ty::Inner::Genus(def_id)) => Ty::Genus(def_id),
+            other => other,
+        };
         if let Some(builtin) = ty.builtin_c_type() {
             return Ok(builtin.to_owned());
         }
@@ -263,7 +268,16 @@ impl Emitter<'_> {
         name: Symbol,
     ) -> Result<Operand, CodegenError> {
         let base = self.expr(base)?;
-        let field = self.field_of(&base, name)?;
+        self.field_from(&base, name)
+    }
+
+    /// The field `name` of an already evaluated genus value.
+    pub(crate) fn field_from(
+        &mut self,
+        base: &Operand,
+        name: Symbol,
+    ) -> Result<Operand, CodegenError> {
+        let field = self.field_of(base, name)?;
         let text = format!("({})->{}", base.text, field.c_name);
         let mut operand = Self::cell_read(&text, field.ty).with_effect(base.effect);
         // A read behind a call is not a pure 64-bit fast-path leaf (C4).

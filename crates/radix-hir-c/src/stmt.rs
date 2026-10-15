@@ -12,7 +12,6 @@ use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirIteraMode, HirLocal, HirScribeKind,
     HirStatement, HirStatementKind,
 };
-use radix_types::Type;
 
 impl Emitter<'_> {
     /// Emit a block's statements one level deeper than the current line.
@@ -679,12 +678,6 @@ impl Emitter<'_> {
     ) -> Result<(), CodegenError> {
         let mut operands = Vec::with_capacity(args.len());
         for arg in args {
-            // The absent-option token waits on the option type.
-            if let Some(ty) = arg.ty
-                && matches!(self.types.get(ty), Type::Option(_))
-            {
-                return Err(unsupported("printing an absent option"));
-            }
             operands.push(self.expr(arg)?);
         }
         let prelude = self.sequence(&mut operands);
@@ -711,6 +704,7 @@ impl Emitter<'_> {
                 Value::Truth => ("%s", format!("({} ? {yes} : {no})", value.text)),
                 Value::List(elem) => ("%s", self.show_list(&value.text, elem)?),
                 Value::Genus(def_id) => ("%s", self.show_genus(&value.text, def_id)?),
+                Value::Opt(inner) => ("%s", self.show_option(&value.text, inner)?),
                 Value::Float => (
                     "%s",
                     format!(

@@ -27,6 +27,7 @@ mod helpers;
 mod items;
 mod list;
 mod names;
+mod option;
 mod range;
 mod stmt;
 mod switch;
@@ -41,6 +42,8 @@ mod emit_test;
 mod item_test;
 #[cfg(test)]
 mod names_test;
+#[cfg(test)]
+mod option_test;
 #[cfg(test)]
 mod range_test;
 #[cfg(test)]
@@ -260,6 +263,7 @@ impl Emitter<'_> {
     pub(crate) fn need_class(&mut self, class: Ty) {
         match class {
             Ty::Int | Ty::Sized(_) => self.support.need_ints(),
+            Ty::Opt(inner) => self.need_class(inner.ty()),
             Ty::Bool => self.support.need_bool(),
             Ty::Float => self.support.need(crate::helpers::Helper::Float),
             Ty::Text | Ty::Genus(_) => {}

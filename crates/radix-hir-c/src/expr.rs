@@ -11,7 +11,7 @@
 use crate::Emitter;
 use crate::error::unsupported;
 use crate::helpers::Helper;
-use crate::ty::{Elem, IntWidth, Ty, classify};
+use crate::ty::{Elem, Inner, IntWidth, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{
     DefId, HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral,
@@ -48,6 +48,8 @@ pub(crate) enum Value {
     Genus(DefId),
     /// A binary64 value (`double`).
     Float,
+    /// An optional: a pointer that may be `NULL`, or a presence-flag struct.
+    Opt(Inner),
 }
 
 impl From<Ty> for Value {
@@ -62,6 +64,7 @@ impl From<Ty> for Value {
             Ty::List(elem) => Value::List(elem),
             Ty::Genus(def_id) => Value::Genus(def_id),
             Ty::Float => Value::Float,
+            Ty::Opt(inner) => Value::Opt(inner),
         }
     }
 }
@@ -159,7 +162,25 @@ fn c_int64(value: i64) -> String {
 impl Emitter<'_> {
     pub(crate) fn expr(&mut self, expr: &HirExpression) -> Result<Operand, CodegenError> {
         match &expr.kind {
-            HirExpressionKind::Path(def_id) => self.path(*def_id),
+            HirExpressionKind::Path(def_id) => {
+                let operand = self.path(*def_id)?;
+                // Typecheck narrows the type of a read the guard proved
+                // present; the cell is still the optional.
+                if let (Value::Opt(inner), Some(ty)) = (operand.value, expr.ty)
+                    && classify(self.types, ty).is_ok_and(|class| class == inner.ty())
+                {
+                    return Ok(Self::narrow_read(&operand, inner));
+                }
+                Ok(operand)
+            }
+            HirExpressionKind::NonNull(subject, kind) => {
+                let unwrapped = self.unwrap(subject)?;
+                match kind {
+                    radix_hir::HirNonNullKind::Value => Ok(unwrapped),
+                    radix_hir::HirNonNullKind::Member(name) => self.field_from(&unwrapped, *name),
+                    _ => Err(unsupported("non-null assertion followed by an index")),
+                }
+            }
             HirExpressionKind::Literal(literal) => {
                 // An integer literal typed as a float is that float (`1` in a
                 // `float` slot is `1.0`); typecheck admits no other crossing.
@@ -167,6 +188,7 @@ impl Emitter<'_> {
                     classify(self.types, ty).is_ok_and(|class| class == Ty::Float)
                 });
                 match literal {
+                    HirLiteral::Nil => self.none_value(expr),
                     HirLiteral::Int(value) if as_float =>
                     {
                         #[expect(clippy::cast_precision_loss)]
@@ -232,8 +254,23 @@ impl Emitter<'_> {
                 entries: None,
             } => {
                 let class = classify(self.types, *target)?;
+                if Self::is_none_literal(source) {
+                    return self.none_of(class);
+                }
                 let value = self.expr(source)?;
                 self.settle(value, class)
+            }
+            // `x is none` / `x not is none`.
+            HirExpressionKind::TypeCheck {
+                positive,
+                expr: subject,
+                ty,
+            } if matches!(
+                self.types.get(*ty),
+                radix_types::Type::Primitive(radix_types::Primitive::Nihil)
+            ) =>
+            {
+                self.none_test(*positive, subject)
             }
             HirExpressionKind::Field(base, name) => self.field_read(base, *name),
             HirExpressionKind::Call(callee, type_args, args, arm) => {
@@ -427,6 +464,11 @@ impl Emitter<'_> {
             Value::List(Elem::Bool) => "faber_list_bool *".to_owned(),
             Value::List(Elem::Float) => "faber_list_f64 *".to_owned(),
             Value::Float => "double ".to_owned(),
+            Value::Opt(inner) => match self.c_type(Ty::Opt(inner)) {
+                Ok(c_type) if c_type.ends_with('*') => c_type,
+                Ok(c_type) => format!("{c_type} "),
+                Err(_) => return String::new(),
+            },
             Value::Genus(def_id) => match self.c_type(Ty::Genus(def_id)) {
                 Ok(c_type) => c_type,
                 Err(_) => return String::new(),
@@ -570,6 +612,23 @@ impl Emitter<'_> {
         left: &HirExpression,
         right: &HirExpression,
     ) -> Result<Operand, CodegenError> {
+        // `x ≡ null` and `null ≡ x` test for none like `x is none`.
+        let equality = match op {
+            HirBinOp::Is | HirBinOp::Eq | HirBinOp::StrictEq => Some(true),
+            HirBinOp::IsNot | HirBinOp::NotEq | HirBinOp::StrictNotEq => Some(false),
+            _ => None,
+        };
+        if let Some(is_none) = equality {
+            if Self::is_none_literal(right) {
+                return self.none_test(is_none, left);
+            }
+            if Self::is_none_literal(left) {
+                return self.none_test(is_none, right);
+            }
+        }
+        if op == HirBinOp::Coalesce {
+            return self.coalesce(left, right);
+        }
         let l = self.expr(left)?;
         let r = self.expr(right)?;
         if l.value == Value::Float || r.value == Value::Float || op == HirBinOp::TrueDiv {
@@ -820,6 +879,15 @@ impl Emitter<'_> {
                 let at = c_string(&self.store_position(site))?;
                 Ok(self.store_sized(&value, width, &at))
             }
+            (Ty::Opt(slot), Value::Opt(inner)) if slot == inner => Ok(value),
+            (Ty::Opt(inner), form) if form == Value::from(inner.ty()) => {
+                Ok(self.some_value(&value, inner))
+            }
+            // An exact value stored into `int ∪ none` narrows to `int` first.
+            (Ty::Opt(inner), Value::Exact) if inner == Inner::Int => {
+                let narrowed = self.store(value, Ty::Int, site)?;
+                Ok(self.some_value(&narrowed, inner))
+            }
             _ => Err(unsupported("conversion between value classes")),
         }
     }
@@ -877,6 +945,14 @@ impl Emitter<'_> {
                 operand.effect = value.effect;
                 operand.stored = Some(class);
                 Ok(operand)
+            }
+            Ty::Opt(inner) if value.value != Value::Opt(inner) => {
+                let value = self.settle(value, inner.ty())?;
+                if value.value == Value::from(inner.ty()) {
+                    Ok(self.some_value(&value, inner))
+                } else {
+                    Ok(value)
+                }
             }
             _ => Ok(value),
         }

@@ -186,6 +186,21 @@ FABER_SIZED(u16, uint16_t, 0, UINT16_MAX)
 FABER_SIZED(u32, uint32_t, 0, UINT32_MAX)
 FABER_SIZED(u64, uint64_t, 0, UINT64_MAX)
 
+/* An optional scalar: the value and whether it is present. Text, lists and
+ * genera are pointers, so their none is NULL and they need no struct. */
+typedef struct faber_opt_i64 {
+    bool has;
+    int64_t value;
+} faber_opt_i64;
+typedef struct faber_opt_bool {
+    bool has;
+    bool value;
+} faber_opt_bool;
+typedef struct faber_opt_f64 {
+    bool has;
+    double value;
+} faber_opt_f64;
+
 /* ------------------------------------------------------------------------ */
 /* Floats                                                                   */
 /* ------------------------------------------------------------------------ */
