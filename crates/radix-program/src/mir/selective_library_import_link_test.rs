@@ -23,6 +23,9 @@ fn triple(int x) → int {
 fn bump(int x) → int {
     return x + 1
 }
+
+@ public
+const int BASE = 7
 "#;
 
 const SELECTIVE_MAIN: &str = r#"+++
@@ -43,6 +46,16 @@ import from "optlib:mathlib" const triple as thrice
 
 main {
     print thrice(5)
+}
+"#;
+
+const SELECTIVE_CONST_MAIN: &str = r#"+++
+locale = "en"
++++
+import from "optlib:mathlib" const BASE
+
+main {
+    print BASE
 }
 "#;
 
@@ -145,6 +158,9 @@ fn double(int x) → int {
 fn quad(int x) → int {
     return double(double(x))
 }
+
+@ public
+const int K = 7
 "#;
 
 const SIBLING_SELECTIVE_MAIN: &str = r#"+++
@@ -154,6 +170,16 @@ import from "./local" const quad
 
 main {
     print quad(3)
+}
+"#;
+
+const SIBLING_CONST_MAIN: &str = r#"+++
+locale = "en"
++++
+import from "./local" const K
+
+main {
+    print K
 }
 "#;
 
@@ -216,5 +242,25 @@ fn package_mir_links_aliased_selective_sibling_function_call() {
             |errors| panic!("aliased sibling selective import must link, got {errors:?}")
         ),
         vec!["20".to_owned()]
+    );
+}
+
+#[test]
+fn package_mir_links_selective_const_read_sibling() {
+    assert_eq!(
+        run_sibling_main("selective-link-sibling-const", SIBLING_CONST_MAIN).unwrap_or_else(
+            |errors| panic!("sibling selective const import must link, got {errors:?}")
+        ),
+        vec!["7".to_owned()]
+    );
+}
+
+#[test]
+fn package_mir_links_selective_const_read_library() {
+    assert_eq!(
+        run_selective_main("selective-link-library-const", SELECTIVE_CONST_MAIN).unwrap_or_else(
+            |errors| panic!("library selective const import must link, got {errors:?}")
+        ),
+        vec!["7".to_owned()]
     );
 }
