@@ -63,6 +63,15 @@ fn is_list_window(types: &TypeTable, expr: &HirExpression, target: Target) -> bo
     if !matches!(resolved(types, index_ty), Type::Intervallum(_)) {
         return false;
     }
+    // The Rust emitter copies the window of any list or bounded list.
+    if matches!(target, Target::HirRust)
+        && matches!(
+            resolved(types, object_ty),
+            Type::Array(_) | Type::BoundedArray { .. }
+        )
+    {
+        return false;
+    }
     match resolved(types, object_ty) {
         Type::Array(element) => {
             !(target_admits_byte_window(target)

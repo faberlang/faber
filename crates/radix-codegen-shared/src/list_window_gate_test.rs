@@ -63,12 +63,7 @@ fn list_window_is_rejected_by_name_on_a_source_target() {
     let list = types.array(int);
     let range = types.intervallum(int);
     let module = index_module(list, range);
-    for target in [
-        Target::HirRust,
-        Target::HirTypeScript,
-        Target::HirGo,
-        Target::MirWasm,
-    ] {
+    for target in [Target::HirTypeScript, Target::HirGo, Target::MirWasm] {
         let error = reject_list_window(&module, &types, target).expect_err("list window refused");
         assert_eq!(issue_of(&error), Some("list_window_unsupported_on_target"));
         assert!(
@@ -79,6 +74,16 @@ fn list_window_is_rejected_by_name_on_a_source_target() {
             "{target:?}: {error:?}"
         );
     }
+}
+
+#[test]
+fn list_window_is_admitted_by_the_rust_emitter() {
+    let mut types = TypeTable::new();
+    let int = types.primitive(Primitive::Numerus);
+    let list = types.array(int);
+    let range = types.intervallum(int);
+    let module = index_module(list, range);
+    reject_list_window(&module, &types, Target::HirRust).expect("rust copies the window");
 }
 
 #[test]

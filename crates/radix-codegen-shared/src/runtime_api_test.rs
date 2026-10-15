@@ -923,7 +923,7 @@ fn the_format_rows_spell_as_faber_format_functions_and_the_crate_root_fmt_type()
         .iter()
         .filter(|row| row.ns == Namespace::Format && row.targets.contains(&Target::HirRust))
         .collect();
-    assert_eq!(rows.len(), 9);
+    assert_eq!(rows.len(), 10);
     for row in rows {
         assert!(row.targets.contains(&Target::HirRust));
         let (kind, spelled) = if row.name == "Fmt" {
