@@ -308,7 +308,7 @@ fn runtime_call_names_gap() {
             kind: MirStatementKind::RuntimeCall {
                 destination: None,
                 call: MirRuntimeCall {
-                    intrinsic: MirIntrinsic::Assert,
+                    intrinsic: MirIntrinsic::ReadLine,
                     args: Vec::new(),
                     return_ty: ty(&types, Primitive::Vacuum),
                 },
@@ -324,7 +324,7 @@ fn runtime_call_names_gap() {
 
     let verdict = classify_with_types(&program, &types);
     assert_eq!(verdict.gaps().len(), 1);
-    assert_eq!(verdict.gaps()[0].shape(), "runtime call Assert");
+    assert_eq!(verdict.gaps()[0].shape(), "runtime call ReadLine");
 }
 
 #[test]
