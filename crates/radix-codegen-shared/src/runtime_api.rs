@@ -635,6 +635,7 @@ const fn format_row(
 /// into a bounded cell.
 pub const FORMAT_FMT: RuntimeItem = format_row("Fmt", RuntimeKind::Type, FORMAT_RUST);
 pub const FORMAT_SPEC: RuntimeItem = format_row("Spec", RuntimeKind::Type, FORMAT_GO);
+pub const FORMAT_DECIMAL: RuntimeItem = format_row("decimal", RuntimeKind::Fn, FORMAT_RUST);
 pub const FORMAT_FLOAT: RuntimeItem = format_row("float", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
 pub const FORMAT_INSTANS: RuntimeItem = format_row("instans", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
 pub const FORMAT_INT: RuntimeItem = format_row("int", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
@@ -1260,6 +1261,7 @@ pub const TABLE: &[RuntimeItem] = &[
     INF_CLAMP,
     FORMAT_FMT,
     FORMAT_SPEC,
+    FORMAT_DECIMAL,
     FORMAT_FLOAT,
     FORMAT_INSTANS,
     FORMAT_INT,
