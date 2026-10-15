@@ -748,6 +748,13 @@ impl FunctionBuilder<'_> {
             return None;
         };
 
+        // Q-X10: the zero-arg generic `grid.formata<T>()` shares
+        // `TensorReshape` with the one-arg `grid.forma(shape)` method but
+        // carries no value argument; its shape comes from the result type.
+        if op == MirCollectionOp::TensorReshape && args.is_empty() {
+            return self.lower_tensor_formata(receiver, expr);
+        }
+
         let mut lowered_receiver = self.lower_expr_value(receiver)?;
         let expr_ty = self.expr_ty(expr)?;
         // A bounded textus slices as its initialized prefix: widen it to the
@@ -4610,6 +4617,30 @@ impl FunctionBuilder<'_> {
         };
 
         Some(self.construct_temp(MirAggregateKind::Array, MirAggregateFields::Ordered(fields), shape_ty, span))
+    }
+
+    /// Lower the zero-arg generic `grid.formata<T>()` tensor view onto the
+    /// runtime `tensor_reshape` call (Q-X10). The call's result type is the
+    /// complete tensor type named by the type argument, so the receiver's
+    /// literal extents lower to the `lista<numerus>` shape operand the runner
+    /// expects; the one-arg `forma(shape)` method shares the op and keeps its
+    /// existing path.
+    fn lower_tensor_formata(&mut self, receiver: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
+        let receiver_value = self.lower_expr_value(receiver)?;
+        let expr_ty = self.expr_ty(expr)?;
+        let shape = self.lower_lista_to_tensor_shape_with_expression(
+            receiver_value.clone(),
+            expr_ty.semantic_id(),
+            None,
+            expr.span,
+            false,
+        )?;
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorReshape),
+            vec![receiver_value, shape],
+            expr_ty,
+            expr.span,
+        ))
     }
 
     fn lower_handled_conversio(&mut self, request: HandledConversio<'_>) -> MirOperand {
