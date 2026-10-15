@@ -791,6 +791,39 @@ impl Emitter<'_> {
         Ok(Operand::new(wrap(&prelude, &call), Value::Decimal).with_effect(effect))
     }
 
+    /// `x ∈ xs` / `x ∉ xs`: the list family's `contains`, with the member on
+    /// the value side. `left_is_list` says which operand is the collection.
+    fn list_membership(
+        &mut self,
+        negated: bool,
+        list_elem: Elem,
+        left_is_list: bool,
+        l: Operand,
+        r: Operand,
+    ) -> Result<Operand, CodegenError> {
+        let effect = l.effect || r.effect;
+        let mut operands = [l, r];
+        let prelude = self.sequence(&mut operands);
+        let [l, r] = operands;
+        let (list, member) = if left_is_list { (l, r) } else { (r, l) };
+        if member.value != Value::from(list_elem.ty()) {
+            return Err(unsupported("membership of a value of another element class"));
+        }
+        self.need_class(Ty::List(list_elem));
+        let call = format!(
+            "(faber_list_{}_contains({}, {}))",
+            list_elem.suffix(),
+            list.text,
+            member.text
+        );
+        let text = if negated {
+            format!("(!{call})")
+        } else {
+            call
+        };
+        Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect))
+    }
+
     /// The element kind of a list-typed expression, if it is one.
     fn list_element(&self, ty: Option<radix_types::TypeId>) -> Option<Elem> {
         match classify(self.types, ty?).ok()? {
@@ -813,6 +846,17 @@ impl Emitter<'_> {
     ) -> Result<Operand, CodegenError> {
         let left_elem = self.list_element(left.ty);
         let right_elem = self.list_element(right.ty);
+        // `x ∈ xs` / `x ∉ xs`: membership is the list family's `contains`, with
+        // the member on the value side. The list element class picks the
+        // family, so this runs before the numeric-only lift restriction.
+        if matches!(op, HirBinOp::Between | HirBinOp::NotBetween) {
+            let (list_elem, left_is_list) = match (left_elem, right_elem) {
+                (Some(elem), None) => (elem, true),
+                (None, Some(elem)) => (elem, false),
+                _ => return Err(unsupported("membership without one list operand")),
+            };
+            return self.list_membership(op == HirBinOp::NotBetween, list_elem, left_is_list, l, r);
+        }
         let Some(elem) = left_elem.or(right_elem) else {
             return Err(unsupported("elementwise operator without a list operand"));
         };

@@ -90,3 +90,13 @@ fn a_u64_list_element_reads_back_exact() {
     assert!(code.contains("faber_list_u64_get("), "{code}");
     assert!(code.contains("faber_opt_u64"), "{code}");
 }
+
+#[test]
+fn membership_is_the_list_family_contains() {
+    let code = emitted(
+        "main {\n    let string c ← \"agens\"\n    if c ∈ [\"pendens\", \"agens\"] {\n        print \"in\"\n    }\n    if 21 ∉ [18, 21] {\n        print \"out\"\n    }\n}",
+    );
+    assert!(code.contains("faber_list_text_contains("), "{code}");
+    assert!(code.contains("faber_list_i64_contains("), "{code}");
+    assert!(code.contains("(!(faber_list_i64_contains("), "{code}");
+}
