@@ -26,6 +26,8 @@
 //!   Compound conditions are conservative (nn-u2): `x non est nihil et …`
 //!   narrows the taken branch only (the conjunction requires the left
 //!   null-check conjunct), while `or` and non-`and` shapes never narrow.
+//!   A genus-field path (`g.nomen`) narrows inside a branch body only; joins
+//!   and the implicit fallthrough conservatively drop field facts.
 //! - U1R generalizes the seam to nominal member tests: `r est M` narrows the
 //!   taken branch to `M` and the fallthrough to the union minus `M` (`non est
 //!   M` mirrors), on immutable bindings only (varia refinement is open row 2).
