@@ -1649,6 +1649,18 @@ main {
 }
 
 #[test]
+fn verum_fac_dum_tail_return_lowers_valid_mir() {
+    // `fac { ... } dum verum` is the do-while spelling of `while true`: the
+    // loop never exits through its synthesized test, so the after-block is
+    // dead. The implicit function return must not land there, or a
+    // value-returning function fails MIR validation.
+    let dump = dump_source(
+        r"functio f() → numerus { varia numerus i ← 0 fac { i ← i + 1 si i ≡ 4 ergo redde i * 10 } dum verum } incipit { nota f() }",
+    );
+    assert!(dump.contains("bb0:"), "valid MIR must be emitted:\n{dump}");
+}
+
+#[test]
 fn lowers_rumpe_inside_fac_to_breakable_exit() {
     let dump = dump_source("functio exemplo() → numerus { fac { rumpe } cape err { redde 0 } redde 1 }");
     // WHY: the entry block must reach the after-block via the rumpe goto edge,
