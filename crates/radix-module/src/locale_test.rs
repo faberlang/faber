@@ -2683,6 +2683,92 @@ fn installed_packs_render_parse002_range_and_json_rows() {
     }
 }
 
+/// The two `@ nucleum` rows and the two parser-budget rows (corpus coverage I3,
+/// batch 6) are owned and rendered by every installed pack, with the
+/// placeholders each template names. The absent-row budget gate counts missing
+/// rows, so it would accept a pack that deletes one of these and adds an
+/// unrelated row elsewhere; name each row here so a deletion fails by name.
+///
+/// `nesting_too_deep` is emitted under the grammar area of the nesting site, so
+/// the same slug is owned under PARSE020, PARSE030 and PARSE040; this test
+/// names only the PARSE020 statement-area row.
+#[test]
+fn installed_packs_render_parse018_nucleum_and_depth_rows() {
+    const ROWS: &[(ParseErrorKind, &str, &str, &[(&str, &str)])] = &[
+        (ParseErrorKind::AnnotationInvalid, "PARSE018", "duplicate_nucleum", &[]),
+        (
+            ParseErrorKind::AnnotationInvalid,
+            "PARSE018",
+            "nucleum_fragment_conflicts_with_fragment",
+            &[],
+        ),
+        (
+            ParseErrorKind::StatementInvalid,
+            "PARSE020",
+            "nesting_too_deep",
+            &[("limit", "256")],
+        ),
+        (
+            ParseErrorKind::ExpressionInvalid,
+            "PARSE030",
+            "expression_too_long",
+            &[("limit", "256")],
+        ),
+    ];
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let owned = owned_pack(locale);
+        for &(kind, code, issue, args) in ROWS {
+            let row = owned
+                .diagnostics
+                .get(code)
+                .and_then(|template| template.issues.get(issue))
+                .unwrap_or_else(|| panic!("{locale} must own {code}.{issue}"));
+            assert!(
+                !row.message.trim().is_empty(),
+                "{locale} {code}.{issue} message must not be empty"
+            );
+            assert!(
+                row.help
+                    .as_deref()
+                    .is_some_and(|help| !help.trim().is_empty()),
+                "{locale} {code}.{issue} help must not be empty"
+            );
+            let mut diagnostic_args = vec![diagnostic_arg("issue", issue)];
+            diagnostic_args.extend(
+                args.iter()
+                    .map(|(name, value)| diagnostic_arg(name, *value)),
+            );
+            let diagnostic = parse_diagnostic(kind, diagnostic_args);
+            assert_eq!(
+                diagnostic.code,
+                Some(code),
+                "{locale} {code}.{issue} emission code must match the owned row"
+            );
+            let rendered = installed_pack(locale)
+                .render_diagnostic_text(&diagnostic)
+                .unwrap_or_else(|err| panic!("{locale} {code}.{issue} template should render: {err:?}"))
+                .unwrap_or_else(|| panic!("{locale} {code} row should exist"));
+            assert!(
+                !rendered.message.contains("locale pack missing row"),
+                "{locale} {code}.{issue}: {}",
+                rendered.message
+            );
+            assert!(
+                !rendered
+                    .message
+                    .contains("locale pack template missing placeholder")
+                    && !rendered
+                        .help
+                        .as_deref()
+                        .is_some_and(|help| help.contains("locale pack template missing placeholder")),
+                "{locale} {code}.{issue} must not miss a template placeholder: {} / {:?}",
+                rendered.message,
+                rendered.help
+            );
+        }
+    }
+}
+
 /// Assert every installed pack owns `code.issue` and renders it with its own
 /// spellings of the named keyword identities.
 fn assert_every_installed_pack_renders_issue(kind: ParseErrorKind, code: &str, issue: &str, keywords: &[&str]) {

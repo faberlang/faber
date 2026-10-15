@@ -692,6 +692,14 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "annotation `@ {annotation}` इस reader surface पर घोषित नहीं है"
 help = "इस फ़ाइल की reader locale के लिए `@ {expected}` का उपयोग करें"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum]
+message = "एक घोषणा में एक से अधिक `@ nucleum` annotation हैं"
+help = "एक ही nucleum annotation रखें"
+
+[diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
+message = "`@ nucleum` fragment ग्राफ़िक्स fragment annotation से टकराता है"
+help = "fragment annotation में से एक हटाएं"
+
 [diagnostics.PARSE019]
 message = "दोहराया गया modifier"
 help = "duplicate modifier हटाएं"
@@ -715,6 +723,10 @@ help = "विषयों को '{et}' से अलग करें"
 [diagnostics.PARSE020.issues.discerne_subject_not_path]
 message = "'{discerne}' का विषय एक नाम या सदस्य पथ होना चाहिए"
 help = "पहले मान को किसी नाम से बाँधें, फिर उसी नाम पर '{discerne}' करें"
+
+[diagnostics.PARSE020.issues.nesting_too_deep]
+message = "स्रोत parser की सीमा {limit} से अधिक गहराई तक नेस्ट है"
+help = "निर्माण को नामित बाइंडिंग में विभाजित करें"
 
 [diagnostics.PARSE021]
 message = "शर्त गायब है"
@@ -795,6 +807,10 @@ help = "∴ के बाद संक्षिप्त closure body को {fa
 [diagnostics.PARSE030.issues.closure_fac_body_dum]
 message = "closure fac body में 'dum' उपयोग नहीं कर सकते"
 help = "closure fac bodies से dum हटाएं"
+
+[diagnostics.PARSE030.issues.expression_too_long]
+message = "अभिव्यक्ति parser की {limit} operator सीमा से अधिक है"
+help = "अभिव्यक्ति को नामित बाइंडिंग में विभाजित करें"
 
 [diagnostics.PARSE031]
 message = "अमान्य literal"

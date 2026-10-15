@@ -692,6 +692,14 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "annotation `@ {annotation}` ไม่ได้ประกาศในพื้นผิว reader นี้"
 help = "ใช้ `@ {expected}` สำหรับ locale ของไฟล์นี้"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum]
+message = "การประกาศมี annotation `@ nucleum` มากกว่าหนึ่งรายการ"
+help = "เก็บ annotation nucleum ไว้เพียงรายการเดียว"
+
+[diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
+message = "fragment `@ nucleum` ขัดแย้งกับ graphics fragment annotation"
+help = "ลบ fragment annotation รายการใดรายการหนึ่ง"
+
 [diagnostics.PARSE019]
 message = "modifier ซ้ำ"
 help = "ลบ modifier ที่ซ้ำ"
@@ -715,6 +723,10 @@ help = "คั่นหัวข้อด้วย '{et}'"
 [diagnostics.PARSE020.issues.discerne_subject_not_path]
 message = "หัวข้อของ '{discerne}' ต้องเป็นชื่อหรือเส้นทางสมาชิก"
 help = "ผูกค่ากับชื่อก่อน แล้วใช้ '{discerne}' กับชื่อนั้น"
+
+[diagnostics.PARSE020.issues.nesting_too_deep]
+message = "ซอร์สซ้อนลึกเกินขีดจำกัดของ parser ที่ {limit}"
+help = "แยกโครงสร้างออกเป็น binding ที่มีชื่อ"
 
 [diagnostics.PARSE021]
 message = "ขาดเงื่อนไข"
@@ -795,6 +807,10 @@ help = "เขียนบอดี clausura แบบย่อหลัง ∴ 
 [diagnostics.PARSE030.issues.closure_fac_body_dum]
 message = "บอดี fac ของ clausura ใช้ 'dum' ไม่ได้"
 help = "ลบ dum จากบอดี fac ของ clausura"
+
+[diagnostics.PARSE030.issues.expression_too_long]
+message = "นิพจน์เกินขีดจำกัด operator ของ parser ที่ {limit}"
+help = "แยกนิพจน์ออกเป็น binding ที่มีชื่อ"
 
 [diagnostics.PARSE031]
 message = "ลิเทอรัลไม่ถูกต้อง"

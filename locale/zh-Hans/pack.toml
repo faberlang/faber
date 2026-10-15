@@ -736,6 +736,14 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "注解 `@ {annotation}` 未在此读取器表面声明"
 help = "对该文件的读取器语言环境使用 `@ {expected}`"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum]
+message = "一个声明携带了多个 `@ nucleum` annotation"
+help = "只保留一个 nucleum annotation"
+
+[diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
+message = "`@ nucleum` fragment 与图形 fragment annotation 冲突"
+help = "移除其中一个 fragment annotation"
+
 [diagnostics.PARSE019]
 message = "重复修饰符"
 help = "删除重复的修饰符"
@@ -759,6 +767,10 @@ help = "用 '{et}' 分隔主体"
 [diagnostics.PARSE020.issues.discerne_subject_not_path]
 message = "'{discerne}' 的主体必须是名称或成员路径"
 help = "先将该值绑定到一个名称，再对该名称使用 '{discerne}'"
+
+[diagnostics.PARSE020.issues.nesting_too_deep]
+message = "源代码嵌套深度超过解析器上限 {limit}"
+help = "将该构造拆分为具名绑定"
 
 [diagnostics.PARSE021]
 message = "缺少条件"
@@ -839,6 +851,10 @@ help = "把 ∴ 后的 compact closure body 写成 {fac_body}"
 [diagnostics.PARSE030.issues.closure_fac_body_dum]
 message = "closure fac body 不能使用 'dum'"
 help = "从 closure fac bodies 中移除 dum"
+
+[diagnostics.PARSE030.issues.expression_too_long]
+message = "表达式超过解析器的 {limit} 个运算符上限"
+help = "将表达式拆分为具名绑定"
 
 [diagnostics.PARSE031]
 message = "无效字面量"
