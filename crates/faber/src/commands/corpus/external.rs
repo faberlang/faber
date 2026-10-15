@@ -465,6 +465,10 @@ fn run_case(
         artifact: &artifact,
     };
     let emitting = Instant::now();
+    // Binary emit (the `clif` object): the API output carries bytes the text
+    // channel cannot, so they travel here and replace the text on write.
+    #[allow(unused_mut)]
+    let mut object_bytes: Option<Vec<u8>> = None;
     let api_target = (!matches!(mode, "mir") && case.input.is_file())
         .then(|| external_target(target))
         .flatten();
@@ -481,7 +485,13 @@ fn run_case(
             .collect::<Vec<_>>()
             .join(" | ");
         let emitted_code = match compilation.output {
-            Some(output) => radix::services::output_code(output),
+            Some(output) => {
+                #[cfg(feature = "mir-clif")]
+                if let radix::module::Output::ClifObject(object) = &output {
+                    object_bytes = Some(object.bytes.clone());
+                }
+                radix::services::output_code(output)
+            }
             None => {
                 let (status, reason) = judge_api_emit_failure(case, &diagnostics);
                 let mut row = result(case, target, status, "emit", reason, None, started);
@@ -573,7 +583,8 @@ fn run_case(
     } else {
         emitted_code
     };
-    if let Err(error) = prepare_files(recipe, &paths, emitted_code.as_bytes()) {
+    let emitted_bytes = object_bytes.unwrap_or_else(|| emitted_code.clone().into_bytes());
+    if let Err(error) = prepare_files(recipe, &paths, &emitted_bytes) {
         return result(case, target, "fail", "setup", Some(error), None, started);
     }
     let mut row = result(case, target, "fail", "build", None, None, started);
@@ -664,6 +675,7 @@ fn external_target(target: &str) -> Option<radix::module::Target> {
         "swift" => Target::HirSwift,
         "wasm" => Target::MirWasm,
         "llvm" => Target::MirLlvm,
+        "clif" => Target::MirClif,
         "sexp" => Target::MirSexp,
         _ => return None,
     })

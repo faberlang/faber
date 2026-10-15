@@ -35,6 +35,8 @@ mod binding_manifest;
 mod binding_probe;
 #[cfg(feature = "hir-rust")]
 mod cargo;
+#[cfg(feature = "mir-clif")]
+pub(crate) mod clif_build;
 mod cmd;
 pub(crate) mod composite_plan;
 #[cfg(feature = "device-runtime")]
@@ -204,6 +206,7 @@ fn is_mir_backed_target(target: Target) -> bool {
             | Target::MirWasm
             | Target::MirLlvm
             | Target::MirLlvmHost
+            | Target::MirClif
             | Target::MirMetal
             | Target::MirWgsl
             | Target::MirSexp

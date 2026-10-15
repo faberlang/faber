@@ -17,12 +17,10 @@ cranelift-module = "=0.136.2"
 cranelift-native = "=0.136.2"
 cranelift-object = "=0.136.2"
 radix-hir = { path = "../radix-hir" }
+radix-lexer = { path = "../radix-lexer" }
 radix-mir = { path = "../radix-mir" }
 radix-types = { path = "../radix-types" }
 rustc-hash = "2"
-
-[dev-dependencies]
-radix-lexer = { path = "../radix-lexer" }
 
 [lints]
 workspace = true

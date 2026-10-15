@@ -82,6 +82,11 @@ pub enum Target {
     /// orchestration. Driver generation uses the same MIR-to-LLVM emitter.
     MirLlvmHost,
 
+    /// Public Cranelift native-object target (`faber build --target clif`).
+    /// Emits a relocatable object for the host triple; Faber owns the link
+    /// step against the `runtime/clif` archive.
+    MirClif,
+
     /// AMD GPU via the AMDGPU/HIP LLVM emitter family.
     ///
     /// Internal variant on the `mir-llvm` emit surface — not a discoverable
@@ -154,6 +159,7 @@ impl Target {
             Target::MirWasm => "wasm-text",
             Target::MirLlvm => "llvm-text",
             Target::MirLlvmHost => "llvm-host",
+            Target::MirClif => "clif",
             Target::MirAmd => "amd",
             Target::MirMetal => "metal-text",
             Target::MirWgsl => "wgsl-text",
@@ -208,6 +214,7 @@ impl Target {
             Target::HirFhir => &["fhir"],
             Target::MirWasm => &["wasm", "wasm-text", "wat"],
             Target::MirLlvm | Target::MirLlvmHost => &["llvm", "llvm-host", "llvm-text"],
+            Target::MirClif => &["clif", "cranelift"],
             Target::MirMetal => &["metal", "metal-text"],
             Target::MirAmd => &["amd"],
             Target::MirWgsl => &["wgsl", "wgsl-text"],
@@ -248,6 +255,7 @@ impl Target {
         Target::MirWasm,
         Target::MirLlvm,
         Target::MirLlvmHost,
+        Target::MirClif,
         Target::MirAmd,
         Target::MirMetal,
         Target::MirWgsl,
@@ -303,6 +311,7 @@ impl Target {
             Target::MirWasm => Some("mir-wasm"),
             Target::MirWgsl => Some("mir-wgsl"),
             Target::MirLlvm | Target::MirLlvmHost => Some("mir-llvm"),
+            Target::MirClif => Some("mir-clif"),
             // Ungated variants, named (no `_`) so a future variant without
             // arms here is a compile error, never a silent `None`.
             Target::MirStepper
@@ -340,6 +349,7 @@ impl Target {
             Target::MirWasm => cfg!(feature = "mir-wasm"),
             Target::MirWgsl => cfg!(feature = "mir-wgsl"),
             Target::MirLlvm | Target::MirLlvmHost => cfg!(feature = "mir-llvm"),
+            Target::MirClif => cfg!(feature = "mir-clif"),
             // Ungated variants, named (no `_`) so a future variant without
             // arms here is a compile error, never a silent `true`.
             Target::MirStepper
@@ -378,6 +388,7 @@ impl Target {
             | Target::MirWasm
             | Target::MirLlvm
             | Target::MirLlvmHost
+            | Target::MirClif
             | Target::MirAmd
             | Target::MirMetal
             | Target::MirWgsl

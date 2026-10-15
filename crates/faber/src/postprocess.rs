@@ -180,6 +180,7 @@ pub fn format_generated_code(target: Target, code: &str) -> Result<String, Strin
         | Target::MirWasm
         | Target::MirLlvm
         | Target::MirLlvmHost
+        | Target::MirClif
         | Target::MirMetal
         | Target::MirWgsl
         | Target::MirSexp
@@ -217,6 +218,7 @@ pub fn lint_generated_code(target: Target, code: &str) -> Result<String, String>
         | Target::MirWasm
         | Target::MirLlvm
         | Target::MirLlvmHost
+        | Target::MirClif
         | Target::MirMetal
         | Target::MirWgsl
         | Target::MirSexp

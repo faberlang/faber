@@ -134,6 +134,10 @@ pub enum FaberCliTarget {
     #[value(name = "llvm-host")]
     MirLlvmHost,
 
+    /// Public Cranelift native object (host triple); `faber build --target clif` links it.
+    #[value(name = "clif", alias = "cranelift")]
+    MirClif,
+
     /// Legacy source-backed MIR package artifact runtime.
     #[value(name = "scena", hide = true)]
     MirScena,
@@ -180,6 +184,7 @@ impl FaberCliTarget {
             FaberCliTarget::HirSwift => Target::HirSwift,
             FaberCliTarget::HirFhir => Target::HirFhir,
             FaberCliTarget::MirLlvmHost => Target::MirLlvmHost,
+            FaberCliTarget::MirClif => Target::MirClif,
             FaberCliTarget::MirScena => Target::MirScena,
             FaberCliTarget::MirFmir => Target::MirFmir,
             FaberCliTarget::MirFmirBinary => Target::MirFmirBinary,
