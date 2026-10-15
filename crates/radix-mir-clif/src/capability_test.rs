@@ -192,12 +192,15 @@ fn littera_is_capable_and_a_map_of_letters_names_gap() {
 #[test]
 fn gaps_keep_storage_order() {
     let mut types = TypeTable::new();
-    let instans = ty(&types, Primitive::Instans);
     let numerus_id = types.primitive(Primitive::Numerus);
     let queue = MirType::semantic(types.intern(radix_types::Type::Queue(numerus_id)));
+    let policy = MirType::semantic(types.intern(radix_types::Type::PolicyFloat(
+        radix_types::FloatPolicy::Trapping,
+        radix_types::NumericWidth::F64,
+    )));
     let program = single_function(FunctionShape {
-        params: vec![param(0, instans)],
-        locals: vec![local(1, queue)],
+        params: vec![param(0, queue)],
+        locals: vec![local(1, policy)],
         temps: Vec::new(),
         statements: Vec::new(),
         terminator: MirTerminatorKind::Return(None),
@@ -210,8 +213,12 @@ fn gaps_keep_storage_order() {
     let verdict = classify_with_types(&program, &types);
     let gaps = verdict.gaps();
     assert_eq!(gaps.len(), 2, "two gaps expected: {gaps:?}");
-    assert_eq!(gaps[0].shape(), "instans value", "param walks before local");
-    assert_eq!(gaps[1].shape(), "collection value");
+    assert_eq!(
+        gaps[0].shape(),
+        "collection value",
+        "param walks before local"
+    );
+    assert_eq!(gaps[1].shape(), "policy float value");
 }
 
 #[test]

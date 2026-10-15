@@ -15,6 +15,7 @@
 
 mod dec;
 mod inf;
+mod ins;
 #[allow(dead_code, clippy::all, clippy::pedantic)]
 #[path = "../../rust/src/magnus.rs"]
 mod magnus;
@@ -316,6 +317,7 @@ const TAG_MATCH: i32 = 13;
 const TAG_REGEX: i32 = 14;
 const TAG_DEC: i32 = 15;
 const TAG_INF: i32 = 16;
+const TAG_INS: i32 = 17;
 
 /// A runtime map (`set` false) or set (`set` true): tagged key/value entries
 /// in insertion order.
@@ -372,6 +374,7 @@ fn element_text(tag: i32, bits: i64) -> String {
         ),
         TAG_DEC => unsafe { dec::text(bits as *const u8) },
         TAG_INF => unsafe { inf::text(bits as *const u8) },
+        TAG_INS => unsafe { ins::text(bits as *const u8) },
         TAG_MATCH => regex_rt::match_element_text(bits),
         TAG_REGEX => regex_rt::regex_element_text(bits),
         TAG_LIST => list_text(unsafe { list_ref(bits as *const List) }),
@@ -917,6 +920,7 @@ fn element_equal(tag: i32, left: i64, right: i64) -> bool {
         },
         TAG_DEC => unsafe { dec::order(left as *const u8, right as *const u8) }.is_eq(),
         TAG_INF => unsafe { inf::order(left as *const u8, right as *const u8) }.is_eq(),
+        TAG_INS => unsafe { ins::order(left as *const u8, right as *const u8) }.is_eq(),
         TAG_MATCH => regex_rt::match_element_equal(left, right),
         TAG_REGEX => regex_rt::regex_element_equal(left, right),
         TAG_STRUCT => unsafe {
@@ -998,6 +1002,7 @@ fn element_order(tag: i32, left: i64, right: i64) -> std::cmp::Ordering {
         },
         TAG_DEC => unsafe { dec::order(left as *const u8, right as *const u8) },
         TAG_INF => unsafe { inf::order(left as *const u8, right as *const u8) },
+        TAG_INS => unsafe { ins::order(left as *const u8, right as *const u8) },
         TAG_BITS..=7 => {
             u64::from_ne_bytes(left.to_ne_bytes()).cmp(&u64::from_ne_bytes(right.to_ne_bytes()))
         }

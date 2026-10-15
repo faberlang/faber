@@ -46,6 +46,8 @@ pub(crate) enum Num {
     Dyn,
     /// An unbounded integer behind a handle.
     Inf,
+    /// An instant at a precision code (0 s, 1 ms, 2 us, 3 ns).
+    Ins(i64),
     /// The absent value.
     Nil,
     Bits(BitsWidth),
@@ -71,6 +73,17 @@ fn int_kind(table: &TypeTable, id: TypeId) -> Option<IntKind> {
 
 /// The cell kind of `id` when it takes part in a numeric conversion.
 fn num_of(table: &TypeTable, id: TypeId) -> Option<Num> {
+    match resolve(table, id) {
+        Type::Primitive(Primitive::Instans) => return Some(Num::Ins(0)),
+        Type::SizedInstans(precision) => {
+            return Some(Num::Ins(match precision {
+                radix_types::InstansPrecision::Millis => 1,
+                radix_types::InstansPrecision::Micros => 2,
+                radix_types::InstansPrecision::Nanos => 3,
+            }));
+        }
+        _ => {}
+    }
     if matches!(
         resolve(table, id),
         Type::SizedNumeric(Primitive::Numerus, NumericWidth::Inf)
@@ -181,6 +194,10 @@ pub(crate) fn numeric_conversion(
         (Num::Dyn, Num::Float(width)) => width == NumericWidth::F64,
         (Num::Dyn, Num::Bool | Num::Text) => true,
         (Num::Nil, Num::Dyn) => true,
+        // An instant parses from text, reads an epoch integer, changes
+        // precision, and boxes into and unboxes from open data.
+        (Num::Text | Num::Ins(_) | Num::Dyn, Num::Ins(_)) | (Num::Ins(_), Num::Dyn) => true,
+        (Num::Int(from), Num::Ins(_)) => from.policy == IntPolicy::Trap && carrier_exact(from),
         // An inf takes any carried integer and narrows with a range check; open
         // data boxes it and unboxes an integer or inf payload.
         (Num::Int(from), Num::Inf) => from.policy == IntPolicy::Trap && carrier_exact(from),
@@ -518,9 +535,10 @@ impl FunctionLower<'_, '_> {
         value: Value,
         variable: Variable,
     ) -> Lowered<()> {
-        let recovery = match &conversion.recovery {
-            Some(operand) => Some(self.scalar(operand)?),
-            None => None,
+        let region = self.recovery_region(conversion);
+        let recovery = match (&conversion.recovery, region) {
+            (Some(operand), None) => Some(self.scalar(operand)?),
+            _ => None,
         };
         let (converted, failed) = self.numeric_value(plan, conversion, value)?;
         let want = match plan.target {
@@ -533,6 +551,7 @@ impl FunctionLower<'_, '_> {
             Num::Dec => Rep::Dec,
             Num::Dyn => Rep::Opt,
             Num::Inf => Rep::Inf,
+            Num::Ins(_) => Rep::Ins,
             Num::Nil => return Err(Decline::new("conversion to the absent value")),
             Num::Text if plan.source == Num::Dyn => Rep::Text,
             Num::Text => return Err(Decline::new("text conversion target")),
@@ -546,10 +565,22 @@ impl FunctionLower<'_, '_> {
                 let truthy = self.builder.ins().iconst(types::I8, 1);
                 self.builder.ins().select(converted, truthy, default)
             }
-            (failed, recovery) => self.finish_conversion(converted, failed, recovery, want)?,
+            (failed, recovery) => {
+                self.finish_conversion(converted, failed, recovery, want, region)?
+            }
         };
         self.builder.def_var(variable, converted);
         Ok(())
+    }
+
+    /// The recovery region a conversion falls into on failure, when its `⊥`
+    /// fallback is a side-effecting region rather than a value in hand.
+    fn recovery_region(&self, conversion: &MirConversion) -> Option<cranelift_codegen::ir::Block> {
+        let Some(MirOperand::Temp(id)) = &conversion.recovery else {
+            return None;
+        };
+        let entry = self.recovery_regions.get(id)?;
+        self.blocks.get(entry).copied()
     }
 
     /// Apply a conversion's failure: the `⊥` default replaces the value, and
@@ -560,7 +591,15 @@ impl FunctionLower<'_, '_> {
         failed: Option<(Value, Failure)>,
         recovery: Option<(Value, Rep)>,
         want: Rep,
+        region: Option<cranelift_codegen::ir::Block>,
     ) -> Lowered<Value> {
+        if let (Some(region), Some((failed, _))) = (region, &failed) {
+            // The fallback runs as its own blocks and stores the destination.
+            let next = self.builder.create_block();
+            self.builder.ins().brif(*failed, region, &[], next, &[]);
+            self.builder.switch_to_block(next);
+            return Ok(converted);
+        }
         Ok(match (failed, recovery) {
             (Some((failed, _)), Some((default, rep))) => {
                 let default = self.coerce(default, rep, want)?;
@@ -582,9 +621,10 @@ impl FunctionLower<'_, '_> {
         value: Value,
         variable: Variable,
     ) -> Lowered<()> {
-        let recovery = match &conversion.recovery {
-            Some(operand) => Some(self.scalar(operand)?),
-            None => None,
+        let region = self.recovery_region(conversion);
+        let recovery = match (&conversion.recovery, region) {
+            (Some(operand), None) => Some(self.scalar(operand)?),
+            _ => None,
         };
         let (converted, failed, want) = match plan {
             Seq::ToSet => (
@@ -787,7 +827,7 @@ impl FunctionLower<'_, '_> {
                 (copied, failed, Rep::List)
             }
         };
-        let converted = self.finish_conversion(converted, failed, recovery, want)?;
+        let converted = self.finish_conversion(converted, failed, recovery, want, region)?;
         self.builder.def_var(variable, converted);
         Ok(())
     }
@@ -856,7 +896,9 @@ impl FunctionLower<'_, '_> {
                 };
                 (self.wrap_some(value, rep)?, None)
             }
-            (Num::Dyn, target) if target != Num::Inf => {
+            (Num::Dyn, target)
+                if matches!(target, Num::Int(_) | Num::Float(_) | Num::Bool | Num::Text) =>
+            {
                 let (tag, rep, label) = match target {
                     Num::Int(_) => (abi::TAG_INT, Rep::Int, "numerus"),
                     Num::Float(_) => (abi::TAG_FLOAT, Rep::Float, "fractus"),
@@ -890,6 +932,56 @@ impl FunctionLower<'_, '_> {
                 (extracted, Some((failed, Failure::Static(message))))
             }
             (Num::Nil, Num::Dyn) => (value, None),
+            (Num::Text, Num::Ins(code)) => {
+                let code = self.builder.ins().iconst(types::I32, code);
+                let instant = self
+                    .call_runtime(&abi::INS_PARSE, &[value, code])?
+                    .ok_or_else(|| Decline::new("instant result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, instant, zero);
+                (
+                    instant,
+                    Some((
+                        failed,
+                        Failure::Static("textus to instans conversion failed"),
+                    )),
+                )
+            }
+            (Num::Int(_), Num::Ins(code)) => {
+                let code = self.builder.ins().iconst(types::I32, code);
+                let instant = self
+                    .call_runtime(&abi::INS_FROM_EPOCH, &[value, code])?
+                    .ok_or_else(|| Decline::new("instant result"))?;
+                (instant, None)
+            }
+            (Num::Ins(_), Num::Ins(code)) => {
+                let code = self.builder.ins().iconst(types::I32, code);
+                let instant = self
+                    .call_runtime(&abi::INS_RETAG, &[value, code])?
+                    .ok_or_else(|| Decline::new("instant result"))?;
+                (instant, None)
+            }
+            (Num::Ins(_), Num::Dyn) => {
+                let boxed = self
+                    .call_runtime(&abi::INS_BOX, &[value])?
+                    .ok_or_else(|| Decline::new("open data result"))?;
+                (boxed, None)
+            }
+            (Num::Dyn, Num::Ins(code)) => {
+                let code = self.builder.ins().iconst(types::I32, code);
+                let instant = self
+                    .call_runtime(&abi::INS_UNBOX, &[value, code])?
+                    .ok_or_else(|| Decline::new("instant result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, instant, zero);
+                (
+                    instant,
+                    Some((
+                        failed,
+                        Failure::Static("valor to instans conversion failed"),
+                    )),
+                )
+            }
             (Num::Int(_), Num::Inf) => {
                 let big = self
                     .call_runtime(&abi::INF_INT, &[value])?

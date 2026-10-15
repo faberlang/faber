@@ -165,6 +165,8 @@ pub(crate) enum Rep {
     Dec,
     /// `inf`: a handle to an unbounded integer.
     Inf,
+    /// `instans`: a handle to a nanosecond count and its precision.
+    Ins,
     /// No value.
     Unit,
 }
@@ -181,6 +183,7 @@ impl Rep {
             | Self::Match
             | Self::Dec
             | Self::Inf
+            | Self::Ins
             | Self::Bits(_)
             | Self::List
             | Self::Record
@@ -319,6 +322,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(
             Primitive::Nihil | Primitive::Ignotum | Primitive::Json | Primitive::Valor,
         ) => Ok(Rep::Opt),
+        Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => Ok(Rep::Ins),
         Type::Primitive(Primitive::Vacuum | Primitive::Numquam) => Ok(Rep::Unit),
         Type::SizedNumeric(Primitive::Numerus, width) => match width {
             NumericWidth::I8
@@ -718,6 +722,9 @@ struct FunctionLower<'f, 'a> {
     /// Wide constants beyond the `i64` carrier (a `u64` literal at or above
     /// 2^63): narrowing one is declined, not trapped at run time.
     huge: rustc_hash::FxHashSet<Value>,
+    /// The recovery region (an orphan block chain the success path skips) that
+    /// defines each recovery temp: a failing conversion branches to it.
+    recovery_regions: rustc_hash::FxHashMap<MirTempId, MirBlockId>,
 }
 
 fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowered<()> {
@@ -758,6 +765,7 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             wide_slots: rustc_hash::FxHashSet::default(),
             narrow: rustc_hash::FxHashSet::default(),
             huge: rustc_hash::FxHashSet::default(),
+            recovery_regions: rustc_hash::FxHashMap::default(),
         };
         lower.run(function)?;
         lower.builder.seal_all_blocks();
@@ -893,16 +901,91 @@ impl FunctionLower<'_, '_> {
 
         // A block no edge reaches never runs: it is closed with a trap
         // instead of being lowered, so dead code cannot decline the program.
-        let mut reachable: rustc_hash::FxHashSet<MirBlockId> = rustc_hash::FxHashSet::default();
-        let mut pending = vec![function.blocks[0].id];
-        while let Some(id) = pending.pop() {
-            if !reachable.insert(id) {
+        // A recovery region (a side-effecting `⊥` fallback) has no edge in the
+        // graph: the failing conversion branches to it.
+        let successors_of = |id: MirBlockId| -> Vec<MirBlockId> {
+            function
+                .blocks
+                .iter()
+                .find(|block| block.id == id)
+                .map(|block| radix_mir::visit::terminator_successors(&block.terminator.kind))
+                .unwrap_or_default()
+        };
+        let closure_from = |roots: Vec<MirBlockId>,
+                            stop: &rustc_hash::FxHashSet<MirBlockId>|
+         -> rustc_hash::FxHashSet<MirBlockId> {
+            let mut seen: rustc_hash::FxHashSet<MirBlockId> = rustc_hash::FxHashSet::default();
+            let mut pending = roots;
+            while let Some(id) = pending.pop() {
+                if stop.contains(&id) || !seen.insert(id) {
+                    continue;
+                }
+                pending.extend(successors_of(id));
+            }
+            seen
+        };
+        let none: rustc_hash::FxHashSet<MirBlockId> = rustc_hash::FxHashSet::default();
+        let mut reachable = closure_from(vec![function.blocks[0].id], &none);
+        let mut has_predecessor: rustc_hash::FxHashSet<MirBlockId> =
+            rustc_hash::FxHashSet::default();
+        for block in &function.blocks {
+            has_predecessor.extend(radix_mir::visit::terminator_successors(
+                &block.terminator.kind,
+            ));
+        }
+        let main = reachable.clone();
+        for block in &function.blocks {
+            if main.contains(&block.id) || has_predecessor.contains(&block.id) {
                 continue;
             }
-            if let Some(block) = function.blocks.iter().find(|block| block.id == id) {
-                pending.extend(radix_mir::visit::terminator_successors(
-                    &block.terminator.kind,
-                ));
+            let region = closure_from(vec![block.id], &main);
+            for member in function.blocks.iter().filter(|b| region.contains(&b.id)) {
+                for statement in &member.statements {
+                    let defined = match &statement.kind {
+                        MirStatementKind::Assign { place, .. } => Some(place),
+                        MirStatementKind::Call { destination, .. }
+                        | MirStatementKind::RuntimeCall { destination, .. } => destination.as_ref(),
+                        MirStatementKind::Construct { destination, .. } => Some(destination),
+                    };
+                    if let Some(place) = defined
+                        && place.projections.is_empty()
+                        && let MirPlaceBase::Temp(id) = place.base
+                    {
+                        self.recovery_regions.entry(id).or_insert(block.id);
+                    }
+                }
+            }
+        }
+        // Regions a reachable conversion can fall into run as well.
+        loop {
+            let mut grew = false;
+            let live = reachable.clone();
+            for block in function.blocks.iter().filter(|b| live.contains(&b.id)) {
+                for statement in &block.statements {
+                    let MirStatementKind::RuntimeCall {
+                        call:
+                            MirRuntimeCall {
+                                intrinsic: MirIntrinsic::Convert(conversion),
+                                ..
+                            },
+                        ..
+                    } = &statement.kind
+                    else {
+                        continue;
+                    };
+                    let Some(MirOperand::Temp(id)) = &conversion.recovery else {
+                        continue;
+                    };
+                    let Some(entry) = self.recovery_regions.get(id).copied() else {
+                        continue;
+                    };
+                    for member in closure_from(vec![entry], &main) {
+                        grew |= reachable.insert(member);
+                    }
+                }
+            }
+            if !grew {
+                break;
             }
         }
         for (position, block) in function.blocks.iter().enumerate() {
@@ -944,6 +1027,7 @@ impl FunctionLower<'_, '_> {
             | Rep::Match
             | Rep::Dec
             | Rep::Inf
+            | Rep::Ins
             | Rep::Bits(_)
             | Rep::List
             | Rep::Record
@@ -1297,6 +1381,7 @@ impl FunctionLower<'_, '_> {
             Rep::Match => abi::TAG_MATCH,
             Rep::Dec => abi::TAG_DEC,
             Rep::Inf => abi::TAG_INF,
+            Rep::Ins => abi::TAG_INS,
             Rep::Bits(width) => abi::TAG_BITS + i64::from(width.bits().trailing_zeros() - 3),
             Rep::List => abi::TAG_LIST,
             Rep::Record => abi::TAG_STRUCT,
@@ -3823,6 +3908,7 @@ impl FunctionLower<'_, '_> {
             Rep::Match => self.call_runtime(&abi::MATCH_TEXT, &[value])?,
             Rep::Dec => self.call_runtime(&abi::DEC_TEXT, &[value])?,
             Rep::Inf => self.call_runtime(&abi::INF_TEXT, &[value])?,
+            Rep::Ins => self.call_runtime(&abi::INS_TEXT, &[value])?,
             Rep::Int if self.is_wide(value) => self.text_from_wide(value)?,
             Rep::Int => self.call_runtime(&abi::TEXT_FROM_I64, &[value])?,
             Rep::Float => {
@@ -4413,7 +4499,7 @@ impl FunctionLower<'_, '_> {
                 let reference = self.runtime_ref(&abi::PRINT_MAP)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
-            Rep::Regex | Rep::Match | Rep::Dec | Rep::Inf => {
+            Rep::Regex | Rep::Match | Rep::Dec | Rep::Inf | Rep::Ins => {
                 let text = self.render_text(value, rep)?;
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
                 self.builder.ins().call(reference, &[stream, text]);
@@ -4712,6 +4798,22 @@ impl FunctionLower<'_, '_> {
         {
             return self.dec_binary(op, (a, a_rep), (b, b_rep));
         }
+        if a_rep == Rep::Ins && b_rep == Rep::Ins {
+            let cc = match op {
+                MirBinOp::Eq => IntCC::Equal,
+                MirBinOp::NotEq => IntCC::NotEqual,
+                MirBinOp::Lt => IntCC::SignedLessThan,
+                MirBinOp::Gt => IntCC::SignedGreaterThan,
+                MirBinOp::LtEq => IntCC::SignedLessThanOrEqual,
+                MirBinOp::GtEq => IntCC::SignedGreaterThanOrEqual,
+                _ => return Err(Decline::new("instant operation")),
+            };
+            let order = self
+                .call_runtime(&abi::INS_COMPARE, &[a, b])?
+                .ok_or_else(|| Decline::new("instant comparison result"))?;
+            let zero = self.builder.ins().iconst(types::I32, 0);
+            return Ok((self.builder.ins().icmp(cc, order, zero), Rep::Bool));
+        }
         if (a_rep == Rep::Inf || b_rep == Rep::Inf || result == Rep::Inf)
             && op != MirBinOp::Coalesce
             && a_rep != Rep::Opt
@@ -4797,6 +4899,7 @@ impl FunctionLower<'_, '_> {
             | Rep::Match
             | Rep::Dec
             | Rep::Inf
+            | Rep::Ins
             | Rep::Bits(_)
             | Rep::List
             | Rep::Record

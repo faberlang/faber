@@ -193,9 +193,7 @@ impl<'a> ClifCapability<'a> {
             Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => None,
             Type::Primitive(Primitive::Regex | Primitive::Match) => None,
             Type::Primitive(Primitive::Json | Primitive::Valor) => None,
-            Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => {
-                Some(Gap::Subset("instans value".to_owned()))
-            }
+            Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => None,
             Type::Primitive(Primitive::Nihil) => None,
             Type::Primitive(Primitive::Ignotum) => None,
             Type::Array(element) => self.type_gap(MirType::semantic(*element)),

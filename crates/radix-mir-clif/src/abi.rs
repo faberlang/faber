@@ -1024,6 +1024,13 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     INF_TO_INT,
     INF_BOX,
     INF_UNBOX,
+    INS_PARSE,
+    INS_FROM_EPOCH,
+    INS_RETAG,
+    INS_TEXT,
+    INS_COMPARE,
+    INS_BOX,
+    INS_UNBOX,
 ];
 
 /// A stored `d64` carrier (scale 8) -> decimal handle.
@@ -1180,6 +1187,51 @@ pub const INF_BOX: RuntimeSymbol = RuntimeSymbol {
 pub const INF_UNBOX: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_inf_unbox",
     params: &[Ptr],
+    ret: Some(Ptr),
+};
+
+/// Element tag of an `instans` handle.
+pub const TAG_INS: i64 = 17;
+/// An instant from RFC 3339 text at a precision code (0 s, 1 ms, 2 us, 3 ns); null when malformed.
+pub const INS_PARSE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_parse",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+/// An instant from an epoch integer in the precision's native units.
+pub const INS_FROM_EPOCH: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_from_epoch",
+    params: &[I64, I32],
+    ret: Some(Ptr),
+};
+/// An instant at another precision.
+pub const INS_RETAG: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_retag",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+/// An instant as RFC 3339 text at its precision.
+pub const INS_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Three-way instant comparison at the coarser precision: -1, 0, 1.
+pub const INS_COMPARE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_compare",
+    params: &[Ptr, Ptr],
+    ret: Some(I32),
+};
+/// An instant as open data.
+pub const INS_BOX: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_box",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// The instant an open-data box holds at a precision, or null.
+pub const INS_UNBOX: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_unbox",
+    params: &[Ptr, I32],
     ret: Some(Ptr),
 };
 
