@@ -30,14 +30,14 @@ locale = "en"
 # =============================================================================
 
 # sales[[k1, k2]] ← v
-# for from sales at [k1, k2] const v { <body> }
+# for from sales at [k1, k2] let v { <body> }
 #
 # EXPECTED OUTPUT:
 #   two lookups, the entry count, then region/year=total rows sorted.
 
 main {
-    var map<tuple<string, int>, int> sales ← empty
-    const string east ← "east"
+    mut map<tuple<string, int>, int> sales ← empty
+    let string east ← "east"
     sales[[east, 2024]] ← 5
     sales[["west", 2024]] ← 7
     sales[[east, 2025]] ← 9
@@ -45,12 +45,12 @@ main {
     print sales[[east, 2024]]
     print sales[["west", 2024]]
     print sales.length()
-    var list<string> rows ← empty
-    for from sales at [region, year] const total {
+    mut list<string> rows ← empty
+    for from sales at [region, year] let total {
         rows.append("§/§=§"(region, year, total))
     }
     rows.sort()
-    for from rows const row {
+    for from rows let row {
         print row
     }
 }

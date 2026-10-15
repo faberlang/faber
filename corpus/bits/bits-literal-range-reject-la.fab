@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "type"
 canonical = false
 summary = "A literal too wide for a bits cell is refused."
-syntax = "const b8 x ← 0x1ff — rejected"
+syntax = "sit b8 x ← 0x1ff — rejected"
 related = ["bits", "↦"]
 locale = "la"
 no_expected = "rejects"
@@ -29,6 +29,6 @@ diagnostic = "SEM010:bits_literal_out_of_range"
 # This exemplum intentionally fails to compile.
 
 incipit {
-    fixum b8 x ← 0x1ff
+    sit b8 x ← 0x1ff
     nota x
 }

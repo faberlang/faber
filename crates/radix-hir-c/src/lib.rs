@@ -20,6 +20,7 @@
 //! target dispatch.
 
 mod conversio;
+mod enumeration;
 mod error;
 mod expr;
 mod float;
@@ -28,6 +29,7 @@ mod helpers;
 mod items;
 mod list;
 mod names;
+mod numeric;
 mod option;
 mod range;
 mod stmt;
@@ -43,13 +45,19 @@ mod control_test;
 #[cfg(test)]
 mod conversio_test;
 #[cfg(test)]
+mod copy_test;
+#[cfg(test)]
 mod emit_test;
+#[cfg(test)]
+mod enumeration_test;
 #[cfg(test)]
 mod item_test;
 #[cfg(test)]
 mod list_test;
 #[cfg(test)]
 mod names_test;
+#[cfg(test)]
+mod numeric_test;
 #[cfg(test)]
 mod option_test;
 #[cfg(test)]
@@ -153,6 +161,11 @@ impl CCodegen<'_> {
             arena,
             genera: FxHashMap::default(),
             shows: Vec::new(),
+            copies: Vec::new(),
+            generics: FxHashSet::default(),
+            variants: FxHashMap::default(),
+            equals: Vec::new(),
+            sponte_params: FxHashSet::default(),
         }
         .program(hir)
     }
@@ -200,6 +213,19 @@ pub(crate) struct Emitter<'a> {
     genera: FxHashMap<DefId, crate::genus::Genus>,
     /// Genera whose show function the program asked for, in request order.
     shows: Vec<DefId>,
+    /// Genera whose deep-copy function (`copy`, R7) the program asked for.
+    copies: Vec<DefId>,
+    /// Generic functions, skipped until instantiated; a call to one is
+    /// refused by name (a call to one nothing wrote contributes nothing).
+    generics: FxHashSet<DefId>,
+    /// Each enumeration variant: the enumeration and its position.
+    variants: FxHashMap<DefId, (DefId, usize)>,
+    /// Enumerations whose structural equality function was asked for.
+    equals: Vec<DefId>,
+    /// Parameters declared `optional` with no default: their C storage is the
+    /// optional of the declared type, but the HIR type is the payload, so a
+    /// body read must not be guard-narrowed (the runner keeps the none).
+    sponte_params: FxHashSet<DefId>,
 }
 
 /// One local, parameter or module constant, by its C identifier.
@@ -232,6 +258,8 @@ impl Emitter<'_> {
         // generated last; the support text follows them, since they need
         // helpers too.
         let (show_prototypes, show_definitions) = self.show_functions()?;
+        let (equal_prototypes, equal_definitions) = self.equal_functions()?;
+        let (copy_prototypes, copy_definitions) = self.copy_functions()?;
         if hir.entry.is_none() {
             self.support.need(crate::helpers::Helper::Trap);
         }
@@ -241,13 +269,18 @@ impl Emitter<'_> {
             out.push_str(&items.constants);
             out.push('\n');
         }
-        let prototypes = format!("{}{show_prototypes}", items.prototypes(&self.called));
+        let prototypes = format!(
+            "{}{show_prototypes}{equal_prototypes}{copy_prototypes}",
+            items.prototypes(&self.called)
+        );
         if !prototypes.is_empty() {
             out.push_str(&prototypes);
             out.push('\n');
         }
         out.push_str(&items.definitions(&self.called));
         out.push_str(&show_definitions);
+        out.push_str(&equal_definitions);
+        out.push_str(&copy_definitions);
         if self.uses_args {
             out.push_str("int main(int argc, char **argv) {\n");
         } else {
@@ -276,11 +309,12 @@ impl Emitter<'_> {
     /// Headers a class needs wherever it is declared.
     pub(crate) fn need_class(&mut self, class: Ty) {
         match class {
-            Ty::Int | Ty::Sized(_) => self.support.need_ints(),
+            Ty::Int | Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) => self.support.need_ints(),
             Ty::Opt(inner) => self.need_class(inner.ty()),
             Ty::Bool => self.support.need_bool(),
             Ty::Float => self.support.need(crate::helpers::Helper::Float),
-            Ty::Text | Ty::Genus(_) => {}
+            Ty::Decimal => self.support.need(crate::helpers::Helper::Decimal),
+            Ty::Text | Ty::Genus(_) | Ty::None => {}
             Ty::List(elem) => {
                 self.support.need(crate::helpers::Helper::List(
                     elem,
@@ -297,8 +331,14 @@ impl Emitter<'_> {
 /// True when emitted C reads the hidden arena `faber_a` (as a name, not as
 /// the prefix of a helper such as `faber_add`).
 pub(crate) fn mentions_arena(text: &str) -> bool {
-    text.match_indices("faber_a").any(|(at, _)| {
-        !text[at + "faber_a".len()..]
+    mentions_name(text, "faber_a")
+}
+
+/// Whether `text` reads `name` as a whole identifier (not as the prefix of a
+/// longer one, which the namer can produce for a collision).
+pub(crate) fn mentions_name(text: &str, name: &str) -> bool {
+    text.match_indices(name).any(|(at, _)| {
+        !text[at + name.len()..]
             .chars()
             .next()
             .is_some_and(|next| next == '_' || next.is_ascii_alphanumeric())

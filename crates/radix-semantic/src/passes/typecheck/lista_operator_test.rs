@@ -114,8 +114,8 @@ fn numeric_lista_multiplication_is_broadcast_not_repetition() {
     // count. A2 supplies the elementwise lowering; A1 only admits its type.
     let fixture = analyze_ok(
         r"incipit {
-    fixum lista<numerus> xs ← [1, 2]
-    fixum lista<numerus> scaled ← xs * 3
+    sit lista<numerus> xs ← [1, 2]
+    sit lista<numerus> scaled ← xs * 3
     nota scaled
 }",
     );

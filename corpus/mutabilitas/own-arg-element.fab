@@ -20,6 +20,6 @@ fn eat(own list<int> xs) → void {
 }
 
 main {
-    var list<list<int>> rows ← [[1], [2]]
+    mut list<list<int>> rows ← [[1], [2]]
     eat(own rows[0])
 }

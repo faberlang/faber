@@ -246,7 +246,7 @@ fn modular_word_zero_literal_accepts() {
     test_support::assert_analysis_accepts_la(
         r"
 incipit {
-    fixum modulus<u32> zero ← 0
+    sit modulus<u32> zero ← 0
     nota zero
 }
 ",
@@ -311,8 +311,8 @@ fn modular_word_rejects_numerus_to_modulus_assignment() {
     test_support::assert_analysis_rejects_with_issue_la(
         r"
 incipit {
-    fixum u32 checked ← 1
-    fixum modulus<u32> word ← checked
+    sit u32 checked ← 1
+    sit modulus<u32> word ← checked
     nota word
 }
 ",
@@ -325,8 +325,8 @@ fn modular_word_rejects_modulus_to_numerus_assignment() {
     test_support::assert_analysis_rejects_with_issue_la(
         r"
 incipit {
-    fixum modulus<u32> word ← 1
-    fixum u32 checked ← word
+    sit modulus<u32> word ← 1
+    sit u32 checked ← word
     nota checked
 }
 ",
@@ -339,8 +339,8 @@ fn modular_word_method_rejects_numerus_argument() {
     test_support::assert_analysis_rejects_with_issue_la(
         r"
 incipit {
-    fixum modulus<u32> word ← 4294967295
-    fixum u32 checked ← 1
+    sit modulus<u32> word ← 4294967295
+    sit u32 checked ← 1
     nota word.addita(checked)
 }
 ",
@@ -353,8 +353,8 @@ fn numerus_method_rejects_modulus_argument() {
     test_support::assert_analysis_rejects_with_issue_la(
         r"
 incipit {
-    fixum modulus<u32> word ← 4294967295
-    fixum u32 checked ← 1
+    sit modulus<u32> word ← 4294967295
+    sit u32 checked ← 1
     nota checked.addita(word)
 }
 ",
@@ -549,7 +549,7 @@ fn sexp_accepts_every_modular_width() {
         ("u32", "4294967295"),
         ("u64", "18446744073709551615"),
     ] {
-        let source = format!("incipit {{\n    fixum modulus<{width}> max ← {max}\n    nota max + 1\n}}\n");
+        let source = format!("incipit {{\n    sit modulus<{width}> max ← {max}\n    nota max + 1\n}}\n");
         let result = test_support::compile_for_target_and_get_result_la(&source, Target::MirSexp);
         assert!(result.success(), "Sexp modulus<{width}> now emits: {:?}", result.diagnostics);
     }
@@ -560,8 +560,8 @@ fn sexp_accepts_every_modular_width() {
 fn go_accepts_local_modular_words_before_emit() {
     let source = r"
 incipit {
-    fixum modulus<u32> max ← 4294967295
-    fixum modulus<u32> one ← 1
+    sit modulus<u32> max ← 4294967295
+    sit modulus<u32> one ← 1
     nota max + one
 }
 ";
@@ -578,8 +578,8 @@ fn typescript_accepts_local_modular_words_before_emit() {
     // the same local modular-word program must now emit successfully there.
     let source = r"
 incipit {
-    fixum modulus<u32> max ← 4294967295
-    fixum modulus<u32> one ← 1
+    sit modulus<u32> max ← 4294967295
+    sit modulus<u32> one ← 1
     nota max + one
 }
 ";
@@ -597,7 +597,7 @@ fn sexp_accepts_modular_words_at_emit() {
     let result = test_support::compile_for_target_and_get_result_la(
         r"
 incipit {
-    fixum modulus<u32> max ← 4294967295
+    sit modulus<u32> max ← 4294967295
     nota max + 1
 }
 ",
@@ -611,7 +611,7 @@ fn lista_preserves_modular_word_element_type() {
     test_support::assert_analysis_accepts_la(
         r"
 incipit {
-    fixum lista<modulus<u32>> values ← []
+    sit lista<modulus<u32>> values ← []
 }
 ",
     );
@@ -625,9 +625,9 @@ fn octeti_is_not_numeric_arithmetic() {
     test_support::assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum octeti left ← |01|
-    fixum octeti right ← |02|
-    fixum _ both ← left + right
+    sit octeti left ← |01|
+    sit octeti right ← |02|
+    sit both ← left + right
 }
 ",
         "numeric_lista_operator_law",
@@ -635,9 +635,9 @@ incipit {
     test_support::assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum b8 left ← 1
-    fixum b8 right ← 2
-    fixum _ both ← left + right
+    sit b8 left ← 1
+    sit b8 right ← 2
+    sit both ← left + right
 }
 ",
         "bits_arithmetic_refused",
@@ -662,8 +662,8 @@ fn explicit_lista_target_allows_sized_numeric_widening() {
     test_support::assert_accepts_la(
         r"
 incipit {
-    fixum f32 single ← 1.0 ∷ f32
-    fixum lista<f64> xs ← [single] ∷ lista<f64>
+    sit f32 single ← 1.0 ∷ f32
+    sit lista<f64> xs ← [single] ∷ lista<f64>
 }
 ",
     );
@@ -673,8 +673,8 @@ incipit {
 fn explicit_lista_target_warns_only_for_sized_numeric_narrowing() {
     let source = r"
 incipit {
-    fixum f64 wide ← 1.0 ∷ f64
-    fixum lista<f32> xs ← [wide] ∷ lista<f32>
+    sit f64 wide ← 1.0 ∷ f64
+    sit lista<f32> xs ← [wide] ∷ lista<f32>
 }
 ";
     let diagnostics = test_support::analyze_and_get_diagnostics_la(source);

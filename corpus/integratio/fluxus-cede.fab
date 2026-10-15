@@ -46,7 +46,7 @@ fn accipe() async → string {
 }
 
 fn paria(int finis) generator → int {
-    for range 0 before finis const i {
+    for range 0 before finis let i {
         if i % 2 ≡ 0 {
             yield i
         }
@@ -57,7 +57,7 @@ async_main {
     await_const _ nomen ← accipe()
     print "salve §"(nomen)
 
-    for from paria(8) const n {
+    for from paria(8) let n {
         print n
     }
 }

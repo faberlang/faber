@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "type"
 canonical = false
 summary = "A literal too big for its slot is a compile error, however long it is; an `inf` slot is the opt-in that holds it."
-syntax = "const numerus x ← 18446744073709551616 — rejected; declare the slot `inf`"
+syntax = "let numerus x ← 18446744073709551616 — rejected; declare the slot `inf`"
 related = ["inf", "numerus", "u64"]
 locale = "en"
 +++
@@ -17,7 +17,7 @@ locale = "en"
 #   • An integer literal of any length is a constant, and it lands only where
 #     its exact value fits. `18446744073709551616` is 2^64: one past `u64`,
 #     so it does not fit `numerus` (`numerus_literal_out_of_range`).
-#   • The fix is the opt-in `inf` slot: `const inf x ← 18446744073709551616`.
+#   • The fix is the opt-in `inf` slot: `let inf x ← 18446744073709551616`.
 #   • No literal quietly becomes an `inf`; the slot decides.
 #
 # Common mistakes:
@@ -36,6 +36,6 @@ locale = "en"
 #   inf-literal-range-error.expected — the stable diagnostic identity.
 
 main {
-    const int too_big ← 18446744073709551616
+    let int too_big ← 18446744073709551616
     print too_big
 }

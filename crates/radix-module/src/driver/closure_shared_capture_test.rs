@@ -25,14 +25,14 @@ fn run_en(body: &str) -> Vec<String> {
 
 #[test]
 fn outer_write_after_capture_is_visible_inside_closure() {
-    let out = run_en("main {\n    var int n ← 1\n    const () → int f ← () → int ∴ n\n    n ← 5\n    print f()\n}\n");
+    let out = run_en("main {\n    mut int n ← 1\n    let () → int f ← () → int ∴ n\n    n ← 5\n    print f()\n}\n");
     assert_eq!(out, ["5"]);
 }
 
 #[test]
 fn closure_write_to_captured_var_is_visible_outside() {
     let out = run_en(
-        "main {\n    var int n ← 0\n    const () → void bump ← () → void ∴ do { n ← n + 1 }\n    bump()\n    bump()\n    print n\n}\n",
+        "main {\n    mut int n ← 0\n    let () → void bump ← () → void ∴ do { n ← n + 1 }\n    bump()\n    bump()\n    print n\n}\n",
     );
     assert_eq!(out, ["2"]);
 }
@@ -40,7 +40,7 @@ fn closure_write_to_captured_var_is_visible_outside() {
 #[test]
 fn escaping_counter_keeps_its_own_shared_state() {
     let out = run_en(
-        "fn counter() → () → int {\n    var int c ← 0\n    return () → int ∴ do { c ← c + 1\n return c }\n}\nmain {\n    const () → int k ← counter()\n    const () → int j ← counter()\n    print k()\n    print k()\n    print j()\n    print k()\n}\n",
+        "fn counter() → () → int {\n    mut int c ← 0\n    return () → int ∴ do { c ← c + 1\n return c }\n}\nmain {\n    let () → int k ← counter()\n    let () → int j ← counter()\n    print k()\n    print k()\n    print j()\n    print k()\n}\n",
     );
     assert_eq!(out, ["1", "2", "1", "3"]);
 }
@@ -48,7 +48,7 @@ fn escaping_counter_keeps_its_own_shared_state() {
 #[test]
 fn loop_bindings_are_fresh_per_iteration() {
     let out = run_en(
-        "main {\n    var list<() → int> fs ← empty\n    for range 0‥3 const i {\n        fs.append(() → int ∴ i * 10)\n    }\n    for from fs const f { print f() }\n}\n",
+        "main {\n    mut list<() → int> fs ← empty\n    for range 0‥3 let i {\n        fs.append(() → int ∴ i * 10)\n    }\n    for from fs let f { print f() }\n}\n",
     );
     assert_eq!(out, ["0", "10", "20"]);
 }
@@ -56,7 +56,7 @@ fn loop_bindings_are_fresh_per_iteration() {
 #[test]
 fn loop_body_var_captured_and_mutated_is_fresh_per_iteration() {
     let out = run_en(
-        "main {\n    var list<() → int> fs ← empty\n    for range 0‥3 const i {\n        var int acc ← i\n        fs.append(() → int ∴ do { acc ← acc + 100\n return acc })\n    }\n    for from fs const f { print f() }\n    for from fs const f { print f() }\n}\n",
+        "main {\n    mut list<() → int> fs ← empty\n    for range 0‥3 let i {\n        mut int acc ← i\n        fs.append(() → int ∴ do { acc ← acc + 100\n return acc })\n    }\n    for from fs let f { print f() }\n    for from fs let f { print f() }\n}\n",
     );
     assert_eq!(out, ["100", "101", "102", "200", "201", "202"]);
 }
@@ -64,7 +64,7 @@ fn loop_body_var_captured_and_mutated_is_fresh_per_iteration() {
 #[test]
 fn nested_closures_share_one_binding() {
     let out = run_en(
-        "main {\n    var int n ← 0\n    const () → void outer ← () → void ∴ do {\n        const () → void inner ← () → void ∴ do { n ← n + 10 }\n        inner()\n        n ← n + 1\n    }\n    outer()\n    outer()\n    print n\n}\n",
+        "main {\n    mut int n ← 0\n    let () → void outer ← () → void ∴ do {\n        let () → void inner ← () → void ∴ do { n ← n + 10 }\n        inner()\n        n ← n + 1\n    }\n    outer()\n    outer()\n    print n\n}\n",
     );
     assert_eq!(out, ["22"]);
 }
@@ -72,7 +72,7 @@ fn nested_closures_share_one_binding() {
 #[test]
 fn two_closures_share_one_captured_var() {
     let out = run_en(
-        "main {\n    var int n ← 0\n    const () → void inc ← () → void ∴ do { n ← n + 1 }\n    const () → int get ← () → int ∴ n\n    inc()\n    inc()\n    print get()\n    n ← 40\n    inc()\n    print get()\n}\n",
+        "main {\n    mut int n ← 0\n    let () → void inc ← () → void ∴ do { n ← n + 1 }\n    let () → int get ← () → int ∴ n\n    inc()\n    inc()\n    print get()\n    n ← 40\n    inc()\n    print get()\n}\n",
     );
     assert_eq!(out, ["2", "41"]);
 }
@@ -80,7 +80,7 @@ fn two_closures_share_one_captured_var() {
 #[test]
 fn escaping_adder_captures_parameter() {
     let out = run_en(
-        "fn apply((int) → int f, int x) → int { return f(x) }\nfn adder(int k) → (int) → int { return int x → int ∴ x + k }\nmain {\n    print apply(int x → int ∴ x * 3, 4)\n    const (int) → int a5 ← adder(5)\n    print a5(1)\n    print apply(adder(7), 1)\n}\n",
+        "fn apply((int) → int f, int x) → int { return f(x) }\nfn adder(int k) → (int) → int { return int x → int ∴ x + k }\nmain {\n    print apply(int x → int ∴ x * 3, 4)\n    let (int) → int a5 ← adder(5)\n    print a5(1)\n    print apply(adder(7), 1)\n}\n",
     );
     assert_eq!(out, ["12", "6", "8"]);
 }
@@ -107,14 +107,14 @@ fn dump_en(body: &str) -> String {
 fn never_rebound_capture_copies_without_a_shared_cell() {
     // A `var` that is captured but never rebound is observably a value:
     // capture stays a plain copy and no cell is allocated.
-    let dump = dump_en("main {\n    var int n ← 1\n    const () → int f ← () → int ∴ n\n    print f()\n}\n");
+    let dump = dump_en("main {\n    mut int n ← 1\n    let () → int f ← () → int ∴ n\n    print f()\n}\n");
     assert!(!dump.contains("shared_cell"), "{dump}");
     assert!(!dump.contains(".cell"), "{dump}");
 }
 
 #[test]
 fn rebound_capture_is_stored_in_a_shared_cell() {
-    let dump = dump_en("main {\n    var int n ← 1\n    const () → int f ← () → int ∴ n\n    n ← 5\n    print f()\n}\n");
+    let dump = dump_en("main {\n    mut int n ← 1\n    let () → int f ← () → int ∴ n\n    n ← 5\n    print f()\n}\n");
     assert!(dump.contains("construct shared_cell"), "{dump}");
     assert!(dump.contains(".cell"), "{dump}");
 }
@@ -124,7 +124,7 @@ fn param_less_vacuum_closure_is_not_the_entry() {
     // Entry-shaped synthetic closures (no params, `void` return) must not
     // be selected as `incipit`; only the unreferenced entry is.
     let out = run_en(
-        "main {\n    const () → void hello ← () → void ∴ do { print \"inner\" }\n    print \"outer\"\n    hello()\n}\n",
+        "main {\n    let () → void hello ← () → void ∴ do { print \"inner\" }\n    print \"outer\"\n    hello()\n}\n",
     );
     assert_eq!(out, ["outer", "inner"]);
 }
@@ -132,7 +132,7 @@ fn param_less_vacuum_closure_is_not_the_entry() {
 #[test]
 fn shared_text_rebinding_reads_before_it_stores() {
     let out = run_en(
-        "main {\n    var string s ← \"a\"\n    const () → void grow ← () → void ∴ do { s ← s + \"b\" }\n    grow()\n    grow()\n    print s\n}\n",
+        "main {\n    mut string s ← \"a\"\n    let () → void grow ← () → void ∴ do { s ← s + \"b\" }\n    grow()\n    grow()\n    print s\n}\n",
     );
     assert_eq!(out, ["abb"]);
 }
@@ -140,7 +140,7 @@ fn shared_text_rebinding_reads_before_it_stores() {
 #[test]
 fn increment_through_a_captured_var() {
     let out = run_en(
-        "main {\n    var int n ← 0\n    const () → void tick ← () → void ∴ do { n↑ }\n    tick()\n    tick()\n    tick()\n    print n\n}\n",
+        "main {\n    mut int n ← 0\n    let () → void tick ← () → void ∴ do { n↑ }\n    tick()\n    tick()\n    tick()\n    print n\n}\n",
     );
     assert_eq!(out, ["3"]);
 }
@@ -148,7 +148,7 @@ fn increment_through_a_captured_var() {
 #[test]
 fn captured_list_mutated_after_capture_is_visible_inside() {
     let out = run_en(
-        "main {\n    var list<int> xs ← [1]\n    const () → int f ← () → int ∴ xs.length()\n    xs.append(2)\n    xs.append(3)\n    print f()\n}\n",
+        "main {\n    mut list<int> xs ← [1]\n    let () → int f ← () → int ∴ xs.length()\n    xs.append(2)\n    xs.append(3)\n    print f()\n}\n",
     );
     assert_eq!(out, ["3"]);
 }

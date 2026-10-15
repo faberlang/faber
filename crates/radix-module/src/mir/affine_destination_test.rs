@@ -28,9 +28,9 @@ fn drop_one<size N>(tensor<f32, [N - 1]> value) → tensor<f32, [N - 1]> {
     return value
 }
 main {
-    const list<f32> values ← [1.0, 2.0, 3.0]
-    const tensor<f32, [3]> three ← values ↦ tensor<f32, [3]>
-    const tensor<f32, [3]> tail ← drop_one(three)
+    let list<f32> values ← [1.0, 2.0, 3.0]
+    let tensor<f32, [3]> three ← values ↦ tensor<f32, [3]>
+    let tensor<f32, [3]> tail ← drop_one(three)
     print tail.shape()[0]
 }
 ";
@@ -47,10 +47,10 @@ fn runtime_size(int value) → int {
     return value
 }
 main {
-    const list<f32> values ← [1.0, 2.0, 3.0]
-    const int n ← runtime_size(4)
-    const tensor<f32, [size (n - 1)]> dynamic ← values ↦ tensor<f32, [size (n - 1)]>
-    const tensor<f32, [size (n - 1)]> dynamic_tail ← drop_one(dynamic)
+    let list<f32> values ← [1.0, 2.0, 3.0]
+    let int n ← runtime_size(4)
+    let tensor<f32, [size (n - 1)]> dynamic ← values ↦ tensor<f32, [size (n - 1)]>
+    let tensor<f32, [size (n - 1)]> dynamic_tail ← drop_one(dynamic)
     print dynamic_tail.shape()[0]
 }
 ";
@@ -64,9 +64,9 @@ fn grow<size N>(tensor<f32, [N + 1]> value) → tensor<f32, [N + 1]> {
     return value
 }
 main {
-    const list<f32> values ← [1.0, 2.0, 3.0, 4.0]
-    const tensor<f32, [4]> four ← values ↦ tensor<f32, [4]>
-    const tensor<f32, [4]> grown ← grow(four)
+    let list<f32> values ← [1.0, 2.0, 3.0, 4.0]
+    let tensor<f32, [4]> four ← values ↦ tensor<f32, [4]>
+    let tensor<f32, [4]> grown ← grow(four)
     print grown.shape()[0]
 }
 ";
@@ -80,9 +80,9 @@ fn ident<size N>(tensor<f32, [N]> value) → tensor<f32, [N]> {
     return value
 }
 main {
-    const list<f32> values ← [1.0, 2.0, 3.0, 4.0]
-    const tensor<f32, [4]> four ← values ↦ tensor<f32, [4]>
-    const tensor<f32, [4]> same ← ident(four)
+    let list<f32> values ← [1.0, 2.0, 3.0, 4.0]
+    let tensor<f32, [4]> four ← values ↦ tensor<f32, [4]>
+    let tensor<f32, [4]> same ← ident(four)
     print same.shape()[0]
 }
 ";

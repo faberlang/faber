@@ -364,7 +364,7 @@ impl Lowerer<'_> {
     /// A side-effect-free place (`xs`, `(xs)`, `ego.xs`) is re-read by each
     /// expanded local, which keeps target ownership unchanged. Anything else
     /// (a call, a literal, an awaited value) is bound to a hidden immutable
-    /// local first, so `fixum [a, b] ← f()` calls `f` once and awaits once.
+    /// local first, so `sit [a, b] ← f()` calls `f` once and awaits once.
     /// Returns the hoisted statement (if any) and the subject expression the
     /// expanded locals must read instead of `init`.
     fn destructure_subject(
@@ -740,7 +740,7 @@ impl Lowerer<'_> {
                     None => error_expr(self, *span),
                 };
                 // Surface fidelity: a wildcard-bound declaration is a discard
-                // binding (`fixum T _ ← expr`), not a bare effect call. The
+                // binding (`sit T _ ← expr`), not a bare effect call. The
                 // lowered statement keeps no `HirLocal`, so the authored
                 // declaration facts ride the presentation sidecar keyed by
                 // the initializer expression id.

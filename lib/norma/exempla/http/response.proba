@@ -7,7 +7,7 @@ import from "norma:http/response" response
 
 describe "response_import" {
     test "Response constructs" {
-        const response.Response r ← response.Response {
+        let response.Response r ← response.Response {
             status = 200,
             headers = headers.Headers { },
             body = "ok"

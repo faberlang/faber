@@ -317,6 +317,36 @@ surface = "connect_tls"
 provider = "norma"
 module_path = ["websocket"]
 kind = "function"
+canonical = "connect_open"
+surface = "connect_open"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "connect_open"
+surface = "connect_open"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "connect_finish"
+surface = "connect_finish"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "connect_finish"
+surface = "connect_finish"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
 canonical = "accept"
 surface = "accept"
 

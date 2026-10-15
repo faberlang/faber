@@ -641,7 +641,7 @@ fn reduction_scalar_return_kernel_synthesizes_indexed_view_signature() {
 
 /// S3-B1 forward shape:
 /// `functio simple_loss(tf32[1000] x, tf32[1000] w) → f32 {
-///    fixum tensor<f32,[1000]> product ← x.multiplica(w); redde product.media() }`.
+///    sit tensor<f32,[1000]> product ← x.multiplica(w); redde product.media() }`.
 fn mul_mean_scalar_return_function(types: &mut TypeTable) -> MirFunction {
     let f32_id = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
     let shape = types.intern_index(IndexExpr::Literal(1000));
@@ -764,7 +764,7 @@ fn result_tuple_errors_classify_to_specific_issue_tags() {
 
 /// Rank-2 transpose kernel shape (S5-U1):
 /// `functio transpono(tf32[M,N] x) → tf32[N,M] {
-///    fixum tensor<f32,[N,M]> t ← transponi(x); redde t }`.
+///    sit tensor<f32,[N,M]> t ← transponi(x); redde t }`.
 fn transpose_rank2_function(types: &mut TypeTable, dims: [u64; 2]) -> MirFunction {
     let f32_id = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
     let dim_ids = dims

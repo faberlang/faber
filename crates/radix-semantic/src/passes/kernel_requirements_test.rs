@@ -158,9 +158,9 @@ fn symbolic_apud_coordinate_is_retained_as_a_store_condition() {
 @ publica
 functio copy_coordinate<magnitudo N>(
     tensor<f32, [N]> input,
-    in tensor<u32, [N]> output
+    varia tensor<u32, [N]> output
 ) → vacuum {
-    itera ex input apud [i] fixum value {
+    itera ex input apud [i] sit value {
         output[i] ← i
     }
 }
@@ -218,7 +218,7 @@ fn tensor_division(
     tensor<wrapping<i32>, [4]> dividend,
     tensor<wrapping<i32>, [4]> divisor
 ) → void {
-    const tensor<wrapping<i32>, [4]> quotient ← dividend.divided(divisor)
+    let tensor<wrapping<i32>, [4]> quotient ← dividend.divided(divisor)
 }
 ",
     );
@@ -272,8 +272,8 @@ fn map_edges<size N>(
     tensor<f32, [N]> input,
     mut tensor<f32, [N]> output
 ) → void {
-    const tensor<f32, [N]> mapped ← input.shift([1]).limes<ZeroGhost>()
-    for from mapped at [i] const value {
+    let tensor<f32, [N]> mapped ← input.shift([1]).limes<ZeroGhost>()
+    for from mapped at [i] let value {
         output[i] ← value
     }
 }
@@ -344,8 +344,8 @@ fn kernel_with_static_extents_records_no_entry_shape_relation() {
         r"
 @ nucleum
 @ publica
-functio scale(tensor<f32, [5]> input, in tensor<f32, [5]> output) → vacuum {
-    itera ex input apud [i] fixum value {
+functio scale(tensor<f32, [5]> input, varia tensor<f32, [5]> output) → vacuum {
+    itera ex input apud [i] sit value {
         output[i] ← value * 2.0
     }
 }
@@ -370,7 +370,7 @@ functio same<magnitudo N>(tensor<f32, [N]> left, tensor<f32, [N]> right) → f32
 }
 
 incipit {
-    fixum tensor<f32, [3]> a ← vacua
+    sit tensor<f32, [3]> a ← vacua
     nota same(a, a)
 }
 ",
@@ -388,8 +388,8 @@ fn vector_literal_over_untyped_float_constants_requires_no_f64() {
 @ kernel
 @ public
 fn productum(f32 x) → f32 {
-    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
-    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    let vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    let vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
     return a.dot(b)
 }
 ",
@@ -409,7 +409,7 @@ fn explicit_f64_array_literal_still_requires_f64() {
 @ kernel
 @ public
 fn wide(f64 x) → f64 {
-    const vf64[2] a ← [x, 2.0] ↦ vf64[2]
+    let vf64[2] a ← [x, 2.0] ↦ vf64[2]
     return a.dot(a)
 }
 ",
@@ -425,7 +425,7 @@ fn lane_loop_copy_is_admitted_under_the_extent_product_condition() {
 @ kernel
 @ public
 fn copy(tensor<f32, [_, _]> src, mut tensor<f32, [_, _]> dst) → void {
-    for from src at [i, j] thread lane const v {
+    for from src at [i, j] thread lane let v {
         dst[[i, j]] ← v
     }
 }
@@ -483,7 +483,7 @@ fn rank_one_argmax_over_a_literal_extent_stores_into_i32() {
 @ kernel
 @ public
 fn peak(tensor<f32, [32]> src, mut tensor<i32, [1]> out) → void {
-    out[0] ← reduce via argmax from src at [i] thread lane const v { return v } coalesce 0
+    out[0] ← reduce via argmax from src at [i] thread lane let v { return v } coalesce 0
 }
 main {}
 ",
@@ -500,7 +500,7 @@ fn rank_one_argmin_over_a_symbolic_extent_is_admitted_under_an_extent_condition(
 @ kernel
 @ public
 fn trough(tensor<f32, [_]> src, mut tensor<i32, [1]> out) → void {
-    out[0] ← reduce via argmin from src at [i] thread lane const v { return v } coalesce 0
+    out[0] ← reduce via argmin from src at [i] thread lane let v { return v } coalesce 0
 }
 main {}
 ",
@@ -524,7 +524,7 @@ fn count_over_a_literal_extent_stores_into_i32() {
 @ kernel
 @ public
 fn tally(tensor<f32, [4, 32]> src, mut tensor<i32, [1]> out) → void {
-    out[0] ← reduce via count from src at [i, j] thread lane const v { return v ≻ 1.0 }
+    out[0] ← reduce via count from src at [i, j] thread lane let v { return v ≻ 1.0 }
 }
 main {}
 ",
@@ -540,7 +540,7 @@ fn an_integer_max_reduction_into_i32_is_still_out_of_range() {
 @ kernel
 @ public
 fn widest(tensor<int, [32]> src, mut tensor<i32, [1]> out) → void {
-    out[0] ← reduce via max from src at [i] thread lane const v { return v } coalesce 0
+    out[0] ← reduce via max from src at [i] thread lane let v { return v } coalesce 0
 }
 main {}
 ",

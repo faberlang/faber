@@ -3587,7 +3587,7 @@ impl TypeChecker<'_> {
     ) {
         // Check under the target as expected type so literal operands erase
         // their exact bounds exactly like a declared-type initializer
-        // (`fixum lista<numerus> x ← [0]`).
+        // (`sit lista<numerus> x ← [0]`).
         let site = StoreSite::new(HirStoreKind::ConversionDefault);
         let recovery_ty = self.check_store_expr(recovery, target_resolved, site);
         self.unify_assign_issue(

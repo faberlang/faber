@@ -29,7 +29,7 @@ functio saluta(textus phr) → textus {
 }
 
 incipit {
-  fixum _ greeting ← saluta(\"Salve\")
+  sit greeting ← saluta(\"Salve\")
   nota greeting
 }
 ";
@@ -217,9 +217,9 @@ fn phase4_full_cross_locale_fanout() {
 /// localized emit surface.
 const TENSOR_VACUA_SOURCE: &str = "\
 incipit {
-  fixum lista<f32> xs ← vacua
-  fixum tensor<f32, []> empty ← vacua
-  fixum numerus n ← 0
+  sit lista<f32> xs ← vacua
+  sit tensor<f32, []> empty ← vacua
+  sit numerus n ← 0
   nota n
 }
 ";
@@ -356,7 +356,7 @@ fn th_locale_vacua_acceptance_is_bounded_to_owned_rows() {
     // for its support keywords (`เริ่ม` incipit, `คงที่` fixum, `บันทึก` nota,
     // `เทนเซอร์` tensor, `เศษ` fractus) — pack-authoritative, no Latin
     // support vocabulary under the non-la pack.
-    let owned = "เริ่ม {\n  คงที่ เทนเซอร์<f32, []> empty ← เซตว่าง\n  บันทึก empty\n}\n";
+    let owned = "เริ่ม {\n  กำหนด เทนเซอร์<f32, []> empty ← เซตว่าง\n  บันทึก empty\n}\n";
     let result = reemit_faber(
         &session,
         session
@@ -377,7 +377,7 @@ fn th_locale_vacua_acceptance_is_bounded_to_owned_rows() {
     // identifier and is NOT claimed as `vacua` — the initializer is an
     // undefined variable reference, so compilation fails. If the parser
     // started accepting unmapped spellings, this would (wrongly) succeed.
-    let unmapped = "เริ่ม {\n  คงที่ เทนเซอร์<f32, []> empty ← หุ่นจำลอง\n  บันทึก empty\n}\n";
+    let unmapped = "เริ่ม {\n  กำหนด เทนเซอร์<f32, []> empty ← หุ่นจำลอง\n  บันทึก empty\n}\n";
     let result = reemit_faber(
         &session,
         session
@@ -397,7 +397,7 @@ fn th_locale_vacua_acceptance_is_bounded_to_owned_rows() {
 #[test]
 fn en_vacua_marker_rejects_after_alias_removal() {
     let session = session_for("en");
-    let source = with_frontmatter("en", "main {\n  var list<int> xs ← vacua\n  print xs.length()\n}\n");
+    let source = with_frontmatter("en", "main {\n  mut list<int> xs ← vacua\n  print xs.length()\n}\n");
     let result = reemit_faber(
         &session,
         session
@@ -458,18 +458,18 @@ fn assert_bare_nihil_value_named_error(locale: &str, body: &str, replacement: &s
 
 #[test]
 fn en_bare_nihil_value_is_named_retired_error() {
-    assert_bare_nihil_value_named_error("en", "main {\n  const int union none n ← nihil\n  print n\n}\n", "null");
+    assert_bare_nihil_value_named_error("en", "main {\n  let int union none n ← nihil\n  print n\n}\n", "null");
 }
 
 #[test]
 fn la_bare_nihil_value_is_named_retired_error() {
-    assert_bare_nihil_value_named_error("la", "incipit {\n  fixum numerus ∪ nihil n ← nihil\n  scribe n\n}\n", "nulla");
+    assert_bare_nihil_value_named_error("la", "incipit {\n  sit numerus ∪ nihil n ← nihil\n  scribe n\n}\n", "nulla");
 }
 
 #[test]
 fn en_empty_marker_compiles() {
     let session = session_for("en");
-    let source = with_frontmatter("en", "main {\n  var list<int> xs ← empty\n  print xs.length()\n}\n");
+    let source = with_frontmatter("en", "main {\n  mut list<int> xs ← empty\n  print xs.length()\n}\n");
     let result = reemit_faber(
         &session,
         session
@@ -486,7 +486,7 @@ fn en_empty_marker_compiles() {
 #[test]
 fn en_empty_named_binding_compiles_with_marker_rhs() {
     let session = session_for("en");
-    let source = with_frontmatter("en", "main {\n  var list<int> empty ← empty\n  print 0\n}\n");
+    let source = with_frontmatter("en", "main {\n  mut list<int> empty ← empty\n  print 0\n}\n");
     let result = reemit_faber(
         &session,
         session
@@ -499,7 +499,7 @@ fn en_empty_named_binding_compiles_with_marker_rhs() {
     );
     assert!(
         result.success(),
-        "en `var list<int> empty ← empty` must compile (RHS is the marker): {:?}",
+        "en `mut list<int> empty ← empty` must compile (RHS is the marker): {:?}",
         result.diagnostics
     );
 }

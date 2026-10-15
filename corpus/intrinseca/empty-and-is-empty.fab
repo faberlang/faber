@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "en empty-collection marker vs is_empty intrinsic in one file."
-syntax = "var list<T> xs ← empty"
+syntax = "mut list<T> xs ← empty"
 related = ["vacua"]
 locale = "en"
 +++
@@ -25,8 +25,8 @@ locale = "en"
 #   Smoke asserts exit 0 only.
 
 main {
-    var list<int> xs ← empty
-    const bool vacant ← xs.is_empty()
+    mut list<int> xs ← empty
+    let bool vacant ← xs.is_empty()
     xs.append(1)
     print vacant, xs.is_empty(), xs.length()
 }

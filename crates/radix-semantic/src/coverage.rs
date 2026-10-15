@@ -91,6 +91,7 @@ pub fn from_target(target: Target) -> Option<HirCoverageTarget> {
         | Target::MirWasm
         | Target::MirLlvm
         | Target::MirLlvmHost
+        | Target::MirClif
         | Target::MirAmd
         | Target::MirMetal
         | Target::MirWgsl

@@ -48,25 +48,25 @@ locale = "en"
 #   index-width.fab stdout contract (u32 thread-id index, rank-2 u32 origin).
 
 main {
-    var tf32[4] input ← tf32[4] {}
+    mut tf32[4] input ← tf32[4] {}
 
     # u32 thread id flowing directly into accipe — no bare-numerus detour.
-    const u32 index ← 1
-    const f32 first ← input.get([index]) ⊥ 0.0
+    let u32 index ← 1
+    let f32 first ← input.get([index]) ⊥ 0.0
     input.set([index], 9.0)
-    const f32 updated ← input.get([index]) ⊥ 0.0
+    let f32 updated ← input.get([index]) ⊥ 0.0
 
     # A bound lu32 index vector also typechecks (lista width sugar).
-    const lu32 idx ← [index]
-    const f32 bound ← input.get(idx) ⊥ 0.0
+    let lu32 idx ← [index]
+    let f32 bound ← input.get(idx) ⊥ 0.0
 
     # Rank-2 grid with a lista<u32> origin index.
-    var tf32[4, 4] grid ← tf32[4, 4] {}
-    const u32 r ← 2
-    const u32 c ← 3
-    const list<u32> origin ← [r, c]
+    mut tf32[4, 4] grid ← tf32[4, 4] {}
+    let u32 r ← 2
+    let u32 c ← 3
+    let list<u32> origin ← [r, c]
     grid.set(origin, 7.0)
-    const f32 elementum ← grid.get(origin) ⊥ 0.0
+    let f32 elementum ← grid.get(origin) ⊥ 0.0
 
     print first
     print updated

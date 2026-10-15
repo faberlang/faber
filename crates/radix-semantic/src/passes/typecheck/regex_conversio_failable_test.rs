@@ -56,8 +56,8 @@ fn fac_cape_handles_dynamic_and_literal_patterns() {
     assert_accepts_la(
         r#"functio f(textus pat) → numerus {
     fac {
-        fixum _ a ← pat ↦ regex
-        fixum _ b ← "\\d+" ↦ regex
+        sit a ← pat ↦ regex
+        sit b ← "\\d+" ↦ regex
     } cape err {
         redde 0
     }
@@ -78,9 +78,9 @@ functio g() → regex ⇥ textus { redde "\\d+" ↦ regex }"#,
 fn incipit_frame_is_exempt() {
     assert_accepts_la(
         r#"incipit {
-    fixum textus pat ← "a+"
-    fixum _ a ← pat ↦ regex
-    fixum _ b ← "\\d+" ↦ regex
+    sit textus pat ← "a+"
+    sit a ← pat ↦ regex
+    sit b ← "\\d+" ↦ regex
 }"#,
     );
 }
@@ -88,8 +88,8 @@ fn incipit_frame_is_exempt() {
 #[test]
 fn recovery_slot_stays_rejected() {
     assert_rejects_with_issue_la(
-        r#"incipit { fixum textus p ← "a"
-    fixum _ r ← p ↦ regex ⊥ p ↦ regex }"#,
+        r#"incipit { sit textus p ← "a"
+    sit r ← p ↦ regex ⊥ p ↦ regex }"#,
         "regex_recovery_unsupported",
     );
 }

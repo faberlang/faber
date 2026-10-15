@@ -39,34 +39,34 @@ locale = "en"
 
 main {
     # textus → octeti (UTF-8 encode)
-    const string hi ← "hi"
-    const list<b8> enc ← hi ↦ list<b8>
+    let string hi ← "hi"
+    let list<b8> enc ← hi ↦ list<b8>
     print enc.length()
 
     # octeti → textus (UTF-8 decode, valid bytes)
     # "hi" in UTF-8
-    const list<b8> raw ← |68 69|
-    const string dec ← raw ↦ string
+    let list<b8> raw ← |68 69|
+    let string dec ← raw ↦ string
     print dec
 
     # octeti → textus with recovery (invalid UTF-8 → recovery value)
-    const list<b8> badUtf8 ← |ff ff|
-    const string recovered ← badUtf8 ↦ string ⊥ "?"
+    let list<b8> badUtf8 ← |ff ff|
+    let string recovered ← badUtf8 ↦ string ⊥ "?"
     print recovered
 
     # ascii → octeti
-    const ascii a ← 'hi'
-    const list<b8> aenc ← a ↦ list<b8>
+    let ascii a ← 'hi'
+    let list<b8> aenc ← a ↦ list<b8>
     print aenc.length()
 
     # octeti → ascii (valid ASCII bytes)
-    const ascii adec ← raw ↦ ascii
+    let ascii adec ← raw ↦ ascii
     print adec
 
     # octeti → ascii with recovery (non-ASCII byte → recovery value)
     # A one-scalar ascii literal is ascii<1>, which does not assign to bare
     # ascii. Recovery for ↦ ascii must be bare ascii (a multi-char literal).
-    const list<b8> nonAscii ← |ff|
-    const ascii arecovery ← nonAscii ↦ ascii ⊥ 'n/a'
+    let list<b8> nonAscii ← |ff|
+    let ascii arecovery ← nonAscii ↦ ascii ⊥ 'n/a'
     print arecovery
 }

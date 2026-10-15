@@ -11,15 +11,15 @@ import from "norma:random" random
 
 main {
     time.sleep(0)
-    const int before ← time.monotonic()
-    const int after ← time.monotonic()
+    let int before ← time.monotonic()
+    let int after ← time.monotonic()
     assert after ≥ before
     random.seed(7)
-    const int first ← random.random_int(1, 9)
+    let int first ← random.random_int(1, 9)
     random.seed(7)
-    const int second ← random.random_int(1, 9)
+    let int second ← random.random_int(1, 9)
     assert first ≡ second
-    const string id ← random.uuid()
+    let string id ← random.uuid()
     assert id.length() ≡ 36
     assert process.pid() ≻ 0
     assert process.cwd().length() ≻ 0

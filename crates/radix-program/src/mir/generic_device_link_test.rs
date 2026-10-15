@@ -46,13 +46,13 @@ locale = "en"
 import from "optlib:devicemath" devicemath
 
 main {
-    const tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
-    const tensor<f32, [2, 2]> b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
-    const list<f32> flat_c ← [1.0, 2.0, 3.0, 4.0]
-    const tensor<f32, [8, 8]> c ← flat_c ↦ tensor<f32, [8, 8]>
-    const _ r22 ← devicemath.kadd(a, b)
-    const _ again22 ← devicemath.kadd(a, b)
-    const _ r88 ← devicemath.kadd(c, c)
+    let tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    let tensor<f32, [2, 2]> b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
+    let list<f32> flat_c ← [1.0, 2.0, 3.0, 4.0]
+    let tensor<f32, [8, 8]> c ← flat_c ↦ tensor<f32, [8, 8]>
+    let r22 ← devicemath.kadd(a, b)
+    let again22 ← devicemath.kadd(a, b)
+    let r88 ← devicemath.kadd(c, c)
     print "ok"
 }
 "#;
@@ -65,9 +65,9 @@ locale = "en"
 import from "optlib:devicemath" devicemath
 
 main {
-    const tensor<f32, [4]> v ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
-    const tensor<f32, [4]> w ← [4.0, 3.0, 2.0, 1.0] ↦ tensor<f32, [4]>
-    const _ rh ← devicemath.khelper(v, w)
+    let tensor<f32, [4]> v ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
+    let tensor<f32, [4]> w ← [4.0, 3.0, 2.0, 1.0] ↦ tensor<f32, [4]>
+    let rh ← devicemath.khelper(v, w)
     print "ok"
 }
 "#;
@@ -278,8 +278,8 @@ locale = "en"
 import from "optlib:sigonly" sigonly
 
 main {
-    const tensor<f32, [4]> v ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
-    const _ r ← sigonly.ksig(v)
+    let tensor<f32, [4]> v ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
+    let r ← sigonly.ksig(v)
     print "ok"
 }
 "#;
@@ -411,9 +411,9 @@ fn probe_helper(tensor<f32, [4]> a, tensor<f32, [4]> b) → tensor<f32, [4]> {
 }
 
 main {
-    const tensor<f32, [4]> v ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
-    const tensor<f32, [4]> w ← [4.0, 3.0, 2.0, 1.0] ↦ tensor<f32, [4]>
-    const _ rh ← probe_helper(v, w)
+    let tensor<f32, [4]> v ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
+    let tensor<f32, [4]> w ← [4.0, 3.0, 2.0, 1.0] ↦ tensor<f32, [4]>
+    let rh ← probe_helper(v, w)
     print "ok"
 }
 "#;

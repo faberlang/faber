@@ -512,7 +512,7 @@ impl TypeChecker<'_> {
     /// When `expected` is a `tabula<K,V>`, a JSON object literal is validated
     /// entry-by-entry and typed as the annotated map on success; otherwise JSON
     /// literals are `valor`. Float literals also accept an expected fractus width
-    /// so declarations such as `fixum lista<f32> xs ← [1.0]` do not need
+    /// so declarations such as `sit lista<f32> xs ← [1.0]` do not need
     /// per-element casts.
     ///
     /// `nihil` stays the primitive nil type here; optional/nullability acceptance

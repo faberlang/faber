@@ -62,7 +62,7 @@ fn fresh_array_initializer_is_recorded_at_expression_and_binding_sites() {
     let (hir, locals) = local_rows(
         r"
 incipit {
-    fixum lista<numerus> fresh ← [1, 2, 3]
+    sit lista<numerus> fresh ← [1, 2, 3]
 }
 ",
     );
@@ -84,9 +84,9 @@ functio make() → lista<numerus> {
     redde [4, 5, 6]
 }
 incipit {
-    fixum lista<numerus> fresh ← [1, 2, 3]
-    fixum lista<numerus> alias ← fresh
-    fixum lista<numerus> called ← make()
+    sit lista<numerus> fresh ← [1, 2, 3]
+    sit lista<numerus> alias ← fresh
+    sit lista<numerus> called ← make()
 }
 ",
     );
@@ -110,8 +110,8 @@ fn own_transfer_records_dead_source_identity_and_spans() {
     let (hir, types, locals) = typed_local_rows(
         r"
 incipit {
-    fixum lista<numerus> source ← own [1, 2, 3]
-    fixum lista<numerus> destination ← own source
+    sit lista<numerus> source ← own [1, 2, 3]
+    sit lista<numerus> destination ← own source
 }
 ",
     );
@@ -138,8 +138,8 @@ fn provably_dead_unmarked_source_records_transfer_death() {
     let (hir, types, locals) = typed_local_rows(
         r"
 incipit {
-    fixum lista<numerus> source ← [1, 2, 3]
-    fixum lista<numerus> destination ← own source
+    sit lista<numerus> source ← [1, 2, 3]
+    sit lista<numerus> destination ← own source
 }
 ",
     );
@@ -158,8 +158,8 @@ fn explicit_copy_keeps_the_exclusive_source_live() {
     let (hir, types, locals) = typed_local_rows(
         r"
 incipit {
-    fixum lista<numerus> source ← own [1, 2, 3]
-    fixum lista<numerus> copied ← copy source
+    sit lista<numerus> source ← own [1, 2, 3]
+    sit lista<numerus> copied ← copy source
     nota source.longitudo()
 }
 ",
@@ -179,7 +179,7 @@ fn scope_exit_records_an_unused_exclusive_source() {
     let (hir, types, locals) = typed_local_rows(
         r"
 incipit {
-    fixum lista<numerus> scoped ← own [1, 2, 3]
+    sit lista<numerus> scoped ← own [1, 2, 3]
 }
 ",
     );
@@ -202,9 +202,9 @@ functio incertum() → bivalens {
     redde verum
 }
 incipit {
-    fixum lista<numerus> source ← own [1, 2, 3]
+    sit lista<numerus> source ← own [1, 2, 3]
     si incertum() {
-        fixum lista<numerus> destination ← own source
+        sit lista<numerus> destination ← own source
     }
 }
 ",
@@ -285,7 +285,7 @@ fn admitted_constructor_shapes_are_fresh() {
 #[test]
 fn analyzed_application_carries_access_facts() {
     let mut parsed = radix_parser::parse(radix_lexer::lex_with_locale_pack(
-        "incipit { fixum lista<numerus> fresh ← [1, 2, 3] }",
+        "incipit { sit lista<numerus> fresh ← [1, 2, 3] }",
         &la_pack(),
     ));
     assert!(parsed.success(), "parse errors: {:?}", parsed.errors);

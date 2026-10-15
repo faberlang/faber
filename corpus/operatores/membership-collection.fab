@@ -35,8 +35,8 @@ locale = "en"
 #   none — stdout not pinned for this exemplum.
 
 main {
-    const string condicio ← "agens"
-    const int aetas ← 21
+    let string condicio ← "agens"
+    let int aetas ← 21
 
     # Basic ∈ with textus lista
     if condicio ∈ ["pendens", "agens", "pausa"] {

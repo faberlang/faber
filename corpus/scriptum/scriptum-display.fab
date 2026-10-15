@@ -37,12 +37,12 @@ fn half(float x) → float {
 }
 
 main {
-    const bool yes ← true
-    const bool no ← false
-    const float whole ← 2.0
-    const float frac ← 2.5
-    const int count ← 7
-    const string word ← "hi"
+    let bool yes ← true
+    let bool no ← false
+    let float whole ← 2.0
+    let float frac ← 2.5
+    let int count ← 7
+    let string word ← "hi"
 
     print "yes=§"(yes)
     print "no=§"(no)

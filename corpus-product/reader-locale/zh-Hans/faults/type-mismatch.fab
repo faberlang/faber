@@ -1,5 +1,5 @@
 # Fault: text literal bound to an integer-typed constant (SEM010).
 入口 {
-  常量 整数 错配 ← "文字"
+  设 整数 错配 ← "文字"
   显示 错配
 }

@@ -48,13 +48,13 @@ locale = "en"
 main {
     # --- Empty and simple records ---
 
-    const json void ← {}
+    let json void ← {}
     print void
-    const json punctum ← { "x": 10, "y": 20 }
+    let json punctum ← { "x": 10, "y": 20 }
     print punctum
 
     # Text keys and constant values
-    const json forma ← { "clavis": 42 }
+    let json forma ← { "clavis": 42 }
     print forma
 
     # NOTE: JSON valor literals accept only constant values (strings, numbers,
@@ -63,6 +63,6 @@ main {
 
     # --- Nested valor ---
 
-    const json nidum ← { "extra": { "medium": 1 } }
+    let json nidum ← { "extra": { "medium": 1 } }
     print nidum
 }

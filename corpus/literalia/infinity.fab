@@ -22,9 +22,9 @@ locale = "en"
 #
 # The rejected forms are deliberately kept as teaching comments rather than
 # executable statements:
-#   const numerus not_an_integer ← ∞
-#   const numerus not_a_number ← nan
-#   const numerus non_numerus_is_not_an_integer ← nonnumerus (la spelling)
+#   let numerus not_an_integer ← ∞
+#   let numerus not_a_number ← nan
+#   let numerus non_numerus_is_not_an_integer ← nonnumerus (la spelling)
 #
 # EXPECTED OUTPUT:
 #   inf
@@ -33,10 +33,10 @@ locale = "en"
 #   NaN
 
 main {
-    const f64 positive ← ∞
-    const f32 narrow ← ∞
-    const f64 negative ← -∞
-    const f32 quiet ← nan
+    let f64 positive ← ∞
+    let f32 narrow ← ∞
+    let f64 negative ← -∞
+    let f32 quiet ← nan
     print positive
     print narrow
     print negative

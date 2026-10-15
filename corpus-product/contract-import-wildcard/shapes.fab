@@ -7,7 +7,7 @@ interface Figurable {
 
 @ public
 class Circle implements Figurable {
-    var int radius = 10
+    mut int radius = 10
 
     fn draw() → string {
         return "circle §"(self.radius)

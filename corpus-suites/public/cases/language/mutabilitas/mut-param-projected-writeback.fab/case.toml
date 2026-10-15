@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/mutabilitas/mut-param-projected-writeback.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/mut-param-projected-writeback.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -12,7 +12,7 @@ const NOT_NARROWED: &str = "optional_receiver_requires_chain";
 
 fn loop_with_guard(guard: &str) -> String {
     format!(
-        "functio f(lista<textus ∪ nihil> xs) → numerus {{\n    varia numerus total ← 0\n    itera ex xs fixum x {{\n        {guard}\n        total ← total + x.longitudo()\n    }}\n    redde total\n}}"
+        "functio f(lista<textus ∪ nihil> xs) → numerus {{\n    varia numerus total ← 0\n    itera ex xs sit x {{\n        {guard}\n        total ← total + x.longitudo()\n    }}\n    redde total\n}}"
     )
 }
 
@@ -71,7 +71,7 @@ fn conditionally_diverging_loop_guard_does_not_narrow() {
 #[test]
 fn continue_guard_does_not_narrow_past_the_loop() {
     test_support::assert_rejects_with_issue(
-        "functio f(textus ∪ nihil y, lista<numerus> xs) → numerus {\n    itera ex xs fixum x {\n        si y est nihil { perge }\n    }\n    redde y.longitudo()\n}",
+        "functio f(textus ∪ nihil y, lista<numerus> xs) → numerus {\n    itera ex xs sit x {\n        si y est nihil { perge }\n    }\n    redde y.longitudo()\n}",
         NOT_NARROWED,
     );
 }
@@ -93,7 +93,7 @@ fn throw_guard_narrows_parameter() {
 #[test]
 fn throw_guard_narrows_local() {
     test_support::assert_accepts(
-        "functio f(textus ∪ nihil p) → numerus ⇥ textus {\n    fixum textus ∪ nihil x ← p\n    si x ≡ nulla { iace \"nihil\" }\n    redde x.longitudo()\n}",
+        "functio f(textus ∪ nihil p) → numerus ⇥ textus {\n    sit textus ∪ nihil x ← p\n    si x ≡ nulla { iace \"nihil\" }\n    redde x.longitudo()\n}",
     );
 }
 

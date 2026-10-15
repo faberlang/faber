@@ -75,7 +75,7 @@ fn risky(int n) → int ⇥ string {
 # A guarded `return` inside a failable function, with an empty handler.
 fn attempt(int n) → string ⇥ string {
     do {
-        const int v ← risky(n)
+        let int v ← risky(n)
         return "ok §"(v)
     }
     catch err {
@@ -84,13 +84,13 @@ fn attempt(int n) → string ⇥ string {
 }
 
 main {
-    const inf small ← 7
-    const inf int_max ← 9223372036854775807
-    const inf past_int ← 9223372036854775808
-    const inf past_u64 ← 18446744073709551616
-    const inf int_min ← -9223372036854775808
-    const inf below_int ← -9223372036854775809
-    const inf u64_max ← 18446744073709551615
+    let inf small ← 7
+    let inf int_max ← 9223372036854775807
+    let inf past_int ← 9223372036854775808
+    let inf past_u64 ← 18446744073709551616
+    let inf int_min ← -9223372036854775808
+    let inf below_int ← -9223372036854775809
+    let inf u64_max ← 18446744073709551615
 
     # 1. The tag table: an integer, at the edges of `i64` and `u64`.
     print probe(small ↦ value)

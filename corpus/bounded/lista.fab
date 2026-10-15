@@ -29,9 +29,9 @@ locale = "en"
 # =============================================================================
 
 main {
-    const list<int, 8> xs ← empty
-    const int n ← xs.length()
-    const bool vacant ← xs.is_empty()
+    let list<int, 8> xs ← empty
+    let int n ← xs.length()
+    let bool vacant ← xs.is_empty()
     print n
     print vacant
 }

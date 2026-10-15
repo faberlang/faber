@@ -62,8 +62,8 @@ fn sectio_binding_scalar_order_typechecks() {
     accepts(&compile(
         r#"
 incipit {
-    fixum textus s ← "az"
-    fixum textus c ← s.sectio(0, 1)
+    sit textus s ← "az"
+    sit textus c ← s.sectio(0, 1)
     si c ≥ 'a' { nota "ok" }
 }
 "#,
@@ -82,7 +82,7 @@ functio keep(textus s, (textus) → bivalens pred) → textus {
 }
 
 incipit {
-    fixum textus out ← keep("abc", textus c ∴ c ≥ 'a' aut c ≤ 'z')
+    sit textus out ← keep("abc", textus c ∴ c ≥ 'a' aut c ≤ 'z')
 }
 "#,
         ),
@@ -98,7 +98,7 @@ fn interval_helper_native_body_scalar_order_typechecks() {
         varia lista<textus> kept ← vacua
         varia numerus i ← 0
         dum i ≺ s.longitudo() {
-            fixum textus c ← s.sectio(i, i + 1)
+            sit textus c ← s.sectio(i, i + 1)
             si c ≥ infimum et c ≤ supremum ergo kept.appende(c)
             i ← i + 1
         }
@@ -153,7 +153,7 @@ fn en_interval_helper_native_body_scalar_order_typechecks() {
         varia lista<textus> kept ← vacua
         varia numerus i ← 0
         dum i ≺ s.longitudo() {
-            fixum textus c ← s.sectio(i, i + 1)
+            sit textus c ← s.sectio(i, i + 1)
             si c ≥ infimum et c ≤ supremum ergo kept.appende(c)
             i ← i + 1
         }
@@ -216,7 +216,7 @@ functio go(ascii<8> bound) {
 
 #[test]
 fn char_literal_assigns_to_textus_slot() {
-    accepts(&compile("incipit { fixum textus t ← 'a' }"));
+    accepts(&compile("incipit { sit textus t ← 'a' }"));
 }
 
 #[test]
@@ -228,7 +228,7 @@ functio keep_if(textus s, (textus) → bivalens pred) → textus {
 }
 
 incipit {
-    fixum textus out ← keep_if("abc", textus c ∴ c ≥ 'a' aut c ≤ 'z')
+    sit textus out ← keep_if("abc", textus c ∴ c ≥ 'a' aut c ≤ 'z')
 }
 "#,
     ));

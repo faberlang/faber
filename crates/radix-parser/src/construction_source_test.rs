@@ -37,7 +37,7 @@ fn construction_fields(source: &str) -> Vec<&'static str> {
 #[test]
 fn construction_source_is_the_last_field() {
     assert_eq!(
-        construction_fields("fixum _ q ← Punctum { x = 1 } ex p"),
+        construction_fields("sit q ← Punctum { x = 1 } ex p"),
         ["field", "source"]
     );
 }
@@ -45,7 +45,7 @@ fn construction_source_is_the_last_field() {
 #[test]
 fn construction_source_accepts_postfix_expressions() {
     assert_eq!(
-        construction_fields("fixum _ q ← Punctum { x = 1, y = 2 } ex fons.punctum()"),
+        construction_fields("sit q ← Punctum { x = 1, y = 2 } ex fons.punctum()"),
         ["field", "field", "source"]
     );
 }
@@ -53,34 +53,31 @@ fn construction_source_accepts_postfix_expressions() {
 #[test]
 fn qualified_construction_takes_a_source() {
     assert_eq!(
-        construction_fields("fixum _ q ← geo.Punctum { x = 1 } ex p"),
+        construction_fields("sit q ← geo.Punctum { x = 1 } ex p"),
         ["field", "source"]
     );
 }
 
 #[test]
 fn construction_without_source_is_unchanged() {
-    assert_eq!(
-        construction_fields("fixum _ q ← Punctum { x = 1 }"),
-        ["field"]
-    );
+    assert_eq!(construction_fields("sit q ← Punctum { x = 1 }"), ["field"]);
 }
 
 #[test]
 fn second_construction_source_is_rejected() {
     assert_parse_error_matches(
-        "fixum _ q ← Punctum { x = 1 } ex p ex r",
+        "sit q ← Punctum { x = 1 } ex p ex r",
         ParseExpectation::Args(&[("issue", "construction_source_repeated")]),
     );
     assert_parse_error_matches(
-        "fixum _ q ← Punctum { x = 1 } ex p ex r",
+        "sit q ← Punctum { x = 1 } ex p ex r",
         ParseExpectation::Kind(ParseErrorKind::Unexpected),
     );
 }
 
 #[test]
 fn next_line_ex_stays_an_extraction_statement() {
-    let result = parse_ok("fixum _ q ← Punctum { x = 1 }\nex q fixum x\n");
+    let result = parse_ok("sit q ← Punctum { x = 1 }\nex q sit x\n");
     let program = result.program.expect("program");
     assert_eq!(program.statements.len(), 2);
     assert!(matches!(program.statements[1].kind, StmtKind::Ex(_)));

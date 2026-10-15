@@ -38,14 +38,14 @@ fn module_constant_initializer_claims_insere() {
 #[test]
 fn genus_static_field_initializer_claims_insere() {
     let init = first_class_field_init_kind(
-        "genus Icon {\n    generis octeti LOGO = insere \"logo.png\"\n}\n",
+        "genus Icon {\n    fixum octeti LOGO = insere \"logo.png\"\n}\n",
     );
     assert!(init.starts_with("Insere("), "got {init}");
 }
 
 #[test]
 fn every_field_modifier_default_claims_insere() {
-    for modifier in ["fixum", "varia", "generis"] {
+    for modifier in ["sit", "varia", "fixum"] {
         let source = format!("genus G {{\n    {modifier} textus s = insere \"x.txt\"\n}}\n");
         let init = first_class_field_init_kind(&source);
         assert!(
@@ -73,7 +73,7 @@ fn insere_is_claimed_in_any_expression_position() {
 #[test]
 fn insere_stays_an_identifier_without_a_following_string() {
     let result = parse_ok_la(
-        "fixum numerus insere = 3\nfixum numerus ALIUS = insere\nfunctio f() → numerus {\n    fixum numerus insere ← 4\n    redde insere\n}\n",
+        "fixum numerus insere = 3\nfixum numerus ALIUS = insere\nfunctio f() → numerus {\n    sit numerus insere ← 4\n    redde insere\n}\n",
     );
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[1].kind else {
@@ -96,6 +96,6 @@ fn insere_call_stays_a_call() {
 #[test]
 fn insere_without_a_string_path_is_not_an_embed_anywhere() {
     // A field default `insere x` is no embed; it fails as ordinary syntax.
-    let result = parse_program_la("genus G {\n    fixum textus s = insere x\n}\n");
+    let result = parse_program_la("genus G {\n    sit textus s = insere x\n}\n");
     assert!(!result.success());
 }

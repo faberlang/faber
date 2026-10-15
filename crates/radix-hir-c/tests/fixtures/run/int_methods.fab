@@ -1,0 +1,23 @@
++++
+locale = "en"
++++
+# Integer methods: `abs`, `sign`, `minimum`, `maximum` and `power`. All are
+# exact: `abs` of `i64::MIN` reaches `2^63`, still in the representation cap,
+# and `power` is repeated squaring that traps `numerus overflow`.
+main {
+    let int value ← 0 - 7
+    let int zero ← 0
+    let int positive ← 7
+    print value.abs()
+    print value.sign()
+    print zero.sign()
+    print positive.sign()
+    print value.minimum(3)
+    print value.maximum(3)
+    print 2.power(10)
+    print 0.power(0)
+    print positive.power(0)
+    let int min ← 0 - 9223372036854775807 - 1
+    print min.abs()
+    print 9223372036854775807.abs()
+}

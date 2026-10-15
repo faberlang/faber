@@ -20,7 +20,7 @@ fn eat(own list<int> xs) → void {
 }
 
 main {
-    var list<int> a ← [1, 2, 3]
+    mut list<int> a ← [1, 2, 3]
     eat(own a)
     print a.length()
 }

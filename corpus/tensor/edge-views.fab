@@ -28,12 +28,12 @@ class ZeroGhost implements EdgePolicy<vector<int, 1>> ∩ EdgeTransform<vector<i
 }
 
 main {
-    const tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
-    const tf32[3] clamped ← base.shift([1]).limes<clamp>()
-    const tf32[3] reflected ← base.shift([1]).limes<reflect>()
-    const tf32[3] wrapped ← base.shift([1]).limes<wrap>()
-    const tf32[3] filled ← base.shift([1]) coalesce 0.0
-    const tf32[3] custom ← base.shift([1]).limes<ZeroGhost>()
+    let tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    let tf32[3] clamped ← base.shift([1]).limes<clamp>()
+    let tf32[3] reflected ← base.shift([1]).limes<reflect>()
+    let tf32[3] wrapped ← base.shift([1]).limes<wrap>()
+    let tf32[3] filled ← base.shift([1]) coalesce 0.0
+    let tf32[3] custom ← base.shift([1]).limes<ZeroGhost>()
     print clamped.flatten()
     print reflected.flatten()
     print wrapped.flatten()

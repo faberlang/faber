@@ -34,9 +34,9 @@ fn rejects(source: &str, kind: SemanticErrorKind, issue: &str) {
 fn tensor_pair(left: &str, right: &str, op: &str) -> String {
     format!(
         "main {{
-    const tensor<f32, {left}> a ← empty
-    const tensor<f32, {right}> b ← empty
-    const _ out ← a {op} b
+    let tensor<f32, {left}> a ← empty
+    let tensor<f32, {right}> b ← empty
+    let out ← a {op} b
 }}"
     )
 }
@@ -126,8 +126,8 @@ fn tensor_scalar_lifting_preserves_shape() {
         for op in ["*", "+", "-"] {
             accepts_shape(
                 &format!(
-                    "main {{ const tensor<f32, {shape:?}> a ← empty
-    const _ out ← a {op} 2.0 }}"
+                    "main {{ let tensor<f32, {shape:?}> a ← empty
+    let out ← a {op} 2.0 }}"
                 ),
                 &shape,
             );
@@ -141,8 +141,8 @@ fn scalar_tensor_lifting_preserves_shape() {
         for op in ["*", "+", "-"] {
             accepts_shape(
                 &format!(
-                    "main {{ const tensor<f32, {shape:?}> a ← empty
-    const _ out ← 2.0 {op} a }}"
+                    "main {{ let tensor<f32, {shape:?}> a ← empty
+    let out ← 2.0 {op} a }}"
                 ),
                 &shape,
             );
@@ -205,9 +205,9 @@ fn explicit_expanded_view_allows_exact_shape_glyphs() {
         accepts_shape(
             &format!(
                 "main {{
-    const tensor<f32, [3]> row ← empty
-    const tensor<f32, [2, 3]> grid ← empty
-    const _ out ← row.expanded([2, 3]) {op} grid
+    let tensor<f32, [3]> row ← empty
+    let tensor<f32, [2, 3]> grid ← empty
+    let out ← row.expanded([2, 3]) {op} grid
 }}"
             ),
             &[2, 3],

@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "transfer"
 canonical = false
 summary = "perge inside a fac block continues the enclosing loop without entering cape."
-syntax = "for range 0‥3 const i { do { if i ≡ 1 { continue } } catch err { } }"
+syntax = "for range 0‥3 let i { do { if i ≡ 1 { continue } } catch err { } }"
 related = ["rumpe", "fac", "cape"]
 locale = "en"
 +++
@@ -31,7 +31,7 @@ locale = "en"
 # =============================================================================
 
 main {
-    for range 0‥3 const i {
+    for range 0‥3 let i {
         do {
             if i ≡ 1 {
                 continue

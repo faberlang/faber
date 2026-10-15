@@ -1081,6 +1081,8 @@ pub enum MirIntrinsic {
     /// Operate on a compiler-owned live sermo directional view.
     Sermo(MirSermoOp),
     ReadLine,
+    /// Read all of stdin to EOF (`lege` with no line argument).
+    ReadAll,
     /// Async suspend (`cede`) or generator yield (`cede` inside `@ cursor`).
     Cede,
     /// Read one compiler-owned GPU execution builtin inside a device function.
@@ -1593,9 +1595,14 @@ pub struct MirCursorStream {
     pub callee: DefId,
     /// `true` when the only consumer is a stepped `itera ex` walk that
     /// re-reads `length` before each index read (D6.6: cursors are lazy).
-    /// A suspending backend may then resume the generator one `cede` per
-    /// step and abandon it on `rumpe`; the result is typed `lista<T>`, so an
-    /// eager backend may ignore the flag and materialize.
+    /// The oracle (`radix-mir-runner`, `eval_cursor_stream`) materializes
+    /// only unstepped streams — a `stepped` stream stays lazy, and a backend
+    /// that cannot suspend the generator must decline by name (for example
+    /// `stepped cursor stream`) rather than materialize: an eager lowering
+    /// changes what the program prints (generator-side output interleaves
+    /// with the loop body) and hangs on an unbounded generator under `break`.
+    /// A suspending backend may resume the generator one `cede` per step and
+    /// abandon it on `rumpe`.
     #[serde(default)]
     pub stepped: bool,
 }

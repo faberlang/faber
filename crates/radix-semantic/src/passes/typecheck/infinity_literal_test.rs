@@ -7,11 +7,11 @@ use crate::{NumericWidth, Primitive, Type};
 fn infinity_and_nan_literals_follow_contextual_float_width() {
     let unit = test_support::analyze_ok(
         r"incipit {
-    fixum f32 narrow ← ∞
-    fixum f64 wide ← ∞
-    fixum fractus default_width ← ∞
-    fixum f32 nan_width ← nonnumerus
-    fixum f32 negated ← -∞
+    sit f32 narrow ← ∞
+    sit f64 wide ← ∞
+    sit fractus default_width ← ∞
+    sit f32 nan_width ← nonnumerus
+    sit f32 negated ← -∞
     nota narrow
     nota wide
     nota default_width
@@ -46,9 +46,9 @@ fn infinity_and_nan_literals_follow_contextual_float_width() {
 #[test]
 fn non_finite_literals_fail_closed_in_numerus_contexts() {
     for source in [
-        "incipit { fixum numerus bad ← ∞ }",
-        "incipit { fixum numerus bad ← nonnumerus }",
-        "incipit { fixum fractus bad ← nan }",
+        "incipit { sit numerus bad ← ∞ }",
+        "incipit { sit numerus bad ← nonnumerus }",
+        "incipit { sit fractus bad ← nan }",
     ] {
         let result = test_support::analyze_source(source);
         assert!(

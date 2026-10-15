@@ -52,9 +52,9 @@ fn ascii_cursor_accepts_as_cursor_littera() {
 fn itera_ex_ascii_cursor_binds_littera() {
     test_support::assert_accepts_la(
         r"incipit {
-    fixum ascii s ← 'ab'
-    itera ex s.cursor() fixum c {
-        fixum littera x ← c
+    sit ascii s ← 'ab'
+    itera ex s.cursor() sit c {
+        sit littera x ← c
         nota x
     }
 }",
@@ -65,8 +65,8 @@ fn itera_ex_ascii_cursor_binds_littera() {
 fn ascii_cursor_collects_to_lista_littera() {
     test_support::assert_accepts_la(
         r"incipit {
-    fixum ascii s ← 'ab'
-    fixum lista<littera> xs ← s.cursor() ↦ lista<littera>
+    sit ascii s ← 'ab'
+    sit lista<littera> xs ← s.cursor() ↦ lista<littera>
     nota xs
 }",
     );
@@ -76,8 +76,8 @@ fn ascii_cursor_collects_to_lista_littera() {
 fn ascii_cursor_collect_to_lista_textus_rejects() {
     test_support::assert_rejects_with_issue_la(
         r"incipit {
-    fixum ascii s ← 'ab'
-    fixum lista<textus> xs ← s.cursor() ↦ lista<textus>
+    sit ascii s ← 'ab'
+    sit lista<textus> xs ← s.cursor() ↦ lista<textus>
     nota xs
 }",
         "cross_collection_unsupported",
@@ -88,8 +88,8 @@ fn ascii_cursor_collect_to_lista_textus_rejects() {
 fn itera_de_ascii_cursor_requires_ex() {
     test_support::assert_rejects_with_issue_la(
         r"incipit {
-    fixum ascii s ← 'ab'
-    itera de s.cursor() fixum c {
+    sit ascii s ← 'ab'
+    itera de s.cursor() sit c {
         nota c
     }
 }",

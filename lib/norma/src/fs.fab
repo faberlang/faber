@@ -36,20 +36,20 @@ fn io_fault_from(value raw) → fault.IoFault {
 # Maps to: stat(), lstat()
 @ public
 class FileStatus {
-    var int mode
+    mut int mode
     # permission bits (e.g., 0o755)
-    var int link_count
+    mut int link_count
     # hard link count
-    var int owner
+    mut int owner
     # owner uid
-    var int group
+    mut int group
     # group gid
-    var int byte_length
+    mut int byte_length
     # size in bytes
-    var int modified
+    mut int modified
     # mtime (ms since epoch)
-    var bool is_directory
-    var bool is_symlink
+    mut bool is_directory
+    mut bool is_symlink
 }
 
 # =========================================================================
@@ -93,14 +93,14 @@ fn read_bytes_async(string path) → list<b8> ⇥ fault.IoFault {
 # Draw a bounded byte range from a file.
 @ public
 fn read_range(string path, int offset, int length) → list<b8> ⇥ fault.IoFault {
-    const list<value> args ← [path ↦ value, offset ↦ value, length ↦ value]
+    let list<value> args ← [path ↦ value, offset ↦ value, length ↦ value]
     return call 'solum:partem' (args) ↦ list<b8>
 }
 
 # Find a text byte pattern within a bounded file range, or -1 when absent.
 @ public
 fn find(string path, string pattern, int offset, int length) → int ⇥ fault.IoFault {
-    const list<value> args ← [path ↦ value, pattern ↦ value, offset ↦ value, length ↦ value]
+    let list<value> args ← [path ↦ value, pattern ↦ value, offset ↦ value, length ↦ value]
     return call 'solum:inveni' (args) ↦ int
 }
 
@@ -148,7 +148,7 @@ fn write_file_async(string path, string data) → void ⇥ fault.IoFault {
 # Pour bytes to file, overwrites existing (sync)
 @ public
 fn write_bytes(string path, list<b8> data) → void ⇥ fault.IoFault {
-    const list<value> args ← [path ↦ value, data ↦ value]
+    let list<value> args ← [path ↦ value, data ↦ value]
     return call 'solum:funde' (args) ↦ void
 }
 
@@ -156,7 +156,7 @@ fn write_bytes(string path, list<b8> data) → void ⇥ fault.IoFault {
 @ public
 @ future
 fn write_bytes_async(string path, list<b8> data) → void ⇥ fault.IoFault {
-    const list<value> args ← [path ↦ value, data ↦ value]
+    let list<value> args ← [path ↦ value, data ↦ value]
     return call 'solum:funde' (args) ↦ void
 }
 
@@ -371,7 +371,7 @@ fn touch_async(string path) → void ⇥ fault.IoFault {
 # Set permission/mode bits.
 @ public
 fn set_mode(string path, int mode) → void ⇥ fault.IoFault {
-    const list<value> args ← [path ↦ value, mode ↦ value]
+    let list<value> args ← [path ↦ value, mode ↦ value]
     return call 'solum:modum' (args) ↦ void
 }
 
@@ -494,21 +494,21 @@ fn join_two(string base, string segment) → string {
 #
 @ public
 fn glob(string root, string pattern) → list<string> ⇥ string {
-    const list<string> segments ← pattern.split("/")
-    var list<string> candidatos ← [root]
-    var int index ← 0
+    let list<string> segments ← pattern.split("/")
+    mut list<string> candidatos ← [root]
+    mut int index ← 0
     while index ≺ segments.length() {
-        const string segment ← segments.get(index) coalesce ""
+        let string segment ← segments.get(index) coalesce ""
         if segment ≡ "" {
             throw "empty path segment in solum.glob pattern"
         }
 
-        var list<string> proximos ← []
+        mut list<string> proximos ← []
         if segment ≡ "*" {
-            for from candidatos const base {
+            for from candidatos let base {
                 do {
-                    const list<string> entries ← list_dir(base)
-                    for from entries const entry {
+                    let list<string> entries ← list_dir(base)
+                    for from entries let entry {
                         proximos.append(join_two(base, entry))
                     }
                 }
@@ -518,8 +518,8 @@ fn glob(string root, string pattern) → list<string> ⇥ string {
             }
         }
         else {
-            for from candidatos const base {
-                const string path ← join_two(base, segment)
+            for from candidatos let base {
+                let string path ← join_two(base, segment)
                 if exists(path) {
                     proximos.append(path)
                 }

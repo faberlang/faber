@@ -389,6 +389,16 @@ fn compile_cli_program(
         // (wasm-host-parity P1 residual — the ten CLI fixtures emit and
         // wasm-tools validate). The emitter fails closed on any shape it
         // does not support.
+        // Cranelift: the shared MIR CLI-program lowering already produced the
+        // entry/argv/exit shapes; the classifier declines any it cannot lower.
+        #[cfg(feature = "mir-clif")]
+        Target::MirClif => {
+            let mut analysis = analysis;
+            match generate_clif_object_output(&mut analysis, no_fuse) {
+                Ok(output) => CompileResult { output: Some(output), diagnostics: analysis.diagnostics },
+                Err(err) => compile_codegen_error(analysis, name, source, err),
+            }
+        }
         #[cfg(feature = "mir-wasm")]
         Target::MirWasm => {
             let mut analysis = analysis;
@@ -401,7 +411,13 @@ fn compile_cli_program(
             let Some(cli_program) = analysis.cli_program.as_ref() else {
                 return missing_cli_program(analysis, name);
             };
-            match codegen::generate_rust_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
+            match codegen::generate_rust_cli(
+                &analysis.hir,
+                &analysis.types,
+                &analysis.interner,
+                cli_program,
+                &analysis.display_tokens,
+            ) {
                 Ok(output) => {
                     CompileResult { output: Some(crate::Output::Rust(output)), diagnostics: analysis.diagnostics }
                 }
@@ -412,30 +428,67 @@ fn compile_cli_program(
             let Some(cli_program) = analysis.cli_program.as_ref() else {
                 return missing_cli_program(analysis, name);
             };
-            match codegen::generate_go_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
+            match codegen::generate_go_cli(
+                &analysis.hir,
+                &analysis.types,
+                &analysis.interner,
+                cli_program,
+                analysis.display_tokens().clone(),
+            ) {
                 Ok(output) => {
                     CompileResult { output: Some(crate::Output::Go(output)), diagnostics: analysis.diagnostics }
                 }
                 Err(err) => compile_codegen_error(analysis, name, source, err.into()),
             }
         }
-        _ => compile_error(
-            analysis,
-            codegen_diagnostic(
-                name,
-                "CODEGEN002",
-                "runnable CLI code generation is not implemented for this target",
-            )
-            .with_args(vec![
-                DiagnosticArg::new("issue", "cli_codegen_rust_only"),
-                DiagnosticArg::new("target", target.as_str()),
-            ]),
-        ),
+        Target::HirTypeScript => {
+            let Some(cli_program) = analysis.cli_program.as_ref() else {
+                return missing_cli_program(analysis, name);
+            };
+            match codegen::generate_ts_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
+                Ok(output) => {
+                    CompileResult { output: Some(crate::Output::TypeScript(output)), diagnostics: analysis.diagnostics }
+                }
+                Err(err) => compile_codegen_error(analysis, name, source, err.into()),
+            }
+        }
+        Target::HirPython => {
+            let Some(cli_program) = analysis.cli_program.as_ref() else {
+                return missing_cli_program(analysis, name);
+            };
+            match codegen::generate_python_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
+                Ok(output) => {
+                    CompileResult { output: Some(crate::Output::Python(output)), diagnostics: analysis.diagnostics }
+                }
+                Err(err) => compile_codegen_error(analysis, name, source, err.into()),
+            }
+        }
+        // Fail-closed backstop: a target that declares `lowers_cli_entry`
+        // but has no arm above (or whose feature is disabled) is refused.
+        _ => compile_error(analysis, cli_codegen_refusal(target, name)),
     }
+}
+
+/// `CODEGEN002` `cli_codegen_rust_only`: the target does not lower a CLI
+/// entry program. Shared by the capability gate and the dispatch backstop.
+fn cli_codegen_refusal(target: Target, name: &str) -> Diagnostic {
+    codegen_diagnostic(
+        name,
+        "CODEGEN002",
+        "runnable CLI code generation is only implemented for Rust and the Go narrow slice",
+    )
+    .with_args(vec![
+        DiagnosticArg::new("issue", "cli_codegen_rust_only"),
+        DiagnosticArg::new("target", target.as_str()),
+    ])
 }
 
 fn cli_codegen_diagnostic(target: Target, name: &str, analysis: &AnalyzedModule) -> Option<Diagnostic> {
     let cli_program = analysis.cli_program.as_ref()?;
+
+    if !target.lowers_cli_entry() {
+        return Some(cli_codegen_refusal(target, name));
+    }
 
     match target {
         Target::HirRust => {
@@ -451,21 +504,46 @@ fn cli_codegen_diagnostic(target: Target, name: &str, analysis: &AnalyzedModule)
             })
         }
         Target::HirGo => go_cli_codegen_diagnostic(name, cli_program),
+        // TypeScript lowers the narrow CLI slice inside its own emitter; a
+        // surface beyond the slice fails closed there with a stable issue.
+        // An unsupported `exitus` expression is reported early here so the
+        // diagnostic is identical to the Rust arm's CODEGEN004.
+        Target::HirTypeScript => {
+            if matches!(cli_program.exit, Some(crate::cli::CliExit::Unsupported)) {
+                return Some(codegen_diagnostic(
+                    name,
+                    "CODEGEN004",
+                    "CLI exitus code generation supports numeric literals, bindings, and args fields in Phase 03",
+                ));
+            }
+            None
+        }
+        // Python lowers the narrow CLI slice inside its own emitter; a
+        // surface beyond the slice fails closed there with a stable issue.
+        // An unsupported `exitus` expression is reported early here so the
+        // diagnostic is identical to the Rust arm's CODEGEN004.
+        Target::HirPython => {
+            if matches!(cli_program.exit, Some(crate::cli::CliExit::Unsupported)) {
+                return Some(
+                    codegen_diagnostic(
+                        name,
+                        "CODEGEN004",
+                        "CLI exitus code generation supports numeric literals, bindings, and args fields in Phase 03",
+                    )
+                    .with_args(vec![
+                        DiagnosticArg::new("issue", "py_cli_exit_unsupported"),
+                        DiagnosticArg::new("target", "python"),
+                    ]),
+                );
+            }
+            None
+        }
         // Wasm text routes CLI programs through the ordinary emit path (the
         // shared MIR CLI lowering already produced the entry/argv/exit
         // shapes); the emitter fails closed on unsupported shapes itself.
-        Target::MirWasm => None,
-        _ => Some(
-            codegen_diagnostic(
-                name,
-                "CODEGEN002",
-                "runnable CLI code generation is only implemented for Rust and the Go narrow slice",
-            )
-            .with_args(vec![
-                DiagnosticArg::new("issue", "cli_codegen_rust_only"),
-                DiagnosticArg::new("target", target.as_str()),
-            ]),
-        ),
+        // Any other capable target reaches the `compile_cli_program`
+        // backstop when it has no dispatch arm.
+        _ => None,
     }
 }
 
@@ -696,6 +774,10 @@ fn generate_output(
         }
         #[cfg(not(feature = "mir-llvm"))]
         Target::MirLlvm | Target::MirLlvmHost => Err(unavailable_target_spanned(Target::MirLlvm)),
+        #[cfg(feature = "mir-clif")]
+        Target::MirClif => generate_clif_object_output(analysis, no_fuse),
+        #[cfg(not(feature = "mir-clif"))]
+        Target::MirClif => Err(unavailable_target_spanned(Target::MirClif)),
         Target::MirAmd => {
             // AMD-A2 fail-closed lane diagnostic (goal AC1 / DDCP0
             // feature-gate policy): without the `mir-amd` feature the AMD
@@ -1013,6 +1095,25 @@ fn generate_llvm_text_output(
         };
         Ok(crate::Output::LlvmText(crate::LlvmTextOutput { code }))
     }
+}
+
+/// Lower one unit to a native Cranelift object (public `clif` target).
+#[cfg(feature = "mir-clif")]
+fn generate_clif_object_output(
+    analysis: &mut AnalyzedModule,
+    no_fuse: bool,
+) -> Result<crate::Output, SpannedCodegenError> {
+    prepare_mir_lowering_interner(analysis);
+    let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+    let object = radix_mir_clif::emit_object(&mir.validated, &mir.interner).map_err(|error| codegen::CodegenError {
+        message: error.message,
+        args: vec![
+            DiagnosticArg::new("category", error.category),
+            DiagnosticArg::new("shape", error.shape),
+            DiagnosticArg::new("detail", error.detail),
+        ],
+    })?;
+    Ok(crate::Output::ClifObject(crate::ClifObjectOutput { bytes: object.bytes }))
 }
 
 /// Build the NVVM kernel descriptor JSON sidecar for a source unit targeting
@@ -4160,6 +4261,7 @@ fn collect_target_policy_diagnostics(
         | Target::MirFmir
         | Target::MirLlvm
         | Target::MirLlvmHost
+        | Target::MirClif
         | Target::MirAmd
         | Target::MirMetal
         | Target::MirScena
@@ -4878,6 +4980,10 @@ fn retarget_cli_program_symbols(
 #[cfg(feature = "mir-core")]
 #[path = "mod_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "cli_capability_test.rs"]
+mod cli_capability_tests;
 
 #[cfg(test)]
 #[cfg(feature = "mir-core")]

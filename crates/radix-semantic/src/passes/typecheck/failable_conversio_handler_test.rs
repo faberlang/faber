@@ -99,7 +99,7 @@ fn fac_cape_covers_the_conversio() {
 fn capta_covers_the_conversio() {
     assert_accepts_la(concat!(
         "functio g(textus s) → vacuum {\n",
-        "    fixum _ r ← capta { s ↦ u8 }\n    nota r\n",
+        "    sit r ← capta { s ↦ u8 }\n    nota r\n",
         "}\n",
     ));
 }
@@ -114,8 +114,8 @@ fn a_handler_does_not_leak_past_its_boundary() {
     assert_rejects_with_issue_la(
         concat!(
             "functio g(textus s) → numerus {\n",
-            "    fixum _ r ← capta { s ↦ u8 }\n    nota r\n",
-            "    fixum u8 y ← s ↦ u8\n    redde 0\n",
+            "    sit r ← capta { s ↦ u8 }\n    nota r\n",
+            "    sit u8 y ← s ↦ u8\n    redde 0\n",
             "}\n",
         ),
         ISSUE,
@@ -127,13 +127,13 @@ fn closures_do_not_inherit_the_enclosing_error_channel_or_main() {
     // A closure is its own frame: errors do not unwind through it, so it
     // needs its own handler even inside main or a `⇥` function.
     assert_rejects_with_issue_la(
-        "incipit {\n    fixum _ h ← numerus x ∴ x ↦ u8\n    nota h(1)\n}\n",
+        "incipit {\n    sit h ← numerus x ∴ x ↦ u8\n    nota h(1)\n}\n",
         ISSUE,
     );
     assert_rejects_with_issue_la(
         concat!(
             "functio g() → vacuum ⇥ textus {\n",
-            "    fixum _ h ← numerus x ∴ x ↦ u8\n    nota h(1)\n",
+            "    sit h ← numerus x ∴ x ↦ u8\n    nota h(1)\n",
             "}\n",
         ),
         ISSUE,
@@ -145,7 +145,7 @@ fn closures_do_not_inherit_the_enclosing_error_channel_or_main() {
 #[test]
 fn main_body_is_exempt_for_conversions() {
     assert_accepts_la(
-        "incipit {\n    fixum u8 n ← 300 ↦ u8\n    fixum numerus m ← \"12\" ↦ numerus\n    nota n\n    nota m\n}\n",
+        "incipit {\n    sit u8 n ← 300 ↦ u8\n    sit numerus m ← \"12\" ↦ numerus\n    nota n\n    nota m\n}\n",
     );
 }
 
@@ -154,7 +154,7 @@ fn main_body_is_exempt_for_failable_calls() {
     // D17.8: an unhandled failable call directly in main panics (fi6c), as a
     // failable conversion there does.
     assert_accepts_la(&format!(
-        "{FAILABLE_FN}incipit {{\n    fixum numerus n ← f(1)\n    nota n\n}}\n"
+        "{FAILABLE_FN}incipit {{\n    sit numerus n ← f(1)\n    nota n\n}}\n"
     ));
     assert_accepts_la(&format!("{FAILABLE_FN}incipit {{\n    nota f(1)\n}}\n"));
 }
@@ -162,7 +162,7 @@ fn main_body_is_exempt_for_failable_calls() {
 #[test]
 fn closures_in_main_do_not_inherit_the_call_exemption() {
     assert_rejects_with_issue_la(
-        &format!("{FAILABLE_FN}incipit {{\n    fixum _ h ← numerus x ∴ f(x)\n    nota h(1)\n}}\n"),
+        &format!("{FAILABLE_FN}incipit {{\n    sit h ← numerus x ∴ f(x)\n    nota h(1)\n}}\n"),
         CALL_ISSUE,
     );
 }
@@ -207,7 +207,7 @@ fn constant_proven_to_fit_is_exempt() {
 fn policy_word_targets_are_exempt() {
     assert_accepts_la(concat!(
         "functio g(numerus x) → modulus<u8> {\n",
-        "    fixum saturatus<u8> s ← x ↦ saturatus<u8>\n",
+        "    sit saturatus<u8> s ← x ↦ saturatus<u8>\n",
         "    redde x ↦ modulus<u8>\n",
         "}\n",
     ));
@@ -233,11 +233,11 @@ fn float_into_policy_word_types_the_catch_binding_as_textus() {
     for word in ["modulus<u8>", "saturatus<u8>"] {
         let program = |binding: &str| {
             format!(
-                "functio g(fractus x) → vacuum {{\n    fac {{\n        fixum {word} w ← x ↦ {word} via Trunc\n        nota w\n    }} cape err {{\n        {binding}\n    }}\n}}\n"
+                "functio g(fractus x) → vacuum {{\n    fac {{\n        sit {word} w ← x ↦ {word} via Trunc\n        nota w\n    }} cape err {{\n        {binding}\n    }}\n}}\n"
             )
         };
-        assert_accepts_la(&program("fixum textus s ← err\n        nota s"));
-        let rejected = analyze_source_la(&program("fixum numerus n ← err\n        nota n"));
+        assert_accepts_la(&program("sit textus s ← err\n        nota s"));
+        let rejected = analyze_source_la(&program("sit numerus n ← err\n        nota n"));
         assert!(
             rejected.diagnostics.iter().any(|err| err.is_error()),
             "{word}: catch binding must be textus, got {:?}",

@@ -1,0 +1,45 @@
++++
+locale = "en"
++++
+# `sponte` parameters and the `x![i]` assertion index.
+#
+# A bare `optional` parameter is the optional of its declared type: a call that
+# omits it passes none, and the body may coalesce it. `optional coalesce <expr>`
+# keeps the declared type and the call site runs the default, which is what the
+# runner does (`lower_direct_call_args`). `x![i]` asserts a list is present and
+# then reads the element.
+class Locus {
+    mut string urbs
+}
+
+fn pick(int x optional) → int {
+    return x coalesce 3
+}
+
+fn page(int n optional coalesce 1) → int {
+    return n + 1
+}
+
+fn greet(string titulus optional) → string {
+    return titulus coalesce "anon"
+}
+
+fn first(string ∪ none s) → string {
+    return s coalesce "empty"
+}
+
+main {
+    print pick()
+    print pick(9)
+    print page()
+    print page(7)
+    print greet()
+    print greet("Marcus")
+    print first(null)
+    print first("Roma")
+    let list<string, 3> letters ← ["a", "b", "c"]
+    print letters![0]
+    print letters![2]
+    let Locus ∪ none held ← Locus { urbs = "Roma" }
+    print held!.urbs
+}

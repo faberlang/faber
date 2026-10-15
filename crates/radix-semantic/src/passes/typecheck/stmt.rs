@@ -135,16 +135,20 @@ impl TypeChecker<'_> {
         }
         // Need: an immutable compile-time integer binding is a valid
         // `axis` argument. Record its exact value; a `var` binding is not
-        // recorded, so a named mutable axis stays the named refusal. Only a
-        // binding with no declared type or an integer declared type is an
-        // integer binding: `fractus k ← 1` must not become a constant axis
-        // just because its initializer folds to an integer.
-        let declares_integer = local.ty.is_none_or(|ty| self.is_integer(ty));
-        if !local.mutable && declares_integer {
-            let value = local.init.as_ref().and_then(|init| {
-                super::integer_range::const_int_value_resolved(init, &self.const_int_values)
-            });
-            if let Some(value) = value {
+        // recorded, so a named mutable axis stays the named refusal. The
+        // recorded value is what the declared cell holds after the store, not
+        // the raw initializer (`fixum modulus<u8> k ← 256` holds 0), and a
+        // cell that is not an integer is not recorded: `fractus k ← 1` must
+        // not become a constant axis just because its initializer folds.
+        if !local.mutable {
+            let stored = local
+                .init
+                .as_ref()
+                .and_then(|init| {
+                    super::integer_range::const_int_value_resolved(init, &self.const_int_values)
+                })
+                .and_then(|value| self.stored_const_int(local.ty, value));
+            if let Some(value) = stored {
                 self.const_int_values.insert(local.def_id, value);
             }
         }
@@ -162,7 +166,7 @@ impl TypeChecker<'_> {
 
         let inferred = match (&local.ty, &mut local.init) {
             (Some(ty), Some(init)) => {
-                // A conversion-directed initializer (`fixum T x ↤ value`) has
+                // A conversion-directed initializer (`sit T x ↤ value`) has
                 // the binding itself as its assignment target; the written type
                 // is the conversion destination. Make the binding visible to
                 // lvalue resolution while the initializer is checked.
@@ -264,7 +268,7 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// `const` is deep (need, rule 2): a plain `var T y ← x` of a
+    /// `const` is deep (need, rule 2): a plain `mut T y ← x` of a
     /// shareable (container or genus) value read through a `const` local or a
     /// module-level constant would make `y` a writable name for state `x`
     /// promises not to change.
@@ -453,9 +457,9 @@ impl TypeChecker<'_> {
     /// The root of the place an `itera` source aliases, when it aliases one.
     ///
     /// A bare place chain is the place itself. A promoted collection method
-    /// whose registry row is the `Values` view (`tabula.valores`) returns an
-    /// array over the receiver's own values, so the receiver's root is the
-    /// aliased place too.
+    /// whose registry row is the `Values` view (`tabula.valores`) on a map or
+    /// ledger receiver returns an array over the receiver's own values, so the
+    /// receiver's root is the aliased place too.
     fn itera_source_alias_root(&self, iter: &HirExpression) -> Option<radix_hir::DefId> {
         if let Some(root) = Self::place_root(iter) {
             return Some(root);
@@ -463,26 +467,42 @@ impl TypeChecker<'_> {
         let HirExpressionKind::MethodCall(receiver, method, _, args, _) = &iter.kind else {
             return None;
         };
-        if !self.is_receiver_values_view(*method, args.len()) {
+        if !self.is_receiver_values_view(receiver, *method, args.len()) {
             return None;
         }
         Self::place_root(receiver)
     }
 
-    /// The registry classifies a promoted method as the collection `Values`
-    /// view: its result is an array over the receiver's own values, not a
-    /// fresh copy. The catalog is the authority; the lookup is pack-first,
-    /// as in `check_intrinsic_method_call`: under a non-`la` pack only the
-    /// active pack's surface spelling resolves (the canonical Latin name is
-    /// not a legal method), while the `la` pack or no pack matches the
-    /// canonical registry name.
-    fn is_receiver_values_view(&self, method: Symbol, arg_count: usize) -> bool {
+    /// The registry classifies a promoted method on `receiver` as the
+    /// collection `Values` view: its result is an array over the receiver's
+    /// own values, not a fresh copy. The catalog is the authority; the lookup
+    /// is pack-first, as in `check_intrinsic_method_call`: under a non-`la`
+    /// pack only the active pack's surface spelling resolves (the canonical
+    /// Latin name is not a legal method), while the `la` pack or no pack
+    /// matches the canonical registry name.
+    ///
+    /// A spelling match alone is not the view: a user method that happens to
+    /// share the name is an ordinary call. The receiver's type is read before
+    /// `check_expr` has run, from the stamped expression type or the bound
+    /// local's type, and a registry row counts only when its receiver family
+    /// is one the type hosts (map and ledger both route to `Tabula`). With no
+    /// type yet (a field-chain receiver) the spelling-and-arity match stands.
+    fn is_receiver_values_view(
+        &self,
+        receiver: &HirExpression,
+        method: Symbol,
+        arg_count: usize,
+    ) -> bool {
         let Some(interner) = self.interner else {
             return false;
         };
         let name = interner.resolve(method);
+        let families = self
+            .values_view_receiver_type(receiver)
+            .map(|ty| super::intrinsics::receiver_families(self.types.get(ty)));
         radix_intrinsics::INTRINSICS.iter().any(|entry| {
             entry.arg_count == arg_count
+                && families.is_none_or(|families| families.contains(&entry.receiver))
                 && radix_intrinsics::mir_collection_op(entry)
                     == Some(radix_types::MirCollectionOp::Values)
                 && match self.locale_pack {
@@ -492,6 +512,18 @@ impl TypeChecker<'_> {
                     _ => entry.faber_name == name,
                 }
         })
+    }
+
+    /// The receiver's peeled type before `check_expr` has typed it: the
+    /// stamped expression type, else the bound local's type for a bare path.
+    fn values_view_receiver_type(&self, receiver: &HirExpression) -> Option<TypeId> {
+        let ty = match (receiver.ty, &receiver.kind) {
+            (Some(ty), _) => ty,
+            (None, HirExpressionKind::Path(def_id)) => self.lookup_binding(*def_id)?.ty,
+            (None, _) => return None,
+        };
+        let resolved = self.resolve_inferred_type(ty);
+        Some(self.types.peel_access_marker(resolved).1)
     }
 
     /// A container or genus instance: a value a plain bind shares rather than

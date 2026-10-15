@@ -431,6 +431,7 @@ fn intrinsic(value: &MirIntrinsic) -> String {
         MirIntrinsic::Sermo(op) => format!("sermo_{}", op.spelling()),
 
         MirIntrinsic::ReadLine => "read_line".to_owned(),
+        MirIntrinsic::ReadAll => "read_all".to_owned(),
         MirIntrinsic::Cede => "cede".to_owned(),
         MirIntrinsic::DeviceBlock(op) => device_block_spelling(*op),
         MirIntrinsic::GpuBuiltin(builtin) => format!("gpu_builtin {}", builtin.spelling()),

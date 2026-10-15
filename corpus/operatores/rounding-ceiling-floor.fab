@@ -24,6 +24,6 @@ diagnostic = "PARSE030:ceiling_floor_delimiters"
 # This exemplum intentionally fails to compile.
 
 main {
-    const float x ← 2.5
+    let float x ← 2.5
     print ⌈x⌋
 }

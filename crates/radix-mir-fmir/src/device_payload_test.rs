@@ -1449,6 +1449,55 @@ fn reflection_round_trips_and_folds_into_packet_sha256() {
     assert_eq!(artifact.packet_sha256, with_reflection);
 }
 
+/// A device section whose single Metal artifact carries a reflection with the
+/// given nested `v` and freshly recomputed digests, so the packet is
+/// self-consistent and only the reflection version can fail admission.
+fn section_with_reflection_version(v: u32) -> FmirDeviceSection {
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![with_computed_digests(FmirDeviceArtifact {
+        reflection: Some(FmirArtifactReflection { v, kernels: vec![] }),
+        ..metal_artifact("kernel void add() {}")
+    })];
+    section
+}
+
+#[test]
+fn reflection_version_mismatch_is_rejected_by_text_decoder() {
+    for actual in [crate::schema::ARTIFACT_REFLECTION_VERSION + 1, 1] {
+        let image = text_image_with_device(Some(section_with_reflection_version(actual)));
+        let text = encode_text_image(&image).expect("encode text image");
+        match decode_text_image(&text, TOOLCHAIN) {
+            Err(FmirImageError::ArtifactReflectionVersionMismatch {
+                actual: found,
+                expected,
+                ..
+            }) => {
+                assert_eq!(found, actual);
+                assert_eq!(expected, crate::schema::ARTIFACT_REFLECTION_VERSION);
+            }
+            other => panic!("expected ArtifactReflectionVersionMismatch, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn reflection_version_mismatch_is_rejected_by_binary_decoder() {
+    let actual = crate::schema::ARTIFACT_REFLECTION_VERSION + 1;
+    let image = binary_image_with_device(Some(section_with_reflection_version(actual)));
+    let bytes = encode_binary_image(&image).expect("encode binary image");
+    match decode_binary_image(&bytes, TOOLCHAIN) {
+        Err(FmirImageError::ArtifactReflectionVersionMismatch {
+            actual: found,
+            expected,
+            ..
+        }) => {
+            assert_eq!(found, actual);
+            assert_eq!(expected, crate::schema::ARTIFACT_REFLECTION_VERSION);
+        }
+        other => panic!("expected ArtifactReflectionVersionMismatch, got {other:?}"),
+    }
+}
+
 #[test]
 fn reflection_content_folds_in_canonical_order_invariant() {
     // DDCP4-U4 content: the reflection fold is over the CANONICAL order of

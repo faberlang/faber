@@ -1,0 +1,30 @@
++++
+locale = "en"
++++
+# `a?.b`: none when the base is none, else the field as an optional; a chain
+# stays one level of optional; a base that is always present is a plain read.
+class Node {
+    mut int value
+    mut string label
+    mut Node ∪ none next
+}
+
+fn total(Node ∪ none n) → int {
+    if n is none {
+        return 0
+    }
+    return n.value + total(n.next)
+}
+
+main {
+    let Node ∪ none missing ← null
+    mut Node head ← Node { value = 1, label = "a", next = Node { value = 2, label = "b", next = null } }
+    print head?.next?.value
+    print head?.next?.next?.value
+    print head?.label
+    print missing?.value
+    print missing?.label
+    print total(head)
+    head.next ← Node { value = 14, label = "c", next = null }
+    print total(head)
+}

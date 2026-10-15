@@ -3,7 +3,10 @@
 use super::{empty_text_frame, is_route, reset_handles, serve, split_ws_url, wrap_tls};
 use crate::http;
 use crate::value::{Arg, Reply};
+use std::io::{Read, Write};
+use std::net::TcpListener;
 use std::thread;
+use std::time::Duration;
 
 fn serve_ok(route: &str, args: &[Arg]) -> Reply {
     serve(route, args)
@@ -97,6 +100,151 @@ fn echo_round_trips() {
         panic!("client receive: {got:?}");
     };
     assert!(fields.contains(&("text".to_owned(), Reply::Str("ping".to_owned()))));
+}
+
+#[test]
+fn connect_open_writes_upgrade_request_and_pends() {
+    let _guard = crate::test_support::handle_table_guard();
+    reset_handles();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let url = format!("ws://127.0.0.1:{port}/chat");
+    let id = match serve_ok("websocket:connect_open", &[Arg::Str(url)]) {
+        Reply::Int(id) => id,
+        other => panic!("connect_open: {other:?}"),
+    };
+    let (mut peer, _) = listener.accept().unwrap();
+    peer.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let mut request = Vec::new();
+    let mut buffer = [0_u8; 512];
+    while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+        let count = peer.read(&mut buffer).unwrap();
+        assert_ne!(count, 0, "peer closed before the upgrade headers arrived");
+        request.extend_from_slice(&buffer[..count]);
+    }
+    let request = String::from_utf8(request).unwrap();
+    assert!(request.starts_with("GET /chat HTTP/1.1\r\n"));
+    assert!(request.contains("Upgrade: websocket\r\n"));
+    assert!(request.contains("Connection: Upgrade\r\n"));
+    assert!(request.contains("Sec-WebSocket-Version: 13\r\n"));
+    let key = request
+        .lines()
+        .find_map(|line| line.strip_prefix("Sec-WebSocket-Key:"))
+        .map(str::trim)
+        .unwrap_or_default();
+    assert!(!key.is_empty(), "missing Sec-WebSocket-Key value");
+    assert!(matches!(
+        serve("websocket:send", &[Arg::Int(id), Arg::Str("x".into())]),
+        Some(Err(_))
+    ));
+    reset_handles();
+}
+
+fn raw_client_handshake() -> (i64, std::net::TcpStream, String) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let url = format!("ws://127.0.0.1:{port}/chat");
+    let id = match serve_ok("websocket:connect_open", &[Arg::Str(url)]) {
+        Reply::Int(id) => id,
+        other => panic!("connect_open: {other:?}"),
+    };
+    let (mut peer, _) = listener.accept().unwrap();
+    peer.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    peer.set_write_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    let mut request = Vec::new();
+    let mut buffer = [0_u8; 512];
+    while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+        let count = peer.read(&mut buffer).unwrap();
+        assert_ne!(count, 0, "peer closed before the upgrade headers arrived");
+        request.extend_from_slice(&buffer[..count]);
+    }
+    let request = String::from_utf8_lossy(&request);
+    let key = request
+        .lines()
+        .find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            name.eq_ignore_ascii_case("sec-websocket-key")
+                .then(|| value.trim().to_owned())
+        })
+        .expect("Sec-WebSocket-Key");
+    (id, peer, key)
+}
+
+#[test]
+fn connect_finish_completes_handshake_and_echoes() {
+    let _guard = crate::test_support::handle_table_guard();
+    reset_handles();
+    let (id, mut peer, key) = raw_client_handshake();
+    let accept = tungstenite::handshake::derive_accept_key(key.as_bytes());
+    write!(
+        peer,
+        "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n"
+    )
+    .unwrap();
+    assert_eq!(
+        serve_ok("websocket:connect_finish", &[Arg::Int(id)]),
+        Reply::Unit
+    );
+    assert_eq!(
+        serve_ok(
+            "websocket:send",
+            &[Arg::Int(id), Arg::Str("salve".to_owned())]
+        ),
+        Reply::Unit
+    );
+    let mut frame_head = [0_u8; 2];
+    peer.read_exact(&mut frame_head).unwrap();
+    assert_eq!(frame_head[0], 0x81);
+    assert_eq!(frame_head[1] & 0x80, 0x80);
+    assert_eq!(frame_head[1] & 0x7f, 5);
+    let mut mask = [0_u8; 4];
+    peer.read_exact(&mut mask).unwrap();
+    let mut payload = [0_u8; 5];
+    peer.read_exact(&mut payload).unwrap();
+    for (index, byte) in payload.iter_mut().enumerate() {
+        *byte ^= mask[index % mask.len()];
+    }
+    assert_eq!(&payload, b"salve");
+
+    peer.write_all(&[0x81, 0x05, b'r', b'e', b'd', b'd', b'e'])
+        .unwrap();
+    assert_eq!(
+        serve_ok("websocket:receive", &[Arg::Int(id)]),
+        Reply::Map(vec![
+            ("text".to_owned(), Reply::Str("redde".to_owned())),
+            ("done".to_owned(), Reply::Bool(false)),
+        ])
+    );
+    serve_ok("websocket:close", &[Arg::Int(id)]);
+}
+
+#[test]
+fn connect_finish_rejects_bad_accept_key() {
+    let _guard = crate::test_support::handle_table_guard();
+    reset_handles();
+    let (id, mut peer, _) = raw_client_handshake();
+    peer.write_all(
+        b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: bogus\r\n\r\n",
+    )
+    .unwrap();
+    assert!(matches!(
+        serve("websocket:connect_finish", &[Arg::Int(id)]),
+        Some(Err(_))
+    ));
+}
+
+#[test]
+fn connect_finish_rejects_non_101() {
+    let _guard = crate::test_support::handle_table_guard();
+    reset_handles();
+    let (id, mut peer, _) = raw_client_handshake();
+    peer.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+        .unwrap();
+    assert!(matches!(
+        serve("websocket:connect_finish", &[Arg::Int(id)]),
+        Some(Err(_))
+    ));
 }
 
 #[test]

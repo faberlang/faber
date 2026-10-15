@@ -2,6 +2,6 @@
 locale = "en"
 +++
 main {
-    var inf n ← 5
+    mut inf n ← 5
     print n
 }

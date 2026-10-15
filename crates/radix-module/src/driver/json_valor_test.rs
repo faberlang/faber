@@ -14,7 +14,7 @@ use crate::test_support::{assert_compile_fails_with_args, assert_compile_fails_w
 fn json_valor_literal_typechecks_as_valor_without_errors() {
     let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
-    fixum _ spec ← {
+    sit spec ← {
         "name": "openapi",
         "version": 3,
         "ratio": 1.5,
@@ -36,7 +36,7 @@ fn json_valor_literal_empty_object_without_cell_is_named_error() {
     assert_compile_fails_with_issue(
         &session,
         "empty.fab",
-        "incipit {\n    fixum _ e ← {}\n    nota e\n}",
+        "incipit {\n    sit e ← {}\n    nota e\n}",
         "inferred_constructor_no_expected_type",
     );
 }
@@ -47,7 +47,7 @@ fn json_valor_literal_rejects_duplicate_keys_at_top_level() {
     assert_compile_fails_with_args(
         &session,
         "dup.fab",
-        "incipit {\n    fixum _ d ← { \"a\": 1, \"b\": 2, \"a\": 3 }\n    nota d\n}",
+        "incipit {\n    sit d ← { \"a\": 1, \"b\": 2, \"a\": 3 }\n    nota d\n}",
         &[
             DiagnosticArg::new("issue", "json_duplicate_key"),
             DiagnosticArg::new("key", "a"),
@@ -61,7 +61,7 @@ fn json_valor_literal_rejects_duplicate_keys_in_nested_object() {
     assert_compile_fails_with_args(
         &session,
         "dup2.fab",
-        "incipit {\n    fixum _ d ← { \"outer\": { \"x\": 1, \"x\": 2 } }\n    nota d\n}",
+        "incipit {\n    sit d ← { \"outer\": { \"x\": 1, \"x\": 2 } }\n    nota d\n}",
         &[
             DiagnosticArg::new("issue", "json_duplicate_key"),
             DiagnosticArg::new("key", "x"),
@@ -73,7 +73,7 @@ fn json_valor_literal_rejects_duplicate_keys_in_nested_object() {
 #[test]
 fn json_valor_literal_distinct_keys_in_different_objects_are_not_duplicates() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n    fixum _ d ← { \"a\": { \"x\": 1 }, \"b\": { \"x\": 2 } }\n    nota d\n}";
+    let source = "incipit {\n    sit d ← { \"a\": { \"x\": 1 }, \"b\": { \"x\": 2 } }\n    nota d\n}";
     let result = compile(&session, "siblings.fab", source, ModuleCompileRequest::default());
     assert!(
         result.success(),
@@ -85,7 +85,7 @@ fn json_valor_literal_distinct_keys_in_different_objects_are_not_duplicates() {
 #[test]
 #[cfg(feature = "hir-faber")]
 fn json_valor_literal_round_trips_through_faber_codegen() {
-    let source = "incipit {\n    fixum _ d ← { \"a\": 1, \"b\": true }\n    nota d\n}";
+    let source = "incipit {\n    sit d ← { \"a\": 1, \"b\": true }\n    nota d\n}";
     let first = super::faber_emit("rt1.fab", source);
     assert!(first.success(), "first compile failed: {:?}", first.diagnostics);
     let Some(out) = first.output else {
@@ -102,7 +102,7 @@ fn json_valor_literal_round_trips_through_faber_codegen() {
 fn json_valor_ascribed_to_tabula_emits_real_hashmap_constant() {
     let session = test_session_la(Target::HirRust);
     let source =
-        "incipit {\n    fixum tabula<textus, numerus> puncta ← { \"aelia\": 95, \"balbus\": 87 }\n    nota puncta\n}";
+        "incipit {\n    sit tabula<textus, numerus> puncta ← { \"aelia\": 95, \"balbus\": 87 }\n    nota puncta\n}";
     let result = compile(&session, "tabula.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected success, got: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
@@ -126,7 +126,7 @@ fn json_valor_ascribed_to_tabula_rejects_value_type_mismatch() {
     assert_compile_fails_with_issue(
         &session,
         "mismatch.fab",
-        "incipit {\n    fixum tabula<textus, textus> bad ← { \"a\": 1 }\n    nota bad\n}",
+        "incipit {\n    sit tabula<textus, textus> bad ← { \"a\": 1 }\n    nota bad\n}",
         "json_value_type_mismatch",
     );
 }
@@ -137,7 +137,7 @@ fn json_valor_ascribed_to_tabula_rejects_null_for_non_valor_value_type() {
     assert_compile_fails_with_issue(
         &session,
         "null-mismatch.fab",
-        "incipit {\n    fixum tabula<textus, numerus> bad ← { \"a\": null }\n    nota bad\n}",
+        "incipit {\n    sit tabula<textus, numerus> bad ← { \"a\": null }\n    nota bad\n}",
         "json_value_type_mismatch",
     );
 }
@@ -148,7 +148,7 @@ fn json_valor_ascribed_to_tabula_rejects_non_textus_key_type() {
     assert_compile_fails_with_issue(
         &session,
         "key-mismatch.fab",
-        "incipit {\n    fixum tabula<numerus, numerus> bad ← { \"a\": 1 }\n    nota bad\n}",
+        "incipit {\n    sit tabula<numerus, numerus> bad ← { \"a\": 1 }\n    nota bad\n}",
         "json_map_key_must_be_textus",
     );
 }
@@ -159,7 +159,7 @@ fn json_valor_ascribed_to_tabula_rejects_nested_value_when_v_is_not_valor() {
     assert_compile_fails_with_issue(
         &session,
         "nested.fab",
-        "incipit {\n    fixum tabula<textus, numerus> bad ← { \"a\": { \"x\": 1 } }\n    nota bad\n}",
+        "incipit {\n    sit tabula<textus, numerus> bad ← { \"a\": { \"x\": 1 } }\n    nota bad\n}",
         "json_nested_value_requires_valor",
     );
 }
@@ -168,7 +168,7 @@ fn json_valor_ascribed_to_tabula_rejects_nested_value_when_v_is_not_valor() {
 #[test]
 fn json_valor_ascribed_to_tabula_valor_values_lower_to_fabervalue() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n    fixum tabula<textus, valor> nested ← { \"a\": { \"x\": 1 } }\n    nota nested\n}";
+    let source = "incipit {\n    sit tabula<textus, valor> nested ← { \"a\": { \"x\": 1 } }\n    nota nested\n}";
     let result = compile(&session, "nested_valor.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected success, got: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;

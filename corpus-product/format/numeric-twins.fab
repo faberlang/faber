@@ -6,12 +6,12 @@ fn bump(int i) → int {
 }
 
 main {
-    const float x ← 2.0
-    const float chained ← x.added(1.0).multiplied(3.0)
-    const float neg ← x.negated()
-    var float acc ← 10.0
+    let float x ← 2.0
+    let float chained ← x.added(1.0).multiplied(3.0)
+    let float neg ← x.negated()
+    mut float acc ← 10.0
     acc.add(5.0)
-    var list<float> xs ← [1.0, 2.0]
+    mut list<float> xs ← [1.0, 2.0]
     xs[bump(0)].add(5.0)
     print chained
     print neg

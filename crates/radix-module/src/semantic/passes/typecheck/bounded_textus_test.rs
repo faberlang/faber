@@ -46,8 +46,8 @@ fn bounded_textus_conversions_follow_d7() {
         r"typus TextusOcto = textus<8>
 
 functio bridges(textus<8> bounded, textus unbounded) → vacuum {
-    fixum textus widened ← bounded ↦ textus
-    fixum TextusOcto narrowed ← unbounded ↦ TextusOcto
+    sit textus widened ← bounded ↦ textus
+    sit TextusOcto narrowed ← unbounded ↦ TextusOcto
     nota widened
     nota narrowed
 }

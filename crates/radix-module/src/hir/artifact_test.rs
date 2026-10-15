@@ -531,14 +531,14 @@ fn dangling_defid_repro_comptime_block_local() {
 
 #[test]
 fn dangling_defid_repro_comptime_class_static_local() {
-    // A class `static` field initialized by `comptime` with a referenced
-    // local (`static int X = comptime { const int t = 3; return t }`) read as
+    // A class `const` member initialized by `comptime` with a referenced
+    // local (`const int X = comptime { const int t = 3; return t }`) read as
     // `Tab.X` from `main` also yields `DanglingIndex { kind: "DefId" }`.
     // Printed once: index 1000000, arena size 2.
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "class Tab {\n",
-        "    static int X = comptime {\n",
+        "    const int X = comptime {\n",
         "        const int t = 3\n",
         "        return t\n",
         "    }\n",
@@ -589,7 +589,7 @@ fn closure_parameter_hole_survives_the_fhir_round_trip() {
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "main {\n",
-        "    const regex word \u{2190} \"[a-z]+\" \u{21a6} regex\n",
+        "    let regex word \u{2190} \"[a-z]+\" \u{21a6} regex\n",
         "    print word.replace(\"ab cd e\", _ m \u{2234} m.text())\n",
         "}\n",
     );
@@ -625,13 +625,13 @@ fn transparent_alias_annotation_survives_the_fhir_round_trip() {
         "type Index = map<string, int>\n",
         "type NomenOptivum = string \u{222a} none\n\n",
         "main {\n",
-        "    const Signum signum \u{2190} 42\n",
-        "    const Cognomen cognomen \u{2190} \"Marcus\"\n",
-        "    const Viget viget \u{2190} true\n",
-        "    const Nomina sodales \u{2190} [\"Gaius\", \"Lucius\", \"Titus\"]\n",
-        "    const Puncta puncta \u{2190} [100, 95, 87]\n",
-        "    const Index index \u{2190} { \"a\": 1 }\n",
-        "    const NomenOptivum nomen \u{2190} null\n",
+        "    let Signum signum \u{2190} 42\n",
+        "    let Cognomen cognomen \u{2190} \"Marcus\"\n",
+        "    let Viget viget \u{2190} true\n",
+        "    let Nomina sodales \u{2190} [\"Gaius\", \"Lucius\", \"Titus\"]\n",
+        "    let Puncta puncta \u{2190} [100, 95, 87]\n",
+        "    let Index index \u{2190} { \"a\": 1 }\n",
+        "    let NomenOptivum nomen \u{2190} null\n",
         "    print signum\n",
         "    print cognomen\n",
         "    print viget\n",
@@ -797,7 +797,7 @@ fn fhir_artifact_keeps_inferred_set_literal_hole() {
     use crate::hir::serialize::from_analyzed;
     use radix_hir::{HirOwnerRef, HirTypeFormHead, HirTypeSlot};
 
-    let source = "+++\nlocale = \"en\"\n+++\n\nmain {\n    const set<int> s ← _ [1, 2]\n    print s.length()\n}\n";
+    let source = "+++\nlocale = \"en\"\n+++\n\nmain {\n    let set<int> s ← _ [1, 2]\n    print s.length()\n}\n";
     let session = Session::new(
         Config::default()
             .with_dev_locale_root()
@@ -1766,8 +1766,8 @@ fn struct_field_type_sites_remap_to_struct_owner_once() {
     use crate::hir::serialize::from_analyzed;
     use radix_hir::{HirItemKind, HirOwnerRef, HirTypeSite, HirTypeSlot};
 
-    let source = "class Point {\n    var int x\n    var int y\n}\n\
-                  class Label {\n    var string text\n    var bool visible\n}\n\
+    let source = "class Point {\n    mut int x\n    mut int y\n}\n\
+                  class Label {\n    mut string text\n    mut bool visible\n}\n\
                   fn identity(int value) → int { return value }\n";
     let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
         .expect("load English locale pack");
@@ -2262,7 +2262,7 @@ functio fallback<T = textus>() → textus {
 }
 
 incipit {
-    fixum _ a ← pick(1)
+    sit a ← pick(1)
     nota fallback()
 }
 "#;
@@ -2415,17 +2415,17 @@ fn kernel_requirements_and_symbolic_extents_survive_fhir_round_trip() {
 @ publica
 functio copy_coordinate<magnitudo N>(
     tensor<f32, [N]> input,
-    in tensor<u32, [N]> output
+    varia tensor<u32, [N]> output
 ) → vacuum {
-    itera ex input apud [i] fixum value {
+    itera ex input apud [i] sit value {
         output[i] ← i
     }
 }
 
 @ nucleum
 @ publica
-functio copy_four(tensor<f32, [4]> input, in tensor<u32, [4]> output) → vacuum {
-    copy_coordinate(input, in output)
+functio copy_four(tensor<f32, [4]> input, varia tensor<u32, [4]> output) → vacuum {
+    copy_coordinate(input, varia output)
 }
 ";
     let session = crate::driver::Session::new(crate::driver::Config::default());
@@ -2455,8 +2455,8 @@ fn kernel_requirements_wire_omits_rows_without_a_device_or_numeric_encoding() {
     let source = r"
 @ nucleum
 @ publica
-functio copy_four(tensor<f32, [4]> input, in tensor<u32, [4]> output) → vacuum {
-    itera ex input apud [i] fixum value {
+functio copy_four(tensor<f32, [4]> input, varia tensor<u32, [4]> output) → vacuum {
+    itera ex input apud [i] sit value {
         output[i] ← i
     }
 }
@@ -2539,4 +2539,44 @@ fn zz_debug_presentation() {
             .map_err(|e| e.to_string())
     );
     let _ = &mut artifact;
+}
+
+#[test]
+fn size_generic_genus_applied_to_size_survives_round_trip() {
+    // A size-generic genus applied to a concrete size (`Box<3>`) used to trip
+    // the FHIR unit gate twice. Lowering recorded no authored child form for
+    // the magnitude argument, so the witness carried one `AppliedArg::Size`
+    // while the authored form carried none and `validate_named_form` failed
+    // with `named_argument_arity`; once the producer records the size child,
+    // the validator's unconditional `AppliedArg::Size` rejection reported
+    // `named_size_argument`. Both slugs must round-trip green.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = concat!(
+        "+++\nlocale = \"en\"\n+++\n\n",
+        "@ public\n",
+        "class Box<size N> {\n",
+        "    mut vector<f32, N> minima\n",
+        "    mut vector<f32, N> maxima\n",
+        "}\n",
+        "@ public\n",
+        "fn box_inflated(Box<3> box, f32 amount) \u{2192} Box<3> {\n",
+        "    let vector<f32, 3> lo \u{2190} box.minima\n",
+        "    let vector<f32, 3> hi \u{2190} box.maxima\n",
+        "    let Box<3> expanded \u{2190} Box {minima = lo, maxima = hi}\n",
+        "    return expanded\n",
+        "}\n",
+    );
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "size-generic.fab", source, AnalyzeRequest::default())
+        .expect("size-generic fixture analyzes");
+    let artifact = from_analyzed(&original, "size-generic", "size-generic.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize size-generic artifact");
+    load_fhir(&bytes).expect("size-generic artifact must load");
 }

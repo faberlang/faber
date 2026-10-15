@@ -40,9 +40,9 @@ locale = "en"
 
 main {
     # logged in
-    const bool intravit ← true
+    let bool intravit ← true
     # has permission
-    const bool licet ← true
+    let bool licet ← true
     if intravit {
         # Inner branch: permission check after login succeeds
         if licet {

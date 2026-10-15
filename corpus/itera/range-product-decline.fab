@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "Range product declines: source/binder arity, extent/binder shadowing, and a mixed range/plain series fail closed."
-syntax = "for range <a>‥<b>, <c>‥<d> const <i>, <j> { }"
+syntax = "for range <a>‥<b>, <c>‥<d> let <i>, <j> { }"
 related = ["ex", "itera", "apud"]
 locale = "en"
 +++
@@ -40,19 +40,19 @@ locale = "en"
 # law, and the every-member-is-a-range law for the Cartesian series.
 
 fn counts(int m, int n) → void {
-    for range 0‥m, 0‥n const i {
+    for range 0‥m, 0‥n let i {
         print i
     }
 }
 
 fn shadows(int k) → void {
-    for range 0‥k, 1‥2 const k, j {
+    for range 0‥k, 1‥2 let k, j {
         print k
     }
 }
 
 fn mixes(int m, int n) → void {
-    for range 0‥m, n const i, j {
+    for range 0‥m, n let i, j {
         print i
     }
 }

@@ -270,10 +270,10 @@ fn runtime_tensor_constructor_and_annotation_share_the_same_local_extent() {
 fn runtime_extent(int value) → int { return value }
 
 main {
-    const int n ← runtime_extent(2)
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[size n, 2] tensor ← flat ↦ tf32[size n, 2]
-    const tf32[size n, 2] same_shape ← tensor
+    let int n ← runtime_extent(2)
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[size n, 2] tensor ← flat ↦ tf32[size n, 2]
+    let tf32[size n, 2] same_shape ← tensor
     print same_shape.shape()
 }
 "#;
@@ -297,11 +297,11 @@ fn unrelated_runtime_local_annotation_is_rejected() {
 fn runtime_extent(int value) → int { return value }
 
 main {
-    const int n ← runtime_extent(2)
-    const int m ← runtime_extent(3)
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[m, 2] tensor_m ← flat ↦ tf32[size m, 2]
-    const tf32[n, 2] invalid ← tensor_m
+    let int n ← runtime_extent(2)
+    let int m ← runtime_extent(3)
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[m, 2] tensor_m ← flat ↦ tf32[size m, 2]
+    let tf32[n, 2] invalid ← tensor_m
     print invalid.shape()
 }
 "#;

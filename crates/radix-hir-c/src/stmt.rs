@@ -151,13 +151,37 @@ impl Emitter<'_> {
             return Err(unsupported("local without a resolved type"));
         };
         let class = classify(self.types, ty)?;
+        // A declaration initializer's `copy` lands on the declared type; the
+        // bind deep-duplicates its source (R7).
+        let copy = crate::ty::is_copy_marker(self.types, ty);
         let Some(init) = &local.init else {
             if entry_args && class == Ty::List(crate::ty::Elem::Text) {
                 return self.entry_arguments(out, local);
             }
-            return Err(unsupported("local without an initializer"));
+            // A deferred binding (`const int pending` then `pending ← 7`): the
+            // frontend proves it is assigned before any read, so the C cell is
+            // declared without an initializer and written once. It is declared
+            // writable so that one store compiles.
+            self.need_class(class);
+            let Some(kind) = self.names.binding_kind(local.def_id) else {
+                return Err(unsupported("local the name catalog does not classify"));
+            };
+            let raw = self.names.resolve_symbol(local.name);
+            let name = self.scope.claim(&prefixed_binding_name(kind, raw));
+            let line = format!("{};", self.declare(class, &name, true)?);
+            self.line(out, &line);
+            self.locals.insert(
+                local.def_id,
+                Local {
+                    name,
+                    ty: class,
+                    constant: None,
+                },
+            );
+            return Ok(());
         };
         let value = self.expr(init)?;
+        let value = if copy { self.copy_value(value)? } else { value };
         let value = self.settle(value, class)?;
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
@@ -279,6 +303,13 @@ impl Emitter<'_> {
                 let ranges: Vec<&HirExpression> = ranges.iter().collect();
                 self.range_product(out, &ranges, bindings, body, *mutable)
             }
+            HirExpressionKind::IteraLockstep {
+                sources,
+                coordinates,
+                bindings,
+                body,
+                mutable,
+            } => self.lockstep(out, sources, coordinates, bindings, body, *mutable),
             HirExpressionKind::Discerne {
                 scrutinees, arms, ..
             } => self.switch(out, scrutinees, arms),
@@ -420,24 +451,61 @@ impl Emitter<'_> {
                 "increment or decrement of a name that is not a local",
             ));
         };
-        if local.ty != Ty::Int {
-            return Err(unsupported("increment or decrement of a non-integer"));
-        }
         let name = local.name.clone();
         let Ok(written) = self.names.resolve_def(*def_id) else {
             return Err(unsupported("increment of a name the catalog does not hold"));
         };
-        let (helper, call) = match inc_dec.op {
-            radix_hir::HirIncDecOp::Inc => (Helper::Add, "faber_add"),
-            radix_hir::HirIncDecOp::Dec => (Helper::Sub, "faber_sub"),
-        };
-        self.support.need(helper);
-        self.support.need(Helper::StoreI64);
-        let at = c_string(&format!("assignment to `{written}`"))?;
-        self.line(
-            out,
-            &format!("{name} = faber_store_i64({call}({name}, 1), {at});"),
-        );
+        let inc = inc_dec.op == radix_hir::HirIncDecOp::Inc;
+        match local.ty {
+            Ty::Int => {
+                let (helper, call) = if inc {
+                    (Helper::Add, "faber_add")
+                } else {
+                    (Helper::Sub, "faber_sub")
+                };
+                self.support.need(helper);
+                self.support.need(Helper::StoreI64);
+                let at = c_string(&format!("assignment to `{written}`"))?;
+                self.line(
+                    out,
+                    &format!("{name} = faber_store_i64({call}({name}, 1), {at});"),
+                );
+            }
+            Ty::Sized(width) => {
+                let call = if inc { "faber_add" } else { "faber_sub" };
+                self.support.need(Helper::SizedStore);
+                let at = c_string(&format!("assignment to `{written}`"))?;
+                self.line(
+                    out,
+                    &format!(
+                        "{name} = faber_store_{}({call}({name}, 1), {at});",
+                        width.marker()
+                    ),
+                );
+            }
+            Ty::Modular(width) | Ty::Saturating(width) => {
+                self.support.need(Helper::Wide);
+                self.support.need_ints();
+                let call = if inc {
+                    "faber_add_wide"
+                } else {
+                    "faber_sub_wide"
+                };
+                let kind = if matches!(local.ty, Ty::Modular(_)) {
+                    "wrapping"
+                } else {
+                    "saturating"
+                };
+                self.line(
+                    out,
+                    &format!(
+                        "{name} = faber_store_{kind}_{}({call}({name}, 1));",
+                        width.marker()
+                    ),
+                );
+            }
+            _ => return Err(unsupported("increment or decrement of a non-integer")),
+        }
         Ok(())
     }
 
@@ -523,6 +591,119 @@ impl Emitter<'_> {
                 constant: None,
             },
         );
+        self.loops += 1;
+        self.block(out, body)?;
+        self.loops -= 1;
+        self.line(out, "}");
+        self.depth -= 1;
+        self.line(out, "}");
+        Ok(())
+    }
+
+    /// `for from xs, ys const x, y { … }`: a lockstep walk. Every source is
+    /// evaluated once, all must have the same length (a run-time abort as the
+    /// runner's, `itera lockstep sources must have equal length`), and the
+    /// binders read the aligned element of each. The optional `apud [i]`
+    /// coordinate binds the shared index. Typecheck forbids a shape change.
+    fn lockstep(
+        &mut self,
+        out: &mut String,
+        sources: &[HirExpression],
+        coordinates: &[(radix_hir::DefId, radix_lexer::Symbol)],
+        bindings: &[(radix_hir::DefId, radix_lexer::Symbol)],
+        body: &HirBlock,
+        mutable: bool,
+    ) -> Result<(), CodegenError> {
+        if sources.is_empty() || sources.len() != bindings.len() {
+            return Err(unsupported(
+                "lockstep iteration without one source per binder",
+            ));
+        }
+        if coordinates.len() > 1 {
+            return Err(unsupported("lockstep iteration with several coordinates"));
+        }
+        let coordinate = coordinates.first();
+        let mut lists = Vec::with_capacity(sources.len());
+        for source in sources {
+            let value = self.expr(source)?;
+            let Value::List(elem) = value.value else {
+                return Err(unsupported("lockstep source that is not a list"));
+            };
+            lists.push((value.text, elem));
+        }
+        self.support.need(Helper::Trap);
+        self.line(out, "{");
+        self.depth += 1;
+        let mut names = Vec::with_capacity(lists.len());
+        for (text, elem) in &lists {
+            let name = format!("faber_t{}", self.temps);
+            self.temps += 1;
+            self.line(
+                out,
+                &format!("faber_list_{} *const {name} = {text};", elem.suffix()),
+            );
+            names.push(name);
+        }
+        for name in &names[1..] {
+            self.line(
+                out,
+                &format!(
+                    "if ({name}->len != {}->len) faber_abort(\"itera lockstep sources must have equal length\");",
+                    names[0]
+                ),
+            );
+        }
+        let index = format!("faber_i{}", self.temps);
+        self.temps += 1;
+        self.line(out, &format!("int64_t {index};"));
+        self.line(
+            out,
+            &format!(
+                "for ({index} = 0; {index} < {}->len; {index}++) {{",
+                names[0]
+            ),
+        );
+        self.depth += 1;
+        for ((name, (_, elem)), (binding, binding_name)) in names.iter().zip(lists).zip(bindings) {
+            let Some(kind) = self.names.binding_kind(*binding) else {
+                return Err(unsupported(
+                    "loop binding the name catalog does not classify",
+                ));
+            };
+            let raw = self.names.resolve_symbol(*binding_name);
+            let c_name = self.scope.claim(&prefixed_binding_name(kind, raw));
+            let class = elem.ty();
+            self.need_class(class);
+            let declaration = self.declare(class, &c_name, mutable)?;
+            self.line(out, &format!("{declaration} = {name}->items[{index}];"));
+            self.locals.insert(
+                *binding,
+                Local {
+                    name: c_name,
+                    ty: class,
+                    constant: None,
+                },
+            );
+        }
+        if let Some((position, position_name)) = coordinate {
+            let Some(kind) = self.names.binding_kind(*position) else {
+                return Err(unsupported(
+                    "loop coordinate the name catalog does not classify",
+                ));
+            };
+            let raw = self.names.resolve_symbol(*position_name);
+            let c_name = self.scope.claim(&prefixed_binding_name(kind, raw));
+            let declaration = self.declare(Ty::Int, &c_name, false)?;
+            self.line(out, &format!("{declaration} = {index};"));
+            self.locals.insert(
+                *position,
+                Local {
+                    name: c_name,
+                    ty: Ty::Int,
+                    constant: None,
+                },
+            );
+        }
         self.loops += 1;
         self.block(out, body)?;
         self.loops -= 1;
@@ -648,7 +829,7 @@ impl Emitter<'_> {
             return self.print_line(out, kind, args);
         }
         // The runner prints each argument as its own line when one of them
-        // has no shared rendering (a sized integer, a genus).
+        // has no shared rendering (a genus).
         for arg in args {
             self.print_line(out, kind, std::slice::from_ref(arg))?;
         }
@@ -657,8 +838,10 @@ impl Emitter<'_> {
 
     /// Whether the runner writes these arguments as one space-joined line:
     /// a single argument, a literal text first with up to two more (its
-    /// format-string form), or every argument having a shared rendering.
-    /// Sized integers and genera keep the per-argument path.
+    /// format-string form), or every argument having a shared rendering. A
+    /// genus value (and so an enumeration, and an optional one) has none, so
+    /// a statement that carries one prints each argument on its own line. A
+    /// sized integer renders like any integer.
     fn print_joins(&self, args: &[HirExpression]) -> bool {
         if args.len() <= 1 {
             return true;
@@ -670,12 +853,24 @@ impl Emitter<'_> {
         if literal_first && args.len() <= 3 {
             return true;
         }
-        args.iter().all(|arg| {
-            arg.ty.is_some_and(|ty| {
-                classify(self.types, ty)
-                    .is_ok_and(|class| !matches!(class, Ty::Sized(_) | Ty::Genus(_)))
-            })
-        })
+        args.iter()
+            .all(|arg| arg.ty.is_some_and(|ty| self.argument_joins(ty)))
+    }
+
+    /// Whether one print argument has a shared rendering. A genus (and so an
+    /// enumeration, and an optional one) has none, and neither does `ascii` or
+    /// bounded text: the runner prints each on its own line. A sized integer
+    /// renders like any integer.
+    fn argument_joins(&self, ty: radix_types::TypeId) -> bool {
+        match self.types.get(ty) {
+            radix_types::Type::Alias(_, inner) => self.argument_joins(*inner),
+            radix_types::Type::Primitive(radix_types::Primitive::Ascii)
+            | radix_types::Type::BoundedAscii { .. }
+            | radix_types::Type::BoundedTextus { .. } => false,
+            _ => classify(self.types, ty).is_ok_and(|class| {
+                !matches!(class, Ty::Genus(_) | Ty::Opt(crate::ty::Inner::Genus(_)))
+            }),
+        }
     }
 
     /// One `printf` for `args`, space separated, ending the line.
@@ -721,6 +916,12 @@ impl Emitter<'_> {
                         value.text
                     ),
                 ),
+                Value::Decimal => {
+                    self.support.need(Helper::DecimalText);
+                    ("%s", format!("faber_dec_fmt(faber_a, {})", value.text))
+                }
+                // A bare `none` prints the locale's none word.
+                Value::None => ("%s", c_string(&tokens.none)?),
                 Value::Void => return Err(unsupported("printing a call with no result")),
             };
             specs.push(spec);

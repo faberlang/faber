@@ -10,14 +10,14 @@ const EN_SOURCE: &str = r#"+++
 locale = "en"
 +++
 main {
-    const tf32[2, 3] grid ← tf32[2, 3] {}
-    const tensor<f32, [2, 3]> long ← tensor<f32, [2, 3]> {}
-    const tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
-    const vector<f32, 4> v ← vector<f32, 4> {}
-    const vf32[4] sv ← vf32[4] {}
-    const mf32[2, 2] sm ← mf32[2, 2] {}
-    const matrix<f32, [2, 2]> lm ← matrix<f32, [2, 2]> {}
-    const vf32[2] authored ← [0.0, 0.0] ∷ vf32[2]
+    let tf32[2, 3] grid ← tf32[2, 3] {}
+    let tensor<f32, [2, 3]> long ← tensor<f32, [2, 3]> {}
+    let tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
+    let vector<f32, 4> v ← vector<f32, 4> {}
+    let vf32[4] sv ← vf32[4] {}
+    let mf32[2, 2] sm ← mf32[2, 2] {}
+    let matrix<f32, [2, 2]> lm ← matrix<f32, [2, 2]> {}
+    let vf32[2] authored ← [0.0, 0.0] ∷ vf32[2]
     print grid.shape()
     print long.shape()
     print lanes.shape()
@@ -31,13 +31,13 @@ const LA_SOURCE: &str = r#"+++
 locale = "la"
 +++
 incipit {
-    fixum tf32[2, 3] grid ← tf32[2, 3] {}
-    fixum tensor<f32, [2, 3]> long ← tensor<f32, [2, 3]> {}
-    fixum tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
-    fixum vector<f32, 4> v ← vector<f32, 4> {}
-    fixum vf32[4] sv ← vf32[4] {}
-    fixum mf32[2, 2] sm ← mf32[2, 2] {}
-    fixum matrix<f32, [2, 2]> lm ← matrix<f32, [2, 2]> {}
+    sit tf32[2, 3] grid ← tf32[2, 3] {}
+    sit tensor<f32, [2, 3]> long ← tensor<f32, [2, 3]> {}
+    sit tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
+    sit vector<f32, 4> v ← vector<f32, 4> {}
+    sit vf32[4] sv ← vf32[4] {}
+    sit mf32[2, 2] sm ← mf32[2, 2] {}
+    sit matrix<f32, [2, 2]> lm ← matrix<f32, [2, 2]> {}
     nota grid.magnitudines()
     nota long.magnitudines()
     nota lanes.magnitudines()
@@ -105,7 +105,7 @@ fn format_la_typed_zero_is_idempotent() {
     let output = format_idempotent("faber-typed-zero-la.fab", LA_SOURCE);
     assert_zero_forms(&output);
     assert!(
-        output.contains("fixum ") && output.contains("incipit"),
+        output.contains("sit ") && output.contains("incipit"),
         "la format must keep the Latin surface:\n{output}"
     );
     for line in ["sm ← mf32[2, 2] {}", "lm ← matrix<f32, [2, 2]> {}"] {
@@ -145,10 +145,10 @@ fn convert_en_to_la_preserves_typed_zero() {
     let _ = fs::remove_file(&fixture);
     assert_eq!(latin, again, "la conversion must be idempotent");
     assert_zero_forms(&latin);
-    assert!(latin.contains("fixum "), "converted to Latin:\n{latin}");
+    assert!(latin.contains("sit "), "converted to Latin:\n{latin}");
     assert_zero_forms(&english);
     assert!(
-        english.contains("const "),
+        english.contains("let "),
         "converted back to English:\n{english}"
     );
 }

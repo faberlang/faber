@@ -66,8 +66,8 @@ fn member_call_through_bound_checks_substituted_argument_type() {
 #[test]
 fn conforming_types_instantiate_the_bound() {
     test_support::assert_accepts(&with_contract(
-        "incipit {\n    fixum Arca x ← maior(Arca { pondus = 3 }, Arca { pondus = 5 })\n    \
-         fixum Saccus y ← maior(Saccus { massa = 2 }, Saccus { massa = 1 })\n    \
+        "incipit {\n    sit Arca x ← maior(Arca { pondus = 3 }, Arca { pondus = 5 })\n    \
+         sit Saccus y ← maior(Saccus { massa = 2 }, Saccus { massa = 1 })\n    \
          nota x.pondus\n    nota y.massa\n}\n",
     ));
 }
@@ -76,7 +76,7 @@ fn conforming_types_instantiate_the_bound() {
 fn non_conforming_type_names_type_and_contract() {
     test_support::assert_rejects_with_args(
         &with_contract(
-            "incipit {\n    fixum Lapis z ← maior(Lapis { massa = 1 }, Lapis { massa = 2 })\n    \
+            "incipit {\n    sit Lapis z ← maior(Lapis { massa = 1 }, Lapis { massa = 2 })\n    \
              nota z.massa\n}\n",
         ),
         &[
@@ -94,7 +94,7 @@ fn contract_with_other_arguments_does_not_satisfy_the_bound() {
         &with_contract(
             "genus Mixtum implet Comparabile<Arca> {\n    varia numerus m\n\n    \
              functio confer(Arca alius) → numerus { redde 0 }\n}\n\n\
-             incipit {\n    fixum Mixtum z ← maior(Mixtum { m = 1 }, Mixtum { m = 2 })\n    \
+             incipit {\n    sit Mixtum z ← maior(Mixtum { m = 1 }, Mixtum { m = 2 })\n    \
              nota z.m\n}\n",
         ),
         "generic_type_arg_bound",

@@ -24,7 +24,8 @@ const ISSUE: &str = "bits_type_unsupported_on_target";
 /// Swift as UInt8..UInt64, TypeScript as `number` (b8, b16, b32) and `bigint`
 /// (b64), the MIR sexp target as a non-negative exact Racket integer kept
 /// inside its N bits, the MIR wasm target as i32 (b8..b32) and i64 (b64) kept
-/// zero-extended in N bits, and the MIR llvm target as iN.
+/// zero-extended in N bits, the MIR llvm target as iN, and the MIR clif target
+/// as an `i64` holding the zero-extended pattern.
 fn target_admits_bits(target: Target) -> bool {
     matches!(
         target,
@@ -38,6 +39,7 @@ fn target_admits_bits(target: Target) -> bool {
             | Target::MirSexp
             | Target::MirWasm
             | Target::MirLlvm
+            | Target::MirClif
     )
 }
 

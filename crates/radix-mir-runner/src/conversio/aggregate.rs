@@ -147,6 +147,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 struct_defaults,
                 span,
             )?,
+            // Register matrices flatten row-major into the same flat list as
+            // a tensor; the source element type picks any element conversion.
+            Value::Matrix(cell) => {
+                let data = cell.borrow().data.clone();
+                self.convert_array_elements(&data, source_ty, element, struct_defaults, span)?
+            }
             Value::Set(cell) => {
                 let mut items: Vec<Value> = cell.borrow().iter().map(MapKey::to_value).collect();
                 // D19.2/D19.6: copia order is unspecified; shuffle under the
@@ -234,7 +240,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<Vec<Value>, RunnerError> {
         let source_element = match self.types.get(source_ty) {
             Type::Array(element) => Some(*element),
-            Type::Tensor(element, _) | Type::Vector(element, _) => Some(*element),
+            Type::Tensor(element, _) | Type::Vector(element, _) | Type::Matrix(element, _) => {
+                Some(*element)
+            }
             _ => None,
         };
         let Some(source_element) = source_element else {
@@ -336,8 +344,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     pub(crate) fn convert_to_eager_sequence(
         &mut self,
         value: Value,
+        source_ty: TypeId,
         target_ty: TypeId,
-        _struct_defaults: &[MirStructFieldDefaults],
+        struct_defaults: &[MirStructFieldDefaults],
+        recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
         match self.types.get(target_ty) {
@@ -353,17 +363,36 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 // deep-copying data/shape into a fresh RefCell.
                 Value::Tensor(cell) => Ok(Value::Tensor(cell)),
                 Value::Array(cell) => {
-                    // WHY: typed `lista ↦ tensor` must lower through
-                    // `TensorFromFlat` and MIR validation rejects the generic
-                    // route. This remains for dynamic/non-canonical Convert
-                    // producers, not as a second compiler lowering path.
-                    let data = cell.borrow().clone();
-                    let shape = lista_to_tensor_shape(target_ty, self.types, data.len());
-                    crate::runtime::tensor_value_typed(
-                        self.types,
-                        data,
-                        Some(*element),
-                        shape,
+                    let element = *element;
+                    self.convert_lista_to_tensor(&cell, target_ty, element, recovery, span)
+                }
+                // A register matrix converts like its flat cell list: the
+                // row-major data flattened, element-converted when the
+                // declared element differs, and built at the target shape.
+                Value::Matrix(cell) => {
+                    let data = cell.borrow().data.clone();
+                    self.convert_register_to_tensor(
+                        &data,
+                        source_ty,
+                        target_ty,
+                        *element,
+                        struct_defaults,
+                        recovery,
+                        "matrix to tensor conversion failed",
+                        span,
+                    )
+                }
+                // A register vector converts like its flat lane list.
+                Value::Vector(cell) => {
+                    let lanes = cell.borrow().clone();
+                    self.convert_register_to_tensor(
+                        &lanes,
+                        source_ty,
+                        target_ty,
+                        *element,
+                        struct_defaults,
+                        recovery,
+                        "vector to tensor conversion failed",
                         span,
                     )
                 }
@@ -399,6 +428,72 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 ),
             )),
         }
+    }
+
+    /// `lista<E> ↦ tensor<E, [literal shape]>` through the generic Convert.
+    ///
+    /// WHY: a conversio carrying a `⊥` recovery legitimately arrives here (the
+    /// typed no-recovery route lowers through `TensorFromFlat`), so the
+    /// element count is checked against the declared extents and a mismatch
+    /// takes the recovery instead of building a tensor of the wrong shape. A
+    /// shape that is not all-literal keeps the flat inference.
+    fn convert_lista_to_tensor(
+        &mut self,
+        items: &Rc<RefCell<Vec<Value>>>,
+        target_ty: TypeId,
+        element: TypeId,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let data = items.borrow().clone();
+        if let Some(ListaToTensorShape::Literal(dims)) =
+            resolve_lista_to_tensor_shape(target_ty, self.types)
+        {
+            let expected = dims.iter().try_fold(1usize, |count, dim| {
+                usize::try_from(*dim)
+                    .ok()
+                    .and_then(|extent| count.checked_mul(extent))
+            });
+            if expected != Some(data.len()) {
+                return self.recover_or_fail(recovery, span, "lista to tensor conversion failed");
+            }
+        }
+        let shape = lista_to_tensor_shape(target_ty, self.types, data.len());
+        crate::runtime::tensor_value_typed(self.types, data, Some(element), shape, span)
+    }
+
+    /// `matrix<E, [R, C]> ↦ tensor<E2, S>` and `vector<E, N> ↦ tensor<E2, S>`:
+    /// the row-major cells or lanes become the tensor's flat data, with any
+    /// declared element conversion applied. A literal target shape must match
+    /// the cell count; a mismatch takes the recovery instead of building a
+    /// tensor of the wrong shape, as for `lista ↦ tensor`.
+    #[allow(clippy::too_many_arguments)]
+    fn convert_register_to_tensor(
+        &mut self,
+        cells: &[Value],
+        source_ty: TypeId,
+        target_ty: TypeId,
+        element: TypeId,
+        struct_defaults: &[MirStructFieldDefaults],
+        recovery: Option<&MirOperand>,
+        mismatch_message: &str,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let data = self.convert_array_elements(cells, source_ty, element, struct_defaults, span)?;
+        if let Some(ListaToTensorShape::Literal(dims)) =
+            resolve_lista_to_tensor_shape(target_ty, self.types)
+        {
+            let expected = dims.iter().try_fold(1usize, |count, dim| {
+                usize::try_from(*dim)
+                    .ok()
+                    .and_then(|extent| count.checked_mul(extent))
+            });
+            if expected != Some(data.len()) {
+                return self.recover_or_fail(recovery, span, mismatch_message);
+            }
+        }
+        let shape = lista_to_tensor_shape(target_ty, self.types, data.len());
+        crate::runtime::tensor_value_typed(self.types, data, Some(element), shape, span)
     }
 
     /// `tabula<K, V> ↦ lista<T>`: the target element type picks the
@@ -647,15 +742,28 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     "valor to numerus conversion failed",
                 )),
             },
-            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
-                match value {
-                    Value::Int(value) => Ok(Value::Int(value)),
-                    _ => Err(RunnerError::conversion(
-                        span,
-                        "valor to numerus conversion failed",
-                    )),
+            Type::Primitive(Primitive::Numerus) => match value {
+                Value::Int(value) => Ok(Value::Int(value)),
+                _ => Err(RunnerError::conversion(
+                    span,
+                    "valor to numerus conversion failed",
+                )),
+            },
+            // Need (CTO ruling 2026-10-15): `valor ↦ numerus<W>`
+            // applies the same magnitude check as `int ↦ W`, so a payload that
+            // does not fit `W` (including a negative into an unsigned width)
+            // fails on the `⇥` channel, where `⊥` supplies the default. The
+            // `NumericWidth::Inf` arm above is untouched; every `i64` fits its
+            // `int_width_range` row.
+            Type::SizedNumeric(Primitive::Numerus, width) => match value {
+                Value::Int(value) if super::scalar::numerus_fits_width(value, *width) => {
+                    Ok(Value::Int(value))
                 }
-            }
+                _ => Err(RunnerError::conversion(
+                    span,
+                    "valor to numerus conversion failed",
+                )),
+            },
             Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
                 match value {
                     Value::Float(value) => Ok(Value::Float(value)),

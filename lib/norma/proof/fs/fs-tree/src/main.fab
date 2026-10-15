@@ -8,21 +8,21 @@ import from "norma:fs" fs
 import from "norma:process" process
 
 main {
-    const string root ← fs.join([fs.temp_dir(), "fs-tree-§"(process.pid())])
+    let string root ← fs.join([fs.temp_dir(), "fs-tree-§"(process.pid())])
     fs.create_dir(root)
     assert fs.exists(root)
     assert fs.is_directory(root)
 
-    const string alpha ← fs.join([root, "alpha.txt"])
+    let string alpha ← fs.join([root, "alpha.txt"])
     fs.touch(alpha)
     assert fs.is_regular(alpha)
 
-    const string beta ← fs.join([root, "beta.txt"])
+    let string beta ← fs.join([root, "beta.txt"])
     fs.copy(alpha, beta)
     assert fs.exists(beta)
     assert fs.is_regular(beta)
 
-    const string gamma ← fs.join([root, "gamma.txt"])
+    let string gamma ← fs.join([root, "gamma.txt"])
     fs.rename(beta, gamma)
     assert fs.exists(gamma)
     assert fs.exists(beta) ≢ true
@@ -30,8 +30,8 @@ main {
     fs.set_mode(gamma, 0o600)
     assert fs.mode(gamma) ≡ 0o600
 
-    const list<string> entries ← fs.list_dir(root)
-    const list<string> names ← entries.sorted()
+    let list<string> entries ← fs.list_dir(root)
+    let list<string> names ← entries.sorted()
     assert names.length() ≡ 2
     assert names.contains("alpha.txt")
     assert names.contains("gamma.txt")

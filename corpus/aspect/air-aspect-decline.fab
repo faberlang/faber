@@ -33,8 +33,8 @@ no_expected = "declaration-only"
 # Declined Line 1 shape: the range bounds are runtime values, so no concrete
 # lanes exist and no unroll obligation is recorded.
 fn deambulatio(int n) → int {
-    const int summa ← 0
-    for range n ‥ 4 const i {
+    let int summa ← 0
+    for range n ‥ 4 let i {
     }
     return summa
 }

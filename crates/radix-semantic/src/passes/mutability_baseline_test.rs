@@ -13,7 +13,7 @@ fn baseline_const_list_in_place_append_requires_varia() {
     assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum lista<numerus> xs ← vacua
+    sit lista<numerus> xs ← vacua
     xs.appende(4)
 }
 ",
@@ -41,12 +41,12 @@ fn baseline_const_into_mut_param_is_rejected() {
     // binding is not (a `varia` binding is, see the twin below).
     assert_rejects_with_issue_la(
         r"
-functio poke(in lista<numerus> xs) → vacuum {
+functio poke(varia lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
-    fixum lista<numerus> a ← [1, 2, 3]
-    poke(in a)
+    sit lista<numerus> a ← [1, 2, 3]
+    poke(varia a)
     nota a.longitudo()
 }
 ",
@@ -58,12 +58,12 @@ incipit {
 fn baseline_var_into_mut_param_is_legal() {
     let _ = analyze_ok_la(
         r"
-functio poke(in lista<numerus> xs) → vacuum {
+functio poke(varia lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
-    poke(in a)
+    poke(varia a)
     nota a.longitudo()
 }
 ",
@@ -92,7 +92,7 @@ fn baseline_summa_unmarked_out_shape_is_rejected() {
     assert_rejects_with_issue_la(
         r"
 functio summa(tf32[256] a, tf32[1] out, u32 id) → vacuum {
-    fixum f32 total ← a.summa()
+    sit f32 total ← a.summa()
     out[id] ← total
 }
 ",
@@ -104,8 +104,8 @@ functio summa(tf32[256] a, tf32[1] out, u32 id) → vacuum {
 fn baseline_summa_mut_out_shape_is_legal() {
     let _ = analyze_ok_la(
         r"
-functio summa(tf32[256] a, in tf32[1] out, u32 id) → vacuum {
-    fixum f32 total ← a.summa()
+functio summa(tf32[256] a, varia tf32[1] out, u32 id) → vacuum {
+    sit f32 total ← a.summa()
     out[id] ← total
 }
 ",

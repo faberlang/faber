@@ -18,3 +18,5 @@ workspace = true
 
 [dependencies]
 radix-runtime-contract = { path = "../../crates/radix-runtime-contract" }
+regex = "1"
+regex-syntax = "0.8"

@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "destructuring"
 canonical = true
 summary = "Extracts fields from a value into local bindings."
-syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
+syntax = "ex <expression> <sit|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
 locale = "en"
 +++
@@ -14,8 +14,8 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Lista destructuring — `fixum [a, b, c] ← lista` extracts elements from a lista into individual bindings.
-#   • Rest patterns — `fixum [caput, ceteri cauda] ← lista` captures remaining elements.
+#   • Lista destructuring — `sit [a, b, c] ← lista` extracts elements from a lista into individual bindings.
+#   • Rest patterns — `sit [caput, ceteri cauda] ← lista` captures remaining elements.
 #   • Mutable destructuring — `varia [x, y] ← lista` for mutable bindings.
 #   • Skip and nested patterns — underscore `_` skips elements; nested listas destructure recursively.
 #
@@ -28,13 +28,13 @@ locale = "en"
 
 # destructura — lista destructuring patterns
 #
-# fixum [a, b, c] ← lista
+# sit [a, b, c] ← lista
 # varia [x, y, z] ← lista
-# fixum [caput, ceteri cauda] ← lista
-# fixum [_, medius, _] ← lista
+# sit [caput, ceteri cauda] ← lista
+# sit [_, medius, _] ← lista
 #
 # GRAMMAR:
-#   destructStmt :← ('fixum' | 'varia') '[' patternList ']' '←' expr
+#   destructStmt :← ('sit' | 'varia') '[' patternList ']' '←' expr
 #
 # EXPECTED OUTPUT:
 #   Element values from inline and bound listas, rest slices, nested rows.
@@ -42,22 +42,22 @@ locale = "en"
 main {
     # --- Basic lista destructuring ---
 
-    const _ numeri ← [1, 2, 3]
-    const [a, b, c] ← numeri
+    let numeri ← [1, 2, 3]
+    let [a, b, c] ← numeri
     print a
     print b
     print c
 
     # Destructure inline lista literal
-    const [primus, secundus, tertius] ← [10, 20, 30]
+    let [primus, secundus, tertius] ← [10, 20, 30]
     print primus
     print secundus
     print tertius
 
     # --- Mutable destructuring with varia ---
 
-    const _ coordinata ← [100, 200]
-    var [x, y] ← coordinata
+    let coordinata ← [100, 200]
+    mut [x, y] ← coordinata
     print x
     print y
     x ← x + 50
@@ -67,28 +67,28 @@ main {
 
     # --- Partial destructuring (fewer variables than elements) ---
 
-    const _ valores ← [1, 2, 3, 4, 5]
-    const [unus, duo] ← valores
+    let valores ← [1, 2, 3, 4, 5]
+    let [unus, duo] ← valores
     print unus
     print duo
 
     # --- Rest pattern with ceteri ---
 
-    const _ res ← [1, 2, 3, 4, 5]
-    const [caput, rest cauda] ← res
+    let res ← [1, 2, 3, 4, 5]
+    let [caput, rest cauda] ← res
     print caput
     print cauda
 
     # --- Skip elements with underscore ---
 
-    const _ triplex ← [10, 20, 30]
-    const [_, medius, _] ← triplex
+    let triplex ← [10, 20, 30]
+    let [_, medius, _] ← triplex
     print medius
 
     # --- Nested listas ---
 
-    const _ matrix ← [[1, 2], [3, 4]]
-    const [ordo1, ordo2] ← matrix
+    let matrix ← [[1, 2], [3, 4]]
+    let [ordo1, ordo2] ← matrix
     print ordo1
     print ordo2
 }

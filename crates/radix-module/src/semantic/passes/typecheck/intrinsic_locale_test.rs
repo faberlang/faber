@@ -469,15 +469,15 @@ fn en_surface_mutating_imperative_scheme_sort_sorted() {
 // ---------------------------------------------------------------------------
 
 /// Real `Lista` source calls under the en pack: `xs.all(...)` / `ys.any(...)`.
-const TWIN_EN_SOURCE: &str = "fn sonda() → bool {\n    const list<int> xs ← empty\n    return xs.all(int d ∴ d ≥ 0)\n}\n\nfn aliud() → bool {\n    const list<int> ys ← empty\n    return ys.any(int d ∴ d ≺ 0)\n}\n";
+const TWIN_EN_SOURCE: &str = "fn sonda() → bool {\n    let list<int> xs ← empty\n    return xs.all(int d ∴ d ≥ 0)\n}\n\nfn aliud() → bool {\n    let list<int> ys ← empty\n    return ys.any(int d ∴ d ≺ 0)\n}\n";
 
 /// The canonical Latin twin spelling under the en pack: not a declared en
 /// surface, so the pack-authoritative lookup must reject the call.
 const TWIN_EN_CANONICAL_MISS: &str =
-    "fn sonda() → bool {\n    const list<int> xs ← empty\n    return xs.omnia(int d ∴ d ≥ 0)\n}\n";
+    "fn sonda() → bool {\n    let list<int> xs ← empty\n    return xs.omnia(int d ∴ d ≥ 0)\n}\n";
 
 /// la source (canonical Latin keywords): the twins resolve registry-direct.
-const TWIN_LA_SOURCE: &str = "functio sonda() → bivalens {\n    fixum lista<numerus> xs ← vacua\n    redde xs.omnia(numerus d ∴ d ≥ 0)\n}\n\nfunctio aliud() → bivalens {\n    fixum lista<numerus> ys ← vacua\n    redde ys.quilibet(numerus d ∴ d ≺ 0)\n}\n";
+const TWIN_LA_SOURCE: &str = "functio sonda() → bivalens {\n    sit lista<numerus> xs ← vacua\n    redde xs.omnia(numerus d ∴ d ≥ 0)\n}\n\nfunctio aliud() → bivalens {\n    sit lista<numerus> ys ← vacua\n    redde ys.quilibet(numerus d ∴ d ≺ 0)\n}\n";
 
 /// (locale, real localized source) for the six translated packs. Each source
 /// is composed from that pack's own `[keywords]`/`[types]` rows; the twin
@@ -487,37 +487,37 @@ const TWIN_TRANSLATED_SOURCES: &[(&str, &str, &str, &str)] = &[
         "ar",
         "الكل",
         "أي",
-        "دالة sonda() → منطقي {\n    ثابت قائمة<عدد> xs ← فارغ\n    أعد xs.الكل(عدد d ∴ d ≥ 0)\n}\n\nدالة aliud() → منطقي {\n    ثابت قائمة<عدد> ys ← فارغ\n    أعد ys.أي(عدد d ∴ d ≺ 0)\n}\n",
+        "دالة sonda() → منطقي {\n    ليكن قائمة<عدد> xs ← فارغ\n    أعد xs.الكل(عدد d ∴ d ≥ 0)\n}\n\nدالة aliud() → منطقي {\n    ليكن قائمة<عدد> ys ← فارغ\n    أعد ys.أي(عدد d ∴ d ≺ 0)\n}\n",
     ),
     (
         "hi",
         "सभी",
         "कोई",
-        "फलन sonda() → तार्किक {\n    स्थिर सूची<संख्या> xs ← खाली\n    लौटाओ xs.सभी(संख्या d ∴ d ≥ 0)\n}\n\nफलन aliud() → तार्किक {\n    स्थिर सूची<संख्या> ys ← खाली\n    लौटाओ ys.कोई(संख्या d ∴ d ≺ 0)\n}\n",
+        "फलन sonda() → तार्किक {\n    बैठा सूची<संख्या> xs ← खाली\n    लौटाओ xs.सभी(संख्या d ∴ d ≥ 0)\n}\n\nफलन aliud() → तार्किक {\n    बैठा सूची<संख्या> ys ← खाली\n    लौटाओ ys.कोई(संख्या d ∴ d ≺ 0)\n}\n",
     ),
     (
         "th-TH",
         "ทั้งหมด",
         "ใดก็ได้",
-        "ฟังก์ชัน sonda() → ตรรกะ {\n    คงที่ รายการ<จำนวน> xs ← เซตว่าง\n    คืน xs.ทั้งหมด(จำนวน d ∴ d ≥ 0)\n}\n\nฟังก์ชัน aliud() → ตรรกะ {\n    คงที่ รายการ<จำนวน> ys ← เซตว่าง\n    คืน ys.ใดก็ได้(จำนวน d ∴ d ≺ 0)\n}\n",
+        "ฟังก์ชัน sonda() → ตรรกะ {\n    กำหนด รายการ<จำนวน> xs ← เซตว่าง\n    คืน xs.ทั้งหมด(จำนวน d ∴ d ≥ 0)\n}\n\nฟังก์ชัน aliud() → ตรรกะ {\n    กำหนด รายการ<จำนวน> ys ← เซตว่าง\n    คืน ys.ใดก็ได้(จำนวน d ∴ d ≺ 0)\n}\n",
     ),
     (
         "vi",
         "tất_cả",
         "bất_kỳ",
-        "hàm sonda() → logic {\n    hằng danh_sách<số> xs ← tập_rỗng\n    trả xs.tất_cả(số d ∴ d ≥ 0)\n}\n\nhàm aliud() → logic {\n    hằng danh_sách<số> ys ← tập_rỗng\n    trả ys.bất_kỳ(số d ∴ d ≺ 0)\n}\n",
+        "hàm sonda() → logic {\n    đặt danh_sách<số> xs ← tập_rỗng\n    trả xs.tất_cả(số d ∴ d ≥ 0)\n}\n\nhàm aliud() → logic {\n    đặt danh_sách<số> ys ← tập_rỗng\n    trả ys.bất_kỳ(số d ∴ d ≺ 0)\n}\n",
     ),
     (
         "zh-Hans",
         "全部",
         "任一",
-        "函数 sonda() → 布尔 {\n    常量 列表<整数> xs ← 空集\n    返回 xs.全部(整数 d ∴ d ≥ 0)\n}\n\n函数 aliud() → 布尔 {\n    常量 列表<整数> ys ← 空集\n    返回 ys.任一(整数 d ∴ d ≺ 0)\n}\n",
+        "函数 sonda() → 布尔 {\n    设 列表<整数> xs ← 空集\n    返回 xs.全部(整数 d ∴ d ≥ 0)\n}\n\n函数 aliud() → 布尔 {\n    设 列表<整数> ys ← 空集\n    返回 ys.任一(整数 d ∴ d ≺ 0)\n}\n",
     ),
     (
         "zh-Hant",
         "全部",
         "任一",
-        "函式 sonda() → 布林 {\n    定值 列表<整數> xs ← 空集\n    傳回 xs.全部(整數 d ∴ d ≥ 0)\n}\n\n函式 aliud() → 布林 {\n    定值 列表<整數> ys ← 空集\n    傳回 ys.任一(整數 d ∴ d ≺ 0)\n}\n",
+        "函式 sonda() → 布林 {\n    設為 列表<整數> xs ← 空集\n    傳回 xs.全部(整數 d ∴ d ≥ 0)\n}\n\n函式 aliud() → 布林 {\n    設為 列表<整數> ys ← 空集\n    傳回 ys.任一(整數 d ∴ d ≺ 0)\n}\n",
     ),
 ];
 

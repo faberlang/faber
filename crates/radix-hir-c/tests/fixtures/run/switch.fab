@@ -34,7 +34,7 @@ fn greet(string lang) → string {
 main {
     print classify(-1), classify(0), classify(7), classify(99)
     print greet("la"), greet("gr"), greet("en")
-    var int n ← 0
+    mut int n ← 0
     while true {
         n ↑
         switch n {

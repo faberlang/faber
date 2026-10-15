@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "The ergo joint (then) as an itera body: one consequent statement after the binder, no braces."
-syntax = "for … const <binder> then <statement>"
+syntax = "for … let <binder> then <statement>"
 related = ["ergo", "si", "dum", "itera", "redde"]
 locale = "en"
 +++
@@ -16,7 +16,7 @@ locale = "en"
 #
 # What this teaches:
 #   • `ergo` (en: `then`) may join the itera head to a single consequent
-#     statement — `for range 0‥4 const i then print i`
+#     statement — `for range 0‥4 let i then print i`
 #   • the joint works on any itera mode: a range head (`ab`) and a value
 #     head (`ex`) both accept `(block_stmt | ergo_joint statement)`
 #   • a block body and an ergo body are interchangeable; ergo reads better
@@ -31,18 +31,18 @@ locale = "en"
 
 # ergo joint on itera bodies
 #
-# for range 0‥4 const i then print i            -- range head (ab)
-# for from [10, 20, 30] const x then print x*2  -- value head (ex)
+# for range 0‥4 let i then print i            -- range head (ab)
+# for from [10, 20, 30] let x then print x*2  -- value head (ex)
 #
 # GRAMMAR:
-#   iteraStmt :← 'itera' (('ex' | 'de') expr | 'ab' expr) … ('fixum' | 'varia')
+#   iteraStmt :← 'itera' (('ex' | 'de') expr | 'ab' expr) … ('sit' | 'varia')
 #                  IDENTIFIER (block_stmt | ergo_joint statement) cape_clause?
 #
 # EXPECTED OUTPUT:
 #   ergo-body.expected — 0..3 from the range head, then the doubled values.
 
 main {
-    for range 0‥4 const i then print i
+    for range 0‥4 let i then print i
 
-    for from [10, 20, 30] const x then print x * 2
+    for from [10, 20, 30] let x then print x * 2
 }

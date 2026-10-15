@@ -2,14 +2,15 @@
 //! field defaults of a nested genus, not the zero value of its field type.
 
 use crate::host::BufferHost;
-use crate::{MapKey, Runner, Value};
+use crate::value::MatrixValue;
+use crate::{MapKey, Runner, RunnerError, Value};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span};
 use radix_mir::{
     MirConstant, MirConversion, MirConversionFlavor, MirNamedOperand, MirOperand, MirProgram,
     MirStructFieldDefaults, MirType, MirValidationContext,
 };
-use radix_types::{Primitive, Type, TypeTable};
+use radix_types::{IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -81,5 +82,181 @@ fn nested_genus_field_absent_from_json_takes_its_declared_default() {
         matches!(inner.borrow().get(&count_field), Some(Value::Int(5))),
         "nested field: {:?}",
         inner.borrow().get(&count_field)
+    );
+}
+
+/// Run one `↦` conversion through the target-directed runner seam.
+fn convert_register(
+    types: &TypeTable,
+    context: &MirValidationContext<'_>,
+    source_ty: TypeId,
+    target_ty: TypeId,
+    source: Value,
+) -> Result<Value, RunnerError> {
+    let interner = Interner::new();
+    let program = MirProgram::new();
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, context, types, &interner, &mut host);
+    runner.eval_runtime_convert(
+        &MirConversion {
+            store: None,
+            flavor: MirConversionFlavor::Runtime,
+            source_ty: MirType::semantic(source_ty),
+            target_ty: MirType::semantic(target_ty),
+            params: vec![],
+            recovery: None,
+            struct_defaults: vec![],
+        },
+        source,
+        Span::default(),
+    )
+}
+
+fn f32_element(types: &mut TypeTable) -> TypeId {
+    types.sized_numeric(Primitive::Fractus, NumericWidth::F32)
+}
+
+fn literal_shape(types: &mut TypeTable, dims: &[u64]) -> IndexId {
+    let dims = dims
+        .iter()
+        .map(|dim| types.intern_index(IndexExpr::Literal(*dim)))
+        .collect();
+    types.intern_index(IndexExpr::Tuple(dims))
+}
+
+fn matrix_2x2(values: [f64; 4]) -> Value {
+    Value::Matrix(Rc::new(RefCell::new(MatrixValue {
+        rows: 2,
+        columns: 2,
+        data: values.into_iter().map(Value::Float).collect(),
+    })))
+}
+
+fn tensor_shape_and_values(value: Value) -> (Vec<i64>, Vec<Value>) {
+    let Value::Tensor(tensor) = value else {
+        panic!("expected a tensor, got {value:?}");
+    };
+    let tensor = tensor.borrow();
+    let values = tensor
+        .logical_values()
+        .unwrap_or_else(|| panic!("tensor must expose logical values"));
+    (tensor.shape.clone(), values)
+}
+
+#[test]
+fn matrix_to_tensor_keeps_row_major_shape_and_values() {
+    let mut types = TypeTable::new();
+    let element = f32_element(&mut types);
+    let shape = literal_shape(&mut types, &[2, 2]);
+    let matrix_ty = types.matrix_with_shape(element, shape);
+    let tensor_ty = types.tensor_with_shape(element, shape);
+    let context = MirValidationContext::new(&types);
+
+    let converted = convert_register(
+        &types,
+        &context,
+        matrix_ty,
+        tensor_ty,
+        matrix_2x2([1.0, 2.0, 3.0, 4.0]),
+    )
+    .expect("matrix<f32, [2, 2]> to tensor<f32, [2, 2]>");
+
+    let (shape, values) = tensor_shape_and_values(converted);
+    assert_eq!(shape, vec![2, 2]);
+    assert_eq!(
+        values,
+        vec![
+            Value::Float(1.0),
+            Value::Float(2.0),
+            Value::Float(3.0),
+            Value::Float(4.0),
+        ]
+    );
+}
+
+#[test]
+fn vector_to_tensor_keeps_lanes_in_order() {
+    let mut types = TypeTable::new();
+    let element = f32_element(&mut types);
+    let width = types.intern_index(IndexExpr::Literal(3));
+    let vector_ty = types.vector_with_width(element, width);
+    let shape = literal_shape(&mut types, &[3]);
+    let tensor_ty = types.tensor_with_shape(element, shape);
+    let context = MirValidationContext::new(&types);
+
+    let converted = convert_register(
+        &types,
+        &context,
+        vector_ty,
+        tensor_ty,
+        Value::Vector(Rc::new(RefCell::new(vec![
+            Value::Float(1.0),
+            Value::Float(2.0),
+            Value::Float(3.0),
+        ]))),
+    )
+    .expect("vector<f32, 3> to tensor<f32, [3]>");
+
+    let (shape, values) = tensor_shape_and_values(converted);
+    assert_eq!(shape, vec![3]);
+    assert_eq!(
+        values,
+        vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)]
+    );
+}
+
+#[test]
+fn matrix_to_lista_flattens_row_major() {
+    let mut types = TypeTable::new();
+    let element = f32_element(&mut types);
+    let shape = literal_shape(&mut types, &[2, 2]);
+    let matrix_ty = types.matrix_with_shape(element, shape);
+    let lista_ty = types.intern(Type::Array(element));
+    let context = MirValidationContext::new(&types);
+
+    let converted = convert_register(
+        &types,
+        &context,
+        matrix_ty,
+        lista_ty,
+        matrix_2x2([1.0, 2.0, 3.0, 4.0]),
+    )
+    .expect("matrix<f32, [2, 2]> to lista<f32>");
+
+    let Value::Array(items) = converted else {
+        panic!("expected a lista, got {converted:?}");
+    };
+    assert_eq!(
+        items.borrow().as_slice(),
+        &[
+            Value::Float(1.0),
+            Value::Float(2.0),
+            Value::Float(3.0),
+            Value::Float(4.0),
+        ]
+    );
+}
+
+#[test]
+fn matrix_to_tensor_of_mismatched_literal_shape_fails_without_recovery() {
+    let mut types = TypeTable::new();
+    let element = f32_element(&mut types);
+    let matrix_shape = literal_shape(&mut types, &[2, 2]);
+    let target_shape = literal_shape(&mut types, &[5]);
+    let matrix_ty = types.matrix_with_shape(element, matrix_shape);
+    let tensor_ty = types.tensor_with_shape(element, target_shape);
+    let context = MirValidationContext::new(&types);
+
+    let result = convert_register(
+        &types,
+        &context,
+        matrix_ty,
+        tensor_ty,
+        matrix_2x2([1.0, 2.0, 3.0, 4.0]),
+    );
+
+    assert!(
+        result.is_err(),
+        "a 2x2 matrix must not become a five-cell rank-1 tensor: {result:?}"
     );
 }

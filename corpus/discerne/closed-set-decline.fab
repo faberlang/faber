@@ -18,7 +18,7 @@ locale = "en"
 # the diagnostic. The accepted spellings are:
 #   • a length:        if values.length() <= 4 { ... }
 #   • a width / range: if n is u32 { ... }   (an `is` test)
-#   • a union member:  match v { case int const n ... case string const s ... }
+#   • a union member:  match v { case int let n ... case string let s ... }
 
 # A length bound is not a member of list<int>.
 fn classify(list<int> values) → string {
@@ -35,7 +35,7 @@ fn classify(list<int> values) → string {
 # An integer width is not a member of int.
 fn width(int n) → string {
     match n {
-        case u32 const w {
+        case u32 let w {
             return "u32"
         }
         case int {

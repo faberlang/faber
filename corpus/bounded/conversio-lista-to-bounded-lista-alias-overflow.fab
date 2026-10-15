@@ -23,9 +23,9 @@ locale = "en"
 type Pair = list<int, 2>
 
 main {
-    const list<int> big ← [1, 2, 3]
+    let list<int> big ← [1, 2, 3]
 
-    const Pair over ← big ↦ Pair ⊥ [7, 8]
+    let Pair over ← big ↦ Pair ⊥ [7, 8]
     print over
     print over.length()
 }

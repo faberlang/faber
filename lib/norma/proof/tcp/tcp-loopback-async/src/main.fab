@@ -17,17 +17,17 @@ import from "norma:net/connection" connection
 
 async_main {
     await_const listener.Listener server_listener ← net.listen_async(0)
-    const int port ← server_listener.port()
+    let int port ← server_listener.port()
     assert port ≻ 0
 
     await_const connection.Socket client ← net.connect_async("127.0.0.1", port, false)
     await_const connection.Socket server ← server_listener.accept_async()
 
-    const list<b8> payload ← |74 63 70 2d 61 73 79 6e 63|
+    let list<b8> payload ← |74 63 70 2d 61 73 79 6e 63|
     await_const void _ ← client.write_bytes_async(payload)
 
     await_const list<b8> ∪ none maybe ← server.read_bytes_async(payload.length())
-    const list<b8> got ← maybe coalesce ||
+    let list<b8> got ← maybe coalesce ||
     assert got ≡ payload
 
     client.close()

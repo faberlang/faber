@@ -4,14 +4,14 @@ fn prefix() -> &'static str {
     r#"functio make<magnitudo H, magnitudo W>() → numerus { redde 1 }
 
 incipit {
-    fixum numerus w ← 4
+    sit numerus w ← 4
 "#
 }
 
 #[test]
 fn slot_lift_runtime_value_is_captured() {
     let result = analyze_source_la(&format!(
-        "{}    fixum numerus a ← make<3, magnitudo w>()\n}}",
+        "{}    sit numerus a ← make<3, magnitudo w>()\n}}",
         prefix()
     ));
     assert!(result.is_ok(), "{:?}", result.diagnostics);
@@ -30,10 +30,7 @@ fn slot_lift_runtime_value_is_captured() {
 
 #[test]
 fn slot_lift_bare_value_name_has_did_you_mean() {
-    let result = analyze_source_la(&format!(
-        "{}    fixum numerus a ← make<3, w>()\n}}",
-        prefix()
-    ));
+    let result = analyze_source_la(&format!("{}    sit numerus a ← make<3, w>()\n}}", prefix()));
     assert!(
         result.diagnostics.iter().any(|diag| diag
             .args
@@ -49,7 +46,7 @@ fn slot_lift_literal_and_size_param_remain_valid() {
     let source = r#"functio make<magnitudo H, magnitudo W>() → numerus { redde 1 }
 functio forward<magnitudo W>() → numerus { redde make<3, W>() }
 incipit {
-    fixum numerus a ← make<3, 4>()
+    sit numerus a ← make<3, 4>()
 }"#;
     let result = analyze_source_la(source);
     assert!(result.is_ok(), "{:?}", result.diagnostics);

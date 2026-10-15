@@ -21,7 +21,7 @@ fn typed_construction_runs_the_creo_hook_after_field_initialization() {
 locale = "en"
 +++
 class Terminus {
-    var int valor = 0
+    mut int valor = 0
 
     fn creo() → void {
         if self.valor ≻ 100 {
@@ -31,8 +31,8 @@ class Terminus {
 }
 
 class Circulus {
-    var int radius = 1
-    var int diameter = 0
+    mut int radius = 1
+    mut int diameter = 0
 
     fn creo() → void {
         self.diameter ← self.radius * 2
@@ -40,11 +40,11 @@ class Circulus {
 }
 
 main {
-    const Terminus inside ← Terminus { valor = 50 }
+    let Terminus inside ← Terminus { valor = 50 }
     print inside.valor
-    const Terminus clamped ← Terminus { valor = 200 }
+    let Terminus clamped ← Terminus { valor = 200 }
     print clamped.valor
-    const Circulus c ← Circulus { radius = 5 }
+    let Circulus c ← Circulus { radius = 5 }
     print c.diameter
 }
 "#,
@@ -60,11 +60,11 @@ fn a_genus_without_a_creo_hook_constructs_unchanged() {
 locale = "en"
 +++
 class Plain {
-    var int valor = 0
+    mut int valor = 0
 }
 
 main {
-    const Plain p ← Plain { valor = 200 }
+    let Plain p ← Plain { valor = 200 }
     print p.valor
 }
 "#,

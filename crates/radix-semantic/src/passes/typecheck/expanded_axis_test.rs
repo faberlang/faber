@@ -32,8 +32,8 @@ fn rejects_with_issue(source: &str, issue: &str) {
 fn expanded_axis_out_of_range_is_refused() {
     rejects_with_issue(
         r"incipit {
-  fixum tf32[2, 3] s ← vacua
-  fixum _ r ← s.expande([2, 4, 3], axis 5)
+  sit tf32[2, 3] s ← vacua
+  sit r ← s.expande([2, 4, 3], axis 5)
   nota r
 }",
         "expanded_axis_out_of_range",
@@ -44,9 +44,9 @@ fn expanded_axis_out_of_range_is_refused() {
 fn expanded_axis_non_constant_is_refused() {
     rejects_with_issue(
         r"incipit {
-  fixum tf32[2, 3] s ← vacua
+  sit tf32[2, 3] s ← vacua
   varia numerus k ← 1
-  fixum _ r ← s.expande([2, 4, 3], axis k)
+  sit r ← s.expande([2, 4, 3], axis k)
   nota r
 }",
         "expanded_axis_not_constant",
@@ -57,8 +57,8 @@ fn expanded_axis_non_constant_is_refused() {
 fn expanded_axis_rank_mismatch_is_refused() {
     rejects_with_issue(
         r"incipit {
-  fixum tf32[2, 3] s ← vacua
-  fixum _ r ← s.expande([2, 3], axis 0)
+  sit tf32[2, 3] s ← vacua
+  sit r ← s.expande([2, 3], axis 0)
   nota r
 }",
         "expanded_axis_rank_mismatch",
@@ -69,8 +69,8 @@ fn expanded_axis_rank_mismatch_is_refused() {
 fn bare_expande_without_axis_stays_the_ordinary_intrinsic() {
     accepts(
         r"incipit {
-  fixum tf32[2, 3] s ← vacua
-  fixum _ r ← s.expande([2, 4, 3])
+  sit tf32[2, 3] s ← vacua
+  sit r ← s.expande([2, 4, 3])
   nota r
 }",
     );

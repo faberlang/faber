@@ -41,27 +41,27 @@ fn fault_from_value(value raw) → fault.IoFault {
 # URL genus elsewhere — design killed that leaf for v1.
 @ public
 class Url {
-    var string scheme = ""
-    var string host = ""
-    var int port = 0
-    var string path = ""
-    var string query = ""
+    mut string scheme = ""
+    mut string host = ""
+    mut int port = 0
+    mut string path = ""
+    mut string query = ""
 }
 
 # Reuse holder. `agent` is the http:agent handle; 0 means ephemeral
 # (the provider builds a one-shot agent for that call).
 @ public
 class Client {
-    var int agent = 0
+    mut int agent = 0
 }
 
 # Incremental receive handle from http:request_open. `next` / `next_n`
 # pull one chunk via http:read; they never drain the remainder.
 @ public
 class Receive {
-    var int reader = 0
-    var int status = 0
-    var headers.Headers headers = headers.Headers { }
+    mut int reader = 0
+    mut int status = 0
+    mut headers.Headers headers = headers.Headers { }
 
     fn next() → Chunk ⇥ fault.IoFault {
         return receive(self)
@@ -77,8 +77,8 @@ class Receive {
 # terminal read; a later receive after done fails at the provider.
 @ public
 class Chunk {
-    var string text = ""
-    var bool done = false
+    mut string text = ""
+    mut bool done = false
 }
 
 @ public
@@ -88,14 +88,14 @@ fn empty() → Client {
 
 @ public
 fn session() → Client {
-    const list<value> none ← []
-    const int handle ↤ call 'http:agent' (none)
+    let list<value> none ← []
+    let int handle ↤ call 'http:agent' (none)
     return Client { agent = handle }
 }
 
 @ public
 fn session_timeout(int timeout_ms) → Client {
-    const int handle ↤ call 'http:agent' ([timeout_ms ↦ value])
+    let int handle ↤ call 'http:agent' ([timeout_ms ↦ value])
     return Client { agent = handle }
 }
 
@@ -104,23 +104,23 @@ fn session_timeout(int timeout_ms) → Client {
 # is dropped. Port, when present, must be between 1 and 65535.
 @ public
 fn split(string url) → Url {
-    const int sep ← find_scheme_sep(url)
+    let int sep ← find_scheme_sep(url)
     if sep ≺ 0 then return Url { }
-    const string scheme ← ascii_lower(url.slice(0, sep))
+    let string scheme ← ascii_lower(url.slice(0, sep))
     if not is_scheme(scheme) then return Url { }
-    const string rest ← url.slice(sep + 3, url.length())
-    const int auth_end ← authority_end(rest)
+    let string rest ← url.slice(sep + 3, url.length())
+    let int auth_end ← authority_end(rest)
     if auth_end ≺ 0 then return Url { }
-    const string authority ← rest.slice(0, auth_end)
-    const string remainder ← rest.slice(auth_end, rest.length())
-    const string hostport ← strip_userinfo(authority)
-    const string host ← ascii_lower(host_of(hostport))
+    let string authority ← rest.slice(0, auth_end)
+    let string remainder ← rest.slice(auth_end, rest.length())
+    let string hostport ← strip_userinfo(authority)
+    let string host ← ascii_lower(host_of(hostport))
     if host.length() ≡ 0 then return Url { }
     if not is_host(host) then return Url { }
-    const int ∪ none port ← port_of(hostport, scheme)
+    let int ∪ none port ← port_of(hostport, scheme)
     if port is none then return Url { }
-    const string path ← remainder_path(remainder)
-    const string query ← remainder_query(remainder)
+    let string path ← remainder_path(remainder)
+    let string query ← remainder_query(remainder)
     return Url {
         scheme = scheme,
         host = host,
@@ -156,10 +156,10 @@ fn request_target(Url url) → string {
 # Fold a name→value map into the shared Headers genus (illegal lines dropped).
 @ public
 fn headers_from_map(map<string, string> pairs) → headers.Headers {
-    var headers.Headers out ← headers.empty()
-    const list<string> names ← pairs.keys()
-    for from names const name {
-        const string ∪ none value ← pairs.get(name)
+    mut headers.Headers out ← headers.empty()
+    let list<string> names ← pairs.keys()
+    for from names let name {
+        let string ∪ none value ← pairs.get(name)
         if value not is none {
             if out.append(name, value ↦ string) {
             }
@@ -275,18 +275,18 @@ fn open_on(Client client, string method, string url, headers.Headers headers, st
 # real crossing failure.
 @ public
 fn receive(Receive stream) → Chunk ⇥ fault.IoFault {
-    const list<value> args ↤ [stream.reader ↦ value]
+    let list<value> args ↤ [stream.reader ↦ value]
     return chunk_of(call 'http:read' (args) ↦ value)
 }
 
 @ public
 fn receive_n(Receive stream, int max_bytes) → Chunk ⇥ fault.IoFault {
-    const list<value> args ↤ [stream.reader ↦ value, max_bytes ↦ value]
+    let list<value> args ↤ [stream.reader ↦ value, max_bytes ↦ value]
     return chunk_of(call 'http:read' (args) ↦ value)
 }
 
 fn require_url(string url, string verb) → void {
-    const Url parsed ← split(url)
+    let Url parsed ← split(url)
     if not is_absolute(parsed) {
         panic "norma:http/client.§: invalid URL"(verb)
     }
@@ -295,7 +295,7 @@ fn require_url(string url, string verb) → void {
 
 fn no_body(string route, int agent, string url, headers.Headers headers) → response.Response ⇥ fault.IoFault {
     require_url(url, route)
-    var list<value> args ← []
+    mut list<value> args ← []
     if agent ≻ 0 {
         args.append(agent ↦ value)
     }
@@ -311,7 +311,7 @@ fn no_body(string route, int agent, string url, headers.Headers headers) → res
 
 fn with_body(string route, int agent, string url, headers.Headers headers, string body) → response.Response ⇥ fault.IoFault {
     require_url(url, route)
-    var list<value> args ← []
+    mut list<value> args ← []
     if agent ≻ 0 {
         args.append(agent ↦ value)
     }
@@ -331,18 +331,18 @@ fn with_body(string route, int agent, string url, headers.Headers headers, strin
 
 fn generic(int agent, string method, string url, headers.Headers headers, string body) → response.Response ⇥ fault.IoFault {
     require_url(url, "http:request")
-    const value raw ← dispatch_generic("http:request", agent, method, url, headers, body)
+    let value raw ← dispatch_generic("http:request", agent, method, url, headers, body)
     return response_of(raw)
 }
 
 fn open_stream(int agent, string method, string url, headers.Headers headers, string body) → Receive ⇥ fault.IoFault {
     require_url(url, "http:request_open")
-    const value raw ← dispatch_generic("http:request_open", agent, method, url, headers, body)
+    let value raw ← dispatch_generic("http:request_open", agent, method, url, headers, body)
     # Why: a carrier that is not {reader, status, headers} is a broken host
     # contract, not caller input, so it panics (like require_url) instead of
     # defaulting a reader or status.
     do {
-        const map<string, value> fields ↤ raw
+        let map<string, value> fields ↤ raw
         return Receive {
             reader = fields["reader"] ↦ int,
             status = fields["status"] ↦ int,
@@ -355,7 +355,7 @@ fn open_stream(int agent, string method, string url, headers.Headers headers, st
 }
 
 fn dispatch_generic(string route, int agent, string method, string url, headers.Headers headers, string body) → value ⇥ fault.IoFault {
-    var list<value> args ← []
+    mut list<value> args ← []
     if agent ≻ 0 {
         args.append(agent ↦ value)
     }
@@ -371,7 +371,7 @@ fn dispatch_generic(string route, int agent, string method, string url, headers.
 
 fn response_of(value raw) → response.Response {
     do {
-        const map<string, value> fields ↤ raw
+        let map<string, value> fields ↤ raw
         return response.of(
             fields["status"] ↦ int,
             headers_from_carrier(fields["headers"]),
@@ -385,7 +385,7 @@ fn response_of(value raw) → response.Response {
 
 fn chunk_of(value raw) → Chunk {
     do {
-        const map<string, value> fields ↤ raw
+        let map<string, value> fields ↤ raw
         return Chunk {
             text = body_text(fields["bytes"]),
             done = fields["done"] ↦ bool
@@ -397,9 +397,9 @@ fn chunk_of(value raw) → Chunk {
 }
 
 fn headers_carrier(headers.Headers headers) → list<value> {
-    var list<value> out ← []
-    for from headers.entries const entry {
-        var map<string, value> row ← {}
+    mut list<value> out ← []
+    for from headers.entries let entry {
+        mut map<string, value> row ← {}
         row.put("name", entry.name ↦ value)
         row.put("value", entry.value ↦ value)
         out.append(row ↦ value)
@@ -408,15 +408,15 @@ fn headers_carrier(headers.Headers headers) → list<value> {
 }
 
 fn headers_from_carrier(value raw) → headers.Headers {
-    var headers.Headers out ← headers.empty()
+    mut headers.Headers out ← headers.empty()
     if raw not is list<value> then return out
     do {
-        const list<value> items ↤ raw
-        for from items const item {
+        let list<value> items ↤ raw
+        for from items let item {
             if item is map<string, value> {
-                const map<string, value> row ↤ item
-                const string name ↤ row["name"]
-                const string header_value ↤ row["value"]
+                let map<string, value> row ↤ item
+                let string name ↤ row["name"]
+                let string header_value ↤ row["value"]
                 if out.append(name, header_value) {
                 }
             }
@@ -433,7 +433,7 @@ fn body_text(value raw) → string {
     # Guarded by the `is` test, so the default never applies.
     if raw is string then return raw ↦ string ⊥ ""
     do {
-        const list<b8> data ↤ raw
+        let list<b8> data ↤ raw
         do {
             return data ↦ string
         }
@@ -447,7 +447,7 @@ fn body_text(value raw) → string {
 }
 
 fn find_scheme_sep(string url) → int {
-    var int i ← 0
+    mut int i ← 0
     while i + 2 ≺ url.length() {
         if url.slice(i, i + 3) ≡ "://" {
             return i
@@ -460,9 +460,9 @@ fn find_scheme_sep(string url) → int {
 fn is_scheme(string scheme) → bool {
     if scheme.length() ≡ 0 then return false
     if not is_alpha(scheme.slice(0, 1)) then return false
-    var int i ← 1
+    mut int i ← 1
     while i ≺ scheme.length() {
-        const string c ← scheme.slice(i, i + 1)
+        let string c ← scheme.slice(i, i + 1)
         if not is_alpha(c) and not is_digit(c) and c ≢ "+" and c ≢ "-" and c ≢ "." {
             return false
         }
@@ -473,10 +473,10 @@ fn is_scheme(string scheme) → bool {
 
 fn authority_end(string rest) → int {
     if rest.length() ≡ 0 then return -1
-    var int i ← 0
-    var bool v6 ← false
+    mut int i ← 0
+    mut bool v6 ← false
     while i ≺ rest.length() {
-        const string c ← rest.slice(i, i + 1)
+        let string c ← rest.slice(i, i + 1)
         if c ≡ "[" {
             v6 ← true
         }
@@ -492,11 +492,11 @@ fn authority_end(string rest) → int {
 }
 
 fn strip_userinfo(string authority) → string {
-    var int at ← -1
-    var int i ← 0
-    var bool v6 ← false
+    mut int at ← -1
+    mut int i ← 0
+    mut bool v6 ← false
     while i ≺ authority.length() {
-        const string c ← authority.slice(i, i + 1)
+        let string c ← authority.slice(i, i + 1)
         if c ≡ "[" {
             v6 ← true
         }
@@ -515,7 +515,7 @@ fn strip_userinfo(string authority) → string {
 fn host_of(string hostport) → string {
     if hostport.length() ≡ 0 then return ""
     if hostport.slice(0, 1) ≡ "[" {
-        var int i ← 1
+        mut int i ← 1
         while i ≺ hostport.length() {
             if hostport.slice(i, i + 1) ≡ "]" {
                 return hostport.slice(1, i)
@@ -524,7 +524,7 @@ fn host_of(string hostport) → string {
         }
         return ""
     }
-    var int i ← 0
+    mut int i ← 0
     while i ≺ hostport.length() {
         if hostport.slice(i, i + 1) ≡ ":" {
             return hostport.slice(0, i)
@@ -536,10 +536,10 @@ fn host_of(string hostport) → string {
 
 fn port_of(string hostport, string scheme) → int ∪ none {
     if hostport.length() ≡ 0 then return null
-    var string digits ← ""
+    mut string digits ← ""
     if hostport.slice(0, 1) ≡ "[" {
-        var int i ← 1
-        var bool closed ← false
+        mut int i ← 1
+        mut bool closed ← false
         while i ≺ hostport.length() {
             if hostport.slice(i, i + 1) ≡ "]" {
                 closed ← true
@@ -556,8 +556,8 @@ fn port_of(string hostport, string scheme) → int ∪ none {
         digits ← hostport.slice(i + 1, hostport.length())
     }
     else {
-        var int colon ← -1
-        var int i ← 0
+        mut int colon ← -1
+        mut int i ← 0
         while i ≺ hostport.length() {
             if hostport.slice(i, i + 1) ≡ ":" {
                 if colon ≥ 0 then return null
@@ -571,13 +571,13 @@ fn port_of(string hostport, string scheme) → int ∪ none {
         digits ← hostport.slice(colon + 1, hostport.length())
     }
     if digits.length() ≡ 0 then return null
-    var int i ← 0
+    mut int i ← 0
     while i ≺ digits.length() {
         if not is_digit(digits.slice(i, i + 1)) then return null
         i ← i + 1
     }
     do {
-        const int n ↤ digits
+        let int n ↤ digits
         if n ≺ 1 or n ≻ 65535 then return null
         return n
     }
@@ -593,15 +593,15 @@ fn default_port(string scheme) → int {
 }
 
 fn is_default_port(string scheme, int port) → bool {
-    const int def ← default_port(scheme)
+    let int def ← default_port(scheme)
     return def ≻ 0 and port ≡ def
 }
 
 fn is_host(string host) → bool {
     if host.length() ≡ 0 then return false
-    var int i ← 0
+    mut int i ← 0
     while i ≺ host.length() {
-        const string c ← host.slice(i, i + 1)
+        let string c ← host.slice(i, i + 1)
         if c ≡ " " or c ≡ "/" or c ≡ "?" or c ≡ "#" or c ≡ "@" or c ≡ "[" or c ≡ "]" {
             return false
         }
@@ -611,7 +611,7 @@ fn is_host(string host) → bool {
 }
 
 fn host_literal(string host) → string {
-    var int i ← 0
+    mut int i ← 0
     while i ≺ host.length() {
         if host.slice(i, i + 1) ≡ ":" {
             return "[§]"(host)
@@ -623,13 +623,13 @@ fn host_literal(string host) → string {
 
 fn remainder_path(string remainder) → string {
     if remainder.length() ≡ 0 then return "/"
-    const string first ← remainder.slice(0, 1)
+    let string first ← remainder.slice(0, 1)
     if first ≡ "?" or first ≡ "#" then return "/"
-    var int i ← 0
+    mut int i ← 0
     while i ≺ remainder.length() {
-        const string c ← remainder.slice(i, i + 1)
+        let string c ← remainder.slice(i, i + 1)
         if c ≡ "?" or c ≡ "#" {
-            const string path ← remainder.slice(0, i)
+            let string path ← remainder.slice(0, i)
             if path.length() ≡ 0 then return "/"
             return path
         }
@@ -639,15 +639,15 @@ fn remainder_path(string remainder) → string {
 }
 
 fn remainder_query(string remainder) → string {
-    var int i ← 0
+    mut int i ← 0
     while i ≺ remainder.length() {
-        const string c ← remainder.slice(i, i + 1)
+        let string c ← remainder.slice(i, i + 1)
         if c ≡ "#" {
             return ""
         }
         if c ≡ "?" {
-            const int start ← i + 1
-            var int j ← start
+            let int start ← i + 1
+            mut int j ← start
             while j ≺ remainder.length() {
                 if remainder.slice(j, j + 1) ≡ "#" {
                     return remainder.slice(start, j)
@@ -662,8 +662,8 @@ fn remainder_query(string remainder) → string {
 }
 
 fn ascii_lower(string s) → string {
-    var string out ← ""
-    var int i ← 0
+    mut string out ← ""
+    mut int i ← 0
     while i ≺ s.length() {
         out ← out + lower_char(s.slice(i, i + 1))
         i ← i + 1
@@ -672,9 +672,9 @@ fn ascii_lower(string s) → string {
 }
 
 fn lower_char(string c) → string {
-    const string upper ← "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    const string lower ← "abcdefghijklmnopqrstuvwxyz"
-    var int i ← 0
+    let string upper ← "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    let string lower ← "abcdefghijklmnopqrstuvwxyz"
+    mut int i ← 0
     while i ≺ 26 {
         if upper.slice(i, i + 1) ≡ c {
             return lower.slice(i, i + 1)

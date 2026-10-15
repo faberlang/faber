@@ -1521,11 +1521,11 @@ fn en_pack_empty_marker_rejects_vacua_alias() {
 
 #[test]
 fn en_empty_named_binding_rhs_claims_as_marker() {
-    // Parse pin: `var list<int> empty ← empty` — the binding is legal; the
+    // Parse pin: `mut list<int> empty ← empty` — the binding is legal; the
     // RHS spelling claims as the marker. The name is unreferenceable in
     // expression position (null-like shadowing).
     let pack = installed_pack("en");
-    let result = parse(lex_with_locale_pack("var list<int> empty ← empty", &pack));
+    let result = parse(lex_with_locale_pack("mut list<int> empty ← empty", &pack));
     assert!(
         result.success(),
         "en empty-named binding with marker RHS must parse: {:?}",
@@ -1571,12 +1571,12 @@ fn marker_named_bindings_warn_under_en_and_la_packs() {
     for (locale, source, issue) in [
         (
             "en",
-            "main { const list<int> empty ← [1] print empty.length() }",
+            "main { let list<int> empty ← [1] print empty.length() }",
             "empty_marker_shadowing",
         ),
         (
             "la",
-            "incipit { fixum lista<numerus> vacua ← [1] nota vacua }",
+            "incipit { sit lista<numerus> vacua ← [1] nota vacua }",
             "empty_marker_shadowing",
         ),
     ] {
@@ -1610,7 +1610,7 @@ fn marker_named_bindings_warn_under_en_and_la_packs() {
 #[test]
 fn en_vacua_spelling_does_not_claim_marker() {
     let pack = installed_pack("en");
-    let result = parse(lex_with_locale_pack("var list<int> xs ← vacua", &pack));
+    let result = parse(lex_with_locale_pack("mut list<int> xs ← vacua", &pack));
     assert!(
         result.success(),
         "en `vacua` must parse as an ordinary identifier: {:?}",
@@ -1732,7 +1732,7 @@ fn installed_packs_resolve_batch_e_keyword_surfaces() {
         ("type", "typus"),
         ("union", "discretio"),
         ("const", "fixum"),
-        ("var", "varia"),
+        ("mut", "varia"),
         ("let", "sit"),
     ] {
         assert_eq!(
@@ -2290,6 +2290,179 @@ fn item_list_separator_issue_rows_exist_in_every_installed_pack() {
             "{locale}: {}",
             rendered.message
         );
+    }
+}
+
+/// The 14 frontend review issue rows are owned and rendered by
+/// every installed pack. The shrink-only absent-row budget gate counts missing
+/// rows, so it would accept a pack that deletes one of these and adds an
+/// unrelated row elsewhere; name each row here so a deletion fails by name.
+#[test]
+fn installed_packs_render_frontend_review_issue_rows() {
+    const ROWS: &[(&str, &str)] = &[
+        ("LEX001", "empty_regex_literal"),
+        ("LEX001", "unterminated_regex_literal"),
+        ("SEM016", "conversio_failure_channel_value_required"),
+        ("PARSE001", "expected_identifier"),
+        ("PARSE001", "expected_string_literal"),
+        ("PARSE001", "expected_mutability_keyword"),
+        ("PARSE001", "await_binding_requires_name"),
+        ("PARSE001", "expected_method_declaration"),
+        ("PARSE001", "expected_praepara_hook"),
+        ("PARSE001", "expected_lane_value"),
+        ("PARSE001", "expected_scribe_keyword"),
+        ("PARSE001", "expected_incipit_keyword"),
+        ("PARSE001", "enum_member_value_number"),
+        ("PARSE001", "enum_member_value"),
+    ];
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let owned = owned_pack(locale);
+        for &(code, issue) in ROWS {
+            let row = owned
+                .diagnostics
+                .get(code)
+                .and_then(|template| template.issues.get(issue))
+                .unwrap_or_else(|| panic!("{locale} must own {code}.{issue}"));
+            assert!(
+                !row.message.trim().is_empty(),
+                "{locale} {code}.{issue} message must not be empty"
+            );
+            assert!(
+                row.help
+                    .as_deref()
+                    .is_some_and(|help| !help.trim().is_empty()),
+                "{locale} {code}.{issue} help must not be empty"
+            );
+            let diagnostic = diagnostic_with_code(code, vec![diagnostic_arg("issue", issue)]);
+            let rendered = installed_pack(locale)
+                .render_diagnostic_text(&diagnostic)
+                .unwrap_or_else(|err| panic!("{locale} {code}.{issue} template should render: {err:?}"))
+                .unwrap_or_else(|| panic!("{locale} {code} row should exist"));
+            assert!(
+                !rendered.message.contains("locale pack missing row"),
+                "{locale} {code}.{issue}: {}",
+                rendered.message
+            );
+        }
+    }
+}
+
+/// The LEX002 float-overflow/underflow rows and the SEM008 conversion-signature
+/// row (corpus coverage I3, batch 1) are owned and rendered by every installed
+/// pack. The absent-row budget gate counts missing rows, so it would accept a
+/// pack that deletes one of these and adds an unrelated row elsewhere; name each
+/// row here so a deletion fails by name.
+#[test]
+fn installed_packs_render_lex002_float_and_sem008_conversio_signature_rows() {
+    const ROWS: &[(&str, &str)] = &[
+        ("LEX002", "float_overflow"),
+        ("LEX002", "float_underflow"),
+        ("SEM008", "conversio_signature"),
+    ];
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let owned = owned_pack(locale);
+        for &(code, issue) in ROWS {
+            let row = owned
+                .diagnostics
+                .get(code)
+                .and_then(|template| template.issues.get(issue))
+                .unwrap_or_else(|| panic!("{locale} must own {code}.{issue}"));
+            assert!(
+                !row.message.trim().is_empty(),
+                "{locale} {code}.{issue} message must not be empty"
+            );
+            assert!(
+                row.help
+                    .as_deref()
+                    .is_some_and(|help| !help.trim().is_empty()),
+                "{locale} {code}.{issue} help must not be empty"
+            );
+            let diagnostic = diagnostic_with_code(code, vec![diagnostic_arg("issue", issue)]);
+            let rendered = installed_pack(locale)
+                .render_diagnostic_text(&diagnostic)
+                .unwrap_or_else(|err| panic!("{locale} {code}.{issue} template should render: {err:?}"))
+                .unwrap_or_else(|| panic!("{locale} {code} row should exist"));
+            assert!(
+                !rendered.message.contains("locale pack missing row"),
+                "{locale} {code}.{issue}: {}",
+                rendered.message
+            );
+            assert!(
+                !rendered
+                    .message
+                    .contains("locale pack template missing placeholder")
+                    && !rendered
+                        .help
+                        .as_deref()
+                        .is_some_and(|help| help.contains("locale pack template missing placeholder")),
+                "{locale} {code}.{issue} must not miss a template placeholder: {} / {:?}",
+                rendered.message,
+                rendered.help
+            );
+        }
+    }
+}
+
+/// The four PARSE001 rows for the copy-in operator, duplicate tuple element
+/// labels, named `implements` slots and imported field names (corpus coverage
+/// I3, batch 2) are owned and rendered by every installed pack, with the
+/// placeholders each template names. The absent-row budget gate counts missing
+/// rows, so it would accept a pack that deletes one of these and adds an
+/// unrelated row elsewhere; name each row here so a deletion fails by name.
+#[test]
+fn installed_packs_render_parse001_copy_duplicate_implements_import_rows() {
+    const ROWS: &[(&str, &[(&str, &str)])] = &[
+        ("copy_into_value_expected", &[("operator", "⇇")]),
+        ("duplicate_tuple_element_label", &[("label", "a")]),
+        ("implements_slot_requires_name", &[]),
+        ("import_field_name", &[("expected", "identifier")]),
+    ];
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let owned = owned_pack(locale);
+        for &(issue, args) in ROWS {
+            let row = owned
+                .diagnostics
+                .get("PARSE001")
+                .and_then(|template| template.issues.get(issue))
+                .unwrap_or_else(|| panic!("{locale} must own PARSE001.{issue}"));
+            assert!(
+                !row.message.trim().is_empty(),
+                "{locale} PARSE001.{issue} message must not be empty"
+            );
+            assert!(
+                row.help
+                    .as_deref()
+                    .is_some_and(|help| !help.trim().is_empty()),
+                "{locale} PARSE001.{issue} help must not be empty"
+            );
+            let mut diagnostic_args = vec![diagnostic_arg("issue", issue)];
+            diagnostic_args.extend(
+                args.iter()
+                    .map(|(name, value)| diagnostic_arg(name, *value)),
+            );
+            let diagnostic = parse_diagnostic(ParseErrorKind::Expected, diagnostic_args);
+            let rendered = installed_pack(locale)
+                .render_diagnostic_text(&diagnostic)
+                .unwrap_or_else(|err| panic!("{locale} PARSE001.{issue} template should render: {err:?}"))
+                .unwrap_or_else(|| panic!("{locale} PARSE001 row should exist"));
+            assert!(
+                !rendered.message.contains("locale pack missing row"),
+                "{locale} PARSE001.{issue}: {}",
+                rendered.message
+            );
+            assert!(
+                !rendered
+                    .message
+                    .contains("locale pack template missing placeholder")
+                    && !rendered
+                        .help
+                        .as_deref()
+                        .is_some_and(|help| help.contains("locale pack template missing placeholder")),
+                "{locale} PARSE001.{issue} must not miss a template placeholder: {} / {:?}",
+                rendered.message,
+                rendered.help
+            );
+        }
     }
 }
 

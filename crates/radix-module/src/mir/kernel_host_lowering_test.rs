@@ -72,13 +72,13 @@ const TENSOR_READ_KERNEL: &str = r"
 @ kernel
 @ public
 fn k(tf32[8] a, mut tf32[8] o) → void {
-    for from a at [i] thread lane const c {
+    for from a at [i] thread lane let c {
         o[i] ← a[i] * 2.0
     }
 }
 main {
-    const tf32[8] a ← tf32[8] {}.fill(1.5)
-    var tf32[8] b ← tf32[8] {}
+    let tf32[8] a ← tf32[8] {}.fill(1.5)
+    mut tf32[8] b ← tf32[8] {}
     k(a, mut b)
     print b[3]
 }
@@ -158,14 +158,14 @@ fn sum2<size H, size W>(tensor<f32, [H, W]> t, int x, int y) → f32 {
 @ kernel
 @ public
 fn k<size H, size W>(tensor<f32, [H, W]> t, mut tensor<f32, [H, W]> o) → void {
-    for from t at [i, j] thread lane const c {
+    for from t at [i, j] thread lane let c {
         o[[i, j]] ← sum2(t, j, i) * 2.0
     }
 }
 main {
-    const int n ← 4
-    const tf32[size n, size n] a ← tf32[size n, size n] {}.fill(1.5)
-    var tf32[size n, size n] b ← tf32[size n, size n] {}
+    let int n ← 4
+    let tf32[size n, size n] a ← tf32[size n, size n] {}.fill(1.5)
+    mut tf32[size n, size n] b ← tf32[size n, size n] {}
     k(a, mut b)
     print b[[2, 3]]
 }
@@ -179,10 +179,10 @@ fn host_kernel_lowering_folds_a_thread_sum_sequentially() {
 @ kernel
 @ public
 fn total<size N>(tf32[N] a) → f32 {
-    return reduce via sum from a at [i] thread lane const s { return s * 2.0 }
+    return reduce via sum from a at [i] thread lane let s { return s * 2.0 }
 }
 main {
-    const tf32[4] a ← [3.0, 1.0, 4.0, 2.0] ↦ tf32[4]
+    let tf32[4] a ← [3.0, 1.0, 4.0, 2.0] ↦ tf32[4]
     print total(a)
 }
 ";
@@ -212,15 +212,15 @@ fn speed_of(f32 scale, vector<f32, 4> s) → f32 {
 @ kernel
 @ public
 fn wave_speed<size H, size W>(f32 scale, tensor<vector<f32, 4>, [H, W]> state, mut tensor<f32, [4]> clock) → void {
-    clock[[1]] ← reduce via max from state at [i, j] thread lane const s { return speed_of(scale, s) } coalesce 0.0
+    clock[[1]] ← reduce via max from state at [i, j] thread lane let s { return speed_of(scale, s) } coalesce 0.0
 }
 main {
-    const tensor<vector<f32, 4>, []> cell_seed ← empty
-    const vector<f32, 4> low ← [0.0, 1.0, 1.0, 0.0] ↦ vector<f32, 4>
-    var tensor<vector<f32, 4>, [5, 5]> state ← cell_seed.create(low, [5, 5])
+    let tensor<vector<f32, 4>, []> cell_seed ← empty
+    let vector<f32, 4> low ← [0.0, 1.0, 1.0, 0.0] ↦ vector<f32, 4>
+    mut tensor<vector<f32, 4>, [5, 5]> state ← cell_seed.create(low, [5, 5])
     state[[3, 2]] ← [0.0, 2.0, 5.0, 0.0] ↦ vector<f32, 4>
     state[[0, 4]] ← [0.0, 1.0, 3.0, 0.0] ↦ vector<f32, 4>
-    var tf32[4] clock ← tf32[4] {}
+    mut tf32[4] clock ← tf32[4] {}
     wave_speed(0.5, state, clock)
     print clock[[1]]
 }

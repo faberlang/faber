@@ -32,21 +32,21 @@ locale = "en"
 #   Division and remainder by zero fail.
 
 main {
-    var wrapping<u16> max ← 65535
-    const wrapping<u16> one ← 1
-    var wrapping<u16> zero ← 0
-    const u16 converted ↤ one
-    const wrapping<u16> ring1 ← max + one
+    mut wrapping<u16> max ← 65535
+    let wrapping<u16> one ← 1
+    mut wrapping<u16> zero ← 0
+    let u16 converted ↤ one
+    let wrapping<u16> ring1 ← max + one
     print ring1
-    const wrapping<u16> ring2 ← zero - one
+    let wrapping<u16> ring2 ← zero - one
     print ring2
-    const wrapping<u16> ring3 ← max * 2
+    let wrapping<u16> ring3 ← max * 2
     print ring3
-    const wrapping<u16> ring4 ← -one
+    let wrapping<u16> ring4 ← -one
     print ring4
-    const wrapping<u16> ring5 ← ¬zero
+    let wrapping<u16> ring5 ← ¬zero
     print ring5
-    const wrapping<u16> ring6 ← one ⇐ 16
+    let wrapping<u16> ring6 ← one ⇐ 16
     print ring6
     print max ⇒ 16
     print max ≻ zero
@@ -54,15 +54,15 @@ main {
     zero ↓
     print max
     print zero
-    const wrapping<u16> methodSum ← max.added(one)
-    const wrapping<u16> methodShift ← max.shifted_left(16)
-    var wrapping<u16> methodAcc ← 0
+    let wrapping<u16> methodSum ← max.added(one)
+    let wrapping<u16> methodShift ← max.shifted_left(16)
+    mut wrapping<u16> methodAcc ← 0
     methodAcc.add(one)
     methodAcc.shift_left(16)
     print converted
     print methodSum
     print methodShift
     print methodAcc
-    const list<wrapping<u16>> words ← [one, max]
+    let list<wrapping<u16>> words ← [one, max]
     print words.get(1) coalesce 0 ∷ wrapping<u16>
 }

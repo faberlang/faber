@@ -75,3 +75,55 @@ incipit {}
     let entry = entry_from_exempla("ok.fab", source, "x").expect("entry");
     assert_eq!(entry.body, "Prose line\n\n```fab\nincipit {}\n```\n");
 }
+
+#[test]
+fn non_en_locale_exemplum_prefixes_fab_block_with_source_frontmatter() {
+    let source = r#"+++
+term = "x"
+kind = "keyword"
+category = "t"
+summary = "S"
+syntax = "x"
+locale = "la"
++++
+# Prose line
+incipit {}
+"#;
+    let entry = entry_from_exempla("ok.fab", source, "x").expect("entry");
+    let block = fab_block(&entry.body).expect("fab block");
+    assert!(
+        block.starts_with("+++"),
+        "la exemplum block must start with source frontmatter: {block}"
+    );
+    assert!(
+        block.contains("locale = \"la\""),
+        "la exemplum block must declare its locale: {block}"
+    );
+}
+
+#[test]
+fn en_locale_exemplum_keeps_bare_fab_block() {
+    let source = r#"+++
+term = "x"
+kind = "keyword"
+category = "t"
+summary = "S"
+syntax = "x"
+locale = "en"
++++
+incipit {}
+"#;
+    let entry = entry_from_exempla("ok.fab", source, "x").expect("entry");
+    let block = fab_block(&entry.body).expect("fab block");
+    assert!(
+        !block.starts_with("+++"),
+        "en exemplum block must stay bare: {block}"
+    );
+}
+
+fn fab_block(body: &str) -> Option<String> {
+    let start = body.find("```fab")?;
+    let code_start = body[start..].find('\n')? + start + 1;
+    let code_end = body[code_start..].find("```")? + code_start;
+    Some(body[code_start..code_end].to_owned())
+}

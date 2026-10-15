@@ -53,7 +53,7 @@ test "adds" {
     assert 1 + 1 ≡ 2
 }
 test "counts" {
-    var int i ← 0
+    mut int i ← 0
     while i ≺ 8 {
         i ← i + 1
     }

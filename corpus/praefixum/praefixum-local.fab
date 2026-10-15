@@ -58,7 +58,7 @@ fn quadratum(int n) → int {
 }
 
 class Cista {
-    var int n
+    mut int n
 
     fn ter() → int {
         const int factor = comptime {
@@ -78,8 +78,8 @@ fn grid_cells(int multiplier) → int {
 
 fn dash_line() → string {
     const string dashes = comptime {
-        var string acc ← ""
-        for range 0‥6 const i {
+        mut string acc ← ""
+        for range 0‥6 let i {
             acc ← acc + "-"
         }
         return acc
@@ -89,8 +89,8 @@ fn dash_line() → string {
 
 fn squares_upto() → list<int> {
     const list<int> squares = comptime {
-        var list<int> acc ← empty
-        for range 1‥6 const i {
+        mut list<int> acc ← empty
+        for range 1‥6 let i {
             acc.append(quadratum(i))
         }
         return acc
@@ -103,8 +103,8 @@ main {
         return quadratum(2) + 3
     }
     const _ total_sq = comptime {
-        var int total ← 0
-        for range 1‥5 const i {
+        mut int total ← 0
+        for range 1‥5 let i {
             total ← total + quadratum(i)
         }
         return total
@@ -121,6 +121,6 @@ main {
     print grid_cells(2)
     print dash_line()
     print squares_upto()
-    const Cista holder ← Cista { n = 5 }
+    let Cista holder ← Cista { n = 5 }
     print holder.ter()
 }

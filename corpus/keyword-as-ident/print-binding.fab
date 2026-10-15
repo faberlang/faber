@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "identifier"
 canonical = true
 summary = "A binding named print used as the argument of the bare output intrinsic."
-syntax = "const string print ← \"print\"; print print"
+syntax = "let string print ← \"print\"; print print"
 related = ["nota", "fixum"]
 locale = "en"
 +++
@@ -14,7 +14,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Binding targets accept keyword spellings — `const string print` is a
+#   • Binding targets accept keyword spellings — `let string print` is a
 #     user name, not a reserved word.
 #   • Bare `print print` is the output intrinsic of that binding.
 #
@@ -26,7 +26,7 @@ locale = "en"
 # =============================================================================
 #
 # Operator example:
-#   const string print ← "print"
+#   let string print ← "print"
 #   print print
 #
 # GRAMMAR:
@@ -36,6 +36,6 @@ locale = "en"
 #   print-binding.expected — print
 
 main {
-    const string print ← "print"
+    let string print ← "print"
     print print
 }

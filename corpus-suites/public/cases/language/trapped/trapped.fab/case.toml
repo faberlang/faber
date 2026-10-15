@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/trapped/trapped.fab"
+group = "language"
+input_root = "corpus"
+input = "trapped/trapped.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

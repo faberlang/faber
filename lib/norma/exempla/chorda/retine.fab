@@ -16,22 +16,22 @@ locale = "en"
 import from "norma:chorda" chorda
 
 main {
-    const string slug ← chorda.keep_between("hello7!", "a", "z")
+    let string slug ← chorda.keep_between("hello7!", "a", "z")
     assert slug ≡ "hello"
 
-    const string letters ← chorda.keep_if("hello7!", string c ∴ c ≥ 'a' and c ≤ 'z')
+    let string letters ← chorda.keep_if("hello7!", string c ∴ c ≥ 'a' and c ≤ 'z')
     assert letters ≡ slug
 
-    const string digits ← chorda.keep_if("id42x", string c ∴ (((c ≡ "0" or c ≡ "1") or c ≡ "2") or c ≡ "3") or c ≡ "4")
+    let string digits ← chorda.keep_if("id42x", string c ∴ (((c ≡ "0" or c ≡ "1") or c ≡ "2") or c ≡ "3") or c ≡ "4")
     assert digits ≡ "42"
 
-    const string stripped ← chorda.drop_if("hi, world!", string c ∴ (c ≡ "," or c ≡ "!") or c ≡ " ")
+    let string stripped ← chorda.drop_if("hi, world!", string c ∴ (c ≡ "," or c ≡ "!") or c ≡ " ")
     assert stripped ≡ "hiworld"
 
-    const string without_digits ← chorda.drop_between("hello7!", "0", "9")
+    let string without_digits ← chorda.drop_between("hello7!", "0", "9")
     assert without_digits ≡ "hello!"
 
-    const list<string> scalae ← chorda.chars("ab")
+    let list<string> scalae ← chorda.chars("ab")
     assert scalae.length() ≡ 2
 
     print slug, digits, stripped

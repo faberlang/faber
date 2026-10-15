@@ -292,8 +292,8 @@ fn lista_tensor_conversio_solves_single_target_hole_from_flat_count() {
     // 4 flat elements over the declared extent [2, _] pin the hole to 2.
     assert_accepts_la(
         r"incipit {
-  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-  fixum tensor<f32, _> shaped ← flat ↦ tensor<f32, [2, _]>
+  sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  sit tensor<f32, _> shaped ← flat ↦ tensor<f32, [2, _]>
   nota shaped.longitudo()
 }",
     );
@@ -305,8 +305,8 @@ fn lista_tensor_conversio_names_indivisible_flat_count_for_target_hole() {
     // named at the conversion like every other tensor count mismatch.
     assert_rejects_with_issue_la(
         r"incipit {
-  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-  fixum tensor<f32, _> shaped ← flat ↦ tensor<f32, [3, _]>
+  sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  sit tensor<f32, _> shaped ← flat ↦ tensor<f32, [3, _]>
   nota shaped.longitudo()
 }",
         "incompatible_tensor_index",
@@ -319,8 +319,8 @@ fn lista_tensor_conversio_refuses_multi_hole_target() {
     // finalize hole check names it.
     assert_rejects_with_issue_la(
         r"incipit {
-  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-  fixum tensor<f32, _> shaped ← flat ↦ tensor<f32, [_, _]>
+  sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  sit tensor<f32, _> shaped ← flat ↦ tensor<f32, [_, _]>
   nota shaped.longitudo()
 }",
         "cannot_infer_tensor_shape",
@@ -345,7 +345,7 @@ fn lista_tensor_conversio_accepts_literal_list_for_narrow_float_tensor() {
     // route accepts it, so the padded route must not reject it either.
     assert_accepts_la(
         r"incipit {
-  fixum tf32[3] row ← [1.0, 2.0, 3.0] ↦ tf32[3]
+  sit tf32[3] row ← [1.0, 2.0, 3.0] ↦ tf32[3]
   nota row.longitudo()
 }",
     );
@@ -355,7 +355,7 @@ fn lista_tensor_conversio_accepts_literal_list_for_narrow_float_tensor() {
 fn lista_tensor_conversio_accepts_literal_list_for_long_form_tensor() {
     assert_accepts_la(
         r"incipit {
-  fixum tensor<f32, [2]> pair ← [1.0, 2.0] ↦ tensor<f32, [2]>
+  sit tensor<f32, [2]> pair ← [1.0, 2.0] ↦ tensor<f32, [2]>
   nota pair.longitudo()
 }",
     );
@@ -388,7 +388,7 @@ fn lista_tensor_conversio_rejects_literal_list_for_text_tensor() {
     // literal cannot be stored into a `textus` element.
     let result = crate::test_support::analyze_source_la(
         r"incipit {
-  fixum tensor<textus, [3]> t ← [1, 2, 3] ↦ tensor<textus, [3]>
+  sit tensor<textus, [3]> t ← [1, 2, 3] ↦ tensor<textus, [3]>
   nota t.longitudo()
 }",
     );

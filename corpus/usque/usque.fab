@@ -30,7 +30,7 @@ locale = "en"
 
 # usque — inclusive upper bound for range iteration
 #
-# itera ab <initium> usque <finis> <var> { … }   -- both endpoints included
+# itera ab <initium> usque <finis> <binder> { … }   -- both endpoints included
 #
 # GRAMMAR:
 #   iterStmt :← 'itera' 'ab' expr 'usque' expr binding block
@@ -40,7 +40,7 @@ locale = "en"
 
 main {
     # i = 0, 1, 2, 3 (includes 3)
-    for range 0 until 3 const i {
+    for range 0 until 3 let i {
         print i
     }
 }

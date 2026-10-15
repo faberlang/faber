@@ -10,7 +10,7 @@ related = ["tensor", "⇇"]
 locale = "en"
 +++
 
-# R2: the target must be writable tensor storage (a `mut` parameter, a `var`, or a writable field); a plain parameter is not.
+# R2: the target must be writable tensor storage (a `mut` parameter, a `mut` local, or a writable field); a plain parameter is not.
 
 fn fill(tf32[2, 2] target, tf32[2, 2] source) → void {
     target ⇇ source

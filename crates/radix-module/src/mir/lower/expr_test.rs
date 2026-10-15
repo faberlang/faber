@@ -7,7 +7,7 @@ use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, run_source};
 
 const TAB: &str =
-    "genus Tab {\n    generis numerus Z = 3\n    generis textus NOMEN = \"tabula\"\n    varia numerus w = 1\n}\n";
+    "genus Tab {\n    fixum numerus Z = 3\n    fixum textus NOMEN = \"tabula\"\n    varia numerus w = 1\n}\n";
 
 fn run(body: &str) -> Result<Vec<String>, String> {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
@@ -28,13 +28,13 @@ fn static_field_read_through_type_name_prints_the_initializer() {
 
 #[test]
 fn static_field_read_in_an_expression_and_beside_an_instance() {
-    let lines = run("fixum Tab t ← Tab {}\nfixum numerus n ← Tab.Z + t.w\nnota n").expect("run");
+    let lines = run("sit Tab t ← Tab {}\nsit numerus n ← Tab.Z + t.w\nnota n").expect("run");
     assert_eq!(lines, vec!["4"]);
 }
 
 #[test]
 fn static_field_read_through_an_instance_is_a_compile_error_not_invalid_mir() {
-    let err = run("fixum Tab t ← Tab {}\nnota t.Z").expect_err("instance read of a static");
+    let err = run("sit Tab t ← Tab {}\nnota t.Z").expect_err("instance read of a static");
     assert!(!err.contains("invalid MIR"), "{err}");
     assert!(err.contains("static_field_read_through_instance"), "{err}");
 }
@@ -85,7 +85,7 @@ fn static_field_read_through_an_imported_genus_inlines_the_interface_initializer
                     )
                     .expect("portable scalar default"),
                 ),
-                modifier: Some(FieldModifier::Generis),
+                modifier: Some(FieldModifier::Const),
                 visibility: MemberVisibility::Publica,
             }],
             methods: Vec::new(),

@@ -43,29 +43,29 @@ locale = "en"
 
 main {
     # every match changes: the run `aa` is one match
-    const regex run ← "a+" ↦ regex
+    let regex run ← "a+" ↦ regex
     print run.replace("caab aa", "x")
 
     # the replacement is literal: no group is substituted
-    const regex pair ← "(?P<n>[a-z])([0-9])" ↦ regex
+    let regex pair ← "(?P<n>[a-z])([0-9])" ↦ regex
     print pair.replace("a1 b2", "$1")
     print pair.replace("a1 b2", "${n}-$2")
     print pair.replace("a1 b2", "\\1\\2")
 
     # the empty-match rule: matches at (0,0) (1,4) (5,5)
-    const regex stars ← "a*" ↦ regex
+    let regex stars ← "a*" ↦ regex
     print stars.replace("baaac", "-")
 
     # the empty pattern matches before each character and at the end
-    const regex nothing ← "" ↦ regex
+    let regex nothing ← "" ↦ regex
     print nothing.replace("ab", "-")
 
     # no match is the text unchanged; an empty replacement deletes
-    const regex digits ← "[0-9]+" ↦ regex
+    let regex digits ← "[0-9]+" ↦ regex
     print digits.replace("none here", "#")
     print digits.replace("a12b3", "")
 
     # non-ASCII text passes through untouched around the matches
-    const regex word ← "[a-z]+" ↦ regex
+    let regex word ← "[a-z]+" ↦ regex
     print word.replace("😀é abc d", "_")
 }

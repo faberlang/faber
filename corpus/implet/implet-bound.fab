@@ -34,7 +34,7 @@ interface Weighable<T> {
 }
 
 class Box implements Weighable<Box> {
-    var int weight = 0
+    mut int weight = 0
 
     fn weigh(Box other) → int {
         return self.weight - other.weight
@@ -42,7 +42,7 @@ class Box implements Weighable<Box> {
 }
 
 class Chest implements Weighable<Chest> {
-    var int load = 0
+    mut int load = 0
 
     fn weigh(Chest other) → int {
         return self.load - other.load
@@ -57,8 +57,8 @@ fn larger<T implements Weighable<T>>(T a, T b) → T {
 }
 
 main {
-    const Box heavyBox ← larger(Box { weight = 3 }, Box { weight = 5 })
-    const Chest heavyChest ← larger(Chest { load = 9 }, Chest { load = 4 })
+    let Box heavyBox ← larger(Box { weight = 3 }, Box { weight = 5 })
+    let Chest heavyChest ← larger(Chest { load = 9 }, Chest { load = 4 })
     print "heavier box: §"(heavyBox.weight)
     print "heavier chest: §"(heavyChest.load)
 }

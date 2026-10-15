@@ -13,11 +13,11 @@ diagnostic = "SEM010:sort_source_unordered"
 # This exemplum intentionally fails to compile: Person has no natural order
 # and the sort has no body.
 class Person {
-    var string name
-    var int age
+    mut string name
+    mut int age
 }
 
 main {
-    const list<Person> people ← [Person { name = "Livia", age = 30 }]
+    let list<Person> people ← [Person { name = "Livia", age = 30 }]
     print sort via asc from people
 }

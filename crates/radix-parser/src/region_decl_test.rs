@@ -31,6 +31,7 @@ impl KeywordPack for EnModulePack {
             "import" => Some("importa"),
             "from" => Some("ex"),
             "const" => Some("fixum"),
+            "let" => Some("sit"),
             _ => None,
         }
     }
@@ -100,7 +101,7 @@ fn regio_leading_comment_block_rides_the_declaration() {
 
 #[test]
 fn leading_comment_without_regio_stays_on_first_statement() {
-    let result = parse_ok("# nota\nfixum numerus x ← 1\n");
+    let result = parse_ok("# nota\nsit numerus x ← 1\n");
     let program = result.program.expect("program");
     assert!(program.region.is_none());
     assert!(
@@ -122,7 +123,7 @@ fn regio_after_import_is_misplaced() {
 #[test]
 fn regio_after_declaration_is_misplaced() {
     assert_parse_error_matches(
-        "fixum numerus x ← 1\nregio geometria\n",
+        "sit numerus x ← 1\nregio geometria\n",
         ParseExpectation::Args(&[("issue", "module_declaration_misplaced")]),
     );
 }
@@ -138,7 +139,7 @@ fn second_regio_is_duplicate() {
 #[test]
 fn regio_word_stays_an_identifier_elsewhere() {
     let result = parse_ok(
-        "fixum numerus regio ← 1\nfunctio f(numerus regio) → numerus {\n    redde regio\n}\n",
+        "sit numerus regio ← 1\nfunctio f(numerus regio) → numerus {\n    redde regio\n}\n",
     );
     assert_eq!(region_name(&result), None);
     assert_eq!(result.program.expect("program").statements.len(), 2);
@@ -146,7 +147,7 @@ fn regio_word_stays_an_identifier_elsewhere() {
 
 #[test]
 fn en_module_word_stays_an_identifier_elsewhere() {
-    let result = parse_en("const int module ← 1\nconst int other ← module\n");
+    let result = parse_en("let int module ← 1\nlet int other ← module\n");
     assert!(result.success(), "{:?}", result.errors);
     assert_eq!(region_name(&result), None);
     assert_eq!(result.program.expect("program").statements.len(), 2);

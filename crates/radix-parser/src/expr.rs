@@ -1863,7 +1863,7 @@ impl Parser {
         let has_body = !body_barred && self.inline_body_head();
         let (mutability, binding, body) = if has_body {
             (
-                self.parse_mutability()?,
+                self.parse_binder_mutability()?,
                 Some(self.parse_ident()?),
                 Some(self.parse_block()?),
             )
@@ -1939,7 +1939,7 @@ impl Parser {
         let has_body = !body_barred && self.inline_body_head();
         let (mutability, binding, body) = if has_body {
             (
-                self.parse_mutability()?,
+                self.parse_binder_mutability()?,
                 Some(self.parse_ident()?),
                 Some(self.parse_block()?),
             )
@@ -2007,15 +2007,13 @@ impl Parser {
             .with_arg("operators", operators)
     }
 
-    /// Whether the cursor is an inline body head: `(fixum | varia) NAME {`.
+    /// Whether the cursor is an inline body head: `(sit | varia) NAME {`.
     ///
     /// Reduce and sort expressions attach such a head only outside a barred
     /// loop body; that guard stays with the caller.
     fn inline_body_head(&self) -> bool {
-        matches!(
-            self.keyword_ident_at(0),
-            Some(TokenKind::Fixum | TokenKind::Varia)
-        ) && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+        self.binder_head_word_at(0)
+            && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
             && self.peek_at(2).kind == TokenKind::LBrace
     }
 
@@ -2051,7 +2049,7 @@ impl Parser {
         }
         let has_term_body = self.inline_body_head();
         if has_term_body {
-            self.parse_mutability()?;
+            self.parse_binder_mutability()?;
             self.parse_ident()?;
             self.parse_block()?;
         } else if self.eat_keyword_ident(TokenKind::Vel) {
@@ -2169,7 +2167,11 @@ impl Parser {
             None
         };
         if long_form_type.is_some() || self.extent_constructor_head() {
-            if self.expression_contexts > 1 {
+            // Only the typed-zero heads are store-position-only; a `list<..>`
+            // bracket constructor is a plain value expression at any depth.
+            let typed_zero_head = self.extent_constructor_head()
+                || long_form_type.as_ref().is_some_and(Self::is_extent_type);
+            if self.expression_contexts > 1 && typed_zero_head {
                 return Err(
                     ParseError::structured(ParseErrorKind::ExpressionInvalid, start)
                         .with_arg("issue", "constructor_store_position_only"),
@@ -2243,12 +2245,42 @@ impl Parser {
         // the lexer emits `RegexString` only directly after the type word or
         // `_`, so the pair claims this literal slot before any identifier or
         // inferred-expression handling. A `RegexString` anywhere else stays the
-        // fallback arm's `expected expression` error.
+        // fallback arm's `expected expression` error. The explicit `regex`
+        // form is the self-typed literal; `_ /pattern/` builds the
+        // inferred-constructor hole — the same `Verte` node as `_ [ … ]` —
+        // which needs an expected type from the checker (rulings 44def1ae /
+        // d381ae56, need).
         if matches!(
             self.peek().kind,
             TokenKind::Ident(_) | TokenKind::Underscore(_)
         ) && let TokenKind::RegexString(pattern) = self.peek_at(1).kind
         {
+            if matches!(self.peek().kind, TokenKind::Underscore(_)) {
+                let hole_span = self.peek().span;
+                self.advance();
+                self.advance();
+                let literal = Expr {
+                    id: self.next_id(),
+                    kind: ExprKind::Literal(Literal::Regex(pattern)),
+                    span: hole_span.merge(self.previous_span()),
+                };
+                let ty = TypeExpr {
+                    nullable: false,
+                    mode: None,
+                    kind: TypeExprKind::Infer,
+                    span: hole_span,
+                    form: TypeFormLevel::LONG,
+                    iuncta_label: None,
+                };
+                return Ok(Expr {
+                    id,
+                    kind: ExprKind::Verte(VerteExpr {
+                        expr: Box::new(literal),
+                        ty,
+                    }),
+                    span: start.merge(self.previous_span()),
+                });
+            }
             self.advance();
             self.advance();
             return Ok(Expr {
@@ -3225,7 +3257,7 @@ impl Parser {
     fn parse_argument_marker(&mut self) -> Option<TypeMode> {
         let mode = if self.check_keyword_ident(TokenKind::De) {
             TypeMode::De
-        } else if self.check_keyword_ident(TokenKind::In) {
+        } else if self.check_keyword_ident(TokenKind::Varia) {
             TypeMode::In
         } else if self.check_keyword_ident(TokenKind::Own) {
             TypeMode::Own
@@ -3283,7 +3315,25 @@ impl Parser {
 
     /// Whether the marker word at the cursor is followed by an operand start
     /// and is not the head of a compact closure (`in x ∴ body`).
+    ///
+    /// A negative integer literal counts as an operand when the sign is glued
+    /// to the digits and separated from the word by whitespace (`axis -1`);
+    /// `axis - 1` and `axis-1` stay a binary subtraction of the word. In that
+    /// negative form the closure head sits after the integer (`peek_at(3)`).
     fn marker_word_precedes_operand(&self) -> bool {
+        if matches!(self.peek_at(1).kind, TokenKind::Minus)
+            && matches!(self.peek_at(2).kind, TokenKind::Integer(_))
+        {
+            let word = self.peek_at(0).span;
+            let minus = self.peek_at(1).span;
+            let integer = self.peek_at(2).span;
+            return word.end < minus.start
+                && minus.end == integer.start
+                && !matches!(
+                    self.peek_at(3).kind,
+                    TokenKind::Therefore | TokenKind::Arrow
+                );
+        }
         matches!(
             self.peek_at(1).kind,
             TokenKind::Ident(_)

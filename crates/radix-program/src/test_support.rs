@@ -126,6 +126,7 @@ fn test_executed_lane_target(
             | Target::MirWasm
             | Target::MirLlvm
             | Target::MirLlvmHost
+            | Target::MirClif
             | Target::MirMetal
             | Target::MirWgsl
             | Target::MirSexp

@@ -4,8 +4,8 @@ locale = "en"
 # List methods: ends and elements as optionals, membership, copies, ordering,
 # removal, and the sort expression, over int, text, bool and float lists.
 main {
-    var list<int> xs ← [5, 3, 8, 3] ∷ list<int>
-    const list<int> none_here ← [] ∷ list<int>
+    mut list<int> xs ← [5, 3, 8, 3] ∷ list<int>
+    let list<int> none_here ← [] ∷ list<int>
     print xs.first(), xs.last(), none_here.first(), none_here.last()
     print xs.get(1), xs.get(9), xs.get(-1)
     print xs.contains(8), xs.contains(7)
@@ -22,13 +22,13 @@ main {
     print xs
     xs.reverse()
     print xs
-    const list<float> f ← [2.5, -0.0, 0.0, 1.0] ∷ list<float>
+    let list<float> f ← [2.5, -0.0, 0.0, 1.0] ∷ list<float>
     print f.sorted(), f.contains(0.0), f.invert()
-    const list<string> t ← ["b", "a", "B", "é"] ∷ list<string>
+    let list<string> t ← ["b", "a", "B", "é"] ∷ list<string>
     print t.sorted(), t.contains("a"), t.first(), t.get(2)
-    const list<bool> b ← [true, false] ∷ list<bool>
+    let list<bool> b ← [true, false] ∷ list<bool>
     print b.sorted(), b.contains(false), b.first()
-    const list<int> big ← [9223372036854775807, 9223372036854775807] ∷ list<int>
+    let list<int> big ← [9223372036854775807, 9223372036854775807] ∷ list<int>
     print big.sum()
     print xs.slice(-1, 2)
 }

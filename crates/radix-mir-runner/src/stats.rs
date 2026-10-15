@@ -400,6 +400,7 @@ pub(crate) fn intrinsic_name(intrinsic: &MirIntrinsic) -> String {
         MirIntrinsic::SermoSetOpener => "sermo_set_opener".to_owned(),
         MirIntrinsic::Sermo(op) => format!("sermo.{}", sermo_name(op)),
         MirIntrinsic::ReadLine => "read_line".to_owned(),
+        MirIntrinsic::ReadAll => "read_all".to_owned(),
         MirIntrinsic::Cede => "cede".to_owned(),
         MirIntrinsic::DeviceBlock(_) => "device_block".to_owned(),
         MirIntrinsic::GpuBuiltin(_) => "gpu_builtin".to_owned(),

@@ -35,6 +35,6 @@ diagnostic = "SEM008:sparsa_element_non_numeric"
 # per-backend EXPECTED_FAILURES lists.
 
 main {
-    const sparsa<string, [2]> words ← empty
+    let sparsa<string, [2]> words ← empty
     print words.length()
 }

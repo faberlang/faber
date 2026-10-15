@@ -11,7 +11,7 @@ functio crea() → lista<numerus> ∪ nihil { redde [1, 2, 3] }
 functio vacat() → lista<numerus> ∪ nihil { redde vacua }
 
 incipit {
-    fixum lista<numerus> ∪ nihil a ← [10, 20]
+    sit lista<numerus> ∪ nihil a ← [10, 20]
     nota a
 }
 ";

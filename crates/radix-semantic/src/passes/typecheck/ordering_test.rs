@@ -40,10 +40,10 @@ fn with_orderable(body: &str) -> String {
 fn genus_glyphs_order_through_compare() {
     test_support::assert_accepts(&with_orderable(
         "incipit {\n\
-         fixum Persona a ← Persona { anni = 3 }\n\
-         fixum Persona b ← Persona { anni = 5 }\n\
-         fixum bivalens x ← a ≺ b\n\
-         fixum bivalens y ← a ≥ b\n\
+         sit Persona a ← Persona { anni = 3 }\n\
+         sit Persona b ← Persona { anni = 5 }\n\
+         sit bivalens x ← a ≺ b\n\
+         sit bivalens y ← a ≥ b\n\
          }\n",
     ));
 }
@@ -52,9 +52,9 @@ fn genus_glyphs_order_through_compare() {
 fn genus_glyph_is_rewritten_to_a_compare_call() {
     let result = test_support::analyze_ok(&with_orderable(
         "incipit {\n\
-         fixum Persona a ← Persona { anni = 3 }\n\
-         fixum Persona b ← Persona { anni = 5 }\n\
-         fixum bivalens x ← a ≺ b\n\
+         sit Persona a ← Persona { anni = 3 }\n\
+         sit Persona b ← Persona { anni = 5 }\n\
+         sit bivalens x ← a ≺ b\n\
          }\n",
     ));
     let hir = result.result.hir.as_ref().expect("hir");
@@ -82,9 +82,9 @@ fn genus_glyph_is_rewritten_to_a_compare_call() {
 fn genus_without_the_contract_has_no_glyphs() {
     let errors = test_support::compile_and_get_diagnostics(&with_orderable(
         "incipit {\n\
-         fixum Lapis a ← Lapis { massa = 3 }\n\
-         fixum Lapis b ← Lapis { massa = 5 }\n\
-         fixum bivalens x ← a ≺ b\n\
+         sit Lapis a ← Lapis { massa = 3 }\n\
+         sit Lapis b ← Lapis { massa = 5 }\n\
+         sit bivalens x ← a ≺ b\n\
          }\n",
     ));
     assert!(
@@ -110,10 +110,10 @@ fn unbounded_parameter_has_no_glyphs() {
 fn builtins_satisfy_the_bound_without_implet() {
     test_support::assert_accepts(&with_orderable(
         "incipit {\n\
-         fixum numerus n ← maior(3, 9)\n\
-         fixum fractus f ← maior(1.5, 2.5)\n\
-         fixum textus t ← maior(\"pirum\", \"malum\")\n\
-         fixum Persona p ← maior(Persona { anni = 3 }, Persona { anni = 5 })\n\
+         sit numerus n ← maior(3, 9)\n\
+         sit fractus f ← maior(1.5, 2.5)\n\
+         sit textus t ← maior(\"pirum\", \"malum\")\n\
+         sit Persona p ← maior(Persona { anni = 3 }, Persona { anni = 5 })\n\
          }\n",
     ));
 }
@@ -123,7 +123,7 @@ fn genus_without_implet_does_not_satisfy_the_bound() {
     test_support::assert_rejects_with_issue(
         &with_orderable(
             "incipit {\n\
-             fixum Lapis l ← maior(Lapis { massa = 3 }, Lapis { massa = 5 })\n\
+             sit Lapis l ← maior(Lapis { massa = 3 }, Lapis { massa = 5 })\n\
              }\n",
         ),
         "generic_type_arg_bound",
@@ -133,7 +133,7 @@ fn genus_without_implet_does_not_satisfy_the_bound() {
 #[test]
 fn bivalens_does_not_conform() {
     test_support::assert_rejects_with_issue(
-        &with_orderable("incipit {\n fixum bivalens b ← maior(verum, falsum)\n}\n"),
+        &with_orderable("incipit {\n sit bivalens b ← maior(verum, falsum)\n}\n"),
         "generic_type_arg_bound",
     );
 }
@@ -142,8 +142,8 @@ fn bivalens_does_not_conform() {
 fn tuples_order_lexicographically_and_satisfy_the_bound() {
     test_support::assert_accepts(&with_orderable(
         "incipit {\n\
-         fixum bivalens x ← iuncta<numerus, textus>[1, \"b\"] ≺ iuncta<numerus, textus>[1, \"c\"]\n\
-         fixum iuncta<numerus, textus> m ← maior(iuncta<numerus, textus>[1, \"b\"], iuncta<numerus, textus>[2, \"a\"])\n\
+         sit bivalens x ← iuncta<numerus, textus>[1, \"b\"] ≺ iuncta<numerus, textus>[1, \"c\"]\n\
+         sit iuncta<numerus, textus> m ← maior(iuncta<numerus, textus>[1, \"b\"], iuncta<numerus, textus>[2, \"a\"])\n\
          }\n",
     ));
 }
@@ -152,7 +152,7 @@ fn tuples_order_lexicographically_and_satisfy_the_bound() {
 fn tuple_with_a_non_orderable_element_does_not_order() {
     let errors = test_support::compile_and_get_diagnostics(&with_orderable(
         "incipit {\n\
-         fixum bivalens x ← iuncta<numerus, bivalens>[1, verum] ≺ iuncta<numerus, bivalens>[1, falsum]\n\
+         sit bivalens x ← iuncta<numerus, bivalens>[1, verum] ≺ iuncta<numerus, bivalens>[1, falsum]\n\
          }\n",
     ));
     assert!(
@@ -166,7 +166,7 @@ fn contract_ordered_operands_must_share_a_type() {
     test_support::assert_rejects_with_issue(
         &with_orderable(
             "incipit {\n\
-             fixum bivalens x ← iuncta<numerus, textus>[1, \"b\"] ≺ iuncta<textus, numerus>[\"b\", 1]\n\
+             sit bivalens x ← iuncta<numerus, textus>[1, \"b\"] ≺ iuncta<textus, numerus>[\"b\", 1]\n\
              }\n",
         ),
         "ordering_operands_differ",

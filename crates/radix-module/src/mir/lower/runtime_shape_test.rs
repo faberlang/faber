@@ -109,7 +109,7 @@ fn return_only_runtime_size_still_requires_a_formal_carrier_witness() {
     let source = SOURCE.replace(
         "main {}",
         r"main {
-    const tf32[2] real ← [1.0, 2.0] ↦ tf32[2]
+    let tf32[2] real ← [1.0, 2.0] ↦ tf32[2]
     do {
         print bias_or_zero(false, real, 2).length()
     } catch error {

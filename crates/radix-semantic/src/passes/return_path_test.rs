@@ -228,7 +228,7 @@ fn accepts_nihil_returning_side_effect_function() {
         }
         functio tracta(Nuntius e) → nihil {
             discerne e {
-                casu Pulsus fixum x ergo nota x
+                casu Pulsus sit x ergo nota x
                 casu Finis ergo nota 0
             }
         }",
@@ -242,12 +242,12 @@ fn accepts_cursor_generator_without_redde() {
     assert_accepts(
         "@ cursor
         functio rangeSync(numerus n) → numerus {
-            itera ab 0‥n fixum i {
+            itera ab 0‥n sit i {
                 cede i
             }
         }
         incipit {
-            itera ex rangeSync(3) fixum num {
+            itera ex rangeSync(3) sit num {
                 nota num
             }
         }",
@@ -258,7 +258,7 @@ fn accepts_cursor_generator_without_redde() {
 fn rejects_statement_bodied_closure_with_missing_return() {
     assert_rejects(
         "incipit {
-            fixum _ maybe ← (bivalens b) → numerus ∴ fac {
+            sit maybe ← (bivalens b) → numerus ∴ fac {
                 si b ergo redde 1
             }
         }",
@@ -269,7 +269,7 @@ fn rejects_statement_bodied_closure_with_missing_return() {
 fn accepts_statement_bodied_closure_when_all_paths_return() {
     assert_accepts(
         "incipit {
-            fixum _ abs ← (numerus x) → numerus ∴ fac {
+            sit abs ← (numerus x) → numerus ∴ fac {
                 si x ≻ 0 {
                     redde x
                 } secus {
@@ -285,7 +285,7 @@ fn accepts_statement_bodied_closure_when_all_paths_return() {
 fn accepts_expression_bodied_closure_without_redde() {
     assert_accepts(
         "incipit {
-            fixum _ summa ← (numerus a, numerus b) → numerus ∴ a + b
+            sit summa ← (numerus a, numerus b) → numerus ∴ a + b
             nota summa(2, 3)
         }",
     );
@@ -295,7 +295,7 @@ fn accepts_expression_bodied_closure_without_redde() {
 fn accepts_fac_bodied_closure_with_redde() {
     assert_accepts(
         "incipit {
-            fixum _ bump ← numerus n → numerus ∴ fac {
+            sit bump ← numerus n → numerus ∴ fac {
                 redde n + 10
             }
             nota bump(5)
@@ -405,7 +405,7 @@ fn rejects_dum_verum_with_rumpe_in_closure_body() {
     assert_rejects(
         "functio f() → numerus {
             dum verum {
-                fixum _ g ← (numerus x) → vacuum ∴ fac { rumpe }
+                sit g ← (numerus x) → vacuum ∴ fac { rumpe }
             }
         }",
     );
@@ -474,7 +474,7 @@ fn accepts_genus_generator_method_without_redde() {
         "genus Streamer {
             @ cursor
             functio rangeSync(numerus n) → numerus {
-                itera ab 0‥n fixum i {
+                itera ab 0‥n sit i {
                     cede i
                 }
             }

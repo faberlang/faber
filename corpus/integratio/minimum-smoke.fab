@@ -4,29 +4,29 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "si_stmt", "arm", "multiplicative_expr", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "integration"
 canonical = true
-summary = "Minimal multi-feature happy path across functio, fixum, si, and nota."
+summary = "Minimal multi-feature happy path across functio, sit, si, and nota."
 syntax = "integratio — multi-feature happy path"
 related = ["functio", "fixum", "si", "nota"]
 locale = "en"
 +++
 # =============================================================================
-# integratio — Minimal multi-feature happy path across functio, fixum, si, and nota
+# integratio — Minimal multi-feature happy path across functio, sit, si, and nota
 # =============================================================================
 #
 # What this teaches:
-#   • Minimal multi-feature happy path across functio, fixum, si, and nota.
-#   • Related keywords: functio, fixum, si, nota
+#   • Minimal multi-feature happy path across functio, sit, si, and nota.
+#   • Related keywords: functio, sit, si, nota
 #
 # Common mistakes:
 #   • Writing code outside `incipit` that produces side effects — top-level code runs at module load; prefer `incipit` for program entry.
 #
-# See also: functio, fixum, si, nota
+# See also: functio, sit, si, nota
 # =============================================================================
 
 # integratio — minimal multi-feature happy path
 #
 # functio name(params) → type { … }
-# fixum _ n ← expr
+# sit n ← expr
 # si <cond> { … }
 # nota template with § interpolation
 #
@@ -43,7 +43,7 @@ fn par(int n) → bool {
 }
 
 main {
-    const int n ← 42
+    let int n ← 42
     if par(n) {
         print "par §"(n)
     }

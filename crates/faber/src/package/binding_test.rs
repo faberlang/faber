@@ -498,7 +498,7 @@ bindings = "bindings/wgsl.toml"
 
 const WGSL_SOURCE: &str = "@ public
 class Lumen {
-    var f32 x = 0.0
+    mut f32 x = 0.0
 }
 
 @ public

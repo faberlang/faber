@@ -1,0 +1,25 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "binding_decl", "sit_decl", "type_annotation", "base_type", "expression", "literal", "array_literal", "itera_stmt", "nota_stmt"]
+category = "binding"
+summary = "A loop binder is let or mut; the old const binder is retired."
+syntax = "for from xs const x { ... }"
+related = ["sit", "varia"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE010:binder_fixum_retired"
++++
+# =============================================================================
+# mutabilitas — const binders are retired
+# =============================================================================
+# Binders take `let` (a fixed name) or `mut` (a writable name):
+# `for from xs let x { ... }`. `const` states a compile-time fact and goes
+# with `=`.
+
+main {
+    let list<int> xs ← [1, 2, 3]
+    for from xs const x {
+        print x
+    }
+}

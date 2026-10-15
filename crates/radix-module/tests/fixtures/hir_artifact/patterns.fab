@@ -32,6 +32,6 @@ incipit {
     nota elige_describe(0)
     nota elige_describe(1)
     nota elige_describe(42)
-    fixum Color col ← Viridis
+    sit Color col ← Viridis
     nota discerne_describe(col)
 }

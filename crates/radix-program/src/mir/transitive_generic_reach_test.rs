@@ -19,7 +19,7 @@ fn width<size D>(tensor<f32, [D]> wx) → int {
 @ kernel
 @ public
 fn gather<size V, size D>(tensor<f32, [D]> gdom, tensor<f32, [V, D]> gtable, tensor<i32, [1]> gids, mut tensor<f32, [D]> gout) → void {
-    for from gdom at [j] thread lane const e {
+    for from gdom at [j] thread lane let e {
         gout[[j]] ← gtable[[gids[0] ↦ int, j]]
     }
 }
@@ -37,7 +37,7 @@ fn probe<size D>(tensor<f32, [D]> hx) → int {
 
 @ public
 fn embed<size V, size D>(tensor<f32, [V, D]> table, tensor<i32, [1]> ids, mut tensor<f32, [D]> hidden) → void {
-    var tensor<f32, [D]> dom ← tf32[D] {}
+    mut tensor<f32, [D]> dom ← tf32[D] {}
     ks.gather(dom, table, ids, mut hidden)
 }
 "#;
@@ -45,14 +45,14 @@ fn embed<size V, size D>(tensor<f32, [V, D]> table, tensor<i32, [1]> ids, mut te
 const MAIN: &str = r#"import from "reachgen:host" host
 
 main {
-    var tensor<f32, [2]> x ← tf32[2] {}
+    mut tensor<f32, [2]> x ← tf32[2] {}
     print host.probe(x)
-    var tensor<f32, [3, 2]> table ← tf32[3, 2] {}
+    mut tensor<f32, [3, 2]> table ← tf32[3, 2] {}
     table[[1, 0]] ← 1.5
     table[[1, 1]] ← 2.5
-    var tensor<i32, [1]> ids ← tensor<i32, [1]> {}
+    mut tensor<i32, [1]> ids ← tensor<i32, [1]> {}
     ids[0] ← 1
-    var tensor<f32, [2]> hidden ← tf32[2] {}
+    mut tensor<f32, [2]> hidden ← tf32[2] {}
     host.embed(table, ids, mut hidden)
     print hidden[[0]]
     print hidden[[1]]

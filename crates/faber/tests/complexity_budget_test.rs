@@ -25,7 +25,7 @@ locale = "en"
 +++
 
 fn branchy(int seed) → int {
-    var _ n ← 0
+    mut _ n ← 0
     if seed ≡ 1 { n ← 1 }
     if seed ≡ 2 { n ← 2 }
     if seed ≡ 3 { n ← 3 }
@@ -42,7 +42,7 @@ fn branchy(int seed) → int {
 }
 
 fn steady(int seed) → int {
-    var _ n ← 0
+    mut _ n ← 0
     if seed ≡ 1 { n ← 1 }
     if seed ≡ 2 { n ← 2 }
     if seed ≡ 3 { n ← 3 }
@@ -58,8 +58,8 @@ fn steady(int seed) → int {
 }
 
 main {
-    const _ loud ← branchy(3)
-    const _ hushed ← steady(4)
+    let loud ← branchy(3)
+    let hushed ← steady(4)
     print "probe"
 }
 "#;

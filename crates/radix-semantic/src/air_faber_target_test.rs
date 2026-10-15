@@ -12,7 +12,7 @@ const ADMIT: &str = r#"
 @ radix lane "air"
 functio tensor_sum(tensor<f32, [4]> x) → f32 {
     varia f32 total ← 0.0
-    itera ex x fixum value {
+    itera ex x sit value {
         total ← total + value
     }
     redde total
@@ -22,7 +22,7 @@ functio tensor_sum(tensor<f32, [4]> x) → f32 {
 const DECLINE: &str = r#"
 @ radix lane "air"
 functio too_wide(tensor<f32, [65]> x) → f32 {
-    itera ex x fixum value { }
+    itera ex x sit value { }
     redde 0.0
 }
 "#;

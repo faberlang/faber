@@ -1,0 +1,39 @@
++++
+term = "ref-optional-write"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "ref_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "dum_stmt", "assignment", "place", "member_suffix", "equality", "equality_tail", "expression", "literal", "typed_constructor", "field_list", "field_init", "nota_stmt", "incipit_stmt"]
+category = "binding"
+summary = "A write through an optional ref cursor is refused once: assign_through_ref."
+syntax = "ref Node ∪ none cur ← head; cur.value ← 99"
+related = ["ref", "optional", "de", "varia"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM056:assign_through_ref"
++++
+
+# =============================================================================
+# mutabilitas — no write through an optional `ref` cursor
+# =============================================================================
+# `ref Node ∪ none cur ← head` re-points freely but is read-only through, with
+# or without the optional wrapper. The single diagnostic for the write is
+# `assign_through_ref`; the walk that only reads is ref-optional-cursor.
+
+class Node {
+    mut int value
+    mut Node next optional
+}
+
+fn bump(Node head) → void {
+    ref Node ∪ none cur ← head
+    while cur not is none {
+        cur.value ← 99
+        cur ← cur.next
+    }
+}
+
+main {
+    let Node b ← Node { value = 2 }
+    let Node a ← Node { value = 1, next = b }
+    bump(a)
+    print a.value
+}

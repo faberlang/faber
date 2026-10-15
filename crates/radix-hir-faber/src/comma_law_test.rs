@@ -871,7 +871,7 @@ fn pattern_positions_pin_between_only_and_no_trailing() {
         &mut writer,
     );
     let output = writer.finish();
-    assert_eq!(output, "def_10 fixum r, g, b");
+    assert_eq!(output, "def_10 sit r, g, b");
     assert_no_trailing_separator(&output);
 
     let arm = HirCasuArm {
@@ -919,7 +919,7 @@ fn multi_subject_arm_separates_patterns_with_et_and_keeps_binding_commas() {
     assert!(
         writer
             .finish()
-            .contains("casu def_10 fixum r et def_11 fixum a, b {")
+            .contains("casu def_10 sit r et def_11 sit a, b {")
     );
 }
 

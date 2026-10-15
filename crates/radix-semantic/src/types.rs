@@ -40,6 +40,7 @@ pub const ISSUE_MUTATING_RECEIVER_THROUGH_REF: &str = "mutating_receiver_through
 
 /// Projection assignment through a `ref` root or view.
 pub const ISSUE_ASSIGN_THROUGH_REF: &str = "assign_through_ref";
+pub const ISSUE_ASSIGN_TO_DE_PARAMETER: &str = "assign_to_de_parameter";
 
 /// Passing a `ref` value into a `mut` or `own` position.
 pub const ISSUE_REF_TO_MUT_OR_OWN_POSITION: &str = "ref_to_mut_or_own_position";

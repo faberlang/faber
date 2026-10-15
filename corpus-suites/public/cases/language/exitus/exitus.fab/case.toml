@@ -7,3 +7,9 @@ input = "exitus/exitus.fab"
 
 [expect]
 check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 1

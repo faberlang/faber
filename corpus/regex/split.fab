@@ -41,7 +41,7 @@ locale = "en"
 #   One printed list per cell, in the order below.
 
 main {
-    const regex comma ← "," ↦ regex
+    let regex comma ← "," ↦ regex
 
     # leading and trailing separators keep empty pieces
     print comma.split(",a,")
@@ -50,23 +50,23 @@ main {
     print comma.split("a,,b")
 
     # a capture group in the pattern is not spliced into the pieces
-    const regex grouped ← "(,)" ↦ regex
+    let regex grouped ← "(,)" ↦ regex
     print grouped.split("a,b")
 
     # a run of whitespace is one separator
-    const regex spaces ← "\\s+" ↦ regex
+    let regex spaces ← "\\s+" ↦ regex
     print spaces.split(" a  b ")
 
     # the empty-match rule: cuts at (0,0) (1,4) (5,5)
-    const regex stars ← "a*" ↦ regex
+    let regex stars ← "a*" ↦ regex
     print stars.split("baaac")
 
     # the empty pattern cuts between every character
-    const regex nothing ← "" ↦ regex
+    let regex nothing ← "" ↦ regex
     print nothing.split("abc")
 
     # no match is the whole text; empty text is one empty piece
-    const regex absent ← "x" ↦ regex
+    let regex absent ← "x" ↦ regex
     print absent.split("abc")
     print comma.split("")
 

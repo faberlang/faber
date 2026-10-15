@@ -135,7 +135,7 @@ fn bare_named_hole_literal_stays_raw() {
     let text = literal_text(
         r#"
 incipit {
-    fixum textus raw ← "§{greet} world"
+    sit textus raw ← "§{greet} world"
     nota raw
 }
 "#,
@@ -148,7 +148,7 @@ fn template_literal_text_keeps_fullwidth_punctuation() {
     let plain = literal_text(
         r#"
 incipit {
-    fixum textus raw ← "a，b、c。é"
+    sit textus raw ← "a，b、c。é"
     nota raw
 }
 "#,
@@ -157,7 +157,7 @@ incipit {
     let (template, args) = scriptum_application(
         r#"
 incipit {
-    fixum textus out ← "a，§，b、c。é"("salve")
+    sit textus out ← "a，§，b、c。é"("salve")
     nota out
 }
 "#,
@@ -171,7 +171,7 @@ fn positional_named_hole_application_erases_to_section_form() {
     let (template, args) = scriptum_application(
         r#"
 incipit {
-    fixum textus out ← "§{greet} world"("salve")
+    sit textus out ← "§{greet} world"("salve")
     nota out
 }
 "#,
@@ -185,7 +185,7 @@ fn labeled_actual_erases_and_reorders_identically_to_positional() {
     let labeled = scriptum_application(
         r#"
 incipit {
-    fixum textus out ← "§{greet} world"(greet: "salve")
+    sit textus out ← "§{greet} world"(greet: "salve")
     nota out
 }
 "#,
@@ -193,7 +193,7 @@ incipit {
     let positional = scriptum_application(
         r#"
 incipit {
-    fixum textus out ← "§ world"("salve")
+    sit textus out ← "§ world"("salve")
     nota out
 }
 "#,
@@ -207,7 +207,7 @@ fn labeled_actuals_reorder_to_hole_positions() {
     let labeled = scriptum_application(
         r#"
 incipit {
-    fixum textus out ← "§{a} §{b}"(b: "two", a: "one")
+    sit textus out ← "§{a} §{b}"(b: "two", a: "one")
     nota out
 }
 "#,
@@ -215,7 +215,7 @@ incipit {
     let positional = scriptum_application(
         r#"
 incipit {
-    fixum textus out ← "§ §"("one", "two")
+    sit textus out ← "§ §"("one", "two")
     nota out
 }
 "#,
@@ -229,7 +229,7 @@ fn mixed_named_and_anonymous_holes_remain_positional() {
     let (template, args) = scriptum_application(
         r#"
 incipit {
-    fixum textus out ← "§{greet} §"("salve", "mundus")
+    sit textus out ← "§{greet} §"("salve", "mundus")
     nota out
 }
 "#,
@@ -243,7 +243,7 @@ fn repeated_numbered_hole_takes_one_value() {
     let (template, args) = scriptum_application(
         r#"
 incipit {
-    fixum textus out ← "§0, §0, §0, and §1"("her", "me")
+    sit textus out ← "§0, §0, §0, and §1"("her", "me")
     nota out
 }
 "#,
@@ -257,7 +257,7 @@ fn repeated_numbered_hole_with_duplicate_values_is_rejected() {
     test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
-    fixum textus out ← "§0, §0, §0, and §1"("her", "her", "her", "me")
+    sit textus out ← "§0, §0, §0, and §1"("her", "her", "her", "me")
     nota out
 }
 "#,
@@ -270,7 +270,7 @@ fn gap_in_numbered_holes_is_rejected() {
     test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
-    fixum textus out ← "§0 and §2"("a", "b", "c")
+    sit textus out ← "§0 and §2"("a", "b", "c")
     nota out
 }
 "#,
@@ -279,7 +279,7 @@ incipit {
     test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
-    fixum textus out ← "§0 and §2"("a", "b")
+    sit textus out ← "§0 and §2"("a", "b")
     nota out
 }
 "#,
@@ -292,7 +292,7 @@ fn under_arity_template_application_is_rejected() {
     test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
-    fixum textus out ← "§ §"("x")
+    sit textus out ← "§ §"("x")
     nota out
 }
 "#,
@@ -305,7 +305,7 @@ fn over_arity_template_application_is_rejected() {
     test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
-    fixum textus out ← "§"("x", "y")
+    sit textus out ← "§"("x", "y")
     nota out
 }
 "#,
@@ -318,7 +318,7 @@ fn unknown_label_at_call_site_is_rejected() {
     test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
-    fixum textus out ← "§{greet} world"(other: "salve")
+    sit textus out ← "§{greet} world"(other: "salve")
     nota out
 }
 "#,
@@ -331,7 +331,7 @@ fn repeated_label_application_takes_one_value() {
     let labeled = scriptum_application(
         r#"
 incipit {
-    fixum textus out ← "§{a} §{a}"(a: "x")
+    sit textus out ← "§{a} §{a}"(a: "x")
     nota out
 }
 "#,
@@ -339,7 +339,7 @@ incipit {
     let positional = scriptum_application(
         r#"
 incipit {
-    fixum textus out ← "§{a} §{a}"("x")
+    sit textus out ← "§{a} §{a}"("x")
     nota out
 }
 "#,
@@ -354,7 +354,7 @@ fn repeated_label_with_a_second_value_is_rejected() {
     test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
-    fixum textus out ← "§{a} §{a}"("x", "y")
+    sit textus out ← "§{a} §{a}"("x", "y")
     nota out
 }
 "#,
@@ -367,7 +367,7 @@ fn forma_repeated_label_takes_one_value() {
     let template = forma_template_text(
         r#"
 incipit {
-    fixum _ captured ← `§{a} or §{a}`(a: "v")
+    sit captured ← `§{a} or §{a}`(a: "v")
     nota captured
 }
 "#,
@@ -380,7 +380,7 @@ fn mixed_labeled_and_positional_actuals_are_rejected() {
     test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
-    fixum textus out ← "§{a} §"("x", a: "y")
+    sit textus out ← "§{a} §"("x", a: "y")
     nota out
 }
 "#,
@@ -393,7 +393,7 @@ fn unfillable_named_hole_is_rejected() {
     test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
-    fixum textus out ← "§{a} §{b}"(a: "x", extra: "y")
+    sit textus out ← "§{a} §{b}"(a: "x", extra: "y")
     nota out
 }
 "#,
@@ -409,7 +409,7 @@ functio f(textus x) → textus {
     redde x
 }
 incipit {
-    fixum textus out ← f(greet: "x")
+    sit textus out ← f(greet: "x")
     nota out
 }
 "#,
@@ -422,7 +422,7 @@ fn scriptum_keyword_is_not_arity_checked() {
     test_support::assert_accepts_la(
         r#"
 incipit {
-    fixum textus out ← scriptum("§ §", "x")
+    sit textus out ← scriptum("§ §", "x")
     nota out
 }
 "#,
@@ -434,7 +434,7 @@ fn labeled_forma_application_erases_template_text() {
     let labeled = forma_template_text(
         r"
 incipit {
-    fixum _ captured ← `hello §{id}`(id: 1)
+    sit captured ← `hello §{id}`(id: 1)
     nota captured
 }
 ",
@@ -442,7 +442,7 @@ incipit {
     let positional = forma_template_text(
         r"
 incipit {
-    fixum _ captured ← `hello §`(1)
+    sit captured ← `hello §`(1)
     nota captured
 }
 ",
@@ -456,7 +456,7 @@ fn labeled_forma_capture_parity_preserves_template_and_positional_params() {
     let labeled = forma_capture(
         r"
 incipit {
-    fixum _ captured ← `hello §{first} §{second}`(second: 2, first: 1)
+    sit captured ← `hello §{first} §{second}`(second: 2, first: 1)
     nota captured
 }
 ",
@@ -464,7 +464,7 @@ incipit {
     let positional = forma_capture(
         r"
 incipit {
-    fixum _ captured ← `hello § §`(1, 2)
+    sit captured ← `hello § §`(1, 2)
     nota captured
 }
 ",
@@ -484,7 +484,7 @@ fn forma_repeated_numbered_hole_takes_one_value() {
     let (template, params) = forma_capture(
         r#"
 incipit {
-    fixum _ captured ← `x = §0 or y = §0`("v")
+    sit captured ← `x = §0 or y = §0`("v")
     nota captured
 }
 "#,
@@ -498,7 +498,7 @@ fn bare_forma_literal_keeps_named_hole_text() {
     let text = forma_template_text(
         r"
 incipit {
-    fixum _ captured ← `hello §{id}`
+    sit captured ← `hello §{id}`
     nota captured
 }
 ",
@@ -559,7 +559,7 @@ fn labeled_positional_scriptum_hir_parity_dumps_are_byte_identical() {
     let labeled = canonical_hir_dump(
         r#"
 incipit {
-    fixum textus out ← "§{greet} world"(greet: "salve")
+    sit textus out ← "§{greet} world"(greet: "salve")
     nota out
 }
 "#,
@@ -567,7 +567,7 @@ incipit {
     let positional = canonical_hir_dump(
         r#"
 incipit {
-    fixum textus out ← "§ world"              ("salve")
+    sit textus out ← "§ world"              ("salve")
     nota out
 }
 "#,
@@ -575,7 +575,7 @@ incipit {
     let scriptum = canonical_hir_dump(
         r#"
 incipit {
-    fixum textus out ← scriptum(    "§ world", "salve")
+    sit textus out ← scriptum(    "§ world", "salve")
     nota out
 }
 "#,
@@ -596,13 +596,13 @@ fn mixed_named_and_anonymous_template_hir_parity_is_positional() {
         "§{a} § ≡ § §",
         r#"
 incipit {
-    fixum textus out ← "§{a} §"("one", "two")
+    sit textus out ← "§{a} §"("one", "two")
     nota out
 }
 "#,
         r#"
 incipit {
-    fixum textus out ← "§ §"   ("one", "two")
+    sit textus out ← "§ §"   ("one", "two")
     nota out
 }
 "#,
@@ -615,13 +615,13 @@ fn explicit_index_before_named_hole_has_positional_hir_parity() {
         "§1 §{greet} ≡ §1 §",
         r#"
 incipit {
-    fixum textus out ← "§1 §{greet}"("one", "two")
+    sit textus out ← "§1 §{greet}"("one", "two")
     nota out
 }
 "#,
         r#"
 incipit {
-    fixum textus out ← "§1 §"       ("one", "two")
+    sit textus out ← "§1 §"       ("one", "two")
     nota out
 }
 "#,
@@ -634,13 +634,13 @@ fn named_hole_before_repeated_explicit_index_has_positional_hir_parity() {
         "§{greet} §0 ≡ § §0",
         r#"
 incipit {
-    fixum textus out ← "§{greet} §0"("one")
+    sit textus out ← "§{greet} §0"("one")
     nota out
 }
 "#,
         r#"
 incipit {
-    fixum textus out ← "§ §0"       ("one")
+    sit textus out ← "§ §0"       ("one")
     nota out
 }
 "#,

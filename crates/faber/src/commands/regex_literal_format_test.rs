@@ -9,8 +9,8 @@ const LA_SOURCE: &str = r#"+++
 locale = "la"
 +++
 incipit {
-    fixum regex r ← regex /\d+\/x/
-    fixum regex s ← _ /ab+c/
+    sit regex r ← regex /\d+\/x/
+    sit regex s ← _ /ab+c/
 }
 "#;
 

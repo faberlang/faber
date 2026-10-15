@@ -22,15 +22,11 @@ const EN_PACK: &str = "../../locale/en/pack.toml";
 // debt: shrink only; need
 const KNOWN_MISSING_ROWS: &[&str] = &[
     "annotation_field_name",
-    "copy_into_value_expected",
     "declaration_block_comma",
     "duplicate_nucleum",
-    "duplicate_tuple_element_label",
     "enum_value_out_of_range",
     "exitus_value_out_of_range",
     "expression_too_long",
-    "implements_slot_requires_name",
-    "import_field_name",
     "label_bind_distinction",
     "labeled_actual_spread_unsupported",
     "nesting_too_deep",

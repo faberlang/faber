@@ -38,75 +38,75 @@ locale = "en"
 #   membrum.expected — chained access samples.
 
 class Punctum {
-    var int x
-    var int y
+    mut int x
+    mut int y
 }
 
 class Figura {
-    var string nomen
-    var int valor
+    mut string nomen
+    mut int valor
 }
 
 class Imum {
-    var string imum
+    mut string imum
 }
 
 class Medium {
-    var Imum medium
+    mut Imum medium
 }
 
 class Extra {
-    var Medium extra
+    mut Medium extra
 }
 
 class Datum {
-    var list<string> nomina
+    mut list<string> nomina
 }
 
 class Adest {
-    var int valor
+    mut int valor
 }
 
 class Forsitan {
-    var Adest adest
+    mut Adest adest
 }
 
 main {
     # --- Dot accessus ---
 
-    const Punctum punctum ← Punctum { x = 10, y = 20 }
+    let Punctum punctum ← Punctum { x = 10, y = 20 }
     print punctum.x
     print punctum.y
 
     # --- Bracket accessus on lista ---
 
-    const list<int, 3> numeri ← [1, 2, 3]
+    let list<int, 3> numeri ← [1, 2, 3]
     print numeri[0]
     print numeri[2]
 
     # --- Bracket accessus on tabula ---
 
-    const map<string, int> indicium ← { "nomen": 1, "valor": 42 }
+    let map<string, int> indicium ← { "nomen": 1, "valor": 42 }
     print indicium["nomen"]
     print indicium["valor"]
 
     # --- Chained member access ---
 
-    const Extra nidus ← Extra { extra = Medium { medium = Imum { imum = "inventum" } } }
+    let Extra nidus ← Extra { extra = Medium { medium = Imum { imum = "inventum" } } }
     print nidus.extra.medium.imum
 
     # --- Mixed dot and bracket ---
 
-    const Datum datum ← Datum { nomina = ["primus", "secundus", "tertius"] }
+    let Datum datum ← Datum { nomina = ["primus", "secundus", "tertius"] }
     print datum.nomina[0]
     print datum.nomina[2]
 
     # --- Accessus optionalis ---
 
-    const Forsitan forsitan ← Forsitan { adest = Adest { valor = 100 } }
+    let Forsitan forsitan ← Forsitan { adest = Adest { valor = 100 } }
     print forsitan?.adest?.valor
 
     # Accessus optionalis on nihil binding
-    const none void ← null
+    let none void ← null
     print void?.absens
 }

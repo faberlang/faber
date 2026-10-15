@@ -43,15 +43,15 @@ locale = "en"
 # whitelist: tabula/methodi-accessus.fab).
 
 main {
-    var map<string, int> puncta ← empty
+    mut map<string, int> puncta ← empty
     puncta.put("aelia", 95)
     puncta.put("balbus", 87)
-    const int ∪ none aelia ← puncta.get("aelia")
-    const int ∪ none absens ← puncta.get("carus")
-    const int carus ← puncta.get("carus") coalesce 0
-    const bool habetbalbum ← puncta.has("balbus")
-    const bool remotus ← puncta.delete("balbus")
-    const int longitudo ← puncta.length()
-    const bool vacuaest ← puncta.is_empty()
+    let int ∪ none aelia ← puncta.get("aelia")
+    let int ∪ none absens ← puncta.get("carus")
+    let int carus ← puncta.get("carus") coalesce 0
+    let bool habetbalbum ← puncta.has("balbus")
+    let bool remotus ← puncta.delete("balbus")
+    let int longitudo ← puncta.length()
+    let bool vacuaest ← puncta.is_empty()
     print aelia, absens, carus, habetbalbum, remotus, longitudo, vacuaest
 }

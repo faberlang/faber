@@ -57,14 +57,14 @@ fn bump(int n) → int {
 }
 
 main {
-    var int total ← 0
-    var int i ← 0
+    mut int total ← 0
+    mut int i ← 0
     while i ≺ 12 {
         total ← bump(total)
         i ← i + 1
     }
-    var string raw ← "41"
-    var int parsed ↤ raw
+    mut string raw ← "41"
+    mut int parsed ↤ raw
     total ← bump(parsed)
     print "total=", total
     print digits()
@@ -341,7 +341,7 @@ fn success_stats_frames_output_and_writes_equivalent_dual_sink_artifact() {
 fn runtime_error_emits_stats_before_cli_failure_for_both_sinks() {
     let (_dir, package) = write_package(
         "runtime-error",
-        "main {\n    print \"before\"\n    const list<int> base ← [1, 2]\n    print base[5]\n}\n",
+        "main {\n    print \"before\"\n    let list<int> base ← [1, 2]\n    print base[5]\n}\n",
     );
     let output_dir = tempfile::tempdir().expect("create stats output directory");
     let stats_file = output_dir.path().join("runtime.json");

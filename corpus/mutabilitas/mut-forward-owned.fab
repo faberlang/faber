@@ -30,7 +30,7 @@ fn viacopy(copy list<int> xs) → int {
 }
 
 main {
-    const list<int> a ← [1, 2, 3]
+    let list<int> a ← [1, 2, 3]
     print viaown(own [1, 2, 3])
     print viacopy(copy a)
     print a.length()

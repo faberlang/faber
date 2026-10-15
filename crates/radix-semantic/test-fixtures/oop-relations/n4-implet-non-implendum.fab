@@ -3,11 +3,11 @@ locale = "en"
 +++
 
 class Base {
-    var string message
+    mut string message
 }
 
 class Weird implements Base {
-    var string note
+    mut string note
 }
 
 main {

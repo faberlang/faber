@@ -47,14 +47,14 @@ locale = "en"
 #   chunked from_le_bytes / from_be_bytes; TypeScript, Go and Swift decline by name.
 
 main {
-    const list<b8> le_bytes ← |00 00 80 3f 00 00 00 40|
-    const list<b8> be_bytes ← |3f 80 00 00 40 00 00 00|
-    const list<b8> grid_bytes ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40|
-    const list<b8> short_bytes ← |00 00 80|
+    let list<b8> le_bytes ← |00 00 80 3f 00 00 00 40|
+    let list<b8> be_bytes ← |3f 80 00 00 40 00 00 00|
+    let list<b8> grid_bytes ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40|
+    let list<b8> short_bytes ← |00 00 80|
 
-    const tensor<f32, [2]> le ← le_bytes ↦ tensor<f32, [2]> via Le
-    const tensor<f32, [2]> be ← be_bytes ↦ tensor<f32, [2]> via Be
-    const tensor<f32, [2, 2]> grid ← grid_bytes ↦ tensor<f32, [2, 2]> via Le
+    let tensor<f32, [2]> le ← le_bytes ↦ tensor<f32, [2]> via Le
+    let tensor<f32, [2]> be ← be_bytes ↦ tensor<f32, [2]> via Be
+    let tensor<f32, [2, 2]> grid ← grid_bytes ↦ tensor<f32, [2, 2]> via Le
 
     print le[[0]]
     print le[[1]]
@@ -64,7 +64,7 @@ main {
     print grid[[1, 1]]
 
     do {
-        const tensor<f32, [2]> bad ← short_bytes ↦ tensor<f32, [2]> via Le
+        let tensor<f32, [2]> bad ← short_bytes ↦ tensor<f32, [2]> via Le
         print bad[[0]]
     }
     catch err {

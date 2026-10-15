@@ -29,7 +29,7 @@ diagnostic = "SEM016:bits_via_clause_not_allowed"
 # This exemplum intentionally fails to compile.
 
 incipit {
-    fixum lista<b8> raw ← [0x01, 0x02]
-    fixum lista<u8> plain ← raw ↦ lista<u8> via Le
+    sit lista<b8> raw ← [0x01, 0x02]
+    sit lista<u8> plain ← raw ↦ lista<u8> via Le
     nota plain
 }

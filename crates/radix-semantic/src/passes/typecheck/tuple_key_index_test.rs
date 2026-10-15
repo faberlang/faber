@@ -12,9 +12,9 @@ fn bracket_list_reads_and_writes_tuple_key_entry() {
         r#"
 incipit {
     varia tabula<iuncta<textus, numerus>, numerus> m ← vacua
-    fixum textus regio ← "east"
+    sit textus regio ← "east"
     m[[regio, 2024]] ← 5
-    fixum numerus v ← m[[regio, 2024]]
+    sit numerus v ← m[[regio, 2024]]
     nota v
 }"#,
     );

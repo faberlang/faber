@@ -53,12 +53,13 @@ tempfile = "3"
 
 [features]
 default = ["full-targets"]
-full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
+full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "mir-clif", "runner"]
 package-mir = ["radix-module/mir-core", "radix-module/runner", "dep:radix-mir-fmir", "dep:radix-mir", "dep:radix-mir-lower", "dep:radix-mir-runner"]
 hir-faber = ["radix-module/hir-faber"]
 hir-c = ["radix-module/hir-c"]
 hir-fhir = ["radix-module/hir-fhir", "dep:handroll", "dep:radix-mir-lower"]
 mir-fmir = ["package-mir", "radix-module/mir-fmir"]
+mir-clif = ["radix-module/mir-clif"]
 runner = ["package-mir", "radix-module/runner"]
 
 [lints]

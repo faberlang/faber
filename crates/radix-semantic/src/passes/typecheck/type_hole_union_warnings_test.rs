@@ -49,7 +49,7 @@ fn underscore_hole_solved_to_multi_member_union_warns_warn016() {
         r"
 typus Valor = numerus ∪ textus
 incipit {
-    fixum _ v ← 1 ∷ Valor
+    sit v ← 1 ∷ Valor
     nota v
 }
 ",
@@ -82,7 +82,7 @@ functio f() → Valor {
     redde 1
 }
 incipit {
-    fixum _ v ← f()
+    sit v ← f()
     nota v
 }
 ",
@@ -107,7 +107,7 @@ fn union_hole_solved_monomorphically_warns_warn017() {
     let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 incipit {
-    fixum ∪ only ← 1
+    sit ∪ only ← 1
     nota only
 }
 ",
@@ -140,8 +140,8 @@ fn nullable_union_never_fires_warn016() {
     let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r#"
 incipit {
-    fixum textus ∪ nihil opt ← "s"
-    fixum _ o ← opt
+    sit textus ∪ nihil opt ← "s"
+    sit o ← opt
     nota o
 }
 "#,
@@ -168,7 +168,7 @@ fn explicit_union_annotation_fires_neither_warning() {
     let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 incipit {
-    fixum numerus ∪ textus named ← 1
+    sit numerus ∪ textus named ← 1
     nota named
 }
 ",
@@ -236,7 +236,7 @@ fn shared_hole_across_decl_and_init_emits_single_warning() {
     let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 incipit {
-    fixum ∪ a ← 1
+    sit ∪ a ← 1
     varia ∪ b ← 0
     b ← a
     nota a
@@ -298,8 +298,8 @@ fn ordinary_underscore_holes_produce_no_hole_warnings() {
     let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 incipit {
-    fixum _ n ← 3
-    fixum lista<_> xs ← [1, 2, 3]
+    sit n ← 3
+    sit lista<_> xs ← [1, 2, 3]
     nota n
     nota xs
 }

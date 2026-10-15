@@ -203,14 +203,14 @@ impl TypeChecker<'_> {
         }
         let ty = if let Some(annotated) = const_item.ty {
             // `const T X = e` states a compile-time fact (an `=` position);
-            // a top-level `fixum T x ← e` is an ordinary store (SEM062).
+            // a top-level `sit T x ← e` is an ordinary store (SEM062).
             let site = StoreSite::new(HirStoreKind::Declaration).named(const_item.name);
             let site = if const_item.statica.is_some() {
                 site.compile_time()
             } else {
                 site
             };
-            // Typed `fixum T x ↤ y` at item scope is conversion-directed
+            // Typed `sit T x ↤ y` at item scope is conversion-directed
             // initialization, not assignment to a constant. Expose the
             // binding only while the initializer is checked so lvalue
             // resolution does not fire SEM020, then drop it so later

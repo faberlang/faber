@@ -31,13 +31,13 @@ locale = "en"
 # shape, so the compiler flattens row-major and lowers through structa.
 
 main {
-    const tf32[3, 3] grid ← [
+    let tf32[3, 3] grid ← [
         [0.0, 0.0, 0.0],
         [1.0, 2.0, 0.0],
         [0.0, 0.0, 0.0]
     ] ↦ tf32[3, 3]
-    const list<int, _> dims ← grid.shape()
-    const list<f32> flat ← grid.flatten()
+    let list<int, _> dims ← grid.shape()
+    let list<f32> flat ← grid.flatten()
 
     print dims
     print grid.length()

@@ -19,7 +19,7 @@ interface Nominatum {
 }
 
 class Civis implements Nominatum {
-    var string nomen
+    mut string nomen
 
     fn plenum() → string {
         return "§"(self.nomen)
@@ -31,6 +31,6 @@ fn nomen_of(Nominatum civis) → string {
 }
 
 main {
-    const Civis civis ← Civis { nomen = "Aurelia" }
+    let Civis civis ← Civis { nomen = "Aurelia" }
     print nomen_of(civis)
 }

@@ -7,7 +7,7 @@ interface Utterable {
 
 @ public
 class Machine implements Utterable {
-    var int wheels = 4
+    mut int wheels = 4
 
     fn speak() → string {
         return "machine §"(self.wheels)

@@ -154,7 +154,7 @@ fn en_embed_spelling_is_contextual() {
     let main = dir.path().join("main.fab");
     write(
         &main,
-        b"+++\nlocale = \"en\"\n+++\nconst string S = embed \"x.txt\"\nfn embed(int x) \xe2\x86\x92 int {\n    return x\n}\nfn local() \xe2\x86\x92 int {\n    const int embed \xe2\x86\x90 3\n    return embed\n}\nmain {\n    print S\n    print embed(local())\n}\n",
+        b"+++\nlocale = \"en\"\n+++\nconst string S = embed \"x.txt\"\nfn embed(int x) \xe2\x86\x92 int {\n    return x\n}\nfn local() \xe2\x86\x92 int {\n    let int embed \xe2\x86\x90 3\n    return embed\n}\nmain {\n    print S\n    print embed(local())\n}\n",
     );
     let unit = analyze_file(&main).unwrap_or_else(|d| panic!("analysis failed: {d:?}"));
     let HirLiteral::String(sym) = static_literal(&unit, "S") else {
@@ -169,7 +169,7 @@ fn faber_reemission_prints_the_embed_not_the_bytes() {
     write(&dir.path().join("x.txt"), b"salve");
     write(&dir.path().join("x.bin"), &[1, 2]);
     let main = dir.path().join("main.fab");
-    let source = "fixum textus S = insere \"x.txt\"\n\nfixum octeti B = insere \"x.bin\"\n\ngenus G {\n    generis textus T = insere \"x.txt\"\n}\n\nincipit {\n    nota S\n}\n";
+    let source = "fixum textus S = insere \"x.txt\"\n\nfixum octeti B = insere \"x.bin\"\n\ngenus G {\n    fixum textus T = insere \"x.txt\"\n}\n\nincipit {\n    nota S\n}\n";
     write(&main, source.as_bytes());
     let session = Session::new(
         Config::default()
@@ -188,6 +188,6 @@ fn faber_reemission_prints_the_embed_not_the_bytes() {
     };
     assert!(out.code.contains("fixum textus S = insere \"x.txt\""), "{}", out.code);
     assert!(out.code.contains("fixum lista<b8> B = insere \"x.bin\""), "{}", out.code);
-    assert!(out.code.contains("generis textus T = insere \"x.txt\""), "{}", out.code);
+    assert!(out.code.contains("fixum textus T = insere \"x.txt\""), "{}", out.code);
     assert!(!out.code.contains("salve"), "{}", out.code);
 }

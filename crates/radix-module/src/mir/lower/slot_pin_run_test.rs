@@ -6,13 +6,13 @@ const SLOT_LIFT: &str = r#"+++
 locale = "en"
 +++
 fn make<size H, size W>() → tf32[H, W] {
-    const list<f32> zeros ← [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    const tf32[H, W] out ← zeros ↦ tf32[H, W]
+    let list<f32> zeros ← [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let tf32[H, W] out ← zeros ↦ tf32[H, W]
     return out
 }
 main {
-    var int w ← 4
-    const tf32[3, 4] a ← make<3, size w>()
+    mut int w ← 4
+    let tf32[3, 4] a ← make<3, size w>()
     print a.shape().get(0)
     print a.shape().get(1)
 }
@@ -22,13 +22,13 @@ const PIN: &str = r#"+++
 locale = "en"
 +++
 fn load(textus path) → tf32[_, _] {
-    const tf32[2, 3] t ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
+    let tf32[2, 3] t ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     return t
 }
 main {
     const size H ← 2
     const size W ← 3
-    const tf32[H, W] elev ← load("x")
+    let tf32[H, W] elev ← load("x")
     print elev.shape().get(0)
     print elev.shape().get(1)
 }
@@ -105,12 +105,12 @@ const TN5_CREATOR_RETURN: &str = r#"+++
 locale = "en"
 +++
 fn make<size H, size W>() → tf32[H, W] {
-    var tf32[H, W] out ← tf32[H, W] {}
+    mut tf32[H, W] out ← tf32[H, W] {}
     out[[0, 0]] ← 7.5
     return out
 }
 main {
-    const tf32[2, 3] a ← make<2, 3>()
+    let tf32[2, 3] a ← make<2, 3>()
     print a.shape().get(0)
     print a.shape().get(1)
     print a.flatten()
@@ -132,12 +132,12 @@ const AFFINE_RETURN: &str = r#"+++
 locale = "en"
 +++
 fn make<size H, size W>() → tf32[H, W] {
-    const tf32[H + 1, W] out ← tf32[H + 1, W] {}
+    let tf32[H + 1, W] out ← tf32[H + 1, W] {}
     return out
 }
 main {
     do {
-        const tf32[2, 3] a ← make<2, 3>()
+        let tf32[2, 3] a ← make<2, 3>()
         print "returned"
     }
     catch err {
@@ -185,16 +185,16 @@ const ANONYMOUS_LIFT_ITERA: &str = r#"+++
 locale = "en"
 +++
 fn make<size H, size W>() → tf32[H, W] {
-    var tf32[H, W] out ← tf32[H, W] {}
+    mut tf32[H, W] out ← tf32[H, W] {}
     out[[0, 0]] ← 7.5
     return out
 }
 main {
-    const tf32[_, _] a ← make<2, 3>()
-    var f32 sum ← 0.0
-    var int coords ← 0
-    var int visits ← 0
-    for from a at [i, j] const c {
+    let tf32[_, _] a ← make<2, 3>()
+    mut f32 sum ← 0.0
+    mut int coords ← 0
+    mut int visits ← 0
+    for from a at [i, j] let c {
         sum ← sum + c
         coords ← coords + i * 10 + j
         visits ← visits + 1

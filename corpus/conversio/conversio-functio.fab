@@ -28,19 +28,19 @@ locale = "en"
 # =============================================================================
 
 class Celsius {
-    var float degrees
+    mut float degrees
 }
 
 class Fahrenheit {
-    var float degrees
+    mut float degrees
 }
 
 class Reading {
-    var int value
+    mut int value
 }
 
 class Gauged {
-    var int value
+    mut int value
 }
 
 @ conversion
@@ -59,12 +59,12 @@ fn toGauged(Reading r) → Gauged ⇥ string {
 
 main {
     # infallible: ↦ calls toFahrenheit
-    const Fahrenheit boiling ← Celsius { degrees = 100.0 } ↦ Fahrenheit
+    let Fahrenheit boiling ← Celsius { degrees = 100.0 } ↦ Fahrenheit
     print boiling.degrees
 
     # failable: the ⊥ default applies only when toGauged fails
-    const Gauged kept ← Reading { value = 7 } ↦ Gauged ⊥ Gauged { value = 0 }
+    let Gauged kept ← Reading { value = 7 } ↦ Gauged ⊥ Gauged { value = 0 }
     print kept.value
-    const Gauged fallback ← Reading { value = -4 } ↦ Gauged ⊥ Gauged { value = 0 }
+    let Gauged fallback ← Reading { value = -4 } ↦ Gauged ⊥ Gauged { value = 0 }
     print fallback.value
 }

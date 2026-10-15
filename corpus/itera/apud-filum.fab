@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "The optional lane-binder clause after `at` declares loop metadata and runs as the plain loop."
-syntax = "for from t at [i] thread f const cell { }"
+syntax = "for from t at [i] thread f let cell { }"
 related = ["apud", "itera", "ex", "filum", "thread"]
 locale = "en"
 +++
@@ -35,20 +35,20 @@ locale = "en"
 
 # Single-source `at [i] thread f` over a list
 #
-# for from t at [i] thread f const cell { <body> }
+# for from t at [i] thread f let cell { <body> }
 #
 # GRAMMAR:
 #   iteraStmt :← 'for' 'from' expr ('at' '[' ident (',' ident)* ']')?
-#               ('thread' ident)? ('const' | 'var') binder …
+#               ('thread' ident)? ('let' | 'mut') binder …
 #
 # EXPECTED OUTPUT:
 #   lane index and element, one line per lane (0‥3) — identical to the
 #   plain loop's output.
 
 main {
-    const list<f32> xs ← [1.0, 2.0, 3.0]
+    let list<f32> xs ← [1.0, 2.0, 3.0]
 
-    for from xs at [i] thread f const v {
+    for from xs at [i] thread f let v {
         print i, v
     }
 }

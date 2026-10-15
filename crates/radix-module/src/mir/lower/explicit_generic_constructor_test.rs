@@ -21,7 +21,7 @@ const SINGLE_PARAMETER: &str = r#"+++
 locale = "en"
 +++
 class Cista<T> {
-    var T item
+    mut T item
 
     fn get() → T {
         return self.item
@@ -29,10 +29,10 @@ class Cista<T> {
 }
 
 main {
-    const Cista<int> b ← Cista<int> { item = 7 }
+    let Cista<int> b ← Cista<int> { item = 7 }
     print b.item
     print b.get()
-    const Cista<int> c ← Cista { item = 7 }
+    let Cista<int> c ← Cista { item = 7 }
     print c.item
     print c.get()
 }
@@ -47,12 +47,12 @@ const TWO_PARAMETERS: &str = r#"+++
 locale = "en"
 +++
 class Pair<A, B> {
-    var A first
-    var B second
+    mut A first
+    mut B second
 }
 
 main {
-    const Pair<int, string> p ← Pair<int, string> { first = 1, second = "x" }
+    let Pair<int, string> p ← Pair<int, string> { first = 1, second = "x" }
     print p.first
     print p.second
 }
@@ -67,7 +67,7 @@ const SIZE_PARAMETER: &str = r#"+++
 locale = "en"
 +++
 class Box<size N> {
-    var vector<f32, N> minima
+    mut vector<f32, N> minima
 
     fn scalar() → f32 {
         return 1.5
@@ -75,8 +75,8 @@ class Box<size N> {
 }
 
 main {
-    const vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    const Box<3> b ← Box<3> { minima = v }
+    let vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    let Box<3> b ← Box<3> { minima = v }
     print b.scalar()
 }
 "#;

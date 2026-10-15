@@ -27,7 +27,7 @@ locale = "en"
 # mySortedMap.get(), ...). Stems reuse builtin tabula stems where the
 # operation is identical (put, get, delete, has) so users cross-walking
 # between tabula and ordinata see the same verbs. Imperativus for in-place
-# mutation (varia receiver required); nominal for projections (length,
+# mutation (mut receiver required); nominal for projections (length,
 # keys, values); the sorted-iteration surface (keys, values) is
 # what ordinata adds on top of tabula.
 #
@@ -47,8 +47,8 @@ locale = "en"
 # lista, instead of O(n log n) sort-on-each-iteration.
 @ public
 class SortedMap<K, V> {
-    var list<K> index = []
-    var map<K, V> entries = empty
+    mut list<K> index = []
+    mut map<K, V> entries = empty
 
     # =========================================================================
     # STATE (nominal / present predicate)
@@ -80,7 +80,7 @@ class SortedMap<K, V> {
     }
 
     # =========================================================================
-    # MUTATION (Imperativus — in-place on a varia receiver)
+    # MUTATION (Imperativus — in-place on a mut receiver)
     # =========================================================================
 
     # Insert or update a binding. Maintains the sorted key index.
@@ -113,10 +113,10 @@ class SortedMap<K, V> {
 
     # Values in key-ascending order. Nominal projection.
     fn values() → list<V> {
-        var list<V> out ← []
-        for from self.index const k {
+        mut list<V> out ← []
+        for from self.index let k {
             # has verified by construction; get cannot miss.
-            const V ∪ none v ← self.entries.get(k)
+            let V ∪ none v ← self.entries.get(k)
             if v ≡ null then continue
             out.append(v)
         }
@@ -142,8 +142,8 @@ fn empty<K, V>() → SortedMap<K, V> {
 # iteration, which is the common ordinata use case.
 @ public
 fn from_map<K, V>(map<K, V> source_map) → SortedMap<K, V> {
-    var SortedMap<K, V> out ← SortedMap { entries = source_map }
-    var list<K> keys ← source_map.keys()
+    mut SortedMap<K, V> out ← SortedMap { entries = source_map }
+    mut list<K> keys ← source_map.keys()
     keys.sort()
     out.index ← keys
     return out
@@ -173,9 +173,9 @@ fn insert<K>(mut list<K> index, K key) → void {
 # Remove a key from the sorted index.
 @ private
 fn remove<K>(mut list<K> index, K key) → void {
-    var int i ← 0
+    mut int i ← 0
     while i ≺ index.length() {
-        const K ∪ none extans ← index.get(i)
+        let K ∪ none extans ← index.get(i)
         if extans not is none {
             if equals<K>(extans, key) {
                 remove_at<K>(mut index, i)
@@ -199,10 +199,10 @@ fn equals<K>(K a, K b) → bool {
 # reassigned (SEM020), so the original is drained and refilled.
 @ private
 fn remove_at<K>(mut list<K> index, int positio) → void {
-    var list<K> out ← []
-    var int i ← 0
+    mut list<K> out ← []
+    mut int i ← 0
     while i ≺ index.length() {
-        const K ∪ none extans ← index.get(i)
+        let K ∪ none extans ← index.get(i)
         if extans ≡ null {
             i ← i + 1
             continue
@@ -213,7 +213,7 @@ fn remove_at<K>(mut list<K> index, int positio) → void {
         i ← i + 1
     }
     while not index.is_empty() { index.remove_last() }
-    for from out const item {
+    for from out let item {
         index.append(item)
     }
 }

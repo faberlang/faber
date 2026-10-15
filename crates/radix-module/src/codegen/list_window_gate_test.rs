@@ -7,7 +7,7 @@
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
-const SOURCE: &str = "incipit {\n    fixum lista<numerus> xs ← [1, 2, 3]\n    nota xs[0‥2]\n}\n";
+const SOURCE: &str = "incipit {\n    sit lista<numerus> xs ← [1, 2, 3]\n    nota xs[0‥2]\n}\n";
 
 fn issues(target: Target) -> Vec<String> {
     let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
@@ -29,10 +29,11 @@ fn assert_rejected(target: Target) {
     );
 }
 
+/// The Rust emitter copies the window of any list, so the gate admits it.
 #[cfg(feature = "hir-rust")]
 #[test]
-fn rust_rejects_the_list_window_before_emission() {
-    assert_rejected(Target::HirRust);
+fn rust_admits_the_list_window() {
+    assert!(issues(Target::HirRust).is_empty());
 }
 
 #[cfg(feature = "hir-ts")]

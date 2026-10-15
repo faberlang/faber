@@ -31,24 +31,24 @@ fn dextra(wrapping<u64> value, wrapping<u64> count) → wrapping<u64> {
 }
 
 main {
-    const wrapping<u64> a ← 7640891576956012808
-    const wrapping<u64> b ← 13503953896175478587
-    const wrapping<u64> c ← 4354685564936845355
-    const wrapping<u64> d ← 11912009170470909681
-    const wrapping<u64> e ← 5840696475078001361
-    const wrapping<u64> f ← 11170449401992604703
-    const wrapping<u64> g ← 2270897969802886507
-    const wrapping<u64> h ← 6620516959814648809
-    const wrapping<u64> w ← 7017280452245743616
-    const wrapping<u64> k ← 4794697086780616226
-    const wrapping<u64> sigma1 ← dextra(e, 14 ∷ wrapping<u64>) ⊻ dextra(e, 18 ∷ wrapping<u64>) ⊻ dextra(e, 41 ∷ wrapping<u64>)
-    const wrapping<u64> choose ← e ∧ f ⊻ ¬e ∧ g
-    const wrapping<u64> temp1 ← h + sigma1 + choose + k + w
-    const wrapping<u64> sigma0 ← dextra(a, 28 ∷ wrapping<u64>) ⊻ dextra(a, 34 ∷ wrapping<u64>) ⊻ dextra(a, 39 ∷ wrapping<u64>)
-    const wrapping<u64> majority ← a ∧ b ⊻ a ∧ c ⊻ b ∧ c
-    const wrapping<u64> temp2 ← sigma0 + majority
-    const wrapping<u64> roundA ← temp1 + temp2
-    const wrapping<u64> roundE ← d + temp1
+    let wrapping<u64> a ← 7640891576956012808
+    let wrapping<u64> b ← 13503953896175478587
+    let wrapping<u64> c ← 4354685564936845355
+    let wrapping<u64> d ← 11912009170470909681
+    let wrapping<u64> e ← 5840696475078001361
+    let wrapping<u64> f ← 11170449401992604703
+    let wrapping<u64> g ← 2270897969802886507
+    let wrapping<u64> h ← 6620516959814648809
+    let wrapping<u64> w ← 7017280452245743616
+    let wrapping<u64> k ← 4794697086780616226
+    let wrapping<u64> sigma1 ← dextra(e, 14 ∷ wrapping<u64>) ⊻ dextra(e, 18 ∷ wrapping<u64>) ⊻ dextra(e, 41 ∷ wrapping<u64>)
+    let wrapping<u64> choose ← e ∧ f ⊻ ¬e ∧ g
+    let wrapping<u64> temp1 ← h + sigma1 + choose + k + w
+    let wrapping<u64> sigma0 ← dextra(a, 28 ∷ wrapping<u64>) ⊻ dextra(a, 34 ∷ wrapping<u64>) ⊻ dextra(a, 39 ∷ wrapping<u64>)
+    let wrapping<u64> majority ← a ∧ b ⊻ a ∧ c ⊻ b ∧ c
+    let wrapping<u64> temp2 ← sigma0 + majority
+    let wrapping<u64> roundA ← temp1 + temp2
+    let wrapping<u64> roundE ← d + temp1
     print roundA
     print roundE
 }

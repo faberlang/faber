@@ -61,10 +61,10 @@ fn expect<'a>(diagnostics: &'a [Diagnostic], code: &str, issue: &str) -> &'a Dia
 
 const INF_FILE: &str = r"
 genus Capsa {
-    fixum inf a
-    fixum exactus<inf> b
-    fixum modulus<inf> c
-    fixum saturatus<inf> d
+    sit inf a
+    sit exactus<inf> b
+    sit modulus<inf> c
+    sit saturatus<inf> d
 }
 
 functio transmitte(inf x) → inf {
@@ -72,10 +72,10 @@ functio transmitte(inf x) → inf {
 }
 
 incipit {
-    fixum inf x ← 0
-    fixum inf y ← transmitte(x)
-    fixum Capsa c ← Capsa { a = y, b = x, c = y, d = x }
-    fixum lista<inf> xs ← [x, y]
+    sit inf x ← 0
+    sit inf y ← transmitte(x)
+    sit Capsa c ← Capsa { a = y, b = x, c = y, d = x }
+    sit lista<inf> xs ← [x, y]
     nota c.a
     nota xs
 }
@@ -84,7 +84,7 @@ incipit {
 const AIR_INF_LOCAL: &str = r#"
 @ radix lane "air"
 functio p(i32 n) → i32 {
-    fixum inf x ← 1
+    sit inf x ← 1
     redde n
 }
 "#;
@@ -99,10 +99,10 @@ fn the_english_spellings_check_clean() {
     assert_accepts(&english(
         r"
 class Box {
-    const inf a
-    const trapping<inf> b
-    const wrapping<inf> c
-    const saturating<inf> d
+    let inf a
+    let trapping<inf> b
+    let wrapping<inf> c
+    let saturating<inf> d
 }
 
 fn carry(inf x) → saturating<inf> {
@@ -110,8 +110,8 @@ fn carry(inf x) → saturating<inf> {
 }
 
 main {
-    const trapping<inf> t ← 1
-    const wrapping<inf> w ← carry(t)
+    let trapping<inf> t ← 1
+    let wrapping<inf> w ← carry(t)
     print w
 }
 ",
@@ -139,12 +139,12 @@ fn rejections_carry_their_catalog_code_and_issue() {
     assert_accepts(&latin("functio f(inf a) → i32 { redde a ↦ i32 ⊥ 0 }\n"));
     let failable = latin("functio f(inf a) → i32 { redde a ↦ i32 }\n");
     expect(&failable, "SEM011", "failable_conversio_requires_handler");
-    let literal = latin("incipit { fixum numerus x ← 18446744073709551616\n nota x }\n");
+    let literal = latin("incipit { sit numerus x ← 18446744073709551616\n nota x }\n");
     expect(&literal, "SEM010", "numerus_literal_out_of_range");
 }
 
-const INF_ARITHMETIC: &str = "incipit {\n fixum inf x ← 5\n fixum inf y ← x * x\n nota y\n}\n";
-const INF_BIG_LITERAL: &str = "incipit {\n fixum inf x ← 18446744073709551616\n nota x\n}\n";
+const INF_ARITHMETIC: &str = "incipit {\n sit inf x ← 5\n sit inf y ← x * x\n nota y\n}\n";
+const INF_BIG_LITERAL: &str = "incipit {\n sit inf x ← 18446744073709551616\n nota x\n}\n";
 
 /// inf track U4: the U3 fail-closed MIR gate (`inf_mir_unsupported_*`) is gone.
 /// Every `inf` operation lowers to MIR and validates, for the exact MIR runner
@@ -247,7 +247,7 @@ fn the_faber_reemitter_keeps_inf() {
 /// re-emitter prints the authored operand and no `↦ inf`.
 #[test]
 fn the_faber_reemitter_prints_nothing_for_an_implicit_widening() {
-    let source = "fixum u64 u ← 5\nfixum inf w ← u\nnota w\n";
+    let source = "sit u64 u ← 5\nsit inf w ← u\nnota w\n";
     let result = compile_for_target_and_get_result(&format!("incipit {{\n{source}}}\n"), Target::HirFaber);
     assert_accepts(&result.diagnostics);
     let Some(crate::Output::Faber(output)) = result.output else {

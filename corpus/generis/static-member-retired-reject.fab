@@ -1,0 +1,26 @@
++++
+term = "generis"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "genus_field_decl", "type_annotation", "base_type", "incipit_stmt", "block_stmt", "nota_stmt"]
+category = "type"
+summary = "A class member of the type itself is const; the old static member word is retired."
+syntax = "class P { static int X = 3 }"
+related = ["fixum", "genus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE010:static_member_retired"
++++
+# =============================================================================
+# generis — the static member word is retired
+# =============================================================================
+# A type-level member is `const T X = e`: the same compile-time constant as a
+# module or block `const`. `static` no longer introduces a member.
+
+class Punctum {
+    static int ORIGO = 0
+    mut int y
+}
+
+main {
+    print "unreachable"
+}

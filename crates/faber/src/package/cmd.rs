@@ -502,6 +502,32 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
         fail("compilation failed");
     };
 
+    // Native `clif` builds: the compiler emits an object, Faber links it
+    // against the runtime archive with the system C linker.
+    #[cfg(feature = "mir-clif")]
+    if target == Target::MirClif {
+        let radix::module::Output::ClifObject(object) = output else {
+            fail("clif compilation produced no object");
+        };
+        let stem = input_path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .filter(|stem| !stem.is_empty())
+            .unwrap_or("out");
+        match super::clif_build::link_executable(
+            &object.bytes,
+            &command.out_dir,
+            stem,
+            command.release,
+        ) {
+            Ok(path) => {
+                println!("{}", path.display());
+                return;
+            }
+            Err(diagnostic) => fail_with_diagnostic(&diagnostic),
+        }
+    }
+
     // Package Rust builds own a generated crate under target/faber/ and let
     // Cargo place artifacts in sibling debug/release directories.
     #[cfg(feature = "hir-rust")]

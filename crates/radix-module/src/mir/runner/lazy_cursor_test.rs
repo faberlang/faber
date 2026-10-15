@@ -26,14 +26,14 @@ fn sync_cursor_step_interleaves_producer_and_consumer() {
 locale = "en"
 +++
 fn three() generator → int {
-    for range 0 ‥ 3 const i {
+    for range 0 ‥ 3 let i {
         print "produce §"(i)
         yield i
     }
 }
 
 main {
-    for from three() const n {
+    for from three() let n {
         print "consume §"(n)
     }
 }
@@ -57,7 +57,7 @@ fn infinite_sync_cursor_with_early_break_terminates() {
 locale = "en"
 +++
 fn naturals() generator → int {
-    var int i ← 0
+    mut int i ← 0
     while true {
         print "produce §"(i)
         yield i
@@ -66,7 +66,7 @@ fn naturals() generator → int {
 }
 
 main {
-    for from naturals() const n {
+    for from naturals() let n {
         print "consume §"(n)
         if n ≥ 1 {
             break
@@ -87,7 +87,7 @@ fn infinite_async_cursor_with_early_break_terminates() {
 locale = "en"
 +++
 fn naturals() async_generator → int {
-    var int i ← 0
+    mut int i ← 0
     while true {
         print "produce §"(i)
         yield i
@@ -96,7 +96,7 @@ fn naturals() async_generator → int {
 }
 
 async_main {
-    for from naturals() const n {
+    for from naturals() let n {
         print "consume §"(n)
         if n ≥ 1 {
             break
@@ -117,7 +117,7 @@ fn generator_consuming_an_infinite_generator_stays_lazy() {
 locale = "en"
 +++
 fn naturals() generator → int {
-    var int i ← 0
+    mut int i ← 0
     while true {
         yield i
         i ← i + 1
@@ -125,7 +125,7 @@ fn naturals() generator → int {
 }
 
 fn evens() generator → int {
-    for from naturals() const n {
+    for from naturals() let n {
         if n % 2 ≡ 0 {
             yield n
         }
@@ -133,7 +133,7 @@ fn evens() generator → int {
 }
 
 main {
-    for from evens() const n {
+    for from evens() let n {
         print n
         if n ≥ 4 {
             break
@@ -156,10 +156,10 @@ fn pair() generator → int {
 
 main {
     print pair()
-    const list<int> all ← pair() ↦ list<int>
+    let list<int> all ← pair() ↦ list<int>
     print all.length()
-    var int total ← 0
-    for from pair() const n {
+    mut int total ← 0
+    for from pair() let n {
         total ← total + n
     }
     print total

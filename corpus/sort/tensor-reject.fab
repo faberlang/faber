@@ -12,7 +12,7 @@ diagnostic = "SEM010:sort_tensor_unsupported"
 
 # This exemplum intentionally fails to compile: a tensor source is refused.
 incipit {
-    fixum lista<f32> flat ← [3.0, 1.0, 2.0, 4.0]
-    fixum tf32[4] t ← flat ↦ tf32[4]
+    sit lista<f32> flat ← [3.0, 1.0, 2.0, 4.0]
+    sit tf32[4] t ← flat ↦ tf32[4]
     nota ordinata via ascendens ex t
 }

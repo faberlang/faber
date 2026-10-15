@@ -49,6 +49,6 @@ functio scribe((textus) → vacuum sink, textus nomen) → vacuum {
 }
 
 incipit {
-    fixum textus nomen ← "salve"
+    sit textus nomen ← "salve"
     nota nomen
 }

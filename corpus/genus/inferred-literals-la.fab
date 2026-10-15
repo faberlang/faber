@@ -39,21 +39,21 @@ functio summa(Punctum p) → numerus {
 }
 
 incipit {
-    fixum iuncta<numerus, textus> t ← _ [1, "a"]
+    sit iuncta<numerus, textus> t ← _ [1, "a"]
     nota t[0]
     nota t[1]
-    fixum iuncta<numerus, textus> u ← par()
+    sit iuncta<numerus, textus> u ← par()
     nota u[0]
-    fixum iuncta<numerus, numerus> v ← [5, 6]
+    sit iuncta<numerus, numerus> v ← [5, 6]
     nota v[1]
-    fixum Punctum p ← { x = 1, y = 2 }
+    sit Punctum p ← { x = 1, y = 2 }
     nota p.x
     nota p.y
-    fixum Punctum q ← origo()
+    sit Punctum q ← origo()
     nota q.y
     nota summa({ x = 10, y = 20 })
-    fixum lista<numerus> xs ← _ [1, 2, 3]
+    sit lista<numerus> xs ← _ [1, 2, 3]
     nota xs.longitudo()
-    fixum lista<numerus> ys ← [4, 5]
+    sit lista<numerus> ys ← [4, 5]
     nota ys.longitudo()
 }

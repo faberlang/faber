@@ -2,6 +2,6 @@
 locale = "en"
 +++
 main {
-    var f32 s ← 0.1
+    mut f32 s ← 0.1
     print s
 }

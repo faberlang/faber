@@ -6,12 +6,12 @@ locale = "en"
 # from C's truncating `/` and `%`.
 main {
     # Longest Collatz chain for a start below 1000: 871 with 178 steps.
-    var int best ← 0
-    var int best_start ← 0
-    var int start ← 1
+    mut int best ← 0
+    mut int best_start ← 0
+    mut int start ← 1
     while start ≺ 1000 {
-        var int n ← start
-        var int steps ← 0
+        mut int n ← start
+        mut int steps ← 0
         while n ≢ 1 {
             if n % 2 ≡ 0 {
                 n ← n / 2
@@ -29,15 +29,15 @@ main {
     print best_start, best
 
     # Floor division and remainder take the divisor's sign.
-    var int a ← -7
-    var int b ← 2
-    var int seven ← 7
-    var int nb ← 0 - b
+    mut int a ← -7
+    mut int b ← 2
+    mut int seven ← 7
+    mut int nb ← 0 - b
     print a / b, a % b, seven / nb, seven % nb, -a
 
     # break and continue act on the innermost loop.
-    var int i ← 0
-    var int total ← 0
+    mut int i ← 0
+    mut int total ← 0
     while true {
         i ← i + 1
         if i ≻ 20 {
@@ -53,7 +53,7 @@ main {
     print total
 
     # An unstored intermediate has no width: 2^63 prints exactly.
-    const int top ← 9223372036854775807
-    var int one ← 1
+    let int top ← 9223372036854775807
+    mut int one ← 1
     print top + one
 }

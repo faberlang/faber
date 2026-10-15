@@ -16,7 +16,7 @@ sit = "设"
 typus = "类型"
 schema = "架构"
 columna = "列"
-varia = "变量"
+varia = "可变"
 ceteri = "其余"
 errata = "勘误"
 exitus = "退出"
@@ -95,7 +95,7 @@ maxima = "最大"
 minima = "最小"
 de = "借自"
 ex = "取自"
-in = "传入"
+in = "可变"
 own = "拥有"
 copy = "拷贝"
 axis = "轴"
@@ -264,6 +264,14 @@ help = "在行尾或文件结束前闭合字符串字面量"
 message = "未闭合 guillemet block string 字面量"
 help = "在行尾或文件结束前闭合字符串字面量"
 
+[diagnostics.LEX001.issues.unterminated_regex_literal]
+message = "未闭合 regex 字面量"
+help = "在行尾或文件结束前闭合 regex 字面量"
+
+[diagnostics.LEX001.issues.empty_regex_literal]
+message = "空的 regex 字面量；请在斜杠之间写出模式"
+help = "在斜杠之间写出模式"
+
 [diagnostics.LEX002]
 message = "无效数字字面量"
 help = "检查 numeric separators 和 base prefixes"
@@ -287,6 +295,14 @@ help = "检查 numeric separators 和 base prefixes"
 [diagnostics.LEX002.issues.invalid_integer]
 message = "无效整数"
 help = "检查 numeric separators 和 base prefixes"
+
+[diagnostics.LEX002.issues.float_overflow]
+message = "浮点字面量过大；会溢出为无穷大"
+help = "写一个更小的数量级，或缩放单位"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "浮点字面量过小；会下溢为零"
+help = "写一个更大的数量级，或缩放单位"
 
 [diagnostics.LEX003]
 message = "无效转义序列"
@@ -340,6 +356,22 @@ help = "先修正 lexer 错误；解析会从干净的 tokens 继续"
 message = "需要 token"
 help = "确保此位置存在期望的 token"
 
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "复制入运算符 `{operator}` 后需要一个值"
+help = "在 `⇇` 之后写源表达式"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "元组元素标签 `{label}` 被使用了多次"
+help = "为每个元素取不同的标签，或去掉标签"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "implements 槽位必须命名一个契约；`_` 不是一致性声明"
+help = "在 implements 子句中写契约名"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "导入字段必须是标识符"
+help = "为导入的字段写一个普通名称"
+
 [diagnostics.PARSE001.issues.annotation_name]
 message = "需要注解名称"
 help = "在 @ 后添加注解名称"
@@ -371,10 +403,6 @@ help = "只保留一个 '{keyword}' rest binding"
 [diagnostics.PARSE001.issues.sit_identifier_binding]
 message = "'{keyword}' 直接绑定单个标识符；请使用 '{keyword}' name ← expr"
 help = "写成 '{keyword}' name ← expr，或对 typed/destructured bindings 使用 fixum"
-
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit 不支持 destructuring patterns"
-help = "对 destructuring pattern 使用 fixum"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "需要 test case 或 setup"
@@ -472,6 +500,50 @@ help = "在项之间加逗号（模式之间用 '{et}'）"
 message = "列表不得在结束定界符之前以逗号结尾"
 help = "删除结束定界符之前的逗号"
 
+[diagnostics.PARSE001.issues.expected_identifier]
+message = "需要标识符"
+help = "在此处写入标识符名称"
+
+[diagnostics.PARSE001.issues.expected_string_literal]
+message = "需要字符串字面量"
+help = "在此处写入带引号的字符串字面量"
+
+[diagnostics.PARSE001.issues.expected_mutability_keyword]
+message = "需要 '{fixum}' 或 '{varia}'"
+help = "用可变性关键字开始该声明"
+
+[diagnostics.PARSE001.issues.await_binding_requires_name]
+message = "'↢' 之前需要具名绑定"
+help = "把 '↢' 绑定到单个名称；解构使用 '←'"
+
+[diagnostics.PARSE001.issues.expected_method_declaration]
+message = "需要方法声明"
+help = "把方法写成 '{functio}' 声明"
+
+[diagnostics.PARSE001.issues.expected_praepara_hook]
+message = "需要 '{praepara}' 钩子"
+help = "写 '{praepara}'、'{praeparabit}'、'{postpara}' 或 '{postparabit}'"
+
+[diagnostics.PARSE001.issues.expected_lane_value]
+message = "需要字符串字面量或标识符"
+help = "把 lane 值写成带引号的字符串或裸名称"
+
+[diagnostics.PARSE001.issues.expected_scribe_keyword]
+message = "需要 '{scribe}' 关键字"
+help = "写 '{scribe}'、'{vide}'、'{mone}' 或 '{nota}'"
+
+[diagnostics.PARSE001.issues.expected_incipit_keyword]
+message = "需要 '{incipit}' 或 '{incipiet}'"
+help = "用 '{incipit}' 或 '{incipiet}' 开始入口点"
+
+[diagnostics.PARSE001.issues.enum_member_value_number]
+message = "'=' 之后需要数字"
+help = "在 '=' 之后写整数，或删除 '='"
+
+[diagnostics.PARSE001.issues.enum_member_value]
+message = "需要枚举成员值"
+help = "在 '=' 之后写整数或字符串"
+
 [diagnostics.PARSE002]
 message = "意外标记"
 help = "删除该标记，或把它移到正确位置"
@@ -511,6 +583,50 @@ help = "请在 genus 上声明 method"
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "`{marker}` 标记不再放在 binding 上，而是放在值上"
 help = "写成 `{keyword} T {name} ← {marker} value`；后面的 `{name} ← {marker} value` 以同样方式标记该值，parameter 则把 `{marker}` 保留在类型之前"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "运行时的 `{keyword}` 声明已废弃；`{name}` 是运行时名称"
+help = "写成 `{sit} T {name} ← …`（或用 `{sit} {name} ← …` 推断类型）；`{fixum}` 表示编译期事实，与 `=` 搭配"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "`{keyword}` 绑定词已废弃"
+help = "绑定名使用 `{sit}`（固定名称）或 `{varia}`（可写名称）；`{fixum}` 表示编译期事实，与 `=` 搭配"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` 不能引入绑定名"
+help = "绑定名对应每次迭代或匹配的值；固定名称写 `{sit}`，可写名称写 `{varia}`"
+
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "成员修饰词 `{keyword}` 已移除；类型级成员是常量"
+help = "写 `{fixum} T NAME = …`；`{fixum}` 表示编译期事实，类成员同样适用"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "`{fixum}` 成员需要编译期的值"
+help = "写 `{fixum} T NAME = value`；每个实例各有的字段用 `{sit}` 或 `{varia}`"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "`{fixum}` 成员用 `=` 初始化，不用 `←`"
+help = "`=` 表示编译期事实：写 `{fixum} T NAME = value`"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` 不能修饰字段"
+help = "字段是只读（`{sit}`）或可写（`{varia}`）；类型级常量写作 `{fixum} T X = …`"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "`{keyword}` 局部变量需要一个可读取的位置：`{keyword} T name ← place`"
+help = "写成 `{keyword} T name ← place`，若不需要初始位置，请使用 `{sit}` 或 `{varia}`"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "`{keyword}` 局部变量只绑定一个名称，不能解构"
+help = "写成 `{keyword} T name ← place`，再通过该名称读取各部分"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "`{keyword}` 局部变量读取的是位置，不能接受 `{marker}` 值"
+help = "要读取位置，写成 `{keyword} T name ← place`；要得到独立的值，写成 `{sit} T name ← {marker} place`"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "`{keyword}` 声明词已废弃；`{name}` 是可写名称"
+help = "写成 `{varia} T {name} ← …`；可写的运行时名称用 `{varia}`"
 
 [diagnostics.PARSE011]
 message = "在 {functio} 后需要函数名"
@@ -1031,6 +1147,10 @@ help = "修正用于 lowering 的 AST construct"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "此注释没有可附加的已降低语句或条目"
 help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "`@ conversion` 函数必须恰好接受一个参数，并恰好声明一个返回类型"
+help = "为转换对写 `functio name(Source) → Destination`"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia 需要一个 type parameter"
@@ -2604,6 +2724,10 @@ help = "更改 representation 前显式 convert element widths"
 message = "propagating conversio failure 需要 `textus` alternate-exit channel"
 help = "把 alternate-exit channel 声明为 textus，或提供 inline recovery"
 
+[diagnostics.SEM016.issues.conversio_failure_channel_value_required]
+message = "propagating sermo materialization failure 需要 `value` alternate-exit channel"
+help = "把 alternate-exit channel 声明为 value、unknown，或已注册的 value conversion"
+
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "regex conversion 需要 textus 或 ascii operand"
 help = "把 textus 或 ascii values convert 到 regex"
@@ -2755,6 +2879,10 @@ help = "使用 `varia` binding 允许重新赋值，或移除多余赋值"
 [diagnostics.SEM020.issues.assignment_to_constant]
 message = "向 constant 赋值"
 help = "使用 `varia` binding 允许重新赋值，或移除多余赋值"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "对 {fixum} 成员 '{field}' 赋值"
+help = "{fixum} 成员是类型的编译期常量，不能被写入；会变化的状态请用 {varia} 字段"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "第二次赋值给 immutable binding"

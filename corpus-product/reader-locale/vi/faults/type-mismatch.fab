@@ -1,5 +1,5 @@
 # Fault: text literal bound to a number-typed constant (SEM010).
 bắtđầu {
-  hằng số sai_kiểu ← "chữ"
+  đặt số sai_kiểu ← "chữ"
   in sai_kiểu
 }

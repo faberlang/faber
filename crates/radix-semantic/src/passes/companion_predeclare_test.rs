@@ -84,8 +84,8 @@ functio mul_pair(numerus a, numerus b) → numerus {
 }
 
 incipit {
-    fixum numerus x ← 5
-    fixum numerus result ← mul_pair(x, x)
+    sit numerus x ← 5
+    sit numerus result ← mul_pair(x, x)
     nota result
 }
 "#,
@@ -114,7 +114,7 @@ fn unknown_names_still_produce_sem001() {
     let (_, errors) = analyze(
         r"
 incipit {
-    fixum numerus result ← non_existent_func()
+    sit numerus result ← non_existent_func()
     nota result
 }
 ",

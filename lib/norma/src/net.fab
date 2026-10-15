@@ -23,32 +23,32 @@ fn fault_from(value raw) → fault.IoFault {
 
 @ public
 fn listen(int port) → listener.Listener ⇥ fault.IoFault {
-    const int id ← call 'caelum:ausculta' (port) ↦ int
+    let int id ← call 'caelum:ausculta' (port) ↦ int
     return listener.Listener { id = id }
 }
 
 @ public
 @ future
 fn listen_async(int port) → listener.Listener ⇥ fault.IoFault {
-    const int id ← call 'caelum:auscultabit' (port) ↦ int
+    let int id ← call 'caelum:auscultabit' (port) ↦ int
     return listener.Listener { id = id }
 }
 
 @ public
 fn listen_tls(int port, string cert, string key) → listener.Listener ⇥ fault.IoFault {
-    const int id ← call 'caelum:ausculta' ([port ↦ value, cert ↦ value, key ↦ value]) ↦ int
+    let int id ← call 'caelum:ausculta' ([port ↦ value, cert ↦ value, key ↦ value]) ↦ int
     return listener.Listener { id = id }
 }
 
 @ public
 fn connect(string host, int port, bool secure optional coalesce false) → connection.Socket ⇥ fault.IoFault {
-    const int id ← call 'caelum:necte' ([host ↦ value, port ↦ value, secure ↦ value]) ↦ int
+    let int id ← call 'caelum:necte' ([host ↦ value, port ↦ value, secure ↦ value]) ↦ int
     return connection.Socket { id = id }
 }
 
 @ public
 @ future
 fn connect_async(string host, int port, bool secure optional coalesce false) → connection.Socket ⇥ fault.IoFault {
-    const int id ← call 'caelum:nectet' ([host ↦ value, port ↦ value, secure ↦ value]) ↦ int
+    let int id ← call 'caelum:nectet' ([host ↦ value, port ↦ value, secure ↦ value]) ↦ int
     return connection.Socket { id = id }
 }

@@ -5,7 +5,7 @@ use crate::capability::{SLUG_CLIF_POLICY, SLUG_CLIF_SUBSET, classify_with_types}
 use radix_lexer::{Span, Symbol};
 use radix_mir::*;
 use radix_types::Type;
-use radix_types::{Primitive, TypeTable};
+use radix_types::{Primitive, SemanticMutability, TypeTable};
 
 fn sample_span() -> Span {
     Span::default()
@@ -137,7 +137,7 @@ fn scalar_core_is_capable() {
 }
 
 #[test]
-fn string_local_names_gap() {
+fn text_local_is_capable() {
     let types = TypeTable::new();
     let program = single_function(FunctionShape {
         params: Vec::new(),
@@ -152,20 +152,55 @@ fn string_local_names_gap() {
     });
 
     let verdict = classify_with_types(&program, &types);
+    assert!(
+        verdict.is_capable(),
+        "text is inside the subset: {verdict:?}"
+    );
+}
+
+#[test]
+fn littera_is_capable_and_a_map_of_letters_names_gap() {
+    let mut types = TypeTable::new();
+    let littera = types.primitive(Primitive::Littera);
+    let numerus = types.primitive(Primitive::Numerus);
+    let map = MirType::semantic(types.map(numerus, littera));
+    let vacuum = ty(&types, Primitive::Vacuum);
+    let shape = |local_ty: MirType| {
+        single_function(FunctionShape {
+            params: Vec::new(),
+            locals: vec![local(0, local_ty)],
+            temps: Vec::new(),
+            statements: Vec::new(),
+            terminator: MirTerminatorKind::Return(None),
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+        })
+    };
+    let program = shape(MirType::semantic(littera));
+    assert!(classify_with_types(&program, &types).is_capable());
+
+    let program = shape(map);
+    let verdict = classify_with_types(&program, &types);
     let gaps = verdict.gaps();
     assert_eq!(gaps.len(), 1, "one gap expected: {gaps:?}");
-    assert_eq!(gaps[0].shape(), "string value");
+    assert_eq!(gaps[0].shape(), "character in a map");
     assert_eq!(gaps[0].slug(), SLUG_CLIF_SUBSET);
 }
 
 #[test]
 fn gaps_keep_storage_order() {
-    let types = TypeTable::new();
-    let string = ty(&types, Primitive::Textus);
-    let instans = ty(&types, Primitive::Instans);
+    let mut types = TypeTable::new();
+    let numerus_id = types.primitive(Primitive::Numerus);
+    let queue = MirType::semantic(types.intern(radix_types::Type::Queue(numerus_id)));
+    let policy = MirType::semantic(types.intern(radix_types::Type::PolicyFloat(
+        radix_types::FloatPolicy::Trapping,
+        radix_types::NumericWidth::F64,
+    )));
     let program = single_function(FunctionShape {
-        params: vec![param(0, string)],
-        locals: vec![local(1, instans)],
+        params: vec![param(0, queue)],
+        locals: vec![local(1, policy)],
         temps: Vec::new(),
         statements: Vec::new(),
         terminator: MirTerminatorKind::Return(None),
@@ -178,15 +213,37 @@ fn gaps_keep_storage_order() {
     let verdict = classify_with_types(&program, &types);
     let gaps = verdict.gaps();
     assert_eq!(gaps.len(), 2, "two gaps expected: {gaps:?}");
-    assert_eq!(gaps[0].shape(), "string value", "param walks before local");
-    assert_eq!(gaps[1].shape(), "instans value");
+    assert_eq!(
+        gaps[0].shape(),
+        "collection value",
+        "param walks before local"
+    );
+    assert_eq!(gaps[1].shape(), "policy float value");
 }
 
 #[test]
-fn collection_type_names_gap() {
+fn list_type_is_capable_and_queue_type_names_gap() {
     let mut types = TypeTable::new();
     let numerus_id = types.primitive(Primitive::Numerus);
     let list = MirType::semantic(types.array(numerus_id));
+    let program = single_function(FunctionShape {
+        params: Vec::new(),
+        locals: vec![local(0, list)],
+        temps: Vec::new(),
+        statements: Vec::new(),
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: ty(&types, Primitive::Vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+    let verdict = classify_with_types(&program, &types);
+    assert!(
+        verdict.is_capable(),
+        "a list of numbers is inside the subset: {verdict:?}"
+    );
+
+    let list = MirType::semantic(types.queue(numerus_id));
     let program = single_function(FunctionShape {
         params: Vec::new(),
         locals: vec![local(0, list)],
@@ -227,7 +284,7 @@ fn unresolved_param_type_names_layout_gap() {
 }
 
 #[test]
-fn try_call_names_gap() {
+fn try_call_is_capable() {
     let types = TypeTable::new();
     let numerus = ty(&types, Primitive::Numerus);
     let (program, types) = minimal(FunctionShape {
@@ -250,12 +307,14 @@ fn try_call_names_gap() {
     });
 
     let verdict = classify_with_types(&program, &types);
-    assert_eq!(verdict.gaps().len(), 1);
-    assert_eq!(verdict.gaps()[0].shape(), "try_call");
+    assert!(
+        verdict.is_capable(),
+        "try_call is inside the subset: {verdict:?}"
+    );
 }
 
 #[test]
-fn error_typed_function_names_gap() {
+fn error_typed_function_is_capable() {
     let types = TypeTable::new();
     let (program, types) = minimal(FunctionShape {
         params: Vec::new(),
@@ -270,8 +329,10 @@ fn error_typed_function_names_gap() {
     });
 
     let verdict = classify_with_types(&program, &types);
-    assert!(!verdict.gaps().is_empty());
-    assert_eq!(verdict.gaps()[0].shape(), "error-typed function");
+    assert!(
+        verdict.is_capable(),
+        "an error channel is inside the subset: {verdict:?}"
+    );
 }
 
 #[test]
@@ -286,7 +347,7 @@ fn runtime_call_names_gap() {
             kind: MirStatementKind::RuntimeCall {
                 destination: None,
                 call: MirRuntimeCall {
-                    intrinsic: MirIntrinsic::Assert,
+                    intrinsic: MirIntrinsic::ReadLine,
                     args: Vec::new(),
                     return_ty: ty(&types, Primitive::Vacuum),
                 },
@@ -302,7 +363,7 @@ fn runtime_call_names_gap() {
 
     let verdict = classify_with_types(&program, &types);
     assert_eq!(verdict.gaps().len(), 1);
-    assert_eq!(verdict.gaps()[0].shape(), "runtime call");
+    assert_eq!(verdict.gaps()[0].shape(), "runtime call ReadLine");
 }
 
 #[test]
@@ -317,7 +378,7 @@ fn aggregate_construction_names_gap() {
             kind: MirStatementKind::Construct {
                 destination: MirPlace::local(MirLocalId(0)),
                 aggregate: MirAggregate {
-                    kind: MirAggregateKind::Tuple,
+                    kind: MirAggregateKind::Tensor,
                     ty: numerus,
                     fields: MirAggregateFields::Ordered(Vec::new()),
                 },
@@ -333,7 +394,7 @@ fn aggregate_construction_names_gap() {
 
     let verdict = classify_with_types(&program, &types);
     assert_eq!(verdict.gaps().len(), 1);
-    assert_eq!(verdict.gaps()[0].shape(), "tuple construction");
+    assert_eq!(verdict.gaps()[0].shape(), "device construction");
 }
 
 #[test]
@@ -348,7 +409,7 @@ fn place_projection_names_gap() {
             kind: MirStatementKind::Assign {
                 place: MirPlace {
                     base: MirPlaceBase::Local(MirLocalId(0)),
-                    projections: vec![MirProjection::Field(Symbol(2))],
+                    projections: vec![MirProjection::VectorLane(0)],
                 },
                 value: MirValue {
                     id: MirValueId(0),
@@ -372,7 +433,7 @@ fn place_projection_names_gap() {
 }
 
 #[test]
-fn closure_callee_names_gap() {
+fn closure_callee_is_capable() {
     let types = TypeTable::new();
     let numerus = ty(&types, Primitive::Numerus);
     let (program, types) = minimal(FunctionShape {
@@ -399,8 +460,10 @@ fn closure_callee_names_gap() {
     });
 
     let verdict = classify_with_types(&program, &types);
-    assert_eq!(verdict.gaps().len(), 1);
-    assert_eq!(verdict.gaps()[0].shape(), "closure call");
+    assert!(
+        verdict.is_capable(),
+        "a captured closure call is inside the subset: {verdict:?}"
+    );
 }
 
 #[test]
@@ -457,7 +520,7 @@ fn bit_operation_names_gap() {
                         lhs: MirOperand::Constant(MirConstant::Int(1)),
                         rhs: MirOperand::Constant(MirConstant::Int(2)),
                     },
-                    ty: numerus,
+                    ty: ty(&types, Primitive::Fractus),
                     span: sample_span(),
                 },
             },
@@ -473,4 +536,109 @@ fn bit_operation_names_gap() {
     let verdict = classify_with_types(&program, &types);
     assert_eq!(verdict.gaps().len(), 1);
     assert_eq!(verdict.gaps()[0].shape(), "bit operation");
+}
+
+fn cursor_stream_gaps(stepped: bool) -> Vec<String> {
+    let types = TypeTable::new();
+    let numerus = ty(&types, Primitive::Numerus);
+    let (program, types) = minimal(FunctionShape {
+        params: Vec::new(),
+        locals: vec![local(0, numerus)],
+        temps: Vec::new(),
+        statements: vec![MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: None,
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::CursorStream(MirCursorStream {
+                        callee: radix_hir::DefId(0),
+                        stepped,
+                    }),
+                    args: Vec::new(),
+                    return_ty: ty(&types, Primitive::Vacuum),
+                },
+            },
+            span: sample_span(),
+        }],
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: ty(&types, Primitive::Vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+    classify_with_types(&program, &types)
+        .gaps()
+        .iter()
+        .map(|gap| gap.shape().to_owned())
+        .collect()
+}
+
+#[test]
+fn stepped_cursor_stream_names_gap() {
+    assert_eq!(cursor_stream_gaps(true), ["stepped cursor stream"]);
+}
+
+#[test]
+fn unstepped_cursor_stream_is_capable() {
+    assert!(cursor_stream_gaps(false).is_empty());
+}
+
+fn local_verdict(types: &TypeTable, local_ty: MirType) -> radix_types::vocabulary::Lowerability {
+    let program = single_function(FunctionShape {
+        params: Vec::new(),
+        locals: vec![local(0, local_ty)],
+        temps: Vec::new(),
+        statements: Vec::new(),
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: ty(types, Primitive::Vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+    classify_with_types(&program, types)
+}
+
+#[test]
+fn none_typed_local_is_capable() {
+    let types = TypeTable::new();
+    let verdict = local_verdict(&types, ty(&types, Primitive::Nihil));
+    assert!(verdict.is_capable(), "the type of null: {verdict:?}");
+    let verdict = local_verdict(&types, ty(&types, Primitive::Ignotum));
+    assert!(verdict.is_capable(), "an unknown value: {verdict:?}");
+}
+
+#[test]
+fn bounded_text_is_capable_and_bounded_bytes_are_not() {
+    let mut types = TypeTable::new();
+    let capacity = types.intern_index(radix_types::IndexExpr::Literal(8));
+    let text = MirType::semantic(types.bounded_textus(capacity));
+    let ascii = MirType::semantic(types.bounded_ascii(capacity));
+    for ty in [text, ascii] {
+        let verdict = local_verdict(&types, ty);
+        assert!(verdict.is_capable(), "a bounded text: {verdict:?}");
+    }
+    let bytes = MirType::semantic(types.bounded_octeti(capacity));
+    let verdict = local_verdict(&types, bytes);
+    let gaps = verdict.gaps();
+    assert_eq!(gaps.len(), 1, "{gaps:?}");
+    assert_eq!(gaps[0].shape(), "byte buffer value");
+}
+
+#[test]
+fn references_are_values_or_shared_handles() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let list = types.array(numerus);
+    let read_only = MirType::semantic(types.reference(SemanticMutability::Immutable, numerus));
+    let verdict = local_verdict(&types, read_only);
+    assert!(verdict.is_capable(), "a read-only borrow: {verdict:?}");
+
+    let shared = MirType::semantic(types.reference(SemanticMutability::Mutable, list));
+    let verdict = local_verdict(&types, shared);
+    assert!(verdict.is_capable(), "a mutable list handle: {verdict:?}");
+
+    let scalar = MirType::semantic(types.reference(SemanticMutability::Mutable, numerus));
+    let verdict = local_verdict(&types, scalar);
+    let gaps = verdict.gaps();
+    assert_eq!(gaps.len(), 1, "{gaps:?}");
+    assert_eq!(gaps[0].shape(), "reference value");
 }

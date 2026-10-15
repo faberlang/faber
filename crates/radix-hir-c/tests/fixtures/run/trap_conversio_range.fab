@@ -3,6 +3,6 @@ locale = "en"
 +++
 # A narrowing conversion out of range ends the program.
 main {
-    const int big ← 300
+    let int big ← 300
     print big ↦ u8
 }

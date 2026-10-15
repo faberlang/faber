@@ -46,6 +46,9 @@ enum Handle {
     Writer {
         stream: IoStream,
     },
+    ClientPending {
+        stream: IoStream,
+    },
 }
 
 struct RequestSlot {
@@ -138,6 +141,8 @@ const ROUTES: &[&str] = &[
     "http:request",
     "http:request_open",
     "http:read",
+    "http:request_send",
+    "http:request_head",
     "http:listen",
     "http:listen_tls",
     "http:accept",
@@ -168,6 +173,8 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
         "http:request" => generic(args, false),
         "http:request_open" => generic(args, true),
         "http:read" => read_chunk(args),
+        "http:request_send" => request_send(args),
+        "http:request_head" => request_head(args),
         "http:listen" => listen(args, false),
         "http:listen_tls" => listen(args, true),
         "http:accept" => accept(args),
@@ -315,7 +322,7 @@ fn client_call(method: &str, args: &[Arg], has_body: bool) -> Result<Reply, Leaf
     exchange(&opener, false)
 }
 
-fn generic(args: &[Arg], open: bool) -> Result<Reply, LeafError> {
+fn opener_from_args(args: &[Arg]) -> Result<ClientOpener, LeafError> {
     let (offset, agent) = match args.first() {
         Some(Arg::Int(id)) => (1, Some(*id)),
         _ => (0, None),
@@ -324,16 +331,17 @@ fn generic(args: &[Arg], open: bool) -> Result<Reply, LeafError> {
     let url = expect_str("http:request", args, offset + 1, "url")?;
     let headers = optional_headers(args, offset + 2)?;
     let body = args.get(offset + 3).map(body_from_arg).unwrap_or_default();
-    exchange(
-        &ClientOpener {
-            agent,
-            method: method.to_owned(),
-            url: url.to_owned(),
-            headers,
-            body,
-        },
-        open,
-    )
+    Ok(ClientOpener {
+        agent,
+        method: method.to_owned(),
+        url: url.to_owned(),
+        headers,
+        body,
+    })
+}
+
+fn generic(args: &[Arg], open: bool) -> Result<Reply, LeafError> {
+    exchange(&opener_from_args(args)?, open)
 }
 
 fn parse_client_args(
@@ -418,7 +426,7 @@ fn split_url(url: &str) -> Result<UrlParts, LeafError> {
     })
 }
 
-fn exchange(opener: &ClientOpener, open: bool) -> Result<Reply, LeafError> {
+fn send_request(opener: &ClientOpener) -> Result<IoStream, LeafError> {
     let (timeout, ca_path) = opener.agent.map_or((DEFAULT_TIMEOUT, None), lookup_agent);
     let url = split_url(&opener.url)?;
     let addr = format!("{}:{}", url.host, url.port);
@@ -462,21 +470,30 @@ fn exchange(opener: &ClientOpener, open: bool) -> Result<Reply, LeafError> {
         })
         .and_then(|()| stream.flush())
         .map_err(|err| LeafError::from_io("http:request", &addr, &err))?;
+    Ok(stream)
+}
+
+fn reader_reply(parsed: ParsedMessage, stream: IoStream) -> Reply {
+    let remaining = parsed.content_length;
+    let id = insert_handle(Handle::Reader {
+        leftover: parsed.body,
+        remaining,
+        chunked: parsed.chunked,
+        done: false,
+        stream,
+    });
+    Reply::Map(vec![
+        ("reader".to_owned(), Reply::Int(id)),
+        ("status".to_owned(), Reply::Int(i64::from(parsed.status))),
+        ("headers".to_owned(), headers_reply(&parsed.headers)),
+    ])
+}
+
+fn exchange(opener: &ClientOpener, open: bool) -> Result<Reply, LeafError> {
+    let mut stream = send_request(opener)?;
     let parsed = read_http_message(&mut stream, DEFAULT_MAX_BODY, true, !open)?;
     if open {
-        let remaining = parsed.content_length;
-        let id = insert_handle(Handle::Reader {
-            leftover: parsed.body,
-            remaining,
-            chunked: parsed.chunked,
-            done: false,
-            stream,
-        });
-        return Ok(Reply::Map(vec![
-            ("reader".to_owned(), Reply::Int(id)),
-            ("status".to_owned(), Reply::Int(i64::from(parsed.status))),
-            ("headers".to_owned(), headers_reply(&parsed.headers)),
-        ]));
+        return Ok(reader_reply(parsed, stream));
     }
     Ok(Reply::Map(vec![
         ("status".to_owned(), Reply::Int(i64::from(parsed.status))),
@@ -486,6 +503,33 @@ fn exchange(opener: &ClientOpener, open: bool) -> Result<Reply, LeafError> {
             Reply::Str(String::from_utf8_lossy(&parsed.body).into_owned()),
         ),
     ]))
+}
+
+/// Write the request and pend the stream without reading the response head.
+fn request_send(args: &[Arg]) -> Result<Reply, LeafError> {
+    let opener = opener_from_args(args)?;
+    let stream = send_request(&opener)?;
+    let id = insert_handle(Handle::ClientPending { stream });
+    Ok(Reply::Int(id))
+}
+
+/// Read the response head for a request pended by `http:request_send`.
+fn request_head(args: &[Arg]) -> Result<Reply, LeafError> {
+    const ROUTE: &str = "http:request_head";
+    let id = expect_int(ROUTE, args, 0, "request")?;
+    let mut stream = with_handles(|map| match map.remove(&id) {
+        Some(Handle::ClientPending { stream }) => Ok(stream),
+        Some(other) => {
+            map.insert(id, other);
+            Err(LeafError::invalid_argument(
+                ROUTE,
+                "id is not a pending request",
+            ))
+        }
+        None => Err(LeafError::closed(ROUTE, "request closed")),
+    })?;
+    let parsed = read_http_message(&mut stream, DEFAULT_MAX_BODY, true, false)?;
+    Ok(reader_reply(parsed, stream))
 }
 
 fn read_chunk(args: &[Arg]) -> Result<Reply, LeafError> {

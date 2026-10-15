@@ -40,10 +40,10 @@ locale = "en"
 # (whitelist: lista/methodi-mutatio.fab).
 
 main {
-    var list<int> res ← [3, 1, 2] ∷ list<int>
+    mut list<int> res ← [3, 1, 2] ∷ list<int>
     res.append(4)
-    const int ∪ none primusremotus ← res.remove_first()
-    const int ∪ none ultimusremotus ← res.remove_last()
+    let int ∪ none primusremotus ← res.remove_first()
+    let int ∪ none ultimusremotus ← res.remove_last()
     res.reverse()
     res.sort()
     print res

@@ -4,7 +4,7 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "ternary"]
 category = "type"
 summary = "MU-3 red: branched shared RHS into own rejects with copy suggestion."
-syntax = "const list<int> c ← own if cond { a } else { b }"
+syntax = "let list<int> c ← own if cond { a } else { b }"
 related = ["own", "copy"]
 locale = "en"
 no_expected = "rejects"
@@ -16,7 +16,7 @@ diagnostic = "SEM057:shared_into_own"
 # This exemplum intentionally fails to compile.
 
 main {
-    const list<int> a ← [1]
-    const list<int> b ← [2]
-    const list<int> c ← own true ✓ a ✗ b
+    let list<int> a ← [1]
+    let list<int> b ← [2]
+    let list<int> c ← own true ✓ a ✗ b
 }

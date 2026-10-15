@@ -1,5 +1,5 @@
 # Fault: fullwidth digit in a numeric literal (LEX004 unexpected_character).
 入口 {
-  常量 整数 次数 ← ７
+  设 整数 次数 ← ７
   显示 次数
 }

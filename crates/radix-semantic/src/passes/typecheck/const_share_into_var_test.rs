@@ -1,4 +1,4 @@
-//! `const` is deep (need, rule 2): a plain `var T y ← x` that shares
+//! `const` is deep (need, rule 2): a plain `mut T y ← x` that shares
 //! a `const` or `ref` container into a writable name is SEM065
 //! `const_shared_into_var`; `← copy x`, `← own x`, scalars and `var` sources
 //! stay legal.
@@ -14,7 +14,7 @@ const MUTATING_RECEIVER_ISSUE: &str = "imperativus_operator_method_requires_vari
 
 #[test]
 fn const_list_shared_into_var_is_rejected() {
-    let source = "incipit {\n    fixum lista<numerus> xs ← [1]\n    varia lista<numerus> ys ← xs\n    ys.appende(2)\n    nota xs\n}";
+    let source = "incipit {\n    sit lista<numerus> xs ← [1]\n    varia lista<numerus> ys ← xs\n    ys.appende(2)\n    nota xs\n}";
     let result = test_support::analyze_source(source);
     assert!(
         result.diagnostics.iter().any(|err| err.is_error()
@@ -28,14 +28,14 @@ fn const_list_shared_into_var_is_rejected() {
 #[test]
 fn const_scalar_into_var_is_accepted() {
     test_support::assert_accepts(
-        "incipit {\n    fixum numerus a ← 1\n    varia numerus b ← a\n    b ← b + 1\n    nota b\n}",
+        "incipit {\n    sit numerus a ← 1\n    varia numerus b ← a\n    b ← b + 1\n    nota b\n}",
     );
 }
 
 #[test]
 fn const_list_copy_into_var_is_accepted() {
     test_support::assert_accepts(
-        "incipit {\n    fixum lista<numerus> xs ← [1]\n    varia lista<numerus> ys ← copy xs\n    ys.appende(2)\n    nota xs\n    nota ys\n}",
+        "incipit {\n    sit lista<numerus> xs ← [1]\n    varia lista<numerus> ys ← copy xs\n    ys.appende(2)\n    nota xs\n    nota ys\n}",
     );
 }
 
@@ -75,7 +75,7 @@ fn module_constant_scalar_into_var_is_accepted() {
 
 #[test]
 fn const_genus_shared_into_var_is_rejected() {
-    let source = "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    fixum Custos c ← Custos { res = [1, 2] }\n    varia Custos d ← c\n    nota d\n}";
+    let source = "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    sit Custos c ← Custos { res = [1, 2] }\n    varia Custos d ← c\n    nota d\n}";
     let result = test_support::analyze_source(source);
     assert!(
         result.diagnostics.iter().any(|err| err.is_error()
@@ -88,7 +88,7 @@ fn const_genus_shared_into_var_is_rejected() {
 
 #[test]
 fn const_genus_field_shared_into_var_is_rejected() {
-    let source = "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    fixum Custos c ← Custos { res = [1, 2] }\n    varia lista<numerus> ys ← c.res\n    ys.appende(3)\n    nota c\n}";
+    let source = "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    sit Custos c ← Custos { res = [1, 2] }\n    varia lista<numerus> ys ← c.res\n    ys.appende(3)\n    nota c\n}";
     let result = test_support::analyze_source(source);
     assert!(
         result.diagnostics.iter().any(|err| err.is_error()
@@ -114,7 +114,7 @@ fn module_constant_genus_field_shared_into_var_is_rejected() {
 
 #[test]
 fn call_result_of_const_list_shared_into_var_is_rejected() {
-    let source = "functio pick(de lista<numerus> xs) → de lista<numerus> {\n    redde xs\n}\nincipit {\n    fixum lista<numerus> xs ← [1, 2]\n    varia lista<numerus> ys ← pick(xs)\n    ys.appende(3)\n    nota ys\n}";
+    let source = "functio pick(de lista<numerus> xs) → de lista<numerus> {\n    redde xs\n}\nincipit {\n    sit lista<numerus> xs ← [1, 2]\n    varia lista<numerus> ys ← pick(xs)\n    ys.appende(3)\n    nota ys\n}";
     let result = test_support::analyze_source(source);
     assert!(
         result.diagnostics.iter().any(|err| err.is_error()
@@ -127,7 +127,7 @@ fn call_result_of_const_list_shared_into_var_is_rejected() {
 
 #[test]
 fn const_nested_list_element_shared_into_var_is_rejected() {
-    let source = "incipit {\n    fixum lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs fixum r {\n        varia lista<numerus> ys ← r\n        ys.appende(3)\n        nota ys\n    }\n}";
+    let source = "incipit {\n    sit lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs sit r {\n        varia lista<numerus> ys ← r\n        ys.appende(3)\n        nota ys\n    }\n}";
     let result = test_support::analyze_source(source);
     assert!(
         result.diagnostics.iter().any(|err| err.is_error()
@@ -141,42 +141,42 @@ fn const_nested_list_element_shared_into_var_is_rejected() {
 #[test]
 fn plain_owned_call_result_into_var_is_accepted() {
     test_support::assert_accepts(
-        "functio pick(lista<numerus> xs) → lista<numerus> {\n    redde xs\n}\nincipit {\n    fixum lista<numerus> xs ← [1, 2]\n    varia lista<numerus> ys ← pick(xs)\n    ys.appende(3)\n    nota ys\n}",
+        "functio pick(lista<numerus> xs) → lista<numerus> {\n    redde xs\n}\nincipit {\n    sit lista<numerus> xs ← [1, 2]\n    varia lista<numerus> ys ← pick(xs)\n    ys.appende(3)\n    nota ys\n}",
     );
 }
 
 #[test]
 fn var_nested_list_element_shared_into_var_is_accepted() {
     test_support::assert_accepts(
-        "incipit {\n    varia lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs fixum r {\n        varia lista<numerus> ys ← r\n        nota ys\n    }\n}",
+        "incipit {\n    varia lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs sit r {\n        varia lista<numerus> ys ← r\n        nota ys\n    }\n}",
     );
 }
 
 #[test]
 fn const_genus_copy_into_var_is_accepted() {
     test_support::assert_accepts(
-        "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    fixum Custos c ← Custos { res = [1, 2] }\n    varia Custos d ← copy c\n    nota d\n}",
+        "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    sit Custos c ← Custos { res = [1, 2] }\n    varia Custos d ← copy c\n    nota d\n}",
     );
 }
 
 #[test]
 fn const_list_own_into_var_is_accepted() {
     test_support::assert_accepts(
-        "incipit {\n    fixum lista<numerus> xs ← [1]\n    varia lista<numerus> ys ← own xs\n    ys.appende(2)\n    nota ys\n}",
+        "incipit {\n    sit lista<numerus> xs ← [1]\n    varia lista<numerus> ys ← own xs\n    ys.appende(2)\n    nota ys\n}",
     );
 }
 
 #[test]
 fn const_text_into_var_is_accepted() {
     test_support::assert_accepts(
-        "incipit {\n    fixum textus s ← \"salve\"\n    varia textus t ← s\n    nota t\n}",
+        "incipit {\n    sit textus s ← \"salve\"\n    varia textus t ← s\n    nota t\n}",
     );
 }
 
 #[test]
 fn const_to_const_share_is_accepted() {
     test_support::assert_accepts(
-        "incipit {\n    fixum lista<numerus> xs ← [1, 2]\n    fixum lista<numerus> ys ← xs\n    nota ys\n}",
+        "incipit {\n    sit lista<numerus> xs ← [1, 2]\n    sit lista<numerus> ys ← xs\n    nota ys\n}",
     );
 }
 
@@ -231,7 +231,7 @@ fn unmarked_param_genus_shared_into_var_is_rejected() {
 #[test]
 fn de_param_const_alias_is_accepted() {
     test_support::assert_accepts(
-        "genus Punctum {\n    varia numerus x\n}\nfunctio prend(de Punctum q) → numerus {\n    fixum Punctum b ← q\n    redde b.x\n}\nincipit { }",
+        "genus Punctum {\n    varia numerus x\n}\nfunctio prend(de Punctum q) → numerus {\n    sit Punctum b ← q\n    redde b.x\n}\nincipit { }",
     );
 }
 
@@ -245,7 +245,7 @@ fn de_param_copy_into_var_is_accepted() {
 #[test]
 fn in_param_genus_shared_into_var_is_accepted() {
     test_support::assert_accepts(
-        "genus Punctum {\n    varia numerus x\n}\nfunctio prend(in Punctum q) → numerus {\n    varia Punctum b ← q\n    redde b.x\n}\nincipit { }",
+        "genus Punctum {\n    varia numerus x\n}\nfunctio prend(varia Punctum q) → numerus {\n    varia Punctum b ← q\n    redde b.x\n}\nincipit { }",
     );
 }
 
@@ -281,7 +281,7 @@ fn parameter_source_arg_is_parameter() {
 
 #[test]
 fn const_local_source_arg_is_constant() {
-    let source = "incipit {\n    fixum lista<numerus> xs ← [1]\n    varia lista<numerus> ys ← xs\n    ys.appende(2)\n    nota xs\n}";
+    let source = "incipit {\n    sit lista<numerus> xs ← [1]\n    varia lista<numerus> ys ← xs\n    ys.appende(2)\n    nota xs\n}";
     let result = test_support::analyze_source(source);
     let err = result
         .diagnostics
@@ -304,7 +304,7 @@ fn const_local_source_arg_is_constant() {
 
 #[test]
 fn itera_binder_source_over_parameter_is_parameter() {
-    let source = "functio f(lista<lista<numerus>> xss) → numerus {\n    itera ex xss fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }";
+    let source = "functio f(lista<lista<numerus>> xss) → numerus {\n    itera ex xss sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }";
     let result = test_support::analyze_source(source);
     let found = result
         .diagnostics
@@ -328,7 +328,7 @@ fn itera_binder_source_over_parameter_is_parameter() {
 
 #[test]
 fn itera_binder_source_over_const_local_is_constant() {
-    let source = "incipit {\n    fixum lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n}";
+    let source = "incipit {\n    sit lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n}";
     let result = test_support::analyze_source(source);
     let found = result
         .diagnostics
@@ -435,7 +435,7 @@ fn wrapped_source_into_var_ascription_parameter_is_rejected() {
 #[test]
 fn wrapped_source_into_var_conditional_parameter_is_rejected() {
     assert_wrapped_source_into_var_rejected(
-        "functio f(lista<numerus> xs) → numerus {\n    fixum bivalens c ← verum\n    varia lista<numerus> ys ← c ✓ xs ✗ [2]\n    redde ys.longitudo()\n}\nincipit { }",
+        "functio f(lista<numerus> xs) → numerus {\n    sit bivalens c ← verum\n    varia lista<numerus> ys ← c ✓ xs ✗ [2]\n    redde ys.longitudo()\n}\nincipit { }",
     );
 }
 
@@ -447,7 +447,7 @@ fn wrapped_source_into_var_all_fresh_is_accepted() {
 }
 
 // ── Aggregates holding containers (7b471d14-8): a tuple or union that holds a
-// container shares that container's state, so a plain `var T y ← x` from an
+// container shares that container's state, so a plain `mut T y ← x` from an
 // unmarked parameter is SEM065 just like a bare container. A scalar-only
 // aggregate still copies by value and stays legal.
 
@@ -518,35 +518,35 @@ fn assert_method_source_into_var_rejected(source: &str) {
 #[test]
 fn itera_method_source_binder_valores_over_parameter_is_rejected() {
     assert_method_source_into_var_rejected(
-        "functio f(tabula<textus, lista<numerus>> p) → numerus {\n    itera ex p.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
+        "functio f(tabula<textus, lista<numerus>> p) → numerus {\n    itera ex p.valores() sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
     );
 }
 
 #[test]
 fn itera_method_source_binder_valores_over_const_local_is_rejected() {
     assert_method_source_into_var_rejected(
-        "incipit {\n    fixum tabula<textus, lista<numerus>> p ← vacua\n    itera ex p.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n}",
+        "incipit {\n    sit tabula<textus, lista<numerus>> p ← vacua\n    itera ex p.valores() sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n}",
     );
 }
 
 #[test]
 fn itera_method_source_binder_scalar_element_is_accepted() {
     test_support::assert_accepts(
-        "functio f(tabula<textus, numerus> p) → numerus {\n    itera ex p.valores() fixum r {\n        varia numerus y ← r\n        y ← y + 1\n    }\n    redde 0\n}\nincipit { }",
+        "functio f(tabula<textus, numerus> p) → numerus {\n    itera ex p.valores() sit r {\n        varia numerus y ← r\n        y ← y + 1\n    }\n    redde 0\n}\nincipit { }",
     );
 }
 
 #[test]
 fn itera_method_source_binder_claves_scalar_keys_is_accepted() {
     test_support::assert_accepts(
-        "functio f(tabula<textus, lista<numerus>> p) → numerus {\n    itera ex p.claves() fixum k {\n        varia textus t ← k\n        nota t\n    }\n    redde 0\n}\nincipit { }",
+        "functio f(tabula<textus, lista<numerus>> p) → numerus {\n    itera ex p.claves() sit k {\n        varia textus t ← k\n        nota t\n    }\n    redde 0\n}\nincipit { }",
     );
 }
 
 #[test]
 fn itera_method_source_binder_fresh_local_is_accepted() {
     test_support::assert_accepts(
-        "functio f() → numerus {\n    varia tabula<textus, lista<numerus>> p ← vacua\n    itera ex p.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
+        "functio f() → numerus {\n    varia tabula<textus, lista<numerus>> p ← vacua\n    itera ex p.valores() sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
     );
 }
 
@@ -573,8 +573,8 @@ fn has_const_shared_into_var(result: &test_support::AnalyzedFixture) -> bool {
 
 #[test]
 fn values_view_detection_is_pack_first() {
-    let en_values = "fn f(map<string, list<int>> p) → int {\n    for from p.values() const r {\n        var list<int> y ← r\n        y.append(1)\n    }\n    return 0\n}\nmain { }";
-    let en_valores = "fn f(map<string, list<int>> p) → int {\n    for from p.valores() const r {\n        var list<int> y ← r\n        y.append(1)\n    }\n    return 0\n}\nmain { }";
+    let en_values = "fn f(map<string, list<int>> p) → int {\n    for from p.values() let r {\n        mut list<int> y ← r\n        y.append(1)\n    }\n    return 0\n}\nmain { }";
+    let en_valores = "fn f(map<string, list<int>> p) → int {\n    for from p.valores() let r {\n        mut list<int> y ← r\n        y.append(1)\n    }\n    return 0\n}\nmain { }";
 
     assert!(
         has_const_shared_into_var(&analyze_en(en_values)),
@@ -583,6 +583,34 @@ fn values_view_detection_is_pack_first() {
     assert!(
         !has_const_shared_into_var(&analyze_en(en_valores)),
         "canonical Latin `valores` is not a method under the en pack, so it must not count as the Values view"
+    );
+}
+
+/// a1a643a1-1: the Values-view alias check needs a map/ledger receiver, not
+/// just the spelling. A user method named `valores` on a genus is an ordinary
+/// call whose result is fresh.
+#[test]
+fn itera_user_method_named_valores_binder_is_accepted() {
+    test_support::assert_accepts(
+        "genus Cista {\n    varia lista<numerus> res\n    functio valores() → lista<lista<numerus>> {\n        redde [[1]]\n    }\n}\nfunctio f(Cista p) → numerus {\n    itera ex p.valores() sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn itera_user_method_named_valores_fresh_control_is_accepted() {
+    test_support::assert_accepts(
+        "genus Cista {\n    varia lista<numerus> res\n    functio fresca() → lista<lista<numerus>> {\n        redde [[1]]\n    }\n}\nfunctio f(Cista p) → numerus {\n    itera ex p.fresca() sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn itera_map_valores_alias_still_rejected_with_user_method_present() {
+    let source = "genus Cista {\n    varia lista<numerus> res\n    functio valores() → lista<lista<numerus>> {\n        redde [[1]]\n    }\n}\nfunctio f(tabula<textus, lista<numerus>> m) → numerus {\n    itera ex m.valores() sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }";
+    let result = test_support::analyze_source(source);
+    assert!(
+        has_const_shared_into_var(&result),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
     );
 }
 
@@ -608,7 +636,7 @@ fn de_result_alias_method_call_receiver_over_parameter_is_rejected() {
 
 #[test]
 fn de_result_alias_free_function_two_de_params_over_parameter_is_rejected() {
-    let source = "functio pick(de lista<numerus> a, de lista<numerus> b) → de lista<numerus> {\n    redde a\n}\nfunctio f(lista<numerus> xs) → numerus {\n    fixum lista<numerus> clean ← [1, 2]\n    varia lista<numerus> y ← pick(xs, clean)\n    redde y.longitudo()\n}\nincipit { }";
+    let source = "functio pick(de lista<numerus> a, de lista<numerus> b) → de lista<numerus> {\n    redde a\n}\nfunctio f(lista<numerus> xs) → numerus {\n    sit lista<numerus> clean ← [1, 2]\n    varia lista<numerus> y ← pick(xs, clean)\n    redde y.longitudo()\n}\nincipit { }";
     let result = test_support::analyze_source(source);
     assert!(
         result.diagnostics.iter().any(|err| err.is_error()

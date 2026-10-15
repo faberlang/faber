@@ -53,10 +53,10 @@ main {
     print Status.done ↦ string
 
     # int ↦ ordo: the matching member, or the ⊥ default
-    const Color found ← 2 ↦ Color ⊥ Color.red
+    let Color found ← 2 ↦ Color ⊥ Color.red
     print found ↦ string
-    const Color missing ← 9 ↦ Color ⊥ Color.red
+    let Color missing ← 9 ↦ Color ⊥ Color.red
     print missing ↦ string
-    const Status negative ← -2 ↦ Status ⊥ Status.pending
+    let Status negative ← -2 ↦ Status ⊥ Status.pending
     print negative ↦ string
 }

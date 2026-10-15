@@ -40,9 +40,9 @@ locale = "en"
 # The code point span of every match, left to right, as ` (start,end)`; ` none` for no match.
 fn spans(string pat, string text) → string {
     do {
-        const regex r ← pat ↦ regex
-        var string out ← ""
-        for from r.find_all(text) const h {
+        let regex r ← pat ↦ regex
+        mut string out ← ""
+        for from r.find_all(text) let h {
             out ← out + " (§,§)"(h.start(), h.end())
         }
         if out ≡ "" {
@@ -59,7 +59,7 @@ fn spans(string pat, string text) → string {
 # conversion rejects the pattern.
 fn hits(string pat, string text) → string {
     do {
-        const regex r ← pat ↦ regex
+        let regex r ← pat ↦ regex
         return r.matches(text) ✓ "y" ✗ "n"
     }
     catch err {
@@ -70,9 +70,9 @@ fn hits(string pat, string text) → string {
 # The pieces of split, each as `<piece>`.
 fn pieces(string pat, string text) → string {
     do {
-        const regex r ← pat ↦ regex
-        var string out ← ""
-        for from r.split(text) const piece {
+        let regex r ← pat ↦ regex
+        mut string out ← ""
+        for from r.split(text) let piece {
             out ← out + "<§>"(piece)
         }
         return out
@@ -85,7 +85,7 @@ fn pieces(string pat, string text) → string {
 # The text with every match replaced by the literal replacement.
 fn swapped(string pat, string text, string with) → string {
     do {
-        const regex r ← pat ↦ regex
+        let regex r ← pat ↦ regex
         return r.replace(text, with)
     }
     catch err {

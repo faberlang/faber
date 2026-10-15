@@ -40,7 +40,7 @@ locale = "en"
 #   50, 100 (clamped), then radius 5 with derived diameter 10 and area
 
 class Terminus {
-    var int valor = 0
+    mut int valor = 0
 
     fn creo() → void {
         if self.valor ≺ 0 {
@@ -57,9 +57,9 @@ class Terminus {
 }
 
 class Circulus {
-    var int radius = 1
-    var int diameter = 0
-    var float area = 0
+    mut int radius = 1
+    mut int diameter = 0
+    mut float area = 0
 
     fn creo() → void {
         self.diameter ← self.radius * 2
@@ -70,16 +70,16 @@ class Circulus {
 main {
     # --- Validation in creo ---
 
-    const Terminus rectus ← Terminus { valor = 50 }
+    let Terminus rectus ← Terminus { valor = 50 }
     print rectus.accipe()
 
     # creo clamps to 100
-    const Terminus coactus ← Terminus { valor = 200 }
+    let Terminus coactus ← Terminus { valor = 200 }
     print coactus.accipe()
 
     # --- Derived initialization in creo ---
 
-    const Circulus c ← Circulus { radius = 5 }
+    let Circulus c ← Circulus { radius = 5 }
     print c.radius
     print c.diameter
     print c.area

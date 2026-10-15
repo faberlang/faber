@@ -16,7 +16,7 @@ sit = "ليكن"
 typus = "نمط"
 schema = "مخطط"
 columna = "عمود"
-varia = "متغير"
+varia = "قابل_للتغيير"
 ceteri = "باقي"
 errata = "مخطئ"
 exitus = "مخرج"
@@ -95,7 +95,7 @@ maxima = "الأقصى"
 minima = "الأدنى"
 de = "عن"
 ex = "من"
-in = "في"
+in = "قابل_للتغيير"
 own = "ملك"
 copy = "نسخة"
 axis = "محور"
@@ -252,6 +252,14 @@ help = "أغلق حرفية السلسلة قبل نهاية السطر أو ا�
 message = "حرفية octeti غير مغلقة"
 help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
 
+[diagnostics.LEX001.issues.unterminated_regex_literal]
+message = "حرفية regex غير مغلقة"
+help = "أغلق حرفية regex قبل نهاية السطر أو الملف"
+
+[diagnostics.LEX001.issues.empty_regex_literal]
+message = "حرفية regex فارغة؛ اكتب نمطا بين الشرطتين المائلتين"
+help = "اكتب نمطا بين الشرطتين المائلتين"
+
 [diagnostics.LEX001.issues.unterminated_string_literal]
 message = "حرفية سلسلة غير مغلقة"
 help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
@@ -287,6 +295,14 @@ help = "تحقق من فواصل الأرقام وبادئات الأساس"
 [diagnostics.LEX002.issues.invalid_integer]
 message = "عدد صحيح غير صالح"
 help = "تحقق من فواصل الأرقام وبادئات الأساس"
+
+[diagnostics.LEX002.issues.float_overflow]
+message = "حرف عشري كبير جدًا؛ فهو يتجاوز الحد إلى ما لا نهاية"
+help = "اكتب مقدارًا أصغر، أو قسّم الوحدة"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "حرف عشري صغير جدًا؛ فهو ينخفض دون الحد إلى الصفر"
+help = "اكتب مقدارًا أكبر، أو قسّم الوحدة"
 
 [diagnostics.LEX003]
 message = "تسلسل escape غير صالح"
@@ -340,6 +356,22 @@ help = "أصلح خطأ المحلل المعجمي أولا؛ يستمر الت
 message = "مطلوب{?expected| |}"
 help = "أضف{?expected| |} في هذا الموضع"
 
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "مطلوب قيمة بعد عامل النسخ الداخلي `{operator}`"
+help = "اكتب تعبير المصدر بعد `⇇`"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "تسمية عنصر الصف `{label}` مستخدمة أكثر من مرة"
+help = "أعطِ كل عنصر تسمية مختلفة، أو احذف التسميات"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "يجب أن يسمّي فتحة implements عقدًا؛ `_` ليس إعلان مطابقة"
+help = "اكتب اسم العقد في جملة implements"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "يجب أن يكون حقل الاستيراد معرّفًا"
+help = "اكتب اسمًا بسيطًا للحقل المستورد"
+
 [diagnostics.PARSE001.issues.annotation_name]
 message = "مطلوب اسم تعليمة"
 help = "أضف اسم التعليمة بعد @"
@@ -371,10 +403,6 @@ help = "احتفظ بربط rest واحد فقط '{keyword}'"
 [diagnostics.PARSE001.issues.sit_identifier_binding]
 message = "'{keyword}' يربط معرفا واحدا مباشرة؛ استخدم '{keyword}' name ← expr"
 help = "اكتب '{keyword}' name ← expr أو استخدم {fixum} للارتباطات المنمطة/المفككة"
-
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "{sit} لا يدعم أنماط التفكيك"
-help = "استخدم {fixum} مع نمط تفكيك"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "مطلوب test case أو setup"
@@ -511,6 +539,50 @@ help = "أعلن الـ method على genus بدلا من ذلك"
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "علامة `{marker}` لم تعد توضع على الارتباط؛ بل توضع على القيمة"
 help = "اكتب `{keyword} T {name} ← {marker} value`؛ و`{name} ← {marker} value` اللاحق يعلّم القيمة بالطريقة نفسها، ويحتفظ المعامل بـ `{marker}` قبل نوعه"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "تم إلغاء تصريح `{keyword}` وقت التشغيل؛ `{name}` اسم وقت تشغيل"
+help = "اكتب `{sit} T {name} ← …` (أو `{sit} {name} ← …` لاستنتاج النوع)؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "تم إلغاء كلمة الربط `{keyword}`"
+help = "تستخدم الروابط `{sit}` (اسم ثابت) أو `{varia}` (اسم قابل للكتابة)؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "لا يمكن أن يبدأ `{keyword}` رابطًا"
+help = "الرابط يسمّي قيمة كل تكرار أو مطابقة؛ اكتب `{sit}` لاسم ثابت أو `{varia}` لاسم قابل للكتابة"
+
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "تم إلغاء مُعدِّل العضو `{keyword}`؛ العضو على مستوى النوع ثابت"
+help = "اكتب `{fixum} T NAME = …`؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويقبله عضو الصنف أيضًا"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "العضو `{fixum}` يحتاج إلى قيمة وقت الترجمة"
+help = "اكتب `{fixum} T NAME = value`؛ وللحقل الخاص بكل نسخة استخدم `{sit}` أو `{varia}`"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "العضو `{fixum}` يُهيَّأ بـ `=` وليس بـ `←`"
+help = "`=` تعبّر عن حقيقة وقت الترجمة: اكتب `{fixum} T NAME = value`"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "لا يمكن لـ `{keyword}` أن يعدّل حقلًا"
+help = "الحقل للقراءة فقط (`{sit}`) أو قابل للكتابة (`{varia}`)؛ والثابت الخاص بالنوع يُكتب `{fixum} T X = …`"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "المتغير المحلي `{keyword}` يحتاج إلى موضع للقراءة: `{keyword} T name ← place`"
+help = "اكتب `{keyword} T name ← place`، أو استخدم `{sit}` أو `{varia}` لاسم بلا موضع ابتدائي"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "المتغير المحلي `{keyword}` يربط اسمًا واحدًا؛ لا يمكن تفكيكه"
+help = "اكتب `{keyword} T name ← place` ثم اقرأ الأجزاء عبر الاسم"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "المتغير المحلي `{keyword}` يقرأ موضعًا ولا يقبل قيمة `{marker}`"
+help = "اكتب `{keyword} T name ← place` لقراءة موضع، أو `{sit} T name ← {marker} place` للحصول على قيمة مستقلة"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "تم إلغاء كلمة التصريح `{keyword}`؛ `{name}` اسم قابل للكتابة"
+help = "اكتب `{varia} T {name} ← …`؛ الاسم القابل للكتابة وقت التشغيل هو `{varia}`"
 
 [diagnostics.PARSE011]
 message = "مطلوب اسم دالة بعد {functio}"
@@ -1031,6 +1103,10 @@ help = "أصلح بنية AST للتخفيض"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "لا يوجد تصريح أو عنصر مخفَّض لإرفاق التعليق به"
 help = "أصلح بنية AST للتخفيض"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "يجب أن تأخذ دالة `@ conversion` معاملاً واحدًا بالضبط وأن تُعلن نوع إرجاع واحدًا بالضبط"
+help = "اكتب `functio name(Source) → Destination` لزوج التحويل"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "{copia} يتطلب معامل نوع واحدا"
@@ -2604,6 +2680,10 @@ help = "حول element widths صراحة قبل تغيير representation"
 message = "propagating conversio failure يتطلب alternate-exit channel من نوع `{textus}`"
 help = "صرح alternate-exit channel كـ {textus} أو قدم inline recovery"
 
+[diagnostics.SEM016.issues.conversio_failure_channel_value_required]
+message = "نشر فشل materialization لـ sermo يتطلب alternate-exit channel من نوع `value`"
+help = "صرح alternate-exit channel كـ value أو unknown أو تحويل value مسجل"
+
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "{regex} conversion يتطلب {textus} أو {ascii} operand"
 help = "حول {textus} أو {ascii} values إلى {regex}"
@@ -2755,6 +2835,10 @@ help = "استخدم ربط `{varia}` للسماح بإعادة الإسناد �
 [diagnostics.SEM020.issues.assignment_to_constant]
 message = "إسناد إلى constant"
 help = "استخدم ربط `{varia}` للسماح بإعادة الإسناد أو أزل الإسناد الإضافي"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "إسناد إلى العضو {fixum} '{field}'"
+help = "العضو {fixum} ثابت وقت الترجمة للنوع ولا يُكتب إليه أبدًا؛ استخدم حقل {varia} للحالة المتغيرة"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "إسناد ثان إلى immutable binding"
@@ -3675,9 +3759,21 @@ message = "مطلوب مصدر الاختزال بعد معامل الاختزا
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "مطلوب '{lege}' أو '{lineam}'"
 
+[diagnostics.PARSE001.issues.expected_identifier]
+message = "مطلوب معرّف"
+help = "ضع اسم معرّف هنا"
+
+[diagnostics.PARSE001.issues.expected_string_literal]
+message = "مطلوب حرفية سلسلة"
+help = "ضع حرفية سلسلة بين علامتي تنصيص هنا"
+
 [diagnostics.PARSE001.issues.expected_mutability_keyword]
 message = "مطلوب '{fixum}' أو '{varia}'"
 help = "ابدأ التعريف بكلمة مفتاحية للقابلية للتغيير"
+
+[diagnostics.PARSE001.issues.await_binding_requires_name]
+message = "مطلوب ربط مسمّى قبل '↢'"
+help = "اربط '↢' باسم واحد؛ التفكيك يستخدم '←'"
 
 [diagnostics.PARSE001.issues.expected_method_declaration]
 message = "مطلوب تصريح دالة"
@@ -3687,6 +3783,10 @@ help = "اكتب الدالة كتصريح '{functio}'"
 message = "مطلوب خطاف '{praepara}'"
 help = "اكتب '{praepara}' أو '{praeparabit}' أو '{postpara}' أو '{postparabit}'"
 
+[diagnostics.PARSE001.issues.expected_lane_value]
+message = "مطلوب حرفية سلسلة أو معرّف"
+help = "اكتب قيمة lane كسلسلة بين علامتي تنصيص أو كاسم مجرد"
+
 [diagnostics.PARSE001.issues.expected_scribe_keyword]
 message = "مطلوب كلمة مفتاحية '{scribe}'"
 help = "اكتب '{scribe}' أو '{vide}' أو '{mone}' أو '{nota}'"
@@ -3694,6 +3794,14 @@ help = "اكتب '{scribe}' أو '{vide}' أو '{mone}' أو '{nota}'"
 [diagnostics.PARSE001.issues.expected_incipit_keyword]
 message = "مطلوب '{incipit}' أو '{incipiet}'"
 help = "ابدأ نقطة الدخول بـ '{incipit}' أو '{incipiet}'"
+
+[diagnostics.PARSE001.issues.enum_member_value_number]
+message = "مطلوب رقم بعد '='"
+help = "اكتب عددا صحيحا بعد '=' أو أزل '='"
+
+[diagnostics.PARSE001.issues.enum_member_value]
+message = "مطلوب قيمة عضو enum"
+help = "اكتب عددا صحيحا أو سلسلة بعد '='"
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "مطلوب قوس فتح لجسم elige"

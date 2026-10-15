@@ -46,8 +46,8 @@ fn assert_single_level_numerus_optional(source: &str, local: usize) {
 fn list_get_over_optional_element_is_one_optional() {
     assert_single_level_numerus_optional(
         r"incipit {
-    fixum lista<numerus ∪ nihil> xs ← [1, nulla, 3]
-    fixum _ found ← xs.accipe(0)
+    sit lista<numerus ∪ nihil> xs ← [1, nulla, 3]
+    sit found ← xs.accipe(0)
     nota found
 }",
         1,
@@ -58,8 +58,8 @@ fn list_get_over_optional_element_is_one_optional() {
 fn map_get_over_optional_value_is_one_optional() {
     assert_single_level_numerus_optional(
         r#"incipit {
-    fixum tabula<textus, numerus ∪ nihil> m ← { "a": 1 }
-    fixum _ found ← m.accipe("a")
+    sit tabula<textus, numerus ∪ nihil> m ← { "a": 1 }
+    sit found ← m.accipe("a")
     nota found
 }"#,
         1,
@@ -70,7 +70,7 @@ fn map_get_over_optional_value_is_one_optional() {
 fn list_get_over_optional_element_stores_into_optional_cell() {
     assert_accepts_la(
         r"incipit {
-    fixum lista<numerus ∪ nihil> xs ← [1, nulla, 3]
+    sit lista<numerus ∪ nihil> xs ← [1, nulla, 3]
     varia numerus ∪ nihil a ← xs.accipe(0)
     a ← xs.accipe(1)
     nota a
@@ -82,8 +82,8 @@ fn list_get_over_optional_element_stores_into_optional_cell() {
 fn map_get_over_optional_value_stores_into_optional_cell() {
     assert_accepts_la(
         r#"incipit {
-    fixum tabula<textus, numerus ∪ nihil> m ← { "a": 1 }
-    fixum numerus ∪ nihil a ← m.accipe("a")
+    sit tabula<textus, numerus ∪ nihil> m ← { "a": 1 }
+    sit numerus ∪ nihil a ← m.accipe("a")
     nota a
 }"#,
     );
@@ -93,8 +93,8 @@ fn map_get_over_optional_value_stores_into_optional_cell() {
 fn list_get_over_optional_element_into_plain_cell_is_rejected_once() {
     let result = analyze_source_la(
         r"incipit {
-    fixum lista<numerus ∪ nihil> xs ← [1, nulla, 3]
-    fixum numerus a ← xs.accipe(0)
+    sit lista<numerus ∪ nihil> xs ← [1, nulla, 3]
+    sit numerus a ← xs.accipe(0)
     nota a
 }",
     );
@@ -110,8 +110,8 @@ fn list_get_over_optional_element_into_plain_cell_is_rejected_once() {
 fn map_get_over_optional_value_into_plain_cell_is_rejected() {
     assert_rejects_with_issue_la(
         r#"incipit {
-    fixum tabula<textus, numerus ∪ nihil> m ← { "a": 1 }
-    fixum numerus a ← m.accipe("a")
+    sit tabula<textus, numerus ∪ nihil> m ← { "a": 1 }
+    sit numerus a ← m.accipe("a")
     nota a
 }"#,
         ISSUE,
@@ -122,8 +122,8 @@ fn map_get_over_optional_value_into_plain_cell_is_rejected() {
 fn list_get_over_optional_element_composes_with_vel() {
     assert_accepts_la(
         r"incipit {
-    fixum lista<numerus ∪ nihil> xs ← [1, nulla, 3]
-    fixum numerus a ← xs.accipe(1) vel 7
+    sit lista<numerus ∪ nihil> xs ← [1, nulla, 3]
+    sit numerus a ← xs.accipe(1) vel 7
     nota a
 }",
     );
@@ -133,10 +133,10 @@ fn list_get_over_optional_element_composes_with_vel() {
 fn list_get_over_optional_element_narrows_once() {
     assert_accepts_la(
         r"incipit {
-    fixum lista<numerus ∪ nihil> xs ← [1, nulla, 3]
-    fixum _ a ← xs.accipe(0)
+    sit lista<numerus ∪ nihil> xs ← [1, nulla, 3]
+    sit a ← xs.accipe(0)
     si a non est nihil {
-        fixum numerus b ← a
+        sit numerus b ← a
         nota b
     }
 }",
@@ -147,8 +147,8 @@ fn list_get_over_optional_element_narrows_once() {
 fn list_get_over_plain_element_stays_one_optional() {
     assert_single_level_numerus_optional(
         r"incipit {
-    fixum lista<numerus> xs ← [1, 2, 3]
-    fixum _ found ← xs.accipe(0)
+    sit lista<numerus> xs ← [1, 2, 3]
+    sit found ← xs.accipe(0)
     nota found
 }",
         1,

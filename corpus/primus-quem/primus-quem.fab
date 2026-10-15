@@ -62,12 +62,12 @@ functio elige_primum_viventem(lista<f32> xs) → fractus ∪ nihil {
 }
 
 incipit {
-    fixum fractus ∪ nihil litteram ← elige_litteram()
-    fixum fractus ∪ nihil nullum ← elige_nullum()
-    fixum lista<f32> vacua_lista ← []
-    fixum fractus ∪ nihil vacuum ← elige_vacuum(vacua_lista)
-    fixum lista<f32> xs ← [1.0, 5.0, 3.0]
-    fixum fractus ∪ nihil primum ← elige_primum_viventem(xs)
+    sit fractus ∪ nihil litteram ← elige_litteram()
+    sit fractus ∪ nihil nullum ← elige_nullum()
+    sit lista<f32> vacua_lista ← []
+    sit fractus ∪ nihil vacuum ← elige_vacuum(vacua_lista)
+    sit lista<f32> xs ← [1.0, 5.0, 3.0]
+    sit fractus ∪ nihil primum ← elige_primum_viventem(xs)
 
     nota litteram
     nota nullum

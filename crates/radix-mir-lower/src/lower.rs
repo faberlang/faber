@@ -613,7 +613,10 @@ pub use radix_types::KernelLowering;
 pub struct MirLoweringOptions {
     /// How `@ kernel` functions lower; see [`KernelLowering`].
     pub kernel_lowering: KernelLowering,
-    pub cli_record_fields_by_local: Arc<FxHashMap<Symbol, Vec<MirRuntimeRecordField>>>,
+    /// Parsed runtime CLI record fields keyed by the `argumenta` record
+    /// `TypeId` (entry record and each `@ imperium` command record), so
+    /// surfaces sharing a binding name do not collide.
+    pub cli_parsed_record_fields_by_type: Arc<FxHashMap<TypeId, Vec<MirRuntimeRecordField>>>,
     /// Descriptor-derived CLI record fields keyed by the `argumenta` record
     /// type (entry + `@ imperium` command surfaces), used by the shared
     /// default-path lowering when the caller supplied no parsed runtime
@@ -1783,7 +1786,7 @@ impl<'a> MirLowerer<'a> {
             Arc::clone(&body_ctx.struct_fields),
             Arc::clone(&body_ctx.struct_field_types),
             Arc::clone(&body_ctx.function_params),
-            Arc::clone(&self.options.cli_record_fields_by_local),
+            Arc::clone(&self.options.cli_parsed_record_fields_by_type),
             Arc::clone(&self.options.cli_record_fields_by_type),
             self.options.cli_adapter_active,
         );
@@ -2355,7 +2358,7 @@ pub struct FunctionBuilderContext<'a> {
     interface_implementors: Arc<FxHashMap<DefId, Vec<(DefId, TypeId)>>>,
     imported_method_providers: Arc<FxHashMap<(DefId, Symbol), ImportedMethodProvider>>,
     gpu_builtins: Arc<FxHashMap<DefId, MirKernelBuiltin>>,
-    cli_record_fields_by_local: Arc<FxHashMap<Symbol, Vec<MirRuntimeRecordField>>>,
+    cli_parsed_record_fields_by_type: Arc<FxHashMap<TypeId, Vec<MirRuntimeRecordField>>>,
     /// Descriptor-derived CLI record fields keyed by `argumenta` record type;
     /// the shared default-path fallback when the caller supplied no parsed
     /// runtime fields for a CLI record local.
@@ -2435,7 +2438,7 @@ impl<'a> FunctionBuilderContext<'a> {
             interface_implementors: Arc::new(FxHashMap::default()),
             imported_method_providers: Arc::new(FxHashMap::default()),
             gpu_builtins: Arc::new(FxHashMap::default()),
-            cli_record_fields_by_local: Arc::new(FxHashMap::default()),
+            cli_parsed_record_fields_by_type: Arc::new(FxHashMap::default()),
             cli_record_fields_by_type: Arc::new(FxHashMap::default()),
             cli_adapter_active: false,
             kernel_lowering: KernelLowering::Device,
@@ -2818,7 +2821,7 @@ impl<'a> FunctionBuilder<'a> {
         self.locals
             .push(MirLocalDecl { id, name: Some(param.name), ty: mir_ty, mutable: true, span: param.span });
         if matches!(self.types.get(param.ty), Type::Record(_)) {
-            self.lower_cli_record_initializer(id, param.name, param.ty, mir_ty, param.span);
+            self.lower_cli_record_initializer(id, param.ty, mir_ty, param.span);
         } else {
             self.errors
                 .push(MirError::unsupported(param.span, "non-record CLI argument binding"));
@@ -2897,12 +2900,17 @@ impl<'a> FunctionBuilder<'a> {
     /// constructed record aggregate assigned to `id`. Field sources: S8.2
     /// runtime-filled adapter temps, parsed runtime fields for this local, or
     /// descriptor-derived fields keyed by the record type.
-    fn lower_cli_record_initializer(&mut self, id: MirLocalId, name: Symbol, ty: TypeId, mir_ty: MirType, span: Span) {
+    fn lower_cli_record_initializer(&mut self, id: MirLocalId, ty: TypeId, mir_ty: MirType, span: Span) {
         let fields = if self.context.cli_adapter_active {
             // S8.2: the record reads runtime-filled temps; the emitted adapter
             // seeds them from the typed value table.
             self.runtime_adapter_record_fields(ty, span)
-        } else if let Some(fields) = self.context.cli_record_fields_by_local.get(&name).cloned() {
+        } else if let Some(fields) = self
+            .context
+            .cli_parsed_record_fields_by_type
+            .get(&ty)
+            .cloned()
+        {
             self.runtime_record_fields(fields, span)
         } else {
             self.cli_record_fields_for_type(ty, span)
@@ -2972,7 +2980,8 @@ impl<'a> FunctionBuilder<'a> {
         // payload type, like a `copy` / `own` parameter, so field projection
         // and method receivers see the struct, not the access wrapper.
         let copy_bind = self.types.is_copy_view(ty);
-        let mir_ty = if copy_bind || self.types.is_own_view(ty) {
+        // A `ref` local reads a place: its storage type is the payload too.
+        let mir_ty = if copy_bind || self.types.is_own_view(ty) || self.types.is_ref_view(ty) {
             MirType::semantic(self.types.peel_access_marker(ty).1)
         } else {
             MirType::semantic(ty)
@@ -2987,7 +2996,7 @@ impl<'a> FunctionBuilder<'a> {
 
         if let Some(init) = &local.init {
             if let HirExpressionKind::ConversioAssign { source, recovery, .. } = &init.kind {
-                // Typed `↤` initializer (`fixum numerus n ↤ "42"`): the node's
+                // Typed `↤` initializer (`sit numerus n ↤ "42"`): the node's
                 // target is this binding, so the destination is the local we
                 // just declared. Convert the source to the declared type and
                 // store once — no self-reference to resolve.
@@ -3040,7 +3049,7 @@ impl<'a> FunctionBuilder<'a> {
                 self.lower_expr_to_destination(init, MirPlace::local(id), mir_ty)?;
             }
         } else if local.runtime_provided && matches!(self.types.get(ty), Type::Record(_)) {
-            self.lower_cli_record_initializer(id, local.name, ty, mir_ty, span);
+            self.lower_cli_record_initializer(id, ty, mir_ty, span);
         } else if local.runtime_provided {
             // Runtime-provided vertex shader locals (position, out_position)
             // are bound by the runtime, not by an initializer or zero-init.
@@ -3397,13 +3406,17 @@ impl<'a> FunctionBuilder<'a> {
                 Some((MirPlace::local(binding.local), binding.ty))
             }
             HirExpressionKind::Field(object, name) => {
-                let (mut place, _) = self.lower_assignment_place_with_fallback(object, fallback_ty)?;
+                // The base lowers through the projectable-place path so a
+                // narrowed optional base (`cur not is none { cur.v ← 5 }`)
+                // unwraps before the projection; a non-narrowed base yields
+                // the same place the direct recursion produced.
+                let mut place = self.lower_projectable_place(object)?;
                 place.projections.push(MirProjection::Field(*name));
                 let ty = expr.ty.map_or(fallback_ty, MirType::semantic);
                 Some((place, ty))
             }
             HirExpressionKind::Index(object, index) => {
-                let (mut place, _) = self.lower_assignment_place_with_fallback(object, fallback_ty)?;
+                let mut place = self.lower_projectable_place(object)?;
                 let projection = self.lower_index_projection(&place, object.ty, index)?;
                 place.projections.push(projection);
                 let ty = expr.ty.map_or(fallback_ty, MirType::semantic);

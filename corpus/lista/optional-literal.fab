@@ -45,7 +45,7 @@ locale = "en"
 #   -1
 
 class Bag {
-    var list<int> ∪ none items
+    mut list<int> ∪ none items
 }
 
 fn make() → list<int> ∪ none {
@@ -71,36 +71,36 @@ fn make_empty() → list<int> ∪ none {
 }
 
 main {
-    const list<int> ∪ none declared ← [10, 20]
+    let list<int> ∪ none declared ← [10, 20]
     print size(declared)
 
-    var list<int> ∪ none later ← null
+    mut list<int> ∪ none later ← null
     later ← [4, 5, 6, 7]
     print size(later)
 
     print size([8, 9])
 
-    const list<int> ∪ none returned ← make()
+    let list<int> ∪ none returned ← make()
     print size(returned)
 
-    const Bag bag ← Bag { items = [1] }
+    let Bag bag ← Bag { items = [1] }
     print size(bag.items)
 
-    const list<int> ∪ none blank ← empty
+    let list<int> ∪ none blank ← empty
     print held(blank)
 
-    var list<int> ∪ none refilled ← [1, 2]
+    mut list<int> ∪ none refilled ← [1, 2]
     refilled ← empty
     print held(refilled)
 
     print held(empty)
 
-    const list<int> ∪ none made ← make_empty()
+    let list<int> ∪ none made ← make_empty()
     print held(made)
 
-    const Bag empty_bag ← Bag { items = empty }
+    let Bag empty_bag ← Bag { items = empty }
     print held(empty_bag.items)
 
-    const list<int> ∪ none absent ← null
+    let list<int> ∪ none absent ← null
     print held(absent)
 }

@@ -10,9 +10,9 @@ locale = "en"
 +++
 
 main {
-    var tf32[2, 2] base ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
-    const tf32[1, 2] view ← base.slice(0, 1)
-    const tf32[1, 2] owned ← view.materialize()
+    mut tf32[2, 2] base ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
+    let tf32[1, 2] view ← base.slice(0, 1)
+    let tf32[1, 2] owned ← view.materialize()
     print view.flatten()
     # The borrowed view has no later use, so the base can be mutated.
     base.set([0, 0], 9.0)

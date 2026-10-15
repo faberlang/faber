@@ -873,13 +873,13 @@ fn union_match_reports_missing_variants() {
 
 functio describe(Eventum e) → textus {{
     discerne e {{
-        casu Eventum.Ictus fixum vis {{ redde vis ↦ textus }}
+        casu Eventum.Ictus sit vis {{ redde vis ↦ textus }}
     }}
 }}
 
 incipit {{
-    fixum Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
-    fixum Eventum b ← Eventum.Sonitus
+    sit Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
+    sit Eventum b ← Eventum.Sonitus
     nota describe(a) + describe(b)
 }}"
     );
@@ -899,14 +899,14 @@ fn union_omnia_accepts_all_variants_named() {
 
 functio describe(Eventum e) → textus {{
     discerne omnia e {{
-        casu Eventum.Ictus fixum vis {{ redde vis ↦ textus }}
+        casu Eventum.Ictus sit vis {{ redde vis ↦ textus }}
         casu Eventum.Sonitus {{ redde "sonitus" }}
     }}
 }}
 
 incipit {{
-    fixum Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
-    fixum Eventum b ← Eventum.Sonitus
+    sit Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
+    sit Eventum b ← Eventum.Sonitus
     nota describe(a) + describe(b)
 }}"#
     );
@@ -927,14 +927,14 @@ fn union_omnia_forbids_catchall() {
 
 functio describe(Eventum e) → textus {{
     discerne omnia e {{
-        casu Eventum.Ictus fixum vis {{ redde vis ↦ textus }}
+        casu Eventum.Ictus sit vis {{ redde vis ↦ textus }}
         ceterum {{ redde "alter" }}
     }}
 }}
 
 incipit {{
-    fixum Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
-    fixum Eventum b ← Eventum.Sonitus
+    sit Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
+    sit Eventum b ← Eventum.Sonitus
     nota describe(a) + describe(b)
 }}"#
     );
@@ -953,13 +953,13 @@ fn union_omnia_reports_missing_variants() {
 
 functio describe(Eventum e) → textus {{
     discerne omnia e {{
-        casu Eventum.Ictus fixum vis {{ redde vis ↦ textus }}
+        casu Eventum.Ictus sit vis {{ redde vis ↦ textus }}
     }}
 }}
 
 incipit {{
-    fixum Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
-    fixum Eventum b ← Eventum.Sonitus
+    sit Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
+    sit Eventum b ← Eventum.Sonitus
     nota describe(a) + describe(b)
 }}"
     );

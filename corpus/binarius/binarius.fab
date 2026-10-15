@@ -26,8 +26,7 @@ fn carum() → bool {
 #     (`sic/secus`), and bitwise (`∧ ∨ ⊻ ⇐ ⇒`)
 #   • Assignment patterns — explicit assignment (`←`) and postfix increment
 #     (`↑ ↓` statements)
-#   • `sit` sugar — compact inference syntax alongside explicit `fixum _`
-#     type inference
+#   • `sit` — inferred write-once locals alongside explicitly typed ones
 #
 # Common mistakes:
 #   • confusing `≡` (equality comparison) with `=` (structural field init) or `←` (assignment) — each operator has a distinct role
@@ -44,17 +43,16 @@ fn carum() → bool {
 # GRAMMAR:
 #   binaryExpr :← expr (arithOp | cmpOp | logicOp | bitwiseOp) expr
 #
-# Inferred result locals below mix fixum _ (explicit infer marker) with sit
-# (compact sugar) so both spellings stay visible in one tour.
+# Inferred result locals below use sit; typed locals state their type.
 #
 # EXPECTED OUTPUT:
 #   binarius.expected
 
 main {
     # Arithmetica: + - * / %
-    const int summa ← 10 + 5
+    let int summa ← 10 + 5
     print summa
-    const int differentia ← 10 - 5
+    let int differentia ← 10 - 5
     print differentia
     let productum ← 10 * 5
     print productum
@@ -64,7 +62,7 @@ main {
     print reliquum
 
     # Assignatio explicita (compound glyphs removed)
-    var int index ← 0
+    mut int index ← 0
     index ← index + 10
     index ↑
     index ↓
@@ -94,12 +92,12 @@ main {
     print short
 
     # vel
-    const string ∪ none nomen ← null
+    let string ∪ none nomen ← null
     let solutum ← nomen coalesce "defectum"
     print solutum
-    const string ∪ none primum ← null
-    const string ∪ none secundum ← null
-    const string tertium ← "inventum"
+    let string ∪ none primum ← null
+    let string ∪ none secundum ← null
+    let string tertium ← "inventum"
     let inventum ← (primum coalesce secundum) coalesce tertium
     print inventum
 

@@ -51,19 +51,19 @@ fn encode(value node) → string {
     # only when the integer fits i64); the scalar tests above have removed every
     # other scalar, so only such an `inf` converts here.
     do {
-        const inf big ↤ node
+        let inf big ↤ node
         return big ↦ string
     }
     catch err {
     }
     do {
-        const map<string, value> fields ↤ node
+        let map<string, value> fields ↤ node
         return encode_object(fields)
     }
     catch err {
     }
     do {
-        const list<value> items ↤ node
+        let list<value> items ↤ node
         return encode_array(items)
     }
     catch err {
@@ -72,29 +72,29 @@ fn encode(value node) → string {
 }
 
 fn encode_array(list<value> items) → string {
-    var list<string> encoded ← empty
-    for from items const item {
+    mut list<string> encoded ← empty
+    for from items let item {
         encoded.append(encode(item))
     }
     return text.join(["[", text.join(encoded, ","), "]"], "")
 }
 
 fn encode_object(map<string, value> fields) → string {
-    var list<string> keys ← fields.keys()
+    mut list<string> keys ← fields.keys()
     keys.sort()
-    var list<string> members ← empty
-    for from keys const key {
+    mut list<string> members ← empty
+    for from keys let key {
         members.append(text.join([quote(key), ":", encode(fields[key])], ""))
     }
     return text.join(["{", text.join(members, ","), "}"], "")
 }
 
 fn quote(string raw) → string {
-    var list<string> parts ← [«"»]
-    var int index ← 0
+    mut list<string> parts ← [«"»]
+    mut int index ← 0
     while index ≺ raw.length() {
-        const string c ← raw.slice(index, index + 1)
-        const string ∪ none escaped ← lexer.escape_char(c)
+        let string c ← raw.slice(index, index + 1)
+        let string ∪ none escaped ← lexer.escape_char(c)
         if escaped not is none {
             parts.append(escaped coalesce "")
         }

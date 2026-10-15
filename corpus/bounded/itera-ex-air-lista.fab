@@ -28,13 +28,13 @@ diagnostic = "SEM059:itera_loop"
 
 @ radix lane "air"
 fn bounded_full() → void {
-    const list<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ list<f32, 4> ⊥ [0.0, 0.0, 0.0, 0.0]
-    for from xs const value { }
+    let list<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ list<f32, 4> ⊥ [0.0, 0.0, 0.0, 0.0]
+    for from xs let value { }
 }
 
 @ radix lane "air"
 fn bounded_partial() → void {
-    const list<f32> raw ← [1.0, 2.0, 3.0]
-    const list<f32, 4> xs ← raw ↦ list<f32, 4> ⊥ [0.0, 0.0, 0.0, 0.0]
-    for from xs const value { }
+    let list<f32> raw ← [1.0, 2.0, 3.0]
+    let list<f32, 4> xs ← raw ↦ list<f32, 4> ⊥ [0.0, 0.0, 0.0, 0.0]
+    for from xs let value { }
 }

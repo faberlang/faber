@@ -17,7 +17,7 @@ fn session() -> Session {
 }
 
 fn program(expr: &str) -> String {
-    format!("incipit {{\n    fixum _ d ← {expr}\n    nota d\n}}\n")
+    format!("incipit {{\n    sit d ← {expr}\n    nota d\n}}\n")
 }
 
 fn folded(expr: &str) -> Option<i128> {

@@ -56,18 +56,18 @@ type NomenOptivum = string ∪ none
 
 main {
     # Using primitive aliases
-    const Signum signum ← 42
-    const Cognomen cognomen ← "Marcus"
-    const Viget viget ← true
+    let Signum signum ← 42
+    let Cognomen cognomen ← "Marcus"
+    let Viget viget ← true
 
     print signum
     print cognomen
     print viget
 
     # Using generic aliases
-    const Nomina sodales ← ["Gaius", "Lucius", "Titus"]
+    let Nomina sodales ← ["Gaius", "Lucius", "Titus"]
     print sodales
 
-    const Puncta puncta ← [100, 95, 87]
+    let Puncta puncta ← [100, 95, 87]
     print puncta
 }

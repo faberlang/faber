@@ -4,17 +4,15 @@ use crate::test_support::emitted;
 
 #[test]
 fn a_sized_local_is_a_c_integer_of_that_width() {
-    let code = emitted("main {\n    const u8 a ← 200\n    var i32 b ← -5\n    print a, b\n}");
+    let code = emitted("main {\n    let u8 a ← 200\n    mut i32 b ← -5\n    print a, b\n}");
     assert!(code.contains("const uint8_t l_a = INT64_C(200);"), "{code}");
     assert!(code.contains("int32_t l_b = -INT64_C(5);"), "{code}");
     // Read as `int64_t`, so `%PRId64` always gets what it asks for; the
-    // runner prints sized values one to a line.
+    // runner joins sized integers into one line like any other integer.
     assert!(
-        code.contains("printf(\"%\" PRId64 \"\\n\", ((int64_t)l_a));"),
-        "{code}"
-    );
-    assert!(
-        code.contains("printf(\"%\" PRId64 \"\\n\", ((int64_t)l_b));"),
+        code.contains(
+            "printf(\"%\" PRId64 \" %\" PRId64 \"\\n\", ((int64_t)l_a), ((int64_t)l_b));"
+        ),
         "{code}"
     );
 }
@@ -22,14 +20,14 @@ fn a_sized_local_is_a_c_integer_of_that_width() {
 #[test]
 fn a_store_into_a_sized_cell_checks_the_range() {
     let code =
-        emitted("main {\n    const u8 a ← 200\n    var u8 m ← a\n    m ← a + 100\n    print m\n}");
+        emitted("main {\n    let u8 a ← 200\n    mut u8 m ← a\n    m ← a + 100\n    print m\n}");
     assert!(code.contains("faber_store_u8("), "{code}");
     assert!(code.contains("\"assignment to `m`\""), "{code}");
 }
 
 #[test]
 fn u64_is_read_as_an_exact_value() {
-    let code = emitted("main {\n    const u64 big ← 18446744073709551615\n    print big\n}");
+    let code = emitted("main {\n    let u64 big ← 18446744073709551615\n    print big\n}");
     assert!(
         code.contains("faber_exact_text") || code.contains("faber_i128_text"),
         "{code}"
@@ -53,7 +51,7 @@ fn a_sized_parameter_and_result_are_checked_and_widened() {
 
 #[test]
 fn an_ascription_checks_against_its_type() {
-    let code = emitted("main {\n    const i32 narrow ← 7 ∷ i32\n    print narrow\n}");
+    let code = emitted("main {\n    let i32 narrow ← 7 ∷ i32\n    print narrow\n}");
     assert!(
         code.contains("const int32_t l_narrow = INT64_C(7);"),
         "{code}"

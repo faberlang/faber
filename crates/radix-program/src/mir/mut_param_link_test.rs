@@ -24,16 +24,16 @@ fn copy_into<size T, size D>(tensor<f32, [T, D]> input, mut tensor<f32, [T, D]> 
 const MUT_MAIN: &str = r#"import from "./util" * as utilModule
 
 main {
-    const tensor<f32, [2, 2]> input ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
-    var tensor<f32, [2, 2]> output ← [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]>
+    let tensor<f32, [2, 2]> input ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    mut tensor<f32, [2, 2]> output ← [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]>
     utilModule.copy_into<2, 2>(input, mut output)
     print output.get([1, 0]) coalesce (0.0 ∷ f32)
 }
 "#;
 
 const TRAP_MAIN: &str = r"main {
-    const _ trapped ← trap {
-        const tensor<f32, [2, 2]> y ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    let trapped ← trap {
+        let tensor<f32, [2, 2]> y ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
         print y.get([0, 1]) coalesce (0.0 ∷ f32)
     }
     print trapped is void

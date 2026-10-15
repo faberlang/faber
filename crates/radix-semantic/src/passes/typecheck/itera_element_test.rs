@@ -13,8 +13,8 @@ const NOT_ITERABLE: &str = "itera_source_not_iterable";
 fn itera_ex_copia_textus_binds_textus() {
     test_support::assert_accepts(
         "functio f(copia<textus> t) → vacuum {
-    itera ex t fixum x {
-        fixum textus y ← x
+    itera ex t sit x {
+        sit textus y ← x
         nota y
     }
 }",
@@ -25,8 +25,8 @@ fn itera_ex_copia_textus_binds_textus() {
 fn itera_ex_copia_textus_does_not_bind_numerus() {
     test_support::assert_rejects_with_issue(
         "functio f(copia<textus> t) → vacuum {
-    itera ex t fixum x {
-        fixum numerus y ← x
+    itera ex t sit x {
+        sit numerus y ← x
         nota y
     }
 }",
@@ -39,7 +39,7 @@ fn itera_ex_genus_rejects_as_not_iterable() {
     test_support::assert_rejects_with_issue(
         "genus Arbor { varia numerus magnitudo }
 functio f(Arbor a) → vacuum {
-    itera ex a fixum n {
+    itera ex a sit n {
         nota n
     }
 }",
@@ -52,7 +52,7 @@ fn itera_de_genus_rejects_as_not_iterable() {
     test_support::assert_rejects_with_issue(
         "genus Arbor { varia numerus magnitudo }
 functio f(Arbor a) → vacuum {
-    itera de a fixum n {
+    itera de a sit n {
         nota n
     }
 }",
@@ -64,7 +64,7 @@ functio f(Arbor a) → vacuum {
 fn itera_ex_bivalens_rejects_as_not_iterable() {
     test_support::assert_rejects_with_issue(
         "functio f(bivalens b) → vacuum {
-    itera ex b fixum n {
+    itera ex b sit n {
         nota n
     }
 }",
@@ -76,8 +76,8 @@ fn itera_ex_bivalens_rejects_as_not_iterable() {
 fn itera_ex_textus_binds_littera() {
     test_support::assert_accepts(
         "functio f(textus s) → vacuum {
-    itera ex s fixum c {
-        fixum littera x ← c
+    itera ex s sit c {
+        sit littera x ← c
         nota x
     }
 }",
@@ -88,7 +88,7 @@ fn itera_ex_textus_binds_littera() {
 fn itera_ex_textus_element_compares_with_char_literal() {
     test_support::assert_accepts(
         "functio f(textus s) → bivalens {
-    itera ex s fixum c {
+    itera ex s sit c {
         si c ≡ 'b' { redde verum }
     }
     redde falsum
@@ -100,8 +100,8 @@ fn itera_ex_textus_element_compares_with_char_literal() {
 fn itera_ex_textus_element_is_not_numerus() {
     test_support::assert_rejects_with_issue(
         "functio f(textus s) → vacuum {
-    itera ex s fixum c {
-        fixum numerus x ← c
+    itera ex s sit c {
+        sit numerus x ← c
         nota x
     }
 }",
@@ -113,8 +113,8 @@ fn itera_ex_textus_element_is_not_numerus() {
 fn itera_ex_octeti_binds_index_element_type() {
     test_support::assert_accepts(
         "functio f(octeti b) → vacuum {
-    itera ex b fixum x {
-        fixum b8 y ← x
+    itera ex b sit x {
+        sit b8 y ← x
         nota y
     }
 }",
@@ -125,8 +125,8 @@ fn itera_ex_octeti_binds_index_element_type() {
 fn itera_ex_symbolic_rank1_tensor_binds_element_type() {
     test_support::assert_accepts(
         "functio f<magnitudo N>(tensor<f32, [N]> v) → vacuum {
-    itera ex v fixum x {
-        fixum f32 y ← x
+    itera ex v sit x {
+        sit f32 y ← x
         nota y
     }
 }",

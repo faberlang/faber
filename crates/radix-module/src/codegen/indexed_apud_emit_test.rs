@@ -11,19 +11,19 @@ use crate::driver::{Config, ModuleCompileRequest, Session, compile};
 const COMPOSITE: &str = r#"
 incipit {
     varia tabula<iuncta<textus, numerus>, numerus> sales ← vacua
-    fixum textus east ← "east"
+    sit textus east ← "east"
     sales[[east, 2024]] ← 5
     sales[[east, 2025]] ← 9
     nota sales[[east, 2024]]
-    itera ex sales apud [regio, annus] fixum v {
+    itera ex sales apud [regio, annus] sit v {
         nota regio, annus, v
     }
 }"#;
 
 const LISTA: &str = r#"
 incipit {
-    fixum lista<textus> xs ← ["a", "b"]
-    itera ex xs apud [i] fixum x {
+    sit lista<textus> xs ← ["a", "b"]
+    itera ex xs apud [i] sit x {
         nota i, x
     }
 }"#;

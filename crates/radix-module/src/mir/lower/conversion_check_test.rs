@@ -10,9 +10,9 @@ const RUNTIME_TARGET: &str = r#"+++
 locale = "en"
 +++
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    var int n ← 3
-    const tf32[2, size n] a ← flat ↦ tf32[2, size n]
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    mut int n ← 3
+    let tf32[2, size n] a ← flat ↦ tf32[2, size n]
     print a.shape().get(0)
     print a.shape().get(1)
 }
@@ -26,19 +26,16 @@ const CONVERSIO_ASSIGN_DERIVED: &str = r#"+++
 locale = "en"
 +++
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    var int n ← 3
-    var tf32[2, size n] a ↤ flat
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    mut int n ← 3
+    mut tf32[2, size n] a ↤ flat
     print a.shape().get(0)
     print a.shape().get(1)
 }
 "#;
 
 fn conversio_assign_explicit_source(derived: &str) -> String {
-    derived.replace(
-        "var tf32[2, size n] a ↤ flat",
-        "const tf32[2, size n] a ← flat ↦ tf32[2, size n]",
-    )
+    derived.replace("mut tf32[2, size n] a ↤ flat", "let tf32[2, size n] a ← flat ↦ tf32[2, size n]")
 }
 
 #[test]
@@ -72,8 +69,8 @@ fn conversion_check_element_mismatch_is_rejected_at_check() {
 locale = "en"
 +++
 main {
-    const list<i32> flat ← [1, 2, 3, 4, 5, 6]
-    const tf32[2, 3] tensor ← flat ↦ tf32[2, 3]
+    let list<i32> flat ← [1, 2, 3, 4, 5, 6]
+    let tf32[2, 3] tensor ← flat ↦ tf32[2, 3]
 }
 "#;
     let mut host = BufferHost::default();

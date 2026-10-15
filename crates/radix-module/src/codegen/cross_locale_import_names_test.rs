@@ -72,7 +72,7 @@ const LA_CONSUMER_SOURCE: &str = "\
 importa ex \"./websocket\" websocket\n\
 \n\
 incipit {\n\
-    fixum websocket.Nexus s ← websocket.Nexus { gradus = 1 }\n\
+    sit websocket.Nexus s ← websocket.Nexus { gradus = 1 }\n\
     nota s.gradus\n\
 }\n";
 

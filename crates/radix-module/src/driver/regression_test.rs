@@ -53,8 +53,8 @@ incipit {}"#;
 fn template_verte_annotation_roundtrips_through_faber_codegen() {
     let source = r#"@ verte "auto"
 incipit {
-  fixum _ x ← 42
-  fixum _ y ← x ∷ textus
+  sit x ← 42
+  sit y ← x ∷ textus
 }"#;
     let result = super::faber_emit("test.fab", source);
 
@@ -207,7 +207,7 @@ fn rejects_old_verte_aliases_as_postfix_operators() {
 #[cfg(feature = "hir-faber")]
 fn faber_output_prefers_compact_closure_syntax() {
     let source = r"incipit {
-  fixum _ double ← clausura numerus x: x * 2
+  sit double ← clausura numerus x: x * 2
 }";
     let result = super::faber_emit("test.fab", source);
 
@@ -223,7 +223,7 @@ fn faber_output_prefers_compact_closure_syntax() {
 fn compact_fac_closure_body_typechecks_with_redde() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ predicate ← numerus n → bivalens ∴ fac {
+  sit predicate ← numerus n → bivalens ∴ fac {
     redde n ≻ 1
   }
   nota predicate(2)
@@ -237,7 +237,7 @@ fn compact_fac_closure_body_typechecks_with_redde() {
 fn compact_fac_closure_rejects_redde_without_explicit_return_type() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ predicate ← numerus n ∴ fac {
+  sit predicate ← numerus n ∴ fac {
     redde n ≻ 1
   }
 }";
@@ -257,7 +257,7 @@ fn compact_fac_closure_rejects_redde_without_explicit_return_type() {
 fn contextual_compact_fac_closure_rejects_redde_without_local_return_type() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum (numerus) → bivalens predicate ← numerus n ∴ fac {
+  sit (numerus) → bivalens predicate ← numerus n ∴ fac {
     redde n ≻ 1
   }
 }";
@@ -283,7 +283,7 @@ fn contextual_compact_fac_closure_rejects_redde_without_local_return_type() {
 fn compact_fac_closure_accepts_iace_with_explicit_error_channel() {
     let session = test_session(Target::HirTypeScript);
     let source = r#"incipit {
-  fixum _ failer ← numerus n ⇥ textus ∴ fac {
+  sit failer ← numerus n ⇥ textus ∴ fac {
     iace "bad"
   }
 }"#;
@@ -301,7 +301,7 @@ fn compact_fac_closure_accepts_iace_with_explicit_error_channel() {
 fn compact_fac_closure_rejects_iace_without_local_error_channel() {
     let session = test_session(Target::HirTypeScript);
     let source = r#"functio outer() ⇥ textus {
-  fixum _ failer ← numerus n ∴ fac {
+  sit failer ← numerus n ∴ fac {
     iace "bad"
   }
 }"#;
@@ -326,7 +326,7 @@ fn compact_fac_closure_rejects_iace_without_local_error_channel() {
 fn compact_fac_closure_accepts_local_cape_without_error_channel() {
     let session = Session::new(Config::default().with_dev_locale_root());
     let source = r#"incipit {
-  fixum _ handled ← numerus n ∴ fac {
+  sit handled ← numerus n ∴ fac {
     iace "bad"
   } cape err {
     nota err
@@ -347,7 +347,7 @@ fn compact_fac_closure_cape_body_typechecks_with_redde() {
 }
 
 incipit {
-  fixum _ predicate ← textus value → bivalens ∴ fac {
+  sit predicate ← textus value → bivalens ∴ fac {
     redde parseFlag(value)
   } cape err {
     redde falsum
@@ -363,7 +363,7 @@ incipit {
 fn legacy_block_closure_rejects_redde_without_explicit_return_type() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ predicate ← clausura numerus n {
+  sit predicate ← clausura numerus n {
     redde n ≻ 1
   }
 }";
@@ -389,7 +389,7 @@ fn legacy_block_closure_rejects_redde_without_explicit_return_type() {
 fn legacy_block_closure_body_typechecks_with_redde() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ predicate ← clausura numerus n → bivalens {
+  sit predicate ← clausura numerus n → bivalens {
     redde n ≻ 1
   }
   nota predicate(2)
@@ -447,8 +447,8 @@ incipit {
 fn itera_de_array_index_no_longer_leaves_infer_types() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ xs ← [10, 20, 30]
-  itera de xs fixum idx {
+  sit xs ← [10, 20, 30]
+  itera de xs sit idx {
     nota xs[idx]
   }
 }";
@@ -466,7 +466,7 @@ fn itera_de_array_index_no_longer_leaves_infer_types() {
 fn itera_ab_range_no_longer_leaves_infer_types() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  itera ab 0‥5 fixum i {
+  itera ab 0‥5 sit i {
     nota i
   }
 }";
@@ -484,7 +484,7 @@ fn itera_ab_range_no_longer_leaves_infer_types() {
 fn itera_ab_inclusive_range_glyph_compiles() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  itera ab 0…5 fixum i {
+  itera ab 0…5 sit i {
     nota i
   }
 }";
@@ -520,9 +520,9 @@ fn deferred_local_assignment_can_drive_inference() {
 fn compile_supports_extended_binary_operators() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ a ← 1
-  fixum _ b ← 2
-  fixum numerus ∪ nihil maybe ← nulla
+  sit a ← 1
+  sit b ← 2
+  sit numerus ∪ nihil maybe ← nulla
 
   nota a ≡ b
   nota a ≢ b
@@ -541,9 +541,9 @@ fn compile_supports_extended_binary_operators() {
 fn compile_supports_extended_unary_operators() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ flag ← verum
-  fixum textus ∪ nihil maybe ← nulla
-  fixum _ n ← -3
+  sit flag ← verum
+  sit textus ∪ nihil maybe ← nulla
+  sit n ← -3
 
   nota non flag
   nota maybe est nihil
@@ -617,7 +617,7 @@ fn compile_lowers_probandum_nested_cases_without_lowering_errors() {
     let session = test_session(Target::HirRust);
     let source = r#"probandum "suite" {
   praepara omnia {
-    fixum _ x ← 1
+    sit x ← 1
     nota x
   }
 
@@ -697,9 +697,9 @@ fn compile_probandum_hooks_scope_local_to_suite_and_omnia_to_nested() {
 fn ex_destructured_object_fields_can_be_used_in_arithmetic() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ point ← Point { x = 4, y = 6 }
-  ex point fixum x, y
-  fixum numerus sum ← x + y
+  sit point ← Point { x = 4, y = 6 }
+  ex point sit x, y
+  sit numerus sum ← x + y
   nota sum
 }
 
@@ -726,8 +726,8 @@ fn typed_constructor_uses_type_namespace_after_value_shadowing() {
 }
 
 functio main() → vacuum {
-  fixum persona persona ← persona { nomen = "Bob" }
-  fixum persona alia ← persona { nomen = "Alice" }
+  sit persona persona ← persona { nomen = "Bob" }
+  sit persona alia ← persona { nomen = "Alice" }
   nota persona.nomen, alia.nomen
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -744,7 +744,7 @@ functio main() → vacuum {
 fn object_destructured_aliases_can_be_used_in_arithmetic() {
     let session = test_session(Target::HirRust);
     let source = r"functio totalis(Point point) → numerus {
-  fixum { x ut left, y } ← point
+  sit { x ut left, y } ← point
   redde left + y
 }
 
@@ -765,7 +765,7 @@ genus Point {
 fn array_destructured_vars_can_be_used_in_arithmetic() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ coords ← [100, 200]
+  sit coords ← [100, 200]
   varia [x, y] ← coords
   x ← x + 50
   y ← y + 50
@@ -792,7 +792,7 @@ fn method_return_values_can_participate_in_numeric_comparisons() {
 }
 
 incipit {
-  fixum _ nums ← [1, 2, 3]
+  sit nums ← [1, 2, 3]
   nota accessArray(nums, 1)
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -811,7 +811,7 @@ fn repeated_owned_calls_no_longer_report_use_after_move() {
     let session = test_session(Target::HirRust);
     let source = r"functio sumArray(lista<numerus> nums) → numerus {
   varia numerus total ← 0
-  itera ex nums fixum n {
+  itera ex nums sit n {
     total ← total + n
   }
   redde total
@@ -819,7 +819,7 @@ fn repeated_owned_calls_no_longer_report_use_after_move() {
 
 functio maxValue(lista<numerus> nums) → numerus {
   varia numerus max ← nums[0]
-  itera ex nums fixum n {
+  itera ex nums sit n {
     si n ≻ max {
       max ← n
     }
@@ -829,7 +829,7 @@ functio maxValue(lista<numerus> nums) → numerus {
 
 incipit {
   # 7562d0cf: annotate so the bounded literal widens explicitly.
-  fixum lista<numerus> numbers ← [1, 2, 3, 4, 5]
+  sit lista<numerus> numbers ← [1, 2, 3, 4, 5]
   nota sumArray(numbers)
   nota maxValue(numbers)
 }";
@@ -880,9 +880,9 @@ incipit {
 fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum lista<numerus> empty_list ← []
-  fixum _ first ← [1, 2, 3]
-  fixum _ extended ← [0, sparge first, 99]
+  sit lista<numerus> empty_list ← []
+  sit first ← [1, 2, 3]
+  sit extended ← [0, sparge first, 99]
   nota empty_list, extended
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -897,7 +897,7 @@ fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() 
 
     let context_free_session = test_session(Target::HirRust);
     let context_free_source = r"incipit {
-  fixum _ empty_list ← []
+  sit empty_list ← []
 }";
     let context_free = compile(
         &context_free_session,
@@ -921,12 +921,12 @@ fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() 
 fn typed_vacua_inhabits_declared_empty_collections() {
     let session = test_session(Target::HirRust);
     let source = r"functio empty_numbers() → lista<numerus> {
-  fixum lista<numerus> xs ← vacua
+  sit lista<numerus> xs ← vacua
   redde xs
 }
 
 functio empty_counts() → tabula<textus, numerus> {
-  fixum tabula<textus, numerus> counts ← vacua
+  sit tabula<textus, numerus> counts ← vacua
   redde counts
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -942,7 +942,7 @@ functio empty_counts() → tabula<textus, numerus> {
 fn context_free_vacua_requires_declared_type() {
     let session = test_session(Target::HirRust);
     let source = r"functio empty() → vacuum {
-  fixum _ xs ← vacua
+  sit xs ← vacua
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -959,14 +959,14 @@ fn cursor_iteration_accumulator_from_empty_array_no_longer_reports_inference_err
     let session = test_session(Target::HirRust);
     let source = r"@ cursor
 functio rangeSync(numerus n) → numerus {
-  itera ab 0‥n fixum i {
+  itera ab 0‥n sit i {
     cede i
   }
 }
 
 incipit {
   varia lista<numerus> syncResults ← vacua
-  itera ex rangeSync(5) fixum num {
+  itera ex rangeSync(5) sit num {
     syncResults.appende(num * 2)
   }
   nota syncResults
@@ -996,11 +996,11 @@ functio id(textus x) → textus {
 }
 
 incipit {
-  fixum User ∪ nihil maybeUser ← nulla
-  fixum _ a ← maybeUser?.name
-  fixum _ b ← maybeUser?.nums?[0]
-  fixum (textus) → textus ∪ nihil maybeFn ← id
-  fixum _ c ← maybeFn?("x")
+  sit User ∪ nihil maybeUser ← nulla
+  sit a ← maybeUser?.name
+  sit b ← maybeUser?.nums?[0]
+  sit (textus) → textus ∪ nihil maybeFn ← id
+  sit c ← maybeFn?("x")
   nota a, b, c
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1021,10 +1021,10 @@ functio id(textus x) → textus {
 }
 
 incipit {
-  fixum User ∪ nihil maybeUser ← nulla
-  fixum _ a ← maybeUser?.name
-  fixum (textus) → textus ∪ nihil maybeFn ← id
-  fixum _ c ← maybeFn?("x")
+  sit User ∪ nihil maybeUser ← nulla
+  sit a ← maybeUser?.name
+  sit (textus) → textus ∪ nihil maybeFn ← id
+  sit c ← maybeFn?("x")
   nota a, c
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1043,7 +1043,7 @@ fn rust_output_translates_stdlib_lista_methods() {
     let source = r"incipit {
   varia _ xs ← [1, 2]
   xs.appende(3)
-  fixum _ n ← xs.longitudo()
+  sit n ← xs.longitudo()
   nota n
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1066,7 +1066,7 @@ fn struct_construction_requires_fields_and_checks_defaults() {
 }
 
 incipit {
-  fixum _ u ← User { email = "a@example.com" }
+  sit u ← User { email = "a@example.com" }
 }"#;
     let missing_result = compile(&session, "missing.fab", missing, ModuleCompileRequest::default());
     assert!(!missing_result.success());
@@ -1081,7 +1081,7 @@ incipit {
 }
 
 incipit {
-  fixum _ u ← { } ∷ User
+  sit u ← { } ∷ User
 }"#;
     let default_result = compile(&session, "default.fab", bad_default, ModuleCompileRequest::default());
     assert!(!default_result.success());
@@ -1100,8 +1100,8 @@ incipit {
 fn rust_output_emits_coalesce_unwrap() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum textus ∪ nihil name ← nulla
-  fixum _ display ← name vel "Anonymous"
+  sit textus ∪ nihil name ← nulla
+  sit display ← name vel "Anonymous"
   nota display
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1122,8 +1122,8 @@ fn rust_output_wraps_sponte_fields_in_verte_struct_literals() {
 }
 
 incipit {
-  fixum _ a ← User { name = "Ada" }
-  fixum _ b ← User { name = "Lin", email = "lin@example.com" }
+  sit a ← User { name = "Ada" }
+  sit b ← User { name = "Lin", email = "lin@example.com" }
   nota a.name
   nota b.name
 }"#;
@@ -1153,9 +1153,9 @@ fn rust_output_applies_nullable_field_defaults_in_verte_struct_literals() {
 }
 
 incipit {
-  fixum _ a ← User { name = "Ada" }
-  fixum _ b ← User { name = "Lin", email = nulla }
-  fixum _ c ← User { name = "Ken", email = "ken@example.com" }
+  sit a ← User { name = "Ada" }
+  sit b ← User { name = "Lin", email = nulla }
+  sit c ← User { name = "Ken", email = "ken@example.com" }
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -1208,7 +1208,7 @@ fn elige_accepts_enum_variant_case_values() {
     let source = r#"ordo Color { rubrum, viridis, caeruleum }
 
 incipit {
-  fixum _ color ← Color.rubrum
+  sit color ← Color.rubrum
   elige color {
     casu Color.rubrum { nota "R" }
     casu Color.viridis { nota "G" }
@@ -1355,8 +1355,8 @@ fn degenerate_nihil_only_union_is_rejected() {
 fn array_method_call_no_longer_reports_non_struct_member_error() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ numbers ← [1, 2, 3]
-  fixum _ doubled ← numbers.mappata(numerus x ∴ x * 2)
+  sit numbers ← [1, 2, 3]
+  sit doubled ← numbers.mappata(numerus x ∴ x * 2)
   nota doubled
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1379,7 +1379,7 @@ genus Circle implet Drawable {
 }
 
 incipit {
-  fixum _ c ← Circle {}
+  sit c ← Circle {}
   c.draw()
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1392,7 +1392,7 @@ incipit {
 fn compact_inferred_closure_argument_uses_expected_method_signature() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ numbers ← [1, 2, 3]
+  sit numbers ← [1, 2, 3]
   nota numbers.mappata(_ x ∴ x * 2)
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1407,10 +1407,10 @@ fn compact_inferred_closure_argument_uses_expected_method_signature() {
 fn object_member_and_index_chains_no_longer_report_index_errors() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum _ config ← { name = "test", value = 42 }
+  sit config ← { name = "test", value = 42 }
   nota config["name"]
 
-  fixum _ data ← { items = ["first", "second"] }
+  sit data ← { items = ["first", "second"] }
   nota data.items[0]
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1430,7 +1430,7 @@ fn object_member_and_index_chains_no_longer_report_index_errors() {
 fn array_method_closure_argument_no_longer_reports_argument_type_mismatch() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum _ numbers ← [1, 2, 3]
+  sit numbers ← [1, 2, 3]
   nota numbers.map(clausura numerus x: x * 2)
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1455,7 +1455,7 @@ fn ego_field_assignment_no_longer_reports_assignment_type_mismatch() {
 }
 
 incipit {
-  fixum _ c ← {} ∷ Circulus
+  sit c ← {} ∷ Circulus
   c.crescere(2)
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1477,7 +1477,7 @@ fn objectum_return_type_no_longer_reports_unknown_type() {
 }
 
 incipit {
-  fixum _ response ← getResponse()
+  sit response ← getResponse()
   nota response
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1497,7 +1497,7 @@ incipit {
 fn quidlibet_container_annotation_no_longer_reports_unknown_type() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum lista<quidlibet> docs ← [] ∷ lista<quidlibet>
+  sit lista<quidlibet> docs ← [] ∷ lista<quidlibet>
   nota docs
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1516,7 +1516,7 @@ fn quidlibet_container_annotation_no_longer_reports_unknown_type() {
 fn conversio_type_params_no_longer_report_unknown_type() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum _ n ← "ff" ↦ i32 via Hex
+  sit n ← "ff" ↦ i32 via Hex
   nota n
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1535,11 +1535,11 @@ fn conversio_type_params_no_longer_report_unknown_type() {
 fn verte_vel_no_longer_reports_invalid_cast() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum _ data ← 42
-  fixum _ asText ← data ∷ textus
-  fixum _ parsed ← "invalid" ↦ numerus ⊥ 0
-  fixum tabula<textus, numerus> cache ← { "alice": 95, "bob": 87 }
-  fixum lista<textus> items ← vacua
+  sit data ← 42
+  sit asText ← data ∷ textus
+  sit parsed ← "invalid" ↦ numerus ⊥ 0
+  sit tabula<textus, numerus> cache ← { "alice": 95, "bob": 87 }
+  sit lista<textus> items ← vacua
   nota asText, parsed, cache, items
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1568,9 +1568,9 @@ fn rust_output_converts_textus_literals_to_owned_strings() {
 
 incipit {
   varia textus name ← "Marcus"
-  fixum lista<textus> words ← ["a", "b"]
-  fixum textus ∪ nihil maybe ← nulla
-  fixum _ fallback ← maybe vel "x"
+  sit lista<textus> words ← ["a", "b"]
+  sit textus ∪ nihil maybe ← nulla
+  sit fallback ← maybe vel "x"
   nota pick(verum), name, words, fallback
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1596,8 +1596,8 @@ incipit {
 fn rust_output_wraps_optional_local_initializers_in_some() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum textus ∪ nihil actualName ← "Marcus"
-  fixum textus ∪ nihil maybe ← nulla
+  sit textus ∪ nihil actualName ← "Marcus"
+  sit textus ∪ nihil maybe ← nulla
   nota actualName, maybe
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1617,9 +1617,9 @@ fn rust_output_wraps_optional_local_initializers_in_some() {
 fn rust_output_uses_or_for_option_coalesce() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum textus ∪ nihil a ← nulla
-  fixum textus ∪ nihil b ← nulla
-  fixum _ first ← a vel b
+  sit textus ∪ nihil a ← nulla
+  sit textus ∪ nihil b ← nulla
+  sit first ← a vel b
   nota first
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1634,7 +1634,7 @@ fn rust_output_uses_or_for_option_coalesce() {
 fn rust_output_uses_debug_format_for_collection_scribe() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum lista<textus> names ← ["a", "b"]
+  sit lista<textus> names ← ["a", "b"]
   nota names
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1649,9 +1649,9 @@ fn rust_output_uses_debug_format_for_collection_scribe() {
 fn rust_output_uses_scalar_display_helpers_for_scribe() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum fractus f ← 1.0
-  fixum bivalens b ← verum
-  fixum ascii a ← 'ok'
+  sit fractus f ← 1.0
+  sit bivalens b ← verum
+  sit ascii a ← 'ok'
   nota f, b, a
   nota "§ § §"(f, b, a)
 }"#;
@@ -1773,7 +1773,7 @@ fn typed_array_index_assignment_no_longer_reports_assignment_type_mismatch() {
 fn rust_output_uses_format_macro_for_scriptum() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum _ value ← 7
+  sit value ← 7
   nota scriptum("valor: §", value)
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1788,8 +1788,8 @@ fn rust_output_uses_format_macro_for_scriptum() {
 fn rust_output_uses_zero_based_numbered_scriptum_placeholders() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum _ first ← "prima"
-  fixum _ second ← "secunda"
+  sit first ← "prima"
+  sit second ← "secunda"
   nota scriptum("ordo: §1, §0", first, second)
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1808,7 +1808,7 @@ fn rust_output_uses_zero_based_numbered_scriptum_placeholders() {
 fn rust_output_uses_string_literal_format_application() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum _ value ← 7
+  sit value ← 7
   nota "valor: §"(value)
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1823,8 +1823,8 @@ fn rust_output_uses_string_literal_format_application() {
 fn rust_output_uses_numbered_string_literal_format_application() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum _ first ← "prima"
-  fixum _ second ← "secunda"
+  sit first ← "prima"
+  sit second ← "secunda"
   nota "ordo: §1, §0"(first, second)
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1843,10 +1843,10 @@ fn rust_output_uses_numbered_string_literal_format_application() {
 fn rust_output_supports_unicode_textus_index_and_range_slice() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum _ ch ← "Salve, §!"[7]
-  fixum _ prefix ← "hello world"[0‥5]
-  fixum _ whole ← "hello world"[0 usque 10]
-  fixum _ stepped ← "abcdef"[0‥6 per 2]
+  sit ch ← "Salve, §!"[7]
+  sit prefix ← "hello world"[0‥5]
+  sit whole ← "hello world"[0 usque 10]
+  sit stepped ← "abcdef"[0‥6 per 2]
   nota ch, prefix, whole, stepped
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1869,7 +1869,7 @@ fn rust_compile_accepts_explicit_infer_type_marker() {
 }
 
 incipit {
-  fixum _ name ← "Marcus"
+  sit name ← "Marcus"
   varia _ count ← answer()
   count ← count + 1
   nota "§: §"(name, count)
@@ -1898,10 +1898,10 @@ incipit {
 fn typescript_output_supports_unicode_textus_index_and_range_slice() {
     let session = test_session(Target::HirTypeScript);
     let source = r#"incipit {
-  fixum _ ch ← "Salve, §!"[7]
-  fixum _ prefix ← "hello world"[0‥5]
-  fixum _ whole ← "hello world"[0 usque 10]
-  fixum _ stepped ← "abcdef"[0‥6 per 2]
+  sit ch ← "Salve, §!"[7]
+  sit prefix ← "hello world"[0‥5]
+  sit whole ← "hello world"[0 usque 10]
+  sit stepped ← "abcdef"[0‥6 per 2]
   nota ch, prefix, whole, stepped
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1921,10 +1921,10 @@ fn typescript_output_supports_unicode_textus_index_and_range_slice() {
 fn go_output_supports_unicode_textus_index_and_range_slice() {
     let session = test_session(Target::HirGo);
     let source = r#"incipit {
-  fixum _ ch ← "Salve, §!"[7]
-  fixum _ prefix ← "hello world"[0‥5]
-  fixum _ whole ← "hello world"[0 usque 10]
-  fixum _ stepped ← "abcdef"[0‥6 per 2]
+  sit ch ← "Salve, §!"[7]
+  sit prefix ← "hello world"[0‥5]
+  sit whole ← "hello world"[0 usque 10]
+  sit stepped ← "abcdef"[0‥6 per 2]
   nota ch, prefix, whole, stepped
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -2022,18 +2022,18 @@ functio forward(
     tensor<f32, [2,2]> weight,
     tensor<f32, [2,2]> bias
 ) → tensor<f32, [2,2]> {
-    fixum tensor<f32, [2,2]> prediction ← input.matmul(weight)
+    sit tensor<f32, [2,2]> prediction ← input.matmul(weight)
     redde prediction + bias
 }
 
 incipit {
-    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    fixum tensor<f32, [2,2]> x ← flat ↦ tensor<f32, [2,2]>
-    fixum tensor<f32, [2,2]> w ← flat ↦ tensor<f32, [2,2]>
-    fixum tensor<f32, [2,2]> b ← flat ↦ tensor<f32, [2,2]>
-    fixum numerus steps ← 2
-    itera ab 0‥steps fixum step {
-        fixum tensor<f32, [2,2]> pred ← forward(x, w, b)
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    sit tensor<f32, [2,2]> x ← flat ↦ tensor<f32, [2,2]>
+    sit tensor<f32, [2,2]> w ← flat ↦ tensor<f32, [2,2]>
+    sit tensor<f32, [2,2]> b ← flat ↦ tensor<f32, [2,2]>
+    sit numerus steps ← 2
+    itera ab 0‥steps sit step {
+        sit tensor<f32, [2,2]> pred ← forward(x, w, b)
         nota pred
     }
 }

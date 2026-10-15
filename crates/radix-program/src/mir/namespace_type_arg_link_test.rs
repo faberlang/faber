@@ -21,8 +21,8 @@ fn id<size N>(tensor<f32, [N]> x) → tensor<f32, [N]> {
 const TYPEARG_EXPLICIT_MAIN: &str = r#"import from "./util" * as utilModule
 
 fn run() → f32 {
-    const tensor<f32, [2]> t ← [1.5, 2.5] ↦ tensor<f32, [2]>
-    const tensor<f32, [2]> r ← utilModule.id<2>(t)
+    let tensor<f32, [2]> t ← [1.5, 2.5] ↦ tensor<f32, [2]>
+    let tensor<f32, [2]> r ← utilModule.id<2>(t)
     return r[1]
 }
 
@@ -34,8 +34,8 @@ main {
 const TYPEARG_INFERRED_MAIN: &str = r#"import from "./util" * as utilModule
 
 fn run() → f32 {
-    const tensor<f32, [3]> t ← [1.5, 2.5, 3.5] ↦ tensor<f32, [3]>
-    const tensor<f32, [3]> r ← utilModule.id(t)
+    let tensor<f32, [3]> t ← [1.5, 2.5, 3.5] ↦ tensor<f32, [3]>
+    let tensor<f32, [3]> r ← utilModule.id(t)
     return r[2]
 }
 
@@ -51,11 +51,11 @@ fn forward<size N>(tensor<f32, [N]> x) → tensor<f32, [N]> {
 }
 
 fn run() → f32 {
-    const tensor<f32, [3]> a ← [1.5, 2.5, 3.5] ↦ tensor<f32, [3]>
-    const tensor<f32, [5]> b ← [1.0, 2.0, 3.0, 4.0, 5.0] ↦ tensor<f32, [5]>
-    const tensor<f32, [3]> ra ← forward<3>(a)
-    const tensor<f32, [5]> rb ← forward<5>(b)
-    const tensor<f32, [3]> rc ← ra ↦ tensor<f32, [3]>
+    let tensor<f32, [3]> a ← [1.5, 2.5, 3.5] ↦ tensor<f32, [3]>
+    let tensor<f32, [5]> b ← [1.0, 2.0, 3.0, 4.0, 5.0] ↦ tensor<f32, [5]>
+    let tensor<f32, [3]> ra ← forward<3>(a)
+    let tensor<f32, [5]> rb ← forward<5>(b)
+    let tensor<f32, [3]> rc ← ra ↦ tensor<f32, [3]>
     return rc[1]
 }
 
@@ -331,14 +331,14 @@ fn rope<size D>(tf32[2, D] x, tf32[2, 4, 3] table) → tf32[2, D] {
 const AIR_TYPEARG_MAIN: &str = r#"import from "./util" * as utilModule
 
 fn main() → void {
-    const tf32[2, 8] x ← [[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0]] ↦ tf32[2, 8]
-    const list<f32> y_flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[2, 4, 3] table ← empty
+    let tf32[2, 8] x ← [[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0]] ↦ tf32[2, 8]
+    let list<f32> y_flat ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[2, 4, 3] table ← empty
     do {
-        const tf32[2, 64] y ← y_flat ↦ tf32[2, 64]
-        const _ a ← utilModule.rope<8>(x, table)
-        const _ b ← utilModule.rope<64>(y, table)
-        const _ c ← utilModule.rope(y, table)
+        let tf32[2, 64] y ← y_flat ↦ tf32[2, 64]
+        let a ← utilModule.rope<8>(x, table)
+        let b ← utilModule.rope<64>(y, table)
+        let c ← utilModule.rope(y, table)
     }
     catch err {
     }
@@ -856,4 +856,112 @@ fn package_mir_norma_fs_read_file_string_body_converts_to_textus() {
         },
     )
     .unwrap_or_else(|errors| panic!("norma:fs read_file package must lower, got {errors:?}"));
+}
+
+const NORMA_TIME_AWAITED_SLEEP_ASYNC_MAIN: &str = r#"import from "norma:time" tempus
+
+async_main {
+    tempus.sleep(0)
+    await tempus.sleep_async(0)
+    assert true
+}
+"#;
+
+/// The awaited `tempus.sleep_async(0)` call in a package `async_main` must link
+/// and validate. Before c75db9ed-11.1 the linked program failed MIR validation
+/// with issue `mir_validation_destination_type_mismatch`: the call to the
+/// `@ future sleep_async` callee carried a `promissum<void>` destination
+/// against the linked function's payload `void` return.
+#[test]
+fn package_mir_links_norma_time_awaited_sleep_async() {
+    let dir = crate::test_support::test_temp_dir("norma-time-sleep");
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "norma-time-sleep"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("main.fab"), NORMA_TIME_AWAITED_SLEEP_ASYNC_MAIN).expect("write main.fab");
+    let entry = src.join("main.fab");
+
+    let result = with_lowered_package_mir(
+        &Config::default(),
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        |_| {},
+    );
+    if let Err(diagnostics) = &result {
+        let facts = diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+            .collect::<Vec<_>>();
+        panic!("norma:time awaited sleep_async package must lower, got {facts:?}");
+    }
+}
+
+const NORMA_FS_AWAITED_READ_FILE_ASYNC_MAIN: &str = r#"import from "norma:fs" charta
+
+async_main {
+    await_const string body ← charta.read_file_async<string>("probe.txt")
+    assert body ≡ "v"
+}
+"#;
+
+/// The awaited `charta.read_file_async<string>("probe.txt")` call in a
+/// package `async_main` must link and validate, with the destination carrying
+/// the instantiated payload `string` against the linked template's `T := string`.
+/// Before c75db9ed-11.1 the linked program failed MIR validation with issue
+/// `mir_validation_destination_type_mismatch`: the generic linked future call's
+/// destination carried the uninstantiated payload type.
+#[test]
+fn package_mir_links_norma_fs_awaited_read_file_async_string() {
+    let dir = crate::test_support::test_temp_dir("norma-fs-read-file-async");
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "norma-fs-read-file-async"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("main.fab"), NORMA_FS_AWAITED_READ_FILE_ASYNC_MAIN).expect("write main.fab");
+    let entry = src.join("main.fab");
+
+    let result = with_lowered_package_mir(
+        &Config::default(),
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        |_| {},
+    );
+    if let Err(diagnostics) = &result {
+        let facts = diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+            .collect::<Vec<_>>();
+        panic!("norma:fs awaited read_file_async package must lower, got {facts:?}");
+    }
 }

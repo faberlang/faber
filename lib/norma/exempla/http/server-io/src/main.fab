@@ -23,9 +23,9 @@ import from "norma:http/request" httpreq
 import from "norma:process" process
 
 fn arg_at(int index, string fallback) → string {
-    const list<string> args ← process.argv()
+    let list<string> args ← process.argv()
     if args.length() ≻ index {
-        const string ∪ none item ← args.get(index)
+        let string ∪ none item ← args.get(index)
         if item not is none {
             return item ↦ string
         }
@@ -35,8 +35,8 @@ fn arg_at(int index, string fallback) → string {
 
 # 64 KiB payload via doubling — O(n) copies, not per-byte concat.
 fn stall_frame() → list<b8> {
-    var string block ← "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    var int i ← 0
+    mut string block ← "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    mut int i ← 0
     while i ≺ 10 {
         block ← block + block
         i ← i + 1
@@ -45,29 +45,29 @@ fn stall_frame() → list<b8> {
 }
 
 main {
-    const string mode ← arg_at(0, "sse")
-    const int port ↤ arg_at(1, "18766")
-    const int n ↤ arg_at(2, "8")
+    let string mode ← arg_at(0, "sse")
+    let int port ↤ arg_at(1, "18766")
+    let int n ↤ arg_at(2, "8")
 
-    const server.Listener listener ← server.bind(port)
+    let server.Listener listener ← server.bind(port)
     print "listening"
     print port
 
-    const server.Incoming incoming ← server.accept_incoming(listener.handle)
+    let server.Incoming incoming ← server.accept_incoming(listener.handle)
     print "accepted"
     print incoming.id
-    const httpreq.Request req ← incoming.req
+    let httpreq.Request req ← incoming.req
     print req.path
 
-    const headers.Headers head ← req.headers
-    const bool persist ← server.keep_alive(head)
-    const server.Stream stream ← server.open_sse(incoming)
+    let headers.Headers head ← req.headers
+    let bool persist ← server.keep_alive(head)
+    let server.Stream stream ← server.open_sse(incoming)
 
     if mode ≡ "stall" {
-        const list<b8> frame ← stall_frame()
+        let list<b8> frame ← stall_frame()
         print "frame-bytes"
         print frame.length()
-        var int i ← 0
+        mut int i ← 0
         while i ≺ n {
             print "write-start"
             print i
@@ -78,11 +78,11 @@ main {
         }
     }
     else {
-        var int i ← 0
+        mut int i ← 0
         while i ≺ n {
             print "write-start"
             print i
-            const sse.Event ev ← sse.Event {
+            let sse.Event ev ← sse.Event {
                 name = "",
                 data = i ↦ string,
                 id = "",

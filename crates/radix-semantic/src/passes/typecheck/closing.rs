@@ -149,7 +149,7 @@ impl TypeChecker<'_> {
                 HirItemKind::Struct(genus) => {
                     nodes.insert(item.def_id);
                     for field in &genus.fields {
-                        if field.modifier != Some(radix_syntax::FieldModifier::Generis) {
+                        if field.modifier != Some(radix_syntax::FieldModifier::Const) {
                             fields.push((item.def_id, field.span, field.name, field.ty));
                         }
                     }
@@ -283,7 +283,7 @@ impl TypeChecker<'_> {
         self.structs.get(&def).is_some_and(|info| {
             info.fields
                 .values()
-                .filter(|field| field.modifier != Some(radix_syntax::FieldModifier::Generis))
+                .filter(|field| field.modifier != Some(radix_syntax::FieldModifier::Const))
                 .any(|field| self.type_holds_closable(field.ty, cyclic, seen, depth))
         })
     }

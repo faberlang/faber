@@ -38,21 +38,21 @@ locale = "en"
 #   ["a", "b", "a"]
 
 main {
-    var list<int> xs ← [3, 1, 2, 1]
-    var set<int> unique ← xs ↦ set<int>
+    mut list<int> xs ← [3, 1, 2, 1]
+    mut set<int> unique ← xs ↦ set<int>
     print unique.length()
     print xs
-    var list<int> first ← unique ↦ list<int>
+    mut list<int> first ← unique ↦ list<int>
     first.sort()
     print first
     print unique.length()
-    var list<int> second ← unique ↦ list<int>
+    mut list<int> second ← unique ↦ list<int>
     second.sort()
     print second
 
-    var list<string> names ← ["a", "b", "a"]
-    var set<string> nameSet ← names ↦ set<string>
-    var list<string> nameList ← nameSet ↦ list<string>
+    mut list<string> names ← ["a", "b", "a"]
+    mut set<string> nameSet ← names ↦ set<string>
+    mut list<string> nameList ← nameSet ↦ list<string>
     nameList.sort()
     print nameList
     print names

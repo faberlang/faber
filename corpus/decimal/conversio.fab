@@ -41,19 +41,19 @@ locale = "en"
 #   conversio.expected — one value per print, in order.
 
 main {
-    const d64 a ← 4.2
-    const i64 i ← a ↦ i64 via HalfEven
+    let d64 a ← 4.2
+    let i64 i ← a ↦ i64 via HalfEven
     print i
-    const i64 n ← 5
-    const d64 d ← n ↦ d64
+    let i64 n ← 5
+    let d64 d ← n ↦ d64
     print d
-    const float f ← a ↦ float
+    let float f ← a ↦ float
     print f
-    const float g ← 1.5
-    const d64 h ← g ↦ d64
+    let float g ← 1.5
+    let d64 h ← g ↦ d64
     print h
-    const d64 p ← 2.5
+    let d64 p ← 2.5
     print p ↦ i64 via HalfEven
-    const d64 r ← 3.5
+    let d64 r ← 3.5
     print r ↦ i64 via HalfEven
 }

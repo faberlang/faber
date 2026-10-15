@@ -33,7 +33,7 @@ pub fn result_only_returned(function: &MirFunction, destination: &MirPlace) -> b
 
 /// The place the kernel finally returns a recipe's result as, when nothing
 /// else reads it: the destination itself for `return x.softmax()`, the local
-/// at the end of a plain forward chain for `const y ← x.softmax(); return y`.
+/// at the end of a plain forward chain for `let y ← x.softmax(); return y`.
 ///
 /// A backend that lets one thread write a whole row of the output must also
 /// stop the return from re-storing the result element by element, which would
@@ -45,7 +45,7 @@ pub fn result_only_returned(function: &MirFunction, destination: &MirPlace) -> b
 ///
 /// - the result is read by nothing but plain forwards and the return;
 /// - every place along the chain is written **at most once**, so a forward
-///   target reassigned before the return (`var y ← x.softmax(); y ← other;
+///   target reassigned before the return (`mut y ← x.softmax(); y ← other;
 ///   return y`) is refused: it would return `other` while the caller believed
 ///   it was returning the recipe's result;
 /// - the chain ends in a `Return` of the last place (unlike

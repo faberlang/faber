@@ -7,7 +7,7 @@ locale = "en"
 # fallback and still store a value that fits. One value per print: the runner
 # splits a multi-value print whose argument divides by a literal.
 main {
-    var int a ← -7
+    mut int a ← -7
     print a / 2
     print a % 2
     print a / -2
@@ -16,16 +16,16 @@ main {
     print a % 1
     print a / 3
     print a % -3
-    var int big ← 9223372036854775807
-    var int low ← 0 - big - 1
+    mut int big ← 9223372036854775807
+    mut int low ← 0 - big - 1
     print big / 2
     print big % -2
     print low / 2
     print low % 3
     print low / -2
     print low % -2
-    var int half ← big * 2 / 4
+    mut int half ← big * 2 / 4
     print half
-    var int back ← big + 1 - 1
+    mut int back ← big + 1 - 1
     print back
 }

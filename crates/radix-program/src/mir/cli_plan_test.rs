@@ -210,7 +210,7 @@ const OCTETI_OPTION_MAIN: &str = r#"
 @ cli "tool"
 @ option payload long "payload" type bytes
 main args args {
-  const bytes payload ← args.payload coalesce |21|
+  let bytes payload ← args.payload coalesce |21|
   print payload.length()
 }
 "#;
@@ -268,4 +268,60 @@ fn package_mir_cli_octeti_rest_operand_value_is_rows_of_utf8_bytes() {
         )
     });
     assert_eq!(lines, vec!["2".to_owned(), "2".to_owned(), "1".to_owned()]);
+}
+
+#[test]
+fn package_mir_cli_entry_and_command_may_share_a_binding_name() {
+    let main = r#"
+@ cli "tool"
+@ option verbose long "verbose" type bool global
+main args args {}
+
+@ command "greet"
+@ operand string name
+fn greet() args args {
+  print args.name
+}
+"#;
+    let lines = run_cli_package(
+        "cli-shared-binding-name",
+        &[("main.fab", main)],
+        &["greet", "Ian"],
+    )
+    .unwrap_or_else(|diagnostics| {
+        panic!(
+            "entry and command records must each take their own fields, got {:?}",
+            diagnostic_identities(&diagnostics)
+        )
+    });
+    assert_eq!(lines, vec!["Ian".to_owned()]);
+}
+
+#[test]
+fn package_mir_cli_entry_and_command_sharing_a_binding_name_keep_their_own_fields() {
+    let main = r#"
+@ cli "tool"
+@ option verbose long "verbose" type bool global
+main args args {
+}
+
+@ command "greet"
+@ operand string nomen
+fn greet() args args {
+  print args.verbose
+  print args.nomen
+}
+"#;
+    let lines = run_cli_package(
+        "cli-shared-args-binding",
+        &[("main.fab", main)],
+        &["--verbose", "greet", "Ian"],
+    )
+    .unwrap_or_else(|diagnostics| {
+        panic!(
+            "entry and command sharing the `args` binding must keep their own record fields, got {:?}",
+            diagnostic_identities(&diagnostics)
+        )
+    });
+    assert_eq!(lines, vec!["true".to_owned(), "Ian".to_owned()]);
 }

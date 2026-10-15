@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "endpoint"
 canonical = true
 summary = "A call to a Faber-served route is a typed conversation channel<O, R>: the opener and every reply are checked against the handler."
-syntax = "const channel<O, R> s ← call 'prefix:name' (o)"
+syntax = "let channel<O, R> s ← call 'prefix:name' (o)"
 related = ["ad", "sermo", "tuus", "conversio"]
 locale = "en"
 +++
@@ -16,7 +16,7 @@ locale = "en"
 # What this teaches:
 #   • Typed conversation — when a Faber function serves the route, `call` has
 #     type `channel<O, R>`: `O` is the handler's parameter, `R` each item back
-#   • Inference — `const _ s ← call '…'` infers `channel<O, R>` from the route
+#   • Inference — `let s ← call '…'` infers `channel<O, R>` from the route
 #   • Dropping the types — a typed channel assigns to a bare `channel`, which
 #     reads its frames as loose values again
 #   • No opener — a handler without a parameter has `O = null`, and the call
@@ -41,14 +41,14 @@ fn greeting() → string {
 }
 
 main {
-    const _ s ← call 'numeri:twice' (21)
-    const int doubled ← s ↦ int
+    let s ← call 'numeri:twice' (21)
+    let int doubled ← s ↦ int
     print doubled
 
-    const channel<none, string> g ← call 'salutatio:greeting'
+    let channel<none, string> g ← call 'salutatio:greeting'
     print g ↦ string
 
-    const channel<int, int> t ← call 'numeri:twice' (5)
-    const channel loose ← t
+    let channel<int, int> t ← call 'numeri:twice' (5)
+    let channel loose ← t
     print loose ↦ int
 }

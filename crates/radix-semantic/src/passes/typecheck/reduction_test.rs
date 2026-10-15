@@ -47,14 +47,14 @@ fn filum_placement_and_alignment_are_checked() {
         r"
 @ nucleum
 functio k(tensor<f32, [32]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] filum f fixum s { redde s }
+    redde reducta via summa ex xs apud [i] filum f sit s { redde s }
 }
 ",
     );
     assert_rejects_with_issue(
         r"
 functio k(tensor<f32, [32]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] filum f fixum s { redde s }
+    redde reducta via summa ex xs apud [i] filum f sit s { redde s }
 }
 ",
         "reducta_filum_requires_nucleum_kernel",
@@ -63,7 +63,7 @@ functio k(tensor<f32, [32]> xs) → f32 {
         r"
 @ nucleum
 functio k(tensor<f32, [33]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] filum f fixum s { redde s }
+    redde reducta via summa ex xs apud [i] filum f sit s { redde s }
 }
 ",
         "reducta_tail_not_aligned",
@@ -95,7 +95,7 @@ fn body_requires_one_value_return_and_rejects_captured_mutation() {
     assert_rejects_with_issue(
         r"
 functio sum(tensor<numerus, [4]> xs) → numerus {
-    redde reducta via summa ex xs fixum x { x }
+    redde reducta via summa ex xs sit x { x }
 }
 ",
         "reducta_body_requires_single_redde",
@@ -104,7 +104,7 @@ functio sum(tensor<numerus, [4]> xs) → numerus {
         r"
 functio sum(tensor<numerus, [4]> xs) → numerus {
     varia numerus captured ← 0
-    redde reducta via summa ex xs fixum x { captured ← captured + 1 redde x }
+    redde reducta via summa ex xs sit x { captured ← captured + 1 redde x }
 }
 ",
         "reducta_body_effect",
@@ -300,6 +300,16 @@ functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis 0 -
 }
 
 #[test]
+fn axis_reduction_negative_literal_axis_is_out_of_range() {
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis -1) }
+",
+        "axis_reduction_out_of_range",
+    );
+}
+
+#[test]
 fn axis_reduction_run_time_axis_is_named() {
     assert_rejects_with_issue(
         r"
@@ -314,7 +324,59 @@ fn axis_reduction_named_integer_local_is_a_constant_axis() {
     assert_accepts(
         r"
 functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
-    fixum numerus k ← 1
+    sit numerus k ← 1
+    redde g.summa(axis k)
+}
+",
+    );
+}
+
+#[test]
+fn axis_reduction_named_modular_local_uses_the_reduced_value() {
+    // `modulus<u8>` stores 256 as 0, so the axis is 0 and the result is [3].
+    assert_accepts(
+        r"
+functio cols(tensor<f32, [2, 3]> g) → tensor<f32, [3]> {
+    sit modulus<u8> k ← 256
+    redde g.summa(axis k)
+}
+",
+    );
+}
+
+#[test]
+fn axis_reduction_named_saturating_local_uses_the_clamped_value() {
+    // `saturatus<u8>` stores 300 as 255, which is no axis of a rank-two tensor.
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
+    sit saturatus<u8> k ← 300
+    redde g.summa(axis k)
+}
+",
+        "axis_reduction_out_of_range",
+    );
+}
+
+#[test]
+fn axis_reduction_named_modular_local_in_range_keeps_its_value() {
+    assert_accepts(
+        r"
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
+    sit modulus<u8> k ← 1
+    redde g.summa(axis k)
+}
+",
+    );
+}
+
+#[test]
+fn axis_reduction_named_local_chained_through_another_local() {
+    assert_accepts(
+        r"
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
+    sit numerus a ← 1
+    sit numerus k ← a
     redde g.summa(axis k)
 }
 ",
@@ -326,11 +388,70 @@ fn axis_reduction_named_float_local_is_not_a_constant_axis() {
     assert_rejects_with_issue(
         r"
 functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
-    fixum fractus k ← 1
+    sit fractus k ← 1
     redde g.summa(axis k)
 }
 ",
         "axis_reduction_not_constant",
+    );
+}
+
+#[test]
+fn axis_reduction_named_module_integer_is_a_constant_axis() {
+    assert_accepts(
+        r"
+fixum numerus K = 1
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis K) }
+",
+    );
+}
+
+#[test]
+fn axis_reduction_named_module_float_is_not_a_constant_axis() {
+    assert_rejects_with_issue(
+        r"
+fixum fractus K = 1
+functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis K) }
+",
+        "axis_reduction_not_constant",
+    );
+}
+
+#[test]
+fn axis_reduction_named_module_modular_keeps_its_fitted_value() {
+    // A word cell is an integer cell: the fitted `modulus<u8>` constant is a
+    // constant axis (the stored value equals the raw value, since an `=`
+    // constant must fit its slot).
+    assert_accepts(
+        r"
+fixum modulus<u8> K = 1
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis K) }
+",
+    );
+}
+
+#[test]
+fn axis_reduction_named_module_modular_out_of_range_is_refused_at_the_cell() {
+    // D5.10: an `=` constant must fit its slot whatever the overflow policy,
+    // so the wrap-to-0 store of `fixum modulus<u8> K = 256` (a `←` store
+    // holds 0) cannot arise at module scope: the cell itself is refused.
+    assert_rejects_with_issue(
+        r"
+fixum modulus<u8> K = 256
+functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis K) }
+",
+        "store_constant_out_of_range",
+    );
+}
+
+#[test]
+fn axis_reduction_named_module_chained_through_another_module_constant() {
+    assert_accepts(
+        r"
+fixum numerus A = 1
+fixum numerus K = A
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis K) }
+",
     );
 }
 

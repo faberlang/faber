@@ -59,6 +59,23 @@ impl Emitter<'_> {
         let integer = |operand: &Operand| matches!(operand.value, Value::Int | Value::Exact);
         let effect = l.effect || r.effect;
         let both_float = l.value == Value::Float && r.value == Value::Float;
+        // `≅` / `≇` across families compares true values, never rounding the
+        // integer to binary64 first.
+        if matches!(op, HirBinOp::ApproxEq | HirBinOp::ApproxNotEq) && (integer(&l) || integer(&r))
+        {
+            self.support.need(Helper::Approx);
+            let (exact, float) = if integer(&l) { (l, r) } else { (r, l) };
+            let mut operands = [exact, float];
+            let prelude = self.sequence(&mut operands);
+            let [exact, float] = operands;
+            let call = format!("faber_int_eq_float({}, {})", exact.text, float.text);
+            let text = if op == HirBinOp::ApproxNotEq {
+                format!("(!{call})")
+            } else {
+                call
+            };
+            return Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect));
+        }
         let (call, value): (fn(&str, &str) -> String, Value) = match op {
             // `÷` on integers: both become binary64, and a zero divisor traps.
             HirBinOp::TrueDiv if integer(&l) && integer(&r) => {
@@ -77,12 +94,13 @@ impl Emitter<'_> {
             HirBinOp::Gt if both_float => (|a, b| format!("({a} > {b})"), Value::Truth),
             HirBinOp::LtEq if both_float => (|a, b| format!("({a} <= {b})"), Value::Truth),
             HirBinOp::GtEq if both_float => (|a, b| format!("({a} >= {b})"), Value::Truth),
-            HirBinOp::Eq | HirBinOp::StrictEq if both_float => {
+            HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::ApproxEq if both_float => {
                 (|a, b| format!("({a} == {b})"), Value::Truth)
             }
-            HirBinOp::NotEq | HirBinOp::StrictNotEq if both_float => {
+            HirBinOp::NotEq | HirBinOp::StrictNotEq | HirBinOp::ApproxNotEq if both_float => {
                 (|a, b| format!("({a} != {b})"), Value::Truth)
             }
+
             // An integer against a float compares true values; C would round
             // the integer to binary64 first.
             HirBinOp::Lt if integer(&l) => {
@@ -129,7 +147,7 @@ impl Emitter<'_> {
     /// by operation. The result is an `int`, saturating as the runner does.
     pub(crate) fn float_method(
         &mut self,
-        receiver: &Operand,
+        receiver: Operand,
         receiver_ty: TypeId,
         method: Symbol,
         args: &[HirCallArg],
@@ -140,15 +158,84 @@ impl Emitter<'_> {
         else {
             return Err(unsupported("method call"));
         };
+        if name == "potentia" {
+            return self.float_power(receiver, args);
+        }
         let helper = match entry.mir_kind {
             IntrinsicMirKind::Collection(MirCollectionOp::Floor) => "faber_floor_i64",
             IntrinsicMirKind::Collection(MirCollectionOp::Ceiling) => "faber_ceil_i64",
             IntrinsicMirKind::Collection(MirCollectionOp::Round) => "faber_nearest_i64",
-            _ => return Err(unsupported("float method outside the subset")),
+            IntrinsicMirKind::Collection(MirCollectionOp::Truncate) => "faber_trunc_i64",
+            _ => return self.float_value_method(entry.mir_kind, receiver, args),
         };
         self.support.need(Helper::Float);
         self.support.need_ints();
         let effect = receiver.effect;
         Ok(Operand::new(format!("{helper}({})", receiver.text), Value::Int).with_effect(effect))
+    }
+
+    /// `x.potentia(n)`: IEEE 754 `pow`, no domain guard (`f64::powf`).
+    fn float_power(
+        &mut self,
+        receiver: Operand,
+        args: &[HirCallArg],
+    ) -> Result<Operand, CodegenError> {
+        let [arg] = args else {
+            return Err(unsupported("float potentia without one argument"));
+        };
+        let exponent = self.expr(&arg.expr)?;
+        if exponent.value != Value::Float {
+            return Err(unsupported("float potentia exponent that is not a float"));
+        }
+        self.support.need(Helper::Float);
+        let effect = receiver.effect || exponent.effect;
+        let mut operands = [receiver, exponent];
+        let prelude = self.sequence(&mut operands);
+        let [base, exponent] = operands;
+        let call = format!("faber_pow_f64({}, {})", base.text, exponent.text);
+        Ok(Operand::new(wrap(&prelude, &call), Value::Float).with_effect(effect))
+    }
+
+    /// A float method that yields a float: `absolutum`, `signum`, and the
+    /// two-operand `minimus` / `maximus` (IEEE, NaN propagates).
+    fn float_value_method(
+        &mut self,
+        kind: IntrinsicMirKind,
+        receiver: Operand,
+        args: &[HirCallArg],
+    ) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::Float);
+        let effect = receiver.effect;
+        let text = match kind {
+            IntrinsicMirKind::Collection(MirCollectionOp::Absolute) => {
+                format!("faber_abs_f64({})", receiver.text)
+            }
+            IntrinsicMirKind::Collection(MirCollectionOp::Signum) => {
+                format!("faber_signum_f64({})", receiver.text)
+            }
+            IntrinsicMirKind::Collection(MirCollectionOp::Minimum)
+            | IntrinsicMirKind::Collection(MirCollectionOp::Maximum) => {
+                let Some(arg) = args.first() else {
+                    return Err(unsupported("float method outside the subset"));
+                };
+                let helper =
+                    if matches!(kind, IntrinsicMirKind::Collection(MirCollectionOp::Minimum)) {
+                        "faber_minimum_f64"
+                    } else {
+                        "faber_maximum_f64"
+                    };
+                let mut operands = [receiver, self.expr(&arg.expr)?];
+                if operands[1].value != Value::Float {
+                    return Err(unsupported("float method argument that is not a float"));
+                }
+                let prelude = self.sequence(&mut operands);
+                let [left, right] = operands;
+                let effect = effect || right.effect;
+                let call = format!("{helper}({}, {})", left.text, right.text);
+                return Ok(Operand::new(wrap(&prelude, &call), Value::Float).with_effect(effect));
+            }
+            _ => return Err(unsupported("float method outside the subset")),
+        };
+        Ok(Operand::new(text, Value::Float).with_effect(effect))
     }
 }

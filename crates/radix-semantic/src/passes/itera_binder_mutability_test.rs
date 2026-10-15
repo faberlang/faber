@@ -1,4 +1,4 @@
-//! IB-1: the authored iteration-binder mutability (`varia` / `fixum`) is
+//! IB-1: the authored iteration-binder mutability (`varia` / `sit`) is
 //! carried on every HIR loop node that introduces a binder: `Itera`,
 //! `IteraLockstep`, `IteraRange` and `Reduction`.
 
@@ -41,7 +41,7 @@ fn assert_flag(source: &str, node: &'static str, mutable: bool) {
 
 #[test]
 fn itera_carries_binder_mutability() {
-    for (modifier, mutable) in [("varia", true), ("fixum", false)] {
+    for (modifier, mutable) in [("varia", true), ("sit", false)] {
         assert_flag(
             &format!(
                 "functio f(lista<numerus> xs) → vacuum {{ itera ex xs {modifier} x {{ nota x }} }}"
@@ -54,7 +54,7 @@ fn itera_carries_binder_mutability() {
 
 #[test]
 fn itera_lockstep_carries_binder_mutability() {
-    for (modifier, mutable) in [("varia", true), ("fixum", false)] {
+    for (modifier, mutable) in [("varia", true), ("sit", false)] {
         assert_flag(
             &format!(
                 "functio f(lista<numerus> xs, lista<numerus> ys) → vacuum {{ \
@@ -68,7 +68,7 @@ fn itera_lockstep_carries_binder_mutability() {
 
 #[test]
 fn itera_range_carries_binder_mutability() {
-    for (modifier, mutable) in [("varia", true), ("fixum", false)] {
+    for (modifier, mutable) in [("varia", true), ("sit", false)] {
         assert_flag(
             &format!(
                 "functio f(numerus m, numerus n) → vacuum {{ \
@@ -82,7 +82,7 @@ fn itera_range_carries_binder_mutability() {
 
 #[test]
 fn summa_carries_binder_mutability() {
-    for (modifier, mutable) in [("varia", true), ("fixum", false)] {
+    for (modifier, mutable) in [("varia", true), ("sit", false)] {
         assert_flag(
             &format!(
                 "functio t(tensor<f32, [8]> a) → vacuum {{ \

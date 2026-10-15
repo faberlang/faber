@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "apud coordinate iteration declines arity mismatch and unindexed iterables with structured issues."
-syntax = "for from <iterable> at [coords] const cell { }"
+syntax = "for from <iterable> at [coords] let cell { }"
 related = ["apud", "itera", "ex", "tensor", "matrix", "lista", "copia"]
 locale = "en"
 +++
@@ -43,25 +43,25 @@ locale = "en"
 # pinned in apud-decline.expected; case 4 is an admit row kept here beside them.
 
 fn arity(tensor<f32, [2, 3]> grid) → void {
-    for from grid at [i] const cell {
+    for from grid at [i] let cell {
         print cell
     }
 }
 
 fn ragged(list<list<f32>> rows) → void {
-    for from rows at [r, c] const cell {
+    for from rows at [r, c] let cell {
         print cell
     }
 }
 
 fn members(set<int> s) → void {
-    for from s at [i] const member {
+    for from s at [i] let member {
         print member
     }
 }
 
 fn generic<size R, size C>(tensor<f32, [R, C]> grid) → void {
-    for from grid at [r, c] const cell {
+    for from grid at [r, c] let cell {
         print cell
     }
 }

@@ -71,10 +71,10 @@ fn set_unknown_method_is_rejected() {
 
 #[test]
 fn text_unknown_method_is_rejected() {
-    rejects_unknown_method("incipit {\n    fixum textus t ← \"abc\"\n    nota t.frobnicate()\n}");
+    rejects_unknown_method("incipit {\n    sit textus t ← \"abc\"\n    nota t.frobnicate()\n}");
 }
 
 #[test]
 fn number_unknown_method_is_rejected() {
-    rejects_unknown_method("incipit {\n    fixum numerus n ← 1\n    nota n.frobnicate()\n}");
+    rejects_unknown_method("incipit {\n    sit numerus n ← 1\n    nota n.frobnicate()\n}");
 }

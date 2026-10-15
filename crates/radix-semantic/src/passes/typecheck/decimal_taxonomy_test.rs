@@ -58,8 +58,8 @@ fn integer_scalar_bracket_index_still_accepts() {
 fn tensor_media_over_decimal_element_rejects_with_teaching_issue() {
     test_support::assert_rejects_with_issue_la(
         r"incipit {
-  fixum tensor<d64, [3]> grid ← vacua
-  fixum f64 mean ← grid.media()
+  sit tensor<d64, [3]> grid ← vacua
+  sit f64 mean ← grid.media()
   nota mean
 }",
         "tensor_media_decimal_rejected",
@@ -70,8 +70,8 @@ fn tensor_media_over_decimal_element_rejects_with_teaching_issue() {
 fn tensor_media_over_integer_numerus_still_returns_f64() {
     test_support::assert_accepts_la(
         r"incipit {
-  fixum tensor<numerus, [3]> grid ← vacua
-  fixum f64 mean ← grid.media()
+  sit tensor<numerus, [3]> grid ← vacua
+  sit f64 mean ← grid.media()
   nota mean
 }",
     );
@@ -102,7 +102,7 @@ fn ascii_format_pack_from_decimal_source_rejects() {
 
 #[test]
 fn ascii_format_pack_from_integer_source_still_accepts() {
-    test_support::assert_accepts_la("incipit { fixum ascii<2> hex ← 255 ↦ ascii<2> via Hex }");
+    test_support::assert_accepts_la("incipit { sit ascii<2> hex ← 255 ↦ ascii<2> via Hex }");
 }
 
 // --- wrong site class: endian hints (Be/Le) ---

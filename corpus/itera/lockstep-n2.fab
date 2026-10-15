@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = true
 summary = "Lockstep walk of two lists with two binders."
-syntax = "for from <lista>, <lista> const <left>, <right> { }"
+syntax = "for from <lista>, <lista> let <left>, <right> { }"
 related = ["ex", "de", "apud"]
 locale = "en"
 +++
@@ -30,15 +30,15 @@ locale = "en"
 # =============================================================================
 
 main {
-    const list<string> labels ← ["one", "two", "three"]
-    const list<int> values ← [1, 2, 3]
-    for from labels, values const label, value {
+    let list<string> labels ← ["one", "two", "three"]
+    let list<int> values ← [1, 2, 3]
+    for from labels, values let label, value {
         print label
         print value
     }
-    const list<int> left ← [10, 20, 30]
-    const list<int> right ← [1, 2, 3]
-    for from left, right const a, b {
+    let list<int> left ← [10, 20, 30]
+    let list<int> right ← [1, 2, 3]
+    for from left, right let a, b {
         print a - b
     }
 }

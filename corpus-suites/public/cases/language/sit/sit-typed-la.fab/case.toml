@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/sit/sit-typed-la.fab"
+group = "language"
+input_root = "corpus"
+input = "sit/sit-typed-la.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

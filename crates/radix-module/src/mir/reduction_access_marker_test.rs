@@ -47,7 +47,7 @@ fn mut_parameter_reduction_return_runs() {
     let source = format!(
         "{PRELUDE}
 main {{
-    var tensor<f32, [4]> t ← tf32[4] {{}}
+    mut tensor<f32, [4]> t ← tf32[4] {{}}
     t[[2]] ← 5.0 ∷ f32
     t[[3]] ← 1.5 ∷ f32
     print argmax_mut(mut t)
@@ -62,7 +62,7 @@ fn mut_parameter_sum_and_max_return_run() {
     let source = format!(
         "{PRELUDE}
 main {{
-    var tensor<f32, [4]> t ← tf32[4] {{}}
+    mut tensor<f32, [4]> t ← tf32[4] {{}}
     t[[2]] ← 5.0 ∷ f32
     t[[3]] ← 1.5 ∷ f32
     print sum_mut(mut t)
@@ -78,7 +78,7 @@ fn own_and_plain_parameter_argmax_return_run() {
     let source = format!(
         "{PRELUDE}
 main {{
-    var tensor<f32, [4]> t ← tf32[4] {{}}
+    mut tensor<f32, [4]> t ← tf32[4] {{}}
     t[[1]] ← 2.0 ∷ f32
     print argmax_plain(t)
     print argmax_own(own t)

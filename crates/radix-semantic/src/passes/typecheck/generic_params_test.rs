@@ -91,7 +91,7 @@ fn generic_call_instantiates_type_params_at_call_site() {
 }
 
 incipit {
-    fixum numerus n ← id(42)
+    sit numerus n ← id(42)
     nota n
 }",
     );
@@ -105,7 +105,7 @@ fn generic_call_shares_one_witness_for_repeated_param_symbol() {
 }
 
 incipit {
-    fixum numerus n ← pair(1, 2)
+    sit numerus n ← pair(1, 2)
     nota n
 }",
     );
@@ -119,7 +119,7 @@ fn generic_call_rejects_mismatched_witnesses_for_shared_param_symbol() {
 }
 
 incipit {
-    fixum _ n ← pair(1, "two")
+    sit n ← pair(1, "two")
 }"#,
         "argument_type_mismatch",
     );
@@ -138,9 +138,9 @@ fn magnitudo_param_lowers_in_vector_signature() {
 fn vector_dot_returns_element_type() {
     accepts(
         r"incipit {
-    fixum vf32[4] a ← [1.0, 2.0, 3.0, 4.0] ↦ vf32[4]
-    fixum vf32[4] b ← [4.0, 3.0, 2.0, 1.0] ↦ vf32[4]
-    fixum f32 d ← a.productum(b)
+    sit vf32[4] a ← [1.0, 2.0, 3.0, 4.0] ↦ vf32[4]
+    sit vf32[4] b ← [4.0, 3.0, 2.0, 1.0] ↦ vf32[4]
+    sit f32 d ← a.productum(b)
     nota d
 }",
     );
@@ -155,15 +155,15 @@ fn shape_param_binds_from_argument_shape_at_call_site() {
     // concrete witness.
     accepts(
         r"functio sgd_step<magnitudo Figura>(tensor<f32, Figura> param, tensor<f32, Figura> grad, f32 lr) → tensor<f32, Figura> {
-    fixum tensor<f32, Figura> lr_fill ← param.reple(lr)
-    fixum tensor<f32, Figura> scaled ← grad ⊙ lr_fill
+    sit tensor<f32, Figura> lr_fill ← param.reple(lr)
+    sit tensor<f32, Figura> scaled ← grad ⊙ lr_fill
     redde param - scaled
 }
 
 incipit {
-    fixum tensor<f32, [2, 2]> p ← vacua
-    fixum tensor<f32, [2, 2]> g ← vacua
-    fixum tensor<f32, [2, 2]> r ← sgd_step(p, g, 0.1)
+    sit tensor<f32, [2, 2]> p ← vacua
+    sit tensor<f32, [2, 2]> g ← vacua
+    sit tensor<f32, [2, 2]> r ← sgd_step(p, g, 0.1)
     nota r.longitudo()
 }",
     );
@@ -179,9 +179,9 @@ fn tuple_shape_params_bind_from_argument_shape() {
 }
 
 incipit {
-    fixum tensor<f32, [2, 2]> p ← vacua
-    fixum tensor<f32, [2, 2]> g ← vacua
-    fixum tensor<f32, [2, 2]> r ← sgd_generic(p, g, 0.1)
+    sit tensor<f32, [2, 2]> p ← vacua
+    sit tensor<f32, [2, 2]> g ← vacua
+    sit tensor<f32, [2, 2]> r ← sgd_generic(p, g, 0.1)
     nota r.longitudo()
 }",
     );
@@ -193,21 +193,21 @@ fn shape_param_binds_rank_agnostic_across_concrete_ranks() {
     // signature covers `[2, 2]`, `[4]`, and `[]` witnesses.
     accepts(
         r"functio sgd_step<magnitudo Figura>(tensor<f32, Figura> param, tensor<f32, Figura> grad, f32 lr) → tensor<f32, Figura> {
-    fixum tensor<f32, Figura> lr_fill ← param.reple(lr)
-    fixum tensor<f32, Figura> scaled ← grad ⊙ lr_fill
+    sit tensor<f32, Figura> lr_fill ← param.reple(lr)
+    sit tensor<f32, Figura> scaled ← grad ⊙ lr_fill
     redde param - scaled
 }
 
 incipit {
-    fixum tensor<f32, [2, 2]> p2 ← vacua
-    fixum tensor<f32, [2, 2]> g2 ← vacua
-    fixum tensor<f32, [2, 2]> r2 ← sgd_step(p2, g2, 0.1)
-    fixum tensor<f32, [4]> p1 ← vacua
-    fixum tensor<f32, [4]> g1 ← vacua
-    fixum tensor<f32, [4]> r1 ← sgd_step(p1, g1, 0.1)
-    fixum tensor<f32, []> p0 ← vacua
-    fixum tensor<f32, []> g0 ← vacua
-    fixum tensor<f32, []> r0 ← sgd_step(p0, g0, 0.1)
+    sit tensor<f32, [2, 2]> p2 ← vacua
+    sit tensor<f32, [2, 2]> g2 ← vacua
+    sit tensor<f32, [2, 2]> r2 ← sgd_step(p2, g2, 0.1)
+    sit tensor<f32, [4]> p1 ← vacua
+    sit tensor<f32, [4]> g1 ← vacua
+    sit tensor<f32, [4]> r1 ← sgd_step(p1, g1, 0.1)
+    sit tensor<f32, []> p0 ← vacua
+    sit tensor<f32, []> g0 ← vacua
+    sit tensor<f32, []> r0 ← sgd_step(p0, g0, 0.1)
     nota r0.longitudo()
 }",
     );
@@ -223,7 +223,7 @@ fn shape_param_binds_from_expected_type() {
 }
 
 incipit {
-    fixum tensor<numerus, [2, 2]> u ← make(5)
+    sit tensor<numerus, [2, 2]> u ← make(5)
     nota u.longitudo()
 }",
     );
@@ -239,8 +239,8 @@ fn shape_param_binds_with_explicit_type_args() {
 }
 
 incipit {
-    fixum tensor<f32, [2, 2]> p ← vacua
-    fixum tensor<f32, [2, 2]> r ← sgd_generic<f32>(p, 0.1)
+    sit tensor<f32, [2, 2]> p ← vacua
+    sit tensor<f32, [2, 2]> r ← sgd_generic<f32>(p, 0.1)
     nota r.longitudo()
 }",
     );
@@ -257,9 +257,9 @@ fn shared_shape_param_binds_once_across_repeated_positions() {
 }
 
 incipit {
-    fixum tensor<f32, [2, 2]> x ← vacua
-    fixum tensor<f32, [2]> y ← vacua
-    fixum _ r ← pair_shaped(x, y)
+    sit tensor<f32, [2, 2]> x ← vacua
+    sit tensor<f32, [2]> y ← vacua
+    sit r ← pair_shaped(x, y)
 }",
         "incompatible_tensor_index",
     );
@@ -299,7 +299,7 @@ fn open_shape_hole_in_library_context_still_fires_sem014() {
     // that no witness resolves is still a missing annotation.
     rejects_with_issue(
         r"functio k() → vacuum {
-    fixum tensor<f32, [_, 3]> x ← vacua
+    sit tensor<f32, [_, 3]> x ← vacua
 }",
         "cannot_infer_tensor_shape",
     );
@@ -316,11 +316,11 @@ fn generic_scaled_dot_product_method_body_typechecks() {
     tensor<f32, [B, D]> qb, tensor<f32, [B, D]> kb, tensor<f32, [B, D]> vb,
     tensor<f32, [B, B]> scale
 ) → tensor<f32, [B, D]> {
-    fixum tensor<f32, [D, B]> kt ← kb.transpone()
-    fixum tensor<f32, [B, B]> scores ← qb.matmul(kt)
-    fixum tensor<f32, [B, B]> scaled ← scores ⊙ scale
-    fixum tensor<f32, [B, B]> attn ← scaled.activatio_softmax()
-    fixum tensor<f32, [B, D]> context ← attn.matmul(vb)
+    sit tensor<f32, [D, B]> kt ← kb.transpone()
+    sit tensor<f32, [B, B]> scores ← qb.matmul(kt)
+    sit tensor<f32, [B, B]> scaled ← scores ⊙ scale
+    sit tensor<f32, [B, B]> attn ← scaled.activatio_softmax()
+    sit tensor<f32, [B, D]> context ← attn.matmul(vb)
     redde context
 }",
     );
@@ -331,17 +331,17 @@ fn shape_changing_call_site_binds_witnesses() {
     // Concrete [2, 8] arguments bind B and D through a shape-changing body.
     accepts(
         r#"functio sdpa<magnitudo B, magnitudo D>(tensor<f32, [B, D]> qb, tensor<f32, [B, D]> kb, tensor<f32, [B, D]> vb) → tensor<f32, [B, D]> {
-    fixum tensor<f32, [D, B]> kt ← kb.transpone()
-    fixum tensor<f32, [B, B]> scores ← qb.matmul(kt)
-    fixum tensor<f32, [B, D]> context ← scores.matmul(vb)
+    sit tensor<f32, [D, B]> kt ← kb.transpone()
+    sit tensor<f32, [B, B]> scores ← qb.matmul(kt)
+    sit tensor<f32, [B, D]> context ← scores.matmul(vb)
     redde context
 }
 
 incipit {
-    fixum tensor<f32, [2, 8]> qb ← vacua
-    fixum tensor<f32, [2, 8]> kb ← vacua
-    fixum tensor<f32, [2, 8]> vb ← vacua
-    fixum tensor<f32, [2, 8]> ctx ← sdpa(qb, kb, vb)
+    sit tensor<f32, [2, 8]> qb ← vacua
+    sit tensor<f32, [2, 8]> kb ← vacua
+    sit tensor<f32, [2, 8]> vb ← vacua
+    sit tensor<f32, [2, 8]> ctx ← sdpa(qb, kb, vb)
     nota "call ok"
 }"#,
     );
@@ -357,10 +357,10 @@ fn shape_changing_call_site_shape_mismatch_rejects() {
 }
 
 incipit {
-    fixum tensor<f32, [2, 8]> qb ← vacua
-    fixum tensor<f32, [3, 4]> kb ← vacua
-    fixum tensor<f32, [2, 8]> vb ← vacua
-    fixum tensor<f32, [2, 8]> ctx ← sdpa_bad(qb, kb, vb)
+    sit tensor<f32, [2, 8]> qb ← vacua
+    sit tensor<f32, [3, 4]> kb ← vacua
+    sit tensor<f32, [2, 8]> vb ← vacua
+    sit tensor<f32, [2, 8]> ctx ← sdpa_bad(qb, kb, vb)
     nota "bad call ok"
 }"#,
         "incompatible_tensor_index",
@@ -376,8 +376,8 @@ fn generic_method_type_params_mix_with_class_params_accepts() {
     accepts(
         r"genus Something<A> {
     functio run<C>(A b, C c) → A {
-        fixum C local ← c
-        fixum A a2 ← b
+        sit C local ← c
+        sit A a2 ← b
         redde a2
     }
 }",
@@ -400,9 +400,9 @@ functio make() → Box<numerus> {
 }
 
 incipit {
-    fixum Box<numerus> s ← make()
-    fixum textus t ← s.set<textus>("x")
-    fixum numerus n ← s.set<numerus>(5)
+    sit Box<numerus> s ← make()
+    sit textus t ← s.set<textus>("x")
+    sit numerus n ← s.set<numerus>(5)
     nota t
     nota n
 }"#,
@@ -441,8 +441,8 @@ fn generic_method_on_generic_class_dual_witness_call_accepts() {
     accepts(
         r#"genus Something<A> {
     functio run<C>(A b, C c) → A {
-        fixum C local ← c
-        fixum A a2 ← b
+        sit C local ← c
+        sit A a2 ← b
         redde a2
     }
 }
@@ -452,8 +452,8 @@ functio make() → Something<numerus> {
 }
 
 incipit {
-    fixum Something<numerus> s ← make()
-    fixum numerus result ← s.run<textus>(1, "x")
+    sit Something<numerus> s ← make()
+    sit numerus result ← s.run<textus>(1, "x")
     nota result
 }"#,
     );
@@ -464,8 +464,8 @@ fn generic_method_on_generic_class_swapped_args_rejects() {
     rejects_with_issue(
         r#"genus Something<A> {
     functio run<C>(A b, C c) → A {
-        fixum C local ← c
-        fixum A a2 ← b
+        sit C local ← c
+        sit A a2 ← b
         redde a2
     }
 }
@@ -475,8 +475,8 @@ functio make() → Something<numerus> {
 }
 
 incipit {
-    fixum Something<numerus> s ← make()
-    fixum _ result ← s.run<textus>("x", 1)
+    sit Something<numerus> s ← make()
+    sit result ← s.run<textus>("x", 1)
 }"#,
         "argument_type_mismatch",
     );
@@ -533,7 +533,7 @@ functio caller<magnitudo M, magnitudo N>(tensor<f32, [M, N]> value) → tensor<f
 }
 
 incipit {
-    fixum tensor<f32, [2, 3]> value ← vacua
+    sit tensor<f32, [2, 3]> value ← vacua
     nota caller(value).longitudo()
 }",
     );
@@ -553,7 +553,7 @@ functio caller<magnitudo M, magnitudo N>(tensor<f32, [M, N]> value) → tensor<f
 }
 
 incipit {
-    fixum tensor<f32, [2, 3]> value ← vacua
+    sit tensor<f32, [2, 3]> value ← vacua
     nota caller(value).longitudo()
 }",
     );

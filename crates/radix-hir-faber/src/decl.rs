@@ -124,8 +124,8 @@ impl super::FaberCodegen<'_> {
     ) {
         let await_assignment = self.await_assignment_bindings.contains(&def_id);
         if constant.statica.is_some() {
-            // A module-level constant is spelled `fixum` (st1 R15); the
-            // `generis` word is only the genus field modifier.
+            // A module-level constant is spelled `fixum` (st1 R15); a genus
+            // constant member takes the same word.
             writer.write(surface.contextual_keyword("fixum"));
         } else {
             writer.write(surface.contextual_keyword(if constant.mutable {
@@ -158,7 +158,7 @@ impl super::FaberCodegen<'_> {
         {
             // Typed `↤` constant initializer: lowering stores the
             // binding as the assignment target, so re-emit as
-            // `fixum T name ↤ source [⊥ default]`.
+            // `sit T name ↤ source [⊥ default]`.
             writer.write(" ↤ ");
             self.write_expr_prec(source, 1, names, surface, writer);
             self.write_conversio_assign_via(params, surface, writer);
@@ -425,9 +425,9 @@ impl super::FaberCodegen<'_> {
                 );
                 if let Some(modifier) = field.modifier {
                     writer.write(surface.keyword(match modifier {
-                        radix_syntax::FieldModifier::Fixum => TokenKind::Fixum,
+                        radix_syntax::FieldModifier::Fixum => TokenKind::Sit,
                         radix_syntax::FieldModifier::Varia => TokenKind::Varia,
-                        radix_syntax::FieldModifier::Generis => TokenKind::Generis,
+                        radix_syntax::FieldModifier::Const => TokenKind::Fixum,
                     }));
                     writer.write(" ");
                 }

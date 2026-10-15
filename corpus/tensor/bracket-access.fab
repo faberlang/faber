@@ -42,20 +42,20 @@ locale = "en"
 #   4.0
 
 main {
-    var tf32[4] input ← tf32[4] {}
-    var tf32[4] output ← tf32[4] {}
+    mut tf32[4] input ← tf32[4] {}
+    mut tf32[4] output ← tf32[4] {}
 
-    const u32 index ← 1
+    let u32 index ← 1
     input[index] ← 3.0
-    const f32 old ← input[index]
-    const f32 oldMethod ← input.get([index]) ⊥ 0.0
+    let f32 old ← input[index]
+    let f32 oldMethod ← input.get([index]) ⊥ 0.0
     output[index] ← old + 1.0
-    const f32 updated ← output[index]
+    let f32 updated ← output[index]
 
-    var tf32[2, 2] grid ← tf32[2, 2] {}
+    mut tf32[2, 2] grid ← tf32[2, 2] {}
     grid[[1, 0]] ← updated
-    const f32 elementum ← grid[[1, 0]]
-    const f32 elementumMethod ← grid.get([1, 0])
+    let f32 elementum ← grid[[1, 0]]
+    let f32 elementumMethod ← grid.get([1, 0])
 
     print old
     print oldMethod

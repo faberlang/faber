@@ -9,8 +9,8 @@ import from "norma:time" time
 
 main {
     time.sleep(0)
-    const int before ← time.monotonic()
-    const int after ← time.monotonic()
+    let int before ← time.monotonic()
+    let int after ← time.monotonic()
     assert after ≥ before
     print "clock-ok"
 }

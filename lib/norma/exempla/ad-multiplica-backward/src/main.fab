@@ -17,8 +17,8 @@ fn multiply(tensor<f32, [2]> a, tensor<f32, [2]> b) → tensor<f32, [2]> {
 }
 
 main {
-    const tensor<f32, [2]> left ← empty
-    const tensor<f32, [2]> right ← empty
-    const tensor<f32, [2]> product ← multiply(left, right)
+    let tensor<f32, [2]> left ← empty
+    let tensor<f32, [2]> right ← empty
+    let tensor<f32, [2]> product ← multiply(left, right)
     print product.length()
 }

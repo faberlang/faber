@@ -32,29 +32,29 @@ locale = "en"
 # =============================================================================
 
 fn max_static(tf32[4] values) → f32 {
-    const f32 result ← reduce via max from values
+    let f32 result ← reduce via max from values
     return result
 }
 
 # The `at`-binder is for bodies that use the index.
 fn max_scaled(tf32[4] row, tf32[4] scale) → f32 {
-    const f32 result ← reduce via max from (row ⊙ scale) coalesce 0.0
+    let f32 result ← reduce via max from (row ⊙ scale) coalesce 0.0
     return result
 }
 
 fn min_with_identity(tf32[4] values, f32 floor) → f32 {
-    const f32 result ← reduce via min from values at [i] coalesce floor
+    let f32 result ← reduce via min from values at [i] coalesce floor
     return result
 }
 
 fn max_dynamic<size Figura>(tensor<f32, Figura> values, f32 fallback) → f32 {
-    const f32 result ← reduce via max from values at [i] coalesce fallback
+    let f32 result ← reduce via max from values at [i] coalesce fallback
     return result
 }
 
 fn max_empty() → f32 {
-    const tf32[0] values ← empty
-    const f32 result ← reduce via max from values at [i] coalesce -∞
+    let tf32[0] values ← empty
+    let f32 result ← reduce via max from values at [i] coalesce -∞
     return result
 }
 
@@ -65,9 +65,9 @@ fn max_empty() → f32 {
 #   -inf
 
 main {
-    const list<f32> flat ← [4.0, 1.0, 3.0, 2.0]
-    const tf32[4] values ← flat ↦ tf32[4]
-    const tf32[4] scale ← [1.0, 1.0, 1.0, 1.0] ↦ tf32[4]
+    let list<f32> flat ← [4.0, 1.0, 3.0, 2.0]
+    let tf32[4] values ← flat ↦ tf32[4]
+    let tf32[4] scale ← [1.0, 1.0, 1.0, 1.0] ↦ tf32[4]
 
     print max_static(values)
     print min_with_identity(values, 99.0)

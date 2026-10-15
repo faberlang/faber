@@ -65,21 +65,20 @@ use super::borrow_region_cfg::CfgNodeId;
 
 use crate::scope::ImportedFileInterfaceMethod;
 use crate::{
-    AccessMarker, FuncSig, ISSUE_ASSIGN_THROUGH_REF, ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL,
-    ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN, ParamType, Primitive, Resolver,
-    SUGGESTION_COPY, SemanticError, SemanticErrorKind, SemanticParamMode, Type, TypeId, TypeTable,
-    WarningKind,
+    AccessMarker, FuncSig, ISSUE_ASSIGN_THROUGH_REF, ISSUE_ASSIGN_TO_DE_PARAMETER,
+    ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL, ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN,
+    ParamType, Primitive, Resolver, SUGGESTION_COPY, SemanticError, SemanticErrorKind,
+    SemanticParamMode, Type, TypeId, TypeTable, WarningKind,
 };
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItem,
-    HirItemKind, HirModule, HirParamMode, HirStatement, HirStatementKind,
+    HirItemKind, HirIteraMode, HirModule, HirParamMode, HirStatement, HirStatementKind,
 };
 use radix_intrinsics::{is_mutating_receiver, lookup_method_for_type_id};
 use radix_lexer::Interner;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-const ISSUE_ASSIGN_TO_DE_PARAMETER: &str = "assign_to_de_parameter";
 const ISSUE_BORROW_OF_MOVED: &str = "borrow_of_moved";
 const ISSUE_CANNOT_MOVE_WHILE_BORROWED: &str = "cannot_move_while_borrowed";
 const ISSUE_DE_TO_IN_OR_EX_POSITION: &str = "de_to_in_or_ex_position";
@@ -1084,25 +1083,33 @@ impl<'a> BorrowChecker<'a> {
 
     /// Access rules for writing `target`, shared by assignment and `⇇`.
     fn check_lvalue_access(&mut self, target: &HirExpression) {
+        // One fault, one diagnostic: a write through an explicit `ref` view (a
+        // `ref` binding or `ref` parameter) is `assign_through_ref`; a write
+        // through a bare parameter or an alias of a `ref`/bare parameter is
+        // `assign_to_de_parameter`. Re-pointing the name itself is legal. A
+        // name that already took one of these read-only-through diagnostics
+        // does not also take the non-`mut` alias row — the alias error is for
+        // names whose own cell is writable (`mut alias of a bare parameter`),
+        // not for a `ref` cursor that is read-only through on its own account.
+        let mut refused_through_ref = false;
         if Self::is_projection(target)
             && let Some(def_id) = Self::root_def_id(target)
-            && self.ref_roots.contains(&def_id)
         {
-            self.error(
-                SemanticErrorKind::AssignToImmutableBorrow,
-                ISSUE_ASSIGN_THROUGH_REF,
-                target.span,
-            );
-        }
-        if Self::is_projection(target)
-            && let Some(def_id) = Self::root_def_id(target)
-            && self.de_aliases.contains(&def_id)
-        {
-            self.error(
-                SemanticErrorKind::AssignToImmutableBorrow,
-                ISSUE_ASSIGN_TO_DE_PARAMETER,
-                target.span,
-            );
+            if self.ref_roots.contains(&def_id) {
+                self.error(
+                    SemanticErrorKind::AssignToImmutableBorrow,
+                    ISSUE_ASSIGN_THROUGH_REF,
+                    target.span,
+                );
+                refused_through_ref = true;
+            } else if self.is_de_param(def_id) || self.de_aliases.contains(&def_id) {
+                self.error(
+                    SemanticErrorKind::AssignToImmutableBorrow,
+                    ISSUE_ASSIGN_TO_DE_PARAMETER,
+                    target.span,
+                );
+                refused_through_ref = true;
+            }
         }
         if let Some(def_id) = Self::root_def_id(target) {
             if Self::is_projection(target)
@@ -1110,7 +1117,8 @@ impl<'a> BorrowChecker<'a> {
             {
                 self.nonmut_tensor_write_error(origin, target.span);
             }
-            if Self::is_projection(target)
+            if !refused_through_ref
+                && Self::is_projection(target)
                 && let Some(origin) = self.nonmut_agg_alias_origin(def_id)
             {
                 self.nonmut_agg_write_error(origin, target.span);
@@ -1372,6 +1380,51 @@ impl<'a> BorrowChecker<'a> {
             && origin != local
         {
             self.nonmut_agg_aliases.insert(local, origin);
+        }
+    }
+
+    /// An element binder of `for from xs` names an element of `xs`, so a
+    /// read-only collection (a `const` local, a non-`mut` aggregate parameter,
+    /// or an alias of one) makes the binder a read-only alias of that origin:
+    /// const protects all the way down. A bare rebind of the binder is not a
+    /// projection and stays legal.
+    fn note_itera_binder_alias(
+        &mut self,
+        binding: DefId,
+        mode: HirIteraMode,
+        iter: &HirExpression,
+    ) {
+        if !self.itera_element_can_alias(mode, iter) {
+            return;
+        }
+        let Some(root) = Self::root_def_id(iter) else {
+            return;
+        };
+        let origin = match self.nonmut_agg_origin(root) {
+            Some(origin) => origin,
+            None if self.immutable_locals.contains(&root) => root,
+            None => return,
+        };
+        if origin != binding {
+            self.nonmut_agg_aliases.insert(binding, origin);
+        }
+    }
+
+    /// Whether the binder of an `itera` over `iter` can hold shared storage.
+    /// `de` binds an index or key. `ex` over a list, set or map binds an
+    /// element or value, which must itself alias; any other iterable keeps the
+    /// alias, since a scalar binder has no projection to write through.
+    fn itera_element_can_alias(&self, mode: HirIteraMode, iter: &HirExpression) -> bool {
+        if !matches!(mode, HirIteraMode::Ex) {
+            return false;
+        }
+        let Some(ty) = iter.ty else { return true };
+        let (_, inner) = self.types.peel_access_marker(ty);
+        match self.types.get(inner) {
+            Type::Array(element) | Type::Set(element) | Type::Map(_, element) => {
+                self.is_aliasing_type(*element)
+            }
+            _ => true,
         }
     }
 
@@ -1750,7 +1803,7 @@ impl<'a> BorrowChecker<'a> {
             self.visit_expr(target);
             return;
         };
-        if self.de_aliases.contains(&root) {
+        if self.is_de_param(root) || self.de_aliases.contains(&root) {
             self.error(
                 SemanticErrorKind::AssignToImmutableBorrow,
                 ISSUE_ASSIGN_TO_DE_PARAMETER,
@@ -2281,21 +2334,21 @@ impl<'a> BorrowChecker<'a> {
         }
     }
 
+    fn is_de_param(&self, def_id: DefId) -> bool {
+        self.param_usage
+            .get(&def_id)
+            .is_some_and(|usage| matches!(usage.mode, HirParamMode::De))
+    }
+
     fn write_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
         self.note_live_unmarked_own_bind(def_id);
         self.note_live_own_arg(def_id);
-        if let Some(usage) = self.param_usage.get_mut(&def_id) {
-            if matches!(usage.mode, HirParamMode::De) {
-                self.error(
-                    SemanticErrorKind::AssignToImmutableBorrow,
-                    ISSUE_ASSIGN_TO_DE_PARAMETER,
-                    span,
-                );
-            } else {
-                // `mut` writes the caller's value; `own`/`copy` write the
-                // callee's own value. Either way the parameter is mutated.
-                usage.mutated = true;
-            }
+        if let Some(usage) = self.param_usage.get_mut(&def_id)
+            && !matches!(usage.mode, HirParamMode::De)
+        {
+            // `mut` writes the caller's value; `own`/`copy` write the
+            // callee's own value. Either way the parameter is mutated.
+            usage.mutated = true;
         }
         let (_region_mut_live, region_any_live) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();
@@ -2698,6 +2751,7 @@ impl HirVisitor for BorrowChecker<'_> {
                 self.finish_loop(&entry, body);
             }
             HirExpressionKind::Itera {
+                mode,
                 binding,
                 iter,
                 body: block,
@@ -2705,6 +2759,7 @@ impl HirVisitor for BorrowChecker<'_> {
             } => {
                 self.visit_expr(iter);
                 self.ensure_state(*binding);
+                self.note_itera_binder_alias(*binding, *mode, iter);
                 self.own.note_loop_binder(*binding);
                 let entry = self.loop_entry();
                 self.check_block(block);
@@ -2849,7 +2904,7 @@ impl HirVisitor for BorrowChecker<'_> {
                 if is_mutating {
                     if let Some(def_id) = Self::root_def_id(receiver) {
                         self.check_projection_inputs(receiver);
-                        if self.de_aliases.contains(&def_id) {
+                        if self.is_de_param(def_id) || self.de_aliases.contains(&def_id) {
                             self.error(
                                 SemanticErrorKind::AssignToImmutableBorrow,
                                 ISSUE_ASSIGN_TO_DE_PARAMETER,

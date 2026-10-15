@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "identifier"
 canonical = true
 summary = "Locals, parameters, fields and methods may be spelled like target-language reserved words."
-syntax = "class Cista { var int box; fn move(int yield) → int { const int match ← yield; return match + self.box } }"
+syntax = "class Cista { mut int box; fn move(int yield) → int { let int match ← yield; return match + self.box } }"
 related = ["keyword-as-ident", "fixum"]
 locale = "en"
 +++
@@ -33,12 +33,12 @@ locale = "en"
 #   rust-reserved-names.expected — the computed values.
 
 class Cista {
-    var int box
-    var int final
+    mut int box
+    mut int final
 
     fn move(int yield, int type) → int {
-        const int match ← yield + type
-        const int box ← match + self.box
+        let int match ← yield + type
+        let int box ← match + self.box
         return box + self.final
     }
 }
@@ -48,7 +48,7 @@ fn pack(int box) → int {
 }
 
 main {
-    const Cista c ← Cista { box = 2, final = 3 }
+    let Cista c ← Cista { box = 2, final = 3 }
     print c.move(10, 20)
     print pack(4)
 }

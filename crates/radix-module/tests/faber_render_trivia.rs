@@ -69,9 +69,9 @@ const TRIVIA_SOURCE: &str = "\
 # item comment
 functio workhorse() → numerus {
     # first statement
-    fixum numerus primus ← 1
+    sit numerus primus ← 1
     # second statement
-    fixum numerus secundus ← 2
+    sit numerus secundus ← 2
 
     # braced branch
     si primus ≡ 1 {
@@ -106,7 +106,7 @@ functio f() → vacuum {
 # before entry
 incipit {
     # entry statement
-    fixum numerus score ← 1
+    sit numerus score ← 1
 }
 # trailing comment
 ";
@@ -175,11 +175,11 @@ fn faber_render_comments_render_at_structural_positions() {
     );
     // Statement trivia precedes each statement.
     assert!(
-        code.contains("# first statement\n    fixum numerus primus ← 1"),
+        code.contains("# first statement\n    sit numerus primus ← 1"),
         "statement comment must precede its statement:\n{code}"
     );
     assert!(
-        code.contains("# second statement\n    fixum numerus secundus ← 2"),
+        code.contains("# second statement\n    sit numerus secundus ← 2"),
         "second statement comment must precede its statement:\n{code}"
     );
     // Block-end trivia precedes the function's closing brace.
@@ -268,11 +268,11 @@ fn faber_render_boundary_newlines_do_not_manufacture_blank_lines() {
     // emitter's own statement newline plus the first stored newline must NOT
     // add a second blank line.
     assert!(
-        code.contains("# second statement\n    fixum numerus secundus ← 2\n\n    # braced branch"),
+        code.contains("# second statement\n    sit numerus secundus ← 2\n\n    # braced branch"),
         "one intentional blank line must survive, no more:\n{code}"
     );
     assert!(
-        code.contains("# first statement\n    fixum numerus primus ← 1"),
+        code.contains("# first statement\n    sit numerus primus ← 1"),
         "no manufactured blank line after the first statement:\n{code}"
     );
 }

@@ -111,8 +111,8 @@ fn commune_union_construct_match_and_member_access_checks_green() {
             r#"{SHAPE_ERROR}
 functio describe(ShapeError e) → textus {{
     discerne e {{
-        casu Incompatible fixum message {{ redde message }}
-        casu ElementMismatch fixum message, expected, actual {{ redde message }}
+        casu Incompatible sit message {{ redde message }}
+        casu ElementMismatch sit message, expected, actual {{ redde message }}
     }}
 }}
 
@@ -125,8 +125,8 @@ functio boom() → vacuum ⇥ ShapeError {{
 }}
 
 incipit {{
-    fixum ShapeError a ← finge Incompatible {{ message = "incompatible" }} ∷ ShapeError
-    fixum ShapeError b ← finge ElementMismatch {{ message = "mismatch", expected = 1, actual = 2 }} ∷ ShapeError
+    sit ShapeError a ← finge Incompatible {{ message = "incompatible" }} ∷ ShapeError
+    sit ShapeError b ← finge ElementMismatch {{ message = "mismatch", expected = 1, actual = 2 }} ∷ ShapeError
     nota describe(a) + describe(b) + render(a)
 }}
 "#
@@ -150,7 +150,7 @@ functio render(ShapeError e) → textus {
 }
 
 incipit {
-    fixum ShapeError e ← finge Incompatible { message = "x" } ∷ ShapeError
+    sit ShapeError e ← finge Incompatible { message = "x" } ∷ ShapeError
     nota render(e)
 }
 "#,
@@ -167,8 +167,8 @@ fn existing_union_without_commune_region_checks_identically() {
 }
 
 incipit {
-    fixum Eventum a ← finge Ictus { vis = 3 } ∷ Eventum
-    fixum Eventum b ← finge Eventum.Sonitus { } ∷ Eventum
+    sit Eventum a ← finge Ictus { vis = 3 } ∷ Eventum
+    sit Eventum b ← finge Eventum.Sonitus { } ∷ Eventum
     nota a
     nota b
 }",
@@ -181,7 +181,7 @@ fn construction_requires_commune_fields() {
         &format!(
             r"{SHAPE_ERROR}
 incipit {{
-    fixum ShapeError e ← finge Incompatible {{ }} ∷ ShapeError
+    sit ShapeError e ← finge Incompatible {{ }} ∷ ShapeError
     nota e
 }}
 "
@@ -317,8 +317,8 @@ fn imported_union_match_binds_commune_field() {
 
 functio describe(shape.ShapeError e) → textus {
     discerne e {
-        casu shape.ShapeError.Incompatible fixum message { redde message }
-        casu shape.ShapeError.ElementMismatch fixum message, expected, actual {
+        casu shape.ShapeError.Incompatible sit message { redde message }
+        casu shape.ShapeError.ElementMismatch sit message, expected, actual {
             redde message
         }
     }

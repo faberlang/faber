@@ -27,7 +27,7 @@ fn call_args(source: &str) -> Vec<(Option<TypeMode>, bool)> {
 
 #[test]
 fn parses_each_call_marker() {
-    let args = call_args("incipit {\n    f(in a, own b, copy c, de d, e)\n}");
+    let args = call_args("incipit {\n    f(varia a, own b, copy c, de d, e)\n}");
     let modes: Vec<_> = args.iter().map(|(mode, _)| *mode).collect();
     assert_eq!(
         modes,
@@ -43,7 +43,7 @@ fn parses_each_call_marker() {
 
 #[test]
 fn marker_precedes_a_place_or_call_expression() {
-    let args = call_args("incipit {\n    f(in a.b, own g(x), copy xs[0])\n}");
+    let args = call_args("incipit {\n    f(varia a.b, own g(x), copy xs[0])\n}");
     assert!(args.iter().all(|(mode, _)| mode.is_some()));
 }
 
@@ -88,7 +88,7 @@ fn call_axis_flags(source: &str) -> Vec<(bool, Option<TypeMode>)> {
 
 #[test]
 fn axis_marker_parses_before_a_call_argument() {
-    let args = call_axis_flags("incipit {\n    f(a, axis 1, in b)\n}");
+    let args = call_axis_flags("incipit {\n    f(a, axis 1, varia b)\n}");
     assert_eq!(
         args,
         vec![(false, None), (true, None), (false, Some(TypeMode::In))]
@@ -104,6 +104,18 @@ fn axis_marker_precedes_a_name_or_expression_argument() {
 #[test]
 fn axis_word_stays_an_ordinary_identifier_without_a_following_operand() {
     let args = call_axis_flags("incipit {\n    f(axis)\n}");
+    assert_eq!(args, vec![(false, None)]);
+}
+
+#[test]
+fn axis_marker_precedes_a_negative_literal() {
+    let args = call_axis_flags("incipit {\n    f(axis -1)\n}");
+    assert_eq!(args, vec![(true, None)]);
+}
+
+#[test]
+fn axis_minus_with_spaces_stays_subtraction() {
+    let args = call_axis_flags("incipit {\n    f(axis - 1)\n}");
     assert_eq!(args, vec![(false, None)]);
 }
 

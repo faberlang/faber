@@ -24,12 +24,12 @@ fn en(body: &str) -> String {
 #[test]
 fn copy_list_returns_as_bytes() {
     let source = en("fn mk(list<u8> table) → bytes {
-    var list<u8> b ← copy table
+    mut list<u8> b ← copy table
     b.append(9)
     return b ↦ bytes
 }
 main {
-    const bytes o ← mk([1, 2, 3])
+    let bytes o ← mk([1, 2, 3])
     print o.length()
 }
 ");
@@ -39,9 +39,9 @@ main {
 #[test]
 fn copy_list_converts_to_bytes_with_arrow_down() {
     let source = en("main {
-    const list<u8> t ← [1, 2, 3]
-    var list<u8> b ← copy t
-    const bytes o ↤ b
+    let list<u8> t ← [1, 2, 3]
+    mut list<u8> b ← copy t
+    let bytes o ↤ b
     print o.length()
 }
 ");
@@ -51,9 +51,9 @@ fn copy_list_converts_to_bytes_with_arrow_down() {
 #[test]
 fn copy_list_converts_to_wider_list() {
     let source = en("main {
-    const list<i32> t ← [1, 2, 3]
-    var list<i32> b ← copy t
-    const list<i64> o ← b ↦ list<i64>
+    let list<i32> t ← [1, 2, 3]
+    mut list<i32> b ← copy t
+    let list<i64> o ← b ↦ list<i64>
     print o
 }
 ");
@@ -63,11 +63,11 @@ fn copy_list_converts_to_wider_list() {
 #[test]
 fn plain_list_converts_to_bytes() {
     let source = en("fn mk(list<u8> table) → bytes {
-    const list<u8> b ← table
+    let list<u8> b ← table
     return b ↦ bytes
 }
 main {
-    const bytes o ← mk([1, 2, 3])
+    let bytes o ← mk([1, 2, 3])
     print o.length()
 }
 ");
@@ -77,9 +77,9 @@ main {
 #[test]
 fn plain_list_converts_to_wider_list() {
     let source = en("main {
-    var list<i32> t ← [1, 2, 3]
-    var list<i32> b ← t
-    const list<i64> o ← b ↦ list<i64>
+    mut list<i32> t ← [1, 2, 3]
+    mut list<i32> b ← t
+    let list<i64> o ← b ↦ list<i64>
     print o
 }
 ");

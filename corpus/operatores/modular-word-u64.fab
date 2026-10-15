@@ -32,46 +32,46 @@ locale = "en"
 #   Division and remainder by zero fail.
 
 main {
-    var wrapping<u64> max ← 18446744073709551615
-    const wrapping<u64> one ← 1
-    var wrapping<u64> zero ← 0
-    const u64 converted ↤ one
-    const wrapping<u64> ring1 ← max + one
+    mut wrapping<u64> max ← 18446744073709551615
+    let wrapping<u64> one ← 1
+    mut wrapping<u64> zero ← 0
+    let u64 converted ↤ one
+    let wrapping<u64> ring1 ← max + one
     print ring1
-    const wrapping<u64> ring2 ← zero - one
+    let wrapping<u64> ring2 ← zero - one
     print ring2
-    const wrapping<u64> ring3 ← max * 2
+    let wrapping<u64> ring3 ← max * 2
     print ring3
-    const wrapping<u64> ring4 ← -one
+    let wrapping<u64> ring4 ← -one
     print ring4
-    const wrapping<u64> ring5 ← ¬zero
+    let wrapping<u64> ring5 ← ¬zero
     print ring5
-    const wrapping<u64> ring6 ← one ⇐ 64
+    let wrapping<u64> ring6 ← one ⇐ 64
     print ring6
     print max ⇒ 64
     print max ≻ zero
 
     # Carrier-mix equality: conversions and arithmetic results compare by
     # value against literals (review regression).
-    const wrapping<u64> uno ↤ 1
+    let wrapping<u64> uno ↤ 1
     print one ≡ uno
     print one ≡ one + 0
     max ↑
     zero ↓
     print max
     print zero
-    const wrapping<u64> methodSum ← max.added(one)
-    const wrapping<u64> methodShift ← max.shifted_left(64)
-    var wrapping<u64> methodAcc ← 0
+    let wrapping<u64> methodSum ← max.added(one)
+    let wrapping<u64> methodShift ← max.shifted_left(64)
+    mut wrapping<u64> methodAcc ← 0
     methodAcc.add(one)
     methodAcc.shift_left(64)
     print converted
     print methodSum
     print methodShift
     print methodAcc
-    const list<wrapping<u64>> words ← [one, max]
+    let list<wrapping<u64>> words ← [one, max]
     print words.get(1) coalesce 0 ∷ wrapping<u64>
-    var list<wrapping<u64>> sorted ← [18446744073709551615, 3, 10, 2]
+    mut list<wrapping<u64>> sorted ← [18446744073709551615, 3, 10, 2]
     sorted.sort()
     print sorted
 }

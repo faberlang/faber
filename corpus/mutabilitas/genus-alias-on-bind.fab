@@ -4,7 +4,7 @@ kind = "concept"
 grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "genus_decl", "genus_member", "field_decl", "expression", "assignment", "place", "literal", "typed_constructor", "field_list", "field_init", "expr_stmt", "call_expr", "member_suffix", "nota_stmt"]
 category = "type"
 summary = "D-1: an unmarked genus bind aliases its source place; the access marker decides, never the type."
-syntax = "var V3 b ← a; b.x ← 5.0"
+syntax = "mut V3 b ← a; b.x ← 5.0"
 related = ["genus", "fixum"]
 locale = "en"
 +++
@@ -15,24 +15,24 @@ locale = "en"
 # the source, whether the source is a local or a field place.
 
 class V3 {
-    var f64 x = 0.0
+    mut f64 x = 0.0
 }
 
 class Inner {
-    var int n = 0
+    mut int n = 0
 }
 
 class Outer {
-    var Inner inner = Inner {}
+    mut Inner inner = Inner {}
 }
 
 main {
-    var V3 a ← V3 { x = 1.0 }
-    var V3 b ← a
+    mut V3 a ← V3 { x = 1.0 }
+    mut V3 b ← a
     b.x ← 5.0
     print a.x
-    var Outer o ← Outer {}
-    var Inner i ← o.inner
+    mut Outer o ← Outer {}
+    mut Inner i ← o.inner
     i.n ← 3
     print o.inner.n
 }

@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "type"
 canonical = false
 summary = "Call-site implicit binding: scaled_dot_product binds B, D from concrete [2, 8] arguments."
-syntax = "fixum tensor<f32, [2, 8]> ctx ← scaled_dot_product(qb, kb, vb, scale)"
+syntax = "sit tensor<f32, [2, 8]> ctx ← scaled_dot_product(qb, kb, vb, scale)"
 related = ["tensor", "magnitudo", "functio", "matmul"]
 locale = "la"
 +++
@@ -35,28 +35,28 @@ locale = "la"
 # that binds B=2, D=8 from the argument shapes.
 
 functio scaled_dot_product<magnitudo B, magnitudo D>(tensor<f32, [B, D]> qb, tensor<f32, [B, D]> kb, tensor<f32, [B, D]> vb, tensor<f32, [B, B]> scale) → tensor<f32, [B, D]> {
-    fixum tensor<f32, [D, B]> kt ← kb.transpone()
-    fixum tensor<f32, [B, B]> scores ← qb.matmul(kt)
-    fixum tensor<f32, [B, B]> scaled ← scores ⊙ scale
-    fixum tensor<f32, [B, B]> attn ← scaled.activatio_softmax()
-    fixum tensor<f32, [B, D]> context ← attn.matmul(vb)
+    sit tensor<f32, [D, B]> kt ← kb.transpone()
+    sit tensor<f32, [B, B]> scores ← qb.matmul(kt)
+    sit tensor<f32, [B, B]> scaled ← scores ⊙ scale
+    sit tensor<f32, [B, B]> attn ← scaled.activatio_softmax()
+    sit tensor<f32, [B, D]> context ← attn.matmul(vb)
     redde context
 }
 
 incipit {
-    fixum lista<f32> ones16 ← [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    sit lista<f32> ones16 ← [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
-    fixum lista<f32> ones4 ← [1.0, 1.0, 1.0, 1.0]
+    sit lista<f32> ones4 ← [1.0, 1.0, 1.0, 1.0]
 
-    fixum tensor<f32, [2, 8]> qb ← ones16 ↦ tensor<f32, [2, 8]>
+    sit tensor<f32, [2, 8]> qb ← ones16 ↦ tensor<f32, [2, 8]>
 
-    fixum tensor<f32, [2, 8]> kb ← ones16 ↦ tensor<f32, [2, 8]>
+    sit tensor<f32, [2, 8]> kb ← ones16 ↦ tensor<f32, [2, 8]>
 
-    fixum tensor<f32, [2, 8]> vb ← ones16 ↦ tensor<f32, [2, 8]>
+    sit tensor<f32, [2, 8]> vb ← ones16 ↦ tensor<f32, [2, 8]>
 
-    fixum tensor<f32, [2, 2]> scale ← ones4 ↦ tensor<f32, [2, 2]>
+    sit tensor<f32, [2, 2]> scale ← ones4 ↦ tensor<f32, [2, 2]>
 
-    fixum tensor<f32, [2, 8]> ctx ← scaled_dot_product(qb, kb, vb, scale)
+    sit tensor<f32, [2, 8]> ctx ← scaled_dot_product(qb, kb, vb, scale)
 
     nota "shape-generic scaled_dot_product [2, 8] ligata"
     nota ctx.planata().longitudo()

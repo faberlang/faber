@@ -1,23 +1,23 @@
 +++
-term = "generis read"
+term = "class constant import"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "member_suffix", "incipit_stmt", "expression", "nota_stmt"]
 category = "type"
 canonical = false
-summary = "An imported genus's static field reads through the module and the type name: module.Tab.Z."
+summary = "An imported genus's class constant reads through the module and the type name: module.Tab.LIMIT."
 syntax = "<module>.<Type>.<field>"
-aliases = ["static field read across modules"]
-related = ["generis", "genus", "importa"]
+aliases = ["class constant read across modules"]
+related = ["fixum", "genus", "importa"]
 locale = "en"
 +++
 # =============================================================================
-# generis read — a static field of an imported genus
+# class constant import — a class constant of an imported genus
 # =============================================================================
 #
 # What this teaches:
-#   • `lectio.Tab.LIMIT` reads the static field `LIMIT` of the imported genus
+#   • `lectio.Tab.LIMIT` reads the class constant `LIMIT` of the imported genus
 #     `Tab`; no instance is needed.
-#   • The value comes from the field's initializer in the providing module.
+#   • The value comes from the constant's initializer in the providing module.
 #
 # EXPECTED OUTPUT:
 #   lectio-importata.expected

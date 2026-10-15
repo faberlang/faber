@@ -40,25 +40,25 @@ locale = "en"
 #   Field values for Punctum and Persona instances (defaults and overrides).
 
 class Punctum {
-    var int x
-    var int y
+    mut int x
+    mut int y
 }
 
 class Persona {
-    var string nomen
+    mut string nomen
     # default when omitted at instantiation
-    var int aetas = 0
-    var bool activus = true
+    mut int aetas = 0
+    mut bool activus = true
 }
 
 main {
     # Instantiate with all required fields
-    const Punctum p ← Punctum { x = 10, y = 20 }
+    let Punctum p ← Punctum { x = 10, y = 20 }
     print p.x
     print p.y
 
     # Instantiate with required + optional defaults
-    const Persona marcus ← Persona { nomen = "Marcus" }
+    let Persona marcus ← Persona { nomen = "Marcus" }
     print marcus.nomen
     # 0 from default
     print marcus.aetas
@@ -66,7 +66,7 @@ main {
     print marcus.activus
 
     # Override defaults explicitly
-    const Persona julia ← Persona { nomen = "Julia", aetas = 25, activus = false }
+    let Persona julia ← Persona { nomen = "Julia", aetas = 25, activus = false }
     print julia.nomen
     print julia.aetas
     print julia.activus

@@ -38,6 +38,7 @@
 
 pub mod bits_gate;
 pub mod breakable;
+pub mod cli_ir;
 pub mod conversio_arm;
 pub mod decimal;
 pub mod frame;

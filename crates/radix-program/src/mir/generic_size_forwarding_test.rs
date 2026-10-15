@@ -18,9 +18,9 @@ fn forward<size T, size D>(tensor<f32, [T, D]> x) → tensor<f32, [T, D]> {
 }
 
 main {
-    const tensor<f32, [3, 5]> t ← empty
-    const tensor<f32, [3, 5]> r ← forward<3, 5>(t)
-    const list<int, _> s ← r.shape()
+    let tensor<f32, [3, 5]> t ← empty
+    let tensor<f32, [3, 5]> r ← forward<3, 5>(t)
+    let list<int, _> s ← r.shape()
     print s.length()
 }
 ";

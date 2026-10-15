@@ -3,7 +3,7 @@ locale = "en"
 +++
 # Text methods count code points, as the runner does; case mapping is ASCII.
 main {
-    const string s ← "héllo😀 Wörld"
+    let string s ← "héllo😀 Wörld"
     print s.length()
     print "Hello World".uppercase()
     print "Hello World".lowercase()
@@ -29,7 +29,7 @@ main {
     print "\u{00A0} x \u{3000}".trim()
     print s[1]
     print s[5]
-    const string t ← "xyz"
+    let string t ← "xyz"
     print t[2]
     print t[3]
 }

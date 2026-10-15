@@ -4,7 +4,7 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
 category = "type"
 summary = "MU-3 red: mut source into own rejects with copy suggestion."
-syntax = "const list<int> b ← own mut_a"
+syntax = "let list<int> b ← own mut_a"
 related = ["own", "mut", "copy"]
 locale = "en"
 no_expected = "rejects"
@@ -16,6 +16,6 @@ diagnostic = "SEM057:mut_into_own"
 # This exemplum intentionally fails to compile.
 
 main {
-    var mut list<int> a ← [1, 2, 3]
-    const list<int> b ← own a
+    mut mut list<int> a ← [1, 2, 3]
+    let list<int> b ← own a
 }

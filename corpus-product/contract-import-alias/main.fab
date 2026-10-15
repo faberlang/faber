@@ -5,6 +5,6 @@ fn render(s.Figurable f) → string {
 }
 
 main {
-    const s.Circle c ← s.Circle { radius = 25 }
+    let s.Circle c ← s.Circle { radius = 25 }
     print render(c)
 }

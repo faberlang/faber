@@ -6,4 +6,5 @@ input = "ad/sermo-live-directional.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

@@ -4,8 +4,8 @@ locale = "en"
 # Conversions between the scalar classes: parsing text, narrowing, rounding
 # hints, and recovery. Failures without a recovery have their own fixtures.
 main {
-    const int n ← 7
-    const float f ← 3.75
+    let int n ← 7
+    let float f ← 3.75
     print n ↦ float
     print n ↦ string
     print f ↦ string
@@ -24,18 +24,25 @@ main {
     print "255" ↦ u8
     print "18446744073709551615" ↦ u64
     print "18446744073709551616" ↦ u64 ⊥ 7
-    const int big ← 300
+    let int big ← 300
     print big ↦ u8 ⊥ 7
-    const int small ← 200
+    let int small ← 200
     print small ↦ u8
-    const float g ← 2.5
+    let float g ← 2.5
     print g ↦ int via HalfEven, (3.5 ↦ int via HalfEven), (-2.5 ↦ int via Floor), (-2.5 ↦ int via Trunc)
     print f ↦ int via Floor, f ↦ int via Ceil, f ↦ int via Trunc, f ↦ int via HalfEven
-    const int huge ← 9007199254740993
+    let int huge ← 9007199254740993
     print huge ↦ float
     print "  42 " ↦ int ⊥ 5
     print "ff" ↦ i32 via Hex, "101" ↦ u8 via Bin, "777" ↦ i32 via Oct
     print "ffffffffffffffff" ↦ u64 via Hex ⊥ 7
     print "10000000000000000" ↦ u64 via Hex ⊥ 7
     print "-ff" ↦ i32 via Hex, "zz" ↦ i32 via Hex ⊥ 5
+    # `text ↦ bool` is non-empty; `fractus ↦ bool` is non-zero (`-0.0` is
+    # false); `bool ↦ fractus` is 1.0 / 0.0.
+    print "" ↦ bool, "x" ↦ bool, "0" ↦ bool
+    print f ↦ bool, 0.0 ↦ bool
+    let float negzero ← -1.0 * 0.0
+    print negzero ↦ bool
+    print true ↦ float, false ↦ float
 }

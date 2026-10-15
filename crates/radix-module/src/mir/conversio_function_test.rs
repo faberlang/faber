@@ -47,7 +47,7 @@ fn infallible_conversio_function_serves_arrow() {
     let lines = stdout(&format!(
         "{DECLS}
 incipit {{
-    fixum Fahrenheit f ← Celsius {{ gradus = 100.0 }} ↦ Fahrenheit
+    sit Fahrenheit f ← Celsius {{ gradus = 100.0 }} ↦ Fahrenheit
     nota f.gradus
 }}
 "
@@ -60,9 +60,9 @@ fn failable_conversio_function_takes_the_default_only_on_failure() {
     let lines = stdout(&format!(
         "{DECLS}
 incipit {{
-    fixum Mensura bona ← Lectio {{ valor = 7 }} ↦ Mensura ⊥ Mensura {{ valor = 0 }}
+    sit Mensura bona ← Lectio {{ valor = 7 }} ↦ Mensura ⊥ Mensura {{ valor = 0 }}
     nota bona.valor
-    fixum Mensura mala ← Lectio {{ valor = -4 }} ↦ Mensura ⊥ Mensura {{ valor = 0 }}
+    sit Mensura mala ← Lectio {{ valor = -4 }} ↦ Mensura ⊥ Mensura {{ valor = 0 }}
     nota mala.valor
 }}
 "
@@ -80,7 +80,7 @@ functio mensura(Lectio l) → Mensura ⇥ textus {{
 
 functio descriptio(Lectio l) → textus {{
     fac {{
-        fixum Mensura m ← mensura(l)
+        sit Mensura m ← mensura(l)
         redde \"mensura\"
     }}
     cape err {{

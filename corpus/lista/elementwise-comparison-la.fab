@@ -31,8 +31,8 @@ locale = "la"
 # EXPECTED stdout: see elementwise-comparison-la.expected
 
 incipit {
-    fixum lista<numerus> xs ← [1, 5, 3]
-    fixum lista<numerus> ys ← [2, 4, 3]
+    sit lista<numerus> xs ← [1, 5, 3]
+    sit lista<numerus> ys ← [2, 4, 3]
     nota xs ≺ ys
     nota xs ≻ ys
     nota xs ≤ ys
@@ -41,7 +41,7 @@ incipit {
     nota xs ≇ ys
     nota xs ≤ 3
     nota 3 ≤ xs
-    fixum lista<bivalens> mask ← xs ≻ 2
+    sit lista<bivalens> mask ← xs ≻ 2
     nota mask
     nota xs ≡ ys
 }

@@ -21,7 +21,7 @@ fn analyze_in_locale(source: &str, locale: &str) -> crate::test_support::Analyze
 fn builtin_edge_policy_marker_cannot_be_stored_as_a_local_value() {
     let result = analyze_in_locale(
         r"incipit {
-    fixum clampa policy
+    sit clampa policy
 }",
         "la",
     );
@@ -66,7 +66,7 @@ fn localized_edge_policy_type_names_bind_to_the_same_builtin_identity() {
     config.locale_pack = Some(english_pack);
     let result = crate::test_support::analyze_source_with_config(
         r"main {
-    const clamp policy
+    let clamp policy
 }",
         config,
     );

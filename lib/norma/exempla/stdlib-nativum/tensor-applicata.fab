@@ -16,9 +16,9 @@ locale = "en"
 import from "norma:tensor" tensor
 
 main {
-    const list<int> flat ← [1, 2, 3, 4]
-    const tensor<int, [2, 2]> grid ← tensor.construct<tensor<int, [2, 2]>>(flat)
-    const tensor<int, [2, 2]> scaled ← tensor.apply(grid, int x ∴ x + 1)
-    const int total ← tensor.sum(scaled)
+    let list<int> flat ← [1, 2, 3, 4]
+    let tensor<int, [2, 2]> grid ← tensor.construct<tensor<int, [2, 2]>>(flat)
+    let tensor<int, [2, 2]> scaled ← tensor.apply(grid, int x ∴ x + 1)
+    let int total ← tensor.sum(scaled)
     print total
 }

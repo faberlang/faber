@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversio"
 canonical = true
 summary = "A lista<b8> converts to textus as UTF-8, a lista<b16> as UTF-16 and a lista<b32> as UTF-32; the decode can fail and the encode cannot."
-syntax = "fixum textus s ← lista<b8> ↦ textus ⊥ \"?\" | fixum lista<b16> units ← s ↦ lista<b16>"
+syntax = "sit textus s ← lista<b8> ↦ textus ⊥ \"?\" | sit lista<b16> units ← s ↦ lista<b16>"
 related = ["bits", "↦"]
 locale = "la"
 +++
@@ -32,23 +32,23 @@ locale = "la"
 
 incipit {
     # UTF-8: "é" is two bytes
-    fixum textus word ← "héllo"
-    fixum lista<b8> utf8 ← word ↦ lista<b8>
+    sit textus word ← "héllo"
+    sit lista<b8> utf8 ← word ↦ lista<b8>
     nota utf8
     nota utf8 ↦ textus ⊥ "?"
 
     # UTF-16: a character outside the basic plane is a surrogate pair
-    fixum textus face ← "a😀"
-    fixum lista<b16> utf16 ← face ↦ lista<b16>
+    sit textus face ← "a😀"
+    sit lista<b16> utf16 ← face ↦ lista<b16>
     nota utf16
     nota utf16 ↦ textus ⊥ "?"
 
     # UTF-32: one unit per character
-    fixum lista<b32> utf32 ← face ↦ lista<b32>
+    sit lista<b32> utf32 ← face ↦ lista<b32>
     nota utf32
     nota utf32 ↦ textus ⊥ "?"
 
     # a failing decode: 0xff is never valid in UTF-8
-    fixum lista<b8> bad ← [0x68, 0xff]
+    sit lista<b8> bad ← [0x68, 0xff]
     nota bad ↦ textus ⊥ "?"
 }

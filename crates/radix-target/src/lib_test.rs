@@ -23,6 +23,7 @@ fn universe_spelling(target: Target) -> &'static str {
         Target::MirWasm => "wasm-text",
         Target::MirLlvm => "llvm-text",
         Target::MirLlvmHost => "llvm-host",
+        Target::MirClif => "clif",
         Target::MirAmd => "amd",
         Target::MirMetal => "metal-text",
         Target::MirWgsl => "wgsl-text",
@@ -60,6 +61,7 @@ fn all_is_exactly_the_variant_set() {
         "wasm-text",
         "llvm-text",
         "llvm-host",
+        "clif",
         "amd",
         "metal-text",
         "wgsl-text",
@@ -201,4 +203,27 @@ fn availability_spellings_pin_rust_and_wasm() {
 #[test]
 fn output_mode_variants_are_distinct() {
     assert_ne!(OutputMode::Application, OutputMode::Library);
+}
+
+/// The CLI-entry capability is exactly Rust, TypeScript, Python, Go, wasm
+/// text, and the CLIF object emitter: the driver gate refuses every other target by name with
+/// `cli_codegen_rust_only`.
+#[test]
+fn lowers_cli_entry_is_exactly_rust_ts_py_go_wasm_clif() {
+    let capable: Vec<Target> = Target::ALL
+        .iter()
+        .copied()
+        .filter(|target| target.lowers_cli_entry())
+        .collect();
+    assert_eq!(
+        capable,
+        [
+            Target::HirRust,
+            Target::HirTypeScript,
+            Target::HirGo,
+            Target::HirPython,
+            Target::MirWasm,
+            Target::MirClif
+        ]
+    );
 }

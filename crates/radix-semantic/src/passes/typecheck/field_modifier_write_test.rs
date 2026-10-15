@@ -20,10 +20,10 @@ use crate::test_support;
 
 const PUNCTUM: &str = "\
 genus Punctum {
-    fixum numerus x
+    sit numerus x
     varia numerus y
     varia numerus w
-    fixum lista<numerus> xs
+    sit lista<numerus> xs
 }
 
 ";
@@ -55,7 +55,7 @@ fn fixum_field_reassignment_is_rejected() {
 #[test]
 fn fixum_field_write_from_own_method_is_rejected() {
     test_support::assert_rejects_with_issue(
-        "genus Punctum {\n    fixum numerus x\n\n    functio move() → vacuum { ego.x ← 2 }\n}\n",
+        "genus Punctum {\n    sit numerus x\n\n    functio move() → vacuum { ego.x ← 2 }\n}\n",
         "assignment_to_fixum_field",
     );
 }
@@ -72,7 +72,7 @@ fn place_write_through_fixum_field_is_rejected_like_the_binding_form() {
     test_support::assert_rejects_with_args(
         concat!(
             "genus Intus {\n    varia numerus y\n}\n\n",
-            "genus Foris {\n    fixum Intus intus\n}\n\n",
+            "genus Foris {\n    sit Intus intus\n}\n\n",
             "incipit {\n    varia Foris f ← Foris { intus = Intus { y = 1 } }\n    f.intus.y ← 2\n}",
         ),
         &[
@@ -113,7 +113,7 @@ fn union_write_with_every_member_varia_is_accepted() {
 #[test]
 fn union_write_names_the_member_that_is_not_varia() {
     test_support::assert_rejects_with_args(
-        &figura("varia ", "fixum "),
+        &figura("varia ", "sit "),
         &[
             DiagnosticArg::new("issue", "union_member_not_varia"),
             DiagnosticArg::new("member", "nomen"),

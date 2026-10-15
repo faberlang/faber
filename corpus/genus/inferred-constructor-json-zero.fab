@@ -34,17 +34,17 @@ fn blank() → tf32[3] {
 }
 
 main {
-    const json j ← _ { "a": 1 }
-    const json same ← { "a": 1 }
+    let json j ← _ { "a": 1 }
+    let json same ← { "a": 1 }
     print j
     print same
     print doc()
 
-    const tensor<f32, [8]> b ← _ {}
+    let tensor<f32, [8]> b ← _ {}
     print b.shape()
     print b[[3]]
 
-    const tf32[2, 3] g ← _ {}
+    let tf32[2, 3] g ← _ {}
     print g.shape()
     print g[[1, 2]]
 

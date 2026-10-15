@@ -16,8 +16,8 @@ genus Casual {
 
 functio probe(Formal ∪ Casual u) → textus {
     discerne u {
-        casu Formal fixum f { redde f.greeting }
-        casu Casual fixum c { redde c.greeting }
+        casu Formal sit f { redde f.greeting }
+        casu Casual sit c { redde c.greeting }
     }
 }",
     );
@@ -42,8 +42,8 @@ fn primitive_and_nil_type_patterns_cover_nullable_union() {
     test_support::assert_accepts(
         r#"functio probe(numerus ∪ textus ∪ nihil u) → vacuum {
     discerne u {
-        casu numerus fixum i { nota i }
-        casu textus fixum s { nota s }
+        casu numerus sit i { nota i }
+        casu textus sit s { nota s }
         casu nihil { nota "nihil" }
     }
 }"#,
@@ -58,8 +58,8 @@ genus Casual { varia textus greeting }
 genus Other { varia textus greeting }
 functio probe(Formal ∪ Casual ∪ Other u) → textus {
     discerne u {
-        casu Formal fixum f { redde f.greeting }
-        casu Casual fixum c { redde c.greeting }
+        casu Formal sit f { redde f.greeting }
+        casu Casual sit c { redde c.greeting }
     }
 }",
         "missing_union_members",
@@ -73,7 +73,7 @@ fn type_pattern_catchall_closes_union_coverage() {
 genus Casual { varia textus greeting }
 functio probe(Formal ∪ Casual u) → textus {
     discerne u {
-        casu Formal fixum f { redde f.greeting }
+        casu Formal sit f { redde f.greeting }
         casu _ { redde "other" }
     }
 }"#,
@@ -86,7 +86,7 @@ fn type_pattern_rejects_member_not_in_scrutinee_union() {
         r"genus Formal { varia textus greeting }
 functio probe(textus u) → vacuum {
     discerne u {
-        casu Formal fixum f { nota f }
+        casu Formal sit f { nota f }
     }
 }",
         "discerne_pattern_not_in_closed_set",
@@ -103,7 +103,7 @@ fn alias_over_a_binding_pattern_in_a_variant_payload_types_the_alias() {
 }
 functio probe(Mandatum m) → numerus {
     discerne m {
-        casu Moveo fixum passus ut n { redde n + n }
+        casu Moveo sit passus ut n { redde n + n }
     }
 }",
     );
@@ -117,7 +117,7 @@ fn alias_over_a_binding_pattern_in_a_variant_payload_keeps_the_payload_type() {
 }
 functio probe(Mandatum m) → textus {
     discerne m {
-        casu Moveo fixum passus ut n { redde n }
+        casu Moveo sit passus ut n { redde n }
     }
 }"#,
         "return_type_mismatch",

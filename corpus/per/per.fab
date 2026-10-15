@@ -26,7 +26,7 @@ locale = "en"
 
 # per — step size for range iteration
 #
-# itera ab <initium>‥<finis> per <gradus> <var> { … }   -- half-open range step
+# itera ab <initium>‥<finis> per <gradus> <binder> { … }   -- half-open range step
 #
 # GRAMMAR:
 #   iterStmt :← 'itera' 'ab' expr '‥' expr 'per' expr binding block
@@ -36,7 +36,7 @@ locale = "en"
 
 main {
     # i = 0, 2, 4, 6 (step by 2)
-    for range 0‥8 step 2 const i {
+    for range 0‥8 step 2 let i {
         print i
     }
 }
