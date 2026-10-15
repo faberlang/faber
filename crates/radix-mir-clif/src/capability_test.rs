@@ -501,7 +501,7 @@ fn bit_operation_names_gap() {
                         lhs: MirOperand::Constant(MirConstant::Int(1)),
                         rhs: MirOperand::Constant(MirConstant::Int(2)),
                     },
-                    ty: numerus,
+                    ty: ty(&types, Primitive::Fractus),
                     span: sample_span(),
                 },
             },

@@ -394,7 +394,19 @@ impl MirVisitor for ClifCapability<'_> {
         };
         // Bitwise work on raw-bits values lowers at the type's width; on
         // numbers it is not lowered yet.
-        if bit_op && !matches!(self.types.get(value.ty.semantic_id()), Type::Bits(_)) {
+        let integer_result = matches!(&value.kind, MirValueKind::Binary { .. })
+            && self.type_gap(value.ty).is_none()
+            && matches!(
+                self.types.get(value.ty.semantic_id()),
+                Type::Primitive(Primitive::Numerus)
+                    | Type::SizedNumeric(Primitive::Numerus, _)
+                    | Type::ModularWord(_)
+                    | Type::SaturatingWord(_)
+            );
+        if bit_op
+            && !integer_result
+            && !matches!(self.types.get(value.ty.semantic_id()), Type::Bits(_))
+        {
             self.record(Gap::Subset("bit operation".to_owned()));
         }
         radix_mir::visit::walk_value(self, value);

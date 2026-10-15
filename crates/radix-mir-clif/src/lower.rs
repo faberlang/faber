@@ -2040,6 +2040,11 @@ impl FunctionLower<'_, '_> {
             MirBinOp::Mul => (self.checked_mul(a, b)?, Rep::Int),
             MirBinOp::Div => (self.floor_div(a, b, false)?, Rep::Int),
             MirBinOp::Mod => (self.floor_div(a, b, true)?, Rep::Int),
+            MirBinOp::BitAnd => (self.builder.ins().band(a, b), Rep::Int),
+            MirBinOp::BitOr => (self.builder.ins().bor(a, b), Rep::Int),
+            MirBinOp::BitXor => (self.builder.ins().bxor(a, b), Rep::Int),
+            MirBinOp::Shl => (self.int_shift_left(a, b)?, Rep::Int),
+            MirBinOp::Shr => (self.int_shift_right(a, b)?, Rep::Int),
             MirBinOp::Eq => compare(self, IntCC::Equal),
             MirBinOp::NotEq => compare(self, IntCC::NotEqual),
             MirBinOp::Lt => compare(self, IntCC::SignedLessThan),
@@ -2048,6 +2053,38 @@ impl FunctionLower<'_, '_> {
             MirBinOp::GtEq => compare(self, IntCC::SignedGreaterThanOrEqual),
             _ => return Err(Decline::new("integer operation")),
         })
+    }
+
+    /// `x ⇐ n` on a number is `x · 2ⁿ`: exact, so an overflow of the 64-bit
+    /// carrier traps like any other, and a negative count is an error.
+    fn int_shift_left(&mut self, a: Value, count: Value) -> Lowered<Value> {
+        let zero = self.builder.ins().iconst(types::I64, 0);
+        let negative = self.builder.ins().icmp(IntCC::SignedLessThan, count, zero);
+        self.trap_if(negative, "negative shift count")?;
+        let limit = self.builder.ins().iconst(types::I64, 63);
+        let large = self
+            .builder
+            .ins()
+            .icmp(IntCC::UnsignedGreaterThanOrEqual, count, limit);
+        let one = self.builder.ins().iconst(types::I64, 1);
+        let moved = self.builder.ins().ishl(one, count);
+        let power = self.builder.ins().select(large, zero, moved);
+        let (product, overflow) = self.builder.ins().smul_overflow(a, power);
+        let nonzero = self.builder.ins().icmp(IntCC::NotEqual, a, zero);
+        let too_far = self.builder.ins().band(large, nonzero);
+        let failed = self.builder.ins().bor(overflow, too_far);
+        self.overflow_guard(failed)?;
+        Ok(self.builder.ins().select(large, zero, product))
+    }
+
+    /// `x ⇒ n` on a number is `⌊x / 2ⁿ⌋`.
+    fn int_shift_right(&mut self, a: Value, count: Value) -> Lowered<Value> {
+        let zero = self.builder.ins().iconst(types::I64, 0);
+        let negative = self.builder.ins().icmp(IntCC::SignedLessThan, count, zero);
+        self.trap_if(negative, "negative shift count")?;
+        let limit = self.builder.ins().iconst(types::I64, 63);
+        let clamped = self.builder.ins().umin(count, limit);
+        Ok(self.builder.ins().sshr(a, clamped))
     }
 
     fn float_binary(&mut self, op: MirBinOp, a: Value, b: Value) -> Lowered<(Value, Rep)> {
