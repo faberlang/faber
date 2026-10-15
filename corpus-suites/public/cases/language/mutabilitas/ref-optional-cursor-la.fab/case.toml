@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/mutabilitas/ref-optional-cursor-la.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/ref-optional-cursor-la.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

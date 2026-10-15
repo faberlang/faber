@@ -20,7 +20,7 @@ locale = "en"
 #   • Related keywords: varia, sit, ←
 #
 # Common mistakes:
-#   • Reassigning a `fixum` binding after initialization — `fixum` is immutable; use `varia` for mutable bindings (SEM020) or defer init with a single later assignment.
+#   • Reassigning a `sit` binding after initialization — `sit` is write-once; use `varia` for mutable bindings (SEM020) or defer init with a single later assignment.
 #
 # See also: varia, sit, ←
 # =============================================================================
@@ -28,26 +28,27 @@ locale = "en"
 # fixum — immutable bindings
 #
 # Immediate init:
-#   fixum numerus count ← 0
-#   fixum _ nomen ← "Marcus"
+#   sit numerus count ← 0
+#   sit nomen ← "Marcus"
 #
 # Deferred init (write-once): declare without ←, assign exactly once later, then
 # freeze. The definite-assignment pass rejects reads before that assignment and
 # any second assignment.
-#   fixum numerus pending
+#   sit numerus pending
 #   pending ← 42
 #
-# `sit x` is sugar for `fixum _ x` in both immediate and deferred shapes; see
-# sit/sit.fab for the compact inferred spelling.
+# `sit x` infers the type in both immediate and deferred shapes; see
+# sit/sit.fab for the compact inferred spelling. `fixum` itself now states a
+# compile-time constant (`fixum T X = e`).
 #
 # GRAMMAR:
-#   varDecl := ('fixum' | 'varia') typeAnnotation IDENTIFIER ('←' expression)?
+#   varDecl := ('sit' | 'varia') typeAnnotation IDENTIFIER ('←' expression)?
 #
 # EXPECTED OUTPUT:
 #   fixum.expected (Salve, Marcus! / 7 / 30 / 300)
 
 fn scale(bool compact, int base) → int {
-    const int factor
+    let int factor
     if compact {
         factor ← 10
     }
@@ -58,14 +59,14 @@ fn scale(bool compact, int base) → int {
 }
 
 test "fixum immediate init" {
-    const string nomen ← "Marcus"
-    const string salve ← "Salve, §!"(nomen)
+    let string nomen ← "Marcus"
+    let string salve ← "Salve, §!"(nomen)
     assert nomen ≡ "Marcus"
     assert salve ≡ "Salve, Marcus!"
 }
 
 test "fixum deferred init writes once" {
-    const int pending
+    let int pending
     pending ← 7
     assert pending ≡ 7
 }
@@ -76,10 +77,10 @@ test "fixum factor selected per branch" {
 }
 
 main {
-    const string nomen ← "Marcus"
-    const string salve ← "Salve, §!"(nomen)
+    let string nomen ← "Marcus"
+    let string salve ← "Salve, §!"(nomen)
     print salve
-    const int pending
+    let int pending
     pending ← 7
     print pending
     print scale(true, 3)

@@ -95,7 +95,7 @@ fn saturating_word_literal_adapts_and_clamps_at_the_store() {
         analysis_accepts(&format!(
             r"
 incipit {{
-    fixum saturatus<{width}> top ← {max}
+    sit saturatus<{width}> top ← {max}
     nota top + 1
     nota 1 + top
 }}
@@ -104,7 +104,7 @@ incipit {{
         analysis_accepts(&format!(
             r"
 incipit {{
-    fixum saturatus<{width}> tooBig ← {max_plus_one}
+    sit saturatus<{width}> tooBig ← {max_plus_one}
     nota tooBig
 }}
 "
@@ -127,21 +127,21 @@ fn negated_minimum_constant_is_judged_by_its_exact_value() {
         ("i32", "-2147483648", "-2147483649"),
         ("i64", "-9223372036854775808", "-9223372036854775809"),
     ] {
-        for keyword in ["fixum", "varia"] {
+        for keyword in ["sit", "varia"] {
             analysis_accepts(&format!(
                 "incipit {{\n    {keyword} saturatus<{width}> low ← {min}\n    nota low\n}}\n"
             ));
         }
-        analysis_accepts(&format!("incipit {{\n    fixum {width} low ← {min}\n    nota low\n}}\n"));
+        analysis_accepts(&format!("incipit {{\n    sit {width} low ← {min}\n    nota low\n}}\n"));
         analysis_accepts(&format!(
-            "incipit {{\n    fixum saturatus<{width}> below ← {min_minus_one}\n    nota below\n}}\n"
+            "incipit {{\n    sit saturatus<{width}> below ← {min_minus_one}\n    nota below\n}}\n"
         ));
         analysis_rejects_with_issue(
-            &format!("incipit {{\n    fixum {width} below ← {min_minus_one}\n    nota below\n}}\n"),
+            &format!("incipit {{\n    sit {width} below ← {min_minus_one}\n    nota below\n}}\n"),
             "store_constant_out_of_range",
         );
     }
-    analysis_accepts("incipit {\n    fixum numerus low ← -9223372036854775808\n    nota low\n}\n");
+    analysis_accepts("incipit {\n    sit numerus low ← -9223372036854775808\n    nota low\n}\n");
 }
 
 #[test]
@@ -151,9 +151,9 @@ fn saturating_word_operand_constant_is_exact_and_only_the_store_clamps() {
     analysis_accepts(
         r"
 incipit {
-    fixum saturatus<u8> low ← 10
-    fixum saturatus<u8> a ← low - 300 + 100
-    fixum saturatus<u8> b ← low + 300
+    sit saturatus<u8> low ← 10
+    sit saturatus<u8> a ← low - 300 + 100
+    sit saturatus<u8> b ← low + 300
     nota a
     nota b
 }
@@ -166,7 +166,7 @@ fn saturating_word_signed_negative_literal_adapts() {
     analysis_accepts(
         r"
 incipit {
-    fixum saturatus<i16> low ← -32767
+    sit saturatus<i16> low ← -32767
     nota low * -2
 }
 ",
@@ -223,8 +223,8 @@ fn saturating_word_converts_to_and_from_integers_with_conversio() {
     analysis_accepts(
         r"
 functio round(numerus x) → numerus {
-    fixum saturatus<u8> level ← x ↦ saturatus<u8>
-    fixum saturatus<i16> wide ← level ↦ saturatus<i16>
+    sit saturatus<u8> level ← x ↦ saturatus<u8>
+    sit saturatus<i16> wide ← level ↦ saturatus<i16>
     redde wide ↦ numerus
 }
 ",
@@ -238,12 +238,12 @@ fn saturating_word_bit_pattern_operators_are_exact() {
         r"
 incipit {
     varia saturatus<u8> x ← 200
-    fixum saturatus<u8> a ← x ∧ x
-    fixum saturatus<u8> b ← x ∨ 256
-    fixum saturatus<u8> c ← x ⊻ x
-    fixum saturatus<u8> d ← ¬x
-    fixum saturatus<u8> e ← x ⇐ 1
-    fixum saturatus<u8> f ← x ⇒ 1
+    sit saturatus<u8> a ← x ∧ x
+    sit saturatus<u8> b ← x ∨ 256
+    sit saturatus<u8> c ← x ⊻ x
+    sit saturatus<u8> d ← ¬x
+    sit saturatus<u8> e ← x ⇐ 1
+    sit saturatus<u8> f ← x ⇒ 1
     nota a + b + c + d + e + f
 }
 ",
@@ -289,10 +289,10 @@ fn saturating_word_expression_is_exact_and_an_inferred_slot_keeps_the_word() {
     analysis_accepts(
         r"
 incipit {
-    fixum saturatus<u8> s ← 250
-    fixum numerus wide ← s + 10
-    fixum _ inferred ← s + 10
-    fixum saturatus<u8> same ← inferred
+    sit saturatus<u8> s ← 250
+    sit numerus wide ← s + 10
+    sit inferred ← s + 10
+    sit saturatus<u8> same ← inferred
     nota wide
     nota same
 }
@@ -301,9 +301,9 @@ incipit {
     analysis_rejects_with_issue(
         r"
 incipit {
-    fixum saturatus<u8> s ← 250
-    fixum u8 narrow ← s + 10
-    fixum saturatus<u16> other ← narrow
+    sit saturatus<u8> s ← 250
+    sit u8 narrow ← s + 10
+    sit saturatus<u16> other ← narrow
     nota other
 }
 ",

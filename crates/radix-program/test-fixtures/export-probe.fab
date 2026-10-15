@@ -11,8 +11,8 @@
 
 fn probe(_ u) → string {
     match u {
-        case list<int> const xs { return "list" }
-        case string const s { return "string" }
+        case list<int> let xs { return "list" }
+        case string let s { return "string" }
     }
 }
 

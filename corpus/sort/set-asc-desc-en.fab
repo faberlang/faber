@@ -9,7 +9,7 @@ canonical = true
 
 # A set sorts into a list; the set itself is unchanged.
 main {
-    var set<int> s ← empty
+    mut set<int> s ← empty
     s.add(7)
     s.add(3)
     s.add(5)

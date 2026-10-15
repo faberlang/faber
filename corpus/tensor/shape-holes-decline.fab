@@ -14,17 +14,17 @@ fn dynamic_shape() → list<int> {
 }
 
 main {
-    const tf32[2, 3] grid ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
-    const tf32[3, 2] underdetermined ← grid.reshape([3, 2])
+    let tf32[2, 3] grid ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
+    let tf32[3, 2] underdetermined ← grid.reshape([3, 2])
 
-    const tf32[3] row ← [1.0, 2.0, 3.0] ↦ tf32[3]
-    const tensor<f32, [2, 3]> missing_witness ← row.expanded([2, 3])
+    let tf32[3] row ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    let tensor<f32, [2, 3]> missing_witness ← row.expanded([2, 3])
 
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const list<int> dyn_shape ← dynamic_shape()
-    const tensor<f32, dyn_shape> unknown_rank ← flat ↦ tensor<f32, dyn_shape>
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let list<int> dyn_shape ← dynamic_shape()
+    let tensor<f32, dyn_shape> unknown_rank ← flat ↦ tensor<f32, dyn_shape>
 
-    const list<int> ordinary ← [7, 3]
+    let list<int> ordinary ← [7, 3]
     print underdetermined.length()
     print missing_witness.length()
     print unknown_rank.length()

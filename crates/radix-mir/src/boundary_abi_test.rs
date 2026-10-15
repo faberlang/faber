@@ -564,7 +564,7 @@ fn boundary_abi_accepts_two_kernel_composition_region() {
     assert_eq!(
         calls[0].region.kernels,
         vec![MirFunctionId(1), MirFunctionId(3)],
-        "the batch's kernels ride one region, in invocation order"
+        "the batch's kernels ride one region, varia invocation order"
     );
     assert!(!calls[0].region.is_minimal());
 

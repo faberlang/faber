@@ -27,18 +27,18 @@ locale = "en"
 
 # itera ex — accumulator pattern inside functio
 #
-# itera ex <lista> fixum <item> { <body> }
+# itera ex <lista> sit <item> { <body> }
 #
 # GRAMMAR:
-#   forInStmt :← 'itera' 'ex' expr 'fixum' ident block
+#   forInStmt :← 'itera' 'ex' expr 'sit' ident block
 #
 # EXPECTED OUTPUT:
 #   Sums, maxima, and counts above a threshold for sample listas.
 
 fn summa(list<int> numeri) → int {
-    var int total ← 0
+    mut int total ← 0
 
-    for from numeri const n {
+    for from numeri let n {
         total ← total + n
     }
 
@@ -47,9 +47,9 @@ fn summa(list<int> numeri) → int {
 
 # Assumes non-empty lista (seed from first element)
 fn maximum(list<int> numeri) → int {
-    var int max ← numeri[0]
+    mut int max ← numeri[0]
 
-    for from numeri const n {
+    for from numeri let n {
         if n ≻ max {
             max ← n
         }
@@ -59,9 +59,9 @@ fn maximum(list<int> numeri) → int {
 }
 
 fn supra(list<int> numeri, int limen) → int {
-    var int int ← 0
+    mut int int ← 0
 
-    for from numeri const n {
+    for from numeri let n {
         if n ≻ limen {
             int ← int + 1
         }
@@ -71,7 +71,7 @@ fn supra(list<int> numeri, int limen) → int {
 }
 
 main {
-    const _ numeri ← [1, 2, 3, 4, 5]
+    let numeri ← [1, 2, 3, 4, 5]
 
     print summa(numeri)
     print maximum(numeri)

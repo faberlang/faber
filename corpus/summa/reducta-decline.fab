@@ -4,22 +4,22 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "expression", "reducta_expr", "reducta_op", "reducta_body", "reducta_identity"]
 category = "collection"
 summary = "Reduction type laws reject misplaced or unsupported filum, unaligned tails, non-scalar terms, non-boolean count terms, and identities on non-extrema."
-syntax = "reducta via <op> ex <tensor> [filum f] [fixum x { redde term } | vel identity]"
+syntax = "reducta via <op> ex <tensor> [filum f] [sit x { redde term } | vel identity]"
 related = ["reducta", "filum", "nucleum", "tensor", "vel"]
 locale = "la"
 +++
 
 functio filum_outside_kernel(tensor<f32, [32]> values) → f32 {
-    redde reducta via summa ex values apud [i] filum f fixum value { redde value }
+    redde reducta via summa ex values apud [i] filum f sit value { redde value }
 }
 
 @ nucleum
 functio unaligned_tail(tensor<f32, [33]> values) → f32 {
-    redde reducta via summa ex values apud [i] filum f fixum value { redde value }
+    redde reducta via summa ex values apud [i] filum f sit value { redde value }
 }
 
 functio non_scalar(tensor<textus, [4]> values) → textus {
-    redde reducta via summa ex values apud [i] fixum value { redde value }
+    redde reducta via summa ex values apud [i] sit value { redde value }
 }
 
 functio count_needs_bool(tensor<numerus, [4]> values) → numerus {

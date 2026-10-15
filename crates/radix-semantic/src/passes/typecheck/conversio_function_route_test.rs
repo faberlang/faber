@@ -58,7 +58,7 @@ functio adPositivam(Mensura m) → Positiva ⇥ textus {
 #[test]
 fn registered_pair_serves_explicit_conversio() {
     let failable = function_route_failable(&format!(
-        "{TEMPERATURES}incipit {{\n    fixum Fahrenheit f ← Celsius {{ gradus = 100.0 }} ↦ Fahrenheit\n    nota f.gradus\n}}"
+        "{TEMPERATURES}incipit {{\n    sit Fahrenheit f ← Celsius {{ gradus = 100.0 }} ↦ Fahrenheit\n    nota f.gradus\n}}"
     ));
     assert!(!failable);
 }
@@ -66,7 +66,7 @@ fn registered_pair_serves_explicit_conversio() {
 #[test]
 fn conversio_function_used_through_arrow_is_not_unused() {
     let result = analyze_source_la(&format!(
-        "{TEMPERATURES}incipit {{\n    fixum Fahrenheit f ← Celsius {{ gradus = 100.0 }} ↦ Fahrenheit\n    nota f.gradus\n}}"
+        "{TEMPERATURES}incipit {{\n    sit Fahrenheit f ← Celsius {{ gradus = 100.0 }} ↦ Fahrenheit\n    nota f.gradus\n}}"
     ));
     assert!(result.is_ok(), "{:?}", result.diagnostics);
     assert!(
@@ -82,7 +82,7 @@ fn conversio_function_used_through_arrow_is_not_unused() {
 #[test]
 fn failable_pair_takes_a_default() {
     let failable = function_route_failable(&format!(
-        "{FAILABLE}incipit {{\n    fixum Positiva p ← Mensura {{ valor = -1 }} ↦ Positiva ⊥ Positiva {{ valor = 0 }}\n    nota p.valor\n}}"
+        "{FAILABLE}incipit {{\n    sit Positiva p ← Mensura {{ valor = -1 }} ↦ Positiva ⊥ Positiva {{ valor = 0 }}\n    nota p.valor\n}}"
     ));
     assert!(failable);
 }
@@ -111,7 +111,7 @@ fn failable_pair_without_default_or_channel_is_rejected() {
 #[test]
 fn failable_pair_in_main_is_exempt() {
     let _ = analyze_ok_la(&format!(
-        "{FAILABLE}incipit {{\n    fixum Positiva p ← Mensura {{ valor = 1 }} ↦ Positiva\n    nota p.valor\n}}"
+        "{FAILABLE}incipit {{\n    sit Positiva p ← Mensura {{ valor = 1 }} ↦ Positiva\n    nota p.valor\n}}"
     ));
 }
 
@@ -123,7 +123,7 @@ fn registered_pairs_never_chain() {
 @ conversio
 functio adKelvin(Fahrenheit f) → Kelvin {{ redde Kelvin {{ gradus = f.gradus }} }}
 incipit {{
-    fixum Kelvin k ← Celsius {{ gradus = 1.0 }} ↦ Kelvin
+    sit Kelvin k ← Celsius {{ gradus = 1.0 }} ↦ Kelvin
     nota k.gradus
 }}"
         ),

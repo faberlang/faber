@@ -26,8 +26,8 @@ locale = "en"
 @ kernel
 @ public
 fn productum(f32 x) → f32 {
-    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
-    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    const f32 d ← a.dot(b)
+    let vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    let vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    let f32 d ← a.dot(b)
     return d
 }

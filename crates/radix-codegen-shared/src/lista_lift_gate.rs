@@ -47,6 +47,12 @@ pub fn reject_lista_lift(
     if matches!(target, Target::HirFaber) {
         return Ok(());
     }
+    // The Python emitter lowers every gated form as a comprehension over its
+    // list carrier, with the runner's equal-length trap (radix-hir-python
+    // lift.rs); the other HIR targets keep failing closed here.
+    if matches!(target, Target::HirPython) {
+        return Ok(());
+    }
     let mut gate = Gate { types, found: None };
     walk_program(&mut gate, hir);
     match gate.found {

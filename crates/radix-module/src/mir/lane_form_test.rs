@@ -60,7 +60,7 @@ const COPY: &str = r"
 @ kernel
 @ public
 fn copy(tensor<f32, [_, _]> src, mut tensor<f32, [_, _]> dst) → void {
-    for from src at [i, j] thread lane const v {
+    for from src at [i, j] thread lane let v {
         dst[[i, j]] ← v
     }
 }
@@ -163,10 +163,10 @@ const TWO_REGIONS: &str = r"
 @ kernel
 @ public
 fn k(tensor<f32, [_, _]> src, mut tensor<f32, [_, _]> dst) → void {
-    for from src at [i, j] thread lane const v {
+    for from src at [i, j] thread lane let v {
         dst[[i, j]] ← v
     }
-    for from src at [i, j] thread lane const v {
+    for from src at [i, j] thread lane let v {
         dst[[i, j]] ← v + 1.0
     }
 }
@@ -177,7 +177,7 @@ const POST_LOOP: &str = r"
 @ kernel
 @ public
 fn k(tensor<f32, [_, _]> src, mut tensor<f32, [_, _]> dst) → void {
-    for from src at [i, j] thread lane const v {
+    for from src at [i, j] thread lane let v {
         dst[[i, j]] ← v
     }
     dst[[0, 0]] ← 1.0

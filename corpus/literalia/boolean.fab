@@ -10,8 +10,8 @@ related = ["falsum", "bivalens", "verum"]
 locale = "en"
 +++
 main {
-    const bool enabled ← true
-    const bool disabled ← false
+    let bool enabled ← true
+    let bool disabled ← false
     print enabled
     print disabled
     print enabled and not disabled

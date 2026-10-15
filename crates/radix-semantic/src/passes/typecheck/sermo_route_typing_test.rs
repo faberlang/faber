@@ -38,7 +38,7 @@ fn rejects(handlers: &str, body: &str, issue: &str) {
 fn materialize_to_reply_type_is_accepted() {
     accepts(
         TEXT_TO_NUM,
-        "fixum numerus n ← ad 'x:y' (\"a\") ↦ numerus\nnota n",
+        "sit numerus n ← ad 'x:y' (\"a\") ↦ numerus\nnota n",
     );
 }
 
@@ -46,7 +46,7 @@ fn materialize_to_reply_type_is_accepted() {
 fn materialize_to_other_type_is_a_reply_mismatch() {
     rejects(
         TEXT_TO_NUM,
-        "fixum textus t ← ad 'x:y' (\"a\") ↦ textus\nnota t",
+        "sit textus t ← ad 'x:y' (\"a\") ↦ textus\nnota t",
         "sermo_reply_type_mismatch",
     );
 }
@@ -55,12 +55,12 @@ fn materialize_to_other_type_is_a_reply_mismatch() {
 fn inferred_local_carries_route_types() {
     rejects(
         TEXT_TO_NUM,
-        "fixum _ s ← ad 'x:y' (\"a\")\nfixum textus t ← s ↦ textus\nnota t",
+        "sit s ← ad 'x:y' (\"a\")\nsit textus t ← s ↦ textus\nnota t",
         "sermo_reply_type_mismatch",
     );
     accepts(
         TEXT_TO_NUM,
-        "fixum _ s ← ad 'x:y' (\"a\")\nfixum numerus n ← s ↦ numerus\nnota n",
+        "sit s ← ad 'x:y' (\"a\")\nsit numerus n ← s ↦ numerus\nnota n",
     );
 }
 
@@ -68,7 +68,7 @@ fn inferred_local_carries_route_types() {
 fn opener_must_match_handler_parameter() {
     rejects(
         TEXT_TO_NUM,
-        "fixum numerus n ← ad 'x:y' (5) ↦ numerus\nnota n",
+        "sit numerus n ← ad 'x:y' (5) ↦ numerus\nnota n",
         "ad_route_opener_type_mismatch",
     );
 }
@@ -77,7 +77,7 @@ fn opener_must_match_handler_parameter() {
 fn missing_opener_is_rejected_when_handler_takes_one() {
     rejects(
         TEXT_TO_NUM,
-        "fixum numerus n ← ad 'x:y' ↦ numerus\nnota n",
+        "sit numerus n ← ad 'x:y' ↦ numerus\nnota n",
         "ad_route_opener_missing",
     );
 }
@@ -86,31 +86,31 @@ fn missing_opener_is_rejected_when_handler_takes_one() {
 fn opener_is_rejected_when_handler_takes_none() {
     rejects(
         NO_OPENER,
-        "fixum textus t ← ad 'x:z' (\"a\") ↦ textus\nnota t",
+        "sit textus t ← ad 'x:z' (\"a\") ↦ textus\nnota t",
         "ad_route_opener_unexpected",
     );
-    accepts(NO_OPENER, "fixum textus t ← ad 'x:z' ↦ textus\nnota t");
+    accepts(NO_OPENER, "sit textus t ← ad 'x:z' ↦ textus\nnota t");
 }
 
 #[test]
 fn cursor_handler_materializes_as_lista_of_reply() {
     accepts(
         CURSOR,
-        "fixum lista<numerus> xs ← ad 'x:c' (\"a\") ↦ lista<numerus>\nnota xs",
+        "sit lista<numerus> xs ← ad 'x:c' (\"a\") ↦ lista<numerus>\nnota xs",
     );
     rejects(
         CURSOR,
-        "fixum lista<textus> xs ← ad 'x:c' (\"a\") ↦ lista<textus>\nnota xs",
+        "sit lista<textus> xs ← ad 'x:c' (\"a\") ↦ lista<textus>\nnota xs",
         "sermo_reply_type_mismatch",
     );
 }
 
 #[test]
 fn vacuum_handler_materializes_as_vacuum() {
-    accepts(VACUUM, "fixum vacuum u ← ad 'x:v' (\"a\") ↦ vacuum");
+    accepts(VACUUM, "sit vacuum u ← ad 'x:v' (\"a\") ↦ vacuum");
     rejects(
         VACUUM,
-        "fixum textus t ← ad 'x:v' (\"a\") ↦ textus\nnota t",
+        "sit textus t ← ad 'x:v' (\"a\") ↦ textus\nnota t",
         "sermo_reply_type_mismatch",
     );
 }
@@ -121,12 +121,12 @@ fn vacuum_handler_materializes_as_vacuum() {
 fn tuus_type_must_match_reply() {
     rejects(
         TEXT_TO_NUM,
-        "fixum _ s ← ad 'x:y' (\"a\")\nfixum _ t ← s.tuus<textus>()\nnota t.fini()",
+        "sit s ← ad 'x:y' (\"a\")\nsit t ← s.tuus<textus>()\nnota t.fini()",
         "sermo_view_type_mismatch",
     );
     accepts(
         TEXT_TO_NUM,
-        "fixum _ s ← ad 'x:y' (\"a\")\nfixum _ t ← s.tuus<numerus>()\nnota t.fini()",
+        "sit s ← ad 'x:y' (\"a\")\nsit t ← s.tuus<numerus>()\nnota t.fini()",
     );
 }
 
@@ -134,11 +134,11 @@ fn tuus_type_must_match_reply() {
 fn omitted_tuus_type_is_inferred_from_reply() {
     accepts(
         TEXT_TO_NUM,
-        "fixum _ s ← ad 'x:y' (\"a\")\nfixum _ t ← s.tuus()\nfixum scrinium<numerus> ∪ nihil f ← t.accipe()\nnota f",
+        "sit s ← ad 'x:y' (\"a\")\nsit t ← s.tuus()\nsit scrinium<numerus> ∪ nihil f ← t.accipe()\nnota f",
     );
     rejects(
         TEXT_TO_NUM,
-        "fixum _ s ← ad 'x:y' (\"a\")\nfixum _ t ← s.tuus()\nfixum scrinium<textus> ∪ nihil f ← t.accipe()\nnota f",
+        "sit s ← ad 'x:y' (\"a\")\nsit t ← s.tuus()\nsit scrinium<textus> ∪ nihil f ← t.accipe()\nnota f",
         "initializer_annotation_mismatch",
     );
 }
@@ -147,7 +147,7 @@ fn omitted_tuus_type_is_inferred_from_reply() {
 fn meus_type_must_match_opener() {
     rejects(
         TEXT_TO_NUM,
-        "fixum _ s ← ad 'x:y' (\"a\")\nnota s.meus<numerus>().fini()",
+        "sit s ← ad 'x:y' (\"a\")\nnota s.meus<numerus>().fini()",
         "sermo_view_type_mismatch",
     );
 }
@@ -156,7 +156,7 @@ fn meus_type_must_match_opener() {
 fn meus_close_is_legal_on_a_faber_route() {
     accepts(
         TEXT_TO_NUM,
-        "fixum _ s ← ad 'x:y' (\"a\")\nnota s.meus<textus>().fini()\nnota s.meus().fini()",
+        "sit s ← ad 'x:y' (\"a\")\nnota s.meus<textus>().fini()\nnota s.meus().fini()",
     );
 }
 
@@ -164,12 +164,12 @@ fn meus_close_is_legal_on_a_faber_route() {
 fn meus_send_toward_a_faber_handler_is_rejected() {
     rejects(
         TEXT_TO_NUM,
-        "fixum _ s ← ad 'x:y' (\"a\")\ns.meus<textus>().da(\"b\")",
+        "sit s ← ad 'x:y' (\"a\")\ns.meus<textus>().da(\"b\")",
         "ad_handler_send_closed",
     );
     rejects(
         TEXT_TO_NUM,
-        "fixum _ s ← ad 'x:y' (\"a\")\nfixum _ m ← s.meus<textus>()\nm.da(\"b\")",
+        "sit s ← ad 'x:y' (\"a\")\nsit m ← s.meus<textus>()\nm.da(\"b\")",
         "ad_handler_send_closed",
     );
 }
@@ -180,7 +180,7 @@ fn meus_send_toward_a_faber_handler_is_rejected() {
 fn typed_conversation_assigns_to_bare_sermo() {
     accepts(
         TEXT_TO_NUM,
-        "fixum sermo s ← ad 'x:y' (\"a\")\nfixum textus t ← s ↦ textus\nnota t",
+        "sit sermo s ← ad 'x:y' (\"a\")\nsit textus t ← s ↦ textus\nnota t",
     );
 }
 
@@ -188,7 +188,7 @@ fn typed_conversation_assigns_to_bare_sermo() {
 fn written_typed_form_matching_the_route_is_accepted() {
     accepts(
         TEXT_TO_NUM,
-        "fixum sermo<textus, numerus> s ← ad 'x:y' (\"a\")\nfixum numerus n ← s ↦ numerus\nnota n",
+        "sit sermo<textus, numerus> s ← ad 'x:y' (\"a\")\nsit numerus n ← s ↦ numerus\nnota n",
     );
 }
 
@@ -196,7 +196,7 @@ fn written_typed_form_matching_the_route_is_accepted() {
 fn written_typed_form_disagreeing_with_the_route_is_rejected() {
     rejects(
         TEXT_TO_NUM,
-        "fixum sermo<textus, textus> s ← ad 'x:y' (\"a\")\nnota s ↦ textus",
+        "sit sermo<textus, textus> s ← ad 'x:y' (\"a\")\nnota s ↦ textus",
         "sermo_type_arguments_mismatch",
     );
 }
@@ -205,7 +205,7 @@ fn written_typed_form_disagreeing_with_the_route_is_rejected() {
 fn bare_sermo_does_not_assign_to_a_typed_form() {
     rejects(
         "",
-        "fixum sermo<textus, textus> s ← ad 'runtime:echo' (\"a\")\nnota s ↦ textus",
+        "sit sermo<textus, textus> s ← ad 'runtime:echo' (\"a\")\nnota s ↦ textus",
         "sermo_typed_from_untyped",
     );
 }
@@ -214,7 +214,7 @@ fn bare_sermo_does_not_assign_to_a_typed_form() {
 fn written_sermo_takes_zero_or_two_type_arguments() {
     rejects(
         "",
-        "fixum sermo<textus> s ← ad 'runtime:echo' (\"a\")\nnota s ↦ textus",
+        "sit sermo<textus> s ← ad 'runtime:echo' (\"a\")\nnota s ↦ textus",
         "sermo_arity",
     );
 }
@@ -223,7 +223,7 @@ fn written_sermo_takes_zero_or_two_type_arguments() {
 fn sermo_of_valor_valor_is_the_bare_form() {
     accepts(
         "",
-        "fixum sermo<valor, valor> s ← ad 'runtime:echo' (\"a\")\nfixum sermo b ← s\nfixum textus t ← b ↦ textus\nnota t",
+        "sit sermo<valor, valor> s ← ad 'runtime:echo' (\"a\")\nsit sermo b ← s\nsit textus t ← b ↦ textus\nnota t",
     );
 }
 
@@ -233,7 +233,7 @@ fn sermo_of_valor_valor_is_the_bare_form() {
 fn host_route_stays_valor_valor() {
     accepts(
         "",
-        "fixum textus t ← ad 'solum:lege' (5) ↦ textus\nfixum _ s ← ad 'solum:lege' (\"a\")\nfixum _ v ← s.tuus<numerus>()\nnota t\nnota v.fini()",
+        "sit textus t ← ad 'solum:lege' (5) ↦ textus\nsit s ← ad 'solum:lege' (\"a\")\nsit v ← s.tuus<numerus>()\nnota t\nnota v.fini()",
     );
 }
 
@@ -252,7 +252,7 @@ fn bare_sermo_parameter_accepts_a_typed_conversation() {
 fn finalized_hir_carries_the_bare_sermo_carrier() {
     let result = analyze_source_la(&program(
         TEXT_TO_NUM,
-        "fixum _ s ← ad 'x:y' (\"a\")\nnota s ↦ numerus",
+        "sit s ← ad 'x:y' (\"a\")\nnota s ↦ numerus",
     ));
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
     let tys = entry_local_tys(&result);

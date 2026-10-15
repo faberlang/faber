@@ -246,12 +246,34 @@ impl Validator<'_, '_> {
                         MirAggregateItem::Spread(value) => {
                             let value_ty = self.validate_operand(scope, value, span);
                             if let Some(value_ty) = value_ty {
-                                self.require_assignable(
-                                    value_ty,
-                                    aggregate.ty,
-                                    span,
-                                    "aggregate spread type mismatch",
-                                );
+                                // WHY: a literal containing a spread gets no literal
+                                // capacity, so a bounded-array source never matches the
+                                // plain array type whole; its elements are what flow.
+                                let spread_element = match self.type_kind(value_ty) {
+                                    Type::Array(inner)
+                                    | Type::BoundedArray { element: inner, .. }
+                                        if matches!(aggregate.kind, MirAggregateKind::Array) =>
+                                    {
+                                        Some(MirType::semantic(*inner))
+                                    }
+                                    _ => None,
+                                };
+                                match (spread_element, element_ty) {
+                                    (Some(spread_element), Some(element_ty)) => {
+                                        self.require_assignable(
+                                            spread_element,
+                                            element_ty,
+                                            span,
+                                            "aggregate spread type mismatch",
+                                        );
+                                    }
+                                    _ => self.require_assignable(
+                                        value_ty,
+                                        aggregate.ty,
+                                        span,
+                                        "aggregate spread type mismatch",
+                                    ),
+                                }
                             }
                         }
                     }

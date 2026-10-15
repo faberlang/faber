@@ -30,9 +30,9 @@ locale = "en"
 #   direct call does, so a `mut` parameter is written through to the caller.
 
 main {
-    const int extra ← 7
-    var list<int> a ← [1, 2, 3]
-    const (mut list<int>) → void add ← mut list<int> xs ∴ xs.append(extra)
+    let int extra ← 7
+    mut list<int> a ← [1, 2, 3]
+    let (mut list<int>) → void add ← mut list<int> xs ∴ xs.append(extra)
     add(mut a)
     add(mut a)
     print a

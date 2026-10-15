@@ -1,5 +1,5 @@
 # Fault: text literal bound to a number-typed constant (SEM010).
 आरंभ {
-  स्थिर संख्या गलत_संख्या ← "शब्द"
+  बैठा संख्या गलत_संख्या ← "शब्द"
   दिखाओ गलत_संख्या
 }

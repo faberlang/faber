@@ -54,9 +54,9 @@ fn first_match_returns_the_first_live_element() {
     let lines = run_stdout(
         "afm3_match.fab",
         r"incipit {
-    fixum lista<fractus> xs ← [5.0, 7.0, 9.0]
-    fixum fractus ∪ nihil r ← primus_quem(xs, ubi x { x ≻ 6.0 })
-    fixum fractus out ← r vel -1.0
+    sit lista<fractus> xs ← [5.0, 7.0, 9.0]
+    sit fractus ∪ nihil r ← primus_quem(xs, ubi x { x ≻ 6.0 })
+    sit fractus out ← r vel -1.0
     nota out
 }",
     );
@@ -68,9 +68,9 @@ fn first_match_no_match_yields_nihil() {
     let lines = run_stdout(
         "afm3_no_match.fab",
         r"incipit {
-    fixum lista<fractus> xs ← [1.0, 2.0]
-    fixum fractus ∪ nihil r ← primus_quem(xs, ubi x { x ≻ 5.0 })
-    fixum fractus out ← r vel -1.0
+    sit lista<fractus> xs ← [1.0, 2.0]
+    sit fractus ∪ nihil r ← primus_quem(xs, ubi x { x ≻ 5.0 })
+    sit fractus out ← r vel -1.0
     nota out
 }",
     );
@@ -82,9 +82,9 @@ fn first_match_empty_source_yields_nihil() {
     let lines = run_stdout(
         "afm3_empty.fab",
         r"incipit {
-    fixum lista<fractus> xs ← vacua
-    fixum fractus ∪ nihil r ← primus_quem(xs, ubi x { x ≻ 5.0 })
-    fixum fractus out ← r vel -1.0
+    sit lista<fractus> xs ← vacua
+    sit fractus ∪ nihil r ← primus_quem(xs, ubi x { x ≻ 5.0 })
+    sit fractus out ← r vel -1.0
     nota out
 }",
     );
@@ -99,9 +99,9 @@ fn first_match_evaluates_the_predicate_after_the_first_match() {
     let errors = run_trapped(
         "afm3_total.fab",
         r#"incipit {
-    fixum lista<textus> xs ← ["5", "300"]
-    fixum textus ∪ nihil r ← primus_quem(xs, ubi x { (x ↦ u8) ≻ 2 })
-    fixum textus out ← r vel "none"
+    sit lista<textus> xs ← ["5", "300"]
+    sit textus ∪ nihil r ← primus_quem(xs, ubi x { (x ↦ u8) ≻ 2 })
+    sit textus out ← r vel "none"
     nota out
 }"#,
     );
@@ -118,9 +118,9 @@ fn first_match_predicate_error_propagates_before_any_match() {
     let errors = run_trapped(
         "afm3_error.fab",
         r#"incipit {
-    fixum lista<textus> xs ← ["300"]
-    fixum textus ∪ nihil r ← primus_quem(xs, ubi x { (x ↦ u8) ≻ 2 })
-    fixum textus out ← r vel "none"
+    sit lista<textus> xs ← ["300"]
+    sit textus ∪ nihil r ← primus_quem(xs, ubi x { (x ↦ u8) ≻ 2 })
+    sit textus out ← r vel "none"
     nota out
 }"#,
     );
@@ -135,10 +135,10 @@ fn first_match_over_tensor_source_returns_the_first_live_element() {
     redde primus_quem(x, ubi v { v ≻ 0.0 })
 }
 incipit {
-    fixum lista<f32> flat ← [-1.0, 2.0, 3.0, -4.0]
-    fixum tf32[4] a ← flat ↦ tf32[4]
-    fixum fractus ∪ nihil r ← elige(a)
-    fixum fractus out ← r vel -9.0
+    sit lista<f32> flat ← [-1.0, 2.0, 3.0, -4.0]
+    sit tf32[4] a ← flat ↦ tf32[4]
+    sit fractus ∪ nihil r ← elige(a)
+    sit fractus out ← r vel -9.0
     nota out
 }",
     );
@@ -153,9 +153,9 @@ fn first_match_over_zero_extent_tensor_yields_nihil() {
     redde primus_quem(x, ubi v { v ≻ 0.0 })
 }
 incipit {
-    fixum tf32[0] a ← vacua
-    fixum fractus ∪ nihil r ← elige_vacuum(a)
-    fixum fractus out ← r vel -9.0
+    sit tf32[0] a ← vacua
+    sit fractus ∪ nihil r ← elige_vacuum(a)
+    sit fractus out ← r vel -9.0
     nota out
 }",
     );

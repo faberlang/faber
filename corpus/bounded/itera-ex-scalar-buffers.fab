@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "Value iteration over runtime-length bytes<N> / ascii<N> / string<N> (N <= 10) lowers to a static split on len; arm k unrolls k lanes; spare slots are never read."
-syntax = "for from bytes<N> | ascii<N> | string<N> const x { }"
+syntax = "for from bytes<N> | ascii<N> | string<N> let x { }"
 related = ["bytes", "ascii", "string", "ex", "itera", "longitudo"]
 locale = "en"
 no_expected = "declaration-only"
@@ -38,19 +38,19 @@ no_expected = "declaration-only"
 # (the runner overlay declines the bounded octeti/textus carriers).
 
 fn visit_bytes(list<b8, 8> xs) → void {
-    for from xs const b {
+    for from xs let b {
         print b
     }
 }
 
 fn visit_ascii(ascii<8> xs) → void {
-    for from xs const l {
+    for from xs let l {
         print l
     }
 }
 
 fn visit_string(string<8> xs) → void {
-    for from xs const c {
+    for from xs let c {
         print c
     }
 }

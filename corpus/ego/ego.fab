@@ -8,7 +8,7 @@ canonical = true
 summary = "Refers to the current instance inside a method."
 syntax = "ego.<member>"
 aliases = ["self", "this"]
-related = ["generis", "genus"]
+related = ["fixum", "genus"]
 locale = "en"
 +++
 # =============================================================================
@@ -22,7 +22,7 @@ locale = "en"
 # Common mistakes:
 #   • Using `ego` outside a genus method — `ego` is only valid inside methods defined on a genus (SEM008).
 #
-# See also: generis, genus
+# See also: fixum, genus
 # =============================================================================
 
 # ego — current genus instance reference
@@ -36,7 +36,7 @@ locale = "en"
 #   capsa: prima
 
 class Capsa {
-    var string titulus
+    mut string titulus
 
     fn narra() → string {
         # ego = the receiver instance
@@ -45,6 +45,6 @@ class Capsa {
 }
 
 main {
-    const Capsa capsa ← Capsa { titulus = "prima" }
+    let Capsa capsa ← Capsa { titulus = "prima" }
     print capsa.narra()
 }

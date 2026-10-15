@@ -12,8 +12,8 @@ related = ["sin", "secus", "ergo"]
 locale = "en"
 +++
 test "si runs its body on a verum condition" {
-    const int x ← 10
-    var bool maior ← false
+    let int x ← 10
+    mut bool maior ← false
     if x ≻ 5 {
         maior ← true
     }
@@ -21,8 +21,8 @@ test "si runs its body on a verum condition" {
 }
 
 test "si skips its body on a falsum condition" {
-    const int x ← 10
-    var bool maior ← false
+    let int x ← 10
+    mut bool maior ← false
     if x ≻ 20 {
         maior ← true
     }
@@ -30,8 +30,8 @@ test "si skips its body on a falsum condition" {
 }
 
 test "si block body runs every statement" {
-    const int aetas ← 25
-    var int gradus ← 0
+    let int aetas ← 25
+    mut int gradus ← 0
     if aetas ≥ 18 {
         gradus ← gradus + 1
         gradus ← gradus + 1
@@ -66,7 +66,7 @@ test "si block body runs every statement" {
 
 main {
     # Simple truthy branch — only the first condition matches
-    const int x ← 10
+    let int x ← 10
     if x ≻ 5 {
         print "x maior quam 5"
     }
@@ -76,7 +76,7 @@ main {
     }
 
     # Block body: multiple statements run together when condition holds
-    const int aetas ← 25
+    let int aetas ← 25
     if aetas ≥ 18 {
         print "Adult"
         print "Can vote"

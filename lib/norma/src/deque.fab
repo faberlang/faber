@@ -30,7 +30,7 @@ locale = "en"
 # is identical (append, pop_front, pop_back) so users cross-walking between
 # lista and deque see the same verbs; deque adds prepend (head push) because
 # lista has no head-push intrinsic. Imperativus throughout for mutation
-# (var receiver required); nominal for projections (length, first,
+# (mut receiver required); nominal for projections (length, first,
 # last); present-predicate for state (is_empty); Perfectum for copy-out
 # (to_list).
 
@@ -41,8 +41,8 @@ locale = "en"
 # Double-ended queue over T. See module header for the two-lista scheme.
 @ public
 class Deque<T> {
-    var list<T> head = []
-    var list<T> tail = []
+    mut list<T> head = []
+    mut list<T> tail = []
 
     # =========================================================================
     # STATE (nominal / present predicate)
@@ -57,7 +57,7 @@ class Deque<T> {
     }
 
     # =========================================================================
-    # MUTATION (Imperativus — in-place on a var receiver)
+    # MUTATION (Imperativus — in-place on a mut receiver)
     # =========================================================================
 
     fn append(T v) → void {
@@ -117,15 +117,15 @@ class Deque<T> {
 
     # Head-to-tail copy; does not consume the queue.
     fn to_list() → list<T> {
-        var list<T> out ← []
+        mut list<T> out ← []
         # head is stored reversed (its tail is the queue head), so walk it
         # tail-first to emit in head order.
-        var int i ← self.head.length()
+        mut int i ← self.head.length()
         while i ≻ 0 {
             i ← i - 1
             out.append(self.head.get(i))
         }
-        for from self.tail const v {
+        for from self.tail let v {
             out.append(v)
         }
         return out

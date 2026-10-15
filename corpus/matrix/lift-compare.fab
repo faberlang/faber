@@ -61,11 +61,11 @@ fn clamped(matrix<f32, [2, 2]> a, f32 limit) → matrix<f32, [2, 2]> {
 }
 
 main {
-    const matrix<f32, [2, 2]> a ← [[1.0, 5.0], [3.0, 4.0]] ↦ matrix<f32, [2, 2]>
-    const matrix<f32, [2, 2]> b ← [[4.0, 5.0], [2.0, 4.0]] ↦ matrix<f32, [2, 2]>
-    const matrix<bool, [2, 2]> lt ← below(a, b)
+    let matrix<f32, [2, 2]> a ← [[1.0, 5.0], [3.0, 4.0]] ↦ matrix<f32, [2, 2]>
+    let matrix<f32, [2, 2]> b ← [[4.0, 5.0], [2.0, 4.0]] ↦ matrix<f32, [2, 2]>
+    let matrix<bool, [2, 2]> lt ← below(a, b)
     print lt
-    const matrix<bool, [2, 2]> big ← at_least(a, 3.0)
+    let matrix<bool, [2, 2]> big ← at_least(a, 3.0)
     print big
     print bigger_than(3.0, a)
     print cell_equal(a, b)

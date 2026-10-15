@@ -15,7 +15,7 @@ import from "norma:fault" fault
 
 # Client half of the exchange: one GET carrying `x-client: loop`.
 fn fetch_get(string url) async → response.Response ⇥ fault.IoFault {
-    var headers.Headers request_headers ← headers.empty()
+    mut headers.Headers request_headers ← headers.empty()
     if request_headers.append("x-client", "loop") {
     }
     return client.get_with(url, request_headers)
@@ -27,53 +27,53 @@ fn fetch_post(string url, string body) async → response.Response ⇥ fault.IoF
 }
 
 async_main {
-    const int handle ↤ call 'http:listen' ([0 ↦ value])
-    const int port ↤ call 'http:port' (handle)
+    let int handle ↤ call 'http:listen' ([0 ↦ value])
+    let int port ↤ call 'http:port' (handle)
     assert port ≻ 0
-    const string base ← "http://127.0.0.1:§"(port)
+    let string base ← "http://127.0.0.1:§"(port)
 
-    const promise<response.Response ⇥ fault.IoFault> pending ← fetch_get(base + "/hello")
+    let promise<response.Response ⇥ fault.IoFault> pending ← fetch_get(base + "/hello")
 
-    const server.Incoming incoming ← server.accept_incoming(handle)
+    let server.Incoming incoming ← server.accept_incoming(handle)
     assert incoming.req.method ≡ "GET"
     assert incoming.req.path ≡ "/hello"
-    const string ∪ none sent ← incoming.req.header("x-client")
+    let string ∪ none sent ← incoming.req.header("x-client")
     assert sent not is none
     assert (sent ↦ string) ≡ "loop"
 
-    var headers.Headers response_headers ← headers.empty()
+    mut headers.Headers response_headers ← headers.empty()
     if response_headers.append("x-proof", "yes") {
     }
     server.reply(incoming, 200, response_headers, "hello-body")
 
-    const response.Response got ↢ pending
+    let response.Response got ↢ pending
     assert got.status ≡ 200
     assert got.body ≡ "hello-body"
-    const string ∪ none proof ← got.header("x-proof")
+    let string ∪ none proof ← got.header("x-proof")
     assert proof not is none
     assert (proof ↦ string) ≡ "yes"
 
     # Second exchange on the same listener: POST with a body.
-    const promise<response.Response ⇥ fault.IoFault> pending_post ← fetch_post(base + "/submit", "post-body")
+    let promise<response.Response ⇥ fault.IoFault> pending_post ← fetch_post(base + "/submit", "post-body")
 
-    const server.Incoming incoming_post ← server.accept_incoming(handle)
+    let server.Incoming incoming_post ← server.accept_incoming(handle)
     assert incoming_post.req.method ≡ "POST"
     assert incoming_post.req.path ≡ "/submit"
     assert incoming_post.req.body ≡ "post-body"
 
-    var headers.Headers post_headers ← headers.empty()
+    mut headers.Headers post_headers ← headers.empty()
     if post_headers.append("x-proof", "posted") {
     }
     server.reply(incoming_post, 201, post_headers, "created-body")
 
-    const response.Response got_post ↢ pending_post
+    let response.Response got_post ↢ pending_post
     assert got_post.status ≡ 201
     assert got_post.body ≡ "created-body"
-    const string ∪ none posted ← got_post.header("x-proof")
+    let string ∪ none posted ← got_post.header("x-proof")
     assert posted not is none
     assert (posted ↦ string) ≡ "posted"
 
-    const void stopped ↤ call 'http:stop' (handle)
+    let void stopped ↤ call 'http:stop' (handle)
 
     print "http-loopback-ok"
 }

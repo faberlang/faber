@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "lane"
 canonical = false
 summary = "Shapes the AIR proof-aspect report admits: a literal-range itera ab loop (unroll-equivalence obligation) and a pure scalar let/return function (gate-purity obligation)."
-syntax = "itera ab <literal range> fixum <ident>; return <path>"
+syntax = "itera ab <literal range> sit <ident>; return <path>"
 related = ["itera", "ab", "air-aspect-decline"]
 locale = "en"
 no_expected = "declaration-only"
@@ -37,13 +37,13 @@ no_expected = "declaration-only"
 #
 # Admitted Line 1 shape: literal range gives concrete lanes (route ab, 4 lanes).
 fn unroll_admit() → void {
-    for range 0‥4 const i {
+    for range 0‥4 let i {
     }
 }
 
 # Admitted Line 3 shape: immutable let chain + returned path — inside the
 # scalar/let/call purity subset, no IO or monadic effect forms.
 fn purum(int x) → int {
-    const int s ← x
+    let int s ← x
     return s
 }

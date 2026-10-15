@@ -37,7 +37,7 @@ const REJECT_ISSUE: &str = "tensor_index_vector_integer_elements";
 fn accipe_accepts_lista_u32_bound_index() {
     accepts(
         r"functio check(tf32[16] input, u32 id) → f32 {
-    fixum lista<u32> idx ← [id]
+    sit lista<u32> idx ← [id]
     redde input.accipe(idx) ⊥ 0.0
 }",
     );
@@ -47,7 +47,7 @@ fn accipe_accepts_lista_u32_bound_index() {
 fn accipe_accepts_lu32_lista_sugar_index() {
     accepts(
         r"functio check(tf32[16] input, u32 id) → f32 {
-    fixum lu32 idx ← [id]
+    sit lu32 idx ← [id]
     redde input.accipe(idx) ⊥ 0.0
 }",
     );
@@ -66,7 +66,7 @@ fn accipe_accepts_inline_u32_index_literal() {
 fn accipe_accepts_lista_numerus_u32_spelling() {
     accepts(
         r"functio check(tf32[16] input, u32 id) → f32 {
-    fixum lista<u32> idx ← [id]
+    sit lista<u32> idx ← [id]
     redde input.accipe(idx) ⊥ 0.0
 }",
     );
@@ -84,8 +84,8 @@ fn accipe_accepts_lista_i32_index() {
 #[test]
 fn ponde_accepts_lista_u32_index() {
     accepts(
-        r"functio put(in tf32[16] output, u32 id, f32 v) → vacuum ⇥ textus {
-    fixum lista<u32> idx ← [id]
+        r"functio put(varia tf32[16] output, u32 id, f32 v) → vacuum ⇥ textus {
+    sit lista<u32> idx ← [id]
     output.ponde(idx, v)
 }",
     );
@@ -95,7 +95,7 @@ fn ponde_accepts_lista_u32_index() {
 fn accipe_rank2_accepts_lista_u32_origin() {
     accepts(
         r"functio pick(tf32[4, 4] grid, u32 r, u32 c) → f32 {
-    fixum lista<u32> origin ← [r, c]
+    sit lista<u32> origin ← [r, c]
     redde grid.accipe(origin) ⊥ 0.0
 }",
     );
@@ -105,8 +105,8 @@ fn accipe_rank2_accepts_lista_u32_origin() {
 fn forma_accepts_inline_shape_literal() {
     accepts(
         r"incipit {
-    fixum tf32 seed ← vacua
-    fixum tf32 reshaped ← seed.forma([2, 2])
+    sit tf32 seed ← vacua
+    sit tf32 reshaped ← seed.forma([2, 2])
     nota reshaped.longitudo()
 }",
     );
@@ -146,7 +146,7 @@ fn accipe_rejects_scalar_non_list_index() {
 fn accipe_rejects_lista_u64_index() {
     rejects_with_issue(
         r"functio bad(tf32[16] input, u64 id) → f32 {
-    fixum lista<u64> idx ← [id]
+    sit lista<u64> idx ← [id]
     redde input.accipe(idx) ⊥ 0.0
 }",
         REJECT_ISSUE,
@@ -157,7 +157,7 @@ fn accipe_rejects_lista_u64_index() {
 fn accipe_accepts_empty_index_list() {
     accepts(
         r"functio check(tf32[16] input) → f32 {
-    fixum lista<u32> idx ← []
+    sit lista<u32> idx ← []
     redde input.accipe(idx) ⊥ 0.0
 }",
     );
@@ -180,7 +180,7 @@ fn accipe_accepts_empty_inline_index_literal() {
 fn accipe_rejects_bool_index_list() {
     rejects_with_issue(
         r"functio bad(tf32[16] input) → f32 {
-    fixum lista<bivalens> idx ← [verum]
+    sit lista<bivalens> idx ← [verum]
     redde input.accipe(idx) ⊥ 0.0
 }",
         REJECT_ISSUE,
@@ -190,7 +190,7 @@ fn accipe_rejects_bool_index_list() {
 #[test]
 fn ponde_rejects_float_index_list() {
     rejects_with_issue(
-        r"functio bad(in tf32[16] output, lista<f32> idx, f32 v) → vacuum {
+        r"functio bad(varia tf32[16] output, lista<f32> idx, f32 v) → vacuum {
     output.ponde(idx, v)
 }",
         REJECT_ISSUE,
@@ -204,7 +204,7 @@ fn ponde_rejects_float_index_list() {
 fn numerus_list_binding_accepts_u32_element() {
     accepts(
         r"functio check(tf32[16] input, u32 id) → f32 {
-    fixum lista<numerus> idx ← [id]
+    sit lista<numerus> idx ← [id]
     redde input.accipe(idx) ⊥ 0.0
 }",
     );
@@ -217,7 +217,7 @@ fn numerus_list_binding_takes_a_u64_element_as_a_checked_store() {
     // rejected. This inverts the pre-U4 pin (`initializer_annotation_mismatch`).
     accepts(
         r"functio check(tf32[16] input, u64 id) → f32 {
-    fixum lista<numerus> idx ← [id]
+    sit lista<numerus> idx ← [id]
     redde input.accipe(idx) ⊥ 0.0
 }",
     );
@@ -256,7 +256,7 @@ fn gather_typechecks_with_a_tensor_u32_ids_parameter() {
 fn gather_typechecks_with_ids_built_from_a_flat_list() {
     accepts(
         r"functio select(tf32[4, 3] table) → tf32[4, 3] {
-    fixum tensor<u32, [4]> ids ← [3, 0, 2, 0] ↦ tensor<u32, [4]>
+    sit tensor<u32, [4]> ids ← [3, 0, 2, 0] ↦ tensor<u32, [4]>
     redde table.gather(ids)
 }",
     );
@@ -278,7 +278,7 @@ fn gather_accepts_an_empty_ids_tensor() {
 fn gather_result_rows_are_the_ids_extent() {
     accepts(
         r"functio select(tf32[4, 3] table, tensor<u32, [2]> ids) → tf32[2, 3] {
-    fixum tensor<f32, [2, 3]> out ← table.gather(ids)
+    sit tensor<f32, [2, 3]> out ← table.gather(ids)
     redde out
 }",
     );

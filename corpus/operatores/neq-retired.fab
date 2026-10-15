@@ -30,7 +30,7 @@ diagnostic = "PARSE030:neq_glyph_retired"
 # This exemplum intentionally fails to compile.
 
 main {
-    const int a ← 1
-    const int b ← 2
+    let int a ← 1
+    let int b ← 2
     print a ≠ b
 }

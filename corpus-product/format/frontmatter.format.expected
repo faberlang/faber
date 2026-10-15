@@ -5,7 +5,7 @@ locale = "la"
 # leading doc comment
 functio summa(lista<numerus> valores) → numerus {
     varia numerus totalis ← 0
-    itera ex valores fixum v {
+    itera ex valores sit v {
         totalis ← totalis + v
     }
     redde totalis

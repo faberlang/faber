@@ -35,8 +35,8 @@ locale = "en"
 #   alpha
 
 main {
-    const list<string> flat ← ["alpha", "beta", "gamma"]
-    const tensor<string, [3]> grid ← flat ↦ tensor<string, [3]>
-    const string cell ← grid.get([0])
+    let list<string> flat ← ["alpha", "beta", "gamma"]
+    let tensor<string, [3]> grid ← flat ↦ tensor<string, [3]>
+    let string cell ← grid.get([0])
     print cell
 }

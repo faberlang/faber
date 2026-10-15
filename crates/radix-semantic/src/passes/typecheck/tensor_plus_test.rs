@@ -59,9 +59,9 @@ fn matrix_plus_same_shape_typechecks() {
 fn tensor_plus_implicit_broadcast_rejects() {
     rejects_with_issue(
         r"incipit {
-  fixum tf32[2] a ← vacua
-  fixum tf32[2, 1] b ← vacua
-  fixum tf32[2, 2] c ← a + b
+  sit tf32[2] a ← vacua
+  sit tf32[2, 1] b ← vacua
+  sit tf32[2, 2] c ← a + b
   nota c.longitudo()
 }",
         "incompatible_tensor_index",
@@ -72,9 +72,9 @@ fn tensor_plus_implicit_broadcast_rejects() {
 fn tensor_plus_incompatible_shapes_reject() {
     rejects_with_issue(
         r"incipit {
-  fixum tf32[3] a ← vacua
-  fixum tf32[2] b ← vacua
-  fixum tf32[3] c ← a + b
+  sit tf32[3] a ← vacua
+  sit tf32[2] b ← vacua
+  sit tf32[3] c ← a + b
   nota c.longitudo()
 }",
         "incompatible_tensor_index",
@@ -85,9 +85,9 @@ fn tensor_plus_incompatible_shapes_reject() {
 fn tensor_plus_non_numeric_element_rejects() {
     rejects_with_issue(
         r"incipit {
-  fixum tensor<textus, [2]> a ← vacua
-  fixum tensor<textus, [2]> b ← vacua
-  fixum tensor<textus, [2]> c ← a + b
+  sit tensor<textus, [2]> a ← vacua
+  sit tensor<textus, [2]> b ← vacua
+  sit tensor<textus, [2]> c ← a + b
   nota c.longitudo()
 }",
         "tensor_arithmetic_numeric_element_required",

@@ -68,15 +68,15 @@ fn strip_spans(text: &str) -> String {
 
 #[test]
 fn empty_tensor_runs_as_the_typed_zero() {
-    let empty = stdout(&program("var tf32[2, 3] x ← empty", TENSOR_PROBES));
-    let typed = stdout(&program("var tf32[2, 3] x ← tf32[2, 3] {}", TENSOR_PROBES));
+    let empty = stdout(&program("mut tf32[2, 3] x ← empty", TENSOR_PROBES));
+    let typed = stdout(&program("mut tf32[2, 3] x ← tf32[2, 3] {}", TENSOR_PROBES));
     assert_eq!(typed, ["2", "3", "0.0", "0.0"]);
     assert_eq!(empty, typed);
 }
 
 #[test]
 fn empty_long_form_tensor_runs_as_the_typed_zero() {
-    let empty = stdout(&program("var tensor<f32, [2, 3]> x ← empty", TENSOR_PROBES));
+    let empty = stdout(&program("mut tensor<f32, [2, 3]> x ← empty", TENSOR_PROBES));
     assert_eq!(empty, ["2", "3", "0.0", "0.0"]);
 }
 
@@ -84,8 +84,8 @@ fn empty_long_form_tensor_runs_as_the_typed_zero() {
 fn empty_vector_and_matrix_run_as_their_typed_zeros() {
     let probes = "    print x";
     for (annotation, zero) in [("vf32[4]", "vf32[4] {}"), ("mf32[2, 2]", "mf32[2, 2] {}")] {
-        let empty = stdout(&program(&format!("var {annotation} x ← empty"), probes));
-        let typed = stdout(&program(&format!("var {annotation} x ← {zero}"), probes));
+        let empty = stdout(&program(&format!("mut {annotation} x ← empty"), probes));
+        let typed = stdout(&program(&format!("mut {annotation} x ← {zero}"), probes));
         assert_eq!(empty, typed, "{annotation}");
         assert!(!empty.is_empty(), "{annotation}");
     }
@@ -94,8 +94,8 @@ fn empty_vector_and_matrix_run_as_their_typed_zeros() {
 #[test]
 fn empty_tensor_of_vectors_runs_as_the_typed_zero() {
     let probes = "    print x.shape()[0]";
-    let empty = stdout(&program("var tensor<vf32[2], [3]> x ← empty", probes));
-    let typed = stdout(&program("var tensor<vf32[2], [3]> x ← tensor<vf32[2], [3]> {}", probes));
+    let empty = stdout(&program("mut tensor<vf32[2], [3]> x ← empty", probes));
+    let typed = stdout(&program("mut tensor<vf32[2], [3]> x ← tensor<vf32[2], [3]> {}", probes));
     assert_eq!(empty, ["3"]);
     assert_eq!(empty, typed);
 }
@@ -108,7 +108,7 @@ fn empty_tensor_with_size_generic_extent_runs() {
 
 #[test]
 fn empty_in_assignment_return_and_declared_size_positions_runs() {
-    let source = "+++\nlocale = \"en\"\n+++\nfn pick() → tf32[2] {\n    return empty\n}\nmain {\n    const size K ← 5\n    const tf32[K, 2] k ← empty\n    print k.shape()[0]\n    var tf32[2] w ← tf32[2] {}\n    w ← empty\n    print w[[1]]\n    print pick().shape()[0]\n}\n";
+    let source = "+++\nlocale = \"en\"\n+++\nfn pick() → tf32[2] {\n    return empty\n}\nmain {\n    const size K ← 5\n    let tf32[K, 2] k ← empty\n    print k.shape()[0]\n    mut tf32[2] w ← tf32[2] {}\n    w ← empty\n    print w[[1]]\n    print pick().shape()[0]\n}\n";
     assert_eq!(stdout(source), ["5", "0.0", "2"]);
 }
 
@@ -120,8 +120,8 @@ fn empty_and_typed_zero_lower_to_the_same_mir() {
         ("vf32[4]", "vf32[4] {}"),
         ("mf32[2, 2]", "mf32[2, 2] {}"),
     ] {
-        let empty = entry_mir(&program(&format!("const {annotation} x ← empty"), "    print x"));
-        let typed = entry_mir(&program(&format!("const {annotation} x ← {zero}"), "    print x"));
+        let empty = entry_mir(&program(&format!("let {annotation} x ← empty"), "    print x"));
+        let typed = entry_mir(&program(&format!("let {annotation} x ← {zero}"), "    print x"));
         assert_eq!(empty, typed, "{annotation}");
     }
 }
@@ -129,7 +129,7 @@ fn empty_and_typed_zero_lower_to_the_same_mir() {
 #[test]
 fn empty_rank_zero_tensor_keeps_its_single_default_slot() {
     let out = stdout(&program(
-        "const tensor<f32, []> x ← empty",
+        "let tensor<f32, []> x ← empty",
         "    print x.shape().length()\n    print x",
     ));
     assert_eq!(out, ["0", "[]"]);
@@ -137,14 +137,14 @@ fn empty_rank_zero_tensor_keeps_its_single_default_slot() {
 
 #[test]
 fn empty_sparse_tensor_keeps_its_all_zero_shape() {
-    let out = stdout(&program("const sparsa<f32, [2, 3]> x ← empty", "    print x.shape()[1]"));
+    let out = stdout(&program("let sparsa<f32, [2, 3]> x ← empty", "    print x.shape()[1]"));
     assert_eq!(out, ["3"]);
 }
 
 #[test]
 fn empty_collections_stay_empty_collections() {
     let out = stdout(&program(
-        "const list<int> a ← empty\n    const map<string, int> b ← empty",
+        "let list<int> a ← empty\n    let map<string, int> b ← empty",
         "    print a.length()\n    print b.length()",
     ));
     assert_eq!(out, ["0", "0"]);

@@ -34,32 +34,32 @@ locale = "en"
 # =============================================================================
 
 fn javaHash(list<int> codes) → wrapping<i32> {
-    var wrapping<i32> h ← 0
-    for from codes const c {
-        const wrapping<i32> code ← c ↦ wrapping<i32>
+    mut wrapping<i32> h ← 0
+    for from codes let c {
+        let wrapping<i32> code ← c ↦ wrapping<i32>
         h ← 31 * h + code
     }
     return h
 }
 
 main {
-    var wrapping<i8> a ← 127
+    mut wrapping<i8> a ← 127
     a ← a + 1
     print a
-    const wrapping<i8> m ← -128
-    const wrapping<i8> quotient ← m / -1
+    let wrapping<i8> m ← -128
+    let wrapping<i8> quotient ← m / -1
     print quotient
-    const wrapping<i8> n ← -7
+    let wrapping<i8> n ← -7
     print n / 2
     print n % 2
-    const wrapping<i8> s ← -8
+    let wrapping<i8> s ← -8
     print s ⇒ 1
     print ¬s
-    const int wide ← 300
+    let int wide ← 300
     print wide ↦ wrapping<i8>
-    const int over ← 200
+    let int over ← 200
     print over ↦ wrapping<i8>
-    const wrapping<i8> c ← 200
+    let wrapping<i8> c ← 200
     print c
     print javaHash([104, 101, 108, 108, 111])
 }

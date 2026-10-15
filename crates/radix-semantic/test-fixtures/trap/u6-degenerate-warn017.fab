@@ -11,6 +11,6 @@ fn infallible() → int {
 }
 
 main {
-    const ∪ r ← trap { infallible() }
+    let ∪ r ← trap { infallible() }
     print r
 }

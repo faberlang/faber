@@ -39,7 +39,7 @@ fn reduction_head_requires_via_and_known_operator() {
 #[test]
 fn reduction_node_owns_optional_clauses_and_body() {
     let result = parse_ok(
-        "functio t(tensor<numerus, [8]> xs) → numerus { reducta via summa ex xs apud [i] pro i fixum x { redde x } }",
+        "functio t(tensor<numerus, [8]> xs) → numerus { reducta via summa ex xs apud [i] pro i sit x { redde x } }",
     );
     let program = result.program.expect("program");
     let StmtKind::Func(function) = &program.statements[0].kind else {
@@ -82,7 +82,7 @@ fn body_lookahead_does_not_claim_a_following_call() {
     assert!(reduction.body.is_none());
 
     let declaration = parse_ok(
-        "functio t(tensor<numerus, [4]> xs) → numerus { fixum numerus total ← reducta via summa ex xs redde total }",
+        "functio t(tensor<numerus, [4]> xs) → numerus { sit numerus total ← reducta via summa ex xs redde total }",
     );
     let program = declaration.program.expect("program");
     let StmtKind::Func(function) = &program.statements[0].kind else {

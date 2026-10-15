@@ -27,7 +27,8 @@ impl KeywordPack for EnBindingPack {
     fn keyword_latin_key(&self, text: &str) -> Option<&str> {
         match text {
             "const" => Some("fixum"),
-            "var" => Some("varia"),
+            "let" => Some("sit"),
+            "mut" => Some("varia"),
             "fn" => Some("functio"),
             _ => None,
         }
@@ -109,7 +110,7 @@ fn inferred_slot_is_accepted() {
 
 #[test]
 fn arrow_initializer_stays_a_runtime_store() {
-    let result = parse_ok("functio f() → vacuum { fixum numerus n ← 7 }");
+    let result = parse_ok("functio f() → vacuum { sit numerus n ← 7 }");
     assert!(!first_local(&result).compile_time);
 }
 
@@ -117,7 +118,7 @@ fn arrow_initializer_stays_a_runtime_store() {
 fn varia_with_equals_is_rejected() {
     let latin = parse_program("functio f() → vacuum { varia numerus n = 7 }");
     single_issue(&latin, "varia_compile_time_initializer");
-    let english = parse_en("fn f() → void { var int n = 7 }");
+    let english = parse_en("fn f() → void { mut int n = 7 }");
     single_issue(&english, "varia_compile_time_initializer");
 }
 

@@ -52,10 +52,10 @@ fn gradus(int puncta) → string {
 }
 
 main {
-    const int aetas ← 25
+    let int aetas ← 25
 
     # One level: two outcomes
-    const string gradusaetatis ← aetas ≥ 18 ✓ "adultus" ✗ "minor"
+    let string gradusaetatis ← aetas ≥ 18 ✓ "adultus" ✗ "minor"
     # "adultus"
     print gradusaetatis
 
@@ -64,15 +64,15 @@ main {
     print gradus(85)
 
     # In expressions
-    const int maximum ← aetas ≻ 30 ✓ aetas ✗ 30
+    let int maximum ← aetas ≻ 30 ✓ aetas ✗ 30
     print "maximum: §"(maximum)
 
     # Narrowing: the ✓ branch sees a non-null string
-    var string ∪ none forsitan ← null ∷ string ∪ none
-    const string solutum ← forsitan not is none ✓ forsitan ✗ "defectum"
+    mut string ∪ none forsitan ← null ∷ string ∪ none
+    let string solutum ← forsitan not is none ✓ forsitan ✗ "defectum"
     # "defectum"
     print solutum
 
-    const string licentia ← aetas ≥ 21 ✓ "licet bibere" ✗ "bibere non licet"
+    let string licentia ← aetas ≥ 21 ✓ "licet bibere" ✗ "bibere non licet"
     print licentia
 }

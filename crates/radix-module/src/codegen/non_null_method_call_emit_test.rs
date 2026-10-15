@@ -14,12 +14,12 @@ functio involve(lista<numerus> v) → lista<numerus> ∪ nihil { redde v }
 functio salve() → textus ∪ nihil { redde 'salve' }
 
 incipit {
-    fixum lista<numerus> base ← [1, 2]
+    sit lista<numerus> base ← [1, 2]
     varia lista<numerus> ∪ nihil xs ← involve(base)
     xs!.appende(3)
     nota xs!.longitudo()
     nota xs![0]
-    fixum textus ∪ nihil t ← salve()
+    sit textus ∪ nihil t ← salve()
     nota t!.longitudo()
 }
 ";

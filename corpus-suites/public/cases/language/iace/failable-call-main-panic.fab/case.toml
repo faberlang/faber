@@ -6,7 +6,8 @@ input = "iace/failable-call-main-panic.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false
 
 [targets.runner]
 outcome = "pass"

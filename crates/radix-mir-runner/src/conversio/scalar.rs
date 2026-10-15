@@ -1330,6 +1330,39 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// `ascii<N> ↦ ascii<M>`: the D7 resize. The initialized prefix is the
+    /// text itself, so grow and identity copies keep it and a shrink keeps it
+    /// when it fits `M`; a source of more than `M` characters fails the
+    /// conversion, and `⊥` recovery supplies the fallback.
+    pub(crate) fn convert_ascii_to_bounded_ascii(
+        &mut self,
+        value: Value,
+        capacity: radix_types::IndexId,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let IndexExpr::Literal(capacity) = self.types.get_index(capacity) else {
+            return Err(RunnerError::internal(
+                span,
+                "bounded ascii requires a literal capacity",
+            ));
+        };
+        let capacity = usize::try_from(*capacity).unwrap_or(usize::MAX);
+        match value {
+            Value::Str(text) => {
+                if text.chars().count() > capacity {
+                    self.recover_or_fail(recovery, span, "ascii to bounded ascii conversion failed")
+                } else {
+                    Ok(Value::Str(text))
+                }
+            }
+            other => Err(RunnerError::internal(
+                span,
+                format!("bounded ascii resize requires a text source, got {other:?}"),
+            )),
+        }
+    }
+
     /// `octeti ↦ octeti<N>`: the store-time capacity check. The value stays a
     /// byte vector; a source longer than `N` fails the conversion with the
     /// Rust carrier's text (`OctetiN::try_from_octeti`), and `⊥` recovery
@@ -1545,7 +1578,7 @@ fn format_decimal_carrier(value: i64, width: NumericWidth) -> String {
 /// `true` when `v` fits the signed range of `width`. Mirrors Rust codegen's
 /// `.parse::<W>()` accept/reject boundary for `textus ↦ numerus<W>` (SA-002);
 /// uses the runner's existing target-neutral integer width table.
-fn numerus_fits_width(v: i64, width: NumericWidth) -> bool {
+pub(super) fn numerus_fits_width(v: i64, width: NumericWidth) -> bool {
     exact_fits_width(i128::from(v), width)
 }
 

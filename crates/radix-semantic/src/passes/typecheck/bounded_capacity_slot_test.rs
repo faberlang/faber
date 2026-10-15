@@ -87,7 +87,7 @@ fn lista_element_and_capacity_holes() {
 fn bare_ascii_accepts_char_literal() {
     test_support::assert_accepts_la(
         r"incipit {
-    fixum ascii c ← 'x'
+    sit ascii c ← 'x'
     nota c
 }",
     );
@@ -97,8 +97,8 @@ fn bare_ascii_accepts_char_literal() {
 fn ascii_hole_accepts_char_literal() {
     test_support::assert_accepts_la(
         r"incipit {
-    fixum ascii<_> c ← 'x'
-    fixum ascii<1> d ← c
+    sit ascii<_> c ← 'x'
+    sit ascii<1> d ← c
     nota d
 }",
     );
@@ -108,8 +108,8 @@ fn ascii_hole_accepts_char_literal() {
 fn ascii_hole_solved_to_one_widens_to_eight() {
     test_support::assert_accepts_la(
         r"incipit {
-    fixum ascii<_> c ← 'x'
-    fixum ascii<8> d ← c
+    sit ascii<_> c ← 'x'
+    sit ascii<8> d ← c
     nota d
 }",
     );
@@ -119,7 +119,7 @@ fn ascii_hole_solved_to_one_widens_to_eight() {
 fn ascii_eight_accepts_char_literal() {
     test_support::assert_accepts_la(
         r"incipit {
-    fixum ascii<8> c ← 'x'
+    sit ascii<8> c ← 'x'
     nota c
 }",
     );
@@ -129,7 +129,7 @@ fn ascii_eight_accepts_char_literal() {
 fn ascii_hole_rejects_bare_multi_byte() {
     test_support::assert_rejects_with_issue_la(
         r"incipit {
-    fixum ascii<_> c ← 'ab'
+    sit ascii<_> c ← 'ab'
     nota c
 }",
         "expression_type_mismatch",
@@ -140,7 +140,7 @@ fn ascii_hole_rejects_bare_multi_byte() {
 fn ascii_hole_rejects_unbounded_textus() {
     test_support::assert_rejects_with_issue_la(
         r#"incipit {
-    fixum ascii<_> c ← "hi"
+    sit ascii<_> c ← "hi"
     nota c
 }"#,
         "expression_type_mismatch",
@@ -221,10 +221,10 @@ fn alias_uses_freshen_independently() {
     test_support::assert_accepts_la(
         r"typus X = ascii<_>
 incipit {
-    fixum X a ← 'x'
-    fixum X b ← 'y'
-    fixum ascii<1> c ← a
-    fixum ascii<1> d ← b
+    sit X a ← 'x'
+    sit X b ← 'y'
+    sit ascii<1> c ← a
+    sit ascii<1> d ← b
     nota c
     nota d
 }",
@@ -241,15 +241,15 @@ fn alias_first_solve_does_not_lock_second() {
     // shared var). The shared-var defect is: first 'x' binds α=1, then a
     // later use as dest for a different N fails. Construct that via a
     // rejected second annotation that would succeed if the hole were free:
-    // after a ← 'x', `fixum ascii<8> z ← …` is a different test.
+    // after a ← 'x', `sit ascii<8> z ← …` is a different test.
     //
     // Two uses with the same witness both accept — and a use of X as dest
     // of an already-solved ascii<1> still accepts on a second binding.
     test_support::assert_accepts_la(
         r"typus X = ascii<_>
 incipit {
-    fixum X a ← 'x'
-    fixum X b ← a
+    sit X a ← 'x'
+    sit X b ← a
     nota b
 }",
     );

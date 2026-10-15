@@ -95,7 +95,7 @@ functio electio(bivalens malum) → numerus {
 # failure in its own expression
 @ radix lane "air"
 functio lectio(textus s) → numerus {
-    fixum numerus v ← s ↦ numerus ⊥ 0
+    sit numerus v ← s ↦ numerus ⊥ 0
     redde v
 }
 
@@ -104,7 +104,7 @@ functio lectio(textus s) → numerus {
 functio lectio_in_regione(textus s, bivalens malum) → numerus {
     fac {
         si malum { iace "x" }
-        fixum numerus v ← s ↦ numerus ⊥ 0
+        sit numerus v ← s ↦ numerus ⊥ 0
         redde v
     } cape err { redde 1 }
 }

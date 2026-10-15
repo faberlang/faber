@@ -367,7 +367,7 @@ pub(crate) struct TypeChecker<'a> {
 
     /// Read-only parameters (unmarked or `de`) seen while checking bodies.
     /// Like a `const` local, such a parameter is a read-only value: a plain
-    /// `var T y ← p` of a shareable value is SEM065. DefIds
+    /// `mut T y ← p` of a shareable value is SEM065. DefIds
     /// are unique, so the set needs no per-body scope.
     pub read_only_param_roots: FxHashSet<DefId>,
 
@@ -719,6 +719,12 @@ pub(crate) struct TypeChecker<'a> {
     /// of treating the narrowed type as the binding's new declaration.
     pub(crate) flow_bases: FxHashMap<DefId, BindingInfo>,
 
+    /// Field-path narrowing facts in force for the current branch body (need
+    /// c58fff9c): (base binding, root-to-leaf path) -> narrowed type. Inserted
+    /// by check_block_with_refinement, removed at block exit; joins and the
+    /// implicit fallthrough never carry them.
+    pub(crate) field_facts: FxHashMap<(DefId, Vec<Symbol>), TypeId>,
+
     /// Conversation types of the `@ ad` routes this module can see, keyed
     /// by route (D6.11). Routes absent here type as bare `sermo`.
     pub ad_routes: FxHashMap<Symbol, sermo_route::AdRouteTypes>,
@@ -960,6 +966,7 @@ impl<'a> TypeChecker<'a> {
             locale_pack: None,
             assert_refinements: Vec::new(),
             flow_bases: FxHashMap::default(),
+            field_facts: FxHashMap::default(),
             ad_routes: FxHashMap::default(),
             current_member_owner: None,
             cross_package_structs: FxHashSet::default(),
@@ -989,7 +996,7 @@ impl<'a> TypeChecker<'a> {
         for (def_id, fields, methods, type_params) in self.resolver.imported_file_structs() {
             let instance_field_count = fields
                 .iter()
-                .filter(|field| field.modifier != Some(radix_syntax::FieldModifier::Generis))
+                .filter(|field| field.modifier != Some(radix_syntax::FieldModifier::Const))
                 .count();
             // Imported generic structs substitute construction size args into
             // field types exactly like local ones (S0-G1); without this entry

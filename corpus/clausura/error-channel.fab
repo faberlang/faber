@@ -40,7 +40,7 @@ locale = "en"
 #   error-channel.expected — the thrown payload and the happy-path value.
 
 main {
-    const (int) → int ⇥ string guard ← int x → int ⇥ string ∴ do {
+    let (int) → int ⇥ string guard ← int x → int ⇥ string ∴ do {
         if x ≻ 3 {
             throw "too big"
         }

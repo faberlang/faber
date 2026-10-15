@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "The keyed .sorted(key) method is retired; the sort expression replaces it."
-syntax = "<lista>.sorted(<T x ∴ key>) — rejected; write sort via asc from <lista> const x { return key }"
+syntax = "<lista>.sorted(<T x ∴ key>) — rejected; write sort via asc from <lista> let x { return key }"
 related = ["ordina-clavis"]
 locale = "en"
 no_expected = "rejects"
@@ -20,7 +20,7 @@ diagnostic = "SEM011:sorted_key_retired"
 #
 # Common mistakes:
 #   • calling `.sorted(key)` — write
-#     `sort via asc from list const x { return key }` instead
+#     `sort via asc from list let x { return key }` instead
 #
 # See also: ordina-clavis
 # =============================================================================
@@ -30,15 +30,15 @@ diagnostic = "SEM011:sorted_key_retired"
 # This exemplum intentionally fails to compile.
 
 class Persona {
-    var string nomen
-    var int aetas
+    mut string nomen
+    mut int aetas
 }
 
 main {
-    const list<Persona> personae ← [
+    let list<Persona> personae ← [
         Persona { nomen = "Livia", aetas = 30 },
         Persona { nomen = "Aulus", aetas = 25 }
     ]
-    const list<Persona> per_aetatem ← personae.sorted(Persona p ∴ p.aetas)
+    let list<Persona> per_aetatem ← personae.sorted(Persona p ∴ p.aetas)
     print per_aetatem.length()
 }

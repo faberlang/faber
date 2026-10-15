@@ -1,5 +1,5 @@
 # Fault: Arabic-Indic digit in a numeric literal (LEX004 unexpected_character).
 بداية {
-  ثابت عدد عداد ← ٧
+  ليكن عدد عداد ← ٧
   اعرض عداد
 }

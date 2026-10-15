@@ -53,7 +53,7 @@ fn doubled(int n) → int ⇥ string {
 # own, inside a function that declares the same `⇥` channel.
 fn tally(int n) → string ⇥ string {
     print risky(n)
-    const int total ← risky(n) + risky(n + 1)
+    let int total ← risky(n) + risky(n + 1)
     risky(n + 2)
     return "total §"(total)
 }

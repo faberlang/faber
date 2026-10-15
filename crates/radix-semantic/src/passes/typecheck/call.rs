@@ -2209,7 +2209,7 @@ impl TypeChecker<'_> {
     }
 
     /// R4/R5: report a `⇇` statement used as a value (`x ← a ⇇ b`,
-    /// `fixum t ← a ⇇ b`). The statement has no result to store or chain.
+    /// `sit t ← a ⇇ b`). The statement has no result to store or chain.
     pub fn reject_copy_into_value(&mut self, value: &HirExpression) -> bool {
         if !matches!(value.kind, HirExpressionKind::CopyInto { .. }) {
             return false;

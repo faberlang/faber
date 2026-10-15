@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "A tensor's shape() is a bounded list sized by its static rank, so one extent reads directly as t.shape()[1]."
-syntax = "t.shape()[k] | const list<int, _> dims ← t.shape() | t.shape() ↦ list<int>"
+syntax = "t.shape()[k] | let list<int, _> dims ← t.shape() | t.shape() ↦ list<int>"
 related = ["tensor", "lista", "magnitudo"]
 locale = "en"
 +++
@@ -18,7 +18,7 @@ locale = "en"
 #   • a tensor of static rank R yields `list<int, R>`; the extents may be
 #     compile-time literals (`tf32[2, 3]`) or run-time values (`tf32[2, size n]`)
 #   • one extent reads straight from the call: `t.shape()[1]`
-#   • `const list<int, _> dims ← t.shape()` infers the capacity from the source
+#   • `let list<int, _> dims ← t.shape()` infers the capacity from the source
 #   • widening to an unbounded `list<int>` is always explicit (`↦ list<int>`)
 #
 # See also: tensor, lista, magnitudo
@@ -29,20 +29,20 @@ fn runtime_extent(int value) → int {
 }
 
 main {
-    const list<f32> plana ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[2, 3] fixed ← plana ↦ tf32[2, 3]
+    let list<f32> plana ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[2, 3] fixed ← plana ↦ tf32[2, 3]
 
-    const int n ← runtime_extent(3)
-    const tf32[2, size n] dynamic ← plana ↦ tf32[2, size n]
+    let int n ← runtime_extent(3)
+    let tf32[2, size n] dynamic ← plana ↦ tf32[2, size n]
 
     print fixed.shape()[1]
     print dynamic.shape()[1]
 
-    const list<int, _> dims ← fixed.shape()
+    let list<int, _> dims ← fixed.shape()
     print dims
     print fixed.shape().length()
 
-    var list<int> wide ← dynamic.shape() ↦ list<int>
+    mut list<int> wide ← dynamic.shape() ↦ list<int>
     wide.append(7)
     print wide
 }

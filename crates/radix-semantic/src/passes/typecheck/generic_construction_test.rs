@@ -71,7 +71,7 @@ fn generic_union_variant_construction_binds_to_applied_expected_type() {
 }
 
 functio facere() → Cista<numerus> {
-    fixum Cista<numerus> x ← finge Plena { res = 1 }
+    sit Cista<numerus> x ← finge Plena { res = 1 }
     redde x
 }",
     );
@@ -111,7 +111,7 @@ functio wrong(Cista<textus> value) → textus {
 }
 
 incipit {
-    fixum Cista<textus> x ← wrong(facere())
+    sit Cista<textus> x ← wrong(facere())
     nota x
 }"#,
         "argument_type_mismatch",
@@ -311,8 +311,8 @@ functio facere() → Eventum {
 }
 
 incipit {
-    fixum Eventum a ← finge Ictus { vis = 4 } ∷ Eventum
-    fixum Eventum b ← finge Eventum.Sonitus { } ∷ Eventum
+    sit Eventum a ← finge Ictus { vis = 4 } ∷ Eventum
+    sit Eventum b ← finge Eventum.Sonitus { } ∷ Eventum
     nota a
     nota b
 }",
@@ -357,7 +357,7 @@ fn applied_generic_field_read_substitutes_size_witness() {
 }
 
 functio minimum(Capsa<3> capsam) → vector<f32, 3> {
-    fixum vector<f32, 3> lo ← capsam.minima
+    sit vector<f32, 3> lo ← capsam.minima
     redde lo
 }",
     );

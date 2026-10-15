@@ -95,8 +95,9 @@ pub fn build_package_fhir(
     for unit in package.nodes.values() {
         let relative_path = relative_path_of(&package_root, &unit.path);
         let source_bytes = fs::read(&unit.path).map_err(|error| {
-            vec![fhir_diag(
+            vec![fhir_issue_diag(
                 &unit.path,
+                "fhir_source_unreadable",
                 format!("could not read source for FHIR package: {error}"),
             )]
         })?;
@@ -128,17 +129,29 @@ pub fn build_package_fhir(
         )]
     })?;
     let bytes = encode_package_msgpack(&fhir_package).map_err(|error| {
-        vec![fhir_diag(
+        vec![fhir_issue_diag(
             input,
+            "fhir_encode_failed",
             format!("could not encode FHIR package: {error}"),
         )]
     })?;
 
     let artifact_root = package_root.join("target").join(FHIR_PACKAGE_ARTIFACT_DIR);
-    fs::create_dir_all(&artifact_root)
-        .map_err(|error| vec![fhir_diag(input, error.to_string())])?;
+    fs::create_dir_all(&artifact_root).map_err(|error| {
+        vec![fhir_issue_diag(
+            input,
+            "fhir_artifact_dir_failed",
+            error.to_string(),
+        )]
+    })?;
     let package_path = artifact_root.join(FHIR_PACKAGE_FILE);
-    fs::write(&package_path, &bytes).map_err(|error| vec![fhir_diag(input, error.to_string())])?;
+    fs::write(&package_path, &bytes).map_err(|error| {
+        vec![fhir_issue_diag(
+            input,
+            "fhir_artifact_write_failed",
+            error.to_string(),
+        )]
+    })?;
     crate::nucleum::attach_canonical_mir(&mut nucleum, &mut package.nodes)?;
     let nucleum_path = crate::nucleum::write_nucleum_sidecar(&artifact_root, &nucleum)?;
     Ok(PackageFhir {
@@ -310,3 +323,7 @@ fn fhir_diag(path: &Path, message: impl Into<String>) -> Diagnostic {
 fn fhir_issue_diag(path: &Path, issue: &'static str, message: impl Into<String>) -> Diagnostic {
     fhir_diag(path, message).with_arg("issue", issue)
 }
+
+#[cfg(test)]
+#[path = "fhir_pkg001_issue_test.rs"]
+mod fhir_pkg001_issue_test;

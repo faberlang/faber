@@ -18,7 +18,7 @@ fn fault_from(value raw) → fault.IoFault {
 
 @ public
 class Socket {
-    var int id = 0
+    mut int id = 0
 
     # A clean close is an empty read today (not a `Closed` error).
     fn read_bytes(int n optional) → list<b8> ∪ none ⇥ fault.IoFault {
@@ -54,11 +54,11 @@ class Socket {
 
 fn socket_read(Socket socket, int n optional) → list<b8> ∪ none ⇥ fault.IoFault {
     if n is none {
-        const list<b8> data ← call 'caelum:hauri' (socket.id) ↦ list<b8>
+        let list<b8> data ← call 'caelum:hauri' (socket.id) ↦ list<b8>
         if data.length() ≡ 0 then return null
         return data
     }
-    const list<b8> data ← call 'caelum:hauri' ([socket.id, n coalesce 0]) ↦ list<b8>
+    let list<b8> data ← call 'caelum:hauri' ([socket.id, n coalesce 0]) ↦ list<b8>
     if data.length() ≡ 0 then return null
     return data
 }

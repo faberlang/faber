@@ -26,8 +26,8 @@ locale = "en"
 @ kernel
 @ public
 fn transversum(f32 x) → f32 {
-    const vf32[3] a ← [x, 2.0, 3.0] ↦ vf32[3]
-    const vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
-    const vf32[3] c ← a.cross(b)
+    let vf32[3] a ← [x, 2.0, 3.0] ↦ vf32[3]
+    let vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
+    let vf32[3] c ← a.cross(b)
     return c.dot(b)
 }

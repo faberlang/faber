@@ -59,25 +59,25 @@ fn decode<size N>(tensor<f32, [N]> proto, list<b8> raw) → tensor<f32, [N]> ⇥
 }
 
 main {
-    const int n ← runtime_extent(3)
-    const list<f32> values ← [1.0, 2.0, 3.0]
-    const tensor<f32, [size n]> proto ← values ↦ tensor<f32, [size n]>
-    const list<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40|
+    let int n ← runtime_extent(3)
+    let list<f32> values ← [1.0, 2.0, 3.0]
+    let tensor<f32, [size n]> proto ← values ↦ tensor<f32, [size n]>
+    let list<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40|
 
     do {
-        const tensor<f32, [size n]> decoded ← decode(proto, raw)
+        let tensor<f32, [size n]> decoded ← decode(proto, raw)
         print decoded[[0]]
         print decoded[[2]]
-        const list<int, _> dims ← proto.shape()
+        let list<int, _> dims ← proto.shape()
         print dims
     }
     catch err {
         print "unexpected"
     }
 
-    const list<b8> short_raw ← |00 00 80 3f 00 00 00 40|
+    let list<b8> short_raw ← |00 00 80 3f 00 00 00 40|
     do {
-        const tensor<f32, [size n]> bad ← decode(proto, short_raw)
+        let tensor<f32, [size n]> bad ← decode(proto, short_raw)
         print bad[[0]]
     }
     catch err {

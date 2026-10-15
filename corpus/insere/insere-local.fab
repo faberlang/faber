@@ -7,7 +7,7 @@ canonical = false
 summary = "embed reads a package file in every = position: block-level constants, genus field defaults, and comptime bodies."
 syntax = "const <type> <name> = embed \"<path>\""
 aliases = ["local embed", "embed field default"]
-related = ["insere", "praefixum", "fixum", "generis"]
+related = ["insere", "praefixum", "fixum"]
 locale = "en"
 +++
 # =============================================================================
@@ -17,7 +17,7 @@ locale = "en"
 # What this teaches:
 #   • One initializer surface — `embed "path"` takes the same positions a
 #     module constant does: a block-level `const T x = embed "p"`, a genus
-#     field default under any modifier (`static`, `const`, `var`), and the
+#     field default under any modifier (`const`, `let`, `mut`), and the
 #     `return` of a `comptime { … }` body.
 #   • The slot types the embed — the declared type decides: `string` takes the
 #     file as UTF-8 text, `bytes` takes the raw bytes. Inside a `comptime`
@@ -32,7 +32,7 @@ locale = "en"
 #   • Giving the embed no type to take — `const _ x = embed "p"` is SEM061
 #     `insere_type_required`; declare `string` or `bytes`.
 #
-# See also: insere, praefixum, fixum, generis
+# See also: insere, praefixum, fixum
 # =============================================================================
 
 # insere = — build-time file embed in every `=` position
@@ -46,9 +46,9 @@ locale = "en"
 #   insere-local.expected — the embedded text, its length, and byte counts.
 
 class Folium {
-    static string TITULUS = embed "nuntius.txt"
-    const string MONITUM = embed "nuntius.txt"
-    var list<b8> signum = embed "signum.bin"
+    const string TITULUS = embed "nuntius.txt"
+    let string MONITUM = embed "nuntius.txt"
+    mut list<b8> signum = embed "signum.bin"
 }
 
 const string SUMMA = comptime {
@@ -63,7 +63,7 @@ fn longitudo() → int {
 main {
     const string localis = embed "nuntius.txt"
     const list<b8> octeti = embed "signum.bin"
-    const Folium folium ← Folium {}
+    let Folium folium ← Folium {}
     print localis
     print octeti.length()
     print folium.MONITUM

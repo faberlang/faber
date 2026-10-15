@@ -162,7 +162,7 @@ fn trailing_token_after_route_is_rejected() {
 #[test]
 fn ad_annotation_requires_a_functio() {
     assert_issue(
-        &parse_la("@ ad 'x:y'\nfixum numerus n ← 1"),
+        &parse_la("@ ad 'x:y'\nsit numerus n ← 1"),
         "ad_annotation_requires_functio",
     );
 }

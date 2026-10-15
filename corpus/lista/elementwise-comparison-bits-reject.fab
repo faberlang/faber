@@ -30,7 +30,7 @@ diagnostic = "SEM011:lista_bits_whole_equality_only"
 # This exemplum intentionally fails to compile.
 
 main {
-    const list<b8> xs ← [0x01, 0x02]
-    const list<b8> ys ← [0x01, 0x03]
+    let list<b8> xs ← [0x01, 0x02]
+    let list<b8> ys ← [0x01, 0x03]
     print xs ≺ ys
 }

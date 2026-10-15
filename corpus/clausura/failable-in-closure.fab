@@ -42,19 +42,19 @@ fn risky(int n) → int ⇥ string {
 
 # Plain closures inside a failable function: their returns are plain values.
 fn plain(int n) → int ⇥ string {
-    const (int) → int f ← int x → int ∴ do {
-        const int y ← x + 1
+    let (int) → int f ← int x → int ∴ do {
+        let int y ← x + 1
         return y * 2
     }
-    const (int) → int g ← int x → int ∴ x + 7
-    const int z ← risky(n)
+    let (int) → int g ← int x → int ∴ x + 7
+    let int z ← risky(n)
     return f(z) + g(z)
 }
 
 # A failable call nested in an argument, handled inside the closure.
 fn handled(int n) → int ⇥ string {
-    const (int) → int h ← int x → int ∴ do {
-        var int verdict ← -1
+    let (int) → int h ← int x → int ∴ do {
+        mut int verdict ← -1
         do {
             print "in §"(risky(x))
             verdict ← 1
@@ -69,8 +69,8 @@ fn handled(int n) → int ⇥ string {
 
 # The same closure in a function with no channel of its own.
 fn handled_free(int n) → int {
-    const (int) → int h ← int x → int ∴ do {
-        var int verdict ← -1
+    let (int) → int h ← int x → int ∴ do {
+        mut int verdict ← -1
         do {
             print "in §"(risky(x))
             verdict ← 1

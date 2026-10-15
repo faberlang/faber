@@ -34,55 +34,55 @@ locale = "en"
 # =============================================================================
 
 main {
-    const saturating<u8> high ← 250
-    const saturating<u8> low ← 5
+    let saturating<u8> high ← 250
+    let saturating<u8> low ← 5
     # Arithmetic is exact: nothing here is stored into a saturating slot.
     print high + 10
     print low - 10
     print high * 2
     print high / 2
     print high % 7
-    const saturating<i16> big ← 30000
-    const saturating<i16> neg ← -30000
-    const saturating<i16> floor ← neg - 10000
+    let saturating<i16> big ← 30000
+    let saturating<i16> neg ← -30000
+    let saturating<i16> floor ← neg - 10000
     print big + 10000
     print floor
     print big * -2
     print -floor
     print floor / -1
-    var saturating<u8> level ← 200
+    mut saturating<u8> level ← 200
     # Each assignment is a store into a saturating slot: it clamps.
     level ← level + 100
     print level
     level ← level - 255
     print level
-    const int n ← 200
-    const saturating<u8> fromInt ← n ↦ saturating<u8>
-    const int back ← high ↦ int
+    let int n ← 200
+    let saturating<u8> fromInt ← n ↦ saturating<u8>
+    let int back ← high ↦ int
     print fromInt
     print back
     print high ≻ low
     # Chains clamp once, at the store.
-    const saturating<u8> chainUp ← high + 200 - 100
-    const saturating<u8> chainDown ← low - 300 + 100
-    const saturating<u8> chainExact ← high * 2 / 4
-    const saturating<u8> wide ← 200
-    const saturating<u8> chainFits ← wide * 2 / 4
-    const saturating<u8> chainRound ← low - wide - wide + wide + wide
+    let saturating<u8> chainUp ← high + 200 - 100
+    let saturating<u8> chainDown ← low - 300 + 100
+    let saturating<u8> chainExact ← high * 2 / 4
+    let saturating<u8> wide ← 200
+    let saturating<u8> chainFits ← wide * 2 / 4
+    let saturating<u8> chainRound ← low - wide - wide + wide + wide
     print chainUp
     print chainDown
     print chainExact
     print chainFits
     print chainRound
-    var saturating<u8> acc ← 200
+    mut saturating<u8> acc ← 200
     acc ← acc + 100 - 50
     print acc
     # `↦` into saturating clamps the exact value; into wrapping it reduces mod 2^W.
-    const int over ← 300
-    const int under ← -5
-    const saturating<u8> clampedHigh ← over ↦ saturating<u8>
-    const saturating<u8> clampedLow ← under ↦ saturating<u8>
-    const wrapping<u8> wrapped ← over ↦ wrapping<u8>
+    let int over ← 300
+    let int under ← -5
+    let saturating<u8> clampedHigh ← over ↦ saturating<u8>
+    let saturating<u8> clampedLow ← under ↦ saturating<u8>
+    let wrapping<u8> wrapped ← over ↦ wrapping<u8>
     print clampedHigh
     print clampedLow
     print wrapped

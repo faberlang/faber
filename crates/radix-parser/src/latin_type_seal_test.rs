@@ -22,13 +22,14 @@ impl KeywordPack for EnLikePack {
     fn keyword_latin_key(&self, text: &str) -> Option<&str> {
         match text {
             "const" => Some("fixum"),
+            "let" => Some("sit"),
             "fn" => Some("functio"),
             "genus" => Some("genus"),
             "is" => Some("est"),
             "match" => Some("discerne"),
             "case" => Some("casu"),
             "return" => Some("redde"),
-            "var" => Some("varia"),
+            "mut" => Some("varia"),
             "print" => Some("nota"),
             _ => None,
         }
@@ -198,7 +199,7 @@ fn la_file_accepts_latin_null_type_in_union_est_and_casu_forms() {
 fn en_file_keeps_latin_type_words_as_expression_names() {
     for word in ["ratio", "valor", "lista", "numerus"] {
         let source = format!(
-            "var int {word} ← 1\nprint {word}\n{word} ← 2\nconst int y = {word} + 1\nf({word})\nprint {word}\n\n{word} ← 3\nprint {word}"
+            "mut int {word} ← 1\nprint {word}\n{word} ← 2\nconst int y = {word} + 1\nf({word})\nprint {word}\n\n{word} ← 3\nprint {word}"
         );
         let result = parse_en(&source);
         assert!(
@@ -212,7 +213,7 @@ fn en_file_keeps_latin_type_words_as_expression_names() {
 #[test]
 fn en_file_still_rejects_the_same_words_in_a_type_slot() {
     for word in ["valor", "lista", "numerus"] {
-        let source = format!("var int {word} ← 1\nprint {word}\n{word} ← 2\nconst {word} y = 1");
+        let source = format!("mut int {word} ← 1\nprint {word}\n{word} ← 2\nconst {word} y = 1");
         let result = parse_en(&source);
         assert_eq!(
             wrong_locale_types(&result),

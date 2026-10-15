@@ -91,14 +91,12 @@ fn without_a_marker_value_conversion_stays() {
 
 #[test]
 fn radix_hint_accept_row_stays_green() {
-    test_support::assert_accepts_la("incipit { fixum _ n ← \"ff\" ↦ u32 via Hex }");
+    test_support::assert_accepts_la("incipit { sit n ← \"ff\" ↦ u32 via Hex }");
 }
 
 #[test]
 fn typed_destination_conversio_assign_accepts_u16_to_f16() {
-    test_support::assert_accepts_la(
-        "incipit {\n  fixum u16 dbits ← 0x3E00\n  fixum f16 d ↤ dbits\n}",
-    );
+    test_support::assert_accepts_la("incipit {\n  sit u16 dbits ← 0x3E00\n  sit f16 d ↤ dbits\n}");
 }
 
 // --- CTR-02: channel contract for the builtin `Bits` rows ---

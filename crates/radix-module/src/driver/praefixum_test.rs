@@ -66,7 +66,7 @@ fn loop_with_callee_folds_to_int_literal() {
     let unit = analyze_ok(
         "functio quadratum(numerus n) → numerus {\n    redde n * n\n}\n\
          fixum numerus SUMMA = praefixum {\n    varia numerus s ← 0\n    \
-         itera ab 1‥4 fixum i {\n        s ← s + quadratum(i)\n    }\n    redde s\n}\n\
+         itera ab 1‥4 sit i {\n        s ← s + quadratum(i)\n    }\n    redde s\n}\n\
          incipit {\n    nota SUMMA\n}\n",
     );
     assert_eq!(int(&static_value(&unit, "SUMMA")), 14);
@@ -88,7 +88,7 @@ fn dependent_statics_fold_after_evaluation() {
 fn list_result_is_an_array_literal() {
     let unit = analyze_ok(
         "fixum lista<numerus> L = praefixum {\n    varia lista<numerus> xs ← vacua\n    \
-         itera ab 0‥3 fixum i {\n        xs.appende(i * 10)\n    }\n    redde xs\n}\n",
+         itera ab 0‥3 sit i {\n        xs.appende(i * 10)\n    }\n    redde xs\n}\n",
     );
     let HirExpressionKind::Array(elements) = static_value(&unit, "L").kind else {
         panic!("expected array literal");
@@ -107,7 +107,7 @@ fn list_result_is_an_array_literal() {
 #[test]
 fn genus_result_is_a_typed_construction_literal() {
     let unit = analyze_ok(
-        "genus Punctum {\n    fixum numerus x\n    fixum numerus y\n}\n\
+        "genus Punctum {\n    sit numerus x\n    sit numerus y\n}\n\
          fixum Punctum P = praefixum {\n    redde Punctum { x = 2 * 3, y = 0 - 1 }\n}\n",
     );
     let HirExpressionKind::Verte { entries: Some(entries), .. } = static_value(&unit, "P").kind else {

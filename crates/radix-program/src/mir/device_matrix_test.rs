@@ -62,10 +62,10 @@ locale = "en"
 import from "twinslib:twins" twins
 
 main {
-    const tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
-    const tensor<f32, [2, 2]> b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
-    const tensor<f32, [4]> v ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
-    const _ r ← twins.twin_add(a, b)
+    let tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    let tensor<f32, [2, 2]> b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
+    let tensor<f32, [4]> v ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
+    let r ← twins.twin_add(a, b)
     print "ok"
 }
 "#;
@@ -283,7 +283,7 @@ fn unmarked_twin_helper_is_module_private_and_not_importable() {
     let library = format!("{TWIN_LIB}{UNMARKED_TWIN_HELPER}");
     let main = TWIN_MAIN.replacen(
         "    print \"ok\"",
-        "    const tensor<f32, [4]> w ← [4.0, 3.0, 2.0, 1.0] ↦ tensor<f32, [4]>\n    const _ h ← twins.twin_hidden(v, w)\n    print \"ok\"",
+        "    let tensor<f32, [4]> w ← [4.0, 3.0, 2.0, 1.0] ↦ tensor<f32, [4]>\n    let h ← twins.twin_hidden(v, w)\n    print \"ok\"",
         1,
     );
     let dir = matrix_dir("device-matrix-unmarked-helper");
@@ -420,7 +420,7 @@ fn fragment_role_twin_registers_as_fragment_never_kernel() {
     );
     let main = TWIN_MAIN.replacen(
         "    print \"ok\"",
-        "    const _ f ← twins.twin_frag(v)\n    print \"ok\"",
+        "    let f ← twins.twin_frag(v)\n    print \"ok\"",
         1,
     );
     let dir = matrix_dir("device-matrix-fragment-role");

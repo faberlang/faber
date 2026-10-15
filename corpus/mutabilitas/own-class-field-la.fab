@@ -4,7 +4,7 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "member_suffix", "nota_stmt"]
 category = "type"
 summary = "MU-3: own bind of a class value; the binding reads the source's field."
-syntax = "const Holder f ← own d"
+syntax = "sit Holder f ← own d"
 related = ["own", "genus"]
 locale = "la"
 +++
@@ -17,7 +17,7 @@ genus Holder {
 }
 
 incipit {
-    fixum Holder d ← Holder { x = 2.0 }
-    fixum Holder f ← penes d
+    sit Holder d ← Holder { x = 2.0 }
+    sit Holder f ← penes d
     nota f.x
 }

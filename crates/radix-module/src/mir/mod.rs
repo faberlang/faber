@@ -349,6 +349,9 @@ mod device_tests;
 #[path = "exact_integer_test.rs"]
 mod exact_integer_tests;
 #[cfg(test)]
+#[path = "generic_call_run_test.rs"]
+mod generic_call_run_tests;
+#[cfg(test)]
 #[path = "generic_receiver_call_test.rs"]
 mod generic_receiver_call_tests;
 #[cfg(test)]
@@ -372,6 +375,9 @@ mod infinity_literal_tests;
 #[cfg(test)]
 #[path = "layout_test.rs"]
 mod layout_tests;
+#[cfg(test)]
+#[path = "list_slice_literal_run_test.rs"]
+mod list_slice_literal_run_tests;
 #[cfg(test)]
 #[path = "list_window_test.rs"]
 mod list_window_tests;

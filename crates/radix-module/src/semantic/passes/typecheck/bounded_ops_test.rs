@@ -16,14 +16,14 @@ fn bounded_ops_longitudo_and_vacua_are_len_not_capacity() {
     ascii<8> a,
     lista<b8, 8> o
 ) → vacuum {
-    fixum numerus n_xs ← xs.longitudo()
-    fixum bivalens e_xs ← xs.vacua()
-    fixum numerus n_t ← t.longitudo()
-    fixum bivalens e_t ← t.vacua()
-    fixum numerus n_a ← a.longitudo()
-    fixum bivalens e_a ← a.vacua()
-    fixum numerus n_o ← o.longitudo()
-    fixum bivalens e_o ← o.vacua()
+    sit numerus n_xs ← xs.longitudo()
+    sit bivalens e_xs ← xs.vacua()
+    sit numerus n_t ← t.longitudo()
+    sit bivalens e_t ← t.vacua()
+    sit numerus n_a ← a.longitudo()
+    sit bivalens e_a ← a.vacua()
+    sit numerus n_o ← o.longitudo()
+    sit bivalens e_o ← o.vacua()
     nota n_xs
     nota e_xs
     nota n_t
@@ -50,8 +50,8 @@ fn bounded_ops_accipe_and_sectio_typecheck() {
     ascii<8> a,
     lista<b8, 8> o
 ) → vacuum {
-    fixum numerus ∪ nihil got ← xs.accipe(0)
-    fixum lista<numerus> slice ← xs.sectio(0, 2)
+    sit numerus ∪ nihil got ← xs.accipe(0)
+    sit lista<numerus> slice ← xs.sectio(0, 2)
     nota got
     nota slice
     nota t.accipe(0)
@@ -154,32 +154,32 @@ fn bounded_ops_equality_ignores_spare_slots() {
     // unread (carrier PartialEq is prefix-only). Typecheck accepts `≡`.
     assert_accepts_la(
         r"incipit {
-    fixum lista<numerus> raw ← [1, 2]
-    fixum lista<numerus, 8> a ← raw ↦ lista<numerus, 8>
-    fixum lista<numerus, 8> b ← raw ↦ lista<numerus, 8>
+    sit lista<numerus> raw ← [1, 2]
+    sit lista<numerus, 8> a ← raw ↦ lista<numerus, 8>
+    sit lista<numerus, 8> b ← raw ↦ lista<numerus, 8>
     si a ≡ b { nota 1 }
 }",
     );
     assert_accepts_la(
         r#"incipit {
-    fixum textus raw ← "ab"
-    fixum textus<8> a ← raw ↦ textus<8>
-    fixum textus<8> b ← raw ↦ textus<8>
+    sit textus raw ← "ab"
+    sit textus<8> a ← raw ↦ textus<8>
+    sit textus<8> b ← raw ↦ textus<8>
     si a ≡ b { nota 1 }
 }"#,
     );
     assert_accepts_la(
         r"incipit {
-    fixum ascii<8> a ← 'ab'
-    fixum ascii<8> b ← 'ab'
+    sit ascii<8> a ← 'ab'
+    sit ascii<8> b ← 'ab'
     si a ≡ b { nota 1 }
 }",
     );
     assert_accepts_la(
         r"incipit {
-    fixum lista<b8> raw ← |61 62|
-    fixum lista<b8, 8> a ← raw ↦ lista<b8, 8>
-    fixum lista<b8, 8> b ← raw ↦ lista<b8, 8>
+    sit lista<b8> raw ← |61 62|
+    sit lista<b8, 8> a ← raw ↦ lista<b8, 8>
+    sit lista<b8, 8> b ← raw ↦ lista<b8, 8>
     si a ≡ b { nota 1 }
 }",
     );

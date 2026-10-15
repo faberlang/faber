@@ -52,8 +52,8 @@ enum Condicio {
 
 main {
     # Using ordo values: members are qualified by their ordo name
-    const Color color ← Color.rubrum
-    const Condicio condicio ← Condicio.actum
+    let Color color ← Color.rubrum
+    let Condicio condicio ← Condicio.actum
 
     # Select by ordo
     switch color {

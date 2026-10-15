@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = true
 summary = "Range product semantics: sign classes, offsets, and step directions with exclusive/inclusive boundary twins."
-syntax = "for range <a>‥<b> step <s>, <c>‥<d> const <i>, <j> { }"
+syntax = "for range <a>‥<b> step <s>, <c>‥<d> let <i>, <j> { }"
 related = ["ex", "de", "apud"]
 locale = "en"
 +++
@@ -40,95 +40,95 @@ locale = "en"
 
 main {
     # crossing sign class, no step / stepped, exclusive + inclusive twins
-    for range -5‥5, 2‥4 const i, j {
+    for range -5‥5, 2‥4 let i, j {
         print i
         print j
     }
-    for range -5…5, 2…4 const i, j {
+    for range -5…5, 2…4 let i, j {
         print i
         print j
     }
-    for range -5‥5 step 2, 2‥4 const i, j {
+    for range -5‥5 step 2, 2‥4 let i, j {
         print i
         print j
     }
-    for range -5…5 step 2, 2…4 const i, j {
+    for range -5…5 step 2, 2…4 let i, j {
         print i
         print j
     }
 
     # negative-to-negative sign class, no step / stepped, twins
-    for range -8‥-3, 2‥4 const i, j {
+    for range -8‥-3, 2‥4 let i, j {
         print i
         print j
     }
-    for range -8…-3, 2…4 const i, j {
+    for range -8…-3, 2…4 let i, j {
         print i
         print j
     }
-    for range -8‥-3 step 2, 2‥4 const i, j {
+    for range -8‥-3 step 2, 2‥4 let i, j {
         print i
         print j
     }
-    for range -8…-3 step 2, 2…4 const i, j {
+    for range -8…-3 step 2, 2…4 let i, j {
         print i
         print j
     }
 
     # positive-to-positive sign class, no step / stepped, twins
-    for range 2‥7, 2‥4 const i, j {
+    for range 2‥7, 2‥4 let i, j {
         print i
         print j
     }
-    for range 2…7, 2…4 const i, j {
+    for range 2…7, 2…4 let i, j {
         print i
         print j
     }
-    for range 2‥7 step 2, 2‥4 const i, j {
+    for range 2‥7 step 2, 2‥4 let i, j {
         print i
         print j
     }
-    for range 2…7 step 2, 2…4 const i, j {
+    for range 2…7 step 2, 2…4 let i, j {
         print i
         print j
     }
 
     # offset row — both axes off zero, twins
-    for range 3‥12, -2‥4 const i, j {
+    for range 3‥12, -2‥4 let i, j {
         print i
         print j
     }
-    for range 3…12, -2…4 const i, j {
+    for range 3…12, -2…4 let i, j {
         print i
         print j
     }
 
     # stepped offset row — the stepped outer axis stays outer, twins
-    for range 1‥9 step 3, -2‥4 const i, j {
+    for range 1‥9 step 3, -2‥4 let i, j {
         print i
         print j
     }
-    for range 1…9 step 3, -2…4 const i, j {
+    for range 1…9 step 3, -2…4 let i, j {
         print i
         print j
     }
 
     # zero-start step on the inner axis (product form of 0‥10 step 2), twins
-    for range 3‥5, 0‥10 step 2 const i, j {
+    for range 3‥5, 0‥10 step 2 let i, j {
         print i
         print j
     }
-    for range 3…5, 0…10 step 2 const i, j {
+    for range 3…5, 0…10 step 2 let i, j {
         print i
         print j
     }
 
     # descending outer axis with a positive stride, twins
-    for range 10‥0 step 2, 1‥3 const i, j {
+    for range 10‥0 step 2, 1‥3 let i, j {
         print i
         print j
     }
-    for range 10…0 step 2, 1…3 const i, j {
+    for range 10…0 step 2, 1…3 let i, j {
         print i
         print j
     }

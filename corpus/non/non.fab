@@ -12,21 +12,21 @@ related = ["verum", "falsum"]
 locale = "en"
 +++
 test "non negates falsum" {
-    const bool flag ← false
-    const bool negated ← not flag
+    let bool flag ← false
+    let bool negated ← not flag
     assert negated
 }
 
 test "non negates verum" {
-    const bool flag ← true
-    const bool negated ← not flag
+    let bool flag ← true
+    let bool negated ← not flag
     assert negated ≡ false
 }
 
 test "non applied twice returns the original" {
-    const bool flag ← false
-    const bool negated ← not flag
-    const bool bis ← not negated
+    let bool flag ← false
+    let bool negated ← not flag
+    let bool bis ← not negated
     assert bis ≡ false
 }
 # =============================================================================
@@ -52,7 +52,7 @@ test "non applied twice returns the original" {
 #
 
 main {
-    const bool flag ← false
-    const bool negated ← not flag
+    let bool flag ← false
+    let bool negated ← not flag
     print negated
 }

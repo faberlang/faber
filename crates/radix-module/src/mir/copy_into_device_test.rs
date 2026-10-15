@@ -91,7 +91,7 @@ fn host_tensor(name: &str, values: &[f32], shape: &str) -> String {
         .collect::<Vec<_>>()
         .join(", ");
     format!(
-        "fixum lista<f32> {name}_data ← [{literal}]\nfixum tensor<f32, {shape}> {name} ← {name}_data ↦ tensor<f32, {shape}>\n"
+        "sit lista<f32> {name}_data ← [{literal}]\nsit tensor<f32, {shape}> {name} ← {name}_data ↦ tensor<f32, {shape}>\n"
     )
 }
 

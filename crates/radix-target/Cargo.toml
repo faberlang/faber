@@ -17,6 +17,7 @@ workspace = true
 hir-faber = []
 hir-c = []
 hir-fhir = []
+mir-clif = []
 
 [dev-dependencies]
 radix-hygiene = { path = "../radix-hygiene" }

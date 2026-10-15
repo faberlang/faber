@@ -100,18 +100,18 @@ fn wasm_text(body: &str) -> String {
 #[cfg(feature = "mir-wasm")]
 #[test]
 fn wasm_bits_not_flips_exactly_the_width() {
-    let b8 = wasm_text("fixum b8 a ← 0xf3\nnota ¬ a");
+    let b8 = wasm_text("sit b8 a ← 0xf3\nnota ¬ a");
     assert!(b8.contains("(i32.xor (local.get $l0) (i32.const 255))"), "{b8}");
-    let b16 = wasm_text("fixum b16 a ← 0x00f3\nnota ¬ a");
+    let b16 = wasm_text("sit b16 a ← 0x00f3\nnota ¬ a");
     assert!(b16.contains("(i32.xor (local.get $l0) (i32.const 65535))"), "{b16}");
-    let b64 = wasm_text("fixum b64 a ← 0xf3\nnota ¬ a");
+    let b64 = wasm_text("sit b64 a ← 0xf3\nnota ¬ a");
     assert!(b64.contains("(i64.xor (local.get $l0) (i64.const -1))"), "{b64}");
 }
 
 #[cfg(feature = "mir-wasm")]
 #[test]
 fn wasm_bits_shift_past_width_is_zero_and_negative_count_traps() {
-    let text = wasm_text("fixum b8 a ← 0xf3\nnota a ⇐ 8\nnota a ⇒ 9");
+    let text = wasm_text("sit b8 a ← 0xf3\nnota a ⇐ 8\nnota a ⇒ 9");
     // Width and mask travel with the call; the helper zeroes a count of N or
     // more (unsigned compare, the count is not wrapped) and traps a negative
     // one with the runner's message (kind 2).
@@ -128,7 +128,7 @@ fn wasm_bits_shift_past_width_is_zero_and_negative_count_traps() {
 #[test]
 fn wasm_bits_display_is_hex_at_full_width() {
     let text = wasm_text(
-        "fixum b8 a ← 0x01\nfixum b16 b ← 0x0001\nfixum b32 c ← 0x01\nfixum b64 d ← 0x01\nnota a\nnota b\nnota c\nnota d",
+        "sit b8 a ← 0x01\nsit b16 b ← 0x0001\nsit b32 c ← 0x01\nsit b64 d ← 0x01\nnota a\nnota b\nnota c\nnota d",
     );
     for digits in [2, 4, 8, 16] {
         assert!(text.contains(&format!(" (i32.const {digits}))")), "{digits}: {text}");
@@ -144,7 +144,7 @@ fn wasm_bits_display_is_hex_at_full_width() {
 #[test]
 fn wasm_bits_equality_and_order_read_the_pattern_unsigned() {
     let text = wasm_text(
-        "fixum b8 a ← 0x80\nfixum b8 b ← 0x7f\nnota a ≻ b\nnota a ≺ b\nnota a ≥ b\nnota a ≤ b\nnota a ≡ b\nnota a ≢ b",
+        "sit b8 a ← 0x80\nsit b8 b ← 0x7f\nnota a ≻ b\nnota a ≺ b\nnota a ≥ b\nnota a ≤ b\nnota a ≡ b\nnota a ≢ b",
     );
     for opcode in ["i32.gt_u", "i32.lt_u", "i32.ge_u", "i32.le_u", "i32.eq", "i32.ne"] {
         assert!(
@@ -158,7 +158,7 @@ fn wasm_bits_equality_and_order_read_the_pattern_unsigned() {
 #[cfg(feature = "mir-wasm")]
 #[test]
 fn wasm_displays_a_list_of_bits_in_module_at_full_width() {
-    let text = wasm_text("fixum lista<b8> xs ← [0x00, 0x0f]\nfixum lista<b32> ys ← [0x01]\nnota xs\nnota ys");
+    let text = wasm_text("sit lista<b8> xs ← [0x00, 0x0f]\nsit lista<b32> ys ← [0x01]\nnota xs\nnota ys");
     // One helper per displayed element width, joined `[a, b]` from the
     // bracket and separator rows, reading the existing array rows.
     for digits in [2, 8] {
@@ -191,7 +191,7 @@ fn wasm_displays_a_list_of_bits_in_module_at_full_width() {
 #[cfg(feature = "mir-wasm")]
 #[test]
 fn wasm_refuses_display_of_a_nested_list_of_bits_by_name() {
-    let source = "incipit {\nfixum lista<b8> xs ← [0x00]\nfixum lista<lista<b8>> ys ← [xs, xs]\nnota ys\n}\n";
+    let source = "incipit {\nsit lista<b8> xs ← [0x00]\nsit lista<lista<b8>> ys ← [xs, xs]\nnota ys\n}\n";
     let session = Session::new(
         Config::default()
             .with_target(Target::MirWasm)

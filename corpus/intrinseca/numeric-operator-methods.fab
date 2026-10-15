@@ -18,7 +18,7 @@ locale = "en"
 #   • Related keywords: numerus, fractus, mathesis
 #
 # Common mistakes:
-#   • Calling operator methods like `.add()` on a `fixum` binding — imperative mutation methods require `varia`.
+#   • Calling operator methods like `.add()` on a `sit` binding — imperative mutation methods require `varia`.
 #
 # See also: numerus, fractus, mathesis
 # =============================================================================
@@ -31,12 +31,12 @@ locale = "en"
 #   8
 
 main {
-    const float x ← 2.0
-    const float chained ← x.added(1.0).multiplied(3.0)
-    var float acc ← 10.0
+    let float x ← 2.0
+    let float chained ← x.added(1.0).multiplied(3.0)
+    mut float acc ← 10.0
     acc.add(5.0)
-    const int mask ← 12
-    const int bits ← mask.bit_and(10)
+    let int mask ← 12
+    let int bits ← mask.bit_and(10)
     print chained
     print acc
     print bits

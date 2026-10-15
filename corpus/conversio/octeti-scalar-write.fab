@@ -48,17 +48,17 @@ locale = "en"
 #   bounded octeti.
 
 main {
-    const u16 n ← 258
-    const bytes<2> le ← n ↦ bytes<2> via Le
-    const bytes<2> be ← n ↦ bytes<2> via Be
-    const bytes le_raw ← le ↦ bytes
-    const bytes be_raw ← be ↦ bytes
+    let u16 n ← 258
+    let bytes<2> le ← n ↦ bytes<2> via Le
+    let bytes<2> be ← n ↦ bytes<2> via Be
+    let bytes le_raw ← le ↦ bytes
+    let bytes be_raw ← be ↦ bytes
     print le_raw[0] ↦ u8
     print be_raw[0] ↦ u8
     print le_raw ↦ u16 via Le
     print be_raw ↦ u16 via Be
-    const f32 x ← 1.5
-    const bytes<4> fb ← x ↦ bytes<4> via Le
-    const bytes fb_raw ← fb ↦ bytes
+    let f32 x ← 1.5
+    let bytes<4> fb ← x ↦ bytes<4> via Le
+    let bytes fb_raw ← fb ↦ bytes
     print fb_raw ↦ f32 via Le
 }

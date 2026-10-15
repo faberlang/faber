@@ -223,7 +223,7 @@ fn package_check_normal_diagnostics_uses_coded_compact_headers() {
         "package-check-normal",
         r#"
 main {
-    const int n ← "not a number"
+    let int n ← "not a number"
     print n
 }
 "#,
@@ -250,7 +250,7 @@ fn package_check_expanded_diagnostics_includes_phase_and_span() {
         "package-check-expanded",
         r#"
 main {
-    const int n ← "not a number"
+    let int n ← "not a number"
     print n
 }
 "#,

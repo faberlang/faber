@@ -77,7 +77,7 @@ fn genus_key_with_fractus_field_rejects() {
     assert_rejects(
         r"
 genus Punctum {
-    fixum f64 x
+    sit f64 x
 }
 
 functio probe(tabula<Punctum, numerus> m) → numerus {
@@ -92,7 +92,7 @@ fn nested_map_in_genus_field_type_rejects() {
     assert_rejects(
         r"
 genus Index {
-    fixum tabula<f64, textus> by_weight
+    sit tabula<f64, textus> by_weight
 }
 ",
         "tabula_key_not_hashable",
@@ -104,8 +104,8 @@ fn hashable_keys_accept() {
     test_support::assert_accepts_la(
         r"
 genus Locus {
-    fixum textus regio
-    fixum numerus annus
+    sit textus regio
+    sit numerus annus
 }
 
 discretio Clavis {

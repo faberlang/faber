@@ -39,7 +39,7 @@ locale = "en"
 # conversion rejects the pattern.
 fn hits(string pat, string text) → string {
     do {
-        const regex r ← pat ↦ regex
+        let regex r ← pat ↦ regex
         return r.matches(text) ✓ "y" ✗ "n"
     }
     catch err {

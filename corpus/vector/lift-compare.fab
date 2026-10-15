@@ -60,11 +60,11 @@ fn clamped(vector<f32, 3> a, f32 limit) → vector<f32, 3> {
 }
 
 main {
-    const vector<f32, 3> a ← [1.0, 5.0, 3.0] ↦ vector<f32, 3>
-    const vector<f32, 3> b ← [4.0, 5.0, 2.0] ↦ vector<f32, 3>
-    const vector<bool, 3> lt ← below(a, b)
+    let vector<f32, 3> a ← [1.0, 5.0, 3.0] ↦ vector<f32, 3>
+    let vector<f32, 3> b ← [4.0, 5.0, 2.0] ↦ vector<f32, 3>
+    let vector<bool, 3> lt ← below(a, b)
     print lt
-    const vector<bool, 3> big ← at_least(a, 3.0)
+    let vector<bool, 3> big ← at_least(a, 3.0)
     print big
     print bigger_than(3.0, a)
     print lane_equal(a, b)

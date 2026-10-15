@@ -1,0 +1,29 @@
++++
+locale = "en"
++++
+# Bitwise `∧ ∨ ⊻` and the shifts `⇐ ⇒`: exact and range-checked, never C
+# `int64_t` arithmetic. `i64::MIN ^ u64::MAX` can leave the representation cap,
+# so every result goes through the runtime's cap check as the runner's does.
+main {
+    let int flags ← 0b1010
+    let int person ← 0b1100
+    print flags ∧ person
+    print flags ∨ person
+    print flags ⊻ person
+    print 1 ⇐ 4
+    print 16 ⇒ 2
+    let int negative ← 0 - 8
+    print negative ∧ 7
+    print negative ∨ 1
+    print negative ⊻ 3
+    print negative ⇒ 1
+    print negative ⇐ 1
+    print 0 ⇐ 64
+    print 1 ⇐ 63
+    print 0 - 1 ⇒ 200
+    print 5 ⇒ 0
+    print 5 ⇐ 0
+    print ¬ 5
+    print ¬ 0
+    print ¬ (0 - 1)
+}

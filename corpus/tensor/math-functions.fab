@@ -46,28 +46,28 @@ locale = "la"
 #   [3]
 
 incipit {
-    fixum lista<f32> squares ← [4.0, 9.0, 16.0, 1.0]
-    fixum tensor<f32, [2, 2]> grid ← squares ↦ tensor<f32, [2, 2]>
+    sit lista<f32> squares ← [4.0, 9.0, 16.0, 1.0]
+    sit tensor<f32, [2, 2]> grid ← squares ↦ tensor<f32, [2, 2]>
     nota grid.radix().planata()
-    fixum lista<f32> signed ← [-1.0, 2.0, -3.0, 4.0]
-    fixum tensor<f32, [4]> mixed ← signed ↦ tensor<f32, [4]>
+    sit lista<f32> signed ← [-1.0, 2.0, -3.0, 4.0]
+    sit tensor<f32, [4]> mixed ← signed ↦ tensor<f32, [4]>
     nota mixed.absolutum().planata()
-    fixum lista<f32> zeros ← [0.0, 0.0]
-    fixum tensor<f32, [2]> origin ← zeros ↦ tensor<f32, [2]>
+    sit lista<f32> zeros ← [0.0, 0.0]
+    sit tensor<f32, [2]> origin ← zeros ↦ tensor<f32, [2]>
     nota origin.exponentia().planata()
     nota origin.sinus().planata()
-    fixum lista<f32> decades ← [100.0, 1000.0]
-    fixum tensor<f32, [2]> powers ← decades ↦ tensor<f32, [2]>
+    sit lista<f32> decades ← [100.0, 1000.0]
+    sit tensor<f32, [2]> powers ← decades ↦ tensor<f32, [2]>
     nota powers.logarithmus_decimalis().planata()
-    fixum lista<f32> units ← [1.0, 1.0]
-    fixum tensor<f32, [2]> ones ← units ↦ tensor<f32, [2]>
+    sit lista<f32> units ← [1.0, 1.0]
+    sit tensor<f32, [2]> ones ← units ↦ tensor<f32, [2]>
     nota ones.logarithmus().planata()
     nota origin.cosinus().planata()
-    fixum lista<f32> edge ← [1.0, -1.0]
-    fixum tensor<f32, [2]> domain ← edge ↦ tensor<f32, [2]>
+    sit lista<f32> edge ← [1.0, -1.0]
+    sit tensor<f32, [2]> domain ← edge ↦ tensor<f32, [2]>
     nota domain.radix().planata()
-    fixum lista<i32> counts ← [-3, 0, 5]
-    fixum tensor<i32, [3]> whole ← counts ↦ tensor<i32, [3]>
+    sit lista<i32> counts ← [-3, 0, 5]
+    sit tensor<i32, [3]> whole ← counts ↦ tensor<i32, [3]>
     nota whole.absolutum().planata()
     nota whole.absolutum().magnitudines()
 }

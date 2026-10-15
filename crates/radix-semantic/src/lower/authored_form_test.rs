@@ -84,8 +84,8 @@ fn single_type_child(form: &HirTypeForm) -> &HirTypeForm {
 fn declared_forms_match_authored_spelling_and_canonical_witness() {
     let fixture = analyze_ok(concat!(
         "functio probe() {\n",
-        "    fixum lista<u32> long_form ← vacua\n",
-        "    fixum lu32 fused ← vacua\n",
+        "    sit lista<u32> long_form ← vacua\n",
+        "    sit lu32 fused ← vacua\n",
         "}\n"
     ));
 
@@ -126,7 +126,7 @@ fn declared_forms_match_authored_spelling_and_canonical_witness() {
 fn tensor_forms_record_shape_children() {
     let fixture = analyze_ok(concat!(
         "functio probe() {\n",
-        "    fixum tensor<f32, [2, 2]> board ← vacua\n",
+        "    sit tensor<f32, [2, 2]> board ← vacua\n",
         "}\n"
     ));
     let (form, _) = first_declared_form(&fixture, "board");
@@ -137,7 +137,7 @@ fn tensor_forms_record_shape_children() {
 
 #[test]
 fn hole_annotations_record_infer_heads() {
-    let fixture = analyze_ok("functio probe() {\n    fixum _ holed ← 1\n}");
+    let fixture = analyze_ok("functio probe() {\n    sit holed ← 1\n}");
     let (form, _) = first_declared_form(&fixture, "holed");
     assert_eq!(form.head, HirTypeFormHead::Infer);
     assert!(form.args.is_empty(), "hole heads carry no children");
@@ -148,7 +148,7 @@ fn alias_uses_carry_named_heads_and_alias_bodies_stay_semantic() {
     let fixture = analyze_ok(concat!(
         "typus Word = modulus<u32>\n",
         "functio probe() {\n",
-        "    fixum Word w ← 1\n",
+        "    sit Word w ← 1\n",
         "}\n"
     ));
 
@@ -188,8 +188,8 @@ fn alias_uses_carry_named_heads_and_alias_bodies_stay_semantic() {
 fn iuncta_labels_ride_the_form_and_by_label_reads_record_their_label() {
     let fixture = analyze_ok(concat!(
         "functio probe() {\n",
-        "    fixum iuncta<gx: numerus, gw: numerus> par ← iuncta<numerus, numerus> [1, 2]\n",
-        "    fixum numerus w ← par.gw\n",
+        "    sit iuncta<gx: numerus, gw: numerus> par ← iuncta<numerus, numerus> [1, 2]\n",
+        "    sit numerus w ← par.gw\n",
         "}\n"
     ));
 
@@ -218,7 +218,7 @@ fn iuncta_labels_ride_the_form_and_by_label_reads_record_their_label() {
 
 #[test]
 fn witness_canonicalization_survives_inference_solving() {
-    let fixture = analyze_ok("functio probe() {\n    fixum u32 bare ← 1\n}");
+    let fixture = analyze_ok("functio probe() {\n    sit u32 bare ← 1\n}");
     let (form, local_ty) = first_declared_form(&fixture, "bare");
     assert_eq!(form.head, HirTypeFormHead::Semantic(TypeFormLevel::SHORT));
     assert_eq!(Some(form.ty), local_ty);

@@ -22,25 +22,25 @@ fn port_path() → string {
 }
 
 fn is_serve() → bool {
-    const list<string> args ← process.argv()
+    let list<string> args ← process.argv()
     if args.length() ≡ 0 then return false
     return (args.get(0) coalesce "") ≡ "serve"
 }
 
 fn trusted_client() → client.Client {
-    const int agent ↤ call 'http:agent' ([60000 ↦ value, "ca.pem" ↦ value])
+    let int agent ↤ call 'http:agent' ([60000 ↦ value, "ca.pem" ↦ value])
     return client.Client { agent = agent }
 }
 
 fn run_serve() → void {
-    const server.Listener listener ← server.bind_tls(0, "cert.pem", "key.pem")
-    const int port ← listener.port()
+    let server.Listener listener ← server.bind_tls(0, "cert.pem", "key.pem")
+    let int port ← listener.port()
     assert port ≻ 0
     fs.write_file(port_path(), port ↦ string)
-    var bool running ← true
+    mut bool running ← true
     while running {
-        const server.Incoming incoming ← listener.accept()
-        const string path ← incoming.req.path
+        let server.Incoming incoming ← listener.accept()
+        let string path ← incoming.req.path
         if path ≡ "/json" {
             server.reply(incoming, 200, headers.empty(), incoming.req.body)
         }
@@ -48,8 +48,8 @@ fn run_serve() → void {
             server.reply(incoming, 200, headers.empty(), "event: ping\ndata: one\n\nevent: ping\ndata: two\n\n")
         }
         elif path ≡ "/ws" {
-            const websocket.Socket sock ← websocket.accept(incoming.id)
-            const string msg ← sock.receive()
+            let websocket.Socket sock ← websocket.accept(incoming.id)
+            let string msg ← sock.receive()
             sock.send(msg)
             sock.close()
         }
@@ -65,8 +65,8 @@ fn run_serve() → void {
 }
 
 fn wait_port() → string {
-    const string path ← port_path()
-    var int spins ← 0
+    let string path ← port_path()
+    mut int spins ← 0
     while not fs.exists(path) {
         time.sleep(50)
         spins ← spins + 1
@@ -78,17 +78,17 @@ fn wait_port() → string {
 }
 
 fn run_client() → void {
-    const string port ← wait_port()
-    const client.Client session ← trusted_client()
-    const string json_url ← "https://127.0.0.1:§/json"(port)
-    const response.Response posted ← client.post_on(session, json_url, "{\"ok\":true}")
+    let string port ← wait_port()
+    let client.Client session ← trusted_client()
+    let string json_url ← "https://127.0.0.1:§/json"(port)
+    let response.Response posted ← client.post_on(session, json_url, "{\"ok\":true}")
     assert posted.status ≡ 200
     assert posted.body.length() ≻ 0
 
-    const string sse_url ← "https://127.0.0.1:§/sse"(port)
-    const response.Response streamed ← client.get_on(session, sse_url)
+    let string sse_url ← "https://127.0.0.1:§/sse"(port)
+    let response.Response streamed ← client.get_on(session, sse_url)
     assert streamed.status ≡ 200
-    var list<sse.Event> events ← []
+    mut list<sse.Event> events ← []
     do {
         events ← sse.parse(streamed.body)
     }
@@ -96,23 +96,23 @@ fn run_client() → void {
         panic "na2: sse.parse: §"(err)
     }
     assert events.length() ≥ 2
-    var int seen ← 0
-    for from events const event {
+    mut int seen ← 0
+    for from events let event {
         if event.data ≡ "one" or event.data ≡ "two" {
             seen ← seen + 1
         }
     }
     assert seen ≥ 2
 
-    const string ws_url ← "wss://127.0.0.1:§/ws"(port)
-    const websocket.Socket sock ← websocket.connect_tls(ws_url, "ca.pem")
+    let string ws_url ← "wss://127.0.0.1:§/ws"(port)
+    let websocket.Socket sock ← websocket.connect_tls(ws_url, "ca.pem")
     sock.send("echo-me")
-    const string echoed ← sock.receive()
+    let string echoed ← sock.receive()
     assert echoed ≡ "echo-me"
     sock.close()
 
-    const string stop_url ← "https://127.0.0.1:§/stop"(port)
-    const response.Response stopped ← client.get_on(session, stop_url)
+    let string stop_url ← "https://127.0.0.1:§/stop"(port)
+    let response.Response stopped ← client.get_on(session, stop_url)
     assert stopped.status ≡ 200
     print "na2-ok"
 }

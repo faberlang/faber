@@ -6,4 +6,5 @@ input = "operatores/inf-json.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

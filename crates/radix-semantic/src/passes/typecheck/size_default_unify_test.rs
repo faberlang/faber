@@ -271,11 +271,11 @@ functio peek_bounded_stack<T>(stack<T, 4> s) → numerus {
 }
 
 functio caller(lista<numerus> l, queue<numerus> q, stack<numerus> s, queue<numerus, 4> bq, stack<numerus, 4> bs) → numerus {
-    fixum numerus a ← peek_lista<numerus>(l)
-    fixum numerus b ← peek_queue<numerus>(q)
-    fixum numerus c ← peek_stack<numerus>(s)
-    fixum numerus d ← peek_bounded_queue<numerus>(bq)
-    fixum numerus e ← peek_bounded_stack<numerus>(bs)
+    sit numerus a ← peek_lista<numerus>(l)
+    sit numerus b ← peek_queue<numerus>(q)
+    sit numerus c ← peek_stack<numerus>(s)
+    sit numerus d ← peek_bounded_queue<numerus>(bq)
+    sit numerus e ← peek_bounded_stack<numerus>(bs)
     redde a + b + c + d + e
 }"#,
     );

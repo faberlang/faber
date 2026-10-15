@@ -19,8 +19,8 @@ locale = "en"
 import from "norma:csv" csv
 
 main {
-    const list<list<string>> grid ← csv.parse("name,count\nalpha,1\nbeta,2")
+    let list<list<string>> grid ← csv.parse("name,count\nalpha,1\nbeta,2")
     print grid.length()
-    const string wire ← csv.stringify(grid)
+    let string wire ← csv.stringify(grid)
     print wire
 }

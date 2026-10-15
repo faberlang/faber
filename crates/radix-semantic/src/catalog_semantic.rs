@@ -854,7 +854,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         "tensor_strue_retired" => Some("write flat ↦ tensor<T, figura>".to_owned()),
         "tensor_crea_retired" => {
-            Some("bind the constructor first: const tf32[2, 2] a ← tf32[2, 2] {}".to_owned())
+            Some("bind the constructor first: let tf32[2, 2] a ← tf32[2, 2] {}".to_owned())
         }
         "tensor_structa_forma_removed" => Some("use tensor.structa<CompleteTensorType>(data)".to_owned()),
         "tensor_creata_complete_type_arg_required" => Some("provide a complete tensor type argument".to_owned()),
@@ -1093,10 +1093,10 @@ fn semantic_undefined_member_help(args: &[DiagnosticArg]) -> Option<String> {
         "struct_field_requires_value" => Some("provide a value for the struct field".to_owned()),
         "unknown_field" | "unknown_struct_field" => Some("check the struct field name".to_owned()),
         "static_field_read_through_instance" => Some(
-            "read a `generis` field through the type name (`Type.field`), not an instance".to_owned(),
+            "read a `const` member through the type name (`Type.field`), not an instance".to_owned(),
         ),
         "instance_field_read_through_type" => Some(
-            "read an instance field through an instance; only a `generis` field reads through the type name"
+            "read an instance field through an instance; only a `const` member reads through the type name"
                 .to_owned(),
         ),
         "unknown_method" => Some("check the receiver type and method name".to_owned()),
@@ -1438,7 +1438,7 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::PositionalLaneParam => DiagnosticSpec {
             code: "WARN032",
             help: Some(
-                "bind the iteration coordinate with `apud` on a `filum` loop: `itera ex t apud [i, j] filum f fixum v`",
+                "bind the iteration coordinate with `apud` on a `filum` loop: `itera ex t apud [i, j] filum f sit v`",
             ),
         },
         WarningKind::UnprovenKernelIndex => DiagnosticSpec {

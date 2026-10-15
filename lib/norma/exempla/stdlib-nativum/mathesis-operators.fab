@@ -22,12 +22,12 @@ locale = "en"
 import from "norma:mathesis" mathesis
 
 main {
-    const float x ← 1.5
+    let float x ← 1.5
 
-    const float per_glyph ← x + 2.0
-    const float per_method ← x.added(2.0)
-    const float per_catalog ← mathesis.add(x, 2.0)
-    const float pipeline ← x.added(1.0).multiplied(3.0)
+    let float per_glyph ← x + 2.0
+    let float per_method ← x.added(2.0)
+    let float per_catalog ← mathesis.add(x, 2.0)
+    let float pipeline ← x.added(1.0).multiplied(3.0)
 
     print per_glyph
     print per_method
@@ -35,10 +35,10 @@ main {
     print pipeline
     assert mathesis.at_most(pipeline, 5.0)
 
-    const int bits ← 1
-    const int per_shift_glyph ← bits ⇐ 4
-    const int per_shift_method ← bits.shifted_left(4)
-    const int per_shift_catalog ← mathesis.shift_left(bits, 4)
+    let int bits ← 1
+    let int per_shift_glyph ← bits ⇐ 4
+    let int per_shift_method ← bits.shifted_left(4)
+    let int per_shift_catalog ← mathesis.shift_left(bits, 4)
     assert per_shift_glyph ≡ per_shift_method
     assert per_shift_method ≡ per_shift_catalog
     print per_shift_glyph

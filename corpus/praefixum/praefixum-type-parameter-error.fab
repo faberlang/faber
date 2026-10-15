@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "fixum_decl", "
 category = "comptime"
 canonical = false
 summary = "A comptime body runs once, so inside a generic function or genus it may not depend on a type parameter."
-syntax = "fn f<T>() { const int n = comptime { var list<T> xs ← empty … } } — rejected"
+syntax = "fn f<T>() { const int n = comptime { mut list<T> xs ← empty … } } — rejected"
 related = ["praefixum", "fixum"]
 locale = "en"
 +++
@@ -38,7 +38,7 @@ locale = "en"
 
 fn longitudo<T>(T x) → int {
     const int n = comptime {
-        var list<T> xs ← empty
+        mut list<T> xs ← empty
         return xs.length()
     }
     return n

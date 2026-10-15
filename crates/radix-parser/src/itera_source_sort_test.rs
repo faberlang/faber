@@ -21,7 +21,7 @@ fn refused(source: &str) -> usize {
 #[test]
 fn bare_sort_loop_source_is_refused_with_a_named_issue() {
     assert_parse_error_matches(
-        "functio t(lista<numerus> xs) { itera ex ordinata via ascendens ex xs fixum x { nota x } }",
+        "functio t(lista<numerus> xs) { itera ex ordinata via ascendens ex xs sit x { nota x } }",
         ParseExpectation::Issue(ISSUE),
     );
 }
@@ -30,7 +30,7 @@ fn bare_sort_loop_source_is_refused_with_a_named_issue() {
 fn bare_sort_with_a_key_body_shape_is_refused_the_same_way() {
     // The loop binder wins the `fixum name {` clash; the sort is still bare.
     assert_parse_error_matches(
-        "functio t(tabula<textus, numerus> m) { itera ex ordinata via ascendens de m fixum k { nota k } }",
+        "functio t(tabula<textus, numerus> m) { itera ex ordinata via ascendens de m sit k { nota k } }",
         ParseExpectation::Issue(ISSUE),
     );
 }
@@ -39,7 +39,7 @@ fn bare_sort_with_a_key_body_shape_is_refused_the_same_way() {
 fn bare_reduce_loop_source_is_refused_with_a_named_issue() {
     assert_eq!(
         refused(
-            "functio t(tensor<numerus, [4]> xs) { itera ex reducta via summa ex xs fixum x { nota x } }"
+            "functio t(tensor<numerus, [4]> xs) { itera ex reducta via summa ex xs sit x { nota x } }"
         ),
         1
     );
@@ -47,14 +47,15 @@ fn bare_reduce_loop_source_is_refused_with_a_named_issue() {
 
 #[test]
 fn bound_name_loop_source_is_accepted() {
-    let source = "functio t(lista<numerus> xs) { fixum lista<numerus> ys ← ordinata via ascendens ex xs\n itera ex ys fixum x { nota x } }";
+    let source = "functio t(lista<numerus> xs) { sit lista<numerus> ys ← ordinata via ascendens ex xs\n itera ex ys sit x { nota x } }";
     assert_eq!(refused(source), 0);
     parse_ok(source);
 }
 
 #[test]
 fn parenthesised_sort_loop_source_stays_legal() {
-    let source = "functio t(lista<numerus> xs) { itera ex (ordinata via ascendens ex xs) fixum x { nota x } }";
+    let source =
+        "functio t(lista<numerus> xs) { itera ex (ordinata via ascendens ex xs) sit x { nota x } }";
     assert_eq!(refused(source), 0);
     parse_ok(source);
 }

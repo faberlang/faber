@@ -29,15 +29,15 @@ locale = "la"
 # EXPECTED stdout: see bits-display-la.expected
 
 incipit {
-    fixum b8 one8 ← 0x01
-    fixum b16 one16 ← 0x0001
-    fixum b32 one32 ← 0x00000001
-    fixum b64 one64 ← 0x0000000000000001
+    sit b8 one8 ← 0x01
+    sit b16 one16 ← 0x0001
+    sit b32 one32 ← 0x00000001
+    sit b64 one64 ← 0x0000000000000001
     nota one8
     nota one16
     nota one32
     nota one64
 
-    fixum lista<b8> bytes ← [0x00, 0x0f, 0xa5, 0xff]
+    sit lista<b8> bytes ← [0x00, 0x0f, 0xa5, 0xff]
     nota bytes
 }

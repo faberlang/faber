@@ -150,7 +150,7 @@ fn analysis_without_driver_context_has_no_source_root() {
 fn genus_static_field_embed_folds() {
     let config = config_with("n.txt", InsereSource::Bytes(b"salve".to_vec()));
     let fixture = analyze_source_with_config(
-        "genus Nuntius {\n    generis textus SALUTATIO = insere \"n.txt\"\n}\n",
+        "genus Nuntius {\n    fixum textus SALUTATIO = insere \"n.txt\"\n}\n",
         config,
     );
     assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);

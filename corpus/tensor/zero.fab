@@ -33,11 +33,11 @@ locale = "en"
 #   tensor shape, plain vector lane).
 
 main {
-    const tf32[2, 3] grid ← tf32[2, 3] {}
+    let tf32[2, 3] grid ← tf32[2, 3] {}
     print grid.shape()
     print grid[[1, 2]]
-    const tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
+    let tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
     print lanes.shape()
-    const vector<f32, 4> v ← vector<f32, 4> {}
+    let vector<f32, 4> v ← vector<f32, 4> {}
     print v[3]
 }

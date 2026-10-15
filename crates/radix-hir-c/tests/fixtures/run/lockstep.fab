@@ -1,0 +1,26 @@
++++
+locale = "en"
++++
+# Lockstep `for from a, b let x, y`: every source is evaluated once, all
+# must have equal length, and the binders read the aligned element. `apud [i]`
+# binds the shared index.
+main {
+    let list<string> labels ← ["one", "two", "three"]
+    let list<int> values ← [1, 2, 3]
+    for from labels, values let label, value {
+        print label
+        print value
+    }
+    let list<int> left ← [10, 20, 30]
+    let list<int> right ← [1, 2, 3]
+    for from left, right let a, b {
+        print a - b
+    }
+    let list<int> bases ← [100, 200]
+    let list<int> keys ← [1, 2]
+    let list<int> payloads ← [10, 20]
+    for from bases, keys, payloads at [slot] let base, key, payload {
+        let int total ← slot + base + key + payload
+        print total
+    }
+}

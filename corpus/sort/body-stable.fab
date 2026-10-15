@@ -15,7 +15,7 @@ genus Person {
 
 functio names(lista<Person> ps) → textus {
     varia textus out ← ""
-    itera ex ps fixum p {
+    itera ex ps sit p {
         si out ≡ "" {
             out ← p.name
         }
@@ -27,11 +27,11 @@ functio names(lista<Person> ps) → textus {
 }
 
 incipit {
-    fixum lista<Person> people ← [Person { name = "Livia", age = 30 }, Person { name = "Marcus", age = 30 }, Person { name = "Aulus", age = 25 }, Person { name = "Cornelia", age = 25 }, Person { name = "Titus", age = 40 }]
-    fixum lista<Person> young ← ordinata via ascendens ex people fixum p {
+    sit lista<Person> people ← [Person { name = "Livia", age = 30 }, Person { name = "Marcus", age = 30 }, Person { name = "Aulus", age = 25 }, Person { name = "Cornelia", age = 25 }, Person { name = "Titus", age = 40 }]
+    sit lista<Person> young ← ordinata via ascendens ex people sit p {
         redde p.age
     }
-    fixum lista<Person> old ← ordinata via descendens ex people fixum p {
+    sit lista<Person> old ← ordinata via descendens ex people sit p {
         redde p.age
     }
     nota names(young)

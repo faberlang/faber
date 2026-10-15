@@ -14,7 +14,7 @@ import from "norma:fs" fs
 
 main {
     # processus:identitas: a live, positive pid, stable across calls.
-    const int first ← process.pid()
+    let int first ← process.pid()
     assert first ≻ 0
     assert process.pid() ≡ first
 
@@ -22,19 +22,19 @@ main {
     assert process.argv().length() ≥ 0
 
     # processus:lege: a set variable reads as text, an unset name reads none.
-    const string ∪ none path_value ← process.read_env("PATH")
+    let string ∪ none path_value ← process.read_env("PATH")
     assert path_value not is none
-    const string unset_name ← "FABER_PROOF_UNSET_§"(first)
-    const string ∪ none unset_value ← process.read_env(unset_name)
+    let string unset_name ← "FABER_PROOF_UNSET_§"(first)
+    let string ∪ none unset_value ← process.read_env(unset_name)
     assert unset_value is none
 
     # processus:sedes: the process dwells somewhere.
-    const string original ← process.cwd()
+    let string original ← process.cwd()
     assert original.length() ≻ 0
 
     # processus:muta: enter the temp dir, confirm where the leaf reports the
     # process now dwells, then return to the original directory.
-    const string temp ← fs.temp_dir()
+    let string temp ← fs.temp_dir()
     do {
         process.chdir(temp)
     }
@@ -51,8 +51,8 @@ main {
     assert process.cwd() ≡ original
 
     # processus:muta: a nonexistent directory is a fault, not a crash.
-    const string missing ← fs.join([temp, "faber-proof-missing-§"(first)])
-    var bool missing_failed ← false
+    let string missing ← fs.join([temp, "faber-proof-missing-§"(first)])
+    mut bool missing_failed ← false
     do {
         process.chdir(missing)
     }

@@ -31,8 +31,8 @@ locale = "en"
 # EXPECTED stdout: see elementwise-comparison.expected
 
 main {
-    const list<int> xs ← [1, 5, 3]
-    const list<int> ys ← [2, 4, 3]
+    let list<int> xs ← [1, 5, 3]
+    let list<int> ys ← [2, 4, 3]
     print xs ≺ ys
     print xs ≻ ys
     print xs ≤ ys
@@ -41,7 +41,7 @@ main {
     print xs ≇ ys
     print xs ≤ 3
     print 3 ≤ xs
-    const list<bool> mask ← xs ≻ 2
+    let list<bool> mask ← xs ≻ 2
     print mask
     print xs ≡ ys
 }

@@ -59,29 +59,29 @@ fn thread_max_min_and_product_fold_like_the_plain_reduction() {
 @ kernel
 @ public
 fn t_max<size N>(tf32[N] a, f32 floor) → f32 {
-    return reduce via max from a at [i] thread lane const s { return s } coalesce floor
+    return reduce via max from a at [i] thread lane let s { return s } coalesce floor
 }
 @ kernel
 @ public
 fn t_min<size N>(tf32[N] a, f32 floor) → f32 {
-    return reduce via min from a at [i] thread lane const s { return s } coalesce floor
+    return reduce via min from a at [i] thread lane let s { return s } coalesce floor
 }
 @ kernel
 @ public
 fn t_prod<size N>(tf32[N] a) → f32 {
-    return reduce via product from a at [i] thread lane const s { return s }
+    return reduce via product from a at [i] thread lane let s { return s }
 }
 fn p_max<size N>(tf32[N] a, f32 floor) → f32 {
-    return reduce via max from a at [i] const s { return s } coalesce floor
+    return reduce via max from a at [i] let s { return s } coalesce floor
 }
 fn p_min<size N>(tf32[N] a, f32 floor) → f32 {
-    return reduce via min from a at [i] const s { return s } coalesce floor
+    return reduce via min from a at [i] let s { return s } coalesce floor
 }
 fn p_prod<size N>(tf32[N] a) → f32 {
-    return reduce via product from a at [i] const s { return s }
+    return reduce via product from a at [i] let s { return s }
 }
 main {
-    const tf32[4] a ← [3.0, 1.0, 4.0, 2.0] ↦ tf32[4]
+    let tf32[4] a ← [3.0, 1.0, 4.0, 2.0] ↦ tf32[4]
     print t_max(a, 0.0)
     print t_min(a, 9.0)
     print t_prod(a)
@@ -99,22 +99,22 @@ fn thread_argmax_and_argmin_ties_go_to_the_lowest_coordinate() {
 @ kernel
 @ public
 fn t_argmax<size N>(tf32[N] a) → int {
-    return (reduce via argmax from a at [i] thread lane const s { return s }) coalesce -1
+    return (reduce via argmax from a at [i] thread lane let s { return s }) coalesce -1
 }
 @ kernel
 @ public
 fn t_argmin<size N>(tf32[N] a) → int {
-    return (reduce via argmin from a at [i] thread lane const s { return s }) coalesce -1
+    return (reduce via argmin from a at [i] thread lane let s { return s }) coalesce -1
 }
 fn p_argmax<size N>(tf32[N] a) → int {
-    return (reduce via argmax from a at [i] const s { return s }) coalesce -1
+    return (reduce via argmax from a at [i] let s { return s }) coalesce -1
 }
 fn p_argmin<size N>(tf32[N] a) → int {
-    return (reduce via argmin from a at [i] const s { return s }) coalesce -1
+    return (reduce via argmin from a at [i] let s { return s }) coalesce -1
 }
 main {
-    const tf32[5] hi ← [3.0, 1.0, 3.0, 2.0, 3.0] ↦ tf32[5]
-    const tf32[5] lo ← [4.0, 2.0, 5.0, 2.0, 9.0] ↦ tf32[5]
+    let tf32[5] hi ← [3.0, 1.0, 3.0, 2.0, 3.0] ↦ tf32[5]
+    let tf32[5] lo ← [4.0, 2.0, 5.0, 2.0, 9.0] ↦ tf32[5]
     print t_argmax(hi)
     print t_argmin(lo)
     print p_argmax(hi)
@@ -130,25 +130,25 @@ fn thread_rank2_argmax_tie_returns_the_lowest_row_major_coordinate() {
 @ kernel
 @ public
 fn t_hi<size H, size W>(tf32[H, W] m) → tuple<int, int> ∪ none {
-    return reduce via argmax from m at [i, j] thread lane const s { return s }
+    return reduce via argmax from m at [i, j] thread lane let s { return s }
 }
 @ kernel
 @ public
 fn t_lo<size H, size W>(tf32[H, W] m) → tuple<int, int> ∪ none {
-    return reduce via argmin from m at [i, j] thread lane const s { return s }
+    return reduce via argmin from m at [i, j] thread lane let s { return s }
 }
 fn p_hi<size H, size W>(tf32[H, W] m) → tuple<int, int> ∪ none {
-    return reduce via argmax from m at [i, j] const s { return s }
+    return reduce via argmax from m at [i, j] let s { return s }
 }
 fn p_lo<size H, size W>(tf32[H, W] m) → tuple<int, int> ∪ none {
-    return reduce via argmin from m at [i, j] const s { return s }
+    return reduce via argmin from m at [i, j] let s { return s }
 }
 main {
-    const tf32[2, 3] m ← [[1.0, 5.0, 2.0], [5.0, 0.0, 1.0]] ↦ tf32[2, 3]
-    const tuple<int, int> hi ← t_hi(m) coalesce tuple<int, int> [9, 9]
-    const tuple<int, int> lo ← t_lo(m) coalesce tuple<int, int> [9, 9]
-    const tuple<int, int> phi ← p_hi(m) coalesce tuple<int, int> [9, 9]
-    const tuple<int, int> plo ← p_lo(m) coalesce tuple<int, int> [9, 9]
+    let tf32[2, 3] m ← [[1.0, 5.0, 2.0], [5.0, 0.0, 1.0]] ↦ tf32[2, 3]
+    let tuple<int, int> hi ← t_hi(m) coalesce tuple<int, int> [9, 9]
+    let tuple<int, int> lo ← t_lo(m) coalesce tuple<int, int> [9, 9]
+    let tuple<int, int> phi ← p_hi(m) coalesce tuple<int, int> [9, 9]
+    let tuple<int, int> plo ← p_lo(m) coalesce tuple<int, int> [9, 9]
     print hi[0]
     print hi[1]
     print lo[0]
@@ -169,22 +169,22 @@ fn thread_grouped_reductions_bucket_like_the_plain_reduction() {
 @ kernel
 @ public
 fn t_sum<size N>(tf32[N] a, tensor<int, [N]> g) → tf32[3] {
-    return reduce via sum from a at [i] per g[i] thread lane const s { return s }
+    return reduce via sum from a at [i] per g[i] thread lane let s { return s }
 }
 @ kernel
 @ public
 fn t_count<size N>(tf32[N] a, tensor<int, [N]> g) → tensor<int, [3]> {
-    return reduce via count from a at [i] per g[i] thread lane const s { return s ≻ 2.5 }
+    return reduce via count from a at [i] per g[i] thread lane let s { return s ≻ 2.5 }
 }
 fn p_sum<size N>(tf32[N] a, tensor<int, [N]> g) → tf32[3] {
-    return reduce via sum from a at [i] per g[i] const s { return s }
+    return reduce via sum from a at [i] per g[i] let s { return s }
 }
 fn p_count<size N>(tf32[N] a, tensor<int, [N]> g) → tensor<int, [3]> {
-    return reduce via count from a at [i] per g[i] const s { return s ≻ 2.5 }
+    return reduce via count from a at [i] per g[i] let s { return s ≻ 2.5 }
 }
 main {
-    const tf32[6] a ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] ↦ tf32[6]
-    const tensor<int, [6]> g ← [0, 1, 0, 1, 0, 1] ↦ tensor<int, [6]>
+    let tf32[6] a ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] ↦ tf32[6]
+    let tensor<int, [6]> g ← [0, 1, 0, 1, 0, 1] ↦ tensor<int, [6]>
     print t_sum(a, g)
     print t_count(a, g)
     print p_sum(a, g)
@@ -203,29 +203,29 @@ fn thread_empty_source_yields_the_coalesce_default_or_none() {
 @ kernel
 @ public
 fn t_max(tf32[0] a) → f32 {
-    return reduce via max from a at [i] thread lane const s { return s } coalesce 7.5
+    return reduce via max from a at [i] thread lane let s { return s } coalesce 7.5
 }
 @ kernel
 @ public
 fn t_argmax(tf32[0] a) → int ∪ none {
-    return reduce via argmax from a at [i] thread lane const s { return s }
+    return reduce via argmax from a at [i] thread lane let s { return s }
 }
 @ kernel
 @ public
 fn t_count(tf32[0] a) → int {
-    return reduce via count from a at [i] thread lane const s { return s ≻ 0.0 }
+    return reduce via count from a at [i] thread lane let s { return s ≻ 0.0 }
 }
 fn p_max(tf32[0] a) → f32 {
-    return reduce via max from a at [i] const s { return s } coalesce 7.5
+    return reduce via max from a at [i] let s { return s } coalesce 7.5
 }
 fn p_argmax(tf32[0] a) → int ∪ none {
-    return reduce via argmax from a at [i] const s { return s }
+    return reduce via argmax from a at [i] let s { return s }
 }
 fn p_count(tf32[0] a) → int {
-    return reduce via count from a at [i] const s { return s ≻ 0.0 }
+    return reduce via count from a at [i] let s { return s ≻ 0.0 }
 }
 main {
-    const tf32[0] a ← empty
+    let tf32[0] a ← empty
     print t_max(a)
     print t_argmax(a)
     print t_count(a)
@@ -243,29 +243,29 @@ fn thread_count_any_and_all_match_the_plain_reduction() {
 @ kernel
 @ public
 fn t_count<size N>(tf32[N] a) → int {
-    return reduce via count from a at [i] thread lane const s { return s ≻ 2.0 }
+    return reduce via count from a at [i] thread lane let s { return s ≻ 2.0 }
 }
 @ kernel
 @ public
 fn t_any<size N>(tf32[N] a) → bool {
-    return reduce via any from a at [i] thread lane const s { return s ≻ 3.5 }
+    return reduce via any from a at [i] thread lane let s { return s ≻ 3.5 }
 }
 @ kernel
 @ public
 fn t_all<size N>(tf32[N] a) → bool {
-    return reduce via all from a at [i] thread lane const s { return s ≻ 0.5 }
+    return reduce via all from a at [i] thread lane let s { return s ≻ 0.5 }
 }
 fn p_count<size N>(tf32[N] a) → int {
-    return reduce via count from a at [i] const s { return s ≻ 2.0 }
+    return reduce via count from a at [i] let s { return s ≻ 2.0 }
 }
 fn p_any<size N>(tf32[N] a) → bool {
-    return reduce via any from a at [i] const s { return s ≻ 3.5 }
+    return reduce via any from a at [i] let s { return s ≻ 3.5 }
 }
 fn p_all<size N>(tf32[N] a) → bool {
-    return reduce via all from a at [i] const s { return s ≻ 0.5 }
+    return reduce via all from a at [i] let s { return s ≻ 0.5 }
 }
 main {
-    const tf32[4] a ← [3.0, 1.0, 3.0, 2.0] ↦ tf32[4]
+    let tf32[4] a ← [3.0, 1.0, 3.0, 2.0] ↦ tf32[4]
     print t_count(a)
     print t_any(a)
     print t_all(a)

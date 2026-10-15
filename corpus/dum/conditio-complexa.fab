@@ -37,8 +37,8 @@ locale = "en"
 
 main {
     # et: loop stops when currit becomes falsum (after 3 iterations)
-    var bool currit ← true
-    var int conatus ← 0
+    mut bool currit ← true
+    mut int conatus ← 0
     while currit and conatus ≺ 5 {
         print "conatus: §"(conatus)
         conatus ← conatus + 1
@@ -49,8 +49,8 @@ main {
     }
 
     # aut: continues while at least one counter is positive
-    var int a ← 5
-    var int b ← 3
+    mut int a ← 5
+    mut int b ← 3
     while a ≻ 0 or b ≻ 0 {
         print "a: § b: §"(a, b)
         a ← a - 1

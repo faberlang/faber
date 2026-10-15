@@ -17,7 +17,7 @@ sit = "let"
 typus = "type"
 schema = "schema"
 columna = "column"
-varia = "var"
+varia = "mut"
 ceteri = "rest"
 errata = "errors"
 exitus = "exit"
@@ -557,6 +557,14 @@ help = "check numeric separators and base prefixes"
 message = "invalid integer"
 help = "check numeric separators and base prefixes"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "float literal is too large; it overflows to infinity"
+help = "write a smaller magnitude, or scale the unit"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "float literal is too small; it underflows to zero"
+help = "write a larger magnitude, or scale the unit"
+
 [diagnostics.LEX003]
 message = "invalid escape sequence"
 help = "use a supported escape sequence or escape the backslash"
@@ -609,6 +617,22 @@ help = "fix the lexer error first; parsing continues from clean tokens"
 message = "expected token"
 help = "ensure the expected token is present in this position"
 
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "a value is required after the copy-in operator `{operator}`"
+help = "write the source expression after `⇇`"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "tuple element label `{label}` is used more than once"
+help = "give each element a distinct label, or drop the labels"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "an implements slot must name a contract; `_` is not a conformance declaration"
+help = "write the contract name in the implements clause"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "an import field must be an identifier"
+help = "write a plain name for the imported field"
+
 [diagnostics.PARSE001.issues.annotation_name]
 message = "expected annotation name"
 help = "add an annotation name after @"
@@ -627,11 +651,11 @@ help = "use \"arena\" or \"page\" as the allocator kind"
 
 [diagnostics.PARSE001.issues.mutability_marker]
 message = "expected {expected}"
-help = "add const or var before the binding name"
+help = "add let or mut before the binding name"
 
 [diagnostics.PARSE001.issues.itera_de_requires_fixum]
-message = "itera de bindings are always const; use {expected}"
-help = "de binds an index or key, not a mutable element; use the const form"
+message = "itera de bindings are always fixed; use {expected}"
+help = "de binds an index or key, not a mutable element; use the let form"
 
 [diagnostics.PARSE001.issues.duplicate_rest_pattern]
 message = "rest pattern already specified"
@@ -639,11 +663,7 @@ help = "keep only one '{keyword}' rest binding"
 
 [diagnostics.PARSE001.issues.sit_identifier_binding]
 message = "'{keyword}' binds one identifier directly; use '{keyword}' name ← expr"
-help = "write '{keyword}' name ← expr or use const for typed/destructured bindings"
-
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit does not support destructuring patterns"
-help = "use const with a destructuring pattern"
+help = "write '{keyword}' name ← expr or use let with a type or a destructuring pattern"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "expected test case or setup"
@@ -780,7 +800,7 @@ help = "put a number after '-' in JSON"
 
 [diagnostics.PARSE002.issues.conversio_assign_requires_concrete_type]
 message = "conversion-directed assignment '↤' requires a concrete destination type"
-help = "write a concrete type for the binding, e.g. 'const int x ↤ value'"
+help = "write a concrete type for the binding, e.g. 'let int x ↤ value'"
 
 [diagnostics.PARSE002.issues.conversio_assign_await_unsupported]
 message = "'↤' is not supported on awaited bindings"
@@ -832,7 +852,51 @@ help = "declare the method on a class instead"
 
 [diagnostics.PARSE010.issues.static_decl_retired]
 message = "the module-level `{keyword}` declaration was removed; `{name}` is a constant"
-help = "write `{fixum} T {name} = …`; a module-level constant is spelled like a local one, and `{generis}` remains only the genus field modifier"
+help = "write `{fixum} T {name} = …`; a module-level constant is spelled like a local one, and a class member takes the same word"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "a run-time `{keyword}` declaration was retired; `{name}` is a run-time name"
+help = "write `{sit} T {name} ← …` (or `{sit} {name} ← …` to infer the type); `{fixum}` states a compile-time fact and goes with `=`"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "a `{keyword}` binder was retired"
+help = "binders take `{sit}` (a fixed name) or `{varia}` (a writable name); `{fixum}` states a compile-time fact and goes with `=`"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` cannot introduce a binder"
+help = "a binder names a value per iteration or match; write `{sit}` for a fixed name or `{varia}` for a writable one"
+
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "the `{keyword}` member modifier was removed; a type-level member is a constant"
+help = "write `{fixum} T NAME = …`; `{fixum}` states a compile-time fact and a class member takes it too"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "a `{fixum}` member needs a compile-time value"
+help = "write `{fixum} T NAME = value`; for a per-instance field use `{sit}` or `{varia}`"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "a `{fixum}` member is initialized with `=`, not `←`"
+help = "`=` states a compile-time fact: write `{fixum} T NAME = value`"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` cannot modify a field"
+help = "a field is read-only (`{sit}`) or writable (`{varia}`); a per-type constant is `{fixum} T X = …`"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "a `{keyword}` local needs a place to read: `{keyword} T name ← place`"
+help = "write `{keyword} T name ← place`, or use `{sit}` or `{varia}` for a name without an initial place"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "a `{keyword}` local binds one name; it cannot destructure"
+help = "write `{keyword} T name ← place`, then read the parts through the name"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "a `{keyword}` local reads a place and cannot take a `{marker}` value"
+help = "write `{keyword} T name ← place` to read a place, or `{sit} T name ← {marker} place` for an independent value"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "the `{keyword}` declaration word was retired; `{name}` is a writable name"
+help = "write `{varia} T {name} ← …`; the writable run-time name is `{varia}`"
 
 [diagnostics.PARSE010.issues.varia_compile_time_initializer]
 message = "a {varia} binding cannot be a compile-time constant; `=` states a compile-time fact and `←` stores at runtime"
@@ -843,12 +907,12 @@ message = "a compile-time constant binds one name; `=` cannot initialize a destr
 help = "write `{fixum} T name = value`, or destructure with `←`"
 
 [diagnostics.PARSE010.issues.field_modifier_repeated]
-message = "a field takes exactly one of {fixum}, {varia} or {generis}"
-help = "keep one modifier; a {generis} field is already immutable"
+message = "a field takes exactly one of {sit}, {varia} or {fixum}"
+help = "keep one modifier; a {fixum} member is already read-only"
 
 [diagnostics.PARSE010.issues.field_modifier_missing]
-message = "a {genus} field must declare {fixum}, {varia} or {generis}"
-help = "write `{varia} T name` to keep today's meaning (or {fixum} when never reassigned); `faber field-modifier-codemod <PATH>` migrates whole files"
+message = "a {genus} field must declare {sit}, {varia} or {fixum}"
+help = "write `{varia} T name` to keep today's meaning (or {sit} when never reassigned); `faber field-modifier-codemod <PATH>` migrates whole files"
 
 [diagnostics.PARSE010.issues.module_declaration_misplaced]
 message = "a {regio} declaration must be the first declaration of the file, before any {importa}"
@@ -1036,7 +1100,7 @@ help = "check expression syntax"
 
 [diagnostics.PARSE030.issues.constructor_store_position_only]
 message = "type-expression constructors are allowed only at store positions"
-help = "bind the constructor first: const tf32[2, 3] a ← the type tf32[2, 3] followed by empty braces"
+help = "bind the constructor first: let tf32[2, 3] a ← the type tf32[2, 3] followed by empty braces"
 
 [diagnostics.PARSE030.issues.constructor_requires_empty_braces]
 message = "the typed zero of a type is written `Type` followed by empty braces; the bare type form is retired"
@@ -1064,7 +1128,7 @@ help = "write `{replacement}` for `{glyph}`; every negation glyph has the same n
 
 [diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
 message = "a sort or reduce expression cannot be a loop source"
-help = "bind it to a name first, then loop over the name: `const list<int> ys ← sort via asc from xs`, then `for from ys const x`"
+help = "bind it to a name first, then loop over the name: `let list<int> ys ← sort via asc from xs`, then `for from ys const x`"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
@@ -1424,11 +1488,11 @@ help = "built-in types expose methods, not fields; check the receiver type and m
 
 [diagnostics.SEM004.issues.static_field_read_through_instance]
 message = "static field '{field}' is read through the type name, not an instance"
-help = "read a `generis` field through the type name (`Type.field`), not an instance"
+help = "read a `{fixum}` member through the type name (`Type.field`), not an instance"
 
 [diagnostics.SEM004.issues.instance_field_read_through_type]
 message = "field '{field}' is an instance field and cannot be read through the type name"
-help = "read an instance field through an instance; only a `generis` field reads through the type name"
+help = "read an instance field through an instance; only a `{fixum}` member reads through the type name"
 
 [diagnostics.SEM004.issues.unknown_union_field]
 message = "unknown union field"
@@ -1641,6 +1705,10 @@ help = "fix the AST construct for lowering"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "comment has no lowered statement or item to attach to"
 help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "a `@ conversion` function must take exactly one parameter and declare exactly one return type"
+help = "write `functio name(Source) → Destination` for the conversion pair"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "set requires one type parameter"
@@ -2409,7 +2477,7 @@ help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.conversio_assign_inference_hole_destination]
 message = "conversion-directed assignment '↤' requires a resolved destination type"
-help = "write a concrete type for the destination, e.g. 'const int x ↤ value'"
+help = "write a concrete type for the destination, e.g. 'let int x ↤ value'"
 
 [diagnostics.SEM010.issues.cursor_iteration_requires_ex]
 message = "cursor iteration supports {itera} {ex} only"
@@ -3441,7 +3509,7 @@ help = "write flat ↦ tensor<T, figura>"
 
 [diagnostics.SEM011.issues.tensor_crea_retired]
 message = "tensor receiver method create is retired; use the type-expression constructor"
-help = "bind the constructor first: const tf32[2, 2] a ← the type tf32[2, 2] followed by empty braces"
+help = "bind the constructor first: let tf32[2, 2] a ← the type tf32[2, 2] followed by empty braces"
 
 [diagnostics.SEM011.issues.tensor_structa_forma_removed]
 message = "tensor.structa_forma was removed; use tensor.structa<CompleteTensorType>(data)"
@@ -4217,19 +4285,23 @@ help = "use a single visibility tier per declaration"
 
 [diagnostics.SEM020]
 message = "immutable assignment"
-help = "use a `var` binding to allow reassignment, or remove the extra assignment"
+help = "use a `mut` binding to allow reassignment, or remove the extra assignment"
 
 [diagnostics.SEM020.issues.assignment_to_constant]
 message = "assignment to constant"
-help = "use a `var` binding to allow reassignment, or remove the extra assignment"
+help = "use a `mut` binding to allow reassignment, or remove the extra assignment"
 
 [diagnostics.SEM020.issues.assignment_to_commune_field]
 message = "assignment to commune field"
 help = "commune fields are read-only through the union projection"
 
 [diagnostics.SEM020.issues.assignment_to_fixum_field]
-message = "assignment to {fixum} field '{field}'"
-help = "a {fixum} field is set only in a construction literal; declare it {varia} to allow reassignment"
+message = "assignment to {sit} field '{field}'"
+help = "a {sit} field is set only in a construction literal; declare it {varia} to allow reassignment"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "assignment to {fixum} member '{field}'"
+help = "a {fixum} member is a compile-time constant of the type and is never stored to; use a {varia} field for state that changes"
 
 [diagnostics.SEM020.issues.union_member_not_varia]
 message = "union field '{member}' is not {varia} in: {members}"
@@ -4237,15 +4309,15 @@ help = "a write through a union needs the field declared {varia} in every member
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "second assignment to immutable binding"
-help = "use a `var` binding to allow reassignment, or remove the extra assignment"
+help = "use a `mut` binding to allow reassignment, or remove the extra assignment"
 
 [diagnostics.SEM020.issues.imperativus_operator_method_requires_varia_receiver]
 message = "`{method}` changes `{binding}` in place, but `{binding}` is an immutable binding"
-help = "declare `{binding}` with `var` so it can be changed in place, or call a method that returns a new value instead"
+help = "declare `{binding}` with `mut` so it can be changed in place, or call a method that returns a new value instead"
 
 [diagnostics.SEM020.issues.mutating_receiver_through_const]
-message = "`{method}` changes state reachable through `{binding}`, but `{binding}` is an immutable binding (`const` is deep)"
-help = "declare `{binding}` with `var` so it can be changed in place, or call a method that returns a new value instead"
+message = "`{method}` changes state reachable through `{binding}`, but `{binding}` is an immutable binding (`let` is deep)"
+help = "declare `{binding}` with `mut` so it can be changed in place, or call a method that returns a new value instead"
 
 [diagnostics.SEM020.issues.copy_into_target_immutable]
 message = "'⇇' needs writable tensor storage on its left"
@@ -4253,7 +4325,7 @@ help = "write into a mutable local or a mut parameter; a constant, a fixum bindi
 
 [diagnostics.SEM020.issues.mut_argument_not_writable]
 message = "argument {position}{?binding| (`|`)} is passed to a `mut` parameter but is not a writable place"
-help = "pass a `var` binding, a `mut` parameter, or a field or element of one; a `const` binding, a non-mut parameter or a temporary cannot be written"
+help = "pass a `mut` binding, a `mut` parameter, or a field or element of one; a `let` binding, a non-mut parameter or a temporary cannot be written"
 
 [diagnostics.SEM021]
 message = "invalid assignment target"
@@ -4432,8 +4504,8 @@ message = "assignment to immutable borrow"
 help = "declare the parameter as '{in}' if mutation is intended"
 
 [diagnostics.SEM056.issues.assign_to_de_parameter]
-message = "cannot assign to `de` parameter"
-help = "declare the parameter as '{in}' if mutation is intended"
+message = "cannot write through a `ref` or unmarked parameter"
+help = "declare the parameter '{in}' if the caller's value should change; re-pointing the name is allowed"
 
 [diagnostics.SEM056.issues.assign_to_nonmut_tensor_param]
 message = "cannot write through tensor parameter{?name| '|'} that is not marked `mut`"
@@ -4732,7 +4804,7 @@ message = "@ radix lane \"{lane}\" rejects this function body: `mori` is outside
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
 [diagnostics.SEM059.issues.mutable_varia]
-message = "@ radix lane \"{lane}\" rejects this function body: mutable `var` bindings are outside the v1 AIR subset"
+message = "@ radix lane \"{lane}\" rejects this function body: `mut` bindings are outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
 [diagnostics.SEM059.issues.named_call_arg]
@@ -5048,12 +5120,12 @@ message = "catchall arm absorbs null case of nullable scrutinee; use an explicit
 help = "add an explicit `{casu} {nihil}` arm so the null case is handled deliberately"
 
 [diagnostics.WARN013]
-message = "unnecessary var"
-help = "use `const` when the binding is never reassigned"
+message = "unnecessary mut"
+help = "use `let` when the binding is never reassigned"
 
 [diagnostics.WARN013.issues.unnecessary_varia]
-message = "unnecessary var: binding is never reassigned"
-help = "use `const` when the binding is never reassigned"
+message = "unnecessary mut: binding is never reassigned"
+help = "use `let` when the binding is never reassigned"
 
 [diagnostics.WARN014]
 message = "file interface skipped unsupported export"

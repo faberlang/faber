@@ -32,9 +32,9 @@ fn same_module_qualified_finge_construction_checks_green() {
 }
 
 incipit {
-    fixum Eventum a ← finge Ictus { vis = 3 } ∷ Eventum
-    fixum Eventum b ← finge Eventum.Ictus { vis = 4 } ∷ Eventum
-    fixum Eventum c ← finge Eventum.Sonitus { } ∷ Eventum
+    sit Eventum a ← finge Ictus { vis = 3 } ∷ Eventum
+    sit Eventum b ← finge Eventum.Ictus { vis = 4 } ∷ Eventum
+    sit Eventum c ← finge Eventum.Sonitus { } ∷ Eventum
 }",
     );
 }
@@ -47,7 +47,7 @@ fn same_module_missing_qualified_variant_still_errors() {
         r"discretio Eventum { Ictus, Sonitus }
 
 incipit {
-    fixum Eventum a ← finge Eventum.Perculsus { } ∷ Eventum
+    sit Eventum a ← finge Eventum.Perculsus { } ∷ Eventum
     nota a
 }",
         "unknown_variant",
@@ -401,10 +401,10 @@ functio match_beta(beta.B value) → textus {
 }
 
 incipit {
-    fixum alpha.A a ← construct_alpha()
-    fixum beta.B b ← construct_beta()
-    fixum alpha.A av ← alpha.A.X
-    fixum beta.B bv ← beta.B.X
+    sit alpha.A a ← construct_alpha()
+    sit beta.B b ← construct_beta()
+    sit alpha.A av ← alpha.A.X
+    sit beta.B bv ← beta.B.X
     nota value_alpha(av)
     nota match_alpha(a) + match_beta(b)
 }"#;
@@ -576,8 +576,8 @@ discretio LocalError {
 
 functio causa(LocalError e) → textus {
     discerne e {
-        casu ElementaMismatch fixum causa { redde causa }
-        casu TerminusExcedit fixum causa { redde causa }
+        casu ElementaMismatch sit causa { redde causa }
+        casu TerminusExcedit sit causa { redde causa }
     }
 }
 
@@ -590,7 +590,7 @@ functio construes() → LocalError {
 }
 
 incipit {
-    fixum LocalError a ← construes()
+    sit LocalError a ← construes()
     nota causa(a)
 }"#;
     let mut unit = analyze_collision_consumer(source);
@@ -657,8 +657,8 @@ discretio LocalError {
 }
 
 incipit {
-    fixum token.Foreign f ← finge token.ForeignOnly { } ∷ token.Foreign
-    fixum token.Foreign g ← token.ForeignOnly
+    sit token.Foreign f ← finge token.ForeignOnly { } ∷ token.Foreign
+    sit token.Foreign g ← token.ForeignOnly
     nota f
     nota g
 }"#;

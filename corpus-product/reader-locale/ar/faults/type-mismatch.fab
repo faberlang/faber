@@ -1,5 +1,5 @@
 # Fault: text literal bound to a number-typed constant (SEM010).
 بداية {
-  ثابت عدد رقم_خاطئ ← "نص"
+  ليكن عدد رقم_خاطئ ← "نص"
   اعرض رقم_خاطئ
 }

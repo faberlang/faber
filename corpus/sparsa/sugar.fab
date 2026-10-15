@@ -27,13 +27,13 @@ locale = "en"
 # STYLE: sparse tensor sugar (sf32, si64[N]) — see docs/design/numeric-type-sugar.md
 
 main {
-    var sf32[2, 3] grid ← empty
+    mut sf32[2, 3] grid ← empty
     grid.set([0, 1], 4.0)
 
-    const _ value ← grid.get([0, 1])
-    const _ absent ← grid.get([1, 2])
-    const _ count ← grid.count_nonzero()
+    let value ← grid.get([0, 1])
+    let absent ← grid.get([1, 2])
+    let count ← grid.count_nonzero()
 
-    const tf32[2, 3] dense ← grid.densify()
+    let tf32[2, 3] dense ← grid.densify()
     print value, absent, count, dense.length()
 }

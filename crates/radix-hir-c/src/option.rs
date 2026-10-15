@@ -8,11 +8,124 @@
 use crate::Emitter;
 use crate::error::unsupported;
 use crate::expr::{Operand, Value, c_string, wrap};
+use crate::helpers::Helper;
 use crate::ty::{Inner, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{HirExpression, HirExpressionKind, HirLiteral};
 
 impl Emitter<'_> {
+    /// `a?.b`: none when `a` is none, else the field `b` as an optional. A
+    /// field that is itself an optional is the result as it stands, so a
+    /// chain `a?.b?.c` is one level of optional throughout.
+    pub(crate) fn optional_member(
+        &mut self,
+        expr: &HirExpression,
+        subject: &HirExpression,
+        kind: &radix_hir::HirOptionalChainKind,
+    ) -> Result<Operand, CodegenError> {
+        let name = match kind {
+            radix_hir::HirOptionalChainKind::Member(name) => name,
+            radix_hir::HirOptionalChainKind::Index(index) => {
+                return self.optional_index(subject, index);
+            }
+            radix_hir::HirOptionalChainKind::Call(_) => {
+                return Err(unsupported("optional call chaining"));
+            }
+        };
+        let base = self.expr(subject)?;
+        // A genus that is not optional is always present: the chain is then
+        // the plain field read, wrapped.
+        let (Value::Opt(Inner::Genus(def_id)) | Value::Genus(def_id)) = base.value else {
+            return Err(unsupported(
+                "optional chaining over a value that is not an optional genus",
+            ));
+        };
+        let Some(ty) = expr.ty else {
+            return Err(unsupported("optional chaining without a resolved type"));
+        };
+        let Ty::Opt(inner) = classify(self.types, ty)? else {
+            return Err(unsupported("optional chaining that is not an optional"));
+        };
+        let n = self.temps;
+        self.temps += 1;
+        let held = format!("faber_c{n}");
+        let object = Operand::new(held.clone(), Value::Genus(def_id));
+        let field = self.field_from(&object, *name)?;
+        let present = match field.value {
+            Value::Opt(_) => field,
+            _ => self.some_value(&field, inner),
+        };
+        let none = self.none_of(Ty::Opt(inner))?;
+        let c_type = self.c_type(Ty::Genus(def_id))?;
+        let text = format!(
+            "(__extension__ ({{ {c_type}{held} = {}; {held} == NULL ? {} : {}; }}))",
+            base.text, none.text, present.text
+        );
+        Ok(Operand::new(text, Value::Opt(inner)).with_effect(base.effect))
+    }
+
+    /// `list?[i]`: the element at `i` as an optional, none past either end
+    /// (the list's `get`).
+    fn optional_index(
+        &mut self,
+        subject: &HirExpression,
+        index: &HirExpression,
+    ) -> Result<Operand, CodegenError> {
+        let list = self.expr(subject)?;
+        let Value::List(elem) = list.value else {
+            return Err(unsupported(
+                "optional index over a value that is not a list",
+            ));
+        };
+        let at = self.expr(index)?;
+        if !matches!(at.value, Value::Int | Value::Exact) {
+            return Err(unsupported("list position that is not an integer"));
+        }
+        let Some(inner) = Inner::from_ty(elem.ty()) else {
+            return Err(unsupported(
+                "optional index over a list of this element class",
+            ));
+        };
+        let effect = list.effect || at.effect;
+        let mut operands = [list, at];
+        let prelude = self.sequence(&mut operands);
+        let [list, at] = operands;
+        self.support
+            .need(Helper::List(elem, crate::helpers::ListOp::At));
+        self.need_class(Ty::Opt(inner));
+        let slot = format!("faber_o{}", self.temps);
+        let call = format!(
+            "faber_list_{}_get({}, {}, &{slot})",
+            elem.suffix(),
+            list.text,
+            at.text
+        );
+        let operand = self.optional_call(elem, inner, &slot, call);
+        Ok(Operand::new(wrap(&prelude, &operand.text), operand.value).with_effect(effect))
+    }
+
+    /// `x![i]`: the assertion has run in `unwrap`; what is left is the
+    /// plain index read on what it left.
+    pub(crate) fn asserted_index(
+        &mut self,
+        base: Operand,
+        index: &HirExpression,
+    ) -> Result<Operand, CodegenError> {
+        if base.value == Value::Text {
+            return self.text_index(base, index);
+        }
+        if let Value::List(elem) = base.value {
+            let position = self.expr(index)?;
+            if !matches!(position.value, Value::Int | Value::Exact) {
+                return Err(unsupported("list index that is not an integer"));
+            }
+            return Ok(self.list_at_operands(base, position, elem));
+        }
+        Err(unsupported(
+            "non-null assertion followed by an index on this class",
+        ))
+    }
+
     /// The `null` literal, given the optional class typecheck assigned it.
     pub(crate) fn none_value(&mut self, expr: &HirExpression) -> Result<Operand, CodegenError> {
         let Some(ty) = expr.ty else {
@@ -24,6 +137,10 @@ impl Emitter<'_> {
 
     /// The none of an optional class.
     pub(crate) fn none_of(&mut self, class: Ty) -> Result<Operand, CodegenError> {
+        // A bare `none` value: the only value it can hold.
+        if class == Ty::None {
+            return Ok(Operand::new("(0)".to_owned(), Value::None));
+        }
         let Ty::Opt(inner) = class else {
             return Err(unsupported("null where no optional is expected"));
         };

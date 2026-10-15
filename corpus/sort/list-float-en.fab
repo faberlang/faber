@@ -9,7 +9,7 @@ canonical = true
 
 # Floats use IEEE total order: -0.0 sorts before +0.0, in ascending order.
 main {
-    const list<f64> xs ← [2.5, 0.0, -1.5, -0.0, 1.0, 0.0, -0.0]
+    let list<f64> xs ← [2.5, 0.0, -1.5, -0.0, 1.0, 0.0, -0.0]
     print sort via asc from xs
     print sort via desc from xs
     print xs

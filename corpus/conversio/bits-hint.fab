@@ -53,6 +53,6 @@ functio ex_f64(f64 x) → u64 {
 }
 
 incipit {
-    fixum u32 n ← 1065353216
+    sit u32 n ← 1065353216
     nota in_f32(n)
 }

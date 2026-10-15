@@ -130,8 +130,8 @@ functio mul_pair(numerus a, numerus b) → numerus {
 }
 
 incipit {
-    fixum numerus x ← 5
-    fixum numerus result ← mul_backward(x)
+    sit numerus x ← 5
+    sit numerus result ← mul_backward(x)
     nota result
 }
 "#;
@@ -164,8 +164,8 @@ functio mean(tf32[5] x, tf32[5] y) → fractus {
 }
 
 incipit {
-    fixum fractus upstream ← 1.0
-    fixum _ _ ← mean_backward(vacua, vacua, vacua, upstream)
+    sit fractus upstream ← 1.0
+    sit _ ← mean_backward(vacua, vacua, vacua, upstream)
 }
 "#;
     let errors = analyze_errors(source);
@@ -220,11 +220,11 @@ functio nil() → vacuum {
 }
 
 incipit {
-    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0]
-    fixum tf32[5] x ← flat ↦ tf32[5]
-    fixum tf32[5] y ← flat ↦ tf32[5]
-    fixum fractus upstream ← 1.0
-    fixum _ grads ← mean_backward(x, y, nil(), upstream)
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0]
+    sit tf32[5] x ← flat ↦ tf32[5]
+    sit tf32[5] y ← flat ↦ tf32[5]
+    sit fractus upstream ← 1.0
+    sit grads ← mean_backward(x, y, nil(), upstream)
 }
 "#;
     let result = analyze_result(source);
@@ -241,14 +241,14 @@ const GENERIC_TWO_TENSOR_PRIMAL: &str = r#"
 functio simple_loss<magnitudo R, magnitudo C>(
     tensor<f32, [R, C]> x, tensor<f32, [R, C]> w
 ) → f32 {
-    fixum tensor<f32, [R, C]> product ← x ⊙ w
+    sit tensor<f32, [R, C]> product ← x ⊙ w
     redde product.media()
 }
 "#;
 
 fn generic_companion_probe_source(call: &str, declarations: &str) -> String {
     format!(
-        "{GENERIC_TWO_TENSOR_PRIMAL}\nfunctio nil() → vacuum {{\n    tacet\n}}\n\n{declarations}\n\nincipit {{\n    fixum tensor<f32, [2, 2]> x ← vacua\n    fixum tensor<f32, [2, 2]> w ← vacua\n    fixum f32 upstream ← 1.0\n    {call}\n}}"
+        "{GENERIC_TWO_TENSOR_PRIMAL}\nfunctio nil() → vacuum {{\n    tacet\n}}\n\n{declarations}\n\nincipit {{\n    sit tensor<f32, [2, 2]> x ← vacua\n    sit tensor<f32, [2, 2]> w ← vacua\n    sit f32 upstream ← 1.0\n    {call}\n}}"
     )
 }
 
@@ -257,7 +257,7 @@ fn generic_companion_probe_source(call: &str, declarations: &str) -> String {
 #[test]
 fn generic_companion_implicit_call_substitutes_tuple_return_shapes() {
     let source = generic_companion_probe_source(
-        "fixum [gx, gw] ← loss_backward(x, w, nil(), upstream)\n    fixum f32 consumed ← consume(x, gw)\n    nota consumed",
+        "sit [gx, gw] ← loss_backward(x, w, nil(), upstream)\n    sit f32 consumed ← consume(x, gw)\n    nota consumed",
         r"functio consume(tensor<f32, [2, 2]> gx, tensor<f32, [2, 2]> gw) → f32 {
     redde 1.0
 }",
@@ -295,7 +295,7 @@ fn generic_companion_implicit_call_substitutes_tuple_return_shapes() {
 #[test]
 fn generic_companion_explicit_shape_args_bind_both_dimensions() {
     let source = generic_companion_probe_source(
-        "fixum _ grads ← loss_backward<2, 2>(x, w, nil(), upstream)",
+        "sit grads ← loss_backward<2, 2>(x, w, nil(), upstream)",
         "",
     );
     let result = analyze_result(&source);
@@ -322,7 +322,7 @@ fn generic_companion_explicit_shape_args_bind_both_dimensions() {
 #[test]
 fn generic_companion_result_tuple_annotation_unifies_shapes() {
     let source = generic_companion_probe_source(
-        "fixum iuncta<tensor<f32, [2, 2]>, tensor<f32, [2, 2]>> grads ← loss_backward(x, w, nil(), upstream)",
+        "sit iuncta<tensor<f32, [2, 2]>, tensor<f32, [2, 2]>> grads ← loss_backward(x, w, nil(), upstream)",
         "",
     );
     let result = analyze_result(&source);
@@ -359,7 +359,7 @@ fn generic_companion_result_tuple_annotation_unifies_shapes() {
 #[test]
 fn generic_companion_variable_to_variable_consumer_stays_green() {
     let source = format!(
-        "{GENERIC_TWO_TENSOR_PRIMAL}\nfunctio nil() → vacuum {{\n    tacet\n}}\n\nfunctio grad_wrap<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x, tensor<f32, [M, N]> w, f32 upstream) → f32 {{\n    fixum iuncta<tensor<f32, [M, N]>, tensor<f32, [M, N]>> grads ← loss_backward(x, w, nil(), upstream)\n    fixum _ gw ← grads[1]\n    redde upstream + gw.media()\n}}\n\nincipit {{\n    fixum tensor<f32, [2, 2]> x ← vacua\n    fixum tensor<f32, [2, 2]> w ← vacua\n    fixum f32 upstream ← 1.0\n    fixum f32 packed ← grad_wrap(x, w, upstream)\n    nota packed\n}}"
+        "{GENERIC_TWO_TENSOR_PRIMAL}\nfunctio nil() → vacuum {{\n    tacet\n}}\n\nfunctio grad_wrap<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x, tensor<f32, [M, N]> w, f32 upstream) → f32 {{\n    sit iuncta<tensor<f32, [M, N]>, tensor<f32, [M, N]>> grads ← loss_backward(x, w, nil(), upstream)\n    sit gw ← grads[1]\n    redde upstream + gw.media()\n}}\n\nincipit {{\n    sit tensor<f32, [2, 2]> x ← vacua\n    sit tensor<f32, [2, 2]> w ← vacua\n    sit f32 upstream ← 1.0\n    sit f32 packed ← grad_wrap(x, w, upstream)\n    nota packed\n}}"
     );
     let result = analyze_result(&source);
     let errors = &result.diagnostics;
@@ -394,7 +394,7 @@ fn concrete_primal_companion_frozen_form_regression() {
 @ radix lane "air"
 @ radix backward "loss2_backward"
 functio concrete_loss(tensor<f32, [2, 2]> x, tensor<f32, [2, 2]> w) → f32 {
-    fixum tensor<f32, [2, 2]> product ← x ⊙ w
+    sit tensor<f32, [2, 2]> product ← x ⊙ w
     redde product.media()
 }
 
@@ -407,11 +407,11 @@ functio consume(tensor<f32, [2, 2]> gx, tensor<f32, [2, 2]> gw) → f32 {
 }
 
 incipit {
-    fixum tensor<f32, [2, 2]> x ← vacua
-    fixum tensor<f32, [2, 2]> w ← vacua
-    fixum f32 upstream ← 1.0
-    fixum [gx, gw] ← loss2_backward(x, w, nil(), upstream)
-    fixum f32 consumed ← consume(gx, gw)
+    sit tensor<f32, [2, 2]> x ← vacua
+    sit tensor<f32, [2, 2]> w ← vacua
+    sit f32 upstream ← 1.0
+    sit [gx, gw] ← loss2_backward(x, w, nil(), upstream)
+    sit f32 consumed ← consume(gx, gw)
     nota consumed
 }"#;
     let result = analyze_result(&source);
@@ -444,8 +444,8 @@ incipit {
 #[test]
 fn generic_companion_wrong_arity_type_args_still_rejected() {
     for call in [
-        "fixum _ grads ← loss_backward<2>(x, w, nil(), upstream)",
-        "fixum _ grads ← loss_backward<2, 2, 4>(x, w, nil(), upstream)",
+        "sit grads ← loss_backward<2>(x, w, nil(), upstream)",
+        "sit grads ← loss_backward<2, 2, 4>(x, w, nil(), upstream)",
     ] {
         let source = generic_companion_probe_source(call, "");
         let errors = analyze_errors(&source);
@@ -470,7 +470,7 @@ functio mul_pair(numerus a, numerus b) → numerus {
 }
 
 incipit {
-    fixum numerus result ← nonexistent_func()
+    sit numerus result ← nonexistent_func()
     nota result
 }
 "#;

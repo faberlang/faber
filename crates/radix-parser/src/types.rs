@@ -47,7 +47,7 @@ impl Parser {
     #[allow(dead_code)]
     pub(super) fn try_parse_type(&mut self) -> Result<Option<TypeExpr>, ParseError> {
         if self.check_keyword_ident(TokenKind::De)
-            || self.check_keyword_ident(TokenKind::In)
+            || self.check_keyword_ident(TokenKind::Varia)
             || self.check_keyword_ident(TokenKind::Own)
             || self.check_keyword_ident(TokenKind::Copy)
             || self.check_keyword_ident(TokenKind::Iuncta)
@@ -172,7 +172,7 @@ impl Parser {
         // Access marker: de/in/own/copy (prefix). Nullable is no longer a prefix; use T ∪ nihil.
         let mode = if self.eat_keyword_ident(TokenKind::De) {
             Some(TypeMode::De)
-        } else if self.eat_keyword_ident(TokenKind::In) {
+        } else if self.eat_keyword_ident(TokenKind::Varia) {
             Some(TypeMode::In)
         } else if self.eat_keyword_ident(TokenKind::Own) {
             Some(TypeMode::Own)

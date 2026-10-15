@@ -12,7 +12,7 @@ related = ["si", "ergo", "fac"]
 locale = "en"
 +++
 test "dum counts up to its condition" {
-    var int computus ← 0
+    mut int computus ← 0
     while computus ≺ 5 {
         computus ← computus + 1
     }
@@ -20,7 +20,7 @@ test "dum counts up to its condition" {
 }
 
 test "dum counts down to zero" {
-    var int reliquum ← 3
+    mut int reliquum ← 3
     while reliquum ≻ 0 {
         reliquum ← reliquum - 1
     }
@@ -52,15 +52,15 @@ test "dum counts down to zero" {
 #   dum.expected
 
 main {
-    # Ascending counter: varia so the loop variable can mutate
-    var int computus ← 0
+    # Ascending counter: mut so the loop variable can mutate
+    mut int computus ← 0
     while computus ≺ 5 {
         print computus
         computus ← computus + 1
     }
 
     # Descending loop: condition becomes falsum at 0
-    var int reliquum ← 3
+    mut int reliquum ← 3
     while reliquum ≻ 0 {
         print "reliquum: §"(reliquum)
         reliquum ← reliquum - 1

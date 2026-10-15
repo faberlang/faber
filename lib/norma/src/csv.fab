@@ -15,7 +15,7 @@ import from "norma:text" text
 fn normalize_row(string row) → string {
     if row.length() ≡ 0 then return row
 
-    const string last ← row.slice(row.length() - 1, row.length())
+    let string last ← row.slice(row.length() - 1, row.length())
     if last ≡ "\r" then return row.slice(0, row.length() - 1)
 
     return row
@@ -27,10 +27,10 @@ fn normalize_row(string row) → string {
 fn parse(string wire) → list<list<string>> {
     if wire.length() ≡ 0 then return empty
 
-    const list<string> rows ← wire.split("\n")
-    var list<list<string>> map ← []
-    for from rows const row {
-        const string normalized ← normalize_row(row)
+    let list<string> rows ← wire.split("\n")
+    mut list<list<string>> map ← []
+    for from rows let row {
+        let string normalized ← normalize_row(row)
         map.append(normalized.split(","))
     }
     return map
@@ -40,8 +40,8 @@ fn parse(string wire) → list<list<string>> {
 # Why: Compose rows of fields into comma-separated, LF-joined wire text.
 @ public
 fn stringify(list<list<string>> map) → string {
-    var list<string> rows ← []
-    for from map const fields {
+    mut list<string> rows ← []
+    for from map let fields {
         rows.append(text.join(fields, ","))
     }
     return text.join(rows, "\n")

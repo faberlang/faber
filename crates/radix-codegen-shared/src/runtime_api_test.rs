@@ -835,8 +835,8 @@ fn the_go_format_rows_spell_as_the_flat_rt_names() {
         .iter()
         .filter(|row| row.ns == Namespace::Format && row.targets.contains(&Target::HirGo))
         .collect();
-    // 9 functions and the `FormatSpec` layout-spec type; none is a store row.
-    assert_eq!(go_rows.len(), 10);
+    // 10 functions and the `FormatSpec` layout-spec type; none is a store row.
+    assert_eq!(go_rows.len(), 11);
     assert_eq!(
         go_rows
             .iter()
@@ -852,6 +852,7 @@ fn the_go_format_rows_spell_as_the_flat_rt_names() {
         (&FORMAT_INT, "rt.FormatInt"),
         (&FORMAT_SIGNED, "rt.FormatSigned"),
         (&FORMAT_FLOAT, "rt.FormatFloat"),
+        (&FORMAT_DECIMAL, "rt.FormatDecimal"),
         (&FORMAT_TEXT, "rt.FormatText"),
         (&FORMAT_INSTANS, "rt.FormatInstans"),
         (&FORMAT_MAGNUS, "rt.FormatMagnus"),
@@ -923,7 +924,7 @@ fn the_format_rows_spell_as_faber_format_functions_and_the_crate_root_fmt_type()
         .iter()
         .filter(|row| row.ns == Namespace::Format && row.targets.contains(&Target::HirRust))
         .collect();
-    assert_eq!(rows.len(), 9);
+    assert_eq!(rows.len(), 10);
     for row in rows {
         assert!(row.targets.contains(&Target::HirRust));
         let (kind, spelled) = if row.name == "Fmt" {

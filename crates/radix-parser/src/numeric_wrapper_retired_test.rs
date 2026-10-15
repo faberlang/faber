@@ -43,6 +43,7 @@ impl KeywordPack for AllNumericWords {
     fn keyword_latin_key(&self, text: &str) -> Option<&str> {
         match text {
             "const" => Some("fixum"),
+            "let" => Some("sit"),
             "fn" => Some("functio"),
             _ => None,
         }
@@ -134,7 +135,7 @@ fn every_family_correct_wrapper_is_rejected_with_its_bare_marker() {
         ("fractus", "bf16"),
     ] {
         assert_one_wrapper(
-            &format!("const {word}<{width}> x ← 1"),
+            &format!("let {word}<{width}> x ← 1"),
             &format!("{word}<{width}>"),
             width,
         );
@@ -145,24 +146,20 @@ fn every_family_correct_wrapper_is_rejected_with_its_bare_marker() {
 fn every_locale_word_of_the_type_pack_is_rejected() {
     for word in INT_WORDS {
         assert_one_wrapper(
-            &format!("const {word}<i32> x ← 1"),
+            &format!("let {word}<i32> x ← 1"),
             &format!("{word}<i32>"),
             "i32",
         );
-        assert_one_wrapper(
-            &format!("const {word}<_> x ← 1"),
-            &format!("{word}<_>"),
-            word,
-        );
+        assert_one_wrapper(&format!("let {word}<_> x ← 1"), &format!("{word}<_>"), word);
     }
     for word in FLOAT_WORDS {
         assert_one_wrapper(
-            &format!("const {word}<f32> x ← 1.0"),
+            &format!("let {word}<f32> x ← 1.0"),
             &format!("{word}<f32>"),
             "f32",
         );
         assert_one_wrapper(
-            &format!("const {word}<_> x ← 1.0"),
+            &format!("let {word}<_> x ← 1.0"),
             &format!("{word}<_>"),
             word,
         );
@@ -171,48 +168,40 @@ fn every_locale_word_of_the_type_pack_is_rejected() {
 
 #[test]
 fn wrong_family_wrappers_are_rejected_as_the_wrapper() {
-    assert_one_wrapper("const numerus<f32> x ← 1", "numerus<f32>", "f32");
-    assert_one_wrapper("const fractus<i32> x ← 1", "fractus<i32>", "i32");
-    assert_one_wrapper("const int<f32> x ← 1", "int<f32>", "f32");
+    assert_one_wrapper("let numerus<f32> x ← 1", "numerus<f32>", "f32");
+    assert_one_wrapper("let fractus<i32> x ← 1", "fractus<i32>", "i32");
+    assert_one_wrapper("let int<f32> x ← 1", "int<f32>", "f32");
 }
 
 #[test]
 fn the_marker_holes_are_rejected_and_name_the_bare_word() {
-    assert_one_wrapper("const numerus<_> x ← 1", "numerus<_>", "numerus");
-    assert_one_wrapper("const fractus<_> x ← 1", "fractus<_>", "fractus");
+    assert_one_wrapper("let numerus<_> x ← 1", "numerus<_>", "numerus");
+    assert_one_wrapper("let fractus<_> x ← 1", "fractus<_>", "fractus");
 }
 
 #[test]
 fn the_removed_d32_and_extra_arguments_are_rejected_as_the_wrapper() {
-    assert_one_wrapper("const numerus<d32> x ← 1", "numerus<d32>", "numerus");
+    assert_one_wrapper("let numerus<d32> x ← 1", "numerus<d32>", "numerus");
     assert_one_wrapper(
-        "const numerus<u32, Foo> x ← 1",
+        "let numerus<u32, Foo> x ← 1",
         "numerus<u32, Foo>",
         "numerus",
     );
-    assert_one_wrapper("const numerus<W> x ← 1", "numerus<W>", "numerus");
+    assert_one_wrapper("let numerus<W> x ← 1", "numerus<W>", "numerus");
 }
 
 #[test]
 fn a_wrapper_is_rejected_in_every_type_position() {
     for (source, form, bare) in [
+        ("let lista<numerus<i32>> xs ← vacua", "numerus<i32>", "i32"),
         (
-            "const lista<numerus<i32>> xs ← vacua",
-            "numerus<i32>",
-            "i32",
-        ),
-        (
-            "const tensor<fractus<f32>, [2, 3]> t ← vacua",
+            "let tensor<fractus<f32>, [2, 3]> t ← vacua",
             "fractus<f32>",
             "f32",
         ),
-        ("const _ n ← s ↦ numerus<u32>", "numerus<u32>", "u32"),
-        ("const _ n ← x ↦ numerus<i32> ⊥ 0", "numerus<i32>", "i32"),
-        (
-            "const lista<numerus<u64>> ids ← vacua",
-            "numerus<u64>",
-            "u64",
-        ),
+        ("let n ← s ↦ numerus<u32>", "numerus<u32>", "u32"),
+        ("let n ← x ↦ numerus<i32> ⊥ 0", "numerus<i32>", "i32"),
+        ("let lista<numerus<u64>> ids ← vacua", "numerus<u64>", "u64"),
     ] {
         assert_one_wrapper(source, form, bare);
     }
@@ -223,7 +212,7 @@ fn a_wrapper_is_rejected_in_every_type_position() {
 
 #[test]
 fn the_rejection_recovers_so_later_diagnostics_still_appear() {
-    let result = parse_words("const numerus<i32> a ← 1\nconst b ← )\nconst numerus<u8> c ← 3");
+    let result = parse_words("let numerus<i32> a ← 1\nlet b ← )\nlet numerus<u8> c ← 3");
     assert_eq!(retired(&result).len(), 2, "{:?}", result.errors);
     let program = result.program.as_ref().expect("recovered program");
     // The first declaration keeps its annotation as the bare marker.
@@ -246,17 +235,17 @@ fn the_rejection_recovers_so_later_diagnostics_still_appear() {
 #[test]
 fn the_bare_markers_and_bare_words_parse() {
     for source in [
-        "const i32 x ← 1",
-        "const u8 x ← 1",
-        "const d64 x ← 1",
-        "const inf x ← 1",
-        "const f32 x ← 1.0",
-        "const bf16 x ← 1.0",
-        "const numerus x ← 1",
-        "const fractus x ← 1.0",
-        "const lista<u32> xs ← vacua",
-        "const tensor<f32, [2, 3]> t ← vacua",
-        "const _ n ← s ↦ u32",
+        "let i32 x ← 1",
+        "let u8 x ← 1",
+        "let d64 x ← 1",
+        "let inf x ← 1",
+        "let f32 x ← 1.0",
+        "let bf16 x ← 1.0",
+        "let numerus x ← 1",
+        "let fractus x ← 1.0",
+        "let lista<u32> xs ← vacua",
+        "let tensor<f32, [2, 3]> t ← vacua",
+        "let n ← s ↦ u32",
     ] {
         let _ = parse_clean(source);
     }
@@ -265,11 +254,11 @@ fn the_bare_markers_and_bare_words_parse() {
 #[test]
 fn the_policy_words_keep_their_width_argument() {
     for source in [
-        "const saturatus<i32> x ← 1",
-        "const modulus<u32> x ← 1",
-        "const exactus<u16> x ← 1",
-        "const saturatus<inf> x ← 1",
-        "const modulus<u8> x ← 1",
+        "let saturatus<i32> x ← 1",
+        "let modulus<u32> x ← 1",
+        "let exactus<u16> x ← 1",
+        "let saturatus<inf> x ← 1",
+        "let modulus<u8> x ← 1",
     ] {
         let _ = parse_clean(source);
     }

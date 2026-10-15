@@ -36,14 +36,14 @@ locale = "en"
 #   Cross-ref itera/intervallum.fab and operatores/membership-range.fab.
 
 main {
-    var int exclusivus ← 0
-    for range 0‥5 const _ {
+    mut int exclusivus ← 0
+    for range 0‥5 let _ {
         exclusivus ↑
     }
     # 5 iterations
     print exclusivus
-    var int inclusivus ← 0
-    for range 0…5 const _ {
+    mut int inclusivus ← 0
+    for range 0…5 let _ {
         inclusivus ↑
     }
     # 6 iterations

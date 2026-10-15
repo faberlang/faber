@@ -10,6 +10,6 @@ fn render(o.Utterable u) → string {
 
 main {
     print o.greet("Faber")
-    const o.Machine m ← o.Machine { wheels = 6 }
+    let o.Machine m ← o.Machine { wheels = 6 }
     print render(m)
 }

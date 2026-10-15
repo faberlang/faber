@@ -59,7 +59,7 @@ pub struct FaberCodegen<'a> {
     /// value position is a `ego` (self) reference and must re-emit as the
     /// self keyword, not the type name.
     pub(crate) self_def_ids: FxHashSet<DefId>,
-    /// `(struct def, field name)` of this unit's static (`generis`) fields: a
+    /// `(struct def, field name)` of this unit's const-member (`fixum`) fields: a
     /// `Field(Path(struct), name)` read of one of these is the authored
     /// type-qualified read `Tab.Z`, not an `ego` member read.
     pub(crate) static_fields: FxHashSet<(DefId, Symbol)>,
@@ -98,7 +98,7 @@ pub struct FaberCodegen<'a> {
     /// typecheck expanded from `t.summa(axis n)` / `t.media(axis n)`: those
     /// nodes re-emit as the authored call, never the grouped reduction.
     pub(crate) axis_sugar: FxHashMap<radix_hir::HirId, radix_hir::HirAxisSugar>,
-    /// Initializer-expression ids of authored discard bindings (`fixum T _ ← e`)
+    /// Initializer-expression ids of authored discard bindings (`sit T _ ← e`)
     /// with their declaration facts, for re-emitting the binding.
     pub(crate) discard_bindings: FxHashMap<radix_hir::HirId, radix_hir::HirDiscardBinding>,
     /// Authored destructuring declarations keyed by the first statement id

@@ -30,7 +30,7 @@ locale = "en"
 
 # ante — exclusive upper bound for range iteration
 #
-# itera ab <initium> ante <finis> <var> { … }
+# itera ab <initium> ante <finis> <binder> { … }
 #
 # GRAMMAR:
 #   iterStmt :← 'itera' 'ab' expr 'ante' expr binding '{' stmt* '}'
@@ -40,7 +40,7 @@ locale = "en"
 
 main {
     # i = 0, 1, 2, 3 (stops before 4)
-    for range 0 before 4 const i {
+    for range 0 before 4 let i {
         print i
     }
 }

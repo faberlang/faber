@@ -16,7 +16,7 @@ sit = "đặt"
 typus = "kiểu_tên"
 schema = "lược_đồ"
 columna = "cột"
-varia = "biến"
+varia = "khả_biến"
 ceteri = "còn_lại"
 errata = "lỗi"
 exitus = "thoát"
@@ -95,7 +95,7 @@ maxima = "lớn_nhất"
 minima = "nhỏ_nhất"
 de = "ra"
 ex = "từ"
-in = "vào"
+in = "khả_biến"
 own = "sở_hữu"
 copy = "sao_chép"
 axis = "trục"
@@ -252,6 +252,14 @@ help = "đóng literal chuỗi trước cuối dòng hoặc tệp"
 message = "literal octeti chưa được kết thúc"
 help = "đóng literal chuỗi trước cuối dòng hoặc tệp"
 
+[diagnostics.LEX001.issues.unterminated_regex_literal]
+message = "literal regex chưa được kết thúc"
+help = "đóng literal regex trước cuối dòng hoặc tệp"
+
+[diagnostics.LEX001.issues.empty_regex_literal]
+message = "literal regex rỗng; hãy viết một mẫu giữa hai dấu gạch chéo"
+help = "hãy viết một mẫu giữa hai dấu gạch chéo"
+
 [diagnostics.LEX001.issues.unterminated_string_literal]
 message = "literal chuỗi chưa được kết thúc"
 help = "đóng literal chuỗi trước cuối dòng hoặc tệp"
@@ -287,6 +295,14 @@ help = "kiểm tra dấu phân cách số và tiền tố cơ số"
 [diagnostics.LEX002.issues.invalid_integer]
 message = "số nguyên không hợp lệ"
 help = "kiểm tra dấu phân cách số và tiền tố cơ số"
+
+[diagnostics.LEX002.issues.float_overflow]
+message = "literal số thực quá lớn; nó tràn thành vô cực"
+help = "viết độ lớn nhỏ hơn, hoặc chia tỉ lệ đơn vị"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "literal số thực quá nhỏ; nó tràn xuống thành không"
+help = "viết độ lớn lớn hơn, hoặc chia tỉ lệ đơn vị"
 
 [diagnostics.LEX003]
 message = "chuỗi escape không hợp lệ"
@@ -340,6 +356,22 @@ help = "sửa lỗi lexer trước; quá trình phân tích tiếp tục từ c�
 message = "cần token"
 help = "đảm bảo token cần thiết có mặt tại vị trí này"
 
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "cần một giá trị sau toán tử sao chép vào `{operator}`"
+help = "viết biểu thức nguồn sau `⇇`"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "nhãn phần tử tuple `{label}` được dùng nhiều hơn một lần"
+help = "đặt nhãn khác nhau cho mỗi phần tử, hoặc bỏ nhãn"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "ô implements phải nêu tên một hợp đồng; `_` không phải là khai báo tuân thủ"
+help = "viết tên hợp đồng trong mệnh đề implements"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "trường nhập phải là một định danh"
+help = "viết một tên đơn giản cho trường được nhập"
+
 [diagnostics.PARSE001.issues.annotation_name]
 message = "cần tên annotation"
 help = "thêm tên annotation sau @"
@@ -371,10 +403,6 @@ help = "chỉ giữ một binding rest '{keyword}'"
 [diagnostics.PARSE001.issues.sit_identifier_binding]
 message = "'{keyword}' liên kết trực tiếp với một identifier; dùng '{keyword}' name ← expr"
 help = "viết '{keyword}' name ← expr hoặc dùng fixum cho binding có kiểu hoặc destructure"
-
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit không hỗ trợ pattern destructure"
-help = "dùng fixum với pattern destructure"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "cần test case hoặc setup"
@@ -511,6 +539,50 @@ help = "khai báo method trên genus thay thế"
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "dấu `{marker}` không còn đặt trên binding; nó đặt trên giá trị"
 help = "viết `{keyword} T {name} ← {marker} value`; một `{name} ← {marker} value` sau đó đánh dấu giá trị theo cùng cách, và parameter giữ `{marker}` trước kiểu của nó"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "khai báo `{keyword}` lúc chạy đã bị loại bỏ; `{name}` là một tên lúc chạy"
+help = "hãy viết `{sit} T {name} ← …` (hoặc `{sit} {name} ← …` để suy ra kiểu); `{fixum}` nêu một sự thật lúc biên dịch và đi với `=`"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "từ gắn tên `{keyword}` đã bị loại bỏ"
+help = "tên gắn dùng `{sit}` (tên cố định) hoặc `{varia}` (tên có thể ghi); `{fixum}` nêu một sự thật lúc biên dịch và đi với `=`"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` không thể mở đầu một tên gắn"
+help = "tên gắn đặt tên cho giá trị của mỗi lần lặp hoặc khớp; hãy viết `{sit}` cho tên cố định hoặc `{varia}` cho tên có thể ghi"
+
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "bộ sửa đổi thành viên `{keyword}` đã bị loại bỏ; thành viên cấp kiểu là một hằng"
+help = "viết `{fixum} T NAME = …`; `{fixum}` nêu một sự thật lúc biên dịch và thành viên của lớp cũng dùng được"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "thành viên `{fixum}` cần một giá trị lúc biên dịch"
+help = "viết `{fixum} T NAME = value`; với trường theo từng thể hiện dùng `{sit}` hoặc `{varia}`"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "thành viên `{fixum}` được khởi tạo bằng `=`, không phải `←`"
+help = "`=` nêu một sự thật lúc biên dịch: viết `{fixum} T NAME = value`"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` không thể sửa đổi một trường"
+help = "trường là chỉ đọc (`{sit}`) hoặc có thể ghi (`{varia}`); hằng cấp kiểu viết là `{fixum} T X = …`"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "biến cục bộ `{keyword}` cần một vị trí để đọc: `{keyword} T name ← place`"
+help = "hãy viết `{keyword} T name ← place`, hoặc dùng `{sit}` hay `{varia}` cho tên không có vị trí ban đầu"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "biến cục bộ `{keyword}` chỉ gắn một tên; không thể tách cấu trúc"
+help = "hãy viết `{keyword} T name ← place`, rồi đọc từng phần qua tên đó"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "biến cục bộ `{keyword}` đọc một vị trí và không nhận giá trị `{marker}`"
+help = "hãy viết `{keyword} T name ← place` để đọc một vị trí, hoặc `{sit} T name ← {marker} place` để có một giá trị độc lập"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "từ khai báo `{keyword}` đã bị loại bỏ; `{name}` là một tên có thể ghi"
+help = "hãy viết `{varia} T {name} ← …`; tên lúc chạy có thể ghi là `{varia}`"
 
 [diagnostics.PARSE011]
 message = "cần tên hàm sau '{functio}'"
@@ -1031,6 +1103,10 @@ help = "sửa cấu trúc AST để hạ mức"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "chú thích không có câu lệnh hoặc mục đã hạ mức để gắn vào"
 help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "hàm `@ conversion` phải nhận đúng một tham số và khai báo đúng một kiểu trả về"
+help = "viết `functio name(Source) → Destination` cho cặp chuyển đổi"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia yêu cầu một tham số kiểu"
@@ -2604,6 +2680,10 @@ help = "chuyển đổi rõ ràng độ rộng phần tử trước khi thay đ�
 message = "lan truyền lỗi conversio yêu cầu một kênh thoát thay thế kiểu `textus`"
 help = "khai báo kênh thoát thay thế là textus hoặc cung cấp khôi phục nội tuyến"
 
+[diagnostics.SEM016.issues.conversio_failure_channel_value_required]
+message = "lan truyền lỗi hiện thực hóa sermo yêu cầu một kênh thoát thay thế kiểu `value`"
+help = "khai báo kênh thoát thay thế là value, unknown, hoặc một chuyển đổi value đã đăng ký"
+
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "chuyển đổi regex yêu cầu toán hạng textus hoặc ascii"
 help = "chuyển đổi giá trị textus hoặc ascii sang regex"
@@ -2755,6 +2835,10 @@ help = "sử dụng liên kết `varia` để cho phép gán lại, hoặc xóa 
 [diagnostics.SEM020.issues.assignment_to_constant]
 message = "gán cho hằng số"
 help = "sử dụng liên kết `varia` để cho phép gán lại, hoặc xóa phép gán bổ sung"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "gán cho thành viên {fixum} '{field}'"
+help = "thành viên {fixum} là hằng lúc biên dịch của kiểu và không bao giờ được ghi; dùng trường {varia} cho trạng thái thay đổi"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "phép gán thứ hai cho liên kết bất biến"
@@ -3809,3 +3893,47 @@ message = "cần '(' sau 'scriptum'"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "cần ')' sau các đối số của scriptum"
+
+[diagnostics.PARSE001.issues.expected_identifier]
+message = "cần một identifier"
+help = "đặt tên identifier ở đây"
+
+[diagnostics.PARSE001.issues.expected_string_literal]
+message = "cần một literal chuỗi"
+help = "đặt một literal chuỗi trong ngoặc kép ở đây"
+
+[diagnostics.PARSE001.issues.expected_mutability_keyword]
+message = "cần '{fixum}' hoặc '{varia}'"
+help = "bắt đầu khai báo bằng một từ khóa về khả biến"
+
+[diagnostics.PARSE001.issues.await_binding_requires_name]
+message = "cần một binding có tên trước '↢'"
+help = "ràng buộc '↢' với một tên duy nhất; việc destructure dùng '←'"
+
+[diagnostics.PARSE001.issues.expected_method_declaration]
+message = "cần một khai báo phương thức"
+help = "viết phương thức như một khai báo '{functio}'"
+
+[diagnostics.PARSE001.issues.expected_praepara_hook]
+message = "cần một hook '{praepara}'"
+help = "viết '{praepara}', '{praeparabit}', '{postpara}' hoặc '{postparabit}'"
+
+[diagnostics.PARSE001.issues.expected_lane_value]
+message = "cần một literal chuỗi hoặc một identifier"
+help = "viết giá trị lane dưới dạng chuỗi trong ngoặc kép hoặc một tên trần"
+
+[diagnostics.PARSE001.issues.expected_scribe_keyword]
+message = "cần một từ khóa '{scribe}'"
+help = "viết '{scribe}', '{vide}', '{mone}' hoặc '{nota}'"
+
+[diagnostics.PARSE001.issues.expected_incipit_keyword]
+message = "cần '{incipit}' hoặc '{incipiet}'"
+help = "bắt đầu điểm vào bằng '{incipit}' hoặc '{incipiet}'"
+
+[diagnostics.PARSE001.issues.enum_member_value_number]
+message = "cần một số sau '='"
+help = "viết một số nguyên sau '=' hoặc xóa '='"
+
+[diagnostics.PARSE001.issues.enum_member_value]
+message = "cần một giá trị thành viên enum"
+help = "viết một số nguyên hoặc một chuỗi sau '='"

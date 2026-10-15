@@ -68,8 +68,8 @@ fn lowers_receiver_method_call_with_explicit_type_args() {
 }
 
 incipit {
-    fixum frame s ← frame {}
-    fixum textus data ← s.method<textus>("x")
+    sit frame s ← frame {}
+    sit textus data ← s.method<textus>("x")
 }"#,
         1,
     );
@@ -79,7 +79,7 @@ incipit {
 fn rejects_template_call_with_explicit_type_args_at_lowering() {
     let (program, mut resolver, mut types, mut interner) = prepare_lower_pipeline(
         r#"incipit {
-    fixum _ s ← "§"<textus>("x")
+    sit s ← "§"<textus>("x")
 }"#,
     );
     let (lowered, errors) = lower(LowerRequest {

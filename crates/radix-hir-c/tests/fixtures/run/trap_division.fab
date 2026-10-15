@@ -2,7 +2,7 @@
 locale = "en"
 +++
 main {
-    var int z ← 0
+    mut int z ← 0
     print "before"
     print 7 / z
 }

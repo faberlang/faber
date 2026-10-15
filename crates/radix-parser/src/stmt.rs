@@ -219,14 +219,14 @@ impl Parser {
         };
 
         let mutability_span = self.current_span();
-        let mutability = self.parse_mutability()?;
+        let mutability = self.parse_binder_mutability()?;
         // HIR's itera node does not retain the source mutability marker, so
         // reject this mode conflict while the parser still has that fact.
         if matches!(mode, IteraMode::De) && matches!(mutability, AstMutability::Mutable) {
             return Err(
                 ParseError::structured(ParseErrorKind::Expected, mutability_span)
                     .with_arg("issue", "itera_de_requires_fixum")
-                    .with_arg("expected", "the const form `fixum`"),
+                    .with_arg("expected", "the fixed form `sit`"),
             );
         }
         // A name binder may continue through commas (`itera_binding`'s
@@ -980,7 +980,7 @@ impl Parser {
 
         let source = Box::new(self.parse_expression()?);
 
-        let mutability = self.parse_mutability()?;
+        let mutability = self.parse_binder_mutability()?;
 
         let mut fields = Vec::new();
         let mut rest = None;
@@ -1046,17 +1046,56 @@ impl Parser {
         }
     }
 
-    /// Parse the required `fixum` / `varia` mutability marker shared by binding statements.
-    pub(super) fn parse_mutability(&mut self) -> Result<AstMutability, ParseError> {
-        if self.eat_keyword_ident(TokenKind::Fixum) {
-            Ok(AstMutability::Immutable)
-        } else if self.eat_keyword_ident(TokenKind::Varia) {
-            Ok(AstMutability::Mutable)
-        } else {
-            Err(self
-                .expected_statement_error("mutability_marker")
-                .with_arg("expected", "'fixum' or 'varia'"))
+    /// Whether the cursor holds a binder-introducing word: `sit`/`varia`
+    /// (en `let`/`mut`), or one of the two refused spellings (`fixum`, `de`).
+    pub(super) fn binder_head_word_at(&self, offset: usize) -> bool {
+        matches!(
+            self.keyword_ident_at(offset),
+            Some(TokenKind::Sit | TokenKind::Varia | TokenKind::Fixum | TokenKind::De)
+        )
+    }
+
+    /// Parse the required binder word shared by iteration binders, `ex`
+    /// destructuring, pattern bindings, and sort/reduce bodies.
+    ///
+    /// GRAMMAR:
+    ///   binder-word := `sit` | `varia`          (en `let` | `mut`)
+    ///
+    /// A binder names a value per iteration or match, so it is a write-once
+    /// (`sit`) or re-assignable (`varia`) name. The retired `fixum` binder is
+    /// `PARSE010 binder_fixum_retired` and `de` (`ref`) is `PARSE010
+    /// ref_binder_refused`; both are recorded and read as an immutable binder
+    /// so recovery resumes after the head.
+    pub(super) fn parse_binder_mutability(&mut self) -> Result<AstMutability, ParseError> {
+        if self.eat_keyword_ident(TokenKind::Sit) {
+            return Ok(AstMutability::Immutable);
         }
+        if self.eat_keyword_ident(TokenKind::Varia) {
+            return Ok(AstMutability::Mutable);
+        }
+        let span = self.current_span();
+        let issue = match self.current_keyword_ident() {
+            Some(TokenKind::Fixum) => "binder_fixum_retired",
+            Some(TokenKind::De) => "ref_binder_refused",
+            _ => {
+                let expected = format!(
+                    "'{}' or '{}'",
+                    self.keyword_surface("sit"),
+                    self.keyword_surface("varia")
+                );
+                return Err(self
+                    .expected_statement_error("mutability_marker")
+                    .with_arg("expected", expected));
+            }
+        };
+        let keyword = self.current_word();
+        self.advance();
+        self.errors.push(
+            ParseError::structured(ParseErrorKind::DeclarationInvalid, span)
+                .with_arg("issue", issue)
+                .with_arg("keyword", keyword),
+        );
+        Ok(AstMutability::Immutable)
     }
 
     fn expected_statement_error(&self, issue: &'static str) -> ParseError {

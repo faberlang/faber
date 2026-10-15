@@ -36,8 +36,8 @@ discretio ShapeError {
 }
 
 incipit {
-    fixum ShapeError a ← finge Incompatible { message = "incompatible" } ∷ ShapeError
-    fixum ShapeError b ← finge ElementMismatch { message = "mismatch", expected = 1, actual = 2 } ∷ ShapeError
+    sit ShapeError a ← finge Incompatible { message = "incompatible" } ∷ ShapeError
+    sit ShapeError b ← finge ElementMismatch { message = "mismatch", expected = 1, actual = 2 } ∷ ShapeError
     nota a.message
     nota b.message
 }

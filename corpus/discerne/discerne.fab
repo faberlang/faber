@@ -17,7 +17,7 @@ locale = "en"
 #
 # What this teaches:
 #   • Exhaustive pattern matching — `discerne <value> { casu ... }` matches against all variants of a discretio (tagged union).
-#   • Variant destructuring — `casu <Variant> fixum <field>, ...` destructures variant payload fields.
+#   • Variant destructuring — `casu <Variant> sit <field>, ...` destructures variant payload fields.
 #   • Unit variants — variant without payload fields match by name alone.
 #
 # Common mistakes:
@@ -31,8 +31,8 @@ locale = "en"
 # discerne <value> {
 #     casu <Casus> { <body> }
 #     casu <Casus> ut <alias> { <body> }
-#     casu <Casus> fixum <bindings> { <body> }
-#     casu <Casus> fixum <field> ut <alias> { <body> }
+#     casu <Casus> sit <bindings> { <body> }
+#     casu <Casus> sit <field> ut <alias> { <body> }
 # }
 #
 # GRAMMAR:
@@ -74,13 +74,13 @@ fn nomina(Condicio s) → string {
     }
 }
 
-# casu with fixum bindings destructures variant fields
+# casu with sit bindings destructures variant fields
 fn tracta(Nuntius e) → none {
     match e {
-        case Pulsus const x, y {
+        case Pulsus let x, y {
             print "pulsus: § §"(x, y)
         }
-        case Clavis const clavis {
+        case Clavis let clavis {
             print "clavis: §"(clavis)
         }
         case Finis {

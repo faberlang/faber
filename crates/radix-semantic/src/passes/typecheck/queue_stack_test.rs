@@ -40,19 +40,19 @@ fn queue_and_stack_accept_unbounded_or_bounded_arity_only() {
 #[test]
 fn queue_and_stack_methods_typecheck_with_empty_pop_union() {
     crate::test_support::assert_accepts(
-        r#"functio queue_ops(in queue<numerus> q) → numerus ∪ nihil {
+        r#"functio queue_ops(varia queue<numerus> q) → numerus ∪ nihil {
     varia queue<numerus> values ← q
     values.appende(1)
-    fixum numerus ∪ nihil item ← values.decapita()
-    fixum numerus size ← values.longitudo()
+    sit numerus ∪ nihil item ← values.decapita()
+    sit numerus size ← values.longitudo()
     redde item
 }
 
-functio stack_ops(in stack<textus> s) → textus ∪ nihil {
+functio stack_ops(varia stack<textus> s) → textus ∪ nihil {
     varia stack<textus> values ← s
     values.appende("top")
-    fixum textus ∪ nihil item ← values.detrahe()
-    fixum numerus size ← values.longitudo()
+    sit textus ∪ nihil item ← values.detrahe()
+    sit numerus size ← values.longitudo()
     nota size
     redde item
 }"#,
@@ -62,11 +62,11 @@ functio stack_ops(in stack<textus> s) → textus ∪ nihil {
 #[test]
 fn bounded_queue_and_stack_push_use_alternate_exit_but_pop_stays_nullable() {
     for source in [
-        r"functio queue_push(in queue<numerus, 2> q) → vacuum {
+        r"functio queue_push(varia queue<numerus, 2> q) → vacuum {
     varia queue<numerus, 2> values ← q
     values.appende(1)
 }",
-        r#"functio stack_push(in stack<textus, 2> s) → vacuum {
+        r#"functio stack_push(varia stack<textus, 2> s) → vacuum {
     varia stack<textus, 2> values ← s
     values.appende("top")
 }"#,
@@ -74,12 +74,12 @@ fn bounded_queue_and_stack_push_use_alternate_exit_but_pop_stays_nullable() {
         assert_rejects_with_issue(source, "failable_call_requires_handler");
     }
     crate::test_support::assert_accepts(
-        r"functio queue_pop(in queue<numerus, 2> q) → numerus ∪ nihil {
+        r"functio queue_pop(varia queue<numerus, 2> q) → numerus ∪ nihil {
     varia queue<numerus, 2> values ← q
     redde values.decapita()
 }
 
-functio stack_pop(in stack<textus, 2> s) → textus ∪ nihil {
+functio stack_pop(varia stack<textus, 2> s) → textus ∪ nihil {
     varia stack<textus, 2> values ← s
     redde values.detrahe()
 }",
@@ -90,13 +90,13 @@ functio stack_pop(in stack<textus, 2> s) → textus ∪ nihil {
 fn queue_and_stack_for_from_bind_elements_in_their_access_orders() {
     crate::test_support::assert_accepts(
         r"functio queue_iter(queue<numerus> q) → vacuum {
-    itera ex q fixum item {
+    itera ex q sit item {
         nota item
     }
 }
 
 functio stack_iter(stack<textus, 2> s) → vacuum {
-    itera ex s fixum item {
+    itera ex s sit item {
         nota item
     }
 }",
@@ -106,11 +106,11 @@ functio stack_iter(stack<textus, 2> s) → vacuum {
 #[test]
 fn queue_and_stack_empty_pop_recover_with_coalesce_without_a_handler() {
     crate::test_support::assert_accepts(
-        r#"functio queue_recover(in queue<numerus, 2> q) → numerus {
+        r#"functio queue_recover(varia queue<numerus, 2> q) → numerus {
     redde q.decapita() vel 0
 }
 
-functio stack_recover(in stack<textus, 2> s) → textus {
+functio stack_recover(varia stack<textus, 2> s) → textus {
     redde s.detrahe() vel "empty"
 }"#,
     );

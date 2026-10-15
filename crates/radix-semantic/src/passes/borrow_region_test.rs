@@ -51,10 +51,10 @@ fn analyze_en(source: &str) -> crate::test_support::AnalyzedFixture {
 
 const TENSOR_VIEW_LAST_USE_SOURCE: &str = r#"
 main {
-    const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    var tensor<f32, [2, 2]> base ← data ↦ tensor<f32, [2, 2]>
-    const tensor<f32, [2, 2]> view ← base.transpose()
-    const int dimensions ← view.length()
+    let list<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    mut tensor<f32, [2, 2]> base ← data ↦ tensor<f32, [2, 2]>
+    let tensor<f32, [2, 2]> view ← base.transpose()
+    let int dimensions ← view.length()
     base.set([0, 0], 9.0)
     print dimensions
 }
@@ -73,8 +73,8 @@ fn tensor_view_base_write_is_allowed_after_last_view_use() {
 #[test]
 fn tensor_view_base_write_is_rejected_before_later_view_use() {
     let source = TENSOR_VIEW_LAST_USE_SOURCE.replace(
-        "    const int dimensions ← view.length()\n    base.set([0, 0], 9.0)\n    print dimensions",
-        "    base.set([0, 0], 9.0)\n    const int dimensions ← view.length()\n    print dimensions",
+        "    let int dimensions ← view.length()\n    base.set([0, 0], 9.0)\n    print dimensions",
+        "    base.set([0, 0], 9.0)\n    let int dimensions ← view.length()\n    print dimensions",
     );
     let result = analyze_en(&source);
     assert!(
@@ -91,8 +91,8 @@ fn tensor_view_base_write_is_rejected_before_later_view_use() {
 fn tensor_view_ternary_cannot_escape_through_mutable_binding() {
     let source = r#"
 main {
-    var tf32[2, 2] base ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
-    var tf32[2, 2] view ← true ✓ base.transpose() ✗ base.transpose()
+    mut tf32[2, 2] base ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
+    mut tf32[2, 2] view ← true ✓ base.transpose() ✗ base.transpose()
 }
 "#;
     let result = analyze_en(source);
@@ -110,8 +110,8 @@ main {
 fn tensor_view_ternary_can_be_consumed_by_materialize() {
     let source = r#"
 main {
-    var tf32[2, 2] base ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
-    const tf32[2, 2] owned ← (true ✓ base.transpose() ✗ base.transpose()).materialize()
+    mut tf32[2, 2] base ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
+    let tf32[2, 2] owned ← (true ✓ base.transpose() ✗ base.transpose()).materialize()
     base.set([0, 0], 9.0)
     print owned.length()
 }
@@ -130,8 +130,8 @@ fn ternary_of_equal_shape_view_calls_joins_by_shape() {
     // structurally, so the result has the transposed shape [3, 2].
     let source = r#"
 main {
-    var tf32[2, 3] base ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
-    const tf32[3, 2] owned ← (true ✓ base.transpose() ✗ base.transpose()).materialize()
+    mut tf32[2, 3] base ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
+    let tf32[3, 2] owned ← (true ✓ base.transpose() ✗ base.transpose()).materialize()
     print owned.length()
 }
 "#;
@@ -145,8 +145,8 @@ fn ternary_of_unequal_shape_views_is_rejected_at_the_join() {
     // the shape mismatch instead of silently picking one side.
     let source = r#"
 main {
-    var tf32[2, 3] base ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
-    const tf32[3, 2] owned ← (true ✓ base ✗ base.transpose()).materialize()
+    mut tf32[2, 3] base ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
+    let tf32[3, 2] owned ← (true ✓ base ✗ base.transpose()).materialize()
     print owned.length()
 }
 "#;
@@ -165,8 +165,8 @@ main {
 fn expanded_transpose_chain_cannot_escape_through_mutable_binding() {
     let source = r#"
 main {
-    var tf32[1, 2] base ← [[1.0, 2.0]] ↦ tf32[1, 2]
-    var tf32[2, 1] escaped ← base.expanded([1, 2]).transpose()
+    mut tf32[1, 2] base ← [[1.0, 2.0]] ↦ tf32[1, 2]
+    mut tf32[2, 1] escaped ← base.expanded([1, 2]).transpose()
 }
 "#;
     let result = analyze_en(source);
@@ -201,8 +201,8 @@ class ZeroGhost implements EdgePolicy<vector<int, 1>> ∩ EdgeTransform<vector<i
 fn shifted_limes_view_keeps_provenance_through_wrapper_and_policy_type_args() {
     let main = r#"
 main {
-    var tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
-    var tf32[3] escaped ← true ✓ base.shift([1]).limes<ZeroGhost>() ✗ base.shift([1]).limes<ZeroGhost>()
+    mut tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    mut tf32[3] escaped ← true ✓ base.shift([1]).limes<ZeroGhost>() ✗ base.shift([1]).limes<ZeroGhost>()
 }
 "#;
     let source = format!("{TENSOR_EDGE_POLICY_DECLARATIONS}{main}");
@@ -221,8 +221,8 @@ main {
 fn custom_limes_view_conflicts_with_base_write_until_last_use() {
     let main = r#"
 main {
-    var tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
-    const tf32[3] view ← base.shift([1]).limes<ZeroGhost>()
+    mut tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    let tf32[3] view ← base.shift([1]).limes<ZeroGhost>()
     base.set([0], 9.0)
     print view.length()
 }
@@ -823,7 +823,7 @@ fn text_slice_is_not_a_tensor_view() {
         ),
         (
             "bound then returned",
-            "functio f(textus s) → textus {\n    fixum textus head ← s.sectio(0, 2)\n    redde head\n}\nincipit { nota f(\"abcd\") }",
+            "functio f(textus s) → textus {\n    sit textus head ← s.sectio(0, 2)\n    redde head\n}\nincipit { nota f(\"abcd\") }",
         ),
     ] {
         let (escaped, diagnostics) = has_tensor_view_escape(source);
@@ -843,7 +843,7 @@ fn list_slice_is_not_a_tensor_view() {
         ),
         (
             "bound then returned",
-            "functio f(lista<numerus> xs) → lista<numerus> {\n    fixum lista<numerus> head ← xs.sectio(0, 1)\n    redde head\n}\nincipit { nota f([1, 2]) }",
+            "functio f(lista<numerus> xs) → lista<numerus> {\n    sit lista<numerus> head ← xs.sectio(0, 1)\n    redde head\n}\nincipit { nota f([1, 2]) }",
         ),
     ] {
         let (escaped, diagnostics) = has_tensor_view_escape(source);
@@ -870,7 +870,7 @@ fn tensor_receiver_view_methods_still_escape() {
         ),
         (
             "bound then returned",
-            "functio f(tf32[2, 2] x) → tf32[2, 2] {\n    fixum tf32[2, 2] v ← x.transpone()\n    redde v\n}\nincipit { }",
+            "functio f(tf32[2, 2] x) → tf32[2, 2] {\n    sit tf32[2, 2] v ← x.transpone()\n    redde v\n}\nincipit { }",
         ),
     ] {
         let (escaped, diagnostics) = has_tensor_view_escape(source);
@@ -942,7 +942,7 @@ fn returned_borrow_with_two_regions_of_different_provenance_is_incoherent() {
     let result = analyze_source(
         r"
 functio duo(tf32[2, 2] a, tf32[2, 2] b, bivalens cond) → de tf32[2, 2] {
-    fixum de tf32[2, 2] view ← cond ✓ a.transpone() ✗ b.transpone()
+    sit de tf32[2, 2] view ← cond ✓ a.transpone() ✗ b.transpone()
     redde view
 }
 incipit { }

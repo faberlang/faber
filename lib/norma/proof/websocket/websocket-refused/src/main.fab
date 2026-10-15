@@ -28,9 +28,9 @@ fn connect_tls_here(string url, string ca_path) → websocket.Socket ⇥ fault.I
 # Bind an ephemeral port, read it, stop the listener, and return the now
 # closed port. A connect to it is refused by the kernel.
 fn stopped_port() → int {
-    var int port ← 0
+    mut int port ← 0
     do {
-        const server.Listener listener ← server.bind(0)
+        let server.Listener listener ← server.bind(0)
         port ← listener.port()
         assert port ≻ 0
         listener.stop()
@@ -43,15 +43,15 @@ fn stopped_port() → int {
 
 main {
     # (1) A bound-then-stopped ephemeral port refuses the plaintext connect.
-    const int closed_port ← stopped_port()
-    var bool refused ← false
+    let int closed_port ← stopped_port()
+    mut bool refused ← false
     do {
         connect_plain("ws://127.0.0.1:§/"(closed_port))
         assert false panic "websocket.connect to a stopped port succeeded"
     }
     catch err {
         match err {
-            case ConnectionRefused const path {
+            case ConnectionRefused let path {
                 assert path.length() ≻ 0
                 refused ← true
             }
@@ -64,14 +64,14 @@ main {
 
     # (2) A non-ws scheme is rejected before any socket is opened. The port
     # in the URL is never connected to.
-    var bool invalid ← false
+    mut bool invalid ← false
     do {
         connect_plain("http://127.0.0.1:1/")
         assert false panic "websocket.connect accepted a non-ws URL"
     }
     catch err {
         match err {
-            case InvalidArgument const path {
+            case InvalidArgument let path {
                 invalid ← true
             }
             default {
@@ -84,10 +84,10 @@ main {
     # (3a) connect_tls against a live listener with a missing CA file: the TCP
     # connection succeeds, then wrap_tls reads the CA path and faults NotFound
     # before any TLS handshake. The listener is stopped at the end.
-    var bool ca_missing ← false
+    mut bool ca_missing ← false
     do {
-        const server.Listener live ← server.bind(0)
-        const int live_port ← live.port()
+        let server.Listener live ← server.bind(0)
+        let int live_port ← live.port()
         assert live_port ≻ 0
         do {
             connect_tls_here("wss://127.0.0.1:§/"(live_port), "/nonexistent/websocket-refused-ca.pem")
@@ -95,7 +95,7 @@ main {
         }
         catch tls_err {
             match tls_err {
-                case NotFound const path {
+                case NotFound let path {
                     assert path.length() ≻ 0
                     ca_missing ← true
                 }
@@ -113,14 +113,14 @@ main {
 
     # (3b) The same missing CA file against the stopped port: connect() runs
     # before wrap_tls() reads the CA path, so the refused connect faults first.
-    var bool tls_refused ← false
+    mut bool tls_refused ← false
     do {
         connect_tls_here("wss://127.0.0.1:§/"(closed_port), "/nonexistent/websocket-refused-ca.pem")
         assert false panic "websocket.connect_tls to a stopped port succeeded"
     }
     catch err {
         match err {
-            case ConnectionRefused const path {
+            case ConnectionRefused let path {
                 tls_refused ← true
             }
             default {

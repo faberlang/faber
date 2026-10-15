@@ -46,19 +46,19 @@ functio runtime_extent(numerus value) → numerus {
 }
 
 incipit {
-    fixum numerus n ← runtime_extent(3)
-    fixum lista<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
-    fixum lista<b8> short_raw ← |00 00 80 3f 00 00 00 40|
+    sit numerus n ← runtime_extent(3)
+    sit lista<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
+    sit lista<b8> short_raw ← |00 00 80 3f 00 00 00 40|
 
-    fixum tensor<f32, [2, magnitudo n]> grid ← raw ↦ tensor<f32, [2, magnitudo n]> via Le
-    fixum lista<numerus, 2> dims ← grid.magnitudines()
+    sit tensor<f32, [2, magnitudo n]> grid ← raw ↦ tensor<f32, [2, magnitudo n]> via Le
+    sit lista<numerus, 2> dims ← grid.magnitudines()
 
     nota grid[[0, 0]]
     nota grid[[1, 2]]
     nota dims
 
     fac {
-        fixum tensor<f32, [2, magnitudo n]> bad ← short_raw ↦ tensor<f32, [2, magnitudo n]> via Le
+        sit tensor<f32, [2, magnitudo n]> bad ← short_raw ↦ tensor<f32, [2, magnitudo n]> via Le
         nota bad[[0, 0]]
     }
     cape err {

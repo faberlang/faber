@@ -1,0 +1,28 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "ref_decl", "genus_decl", "genus_member", "field_decl", "typed_constructor", "field_list", "field_init", "assignment", "place", "member_suffix", "expr_stmt"]
+category = "binding"
+summary = "A ref local reads through to a place; a write through it is refused."
+syntax = "ref Cell cur ← c; cur.value ← 5"
+related = ["sit", "varia", "de"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM056:assign_through_ref"
++++
+# =============================================================================
+# mutabilitas — no write through a ref local
+# =============================================================================
+# `ref Cell cur ← c` re-points freely but is read-only through. Write through
+# the place's own name (`c.value ← 5`) instead.
+
+class Cell {
+    mut int value
+}
+
+main {
+    mut Cell c ← Cell { value = 1 }
+    ref Cell cur ← c
+    cur.value ← 5
+    print c.value
+}

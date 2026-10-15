@@ -55,27 +55,27 @@ const REFUSED: &str = "vacua_requires_resolved_extents";
 
 #[test]
 fn empty_accepts_dense_shorthand_tensor() {
-    accepts("fn main() {\n    const tf32[2, 3] a ← empty\n}\n");
+    accepts("fn main() {\n    let tf32[2, 3] a ← empty\n}\n");
 }
 
 #[test]
 fn empty_accepts_dense_long_form_tensor() {
-    accepts("fn main() {\n    const tensor<f32, [2, 3]> a ← empty\n}\n");
+    accepts("fn main() {\n    let tensor<f32, [2, 3]> a ← empty\n}\n");
 }
 
 #[test]
 fn empty_accepts_vector_and_matrix() {
-    accepts("fn main() {\n    const vf32[4] a ← empty\n    const mf32[2, 2] b ← empty\n}\n");
+    accepts("fn main() {\n    let vf32[4] a ← empty\n    let mf32[2, 2] b ← empty\n}\n");
 }
 
 #[test]
 fn empty_accepts_tensor_with_vector_element() {
-    accepts("fn main() {\n    const tensor<vf32[2], [3]> a ← empty\n}\n");
+    accepts("fn main() {\n    let tensor<vf32[2], [3]> a ← empty\n}\n");
 }
 
 #[test]
 fn empty_accepts_declared_size_and_size_generic_extents() {
-    accepts("fn main() {\n    const size K ← 5\n    const tf32[K, 2] a ← empty\n}\n");
+    accepts("fn main() {\n    const size K ← 5\n    let tf32[K, 2] a ← empty\n}\n");
     accepts("fn zeros<size N>() → tensor<f32, [N]> {\n    return empty\n}\n");
 }
 
@@ -84,20 +84,19 @@ fn empty_accepts_return_assignment_and_argument_positions() {
     accepts(
         "fn pick() → tf32[2] {\n    return empty\n}\n\
          fn take(tf32[2] x) → void {\n}\n\
-         fn main() {\n    var tf32[2] w ← pick()\n    w ← empty\n    take(empty)\n}\n",
+         fn main() {\n    mut tf32[2] w ← pick()\n    w ← empty\n    take(empty)\n}\n",
     );
 }
 
 #[test]
 fn empty_refuses_unresolved_extent_by_name() {
-    refuses_with("fn main() {\n    const tf32[2, _] a ← empty\n}\n", REFUSED);
-    refuses_with("fn main() {\n    const tf32[_, _] a ← empty\n}\n", REFUSED);
+    refuses_with("fn main() {\n    let tf32[2, _] a ← empty\n}\n", REFUSED);
+    refuses_with("fn main() {\n    let tf32[_, _] a ← empty\n}\n", REFUSED);
 }
 
 #[test]
 fn refused_empty_does_not_cascade_store_mismatches() {
-    let found =
-        issues("fn f<size N>() → vf32[N] {\n    const vf32[N] a ← empty\n    return a\n}\n");
+    let found = issues("fn f<size N>() → vf32[N] {\n    let vf32[N] a ← empty\n    return a\n}\n");
     assert!(found.iter().any(|found| found == REFUSED), "got: {found:?}");
     for cascade in [
         "expression_type_mismatch",
@@ -130,17 +129,17 @@ fn empty_refuses_register_extent_that_the_typed_zero_refuses() {
 #[test]
 fn empty_refuses_scalar_context_as_before() {
     refuses_with(
-        "fn main() {\n    const int a ← empty\n}\n",
+        "fn main() {\n    let int a ← empty\n}\n",
         "vacua_requires_collection_type",
     );
 }
 
 #[test]
 fn empty_keeps_rank_zero_sparse_and_collection_slots() {
-    accepts("fn main() {\n    const tensor<f32, []> a ← empty\n}\n");
-    accepts("fn main() {\n    const sparsa<f32, [2, 3]> a ← empty\n}\n");
+    accepts("fn main() {\n    let tensor<f32, []> a ← empty\n}\n");
+    accepts("fn main() {\n    let sparsa<f32, [2, 3]> a ← empty\n}\n");
     accepts(
-        "fn main() {\n    const list<int> a ← empty\n    const map<string, int> b ← empty\n    const set<int> c ← empty\n}\n",
+        "fn main() {\n    let list<int> a ← empty\n    let map<string, int> b ← empty\n    let set<int> c ← empty\n}\n",
     );
 }
 
@@ -153,9 +152,9 @@ fn inferred_constructor_empty_braces_build_typed_zero_for_tensor_vector_and_matr
         "fn z() → tf32[3] { return _ {} }\n\
          fn take(tensor<f32, [2, 2]> t) → int { return 0 }\n\
          main {\n\
-         \x20   var tensor<f32, [8]> b ← _ {}\n\
-         \x20   const vf32[4] v ← _ {}\n\
-         \x20   const mf32[2, 2] m ← _ {}\n\
+         \x20   mut tensor<f32, [8]> b ← _ {}\n\
+         \x20   let vf32[4] v ← _ {}\n\
+         \x20   let mf32[2, 2] m ← _ {}\n\
          \x20   print take(_ {})\n\
          \x20   print z().shape()\n\
          }\n",

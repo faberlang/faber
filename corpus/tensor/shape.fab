@@ -40,7 +40,7 @@ locale = "en"
 #   shape.fab stdout contract (longitudo, shape vector, accipe, scalar value).
 
 main {
-    const list<f32> plana ← [
+    let list<f32> plana ← [
         1.0,
         2.0,
         3.0,
@@ -48,24 +48,24 @@ main {
         5.0,
         6.0
     ]
-    const list<int> shape ← [2, 3]
+    let list<int> shape ← [2, 3]
 
-    var tf32[2, 3] grid ← plana ↦ tf32[shape]
-    const list<int, _> dims ← grid.shape()
+    mut tf32[2, 3] grid ← plana ↦ tf32[shape]
+    let list<int, _> dims ← grid.shape()
 
-    const list<int> newshape ← [3, 2]
-    const tf32[3, 2] reshaped ← grid.reshape(newshape).materialize()
+    let list<int> newshape ← [3, 2]
+    let tf32[3, 2] reshaped ← grid.reshape(newshape).materialize()
 
-    const list<int> origin ← [0, 0]
+    let list<int> origin ← [0, 0]
     grid.set(origin, 9.0)
-    const f32 corner ← grid.get(origin) ⊥ 0.0
+    let f32 corner ← grid.get(origin) ⊥ 0.0
 
-    var tf32[2, 3] filler ← tf32[2, 3] {}
+    mut tf32[2, 3] filler ← tf32[2, 3] {}
     filler.fill(4.0)
 
-    const tf32[1, 3] slice ← grid.slice(0, 1)
-    const tf32[1, 3] owned ← slice.materialize()
-    const list<f32> plana2 ← owned.flatten()
+    let tf32[1, 3] slice ← grid.slice(0, 1)
+    let tf32[1, 3] owned ← slice.materialize()
+    let list<f32> plana2 ← owned.flatten()
 
     print grid.length()
     print dims

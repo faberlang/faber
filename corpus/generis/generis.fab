@@ -1,48 +1,56 @@
 +++
-term = "generis"
-explains = ["generis"]
-kind = "keyword"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+term = "class constant"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "genus_field_decl", "genus_const_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "type"
-canonical = true
-summary = "Marks a class member as belonging to the type itself."
-syntax = "generis <type> <name> [= <expression>]"
-related = ["genus", "ego"]
+canonical = false
+summary = "A class member that belongs to the type itself is a compile-time constant: const T X = e."
+syntax = "const <type> <NAME> = <expression>"
+aliases = ["type-level constant", "class const member"]
+related = ["fixum", "genus", "ego"]
 locale = "en"
 +++
 # =============================================================================
-# generis — Marks a class member as belonging to the type itself
+# class constant — a genus member that belongs to the type
 # =============================================================================
 #
 # What this teaches:
-#   • Marks a class member as belonging to the type itself.
-#   • Related keywords: genus, ego
+#   • `const T X = e` inside a class is a type-level constant: one per type,
+#     compile-time, read-only. It is the same declaration as a module or block
+#     constant, with the same `=` initializer.
+#   • It is read through the type name (`Color.RUBER`), never through an
+#     instance, and it is never stored to.
+#   • The old `static` member word is retired (PARSE010 static_member_retired).
 #
 # Common mistakes:
-#   • Accessing a `generis` field on an instance instead of the type — `generis` fields are static members accessed via the genus name, not via `ego`.
+#   • Reading a class constant on an instance instead of the type — class
+#     constants are read through the genus name, not via `ego` or a value.
+#   • Writing `static T X = e` — use `const T X = e`.
+#   • Storing to a class constant — it is a compile-time fact, so a store is
+#     SEM020 assignment_to_const_member.
 #
-# See also: genus, ego
+# See also: fixum, genus, ego
 # =============================================================================
 
-# generis marks a static genus field (shared across instances)
+# const inside a class declares a type-level constant (shared by every instance)
 #
-# generis <type> <field> = <initium>  -- class-level binding, not per-instance
+# const <type> <NAME> = <initium>  -- class-level constant, not per-instance
 #
 # GRAMMAR:
-#   fieldDecl inside genusDecl :← 'generis'? type ident ('=' expr)?
+#   genus_const_decl :← 'fixum' type_annotation IDENTIFIER '=' const_init
 #
 # EXPECTED OUTPUT:
 #   ruber
 #
-# Instance field `nomen` is per-object; `generis ruber` would be accessed on the
-# genus type in full programs (here only instance fields are read).
+# Instance field `nomen` is per-object; the constant `RUBER` is read on the
+# type (`Color.RUBER`). Here only the instance field is printed.
 
 class Color {
-    static string ruber = "#ff0000"
-    var string nomen = "ruber"
+    const string ruber = "#ff0000"
+    mut string nomen = "ruber"
 }
 
 main {
-    const Color color ← Color {}
+    let Color color ← Color {}
     print color.nomen
 }

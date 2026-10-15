@@ -19,12 +19,12 @@ locale = "en"
 import from "norma:tensor" tensor
 
 main {
-    const list<int> xs ← [1, 2, 3, 4]
-    const tensor<int, [4]> grid ← tensor.construct<tensor<int, [4]>>(xs)
-    const list<int> flat ← tensor.flatten(grid)
+    let list<int> xs ← [1, 2, 3, 4]
+    let tensor<int, [4]> grid ← tensor.construct<tensor<int, [4]>>(xs)
+    let list<int> flat ← tensor.flatten(grid)
     print flat.length()
 
-    const list<f32> data ← [
+    let list<f32> data ← [
         1.0,
         2.0,
         3.0,
@@ -32,8 +32,8 @@ main {
         5.0,
         6.0
     ]
-    const tensor<f32, [2, 3]> shaped ← tensor.construct<tensor<f32, [2, 3]>>(data)
-    const tensor<f32, [2, 3]> filled ← tensor.creata<tensor<f32, [2, 3]>>(0.0 ∷ f32)
+    let tensor<f32, [2, 3]> shaped ← tensor.construct<tensor<f32, [2, 3]>>(data)
+    let tensor<f32, [2, 3]> filled ← tensor.creata<tensor<f32, [2, 3]>>(0.0 ∷ f32)
     print tensor.product(shaped.shape() ↦ list<int>)
     print filled.length()
 }

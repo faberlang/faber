@@ -23,6 +23,6 @@ locale = "en"
 # =============================================================================
 
 main {
-    const list<int> rejected ← [1, 2] + [3]
+    let list<int> rejected ← [1, 2] + [3]
     print rejected
 }

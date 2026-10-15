@@ -2,10 +2,10 @@
 locale = "en"
 +++
 fn pack(int n, float x, string name, list<b8> buf) → string {
-    const int count ← n
-    const float scale ← x
-    const string label ← name
-    const list<b8> payload ← buf
+    let int count ← n
+    let float scale ← x
+    let string label ← name
+    let list<b8> payload ← buf
     print count
     print scale
     print label

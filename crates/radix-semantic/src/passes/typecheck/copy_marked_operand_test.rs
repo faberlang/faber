@@ -34,7 +34,7 @@ fn assert_no_glyph_operand_rejection(source: &str) {
 #[test]
 fn glyph_matmul_accepts_copy_marked_tensor_operand() {
     assert_no_glyph_operand_rejection(
-        "functio product(tensor<f32, [2, 2]> w) → tensor<f32, [2, 2]> {\n    varia tensor<f32, [2, 2]> acc ← copy w\n    fixum tensor<f32, [2, 2]> prod ← acc · w\n    nota prod\n    redde acc\n}",
+        "functio product(tensor<f32, [2, 2]> w) → tensor<f32, [2, 2]> {\n    varia tensor<f32, [2, 2]> acc ← copy w\n    sit tensor<f32, [2, 2]> prod ← acc · w\n    nota prod\n    redde acc\n}",
     );
 }
 

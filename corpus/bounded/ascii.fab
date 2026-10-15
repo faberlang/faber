@@ -29,10 +29,10 @@ locale = "en"
 # =============================================================================
 
 main {
-    const ascii<8> a ← 'ab'
-    const ascii<8> b ← 'ab'
-    const int n ← a.length()
-    const bool vacant ← a.is_empty()
+    let ascii<8> a ← 'ab'
+    let ascii<8> b ← 'ab'
+    let int n ← a.length()
+    let bool vacant ← a.is_empty()
     print n
     print vacant
     if a ≡ b {

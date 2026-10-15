@@ -44,7 +44,7 @@ fn rejects(source: &str, issue: &str, found: Option<&str>) {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn list_right_operand_accepts() {
-    accepts("incipit { fixum lista<numerus> xs ← [1, 2]\n nota 1 ∈ xs }");
+    accepts("incipit { sit lista<numerus> xs ← [1, 2]\n nota 1 ∈ xs }");
 }
 
 #[cfg(feature = "hir-rust")]
@@ -56,14 +56,14 @@ fn set_right_operand_accepts() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn map_right_operand_tests_keys() {
-    accepts("incipit { fixum tabula<textus, numerus> m ← {\"a\": 1}\n nota \"a\" ∈ m }");
+    accepts("incipit { sit tabula<textus, numerus> m ← {\"a\": 1}\n nota \"a\" ∈ m }");
 }
 
 #[test]
 fn text_right_operand_is_rejected_for_a_text_left() {
     // OD-1: no membership operator over text; the text method is the spelling.
     rejects(
-        "incipit { fixum textus c ← \"7\"\n nota c ∈ \"0123456789\" }",
+        "incipit { sit textus c ← \"7\"\n nota c ∈ \"0123456789\" }",
         "membership_over_text",
         Some("textus"),
     );
@@ -72,7 +72,7 @@ fn text_right_operand_is_rejected_for_a_text_left() {
 #[test]
 fn text_right_operand_is_rejected_whatever_the_left_operand() {
     rejects(
-        "incipit { fixum numerus n ← 5\n fixum textus t ← \"abc\"\n nota n ∈ t }",
+        "incipit { sit numerus n ← 5\n sit textus t ← \"abc\"\n nota n ∈ t }",
         "membership_over_text",
         Some("textus"),
     );
@@ -81,7 +81,7 @@ fn text_right_operand_is_rejected_whatever_the_left_operand() {
 #[test]
 fn negated_text_right_operand_is_rejected() {
     rejects(
-        "incipit { fixum textus t ← \"abc\"\n nota \"a\" ∉ t }",
+        "incipit { sit textus t ← \"abc\"\n nota \"a\" ∉ t }",
         "membership_over_text",
         Some("textus"),
     );
@@ -90,7 +90,7 @@ fn negated_text_right_operand_is_rejected() {
 #[test]
 fn ascii_right_operand_is_rejected() {
     rejects(
-        "incipit { fixum ascii t ← 'abc'\n nota 'a' ∈ t }",
+        "incipit { sit ascii t ← 'abc'\n nota 'a' ∈ t }",
         "membership_over_text",
         Some("ascii"),
     );
@@ -99,7 +99,7 @@ fn ascii_right_operand_is_rejected() {
 #[test]
 fn list_element_mismatch_keeps_its_issue() {
     rejects(
-        "incipit { fixum lista<numerus> xs ← [1, 2]\n nota \"a\" ∈ xs }",
+        "incipit { sit lista<numerus> xs ← [1, 2]\n nota \"a\" ∈ xs }",
         "membership_operand_type_mismatch",
         None,
     );
@@ -108,7 +108,7 @@ fn list_element_mismatch_keeps_its_issue() {
 #[test]
 fn integer_right_operand_rejects() {
     rejects(
-        "incipit { fixum numerus x ← 5\n nota x ∈ 5 }",
+        "incipit { sit numerus x ← 5\n nota x ∈ 5 }",
         "membership_requires_collection",
         Some("numerus"),
     );
@@ -117,7 +117,7 @@ fn integer_right_operand_rejects() {
 #[test]
 fn bool_right_operand_rejects() {
     rejects(
-        "incipit { fixum bivalens b ← verum\n nota verum ∈ b }",
+        "incipit { sit bivalens b ← verum\n nota verum ∈ b }",
         "membership_requires_collection",
         Some("bivalens"),
     );
@@ -126,7 +126,7 @@ fn bool_right_operand_rejects() {
 #[test]
 fn nullable_list_right_operand_rejects() {
     rejects(
-        "incipit { fixum lista<numerus> ∪ nihil m ← [1]\n nota 1 ∈ m }",
+        "incipit { sit lista<numerus> ∪ nihil m ← [1]\n nota 1 ∈ m }",
         "membership_requires_collection",
         None,
     );
@@ -135,7 +135,7 @@ fn nullable_list_right_operand_rejects() {
 #[test]
 fn nullable_list_with_wrong_element_rejects_as_nullable() {
     rejects(
-        "incipit { fixum lista<textus> ∪ nihil m ← [\"a\"]\n nota 3 ∈ m }",
+        "incipit { sit lista<textus> ∪ nihil m ← [\"a\"]\n nota 3 ∈ m }",
         "membership_requires_collection",
         None,
     );

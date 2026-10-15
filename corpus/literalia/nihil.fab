@@ -41,9 +41,9 @@ fn maybe() → int ∪ none {
 }
 
 main {
-    const int ∪ none absent ← null
+    let int ∪ none absent ← null
     print absent
-    const bool nihilne ← absent is none
+    let bool nihilne ← absent is none
     print nihilne
     print maybe() not is none
 }

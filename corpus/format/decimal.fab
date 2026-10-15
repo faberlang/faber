@@ -32,11 +32,11 @@ locale = "en"
 # =============================================================================
 
 main {
-    const d64 p ← 12.5
-    const d64 t ← 0.25
-    const d64 u ← 0.35
-    const d64 a ← 1.5
-    const d64 b ← 2.25
+    let d64 p ← 12.5
+    let d64 t ← 0.25
+    let d64 u ← 0.35
+    let d64 a ← 1.5
+    let d64 b ← 2.25
 
     print p ¶ ".2"
     print t ¶ ".1"

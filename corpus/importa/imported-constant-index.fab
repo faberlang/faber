@@ -41,16 +41,16 @@ fn read(tensor<f32, [8]> t) → f32 {
 }
 
 main {
-    var tf32[8] cells ← tf32[8] {}
+    mut tf32[8] cells ← tf32[8] {}
 
     cells[constantia.BASE] ← 7.0
-    const f32 direct ← read(cells)
-    const f32 doubled ← cells[[constantia.BASE]]
+    let f32 direct ← read(cells)
+    let f32 doubled ← cells[[constantia.BASE]]
 
-    const u32 step ← 1
+    let u32 step ← 1
     cells[constantia.BASE + step] ← 8.0
-    const f32 shifted ← cells[constantia.BASE + step]
-    const f32 shiftedDoubled ← cells[[constantia.BASE + step]]
+    let f32 shifted ← cells[constantia.BASE + step]
+    let f32 shiftedDoubled ← cells[[constantia.BASE + step]]
 
     print direct
     print doubled

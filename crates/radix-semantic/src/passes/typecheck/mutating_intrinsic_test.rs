@@ -41,21 +41,21 @@ fn warns_unnecessary_varia(source: &str) -> bool {
 #[test]
 fn fixum_list_ordina_is_rejected() {
     rejects_with_mutating_receiver_issue(
-        "incipit {\n    fixum lista<numerus> xs ← [3, 1, 2]\n    xs.ordina()\n}",
+        "incipit {\n    sit lista<numerus> xs ← [3, 1, 2]\n    xs.ordina()\n}",
     );
 }
 
 #[test]
 fn fixum_list_appende_is_rejected() {
     rejects_with_mutating_receiver_issue(
-        "incipit {\n    fixum lista<numerus> xs ← [3, 1, 2]\n    xs.appende(4)\n}",
+        "incipit {\n    sit lista<numerus> xs ← [3, 1, 2]\n    xs.appende(4)\n}",
     );
 }
 
 #[test]
 fn fixum_numerus_adde_still_rejected() {
     rejects_with_mutating_receiver_issue(
-        "incipit {\n    fixum numerus n ← 1\n    n.adde(2)\n    nota n\n}",
+        "incipit {\n    sit numerus n ← 1\n    n.adde(2)\n    nota n\n}",
     );
 }
 
@@ -96,7 +96,7 @@ fn fixum_list_value_returning_twin_stays_accepted() {
     // `addita` is the Perfectum twin (AppendImmutable): it yields a new list
     // and leaves the receiver alone, so a `fixum` receiver stays legal.
     test_support::assert_accepts(
-        "incipit {\n    fixum lista<numerus> xs ← [3, 1, 2]\n    nota xs.addita(4)\n}",
+        "incipit {\n    sit lista<numerus> xs ← [3, 1, 2]\n    nota xs.addita(4)\n}",
     );
 }
 
@@ -105,7 +105,7 @@ fn fixum_field_list_contents_stay_mutable() {
     // A `varia` object's field contents stay mutable. (A `fixum` object's do
     // not: see `const_object_field_list_append_is_rejected`.)
     test_support::assert_accepts(
-        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
+        "genus Punctum {\n    sit lista<numerus> xs\n}\n\n\
          incipit {\n    varia Punctum p ← Punctum { xs = [] }\n    p.xs.appende(3)\n    nota p.xs\n}",
     );
 }
@@ -128,32 +128,32 @@ fn const_object_field_list_append_is_rejected() {
     // `const` is deep: a field of a const object is not
     // reachable for in-place mutation.
     rejects_through_const(
-        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
-         incipit {\n    fixum Punctum p ← Punctum { xs = [] }\n    p.xs.appende(3)\n}",
+        "genus Punctum {\n    sit lista<numerus> xs\n}\n\n\
+         incipit {\n    sit Punctum p ← Punctum { xs = [] }\n    p.xs.appende(3)\n}",
     );
 }
 
 #[test]
 fn const_object_nested_field_list_append_is_rejected() {
     rejects_through_const(
-        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
-         genus Cista {\n    fixum Punctum p\n}\n\n\
-         incipit {\n    fixum Cista c ← Cista { p = Punctum { xs = [] } }\n    c.p.xs.appende(3)\n}",
+        "genus Punctum {\n    sit lista<numerus> xs\n}\n\n\
+         genus Cista {\n    sit Punctum p\n}\n\n\
+         incipit {\n    sit Cista c ← Cista { p = Punctum { xs = [] } }\n    c.p.xs.appende(3)\n}",
     );
 }
 
 #[test]
 fn const_list_direct_append_keeps_its_own_issue() {
     rejects_with_mutating_receiver_issue(
-        "incipit {\n    fixum lista<numerus> xs ← [3, 1, 2]\n    xs.appende(4)\n}",
+        "incipit {\n    sit lista<numerus> xs ← [3, 1, 2]\n    xs.appende(4)\n}",
     );
 }
 
 #[test]
 fn const_object_field_list_read_stays_accepted() {
     test_support::assert_accepts(
-        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
-         incipit {\n    fixum Punctum p ← Punctum { xs = [] }\n    nota p.xs.longitudo()\n}",
+        "genus Punctum {\n    sit lista<numerus> xs\n}\n\n\
+         incipit {\n    sit Punctum p ← Punctum { xs = [] }\n    nota p.xs.longitudo()\n}",
     );
 }
 

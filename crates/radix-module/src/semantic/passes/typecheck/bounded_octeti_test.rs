@@ -73,8 +73,8 @@ fn bounded_octeti_conversions_follow_d7() {
         r"typus OctetiOcto = lista<b8, 8>
 
 functio bridges(lista<b8, 8> bounded, lista<b8> unbounded) → vacuum {
-    fixum lista<b8> widened ← bounded ↦ lista<b8>
-    fixum OctetiOcto narrowed ← unbounded ↦ OctetiOcto
+    sit lista<b8> widened ← bounded ↦ lista<b8>
+    sit OctetiOcto narrowed ← unbounded ↦ OctetiOcto
     nota widened
     nota narrowed
 }
@@ -90,7 +90,7 @@ incipit {
 
     let implicit = analyze_and_get_diagnostics_la(
         r"functio assign(lista<b8> unbounded) → vacuum {
-    fixum lista<b8, 8> bounded ← unbounded
+    sit lista<b8, 8> bounded ← unbounded
     nota bounded
 }
 
@@ -105,8 +105,8 @@ incipit {
 
     let result = compile_and_get_result_la(
         r"functio bridges(lista<b8, 8> bounded, lista<b8> unbounded) → vacuum {
-    fixum lista<b8> widened ← bounded ↦ lista<b8>
-    fixum lista<b8, 8> narrowed ← unbounded ↦ lista<b8, 8>
+    sit lista<b8> widened ← bounded ↦ lista<b8>
+    sit lista<b8, 8> narrowed ← unbounded ↦ lista<b8, 8>
     nota widened
     nota narrowed
 }
@@ -182,7 +182,8 @@ incipit {
 
 /// An octeti to tensor conversion whose extent is a size parameter that no
 /// value binding supplies on TypeScript is declined by name, never emitted
-/// with a scalar shape.
+/// with a scalar shape. A tensor parameter whose axis names the size is the
+/// witness the entry scan binds it from, so that form emits.
 #[cfg(feature = "hir-ts")]
 #[test]
 fn octeti_to_tensor_with_an_unbound_size_extent_is_declined_on_typescript() {
@@ -204,6 +205,24 @@ incipit {
             diagnostic.is_error() && diagnostic.issue() == Some("ts_octeti_tensor_shape_unresolved")
         }),
         "diagnostics: {:?}",
+        result.diagnostics
+    );
+}
+
+#[cfg(feature = "hir-ts")]
+#[test]
+fn octeti_to_tensor_with_a_witnessed_size_extent_emits_on_typescript() {
+    let source = r"functio decode<magnitudo N>(tensor<f32, [N]> proto, lista<b8> raw) → tensor<f32, [N]> ⇥ textus {
+    redde raw ↦ tensor<f32, [N]> via Le
+}
+
+incipit {
+    nota 0
+}";
+    let result = compile_for_target_and_get_result_la(source, Target::HirTypeScript);
+    assert!(
+        result.success(),
+        "a size parameter bound from a tensor parameter axis must emit: {:?}",
         result.diagnostics
     );
 }

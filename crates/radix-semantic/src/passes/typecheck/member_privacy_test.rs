@@ -101,7 +101,7 @@ fn private_field_read_from_a_free_function_is_rejected() {
 #[test]
 fn private_field_is_copied_by_construction_source() {
     test_support::assert_accepts(&arca(
-        "    fixum Arca b ← Arca { apertum = 7 } ex a\n    nota b.lege()",
+        "    sit Arca b ← Arca { apertum = 7 } ex a\n    nota b.lege()",
     ));
 }
 

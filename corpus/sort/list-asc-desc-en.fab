@@ -9,9 +9,9 @@ canonical = true
 
 # sort via asc|desc from <list> builds a new list; the source is unchanged.
 main {
-    const list<int> xs ← [3, 1, 2, 3, 0]
-    const list<int> up ← sort via asc from xs
-    const list<int> down ← sort via desc from xs
+    let list<int> xs ← [3, 1, 2, 3, 0]
+    let list<int> up ← sort via asc from xs
+    let list<int> down ← sort via desc from xs
     print up
     print down
     print xs

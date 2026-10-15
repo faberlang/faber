@@ -16,28 +16,28 @@ import from "norma:crypto" crypto
 
 fn expect(list<b8> got, list<b8> want, string label) → void ⇥ string {
     if got.length() ≢ want.length() then throw "§: wrong length"(label)
-    for range 0‥got.length() const i {
-        const b8 g ← got.get(i) coalesce (0 ∷ b8)
-        const b8 w ← want.get(i) coalesce (0 ∷ b8)
+    for range 0‥got.length() let i {
+        let b8 g ← got.get(i) coalesce (0 ∷ b8)
+        let b8 w ← want.get(i) coalesce (0 ∷ b8)
         if g ≢ w then throw "§: byte mismatch at §"(label, i)
     }
 }
 
 fn _repeat(int n, u8 b) → list<b8> {
-    var list<u8> out ← empty
-    for range 0‥n const i {
+    mut list<u8> out ← empty
+    for range 0‥n let i {
         out.append(b)
     }
-    const list<b8> result ← out ↦ list<b8>
+    let list<b8> result ← out ↦ list<b8>
     return result
 }
 
 main {
     do {
-        const list<b8> abc ← |61 62 63|
-        const list<b8> empty_bytes ← empty
-        const list<b8> empty_msg ← empty_bytes
-        const list<b8> zeros ← |61 00 62 00 63|
+        let list<b8> abc ← |61 62 63|
+        let list<b8> empty_bytes ← empty
+        let list<b8> empty_msg ← empty_bytes
+        let list<b8> zeros ← |61 00 62 00 63|
 
         # SHA-256
         expect(crypto.digest("sha256", abc), |ba 78 16 bf 8f 01 cf ea 41 41 40 de 5d ae 22 23 b0 03 61 a3 96 17 7a 9c b4 10 ff 61 f2 00 15 ad|, "sha256 abc")
@@ -71,12 +71,12 @@ main {
     }
 
     # API contract — invalid algorithm names must fail with the exact error text
-    const string ALG_ERROR ← "norma:crypto.digest: algorithm must be sha256, sha384, or sha512"
+    let string ALG_ERROR ← "norma:crypto.digest: algorithm must be sha256, sha384, or sha512"
 
-    var list<string> failed ← empty
-    for from ["", "md5", "SHA256", "Sha384", "sha-256"] const alg {
+    mut list<string> failed ← empty
+    for from ["", "md5", "SHA256", "Sha384", "sha-256"] let alg {
         do {
-            const list<b8> result ← crypto.digest(alg, |61 62 63|)
+            let list<b8> result ← crypto.digest(alg, |61 62 63|)
             failed.append(alg)
         }
         catch err {
@@ -86,8 +86,8 @@ main {
 
     do {
         if not failed.is_empty() then {
-            var string msg ← "crypta-sha2: algorithm rejection missed these names: "
-            for from failed const name {
+            mut string msg ← "crypta-sha2: algorithm rejection missed these names: "
+            for from failed let name {
                 msg ← (msg + name) + " "
             }
             throw msg

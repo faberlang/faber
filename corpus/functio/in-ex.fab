@@ -64,7 +64,7 @@ fn consume(own string buffer) → string {
 
 main {
     imprime("mutabile")
-    var int value ← 3
+    mut int value ← 3
     # mut borrows the caller's scalar inside duplica
     duplica(mut value)
 

@@ -37,7 +37,7 @@ locale = "en"
 #   praefixum-self-error.expected — the stable diagnostic identity.
 
 class Cista {
-    var int n
+    mut int n
 
     fn ter() → int {
         const int k = comptime {

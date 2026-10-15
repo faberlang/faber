@@ -41,17 +41,17 @@ fn line(string heading, float value, int tally) → string {
 
 # Numbers: precision, width, zero-pad, align, fill, sign.
 fn numbers() {
-    const float pretium ← 12.5
+    let float pretium ← 12.5
     print "Summa: §"(pretium ¶ ".2")
-    const int n ← 42
+    let int n ← 42
     print n ¶ ".2"
     print "[§]"(n ¶ "5")
     print n ¶ "05"
     print "[§]"(n ¶ "<5")
     print n ¶ "*^7"
     print n ¶ "+"
-    const int a ← 3
-    const int b ← 4
+    let int a ← 3
+    let int b ← 4
     print a + b ¶ ".1"
 }
 
@@ -61,20 +61,20 @@ fn kinds() {
     print 255 ¶ "08x"
     print 5 ¶ "b"
     print 8 ¶ "o"
-    const float amount ← 1234.5
+    let float amount ← 1234.5
     print amount ¶ "e"
     print amount ¶ ".2e"
-    const float factor ← 1.23456
+    let float factor ← 1.23456
     print factor ¶ ".3"
     print -1.5 ¶ "08.2"
     print "[§]"(3.0 ¶ ">6")
-    const u8 octo ← 200
+    let u8 octo ← 200
     print octo ¶ "08b"
 }
 
 # Text: truncate to characters, width, fill.
 fn strings() {
-    const string nomen ← "Aurelia"
+    let string nomen ← "Aurelia"
     print nomen ¶ ".3"
     print "[§]"(nomen ¶ "9")
     print nomen ¶ "*>10"
@@ -85,11 +85,11 @@ fn strings() {
 fn instants() {
     # Both literals are valid instants, so the handler never runs.
     do {
-        const instant t ← "1979-05-27T07:32:00Z" ↦ instant
+        let instant t ← "1979-05-27T07:32:00Z" ↦ instant
         print t ¶ "iso"
         print t ¶ "date"
         print t ¶ "time"
-        const instant<ms> stamp ← "1979-05-27T07:32:00.123Z" ↦ instant<ms>
+        let instant<ms> stamp ← "1979-05-27T07:32:00.123Z" ↦ instant<ms>
         print stamp ¶ "iso"
     }
     catch err {
@@ -100,9 +100,9 @@ fn instants() {
 # Edges: sign plus digits in hex; NaN and infinities ignore precision.
 fn edges() {
     print -42 ¶ "x"
-    const float zero ← 0.0
-    const float notnum ← nan
-    const float endless ← 1.0 / zero
+    let float zero ← 0.0
+    let float notnum ← nan
+    let float endless ← 1.0 / zero
     print notnum ¶ ".2"
     print endless ¶ ".2"
     print -endless ¶ ""

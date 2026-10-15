@@ -283,6 +283,7 @@ impl TypeChecker<'_> {
                     HirExpressionKind::Literal(HirLiteral::JsonValor(
                         radix_syntax::JsonValue::Object(_)
                     )) | HirExpressionKind::Array(_)
+                        | HirExpressionKind::Literal(HirLiteral::Regex(..))
                 ))
     }
 
@@ -675,6 +676,50 @@ impl TypeChecker<'_> {
         None
     }
 
+    /// `_ /a/` against a typed cell: the hole form (`Verte` with an `Infer`
+    /// target over a regex literal) unwraps to the literal so the ordinary
+    /// regex check runs against the expected type. With no concrete expected
+    /// type the hole is the named no-expected-type error.
+    fn desugar_regex_hole(
+        &mut self,
+        expr: &mut HirExpression,
+        expected: Option<TypeId>,
+    ) -> Option<TypeId> {
+        let hole = match &expr.kind {
+            HirExpressionKind::Verte {
+                source,
+                target,
+                entries: None,
+            } => {
+                matches!(
+                    source.kind,
+                    HirExpressionKind::Literal(HirLiteral::Regex(..))
+                ) && self.is_infer(self.resolve_inferred_type(*target))
+            }
+            _ => false,
+        };
+        if !hole {
+            return None;
+        }
+        let concrete = expected
+            .map(|ty| self.resolve_inferred_type(ty))
+            .filter(|ty| !self.is_infer(*ty));
+        if concrete.is_none() {
+            self.invalid_conversion(
+                super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
+                expr.span,
+            );
+            return Some(self.error_type);
+        }
+        let placeholder = HirExpressionKind::Tuple(Vec::new(), None);
+        if let HirExpressionKind::Verte { source, .. } =
+            std::mem::replace(&mut expr.kind, placeholder)
+        {
+            expr.kind = source.kind;
+        }
+        None
+    }
+
     /// Synthesizes an expression type, optionally using an expected type as
     /// context for shape-sensitive expressions.
     ///
@@ -748,6 +793,10 @@ impl TypeChecker<'_> {
             return settled;
         }
         if let Some(settled) = self.desugar_bracket_literal_shape(expr, expected) {
+            self.pending_conversion = saved_pending_conversion;
+            return settled;
+        }
+        if let Some(settled) = self.desugar_regex_hole(expr, expected) {
             self.pending_conversion = saved_pending_conversion;
             return settled;
         }
@@ -832,7 +881,7 @@ impl TypeChecker<'_> {
             }
             HirExpressionKind::Dum(cond, block) => {
                 self.check_condition(cond);
-                self.check_loop_block(block);
+                self.check_dum_block(cond, block);
                 self.vacuum_type()
             }
             HirExpressionKind::Itera {
@@ -950,6 +999,24 @@ impl TypeChecker<'_> {
                 target,
                 entries,
             } => {
+                // `_ /pattern/`: the inferred regex hole takes its type from
+                // the expected slot and is a named error without one (BUG-01,
+                // need). The explicit `regex /pattern/` form stays a
+                // self-typed literal and never reaches this hole shape.
+                if entries.is_none()
+                    && self.is_infer(self.resolve_inferred_type(*target))
+                    && matches!(
+                        &source.kind,
+                        HirExpressionKind::Literal(HirLiteral::Regex(..))
+                    )
+                    && !expected.is_some_and(|ty| !self.is_infer(self.resolve_inferred_type(ty)))
+                {
+                    self.invalid_conversion(
+                        super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
+                        expr.span,
+                    );
+                    return self.error_type;
+                }
                 if entries.is_some() && self.is_infer(self.resolve_inferred_type(*target)) {
                     // `_ { … }`: the hole before braces builds the expected
                     // type. No concrete expected type is a named error.

@@ -15,6 +15,6 @@ fn probe(Greets g) → string {
 }
 
 fn main() → void {
-    const Hello h ← Hello {}
+    let Hello h ← Hello {}
     print probe(h)
 }

@@ -190,7 +190,7 @@ fn lowers_en_require_surface_to_guarded_throw() {
 fn preserves_spread_args_in_optional_and_non_null_calls() {
     let source = r"
 functio run(ignotum callback) → vacuum {
-  fixum lista<numerus> values ← [1, 2]
+  sit lista<numerus> values ← [1, 2]
   callback?(sparge values)
   callback!(sparge values)
 }
@@ -467,7 +467,7 @@ genus lista<T> {
 #[test]
 fn annotation_union_deduplicates_structurally_equal_compound_members() {
     let source = r"incipit {
-  fixum lista<numerus> ∪ lista<numerus> values ← vacua
+  sit lista<numerus> ∪ lista<numerus> values ← vacua
 }";
 
     let (lowered, _, types) = lower_source(source);
@@ -1448,7 +1448,7 @@ fixum numerus N = praefixum {
 fn preserves_var_decl_is_await() {
     let source = r"
 functio onero() → vacuum {
-  fixum numerus x ← 42
+  sit numerus x ← 42
   tacet
 }
 ";
@@ -1532,7 +1532,7 @@ fn preserves_top_level_varia_mutability() {
 
 #[test]
 fn preserves_top_level_fixum_immutability() {
-    let source = "fixum numerus answer ← 42";
+    let source = "sit numerus answer ← 42";
 
     let (lowered, _, _) = lower_source(source);
     let HirItemKind::Constant(konst) = &lowered.hir.items[0].kind else {
@@ -1601,7 +1601,7 @@ functio dispatch(numerus x) → vacuum {
 fn lowers_itera_with_cape_into_handled_expression() {
     let source = r"
 functio traverse() → vacuum {
-  itera ex [1, 2, 3] fixum item ergo nota item cape err {
+  itera ex [1, 2, 3] sit item ergo nota item cape err {
     nota err.nuntius
   }
 }
@@ -1689,8 +1689,8 @@ fn validate_locale_pack_ok(pack: &crate::locale::LocalePack) -> bool {
 /// pack-authoritative, no Latin support vocabulary.
 #[test]
 fn localized_tensor_vacua_surface_lowers_to_latin_identity() {
-    let latin_source = "incipit {\n  fixum tensor<f32, []> empty ← vacua\n}\n";
-    let thai_source = "เริ่ม {\n  คงที่ เทนเซอร์<f32, []> empty ← เซตว่าง\n}\n";
+    let latin_source = "incipit {\n  sit tensor<f32, []> empty ← vacua\n}\n";
+    let thai_source = "เริ่ม {\n  กำหนด เทนเซอร์<f32, []> empty ← เซตว่าง\n}\n";
 
     let (latin_lowered, _, latin_types) = lower_source(latin_source);
     let pack_path = crate::locale::workspace_locale_pack_path("th-TH");
@@ -1735,7 +1735,7 @@ fn unshadowed_lege_lowers_to_readline() {
     let (lowered, _, _) = lower_source(
         r"
 incipit {
-  fixum _ input ← lege
+  sit input ← lege
 }
 ",
     );
@@ -1755,7 +1755,7 @@ fn shadowed_lege_lowers_to_name_load() {
     let (lowered, _, _) = lower_source(
         r#"
 incipit {
-  fixum textus lege ← "data"
+  sit textus lege ← "data"
   nota lege
 }
 "#,
@@ -1785,7 +1785,7 @@ functio lege(textus path) → textus {
   redde path
 }
 incipit {
-  fixum textus x ← lege("cfg")
+  sit textus x ← lege("cfg")
 }
 "#,
     );
@@ -1810,7 +1810,7 @@ fn unshadowed_vacua_lowers_to_vacua() {
     let (lowered, _, _) = lower_source(
         r"
 incipit {
-  fixum lista<numerus> values ← vacua
+  sit lista<numerus> values ← vacua
 }
 ",
     );
@@ -1834,7 +1834,7 @@ fn bound_vacua_lowers_to_name_load() {
     let (lowered, _, _) = lower_source(
         r#"
 incipit {
-  fixum textus vacua ← "empty"
+  sit textus vacua ← "empty"
   nota vacua
 }
 "#,
@@ -1862,7 +1862,7 @@ fn vacua_call_lowers_to_call_on_path() {
         r"
 functio vacua() → numerus { redde 1 }
 incipit {
-  fixum _ x ← vacua()
+  sit x ← vacua()
 }
 ",
     );
@@ -1889,7 +1889,7 @@ functio scriptum(textus t) → textus {
   redde t
 }
 incipit {
-  fixum textus x ← scriptum("hello")
+  sit textus x ← scriptum("hello")
 }
 "#,
     );
@@ -1913,7 +1913,7 @@ fn unshadowed_scriptum_lowers_to_scriptum() {
     let (lowered, _, _) = lower_source(
         r#"
 incipit {
-  fixum textus x ← scriptum("hello")
+  sit textus x ← scriptum("hello")
 }
 "#,
     );

@@ -26,7 +26,7 @@ locale = "en"
 @ kernel
 @ public
 fn vector_swizzle(f32 x) → f32 {
-    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
-    const vf32[4] b ← a.swizzle("wzyx")
+    let vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    let vf32[4] b ← a.swizzle("wzyx")
     return b.dot(a)
 }

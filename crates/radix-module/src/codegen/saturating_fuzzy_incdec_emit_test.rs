@@ -12,8 +12,8 @@ const SATURATING: &str = r#"+++
 locale = "en"
 +++
 main {
-    const saturating<i8> a ← -7
-    const saturating<i8> two ← 2
+    let saturating<i8> a ← -7
+    let saturating<i8> two ← 2
     print a / two
     print a % two
 }
@@ -23,8 +23,8 @@ const FUZZY: &str = r#"+++
 locale = "en"
 +++
 main {
-    const d64 d ← 0.1
-    const float f ← 0.1
+    let d64 d ← 0.1
+    let float f ← 0.1
     print d ≈ f
 }
 "#;
@@ -36,7 +36,7 @@ fn idx() → int {
     return 1
 }
 main {
-    var list<u8> xs ← [1, 2]
+    mut list<u8> xs ← [1, 2]
     xs[idx()] ↑
     print xs
 }

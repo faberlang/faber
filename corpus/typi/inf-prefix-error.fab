@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "type"
 canonical = false
 summary = "`inf` takes no width-prefix sugar: `linf` is an ordinary name, so as a type it is unknown."
-syntax = "const linf x ← 1 — rejected; write `inf`"
+syntax = "let linf x ← 1 — rejected; write `inf`"
 related = ["inf", "numerus"]
 locale = "en"
 +++
@@ -16,7 +16,7 @@ locale = "en"
 # What this teaches:
 #   • Some width markers have prefixed sugar (`lf32` is a list of `f32`, `tf32`
 #     a tensor). `inf` has none: `linf`, `tinf`, `vinf`, `minf` and `sinf`
-#     stay ordinary identifiers, so `const linf x` names an unknown type
+#     stay ordinary identifiers, so `let linf x` names an unknown type
 #     (`unknown_type`).
 #   • Write the collection out: `lista<inf>`.
 #
@@ -35,6 +35,6 @@ locale = "en"
 #   inf-prefix-error.expected — the stable diagnostic identity.
 
 main {
-    const linf prefixed ← 1
+    let linf prefixed ← 1
     print prefixed
 }

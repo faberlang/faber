@@ -6,4 +6,5 @@ input = "intrinseca/fractus-rotundatio.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

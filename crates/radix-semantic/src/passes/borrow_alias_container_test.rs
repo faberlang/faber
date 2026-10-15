@@ -48,35 +48,35 @@ fn assert_accepted(body: &str) {
 #[test]
 fn copia_alias_of_de_param_rejects_mutating_method() {
     assert_rejected(
-        "functio f(de copia<numerus> s) → vacuum { fixum copia<numerus> t ← s\n t.adde(1) }",
+        "functio f(de copia<numerus> s) → vacuum { sit copia<numerus> t ← s\n t.adde(1) }",
     );
 }
 
 #[test]
 fn queue_alias_of_de_param_rejects_mutating_method() {
     assert_rejected(
-        "functio f(de queue<numerus> q) → vacuum { fixum queue<numerus> r ← q\n r.appende(1) }",
+        "functio f(de queue<numerus> q) → vacuum { sit queue<numerus> r ← q\n r.appende(1) }",
     );
 }
 
 #[test]
 fn stack_alias_of_de_param_rejects_mutating_method() {
     assert_rejected(
-        "functio f(de stack<numerus> k) → vacuum { fixum stack<numerus> m ← k\n m.appende(1) }",
+        "functio f(de stack<numerus> k) → vacuum { sit stack<numerus> m ← k\n m.appende(1) }",
     );
 }
 
 #[test]
 fn sparsa_alias_of_de_param_rejects_mutating_method() {
     assert_rejected(
-        "functio f(de sparsa<f32, [2, 3]> p) → vacuum { fixum sparsa<f32, [2, 3]> r ← p\n r.ponde([0, 1], 4.0) }",
+        "functio f(de sparsa<f32, [2, 3]> p) → vacuum { sit sparsa<f32, [2, 3]> r ← p\n r.ponde([0, 1], 4.0) }",
     );
 }
 
 #[test]
 fn tensor_alias_of_de_param_rejects_element_write() {
     assert_rejected(
-        "functio f(de tensor<f64, [3]> t) → vacuum { fixum tensor<f64, [3]> u ← t\n u[0] ← 1.0 }",
+        "functio f(de tensor<f64, [3]> t) → vacuum { sit tensor<f64, [3]> u ← t\n u[0] ← 1.0 }",
     );
 }
 
@@ -90,6 +90,6 @@ fn copia_alias_of_mutable_local_still_mutates() {
 #[test]
 fn copia_alias_of_de_param_allows_reads() {
     assert_accepted(
-        "functio f(de copia<numerus> s) → bivalens { fixum copia<numerus> t ← s\n redde t.habet(1) }",
+        "functio f(de copia<numerus> s) → bivalens { sit copia<numerus> t ← s\n redde t.habet(1) }",
     );
 }

@@ -44,7 +44,7 @@ fn describe(list<b8> buf) → int {
 }
 
 fn firstByte(list<b8> buf) → u8 {
-    const b8 raw ← buf.get(0) coalesce (0 ∷ b8)
+    let b8 raw ← buf.get(0) coalesce (0 ∷ b8)
     return raw ↦ u8
 }
 
@@ -56,27 +56,27 @@ fn appendByte(mut list<b8> buf, u8 value) → list<b8> {
 fn fromNumbers() → list<b8> {
     # WHY: lista<u8> is a list of numbers; the same-width conversion makes
     # it a byte list with no clause.
-    var list<u8> numbers ← empty
+    mut list<u8> numbers ← empty
     numbers.append(0xde ∷ u8)
     numbers.append(0xad ∷ u8)
-    const list<b8> asBytes ← numbers ↦ list<b8>
+    let list<b8> asBytes ← numbers ↦ list<b8>
     return asBytes
 }
 
 main {
-    var list<b8> sig ← |de ad be ef|
+    mut list<b8> sig ← |de ad be ef|
 
     # lista methods on an octeti receiver
-    const int n ← describe(sig)
+    let int n ← describe(sig)
     print n
 
-    const u8 first ← firstByte(sig)
+    let u8 first ← firstByte(sig)
     print first
 
     # a number appended as raw bits
-    const u8 marker ← 0xff ∷ u8
-    const list<b8> grown ← appendByte(mut sig, marker)
+    let u8 marker ← 0xff ∷ u8
+    let list<b8> grown ← appendByte(mut sig, marker)
     print grown.length()
-    const list<b8> crossed ← fromNumbers()
+    let list<b8> crossed ← fromNumbers()
     print crossed.length()
 }

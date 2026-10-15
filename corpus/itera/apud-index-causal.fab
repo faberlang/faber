@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "Coordinates bound by `at` are ordinary numerus values — the body can branch on the indices."
-syntax = "for from m at [r, c] const cell { if r ≤ c { } }"
+syntax = "for from m at [r, c] let cell { if r ≤ c { } }"
 related = ["apud", "itera", "ex", "matrix", "si"]
 locale = "en"
 +++
@@ -29,7 +29,7 @@ locale = "en"
 
 # Index-dependent causal body — keep only r ≤ c (upper triangle)
 #
-# for from m at [r, c] const cell { if r ≤ c { print r, c, cell } }
+# for from m at [r, c] let cell { if r ≤ c { print r, c, cell } }
 #
 # GRAMMAR:
 #   iteraStmt :← 'for' 'from' expr ('at' '[' ident (',' ident)* ']')? …
@@ -38,11 +38,11 @@ locale = "en"
 #   six upper-triangle cells of the 3×3 outer product, row-major.
 
 main {
-    const vf32[3] a ← [2.0, 3.0, 4.0] ↦ vf32[3]
-    const vf32[3] b ← [5.0, 7.0, 11.0] ↦ vf32[3]
-    const matrix<f32, [3, 3]> m ← a ⊗ b
+    let vf32[3] a ← [2.0, 3.0, 4.0] ↦ vf32[3]
+    let vf32[3] b ← [5.0, 7.0, 11.0] ↦ vf32[3]
+    let matrix<f32, [3, 3]> m ← a ⊗ b
 
-    for from m at [r, c] const cell {
+    for from m at [r, c] let cell {
         if r ≤ c {
             print r, c, cell
         }

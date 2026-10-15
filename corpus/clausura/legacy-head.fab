@@ -40,8 +40,8 @@ locale = "en"
 #   legacy-head.expected — the doubled and summed values.
 
 main {
-    const _ a ← lambda int x: x * 2
+    let a ← lambda int x: x * 2
     print a(5)
-    const _ b ← lambda int x, int y: x + y
+    let b ← lambda int x, int y: x + y
     print b(2, 3)
 }

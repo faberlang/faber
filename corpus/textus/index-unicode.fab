@@ -30,7 +30,7 @@ locale = "en"
 # =============================================================================
 
 main {
-    const string s ← "Grüße"
+    let string s ← "Grüße"
     print s[0]
     print s[2]
     print s[3]

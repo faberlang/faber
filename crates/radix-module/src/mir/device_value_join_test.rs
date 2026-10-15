@@ -36,21 +36,21 @@ fn chain_source(first: [&str; 2], second: [&str; 2]) -> String {
 @ kernel
 @ public
 fn first(tf32[8] {a}, mut tf32[8] {b}) → void {{
-    for from {a} at [i] thread lane const c {{
+    for from {a} at [i] thread lane let c {{
         {b}[i] ← {a}[i] * 2.0
     }}
 }}
 @ kernel
 @ public
 fn second(tf32[8] {c}, mut tf32[8] {d}) → void {{
-    for from {c} at [i] thread lane const c2 {{
+    for from {c} at [i] thread lane let c2 {{
         {d}[i] ← {c}[i] + 1.0
     }}
 }}
 main {{
-    const tf32[8] a0 ← tf32[8] {{}}.fill(1.5)
-    var tf32[8] t ← tf32[8] {{}}
-    var tf32[8] r ← tf32[8] {{}}
+    let tf32[8] a0 ← tf32[8] {{}}.fill(1.5)
+    mut tf32[8] t ← tf32[8] {{}}
+    mut tf32[8] r ← tf32[8] {{}}
     first(a0, mut t)
     second(t, mut r)
     print r[3]

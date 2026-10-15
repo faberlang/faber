@@ -91,30 +91,30 @@ locale = "en"
 
 main {
     # ---------------------------------------------------------------- ints
-    const int a ← 7
-    const int b ← 7
-    const u8 narrow ← 3 ∷ u8
-    const u16 wider ← 3 ∷ u16
-    const int signed ← -1
-    const u64 unsigned ← 18446744073709551615
-    const int large ← 10
+    let int a ← 7
+    let int b ← 7
+    let u8 narrow ← 3 ∷ u8
+    let u16 wider ← 3 ∷ u16
+    let int signed ← -1
+    let u64 unsigned ← 18446744073709551615
+    let int large ← 10
 
     # --------------------------------------------------------------- floats
-    const f32 single ← 2.5 ∷ f32
-    const float double ← 2.5
-    const float half ← 0.5
-    const float four_two ← 4.2
-    const i64 above ← 9007199254740993
-    const i64 below ← 9007199254740992
-    const float boundary ← 9007199254740992.0
+    let f32 single ← 2.5 ∷ f32
+    let float double ← 2.5
+    let float half ← 0.5
+    let float four_two ← 4.2
+    let i64 above ← 9007199254740993
+    let i64 below ← 9007199254740992
+    let float boundary ← 9007199254740992.0
 
     # -------------------------------------------------------------- decimals
-    const d64 d64v ← 4.2
-    const d64 d64w ← 4.2
-    const int five ← 5
+    let d64 d64v ← 4.2
+    let d64 d64w ← 4.2
+    let int five ← 5
 
     # ----------------------------------------------------------- conversio
-    const u64 five_u ← 5
+    let u64 five_u ← 5
 
     # ----------------------------------------------------- ≡ / ≢ (P1 join)
     # Identical types join exactly (P1 ints, P7 decimals); every other family

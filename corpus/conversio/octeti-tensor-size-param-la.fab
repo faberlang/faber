@@ -52,25 +52,25 @@ functio decode<magnitudo N>(tensor<f32, [N]> proto, lista<b8> raw) → tensor<f3
 }
 
 incipit {
-    fixum numerus n ← runtime_extent(3)
-    fixum lista<f32> values ← [1.0, 2.0, 3.0]
-    fixum tensor<f32, [magnitudo n]> proto ← values ↦ tensor<f32, [magnitudo n]>
-    fixum lista<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40|
+    sit numerus n ← runtime_extent(3)
+    sit lista<f32> values ← [1.0, 2.0, 3.0]
+    sit tensor<f32, [magnitudo n]> proto ← values ↦ tensor<f32, [magnitudo n]>
+    sit lista<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40|
 
     fac {
-        fixum tensor<f32, [magnitudo n]> decoded ← decode(proto, raw)
+        sit tensor<f32, [magnitudo n]> decoded ← decode(proto, raw)
         nota decoded[[0]]
         nota decoded[[2]]
-        fixum lista<numerus, 1> dims ← proto.magnitudines()
+        sit lista<numerus, 1> dims ← proto.magnitudines()
         nota dims
     }
     cape err {
         nota "unexpected"
     }
 
-    fixum lista<b8> short_raw ← |00 00 80 3f 00 00 00 40|
+    sit lista<b8> short_raw ← |00 00 80 3f 00 00 00 40|
     fac {
-        fixum tensor<f32, [magnitudo n]> bad ← decode(proto, short_raw)
+        sit tensor<f32, [magnitudo n]> bad ← decode(proto, short_raw)
         nota bad[[0]]
     }
     cape err {

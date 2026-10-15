@@ -7,20 +7,20 @@ use crate::codegen::Target;
 use crate::driver::ModuleCompileRequest;
 use crate::test_support::{assert_compile_fails_with_issue, test_session};
 
-const EXTRA_FIELD_BARE: &str = "+++\nlocale = \"en\"\n+++\n\nclass P {\n    var int x = 0\n}\n\nmain {\n    const P p ← { x = 1, z = 2 }\n    print p.x\n}\n";
+const EXTRA_FIELD_BARE: &str = "+++\nlocale = \"en\"\n+++\n\nclass P {\n    mut int x = 0\n}\n\nmain {\n    let P p ← { x = 1, z = 2 }\n    print p.x\n}\n";
 
-const EXTRA_FIELD_HOLE: &str = "+++\nlocale = \"en\"\n+++\n\nclass P {\n    var int x = 0\n}\n\nmain {\n    const P p ← _ { x = 1, z = 2 }\n    print p.x\n}\n";
+const EXTRA_FIELD_HOLE: &str = "+++\nlocale = \"en\"\n+++\n\nclass P {\n    mut int x = 0\n}\n\nmain {\n    let P p ← _ { x = 1, z = 2 }\n    print p.x\n}\n";
 
-const MISSING_FIELD_BARE: &str = "+++\nlocale = \"en\"\n+++\n\nclass Q {\n    var int x\n    var int y\n}\n\nmain {\n    const Q q ← { x = 1 }\n    print q.x\n}\n";
+const MISSING_FIELD_BARE: &str = "+++\nlocale = \"en\"\n+++\n\nclass Q {\n    mut int x\n    mut int y\n}\n\nmain {\n    let Q q ← { x = 1 }\n    print q.x\n}\n";
 
 const UNION_HOLE_BRACKETS: &str =
-    "+++\nlocale = \"en\"\n+++\n\nmain {\n    const int ∪ string v ← _ [1, 2]\n    print v\n}\n";
+    "+++\nlocale = \"en\"\n+++\n\nmain {\n    let int ∪ string v ← _ [1, 2]\n    print v\n}\n";
 
 const UNION_BARE_BRACKETS: &str =
-    "+++\nlocale = \"en\"\n+++\n\nmain {\n    const int ∪ string v ← [1, 2]\n    print v\n}\n";
+    "+++\nlocale = \"en\"\n+++\n\nmain {\n    let int ∪ string v ← [1, 2]\n    print v\n}\n";
 
 const OPTIONAL_LIST_BARE_BRACKETS: &str =
-    "+++\nlocale = \"en\"\n+++\n\nmain {\n    const list<int> ∪ none xs ← [1, 2]\n    print xs\n}\n";
+    "+++\nlocale = \"en\"\n+++\n\nmain {\n    let list<int> ∪ none xs ← [1, 2]\n    print xs\n}\n";
 
 #[test]
 fn class_literal_extra_field_bare_is_named() {

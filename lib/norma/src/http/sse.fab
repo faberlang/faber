@@ -12,15 +12,15 @@ locale = "en"
 
 @ public
 class Event {
-    var string name = ""
-    var string data = ""
-    var string id = ""
-    var string retry = ""
+    mut string name = ""
+    mut string data = ""
+    mut string id = ""
+    mut string retry = ""
 }
 
 @ public
 fn stringify(Event event) → string {
-    var string out ← ""
+    mut string out ← ""
     if event.name.length() ≻ 0 {
         out ← out + "event: " + event.name + "\n"
     }
@@ -30,8 +30,8 @@ fn stringify(Event event) → string {
     if event.retry.length() ≻ 0 {
         out ← out + "retry: " + event.retry + "\n"
     }
-    const list<string> lines ← data_lines(event.data)
-    var int i ← 0
+    let list<string> lines ← data_lines(event.data)
+    mut int i ← 0
     while i ≺ lines.length() {
         out ← out + "data: " + lines[i] + "\n"
         i ← i + 1
@@ -42,29 +42,29 @@ fn stringify(Event event) → string {
 
 @ public
 fn parse(string wire) → list<Event> ⇥ string {
-    var string src ← wire
-    const string bom ↤ |ef bb bf|
+    mut string src ← wire
+    let string bom ↤ |ef bb bf|
     if src.length() ≻ 0 and src.slice(0, 1) ≡ bom {
         src ← src.slice(1, src.length())
     }
-    var list<Event> events ← []
-    var string last_id ← ""
-    var string name ← ""
-    var string data ← ""
-    var string id ← ""
-    var string retry ← ""
-    var bool has_data ← false
-    var bool has_id ← false
-    var int i ← 0
-    const int n ← src.length()
+    mut list<Event> events ← []
+    mut string last_id ← ""
+    mut string name ← ""
+    mut string data ← ""
+    mut string id ← ""
+    mut string retry ← ""
+    mut bool has_data ← false
+    mut bool has_id ← false
+    mut int i ← 0
+    let int n ← src.length()
     while i ≺ n {
-        const int line_end_pos ← line_end(src, i)
-        const string line ← src.slice(i, line_end_pos)
+        let int line_end_pos ← line_end(src, i)
+        let string line ← src.slice(i, line_end_pos)
         i ← after_line(src, line_end_pos)
         if line.length() ≡ 0 {
-            const Event ∪ none ev ← finish_event(name, data, id, retry, last_id, has_data, has_id)
+            let Event ∪ none ev ← finish_event(name, data, id, retry, last_id, has_data, has_id)
             if ev not is none {
-                const Event ready ↤ ev
+                let Event ready ↤ ev
                 events.append(ready)
             }
             if has_id {
@@ -81,9 +81,9 @@ fn parse(string wire) → list<Event> ⇥ string {
             # comment / keep-alive
         }
         else {
-            const int colon ← colon_at(line)
-            var string field_name ← line
-            var string field_value ← ""
+            let int colon ← colon_at(line)
+            mut string field_name ← line
+            mut string field_value ← ""
             if colon ≥ 0 {
                 field_name ← line.slice(0, colon)
                 field_value ← line.slice(colon + 1, line.length())
@@ -116,9 +116,9 @@ fn parse(string wire) → list<Event> ⇥ string {
         }
     }
     if has_data {
-        const Event ∪ none ev ← finish_event(name, data, id, retry, last_id, has_data, has_id)
+        let Event ∪ none ev ← finish_event(name, data, id, retry, last_id, has_data, has_id)
         if ev not is none {
-            const Event ready ↤ ev
+            let Event ready ↤ ev
             events.append(ready)
         }
     }
@@ -126,9 +126,9 @@ fn parse(string wire) → list<Event> ⇥ string {
 }
 
 fn data_lines(string data) → list<string> {
-    var list<string> lines ← []
-    var int start ← 0
-    var int i ← 0
+    mut list<string> lines ← []
+    mut int start ← 0
+    mut int i ← 0
     while i ≺ data.length() {
         if data.slice(i, i + 1) ≡ "\n" {
             lines.append(data.slice(start, i))
@@ -144,9 +144,9 @@ fn data_lines(string data) → list<string> {
 }
 
 fn line_end(string s, int start) → int {
-    var int i ← start
+    mut int i ← start
     while i ≺ s.length() {
-        const string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1)
         if c ≡ "\n" or c ≡ "\r" then return i
         i ← i + 1
     }
@@ -165,7 +165,7 @@ fn after_line(string s, int line_end) → int {
 }
 
 fn colon_at(string line) → int {
-    var int i ← 0
+    mut int i ← 0
     while i ≺ line.length() {
         if line.slice(i, i + 1) ≡ ":" then return i
         i ← i + 1
@@ -174,7 +174,7 @@ fn colon_at(string line) → int {
 }
 
 fn has_nul(string s) → bool {
-    var int i ← 0
+    mut int i ← 0
     while i ≺ s.length() {
         # NUL is valid UTF-8, so the conversion cannot fail; the default only satisfies D17.8.
         if s.slice(i, i + 1) ≡ (|00| ↦ string ⊥ "") then return true
@@ -185,7 +185,7 @@ fn has_nul(string s) → bool {
 
 fn is_digits(string s) → bool {
     if s.length() ≡ 0 then return false
-    var int i ← 0
+    mut int i ← 0
     while i ≺ s.length() {
         if not "0123456789".contains(s.slice(i, i + 1)) then return false
         i ← i + 1
@@ -195,12 +195,12 @@ fn is_digits(string s) → bool {
 
 fn finish_event(string name, string data, string id, string retry, string last_id, bool has_data, bool has_id) → Event ∪ none {
     if not has_data then return null
-    var string payload ← data
+    mut string payload ← data
     if payload.length() ≻ 0 and payload.slice(payload.length() - 1, payload.length()) ≡ "\n" {
         payload ← payload.slice(0, payload.length() - 1)
     }
     if payload.length() ≡ 0 then return null
-    var string evid ← last_id
+    mut string evid ← last_id
     if has_id {
         evid ← id
     }
@@ -208,8 +208,8 @@ fn finish_event(string name, string data, string id, string retry, string last_i
 }
 
 fn must_parse(string wire) → list<Event> {
-    var list<Event> out ← []
-    var bool ok ← false
+    mut list<Event> out ← []
+    mut bool ok ← false
     do {
         out ← parse(wire)
         ok ← true
@@ -222,9 +222,9 @@ fn must_parse(string wire) → list<Event> {
 }
 
 fn parse_msg(string wire) → string {
-    var string msg ← ""
+    mut string msg ← ""
     do {
-        const list<Event> events ← parse(wire)
+        let list<Event> events ← parse(wire)
         msg ← events.length() ↦ string
     }
     catch err {
@@ -235,12 +235,12 @@ fn parse_msg(string wire) → string {
 
 describe "sse" {
     test "serialize data hello golden" {
-        const Event ev ← Event { data = "hello" }
+        let Event ev ← Event { data = "hello" }
         assert stringify(ev) ≡ "data: hello\n\n"
     }
 
     test "parse data hello golden" {
-        const list<Event> evs ← must_parse("data: hello\n\n")
+        let list<Event> evs ← must_parse("data: hello\n\n")
         assert evs.length() ≡ 1
         assert evs[0].data ≡ "hello"
         assert evs[0].name ≡ ""
@@ -249,31 +249,31 @@ describe "sse" {
     }
 
     test "roundtrip hello" {
-        const Event ev ← Event { data = "hello" }
-        const list<Event> evs ← must_parse(stringify(ev))
+        let Event ev ← Event { data = "hello" }
+        let list<Event> evs ← must_parse(stringify(ev))
         assert evs.length() ≡ 1
         assert evs[0].data ≡ "hello"
     }
 
     test "serialize and parse multi-line data" {
-        const Event ev ← Event { data = "hello\nworld" }
+        let Event ev ← Event { data = "hello\nworld" }
         assert stringify(ev) ≡ "data: hello\ndata: world\n\n"
-        const list<Event> evs ← must_parse(stringify(ev))
+        let list<Event> evs ← must_parse(stringify(ev))
         assert evs.length() ≡ 1
         assert evs[0].data ≡ "hello\nworld"
     }
 
     test "parse multi-line data without space after colon" {
-        const list<Event> evs ← must_parse("data:line1\ndata:line2\n\n")
+        let list<Event> evs ← must_parse("data:line1\ndata:line2\n\n")
         assert evs.length() ≡ 1
         assert evs[0].data ≡ "line1\nline2"
     }
 
     test "serialize and parse id and retry" {
-        const Event ev ← Event { name = "token", data = "hello", id = "42", retry = "3000" }
-        const string wire ← stringify(ev)
+        let Event ev ← Event { name = "token", data = "hello", id = "42", retry = "3000" }
+        let string wire ← stringify(ev)
         assert wire ≡ "event: token\nid: 42\nretry: 3000\ndata: hello\n\n"
-        const list<Event> evs ← must_parse(wire)
+        let list<Event> evs ← must_parse(wire)
         assert evs.length() ≡ 1
         assert evs[0].name ≡ "token"
         assert evs[0].data ≡ "hello"
@@ -282,65 +282,65 @@ describe "sse" {
     }
 
     test "parse comment lines do not dispatch" {
-        const list<Event> evs ← must_parse(": keep-alive\n\n")
+        let list<Event> evs ← must_parse(": keep-alive\n\n")
         assert evs.length() ≡ 0
     }
 
     test "parse comment then data" {
-        const list<Event> evs ← must_parse(": ping\ndata: hello\n\n")
+        let list<Event> evs ← must_parse(": ping\ndata: hello\n\n")
         assert evs.length() ≡ 1
         assert evs[0].data ≡ "hello"
     }
 
     test "parse unknown fields ignored" {
-        const list<Event> evs ← must_parse("foo: bar\ndata: hello\n\n")
+        let list<Event> evs ← must_parse("foo: bar\ndata: hello\n\n")
         assert evs.length() ≡ 1
         assert evs[0].data ≡ "hello"
     }
 
     test "parse crlf and cr line endings" {
-        const list<Event> a ← must_parse("data: hello\r\n\r\n")
+        let list<Event> a ← must_parse("data: hello\r\n\r\n")
         assert a.length() ≡ 1
         assert a[0].data ≡ "hello"
-        const list<Event> b ← must_parse("data: hello\r\r")
+        let list<Event> b ← must_parse("data: hello\r\r")
         assert b.length() ≡ 1
         assert b[0].data ≡ "hello"
     }
 
     test "parse leading bom stripped" {
-        const string bom ↤ |ef bb bf| ⊥ ""
-        const list<Event> evs ← must_parse(bom + "data: hello\n\n")
+        let string bom ↤ |ef bb bf| ⊥ ""
+        let list<Event> evs ← must_parse(bom + "data: hello\n\n")
         assert evs.length() ≡ 1
         assert evs[0].data ≡ "hello"
     }
 
     test "parse two events" {
-        const list<Event> evs ← must_parse("data: one\n\ndata: two\n\n")
+        let list<Event> evs ← must_parse("data: one\n\ndata: two\n\n")
         assert evs.length() ≡ 2
         assert evs[0].data ≡ "one"
         assert evs[1].data ≡ "two"
     }
 
     test "parse inherits last event id" {
-        const list<Event> evs ← must_parse("id: 7\n\ndata: hello\n\n")
+        let list<Event> evs ← must_parse("id: 7\n\ndata: hello\n\n")
         assert evs.length() ≡ 1
         assert evs[0].data ≡ "hello"
         assert evs[0].id ≡ "7"
     }
 
     test "parse split-boundary trailing event without blank line" {
-        const list<Event> evs ← must_parse("data: hello")
+        let list<Event> evs ← must_parse("data: hello")
         assert evs.length() ≡ 1
         assert evs[0].data ≡ "hello"
     }
 
     test "parse empty stream" {
-        const list<Event> evs ← must_parse("")
+        let list<Event> evs ← must_parse("")
         assert evs.length() ≡ 0
     }
 
     test "parse strips one leading space after colon" {
-        const list<Event> evs ← must_parse("data:  hello\n\n")
+        let list<Event> evs ← must_parse("data:  hello\n\n")
         assert evs.length() ≡ 1
         assert evs[0].data ≡ " hello"
     }
@@ -350,7 +350,7 @@ describe "sse" {
     }
 
     test "rejects nul in id" {
-        const string nul ↤ |00| ⊥ ""
+        let string nul ↤ |00| ⊥ ""
         assert parse_msg("id: a" + nul + "b\ndata: hello\n\n") ≡ "norma:http/sse.parse: illegal id"
     }
 }

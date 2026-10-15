@@ -25,7 +25,7 @@ locale = "en"
 # =============================================================================
 
 main {
-    var int valorem ← 0
+    mut int valorem ← 0
     do {
         if true {
             if true {

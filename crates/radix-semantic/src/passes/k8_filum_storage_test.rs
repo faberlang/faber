@@ -35,7 +35,7 @@ fn kernel(grid: &str, statement: &str) -> String {
     format!(
         r"incipit {{
     varia tensor<numerus, [4]> grid ← {grid}
-    itera ex grid apud [i] filum lane fixum value {{
+    itera ex grid apud [i] filum lane sit value {{
         {statement}
     }}
 }}"
@@ -75,7 +75,7 @@ fn other_call_result_keeps_unknown_identity() {
             r"incipit {{
     varia tensor<numerus, [4]> fresh ← ti64[4] {{}}
     varia tensor<numerus, [4]> grid ← fresh.addita(fresh)
-    itera ex grid apud [i] filum lane fixum value {{
+    itera ex grid apud [i] filum lane sit value {{
         grid[i] ← value
     }}
 }}"
@@ -99,7 +99,7 @@ const GRID: &str = "tensor<numerus, [4]>";
 fn kernel_fn(params: &str, statement: &str) -> String {
     format!(
         r"functio kernel({params}) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         {statement}
     }}
 }}
@@ -153,7 +153,7 @@ fn mut_param_written_then_read_at_a_neighbour_is_rejected() {
     rejected(
         &with_src(
             &format!("in {GRID} out"),
-            "out[i] ← value\n        fixum numerus next ← out[i + 1]",
+            "out[i] ← value\n        sit numerus next ← out[i + 1]",
         ),
         "written_storage_neighbor_read",
     );
@@ -163,13 +163,13 @@ fn mut_param_written_then_read_at_a_neighbour_is_rejected() {
 fn read_param_read_at_neighbours_and_never_written_is_accepted() {
     accepted(&kernel_fn(
         &format!("de {GRID} src"),
-        "fixum numerus next ← src[i + 1]",
+        "sit numerus next ← src[i + 1]",
     ));
     // Paired with a local that owns its storage.
     accepted(&format!(
         r"functio kernel(de {GRID} src) → vacuum {{
     varia {GRID} grid ← ti64[4] {{}}
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         grid[i] ← src[i + 1]
     }}
 }}
@@ -189,7 +189,7 @@ fn two_mut_params_written_at_own_coordinates_are_accepted() {
 #[test]
 fn bind_alias_of_a_mut_param_joins_its_root() {
     rejected(
-        &with_out_alias("alias[i] ← value\n        fixum numerus next ← out[i + 1]"),
+        &with_out_alias("alias[i] ← value\n        sit numerus next ← out[i + 1]"),
         "written_storage_neighbor_read",
     );
     accepted(&with_out_alias("alias[i] ← src[i + 1]"));
@@ -249,8 +249,8 @@ fn call_from_the_body_stays_declined_with_param_roots() {
             r"functio inner(in {GRID} out) → vacuum {{
 }}
 functio kernel(in {GRID} out, de {GRID} src) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
-        inner(in out)
+    itera ex src apud [i] filum lane sit value {{
+        inner(varia out)
         out[i] ← value
     }}
 }}
@@ -268,7 +268,7 @@ fn write_through_a_read_param_is_a_borrow_error_not_an_independence_one() {
     assert!(
         errors
             .iter()
-            .any(|d| d.issue() == Some("assign_to_de_parameter")),
+            .any(|d| d.issue() == Some("assign_through_ref")),
         "{errors:?}"
     );
     assert!(
@@ -281,14 +281,14 @@ fn write_through_a_read_param_is_a_borrow_error_not_an_independence_one() {
 fn aliasing_call_is_a_borrow_error_while_the_kernel_is_certified() {
     let source = format!(
         r"functio kernel(in {GRID} out, de {GRID} src) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         out[i] ← src[i + 1]
     }}
 }}
 incipit {{
     varia {GRID} grid ← ti64[4] {{}}
     varia {GRID} alias ← grid
-    kernel(in grid, alias)
+    kernel(varia grid, alias)
 }}"
     );
     let result = analyze_source_la(&source);

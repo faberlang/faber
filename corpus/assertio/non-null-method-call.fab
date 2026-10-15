@@ -20,8 +20,8 @@ locale = "en"
 #   • A read method (`length`) and an in-place writer (`append`) both go
 #     through the assertion; the writer mutates the stored list, so the
 #     length after two appends is 4.
-#   • The binding must be `var` for an in-place writer; reading through `!.`
-#     only needs `const`.
+#   • The binding must be `mut` for an in-place writer; reading through `!.`
+#     only needs `let`.
 #   • The assertion traps like any other `!` use when the value is `nihil`.
 #
 # Common mistakes:
@@ -49,13 +49,13 @@ fn greeting() → string ∪ none {
 }
 
 main {
-    const list<int> base ← [1, 2]
-    var list<int> ∪ none xs ← wrap(base)
+    let list<int> base ← [1, 2]
+    mut list<int> ∪ none xs ← wrap(base)
     xs!.append(3)
     xs!.append(4)
     print xs!.length()
 
-    const string ∪ none text ← greeting()
+    let string ∪ none text ← greeting()
     print text!.length()
 
     print xs![2]

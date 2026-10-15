@@ -71,9 +71,9 @@ fn solo_entry(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 
 }
 
 fn main() → void {
-    const _ a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
-    const _ b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
-    const _ r ← solo_entry(a, b)
+    let a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    let b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
+    let r ← solo_entry(a, b)
     print "ok"
 }
 "#;
@@ -84,9 +84,9 @@ locale = "en"
 import from "composelib:math" math
 
 fn main() → void {
-    const _ a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
-    const _ b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
-    const _ r ← math.add(a, b)
+    let a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    let b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
+    let r ← math.add(a, b)
     print "ok"
 }
 "#;
@@ -126,7 +126,7 @@ locale = "en"
 @ kernel
 @ public
 fn ping<size M, size N>(tensor<f32, [M, N]> a) → tensor<f32, [M, N]> {
-    const tensor<f32, [M, N]> out ← ping(a)
+    let tensor<f32, [M, N]> out ← ping(a)
     return out
 }
 "#;
@@ -157,7 +157,7 @@ fn deep_chain_library(depth: usize) -> String {
             source.push_str("@ kernel\n@ public\nfn step_0<size M>(tensor<f32, [M]> a) → tensor<f32, [M]> {\n    return a\n}\n");
         } else {
             source.push_str(&format!(
-                "@ kernel\n@ public\nfn step_{level}<size M>(tensor<f32, [M]> a) → tensor<f32, [M]> {{\n    const tensor<f32, [M]> out ← step_{}(a)\n    return out\n}}\n",
+                "@ kernel\n@ public\nfn step_{level}<size M>(tensor<f32, [M]> a) → tensor<f32, [M]> {{\n    let tensor<f32, [M]> out ← step_{}(a)\n    return out\n}}\n",
                 level - 1
             ));
         }

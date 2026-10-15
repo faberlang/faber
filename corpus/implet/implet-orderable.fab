@@ -45,8 +45,8 @@ locale = "en"
 import from "norma:order" const Orderable
 
 class Person implements Orderable<Person> {
-    var string label = ""
-    var int years = 0
+    mut string label = ""
+    mut int years = 0
 
     fn compare(Person other) → int {
         return self.years - other.years
@@ -61,8 +61,8 @@ fn larger<T implements Orderable<T>>(T a, T b) → T {
 }
 
 main {
-    const Person anna ← Person { label = "Anna", years = 31 }
-    const Person marcus ← Person { label = "Marcus", years = 27 }
+    let Person anna ← Person { label = "Anna", years = 31 }
+    let Person marcus ← Person { label = "Marcus", years = 27 }
     print anna ≻ marcus
     print marcus ≤ anna
     print anna ≺ marcus
@@ -74,12 +74,12 @@ main {
 
     # Through the contract NaN is the largest float, so `larger` returns it
     # (NaN is never equal to itself). The bare glyph stays IEEE: false.
-    const f64 top ← larger(1.5, nan)
+    let f64 top ← larger(1.5, nan)
     print top ≢ top
     print top ≻ 1.5
 
-    const tuple<int, string> first ← tuple<int, string>[2, "b"]
-    const tuple<int, string> second ← tuple<int, string>[2, "c"]
+    let tuple<int, string> first ← tuple<int, string>[2, "b"]
+    let tuple<int, string> second ← tuple<int, string>[2, "c"]
     print first ≺ second
     print "larger tuple: §"(larger(first, second)[1])
 }

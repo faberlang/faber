@@ -36,23 +36,23 @@ locale = "en"
 #   [1, 2]
 
 main {
-    var map<int, string> names ← empty
+    mut map<int, string> names ← empty
     names[9] ← "y"
     names[5] ← "x"
-    var list<int> nameKeys ← names ↦ list<int>
+    mut list<int> nameKeys ← names ↦ list<int>
     nameKeys.sort()
     print nameKeys
-    var list<string> nameValues ← names ↦ list<string>
+    mut list<string> nameValues ← names ↦ list<string>
     nameValues.sort()
     print nameValues
 
-    var map<string, int> counts ← empty
+    mut map<string, int> counts ← empty
     counts["b"] ← 2
     counts["a"] ← 1
-    var list<string> countKeys ← counts ↦ list<string>
+    mut list<string> countKeys ← counts ↦ list<string>
     countKeys.sort()
     print countKeys
-    var list<int> countValues ← counts ↦ list<int>
+    mut list<int> countValues ← counts ↦ list<int>
     countValues.sort()
     print countValues
 }

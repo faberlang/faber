@@ -78,6 +78,8 @@ struct DefiniteAssignmentChecker<'a> {
     /// Write-once bindings: `fixum` locals and (immutable) parameters. A second
     /// assignment to any of these is rejected; the first initializes them.
     write_once: FxHashSet<DefId>,
+    /// Bare and `ref` parameters: the name may be re-pointed inside the callee.
+    repointable: FxHashSet<DefId>,
     errors: Vec<SemanticError>,
     /// Type table for tensor-index-mutation detection (bracket `ponde` sugar).
     types: &'a TypeTable,
@@ -101,6 +103,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
             states: FxHashMap::default(),
             sponte_slots: FxHashSet::default(),
             write_once: FxHashSet::default(),
+            repointable: FxHashSet::default(),
             errors: Vec::new(),
             types,
         }
@@ -151,6 +154,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
         self.states.clear();
         self.sponte_slots.clear();
         self.write_once.clear();
+        self.repointable.clear();
     }
 
     fn register_param(&mut self, param: &HirParam) {
@@ -160,8 +164,17 @@ impl<'a> DefiniteAssignmentChecker<'a> {
         // (they lower to Rust `mut` bindings). Unmarked/`ref` parameters are
         // write-once: they are already initialized by the caller, so any
         // assignment is a reassignment.
+        // A `ref` parameter is not write-once at all: re-pointing it is legal
+        // and a write through it is the borrow pass's single `assign_through_ref`.
+        // A bare parameter is `ref` by default: re-pointing the name is legal,
+        // a write through it stays this pass's rejection.
         if !matches!(param.mode, HirParamMode::In) && !self.types.is_exclusive_value(param.ty) {
-            self.write_once.insert(param.def_id);
+            if matches!(param.mode, HirParamMode::De) {
+                self.repointable.insert(param.def_id);
+            } else {
+                self.write_once.insert(param.def_id);
+                self.repointable.insert(param.def_id);
+            }
         }
         if param.sponte {
             self.sponte_slots.insert(param.def_id);
@@ -238,8 +251,20 @@ impl<'a> DefiniteAssignmentChecker<'a> {
     /// Reject a second assignment to a write-once (`fixum`/param) binding.
     /// The first assignment transitions `Unassigned → Assigned`; any later
     /// assignment (when the state is `Assigned` or `MaybeAssigned`) is illegal.
-    fn enforce_write_once(&mut self, def_id: DefId, span: radix_lexer::Span) {
+    fn enforce_write_once(&mut self, def_id: DefId, span: radix_lexer::Span, repoint: bool) {
         if !self.write_once.contains(&def_id) {
+            return;
+        }
+        // Re-pointing a parameter name is legal (callee-local); only a write
+        // through it is refused.
+        if self.repointable.contains(&def_id) {
+            if !repoint {
+                self.error(
+                    SemanticErrorKind::AssignToImmutableBorrow,
+                    crate::types::ISSUE_ASSIGN_TO_DE_PARAMETER,
+                    span,
+                );
+            }
             return;
         }
         if matches!(
@@ -321,7 +346,8 @@ impl<'a> DefiniteAssignmentChecker<'a> {
             // scalar/struct bindings. The HIR object carries its typecheck
             // type, so a tensor-typed index base is a mutation, not an assign.
             if !self.is_tensor_index_mutation(target) {
-                self.enforce_write_once(def_id, target.span);
+                let repoint = matches!(target.kind, HirExpressionKind::Path(_));
+                self.enforce_write_once(def_id, target.span, repoint);
                 self.mark_assigned(def_id);
             }
         } else {
@@ -347,7 +373,8 @@ impl<'a> DefiniteAssignmentChecker<'a> {
         if let Some(def_id) = Self::root_def_id(target) {
             self.check_projection_inputs(target);
             self.read_binding(def_id, target.span);
-            self.enforce_write_once(def_id, target.span);
+            let repoint = matches!(target.kind, HirExpressionKind::Path(_));
+            self.enforce_write_once(def_id, target.span, repoint);
             self.mark_assigned(def_id);
         } else {
             self.visit_expr(target);

@@ -13,8 +13,8 @@ locale = "en"
 # =============================================================================
 
 main {
-    var list<int> a ← [1, 2, 3]
-    var list<int> b ← a
+    mut list<int> a ← [1, 2, 3]
+    mut list<int> b ← a
     b.append(4)
     print a.length()
 }

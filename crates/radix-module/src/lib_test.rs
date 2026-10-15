@@ -83,8 +83,8 @@ fn shape_generic_tensor_reple_value_emits_filled_copy() {
     let result = compiler.compile_str(
         "generic-shape.fab",
         r"functio sgd_step<magnitudo Figura>(tensor<f32, Figura> param, tensor<f32, Figura> grad, f32 lr) → tensor<f32, Figura> {
-    fixum tensor<f32, Figura> lr_fill ← param.reple(lr)
-    fixum tensor<f32, Figura> scaled ← grad ⊙ lr_fill
+    sit tensor<f32, Figura> lr_fill ← param.reple(lr)
+    sit tensor<f32, Figura> scaled ← grad ⊙ lr_fill
     redde param - scaled
 }",
     );

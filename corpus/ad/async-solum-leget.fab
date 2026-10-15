@@ -36,7 +36,7 @@ import from "norma:fs" charta
 import from "norma:process" process
 
 async_main {
-    const string textPath ← "§/faber-async-fs-leget-§.txt"(charta.temp_dir(), process.pid())
+    let string textPath ← "§/faber-async-fs-leget-§.txt"(charta.temp_dir(), process.pid())
     charta.write_file(textPath, "async fs\n")
     await_const string body ← charta.read_file_async<string>(textPath)
     assert body ≡ "async fs\n"

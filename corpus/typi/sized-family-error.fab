@@ -37,6 +37,6 @@ diagnostic = "PARSE040:numeric_wrapper_retired"
 # pin the PARSE040 `numeric_wrapper_retired` diagnostic the parser gives every wrapped form (N7d).
 
 main {
-    const int<f32> invalid ← 1.0 ∷ f32
+    let int<f32> invalid ← 1.0 ∷ f32
     print invalid
 }

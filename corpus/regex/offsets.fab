@@ -38,16 +38,16 @@ locale = "en"
 # The one-letter text for a code point: characters that are invisible or look like another
 # letter are written by number, never as a literal.
 fn u(int n) → string {
-    const char c ← n ↦ char via Code ⊥ '?'
+    let char c ← n ↦ char via Code ⊥ '?'
     return c ↦ string
 }
 
 # The code point span of every match, left to right, as ` (start,end)`; ` none` for no match.
 fn spans(string pat, string text) → string {
     do {
-        const regex r ← pat ↦ regex
-        var string out ← ""
-        for from r.find_all(text) const h {
+        let regex r ← pat ↦ regex
+        mut string out ← ""
+        for from r.find_all(text) let h {
             out ← out + " (§,§)"(h.start(), h.end())
         }
         if out ≡ "" {
@@ -63,8 +63,8 @@ fn spans(string pat, string text) → string {
 # The code point span of the leftmost match, as `(start,end)`; `none` for no match.
 fn first(string pat, string text) → string {
     do {
-        const regex r ← pat ↦ regex
-        const _ h ← r.find(text)
+        let regex r ← pat ↦ regex
+        let h ← r.find(text)
         if h ≡ null {
             return "none"
         }

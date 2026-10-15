@@ -1,0 +1,88 @@
++++
+locale = "en"
++++
+# Enumerations and tagged unions: ordo conversions, structural equality,
+# variant patterns binding payload fields, display of every variant shape.
+enum Color {
+    red,
+    green = 5,
+    blue
+}
+
+enum Status {
+    pending = 10,
+    active,
+    done = -3,
+    archived
+}
+
+union Shape {
+    Circle { int radius },
+    Rect { int w
+           int h },
+    Label { string text },
+    Nothing
+}
+
+fn name(Color c) → string {
+    switch c {
+        case Color.red { return "r" }
+        case Color.green { return "g" }
+        case Color.blue { return "b" }
+    }
+    return "?"
+}
+
+fn area(Shape s) → int {
+    match s {
+        case Circle let radius { return radius * radius * 3 }
+        case Rect let w, h { return w * h }
+        case Label let text { return text.length() }
+        case Nothing { return 0 }
+    }
+}
+
+fn classify_shape(Shape s) → none {
+    match s {
+        case Rect let w, _ {
+            print "wide §"(w)
+        }
+        case Nothing {
+            print "nothing"
+        }
+        case _ {
+            print "other"
+        }
+    }
+}
+
+main {
+    let Color c ← Color.green
+    print c, name(c), c ↦ int, c ↦ string
+    print Status.active ↦ int, Status.archived ↦ int, Status.done ↦ int
+    let Color found ← 6 ↦ Color ⊥ Color.red
+    let Color missing ← 9 ↦ Color ⊥ Color.red
+    print found, missing
+    let bool same ← c ≡ Color.green
+    let bool other ← c ≢ Color.green
+    print same, other
+
+    let Shape a ← variant Circle { radius = 3 } ∷ Shape
+    let Shape b ← variant Circle { radius = 3 } ∷ Shape
+    let Shape r ← variant Rect { w = 2, h = 5 } ∷ Shape
+    let Shape l ← variant Label { text = "abc" } ∷ Shape
+    let Shape n ← variant Nothing ∷ Shape
+    print a, r, l, n
+    print area(a), area(r), area(l), area(n)
+    let bool t1 ← a ≡ b
+    let bool t2 ← a ≡ r
+    let bool t3 ← l ≡ variant Label { text = "abc" } ∷ Shape
+    print t1, t2, t3
+    classify_shape(r)
+    classify_shape(n)
+    classify_shape(a)
+    print "§ and §"(r, c)
+    mut Shape v ← a
+    v ← l
+    print v
+}

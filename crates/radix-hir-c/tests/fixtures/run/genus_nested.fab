@@ -5,14 +5,14 @@ locale = "en"
 # a method builds text in the arena, and a genus passed to a function is the
 # caller's genus.
 class Tag {
-    var string label = "none"
-    var bool hot = false
+    mut string label = "none"
+    mut bool hot = false
 }
 
 class Item {
-    var int id = 0
-    var Tag tag = { label = "default" }
-    var list<int> counts = empty
+    mut int id = 0
+    mut Tag tag = { label = "default" }
+    mut list<int> counts = empty
 
     fn describe() → string {
         return "item §: §"(self.id, self.tag.label)
@@ -25,8 +25,8 @@ fn heat(mut Item item) {
 }
 
 main {
-    var Item a ← { id = 1, tag = { label = "x\ty", hot = false } }
-    var Item b ← { id = 2 }
+    mut Item a ← { id = 1, tag = { label = "x\ty", hot = false } }
+    mut Item b ← { id = 2 }
     heat(mut a)
     heat(mut a)
     print a

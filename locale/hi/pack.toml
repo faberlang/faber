@@ -16,7 +16,7 @@ sit = "बैठा"
 typus = "प्रकार"
 schema = "स्कीमा"
 columna = "कॉलम"
-varia = "चर"
+varia = "परिवर्तनीय"
 ceteri = "बाकी"
 errata = "त्रुटि"
 exitus = "निर्गम"
@@ -95,7 +95,7 @@ maxima = "अधिकतम"
 minima = "न्यूनतम"
 de = "से"
 ex = "सेवन"
-in = "में"
+in = "परिवर्तनीय"
 own = "स्वामित्व"
 copy = "प्रतिलिपि"
 axis = "अक्ष"
@@ -252,6 +252,14 @@ help = "पंक्ति या फ़ाइल के अंत से पह
 message = "समाप्त न हुआ octeti literal"
 help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
 
+[diagnostics.LEX001.issues.unterminated_regex_literal]
+message = "समाप्त न हुआ regex literal"
+help = "पंक्ति या फ़ाइल के अंत से पहले regex literal बंद करें"
+
+[diagnostics.LEX001.issues.empty_regex_literal]
+message = "खाली regex literal; slashes के बीच एक pattern लिखें"
+help = "slashes के बीच एक pattern लिखें"
+
 [diagnostics.LEX001.issues.unterminated_string_literal]
 message = "समाप्त न हुआ string literal"
 help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
@@ -287,6 +295,14 @@ help = "numeric separators और base prefixes जांचें"
 [diagnostics.LEX002.issues.invalid_integer]
 message = "अमान्य integer"
 help = "numeric separators और base prefixes जांचें"
+
+[diagnostics.LEX002.issues.float_overflow]
+message = "फ़्लोट अक्षर बहुत बड़ा है; यह अनंत तक अतिप्रवाहित हो जाता है"
+help = "छोटा परिमाण लिखें, या इकाई को मापें"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "फ़्लोट अक्षर बहुत छोटा है; यह शून्य तक अधःप्रवाहित हो जाता है"
+help = "बड़ा परिमाण लिखें, या इकाई को मापें"
 
 [diagnostics.LEX003]
 message = "अमान्य escape sequence"
@@ -340,6 +356,22 @@ help = "पहले lexer error ठीक करें; parsing साफ token
 message = "token अपेक्षित है"
 help = "सुनिश्चित करें कि इस स्थान पर अपेक्षित token मौजूद है"
 
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "कॉपी-इन ऑपरेटर `{operator}` के बाद एक मान आवश्यक है"
+help = "`⇇` के बाद स्रोत अभिव्यक्ति लिखें"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "टपल तत्व लेबल `{label}` एक से अधिक बार प्रयोग किया गया है"
+help = "प्रत्येक तत्व को अलग लेबल दें, या लेबल हटा दें"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "implements स्लॉट को एक अनुबंध का नाम देना चाहिए; `_` अनुरूपता घोषणा नहीं है"
+help = "implements क्लॉज़ में अनुबंध का नाम लिखें"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "आयात फ़ील्ड एक पहचानकर्ता होना चाहिए"
+help = "आयातित फ़ील्ड के लिए एक सरल नाम लिखें"
+
 [diagnostics.PARSE001.issues.annotation_name]
 message = "annotation नाम अपेक्षित है"
 help = "@ के बाद annotation नाम जोड़ें"
@@ -371,10 +403,6 @@ help = "केवल एक '{keyword}' rest binding रखें"
 [diagnostics.PARSE001.issues.sit_identifier_binding]
 message = "'{keyword}' सीधे एक identifier bind करता है; '{keyword}' name ← expr का उपयोग करें"
 help = "'{keyword}' name ← expr लिखें या typed/destructured bindings के लिए fixum का उपयोग करें"
-
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit destructuring patterns का समर्थन नहीं करता"
-help = "destructuring pattern के साथ fixum का उपयोग करें"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "test case या setup अपेक्षित है"
@@ -511,6 +539,50 @@ help = "method को genus पर घोषित करें"
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "`{marker}` marker अब binding पर नहीं लगता; यह value पर लगता है"
 help = "`{keyword} T {name} ← {marker} value` लिखें; बाद का `{name} ← {marker} value` value को उसी तरह चिह्नित करता है, और parameter अपने type से पहले `{marker}` रखता है"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "रन-टाइम `{keyword}` घोषणा हटा दी गई है; `{name}` एक रन-टाइम नाम है"
+help = "`{sit} T {name} ← …` लिखें (प्रकार अनुमान के लिए `{sit} {name} ← …`); `{fixum}` कंपाइल-टाइम तथ्य बताता है और `=` के साथ आता है"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "`{keyword}` बाइंडर शब्द हटा दिया गया है"
+help = "बाइंडर `{sit}` (स्थिर नाम) या `{varia}` (लिखने योग्य नाम) लेते हैं; `{fixum}` कंपाइल-टाइम तथ्य बताता है और `=` के साथ आता है"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` बाइंडर शुरू नहीं कर सकता"
+help = "बाइंडर हर पुनरावृत्ति या मिलान के मान को नाम देता है; स्थिर नाम के लिए `{sit}` और लिखने योग्य नाम के लिए `{varia}` लिखें"
+
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "सदस्य संशोधक `{keyword}` हटा दिया गया है; प्रकार-स्तर का सदस्य एक स्थिरांक है"
+help = "`{fixum} T NAME = …` लिखें; `{fixum}` कंपाइल-टाइम तथ्य बताता है और क्लास सदस्य भी इसे लेता है"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "`{fixum}` सदस्य को कंपाइल-टाइम मान चाहिए"
+help = "`{fixum} T NAME = value` लिखें; प्रति-इंस्टेंस फ़ील्ड के लिए `{sit}` या `{varia}` इस्तेमाल करें"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "`{fixum}` सदस्य `=` से आरंभ होता है, `←` से नहीं"
+help = "`=` कंपाइल-टाइम तथ्य बताता है: `{fixum} T NAME = value` लिखें"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` किसी फ़ील्ड को संशोधित नहीं कर सकता"
+help = "फ़ील्ड केवल-पठन (`{sit}`) या लिखने योग्य (`{varia}`) होता है; प्रकार-स्तर का स्थिरांक `{fixum} T X = …` लिखा जाता है"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "`{keyword}` लोकल को पढ़ने के लिए एक स्थान चाहिए: `{keyword} T name ← place`"
+help = "`{keyword} T name ← place` लिखें, या प्रारंभिक स्थान के बिना नाम के लिए `{sit}` या `{varia}` का उपयोग करें"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "`{keyword}` लोकल एक ही नाम बाँधता है; इसे विघटित नहीं किया जा सकता"
+help = "`{keyword} T name ← place` लिखें, फिर उस नाम से हिस्से पढ़ें"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "`{keyword}` लोकल एक स्थान पढ़ता है और `{marker}` मान नहीं ले सकता"
+help = "स्थान पढ़ने के लिए `{keyword} T name ← place` लिखें, या स्वतंत्र मान के लिए `{sit} T name ← {marker} place`"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "`{keyword}` घोषणा-शब्द हटा दिया गया है; `{name}` एक लिखने योग्य नाम है"
+help = "`{varia} T {name} ← …` लिखें; लिखने योग्य रन-टाइम नाम `{varia}` है"
 
 [diagnostics.PARSE011]
 message = "'{functio}' के बाद function नाम अपेक्षित है"
@@ -1043,6 +1115,10 @@ help = "lowering के लिए AST construct ठीक करें"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "टिप्पणी जोड़ने के लिए कोई lowered statement या item नहीं है"
 help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "`@ conversion` फ़ंक्शन को ठीक एक पैरामीटर लेना चाहिए और ठीक एक रिटर्न प्रकार घोषित करना चाहिए"
+help = "रूपांतरण जोड़ी के लिए `functio name(Source) → Destination` लिखें"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia के लिए एक type parameter आवश्यक है"
@@ -2616,6 +2692,10 @@ help = "representation बदलने से पहले element widths को
 message = "conversio failure को propagate करने के लिए `textus` alternate-exit channel आवश्यक है"
 help = "alternate-exit channel को textus के रूप में घोषित करें या inline recovery दें"
 
+[diagnostics.SEM016.issues.conversio_failure_channel_value_required]
+message = "sermo materialization failure को propagate करने के लिए `value` alternate-exit channel आवश्यक है"
+help = "alternate-exit channel को value, unknown या registered value conversion के रूप में घोषित करें"
+
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "regex रूपांतरण के लिए textus या ascii operand आवश्यक है"
 help = "textus या ascii मानों को regex में रूपांतरित करें"
@@ -2767,6 +2847,10 @@ help = "reassignment की अनुमति के लिए `varia` binding 
 [diagnostics.SEM020.issues.assignment_to_constant]
 message = "constant को assignment"
 help = "reassignment की अनुमति के लिए `varia` binding का उपयोग करें, या अतिरिक्त assignment हटाएँ"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "{fixum} सदस्य '{field}' में असाइनमेंट"
+help = "{fixum} सदस्य प्रकार का कंपाइल-टाइम स्थिरांक है और उसमें कभी लिखा नहीं जाता; बदलने वाली स्थिति के लिए {varia} फ़ील्ड इस्तेमाल करें"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "अपरिवर्तनीय binding को दूसरा assignment"
@@ -3687,9 +3771,21 @@ message = "रिडक्शन संक्रिया के बाद र�
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "'{lege}' या '{lineam}' अपेक्षित है"
 
+[diagnostics.PARSE001.issues.expected_identifier]
+message = "एक identifier अपेक्षित है"
+help = "यहाँ एक identifier name रखें"
+
+[diagnostics.PARSE001.issues.expected_string_literal]
+message = "एक string literal अपेक्षित है"
+help = "यहाँ एक quoted string literal रखें"
+
 [diagnostics.PARSE001.issues.expected_mutability_keyword]
 message = "'{fixum}' या '{varia}' अपेक्षित है"
 help = "declaration को '{fixum}' या '{varia}' keyword से शुरू करें"
+
+[diagnostics.PARSE001.issues.await_binding_requires_name]
+message = "'↢' से पहले एक named binding अपेक्षित है"
+help = "'↢' को एक नाम से bind करें; destructuring '←' का उपयोग करता है"
 
 [diagnostics.PARSE001.issues.expected_method_declaration]
 message = "method declaration अपेक्षित है"
@@ -3699,6 +3795,10 @@ help = "method को '{functio}' declaration के रूप में लि�
 message = "'{praepara}' हुक अपेक्षित है"
 help = "'{praepara}', '{praeparabit}', '{postpara}' या '{postparabit}' लिखें"
 
+[diagnostics.PARSE001.issues.expected_lane_value]
+message = "एक string literal या identifier अपेक्षित है"
+help = "lane value को quoted string या bare name के रूप में लिखें"
+
 [diagnostics.PARSE001.issues.expected_scribe_keyword]
 message = "'{scribe}' keyword अपेक्षित है"
 help = "'{scribe}', '{vide}', '{mone}' या '{nota}' लिखें"
@@ -3706,6 +3806,14 @@ help = "'{scribe}', '{vide}', '{mone}' या '{nota}' लिखें"
 [diagnostics.PARSE001.issues.expected_incipit_keyword]
 message = "'{incipit}' या '{incipiet}' अपेक्षित है"
 help = "entry point को '{incipit}' या '{incipiet}' से शुरू करें"
+
+[diagnostics.PARSE001.issues.enum_member_value_number]
+message = "'=' के बाद एक number अपेक्षित है"
+help = "'=' के बाद integer लिखें या '=' हटाएं"
+
+[diagnostics.PARSE001.issues.enum_member_value]
+message = "एक enum member value अपेक्षित है"
+help = "'=' के बाद integer या string लिखें"
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "elige body के लिए एक opening brace अपेक्षित है"

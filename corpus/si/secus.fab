@@ -44,7 +44,7 @@ locale = "en"
 
 main {
     # Two-way branch: exactly one arm runs
-    const int puncta ← 85
+    let int puncta ← 85
     if puncta ≥ 90 {
         print "gradus: A"
     }
@@ -54,7 +54,7 @@ main {
     }
 
     # Each branch may contain several statements
-    const int calor ← 22
+    let int calor ← 22
     if calor ≻ 30 {
         print "calidum"
         print "aquam bibe"
@@ -66,7 +66,7 @@ main {
     }
 
     # sin chains additional tests; first match wins (75 → C)
-    const int gradus ← 75
+    let int gradus ← 75
     if gradus ≥ 90 {
         print "A - optimum"
     }

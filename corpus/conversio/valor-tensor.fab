@@ -30,15 +30,15 @@ locale = "en"
 # flatten via `tensor ↦ lista` (`.flatten()`), then `lista ↦ valor` boxing.
 
 main {
-    const value arr ← [1, 2, 3, 4]
-    const list<int> xs ← arr ↦ list<int>
+    let value arr ← [1, 2, 3, 4]
+    let list<int> xs ← arr ↦ list<int>
     assert xs.length() ≡ 4
-    const tensor<int, [4]> grid ← xs ↦ tensor<int, [4]>
-    const list<int> flat ← grid ↦ list<int>
+    let tensor<int, [4]> grid ← xs ↦ tensor<int, [4]>
+    let list<int> flat ← grid ↦ list<int>
     assert flat.length() ≡ 4
-    const value roundtrip ← flat ↦ value
+    let value roundtrip ← flat ↦ value
     print roundtrip
-    const value obj ← { "alpha": 10, "beta": 20 } ↦ value
-    const map<string, int> scores ← obj ↦ map<string, int>
+    let value obj ← { "alpha": 10, "beta": 20 } ↦ value
+    let map<string, int> scores ← obj ↦ map<string, int>
     print scores.get("alpha") coalesce 0
 }

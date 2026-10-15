@@ -473,7 +473,7 @@ impl FunctionBuilder<'_> {
             interface_implementors: Arc::clone(&context.interface_implementors),
             imported_method_providers: Arc::clone(&context.imported_method_providers),
             gpu_builtins: Arc::clone(&context.gpu_builtins),
-            cli_record_fields_by_local: Arc::clone(&context.cli_record_fields_by_local),
+            cli_parsed_record_fields_by_type: Arc::clone(&context.cli_parsed_record_fields_by_type),
             cli_record_fields_by_type: Arc::clone(&context.cli_record_fields_by_type),
             cli_adapter_active: context.cli_adapter_active,
             kernel_lowering: context.kernel_lowering,

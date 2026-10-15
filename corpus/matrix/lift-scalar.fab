@@ -88,7 +88,7 @@ fn lowered(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2, 2]>
 }
 
 main {
-    const matrix<f32, [2, 2]> a ← [[1.0, 2.0], [4.0, 8.0]] ↦ matrix<f32, [2, 2]>
+    let matrix<f32, [2, 2]> a ← [[1.0, 2.0], [4.0, 8.0]] ↦ matrix<f32, [2, 2]>
     print scaled(a, 2.5)
     print scaled_left(a, 2.5)
     print shrunk(a, 4.0)
@@ -99,9 +99,9 @@ main {
     print flipped(a)
     print a
     print true_scaled(a, 4.0)
-    const matrix<f32, [2, 2]> b ← [[4.0, 2.0], [1.0, 16.0]] ↦ matrix<f32, [2, 2]>
+    let matrix<f32, [2, 2]> b ← [[4.0, 2.0], [1.0, 16.0]] ↦ matrix<f32, [2, 2]>
     print true_paired(a, b)
-    const matrix<i32, [2, 2]> n ← [[7, 8], [9, 10]] ↦ matrix<i32, [2, 2]>
+    let matrix<i32, [2, 2]> n ← [[7, 8], [9, 10]] ↦ matrix<i32, [2, 2]>
     print true_ints(n)
     print raised(a, 3.0)
     print lowered(a, b)

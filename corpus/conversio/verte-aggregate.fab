@@ -41,15 +41,15 @@ locale = "en"
 #   10
 
 class Civis {
-    var string nomen
-    var string regio = "Roma"
-    var int aetas optional
+    mut string nomen
+    mut string regio = "Roma"
+    mut int aetas optional
 }
 
 main {
-    const Civis civis ← Civis { nomen = "Livia" }
-    const list<int> numeri ← [1, 2, 3] ∷ list<int>
-    const map<string, int> puncta ← { "alpha": 10, "beta": 20 }
+    let Civis civis ← Civis { nomen = "Livia" }
+    let list<int> numeri ← [1, 2, 3] ∷ list<int>
+    let map<string, int> puncta ← { "alpha": 10, "beta": 20 }
     print civis.nomen
     print civis.regio
     print civis.aetas coalesce 0

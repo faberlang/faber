@@ -103,7 +103,7 @@ fn field_annotation_with_payload_survives_format() {
     );
     let emitted = result.output.expect("output").code;
     assert!(
-        emitted.contains("@ json { name = \"wire_name\" }\n    var string name"),
+        emitted.contains("@ json { name = \"wire_name\" }\n    mut string name"),
         "the field annotation must stay on its field:\n{emitted}"
     );
 }
@@ -184,7 +184,7 @@ fn modifier_binding_keeps_its_own_kind_and_order() {
     let emitted = reemit(&source, "en");
     assert!(
         emitted.contains("fn run() options opts errors failure"),
-        "each binding keeps its modifier keyword, in authored order:\n{emitted}"
+        "each binding keeps its modifier keyword, varia authored order:\n{emitted}"
     );
 }
 
@@ -217,7 +217,7 @@ fn function_without_modifier_bindings_is_unchanged() {
 #[test]
 fn record_annotation_keeps_its_hole_and_authored_order() {
     let source = format!(
-        "{EN}main {{\n    const record<g: _, w: int> hole ← record<g: f32, w: int> {{ g = 1.0, w = 2 }}\n    print hole.w\n}}\n"
+        "{EN}main {{\n    let record<g: _, w: int> hole ← record<g: f32, w: int> {{ g = 1.0, w = 2 }}\n    print hole.w\n}}\n"
     );
     let emitted = reemit(&source, "en");
     assert!(
@@ -230,7 +230,7 @@ fn record_annotation_keeps_its_hole_and_authored_order() {
 #[test]
 fn record_annotation_keeps_authored_field_order() {
     let source = format!(
-        "{EN}main {{\n    const record<w: int, g: _> hole ← record<g: f32, w: int> {{ g = 1.0, w = 2 }}\n    print hole.w\n}}\n"
+        "{EN}main {{\n    let record<w: int, g: _> hole ← record<g: f32, w: int> {{ g = 1.0, w = 2 }}\n    print hole.w\n}}\n"
     );
     let emitted = reemit(&source, "en");
     assert!(emitted.contains("record<w: int, g: _> hole"), "{emitted}");

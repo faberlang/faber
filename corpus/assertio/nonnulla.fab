@@ -41,18 +41,18 @@ locale = "en"
 #   Rust: assertio !. not yet emitted — compile-only smoke.
 
 class Persona {
-    var string nomen
-    var string urbs optional
+    mut string nomen
+    mut string urbs optional
 }
 
 main {
     # Optional genus value — !. asserts it is not nihil before field access
-    const Persona ∪ none p ← Persona { nomen = "Marcus", urbs = "Roma" }
+    let Persona ∪ none p ← Persona { nomen = "Marcus", urbs = "Roma" }
     print p!.nomen
     print p!.urbs
 
     # !. on lista index — asserts element exists
-    const list<string, 3> litterae ← ["a", "b", "c"]
+    let list<string, 3> litterae ← ["a", "b", "c"]
     print litterae![0]
     print litterae![2]
 }

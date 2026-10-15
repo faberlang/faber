@@ -17,7 +17,7 @@ main {
     console.write_line("line-one")
     console.write_partial("partial-")
     console.write_line("then-line")
-    const list<b8> bytes ← [0x68, 0x69, 0x0a]
+    let list<b8> bytes ← [0x68, 0x69, 0x0a]
     console.write_bytes(bytes)
     console.warn_line("warn-one")
     console.debug_line("debug-one")

@@ -4,7 +4,7 @@ use crate::test_support::args_have_no_legacy_message;
 use crate::{ParseErrorKind, parse};
 use radix_lexer::{INLINE_COMMENT_ISSUE, LexErrorKind, lex};
 
-const BRACE_INLINE_FIXTURE: &str = "functio f() → vacuum { fixum numerus x ← 1  # inline }\n";
+const BRACE_INLINE_FIXTURE: &str = "functio f() → vacuum { sit numerus x ← 1  # inline }\n";
 
 fn inline_hash_offset(source: &str) -> u32 {
     u32::try_from(source.find('#').expect("# in fixture"))

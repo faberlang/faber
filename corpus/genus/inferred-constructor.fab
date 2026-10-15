@@ -21,8 +21,8 @@ locale = "en"
 # =============================================================================
 
 class Punctum {
-    var int x = 0
-    var int y = 0
+    mut int x = 0
+    mut int y = 0
 }
 
 fn origo() → Punctum {
@@ -30,11 +30,11 @@ fn origo() → Punctum {
 }
 
 main {
-    const Punctum a ← _ { x = 1, y = 2 }
+    let Punctum a ← _ { x = 1, y = 2 }
     print a.x
     print a.y
 
-    const Punctum b ← origo()
+    let Punctum b ← origo()
     print b.x
     print b.y
 }

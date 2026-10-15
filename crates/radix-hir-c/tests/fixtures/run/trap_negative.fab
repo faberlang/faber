@@ -4,8 +4,8 @@ locale = "en"
 # Below the representation cap the exact model traps `numerus overflow`
 # before any store; the fast path's fallback must give the same trap.
 main {
-    var int big ← 9223372036854775807
+    mut int big ← 9223372036854775807
     print "before"
-    var int low ← 0 - big - 10
+    mut int low ← 0 - big - 10
     print low
 }

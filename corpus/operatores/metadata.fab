@@ -36,7 +36,7 @@ locale = "en"
 #   Per-file metadata belongs in +++ frontmatter, not line-start § directives.
 
 main {
-    const string nomen ← "Marcus"
+    let string nomen ← "Marcus"
     print "Salve, §!"(nomen)
     print "§ + § = §"(1, 2, 3)
 }

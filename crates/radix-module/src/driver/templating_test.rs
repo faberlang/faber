@@ -14,9 +14,9 @@ use crate::test_support::{assert_compile_fails_with_args, assert_compile_fails_w
 fn backtick_template_captures_forma_without_rendering() {
     let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
-  fixum textus accountId ← "acct-1"
-  fixum textus plan ← "pro"
-  fixum _ q ← `select * from accounts where id = § and plan = §`(accountId, plan)
+  sit textus accountId ← "acct-1"
+  sit textus plan ← "pro"
+  sit q ← `select * from accounts where id = § and plan = §`(accountId, plan)
   nota q.template
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -35,7 +35,7 @@ fn backtick_template_captures_forma_without_rendering() {
 fn bare_backtick_template_produces_empty_params() {
     let session = test_session_la(Target::HirRust);
     let source = r"incipit {
-  fixum _ q ← `select 1`
+  sit q ← `select 1`
   nota q.template
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -50,9 +50,9 @@ fn bare_backtick_template_produces_empty_params() {
 fn forma_reused_textus_param_is_borrowed_not_moved() {
     let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
-  fixum textus t ← "x"
-  fixum _ first ← `§`(t)
-  fixum _ second ← `§`(t)
+  sit textus t ← "x"
+  sit first ← `§`(t)
+  sit second ← `§`(t)
   nota first.template
   nota second.template
 }"#;
@@ -71,8 +71,8 @@ fn forma_reused_textus_param_is_borrowed_not_moved() {
 fn quoted_template_still_renders_via_scriptum() {
     let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
-  fixum textus name ← "Mundus"
-  fixum textus message ← "Hello, §!"(name)
+  sit textus name ← "Mundus"
+  sit textus message ← "Hello, §!"(name)
   nota message
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -87,8 +87,8 @@ fn quoted_template_still_renders_via_scriptum() {
 fn compile_lowers_scriptum_expression() {
     let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
-  fixum _ name ← "Marcus"
-  fixum _ msg ← scriptum("salve, §!", name)
+  sit name ← "Marcus"
+  sit msg ← scriptum("salve, §!", name)
   nota msg
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -102,7 +102,7 @@ fn compile_lowers_scriptum_expression() {
 #[test]
 fn block_string_literal_uses_guillemets() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  fixum _ quote ← «he said \"salve\"»\n  nota quote\n}";
+    let source = "incipit {\n  sit quote ← «he said \"salve\"»\n  nota quote\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
@@ -113,7 +113,7 @@ fn block_string_literal_uses_guillemets() {
 #[test]
 fn block_string_opener_glyphs_are_rejected() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  fixum _ quote ← ❝he said \"salve\"❞\n  nota quote\n}";
+    let source = "incipit {\n  sit quote ← ❝he said \"salve\"❞\n  nota quote\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
@@ -130,7 +130,8 @@ fn block_string_opener_glyphs_are_rejected() {
 #[test]
 fn guillemet_block_string_template_renders_via_scriptum() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  fixum _ code ← 200\n  fixum _ label ← \"ok\"\n  fixum _ msg ← «status: § (§)»(code, label)\n  nota msg\n}";
+    let source =
+        "incipit {\n  sit code ← 200\n  sit label ← \"ok\"\n  sit msg ← «status: § (§)»(code, label)\n  nota msg\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
@@ -144,7 +145,7 @@ fn guillemet_block_string_template_renders_via_scriptum() {
 #[test]
 fn ascii_literal_compiles_to_faber_ascii() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  fixum _ route ← 'pg:query'\n  nota route\n}";
+    let source = "incipit {\n  sit route ← 'pg:query'\n  nota route\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
@@ -159,7 +160,7 @@ fn ascii_literal_rejects_non_ascii_content() {
     assert_compile_fails_with_args(
         &session,
         "test.fab",
-        "incipit {\n  fixum _ bad ← 'café'\n  nota bad\n}",
+        "incipit {\n  sit bad ← 'café'\n  nota bad\n}",
         &[
             DiagnosticArg::new("issue", "ascii_literal_non_ascii_scalar"),
             DiagnosticArg::new("character", "é"),
@@ -173,7 +174,7 @@ fn ascii_literal_rejects_template_application() {
     assert_compile_fails_with_args(
         &session,
         "test.fab",
-        "incipit {\n  fixum _ id ← 1\n  fixum _ bad ← 'route'(id)\n  nota bad\n}",
+        "incipit {\n  sit id ← 1\n  sit bad ← 'route'(id)\n  nota bad\n}",
         &[DiagnosticArg::new("issue", "ascii_literal_template_application")],
     );
 }
@@ -182,7 +183,7 @@ fn ascii_literal_rejects_template_application() {
 #[test]
 fn ascii_widens_to_textus() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  fixum _ route ← 'pg:query'\n  fixum textus shown ← route\n  nota shown\n}";
+    let source = "incipit {\n  sit route ← 'pg:query'\n  sit textus shown ← route\n  nota shown\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
@@ -194,7 +195,7 @@ fn ascii_widens_to_textus() {
 #[test]
 fn textus_to_ascii_conversio_emits_try_from_textus() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  fixum _ raw ← \"ok\"\n  fixum ascii token ← raw ↦ ascii\n  nota token\n}";
+    let source = "incipit {\n  sit raw ← \"ok\"\n  sit ascii token ← raw ↦ ascii\n  nota token\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
@@ -208,7 +209,7 @@ fn textus_to_ascii_conversio_emits_try_from_textus() {
 #[test]
 fn octeti_literal_compiles_to_vec_u8() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  fixum octeti sig ← |de ad be ef|\n  fixum octeti empty_octeti ← ||\n  nota sig\n}";
+    let source = "incipit {\n  sit octeti sig ← |de ad be ef|\n  sit octeti empty_octeti ← ||\n  nota sig\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
@@ -223,7 +224,7 @@ fn octeti_literal_rejects_odd_hex_digit_count() {
     assert_compile_fails_with_args(
         &session,
         "test.fab",
-        "incipit {\n  fixum octeti bad ← |abc|\n  nota bad\n}",
+        "incipit {\n  sit octeti bad ← |abc|\n  nota bad\n}",
         &[DiagnosticArg::new("issue", "octeti_literal_odd_digit_count")],
     );
 }
@@ -234,7 +235,7 @@ fn octeti_literal_rejects_invalid_hex_character() {
     assert_compile_fails_with_args(
         &session,
         "test.fab",
-        "incipit {\n  fixum octeti bad ← |de ad g0|\n  nota bad\n}",
+        "incipit {\n  sit octeti bad ← |de ad g0|\n  nota bad\n}",
         &[
             DiagnosticArg::new("issue", "octeti_literal_invalid_character"),
             DiagnosticArg::new("character", "g"),
@@ -248,7 +249,7 @@ fn octeti_literal_rejects_template_application() {
     assert_compile_fails_with_args(
         &session,
         "test.fab",
-        "incipit {\n  fixum _ id ← 1\n  fixum _ bad ← |00|(id)\n  nota bad\n}",
+        "incipit {\n  sit id ← 1\n  sit bad ← |00|(id)\n  nota bad\n}",
         &[DiagnosticArg::new("issue", "octeti_literal_template_application")],
     );
 }
@@ -258,7 +259,7 @@ fn octeti_literal_rejects_template_application() {
 fn octeti_literal_matches_in_elige_pattern() {
     let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
-  fixum _ bytes ← |deadbeef|
+  sit bytes ← |deadbeef|
   elige bytes {
     casu |deadbeef| ergo nota "hit"
     casu |00| ergo nota "miss"
@@ -284,7 +285,7 @@ fn octetus_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
     // `accipe` is the optional read (`b8 ∪ nihil`), and an optional into a plain
     // cell is SEM010 optional_into_plain_cell (sb300 1d034eee1e, need),
     // so each read is coalesced with a b8 default.
-    let source = "functio firstByte(octeti buf) → u8 {\n    fixum b8 b ← buf.accipe(0) vel (0 ∷ b8)\n    redde b ↦ u8\n}\n\nincipit {\n    varia octeti sig ← |de ad be ef|\n    fixum u8 a ← firstByte(sig)\n    fixum b8 raw ← sig.accipe(1) vel (0 ∷ b8)\n    sig.appende(raw)\n    nota a\n}\n";
+    let source = "functio firstByte(octeti buf) → u8 {\n    sit b8 b ← buf.accipe(0) vel (0 ∷ b8)\n    redde b ↦ u8\n}\n\nincipit {\n    varia octeti sig ← |de ad be ef|\n    sit u8 a ← firstByte(sig)\n    sit b8 raw ← sig.accipe(1) vel (0 ∷ b8)\n    sig.appende(raw)\n    nota a\n}\n";
     let result = compile(&session, "octet_builtin.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected success, got: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
@@ -311,7 +312,7 @@ fn octetus_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
 #[test]
 fn octetus_builtin_rejects_width_parameters() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit { fixum octetus<i32> x ← 1 }";
+    let source = "incipit { sit octetus<i32> x ← 1 }";
     let result = compile(&session, "octet_params.fab", source, ModuleCompileRequest::default());
     assert!(!result.success(), "expected octetus<i32> to be rejected, got success");
 }
@@ -322,11 +323,11 @@ fn octetus_builtin_rejects_width_parameters() {
 fn bare_assignment_rejects_valor_to_concrete_targets() {
     let session = test_session_la(Target::HirRust);
     for (name, source) in [
-        ("valor-to-numerus.fab", "incipit {\n  fixum numerus n ← { \"a\": 1 }\n}"),
-        ("valor-to-textus.fab", "incipit {\n  fixum textus s ← { \"a\": 1 }\n}"),
-        ("valor-to-bivalens.fab", "incipit {\n  fixum bivalens b ← { \"a\": 1 }\n}"),
-        ("valor-to-fractus.fab", "incipit {\n  fixum fractus f ← { \"a\": 1 }\n}"),
-        ("valor-to-lista.fab", "incipit {\n  fixum lista<numerus> xs ← { \"a\": 1 }\n}"),
+        ("valor-to-numerus.fab", "incipit {\n  sit numerus n ← { \"a\": 1 }\n}"),
+        ("valor-to-textus.fab", "incipit {\n  sit textus s ← { \"a\": 1 }\n}"),
+        ("valor-to-bivalens.fab", "incipit {\n  sit bivalens b ← { \"a\": 1 }\n}"),
+        ("valor-to-fractus.fab", "incipit {\n  sit fractus f ← { \"a\": 1 }\n}"),
+        ("valor-to-lista.fab", "incipit {\n  sit lista<numerus> xs ← { \"a\": 1 }\n}"),
     ] {
         assert_compile_fails_with_issue(&session, name, source, "expression_type_mismatch");
     }
@@ -338,13 +339,13 @@ fn bare_assignment_rejects_scalar_narrowing() {
     assert_compile_fails_with_issue(
         &session,
         "fractus-to-numerus.fab",
-        "incipit {\n  fixum numerus n ← 1.5\n}",
+        "incipit {\n  sit numerus n ← 1.5\n}",
         "expression_type_mismatch",
     );
     assert_compile_fails_with_issue(
         &session,
         "textus-to-ascii.fab",
-        "incipit {\n  fixum ascii a ← \"uber\"\n}",
+        "incipit {\n  sit ascii a ← \"uber\"\n}",
         "expression_type_mismatch",
     );
 }
@@ -355,22 +356,22 @@ fn bare_assignment_rejects_json_tabula_shape_mismatches() {
     for (name, source, issue) in [
         (
             "f8-null-to-numerus.fab",
-            "incipit {\n  fixum tabula<textus, numerus> x ← { \"a\": null }\n}",
+            "incipit {\n  sit tabula<textus, numerus> x ← { \"a\": null }\n}",
             "json_value_type_mismatch",
         ),
         (
             "f9-textus-to-numerus.fab",
-            "incipit {\n  fixum tabula<textus, numerus> x ← { \"a\": \"95\" }\n}",
+            "incipit {\n  sit tabula<textus, numerus> x ← { \"a\": \"95\" }\n}",
             "json_value_type_mismatch",
         ),
         (
             "f10-array-to-numerus.fab",
-            "incipit {\n  fixum tabula<textus, numerus> x ← { \"a\": [1, 2] }\n}",
+            "incipit {\n  sit tabula<textus, numerus> x ← { \"a\": [1, 2] }\n}",
             "json_nested_value_requires_valor",
         ),
         (
             "f11-wrong-key-type.fab",
-            "incipit {\n  fixum tabula<numerus, numerus> x ← { \"a\": 1 }\n}",
+            "incipit {\n  sit tabula<numerus, numerus> x ← { \"a\": 1 }\n}",
             "json_map_key_must_be_textus",
         ),
     ] {
@@ -394,13 +395,13 @@ fn explicit_assignment_rejects_numeric_narrowing() {
 fn bare_assignment_keeps_implicit_widening() {
     let session = test_session_la(Target::HirRust);
     for (name, source) in [
-        ("numerus-to-valor.fab", "incipit {\n  fixum valor v ← 5\n}"),
-        ("textus-to-valor.fab", "incipit {\n  fixum valor v ← \"str\"\n}"),
-        ("bivalens-to-valor.fab", "incipit {\n  fixum valor v ← verum\n}"),
-        ("lista-to-valor.fab", "incipit {\n  fixum valor v ← [1, 2, 3]\n}"),
-        ("json-to-valor.fab", "incipit {\n  fixum valor v ← { \"a\": 1 } ↦ valor\n}"),
-        ("numerus-to-fractus.fab", "incipit {\n  fixum fractus f ← 1\n}"),
-        ("ascii-to-textus.fab", "incipit {\n  fixum textus s ← 'ascii'\n}"),
+        ("numerus-to-valor.fab", "incipit {\n  sit valor v ← 5\n}"),
+        ("textus-to-valor.fab", "incipit {\n  sit valor v ← \"str\"\n}"),
+        ("bivalens-to-valor.fab", "incipit {\n  sit valor v ← verum\n}"),
+        ("lista-to-valor.fab", "incipit {\n  sit valor v ← [1, 2, 3]\n}"),
+        ("json-to-valor.fab", "incipit {\n  sit valor v ← { \"a\": 1 } ↦ valor\n}"),
+        ("numerus-to-fractus.fab", "incipit {\n  sit fractus f ← 1\n}"),
+        ("ascii-to-textus.fab", "incipit {\n  sit textus s ← 'ascii'\n}"),
     ] {
         let result = compile(&session, name, source, ModuleCompileRequest::default());
         assert!(
@@ -417,7 +418,7 @@ fn bare_json_literal_does_not_implicitly_assign_to_valor() {
     assert_compile_fails_with_issue(
         &session,
         "json-direct-valor.fab",
-        "incipit {\n  fixum valor v ← { \"a\": 1 }\n}",
+        "incipit {\n  sit valor v ← { \"a\": 1 }\n}",
         "initializer_annotation_mismatch",
     );
 }

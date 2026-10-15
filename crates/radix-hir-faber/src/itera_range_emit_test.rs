@@ -55,7 +55,8 @@ impl KeywordSurface for EnSurface {
         match key {
             "ab" => "range",
             "fixum" => "const",
-            "varia" => "var",
+            "sit" => "let",
+            "varia" => "mut",
             // The `en` pack's filum row (`filum = "thread"`), as emitted by
             // the locale-backed surface bridge.
             "filum" => "thread",
@@ -88,7 +89,8 @@ impl KeywordPack for EnPack {
             "at" => Some("apud"),
             "range" => Some("ab"),
             "const" => Some("fixum"),
-            "var" => Some("varia"),
+            "let" => Some("sit"),
+            "mut" => Some("varia"),
             "thread" => Some("filum"),
             _ => None,
         }
@@ -200,7 +202,7 @@ fn latin_two_series_round_trips() {
     let product = ctx.range_product(vec![int_range(0, 3), int_range(5, 7)], &["i", "j"]);
     let code = ctx.render(&product, &LatinSurface);
     assert!(
-        code.starts_with("itera ab 0‥3, 5‥7 fixum i, j {"),
+        code.starts_with("itera ab 0‥3, 5‥7 sit i, j {"),
         "N=2 Latin head must preserve the series, got:\n{code}"
     );
     assert_round_trips(&code, 2, 2, false);
@@ -215,7 +217,7 @@ fn latin_three_series_round_trips() {
     );
     let code = ctx.render(&product, &LatinSurface);
     assert!(
-        code.starts_with("itera ab 0‥2, 4‥6, 8‥10 fixum i, j, p {"),
+        code.starts_with("itera ab 0‥2, 4‥6, 8‥10 sit i, j, p {"),
         "N=3 Latin head must preserve the series, got:\n{code}"
     );
     assert_round_trips(&code, 3, 3, false);
@@ -227,7 +229,7 @@ fn english_two_series_round_trips() {
     let product = ctx.range_product(vec![int_range(0, 3), int_range(5, 7)], &["i", "j"]);
     let code = ctx.render(&product, &EnSurface);
     assert!(
-        code.starts_with("for range 0‥3, 5‥7 const i, j {"),
+        code.starts_with("for range 0‥3, 5‥7 let i, j {"),
         "N=2 English head must keep the documented `for range` form, got:\n{code}"
     );
     assert!(
@@ -246,7 +248,7 @@ fn english_three_series_round_trips() {
     );
     let code = ctx.render(&product, &EnSurface);
     assert!(
-        code.starts_with("for range 0‥2, 4‥6, 8‥10 const i, j, p {"),
+        code.starts_with("for range 0‥2, 4‥6, 8‥10 let i, j, p {"),
         "N=3 English head must keep the documented `for range` form, got:\n{code}"
     );
     assert_round_trips(&code, 3, 3, true);
@@ -276,13 +278,13 @@ fn latin_mutable_binder_emits_varia() {
 }
 
 #[test]
-fn english_mutable_binder_emits_var() {
+fn english_mutable_binder_emits_mut() {
     let mut ctx = Ctx::new();
     let product = mutable_range_product(&mut ctx);
     let code = ctx.render(&product, &EnSurface);
     assert!(
-        code.starts_with("for range 0‥3, 5‥7 var i, j {"),
-        "mutable English head must keep var, got:\n{code}"
+        code.starts_with("for range 0‥3, 5‥7 mut i, j {"),
+        "mutable English head must keep mut, got:\n{code}"
     );
     assert_round_trips(&code, 2, 2, true);
 }
@@ -312,7 +314,7 @@ fn filum_lane_binder_round_trips_on_single_source_itera() {
     let lane_itera = build(&mut ctx);
     let code = ctx.render(&lane_itera, &LatinSurface);
     assert!(
-        code.starts_with("itera ex 0‥3 apud [i] filum f fixum v {"),
+        code.starts_with("itera ex 0‥3 apud [i] filum f sit v {"),
         "Latin head must keep the lane-binder clause, got:\n{code}"
     );
     let lexed = radix_lexer::lex(&code);
@@ -333,7 +335,7 @@ fn filum_lane_binder_round_trips_on_single_source_itera() {
     let lane_itera = build(&mut ctx);
     let code = ctx.render(&lane_itera, &EnSurface);
     assert!(
-        code.starts_with("for from 0‥3 at [i] thread f const v {"),
+        code.starts_with("for from 0‥3 at [i] thread f let v {"),
         "English head must project the pack's filum row, got:\n{code}"
     );
     let lexed = radix_lexer::lex_with_locale_pack(&code, &EnPack);

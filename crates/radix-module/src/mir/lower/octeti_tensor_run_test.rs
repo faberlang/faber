@@ -12,11 +12,11 @@ const LE_DECODE: &str = r#"+++
 locale = "en"
 +++
 main {
-    const list<b8> raw ← [0x00, 0x00, 0x80, 0x3f, 0x00, 0x00, 0x00, 0x40]
-    const tensor<f32, [2]> v ← raw ↦ tensor<f32, [2]> via Le
+    let list<b8> raw ← [0x00, 0x00, 0x80, 0x3f, 0x00, 0x00, 0x00, 0x40]
+    let tensor<f32, [2]> v ← raw ↦ tensor<f32, [2]> via Le
     print v[[0]]
     print v[[1]]
-    const tensor<u8, [8]> b ← raw ↦ tensor<u8, [8]>
+    let tensor<u8, [8]> b ← raw ↦ tensor<u8, [8]>
     print b[[3]]
 }
 "#;
@@ -43,16 +43,16 @@ fn runtime_extent(int value) → int {
 }
 
 main {
-    const bytes raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
-    const int n ← runtime_extent(3)
-    const tensor<f32, [2, size n]> v ← raw ↦ tensor<f32, [2, size n]> via Le
+    let bytes raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
+    let int n ← runtime_extent(3)
+    let tensor<f32, [2, size n]> v ← raw ↦ tensor<f32, [2, size n]> via Le
     print v[[0, 0]]
     print v[[1, 2]]
     print v.shape()[1]
 
     do {
-        const int m ← runtime_extent(2)
-        const tensor<f32, [2, size m]> bad ← raw ↦ tensor<f32, [2, size m]> via Le
+        let int m ← runtime_extent(2)
+        let tensor<f32, [2, size m]> bad ← raw ↦ tensor<f32, [2, size m]> via Le
         print bad[[0, 0]]
     }
     catch err {

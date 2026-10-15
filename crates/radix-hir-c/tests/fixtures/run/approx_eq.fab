@@ -1,0 +1,35 @@
++++
+locale = "en"
++++
+# `≈` / `≉` is the exact integer tolerance rule `10^9 · |a − b| ≤ max(|a|, |b|)`
+# (and `1e-9 · max` between floats); `≅` / `≇` is exact value equality across
+# numeric widths, never rounding an integer to a float.
+fn near64(i64 a, i64 b) → bool {
+    return a ≈ b
+}
+fn far32(i32 a, i32 b) → bool {
+    return a ≉ b
+}
+main {
+    print near64(5, -5)
+    print near64(0, 0)
+    print near64(1000000000, 999999999)
+    print near64(999999999, 999999998)
+    print near64(-5, 5)
+    print far32(2147483647, -2147483648)
+    print 1.0 ≈ 1.0, 1.0 ≈ 2.0, 1.0 ≉ 2.0
+
+    let u8 port ← 42 ∷ u8
+    let int count ← 42
+    print port ≅ count
+    print 1 ≅ 1.0
+    print 42.145 ≅ 42.0
+    print 1 ≇ 2
+
+    # A `u64` cell that fits `i64` still reads as an exact value.
+    let i64 above_precision ← 9007199254740993
+    let u64 below_precision ← 9007199254740992
+    print above_precision ≅ below_precision
+    let f64 float_boundary ← 9007199254740992.0
+    print above_precision ≅ float_boundary
+}

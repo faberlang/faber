@@ -42,7 +42,7 @@ fn assert_no_issue(source: &str, unexpected: &str) {
 }
 
 fn read(element: &str, shape: &str, hint: &str) -> String {
-    format!("incipit {{ fixum _ t ← |00 01 02 03| ↦ tensor<{element}, {shape}> via {hint} }}")
+    format!("incipit {{ sit t ← |00 01 02 03| ↦ tensor<{element}, {shape}> via {hint} }}")
 }
 
 // --- accepted -------------------------------------------------------------
@@ -75,13 +75,13 @@ fn every_element_width_is_accepted_with_a_matching_literal() {
         if matches!(element, "u8" | "i8") {
             // An 8-bit element has no byte order and takes no clause (B6).
             assert_accepts_la(&format!(
-                "incipit {{ fixum _ t ← |{eight}| ↦ tensor<{element}, [{count}]> }}"
+                "incipit {{ sit t ← |{eight}| ↦ tensor<{element}, [{count}]> }}"
             ));
             continue;
         }
         for hint in ["Le", "Be"] {
             assert_accepts_la(&format!(
-                "incipit {{ fixum _ t ← |{eight}| ↦ tensor<{element}, [{count}]> via {hint} }}"
+                "incipit {{ sit t ← |{eight}| ↦ tensor<{element}, [{count}]> via {hint} }}"
             ));
         }
     }
@@ -96,7 +96,7 @@ fn bounded_octeti_source_is_accepted() {
 
 #[test]
 fn runtime_length_source_is_accepted_without_a_static_check() {
-    assert_accepts_la("incipit { fixum _ t ← |00 01 02 03|[0‥4] ↦ tensor<f32, [1]> via Le }");
+    assert_accepts_la("incipit { sit t ← |00 01 02 03|[0‥4] ↦ tensor<f32, [1]> via Le }");
     assert_no_issue(
         "functio w(lista<b8> b) → tensor<f32, [4]> ⇥ textus { redde b ↦ tensor<f32, [4]> via Le }",
         LENGTH,
@@ -119,7 +119,7 @@ fn non_literal_extents_are_not_rejected_here() {
 fn handlers_cover_the_failable_conversion() {
     assert_accepts_la(concat!(
         "functio w(lista<b8> b) → numerus {\n",
-        "    fac {\n        fixum _ t ← b ↦ tensor<f32, [2]> via Le\n        redde 1\n",
+        "    fac {\n        sit t ← b ↦ tensor<f32, [2]> via Le\n        redde 1\n",
         "    } cape err {\n        redde 0\n    }\n",
         "}\n",
     ));
@@ -133,9 +133,7 @@ fn handlers_cover_the_failable_conversion() {
 
 #[test]
 fn main_body_is_exempt_from_the_handler_rule() {
-    assert_accepts_la(
-        "incipit { fixum _ t ← |00 01 02 03 04 05 06 07| ↦ tensor<f32, [2]> via Le }",
-    );
+    assert_accepts_la("incipit { sit t ← |00 01 02 03 04 05 06 07| ↦ tensor<f32, [2]> via Le }");
 }
 
 // --- rejected: hint -------------------------------------------------------
@@ -143,7 +141,7 @@ fn main_body_is_exempt_from_the_handler_rule() {
 #[test]
 fn missing_hint_is_unspecified() {
     let err = error_with_issue(
-        "incipit { fixum _ t ← |00 01 02 03| ↦ tensor<f32, [1]> }",
+        "incipit { sit t ← |00 01 02 03| ↦ tensor<f32, [1]> }",
         UNSPECIFIED,
     );
     assert_eq!(err.kind, SemanticErrorKind::ConversionInvalid);
@@ -151,10 +149,10 @@ fn missing_hint_is_unspecified() {
 
 #[test]
 fn one_byte_elements_take_no_hint_and_refuse_one() {
-    assert_accepts_la("incipit { fixum _ t ← |00 01| ↦ tensor<u8, [2]> }");
+    assert_accepts_la("incipit { sit t ← |00 01| ↦ tensor<u8, [2]> }");
     for hint in ["Le", "Be"] {
         assert_rejects_with_issue_la(
-            &format!("incipit {{ fixum _ t ← |00 01| ↦ tensor<u8, [2]> via {hint} }}"),
+            &format!("incipit {{ sit t ← |00 01| ↦ tensor<u8, [2]> via {hint} }}"),
             "bits_via_clause_not_allowed",
         );
     }
@@ -193,7 +191,7 @@ fn half_float_elements_are_unsupported() {
 #[test]
 fn vector_element_is_unsupported() {
     assert_rejects_with_issue_la(
-        "incipit { fixum _ t ← |00 01 02 03| ↦ tensor<vector<f32, 4>, [2]> via Le }",
+        "incipit { sit t ← |00 01 02 03| ↦ tensor<vector<f32, 4>, [2]> via Le }",
         ELEMENT,
     );
 }
@@ -218,7 +216,7 @@ fn static_length_mismatch_multiplies_every_extent() {
 #[test]
 fn static_window_length_mismatch_is_rejected() {
     let err = error_with_issue(
-        "incipit { fixum _ t ← |00 01 02 03 04 05 06 07|[0‥8] ↦ tensor<f32, [1]> via Le }",
+        "incipit { sit t ← |00 01 02 03 04 05 06 07|[0‥8] ↦ tensor<f32, [1]> via Le }",
         LENGTH,
     );
     assert_eq!(arg(&err, "expected"), Some("4"));

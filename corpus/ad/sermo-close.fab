@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "endpoint"
 canonical = true
 summary = "A sermo closes itself when its conversation completes; a pool of many keeps only the unfinished ones open, and close() ends one early and reports its error."
-syntax = "fixum bivalens clausa ← s.close()"
+syntax = "sit bivalens clausa ← s.close()"
 related = ["ad", "sermo", "tuus", "fac", "cape"]
 locale = "la"
 +++
@@ -44,7 +44,7 @@ functio bis(numerus n) → numerus {
 
 @ ad 'numeri:numera'
 functio numera(numerus n) fiunt → numerus {
-    itera ab 0‥n fixum i {
+    itera ab 0‥n sit i {
         cede i
     }
 }
@@ -56,7 +56,7 @@ functio defice(numerus n) → numerus ⇥ textus {
 
 functio summa(lista<numerus> partes) → numerus {
     varia numerus totum ← 0
-    itera ex partes fixum pars {
+    itera ex partes sit pars {
         totum ← totum + pars
     }
     redde totum
@@ -65,23 +65,23 @@ functio summa(lista<numerus> partes) → numerus {
 incipit {
     # Four conversations finish at once; their handles wait in the pool.
     varia tabula<numerus, sermo> piscina ← vacua
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         piscina[i] ← ad 'numeri:bis' (i)
     }
 
     # A longer conversation streams while the finished ones hold nothing.
-    fixum sermo longus ← ad 'numeri:numera' (5)
-    itera ab 0‥4 fixum i {
+    sit sermo longus ← ad 'numeri:numera' (5)
+    itera ab 0‥4 sit i {
         nota piscina[i] ↦ numerus
     }
     nota summa(longus ↦ lista<numerus>)
 
     # Reading waits for the handler (a failed read defaults to 0); close()
     # then reports the error the conversation ended with.
-    fixum sermo fractus ← ad 'numeri:defice' (7)
+    sit sermo fractus ← ad 'numeri:defice' (7)
     nota fractus ↦ numerus ⊥ 0
     fac {
-        fixum bivalens clausa ← fractus.close()
+        sit bivalens clausa ← fractus.close()
         nota clausa
     } cape err {
         nota err
@@ -89,8 +89,8 @@ incipit {
 
     # Closing early drops the unread reply; a live handler is cancelled.
     fac {
-        fixum sermo ultimus ← ad 'numeri:bis' (21)
-        fixum bivalens clausa ← ultimus.close()
+        sit sermo ultimus ← ad 'numeri:bis' (21)
+        sit bivalens clausa ← ultimus.close()
         nota clausa
     } cape err {
         nota err

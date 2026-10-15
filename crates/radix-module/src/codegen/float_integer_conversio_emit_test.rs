@@ -10,10 +10,10 @@ const MESSAGE: &str = "fractus to numerus conversion out of range";
 
 const SOURCE: &str = "
 incipit {
-    fixum fractus d ← 300.0
-    fixum u8 r ← d ↦ u8 via Trunc ⊥ 7
+    sit fractus d ← 300.0
+    sit u8 r ← d ↦ u8 via Trunc ⊥ 7
     nota r
-    fixum u8 t ← d ↦ u8 via Trunc
+    sit u8 t ← d ↦ u8 via Trunc
     nota t
 }
 ";

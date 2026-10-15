@@ -302,7 +302,7 @@ fn payload_free_enum_annotation_draws_no_union_warning() {
     let result = test_support::analyze_and_get_diagnostics(concat!(
         "ordo Kind { plain, fizz }\n\n",
         "functio f(Kind k, Kind ∪ nihil m) → numerus {\n",
-        "    fixum Kind j ← Kind.fizz\n",
+        "    sit Kind j ← Kind.fizz\n",
         "    redde 1\n",
         "}",
     ));
@@ -363,6 +363,6 @@ fn enum_variant_refinement_reaches_return_funnel() {
 #[test]
 fn enum_variant_refinement_reaches_initializer_funnel() {
     test_support::assert_accepts(&format!(
-        "{CARRIER}functio probe(Carrier r) → textus {{\n    adfirma r est DetailCarrier\n    fixum textus body ← r.detail.body\n    redde body\n}}"
+        "{CARRIER}functio probe(Carrier r) → textus {{\n    adfirma r est DetailCarrier\n    sit textus body ← r.detail.body\n    redde body\n}}"
     ));
 }

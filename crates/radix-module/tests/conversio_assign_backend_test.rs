@@ -124,7 +124,7 @@ fn call_occurrences(code: &str, def_prefix: &str, name: &str) -> usize {
 #[test]
 fn rust_emits_conversio_assign_as_parse_then_store() {
     let code =
-        emit_rust("incipit {\n  fixum textus raw ← \"42\"\n  varia numerus count ← 0\n  count ↤ raw\n  nota count\n}");
+        emit_rust("incipit {\n  sit textus raw ← \"42\"\n  varia numerus count ← 0\n  count ↤ raw\n  nota count\n}");
     assert!(
         code.contains(".parse::<"),
         "rust must emit the text→numeric conversion, not a cast:\n{code}"
@@ -300,7 +300,7 @@ fn chain_emits_inner_conversion_feeding_outer_store_on_rust() {
     // still converts through the `↦` route: the inner text→numeric parse
     // appears once, and both stores are emitted.
     let code = emit_rust(
-        "incipit {\n  fixum textus raw ← \"42\"\n  varia numerus a ← 0\n  varia numerus b ← 0\n  a ↤ b ↤ raw\n  nota a\n  nota b\n}",
+        "incipit {\n  sit textus raw ← \"42\"\n  varia numerus a ← 0\n  varia numerus b ← 0\n  a ↤ b ↤ raw\n  nota a\n  nota b\n}",
     );
     assert_eq!(
         count_occurrences(&code, ".parse::<"),

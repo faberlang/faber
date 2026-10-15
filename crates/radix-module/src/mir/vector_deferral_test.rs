@@ -68,7 +68,7 @@ fn generic_width_method_expands_at_the_instance() {
 }
 
 incipit {
-    fixum vf32[3] v ← [3.0, 4.0, 0.0] ↦ vf32[3]
+    sit vf32[3] v ← [3.0, 4.0, 0.0] ↦ vf32[3]
     nota dot_self(v)
 }
 ");
@@ -82,8 +82,8 @@ fn one_generic_template_instantiates_at_two_widths() {
 }
 
 incipit {
-    fixum vf32[2] a ← [3.0, 4.0] ↦ vf32[2]
-    fixum vf32[3] b ← [1.0, 2.0, 2.0] ↦ vf32[3]
+    sit vf32[2] a ← [3.0, 4.0] ↦ vf32[2]
+    sit vf32[3] b ← [1.0, 2.0, 2.0] ↦ vf32[3]
     nota dot_self(a)
     nota dot_self(b)
 }
@@ -94,8 +94,8 @@ incipit {
 #[test]
 fn projected_receiver_is_copied_to_a_temp_before_deferral() {
     let lines = run(r"incipit {
-    fixum vf32[3] v ← [3.0, 4.0, 0.0] ↦ vf32[3]
-    fixum lista<vf32[3]> xs ← [v]
+    sit vf32[3] v ← [3.0, 4.0, 0.0] ↦ vf32[3]
+    sit lista<vf32[3]> xs ← [v]
     nota xs[0].longitudo()
 }
 ");

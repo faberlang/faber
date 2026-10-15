@@ -30,7 +30,7 @@ fn unused_mut_params(source: &str) -> usize {
 #[test]
 fn optional_alias_of_de_list_rejects_non_null_appende() {
     test_support::assert_rejects_with_issue(
-        "functio f(de lista<numerus> xs) → vacuum {\n fixum lista<numerus> ∪ nihil ys ← xs\n ys!.appende(1)\n}\nincipit { }",
+        "functio f(de lista<numerus> xs) → vacuum {\n sit lista<numerus> ∪ nihil ys ← xs\n ys!.appende(1)\n}\nincipit { }",
         "assign_to_de_parameter",
     );
 }
@@ -38,7 +38,7 @@ fn optional_alias_of_de_list_rejects_non_null_appende() {
 #[test]
 fn optional_alias_of_de_list_rejects_non_null_value_returning_mutator() {
     test_support::assert_rejects_with_issue(
-        "functio f(de lista<numerus> xs) → vacuum {\n fixum lista<numerus> ∪ nihil ys ← xs\n ys!.detrahe()\n}\nincipit { }",
+        "functio f(de lista<numerus> xs) → vacuum {\n sit lista<numerus> ∪ nihil ys ← xs\n ys!.detrahe()\n}\nincipit { }",
         "assign_to_de_parameter",
     );
 }
@@ -46,7 +46,7 @@ fn optional_alias_of_de_list_rejects_non_null_value_returning_mutator() {
 #[test]
 fn optional_alias_of_de_list_read_through_non_null_stays_legal() {
     test_support::assert_accepts(
-        "functio f(de lista<numerus> xs) → numerus {\n fixum lista<numerus> ∪ nihil ys ← xs\n redde ys!.longitudo()\n}\nincipit { }",
+        "functio f(de lista<numerus> xs) → numerus {\n sit lista<numerus> ∪ nihil ys ← xs\n redde ys!.longitudo()\n}\nincipit { }",
     );
 }
 
@@ -54,13 +54,13 @@ fn optional_alias_of_de_list_read_through_non_null_stays_legal() {
 fn in_param_written_through_non_null_is_not_unused_mut() {
     // `!` on a non-optional receiver is a pass-through assertion; the pop is
     // still a write to the `in` parameter, so no WARN008 'change to ref'.
-    let source = "functio f(in lista<numerus> xs) → vacuum {\n xs!.detrahe()\n}\nincipit { }";
+    let source = "functio f(varia lista<numerus> xs) → vacuum {\n xs!.detrahe()\n}\nincipit { }";
     assert_eq!(unused_mut_params(source), 0);
 }
 
 #[test]
 fn in_param_only_read_through_non_null_still_suggests_ref() {
     let source =
-        "functio f(in lista<numerus> xs) → numerus {\n redde xs!.longitudo()\n}\nincipit { }";
+        "functio f(varia lista<numerus> xs) → numerus {\n redde xs!.longitudo()\n}\nincipit { }";
     assert_eq!(unused_mut_params(source), 1);
 }

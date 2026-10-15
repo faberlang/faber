@@ -81,8 +81,8 @@ targets = ["rust"]
         provider.join("src/vectors.fab"),
         r#"@ public
 class Box<size N> {
-    var vector<f32, N> minima
-    var vector<f32, N> maxima
+    mut vector<f32, N> minima
+    mut vector<f32, N> maxima
 }
 
 @ public
@@ -102,7 +102,7 @@ fn cross(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
 
 @ public
 fn lane(vector<f32, 3> a) → f32 {
-    const vector<f32, 3> swapped ← a.swizzle("zyx")
+    let vector<f32, 3> swapped ← a.swizzle("zyx")
     return swapped.dot(a)
 }
 
@@ -129,24 +129,24 @@ locale = "en"
 import from "probevectors:vectors" gmt
 
 fn imported() → f32 {
-    const vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    const vector<f32, 3> b ← [2.0, 4.0, 6.0] ↦ vector<f32, 3>
-    const vector<f32, 3> s ← gmt.add(a, b)
-    const vector<f32, 3> x ← gmt.cross(a, b)
+    let vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    let vector<f32, 3> b ← [2.0, 4.0, 6.0] ↦ vector<f32, 3>
+    let vector<f32, 3> s ← gmt.add(a, b)
+    let vector<f32, 3> x ← gmt.cross(a, b)
     return (s.dot(b) + x.dot(a)) + gmt.lane(a)
 }
 
 fn imported_signature() → vector<f32, 4> {
-    const vector<f32, 4> a ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
-    const vector<f32, 4> b ← [2.0, 4.0, 6.0, 8.0] ↦ vector<f32, 4>
+    let vector<f32, 4> a ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    let vector<f32, 4> b ← [2.0, 4.0, 6.0, 8.0] ↦ vector<f32, 4>
     return gmt.add(a, b)
 }
 
 fn imported_shapes() → matrix<f32, [3, 3]> {
-    const vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    const vector<f32, 2> narrow ← [1.0, 2.0] ↦ vector<f32, 2>
-    const matrix<f32, [3, 2]> outer ← s ⊗ narrow
-    const matrix<f32, [2, 3]> inner ← narrow ⊗ s
+    let vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    let vector<f32, 2> narrow ← [1.0, 2.0] ↦ vector<f32, 2>
+    let matrix<f32, [3, 2]> outer ← s ⊗ narrow
+    let matrix<f32, [2, 3]> inner ← narrow ⊗ s
     return gmt.multiply(outer, inner)
 }
 "#,
@@ -353,7 +353,7 @@ functio matrix4_inversa_affinis(de Matrix4 matrix) → Matrix4 ∪ nihil {
         r#"
 importa ex "triga:triga" triga
 incipit {
-  fixum triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
+  sit triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
 }
 "#,
     )
@@ -585,7 +585,7 @@ genus Instrumentum {
         r#"
 importa ex "probe:probe" probe
 incipit {
-  fixum probe.Instrumentum m ← probe.Instrumentum { nomen = "x" }
+  sit probe.Instrumentum m ← probe.Instrumentum { nomen = "x" }
   nota m.nomen
 }
 "#,
@@ -1107,8 +1107,8 @@ functio vector3_normalizata(de Vector3 v) → Vector3 {
         r#"
 importa ex "triga:triga" triga
 incipit {
-  fixum triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
-  fixum triga.Vector3 n ← triga.vector3_normalizata(zero)
+  sit triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
+  sit triga.Vector3 n ← triga.vector3_normalizata(zero)
   adfirma n.x ≡ (0.0 ∷ f32) mori "ok"
 }
 "#,
@@ -1184,8 +1184,8 @@ functio vector3_normalizata(de Vector3 v) → Vector3 {
         r#"
 importa ex "triga:triga" triga
 incipit {
-  fixum triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
-  fixum triga.Vector3 n ← triga.vector3_normalizata(zero)
+  sit triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
+  sit triga.Vector3 n ← triga.vector3_normalizata(zero)
   adfirma n.x ≡ (0.0 ∷ f32) mori "ok"
 }
 "#,
@@ -1277,8 +1277,8 @@ functio exstat(textus via) → bivalens {
         r#"
 importa ex "probe:probe" probe
 incipit {
-  fixum bivalens ok ← probe.exstat("x")
-  fixum lista<textus> lines ← probe.carpe("y")
+  sit bivalens ok ← probe.exstat("x")
+  sit lista<textus> lines ← probe.carpe("y")
 }
 "#,
     )
@@ -1368,7 +1368,7 @@ functio salve() → textus {
         r#"
 importa ex "probe:probe" probe
 incipit {
-  fixum textus s ← probe.salve()
+  sit textus s ← probe.salve()
 }
 "#,
     )
@@ -1473,7 +1473,7 @@ functio causa(ProbeError e) → textus {
         r#"
 importa ex "probe:probe" probe
 incipit {
-  fixum textus s ← probe.causa(probe.perperam("x"))
+  sit textus s ← probe.causa(probe.perperam("x"))
   nota s
 }
 "#,
@@ -1575,8 +1575,8 @@ importa ex "probe:math" math
 importa ex "probe:scene" scene
 
 incipit {
-  fixum scene.SceneNode node ← scene.scene_group("root")
-  fixum math.Matrix4 local ← node.local_matrix
+  sit scene.SceneNode node ← scene.scene_group("root")
+  sit math.Matrix4 local ← node.local_matrix
   nota node.name
   nota local.m00
 }
@@ -1690,9 +1690,9 @@ importa ex "probe:browser" browser
 importa ex "probe:visus" visus
 
 incipit {
-  fixum visus.Thema t ← visus.Thema { nomen = "lumen" }
-  fixum browser.Scope s ← browser.Scope { selector = "#root" }
-  fixum browser.Mounted ∪ nihil m ← browser.mount(s, visus.textus_visus("hi"), t)
+  sit visus.Thema t ← visus.Thema { nomen = "lumen" }
+  sit browser.Scope s ← browser.Scope { selector = "#root" }
+  sit browser.Mounted ∪ nihil m ← browser.mount(s, visus.textus_visus("hi"), t)
   nota m
 }
 "##,
@@ -1780,7 +1780,7 @@ targets = ["rust"]
         r"
 @ public
 class Capsule {
-    var string schema
+    mut string schema
 }
 
 @ public
@@ -1841,7 +1841,7 @@ fn from_gguf_manifest_error(gguf_manifest.GgufManifestError err) → GgufError {
 @ public
 fn admit_capsule(string schema) → capsule.Capsule ⇥ GgufError {
     do {
-        const capsule.Capsule c ← capsule.construct_manifest(schema)
+        let capsule.Capsule c ← capsule.construct_manifest(schema)
         return c
     }
     catch err {
@@ -2069,8 +2069,8 @@ importa ex "probe:tela" tela
 importa ex "probe:extension" ext
 
 incipit {
-  fixum tela.Scopulum k ← tela.scopulum("a", "b")
-  fixum ext.Scopulum e ← ext.chart_axis_muted()
+  sit tela.Scopulum k ← tela.scopulum("a", "b")
+  sit ext.Scopulum e ← ext.chart_axis_muted()
   nota k.nomen
   nota e.nomen
 }
@@ -2118,7 +2118,7 @@ fn norma_json_tool_path_installs_facade_exports() {
         r#"
 importa ex "norma:json" json
 incipit {
-  fixum json ∪ nihil maybe ← json.try_parse("{}")
+  sit json ∪ nihil maybe ← json.try_parse("{}")
   nota maybe
 }
 "#,
@@ -2315,9 +2315,9 @@ functio wire(instans<ns> t) → textus {
         r#"
 importa ex "probe:probe" probe
 incipit {
-  fixum instans<ns> nanos ← probe.nunc()
-  fixum instans parsed ← probe.solve("1979-05-27T07:32:00Z")
-  fixum textus w ← probe.wire(nanos)
+  sit instans<ns> nanos ← probe.nunc()
+  sit instans parsed ← probe.solve("1979-05-27T07:32:00Z")
+  sit textus w ← probe.wire(nanos)
   nota parsed
   nota w
 }
@@ -2491,8 +2491,8 @@ targets = ["rust"]
 import from "web:dom" public * as web
 
 class Mounted {
-    var string selector
-    var web.Scope scopus
+    mut string selector
+    mut web.Scope scopus
 }
 
 fn mount(string selector) → Mounted {
@@ -2503,7 +2503,7 @@ fn mount(string selector) → Mounted {
 }
 
 fn probe(string selector) → string {
-    var web.Scope s ← web.scope(selector)
+    mut web.Scope s ← web.scope(selector)
     return s.selector
 }
 "#,
@@ -2580,7 +2580,7 @@ fn valida_nomen_tag(string nomen) → bool {
         r#"
 importa ex "tela:valida" valida
 incipit {
-  fixum bivalens ok ← valida.valida_nomen_tag("a")
+  sit bivalens ok ← valida.valida_nomen_tag("a")
   nota ok
 }
 "#,
@@ -2643,7 +2643,7 @@ fn valida_nomen_tag(string nomen) → bool {
         r#"
 importa ex "tela:valida" valida
 incipit {
-  fixum bivalens ok ← valida.valida_nomen_tag("a")
+  sit bivalens ok ← valida.valida_nomen_tag("a")
   nota ok
 }
 "#,
@@ -2703,7 +2703,7 @@ targets = ["rust"]
         r"
 @ public
 class Point {
-    var int x
+    mut int x
 }
 
 @ public
@@ -2747,7 +2747,7 @@ locale = "la"
 importa ex "canvas:canvas" * ut canvas
 
 incipit {
-  fixum canvas.Punctum punctum ← canvas.fac_punctum(1)
+  sit canvas.Punctum punctum ← canvas.fac_punctum(1)
   nota punctum
 }
 "#,
@@ -2899,7 +2899,7 @@ incipit {
 fn en_surface_contains_infers_with_non_literal_string_arg() {
     let source = r#"
 fn valid_tag_name(string name) → bool {
-    const string litterae ← "abcdefghijklmnopqrstuvwxyz"
+    let string litterae ← "abcdefghijklmnopqrstuvwxyz"
     if name.length() ≡ 0 then return false
     if not litterae.contains(name.slice(0, 1)) then return false
     return true
@@ -3062,7 +3062,7 @@ fn latin_consumer_resolves_library_owned_pack() {
         r#"
 importa ex "demo:canvas" canvas
 incipit {
-    fixum canvas.Punctum p ← canvas.fac_punctum("salve")
+    sit canvas.Punctum p ← canvas.fac_punctum("salve")
     nota p
 }
 "#,
@@ -3099,7 +3099,7 @@ fn latin_consumer_still_accepts_canonical_library_names() {
         r#"
 importa ex "demo:canvas" canvas
 incipit {
-    fixum canvas.Point p ← canvas.make_point("salve")
+    sit canvas.Point p ← canvas.make_point("salve")
     nota p
 }
 "#,
@@ -3136,7 +3136,7 @@ fn latin_consumer_rejects_unmapped_library_surface() {
         r#"
 importa ex "demo:canvas" canvas
 incipit {
-    fixum canvas.Punctum fictum ← canvas.fac_ignotum("salve")
+    sit canvas.Punctum fictum ← canvas.fac_ignotum("salve")
     nota fictum
 }
 "#,
@@ -3253,7 +3253,7 @@ fn interface_snapshot_snaps_consts_and_tuple_returns() {
         "producer.fab",
         r#"
 @ publica
-fixum textus schema_versio ← "2.0.0"
+sit textus schema_versio ← "2.0.0"
 
 @ publica
 functio limes() → iuncta<numerus, numerus> {
@@ -3333,14 +3333,14 @@ importa ex "probe:eventum" eventum
 
 functio describe(eventum.Eventum e) → textus {
     discerne e {
-        casu eventum.Eventum.Ictus fixum vis { redde vis ↦ textus }
+        casu eventum.Eventum.Ictus sit vis { redde vis ↦ textus }
         casu eventum.Eventum.Sonitus { redde "sonitus" }
     }
 }
 
 incipit {
-    fixum eventum.Eventum a ← finge eventum.Eventum.Ictus { vis = 3 } ∷ eventum.Eventum
-    fixum eventum.Eventum b ← eventum.Eventum.Sonitus
+    sit eventum.Eventum a ← finge eventum.Eventum.Ictus { vis = 3 } ∷ eventum.Eventum
+    sit eventum.Eventum b ← eventum.Eventum.Sonitus
     nota describe(a) + describe(b)
 }
 "#,
@@ -3376,7 +3376,7 @@ locale = "en"
 
 @ public
 class Punctum {
-    var u32 gradus
+    mut u32 gradus
 }
 "#,
     )
@@ -3391,7 +3391,7 @@ import from "./lib_punctum" * as p
 
 @ public
 class Catena {
-    var list<p.Punctum> puncta
+    mut list<p.Punctum> puncta
 }
 "#,
     )
@@ -3803,7 +3803,7 @@ fn import_contract_carries_static_field_default_from_sibling() {
         r"
 @ publica
 genus Tab {
-    generis numerus LIMES = 7
+    fixum numerus LIMES = 7
     varia numerus w = 1
 }
 ",

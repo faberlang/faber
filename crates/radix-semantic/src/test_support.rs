@@ -477,7 +477,7 @@ mod tests {
     #[test]
     fn la_helpers_read_latin() {
         let unit = analyze_ok_la(
-            "incipit {\n    fixum [caput, ceteri cauda] \u{2190} [1, 2, 3, 4, 5]\n    nota caput\n    nota cauda\n}\n",
+            "incipit {\n    sit [caput, ceteri cauda] \u{2190} [1, 2, 3, 4, 5]\n    nota caput\n    nota cauda\n}\n",
         );
         assert!(unit.is_ok(), "diagnostics: {:?}", unit.diagnostics);
     }

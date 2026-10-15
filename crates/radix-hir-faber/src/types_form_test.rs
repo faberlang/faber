@@ -1185,7 +1185,7 @@ fn generate_local_hole_uses_authored_form_without_legacy_flags() {
         .generate(&hir, &presentation, &LaSurface)
         .expect("authored hole must emit");
     assert!(
-        output.code.contains("fixum _ x ←"),
+        output.code.contains("sit x ←"),
         "authored infer form must re-emit as a hole: {}",
         output.code
     );

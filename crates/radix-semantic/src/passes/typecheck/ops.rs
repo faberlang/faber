@@ -842,6 +842,16 @@ impl TypeChecker<'_> {
         target: &mut HirExpression,
         value: &mut HirExpression,
     ) -> TypeId {
+        // The value is evaluated before the store takes effect, so a flow
+        // fact on the target still holds for the value expression. Save it,
+        // type the lvalue from the declared cell, re-arm the fact for the
+        // value check, and drop it again once the store is checked.
+        let saved_target_fact = match &target.kind {
+            HirExpressionKind::Path(def_id) => {
+                self.lookup_binding(*def_id).map(|info| (*def_id, info))
+            }
+            _ => None,
+        };
         self.invalidate_assignment_target(target);
         let target_ty = self.check_lvalue(target);
         if target_ty == self.error_type {
@@ -861,7 +871,11 @@ impl TypeChecker<'_> {
             return target_ty;
         }
         let site = self.assignment_store_site(target);
+        if let Some((def_id, info)) = saved_target_fact {
+            self.reinstate_flow_fact(def_id, info);
+        }
         let value_ty = self.check_store_expr(value, target_ty, site);
+        self.invalidate_assignment_target(target);
         let unresolved_edge_view = self
             .tensor_edge_policies
             .shifted_expressions
@@ -946,7 +960,7 @@ impl TypeChecker<'_> {
             return target_ty;
         }
         // The destination type must resolve before conversion checking: an
-        // inference-hole destination (e.g. `fixum _ xs ← []`) cannot name a
+        // inference-hole destination (e.g. `sit xs ← []`) cannot name a
         // conversion target.
         let target_resolved = self.resolve_inferred_type(target_ty);
         if self.destination_type_has_inference_hole(target_resolved) {
@@ -1478,7 +1492,21 @@ impl TypeChecker<'_> {
                 unreachable!("membership is resolved by check_membership before check_binary")
             }
             HirBinOp::Coalesce => unreachable!("coalesce is handled before eager rhs checking"),
-            HirBinOp::And | HirBinOp::Or => {
+            HirBinOp::And => {
+                let lhs_ty = self.check_expr(lhs);
+                // `et` short-circuits: the right conjunct is evaluated only
+                // when the left holds, so it is checked under the left
+                // conjunct's then-facts.
+                let rhs_ty = self.check_conjunct_rhs_narrowed(&*lhs, rhs);
+                if let Some(result) = self.check_tensor_lift_logic(lhs, lhs_ty, rhs_ty) {
+                    return result;
+                }
+                if let Some(result) = self.check_lista_logic(op, lhs, lhs_ty, rhs_ty) {
+                    return result;
+                }
+                self.bool_bin(lhs_ty, rhs_ty, lhs.span)
+            }
+            HirBinOp::Or => {
                 let lhs_ty = self.check_expr(lhs);
                 let rhs_ty = self.check_expr(rhs);
                 if let Some(result) = self.check_tensor_lift_logic(lhs, lhs_ty, rhs_ty) {

@@ -18,8 +18,8 @@ fn run(body: &str) -> Vec<String> {
 fn policy_cells_print_on_one_line() {
     let lines = run("
 main {
-    const wrapping<u8> w ← 44
-    const saturating<u8> c ← 255
+    let wrapping<u8> w ← 44
+    let saturating<u8> c ← 255
     print w, c
 }
 ");
@@ -30,8 +30,8 @@ main {
 fn sized_integers_print_on_one_line() {
     let lines = run("
 main {
-    const u8 a ← 7
-    const i16 b ← -3
+    let u8 a ← 7
+    let i16 b ← -3
     print a, b
 }
 ");
@@ -42,7 +42,7 @@ main {
 fn raw_bits_print_on_one_line_at_their_own_width() {
     let separate = run("
 main {
-    const b8 p ← 0xf3
+    let b8 p ← 0xf3
     print p ⇐ 4
     print p
 }
@@ -50,7 +50,7 @@ main {
     assert_eq!(separate.len(), 2);
     let joined = run("
 main {
-    const b8 p ← 0xf3
+    let b8 p ← 0xf3
     print p ⇐ 4, p
 }
 ");
@@ -61,8 +61,8 @@ main {
 fn mixed_plain_policy_and_bits_print_on_one_line() {
     let separate = run("
 main {
-    const wrapping<u8> w ← 44
-    const b8 p ← 0xf3
+    let wrapping<u8> w ← 44
+    let b8 p ← 0xf3
     print 1
     print w
     print p
@@ -71,8 +71,8 @@ main {
     assert_eq!(separate.len(), 3);
     let joined = run("
 main {
-    const wrapping<u8> w ← 44
-    const b8 p ← 0xf3
+    let wrapping<u8> w ← 44
+    let b8 p ← 0xf3
     print 1, w, p
 }
 ");
@@ -86,8 +86,8 @@ main {
 fn wide_float_and_sized_integer_print_on_one_line() {
     let lines = run("
 main {
-    const f64 x ← 1.5
-    const u8 k ← 2
+    let f64 x ← 1.5
+    let u8 k ← 2
     print x, k
 }
 ");

@@ -38,17 +38,17 @@ locale = "en"
 #   Punctum { x = 1, nomen = "hello" }, Vacuus {}, Involucrum { … }, Nuntius.Pulsus { … }
 
 class Punctum {
-    var int x
-    var string nomen
+    mut int x
+    mut string nomen
 }
 
 class Vacuus {
 }
 
 class Involucrum {
-    var Punctum p
-    var list<int> gradus
-    var string titulus
+    mut Punctum p
+    mut list<int> gradus
+    mut string titulus
 }
 
 union Nuntius {
@@ -60,18 +60,18 @@ union Nuntius {
 }
 
 main {
-    const Punctum p ← Punctum { x = 1, nomen = "hello" }
+    let Punctum p ← Punctum { x = 1, nomen = "hello" }
     print p
 
     print Vacuus {}
 
-    const Involucrum i ← Involucrum { p = p, gradus = [0, 1, 2], titulus = "t" }
+    let Involucrum i ← Involucrum { p = p, gradus = [0, 1, 2], titulus = "t" }
     print i
 
-    const Nuntius n ← variant Pulsus { x = 1, y = "hello" } ∷ Nuntius
+    let Nuntius n ← variant Pulsus { x = 1, y = "hello" } ∷ Nuntius
     print n
 
-    const Nuntius f ← variant Finis ∷ Nuntius
+    let Nuntius f ← variant Finis ∷ Nuntius
     print f
 
     print "hello"

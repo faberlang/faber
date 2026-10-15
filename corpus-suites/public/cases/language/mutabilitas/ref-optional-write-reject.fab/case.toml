@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/mutabilitas/ref-optional-write-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/ref-optional-write-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "assign_through_ref"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "assign_through_ref"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "assign_through_ref"

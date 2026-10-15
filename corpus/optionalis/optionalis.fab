@@ -34,40 +34,40 @@ locale = "en"
 #   optionalis.expected — present and absent path samples.
 
 class Locus {
-    var string urbs
-    var string regio optional
+    mut string urbs
+    mut string regio optional
 }
 
 class Civis {
-    var string nomen
+    mut string nomen
     # voluntary nested record
-    var Locus locus optional
+    mut Locus locus optional
 }
 
 main {
     # --- Civis with full locus ---
 
-    const Civis aelia ← Civis { nomen = "Aelia", locus = Locus { urbs = "Roma", regio = "Italia" } }
-    const string ∪ none urbs ← aelia?.locus?.urbs
+    let Civis aelia ← Civis { nomen = "Aelia", locus = Locus { urbs = "Roma", regio = "Italia" } }
+    let string ∪ none urbs ← aelia?.locus?.urbs
     # "Roma"
     print urbs
-    const string ∪ none regio ← aelia?.locus?.regio
+    let string ∪ none regio ← aelia?.locus?.regio
     # "Italia"
     print regio
 
     # --- Civis with no locus (chain short-circuits to nihil) ---
 
-    const Civis brutus ← Civis { nomen = "Brutus" }
-    const string ∪ none urbs2 ← brutus?.locus?.urbs
+    let Civis brutus ← Civis { nomen = "Brutus" }
+    let string ∪ none urbs2 ← brutus?.locus?.urbs
     # nihil
     print urbs2
-    const string ∪ none regio2 ← brutus?.locus?.regio
+    let string ∪ none regio2 ← brutus?.locus?.regio
     # nihil
     print regio2
 
     # --- Accessus optionalis on lista ---
 
-    const list<string, 3> litterae ← ["a", "b", "c"]
+    let list<string, 3> litterae ← ["a", "b", "c"]
     # "a"
     print litterae?[0]
     # nihil (out of range)
@@ -75,7 +75,7 @@ main {
 
     # --- Combining with vel for defaults ---
 
-    const string defecta ← brutus?.locus?.urbs coalesce "ignota"
+    let string defecta ← brutus?.locus?.urbs coalesce "ignota"
     # "ignota"
     print defecta
 }

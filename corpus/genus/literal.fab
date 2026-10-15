@@ -34,23 +34,23 @@ locale = "en"
 #   10, 20, "Marcus", 0
 
 class Punctum {
-    var int x
-    var int y
+    mut int x
+    mut int y
 }
 
 class Persona {
-    var string nomen
-    var int aetas = 0
+    mut string nomen
+    mut int aetas = 0
 }
 
 main {
     # All required fields supplied
-    const Punctum p1 ← Punctum { x = 10, y = 20 }
+    let Punctum p1 ← Punctum { x = 10, y = 20 }
     print p1.x
     print p1.y
 
     # Omitted field picks up genus default
-    const Persona persona ← Persona { nomen = "Marcus" }
+    let Persona persona ← Persona { nomen = "Marcus" }
     print persona.nomen
     print persona.aetas
 }

@@ -26,9 +26,9 @@ const BARE_GRADIENT: &str = r"functio loss(f32 x, f32 y) → f32 {
     redde x * y
 }
 incipit {
-    fixum f32 a ← 1.0
-    fixum f32 b ← 2.0
-    fixum _ g ← loss(a, b) ∇
+    sit f32 a ← 1.0
+    sit f32 b ← 2.0
+    sit g ← loss(a, b) ∇
 }
 ";
 
@@ -36,9 +36,9 @@ const SELECTED_GRADIENT: &str = r"functio loss(f32 x, f32 y) → f32 {
     redde x * y
 }
 incipit {
-    fixum f32 a ← 1.0
-    fixum f32 b ← 2.0
-    fixum _ g ← loss(a, b) ∇ [a, b]
+    sit f32 a ← 1.0
+    sit f32 b ← 2.0
+    sit g ← loss(a, b) ∇ [a, b]
 }
 ";
 

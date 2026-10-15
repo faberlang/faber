@@ -44,27 +44,27 @@ main {
     print 7 % -2
 
     # 2. d64 is exact on the carriers.
-    const d64 dec_neg75 ← -7.5
-    const d64 dec_pos2 ← 2.0
-    const d64 dec_pos75 ← 7.5
-    const d64 dec_neg2 ← -2.0
+    let d64 dec_neg75 ← -7.5
+    let d64 dec_pos2 ← 2.0
+    let d64 dec_pos75 ← 7.5
+    let d64 dec_neg2 ← -2.0
     print dec_neg75 % dec_pos2
     print dec_pos75 % dec_neg2
     print dec_neg75 % dec_neg2
     print dec_pos75 % dec_pos2
 
     # 3. Floats: fmod, then the divisor once when the signs disagree.
-    const float flt_neg75 ← -7.5
-    const float flt_pos2 ← 2.0
-    const float flt_pos75 ← 7.5
-    const float flt_neg2 ← -2.0
+    let float flt_neg75 ← -7.5
+    let float flt_pos2 ← 2.0
+    let float flt_pos75 ← 7.5
+    let float flt_neg2 ← -2.0
     print flt_neg75 % flt_pos2
     print flt_pos75 % flt_neg2
     print flt_neg75 % flt_neg2
     print flt_pos75 % flt_pos2
 
     # 4. f32 follows the same rule.
-    const f32 f32_neg75 ← -7.5
-    const f32 f32_pos2 ← 2.0
+    let f32 f32_neg75 ← -7.5
+    let f32 f32_pos2 ← 2.0
     print f32_neg75 % f32_pos2
 }

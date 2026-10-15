@@ -77,8 +77,8 @@ functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
             name: "sized_numerus_cross_width_eq_rejects",
             source: r#"
 incipit {
-    fixum u8 narrow ← 1 ∷ u8
-    fixum numerus wide ← 1
+    sit u8 narrow ← 1 ∷ u8
+    sit numerus wide ← 1
     si narrow ≡ wide { nota "bad" }
 }
 "#,
@@ -90,7 +90,7 @@ incipit {
             name: "sized_numerus_d64_within_width_eq_accepts",
             source: r#"
 incipit {
-    fixum d64 a ← 4.2
+    sit d64 a ← 4.2
     si a ≡ a { nota "ok" }
 }
 "#,
@@ -100,7 +100,7 @@ incipit {
             name: "decimal_integer_cross_family_eq_rejects",
             source: r#"
 incipit {
-    fixum d64 a ← 4.2
+    sit d64 a ← 4.2
     si a ≡ 1 { nota "bad" }
 }
 "#,
@@ -110,7 +110,7 @@ incipit {
             name: "decimal_fractus_cross_family_eq_rejects",
             source: r#"
 incipit {
-    fixum d64 a ← 4.2
+    sit d64 a ← 4.2
     si a ≡ 4.2 { nota "bad" }
 }
 "#,
@@ -121,8 +121,8 @@ incipit {
             name: "octeti_lista_eq_accepts",
             source: r#"
 incipit {
-    fixum octeti raw ← |41|
-    fixum lista<b8> bytes ← |41|
+    sit octeti raw ← |41|
+    sit lista<b8> bytes ← |41|
     si raw ≡ bytes { nota "same" }
 }
 "#,
@@ -134,8 +134,8 @@ incipit {
             name: "octeti_lista_u8_eq_rejects",
             source: r#"
 incipit {
-    fixum octeti raw ← |41|
-    fixum lista<u8> bytes ← [0x41 ∷ u8]
+    sit octeti raw ← |41|
+    sit lista<u8> bytes ← [0x41 ∷ u8]
     si raw ≡ bytes { nota "bad" }
 }
 "#,
@@ -145,7 +145,7 @@ incipit {
             name: "ascii_index_numerus_eq_rejects",
             source: r#"
 incipit {
-    fixum textus s ← "ab"
+    sit textus s ← "ab"
     si s[0] ≡ 97 { nota "bad" }
 }
 "#,
@@ -165,7 +165,7 @@ incipit {
             name: "est_value_rhs_rejects",
             // `est` tests a type (D23.1); a value right-hand side is rejected
             // by name rather than compared.
-            source: "incipit {\n    fixum numerus unus ← 1\n    si unus est unus { nota \"bad\" }\n}",
+            source: "incipit {\n    sit numerus unus ← 1\n    si unus est unus { nota \"bad\" }\n}",
             expect: EqualityExpect::RejectsIssueKind(
                 SemanticErrorKind::OperandTypesInvalid,
                 "est_value_rhs",
@@ -312,7 +312,7 @@ fn ascii_numerus_equality_rejects_with_sem010() {
     let result = compile(
         r#"
 incipit {
-    fixum textus s ← "ab"
+    sit textus s ← "ab"
     si s[0] ≡ 97 { nota "bad" }
 }
 "#,

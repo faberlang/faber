@@ -22,7 +22,7 @@ fn pos_f32_local_init() {
     test_support::assert_analysis_accepts(
         r"
 functio f() → f32 {
-    fixum f32 x ← 1.0
+    sit f32 x ← 1.0
     redde x
 }
 ",
@@ -91,7 +91,7 @@ fn pos_i32_local_init() {
     test_support::assert_analysis_accepts(
         r"
 functio f() → i32 {
-    fixum i32 x ← 1
+    sit i32 x ← 1
     redde x
 }
 ",
@@ -122,7 +122,7 @@ fn neg_f32_local_init() {
     test_support::assert_analysis_accepts(
         r"
 functio f() → f32 {
-    fixum f32 x ← -1.0
+    sit f32 x ← -1.0
     redde x
 }
 ",
@@ -221,7 +221,7 @@ fn neg_i32_local_init() {
     test_support::assert_analysis_accepts(
         r"
 functio f() → i32 {
-    fixum i32 x ← -1
+    sit i32 x ← -1
     redde x
 }
 ",
@@ -285,7 +285,7 @@ fn bitnot_i32_local_init() {
     test_support::assert_analysis_accepts(
         r"
 functio f() → i32 {
-    fixum i32 x ← ¬1
+    sit i32 x ← ¬1
     redde x
 }
 ",
@@ -316,7 +316,7 @@ fn pos_f16_local_init() {
     test_support::assert_analysis_accepts(
         r"
 functio f() → f16 {
-    fixum f16 x ← 1.0
+    sit f16 x ← 1.0
     redde x
 }
 ",
@@ -328,7 +328,7 @@ fn neg_f16_local_init() {
     test_support::assert_analysis_accepts(
         r"
 functio f() → f16 {
-    fixum f16 x ← -1.0
+    sit f16 x ← -1.0
     redde x
 }
 ",

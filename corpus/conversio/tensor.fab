@@ -44,35 +44,35 @@ locale = "en"
 # See docs/factory/conversio-tensor-coverage/.
 
 main {
-    const list<int> xs ← [1, 2, 3, 4]
-    const tensor<int, [4]> grid ← xs ↦ tensor<int, [4]>
-    const list<int> flat ← grid ↦ list<int>
+    let list<int> xs ← [1, 2, 3, 4]
+    let tensor<int, [4]> grid ← xs ↦ tensor<int, [4]>
+    let list<int> flat ← grid ↦ list<int>
     print flat.length()
 
-    const tensor<float, [4]> floats ← grid ↦ tensor<float, [4]>
-    const tensor<int, [4]> ints ← floats ↦ tensor<int, [4]>
+    let tensor<float, [4]> floats ← grid ↦ tensor<float, [4]>
+    let tensor<int, [4]> ints ← floats ↦ tensor<int, [4]>
     print ints.length()
 
-    const tensor<i32, []> narrow ← empty
-    const tensor<i64, []> wide ← narrow ↦ tensor<i64, []>
-    const tensor<i32, []> narrowed ← wide ↦ tensor<i32, []>
+    let tensor<i32, []> narrow ← empty
+    let tensor<i64, []> wide ← narrow ↦ tensor<i64, []>
+    let tensor<i32, []> narrowed ← wide ↦ tensor<i32, []>
     print narrowed.length()
 
-    const tensor<u8, []> bytes ← empty
-    const tensor<u16, []> words ← bytes ↦ tensor<u16, []>
-    const tensor<u8, []> shrunk ← words ↦ tensor<u8, []>
+    let tensor<u8, []> bytes ← empty
+    let tensor<u16, []> words ← bytes ↦ tensor<u16, []>
+    let tensor<u8, []> shrunk ← words ↦ tensor<u8, []>
     print shrunk.length()
 
-    const tensor<f32, []> half ← empty
-    const tensor<float, []> full ← half ↦ tensor<float, []>
-    const tensor<f32, []> single ← full ↦ tensor<f32, []>
+    let tensor<f32, []> half ← empty
+    let tensor<float, []> full ← half ↦ tensor<float, []>
+    let tensor<f32, []> single ← full ↦ tensor<f32, []>
     print single.length()
 
-    const tensor<float, []> fromFloat ← empty
-    const tensor<i32, []> fromFractus ← fromFloat ↦ tensor<i32, []>
+    let tensor<float, []> fromFloat ← empty
+    let tensor<i32, []> fromFractus ← fromFloat ↦ tensor<i32, []>
     print fromFractus.length()
 
-    const tensor<i32, []> signed ← empty
-    const tensor<float, []> promoted ← signed ↦ tensor<float, []>
+    let tensor<i32, []> signed ← empty
+    let tensor<float, []> promoted ← signed ↦ tensor<float, []>
     print promoted.length()
 }

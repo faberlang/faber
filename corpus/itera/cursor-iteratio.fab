@@ -29,10 +29,10 @@ locale = "en"
 
 # itera ex — cursor function return iteration
 #
-# itera ex <cursor-call> fixum <item> { <body> }
+# itera ex <cursor-call> sit <item> { <body> }
 #
 # GRAMMAR:
-#   forInStmt  :← 'itera' 'ex' callExpr 'fixum' ident block
+#   forInStmt  :← 'itera' 'ex' callExpr 'sit' ident block
 #   cursorDecl :← funcDecl 'fiunt' | funcDecl 'fient'
 #
 # EXPECTED OUTPUT:
@@ -44,14 +44,14 @@ locale = "en"
 
 # Multi-value sync stream function that yields values via cede
 fn grena(int n) generator → int {
-    for range 0 ‥ n const i {
+    for range 0 ‥ n let i {
         yield i
     }
 }
 
 # Multi-value async stream function that yields values via cede
 fn grena_futurum(int n) async_generator → int {
-    for range 0 ‥ n const i {
+    for range 0 ‥ n let i {
         yield i
     }
 }
@@ -59,19 +59,19 @@ fn grena_futurum(int n) async_generator → int {
 async_main {
     # Direct consumption of cursor yield stream
     print "Sync cursor iteration:"
-    for from grena(3) const n {
+    for from grena(3) let n {
         print "  numerus: §"(n)
     }
 
     # Collect all results from cursor function
-    var list<int> effecta ← []
-    for from grena(5) const n {
+    mut list<int> effecta ← []
+    for from grena(5) let n {
         effecta.append(n * 2)
     }
     print "Sync collected:"
     print effecta
     print "Async cursor iteration:"
-    for from grena_futurum(3) const n {
+    for from grena_futurum(3) let n {
         print "  async numerus: §"(n)
     }
 }

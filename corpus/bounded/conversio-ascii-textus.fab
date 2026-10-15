@@ -37,7 +37,7 @@ locale = "en"
 #   conversio-ascii-textus.expected — the widened textus value.
 
 main {
-    const ascii<8> a ← 'ab'
-    const string s ← a ↦ string
+    let ascii<8> a ← 'ab'
+    let string s ← a ↦ string
     print s
 }

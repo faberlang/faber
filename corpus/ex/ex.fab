@@ -6,7 +6,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "destructuring"
 canonical = true
 summary = "Extracts fields from a value into local bindings."
-syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
+syntax = "ex <expression> <sit|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
 locale = "en"
 +++
@@ -16,7 +16,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Field extraction — `ex <expr> fixum <field>, ...` extracts named fields from genus records into local scope.
+#   • Field extraction — `ex <expr> sit <field>, ...` extracts named fields from genus records into local scope.
 #   • Multiple field extraction — extract several fields from a single expression in one statement.
 #
 # Common mistakes:
@@ -38,13 +38,13 @@ locale = "en"
 #
 
 class Persona {
-    var string nomen
-    var int aetas
+    mut string nomen
+    mut int aetas
 }
 
 main {
-    const _ p ← Persona { nomen = "Marcus", aetas = 30 }
-    from p const nomen, aetas
+    let p ← Persona { nomen = "Marcus", aetas = 30 }
+    from p let nomen, aetas
     print nomen
     print aetas
 }

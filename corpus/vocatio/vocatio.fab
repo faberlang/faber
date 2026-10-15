@@ -53,7 +53,7 @@ fn multiplica(int x, int y) → int {
 }
 
 class Computator {
-    var int valor = 0
+    mut int valor = 0
 
     fn pone(int n) → Computator {
         self.valor ← n
@@ -75,30 +75,30 @@ main {
     saluta()
 
     # Call with arguments
-    const int summa ← adde(10, 20)
+    let int summa ← adde(10, 20)
     # 30
     print summa
 
     # Multiple arguments
-    const int productum ← multiplica(5, 6)
+    let int productum ← multiplica(5, 6)
     # 30
     print productum
 
     # Method call on objectum
-    var Computator computator ← Computator {}
+    mut Computator computator ← Computator {}
     computator.pone(10)
     # 10
     print computator.accipe()
 
     # Chained method calls
-    var Computator alter ← Computator {}
-    const int value ← alter.pone(5).duplica().duplica().accipe()
+    mut Computator alter ← Computator {}
+    let int value ← alter.pone(5).duplica().duplica().accipe()
     # 20
     print value
 
     # Call with sparge
-    const list<int> numeri ← [3, 7]
-    const int sparsa ← adde(spread numeri)
+    let list<int> numeri ← [3, 7]
+    let int sparsa ← adde(spread numeri)
     # 10
     print sparsa
 }

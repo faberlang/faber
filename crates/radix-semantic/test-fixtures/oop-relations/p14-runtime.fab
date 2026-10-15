@@ -19,10 +19,10 @@ fn greet_of(Greets g) → string {
 }
 
 main {
-    const Formal a ← Formal {}
-    const Casual b ← Casual {}
-    const string out1 ← greet_of(a)
+    let Formal a ← Formal {}
+    let Casual b ← Casual {}
+    let string out1 ← greet_of(a)
     print out1
-    const string out2 ← greet_of(b)
+    let string out2 ← greet_of(b)
     print out2
 }

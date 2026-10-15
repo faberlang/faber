@@ -42,17 +42,17 @@ main {
     print "Salve, Munde!"
 
     # Variable output
-    const string nomen ← "Marcus"
+    let string nomen ← "Marcus"
     print nomen
 
     # Multiple arguments
-    const int aetas ← 30
+    let int aetas ← 30
     print "nomen: §"(nomen)
     print "aetas: §"(aetas)
 
     # Expressions
-    const int x ← 10
-    const int y ← 20
+    let int x ← 10
+    let int y ← 20
     print "summa: §"(x + y)
 
     # Multiple values in one statement

@@ -12,7 +12,7 @@ related = ["nihil"]
 locale = "en"
 +++
 test "vel supplies a fallback for nihil" {
-    const string ∪ none nomen ← null
+    let string ∪ none nomen ← null
     let ostensum ← nomen coalesce "ignotus"
     assert ostensum ≡ "ignotus"
 }
@@ -27,9 +27,9 @@ test "vel preserves non-nihil values" {
 }
 
 test "vel chains to the first non-nihil value" {
-    const string ∪ none a ← null
-    const string ∪ none b ← null
-    const string ∪ none c ← "inventum"
+    let string ∪ none a ← null
+    let string ∪ none b ← null
+    let string ∪ none c ← "inventum"
     let primum ← ((a coalesce b) coalesce c) coalesce "nihil"
     assert primum ≡ "inventum"
 }
@@ -73,13 +73,13 @@ fn supplementum(int valor) → int {
 
 main {
     # Basic nihil coalescing
-    const string ∪ none nomen ← null
+    let string ∪ none nomen ← null
     let ostensum ← nomen coalesce "ignotus"
     # "ignotus"
     print ostensum
 
     # With present value
-    const string ∪ none adest ← "Marcus"
+    let string ∪ none adest ← "Marcus"
     let ostensum2 ← adest coalesce "ignotus"
     # "Marcus"
     print ostensum2
@@ -100,9 +100,9 @@ main {
     print alter
 
     # Chaining
-    const string ∪ none a ← null
-    const string ∪ none b ← null
-    const string ∪ none c ← "inventum"
+    let string ∪ none a ← null
+    let string ∪ none b ← null
+    let string ∪ none c ← "inventum"
     let primum ← ((a coalesce b) coalesce c) coalesce "nihil"
     # "inventum"
     print primum

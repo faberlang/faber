@@ -27,8 +27,8 @@ locale = "en"
 # sermo.tuus<T>() — typed inbound frame stream
 
 main {
-    const channel s ← call 'runtime:echo' ("salve")
-    for from s.tuus<string>().cursor() const frame {
+    let channel s ← call 'runtime:echo' ("salve")
+    for from s.tuus<string>().cursor() let frame {
         assert frame.data ≡ "salve"
     }
 }

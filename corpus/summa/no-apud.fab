@@ -4,8 +4,8 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "incipit_stmt", "fixum_decl", "expression", "reducta_expr", "literal", "nota_stmt"]
 category = "collection"
 canonical = false
-summary = "Rank-1 sequential sum without coordinates: reducta via summa ex <tensor> fixum s { redde <term> }."
-syntax = "reducta via summa ex <source> fixum <binder> { redde <term> }"
+summary = "Rank-1 sequential sum without coordinates: reducta via summa ex <tensor> sit s { redde <term> }."
+syntax = "reducta via summa ex <source> sit <binder> { redde <term> }"
 related = ["summa", "apud", "tensor"]
 locale = "la"
 +++
@@ -17,7 +17,7 @@ locale = "la"
 # What this teaches:
 #   • Omitting `apud` — a rank-1 tensor folds with no coordinate binder at
 #     all; the term body sees only the element
-#   • Sibling of the canonical `reducta via summa ex … apud [i] fixum s`
+#   • Sibling of the canonical `reducta via summa ex … apud [i] sit s`
 #     form — the apud clause is optional on rank-1 sources
 #   • Rank law — a rank ≥ 2 source without apud declines with the shared
 #     arity rule (itera_apud_arity_mismatch), so no-apud implies rank 1
@@ -31,11 +31,11 @@ locale = "la"
 # =============================================================================
 
 functio total(tensor<f32, [8]> a) → f32 {
-    redde reducta via summa ex a fixum s { redde s }
+    redde reducta via summa ex a sit s { redde s }
 }
 
 incipit {
-    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-        fixum tf32[8] a ← flat ↦ tf32[8]
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+        sit tf32[8] a ← flat ↦ tf32[8]
     nota total(a)
 }

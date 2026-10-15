@@ -41,9 +41,9 @@ fn hex_digit_upper(int digit) → string {
 
 @ private
 fn hex_value(string c) → int ∪ none {
-    const string lower ← "0123456789abcdef"
-    const string upper ← "0123456789ABCDEF"
-    var int digit ← 0
+    let string lower ← "0123456789abcdef"
+    let string upper ← "0123456789ABCDEF"
+    mut int digit ← 0
     while digit ≺ 16 {
         if lower.slice(digit, digit + 1) ≡ c or upper.slice(digit, digit + 1) ≡ c then return digit
         digit ← digit + 1
@@ -59,32 +59,32 @@ fn sextet(int bits) → string {
 # Encode bytes to base64 string
 @ public
 fn base64(list<b8> data) → string {
-    var string out ← ""
-    var int i ← 0
-    const int n ← data.length()
+    mut string out ← ""
+    mut int i ← 0
+    let int n ← data.length()
     while i + 3 ≤ n {
-        const int b0 ← byte_at(data, i)
-        const int b1 ← byte_at(data, i + 1)
-        const int b2 ← byte_at(data, i + 2)
-        const int triple ← (b0 * 65536) + (b1 * 256) + b2
+        let int b0 ← byte_at(data, i)
+        let int b1 ← byte_at(data, i + 1)
+        let int b2 ← byte_at(data, i + 2)
+        let int triple ← (b0 * 65536) + (b1 * 256) + b2
         out ← out + sextet((triple / 262144) % 64)
         out ← out + sextet((triple / 4096) % 64)
         out ← out + sextet((triple / 64) % 64)
         out ← out + sextet(triple % 64)
         i ← i + 3
     }
-    const int rem ← n - i
+    let int rem ← n - i
     if rem ≡ 1 {
-        const int b0 ← byte_at(data, i)
-        const int triple ← b0 * 65536
+        let int b0 ← byte_at(data, i)
+        let int triple ← b0 * 65536
         out ← out + sextet((triple / 262144) % 64)
         out ← out + sextet((triple / 4096) % 64)
         out ← out + "=="
     }
     if rem ≡ 2 {
-        const int b0 ← byte_at(data, i)
-        const int b1 ← byte_at(data, i + 1)
-        const int triple ← (b0 * 65536) + (b1 * 256)
+        let int b0 ← byte_at(data, i)
+        let int b1 ← byte_at(data, i + 1)
+        let int triple ← (b0 * 65536) + (b1 * 256)
         out ← out + sextet((triple / 262144) % 64)
         out ← out + sextet((triple / 4096) % 64)
         out ← out + sextet((triple / 64) % 64)
@@ -95,8 +95,8 @@ fn base64(list<b8> data) → string {
 
 @ private
 fn alphabet_index(string c) → int ∪ none {
-    var int i ← 0
-    const string table ← alphabet()
+    mut int i ← 0
+    let string table ← alphabet()
     while i ≺ 64 {
         if table.slice(i, i + 1) ≡ c then return i
         i ← i + 1
@@ -107,23 +107,23 @@ fn alphabet_index(string c) → int ∪ none {
 # Decode base64 string to bytes (throws on invalid input)
 @ public
 fn decode_base64(string data) → list<b8> ⇥ string {
-    var list<int> sextets ← []
-    var int i ← 0
+    mut list<int> sextets ← []
+    mut int i ← 0
     while i ≺ data.length() {
-        const string c ← data.slice(i, i + 1)
+        let string c ← data.slice(i, i + 1)
         if c ≡ " " or c ≡ "\n" or c ≡ "\r" or c ≡ "\t" {
             i ← i + 1
             continue
         }
         if c ≡ "=" then break
-        const int ∪ none idx ← alphabet_index(c)
+        let int ∪ none idx ← alphabet_index(c)
         if idx is none then throw "norma:encoding.decode_base64: invalid character"
         sextets.append(idx ↦ int ⊥ 0)
         i ← i + 1
     }
-    var int pads ← 0
+    mut int pads ← 0
     while i ≺ data.length() {
-        const string c ← data.slice(i, i + 1)
+        let string c ← data.slice(i, i + 1)
         if c ≡ "=" {
             pads ← pads + 1
         }
@@ -133,15 +133,15 @@ fn decode_base64(string data) → list<b8> ⇥ string {
         i ← i + 1
     }
     if sextets.length() % 4 ≡ 1 then throw "norma:encoding.decode_base64: truncated input"
-    var list<u8> out ← []
-    var int j ← 0
-    const int n ← sextets.length()
+    mut list<u8> out ← []
+    mut int j ← 0
+    let int n ← sextets.length()
     while j ≺ n {
-        const int s0 ← sextets.get(j) coalesce 0
-        const int s1 ← sextets.get(j + 1) coalesce 0
-        const int s2 ← sextets.get(j + 2) coalesce 0
-        const int s3 ← sextets.get(j + 3) coalesce 0
-        const int triple ← (s0 * 262144) + (s1 * 4096) + (s2 * 64) + s3
+        let int s0 ← sextets.get(j) coalesce 0
+        let int s1 ← sextets.get(j + 1) coalesce 0
+        let int s2 ← sextets.get(j + 2) coalesce 0
+        let int s3 ← sextets.get(j + 3) coalesce 0
+        let int triple ← (s0 * 262144) + (s1 * 4096) + (s2 * 64) + s3
         out.append(((triple / 65536) % 256) ↦ u8 ⊥ 0)
         if j + 2 ≺ n then out.append(((triple / 256) % 256) ↦ u8 ⊥ 0)
         if j + 3 ≺ n then out.append((triple % 256) ↦ u8 ⊥ 0)
@@ -168,10 +168,10 @@ fn try_decode_base64(string data) → list<b8> ∪ none {
 # Encode bytes to lowercase hex string
 @ public
 fn hex(list<b8> data) → string {
-    var string out ← ""
-    var int i ← 0
+    mut string out ← ""
+    mut int i ← 0
     while i ≺ data.length() {
-        const int b ← byte_at(data, i)
+        let int b ← byte_at(data, i)
         out ← out + hex_digit(b / 16)
         out ← out + hex_digit(b % 16)
         i ← i + 1
@@ -183,11 +183,11 @@ fn hex(list<b8> data) → string {
 @ public
 fn decode_hex(string data) → list<b8> ⇥ string {
     if data.length() % 2 ≢ 0 then throw "norma:encoding.decode_hex: odd digit count"
-    var list<u8> out ← []
-    var int i ← 0
+    mut list<u8> out ← []
+    mut int i ← 0
     while i ≺ data.length() {
-        const int ∪ none hi ← hex_value(data.slice(i, i + 1))
-        const int ∪ none lo ← hex_value(data.slice(i + 1, i + 2))
+        let int ∪ none hi ← hex_value(data.slice(i, i + 1))
+        let int ∪ none lo ← hex_value(data.slice(i + 1, i + 2))
         if hi is none or lo is none then throw "norma:encoding.decode_hex: invalid hex digit"
         out.append(((hi ↦ int ⊥ 0) * 16 + (lo ↦ int ⊥ 0)) ↦ u8 ⊥ 0)
         i ← i + 2
@@ -217,10 +217,10 @@ fn is_unreserved(string c) → bool {
 
 @ private
 fn percent_encode_bytes(list<b8> raw) → string {
-    var string out ← ""
-    var int i ← 0
+    mut string out ← ""
+    mut int i ← 0
     while i ≺ raw.length() {
-        const int b ← byte_at(raw, i)
+        let int b ← byte_at(raw, i)
         out ← out + "%§§"(hex_digit_upper(b / 16), hex_digit_upper(b % 16))
         i ← i + 1
     }
@@ -229,10 +229,10 @@ fn percent_encode_bytes(list<b8> raw) → string {
 
 @ private
 fn encode_form(string data, bool plus_space) → string {
-    var string out ← ""
-    var int i ← 0
+    mut string out ← ""
+    mut int i ← 0
     while i ≺ data.length() {
-        const string c ← data.slice(i, i + 1)
+        let string c ← data.slice(i, i + 1)
         if plus_space and c ≡ " " {
             out ← out + "+"
         }
@@ -255,25 +255,25 @@ fn url(string data) → string {
 
 @ private
 fn decode_percent(string data, bool plus_space) → string ⇥ string {
-    var list<u8> out ← []
-    var int i ← 0
+    mut list<u8> out ← []
+    mut int i ← 0
     while i ≺ data.length() {
-        const string c ← data.slice(i, i + 1)
+        let string c ← data.slice(i, i + 1)
         if plus_space and c ≡ "+" {
             out.append(32 ↦ u8 ⊥ 0)
             i ← i + 1
         }
         elif c ≡ "%" {
             if i + 3 ≻ data.length() then throw "norma:encoding.decode_url: truncated escape"
-            const int ∪ none hi ← hex_value(data.slice(i + 1, i + 2))
-            const int ∪ none lo ← hex_value(data.slice(i + 2, i + 3))
+            let int ∪ none hi ← hex_value(data.slice(i + 1, i + 2))
+            let int ∪ none lo ← hex_value(data.slice(i + 2, i + 3))
             if hi is none or lo is none then throw "norma:encoding.decode_url: invalid escape"
             out.append(((hi ↦ int ⊥ 0) * 16 + (lo ↦ int ⊥ 0)) ↦ u8 ⊥ 0)
             i ← i + 3
         }
         else {
-            const list<b8> raw ← c ↦ list<b8>
-            var int k ← 0
+            let list<b8> raw ← c ↦ list<b8>
+            mut int k ← 0
             while k ≺ raw.length() {
                 out.append((raw.get(k) coalesce (0 ∷ b8)) ↦ u8)
                 k ← k + 1

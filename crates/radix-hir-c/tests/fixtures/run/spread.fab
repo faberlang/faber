@@ -1,0 +1,15 @@
++++
+locale = "en"
++++
+# `[1, spread xs, 4]`: the length is known only at run time, so the list is
+# built by pushing each element in source order.
+main {
+    let list<int> media ← [2, 3]
+    let list<int> numeri ← [1, spread media, 4]
+    print numeri
+    let list<string> a ← ["b", "c"]
+    let list<string> names ← ["a", spread a, "d"]
+    print names
+    let list<int> twice ← [spread media, spread media]
+    print twice
+}

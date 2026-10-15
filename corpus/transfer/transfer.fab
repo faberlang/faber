@@ -19,7 +19,7 @@ locale = "en"
 #     the existing storage of `target`. `←` only ever rebinds a name; `⇇` is
 #     the one way to write into a tensor that already exists
 #   • Writable targets — the left side is tensor storage you may write: a
-#     `var` local, a `mut` parameter, or a field of a writable root. The write
+#     `mut` local, a `mut` parameter, or a field of a writable root. The write
 #     is visible to the caller of a `mut` parameter and through every `←`
 #     alias of the target (see copy-into-alias)
 #   • Views on the right — the value may be any tensor expression, including a
@@ -36,7 +36,7 @@ locale = "en"
 #   • writing `target ← value` into a `mut` tensor parameter of a kernel — a
 #     kernel parameter is a device buffer with no binding to rebind, so a
 #     whole-tensor `←` there is rejected (`mut_tensor_param_rebind`); write `⇇`
-#   • a `const` or non-`mut` target, a scalar/list/matrix/vector target (a
+#   • a `let` or non-`mut` target, a scalar/list/matrix/vector target (a
 #     value type is written by `←`), or a view target such as
 #     `out.slice(0, 1) ⇇ x` — all rejected
 #   • a right side that aliases the left, or a chain `a ⇇ b ⇇ c`
@@ -61,12 +61,12 @@ fn fill_transposed(mut tf32[2, 2] target, tf32[2, 2] source) → void {
 }
 
 main {
-    const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
-    const list<f32> flat_b ← [10.0, 20.0, 30.0, 40.0]
-    const tf32[2, 2] source ← flat_a ↦ tf32[2, 2]
-    var tf32[2, 2] target ← flat_b ↦ tf32[2, 2]
+    let list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
+    let list<f32> flat_b ← [10.0, 20.0, 30.0, 40.0]
+    let tf32[2, 2] source ← flat_a ↦ tf32[2, 2]
+    mut tf32[2, 2] target ← flat_b ↦ tf32[2, 2]
 
-    # Into a var tensor.
+    # Into a mut tensor.
     target ⇇ source
     print target.flatten()
 

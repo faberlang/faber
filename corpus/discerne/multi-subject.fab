@@ -12,7 +12,7 @@ locale = "en"
 # A match over two scrutinees. The header is `match a and b`; every arm lists
 # one pattern per subject joined by `and`; the arms are tried in order and the
 # first arm whose patterns all match runs. `_` matches anything for its subject,
-# and `default` is the catch-all arm. A pattern with `const` binds the
+# and `default` is the catch-all arm. A pattern with `let` binds the
 # variant's fields for that arm only.
 union Shape {
     Circle {
@@ -26,10 +26,10 @@ union Shape {
 
 fn describe(Shape a, Shape b) → string {
     match a and b {
-        case Circle const r and Square const s {
+        case Circle let r and Square let s {
             return "circle-square §,§"(r, s)
         }
-        case Circle const r and _ {
+        case Circle let r and _ {
             return "circle-first §"(r)
         }
         case _ and Dot {
@@ -59,9 +59,9 @@ fn pair(Side a, Side b) → string {
 }
 
 main {
-    const Shape c ← variant Circle { r = 1 } ∷ Shape
-    const Shape q ← variant Square { s = 2 } ∷ Shape
-    const Shape d ← variant Dot { } ∷ Shape
+    let Shape c ← variant Circle { r = 1 } ∷ Shape
+    let Shape q ← variant Square { s = 2 } ∷ Shape
+    let Shape d ← variant Dot { } ∷ Shape
     print describe(c, q)
     print describe(c, d)
     print describe(q, d)

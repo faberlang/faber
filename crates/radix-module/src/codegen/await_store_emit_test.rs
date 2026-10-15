@@ -11,7 +11,7 @@ functio fetch() fiet → numerus {
 }
 
 functio caller() fiet → vacuum {
-    fixum u8 v ↢ fetch()
+    sit u8 v ↢ fetch()
     nota v
 }";
 
@@ -70,7 +70,7 @@ functio fetch() fiet → u8 {
 }
 
 functio caller() fiet → vacuum {
-    fixum u8 v ↢ fetch()
+    sit u8 v ↢ fetch()
     nota v
 }";
     let code = emit(Target::HirRust, source);

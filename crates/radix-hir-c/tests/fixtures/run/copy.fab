@@ -1,0 +1,42 @@
++++
+locale = "en"
++++
+# The `copy` marker (R7): a bind or a call argument deep-duplicates. A list
+# gets a fresh arena array; a genus is duplicated field by field, so a list
+# field inside it is not shared.
+class Holder {
+    mut float x = 0.0
+    mut list<int> marks = []
+}
+class Counter {
+    mut int n = 0
+}
+fn take(copy list<int> items) → int {
+    mut list<int> fresh ← items
+    fresh.append(5)
+    return fresh.length()
+}
+fn bump(copy Counter c) → int {
+    mut Counter mine ← c
+    mine.n ← mine.n + 1
+    return mine.n
+}
+main {
+    let list<int> a ← [1, 2]
+    print take(copy a)
+    print a.length()
+
+    mut Counter c ← Counter {}
+    c.n ← 3
+    print bump(copy c)
+    print c.n
+
+    let Holder source ← Holder { x = 1.0 }
+    mut Holder duplicate ← copy source
+    duplicate.x ← 5.0
+    duplicate.marks.append(1)
+    print source.x
+    print source.marks.length()
+    print duplicate.x
+    print duplicate.marks.length()
+}

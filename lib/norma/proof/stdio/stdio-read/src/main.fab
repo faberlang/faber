@@ -13,39 +13,39 @@ locale = "en"
 import from "norma:console" console
 
 main {
-    const string ∪ none a ← console.read_line()
+    let string ∪ none a ← console.read_line()
     assert a not is none
-    const string first ↤ a
+    let string first ↤ a
     assert first ≡ "alpha"
 
-    const string ∪ none b ← console.read_line()
+    let string ∪ none b ← console.read_line()
     assert b not is none
-    const string second ↤ b
+    let string second ↤ b
     assert second ≡ "beta"
 
-    const list<b8> chunk ← console.read_bytes(3) coalesce ||
+    let list<b8> chunk ← console.read_bytes(3) coalesce ||
     assert chunk.length() ≥ 1
     assert (chunk.get(0) coalesce (0 ∷ b8)) ≡ 0x67
 
     # End-of-input behaviour. The byte read above took only "gam", so stdin
     # still holds `ma\n\n`: the rest of the gamma line, then one blank line.
-    const string ∪ none rest ← console.read_line()
+    let string ∪ none rest ← console.read_line()
     assert rest not is none
-    const string rest_text ↤ rest
+    let string rest_text ↤ rest
     assert rest_text ≡ "ma"
 
     # A blank line is a present empty string, not end of input.
-    const string ∪ none blank ← console.read_line()
+    let string ∪ none blank ← console.read_line()
     assert blank not is none
-    const string blank_text ↤ blank
+    let string blank_text ↤ blank
     assert blank_text ≡ ""
 
     # Only past the last byte does a line read report none, and a byte read
     # at end of input is none as well (not an empty list).
-    const string ∪ none eof ← console.read_line()
+    let string ∪ none eof ← console.read_line()
     assert eof is none
 
-    const list<b8> ∪ none tail ← console.read_bytes(4)
+    let list<b8> ∪ none tail ← console.read_bytes(4)
     assert tail is none
 
     console.write_line("stdio-read-ok")

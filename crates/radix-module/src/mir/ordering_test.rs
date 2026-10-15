@@ -39,8 +39,8 @@ fn genus_glyphs_call_compare() {
     let lines = run_lines(&format!(
         "{ORDERABLE}
 incipit {{
-    fixum Persona a ← Persona {{ anni = 3 }}
-    fixum Persona b ← Persona {{ anni = 5 }}
+    sit Persona a ← Persona {{ anni = 3 }}
+    sit Persona b ← Persona {{ anni = 5 }}
     nota a ≺ b
     nota a ≥ b
     nota maior(a, b).anni
@@ -57,7 +57,7 @@ fn builtins_order_through_the_bound() {
 incipit {{
     nota maior(3, 9)
     nota maior(\"pirum\", \"malum\")
-    fixum fractus top ← maior(1.5, nonnumerus)
+    sit fractus top ← maior(1.5, nonnumerus)
     nota top ≢ top
     nota maior(2.5, -1.0)
 }}
@@ -71,9 +71,9 @@ fn tuples_order_lexicographically() {
     let lines = run_lines(&format!(
         "{ORDERABLE}
 incipit {{
-    fixum iuncta<numerus, textus> x ← iuncta<numerus, textus>[2, \"b\"]
-    fixum iuncta<numerus, textus> y ← iuncta<numerus, textus>[2, \"c\"]
-    fixum iuncta<numerus, textus> z ← iuncta<numerus, textus>[10, \"a\"]
+    sit iuncta<numerus, textus> x ← iuncta<numerus, textus>[2, \"b\"]
+    sit iuncta<numerus, textus> y ← iuncta<numerus, textus>[2, \"c\"]
+    sit iuncta<numerus, textus> z ← iuncta<numerus, textus>[10, \"a\"]
     nota x ≺ y
     nota z ≤ x
     nota maior(x, y)[1]

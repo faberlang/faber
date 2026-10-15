@@ -26,7 +26,7 @@ ruling = "ea7cfde1"
 # =============================================================================
 
 main {
-    const float a ← 2.5
-    const int n ← a ↦ int
+    let float a ← 2.5
+    let int n ← a ↦ int
     print n
 }

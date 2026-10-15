@@ -1,6 +1,6 @@
 //! Parser coverage for value-side `copy`/`own` markers (operator ruling
-//! 2026-10-08): `var T b ← copy a`, `var T b ← own a`, `b ← copy c`, and the
-//! retired binding-side spelling (`var copy T b ← a`, need), which is
+//! 2026-10-08): `mut T b ← copy a`, `mut T b ← own a`, `b ← copy c`, and the
+//! retired binding-side spelling (`mut copy T b ← a`, need), which is
 //! PARSE010 `binding_marker_moved_to_value`.
 
 use crate::test_support::{has_arg, parse_ok, parse_program};
@@ -24,7 +24,8 @@ impl KeywordPack for MarkerPack {
     fn keyword_latin_key(&self, text: &str) -> Option<&str> {
         match text {
             "const" => Some("fixum"),
-            "var" => Some("varia"),
+            "let" | "sit" => Some("sit"),
+            "mut" => Some("varia"),
             "copy" | "exemplum" => Some("copy"),
             "own" | "penes" => Some("own"),
             "fixum" => Some("fixum"),
@@ -92,14 +93,14 @@ fn declared_mode(source: &str) -> (Option<TypeMode>, bool) {
 
 #[test]
 fn value_marker_copy_lands_on_the_declared_type() {
-    let (mode, init_is_ident) = declared_mode("incipit {\n    fixum lista<numerus> b ← copy a\n}");
+    let (mode, init_is_ident) = declared_mode("incipit {\n    sit lista<numerus> b ← copy a\n}");
     assert_eq!(mode, Some(TypeMode::Copy));
     assert!(init_is_ident, "the marker is not part of the initializer");
 }
 
 #[test]
 fn value_marker_own_lands_on_the_declared_type() {
-    let (mode, init_is_ident) = declared_mode("incipit {\n    fixum lista<numerus> b ← own a\n}");
+    let (mode, init_is_ident) = declared_mode("incipit {\n    sit lista<numerus> b ← own a\n}");
     assert_eq!(mode, Some(TypeMode::Own));
     assert!(init_is_ident);
 }
@@ -131,8 +132,8 @@ fn value_marker_words_stay_identifiers_without_an_operand() {
 
 #[test]
 fn binding_marker_copy_is_retired_in_the_latin_surface() {
-    let result = parse_program("incipit {\n    fixum copy lista<numerus> b ← a\n}");
-    assert_binding_marker_retired(&result, "fixum", "copy", "b");
+    let result = parse_program("incipit {\n    sit copy lista<numerus> b ← a\n}");
+    assert_binding_marker_retired(&result, "sit", "copy", "b");
 }
 
 #[test]
@@ -143,20 +144,20 @@ fn binding_marker_own_is_retired_in_the_latin_surface() {
 
 #[test]
 fn binding_marker_copy_is_retired_in_the_en_surface() {
-    let result = parse_surface("incipit {\n    var copy Punctum b ← a\n}");
-    assert_binding_marker_retired(&result, "var", "copy", "b");
+    let result = parse_surface("incipit {\n    mut copy Punctum b ← a\n}");
+    assert_binding_marker_retired(&result, "mut", "copy", "b");
 }
 
 #[test]
 fn binding_marker_own_is_retired_in_the_en_surface() {
-    let result = parse_surface("incipit {\n    const own Punctum b ← a\n}");
-    assert_binding_marker_retired(&result, "const", "own", "b");
+    let result = parse_surface("incipit {\n    let own Punctum b ← a\n}");
+    assert_binding_marker_retired(&result, "let", "own", "b");
 }
 
 #[test]
 fn binding_marker_is_retired_in_the_la_surface_spellings() {
-    let result = parse_surface("incipit {\n    fixum exemplum Punctum b ← a\n}");
-    assert_binding_marker_retired(&result, "fixum", "exemplum", "b");
+    let result = parse_surface("incipit {\n    sit exemplum Punctum b ← a\n}");
+    assert_binding_marker_retired(&result, "sit", "exemplum", "b");
     let result = parse_surface("incipit {\n    varia penes Punctum b ← a\n}");
     assert_binding_marker_retired(&result, "varia", "penes", "b");
 }
@@ -168,6 +169,6 @@ fn binding_marker_retirement_leaves_parameter_markers_alone() {
 
 #[test]
 fn binding_marker_retirement_leaves_the_value_side_form_clean() {
-    let result = parse_surface("incipit {\n    var Punctum b ← copy a\n}");
+    let result = parse_surface("incipit {\n    mut Punctum b ← copy a\n}");
     assert!(result.success(), "{:?}", result.errors);
 }

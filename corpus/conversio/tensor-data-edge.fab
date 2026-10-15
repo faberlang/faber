@@ -48,24 +48,24 @@ fn byteAt(list<b8> buf, int off) → int {
 }
 
 fn leU32(list<b8> buf, int off) → int {
-    const int b0 ← byteAt(buf, off)
-    const int b1 ← byteAt(buf, off + 1)
-    const int b2 ← byteAt(buf, off + 2)
-    const int b3 ← byteAt(buf, off + 3)
+    let int b0 ← byteAt(buf, off)
+    let int b1 ← byteAt(buf, off + 1)
+    let int b2 ← byteAt(buf, off + 2)
+    let int b3 ← byteAt(buf, off + 3)
     return b3 * 16777216 + b2 * 65536 + b1 * 256 + b0
 }
 
 fn powerTwo(int n) → float {
-    var float result ← 1.0
+    mut float result ← 1.0
     if n ≥ 0 {
-        var int i ← 0
+        mut int i ← 0
         while i ≺ n {
             result ← result * 2.0
             i ← i + 1
         }
     }
     else {
-        var int i ← n
+        mut int i ← n
         while i ≺ 0 {
             result ← result / 2.0
             i ← i + 1
@@ -75,26 +75,26 @@ fn powerTwo(int n) → float {
 }
 
 fn f32le(list<b8> buf, int off) → f32 {
-    const int raw ← leU32(buf, off)
-    const int sign ← (raw ⇒ 31) % 2
-    const int exp ← (raw ⇒ 23) % 256
-    const int frac ← raw % 8388608
-    var float signFactor ← 1.0
+    let int raw ← leU32(buf, off)
+    let int sign ← (raw ⇒ 31) % 2
+    let int exp ← (raw ⇒ 23) % 256
+    let int frac ← raw % 8388608
+    mut float signFactor ← 1.0
     if sign ≢ 0 {
         signFactor ← -1.0
     }
-    const float fracRatio ← (frac ↦ float) / 8388608.0
+    let float fracRatio ← (frac ↦ float) / 8388608.0
     if exp ≡ 0 {
         if frac ≡ 0 then return signFactor * 0.0 ↦ f32
         return signFactor * powerTwo(-126) * fracRatio ↦ f32
     }
-    const float power ← powerTwo(exp - 127)
+    let float power ← powerTwo(exp - 127)
     return signFactor * power * (1.0 + fracRatio) ↦ f32
 }
 
 fn decodeFlat(list<b8> buf, int off, int count) → list<f32> {
-    var list<f32> out ← empty
-    var int i ← 0
+    mut list<f32> out ← empty
+    mut int i ← 0
     while i ≺ count {
         out.append(f32le(buf, off + i * 4))
         i ← i + 1
@@ -104,18 +104,18 @@ fn decodeFlat(list<b8> buf, int off, int count) → list<f32> {
 
 main {
     # 8-byte LE dim header + 16 × f32le 1.0
-    const list<b8> fixture ← |02 00 00 00 08 00 00 00 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f|
-    const int dim0 ← leU32(fixture, 0)
-    const int dim1 ← leU32(fixture, 4)
-    const list<f32> flat ← decodeFlat(fixture, 8, dim0 * dim1)
-    const tensor<f32, [2, 8]> grid ← flat ↦ tensor<f32, [2, 8]>
+    let list<b8> fixture ← |02 00 00 00 08 00 00 00 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f|
+    let int dim0 ← leU32(fixture, 0)
+    let int dim1 ← leU32(fixture, 4)
+    let list<f32> flat ← decodeFlat(fixture, 8, dim0 * dim1)
+    let tensor<f32, [2, 8]> grid ← flat ↦ tensor<f32, [2, 8]>
     print dim0
     print dim1
     print grid.flatten().length()
-    const list<f32> zeros16 ← [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    const list<f32> short ← [1.0, 2.0, 3.0]
-    const tensor<f32, [2, 8]> zeros ← zeros16 ↦ tensor<f32, [2, 8]>
-    const tensor<f32, [2, 8]> recovered ← short ↦ tensor<f32, [2, 8]> ⊥ zeros
+    let list<f32> zeros16 ← [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let list<f32> short ← [1.0, 2.0, 3.0]
+    let tensor<f32, [2, 8]> zeros ← zeros16 ↦ tensor<f32, [2, 8]>
+    let tensor<f32, [2, 8]> recovered ← short ↦ tensor<f32, [2, 8]> ⊥ zeros
     print recovered.flatten().length()
     print recovered.flatten()[0]
 }

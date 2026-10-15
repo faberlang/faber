@@ -48,7 +48,7 @@ const GENERIC_SIMPLE_LOSS_SOURCE: &str = r#"
 functio simple_loss<magnitudo R, magnitudo C>(
     tensor<f32, [R, C]> x, tensor<f32, [R, C]> w
 ) → f32 {
-    fixum tensor<f32, [R, C]> product ← x ⊙ w
+    sit tensor<f32, [R, C]> product ← x ⊙ w
     redde product.media()
 }
 "#;
@@ -79,9 +79,9 @@ fn concrete_generic_backward_reduction_finalizes_companion_shape_size() {
         "{GENERIC_SIMPLE_LOSS_SOURCE}\n{}",
         r"
 incipit {
-    fixum tensor<f32, [2, 8]> x ← vacua
-    fixum tensor<f32, [2, 8]> w ← vacua
-    fixum f32 loss ← simple_loss(x, w)
+    sit tensor<f32, [2, 8]> x ← vacua
+    sit tensor<f32, [2, 8]> w ← vacua
+    sit f32 loss ← simple_loss(x, w)
     nota loss
 }
 "
@@ -204,7 +204,7 @@ fn generic_wrapper_call_to_generic_companion_typechecks_at_call_site() {
 functio simple_loss<magnitudo R, magnitudo C>(
     tensor<f32, [R, C]> x, tensor<f32, [R, C]> w
 ) → f32 {
-    fixum tensor<f32, [R, C]> product ← x ⊙ w
+    sit tensor<f32, [R, C]> product ← x ⊙ w
     redde product.media()
 }
 
@@ -215,7 +215,7 @@ functio nil() → vacuum {
 functio gradientes_simple_loss<magnitudo R, magnitudo C>(
     tensor<f32, [R, C]> x, tensor<f32, [R, C]> w, f32 upstream
 ) → tensor<f32, [R, C]> {
-    fixum [gx, gw] ← loss_backward(x, w, nil(), upstream)
+    sit [gx, gw] ← loss_backward(x, w, nil(), upstream)
     redde gx
 }
 "#;
@@ -252,9 +252,9 @@ functio broad_loss<magnitudo R, magnitudo C>(
 }
 
 incipit {
-    fixum tensor<f32, [2, 8]> a ← vacua
-    fixum tensor<f32, [8]> b ← vacua
-    fixum f32 loss ← broad_loss(a, b)
+    sit tensor<f32, [2, 8]> a ← vacua
+    sit tensor<f32, [8]> b ← vacua
+    sit f32 loss ← broad_loss(a, b)
     nota loss
 }
 "#;
@@ -312,7 +312,7 @@ fn unrolled_full_prefix_range_loop_generates_companion_through_driver() {
 @ radix backward "lane_sum_backward"
 functio lane_sum(tensor<f32, [4]> x) → f32 {
     varia tensor<f32, [4]> acc ← copy x
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         acc ← acc + x
     }
     redde acc.media()
@@ -370,15 +370,15 @@ fn generic_full_prefix_range_reaches_concrete_backward_companion() {
 @ radix backward "generic_lane_sum_backward"
 functio generic_lane_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
     varia tensor<f32, [N]> acc ← copy x
-    itera ex x fixum value {
+    itera ex x sit value {
         acc ← acc + x
     }
     redde acc.media()
 }
 
 incipit {
-    fixum tensor<f32, [4]> x ← vacua
-    fixum f32 y ← generic_lane_sum(x)
+    sit tensor<f32, [4]> x ← vacua
+    sit f32 y ← generic_lane_sum(x)
     nota y
 }
 "#;
@@ -414,13 +414,13 @@ fn generic_air_instance_over_unroll_budget_fails_closed() {
     let source = r#"
 @ radix lane "air"
 functio generic_too_wide<magnitudo N>(tensor<f32, [N]> x) → f32 {
-    itera ex x fixum value { }
+    itera ex x sit value { }
     redde 0.0
 }
 
 incipit {
-    fixum tensor<f32, [65]> x ← vacua
-    fixum f32 y ← generic_too_wide(x)
+    sit tensor<f32, [65]> x ← vacua
+    sit f32 y ← generic_too_wide(x)
     nota y
 }
 "#;
@@ -457,16 +457,16 @@ functio generic_masked_mean<magnitudo N>(
     tensor<f32, [N]> x, tensor<f32, [N]> mask
 ) → f32 {
     varia tensor<f32, [N]> acc ← copy x
-    itera ex x fixum value {
+    itera ex x sit value {
         acc ← acc + x
     }
     redde (acc ⊙ mask).media()
 }
 
 incipit {
-    fixum tensor<f32, [4]> x ← vacua
-    fixum tensor<f32, [4]> mask ← vacua
-    fixum f32 y ← generic_masked_mean(x, mask)
+    sit tensor<f32, [4]> x ← vacua
+    sit tensor<f32, [4]> mask ← vacua
+    sit f32 y ← generic_masked_mean(x, mask)
     nota y
 }
 "#;
@@ -527,7 +527,7 @@ fn unrolled_masked_route_generates_companion_through_driver() {
 @ radix backward "masked_mean_backward"
 functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     varia tensor<f32, [4]> acc ← copy x
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         acc ← acc + x
     }
     redde (acc ⊙ mask).media()

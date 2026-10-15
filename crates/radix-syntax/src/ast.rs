@@ -443,15 +443,17 @@ pub enum ClassMemberKind {
 
 /// Leading modifier of a `genus` field (DECISIONS D16.1).
 ///
-/// A field declares exactly one: `fixum` (per instance, set only at
-/// construction), `varia` (per instance, reassignable) or `generis` (one per
-/// type, compile-time). The modifier is optional until the D5c tightening
-/// makes it mandatory; `None` is an unmarked field.
+/// A field declares exactly one: `sit` (en `let`; per instance, set only at
+/// construction; the variant keeps its historical `Fixum` name), `varia` (per
+/// instance, reassignable) or `fixum` (en `const`; a type-level compile-time
+/// constant, read-only, `=` initializer required). The retired `generis` (en
+/// `static`) word is `PARSE010 static_member_retired`. `None` is an unmarked
+/// field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FieldModifier {
     Fixum,
     Varia,
-    Generis,
+    Const,
 }
 
 /// Visibility of a `genus` member (DECISIONS D5.2, D5.3).
@@ -477,10 +479,10 @@ pub struct FieldDecl {
 }
 
 impl FieldDecl {
-    /// Whether the field belongs to the type (`generis`) rather than instances.
+    /// Whether the field belongs to the type (a `const` member) rather than instances.
     #[must_use]
     pub fn is_static(&self) -> bool {
-        self.modifier == Some(FieldModifier::Generis)
+        self.modifier == Some(FieldModifier::Const)
     }
 }
 

@@ -9,14 +9,14 @@ import from "norma:http/client" client
 
 describe "client_import" {
     test "Url and Client construct" {
-        const client.Url url ← client.Url {
+        let client.Url url ← client.Url {
             scheme = "http",
             host = "127.0.0.1",
             port = 9,
             path = "/test",
             query = ""
         }
-        const client.Client session ← client.Client { }
+        let client.Client session ← client.Client { }
         assert url.host ≡ "127.0.0.1"
         assert url.port ≡ 9
         assert url.path ≡ "/test"
@@ -24,11 +24,11 @@ describe "client_import" {
     }
 
     test "Receive and Chunk construct" {
-        const client.Receive stream ← client.Receive {
+        let client.Receive stream ← client.Receive {
             reader = 1,
             status = 200
         }
-        const client.Chunk chunk ← client.Chunk { text = "data: one\n\n", done = false }
+        let client.Chunk chunk ← client.Chunk { text = "data: one\n\n", done = false }
         assert stream.status ≡ 200
         assert chunk.done ≡ false
         print "receive constructed"

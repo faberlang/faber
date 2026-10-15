@@ -4,7 +4,7 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "member_suffix", "nota_stmt"]
 category = "type"
 summary = "MU-3: own bind of a class value; the binding reads the source's field."
-syntax = "const Holder f ← own d"
+syntax = "let Holder f ← own d"
 related = ["own", "genus"]
 locale = "en"
 +++
@@ -13,11 +13,11 @@ locale = "en"
 # =============================================================================
 
 class Holder {
-    var f64 x = 0.0
+    mut f64 x = 0.0
 }
 
 main {
-    const Holder d ← Holder { x = 2.0 }
-    const Holder f ← own d
+    let Holder d ← Holder { x = 2.0 }
+    let Holder f ← own d
     print f.x
 }

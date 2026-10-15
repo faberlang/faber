@@ -39,9 +39,9 @@ union Fault {{
 @ conversion
 fn fault_from(value raw) → Fault {{
     do {{
-        const map<string, value> record ← raw ↦ map<string, value>
-        const string kind ← record["kind"] ↦ string
-        const string path ← record["path"] ↦ string
+        let map<string, value> record ← raw ↦ map<string, value>
+        let string kind ← record["kind"] ↦ string
+        let string path ← record["path"] ↦ string
         if kind ≡ "NotFound" {{
             return variant NotFound {{ path = path }}
         }}
@@ -57,11 +57,11 @@ fn read(string p) → string ⇥ Fault {{
 
 main {{
     do {{
-        const string text ← read("{MISSING}")
+        let string text ← read("{MISSING}")
         print text
     }} catch err {{
         match err {{
-            case NotFound const path {{
+            case NotFound let path {{
                 print path
             }}
             case Other {{
@@ -93,9 +93,9 @@ union Fault {{
 @ conversion
 fn fault_from(value raw) → Fault {{
     do {{
-        const map<string, value> record ← raw ↦ map<string, value>
-        const string kind ← record["kind"] ↦ string
-        const string path ← record["path"] ↦ string
+        let map<string, value> record ← raw ↦ map<string, value>
+        let string kind ← record["kind"] ↦ string
+        let string path ← record["path"] ↦ string
         if kind ≡ "NotFound" {{
             return variant NotFound {{ path = path }}
         }}
@@ -112,11 +112,11 @@ fn read<T>(string p) → T ⇥ Fault {{
 
 main {{
     do {{
-        const string text ← read<string>("{MISSING}")
+        let string text ← read<string>("{MISSING}")
         print text
     }} catch err {{
         match err {{
-            case NotFound const path {{
+            case NotFound let path {{
                 print path
             }}
             case Other {{
@@ -149,9 +149,9 @@ union Fault {{
 @ conversion
 fn fault_from(value raw) → Fault {{
     do {{
-        const map<string, value> record ← raw ↦ map<string, value>
-        const string kind ← record["kind"] ↦ string
-        const string path ← record["path"] ↦ string
+        let map<string, value> record ← raw ↦ map<string, value>
+        let string kind ← record["kind"] ↦ string
+        let string path ← record["path"] ↦ string
         if kind ≡ "NotFound" {{
             return variant NotFound {{ path = path }}
         }}
@@ -167,7 +167,7 @@ fn read<T>(string p) → T ⇥ Fault {{
 }}
 
 main {{
-    const string text ← read<string>("{}")
+    let string text ← read<string>("{}")
     print text
 }}
 "#,
@@ -190,8 +190,8 @@ union Fault {{ Absens, Perit }}
 
 fn kind_of(value raw) → string {{
     do {{
-        const map<string, value> record ← raw ↦ map<string, value>
-        const string kind ← record["kind"] ↦ string
+        let map<string, value> record ← raw ↦ map<string, value>
+        let string kind ← record["kind"] ↦ string
         return kind
     }} catch err {{
         return ""
@@ -212,7 +212,7 @@ fn read(string p) → string ⇥ Fault {{
 
 main {{
     do {{
-        const string text ← read("/nonexistent/e71f077f/failable-row.txt")
+        let string text ← read("/nonexistent/e71f077f/failable-row.txt")
         print text
     }} catch err {{
         match err {{

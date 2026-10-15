@@ -17,7 +17,7 @@ fn fault_from(value raw) → fault.IoFault {
 
 @ public
 class Listener {
-    var int id = 0
+    mut int id = 0
 
     fn accept() → connection.Socket ⇥ fault.IoFault {
         return listener_accept(self)
@@ -38,7 +38,7 @@ class Listener {
 }
 
 fn listener_accept(Listener listener) → connection.Socket ⇥ fault.IoFault {
-    const int child ← call 'caelum:accipe' (listener.id) ↦ int
+    let int child ← call 'caelum:accipe' (listener.id) ↦ int
     return connection.Socket { id = child }
 }
 

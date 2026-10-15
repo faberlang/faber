@@ -19,7 +19,7 @@ fn analyze_en(source: &str) -> AnalyzedFixture {
 }
 
 const CELL: &str = "class Cell {
-    var int n = 0
+    mut int n = 0
 
     fn inc() → void {
         self.n ← self.n + 1
@@ -89,18 +89,29 @@ fn copy_parameter_accepts_every_mutation_form() {
     }
 }
 
+/// The forms that write through the parameter. Whole reassignment is not one:
+/// a bare or `ref` parameter is re-pointable, so `xs ← [1, 2]` rebinds the
+/// callee's name and writes nothing of the caller's.
+const WRITE_THROUGH_FORMS: [&str; 4] = ["method", "class_method", "field", "element"];
+
 #[test]
-fn unmarked_parameter_rejects_every_mutation_form() {
-    for name in FORMS {
+fn unmarked_parameter_rejects_every_write_through_form() {
+    for name in WRITE_THROUGH_FORMS {
         assert_rejects_sem020_or_sem056(&form("", name));
     }
 }
 
 #[test]
-fn ref_parameter_rejects_every_mutation_form() {
-    for name in FORMS {
+fn ref_parameter_rejects_every_write_through_form() {
+    for name in WRITE_THROUGH_FORMS {
         assert_rejects_sem020_or_sem056(&form("ref", name));
     }
+}
+
+#[test]
+fn unmarked_and_ref_parameters_accept_repointing() {
+    assert_accepts(&form("", "reassign"));
+    assert_accepts(&form("ref", "reassign"));
 }
 
 #[test]

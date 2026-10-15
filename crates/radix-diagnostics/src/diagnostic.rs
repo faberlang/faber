@@ -359,7 +359,7 @@ pub enum SemanticErrorKind {
     /// the library sweep landed; now an error.
     TopLevelBindingForbidden,
 
-    /// A plain `var T y ← x` that would share a read-only (`const` or `ref`)
+    /// A plain `mut T y ← x` that would share a read-only (`const` or `ref`)
     /// value into a writable name (need, rule 2: `const` is deep).
     /// The legal spellings are `← copy x` and `← own x`.
     ConstSharedIntoVar,

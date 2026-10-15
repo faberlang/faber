@@ -9,7 +9,7 @@ use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, run_source};
 
-const BIG: &str = "fixum numerus big ← 9223372036854775807\n";
+const BIG: &str = "sit numerus big ← 9223372036854775807\n";
 
 fn run(prelude: &str, body: &str) -> (Vec<String>, Vec<(String, String)>) {
     let session = Session::new(
@@ -45,7 +45,7 @@ fn assert_store_trap(prelude: &str, body: &str, position: &str) {
 #[test]
 fn nested_sum_traps_at_the_declaration() {
     // p18a
-    assert_store_trap("", "fixum numerus r ← big + 1 + 0\nnota r", "(declaration of `r`)");
+    assert_store_trap("", "sit numerus r ← big + 1 + 0\nnota r", "(declaration of `r`)");
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn conditional_branch_traps_at_the_declaration() {
     // p18c
     assert_store_trap(
         "",
-        "fixum bivalens t ← verum\nfixum numerus r ← t ✓ big + 1 ✗ 0\nnota r",
+        "sit bivalens t ← verum\nsit numerus r ← t ✓ big + 1 ✗ 0\nnota r",
         "(declaration of `r`)",
     );
 }
@@ -89,7 +89,7 @@ fn negated_minimum_plus_zero_traps() {
     // p18f
     assert_store_trap(
         "",
-        "fixum numerus mn ← -9223372036854775807 - 1\nfixum numerus r ← -mn + 0\nnota r",
+        "sit numerus mn ← -9223372036854775807 - 1\nsit numerus r ← -mn + 0\nnota r",
         "(declaration of `r`)",
     );
 }
@@ -127,20 +127,20 @@ fn append_argument_traps() {
 #[test]
 fn inferred_slot_traps_at_the_declaration() {
     // ss6 / p22: `_` takes `i64`, so the declaration is the checked store.
-    assert_store_trap("", "fixum _ v ← big + 1\nnota v", "(declaration of `v`");
-    assert_store_trap("", "fixum _ v ← big + 1 + 0\nnota v", "(declaration of `v`");
+    assert_store_trap("", "sit v ← big + 1\nnota v", "(declaration of `v`");
+    assert_store_trap("", "sit v ← big + 1 + 0\nnota v", "(declaration of `v`");
 }
 
 #[test]
 fn in_range_nested_values_still_store() {
     // Controls: nothing here reaches past `i64::MAX`.
-    let (out, errors) = run("", "fixum numerus r ← 5 + 1 + 0\nnota r");
+    let (out, errors) = run("", "sit numerus r ← 5 + 1 + 0\nnota r");
     assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(out, ["6"]);
-    let (out, errors) = run("", "fixum numerus r ← big - 1 + 1\nnota r");
+    let (out, errors) = run("", "sit numerus r ← big - 1 + 1\nnota r");
     assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(out, ["9223372036854775807"]);
-    let (out, errors) = run("", "fixum bivalens t ← falsum\nfixum numerus r ← t ✓ big + 1 ✗ 7\nnota r");
+    let (out, errors) = run("", "sit bivalens t ← falsum\nsit numerus r ← t ✓ big + 1 ✗ 7\nnota r");
     assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(out, ["7"]);
 }

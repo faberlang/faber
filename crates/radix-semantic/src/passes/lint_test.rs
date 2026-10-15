@@ -1082,21 +1082,21 @@ fn en_unnecessary_varia_count(source: &str) -> usize {
 
 #[test]
 fn english_plain_in_place_sort_counts_as_mutation_for_unnecessary_varia() {
-    let source = "main {\n    var list<int> xs ← [3, 1, 2]\n    xs.sort()\n}";
+    let source = "main {\n    mut list<int> xs ← [3, 1, 2]\n    xs.sort()\n}";
     assert_eq!(en_unnecessary_varia_count(source), 0);
 }
 
 #[test]
 fn english_plain_in_place_sort_of_copy_binding_counts_as_mutation_for_unnecessary_varia() {
     // The `copy` access marker must peel for the en `.sort()` surface too.
-    let source = "main {\n    var list<int> xs ← [3, 1, 2]\n    var list<int> ys ← copy xs\n    ys.sort()\n}";
+    let source = "main {\n    mut list<int> xs ← [3, 1, 2]\n    mut list<int> ys ← copy xs\n    ys.sort()\n}";
     assert_eq!(en_unnecessary_varia_count(source), 1);
 }
 
 #[test]
 fn english_keyed_in_place_sort_counts_as_mutation_for_unnecessary_varia() {
     // The exemplar shape: a `const` source and a `var` copy sorted in place.
-    let source = "class Persona {\n    var string nomen\n    var int aetas\n}\nmain {\n    const list<Persona> ps ← [Persona { nomen = \"b\", aetas = 2 }]\n    var list<Persona> m ← copy ps\n    m.sort(Persona p ∴ p.aetas)\n}";
+    let source = "class Persona {\n    mut string nomen\n    mut int aetas\n}\nmain {\n    let list<Persona> ps ← [Persona { nomen = \"b\", aetas = 2 }]\n    mut list<Persona> m ← copy ps\n    m.sort(Persona p ∴ p.aetas)\n}";
     assert_eq!(en_unnecessary_varia_count(source), 0);
 }
 
@@ -1208,8 +1208,8 @@ fn warns_on_mixed_string_chain_with_literal() {
     let result = crate::test_support::analyze_source(
         r#"
 incipit {
-    fixum textus x ← "seed"
-    fixum textus m ← "a" + x + "b"
+    sit textus x ← "seed"
+    sit textus m ← "a" + x + "b"
     nota m
 }
 "#,
@@ -1237,8 +1237,8 @@ fn does_not_warn_on_two_operand_string_concat() {
     let result = crate::test_support::analyze_source(
         r#"
 incipit {
-    fixum textus x ← "seed"
-    fixum textus m ← "a" + x
+    sit textus x ← "seed"
+    sit textus m ← "a" + x
     nota m
 }
 "#,
@@ -1257,10 +1257,10 @@ fn does_not_warn_on_pure_variable_string_chain() {
     let result = crate::test_support::analyze_source(
         r#"
 incipit {
-    fixum textus x ← "seed"
-    fixum textus y ← "more"
-    fixum textus z ← "again"
-    fixum textus m ← x + y + z
+    sit textus x ← "seed"
+    sit textus y ← "more"
+    sit textus z ← "again"
+    sit textus m ← x + y + z
     nota m
 }
 "#,

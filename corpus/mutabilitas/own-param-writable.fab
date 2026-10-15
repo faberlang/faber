@@ -13,11 +13,11 @@ locale = "en"
 # =============================================================================
 # `own` hands the callee a value it owns, so the callee writes it directly:
 # method call, field store, whole reassignment, element store. Parameters take
-# no `var`/`const`: the marker says everything. Each call passes a fresh value,
+# no `mut`/`ref`: the marker says everything. Each call passes a fresh value,
 # so the caller never reads what it gave away.
 
 class Cell {
-    var int n = 0
+    mut int n = 0
 
     fn bump() → void {
         self.n ← self.n + 1

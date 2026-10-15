@@ -20,15 +20,15 @@ locale = "en"
 import from "norma:chorda" chorda
 
 main {
-    const list<b8> hello ← chorda.encode("Salve")
+    let list<b8> hello ← chorda.encode("Salve")
     assert chorda.decode(hello) ≡ "Salve"
     assert chorda.decode(chorda.encode("")) ≡ ""
     assert chorda.decode(chorda.encode("π ≈ 3.14")) ≡ "π ≈ 3.14"
     assert chorda.decode(|68 65 6c 6c 6f|) ≡ "hello"
     assert chorda.decode(|ce bb|) ≡ "λ"
-    const string ∪ none ok ← chorda.try_decode(|68 65 6c 6c 6f|)
+    let string ∪ none ok ← chorda.try_decode(|68 65 6c 6c 6f|)
     assert ok ≡ "hello"
-    const string ∪ none bad ← chorda.try_decode(|ff fe|)
+    let string ∪ none bad ← chorda.try_decode(|ff fe|)
     assert bad is none
     print "mechanica-ok"
 }

@@ -158,7 +158,7 @@ fn func_with_param_type(interner: &mut Interner, ty: TypeExpr) -> Program {
 #[test]
 fn reports_undefined_variable_in_expression() {
     compile_and_expect(
-        "incipit { fixum _ x ← missing }",
+        "incipit { sit x ← missing }",
         "SEM001",
         "unknown_identifier",
     );
@@ -182,7 +182,7 @@ fn unknown_non_scribe_callee_stays_unknown_identifier() {
 fn semantic_undefined_variable_suggests_visible_name() {
     let parsed = parse(lex(r#"
 incipit {
-  fixum _ greeting ← "salve"
+  sit greeting ← "salve"
   nota greting
 }
 "#));
@@ -220,7 +220,7 @@ incipit {
 fn semantic_undefined_variable_does_not_suggest_distant_visible_name() {
     let parsed = parse(lex(r#"
 incipit {
-  fixum _ greeting ← "salve"
+  sit greeting ← "salve"
   nota zz
 }
 "#));
@@ -252,7 +252,7 @@ incipit {
 fn semantic_name_suggestion_skips_edit_distance_for_impossible_lengths() {
     let parsed = parse(lex(r#"
 incipit {
-  fixum _ greeting ← "salve"
+  sit greeting ← "salve"
 }
 "#));
     assert!(
@@ -276,8 +276,8 @@ incipit {
 fn semantic_undefined_variables_reuse_suggestion_cache() {
     let parsed = parse(lex(r#"
 incipit {
-  fixum _ greeting ← "salve"
-  fixum _ farewell ← "vale"
+  sit greeting ← "salve"
+  sit farewell ← "vale"
   nota greting
   nota farewel
 }
@@ -329,7 +329,7 @@ incipit {
 fn semantic_undefined_variable_suggests_unicode_fold_parity() {
     let parsed = parse(lex(r"
 incipit {
-  fixum _ rēs ← 1
+  sit rēs ← 1
   nota res
 }
 "));
@@ -367,8 +367,8 @@ incipit {
 fn reports_duplicate_local_definition_with_structured_event() {
     let parsed = parse(lex(r"
 incipit {
-  fixum numerus value ← 1
-  fixum numerus value ← 2
+  sit numerus value ← 1
+  sit numerus value ← 2
 }
 "));
     assert!(
@@ -432,7 +432,7 @@ fn resolves_type_alias_to_builtin() {
 #[test]
 fn resolves_fn_type_param_modes_from_type_position() {
     let mut parsed = parse(lex(
-        "typus Handler = (de textus, in lista<numerus>, own lista<numerus>, copy lista<numerus>) → vacuum",
+        "typus Handler = (de textus, varia lista<numerus>, own lista<numerus>, copy lista<numerus>) → vacuum",
     ));
     assert!(
         parsed.errors.is_empty(),
@@ -699,7 +699,7 @@ fn reports_non_index_figura_name_with_structured_event() {
 #[test]
 fn resolves_local_runtime_value_as_figura_extent() {
     let parsed = parse(lex(
-        "functio f(numerus value) → numerus {\n    fixum numerus n ← value\n    fixum tf32[n, 2] shaped ← value\n    redde n\n}",
+        "functio f(numerus value) → numerus {\n    sit numerus n ← value\n    sit tf32[n, 2] shaped ← value\n    redde n\n}",
     ));
     assert!(parsed.success(), "parse errors: {:?}", parsed.errors);
     let program = parsed.program.as_ref().expect("program");
@@ -1601,7 +1601,7 @@ fn type_alias_union_spellings_with_and_without_alias_member_are_equal() {
 #[test]
 fn reports_non_variant_pattern() {
     compile_and_expect(
-        "ordo MyEnum { Red }\n functio NotAVariant() → vacuum {}\n incipit { fixum numerus subject ← 1\n discerne subject { casu MyEnum.NotAVariant {} } }",
+        "ordo MyEnum { Red }\n functio NotAVariant() → vacuum {}\n incipit { sit numerus subject ← 1\n discerne subject { casu MyEnum.NotAVariant {} } }",
         "SEM001",
         "name_not_variant",
     );
@@ -1612,7 +1612,7 @@ fn reports_non_variant_finge_suffix() {
     // The `finge` path shares the enum-suffix diagnostic policy with the
     // `discerne` pattern path.
     compile_and_expect(
-        "ordo MyEnum { Red }\n functio NotAVariant() → vacuum {}\n incipit { fixum _ v ← finge MyEnum.NotAVariant { } }",
+        "ordo MyEnum { Red }\n functio NotAVariant() → vacuum {}\n incipit { sit v ← finge MyEnum.NotAVariant { } }",
         "SEM001",
         "name_not_variant",
     );
@@ -1628,7 +1628,7 @@ fn stage_annotation_defines_stage_locals() {
 #[test]
 fn reports_unknown_variant_with_structured_event() {
     compile_and_expect(
-        "ordo MyEnum { Red, Green }\n incipit { fixum numerus subject ← 1\n discerne subject { casu MyEnum.Missing {} } }",
+        "ordo MyEnum { Red, Green }\n incipit { sit numerus subject ← 1\n discerne subject { casu MyEnum.Missing {} } }",
         "SEM001",
         "unknown_variant",
     );
@@ -1636,8 +1636,7 @@ fn reports_unknown_variant_with_structured_event() {
 
 #[test]
 fn resolves_qualified_variant_through_parent_despite_local_shadow() {
-    let result =
-        compile_ok("ordo Color { Red }\n incipit { fixum numerus Red ← 1 nota Color.Red }");
+    let result = compile_ok("ordo Color { Red }\n incipit { sit numerus Red ← 1 nota Color.Red }");
 
     assert!(
         result
@@ -1657,7 +1656,7 @@ fn resolves_qualified_variant_through_parent_despite_local_shadow() {
 #[test]
 fn allows_variant_patterns_from_collected_enum() {
     let result = compile_ok(
-        "ordo Color { Red, Green }\n incipit { fixum numerus subject ← 1\n discerne subject { casu Color.Red {} } }",
+        "ordo Color { Red, Green }\n incipit { sit numerus subject ← 1\n discerne subject { casu Color.Red {} } }",
     );
     assert!(
         result.is_ok(),
@@ -1692,7 +1691,7 @@ fn cross_union_same_name_variants_declare_and_resolve_qualified() {
     // casu patterns compile.
     let result = compile_ok(
         "discretio A { X }\ndiscretio B { X }\n\
-         incipit {\n  fixum _ ax ← A.X\n  fixum _ bx ← B.X\n\
+         incipit {\n  sit ax ← A.X\n  sit bx ← B.X\n\
          \x20 elige ax { casu A.X { nota \"a\" } }\n\
          \x20 elige bx { casu B.X { nota \"b\" } }\n}",
     );
@@ -1711,7 +1710,7 @@ fn same_union_duplicate_variant_still_sem005() {
 #[test]
 fn ambiguous_bare_variant_expression_reports_variant_ambiguous() {
     compile_and_expect(
-        "discretio A { X }\ndiscretio B { X }\nincipit { fixum _ x ← X }",
+        "discretio A { X }\ndiscretio B { X }\nincipit { sit x ← X }",
         "SEM001",
         "variant_ambiguous",
     );
@@ -1736,9 +1735,9 @@ fn single_union_bare_variant_surfaces_unchanged() {
         "discretio Nodus {\n  Groupus { lista<numerus> filii },\n  Tessera { numerus geometria }\n}\n\
          functio make(numerus g) → Nodus {\n  redde finge Tessera { geometria = g } ∷ Nodus\n}\n\
          functio read(Nodus n) → numerus {\n  discerne n {\n\
-         \x20   casu Tessera fixum geometria { redde geometria }\n\
-         \x20   casu Groupus fixum filii { redde 0 }\n  }\n}\n\
-         incipit {\n  fixum Nodus n ← make(7)\n  nota read(n)\n}",
+         \x20   casu Tessera sit geometria { redde geometria }\n\
+         \x20   casu Groupus sit filii { redde 0 }\n  }\n}\n\
+         incipit {\n  sit Nodus n ← make(7)\n  nota read(n)\n}",
     );
     assert!(
         result.is_ok(),
@@ -1753,7 +1752,7 @@ fn rejects_qualified_construction_with_unknown_prefix() {
     // reject — `finge missing.A.X { }` must never silently resolve as the
     // local `A.X`.
     compile_and_expect(
-        "discretio A { X }\nincipit { fixum _ v ← finge missing.A.X { } ∷ A }",
+        "discretio A { X }\nincipit { sit v ← finge missing.A.X { } ∷ A }",
         "SEM001",
         "unknown_variant",
     );
@@ -1765,7 +1764,7 @@ fn rejects_qualified_construction_with_non_namespace_prefix() {
     // a value/type binding in prefix position is not a namespace, so the
     // path must reject rather than resolve the penultimate local union.
     compile_and_expect(
-        "discretio A { X }\nincipit { fixum numerus missing ← 1\n fixum _ v ← finge missing.A.X { } ∷ A }",
+        "discretio A { X }\nincipit { sit numerus missing ← 1\n sit v ← finge missing.A.X { } ∷ A }",
         "SEM001",
         "unknown_variant",
     );
@@ -1775,7 +1774,7 @@ fn rejects_qualified_construction_with_non_namespace_prefix() {
 fn allows_exact_local_qualified_construction() {
     // CG2-R07 regression pin: the exact local qualifier `finge A.X { }`
     // still resolves through the local union's parent.
-    let result = compile_ok("discretio A { X }\nincipit { fixum _ v ← finge A.X { } ∷ A }");
+    let result = compile_ok("discretio A { X }\nincipit { sit v ← finge A.X { } ∷ A }");
     assert!(
         result.is_ok(),
         "exact local qualified construction should resolve: {:?}",
@@ -1826,7 +1825,7 @@ fn accepts_perge_through_fac_cape_to_enclosing_loop() {
     let result = compile_ok(
         r"
 incipit {
-    itera ab 0‥3 fixum i {
+    itera ab 0‥3 sit i {
         fac {
             si i ≡ 1 { perge }
             nota i
@@ -1843,7 +1842,7 @@ fn accepts_perge_through_plain_fac_within_loop() {
     let result = compile_ok(
         r"
 incipit {
-    itera ab 0‥3 fixum i {
+    itera ab 0‥3 sit i {
         fac { perge }
     }
 }
@@ -1856,8 +1855,8 @@ incipit {
 fn reports_perge_in_closure_fac_body_with_loop_outside_closure() {
     let source = r"
 incipit {
-    itera ab 0‥3 fixum i {
-        fixum _ f ← (numerus a) ∴ fac { perge }
+    itera ab 0‥3 sit i {
+        sit f ← (numerus a) ∴ fac { perge }
     }
 }
 ";
@@ -1870,7 +1869,7 @@ fn accepts_perge_in_loop_nested_inside_fac() {
         r"
 incipit {
     fac {
-        itera ab 0‥3 fixum i {
+        itera ab 0‥3 sit i {
             si i ≡ 1 { perge }
             nota i
         }
@@ -1886,7 +1885,7 @@ fn accepts_perge_in_cape_arm_inside_loop() {
     let result = compile_ok(
         r#"
 incipit {
-    itera ab 0‥3 fixum i {
+    itera ab 0‥3 sit i {
         fac {
             si i ≡ 1 { iace "x" }
         } cape err {
@@ -2181,14 +2180,14 @@ fn rivus_pilot_bare_colliding_name_reports_variant_ambiguous() {
     compile_and_expect(
         "discretio Severity { Error, Warning, Info }\n\
          discretio SemanticErrorKind { InvalidAnnotation, InvalidAssignmentTarget, Warning }\n\
-         incipit { fixum _ w ← Warning }",
+         incipit { sit w ← Warning }",
         "SEM001",
         "variant_ambiguous",
     );
     compile_and_expect(
         "discretio DiagnosticPhase { Io, Lex, Parse }\n\
          discretio PhaseErrorKind { Lex, Parse, Semantic }\n\
-         incipit { fixum _ l ← Lex }",
+         incipit { sit l ← Lex }",
         "SEM001",
         "variant_ambiguous",
     );
@@ -2208,7 +2207,7 @@ fn shadowed_lege_binding_is_the_value_not_the_builtin() {
     let result = compile_ok(
         r#"
 incipit {
-  fixum textus lege ← "data"
+  sit textus lege ← "data"
   nota lege
 }
 "#,
@@ -2233,7 +2232,7 @@ functio lege(textus path) → textus {
   redde path
 }
 incipit {
-  fixum textus x ← lege("cfg")
+  sit textus x ← lege("cfg")
   nota x
 }
 "#,
@@ -2258,7 +2257,7 @@ fn bound_vacua_is_the_value_beside_a_same_named_binding() {
     let result = compile_ok(
         r#"
 incipit {
-  fixum textus vacua ← "empty"
+  sit textus vacua ← "empty"
   nota vacua
 }
 "#,
@@ -2286,8 +2285,8 @@ functio vacua() → lista<numerus> {
   redde [1]
 }
 incipit {
-  fixum lista<numerus> xs ← vacua
-  fixum lista<numerus> ys ← vacua()
+  sit lista<numerus> xs ← vacua
+  sit lista<numerus> ys ← vacua()
   nota xs
   nota ys
 }
@@ -2318,8 +2317,8 @@ fn empty() → list<int> {
     return [1]
 }
 fn probe() → list<int> {
-    const list<int> xs ← empty
-    const list<int> ys ← empty()
+    let list<int> xs ← empty
+    let list<int> ys ← empty()
     return xs + ys
 }
 "#,
@@ -2392,7 +2391,7 @@ fn bound_value_literals_are_the_binding_and_warn() {
         ("nonnumerus", "\"x\""),
     ] {
         let result = compile_ok(&format!(
-            "incipit {{\n  fixum textus {keyword} ← {value}\n  fixum textus y ← {keyword}\n  nota y\n}}\n"
+            "incipit {{\n  sit textus {keyword} ← {value}\n  sit textus y ← {keyword}\n  nota y\n}}\n"
         ));
         assert!(
             result.is_ok(),
@@ -2412,10 +2411,10 @@ fn unbound_value_literals_stay_literals_without_warning() {
     let result = compile_ok(
         r"
 incipit {
-  fixum bivalens a ← verum
-  fixum bivalens b ← falsum
-  fixum numerus ∪ nihil c ← nulla
-  fixum fractus d ← nonnumerus
+  sit bivalens a ← verum
+  sit bivalens b ← falsum
+  sit numerus ∪ nihil c ← nulla
+  sit fractus d ← nonnumerus
   nota a
   nota b
   nota c
@@ -2443,10 +2442,10 @@ fn value_literal_shadowing_is_scoped_to_the_binding() {
         r#"
 incipit {
   si verum {
-    fixum textus verum ← "inner"
+    sit textus verum ← "inner"
     nota verum
   }
-  fixum bivalens ok ← verum
+  sit bivalens ok ← verum
   nota ok
 }
 "#,
@@ -2487,7 +2486,7 @@ functio verum() → textus {
   redde "v"
 }
 incipit {
-  fixum bivalens a ← verum
+  sit bivalens a ← verum
   nota a
 }
 "#,
@@ -2510,10 +2509,10 @@ fn en_bound_value_literals_are_the_binding_and_warn() {
     let result = crate::test_support::analyze_source_with_config(
         r#"
 fn probe() → string {
-    const string true ← "t"
-    const string null ← "n"
-    const float nan ← 1.0
-    const string pair ← true + null
+    let string true ← "t"
+    let string null ← "n"
+    let float nan ← 1.0
+    let string pair ← true + null
     return pair
 }
 "#,
@@ -2541,7 +2540,7 @@ fn unshadowed_lege_stays_the_builtin() {
     let result = compile_ok(
         r"
 incipit {
-  fixum _ input ← lege
+  sit input ← lege
 }
 ",
     );
@@ -2560,7 +2559,7 @@ functio scriptum(textus t) → textus {
   redde t
 }
 incipit {
-  fixum textus x ← scriptum("hello")
+  sit textus x ← scriptum("hello")
   nota x
 }
 "#,
@@ -2577,7 +2576,7 @@ fn unshadowed_scriptum_stays_the_builtin() {
     let result = compile_ok(
         r#"
 incipit {
-  fixum textus x ← scriptum("hello")
+  sit textus x ← scriptum("hello")
   nota x
 }
 "#,
@@ -2698,7 +2697,7 @@ fn resolve_records_shadowing_for_bound_lege() {
     let (program, resolver, _) = resolve_ok(
         r#"
 incipit {
-  fixum textus lege ← "data"
+  sit textus lege ← "data"
   nota lege
 }
 "#,
@@ -2721,7 +2720,7 @@ fn resolve_does_not_record_shadowing_for_unbound_lege() {
     let (program, resolver, _) = resolve_ok(
         r"
 incipit {
-  fixum _ input ← lege
+  sit input ← lege
 }
 ",
     );
@@ -2743,7 +2742,7 @@ fn resolve_records_shadowing_for_bound_vacua() {
     let (program, resolver, _) = resolve_ok(
         r#"
 incipit {
-  fixum textus vacua ← "empty"
+  sit textus vacua ← "empty"
   nota vacua
 }
 "#,
@@ -2767,7 +2766,7 @@ fn resolve_records_shadowing_for_vacua_in_call_position() {
         r"
 functio vacua() → numerus { redde 1 }
 incipit {
-  fixum _ x ← vacua()
+  sit x ← vacua()
 }
 ",
     );
@@ -2791,7 +2790,7 @@ fn resolve_binding_wins_in_every_marker_expression_position() {
     let (program, resolver, _) = resolve_ok(
         r"
 incipit {
-  fixum lista<numerus> vacua ← [1, 2, 3]
+  sit lista<numerus> vacua ← [1, 2, 3]
   nota vacua
   nota vacua.longitudo()
   nota vacua[0]
@@ -2823,7 +2822,7 @@ fn initializer_self_reference_falls_back_to_marker_without_outer_binding() {
     let (program, resolver, _) = resolve_ok(
         r"
 functio probe() → lista<numerus> {
-  fixum lista<numerus> vacua ← vacua
+  sit lista<numerus> vacua ← vacua
   redde vacua
 }
 ",
@@ -2850,9 +2849,9 @@ fn initializer_self_reference_uses_live_outer_binding() {
     let (program, resolver, _) = resolve_ok(
         r"
 functio probe() → lista<numerus> {
-  fixum lista<numerus> vacua ← [1, 2, 3]
+  sit lista<numerus> vacua ← [1, 2, 3]
   {
-    fixum lista<numerus> vacua ← vacua
+    sit lista<numerus> vacua ← vacua
     redde vacua
   }
 }
@@ -2881,7 +2880,7 @@ fn marker_resolution_reverts_after_scope_exit() {
         r"
 incipit {
   {
-    fixum lista<numerus> vacua ← [1, 2, 3]
+    sit lista<numerus> vacua ← [1, 2, 3]
     nota vacua
   }
   nota vacua
@@ -2915,7 +2914,7 @@ fn set_typed_marker_binding_is_a_list_argument_type_error() {
         r"
 functio probe(lista<numerus> xs) { }
 incipit {
-  fixum copia<numerus> vacua ← [1, 2] ↦ copia<numerus>
+  sit copia<numerus> vacua ← [1, 2] ↦ copia<numerus>
   probe(vacua)
 }
 ",
@@ -2933,7 +2932,7 @@ fn en_read_binding_wins_over_lege_builtin() {
     let result = crate::test_support::analyze_source_with_config(
         r#"
 main {
-  const string read ← "data"
+  let string read ← "data"
   print read
 }
 "#,
@@ -2964,7 +2963,7 @@ fn read(string file) → string {
   return file
 }
 main {
-  const string x ← read("cfg")
+  let string x ← read("cfg")
   print x
 }
 "#,
@@ -3168,7 +3167,7 @@ fn arm_not_member_unrelated_local_constant_lists_members() {
     let source = r"genus Punctum { varia numerus x }
 genus Linea { varia numerus y }
 functio f(Punctum ∪ Linea u) → vacuum {
-    fixum numerus Septem ← 7
+    sit numerus Septem ← 7
     nota Septem
     discerne u {
         casu Punctum { nota 1 }
@@ -3221,7 +3220,7 @@ fn arm_not_member_misspelled_enum_member_lists_members_and_suggests() {
 #[test]
 fn arm_not_member_misspelled_discretio_variant_lists_members_and_suggests() {
     let source = format!(
-        "{ARM_FORMA}\nfunctio f(Forma x) → vacuum {{\n    discerne x {{\n        casu Circulus fixum r {{ nota r }}\n        casu Quadratum fixum s {{ nota s }}\n        casu Punctm {{ nota 0 }}\n    }}\n}}"
+        "{ARM_FORMA}\nfunctio f(Forma x) → vacuum {{\n    discerne x {{\n        casu Circulus sit r {{ nota r }}\n        casu Quadratum sit s {{ nota s }}\n        casu Punctm {{ nota 0 }}\n    }}\n}}"
     );
     let args = arm_not_member_args(&source);
     assert_eq!(arm_arg(&args, "name"), Some("Punctm"));
@@ -3260,7 +3259,7 @@ fn arm_not_member_is_checked_in_each_multi_subject_position() {
 #[test]
 fn arm_not_member_is_checked_under_omnia() {
     let source = format!(
-        "{ARM_FORMA}\nfunctio f(Forma x) → vacuum {{\n    discerne omnia x {{\n        casu Circulus fixum r {{ nota r }}\n        casu Quadratum fixum s {{ nota s }}\n        casu Punctm {{ nota 0 }}\n    }}\n}}"
+        "{ARM_FORMA}\nfunctio f(Forma x) → vacuum {{\n    discerne omnia x {{\n        casu Circulus sit r {{ nota r }}\n        casu Quadratum sit s {{ nota s }}\n        casu Punctm {{ nota 0 }}\n    }}\n}}"
     );
     let args = arm_not_member_args(&source);
     assert_eq!(arm_arg(&args, "name"), Some("Punctm"));
@@ -3356,7 +3355,7 @@ functio f(Punctum ∪ Linea u) → vacuum {
 #[test]
 fn arm_not_member_leaves_members_wildcard_and_default_valid() {
     crate::test_support::assert_accepts(&format!(
-        "{ARM_FORMA}\nfunctio f(Forma a, Forma b) → vacuum {{\n    discerne a et b {{\n        casu Circulus fixum r et Punctum {{ nota r }}\n        casu Punctum et _ {{ nota 1 }}\n        casu Quadratum fixum s et _ {{ nota s }}\n        ceterum {{ nota 3 }}\n    }}\n}}"
+        "{ARM_FORMA}\nfunctio f(Forma a, Forma b) → vacuum {{\n    discerne a et b {{\n        casu Circulus sit r et Punctum {{ nota r }}\n        casu Punctum et _ {{ nota 1 }}\n        casu Quadratum sit s et _ {{ nota s }}\n        ceterum {{ nota 3 }}\n    }}\n}}"
     ));
     crate::test_support::assert_accepts(&format!(
         "{ARM_COLOR}\nfunctio f(Color c) → vacuum {{\n    discerne c {{\n        casu Rubrum aut Viridis {{ nota 1 }}\n        ceterum {{ nota 2 }}\n    }}\n}}"

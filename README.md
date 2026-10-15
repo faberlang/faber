@@ -37,20 +37,20 @@ Outer product `⊗`, matrix product `·`, element-wise product `⊙` and transpo
 
 ```fab
 main {
-    const vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
-    const vf32[2] p ← [1.0, 1.0] ↦ vf32[2]
-    const vf32[4] s ← [1.0, 2.0, 3.0, 4.0] ↦ vf32[4]
+    let vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    let vf32[2] p ← [1.0, 1.0] ↦ vf32[2]
+    let vf32[4] s ← [1.0, 2.0, 3.0, 4.0] ↦ vf32[4]
 
-    const matrix<f32, [3, 2]> left ← a ⊗ p
-    const matrix<f32, [2, 4]> right ← p ⊗ s
-    const matrix<f32, [3, 4]> product ← left · right
+    let matrix<f32, [3, 2]> left ← a ⊗ p
+    let matrix<f32, [2, 4]> right ← p ⊗ s
+    let matrix<f32, [3, 4]> product ← left · right
     print product
 
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[2, 3] m ← flat ↦ tf32[2, 3]
-    const tf32[3, 2] t ← mᵀ.materialize()
-    const tf32[2, 2] gram ← m · t
-    const tf32[2, 3] squares ← m ⊙ m
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[2, 3] m ← flat ↦ tf32[2, 3]
+    let tf32[3, 2] t ← mᵀ.materialize()
+    let tf32[2, 2] gram ← m · t
+    let tf32[2, 3] squares ← m ⊙ m
     print gram.flatten()
     print squares.sum()
 }
@@ -70,25 +70,25 @@ body.
 
 ```fab
 main {
-    for range 10‥0 step 4 const i {
+    for range 10‥0 step 4 let i {
         print i
     }
-    for range 1…2, 1…3 const row, col {
+    for range 1…2, 1…3 let row, col {
         print row * col
     }
 
-    const list<int> price ← [4, 9, 2]
-    const list<int> count ← [3, 1, 5]
-    var int bill ← 0
-    for from price, count const p, n {
+    let list<int> price ← [4, 9, 2]
+    let list<int> count ← [3, 1, 5]
+    mut int bill ← 0
+    for from price, count let p, n {
         bill ← bill + p * n
     }
     print bill
 
-    const tf32[5] x ← [3.0, 1.0, 4.0, 1.0, 5.0] ↦ tf32[5]
+    let tf32[5] x ← [3.0, 1.0, 4.0, 1.0, 5.0] ↦ tf32[5]
     print reduce via max from x
-    print reduce via argmax from x at [i] const s { return s }
-    print reduce via count from x at [i] const s { return s ≻ 2.0 }
+    print reduce via argmax from x at [i] let s { return s }
+    print reduce via count from x at [i] let s { return s ≻ 2.0 }
 }
 ```
 
@@ -132,8 +132,8 @@ fn report(int a, int b) → string {
     }
     catch err {
         match err {
-            case ByZero const n { return "cannot divide § by zero"(n) }
-            case Negative const d { return "negative divisor §"(d) }
+            case ByZero let n { return "cannot divide § by zero"(n) }
+            case Negative let d { return "negative divisor §"(d) }
         }
     }
 }
@@ -163,25 +163,25 @@ cell traps, and only the store that does not fit traps.
 
 ```fab
 main {
-    const wrapping<u8> a ← 200
-    const wrapping<u8> b ← 100
-    const wrapping<u8> mean ← (a + b) / 2
+    let wrapping<u8> a ← 200
+    let wrapping<u8> b ← 100
+    let wrapping<u8> mean ← (a + b) / 2
     print mean
 
-    const saturating<u8> hi ← 250
-    const saturating<u8> chain ← hi + 200 - 100
+    let saturating<u8> hi ← 250
+    let saturating<u8> chain ← hi + 200 - 100
     print chain
 
-    const int big ← 300
-    const wrapping<u8> wrapped ← big ↦ wrapping<u8>
-    const saturating<u8> clamped ← big ↦ saturating<u8>
+    let int big ← 300
+    let wrapping<u8> wrapped ← big ↦ wrapping<u8>
+    let saturating<u8> clamped ← big ↦ saturating<u8>
     print wrapped
     print clamped
 
-    const u8 x ← 255
-    const int exact ← x + x
+    let u8 x ← 255
+    let int exact ← x + x
     print exact
-    const u8 y ← x + 1
+    let u8 y ← x + 1
     print y
 }
 ```
@@ -203,18 +203,18 @@ on an `int` is arithmetic.
 
 ```fab
 main {
-    const b8 pattern ← 0xf3
-    const b8 left ← pattern ⇐ 4
-    const b8 cleared ← (pattern ⇐ 4) ⇒ 4
+    let b8 pattern ← 0xf3
+    let b8 left ← pattern ⇐ 4
+    let b8 cleared ← (pattern ⇐ 4) ⇒ 4
     print left
     print cleared
     print ¬pattern
 
-    const int number ← 0xf3
+    let int number ← 0xf3
     print number ⇐ 4
 
-    const f32 one ← 1.0
-    const b32 bits ← one ↦ b32
+    let f32 one ← 1.0
+    let b32 bits ← one ↦ b32
     print bits
 }
 ```
@@ -234,16 +234,16 @@ A float reaches an integer only through a named rounding mode
 
 ```fab
 main {
-    const float x ← 2.5
-    const float y ← -2.5
+    let float x ← 2.5
+    let float y ← -2.5
     print "§ § §"(x ↦ int via HalfEven, x ↦ int via Floor, x ↦ int via Ceil)
     print "§ §"(y ↦ int via HalfEven, y ↦ int via Trunc)
 
-    const int parsed ← "4x" ↦ int ⊥ -1
+    let int parsed ← "4x" ↦ int ⊥ -1
     print parsed
 
-    const list<int> xs ← [10, 20, 30]
-    const int ∪ none tenth ← xs.get(9)
+    let list<int> xs ← [10, 20, 30]
+    let int ∪ none tenth ← xs.get(9)
     print tenth
     print tenth coalesce 0
 }

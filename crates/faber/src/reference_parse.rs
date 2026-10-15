@@ -11,6 +11,7 @@ struct ExemplaFrontmatter {
     category: Option<String>,
     canonical: Option<bool>,
     canonical_term: Option<String>,
+    locale: Option<String>,
     summary: Option<String>,
     syntax: Option<String>,
     #[serde(default)]
@@ -61,8 +62,9 @@ pub fn entry_from_exempla(
         .syntax
         .ok_or_else(|| ExplainError::new(format!("{path_label}: frontmatter missing syntax")))?;
 
+    let source_locale = fm.locale.filter(|locale| locale != "en");
     let (comment_header, fab_source) = split_header_and_source(split.body);
-    let body = build_entry_body(&comment_header, &fab_source);
+    let body = build_entry_body(&comment_header, &fab_source, source_locale.as_deref());
 
     let aliases = if fm.term.as_deref() == Some(term_override) {
         fm.aliases
@@ -125,7 +127,7 @@ pub fn legacy_entry_from_redirect(
     Ok(entry)
 }
 
-fn build_entry_body(comment_header: &str, fab_source: &str) -> String {
+fn build_entry_body(comment_header: &str, fab_source: &str, locale: Option<&str>) -> String {
     let mut body = String::new();
     let prose = comment_header_to_prose(comment_header);
     if !prose.is_empty() {
@@ -135,10 +137,21 @@ fn build_entry_body(comment_header: &str, fab_source: &str) -> String {
 
     let fab_source = fab_source.trim();
     if !fab_source.is_empty() {
-        push_fab_block(&mut body, fab_source);
+        let example = with_source_locale_frontmatter(fab_source, locale);
+        push_fab_block(&mut body, &example);
     }
 
     body
+}
+
+/// Prefix the example with a source frontmatter when the exemplum declares a
+/// non-en reader locale, so the extracted block is a complete file that
+/// selects its own reader locale from frontmatter instead of parsing as en.
+fn with_source_locale_frontmatter(source: &str, locale: Option<&str>) -> String {
+    match locale {
+        Some(locale) => format!("+++\nlocale = \"{locale}\"\n+++\n{source}"),
+        None => source.to_owned(),
+    }
 }
 
 /// Append a fenced `fab` block, guaranteeing a trailing newline inside the

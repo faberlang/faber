@@ -57,6 +57,7 @@ impl KeywordPack for EnPack {
         match text {
             "size" => Some("magnitudo"),
             "const" => Some("fixum"),
+            "let" => Some("sit"),
             _ => None,
         }
     }

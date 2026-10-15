@@ -24,18 +24,18 @@ fn run_lines(name: &str, body: &str) -> Vec<String> {
 /// into `i32`, in the order Floor, Ceil, HalfEven, Trunc.
 const MODES: &str = r#"
 fn float_modes(f64 x) → string {
-    const i32 fl ← x ↦ i32 via Floor ⊥ 99
-    const i32 ce ← x ↦ i32 via Ceil ⊥ 99
-    const i32 he ← x ↦ i32 via HalfEven ⊥ 99
-    const i32 tr ← x ↦ i32 via Trunc ⊥ 99
+    let i32 fl ← x ↦ i32 via Floor ⊥ 99
+    let i32 ce ← x ↦ i32 via Ceil ⊥ 99
+    let i32 he ← x ↦ i32 via HalfEven ⊥ 99
+    let i32 tr ← x ↦ i32 via Trunc ⊥ 99
     return "§ § § §"(fl, ce, he, tr)
 }
 
 fn decimal_modes(d64 x) → string {
-    const i32 fl ← x ↦ i32 via Floor ⊥ 99
-    const i32 ce ← x ↦ i32 via Ceil ⊥ 99
-    const i32 he ← x ↦ i32 via HalfEven ⊥ 99
-    const i32 tr ← x ↦ i32 via Trunc ⊥ 99
+    let i32 fl ← x ↦ i32 via Floor ⊥ 99
+    let i32 ce ← x ↦ i32 via Ceil ⊥ 99
+    let i32 he ← x ↦ i32 via HalfEven ⊥ 99
+    let i32 tr ← x ↦ i32 via Trunc ⊥ 99
     return "§ § § §"(fl, ce, he, tr)
 }
 "#;
@@ -102,8 +102,8 @@ fn the_rounded_value_is_what_the_range_check_sees() {
     // -0.5 truncates and half-even rounds to 0 (fits u8) but floors to -1.
     let body = r#"
 main {
-    const f64 high ← 255.5
-    const f64 low ← -0.5
+    let f64 high ← 255.5
+    let f64 low ← -0.5
     print high ↦ u8 via Floor ⊥ 7
     print high ↦ u8 via Trunc ⊥ 7
     print high ↦ u8 via Ceil ⊥ 7
@@ -124,18 +124,18 @@ main {
 fn out_of_range_and_nan_fail_into_the_default_for_every_mode() {
     let body = r#"
 fn probe(f64 x) → string {
-    const i32 fl ← x ↦ i32 via Floor ⊥ 99
-    const i32 ce ← x ↦ i32 via Ceil ⊥ 99
-    const i32 he ← x ↦ i32 via HalfEven ⊥ 99
-    const i32 tr ← x ↦ i32 via Trunc ⊥ 99
+    let i32 fl ← x ↦ i32 via Floor ⊥ 99
+    let i32 ce ← x ↦ i32 via Ceil ⊥ 99
+    let i32 he ← x ↦ i32 via HalfEven ⊥ 99
+    let i32 tr ← x ↦ i32 via Trunc ⊥ 99
     return "§ § § §"(fl, ce, he, tr)
 }
 
 main {
-    const f64 zero ← 0.0
-    const f64 notnum ← zero / zero
-    const f64 plus ← 1.0 / zero
-    const f64 minus ← -1.0 / zero
+    let f64 zero ← 0.0
+    let f64 notnum ← zero / zero
+    let f64 plus ← 1.0 / zero
+    let f64 minus ← -1.0 / zero
     print probe(notnum)
     print probe(plus)
     print probe(minus)
@@ -159,7 +159,7 @@ main {
 fn large_decimals_fail_into_the_default_and_fit_into_inf() {
     let body = r#"
 main {
-    const d64 huge ← 3000000000.5
+    let d64 huge ← 3000000000.5
     print huge ↦ i32 via Floor ⊥ 99
     print huge ↦ i64 via Floor ⊥ 99
     print huge ↦ inf via Ceil ⊥ 99
@@ -176,8 +176,8 @@ main {
 fn inf_target_rounds_floats_and_decimals_by_the_clause() {
     let body = r#"
 main {
-    const f64 f ← -2.5
-    const d64 d ← -2.5
+    let f64 f ← -2.5
+    let d64 d ← -2.5
     print f ↦ inf via Floor ⊥ 99
     print f ↦ inf via Ceil ⊥ 99
     print f ↦ inf via HalfEven ⊥ 99
@@ -198,8 +198,8 @@ main {
 fn policy_word_targets_round_then_apply_the_policy() {
     let body = r#"
 main {
-    const f64 f ← 300.5
-    const d64 d ← 300.5
+    let f64 f ← 300.5
+    let d64 d ← 300.5
     print f ↦ wrapping<u8> via Floor
     print f ↦ saturating<u8> via Floor
     print d ↦ wrapping<u8> via Ceil
