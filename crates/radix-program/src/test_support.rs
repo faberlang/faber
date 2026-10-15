@@ -17,6 +17,7 @@ use radix_module::driver::Config;
 use crate::analyze::AnalysisSeams;
 use crate::discovery::PackageSpec;
 use crate::library::{LibraryResolver, LockedLibraryPackage};
+#[cfg(feature = "package-mir")]
 use crate::mir::{DeviceManifestConfig, MirSeams, PreparedPackageMir};
 
 /// The reader pack selected by the CLI locale or the package's `[locale]`
@@ -113,6 +114,7 @@ pub fn test_analysis_seams() -> AnalysisSeams {
 /// The executed-lane target resolution used by the moved mir tests: an
 /// explicit MIR-backed config target wins, otherwise the caller's target is
 /// kept (the tests never read a product manifest `[build] target`).
+#[cfg(feature = "package-mir")]
 fn test_executed_lane_target(
     config: &Config,
     _input: &Path,
@@ -151,18 +153,21 @@ fn test_library_resolver(config: &Config) -> LibraryResolver {
 }
 
 /// A config-rooted library cache wired to the test locale loader.
+#[cfg(feature = "package-mir")]
 fn test_library_cache_for_config(config: &Config) -> crate::library::LibraryInterfaceCache {
     crate::library::LibraryInterfaceCache::with_config(config).with_locale_loader(test_locale_pack)
 }
 
 /// The moved mir tests never declare a `[device]` surface; the device-config
 /// seam returns the empty default.
+#[cfg(feature = "package-mir")]
 fn test_device_config_for_input(_input: &Path) -> Result<DeviceManifestConfig, Vec<Diagnostic>> {
     Ok(DeviceManifestConfig::default())
 }
 
 /// The moved mir tests never construct a device section (no `device-runtime`
 /// in radix-program); the seam returns `None`.
+#[cfg(feature = "package-mir")]
 fn test_device_section_builder(
     _prepared: &PreparedPackageMir<'_>,
     _lowered: &radix_mir_lower::lower::LoweredMirUnit<'_>,
@@ -172,6 +177,7 @@ fn test_device_section_builder(
 }
 
 /// The moved mir tests never write an fmir-bin runner crate.
+#[cfg(feature = "package-mir")]
 fn test_bin_runner_writer(
     _artifact_root: &Path,
     _entrypoint_path: &Path,
@@ -183,6 +189,7 @@ fn test_bin_runner_writer(
 }
 
 /// Test package-MIR seams for the moved mir tests (RP5).
+#[cfg(feature = "package-mir")]
 pub fn test_mir_seams() -> MirSeams {
     MirSeams {
         analysis: test_analysis_seams(),

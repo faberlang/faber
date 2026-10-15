@@ -90,7 +90,7 @@ pub mod test_source_filter;
 #[cfg(feature = "mir-wasm")]
 pub mod wasm;
 
-#[cfg(all(test, feature = "package-mir"))]
+#[cfg(test)]
 pub(crate) mod test_support;
 
 pub(crate) const MANIFEST_FILE: &str = "faber.toml";
