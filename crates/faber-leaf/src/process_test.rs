@@ -108,14 +108,56 @@ fn exec_returns_stdout() {
 }
 
 #[test]
-fn unset_env_is_unset() {
-    let error = serve(
+fn read_env_unset_is_an_absent_record() {
+    let reply = serve(
         "processus:lege",
         &[Arg::Str("FABER_LEAF_NO_SUCH_ENV".to_owned())],
     )
     .expect("route")
-    .expect_err("unset");
-    assert_eq!(error.kind(), crate::LeafErrorKind::Unset);
+    .expect("read_env");
+    assert_eq!(
+        reply,
+        Reply::Map(vec![
+            ("present".to_owned(), Reply::Bool(false)),
+            ("value".to_owned(), Reply::Str(String::new())),
+        ])
+    );
+}
+
+#[test]
+fn read_env_set_is_a_present_record() {
+    let name = "FABER_LEAF_TEST_ENV_SET";
+    // SAFETY: distinct name per test; parallel tests never touch this var.
+    unsafe { std::env::set_var(name, "leaf-value") };
+    let reply = serve("processus:lege", &[Arg::Str(name.to_owned())])
+        .expect("route")
+        .expect("read_env");
+    unsafe { std::env::remove_var(name) };
+    assert_eq!(
+        reply,
+        Reply::Map(vec![
+            ("present".to_owned(), Reply::Bool(true)),
+            ("value".to_owned(), Reply::Str("leaf-value".to_owned())),
+        ])
+    );
+}
+
+#[test]
+fn read_env_empty_is_a_present_empty_record() {
+    let name = "FABER_LEAF_TEST_ENV_EMPTY";
+    // SAFETY: distinct name per test; parallel tests never touch this var.
+    unsafe { std::env::set_var(name, "") };
+    let reply = serve("processus:lege", &[Arg::Str(name.to_owned())])
+        .expect("route")
+        .expect("read_env");
+    unsafe { std::env::remove_var(name) };
+    assert_eq!(
+        reply,
+        Reply::Map(vec![
+            ("present".to_owned(), Reply::Bool(true)),
+            ("value".to_owned(), Reply::Str(String::new())),
+        ])
+    );
 }
 
 #[test]

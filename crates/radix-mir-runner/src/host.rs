@@ -1,11 +1,13 @@
 #![allow(clippy::needless_lifetimes)]
 
-use super::{RunnerError, Value};
+use super::{MapKey, RunnerError, Value};
 use radix_lexer::{Interner, Span};
 use radix_mir::{MirDiagnosticKind, MirProvider, MirProviderKind};
 use rustc_hash::FxHashMap;
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::io::{self, BufRead, IsTerminal, Read, Write};
+use std::rc::Rc;
 
 /// The runner's opaque internal diagnostic for a failed host IO operation.
 fn io_error(error: io::Error) -> RunnerError {
@@ -308,13 +310,18 @@ impl Host for BufferHost {
         }
         // WHY: `with_env` is the sandbox's virtual environment; a seeded name
         // answers from the host map so a test never has to mutate the real
-        // process env. An unseeded read falls through to the shared leaf,
-        // which is the product `read_env` route.
+        // process env. The reply keeps the shared leaf's `{present, value}`
+        // record so `norma:process.read_env` sees one carrier shape. An
+        // unseeded read falls through to the shared leaf, which is the
+        // product `read_env` route.
         if route == "processus:lege"
             && let Some(name) = process_env_name(opener)
             && let Some(value) = self.env.get(&name)
         {
-            return Some(Ok(vec![Value::Str(value.clone())]));
+            let mut record = FxHashMap::default();
+            record.insert(MapKey::Str("present".to_owned()), Value::Bool(true));
+            record.insert(MapKey::Str("value".to_owned()), Value::Str(value.clone()));
+            return Some(Ok(vec![Value::Map(Rc::new(RefCell::new(record)))]));
         }
         super::routes::serve_route(self, route, opener, span)
     }

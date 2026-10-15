@@ -280,15 +280,22 @@ fn exec(args: &[Arg]) -> Result<Reply, LeafError> {
     ))
 }
 
+// Absence is a record, not an error: an unset variable answers
+// `{present: false, value: ""}` so `norma:process.read_env` can return
+// `none`; a set-to-empty variable stays a present empty string. Only
+// `NotUnicode` remains a read failure.
 fn read_env(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:lege";
     let name = expect_str(ROUTE, args, 0, "name")?;
     match std::env::var(name) {
-        Ok(value) => Ok(Reply::Str(value)),
-        Err(std::env::VarError::NotPresent) => Err(LeafError::unset(
-            ROUTE,
-            format!("environment variable `{name}` is not set"),
-        )),
+        Ok(value) => Ok(Reply::Map(vec![
+            ("present".to_owned(), Reply::Bool(true)),
+            ("value".to_owned(), Reply::Str(value)),
+        ])),
+        Err(std::env::VarError::NotPresent) => Ok(Reply::Map(vec![
+            ("present".to_owned(), Reply::Bool(false)),
+            ("value".to_owned(), Reply::Str(String::new())),
+        ])),
         Err(err) => Err(LeafError::invalid_argument(ROUTE, err.to_string())),
     }
 }
