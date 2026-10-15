@@ -214,6 +214,14 @@ const TAG_BOOL: i32 = 2;
 const TAG_TEXT: i32 = 3;
 const TAG_BITS: i32 = 4;
 const TAG_LIST: i32 = 8;
+const TAG_STRUCT: i32 = 9;
+
+/// A runtime `genus` instance: its display name and named, tagged fields in
+/// declaration order.
+pub struct Record {
+    name: *const u8,
+    fields: Vec<(*const u8, i32, i64)>,
+}
 
 /// # Safety
 ///
@@ -241,6 +249,7 @@ fn element_text(tag: i32, bits: i64) -> String {
         TAG_BOOL => display_bivalens(bits != 0, tokens()).to_owned(),
         TAG_TEXT => format!("{:?}", text_str(unsafe { text_bytes(bits as *const u8) })),
         TAG_LIST => list_text(unsafe { list_ref(bits as *const List) }),
+        TAG_STRUCT => record_text(unsafe { &*(bits as *const Record) }),
         tag if (TAG_BITS..TAG_BITS + 4).contains(&tag) => bits_text(bits, 8 << (tag - TAG_BITS)),
         _ => bits.to_string(),
     }
@@ -253,6 +262,93 @@ fn list_text(list: &List) -> String {
         .map(|&(tag, bits)| element_text(tag, bits))
         .collect();
     format!("[{}]", parts.join(", "))
+}
+
+fn record_text(record: &Record) -> String {
+    let name = text_str(unsafe { text_bytes(record.name) }).into_owned();
+    if record.fields.is_empty() {
+        return format!("{name} {{}}");
+    }
+    let parts: Vec<String> = record
+        .fields
+        .iter()
+        .map(|&(field, tag, bits)| {
+            format!(
+                "{} = {}",
+                text_str(unsafe { text_bytes(field) }),
+                element_text(tag, bits)
+            )
+        })
+        .collect();
+    format!("{name} {{ {} }}", parts.join(", "))
+}
+
+/// New empty record.
+///
+/// # Safety
+///
+/// `name` addresses a well-formed text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_record_new(name: *const u8) -> *mut Record {
+    Box::into_raw(Box::new(Record {
+        name,
+        fields: Vec::new(),
+    }))
+}
+
+/// Set (or extend to) field `index`.
+///
+/// # Safety
+///
+/// `record` is a live runtime record and `field` a well-formed text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_record_set(
+    record: *mut Record,
+    index: i64,
+    field: *const u8,
+    tag: i32,
+    bits: i64,
+) {
+    let record = unsafe { &mut *record };
+    let index = usize::try_from(index).unwrap_or(0);
+    if record.fields.len() <= index {
+        record.fields.resize(index + 1, (field, 0, 0));
+    }
+    record.fields[index] = (field, tag, bits);
+}
+
+/// Field bits at `index`.
+///
+/// # Safety
+///
+/// `record` is a live runtime record.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_record_get(record: *const Record, index: i64) -> i64 {
+    let record = unsafe { &*record };
+    usize::try_from(index)
+        .ok()
+        .and_then(|at| record.fields.get(at))
+        .map_or(0, |&(_, _, bits)| bits)
+}
+
+/// Print one record line.
+///
+/// # Safety
+///
+/// `record` is a live runtime record.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_print_record(stream: i32, record: *const Record) {
+    emit(stream, &record_text(unsafe { &*record }));
+}
+
+/// Render a record as text.
+///
+/// # Safety
+///
+/// `record` is a live runtime record.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_from_record(record: *const Record) -> *const u8 {
+    text_new(record_text(unsafe { &*record }).as_bytes())
 }
 
 /// New empty list.

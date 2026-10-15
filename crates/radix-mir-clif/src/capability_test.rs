@@ -388,7 +388,7 @@ fn place_projection_names_gap() {
             kind: MirStatementKind::Assign {
                 place: MirPlace {
                     base: MirPlaceBase::Local(MirLocalId(0)),
-                    projections: vec![MirProjection::Field(Symbol(2))],
+                    projections: vec![MirProjection::VectorLane(0)],
                 },
                 value: MirValue {
                     id: MirValueId(0),

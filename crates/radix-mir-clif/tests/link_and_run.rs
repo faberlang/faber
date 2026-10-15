@@ -262,6 +262,7 @@ fn build_and_run(name: &str, program: &MirProgram, types: &TypeTable) -> Output 
         &interner,
         Some(MirFunctionId(1)),
         ["true", "false", "none", "tuple"].map(str::to_owned),
+        &radix_mir_clif::StructMeta::default(),
     )
     .expect("object emission succeeds");
 

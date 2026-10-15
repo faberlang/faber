@@ -72,6 +72,38 @@ pub const TAG_TEXT: i64 = 3;
 /// Raw-bits tags are `TAG_BITS + log2(width / 8)`: 4, 5, 6, 7.
 pub const TAG_BITS: i64 = 4;
 pub const TAG_LIST: i64 = 8;
+pub const TAG_STRUCT: i64 = 9;
+
+/// New empty record (`genus` instance): (name text handle).
+pub const RECORD_NEW: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_record_new",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Set field `index`: (record, index, field-name text handle, tag, bits).
+pub const RECORD_SET: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_record_set",
+    params: &[Ptr, I64, Ptr, I32, I64],
+    ret: None,
+};
+/// Field bits at `index`.
+pub const RECORD_GET: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_record_get",
+    params: &[Ptr, I64],
+    ret: Some(I64),
+};
+/// Print a record line.
+pub const PRINT_RECORD: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_print_record",
+    params: &[I32, Ptr],
+    ret: None,
+};
+/// Render a record as text.
+pub const TEXT_FROM_RECORD: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_from_record",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
 
 /// New empty list.
 pub const LIST_NEW: RuntimeSymbol = RuntimeSymbol {
@@ -234,6 +266,11 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     LIST_SORTED,
     PRINT_LIST,
     TEXT_FROM_LIST,
+    RECORD_NEW,
+    RECORD_SET,
+    RECORD_GET,
+    PRINT_RECORD,
+    TEXT_FROM_RECORD,
     PRINT_TEXT,
     PRINT_BITS,
     TEXT_FROM_BITS,

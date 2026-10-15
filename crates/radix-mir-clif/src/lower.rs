@@ -41,8 +41,18 @@ fn cranelift_error<E: std::fmt::Display>(error: E) -> Decline {
     Decline::new(format!("cranelift: {error}"))
 }
 
+/// What the lowering needs to know about `genus` types: field order, field
+/// types and display names, taken from the validated program.
+#[derive(Debug, Clone, Default)]
+pub struct StructMeta {
+    pub order: FxHashMap<radix_hir::DefId, Vec<radix_lexer::Symbol>>,
+    pub fields: FxHashMap<radix_hir::DefId, FxHashMap<radix_lexer::Symbol, MirType>>,
+    pub names: FxHashMap<radix_hir::DefId, String>,
+}
+
 /// Everything the lowering reads about the program being emitted.
 pub struct ProgramInput<'a> {
+    pub structs: &'a StructMeta,
     pub program: &'a MirProgram,
     pub types: &'a TypeTable,
     pub interner: &'a Interner,
@@ -66,6 +76,8 @@ pub(crate) enum Rep {
     Bits(BitsWidth),
     /// `lista<T>`: a pointer to a runtime list of tagged elements.
     List,
+    /// A `genus` instance: a pointer to a runtime record.
+    Record,
     /// `textus`: a pointer to `[len: i64][bytes...]` (see `abi::TEXT_HEADER`).
     Text,
     /// No value.
@@ -78,7 +90,7 @@ impl Rep {
             Self::Int => Some(types::I64),
             Self::Float => Some(types::F64),
             Self::Bool => Some(types::I8),
-            Self::Text | Self::Bits(_) | Self::List => Some(types::I64),
+            Self::Text | Self::Bits(_) | Self::List | Self::Record => Some(types::I64),
             Self::Unit => None,
         }
     }
@@ -101,6 +113,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(Primitive::Bivalens) => Ok(Rep::Bool),
         Type::Primitive(Primitive::Textus) => Ok(Rep::Text),
         Type::Bits(width) => Ok(Rep::Bits(*width)),
+        Type::Struct(_) => Ok(Rep::Record),
         // A promise carrier is its payload: async functions run to
         // completion and `cede` reads the value.
         Type::Promissum(inner) => rep_of(table, MirType::semantic(*inner)),
@@ -535,7 +548,9 @@ impl FunctionLower<'_, '_> {
             Rep::Int => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Float => Some(self.builder.ins().f64const(0.0)),
             Rep::Bool => Some(self.builder.ins().iconst(types::I8, 0)),
-            Rep::Text | Rep::Bits(_) | Rep::List => Some(self.builder.ins().iconst(types::I64, 0)),
+            Rep::Text | Rep::Bits(_) | Rep::List | Rep::Record => {
+                Some(self.builder.ins().iconst(types::I64, 0))
+            }
             Rep::Unit => None,
         }
     }
@@ -660,6 +675,45 @@ impl FunctionLower<'_, '_> {
         }
     }
 
+    /// The `genus` definition behind a struct type.
+    fn struct_def(&self, ty: MirType) -> Lowered<radix_hir::DefId> {
+        match resolve(self.state.input.types, ty.semantic_id()) {
+            Type::Struct(def) => Ok(*def),
+            _ => Err(Decline::new("field of a non-genus")),
+        }
+    }
+
+    /// Declaration index and type of field `name` of a `genus`.
+    fn field_slot(
+        &self,
+        ty: MirType,
+        name: radix_lexer::Symbol,
+    ) -> Lowered<(radix_hir::DefId, usize, MirType)> {
+        let def = self.struct_def(ty)?;
+        let meta = self.state.input.structs;
+        let index = meta
+            .order
+            .get(&def)
+            .and_then(|order| order.iter().position(|field| *field == name))
+            .ok_or_else(|| Decline::new("unknown field"))?;
+        let field_ty = meta
+            .fields
+            .get(&def)
+            .and_then(|fields| fields.get(&name))
+            .copied()
+            .ok_or_else(|| Decline::new("unknown field"))?;
+        Ok((def, index, field_ty))
+    }
+
+    /// The type after one projection step.
+    fn projected_type(&self, ty: MirType, projection: &MirProjection) -> Lowered<MirType> {
+        match projection {
+            MirProjection::Index(_) => self.element_type(ty),
+            MirProjection::Field(name) => Ok(self.field_slot(ty, *name)?.2),
+            _ => Err(Decline::new("place projection")),
+        }
+    }
+
     /// The static type of a place after its projections.
     fn place_type(&self, place: &MirPlace) -> Lowered<MirType> {
         let mut ty = *self
@@ -667,10 +721,7 @@ impl FunctionLower<'_, '_> {
             .get(&Self::base_slot(place))
             .ok_or_else(|| Decline::new("undeclared storage slot"))?;
         for projection in &place.projections {
-            if !matches!(projection, MirProjection::Index(_)) {
-                return Err(Decline::new("place projection"));
-            }
-            ty = self.element_type(ty)?;
+            ty = self.projected_type(ty, projection)?;
         }
         Ok(ty)
     }
@@ -697,6 +748,7 @@ impl FunctionLower<'_, '_> {
             Rep::Text => abi::TAG_TEXT,
             Rep::Bits(width) => abi::TAG_BITS + i64::from(width.bits().trailing_zeros() - 3),
             Rep::List => abi::TAG_LIST,
+            Rep::Record => abi::TAG_STRUCT,
             Rep::Unit => return Err(Decline::new("unit list element")),
         })
     }
@@ -752,24 +804,36 @@ impl FunctionLower<'_, '_> {
         let mut current = self.builder.use_var(variable);
         let mut current_rep = rep;
         for projection in &place.projections {
-            let MirProjection::Index(index) = projection else {
-                return Err(Decline::new("place projection"));
-            };
-            if current_rep != Rep::List {
-                return Err(Decline::new("index of a non-list"));
+            let next = self.projected_type(ty, projection)?;
+            let next_rep = rep_of(self.state.input.types, next)?;
+            let bits = match projection {
+                MirProjection::Index(index) => {
+                    if current_rep != Rep::List {
+                        return Err(Decline::new("index of a non-list"));
+                    }
+                    let (index, index_rep) = self.scalar(index)?;
+                    if index_rep != Rep::Int {
+                        return Err(Decline::new("list index representation"));
+                    }
+                    self.call_runtime(&abi::LIST_GET, &[current, index])?
+                }
+                MirProjection::Field(name) => {
+                    if current_rep != Rep::Record {
+                        return Err(Decline::new("field of a non-genus"));
+                    }
+                    let (_, position, _) = self.field_slot(ty, *name)?;
+                    let position = self.builder.ins().iconst(
+                        types::I64,
+                        i64::try_from(position).map_err(|_| Decline::new("field index"))?,
+                    );
+                    self.call_runtime(&abi::RECORD_GET, &[current, position])?
+                }
+                _ => return Err(Decline::new("place projection")),
             }
-            let element = self.element_type(ty)?;
-            let element_rep = rep_of(self.state.input.types, element)?;
-            let (index, index_rep) = self.scalar(index)?;
-            if index_rep != Rep::Int {
-                return Err(Decline::new("list index representation"));
-            }
-            let bits = self
-                .call_runtime(&abi::LIST_GET, &[current, index])?
-                .ok_or_else(|| Decline::new("list get result"))?;
-            current = self.element_value(bits, element_rep);
-            current_rep = element_rep;
-            ty = element;
+            .ok_or_else(|| Decline::new("projection result"))?;
+            current = self.element_value(bits, next_rep);
+            current_rep = next_rep;
+            ty = next;
         }
         Ok((current, current_rep))
     }
@@ -780,32 +844,48 @@ impl FunctionLower<'_, '_> {
         let Some((last, prefix)) = place.projections.split_last() else {
             return Err(Decline::new("place projection"));
         };
-        let MirProjection::Index(last_index) = last else {
-            return Err(Decline::new("place projection"));
-        };
         let container = MirPlace {
             base: place.base.clone(),
             projections: prefix.to_vec(),
         };
-        let (list, list_rep) = if prefix.is_empty() {
+        let container_ty = self.place_type(&container)?;
+        let (handle, handle_rep) = if prefix.is_empty() {
             let (variable, rep) = self.place_slot(&container)?;
             (self.builder.use_var(variable), rep)
         } else {
             self.read_projected(&container)?
         };
-        if list_rep != Rep::List {
-            return Err(Decline::new("index of a non-list"));
-        }
-        let (index, index_rep) = self.scalar(last_index)?;
-        if index_rep != Rep::Int {
-            return Err(Decline::new("list index representation"));
-        }
         let tag = self
             .builder
             .ins()
             .iconst(types::I32, Self::element_tag(rep)?);
         let bits = self.element_bits(value, rep);
-        self.call_runtime(&abi::LIST_SET, &[list, index, tag, bits])?;
+        match last {
+            MirProjection::Index(last_index) => {
+                if handle_rep != Rep::List {
+                    return Err(Decline::new("index of a non-list"));
+                }
+                let (index, index_rep) = self.scalar(last_index)?;
+                if index_rep != Rep::Int {
+                    return Err(Decline::new("list index representation"));
+                }
+                self.call_runtime(&abi::LIST_SET, &[handle, index, tag, bits])?;
+            }
+            MirProjection::Field(name) => {
+                if handle_rep != Rep::Record {
+                    return Err(Decline::new("field of a non-genus"));
+                }
+                let (_, position, _) = self.field_slot(container_ty, *name)?;
+                let position = self.builder.ins().iconst(
+                    types::I64,
+                    i64::try_from(position).map_err(|_| Decline::new("field index"))?,
+                );
+                let field = self.state.input.interner.resolve(*name).to_owned();
+                let field = self.text_literal(field.as_bytes())?;
+                self.call_runtime(&abi::RECORD_SET, &[handle, position, field, tag, bits])?;
+            }
+            _ => return Err(Decline::new("place projection")),
+        }
         Ok(())
     }
 
@@ -844,6 +924,61 @@ impl FunctionLower<'_, '_> {
             return Err(Decline::new("list destination representation"));
         }
         self.builder.def_var(variable, list);
+        Ok(())
+    }
+
+    /// A `genus` construction: fields supplied by name, stored in declaration
+    /// order.
+    fn construct_struct(
+        &mut self,
+        destination: &MirPlace,
+        aggregate: &MirAggregate,
+    ) -> Lowered<()> {
+        let MirAggregateKind::Struct(def) = aggregate.kind else {
+            return Err(Decline::new("struct kind"));
+        };
+        let MirAggregateFields::Named(supplied) = &aggregate.fields else {
+            return Err(Decline::new("struct fields"));
+        };
+        let meta = self.state.input.structs;
+        let order = meta
+            .order
+            .get(&def)
+            .ok_or_else(|| Decline::new("unknown genus"))?
+            .clone();
+        let name = meta
+            .names
+            .get(&def)
+            .cloned()
+            .unwrap_or_else(|| format!("def{}", def.0));
+        let name = self.text_literal(name.as_bytes())?;
+        let record = self
+            .call_runtime(&abi::RECORD_NEW, &[name])?
+            .ok_or_else(|| Decline::new("record new result"))?;
+        for (position, field) in order.iter().enumerate() {
+            let Some(item) = supplied.iter().find(|item| item.name == *field) else {
+                return Err(Decline::new("genus field without a value"));
+            };
+            let (_, _, field_ty) = self.field_slot(aggregate.ty, *field)?;
+            let (value, rep) = self.element_operand(&item.value, field_ty)?;
+            let position = self.builder.ins().iconst(
+                types::I64,
+                i64::try_from(position).map_err(|_| Decline::new("field index"))?,
+            );
+            let text = self.state.input.interner.resolve(*field).to_owned();
+            let text = self.text_literal(text.as_bytes())?;
+            let tag = self
+                .builder
+                .ins()
+                .iconst(types::I32, Self::element_tag(rep)?);
+            let bits = self.element_bits(value, rep);
+            self.call_runtime(&abi::RECORD_SET, &[record, position, text, tag, bits])?;
+        }
+        let (variable, slot_rep) = self.place_slot(destination)?;
+        if slot_rep != Rep::Record {
+            return Err(Decline::new("genus destination representation"));
+        }
+        self.builder.def_var(variable, record);
         Ok(())
     }
 
@@ -1026,6 +1161,12 @@ impl FunctionLower<'_, '_> {
             } if aggregate.kind == MirAggregateKind::Array => {
                 self.construct_array(destination, aggregate)
             }
+            MirStatementKind::Construct {
+                destination,
+                aggregate,
+            } if matches!(aggregate.kind, MirAggregateKind::Struct(_)) => {
+                self.construct_struct(destination, aggregate)
+            }
             MirStatementKind::Construct { .. } => Err(Decline::new("aggregate construction")),
         }
     }
@@ -1176,6 +1317,7 @@ impl FunctionLower<'_, '_> {
             }
             Rep::Bool => self.call_runtime(&abi::TEXT_FROM_BOOL, &[value])?,
             Rep::List => self.call_runtime(&abi::TEXT_FROM_LIST, &[value])?,
+            Rep::Record => self.call_runtime(&abi::TEXT_FROM_RECORD, &[value])?,
             Rep::Bits(width) => {
                 let bits = self
                     .builder
@@ -1289,7 +1431,8 @@ impl FunctionLower<'_, '_> {
             (Rep::Float, Rep::Float)
             | (Rep::Bool, Rep::Bool)
             | (Rep::Text, Rep::Text)
-            | (Rep::List, Rep::List) => value,
+            | (Rep::List, Rep::List)
+            | (Rep::Record, Rep::Record) => value,
             (Rep::Bits(from), Rep::Bits(to)) if from == to => value,
             _ => return Err(Decline::new("conversion between representations")),
         };
@@ -1430,6 +1573,10 @@ impl FunctionLower<'_, '_> {
                 let reference = self.runtime_ref(&abi::PRINT_LIST)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
+            Rep::Record => {
+                let reference = self.runtime_ref(&abi::PRINT_RECORD)?;
+                self.builder.ins().call(reference, &[stream, value]);
+            }
             Rep::Text => {
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
                 self.builder.ins().call(reference, &[stream, value]);
@@ -1508,7 +1655,9 @@ impl FunctionLower<'_, '_> {
             Rep::Float => self.float_binary(op, a, b),
             Rep::Bool => self.bool_binary(op, a, b),
             Rep::Text => self.text_binary(op, a, b),
-            Rep::Bits(_) | Rep::List | Rep::Unit => Err(Decline::new("unit operands")),
+            Rep::Bits(_) | Rep::List | Rep::Record | Rep::Unit => {
+                Err(Decline::new("unit operands"))
+            }
         }
     }
 

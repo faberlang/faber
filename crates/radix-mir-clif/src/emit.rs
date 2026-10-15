@@ -7,7 +7,7 @@ use radix_types::TypeTable;
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
 
 use crate::capability::{SLUG_CLIF_SUBSET, classify_clif_reachable};
-use crate::lower::{ProgramInput, lower_program};
+use crate::lower::{ProgramInput, StructMeta, lower_program};
 
 /// A relocatable native object for the host triple.
 #[derive(Debug, Clone)]
@@ -76,7 +76,25 @@ pub fn emit_object(
         Some(id) => display_tokens(validated, id),
         None => ["true", "false", "none", "tuple"].map(str::to_owned),
     };
-    emit_program(program, types, interner, entry, tokens)
+    let validation = validated.validation();
+    let structs = StructMeta {
+        order: validation
+            .struct_field_order
+            .iter()
+            .map(|(def, order)| (*def, order.clone()))
+            .collect(),
+        fields: validation
+            .struct_fields
+            .iter()
+            .map(|(def, fields)| (*def, fields.iter().map(|(n, t)| (*n, *t)).collect()))
+            .collect(),
+        names: validation
+            .display_names
+            .iter()
+            .map(|(def, name)| (*def, name.clone()))
+            .collect(),
+    };
+    emit_program(program, types, interner, entry, tokens, &structs)
 }
 
 fn display_tokens(validated: &ValidatedMir<'_>, entry: radix_mir::MirFunctionId) -> [String; 4] {
@@ -104,8 +122,10 @@ pub fn emit_program(
     interner: &Interner,
     entry: Option<radix_mir::MirFunctionId>,
     tokens: [String; 4],
+    structs: &StructMeta,
 ) -> Result<ClifObject, ClifError> {
     let input = ProgramInput {
+        structs,
         program,
         types,
         interner,
