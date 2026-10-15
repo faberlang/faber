@@ -17,7 +17,7 @@ locale = "en"
 #   • `regex /pattern/` is the inline literal: the file locale's regex type
 #     word, then a slash-delimited body read raw to the next unescaped `/`
 #   • `_ /pattern/` is the inferred form: the underscore opener takes the
-#     expected type from the typed binding slot, so `const regex name ← _ /…/`
+#     expected type from the typed binding slot, so `let regex name ← _ /…/`
 #     works (an untyped `_` binding gives it nothing to take)
 #   • only `\/` is processed by Faber; every other backslash reaches the
 #     engine unchanged, the body never spans a line, and `//` is rejected
@@ -49,8 +49,8 @@ main {
     print hit!.text()
 
     # the inferred form: `_ /pattern/` takes the type from the binding slot
-    const regex word ← _ /(?i)[a-z]+/
-    const _ shout ← word.find("HELLO there")
+    let regex word ← _ /(?i)[a-z]+/
+    let shout ← word.find("HELLO there")
     print shout!.text()
 
     # an escaped slash: `\/` writes one `/`; no other escape is processed

@@ -18,7 +18,7 @@ fn total(Node ∪ none n) → int {
 
 main {
     const Node ∪ none missing ← null
-    var Node head ← Node { value = 1, label = "a", next = Node { value = 2, label = "b", next = null } }
+    mut Node head ← Node { value = 1, label = "a", next = Node { value = 2, label = "b", next = null } }
     print head?.next?.value
     print head?.next?.next?.value
     print head?.label

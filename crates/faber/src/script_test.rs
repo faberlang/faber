@@ -56,7 +56,7 @@ fn bounded_lista_for_ref_runs_indices_end_to_end() {
         r#"
 main {
     const list<int, 3> numeri ← [10, 20, 30]
-    for ref numeri const index {
+    for ref numeri let index {
         print index
     }
 }

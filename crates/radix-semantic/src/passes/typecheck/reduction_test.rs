@@ -375,8 +375,8 @@ fn axis_reduction_named_local_chained_through_another_local() {
     assert_accepts(
         r"
 functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
-    fixum numerus a ← 1
-    fixum numerus k ← a
+    sit numerus a ← 1
+    sit numerus k ← a
     redde g.summa(axis k)
 }
 ",

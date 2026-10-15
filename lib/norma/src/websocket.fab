@@ -52,7 +52,7 @@ fn connect_tls(string url, string ca_path) → Socket ⇥ fault.IoFault {
 # open/receive pair over http:request_open.
 @ public
 fn connect_open(string url) → Socket ⇥ fault.IoFault {
-    const int id ↤ call 'websocket:connect_open' ([url ↦ value])
+    let int id ↤ call 'websocket:connect_open' ([url ↦ value])
     return Socket { id = id }
 }
 

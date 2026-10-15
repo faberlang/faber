@@ -267,18 +267,18 @@ fn const_itera_binder_mutating_method_is_rejected() {
 
 #[test]
 fn const_itera_binder_over_var_list_is_accepted() {
-    let src = const_binder_src("var list<Point> xs ← [Point { x = 1 }]", "var p", "p.x ← 5");
+    let src = const_binder_src("mut list<Point> xs ← [Point { x = 1 }]", "mut p", "p.x ← 5");
     assert_accepts(&src);
 }
 
 #[test]
 fn const_itera_binder_scalar_rebind_is_accepted() {
-    let src = const_binder_src("const list<int> xs ← [1, 2]", "var n", "n ← n + 1");
+    let src = const_binder_src("const list<int> xs ← [1, 2]", "mut n", "n ← n + 1");
     assert_accepts(&src);
 }
 
 #[test]
 fn const_itera_binder_string_rebind_is_accepted() {
-    let src = const_binder_src("const list<string> xs ← [\"a\"]", "var s", "s ← s + \"!\"");
+    let src = const_binder_src("const list<string> xs ← [\"a\"]", "mut s", "s ← s + \"!\"");
     assert_accepts(&src);
 }

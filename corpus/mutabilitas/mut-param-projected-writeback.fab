@@ -42,7 +42,7 @@ fn setseven(mut int n) → void {
 }
 
 main {
-    var Box b ← Box {}
+    mut Box b ← Box {}
     setseven(mut b.count)
     print b.count
     print b.label

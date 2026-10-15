@@ -77,7 +77,7 @@ main {
     # A float lift floors like the scalar operator (ruling 14, F9 ruling 29):
     # the remainder takes the divisor's sign.
     const list<f32> signs ← [-7.5, 7.5]
-    const f32 neg_two ← -2.0
+    let f32 neg_two ← -2.0
     print signs % 2.0
     print signs % neg_two
     print a ÷ b

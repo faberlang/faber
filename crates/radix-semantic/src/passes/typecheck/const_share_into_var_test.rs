@@ -592,20 +592,20 @@ fn values_view_detection_is_pack_first() {
 #[test]
 fn itera_user_method_named_valores_binder_is_accepted() {
     test_support::assert_accepts(
-        "genus Cista {\n    varia lista<numerus> res\n    functio valores() → lista<lista<numerus>> {\n        redde [[1]]\n    }\n}\nfunctio f(Cista p) → numerus {\n    itera ex p.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
+        "genus Cista {\n    varia lista<numerus> res\n    functio valores() → lista<lista<numerus>> {\n        redde [[1]]\n    }\n}\nfunctio f(Cista p) → numerus {\n    itera ex p.valores() sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
     );
 }
 
 #[test]
 fn itera_user_method_named_valores_fresh_control_is_accepted() {
     test_support::assert_accepts(
-        "genus Cista {\n    varia lista<numerus> res\n    functio fresca() → lista<lista<numerus>> {\n        redde [[1]]\n    }\n}\nfunctio f(Cista p) → numerus {\n    itera ex p.fresca() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
+        "genus Cista {\n    varia lista<numerus> res\n    functio fresca() → lista<lista<numerus>> {\n        redde [[1]]\n    }\n}\nfunctio f(Cista p) → numerus {\n    itera ex p.fresca() sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
     );
 }
 
 #[test]
 fn itera_map_valores_alias_still_rejected_with_user_method_present() {
-    let source = "genus Cista {\n    varia lista<numerus> res\n    functio valores() → lista<lista<numerus>> {\n        redde [[1]]\n    }\n}\nfunctio f(tabula<textus, lista<numerus>> m) → numerus {\n    itera ex m.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }";
+    let source = "genus Cista {\n    varia lista<numerus> res\n    functio valores() → lista<lista<numerus>> {\n        redde [[1]]\n    }\n}\nfunctio f(tabula<textus, lista<numerus>> m) → numerus {\n    itera ex m.valores() sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }";
     let result = test_support::analyze_source(source);
     assert!(
         has_const_shared_into_var(&result),

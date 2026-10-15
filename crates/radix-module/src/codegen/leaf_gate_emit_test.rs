@@ -35,7 +35,7 @@ fn rust_admits_inline_fs_leaf() {
 fn go_admits_inline_clock_leaf() {
     const SOURCE: &str = r#"
 incipit {
-    fixum numerus nunc ← ad 'tempus:monotonicum' ↦ numerus
+    sit numerus nunc ← ad 'tempus:monotonicum' ↦ numerus
     nota nunc
 }
 "#;
@@ -48,7 +48,7 @@ incipit {
 fn go_admits_inline_entropy_leaf() {
     const SOURCE: &str = r#"
 incipit {
-    fixum numerus sors ← ad 'aleator:sortire' ([0, 10]) ↦ numerus
+    sit numerus sors ← ad 'aleator:sortire' ([0, 10]) ↦ numerus
     nota sors
 }
 "#;
@@ -61,7 +61,7 @@ incipit {
 fn go_admits_inline_stdio_leaf() {
     const SOURCE: &str = r#"
 incipit {
-    fixum textus linea ← ad 'consolum:lege' ↦ textus
+    sit textus linea ← ad 'consolum:lege' ↦ textus
     nota linea
 }
 "#;

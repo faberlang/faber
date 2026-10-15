@@ -669,7 +669,7 @@ fn rounding_saturates_through_the_runtime() {
 #[test]
 fn truncate_and_the_float_valued_methods_use_the_runtime() {
     let code = emitted(
-        "main {\n    var float a ← -3.75\n    print a.truncate()\n    print a.abs()\n    print a.sign()\n    print a.minimum(2.5)\n    print a.maximum(2.5)\n}",
+        "main {\n    mut float a ← -3.75\n    print a.truncate()\n    print a.abs()\n    print a.sign()\n    print a.minimum(2.5)\n    print a.maximum(2.5)\n}",
     );
     for call in [
         "faber_trunc_i64(l_a)",

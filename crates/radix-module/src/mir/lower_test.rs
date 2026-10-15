@@ -3214,9 +3214,9 @@ fn lowers_array_literal_with_spread_of_inferred_lists() {
     let dump = dump_source(
         r"
 functio build() → lista<numerus> {
-    fixum _ a ← [1, 2]
-    fixum _ b ← [3, 4]
-    fixum _ c ← [0, sparge a, sparge b, 5]
+    sit a ← [1, 2]
+    sit b ← [3, 4]
+    sit c ← [0, sparge a, sparge b, 5]
     redde c
 }
 ",

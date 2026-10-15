@@ -11804,8 +11804,8 @@ import from "./b" b
 @ cli "tool"
 @ operand rest string ignored
 main args args exit 0 {
-  const string _ ← a.identity("x")
-  const string __ ← b.identity("y")
+  let string _ ← a.identity("x")
+  let string __ ← b.identity("y")
 }
 "#,
     )

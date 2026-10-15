@@ -4,34 +4,34 @@ locale = "en"
 # Range loops: direction from the bounds, a positive written step, inclusive
 # ends, the counter running past i64, the product, and the list position.
 main {
-    for range 0‥4 const i {
+    for range 0‥4 let i {
         print i
     }
-    for range 0…4 const i {
+    for range 0…4 let i {
         print i
     }
-    for range 4‥0 const i {
+    for range 4‥0 let i {
         print i
     }
-    for range 4…0 const i {
+    for range 4…0 let i {
         print i
     }
-    for range 10‥0 step 3 const i {
+    for range 10‥0 step 3 let i {
         print i
     }
-    for range 0…10 step 5 const i {
+    for range 0…10 step 5 let i {
         print i
     }
-    for range 3‥3 const i {
+    for range 3‥3 let i {
         print i
     }
-    for range 3…3 const i {
+    for range 3…3 let i {
         print i
     }
-    for range 9223372036854775806…9223372036854775807 const i {
+    for range 9223372036854775806…9223372036854775807 let i {
         print i
     }
-    for range 0‥6 const i {
+    for range 0‥6 let i {
         if i ≡ 1 {
             continue
         }
@@ -40,20 +40,20 @@ main {
         }
         print i
     }
-    for range 0‥2, 0‥3 const i, j {
+    for range 0‥2, 0‥3 let i, j {
         if j ≡ 2 {
             break
         }
         print i, j
     }
-    var int total ← 0
+    mut int total ← 0
     for range 1…5 var n {
         n ← n * 10
         total ← total + n
     }
     print total
     const list<string> days ← ["mon", "tue", "wed"]
-    for from days at [i] const day {
+    for from days at [i] let day {
         print i, day
     }
     debug "to stderr"

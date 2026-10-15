@@ -571,7 +571,7 @@ locale = "en"
 +++
 @ cli "tool"
 main args args {
-  const bool b ← true
+  let bool b ← true
   print b
   const int ∪ none o ← null
   print o

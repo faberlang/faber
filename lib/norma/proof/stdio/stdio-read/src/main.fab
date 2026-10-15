@@ -31,13 +31,13 @@ main {
     # still holds `ma\n\n`: the rest of the gamma line, then one blank line.
     const string ∪ none rest ← console.read_line()
     assert rest not is none
-    const string rest_text ↤ rest
+    let string rest_text ↤ rest
     assert rest_text ≡ "ma"
 
     # A blank line is a present empty string, not end of input.
     const string ∪ none blank ← console.read_line()
     assert blank not is none
-    const string blank_text ↤ blank
+    let string blank_text ↤ blank
     assert blank_text ≡ ""
 
     # Only past the last byte does a line read report none, and a byte read

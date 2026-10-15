@@ -57,7 +57,7 @@ fn bounded_lista_ex_lowers_to_len_static_split() {
 #[test]
 fn bounded_lista_de_lowers_to_index_loop() {
     let source = r"functio firstIndex(lista<numerus, 8> xs) → numerus {
-  itera de xs fixum index {
+  itera de xs sit index {
     redde index
   }
   redde 0
@@ -84,7 +84,7 @@ fn bounded_lista_de_lowers_to_index_loop() {
 #[test]
 fn bounded_lista_de_above_ten_lowers() {
     let source = r"functio firstIndex(lista<numerus, 16> xs) → numerus {
-  itera de xs fixum index {
+  itera de xs sit index {
     redde index
   }
   redde 0

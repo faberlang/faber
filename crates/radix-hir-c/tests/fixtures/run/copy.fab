@@ -12,12 +12,12 @@ class Counter {
     var int n = 0
 }
 fn take(copy list<int> items) → int {
-    var list<int> fresh ← items
+    mut list<int> fresh ← items
     fresh.append(5)
     return fresh.length()
 }
 fn bump(copy Counter c) → int {
-    var Counter mine ← c
+    mut Counter mine ← c
     mine.n ← mine.n + 1
     return mine.n
 }
@@ -26,13 +26,13 @@ main {
     print take(copy a)
     print a.length()
 
-    var Counter c ← Counter {}
+    mut Counter c ← Counter {}
     c.n ← 3
     print bump(copy c)
     print c.n
 
-    const Holder source ← Holder { x = 1.0 }
-    var Holder duplicate ← copy source
+    let Holder source ← Holder { x = 1.0 }
+    mut Holder duplicate ← copy source
     duplicate.x ← 5.0
     duplicate.marks.append(1)
     print source.x

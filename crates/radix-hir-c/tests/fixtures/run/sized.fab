@@ -24,26 +24,26 @@ fn clamp8(int n) → u8 {
 }
 
 main {
-    const u8 a ← 200
-    var i32 b ← -5
+    let u8 a ← 200
+    mut i32 b ← -5
     b ← b * 1000
     print a, b
-    const u64 big ← 18446744073709551615
+    let u64 big ← 18446744073709551615
     print big, big - 1
-    const i8 low ← -128
+    let i8 low ← -128
     print low
-    var u16 w ← 65535
+    mut u16 w ← 65535
     w ← w - 1
     print w
     print scale(20, 200)
     print clamp8(-4), clamp8(100), clamp8(999)
-    const Pixel p ← Pixel { red = 255, green = 0, offset = -300 }
+    let Pixel p ← Pixel { red = 255, green = 0, offset = -300 }
     print p.red, p.green, p.offset
     print p
-    const u32 mixed ← 4000000000
+    let u32 mixed ← 4000000000
     print mixed + 1
-    const int total ← a + b
+    let int total ← a + b
     print total
-    const u8 viaAscription ← 42 ∷ u8
+    let u8 viaAscription ← 42 ∷ u8
     print viaAscription
 }

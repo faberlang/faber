@@ -479,7 +479,7 @@ fn praefixum_link_method_homonym_genus_effect_is_its_own() {
     let main_source = |home: &str| {
         format!(
             "import from \"./a\" a\nimport from \"./b\" b\n\n\
-             const int M = comptime {{\n    const {home}.Box x ← {home}.Box {{ n = 7 }}\n    return x.get()\n}}\n\n\
+             const int M = comptime {{\n    let {home}.Box x ← {home}.Box {{ n = 7 }}\n    return x.get()\n}}\n\n\
              main {{\n    print M\n}}\n"
         )
     };

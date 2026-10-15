@@ -4,7 +4,7 @@ locale = "en"
 # List methods: ends and elements as optionals, membership, copies, ordering,
 # removal, and the sort expression, over int, text, bool and float lists.
 main {
-    var list<int> xs ← [5, 3, 8, 3] ∷ list<int>
+    mut list<int> xs ← [5, 3, 8, 3] ∷ list<int>
     const list<int> none_here ← [] ∷ list<int>
     print xs.first(), xs.last(), none_here.first(), none_here.last()
     print xs.get(1), xs.get(9), xs.get(-1)

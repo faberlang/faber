@@ -14,7 +14,7 @@ fn an_end_read_is_an_optional() {
 #[test]
 fn removing_an_end_is_an_effect_so_siblings_keep_their_order() {
     let code = emitted(
-        "main {\n    var list<int> v ← [1] ∷ list<int>\n    print v.remove_last(), v.length()\n}",
+        "main {\n    mut list<int> v ← [1] ∷ list<int>\n    print v.remove_last(), v.length()\n}",
     );
     // Both operands are bound in source order before the print.
     let remove = code.find("faber_list_i64_remove_last").expect("remove");
@@ -45,7 +45,7 @@ fn integer_lists_sum_exactly() {
 
 #[test]
 fn in_place_sort_uses_the_sort_helper() {
-    let code = emitted("main {\n    var list<int> v ← [2, 1]\n    v.sort()\n    print v\n}");
+    let code = emitted("main {\n    mut list<int> v ← [2, 1]\n    v.sort()\n    print v\n}");
     assert!(code.contains("faber_list_i64_sort(l_v)"), "{code}");
 }
 

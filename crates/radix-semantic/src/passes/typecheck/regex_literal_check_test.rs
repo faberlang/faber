@@ -44,7 +44,7 @@ fn dynamic_conversion_stays_failable_not_check_time() {
 #[test]
 fn inferred_regex_double_hole_is_named_error() {
     assert_rejects_with_issue(
-        r"incipit { fixum _ r ← _ /a/ }",
+        r"incipit { sit r ← _ /a/ }",
         "inferred_constructor_no_expected_type",
     );
 }
@@ -59,7 +59,7 @@ fn inferred_regex_context_free_is_named_error() {
 
 #[test]
 fn inferred_regex_typed_binding_accepts() {
-    assert_accepts(r"incipit { fixum regex r ← _ /a/ }");
+    assert_accepts(r"incipit { sit regex r ← _ /a/ }");
 }
 
 #[test]
@@ -79,5 +79,5 @@ fn inferred_regex_optional_slot_accepts() {
 
 #[test]
 fn explicit_regex_literal_stays_self_typed() {
-    assert_accepts(r"incipit { fixum _ r ← regex /a/ }");
+    assert_accepts(r"incipit { sit r ← regex /a/ }");
 }

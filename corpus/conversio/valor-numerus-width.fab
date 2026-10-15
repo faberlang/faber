@@ -30,25 +30,25 @@ locale = "en"
 
 main {
     # in range: the boxed value converts unchanged
-    const value inRange ← 200
-    const u8 fits ← inRange ↦ u8
+    let value inRange ← 200
+    let u8 fits ← inRange ↦ u8
     print fits
-    const value boundary ← 255
-    const u8 upper ← boundary ↦ u8
+    let value boundary ← 255
+    let u8 upper ← boundary ↦ u8
     print upper
 
     # out of range: the check fails and the recovery supplies the value
-    const value overflow ← 300
-    const u8 recovered ← overflow ↦ u8 ⊥ 7
+    let value overflow ← 300
+    let u8 recovered ← overflow ↦ u8 ⊥ 7
     print recovered
 
     # negative into unsigned is out of range too
-    const value negative ← 0 - 1
-    const u8 unsigned ← negative ↦ u8 ⊥ 0
+    let value negative ← 0 - 1
+    let u8 unsigned ← negative ↦ u8 ⊥ 0
     print unsigned
 
     # the signed width keeps the negative value
-    const value signedLow ← 0 - 128
-    const i8 lowest ← signedLow ↦ i8
+    let value signedLow ← 0 - 128
+    let i8 lowest ← signedLow ↦ i8
     print lowest
 }

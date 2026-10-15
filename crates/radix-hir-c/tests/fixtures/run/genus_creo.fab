@@ -37,6 +37,6 @@ main {
     print Terminus { valor = 200 }.accipe()
     print Terminus { valor = -4 }.accipe()
     print FIXED.accipe()
-    const Circulus c ← Circulus { radius = 5 }
+    let Circulus c ← Circulus { radius = 5 }
     print c.radius, c.diameter, c.area
 }

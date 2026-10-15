@@ -4,7 +4,7 @@ locale = "en"
 # A failed assertion aborts with its message; stdout so far stays written.
 main {
     print "start"
-    const int x ← 1
+    let int x ← 1
     assert x ≡ 2 panic "x must be two"
     print "unreachable"
 }

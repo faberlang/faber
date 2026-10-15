@@ -5,7 +5,7 @@ locale = "en"
 # The bytes are the same counted UTF-8 value a `string` is, the typechecker
 # proves a literal fits, and a run-time `↦ string<N>` checks the capacity.
 main {
-    const ascii route ← 'pg:query'
+    let ascii route ← 'pg:query'
     print route
     const ascii<8> a ← 'ab'
     const ascii<8> b ← 'ab'
@@ -13,9 +13,9 @@ main {
     if a ≡ b {
         print 1
     }
-    const string s ← a ↦ string
+    let string s ← a ↦ string
     print s
-    const string raw ← "héj"
+    let string raw ← "héj"
     const string<8> t ← raw ↦ string<8>
     print t
     print t.slice(0, 2)

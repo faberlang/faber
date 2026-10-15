@@ -24,21 +24,21 @@ main {
     # Server half: the request bytes are buffered, so accept completes and
     # websocket.accept writes the 101.
     const server.Incoming incoming ← listener.accept()
-    const string path ← incoming.req.path
+    let string path ← incoming.req.path
     const websocket.Socket sock ← websocket.accept(incoming.id)
     websocket.connect_finish(client)
 
     # Echo exchange, strictly alternating so neither side waits on the other.
     client.send("ping")
-    const string got ← sock.receive() coalesce "nil"
+    let string got ← sock.receive() coalesce "nil"
     sock.send("pong")
     const string ∪ none reply ← client.receive()
-    const string pong ← reply coalesce "nil"
+    let string pong ← reply coalesce "nil"
     assert pong ≡ "pong"
     client.close()
 
     # The peer close is a clean end: the next receive is none ("nil").
-    const string tail ← sock.receive() coalesce "nil"
+    let string tail ← sock.receive() coalesce "nil"
     sock.close()
 
     assert path ≡ "/chat"
