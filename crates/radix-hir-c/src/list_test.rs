@@ -59,3 +59,34 @@ fn a_spread_literal_pushes_each_element_in_order() {
     );
     assert!(code.contains("faber_list_i64_new(faber_a, 0)"), "{code}");
 }
+
+#[test]
+fn a_modular_list_uses_its_width_family() {
+    let code = emitted(
+        "main {\n    const list<wrapping<u32>> xs ← [1, 4294967295]\n    print xs\n    print xs.sorted()\n}",
+    );
+    assert!(code.contains("faber_list_u32_of(faber_a, 2"), "{code}");
+    assert!(code.contains("faber_list_u32_show(faber_a, l_xs)"), "{code}");
+    assert!(
+        code.contains("faber_list_u32_sorted(faber_a, l_xs)"),
+        "{code}"
+    );
+}
+
+#[test]
+fn a_modular_list_element_reduces_at_its_store() {
+    // `300` is not a `u8`; the element store reduces it modulo 2^8.
+    let code = emitted(
+        "main {\n    const list<wrapping<u8>> xs ← [300]\n    print xs\n}",
+    );
+    assert!(code.contains("faber_store_wrapping_u8("), "{code}");
+}
+
+#[test]
+fn a_u64_list_element_reads_back_exact() {
+    let code = emitted(
+        "main {\n    const list<wrapping<u64>> xs ← [18446744073709551615]\n    print xs.get(0) coalesce 0 ∷ wrapping<u64>\n}",
+    );
+    assert!(code.contains("faber_list_u64_get("), "{code}");
+    assert!(code.contains("faber_opt_u64"), "{code}");
+}
