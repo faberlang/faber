@@ -50,6 +50,37 @@ pub struct StructMeta {
     pub names: FxHashMap<radix_hir::DefId, String>,
 }
 
+/// Whether `function` rebinds local `id` as a whole. A reference parameter
+/// shares its handle, so mutation through projections reaches the caller; a
+/// whole-value rebind would not, and stays declined.
+fn rebinds_local(function: &MirFunction, id: MirLocalId) -> bool {
+    let whole = |place: &MirPlace| {
+        place.projections.is_empty()
+            && matches!(place.base, MirPlaceBase::Local(found) if found == id)
+    };
+    function.blocks.iter().any(|block| {
+        block
+            .statements
+            .iter()
+            .any(|statement| match &statement.kind {
+                MirStatementKind::Assign { place, .. } => whole(place),
+                MirStatementKind::Call { destination, .. }
+                | MirStatementKind::RuntimeCall { destination, .. } => {
+                    destination.as_ref().is_some_and(whole)
+                }
+                MirStatementKind::Construct { destination, .. } => whole(destination),
+            })
+            || match &block.terminator.kind {
+                MirTerminatorKind::TryCall {
+                    destination,
+                    error_place,
+                    ..
+                } => destination.as_ref().is_some_and(whole) || whole(error_place),
+                _ => false,
+            }
+    })
+}
+
 /// Everything the lowering reads about the program being emitted.
 pub struct ProgramInput<'a> {
     pub structs: &'a StructMeta,
@@ -179,7 +210,11 @@ impl<'a> ModuleState<'a> {
     fn signature_for(&self, function: &MirFunction) -> Lowered<Signature> {
         let mut signature = self.module.make_signature();
         for param in &function.params {
-            if param.mode != MirParamMode::Owned {
+            if !matches!(
+                param.mode,
+                MirParamMode::Owned | MirParamMode::Ref | MirParamMode::MutRef | MirParamMode::Move
+            ) || (param.mode != MirParamMode::Owned && rebinds_local(function, param.local))
+            {
                 return Err(Decline::new("reference parameter"));
             }
             let rep = rep_of(self.input.types, param.ty)?;
