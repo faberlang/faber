@@ -64,3 +64,34 @@ fn text_compares_by_bytes_and_booleans_by_equality() {
     assert!(code.contains("(strcmp(\"a\", \"a\") == 0)"), "{code}");
     assert!(code.contains("((l_p) != (0))"), "{code}");
 }
+
+#[test]
+fn a_switch_is_an_if_chain_over_once_evaluated_subjects() {
+    let code = emitted(
+        "main {\n    const int code ← 404\n    switch code {\n        case 200 { print \"ok\" }\n        case 404 { print \"missing\" }\n        default { print \"other\" }\n    }\n}",
+    );
+    assert!(code.contains("int64_t faber_t0 = l_code;"), "{code}");
+    assert!(code.contains("if ((faber_t0 == INT64_C(200))) {"), "{code}");
+    assert!(
+        code.contains("} else if ((faber_t0 == INT64_C(404))) {"),
+        "{code}"
+    );
+    assert!(code.contains("} else {"), "{code}");
+}
+
+#[test]
+fn a_text_switch_compares_with_strcmp() {
+    let code = emitted(
+        "main {\n    const string s ← \"a\"\n    switch s {\n        case \"a\" { print 1 }\n    }\n}",
+    );
+    assert!(code.contains("(strcmp(faber_t0, \"a\") == 0)"), "{code}");
+}
+
+#[test]
+fn a_module_without_an_entry_fails_as_the_runner_does() {
+    let code = emitted("fn f() → int {\n    return 1\n}");
+    assert!(
+        code.contains("faber_trap(\"no entry function in MIR program\");"),
+        "{code}"
+    );
+}

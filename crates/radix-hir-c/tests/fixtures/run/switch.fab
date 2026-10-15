@@ -1,0 +1,53 @@
++++
+locale = "en"
++++
+# Value dispatch: integers (including negative), text, a default, and a switch inside a loop that breaks out.
+fn classify(int n) → string {
+    switch n {
+        case -1 {
+            return "minus one"
+        }
+        case 0 {
+            return "zero"
+        }
+        case 7 {
+            return "seven"
+        }
+        default {
+            return "other"
+        }
+    }
+}
+
+fn greet(string lang) → string {
+    switch lang {
+        case "la" {
+            return "Salve"
+        }
+        case "gr" {
+            return "Chaire"
+        }
+    }
+    return "Hello"
+}
+
+main {
+    print classify(-1), classify(0), classify(7), classify(99)
+    print greet("la"), greet("gr"), greet("en")
+    var int n ← 0
+    while true {
+        n ↑
+        switch n {
+            case 2 {
+                print "two"
+            }
+            case 5 {
+                break
+            }
+            default {
+                print "n =", n
+            }
+        }
+    }
+    print "done"
+}

@@ -216,7 +216,7 @@ impl Emitter<'_> {
         Ok(())
     }
 
-    fn expr_statement(
+    pub(crate) fn expr_statement(
         &mut self,
         out: &mut String,
         expr: &HirExpression,
@@ -279,6 +279,9 @@ impl Emitter<'_> {
                 let ranges: Vec<&HirExpression> = ranges.iter().collect();
                 self.range_product(out, &ranges, bindings, body, *mutable)
             }
+            HirExpressionKind::Discerne {
+                scrutinees, arms, ..
+            } => self.switch(out, scrutinees, arms),
             HirExpressionKind::Block(block) => self.plain_block(out, block),
             HirExpressionKind::Loop(block) => self.loop_block(out, block),
             HirExpressionKind::Panic(message) => {

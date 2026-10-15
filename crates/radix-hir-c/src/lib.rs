@@ -29,6 +29,7 @@ mod list;
 mod names;
 mod range;
 mod stmt;
+mod switch;
 mod text;
 mod ty;
 
@@ -212,6 +213,9 @@ impl Emitter<'_> {
         // generated last; the support text follows them, since they need
         // helpers too.
         let (show_prototypes, show_definitions) = self.show_functions()?;
+        if hir.entry.is_none() {
+            self.support.need(crate::helpers::Helper::Trap);
+        }
         let mut out = self.support.text();
         out.push_str(&items.genera);
         if !items.constants.is_empty() {
@@ -240,7 +244,13 @@ impl Emitter<'_> {
             }
         }
         out.push_str(&body);
-        out.push_str("    return 0;\n}\n");
+        if hir.entry.is_none() {
+            // A module with no entry block has nothing to run: `faber run`
+            // reports it and exits 1, and so does this program.
+            out.push_str("    faber_trap(\"no entry function in MIR program\");\n}\n");
+        } else {
+            out.push_str("    return 0;\n}\n");
+        }
         Ok((out, self.support.uses_arena()))
     }
 

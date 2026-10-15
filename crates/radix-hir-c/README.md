@@ -83,6 +83,8 @@ report. It checks the runtime first: `faber.h` compiles on its own and
 | `n ↑` / `n ↓` on an `int` local | `faber_store_i64(faber_add(n, 1), "assignment to `n`")`, the assignment's own check and text |
 | `panic "m"` and `assert c [panic "m"]` | `faber_abort(m)`: `abort: m` on stderr, exit 1 (`assertion failed` without a message) |
 | text and boolean comparison | text `≺ ≻ ≤ ≥ ≡ ≢` by `strcmp`, which orders UTF-8 bytes as unsigned: the code-point order the runner uses; booleans `≡` / `≢` only |
+| `switch` / `discerne` on `int`, text, boolean and float values | scrutinees evaluated once in order into temporaries, then an `if` / `else if` chain over literal, negated-literal, alternative (`aut`), binding and wildcard patterns; the first arm that matches runs, a default is the `else`. C's `switch` is not used (it takes no text, and its `break` would stop leaving the loop around it) |
+| a module with no entry block | the functions, and a `main` that traps `no entry function in MIR program`, which is what `faber run` does (stderr text, exit 1) |
 | local names | the shared binding policy (`prefixed_binding_name`): `l_<name>`. Nothing C reserves starts with `l_`, so `char`, `goto`, `stdout` or `INT64_MAX` need no keyword table |
 
 ## Rejected by name
@@ -109,5 +111,5 @@ fallback on intermediates that overflow `int64_t` but not the cap. `loops.fab` r
 jumps, the logical operators, and an unstored 2^63. The `trap_*.fab` fixtures
 trap at a store, a call argument, a division by zero, and an intermediate
 beyond the cap, and
-must exit 1 with the runner's partial stdout. `control.fab` runs conditionals, `elif`, do-while with `continue` and `break`, increment, and text and boolean comparison; `trap_assert.fab` and `trap_increment.fab` abort and trap. `entry_args.fab` runs `main args` with none given (checked by hand with arguments). `tests/fixtures/reject/*.fab`
+must exit 1 with the runner's partial stdout. `switch.fab` runs value dispatch including inside a loop that breaks. `control.fab` runs conditionals, `elif`, do-while with `continue` and `break`, increment, and text and boolean comparison; `trap_assert.fab` and `trap_increment.fab` abort and trap. `entry_args.fab` runs `main args` with none given (checked by hand with arguments). `tests/fixtures/reject/*.fab`
 must fail with the named rejection.

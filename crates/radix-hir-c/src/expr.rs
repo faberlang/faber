@@ -419,7 +419,7 @@ impl Emitter<'_> {
     /// A folded integer constant. Inside `i64` it is an `int64_t` literal;
     /// between `2^63` and the cap it is an exact intermediate that only a
     /// print or a wider store can take.
-    fn int(&mut self, value: i128) -> Result<Operand, CodegenError> {
+    pub(crate) fn int(&mut self, value: i128) -> Result<Operand, CodegenError> {
         if !(CAP_MIN..=CAP_MAX).contains(&value) {
             return Err(unsupported(
                 "integer constant beyond the 64-bit representation cap",
