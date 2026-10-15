@@ -209,6 +209,7 @@ pub struct List {
     items: Vec<(i32, i64)>,
 }
 
+const TAG_INT: i32 = 0;
 const TAG_FLOAT: i32 = 1;
 const TAG_BOOL: i32 = 2;
 const TAG_TEXT: i32 = 3;
@@ -1644,6 +1645,63 @@ pub unsafe extern "C" fn __faber_clif_v1_list_retag(list: *const List, tag: i32)
             .map(|&(_, bits)| (tag, bits))
             .collect(),
     )
+}
+
+/// A list regrouped at another element width through its byte string; null
+/// when the bytes do not divide into whole target elements.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_rewidth(
+    list: *const List,
+    from: i32,
+    to: i32,
+    flags: i32,
+) -> *mut List {
+    let (from, to) = (
+        usize::try_from(from / 8).unwrap_or(1),
+        usize::try_from(to / 8).unwrap_or(1),
+    );
+    let big = flags & 1 != 0;
+    let kind = (flags >> 1) & 3;
+    let items = &unsafe { list_ref(list) }.items;
+    let mut bytes = Vec::with_capacity(items.len() * from);
+    for &(_, bits) in items {
+        let pattern = bits as u64;
+        if big {
+            bytes.extend_from_slice(&pattern.to_be_bytes()[8 - from..]);
+        } else {
+            bytes.extend_from_slice(&pattern.to_le_bytes()[..from]);
+        }
+    }
+    if bytes.len() % to != 0 {
+        return std::ptr::null_mut();
+    }
+    let raw_tag = TAG_BITS + i32::try_from(to.trailing_zeros()).unwrap_or(0);
+    let out = bytes
+        .chunks_exact(to)
+        .map(|chunk| {
+            let mut pattern = 0_u64;
+            if big {
+                for &byte in chunk {
+                    pattern = (pattern << 8) | u64::from(byte);
+                }
+            } else {
+                for (index, &byte) in chunk.iter().enumerate() {
+                    pattern |= u64::from(byte) << (8 * index);
+                }
+            }
+            let shift = 64 - 8 * u32::try_from(to).unwrap_or(8);
+            match kind {
+                2 => (TAG_INT, ((pattern << shift) as i64) >> shift),
+                1 => (TAG_INT, pattern as i64),
+                _ => (raw_tag, pattern as i64),
+            }
+        })
+        .collect();
+    list_new_from(out)
 }
 
 /// A non-negative integer as fixed-width, zero-padded, lowercase digits in

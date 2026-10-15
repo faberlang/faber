@@ -166,7 +166,11 @@ pub(crate) enum Seq {
     Copy { capacity: Option<u64> },
     /// A list whose elements keep their bits and change element tag
     /// (`list<b8>` and `list<u8>`).
-    Retag(i64),
+    Retag { tag: i64, capacity: Option<u64> },
+    /// A list regrouped at another element width through its bytes, in the
+    /// byte order of the conversion's `via` hint; `kind` is the target
+    /// element kind (0 raw bits, 1 unsigned, 2 signed).
+    Rewidth { from: u32, to: u32, kind: i64 },
     /// Text to a list of UTF-8, UTF-16 or UTF-32 units of the given width.
     Encode(u32),
     /// A list of unit patterns to text; 8, 16 and 32 decode UTF-8, UTF-16 and
@@ -185,8 +189,15 @@ pub(crate) enum Seq {
 fn list_element(table: &TypeTable, id: TypeId) -> Option<TypeId> {
     match resolve(table, id) {
         Type::Array(element) | Type::BoundedArray { element, .. } => Some(*element),
+        Type::BoundedOcteti { .. } => byte_element(table),
         _ => None,
     }
+}
+
+/// The raw byte type, which a bounded byte buffer holds; `None` when the
+/// program never names one.
+pub(crate) fn byte_element(table: &TypeTable) -> Option<TypeId> {
+    table.find_equal(&Type::Bits(BitsWidth::B8))
 }
 
 fn same_type(table: &TypeTable, a: TypeId, b: TypeId) -> bool {
@@ -204,6 +215,32 @@ fn bits_unsigned_pair(table: &TypeTable, a: TypeId, b: TypeId) -> bool {
     };
     let (a, b) = (resolve(table, a), resolve(table, b));
     pair(a, b) || pair(b, a)
+}
+
+/// An integer or raw-bits element: its width in bits and kind (0 raw bits, 1
+/// unsigned, 2 signed). A 64-bit unsigned element is unrepresentable.
+fn bits_cell(table: &TypeTable, id: TypeId) -> Option<(u32, i64)> {
+    Some(match resolve(table, id) {
+        Type::Bits(width) => (width.bits(), 0),
+        Type::SizedNumeric(Primitive::Numerus, width) => match width {
+            NumericWidth::U8 => (8, 1),
+            NumericWidth::U16 => (16, 1),
+            NumericWidth::U32 => (32, 1),
+            NumericWidth::I8 => (8, 2),
+            NumericWidth::I16 => (16, 2),
+            NumericWidth::I32 => (32, 2),
+            NumericWidth::I64 => (64, 2),
+            _ => return None,
+        },
+        _ => return None,
+    })
+}
+
+/// A width change between element kinds where one side is raw bits.
+fn rewidth(table: &TypeTable, source: TypeId, target_element: TypeId) -> Option<Seq> {
+    let (from, from_kind) = bits_cell(table, list_element(table, source)?)?;
+    let (to, kind) = bits_cell(table, target_element)?;
+    (from != to && (from_kind == 0 || kind == 0)).then_some(Seq::Rewidth { from, to, kind })
 }
 
 /// The plan for an explicit collection conversion, or `None` when the pair
@@ -271,18 +308,28 @@ pub(crate) fn sequence_conversion(
                 None
             }
         }
-        (_, Type::Array(to) | Type::BoundedArray { element: to, .. }) => {
+        (
+            Type::Array(_) | Type::BoundedArray { .. } | Type::BoundedOcteti { .. },
+            Type::Array(to),
+        ) if rewidth(table, source, *to).is_some() => rewidth(table, source, *to),
+        (_, Type::Array(_) | Type::BoundedArray { .. } | Type::BoundedOcteti { .. }) => {
+            let to = &match target_type {
+                Type::Array(to) | Type::BoundedArray { element: to, .. } => *to,
+                _ => byte_element(table)?,
+            };
             let from = list_element(table, source)?;
             let capacity = match target_type {
-                Type::BoundedArray { capacity, .. } => match table.get_index(*capacity) {
-                    radix_types::IndexExpr::Literal(bound) => Some(*bound),
-                    _ => return None,
-                },
+                Type::BoundedArray { capacity, .. } | Type::BoundedOcteti { capacity } => {
+                    match table.get_index(*capacity) {
+                        radix_types::IndexExpr::Literal(bound) => Some(*bound),
+                        _ => return None,
+                    }
+                }
                 _ => None,
             };
             if same_type(table, from, *to) {
                 rep_ok(*to).then_some(Seq::Copy { capacity })
-            } else if capacity.is_none() && bits_unsigned_pair(table, from, *to) {
+            } else if bits_unsigned_pair(table, from, *to) {
                 let rep = rep_of(table, MirType::semantic(*to)).ok()?;
                 let tag = match rep {
                     Rep::Int => abi::TAG_INT,
@@ -291,7 +338,7 @@ pub(crate) fn sequence_conversion(
                     }
                     _ => return None,
                 };
-                Some(Seq::Retag(tag))
+                Some(Seq::Retag { tag, capacity })
             } else {
                 None
             }
@@ -398,14 +445,13 @@ impl FunctionLower<'_, '_> {
                     Rep::List,
                 )
             }
-            Seq::Retag(tag) => {
+            Seq::Retag { tag, capacity } => {
                 let tag = self.builder.ins().iconst(types::I32, tag);
-                (
-                    self.call_runtime(&abi::LIST_RETAG, &[value, tag])?
-                        .ok_or_else(|| Decline::new("retag result"))?,
-                    None,
-                    Rep::List,
-                )
+                let retagged = self
+                    .call_runtime(&abi::LIST_RETAG, &[value, tag])?
+                    .ok_or_else(|| Decline::new("retag result"))?;
+                let failed = self.over_capacity(value, capacity)?;
+                (retagged, failed, Rep::List)
             }
             Seq::Encode(width) => {
                 let width = self.builder.ins().iconst(types::I32, i64::from(width));
@@ -430,6 +476,30 @@ impl FunctionLower<'_, '_> {
                         Failure::Static("bits list to textus conversion failed"),
                     )),
                     Rep::Text,
+                )
+            }
+            Seq::Rewidth { from, to, kind } => {
+                let big = conversion
+                    .params
+                    .iter()
+                    .find_map(|param| match self.state.input.interner.resolve(*param) {
+                        "be" | "Be" => Some(1),
+                        "le" | "Le" => Some(0),
+                        _ => None,
+                    })
+                    .ok_or_else(|| Decline::new("list regroup without a byte order"))?;
+                let from = self.builder.ins().iconst(types::I32, i64::from(from));
+                let to = self.builder.ins().iconst(types::I32, i64::from(to));
+                let flags = self.builder.ins().iconst(types::I32, big | (kind << 1));
+                let regrouped = self
+                    .call_runtime(&abi::LIST_REWIDTH, &[value, from, to, flags])?
+                    .ok_or_else(|| Decline::new("regroup result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, regrouped, zero);
+                (
+                    regrouped,
+                    Some((failed, Failure::Static("bits list length mismatch"))),
+                    Rep::List,
                 )
             }
             Seq::Release => (value, None, Rep::Text),
@@ -487,32 +557,39 @@ impl FunctionLower<'_, '_> {
                 let copied = self
                     .call_runtime(&abi::LIST_SLICE, &[value, start, end])?
                     .ok_or_else(|| Decline::new("copy result"))?;
-                let failed = match capacity {
-                    Some(capacity) => {
-                        let length = self
-                            .call_runtime(&abi::LIST_LEN, &[value])?
-                            .ok_or_else(|| Decline::new("length result"))?;
-                        let bound = self.builder.ins().iconst(
-                            types::I64,
-                            i64::try_from(capacity).map_err(|_| Decline::new("capacity"))?,
-                        );
-                        let over = self
-                            .builder
-                            .ins()
-                            .icmp(IntCC::SignedGreaterThan, length, bound);
-                        Some((
-                            over,
-                            Failure::Static("lista conversion exceeds the bounded capacity"),
-                        ))
-                    }
-                    None => None,
-                };
+                let failed = self.over_capacity(value, capacity)?;
                 (copied, failed, Rep::List)
             }
         };
         let converted = self.finish_conversion(converted, failed, recovery, want)?;
         self.builder.def_var(variable, converted);
         Ok(())
+    }
+
+    /// The failure of a list longer than a bounded capacity, if there is one.
+    fn over_capacity(
+        &mut self,
+        list: Value,
+        capacity: Option<u64>,
+    ) -> Lowered<Option<(Value, Failure)>> {
+        let Some(capacity) = capacity else {
+            return Ok(None);
+        };
+        let length = self
+            .call_runtime(&abi::LIST_LEN, &[list])?
+            .ok_or_else(|| Decline::new("length result"))?;
+        let bound = self.builder.ins().iconst(
+            types::I64,
+            i64::try_from(capacity).map_err(|_| Decline::new("capacity"))?,
+        );
+        let over = self
+            .builder
+            .ins()
+            .icmp(IntCC::SignedGreaterThan, length, bound);
+        Ok(Some((
+            over,
+            Failure::Static("lista conversion exceeds the bounded capacity"),
+        )))
     }
 
     /// The converted value plus, when the conversion can fail, the failure

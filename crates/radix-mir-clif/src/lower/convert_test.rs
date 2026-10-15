@@ -1,7 +1,7 @@
 //! The explicit numeric conversion matrix: which source/target pairs lower,
 //! and which stay declined by name.
 
-use super::convert::{MemberTest, Num, member_tests, numeric_conversion};
+use super::convert::{MemberTest, Num, Seq, member_tests, numeric_conversion, sequence_conversion};
 use super::rep_of;
 use radix_mir::MirType;
 use radix_types::{BitsWidth, NumericWidth, Primitive, Type, TypeId, TypeTable};
@@ -129,4 +129,51 @@ fn union_targets_test_each_member_and_reject_unlowered_members() {
     assert!(rep_of(&f.types, MirType::semantic(mixed)).is_ok());
     assert!(rep_of(&f.types, MirType::semantic(with_none)).is_err());
     assert!(rep_of(&f.types, MirType::semantic(with_regex)).is_err());
+}
+
+#[test]
+fn bounded_text_bytes_and_regrouped_lists_plan_by_type() {
+    let mut f = Fixture::new();
+    let capacity = f.types.intern_index(radix_types::IndexExpr::Literal(8));
+    let text = f.primitive(Primitive::Textus);
+    let int = f.primitive(Primitive::Numerus);
+    let bounded_text = f.types.bounded_textus(capacity);
+    let bounded_ascii = f.types.bounded_ascii(capacity);
+    let plan = |f: &Fixture, from, to| sequence_conversion(&f.types, from, to);
+    assert_eq!(
+        plan(&f, text, bounded_text),
+        Some(Seq::BoundText { capacity: 8 })
+    );
+    assert_eq!(plan(&f, bounded_text, text), Some(Seq::Release));
+    assert_eq!(plan(&f, bounded_ascii, text), Some(Seq::Release));
+    assert_eq!(
+        plan(&f, int, bounded_ascii),
+        Some(Seq::Pack { capacity: 8 })
+    );
+    // Text never narrows to ascii by this plan.
+    assert_eq!(plan(&f, text, bounded_ascii), None);
+    let b8 = f.bits(BitsWidth::B8);
+    let u16_ = f.sized(Primitive::Numerus, NumericWidth::U16);
+    let u64_ = f.sized(Primitive::Numerus, NumericWidth::U64);
+    let bytes = f.types.array(b8);
+    let words = f.types.array(u16_);
+    let wide = f.types.array(u64_);
+    assert_eq!(
+        plan(&f, bytes, words),
+        Some(Seq::Rewidth {
+            from: 8,
+            to: 16,
+            kind: 1
+        })
+    );
+    assert_eq!(
+        plan(&f, words, bytes),
+        Some(Seq::Rewidth {
+            from: 16,
+            to: 8,
+            kind: 0
+        })
+    );
+    // A 64-bit unsigned element does not fit the carrier.
+    assert_eq!(plan(&f, bytes, wide), None);
 }

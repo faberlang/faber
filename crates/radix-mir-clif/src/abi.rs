@@ -547,6 +547,16 @@ pub const LIST_TO_SET: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr],
     ret: Some(Ptr),
 };
+/// A list of integer or raw-bits elements regrouped at another width through
+/// the byte string they spell: (list, from bits, to bits, flags) -> list, or
+/// null when the bytes do not divide into whole target elements. Flag 1 is
+/// big-endian; bits 1 and 2 give the target kind (0 raw bits, 1 unsigned, 2
+/// signed).
+pub const LIST_REWIDTH: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_rewidth",
+    params: &[Ptr, I32, I32, I32],
+    ret: Some(Ptr),
+};
 /// A copy of a list with every element tag replaced.
 pub const LIST_RETAG: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_list_retag",
@@ -688,6 +698,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     APPROX_INT,
     LIST_TO_SET,
     LIST_RETAG,
+    LIST_REWIDTH,
     TEXT_ENCODE,
     TEXT_PACK,
     LIST_DECODE,

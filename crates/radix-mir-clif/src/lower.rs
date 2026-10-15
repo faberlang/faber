@@ -27,7 +27,7 @@ use crate::abi::{self, AbiTy, RuntimeSymbol};
 mod closure;
 mod convert;
 mod lift;
-pub(crate) use convert::{member_tests, numeric_conversion, sequence_conversion};
+pub(crate) use convert::{byte_element, member_tests, numeric_conversion, sequence_conversion};
 
 /// A named refusal discovered during lowering.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -269,6 +269,11 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Promissum(inner) => rep_of(table, MirType::semantic(*inner)),
         Type::Array(element) | Type::BoundedArray { element, .. } | Type::Cursor(element) => {
             rep_of(table, MirType::semantic(*element))?;
+            Ok(Rep::List)
+        }
+        // A bounded byte buffer is a bounded list of raw bytes.
+        Type::BoundedOcteti { .. } => {
+            convert::byte_element(table).ok_or_else(|| Decline::new("byte buffer element"))?;
             Ok(Rep::List)
         }
         // A read-only reference is the value it borrows; a mutable one is a
@@ -1008,6 +1013,9 @@ impl FunctionLower<'_, '_> {
             Type::Array(element) | Type::BoundedArray { element, .. } => {
                 Ok(MirType::semantic(*element))
             }
+            Type::BoundedOcteti { .. } => convert::byte_element(self.state.input.types)
+                .map(MirType::semantic)
+                .ok_or_else(|| Decline::new("byte buffer element")),
             _ => Err(Decline::new("index of a non-list")),
         }
     }
