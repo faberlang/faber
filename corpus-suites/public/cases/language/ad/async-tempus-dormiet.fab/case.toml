@@ -6,10 +6,5 @@ input = "ad/async-tempus-dormiet.fab"
 
 
 [expect]
-check_only = true
-
-[targets.runner]
-outcome = "known-fail"
-phase = "run"
-diagnostic_contains = "mir_validation_destination_type_mismatch"
-known_fail_why = "The program fails MIR validation after package linking with issue mir_validation_destination_type_mismatch, so the runner never executes it."
+stdout = "stdout.expected"
+check_only = false
