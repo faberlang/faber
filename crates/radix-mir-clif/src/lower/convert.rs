@@ -750,6 +750,98 @@ enum Rounding {
     Trunc,
 }
 
+/// What a union member test compares at run time.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum MemberTest {
+    /// The payload tag alone (widths and element types are erased, as the
+    /// runner erases them).
+    Tag(i64),
+    /// A `genus` instance of this definition.
+    Struct(radix_hir::DefId),
+    /// The absence of a value (an optional's none).
+    Nil,
+}
+
+/// The run-time tests for `x est <target>` over a boxed union, any of which
+/// may match (a union target tests each member); `None` when a target is not
+/// told apart by tag or definition.
+pub(crate) fn member_tests(table: &TypeTable, target: TypeId) -> Option<Vec<MemberTest>> {
+    Some(vec![match resolve(table, target) {
+        Type::Union(members) => {
+            let mut tests = Vec::new();
+            for member in members {
+                tests.extend(member_tests(table, *member)?);
+            }
+            return Some(tests);
+        }
+        Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
+            MemberTest::Tag(abi::TAG_INT)
+        }
+        Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
+            MemberTest::Tag(abi::TAG_FLOAT)
+        }
+        Type::Primitive(Primitive::Bivalens) => MemberTest::Tag(abi::TAG_BOOL),
+        Type::Primitive(Primitive::Textus | Primitive::Ascii) => MemberTest::Tag(abi::TAG_TEXT),
+        Type::Array(_) | Type::BoundedArray { .. } => MemberTest::Tag(abi::TAG_LIST),
+        Type::Struct(def) => MemberTest::Struct(*def),
+        Type::Primitive(Primitive::Nihil) => MemberTest::Nil,
+        _ => return None,
+    }])
+}
+
+impl FunctionLower<'_, '_> {
+    /// `x est T` / `x non est T` over a boxed union payload.
+    pub(super) fn type_check(
+        &mut self,
+        op: &MirTypeCheckOp,
+        operand: &MirOperand,
+    ) -> Lowered<Value> {
+        let (handle, rep) = self.scalar(operand)?;
+        if rep != Rep::Opt {
+            return Err(Decline::new("type check of a non-union"));
+        }
+        let tests = member_tests(self.state.input.types, op.ty.semantic_id())
+            .ok_or_else(|| Decline::new("type check target"))?;
+        let mut found: Option<Value> = None;
+        for test in tests {
+            let hit = match test {
+                MemberTest::Nil => {
+                    let zero = self.builder.ins().iconst(types::I64, 0);
+                    Some(self.builder.ins().icmp(IntCC::Equal, handle, zero))
+                }
+                MemberTest::Tag(tag) => {
+                    let tag = self.builder.ins().iconst(types::I32, tag);
+                    self.call_runtime(&abi::UNION_HAS_TAG, &[handle, tag])?
+                }
+                MemberTest::Struct(def) => {
+                    let name = self
+                        .state
+                        .input
+                        .structs
+                        .names
+                        .get(&def)
+                        .ok_or_else(|| Decline::new("type check of an unnamed definition"))?
+                        .clone();
+                    let name = self.text_literal(name.as_bytes())?;
+                    self.call_runtime(&abi::UNION_IS_STRUCT, &[handle, name])?
+                }
+            }
+            .ok_or_else(|| Decline::new("type check result"))?;
+            found = Some(match found {
+                Some(seen) => self.builder.ins().bor(seen, hit),
+                None => hit,
+            });
+        }
+        let found = found.ok_or_else(|| Decline::new("type check target"))?;
+        if op.positive {
+            Ok(found)
+        } else {
+            let one = self.builder.ins().iconst(types::I8, 1);
+            Ok(self.builder.ins().bxor(found, one))
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "convert_test.rs"]
 mod convert_test;

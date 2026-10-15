@@ -557,6 +557,19 @@ pub const LIST_DECODE: RuntimeSymbol = RuntimeSymbol {
     ret: Some(Ptr),
 };
 
+/// Whether a boxed union (or optional) payload carries a tag; null never does.
+pub const UNION_HAS_TAG: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_union_has_tag",
+    params: &[Ptr, I32],
+    ret: Some(I8),
+};
+/// Whether a boxed payload is a `genus` instance of the named type.
+pub const UNION_IS_STRUCT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_union_is_struct",
+    params: &[Ptr, Ptr],
+    ret: Some(I8),
+};
+
 /// The runtime entry the emitted `main` shim calls.
 pub const MAIN: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_main",
@@ -649,6 +662,8 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     LIST_RETAG,
     TEXT_ENCODE,
     LIST_DECODE,
+    UNION_HAS_TAG,
+    UNION_IS_STRUCT,
     SET_DISPLAY_TOKENS,
 ];
 

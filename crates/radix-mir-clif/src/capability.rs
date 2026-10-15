@@ -222,7 +222,19 @@ impl<'a> ClifCapability<'a> {
             Type::Tuple(elements) => elements
                 .iter()
                 .find_map(|element| self.type_gap(MirType::semantic(*element))),
-            Type::Union(_) | Type::Intersection(_) => Some(Gap::Subset("union value".to_owned())),
+            Type::Union(members) => members.iter().find_map(|member| {
+                if matches!(
+                    self.types.get(*member),
+                    Type::Primitive(Primitive::Nihil | Primitive::Ignotum)
+                        | Type::Option(_)
+                        | Type::Bits(_)
+                        | Type::Union(_)
+                ) {
+                    return Some(Gap::Subset("union value".to_owned()));
+                }
+                self.type_gap(MirType::semantic(*member))
+            }),
+            Type::Intersection(_) => Some(Gap::Subset("union value".to_owned())),
             Type::Option(inner) => match self.types.get(*inner) {
                 Type::Option(_) => Some(Gap::Subset("optional value".to_owned())),
                 _ => self.type_gap(MirType::semantic(*inner)),
@@ -552,6 +564,11 @@ impl MirVisitor for ClifCapability<'_> {
                     )
                     .is_some()
         );
+        let type_check = matches!(
+            &call.intrinsic,
+            MirIntrinsic::TypeCheck(op)
+                if crate::lower::member_tests(self.types, op.ty.semantic_id()).is_some()
+        );
         let sequence = matches!(
             &call.intrinsic,
             MirIntrinsic::Convert(conversion)
@@ -566,6 +583,7 @@ impl MirVisitor for ClifCapability<'_> {
         if renders_text
             || numeric
             || sequence
+            || type_check
             || set_to_list
             || matches!(
                 call.intrinsic,

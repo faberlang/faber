@@ -1,7 +1,9 @@
 //! The explicit numeric conversion matrix: which source/target pairs lower,
 //! and which stay declined by name.
 
-use super::convert::{Num, numeric_conversion};
+use super::convert::{MemberTest, Num, member_tests, numeric_conversion};
+use super::rep_of;
+use radix_mir::MirType;
 use radix_types::{BitsWidth, NumericWidth, Primitive, Type, TypeId, TypeTable};
 
 struct Fixture {
@@ -103,4 +105,28 @@ fn raw_bits_pair_only_with_same_width_scalars() {
         numeric_conversion(&f.types, i32_, b32).map(|plan| plan.target()),
         Some(Num::Bits(BitsWidth::B32))
     ));
+}
+
+#[test]
+fn union_targets_test_each_member_and_reject_unlowered_members() {
+    let mut f = Fixture::new();
+    let int = f.primitive(Primitive::Numerus);
+    let text = f.primitive(Primitive::Textus);
+    let none = f.primitive(Primitive::Nihil);
+    let regex = f.primitive(Primitive::Regex);
+    let mixed = f.types.intern(Type::Union(vec![int, text]));
+    let with_none = f.types.intern(Type::Union(vec![int, none]));
+    let with_regex = f.types.intern(Type::Union(vec![int, regex]));
+    // Union members are stored in id order, so the tests come in either order.
+    let tests = member_tests(&f.types, mixed).expect("a union of scalars tests by tag");
+    assert_eq!(tests.len(), 2);
+    assert!(tests.contains(&MemberTest::Tag(crate::abi::TAG_INT)));
+    assert!(tests.contains(&MemberTest::Tag(crate::abi::TAG_TEXT)));
+    assert_eq!(member_tests(&f.types, none), Some(vec![MemberTest::Nil]));
+    assert_eq!(member_tests(&f.types, regex), None);
+    // A boxed union lowers; a none member would collide with the optional's
+    // null and a member outside the subset is refused.
+    assert!(rep_of(&f.types, MirType::semantic(mixed)).is_ok());
+    assert!(rep_of(&f.types, MirType::semantic(with_none)).is_err());
+    assert!(rep_of(&f.types, MirType::semantic(with_regex)).is_err());
 }

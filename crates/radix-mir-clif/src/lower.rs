@@ -22,7 +22,7 @@ use rustc_hash::FxHashMap;
 use crate::abi::{self, AbiTy, RuntimeSymbol};
 
 mod convert;
-pub(crate) use convert::{numeric_conversion, sequence_conversion};
+pub(crate) use convert::{member_tests, numeric_conversion, sequence_conversion};
 
 /// A named refusal discovered during lowering.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -209,6 +209,24 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             }
             rep_of(table, MirType::semantic(signature.ret))?;
             Ok(Rep::Func)
+        }
+        // An inline union is a box of one tagged payload, the optional's
+        // layout without the null; a union with a none, bits or optional
+        // member stays declined.
+        Type::Union(members) => {
+            for member in members {
+                if matches!(
+                    resolve(table, *member),
+                    Type::Primitive(Primitive::Nihil | Primitive::Ignotum)
+                        | Type::Option(_)
+                        | Type::Bits(_)
+                        | Type::Union(_)
+                ) {
+                    return Err(Decline::new("union member"));
+                }
+                rep_of(table, MirType::semantic(*member))?;
+            }
+            Ok(Rep::Opt)
         }
         Type::Option(inner) => {
             if matches!(table.get(*inner), Type::Option(_)) {
@@ -2356,6 +2374,19 @@ impl FunctionLower<'_, '_> {
         }
     }
 
+    /// Whether `value` is a plain read of a union-typed place.
+    fn reads_union(&self, value: &MirValue) -> bool {
+        let MirValueKind::Operand(operand @ MirOperand::Place(_)) = &value.kind else {
+            return false;
+        };
+        self.operand_type(operand).is_ok_and(|ty| {
+            matches!(
+                resolve(self.state.input.types, ty.semantic_id()),
+                Type::Union(_)
+            )
+        })
+    }
+
     fn operand(&mut self, operand: &MirOperand) -> Lowered<(Option<Value>, Rep)> {
         match operand {
             MirOperand::Constant(constant) => self.constant(constant),
@@ -2414,7 +2445,16 @@ impl FunctionLower<'_, '_> {
                 }
                 let (variable, slot_rep) = self.place_slot(place)?;
                 if let Some(computed) = computed {
-                    let computed = self.coerce(computed, rep, slot_rep)?;
+                    let computed =
+                        if rep == Rep::Opt && slot_rep != Rep::Opt && self.reads_union(value) {
+                            // Narrowing a union to the member a type test proved.
+                            let bits = self
+                                .call_runtime(&abi::OPT_BITS, &[computed])?
+                                .ok_or_else(|| Decline::new("narrowing result"))?;
+                            self.element_value(bits, slot_rep)
+                        } else {
+                            self.coerce(computed, rep, slot_rep)?
+                        };
                     self.builder.def_var(variable, computed);
                 }
                 Ok(())
@@ -2770,6 +2810,13 @@ impl FunctionLower<'_, '_> {
                 self.format_string(destination, *template, &call.args)
             }
             MirIntrinsic::Collection(op) => self.collection_op(destination, *op, &call.args),
+            MirIntrinsic::TypeCheck(op) => {
+                let ([operand], Some(destination)) = (call.args.as_slice(), destination) else {
+                    return Err(Decline::new("type check shape"));
+                };
+                let result = self.type_check(op, operand)?;
+                self.define_result(destination, Some(result), Rep::Bool)
+            }
             MirIntrinsic::Duplicate => {
                 let ([argument], Some(destination)) = (call.args.as_slice(), destination) else {
                     return Err(Decline::new("duplicate shape"));

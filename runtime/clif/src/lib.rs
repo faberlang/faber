@@ -1675,3 +1675,33 @@ pub unsafe extern "C" fn __faber_clif_v1_list_decode(list: *const List, mode: i3
     };
     decoded.map_or(std::ptr::null(), |text| text_new(text.as_bytes()))
 }
+
+/// Whether a boxed payload carries `tag`; null (a none) never does.
+///
+/// # Safety
+///
+/// `handle` is null or a live boxed payload.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_union_has_tag(handle: *const Present, tag: i32) -> i8 {
+    i8::from(unsafe { handle.as_ref() }.is_some_and(|present| present.tag == tag))
+}
+
+/// Whether a boxed payload is a `genus` instance named `name`.
+///
+/// # Safety
+///
+/// `handle` is null or a live boxed payload; `name` is a text handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_union_is_struct(
+    handle: *const Present,
+    name: *const u8,
+) -> i8 {
+    let Some(present) = (unsafe { handle.as_ref() }) else {
+        return 0;
+    };
+    if present.tag != TAG_STRUCT {
+        return 0;
+    }
+    let record = unsafe { &*(present.bits as *const Record) };
+    i8::from(!record.variant && unsafe { text_bytes(record.name) == text_bytes(name) })
+}
