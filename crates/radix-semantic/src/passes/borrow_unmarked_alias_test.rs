@@ -242,3 +242,43 @@ fn object_field_alias_store_is_rejected_via_reassignment() {
     assert_rejects(&src(""), SECOND);
     assert_accepts(&src("mut "));
 }
+
+const POINT: &str = "class Point {\n    var int x = 0\n}\n";
+
+fn const_binder_src(decl: &str, binder: &str, body: &str) -> String {
+    format!("{POINT}main {{\n    {decl}\n    for from xs {binder} {{\n        {body}\n    }}\n}}\n")
+}
+
+#[test]
+fn const_itera_binder_field_write_is_rejected() {
+    let src = const_binder_src(
+        "const list<Point> xs ← [Point { x = 1 }]",
+        "var p",
+        "p.x ← 5",
+    );
+    assert_rejects(&src, SECOND);
+}
+
+#[test]
+fn const_itera_binder_mutating_method_is_rejected() {
+    let src = const_binder_src("const list<list<int>> xs ← [[1]]", "var r", "r.append(2)");
+    assert_rejects(&src, METHOD);
+}
+
+#[test]
+fn const_itera_binder_over_var_list_is_accepted() {
+    let src = const_binder_src("var list<Point> xs ← [Point { x = 1 }]", "var p", "p.x ← 5");
+    assert_accepts(&src);
+}
+
+#[test]
+fn const_itera_binder_scalar_rebind_is_accepted() {
+    let src = const_binder_src("const list<int> xs ← [1, 2]", "var n", "n ← n + 1");
+    assert_accepts(&src);
+}
+
+#[test]
+fn const_itera_binder_string_rebind_is_accepted() {
+    let src = const_binder_src("const list<string> xs ← [\"a\"]", "var s", "s ← s + \"!\"");
+    assert_accepts(&src);
+}

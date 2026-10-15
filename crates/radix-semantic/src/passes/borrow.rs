@@ -73,7 +73,7 @@ use crate::{
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItem,
-    HirItemKind, HirModule, HirParamMode, HirStatement, HirStatementKind,
+    HirItemKind, HirIteraMode, HirModule, HirParamMode, HirStatement, HirStatementKind,
 };
 use radix_intrinsics::{is_mutating_receiver, lookup_method_for_type_id};
 use radix_lexer::Interner;
@@ -1372,6 +1372,51 @@ impl<'a> BorrowChecker<'a> {
             && origin != local
         {
             self.nonmut_agg_aliases.insert(local, origin);
+        }
+    }
+
+    /// An element binder of `for from xs` names an element of `xs`, so a
+    /// read-only collection (a `const` local, a non-`mut` aggregate parameter,
+    /// or an alias of one) makes the binder a read-only alias of that origin:
+    /// const protects all the way down. A bare rebind of the binder is not a
+    /// projection and stays legal.
+    fn note_itera_binder_alias(
+        &mut self,
+        binding: DefId,
+        mode: HirIteraMode,
+        iter: &HirExpression,
+    ) {
+        if !self.itera_element_can_alias(mode, iter) {
+            return;
+        }
+        let Some(root) = Self::root_def_id(iter) else {
+            return;
+        };
+        let origin = match self.nonmut_agg_origin(root) {
+            Some(origin) => origin,
+            None if self.immutable_locals.contains(&root) => root,
+            None => return,
+        };
+        if origin != binding {
+            self.nonmut_agg_aliases.insert(binding, origin);
+        }
+    }
+
+    /// Whether the binder of an `itera` over `iter` can hold shared storage.
+    /// `de` binds an index or key. `ex` over a list, set or map binds an
+    /// element or value, which must itself alias; any other iterable keeps the
+    /// alias, since a scalar binder has no projection to write through.
+    fn itera_element_can_alias(&self, mode: HirIteraMode, iter: &HirExpression) -> bool {
+        if !matches!(mode, HirIteraMode::Ex) {
+            return false;
+        }
+        let Some(ty) = iter.ty else { return true };
+        let (_, inner) = self.types.peel_access_marker(ty);
+        match self.types.get(inner) {
+            Type::Array(element) | Type::Set(element) | Type::Map(_, element) => {
+                self.is_aliasing_type(*element)
+            }
+            _ => true,
         }
     }
 
@@ -2698,6 +2743,7 @@ impl HirVisitor for BorrowChecker<'_> {
                 self.finish_loop(&entry, body);
             }
             HirExpressionKind::Itera {
+                mode,
                 binding,
                 iter,
                 body: block,
@@ -2705,6 +2751,7 @@ impl HirVisitor for BorrowChecker<'_> {
             } => {
                 self.visit_expr(iter);
                 self.ensure_state(*binding);
+                self.note_itera_binder_alias(*binding, *mode, iter);
                 self.own.note_loop_binder(*binding);
                 let entry = self.loop_entry();
                 self.check_block(block);
