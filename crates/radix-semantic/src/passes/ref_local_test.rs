@@ -68,3 +68,18 @@ fn write_through_a_bare_parameter_is_one_diagnostic() {
     ));
     assert_eq!(errors, ["assign_to_de_parameter"], "{errors:?}");
 }
+
+#[test]
+fn a_ref_local_that_is_never_repointed_is_not_an_unneeded_mut() {
+    let fixture = analyze_en(&format!(
+        "{CELL}main {{\n    let Cell c ← Cell {{ value = 1 }}\n    ref Cell cur ← c\n    print cur.value\n}}\n"
+    ));
+    assert!(
+        !fixture
+            .diagnostics
+            .iter()
+            .any(|d| issue(d) == Some("unnecessary_varia")),
+        "{:?}",
+        fixture.diagnostics
+    );
+}
