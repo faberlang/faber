@@ -121,13 +121,39 @@ fn go_rejects_register_logic_and_select_by_name() {
     }
 }
 
+/// The Rust emitter lifts the register forms itself, so a float or boolean
+/// lane form reaches output with no lift issue.
 #[cfg(feature = "hir-rust")]
 #[test]
-fn rust_rejects_register_logic_and_select_by_name() {
-    for (body, issue) in MASKED {
-        let (found, _) = masked_issues(Target::HirRust, body);
-        assert!(found.iter().any(|found| found == issue), "`{body}`: {found:?}");
+fn rust_emits_register_logic_and_select() {
+    for (body, _) in MASKED {
+        let (found, emitted) = masked_issues(Target::HirRust, body);
+        assert!(emitted, "`{body}`: {found:?}");
+        assert!(
+            !found
+                .iter()
+                .any(|issue| issue == VECTOR_ISSUE || issue == MATRIX_ISSUE),
+            "`{body}`: {found:?}"
+        );
     }
+}
+
+/// A lane combination the Rust emitter cannot spell is refused by the named
+/// issue, never printed as the scalar operator between arrays.
+#[cfg(feature = "hir-rust")]
+#[test]
+fn rust_refuses_integer_lane_arithmetic_by_name() {
+    let session = Session::new(Config::default().with_target(Target::HirRust).with_dev_locale_root());
+    let source = "incipit {\nfixum vector<i32, 3> a ← [1, 2, 3] ↦ vector<i32, 3>\nfixum vector<i32, 3> r ← a * 2\n}\n";
+    let result = crate::driver::compile(&session, "<test>", source, ModuleCompileRequest::default());
+    assert!(result.output.is_none());
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .flat_map(|diagnostic| diagnostic.args.iter())
+            .any(|arg| arg.name == "issue" && arg.value == VECTOR_ISSUE)
+    );
 }
 
 #[cfg(feature = "hir-swift")]
@@ -179,12 +205,15 @@ fn go_rejects_the_lifted_register_forms() {
 
 #[cfg(feature = "hir-rust")]
 #[test]
-fn rust_rejects_the_lifted_register_forms() {
-    for body in LIFTED {
-        assert!(rejected_with(Target::HirRust, body, VECTOR_ISSUE), "`{body}`");
-    }
-    for body in LIFTED_MATRIX {
-        assert!(rejected_with(Target::HirRust, body, MATRIX_ISSUE), "`{body}`");
+fn rust_emits_the_lifted_register_forms() {
+    for body in LIFTED.iter().chain(LIFTED_MATRIX) {
+        let found = issues(Target::HirRust, body);
+        assert!(
+            !found
+                .iter()
+                .any(|issue| issue == VECTOR_ISSUE || issue == MATRIX_ISSUE),
+            "`{body}`: {found:?}"
+        );
     }
 }
 

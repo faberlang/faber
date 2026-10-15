@@ -79,7 +79,15 @@ pub fn reject_tensor_lift(
             }
             self.found = lifted_form(self.types, self.interner, self.target, expr)
                 .map(|(family, label)| (family, label, Operands::Scalar))
-                .or_else(|| register_form(self.types, self.interner, expr));
+                .or_else(|| {
+                    // The Rust emitter lifts the register forms itself and
+                    // refuses a lane combination it cannot spell by the same
+                    // named issues.
+                    if matches!(self.target, Target::HirRust) {
+                        return None;
+                    }
+                    register_form(self.types, self.interner, expr)
+                });
             if self.found.is_none() {
                 walk_expr(self, expr);
             }
