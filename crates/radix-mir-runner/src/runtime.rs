@@ -135,7 +135,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Ok(Value::Unit)
             }
             MirIntrinsic::FormatString { template } => {
-                let template_text = self.interner.resolve(*template);
+                // The template is source text with escapes undecoded; decode it
+                // exactly as a plain string constant is, so `"a\tb §"` agrees.
+                let template_text = self.interned_textus(*template);
                 let args = call
                     .args
                     .iter()
@@ -168,7 +170,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .map(|arg| self.operand_bits_width(arg))
                     .collect();
                 Ok(Value::Str(format_template_shaped(
-                    template_text,
+                    &template_text,
                     &args,
                     &widths,
                     &char_text,

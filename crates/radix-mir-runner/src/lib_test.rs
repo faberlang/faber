@@ -273,6 +273,39 @@ fn repeated_numbered_hole_reads_one_argument() {
 }
 
 #[test]
+fn template_text_decodes_escapes_like_plain_strings() {
+    // Template text is raw source: its escapes decode exactly as a plain
+    // string constant's do, while `§` hole parsing is unchanged.
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::{Primitive, TypeTable};
+
+    let types = TypeTable::new();
+    let textus = MirType::semantic(types.primitive(Primitive::Textus));
+    let span = Span::default();
+    let mut interner = Interner::new();
+    let template = interner.intern(r"a\tb\nc\\d\u{41} §");
+    let x = interner.intern("x");
+    let program = MirProgram::new();
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    let rendered = runner
+        .eval_runtime_call(
+            &MirRuntimeCall {
+                intrinsic: MirIntrinsic::FormatString { template },
+                args: vec![MirOperand::Constant(MirConstant::String(x))],
+                return_ty: textus,
+            },
+            span,
+        )
+        .expect("format call should execute");
+    drop(runner);
+    assert_eq!(rendered, Value::Str("a\tb\nc\\dA x".to_owned()));
+}
+
+#[test]
 fn converts_numeric_array_to_octeti_in_one_step() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
