@@ -667,6 +667,7 @@ fn single_file_cli_run_missing_operand_refuses_by_name() {
         "a missing CLI operand must refuse, got stdout: {}",
         String::from_utf8_lossy(&output.stdout)
     );
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: subprocess CLI stderr renderer contract.
     assert!(
         stderr.contains("PKG001") && stderr.contains("package_mir_cli_surface_unsupported"),
         "missing operand must refuse with the named CLI-surface diagnostic: {stderr}"
