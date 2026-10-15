@@ -3381,7 +3381,7 @@ impl FunctionBuilder<'_> {
 
         self.terminate_current(MirTerminatorKind::Goto(body_id), expr.span);
         self.switch_to(body_id);
-        let Some((body, test, _)) = block.fac_dum_parts() else {
+        let Some((body, test, cond)) = block.fac_dum_parts() else {
             self.breakables.push(BreakableContext {
                 perge_target: Some(body_id),
                 rumpe_target: after_id,
@@ -3409,6 +3409,14 @@ impl FunctionBuilder<'_> {
             }
             self.visit_stmt(stmt);
         }
+        // The synthesized `si ¬cond { rumpe }` test is lowered while this
+        // breakable context is still on the stack, so snapshot the body's
+        // `rumpe` flag first: the test's own `rumpe` must not count as a user
+        // break out of the loop.
+        let body_rumpe_used = self
+            .breakables
+            .last()
+            .is_some_and(|context| context.rumpe_used);
         self.terminate_open_current(MirTerminatorKind::Goto(test_id), test.span);
         self.switch_to(test_id);
         if block.breakable == Some(radix_hir::HirBreakableKind::FacOmniaLoop) && self.context.fault_delivery {
@@ -3418,7 +3426,16 @@ impl FunctionBuilder<'_> {
         self.visit_stmt(test);
         self.breakables.pop();
         self.terminate_open_current(MirTerminatorKind::Goto(body_id), expr.span);
-        self.switch_to(after_id);
+        // `fac { … } dum verum` is the do-while spelling of `while true`: the
+        // synthesized `si ¬verum { rumpe }` is unreachable, so with no user
+        // `rumpe` the exit block must not carry the implicit function return,
+        // and the dead rumpe edge still reaches the sealed block keeping the
+        // loop a valid terminator path.
+        if hir_cond_is_literal_true(cond) && !body_rumpe_used {
+            self.seal_unreachable(after_id, expr.span);
+        } else {
+            self.switch_to(after_id);
+        }
         Some(MirOperand::Constant(MirConstant::Unit))
     }
 
