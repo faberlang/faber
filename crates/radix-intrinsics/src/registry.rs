@@ -1239,6 +1239,43 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         CodegenOnly
     ),
+    // Ruling 2026-10-15 / need: the three Matrix coordinate reads.
+    // `m.get([r, c])` is the nullable read (`T ∪ none`, see the lista
+    // `accipe` above); `m.at([r, c])` and `m.set([r, c], v)` report an
+    // out-of-range coordinate on `⇥` and share the Tensor `TensorGet` /
+    // `TensorSet` MIR ops.
+    intrinsic!(
+        Matrix,
+        "accipe",
+        1,
+        &[IntrinsicParamKind::NumerusArray],
+        OptionInner,
+        collection TensorGet
+    ),
+    MethodIntrinsic {
+        failable: true,
+        range_checked_arg: Some(0),
+        ..intrinsic!(
+            Matrix,
+            "apud",
+            1,
+            &[IntrinsicParamKind::NumerusArray],
+            Inner,
+            collection TensorGet
+        )
+    },
+    MethodIntrinsic {
+        failable: true,
+        range_checked_arg: Some(0),
+        ..intrinsic!(
+            Matrix,
+            "ponde",
+            2,
+            &[IntrinsicParamKind::NumerusArray, IntrinsicParamKind::Inner],
+            Vacuum,
+            collection TensorSet
+        )
+    },
     intrinsic!(
         Vector,
         "addita",
