@@ -1,0 +1,36 @@
++++
+locale = "en"
++++
+# d64: exact decimal arithmetic at the scaled carrier, the shortest display,
+# and the conversio rows (decimal -> i64 via HalfEven, integer -> d64,
+# fractus -> d64, decimal -> fractus).
+
+main {
+    const d64 a ← 4.2
+    const d64 b ← 0.1
+    print a
+    print b
+    print a + b
+    print a - b
+    print a * b
+    print a / b
+    const d64 tiny ← 0.00000005
+    const d64 half ← 0.5
+    const d64 z ← tiny * half
+    print z
+    const d64 n ← -1.5
+    print n
+    print "§ and §"(a, n)
+    print a + 1
+    print a * 2.0
+    print a ≅ 4.2
+    const d64 e ← 5
+    print e
+    const i64 rounded ← a ↦ i64 via HalfEven
+    print rounded
+    const float g ← 1.5
+    const d64 h ← g ↦ d64
+    print h
+    const float back ← a ↦ float
+    print back
+}

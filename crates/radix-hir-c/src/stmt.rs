@@ -882,6 +882,10 @@ impl Emitter<'_> {
                         value.text
                     ),
                 ),
+                Value::Decimal => {
+                    self.support.need(Helper::DecimalText);
+                    ("%s", format!("faber_dec_fmt(faber_a, {})", value.text))
+                }
                 // A bare `none` prints the locale's none word.
                 Value::None => ("%s", c_string(&tokens.none)?),
                 Value::Void => return Err(unsupported("printing a call with no result")),

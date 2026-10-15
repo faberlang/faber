@@ -52,6 +52,11 @@ pub(crate) enum Helper {
     TextRead,
     /// `faber_try_*` and `faber_conv_fail` (no allocation).
     Conv,
+    /// The exact `d64` decimal helpers (`faber_dec_add`, `faber_dec_store`, …),
+    /// which do not allocate.
+    Decimal,
+    /// `faber_dec_fmt`: a decimal's text in the arena.
+    DecimalText,
 }
 
 /// One operation of a list family (`faber_list_<elem>_<op>`).
@@ -77,6 +82,7 @@ impl Helper {
             | Helper::Join
             | Helper::Quoted
             | Helper::FloatText
+            | Helper::DecimalText
             | Helper::TextAlloc
             | Helper::List(_, ListOp::New | ListOp::Of | ListOp::Push | ListOp::Show) => true,
             Helper::Types
@@ -101,6 +107,7 @@ impl Helper {
             | Helper::FmodI64
             | Helper::TextRead
             | Helper::Conv
+            | Helper::Decimal
             | Helper::Float => false,
         }
     }

@@ -99,7 +99,47 @@ impl Emitter<'_> {
             (Value::Int | Value::Exact, Ty::Bool) => {
                 Operand::new(format!("(({}) != 0)", value.text), Value::Truth)
             }
-            (Value::Text, Ty::Text) | (Value::Float, Ty::Float) | (Value::Truth, Ty::Bool) => value,
+            // `d64` rows (D11.7): the exact carrier converts through the
+            // runner's `faber_dec` helpers.
+            (Value::Decimal, Ty::Int | Ty::Sized(_)) => {
+                self.decimal_to_int(&value, class, params)?
+            }
+            (Value::Decimal, Ty::Float) => {
+                self.support.need(Helper::Decimal);
+                Operand::new(format!("faber_dec_f64({})", value.text), Value::Float)
+            }
+            (Value::Decimal, Ty::Text) => {
+                self.support.need(Helper::DecimalText);
+                Operand::new(
+                    format!("faber_dec_fmt(faber_a, {})", value.text),
+                    Value::Text,
+                )
+            }
+            (Value::Int | Value::Exact, Ty::Decimal) => {
+                self.support.need(Helper::Decimal);
+                Operand::new(
+                    format!("faber_dec_int((faber_i128){})", value.text),
+                    Value::Decimal,
+                )
+            }
+            (Value::Float, Ty::Decimal) => {
+                self.support.need(Helper::Decimal);
+                Operand::new(
+                    format!(
+                        "faber_dec_parse(faber_f64_text({}, (char[FABER_F64_TEXT]){{0}}), 8)",
+                        value.text
+                    ),
+                    Value::Decimal,
+                )
+            }
+            (Value::Text, Ty::Decimal) => {
+                self.support.need(Helper::Decimal);
+                Operand::new(format!("faber_dec_parse({}, 8)", value.text), Value::Decimal)
+            }
+            (Value::Text, Ty::Text)
+            | (Value::Float, Ty::Float)
+            | (Value::Truth, Ty::Bool)
+            | (Value::Decimal, Ty::Decimal) => value,
             (Value::Int, Ty::Int) => value,
             (_, Ty::Int | Ty::Sized(_)) if integer => {
                 self.fallible_int(&value, class, Kind::IntInt, None, params, recovery)?
@@ -170,6 +210,38 @@ impl Emitter<'_> {
         Err(unsupported(
             "float to integer conversion without a rounding hint",
         ))
+    }
+
+    /// A `d64` rounded to an integer cell: the rounding half of the `via`
+    /// hint picks the helper, then the target width checks the result.
+    fn decimal_to_int(
+        &mut self,
+        value: &Operand,
+        class: Ty,
+        params: &[Symbol],
+    ) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::Decimal);
+        let rounding = self.rounding_mode(params)?;
+        let helper = match rounding {
+            0 => "faber_dec_round_floor",
+            1 => "faber_dec_round_ceil",
+            2 => "faber_dec_round_trunc",
+            _ => "faber_dec_round",
+        };
+        let rounded = Operand::new(format!("{helper}({})", value.text), Value::Exact)
+            .with_effect(value.effect);
+        match class {
+            Ty::Int => {
+                self.support.need(Helper::StoreI64);
+                Ok(Operand::new(
+                    format!("faber_store_i64({}, \"conversion\")", rounded.text),
+                    Value::Int,
+                )
+                .with_effect(value.effect))
+            }
+            Ty::Sized(width) => Ok(self.store_sized(&rounded, width, "conversion")),
+            _ => Err(unsupported("decimal conversion to a non-integer class")),
+        }
     }
 
     /// The radix of a text-to-integer conversion: decimal, or the `via` hint.

@@ -93,7 +93,7 @@ impl Inner {
             Ty::Float => Some(Inner::Float),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
-            Ty::Sized(_) | Ty::Opt(_) | Ty::None => None,
+            Ty::Sized(_) | Ty::Opt(_) | Ty::None | Ty::Decimal => None,
         }
     }
 
@@ -120,6 +120,9 @@ pub(crate) enum Ty {
     Opt(Inner),
     /// Bare `int` (`i64`): C `int64_t`.
     Int,
+    /// `d64`: an exact decimal. A stored cell holds a `faber_dec` pair at
+    /// scale 8; an unstored computation holds its own scale.
+    Decimal,
     /// `i8`…`u64`: C `intN_t` / `uintN_t`, read as an `int64_t` (an exact
     /// value for `u64`, which does not fit one) and written only through a
     /// range-checked store.
@@ -199,6 +202,7 @@ impl Ty {
             Ty::Text => Some("const char *"),
             Ty::Bool => Some("bool"),
             Ty::Float => Some("double"),
+            Ty::Decimal => Some("faber_dec"),
             Ty::List(Elem::Float) => Some("faber_list_f64 *"),
             Ty::List(Elem::Int) => Some("faber_list_i64 *"),
             Ty::List(Elem::Text) => Some("faber_list_text *"),
@@ -237,6 +241,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
         Type::Primitive(Primitive::Numerus)
         | Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64) => Ok(Ty::Int),
         Type::SizedNumeric(Primitive::Numerus, width) => match width {
+            NumericWidth::D64 => Ok(Ty::Decimal),
             NumericWidth::I8 => Ok(Ty::Sized(IntWidth::I8)),
             NumericWidth::I16 => Ok(Ty::Sized(IntWidth::I16)),
             NumericWidth::I32 => Ok(Ty::Sized(IntWidth::I32)),
@@ -270,6 +275,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::Float => Ok(Ty::List(Elem::Float)),
                 Ty::List(_) => Err(unsupported("nested list type")),
                 Ty::Genus(_) => Err(unsupported("list of genus")),
+                Ty::Decimal => Err(unsupported("list of decimals")),
                 Ty::None => Err(unsupported("list of none")),
             }
         }

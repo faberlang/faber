@@ -49,6 +49,8 @@ pub(crate) enum Value {
     Genus(DefId),
     /// A binary64 value (`double`).
     Float,
+    /// An exact decimal (`faber_dec`: an `i128` carrier at its own scale).
+    Decimal,
     /// An optional: a pointer that may be `NULL`, or a presence-flag struct.
     Opt(Inner),
     /// A bare `none` value, always `(0)`, printed as the locale's none word.
@@ -67,6 +69,7 @@ impl From<Ty> for Value {
             Ty::List(elem) => Value::List(elem),
             Ty::Genus(def_id) => Value::Genus(def_id),
             Ty::Float => Value::Float,
+            Ty::Decimal => Value::Decimal,
             Ty::Opt(inner) => Value::Opt(inner),
             Ty::None => Value::None,
         }
@@ -196,8 +199,15 @@ impl Emitter<'_> {
                 let as_float = expr.ty.is_some_and(|ty| {
                     classify(self.types, ty).is_ok_and(|class| class == Ty::Float)
                 });
+                let as_decimal = expr.ty.is_some_and(|ty| {
+                    classify(self.types, ty).is_ok_and(|class| class == Ty::Decimal)
+                });
                 match literal {
                     HirLiteral::Nil => self.none_value(expr),
+                    HirLiteral::Int(value) if as_decimal => self.decimal_int_literal(*value),
+                    HirLiteral::FloatText { text, .. } if as_decimal => {
+                        self.decimal_text_literal(*text)
+                    }
                     HirLiteral::Int(value) if as_float =>
                     {
                         #[expect(clippy::cast_precision_loss)]
@@ -579,6 +589,10 @@ impl Emitter<'_> {
             Value::List(Elem::Bool) => "faber_list_bool *".to_owned(),
             Value::List(Elem::Float) => "faber_list_f64 *".to_owned(),
             Value::Float => "double ".to_owned(),
+            Value::Decimal => {
+                self.support.need(Helper::Decimal);
+                "faber_dec ".to_owned()
+            }
             Value::Opt(inner) => match self.c_type(Ty::Opt(inner)) {
                 Ok(c_type) if c_type.ends_with('*') => c_type,
                 Ok(c_type) => format!("{c_type} "),
@@ -631,6 +645,111 @@ impl Emitter<'_> {
         })
     }
 
+    /// A `d64` integer literal: an exact carrier at scale 0.
+    fn decimal_int_literal(&mut self, value: u64) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::Decimal);
+        let text = if let Ok(narrow) = i64::try_from(value) {
+            self.support.need_ints();
+            c_int64(narrow)
+        } else {
+            self.support.need(Helper::Types);
+            format!("(faber_i128)UINT64_C({value})")
+        };
+        Ok(Operand::new(format!("faber_dec_int({text})"), Value::Decimal))
+    }
+
+    /// A `d64` decimal literal, carried exactly as its digit text (the
+    /// frontend proves it fits the declared width and never rounds it).
+    fn decimal_text_literal(&mut self, symbol: radix_lexer::Symbol) -> Result<Operand, CodegenError> {
+        let raw = self.names.resolve_symbol(symbol);
+        let decoded = radix_codegen_shared::unescape_faber_text(raw);
+        let Some(carrier) = radix_codegen_shared::decimal::decimal_text_to_carrier(
+            &decoded,
+            radix_types::NumericWidth::D64,
+        ) else {
+            return Err(unsupported("decimal literal outside the d64 range"));
+        };
+        self.support.need(Helper::Decimal);
+        self.support.need_ints();
+        Ok(Operand::new(
+            format!("faber_dec_of({})", c_int64(carrier)),
+            Value::Decimal,
+        ))
+    }
+
+    /// `-x` over an exact decimal.
+    fn decimal_negate(&mut self, value: &Operand) -> Operand {
+        self.support.need(Helper::Decimal);
+        Operand::new(format!("faber_dec_neg({})", value.text), Value::Decimal)
+            .with_effect(value.effect)
+    }
+
+    /// An operand as an exact decimal: a decimal is itself; an integer is a
+    /// scale-0 carrier (`a + 1`, `d64 ≻ int`).
+    fn as_decimal(&mut self, value: Operand) -> Result<Operand, CodegenError> {
+        match value.value {
+            Value::Decimal => Ok(value),
+            Value::Int | Value::Exact => {
+                self.support.need(Helper::Decimal);
+                Ok(Operand::new(
+                    format!("faber_dec_int((faber_i128){})", value.text),
+                    Value::Decimal,
+                )
+                .with_effect(value.effect))
+            }
+            _ => Err(unsupported("decimal operation on a non-numeric value")),
+        }
+    }
+
+    /// `+ - * / %` and the comparisons over exact decimals. The carriers are
+    /// exact until a store rounds; comparison uses the runner's three-way
+    /// `faber_dec_cmp`, which scales only as far as `i128` allows.
+    fn decimal_binary(
+        &mut self,
+        op: HirBinOp,
+        l: Operand,
+        r: Operand,
+    ) -> Result<Operand, CodegenError> {
+        let l = self.as_decimal(l)?;
+        let r = self.as_decimal(r)?;
+        let effect = l.effect || r.effect;
+        let mut operands = [l, r];
+        let prelude = self.sequence(&mut operands);
+        let [l, r] = operands;
+        self.support.need(Helper::Decimal);
+        let name = match op {
+            HirBinOp::Add => "faber_dec_add",
+            HirBinOp::Sub => "faber_dec_sub",
+            HirBinOp::Mul => "faber_dec_mul",
+            HirBinOp::Div => "faber_dec_div",
+            HirBinOp::Mod => "faber_dec_rem",
+            HirBinOp::Lt
+            | HirBinOp::Gt
+            | HirBinOp::LtEq
+            | HirBinOp::GtEq
+            | HirBinOp::Eq
+            | HirBinOp::StrictEq
+            | HirBinOp::ApproxEq
+            | HirBinOp::NotEq
+            | HirBinOp::StrictNotEq
+            | HirBinOp::ApproxNotEq => {
+                let glyph = match op {
+                    HirBinOp::Lt => "<",
+                    HirBinOp::Gt => ">",
+                    HirBinOp::LtEq => "<=",
+                    HirBinOp::GtEq => ">=",
+                    HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::ApproxEq => "==",
+                    _ => "!=",
+                };
+                let call = format!("(faber_dec_cmp({}, {}) {glyph} 0)", l.text, r.text);
+                return Ok(Operand::new(wrap(&prelude, &call), Value::Truth).with_effect(effect));
+            }
+            other => return Err(unsupported(binary_name(other))),
+        };
+        let call = format!("{name}({}, {})", l.text, r.text);
+        Ok(Operand::new(wrap(&prelude, &call), Value::Decimal).with_effect(effect))
+    }
+
     fn path(&self, def_id: radix_hir::DefId) -> Result<Operand, CodegenError> {
         match self.locals.get(&def_id) {
             Some(local) => {
@@ -663,6 +782,9 @@ impl Emitter<'_> {
                 operand.narrow = Some(Narrow::leaf(cell));
                 operand
             }
+            // A stored decimal is a `faber_dec` pair at scale 8; a read is the
+            // pair itself.
+            Ty::Decimal => Operand::new(cell.to_owned(), Value::Decimal),
             other => Operand::new(cell.to_owned(), other.into()),
         }
     }
@@ -706,6 +828,7 @@ impl Emitter<'_> {
         let inner = self.expr(operand)?;
         match op {
             HirUnOp::Neg if inner.value == Value::Float => Ok(Self::float_negate(&inner)),
+            HirUnOp::Neg if inner.value == Value::Decimal => Ok(self.decimal_negate(&inner)),
             HirUnOp::Neg if !inner.is_integer() => Err(unsupported("negation of a non-integer")),
             HirUnOp::Neg => {
                 if let Some(value) = inner.constant {
@@ -772,6 +895,9 @@ impl Emitter<'_> {
         // a float operand would make it.
         if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq) {
             return self.fuzzy(op, l, r);
+        }
+        if l.value == Value::Decimal || r.value == Value::Decimal {
+            return self.decimal_binary(op, l, r);
         }
         if l.value == Value::Float || r.value == Value::Float || op == HirBinOp::TrueDiv {
             return self.float_binary(op, l, r);
@@ -1137,6 +1263,19 @@ impl Emitter<'_> {
                 let narrowed = self.store(value, Ty::Int, site)?;
                 Ok(self.some_value(&narrowed, inner))
             }
+            // A decimal rounds half-even to scale 8 at the store and checks
+            // the `i64` carrier. Nothing else in this subset stores one.
+            (Ty::Decimal, Value::Decimal) => {
+                let at = c_string(&self.store_position(site))?;
+                self.support.need(Helper::Decimal);
+                let text = format!(
+                    "faber_dec_of(faber_dec_store({}, {at}, \"\"))",
+                    value.text
+                );
+                let mut operand = Operand::new(text, Value::Decimal).with_effect(value.effect);
+                operand.stored = Some(Ty::Decimal);
+                Ok(operand)
+            }
             _ => Err(unsupported("conversion between value classes")),
         }
     }
@@ -1216,6 +1355,20 @@ impl Emitter<'_> {
                 } else {
                     Ok(value)
                 }
+            }
+            // A raw integer reaching a decimal cell (typecheck inserted no
+            // store): wrap it at scale 0 and round it like the store would.
+            Ty::Decimal if value.value != Value::Decimal => {
+                self.support.need(Helper::Decimal);
+                let pair = Operand::new(
+                    format!("faber_dec_int((faber_i128){})", value.text),
+                    Value::Decimal,
+                )
+                .with_effect(value.effect);
+                let stored = format!("faber_dec_of(faber_dec_store({}, \"\", \"\"))", pair.text);
+                let mut operand = Operand::new(stored, Value::Decimal).with_effect(value.effect);
+                operand.stored = Some(Ty::Decimal);
+                Ok(operand)
             }
             _ => Ok(value),
         }
