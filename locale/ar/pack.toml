@@ -3008,6 +3008,18 @@ help = "أزل المحور المكرر؛ يمكن أن يظهر كل محور 
 message = "اختزال المحور مبني فقط لـ tensor من الرتبة 2 إلى 8"
 help = "اختزل tensor من الرتبة 2 إلى 8 بأبعاد حرفية، أو اكتب الاختزال الصريح بـ `reducta ... per [...]`"
 
+[diagnostics.SEM010.issues.expanded_axis_out_of_range]
+message = "المحور خارج مدى tensor الموسّع"
+help = "استخدم محورا من 0 حتى رتبة tensor المصدر؛ يُدرج البعد الجديد هناك"
+
+[diagnostics.SEM010.issues.expanded_axis_not_constant]
+message = "محور التوسيع يجب أن يكون ثابتا وقت الترجمة"
+help = "اكتب محورا حرفيا مثل `axis 1`"
+
+[diagnostics.SEM010.issues.expanded_axis_rank_mismatch]
+message = "التوسيع بـ `axis` يضيف بعدا واحدا بالضبط"
+help = "أعط قائمة شكل هدف طولها رتبة المصدر زائد واحد"
+
 [diagnostics.SEM010.issues.reducta_group_keys_not_literal]
 message = "مفاتيح التجميع في اختزال مجمّع متعدد المفاتيح يجب أن تكون قائمة بين قوسين بتعابير مفاتيح مكتوبة في موضعها"
 help = "اكتب `per [i, j]` بمفاتيح مذكورة صراحة؛ فقائمة محفوظة في متغير أو منشورة لا يمكنها تسمية محاور النتيجة"

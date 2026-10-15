@@ -3008,6 +3008,18 @@ help = "刪除重複的軸；每個軸只能出現一次"
 message = "軸歸約僅為秩 2 至 8 的張量而建"
 help = "對秩 2 至 8 的張量以字面維度歸約，或使用 `reducta ... per [...]` 寫出明確歸約"
 
+[diagnostics.SEM010.issues.expanded_axis_out_of_range]
+message = "軸超出擴展後張量的範圍"
+help = "使用從 0 到來源張量秩的軸；新維度插入在該處"
+
+[diagnostics.SEM010.issues.expanded_axis_not_constant]
+message = "擴展的軸必須是編譯時期常數"
+help = "寫出字面軸，例如 `axis 1`"
+
+[diagnostics.SEM010.issues.expanded_axis_rank_mismatch]
+message = "帶 `axis` 的擴展恰好增加一個維度"
+help = "給出一個目標形狀清單，其長度等於來源秩加一"
+
 [diagnostics.SEM010.issues.reducta_group_keys_not_literal]
 message = "多鍵分組歸約的分組鍵必須是就地寫出的方括號鍵運算式列表"
 help = "逐項寫出鍵：`per [i, j]`；保存在變數中的列表或展開不能命名結果軸"

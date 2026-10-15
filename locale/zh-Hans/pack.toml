@@ -3008,6 +3008,18 @@ help = "删除重复的轴；每个轴只能出现一次"
 message = "轴归约仅针对秩 2 到 8 的张量"
 help = "对秩 2 到 8 且维度为字面的张量使用归约，或写成显式归约 `reducta ... per [...]`"
 
+[diagnostics.SEM010.issues.expanded_axis_out_of_range]
+message = "轴超出扩展后张量的范围"
+help = "使用从 0 到源张量秩的轴；新维度插入到该处"
+
+[diagnostics.SEM010.issues.expanded_axis_not_constant]
+message = "扩展的轴必须是编译期常量"
+help = "写出字面轴，例如 `axis 1`"
+
+[diagnostics.SEM010.issues.expanded_axis_rank_mismatch]
+message = "带 `axis` 的扩展恰好增加一个维度"
+help = "给出一个目标形状列表，其长度等于源秩加一"
+
 [diagnostics.SEM010.issues.reducta_group_keys_not_literal]
 message = "多键分组归约的分组键必须是就地写出的、带方括号的键表达式列表"
 help = "逐项写出键：`per [i, j]`；保存在变量中的列表或展开不能命名结果轴"

@@ -3008,6 +3008,18 @@ help = "xóa trục bị lặp; mỗi trục chỉ được xuất hiện một 
 message = "phép rút gọn theo trục chỉ được xây dựng cho tensor hạng 2 đến 8"
 help = "rút gọn tensor hạng 2 đến 8 với các chiều literal, hoặc viết phép rút gọn tường minh bằng `reducta ... per [...]`"
 
+[diagnostics.SEM010.issues.expanded_axis_out_of_range]
+message = "trục nằm ngoài phạm vi của tensor được mở rộng"
+help = "dùng một trục từ 0 đến hạng của tensor nguồn; chiều mới được chèn tại đó"
+
+[diagnostics.SEM010.issues.expanded_axis_not_constant]
+message = "trục của một phép mở rộng phải là hằng số tại thời điểm biên dịch"
+help = "viết một trục literal như `axis 1`"
+
+[diagnostics.SEM010.issues.expanded_axis_rank_mismatch]
+message = "phép mở rộng với `axis` thêm đúng một chiều"
+help = "cho một danh sách hình dạng đích có độ dài bằng hạng của nguồn cộng một"
+
 [diagnostics.SEM010.issues.reducta_group_keys_not_literal]
 message = "các khóa nhóm của phép rút gọn nhóm nhiều khóa phải là danh sách biểu thức khóa đặt trong ngoặc vuông và viết tại chỗ"
 help = "viết `per [i, j]` với các khóa được ghi rõ; một danh sách giữ trong biến hoặc một spread không thể đặt tên cho các trục kết quả"

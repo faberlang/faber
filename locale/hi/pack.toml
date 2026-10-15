@@ -3020,6 +3020,18 @@ help = "दोहराया गया axis हटाएँ; हर axis के
 message = "axis reduction केवल rank 2 से 8 के tensors के लिए बना है"
 help = "rank 2 से 8 के tensor को literal dimensions के साथ reduce करें, या `reducta ... per [...]` के साथ स्पष्ट reduction लिखें"
 
+[diagnostics.SEM010.issues.expanded_axis_out_of_range]
+message = "axis expanded tensor के range के बाहर है"
+help = "0 से source tensor के rank तक का axis उपयोग करें; नया dimension वहीं जोड़ा जाता है"
+
+[diagnostics.SEM010.issues.expanded_axis_not_constant]
+message = "expansion का axis compile-time constant होना चाहिए"
+help = "`axis 1` जैसा literal axis लिखें"
+
+[diagnostics.SEM010.issues.expanded_axis_rank_mismatch]
+message = "`axis` के साथ expansion ठीक एक dimension जोड़ता है"
+help = "ऐसी target shape list दें जिसकी length source rank से एक अधिक हो"
+
 [diagnostics.SEM010.issues.reducta_group_keys_not_literal]
 message = "multi-key grouped reduction की grouping keys यथास्थान लिखी key expressions की bracketed list होनी चाहिए"
 help = "`per [i, j]` में keys स्पष्ट रूप से लिखें; variable या spread में रखी list result axes के नाम नहीं दे सकती"
