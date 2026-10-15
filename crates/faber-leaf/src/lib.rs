@@ -60,6 +60,9 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
 }
 
 #[cfg(test)]
+mod test_support;
+
+#[cfg(test)]
 pub(crate) static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Reset process-global leaf state that must not cross program executions.

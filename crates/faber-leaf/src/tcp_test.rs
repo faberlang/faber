@@ -3,6 +3,7 @@ use std::thread;
 
 #[test]
 fn route_list_matches_serve() {
+    let _guard = crate::test_support::handle_table_guard();
     for route in super::ROUTES {
         assert!(is_route(route), "{route} not recognized");
         assert!(serve(route, &[]).is_some(), "{route} not served");
@@ -20,11 +21,13 @@ fn serve_ok(route: &str, args: &[Arg]) -> Reply {
 
 #[test]
 fn unknown_route_is_not_this_leaf() {
+    let _guard = crate::test_support::handle_table_guard();
     assert!(serve("solum:lege", &[]).is_none());
 }
 
 #[test]
 fn plaintext_echo_round_trips() {
+    let _guard = crate::test_support::handle_table_guard();
     reset_handles();
     let listener = match serve_ok("caelum:ausculta", &[Arg::Int(0)]) {
         Reply::Int(id) => id,
@@ -94,4 +97,30 @@ fn plaintext_echo_round_trips() {
     ));
     server.join().expect("server");
     reset_handles();
+}
+
+fn hold_guard_and_bump(counter: &std::sync::atomic::AtomicUsize) {
+    let _guard = crate::test_support::handle_table_guard();
+    assert!(
+        counter.load(std::sync::atomic::Ordering::SeqCst).is_multiple_of(2),
+        "another test held the guard concurrently"
+    );
+    thread::yield_now();
+    counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    thread::yield_now();
+    counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn handle_table_guard_serializes_tests() {
+    let counter = std::sync::atomic::AtomicUsize::new(0);
+    thread::scope(|scope| {
+        scope.spawn(|| hold_guard_and_bump(&counter));
+        scope.spawn(|| hold_guard_and_bump(&counter));
+    });
+    assert_eq!(
+        counter.load(std::sync::atomic::Ordering::SeqCst),
+        4,
+        "both guarded bodies must finish"
+    );
 }

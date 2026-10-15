@@ -6,12 +6,6 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 
-fn lock() -> std::sync::MutexGuard<'static, ()> {
-    crate::TEST_LOCK
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-}
-
 fn serve_ok(route: &str, args: &[Arg]) -> Reply {
     serve(route, args)
         .expect("http route")
@@ -20,7 +14,7 @@ fn serve_ok(route: &str, args: &[Arg]) -> Reply {
 
 #[test]
 fn plaintext_get_round_trips() {
-    let _guard = lock();
+    let _guard = crate::test_support::handle_table_guard();
     reset_handles();
     let listener = match serve_ok("http:listen", &[Arg::Int(0)]) {
         Reply::Int(id) => id,
@@ -77,7 +71,7 @@ fn plaintext_get_round_trips() {
 
 #[test]
 fn client_posts_to_local_listener() {
-    let _guard = lock();
+    let _guard = crate::test_support::handle_table_guard();
     reset_handles();
     let listener = match serve_ok("http:listen", &[Arg::Int(0)]) {
         Reply::Int(id) => id,
@@ -132,7 +126,7 @@ fn client_posts_to_local_listener() {
 
 #[test]
 fn oversize_body_is_refused() {
-    let _guard = lock();
+    let _guard = crate::test_support::handle_table_guard();
     reset_handles();
     let listener = match serve_ok("http:listen", &[Arg::Int(0), Arg::Int(4)]) {
         Reply::Int(id) => id,
@@ -160,7 +154,7 @@ fn oversize_body_is_refused() {
 
 #[test]
 fn request_open_reads_chunked_body_incrementally() {
-    let _guard = lock();
+    let _guard = crate::test_support::handle_table_guard();
     reset_handles();
     let listener = match serve_ok("http:listen", &[Arg::Int(0)]) {
         Reply::Int(id) => id,
@@ -263,7 +257,7 @@ fn request_open_reads_chunked_body_incrementally() {
 
 #[test]
 fn request_open_reassembles_content_length_body_across_segments() {
-    let _guard = lock();
+    let _guard = crate::test_support::handle_table_guard();
     reset_handles();
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let port = listener.local_addr().expect("addr").port();
@@ -337,7 +331,7 @@ fn request_open_reassembles_content_length_body_across_segments() {
 
 #[test]
 fn route_list_matches_serve() {
-    let _guard = lock();
+    let _guard = crate::test_support::handle_table_guard();
     for route in super::ROUTES {
         assert!(is_route(route), "{route} not recognized");
         assert!(serve(route, &[]).is_some(), "{route} not served");
@@ -348,7 +342,6 @@ fn route_list_matches_serve() {
 }
 
 fn hostile_chunk_case_server(side_body: &[u8]) -> String {
-    let _guard = lock();
     reset_handles();
     let listener = match serve_ok("http:listen", &[Arg::Int(0)]) {
         Reply::Int(id) => id,
@@ -382,6 +375,7 @@ fn hostile_chunk_request(chunk_header: &str) -> String {
 
 #[test]
 fn server_rejects_overflowing_chunk_size() {
+    let _guard = crate::test_support::handle_table_guard();
     let message = hostile_chunk_request("ffffffffffffffff");
     assert!(
         message.contains("chunk") || message.contains("body"),
@@ -391,6 +385,7 @@ fn server_rejects_overflowing_chunk_size() {
 
 #[test]
 fn server_rejects_huge_chunk_size_without_unbounded_buffering() {
+    let _guard = crate::test_support::handle_table_guard();
     let message = hostile_chunk_request("7fffffffffffffff");
     assert!(
         message.contains("chunk") || message.contains("body"),
@@ -400,13 +395,13 @@ fn server_rejects_huge_chunk_size_without_unbounded_buffering() {
 
 #[test]
 fn server_rejects_non_hex_chunk_size() {
+    let _guard = crate::test_support::handle_table_guard();
     let message = hostile_chunk_request("zzzz");
     assert!(message.contains("invalid chunk size"), "{message}");
 }
 
 fn hostile_chunked_response(chunk_header: &str) -> String {
     let chunk_header = chunk_header.to_owned();
-    let _guard = lock();
     reset_handles();
     let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
     let port = listener.local_addr().expect("addr").port();
@@ -450,18 +445,21 @@ fn hostile_chunked_response(chunk_header: &str) -> String {
 
 #[test]
 fn client_rejects_overflowing_chunk_size() {
+    let _guard = crate::test_support::handle_table_guard();
     let message = hostile_chunked_response("ffffffffffffffff");
     assert!(!message.is_empty(), "{message}");
 }
 
 #[test]
 fn client_rejects_huge_chunk_size() {
+    let _guard = crate::test_support::handle_table_guard();
     let message = hostile_chunked_response("7fffffffffffffff");
     assert!(!message.is_empty(), "{message}");
 }
 
 #[test]
 fn client_rejects_non_hex_chunk_size() {
+    let _guard = crate::test_support::handle_table_guard();
     let message = hostile_chunked_response("zzzz");
     assert!(message.contains("invalid chunk size"), "{message}");
 }

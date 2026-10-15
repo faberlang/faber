@@ -5,12 +5,6 @@ use crate::http;
 use crate::value::{Arg, Reply};
 use std::thread;
 
-fn lock() -> std::sync::MutexGuard<'static, ()> {
-    crate::TEST_LOCK
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-}
-
 fn serve_ok(route: &str, args: &[Arg]) -> Reply {
     serve(route, args)
         .expect("websocket route")
@@ -43,7 +37,7 @@ fn http_ok(route: &str, args: &[Arg]) -> Reply {
 
 #[test]
 fn echo_round_trips() {
-    let _guard = lock();
+    let _guard = crate::test_support::handle_table_guard();
     reset_handles();
     http::reset_handles();
     let listener = match http_ok("http:listen", &[Arg::Int(0)]) {
@@ -107,6 +101,7 @@ fn echo_round_trips() {
 
 #[test]
 fn route_list_matches_serve() {
+    let _guard = crate::test_support::handle_table_guard();
     for route in super::ROUTES {
         assert!(is_route(route), "{route} not recognized");
         assert!(serve(route, &[]).is_some(), "{route} not served");
@@ -144,6 +139,7 @@ fn split_ws_url_wss_ipv6_literal_defaults_to_443() {
 
 #[test]
 fn split_ws_url_ipv6_literal_tls_server_name_drops_brackets() {
+    let _guard = crate::test_support::handle_table_guard();
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let stream = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
     assert!(wrap_tls(stream, "[::1]", None).is_ok());
