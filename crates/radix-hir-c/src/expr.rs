@@ -269,8 +269,19 @@ impl Emitter<'_> {
                 if Self::is_none_literal(source) {
                     return self.none_of(class);
                 }
-                let value = self.expr(source)?;
-                self.settle(value, class)
+                // `[1, 2, 3] ∷ list<int>`: the literal's own type is bounded
+                // by its length; the ascription makes it growable.
+                let literal = matches!(
+                    source.kind,
+                    HirExpressionKind::Array(_) | HirExpressionKind::Vacua
+                );
+                let widen =
+                    literal && matches!(class, Ty::List(_)) && !self.is_bounded_type(*target);
+                let before = self.unbounded_literals;
+                self.unbounded_literals = before || widen;
+                let value = self.expr(source);
+                self.unbounded_literals = before;
+                self.settle(value?, class)
             }
             // `x is none` / `x not is none`.
             HirExpressionKind::TypeCheck {

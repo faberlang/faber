@@ -607,6 +607,7 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         TYPE *items;                                                                    \
         int64_t len;                                                                    \
         int64_t cap;                                                                    \
+        bool fixed; /* a bounded list: a push at capacity is an error, not a grow */    \
     } faber_list_##NAME;                                                                \
                                                                                         \
     static inline faber_list_##NAME *faber_list_##NAME##_new(faber_arena *arena,        \
@@ -617,6 +618,14 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
                          : NULL;                                                        \
         list->len = 0;                                                                  \
         list->cap = capacity;                                                           \
+        list->fixed = false;                                                            \
+        return list;                                                                    \
+    }                                                                                   \
+                                                                                        \
+    static inline faber_list_##NAME *faber_list_##NAME##_new_fixed(faber_arena *arena,  \
+                                                                  int64_t capacity) {   \
+        faber_list_##NAME *list = faber_list_##NAME##_new(arena, capacity);             \
+        list->fixed = true;                                                             \
         return list;                                                                    \
     }                                                                                   \
                                                                                         \
@@ -628,10 +637,21 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         return list;                                                                    \
     }                                                                                   \
                                                                                         \
+    static inline faber_list_##NAME *faber_list_##NAME##_of_fixed(                      \
+        faber_arena *arena, int64_t count, const TYPE *items) {                         \
+        faber_list_##NAME *list = faber_list_##NAME##_of(arena, count, items);          \
+        list->fixed = true;                                                             \
+        return list;                                                                    \
+    }                                                                                   \
+                                                                                        \
     static inline void faber_list_##NAME##_push(faber_arena *arena,                     \
                                                 faber_list_##NAME *list, TYPE item) {   \
         if (list->len == list->cap) {                                                   \
-            int64_t capacity = list->cap < 4 ? 4 : list->cap * 2;                       \
+            int64_t capacity;                                                           \
+            if (list->fixed) {                                                          \
+                faber_trap("bounded collection push at capacity");                      \
+            }                                                                           \
+            capacity = list->cap < 4 ? 4 : list->cap * 2;                               \
             TYPE *items = faber_alloc(arena, (size_t)capacity * sizeof *items);         \
             if (list->len > 0) {                                                        \
                 memcpy(items, list->items, (size_t)list->len * sizeof *items);          \

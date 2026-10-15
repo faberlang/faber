@@ -37,6 +37,8 @@ mod textops;
 mod ty;
 
 #[cfg(test)]
+mod bounded_test;
+#[cfg(test)]
 mod control_test;
 #[cfg(test)]
 mod conversio_test;
@@ -140,6 +142,7 @@ impl CCodegen<'_> {
             entry_args: None,
             uses_args: false,
             fac_exits: Vec::new(),
+            unbounded_literals: false,
             support: Support::default(),
             depth: 0,
             loops: 0,
@@ -176,6 +179,9 @@ pub(crate) struct Emitter<'a> {
     /// Plain `fac` blocks being written: the loop depth they opened at, the
     /// label `rumpe` jumps to, and whether any `rumpe` did.
     fac_exits: Vec<(usize, String, bool)>,
+    /// A list literal is being written under `∷ list<T>`: it is growable
+    /// whatever length its own type has.
+    unbounded_literals: bool,
     support: Support,
     /// Nesting depth of the statement being written (a function body is 1).
     depth: usize,

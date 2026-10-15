@@ -26,6 +26,36 @@ impl Emitter<'_> {
         }
     }
 
+    /// The capacity of a bounded list type (`list<int, 8>`), peeling aliases.
+    /// `None` for an unbounded list, or a capacity not known at compile time.
+    fn list_capacity(&self, ty: radix_types::TypeId) -> Option<u64> {
+        match self.types.get(ty) {
+            radix_types::Type::Alias(_, inner) => self.list_capacity(*inner),
+            radix_types::Type::BoundedArray { capacity, .. } => {
+                match self.types.get_index(*capacity) {
+                    radix_types::IndexExpr::Literal(value) => Some(*value),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Whether a type is a bounded list (`list<T, N>`), peeling aliases.
+    pub(crate) fn is_bounded_type(&self, ty: radix_types::TypeId) -> bool {
+        match self.types.get(ty) {
+            radix_types::Type::Alias(_, inner) => self.is_bounded_type(*inner),
+            radix_types::Type::BoundedArray { .. } => true,
+            _ => false,
+        }
+    }
+
+    /// Whether an expression's value is a bounded list the runtime must mark
+    /// `fixed`: its type says so, and no ascription to `list<T>` is in force.
+    fn is_fixed(&self, expr: &HirExpression) -> bool {
+        !self.unbounded_literals && expr.ty.is_some_and(|ty| self.is_bounded_type(ty))
+    }
+
     fn list_operand(&mut self, text: String, elem: Elem) -> Operand {
         self.need_class(Ty::List(elem));
         Operand::new(text, Value::List(elem))
@@ -35,7 +65,18 @@ impl Emitter<'_> {
     pub(crate) fn empty_list(&mut self, expr: &HirExpression) -> Result<Operand, CodegenError> {
         let elem = self.list_elem(expr)?;
         self.support.need(Helper::List(elem, ListOp::New));
-        let text = format!("faber_list_{}_new(faber_a, 0)", elem.suffix());
+        let text = if self.is_fixed(expr) {
+            let capacity = expr.ty.and_then(|ty| self.list_capacity(ty));
+            let Some(capacity) = capacity else {
+                return Err(unsupported("bounded list with a capacity not known here"));
+            };
+            format!(
+                "faber_list_{}_new_fixed(faber_a, {capacity})",
+                elem.suffix()
+            )
+        } else {
+            format!("faber_list_{}_new(faber_a, 0)", elem.suffix())
+        };
         Ok(self.list_operand(text, elem))
     }
 
@@ -65,8 +106,13 @@ impl Emitter<'_> {
             .collect::<Vec<_>>()
             .join(", ");
         self.support.need(Helper::List(elem, ListOp::Of));
+        let of = if self.is_fixed(expr) {
+            "of_fixed"
+        } else {
+            "of"
+        };
         let call = format!(
-            "faber_list_{n}_of(faber_a, {count}, ({t}[]){{{items}}})",
+            "faber_list_{n}_{of}(faber_a, {count}, ({t}[]){{{items}}})",
             n = elem.suffix(),
             count = operands.len(),
             t = elem.c_type(),

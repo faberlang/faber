@@ -232,16 +232,20 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
         Type::Primitive(Primitive::Bivalens) => Ok(Ty::Bool),
         Type::Primitive(Primitive::Fractus)
         | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Ok(Ty::Float),
-        Type::Array(inner) => match classify(types, *inner)? {
-            Ty::Int => Ok(Ty::List(Elem::Int)),
-            Ty::Sized(_) => Err(unsupported("list of sized integers")),
-            Ty::Opt(_) => Err(unsupported("list of optionals")),
-            Ty::Text => Ok(Ty::List(Elem::Text)),
-            Ty::Bool => Ok(Ty::List(Elem::Bool)),
-            Ty::Float => Ok(Ty::List(Elem::Float)),
-            Ty::List(_) => Err(unsupported("nested list type")),
-            Ty::Genus(_) => Err(unsupported("list of genus")),
-        },
+        // A bounded list is a list whose value carries its capacity at run
+        // time (`fixed`), so it is the same class.
+        Type::Array(inner) | Type::BoundedArray { element: inner, .. } => {
+            match classify(types, *inner)? {
+                Ty::Int => Ok(Ty::List(Elem::Int)),
+                Ty::Sized(_) => Err(unsupported("list of sized integers")),
+                Ty::Opt(_) => Err(unsupported("list of optionals")),
+                Ty::Text => Ok(Ty::List(Elem::Text)),
+                Ty::Bool => Ok(Ty::List(Elem::Bool)),
+                Ty::Float => Ok(Ty::List(Elem::Float)),
+                Ty::List(_) => Err(unsupported("nested list type")),
+                Ty::Genus(_) => Err(unsupported("list of genus")),
+            }
+        }
         Type::Struct(def_id) => Ok(Ty::Genus(*def_id)),
         Type::Option(inner) => match Inner::from_ty(classify(types, *inner)?) {
             Some(inner) => Ok(Ty::Opt(inner)),
@@ -280,7 +284,6 @@ fn describe(ty: &Type) -> &'static str {
         Type::ModularWord(_) | Type::SaturatingWord(_) | Type::PolicyFloat(..) => {
             "wrapping, saturating, or policy numeric type"
         }
-        Type::BoundedArray { .. } => "bounded list type",
         Type::Map(..) | Type::Ledger(..) => "map type",
         Type::Tensor(..)
         | Type::Vector(..)
