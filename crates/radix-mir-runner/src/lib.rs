@@ -4125,6 +4125,10 @@ mod value_test;
 mod decimal_test;
 
 #[cfg(test)]
+#[path = "decimal_signum_test.rs"]
+mod decimal_signum_test;
+
+#[cfg(test)]
 #[path = "policy_float_test.rs"]
 mod policy_float_test;
 

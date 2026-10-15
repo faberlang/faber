@@ -142,6 +142,15 @@ pub(crate) fn neg(value: &crate::Value, span: Span) -> Result<crate::Value, Runn
     Ok(canonical(carrier, scale))
 }
 
+/// The decimal sign of a receiver: `-1`, `0`, or `1` exactly. A stored `d64`
+/// carrier is scale 8, so the sign must not be returned as a carrier `±1`
+/// (which would mean `±10^-8`); the result is scale 0.
+pub(crate) fn signum(value: &crate::Value, span: Span) -> Result<crate::Value, RunnerError> {
+    let (carrier, _scale) = parts(value)
+        .ok_or_else(|| RunnerError::internal(span, "decimal receiver type mismatch"))?;
+    Ok(canonical(carrier.signum(), 0))
+}
+
 /// Exact three-way comparison of two decimal values.
 pub(crate) fn compare(a: (i128, u32), b: (i128, u32)) -> Ordering {
     let scale = a.1.max(b.1);
