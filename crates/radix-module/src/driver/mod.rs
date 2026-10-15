@@ -425,6 +425,17 @@ fn compile_cli_program(
                 Err(err) => compile_codegen_error(analysis, name, source, err.into()),
             }
         }
+        Target::HirTypeScript => {
+            let Some(cli_program) = analysis.cli_program.as_ref() else {
+                return missing_cli_program(analysis, name);
+            };
+            match codegen::generate_ts_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
+                Ok(output) => {
+                    CompileResult { output: Some(crate::Output::TypeScript(output)), diagnostics: analysis.diagnostics }
+                }
+                Err(err) => compile_codegen_error(analysis, name, source, err.into()),
+            }
+        }
         // Fail-closed backstop: a target that declares `lowers_cli_entry`
         // but has no arm above (or whose feature is disabled) is refused.
         _ => compile_error(analysis, cli_codegen_refusal(target, name)),
@@ -466,6 +477,9 @@ fn cli_codegen_diagnostic(target: Target, name: &str, analysis: &AnalyzedModule)
             })
         }
         Target::HirGo => go_cli_codegen_diagnostic(name, cli_program),
+        // TypeScript lowers the narrow CLI slice inside its own emitter; a
+        // surface beyond the slice fails closed there with a stable issue.
+        Target::HirTypeScript => None,
         // Wasm text routes CLI programs through the ordinary emit path (the
         // shared MIR CLI lowering already produced the entry/argv/exit
         // shapes); the emitter fails closed on unsupported shapes itself.
