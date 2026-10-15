@@ -645,12 +645,6 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
             }
             "annotation_name" => return Some("expected annotation name".to_owned()),
             "duplicate_rest_pattern" => return Some("rest pattern already specified".to_owned()),
-            "sit_identifier_binding" => {
-                let keyword = quote_arg(args, "keyword")?;
-                return Some(format!(
-                    "{keyword} binds one identifier directly; use {keyword} name ← expr"
-                ));
-            }
             "test_case_or_setup" => return Some("expected test case or setup".to_owned()),
             "test_modifier_integer" => {
                 let modifier = quote_arg(args, "modifier")?;
@@ -753,12 +747,6 @@ fn expected_help_issue_late(issue: &str, args: &[DiagnosticArg]) -> Option<Strin
         }
         "mutability_marker" => {
             return Some("add sit or varia before the binding name".to_owned());
-        }
-        "sit_identifier_binding" => {
-            let keyword = quote_arg(args, "keyword")?;
-            return Some(format!(
-                "write {keyword} name ← expr or use sit with a type or a destructuring pattern"
-            ));
         }
         "test_case_or_setup" => {
             let proba = quote_arg(args, "proba")?;

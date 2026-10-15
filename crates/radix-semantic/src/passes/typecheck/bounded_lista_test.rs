@@ -73,7 +73,7 @@ fn bounded_lista_literal_indices_reject_provable_oob_and_negative() {
     assert_rejects_with_issue_la(
         r"incipit {
     sit lista<numerus, 8> xs ← vacua
-    sit bad ← xs[8]
+    sit _ bad ← xs[8]
     nota bad
 }",
         "index_provably_out_of_bounds",
@@ -81,7 +81,7 @@ fn bounded_lista_literal_indices_reject_provable_oob_and_negative() {
     assert_rejects_with_issue_la(
         r"incipit {
     sit lista<numerus, 8> xs ← vacua
-    sit bad ← xs[-1]
+    sit _ bad ← xs[-1]
     nota bad
 }",
         "index_provably_out_of_bounds",
@@ -94,17 +94,17 @@ fn bounded_cord_literal_indices_reject_provable_oob_and_negative() {
         r#"incipit {
     sit textus raw ← "a"
     sit textus<8> text ← raw ↦ textus<8>
-    sit bad ← text[8]
+    sit _ bad ← text[8]
     nota bad
 }"#,
         r"incipit {
     sit ascii<8> text ← 'a'
-    sit bad ← text[-1]
+    sit _ bad ← text[-1]
     nota bad
 }",
         r"incipit {
     sit octeti<8> bytes ← |61| ↦ octeti<8>
-    sit bad ← bytes[8]
+    sit _ bad ← bytes[8]
     nota bad
 }",
     ] {
@@ -176,7 +176,7 @@ fn bounded_lista_assignment_is_not_implicit_conversion() {
 fn unannotated_lista_literal_carries_exact_bound() {
     let unit = analyze_ok_la(
         r"incipit {
-    sit xs ← [1, 2]
+    sit _ xs ← [1, 2]
     nota xs
 }",
     );
@@ -247,7 +247,7 @@ fn empty_list_literal_takes_the_bounded_cell_capacity() {
 #[test]
 fn unannotated_literal_pair_length_mismatch_rejects_at_typecheck() {
     assert_rejects_with_issue_la(
-        "incipit { sit xs ← [1, 2] + [3] }",
+        "incipit { sit _ xs ← [1, 2] + [3] }",
         "lista_capacity_mismatch",
     );
 }

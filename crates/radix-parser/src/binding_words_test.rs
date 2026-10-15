@@ -5,7 +5,9 @@
 //! Contract: a run-time `const T x ← e` and the old English `var` spelling are
 //! parsed whole and reported as PARSE010 `runtime_const_retired` and
 //! `var_retired` (args `keyword` as written, `name`). A typed `let T x ← e`
-//! and the inferred `let x ← e` both parse as an immutable local. A `ref` local
+//! and the inferred `let _ x ← e` both parse as an immutable local; the
+//! type-omitted `let x ← e` (and `mut x`, `ref x`, `const x`) is PARSE010
+//! `binding_type_slot_required` (args `keyword`, `name`). A `ref` local
 //! is a writable-name cell read through the `ref` access view; a missing
 //! initializer, a `copy`/`own` marker and a pattern each have a named issue.
 //! Tests identify diagnostics by issue and args, never by message text.
@@ -124,11 +126,101 @@ fn typed_let_is_an_immutable_local_with_a_type() {
 }
 
 #[test]
-fn inferred_let_keeps_its_shorthand() {
-    let result = parse_en(&body("let x ← 5"));
+fn inferred_let_writes_the_underscore_slot() {
+    let result = parse_en(&body("let _ x ← 5"));
     assert!(result.success(), "{:?}", result.errors);
     let decl = first_local(&result);
     assert_eq!(decl.mutability, Mutability::Immutable);
+    assert!(matches!(
+        decl.ty.as_ref().expect("inferred slot").kind,
+        radix_syntax::TypeExprKind::Infer
+    ));
+}
+
+#[test]
+fn every_binding_word_infers_through_the_underscore_slot() {
+    for statement in [
+        "let _ x ← 5",
+        "mut _ x ← 5",
+        "ref _ x ← head",
+        "const _ X = 5",
+    ] {
+        let result = parse_en(&body(statement));
+        assert!(result.success(), "{statement}: {:?}", result.errors);
+        assert!(
+            matches!(
+                first_local(&result).ty.as_ref().expect("slot").kind,
+                radix_syntax::TypeExprKind::Infer
+            ),
+            "{statement}"
+        );
+    }
+    for statement in [
+        "sit _ x ← 5",
+        "varia _ x ← 5",
+        "de _ x ← head",
+        "fixum _ X = 5",
+    ] {
+        let result = parse_program(&format!(
+            "functio f() → numerus {{\n    {statement}\n    redde 0\n}}"
+        ));
+        assert!(result.success(), "{statement}: {:?}", result.errors);
+    }
+}
+
+#[test]
+fn a_declaration_without_a_type_slot_is_named() {
+    for (statement, keyword, name) in [
+        ("let x ← 5", "let", "x"),
+        ("let x", "let", "x"),
+        ("mut x ← 5", "mut", "x"),
+        ("ref x ← head", "ref", "x"),
+        ("const X = 5", "const", "X"),
+        ("let x ↤ s", "let", "x"),
+    ] {
+        let result = parse_en(&body(statement));
+        assert_issue(&result, "binding_type_slot_required", keyword, Some(name));
+    }
+    for (statement, keyword, name) in [
+        ("sit x ← 5", "sit", "x"),
+        ("sit x", "sit", "x"),
+        ("varia x ← 5", "varia", "x"),
+        ("de x ← head", "de", "x"),
+        ("fixum X = 5", "fixum", "X"),
+    ] {
+        let result = parse_program(&format!(
+            "functio f() → numerus {{\n    {statement}\n    redde 0\n}}"
+        ));
+        assert_issue(&result, "binding_type_slot_required", keyword, Some(name));
+    }
+}
+
+#[test]
+fn a_binder_takes_no_type_slot() {
+    // Binders (iteration, `ex` extraction, match arms, sort and reduce
+    // bodies) are bound to a thing that already carries the type: they write
+    // no type slot and are never `binding_type_slot_required`.
+    for source in [
+        "itera ex xs sit x { tacet }",
+        "itera ab 0‥3 varia i { tacet }",
+        "ex punctum sit x, y",
+        "sit [a, b] ← pair",
+        "discerne x {\n    casu Circulus sit r et Quadratum sit a, b { tacet }\n}",
+        "sit lista<numerus> ys ← ordinata via ascendens ex xs sit p { redde [p] }",
+        "sit _ n ← reducta via summa ex xs apud [i] sit s { redde s }",
+    ] {
+        let result = parse_program(&binder_body_la(source));
+        assert!(result.success(), "{source}: {:?}", result.errors);
+    }
+    let english = parse_en(&binder_body("for range 0‥3 let i { tacet }"));
+    assert!(
+        !english
+            .errors
+            .iter()
+            .any(|err| has_arg(err, "issue", "binding_type_slot_required")),
+        "{:?}",
+        english.errors
+    );
 }
 
 #[test]
@@ -138,8 +230,10 @@ fn typed_let_may_defer_its_initializer() {
 }
 
 #[test]
-fn a_let_named_like_a_mode_word_stays_a_name() {
+fn a_lone_mode_word_after_let_is_the_missing_slot_name() {
     let result = parse_en(&body("let copy ← 1"));
+    assert_issue(&result, "binding_type_slot_required", "let", Some("copy"));
+    let result = parse_en(&body("let _ copy ← 1"));
     assert!(result.success(), "{:?}", result.errors);
 }
 

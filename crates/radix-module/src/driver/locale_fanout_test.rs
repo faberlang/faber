@@ -29,7 +29,7 @@ functio saluta(textus phr) → textus {
 }
 
 incipit {
-  sit greeting ← saluta(\"Salve\")
+  sit _ greeting ← saluta(\"Salve\")
   nota greeting
 }
 ";

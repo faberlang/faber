@@ -64,7 +64,7 @@ fn optional_into_optional_declaration_is_accepted() {
 #[test]
 fn optional_into_inferred_declaration_is_accepted() {
     assert_accepts_la(
-        "functio f(textus ∪ nihil x) → textus ∪ nihil {\n    sit y ← x\n    redde y\n}",
+        "functio f(textus ∪ nihil x) → textus ∪ nihil {\n    sit _ y ← x\n    redde y\n}",
     );
 }
 

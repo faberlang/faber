@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/mutabilitas/binding-type-slot-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/binding-type-slot-reject.fab"
+
+
+[expect]
+check_only = true

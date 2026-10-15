@@ -260,7 +260,7 @@ fn english_comma_is_the_named_migration_diagnostic() {
 
 #[test]
 fn omnia_stays_a_legal_binding_name_elsewhere() {
-    let result = parse_ok("sit omnia ← 1");
+    let result = parse_ok("sit _ omnia ← 1");
     assert_eq!(
         result.program.as_ref().expect("program").statements.len(),
         1

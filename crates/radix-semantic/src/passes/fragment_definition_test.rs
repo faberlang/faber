@@ -367,7 +367,7 @@ functio host_add(numerus x) → numerus {
 
 @ nucleum fragment
 functio helper() → vacuum {
-    sit f ← host_add
+    sit _ f ← host_add
     redde
 }
 ",

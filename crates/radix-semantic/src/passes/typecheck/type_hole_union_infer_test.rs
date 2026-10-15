@@ -322,8 +322,8 @@ fn source_underscore_hole_path_is_unchanged() {
     test_support::assert_analysis_accepts_la(
         r"
 incipit {
-    sit r ← 1
-    sit s ← r
+    sit _ r ← 1
+    sit _ s ← r
     nota s
 }
 ",

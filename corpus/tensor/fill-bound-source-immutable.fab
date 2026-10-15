@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "Bound tensor fill materializes a fresh tensor; the source keeps its values."
-syntax = "let filled ← t.fill(value)"
+syntax = "let _ filled ← t.fill(value)"
 related = ["tensor", "fractus", "lista"]
 locale = "en"
 +++

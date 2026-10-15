@@ -336,9 +336,9 @@ fn main() → void {
     let tf32[2, 4, 3] table ← empty
     do {
         let tf32[2, 64] y ← y_flat ↦ tf32[2, 64]
-        let a ← utilModule.rope<8>(x, table)
-        let b ← utilModule.rope<64>(y, table)
-        let c ← utilModule.rope(y, table)
+        let _ a ← utilModule.rope<8>(x, table)
+        let _ b ← utilModule.rope<64>(y, table)
+        let _ c ← utilModule.rope(y, table)
     }
     catch err {
     }

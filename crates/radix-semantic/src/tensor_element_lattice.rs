@@ -126,7 +126,7 @@ pub fn needs_convert_elements(
 #[must_use]
 pub fn conversio_source(from: &TensorElementSpec, to: &TensorElementSpec) -> String {
     format!(
-        "incipit {{\n  sit tensor<{}, []> a ← vacua\n  sit b ← a ↦ tensor<{}, []>\n}}",
+        "incipit {{\n  sit tensor<{}, []> a ← vacua\n  sit _ b ← a ↦ tensor<{}, []>\n}}",
         from.faber, to.faber
     )
 }

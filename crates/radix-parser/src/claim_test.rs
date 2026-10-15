@@ -149,7 +149,7 @@ fn assert_expression_block_comment_claimed(source: &str) {
 #[test]
 fn expression_block_comment_lambda_initializer() {
     assert_expression_block_comment_claimed(
-        "functio f() → vacuum { sit x ← clausura → vacuum {\n# lambda body\ntacet\n} }\n",
+        "functio f() → vacuum { sit _ x ← clausura → vacuum {\n# lambda body\ntacet\n} }\n",
     );
 }
 

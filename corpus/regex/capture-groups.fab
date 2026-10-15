@@ -41,7 +41,7 @@ locale = "en"
 fn groups(string pat, string text, int n) → string {
     do {
         let regex r ← pat ↦ regex
-        let h ← r.find(text)
+        let _ h ← r.find(text)
         if h ≡ null {
             return "nomatch"
         }

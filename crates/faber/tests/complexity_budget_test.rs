@@ -58,8 +58,8 @@ fn steady(int seed) → int {
 }
 
 main {
-    let loud ← branchy(3)
-    let hushed ← steady(4)
+    let _ loud ← branchy(3)
+    let _ hushed ← steady(4)
     print "probe"
 }
 "#;

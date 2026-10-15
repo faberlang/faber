@@ -5,7 +5,7 @@ fn pair() → int ∪ string {
     return 5
 }
 main {
-    let v ← 5
+    let _ v ← 5
     print v
     let ∪ u ← pair()
     print u

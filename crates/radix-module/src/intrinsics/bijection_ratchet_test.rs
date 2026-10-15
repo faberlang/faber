@@ -253,7 +253,7 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
             "regex rx",
             "",
             "regex rx",
-            "sit r ← rx.inventa(\"xy\")",
+            "sit _ r ← rx.inventa(\"xy\")",
             "\"xy\"",
             "textus",
             "0",
@@ -424,9 +424,9 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
         // and needs a `⊥` default, a `fac`/`cape` handler or an enclosing `⇥`:
         // the probe supplies a handler so it meets method admission, not
         // SEM011 failable_call_requires_handler.
-        format!("    fac {{\n        sit ex ← {call}\n    }} cape err {{\n    }}")
+        format!("    fac {{\n        sit _ ex ← {call}\n    }} cape err {{\n    }}")
     } else {
-        format!("    sit ex ← {call}")
+        format!("    sit _ ex ← {call}")
     };
     let mut src = String::new();
     let _ = writeln!(src, "functio proba({param}) → vacuum {{");

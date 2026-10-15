@@ -74,7 +74,7 @@ fn compile_en_empty_marker_and_is_empty_intrinsic() {
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
-    let source = "fn f() → int {\n  mut list<int> xs ← empty\n  let vacant ← xs.is_empty()\n  return 0\n}";
+    let source = "fn f() → int {\n  mut list<int> xs ← empty\n  let _ vacant ← xs.is_empty()\n  return 0\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(
         result.success(),
@@ -189,7 +189,7 @@ fn compile_rejects_undeclared_tokenless_latin_keyword_in_grammar_slot() {
         .with_target(Target::HirRust)
         .with_locale_pack(super::zh_locale_pack());
     let session = Session::new(config);
-    let source = "functio salve() → numerus {\n  sit t ← iuncta<numerus> [1]\n  redde 0\n}\n";
+    let source = "functio salve() → numerus {\n  sit _ t ← iuncta<numerus> [1]\n  redde 0\n}\n";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
@@ -221,7 +221,7 @@ fn deny_warnings_does_not_escalate_undeclared_latin_keyword_failure() {
         .with_locale_pack(super::zh_locale_pack())
         .with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] });
     let session = Session::new(config);
-    let source = "functio salve() → numerus {\n  sit t ← iuncta<numerus> [1]\n  redde 0\n}\n";
+    let source = "functio salve() → numerus {\n  sit _ t ← iuncta<numerus> [1]\n  redde 0\n}\n";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(
@@ -391,7 +391,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     let source = r#"函数 checksum() → numerus {
   sit 模数<u32> m ← 5
   sit u32 checked ← 5
-  sit w ← checked ↦ 模数<u32>
+  sit _ w ← checked ↦ 模数<u32>
   sit 元组<textus, numerus> t ← 元组<textus, numerus> ["salve", 7]
   redde 0
 }"#;
@@ -440,8 +440,8 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
   显示 42
   警告 7
   格式化("salve {0}", 1)
-  sit s ← 读行
-  sit t ← 读入
+  sit _ s ← 读行
+  sit _ t ← 读入
   redde 0
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -487,11 +487,11 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
         .with_locale_pack(pack);
     let session = Session::new(config);
     let source = r"函数 checksum() → numerus {
-  sit a ← nulla 是 nihil
-  sit b ← 非 (nulla 是 nihil)
-  sit c ← nulla 是 nihil 且 nulla 是 nihil
-  sit d ← nulla 是 nihil 或 nulla 是 nihil
-  sit n ← nulla 兜底 0
+  sit _ a ← nulla 是 nihil
+  sit _ b ← 非 (nulla 是 nihil)
+  sit _ c ← nulla 是 nihil 且 nulla 是 nihil
+  sit _ d ← nulla 是 nihil 或 nulla 是 nihil
+  sit _ n ← nulla 兜底 0
   redde 0
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -877,7 +877,7 @@ fn compile_reports_parse_errors() {
 #[test]
 fn compile_rejects_itera_pro_mode() {
     let session = test_session(Target::HirRust);
-    let source = "incipit {\n  sit xs ← [1, 2, 3]\n  itera pro fixum x de xs {\n    nota x\n  }\n}";
+    let source = "incipit {\n  sit _ xs ← [1, 2, 3]\n  itera pro fixum x de xs {\n    nota x\n  }\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
@@ -907,7 +907,7 @@ fn compile_reports_semantic_errors() {
 #[test]
 fn compile_rejects_itera_ab_over_collection() {
     let session = test_session(Target::HirRust);
-    let source = "incipit {\n  sit xs ← [1, 2, 3]\n  itera ab xs sit i {\n    nota i\n  }\n}";
+    let source = "incipit {\n  sit _ xs ← [1, 2, 3]\n  itera ab xs sit i {\n    nota i\n  }\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
@@ -966,7 +966,7 @@ genus Circle implet Drawable {
 }
 
 incipit {
-  sit c ← Circle {}
+  sit _ c ← Circle {}
   c.draw()
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -994,7 +994,7 @@ genus Circle implet Drawable {
 }
 
 incipit {
-  sit c ← Circle {}
+  sit _ c ← Circle {}
   c.draw()
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1034,7 +1034,7 @@ fn compile_rejects_iace_without_function_error_channel() {
 #[cfg(feature = "hir-faber")]
 fn incipit_argumenta_compiles_for_faber_target() {
     let source = r"incipit argumenta args {
-  sit first ← args.accipe(0)
+  sit _ first ← args.accipe(0)
 }";
     let result = super::faber_emit("test.fab", source);
 
@@ -1177,7 +1177,7 @@ incipit {
 fn rust_target_accepts_lege_expression() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  sit x ← lege
+  sit _ x ← lege
   nota x
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1190,7 +1190,7 @@ fn rust_target_accepts_lege_expression() {
 #[cfg(feature = "hir-faber")]
 fn regex_conversio_no_longer_reports_unsupported_lowering_error() {
     let source = r#"incipit {
-  sit pattern ← "(?g)\\d+" ↦ regex
+  sit _ pattern ← "(?g)\\d+" ↦ regex
   nota pattern
 }"#;
     let result = super::faber_emit("test.fab", source);
@@ -1211,7 +1211,7 @@ fn regex_conversio_no_longer_reports_unsupported_lowering_error() {
 #[test]
 fn sed_expression_fails_with_generic_unknown_identifier() {
     let session = test_session(Target::HirRust);
-    let source = r#"incipit { sit r ← sed "\\d+" g }"#;
+    let source = r#"incipit { sit _ r ← sed "\\d+" g }"#;
     let result = compile(&session, "sed-retired.fab", source, ModuleCompileRequest::default());
     // `sed` is a plain identifier; the source fails with generic
     // unknown-identifier errors.
@@ -1229,7 +1229,7 @@ fn sed_expression_fails_with_generic_unknown_identifier() {
 fn warning_only_semantic_diagnostics_still_emit_output() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  sit unused ← 1
+  sit _ unused ← 1
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -1262,7 +1262,7 @@ fn compile_accepts_textus_explicit_append_with_ascii_operand() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
   varia textus buf ← "x-"
-  sit tag ← 'suffix'
+  sit _ tag ← 'suffix'
   buf ← buf + tag
   nota buf
 }"#;
@@ -1328,7 +1328,7 @@ fn go_target_rejects_bodyless_externa_at_parse_boundary() {
 functio argv() → ignotum
 
 incipit {
-  sit args ← argv() ∷ lista<textus>
+  sit _ args ← argv() ∷ lista<textus>
   nota args.longitudo()
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1349,8 +1349,8 @@ incipit {
 fn ab_pipeline_is_not_active_rust_syntax() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  sit users ← [{ activus = verum }]
-  sit active ← ab users activus
+  sit _ users ← [{ activus = verum }]
+  sit _ active ← ab users activus
   nota active
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1363,7 +1363,7 @@ fn ab_pipeline_is_not_active_rust_syntax() {
 fn triple_quote_is_not_a_block_string_surface() {
     let session = test_session(Target::HirRust);
     // A bare `"""` fails as an ordinary unterminated string.
-    let source = "incipit {\n  sit value ← \"\"\"\n  nota value\n}";
+    let source = "incipit {\n  sit _ value ← \"\"\"\n  nota value\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
@@ -1441,12 +1441,12 @@ fn compile_accepts_array_and_ex_destructuring_bindings() {
     let session = test_session(Target::HirRust);
     let source = r#"genus Persona { varia textus name }
 incipit {
-  sit xs ← [1, 2]
+  sit _ xs ← [1, 2]
   sit [a, b] ← xs
   nota a
   nota b
 
-  sit person ← Persona { name = "Marcus" }
+  sit _ person ← Persona { name = "Marcus" }
   ex person sit name
   nota name
 }"#;
@@ -1463,7 +1463,7 @@ fn enum_member_access_no_longer_reports_unknown_identifier() {
     let source = r#"ordo Color { rubrum, viridis }
 
 incipit {
-  sit color ← Color.rubrum
+  sit _ color ← Color.rubrum
   elige color {
     casu Color.rubrum { nota "r" }
     casu Color.viridis { nota "v" }
@@ -1488,8 +1488,8 @@ fn enum_variant_path_resolves_but_bare_enum_name_reports_name_not_value() {
     let source = r"ordo Color { rubrum, viridis }
 
 incipit {
-  sit c ← Color.rubrum
-  sit e ← Color
+  sit _ c ← Color.rubrum
+  sit _ e ← Color
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -1684,7 +1684,7 @@ fn externa_ignotum_receiver_no_longer_reaches_type_inference() {
 fixum ignotum process = 0
 
 incipit {
-  sit args ← process.argv ∷ lista<textus>
+  sit _ args ← process.argv ∷ lista<textus>
   nota args.longitudo()
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1708,7 +1708,7 @@ fn ex_object_varia_bindings_accept_same_type_reassignment() {
     let session = test_session(Target::HirRust);
     let source = r"genus Datum { varia numerus count  varia bivalens active }
 incipit {
-  sit data ← Datum { count = 100, active = verum }
+  sit _ data ← Datum { count = 100, active = verum }
   ex data varia count, active
   count ← 200
   active ← falsum

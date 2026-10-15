@@ -187,7 +187,7 @@ functio simple_loss(tensor<f32, [2, 2]> x, tensor<f32, [2, 2]> w) → f32 {
 }
 
 functio gradientes(tensor<f32, [2, 2]> x, tensor<f32, [2, 2]> w) → f32 {
-    sit grads ← loss_backward(x, w, nil(), 1.0)
+    sit _ grads ← loss_backward(x, w, nil(), 1.0)
     sit [_, gw] ← grads
     redde gw.media()
 }

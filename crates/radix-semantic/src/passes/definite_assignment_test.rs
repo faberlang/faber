@@ -484,7 +484,7 @@ fn rejects_second_assignment_to_sit_with_initializer() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
-    sit value ← 1
+    sit _ value ← 1
     value ← 2
     redde value
 }

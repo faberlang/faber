@@ -25,13 +25,13 @@ fn octeti_window_to_u32_le_accepts() {
 
 #[test]
 fn octeti_literal_window_to_u32_be_accepts() {
-    test_support::assert_accepts_la("incipit { sit n ← |de ad be ef|[0‥4] ↦ u32 via Be }");
+    test_support::assert_accepts_la("incipit { sit _ n ← |de ad be ef|[0‥4] ↦ u32 via Be }");
 }
 
 #[test]
 fn octeti_literal_without_endian_still_unspecified() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit n ← |de ad be ef| ↦ u32 }",
+        "incipit { sit _ n ← |de ad be ef| ↦ u32 }",
         "octeti_to_numerus_unspecified",
     );
 }
@@ -39,7 +39,7 @@ fn octeti_literal_without_endian_still_unspecified() {
 #[test]
 fn octeti_window_without_endian_still_unspecified() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit n ← |de ad be ef|[0‥4] ↦ u32 }",
+        "incipit { sit _ n ← |de ad be ef|[0‥4] ↦ u32 }",
         "octeti_to_numerus_unspecified",
     );
 }
@@ -47,7 +47,7 @@ fn octeti_window_without_endian_still_unspecified() {
 #[test]
 fn three_byte_source_mismatches_u32() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit n ← |de ad be| ↦ u32 via Be }",
+        "incipit { sit _ n ← |de ad be| ↦ u32 via Be }",
         "octeti_endian_width_mismatch",
     );
 }
@@ -55,7 +55,7 @@ fn three_byte_source_mismatches_u32() {
 #[test]
 fn three_byte_window_mismatches_u32() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit n ← |de ad be|[0‥3] ↦ u32 via Be }",
+        "incipit { sit _ n ← |de ad be|[0‥3] ↦ u32 via Be }",
         "octeti_endian_width_mismatch",
     );
 }
@@ -63,7 +63,7 @@ fn three_byte_window_mismatches_u32() {
 #[test]
 fn four_byte_window_mismatches_u16() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit n ← |de ad be ef|[0‥4] ↦ u16 via Be }",
+        "incipit { sit _ n ← |de ad be ef|[0‥4] ↦ u16 via Be }",
         "octeti_endian_width_mismatch",
     );
 }
@@ -99,7 +99,7 @@ fn octeti_window_to_f64_le_accepts() {
 #[test]
 fn fractus_without_endian_still_unspecified() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit n ← |de ad be ef|[0‥4] ↦ f32 }",
+        "incipit { sit _ n ← |de ad be ef|[0‥4] ↦ f32 }",
         "octeti_to_fractus_unspecified",
     );
 }
@@ -107,7 +107,7 @@ fn fractus_without_endian_still_unspecified() {
 #[test]
 fn three_byte_window_mismatches_f32() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit n ← |de ad be|[0‥3] ↦ f32 via Be }",
+        "incipit { sit _ n ← |de ad be|[0‥3] ↦ f32 via Be }",
         "octeti_endian_width_mismatch",
     );
 }
@@ -115,7 +115,7 @@ fn three_byte_window_mismatches_f32() {
 #[test]
 fn four_byte_window_mismatches_f64() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit n ← |de ad be ef|[0‥4] ↦ f64 via Le }",
+        "incipit { sit _ n ← |de ad be ef|[0‥4] ↦ f64 via Le }",
         "octeti_endian_width_mismatch",
     );
 }
@@ -123,14 +123,14 @@ fn four_byte_window_mismatches_f64() {
 #[test]
 fn hex_hint_on_fractus_still_rejected() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit n ← |de ad be ef|[0‥4] ↦ f32 via Hex }",
+        "incipit { sit _ n ← |de ad be ef|[0‥4] ↦ f32 via Hex }",
         "octeti_to_fractus_unspecified",
     );
 }
 
 #[test]
 fn textus_hex_parse_still_accepts() {
-    test_support::assert_accepts_la(r#"incipit { sit n ← "ff" ↦ i32 via Hex }"#);
+    test_support::assert_accepts_la(r#"incipit { sit _ n ← "ff" ↦ i32 via Hex }"#);
 }
 
 // --- bounded `octeti<N> ↦ W via Be|Le` read -----------------

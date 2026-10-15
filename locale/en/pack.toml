@@ -661,10 +661,6 @@ help = "de binds an index or key, not a mutable element; use the let form"
 message = "rest pattern already specified"
 help = "keep only one '{keyword}' rest binding"
 
-[diagnostics.PARSE001.issues.sit_identifier_binding]
-message = "'{keyword}' binds one identifier directly; use '{keyword}' name ← expr"
-help = "write '{keyword}' name ← expr or use let with a type or a destructuring pattern"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "expected test case or setup"
 help = "start the body item with '{proba}', '{probandum}', or '{setup}'"
@@ -856,7 +852,11 @@ help = "write `{fixum} T {name} = …`; a module-level constant is spelled like 
 
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "a run-time `{keyword}` declaration was retired; `{name}` is a run-time name"
-help = "write `{sit} T {name} ← …` (or `{sit} {name} ← …` to infer the type); `{fixum}` states a compile-time fact and goes with `=`"
+help = "write `{sit} T {name} ← …` (or `{sit} _ {name} ← …` to infer the type); `{fixum}` states a compile-time fact and goes with `=`"
+
+[diagnostics.PARSE010.issues.binding_type_slot_required]
+message = "a `{keyword}` declaration writes its type slot; `{name}` has none"
+help = "write `{keyword} T {name} ← …`, or `{keyword} _ {name} ← …` to infer the type"
 
 [diagnostics.PARSE010.issues.binder_fixum_retired]
 message = "a `{keyword}` binder was retired"

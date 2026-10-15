@@ -400,10 +400,6 @@ help = "de 绑定的是索引或键，不是可变元素；请使用 const 形�
 message = "rest pattern 已指定"
 help = "只保留一个 '{keyword}' rest binding"
 
-[diagnostics.PARSE001.issues.sit_identifier_binding]
-message = "'{keyword}' 直接绑定单个标识符；请使用 '{keyword}' name ← expr"
-help = "写成 '{keyword}' name ← expr，或对 typed/destructured bindings 使用 fixum"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "需要 test case 或 setup"
 help = "用 '{proba}'、'{probandum}' 或 '{setup}' 开始 body item"
@@ -586,7 +582,11 @@ help = "写成 `{keyword} T {name} ← {marker} value`；后面的 `{name} ← {
 
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "运行时的 `{keyword}` 声明已废弃；`{name}` 是运行时名称"
-help = "写成 `{sit} T {name} ← …`（或用 `{sit} {name} ← …` 推断类型）；`{fixum}` 表示编译期事实，与 `=` 搭配"
+help = "写成 `{sit} T {name} ← …`（或用 `{sit} _ {name} ← …` 推断类型）；`{fixum}` 表示编译期事实，与 `=` 搭配"
+
+[diagnostics.PARSE010.issues.binding_type_slot_required]
+message = "`{keyword}` 声明必须写出类型位；`{name}` 没有类型"
+help = "写成 `{keyword} T {name} ← …`，或用 `{keyword} _ {name} ← …` 推断类型"
 
 [diagnostics.PARSE010.issues.binder_fixum_retired]
 message = "`{keyword}` 绑定词已废弃"

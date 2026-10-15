@@ -26,7 +26,7 @@ locale = "en"
 #   • using the function — a call, a call through an imported namespace or an
 #     imported name, or taking it as a value — fails with SEM017
 #     (`nondum_function_for_target`): `parse_later("a=1")` or
-#     `sit f ← parse_later` are both refused, wherever the declaration lives
+#     `sit _ f ← parse_later` are both refused, wherever the declaration lives
 #   • leaving the body off a function that is not marked `@ nondum`
 #     (PARSE012, `function_body_absent`)
 #

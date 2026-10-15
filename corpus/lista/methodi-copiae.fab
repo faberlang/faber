@@ -46,14 +46,14 @@ locale = "en"
 # (whitelist: lista/methodi-copiae.fab).
 
 main {
-    let res ← [1, 2, 3, 4, 5] ∷ list<int>
-    let addita ← res.added(6)
-    let sectio ← res.slice(1, 4)
-    let primaduo ← res.take(2)
-    let ultimaduo ← res.take_last(2)
-    let omissaduo ← res.drop(2)
-    let inversa ← res.invert()
-    let ordinata ← [3, 1, 2].sorted()
+    let _ res ← [1, 2, 3, 4, 5] ∷ list<int>
+    let _ addita ← res.added(6)
+    let _ sectio ← res.slice(1, 4)
+    let _ primaduo ← res.take(2)
+    let _ ultimaduo ← res.take_last(2)
+    let _ omissaduo ← res.drop(2)
+    let _ inversa ← res.invert()
+    let _ ordinata ← [3, 1, 2].sorted()
     print addita
     print sectio
     print primaduo

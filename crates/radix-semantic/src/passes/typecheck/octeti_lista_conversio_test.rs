@@ -11,7 +11,7 @@ fn octeti_to_lista_u8_accepts() {
 
 #[test]
 fn octeti_literal_to_lista_u8_accepts() {
-    test_support::assert_accepts_la("incipit { sit b ← |de ad be ef| ↦ lista<u8> }");
+    test_support::assert_accepts_la("incipit { sit _ b ← |de ad be ef| ↦ lista<u8> }");
 }
 
 #[test]
@@ -24,7 +24,7 @@ fn lista_u8_to_octeti_still_accepts() {
 #[test]
 fn octeti_to_lista_textus_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit b ← |de ad| ↦ lista<textus> }",
+        "incipit { sit _ b ← |de ad| ↦ lista<textus> }",
         "unsupported_conversio",
     );
 }
@@ -34,7 +34,7 @@ fn octeti_to_lista_unsized_numerus_rejects() {
     // An unsized numerus element has no bit width to match: the bits row
     // names it (`lista<b8>` converts to a sized same-width `lista<uN>` only).
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit b ← |de ad| ↦ lista<numerus> }",
+        "incipit { sit _ b ← |de ad| ↦ lista<numerus> }",
         "bits_conversion_width_mismatch",
     );
 }
@@ -42,7 +42,7 @@ fn octeti_to_lista_unsized_numerus_rejects() {
 #[test]
 fn numeric_to_octeti_unspecified_unchanged() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit b ← 42 ↦ lista<b8> }",
+        "incipit { sit _ b ← 42 ↦ lista<b8> }",
         "numeric_to_octeti_unspecified",
     );
 }

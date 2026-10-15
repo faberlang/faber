@@ -47,7 +47,7 @@ fn list_get_over_optional_element_is_one_optional() {
     assert_single_level_numerus_optional(
         r"incipit {
     sit lista<numerus ∪ nihil> xs ← [1, nulla, 3]
-    sit found ← xs.accipe(0)
+    sit _ found ← xs.accipe(0)
     nota found
 }",
         1,
@@ -59,7 +59,7 @@ fn map_get_over_optional_value_is_one_optional() {
     assert_single_level_numerus_optional(
         r#"incipit {
     sit tabula<textus, numerus ∪ nihil> m ← { "a": 1 }
-    sit found ← m.accipe("a")
+    sit _ found ← m.accipe("a")
     nota found
 }"#,
         1,
@@ -134,7 +134,7 @@ fn list_get_over_optional_element_narrows_once() {
     assert_accepts_la(
         r"incipit {
     sit lista<numerus ∪ nihil> xs ← [1, nulla, 3]
-    sit a ← xs.accipe(0)
+    sit _ a ← xs.accipe(0)
     si a non est nihil {
         sit numerus b ← a
         nota b
@@ -148,7 +148,7 @@ fn list_get_over_plain_element_stays_one_optional() {
     assert_single_level_numerus_optional(
         r"incipit {
     sit lista<numerus> xs ← [1, 2, 3]
-    sit found ← xs.accipe(0)
+    sit _ found ← xs.accipe(0)
     nota found
 }",
         1,

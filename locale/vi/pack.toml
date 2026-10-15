@@ -400,10 +400,6 @@ help = "de liên kết một chỉ mục hoặc khóa, không phải phần tử
 message = "pattern rest đã được chỉ định"
 help = "chỉ giữ một binding rest '{keyword}'"
 
-[diagnostics.PARSE001.issues.sit_identifier_binding]
-message = "'{keyword}' liên kết trực tiếp với một identifier; dùng '{keyword}' name ← expr"
-help = "viết '{keyword}' name ← expr hoặc dùng fixum cho binding có kiểu hoặc destructure"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "cần test case hoặc setup"
 help = "bắt đầu mục body bằng '{proba}', '{probandum}' hoặc '{setup}'"
@@ -542,7 +538,11 @@ help = "viết `{keyword} T {name} ← {marker} value`; một `{name} ← {marke
 
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "khai báo `{keyword}` lúc chạy đã bị loại bỏ; `{name}` là một tên lúc chạy"
-help = "hãy viết `{sit} T {name} ← …` (hoặc `{sit} {name} ← …` để suy ra kiểu); `{fixum}` nêu một sự thật lúc biên dịch và đi với `=`"
+help = "hãy viết `{sit} T {name} ← …` (hoặc `{sit} _ {name} ← …` để suy ra kiểu); `{fixum}` nêu một sự thật lúc biên dịch và đi với `=`"
+
+[diagnostics.PARSE010.issues.binding_type_slot_required]
+message = "khai báo `{keyword}` phải ghi chỗ kiểu; `{name}` chưa có kiểu"
+help = "hãy viết `{keyword} T {name} ← …` hoặc `{keyword} _ {name} ← …` để suy ra kiểu"
 
 [diagnostics.PARSE010.issues.binder_fixum_retired]
 message = "từ gắn tên `{keyword}` đã bị loại bỏ"

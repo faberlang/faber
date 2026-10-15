@@ -58,7 +58,7 @@ main {
     print "valor: §"(value)
 
     # This would call mori:
-    # sit malum ← divide(10, 0)
+    # sit _ malum ← divide(10, 0)
 
     # Lista accessus
     let list<int> nums ← [1, 2, 3]

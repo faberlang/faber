@@ -400,10 +400,6 @@ help = "de एक index या key bind करता है, mutable element न
 message = "rest pattern पहले ही निर्दिष्ट है"
 help = "केवल एक '{keyword}' rest binding रखें"
 
-[diagnostics.PARSE001.issues.sit_identifier_binding]
-message = "'{keyword}' सीधे एक identifier bind करता है; '{keyword}' name ← expr का उपयोग करें"
-help = "'{keyword}' name ← expr लिखें या typed/destructured bindings के लिए fixum का उपयोग करें"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "test case या setup अपेक्षित है"
 help = "body item को '{proba}', '{probandum}', या '{setup}' से शुरू करें"
@@ -542,7 +538,11 @@ help = "`{keyword} T {name} ← {marker} value` लिखें; बाद क�
 
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "रन-टाइम `{keyword}` घोषणा हटा दी गई है; `{name}` एक रन-टाइम नाम है"
-help = "`{sit} T {name} ← …` लिखें (प्रकार अनुमान के लिए `{sit} {name} ← …`); `{fixum}` कंपाइल-टाइम तथ्य बताता है और `=` के साथ आता है"
+help = "`{sit} T {name} ← …` लिखें (प्रकार अनुमान के लिए `{sit} _ {name} ← …`); `{fixum}` कंपाइल-टाइम तथ्य बताता है और `=` के साथ आता है"
+
+[diagnostics.PARSE010.issues.binding_type_slot_required]
+message = "`{keyword}` घोषणा में प्रकार का स्थान लिखना ज़रूरी है; `{name}` के लिए कोई प्रकार नहीं लिखा"
+help = "`{keyword} T {name} ← …` लिखें, या प्रकार अनुमान के लिए `{keyword} _ {name} ← …`"
 
 [diagnostics.PARSE010.issues.binder_fixum_retired]
 message = "`{keyword}` बाइंडर शब्द हटा दिया गया है"

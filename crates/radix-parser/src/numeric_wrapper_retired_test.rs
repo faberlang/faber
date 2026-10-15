@@ -199,8 +199,8 @@ fn a_wrapper_is_rejected_in_every_type_position() {
             "fractus<f32>",
             "f32",
         ),
-        ("let n ← s ↦ numerus<u32>", "numerus<u32>", "u32"),
-        ("let n ← x ↦ numerus<i32> ⊥ 0", "numerus<i32>", "i32"),
+        ("let _ n ← s ↦ numerus<u32>", "numerus<u32>", "u32"),
+        ("let _ n ← x ↦ numerus<i32> ⊥ 0", "numerus<i32>", "i32"),
         ("let lista<numerus<u64>> ids ← vacua", "numerus<u64>", "u64"),
     ] {
         assert_one_wrapper(source, form, bare);
@@ -212,7 +212,7 @@ fn a_wrapper_is_rejected_in_every_type_position() {
 
 #[test]
 fn the_rejection_recovers_so_later_diagnostics_still_appear() {
-    let result = parse_words("let numerus<i32> a ← 1\nlet b ← )\nlet numerus<u8> c ← 3");
+    let result = parse_words("let numerus<i32> a ← 1\nlet _ b ← )\nlet numerus<u8> c ← 3");
     assert_eq!(retired(&result).len(), 2, "{:?}", result.errors);
     let program = result.program.as_ref().expect("recovered program");
     // The first declaration keeps its annotation as the bare marker.
@@ -245,7 +245,7 @@ fn the_bare_markers_and_bare_words_parse() {
         "let fractus x ← 1.0",
         "let lista<u32> xs ← vacua",
         "let tensor<f32, [2, 3]> t ← vacua",
-        "let n ← s ↦ u32",
+        "let _ n ← s ↦ u32",
     ] {
         let _ = parse_clean(source);
     }

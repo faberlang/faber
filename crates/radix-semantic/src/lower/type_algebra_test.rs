@@ -203,7 +203,7 @@ fn g_error_channel_hole_is_rejected() {
 fn g_binding_holes_stay_legal() {
     analyze_en(
         "main {
-    let v ← 5
+    let _ v ← 5
     print v
 }
 ",
@@ -380,7 +380,7 @@ fn qualified_bare_generic_ascription_in_construction_is_admitted() {
         r#"importa ex "./lib" lib
 
 functio probe() → numerus {
-    sit x ← finge lib.Res.Plena { res = 3 } ∷ lib.Res
+    sit _ x ← finge lib.Res.Plena { res = 3 } ∷ lib.Res
     redde 1
 }"#,
     );

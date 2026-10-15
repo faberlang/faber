@@ -8,7 +8,7 @@ syntax = "sit [type] <name> ← <expression>"
 locale = "la"
 +++
 
-# `sit` is the run-time, write-once name. The type is optional: `sit x ← e`
+# `sit` is the run-time, write-once name. The type is optional: `sit _ x ← e`
 # infers it, `sit T x ← e` states it. `fixum` is only for compile-time facts
 # and goes with `=`.
 
@@ -16,7 +16,7 @@ fixum numerus LIMES = 10
 
 functio scala(numerus basis) → numerus {
     sit numerus factor ← 3
-    sit duplum ← basis * 2
+    sit _ duplum ← basis * 2
     redde duplum * factor
 }
 

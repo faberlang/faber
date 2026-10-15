@@ -760,7 +760,6 @@ impl super::FaberCodegen<'_> {
             writer.write(keyword);
             writer.write(" ");
         }
-        let infer_let = keyword == surface.contextual_keyword("sit");
         let mut value_marker: Option<&str> = None;
         if let Some(ty) = local.ty {
             // The authored form at this site is the sole authority for
@@ -787,22 +786,20 @@ impl super::FaberCodegen<'_> {
                     value_marker = Some(word);
                 }
             }
-            // The inferred `sit name ← e` shorthand carries no hole.
-            if !(infer_let && rendered == "_") {
-                writer.write(&rendered);
-                writer.write(" ");
-            }
-        } else if local.init.is_some() {
+            // Every declaration writes its type slot: an inferred local
+            // re-emits as `let _ name ← e`.
+            writer.write(&rendered);
+            writer.write(" ");
+        } else {
             // A pre-finalization or hand-built local may not have a semantic
             // `ty` field yet. A present form still owns its authored spelling;
             // use its witness for the same site-aware render path.
-            if let Some(form_ty) = self.authored_type_forms.get(&site).map(|form| form.ty) {
-                let rendered = self.render_type_at(&site, form_ty, names, surface);
-                if !(infer_let && rendered == "_") {
-                    writer.write(&rendered);
-                    writer.write(" ");
-                }
-            }
+            let rendered = match self.authored_type_forms.get(&site).map(|form| form.ty) {
+                Some(form_ty) => self.render_type_at(&site, form_ty, names, surface),
+                None => "_".to_owned(),
+            };
+            writer.write(&rendered);
+            writer.write(" ");
         }
         writer.write(&self.symbol_to_string(local.name));
         if let Some(init) = &local.init {

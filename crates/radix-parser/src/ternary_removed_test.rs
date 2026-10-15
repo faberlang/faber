@@ -11,7 +11,7 @@ use crate::test_support::{ParseExpectation, assert_parse_error_matches, parse_ok
 #[test]
 fn question_colon_reports_migration_to_check_ballot() {
     assert_parse_error_matches(
-        "sit v ← c ? 1 : 2",
+        "sit _ v ← c ? 1 : 2",
         ParseExpectation::Issue("conditional_question_colon_removed"),
     );
 }
@@ -19,7 +19,7 @@ fn question_colon_reports_migration_to_check_ballot() {
 #[test]
 fn sic_secus_reports_migration_to_check_ballot() {
     assert_parse_error_matches(
-        "sit v ← c sic 1 secus 2",
+        "sit _ v ← c sic 1 secus 2",
         ParseExpectation::Issue("conditional_sic_removed"),
     );
 }
@@ -54,8 +54,8 @@ fn assert_sic_migration_args(source: &str) {
 
 #[test]
 fn sic_migration_diagnostic_keeps_kind_issue_and_args() {
-    assert_sic_migration_args("sit v ← c sic 1 secus 2");
-    assert_sic_migration_args("sit v ← a ∧ b sic 1 secus 2");
+    assert_sic_migration_args("sit _ v ← c sic 1 secus 2");
+    assert_sic_migration_args("sit _ v ← a ∧ b sic 1 secus 2");
 }
 
 #[test]
@@ -63,12 +63,12 @@ fn retired_words_are_ordinary_identifiers() {
     // KW-1: `sic` and the retired predicate words left the registry. Only the
     // exact `c sic <value>` shape on one line reports the migration; a binding
     // or reference by that name parses.
-    let _ = parse_ok("sit sic ← 1\nsit v ← sic");
-    let _ = parse_ok("sit v ← c\nsit w ← 2\nsit positivum ← 3\nsit nonnulla ← positivum");
-    let _ = parse_ok("sit v ← a\nsic ← 2");
+    let _ = parse_ok("sit _ sic ← 1\nsit _ v ← sic");
+    let _ = parse_ok("sit _ v ← c\nsit _ w ← 2\nsit _ positivum ← 3\nsit _ nonnulla ← positivum");
+    let _ = parse_ok("sit _ v ← a\nsic ← 2");
 }
 
 #[test]
 fn optional_chain_forms_survive_the_removal() {
-    let _ = parse_ok("sit v ← a?.b\nsit w ← a?[0]\nsit x ← a?(1)");
+    let _ = parse_ok("sit _ v ← a?.b\nsit _ w ← a?[0]\nsit _ x ← a?(1)");
 }

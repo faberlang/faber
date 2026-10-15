@@ -57,26 +57,26 @@ fn explora_bivalens(bool x) → string {
 main {
     # Null checking with est
     let int ∪ none forsitan ← null
-    let nihil_est ← forsitan is none
+    let _ nihil_est ← forsitan is none
     print nihil_est
 
     # Boolean true comparison with ≡
-    let enabled ← true
-    let verum_est ← enabled ≡ true
+    let _ enabled ← true
+    let _ verum_est ← enabled ≡ true
     print verum_est
 
     # Boolean false comparison with ≡
-    let disabled ← false
-    let falsum_est ← disabled ≡ false
+    let _ disabled ← false
+    let _ falsum_est ← disabled ≡ false
     print falsum_est
 
     # Chained with logical operators
     let string ∪ none nomen ← null
-    let defectum_debet ← nomen is none and enabled ≡ true
+    let _ defectum_debet ← nomen is none and enabled ≡ true
     print defectum_debet
 
     # Parenthesized for clarity
-    let utraque_nihil ← forsitan is none and nomen is none
+    let _ utraque_nihil ← forsitan is none and nomen is none
     print utraque_nihil
 
     # Dynamic ignotum dispatch for nihil and exact boolean checks on bivalens

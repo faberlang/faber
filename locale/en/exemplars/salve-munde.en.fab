@@ -7,6 +7,6 @@ fn greet(string msg) → string {
 }
 
 main {
-  let greeting ← greet("Hello, World!")
+  let _ greeting ← greet("Hello, World!")
   print greeting
 }

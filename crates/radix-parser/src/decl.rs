@@ -495,7 +495,29 @@ impl Parser {
         let ty = if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
             None
         } else {
-            Some(self.parse_type()?)
+            let first = self.current_span();
+            let ty = self.parse_type()?;
+            // The word read as a type is followed by an initializer operator:
+            // it was the name, and the type slot is missing.
+            if matches!(
+                self.peek().kind,
+                TokenKind::Assign
+                    | TokenKind::Eq
+                    | TokenKind::ConversioAssign
+                    | TokenKind::AwaitAssign
+            ) {
+                let name = match &ty.kind {
+                    TypeExprKind::Named(ident, _) => self.interner.resolve(ident.name).to_owned(),
+                    _ => String::new(),
+                };
+                return Err(
+                    ParseError::structured(ParseErrorKind::DeclarationInvalid, first)
+                        .with_arg("issue", "binding_type_slot_required")
+                        .with_arg("keyword", keyword)
+                        .with_arg("name", name),
+                );
+            }
+            Some(ty)
         };
 
         let binding = self.parse_binding_pattern()?;
@@ -733,9 +755,10 @@ impl Parser {
         }))
     }
 
-    /// Whether the cursor (just after `sit`) starts a written type before the
-    /// name. The inferred shorthand is a name followed by an initializer
-    /// operator, a line break or a block end; everything else is a type.
+    /// Whether the cursor (just after `sit`) starts a written type slot
+    /// (`T`, or `_` to infer) before the name. A lone name followed by an
+    /// initializer operator, a line break or a block end is the type-omitted
+    /// form, which does not exist (`binding_type_slot_required`).
     fn at_typed_sit_decl(&self) -> bool {
         if !matches!(self.peek().kind, TokenKind::Ident(_)) {
             return !matches!(self.peek().kind, TokenKind::LBracket | TokenKind::LBrace);
@@ -779,9 +802,13 @@ impl Parser {
             .any(|token| token.kind == TokenKind::Newline)
     }
 
-    /// Parse `sit` inferred immutable binding declarations.
+    /// Parse `sit` (en `let`) run-time write-once declarations.
+    ///
+    /// Every declaration writes its type slot: `sit T name ← e`, or `sit _
+    /// name ← e` to ask for inference. The type-omitted shorthand (`sit name ←
+    /// e`) does not exist: it is `PARSE010 binding_type_slot_required`
+    /// (args `keyword`, `name`).
     fn parse_sit_decl(&mut self) -> Result<StmtKind, ParseError> {
-        let start = self.current_span();
         let keyword = self.current_word();
         self.expect_keyword_ident(TokenKind::Sit)?;
 
@@ -790,60 +817,20 @@ impl Parser {
             return self.parse_var_decl_rest(AstMutability::Immutable, keyword, false);
         }
 
-        if matches!(self.peek().kind, TokenKind::Underscore(_)) {
-            return Err(
-                ParseError::structured(ParseErrorKind::Expected, self.current_span())
-                    .with_arg("issue", "sit_identifier_binding")
-                    .with_arg("keyword", "sit"),
-            );
-        }
-
-        // Typed form `sit T name ← e`: the run-time, fixed-name, read-only
-        // declaration. The inferred shorthand `sit name ← e` stays.
         if self.at_typed_sit_decl() {
             return self.parse_var_decl_rest(AstMutability::Immutable, keyword, false);
         }
+        Err(self.type_slot_required_error(keyword))
+    }
 
-        let ident = self.parse_ident()?;
-        let binding = BindingPattern::Ident(ident);
-
-        let (init, await_form) = if self.eat(&TokenKind::Assign) {
-            (Some(Box::new(self.parse_expression()?)), None)
-        } else if self.check(&TokenKind::ConversioAssign) {
-            // `sit` is an inferred binding (≡ `fixum _`): no concrete
-            // destination type, so conversion-directed assignment is rejected.
-            return Err(self.conversio_assign_requires_concrete_type_error());
-        } else if self.eat(&TokenKind::AwaitAssign) {
-            (
-                Some(Box::new(self.parse_expression()?)),
-                Some(AwaitBindingForm::Assignment),
-            )
-        } else {
-            // WHY: `sit x` is the inferred deferred immutable (≡ `fixum _ x`).
-            // We do not peek for a trailing identifier here: newlines are not
-            // token-level separators, so the next statement's leading identifier
-            // would be misread as an explicit-type attempt. Stray tokens surface
-            // as natural parse errors from the block parser.
-            (None, None)
-        };
-
-        let ty = Some(TypeExpr {
-            nullable: false,
-            mode: None,
-            kind: TypeExprKind::Infer,
-            span: start,
-            form: TypeFormLevel::LONG,
-            iuncta_label: None,
-        });
-
-        Ok(StmtKind::Var(VarDecl {
-            mutability: AstMutability::Immutable,
-            await_form,
-            ty,
-            binding,
-            init,
-            compile_time: false,
-        }))
+    /// `PARSE010 binding_type_slot_required`: a declaration word followed
+    /// directly by a name and no type slot. The word at the cursor is the
+    /// would-be name; `_` is the explicit request to infer.
+    fn type_slot_required_error(&self, keyword: String) -> ParseError {
+        ParseError::structured(ParseErrorKind::DeclarationInvalid, self.current_span())
+            .with_arg("issue", "binding_type_slot_required")
+            .with_arg("keyword", keyword)
+            .with_arg("name", self.current_word())
     }
 
     pub(super) fn parse_binding_pattern(&mut self) -> Result<BindingPattern, ParseError> {

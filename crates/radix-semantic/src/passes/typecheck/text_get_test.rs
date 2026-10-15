@@ -10,7 +10,7 @@ fn text_get_infers_optional_textus() {
     let unit = analyze_ok_la(
         r#"incipit {
     sit textus s ← "hé"
-    sit found ← s.accipe(0)
+    sit _ found ← s.accipe(0)
     nota found
 }"#,
     );

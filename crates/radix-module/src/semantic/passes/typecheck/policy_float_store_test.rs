@@ -225,7 +225,7 @@ fn policy_float_store_assignment_is_a_store() {
 
 #[test]
 fn policy_float_store_an_inferred_slot_infers_the_cell() {
-    let source = entry("sit y ← t * t\nsit z ← t + 1\nnota y\nnota z");
+    let source = entry("sit _ y ← t * t\nsit _ z ← t + 1\nnota y\nnota z");
     let collected = collected(&source);
     let stores = &collected.collector.stores;
     assert_eq!(stores.len(), 2);
@@ -237,7 +237,7 @@ fn policy_float_store_an_inferred_slot_infers_the_cell() {
 
 #[test]
 fn policy_float_store_an_inferred_slot_from_a_leaf_or_a_bare_float_has_no_node() {
-    let source = entry("sit a ← t\nsit b ← -t\nsit c ← x * x\nnota a\nnota b\nnota c");
+    let source = entry("sit _ a ← t\nsit _ b ← -t\nsit _ c ← x * x\nnota a\nnota b\nnota c");
     assert!(kinds(&source).is_empty());
 }
 

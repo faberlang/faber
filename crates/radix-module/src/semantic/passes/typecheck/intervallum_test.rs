@@ -49,7 +49,7 @@ fn intervallum_typed_parameter_accepts() {
 #[test]
 fn intervallum_inferred_binding_accepts() {
     let source = r"incipit {
-  sit fines ← 0‥10
+  sit _ fines ← 0‥10
 }";
     accepts(&compile(source));
 }
@@ -66,7 +66,7 @@ fn intervallum_zero_length_accepts() {
 #[test]
 fn intervallum_value_step_rejects() {
     let source = r"incipit {
-  sit fines ← 0‥10 per 2
+  sit _ fines ← 0‥10 per 2
 }";
     rejects_with_issue(&compile(source), "intervallum_value_step_unsupported");
 }
@@ -86,7 +86,7 @@ fn intervallum_step_remains_valid_for_itera_ab() {
 #[test]
 fn intervallum_step_remains_valid_for_textus_slice() {
     let source = r#"incipit {
-  sit even ← "abcdef"[0‥6 per 2]
+  sit _ even ← "abcdef"[0‥6 per 2]
 }"#;
     accepts(&compile(source));
 }
@@ -165,7 +165,7 @@ fn intra_inclusive_codegen_honors_inclusive_end() {
 #[test]
 fn intervallum_literal_codegen_emits_carrier() {
     let source = r"incipit {
-  sit fines ← 0‥10
+  sit _ fines ← 0‥10
   nota fines
 }";
     let result = compile(source);
@@ -179,7 +179,7 @@ fn intervallum_literal_codegen_emits_carrier() {
 #[test]
 fn intervallum_value_clamp_half_open_codegen() {
     let source = r"incipit {
-  sit clamped ← 15 ↦ 0‥10
+  sit _ clamped ← 15 ↦ 0‥10
 }";
     let result = compile(source);
     accepts(&result);
@@ -191,7 +191,7 @@ fn intervallum_value_clamp_half_open_codegen() {
 #[test]
 fn intervallum_value_clamp_inclusive_codegen() {
     let source = r"incipit {
-  sit clamped ← 15 ↦ 0…10
+  sit _ clamped ← 15 ↦ 0…10
 }";
     let result = compile(source);
     accepts(&result);
@@ -286,7 +286,7 @@ fn intervallum_range_clamp_codegen_inherits_target_inclusivity() {
 fn intervallum_continet_method_codegen() {
     let source = r"incipit {
   sit intervallum<numerus> fines ← 0‥10
-  sit ok ← fines.continet(5)
+  sit _ ok ← fines.continet(5)
 }";
     let result = compile(source);
     accepts(&result);
@@ -297,7 +297,7 @@ fn intervallum_continet_method_codegen() {
 #[test]
 fn intervallum_clamp_recovery_rejects() {
     let source = r"incipit {
-  sit clamped ← 15 ↦ 0‥10 ⊥ 0
+  sit _ clamped ← 15 ↦ 0‥10 ⊥ 0
 }";
     rejects_with_issue(&compile(source), "intervallum_clamp_recovery_unsupported");
 }
@@ -334,7 +334,7 @@ fn intervallum_inter_overlapping_codegen() {
     let source = r"incipit {
   sit intervallum<numerus> left ← 0‥10
   sit intervallum<numerus> right ← 5‥15
-  sit hit ← left.inter(right)
+  sit _ hit ← left.inter(right)
 }";
     let result = compile(source);
     accepts(&result);
@@ -351,12 +351,12 @@ fn intervallum_intersection_method_spellings_survive_the_membership_retirement()
     let latin = r"incipit {
   sit intervallum<numerus> left ← 0‥10
   sit intervallum<numerus> right ← 5‥15
-  sit hit ← left.inter(right)
+  sit _ hit ← left.inter(right)
 }";
     accepts(&compile(latin));
     let en = |method: &str| {
         format!(
-            "+++\nlocale = \"en\"\n+++\nmain {{\n    let intervallum<int> a ← 0‥10\n    let intervallum<int> b ← 5‥15\n    let x ← a.{method}(b)\n    print x\n}}\n"
+            "+++\nlocale = \"en\"\n+++\nmain {{\n    let intervallum<int> a ← 0‥10\n    let intervallum<int> b ← 5‥15\n    let _ x ← a.{method}(b)\n    print x\n}}\n"
         )
     };
     accepts(&compile(&en("intersect")));
@@ -369,7 +369,7 @@ fn intervallum_union_adjacent_codegen() {
     let source = r"incipit {
   sit intervallum<numerus> left ← 0‥5
   sit intervallum<numerus> right ← 5‥10
-  sit merged ← left.union(right)
+  sit _ merged ← left.union(right)
 }";
     let result = compile(source);
     accepts(&result);
@@ -382,7 +382,7 @@ fn intervallum_union_adjacent_codegen() {
 fn intervallum_longitudo_codegen() {
     let source = r"incipit {
   sit intervallum<numerus> fines ← 0‥10
-  sit span ← fines.longitudo()
+  sit _ span ← fines.longitudo()
 }";
     let result = compile(source);
     accepts(&result);

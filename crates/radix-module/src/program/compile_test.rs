@@ -1863,7 +1863,7 @@ import from "demo:gguf" gguf
 
 fn use_admit() → string {
     do {
-        let c ← gguf.admit_capsule("schema-2")
+        let _ c ← gguf.admit_capsule("schema-2")
         return c.schema
     }
     catch err {

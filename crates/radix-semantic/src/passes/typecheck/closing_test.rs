@@ -61,7 +61,7 @@ fn typed_sermo_close_propagates_textus() {
          redde s.close()\n\
          }\n\
          incipit {\n\
-         sit s ← ad 'numeri:bis' (2)\n\
+         sit _ s ← ad 'numeri:bis' (2)\n\
          nota finis(s) ⊥ falsum\n\
          }\n",
     );

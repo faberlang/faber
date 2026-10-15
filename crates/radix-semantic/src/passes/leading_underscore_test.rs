@@ -130,7 +130,7 @@ fn top_level_const_warns_as_constant_and_local_const_as_local() {
 #[test]
 fn bare_hole_never_warns() {
     let source = "incipit {\n    sit lista<numerus> triplex ← [1, 2, 3]\n    \
-        sit [_, medius, _] ← triplex\n    sit x ← medius\n    nota x\n}";
+        sit [_, medius, _] ← triplex\n    sit _ x ← medius\n    nota x\n}";
     let result = analyze_source_la(source);
     assert!(result.is_ok(), "{:?}", result.diagnostics);
     assert!(underscore_findings(source).is_empty());

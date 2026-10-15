@@ -45,12 +45,12 @@ locale = "en"
 main {
     # the inline literal: the type word, then the raw body
     let regex digits ← regex /\d+/
-    let hit ← digits.find("order 42 placed")
+    let _ hit ← digits.find("order 42 placed")
     print hit!.text()
 
     # the inferred form: `_ /pattern/` takes the type from the binding slot
     let regex word ← _ /(?i)[a-z]+/
-    let shout ← word.find("HELLO there")
+    let _ shout ← word.find("HELLO there")
     print shout!.text()
 
     # an escaped slash: `\/` writes one `/`; no other escape is processed
