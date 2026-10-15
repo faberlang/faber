@@ -89,12 +89,19 @@ fn go_rejects_the_lifted_forms() {
     }
 }
 
+/// The Rust emitter lifts the forms itself (`convert_elements`, `lift_with`,
+/// `lift_with3`), so none of them reaches the lift issue.
 #[cfg(feature = "hir-rust")]
 #[test]
-fn rust_rejects_the_lifted_forms() {
-    // Tensor `*` against a scalar keeps the older Rust addita-family message.
-    for body in &LIFTED[1..] {
-        assert_rejected(Target::HirRust, body);
+fn rust_emits_the_lifted_forms() {
+    for body in LIFTED {
+        let found = issues(Target::HirRust, body);
+        assert!(
+            !found
+                .iter()
+                .any(|issue| issue == "tensor_lift_unsupported_on_target"),
+            "Rust `{body}` is refused: {found:?}"
+        );
     }
 }
 

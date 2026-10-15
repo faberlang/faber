@@ -138,24 +138,6 @@ fn rust_emits_register_logic_and_select() {
     }
 }
 
-/// A lane combination the Rust emitter cannot spell is refused by the named
-/// issue, never printed as the scalar operator between arrays.
-#[cfg(feature = "hir-rust")]
-#[test]
-fn rust_refuses_integer_lane_arithmetic_by_name() {
-    let session = Session::new(Config::default().with_target(Target::HirRust).with_dev_locale_root());
-    let source = "incipit {\nfixum vector<i32, 3> a ← [1, 2, 3] ↦ vector<i32, 3>\nfixum vector<i32, 3> r ← a * 2\n}\n";
-    let result = crate::driver::compile(&session, "<test>", source, ModuleCompileRequest::default());
-    assert!(result.output.is_none());
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .flat_map(|diagnostic| diagnostic.args.iter())
-            .any(|arg| arg.name == "issue" && arg.value == VECTOR_ISSUE)
-    );
-}
-
 #[cfg(feature = "hir-swift")]
 #[test]
 fn swift_python_and_haskell_never_emit_register_logic_and_select() {

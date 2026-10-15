@@ -78,6 +78,7 @@ pub fn reject_tensor_lift(
                 return;
             }
             self.found = lifted_form(self.types, self.interner, self.target, expr)
+                .filter(|_| !matches!(self.target, Target::HirRust))
                 .map(|(family, label)| (family, label, Operands::Scalar))
                 .or_else(|| {
                     // The Rust emitter lifts the register forms itself and
