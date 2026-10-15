@@ -387,6 +387,65 @@ functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
 }
 
 #[test]
+fn axis_reduction_named_module_integer_is_a_constant_axis() {
+    assert_accepts(
+        r"
+fixum numerus K = 1
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis K) }
+",
+    );
+}
+
+#[test]
+fn axis_reduction_named_module_float_is_not_a_constant_axis() {
+    assert_rejects_with_issue(
+        r"
+fixum fractus K = 1
+functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis K) }
+",
+        "axis_reduction_not_constant",
+    );
+}
+
+#[test]
+fn axis_reduction_named_module_modular_keeps_its_fitted_value() {
+    // A word cell is an integer cell: the fitted `modulus<u8>` constant is a
+    // constant axis (the stored value equals the raw value, since an `=`
+    // constant must fit its slot).
+    assert_accepts(
+        r"
+fixum modulus<u8> K = 1
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis K) }
+",
+    );
+}
+
+#[test]
+fn axis_reduction_named_module_modular_out_of_range_is_refused_at_the_cell() {
+    // D5.10: an `=` constant must fit its slot whatever the overflow policy,
+    // so the wrap-to-0 store of `fixum modulus<u8> K = 256` (a `←` store
+    // holds 0) cannot arise at module scope: the cell itself is refused.
+    assert_rejects_with_issue(
+        r"
+fixum modulus<u8> K = 256
+functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis K) }
+",
+        "store_constant_out_of_range",
+    );
+}
+
+#[test]
+fn axis_reduction_named_module_chained_through_another_module_constant() {
+    assert_accepts(
+        r"
+fixum numerus A = 1
+fixum numerus K = A
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis K) }
+",
+    );
+}
+
+#[test]
 fn axis_reduction_drops_the_named_axis_from_a_rank_three_shape() {
     assert_accepts(
         r"
