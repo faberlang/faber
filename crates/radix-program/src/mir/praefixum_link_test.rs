@@ -147,6 +147,29 @@ fn praefixum_link_evaluates_chained_comptime_modules() {
 }
 
 #[test]
+fn praefixum_link_exported_comptime_feeds_ordinary_constant() {
+    let dir = test_temp_dir("praefixum-link-exported-feeds-const");
+    let dir = dir.as_ref();
+    write(dir, "base.fab", "@ public\nconst int BASE = 5\n");
+    write(
+        dir,
+        "mid.fab",
+        "import from \"./base\" base\n\n\
+         @ public\nconst int MID = comptime {\n    return base.BASE + 1\n}\n",
+    );
+    write(
+        dir,
+        "main.fab",
+        "import from \"./mid\" mid\n\n\
+         const int TOP = mid.MID + 1\n\n\
+         main {\n    print TOP\n}\n",
+    );
+    let package = analyze(dir);
+    let (_, main) = package.node_by_path(&dir.join("main.fab")).unwrap();
+    assert_eq!(int_literal(constant(main, "TOP")), 7);
+}
+
+#[test]
 fn praefixum_link_carried_provider_holds_evaluated_constant() {
     let dir = test_temp_dir("praefixum-link-carried-provider");
     let dir = dir.as_ref();

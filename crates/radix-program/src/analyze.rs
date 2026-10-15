@@ -698,7 +698,10 @@ fn analyze_package_spec_with_deadline(
             package: package_name.clone(),
             module_path: file.module_segments.clone(),
         };
-        let file_interface = match crate::file_interface::extract_file_interface_with_identity(
+        // `allow(unused_mut)`: only the runner-gated deferred evaluation below
+        // re-extracts the interface, so builds without `runner` never reassign.
+        #[cfg_attr(not(feature = "runner"), allow(unused_mut))]
+        let mut file_interface = match crate::file_interface::extract_file_interface_with_identity(
             &analysis,
             &export_names,
             &file.path.display().to_string(),
@@ -794,6 +797,23 @@ fn analyze_package_spec_with_deadline(
                 file.path.clone(),
                 carried_provider_unit_from_evaluated(analysis.clone()),
             );
+            // The interface extracted above predates the fold: an exported
+            // `comptime` constant still reads as non-constant there. Importers
+            // read `analyzed_interfaces_by_path`, so republish the interface
+            // from the evaluated analysis.
+            file_interface = match crate::file_interface::extract_file_interface_with_identity(
+                &analysis,
+                &export_names,
+                &file.path.display().to_string(),
+                Some(&export_identity),
+            ) {
+                Ok(interface) => interface,
+                Err(diag) => {
+                    diagnostics.push(diag);
+                    continue;
+                }
+            };
+            analyzed_interfaces_by_path.insert(file.path.clone(), file_interface.clone());
         }
 
         nodes.insert(
