@@ -4,7 +4,7 @@ use crate::error::unsupported;
 use crate::expr::{Value, c_string, construct_name};
 use crate::helpers::Helper;
 use crate::items::Returns;
-use crate::ty::classify;
+use crate::ty::{Ty, classify};
 use crate::{Emitter, Local};
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
@@ -81,6 +81,11 @@ impl Emitter<'_> {
             (Returns::Void, None) => self.line(out, "return;"),
             (Returns::Value(class), Some(value)) => {
                 let operand = self.expr(value)?;
+                let operand = if class == Ty::Int {
+                    self.fit(operand)?
+                } else {
+                    operand
+                };
                 if operand.value != crate::expr::Value::from(class) {
                     return Err(unsupported("value stored without a store check"));
                 }
@@ -115,6 +120,11 @@ impl Emitter<'_> {
             return Err(unsupported("local without an initializer"));
         };
         let value = self.expr(init)?;
+        let value = if class == Ty::Int {
+            self.fit(value)?
+        } else {
+            value
+        };
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
         }
@@ -230,6 +240,11 @@ impl Emitter<'_> {
         };
         let (name, class) = (local.name.clone(), local.ty);
         let value = self.expr(value)?;
+        let value = if class == Ty::Int {
+            self.fit(value)?
+        } else {
+            value
+        };
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
         }

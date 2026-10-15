@@ -6,6 +6,7 @@ const SCALARS: &str = include_str!("../tests/fixtures/run/scalars.c");
 const C_EDGES: &str = include_str!("../tests/fixtures/run/c_edges.c");
 const LOOPS: &str = include_str!("../tests/fixtures/run/loops.c");
 const FUNCTIONS: &str = include_str!("../tests/fixtures/run/functions.c");
+const NARROWING: &str = include_str!("../tests/fixtures/run/narrowing.c");
 
 #[test]
 fn scalars_program_is_pinned() {
@@ -164,7 +165,7 @@ fn arithmetic_over_a_variable_is_exact_and_checked_at_the_store() {
     let code = emitted("main {\n    var int n ← 1\n    n ← n + 1\n    print n\n}");
     assert!(
         code.contains(
-            "    l_n = faber_store_i64(faber_add(l_n, INT64_C(1)), \"assignment to `n`\");\n"
+            "    l_n = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_n, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_n, INT64_C(1)), \"assignment to `n`\") : faber_r; }));\n"
         ),
         "{code}"
     );
@@ -202,7 +203,7 @@ fn helpers_are_emitted_only_when_used() {
 
 #[test]
 fn remainder_pulls_in_floor_division() {
-    let code = emitted("main {\n    var int n ← 7\n    print n % 2\n}");
+    let code = emitted("main {\n    var int n ← 7\n    var int d ← 2\n    print n % d\n}");
     assert!(code.contains("static faber_i128 faber_div("), "{code}");
     assert!(code.contains("static faber_i128 faber_rem("), "{code}");
 }
@@ -257,7 +258,7 @@ fn functions_get_prototypes_and_prefixed_names() {
         "static int64_t f_twice(int64_t);\n",
         "static void f_hello(void);\n",
         "static int64_t f_twice(int64_t p_x) {\n",
-        "    return faber_store_i64(faber_mul(p_x, INT64_C(2)), \"return\");\n",
+        "faber_mul_o(p_x, INT64_C(2), &faber_o); faber_o ? faber_store_i64(faber_mul(p_x, INT64_C(2)), \"return\") : faber_r;",
         "    f_hello();\n",
     ] {
         assert!(code.contains(line), "{line:?} missing in {code}");
@@ -291,7 +292,7 @@ fn an_exact_argument_is_checked_like_a_store() {
         "fn f(int x) → int {\n    return x\n}\nmain {\n    var int n ← 1\n    print f(n + 1)\n}",
     );
     assert!(
-        code.contains("f_f(faber_store_i64(faber_add(l_n, INT64_C(1)), \"argument\"))"),
+        code.contains("faber_o ? faber_store_i64(faber_add(l_n, INT64_C(1)), \"argument\")"),
         "{code}"
     );
 }
@@ -318,4 +319,57 @@ fn module_constants_are_static_const() {
         "{code}"
     );
     assert!(code.contains(", k_LIMIT);"), "{code}");
+}
+
+#[test]
+fn narrowing_program_is_pinned() {
+    let source = include_str!("../tests/fixtures/run/narrowing.fab");
+    let source = crate::test_support::program("narrowing.fab", source);
+    assert_eq!(source, NARROWING);
+}
+
+/// C4: division and remainder of an `int64_t` by a constant other than 0 and
+/// -1 cannot leave `int64_t`, so they stay there with no exact helper.
+#[test]
+fn division_by_a_safe_constant_stays_in_int64() {
+    let code = emitted("main {\n    var int n ← 7\n    print n / 2, n % -3\n}");
+    assert!(code.contains("faber_fdiv_i64(l_n, INT64_C(2))"), "{code}");
+    assert!(code.contains("faber_fmod_i64(l_n, -INT64_C(3))"), "{code}");
+    assert!(!code.contains("faber_i128"), "{code}");
+}
+
+/// `x / -1` can leave `int64_t` (`INT64_MIN / -1`), and a variable divisor
+/// can be zero or -1, so both keep the exact helper.
+#[test]
+fn division_by_minus_one_or_a_variable_stays_exact() {
+    let code = emitted("main {\n    var int n ← 7\n    var int d ← 2\n    print n / -1, n / d\n}");
+    assert!(code.contains("faber_div(l_n, -INT64_C(1))"), "{code}");
+    assert!(code.contains("faber_div(l_n, l_d)"), "{code}");
+    assert!(!code.contains("faber_fdiv_i64"), "{code}");
+}
+
+/// The fallback re-evaluates the expression, so an expression with a call
+/// never takes the fast path: the call would run twice.
+#[test]
+fn an_expression_with_a_call_has_no_fast_path() {
+    let code = emitted(
+        "fn f() → int {\n    print \"f\"\n    return 1\n}\nmain {\n    var int n ← 1\n    n ← n + f()\n    print n\n}",
+    );
+    assert!(!code.contains("faber_add_o"), "{code}");
+    assert!(
+        code.contains(
+            "int64_t faber_t0 = l_n; int64_t faber_t1 = f_f(); faber_add(faber_t0, faber_t1);"
+        ),
+        "{code}"
+    );
+}
+
+/// Typecheck puts no store node where its range rule proves the result fits
+/// (`big + 1 - 1`); the value narrows through `faber_fit_i64`.
+#[test]
+fn a_proven_range_narrows_through_fit() {
+    let code = emitted(
+        "main {\n    var int big ← 9223372036854775807\n    var int back ← big + 1 - 1\n    print back, big\n}",
+    );
+    assert!(code.contains("faber_o ? faber_fit_i64(faber_sub(faber_add(l_big, INT64_C(1)), INT64_C(1))) : faber_r;"), "{code}");
 }

@@ -63,6 +63,47 @@ pub(crate) struct Operand {
     /// The expression calls a function, so where it runs relative to its
     /// siblings can show in the output (see [`Emitter::sequence`]).
     pub(crate) effect: bool,
+    /// The same value computed in `int64_t` on the C4 fast path, present only
+    /// for a pure integer expression whose leaves are `int64_t` values.
+    pub(crate) narrow: Option<Narrow>,
+}
+
+/// An integer expression in `int64_t` that sets `faber_o` on any overflow,
+/// and the helpers its text calls. Only a consumer that declares `faber_o` and
+/// can fall back to the exact form may use it (see [`Emitter::store_exact`]).
+#[derive(Debug, Clone)]
+pub(crate) struct Narrow {
+    text: String,
+    helpers: Vec<Helper>,
+}
+
+impl Narrow {
+    fn leaf(text: &str) -> Self {
+        Self {
+            text: text.to_owned(),
+            helpers: Vec::new(),
+        }
+    }
+
+    /// `name(left, right, &faber_o)`, or `name(left, right)` for the floor
+    /// helpers, which cannot overflow.
+    fn join(helper: Helper, left: &Narrow, right: &Narrow) -> Self {
+        let (name, flag) = match helper {
+            Helper::AddO => ("faber_add_o", true),
+            Helper::SubO => ("faber_sub_o", true),
+            Helper::MulO => ("faber_mul_o", true),
+            Helper::FdivI64 => ("faber_fdiv_i64", false),
+            _ => ("faber_fmod_i64", false),
+        };
+        let tail = if flag { ", &faber_o" } else { "" };
+        let mut helpers = left.helpers.clone();
+        helpers.extend(right.helpers.iter().copied());
+        helpers.push(helper);
+        Self {
+            text: format!("{name}({}, {}{tail})", left.text, right.text),
+            helpers,
+        }
+    }
 }
 
 impl Operand {
@@ -72,6 +113,7 @@ impl Operand {
             value,
             constant: None,
             effect: false,
+            narrow: None,
         }
     }
 
@@ -152,9 +194,9 @@ impl Emitter<'_> {
                 if operand.constant.is_some() {
                     return Err(unsupported("integer constant beyond i64"));
                 }
-                self.support.need(Helper::StoreI64);
-                operand.text = format!("faber_store_i64({}, \"argument\")", operand.text);
+                operand.text = self.store_exact(&operand, "\"argument\"");
                 operand.value = Value::Int;
+                operand.narrow = None;
             }
             if operand.value != Value::from(param) {
                 return Err(unsupported("value stored without a store check"));
@@ -234,11 +276,13 @@ impl Emitter<'_> {
             self.support.need(Helper::Types);
             (format!("((faber_i128)UINT64_C({value}))"), Value::Exact)
         };
+        let narrow = (class == Value::Int).then(|| Narrow::leaf(&text));
         Ok(Operand {
             text,
             value: class,
             constant: Some(value),
             effect: false,
+            narrow,
         })
     }
 
@@ -254,6 +298,7 @@ impl Emitter<'_> {
                 value: local.ty.into(),
                 constant: local.constant,
                 effect: false,
+                narrow: (local.ty == Ty::Int).then(|| Narrow::leaf(&local.name)),
             }),
             None => Err(unsupported("reference to a name that is not a local")),
         }
@@ -295,10 +340,15 @@ impl Emitter<'_> {
                     return self.int(-value);
                 }
                 self.support.need(Helper::Sub);
-                Ok(
+                let narrow = inner
+                    .narrow
+                    .as_ref()
+                    .map(|n| Narrow::join(Helper::SubO, &Narrow::leaf("INT64_C(0)"), n));
+                let mut operand =
                     Operand::new(format!("faber_sub(0, {})", inner.text), Value::Exact)
-                        .with_effect(inner.effect),
-                )
+                        .with_effect(inner.effect);
+                operand.narrow = narrow;
+                Ok(operand)
             }
             HirUnOp::Not if inner.value == Value::Truth => {
                 Ok(Operand::new(format!("(!{})", inner.text), Value::Truth)
@@ -352,13 +402,7 @@ impl Emitter<'_> {
             other => return Err(unsupported(binary_name(other))),
         };
         let (Some(a), Some(b)) = (l.constant, r.constant) else {
-            self.support.need(helper);
-            let effect = l.effect || r.effect;
-            let mut operands = [l, r];
-            let prelude = self.sequence(&mut operands);
-            let [l, r] = operands;
-            let text = wrap(&prelude, &format!("{name}({}, {})", l.text, r.text));
-            return Ok(Operand::new(text, Value::Exact).with_effect(effect));
+            return Ok(self.runtime_arithmetic(op, helper, name, l, r));
         };
         if b == 0 {
             match op {
@@ -373,6 +417,103 @@ impl Emitter<'_> {
                 "integer constant beyond the 64-bit representation cap",
             )),
         }
+    }
+
+    /// Arithmetic with at least one runtime operand. Division and remainder
+    /// of an `int64_t` by a constant other than 0 and -1 stay in `int64_t`
+    /// (C4); everything else is an exact helper call, carrying a 64-bit fast
+    /// form when the operands are pure `int64_t` expressions.
+    fn runtime_arithmetic(
+        &mut self,
+        op: HirBinOp,
+        helper: Helper,
+        name: &str,
+        l: Operand,
+        r: Operand,
+    ) -> Operand {
+        let effect = l.effect || r.effect;
+        let floor = match op {
+            HirBinOp::Div => Some(Helper::FdivI64),
+            HirBinOp::Mod => Some(Helper::FmodI64),
+            _ => None,
+        };
+        let safe_divisor = r
+            .constant
+            .is_some_and(|c| c != 0 && c != -1 && i64::try_from(c).is_ok());
+        if let Some(floor) = floor
+            && safe_divisor
+            && l.value == Value::Int
+        {
+            self.support.need(floor);
+            let text = Narrow::join(floor, &Narrow::leaf(&l.text), &Narrow::leaf(&r.text)).text;
+            let narrow = match (&l.narrow, &r.narrow) {
+                (Some(ln), Some(rn)) => Some(Narrow::join(floor, ln, rn)),
+                _ => None,
+            };
+            let mut operand = Operand::new(text, Value::Int).with_effect(effect);
+            operand.narrow = narrow;
+            return operand;
+        }
+        self.support.need(helper);
+        let fast = match op {
+            HirBinOp::Add => Some(Helper::AddO),
+            HirBinOp::Sub => Some(Helper::SubO),
+            HirBinOp::Mul => Some(Helper::MulO),
+            _ if safe_divisor => floor,
+            _ => None,
+        };
+        let narrow = match (fast, &l.narrow, &r.narrow) {
+            (Some(fast), Some(ln), Some(rn)) if !effect => Some(Narrow::join(fast, ln, rn)),
+            _ => None,
+        };
+        let mut operands = [l, r];
+        let prelude = self.sequence(&mut operands);
+        let [l, r] = operands;
+        let text = wrap(&prelude, &format!("{name}({}, {})", l.text, r.text));
+        let mut operand = Operand::new(text, Value::Exact).with_effect(effect);
+        operand.narrow = narrow;
+        operand
+    }
+
+    /// Narrow an exact runtime value into an `int64_t` cell. With a fast form
+    /// the value is computed in `int64_t` first, and only an overflow
+    /// re-evaluates it exactly through `faber_store_i64`; the expression is
+    /// pure, so evaluating it twice cannot show.
+    pub(crate) fn store_exact(&mut self, value: &Operand, at: &str) -> String {
+        self.support.need(Helper::StoreI64);
+        let exact = format!("faber_store_i64({}, {at})", value.text);
+        self.fast_or(value, exact)
+    }
+
+    /// An exact value that reached an `int` cell with no store node: narrow it
+    /// to its own expression type, which typecheck proved is `int` (see
+    /// `FIT_I64`). Other values pass through unchanged.
+    pub(crate) fn fit(&mut self, value: Operand) -> Result<Operand, CodegenError> {
+        if value.value != Value::Exact {
+            return Ok(value);
+        }
+        if value.constant.is_some() {
+            return Err(unsupported("integer constant beyond i64"));
+        }
+        self.support.need(Helper::FitI64);
+        let exact = format!("faber_fit_i64({})", value.text);
+        let text = self.fast_or(&value, exact);
+        Ok(Operand::new(text, Value::Int).with_effect(value.effect))
+    }
+
+    /// `exact`, or the fast `int64_t` form of `value` with `exact` as the
+    /// overflow fallback when `value` has one.
+    fn fast_or(&mut self, value: &Operand, exact: String) -> String {
+        let Some(narrow) = &value.narrow else {
+            return exact;
+        };
+        for helper in &narrow.helpers {
+            self.support.need(*helper);
+        }
+        format!(
+            "(__extension__ ({{ int faber_o = 0; int64_t faber_r = {}; faber_o ? {exact} : faber_r; }}))",
+            narrow.text
+        )
     }
 
     /// Integer comparison by exact value: C's usual arithmetic conversions
@@ -443,12 +584,9 @@ impl Emitter<'_> {
                 Err(unsupported("integer constant beyond i64"))
             }
             (Ty::Int, Value::Exact) => {
-                self.support.need(Helper::StoreI64);
                 let at = c_string(&self.store_position(site))?;
-                Ok(
-                    Operand::new(format!("faber_store_i64({}, {at})", value.text), Value::Int)
-                        .with_effect(value.effect),
-                )
+                let text = self.store_exact(&value, &at);
+                Ok(Operand::new(text, Value::Int).with_effect(value.effect))
             }
             _ => Err(unsupported("conversion between value classes")),
         }

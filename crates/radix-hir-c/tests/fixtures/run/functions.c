@@ -40,22 +40,6 @@ static faber_i128 faber_sub(faber_i128 a, faber_i128 b) {
     return faber_cap(a - b);
 }
 
-static faber_i128 faber_div(faber_i128 a, faber_i128 b) {
-    faber_i128 quotient;
-    if (b == 0) {
-        faber_trap("numerus division failed");
-    }
-    quotient = a / b;
-    if (a % b != 0 && ((a < 0) != (b < 0))) {
-        quotient -= 1;
-    }
-    return quotient;
-}
-
-static faber_i128 faber_rem(faber_i128 a, faber_i128 b) {
-    return a - b * faber_div(a, b);
-}
-
 static int64_t faber_store_i64(faber_i128 value, const char *at) {
     if (value < INT64_MIN || value > INT64_MAX) {
         char text[41];
@@ -63,6 +47,20 @@ static int64_t faber_store_i64(faber_i128 value, const char *at) {
         exit(1);
     }
     return (int64_t)value;
+}
+
+static inline int64_t faber_sub_o(int64_t a, int64_t b, int *overflow) {
+    int64_t difference;
+    *overflow |= __builtin_sub_overflow(a, b, &difference);
+    return difference;
+}
+
+static inline int64_t faber_fmod_i64(int64_t a, int64_t b) {
+    int64_t remainder = a % b;
+    if (remainder != 0 && ((remainder < 0) != (b < 0))) {
+        remainder += b;
+    }
+    return remainder;
 }
 
 static const int64_t k_LIMIT = INT64_C(10);
@@ -78,7 +76,7 @@ static int64_t f_fib(int64_t p_n) {
     if (p_n < INT64_C(2)) {
         return p_n;
     }
-    return faber_store_i64((__extension__ ({ int64_t faber_t0 = f_fib(faber_store_i64(faber_sub(p_n, INT64_C(1)), "argument")); int64_t faber_t1 = f_fib(faber_store_i64(faber_sub(p_n, INT64_C(2)), "argument")); faber_add(faber_t0, faber_t1); })), "return");
+    return faber_store_i64((__extension__ ({ int64_t faber_t0 = f_fib((__extension__ ({ int faber_o = 0; int64_t faber_r = faber_sub_o(p_n, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_sub(p_n, INT64_C(1)), "argument") : faber_r; }))); int64_t faber_t1 = f_fib((__extension__ ({ int faber_o = 0; int64_t faber_r = faber_sub_o(p_n, INT64_C(2), &faber_o); faber_o ? faber_store_i64(faber_sub(p_n, INT64_C(2)), "argument") : faber_r; }))); faber_add(faber_t0, faber_t1); })), "return");
 }
 
 static int64_t f_noisy(int64_t p_x) {
@@ -87,7 +85,7 @@ static int64_t f_noisy(int64_t p_x) {
 }
 
 static bool f_is_even(int64_t p_n) {
-    return (faber_rem(p_n, INT64_C(2)) == INT64_C(0));
+    return (faber_fmod_i64(p_n, INT64_C(2)) == INT64_C(0));
 }
 
 static void f_shout(const char *p_s, bool p_loud) {

@@ -27,16 +27,30 @@ pub(crate) enum Helper {
     Mul,
     Div,
     Rem,
+    FitI64,
     StoreI64,
+    AddO,
+    SubO,
+    MulO,
+    FdivI64,
+    FmodI64,
 }
 
 impl Helper {
     /// Helpers this one calls or names.
     fn needs(self) -> &'static [Helper] {
         match self {
-            Helper::Types | Helper::Trap => &[],
+            // The 64-bit fast-path helpers stand alone: plain `int64_t` and
+            // the overflow builtins.
+            Helper::Types
+            | Helper::Trap
+            | Helper::AddO
+            | Helper::SubO
+            | Helper::MulO
+            | Helper::FdivI64
+            | Helper::FmodI64 => &[],
             Helper::Text => &[Helper::Types],
-            Helper::Cap | Helper::Div => &[Helper::Types, Helper::Trap],
+            Helper::Cap | Helper::Div | Helper::FitI64 => &[Helper::Types, Helper::Trap],
             Helper::Add | Helper::Sub | Helper::Mul => &[Helper::Cap],
             Helper::Rem => &[Helper::Div],
             Helper::StoreI64 => &[Helper::Types, Helper::Text],
@@ -54,7 +68,13 @@ impl Helper {
             Helper::Mul => MUL,
             Helper::Div => DIV,
             Helper::Rem => REM,
+            Helper::FitI64 => FIT_I64,
             Helper::StoreI64 => STORE_I64,
+            Helper::AddO => ADD_O,
+            Helper::SubO => SUB_O,
+            Helper::MulO => MUL_O,
+            Helper::FdivI64 => FDIV_I64,
+            Helper::FmodI64 => FMOD_I64,
         }
     }
 }
@@ -146,6 +166,20 @@ static faber_i128 faber_rem(faber_i128 a, faber_i128 b) {
 }
 ";
 
+/// Narrowing an exact value to its own expression type where typecheck put no
+/// store node, because its range rule proved the result fits (`big + 1 - 1`
+/// is `int` though `big + 1` is not). The check cannot fail on a proven range;
+/// it stays so a wrong proof traps instead of truncating. Same text as the
+/// Rust target's `faber::exact::fit`.
+const FIT_I64: &str = "\
+static int64_t faber_fit_i64(faber_i128 value) {
+    if (value < INT64_MIN || value > INT64_MAX) {
+        faber_trap(\"numerus overflow\");
+    }
+    return (int64_t)value;
+}
+";
+
 /// The store into an `int` (`int64_t`) cell: the one place the width applies.
 const STORE_I64: &str = "\
 static int64_t faber_store_i64(faber_i128 value, const char *at) {
@@ -155,6 +189,61 @@ static int64_t faber_store_i64(faber_i128 value, const char *at) {
         exit(1);
     }
     return (int64_t)value;
+}
+";
+
+/// The 64-bit fast path (goal unit C4). Each operation computes the wrapped
+/// `int64_t` result, which the builtins define, and records an overflow in
+/// the caller's flag. When the flag stays clear every exact intermediate
+/// equals its `int64_t` value, so the fast result is the exact result; when it
+/// is set, the caller re-evaluates the same pure expression through the exact
+/// helpers, which give the exact value, trap and trap text.
+const ADD_O: &str = "\
+static inline int64_t faber_add_o(int64_t a, int64_t b, int *overflow) {
+    int64_t sum;
+    *overflow |= __builtin_add_overflow(a, b, &sum);
+    return sum;
+}
+";
+
+const SUB_O: &str = "\
+static inline int64_t faber_sub_o(int64_t a, int64_t b, int *overflow) {
+    int64_t difference;
+    *overflow |= __builtin_sub_overflow(a, b, &difference);
+    return difference;
+}
+";
+
+const MUL_O: &str = "\
+static inline int64_t faber_mul_o(int64_t a, int64_t b, int *overflow) {
+    int64_t product;
+    *overflow |= __builtin_mul_overflow(a, b, &product);
+    return product;
+}
+";
+
+/// Floor division of an `int64_t` by a constant other than 0 and -1: C's `/`
+/// cannot overflow, and the floored quotient stays inside `int64_t`
+/// (`|b| >= 2` halves the magnitude; `b == 1` never adjusts).
+const FDIV_I64: &str = "\
+static inline int64_t faber_fdiv_i64(int64_t a, int64_t b) {
+    int64_t quotient = a / b;
+    if (a % b != 0 && ((a < 0) != (b < 0))) {
+        quotient -= 1;
+    }
+    return quotient;
+}
+";
+
+/// Floor remainder by a constant other than 0 and -1, from C's `%` so no
+/// product can overflow: the result takes the divisor's sign.
+const FMOD_I64: &str = "\
+static inline int64_t faber_fmod_i64(int64_t a, int64_t b) {
+    int64_t remainder = a % b;
+    if (remainder != 0 && ((remainder < 0) != (b < 0))) {
+        remainder += b;
+    }
+    return remainder;
 }
 ";
 

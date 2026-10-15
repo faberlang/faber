@@ -1,0 +1,31 @@
++++
+locale = "en"
++++
+# The 64-bit fast path must agree with the exact model everywhere: floor
+# division and remainder by constants, the int64 extremes, and intermediates
+# that overflow int64 but not the representation cap, which take the exact
+# fallback and still store a value that fits. One value per print: the runner
+# splits a multi-value print whose argument divides by a literal.
+main {
+    var int a ← -7
+    print a / 2
+    print a % 2
+    print a / -2
+    print a % -2
+    print a / 1
+    print a % 1
+    print a / 3
+    print a % -3
+    var int big ← 9223372036854775807
+    var int low ← 0 - big - 1
+    print big / 2
+    print big % -2
+    print low / 2
+    print low % 3
+    print low / -2
+    print low % -2
+    var int half ← big * 2 / 4
+    print half
+    var int back ← big + 1 - 1
+    print back
+}

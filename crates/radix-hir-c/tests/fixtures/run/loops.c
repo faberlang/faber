@@ -72,6 +72,40 @@ static int64_t faber_store_i64(faber_i128 value, const char *at) {
     return (int64_t)value;
 }
 
+static inline int64_t faber_add_o(int64_t a, int64_t b, int *overflow) {
+    int64_t sum;
+    *overflow |= __builtin_add_overflow(a, b, &sum);
+    return sum;
+}
+
+static inline int64_t faber_sub_o(int64_t a, int64_t b, int *overflow) {
+    int64_t difference;
+    *overflow |= __builtin_sub_overflow(a, b, &difference);
+    return difference;
+}
+
+static inline int64_t faber_mul_o(int64_t a, int64_t b, int *overflow) {
+    int64_t product;
+    *overflow |= __builtin_mul_overflow(a, b, &product);
+    return product;
+}
+
+static inline int64_t faber_fdiv_i64(int64_t a, int64_t b) {
+    int64_t quotient = a / b;
+    if (a % b != 0 && ((a < 0) != (b < 0))) {
+        quotient -= 1;
+    }
+    return quotient;
+}
+
+static inline int64_t faber_fmod_i64(int64_t a, int64_t b) {
+    int64_t remainder = a % b;
+    if (remainder != 0 && ((remainder < 0) != (b < 0))) {
+        remainder += b;
+    }
+    return remainder;
+}
+
 int main(void) {
     int64_t l_best = INT64_C(0);
     int64_t l_best_start = INT64_C(0);
@@ -80,37 +114,37 @@ int main(void) {
         int64_t l_n = l_start;
         int64_t l_steps = INT64_C(0);
         while (l_n != INT64_C(1)) {
-            if (faber_rem(l_n, INT64_C(2)) == INT64_C(0)) {
-                l_n = faber_store_i64(faber_div(l_n, INT64_C(2)), "assignment to `n`");
+            if (faber_fmod_i64(l_n, INT64_C(2)) == INT64_C(0)) {
+                l_n = faber_fdiv_i64(l_n, INT64_C(2));
             } else {
-                l_n = faber_store_i64(faber_add(faber_mul(INT64_C(3), l_n), INT64_C(1)), "assignment to `n`");
+                l_n = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(faber_mul_o(INT64_C(3), l_n, &faber_o), INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(faber_mul(INT64_C(3), l_n), INT64_C(1)), "assignment to `n`") : faber_r; }));
             }
-            l_steps = faber_store_i64(faber_add(l_steps, INT64_C(1)), "assignment to `steps`");
+            l_steps = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_steps, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_steps, INT64_C(1)), "assignment to `steps`") : faber_r; }));
         }
         if (l_steps > l_best) {
             l_best = l_steps;
             l_best_start = l_start;
         }
-        l_start = faber_store_i64(faber_add(l_start, INT64_C(1)), "assignment to `start`");
+        l_start = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_start, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_start, INT64_C(1)), "assignment to `start`") : faber_r; }));
     }
     printf("%" PRId64 " %" PRId64 "\n", l_best_start, l_best);
     int64_t l_a = -INT64_C(7);
     int64_t l_b = INT64_C(2);
     int64_t l_seven = INT64_C(7);
-    int64_t l_nb = faber_store_i64(faber_sub(INT64_C(0), l_b), "declaration of `nb`");
+    int64_t l_nb = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_sub_o(INT64_C(0), l_b, &faber_o); faber_o ? faber_store_i64(faber_sub(INT64_C(0), l_b), "declaration of `nb`") : faber_r; }));
     printf("%s %s %s %s %s\n", faber_i128_text(faber_div(l_a, l_b), (char[41]){0}), faber_i128_text(faber_rem(l_a, l_b), (char[41]){0}), faber_i128_text(faber_div(l_seven, l_nb), (char[41]){0}), faber_i128_text(faber_rem(l_seven, l_nb), (char[41]){0}), faber_i128_text(faber_sub(0, l_a), (char[41]){0}));
     int64_t l_i = INT64_C(0);
     int64_t l_total = INT64_C(0);
     while (1) {
-        l_i = faber_store_i64(faber_add(l_i, INT64_C(1)), "assignment to `i`");
+        l_i = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_i, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_i, INT64_C(1)), "assignment to `i`") : faber_r; }));
         if (l_i > INT64_C(20)) {
             break;
         }
-        if ((faber_rem(l_i, INT64_C(3)) == INT64_C(0)) || (faber_rem(l_i, INT64_C(5)) == INT64_C(0))) {
+        if ((faber_fmod_i64(l_i, INT64_C(3)) == INT64_C(0)) || (faber_fmod_i64(l_i, INT64_C(5)) == INT64_C(0))) {
             continue;
         }
         if ((l_i >= INT64_C(2)) && (!(l_i == INT64_C(7)))) {
-            l_total = faber_store_i64(faber_add(l_total, l_i), "assignment to `total`");
+            l_total = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_total, l_i, &faber_o); faber_o ? faber_store_i64(faber_add(l_total, l_i), "assignment to `total`") : faber_r; }));
         }
     }
     printf("%" PRId64 "\n", l_total);
