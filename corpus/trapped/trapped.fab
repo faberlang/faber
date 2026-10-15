@@ -1,0 +1,67 @@
++++
+term = "trapped"
+explains = ["trapped"]
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fixum_decl", "redde_stmt", "si_stmt", "iace_stmt", "capta_expr", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "incipit_stmt", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal"]
+category = "errors"
+canonical = true
+summary = "The result of a capture boundary: trap { ... } reifies the error channel into a value read by match."
+syntax = "trapped<R, T>"
+related = ["discerne", "iace", "cape"]
+locale = "en"
++++
+# =============================================================================
+# trapped — the capture boundary's result value
+# =============================================================================
+#
+# What this teaches:
+#   • trap { ... } runs its block and reifies the ⇥ error channel into a value
+#     instead of propagating it; the block's trailing expression is the success.
+#   • Ruled shape (error model 2026-10-13, grammar/EBNF.md): the result is
+#     trapped<R, T>, variants returned { value: R } and thrown { error: T },
+#     read with an ordinary match; R and T are separate slots.
+#   • On the current compiler the boundary's result checks and runs as the
+#     union R ∪ E, so this program matches the members (case int / case
+#     string); the returned/thrown variant arms land with the trapped
+#     re-typing (need follow-ups).
+#   • trap catches only the ⇥ channel — panic stays fatal; the success and
+#     error types collapsing to one type is rejected (trap_union_collapsed).
+#
+# Common mistakes:
+#   • Expecting trap to catch panic or adfirma — it never does.
+#   • Success and error of the same type — the value cannot tell them apart.
+#   • Confusing trap with cape — cape is the statement-level handler that
+#     binds the payload; trap is the expression that yields the value.
+#
+# See also: discerne, iace, cape, defectus
+# =============================================================================
+
+fn half(int n) → int ⇥ string {
+    if n % 2 ≢ 0 {
+        throw "odd"
+    }
+    return n / 2
+}
+
+main {
+    # trap { ... } turns the failable call's two exits into one value.
+    const _ missed ← trap { half(7) }
+    match missed {
+        case int const value {
+            print "returned §"(value)
+        }
+        case string const err {
+            print "thrown §"(err)
+        }
+    }
+
+    const _ made ← trap { half(8) }
+    match made {
+        case int const value {
+            print "returned §"(value)
+        }
+        case string const err {
+            print "thrown §"(err)
+        }
+    }
+}
