@@ -52,7 +52,10 @@ fn define_builtin_symbol(resolver: &mut Resolver, symbol: crate::Symbol) {
     // `scrinium`, `status`, `meus`, `tuus`) and made release reject programs a
     // debug build accepts.
     let defined = resolver.define(symbol);
-    debug_assert!(defined.is_ok(), "builtin frame symbol registers exactly once");
+    debug_assert!(
+        defined.is_ok(),
+        "builtin frame symbol registers exactly once"
+    );
 }
 
 const STATUS_VARIANTS: &[&str] = &["request", "item", "byte", "bulk", "done", "error", "cancel"];
