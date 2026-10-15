@@ -72,11 +72,13 @@ fn go_rejects_the_runner_only_list_forms() {
     }
 }
 
+/// The Rust emitter lifts these forms itself (iterator `zip`/`map` over the
+/// lanes), so none of them reaches the lift issue.
 #[cfg(feature = "hir-rust")]
 #[test]
-fn rust_rejects_the_runner_only_list_forms() {
+fn rust_emits_the_runner_only_list_forms() {
     for body in RUNNER_ONLY {
-        assert!(rejected_with(Target::HirRust, body), "`{body}`");
+        assert!(!rejected_with(Target::HirRust, body), "`{body}`");
     }
 }
 
