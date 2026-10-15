@@ -9,15 +9,16 @@ fn small_compiled() -> BTreeSet<&'static str> {
 }
 
 /// Features of the experimental, default-off novelty targets (BASIC, Pascal,
-/// COBOL, Fortran, Odin). They are outside `full-targets`, so the default test build
+/// COBOL, Fortran, Odin, C). They are outside `full-targets`, so the default test build
 /// lists their rows as `available=no`.
 #[cfg(all(feature = "full-targets", feature = "hir-rust"))]
-const EXPERIMENTAL_DEFAULT_OFF: [&str; 5] = [
+const EXPERIMENTAL_DEFAULT_OFF: [&str; 6] = [
     "mir-basic",
     "hir-pascal",
     "hir-cobol",
     "hir-fortran",
     "hir-odin",
+    "hir-c",
 ];
 
 #[cfg(feature = "hir-rust")]

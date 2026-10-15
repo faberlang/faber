@@ -1,0 +1,15 @@
++++
+locale = "en"
++++
+main {
+    print 1 + 2
+    print "hi"
+    print 2 * 3 + 4
+    const int neg ← 0 - 7
+    print neg / 2
+    print neg % 2
+    print "say \"hi\"\tand\\done"
+    const int answer ← 40 + 2
+    const string greeting ← "héllo"
+    print answer, greeting
+}

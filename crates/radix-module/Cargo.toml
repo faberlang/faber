@@ -38,6 +38,8 @@ radix-semantic = { path = "../radix-semantic" }
 # Novelty Pascal leaf: default-off, NOT in full-targets.
 # Novelty Fortran leaf: default-off, NOT in full-targets.
 # Novelty Odin leaf: default-off, NOT in full-targets.
+# Novelty C leaf: default-off, NOT in full-targets.
+radix-hir-c = { path = "../radix-hir-c", optional = true }
 radix-hir-faber = { path = "../radix-hir-faber", optional = true }
 radix-mir = { path = "../radix-mir", optional = true }
 radix-mir-lower = { path = "../radix-mir-lower", optional = true }
@@ -81,4 +83,5 @@ mir-fmir = ["mir-core"]
 mir-core = ["dep:radix-mir", "dep:radix-mir-lower"]
 runner = ["mir-core", "dep:radix-mir-runner"]
 test-support = ["dep:tempfile"]
+hir-c = ["dep:radix-hir-c", "radix-target/hir-c"]
 

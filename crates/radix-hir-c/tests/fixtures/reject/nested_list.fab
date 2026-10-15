@@ -1,0 +1,7 @@
++++
+locale = "en"
++++
+main {
+    const list<list<int>> grid ← [[1], [2]]
+    print grid
+}

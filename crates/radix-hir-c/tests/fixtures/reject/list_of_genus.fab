@@ -1,0 +1,11 @@
++++
+locale = "en"
++++
+class Point {
+    var int x = 0
+}
+
+main {
+    const list<Point> ps ← [{ x = 1 }]
+    print ps.length()
+}

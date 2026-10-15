@@ -1,0 +1,27 @@
+[package]
+name = "radix-hir-c"
+version = "0.84.0"
+edition = "2024"
+description = "Novelty C HIR codegen backend (integer-and-text spike with exact arithmetic) for the Radix compiler"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+radix-codegen-shared = { path = "../radix-codegen-shared" }
+radix-diagnostics = { path = "../radix-diagnostics" }
+radix-hir = { path = "../radix-hir" }
+radix-intrinsics = { path = "../radix-intrinsics" }
+radix-lexer = { path = "../radix-lexer" }
+radix-types = { path = "../radix-types" }
+rustc-hash = "2"
+
+[dev-dependencies]
+radix-hygiene = { path = "../radix-hygiene" }
+# The pinned-output and rejection tests compile Faber source through the
+# module compiler. Cargo allows this dev-dependency cycle (radix-module
+# depends on this crate through its default-off `hir-c` feature). `mir-core`
+# is listed because radix-module does not build without it.
+radix-module = { path = "../radix-module", default-features = false, features = ["hir-c", "mir-core"] }

@@ -23,6 +23,8 @@
 //!   public [`crate::Output`] variant.
 
 pub use radix_semantic::coverage;
+#[cfg(feature = "hir-c")]
+pub mod c;
 #[cfg(feature = "hir-cobol")]
 pub mod cobol;
 pub mod conversio_coverage;
@@ -433,6 +435,7 @@ pub fn generate_from_analyzed_with_options(
         Target::HirCobol => generate_cobol_from_analyzed(analysis, hir),
         Target::HirFortran => generate_fortran_from_analyzed(analysis, hir),
         Target::HirOdin => generate_odin_from_analyzed(analysis, hir),
+        Target::HirC => generate_c_from_analyzed(analysis, hir),
         #[cfg(feature = "hir-faber")]
         Target::HirFaber => {
             let imported_spellings = analysis.resolver.imported_spellings(&analysis.interner);
@@ -949,6 +952,19 @@ fn generate_odin_from_analyzed(
     _hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirOdin))
+}
+
+#[cfg(feature = "hir-c")]
+fn generate_c_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) -> Result<crate::Output, CodegenError> {
+    let mut r#gen = c::CCodegen::new(hir, analysis.interner());
+    r#gen.set_display_tokens(analysis.display_tokens().clone());
+    let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
+    Ok(crate::Output::C(crate::COutput { code: output.code }))
+}
+
+#[cfg(not(feature = "hir-c"))]
+fn generate_c_from_analyzed(_analysis: &dyn CodegenAnalysis, _hir: &HirModule) -> Result<crate::Output, CodegenError> {
+    Err(unavailable_target_error(Target::HirC))
 }
 
 /// Emit each distinct file-namespace provider binding as a module, mapping

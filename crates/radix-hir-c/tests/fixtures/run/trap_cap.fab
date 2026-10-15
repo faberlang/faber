@@ -1,0 +1,10 @@
++++
+locale = "en"
++++
+# An intermediate beyond the representation cap traps even though it is never
+# stored: (2^63 - 1) * 4 exceeds 2^64 - 1.
+main {
+    var int n ← 9223372036854775807
+    print "before"
+    print n * 4 / 8
+}

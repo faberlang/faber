@@ -1,0 +1,8 @@
++++
+locale = "en"
++++
+# A list shows its text elements quoted, with the runner's escapes.
+main {
+    const list<string> s ← ["q\"x", "b\\s", "n\nl", "t\tb", "é", "r\rr", "e\u{1b}c", ""]
+    print s
+}

@@ -1,0 +1,9 @@
++++
+locale = "en"
++++
+fn f() → int {
+    return 1
+}
+main {
+    print f()
+}

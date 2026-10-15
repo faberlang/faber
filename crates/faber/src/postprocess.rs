@@ -174,6 +174,7 @@ pub fn format_generated_code(target: Target, code: &str) -> Result<String, Strin
         | Target::HirCobol
         | Target::HirFortran
         | Target::HirOdin
+        | Target::HirC
         | Target::HirFhir
         | Target::MirStepper
         | Target::MirWasm
@@ -210,6 +211,7 @@ pub fn lint_generated_code(target: Target, code: &str) -> Result<String, String>
         | Target::HirCobol
         | Target::HirFortran
         | Target::HirOdin
+        | Target::HirC
         | Target::HirFhir
         | Target::MirStepper
         | Target::MirWasm

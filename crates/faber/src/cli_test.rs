@@ -194,6 +194,7 @@ fn cli_parses_emit_external_target_names() {
         ("fortran", FaberCliTarget::HirFortran),
         ("f90", FaberCliTarget::HirFortran),
         ("odin", FaberCliTarget::HirOdin),
+        ("c", FaberCliTarget::HirC),
     ] {
         let cli = Cli::try_parse_from(["faber", "emit", "-t", name, "main.fab"])
             .unwrap_or_else(|err| panic!("parse emit target {name}: {err}"));

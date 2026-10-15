@@ -1,0 +1,9 @@
++++
+locale = "en"
++++
+main {
+    var list<int> xs ← [1, 2]
+    var int i ← 0 - 1
+    print "before"
+    print xs[i]
+}

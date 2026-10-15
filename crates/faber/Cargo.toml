@@ -67,6 +67,7 @@ tempfile = "3"
 default = ["full-targets"]
 full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
 hir-faber = ["radix/hir-faber"]
+hir-c = ["radix/hir-c"]
 hir-fhir = ["radix/hir-fhir"]
 mir-fmir = ["radix/mir-fmir"]
 runner = ["radix/runner", "dep:radix-mir-runner", "dep:proba", "proba/runner"]

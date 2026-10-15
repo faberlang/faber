@@ -1,0 +1,6 @@
++++
+locale = "en"
++++
+main {
+    print 1.5
+}

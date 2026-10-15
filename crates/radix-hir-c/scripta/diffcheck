@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# Differential check for the c target.
+#
+# For every fixture in tests/fixtures/run/*.fab: emit C, build it with the host
+# C compiler under strict C11 with UndefinedBehaviorSanitizer and
+# AddressSanitizer (every report is fatal), run the built binary, run `faber run` on the same source, and
+# compare stdout (byte for byte) and exit status; a trap fixture must exit 1
+# with the same partial stdout as the runner. For every fixture in
+# tests/fixtures/reject/*.fab: emission must fail with a named "unsupported on
+# target c" rejection and must not produce a program.
+# Run by hand from anywhere; no crate test depends on it.
+#   scripta/diffcheck [run-fixture.fab ...]
+#
+# The faber binary is rebuilt every time (a no-op when current), with every
+# novelty feature, so the novelty diffchecks share one binary and never undo
+# each other's build. Compiler lookup order: $CC, then cc, gcc, clang. A
+# missing compiler is a loud skip that says nothing was checked and exits 77;
+# zero fixtures is a failure. $CFLAGS replaces the default flags.
+#
+# -Wno-unused-variable: an immutable integer local whose reads all fold is
+# declared but never named again; that is the emitter's choice, not a defect.
+set -u
+here=$(cd "$(dirname "$0")/.." && pwd)
+radix=$(cd "$here/../.." && pwd)
+cc=${CC:-}
+for candidate in cc gcc clang; do
+  [ -n "$cc" ] && break
+  cc=$(command -v "$candidate" || true)
+done
+if [ -z "$cc" ] || ! command -v "$cc" >/dev/null 2>&1; then
+  echo "SKIPPED: no C compiler (cc, gcc, clang) found; NOTHING WAS CHECKED." >&2
+  echo "SKIPPED: install one or set CC=/path/to/cc to run the c differential check." >&2
+  exit 77
+fi
+cflags=${CFLAGS:--std=c11 -pedantic -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=undefined,address -fno-sanitize-recover=all}
+# The arena never frees by design (goal unit C5), so leak reports are noise;
+# every other AddressSanitizer report fails the fixture.
+export ASAN_OPTIONS=${ASAN_OPTIONS:-detect_leaks=0}
+echo "cc: $("$cc" --version 2>&1 | head -n 1)"
+echo "cflags: $cflags"
+faber=$radix/target/debug/faber
+work=$radix/target/c-diffcheck
+runtime=$radix/runtime/c
+mkdir -p "$work"
+# The runtime first: the header compiles cleanly on its own (included, as a
+# program includes it), and its own checks pass under the sanitizers.
+printf '#include "faber.h"\n' >"$work/header.c"
+# shellcheck disable=SC2086 # cflags is a word list on purpose
+if ! "$cc" $cflags -I "$runtime" -fsyntax-only "$work/header.c" >"$work/header.out" 2>&1; then
+  echo "FAIL runtime: faber.h does not compile on its own"
+  head -n 8 "$work/header.out"
+  exit 1
+fi
+# shellcheck disable=SC2086
+if ! "$cc" $cflags -I "$runtime" -o "$work/faber_test" "$runtime/tests/faber_test.c" -lm >"$work/faber_test.out" 2>&1 \
+  || ! "$work/faber_test" >>"$work/faber_test.out" 2>&1; then
+  echo "FAIL runtime: runtime/c/tests/faber_test.c"
+  head -n 12 "$work/faber_test.out"
+  exit 1
+fi
+echo "ok   runtime (faber.h, tests/faber_test.c)"
+(cd "$radix" && cargo build -q -p faber --features mir-basic,hir-pascal,hir-cobol,hir-fortran,hir-odin,hir-c 2>"$work/cargo.err") || {
+  echo "FAIL: could not build faber with the novelty features" >&2
+  tail -n 30 "$work/cargo.err" >&2
+  exit 1
+}
+if [ $# -gt 0 ]; then
+  fixtures=("$@")
+  rejects=()
+else
+  fixtures=("$here"/tests/fixtures/run/*.fab)
+  rejects=("$here"/tests/fixtures/reject/*.fab)
+fi
+pass=0
+fail=0
+checked=0
+for fab in "${fixtures[@]}"; do
+  [ -f "$fab" ] || continue
+  checked=$((checked + 1))
+  name=$(basename "$fab" .fab)
+  rm -f "$work/$name" "$work/$name.c" "$work/$name".*.out "$work/$name".*.err
+  src=$work/$name.c
+  if ! "$faber" emit -t c "$fab" >"$src" 2>"$work/$name.emit.err"; then
+    echo "FAIL $name: emit rejected: $(head -c 300 "$work/$name.emit.err")"
+    fail=$((fail + 1))
+    continue
+  fi
+  # shellcheck disable=SC2086 # cflags is a word list on purpose
+  if ! "$cc" $cflags -I "$runtime" -o "$work/$name" "$src" -lm >"$work/$name.cc.out" 2>&1; then
+    echo "FAIL $name: the C compiler rejected the program"
+    head -n 8 "$work/$name.cc.out"
+    fail=$((fail + 1))
+    continue
+  fi
+  "$work/$name" >"$work/$name.bin.out" 2>"$work/$name.bin.err"
+  bin_code=$?
+  "$faber" run "$fab" >"$work/$name.run.out" 2>/dev/null
+  run_code=$?
+  # A trap legitimately writes `error: ...` to stderr; a sanitizer report
+  # (UBSan `runtime error:`, ASan `ERROR: AddressSanitizer`) is undefined
+  # behavior the emitter let through.
+  if grep -qE "runtime error:|ERROR: AddressSanitizer" "$work/$name.bin.err"; then
+    echo "FAIL $name: sanitizer report"
+    head -n 8 "$work/$name.bin.err"
+    fail=$((fail + 1))
+  elif [ "$bin_code" -eq "$run_code" ] && cmp -s "$work/$name.bin.out" "$work/$name.run.out"; then
+    echo "ok   $name"
+    pass=$((pass + 1))
+  else
+    echo "FAIL $name: c exit $bin_code, faber run exit $run_code"
+    diff "$work/$name.bin.out" "$work/$name.run.out" | head -n 10
+    fail=$((fail + 1))
+  fi
+done
+for fab in ${rejects[@]+"${rejects[@]}"}; do
+  [ -f "$fab" ] || continue
+  checked=$((checked + 1))
+  name=reject_$(basename "$fab" .fab)
+  if "$faber" emit -t c "$fab" >"$work/$name.c" 2>"$work/$name.emit.err"; then
+    echo "FAIL $name: emitted a program; it must be rejected by name"
+    fail=$((fail + 1))
+  elif grep -q "unsupported on target c" "$work/$name.emit.err"; then
+    echo "ok   $name (rejected by name)"
+    pass=$((pass + 1))
+  else
+    echo "FAIL $name: rejected, but not by a named \"unsupported on target c\" diagnostic: $(head -c 300 "$work/$name.emit.err")"
+    fail=$((fail + 1))
+  fi
+done
+if [ "$checked" -eq 0 ]; then
+  echo "FAIL: no fixtures found; nothing was checked" >&2
+  exit 1
+fi
+echo "diffcheck: $pass matched, $fail differ"
+[ "$fail" -eq 0 ]

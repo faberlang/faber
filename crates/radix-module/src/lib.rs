@@ -170,6 +170,10 @@ pub enum Output {
     #[cfg(feature = "hir-odin")]
     Odin(OdinOutput),
 
+    /// Novelty C backend output (default-off `hir-c` feature).
+    #[cfg(feature = "hir-c")]
+    C(COutput),
+
     /// Canonical Faber source output.
     Faber(FaberOutput),
 
@@ -241,6 +245,13 @@ pub struct FortranOutput {
 #[cfg(feature = "hir-odin")]
 pub struct OdinOutput {
     /// Complete generated Odin program.
+    pub code: String,
+}
+
+/// Novelty C backend output.
+#[cfg(feature = "hir-c")]
+pub struct COutput {
+    /// Complete generated C11 translation unit.
     pub code: String,
 }
 

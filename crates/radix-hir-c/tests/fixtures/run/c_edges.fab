@@ -1,0 +1,21 @@
++++
+locale = "en"
++++
+main {
+    print 0 - 9223372036854775807 - 1
+    print 9223372036854775807
+    print "100%s and %d stay text"
+    print "what??!"
+    print "café"
+    print "héab"
+    const int char ← 1
+    const int goto ← 2
+    const int stdout ← 3
+    const int size_t ← 4
+    const int INT64_MAX ← 5
+    const string printf ← "shadow"
+    print char, goto, stdout, size_t, INT64_MAX, printf
+    var int count ← 5
+    var string label ← "mutable"
+    print count, label
+}
