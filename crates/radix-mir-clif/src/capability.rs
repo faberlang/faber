@@ -183,7 +183,7 @@ impl<'a> ClifCapability<'a> {
             Type::SizedNumeric(Primitive::Fractus, width) if width.is_float() => None,
             Type::SizedNumeric(..) => Some(Gap::Subset("sized numeric value".to_owned())),
             Type::PolicyFloat(..) => Some(Gap::Subset("policy float value".to_owned())),
-            Type::Primitive(Primitive::Ascii) => Some(Gap::Subset("string value".to_owned())),
+            Type::Primitive(Primitive::Ascii) => None,
             Type::Primitive(Primitive::Littera) => Some(Gap::Subset("character value".to_owned())),
             Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => {
                 Some(Gap::Subset("byte buffer value".to_owned()))
@@ -343,7 +343,7 @@ impl<'a> ClifCapability<'a> {
             MirConstant::Int(_) | MirConstant::UInt(_) | MirConstant::Float(_) => None,
             MirConstant::Bool(_) | MirConstant::Unit => None,
             MirConstant::String(_) => None,
-            MirConstant::Ascii(_) => Some(Gap::Subset("string constant".to_owned())),
+            MirConstant::Ascii(_) => None,
             MirConstant::Octeti(_) => Some(Gap::Subset("byte constant".to_owned())),
             MirConstant::Regex { .. } => Some(Gap::Subset("regex constant".to_owned())),
             MirConstant::Nil => None,

@@ -212,7 +212,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(Primitive::Numerus) => Ok(Rep::Int),
         Type::Primitive(Primitive::Fractus) => Ok(Rep::Float),
         Type::Primitive(Primitive::Bivalens) => Ok(Rep::Bool),
-        Type::Primitive(Primitive::Textus) => Ok(Rep::Text),
+        Type::Primitive(Primitive::Textus | Primitive::Ascii) => Ok(Rep::Text),
         Type::Bits(width) => Ok(Rep::Bits(*width)),
         Type::Struct(_) | Type::Enum(_) => Ok(Rep::Record),
         Type::Map(key, value) => {
@@ -824,7 +824,7 @@ impl FunctionLower<'_, '_> {
                     Rep::Func,
                 )
             }
-            MirConstant::String(symbol) => {
+            MirConstant::String(symbol) | MirConstant::Ascii(symbol) => {
                 let text = radix_lexer::textus_literal::decode_textus_literal(
                     self.state.input.interner.resolve(*symbol),
                 );
