@@ -426,3 +426,47 @@ fn int_to_f32_rounds_once() {
         Value::Float(once as f64)
     );
 }
+
+/// `f64 ↦ f32` rounds to binary32 at the store: 0.1 is not representable, so
+/// the narrowed cell holds the nearest f32, not the f64 literal.
+#[test]
+fn float_to_f32_rounds_to_binary32() {
+    let f32_ty = Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32);
+    let narrowed = run_conversion(fractus(), f32_ty, Value::Float(0.1), None).expect("f64 to f32");
+    assert_eq!(narrowed, Value::Float(f64::from(0.1_f64 as f32)));
+    assert_ne!(narrowed, Value::Float(0.1));
+}
+
+#[test]
+fn text_to_f32_rounds_to_binary32() {
+    let f32_ty = Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32);
+    let narrowed = run_conversion(
+        Type::Primitive(Primitive::Textus),
+        f32_ty,
+        Value::Str("0.1".into()),
+        None,
+    )
+    .expect("text to f32");
+    assert_eq!(narrowed, Value::Float(f64::from(0.1_f64 as f32)));
+    assert_ne!(narrowed, Value::Float(0.1));
+}
+
+/// Beyond `f32::MAX` the nearest binary32 is infinity (IEEE overflow); the
+/// store does not clamp.
+#[test]
+fn float_above_f32_max_narrows_to_infinity() {
+    let f32_ty = Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32);
+    assert_eq!(
+        run_conversion(fractus(), f32_ty, Value::Float(1e39), None).expect("f64 to f32"),
+        Value::Float(f64::INFINITY)
+    );
+}
+
+#[test]
+fn float_to_f64_keeps_the_value() {
+    let f64_ty = Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64);
+    assert_eq!(
+        run_conversion(fractus(), f64_ty, Value::Float(0.1), None).expect("f64 to f64"),
+        Value::Float(0.1)
+    );
+}
