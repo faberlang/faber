@@ -463,7 +463,16 @@ fn resolve_stmt(
             }
         }
         StmtKind::Itera(stmt) => {
+            let enum_source = !matches!(stmt.mode, radix_syntax::IteraMode::Ab);
             for source in &stmt.sources {
+                // An `ordo` name in source position names the enum's own
+                // member series, not a value, so the
+                // type-kind-name expression rejection below must not fire for
+                // it. Every other type-kind name in expression position still
+                // rejects, and typecheck keeps `de` over an enum rejected.
+                if enum_source && is_enum_iteration_source(resolver, source) {
+                    continue;
+                }
                 resolve_expr(resolver, interner, source, errors);
             }
             resolver.enter_scope(ScopeKind::Loop);
@@ -1343,6 +1352,21 @@ fn resolve_pattern_bind(
             }
         }
     }
+}
+
+/// Whether `expr` is exactly a bare name resolving to an `ordo` definition.
+///
+/// `itera ex Color` names the enum's member series, so it is the one place a
+/// type-kind name stands in expression position without the ordinary
+/// `name_not_value` rejection.
+fn is_enum_iteration_source(resolver: &Resolver, expr: &Expr) -> bool {
+    let ExprKind::Ident(ident) = &expr.kind else {
+        return false;
+    };
+    resolver
+        .lookup(ident.name)
+        .and_then(|def_id| resolver.get_symbol(def_id))
+        .is_some_and(|symbol| symbol.kind == SymbolKind::Enum)
 }
 
 fn resolve_expr(
