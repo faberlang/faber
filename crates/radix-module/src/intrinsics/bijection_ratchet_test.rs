@@ -199,7 +199,9 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
             "",
             "0.5",
             "fractus",
-            "0",
+            // The coordinate lista the Matrix `accipe`/`apud`/`ponde` rows
+            // take; `[0, 0]` is provably in range for `[2, 2]`.
+            "[0, 0]",
         )],
         IntrinsicReceiver::Sparsa => vec![dtype(
             "fractus",
