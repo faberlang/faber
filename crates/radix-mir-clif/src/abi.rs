@@ -73,6 +73,44 @@ pub const TAG_TEXT: i64 = 3;
 pub const TAG_BITS: i64 = 4;
 pub const TAG_LIST: i64 = 8;
 pub const TAG_STRUCT: i64 = 9;
+pub const TAG_OPT: i64 = 10;
+
+/// Box a present optional payload: (tag, bits) -> optional handle (null is none).
+pub const OPT_SOME: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_opt_some",
+    params: &[I32, I64],
+    ret: Some(Ptr),
+};
+/// Payload bits of a present optional; none ends the run.
+pub const OPT_BITS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_opt_bits",
+    params: &[Ptr],
+    ret: Some(I64),
+};
+/// Payload bits, or the fallback bits when none: (optional, fallback).
+pub const OPT_BITS_OR: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_opt_bits_or",
+    params: &[Ptr, I64],
+    ret: Some(I64),
+};
+/// Optional equality: both none, or both present with equal payloads.
+pub const OPT_EQ: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_opt_eq",
+    params: &[Ptr, Ptr],
+    ret: Some(I8),
+};
+/// Print an optional line.
+pub const PRINT_OPT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_print_opt",
+    params: &[I32, Ptr],
+    ret: None,
+};
+/// Render an optional as text.
+pub const TEXT_FROM_OPT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_from_opt",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
 
 /// New empty record (`genus` instance): (name text handle).
 pub const RECORD_NEW: RuntimeSymbol = RuntimeSymbol {
@@ -272,6 +310,12 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     LIST_SORTED,
     PRINT_LIST,
     TEXT_FROM_LIST,
+    OPT_SOME,
+    OPT_BITS,
+    OPT_BITS_OR,
+    OPT_EQ,
+    PRINT_OPT,
+    TEXT_FROM_OPT,
     DUPLICATE,
     RECORD_NEW,
     RECORD_SET,

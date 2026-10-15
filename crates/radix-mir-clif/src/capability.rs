@@ -199,7 +199,10 @@ impl<'a> ClifCapability<'a> {
             Type::Enum(_) | Type::Interface(_) => Some(Gap::Subset("enum value".to_owned())),
             Type::Tuple(_) => Some(Gap::Subset("tuple value".to_owned())),
             Type::Union(_) | Type::Intersection(_) => Some(Gap::Subset("union value".to_owned())),
-            Type::Option(_) => Some(Gap::Subset("optional value".to_owned())),
+            Type::Option(inner) => match self.types.get(*inner) {
+                Type::Option(_) => Some(Gap::Subset("optional value".to_owned())),
+                _ => self.type_gap(MirType::semantic(*inner)),
+            },
             Type::Func(_) => Some(Gap::Subset("function value".to_owned())),
             Type::Ref(..) => Some(Gap::Subset("reference value".to_owned())),
             Type::ModularWord(width) | Type::SaturatingWord(width)
@@ -293,7 +296,7 @@ impl<'a> ClifCapability<'a> {
             MirConstant::Ascii(_) => Some(Gap::Subset("string constant".to_owned())),
             MirConstant::Octeti(_) => Some(Gap::Subset("byte constant".to_owned())),
             MirConstant::Regex { .. } => Some(Gap::Subset("regex constant".to_owned())),
-            MirConstant::Nil => Some(Gap::Subset("none constant".to_owned())),
+            MirConstant::Nil => None,
             MirConstant::Function(_) => Some(Gap::Subset("function constant".to_owned())),
             MirConstant::Magnus(_) => Some(Gap::Subset("inf constant".to_owned())),
             MirConstant::ShapeSize { .. } => Some(Gap::Policy("device constant".to_owned())),
@@ -333,7 +336,10 @@ impl<'a> ClifCapability<'a> {
                 None
             }
             MirValueKind::Closure(_) => Some(Gap::Subset("closure value".to_owned())),
-            MirValueKind::Option(_) => Some(Gap::Subset("optional value".to_owned())),
+            MirValueKind::Option(MirOptionOp::Chain { .. }) => {
+                Some(Gap::Subset("optional chain".to_owned()))
+            }
+            MirValueKind::Option(_) => None,
             MirValueKind::TensorExtent { .. } => Some(Gap::Policy("device value".to_owned())),
         }
     }
@@ -394,19 +400,6 @@ impl MirVisitor for ClifCapability<'_> {
         // numbers it is not lowered yet.
         if bit_op && !matches!(self.types.get(value.ty.semantic_id()), Type::Bits(_)) {
             self.record(Gap::Subset("bit operation".to_owned()));
-        }
-        if let MirValueKind::Binary {
-            op: MirBinOp::Coalesce,
-            ..
-        } = &value.kind
-        {
-            self.record(Gap::Subset("optional value".to_owned()));
-        }
-        if let MirValueKind::Unary {
-            op: MirUnOp::IsNil, ..
-        } = &value.kind
-        {
-            self.record(Gap::Subset("optional value".to_owned()));
         }
         radix_mir::visit::walk_value(self, value);
     }

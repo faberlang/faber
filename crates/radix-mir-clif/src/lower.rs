@@ -78,6 +78,8 @@ pub(crate) enum Rep {
     List,
     /// A `genus` instance: a pointer to a runtime record.
     Record,
+    /// `T ∪ none`: null for none, else a pointer to a boxed payload.
+    Opt,
     /// `textus`: a pointer to `[len: i64][bytes...]` (see `abi::TEXT_HEADER`).
     Text,
     /// No value.
@@ -90,7 +92,7 @@ impl Rep {
             Self::Int => Some(types::I64),
             Self::Float => Some(types::F64),
             Self::Bool => Some(types::I8),
-            Self::Text | Self::Bits(_) | Self::List | Self::Record => Some(types::I64),
+            Self::Text | Self::Bits(_) | Self::List | Self::Record | Self::Opt => Some(types::I64),
             Self::Unit => None,
         }
     }
@@ -114,6 +116,13 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(Primitive::Textus) => Ok(Rep::Text),
         Type::Bits(width) => Ok(Rep::Bits(*width)),
         Type::Struct(_) => Ok(Rep::Record),
+        Type::Option(inner) => {
+            if matches!(table.get(*inner), Type::Option(_)) {
+                return Err(Decline::new("nested optional value"));
+            }
+            rep_of(table, MirType::semantic(*inner))?;
+            Ok(Rep::Opt)
+        }
         // A promise carrier is its payload: async functions run to
         // completion and `cede` reads the value.
         Type::Promissum(inner) => rep_of(table, MirType::semantic(*inner)),
@@ -427,6 +436,7 @@ struct FunctionLower<'f, 'a> {
     blocks: FxHashMap<MirBlockId, Block>,
     slots: FxHashMap<Slot, (Variable, Rep)>,
     slot_tys: FxHashMap<Slot, MirType>,
+    ret_rep: Rep,
     values: FxHashMap<MirValueId, (Option<Value>, Rep)>,
     refs: FxHashMap<&'static str, FuncRef>,
     function_refs: FxHashMap<MirFunctionId, FuncRef>,
@@ -444,6 +454,7 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
     if function.is_generator {
         return Err(Decline::new("generator function"));
     }
+    let ret_rep = rep_of(state.input.types, function.return_ty)?;
     let mut context = state.module.make_context();
     context.func.signature = signature;
     let mut builder_context = FunctionBuilderContext::new();
@@ -455,6 +466,7 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             blocks: FxHashMap::default(),
             slots: FxHashMap::default(),
             slot_tys: FxHashMap::default(),
+            ret_rep,
             values: FxHashMap::default(),
             refs: FxHashMap::default(),
             function_refs: FxHashMap::default(),
@@ -548,7 +560,7 @@ impl FunctionLower<'_, '_> {
             Rep::Int => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Float => Some(self.builder.ins().f64const(0.0)),
             Rep::Bool => Some(self.builder.ins().iconst(types::I8, 0)),
-            Rep::Text | Rep::Bits(_) | Rep::List | Rep::Record => {
+            Rep::Text | Rep::Bits(_) | Rep::List | Rep::Record | Rep::Opt => {
                 Some(self.builder.ins().iconst(types::I64, 0))
             }
             Rep::Unit => None,
@@ -617,6 +629,7 @@ impl FunctionLower<'_, '_> {
                 Rep::Bool,
             ),
             MirConstant::Unit => (None, Rep::Unit),
+            MirConstant::Nil => (Some(self.builder.ins().iconst(types::I64, 0)), Rep::Opt),
             MirConstant::String(symbol) => {
                 let text = radix_lexer::textus_literal::decode_textus_literal(
                     self.state.input.interner.resolve(*symbol),
@@ -749,6 +762,7 @@ impl FunctionLower<'_, '_> {
             Rep::Bits(width) => abi::TAG_BITS + i64::from(width.bits().trailing_zeros() - 3),
             Rep::List => abi::TAG_LIST,
             Rep::Record => abi::TAG_STRUCT,
+            Rep::Opt => abi::TAG_OPT,
             Rep::Unit => return Err(Decline::new("unit list element")),
         })
     }
@@ -777,6 +791,98 @@ impl FunctionLower<'_, '_> {
         }
     }
 
+    /// Box `value` as a present optional.
+    fn wrap_some(&mut self, value: Value, rep: Rep) -> Lowered<Value> {
+        let tag = self
+            .builder
+            .ins()
+            .iconst(types::I32, Self::element_tag(rep)?);
+        let bits = self.element_bits(value, rep);
+        self.call_runtime(&abi::OPT_SOME, &[tag, bits])?
+            .ok_or_else(|| Decline::new("optional box result"))
+    }
+
+    /// `value` of representation `have` as a `want`: equal representations
+    /// pass through, a plain value stored where an optional is expected is
+    /// boxed as present.
+    fn coerce(&mut self, value: Value, have: Rep, want: Rep) -> Lowered<Value> {
+        if have == want {
+            Ok(value)
+        } else if want == Rep::Opt && have != Rep::Unit {
+            self.wrap_some(value, have)
+        } else {
+            Err(Decline::new("representation mismatch"))
+        }
+    }
+
+    /// `lhs vel rhs`: the left payload when present, else the fallback.
+    fn coalesce(
+        &mut self,
+        lhs: (Value, Rep),
+        rhs: (Value, Rep),
+        result: Rep,
+    ) -> Lowered<(Value, Rep)> {
+        if lhs.1 != Rep::Opt {
+            return Err(Decline::new("coalesce of a non-optional"));
+        }
+        if result == Rep::Opt {
+            let fallback = self.coerce(rhs.0, rhs.1, Rep::Opt)?;
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let none = self.builder.ins().icmp(IntCC::Equal, lhs.0, zero);
+            let picked = self.builder.ins().select(none, fallback, lhs.0);
+            return Ok((picked, Rep::Opt));
+        }
+        if rhs.1 != result {
+            return Err(Decline::new("coalesce fallback representation"));
+        }
+        let fallback = self.element_bits(rhs.0, rhs.1);
+        let bits = self
+            .call_runtime(&abi::OPT_BITS_OR, &[lhs.0, fallback])?
+            .ok_or_else(|| Decline::new("coalesce result"))?;
+        Ok((self.element_value(bits, result), result))
+    }
+
+    /// Optional-specific MIR operations.
+    fn option_op(&mut self, op: &MirOptionOp, ty: MirType) -> Lowered<(Value, Rep)> {
+        let result = rep_of(self.state.input.types, ty)?;
+        match op {
+            MirOptionOp::None => Ok((self.builder.ins().iconst(types::I64, 0), Rep::Opt)),
+            MirOptionOp::Some(operand) => {
+                let (value, rep) = self.scalar(operand)?;
+                Ok((self.wrap_some(value, rep)?, Rep::Opt))
+            }
+            MirOptionOp::IsNil(operand) | MirOptionOp::IsNotNil(operand) => {
+                let (value, rep) = self.scalar(operand)?;
+                if rep != Rep::Opt {
+                    return Err(Decline::new("nil test of a non-optional"));
+                }
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let cc = if matches!(op, MirOptionOp::IsNil(_)) {
+                    IntCC::Equal
+                } else {
+                    IntCC::NotEqual
+                };
+                Ok((self.builder.ins().icmp(cc, value, zero), Rep::Bool))
+            }
+            MirOptionOp::Unwrap { value, .. } => {
+                let (handle, rep) = self.scalar(value)?;
+                if rep != Rep::Opt {
+                    return Err(Decline::new("unwrap of a non-optional"));
+                }
+                let bits = self
+                    .call_runtime(&abi::OPT_BITS, &[handle])?
+                    .ok_or_else(|| Decline::new("unwrap result"))?;
+                Ok((self.element_value(bits, result), result))
+            }
+            MirOptionOp::Coalesce { value, fallback } => {
+                let lhs = self.scalar(value)?;
+                let rhs = self.scalar(fallback)?;
+                self.coalesce(lhs, rhs, result)
+            }
+            MirOptionOp::Chain { .. } => Err(Decline::new("optional chain")),
+        }
+    }
+
     /// An operand that fills an element of type `element`: a bare literal into
     /// a `bN` element is the pattern itself.
     fn element_operand(&mut self, operand: &MirOperand, element: MirType) -> Lowered<(Value, Rep)> {
@@ -787,9 +893,7 @@ impl FunctionLower<'_, '_> {
             return Ok((value, rep));
         }
         let (value, have) = self.scalar(operand)?;
-        if have != rep {
-            return Err(Decline::new("list element representation mismatch"));
-        }
+        let value = self.coerce(value, have, rep)?;
         Ok((value, rep))
     }
 
@@ -1133,16 +1237,12 @@ impl FunctionLower<'_, '_> {
                     let Some(computed) = computed else {
                         return Err(Decline::new("unit element store"));
                     };
-                    if target_rep != rep {
-                        return Err(Decline::new("assignment representation mismatch"));
-                    }
-                    return self.write_projected(place, computed, rep);
+                    let computed = self.coerce(computed, rep, target_rep)?;
+                    return self.write_projected(place, computed, target_rep);
                 }
                 let (variable, slot_rep) = self.place_slot(place)?;
                 if let Some(computed) = computed {
-                    if slot_rep != rep {
-                        return Err(Decline::new("assignment representation mismatch"));
-                    }
+                    let computed = self.coerce(computed, rep, slot_rep)?;
                     self.builder.def_var(variable, computed);
                 }
                 Ok(())
@@ -1195,9 +1295,29 @@ impl FunctionLower<'_, '_> {
             _ => return Err(Decline::new("indirect call")),
         };
         let reference = self.function_ref(id)?;
+        let params: Vec<Rep> = {
+            let callee = self
+                .state
+                .input
+                .program
+                .functions
+                .iter()
+                .find(|function| function.id == id)
+                .ok_or_else(|| Decline::new("unknown callee"))?;
+            callee
+                .params
+                .iter()
+                .map(|param| rep_of(self.state.input.types, param.ty))
+                .collect::<Lowered<_>>()?
+        };
         let mut values = Vec::with_capacity(args.len());
-        for arg in args {
-            values.push(self.scalar(arg)?.0);
+        for (position, arg) in args.iter().enumerate() {
+            let (value, have) = self.scalar(arg)?;
+            let value = match params.get(position) {
+                Some(want) => self.coerce(value, have, *want)?,
+                None => value,
+            };
+            values.push(value);
         }
         let call = self.builder.ins().call(reference, &values);
         if let Some(destination) = destination {
@@ -1334,6 +1454,7 @@ impl FunctionLower<'_, '_> {
             Rep::Bool => self.call_runtime(&abi::TEXT_FROM_BOOL, &[value])?,
             Rep::List => self.call_runtime(&abi::TEXT_FROM_LIST, &[value])?,
             Rep::Record => self.call_runtime(&abi::TEXT_FROM_RECORD, &[value])?,
+            Rep::Opt => self.call_runtime(&abi::TEXT_FROM_OPT, &[value])?,
             Rep::Bits(width) => {
                 let bits = self
                     .builder
@@ -1448,7 +1569,8 @@ impl FunctionLower<'_, '_> {
             | (Rep::Bool, Rep::Bool)
             | (Rep::Text, Rep::Text)
             | (Rep::List, Rep::List)
-            | (Rep::Record, Rep::Record) => value,
+            | (Rep::Record, Rep::Record)
+            | (Rep::Opt, Rep::Opt) => value,
             (Rep::Bits(from), Rep::Bits(to)) if from == to => value,
             _ => return Err(Decline::new("conversion between representations")),
         };
@@ -1593,6 +1715,10 @@ impl FunctionLower<'_, '_> {
                 let reference = self.runtime_ref(&abi::PRINT_RECORD)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
+            Rep::Opt => {
+                let reference = self.runtime_ref(&abi::PRINT_OPT)?;
+                self.builder.ins().call(reference, &[stream, value]);
+            }
             Rep::Text => {
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
                 self.builder.ins().call(reference, &[stream, value]);
@@ -1609,6 +1735,10 @@ impl FunctionLower<'_, '_> {
             MirValueKind::Operand(operand) => self.operand(operand),
             MirValueKind::Unary { op, operand } => {
                 let (computed, rep) = self.unary(*op, operand)?;
+                Ok((Some(computed), rep))
+            }
+            MirValueKind::Option(op) => {
+                let (computed, rep) = self.option_op(op, value.ty)?;
                 Ok((Some(computed), rep))
             }
             MirValueKind::Binary { op, lhs, rhs } => {
@@ -1632,6 +1762,15 @@ impl FunctionLower<'_, '_> {
                 let one = self.builder.ins().iconst(types::I8, 1);
                 Ok((self.builder.ins().bxor(value, one), Rep::Bool))
             }
+            (MirUnOp::IsNil | MirUnOp::IsNotNil, Rep::Opt) => {
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let cc = if op == MirUnOp::IsNil {
+                    IntCC::Equal
+                } else {
+                    IntCC::NotEqual
+                };
+                Ok((self.builder.ins().icmp(cc, value, zero), Rep::Bool))
+            }
             (MirUnOp::BitNot, Rep::Bits(width)) => {
                 let mask = if width == BitsWidth::B64 {
                     -1
@@ -1654,6 +1793,22 @@ impl FunctionLower<'_, '_> {
     ) -> Lowered<(Value, Rep)> {
         let (a, a_rep) = self.scalar(lhs)?;
         let (b, b_rep) = self.scalar(rhs)?;
+        if op == MirBinOp::Coalesce {
+            return self.coalesce((a, a_rep), (b, b_rep), result);
+        }
+        if (a_rep == Rep::Opt || b_rep == Rep::Opt) && matches!(op, MirBinOp::Eq | MirBinOp::NotEq)
+        {
+            let a = self.coerce(a, a_rep, Rep::Opt)?;
+            let b = self.coerce(b, b_rep, Rep::Opt)?;
+            let same = self
+                .call_runtime(&abi::OPT_EQ, &[a, b])?
+                .ok_or_else(|| Decline::new("optional equality result"))?;
+            if op == MirBinOp::Eq {
+                return Ok((same, Rep::Bool));
+            }
+            let one = self.builder.ins().iconst(types::I8, 1);
+            return Ok((self.builder.ins().bxor(same, one), Rep::Bool));
+        }
         if let Some(width) = [a_rep, b_rep, result]
             .into_iter()
             .find_map(|rep| match rep {
@@ -1671,7 +1826,7 @@ impl FunctionLower<'_, '_> {
             Rep::Float => self.float_binary(op, a, b),
             Rep::Bool => self.bool_binary(op, a, b),
             Rep::Text => self.text_binary(op, a, b),
-            Rep::Bits(_) | Rep::List | Rep::Record | Rep::Unit => {
+            Rep::Bits(_) | Rep::List | Rep::Record | Rep::Opt | Rep::Unit => {
                 Err(Decline::new("unit operands"))
             }
         }
@@ -1929,7 +2084,8 @@ impl FunctionLower<'_, '_> {
             MirTerminatorKind::Return(value) => {
                 match value {
                     Some(operand) => match self.operand(operand)? {
-                        (Some(value), _) => {
+                        (Some(value), have) => {
+                            let value = self.coerce(value, have, self.ret_rep)?;
                             self.builder.ins().return_(&[value]);
                         }
                         (None, _) => {

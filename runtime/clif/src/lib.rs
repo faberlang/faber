@@ -215,6 +215,13 @@ const TAG_TEXT: i32 = 3;
 const TAG_BITS: i32 = 4;
 const TAG_LIST: i32 = 8;
 const TAG_STRUCT: i32 = 9;
+const TAG_OPT: i32 = 10;
+
+/// A present optional payload.
+pub struct Present {
+    tag: i32,
+    bits: i64,
+}
 
 /// A runtime `genus` instance: its display name and named, tagged fields in
 /// declaration order.
@@ -250,6 +257,10 @@ fn element_text(tag: i32, bits: i64) -> String {
         TAG_TEXT => format!("{:?}", text_str(unsafe { text_bytes(bits as *const u8) })),
         TAG_LIST => list_text(unsafe { list_ref(bits as *const List) }),
         TAG_STRUCT => record_text(unsafe { &*(bits as *const Record) }),
+        TAG_OPT => match unsafe { (bits as *const Present).as_ref() } {
+            Some(present) => element_text(present.tag, present.bits),
+            None => tokens().none.clone(),
+        },
         tag if (TAG_BITS..TAG_BITS + 4).contains(&tag) => bits_text(bits, 8 << (tag - TAG_BITS)),
         _ => bits.to_string(),
     }
@@ -285,6 +296,13 @@ fn record_text(record: &Record) -> String {
 
 fn duplicate(tag: i32, bits: i64) -> i64 {
     match tag {
+        TAG_OPT => match unsafe { (bits as *const Present).as_ref() } {
+            Some(present) => Box::into_raw(Box::new(Present {
+                tag: present.tag,
+                bits: duplicate(present.tag, present.bits),
+            })) as i64,
+            None => 0,
+        },
         TAG_LIST => {
             let source = unsafe { list_ref(bits as *const List) };
             let items = source
@@ -318,6 +336,79 @@ fn duplicate(tag: i32, bits: i64) -> i64 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_duplicate(tag: i32, bits: i64) -> i64 {
     duplicate(tag, bits)
+}
+
+/// Box a present optional payload.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_opt_some(tag: i32, bits: i64) -> *const Present {
+    Box::into_raw(Box::new(Present { tag, bits }))
+}
+
+/// Payload bits of a present optional; none ends the run.
+///
+/// # Safety
+///
+/// `handle` is null or a present optional.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_opt_bits(handle: *const Present) -> i64 {
+    match unsafe { handle.as_ref() } {
+        Some(present) => present.bits,
+        None => unsafe { __faber_clif_v1_trap(c"unwrapped a none value".as_ptr().cast(), 22) },
+    }
+}
+
+/// Payload bits, or `fallback` when none.
+///
+/// # Safety
+///
+/// `handle` is null or a present optional.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_opt_bits_or(handle: *const Present, fallback: i64) -> i64 {
+    unsafe { handle.as_ref() }.map_or(fallback, |present| present.bits)
+}
+
+/// Optional equality.
+///
+/// # Safety
+///
+/// Both are null or present optionals.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_opt_eq(left: *const Present, right: *const Present) -> i8 {
+    match unsafe { (left.as_ref(), right.as_ref()) } {
+        (None, None) => 1,
+        (Some(a), Some(b)) => i8::from(a.tag == b.tag && element_equal(a.tag, a.bits, b.bits)),
+        _ => 0,
+    }
+}
+
+fn opt_top_text(handle: *const Present) -> String {
+    match unsafe { handle.as_ref() } {
+        None => tokens().none.clone(),
+        Some(present) if present.tag == TAG_TEXT => {
+            text_str(unsafe { text_bytes(present.bits as *const u8) }).into_owned()
+        }
+        Some(present) => element_text(present.tag, present.bits),
+    }
+}
+
+/// Print one optional line.
+///
+/// # Safety
+///
+/// `handle` is null or a present optional.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_print_opt(stream: i32, handle: *const Present) {
+    emit(stream, &opt_top_text(handle));
+}
+
+/// Render an optional as text.
+///
+/// # Safety
+///
+/// `handle` is null or a present optional.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_from_opt(handle: *const Present) -> *const u8 {
+    text_new(opt_top_text(handle).as_bytes())
 }
 
 /// New empty record.
