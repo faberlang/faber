@@ -40,7 +40,8 @@ report.
 | functions with `int`, `string` and `bool` parameters and results, or no result; recursion | `static` C functions named `f_<name>` with prototypes first, so any call order works; parameters `p_<name>`; a result returns through its `return` store |
 | calls | C leaves argument and operand order unspecified, so when two or more operands of one evaluation include a call, they are bound to temporaries in source order inside a GNU statement expression; an exact argument is checked like a store (`argument`) |
 | module constants | `static const` `k_<name>` with the folded value |
-| integer arithmetic `+ - * / %` and negation over variables | exact helper calls, narrowed by `faber_store_i64(value, "assignment to `n`")` at the store; the store text is the runner's |
+| integer arithmetic `+ - * / %` and negation over variables | exact helper calls, narrowed by `faber_store_i64(value, "assignment to `n`")` at the store; the store text is the runner's. Where typecheck put no store node (its range rule proved the result fits), `faber_fit_i64` narrows instead |
+| the 64-bit fast path | `/` and `%` of an `int64_t` by a constant other than 0 and -1 stay `int64_t` (`faber_fdiv_i64`, `faber_fmod_i64`). A pure `+ - *` tree over `int64_t` values ending in a store runs on `int64_t` with `__builtin_*_overflow` and one flag; on overflow the same expression is re-evaluated through the exact helpers, so the value, trap and trap text are the exact model's. An expression with a call never takes it, because the fallback re-evaluates |
 | integer arithmetic over constants | folded at emit time with the same rules; `INT64_C(n)`, `-INT64_C(n)`, `INT64_MIN`, or an exact `UINT64_C` value above `i64` |
 | integer comparisons `≺ ≻ ≤ ≥ ≡ ≢` | C comparisons by exact value (an `int64_t` widens to `faber_i128` against an exact operand) |
 | `and`, `or`, `not`, `true`, `false` | `&&`, `\|\|`, `!`, `(1)`, `(0)` |
@@ -63,9 +64,10 @@ in `expr.rs` and `ty.rs`.
 
 `tests/fixtures/run/*.fab` are compared with `faber run` by `scripta/diffcheck`
 (stdout and exit status); `scalars.c`, `c_edges.c`, `loops.c` and
-`functions.c` are pinned. `functions.fab` runs recursion, call order with
+`functions.c` and `narrowing.c` are pinned. `functions.fab` runs recursion, call order with
 printing callees, booleans, module constants and a function without a result.
-`loops.fab` runs Collatz, floor division over negative variables, both loop
+`narrowing.fab` checks the fast path at the `int64_t` extremes and its exact
+fallback on intermediates that overflow `int64_t` but not the cap. `loops.fab` runs Collatz, floor division over negative variables, both loop
 jumps, the logical operators, and an unstored 2^63. The `trap_*.fab` fixtures
 trap at a store, a call argument, a division by zero, and an intermediate
 beyond the cap, and
