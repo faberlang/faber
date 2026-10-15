@@ -9,7 +9,7 @@ use super::{
 };
 use crate::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase, Severity};
 use crate::lexer::Span;
-use crate::locale::{DiagnosticTemplateRenderError, LocalePack, TemplateField};
+use crate::locale::{DiagnosticTemplateRenderError, LocalePack, LocalePackIssue, LocalePackLoadError, TemplateField};
 
 #[test]
 fn plain_render_includes_code_location_source_and_help() {
@@ -382,6 +382,131 @@ fn render_with_pack_falls_back_when_placeholder_is_missing() {
     let batch =
         render_expanded_diagnostics_with_pack(&[diagnostic, other], &pack).expect("batch render does not abort");
     assert!(batch.contains("other failure"), "{batch}");
+}
+
+/// A pack that must quote Faber's own braced syntax (LEX003's `u{...}`,
+/// SEM016's `_ { … }`) uses `{{` as the literal-brace escape.
+#[test]
+fn render_with_pack_doubled_brace_renders_literal_brace() {
+    let pack = LocalePack::from_toml_str(
+        r#"
+[pack]
+id = "la-test"
+fallback = ["la"]
+
+[diagnostics.LEX003]
+message = "unknown escape {escape}; write u{{...} for a braced hex escape {name}"
+help = "replace {escape} with u{{...}"
+
+[llm]
+system_prompt_snippet = "emit Latin Faber"
+exemplars = ["./exemplars/salve-munde.fab"]
+"#,
+    )
+    .expect("doubled brace is a legal template");
+    let diagnostic = Diagnostic::error("unknown escape")
+        .with_code("LEX003")
+        .with_args(vec![
+            DiagnosticArg::new("escape", "\\x"),
+            DiagnosticArg::new("name", "hex_escape"),
+        ]);
+
+    let rendered = pack
+        .render_diagnostic_text(&diagnostic)
+        .expect("doubled brace renders without error")
+        .expect("LEX003 template row");
+    assert!(
+        rendered.message.contains("u{...}"),
+        "doubled brace renders one literal brace: {:?}",
+        rendered.message
+    );
+    assert!(
+        !rendered.message.contains("missing placeholder"),
+        "literal brace is not a missing placeholder: {:?}",
+        rendered.message
+    );
+    // A normal placeholder after the escape still resolves.
+    assert!(
+        rendered.message.contains("hex_escape"),
+        "placeholder after the escape still resolves: {:?}",
+        rendered.message
+    );
+    assert_eq!(
+        rendered.help.as_deref(),
+        Some("replace \\x with u{...}"),
+        "help escapes the same way"
+    );
+}
+
+/// The `{{` escape must not swallow real placeholder errors.
+#[test]
+fn render_with_pack_single_brace_placeholder_behavior_is_unchanged() {
+    // A single opening brace with no closing brace stays an error. Validation
+    // rejects it at load; if a pack ever reaches the renderer with one, the
+    // renderer still reports `UnclosedPlaceholder`.
+    let unclosed = LocalePack::from_toml_str(
+        r#"
+[pack]
+id = "la-test"
+fallback = ["la"]
+
+[diagnostics.LEX003]
+message = "write u{..."
+
+[llm]
+system_prompt_snippet = "emit Latin Faber"
+exemplars = ["./exemplars/salve-munde.fab"]
+"#,
+    );
+    match unclosed {
+        Ok(pack) => {
+            let diagnostic = Diagnostic::error("unclosed").with_code("LEX003");
+            assert_eq!(
+                pack.render_diagnostic_text(&diagnostic),
+                Err(DiagnosticTemplateRenderError::UnclosedPlaceholder {
+                    code: "LEX003".to_owned(),
+                    field: TemplateField::Message,
+                }),
+                "a single opening brace is still unclosed"
+            );
+        }
+        Err(LocalePackLoadError::Validation(issues)) => assert!(
+            issues.contains(&LocalePackIssue::UnclosedTemplatePlaceholder {
+                code: "LEX003".to_owned(),
+                field: TemplateField::Message,
+            }),
+            "an unclosed single brace must stay a validation error: {issues:?}"
+        ),
+        Err(err) => panic!("unexpected load error: {err:?}"),
+    }
+
+    // A single `{nope}` with no matching arg still reports the missing
+    // placeholder rather than rendering a literal brace.
+    let missing = LocalePack::from_toml_str(
+        r#"
+[pack]
+id = "la-test"
+fallback = ["la"]
+
+[diagnostics.LEX003]
+message = "unknown escape {nope}"
+
+[llm]
+system_prompt_snippet = "emit Latin Faber"
+exemplars = ["./exemplars/salve-munde.fab"]
+"#,
+    )
+    .expect("single-brace placeholder is legal");
+    let diagnostic = Diagnostic::error("unknown escape").with_code("LEX003");
+    assert_eq!(
+        missing.render_diagnostic_text(&diagnostic),
+        Err(DiagnosticTemplateRenderError::MissingPlaceholder {
+            code: "LEX003".to_owned(),
+            field: TemplateField::Message,
+            placeholder: "nope".to_owned(),
+        }),
+        "a single-brace placeholder without an arg still reports missing"
+    );
 }
 
 /// The issue row owns the prose; the base row is only for code-only diagnostics.
