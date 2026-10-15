@@ -390,12 +390,7 @@ impl<'a> ClifCapability<'a> {
             MirAggregateKind::Record => None,
             MirAggregateKind::Struct(_) => None,
             MirAggregateKind::EnumVariant(_) => None,
-            MirAggregateKind::ClosureEnvironment(_) => {
-                Some(Gap::Subset("closure construction".to_owned()))
-            }
-            MirAggregateKind::SharedCell => {
-                Some(Gap::Subset("shared cell construction".to_owned()))
-            }
+            MirAggregateKind::ClosureEnvironment(_) | MirAggregateKind::SharedCell => None,
             MirAggregateKind::Tensor
             | MirAggregateKind::SparseTensor
             | MirAggregateKind::Vector
@@ -411,7 +406,7 @@ impl<'a> ClifCapability<'a> {
             MirValueKind::Operand(_) | MirValueKind::Unary { .. } | MirValueKind::Binary { .. } => {
                 None
             }
-            MirValueKind::Closure(_) => Some(Gap::Subset("closure value".to_owned())),
+            MirValueKind::Closure(_) => None,
             MirValueKind::Option(MirOptionOp::Chain {
                 link: MirOptionChainLink::Field(_) | MirOptionChainLink::Index(_),
                 ..
@@ -517,6 +512,8 @@ impl MirVisitor for ClifCapability<'_> {
                 MirProjection::Index(_)
                     | MirProjection::Field(_)
                     | MirProjection::VariantField { .. }
+                    | MirProjection::ClosureCapture { .. }
+                    | MirProjection::SharedCell
             )
         }) {
             self.record(Gap::Subset("place projection".to_owned()));
@@ -702,10 +699,7 @@ impl MirVisitor for ClifCapability<'_> {
                     self.record(Gap::Abi("external definition call".to_owned()));
                 }
             }
-            MirCallee::Closure(_) => {
-                self.record(Gap::Subset("closure call".to_owned()));
-            }
-            MirCallee::Value(_) => {}
+            MirCallee::Closure(_) | MirCallee::Value(_) => {}
         }
         radix_mir::visit::walk_callee(self, callee);
     }

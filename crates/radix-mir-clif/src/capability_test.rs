@@ -420,7 +420,7 @@ fn place_projection_names_gap() {
 }
 
 #[test]
-fn closure_callee_names_gap() {
+fn closure_callee_is_capable() {
     let types = TypeTable::new();
     let numerus = ty(&types, Primitive::Numerus);
     let (program, types) = minimal(FunctionShape {
@@ -447,8 +447,10 @@ fn closure_callee_names_gap() {
     });
 
     let verdict = classify_with_types(&program, &types);
-    assert_eq!(verdict.gaps().len(), 1);
-    assert_eq!(verdict.gaps()[0].shape(), "closure call");
+    assert!(
+        verdict.is_capable(),
+        "a captured closure call is inside the subset: {verdict:?}"
+    );
 }
 
 #[test]

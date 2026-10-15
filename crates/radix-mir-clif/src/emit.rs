@@ -104,6 +104,11 @@ pub fn emit_object(
             .map(|(def, variants)| (*def, variants.clone()))
             .collect(),
         optional_params: rustc_hash::FxHashMap::default(),
+        environments: validation
+            .closure_environments
+            .iter()
+            .map(|(id, environment)| (*id, environment.clone()))
+            .collect(),
     };
     for (def, names) in &validation.nullable_struct_fields {
         let Some(fields) = structs.fields.get_mut(def) else {

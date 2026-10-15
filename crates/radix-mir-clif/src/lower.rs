@@ -24,6 +24,7 @@ use rustc_hash::FxHashMap;
 
 use crate::abi::{self, AbiTy, RuntimeSymbol};
 
+mod closure;
 mod convert;
 mod lift;
 pub(crate) use convert::{member_tests, numeric_conversion, sequence_conversion};
@@ -60,6 +61,8 @@ pub struct StructMeta {
     /// Parameters that admit none although declared with a plain type (the
     /// `optional` modifier): function, position and the optional type.
     pub optional_params: FxHashMap<(MirFunctionId, usize), MirType>,
+    /// Captured-closure environments by id.
+    pub environments: FxHashMap<MirClosureEnvironmentId, MirClosureEnvironment>,
 }
 
 /// Whether `function` rebinds local `id` as a whole. A reference parameter
@@ -307,6 +310,9 @@ struct ModuleState<'a> {
     runtime: FxHashMap<&'static str, FuncId>,
     strings: FxHashMap<Vec<u8>, DataId>,
     texts: FxHashMap<Vec<u8>, DataId>,
+    /// Function-value shims by function, and those still to define.
+    shims: FxHashMap<MirFunctionId, FuncId>,
+    pending_shims: Vec<MirFunctionId>,
 }
 
 impl<'a> ModuleState<'a> {
@@ -324,6 +330,10 @@ impl<'a> ModuleState<'a> {
         let mut signature = self.module.make_signature();
         if function.is_generator {
             // The collector: a runtime list every `cede` appends to.
+            signature.params.push(AbiParam::new(types::I64));
+        }
+        if self.closure_environment(function.id).is_some() {
+            // A closure body receives its environment record first.
             signature.params.push(AbiParam::new(types::I64));
         }
         for (index, param) in function.params.iter().enumerate() {
@@ -475,6 +485,8 @@ pub fn lower_program(input: &ProgramInput<'_>) -> Result<Vec<u8>, Decline> {
         runtime: FxHashMap::default(),
         strings: FxHashMap::default(),
         texts: FxHashMap::default(),
+        shims: FxHashMap::default(),
+        pending_shims: Vec::new(),
     };
 
     let entry = match input.entry {
@@ -492,14 +504,20 @@ pub fn lower_program(input: &ProgramInput<'_>) -> Result<Vec<u8>, Decline> {
         }
         None => None,
     };
-    while let Some(id) = state.pending.pop() {
-        let function = input
-            .program
-            .functions
-            .iter()
-            .find(|function| function.id == id)
-            .ok_or_else(|| Decline::new("unknown callee"))?;
-        lower_function(&mut state, function)?;
+    loop {
+        if let Some(id) = state.pending.pop() {
+            let function = input
+                .program
+                .functions
+                .iter()
+                .find(|function| function.id == id)
+                .ok_or_else(|| Decline::new("unknown callee"))?;
+            lower_function(&mut state, function)?;
+        } else if let Some(id) = state.pending_shims.pop() {
+            closure::define_value_shim(&mut state, id)?;
+        } else {
+            break;
+        }
     }
     define_entry_shims(&mut state, entry)?;
     state.module.finish().emit().map_err(cranelift_error)
@@ -618,6 +636,10 @@ struct FunctionLower<'f, 'a> {
     /// A generator's collector list, its leading parameter.
     collector: Option<Value>,
     generator: bool,
+    /// Slots that hold a shared cell instead of their content.
+    cells: rustc_hash::FxHashSet<Slot>,
+    /// The next scratch temporary id above every declared one.
+    scratch_floor: u32,
 }
 
 fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowered<()> {
@@ -652,6 +674,8 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             function_refs: FxHashMap::default(),
             collector: None,
             generator: function.is_generator,
+            cells: rustc_hash::FxHashSet::default(),
+            scratch_floor: 0,
         };
         lower.run(function)?;
         lower.builder.seal_all_blocks();
@@ -690,8 +714,15 @@ impl FunctionLower<'_, '_> {
                 Type::Primitive(Primitive::Ignotum)
             )
         };
+        let environment = self.state.closure_environment(function.id);
+        let (cells, environments) = closure::construction_slots(function);
+        self.cells = cells;
         for local in &function.locals {
-            if unknown(local.ty) {
+            let env_slot = environments.contains(&Slot::Local(local.id))
+                || environment
+                    .as_ref()
+                    .is_some_and(|environment| environment.environment_local == local.id);
+            if unknown(local.ty) && !env_slot {
                 continue;
             }
             let declared = function
@@ -701,21 +732,41 @@ impl FunctionLower<'_, '_> {
                 .map_or(local.ty, |index| {
                     self.state.param_type(function.id, index, local.ty)
                 });
-            let rep = rep_of(table, declared)?;
-            self.declare(Slot::Local(local.id), rep);
-            self.slot_tys.insert(Slot::Local(local.id), declared);
+            let slot = Slot::Local(local.id);
+            let rep = if self.cells.contains(&slot) {
+                Rep::List
+            } else if env_slot {
+                Rep::Record
+            } else {
+                rep_of(table, declared)?
+            };
+            self.declare(slot, rep);
+            self.slot_tys.insert(slot, declared);
         }
         for temp in &function.temps {
-            if unknown(temp.ty) {
+            if unknown(temp.ty) && !environments.contains(&Slot::Temp(temp.id)) {
                 continue;
             }
-            let rep = rep_of(table, temp.ty)?;
-            self.declare(Slot::Temp(temp.id), rep);
-            self.slot_tys.insert(Slot::Temp(temp.id), temp.ty);
+            let slot = Slot::Temp(temp.id);
+            let rep = if self.cells.contains(&slot) {
+                Rep::List
+            } else if environments.contains(&slot) {
+                Rep::Record
+            } else {
+                rep_of(table, temp.ty)?
+            };
+            self.declare(slot, rep);
+            self.slot_tys.insert(slot, temp.ty);
         }
-        let offset = usize::from(function.is_generator);
+        let mut offset = usize::from(function.is_generator);
         if function.is_generator {
             self.collector = Some(self.builder.block_params(entry)[0]);
+        }
+        if let Some(environment) = &environment {
+            let value = self.builder.block_params(entry)[offset];
+            let (variable, _) = self.slot(Slot::Local(environment.environment_local))?;
+            self.builder.def_var(variable, value);
+            offset += 1;
         }
         for (index, param) in function.params.iter().enumerate() {
             let rep = rep_of(table, self.state.param_type(function.id, index, param.ty))?;
@@ -726,7 +777,8 @@ impl FunctionLower<'_, '_> {
         }
         // Locals start zeroed so every variable is defined on every path.
         for (slot, (variable, rep)) in &self.slots.clone() {
-            let is_param = matches!(slot, Slot::Local(id) if function.params.iter().any(|param| param.local == *id));
+            let is_param = matches!(slot, Slot::Local(id) if function.params.iter().any(|param| param.local == *id)
+                || environment.as_ref().is_some_and(|environment| environment.environment_local == *id));
             if is_param {
                 continue;
             }
@@ -800,12 +852,15 @@ impl FunctionLower<'_, '_> {
         self.slots
             .get(&slot)
             .copied()
-            .ok_or_else(|| Decline::new("undeclared storage slot"))
+            .ok_or_else(|| Decline::new(format!("undeclared storage slot {slot:?}")))
     }
 
     fn place_slot(&self, place: &MirPlace) -> Lowered<(Variable, Rep)> {
         if !place.projections.is_empty() {
-            return Err(Decline::new("place projection"));
+            return Err(Decline::new(format!(
+                "place projection {:?} in a slot",
+                place.projections.first()
+            )));
         }
         match place.base {
             MirPlaceBase::Local(id) => self.slot(Slot::Local(id)),
@@ -859,14 +914,7 @@ impl FunctionLower<'_, '_> {
             ),
             MirConstant::Unit => (None, Rep::Unit),
             MirConstant::Nil => (Some(self.builder.ins().iconst(types::I64, 0)), Rep::Opt),
-            MirConstant::Function(id) => {
-                let reference = self.function_ref(*id)?;
-                let pointer = self.state.pointer;
-                (
-                    Some(self.builder.ins().func_addr(pointer, reference)),
-                    Rep::Func,
-                )
-            }
+            MirConstant::Function(id) => (Some(self.plain_function_value(*id)?), Rep::Func),
             MirConstant::String(symbol) | MirConstant::Ascii(symbol) => {
                 let text = radix_lexer::textus_literal::decode_textus_literal(
                     self.state.input.interner.resolve(*symbol),
@@ -1059,7 +1107,15 @@ impl FunctionLower<'_, '_> {
             MirProjection::VariantField { variant, field } => {
                 Ok(self.variant_slot(*variant, *field)?.1)
             }
-            _ => Err(Decline::new("place projection")),
+            MirProjection::ClosureCapture {
+                environment,
+                source,
+            } => Ok(self.capture_slot(*environment, *source)?.1),
+            // A cell is typed with its content.
+            MirProjection::SharedCell => Ok(ty),
+            _ => Err(Decline::new(format!(
+                "place projection {projection:?} type"
+            ))),
         }
     }
 
@@ -1100,7 +1156,7 @@ impl FunctionLower<'_, '_> {
             Rep::Record => abi::TAG_STRUCT,
             Rep::Opt => abi::TAG_OPT,
             Rep::Map | Rep::Set => abi::TAG_MAP,
-            Rep::Func => return Err(Decline::new("function value element")),
+            Rep::Func => abi::TAG_LIST,
             Rep::Tuple => abi::TAG_LIST,
             Rep::Unit => return Err(Decline::new("unit list element")),
         })
@@ -1375,8 +1431,38 @@ impl FunctionLower<'_, '_> {
                 continue;
             }
             let next = self.projected_type(ty, projection)?;
-            let next_rep = rep_of(self.state.input.types, next)?;
+            let next_rep = match projection {
+                // A shared capture is the cell itself until it is projected.
+                MirProjection::ClosureCapture {
+                    environment,
+                    source,
+                } if self.capture_slot(*environment, *source)?.2 == MirCaptureMode::Shared => {
+                    Rep::List
+                }
+                _ => rep_of(self.state.input.types, next)?,
+            };
             let bits = match projection {
+                MirProjection::ClosureCapture {
+                    environment,
+                    source,
+                } => {
+                    if current_rep != Rep::Record {
+                        return Err(Decline::new("capture of a non-environment"));
+                    }
+                    let (position, _, _) = self.capture_slot(*environment, *source)?;
+                    let position = self.builder.ins().iconst(
+                        types::I64,
+                        i64::try_from(position).map_err(|_| Decline::new("capture index"))?,
+                    );
+                    self.call_runtime(&abi::RECORD_GET, &[current, position])?
+                }
+                MirProjection::SharedCell => {
+                    if current_rep != Rep::List {
+                        return Err(Decline::new("cell projection of a non-cell"));
+                    }
+                    let zero = self.builder.ins().iconst(types::I64, 0);
+                    self.call_runtime(&abi::LIST_GET, &[current, zero])?
+                }
                 MirProjection::Index(index) if current_rep == Rep::Map => {
                     let (key_ty, _) = self.map_types(ty)?;
                     let (key, key_rep) = self.element_operand(index, key_ty)?;
@@ -1419,7 +1505,11 @@ impl FunctionLower<'_, '_> {
                     );
                     self.call_runtime(&abi::RECORD_GET, &[current, position])?
                 }
-                _ => return Err(Decline::new("place projection")),
+                _ => {
+                    return Err(Decline::new(format!(
+                        "place projection {projection:?} read"
+                    )));
+                }
             }
             .ok_or_else(|| Decline::new("projection result"))?;
             current = self.element_value(bits, next_rep);
@@ -1433,7 +1523,7 @@ impl FunctionLower<'_, '_> {
     /// the last index is a `list_set`.
     fn write_projected(&mut self, place: &MirPlace, value: Value, rep: Rep) -> Lowered<()> {
         let Some((last, prefix)) = place.projections.split_last() else {
-            return Err(Decline::new("place projection"));
+            return Err(Decline::new("place projection write without projections"));
         };
         let container = MirPlace {
             base: place.base.clone(),
@@ -1485,6 +1575,13 @@ impl FunctionLower<'_, '_> {
                 let field = self.text_literal(field.as_bytes())?;
                 self.call_runtime(&abi::RECORD_SET, &[handle, position, field, tag, bits])?;
             }
+            MirProjection::SharedCell => {
+                if handle_rep != Rep::List {
+                    return Err(Decline::new("cell projection of a non-cell"));
+                }
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                self.call_runtime(&abi::LIST_SET, &[handle, zero, tag, bits])?;
+            }
             MirProjection::VariantField { variant, field } => {
                 if handle_rep != Rep::Record {
                     return Err(Decline::new("variant field of a non-enum"));
@@ -1498,7 +1595,7 @@ impl FunctionLower<'_, '_> {
                 let name = self.text_literal(name.as_bytes())?;
                 self.call_runtime(&abi::RECORD_SET, &[handle, position, name, tag, bits])?;
             }
-            _ => return Err(Decline::new("place projection")),
+            _ => return Err(Decline::new(format!("place projection {last:?} write"))),
         }
         Ok(())
     }
@@ -2590,6 +2687,16 @@ impl FunctionLower<'_, '_> {
                 Ok(())
             }
             MirStatementKind::Call {
+                destination: Some(destination),
+                ..
+            }
+            | MirStatementKind::RuntimeCall {
+                destination: Some(destination),
+                ..
+            } if !destination.projections.is_empty() => {
+                self.statement_into_projection(statement, destination)
+            }
+            MirStatementKind::Call {
                 destination,
                 callee,
                 args,
@@ -2631,6 +2738,21 @@ impl FunctionLower<'_, '_> {
             } if aggregate.kind == MirAggregateKind::Tuple => {
                 self.construct_tuple(destination, aggregate)
             }
+            MirStatementKind::Construct {
+                destination,
+                aggregate,
+            } if aggregate.kind == MirAggregateKind::SharedCell => {
+                self.construct_cell(destination, aggregate)
+            }
+            MirStatementKind::Construct {
+                destination,
+                aggregate,
+            } if matches!(aggregate.kind, MirAggregateKind::ClosureEnvironment(_)) => {
+                let MirAggregateKind::ClosureEnvironment(id) = aggregate.kind else {
+                    return Err(Decline::new("closure environment kind"));
+                };
+                self.construct_environment(destination, id, aggregate)
+            }
             MirStatementKind::Construct { .. } => Err(Decline::new("aggregate construction")),
         }
     }
@@ -2641,6 +2763,7 @@ impl FunctionLower<'_, '_> {
         callee: &MirCallee,
         args: &[MirOperand],
     ) -> Lowered<()> {
+        let mut environment = None;
         let id = match callee {
             MirCallee::Function(id) => *id,
             MirCallee::Definition { source, type_args } if type_args.is_empty() => {
@@ -2658,6 +2781,14 @@ impl FunctionLower<'_, '_> {
             }
             MirCallee::Value(operand) => {
                 return self.indirect_call(destination, operand, args);
+            }
+            MirCallee::Closure(closure) => {
+                let (record, rep) = self.scalar(&closure.environment)?;
+                if rep != Rep::Record {
+                    return Err(Decline::new("closure environment representation"));
+                }
+                environment = Some(record);
+                closure.function
             }
             _ => return Err(Decline::new("indirect call")),
         };
@@ -2703,7 +2834,8 @@ impl FunctionLower<'_, '_> {
         {
             return Err(Decline::new("direct call of a generator"));
         }
-        let mut values = Vec::with_capacity(args.len());
+        let mut values = Vec::with_capacity(args.len() + 1);
+        values.extend(environment);
         for (position, arg) in args.iter().enumerate() {
             let (value, have) = self.scalar(arg)?;
             let value = match params.get(position) {
@@ -2786,16 +2918,18 @@ impl FunctionLower<'_, '_> {
         callee: &MirOperand,
         args: &[MirOperand],
     ) -> Lowered<()> {
-        let (pointer, rep) = self.scalar(callee)?;
+        let (object, rep) = self.scalar(callee)?;
         if rep != Rep::Func {
             return Err(Decline::new("call of a non-function"));
         }
+        let (pointer, environment) = self.function_parts(object)?;
         let ty = self.operand_type(callee)?;
         let table = self.state.input.types;
         let Type::Func(signature) = resolve(table, ty.semantic_id()) else {
             return Err(Decline::new("call of a non-function"));
         };
         let mut abi_signature = self.state.module.make_signature();
+        abi_signature.params.push(AbiParam::new(types::I64));
         let mut wanted = Vec::with_capacity(signature.params.len());
         for param in &signature.params {
             let rep = rep_of(table, MirType::semantic(param_value_type(table, param.ty)))?;
@@ -2809,7 +2943,8 @@ impl FunctionLower<'_, '_> {
         if let Some(cl) = result_rep.cl_type() {
             abi_signature.returns.push(AbiParam::new(cl));
         }
-        let mut values = Vec::with_capacity(args.len());
+        let mut values = Vec::with_capacity(args.len() + 1);
+        values.push(environment);
         for (position, arg) in args.iter().enumerate() {
             let (value, have) = self.scalar(arg)?;
             let value = match wanted.get(position) {
@@ -3575,6 +3710,7 @@ impl FunctionLower<'_, '_> {
                 let (computed, rep) = self.binary(*op, lhs, rhs, result)?;
                 Ok((Some(computed), rep))
             }
+            MirValueKind::Closure(closure) => Ok((Some(self.closure_value(closure)?), Rep::Func)),
             _ => Err(Decline::new("value kind")),
         }
     }
