@@ -1627,7 +1627,7 @@ main {
 }
 "#,
     );
-    assert!(dump.contains("bb0:"), "valid MIR must be emitted:\n{dump}");
+    assert!(dump.contains("bb0:"), "valid lowered dump must be emitted:\n{dump}");
 }
 
 #[test]
@@ -1645,7 +1645,7 @@ main {
 }
 "#,
     );
-    assert!(dump.contains("bb0:"), "valid MIR must be emitted:\n{dump}");
+    assert!(dump.contains("bb0:"), "valid lowered dump must be emitted:\n{dump}");
 }
 
 #[test]
@@ -1657,7 +1657,7 @@ fn verum_fac_dum_tail_return_lowers_valid_mir() {
     let dump = dump_source(
         r"functio f() → numerus { varia numerus i ← 0 fac { i ← i + 1 si i ≡ 4 ergo redde i * 10 } dum verum } incipit { nota f() }",
     );
-    assert!(dump.contains("bb0:"), "valid MIR must be emitted:\n{dump}");
+    assert!(dump.contains("bb0:"), "valid lowered dump must be emitted:\n{dump}");
 }
 
 #[test]
