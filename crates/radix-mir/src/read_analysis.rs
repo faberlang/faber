@@ -195,44 +195,69 @@ pub(crate) fn operand_slot(operand: &MirOperand) -> Option<MirPlaceBase> {
     }
 }
 
-/// The base slots a statement reads, locals and temps (the statement's own
-/// destination is a write, never a read). Slot-level mirror of
-/// [`statement_read_locals`], with the same exclusion policy: the
-/// `TensorFill` shape-receiver first operand is not a live value read.
+/// The base slots a statement reads, locals and temps: operand and value
+/// reads, plus the slots named by `Index` projections of the statement's own
+/// destination (the destination's base slot is a write, never a read).
+/// Slot-level mirror of [`statement_read_locals`], with the same exclusion
+/// policy: the `TensorFill` shape-receiver first operand is not a live value
+/// read.
 pub(crate) fn statement_read_slots(statement: &MirStatement) -> Vec<MirPlaceBase> {
     let mut read = Vec::new();
     match &statement.kind {
-        MirStatementKind::Assign { value, .. } => {
+        MirStatementKind::Assign { place, value } => {
+            push_place_index_slots(place, &mut read);
             value_read_slots(value, &mut read);
         }
-        MirStatementKind::RuntimeCall { call, .. } => {
-            read.extend(live_call_args(call).iter().filter_map(operand_slot));
+        MirStatementKind::RuntimeCall { destination, call } => {
+            if let Some(place) = destination {
+                push_place_index_slots(place, &mut read);
+            }
+            push_operand_list_slots(live_call_args(call), &mut read);
         }
-        MirStatementKind::Call { args, .. } => {
-            read.extend(args.iter().filter_map(operand_slot));
+        MirStatementKind::Call {
+            destination, args, ..
+        } => {
+            if let Some(place) = destination {
+                push_place_index_slots(place, &mut read);
+            }
+            push_operand_list_slots(args, &mut read);
         }
-        MirStatementKind::Construct { aggregate, .. } => {
+        MirStatementKind::Construct {
+            destination,
+            aggregate,
+        } => {
+            push_place_index_slots(destination, &mut read);
             aggregate_read_slots(aggregate, &mut read);
         }
     }
     read
 }
 
-/// The base slots a terminator reads (locals and temps).
+/// The base slots a terminator reads (locals and temps), including the
+/// `Index` operands of a `TryCall` destination and error place.
 pub(crate) fn terminator_read_slots(terminator: &MirTerminatorKind) -> Vec<MirPlaceBase> {
     let mut read = Vec::new();
     match terminator {
         MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
-            read.extend(operand_slot(operand));
+            push_operand_slots(operand, &mut read);
         }
         MirTerminatorKind::Branch { condition, .. }
         | MirTerminatorKind::Switch {
             value: condition, ..
         } => {
-            read.extend(operand_slot(condition));
+            push_operand_slots(condition, &mut read);
         }
-        MirTerminatorKind::TryCall { args, .. } => {
-            read.extend(args.iter().filter_map(operand_slot));
+        MirTerminatorKind::TryCall {
+            destination,
+            args,
+            error_place,
+            ..
+        } => {
+            if let Some(place) = destination {
+                push_place_index_slots(place, &mut read);
+            }
+            push_place_index_slots(error_place, &mut read);
+            push_operand_list_slots(args, &mut read);
         }
         MirTerminatorKind::Return(None)
         | MirTerminatorKind::Goto(_)
@@ -319,6 +344,43 @@ fn push_place_index_locals(place: &MirPlace, out: &mut Vec<MirLocalId>) {
     }
 }
 
+/// Collect the base slots an operand reads into `out` (slot-level mirror of
+/// [`push_operand_locals`]): a bare temp or a place base, then the slots read
+/// by every `Index` projection of that place. Value and constant operands read
+/// no slot.
+fn push_operand_slots(operand: &MirOperand, out: &mut Vec<MirPlaceBase>) {
+    out.extend(operand_slot(operand));
+    if let MirOperand::Place(place) = operand {
+        push_place_index_slots(place, out);
+    }
+}
+
+/// Collect the base slots read by the operands of an argument list into
+/// `out`.
+fn push_operand_list_slots(operands: &[MirOperand], out: &mut Vec<MirPlaceBase>) {
+    for operand in operands {
+        push_operand_slots(operand, out);
+    }
+}
+
+/// Collect the base slots read by a place's `Index` projections into `out`
+/// (slot-level mirror of [`push_place_index_locals`]). The place's own base is
+/// NOT pushed: as a destination it is a write, and as an operand
+/// [`push_operand_slots`] already pushed it.
+fn push_place_index_slots(place: &MirPlace, out: &mut Vec<MirPlaceBase>) {
+    for projection in &place.projections {
+        match projection {
+            MirProjection::Index(operand) => push_operand_slots(operand, out),
+            MirProjection::Field(_)
+            | MirProjection::VariantField { .. }
+            | MirProjection::ClosureCapture { .. }
+            | MirProjection::SharedCell
+            | MirProjection::VectorLane(_)
+            | MirProjection::MatrixCell { .. } => {}
+        }
+    }
+}
+
 /// Collect the locals a value reads into `out`.
 fn value_read_locals(value: &MirValue, out: &mut Vec<MirLocalId>) {
     match &value.kind {
@@ -347,14 +409,14 @@ fn value_read_slots(value: &MirValue, out: &mut Vec<MirPlaceBase>) {
         | MirValueKind::TensorExtent {
             tensor: operand, ..
         } => {
-            out.extend(operand_slot(operand));
+            push_operand_slots(operand, out);
         }
         MirValueKind::Binary { lhs, rhs, .. } => {
-            out.extend(operand_slot(lhs));
-            out.extend(operand_slot(rhs));
+            push_operand_slots(lhs, out);
+            push_operand_slots(rhs, out);
         }
         MirValueKind::Option(op) => option_read_slots(op, out),
-        MirValueKind::Closure(closure) => out.extend(operand_slot(&closure.environment)),
+        MirValueKind::Closure(closure) => push_operand_slots(&closure.environment, out),
     }
 }
 
@@ -380,13 +442,13 @@ fn option_read_slots(op: &MirOptionOp, out: &mut Vec<MirPlaceBase>) {
     match op {
         MirOptionOp::Some(operand)
         | MirOptionOp::IsNil(operand)
-        | MirOptionOp::IsNotNil(operand) => out.extend(operand_slot(operand)),
-        MirOptionOp::Unwrap { value, .. } => out.extend(operand_slot(value)),
+        | MirOptionOp::IsNotNil(operand) => push_operand_slots(operand, out),
+        MirOptionOp::Unwrap { value, .. } => push_operand_slots(value, out),
         MirOptionOp::Coalesce { value, fallback } => {
-            out.extend(operand_slot(value));
-            out.extend(operand_slot(fallback));
+            push_operand_slots(value, out);
+            push_operand_slots(fallback, out);
         }
-        MirOptionOp::Chain { base, .. } => out.extend(operand_slot(base)),
+        MirOptionOp::Chain { base, .. } => push_operand_slots(base, out),
         MirOptionOp::None => {}
     }
 }
@@ -422,18 +484,18 @@ fn aggregate_read_slots(aggregate: &MirAggregate, out: &mut Vec<MirPlaceBase>) {
         MirAggregateFields::Ordered(items) => {
             for item in items {
                 let (MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand)) = item;
-                out.extend(operand_slot(operand));
+                push_operand_slots(operand, out);
             }
         }
         MirAggregateFields::Named(fields) => {
             for field in fields {
-                out.extend(operand_slot(&field.value));
+                push_operand_slots(&field.value, out);
             }
         }
         MirAggregateFields::Keyed(fields) => {
             for field in fields {
-                out.extend(operand_slot(&field.key));
-                out.extend(operand_slot(&field.value));
+                push_operand_slots(&field.key, out);
+                push_operand_slots(&field.value, out);
             }
         }
     }
