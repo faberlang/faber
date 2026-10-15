@@ -42,7 +42,7 @@ fn curata_modifier_reports_allocator_surface_removed() {
 
 #[test]
 fn cura_and_curata_are_ordinary_identifiers_elsewhere() {
-    let bindings = parse_ok("fixum _ cura ← 5\nfixum _ curata ← cura\n");
+    let bindings = parse_ok("sit cura ← 5\nsit curata ← cura\n");
     assert_eq!(bindings.program.expect("program").statements.len(), 2);
     let function = parse_ok("functio cura(numerus curata) → numerus { redde curata }\n");
     assert_eq!(function.program.expect("program").statements.len(), 1);

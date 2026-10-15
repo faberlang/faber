@@ -10,14 +10,14 @@ import from "./client" client
 
 describe "client_construct" {
     test "Url and Client construct" {
-        const client.Url url ← client.Url {
+        let client.Url url ← client.Url {
             scheme = "http",
             host = "127.0.0.1",
             port = 9,
             path = "/test",
             query = "q=1"
         }
-        const client.Client session ← client.Client { }
+        let client.Client session ← client.Client { }
         assert url.scheme ≡ "http"
         assert url.host ≡ "127.0.0.1"
         assert url.port ≡ 9
@@ -27,11 +27,11 @@ describe "client_construct" {
     }
 
     test "Receive and Chunk construct" {
-        const client.Receive stream ← client.Receive {
+        let client.Receive stream ← client.Receive {
             reader = 1,
             status = 200
         }
-        const client.Chunk chunk ← client.Chunk {
+        let client.Chunk chunk ← client.Chunk {
             text = "data: one\n\n",
             done = false
         }

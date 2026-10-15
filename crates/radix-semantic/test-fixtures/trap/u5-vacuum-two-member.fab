@@ -10,6 +10,6 @@ fn nothing() → void ⇥ string {
 }
 
 main {
-    const ∪ r ← trap { nothing() }
+    let ∪ r ← trap { nothing() }
     print r
 }

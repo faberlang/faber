@@ -12,24 +12,24 @@ locale = "en"
 import from "norma:console" console
 
 main {
-    const string ∪ none a ← console.read_line()
+    let string ∪ none a ← console.read_line()
     assert a not is none
-    const string first ↤ a
+    let string first ↤ a
     assert first ≡ "alpha"
 
-    const string ∪ none b ← console.read_line()
+    let string ∪ none b ← console.read_line()
     assert b not is none
-    const string second ↤ b
+    let string second ↤ b
     assert second ≡ "beta"
 
-    const list<b8> chunk ← console.read_bytes(3) coalesce ||
+    let list<b8> chunk ← console.read_bytes(3) coalesce ||
     assert chunk.length() ≥ 1
     assert (chunk.get(0) coalesce (0 ∷ b8)) ≡ 0x67
 
     # End-of-input behaviour. The byte read above took only "gam", so stdin
     # still holds the rest of `gamma\n`. Drain it line by line: reassign
     # `rest` while the read yields a value that is not none and not empty.
-    var string ∪ none rest ← console.read_line()
+    mut string ∪ none rest ← console.read_line()
     while rest not is none and rest!.length() ≻ 0 {
         rest ← console.read_line()
     }
@@ -43,7 +43,7 @@ main {
     # Past the drained input, end of input holds: one more byte read hits
     # EOF. Both an empty and a none reply coalesce to the empty list, so the
     # length is zero either way.
-    const list<b8> tail ← console.read_bytes(4) coalesce ||
+    let list<b8> tail ← console.read_bytes(4) coalesce ||
     assert tail.length() ≡ 0
 
     console.write_line("stdio-read-ok")

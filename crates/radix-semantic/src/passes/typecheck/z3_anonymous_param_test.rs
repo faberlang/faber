@@ -27,8 +27,8 @@ fn two_calls_with_different_shapes_both_check() {
     let source = r#"fn rows(tensor<f32, [_, _]> t) → int { return 1 }
 
 main {
-    const tf32[2, 3] a ← tf32[2, 3] {}
-    const tf32[4, 5] b ← tf32[4, 5] {}
+    let tf32[2, 3] a ← tf32[2, 3] {}
+    let tf32[4, 5] b ← tf32[4, 5] {}
     print rows(a)
     print rows(b)
 }
@@ -48,8 +48,8 @@ fn anonymous_and_literal_axes_stay_distinct_within_one_call() {
     let source = r#"fn pick(tensor<f32, [_, 3]> t) → int { return 1 }
 
 main {
-    const tf32[2, 3] a ← tf32[2, 3] {}
-    const tf32[4, 3] b ← tf32[4, 3] {}
+    let tf32[2, 3] a ← tf32[2, 3] {}
+    let tf32[4, 3] b ← tf32[4, 3] {}
     print pick(a)
     print pick(b)
 }
@@ -58,7 +58,7 @@ main {
     assert!(result.is_ok(), "{:?}", result.err());
 
     let mismatched = analyze(
-        "fn pick(tensor<f32, [_, 3]> t) → int { return 1 }\nmain {\n    const tf32[2, 4] bad ← tf32[2, 4] {}\n    print pick(bad)\n}\n",
+        "fn pick(tensor<f32, [_, 3]> t) → int { return 1 }\nmain {\n    let tf32[2, 4] bad ← tf32[2, 4] {}\n    print pick(bad)\n}\n",
     );
     assert!(
         mismatched.is_err(),

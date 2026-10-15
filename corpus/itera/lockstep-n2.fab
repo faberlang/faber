@@ -30,14 +30,14 @@ locale = "en"
 # =============================================================================
 
 main {
-    const list<string> labels ← ["one", "two", "three"]
-    const list<int> values ← [1, 2, 3]
+    let list<string> labels ← ["one", "two", "three"]
+    let list<int> values ← [1, 2, 3]
     for from labels, values const label, value {
         print label
         print value
     }
-    const list<int> left ← [10, 20, 30]
-    const list<int> right ← [1, 2, 3]
+    let list<int> left ← [10, 20, 30]
+    let list<int> right ← [1, 2, 3]
     for from left, right const a, b {
         print a - b
     }

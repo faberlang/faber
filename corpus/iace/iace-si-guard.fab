@@ -50,7 +50,7 @@ fn validata(string input) → string ⇥ string {
 main {
     # Happy path — guard not triggered
     do {
-        const string a ← validata("hello")
+        let string a ← validata("hello")
         print "ok: §"(a)
     }
     catch err {
@@ -59,7 +59,7 @@ main {
 
     # Empty input — iace si guard triggers
     do {
-        const string b ← validata("")
+        let string b ← validata("")
         print "should not reach"
     }
     catch err {

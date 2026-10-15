@@ -16,6 +16,6 @@ diagnostic = "SEM056:mutating_receiver_through_ref"
 # This exemplum intentionally fails to compile.
 
 main {
-    const ref list<int> xs ← [1, 2, 3]
+    let ref list<int> xs ← [1, 2, 3]
     xs.append(4)
 }

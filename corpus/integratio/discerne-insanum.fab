@@ -61,9 +61,9 @@ fn narra(Mandatum m) → string {
 }
 
 main {
-    const Mandatum a ← variant Moveo { locus = "forum", passus = 8 }
-    const Mandatum b ← variant Loquere { verba = "salve" }
-    const Mandatum c ← variant Tace
+    let Mandatum a ← variant Moveo { locus = "forum", passus = 8 }
+    let Mandatum b ← variant Loquere { verba = "salve" }
+    let Mandatum c ← variant Tace
     print narra(a)
     print narra(b)
     print narra(c)

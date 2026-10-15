@@ -43,8 +43,8 @@ fn uno() → i8 {
 }
 
 main {
-    var i8 max ← 127 ∷ i8
+    mut i8 max ← 127 ∷ i8
     print max + uno()
-    var i8 total ← max + uno()
+    mut i8 total ← max + uno()
     print total
 }

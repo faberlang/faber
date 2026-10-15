@@ -45,22 +45,22 @@ locale = "en"
 #   [1.0, 4.0, 9.0, 16.0]
 
 main {
-    const vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
-    const vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
-    const vf32[2] q ← [4.0, 5.0] ↦ vf32[2]
-    const matrix<f32, [3, 2]> o ← a ⊗ q
+    let vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    let vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
+    let vf32[2] q ← [4.0, 5.0] ↦ vf32[2]
+    let matrix<f32, [3, 2]> o ← a ⊗ q
 
-    const vf32[3] v ← a ⊙ b
+    let vf32[3] v ← a ⊙ b
     print v
 
-    const matrix<f32, [3, 2]> m ← o ⊙ o
+    let matrix<f32, [3, 2]> m ← o ⊙ o
     print m
 
-    const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
-    const list<f32> flat_b ← [1.0, 2.0, 3.0, 4.0]
-    var tf32[2, 2] ta ← flat_a ↦ tf32[2, 2]
-    var tf32[2, 2] tb ← flat_b ↦ tf32[2, 2]
-    const tf32[2, 2] t ← ta ⊙ tb
-    const list<f32> out ← t.flatten()
+    let list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
+    let list<f32> flat_b ← [1.0, 2.0, 3.0, 4.0]
+    mut tf32[2, 2] ta ← flat_a ↦ tf32[2, 2]
+    mut tf32[2, 2] tb ← flat_b ↦ tf32[2, 2]
+    let tf32[2, 2] t ← ta ⊙ tb
+    let list<f32> out ← t.flatten()
     print out
 }

@@ -70,7 +70,7 @@ locale = "la"
 +++
 {COUNTER}
 incipit {{
-    fixum sermo s ← ad 'numeri:omnes'
+    sit sermo s ← ad 'numeri:omnes'
     itera ex s.tuus<numerus>().cursor() fixum item {{
         nota "consume §"(item.data)
         si item.data ≥ 1 {{
@@ -95,14 +95,14 @@ locale = "la"
 +++
 {COUNTER}
 incipit {{
-    fixum sermo s ← ad 'numeri:omnes'
-    fixum tuus<numerus> t ← s.tuus<numerus>()
-    fixum scrinium<numerus> ∪ nihil primum ← t.accipe()
+    sit sermo s ← ad 'numeri:omnes'
+    sit tuus<numerus> t ← s.tuus<numerus>()
+    sit scrinium<numerus> ∪ nihil primum ← t.accipe()
     nota primum?.data
-    fixum scrinium<numerus> ∪ nihil secundum ← t.accipe()
+    sit scrinium<numerus> ∪ nihil secundum ← t.accipe()
     nota secundum?.data
-    fixum status clausum ← t.fini()
-    fixum scrinium<numerus> ∪ nihil post ← t.accipe()
+    sit status clausum ← t.fini()
+    sit scrinium<numerus> ∪ nihil post ← t.accipe()
     nota post ≡ nulla
 }}
 "#
@@ -127,7 +127,7 @@ functio auge(lista<numerus> xs) → numerus {
 }
 
 incipit {
-    fixum lista<numerus> meae ← [1, 2, 3]
+    sit lista<numerus> meae ← [1, 2, 3]
     nota ad 'lista:auge' (meae) ↦ numerus
     nota meae.longitudo()
 }
@@ -153,8 +153,8 @@ functio tres() fiunt → numerus {
 }
 
 incipit {
-    fixum vacuum v ← ad 'nota:scribe' ("hic") ↦ vacuum
-    fixum lista<numerus> xs ← ad 'numeri:tres' ↦ lista<numerus>
+    sit vacuum v ← ad 'nota:scribe' ("hic") ↦ vacuum
+    sit lista<numerus> xs ← ad 'numeri:tres' ↦ lista<numerus>
     nota xs.longitudo()
 }
 "#;

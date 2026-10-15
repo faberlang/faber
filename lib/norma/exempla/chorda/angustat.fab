@@ -18,13 +18,13 @@ locale = "en"
 import from "norma:chorda" chorda
 
 main {
-    const ascii ∪ none present ← chorda.try_to_ascii("Authorization")
+    let ascii ∪ none present ← chorda.try_to_ascii("Authorization")
     assert present ≢ null
 
-    const ascii ∪ none absent ← chorda.try_to_ascii("π")
+    let ascii ∪ none absent ← chorda.try_to_ascii("π")
     assert absent ≡ null
 
-    const string neat ← chorda.collapse_spaces("  foo   bar  ")
+    let string neat ← chorda.collapse_spaces("  foo   bar  ")
     assert neat ≡ "foo bar"
 
     print neat

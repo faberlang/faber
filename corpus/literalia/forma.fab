@@ -34,17 +34,17 @@ locale = "en"
 #   Raw template text lines showing preserved § holes.
 
 main {
-    const string tenantId ← "tenant-42"
-    const string plan ← "pro"
-    const forma q ← `
+    let string tenantId ← "tenant-42"
+    let string plan ← "pro"
+    let forma q ← `
         select id, email, plan
         from accounts
         where tenant_id = §
           and plan = §
     `(tenantId, plan)
     print q.template
-    const forma indexed ← `where tenant_id = §0 or parent_tenant_id = §0`(tenantId)
+    let forma indexed ← `where tenant_id = §0 or parent_tenant_id = §0`(tenantId)
     print indexed.template
-    const forma bare ← `select 1`
+    let forma bare ← `select 1`
     print bare.template
 }

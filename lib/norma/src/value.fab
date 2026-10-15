@@ -77,8 +77,8 @@ fn is_instant(value v) → bool {
 fn map_lookup(value v, string key) → value {
     if v is none then return null
     if v not is map<string, value> then return null
-    const map<string, value> tab ↤ v ⊥ empty
-    const value got ← tab.get(key)
+    let map<string, value> tab ↤ v ⊥ empty
+    let value got ← tab.get(key)
     return got
 }
 
@@ -93,8 +93,8 @@ fn get(value v, string key) → value {
 fn get_index(value v, int index) → value {
     if v is none then return null
     if v not is list<value> then return null
-    const list<value> items ↤ v ⊥ empty
-    const value got ← items.get(index)
+    let list<value> items ↤ v ⊥ empty
+    let value got ← items.get(index)
     return got
 }
 
@@ -102,8 +102,8 @@ fn get_index(value v, int index) → value {
 # key; numeric segments index lists. Returns null if any segment misses.
 @ public
 fn find(value v, string path) → value {
-    const list<string> parts ← path.split(".")
-    var value current ← v
+    let list<string> parts ← path.split(".")
+    mut value current ← v
     for from parts const pars {
         current ← find_part(current, pars)
         if current is none then return null
@@ -117,13 +117,13 @@ fn find(value v, string path) → value {
 fn find_part(value current, string part) → value {
     if current is none then return null
     if current is map<string, value> {
-        const map<string, value> tab ↤ current ⊥ empty
-        const value got ← tab.get(part)
+        let map<string, value> tab ↤ current ⊥ empty
+        let value got ← tab.get(part)
         return got
     }
     if current is list<value> {
         do {
-            const int idx ↤ part
+            let int idx ↤ part
             return get_index(current, idx)
         }
         catch err {
@@ -140,7 +140,7 @@ fn find_part(value current, string part) → value {
 # Require a string child at clavis; throw on missing or non-string.
 @ public
 fn require_string(value v, string key) → string ⇥ string {
-    const value child ← map_lookup(v, key)
+    let value child ← map_lookup(v, key)
     if child is none then throw "missing key: §"(key)
     if child not is string then throw "key not textus: §"(key)
     return child ↦ string
@@ -151,7 +151,7 @@ fn require_string(value v, string key) → string ⇥ string {
 @ public
 fn require_strings(value v, list<string> keys) → void ⇥ string {
     for from keys const key {
-        const string _ ← require_string(v, key)
+        let string _ ← require_string(v, key)
     }
     return
 }

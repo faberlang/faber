@@ -28,28 +28,28 @@ genus Alius {
 
 fn with_types(body: &str) -> String {
     format!(
-        "{TYPES}incipit {{\n    fixum Punctum p ← Punctum {{ x = 1, y = 2, xs = [] }}\n{body}\n}}"
+        "{TYPES}incipit {{\n    sit Punctum p ← Punctum {{ x = 1, y = 2, xs = [] }}\n{body}\n}}"
     )
 }
 
 #[test]
 fn override_with_source_omits_required_fields() {
     test_support::assert_accepts(&with_types(
-        "    fixum Punctum q ← Punctum { y = 9 } ex p\n    nota q.y",
+        "    sit Punctum q ← Punctum { y = 9 } ex p\n    nota q.y",
     ));
 }
 
 #[test]
 fn empty_override_copies_every_field() {
     test_support::assert_accepts(&with_types(
-        "    fixum Punctum q ← Punctum {} ex p\n    nota q.x",
+        "    sit Punctum q ← Punctum {} ex p\n    nota q.x",
     ));
 }
 
 #[test]
 fn fixum_field_can_be_set_in_copy_with_changes() {
     test_support::assert_accepts(&with_types(
-        "    fixum Punctum q ← Punctum { x = 5, xs = [1] } ex p\n    nota q.x",
+        "    sit Punctum q ← Punctum { x = 5, xs = [1] } ex p\n    nota q.x",
     ));
 }
 
@@ -57,7 +57,7 @@ fn fixum_field_can_be_set_in_copy_with_changes() {
 fn source_of_another_genus_is_rejected() {
     test_support::assert_rejects_with_args(
         &with_types(
-            "    fixum Alius a ← Alius { x = 3 }\n    fixum Punctum q ← Punctum { y = 9 } ex a",
+            "    sit Alius a ← Alius { x = 3 }\n    sit Punctum q ← Punctum { y = 9 } ex a",
         ),
         &[DiagnosticArg::new(
             "issue",
@@ -69,7 +69,7 @@ fn source_of_another_genus_is_rejected() {
 #[test]
 fn scalar_source_is_rejected() {
     test_support::assert_rejects_with_issue(
-        &with_types("    fixum Punctum q ← Punctum { y = 9 } ex 3"),
+        &with_types("    sit Punctum q ← Punctum { y = 9 } ex 3"),
         "construction_source_type_mismatch",
     );
 }
@@ -77,7 +77,7 @@ fn scalar_source_is_rejected() {
 #[test]
 fn override_value_type_is_still_checked() {
     test_support::assert_rejects_with_issue(
-        &with_types("    fixum Punctum q ← Punctum { y = \"nine\" } ex p"),
+        &with_types("    sit Punctum q ← Punctum { y = \"nine\" } ex p"),
         "field_initializer_type_mismatch",
     );
 }
@@ -85,7 +85,7 @@ fn override_value_type_is_still_checked() {
 #[test]
 fn unknown_override_field_is_still_rejected() {
     test_support::assert_rejects_with_issue(
-        &with_types("    fixum Punctum q ← Punctum { z = 9 } ex p"),
+        &with_types("    sit Punctum q ← Punctum { z = 9 } ex p"),
         "unknown_field",
     );
 }
@@ -93,7 +93,7 @@ fn unknown_override_field_is_still_rejected() {
 #[test]
 fn missing_required_field_without_source_is_still_rejected() {
     test_support::assert_rejects_with_issue(
-        &with_types("    fixum Punctum q ← Punctum { y = 9 }"),
+        &with_types("    sit Punctum q ← Punctum { y = 9 }"),
         "missing_required_struct_field",
     );
 }

@@ -27,7 +27,7 @@ locale = "en"
 #   2, 3, 2, 4, -2, 2, 3
 
 main {
-    const float half ← 2.5
+    let float half ← 2.5
     print ⌊half⌋
     print ⌈half⌉
     print ⌊half⌉

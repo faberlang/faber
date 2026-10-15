@@ -43,14 +43,14 @@ fn panic_calls(name: &str, source: &str) -> usize {
 
 #[test]
 fn loop_with_bracket_store_on_the_same_map_carries_one_size_guard() {
-    let source = program("var map<string, int> m ← { \"a\": 1 }\nfor from m at [k] const v {\nm[k] ← v + 1\n}");
+    let source = program("mut map<string, int> m ← { \"a\": 1 }\nfor from m at [k] const v {\nm[k] ← v + 1\n}");
     assert_eq!(panic_calls("map-guard-store.fab", &source), 1);
 }
 
 #[test]
 fn loop_without_a_bracket_store_carries_no_size_guard() {
     let source = program(
-        "var map<string, int> m ← { \"a\": 1 }\nvar int total ← 0\nfor from m const v {\ntotal ← total + v\n}\nprint total",
+        "mut map<string, int> m ← { \"a\": 1 }\nmut int total ← 0\nfor from m const v {\ntotal ← total + v\n}\nprint total",
     );
     assert_eq!(panic_calls("map-guard-none.fab", &source), 0);
 }
@@ -58,7 +58,7 @@ fn loop_without_a_bracket_store_carries_no_size_guard() {
 #[test]
 fn loop_storing_into_a_different_map_carries_no_size_guard() {
     let source = program(
-        "var map<string, int> m ← { \"a\": 1 }\nvar map<string, int> n ← empty\nfor from m at [k] const v {\nn[k] ← v\n}\nprint n[\"a\"]",
+        "mut map<string, int> m ← { \"a\": 1 }\nmut map<string, int> n ← empty\nfor from m at [k] const v {\nn[k] ← v\n}\nprint n[\"a\"]",
     );
     assert_eq!(panic_calls("map-guard-other.fab", &source), 0);
 }
@@ -66,7 +66,7 @@ fn loop_storing_into_a_different_map_carries_no_size_guard() {
 #[test]
 fn update_only_bracket_store_loop_runs_to_completion() {
     let source = program(
-        "var map<string, int> m ← { \"a\": 1, \"b\": 2 }\nfor from m at [k] const v {\nm[k] ← v * 10\n}\nprint m[\"a\"]\nprint m[\"b\"]",
+        "mut map<string, int> m ← { \"a\": 1, \"b\": 2 }\nfor from m at [k] const v {\nm[k] ← v * 10\n}\nprint m[\"a\"]\nprint m[\"b\"]",
     );
     let mut host = BufferHost::default();
     run_source(&session(), "map-guard-update.fab", &source, &mut host)
@@ -77,7 +77,7 @@ fn update_only_bracket_store_loop_runs_to_completion() {
 #[test]
 fn adding_bracket_store_loop_traps_with_the_size_message() {
     let source = program(
-        "var map<string, int> m ← { \"a\": 1 }\nfor from m const v {\nm[\"b\"] ← v\nprint \"stored\"\n}\nprint \"unreached\"",
+        "mut map<string, int> m ← { \"a\": 1 }\nfor from m const v {\nm[\"b\"] ← v\nprint \"stored\"\n}\nprint \"unreached\"",
     );
     let mut host = BufferHost::default();
     let outcome: Result<Result<(), RunSourceError>, _> = catch_unwind(AssertUnwindSafe(|| {

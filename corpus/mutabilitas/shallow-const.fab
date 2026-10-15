@@ -14,7 +14,7 @@ locale = "en"
 # =============================================================================
 
 main {
-    var list<int> xs ← []
+    mut list<int> xs ← []
     xs.append(4)
     print xs.length()
 }

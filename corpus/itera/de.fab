@@ -37,7 +37,7 @@ no_expected = "nondeterministic-by-design"
 
 main {
     # Iterate over tabula keys
-    const map<string, string> persona ← { "nomen": "Marcus", "urbs": "Roma" }
+    let map<string, string> persona ← { "nomen": "Marcus", "urbs": "Roma" }
     for ref persona const clavis {
         print clavis
     }
@@ -48,13 +48,13 @@ main {
     }
 
     # Iterate over lista indices
-    const list<int, 3> numeri ← [10, 20, 30]
+    let list<int, 3> numeri ← [10, 20, 30]
     for ref numeri const index {
         print "index: § valor: §"(index, numeri[index])
     }
 
     # With numerus-valued tabula
-    const map<string, int> forma ← { "alpha": 1, "beta": 2 }
+    let map<string, int> forma ← { "alpha": 1, "beta": 2 }
     for ref forma const k {
         print k
     }

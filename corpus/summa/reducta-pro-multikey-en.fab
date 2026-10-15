@@ -50,12 +50,12 @@ fn per_bucket(tf32[6] weights, tensor<int, [6]> rows, tensor<int, [6]> cols) →
 }
 
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
-    const tf32[2, 2, 3] cube ← flat ↦ tf32[2, 2, 3]
-    const list<f32> loose ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[6] weights ← loose ↦ tf32[6]
-    const tensor<int, [6]> rows ← [0, 0, 1, 1, 0, 1] ↦ tensor<int, [6]>
-    const tensor<int, [6]> cols ← [0, 2, 1, 1, 0, 2] ↦ tensor<int, [6]>
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
+    let tf32[2, 2, 3] cube ← flat ↦ tf32[2, 2, 3]
+    let list<f32> loose ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[6] weights ← loose ↦ tf32[6]
+    let tensor<int, [6]> rows ← [0, 0, 1, 1, 0, 1] ↦ tensor<int, [6]>
+    let tensor<int, [6]> cols ← [0, 2, 1, 1, 0, 2] ↦ tensor<int, [6]>
     print per_cell(cube)
     print big_per_cell(cube)
     print per_bucket(weights, rows, cols)

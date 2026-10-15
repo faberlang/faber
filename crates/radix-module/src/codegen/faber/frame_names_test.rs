@@ -54,7 +54,7 @@ const EN_FAMILY: &str = r#"+++
 locale = "en"
 +++
 fn drain(channel s) → int {
-    var int n ← 0
+    mut int n ← 0
     for from s.recv<string>().cursor() const f {
         n ← n + 1
     }
@@ -62,11 +62,11 @@ fn drain(channel s) → int {
 }
 
 main {
-    const channel s ← call 'runtime:echo' ("salve")
-    const send<value> outbound ← s.send<value>()
-    const status closed ← outbound.fini()
-    const recv<string> t ← s.recv<string>()
-    const frame<string> ∪ none received ← t.accipe()
+    let channel s ← call 'runtime:echo' ("salve")
+    let send<value> outbound ← s.send<value>()
+    let status closed ← outbound.fini()
+    let recv<string> t ← s.recv<string>()
+    let frame<string> ∪ none received ← t.accipe()
     print closed
     print received
     print drain(call 'runtime:echo' ("salve"))
@@ -85,11 +85,11 @@ functio drain(sermo s) → numerus {
 }
 
 incipit {
-    fixum sermo s ← ad 'runtime:echo' ("salve")
-    fixum meus<valor> outbound ← s.meus<valor>()
-    fixum status closed ← outbound.fini()
-    fixum tuus<textus> t ← s.tuus<textus>()
-    fixum scrinium<textus> ∪ nihil received ← t.accipe()
+    sit sermo s ← ad 'runtime:echo' ("salve")
+    sit meus<valor> outbound ← s.meus<valor>()
+    sit status closed ← outbound.fini()
+    sit tuus<textus> t ← s.tuus<textus>()
+    sit scrinium<textus> ∪ nihil received ← t.accipe()
     nota closed
     nota received
     nota drain(ad 'runtime:echo' ("salve"))
@@ -114,8 +114,8 @@ fn en_family_words_stay_ordinary_identifiers() {
 locale = "en"
 +++
 class Packet {
-    var int frame = 0
-    var string channel = ""
+    mut int frame = 0
+    mut string channel = ""
 }
 
 fn send(int recv) → int {
@@ -123,10 +123,10 @@ fn send(int recv) → int {
 }
 
 main {
-    const int frame ← 3
-    const string channel ← "c"
-    const Packet p ← Packet { frame = frame, channel = channel }
-    const int recv ← send(p.frame)
+    let int frame ← 3
+    let string channel ← "c"
+    let Packet p ← Packet { frame = frame, channel = channel }
+    let int recv ← send(p.frame)
     print recv
     print channel
     for from [1, 2] const frame {
@@ -142,10 +142,10 @@ fn convert_la_to_en_spells_family_in_en() {
     let en = convert("en", LA_FAMILY);
     for needle in [
         "fn drain(channel s)",
-        "const channel s ←",
-        "const send<value> outbound ← s.send<value>()",
-        "const recv<string> t ← s.recv<string>()",
-        "const frame<string> ∪ none received",
+        "let channel s ←",
+        "let send<value> outbound ← s.send<value>()",
+        "let recv<string> t ← s.recv<string>()",
+        "let frame<string> ∪ none received",
         "s.recv<string>().cursor()",
     ] {
         assert!(en.contains(needle), "en convert must contain `{needle}`:\n{en}");
@@ -163,10 +163,10 @@ fn convert_en_to_la_round_trips_family() {
     let la = convert("la", &en);
     for needle in [
         "functio drain(sermo s)",
-        "fixum sermo s ←",
-        "fixum meus<valor> outbound ← s.meus<valor>()",
-        "fixum tuus<textus> t ← s.tuus<textus>()",
-        "fixum scrinium<textus> ∪ nihil received",
+        "sit sermo s ←",
+        "sit meus<valor> outbound ← s.meus<valor>()",
+        "sit tuus<textus> t ← s.tuus<textus>()",
+        "sit scrinium<textus> ∪ nihil received",
     ] {
         assert!(la.contains(needle), "la convert must contain `{needle}`:\n{la}");
     }
@@ -193,7 +193,7 @@ fn en_view_method_alone_registers_frame_types() {
 locale = "en"
 +++
 fn drain(channel s) → int {
-    var int n ← 0
+    mut int n ← 0
     for from s.recv<string>().cursor() const f {
         n ← n + 1
     }

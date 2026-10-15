@@ -149,7 +149,7 @@ fn modular_word_accepts_max_literal_per_width() {
         let source = format!(
             r"
 incipit {{
-    fixum modulus<{w}> max ← {max}
+    sit modulus<{w}> max ← {max}
     nota max
 }}
 ",
@@ -173,7 +173,7 @@ fn modular_word_reduces_max_plus_one_literal_per_width() {
         let source = format!(
             r"
 incipit {{
-    fixum modulus<{w}> tooBig ← {max_plus_one}
+    sit modulus<{w}> tooBig ← {max_plus_one}
     nota tooBig
 }}
 ",
@@ -286,10 +286,10 @@ fn signed_modular_word_stores_reduce_constants_and_conversions() {
     analysis_accepts(
         r"
 incipit {
-    fixum modulus<i8> wrapped ← 200
-    fixum modulus<i8> low ← -128
-    fixum numerus wide ← 300
-    fixum modulus<i8> converted ← wide ↦ modulus<i8>
+    sit modulus<i8> wrapped ← 200
+    sit modulus<i8> low ← -128
+    sit numerus wide ← 300
+    sit modulus<i8> converted ← wide ↦ modulus<i8>
     nota wrapped + low + converted
 }
 ",

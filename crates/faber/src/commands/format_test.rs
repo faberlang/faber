@@ -98,8 +98,8 @@ fn canonical_format_keeps_comparison_glyphs() {
 locale = "en"
 +++
 class Proba {
-    var float x
-    var float y
+    mut float x
+    mut float y
     fn compara(float other) → bool {
         return self.x ≺ other and self.x ≻ other and self.x ≤ other and self.x ≥ other
     }
@@ -127,8 +127,8 @@ fn canonical_format_refuses_ascii_comparison() {
 locale = "en"
 +++
 class Proba {
-    var float x
-    var float y
+    mut float x
+    mut float y
     fn compara(float other) → bool {
         return self.x < other and self.x > other
     }
@@ -174,7 +174,7 @@ fn canonical_format_prints_the_negation_glyph() {
 locale = "en"
 +++
 class Proba {
-    var float x
+    mut float x
     fn differs(float other) → bool {
         return self.x ≢ other
     }
@@ -199,7 +199,7 @@ fn canonical_format_refuses_retired_inequality_glyph() {
 locale = "en"
 +++
 class Proba {
-    var float x
+    mut float x
     fn differs(float other) → bool {
         return self.x ≠ other
     }
@@ -385,7 +385,7 @@ pub(crate) fn run_faber_format_stdout_with_args(args: &[&str]) -> String {
 /// product-default en pack is pack-authoritative).
 pub(crate) const VALID_BLOCK_SOURCE: &str = "+++\nlocale = \"la\"\n+++\nfunctio gradus(numerus x) → numerus {\n    si x ≻ 0 {\n        redde x\n    } sin x ≡ 0 {\n        redde 0\n    } secus {\n        redde 0 - x\n    }\n}\n";
 
-pub(crate) const EN_TYPES_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nfn pack(int n, float x, string name, list<b8> buf) → string {\n    const int count ← n\n    const float scale ← x\n    const string label ← name\n    const list<b8> payload ← buf\n    print count\n    print scale\n    print label\n    print payload.length()\n    return label\n}\n";
+pub(crate) const EN_TYPES_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nfn pack(int n, float x, string name, list<b8> buf) → string {\n    let int count ← n\n    let float scale ← x\n    let string label ← name\n    let list<b8> payload ← buf\n    print count\n    print scale\n    print label\n    print payload.length()\n    return label\n}\n";
 
 /// Need: `faber format --stdout` on an en-frontmatter source must
 /// keep English type spellings (the author engine relatinized them).
@@ -532,13 +532,13 @@ fn format_stdin_en_source_keeps_english_surface() {
 /// Need: the named-tuple loss probe, verbatim. Labels are an
 /// identity-erased alias layer, so canonical re-emission used to rewrite
 /// `tuple<gx: int, gw: int>` to `tuple<int, int>` and `pair.gw` to `pair[1]`.
-const NAMED_TUPLE_LABEL_PROBE: &str = "+++\nlocale = \"en\"\n+++\nmain {\n    const tuple<gx: int, gw: int> pair ← tuple<gx: int, gw: int> [1, 2]\n    print pair.gw\n}\n";
+const NAMED_TUPLE_LABEL_PROBE: &str = "+++\nlocale = \"en\"\n+++\nmain {\n    let tuple<gx: int, gw: int> pair ← tuple<gx: int, gw: int> [1, 2]\n    print pair.gw\n}\n";
 
 /// The live Gradus shape the loss was first found in
 /// (`gradus/src/gradient.fab`): generic shape parameters, tensor element
 /// types, a labeled tuple binding, and a by-label read. The genus field and
 /// the generic return type also cover the named aggregate positions.
-const GRADUS_SHAPED_TUPLE_LABEL_PROBE: &str = "+++\nlocale = \"en\"\n+++\nclass GradPack<size R, size C> {\n    var tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads\n}\n\nfn backward<size R, size C>(tensor<f32, [R, C]> x, tensor<f32, [R, C]> w) → tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> {\n    const tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads ← tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> [x, w]\n    return grads\n}\n\nfn pick_w<size R, size C>(tensor<f32, [R, C]> x, tensor<f32, [R, C]> w) → tensor<f32, [R, C]> {\n    const tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads ← tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> [x, w]\n    return grads.grad_w\n}\n";
+const GRADUS_SHAPED_TUPLE_LABEL_PROBE: &str = "+++\nlocale = \"en\"\n+++\nclass GradPack<size R, size C> {\n    mut tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads\n}\n\nfn backward<size R, size C>(tensor<f32, [R, C]> x, tensor<f32, [R, C]> w) → tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> {\n    let tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads ← tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> [x, w]\n    return grads\n}\n\nfn pick_w<size R, size C>(tensor<f32, [R, C]> x, tensor<f32, [R, C]> w) → tensor<f32, [R, C]> {\n    let tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads ← tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> [x, w]\n    return grads.grad_w\n}\n";
 
 /// A source that already is canonical output must format to itself — for the
 /// named-tuple probes that is exactly the labels-and-label-access assertion.
@@ -634,7 +634,7 @@ fn format_stdin_preserves_comments_in_expression_owned_blocks() {
         cases.push((
             format!("{kind} initializer"),
             format!(
-                "{FRONT}functio f() → vacuum {{\n    fixum ∪ g ← {}\n}}\n",
+                "{FRONT}functio f() → vacuum {{\n    sit ∪ g ← {}\n}}\n",
                 block("    ")
             ),
         ));
@@ -1146,8 +1146,8 @@ fn format_cli_keeps_the_transpose_glyph() {
 /// re-parses.
 #[test]
 fn format_cli_round_trips_rounding_and_transpose_glyphs() {
-    let english = "+++\nlocale = \"en\"\n+++\nfn flipped(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> {\n    return aᵀ.materialize()\n}\n\nmain {\n    const float half ← 2.5\n    print ⌊half⌋\n    print ⌈half⌉\n    print ⌊half⌉\n}\n";
-    let latin = "+++\nlocale = \"la\"\n+++\nfunctio versa(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> {\n    redde aᵀ.materialize()\n}\n\nincipit {\n    fixum fractus dimidium ← 2.5\n    nota ⌊dimidium⌋\n    nota ⌈dimidium⌉\n    nota ⌊dimidium⌉\n}\n";
+    let english = "+++\nlocale = \"en\"\n+++\nfn flipped(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> {\n    return aᵀ.materialize()\n}\n\nmain {\n    let float half ← 2.5\n    print ⌊half⌋\n    print ⌈half⌉\n    print ⌊half⌉\n}\n";
+    let latin = "+++\nlocale = \"la\"\n+++\nfunctio versa(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> {\n    redde aᵀ.materialize()\n}\n\nincipit {\n    sit fractus dimidium ← 2.5\n    nota ⌊dimidium⌋\n    nota ⌈dimidium⌉\n    nota ⌊dimidium⌉\n}\n";
 
     for (locale, source, pack) in [("en", english, english_pack()), ("la", latin, latin_pack())] {
         let fixture =
@@ -1173,7 +1173,7 @@ fn format_cli_round_trips_rounding_and_transpose_glyphs() {
 /// (`a.add(2)`) instead of respelling it as the desugared `a ← a + 2`.
 #[test]
 fn format_cli_keeps_the_in_place_numeric_twin() {
-    let source = "+++\nlocale = \"en\"\n+++\nmain {\n    var int a ← 1\n    a.add(2)\n    a.negate()\n    print a\n}\n";
+    let source = "+++\nlocale = \"en\"\n+++\nmain {\n    mut int a ← 1\n    a.add(2)\n    a.negate()\n    print a\n}\n";
     let fixture = std::env::temp_dir().join("faber-format-numeric-twin-cli.fab");
     fs::write(&fixture, source).expect("write numeric twin fixture");
 
@@ -1401,7 +1401,7 @@ fn format_usage_errors_exit_two() {
 
 // ── membership-glyph 3a: `∈` / `∉` survive the format round trip ──────────
 
-const MEMBERSHIP_EN_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nmain {\n    const list<int> xs ← [1, 2]\n    if 1 ∈ xs {\n        print \"in\"\n    }\n    if 3 ∉ xs {\n        print \"out\"\n    }\n    if 5 ∉ 0‥10 {\n        print \"outside\"\n    }\n}\n";
+const MEMBERSHIP_EN_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nmain {\n    let list<int> xs ← [1, 2]\n    if 1 ∈ xs {\n        print \"in\"\n    }\n    if 3 ∉ xs {\n        print \"out\"\n    }\n    if 5 ∉ 0‥10 {\n        print \"outside\"\n    }\n}\n";
 
 #[test]
 fn format_stdin_keeps_membership_glyphs_at_the_source_locale() {
@@ -1430,7 +1430,7 @@ fn format_stdin_keeps_membership_glyphs_at_the_source_locale() {
 fn format_stdin_keeps_a_negated_glyph_membership_as_a_negation() {
     // `not (x ∈ xs)` is a unary not over `∈`: the glyph is printed and the
     // negation stays a negation (no `∉` is invented).
-    let source = "+++\nlocale = \"en\"\n+++\nmain {\n    const list<int> xs ← [1, 2]\n    if not (3 ∈ xs) {\n        print \"out\"\n    }\n}\n";
+    let source = "+++\nlocale = \"en\"\n+++\nmain {\n    let list<int> xs ← [1, 2]\n    if not (3 ∈ xs) {\n        print \"out\"\n    }\n}\n";
     let (stdout, stderr, success) = run_faber_format_stdin(source);
     assert!(success, "{stderr}");
     assert!(stdout.contains("if not (3 ∈ xs) {"), "{stdout}");

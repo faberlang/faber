@@ -12,18 +12,18 @@ locale = "en"
 import from "norma:console" console
 
 main {
-    const bool in_first ← console.stdin_is_tty()
-    const bool in_second ← console.stdin_is_tty()
+    let bool in_first ← console.stdin_is_tty()
+    let bool in_second ← console.stdin_is_tty()
     assert in_first ≡ in_second
     assert in_first ≡ false
 
-    const bool out_first ← console.stdout_is_tty()
-    const bool out_second ← console.stdout_is_tty()
+    let bool out_first ← console.stdout_is_tty()
+    let bool out_second ← console.stdout_is_tty()
     assert out_first ≡ out_second
     assert out_first ≡ false
 
-    const bool err_first ← console.stderr_is_tty()
-    const bool err_second ← console.stderr_is_tty()
+    let bool err_first ← console.stderr_is_tty()
+    let bool err_second ← console.stderr_is_tty()
     assert err_first ≡ err_second
     assert err_first ≡ false
 

@@ -301,7 +301,7 @@ fn air_first_match_unbounded_lista_local_path_declines_not_bounded() {
         r#"
 @ radix lane "air"
 functio pick(numerus n) → fractus ∪ nihil {
-    fixum lista<f32> xs ← [1.0, 2.0, 3.0]
+    sit lista<f32> xs ← [1.0, 2.0, 3.0]
     redde primus_quem(xs, ubi v { v ≻ n })
 }
 "#,

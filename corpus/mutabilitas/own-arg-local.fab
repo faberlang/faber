@@ -13,7 +13,7 @@ locale = "en"
 # =============================================================================
 
 class Box {
-    var list<int> xs
+    mut list<int> xs
 }
 
 fn eat(own list<int> xs) → void {
@@ -33,7 +33,7 @@ fn relay(own list<int> p) → void {
 }
 
 main {
-    var list<int> a ← [1, 2, 3]
+    mut list<int> a ← [1, 2, 3]
     eat(own a)
     a ← [5, 6]
     print a.length()
@@ -42,11 +42,11 @@ main {
     eat(own make())
     relay(own make())
 
-    const Box b ← Box { xs = [1, 2, 3, 4] }
+    let Box b ← Box { xs = [1, 2, 3, 4] }
     dup(copy b.xs)
     print b.xs.length()
 
-    var list<int> c ← [1]
+    mut list<int> c ← [1]
     if a.length() ≻ 5 {
         eat(own c)
     } else {

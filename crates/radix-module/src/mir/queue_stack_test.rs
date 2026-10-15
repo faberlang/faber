@@ -64,8 +64,8 @@ incipit {
     varia queue<numerus> r ← vacua
     r.appende(10)
     r.appende(20)
-    fixum queue<numerus> sum ← q + r
-    fixum queue<numerus> scaled ← q * 3
+    sit queue<numerus> sum ← q + r
+    sit queue<numerus> scaled ← q * 3
     itera ex sum fixum item {
         nota item
     }
@@ -82,7 +82,7 @@ incipit {
     varia stack<numerus> b ← vacua
     b.appende(1)
     b.appende(3)
-    fixum stack<numerus> products ← a ⊙ b
+    sit stack<numerus> products ← a ⊙ b
     itera ex products fixum item {
         nota item
     }
@@ -105,7 +105,7 @@ incipit {
     q.appende(2)
     varia queue<numerus> r ← vacua
     r.appende(10)
-    fixum queue<numerus> _ ← q + r
+    sit queue<numerus> _ ← q + r
 }
 ";
     let mut host = BufferHost::default();

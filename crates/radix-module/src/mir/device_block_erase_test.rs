@@ -42,8 +42,8 @@ fn k<size H, size W>(tensor<f32, [H, W]> src, mut tensor<f32, [H, W]> dst) → v
 }
 
 main {
-    var tensor<f32, [3, 4]> src ← tf32[3, 4] {}
-    var tensor<f32, [3, 4]> dst ← tf32[3, 4] {}
+    mut tensor<f32, [3, 4]> src ← tf32[3, 4] {}
+    mut tensor<f32, [3, 4]> dst ← tf32[3, 4] {}
     do all {
         k(src, mut dst)
     }

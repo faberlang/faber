@@ -30,8 +30,8 @@ fn k<size H, size W>(tensor<f32, [H, W]> src, mut tensor<f32, [H, W]> dst) → v
 main args args {
     const size R ← args.rows
     const size C ← args.cols
-    var tensor<f32, [R, C]> src ← tf32[R, C] {}
-    var tensor<f32, [R, C]> dst ← tf32[R, C] {}
+    mut tensor<f32, [R, C]> src ← tf32[R, C] {}
+    mut tensor<f32, [R, C]> dst ← tf32[R, C] {}
     do all {
         k(src, mut dst)
     }

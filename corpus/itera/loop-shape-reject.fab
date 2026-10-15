@@ -15,7 +15,7 @@ diagnostic = "SEM011:loop_collection_shape_change"
 # store is the unchecked "developer knows best" form. For a worklist, use a
 # queue with `while`.
 main {
-    var list<int> xs ← [1, 2, 3]
+    mut list<int> xs ← [1, 2, 3]
     for from xs const x {
         xs.append(x)
     }

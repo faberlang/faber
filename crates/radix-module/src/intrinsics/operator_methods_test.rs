@@ -92,10 +92,10 @@ fn modular_word_receiver_resolves_only_explicitly_lowered_numeric_rows() {
 fn emits_numeric_operator_methods_as_rust_glyph_operations() {
     let source = r"
 incipit {
-    fixum fractus a ← 1.5
-    fixum _ sum ← a.addita(2.0)
-    fixum _ gt ← a.maior(1.0)
-    fixum _ le ← a.minime(2.0)
+    sit fractus a ← 1.5
+    sit sum ← a.addita(2.0)
+    sit gt ← a.maior(1.0)
+    sit le ← a.minime(2.0)
     varia fractus acc ← 10.0
     acc.adde(5.0)
     nota sum, gt, le, acc
@@ -116,7 +116,7 @@ incipit {
 fn rejects_imperativus_addita_on_fixum_receiver() {
     rejects_imperativus_on_fixum(
         r"incipit {
-    fixum fractus x ← 1.0
+    sit fractus x ← 1.0
     x.adde(2.0)
 }",
     );
@@ -127,9 +127,9 @@ fn rejects_imperativus_addita_on_fixum_receiver() {
 fn emits_bitwise_operator_methods_as_rust_glyph_operations() {
     let source = r"
 incipit {
-    fixum numerus mask ← 12
-    fixum _ bits ← mask.coniuncta(10)
-    fixum _ inv ← mask.complementata()
+    sit numerus mask ← 12
+    sit bits ← mask.coniuncta(10)
+    sit inv ← mask.complementata()
     varia numerus acc ← 15
     acc.coniunge(8)
     nota bits, inv, acc
@@ -152,7 +152,7 @@ incipit {
 fn rejects_imperativus_nega_on_fixum_receiver() {
     rejects_imperativus_on_fixum(
         r"incipit {
-    fixum fractus x ← 1.0
+    sit fractus x ← 1.0
     x.nega()
 }",
     );
@@ -162,7 +162,7 @@ fn rejects_imperativus_nega_on_fixum_receiver() {
 fn rejects_imperativus_coniunge_on_fixum_receiver() {
     rejects_imperativus_on_fixum(
         r"incipit {
-    fixum numerus x ← 1
+    sit numerus x ← 1
     x.coniunge(2)
 }",
     );
@@ -188,8 +188,8 @@ incipit {
 fn potentia_receiver_codegen_uses_ieee_powf() {
     let session = Session::new(Config::default().with_latin_locale());
     let source = r"incipit {
-    fixum fractus b ← -2.0
-    fixum fractus r ← b.potentia(2.0)
+    sit fractus b ← -2.0
+    sit fractus r ← b.potentia(2.0)
     nota r
 }";
     assert!(
@@ -207,8 +207,8 @@ fn potentia_receiver_codegen_uses_ieee_powf() {
 #[test]
 fn numerus_potentia_codegen_uses_integer_pow_without_float_guard() {
     let source = r"incipit {
-    fixum numerus base ← -2
-    fixum numerus result ← base.potentia(3)
+    sit numerus base ← -2
+    sit numerus result ← base.potentia(3)
     nota result
 }";
     let code = compile_rust("potentia-numerus.fab", source);
@@ -232,9 +232,9 @@ fn numerus_potentia_codegen_uses_integer_pow_without_float_guard() {
 fn emits_shift_operator_methods_as_rust_glyph_operations() {
     let source = r"
 incipit {
-    fixum numerus n ← 1
-    fixum _ left ← n.sinistrata(4)
-    fixum _ right ← n.dextrata(2)
+    sit numerus n ← 1
+    sit left ← n.sinistrata(4)
+    sit right ← n.dextrata(2)
     varia numerus acc ← 16
     acc.sinistra(1)
     acc.dextra(1)
@@ -261,8 +261,8 @@ fn rejects_shift_operator_on_fractus_receiver() {
         &session,
         "shift-fractus.fab",
         r"incipit {
-    fixum fractus x ← 1.0
-    fixum _ y ← x.sinistrata(1.0)
+    sit fractus x ← 1.0
+    sit y ← x.sinistrata(1.0)
 }",
         AnalyzeRequest::default(),
     );
@@ -285,8 +285,8 @@ fn rejects_bitwise_operator_on_fractus_receiver() {
         &session,
         "bitwise-fractus.fab",
         r"incipit {
-    fixum fractus x ← 1.0
-    fixum _ y ← x.coniuncta(1.0)
+    sit fractus x ← 1.0
+    sit y ← x.coniuncta(1.0)
 }",
         AnalyzeRequest::default(),
     );
@@ -306,9 +306,9 @@ fn rejects_bitwise_operator_on_fractus_receiver() {
 #[test]
 fn sized_integer_absolutum_and_potentia_emit_exact_i128_values() {
     let source = r"incipit {
-    fixum i8 n ← -128
-    fixum u8 m ← n.absolutum()
-    fixum i32 p ← 100000
+    sit i8 n ← -128
+    sit u8 m ← n.absolutum()
+    sit i32 p ← 100000
     nota m, p.potentia(2)
 }";
     let code = compile_rust("abs-power-sized.fab", source);

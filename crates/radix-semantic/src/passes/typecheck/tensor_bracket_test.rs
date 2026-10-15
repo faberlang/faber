@@ -86,7 +86,7 @@ fn tensor_bracket_accepts_rank2_list_literal_index() {
 fn tensor_bracket_accepts_bound_u32_index_list() {
     accepts(
         r"functio pick(tf32[4, 4] grid, u32 r, u32 c) → f32 {
-    fixum lista<u32> origin ← [r, c]
+    sit lista<u32> origin ← [r, c]
     redde grid[origin]
 }",
     );

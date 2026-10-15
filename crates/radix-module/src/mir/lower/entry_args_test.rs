@@ -98,7 +98,7 @@ fn raw_entry_args_do_not_exempt_user_locals_from_initialization() {
 locale = "en"
 +++
 main args argv {
-    const int uninitialized
+    let int uninitialized
     print uninitialized
 }
 "#;

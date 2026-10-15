@@ -16,7 +16,7 @@ sit = "設為"
 typus = "型別"
 schema = "結構"
 columna = "欄位"
-varia = "變值"
+varia = "可變"
 ceteri = "其餘"
 errata = "錯誤"
 exitus = "出口"
@@ -95,7 +95,7 @@ maxima = "最大"
 minima = "最小"
 de = "從"
 ex = "取自"
-in = "傳入"
+in = "可變"
 own = "擁有"
 copy = "拷貝"
 axis = "軸"
@@ -511,6 +511,26 @@ help = "請在 genus 上宣告 method"
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "`{marker}` 標記不再放在繫結上，而是放在值上"
 help = "寫成 `{keyword} T {name} ← {marker} value`；之後的 `{name} ← {marker} value` 以相同方式標記值，而參數則將 `{marker}` 保留在其型別之前"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "執行期的 `{keyword}` 宣告已廢止；`{name}` 是執行期名稱"
+help = "寫成 `{sit} T {name} ← …`（或用 `{sit} {name} ← …` 推斷型別）；`{fixum}` 表示編譯期事實，與 `=` 搭配"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "`{keyword}` 區域變數需要一個可讀取的位置：`{keyword} T name ← place`"
+help = "寫成 `{keyword} T name ← place`，若不需要初始位置，請使用 `{sit}` 或 `{varia}`"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "`{keyword}` 區域變數只繫結一個名稱，不能解構"
+help = "寫成 `{keyword} T name ← place`，再透過該名稱讀取各部分"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "`{keyword}` 區域變數讀取的是位置，不能接受 `{marker}` 值"
+help = "要讀取位置，寫成 `{keyword} T name ← place`；要得到獨立的值，寫成 `{sit} T name ← {marker} place`"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "`{keyword}` 宣告詞已廢止；`{name}` 是可寫名稱"
+help = "寫成 `{varia} T {name} ← …`；可寫的執行期名稱用 `{varia}`"
 
 [diagnostics.PARSE011]
 message = "在 {functio} 後需要函式名稱"

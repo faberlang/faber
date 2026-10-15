@@ -28,12 +28,12 @@ locale = "en"
 #   [1, 2, 3]
 
 class Persona {
-    var string nomen
-    var int aetas
+    mut string nomen
+    mut int aetas
 }
 
 fn nomina(list<Persona> ps) → string {
-    var string out ← ""
+    mut string out ← ""
     for from ps const p {
         if out ≡ "" {
             out ← p.nomen
@@ -45,7 +45,7 @@ fn nomina(list<Persona> ps) → string {
 }
 
 main {
-    const list<Persona> personae ← [
+    let list<Persona> personae ← [
         Persona { nomen = "Livia", aetas = 30 },
         Persona { nomen = "Marcus", aetas = 30 },
         Persona { nomen = "Aulus", aetas = 25 },
@@ -55,23 +55,23 @@ main {
     ]
 
     # Text key: code-point order puts "É" (U+00C9) after every ASCII letter.
-    const list<Persona> per_nomen ← sort via asc from personae const p { return p.nomen }
+    let list<Persona> per_nomen ← sort via asc from personae const p { return p.nomen }
     print nomina(per_nomen)
 
     # The source list is unchanged.
     print nomina(personae)
 
     # The direction is `desc`, not a negated key; equal keys stay stable.
-    const list<Persona> senes ← sort via desc from personae const p { return p.aetas }
+    let list<Persona> senes ← sort via desc from personae const p { return p.aetas }
     print nomina(senes)
 
     # Numeric key, stable: 25s keep Aulus before Cornelia; 30s keep
     # Livia, Marcus, Émilia in source order.
-    var list<Persona> per_aetatem ← copy personae
+    mut list<Persona> per_aetatem ← copy personae
     per_aetatem.sort(Persona p ∴ p.aetas)
     print nomina(per_aetatem)
 
     # Without a body, the elements sort by their natural order.
-    const list<int> numeri ← [3, 1, 2]
+    let list<int> numeri ← [3, 1, 2]
     print sort via asc from numeri
 }

@@ -156,7 +156,7 @@ fn embed_outside_a_constant_initializer_is_rejected() {
     for body in [
         "nota insere \"n.txt\"",
         "varia textus x ← \"a\"\n    x ← insere \"n.txt\"",
-        "fixum textus x ← insere \"n.txt\"",
+        "sit textus x ← insere \"n.txt\"",
     ] {
         let source = format!("incipit {{\n    {body}\n}}\n");
         rejects_with(&source, text_config(), "insere_outside_constant");

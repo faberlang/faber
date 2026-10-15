@@ -166,7 +166,7 @@ fn ref_local_then_mut_local_conflicts() {
         r"
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
-    fixum de lista<numerus> r ← a
+    sit de lista<numerus> r ← a
     varia in lista<numerus> b ← a
     nota r.longitudo()
     nota b.longitudo()
@@ -265,7 +265,7 @@ incipit {
 
 const MUT_SCALAR_SWAP: &str = r"
 functio swap(in numerus a, in numerus b) → vacuum {
-    fixum numerus held ← a
+    sit numerus held ← a
     a ← b
     b ← held
 }
@@ -301,7 +301,7 @@ incipit {
 fn three_mut_scalar_param_rotation_retains_no_borrow() {
     let source = r"
 functio rotate(in numerus a, in numerus b, in numerus c) → vacuum {
-    fixum numerus held ← a
+    sit numerus held ← a
     a ← b
     b ← c
     c ← held
@@ -321,7 +321,7 @@ incipit {
 fn passing_one_scalar_variable_to_two_mut_params_still_conflicts() {
     let source = r"
 functio swap(in numerus a, in numerus b) → vacuum {
-    fixum numerus held ← a
+    sit numerus held ← a
     a ← b
     b ← held
 }

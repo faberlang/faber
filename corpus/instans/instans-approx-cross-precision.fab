@@ -32,15 +32,15 @@ locale = "en"
 
 main {
     # same second; the millisecond wire adds sub-second precision
-    const value secondWire ← "1979-05-27T07:32:00Z"
-    const value millisWire ← "1979-05-27T07:32:00.500Z"
-    const instant whole ← secondWire ↦ instant
-    const instant<ms> half ← millisWire ↦ instant<ms>
+    let value secondWire ← "1979-05-27T07:32:00Z"
+    let value millisWire ← "1979-05-27T07:32:00.500Z"
+    let instant whole ← secondWire ↦ instant
+    let instant<ms> half ← millisWire ↦ instant<ms>
 
-    const bool approx ← whole ≅ half
-    const bool atMost ← whole ≤ half
-    const bool atLeast ← whole ≥ half
-    const bool distinct ← whole ≇ half
+    let bool approx ← whole ≅ half
+    let bool atMost ← whole ≤ half
+    let bool atLeast ← whole ≥ half
+    let bool distinct ← whole ≇ half
 
     print approx
     print atMost

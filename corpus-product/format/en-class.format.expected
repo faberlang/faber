@@ -2,8 +2,8 @@
 locale = "en"
 +++
 class Point {
-    var int x
-    var float y
+    mut int x
+    mut float y
 
     fn doubled() → int {
         return self.x * 2
@@ -15,7 +15,7 @@ fn make(int x, float y) → Point {
 }
 
 fn show() → string {
-    var Point p ← make(21, 1.5)
+    mut Point p ← make(21, 1.5)
     print p.doubled()
     return "ok"
 }

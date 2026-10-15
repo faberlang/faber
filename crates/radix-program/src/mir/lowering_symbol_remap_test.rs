@@ -9,7 +9,7 @@ use super::*;
 
 const HELPER: &str = r"@ public
 fn dot(list<int> a, list<int> b) → int {
-    var int sum ← 0
+    mut int sum ← 0
     for from a, b const x, y {
         sum ← sum + x * y
     }

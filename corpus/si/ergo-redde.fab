@@ -93,7 +93,7 @@ main {
     print gradus(55)
 
     # Linear search with early redde
-    const _ numeri ← [1, 2, 3, 4, 5]
+    let numeri ← [1, 2, 3, 4, 5]
     print inveni(numeri, 3)
     print inveni(numeri, 9)
 }

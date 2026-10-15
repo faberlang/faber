@@ -38,13 +38,13 @@ locale = "en"
 #   Cross-ref scriptum/scriptum.fab for § template application.
 
 main {
-    const regex digits ← "\\d+" ↦ regex
+    let regex digits ← "\\d+" ↦ regex
     print digits
-    const regex word ← "(?i)\\w+" ↦ regex
+    let regex word ← "(?i)\\w+" ↦ regex
     print word
 
     # Template application → textus, then conversio to regex (dynamic path segments)
-    const string tenant ← "acme"
-    const regex homePath ← "/home/§/.*"(tenant) ↦ regex
+    let string tenant ← "acme"
+    let regex homePath ← "/home/§/.*"(tenant) ↦ regex
     print homePath
 }

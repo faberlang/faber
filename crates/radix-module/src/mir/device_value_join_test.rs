@@ -48,9 +48,9 @@ fn second(tf32[8] {c}, mut tf32[8] {d}) → void {{
     }}
 }}
 main {{
-    const tf32[8] a0 ← tf32[8] {{}}.fill(1.5)
-    var tf32[8] t ← tf32[8] {{}}
-    var tf32[8] r ← tf32[8] {{}}
+    let tf32[8] a0 ← tf32[8] {{}}.fill(1.5)
+    mut tf32[8] t ← tf32[8] {{}}
+    mut tf32[8] r ← tf32[8] {{}}
     first(a0, mut t)
     second(t, mut r)
     print r[3]

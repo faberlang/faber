@@ -21,8 +21,8 @@ fn id<size N>(tensor<f32, [N]> x) → tensor<f32, [N]> {
 const TYPEARG_EXPLICIT_MAIN: &str = r#"import from "./util" * as utilModule
 
 fn run() → f32 {
-    const tensor<f32, [2]> t ← [1.5, 2.5] ↦ tensor<f32, [2]>
-    const tensor<f32, [2]> r ← utilModule.id<2>(t)
+    let tensor<f32, [2]> t ← [1.5, 2.5] ↦ tensor<f32, [2]>
+    let tensor<f32, [2]> r ← utilModule.id<2>(t)
     return r[1]
 }
 
@@ -34,8 +34,8 @@ main {
 const TYPEARG_INFERRED_MAIN: &str = r#"import from "./util" * as utilModule
 
 fn run() → f32 {
-    const tensor<f32, [3]> t ← [1.5, 2.5, 3.5] ↦ tensor<f32, [3]>
-    const tensor<f32, [3]> r ← utilModule.id(t)
+    let tensor<f32, [3]> t ← [1.5, 2.5, 3.5] ↦ tensor<f32, [3]>
+    let tensor<f32, [3]> r ← utilModule.id(t)
     return r[2]
 }
 
@@ -51,11 +51,11 @@ fn forward<size N>(tensor<f32, [N]> x) → tensor<f32, [N]> {
 }
 
 fn run() → f32 {
-    const tensor<f32, [3]> a ← [1.5, 2.5, 3.5] ↦ tensor<f32, [3]>
-    const tensor<f32, [5]> b ← [1.0, 2.0, 3.0, 4.0, 5.0] ↦ tensor<f32, [5]>
-    const tensor<f32, [3]> ra ← forward<3>(a)
-    const tensor<f32, [5]> rb ← forward<5>(b)
-    const tensor<f32, [3]> rc ← ra ↦ tensor<f32, [3]>
+    let tensor<f32, [3]> a ← [1.5, 2.5, 3.5] ↦ tensor<f32, [3]>
+    let tensor<f32, [5]> b ← [1.0, 2.0, 3.0, 4.0, 5.0] ↦ tensor<f32, [5]>
+    let tensor<f32, [3]> ra ← forward<3>(a)
+    let tensor<f32, [5]> rb ← forward<5>(b)
+    let tensor<f32, [3]> rc ← ra ↦ tensor<f32, [3]>
     return rc[1]
 }
 
@@ -331,14 +331,14 @@ fn rope<size D>(tf32[2, D] x, tf32[2, 4, 3] table) → tf32[2, D] {
 const AIR_TYPEARG_MAIN: &str = r#"import from "./util" * as utilModule
 
 fn main() → void {
-    const tf32[2, 8] x ← [[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0]] ↦ tf32[2, 8]
-    const list<f32> y_flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[2, 4, 3] table ← empty
+    let tf32[2, 8] x ← [[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0]] ↦ tf32[2, 8]
+    let list<f32> y_flat ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[2, 4, 3] table ← empty
     do {
-        const tf32[2, 64] y ← y_flat ↦ tf32[2, 64]
-        const _ a ← utilModule.rope<8>(x, table)
-        const _ b ← utilModule.rope<64>(y, table)
-        const _ c ← utilModule.rope(y, table)
+        let tf32[2, 64] y ← y_flat ↦ tf32[2, 64]
+        let a ← utilModule.rope<8>(x, table)
+        let b ← utilModule.rope<64>(y, table)
+        let c ← utilModule.rope(y, table)
     }
     catch err {
     }

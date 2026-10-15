@@ -20,7 +20,7 @@ fn eat(own list<int> xs) → void {
 }
 
 main {
-    const list<list<int>> rows ← [[1], [2]]
+    let list<list<int>> rows ← [[1], [2]]
     for from rows const row {
         eat(own row)
     }

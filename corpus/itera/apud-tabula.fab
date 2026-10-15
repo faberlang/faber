@@ -33,11 +33,11 @@ locale = "en"
 #   key=value rows in sorted key order.
 
 main {
-    var map<string, int> stock ← empty
+    mut map<string, int> stock ← empty
     stock["pear"] ← 3
     stock["apple"] ← 5
     stock["fig"] ← 1
-    var list<string> rows ← empty
+    mut list<string> rows ← empty
     for from stock at [name] const count {
         rows.append("§=§"(name, count))
     }

@@ -35,8 +35,8 @@ fn k<size H, size W>(tensor<f32, [H, W]> src, mut tensor<f32, [H, W]> dst) → v
 main args args {
     const size R ← args.rows
     const size C ← args.cols
-    var tensor<f32, [R, C]> src ← tf32[R, C] {}
-    var tensor<f32, [R, C]> dst ← tf32[R, C] {}
+    mut tensor<f32, [R, C]> src ← tf32[R, C] {}
+    mut tensor<f32, [R, C]> dst ← tf32[R, C] {}
     do all {
         k(src, mut dst)
     }
@@ -122,8 +122,8 @@ fn throw_sites_follow_the_index_sites_in_block_order() {
         )
         .replace("k(src, mut dst)", "k(src, other, mut dst)")
         .replace(
-            "var tensor<f32, [R, C]> dst ←",
-            "var tensor<f32, [R, C]> other ← tf32[R, C] {}\n    var tensor<f32, [R, C]> dst ←",
+            "mut tensor<f32, [R, C]> dst ←",
+            "mut tensor<f32, [R, C]> other ← tf32[R, C] {}\n    mut tensor<f32, [R, C]> dst ←",
         );
     let (_, signature, reflection) = lowered_kernel(&source);
     let sites: Vec<_> = reflection
@@ -178,8 +178,8 @@ fn scale(tensor<f32, [8]> src, mut tensor<f32, [8]> dst) → void ⇥ string {
 
 @ cli "kernel-throw-inline"
 main args args {
-    var tensor<f32, [8]> src ← tf32[8] {}
-    var tensor<f32, [8]> dst ← tf32[8] {}
+    mut tensor<f32, [8]> src ← tf32[8] {}
+    mut tensor<f32, [8]> dst ← tf32[8] {}
     do all {
         scale(src, mut dst)
     }

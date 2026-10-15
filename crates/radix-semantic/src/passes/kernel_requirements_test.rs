@@ -218,7 +218,7 @@ fn tensor_division(
     tensor<wrapping<i32>, [4]> dividend,
     tensor<wrapping<i32>, [4]> divisor
 ) → void {
-    const tensor<wrapping<i32>, [4]> quotient ← dividend.divided(divisor)
+    let tensor<wrapping<i32>, [4]> quotient ← dividend.divided(divisor)
 }
 ",
     );
@@ -272,7 +272,7 @@ fn map_edges<size N>(
     tensor<f32, [N]> input,
     mut tensor<f32, [N]> output
 ) → void {
-    const tensor<f32, [N]> mapped ← input.shift([1]).limes<ZeroGhost>()
+    let tensor<f32, [N]> mapped ← input.shift([1]).limes<ZeroGhost>()
     for from mapped at [i] const value {
         output[i] ← value
     }
@@ -370,7 +370,7 @@ functio same<magnitudo N>(tensor<f32, [N]> left, tensor<f32, [N]> right) → f32
 }
 
 incipit {
-    fixum tensor<f32, [3]> a ← vacua
+    sit tensor<f32, [3]> a ← vacua
     nota same(a, a)
 }
 ",
@@ -388,8 +388,8 @@ fn vector_literal_over_untyped_float_constants_requires_no_f64() {
 @ kernel
 @ public
 fn productum(f32 x) → f32 {
-    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
-    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    let vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    let vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
     return a.dot(b)
 }
 ",
@@ -409,7 +409,7 @@ fn explicit_f64_array_literal_still_requires_f64() {
 @ kernel
 @ public
 fn wide(f64 x) → f64 {
-    const vf64[2] a ← [x, 2.0] ↦ vf64[2]
+    let vf64[2] a ← [x, 2.0] ↦ vf64[2]
     return a.dot(a)
 }
 ",

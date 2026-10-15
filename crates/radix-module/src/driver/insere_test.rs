@@ -154,7 +154,7 @@ fn en_embed_spelling_is_contextual() {
     let main = dir.path().join("main.fab");
     write(
         &main,
-        b"+++\nlocale = \"en\"\n+++\nconst string S = embed \"x.txt\"\nfn embed(int x) \xe2\x86\x92 int {\n    return x\n}\nfn local() \xe2\x86\x92 int {\n    const int embed \xe2\x86\x90 3\n    return embed\n}\nmain {\n    print S\n    print embed(local())\n}\n",
+        b"+++\nlocale = \"en\"\n+++\nconst string S = embed \"x.txt\"\nfn embed(int x) \xe2\x86\x92 int {\n    return x\n}\nfn local() \xe2\x86\x92 int {\n    let int embed \xe2\x86\x90 3\n    return embed\n}\nmain {\n    print S\n    print embed(local())\n}\n",
     );
     let unit = analyze_file(&main).unwrap_or_else(|d| panic!("analysis failed: {d:?}"));
     let HirLiteral::String(sym) = static_literal(&unit, "S") else {

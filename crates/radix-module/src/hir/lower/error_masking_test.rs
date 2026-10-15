@@ -109,7 +109,7 @@ enum Mark {
 }
 @ public
 class Payload {
-    var Mark mark
+    mut Mark mark
 }
 ";
 

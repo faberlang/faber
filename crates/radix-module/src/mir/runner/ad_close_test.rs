@@ -112,20 +112,20 @@ fn live_cursor_conversations_hold_slots_until_closed() {
 fn close_reports_the_error_terminal() {
     let source = program(
         r#"functio claude(sermo s) → textus ⇥ textus {
-    fixum bivalens clausa ← s.close()
+    sit bivalens clausa ← s.close()
     redde "clausa §"(clausa)
 }
 
 incipit {
-    fixum sermo f ← ad 'numeri:defice' (7)
+    sit sermo f ← ad 'numeri:defice' (7)
     nota f.close() ⊥ verum
-    fixum sermo g ← ad 'numeri:defice' (8)
+    sit sermo g ← ad 'numeri:defice' (8)
     nota claude(g) ⊥ "error"
-    fixum sermo h ← ad 'numeri:bis' (1)
+    sit sermo h ← ad 'numeri:bis' (1)
     nota claude(h) ⊥ "error"
     fac {
-        fixum sermo k ← ad 'numeri:defice' (9)
-        fixum bivalens nunquam ← k.close()
+        sit sermo k ← ad 'numeri:defice' (9)
+        sit bivalens nunquam ← k.close()
         nota nunquam
     } cape err {
         nota err
@@ -141,14 +141,14 @@ incipit {
 fn abandoned_conversation_releases_on_last_reference() {
     let source = program(
         r#"functio desere() {
-    fixum sermo s ← ad 'numeri:cuncti'
+    sit sermo s ← ad 'numeri:cuncti'
     nota "deserta"
 }
 
 incipit {
     desere()
     desere()
-    fixum sermo tenta ← ad 'numeri:cuncti'
+    sit sermo tenta ← ad 'numeri:cuncti'
     nota "tenta"
 }
 "#,
@@ -180,11 +180,11 @@ fn fini_reports_the_real_terminal() {
 }
 
 incipit {
-    fixum sermo vivus ← ad 'numeri:cuncti'
+    sit sermo vivus ← ad 'numeri:cuncti'
     nota nomen(vivus.tuus<numerus>().fini())
-    fixum sermo plenus ← ad 'numeri:bis' (2)
+    sit sermo plenus ← ad 'numeri:bis' (2)
     nota nomen(plenus.tuus<numerus>().fini())
-    fixum sermo fractus ← ad 'numeri:defice' (3)
+    sit sermo fractus ← ad 'numeri:defice' (3)
     nota nomen(fractus.tuus<numerus>().fini())
 }
 "#,

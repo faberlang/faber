@@ -885,7 +885,7 @@ fn unexpected_help(args: &[DiagnosticArg]) -> Option<String> {
         "json_integer_underflow" => Some("use a numerus value within range".to_owned()),
         "expected_json_number_after_minus" => Some("put a number after '-' in JSON".to_owned()),
         "conversio_assign_requires_concrete_type" => {
-            Some("write a concrete type for the binding, e.g. 'fixum numerus x ↤ value'".to_owned())
+            Some("write a concrete type for the binding, e.g. 'sit numerus x ↤ value'".to_owned())
         }
         "conversio_assign_await_unsupported" => {
             Some("keep '←' for 'figendum'/'variandum' awaited bindings".to_owned())
@@ -1135,7 +1135,7 @@ fn invalid_expression_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("write one 'target ⇇ value' per statement; '⇇' has no result to chain".to_owned())
         }
         "itera_source_sort_reduce_unbound" => Some(
-            "bind it to a name first, then loop over the name: `const list<int> ys ← sort via asc from xs`, then `for from ys const x`"
+            "bind it to a name first, then loop over the name: `let list<int> ys ← sort via asc from xs`, then `for from ys const x`"
                 .to_owned(),
         ),
         "recovery_uses_exit_arrow" => {

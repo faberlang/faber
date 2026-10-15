@@ -45,14 +45,14 @@ locale = "en"
 #   composites as construction literals, scalars as values.
 
 class Rec {
-    var bool ok
-    var int ∪ none opt
-    var char c
-    var ascii a
-    var ascii u
-    var list<string> names
-    var d64 price
-    var f32 ratio
+    mut bool ok
+    mut int ∪ none opt
+    mut char c
+    mut ascii a
+    mut ascii u
+    mut list<string> names
+    mut d64 price
+    mut f32 ratio
     static int LIMIT = 4
 }
 
@@ -87,43 +87,43 @@ union Shape {
 }
 
 main {
-    const Rec r ← Rec { ok = true, opt = 3, c = 'q', a = 'abc', u = 'q', names = ["a", "b"], price = 0.1, ratio = 0.1 }
+    let Rec r ← Rec { ok = true, opt = 3, c = 'q', a = 'abc', u = 'q', names = ["a", "b"], price = 0.1, ratio = 0.1 }
     print r
 
-    const Rec e ← Rec { ok = false, opt = null, c = 'z', a = 'xyz', u = 'z', names = [], price = 2.0, ratio = 0.25 }
+    let Rec e ← Rec { ok = false, opt = null, c = 'z', a = 'xyz', u = 'z', names = [], price = 2.0, ratio = 0.25 }
     print e
 
     print Vacuus {}
 
-    const Node leaf ← variant Leaf { v = 1 } ∷ Node
+    let Node leaf ← variant Leaf { v = 1 } ∷ Node
     print leaf
-    const Node end ← variant Finis ∷ Node
+    let Node end ← variant Finis ∷ Node
     print end
 
-    const Signum s ← variant Alpha ∷ Signum
+    let Signum s ← variant Alpha ∷ Signum
     print s
-    const Color k ← Color.Red
+    let Color k ← Color.Red
     print k
 
-    const Shape dot ← variant Dot { kind = 1 } ∷ Shape
+    let Shape dot ← variant Dot { kind = 1 } ∷ Shape
     print dot
-    const Shape circle ← variant Circle { kind = 2, r = 1.5 } ∷ Shape
+    let Shape circle ← variant Circle { kind = 2, r = 1.5 } ∷ Shape
     print circle
 
-    const list<string> words ← ["a", "b"]
+    let list<string> words ← ["a", "b"]
     print words
-    const list<char> letters ← ['x', 'y']
+    let list<char> letters ← ['x', 'y']
     print letters
-    const list<ascii> marks ← ['q', 'abc']
+    let list<ascii> marks ← ['q', 'abc']
     print marks
-    const list<int> numbers ← [0, 1, 2]
+    let list<int> numbers ← [0, 1, 2]
     print numbers
-    const list<bool> flags ← [true, false]
+    let list<bool> flags ← [true, false]
     print flags
 
     print "hello"
     print 'q'
-    const ascii one ← 'q'
+    let ascii one ← 'q'
     print one
     print 7
     print true

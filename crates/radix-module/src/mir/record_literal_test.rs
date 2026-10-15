@@ -25,7 +25,7 @@ fn run(source: &str) -> Vec<String> {
 fn labelled_record_literal_reads_its_fields_on_the_runner() {
     let out = run(r"
 main {
-    const record<loss: f32, steps: int> r ← record<loss: f32, steps: int> { loss = 3.0, steps = 4 }
+    let record<loss: f32, steps: int> r ← record<loss: f32, steps: int> { loss = 3.0, steps = 4 }
     print r.steps
     print r.loss
 }
@@ -40,7 +40,7 @@ fn labelled_record_literal_lowers_to_one_record_aggregate() {
         &session,
         "record-literal-dump.fab",
         &english(
-            "main {\n    const record<loss: f32, steps: int> r ← record<loss: f32, steps: int> { loss = 3.0, steps = 4 }\n    print r.steps\n}\n",
+            "main {\n    let record<loss: f32, steps: int> r ← record<loss: f32, steps: int> { loss = 3.0, steps = 4 }\n    print r.steps\n}\n",
         ),
     )
     .expect("analyzes");
@@ -58,8 +58,8 @@ fn steps_of(record<loss: f32, steps: int> r) → int {
     return r.steps
 }
 main {
-    const record<loss: f32, steps: int> r ← record<loss: f32, steps: int> { loss = 1.5, steps = 4 }
-    const record<loss: f32, steps: int> s ← bump(r)
+    let record<loss: f32, steps: int> r ← record<loss: f32, steps: int> { loss = 1.5, steps = 4 }
+    let record<loss: f32, steps: int> s ← bump(r)
     print steps_of(s)
     print s.loss
 }
@@ -71,7 +71,7 @@ main {
 fn nested_record_literal_runs() {
     let out = run(r"
 main {
-    const record<id: int, inner: record<a: int, b: int>> r ← record<id: int, inner: record<a: int, b: int>> { id = 1, inner = record<a: int, b: int> { a = 2, b = 3 } }
+    let record<id: int, inner: record<a: int, b: int>> r ← record<id: int, inner: record<a: int, b: int>> { id = 1, inner = record<a: int, b: int> { a = 2, b = 3 } }
     print r.id
     print r.inner.b
 }
@@ -83,7 +83,7 @@ main {
 fn record_with_a_list_field_runs() {
     let out = run(r"
 main {
-    const record<name: string, xs: list<int>> r ← record<name: string, xs: list<int>> { name = 'a', xs = [1, 2, 3] }
+    let record<name: string, xs: list<int>> r ← record<name: string, xs: list<int>> { name = 'a', xs = [1, 2, 3] }
     print r.xs[2]
     print r.name
 }
@@ -95,7 +95,7 @@ main {
 fn whole_record_prints_in_written_order() {
     let out = run(r"
 main {
-    const record<loss: f32, steps: int> r ← record<loss: f32, steps: int> { loss = 3.0, steps = 4 }
+    let record<loss: f32, steps: int> r ← record<loss: f32, steps: int> { loss = 3.0, steps = 4 }
     print r
 }
 ");

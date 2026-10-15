@@ -267,7 +267,7 @@ functio computa(numerus x) → numerus {
 }
 
 incipit {
-    fixum Event event ← finge Click { x = 7 }
+    sit Event event ← finge Click { x = 7 }
     discerne event {
         casu Click fixum x { nota computa(x) }
         casu Quit { nota "quit" }
@@ -280,7 +280,7 @@ fn aux_equivalence_source() -> &'static str {
     r"
 @ publica
 functio auxilia(numerus x) → numerus {
-    fixum numerus duplum ← x * 2
+    sit numerus duplum ← x * 2
     redde duplum + 1
 }
 "

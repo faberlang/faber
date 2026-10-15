@@ -332,7 +332,7 @@ fn device_safe_rejects_tensor_slice_view_without_materialization() {
     let result = classify_source(
         r"@ nucleum
 functio sectum(tf32[4] input) → vacuum {
-    fixum tf32[1] view ← input.sectio(0, 1)
+    sit tf32[1] view ← input.sectio(0, 1)
 }
 ",
     );

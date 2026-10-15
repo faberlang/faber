@@ -13,7 +13,7 @@ fn baseline_const_list_in_place_append_requires_varia() {
     assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum lista<numerus> xs ← vacua
+    sit lista<numerus> xs ← vacua
     xs.appende(4)
 }
 ",
@@ -45,7 +45,7 @@ functio poke(in lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
-    fixum lista<numerus> a ← [1, 2, 3]
+    sit lista<numerus> a ← [1, 2, 3]
     poke(in a)
     nota a.longitudo()
 }
@@ -92,7 +92,7 @@ fn baseline_summa_unmarked_out_shape_is_rejected() {
     assert_rejects_with_issue_la(
         r"
 functio summa(tf32[256] a, tf32[1] out, u32 id) → vacuum {
-    fixum f32 total ← a.summa()
+    sit f32 total ← a.summa()
     out[id] ← total
 }
 ",
@@ -105,7 +105,7 @@ fn baseline_summa_mut_out_shape_is_legal() {
     let _ = analyze_ok_la(
         r"
 functio summa(tf32[256] a, in tf32[1] out, u32 id) → vacuum {
-    fixum f32 total ← a.summa()
+    sit f32 total ← a.summa()
     out[id] ← total
 }
 ",

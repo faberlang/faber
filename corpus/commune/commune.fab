@@ -56,8 +56,8 @@ fn render(ShapeError e) → string {
 }
 
 main {
-    const ShapeError a ← variant Incompatible { message = "incompatible" }
-    const ShapeError b ← variant ElementMismatch { message = "mismatch", expected = 1, actual = 2 }
+    let ShapeError a ← variant Incompatible { message = "incompatible" }
+    let ShapeError b ← variant ElementMismatch { message = "mismatch", expected = 1, actual = 2 }
     print describe(a)
     print describe(b)
     print render(a)

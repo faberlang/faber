@@ -113,8 +113,8 @@ fn tabula_claves_is_registered_as_keys() {
 fn tabula_claves_typechecks_as_key_lista() {
     let source = r#"
 incipit {
-  fixum tabula<textus, numerus> scores ← { "aelia": 95 }
-  fixum lista<textus> keys ← scores.claves()
+  sit tabula<textus, numerus> scores ← { "aelia": 95 }
+  sit lista<textus> keys ← scores.claves()
   nota keys
 }
 "#;
@@ -138,8 +138,8 @@ fn tabula_valores_is_registered_as_values() {
 fn tabula_valores_typechecks_as_value_lista() {
     let source = r#"
 incipit {
-  fixum tabula<textus, numerus> scores ← { "aelia": 95 }
-  fixum lista<numerus> values ← scores.valores()
+  sit tabula<textus, numerus> scores ← { "aelia": 95 }
+  sit lista<numerus> values ← scores.valores()
   nota values
 }
 "#;
@@ -163,8 +163,8 @@ fn intervallum_coercere_is_registered_as_interval_clamp() {
 fn intervallum_coercere_typechecks_as_intervallum() {
     let source = r"
 incipit {
-  fixum intervallum<numerus> wide ← 0‥10
-  fixum intervallum<numerus> narrow ← wide.coercere(2…8)
+  sit intervallum<numerus> wide ← 0‥10
+  sit intervallum<numerus> narrow ← wide.coercere(2…8)
   nota narrow
 }
 ";
@@ -307,8 +307,8 @@ fn textus_vacua_is_registered_as_is_empty() {
 fn textus_vacua_typechecks_as_bivalens() {
     let source = r#"
 incipit {
-  fixum textus s ← ""
-  fixum bivalens empty_flag ← s.vacua()
+  sit textus s ← ""
+  sit bivalens empty_flag ← s.vacua()
   nota empty_flag
 }
 "#;
@@ -481,8 +481,8 @@ fn regex_muta_closure_typechecks_from_the_match_signature() {
     // so the intrinsic's signature types it. The literal form is unchanged.
     let closure = r#"
 incipit {
-  fixum regex r ← "a+" ↦ regex
-  fixum textus out ← r.muta("caab", _ m ∴ m.inventum())
+  sit regex r ← "a+" ↦ regex
+  sit textus out ← r.muta("caab", _ m ∴ m.inventum())
   nota out
 }
 "#;
@@ -490,8 +490,8 @@ incipit {
     assert!(result.is_ok(), "closure muta must typecheck: {:?}", result.err());
     let literal = r#"
 incipit {
-  fixum regex r ← "a+" ↦ regex
-  fixum textus out ← r.muta("caab", "x")
+  sit regex r ← "a+" ↦ regex
+  sit textus out ← r.muta("caab", "x")
   nota out
 }
 "#;
@@ -503,7 +503,7 @@ incipit {
 fn regex_muta_rejects_a_closure_that_does_not_return_textus() {
     let source = r#"
 incipit {
-  fixum regex r ← "a+" ↦ regex
+  sit regex r ← "a+" ↦ regex
   nota r.muta("caab", _ m ∴ m.principium())
 }
 "#;
@@ -517,7 +517,7 @@ incipit {
 fn regex_muta_rejects_a_closure_parameter_that_is_not_the_match() {
     let source = r#"
 incipit {
-  fixum regex r ← "a+" ↦ regex
+  sit regex r ← "a+" ↦ regex
   nota r.muta("caab", numerus m ∴ "x")
 }
 "#;

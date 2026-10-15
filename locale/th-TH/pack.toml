@@ -12,11 +12,11 @@ importa = "นำเข้า"
 regio = "โมดูล"
 modulus = "โมดูลัส"
 ordo = "ลำดับ"
-sit = "อนุมานคงที่"
+sit = "กำหนด"
 typus = "ชนิดนามแฝง"
 schema = "สคีมา"
 columna = "คอลัมน์"
-varia = "แปร"
+varia = "แก้ไขได้"
 ceteri = "ที่เหลือ"
 errata = "ข้อผิดพลาด"
 exitus = "ทางออก"
@@ -95,7 +95,7 @@ maxima = "สูงสุด"
 minima = "ต่ำสุด"
 de = "จาก"
 ex = "ออก"
-in = "ใน"
+in = "แก้ไขได้"
 own = "เป็นเจ้าของ"
 copy = "สำเนา"
 axis = "แกน"
@@ -511,6 +511,26 @@ help = "ประกาศ method บน genus แทน"
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "เครื่องหมาย `{marker}` ไม่ได้อยู่บนการผูกอีกต่อไป แต่อยู่บนค่า"
 help = "เขียน `{keyword} T {name} ← {marker} value`; ต่อมา `{name} ← {marker} value` ทำเครื่องหมายที่ค่าในแบบเดียวกัน และพารามิเตอร์เก็บ `{marker}` ไว้หน้าชนิดของมัน"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "การประกาศ `{keyword}` ขณะรันถูกยกเลิกแล้ว; `{name}` เป็นชื่อขณะรัน"
+help = "เขียน `{sit} T {name} ← …` (หรือ `{sit} {name} ← …` เพื่อให้อนุมานชนิด); `{fixum}` ระบุข้อเท็จจริงตอนคอมไพล์และใช้คู่กับ `=`"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "ตัวแปรโลคัล `{keyword}` ต้องมีตำแหน่งให้อ่าน: `{keyword} T name ← place`"
+help = "เขียน `{keyword} T name ← place` หรือใช้ `{sit}` หรือ `{varia}` สำหรับชื่อที่ไม่มีตำแหน่งเริ่มต้น"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "ตัวแปรโลคัล `{keyword}` ผูกได้เพียงหนึ่งชื่อ; แยกโครงสร้างไม่ได้"
+help = "เขียน `{keyword} T name ← place` แล้วอ่านแต่ละส่วนผ่านชื่อนั้น"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "ตัวแปรโลคัล `{keyword}` อ่านตำแหน่ง และรับค่า `{marker}` ไม่ได้"
+help = "เขียน `{keyword} T name ← place` เพื่ออ่านตำแหน่ง หรือ `{sit} T name ← {marker} place` เพื่อได้ค่าที่เป็นอิสระ"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "คำประกาศ `{keyword}` ถูกยกเลิกแล้ว; `{name}` เป็นชื่อที่เขียนได้"
+help = "เขียน `{varia} T {name} ← …`; ชื่อขณะรันที่เขียนได้คือ `{varia}`"
 
 [diagnostics.PARSE011]
 message = "ต้องมีชื่อฟังก์ชันหลัง '{functio}'"

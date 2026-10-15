@@ -40,7 +40,7 @@ locale = "en"
 #   none
 
 fn summa(rest list<int> numeri) → int {
-    var _ total ← 0
+    mut _ total ← 0
 
     for from numeri const n {
         total ← total + n

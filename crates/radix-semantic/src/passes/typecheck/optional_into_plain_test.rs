@@ -11,7 +11,7 @@ const ISSUE: &str = "optional_into_plain_cell";
 #[test]
 fn optional_parameter_into_plain_declaration_is_rejected() {
     assert_rejects_with_issue_la(
-        "functio f(textus ∪ nihil x) → textus {\n    fixum textus y ← x\n    redde y\n}",
+        "functio f(textus ∪ nihil x) → textus {\n    sit textus y ← x\n    redde y\n}",
         ISSUE,
     );
 }
@@ -20,8 +20,8 @@ fn optional_parameter_into_plain_declaration_is_rejected() {
 fn optional_method_result_into_plain_declaration_is_rejected() {
     assert_rejects_with_issue_la(
         r"incipit {
-    fixum lista<fractus> xs ← vacua
-    fixum numerus first ← xs.argmaxima()
+    sit lista<fractus> xs ← vacua
+    sit numerus first ← xs.argmaxima()
     nota first
 }",
         ISSUE,
@@ -39,7 +39,7 @@ fn optional_into_plain_assignment_is_rejected() {
 #[test]
 fn narrowed_optional_into_plain_declaration_is_accepted() {
     assert_accepts_la(
-        "functio f(textus ∪ nihil x) → textus {\n    si x non est nihil {\n        fixum textus y ← x\n        redde y\n    }\n    redde \"\"\n}",
+        "functio f(textus ∪ nihil x) → textus {\n    si x non est nihil {\n        sit textus y ← x\n        redde y\n    }\n    redde \"\"\n}",
     );
 }
 
@@ -47,8 +47,8 @@ fn narrowed_optional_into_plain_declaration_is_accepted() {
 fn coalesced_optional_into_plain_declaration_is_accepted() {
     assert_accepts_la(
         r"incipit {
-    fixum lista<fractus> xs ← vacua
-    fixum numerus first ← xs.argmaxima() vel 0
+    sit lista<fractus> xs ← vacua
+    sit numerus first ← xs.argmaxima() vel 0
     nota first
 }",
     );
@@ -57,21 +57,21 @@ fn coalesced_optional_into_plain_declaration_is_accepted() {
 #[test]
 fn optional_into_optional_declaration_is_accepted() {
     assert_accepts_la(
-        "functio f(textus ∪ nihil x) → textus ∪ nihil {\n    fixum textus ∪ nihil y ← x\n    redde y\n}",
+        "functio f(textus ∪ nihil x) → textus ∪ nihil {\n    sit textus ∪ nihil y ← x\n    redde y\n}",
     );
 }
 
 #[test]
 fn optional_into_inferred_declaration_is_accepted() {
     assert_accepts_la(
-        "functio f(textus ∪ nihil x) → textus ∪ nihil {\n    fixum _ y ← x\n    redde y\n}",
+        "functio f(textus ∪ nihil x) → textus ∪ nihil {\n    sit y ← x\n    redde y\n}",
     );
 }
 
 #[test]
 fn plain_into_optional_and_plain_into_plain_are_accepted() {
     assert_accepts_la(
-        "functio f(textus x) → textus {\n    fixum textus ∪ nihil y ← x\n    fixum textus z ← x\n    redde z\n}",
+        "functio f(textus x) → textus {\n    sit textus ∪ nihil y ← x\n    sit textus z ← x\n    redde z\n}",
     );
 }
 
@@ -121,7 +121,7 @@ fn optional_yield_into_plain_element_type_is_rejected() {
 #[test]
 fn optional_element_into_plain_list_literal_is_rejected() {
     assert_rejects_with_issue_la(
-        "functio f(numerus ∪ nihil x) {\n    fixum lista<numerus> xs ← [x, 1]\n    nota xs\n}",
+        "functio f(numerus ∪ nihil x) {\n    sit lista<numerus> xs ← [x, 1]\n    nota xs\n}",
         ISSUE,
     );
 }

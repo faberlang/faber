@@ -55,9 +55,9 @@ fn kinds(source: &str) -> Vec<HirStoreKind> {
 #[test]
 fn float_literal_beside_a_float_outside_the_finite_range_is_rejected() {
     for (ty, literal) in [("f32", "1e40"), ("f16", "70000.0"), ("bf16", "1e39")] {
-        let source = format!("incipit {{\nfixum {ty} x ← 1.5\nnota x + {literal}\n}}\n");
+        let source = format!("incipit {{\nsit {ty} x ← 1.5\nnota x + {literal}\n}}\n");
         assert_rejects_with_issue_la(&source, OUT_OF_RANGE);
-        let slot = format!("incipit {{\nfixum {ty} y ← {literal}\nnota y\n}}\n");
+        let slot = format!("incipit {{\nsit {ty} y ← {literal}\nnota y\n}}\n");
         assert_rejects_with_issue_la(&slot, OUT_OF_RANGE);
     }
 }
@@ -65,18 +65,18 @@ fn float_literal_beside_a_float_outside_the_finite_range_is_rejected() {
 #[test]
 fn integer_constant_outside_a_float_range_is_rejected() {
     assert_rejects_with_issue_la(
-        "incipit {\nfixum f16 x ← 1.5\nnota x + 70000\n}\n",
+        "incipit {\nsit f16 x ← 1.5\nnota x + 70000\n}\n",
         OUT_OF_RANGE,
     );
-    assert_rejects_with_issue_la("incipit {\nfixum f16 y ← 65536\nnota y\n}\n", OUT_OF_RANGE);
+    assert_rejects_with_issue_la("incipit {\nsit f16 y ← 65536\nnota y\n}\n", OUT_OF_RANGE);
 }
 
 #[test]
 fn float_constants_inside_the_range_are_accepted() {
-    assert_accepts_la("incipit {\nfixum f32 x ← 1.5\nnota x + 3.0e38\n}\n");
-    assert_accepts_la("incipit {\nfixum f16 y ← 65504.0\nnota y\n}\n");
-    assert_accepts_la("incipit {\nfixum f64 x ← 1.5\nnota x + 1e300\n}\n");
-    assert_accepts_la("incipit {\nfixum f32 y ← -∞\nnota y\n}\n");
+    assert_accepts_la("incipit {\nsit f32 x ← 1.5\nnota x + 3.0e38\n}\n");
+    assert_accepts_la("incipit {\nsit f16 y ← 65504.0\nnota y\n}\n");
+    assert_accepts_la("incipit {\nsit f64 x ← 1.5\nnota x + 1e300\n}\n");
+    assert_accepts_la("incipit {\nsit f32 y ← -∞\nnota y\n}\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -85,21 +85,21 @@ fn float_constants_inside_the_range_are_accepted() {
 
 #[test]
 fn exactly_representable_large_integer_constants_are_accepted() {
-    assert_accepts_la("incipit {\nfixum f64 y ← 18014398509481984\nnota y\n}\n");
-    assert_accepts_la("incipit {\nfixum f64 x ← 1.5\nnota x * (1 ⇐ 60)\n}\n");
-    assert_accepts_la("incipit {\nfixum f32 y ← 1073741824\nnota y\n}\n");
-    assert_accepts_la("incipit {\nfixum bf16 y ← 1024\nnota y\n}\n");
+    assert_accepts_la("incipit {\nsit f64 y ← 18014398509481984\nnota y\n}\n");
+    assert_accepts_la("incipit {\nsit f64 x ← 1.5\nnota x * (1 ⇐ 60)\n}\n");
+    assert_accepts_la("incipit {\nsit f32 y ← 1073741824\nnota y\n}\n");
+    assert_accepts_la("incipit {\nsit bf16 y ← 1024\nnota y\n}\n");
 }
 
 #[test]
 fn inexact_integer_constants_are_still_rejected() {
     assert_rejects_with_issue_la(
-        "incipit {\nfixum f64 y ← 9007199254740993\nnota y\n}\n",
+        "incipit {\nsit f64 y ← 9007199254740993\nnota y\n}\n",
         INEXACT,
     );
-    assert_rejects_with_issue_la("incipit {\nfixum f32 y ← 16777217\nnota y\n}\n", INEXACT);
+    assert_rejects_with_issue_la("incipit {\nsit f32 y ← 16777217\nnota y\n}\n", INEXACT);
     assert_rejects_with_issue_la(
-        "incipit {\nfixum f64 x ← 1.5\nnota x * ((1 ⇐ 60) + 1)\n}\n",
+        "incipit {\nsit f64 x ← 1.5\nnota x * ((1 ⇐ 60) + 1)\n}\n",
         INEXACT,
     );
 }
@@ -112,7 +112,7 @@ const BIG: &str = "functio big() → numerus { redde 300 }\n";
 
 #[test]
 fn call_result_into_a_narrower_slot_is_a_checked_store() {
-    let decl = format!("{BIG}incipit {{\nfixum u8 x ← big()\nnota x\n}}\n");
+    let decl = format!("{BIG}incipit {{\nsit u8 x ← big()\nnota x\n}}\n");
     assert_eq!(kinds(&decl), vec![HirStoreKind::Declaration]);
     let assign = format!("{BIG}incipit {{\nvaria u8 x ← 1\nx ← big()\nnota x\n}}\n");
     assert_eq!(kinds(&assign), vec![HirStoreKind::Assignment]);
@@ -126,7 +126,7 @@ fn call_result_into_a_narrower_slot_is_a_checked_store() {
 fn method_result_into_a_narrower_slot_is_a_checked_store() {
     let source = "genus Q {\n    functio m() → numerus {\n        redde 300\n    }\n}\n\
                   functio take(u8 v) → vacuum {\n    nota v\n}\n\
-                  functio go(Q q) → vacuum {\n    fixum u8 x ← q.m()\n    take(q.m())\n    nota x\n}\n";
+                  functio go(Q q) → vacuum {\n    sit u8 x ← q.m()\n    take(q.m())\n    nota x\n}\n";
     assert_eq!(
         kinds(source),
         vec![HirStoreKind::Declaration, HirStoreKind::Argument]
@@ -141,18 +141,18 @@ fn call_as_a_parameter_default_is_a_checked_store() {
 
 #[test]
 fn conditional_into_a_narrower_slot_is_a_checked_store() {
-    let mixed = "incipit {\nfixum numerus n ← 300\nfixum bivalens c ← verum\n\
-                 fixum u8 x ← c ✓ n ✗ 1\nnota x\n}\n";
+    let mixed = "incipit {\nsit numerus n ← 300\nsit bivalens c ← verum\n\
+                 sit u8 x ← c ✓ n ✗ 1\nnota x\n}\n";
     assert_eq!(kinds(mixed), vec![HirStoreKind::Declaration]);
-    let branches = "incipit {\nfixum u8 a ← 200\nfixum u16 b ← 300\n\
-                    fixum bivalens c ← falsum\nfixum u8 x ← c ✓ a ✗ b\nnota x\n}\n";
+    let branches = "incipit {\nsit u8 a ← 200\nsit u16 b ← 300\n\
+                    sit bivalens c ← falsum\nsit u8 x ← c ✓ a ✗ b\nnota x\n}\n";
     assert_eq!(kinds(branches), vec![HirStoreKind::Declaration]);
 }
 
 #[test]
 fn conditional_that_fits_the_slot_needs_no_node() {
-    let source = "incipit {\nfixum u8 a ← 200\nfixum u8 b ← 3\n\
-                  fixum bivalens c ← falsum\nfixum u8 x ← c ✓ a ✗ b\nnota x\n}\n";
+    let source = "incipit {\nsit u8 a ← 200\nsit u8 b ← 3\n\
+                  sit bivalens c ← falsum\nsit u8 x ← c ✓ a ✗ b\nnota x\n}\n";
     assert!(kinds(source).is_empty());
 }
 
@@ -163,11 +163,11 @@ fn conditional_that_fits_the_slot_needs_no_node() {
 #[test]
 fn constant_expressions_take_a_word_slot_after_exact_evaluation() {
     for source in [
-        "incipit {\nfixum saturatus<u8> z ← 0 - 1 + 2\nnota z\n}\n",
-        "incipit {\nfixum saturatus<u8> z ← 300 - 100\nnota z\n}\n",
-        "incipit {\nfixum saturatus<u8> z ← 250 * 2 / 2\nnota z\n}\n",
-        "incipit {\nfixum modulus<u8> u ← 300 - 50\nnota u\n}\n",
-        "incipit {\nfixum saturatus<i8> s ← 3 - 10\nnota s\n}\n",
+        "incipit {\nsit saturatus<u8> z ← 0 - 1 + 2\nnota z\n}\n",
+        "incipit {\nsit saturatus<u8> z ← 300 - 100\nnota z\n}\n",
+        "incipit {\nsit saturatus<u8> z ← 250 * 2 / 2\nnota z\n}\n",
+        "incipit {\nsit modulus<u8> u ← 300 - 50\nnota u\n}\n",
+        "incipit {\nsit saturatus<i8> s ← 3 - 10\nnota s\n}\n",
     ] {
         assert_accepts_la(source);
     }
@@ -175,7 +175,7 @@ fn constant_expressions_take_a_word_slot_after_exact_evaluation() {
 
 #[test]
 fn folded_word_constant_carries_the_exact_value_and_the_slot_type() {
-    let (probe, result) = probe("incipit {\nfixum saturatus<u8> z ← 300 - 100\nnota z\n}\n");
+    let (probe, result) = probe("incipit {\nsit saturatus<u8> z ← 300 - 100\nnota z\n}\n");
     assert!(probe.stores.is_empty());
     let (value, ty) = probe.literals[0];
     assert_eq!(value, 200);
@@ -189,7 +189,7 @@ fn folded_word_constant_carries_the_exact_value_and_the_slot_type() {
 fn constant_expression_that_overflows_a_word_slot_follows_its_policy() {
     // 300 does not fit `saturatus<u8>`: the exact value clamps at the store.
     assert_eq!(
-        kinds("incipit {\nfixum saturatus<u8> z ← 100 + 200\nnota z\n}\n"),
+        kinds("incipit {\nsit saturatus<u8> z ← 100 + 200\nnota z\n}\n"),
         vec![HirStoreKind::Declaration]
     );
 }
@@ -201,8 +201,8 @@ fn constant_expression_that_overflows_a_word_slot_follows_its_policy() {
 #[test]
 fn constant_negative_shift_count_is_a_compile_error() {
     for source in [
-        "incipit {\nfixum u8 a ← 1\nnota a ⇐ -1\n}\n",
-        "incipit {\nfixum u8 a ← 1\nnota a ⇒ -3\n}\n",
+        "incipit {\nsit u8 a ← 1\nnota a ⇐ -1\n}\n",
+        "incipit {\nsit u8 a ← 1\nnota a ⇒ -3\n}\n",
         "incipit {\nnota 1 ⇐ -1\n}\n",
     ] {
         assert_rejects_with_issue_la(source, "shift_count_negative");
@@ -211,9 +211,7 @@ fn constant_negative_shift_count_is_a_compile_error() {
 
 #[test]
 fn typed_and_nonnegative_shift_counts_are_accepted() {
-    assert_accepts_la(
-        "incipit {\nfixum u8 a ← 1\nfixum numerus k ← -1\nnota a ⇐ k\nnota a ⇐ 3\n}\n",
-    );
+    assert_accepts_la("incipit {\nsit u8 a ← 1\nsit numerus k ← -1\nnota a ⇐ k\nnota a ⇐ 3\n}\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +220,7 @@ fn typed_and_nonnegative_shift_counts_are_accepted() {
 
 #[test]
 fn strict_equality_with_a_constant_outside_the_type_is_accepted() {
-    assert_accepts_la("incipit {\nfixum u8 a ← 7\nnota a ≡ 300\nnota -1 ≡ a\n}\n");
+    assert_accepts_la("incipit {\nsit u8 a ← 7\nnota a ≡ 300\nnota -1 ≡ a\n}\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -232,12 +230,12 @@ fn strict_equality_with_a_constant_outside_the_type_is_accepted() {
 #[test]
 fn integer_quotient_into_a_float_slot_names_true_division() {
     assert_rejects_with_issue_la(
-        "incipit {\nfixum numerus a ← 7\nfixum numerus b ← 2\nfixum fractus avg ← a / b\nnota avg\n}\n",
+        "incipit {\nsit numerus a ← 7\nsit numerus b ← 2\nsit fractus avg ← a / b\nnota avg\n}\n",
         "integer_quotient_to_float_requires_true_division",
     );
     // The plain integer-into-float case keeps its own help.
     assert_rejects_with_issue_la(
-        "incipit {\nfixum numerus a ← 7\nfixum fractus f ← a\nnota f\n}\n",
+        "incipit {\nsit numerus a ← 7\nsit fractus f ← a\nnota f\n}\n",
         "integer_to_float_requires_conversio",
     );
 }
@@ -266,14 +264,14 @@ fn constant_argument_carries_the_parameter_type() {
 
 #[test]
 fn the_smallest_int_is_a_valid_constant() {
-    assert_accepts_la("incipit {\nfixum numerus a ← -9223372036854775808\nnota a\n}\n");
-    assert_accepts_la("incipit {\nfixum i64 a ← -9223372036854775808\nnota a\n}\n");
+    assert_accepts_la("incipit {\nsit numerus a ← -9223372036854775808\nnota a\n}\n");
+    assert_accepts_la("incipit {\nsit i64 a ← -9223372036854775808\nnota a\n}\n");
     assert_rejects_with_issue_la(
-        "incipit {\nfixum i32 a ← -9223372036854775808\nnota a\n}\n",
+        "incipit {\nsit i32 a ← -9223372036854775808\nnota a\n}\n",
         "store_constant_out_of_range",
     );
     assert_rejects_with_issue_la(
-        "incipit {\nfixum numerus a ← -9223372036854775809\nnota a\n}\n",
+        "incipit {\nsit numerus a ← -9223372036854775809\nnota a\n}\n",
         "numerus_literal_out_of_range",
     );
 }
@@ -282,8 +280,8 @@ fn the_smallest_int_is_a_valid_constant() {
 // 9. Ruling 8 extended: a typed u64 and a typed signed value never join
 // ---------------------------------------------------------------------------
 
-const U64_AND_I8: &str = "fixum u64 a ← 18446744073709551615\n\
-                          fixum i8 b ← -1\nfixum bivalens c ← verum\n";
+const U64_AND_I8: &str = "sit u64 a ← 18446744073709551615\n\
+                          sit i8 b ← -1\nsit bivalens c ← verum\n";
 
 fn with_mix(body: &str) -> String {
     format!("incipit {{\n{U64_AND_I8}{body}\n}}\n")
@@ -291,47 +289,44 @@ fn with_mix(body: &str) -> String {
 
 #[test]
 fn u64_with_a_signed_type_does_not_join_in_a_conditional() {
-    assert_rejects_with_issue_la(&with_mix("fixum _ x ← c ✓ a ✗ b\nnota x"), U64_SIGNED);
+    assert_rejects_with_issue_la(&with_mix("sit x ← c ✓ a ✗ b\nnota x"), U64_SIGNED);
 }
 
 #[test]
 fn u64_with_a_signed_type_does_not_join_in_bitwise_operators() {
     for op in ["∧", "∨", "⊻"] {
-        assert_rejects_with_issue_la(
-            &with_mix(&format!("fixum _ x ← a {op} b\nnota x")),
-            U64_SIGNED,
-        );
+        assert_rejects_with_issue_la(&with_mix(&format!("sit x ← a {op} b\nnota x")), U64_SIGNED);
     }
-    assert_rejects_with_issue_la(&with_mix("fixum i64 x ← a ∨ b\nnota x"), U64_SIGNED);
+    assert_rejects_with_issue_la(&with_mix("sit i64 x ← a ∨ b\nnota x"), U64_SIGNED);
 }
 
 #[test]
 fn u64_with_a_signed_type_does_not_join_in_a_collection_literal() {
-    assert_rejects_with_issue_la(&with_mix("fixum _ xs ← [a, b]\nnota xs"), U64_SIGNED);
+    assert_rejects_with_issue_la(&with_mix("sit xs ← [a, b]\nnota xs"), U64_SIGNED);
     assert_rejects_with_issue_la(
-        &with_mix("fixum _ t ← reducta via summa ex [a, b] fixum v { redde v }\nnota t"),
+        &with_mix("sit t ← reducta via summa ex [a, b] fixum v { redde v }\nnota t"),
         U64_SIGNED,
     );
 }
 
 #[test]
 fn u64_with_an_untyped_constant_still_joins() {
-    let head = "fixum u64 x ← 5\nfixum bivalens c ← verum\n";
+    let head = "sit u64 x ← 5\nsit bivalens c ← verum\n";
     for body in [
         "nota x - 1",
         "nota c ✓ x ✗ 0",
         "nota x ∨ 1",
         "nota x ⊻ 3",
         "nota x ∧ -1",
-        "fixum _ xs ← [x, 0]\nnota xs",
-        "fixum _ xs ← [0, 1, x]\nnota xs",
-        "fixum _ y ← c ✓ 0 ✗ x\nnota y",
+        "sit xs ← [x, 0]\nnota xs",
+        "sit xs ← [0, 1, x]\nnota xs",
+        "sit y ← c ✓ 0 ✗ x\nnota y",
     ] {
         assert_accepts_la(&format!("incipit {{\n{head}{body}\n}}\n"));
     }
     // A negative constant with `u64` has no 64-bit type holding both.
     assert_rejects_with_issue_la(
-        &format!("incipit {{\n{head}fixum _ xs ← [x, -1]\nnota xs\n}}\n"),
+        &format!("incipit {{\n{head}sit xs ← [x, -1]\nnota xs\n}}\n"),
         U64_SIGNED,
     );
 }
@@ -339,7 +334,7 @@ fn u64_with_an_untyped_constant_still_joins() {
 #[test]
 fn unsigned_widths_below_u64_still_join_with_signed_types() {
     assert_accepts_la(
-        "incipit {\nfixum u32 a ← 5\nfixum i8 b ← -1\nfixum bivalens c ← verum\n\
-         nota c ✓ a ✗ b\nnota a ∨ b\nfixum _ xs ← [a, b]\nnota xs\n}\n",
+        "incipit {\nsit u32 a ← 5\nsit i8 b ← -1\nsit bivalens c ← verum\n\
+         nota c ✓ a ✗ b\nnota a ∨ b\nsit xs ← [a, b]\nnota xs\n}\n",
     );
 }

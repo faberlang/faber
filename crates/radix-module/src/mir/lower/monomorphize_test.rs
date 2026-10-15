@@ -486,9 +486,9 @@ main args args {
     const size M ← args.m
     const size K ← args.k
     const size N ← args.n
-    var tensor<f32, [M, K]> a ← tf32[M, K] {}
-    var tensor<f32, [K, N]> b ← tf32[K, N] {}
-    var tensor<f32, [M, N]> o ← mm(a, b)
+    mut tensor<f32, [M, K]> a ← tf32[M, K] {}
+    mut tensor<f32, [K, N]> b ← tf32[K, N] {}
+    mut tensor<f32, [M, N]> o ← mm(a, b)
     print o[[0, 0]]
 }
 "#,

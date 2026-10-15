@@ -177,7 +177,7 @@ fn helper_local_alias_of_a_parameter_keeps_the_parameter_storage() {
     let aliased = r"
 @ nucleum
 functio peek(de tensor<f32, [4]> t, numerus at) → f32 {
-    fixum tensor<f32, [4]> view ← t
+    sit tensor<f32, [4]> view ← t
     redde view[at + 1]
 }
 ";
@@ -242,7 +242,7 @@ functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
     rejected(
         &kernel(
             &both,
-            "store(in out, i, value)\n        fixum f32 next ← peek(out, i)",
+            "store(in out, i, value)\n        sit f32 next ← peek(out, i)",
         ),
         "written_storage_neighbor_read",
     );
@@ -600,7 +600,7 @@ functio total(de tensor<f32, [4]> t) → f32 { redde t[0] }
     for argument in ["src", "out"] {
         accepted(&kernel(total, "out[i] ← value + z").replace(
             "    itera ex src",
-            &format!("    fixum f32 z ← total({argument})\n    itera ex src"),
+            &format!("    sit f32 z ← total({argument})\n    itera ex src"),
         ));
     }
 }
@@ -665,12 +665,12 @@ incipit {{
 #[test]
 fn edge_view_of_an_unwritten_tensor_is_accepted() {
     accepted(&view_kernel(
-        "fixum tensor<f32, [4]> west ← src.disloco([1]).limes<clampa>()\n        out[i] ← west[i] + value",
+        "sit tensor<f32, [4]> west ← src.disloco([1]).limes<clampa>()\n        out[i] ← west[i] + value",
     ));
     accepted(
         r"
 functio k(in tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
-    fixum tensor<f32, [4]> west ← src.disloco([1]).limes<reflexa>()
+    sit tensor<f32, [4]> west ← src.disloco([1]).limes<reflexa>()
     itera ex src apud [i] filum lane fixum value {
         out[i] ← west[i] + value
     }
@@ -688,7 +688,7 @@ fn edge_view_of_the_written_tensor_is_rejected() {
         r"
 functio k(in tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
     varia tensor<f32, [4]> alias ← out
-    fixum tensor<f32, [4]> west ← alias.disloco([1]).limes<clampa>()
+    sit tensor<f32, [4]> west ← alias.disloco([1]).limes<clampa>()
     itera ex src apud [i] filum lane fixum value {
         out[i] ← west[i] + value
     }

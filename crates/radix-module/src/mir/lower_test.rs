@@ -107,7 +107,7 @@ fn lowers_decimal_literal_text_to_the_exact_carrier_across_mir() {
     let dump = dump_source(
         r"
 functio exacta() → d64 {
-    fixum d64 x ← 92233720368.54775807
+    sit d64 x ← 92233720368.54775807
     redde x
 }
 ",
@@ -131,7 +131,7 @@ fn decimal_literal_executes_at_the_exact_scaled_carrier() {
         &Session::new(Config::default().with_target(Target::HirTypeScript)),
         "decimal-exact-carrier.fab",
         r"incipit {
-    fixum d64 x ← 92233720368.54775807
+    sit d64 x ← 92233720368.54775807
     nota x
 }",
         &mut host,
@@ -149,7 +149,7 @@ fn decimal_literal_switch_matches_at_the_exact_carrier() {
         &Session::new(Config::default().with_target(Target::HirTypeScript)),
         "decimal-exact-switch.fab",
         r#"incipit {
-    fixum d64 x ← 4.2
+    sit d64 x ← 4.2
     elige x {
         casu 4.2 { nota "hit" }
         ceterum { nota "miss" }
@@ -183,8 +183,8 @@ fn queue_and_stack_methods_lower_to_core_collection_walkers() {
         r"incipit {
     varia queue<numerus> q ← vacua
     q.appende(1)
-    fixum numerus ∪ nihil item ← q.decapita()
-    fixum numerus size ← q.longitudo()
+    sit numerus ∪ nihil item ← q.decapita()
+    sit numerus size ← q.longitudo()
     nota item
     nota size
 }",
@@ -200,7 +200,7 @@ fn queue_and_stack_methods_lower_to_core_collection_walkers() {
         r#"incipit {
     varia stack<textus> s ← vacua
     s.appende("top")
-    fixum textus ∪ nihil item ← s.detrahe()
+    sit textus ∪ nihil item ← s.detrahe()
     nota item
 }"#,
     );
@@ -347,7 +347,7 @@ fn top_level_conversio_init_rejects_as_top_level_binding() {
     // There is no static equivalent for this fixture; assert the rejection.
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
     let source = r#"
-fixum numerus answer ↤ "42"
+sit numerus answer ↤ "42"
 
 incipit {
     nota answer
@@ -373,9 +373,9 @@ fn lowers_atomic_methods_to_dedicated_mir_intrinsics() {
     let dump = dump_source(
         r"
 functio atomic_ops(in atomic<i32> cell, i32 value) → bivalens {
-    fixum i32 loaded ← cell.load()
+    sit i32 loaded ← cell.load()
     cell.store(value)
-    fixum i32 old ← cell.exchange(loaded)
+    sit i32 old ← cell.exchange(loaded)
     redde cell.compare_exchange(old, value)
 }
 ",
@@ -473,7 +473,7 @@ fn runtime_size_declaration_rejects_negative_lift_and_accepts_nonnegative() {
 locale = "en"
 +++
 main {
-    var int h ← -1
+    mut int h ← -1
     const size H ← h
     print H
 }
@@ -727,9 +727,9 @@ function f0 -> ty#3 {
 fn lowers_vacua_to_empty_collection_aggregates() {
     let dump = dump_source(
         r"functio inanes() → numerus {
-  fixum lista<numerus> numeri ← vacua
-  fixum tabula<textus, numerus> pondera ← vacua
-  fixum copia<textus> nomina ← vacua
+  sit lista<numerus> numeri ← vacua
+  sit tabula<textus, numerus> pondera ← vacua
+  sit copia<textus> nomina ← vacua
   redde 0
 }",
     );
@@ -745,7 +745,7 @@ fn lowers_vacua_to_empty_collection_aggregates() {
 fn lowers_tensor_vacua_to_rank_zero_aggregate() {
     let dump = dump_source(
         r"functio empty_tensor() → numerus {
-  fixum tensor<f32, []> grid ← vacua
+  sit tensor<f32, []> grid ← vacua
   redde 0
 }",
     );
@@ -762,7 +762,7 @@ fn lowers_genus_method_calls_with_explicit_receiver_param() {
 }
 
 incipit {
-  fixum _ c ← Capsa { n = 4 }
+  sit c ← Capsa { n = 4 }
   nota c.value()
 }",
     );
@@ -777,7 +777,7 @@ incipit {
 fn lowers_non_nullable_coalesce_without_requiring_nullable_lhs() {
     let dump = dump_source(
         r"incipit {
-  fixum _ zero ← 0
+  sit zero ← 0
   nota zero vel 999
 }",
     );
@@ -799,7 +799,7 @@ functio latus() → numerus {
     redde 9
 }
 incipit {
-  fixum numerus x ← forte() vel latus()
+  sit numerus x ← forte() vel latus()
   nota x
 }",
     );
@@ -843,7 +843,7 @@ genus User {
 }
 
 incipit {
-  fixum _ alice ← User { name = "Alice", address = Address { city = "Roma" } }
+  sit alice ← User { name = "Alice", address = Address { city = "Roma" } }
   nota alice?.address?.city
 }"#,
     );
@@ -940,7 +940,7 @@ fn lowers_failable_call_in_alternate_exit_function_to_return_error_edge() {
 functio fail() → numerus ⇥ textus { iace "bad" }
 
 functio caller() → numerus ⇥ textus {
-    fixum numerus x ← fail()
+    sit numerus x ← fail()
     redde x + 1
 }
 "#,
@@ -1086,11 +1086,11 @@ fn lowers_canonical_predicate_replacements_to_mir_primitives() {
     let dump = dump_source(
         r"
 functio pred(numerus n, fractus f, bivalens flag, textus ∪ nihil maybe) → bivalens {
-    fixum _ positive ← n ≻ 0
-    fixum _ negative ← f ≺ 0
-    fixum _ enabled ← flag ≡ verum
-    fixum _ disabled ← flag ≡ falsum
-    fixum _ absent ← maybe est nihil
+    sit positive ← n ≻ 0
+    sit negative ← f ≺ 0
+    sit enabled ← flag ≡ verum
+    sit disabled ← flag ≡ falsum
+    sit absent ← maybe est nihil
     redde positive et negative et enabled et disabled et absent
 }
 ",
@@ -1114,8 +1114,8 @@ fn lowers_est_type_check_to_runner_dispatched_variant_tag_intrinsic() {
     let dump = dump_source(
         r"
 functio check(valor v) → bivalens {
-    fixum _ positive ← v est numerus
-    fixum _ negative ← v non est numerus
+    sit positive ← v est numerus
+    sit negative ← v non est numerus
     redde positive et negative
 }
 ",
@@ -1290,7 +1290,7 @@ function f0 -> ty#5 {
 
 #[test]
 fn lowers_non_empty_entry_block_as_synthetic_function_body() {
-    let dump = dump_source(r"incipit { fixum numerus n ← 1 + 2 }");
+    let dump = dump_source(r"incipit { sit numerus n ← 1 + 2 }");
 
     assert_eq!(
         dump,
@@ -1457,7 +1457,7 @@ function f0 -> ty#1 {
 
 #[test]
 fn lowers_expression_valued_si_into_shared_destination() {
-    let dump = dump_source("functio positum(numerus n) → numerus { fixum numerus x ← n ≻ 0 ✓ 1 ✗ 0 redde x }");
+    let dump = dump_source("functio positum(numerus n) → numerus { sit numerus x ← n ≻ 0 ✓ 1 ✗ 0 redde x }");
 
     assert_eq!(
         dump,
@@ -2395,7 +2395,7 @@ functio numerateClaves(de tabula<textus, numerus> pondera) → numerus {
 incipit {
   varia lista<numerus> numeri ← [1, 2, 3]
   nota summa(numeri)
-  fixum Crater crater ← Crater { mensurae = [4, 5] }
+  sit Crater crater ← Crater { mensurae = [4, 5] }
   nota summaCrateris(crater)
   varia tabula<textus, numerus> pondera ← vacua
   pondera.pone("a", 10)
@@ -2450,7 +2450,7 @@ fn textus_itera_ex_lowers_to_index_loop_with_runtime_length() {
         r#"functio numerumSeptem(textus s) → numerus {
   varia numerus count ← 0
   itera ex s fixum c {
-    fixum textus t ← c ↦ textus
+    sit textus t ← c ↦ textus
     si t ≡ "7" {
       count ← count + 1
     }
@@ -2477,7 +2477,7 @@ fn textus_itera_ex_runs_char_inspection_through_runner() {
     let source = r#"functio numerumSeptem(textus s) → numerus {
   varia numerus count ← 0
   itera ex s fixum c {
-    fixum textus t ← c ↦ textus
+    sit textus t ← c ↦ textus
     si t ≡ "7" {
       count ← count + 1
     }
@@ -2735,7 +2735,7 @@ fn lowers_trap_failable_call_to_try_call_carrier_wrap_never_return_error() {
     let dump = dump_source(
         r#"
 functio fail() → numerus ⇥ textus { iace "bad" }
-functio safe() → vacuum { fixum ∪ r ← capta { fail() } nota r }
+functio safe() → vacuum { sit ∪ r ← capta { fail() } nota r }
 "#,
     );
 
@@ -2763,7 +2763,7 @@ functio safe() → vacuum { fixum ∪ r ← capta { fail() } nota r }
 fn lowers_trap_iace_to_carrier_wrap() {
     // An explicit `iace` inside the trap body wraps into the same carrier
     // instead of propagating.
-    let dump = dump_source(r#"functio safe() → vacuum { fixum ∪ r ← capta { iace "bad" } nota r }"#);
+    let dump = dump_source(r#"functio safe() → vacuum { sit ∪ r ← capta { iace "bad" } nota r }"#);
 
     assert!(dump.contains("goto bb"), "trap lowering produced control flow: {dump}");
     assert!(
@@ -2782,7 +2782,7 @@ fn lowers_trap_type_narrowed_member_projection() {
         genus Errata { varia textus message }
         functio fail() → numerus ⇥ Errata { iace Errata { message = "bad" } }
         functio inspect() → textus {
-            fixum numerus ∪ Errata r ← capta { fail() }
+            sit numerus ∪ Errata r ← capta { fail() }
             adfirma r est Errata
             redde r.message
         }
@@ -2796,7 +2796,7 @@ fn runs_trap_type_narrowed_collection_member_projection() {
     let source = r"
         functio make() → lista<numerus> { redde [1, 2] }
         incipit {
-            fixum numerus ∪ lista<numerus> r ← capta { make() }
+            sit numerus ∪ lista<numerus> r ← capta { make() }
             adfirma r est lista<numerus>
             nota r.longitudo()
         }
@@ -2822,7 +2822,7 @@ fn lowers_trap_inside_fac_routes_to_innermost_boundary() {
 functio fail() → numerus ⇥ textus { iace "bad" }
 functio safe() → vacuum {
     fac {
-        fixum ∪ r ← capta { fail() }
+        sit ∪ r ← capta { fail() }
         nota r
     } cape err {
         nota err
@@ -2932,9 +2932,9 @@ functio addendum(numerus a, numerus b) → numerus ⇥ FormaError {
     redde a + b
 }
 functio typo_par_tres(lista<numerus> a, lista<numerus> b, lista<numerus> c) → bivalens ⇥ NnError {
-    fixum textus ta ← "f32"
-    fixum textus tb ← "f32"
-    fixum textus tc ← "f32"
+    sit textus ta ← "f32"
+    sit textus tb ← "f32"
+    sit textus tc ← "f32"
     si ta ≢ tb aut tb ≢ tc {
         iace finge TypoMismatch { causa = "dtype mismatch" }
     }
@@ -2944,22 +2944,22 @@ functio typo_par_tres(lista<numerus> a, lista<numerus> b, lista<numerus> c) → 
     redde verum
 }
 functio linear(lista<numerus> x, lista<numerus> w, lista<numerus> b) → numerus ⇥ NnError {
-    fixum lista<numerus> fx ← x
-    fixum lista<numerus> fw ← w
+    sit lista<numerus> fx ← x
+    sit lista<numerus> fw ← w
     si fx.longitudo() ≢ 2 {
         iace finge GradusMismatch { causa = "linear requires rank-2 input" }
     }
     si fw.longitudo() ≢ 2 {
         iace finge GradusMismatch { causa = "linear requires rank-2 weight" }
     }
-    fixum numerus m ← fx.accipe(0) vel 1
-    fixum numerus k ← fx.accipe(1) vel 1
-    fixum numerus n ← fw.accipe(1) vel 1
+    sit numerus m ← fx.accipe(0) vel 1
+    sit numerus k ← fx.accipe(1) vel 1
+    sit numerus n ← fw.accipe(1) vel 1
     si k ≢ (fw.accipe(0) vel 1) {
         iace finge Incompatibilis { causa = "inner dimensions mismatch" }
     }
-    fixum bivalens _ ← typo_par_tres(x, w, b)
-    fixum lista<numerus> fb ← b
+    sit bivalens _ ← typo_par_tres(x, w, b)
+    sit lista<numerus> fb ← b
     si fb.longitudo() ≡ 1 {
         si (fb.accipe(0) vel 1) ≢ n {
             iace finge FormaMismatch { causa = "bias does not match output width" }
@@ -2976,11 +2976,11 @@ functio linear(lista<numerus> x, lista<numerus> w, lista<numerus> b) → numerus
         }
     }
     fac {
-        fixum numerus prediction ← mensura(x, w)
+        sit numerus prediction ← mensura(x, w)
         redde addendum(prediction, n)
     }
     cape err {
-        fixum textus c ← causa(err)
+        sit textus c ← causa(err)
         si c ≡ "matmul requires rank-2 operands" {
             iace finge GradusMismatch { causa = c }
         }
@@ -3061,7 +3061,7 @@ functio quantitas(lista<numerus> f) → numerus ⇥ NnError {
         redde mensura(f)
     }
     cape err {
-        fixum textus c ← causa(err)
+        sit textus c ← causa(err)
         si c ≡ "negative dimension" {
             iace finge DimensioNegativa { causa = c }
         }
@@ -3157,7 +3157,7 @@ fn lowers_struct_construction_and_field_read() {
         r#"
 genus Persona { varia textus nomen varia numerus aetas }
 functio nomen() → textus {
-    fixum Persona p ← Persona { nomen = "Ada", aetas = 36 }
+    sit Persona p ← Persona { nomen = "Ada", aetas = 36 }
     redde p.nomen
 }
 "#,
@@ -3176,7 +3176,7 @@ fn lowers_struct_construction_field_defaults() {
         r#"
 genus Persona { varia textus nomen varia numerus aetas = 0 }
 functio aetas() → numerus {
-    fixum Persona p ← Persona { nomen = "Ada" }
+    sit Persona p ← Persona { nomen = "Ada" }
     redde p.aetas
 }
 "#,
@@ -3193,8 +3193,8 @@ fn lowers_array_spread_and_index_read() {
     let dump = dump_source(
         r"
 functio primus() → numerus {
-    fixum lista<numerus> xs ← [1, 2]
-    fixum lista<numerus> ys ← [0, sparge xs]
+    sit lista<numerus> xs ← [1, 2]
+    sit lista<numerus> ys ← [0, sparge xs]
     redde ys[0]
 }
 ",
@@ -3210,7 +3210,7 @@ fn lowers_nested_json_valor_literal() {
     let dump = dump_source(
         r#"
 incipit {
-    fixum valor nidum ← { "extra": { "medium": 1 }, "items": [1, { "x": 2 }] } ↦ valor
+    sit valor nidum ← { "extra": { "medium": 1 }, "items": [1, { "x": 2 }] } ↦ valor
     nota nidum
 }
 "#,
@@ -3230,7 +3230,7 @@ fn lowers_map_and_set_construction() {
     let map_dump = dump_source(
         r#"
 functio lectio() → numerus {
-    fixum tabula<textus, numerus> xs ← { "a": 1, "b": 2 }
+    sit tabula<textus, numerus> xs ← { "a": 1, "b": 2 }
     redde xs["a"]
 }
 "#,
@@ -3343,7 +3343,7 @@ incipit {
 locale = "en"
 +++
 main {
-    var map<string, int> seen ← empty
+    mut map<string, int> seen ← empty
     print seen.length()
 }
 "#,
@@ -3387,7 +3387,7 @@ fn lowers_tensor_bracket_access_to_tensor_runtime_ops() {
     let dump = dump_source(
         r"
 functio muta(tf32[4] input, in tf32[4] output, u32 id) → f32 {
-    fixum f32 value ← input[id]
+    sit f32 value ← input[id]
     output[id] ← value
     redde value
 }
@@ -3658,7 +3658,7 @@ fn lowers_ordo_elige_statement_continues_after_match() {
         r#"
 ordo Color { rubrum, viridis }
 incipit {
-    fixum _ color ← Color.rubrum
+    sit color ← Color.rubrum
     elige color {
         casu Color.rubrum { nota "rubrum" }
         casu Color.viridis { nota "viridis" }
@@ -3829,9 +3829,9 @@ fn lowers_ascii_format_hole_with_materialized_conversion_target() {
 locale = "en"
 +++
 main {
-    const _ inferred_hex ← 255 ↦ ascii<_> via Hex
-    const _ inferred_bin ← 255 ↦ ascii<_> via Bin
-    const _ inferred_oct ← 255 ↦ ascii<_> via Oct
+    let inferred_hex ← 255 ↦ ascii<_> via Hex
+    let inferred_bin ← 255 ↦ ascii<_> via Bin
+    let inferred_oct ← 255 ↦ ascii<_> via Oct
 }
 "#,
     );
@@ -3875,7 +3875,7 @@ fn lowers_expression_ad_to_sermo_runtime_intrinsics() {
     let dump = dump_source(
         r#"
 incipit {
-    fixum textus t ← ad 'runtime:echo' ("salve") ↦ textus
+    sit textus t ← ad 'runtime:echo' ("salve") ↦ textus
     adfirma t ≡ "salve"
 }
 "#,
@@ -3893,12 +3893,12 @@ fn lowers_numeric_operator_methods_to_binary_mir() {
     let dump = dump_source(
         r"
 incipit {
-    fixum fractus x ← 2.0
-    fixum fractus chained ← x.addita(1.0).multiplicata(3.0)
+    sit fractus x ← 2.0
+    sit fractus chained ← x.addita(1.0).multiplicata(3.0)
     varia fractus acc ← 10.0
     acc.adde(5.0)
-    fixum numerus mask ← 12
-    fixum numerus bits ← mask.coniuncta(10)
+    sit numerus mask ← 12
+    sit numerus bits ← mask.coniuncta(10)
     nota chained
     nota acc
     nota bits
@@ -4033,9 +4033,9 @@ fn lowers_cross_family_scalar_conversion_to_a_runtime_convert() {
     let dump = dump_source(
         r"
 functio ascriptiones() → numerus ⇥ textus {
-  fixum numerus truncatum ← 1.9 ↦ numerus via Trunc
-  fixum i8 saturatum ← 300.0 ↦ i8 via Trunc
-  fixum i32 idem ← 7 ∷ i32
+  sit numerus truncatum ← 1.9 ↦ numerus via Trunc
+  sit i8 saturatum ← 300.0 ↦ i8 via Trunc
+  sit i32 idem ← 7 ∷ i32
   redde truncatum
 }",
     );
@@ -4074,8 +4074,8 @@ fn lowers_lista_mutatio_methods() {
 incipit {
     varia _ res ← [3, 1, 2] ∷ lista<numerus>
     res.appende(4)
-    fixum _ primusremotus ← res.decapita()
-    fixum _ ultimusremotus ← res.detrahe()
+    sit primusremotus ← res.decapita()
+    sit ultimusremotus ← res.detrahe()
     res.inverte()
     res.ordina()
     nota res, primusremotus, ultimusremotus
@@ -4097,11 +4097,11 @@ fn lowers_lista_copy_view_methods() {
     let dump = dump_source(
         r"
 incipit {
-    fixum _ res ← [1, 2, 3, 4, 5] ∷ lista<numerus>
-    fixum _ sectio ← res.sectio(1, 4)
-    fixum _ primaduo ← res.prima(2)
-    fixum _ ultimaduo ← res.ultima(2)
-    fixum _ omissaduo ← res.omissa(2)
+    sit res ← [1, 2, 3, 4, 5] ∷ lista<numerus>
+    sit sectio ← res.sectio(1, 4)
+    sit primaduo ← res.prima(2)
+    sit ultimaduo ← res.ultima(2)
+    sit omissaduo ← res.omissa(2)
     nota sectio, primaduo, ultimaduo, omissaduo
 }
 ",
@@ -4120,7 +4120,7 @@ fn lowers_tensor_longitudo_to_collection_length() {
     let dump = dump_source(
         r"
 incipit {
-    fixum tensor<f32, []> empty_tensor ← vacua
+    sit tensor<f32, []> empty_tensor ← vacua
     nota empty_tensor.longitudo()
 }
 ",
@@ -4135,19 +4135,19 @@ fn lowers_tensor_intrinsic_methods_to_collection_ops() {
     let dump = dump_source(
         r"
 incipit {
-    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
     varia tf32[2, 2] grid ← flat ↦ tf32[2, 2]
     nota grid.magnitudines()
-    fixum tf32[4] reshaped ← grid.forma([4]).materialize()
+    sit tf32[4] reshaped ← grid.forma([4]).materialize()
     grid.ponde([0, 0], 9.0)
-    fixum f32 corner ← grid.accipe([0, 0])
+    sit f32 corner ← grid.accipe([0, 0])
     varia tf32[2, 2] filler ← tf32[2, 2] {}.reple(1.0)
     filler.reple(4.0)
-    fixum tf32[1, 2] slice ← grid.sectio(0, 1)
-    fixum lista<f32> out ← slice.planata()
-    fixum tf32[2, 2] sum ← grid + filler
-    fixum tf32[2, 2] diff ← sum - filler
-    fixum tf32[2, 2] prod ← diff ⊙ grid
+    sit tf32[1, 2] slice ← grid.sectio(0, 1)
+    sit lista<f32> out ← slice.planata()
+    sit tf32[2, 2] sum ← grid + filler
+    sit tf32[2, 2] diff ← sum - filler
+    sit tf32[2, 2] prod ← diff ⊙ grid
     nota prod.summa()
     nota prod.media()
     nota reshaped.longitudo()
@@ -4195,8 +4195,8 @@ fn lowers_shaped_lista_to_tensor_conversio_to_tensor_from_flat() {
     assert_lista_to_tensor_conversio_lowers_to_tensor_from_flat(
         r"
 incipit {
-    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    fixum tf32[2, 2] grid ← flat ↦ tf32[2, 2]
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    sit tf32[2, 2] grid ← flat ↦ tf32[2, 2]
     nota grid.magnitudines()
 }
 ",
@@ -4208,7 +4208,7 @@ fn lowers_rectangular_lista_literal_to_tensor_conversio_to_tensor_from_flat() {
     assert_lista_to_tensor_conversio_lowers_to_tensor_from_flat(
         r"
 incipit {
-    fixum tf32[2, 2] grid ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
+    sit tf32[2, 2] grid ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
     nota grid.magnitudines()
 }
 ",
@@ -4223,7 +4223,7 @@ fn lowers_literal_lista_to_narrow_float_tensor_conversio_to_tensor_from_flat() {
     assert_lista_to_tensor_conversio_lowers_to_tensor_from_flat(
         r"
 incipit {
-    fixum tf32[3] row ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    sit tf32[3] row ← [1.0, 2.0, 3.0] ↦ tf32[3]
     nota row.longitudo()
 }
 ",
@@ -4270,7 +4270,7 @@ fn lowers_intervallum_coercere_to_interval_clamp() {
     let dump = dump_source(
         r"
 incipit {
-    fixum intervallum<numerus> wide ← 0‥10
+    sit intervallum<numerus> wide ← 0‥10
     nota wide.coercere(2…8)
 }
 ",
@@ -4314,7 +4314,7 @@ fn edge_empty_tabula_habet_lowers_to_collection_contains() {
     let dump = dump_source(
         r#"
 incipit {
-    fixum tabula<textus, numerus> items ← vacua
+    sit tabula<textus, numerus> items ← vacua
     nota items.habet("a")
 }
 "#,
@@ -4335,7 +4335,7 @@ fn lowers_textus_runtime_methods_to_intrinsics() {
     let dump = dump_source(
         r#"
 incipit {
-    fixum _ nuntius ← " Ave Roma "
+    sit nuntius ← " Ave Roma "
     nota nuntius.longitudo()
     nota nuntius.sectio(1, 4)
     nota nuntius.continet("Roma")
@@ -4372,7 +4372,7 @@ fn lowers_textus_accipe_to_collection_index_intrinsic() {
     let dump = dump_source(
         r#"
 incipit {
-    fixum textus nuntius ← "Ave Roma"
+    sit textus nuntius ← "Ave Roma"
     nota nuntius.accipe(0)
 }
 "#,
@@ -4394,7 +4394,7 @@ fn edge_empty_textus_longitudo_lowers_to_collection_length() {
     let dump = dump_source(
         r#"
 incipit {
-    fixum _ len ← "".longitudo()
+    sit len ← "".longitudo()
     nota len
 }
 "#,
@@ -4413,13 +4413,13 @@ fn lowers_numeric_runtime_methods_to_intrinsics() {
     let dump = dump_source(
         r"
 incipit {
-    fixum numerus n ← -7
+    sit numerus n ← -7
     nota n.absolutum()
     nota n.signum()
     nota n.minimus(3)
     nota n.maximus(3)
 
-    fixum fractus f ← -3.75
+    sit fractus f ← -3.75
     nota f.absolutum()
     nota f.signum()
     nota f.minimus(2.5)
@@ -4588,8 +4588,8 @@ fn reducta_does_not_overwrite_its_initial_value() {
     // caller binding and must read the same after the call (need:
     // gradus `kv.extend` reduced onto `c.history` and corrupted the cache).
     let source = r"functio main2() → vacuum {
-  fixum lista<numerus> base ← [1]
-  fixum lista<numerus> folded ← [3, 4].reducta((lista<numerus> acc, numerus x) ∴ acc.addita(x), base)
+  sit lista<numerus> base ← [1]
+  sit lista<numerus> folded ← [3, 4].reducta((lista<numerus> acc, numerus x) ∴ acc.addita(x), base)
   nota folded.longitudo()
   nota base.longitudo()
 }
@@ -4617,8 +4617,8 @@ functio minimum(tensor<f64, [3]> values) → numerus {
   redde reducta via argminima ex values
 }
 incipit {
-  fixum lista<f64> flat ← [nonnumerus, nonnumerus, nonnumerus]
-  fixum tf64[3] values ← flat ↦ tf64[3]
+  sit lista<f64> flat ← [nonnumerus, nonnumerus, nonnumerus]
+  sit tf64[3] values ← flat ↦ tf64[3]
   nota maximum(values)
   nota minimum(values)
 }";
@@ -4642,15 +4642,15 @@ functio counts(tensor<f64, [5]> xs, tensor<numerus, [5]> rows, tensor<numerus, [
   redde reducta via numeratio ex xs apud [i] pro [rows[i], cols[i]] fixum v { redde v ≻ 0.0 }
 }
 incipit {
-  fixum lista<f64> xs_data ← [1.0, 2.0, 4.0, 8.0, 16.0]
-  fixum tensor<f64, [5]> xs ← xs_data ↦ tensor<f64, [5]>
-  fixum lista<numerus> rows_data ← [0, 1, 0, 1, 1]
-  fixum tensor<numerus, [5]> rows ← rows_data ↦ tensor<numerus, [5]>
-  fixum lista<numerus> cols_data ← [2, 0, 2, 1, 0]
-  fixum tensor<numerus, [5]> cols ← cols_data ↦ tensor<numerus, [5]>
-  fixum tensor<f64, [2, 3]> grid ← buckets(xs, rows, cols)
+  sit lista<f64> xs_data ← [1.0, 2.0, 4.0, 8.0, 16.0]
+  sit tensor<f64, [5]> xs ← xs_data ↦ tensor<f64, [5]>
+  sit lista<numerus> rows_data ← [0, 1, 0, 1, 1]
+  sit tensor<numerus, [5]> rows ← rows_data ↦ tensor<numerus, [5]>
+  sit lista<numerus> cols_data ← [2, 0, 2, 1, 0]
+  sit tensor<numerus, [5]> cols ← cols_data ↦ tensor<numerus, [5]>
+  sit tensor<f64, [2, 3]> grid ← buckets(xs, rows, cols)
   nota grid
-  fixum tensor<numerus, [2, 3]> tally ← counts(xs, rows, cols)
+  sit tensor<numerus, [2, 3]> tally ← counts(xs, rows, cols)
   nota tally
 }";
     let mut host = crate::mir::BufferHost::default();
@@ -4672,8 +4672,8 @@ functio over_second(tensor<f64, [2, 3, 4]> g) → tensor<f64, [2, 4]> { redde g.
 functio over_third(tensor<f64, [2, 3, 4]> g) → tensor<f64, [2, 3]> { redde g.summa(axis 2) }
 functio mean_second(tensor<f64, [2, 3, 4]> g) → tensor<f64, [2, 4]> { redde g.media(axis 1) }
 incipit {
-  fixum lista<f64> data ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
-  fixum tensor<f64, [2, 3, 4]> g ← data ↦ tensor<f64, [2, 3, 4]>
+  sit lista<f64> data ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
+  sit tensor<f64, [2, 3, 4]> g ← data ↦ tensor<f64, [2, 3, 4]>
   nota over_first(g)
   nota over_second(g)
   nota over_third(g)
@@ -4704,10 +4704,10 @@ fn reducta_grouping_preserves_source_and_key_tensors() {
   redde reducta via numeratio ex values apud [i] pro keys[i] fixum value { redde value }
 }
 incipit {
-  fixum lista<bivalens> values_data ← [verum, falsum, verum]
-  fixum tensor<bivalens, [3]> values ← values_data ↦ tensor<bivalens, [3]>
-  fixum lista<numerus> keys_data ← [0, 1, 0]
-  fixum tensor<numerus, [3]> keys ← keys_data ↦ tensor<numerus, [3]>
+  sit lista<bivalens> values_data ← [verum, falsum, verum]
+  sit tensor<bivalens, [3]> values ← values_data ↦ tensor<bivalens, [3]>
+  sit lista<numerus> keys_data ← [0, 1, 0]
+  sit tensor<numerus, [3]> keys ← keys_data ↦ tensor<numerus, [3]>
   nota count(values, keys)
   nota values[0]
   nota keys[0]
@@ -4729,10 +4729,10 @@ fn reducta_group_out_of_range_uses_existing_tensor_write_failure() {
   redde reducta via numeratio ex values apud [i] pro keys[i] fixum value { redde value }
 }
 incipit {
-  fixum lista<bivalens> values_data ← [verum, falsum, verum]
-  fixum tensor<bivalens, [3]> values ← values_data ↦ tensor<bivalens, [3]>
-  fixum lista<numerus> keys_data ← [0, 1, 2]
-  fixum tensor<numerus, [3]> keys ← keys_data ↦ tensor<numerus, [3]>
+  sit lista<bivalens> values_data ← [verum, falsum, verum]
+  sit tensor<bivalens, [3]> values ← values_data ↦ tensor<bivalens, [3]>
+  sit lista<numerus> keys_data ← [0, 1, 2]
+  sit tensor<numerus, [3]> keys ← keys_data ↦ tensor<numerus, [3]>
   nota count(values, keys)
 }";
     let mut host = crate::mir::BufferHost::default();
@@ -4758,12 +4758,12 @@ fn reducta_two_key_group_out_of_range_key_never_aliases_a_bucket() {
   redde reducta via summa ex xs apud [i] pro [rows[i], cols[i]] fixum v { redde v }
 }
 incipit {
-  fixum lista<f64> xs_data ← [1.0, 2.0]
-  fixum tensor<f64, [2]> xs ← xs_data ↦ tensor<f64, [2]>
-  fixum lista<numerus> rows_data ← [0, 1]
-  fixum tensor<numerus, [2]> rows ← rows_data ↦ tensor<numerus, [2]>
-  fixum lista<numerus> cols_data ← [3, 0]
-  fixum tensor<numerus, [2]> cols ← cols_data ↦ tensor<numerus, [2]>
+  sit lista<f64> xs_data ← [1.0, 2.0]
+  sit tensor<f64, [2]> xs ← xs_data ↦ tensor<f64, [2]>
+  sit lista<numerus> rows_data ← [0, 1]
+  sit tensor<numerus, [2]> rows ← rows_data ↦ tensor<numerus, [2]>
+  sit lista<numerus> cols_data ← [3, 0]
+  sit tensor<numerus, [2]> cols ← cols_data ↦ tensor<numerus, [2]>
   nota buckets(xs, rows, cols)
 }";
     let mut host = crate::mir::BufferHost::default();
@@ -4786,8 +4786,8 @@ fn cumulata_does_not_overwrite_its_initial_value() {
     // The scan rewrites its accumulator at each step; its initial value is a
     // caller binding and must read the same after the call.
     let source = r"functio main2() → vacuum {
-  fixum lista<numerus> base ← [1]
-  fixum lista<lista<numerus>> scanned ← [3, 4].cumulata((lista<numerus> acc, numerus x) ∴ acc.addita(x), base)
+  sit lista<numerus> base ← [1]
+  sit lista<lista<numerus>> scanned ← [3, 4].cumulata((lista<numerus> acc, numerus x) ∴ acc.addita(x), base)
   nota scanned.longitudo()
   nota base.longitudo()
 }
@@ -5010,7 +5010,7 @@ fn fixum_deferred_local_declares_without_zero_init() {
     let dump = dump_source(
         r"
 functio scale(bivalens compact, numerus base) → numerus {
-    fixum numerus factor
+    sit numerus factor
     si compact { factor ← 10 } secus { factor ← 100 }
     redde base * factor
 }
@@ -5028,7 +5028,7 @@ genus User {
     varia textus email sponte
 }
 incipit {
-    fixum User u ← User { name = "Ada" }
+    sit User u ← User { name = "Ada" }
     nota u.name
 }
 "#;
@@ -5087,7 +5087,7 @@ genus User {
     varia textus ∪ numerus ∪ nihil tag sponte
 }
 incipit {
-    fixum User u ← User { name = "Ada" }
+    sit User u ← User { name = "Ada" }
     nota u.name
 }
 "#;
@@ -5149,7 +5149,7 @@ incipit {
 fn lowers_callable_closure_values_and_indirect_calls() {
     let dump = dump_source(
         r"incipit {
-  fixum _ duplica ← numerus x ∴ x * 2
+  sit duplica ← numerus x ∴ x * 2
   nota duplica(5)
 }",
     );
@@ -5165,8 +5165,8 @@ fn lowers_callable_closure_values_and_indirect_calls() {
 fn lowers_captured_closure_environment_layout() {
     let dump = dump_source(
         r"incipit {
-  fixum _ base ← 10
-  fixum _ adde ← numerus x ∴ x + base
+  sit base ← 10
+  sit adde ← numerus x ∴ x + base
   nota adde(5)
 }",
     );
@@ -5182,10 +5182,10 @@ fn lowers_captured_closure_environment_layout() {
 fn lowers_failable_captured_closure_call_to_try_call() {
     let dump = dump_source(
         r"incipit {
-  fixum _ base ← 10
-  fixum _ adde ← (numerus x) → numerus ⇥ textus ∴ x + base
+  sit base ← 10
+  sit adde ← (numerus x) → numerus ⇥ textus ∴ x + base
   fac {
-    fixum _ value ← adde(5)
+    sit value ← adde(5)
     nota value
   }
   cape err {
@@ -5202,8 +5202,8 @@ fn lowers_failable_captured_closure_call_to_try_call() {
 fn validates_captured_closure_callee_environment_function_match() {
     let unit = analyze(
         r"incipit {
-  fixum _ base ← 10
-  fixum _ adde ← numerus x ∴ x + base
+  sit base ← 10
+  sit adde ← numerus x ∴ x + base
   nota adde(5)
 }",
     );
@@ -5236,9 +5236,9 @@ fn validates_captured_closure_callee_environment_function_match() {
 fn lowers_nested_captured_closure_environment_layout() {
     let dump = dump_source(
         r"incipit {
-  fixum _ base ← 10
-  fixum _ maker ← numerus y ∴ numerus z ∴ z + y + base
-  fixum _ adde ← maker(2)
+  sit base ← 10
+  sit maker ← numerus y ∴ numerus z ∴ z + y + base
+  sit adde ← maker(2)
   nota adde(5)
 }",
     );
@@ -5440,8 +5440,8 @@ functio rope_q<T, magnitudo D, magnitudo d, magnitudo P>(tensor<T, [D, d]> input
 fn sparsa_nonnihil_lowers_to_distinct_runtime_operation() {
     let dump = dump_source(
         r"incipit {
-    fixum tf32[2, 2] dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tf32[2, 2]
-    fixum sf32[2, 2] sparse ← dense ↦ sf32[2, 2]
+    sit tf32[2, 2] dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tf32[2, 2]
+    sit sf32[2, 2] sparse ← dense ↦ sf32[2, 2]
     nota sparse.nonnihil()
 }",
     );
@@ -5454,8 +5454,8 @@ fn sparse_representation_vacua_access_and_densify_lower_distinctly() {
         r"incipit {
     varia sf32[2, 3] sparse ← vacua
     sparse.ponde([0, 1], 4.0)
-    fixum _ value ← sparse.accipe([0, 1])
-    fixum tf32[2, 3] dense ← sparse.densata()
+    sit value ← sparse.accipe([0, 1])
+    sit tf32[2, 3] dense ← sparse.densata()
     nota value, dense.longitudo()
 }",
     );
@@ -5469,8 +5469,8 @@ fn sparse_representation_vacua_access_and_densify_lower_distinctly() {
 #[test]
 fn sparsa_shape_lowers_to_tensor_shape_and_validates() {
     let source = r"incipit {
-    fixum sf32[2, 3] sparse ← vacua
-    fixum _ shape ← sparse.magnitudines()
+    sit sf32[2, 3] sparse ← vacua
+    sit shape ← sparse.magnitudines()
     nota shape
 }";
     let dump = dump_source(source);
@@ -5486,10 +5486,10 @@ fn sparsa_shape_lowers_to_tensor_shape_and_validates() {
 fn stage3_mir_closeout_preserves_interval_and_sermo_operations() {
     let interval = dump_source(
         r"incipit {
-    fixum intervallum<numerus> left ← 0‥6
-    fixum intervallum<numerus> right ← 4…10
-    fixum _ overlap ← left.inter(right)
-    fixum _ values ← left ↦ lista<numerus>
+    sit intervallum<numerus> left ← 0‥6
+    sit intervallum<numerus> right ← 4…10
+    sit overlap ← left.inter(right)
+    sit values ← left ↦ lista<numerus>
     nota overlap, values
 }",
     );
@@ -5499,7 +5499,7 @@ fn stage3_mir_closeout_preserves_interval_and_sermo_operations() {
 
     let sermo = dump_source(
         r#"incipit {
-    fixum sermo stream ← ad 'runtime:echo' ("salve")
+    sit sermo stream ← ad 'runtime:echo' ("salve")
     itera ex stream.tuus<textus>().cursor() fixum frame {
         adfirma frame.data ≡ "salve"
     }
@@ -5518,8 +5518,8 @@ functio identitas_lista<T>(lista<T> xs) → lista<T> {
 }
 
 incipit {
-    fixum lista<textus> xs ← ["creata"]
-    fixum lista<textus> ys ← identitas_lista<textus>(xs)
+    sit lista<textus> xs ← ["creata"]
+    sit lista<textus> ys ← identitas_lista<textus>(xs)
     nota ys
 }
 "#;
@@ -5538,7 +5538,7 @@ functio fortasse<T>(T x) → T ∪ nihil {
 }
 
 incipit {
-    fixum textus ∪ nihil value ← fortasse<textus>("creata")
+    sit textus ∪ nihil value ← fortasse<textus>("creata")
     nota value
 }
 "#;
@@ -5644,8 +5644,8 @@ functio identitas<T>(T x) → T {
 }
 
 incipit {
-    fixum Capsa capsa ← Capsa { nomen = "creata" }
-    fixum textus nomen ← identitas(capsa.nomen)
+    sit Capsa capsa ← Capsa { nomen = "creata" }
+    sit textus nomen ← identitas(capsa.nomen)
     nota nomen
 }
 "#;
@@ -5664,8 +5664,8 @@ functio identitas<T>(T x) → T {
 }
 
 incipit {
-    fixum lista<textus> verba ← ["creata"]
-    fixum textus verbum ← identitas(verba![0])
+    sit lista<textus> verba ← ["creata"]
+    sit textus verbum ← identitas(verba![0])
     nota verbum
 }
 "#;
@@ -5684,9 +5684,9 @@ functio identitas<T>(T x) → T {
 }
 
 incipit {
-    fixum _ a ← identitas<textus>("creata")
-    fixum _ b ← identitas<textus>("iterum")
-    fixum _ c ← identitas<numerus>(7)
+    sit a ← identitas<textus>("creata")
+    sit b ← identitas<textus>("iterum")
+    sit c ← identitas<numerus>(7)
     nota a
     nota b
     nota c
@@ -5771,7 +5771,7 @@ functio duplum<T>(T x) → T {
 }
 
 incipit {
-    fixum numerus v ← duplum<numerus>(7)
+    sit numerus v ← duplum<numerus>(7)
     nota v
 }
 ",
@@ -5839,9 +5839,9 @@ functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32,
 }
 
 incipit {
-    fixum tensor<f32, [2, 8]> x ← vacua
-    fixum tensor<f32, [2, 8]> y ← vacua
-    fixum tensor<f32, [2, 8]> z ← add_tensors(x, y)
+    sit tensor<f32, [2, 8]> x ← vacua
+    sit tensor<f32, [2, 8]> y ← vacua
+    sit tensor<f32, [2, 8]> z ← add_tensors(x, y)
     nota z
 }
 ";
@@ -5919,8 +5919,8 @@ functio take<magnitudo M, magnitudo K, magnitudo N>(tensor<f32, [M, N]> x) → t
 }
 
 incipit {
-    fixum tensor<f32, [2, 2]> a ← vacua
-    fixum tensor<f32, [2, 2]> b ← take<2, 2, 2>(a)
+    sit tensor<f32, [2, 2]> a ← vacua
+    sit tensor<f32, [2, 2]> b ← take<2, 2, 2>(a)
     nota b.longitudo()
 }
 ";
@@ -5949,12 +5949,12 @@ functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32,
 }
 
 incipit {
-    fixum tensor<f32, [2, 8]> x ← vacua
-    fixum tensor<f32, [2, 8]> y ← vacua
-    fixum tensor<f32, [4, 4]> p ← vacua
-    fixum tensor<f32, [4, 4]> q ← vacua
-    fixum tensor<f32, [2, 8]> z ← add_tensors(x, y)
-    fixum tensor<f32, [4, 4]> r ← add_tensors(p, q)
+    sit tensor<f32, [2, 8]> x ← vacua
+    sit tensor<f32, [2, 8]> y ← vacua
+    sit tensor<f32, [4, 4]> p ← vacua
+    sit tensor<f32, [4, 4]> q ← vacua
+    sit tensor<f32, [2, 8]> z ← add_tensors(x, y)
+    sit tensor<f32, [4, 4]> r ← add_tensors(p, q)
     nota z
     nota r
 }
@@ -5989,12 +5989,12 @@ functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32,
 }
 
 incipit {
-    fixum tensor<f32, [2, 8]> x ← vacua
-    fixum tensor<f32, [2, 8]> y ← vacua
-    fixum tensor<f32, [2, 8]> p ← vacua
-    fixum tensor<f32, [2, 8]> q ← vacua
-    fixum tensor<f32, [2, 8]> z ← add_tensors(x, y)
-    fixum tensor<f32, [2, 8]> r ← add_tensors(p, q)
+    sit tensor<f32, [2, 8]> x ← vacua
+    sit tensor<f32, [2, 8]> y ← vacua
+    sit tensor<f32, [2, 8]> p ← vacua
+    sit tensor<f32, [2, 8]> q ← vacua
+    sit tensor<f32, [2, 8]> z ← add_tensors(x, y)
+    sit tensor<f32, [2, 8]> r ← add_tensors(p, q)
     nota z
     nota r
 }
@@ -6025,10 +6025,10 @@ fn require_extent<size N>(ref tf32[N] value) → int {
 main {
     const size short ← runtime_extent(2)
     const size long ← runtime_extent(3)
-    const list<f32> short_flat ← [1.0, 2.0]
-    const list<f32> long_flat ← [3.0, 4.0, 5.0]
-    const tf32[short] short_value ← short_flat ↦ tf32[short]
-    const tf32[long] long_value ← long_flat ↦ tf32[long]
+    let list<f32> short_flat ← [1.0, 2.0]
+    let list<f32> long_flat ← [3.0, 4.0, 5.0]
+    let tf32[short] short_value ← short_flat ↦ tf32[short]
+    let tf32[long] long_value ← long_flat ↦ tf32[long]
     print require_extent(short_value)
     print require_extent(long_value)
 }
@@ -6183,12 +6183,12 @@ functio outer<magnitudo N>(tensor<f32, [N]> x) → tensor<f32, [N]> {
 }
 
 incipit {
-    fixum tensor<f32, [4]> a ← vacua
-    fixum tensor<f32, [4]> b ← vacua
-    fixum tensor<f32, [8]> c ← vacua
-    fixum tensor<f32, [4]> first ← outer(a)
-    fixum tensor<f32, [4]> duplicate ← outer(b)
-    fixum tensor<f32, [8]> distinct ← outer(c)
+    sit tensor<f32, [4]> a ← vacua
+    sit tensor<f32, [4]> b ← vacua
+    sit tensor<f32, [8]> c ← vacua
+    sit tensor<f32, [4]> first ← outer(a)
+    sit tensor<f32, [4]> duplicate ← outer(b)
+    sit tensor<f32, [8]> distinct ← outer(c)
     nota first
     nota duplicate
     nota distinct
@@ -6230,9 +6230,9 @@ functio outer<magnitudo N>(tensor<f32, [N]> x) → tensor<f32, [N]> ⇥ textus {
 }
 
 incipit {
-    fixum tensor<f32, [4]> x ← vacua
+    sit tensor<f32, [4]> x ← vacua
     fac {
-        fixum tensor<f32, [4]> y ← outer(x)
+        sit tensor<f32, [4]> y ← outer(x)
         nota y
     } cape err {
         nota err
@@ -6280,8 +6280,8 @@ functio outer<magnitudo N>(tensor<f32, [N]> x) → numerus {
 }
 
 incipit {
-    fixum tensor<f32, [4]> x ← vacua
-    fixum numerus value ← outer(x)
+    sit tensor<f32, [4]> x ← vacua
+    sit numerus value ← outer(x)
     nota value
 }
 ";
@@ -6452,7 +6452,7 @@ fn conflicting_shader_annotations_with_nucleum_emit_diagnostic() {
 #[test]
 fn lowers_vertex_method_inside_genus_to_shader_stage() {
     let unit = analyze(
-        "genus Renderer {\n  varia numerus dummy = 0\n  @ vertex\n  functio draw() → vacuum { redde }\n}\n\nincipit {\n  fixum _ r ← Renderer {}\n}",
+        "genus Renderer {\n  varia numerus dummy = 0\n  @ vertex\n  functio draw() → vacuum { redde }\n}\n\nincipit {\n  sit r ← Renderer {}\n}",
     );
     let program = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
@@ -6472,7 +6472,7 @@ fn lowers_vertex_method_inside_genus_to_shader_stage() {
 #[test]
 fn lowers_fragment_method_inside_genus_to_shader_stage() {
     let unit = analyze(
-        "genus Renderer {\n  varia numerus dummy = 0\n  @ fragment\n  functio shade() → vacuum { redde }\n}\n\nincipit {\n  fixum _ r ← Renderer {}\n}",
+        "genus Renderer {\n  varia numerus dummy = 0\n  @ fragment\n  functio shade() → vacuum { redde }\n}\n\nincipit {\n  sit r ← Renderer {}\n}",
     );
     let program = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
@@ -7060,9 +7060,9 @@ fn conversio_assign_lowers_through_shared_conversion_owner() {
 
 #[test]
 fn conversio_assign_typed_init_lowers_single_convert_then_store() {
-    // `fixum numerus n ↤ "42"`: the destination is the local being declared;
+    // `sit numerus n ↤ "42"`: the destination is the local being declared;
     // convert the source to the written type once, store once.
-    let dump = dump_source("incipit {\n  fixum numerus n ↤ \"42\"\n}\n");
+    let dump = dump_source("incipit {\n  sit numerus n ↤ \"42\"\n}\n");
     assert_eq!(
         count_occurrences(&dump, "runtime convert runtime"),
         1,
@@ -7115,8 +7115,8 @@ fn conversio_recovery_with_branching_fallback_validates_as_a_recovery_region() {
     // need: a `⊥` fallback with its own branches (`c ✓ fb() ✗ 0`)
     // lowers into a detached multi-block recovery region; validation must
     // accept the whole region, not only its tail block.
-    let source = "functio fb() → numerus {\n  redde 7\n}\nincipit {\n  fixum bivalens c ← verum\n  \
-                  fixum numerus n ← \"x\" ↦ numerus ⊥ (c ✓ fb() ✗ 0)\n  nota n\n}\n";
+    let source = "functio fb() → numerus {\n  redde 7\n}\nincipit {\n  sit bivalens c ← verum\n  \
+                  sit numerus n ← \"x\" ↦ numerus ⊥ (c ✓ fb() ✗ 0)\n  nota n\n}\n";
     let unit = analyze(source);
     let lowered =
         lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).expect("MIR lowering succeeds");
@@ -7181,8 +7181,8 @@ fn maximum_with_apud(tf32[3] values) → f32 {
 }
 
 main {
-    const list<f32> flat ← [1.0, 4.0, 2.0]
-    const tf32[3] values ← flat ↦ tf32[3]
+    let list<f32> flat ← [1.0, 4.0, 2.0]
+    let tf32[3] values ← flat ↦ tf32[3]
     print maximum_without_apud(values)
     print maximum_with_apud(values)
 }
@@ -7314,16 +7314,16 @@ functio chained(lista<numerus> values, numerus lower, numerus upper) → lista<n
 fn minmax_infix_clamp_runner_matches_method_twins() {
     let source = r"
 incipit {
-    fixum numerus scalar ← 2 ⤒ 5
+    sit numerus scalar ← 2 ⤒ 5
     nota scalar
 
-    fixum lista<numerus> values ← [1, 5, 9]
-    fixum lista<numerus> clamped ← values ⤒ 4 ⤓ 8
+    sit lista<numerus> values ← [1, 5, 9]
+    sit lista<numerus> clamped ← values ⤒ 4 ⤓ 8
     nota clamped.summa()
 
-    fixum lista<f32> flat ← [-1.0, 0.5, 2.0]
-    fixum tf32[3] values_tensor ← flat ↦ tf32[3]
-    fixum tf32[3] clamped_tensor ← values_tensor ⤒ 0.0 ⤓ 1.0
+    sit lista<f32> flat ← [-1.0, 0.5, 2.0]
+    sit tf32[3] values_tensor ← flat ↦ tf32[3]
+    sit tf32[3] clamped_tensor ← values_tensor ⤒ 0.0 ⤓ 1.0
     nota clamped_tensor.summa()
 }
 ";
@@ -7377,7 +7377,7 @@ fn run_lines(body: &str) -> Result<Vec<String>, String> {
 #[test]
 fn decimal_sum_is_exact_and_stores_at_scale_eight() {
     // 0.1 + 0.2 = 0.3 (carrier 30_000_000 at scale 8), printed shortest.
-    let lines = run_lines("fixum d64 a ← 0.1\nfixum d64 b ← 0.2\nfixum d64 c ← a + b\nnota c").expect("runs");
+    let lines = run_lines("sit d64 a ← 0.1\nsit d64 b ← 0.2\nsit d64 c ← a + b\nnota c").expect("runs");
     assert_eq!(lines, ["0.3"]);
 }
 
@@ -7387,9 +7387,9 @@ fn decimal_product_keeps_its_exact_scale_until_a_slot_stores_it() {
     // 19.99 * 0.0725 * 0.0725 = 0.1050724375 (scale 10) prints exactly and
     // stores half-even at scale 8 as 0.10507244.
     let lines = run_lines(
-        "fixum d64 p ← 19.99\nfixum d64 r ← 0.0725\n\
-         fixum d64 t ← p * r\nnota t\nnota p * r * r\n\
-         fixum d64 s ← p * r * r\nnota s",
+        "sit d64 p ← 19.99\nsit d64 r ← 0.0725\n\
+         sit d64 t ← p * r\nnota t\nnota p * r * r\n\
+         sit d64 s ← p * r * r\nnota s",
     )
     .expect("runs");
     assert_eq!(lines, ["1.449275", "0.1050724375", "0.10507244"]);
@@ -7400,8 +7400,8 @@ fn decimal_expression_rounds_once_at_the_store_not_per_operation() {
     // 1.5 * 0.00000001 = 0.000000015 (a tie at scale 8); * 100.0 gives
     // 0.0000015 exactly. Rounding after `*` would give 0.00000002 * 100.0.
     let lines = run_lines(
-        "fixum d64 a ← 1.5\nfixum d64 r ← 0.00000001\n\
-         fixum d64 h ← 100.0\nfixum d64 t ← a * r * h\nnota t",
+        "sit d64 a ← 1.5\nsit d64 r ← 0.00000001\n\
+         sit d64 h ← 100.0\nsit d64 t ← a * r * h\nnota t",
     )
     .expect("runs");
     assert_eq!(lines, ["0.0000015"]);
@@ -7411,8 +7411,8 @@ fn decimal_expression_rounds_once_at_the_store_not_per_operation() {
 fn decimal_division_rounds_half_even_to_the_larger_scale() {
     // 1.0 / 3.0 at scale 8 is 0.33333333; 2.0 / 3.0 is 0.66666667.
     let lines = run_lines(
-        "fixum d64 one ← 1.0\nfixum d64 two ← 2.0\nfixum d64 three ← 3.0\n\
-         fixum d64 q ← one / three\nnota q\nfixum d64 w ← two / three\nnota w",
+        "sit d64 one ← 1.0\nsit d64 two ← 2.0\nsit d64 three ← 3.0\n\
+         sit d64 q ← one / three\nnota q\nsit d64 w ← two / three\nnota w",
     )
     .expect("runs");
     assert_eq!(lines, ["0.33333333", "0.66666667"]);
@@ -7423,14 +7423,14 @@ fn decimal_intermediate_may_leave_the_range_until_the_store() {
     // big + 1.0 - 1.0 passes through 92233720369.0, past the d64 range, and
     // lands back inside it; big * 2.0 lands outside and traps at the store.
     let lines = run_lines(
-        "fixum d64 big ← 92233720368.0\nfixum d64 one ← 1.0\n\
-         fixum d64 ok ← big + one - one\nnota ok",
+        "sit d64 big ← 92233720368.0\nsit d64 one ← 1.0\n\
+         sit d64 ok ← big + one - one\nnota ok",
     )
     .expect("runs");
     assert_eq!(lines, ["92233720368"]);
     let trap = run_lines(
-        "fixum d64 big ← 92233720368.0\nfixum d64 two ← 2.0\n\
-         fixum d64 boom ← big * two\nnota boom",
+        "sit d64 big ← 92233720368.0\nsit d64 two ← 2.0\n\
+         sit d64 boom ← big * two\nnota boom",
     )
     .expect_err("out of range store traps");
     assert!(trap.contains("implicit_store_out_of_range"), "{trap}");
@@ -7440,7 +7440,7 @@ fn decimal_intermediate_may_leave_the_range_until_the_store() {
 #[test]
 fn decimal_comparison_of_intermediates_is_exact() {
     let lines = run_lines(
-        "fixum d64 p ← 19.99\nfixum d64 r ← 0.0725\n\
+        "sit d64 p ← 19.99\nsit d64 r ← 0.0725\n\
          nota p * r * r ≻ p * r\nnota p * r * r ≺ p * r\nnota p * r * r ≅ p * r * r",
     )
     .expect("runs");
@@ -7463,15 +7463,15 @@ functio idem(d64 x) → d64 {
     redde x
 }
 incipit {
-    fixum d64 r ← 0.0725
+    sit d64 r ← 0.0725
     nota cubus(r)
     nota idem(r * r * r)
     varia d64 v ← 1.0
     v ← r * r * r
     nota v
-    fixum _ w ← r * r * r
+    sit w ← r * r * r
     nota w
-    fixum lista<d64> xs ← [r * r * r]
+    sit lista<d64> xs ← [r * r * r]
     nota xs[0]
     nota r * r * r
 }",
@@ -7611,8 +7611,8 @@ fn ascribed_json_object_literal_constructs_the_typed_map() {
 locale = "en"
 +++
 main {
-    const _ a ← {"a": 1} ∷ map<string, int>
-    const _ b ← {"a": null} ∷ map<string, int ∪ none>
+    let a ← {"a": 1} ∷ map<string, int>
+    let b ← {"a": null} ∷ map<string, int ∪ none>
     print a
     print b
 }

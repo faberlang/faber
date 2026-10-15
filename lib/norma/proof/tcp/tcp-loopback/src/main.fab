@@ -21,53 +21,53 @@ import from "norma:net/endpoint" endpoint
 
 main {
     # caelum:ausculta — listen on an ephemeral kernel-assigned port.
-    const listener.Listener server ← net.listen(0)
+    let listener.Listener server ← net.listen(0)
     assert server.id ≻ 0
 
     # caelum:portus — the assigned port is live.
-    const int port ← server.port()
+    let int port ← server.port()
     assert port ≻ 0
 
     # caelum:necte — connect completes in the kernel backlog before accept.
-    const connection.Socket client ← net.connect("127.0.0.1", port, false)
+    let connection.Socket client ← net.connect("127.0.0.1", port, false)
     assert client.id ≻ 0
 
     # caelum:locus / caelum:remotus — client-side endpoints.
-    const endpoint.Endpoint client_local ← client.local()
+    let endpoint.Endpoint client_local ← client.local()
     assert client_local.host ≡ "127.0.0.1"
-    const endpoint.Endpoint client_remote ← client.remote()
+    let endpoint.Endpoint client_remote ← client.remote()
     assert client_remote.host ≡ "127.0.0.1"
     assert client_remote.port ≡ port
 
     # caelum:accipe — take the queued connection.
-    const connection.Socket peer ← server.accept()
+    let connection.Socket peer ← server.accept()
     assert peer.id ≻ 0
 
     # caelum:locus / caelum:remotus — server-side endpoints. The accepted
     # socket's remote address is the client's local address.
-    const endpoint.Endpoint peer_local ← peer.local()
+    let endpoint.Endpoint peer_local ← peer.local()
     assert peer_local.host ≡ "127.0.0.1"
     assert peer_local.port ≡ port
-    const endpoint.Endpoint peer_remote ← peer.remote()
+    let endpoint.Endpoint peer_remote ← peer.remote()
     assert peer_remote.host ≡ "127.0.0.1"
     assert peer_remote.port ≡ client_local.port
 
     # caelum:funde / caelum:hauri — client writes, server reads it exactly.
-    const list<b8> payload ← |68 65 6c 6c 6f|
+    let list<b8> payload ← |68 65 6c 6c 6f|
     client.write_bytes(payload)
-    const list<b8> request ← peer.read_bytes(payload.length()) coalesce ||
+    let list<b8> request ← peer.read_bytes(payload.length()) coalesce ||
     assert request ≡ payload
 
     # The reply path is the mirror image: server writes, client reads.
-    const list<b8> reply ← |77 6f 72 6c 64|
+    let list<b8> reply ← |77 6f 72 6c 64|
     peer.write_bytes(reply)
-    const list<b8> response ← client.read_bytes(reply.length()) coalesce ||
+    let list<b8> response ← client.read_bytes(reply.length()) coalesce ||
     assert response ≡ reply
 
     # caelum:claude on the client: the peer's next read observes the closed
     # peer as an absent (none) result, not as a zero-length list.
     client.close()
-    const list<b8> ∪ none eof ← peer.read_bytes(1)
+    let list<b8> ∪ none eof ← peer.read_bytes(1)
     assert eof is none
 
     peer.close()
@@ -75,11 +75,11 @@ main {
 
     # caelum:necte on a released port: open a listener, take its port, close
     # it, then connect. The fault crosses as the ConnectionRefused variant.
-    const listener.Listener closed_server ← net.listen(0)
-    const int closed_port ← closed_server.port()
+    let listener.Listener closed_server ← net.listen(0)
+    let int closed_port ← closed_server.port()
     assert closed_port ≻ 0
     closed_server.close()
-    var bool refused ← false
+    mut bool refused ← false
     do {
         net.connect("127.0.0.1", closed_port, false)
         assert false panic "connect to a closed listener succeeded"
@@ -99,10 +99,10 @@ main {
 
     # caelum:ausculta on a live port: a second listen on the port held by A
     # faults AddrInUse; A stays open until the fault is observed.
-    const listener.Listener holder ← net.listen(0)
-    const int holder_port ← holder.port()
+    let listener.Listener holder ← net.listen(0)
+    let int holder_port ← holder.port()
     assert holder_port ≻ 0
-    var bool in_use ← false
+    mut bool in_use ← false
     do {
         net.listen(holder_port)
         assert false panic "second listen on a live port succeeded"
@@ -125,7 +125,7 @@ main {
     # handshake. The TLS success path (live listener plus handshake) is proved
     # by the package-manager program: a real handshake needs
     # PEM material from lib/norma/proof/integration/gen-test-certs at run time.
-    var bool tls_faulted ← false
+    mut bool tls_faulted ← false
     do {
         net.listen_tls(0, "/nonexistent/cert.pem", "/nonexistent/key.pem")
         assert false panic "listen_tls with absent PEM files succeeded"

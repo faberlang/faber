@@ -41,15 +41,15 @@ locale = "en"
 #   Scalar longitudo() and indexed accipe only (lista.expected).
 
 main {
-    const list<int> vacuares ← empty
-    const _ numeri ← [1, 2, 3, 4, 5]
-    const _ nomina ← ["Marcus", "Julia", "Gaius"]
-    const _ vexilla ← [true, false, true]
-    const _ matrix ← [[1, 2], [3, 4], [5, 6]]
-    const list<int> primum ← [1, 2, 3]
-    const list<int> secundum ← [4, 5, 6]
-    const _ coniuncta ← [spread primum, spread secundum]
-    const _ aucta ← [0, spread primum, 99]
+    let list<int> vacuares ← empty
+    let numeri ← [1, 2, 3, 4, 5]
+    let nomina ← ["Marcus", "Julia", "Gaius"]
+    let vexilla ← [true, false, true]
+    let matrix ← [[1, 2], [3, 4], [5, 6]]
+    let list<int> primum ← [1, 2, 3]
+    let list<int> secundum ← [4, 5, 6]
+    let coniuncta ← [spread primum, spread secundum]
+    let aucta ← [0, spread primum, 99]
     print vacuares.length()
     print numeri.length()
     print numeri[0]

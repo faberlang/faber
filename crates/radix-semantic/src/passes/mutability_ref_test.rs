@@ -15,7 +15,7 @@ fn ref_list_read_methods_are_legal() {
     let _ = analyze_ok_la(
         r"
 incipit {
-    fixum de lista<numerus> xs ← [1, 2, 3]
+    sit de lista<numerus> xs ← [1, 2, 3]
     nota xs.longitudo()
 }
 ",
@@ -27,7 +27,7 @@ fn ref_list_mutating_receiver_rejects() {
     assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum de lista<numerus> xs ← [1, 2, 3]
+    sit de lista<numerus> xs ← [1, 2, 3]
     xs.appende(4)
 }
 ",
@@ -52,7 +52,7 @@ fn projection_assignment_through_ref_rejects() {
     assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum de lista<numerus> xs ← [1, 2, 3]
+    sit de lista<numerus> xs ← [1, 2, 3]
     xs[0] ← 9
 }
 ",
@@ -80,7 +80,7 @@ functio poke(in lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
-    fixum de lista<numerus> a ← [1, 2, 3]
+    sit de lista<numerus> a ← [1, 2, 3]
     poke(in a)
 }
 ",
@@ -96,7 +96,7 @@ functio take(own lista<numerus> xs) → vacuum {
     nota xs.longitudo()
 }
 incipit {
-    fixum de lista<numerus> a ← [1, 2, 3]
+    sit de lista<numerus> a ← [1, 2, 3]
     take(own a)
 }
 ",
@@ -127,7 +127,7 @@ genus Persona {
     varia lista<numerus> amici
 }
 incipit {
-    fixum de Persona p ← Persona { amici = [1, 2] }
+    sit de Persona p ← Persona { amici = [1, 2] }
     nota p.amici
 }
 ",
@@ -167,7 +167,7 @@ genus Persona {
     varia lista<numerus> amici
 }
 incipit {
-    fixum de Persona p ← Persona { amici = [1, 2] }
+    sit de Persona p ← Persona { amici = [1, 2] }
     p.amici.appende(3)
 }
 ",
@@ -183,7 +183,7 @@ genus Persona {
     varia lista<numerus> amici
 }
 incipit {
-    fixum de Persona p ← Persona { amici = [1, 2] }
+    sit de Persona p ← Persona { amici = [1, 2] }
     p.amici[0] ← 9
 }
 ",

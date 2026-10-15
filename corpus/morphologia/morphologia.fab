@@ -43,14 +43,14 @@ locale = "en"
 #   numeri prima: [1, 2, 3, 4, 5]
 
 main {
-    const list<int> numeri ← [1, 2, 3, 4, 5] ∷ list<int>
+    let list<int> numeri ← [1, 2, 3, 4, 5] ∷ list<int>
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
     # FILTRA: filtr-
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # filtrata returns a new filtered list
-    const list<int> pares ← numeri.filter(int x ∴ x % 2 ≡ 0)
+    let list<int> pares ← numeri.filter(int x ∴ x % 2 ≡ 0)
     print "filtrata nova: §"(pares)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
@@ -58,11 +58,11 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # addita returns a new list with an added element
-    const list<int> aucta ← numeri.added(6)
+    let list<int> aucta ← numeri.added(6)
     print "addita nova: §"(aucta)
 
     # appende mutates in place
-    var list<int> mutanda ← [1, 2, 3]
+    mut list<int> mutanda ← [1, 2, 3]
     mutanda.append(4)
     print "appende mutat: §"(mutanda)
 
@@ -71,11 +71,11 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # inversa returns a new reversed list
-    const list<int> versa ← numeri.invert()
+    let list<int> versa ← numeri.invert()
     print "inversa nova: §"(versa)
 
     # inverte mutates in place
-    var list<int> invertenda ← [1, 2, 3]
+    mut list<int> invertenda ← [1, 2, 3]
     invertenda.reverse()
     print "inverte mutat: §"(invertenda)
 
@@ -84,11 +84,11 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # ordinata returns a new sorted list
-    const list<int> ordinata ← numeri.sorted()
+    let list<int> ordinata ← numeri.sorted()
     print "ordinata nova: §"(ordinata)
 
     # ordina mutates in place
-    var list<int> ordinanda ← [3, 1, 2]
+    mut list<int> ordinanda ← [3, 1, 2]
     ordinanda.sort()
     print "ordina mutat: §"(ordinanda)
 
@@ -97,7 +97,7 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # mappata returns a new mapped list
-    const list<int> duplicata ← numeri.map(int x ∴ x * 2)
+    let list<int> duplicata ← numeri.map(int x ∴ x * 2)
     print "mappata nova: §"(duplicata)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡

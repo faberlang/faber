@@ -28,7 +28,7 @@ locale = "en"
 # =============================================================================
 
 main {
-    var map<string, int> stock ← { "pear": 3 }
+    mut map<string, int> stock ← { "pear": 3 }
     print "before"
     for from stock const count {
         stock["fig"] ← count

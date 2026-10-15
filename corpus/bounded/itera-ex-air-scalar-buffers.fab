@@ -44,18 +44,18 @@ diagnostic = "SEM059:runtime_conversion"
 
 @ radix lane "air"
 fn full_bytes() → void {
-    const list<b8, 8> xs ← |de ad be ef ba dc fe ca| ↦ list<b8, 8>
+    let list<b8, 8> xs ← |de ad be ef ba dc fe ca| ↦ list<b8, 8>
     for from xs const b { }
 }
 
 @ radix lane "air"
 fn full_ascii() → void {
-    const ascii<8> xs ← 'alphabet' ↦ ascii<8>
+    let ascii<8> xs ← 'alphabet' ↦ ascii<8>
     for from xs const c { }
 }
 
 @ radix lane "air"
 fn full_string() → void {
-    const string<8> xs ← "abcdefgh" ↦ string<8>
+    let string<8> xs ← "abcdefgh" ↦ string<8>
     for from xs const c { }
 }

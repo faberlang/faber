@@ -35,14 +35,14 @@ fn reemit(source: &str, to: &str) -> String {
         .code
 }
 
-const BODY: &str = "class Arca {\n    @ private\n    var int secretum\n    @ internal\n    var int domesticum\n\n    fn lege() → int {\n        return self.occulta()\n    }\n\n    @ private\n    fn occulta() → int {\n        return self.secretum\n    }\n}\n\nmain {\n    const Arca a ← Arca { secretum = 1, domesticum = 2 }\n    print a.lege()\n}\n";
+const BODY: &str = "class Arca {\n    @ private\n    mut int secretum\n    @ internal\n    mut int domesticum\n\n    fn lege() → int {\n        return self.occulta()\n    }\n\n    @ private\n    fn occulta() → int {\n        return self.secretum\n    }\n}\n\nmain {\n    let Arca a ← Arca { secretum = 1, domesticum = 2 }\n    print a.lege()\n}\n";
 
 #[test]
 fn en_format_keeps_member_visibility() {
     let en = format!("+++\nlocale = \"en\"\n+++\n{BODY}");
     let formatted = reemit(&en, "en");
-    assert!(formatted.contains("    @ private\n    var int secretum\n"), "{formatted}");
-    assert!(formatted.contains("    @ internal\n    var int domesticum\n"), "{formatted}");
+    assert!(formatted.contains("    @ private\n    mut int secretum\n"), "{formatted}");
+    assert!(formatted.contains("    @ internal\n    mut int domesticum\n"), "{formatted}");
     assert!(formatted.contains("    @ private\n    fn occulta()"), "{formatted}");
 }
 

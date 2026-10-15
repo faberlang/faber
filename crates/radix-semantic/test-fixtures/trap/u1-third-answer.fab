@@ -12,6 +12,6 @@ fn failable() → int ⇥ string {
 }
 
 main {
-    const _ r ← trap { failable() }
+    let r ← trap { failable() }
     print r
 }

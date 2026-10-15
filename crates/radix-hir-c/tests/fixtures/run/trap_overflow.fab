@@ -3,7 +3,7 @@ locale = "en"
 +++
 # The width applies at the store: printing first, then the store traps.
 main {
-    var int n ← 9223372036854775807
+    mut int n ← 9223372036854775807
     print "before"
     n ← n + 1
     print "never", n

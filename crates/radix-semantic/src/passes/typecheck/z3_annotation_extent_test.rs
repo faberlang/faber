@@ -40,9 +40,9 @@ fn bare_value_name_annotation_extent_is_refused_with_did_you_mean() {
     let source = r#"fn runtime_extent(int value) → int { return value }
 
 main {
-    const int n ← runtime_extent(2)
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[2, n] a ← flat ↦ tf32[2, size n]
+    let int n ← runtime_extent(2)
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[2, n] a ← flat ↦ tf32[2, size n]
 }
 "#;
     let result = analyze(source);
@@ -60,9 +60,9 @@ fn spelled_size_lift_annotation_stays_green() {
     let source = r#"fn runtime_extent(int value) → int { return value }
 
 main {
-    const int n ← runtime_extent(2)
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[2, size n] a ← flat ↦ tf32[2, size n]
+    let int n ← runtime_extent(2)
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[2, size n] a ← flat ↦ tf32[2, size n]
     print a.shape().get(1)
 }
 "#;
@@ -79,8 +79,8 @@ fn bare_value_param_name_annotation_extent_is_refused_with_did_you_mean() {
     // The value name lowers through the parameter path (ScalarParameter);
     // the refusal must cover it identically.
     let source = r#"fn probe(int n) → int {
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[2, n] a ← flat ↦ tf32[2, size n]
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[2, n] a ← flat ↦ tf32[2, size n]
     return 1
 }
 main {}
@@ -98,7 +98,7 @@ main {}
 #[test]
 fn bare_affine_extent_is_refused_but_parenthesized_lift_stays_green() {
     let refused = analyze(
-        "fn runtime_size(int value) → int { return value }\nmain {\n    const int n ← runtime_size(4)\n    const list<f32> flat ← [1.0, 2.0, 3.0]\n    const tensor<f32, [n - 1]> dynamic ← flat ↦ tensor<f32, [size (n - 1)]>\n}\n",
+        "fn runtime_size(int value) → int { return value }\nmain {\n    let int n ← runtime_size(4)\n    let list<f32> flat ← [1.0, 2.0, 3.0]\n    let tensor<f32, [n - 1]> dynamic ← flat ↦ tensor<f32, [size (n - 1)]>\n}\n",
     );
     assert!(refused.is_err(), "bare affine extent must refuse");
     assert_eq!(
@@ -109,7 +109,7 @@ fn bare_affine_extent_is_refused_but_parenthesized_lift_stays_green() {
     );
 
     let lifted = analyze(
-        "fn runtime_size(int value) → int { return value }\nmain {\n    const int n ← runtime_size(4)\n    const list<f32> flat ← [1.0, 2.0, 3.0]\n    const tensor<f32, [size (n - 1)]> dynamic ← flat ↦ tensor<f32, [size (n - 1)]>\n}\n",
+        "fn runtime_size(int value) → int { return value }\nmain {\n    let int n ← runtime_size(4)\n    let list<f32> flat ← [1.0, 2.0, 3.0]\n    let tensor<f32, [size (n - 1)]> dynamic ← flat ↦ tensor<f32, [size (n - 1)]>\n}\n",
     );
     assert!(
         lifted.is_ok(),
@@ -122,7 +122,7 @@ fn bare_affine_extent_is_refused_but_parenthesized_lift_stays_green() {
 fn declared_size_names_stay_admissible_in_annotations() {
     // Static fold (Z1) and the runtime lift declaration both stay green.
     let static_size =
-        analyze("main {\n    const size N = 3\n    var tf32[N, 2] values ← tf32[N, 2] {}\n}\n");
+        analyze("main {\n    const size N = 3\n    mut tf32[N, 2] values ← tf32[N, 2] {}\n}\n");
     assert!(
         static_size.is_ok(),
         "declared static size stays a size term: {:?}",
@@ -130,7 +130,7 @@ fn declared_size_names_stay_admissible_in_annotations() {
     );
 
     let runtime_size = analyze(
-        "fn probe(int h) {\n    const size H ← h\n    const list<f32> zeros ← [0.0, 0.0]\n    do {\n        var tf32[H + 1] values ← zeros ↦ tf32[H + 1]\n    }\n    catch err {\n    }\n}\nmain {}\n",
+        "fn probe(int h) {\n    const size H ← h\n    let list<f32> zeros ← [0.0, 0.0]\n    do {\n        mut tf32[H + 1] values ← zeros ↦ tf32[H + 1]\n    }\n    catch err {\n    }\n}\nmain {}\n",
     );
     assert!(
         runtime_size.is_ok(),
@@ -144,9 +144,9 @@ fn whole_shape_list_binding_stays_admissible() {
     // The whole-figura value name is the shape-list reading (conversions
     // track), not a per-extent int→size crossing.
     let source = r#"main {
-  const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-  const list<int> shape ← [2, 2]
-  const tf32[2, 2] data ← flat ↦ tf32[shape]
+  let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  let list<int> shape ← [2, 2]
+  let tf32[2, 2] data ← flat ↦ tf32[shape]
 }
 "#;
     let result = analyze(source);

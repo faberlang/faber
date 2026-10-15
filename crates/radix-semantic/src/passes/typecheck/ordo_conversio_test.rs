@@ -48,7 +48,7 @@ const STATUS: &str = "ordo Status { pendens = 10, actum, finitum = -3, deletum }
 #[test]
 fn ordo_to_numerus_records_implicit_discriminants() {
     let (row, values) = only_ordo_route(&format!(
-        "{COLOR}incipit {{ fixum numerus n ← Color.viridis ↦ numerus\n nota n }}"
+        "{COLOR}incipit {{ sit numerus n ← Color.viridis ↦ numerus\n nota n }}"
     ));
     assert_eq!(row, HirOrdoRow::ToNumerus);
     assert_eq!(values, vec![Some(0), Some(1), Some(2)]);
@@ -57,7 +57,7 @@ fn ordo_to_numerus_records_implicit_discriminants() {
 #[test]
 fn ordo_to_numerus_continues_from_declared_discriminants() {
     let (row, values) = only_ordo_route(&format!(
-        "{STATUS}incipit {{ fixum numerus n ← Status.actum ↦ numerus\n nota n }}"
+        "{STATUS}incipit {{ sit numerus n ← Status.actum ↦ numerus\n nota n }}"
     ));
     assert_eq!(row, HirOrdoRow::ToNumerus);
     assert_eq!(values, vec![Some(10), Some(11), Some(-3), Some(-2)]);
@@ -66,7 +66,7 @@ fn ordo_to_numerus_continues_from_declared_discriminants() {
 #[test]
 fn ordo_to_textus_records_member_names() {
     let routes = routes(&format!(
-        "{COLOR}incipit {{ fixum textus s ← Color.caeruleum ↦ textus\n nota s }}"
+        "{COLOR}incipit {{ sit textus s ← Color.caeruleum ↦ textus\n nota s }}"
     ));
     let [HirConversioRoute::Ordo { row, members }] = routes.as_slice() else {
         panic!("expected one ordo route, got {routes:?}");
@@ -78,7 +78,7 @@ fn ordo_to_textus_records_member_names() {
 #[test]
 fn numerus_to_ordo_with_default_is_accepted() {
     let (row, _) = only_ordo_route(&format!(
-        "{COLOR}incipit {{ fixum Color c ← 7 ↦ Color ⊥ Color.rubrum\n nota 1 }}"
+        "{COLOR}incipit {{ sit Color c ← 7 ↦ Color ⊥ Color.rubrum\n nota 1 }}"
     ));
     assert_eq!(row, HirOrdoRow::FromNumerus);
 }
@@ -102,11 +102,11 @@ fn numerus_to_ordo_propagation_requires_a_textus_channel() {
 #[test]
 fn infallible_ordo_rows_reject_a_default() {
     assert_rejects_with_issue_la(
-        &format!("{COLOR}incipit {{ fixum numerus n ← Color.viridis ↦ numerus ⊥ 0\n nota n }}"),
+        &format!("{COLOR}incipit {{ sit numerus n ← Color.viridis ↦ numerus ⊥ 0\n nota n }}"),
         "ordo_conversio_recovery_unsupported",
     );
     assert_rejects_with_issue_la(
-        &format!("{COLOR}incipit {{ fixum textus s ← Color.viridis ↦ textus ⊥ \"x\"\n nota s }}"),
+        &format!("{COLOR}incipit {{ sit textus s ← Color.viridis ↦ textus ⊥ \"x\"\n nota s }}"),
         "ordo_conversio_recovery_unsupported",
     );
 }
@@ -115,15 +115,15 @@ fn infallible_ordo_rows_reject_a_default() {
 fn string_valued_ordo_has_no_numeric_rows() {
     let source = "ordo Via { domus = \"home\", opus = \"work\" }\n";
     assert_rejects_with_issue_la(
-        &format!("{source}incipit {{ fixum numerus n ← Via.opus ↦ numerus\n nota n }}"),
+        &format!("{source}incipit {{ sit numerus n ← Via.opus ↦ numerus\n nota n }}"),
         "ordo_conversio_string_member",
     );
     assert_rejects_with_issue_la(
-        &format!("{source}incipit {{ fixum Via v ← 1 ↦ Via ⊥ Via.domus\n nota 1 }}"),
+        &format!("{source}incipit {{ sit Via v ← 1 ↦ Via ⊥ Via.domus\n nota 1 }}"),
         "ordo_conversio_string_member",
     );
     let (row, values) = only_ordo_route(&format!(
-        "{source}incipit {{ fixum textus s ← Via.opus ↦ textus\n nota s }}"
+        "{source}incipit {{ sit textus s ← Via.opus ↦ textus\n nota s }}"
     ));
     assert_eq!(row, HirOrdoRow::ToTextus);
     assert_eq!(values, vec![None, None]);
@@ -132,13 +132,11 @@ fn string_valued_ordo_has_no_numeric_rows() {
 #[test]
 fn other_ordo_pairs_stay_unsupported() {
     assert_rejects_with_issue_la(
-        &format!("{COLOR}incipit {{ fixum fractus f ← Color.viridis ↦ fractus\n nota f }}"),
+        &format!("{COLOR}incipit {{ sit fractus f ← Color.viridis ↦ fractus\n nota f }}"),
         "unsupported_conversio",
     );
     assert_rejects_with_issue_la(
-        &format!(
-            "{COLOR}incipit {{ fixum Color c ← \"viridis\" ↦ Color ⊥ Color.rubrum\n nota 1 }}"
-        ),
+        &format!("{COLOR}incipit {{ sit Color c ← \"viridis\" ↦ Color ⊥ Color.rubrum\n nota 1 }}"),
         "unsupported_conversio",
     );
 }
@@ -162,7 +160,7 @@ fn conversio_assign_through_an_ordo_row_fails_closed() {
 #[test]
 fn numerus_to_ordo_probes_only_the_first_member_with_a_value() {
     let (row, values) = only_ordo_route(
-        "ordo Gradus { primus = 1, alter = 1, tertius }\nincipit { fixum Gradus g ← 1 ↦ Gradus ⊥ Gradus.primus\n nota 1 }",
+        "ordo Gradus { primus = 1, alter = 1, tertius }\nincipit { sit Gradus g ← 1 ↦ Gradus ⊥ Gradus.primus\n nota 1 }",
     );
     assert_eq!(row, HirOrdoRow::FromNumerus);
     assert_eq!(values, vec![Some(1), None, Some(2)]);

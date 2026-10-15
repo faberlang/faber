@@ -40,20 +40,20 @@ fn trap(body: &str) -> (Vec<String>, String, String) {
 #[test]
 fn probes_store_or_widen_by_value() {
     // p01, p03, p12: arithmetic is wide; only the final store is checked.
-    assert_eq!(ok("varia u8 x ← 250\nfixum u8 y ← x + 2\nnota y"), ["252"]);
-    assert_eq!(ok("varia u8 x ← 250\nfixum numerus w ← x + 10\nnota w"), ["260"]);
-    assert_eq!(ok("varia u8 x ← 200\nfixum u8 y ← x * 2 / 4\nnota y"), ["100"]);
+    assert_eq!(ok("varia u8 x ← 250\nsit u8 y ← x + 2\nnota y"), ["252"]);
+    assert_eq!(ok("varia u8 x ← 250\nsit numerus w ← x + 10\nnota w"), ["260"]);
+    assert_eq!(ok("varia u8 x ← 200\nsit u8 y ← x * 2 / 4\nnota y"), ["100"]);
     // p18
-    assert_eq!(ok("varia i8 x ← -128\nfixum numerus y ← -x\nnota y"), ["128"]);
+    assert_eq!(ok("varia i8 x ← -128\nsit numerus y ← -x\nnota y"), ["128"]);
 }
 
 #[test]
 fn probes_trap_at_the_store_with_the_store_identity() {
     // p02, p04, p08b (ruling 5): identity is distinct from arithmetic overflow.
     for body in [
-        "varia u8 x ← 250\nnota \"a\"\nfixum u8 y ← x + 10\nnota y",
-        "varia u8 x ← 0\nnota \"a\"\nfixum u8 y ← x + 300\nnota y",
-        "varia u8 x ← 250\nnota \"a\"\nfixum u8 y ← x ⇐ 2\nnota y",
+        "varia u8 x ← 250\nnota \"a\"\nsit u8 y ← x + 10\nnota y",
+        "varia u8 x ← 0\nnota \"a\"\nsit u8 y ← x + 300\nnota y",
+        "varia u8 x ← 250\nnota \"a\"\nsit u8 y ← x ⇐ 2\nnota y",
     ] {
         let (out, issue, message) = trap(body);
         assert_eq!(out, ["a"]);
@@ -95,17 +95,17 @@ fn floor_division_and_remainder() {
 #[test]
 fn min_over_minus_one_is_exact_and_only_the_i64_store_traps() {
     // ruling 14 / 17: 2^63 is a valid intermediate and a valid u64.
-    let out = ok("varia numerus m ← -9223372036854775807 - 1\nvaria numerus d ← -1\nfixum u64 q ← m / d\nnota q");
+    let out = ok("varia numerus m ← -9223372036854775807 - 1\nvaria numerus d ← -1\nsit u64 q ← m / d\nnota q");
     assert_eq!(out, ["9223372036854775808"]);
     let (_, issue, _) =
-        trap("varia numerus m ← -9223372036854775807 - 1\nvaria numerus d ← -1\nfixum numerus r ← m / d\nnota r");
+        trap("varia numerus m ← -9223372036854775807 - 1\nvaria numerus d ← -1\nsit numerus r ← m / d\nnota r");
     assert_eq!(issue, "implicit_store_out_of_range");
 }
 
 #[test]
 fn bitnot_is_minus_x_minus_one() {
     // rulings 9, 19(b).
-    assert_eq!(ok("varia u8 x ← 250\nfixum i16 y ← ¬x\nnota y\nnota ¬0"), ["-251", "-1"]);
+    assert_eq!(ok("varia u8 x ← 250\nsit i16 y ← ¬x\nnota y\nnota ¬0"), ["-251", "-1"]);
     assert_eq!(ok("varia u64 a ← 9223372036854775807\nnota ¬a"), ["-9223372036854775808"]);
     let (_, issue, _) = trap("varia u64 a ← 9223372036854775808\nnota ¬a");
     assert_eq!(issue, "runner_numerus_overflow");
@@ -122,7 +122,7 @@ fn bitnot_of_u64_max_is_past_the_range() {
 fn shifts_are_unmasked() {
     // ruling 10 and the audit's reproductions.
     assert_eq!(
-        ok("varia u8 a ← 1\nvaria u8 n ← 63\nfixum u64 y ← a ⇐ n\nnota y"),
+        ok("varia u8 a ← 1\nvaria u8 n ← 63\nsit u64 y ← a ⇐ n\nnota y"),
         ["9223372036854775808"]
     );
     {
@@ -145,13 +145,13 @@ fn wrapping_and_saturating_stores_apply_the_policy_at_runtime() {
     // ruling 3 / 17b, non-constant values.
     assert_eq!(
         ok(
-            "varia modulus<u32> n ← 300\nfixum modulus<u8> w ← n\nnota w\nvaria modulus<u32> m ← 4294967295\nfixum modulus<u8> v ← m\nnota v"
+            "varia modulus<u32> n ← 300\nsit modulus<u8> w ← n\nnota w\nvaria modulus<u32> m ← 4294967295\nsit modulus<u8> v ← m\nnota v"
         ),
         ["44", "255"]
     );
     assert_eq!(
         ok(
-            "varia saturatus<u16> n ← 300\nfixum saturatus<u8> w ← n\nnota w\nvaria saturatus<i16> k ← -500\nfixum saturatus<i8> u ← k\nnota u"
+            "varia saturatus<u16> n ← 300\nsit saturatus<u8> w ← n\nnota w\nvaria saturatus<i16> k ← -500\nsit saturatus<i8> u ← k\nnota u"
         ),
         ["255", "-128"]
     );
@@ -161,7 +161,7 @@ fn wrapping_and_saturating_stores_apply_the_policy_at_runtime() {
 fn wrapping_shift_count_is_not_masked() {
     // ruling 10: `1 ⇐ 33` on `wrapping<u32>` is 0.
     assert_eq!(
-        ok("varia modulus<u32> a ← 1\nvaria modulus<u32> n ← 33\nfixum modulus<u32> s ← a ⇐ n\nnota s\nnota a ⇒ n"),
+        ok("varia modulus<u32> a ← 1\nvaria modulus<u32> n ← 33\nsit modulus<u32> s ← a ⇐ n\nnota s\nnota a ⇒ n"),
         ["0", "0"]
     );
 }
@@ -170,7 +170,7 @@ fn wrapping_shift_count_is_not_masked() {
 fn true_division_of_words_converts_and_traps_on_zero() {
     // audit item: `÷` on wrapping / saturating operands is real division.
     assert_eq!(
-        ok("varia modulus<u8> a ← 7\nvaria modulus<u8> b ← 2\nfixum fractus q ← a ÷ b\nnota q"),
+        ok("varia modulus<u8> a ← 7\nvaria modulus<u8> b ← 2\nsit fractus q ← a ÷ b\nnota q"),
         ["3.5"]
     );
     let (out, _, _) = trap("varia modulus<u8> a ← 7\nvaria modulus<u8> b ← 0\nnota \"a\"\nnota a ÷ b");
@@ -208,7 +208,7 @@ fn u64_arithmetic_past_the_range_traps() {
 
 #[test]
 fn explicit_narrowing_stays_recoverable() {
-    assert_eq!(ok("varia numerus n ← 300\nfixum u8 y ← n ↦ u8 ⊥ 7\nnota y"), ["7"]);
+    assert_eq!(ok("varia numerus n ← 300\nsit u8 y ← n ↦ u8 ⊥ 7\nnota y"), ["7"]);
 }
 
 #[test]
@@ -220,7 +220,7 @@ fn true_division_width_follows_the_operands() {
     assert_eq!(ok("nota 7 ÷ 2\nnota 1 ÷ 3"), ["3.5", "0.3333333333333333"]);
     // A sub-expression keys on its range type: (u8 + u8) is u16, still f32.
     assert_eq!(
-        ok("varia u8 a ← 200\nvaria u8 b ← 100\nvaria u8 c ← 7\nfixum _ q ← (a + b) ÷ c\nnota q"),
+        ok("varia u8 a ← 200\nvaria u8 b ← 100\nvaria u8 c ← 7\nsit q ← (a + b) ÷ c\nnota q"),
         ["42.857143"]
     );
     let (out, _, _) = trap("varia u8 a ← 1\nvaria u8 b ← 0\nnota \"a\"\nnota a ÷ b");
@@ -235,7 +235,7 @@ fn true_division_word_operand_with_a_literal_converts_from_the_constant_type() {
     assert_eq!(ok("varia modulus<u64> w ← 90\nnota w ÷ 3"), ["30.0"]);
     assert_eq!(ok("varia saturatus<u8> s ← 250\nnota s ÷ 4"), ["62.5"]);
     assert_eq!(
-        ok("varia saturatus<u8> s ← 250\nfixum fractus q ← (s + 10) ÷ 2\nnota q"),
+        ok("varia saturatus<u8> s ← 250\nsit fractus q ← (s + 10) ÷ 2\nnota q"),
         ["130.0"]
     );
 }
@@ -245,9 +245,9 @@ fn saturating_chain_division_by_zero_is_an_ordinary_integer_failure() {
     // Ruling 3: saturating arithmetic is exact integer arithmetic, so a zero
     // divisor anywhere in the chain is the integer division failure.
     for body in [
-        "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nfixum saturatus<u8> r ← x + 10 / z\nnota r",
-        "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nfixum saturatus<u8> r ← x + x % z\nnota r",
-        "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nfixum saturatus<u8> r ← (x + 10) / (z + 0)\nnota r",
+        "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nsit saturatus<u8> r ← x + 10 / z\nnota r",
+        "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nsit saturatus<u8> r ← x + x % z\nnota r",
+        "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nsit saturatus<u8> r ← (x + 10) / (z + 0)\nnota r",
         "varia saturatus<u8> x ← 250\nvaria saturatus<u8> z ← 0\nnota x / z",
     ] {
         let (_, issue, _) = trap(body);
@@ -260,14 +260,14 @@ fn saturating_u64_intermediates_must_lie_in_the_exact_range() {
     // u9a / ruling 17: every exact value lies in [-2^63, 2^64 - 1], so a
     // chain through 2^64 traps; a chain that stays inside clamps at the store.
     let top = "varia saturatus<u64> top ← 18446744073709551615\n";
-    let (_, issue, _) = trap(&format!("{top}fixum saturatus<u64> r ← top + 1 - 5\nnota r"));
+    let (_, issue, _) = trap(&format!("{top}sit saturatus<u64> r ← top + 1 - 5\nnota r"));
     assert_eq!(issue, "runner_numerus_overflow");
     assert_eq!(
-        ok(&format!("{top}fixum saturatus<u64> r ← top - 5 + 3\nnota r")),
+        ok(&format!("{top}sit saturatus<u64> r ← top - 5 + 3\nnota r")),
         ["18446744073709551613"]
     );
     assert_eq!(
-        ok("varia saturatus<u64> z ← 0\nfixum saturatus<u64> r ← z - 5 + 3\nnota r"),
+        ok("varia saturatus<u64> z ← 0\nsit saturatus<u64> r ← z - 5 + 3\nnota r"),
         ["0"]
     );
 }
@@ -277,7 +277,7 @@ const CAP_MAX: &str = "varia numerus a ← 9223372036854775807\nvaria numerus b 
 #[test]
 fn cap_typed_sum_is_checked_at_argument_and_return_stores() {
     // f1 (ruling 17b): the sum is a legal intermediate but does not fit `i64`.
-    let (out, issue, _) = trap(&format!("{CAP_MAX}nota \"a\"\nfixum numerus c ← a + b\nnota c"));
+    let (out, issue, _) = trap(&format!("{CAP_MAX}nota \"a\"\nsit numerus c ← a + b\nnota c"));
     assert_eq!(out, ["a"]);
     assert_eq!(issue, "implicit_store_out_of_range");
     // No slot, no store: the legal intermediate prints.
@@ -326,8 +326,8 @@ fn cap_typed_sum_is_checked_at_argument_and_return_stores() {
 #[test]
 fn bitnot_of_u64_stores_into_int_as_a_checked_narrowing() {
     // f2 (rulings 9, 19a): `¬u` keeps its sign at the cap, so `int` takes it.
-    assert_eq!(ok("varia u64 u ← 5\nfixum numerus y ← ¬u\nnota y"), ["-6"]);
-    let (out, issue, _) = trap("varia u64 u ← 18446744073709551615\nnota \"a\"\nfixum numerus y ← ¬u\nnota y");
+    assert_eq!(ok("varia u64 u ← 5\nsit numerus y ← ¬u\nnota y"), ["-6"]);
+    let (out, issue, _) = trap("varia u64 u ← 18446744073709551615\nnota \"a\"\nsit numerus y ← ¬u\nnota y");
     assert_eq!(out, ["a"]);
     assert_eq!(issue, "runner_numerus_overflow");
 }
@@ -370,13 +370,11 @@ fn word_slot_constants_at_the_64_bit_edges() {
     // into a saturating slot, and the u64 maximum stores into 64-bit words by
     // declaration, assignment, argument and as an operand beside a word.
     assert_eq!(
-        ok("fixum saturatus<i64> x ← -9223372036854775807 - 1\nnota x"),
+        ok("sit saturatus<i64> x ← -9223372036854775807 - 1\nnota x"),
         ["-9223372036854775808"]
     );
     assert_eq!(
-        ok(
-            "fixum saturatus<u64> a ← 18446744073709551615\nfixum modulus<u64> b ← 18446744073709551615\nnota a\nnota b"
-        ),
+        ok("sit saturatus<u64> a ← 18446744073709551615\nsit modulus<u64> b ← 18446744073709551615\nnota a\nnota b"),
         ["18446744073709551615", "18446744073709551615"]
     );
     assert_eq!(
@@ -385,7 +383,7 @@ fn word_slot_constants_at_the_64_bit_edges() {
     );
     assert_eq!(
         ok(
-            "fixum modulus<u64> m ← 5\nfixum modulus<u64> p ← m + 18446744073709551615\nfixum modulus<u64> q ← 18446744073709551615 + m\nnota p\nnota q"
+            "sit modulus<u64> m ← 5\nsit modulus<u64> p ← m + 18446744073709551615\nsit modulus<u64> q ← 18446744073709551615 + m\nnota p\nnota q"
         ),
         ["4", "4"]
     );
@@ -412,12 +410,12 @@ fn negated_i64_min_constant_fits_every_64_bit_slot() {
     // trapping slot and follows the slot's policy in a saturating one.
     assert_eq!(
         ok(
-            "fixum saturatus<i64> x ← -9223372036854775808\nvaria saturatus<i64> y ← -9223372036854775808\nfixum i64 z ← -9223372036854775808\nfixum numerus w ← -9223372036854775808\nnota x\nnota y\nnota z\nnota w"
+            "sit saturatus<i64> x ← -9223372036854775808\nvaria saturatus<i64> y ← -9223372036854775808\nsit i64 z ← -9223372036854775808\nsit numerus w ← -9223372036854775808\nnota x\nnota y\nnota z\nnota w"
         ),
         ["-9223372036854775808"; 4]
     );
     assert_eq!(
-        ok("fixum saturatus<i64> x ← -9223372036854775809\nnota x"),
+        ok("sit saturatus<i64> x ← -9223372036854775809\nnota x"),
         ["-9223372036854775808"]
     );
     let session = Session::new(
@@ -425,7 +423,7 @@ fn negated_i64_min_constant_fits_every_64_bit_slot() {
             .with_target(Target::HirTypeScript)
             .with_latin_locale(),
     );
-    let source = "incipit {\nfixum numerus z ← -9223372036854775809\nnota z\n}\n";
+    let source = "incipit {\nsit numerus z ← -9223372036854775809\nnota z\n}\n";
     let mut host = BufferHost::default();
     assert!(run_source(&session, "exact.fab", source, &mut host).is_err());
 }
@@ -442,7 +440,7 @@ fn summa_at_the_cap_is_a_checked_store() {
                 .with_latin_locale(),
         );
         let source = format!(
-            "{functions}incipit {{\nfixum lista<i64> v ← [{values}]\nnota \"a\"\nnota total(v ↦ tensor<i64, [3]>)\n}}\n"
+            "{functions}incipit {{\nsit lista<i64> v ← [{values}]\nnota \"a\"\nnota total(v ↦ tensor<i64, [3]>)\n}}\n"
         );
         let mut host = BufferHost::default();
         let result = run_source(&session, "reducta.fab", &source, &mut host);
@@ -468,7 +466,7 @@ fn reducta_summa_widens_narrow_integer_terms_before_accumulating() {
             .with_latin_locale(),
     );
     let source = "functio total(tensor<i8, [2]> a) → numerus {\n  redde reducta via summa ex a\n}\n\
-                  incipit {\nfixum tensor<i8, [2]> a ← [100, 100] ↦ tensor<i8, [2]>\nnota total(a)\n}\n";
+                  incipit {\nsit tensor<i8, [2]> a ← [100, 100] ↦ tensor<i8, [2]>\nnota total(a)\n}\n";
     let mut host = BufferHost::default();
     let result = run_source(&session, "reducta.fab", source, &mut host);
     assert!(result.is_ok(), "{result:?}");
@@ -483,7 +481,7 @@ fn grouped_reducta_summa_widens_narrow_integer_terms_before_accumulating() {
             .with_latin_locale(),
     );
     let source = "functio grouped(tensor<i8, [2]> values, tensor<numerus, [2]> keys) → tensor<i64, [1]> {\n  redde reducta via summa ex values apud [i] pro keys[i]\n}\n\
-                  incipit {\nfixum tensor<i8, [2]> values ← [100, 100] ↦ tensor<i8, [2]>\nfixum tensor<numerus, [2]> keys ← [0, 0] ↦ tensor<numerus, [2]>\nnota grouped(values, keys)\n}\n";
+                  incipit {\nsit tensor<i8, [2]> values ← [100, 100] ↦ tensor<i8, [2]>\nsit tensor<numerus, [2]> keys ← [0, 0] ↦ tensor<numerus, [2]>\nnota grouped(values, keys)\n}\n";
     let mut host = BufferHost::default();
     let result = run_source(&session, "reducta-group.fab", source, &mut host);
     assert!(result.is_ok(), "{result:?}");
@@ -502,7 +500,7 @@ fn summa_accumulates_exactly_and_checks_at_the_store() {
                 .with_latin_locale(),
         );
         let source =
-            format!("{functions}incipit {{\nfixum lista<i64> v ← [{values}]\nnota total(v ↦ tensor<i64, [3]>)\n}}\n");
+            format!("{functions}incipit {{\nsit lista<i64> v ← [{values}]\nnota total(v ↦ tensor<i64, [3]>)\n}}\n");
         let mut host = BufferHost::default();
         let result = run_source(&session, "reducta.fab", &source, &mut host);
         (host.stdout_lines, result)
@@ -523,7 +521,7 @@ fn saturating_unary_negation_is_exact_and_clamps_at_the_store() {
     // sx5 / ruling 3, 19: `-s` over an unsigned saturating leaf is exact.
     let s = "varia saturatus<u8> s ← 5\n";
     assert_eq!(ok(&format!("{s}nota -s")), ["-5"]);
-    assert_eq!(ok(&format!("{s}fixum saturatus<u8> t ← -s\nnota t")), ["0"]);
+    assert_eq!(ok(&format!("{s}sit saturatus<u8> t ← -s\nnota t")), ["0"]);
 }
 
 #[test]
@@ -531,13 +529,13 @@ fn saturating_bitwise_operators_are_exact_and_clamp_at_the_store() {
     // sx6 / ruling 19: `∧ ∨ ⊻ ¬ ⇐ ⇒` are exact over integers; only the store clamps.
     let s = "varia saturatus<u8> s ← 200\n";
     assert_eq!(ok(&format!("{s}nota ¬s")), ["-201"]);
-    assert_eq!(ok(&format!("{s}fixum saturatus<u8> t ← ¬s\nnota t")), ["0"]);
+    assert_eq!(ok(&format!("{s}sit saturatus<u8> t ← ¬s\nnota t")), ["0"]);
     assert_eq!(ok(&format!("{s}nota s ∨ 0x100")), ["456"]);
-    assert_eq!(ok(&format!("{s}fixum saturatus<u8> t ← s ∨ 0x100\nnota t")), ["255"]);
+    assert_eq!(ok(&format!("{s}sit saturatus<u8> t ← s ∨ 0x100\nnota t")), ["255"]);
     assert_eq!(ok(&format!("{s}nota s ∧ 0x0f")), ["8"]);
     assert_eq!(ok(&format!("{s}nota s ⊻ 0x0f")), ["199"]);
     assert_eq!(ok(&format!("{s}nota s ⇐ 2")), ["800"]);
-    assert_eq!(ok(&format!("{s}fixum saturatus<u8> t ← s ⇐ 2\nnota t")), ["255"]);
+    assert_eq!(ok(&format!("{s}sit saturatus<u8> t ← s ⇐ 2\nnota t")), ["255"]);
     assert_eq!(ok(&format!("{s}nota s ⇒ 2")), ["50"]);
 }
 
@@ -545,8 +543,8 @@ fn saturating_bitwise_operators_are_exact_and_clamp_at_the_store() {
 
 #[test]
 fn value_twin_is_exact_and_checked_at_the_store() {
-    assert_eq!(ok("fixum u8 x ← 200\nnota x.addita(100)"), ["300"]);
-    let (out, issue, message) = trap("fixum u8 x ← 200\nnota \"a\"\nfixum u8 y ← x.addita(100)\nnota y");
+    assert_eq!(ok("sit u8 x ← 200\nnota x.addita(100)"), ["300"]);
+    let (out, issue, message) = trap("sit u8 x ← 200\nnota \"a\"\nsit u8 y ← x.addita(100)\nnota y");
     assert_eq!(out, ["a"]);
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(
@@ -580,8 +578,8 @@ fn in_place_twin_through_an_index_place() {
 
 #[test]
 fn unary_twins_follow_the_range_rule() {
-    assert_eq!(ok("fixum i8 n ← -128\nnota n.negativa()"), ["128"]);
-    let (_, issue, _) = trap("fixum i8 n ← -128\nfixum i8 m ← n.negativa()\nnota m");
+    assert_eq!(ok("sit i8 n ← -128\nnota n.negativa()"), ["128"]);
+    let (_, issue, _) = trap("sit i8 n ← -128\nsit i8 m ← n.negativa()\nnota m");
     assert_eq!(issue, "implicit_store_out_of_range");
 }
 
@@ -589,33 +587,30 @@ fn unary_twins_follow_the_range_rule() {
 fn word_twins_keep_the_word_semantics() {
     assert_eq!(ok("varia modulus<u8> w ← 200\nw.adde(100)\nnota w"), ["44"]);
     // The twin means the operator: exact until it lands in a slot (§8).
-    assert_eq!(ok("fixum modulus<u8> w ← 200\nnota w.addita(100)"), ["300"]);
-    assert_eq!(
-        ok("fixum modulus<u8> w ← 200\nfixum modulus<u8> s ← w.addita(100)\nnota s"),
-        ["44"]
-    );
+    assert_eq!(ok("sit modulus<u8> w ← 200\nnota w.addita(100)"), ["300"]);
+    assert_eq!(ok("sit modulus<u8> w ← 200\nsit modulus<u8> s ← w.addita(100)\nnota s"), ["44"]);
 }
 
 #[test]
 fn absolutum_is_exact_for_sized_integers() {
-    assert_eq!(ok("fixum i8 n ← -128\nnota n.absolutum()"), ["128"]);
-    assert_eq!(ok("fixum i8 n ← -128\nfixum u8 m ← n.absolutum()\nnota m"), ["128"]);
-    let (_, issue, _) = trap("fixum i8 n ← -128\nfixum i8 m ← n.absolutum()\nnota m");
+    assert_eq!(ok("sit i8 n ← -128\nnota n.absolutum()"), ["128"]);
+    assert_eq!(ok("sit i8 n ← -128\nsit u8 m ← n.absolutum()\nnota m"), ["128"]);
+    let (_, issue, _) = trap("sit i8 n ← -128\nsit i8 m ← n.absolutum()\nnota m");
     assert_eq!(issue, "implicit_store_out_of_range");
     // `|i64::MIN|` is 2^63, a valid exact value.
     assert_eq!(
-        ok("fixum numerus m ← -9223372036854775807 - 1\nnota m.absolutum()"),
+        ok("sit numerus m ← -9223372036854775807 - 1\nnota m.absolutum()"),
         ["9223372036854775808"]
     );
 }
 
 #[test]
 fn potentia_is_exact_and_range_typed() {
-    assert_eq!(ok("fixum i32 p ← 100000\nnota p.potentia(2)"), ["10000000000"]);
-    let (_, issue, message) = trap("fixum i32 p ← 100000\nfixum i32 q ← p.potentia(2)\nnota q");
+    assert_eq!(ok("sit i32 p ← 100000\nnota p.potentia(2)"), ["10000000000"]);
+    let (_, issue, message) = trap("sit i32 p ← 100000\nsit i32 q ← p.potentia(2)\nnota q");
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(message.contains("10000000000"), "{message}");
-    assert_eq!(ok("fixum u8 u ← 3\nfixum u8 q ← u.potentia(3)\nnota q"), ["27"]);
+    assert_eq!(ok("sit u8 u ← 3\nsit u8 q ← u.potentia(3)\nnota q"), ["27"]);
 }
 
 fn run_module(source: &str) -> (Vec<String>, Vec<(String, String)>) {
@@ -690,7 +685,7 @@ fn in_place_twin_yields_no_value() {
             .with_target(Target::HirTypeScript)
             .with_latin_locale(),
     );
-    let source = "incipit {\nvaria numerus x ← 1\nfixum numerus y ← x.adde(1)\nnota y\n}\n";
+    let source = "incipit {\nvaria numerus x ← 1\nsit numerus y ← x.adde(1)\nnota y\n}\n";
     let mut host = BufferHost::default();
     let Err(RunSourceError::Frontend(diagnostics)) = run_source(&session, "value.fab", source, &mut host) else {
         panic!("using an in-place twin as a value must not analyze");
@@ -704,17 +699,17 @@ fn in_place_twin_yields_no_value() {
 fn list_sum_is_typed_at_the_cap_and_exact() {
     // ss4 (rulings 17, 21): the `.summa()` method is typed like the construct.
     // Partial sums are exact; only the store applies the slot policy.
-    assert_eq!(ok("fixum lista<i8> a ← [100, 100, -100]\nnota a.summa()"), ["100"]);
+    assert_eq!(ok("sit lista<i8> a ← [100, 100, -100]\nnota a.summa()"), ["100"]);
     assert_eq!(
-        ok("fixum lista<numerus> a ← [9223372036854775807, 1, -1]\nnota a.summa()"),
+        ok("sit lista<numerus> a ← [9223372036854775807, 1, -1]\nnota a.summa()"),
         ["9223372036854775807"]
     );
-    assert_eq!(ok("fixum lista<u8> c ← [200, 100]\nnota c.summa()"), ["300"]);
+    assert_eq!(ok("sit lista<u8> c ← [200, 100]\nnota c.summa()"), ["300"]);
     assert_eq!(
-        ok("fixum lista<i8> a ← [100, 100, -100]\nvaria i8 t ← a.summa()\nnota t"),
+        ok("sit lista<i8> a ← [100, 100, -100]\nvaria i8 t ← a.summa()\nnota t"),
         ["100"]
     );
-    let (out, _, message) = trap("fixum lista<u8> c ← [200, 100]\nvaria u8 s ← c.summa()\nnota s");
+    let (out, _, message) = trap("sit lista<u8> c ← [200, 100]\nvaria u8 s ← c.summa()\nnota s");
     assert!(out.is_empty());
     assert!(message.contains("300 does not fit in `u8`"), "{message}");
 }
@@ -723,22 +718,21 @@ fn list_sum_is_typed_at_the_cap_and_exact() {
 fn list_sum_at_the_cap_is_a_checked_store() {
     // The exact total above `i64::MAX` is a cap-typed value; storing it into
     // `int` is the checked store.
-    let (_, issue, _) = trap(
-        "fixum lista<numerus> a ← [9223372036854775807, 9223372036854775807]\nfixum numerus s ← a.summa()\nnota s",
-    );
+    let (_, issue, _) =
+        trap("sit lista<numerus> a ← [9223372036854775807, 9223372036854775807]\nsit numerus s ← a.summa()\nnota s");
     assert_eq!(issue, "implicit_store_out_of_range");
 }
 
 #[test]
 fn tensor_matmul_dot_products_are_exact_and_store_per_element() {
     // Partial sum 200 leaves `i8`; the finished cell 0 fits and is stored.
-    let setup = "fixum lista<i8> l_data ← [100, 100, 100]\nfixum tensor<i8, [1, 3]> l ← l_data ↦ tensor<i8, [1, 3]>\n";
+    let setup = "sit lista<i8> l_data ← [100, 100, 100]\nsit tensor<i8, [1, 3]> l ← l_data ↦ tensor<i8, [1, 3]>\n";
     let fits = format!(
-        "{setup}fixum lista<i8> r_data ← [1, 1, -2]\nfixum tensor<i8, [3, 1]> r ← r_data ↦ tensor<i8, [3, 1]>\nfixum tensor<i8, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
+        "{setup}sit lista<i8> r_data ← [1, 1, -2]\nsit tensor<i8, [3, 1]> r ← r_data ↦ tensor<i8, [3, 1]>\nsit tensor<i8, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
     );
     assert_eq!(ok(&fits), ["0"]);
     let too_big = format!(
-        "{setup}fixum lista<i8> r_data ← [1, 1, 1]\nfixum tensor<i8, [3, 1]> r ← r_data ↦ tensor<i8, [3, 1]>\nfixum tensor<i8, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
+        "{setup}sit lista<i8> r_data ← [1, 1, 1]\nsit tensor<i8, [3, 1]> r ← r_data ↦ tensor<i8, [3, 1]>\nsit tensor<i8, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
     );
     let (_, issue, message) = trap(&too_big);
     assert_eq!(issue, "implicit_store_out_of_range");
@@ -748,16 +742,16 @@ fn tensor_matmul_dot_products_are_exact_and_store_per_element() {
 #[test]
 fn tensor_elementwise_stores_each_element_under_the_element_type() {
     // ts1 (rulings 17, 19): each element is exact and stored per element.
-    let setup = "fixum tensor<i8, [3]> a ← [100, 100, -100] ↦ tensor<i8, [3]>\n";
+    let setup = "sit tensor<i8, [3]> a ← [100, 100, -100] ↦ tensor<i8, [3]>\n";
     let sum = format!(
-        "{setup}fixum tensor<i8, [3]> b ← [100, 1, -100] ↦ tensor<i8, [3]>\nfixum tensor<i8, [3]> s ← a + b\nnota s.summa()"
+        "{setup}sit tensor<i8, [3]> b ← [100, 1, -100] ↦ tensor<i8, [3]>\nsit tensor<i8, [3]> s ← a + b\nnota s.summa()"
     );
     let (out, issue, message) = trap(&sum);
     assert!(out.is_empty());
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(message.contains("200 does not fit in `i8`"), "{message}");
     let prod = format!(
-        "{setup}fixum tensor<i8, [3]> b ← [1, 1, 1] ↦ tensor<i8, [3]>\nfixum tensor<i8, [3]> s ← a ⊙ b\nnota s.summa()"
+        "{setup}sit tensor<i8, [3]> b ← [1, 1, 1] ↦ tensor<i8, [3]>\nsit tensor<i8, [3]> s ← a ⊙ b\nnota s.summa()"
     );
     assert_eq!(ok(&prod), ["100"]);
 }

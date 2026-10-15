@@ -55,7 +55,7 @@ impl KeywordSurface for EnSurface {
         match key {
             "ab" => "range",
             "fixum" => "const",
-            "varia" => "var",
+            "varia" => "mut",
             // The `en` pack's filum row (`filum = "thread"`), as emitted by
             // the locale-backed surface bridge.
             "filum" => "thread",
@@ -88,7 +88,8 @@ impl KeywordPack for EnPack {
             "at" => Some("apud"),
             "range" => Some("ab"),
             "const" => Some("fixum"),
-            "var" => Some("varia"),
+            "let" => Some("sit"),
+            "mut" => Some("varia"),
             "thread" => Some("filum"),
             _ => None,
         }
@@ -276,13 +277,13 @@ fn latin_mutable_binder_emits_varia() {
 }
 
 #[test]
-fn english_mutable_binder_emits_var() {
+fn english_mutable_binder_emits_mut() {
     let mut ctx = Ctx::new();
     let product = mutable_range_product(&mut ctx);
     let code = ctx.render(&product, &EnSurface);
     assert!(
-        code.starts_with("for range 0‥3, 5‥7 var i, j {"),
-        "mutable English head must keep var, got:\n{code}"
+        code.starts_with("for range 0‥3, 5‥7 mut i, j {"),
+        "mutable English head must keep mut, got:\n{code}"
     );
     assert_round_trips(&code, 2, 2, true);
 }

@@ -26,7 +26,7 @@ fn sampleSkill() → string {
 main {
     # Happy path: well-formed document with delimiter fence
     do {
-        const string doc ← sampleSkill()
+        let string doc ← sampleSkill()
         const [metadatum, corpus] ← chorda.split_frontmatter(doc, "+++")
 
         assert metadatum.contains("version = 1")
@@ -87,7 +87,7 @@ main {
     # Metadata with no trailing newline after opening fence:
     # opening fence then immediate content then closing fence
     do {
-        const string doc ← "+++\nkey = val\n+++"
+        let string doc ← "+++\nkey = val\n+++"
         const [metadatum, corpus] ← chorda.split_frontmatter(doc, "+++")
         assert metadatum.contains("key = val")
         assert corpus.length() ≡ 0

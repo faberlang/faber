@@ -22,6 +22,6 @@ fn probe(Reversible r) → void {
 }
 
 main {
-    const Doc d ← Doc {}
+    let Doc d ← Doc {}
     probe(d)
 }

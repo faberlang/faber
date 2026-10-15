@@ -29,6 +29,6 @@ diagnostic = "SEM010:bits_literal_out_of_range"
 # This exemplum intentionally fails to compile.
 
 incipit {
-    fixum b8 x ← 0x1ff
+    sit b8 x ← 0x1ff
     nota x
 }

@@ -33,9 +33,9 @@ locale = "en"
 # EXPECTED stdout: see reads-three-ways.expected
 
 main {
-    const list<int> xs ← [10, 20, 30]
-    const string s ← "héj"
-    var int far ← 2
+    let list<int> xs ← [10, 20, 30]
+    let string s ← "héj"
+    mut int far ← 2
     far ← far + 5
 
     # bracket read: in range only (out of range would end the run)

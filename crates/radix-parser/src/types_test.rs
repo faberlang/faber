@@ -130,9 +130,8 @@ fn invalid_type_tensor_sugar_angle_form_carries_sugar_discriminator() {
 
 #[test]
 fn parses_own_and_copy_type_position_markers() {
-    let result = parse_ok_la(
-        "fixum lista<numerus> owned ← own vacua\nfixum lista<numerus> copied ← copy vacua",
-    );
+    let result =
+        parse_ok_la("sit lista<numerus> owned ← own vacua\nsit lista<numerus> copied ← copy vacua");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(owned) = &program.statements[0].kind else {
         panic!("expected owned binding");
@@ -170,7 +169,7 @@ fn parses_own_copy_markers_on_function_params() {
 
 #[test]
 fn own_and_copy_remain_binding_names() {
-    let _ = parse_ok_la("incipit { fixum numerus own ← 1\n fixum numerus copy ← 2 }");
+    let _ = parse_ok_la("incipit { sit numerus own ← 1\n sit numerus copy ← 2 }");
 }
 
 #[test]
@@ -205,7 +204,7 @@ fn parses_type_position_markers_on_fn_type_params() {
 
 #[test]
 fn parses_type_position_markers_on_closure_params() {
-    let result = parse_ok_la("fixum _ f ← (de textus x, own lista<numerus> xs) ∴ xs");
+    let result = parse_ok_la("sit f ← (de textus x, own lista<numerus> xs) ∴ xs");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(binding) = &program.statements[0].kind else {
         panic!("expected fixum");
@@ -946,7 +945,7 @@ fn rejects_duplicate_iuncta_labels_at_the_duplicate_label() {
 
 #[test]
 fn rejects_iuncta_label_spelling_on_call_site_type_arguments() {
-    let source = "incipit { fixum _ x ← f<gx: numerus>(x) }";
+    let source = "incipit { sit x ← f<gx: numerus>(x) }";
     let result = parse_program_la(source);
     let colon = u32::try_from(source.find(':').expect("label colon")).expect("offset fits u32");
     // The failed type-argument attempt falls back to the (retired) ASCII
@@ -1049,7 +1048,7 @@ fn parses_iuncta_tuple_type_with_sixteen_elements() {
 #[test]
 fn rejects_iuncta_with_seventeen_elements() {
     parse_errors_include_issue(
-        "incipit { fixum iuncta<u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8> big ← vacua }",
+        "incipit { sit iuncta<u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8> big ← vacua }",
         ParseErrorKind::TypeInvalid,
         "iuncta_arity_exceeded",
     );
@@ -1134,7 +1133,7 @@ fn parses_ratio_type_with_mandatory_labels_and_holes() {
 
 #[test]
 fn parses_ratio_as_an_ordinary_binding_name() {
-    let _ = parse_ok_la("fixum numerus ratio ← 3\nfunctio f(f32 ratio) → vacuum {}");
+    let _ = parse_ok_la("sit numerus ratio ← 3\nfunctio f(f32 ratio) → vacuum {}");
 }
 
 #[test]
@@ -1214,7 +1213,7 @@ fn rejects_trailing_comma_in_ratio_type_arguments() {
 
 #[test]
 fn parses_union_hole_binding_type() {
-    let result = parse_ok_la("fixum ∪ x ← 1");
+    let result = parse_ok_la("sit ∪ x ← 1");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1499,17 +1498,17 @@ fn first_tensor_element(expr: &TypeExpr) -> TypeExpr {
 #[test]
 fn type_form_levels_capture_sugar_roots_and_width_children() {
     // Long root keeps L0; its bare-width element is authored SHORT.
-    let long_list = binding_annotation("fixum lista<u32> xs ← vacua");
+    let long_list = binding_annotation("sit lista<u32> xs ← vacua");
     assert_eq!(long_list.form, TypeFormLevel::LONG);
     assert_eq!(first_type_arg(&long_list).form, TypeFormLevel::SHORT);
 
     // Fused lista sugar: root SHORT, bare-width element SHORT.
-    let fused_list = binding_annotation("fixum lu32 xs ← vacua");
+    let fused_list = binding_annotation("sit lu32 xs ← vacua");
     assert_eq!(fused_list.form, TypeFormLevel::SHORT);
     assert_eq!(first_type_arg(&fused_list).form, TypeFormLevel::SHORT);
 
     // Long tensor keeps L0; bare-width element SHORT.
-    let long_tensor = binding_annotation("fixum tensor<f32, [2, 2]> t ← vacua");
+    let long_tensor = binding_annotation("sit tensor<f32, [2, 2]> t ← vacua");
     assert_eq!(long_tensor.form, TypeFormLevel::LONG);
     assert_eq!(
         first_tensor_element(&long_tensor).form,
@@ -1517,7 +1516,7 @@ fn type_form_levels_capture_sugar_roots_and_width_children() {
     );
 
     // Fused tensor sugar: root SHORT, element SHORT.
-    let fused_tensor = binding_annotation("fixum tf32[2, 2] t ← vacua");
+    let fused_tensor = binding_annotation("sit tf32[2, 2] t ← vacua");
     assert_eq!(fused_tensor.form, TypeFormLevel::SHORT);
     assert_eq!(
         first_tensor_element(&fused_tensor).form,
@@ -1525,11 +1524,11 @@ fn type_form_levels_capture_sugar_roots_and_width_children() {
     );
 
     // Bare width marker is itself SHORT.
-    let bare_width = binding_annotation("fixum u32 x ← 1");
+    let bare_width = binding_annotation("sit u32 x ← 1");
     assert_eq!(bare_width.form, TypeFormLevel::SHORT);
 
     // Long collection head over a width marker: root LONG, width argument SHORT.
-    let long_scalar = binding_annotation("fixum lista<u32> x ← vacua");
+    let long_scalar = binding_annotation("sit lista<u32> x ← vacua");
     assert_eq!(long_scalar.form, TypeFormLevel::LONG);
     assert_eq!(first_type_arg(&long_scalar).form, TypeFormLevel::SHORT);
 }
@@ -1537,7 +1536,7 @@ fn type_form_levels_capture_sugar_roots_and_width_children() {
 #[test]
 fn type_form_levels_stay_independent_under_nesting() {
     // `lista<lista<u32>>`: both collection roots LONG, inner bare width SHORT.
-    let nested = binding_annotation("fixum lista<lista<u32>> xs ← vacua");
+    let nested = binding_annotation("sit lista<lista<u32>> xs ← vacua");
     assert_eq!(nested.form, TypeFormLevel::LONG);
     let mid = first_type_arg(&nested);
     assert_eq!(mid.form, TypeFormLevel::LONG);
@@ -1545,7 +1544,7 @@ fn type_form_levels_stay_independent_under_nesting() {
 
     // Fused sugar does not propagate SHORT to ancestors: `lista<lu32>` keeps
     // the outer root LONG with a SHORT fused-list child.
-    let fused_child = binding_annotation("fixum lista<lu32> xs ← vacua");
+    let fused_child = binding_annotation("sit lista<lu32> xs ← vacua");
     assert_eq!(fused_child.form, TypeFormLevel::LONG);
     let child = first_type_arg(&fused_child);
     assert_eq!(child.form, TypeFormLevel::SHORT);

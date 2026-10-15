@@ -31,17 +31,17 @@ locale = "la"
 # EXPECTED stdout: see bits-bulk-la.expected
 
 incipit {
-    fixum lista<b8> raw ← [0x01, 0x02, 0x03, 0x04]
-    fixum lista<u8> plain ← raw ↦ lista<u8>
-    fixum lista<b8> back ← plain ↦ lista<b8>
+    sit lista<b8> raw ← [0x01, 0x02, 0x03, 0x04]
+    sit lista<u8> plain ← raw ↦ lista<u8>
+    sit lista<b8> back ← plain ↦ lista<b8>
     nota plain
     nota back
-    fixum lista<u16> le ← raw ↦ lista<u16> via Le
-    fixum lista<u16> be ← raw ↦ lista<u16> via Be
+    sit lista<u16> le ← raw ↦ lista<u16> via Le
+    sit lista<u16> be ← raw ↦ lista<u16> via Be
     nota le
     nota be
-    fixum lista<b8> encoded ← le ↦ lista<b8> via Le
+    sit lista<b8> encoded ← le ↦ lista<b8> via Le
     nota encoded
-    fixum lista<b16> wide ← raw ↦ lista<b16> via Be
+    sit lista<b16> wide ← raw ↦ lista<b16> via Be
     nota wide
 }

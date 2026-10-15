@@ -35,14 +35,14 @@ fn integer_constant_beside_d64_joins() {
 
 #[test]
 fn integer_constant_fills_a_d64_slot() {
-    assert_accepts_la(&format!("incipit {{ fixum {D} e ← 5 }}"));
-    assert_accepts_la(&format!("incipit {{ fixum {D} e ← -5 }}"));
-    assert_accepts_la(&format!("incipit {{ fixum {D} e ← 1 + 2 }}"));
+    assert_accepts_la(&format!("incipit {{ sit {D} e ← 5 }}"));
+    assert_accepts_la(&format!("incipit {{ sit {D} e ← -5 }}"));
+    assert_accepts_la(&format!("incipit {{ sit {D} e ← 1 + 2 }}"));
 }
 
 #[test]
 fn decimal_constant_arithmetic_fills_a_d64_slot() {
-    assert_accepts_la(&format!("incipit {{ fixum {D} e ← 0.1 + 0.2 }}"));
+    assert_accepts_la(&format!("incipit {{ sit {D} e ← 0.1 + 0.2 }}"));
 }
 
 #[test]
@@ -77,10 +77,10 @@ fn constant_beside_d64_is_checked_for_range() {
         "decimal_literal_out_of_range",
     );
     assert_rejects_with_issue_la(
-        &format!("incipit {{ fixum {D} e ← 92233720369 }}"),
+        &format!("incipit {{ sit {D} e ← 92233720369 }}"),
         "decimal_literal_out_of_range",
     );
-    assert_accepts_la(&format!("incipit {{ fixum {D} e ← 92233720368 }}"));
+    assert_accepts_la(&format!("incipit {{ sit {D} e ← 92233720368 }}"));
 }
 
 #[test]
@@ -97,11 +97,11 @@ fn typed_operands_beside_d64_still_need_conversio() {
 
 #[test]
 fn explicit_conversion_still_accepts() {
-    assert_accepts_la(&format!("incipit {{ fixum {D} e ← 5 ↦ {D} }}"));
+    assert_accepts_la(&format!("incipit {{ sit {D} e ← 5 ↦ {D} }}"));
 }
 
 #[test]
 fn integer_and_float_slots_are_unchanged() {
     assert_accepts_la("functio f(numerus n) → numerus { redde n + 1 }");
-    assert_accepts_la("incipit { fixum d64 e ← 4.2 }");
+    assert_accepts_la("incipit { sit d64 e ← 4.2 }");
 }

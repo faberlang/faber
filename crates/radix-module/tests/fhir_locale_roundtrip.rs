@@ -47,7 +47,7 @@ functio forward(tensor<f32, [2, 2]> input) → tensor<f32, [2, 2]> {
 }
 
 incipit {
-  fixum _ salve ← "salve"
+  sit salve ← "salve"
   nota salve
 }
 "#;
@@ -134,7 +134,7 @@ fn fhir_core_renders_localized_surfaces_and_reparses_idempotently() {
     assert!(en.contains("tensor<f32, [2, 2]>"), "en tensor long form:\n{en}");
     assert!(en.contains("main {"), "en entry keyword must localize:\n{en}");
     assert!(
-        en.contains("const _ salve ← \"salve\""),
+        en.contains("let salve ← \"salve\""),
         "en const binding must preserve the authored inferred-type marker:\n{en}"
     );
     assert!(en.contains("print salve"), "en nota must localize:\n{en}");
@@ -152,7 +152,7 @@ fn fhir_core_renders_localized_surfaces_and_reparses_idempotently() {
     );
     assert!(th.contains("เริ่ม {"), "th entry keyword must localize:\n{th}");
     assert!(
-        th.contains("คงที่ _ salve ← \"salve\""),
+        th.contains("กำหนด salve ← \"salve\""),
         "th const binding must preserve the authored inferred-type marker:\n{th}"
     );
     assert!(th.contains("บันทึก salve"), "th nota must localize:\n{th}");

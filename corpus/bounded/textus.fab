@@ -29,11 +29,11 @@ locale = "en"
 # =============================================================================
 
 main {
-    const string raw ← "ab"
-    const string<8> a ← raw ↦ string<8>
-    const string<8> b ← raw ↦ string<8>
-    const int n ← a.length()
-    const bool vacant ← a.is_empty()
+    let string raw ← "ab"
+    let string<8> a ← raw ↦ string<8>
+    let string<8> b ← raw ↦ string<8>
+    let int n ← a.length()
+    let bool vacant ← a.is_empty()
     print n
     print vacant
     print a.slice(0, 1)

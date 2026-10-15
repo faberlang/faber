@@ -56,7 +56,7 @@ fn unsigned_integer_numerus_u64_accepts_i64_max_plus_one() {
     analysis_accepts(
         r"
 incipit {
-    fixum u64 sha ← 9223372036854775808
+    sit u64 sha ← 9223372036854775808
     nota sha
 }
 ",
@@ -68,7 +68,7 @@ fn unsigned_integer_numerus_u64_accepts_u64_max() {
     analysis_accepts(
         r"
 incipit {
-    fixum u64 max ← 18446744073709551615
+    sit u64 max ← 18446744073709551615
     nota max
 }
 ",
@@ -80,7 +80,7 @@ fn unsigned_integer_numerus_u64_accepts_radix_prefixed_u64_max() {
     analysis_accepts(
         r"
 incipit {
-    fixum u64 max ← 0xffffffffffffffff
+    sit u64 max ← 0xffffffffffffffff
     nota max
 }
 ",
@@ -92,7 +92,7 @@ fn unsigned_integer_numerus_u64_rejects_above_u64_max() {
     analysis_rejects(
         r"
 incipit {
-    fixum u64 tooBig ← 18446744073709551616
+    sit u64 tooBig ← 18446744073709551616
     nota tooBig
 }
 ",
@@ -105,7 +105,7 @@ fn unsigned_integer_rust_codegen_preserves_u64_max_literal() {
     let result = compile(
         r"
 incipit {
-    fixum u64 max ← 18446744073709551615
+    sit u64 max ← 18446744073709551615
     nota max
 }
 ",
@@ -128,7 +128,7 @@ fn unsigned_integer_signed_numerus_range_unchanged() {
     analysis_accepts(
         r"
 incipit {
-    fixum numerus max ← 9223372036854775807
+    sit numerus max ← 9223372036854775807
     nota max
 }
 ",
@@ -136,7 +136,7 @@ incipit {
     analysis_rejects(
         r"
 incipit {
-    fixum numerus tooBig ← 9223372036854775808
+    sit numerus tooBig ← 9223372036854775808
     nota tooBig
 }
 ",
@@ -148,7 +148,7 @@ fn unsigned_integer_u64_analysis_accepts_zero() {
     analysis_accepts(
         r"
 incipit {
-    fixum u64 zero ← 0
+    sit u64 zero ← 0
     nota zero
 }
 ",

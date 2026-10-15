@@ -101,7 +101,7 @@ fn literal_negative_step_is_rejected_on_a_range_product_too() {
 fn computed_zero_step_traps_at_run_time() {
     let mut host = BufferHost::default();
     let source = program(
-        "var int s ← 1\nfor range 0‥2 step s const i {\nprint i\n}\ns ← 0\nfor range 0‥2 step s const j {\nprint j\n}",
+        "mut int s ← 1\nfor range 0‥2 step s const i {\nprint i\n}\ns ← 0\nfor range 0‥2 step s const j {\nprint j\n}",
     );
     let outcome = catch_unwind(AssertUnwindSafe(|| {
         run_source(&session(), "range-step-trap.fab", &source, &mut host)
@@ -114,7 +114,7 @@ fn computed_zero_step_traps_at_run_time() {
 #[test]
 fn computed_negative_step_traps_at_run_time() {
     let mut host = BufferHost::default();
-    let source = program("var int s ← 2\ns ← s - 5\nfor range 0‥2 step s const i {\nprint i\n}\nprint \"unreached\"");
+    let source = program("mut int s ← 2\ns ← s - 5\nfor range 0‥2 step s const i {\nprint i\n}\nprint \"unreached\"");
     let outcome = catch_unwind(AssertUnwindSafe(|| {
         run_source(&session(), "range-step-negative-trap.fab", &source, &mut host)
     }));
@@ -125,7 +125,7 @@ fn computed_negative_step_traps_at_run_time() {
 
 #[test]
 fn varia_range_binder_is_a_per_iteration_copy() {
-    let lines = run_lines("range-varia-binder.fab", "for range 0‥6 var i {\nprint i\ni ← i + 1\n}");
+    let lines = run_lines("range-varia-binder.fab", "for range 0‥6 mut i {\nprint i\ni ← i + 1\n}");
     assert_eq!(lines, ["0", "1", "2", "3", "4", "5"]);
 }
 
@@ -133,7 +133,7 @@ fn varia_range_binder_is_a_per_iteration_copy() {
 fn varia_range_binder_copy_survives_a_step_and_perge() {
     let lines = run_lines(
         "range-varia-binder-step.fab",
-        "for range 10‥0 step 3 var i {\ni ← i + 100\nprint i\n}",
+        "for range 10‥0 step 3 mut i {\ni ← i + 100\nprint i\n}",
     );
     assert_eq!(lines, ["110", "107", "104", "101"]);
 }
@@ -142,7 +142,7 @@ fn varia_range_binder_copy_survives_a_step_and_perge() {
 fn varia_range_product_binders_are_per_iteration_copies() {
     let lines = run_lines(
         "range-varia-product.fab",
-        "for range 0‥2, 0‥2 var i, j {\nprint i\nprint j\ni ← i + 5\nj ← j + 5\n}",
+        "for range 0‥2, 0‥2 mut i, j {\nprint i\nprint j\ni ← i + 5\nj ← j + 5\n}",
     );
     // Each binder is copied once per iteration of its own axis: the outer
     // write (+5) stays visible to the rest of that outer iteration's inner

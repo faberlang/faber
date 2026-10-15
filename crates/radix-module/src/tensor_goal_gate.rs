@@ -60,7 +60,7 @@ pub fn run_convert_gate() {
         &session,
         "sized-i32.fab",
         r#"incipit {
-  fixum i32 n ← "42" ↦ i32
+  sit i32 n ← "42" ↦ i32
   nota n
 }"#,
         AnalyzeRequest::default(),
@@ -71,7 +71,7 @@ pub fn run_convert_gate() {
         &session,
         "sized-f32.fab",
         r#"incipit {
-  fixum f32 f ← "1.5" ↦ f32
+  sit f32 f ← "1.5" ↦ f32
   nota f
 }"#,
         AnalyzeRequest::default(),
@@ -82,7 +82,7 @@ pub fn run_convert_gate() {
         &session,
         "family-error.fab",
         r"incipit {
-  fixum numerus<f32> invalid ← 1.0 ∷ f32
+  sit numerus<f32> invalid ← 1.0 ∷ f32
   nota invalid
 }",
         AnalyzeRequest::default(),

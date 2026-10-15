@@ -75,9 +75,9 @@ fn k<size H, size W>({params}) → void {{
 main args args {{
     const size R ← args.rows
     const size C ← args.cols
-    var tensor<f32, [R, C]> src ← tf32[R, C] {{}}
-    var tensor<f32, [R, C]> other ← tf32[R, C] {{}}
-    var tensor<f32, [R, C]> dst ← tf32[R, C] {{}}
+    mut tensor<f32, [R, C]> src ← tf32[R, C] {{}}
+    mut tensor<f32, [R, C]> other ← tf32[R, C] {{}}
+    mut tensor<f32, [R, C]> dst ← tf32[R, C] {{}}
     {call}
 }}
 "#
@@ -120,8 +120,8 @@ fn k<size H, size W>(tensor<vector<f32, 4>, [H, W]> state, mut tensor<f32, [H, W
 main args args {
     const size R ← args.rows
     const size C ← args.cols
-    var tensor<vector<f32, 4>, [R, C]> state ← tensor<vector<f32, 4>, [R, C]> {}
-    var tensor<f32, [R, C]> depth ← tf32[R, C] {}
+    mut tensor<vector<f32, 4>, [R, C]> state ← tensor<vector<f32, 4>, [R, C]> {}
+    mut tensor<f32, [R, C]> depth ← tf32[R, C] {}
     k(state, mut depth)
 }
 "#;

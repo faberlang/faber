@@ -146,7 +146,7 @@ fn lifted_extents_re_parse_as_size_lifts() {
         .types
         .intern_index(IndexExpr::Tuple(vec![n, two, shifted]));
     let figura = fixture.emit(tuple, &LaSurface);
-    let source = format!("{{ fixum tensor<f32, {figura}> t ← 0 }}");
+    let source = format!("{{ sit tensor<f32, {figura}> t ← 0 }}");
     let parsed = radix_parser::parse(radix_lexer::lex(&source));
     assert!(
         parsed.success(),

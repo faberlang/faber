@@ -10,12 +10,12 @@ canonical = true
 # A body returns the sort key. Ties keep source order in both directions:
 # descending is not the reverse of ascending.
 class Person {
-    var string name
-    var int age
+    mut string name
+    mut int age
 }
 
 fn names(list<Person> ps) → string {
-    var string out ← ""
+    mut string out ← ""
     for from ps const p {
         if out ≡ "" {
             out ← p.name
@@ -27,15 +27,15 @@ fn names(list<Person> ps) → string {
 }
 
 main {
-    const list<Person> people ← [
+    let list<Person> people ← [
         Person { name = "Livia", age = 30 },
         Person { name = "Marcus", age = 30 },
         Person { name = "Aulus", age = 25 },
         Person { name = "Cornelia", age = 25 },
         Person { name = "Titus", age = 40 }
     ]
-    const list<Person> young ← sort via asc from people const p { return p.age }
-    const list<Person> old ← sort via desc from people const p { return p.age }
+    let list<Person> young ← sort via asc from people const p { return p.age }
+    let list<Person> old ← sort via desc from people const p { return p.age }
     print names(young)
     print names(old)
     print names(people)

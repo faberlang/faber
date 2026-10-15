@@ -11,7 +11,7 @@ class Hello implements Greets {
 }
 
 fn failable() → void ⇥ Greets ∪ string {
-    const Hello h ← Hello {}
+    let Hello h ← Hello {}
     throw h
 }
 

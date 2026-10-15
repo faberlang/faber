@@ -1,5 +1,5 @@
 # Fault: fullwidth digit in a numeric literal (LEX004 unexpected_character).
 bắtđầu {
-  hằng số đếm ← ７
+  đặt số đếm ← ７
   in đếm
 }

@@ -48,7 +48,7 @@ const GENERIC_SIMPLE_LOSS_SOURCE: &str = r#"
 functio simple_loss<magnitudo R, magnitudo C>(
     tensor<f32, [R, C]> x, tensor<f32, [R, C]> w
 ) → f32 {
-    fixum tensor<f32, [R, C]> product ← x ⊙ w
+    sit tensor<f32, [R, C]> product ← x ⊙ w
     redde product.media()
 }
 "#;
@@ -79,9 +79,9 @@ fn concrete_generic_backward_reduction_finalizes_companion_shape_size() {
         "{GENERIC_SIMPLE_LOSS_SOURCE}\n{}",
         r"
 incipit {
-    fixum tensor<f32, [2, 8]> x ← vacua
-    fixum tensor<f32, [2, 8]> w ← vacua
-    fixum f32 loss ← simple_loss(x, w)
+    sit tensor<f32, [2, 8]> x ← vacua
+    sit tensor<f32, [2, 8]> w ← vacua
+    sit f32 loss ← simple_loss(x, w)
     nota loss
 }
 "
@@ -204,7 +204,7 @@ fn generic_wrapper_call_to_generic_companion_typechecks_at_call_site() {
 functio simple_loss<magnitudo R, magnitudo C>(
     tensor<f32, [R, C]> x, tensor<f32, [R, C]> w
 ) → f32 {
-    fixum tensor<f32, [R, C]> product ← x ⊙ w
+    sit tensor<f32, [R, C]> product ← x ⊙ w
     redde product.media()
 }
 
@@ -252,9 +252,9 @@ functio broad_loss<magnitudo R, magnitudo C>(
 }
 
 incipit {
-    fixum tensor<f32, [2, 8]> a ← vacua
-    fixum tensor<f32, [8]> b ← vacua
-    fixum f32 loss ← broad_loss(a, b)
+    sit tensor<f32, [2, 8]> a ← vacua
+    sit tensor<f32, [8]> b ← vacua
+    sit f32 loss ← broad_loss(a, b)
     nota loss
 }
 "#;
@@ -377,8 +377,8 @@ functio generic_lane_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
 }
 
 incipit {
-    fixum tensor<f32, [4]> x ← vacua
-    fixum f32 y ← generic_lane_sum(x)
+    sit tensor<f32, [4]> x ← vacua
+    sit f32 y ← generic_lane_sum(x)
     nota y
 }
 "#;
@@ -419,8 +419,8 @@ functio generic_too_wide<magnitudo N>(tensor<f32, [N]> x) → f32 {
 }
 
 incipit {
-    fixum tensor<f32, [65]> x ← vacua
-    fixum f32 y ← generic_too_wide(x)
+    sit tensor<f32, [65]> x ← vacua
+    sit f32 y ← generic_too_wide(x)
     nota y
 }
 "#;
@@ -464,9 +464,9 @@ functio generic_masked_mean<magnitudo N>(
 }
 
 incipit {
-    fixum tensor<f32, [4]> x ← vacua
-    fixum tensor<f32, [4]> mask ← vacua
-    fixum f32 y ← generic_masked_mean(x, mask)
+    sit tensor<f32, [4]> x ← vacua
+    sit tensor<f32, [4]> mask ← vacua
+    sit f32 y ← generic_masked_mean(x, mask)
     nota y
 }
 "#;

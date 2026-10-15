@@ -40,8 +40,8 @@ functio placement(tensor<f32, [32]> a) → f32 {
 # 2. tail — K = 8 not aligned to the 32-lane width declines
 @ nucleum
 @ publica
-functio tail(tensor<f32, [8]> a, in tf32[1] out) → vacuum {
-    fixum f32 total ← reducta via summa ex a apud [i] filum f fixum s { redde s }
+functio tail(tensor<f32, [8]> a, varia tf32[1] out) → vacuum {
+    sit f32 total ← reducta via summa ex a apud [i] filum f fixum s { redde s }
     out[0] ← total
 }
 

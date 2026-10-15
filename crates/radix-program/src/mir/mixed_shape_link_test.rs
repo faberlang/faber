@@ -13,7 +13,7 @@ locale = "en"
 +++
 @ public { }
 fn family<size Figura>(list<tensor<f32, Figura>> params, list<tensor<f32, Figura>> grads, f32 lr) → list<tensor<f32, Figura>> {
-    var list<tensor<f32, Figura>> out ← empty
+    mut list<tensor<f32, Figura>> out ← empty
     for range 0‥params.length() const i {
         out.append(params[i] - grads[i] * lr)
     }
@@ -22,7 +22,7 @@ fn family<size Figura>(list<tensor<f32, Figura>> params, list<tensor<f32, Figura
 
 @ public { }
 fn step_2x2(tensor<f32, [2, 2]> param, tensor<f32, [2, 2]> grad, f32 lr) → tensor<f32, [2, 2]> {
-    const list<tensor<f32, [2, 2]>> out ← family([param], [grad], lr)
+    let list<tensor<f32, [2, 2]>> out ← family([param], [grad], lr)
     return out[0]
 }
 "#;
@@ -33,13 +33,13 @@ locale = "en"
 import from "optlib:optimize" optimize
 
 main {
-    const tensor<f32, [2, 2]> a ← empty
-    const tensor<f32, [8, 8]> b ← empty
-    const tensor<f32, [8]> c ← empty
-    const f32 lr ← 0.01 ∷ f32
-    const _ r2 ← optimize.step_2x2(a, a, lr)
-    const list<tensor<f32, [8, 8]>> r88 ← optimize.family([b], [b], lr)
-    const list<tensor<f32, [8]>> r8 ← optimize.family([c], [c], lr)
+    let tensor<f32, [2, 2]> a ← empty
+    let tensor<f32, [8, 8]> b ← empty
+    let tensor<f32, [8]> c ← empty
+    let f32 lr ← 0.01 ∷ f32
+    let r2 ← optimize.step_2x2(a, a, lr)
+    let list<tensor<f32, [8, 8]>> r88 ← optimize.family([b], [b], lr)
+    let list<tensor<f32, [8]>> r8 ← optimize.family([c], [c], lr)
     print r88.length()
     print r8.length()
 }
@@ -88,11 +88,11 @@ locale = "en"
 import from "optlib:optimize" optimize
 
 fn prove_mixed_shape_family() {
-    const tensor<f32, [8, 8]> b ← empty
-    const tensor<f32, [8]> c ← empty
-    const f32 lr ← 0.01 ∷ f32
-    const list<tensor<f32, [8, 8]>> r88 ← optimize.family([b], [b], lr)
-    const list<tensor<f32, [8]>> r8 ← optimize.family([c], [c], lr)
+    let tensor<f32, [8, 8]> b ← empty
+    let tensor<f32, [8]> c ← empty
+    let f32 lr ← 0.01 ∷ f32
+    let list<tensor<f32, [8, 8]>> r88 ← optimize.family([b], [b], lr)
+    let list<tensor<f32, [8]>> r8 ← optimize.family([c], [c], lr)
     print r88.length()
     print r8.length()
 }

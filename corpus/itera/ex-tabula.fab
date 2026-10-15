@@ -43,11 +43,11 @@ locale = "en"
 #   sum (6).
 
 main {
-    const map<string, int> puncta ← { "alpha": 1, "beta": 2, "gamma": 3 }
+    let map<string, int> puncta ← { "alpha": 1, "beta": 2, "gamma": 3 }
 
     # the ex binder receives each value, never the key — collect then sort,
     # since tabula order is unspecified (D19.2)
-    var list<int> valores ← empty
+    mut list<int> valores ← empty
     for from puncta const v {
         valores.append(v)
     }
@@ -57,7 +57,7 @@ main {
     }
 
     # order-independent aggregate — the sum is stable whatever the map order
-    var int totum ← 0
+    mut int totum ← 0
     for from puncta const v {
         totum ← totum + v
     }

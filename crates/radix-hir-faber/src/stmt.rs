@@ -417,7 +417,7 @@ impl super::FaberCodegen<'_> {
     ) {
         // Only the synthetic runtime-provided binding local is skipped. A
         // `cape err { … }` handler whose first authored statement is a real
-        // local (`fixum textus c ← …`) must keep it — skipping on "first
+        // local (`sit textus c ← …`) must keep it — skipping on "first
         // statement is a local" alone dropped authored bindings.
         let skip_binding_local = block.statements.first().is_some_and(
             |stmt| matches!(&stmt.kind, HirStatementKind::Local(local) if local.runtime_provided),
@@ -614,12 +614,13 @@ impl super::FaberCodegen<'_> {
                 self.write_local_stmt(local, names, surface, writer);
             }
             HirStatementKind::Expr(expr) => {
-                // Authored discard binding (`fixum T _ ← expr`): lowering drops
+                // Authored discard binding (`sit T _ ← expr`): lowering drops
                 // the declaration, so the presentation facts restore it.
                 if let Some(discard) = self.discard_bindings.get(&expr.id) {
                     let keyword = match (discard.is_await, discard.mutable) {
                         (true, false) => surface.contextual_keyword("figendum"),
                         (true, true) => surface.contextual_keyword("variandum"),
+                        (false, false) if discard.ty.is_some() => surface.contextual_keyword("sit"),
                         (false, false) => surface.contextual_keyword("fixum"),
                         (false, true) => surface.contextual_keyword("varia"),
                     };
@@ -729,18 +730,37 @@ impl super::FaberCodegen<'_> {
             return;
         }
         let await_assignment = self.await_assignment_bindings.contains(&local.def_id);
-        let keyword = match (local.is_await, await_assignment, local.mutable) {
-            (true, true, false) | (false, _, false) => surface.contextual_keyword("fixum"),
-            (true, true, true) | (false, _, true) => surface.contextual_keyword("varia"),
-            (true, false, false) => surface.contextual_keyword("figendum"),
-            (true, false, true) => surface.contextual_keyword("variandum"),
-        };
-        writer.write(keyword);
-        writer.write(" ");
+        // `fixum` states a compile-time fact (`=`); a run-time read-only name
+        // is `sit`. A `ref` view of a writable-name cell leads with the mode
+        // word the type renders, with no `varia`.
+        let compile_time = self.compile_time_locals.contains(&local.def_id);
         let site = HirTypeSite {
             owner: HirOwnerRef::Def(local.def_id),
             slot: HirTypeSlot::Declared,
         };
+        let ref_prefix = format!("{} ", surface.keyword(TokenKind::De));
+        let ref_local = local.mutable
+            && !local.is_await
+            && !await_assignment
+            && local.init.is_some()
+            && local.ty.is_some_and(|ty| {
+                self.render_type_at(&site, ty, names, surface)
+                    .starts_with(&ref_prefix)
+            });
+        let keyword = match (local.is_await, await_assignment, local.mutable) {
+            (false, _, false) if !compile_time => surface.contextual_keyword("sit"),
+            (true, true, false) if !compile_time => surface.contextual_keyword("sit"),
+            (true, true, false) | (false, _, false) => surface.contextual_keyword("fixum"),
+            (false, _, true) if ref_local => "",
+            (true, true, true) | (false, _, true) => surface.contextual_keyword("varia"),
+            (true, false, false) => surface.contextual_keyword("figendum"),
+            (true, false, true) => surface.contextual_keyword("variandum"),
+        };
+        if !keyword.is_empty() {
+            writer.write(keyword);
+            writer.write(" ");
+        }
+        let infer_let = keyword == surface.contextual_keyword("sit");
         let mut value_marker: Option<&str> = None;
         if let Some(ty) = local.ty {
             // The authored form at this site is the sole authority for
@@ -767,16 +787,21 @@ impl super::FaberCodegen<'_> {
                     value_marker = Some(word);
                 }
             }
-            writer.write(&rendered);
-            writer.write(" ");
+            // The inferred `sit name ← e` shorthand carries no hole.
+            if !(infer_let && rendered == "_") {
+                writer.write(&rendered);
+                writer.write(" ");
+            }
         } else if local.init.is_some() {
             // A pre-finalization or hand-built local may not have a semantic
             // `ty` field yet. A present form still owns its authored spelling;
             // use its witness for the same site-aware render path.
             if let Some(form_ty) = self.authored_type_forms.get(&site).map(|form| form.ty) {
                 let rendered = self.render_type_at(&site, form_ty, names, surface);
-                writer.write(&rendered);
-                writer.write(" ");
+                if !(infer_let && rendered == "_") {
+                    writer.write(&rendered);
+                    writer.write(" ");
+                }
             }
         }
         writer.write(&self.symbol_to_string(local.name));

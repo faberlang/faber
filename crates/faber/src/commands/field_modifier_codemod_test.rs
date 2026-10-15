@@ -13,7 +13,7 @@ fn en_frontmatter_file_gets_var() {
     assert_eq!(result.inserted, 1);
     assert_eq!(
         result.source,
-        "+++\nlocale = \"en\"\n+++\nclass Punctum {\n    var int x\n}\n"
+        "+++\nlocale = \"en\"\n+++\nclass Punctum {\n    mut int x\n}\n"
     );
 }
 
@@ -31,7 +31,7 @@ fn la_frontmatter_file_gets_varia() {
 }
 
 const DRIFT_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nclass Punctum {\n    int x\n}\n";
-const DONE_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nclass Punctum {\n    var int x\n}\n";
+const DONE_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nclass Punctum {\n    mut int x\n}\n";
 
 fn run_codemod(args: &[&str]) -> std::process::Output {
     let mut full = vec!["field-modifier-codemod"];

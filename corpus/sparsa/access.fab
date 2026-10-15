@@ -32,15 +32,15 @@ locale = "en"
 #   removal.
 
 main {
-    var sparsa<f32, [2, 3]> grid ← empty
+    mut sparsa<f32, [2, 3]> grid ← empty
 
     grid.set([0, 1], 4.0)
     grid.set([1, 2], 9.0)
     grid.set([1, 2], 0.0)
 
-    const f32 stored ← grid.get([0, 1])
-    const f32 absent ← grid.get([1, 2])
-    const int count ← grid.count_nonzero()
+    let f32 stored ← grid.get([0, 1])
+    let f32 absent ← grid.get([1, 2])
+    let int count ← grid.count_nonzero()
 
     print stored, absent, count
 }

@@ -28,11 +28,11 @@ locale = "en"
 # =============================================================================
 
 main {
-    var map<string, int> stock ← { "pear": 3, "apple": 5, "fig": 1 }
+    mut map<string, int> stock ← { "pear": 3, "apple": 5, "fig": 1 }
     for from stock at [name] const count {
         stock[name] ← count * 10
     }
-    var list<string> rows ← empty
+    mut list<string> rows ← empty
     for from stock at [name] const count {
         rows.append("§=§"(name, count))
     }

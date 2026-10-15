@@ -740,7 +740,7 @@ impl Lowerer<'_> {
                     None => error_expr(self, *span),
                 };
                 // Surface fidelity: a wildcard-bound declaration is a discard
-                // binding (`fixum T _ ← expr`), not a bare effect call. The
+                // binding (`sit T _ ← expr`), not a bare effect call. The
                 // lowered statement keeps no `HirLocal`, so the authored
                 // declaration facts ride the presentation sidecar keyed by
                 // the initializer expression id.

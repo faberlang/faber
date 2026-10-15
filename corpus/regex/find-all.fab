@@ -45,8 +45,8 @@ locale = "en"
 
 main {
     # the empty-match rule: (0,0) (1,4) (5,5)
-    const regex stars ← "a*" ↦ regex
-    const _ runs ← stars.find_all("baaac")
+    let regex stars ← "a*" ↦ regex
+    let runs ← stars.find_all("baaac")
     print runs.length()
     for from runs const run {
         print run.start()
@@ -54,8 +54,8 @@ main {
     }
 
     # offsets count code points: the emoji is one position
-    const regex word ← "[a-z]+" ↦ regex
-    const _ words ← word.find_all("😀é abc d")
+    let regex word ← "[a-z]+" ↦ regex
+    let words ← word.find_all("😀é abc d")
     for from words const hit {
         print hit.text()
         print hit.start()
@@ -63,18 +63,18 @@ main {
     }
 
     # groups and names are per match; a group that did not take part is none
-    const regex pair ← "(?P<key>[a-z]+)=([0-9]+)?" ↦ regex
-    const _ pairs ← pair.find_all("a=1 b= c=3")
+    let regex pair ← "(?P<key>[a-z]+)=([0-9]+)?" ↦ regex
+    let pairs ← pair.find_all("a=1 b= c=3")
     for from pairs const kv {
         print kv.named("key")
         print kv.group(2) coalesce "unset"
     }
 
     # no match is an empty list
-    const regex digits ← "[0-9]+" ↦ regex
+    let regex digits ← "[0-9]+" ↦ regex
     print digits.find_all("none here").length()
 
     # the empty pattern matches before each character and at the end
-    const regex nothing ← "" ↦ regex
+    let regex nothing ← "" ↦ regex
     print nothing.find_all("ab").length()
 }

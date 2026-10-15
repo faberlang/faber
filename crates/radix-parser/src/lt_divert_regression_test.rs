@@ -17,8 +17,8 @@
 //! | `textus < 5` | parses as comparison (was PARSE001) |
 //! | `ratio < 5` | parses as comparison (was `ratio_type_arg_label_required`) |
 //! | `iuncta` as declaration name | stays rejected (lexer keyword) |
-//! | `fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }` (la) | keeps parsing |
-//! | `fixum record<g: int> r ← record<g: int> { g = 1 }` (en pack) | constructs; head canonicalizes to `ratio` |
+//! | `sit ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }` (la) | keeps parsing |
+//! | `sit record<g: int> r ← record<g: int> { g = 1 }` (en pack) | constructs; head canonicalizes to `ratio` |
 //! | `record < 5` (la) | parses (unmapped spelling, comparison) |
 //! | `textus(5)` | parses; check-phase name resolution rejects the type-name callee |
 //! | `string(5)` (en pack) | parses; check-phase name resolution rejects the type-name callee |
@@ -52,6 +52,8 @@ impl KeywordPack for EnLikeTestPack {
         match text {
             "incipit" => Some("incipit"),
             "fixum" => Some("fixum"),
+            "sit" => Some("sit"),
+            "sit" => Some("sit"),
             _ => None,
         }
     }
@@ -89,7 +91,7 @@ fn parse_ok_with_en_like_pack(source: &str) -> crate::ParseResult {
 }
 
 /// Extract the initializer of the first `fixum`/`varia` declaration inside
-/// `incipit { … }` (each matrix cell is planted as `fixum bivalens ok ← <cell>`).
+/// `incipit { … }` (each matrix cell is planted as `sit bivalens ok ← <cell>`).
 fn incipit_init_expr(result: &crate::ParseResult) -> &radix_syntax::Expr {
     let program = result.program.as_ref().expect("program");
     let stmt = program.statements.last().expect("statement");
@@ -106,7 +108,7 @@ fn incipit_init_expr(result: &crate::ParseResult) -> &radix_syntax::Expr {
 }
 
 fn assert_init_is_binary(cell: &str) {
-    let source = format!("incipit {{\n    fixum bivalens ok ← {cell}\n}}");
+    let source = format!("incipit {{\n    sit bivalens ok ← {cell}\n}}");
     let result = parse_recovering_ascii_comparison(&source);
     let init = incipit_init_expr(&result);
     assert!(
@@ -147,7 +149,7 @@ fn ratio_identifier_less_than_parses_as_comparison() {
 #[test]
 fn en_like_pack_mapped_spelling_less_than_parses_as_comparison() {
     for cell in ["string < 5", "value < 5", "record < 5"] {
-        let source = format!("incipit {{\n    fixum bivalens ok ← {cell}\n}}");
+        let source = format!("incipit {{\n    sit bivalens ok ← {cell}\n}}");
         let result = parse_with_en_like_pack(&source);
         assert!(
             result
@@ -166,7 +168,7 @@ fn en_like_pack_mapped_spelling_less_than_parses_as_comparison() {
 
 #[test]
 fn la_ratio_declaration_and_constructor_keep_parsing() {
-    let _ = parse_ok("fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }");
+    let _ = parse_ok("sit ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }");
 }
 
 #[test]
@@ -176,7 +178,7 @@ fn en_record_declaration_and_constructor_parse() {
     // the `iuncta` identity claim — same-locale surface, no mixed
     // `record<g: int>` annotation + `ratio<g: int>` initializer.
     let result = parse_ok_with_en_like_pack(
-        "incipit {\n    fixum record<g: int> r ← record<g: int> { g = 1 }\n}",
+        "incipit {\n    sit record<g: int> r ← record<g: int> { g = 1 }\n}",
     );
     let init = incipit_init_expr(&result);
     let ExprKind::Verte(verte) = &init.kind else {

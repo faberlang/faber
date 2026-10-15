@@ -13,7 +13,7 @@ diagnostic = "PARSE030:itera_source_sort_reduce_unbound"
 # This exemplum intentionally fails to compile: a sort expression is never
 # written in a loop header. Bind the sorted value to a name, then loop over it.
 main {
-    const list<int> xs ← [3, 1, 2]
+    let list<int> xs ← [3, 1, 2]
     for from sort via asc from xs const x {
         print x
     }

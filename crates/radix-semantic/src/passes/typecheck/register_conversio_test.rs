@@ -37,7 +37,7 @@ fn octeti_window_8_to_vu32x2_be_accepts() {
 fn octeti_literal_16_to_vu32x4_le_accepts() {
     assert_accepts_la(
         "incipit {
-    fixum _ v ← |de ad be ef fe dc ba 98 76 54 32 10 01 23 45 67| ↦ vector<u32, 4> via Le
+    sit v ← |de ad be ef fe dc ba 98 76 54 32 10 01 23 45 67| ↦ vector<u32, 4> via Le
 }",
     );
 }

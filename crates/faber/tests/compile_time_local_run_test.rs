@@ -60,7 +60,7 @@ fn a_constant_that_does_not_fit_its_type_is_rejected() {
 
 #[test]
 fn varia_with_equals_is_rejected() {
-    let (_, stderr, ok) = run("varia", "main {\n    var int n = 3\n    print n\n}\n");
+    let (_, stderr, ok) = run("varia", "main {\n    mut int n = 3\n    print n\n}\n");
     assert!(!ok);
     assert!(
         stderr.contains("varia_compile_time_initializer"),

@@ -17,7 +17,7 @@ genus Holder {
 }
 
 incipit {
-    fixum Holder d ← Holder { x = 2.0 }
-    fixum Holder f ← penes d
+    sit Holder d ← Holder { x = 2.0 }
+    sit Holder f ← penes d
     nota f.x
 }

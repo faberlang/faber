@@ -34,7 +34,7 @@ no_expected = "traps-by-design"
 #   tensor structa element count does not match shape
 
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0]
-    const tf32[2, 2] grid ← flat ↦ tf32[2, 2]
+    let list<f32> flat ← [1.0, 2.0, 3.0]
+    let tf32[2, 2] grid ← flat ↦ tf32[2, 2]
     print grid.length()
 }

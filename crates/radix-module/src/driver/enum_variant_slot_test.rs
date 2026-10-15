@@ -39,8 +39,8 @@ union Opt<T> {
 }
 
 class Box {
-    var Color ∪ none k
-    var Shape ∪ none s
+    mut Color ∪ none k
+    mut Shape ∪ none s
 }
 ";
 
@@ -49,7 +49,7 @@ fn enum_value_into_optional_local_prints_qualified_variant() {
     let out = run_en(&format!(
         "{DECLS}
 main {{
-    const Color ∪ none o ← Color.Green
+    let Color ∪ none o ← Color.Green
     print o
 }}
 "
@@ -62,7 +62,7 @@ fn enum_value_into_optional_field_prints_qualified_variant() {
     let out = run_en(&format!(
         "{DECLS}
 main {{
-    const Box b ← Box {{ k = Color.Red, s = variant Circ {{ r = 1.5 }} ∷ Shape }}
+    let Box b ← Box {{ k = Color.Red, s = variant Circ {{ r = 1.5 }} ∷ Shape }}
     print b
 }}
 "
@@ -75,7 +75,7 @@ fn payload_variant_into_optional_local_prints_qualified_variant() {
     let out = run_en(&format!(
         "{DECLS}
 main {{
-    const Shape ∪ none s ← variant Circ {{ r = 2.5 }} ∷ Shape
+    let Shape ∪ none s ← variant Circ {{ r = 2.5 }} ∷ Shape
     print s
 }}
 "
@@ -88,11 +88,11 @@ fn generic_union_variant_with_payload_runs() {
     let out = run_en(&format!(
         "{DECLS}
 main {{
-    const Opt<int> a ← variant Has {{ v = 3 }} ∷ Opt<int>
+    let Opt<int> a ← variant Has {{ v = 3 }} ∷ Opt<int>
     print a
-    const Opt<string> b ← variant Has {{ v = \"hi\" }} ∷ Opt<string>
+    let Opt<string> b ← variant Has {{ v = \"hi\" }} ∷ Opt<string>
     print b
-    const Opt<int> c ← variant Nada ∷ Opt<int>
+    let Opt<int> c ← variant Nada ∷ Opt<int>
     print c
 }}
 "

@@ -13,6 +13,6 @@ locale = "en"
 # =============================================================================
 
 main {
-    const ref list<int> xs ← [1, 2, 3]
+    let ref list<int> xs ← [1, 2, 3]
     print xs.length()
 }

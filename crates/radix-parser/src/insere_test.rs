@@ -73,7 +73,7 @@ fn insere_is_claimed_in_any_expression_position() {
 #[test]
 fn insere_stays_an_identifier_without_a_following_string() {
     let result = parse_ok_la(
-        "fixum numerus insere = 3\nfixum numerus ALIUS = insere\nfunctio f() → numerus {\n    fixum numerus insere ← 4\n    redde insere\n}\n",
+        "fixum numerus insere = 3\nfixum numerus ALIUS = insere\nfunctio f() → numerus {\n    sit numerus insere ← 4\n    redde insere\n}\n",
     );
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[1].kind else {

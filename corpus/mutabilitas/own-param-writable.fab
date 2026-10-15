@@ -17,7 +17,7 @@ locale = "en"
 # so the caller never reads what it gave away.
 
 class Cell {
-    var int n = 0
+    mut int n = 0
 
     fn bump() → void {
         self.n ← self.n + 1

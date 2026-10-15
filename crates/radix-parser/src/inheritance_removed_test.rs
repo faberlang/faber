@@ -51,7 +51,7 @@ fn implet_contract_still_parses() {
 
 #[test]
 fn abstractus_and_sub_are_ordinary_identifiers_elsewhere() {
-    let bindings = parse_ok("fixum _ sub ← 5\nfixum _ abstractus ← sub\n");
+    let bindings = parse_ok("sit sub ← 5\nsit abstractus ← sub\n");
     assert_eq!(bindings.program.expect("program").statements.len(), 2);
     let function = parse_ok("functio sub(numerus abstractus) → numerus { redde abstractus }\n");
     assert_eq!(function.program.expect("program").statements.len(), 1);

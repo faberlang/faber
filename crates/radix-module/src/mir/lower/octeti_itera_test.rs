@@ -37,8 +37,8 @@ fn octeti_itera_ex_runs_decoder_byte_list_in_order_and_handles_empty() {
 }
 
 incipit {
-    fixum octeti input ← |00 7f 80 ff 00|
-    fixum lista<u8> copied ← byte_list(input)
+    sit octeti input ← |00 7f 80 ff 00|
+    sit lista<u8> copied ← byte_list(input)
     nota copied.longitudo()
     itera ex copied fixum byte {
         nota byte
@@ -55,7 +55,7 @@ incipit {
 #[test]
 fn octeti_itera_ex_preserves_continue_and_break() {
     let source = r"incipit {
-    fixum octeti input ← |00 7f 80 ff|
+    sit octeti input ← |00 7f 80 ff|
     itera ex input fixum byte {
         si byte ≡ 0 {
             perge

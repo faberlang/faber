@@ -30,6 +30,7 @@ impl KeywordPack for EnStaticPack {
         match text {
             "static" => Some("generis"),
             "const" => Some("fixum"),
+            "let" => Some("sit"),
             "fn" => Some("functio"),
             _ => None,
         }

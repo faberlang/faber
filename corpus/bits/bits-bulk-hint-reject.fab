@@ -29,7 +29,7 @@ diagnostic = "SEM016:bits_via_clause_not_allowed"
 # This exemplum intentionally fails to compile.
 
 main {
-    const list<b8> raw ← [0x01, 0x02]
-    const list<u8> plain ← raw ↦ list<u8> via Le
+    let list<b8> raw ← [0x01, 0x02]
+    let list<u8> plain ← raw ↦ list<u8> via Le
     print plain
 }

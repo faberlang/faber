@@ -99,14 +99,14 @@ fn pure_value_method_call_is_not_an_access() {
     // A registered value method on a scalar receiver reads no storage: the
     // call must prove, not decline as an unproved effect.
     accepted(&body(
-        "fixum numerus magnitude ← value.absolutum()\n grid[i] ← value + magnitude",
+        "sit numerus magnitude ← value.absolutum()\n grid[i] ← value + magnitude",
     ));
 }
 
 #[test]
 fn neighbor_read_of_written_tensor_rejected() {
     rejected(
-        &body("fixum numerus prior ← grid[i + 1]\n grid[i] ← prior"),
+        &body("sit numerus prior ← grid[i + 1]\n grid[i] ← prior"),
         "written_storage_neighbor_read",
     );
     rejected(
@@ -165,7 +165,7 @@ fn transformed_view_neighbor_rejected() {
         r"incipit {
     varia tensor<numerus, [2, 2]> grid ← vacua
     itera ex grid apud [i, j] filum lane fixum value {
-        fixum numerus neighbor ← grid.transpone().accipe([i, j])
+        sit numerus neighbor ← grid.transpone().accipe([i, j])
         grid.ponde([i, j], neighbor)
     }
 }",
@@ -175,7 +175,7 @@ fn transformed_view_neighbor_rejected() {
         r"incipit {
     varia tensor<numerus, [4]> grid ← vacua
     itera ex grid apud [i] filum lane fixum value {
-        fixum numerus neighbor ← grid.sectio(1, 4).accipe([i])
+        sit numerus neighbor ← grid.sectio(1, 4).accipe([i])
         grid[i] ← neighbor
     }
 }",
@@ -202,7 +202,7 @@ fn tensor_conversio_initializer_proves_fresh_storage() {
     // so the conversion initializer proves like the factory methods do.
     accepted(
         r"incipit {
-    fixum tensor<numerus, [4]> lanes ← [1, 2, 3, 4] ↦ tensor<numerus, [4]>
+    sit tensor<numerus, [4]> lanes ← [1, 2, 3, 4] ↦ tensor<numerus, [4]>
     varia tensor<numerus, [4]> grid ← vacua
     itera ex lanes apud [i] filum lane fixum value {
         grid[i] ← value
@@ -218,7 +218,7 @@ fn float_literal_conversio_initializer_proves_fresh_storage() {
     // the lowering still builds a fresh tensor, so the fact stands.
     accepted(
         r"incipit {
-    fixum tf32[2] lanes ← [1.0, 2.0] ↦ tf32[2]
+    sit tf32[2] lanes ← [1.0, 2.0] ↦ tf32[2]
     varia tf32[2] grid ← tf32[2] {}
     itera ex lanes apud [i] filum lane fixum value {
         grid[i] ← value

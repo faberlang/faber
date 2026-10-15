@@ -20,13 +20,13 @@ locale = "en"
 # radix-module test `copy_duplicate_test.rs`.)
 
 class Holder {
-    var f64 x = 0.0
-    var list<int> marks = []
+    mut f64 x = 0.0
+    mut list<int> marks = []
 }
 
 main {
-    const Holder a ← Holder { x = 1.0 }
-    var Holder b ← copy a
+    let Holder a ← Holder { x = 1.0 }
+    mut Holder b ← copy a
     b.x ← 5.0
     b.marks.append(1)
     print a.x

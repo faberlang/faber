@@ -39,7 +39,7 @@ fn rust_simple_function_has_no_unsupported_errors() {
 
 #[test]
 fn rust_variable_declaration_has_no_unsupported_errors() {
-    let (program, _) = parse_program("functio f() → vacuum { fixum numerus x ← 1 }\n");
+    let (program, _) = parse_program("functio f() → vacuum { sit numerus x ← 1 }\n");
     let errors = collect_rust_unsupported_errors(&program, "test.fab");
     assert!(errors.is_empty(), "variable declaration should have no Rust unsupported errors");
 }

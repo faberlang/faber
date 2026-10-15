@@ -33,13 +33,13 @@ fn runtime_extent(int value) → int {
 }
 
 fn make<size H, size W>() → tf32[H, W] {
-    var tf32[H, W] out ← tf32[H, W] {}
+    mut tf32[H, W] out ← tf32[H, W] {}
     out[[0, 0]] ← 7.5
     return out
 }
 
 main {
-    var int n ← runtime_extent(3)
+    mut int n ← runtime_extent(3)
     const size N ← n
     n ← n + 10
     print N
@@ -47,12 +47,12 @@ main {
     print N + 1
 
     const size ROWS = 2
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[ROWS, N] grid ← flat ↦ tf32[ROWS, N]
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[ROWS, N] grid ← flat ↦ tf32[ROWS, N]
     print grid.shape().get(0)
     print grid.shape().get(1)
 
-    const tf32[_, _] made ← make<2, 3>()
+    let tf32[_, _] made ← make<2, 3>()
     print made.shape().get(0)
     print made.shape().get(1)
     print made.flatten()

@@ -34,7 +34,7 @@ fn rust_needs_records_hashmap_from_types_not_body_text() {
     let (hir, types) = analyze_hir(
         r"
 incipit {
-  fixum tabula<textus, numerus> m ← vacua
+  sit tabula<textus, numerus> m ← vacua
   nota m
 }
 ",
@@ -53,7 +53,7 @@ fn rust_needs_faber_runtime_from_valor_type() {
     let (hir, types) = analyze_hir(
         r"
 incipit {
-  fixum valor v ← 1
+  sit valor v ← 1
   nota v
 }
 ",
@@ -68,8 +68,8 @@ fn rust_needs_regex_follows_the_regex_type_in_use() {
     let (hir, types) = analyze_hir(
         r#"
 incipit {
-  fixum textus s ← "a+"
-  fixum regex r ← s ↦ regex
+  sit textus s ← "a+"
+  sit regex r ← s ↦ regex
   nota r
 }
 "#,
@@ -81,7 +81,7 @@ incipit {
     let (hir, types) = analyze_hir(
         r"
 incipit {
-  fixum valor v ← 1
+  sit valor v ← 1
   nota v
 }
 ",
@@ -99,8 +99,8 @@ fn rust_needs_faber_runtime_for_an_integer_only_program() {
     let (hir, types) = analyze_hir(
         r"
 incipit {
-  fixum numerus a ← 7
-  fixum numerus b ← a + 1
+  sit numerus a ← 7
+  sit numerus b ← a + 1
   nota b
 }
 ",
@@ -118,8 +118,8 @@ fn rust_needs_faber_runtime_for_a_decimal_program() {
     let (hir, types) = analyze_hir(
         r"
 incipit {
-  fixum d64 a ← 1.5
-  fixum d64 b ← a + 1
+  sit d64 a ← 1.5
+  sit d64 b ← a + 1
   nota b
 }
 ",
@@ -137,7 +137,7 @@ fn rust_needs_faber_runtime_for_an_inf_program() {
     let (hir, types) = analyze_hir(
         r"
 incipit {
-  fixum inf a ← 18446744073709551616
+  sit inf a ← 18446744073709551616
   nota a / 7
 }
 ",
@@ -155,7 +155,7 @@ fn rust_needs_faber_runtime_for_a_format_only_program() {
     let (hir, types) = analyze_hir(
         r#"
 incipit {
-  fixum textus name ← "faber"
+  sit textus name ← "faber"
   nota name ¶ ">8"
 }
 "#,

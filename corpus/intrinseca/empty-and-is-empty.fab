@@ -25,8 +25,8 @@ locale = "en"
 #   Smoke asserts exit 0 only.
 
 main {
-    var list<int> xs ← empty
-    const bool vacant ← xs.is_empty()
+    mut list<int> xs ← empty
+    let bool vacant ← xs.is_empty()
     xs.append(1)
     print vacant, xs.is_empty(), xs.length()
 }

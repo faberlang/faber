@@ -30,6 +30,6 @@ diagnostic = "SEM008:retired_byte_word"
 # This exemplum intentionally fails to compile.
 
 main {
-    const byte b ← 0x80 ∷ u8
+    let byte b ← 0x80 ∷ u8
     print b
 }

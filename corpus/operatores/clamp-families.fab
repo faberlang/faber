@@ -89,26 +89,26 @@ main {
     print clamp_f32(2.5, 0.5, 1.5)
 
     # 3. A class method reads its own fields.
-    const Span span ← Span { low = 0.0, high = 255.0 }
+    let Span span ← Span { low = 0.0, high = 255.0 }
     print span.center()
     print span.contains(3.0)
     print span.limit(300.0)
     print span.limit(-5.0)
 
     # 4. IEEE 754-2019: NaN propagates from either side.
-    const f64 zero ← 0.0
-    const f64 not_a_number ← zero ÷ zero
+    let f64 zero ← 0.0
+    let f64 not_a_number ← zero ÷ zero
     # A result is NaN exactly when it differs from itself.
-    const f64 from_value ← clamp_f64(not_a_number, 0.0, 1.0)
-    const f64 from_low ← clamp_f64(0.5, not_a_number, 1.0)
-    const f64 from_high ← clamp_f64(0.5, 0.0, not_a_number)
+    let f64 from_value ← clamp_f64(not_a_number, 0.0, 1.0)
+    let f64 from_low ← clamp_f64(0.5, not_a_number, 1.0)
+    let f64 from_high ← clamp_f64(0.5, 0.0, not_a_number)
     print from_value ≢ from_value
     print from_low ≢ from_low
     print from_high ≢ from_high
 
     # 5. IEEE 754-2019: -0.0 orders below +0.0.
-    const f64 pos_zero ← 0.0
-    const f64 neg_zero ← -1.0 * pos_zero
+    let f64 pos_zero ← 0.0
+    let f64 neg_zero ← -1.0 * pos_zero
     # The sign of a zero shows in the sign of its reciprocal.
     print 1.0 ÷ (neg_zero ⤒ pos_zero) ≻ 0.0
     print 1.0 ÷ (pos_zero ⤓ neg_zero) ≻ 0.0

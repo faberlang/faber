@@ -30,9 +30,9 @@ locale = "la"
 # EXPECTED stdout: see bits-order-la.expected
 
 incipit {
-    fixum b8 high ← 0x80
-    fixum b8 low ← 0x7f
-    fixum b8 same ← 0x80
+    sit b8 high ← 0x80
+    sit b8 low ← 0x7f
+    sit b8 same ← 0x80
     nota high ≻ low
     nota high ≺ low
     nota high ≥ same
@@ -42,8 +42,8 @@ incipit {
     nota high ≡ 0x80
     nota 0x7f ≺ high
 
-    fixum b64 big ← 0x8000000000000000
-    fixum b64 small ← 0x7fffffffffffffff
+    sit b64 big ← 0x8000000000000000
+    sit b64 small ← 0x7fffffffffffffff
     nota big ≻ small
     nota big ≡ small
 }

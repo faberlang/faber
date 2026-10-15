@@ -22,8 +22,8 @@ locale = "en"
 # =============================================================================
 
 class Punctum {
-    var int x = 0
-    var int y = 0
+    mut int x = 0
+    mut int y = 0
 }
 
 fn par() → tuple<int, string> {
@@ -39,26 +39,26 @@ fn summa(Punctum p) → int {
 }
 
 main {
-    const tuple<int, string> t ← _ [1, "a"]
+    let tuple<int, string> t ← _ [1, "a"]
     print t[0]
     print t[1]
 
-    const tuple<int, string> u ← par()
+    let tuple<int, string> u ← par()
     print u[0]
 
-    const tuple<int, int> v ← [5, 6]
+    let tuple<int, int> v ← [5, 6]
     print v[1]
 
-    const Punctum p ← { x = 1, y = 2 }
+    let Punctum p ← { x = 1, y = 2 }
     print p.x
     print p.y
 
-    const Punctum q ← origo()
+    let Punctum q ← origo()
     print q.y
     print summa({ x = 10, y = 20 })
 
-    const list<int> xs ← _ [1, 2, 3]
+    let list<int> xs ← _ [1, 2, 3]
     print xs.length()
-    const list<int> ys ← [4, 5]
+    let list<int> ys ← [4, 5]
     print ys.length()
 }

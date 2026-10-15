@@ -26,7 +26,7 @@ fn first_initializer_literal(source: &str) -> (radix_lexer::Interner, Literal) {
 
 #[test]
 fn a_big_literal_in_expression_position_is_a_big_int_literal() {
-    let (interner, literal) = first_initializer_literal("fixum inf x ← 18446744073709551616\n");
+    let (interner, literal) = first_initializer_literal("sit inf x ← 18446744073709551616\n");
     let Literal::BigInt(text) = literal else {
         panic!("expected a big literal");
     };
@@ -35,7 +35,7 @@ fn a_big_literal_in_expression_position_is_a_big_int_literal() {
 
 #[test]
 fn a_u64_max_literal_stays_an_ordinary_int() {
-    let (_, literal) = first_initializer_literal("fixum u64 x ← 18446744073709551615\n");
+    let (_, literal) = first_initializer_literal("sit u64 x ← 18446744073709551615\n");
     assert!(matches!(literal, Literal::Int(18_446_744_073_709_551_615)));
 }
 
@@ -69,10 +69,10 @@ discerne x {
 #[test]
 fn a_big_literal_in_a_json_literal_is_rejected() {
     for source in [
-        "fixum json l ← { \"a\": 18446744073709551616 }\n",
-        "fixum json l ← { \"a\": [1, 123456789012345678901234567890] }\n",
+        "sit json l ← { \"a\": 18446744073709551616 }\n",
+        "sit json l ← { \"a\": [1, 123456789012345678901234567890] }\n",
         // A u64 above i64::MAX is an `Integer` token and fails the same checked boundary.
-        "fixum json l ← { \"a\": 9223372036854775808 }\n",
+        "sit json l ← { \"a\": 9223372036854775808 }\n",
     ] {
         assert_parse_error_issue(source, "json_integer_overflow");
     }

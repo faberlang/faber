@@ -75,7 +75,7 @@ fn field_name_warns() {
 #[test]
 fn local_warns_once_at_declaration() {
     assert_single(
-        "incipit {\n    fixum numerus _n ← 1\n    nota _n\n    nota _n\n}",
+        "incipit {\n    sit numerus _n ← 1\n    nota _n\n    nota _n\n}",
         "_n",
         "local",
     );
@@ -129,8 +129,8 @@ fn top_level_const_warns_as_constant_and_local_const_as_local() {
 
 #[test]
 fn bare_hole_never_warns() {
-    let source = "incipit {\n    fixum lista<numerus> triplex ← [1, 2, 3]\n    \
-        fixum [_, medius, _] ← triplex\n    fixum _ x ← medius\n    nota x\n}";
+    let source = "incipit {\n    sit lista<numerus> triplex ← [1, 2, 3]\n    \
+        fixum [_, medius, _] ← triplex\n    sit x ← medius\n    nota x\n}";
     let result = analyze_source_la(source);
     assert!(result.is_ok(), "{:?}", result.diagnostics);
     assert!(underscore_findings(source).is_empty());
@@ -139,7 +139,7 @@ fn bare_hole_never_warns() {
 #[test]
 fn plain_names_never_warn() {
     let source = "functio duplex(numerus n) → numerus { redde n * 2 }\n\
-        incipit { fixum numerus n_x ← duplex(2)\n nota n_x }";
+        incipit { sit numerus n_x ← duplex(2)\n nota n_x }";
     let result = analyze_source_la(source);
     assert!(result.is_ok(), "{:?}", result.diagnostics);
     assert!(underscore_findings(source).is_empty());

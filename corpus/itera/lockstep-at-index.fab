@@ -27,17 +27,17 @@ locale = "en"
 # =============================================================================
 
 main {
-    const list<string> labels ← ["a", "b", "c"]
-    const list<int> values ← [1, 2, 3]
+    let list<string> labels ← ["a", "b", "c"]
+    let list<int> values ← [1, 2, 3]
     for from labels, values at [i] const label, value {
         print i
         print label
     }
-    const list<int> bases ← [100, 200]
-    const list<int> keys ← [1, 2]
-    const list<int> payloads ← [10, 20]
+    let list<int> bases ← [100, 200]
+    let list<int> keys ← [1, 2]
+    let list<int> payloads ← [10, 20]
     for from bases, keys, payloads at [slot] const base, key, payload {
-        const int total ← slot + base + key + payload
+        let int total ← slot + base + key + payload
         print total
     }
 }

@@ -29,18 +29,18 @@ fn program(body: &str) -> String {
 
 #[test]
 fn generator_call_binds_to_cursor() {
-    assert_eq!(errors(&program("fixum cursor<numerus> c ← gen()")), 0);
+    assert_eq!(errors(&program("sit cursor<numerus> c ← gen()")), 0);
 }
 
 #[test]
 fn generator_call_is_not_a_lista() {
-    assert!(errors(&program("fixum lista<numerus> xs ← gen()")) > 0);
+    assert!(errors(&program("sit lista<numerus> xs ← gen()")) > 0);
 }
 
 #[test]
 fn generator_call_collects_to_lista_by_conversion() {
     assert_eq!(
-        errors(&program("fixum lista<numerus> xs ← gen() ↦ lista<numerus>")),
+        errors(&program("sit lista<numerus> xs ← gen() ↦ lista<numerus>")),
         0
     );
 }

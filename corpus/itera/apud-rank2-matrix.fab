@@ -38,9 +38,9 @@ locale = "en"
 #   r, c, cell per line — rows outer (0‥2), columns inner (0‥3).
 
 main {
-    const vf32[2] a ← [1.0, 2.0] ↦ vf32[2]
-    const vf32[3] b ← [10.0, 20.0, 30.0] ↦ vf32[3]
-    const matrix<f32, [2, 3]> m ← a ⊗ b
+    let vf32[2] a ← [1.0, 2.0] ↦ vf32[2]
+    let vf32[3] b ← [10.0, 20.0, 30.0] ↦ vf32[3]
+    let matrix<f32, [2, 3]> m ← a ⊗ b
 
     for from m at [r, c] const cell {
         print r, c, cell

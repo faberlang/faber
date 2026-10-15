@@ -583,7 +583,7 @@ fn fragment_instantiation_message_carries_type_and_call_site_context() {
 
 #[test]
 fn mixed_script_advisory_renders_prose_in_every_installed_pack() {
-    let source = "const аdd ← 1\n";
+    let source = "let аdd ← 1\n";
     let advisory = crate::lexer::lex(source)
         .mixed_script_advisories
         .first()

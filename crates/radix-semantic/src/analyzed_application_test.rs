@@ -56,7 +56,7 @@ functio add(numerus a, numerus b) → numerus {
   redde a + b
 }
 incipit {
-  fixum numerus x ← add(1, 2)
+  sit numerus x ← add(1, 2)
 }
 ";
     let (parts, interner) = analyze_parts(source);
@@ -144,7 +144,7 @@ functio id(numerus x) → numerus {
   redde x
 }
 incipit {
-  fixum numerus y ← id(1)
+  sit numerus y ← id(1)
 }
 ";
     let (parts, interner) = analyze_parts(source);
@@ -184,7 +184,7 @@ functio main() → numerus {
   redde helper()
 }
 incipit {
-  fixum numerus z ← main()
+  sit numerus z ← main()
 }
 ";
     let (parts, interner) = analyze_parts(source);
@@ -205,7 +205,7 @@ functio identity(Persona value) → Persona {
   redde value
 }
 incipit {
-  fixum Persona result ← identity(Persona { name = "salve" })
+  sit Persona result ← identity(Persona { name = "salve" })
 }
 "#;
     let (parts, _interner) = analyze_parts(source);
@@ -291,7 +291,7 @@ functio add(numerus a, numerus b) → numerus {
   redde a + b
 }
 incipit {
-  fixum numerus x ← add(1, 2)
+  sit numerus x ← add(1, 2)
 }
 ";
     let (mut parts, interner) = analyze_parts(source);

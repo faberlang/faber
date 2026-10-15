@@ -27,20 +27,20 @@ locale = "en"
 class Tab {
     static int LIMIT = 3
     static int SQUARES = comptime {
-        var int total ← 0
+        mut int total ← 0
         for range 1‥4 const i {
             total ← total + i * i
         }
         return total
     }
     static list<b8> DATA = embed "generis.expected"
-    var int w = 1
+    mut int w = 1
 }
 
 main {
     print Tab.LIMIT
     print Tab.SQUARES
     print Tab.DATA.length()
-    const Tab t ← Tab {}
+    let Tab t ← Tab {}
     print t.w
 }

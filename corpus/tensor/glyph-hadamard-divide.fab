@@ -35,10 +35,10 @@ fn hadamard_divide(tensor<f32, [2, 2]> numerator, tensor<f32, [2, 2]> denominato
 }
 
 main {
-    const list<f32> flat_numerator ← [2.0, 4.0, 9.0, 16.0]
-    const list<f32> flat_denominator ← [1.0, 2.0, 3.0, 4.0]
-    var tf32[2, 2] numerator ← flat_numerator ↦ tf32[2, 2]
-    var tf32[2, 2] denominator ← flat_denominator ↦ tf32[2, 2]
-    const tf32[2, 2] result ← hadamard_divide(numerator, denominator)
+    let list<f32> flat_numerator ← [2.0, 4.0, 9.0, 16.0]
+    let list<f32> flat_denominator ← [1.0, 2.0, 3.0, 4.0]
+    mut tf32[2, 2] numerator ← flat_numerator ↦ tf32[2, 2]
+    mut tf32[2, 2] denominator ← flat_denominator ↦ tf32[2, 2]
+    let tf32[2, 2] result ← hadamard_divide(numerator, denominator)
     print result.flatten()
 }

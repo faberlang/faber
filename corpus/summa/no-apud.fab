@@ -35,7 +35,7 @@ functio total(tensor<f32, [8]> a) → f32 {
 }
 
 incipit {
-    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-        fixum tf32[8] a ← flat ↦ tf32[8]
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+        sit tf32[8] a ← flat ↦ tf32[8]
     nota total(a)
 }

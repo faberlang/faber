@@ -11,7 +11,7 @@ const SOURCE: &str = "functio double(tensor<f32, [2, 2]> source, in tensor<f32, 
 }
 
 incipit {
-fixum tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+sit tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
 varia tensor<f32, [2, 2]> b ← [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]>
 double(a, in b)
 }

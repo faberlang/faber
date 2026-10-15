@@ -2,6 +2,6 @@
 locale = "en"
 +++
 main {
-    const list<int> xs ← [1, 2]
+    let list<int> xs ← [1, 2]
     print 1
 }

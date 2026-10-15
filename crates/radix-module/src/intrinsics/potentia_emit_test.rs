@@ -5,14 +5,14 @@ use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
 const FLOAT_POW: &str = r"incipit {
-    fixum fractus b ← -8.0
-    fixum fractus r ← b.potentia(0.5)
+    sit fractus b ← -8.0
+    sit fractus r ← b.potentia(0.5)
     nota r
     nota 2.0.potentia(3.0)
 }";
 
 const FLOAT_LITERAL_POW: &str = r"incipit {
-    fixum fractus r ← 2.0.potentia(3.0)
+    sit fractus r ← 2.0.potentia(3.0)
     nota r
 }";
 
@@ -65,7 +65,7 @@ const INTEGER_POW: &str = r"functio minus() → numerus {
 }
 
 incipit {
-    fixum numerus base ← 2
+    sit numerus base ← 2
     nota base.potentia(minus())
 }";
 

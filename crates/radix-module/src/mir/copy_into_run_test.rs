@@ -29,7 +29,7 @@ fn ok(source: &str) -> Vec<String> {
 #[test]
 fn a_value_is_copied_into_a_var_tensor() {
     let out = ok("incipit {
-fixum tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+sit tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
 varia tensor<f32, [2, 2]> b ← [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]>
 b ⇇ a + a
 nota b.planata()
@@ -42,7 +42,7 @@ fn the_target_keeps_its_storage_identity_for_every_alias() {
     // `c` aliases `b`'s storage; a copy-into through `b` is visible through
     // `c`, which a rebind (`b ← …`) would not be.
     let out = ok("incipit {
-fixum tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+sit tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
 varia tensor<f32, [2, 2]> b ← [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]>
 varia tensor<f32, [2, 2]> c ← b
 b ⇇ a
@@ -54,7 +54,7 @@ nota c.planata()
 #[test]
 fn a_view_source_is_written_into_a_fresh_buffer() {
     let out = ok("incipit {
-fixum tensor<f32, [2, 3]> a ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tensor<f32, [2, 3]>
+sit tensor<f32, [2, 3]> a ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tensor<f32, [2, 3]>
 varia tensor<f32, [3, 2]> t ← [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [3, 2]>
 t ⇇ a.transpone()
 nota t.planata()
@@ -70,7 +70,7 @@ fn a_mut_parameter_is_written_in_place_and_visible_to_the_caller() {
 }
 
 incipit {
-fixum tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+sit tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
 varia tensor<f32, [2, 2]> b ← [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]>
 double(a, in b)
 nota b.planata()
@@ -90,7 +90,7 @@ functio fill(in Holder holder, tensor<f32, [2, 2]> source) → vacuum {
 }
 
 incipit {
-fixum tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+sit tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
 varia Holder h ← Holder { buf = [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]> }
 fill(in h, a)
 nota h.buf.planata()

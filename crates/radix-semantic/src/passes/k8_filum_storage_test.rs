@@ -153,7 +153,7 @@ fn mut_param_written_then_read_at_a_neighbour_is_rejected() {
     rejected(
         &with_src(
             &format!("in {GRID} out"),
-            "out[i] ← value\n        fixum numerus next ← out[i + 1]",
+            "out[i] ← value\n        sit numerus next ← out[i + 1]",
         ),
         "written_storage_neighbor_read",
     );
@@ -163,7 +163,7 @@ fn mut_param_written_then_read_at_a_neighbour_is_rejected() {
 fn read_param_read_at_neighbours_and_never_written_is_accepted() {
     accepted(&kernel_fn(
         &format!("de {GRID} src"),
-        "fixum numerus next ← src[i + 1]",
+        "sit numerus next ← src[i + 1]",
     ));
     // Paired with a local that owns its storage.
     accepted(&format!(
@@ -189,7 +189,7 @@ fn two_mut_params_written_at_own_coordinates_are_accepted() {
 #[test]
 fn bind_alias_of_a_mut_param_joins_its_root() {
     rejected(
-        &with_out_alias("alias[i] ← value\n        fixum numerus next ← out[i + 1]"),
+        &with_out_alias("alias[i] ← value\n        sit numerus next ← out[i + 1]"),
         "written_storage_neighbor_read",
     );
     accepted(&with_out_alias("alias[i] ← src[i + 1]"));

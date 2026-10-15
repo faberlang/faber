@@ -11,23 +11,23 @@ import from "norma:net" net
 import from "norma:net/listener" listener
 
 main {
-    const string dir ← fs.temp_dir()
-    const string path ← fs.join([dir, "n4b-stat.txt"])
+    let string dir ← fs.temp_dir()
+    let string path ← fs.join([dir, "n4b-stat.txt"])
     fs.write_file(path, "stat")
-    const fs.FileStatus info ← fs.stat(path)
+    let fs.FileStatus info ← fs.stat(path)
     assert info.byte_length ≡ 4
     assert info.is_directory ≡ false
     fs.delete(path)
 
-    const process.Subprocess child ← process.spawn(["true"])
+    let process.Subprocess child ← process.spawn(["true"])
     assert child.pid ≻ 0
 
-    const time.Ticker ticks ← time.interval(0)
-    const instant<ns> first ← ticks.next()
+    let time.Ticker ticks ← time.interval(0)
+    let instant<ns> first ← ticks.next()
     assert (first ↦ string).length() ≻ 0
 
-    const listener.Listener server ← net.listen(0)
-    const int port ← server.port()
+    let listener.Listener server ← net.listen(0)
+    let int port ← server.port()
     assert port ≻ 0
     server.close()
 

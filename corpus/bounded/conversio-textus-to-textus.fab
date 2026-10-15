@@ -35,8 +35,8 @@ locale = "en"
 # (UnsupportedMir), so stdout stays unpinned.
 
 main {
-    const string raw ← "abcd"
-    const string<8> t ← raw ↦ string<8>
-    const string u ← t ↦ string
+    let string raw ← "abcd"
+    let string<8> t ← raw ↦ string<8>
+    let string u ← t ↦ string
     print u
 }

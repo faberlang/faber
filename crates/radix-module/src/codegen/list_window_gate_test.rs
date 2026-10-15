@@ -7,7 +7,7 @@
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
-const SOURCE: &str = "incipit {\n    fixum lista<numerus> xs ← [1, 2, 3]\n    nota xs[0‥2]\n}\n";
+const SOURCE: &str = "incipit {\n    sit lista<numerus> xs ← [1, 2, 3]\n    nota xs[0‥2]\n}\n";
 
 fn issues(target: Target) -> Vec<String> {
     let session = Session::new(Config::default().with_target(target).with_dev_locale_root());

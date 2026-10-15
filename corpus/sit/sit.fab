@@ -59,6 +59,6 @@ main {
     label ← "deferred"
     print label
 
-    const _ idem ← nuntius
+    let idem ← nuntius
     print idem
 }

@@ -46,7 +46,7 @@ locale = "en"
 #   plain loop's output.
 
 main {
-    const list<f32> xs ← [1.0, 2.0, 3.0]
+    let list<f32> xs ← [1.0, 2.0, 3.0]
 
     for from xs at [i] thread f const v {
         print i, v

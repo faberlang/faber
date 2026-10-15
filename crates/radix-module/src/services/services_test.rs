@@ -2030,7 +2030,7 @@ fn emit_faber_file_preserves_namespace_qualified_type_references() {
     std::fs::write(&types, "@ publica\ngenus Box {\n    varia textus value\n}\n").expect("write types");
     std::fs::write(
         &main,
-        "importa ex \"./types\" T\n\nincipit {\n    fixum T.Box box ← T.Box { value = \"ok\" }\n    nota box.value\n}\n",
+        "importa ex \"./types\" T\n\nincipit {\n    sit T.Box box ← T.Box { value = \"ok\" }\n    nota box.value\n}\n",
     )
     .expect("write main");
 
@@ -2041,7 +2041,7 @@ fn emit_faber_file_preserves_namespace_qualified_type_references() {
         panic!("expected Faber output");
     };
     assert!(output.code.contains("importa ex \"./types\" T"));
-    assert!(output.code.contains("fixum T.Box box"));
+    assert!(output.code.contains("sit T.Box box"));
     assert!(!output.code.contains("genus Box"));
 }
 
@@ -2392,7 +2392,7 @@ fn check_with_installed_pack(locale: &str, source: &str) -> crate::services::Che
 
 #[test]
 fn check_valid_identifier_near_keyword_draws_no_locale002() {
-    let result = check_with_installed_pack("en", "main {\n  const int clamp ← 1\n  print clamp\n}\n");
+    let result = check_with_installed_pack("en", "main {\n  let int clamp ← 1\n  print clamp\n}\n");
 
     assert!(result.success, "diagnostics: {:?}", result.diagnostics);
     assert!(
@@ -2404,7 +2404,7 @@ fn check_valid_identifier_near_keyword_draws_no_locale002() {
 
 #[test]
 fn check_misspelled_name_at_resolve_error_keeps_locale002() {
-    let result = check_with_installed_pack("en", "main {\n  const int clamp ← 1\n  print clamq\n}\n");
+    let result = check_with_installed_pack("en", "main {\n  let int clamp ← 1\n  print clamq\n}\n");
 
     assert!(!result.success);
     assert_eq!(

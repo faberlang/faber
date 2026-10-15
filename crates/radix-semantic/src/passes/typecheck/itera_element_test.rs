@@ -14,7 +14,7 @@ fn itera_ex_copia_textus_binds_textus() {
     test_support::assert_accepts(
         "functio f(copia<textus> t) → vacuum {
     itera ex t fixum x {
-        fixum textus y ← x
+        sit textus y ← x
         nota y
     }
 }",
@@ -26,7 +26,7 @@ fn itera_ex_copia_textus_does_not_bind_numerus() {
     test_support::assert_rejects_with_issue(
         "functio f(copia<textus> t) → vacuum {
     itera ex t fixum x {
-        fixum numerus y ← x
+        sit numerus y ← x
         nota y
     }
 }",
@@ -77,7 +77,7 @@ fn itera_ex_textus_binds_littera() {
     test_support::assert_accepts(
         "functio f(textus s) → vacuum {
     itera ex s fixum c {
-        fixum littera x ← c
+        sit littera x ← c
         nota x
     }
 }",
@@ -101,7 +101,7 @@ fn itera_ex_textus_element_is_not_numerus() {
     test_support::assert_rejects_with_issue(
         "functio f(textus s) → vacuum {
     itera ex s fixum c {
-        fixum numerus x ← c
+        sit numerus x ← c
         nota x
     }
 }",
@@ -114,7 +114,7 @@ fn itera_ex_octeti_binds_index_element_type() {
     test_support::assert_accepts(
         "functio f(octeti b) → vacuum {
     itera ex b fixum x {
-        fixum b8 y ← x
+        sit b8 y ← x
         nota y
     }
 }",
@@ -126,7 +126,7 @@ fn itera_ex_symbolic_rank1_tensor_binds_element_type() {
     test_support::assert_accepts(
         "functio f<magnitudo N>(tensor<f32, [N]> v) → vacuum {
     itera ex v fixum x {
-        fixum f32 y ← x
+        sit f32 y ← x
         nota y
     }
 }",

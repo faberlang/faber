@@ -24,8 +24,8 @@ locale = "en"
 # =============================================================================
 
 main {
-    const sparsa<float, [2, 3]> s ← empty
-    const int len ← s.length()
-    const int count ← s.count_nonzero()
+    let sparsa<float, [2, 3]> s ← empty
+    let int len ← s.length()
+    let int count ← s.count_nonzero()
     print len, count
 }

@@ -18,30 +18,30 @@ fn strip_inserted(output: &str, word: &str) -> String {
     output.replace(&format!("{word} "), "")
 }
 
-const EN: &str = "+++\nlocale = \"en\"\n+++\n# header comment\n@ public\nclass Punctum {\n    # doc for x\n    int  x\n    const int y\n    static int Z = 3\n    @ private\n    list<int> xs\n    string ∪ none label optional\n\n    fn norm() → int {\n        const int local ← 1\n        return self.x + local\n    }\n}\n\nunion Figura {\n    Circulus { float radius }\n}\n";
+const EN: &str = "+++\nlocale = \"en\"\n+++\n# header comment\n@ public\nclass Punctum {\n    # doc for x\n    int  x\n    const int y\n    static int Z = 3\n    @ private\n    list<int> xs\n    string ∪ none label optional\n\n    fn norm() → int {\n        let int local ← 1\n        return self.x + local\n    }\n}\n\nunion Figura {\n    Circulus { float radius }\n}\n";
 
 #[test]
-fn en_inserts_var_before_unmarked_fields_only() {
+fn en_inserts_mut_before_unmarked_fields_only() {
     let result = insert_field_modifiers(&pack("en"), EN).expect("codemod");
     assert_eq!(result.inserted, 3);
-    assert!(result.source.contains("    var int  x\n"), "{}", result.source);
+    assert!(result.source.contains("    mut int  x\n"), "{}", result.source);
     assert!(result.source.contains("    const int y\n"), "{}", result.source);
     assert!(result.source.contains("    static int Z = 3\n"), "{}", result.source);
     assert!(
         result
             .source
-            .contains("    @ private\n    var list<int> xs\n"),
+            .contains("    @ private\n    mut list<int> xs\n"),
         "{}",
         result.source
     );
     assert!(
         result
             .source
-            .contains("    var string ∪ none label optional\n"),
+            .contains("    mut string ∪ none label optional\n"),
         "{}",
         result.source
     );
-    assert!(result.source.contains("        const int local ← 1\n"), "{}", result.source);
+    assert!(result.source.contains("        let int local ← 1\n"), "{}", result.source);
     assert!(result.source.contains("    Circulus { float radius }\n"), "{}", result.source);
 }
 
@@ -50,7 +50,7 @@ fn output_is_byte_identical_except_inserted_keywords() {
     let result = insert_field_modifiers(&pack("en"), EN).expect("codemod");
     // Every inserted span is exactly `var ` and nothing else moved.
     assert_eq!(result.source.len(), EN.len() + result.inserted * "var ".len());
-    assert_eq!(strip_inserted(&result.source, "var"), EN);
+    assert_eq!(strip_inserted(&result.source, "mut"), EN);
 }
 
 #[test]

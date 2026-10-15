@@ -82,7 +82,7 @@ fn body_lookahead_does_not_claim_a_following_call() {
     assert!(reduction.body.is_none());
 
     let declaration = parse_ok(
-        "functio t(tensor<numerus, [4]> xs) → numerus { fixum numerus total ← reducta via summa ex xs redde total }",
+        "functio t(tensor<numerus, [4]> xs) → numerus { sit numerus total ← reducta via summa ex xs redde total }",
     );
     let program = declaration.program.expect("program");
     let StmtKind::Func(function) = &program.statements[0].kind else {

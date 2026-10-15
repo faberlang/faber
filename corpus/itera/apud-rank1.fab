@@ -38,8 +38,8 @@ locale = "en"
 #   lane index and element, one line per lane (0‥3).
 
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0]
-    var tf32[3] line ← flat ↦ tf32[3]
+    let list<f32> flat ← [1.0, 2.0, 3.0]
+    mut tf32[3] line ← flat ↦ tf32[3]
 
     for from line at [i] const cell {
         print i, cell

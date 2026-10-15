@@ -11,7 +11,6 @@
 use crate::test_support::{analyze_ok, assert_rejects_with_issue};
 
 const MUTATING_METHOD_ISSUE: &str = "imperativus_operator_method_requires_varia_receiver";
-const FIELD_WRITE_ISSUE: &str = "immutable_second_assignment";
 
 const COUNTER: &str = r"
 genus Contador {
@@ -32,7 +31,7 @@ fn with_counter(rest: &str) -> String {
 #[test]
 fn const_binding_rejects_mutating_method_call() {
     assert_rejects_with_issue(
-        &with_counter("incipit {\n fixum Contador k ← Contador { n = 1 }\n k.cresce()\n}\n"),
+        &with_counter("incipit {\n sit Contador k ← Contador { n = 1 }\n k.cresce()\n}\n"),
         MUTATING_METHOD_ISSUE,
     );
 }
@@ -40,7 +39,7 @@ fn const_binding_rejects_mutating_method_call() {
 #[test]
 fn const_binding_rejects_method_that_mutates_through_a_sibling() {
     assert_rejects_with_issue(
-        &with_counter("incipit {\n fixum Contador k ← Contador { n = 1 }\n k.bis()\n}\n"),
+        &with_counter("incipit {\n sit Contador k ← Contador { n = 1 }\n k.bis()\n}\n"),
         MUTATING_METHOD_ISSUE,
     );
 }
@@ -57,7 +56,7 @@ fn plain_parameter_rejects_mutating_method_call() {
 fn plain_parameter_rejects_field_write() {
     assert_rejects_with_issue(
         &with_counter("functio f(Contador c) → vacuum { c.n ← 1 }\nincipit { }\n"),
-        FIELD_WRITE_ISSUE,
+        "assign_to_de_parameter",
     );
 }
 
@@ -97,7 +96,7 @@ fn mut_parameter_accepts_mutating_method_call() {
 #[test]
 fn const_binding_accepts_non_mutating_method_call() {
     let _ = analyze_ok(&with_counter(
-        "incipit {\n fixum Contador k ← Contador { n = 1 }\n nota k.lege()\n}\n",
+        "incipit {\n sit Contador k ← Contador { n = 1 }\n nota k.lege()\n}\n",
     ));
 }
 
@@ -110,7 +109,7 @@ genus Sacculus {
     functio adde(numerus x) → vacuum { ego.xs.appende(x) }
 }
 incipit {
-    fixum Sacculus s ← Sacculus { xs = [] }
+    sit Sacculus s ← Sacculus { xs = [] }
     s.adde(1)
 }
 ",

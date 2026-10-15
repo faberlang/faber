@@ -47,7 +47,7 @@ locale = "en"
 #   fixum.expected (Salve, Marcus! / 7 / 30 / 300)
 
 fn scale(bool compact, int base) → int {
-    const int factor
+    let int factor
     if compact {
         factor ← 10
     }
@@ -58,14 +58,14 @@ fn scale(bool compact, int base) → int {
 }
 
 test "fixum immediate init" {
-    const string nomen ← "Marcus"
-    const string salve ← "Salve, §!"(nomen)
+    let string nomen ← "Marcus"
+    let string salve ← "Salve, §!"(nomen)
     assert nomen ≡ "Marcus"
     assert salve ≡ "Salve, Marcus!"
 }
 
 test "fixum deferred init writes once" {
-    const int pending
+    let int pending
     pending ← 7
     assert pending ≡ 7
 }
@@ -76,10 +76,10 @@ test "fixum factor selected per branch" {
 }
 
 main {
-    const string nomen ← "Marcus"
-    const string salve ← "Salve, §!"(nomen)
+    let string nomen ← "Marcus"
+    let string salve ← "Salve, §!"(nomen)
     print salve
-    const int pending
+    let int pending
     pending ← 7
     print pending
     print scale(true, 3)

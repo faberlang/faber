@@ -42,7 +42,7 @@ fn verdict(string pat) → string {
         return "accepted"
     }
     catch err {
-        const list<string> parts ← err.split(":")
+        let list<string> parts ← err.split(":")
         return parts[0]
     }
 }

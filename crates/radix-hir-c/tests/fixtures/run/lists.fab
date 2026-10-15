@@ -5,27 +5,27 @@ locale = "en"
 # second binding, indexed read and write, iteration, and display of int,
 # text and bool lists.
 main {
-    var list<int> xs ← [3, 1, 4]
+    mut list<int> xs ← [3, 1, 4]
     print xs
     print xs.length(), xs.is_empty()
     xs.append(1)
     xs.append(5)
     print xs, xs[0], xs[4]
-    var list<int> ys ← xs
+    mut list<int> ys ← xs
     ys.append(9)
     print xs.length(), ys.length()
     xs[1] ← 10
     print ys
-    var int total ← 0
+    mut int total ← 0
     for from xs const x {
         total ← total + x
     }
     print total
-    const list<string> names ← ["a", "b"]
+    let list<string> names ← ["a", "b"]
     print names
-    var list<bool> flags ← empty
+    mut list<bool> flags ← empty
     flags.append(true)
     print flags, flags.length()
-    var list<int> empty ← empty
+    mut list<int> empty ← empty
     print empty, empty.is_empty()
 }

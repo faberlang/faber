@@ -29,7 +29,7 @@ diagnostic = "SEM011:bits_arithmetic_refused"
 # This exemplum intentionally fails to compile.
 
 main {
-    const b8 a ← 0x01
-    const b8 b ← 0x02
+    let b8 a ← 0x01
+    let b8 b ← 0x02
     print a + b
 }

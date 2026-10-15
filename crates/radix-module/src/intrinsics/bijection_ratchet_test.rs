@@ -163,7 +163,7 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
                 "tf32[3]",
                 "varia tf32[3] r ← [0.5, 0.5, 0.5] ↦ tf32[3]",
                 "",
-                "fixum lista<f32> flat ← [0.5, 0.5, 0.5]",
+                "sit lista<f32> flat ← [0.5, 0.5, 0.5]",
                 "0.5",
                 "fractus",
                 "[0]",
@@ -173,7 +173,7 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
                 "ti32[3]",
                 "varia ti32[3] r ← [1, 1, 1] ↦ ti32[3]",
                 "",
-                "fixum lista<i32> flat ← [1, 1, 1]",
+                "sit lista<i32> flat ← [1, 1, 1]",
                 "1",
                 "numerus",
                 "[0]",
@@ -228,7 +228,7 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
             // receiver as an `in` (mutable-borrow) parameter instead of a local.
             "",
             "in atomic<i32> r",
-            "fixum i32 v ← 1 ↦ i32",
+            "sit i32 v ← 1 ↦ i32",
             "v",
             "numerus",
             "0",
@@ -237,7 +237,7 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
         IntrinsicReceiver::Regex => vec![dtype(
             "regex",
             "regex r",
-            "fixum regex r ← \"[0-9]+\" ↦ regex",
+            "sit regex r ← \"[0-9]+\" ↦ regex",
             "",
             "",
             "\"12\"",
@@ -253,7 +253,7 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
             "regex rx",
             "",
             "regex rx",
-            "fixum _ r ← rx.inventa(\"xy\")",
+            "sit r ← rx.inventa(\"xy\")",
             "\"xy\"",
             "textus",
             "0",
@@ -418,15 +418,15 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
     } else if key == "Tensor.gather/1" {
         // Gather's shape-transforming result cannot be inferred from the
         // `_` binding; pin the result shape like the corpus exemplar.
-        format!("    fixum {sugar}[4, 3] ex ← {call}")
+        format!("    sit {sugar}[4, 3] ex ← {call}")
     } else if row.failable {
         // A failable read (`apud`, need; unit sb272) reports on `⇥`
         // and needs a `⊥` default, a `fac`/`cape` handler or an enclosing `⇥`:
         // the probe supplies a handler so it meets method admission, not
         // SEM011 failable_call_requires_handler.
-        format!("    fac {{\n        fixum _ ex ← {call}\n    }} cape err {{\n    }}")
+        format!("    fac {{\n        sit ex ← {call}\n    }} cape err {{\n    }}")
     } else {
-        format!("    fixum _ ex ← {call}")
+        format!("    sit ex ← {call}")
     };
     let mut src = String::new();
     let _ = writeln!(src, "functio proba({param}) → vacuum {{");

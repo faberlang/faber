@@ -28,7 +28,7 @@ fn bf16_literal_and_print_forms_keep_the_whole_marker() {
     test_support::assert_accepts_la(
         r"
 incipit {
-    fixum bf16 value ← 1.0
+    sit bf16 value ← 1.0
     nota value
 }
 ",
@@ -41,8 +41,8 @@ fn bf16_does_not_silently_widen_to_f32() {
     test_support::assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum bf16 value ← 1.0
-    fixum f32 widened ← value
+    sit bf16 value ← 1.0
+    sit f32 widened ← value
 }
 ",
         "initializer_annotation_mismatch",

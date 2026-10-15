@@ -4,7 +4,7 @@
 
 use crate::test_support::{analyze_source_with_config, issue};
 
-const DEFS: &str = "class Box {\n    var list<int> xs\n}\n\
+const DEFS: &str = "class Box {\n    mut list<int> xs\n}\n\
 fn eat(own list<int> xs) → void { print xs.length() }\n\
 fn dup(copy list<int> xs) → void { print xs.length() }\n\
 fn peek(list<int> xs) → void { print xs.length() }\n\
@@ -34,7 +34,7 @@ fn func(sig_and_body: &str) -> Vec<String> {
     issues(&format!("{DEFS}{sig_and_body}\nmain {{ }}\n"))
 }
 
-const LOCAL: &str = "    var list<int> a ← [1, 2, 3]\n";
+const LOCAL: &str = "    mut list<int> a ← [1, 2, 3]\n";
 
 #[test]
 fn whole_local_fresh_and_exclusive_parameters_are_accepted() {
@@ -47,15 +47,15 @@ fn whole_local_fresh_and_exclusive_parameters_are_accepted() {
 
 #[test]
 fn field_and_element_arguments_are_not_local_bindings() {
-    let field = "    const Box b ← Box { xs = [1] }\n    eat(own b.xs)";
+    let field = "    let Box b ← Box { xs = [1] }\n    eat(own b.xs)";
     assert_eq!(main_body(field), ["own_argument_not_local_binding"]);
-    let element = "    var list<list<int>> a ← [[1], [2]]\n    eat(own a[0])";
+    let element = "    mut list<list<int>> a ← [[1], [2]]\n    eat(own a[0])";
     assert_eq!(main_body(element), ["own_argument_not_local_binding"]);
 }
 
 #[test]
 fn copy_of_a_field_is_accepted_and_does_not_kill_the_name() {
-    let body = "    const Box b ← Box { xs = [1] }\n    dup(copy b.xs)\n    dup(copy b.xs)\n    print b.xs.length()";
+    let body = "    let Box b ← Box { xs = [1] }\n    dup(copy b.xs)\n    dup(copy b.xs)\n    print b.xs.length()";
     assert!(main_body(body).is_empty());
     let local = format!("{LOCAL}    dup(copy a)\n    print a.length()");
     assert!(main_body(&local).is_empty());
@@ -79,16 +79,15 @@ fn module_constant_cannot_be_given_away() {
 
 #[test]
 fn loop_binder_cannot_be_given_away() {
-    let body = "    const list<list<int>> ll ← [[1], [2]]\n    for from ll const x {\n        eat(own x)\n    }";
+    let body = "    let list<list<int>> ll ← [[1], [2]]\n    for from ll const x {\n        eat(own x)\n    }";
     assert_eq!(main_body(body), ["own_argument_loop_binder"]);
 }
 
 #[test]
 fn method_arguments_follow_the_same_rules() {
-    let ok = format!("    const Sink s ← Sink {{}}\n{LOCAL}    s.take(own a)");
+    let ok = format!("    let Sink s ← Sink {{}}\n{LOCAL}    s.take(own a)");
     assert!(main_body(&ok).is_empty());
-    let bad =
-        "    const Sink s ← Sink {}\n    const Box b ← Box { xs = [1] }\n    s.take(own b.xs)";
+    let bad = "    let Sink s ← Sink {}\n    let Box b ← Box { xs = [1] }\n    s.take(own b.xs)";
     assert_eq!(main_body(bad), ["own_argument_not_local_binding"]);
 }
 
@@ -108,7 +107,7 @@ fn use_after_own_of_an_exclusive_source_is_use_after_move() {
 
 #[test]
 fn a_different_name_after_the_move_is_fine() {
-    let body = format!("{LOCAL}    var list<int> c ← [4]\n    eat(own a)\n    print c.length()");
+    let body = format!("{LOCAL}    mut list<int> c ← [4]\n    eat(own a)\n    print c.length()");
     assert!(main_body(&body).is_empty());
 }
 
@@ -138,14 +137,14 @@ fn branches_do_not_kill_each_other() {
 
 #[test]
 fn a_diverging_branch_does_not_kill_the_name_after_the_join() {
-    let f = "fn f(list<int> q) → void {\n    var list<int> a ← [1]\n    if q.length() ≻ 1 {\n        eat(own a)\n        return\n    }\n    print a.length()\n}";
+    let f = "fn f(list<int> q) → void {\n    mut list<int> a ← [1]\n    if q.length() ≻ 1 {\n        eat(own a)\n        return\n    }\n    print a.length()\n}";
     assert!(func(f).is_empty());
 }
 
 #[test]
 fn moving_an_outer_binding_in_a_while_body_is_moved_in_loop() {
     let body = format!(
-        "{LOCAL}    var bool c ← true\n    while c {{\n        eat(own a)\n        c ← false\n    }}"
+        "{LOCAL}    mut bool c ← true\n    while c {{\n        eat(own a)\n        c ← false\n    }}"
     );
     assert_eq!(main_body(&body), ["moved_in_loop"]);
     let exclusive =
@@ -155,18 +154,18 @@ fn moving_an_outer_binding_in_a_while_body_is_moved_in_loop() {
 
 #[test]
 fn a_value_created_in_the_loop_body_moves_once_per_iteration() {
-    let body = "    var bool c ← true\n    while c {\n        var list<int> b ← [1]\n        eat(own b)\n        c ← false\n    }";
+    let body = "    mut bool c ← true\n    while c {\n        mut list<int> b ← [1]\n        eat(own b)\n        c ← false\n    }";
     assert!(main_body(body).is_empty());
 }
 
 #[test]
 fn a_loop_that_reassigns_or_leaves_after_the_move_is_fine() {
     let reassign = format!(
-        "{LOCAL}    var bool c ← true\n    while c {{\n        eat(own a)\n        a ← [2]\n        c ← false\n    }}"
+        "{LOCAL}    mut bool c ← true\n    while c {{\n        eat(own a)\n        a ← [2]\n        c ← false\n    }}"
     );
     assert!(main_body(&reassign).is_empty());
     let leaves = format!(
-        "{LOCAL}    var bool c ← true\n    while c {{\n        eat(own a)\n        break\n    }}"
+        "{LOCAL}    mut bool c ← true\n    while c {{\n        eat(own a)\n        break\n    }}"
     );
     assert!(main_body(&leaves).is_empty());
 }
@@ -174,7 +173,7 @@ fn a_loop_that_reassigns_or_leaves_after_the_move_is_fine() {
 #[test]
 fn a_break_in_a_nested_loop_does_not_leave_the_outer_loop() {
     let body = format!(
-        "{LOCAL}    var bool c ← true\n    var bool d ← true\n    while c {{\n        eat(own a)\n        while d {{\n            d ← false\n            break\n        }}\n        c ← false\n    }}"
+        "{LOCAL}    mut bool c ← true\n    mut bool d ← true\n    while c {{\n        eat(own a)\n        while d {{\n            d ← false\n            break\n        }}\n        c ← false\n    }}"
     );
     assert_eq!(main_body(&body), ["moved_in_loop"]);
 }
@@ -182,7 +181,7 @@ fn a_break_in_a_nested_loop_does_not_leave_the_outer_loop() {
 #[test]
 fn a_return_inside_a_closure_does_not_leave_the_loop() {
     let body = format!(
-        "{LOCAL}    var bool c ← true\n    while c {{\n        eat(own a)\n        const () → int f ← () → int ∴ do {{\n            return 1\n        }}\n        print f()\n        c ← false\n    }}"
+        "{LOCAL}    mut bool c ← true\n    while c {{\n        eat(own a)\n        let () → int f ← () → int ∴ do {{\n            return 1\n        }}\n        print f()\n        c ← false\n    }}"
     );
     assert_eq!(main_body(&body), ["moved_in_loop"]);
 }
@@ -195,25 +194,22 @@ fn a_return_in_a_nested_loop_still_leaves_the_function() {
 
 #[test]
 fn a_closure_called_after_its_captured_name_was_given_away_is_rejected() {
-    let body = format!(
-        "{LOCAL}    const () → int f ← () → int ∴ a.length()\n    eat(own a)\n    print f()"
-    );
+    let body =
+        format!("{LOCAL}    let () → int f ← () → int ∴ a.length()\n    eat(own a)\n    print f()");
     assert_eq!(main_body(&body), ["moved_name_captured_by_closure"]);
 }
 
 #[test]
 fn a_closure_called_before_the_move_is_fine() {
-    let body = format!(
-        "{LOCAL}    const () → int f ← () → int ∴ a.length()\n    print f()\n    eat(own a)"
-    );
+    let body =
+        format!("{LOCAL}    let () → int f ← () → int ∴ a.length()\n    print f()\n    eat(own a)");
     assert!(main_body(&body).is_empty());
 }
 
 #[test]
 fn bind_form_own_from_unmarked_behaves_as_before() {
-    let dead =
-        "    const list<int> a ← [1, 2, 3]\n    const list<int> b ← own a\n    print b.length()";
+    let dead = "    let list<int> a ← [1, 2, 3]\n    let list<int> b ← own a\n    print b.length()";
     assert!(main_body(dead).is_empty());
-    let live = "    const list<int> a ← [1, 2, 3]\n    const list<int> b ← own a\n    print a.length()\n    print b.length()";
+    let live = "    let list<int> a ← [1, 2, 3]\n    let list<int> b ← own a\n    print a.length()\n    print b.length()";
     assert_eq!(main_body(live), ["unmarked_into_own"]);
 }

@@ -37,16 +37,16 @@ fn normal(int code) → vector<f32, 3> ∪ none {
 }
 
 main {
-    const vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    const vector<i32, 4> w ← [10, 20, 30, 40] ↦ vector<i32, 4>
+    let vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    let vector<i32, 4> w ← [10, 20, 30, 40] ↦ vector<i32, 4>
     print v[1]
-    const f32 a ← v[2]
+    let f32 a ← v[2]
     print a
     print w[3]
-    const vector<f32, 3> ∪ none hit ← normal(1)
+    let vector<f32, 3> ∪ none hit ← normal(1)
     print hit![2]
     print v[0] + v[1] + v[2]
-    var vector<f32, 3> u ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    mut vector<f32, 3> u ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
     u[1] ← 9.0
     print u
 }

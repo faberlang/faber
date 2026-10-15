@@ -35,7 +35,7 @@ fn own_fresh_literal_is_legal() {
     let _ = analyze_ok_la(
         r"
 incipit {
-    fixum lista<numerus> xs ← own [1, 2, 3]
+    sit lista<numerus> xs ← own [1, 2, 3]
     nota xs.longitudo()
 }
 ",
@@ -47,8 +47,8 @@ fn own_transfer_without_later_use_is_legal() {
     let _ = analyze_ok_la(
         r"
 incipit {
-    fixum lista<numerus> a ← own [1, 2, 3]
-    fixum lista<numerus> b ← own a
+    sit lista<numerus> a ← own [1, 2, 3]
+    sit lista<numerus> b ← own a
     nota b.longitudo()
 }
 ",
@@ -60,8 +60,8 @@ fn own_transfer_then_use_is_sem050() {
     assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum lista<numerus> a ← own [1, 2, 3]
-    fixum lista<numerus> b ← own a
+    sit lista<numerus> a ← own [1, 2, 3]
+    sit lista<numerus> b ← own a
     nota a.longitudo()
     nota b.longitudo()
 }
@@ -78,7 +78,7 @@ functio take(own lista<numerus> xs) → vacuum {
     nota xs.longitudo()
 }
 incipit {
-    fixum lista<numerus> a ← own [1, 2, 3]
+    sit lista<numerus> a ← own [1, 2, 3]
     take(a)
     nota a.longitudo()
 }
@@ -92,8 +92,8 @@ fn unmarked_dead_into_own_is_legal() {
     let _ = analyze_ok_la(
         r"
 incipit {
-    fixum lista<numerus> a ← [1, 2, 3]
-    fixum lista<numerus> b ← own a
+    sit lista<numerus> a ← [1, 2, 3]
+    sit lista<numerus> b ← own a
     nota b.longitudo()
 }
 ",
@@ -105,8 +105,8 @@ fn unmarked_live_into_own_rejects_with_copy_suggestion() {
     assert_own_bind_rejects(
         r"
 incipit {
-    fixum lista<numerus> a ← [1, 2, 3]
-    fixum lista<numerus> b ← own a
+    sit lista<numerus> a ← [1, 2, 3]
+    sit lista<numerus> b ← own a
     nota a.longitudo()
     nota b.longitudo()
 }
@@ -120,8 +120,8 @@ fn ref_into_own_rejects_with_copy_suggestion() {
     assert_own_bind_rejects(
         r"
 incipit {
-    fixum de lista<numerus> a ← [1, 2, 3]
-    fixum lista<numerus> b ← own a
+    sit de lista<numerus> a ← [1, 2, 3]
+    sit lista<numerus> b ← own a
 }
 ",
         ISSUE_REF_INTO_OWN,
@@ -134,7 +134,7 @@ fn mut_into_own_rejects_with_copy_suggestion() {
         r"
 incipit {
     varia in lista<numerus> a ← [1, 2, 3]
-    fixum lista<numerus> b ← own a
+    sit lista<numerus> b ← own a
 }
 ",
         ISSUE_MUT_INTO_OWN,
@@ -149,7 +149,7 @@ functio take(own lista<numerus> xs) → vacuum {
     nota xs.longitudo()
 }
 incipit {
-    fixum lista<numerus> a ← [1, 2, 3]
+    sit lista<numerus> a ← [1, 2, 3]
     varia in lista<numerus> b ← a
     take(b)
 }
@@ -166,8 +166,8 @@ genus Persona {
     varia lista<numerus> amici
 }
 incipit {
-    fixum Persona p ← Persona { amici = [1, 2] }
-    fixum lista<numerus> b ← own p.amici
+    sit Persona p ← Persona { amici = [1, 2] }
+    sit lista<numerus> b ← own p.amici
 }
 ",
         ISSUE_FIELD_INTO_OWN,
@@ -179,8 +179,8 @@ fn index_into_own_rejects_with_copy_suggestion() {
     assert_own_bind_rejects(
         r"
 incipit {
-    fixum lista<lista<numerus>> xs ← [[1], [2]]
-    fixum lista<numerus> b ← own xs[0]
+    sit lista<lista<numerus>> xs ← [[1], [2]]
+    sit lista<numerus> b ← own xs[0]
 }
 ",
         ISSUE_INDEX_INTO_OWN,
@@ -192,9 +192,9 @@ fn shared_branch_into_own_rejects_with_copy_suggestion() {
     assert_own_bind_rejects(
         r"
 incipit {
-    fixum lista<numerus> a ← [1]
-    fixum lista<numerus> b ← [2]
-    fixum lista<numerus> c ← own verum ✓ a ✗ b
+    sit lista<numerus> a ← [1]
+    sit lista<numerus> b ← [2]
+    sit lista<numerus> c ← own verum ✓ a ✗ b
 }
 ",
         ISSUE_SHARED_INTO_OWN,
@@ -206,8 +206,8 @@ fn copy_source_transfers_like_own() {
     let _ = analyze_ok_la(
         r"
 incipit {
-    fixum lista<numerus> a ← copy [1, 2, 3]
-    fixum lista<numerus> b ← own a
+    sit lista<numerus> a ← copy [1, 2, 3]
+    sit lista<numerus> b ← own a
     nota b.longitudo()
 }
 ",
@@ -219,8 +219,8 @@ fn copy_source_then_use_is_sem050() {
     assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum lista<numerus> a ← copy [1, 2, 3]
-    fixum lista<numerus> b ← own a
+    sit lista<numerus> a ← copy [1, 2, 3]
+    sit lista<numerus> b ← own a
     nota a.longitudo()
 }
 ",

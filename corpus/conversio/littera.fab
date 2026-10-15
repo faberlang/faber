@@ -37,54 +37,54 @@ locale = "en"
 
 main {
     # A number converted to text is its digits.
-    const string s ← 7 ↦ string
+    let string s ← 7 ↦ string
     print s
-    const ascii a ← 42 ↦ ascii
+    let ascii a ← 42 ↦ ascii
     print a
-    const char seven ← 7 ↦ char ⊥ '?'
+    let char seven ← 7 ↦ char ⊥ '?'
     print seven
-    const char two ← 42 ↦ char ⊥ '?'
+    let char two ← 42 ↦ char ⊥ '?'
     print two
 
     # A char parses as its digit.
-    const char d ← '7'
-    const int n ← d ↦ int ⊥ -1
+    let char d ← '7'
+    let int n ← d ↦ int ⊥ -1
     print n
-    const char x ← 'x'
-    const int bad ← x ↦ int ⊥ -1
+    let char x ← 'x'
+    let int bad ← x ↦ int ⊥ -1
     print bad
 
     # A char is a one-letter string.
-    const string letter ← x ↦ string
+    let string letter ← x ↦ string
     print letter
 
     # A string converts to a char only with exactly one letter.
-    const string u ← "ü"
-    const char uc ← u ↦ char ⊥ '?'
+    let string u ← "ü"
+    let char uc ← u ↦ char ⊥ '?'
     print uc
-    const string pair ← "xy"
-    const char pc ← pair ↦ char ⊥ '?'
+    let string pair ← "xy"
+    let char pc ← pair ↦ char ⊥ '?'
     print pc
 
     # Bytes decode to text; one byte converts through a window.
-    const list<b8> raw ← |68 69 ff|
-    const string hi ← raw[0‥2] ↦ string ⊥ "?"
+    let list<b8> raw ← |68 69 ff|
+    let string hi ← raw[0‥2] ↦ string ⊥ "?"
     print hi
-    const string broken ← raw ↦ string ⊥ "?"
+    let string broken ← raw ↦ string ⊥ "?"
     print broken
-    const ascii first ← raw[0‥1] ↦ ascii ⊥ '--'
+    let ascii first ← raw[0‥1] ↦ ascii ⊥ '--'
     print first
-    const ascii high ← raw[2‥3] ↦ ascii ⊥ '--'
+    let ascii high ← raw[2‥3] ↦ ascii ⊥ '--'
     print high
 
     # Code points use the Code hint.
-    const char big ← 'A'
-    const u32 code ← big ↦ u32 via Code
+    let char big ← 'A'
+    let u32 code ← big ↦ u32 via Code
     print code
-    const char back ← 65 ↦ char via Code ⊥ '?'
+    let char back ← 65 ↦ char via Code ⊥ '?'
     print back
-    const char surrogate ← 55296 ↦ char via Code ⊥ '?'
+    let char surrogate ← 55296 ↦ char via Code ⊥ '?'
     print surrogate
-    const char beyond ← 1114112 ↦ char via Code ⊥ '?'
+    let char beyond ← 1114112 ↦ char via Code ⊥ '?'
     print beyond
 }

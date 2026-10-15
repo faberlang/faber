@@ -57,7 +57,7 @@ fn infinite_sync_cursor_with_early_break_terminates() {
 locale = "en"
 +++
 fn naturals() generator → int {
-    var int i ← 0
+    mut int i ← 0
     while true {
         print "produce §"(i)
         yield i
@@ -87,7 +87,7 @@ fn infinite_async_cursor_with_early_break_terminates() {
 locale = "en"
 +++
 fn naturals() async_generator → int {
-    var int i ← 0
+    mut int i ← 0
     while true {
         print "produce §"(i)
         yield i
@@ -117,7 +117,7 @@ fn generator_consuming_an_infinite_generator_stays_lazy() {
 locale = "en"
 +++
 fn naturals() generator → int {
-    var int i ← 0
+    mut int i ← 0
     while true {
         yield i
         i ← i + 1
@@ -156,9 +156,9 @@ fn pair() generator → int {
 
 main {
     print pair()
-    const list<int> all ← pair() ↦ list<int>
+    let list<int> all ← pair() ↦ list<int>
     print all.length()
-    var int total ← 0
+    mut int total ← 0
     for from pair() const n {
         total ← total + n
     }

@@ -26,11 +26,11 @@ use crate::mir::{BufferHost, RunSourceError, run_source};
 fn run_unit_rope(method: &str) -> Vec<f64> {
     let source = format!(
         "incipit {{
-    fixum lista<f32> flat ← [1.0, 0.0, 0.0, 0.0]
-    fixum tensor<f32, [4]> x ← flat ↦ tensor<f32, [4]>
-    fixum lista<f32> table_flat ← [0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
-    fixum tensor<f32, [1, 2, 3]> rope_table ← table_flat ↦ tensor<f32, [1, 2, 3]>
-    fixum tensor<f32, [4]> y ← x.{method}<4>(0, rope_table)
+    sit lista<f32> flat ← [1.0, 0.0, 0.0, 0.0]
+    sit tensor<f32, [4]> x ← flat ↦ tensor<f32, [4]>
+    sit lista<f32> table_flat ← [0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
+    sit tensor<f32, [1, 2, 3]> rope_table ← table_flat ↦ tensor<f32, [1, 2, 3]>
+    sit tensor<f32, [4]> y ← x.{method}<4>(0, rope_table)
     nota y
 }}"
     );

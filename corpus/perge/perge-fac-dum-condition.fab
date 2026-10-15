@@ -29,7 +29,7 @@ locale = "en"
 
 main {
     # perge at n ≥ 2 still tests `n < 4`, so the loop ends when n reaches 4.
-    var int n ← 0
+    mut int n ← 0
     do {
         n ↑
         if n ≥ 2 { continue }
@@ -38,7 +38,7 @@ main {
     print "done"
 
     # perge passes through two plain fac blocks to the dum test.
-    var int m ← 0
+    mut int m ← 0
     do {
         do {
             do {

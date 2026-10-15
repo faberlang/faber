@@ -6,8 +6,8 @@
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
-const PRELUDE: &str = "fixum tensor<f32, [2]> a ← [1.0, 2.0] ↦ tensor<f32, [2]>
-fixum tensor<f32, [2]> b ← [2.0, 1.0] ↦ tensor<f32, [2]>
+const PRELUDE: &str = "sit tensor<f32, [2]> a ← [1.0, 2.0] ↦ tensor<f32, [2]>
+sit tensor<f32, [2]> b ← [2.0, 1.0] ↦ tensor<f32, [2]>
 ";
 
 fn issues(target: Target, body: &str) -> Vec<String> {
@@ -34,12 +34,12 @@ fn assert_rejected(target: Target, body: &str) {
 }
 
 const LIFTED: &[&str] = &[
-    "fixum tensor<f32, [2]> r ← a * 0.5",
-    "fixum tensor<f32, [2]> r ← -a",
-    "fixum tensor<bivalens, [2]> r ← a ≻ b",
-    "fixum tensor<f32, [2]> r ← a ⤒ b",
-    "fixum tensor<f32, [2]> r ← (a ≻ b) ✓ a ✗ b",
-    "fixum tensor<f32, [2]> r ← a ÷ b",
+    "sit tensor<f32, [2]> r ← a * 0.5",
+    "sit tensor<f32, [2]> r ← -a",
+    "sit tensor<bivalens, [2]> r ← a ≻ b",
+    "sit tensor<f32, [2]> r ← a ⤒ b",
+    "sit tensor<f32, [2]> r ← (a ≻ b) ✓ a ✗ b",
+    "sit tensor<f32, [2]> r ← a ÷ b",
 ];
 
 /// The forms the TypeScript carrier lifts itself (`Tensor.lift`, `map`,
@@ -47,24 +47,24 @@ const LIFTED: &[&str] = &[
 /// `vel` forms.
 #[cfg(feature = "hir-ts")]
 const TS_LIFTED: &[&str] = &[
-    "fixum tensor<f32, [2]> r ← a * 0.5",
-    "fixum tensor<f32, [2]> r ← 10.0 - a",
-    "fixum tensor<f32, [2]> r ← a + 1.0",
-    "fixum tensor<f32, [2]> r ← a / 4.0",
-    "fixum tensor<f32, [2]> r ← a % 3.0",
-    "fixum tensor<f32, [2]> r ← -a",
-    "fixum tensor<bivalens, [2]> r ← a ≻ b",
-    "fixum tensor<f32, [2]> r ← a ⤒ b",
-    "fixum tensor<f32, [2]> r ← a ⤓ b",
-    "fixum tensor<f32, [2]> r ← (a ≻ b) ✓ a ✗ b",
-    "fixum tensor<f32, [2]> r ← (a ≻ b) ✓ 1.0 ✗ 0.0",
-    "fixum tensor<bivalens, [2]> r ← non (a ≻ b)",
-    "fixum tensor<bivalens, [2]> r ← (a ≺ 2.0) aut (a ≻ 3.0)",
-    "fixum tensor<bivalens, [2]> r ← (a ≻ 1.0) et (a ≤ b)",
-    "fixum tensor<f32, [2]> r ← a ÷ b",
-    "fixum tensor<bivalens, [2]> r ← a ≅ b",
-    "fixum tensor<bivalens, [2]> r ← a ≇ 2.0",
-    "fixum tensor<bivalens, [2]> r ← a ≤ b",
+    "sit tensor<f32, [2]> r ← a * 0.5",
+    "sit tensor<f32, [2]> r ← 10.0 - a",
+    "sit tensor<f32, [2]> r ← a + 1.0",
+    "sit tensor<f32, [2]> r ← a / 4.0",
+    "sit tensor<f32, [2]> r ← a % 3.0",
+    "sit tensor<f32, [2]> r ← -a",
+    "sit tensor<bivalens, [2]> r ← a ≻ b",
+    "sit tensor<f32, [2]> r ← a ⤒ b",
+    "sit tensor<f32, [2]> r ← a ⤓ b",
+    "sit tensor<f32, [2]> r ← (a ≻ b) ✓ a ✗ b",
+    "sit tensor<f32, [2]> r ← (a ≻ b) ✓ 1.0 ✗ 0.0",
+    "sit tensor<bivalens, [2]> r ← non (a ≻ b)",
+    "sit tensor<bivalens, [2]> r ← (a ≺ 2.0) aut (a ≻ 3.0)",
+    "sit tensor<bivalens, [2]> r ← (a ≻ 1.0) et (a ≤ b)",
+    "sit tensor<f32, [2]> r ← a ÷ b",
+    "sit tensor<bivalens, [2]> r ← a ≅ b",
+    "sit tensor<bivalens, [2]> r ← a ≇ 2.0",
+    "sit tensor<bivalens, [2]> r ← a ≤ b",
 ];
 
 #[cfg(feature = "hir-ts")]
@@ -116,7 +116,7 @@ fn swift_python_and_haskell_reject_the_lifted_forms() {
 #[cfg(feature = "hir-faber")]
 #[test]
 fn faber_reemission_keeps_the_lifted_forms() {
-    let found = issues(Target::HirFaber, "fixum tensor<bivalens, [2]> r ← a > b");
+    let found = issues(Target::HirFaber, "sit tensor<bivalens, [2]> r ← a > b");
     assert!(
         !found
             .iter()
@@ -128,7 +128,7 @@ fn faber_reemission_keeps_the_lifted_forms() {
 #[cfg(feature = "hir-ts")]
 #[test]
 fn same_element_tensor_plus_keeps_its_emitter() {
-    let found = issues(Target::HirTypeScript, "fixum tensor<f32, [2]> r ← a + b");
+    let found = issues(Target::HirTypeScript, "sit tensor<f32, [2]> r ← a + b");
     assert!(
         !found
             .iter()
@@ -141,7 +141,7 @@ fn same_element_tensor_plus_keeps_its_emitter() {
 #[test]
 fn rust_admits_scalar_coalesce_over_a_shifted_view() {
     // The runtime carries `vel` over a nullable-element tensor as `coalesce`.
-    let found = issues(Target::HirRust, "fixum tensor<f32, [2]> r ← a.disloco([1]) vel 0.0");
+    let found = issues(Target::HirRust, "sit tensor<f32, [2]> r ← a.disloco([1]) vel 0.0");
     // Only the unused-binding warnings remain: the form type-checks and emits.
     assert!(found.iter().all(|issue| issue == "unused_variable"), "{found:?}");
 }
@@ -149,16 +149,16 @@ fn rust_admits_scalar_coalesce_over_a_shifted_view() {
 #[cfg(feature = "hir-ts")]
 #[test]
 fn typescript_still_rejects_coalesce_over_a_shifted_view() {
-    assert_rejected(Target::HirTypeScript, "fixum tensor<f32, [2]> r ← a.disloco([1]) vel 0.0");
+    assert_rejected(Target::HirTypeScript, "sit tensor<f32, [2]> r ← a.disloco([1]) vel 0.0");
 }
 
 /// `≡ ≢` between two tensors compare whole values; the runner and the
 /// TypeScript emitter are their only executors, so every other HIR-backed
 /// target names `tensor_equality_unsupported_on_target`.
 const WHOLE_EQUALITY: &[&str] = &[
-    "fixum bivalens r ← a ≡ b",
-    "fixum bivalens r ← a ≢ b",
-    "fixum bivalens r ← a ≡ a",
+    "sit bivalens r ← a ≡ b",
+    "sit bivalens r ← a ≢ b",
+    "sit bivalens r ← a ≡ a",
 ];
 
 fn assert_equality_rejected(target: Target, body: &str) {

@@ -70,7 +70,7 @@ fn Sigma1_32(wrapping<u32> x) → wrapping<u32> {
 
 @ private
 fn word32(list<u8> buf, int off) → wrapping<u32> {
-    var wrapping<u32> w ↤ buf[off]
+    mut wrapping<u32> w ↤ buf[off]
     w ← w ⇐ 8
     w ← w ∨ (buf[off + 1] ↦ wrapping<u32>)
     w ← w ⇐ 8
@@ -82,13 +82,13 @@ fn word32(list<u8> buf, int off) → wrapping<u32> {
 
 @ private
 fn schedule32(list<u8> buf, int init) → list<wrapping<u32>> {
-    var list<wrapping<u32>> w ← []
+    mut list<wrapping<u32>> w ← []
     for range 0‥16 const i {
         w.append(word32(buf, init + i * 4))
     }
     for range 16‥64 const i {
-        const wrapping<u32> s0 ← sigma0_32(w[i - 15])
-        const wrapping<u32> s1 ← sigma1_32(w[i - 2])
+        let wrapping<u32> s0 ← sigma0_32(w[i - 15])
+        let wrapping<u32> s1 ← sigma1_32(w[i - 2])
         w.append(s1 + w[i - 7] + s0 + w[i - 16])
     }
     return w
@@ -96,21 +96,21 @@ fn schedule32(list<u8> buf, int init) → list<wrapping<u32>> {
 
 @ private
 fn compress32(list<wrapping<u32>> state, list<wrapping<u32>> w, list<wrapping<u32>> k) → list<wrapping<u32>> {
-    var wrapping<u32> a ← state[0]
-    var wrapping<u32> b ← state[1]
-    var wrapping<u32> c ← state[2]
-    var wrapping<u32> d ← state[3]
-    var wrapping<u32> e ← state[4]
-    var wrapping<u32> f ← state[5]
-    var wrapping<u32> g ← state[6]
-    var wrapping<u32> h ← state[7]
+    mut wrapping<u32> a ← state[0]
+    mut wrapping<u32> b ← state[1]
+    mut wrapping<u32> c ← state[2]
+    mut wrapping<u32> d ← state[3]
+    mut wrapping<u32> e ← state[4]
+    mut wrapping<u32> f ← state[5]
+    mut wrapping<u32> g ← state[6]
+    mut wrapping<u32> h ← state[7]
     for range 0‥64 const i {
-        const wrapping<u32> s1 ← Sigma1_32(e)
-        const wrapping<u32> choose ← (e ∧ f) ⊻ ((¬e) ∧ g)
-        const wrapping<u32> t1 ← h + s1 + choose + k[i] + w[i]
-        const wrapping<u32> s0 ← Sigma0_32(a)
-        const wrapping<u32> majority ← (a ∧ b) ⊻ (a ∧ c) ⊻ (b ∧ c)
-        const wrapping<u32> t2 ← s0 + majority
+        let wrapping<u32> s1 ← Sigma1_32(e)
+        let wrapping<u32> choose ← (e ∧ f) ⊻ ((¬e) ∧ g)
+        let wrapping<u32> t1 ← h + s1 + choose + k[i] + w[i]
+        let wrapping<u32> s0 ← Sigma0_32(a)
+        let wrapping<u32> majority ← (a ∧ b) ⊻ (a ∧ c) ⊻ (b ∧ c)
+        let wrapping<u32> t2 ← s0 + majority
         h ← g
         g ← f
         f ← e
@@ -120,7 +120,7 @@ fn compress32(list<wrapping<u32>> state, list<wrapping<u32>> w, list<wrapping<u3
         b ← a
         a ← t1 + t2
     }
-    var list<wrapping<u32>> result ← []
+    mut list<wrapping<u32>> result ← []
     result.append(a + state[0])
     result.append(b + state[1])
     result.append(c + state[2])
@@ -137,9 +137,9 @@ fn compress32(list<wrapping<u32>> state, list<wrapping<u32>> w, list<wrapping<u3
 # `word ↦ int<u8>` is magnitude-checked and would abort on any word above 255.
 @ private
 fn serialize32(list<wrapping<u32>> h) → list<u8> {
-    var list<u8> out ← []
+    mut list<u8> out ← []
     for range 0‥8 const i {
-        const wrapping<u32> word ← h[i]
+        let wrapping<u32> word ← h[i]
         out.append(((word ⇒ 24) ↦ wrapping<u8>) ↦ u8)
         out.append(((word ⇒ 16) ↦ wrapping<u8>) ↦ u8)
         out.append(((word ⇒ 8) ↦ wrapping<u8>) ↦ u8)
@@ -151,8 +151,8 @@ fn serialize32(list<wrapping<u32>> h) → list<u8> {
 # The length bytes use the same wrapping extraction as serialize32.
 @ private
 fn pad32(list<b8> data) → list<u8> {
-    const int bit_len ← data.length() * 8
-    var list<u8> padded ← []
+    let int bit_len ← data.length() * 8
+    mut list<u8> padded ← []
     for range 0‥data.length() const i {
         padded.append((data.get(i) coalesce (0 ∷ b8)) ↦ u8)
     }
@@ -161,7 +161,7 @@ fn pad32(list<b8> data) → list<u8> {
         padded.append(0 ∷ u8)
     }
     for range 0‥8 const i {
-        const int shift ← (7 - i) * 8
+        let int shift ← (7 - i) * 8
         padded.append(((bit_len ⇒ shift) ↦ wrapping<u8>) ↦ u8)
     }
     return padded
@@ -174,16 +174,16 @@ fn K32() → list<wrapping<u32>> {
 
 @ private
 fn sha256(list<b8> data) → list<b8> {
-    const list<u8> padded ← pad32(data)
-    const list<wrapping<u32>> k ← K32()
-    var list<wrapping<u32>> state ← [1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225]
-    const int n_blocks ← padded.length() / 64
+    let list<u8> padded ← pad32(data)
+    let list<wrapping<u32>> k ← K32()
+    mut list<wrapping<u32>> state ← [1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225]
+    let int n_blocks ← padded.length() / 64
     for range 0‥n_blocks const bi {
-        const list<wrapping<u32>> w ← schedule32(padded, bi * 64)
+        let list<wrapping<u32>> w ← schedule32(padded, bi * 64)
         state ← compress32(state, w, k)
     }
-    const list<u8> out ← serialize32(state)
-    const list<b8> result ← out ↦ list<b8>
+    let list<u8> out ← serialize32(state)
+    let list<b8> result ← out ↦ list<b8>
     return result
 }
 
@@ -209,7 +209,7 @@ fn Sigma1_64(wrapping<u64> x) → wrapping<u64> {
 
 @ private
 fn word64(list<u8> buf, int off) → wrapping<u64> {
-    var wrapping<u64> w ↤ buf[off]
+    mut wrapping<u64> w ↤ buf[off]
     w ← w ⇐ 8
     w ← w ∨ (buf[off + 1] ↦ wrapping<u64>)
     w ← w ⇐ 8
@@ -229,13 +229,13 @@ fn word64(list<u8> buf, int off) → wrapping<u64> {
 
 @ private
 fn schedule64(list<u8> buf, int init) → list<wrapping<u64>> {
-    var list<wrapping<u64>> w ← []
+    mut list<wrapping<u64>> w ← []
     for range 0‥16 const i {
         w.append(word64(buf, init + i * 8))
     }
     for range 16‥80 const i {
-        const wrapping<u64> s0 ← sigma0_64(w[i - 15])
-        const wrapping<u64> s1 ← sigma1_64(w[i - 2])
+        let wrapping<u64> s0 ← sigma0_64(w[i - 15])
+        let wrapping<u64> s1 ← sigma1_64(w[i - 2])
         w.append(s1 + w[i - 7] + s0 + w[i - 16])
     }
     return w
@@ -243,21 +243,21 @@ fn schedule64(list<u8> buf, int init) → list<wrapping<u64>> {
 
 @ private
 fn compress64(list<wrapping<u64>> state, list<wrapping<u64>> w, list<wrapping<u64>> k) → list<wrapping<u64>> {
-    var wrapping<u64> a ← state[0]
-    var wrapping<u64> b ← state[1]
-    var wrapping<u64> c ← state[2]
-    var wrapping<u64> d ← state[3]
-    var wrapping<u64> e ← state[4]
-    var wrapping<u64> f ← state[5]
-    var wrapping<u64> g ← state[6]
-    var wrapping<u64> h ← state[7]
+    mut wrapping<u64> a ← state[0]
+    mut wrapping<u64> b ← state[1]
+    mut wrapping<u64> c ← state[2]
+    mut wrapping<u64> d ← state[3]
+    mut wrapping<u64> e ← state[4]
+    mut wrapping<u64> f ← state[5]
+    mut wrapping<u64> g ← state[6]
+    mut wrapping<u64> h ← state[7]
     for range 0‥80 const i {
-        const wrapping<u64> s1 ← Sigma1_64(e)
-        const wrapping<u64> choose ← (e ∧ f) ⊻ ((¬e) ∧ g)
-        const wrapping<u64> t1 ← h + s1 + choose + k[i] + w[i]
-        const wrapping<u64> s0 ← Sigma0_64(a)
-        const wrapping<u64> majority ← (a ∧ b) ⊻ (a ∧ c) ⊻ (b ∧ c)
-        const wrapping<u64> t2 ← s0 + majority
+        let wrapping<u64> s1 ← Sigma1_64(e)
+        let wrapping<u64> choose ← (e ∧ f) ⊻ ((¬e) ∧ g)
+        let wrapping<u64> t1 ← h + s1 + choose + k[i] + w[i]
+        let wrapping<u64> s0 ← Sigma0_64(a)
+        let wrapping<u64> majority ← (a ∧ b) ⊻ (a ∧ c) ⊻ (b ∧ c)
+        let wrapping<u64> t2 ← s0 + majority
         h ← g
         g ← f
         f ← e
@@ -267,7 +267,7 @@ fn compress64(list<wrapping<u64>> state, list<wrapping<u64>> w, list<wrapping<u6
         b ← a
         a ← t1 + t2
     }
-    var list<wrapping<u64>> result ← []
+    mut list<wrapping<u64>> result ← []
     result.append(a + state[0])
     result.append(b + state[1])
     result.append(c + state[2])
@@ -282,9 +282,9 @@ fn compress64(list<wrapping<u64>> state, list<wrapping<u64>> w, list<wrapping<u6
 # n_words is 8 for SHA-512 and 6 for SHA-384 truncation.
 @ private
 fn serialize64(list<wrapping<u64>> h, int n_words) → list<u8> {
-    var list<u8> out ← []
+    mut list<u8> out ← []
     for range 0‥n_words const i {
-        const wrapping<u64> word ← h[i]
+        let wrapping<u64> word ← h[i]
         out.append(((word ⇒ 56) ↦ wrapping<u8>) ↦ u8)
         out.append(((word ⇒ 48) ↦ wrapping<u8>) ↦ u8)
         out.append(((word ⇒ 40) ↦ wrapping<u8>) ↦ u8)
@@ -299,8 +299,8 @@ fn serialize64(list<wrapping<u64>> h, int n_words) → list<u8> {
 
 @ private
 fn pad64(list<b8> data) → list<u8> {
-    const int bit_len ← data.length() * 8
-    var list<u8> padded ← []
+    let int bit_len ← data.length() * 8
+    mut list<u8> padded ← []
     for range 0‥data.length() const i {
         padded.append((data.get(i) coalesce (0 ∷ b8)) ↦ u8)
     }
@@ -313,7 +313,7 @@ fn pad64(list<b8> data) → list<u8> {
         padded.append(0 ∷ u8)
     }
     for range 0‥8 const i {
-        const int shift ← (7 - i) * 8
+        let int shift ← (7 - i) * 8
         padded.append(((bit_len ⇒ shift) ↦ wrapping<u8>) ↦ u8)
     }
     return padded
@@ -326,28 +326,28 @@ fn K64() → list<wrapping<u64>> {
 
 @ private
 fn sha512_engine(list<b8> data, list<wrapping<u64>> iv, int n_words) → list<b8> {
-    const list<u8> padded ← pad64(data)
-    const list<wrapping<u64>> k ← K64()
-    var list<wrapping<u64>> state ← copy iv
-    const int n_blocks ← padded.length() / 128
+    let list<u8> padded ← pad64(data)
+    let list<wrapping<u64>> k ← K64()
+    mut list<wrapping<u64>> state ← copy iv
+    let int n_blocks ← padded.length() / 128
     for range 0‥n_blocks const bi {
-        const list<wrapping<u64>> w ← schedule64(padded, bi * 128)
+        let list<wrapping<u64>> w ← schedule64(padded, bi * 128)
         state ← compress64(state, w, k)
     }
-    const list<u8> out ← serialize64(state, n_words)
-    const list<b8> result ← out ↦ list<b8>
+    let list<u8> out ← serialize64(state, n_words)
+    let list<b8> result ← out ↦ list<b8>
     return result
 }
 
 @ private
 fn sha512(list<b8> data) → list<b8> {
-    const list<wrapping<u64>> iv ← [7640891576956012808, 13503953896175478587, 4354685564936845355, 11912009170470909681, 5840696475078001361, 11170449401992604703, 2270897969802886507, 6620516959819538809]
+    let list<wrapping<u64>> iv ← [7640891576956012808, 13503953896175478587, 4354685564936845355, 11912009170470909681, 5840696475078001361, 11170449401992604703, 2270897969802886507, 6620516959819538809]
     return sha512_engine(data, iv, 8)
 }
 
 @ private
 fn sha384(list<b8> data) → list<b8> {
-    const list<wrapping<u64>> iv ← [14680500436340154072, 7105036623409894663, 10473403895298186519, 1526699215303891257, 7436329637833083697, 10282925794625328401, 15784041429090275239, 5167115440072839076]
+    let list<wrapping<u64>> iv ← [14680500436340154072, 7105036623409894663, 10473403895298186519, 1526699215303891257, 7436329637833083697, 10282925794625328401, 15784041429090275239, 5167115440072839076]
     return sha512_engine(data, iv, 6)
 }
 
@@ -360,8 +360,8 @@ fn sha384(list<b8> data) → list<b8> {
 fn hmac(string alg, list<b8> key, list<b8> data) → list<b8> ⇥ string {
     if data.length() ≻ 67108864 then throw "norma:crypto.hmac: input exceeds 67108864-byte limit"
     if key.length() ≻ 1048576 then throw "norma:crypto.hmac: key exceeds 1048576-byte limit"
-    var string hash ← ""
-    var int block ← 0
+    mut string hash ← ""
+    mut int block ← 0
     if alg ≡ "hmac-sha256" {
         hash ← "sha256"
         block ← 64
@@ -380,11 +380,11 @@ fn hmac(string alg, list<b8> key, list<b8> data) → list<b8> ⇥ string {
     # SEM065: `key` is an unmarked read-only parameter and `bytes` is a
     # shareable container payload, so `var` cannot bind it directly; the
     # `copy` makes an independently mutable working key for the block branch.
-    var list<b8> k ← copy key
+    mut list<b8> k ← copy key
     if k.length() ≻ block {
         k ← digest(hash, k)
     }
-    const list<b8> inner ← digest(hash, concat_bytes(xor_pad(k, block, 54), data))
+    let list<b8> inner ← digest(hash, concat_bytes(xor_pad(k, block, 54), data))
     return digest(hash, concat_bytes(xor_pad(k, block, 92), inner))
 }
 
@@ -395,10 +395,10 @@ fn byte_int(list<b8> src, int i) → int {
 
 @ private
 fn xor_pad(list<b8> key, int block, int mask) → list<b8> {
-    var list<u8> out ← []
-    var int i ← 0
+    mut list<u8> out ← []
+    mut int i ← 0
     while i ≺ block {
-        var int b ← 0
+        mut int b ← 0
         if i ≺ key.length() {
             b ← byte_int(key, i)
         }
@@ -410,8 +410,8 @@ fn xor_pad(list<b8> key, int block, int mask) → list<b8> {
 
 @ private
 fn concat_bytes(list<b8> a, list<b8> b) → list<b8> {
-    var list<u8> out ← []
-    var int i ← 0
+    mut list<u8> out ← []
+    mut int i ← 0
     while i ≺ a.length() {
         out.append((a.get(i) coalesce (0 ∷ b8)) ↦ u8)
         i ← i + 1

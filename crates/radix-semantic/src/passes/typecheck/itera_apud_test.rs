@@ -56,9 +56,9 @@ fn rank2_tensor_apud_typechecks_element_and_numerus_coordinates() {
         r"
 functio grid(tensor<f32, [2, 3]> m) → vacuum {
     itera ex m apud [i, j] fixum cell {
-        fixum f32 x ← cell
-        fixum numerus a ← i
-        fixum numerus b ← j
+        sit f32 x ← cell
+        sit numerus a ← i
+        sit numerus b ← j
         nota x, a, b
     }
 }",
@@ -71,10 +71,10 @@ fn rank3_tensor_apud_typechecks_three_coordinates() {
         r"
 functio cube(tensor<f32, [2, 3, 4]> t) → vacuum {
     itera ex t apud [i, j, k] fixum cell {
-        fixum f32 x ← cell
-        fixum numerus a ← i
-        fixum numerus b ← j
-        fixum numerus c ← k
+        sit f32 x ← cell
+        sit numerus a ← i
+        sit numerus b ← j
+        sit numerus c ← k
         nota x, a, b, c
     }
 }",
@@ -87,8 +87,8 @@ fn rank1_tensor_apud_single_coordinate_typechecks() {
         r"
 functio line(tensor<f32, [8]> t) → vacuum {
     itera ex t apud [i] fixum cell {
-        fixum f32 x ← cell
-        fixum numerus a ← i
+        sit f32 x ← cell
+        sit numerus a ← i
         nota x, a
     }
 }",
@@ -101,9 +101,9 @@ fn matrix_apud_typechecks_element_and_two_coordinates() {
         r"
 functio grid(matrix<f32, [2, 3]> m) → vacuum {
     itera ex m apud [i, j] fixum cell {
-        fixum f32 x ← cell
-        fixum numerus a ← i
-        fixum numerus b ← j
+        sit f32 x ← cell
+        sit numerus a ← i
+        sit numerus b ← j
         nota x, a, b
     }
 }",
@@ -118,7 +118,7 @@ fn rank1_tensor_without_apud_keeps_element_binding() {
         r"
 functio line(tensor<f32, [8]> t) → vacuum {
     itera ex t fixum cell {
-        fixum f32 x ← cell
+        sit f32 x ← cell
         nota x
     }
 }",
@@ -257,8 +257,8 @@ fn apud_on_plain_list_binds_numerus_index_and_element() {
         r"
 functio flat(lista<textus> xs) → vacuum {
     itera ex xs apud [i] fixum cell {
-        fixum numerus n ← i
-        fixum textus t ← cell
+        sit numerus n ← i
+        sit textus t ← cell
         nota n, t
     }
 }",
@@ -271,8 +271,8 @@ fn apud_on_tabula_binds_key_and_value() {
         r"
 functio pairs(tabula<textus, numerus> m) → vacuum {
     itera ex m apud [k] fixum v {
-        fixum textus key ← k
-        fixum numerus value ← v
+        sit textus key ← k
+        sit numerus value ← v
         nota key, value
     }
 }",
@@ -285,9 +285,9 @@ fn apud_on_tuple_key_tabula_binds_each_key_part() {
         r"
 functio sales(tabula<iuncta<textus, numerus>, numerus> m) → vacuum {
     itera ex m apud [regio, annus] fixum v {
-        fixum textus r ← regio
-        fixum numerus a ← annus
-        fixum numerus value ← v
+        sit textus r ← regio
+        sit numerus a ← annus
+        sit numerus value ← v
         nota r, a, value
     }
 }",

@@ -40,10 +40,10 @@ locale = "en"
 #   thread loops, then from the plain loops; the two lines are identical.
 
 main {
-    const tf32[2] rows ← [1.0, 2.0] ↦ tf32[2]
-    const tf32[3] cols ← [10.0, 20.0, 30.0] ↦ tf32[3]
-    var tf32[2, 3] grid ← tf32[2, 3] {}
-    var tf32[2, 3] plain ← tf32[2, 3] {}
+    let tf32[2] rows ← [1.0, 2.0] ↦ tf32[2]
+    let tf32[3] cols ← [10.0, 20.0, 30.0] ↦ tf32[3]
+    mut tf32[2, 3] grid ← tf32[2, 3] {}
+    mut tf32[2, 3] plain ← tf32[2, 3] {}
 
     for from rows at [i] thread outer const row {
         for from cols at [j] thread inner const col {

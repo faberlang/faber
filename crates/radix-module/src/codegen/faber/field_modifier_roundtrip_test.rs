@@ -36,14 +36,14 @@ fn reemit(source: &str, to: &str) -> String {
         .code
 }
 
-const BODY: &str = "class Punctum {\n    const int x\n    var int y\n    static int Z = 3\n}\n\nmain {\n    const Punctum p ← Punctum { x = 1, y = 2 }\n    print p.x\n}\n";
+const BODY: &str = "class Punctum {\n    const int x\n    mut int y\n    static int Z = 3\n}\n\nmain {\n    let Punctum p ← Punctum { x = 1, y = 2 }\n    print p.x\n}\n";
 
 #[test]
 fn en_format_keeps_each_field_modifier() {
     let en = format!("+++\nlocale = \"en\"\n+++\n{BODY}");
     let formatted = reemit(&en, "en");
     assert!(formatted.contains("    const int x\n"), "{formatted}");
-    assert!(formatted.contains("    var int y\n"), "{formatted}");
+    assert!(formatted.contains("    mut int y\n"), "{formatted}");
     assert!(formatted.contains("    static int Z = 3\n"), "{formatted}");
 }
 

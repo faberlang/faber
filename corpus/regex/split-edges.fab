@@ -39,8 +39,8 @@ locale = "en"
 # The pieces of split, each as `<piece>`.
 fn pieces(string pat, string text) → string {
     do {
-        const regex r ← pat ↦ regex
-        var string out ← ""
+        let regex r ← pat ↦ regex
+        mut string out ← ""
         for from r.split(text) const piece {
             out ← out + "<§>"(piece)
         }

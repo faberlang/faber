@@ -36,7 +36,7 @@ locale = "en"
 #   capsa: prima
 
 class Capsa {
-    var string titulus
+    mut string titulus
 
     fn narra() → string {
         # ego = the receiver instance
@@ -45,6 +45,6 @@ class Capsa {
 }
 
 main {
-    const Capsa capsa ← Capsa { titulus = "prima" }
+    let Capsa capsa ← Capsa { titulus = "prima" }
     print capsa.narra()
 }

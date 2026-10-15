@@ -33,6 +33,7 @@ impl KeywordPack for EnDiscernePack {
             "case" => Some("casu"),
             "and" => Some("et"),
             "const" => Some("fixum"),
+            "let" => Some("sit"),
             _ => None,
         }
     }
@@ -259,7 +260,7 @@ fn english_comma_is_the_named_migration_diagnostic() {
 
 #[test]
 fn omnia_stays_a_legal_binding_name_elsewhere() {
-    let result = parse_ok("fixum _ omnia ← 1");
+    let result = parse_ok("sit omnia ← 1");
     assert_eq!(
         result.program.as_ref().expect("program").statements.len(),
         1

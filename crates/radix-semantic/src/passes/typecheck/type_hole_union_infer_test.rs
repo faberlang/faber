@@ -271,7 +271,7 @@ fn source_union_hole_accepts_direct_flows() {
     test_support::assert_analysis_accepts_la(
         r"
 incipit {
-    fixum ∪ x ← 42
+    sit ∪ x ← 42
     varia ∪ y ← 1
     y ← 2
     nota x
@@ -305,8 +305,8 @@ fn source_union_hole_accepts_hole_to_hole_merge() {
     test_support::assert_analysis_accepts_la(
         r#"
 incipit {
-    fixum ∪ a ← 1
-    fixum ∪ b ← "s"
+    sit ∪ a ← 1
+    sit ∪ b ← "s"
     varia ∪ c ← 1
     c ← a
     nota a
@@ -322,8 +322,8 @@ fn source_underscore_hole_path_is_unchanged() {
     test_support::assert_analysis_accepts_la(
         r"
 incipit {
-    fixum _ r ← 1
-    fixum _ s ← r
+    sit r ← 1
+    sit s ← r
     nota s
 }
 ",

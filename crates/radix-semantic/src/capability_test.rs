@@ -655,7 +655,7 @@ functio plana() → numerus {
     redde 1
 }
 functio facit() → numerus {
-    fixum _ duplo ← (numerus value) → numerus ∴ value + plana()
+    sit duplo ← (numerus value) → numerus ∴ value + plana()
     redde duplo(3)
 }
 incipit { }
@@ -872,8 +872,8 @@ fn own_transfer_site_proves_move_and_dead_liveness() {
     let (queries, hir, _types) = source_queries(
         r"
 incipit {
-    fixum lista<numerus> source ← own [1, 2, 3]
-    fixum lista<numerus> destination ← own source
+    sit lista<numerus> source ← own [1, 2, 3]
+    sit lista<numerus> destination ← own source
 }
 ",
     );
@@ -894,8 +894,8 @@ fn plain_scalar_use_proves_read_move_and_live_liveness() {
     let (queries, hir, _types) = source_queries(
         r"
 incipit {
-    fixum numerus x ← 5
-    fixum numerus y ← x
+    sit numerus x ← 5
+    sit numerus y ← x
 }
 ",
     );
@@ -980,7 +980,7 @@ fn non_path_and_unknown_place_queries_fail_closed() {
     let (queries, hir, _types) = source_queries(
         r"
 incipit {
-    fixum numerus x ← 1 + 2
+    sit numerus x ← 1 + 2
 }
 ",
     );
@@ -1006,7 +1006,7 @@ incipit {
 fn derived_queries_implement_the_combined_interface_and_attach_regions() {
     fn accepts_combined<T: CapabilityQueries>(_: &T) {}
 
-    let (queries, hir, types) = source_queries("incipit { fixum numerus x ← 1 }");
+    let (queries, hir, types) = source_queries("incipit { sit numerus x ← 1 }");
     accepts_combined(&*queries.queries);
     assert!(!queries.has_regions());
 

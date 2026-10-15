@@ -14,10 +14,10 @@ functio numera_alveum(tf32[6] altitudo, tensor<numerus, [6]> alveus) → tensor<
     redde reducta via numeratio ex altitudo apud [i] pro alveus[i] fixum s { redde s ≻ 2.5 }
 }
 incipit {
-    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-        fixum tf32[6] altitudo ← flat ↦ tf32[6]
-        fixum tensor<numerus, [6]> aequalis ← [0, 1, 2, 0, 1, 2] ↦ tensor<numerus, [6]>
-    fixum tensor<numerus, [6]> inaequalis ← [0, 0, 1, 1, 0, 1] ↦ tensor<numerus, [6]>
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+        sit tf32[6] altitudo ← flat ↦ tf32[6]
+        sit tensor<numerus, [6]> aequalis ← [0, 1, 2, 0, 1, 2] ↦ tensor<numerus, [6]>
+    sit tensor<numerus, [6]> inaequalis ← [0, 0, 1, 1, 0, 1] ↦ tensor<numerus, [6]>
     nota per_alveum(altitudo, aequalis)
     nota per_alveum(altitudo, inaequalis)
     nota numera_alveum(altitudo, aequalis)

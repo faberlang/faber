@@ -35,9 +35,9 @@ fn atomic_integer_methods_typecheck() {
     accepts(
         r"
 functio atomic_ops(in atomic<i32> cell, i32 value) → bivalens {
-    fixum i32 loaded ← cell.load()
+    sit i32 loaded ← cell.load()
     cell.store(value)
-    fixum i32 old ← cell.exchange(loaded)
+    sit i32 old ← cell.exchange(loaded)
     redde cell.compare_exchange(old, value)
 }
 ",

@@ -8,7 +8,7 @@ fn echo(int x) → int {
 }
 
 main {
-    var int n ← 9223372036854775807
+    mut int n ← 9223372036854775807
     print "before"
     print echo(n + 1)
 }

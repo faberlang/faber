@@ -137,7 +137,7 @@ impl TypeChecker<'_> {
         expected: Option<TypeId>,
         span: radix_lexer::Span,
     ) -> TypeId {
-        // An explicit `∪` annotation hole (`const ∪ r ← capta { … }`) owns the
+        // An explicit `∪` annotation hole (`let ∪ r ← capta { … }`) owns the
         // accumulation directly; anything else gets a fresh hole.
         let expected_var = expected
             .map(|ty| self.resolve_inferred_type(ty))
@@ -173,7 +173,7 @@ impl TypeChecker<'_> {
             return self.error_type;
         }
 
-        // `const _ r ← capta { ... }`: the monomorphic `_` hole binds to the
+        // `let r ← capta { ... }`: the monomorphic `_` hole binds to the
         // trap hole so the local's type is the solved union (the U-02 arm
         // would otherwise strand the `_` as an unbound pending member).
         if expected_var.is_none()

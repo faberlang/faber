@@ -37,9 +37,9 @@ locale = "en"
 #   1, 2, 3, 4 (expanded list elements).
 
 main {
-    const list<int> media ← [2, 3]
+    let list<int> media ← [2, 3]
     # → [1, 2, 3, 4]
-    const list<int> numeri ← [1, spread media, 4]
+    let list<int> numeri ← [1, spread media, 4]
     for from numeri const n {
         print n
     }

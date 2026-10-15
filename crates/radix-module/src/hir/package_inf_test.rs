@@ -10,10 +10,10 @@ use crate::locale::{KeywordSurface, latin_locale_pack};
 
 const INF_SOURCE: &str = r"
 functio tere(inf a, exactus<inf> b, modulus<inf> c, saturatus<inf> d) → inf {
-    fixum inf plain ← a
-    fixum exactus<inf> t ← b
-    fixum modulus<inf> w ← c
-    fixum saturatus<inf> s ← d
+    sit inf plain ← a
+    sit exactus<inf> t ← b
+    sit modulus<inf> w ← c
+    sit saturatus<inf> s ← d
     redde plain
 }
 ";
@@ -55,9 +55,9 @@ fn an_inf_module_round_trips_through_the_package_with_its_spellings() {
         "exactus<inf> b",
         "modulus<inf> c",
         "saturatus<inf> d",
-        "fixum exactus<inf> t",
-        "fixum modulus<inf> w",
-        "fixum saturatus<inf> s",
+        "sit exactus<inf> t",
+        "sit modulus<inf> w",
+        "sit saturatus<inf> s",
     ] {
         assert!(output.code.contains(spelling), "lost `{spelling}`:\n{}", output.code);
     }

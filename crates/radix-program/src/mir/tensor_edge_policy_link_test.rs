@@ -29,9 +29,9 @@ class ZeroGhost {
 }
 
 main {
-    const tf32[3] source ← [1.0, 2.0, 3.0] ↦ tf32[3]
-    const list<f32> clamped ← utilModule.resolve_shift<clamp>(source)
-    const list<f32> custom ← utilModule.resolve_shift<ZeroGhost>(source)
+    let tf32[3] source ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    let list<f32> clamped ← utilModule.resolve_shift<clamp>(source)
+    let list<f32> custom ← utilModule.resolve_shift<ZeroGhost>(source)
     print clamped
     print custom
 }

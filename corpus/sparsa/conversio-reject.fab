@@ -36,7 +36,7 @@ diagnostic = "SEM016:sparsa_tensor_shape_mismatch"
 # per-backend EXPECTED_FAILURES lists.
 
 main {
-    const tf32[2, 2] dense ← empty
-    const sf32[4] sparse ← dense ↦ sf32[4]
+    let tf32[2, 2] dense ← empty
+    let sf32[4] sparse ← dense ↦ sf32[4]
     print sparse.length()
 }

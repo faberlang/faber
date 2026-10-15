@@ -35,7 +35,7 @@ functio nomina(lista<Persona> ps) → lista<textus> {
 fn sort_expression_orders_a_list_both_directions_and_keeps_the_source() {
     let lines = run_lines(
         "incipit {
-    fixum lista<numerus> xs ← [3, 1, 2, 1]
+    sit lista<numerus> xs ← [3, 1, 2, 1]
     nota ordinata via ascendens ex xs
     nota ordinata via descendens ex xs
     nota xs
@@ -72,10 +72,10 @@ fn sort_expression_body_key_is_stable_in_both_directions() {
     let lines = run_lines(&format!(
         "{PERSONAE}
 incipit {{
-    fixum lista<Persona> ps ← [Persona {{ nomen = \"l\", aetas = 30 }}, Persona {{ nomen = \"m\", aetas = 30 }}, Persona {{ nomen = \"a\", aetas = 25 }}, Persona {{ nomen = \"c\", aetas = 25 }}]
+    sit lista<Persona> ps ← [Persona {{ nomen = \"l\", aetas = 30 }}, Persona {{ nomen = \"m\", aetas = 30 }}, Persona {{ nomen = \"a\", aetas = 25 }}, Persona {{ nomen = \"c\", aetas = 25 }}]
     nota nomina(ordinata via ascendens ex ps fixum p {{ redde p.aetas }})
     nota nomina(ordinata via descendens ex ps fixum p {{ redde p.aetas }})
-    fixum lista<numerus> e ← []
+    sit lista<numerus> e ← []
     nota ordinata via ascendens ex e
 }}
 "

@@ -20,7 +20,7 @@ fn ponde_runtime_index_outside_main_without_a_handler_is_rejected() {
 #[test]
 fn ponde_runtime_index_in_main_may_abort_unhandled() {
     let _ = test_support::analyze_ok_la(&format!(
-        "incipit {{\n    {PARAMS}    fixum numerus i ← 1\n    t.ponde([i], 2.0)\n}}\n"
+        "incipit {{\n    {PARAMS}    sit numerus i ← 1\n    t.ponde([i], 2.0)\n}}\n"
     ));
 }
 
@@ -84,7 +84,7 @@ fn ponde_literal_out_of_range_does_not_also_demand_a_handler() {
 fn ponde_list_variable_index_stays_failable() {
     test_support::assert_rejects_with_issue_la(
         &format!(
-            "functio put() → vacuum {{\n    {PARAMS}    fixum lista<numerus> idx ← [1]\n    t.ponde(idx, 2.0)\n}}\n"
+            "functio put() → vacuum {{\n    {PARAMS}    sit lista<numerus> idx ← [1]\n    t.ponde(idx, 2.0)\n}}\n"
         ),
         "failable_call_requires_handler",
     );

@@ -42,9 +42,9 @@ locale = "en"
 
 # One line of hex per byte string, so the byte order is visible.
 fn dump(list<b8> buf) → string {
-    var string line ← ""
+    mut string line ← ""
     for range 0‥buf.length() const i {
-        const u8 piece ← buf.get(i) coalesce 0 ∷ b8 ↦ u8
+        let u8 piece ← buf.get(i) coalesce 0 ∷ b8 ↦ u8
         line ← "§§ "(line, piece ¶ "02x")
     }
     return line
@@ -68,16 +68,16 @@ fn round_le(inf value) → inf {
 
 main {
     # 1. Minimal two's complement, most significant byte first.
-    const inf zero ← 0
-    const inf minus_one ← -1
-    const inf top_positive ← 127
-    const inf first_two_bytes ← 128
-    const inf minus_128 ← -128
-    const inf minus_129 ← -129
-    const inf byte_max ← 255
-    const inf over_byte ← 256
-    const inf big ← 18446744073709551616
-    const inf big_negative ← -18446744073709551617
+    let inf zero ← 0
+    let inf minus_one ← -1
+    let inf top_positive ← 127
+    let inf first_two_bytes ← 128
+    let inf minus_128 ← -128
+    let inf minus_129 ← -129
+    let inf byte_max ← 255
+    let inf over_byte ← 256
+    let inf big ← 18446744073709551616
+    let inf big_negative ← -18446744073709551617
     print encode_be(zero)
     print encode_be(minus_one)
     print encode_be(top_positive)
@@ -109,23 +109,23 @@ main {
     print round_le(big_negative)
 
     # 4. Decoding fixed bytes: `ff 7f` is -129, `00 80` is 128.
-    const list<b8> pattern ← |ff 7f|
-    const list<b8> padded ← |00 80|
+    let list<b8> pattern ← |ff 7f|
+    let list<b8> padded ← |00 80|
     print pattern ↦ inf via Be
     print padded ↦ inf via Be
     print pattern ↦ inf via Le
 
     # 5. A valor carries an inf of any size and gives it back exactly.
-    const value boxed ← big ↦ value
+    let value boxed ← big ↦ value
     print boxed ↦ inf
-    const value small_boxed ← minus_129 ↦ value
+    let value small_boxed ← minus_129 ↦ value
     print small_boxed ↦ inf
-    const value from_numerus ← 7 ↦ value
+    let value from_numerus ← 7 ↦ value
     print from_numerus ↦ inf
 
     # 6. A valor that is not an integer fails; `⊥` recovers.
-    const value fractional ← 1.5 ↦ value
-    const value word ← "7" ↦ value
+    let value fractional ← 1.5 ↦ value
+    let value word ← "7" ↦ value
     print fractional ↦ inf ⊥ 9
     print word ↦ inf ⊥ 8
 }

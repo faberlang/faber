@@ -267,7 +267,7 @@ fn probe(op: Op, family: Family) -> String {
     let (lhs, rhs) = pair_types(family);
     if op == Op::Arith {
         // The sum lands in an inferred slot: the store rule (U4) is not probed.
-        return format!("functio p({lhs} a, {rhs} b) {{ fixum _ r ← a + b }}");
+        return format!("functio p({lhs} a, {rhs} b) {{ sit r ← a + b }}");
     }
     format!(
         "functio p({lhs} a, {rhs} b) → bivalens {{ redde a {} b }}",

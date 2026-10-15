@@ -43,16 +43,16 @@ fn queue_and_stack_methods_typecheck_with_empty_pop_union() {
         r#"functio queue_ops(in queue<numerus> q) → numerus ∪ nihil {
     varia queue<numerus> values ← q
     values.appende(1)
-    fixum numerus ∪ nihil item ← values.decapita()
-    fixum numerus size ← values.longitudo()
+    sit numerus ∪ nihil item ← values.decapita()
+    sit numerus size ← values.longitudo()
     redde item
 }
 
 functio stack_ops(in stack<textus> s) → textus ∪ nihil {
     varia stack<textus> values ← s
     values.appende("top")
-    fixum textus ∪ nihil item ← values.detrahe()
-    fixum numerus size ← values.longitudo()
+    sit textus ∪ nihil item ← values.detrahe()
+    sit numerus size ← values.longitudo()
     nota size
     redde item
 }"#,

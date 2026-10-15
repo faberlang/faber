@@ -47,7 +47,7 @@ fn fault_from_value(value raw) → fault.IoFault {
 # Opaque listener handle from http:listen.
 @ public
 class Listener {
-    var int handle = 0
+    mut int handle = 0
 
     fn accept() → Incoming ⇥ fault.IoFault {
         return accept_incoming(self.handle)
@@ -65,15 +65,15 @@ class Listener {
 # One accepted request plus the provider ids needed to respond.
 @ public
 class Incoming {
-    var string id = ""
-    var int connection = 0
-    var httpreq.Request req = httpreq.Request { }
+    mut string id = ""
+    mut int connection = 0
+    mut httpreq.Request req = httpreq.Request { }
 }
 
 # Open chunked writer from http:respond_open.
 @ public
 class Stream {
-    var int writer = 0
+    mut int writer = 0
 
     fn write(list<b8> data) → void ⇥ fault.IoFault {
         return write_chunk(self, data)
@@ -135,32 +135,32 @@ fn stop(int handle) → void ⇥ fault.IoFault {
 
 @ public
 fn bind(int port) → Listener ⇥ fault.IoFault {
-    const int handle ← listen([port ↦ value])
+    let int handle ← listen([port ↦ value])
     return Listener { handle = handle }
 }
 
 # Two-argument listen: text second item is bind_host (provider default body cap).
 @ public
 fn bind_at(int port, string host) → Listener ⇥ fault.IoFault {
-    const int handle ← listen([port ↦ value, host ↦ value])
+    let int handle ← listen([port ↦ value, host ↦ value])
     return Listener { handle = handle }
 }
 
 @ public
 fn bind_limited(int port, int max_body_bytes) → Listener ⇥ fault.IoFault {
-    const int handle ← listen([port ↦ value, max_body_bytes ↦ value])
+    let int handle ← listen([port ↦ value, max_body_bytes ↦ value])
     return Listener { handle = handle }
 }
 
 @ public
 fn bind_full(int port, int max_body_bytes, string host) → Listener ⇥ fault.IoFault {
-    const int handle ← listen([port ↦ value, max_body_bytes ↦ value, host ↦ value])
+    let int handle ← listen([port ↦ value, max_body_bytes ↦ value, host ↦ value])
     return Listener { handle = handle }
 }
 
 @ public
 fn bind_tls(int port, string cert, string key) → Listener ⇥ fault.IoFault {
-    const int handle ← call 'http:listen_tls' ([port ↦ value, cert ↦ value, key ↦ value]) ↦ int
+    let int handle ← call 'http:listen_tls' ([port ↦ value, cert ↦ value, key ↦ value]) ↦ int
     return Listener { handle = handle }
 }
 
@@ -175,7 +175,7 @@ fn incoming_of(value raw) → Incoming {
     # is a broken host contract, not caller input, so it panics instead of
     # defaulting an id or connection.
     do {
-        const map<string, value> fields ↤ raw
+        let map<string, value> fields ↤ raw
         return Incoming {
             id = fields["id"] ↦ string,
             connection = fields["connection"] ↦ int,
@@ -218,7 +218,7 @@ fn keep_alive_version(string version, headers.Headers headers) → bool {
 # One-shot reply. The provider writes content-length and closes.
 @ public
 fn reply(Incoming incoming, int status, headers.Headers headers, string body) → void ⇥ fault.IoFault {
-    const list<value> args ← [
+    let list<value> args ← [
         incoming.id ↦ value,
         status ↦ value,
         headers_carrier(headers) ↦ value,
@@ -235,7 +235,7 @@ fn reply_with(Incoming incoming, response.Response response) → void ⇥ fault.
 # Begin a chunked response. Caller writes frames then finish.
 @ public
 fn open(Incoming incoming, int status, headers.Headers headers) → Stream ⇥ fault.IoFault {
-    const list<value> args ← [
+    let list<value> args ← [
         incoming.id ↦ value,
         status ↦ value,
         headers_carrier(headers) ↦ value
@@ -246,7 +246,7 @@ fn open(Incoming incoming, int status, headers.Headers headers) → Stream ⇥ f
 # SSE helper: content-type text/event-stream, then chunked frames.
 @ public
 fn open_sse(Incoming incoming) → Stream ⇥ fault.IoFault {
-    var headers.Headers head ← headers.empty()
+    mut headers.Headers head ← headers.empty()
     if head.append("Content-Type", "text/event-stream") {
     }
     if head.append("Cache-Control", "no-cache") {
@@ -270,7 +270,7 @@ fn event_chunk(sse.Event event) → list<b8> {
 
 @ public
 fn write_chunk(Stream stream, list<b8> data) → void ⇥ fault.IoFault {
-    const list<value> args ← [stream.writer ↦ value, data ↦ value]
+    let list<value> args ← [stream.writer ↦ value, data ↦ value]
     return respond_chunk(args)
 }
 
@@ -281,7 +281,7 @@ fn send_event(Stream stream, sse.Event event) → void ⇥ fault.IoFault {
 
 @ public
 fn finish_stream(Stream stream, bool keep_alive) → void ⇥ fault.IoFault {
-    const list<value> args ← [stream.writer ↦ value, keep_alive ↦ value]
+    let list<value> args ← [stream.writer ↦ value, keep_alive ↦ value]
     return respond_finish(args)
 }
 
@@ -290,7 +290,7 @@ fn is_http10(string version) → bool {
 }
 
 fn has_connection_token(headers.Headers headers, string want) → bool {
-    const string folded ← ascii_lower(want)
+    let string folded ← ascii_lower(want)
     for from headers.entries const entry {
         if ascii_lower(entry.name) ≡ "connection" {
             if line_has_token(entry.value, folded) {
@@ -302,20 +302,20 @@ fn has_connection_token(headers.Headers headers, string want) → bool {
 }
 
 fn line_has_token(string line, string folded_want) → bool {
-    var int i ← 0
-    const int n ← line.length()
+    mut int i ← 0
+    let int n ← line.length()
     while i ≺ n {
         while i ≺ n {
-            const string c ← line.slice(i, i + 1)
+            let string c ← line.slice(i, i + 1)
             if c ≢ " " and c ≢ "\t" and c ≢ "," {
                 break
             }
             i ← i + 1
         }
         if i ≥ n then return false
-        var int j ← i
+        mut int j ← i
         while j ≺ n {
-            const string c ← line.slice(j, j + 1)
+            let string c ← line.slice(j, j + 1)
             if c ≡ " " or c ≡ "\t" or c ≡ "," {
                 break
             }
@@ -330,9 +330,9 @@ fn line_has_token(string line, string folded_want) → bool {
 }
 
 fn headers_carrier(headers.Headers headers) → list<value> {
-    var list<value> out ← []
+    mut list<value> out ← []
     for from headers.entries const entry {
-        var map<string, value> row ← empty
+        mut map<string, value> row ← empty
         row.put("name", entry.name ↦ value)
         row.put("value", entry.value ↦ value)
         out.append(row ↦ value)
@@ -341,15 +341,15 @@ fn headers_carrier(headers.Headers headers) → list<value> {
 }
 
 fn headers_from_carrier(value raw) → headers.Headers {
-    var headers.Headers out ← headers.empty()
+    mut headers.Headers out ← headers.empty()
     if raw not is list<value> then return out
     do {
-        const list<value> items ↤ raw
+        let list<value> items ↤ raw
         for from items const item {
             if item is map<string, value> {
-                const map<string, value> row ↤ item
-                const string name ↤ row["name"]
-                const string header_value ↤ row["value"]
+                let map<string, value> row ↤ item
+                let string name ↤ row["name"]
+                let string header_value ↤ row["value"]
                 if out.append(name, header_value) {
                 }
             }
@@ -371,8 +371,8 @@ fn body_text(value raw) → string {
 }
 
 fn ascii_lower(string s) → string {
-    var string out ← ""
-    var int i ← 0
+    mut string out ← ""
+    mut int i ← 0
     while i ≺ s.length() {
         out ← out + lower_char(s.slice(i, i + 1))
         i ← i + 1
@@ -381,9 +381,9 @@ fn ascii_lower(string s) → string {
 }
 
 fn lower_char(string c) → string {
-    const string upper ← "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    const string lower ← "abcdefghijklmnopqrstuvwxyz"
-    var int i ← 0
+    let string upper ← "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    let string lower ← "abcdefghijklmnopqrstuvwxyz"
+    mut int i ← 0
     while i ≺ 26 {
         if upper.slice(i, i + 1) ≡ c {
             return lower.slice(i, i + 1)
@@ -395,35 +395,35 @@ fn lower_char(string c) → string {
 
 describe "server" {
     test "http11 default keep-alive" {
-        const headers.Headers blank ← headers.Headers { entries = [] }
+        let headers.Headers blank ← headers.Headers { entries = [] }
         assert keep_alive(blank)
         assert keep_alive_version("HTTP/1.1", blank)
         assert keep_alive_version("1.1", blank)
     }
 
     test "http11 honors connection close" {
-        const headers.Headers closed ← headers.Headers {
+        let headers.Headers closed ← headers.Headers {
             entries = [headers.Header { name = "Connection", value = "close" }]
         }
         assert not keep_alive(closed)
     }
 
     test "http11 close is case-insensitive and list-aware" {
-        const headers.Headers mixed ← headers.Headers {
+        let headers.Headers mixed ← headers.Headers {
             entries = [headers.Header { name = "Connection", value = "Keep-Alive, Close" }]
         }
         assert not keep_alive(mixed)
-        const headers.Headers titled ← headers.Headers {
+        let headers.Headers titled ← headers.Headers {
             entries = [headers.Header { name = "CONNECTION", value = "Close" }]
         }
         assert not keep_alive(titled)
     }
 
     test "http10 default off unless keep-alive named" {
-        const headers.Headers blank ← headers.Headers { entries = [] }
+        let headers.Headers blank ← headers.Headers { entries = [] }
         assert not keep_alive_version("HTTP/1.0", blank)
         assert not keep_alive_version("1.0", blank)
-        const headers.Headers named ← headers.Headers {
+        let headers.Headers named ← headers.Headers {
             entries = [headers.Header { name = "Connection", value = "Keep-Alive" }]
         }
         assert keep_alive_version("HTTP/1.0", named)
@@ -433,13 +433,13 @@ describe "server" {
     }
 
     test "incoming and stream genera construct" {
-        const Listener listener ← Listener { handle = 7 }
-        const Incoming incoming ← Incoming {
+        let Listener listener ← Listener { handle = 7 }
+        let Incoming incoming ← Incoming {
             id = "http-1",
             connection = 3,
             req = httpreq.Request { method = "GET", path = "/x", query = "", body = "" }
         }
-        const Stream stream ← Stream { writer = 9 }
+        let Stream stream ← Stream { writer = 9 }
         assert listener.handle ≡ 7
         assert incoming.id ≡ "http-1"
         assert incoming.connection ≡ 3

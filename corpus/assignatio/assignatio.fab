@@ -45,7 +45,7 @@ locale = "en"
 #   salve munde
 
 main {
-    var int x ← 10
+    mut int x ← 10
     x ← 20
     # 20
     print x
@@ -61,7 +61,7 @@ main {
     x ← x / 3
     # 10
     print x
-    var string s ← "salve"
+    mut string s ← "salve"
     s ← s + " munde"
     # salve munde
     print s

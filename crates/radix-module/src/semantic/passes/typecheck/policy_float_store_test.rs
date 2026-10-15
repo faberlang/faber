@@ -140,7 +140,7 @@ fn is_trapping_f32(types: &crate::semantic::TypeTable, ty: TypeId) -> bool {
 /// An entry block with a finite `trapping<f32>` cell `t`, a bare `f32` `x`
 /// and a `saturating<f32>` cell `s`.
 fn entry(body: &str) -> String {
-    format!("incipit {{\nfixum exactus<f32> t ← 1.5\nfixum f32 x ← 2.5\nfixum saturatus<f32> s ← 1.5\n{body}\n}}\n")
+    format!("incipit {{\nsit exactus<f32> t ← 1.5\nsit f32 x ← 2.5\nsit saturatus<f32> s ← 1.5\n{body}\n}}\n")
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ fn entry(body: &str) -> String {
 
 #[test]
 fn policy_float_store_declaration_of_trapping_arithmetic_carries_the_cell() {
-    let source = entry("fixum exactus<f32> u ← t * t\nnota u");
+    let source = entry("sit exactus<f32> u ← t * t\nnota u");
     let collected = collected(&source);
     let stores = &collected.collector.stores;
     assert_eq!(stores.len(), 1);
@@ -175,7 +175,7 @@ fn policy_float_store_every_arithmetic_operator_is_a_store() {
         "(t + 1.5) * 2.5",
         "t + t * t",
     ] {
-        let source = entry(&format!("fixum exactus<f32> u ← {expr}\nnota u"));
+        let source = entry(&format!("sit exactus<f32> u ← {expr}\nnota u"));
         assert_eq!(kinds(&source), vec![HirStoreKind::Declaration], "{expr}");
     }
 }
@@ -183,7 +183,7 @@ fn policy_float_store_every_arithmetic_operator_is_a_store() {
 #[test]
 fn policy_float_store_a_cell_leaf_in_its_own_cell_carries_no_node() {
     let source = entry(
-        "fixum exactus<f32> v ← t\nfixum exactus<f32> w ← -t\nfixum exactus<f32> c ← 1.5\n\
+        "sit exactus<f32> v ← t\nsit exactus<f32> w ← -t\nsit exactus<f32> c ← 1.5\n\
          varia exactus<f32> r ← t\nr ← t\nr ← 2.5\nnota v\nnota w\nnota c\nnota r",
     );
     assert!(kinds(&source).is_empty());
@@ -192,25 +192,25 @@ fn policy_float_store_a_cell_leaf_in_its_own_cell_carries_no_node() {
 #[test]
 fn policy_float_store_a_bare_float_slot_is_not_checked() {
     // The container decides: a bare `f32` slot holds whatever IEEE gives.
-    let source = entry("fixum f32 y ← t * t\nvaria f32 z ← x\nz ← t * t\nnota y\nnota z");
+    let source = entry("sit f32 y ← t * t\nvaria f32 z ← x\nz ← t * t\nnota y\nnota z");
     assert!(kinds(&source).is_empty());
 }
 
 #[test]
 fn policy_float_store_an_authored_conversion_carries_no_node() {
-    let source = entry("fixum exactus<f32> v ← x ↦ exactus<f32>\nnota v");
+    let source = entry("sit exactus<f32> v ← x ↦ exactus<f32>\nnota v");
     assert!(kinds(&source).is_empty());
 }
 
 #[test]
 fn policy_float_store_a_saturating_store_never_gets_a_node() {
     let source = entry(
-        "fixum saturatus<f32> a ← s * s\nvaria saturatus<f32> b ← s\nb ← s + s\n\
-         fixum saturatus<f32> c ← s\nnota a\nnota b\nnota c",
+        "sit saturatus<f32> a ← s * s\nvaria saturatus<f32> b ← s\nb ← s + s\n\
+         sit saturatus<f32> c ← s\nnota a\nnota b\nnota c",
     );
     assert!(kinds(&source).is_empty());
     // Trapping arithmetic never lands in a saturating slot without `↦`.
-    assert_rejected(&entry("fixum saturatus<f32> bad ← t * t\nnota bad"));
+    assert_rejected(&entry("sit saturatus<f32> bad ← t * t\nnota bad"));
 }
 
 #[test]
@@ -225,7 +225,7 @@ fn policy_float_store_assignment_is_a_store() {
 
 #[test]
 fn policy_float_store_an_inferred_slot_infers_the_cell() {
-    let source = entry("fixum _ y ← t * t\nfixum _ z ← t + 1\nnota y\nnota z");
+    let source = entry("sit y ← t * t\nsit z ← t + 1\nnota y\nnota z");
     let collected = collected(&source);
     let stores = &collected.collector.stores;
     assert_eq!(stores.len(), 2);
@@ -237,7 +237,7 @@ fn policy_float_store_an_inferred_slot_infers_the_cell() {
 
 #[test]
 fn policy_float_store_an_inferred_slot_from_a_leaf_or_a_bare_float_has_no_node() {
-    let source = entry("fixum _ a ← t\nfixum _ b ← -t\nfixum _ c ← x * x\nnota a\nnota b\nnota c");
+    let source = entry("sit a ← t\nsit b ← -t\nsit c ← x * x\nnota a\nnota b\nnota c");
     assert!(kinds(&source).is_empty());
 }
 
@@ -266,25 +266,25 @@ fn policy_float_store_a_bare_float_beside_trapping_arithmetic_is_the_mixing_issu
         "((t * t) + t) + x",
         "(t * t) ÷ x",
     ] {
-        assert_rejected_with(&entry(&format!("fixum f32 q ← {expr}\nnota q")), ISSUE_MIXING);
+        assert_rejected_with(&entry(&format!("sit f32 q ← {expr}\nnota q")), ISSUE_MIXING);
     }
 }
 
 #[test]
 fn policy_float_store_trapping_arithmetic_beside_another_cell_or_width_is_the_mixing_issue() {
     assert_rejected_with(
-        &entry("fixum exactus<f64> w ← 1.5\nfixum f64 q ← (t * t) + (w * w)\nnota q"),
+        &entry("sit exactus<f64> w ← 1.5\nsit f64 q ← (t * t) + (w * w)\nnota q"),
         ISSUE_MIXING,
     );
-    assert_rejected_with(&entry("fixum f32 q ← (t * t) + s\nnota q"), ISSUE_MIXING);
-    assert_rejected_with(&entry("fixum f32 q ← (s * s) + (t * t)\nnota q"), ISSUE_MIXING);
+    assert_rejected_with(&entry("sit f32 q ← (t * t) + s\nnota q"), ISSUE_MIXING);
+    assert_rejected_with(&entry("sit f32 q ← (s * s) + (t * t)\nnota q"), ISSUE_MIXING);
 }
 
 #[test]
 fn policy_float_store_untyped_constants_and_same_cell_operands_mix_freely() {
     let source = entry(
-        "fixum exactus<f32> u ← (t * t) + 1.5\nfixum exactus<f32> v ← (t * t) + (t - 2)\n\
-         fixum exactus<f32> w ← 2 * (t * t) + 1\nnota u\nnota v\nnota w",
+        "sit exactus<f32> u ← (t * t) + 1.5\nsit exactus<f32> v ← (t * t) + (t - 2)\n\
+         sit exactus<f32> w ← 2 * (t * t) + 1\nnota u\nnota v\nnota w",
     );
     assert_eq!(kinds(&source).len(), 3);
 }
@@ -296,7 +296,7 @@ fn policy_float_store_untyped_constants_and_same_cell_operands_mix_freely() {
 
 #[test]
 fn policy_float_store_an_unstored_expression_has_no_node() {
-    let source = entry("nota t * t\nfixum bivalens c ← t * t ≻ 1.0\nnota c");
+    let source = entry("nota t * t\nsit bivalens c ← t * t ≻ 1.0\nnota c");
     assert!(kinds(&source).is_empty());
 }
 
@@ -304,8 +304,8 @@ fn policy_float_store_an_unstored_expression_has_no_node() {
 fn policy_float_store_trapping_arithmetic_is_the_bare_float() {
     // It lands in a bare `f32` slot unchanged, and does not land in a `f64`
     // cell or a `saturating` cell.
-    assert!(kinds(&entry("fixum f32 y ← t * t\nnota y")).is_empty());
-    assert_rejected(&entry("fixum exactus<f64> y ← t * t\nnota y"));
+    assert!(kinds(&entry("sit f32 y ← t * t\nnota y")).is_empty());
+    assert_rejected(&entry("sit exactus<f64> y ← t * t\nnota y"));
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +316,7 @@ const TAKE: &str = "functio take(exactus<f32> c) → vacuum {\n    nota c\n}\n";
 
 #[test]
 fn policy_float_store_position_argument() {
-    let source = format!("{TAKE}incipit {{\nfixum exactus<f32> t ← 1.5\ntake(t * t)\ntake(t)\n}}\n");
+    let source = format!("{TAKE}incipit {{\nsit exactus<f32> t ← 1.5\ntake(t * t)\ntake(t)\n}}\n");
     assert_eq!(kinds(&source), vec![HirStoreKind::Argument]);
 }
 
@@ -345,7 +345,7 @@ fn policy_float_store_position_return() {
 #[test]
 fn policy_float_store_position_closure_return() {
     let source = entry(
-        "fixum (exactus<f32>) → exactus<f32> f ← clausura exactus<f32> v → exactus<f32> { redde v * v }\nnota f(t)",
+        "sit (exactus<f32>) → exactus<f32> f ← clausura exactus<f32> v → exactus<f32> { redde v * v }\nnota f(t)",
     );
     assert_eq!(kinds(&source), vec![HirStoreKind::Return]);
 }
@@ -365,33 +365,33 @@ fn policy_float_store_position_throw() {
 #[test]
 fn policy_float_store_position_field() {
     let source = "genus Arca {\n    fixum exactus<f32> a\n}\n\
-                  incipit {\nfixum exactus<f32> t ← 1.5\nfixum Arca b ← Arca { a = t * t }\nfixum Arca c ← Arca { a = t }\n}\n";
+                  incipit {\nsit exactus<f32> t ← 1.5\nsit Arca b ← Arca { a = t * t }\nsit Arca c ← Arca { a = t }\n}\n";
     assert_eq!(kinds(source), vec![HirStoreKind::Field]);
 }
 
 #[test]
 fn policy_float_store_position_variant_field() {
     let source = "discretio Forma {\n    Plena { exactus<f32> res }\n}\n\
-                  incipit {\nfixum exactus<f32> t ← 1.5\nfixum Forma f ← finge Plena { res = t * t }\n}\n";
+                  incipit {\nsit exactus<f32> t ← 1.5\nsit Forma f ← finge Plena { res = t * t }\n}\n";
     assert_eq!(kinds(source), vec![HirStoreKind::Field]);
 }
 
 #[test]
 fn policy_float_store_position_element() {
-    let source = entry("fixum lista<exactus<f32>> xs ← [t * t, t]\nnota xs");
+    let source = entry("sit lista<exactus<f32>> xs ← [t * t, t]\nnota xs");
     assert_eq!(kinds(&source), vec![HirStoreKind::Element]);
 }
 
 #[test]
 fn policy_float_store_position_tuple() {
     let source =
-        entry("fixum iuncta<exactus<f32>, exactus<f32>> p ← iuncta<exactus<f32>, exactus<f32>>[t * t, t]\nnota p");
+        entry("sit iuncta<exactus<f32>, exactus<f32>> p ← iuncta<exactus<f32>, exactus<f32>>[t * t, t]\nnota p");
     assert_eq!(kinds(&source), vec![HirStoreKind::TuplePosition]);
 }
 
 #[test]
 fn policy_float_store_position_conversion_default() {
-    let source = entry("fixum numerus n ← 5\nfixum exactus<f32> r ← n ↦ exactus<f32> ⊥ (t * t)\nnota r");
+    let source = entry("sit numerus n ← 5\nsit exactus<f32> r ← n ↦ exactus<f32> ⊥ (t * t)\nnota r");
     assert_eq!(kinds(&source), vec![HirStoreKind::ConversionDefault]);
 }
 
@@ -402,10 +402,10 @@ fn policy_float_store_position_await_binding_never_carries_trapping_arithmetic()
     // arithmetic. A leaf cell needs no mark; a bare float needs an authored
     // `↦`, as for any other store (D4).
     let leaf = "functio fetch() fiet → exactus<f32> {\n    redde 1.5\n}\n\
-                functio caller() fiet → vacuum {\n    fixum exactus<f32> v ↢ fetch()\n    nota v\n}\n";
+                functio caller() fiet → vacuum {\n    sit exactus<f32> v ↢ fetch()\n    nota v\n}\n";
     assert!(kinds(leaf).is_empty());
     let bare = "functio fetch() fiet → f32 {\n    redde 1.5\n}\n\
-                functio caller() fiet → vacuum {\n    fixum exactus<f32> v ↢ fetch()\n    nota v\n}\n";
+                functio caller() fiet → vacuum {\n    sit exactus<f32> v ↢ fetch()\n    nota v\n}\n";
     assert_rejected(bare);
 }
 
@@ -415,7 +415,7 @@ fn policy_float_store_position_await_binding_never_carries_trapping_arithmetic()
 
 #[test]
 fn policy_float_store_a_single_cell_member_of_a_union_slot_is_checked() {
-    let source = entry("fixum exactus<f32> ∪ nihil u ← t * t\nnota u");
+    let source = entry("sit exactus<f32> ∪ nihil u ← t * t\nnota u");
     let collected = collected(&source);
     let stores = &collected.collector.stores;
     assert_eq!(stores.len(), 1);
@@ -425,7 +425,7 @@ fn policy_float_store_a_single_cell_member_of_a_union_slot_is_checked() {
 #[test]
 fn policy_float_store_element_and_field_assignments_are_stores() {
     let source = "genus Arca {\n    varia exactus<f32> a\n}\n\
-                  incipit {\nfixum exactus<f32> t ← 1.5\nvaria Arca b ← Arca { a = t }\nb.a ← t * t\n\
+                  incipit {\nsit exactus<f32> t ← 1.5\nvaria Arca b ← Arca { a = t }\nb.a ← t * t\n\
                   varia lista<exactus<f32>> xs ← [t]\nxs[0] ← t + t\nnota b\nnota xs\n}\n";
     assert_eq!(kinds(source), vec![HirStoreKind::Assignment, HirStoreKind::Assignment]);
 }
@@ -438,20 +438,20 @@ fn policy_float_store_element_and_field_assignments_are_stores() {
 fn policy_float_store_the_exemplum_source_checks_clean() {
     let source = r"
 main {
-    const f32 m ← 3.4028235e38
-    const saturating<f32> s ← m ↦ saturating<f32>
+    let f32 m ← 3.4028235e38
+    let saturating<f32> s ← m ↦ saturating<f32>
     print s * s
-    const saturating<f32> p ← s * s
+    let saturating<f32> p ← s * s
     print p
-    const saturating<f32> zero ← 0.0
+    let saturating<f32> zero ← 0.0
     print zero / zero
-    const inf huge ← 2 ⇐ 2000
+    let inf huge ← 2 ⇐ 2000
     print huge ↦ saturating<f64>
-    const f64 wide ← 1.0e300
+    let f64 wide ← 1.0e300
     print wide ↦ saturating<f32>
-    const trapping<f32> t ← m ↦ trapping<f32>
+    let trapping<f32> t ← m ↦ trapping<f32>
     print t * t
-    const trapping<f32> u ← t * t
+    let trapping<f32> u ← t * t
     print u
 }
 ";

@@ -36,8 +36,8 @@ no_expected = "needs-device"
 
 @ nucleum
 @ publica { }
-functio column_dot(tensor<f32, [32]> a, in tensor<f32, [1]> out) → vacuum {
-    fixum f32 total ← reducta via summa ex a apud [i] filum f fixum s {
+functio column_dot(tensor<f32, [32]> a, varia tensor<f32, [1]> out) → vacuum {
+    sit f32 total ← reducta via summa ex a apud [i] filum f fixum s {
         varia f32 t ← s * 1.4140625
         redde t
     }

@@ -16,7 +16,7 @@ sit = "ليكن"
 typus = "نمط"
 schema = "مخطط"
 columna = "عمود"
-varia = "متغير"
+varia = "قابل_للتغيير"
 ceteri = "باقي"
 errata = "مخطئ"
 exitus = "مخرج"
@@ -95,7 +95,7 @@ maxima = "الأقصى"
 minima = "الأدنى"
 de = "عن"
 ex = "من"
-in = "في"
+in = "قابل_للتغيير"
 own = "ملك"
 copy = "نسخة"
 axis = "محور"
@@ -511,6 +511,26 @@ help = "أعلن الـ method على genus بدلا من ذلك"
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "علامة `{marker}` لم تعد توضع على الارتباط؛ بل توضع على القيمة"
 help = "اكتب `{keyword} T {name} ← {marker} value`؛ و`{name} ← {marker} value` اللاحق يعلّم القيمة بالطريقة نفسها، ويحتفظ المعامل بـ `{marker}` قبل نوعه"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "تم إلغاء تصريح `{keyword}` وقت التشغيل؛ `{name}` اسم وقت تشغيل"
+help = "اكتب `{sit} T {name} ← …` (أو `{sit} {name} ← …` لاستنتاج النوع)؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "المتغير المحلي `{keyword}` يحتاج إلى موضع للقراءة: `{keyword} T name ← place`"
+help = "اكتب `{keyword} T name ← place`، أو استخدم `{sit}` أو `{varia}` لاسم بلا موضع ابتدائي"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "المتغير المحلي `{keyword}` يربط اسمًا واحدًا؛ لا يمكن تفكيكه"
+help = "اكتب `{keyword} T name ← place` ثم اقرأ الأجزاء عبر الاسم"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "المتغير المحلي `{keyword}` يقرأ موضعًا ولا يقبل قيمة `{marker}`"
+help = "اكتب `{keyword} T name ← place` لقراءة موضع، أو `{sit} T name ← {marker} place` للحصول على قيمة مستقلة"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "تم إلغاء كلمة التصريح `{keyword}`؛ `{name}` اسم قابل للكتابة"
+help = "اكتب `{varia} T {name} ← …`؛ الاسم القابل للكتابة وقت التشغيل هو `{varia}`"
 
 [diagnostics.PARSE011]
 message = "مطلوب اسم دالة بعد {functio}"

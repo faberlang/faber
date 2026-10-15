@@ -16,8 +16,8 @@ diagnostic = "SEM052:use_while_mutably_borrowed"
 # This exemplum intentionally fails to compile.
 
 main {
-    var list<int> a ← [1, 2, 3]
-    var mut list<int> b ← a
+    mut list<int> a ← [1, 2, 3]
+    mut mut list<int> b ← a
     print a.length()
     print b.length()
 }

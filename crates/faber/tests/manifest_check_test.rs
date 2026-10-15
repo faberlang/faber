@@ -26,7 +26,7 @@ locale = "en"
 +++
 
 fn fiver(int seed) → int {
-    var _ n ← 0
+    mut _ n ← 0
     if seed ≡ 1 { n ← 1 }
     if seed ≡ 2 { n ← 2 }
     if seed ≡ 3 { n ← 3 }
@@ -35,7 +35,7 @@ fn fiver(int seed) → int {
 }
 
 fn steady(int seed) → int {
-    var _ n ← 0
+    mut _ n ← 0
     if seed ≡ 1 { n ← 1 }
     if seed ≡ 2 { n ← 2 }
     if seed ≡ 3 { n ← 3 }
@@ -51,7 +51,7 @@ fn steady(int seed) → int {
 }
 
 fn branchy(int seed) → int {
-    var _ n ← 0
+    mut _ n ← 0
     if seed ≡ 1 { n ← 1 }
     if seed ≡ 2 { n ← 2 }
     if seed ≡ 3 { n ← 3 }
@@ -68,9 +68,9 @@ fn branchy(int seed) → int {
 }
 
 main {
-    const _ five ← fiver(3)
-    const _ hushed ← steady(4)
-    const _ loud ← branchy(5)
+    let five ← fiver(3)
+    let hushed ← steady(4)
+    let loud ← branchy(5)
     print "probe"
 }
 "#;

@@ -12,7 +12,7 @@ functio factum_tot(tensor<f32, [4]> a) → f32 { redde reducta via factum ex a }
 functio maxima_tot(tensor<f32, [4]> a) → f32 { redde reducta via maxima ex a }
 functio minima_tot(tensor<f32, [4]> a) → f32 { redde reducta via minima ex a apud [i] }
 functio maxima_vacua() → f32 {
-    fixum tf32[0] v ← vacua
+    sit tf32[0] v ← vacua
     redde reducta via maxima ex v apud [i] vel -∞
 }
 functio numera_maiora(tensor<f32, [4]> a) → numerus {
@@ -34,8 +34,8 @@ functio summa_corpus(tensor<f32, [4]> a) → f32 {
     redde reducta via summa ex a apud [i] fixum s { redde s + 1.0 }
 }
 incipit {
-    fixum lista<f32> flat ← [3.0, 1.0, 3.0, 2.0]
-        fixum tf32[4] a ← flat ↦ tf32[4]
+    sit lista<f32> flat ← [3.0, 1.0, 3.0, 2.0]
+        sit tf32[4] a ← flat ↦ tf32[4]
     nota summa_tot(a)
     nota factum_tot(a)
     nota maxima_tot(a)

@@ -107,7 +107,7 @@ genus KeywordSpec {
 }
 
 incipit {
-    fixum lista<KeywordSpec> KEYWORDS ← [
+    sit lista<KeywordSpec> KEYWORDS ← [
         KeywordSpec { text = "palabra", token_kind = token.TokenKind.Palabra },
         KeywordSpec { text = "numerus", token_kind = finge token.TokenKind.Numerus { code = 3 } ∷ token.TokenKind },
         KeywordSpec { text = "vacua", token_kind = nulla }
@@ -126,7 +126,7 @@ fn imported_union_variant_single_local_initializer_checks_green() {
     let source = r#"importa ex "./token" token
 
 incipit {
-    fixum token.TokenKind PALABRA ← token.TokenKind.Palabra
+    sit token.TokenKind PALABRA ← token.TokenKind.Palabra
     nota PALABRA
 }"#;
     assert_checks_green(
@@ -171,7 +171,7 @@ genus TokenRow {
 }
 
 incipit {
-    fixum TokenRow row ← TokenRow { kind = token.TokenKind.Palabra }
+    sit TokenRow row ← TokenRow { kind = token.TokenKind.Palabra }
     nota row
 }"#;
     assert_checks_green(
@@ -192,7 +192,7 @@ genus KeywordSpec {
 }
 
 incipit {
-    fixum KeywordSpec s ← KeywordSpec { text = "x", token_kind = token.TokenKind.Palabra }
+    sit KeywordSpec s ← KeywordSpec { text = "x", token_kind = token.TokenKind.Palabra }
     nota s
 }"#;
     assert_checks_green(
@@ -230,7 +230,7 @@ fn imported_union_value_reference_in_local_initializer_checks_green() {
     let source = r#"importa ex "./token" token
 
 incipit {
-    fixum token.TokenKind t ← token.TokenKind.Palabra
+    sit token.TokenKind t ← token.TokenKind.Palabra
     nota t
 }"#;
     assert_checks_green(
@@ -250,8 +250,8 @@ fn same_module_union_value_references_regression_checks_green() {
 }
 
 incipit {
-    fixum Eventum b ← Eventum.Sonitus
-    fixum Eventum a ← finge Ictus { vis = 3 } ∷ Eventum
+    sit Eventum b ← Eventum.Sonitus
+    sit Eventum a ← finge Ictus { vis = 3 } ∷ Eventum
     nota b
 }",
     );

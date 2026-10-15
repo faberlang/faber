@@ -9,9 +9,9 @@
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
-const PRELUDE: &str = "fixum lista<numerus> a ← [7, 8, 9]
-fixum lista<numerus> b ← [2, 3, 4]
-fixum lista<u8> bytes ← [1, 2, 3]
+const PRELUDE: &str = "sit lista<numerus> a ← [7, 8, 9]
+sit lista<numerus> b ← [2, 3, 4]
+sit lista<u8> bytes ← [1, 2, 3]
 ";
 
 fn issues(target: Target, body: &str) -> Vec<String> {
@@ -34,26 +34,26 @@ fn rejected_with(target: Target, body: &str) -> bool {
 }
 
 const RUNNER_ONLY: &[&str] = &[
-    "fixum lista<numerus> r ← a % 2",
-    "fixum lista<numerus> r ← 9 % a",
-    "fixum lista<fractus> r ← a ÷ 2",
-    "fixum lista<fractus> r ← a ÷ b",
-    "fixum lista<numerus> r ← a ⊙ b",
-    "fixum lista<numerus> r ← a ⊘ b",
-    "fixum lista<numerus> r ← -a",
-    "fixum lista<u16> r ← bytes + 300",
-    "fixum lista<bivalens> r ← a ≺ b",
-    "fixum lista<bivalens> r ← a ≥ 8",
-    "fixum lista<bivalens> r ← 8 ≅ a",
-    "fixum lista<bivalens> r ← a ≇ b",
+    "sit lista<numerus> r ← a % 2",
+    "sit lista<numerus> r ← 9 % a",
+    "sit lista<fractus> r ← a ÷ 2",
+    "sit lista<fractus> r ← a ÷ b",
+    "sit lista<numerus> r ← a ⊙ b",
+    "sit lista<numerus> r ← a ⊘ b",
+    "sit lista<numerus> r ← -a",
+    "sit lista<u16> r ← bytes + 300",
+    "sit lista<bivalens> r ← a ≺ b",
+    "sit lista<bivalens> r ← a ≥ 8",
+    "sit lista<bivalens> r ← 8 ≅ a",
+    "sit lista<bivalens> r ← a ≇ b",
 ];
 
 const KEPT: &[&str] = &[
-    "fixum lista<numerus> r ← a + b",
-    "fixum lista<numerus> r ← a - b",
-    "fixum lista<numerus> r ← a * 2",
-    "fixum lista<numerus> r ← 2 - a",
-    "fixum lista<u8> r ← bytes + 1",
+    "sit lista<numerus> r ← a + b",
+    "sit lista<numerus> r ← a - b",
+    "sit lista<numerus> r ← a * 2",
+    "sit lista<numerus> r ← 2 - a",
+    "sit lista<u8> r ← bytes + 1",
 ];
 
 #[cfg(feature = "hir-ts")]

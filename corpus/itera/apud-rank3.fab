@@ -37,8 +37,8 @@ locale = "en"
 #   i, j, k, cell per line — eight lanes in i-outer, k-inner order.
 
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-    var tf32[2, 2, 2] cube ← flat ↦ tf32[2, 2, 2]
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    mut tf32[2, 2, 2] cube ← flat ↦ tf32[2, 2, 2]
 
     for from cube at [i, j, k] const cell {
         print i, j, k, cell

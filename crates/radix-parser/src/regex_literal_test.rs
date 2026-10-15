@@ -31,7 +31,7 @@ fn entry_initializer(result: &ParseResult) -> &Expr {
 
 #[test]
 fn regex_type_word_literal_parses() {
-    let result = parse_ok(r"incipit { fixum regex r ← regex /\d+/ }");
+    let result = parse_ok(r"incipit { sit regex r ← regex /\d+/ }");
     let init = entry_initializer(&result);
     let ExprKind::Literal(Literal::Regex(pattern)) = init.kind else {
         panic!("expected regex literal, got {:?}", init.kind);
@@ -41,7 +41,7 @@ fn regex_type_word_literal_parses() {
 
 #[test]
 fn inferred_regex_literal_parses() {
-    let result = parse_ok(r"incipit { fixum regex r ← _ /a/ }");
+    let result = parse_ok(r"incipit { sit regex r ← _ /a/ }");
     let init = entry_initializer(&result);
     let ExprKind::Literal(Literal::Regex(pattern)) = init.kind else {
         panic!("expected regex literal, got {:?}", init.kind);
@@ -51,7 +51,7 @@ fn inferred_regex_literal_parses() {
 
 #[test]
 fn bare_slash_stays_division() {
-    let result = parse_ok(r"incipit { fixum numerus q ← 6 / 2 }");
+    let result = parse_ok(r"incipit { sit numerus q ← 6 / 2 }");
     let init = entry_initializer(&result);
     let ExprKind::Binary(binary) = &init.kind else {
         panic!("expected binary expression, got {:?}", init.kind);

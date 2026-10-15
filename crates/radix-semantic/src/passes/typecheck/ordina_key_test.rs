@@ -37,7 +37,7 @@ genus Persona {
 
 fn with_persona(body: &str) -> String {
     format!(
-        "{PERSONA}\nincipit {{\n    fixum lista<Persona> ps ← [Persona {{ nomen = \"b\", aetas = 2, activa = verum }}]\n{body}\n}}\n"
+        "{PERSONA}\nincipit {{\n    sit lista<Persona> ps ← [Persona {{ nomen = \"b\", aetas = 2, activa = verum }}]\n{body}\n}}\n"
     )
 }
 
@@ -45,7 +45,7 @@ fn with_persona(body: &str) -> String {
 fn ordinata_text_key_is_retired_by_name() {
     rejects_with_issue(
         &compile(&with_persona(
-            "    fixum lista<Persona> o ← ps.ordinata(Persona p ∴ p.nomen)\n    nota o.longitudo()",
+            "    sit lista<Persona> o ← ps.ordinata(Persona p ∴ p.nomen)\n    nota o.longitudo()",
         )),
         "sorted_key_retired",
     );
@@ -55,7 +55,7 @@ fn ordinata_text_key_is_retired_by_name() {
 fn ordinata_numeric_key_is_retired_by_name() {
     rejects_with_issue(
         &compile(&with_persona(
-            "    fixum lista<Persona> o ← ps.ordinata(Persona p ∴ p.aetas)\n    nota o.longitudo()",
+            "    sit lista<Persona> o ← ps.ordinata(Persona p ∴ p.aetas)\n    nota o.longitudo()",
         )),
         "sorted_key_retired",
     );
@@ -64,7 +64,7 @@ fn ordinata_numeric_key_is_retired_by_name() {
 #[test]
 fn ordinata_key_retirement_is_the_only_diagnostic() {
     let result = compile(&with_persona(
-        "    fixum lista<Persona> o ← ps.ordinata(Persona p ∴ p.aetas)\n    nota o.longitudo()",
+        "    sit lista<Persona> o ← ps.ordinata(Persona p ∴ p.aetas)\n    nota o.longitudo()",
     ));
     assert_eq!(
         result.diagnostics.len(),
@@ -94,6 +94,6 @@ fn ordina_genus_key_rejects() {
 #[test]
 fn ordinata_without_key_is_unchanged() {
     accepts(&compile(
-        "incipit {\n    fixum lista<numerus> o ← [3, 1, 2].ordinata()\n    nota o\n}\n",
+        "incipit {\n    sit lista<numerus> o ← [3, 1, 2].ordinata()\n    nota o\n}\n",
     ));
 }

@@ -43,45 +43,45 @@ fn epoch_wire(instant t) → string {
 
 main {
     # --- precision declarations from canonical nanosecond wall clock ---
-    const instant<ns> nanos ← tempus.now()
-    const instant secunda ← nanos ↦ instant
-    const instant<ms> millis ← nanos ↦ instant<ms>
-    const instant<us> micros ← nanos ↦ instant<us>
+    let instant<ns> nanos ← tempus.now()
+    let instant secunda ← nanos ↦ instant
+    let instant<ms> millis ← nanos ↦ instant<ms>
+    let instant<us> micros ← nanos ↦ instant<us>
 
     # --- valor ↦ instans: UTC wire and numeric offset normalize to same instant ---
-    const value utc ← "1979-05-27T07:32:00Z"
-    const value offset ← "1979-05-27T03:32:00-04:00"
-    const instant parsed ← utc ↦ instant
-    const instant normalized ← offset ↦ instant
+    let value utc ← "1979-05-27T07:32:00Z"
+    let value offset ← "1979-05-27T03:32:00-04:00"
+    let instant parsed ← utc ↦ instant
+    let instant normalized ← offset ↦ instant
     assert parsed ≡ normalized panic "offset ingest normalizes to UTC instant"
 
     # --- microsecond wire extracted from a value at declared precision ---
-    const value carrier ← "1979-05-27T07:32:00.123456Z"
-    const instant<us> fromToml ← carrier ↦ instant<us>
+    let value carrier ← "1979-05-27T07:32:00.123456Z"
+    let instant<us> fromToml ← carrier ↦ instant<us>
     assert (fromToml ↦ string) ≡ "1979-05-27T07:32:00.123456Z" panic "emit honors micros contract"
 
     # --- precision-tagged equality: distinct at ns, equal at ms ---
-    const value leftWire ← "1979-05-27T07:32:00.123456Z"
-    const value rightWire ← "1979-05-27T07:32:00.123999Z"
-    const instant<ns> left ← leftWire ↦ instant<ns>
-    const instant<ns> right ← rightWire ↦ instant<ns>
+    let value leftWire ← "1979-05-27T07:32:00.123456Z"
+    let value rightWire ← "1979-05-27T07:32:00.123999Z"
+    let instant<ns> left ← leftWire ↦ instant<ns>
+    let instant<ns> right ← rightWire ↦ instant<ns>
     assert left ≢ right panic "sub-millisecond bits differ at nanosecond precision"
-    const instant<ms> leftMs ← left ↦ instant<ms>
-    const instant<ms> rightMs ← right ↦ instant<ms>
+    let instant<ms> leftMs ← left ↦ instant<ms>
+    let instant<ms> rightMs ← right ↦ instant<ms>
     assert leftMs ≡ rightMs panic "same millisecond at declared ms precision"
 
     # --- cross-precision conversio: widen and narrow with observable truncation ---
-    const instant<ns> fine ← parsed ↦ instant<ns>
-    const instant<ms> coarse ← fine ↦ instant<ms>
-    const instant seconds ← fine ↦ instant
+    let instant<ns> fine ← parsed ↦ instant<ns>
+    let instant<ms> coarse ← fine ↦ instant<ms>
+    let instant seconds ← fine ↦ instant
     assert (seconds ↦ string) ≡ "1979-05-27T07:32:00Z" panic "narrow to seconds strips sub-second wire"
-    const instant<ms> wider ← secunda ↦ instant<ms>
+    let instant<ms> wider ← secunda ↦ instant<ms>
     assert wider ≤ millis panic "cross-precision comparison at coarser operand"
 
     # --- wire emit and parse-back through a value (same instant) ---
-    const string wire ← epoch_wire(parsed)
-    const value replayCarrier ← "1979-05-27T07:32:00Z"
-    const instant roundtrip ← replayCarrier ↦ instant
+    let string wire ← epoch_wire(parsed)
+    let value replayCarrier ← "1979-05-27T07:32:00Z"
+    let instant roundtrip ← replayCarrier ↦ instant
     assert roundtrip ≡ parsed panic "wire parse-back matches UTC valor extract"
     assert wire ≡ "1979-05-27T07:32:00Z" panic "seconds-precision wire emit"
     print wire, secunda, millis, micros, nanos, fromToml, coarse

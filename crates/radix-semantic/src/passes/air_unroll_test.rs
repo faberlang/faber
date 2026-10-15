@@ -203,7 +203,7 @@ const SECTION3_SCALAR_LOOP: &str = r#"
 @ radix lane "air"
 @ radix backward "range_backward"
 functio loop_count() → f32 {
-    fixum f32 total ← 0.0
+    sit f32 total ← 0.0
     itera ab 0‥10 per 2 fixum i {
         total ← total + 1.0
     }
@@ -815,7 +815,7 @@ fn in_region_fill_mask_declines_with_causa() {
 @ radix lane "air"
 @ radix backward "fill_backward"
 functio fill_mask(tensor<f32, [4]> x) → f32 {
-    fixum tensor<f32, [4]> mask ← x.reple(1.0)
+    sit tensor<f32, [4]> mask ← x.reple(1.0)
     varia tensor<f32, [4]> acc ← copy x
     itera ab 0‥4 fixum i {
         acc ← acc + x
@@ -926,7 +926,7 @@ fn bounded_lista_ex_full_literal_admits_guard_free_lanes() {
         r#"
 @ radix lane "air"
 functio bounded_sum() → vacuum {
-    fixum lista<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, 4>
+    sit lista<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, 4>
     itera ex xs fixum value { }
 }
 "#,
@@ -958,9 +958,9 @@ fn bounded_lista_ex_inference_chain_preserves_fullness_fact() {
         r#"
 @ radix lane "air"
 functio bounded_chain() → vacuum ⇥ textus {
-    fixum lista<f32> raw ← [1.0, 2.0, 3.0, 4.0]
-    fixum lista<f32, 4> full ← raw ↦ lista<f32, 4>
-    fixum lista<f32, 4> alias ← full
+    sit lista<f32> raw ← [1.0, 2.0, 3.0, 4.0]
+    sit lista<f32, 4> full ← raw ↦ lista<f32, 4>
+    sit lista<f32, 4> alias ← full
     itera ex alias fixum value { }
 }
 "#,
@@ -985,8 +985,8 @@ fn bounded_lista_ex_non_full_value_declines_not_concrete() {
         r#"
 @ radix lane "air"
 functio bounded_partial() → vacuum ⇥ textus {
-    fixum lista<f32> raw ← [1.0, 2.0, 3.0]
-    fixum lista<f32, 4> xs ← raw ↦ lista<f32, 4>
+    sit lista<f32> raw ← [1.0, 2.0, 3.0]
+    sit lista<f32, 4> xs ← raw ↦ lista<f32, 4>
     itera ex xs fixum value { }
 }
 "#,
@@ -1000,7 +1000,7 @@ fn bounded_lista_ex_full_literal_n8_admits_guard_free_lanes() {
         r#"
 @ radix lane "air"
 functio bounded_sum_8() → vacuum {
-    fixum lista<f32, 8> xs ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0] ↦ lista<f32, 8>
+    sit lista<f32, 8> xs ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0] ↦ lista<f32, 8>
     itera ex xs fixum value { }
 }
 "#,
@@ -1033,7 +1033,7 @@ fn bounded_lista_ex_over_budget_declines_whole_with_causa() {
         r#"
 @ radix lane "air"
 functio too_wide() → vacuum {{
-    fixum lista<f32, 65> xs ← [{elements}] ↦ lista<f32, 65>
+    sit lista<f32, 65> xs ← [{elements}] ↦ lista<f32, 65>
     itera ex xs fixum value {{ }}
 }}
 "#
@@ -1053,7 +1053,7 @@ fn bounded_lista_ex_unbounded_declines_not_concrete() {
         r#"
 @ radix lane "air"
 functio unbounded() → vacuum {
-    fixum lista<f32> xs ← [1.0, 2.0, 3.0]
+    sit lista<f32> xs ← [1.0, 2.0, 3.0]
     itera ex xs fixum value { }
 }
 "#,
@@ -1112,7 +1112,7 @@ fn octeti_ex_full_literal_admits_guard_free_lanes() {
         r#"
 @ radix lane "air"
 functio octeti_full() → vacuum {
-    fixum octeti<8> xs ← |de ad be ef ba dc fe ca| ↦ octeti<8>
+    sit octeti<8> xs ← |de ad be ef ba dc fe ca| ↦ octeti<8>
     itera ex xs fixum b { }
 }
 "#,
@@ -1141,7 +1141,7 @@ fn ascii_ex_full_literal_admits_guard_free_lanes() {
         r#"
 @ radix lane "air"
 functio ascii_full() → vacuum {
-    fixum ascii<8> xs ← 'alphabet' ↦ ascii<8>
+    sit ascii<8> xs ← 'alphabet' ↦ ascii<8>
     itera ex xs fixum c { }
 }
 "#,
@@ -1170,7 +1170,7 @@ fn textus_ex_full_literal_admits_guard_free_lanes() {
         r#"
 @ radix lane "air"
 functio textus_full() → vacuum {
-    fixum textus<8> xs ← "abcdefgh" ↦ textus<8>
+    sit textus<8> xs ← "abcdefgh" ↦ textus<8>
     itera ex xs fixum c { }
 }
 "#,
@@ -1225,7 +1225,7 @@ fn textus_ex_over_budget_declines_whole_with_causa() {
         r#"
 @ radix lane "air"
 functio too_wide() → vacuum {{
-    fixum textus<65> xs ← "{literal}" ↦ textus<65>
+    sit textus<65> xs ← "{literal}" ↦ textus<65>
     itera ex xs fixum c {{ }}
 }}
 "#
@@ -1336,7 +1336,7 @@ fn apud_triangular_arithmetic_body_admits_per_lane_conditions() {
 functio triangular(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
     varia tensor<f32, [2, 2]> acc ← copy x
     itera ex x apud [i, j] fixum cell {
-        fixum numerus idx ← i * 2 + j
+        sit numerus idx ← i * 2 + j
         si idx ≻ 2 { iace "upper" }
         acc ← acc + x
     }
@@ -1833,7 +1833,7 @@ fn apud_route_a_bounded_lista_nest_admits_product_lanes() {
 @ radix lane "air"
 functio nested_lista(tensor<f32, [4]> x) → f32 {
     varia f32 total ← 0.0
-    fixum lista<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, 4>
+    sit lista<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, 4>
     itera ex x apud [i] fixum cell {
         itera ex xs fixum value {
             total ← total + 1.0
@@ -1933,7 +1933,7 @@ fn tail_position_unroll_leaves_pre_loop_accumulator_reads_alone() {
     let source = r"
 functio tail_loop() → vacuum {
     varia f32 total ← 0.0
-    fixum f32 before ← total
+    sit f32 before ← total
     itera ab 0‥4 fixum i {
         total ← total + 1.0
     }

@@ -64,7 +64,7 @@ async_main {
     }
 
     # Collect all results from cursor function
-    var list<int> effecta ← []
+    mut list<int> effecta ← []
     for from grena(5) const n {
         effecta.append(n * 2)
     }

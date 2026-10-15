@@ -40,19 +40,19 @@ fn lane(vector<f32, 3> v, int i) → f32 {
 }
 
 main {
-    const vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    var f32 sum ← 0.0
-    var int i ← 0
+    let vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    mut f32 sum ← 0.0
+    mut int i ← 0
     while i ≺ 3 {
         sum ← sum + v[i]
         i ← i + 1
     }
     print sum
-    const int k ← 2
+    let int k ← 2
     print v[k]
     print lane(v, 1)
-    var vector<f32, 3> w ← [0.0, 0.0, 0.0] ↦ vector<f32, 3>
-    var int j ← 0
+    mut vector<f32, 3> w ← [0.0, 0.0, 0.0] ↦ vector<f32, 3>
+    mut int j ← 0
     while j ≺ 3 {
         w[j] ← v[j] * 2.0
         print w[j]

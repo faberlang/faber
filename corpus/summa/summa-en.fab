@@ -28,8 +28,8 @@ no_expected = "needs-device"
 @ kernel
 @ public { }
 fn column_dot(tensor<f32, [32]> a, mut tensor<f32, [1]> out) → void {
-    const f32 total ← reduce via sum from a at [i] thread f const s {
-        var f32 t ← s * 1.4140625
+    let f32 total ← reduce via sum from a at [i] thread f const s {
+        mut f32 t ← s * 1.4140625
         return t
     }
     out[0] ← total

@@ -9,7 +9,7 @@ canonical = true
 
 # `from` sorts a map's values; `ref` sorts a map's keys.
 main {
-    var map<string, int> m ← empty
+    mut map<string, int> m ← empty
     m["gamma"] ← 30
     m["alpha"] ← 20
     m["beta"] ← 10

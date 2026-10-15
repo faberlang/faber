@@ -33,7 +33,7 @@ locale = "en"
 #   one line per element: its position, then the element.
 
 main {
-    const list<string> days ← ["mon", "tue", "wed"]
+    let list<string> days ← ["mon", "tue", "wed"]
     for from days at [i] const day {
         print i, day
     }

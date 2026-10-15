@@ -46,7 +46,7 @@ fn minus() → int {
 main {
     print 2.power(10)
     print 0.power(0)
-    const float half ← 2.0
+    let float half ← 2.0
     print half.power(-1.0)
     print 2.power(minus())
     print 99

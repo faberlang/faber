@@ -47,6 +47,6 @@ fn trapped_match_is_coverage_checked() {
 #[test]
 fn trapped_variant_names_stay_contextual() {
     assert_accepts(
-        "functio f() → numerus {\n    fixum numerus returned ← 1\n    redde returned\n}\n",
+        "functio f() → numerus {\n    sit numerus returned ← 1\n    redde returned\n}\n",
     );
 }

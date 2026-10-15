@@ -62,7 +62,7 @@ fn ratio_annotation_and_construction_round_trip() {
     test_support::assert_accepts_la(
         r"
 functio first() → f32 {
-    fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
+    sit ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
     redde r.g
 }
 ",
@@ -74,7 +74,7 @@ fn ratio_lowers_to_record() {
     let result = test_support::analyze_ok_la(
         r"
 incipit {
-    fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
+    sit ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
     nota r.g
 }
 ",
@@ -95,7 +95,7 @@ fn ratio_keyword_label_member_access_typechecks() {
     test_support::assert_accepts_la(
         r"
 functio first() → f32 {
-    fixum ratio<fixum: f32> r ← ratio<fixum: f32> { fixum = 1.0 }
+    sit ratio<fixum: f32> r ← ratio<fixum: f32> { fixum = 1.0 }
     redde r.fixum
 }
 ",
@@ -107,7 +107,7 @@ fn ratio_unknown_field_access_rejects() {
     test_support::assert_rejects_with_issue_la(
         r"
 functio bad() → f32 {
-    fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
+    sit ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
     redde r.nope
 }
 ",
@@ -120,7 +120,7 @@ fn ratio_unknown_construction_field_rejects() {
     test_support::assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0, w = 2.0 }
+    sit ratio<g: f32> r ← ratio<g: f32> { g = 1.0, w = 2.0 }
     nota r.g
 }
 ",
@@ -133,7 +133,7 @@ fn ratio_missing_construction_field_rejects() {
     test_support::assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum ratio<g: f32, w: f32> r ← ratio<g: f32, w: f32> { g = 1.0 }
+    sit ratio<g: f32, w: f32> r ← ratio<g: f32, w: f32> { g = 1.0 }
     nota r.g
 }
 ",
@@ -146,7 +146,7 @@ fn ratio_init_type_mismatch_rejects() {
     test_support::assert_rejects_with_issue_la(
         r#"
 incipit {
-    fixum ratio<g: f32> r ← ratio<g: f32> { g = "x" }
+    sit ratio<g: f32> r ← ratio<g: f32> { g = "x" }
     nota r.g
 }
 "#,
@@ -159,8 +159,8 @@ fn ratio_distinct_field_types_do_not_assign() {
     test_support::assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum ratio<g: f32> a ← ratio<g: f32> { g = 1.0 }
-    fixum ratio<g: numerus> b ← a
+    sit ratio<g: f32> a ← ratio<g: f32> { g = 1.0 }
+    sit ratio<g: numerus> b ← a
     nota b.g
 }
 ",
@@ -177,8 +177,8 @@ genus P {
 }
 
 incipit {
-    fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
-    fixum P p ← r
+    sit ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
+    sit P p ← r
     nota p.g
 }
 ",
@@ -191,8 +191,8 @@ fn ratio_label_order_does_not_change_identity() {
     test_support::assert_accepts_la(
         r"
 incipit {
-    fixum ratio<g: f32, w: f32> a ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 }
-    fixum ratio<w: f32, g: f32> b ← a
+    sit ratio<g: f32, w: f32> a ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 }
+    sit ratio<w: f32, g: f32> b ← a
     nota b.g
 }
 ",
@@ -204,7 +204,7 @@ fn ratio_object_pattern_destructuring() {
     test_support::assert_accepts_la(
         r"
 incipit {
-    fixum ratio<g: f32, w: f32> r ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 }
+    sit ratio<g: f32, w: f32> r ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 }
     fixum { g, w } ← r
     nota g
     nota w
@@ -218,7 +218,7 @@ fn ratio_object_pattern_ceteri() {
     test_support::assert_accepts_la(
         r"
 incipit {
-    fixum ratio<g: f32, w: f32> r ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 }
+    sit ratio<g: f32, w: f32> r ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 }
     fixum { g, ceteri rest } ← r
     nota g
     nota rest.w
@@ -232,7 +232,7 @@ fn ratio_object_pattern_unknown_label_rejects() {
     test_support::assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
+    sit ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
     fixum { nope } ← r
     nota nope
 }
@@ -250,8 +250,8 @@ genus P {
 }
 
 incipit {
-    fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
-    fixum P p ← r ↦ P
+    sit ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
+    sit P p ← r ↦ P
     nota p.g
 }
 ",
@@ -268,8 +268,8 @@ genus P {
 }
 
 incipit {
-    fixum P p ← P { g = 1.0 }
-    fixum ratio<g: f32> r ← p ↦ ratio<g: f32>
+    sit P p ← P { g = 1.0 }
+    sit ratio<g: f32> r ← p ↦ ratio<g: f32>
     nota r.g
 }
 ",
@@ -283,8 +283,8 @@ fn identical_record_conversio_stays() {
         r"
 typus R = ratio<g: f32>
 incipit {
-    fixum ratio<g: f32> a ← ratio<g: f32> { g = 1.0 }
-    fixum ratio<g: f32> b ← a ↦ R
+    sit ratio<g: f32> a ← ratio<g: f32> { g = 1.0 }
+    sit ratio<g: f32> b ← a ↦ R
     nota b.g
 }
 ",
@@ -296,7 +296,7 @@ fn ratio_identifier_binding_stays() {
     test_support::assert_accepts_la(
         r"
 incipit {
-    fixum numerus ratio ← 3
+    sit numerus ratio ← 3
     nota ratio
 }
 ",
@@ -315,7 +315,7 @@ genus P {
 @ cli "tool"
 @ optio verbose brevis "v" longum "verbose" typus bivalens
 incipit argumenta args {
-    fixum P p ← args ↦ P
+    sit P p ← args ↦ P
     nota p.verbose
 }
 "#,
@@ -379,7 +379,7 @@ genus P {
 @ cli "tool"
 @ optio verbose brevis "v" longum "verbose" typus bivalens
 incipit argumenta args {
-    fixum P p ← P { verbose = args.verbose }
+    sit P p ← P { verbose = args.verbose }
     nota p.verbose
 }
 "#,

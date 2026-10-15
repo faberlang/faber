@@ -37,21 +37,21 @@ locale = "en"
 # BACKEND: Go e2e whitelist — collection method surface not yet lowered for Go.
 
 main {
-    var map<string, int> map ← empty
+    mut map<string, int> map ← empty
     map["primus"] ← 42
     map["secundus"] ← 99
-    var list<string> res ← empty
+    mut list<string> res ← empty
     res.append("alpha")
     res.append("beta")
-    var set<int> visi ← empty
+    mut set<int> visi ← empty
     visi.add(1)
     visi.add(2)
-    const map<string, int> puncta ← { "aelia": 95, "balbus": 87 }
-    const list<int> numeri ← [1, 2, 3] ∷ list<int>
-    const list<string> claves ← ["primus", "secundus"] ∷ list<string>
+    let map<string, int> puncta ← { "aelia": 95, "balbus": 87 }
+    let list<int> numeri ← [1, 2, 3] ∷ list<int>
+    let list<string> claves ← ["primus", "secundus"] ∷ list<string>
     print map["primus"], res.length(), visi.has(2)
     print puncta["aelia"], numeri.first(), claves.last()
 
     # Shadowing pin last so earlier `empty` inits stay the marker.
-    var list<int> empty ← empty
+    mut list<int> empty ← empty
 }

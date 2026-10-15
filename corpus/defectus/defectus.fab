@@ -74,18 +74,18 @@ fn fatal(int n) → int ⇥ string {
 
 main {
     # The call's value on success, the default on failure.
-    const int a ← half(8) ⊥ 0
-    const int b ← half(7) ⊥ -1
+    let int a ← half(8) ⊥ 0
+    let int b ← half(7) ⊥ -1
     print a, b
 
     # The default runs only when the call fails: `fallback` prints once.
-    const int c ← half(4) ⊥ fallback()
-    const int d ← half(5) ⊥ fallback()
+    let int c ← half(4) ⊥ fallback()
+    let int d ← half(5) ⊥ fallback()
     print c, d
 
     print safeQuarter(8), safeQuarter(6)
 
     # `⊥` never catches `panic`; this would still abort:
-    # const int e ← fatal(0) ⊥ 1
+    # let int e ← fatal(0) ⊥ 1
     print fatal(2) ⊥ 0, half(1) ⊥ -1
 }

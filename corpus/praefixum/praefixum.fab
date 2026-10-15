@@ -54,7 +54,7 @@ fn quadratum(int n) → int {
 
 # A loop that calls a pure function.
 const int SUMMA_QUADRATORUM = comptime {
-    var int total ← 0
+    mut int total ← 0
     for range 1‥11 const i {
         total ← total + quadratum(i)
     }
@@ -63,9 +63,9 @@ const int SUMMA_QUADRATORUM = comptime {
 
 # A collection built at build time.
 const list<int> PRIMI = comptime {
-    var list<int> found ← empty
+    mut list<int> found ← empty
     for range 2‥30 const n {
-        var bool isPrime ← true
+        mut bool isPrime ← true
         for range 2 ‥ n const d {
             if n % d ≡ 0 {
                 isPrime ← false
@@ -80,7 +80,7 @@ const list<int> PRIMI = comptime {
 
 # Text and a genus value.
 const string LINEA = comptime {
-    var string stripe ← ""
+    mut string stripe ← ""
     for range 0‥8 const i {
         stripe ← stripe + "="
     }

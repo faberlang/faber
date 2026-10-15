@@ -8,7 +8,7 @@ use std::process::Command;
 // File mode (`cmd_check_file`, single-file pipeline) uses the canonical Latin
 // surface by default, so the fixtures use `functio`/`fixum`/`varia`/`itera ab`.
 const MIXED_SOURCE: &str = r#"functio computus_gyrum() → fractus {
-    fixum fractus total ← 0.0
+    sit fractus total ← 0.0
     itera ab 0‥10 per 2 fixum i {
         total ← total + 1.0
     }

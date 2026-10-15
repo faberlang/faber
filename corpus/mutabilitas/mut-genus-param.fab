@@ -13,7 +13,7 @@ locale = "en"
 # =============================================================================
 
 class Counter {
-    var int n = 0
+    mut int n = 0
 
     fn inc() → void {
         self.n ← self.n + 1
@@ -31,7 +31,7 @@ fn twice(mut Counter c) → void {
 }
 
 main {
-    var Counter c ← Counter {}
+    mut Counter c ← Counter {}
     bump(mut c)
     twice(mut c)
     print c.n

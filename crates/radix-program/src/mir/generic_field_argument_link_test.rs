@@ -25,13 +25,13 @@ locale = "en"
 import from "twinslib:twins" twins
 
 class Pair {
-    var tensor<f32, [2, 2]> a
-    var tensor<f32, [2, 2]> b
+    mut tensor<f32, [2, 2]> a
+    mut tensor<f32, [2, 2]> b
 }
 
 fn make() → Pair {
-    var tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
-    var tensor<f32, [2, 2]> b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
+    mut tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    mut tensor<f32, [2, 2]> b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
     return Pair { a = a, b = b }
 }
 
@@ -41,7 +41,7 @@ fn add(Pair p) → void {
 }
 
 main {
-    const Pair p ← make()
+    let Pair p ← make()
     add(p)
 }
 "#;

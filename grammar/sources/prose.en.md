@@ -88,9 +88,18 @@ use a top-level function.
 ### Variables
 
 
-- `fixum` = immutable binding (write-once): it may be declared without an
-  initializer and assigned exactly once later, then frozen. `varia` = mutable
-  binding (reassignable), like `let`.
+- `sit` (en `let`) = run-time name, write-once: `sit T name ← e` states the
+  type, `sit name ← e` infers it. It may be declared without an initializer and
+  assigned exactly once later, then frozen. `varia` (en `mut`) = writable name
+  (reassignable). `fixum` (en `const`) = compile-time constant only, and it goes
+  with `=`: a run-time `fixum T name ← e` is `PARSE010` `runtime_const_retired`
+  (write `sit`), and the old English spelling `var` is `PARSE010` `var_retired`
+  (write `mut`).
+- `de T name ← place` (en `ref T name ← place`) is a re-pointable name that
+  reads through to a place: the name may be bound to another place, a write
+  through it is `SEM056` `assign_through_ref`, a scalar type takes no marker
+  (`SEM008` `scalar_access_marker`), and `copy`/`own` do not belong on it
+  (`PARSE010` `ref_local_value_marker`).
 - `figendum` / `variandum` await a `promissum<T>` or `promissum<T ⇥ E>`, bind
   the resolved `T`, and propagate a compatible alternate `E`.
 - `↢` is the await-directed initializer for an ordinary declaration:
@@ -98,13 +107,13 @@ use a top-level function.
   It has the same await and alternate-propagation semantics as
   `figendum T name ← future`, but it is not a general expression operator and
   cannot target an existing place.
-- Use `_` as the type annotation when the initializer determines the type: `fixum _ name ← value`
-- `sit name ← value` is sugar for `fixum _ name ← value` (inferred immutable local)
-- `sit name` (no initializer) is sugar for `fixum _ name` — the inferred deferred
+- Use `_` as the type annotation when the initializer determines the type: `varia _ name ← value`
+- `sit name ← value` is the inferred write-once local; `sit T name ← value` is the typed one
+- `sit name` (no initializer) is the inferred deferred
   immutable. Assign exactly once before any read.
-- Typed `fixum`/`varia` initializers accept `↤` (`fixum numerus x ↤ "42"`):
+- Typed `sit`/`varia` initializers accept `↤` (`sit numerus x ↤ "42"`):
   the written type is the conversion destination, then the binding is
-  initialized. `figendum`/`variandum` keep `←`; `fixum _`, `sit`, and untyped
+  initialized. `figendum`/`variandum` keep `←`; `varia _`, inferred `sit`, and untyped
   destructuring reject `↤` (no concrete destination type).
 - `fixum T x = e` (D5.10) declares a typed **constant**; at the top of a file
   the same declaration is the module-level constant (next section). `=` states a
@@ -115,7 +124,7 @@ use a top-level function.
   an ordinary immutable local of type `T`. `varia` never takes `=`
   (`varia_compile_time_initializer`), and a value that is not known at compile
   time is stored with `←` (`constant_initializer_not_constant`, SEM060).
-- Deferred init: `fixum numerus x` or `sit x` declares an uninitialized immutable
+- Deferred init: `sit numerus x` or `sit x` declares an uninitialized immutable
   slot that must be assigned exactly once before any read; a second assignment is
   rejected. The definite-assignment pass (semantic Phase 3a) enforces this.
 

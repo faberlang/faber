@@ -200,7 +200,7 @@ fn method_reading_a_neighbour_of_the_written_tensor_is_rejected() {
     rejected(
         &kernel(
             OVER_OUT,
-            "s.put(i, value)\n        fixum f32 next ← s.peek(i)",
+            "s.put(i, value)\n        sit f32 next ← s.peek(i)",
         ),
         "written_storage_neighbor_read",
     );

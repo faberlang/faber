@@ -3225,7 +3225,7 @@ impl Parser {
     fn parse_argument_marker(&mut self) -> Option<TypeMode> {
         let mode = if self.check_keyword_ident(TokenKind::De) {
             TypeMode::De
-        } else if self.check_keyword_ident(TokenKind::In) {
+        } else if self.check_keyword_ident(TokenKind::Varia) {
             TypeMode::In
         } else if self.check_keyword_ident(TokenKind::Own) {
             TypeMode::Own

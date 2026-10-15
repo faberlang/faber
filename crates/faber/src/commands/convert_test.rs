@@ -80,12 +80,12 @@ fn convert_thai_localizes_surface() {
     );
 
     assert!(thai_output.contains("ฟังก์ชัน ต้อนรับ(ข้อความ who) → ข้อความ"));
-    assert!(thai_output.contains("คงที่ ข้อความ line ← \"ขอต้อนรับ, §!\"(who)"));
+    assert!(thai_output.contains("กำหนด ข้อความ line ← \"ขอต้อนรับ, §!\"(who)"));
     assert!(thai_output.contains("คืน line"));
     assert!(thai_output.contains("ฟังก์ชัน สอบผ่าน(จํานวน mark) → ตรรกะ"));
     assert!(thai_output.contains("ถ้าไม่ก็ mark ≥ 40 ดังนั้น คืน จริง"));
     assert!(thai_output.contains("ฟังก์ชัน นับคะแนน(รายการ<จํานวน> marks) → จํานวน"));
-    assert!(thai_output.contains("แปร จํานวน total ← 0"));
+    assert!(thai_output.contains("แก้ไขได้ จํานวน total ← 0"));
     assert!(thai_output.contains("วน จาก marks คงที่ mark"));
     assert!(thai_output.contains("ถ้า mark ≺ 0 {"));
     assert!(thai_output.contains("ไปต่อ"));
@@ -93,8 +93,8 @@ fn convert_thai_localizes_surface() {
     assert!(thai_output.contains("ฟังก์ชัน ลดลง(จํานวน start) → จํานวน"));
     assert!(thai_output.contains("ขณะ current ≻ 0"));
     assert!(thai_output.contains("เริ่ม {"));
-    assert!(thai_output.contains("คงที่ จํานวน mark ← 77"));
-    assert!(thai_output.contains("คงที่ รายการ<จํานวน> marks ← [-1, 95, 30, 55, 61]"));
+    assert!(thai_output.contains("กำหนด จํานวน mark ← 77"));
+    assert!(thai_output.contains("กำหนด รายการ<จํานวน> marks ← [-1, 95, 30, 55, 61]"));
     assert!(thai_output.contains("บันทึก สอบผ่าน(mark)"));
     assert!(thai_output.contains("บันทึก นับคะแนน(marks)"));
     // The Latin keyword surface must not survive localized re-emit, and the
@@ -328,16 +328,16 @@ locale = "en"
 type Word = wrapping<u32>
 
 fn forms() → int {
-    const int scalar_long ← 1
-    const u32 scalar_short ← 2
-    const list<u32> list_long ← empty
-    const list<u32> list_middle ← empty
-    const lu32 list_short ← empty
-    const tensor<float, [2, 3]> tensor_long ← empty
-    const tf32[2, 3] tensor_short ← empty
-    const Word alias_use ← 3
-    const list<list<list<tensor<float, [2, 2]>>>> nested_long ← empty
-    const list<list<list<tf32[2, 2]>>> nested_short ← empty
+    let int scalar_long ← 1
+    let u32 scalar_short ← 2
+    let list<u32> list_long ← empty
+    let list<u32> list_middle ← empty
+    let lu32 list_short ← empty
+    let tensor<float, [2, 3]> tensor_long ← empty
+    let tf32[2, 3] tensor_short ← empty
+    let Word alias_use ← 3
+    let list<list<list<tensor<float, [2, 2]>>>> nested_long ← empty
+    let list<list<list<tf32[2, 2]>>> nested_short ← empty
     return 0
 }
 "#;
@@ -368,31 +368,31 @@ fn convert_preserves_authored_type_forms_en_to_la() {
     );
 
     assert!(
-        output.contains("fixum numerus scalar_long"),
+        output.contains("sit numerus scalar_long"),
         "scalar L0 must stay long:\n{output}"
     );
     assert!(
-        output.contains("fixum u32 scalar_short"),
+        output.contains("sit u32 scalar_short"),
         "scalar L1 must stay short:\n{output}"
     );
     assert!(
-        output.contains("fixum lista<u32> list_long"),
+        output.contains("sit lista<u32> list_long"),
         "list L0/L0 must stay long:\n{output}"
     );
     assert!(
-        output.contains("fixum lista<u32> list_middle"),
+        output.contains("sit lista<u32> list_middle"),
         "list L0/L1 must stay mixed:\n{output}"
     );
     assert!(
-        output.contains("fixum lu32 list_short"),
+        output.contains("sit lu32 list_short"),
         "list L1/L1 must stay fused:\n{output}"
     );
     assert!(
-        output.contains("fixum tensor<fractus, [2, 3]> tensor_long"),
+        output.contains("sit tensor<fractus, [2, 3]> tensor_long"),
         "tensor L0 must stay long:\n{output}"
     );
     assert!(
-        output.contains("fixum tf32[2, 3] tensor_short"),
+        output.contains("sit tf32[2, 3] tensor_short"),
         "tensor L1 must stay fused:\n{output}"
     );
     assert!(
@@ -400,15 +400,15 @@ fn convert_preserves_authored_type_forms_en_to_la() {
         "alias body must stay authored:\n{output}"
     );
     assert!(
-        output.contains("fixum Word alias_use"),
+        output.contains("sit Word alias_use"),
         "alias use must not expand:\n{output}"
     );
     assert!(
-        output.contains("fixum lista<lista<lista<tensor<fractus, [2, 2]>>>> nested_long"),
+        output.contains("sit lista<lista<lista<tensor<fractus, [2, 2]>>>> nested_long"),
         "nested long form must stay long:\n{output}"
     );
     assert!(
-        output.contains("fixum lista<lista<lista<tf32[2, 2]>>> nested_short"),
+        output.contains("sit lista<lista<lista<tf32[2, 2]>>> nested_short"),
         "only the nested tensor node may stay fused:\n{output}"
     );
 }
@@ -422,9 +422,9 @@ fn convert_preserves_three_way_list_forms_en_to_la() {
 locale = "en"
 +++
 fn lists() → int {
-    const list<u32> long_form ← empty
-    const list<u32> child_short ← empty
-    const lu32 root_short ← empty
+    let list<u32> long_form ← empty
+    let list<u32> child_short ← empty
+    let lu32 root_short ← empty
     return 0
 }
 "#,
@@ -465,10 +465,10 @@ fn convert_preserves_trapping_policy_word_spelling() {
 locale = "en"
 +++
 fn policy(trapping<u8> a) → trapping<i64> {
-    const trapping<u8> spelled ← a
-    const u8 bare ← a
-    const u8 long_form ← a
-    const list<trapping<u16>> inner ← empty
+    let trapping<u8> spelled ← a
+    let u8 bare ← a
+    let u8 long_form ← a
+    let list<trapping<u16>> inner ← empty
     return 0
 }
 "#,
@@ -480,10 +480,10 @@ fn policy(trapping<u8> a) → trapping<i64> {
         latin.contains("functio policy(exactus<u8> a) → exactus<i64>"),
         "{latin}"
     );
-    assert!(latin.contains("fixum exactus<u8> spelled"), "{latin}");
-    assert!(latin.contains("fixum u8 bare"), "{latin}");
-    assert!(latin.contains("fixum u8 long_form"), "{latin}");
-    assert!(latin.contains("fixum lista<exactus<u16>> inner"), "{latin}");
+    assert!(latin.contains("sit exactus<u8> spelled"), "{latin}");
+    assert!(latin.contains("sit u8 bare"), "{latin}");
+    assert!(latin.contains("sit u8 long_form"), "{latin}");
+    assert!(latin.contains("sit lista<exactus<u16>> inner"), "{latin}");
 
     fs::write(&fixture, &latin).expect("rewrite latin fixture");
     let english = run_faber_convert_stdout_with_args(&["convert", "--to", "en", "--stdout", path]);
@@ -492,11 +492,11 @@ fn policy(trapping<u8> a) → trapping<i64> {
         english.contains("fn policy(trapping<u8> a) → trapping<i64>"),
         "{english}"
     );
-    assert!(english.contains("const trapping<u8> spelled"), "{english}");
-    assert!(english.contains("const u8 bare"), "{english}");
-    assert!(english.contains("const u8 long_form"), "{english}");
+    assert!(english.contains("let trapping<u8> spelled"), "{english}");
+    assert!(english.contains("let u8 bare"), "{english}");
+    assert!(english.contains("let u8 long_form"), "{english}");
     assert!(
-        english.contains("const list<trapping<u16>> inner"),
+        english.contains("let list<trapping<u16>> inner"),
         "{english}"
     );
 }
@@ -506,14 +506,14 @@ const VIA_HINT_SOURCE: &str = r#"+++
 locale = "en"
 +++
 main {
-    const list<b8> raw ← |3c 00 00 00|
-    const char big ← 'A'
-    const u16 a ← raw[0‥2] ↦ u16 via Le
-    const f16 b ← a ↦ b16 ↦ f16
-    const int c ← "ff" ↦ i32 via Hex ⊥ 0
-    const u32 d ← big ↦ u32 via Code
-    const char e ← 65 ↦ char via Code ⊥ '?'
-    const int via ← c
+    let list<b8> raw ← |3c 00 00 00|
+    let char big ← 'A'
+    let u16 a ← raw[0‥2] ↦ u16 via Le
+    let f16 b ← a ↦ b16 ↦ f16
+    let int c ← "ff" ↦ i32 via Hex ⊥ 0
+    let u32 d ← big ↦ u32 via Code
+    let char e ← 65 ↦ char via Code ⊥ '?'
+    let int via ← c
     print via
 }
 "#;
@@ -546,7 +546,7 @@ fn convert_keeps_hints_in_the_via_clause() {
         "no hint stays a type argument:\n{formatted}"
     );
     assert!(
-        formatted.contains("const int via ← c") && formatted.contains("print via"),
+        formatted.contains("let int via ← c") && formatted.contains("print via"),
         "`via` stays an ordinary name:\n{formatted}"
     );
     assert!(latin.contains("↦ u16 via Le"), "{latin}");
@@ -602,11 +602,11 @@ fn convert_rejects_the_retired_type_argument_hint_pointing_at_the_clause() {
     // is the wrapper diagnostic; the `char` head keeps the hint diagnostic.
     for (source, issue) in [
         (
-            "main {\n    const int c ← \"ff\" ↦ int<i32, Hex> ⊥ 0\n}\n",
+            "main {\n    let int c ← \"ff\" ↦ int<i32, Hex> ⊥ 0\n}\n",
             "numeric_wrapper_retired",
         ),
         (
-            "main {\n    const char e ← 65 ↦ char<Code> ⊥ '?'\n}\n",
+            "main {\n    let char e ← 65 ↦ char<Code> ⊥ '?'\n}\n",
             "conversio_hint_type_argument",
         ),
     ] {

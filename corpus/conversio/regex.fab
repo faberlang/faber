@@ -33,15 +33,15 @@ locale = "en"
 # `lookahead` for a construct the RE2 dialect does not have.
 
 main {
-    const string digitsWire ← "\\d+"
-    const regex digits ← digitsWire ↦ regex
+    let string digitsWire ← "\\d+"
+    let regex digits ← digitsWire ↦ regex
     print digits
-    const ascii wordWire ← '(?i)[a-z]+'
-    const regex word ← wordWire ↦ regex
+    let ascii wordWire ← '(?i)[a-z]+'
+    let regex word ← wordWire ↦ regex
     print word
-    const string brokenWire ← "\\d["
+    let string brokenWire ← "\\d["
     do {
-        const regex broken ← brokenWire ↦ regex
+        let regex broken ← brokenWire ↦ regex
         print broken
     }
     catch err {
@@ -49,9 +49,9 @@ main {
             print "rejected: syntax"
         }
     }
-    const string lookaheadWire ← "a(?=b)"
+    let string lookaheadWire ← "a(?=b)"
     do {
-        const regex lookahead ← lookaheadWire ↦ regex
+        let regex lookahead ← lookaheadWire ↦ regex
         print lookahead
     }
     catch err {

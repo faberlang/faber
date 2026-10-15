@@ -29,7 +29,7 @@ locale = "en"
 #     4.2 + 0.1 prints `4.3`, and 4.2 / 0.1 prints `42`, never `42.0`.
 #   • Untyped constants join by exact value — beside a `d64` or in a `d64`
 #     slot, a written constant is a decimal: `a + 1`, `a * 2`, `a * 2.0`,
-#     `a ≅ 4.2`, and `const d64 e ← 5` are exact (`a * 2` is 8.4). The
+#     `a ≅ 4.2`, and `let d64 e ← 5` are exact (`a * 2` is 8.4). The
 #     constant may have at most 8 fractional digits and must fit the range.
 #   • A conditional, `discerne` or block that yields decimal arithmetic
 #     rounds at the slot like any other computed decimal: 0.00000005 * 0.5
@@ -66,21 +66,21 @@ locale = "en"
 #   arithmetic.expected — shortest decimals, one per print.
 
 main {
-    const d64 a ← 4.2
-    const d64 b ← 0.1
+    let d64 a ← 4.2
+    let d64 b ← 0.1
     print a
     print b
     print a + b
     print a - b
     print a * b
     print a / b
-    const d64 tiny ← 0.00000005
-    const d64 half ← 0.5
-    const d64 z ← true ✓ tiny * half ✗ a
+    let d64 tiny ← 0.00000005
+    let d64 half ← 0.5
+    let d64 z ← true ✓ tiny * half ✗ a
     print z
-    const d64 w ← false ✓ a ✗ tiny * half
+    let d64 w ← false ✓ a ✗ tiny * half
     print w
-    const d64 n ← -1.5
+    let d64 n ← -1.5
     print n
     print "§ and §"(a, n)
     print a + 1
@@ -88,18 +88,18 @@ main {
     print a * 2.0
     print a + 0.1
     print a ≅ 4.2
-    const d64 e ← 5
+    let d64 e ← 5
     print e
-    const bool t ← true
-    const bool f ← false
-    const d64 on ← (t ✓ tiny * half ✗ tiny) * 100.0
+    let bool t ← true
+    let bool f ← false
+    let d64 on ← (t ✓ tiny * half ✗ tiny) * 100.0
     print on
-    const d64 lead ← 100.0 * (t ✓ tiny * half ✗ tiny)
+    let d64 lead ← 100.0 * (t ✓ tiny * half ✗ tiny)
     print lead
-    const d64 off ← (f ✓ tiny ✗ tiny * half) * 100.0
+    let d64 off ← (f ✓ tiny ✗ tiny * half) * 100.0
     print off
-    const d64 sum ← (t ✓ tiny * half ✗ tiny) + (f ✓ tiny ✗ tiny * half)
+    let d64 sum ← (t ✓ tiny * half ✗ tiny) + (f ✓ tiny ✗ tiny * half)
     print sum
-    const d64 quot ← (t ✓ tiny * half ✗ tiny) / 2.0
+    let d64 quot ← (t ✓ tiny * half ✗ tiny) / 2.0
     print quot
 }

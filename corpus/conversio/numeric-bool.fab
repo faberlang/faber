@@ -37,20 +37,20 @@ locale = "en"
 # at typecheck — use `chorda` instead. See docs/factory/conversio-numeric-bool-coverage/.
 
 main {
-    const float pi ← 3.7
-    const int truncated ← pi ↦ int via Trunc
+    let float pi ← 3.7
+    let int truncated ← pi ↦ int via Trunc
     print truncated
-    const bool fromFractus ← pi ↦ bool
+    let bool fromFractus ← pi ↦ bool
     print fromFractus
-    const int count ← 42
-    const bool fromNumerus ← count ↦ bool
+    let int count ← 42
+    let bool fromNumerus ← count ↦ bool
     print fromNumerus
-    const bool flag ← true
-    const int asInt ← flag ↦ int
-    const float asFloat ← flag ↦ float
+    let bool flag ← true
+    let int asInt ← flag ↦ int
+    let float asFloat ← flag ↦ float
     print asInt
     print asFloat
-    const ascii token ← 'yes'
-    const bool fromAscii ← token ↦ bool
+    let ascii token ← 'yes'
+    let bool fromAscii ← token ↦ bool
     print fromAscii
 }

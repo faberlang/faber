@@ -53,9 +53,9 @@ fn textus_cursor_accepts_as_cursor_littera() {
 fn itera_ex_textus_cursor_binds_littera() {
     test_support::assert_accepts(
         r#"incipit {
-    fixum textus s ← "ab"
+    sit textus s ← "ab"
     itera ex s.cursor() fixum c {
-        fixum littera x ← c
+        sit littera x ← c
         nota x
     }
 }"#,
@@ -66,8 +66,8 @@ fn itera_ex_textus_cursor_binds_littera() {
 fn textus_cursor_collects_to_lista_littera() {
     test_support::assert_accepts(
         r#"incipit {
-    fixum textus s ← "ab"
-    fixum lista<littera> xs ← s.cursor() ↦ lista<littera>
+    sit textus s ← "ab"
+    sit lista<littera> xs ← s.cursor() ↦ lista<littera>
     nota xs
 }"#,
     );
@@ -77,7 +77,7 @@ fn textus_cursor_collects_to_lista_littera() {
 fn quoted_textus_cursor_collects_to_lista_littera() {
     test_support::assert_accepts(
         r#"incipit {
-    fixum lista<littera> xs ← "ab".cursor() ↦ lista<littera>
+    sit lista<littera> xs ← "ab".cursor() ↦ lista<littera>
     nota xs
 }"#,
     );
@@ -87,8 +87,8 @@ fn quoted_textus_cursor_collects_to_lista_littera() {
 fn textus_cursor_collect_to_lista_textus_rejects() {
     test_support::assert_rejects_with_issue(
         r#"incipit {
-    fixum textus s ← "ab"
-    fixum lista<textus> xs ← s.cursor() ↦ lista<textus>
+    sit textus s ← "ab"
+    sit lista<textus> xs ← s.cursor() ↦ lista<textus>
     nota xs
 }"#,
         "cross_collection_unsupported",
@@ -99,7 +99,7 @@ fn textus_cursor_collect_to_lista_textus_rejects() {
 fn itera_de_textus_cursor_requires_ex() {
     test_support::assert_rejects_with_issue(
         r#"incipit {
-    fixum textus s ← "ab"
+    sit textus s ← "ab"
     itera de s.cursor() fixum c {
         nota c
     }

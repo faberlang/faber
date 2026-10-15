@@ -111,7 +111,7 @@ fn eot_driver_legacy_source_baseline_preserves_output_and_input_forms() {
   mone "legacy warning"
   vide "legacy debug"
   scribe "legacy compatibility"
-  fixum _ input ← lege
+  sit input ← lege
   nota input
 }"#;
     let file = SourceFile::inline("eot-1-legacy.fab", source.to_owned()).expect("source");

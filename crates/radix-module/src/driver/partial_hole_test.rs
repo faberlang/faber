@@ -1,4 +1,4 @@
-//! Partial holes in a written type argument: `const list<_> a ← list<_>[1, 2]`
+//! Partial holes in a written type argument: `let list<_> a ← list<_>[1, 2]`
 //! solves the element hole from the element types. Residual item 222376cb.
 
 use super::compile;
@@ -7,7 +7,7 @@ use crate::driver::ModuleCompileRequest;
 use crate::test_support::{assert_compile_fails_with_issue, test_session};
 
 const HOLE_LIST: &str =
-    "+++\nlocale = \"en\"\n+++\n\nmain {\n    const list<_> a ← list<_>[1, 2]\n    print a.length()\n}\n";
+    "+++\nlocale = \"en\"\n+++\n\nmain {\n    let list<_> a ← list<_>[1, 2]\n    print a.length()\n}\n";
 
 #[cfg(feature = "hir-rust")]
 #[test]
@@ -26,7 +26,7 @@ fn partial_hole_list_runs_on_the_mir_runner() {
     assert_eq!(host.stdout_lines, ["2"], "both elements are in the list");
 }
 
-const HOLE_TUPLE: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    const tuple<_, string> t \u{2190} tuple<_, string>[1, \"x\"]\n    print t[1]\n}\n";
+const HOLE_TUPLE: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    let tuple<_, string> t \u{2190} tuple<_, string>[1, \"x\"]\n    print t[1]\n}\n";
 
 #[cfg(feature = "hir-rust")]
 #[test]
@@ -46,7 +46,7 @@ fn partial_hole_tuple_runs_on_the_mir_runner() {
 }
 
 const NO_ELEMENT_LIST: &str =
-    "+++\nlocale = \"en\"\n+++\n\nmain {\n    const list<_> a \u{2190} list<_>[]\n    print a.length()\n}\n";
+    "+++\nlocale = \"en\"\n+++\n\nmain {\n    let list<_> a \u{2190} list<_>[]\n    print a.length()\n}\n";
 
 #[test]
 fn partial_hole_list_with_no_element_is_named() {
@@ -59,7 +59,7 @@ fn partial_hole_list_with_no_element_is_named() {
     );
 }
 
-const HOLE_TUPLE_ELEMENT_MISMATCH: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    const tuple<_, string> t \u{2190} tuple<_, string>[1, 2]\n    print t[1]\n}\n";
+const HOLE_TUPLE_ELEMENT_MISMATCH: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    let tuple<_, string> t \u{2190} tuple<_, string>[1, 2]\n    print t[1]\n}\n";
 
 #[test]
 fn partial_hole_tuple_element_mismatch_is_named() {

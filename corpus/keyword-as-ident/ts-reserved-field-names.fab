@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "identifier"
 canonical = true
 summary = "Genus fields, methods, variant fields, parameters and locals may be spelled like ECMAScript reserved words; a field is read, written and built under the name it was declared with."
-syntax = "class Pouch { var int yield; fn delete(int await) → int { const int let ← await + self.yield; return let } }"
+syntax = "class Pouch { var int yield; fn delete(int await) → int { let int let ← await + self.yield; return let } }"
 related = ["keyword-as-ident", "rust-reserved-names"]
 locale = "en"
 +++
@@ -34,20 +34,20 @@ locale = "en"
 #   ts-reserved-field-names.expected — the computed values, then the displayed genus.
 
 class Pouch {
-    var int yield
-    var int delete
-    var int default
-    var int static
-    var int enum
-    var int implements
-    var int interface
-    var int package
-    var int private
-    var int protected
-    var int public
+    mut int yield
+    mut int delete
+    mut int default
+    mut int static
+    mut int enum
+    mut int implements
+    mut int interface
+    mut int package
+    mut int private
+    mut int protected
+    mut int public
 
     fn new(int await) → int {
-        const int let ← await + self.yield
+        let int let ← await + self.yield
         return let + self.delete + self.default
     }
 
@@ -84,7 +84,7 @@ fn weigh(Shift s) → int {
 }
 
 main {
-    const Pouch b ← Pouch { yield = 1, delete = 2, default = 3, static = 4, enum = 5, implements = 6, interface = 7, package = 8, private = 9, protected = 10, public = 11 }
+    let Pouch b ← Pouch { yield = 1, delete = 2, default = 3, static = 4, enum = 5, implements = 6, interface = 7, package = 8, private = 9, protected = 10, public = 11 }
     print b.yield
     print b.delete
     print b.default
@@ -93,12 +93,12 @@ main {
     print b.visibility()
     print pack(1, 2)
 
-    var Pouch c ← Pouch { yield = 4, delete = 5, default = 6, static = 0, enum = 0, implements = 0, interface = 0, package = 0, private = 0, protected = 0, public = 0 }
+    mut Pouch c ← Pouch { yield = 4, delete = 5, default = 6, static = 0, enum = 0, implements = 0, interface = 0, package = 0, private = 0, protected = 0, public = 0 }
     c.yield ← 9
     c.delete ← c.delete + 1
     print c.yield + c.delete
 
-    const Shift moved ← variant Move { yield = 3, delete = 4 } ∷ Shift
+    let Shift moved ← variant Move { yield = 3, delete = 4 } ∷ Shift
     print weigh(moved)
     print weigh(variant Stay ∷ Shift)
 

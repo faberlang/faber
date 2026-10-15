@@ -46,18 +46,18 @@ main {
     print "\\#&-~ é😀 x".escape()
 
     # round trip: ^ + escaped + $ matches the whole probe
-    const list<string> probes ← [
+    let list<string> probes ← [
         "\\", ".", "+", "*", "?", "(", ")", "|", "[", "]", "{", "}", "^", "$", "#", "&", "-", "~",
         "a.b", "x+y*z", "(a|b)", "[a-z]{2}", "^start$", "a\\d", "tab\there", "line\nbreak",
         "é", "😀", "naïve café 😀", "日本語", "", "plain"
     ]
-    var int tried ← 0
-    var int whole ← 0
+    mut int tried ← 0
+    mut int whole ← 0
     for from probes const probe {
         tried ← tried + 1
-        const string head ← "^" + probe.escape()
-        const regex anchored ← (head + "$") ↦ regex
-        const _ hit ← anchored.find(probe)
+        let string head ← "^" + probe.escape()
+        let regex anchored ← (head + "$") ↦ regex
+        let hit ← anchored.find(probe)
         if hit ≡ null {
             print "miss"
         } else {

@@ -13,8 +13,8 @@ fn all_pos(tf32[4] a) → bool { return reduce via all from a at [i] const s { r
 fn some_huge(tf32[4] a) → bool { return reduce via any from a at [i] const s { return s ≻ 3.5 } }
 fn peak(tf32[4] a, f32 floor) → f32 { return reduce via max from a at [i] coalesce floor }
 main {
-    const list<f32> flat ← [3.0, 1.0, 3.0, 2.0]
-    const tf32[4] a ← flat ↦ tf32[4]
+    let list<f32> flat ← [3.0, 1.0, 3.0, 2.0]
+    let tf32[4] a ← flat ↦ tf32[4]
     print total(a)
     print big(a)
     print all_pos(a)

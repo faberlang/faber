@@ -33,40 +33,40 @@ fn init_is_construct(source: &str) -> bool {
 
 #[test]
 fn sugar_zero_requires_empty_braces() {
-    assert!(init_is_construct("fixum tf32[2, 3] a ← tf32[2, 3] {}"));
-    assert!(init_is_construct("fixum vf32[4] v ← vf32[4] {}"));
-    assert!(init_is_construct("fixum mf32[2, 2] m ← mf32[2, 2] {}"));
+    assert!(init_is_construct("sit tf32[2, 3] a ← tf32[2, 3] {}"));
+    assert!(init_is_construct("sit vf32[4] v ← vf32[4] {}"));
+    assert!(init_is_construct("sit mf32[2, 2] m ← mf32[2, 2] {}"));
 }
 
 #[test]
 fn long_form_zero_is_a_value_expression() {
     assert!(init_is_construct(
-        "fixum tensor<f32, [2, 3]> a ← tensor<f32, [2, 3]> {}"
+        "sit tensor<f32, [2, 3]> a ← tensor<f32, [2, 3]> {}"
     ));
     assert!(init_is_construct(
-        "fixum vector<f32, 4> v ← vector<f32, 4> {}"
+        "sit vector<f32, 4> v ← vector<f32, 4> {}"
     ));
     assert!(init_is_construct(
-        "fixum matrix<f32, [2, 2]> m ← matrix<f32, [2, 2]> {}"
+        "sit matrix<f32, [2, 2]> m ← matrix<f32, [2, 2]> {}"
     ));
     // A vector-element tensor.
     assert!(init_is_construct(
-        "fixum tensor<vector<f32, 4>, [8]> a ← tensor<vector<f32, 4>, [8]> {}"
+        "sit tensor<vector<f32, 4>, [8]> a ← tensor<vector<f32, 4>, [8]> {}"
     ));
 }
 
 #[test]
 fn zero_is_an_ordinary_receiver() {
-    let result = parse_source("fixum tf32[4] a ← tf32[4] {}.reple(1.5)");
+    let result = parse_source("sit tf32[4] a ← tf32[4] {}.reple(1.5)");
     assert!(result.success(), "{:?}", result.errors);
 }
 
 #[test]
 fn bare_form_is_retired_with_a_named_diagnostic() {
     for source in [
-        "fixum tf32[2] a ← tf32[2]",
-        "fixum tensor<f32, [2]> a ← tensor<f32, [2]>",
-        "fixum vector<f32, 4> v ← vector<f32, 4>",
+        "sit tf32[2] a ← tf32[2]",
+        "sit tensor<f32, [2]> a ← tensor<f32, [2]>",
+        "sit vector<f32, 4> v ← vector<f32, 4>",
     ] {
         let result = parse_source(source);
         assert!(
@@ -79,7 +79,7 @@ fn bare_form_is_retired_with_a_named_diagnostic() {
 
 #[test]
 fn bracket_suffix_is_not_a_zero() {
-    let result = parse_source("fixum tf32[2] a ← tf32[2] []");
+    let result = parse_source("sit tf32[2] a ← tf32[2] []");
     assert!(!result.success(), "`Type []` must be refused");
     assert!(
         issues(&result).contains(&"constructor_requires_empty_braces".to_owned()),
@@ -90,7 +90,7 @@ fn bracket_suffix_is_not_a_zero() {
 
 #[test]
 fn collection_type_zero_is_refused_by_name() {
-    let result = parse_source("fixum _ a ← lista<f32, 4> {}");
+    let result = parse_source("sit a ← lista<f32, 4> {}");
     assert!(
         issues(&result).contains(&"constructor_type_not_claimed".to_owned()),
         "{:?}",
@@ -100,11 +100,11 @@ fn collection_type_zero_is_refused_by_name() {
 
 #[test]
 fn comparison_with_a_type_word_name_still_parses() {
-    let result = parse_source("fixum int vector ← 5\nfixum bivalens b ← vector ≺ 7");
+    let result = parse_source("sit int vector ← 5\nsit bivalens b ← vector ≺ 7");
     assert!(result.success(), "{:?}", result.errors);
-    let result = parse_source("fixum int tensor ← 5\nfixum bivalens b ← tensor ≺ 7");
+    let result = parse_source("sit int tensor ← 5\nsit bivalens b ← tensor ≺ 7");
     assert!(result.success(), "{:?}", result.errors);
     // The retired ASCII form still recovers as a comparison, reporting only itself.
-    let result = parse_source("fixum int vector ← 5\nfixum bivalens b ← vector < 7");
+    let result = parse_source("sit int vector ← 5\nsit bivalens b ← vector < 7");
     assert_eq!(issues(&result), vec!["comparison_ascii_retired".to_owned()]);
 }

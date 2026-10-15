@@ -38,7 +38,7 @@ locale = "en"
 
 class Punctum {
     const int x
-    var int y
+    mut int y
     const string nomen
     const list<int> gradus
 }
@@ -48,32 +48,32 @@ fn origo() → Punctum {
 }
 
 main {
-    const Punctum p ← Punctum { x = 1, y = 2, nomen = "origo", gradus = [1, 2] }
+    let Punctum p ← Punctum { x = 1, y = 2, nomen = "origo", gradus = [1, 2] }
     print p.x
     print p.y
     print p.nomen
 
     # One override; every other field comes from p
-    const Punctum q ← Punctum { y = 9 } from p
+    let Punctum q ← Punctum { y = 9 } from p
     print q.x
     print q.y
     print q.nomen
 
     # const fields can be set: this is still a construction literal
-    const Punctum r ← Punctum { x = 5, nomen = "finis" } from q
+    let Punctum r ← Punctum { x = 5, nomen = "finis" } from q
     print r.x
     print r.y
     print r.nomen
     print r.gradus.length()
 
     # No overrides: a field-for-field copy
-    const Punctum s ← Punctum {} from p
+    let Punctum s ← Punctum {} from p
     print s.x
     print s.y
     print s.nomen
 
     # The source may be any postfix expression, such as a call
-    const Punctum t ← Punctum { gradus = [3, 4] } from origo()
+    let Punctum t ← Punctum { gradus = [3, 4] } from origo()
     print t.x
     print t.gradus.length()
     print t.nomen

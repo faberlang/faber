@@ -14,9 +14,9 @@ fn pair_widths<size D>(tensor<f32, [D]> full, tensor<f32, [D / 2]> half) → voi
 }
 
 main {
-    const list<f32> five_values ← [1.0, 2.0, 3.0, 4.0, 5.0]
-    const list<f32> two_values ← [1.0, 2.0]
-    const tensor<f32, [5]> full ← five_values ↦ tensor<f32, [5]>
-    const tensor<f32, [2]> half ← two_values ↦ tensor<f32, [2]>
+    let list<f32> five_values ← [1.0, 2.0, 3.0, 4.0, 5.0]
+    let list<f32> two_values ← [1.0, 2.0]
+    let tensor<f32, [5]> full ← five_values ↦ tensor<f32, [5]>
+    let tensor<f32, [2]> half ← two_values ↦ tensor<f32, [2]>
     pair_widths(full, half)
 }

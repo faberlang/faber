@@ -48,56 +48,56 @@ ruling = "6e66822e"
 #   Extracted field values, aliased names, mutated varia bindings, rest maps.
 
 class Persona {
-    var string nomen
-    var int aetas
-    var string urbs
+    mut string nomen
+    mut int aetas
+    mut string urbs
 }
 
 class Civis {
-    var string nomen
-    var string epistula
+    mut string nomen
+    mut string epistula
 }
 
 class Datum {
-    var int numerus
-    var bool activus
+    mut int numerus
+    mut bool activus
 }
 
 class Forma {
-    var string hospes
-    var int portus
-    var bool tutus
+    mut string hospes
+    mut int portus
+    mut bool tutus
 }
 
 class Plenus {
-    var int signum
-    var string nomen
-    var string epistula
-    var string munus
+    mut int signum
+    mut string nomen
+    mut string epistula
+    mut string munus
 }
 
 class Sodalis {
-    var string nomen
-    var bool probatus
+    mut string nomen
+    mut bool probatus
 }
 
 class Relatus {
-    var Sodalis civis
+    mut Sodalis civis
 }
 
 class Responsum {
-    var Relatus datum
+    mut Relatus datum
 }
 
 class Vestis {
-    var string modus
-    var string lingua
+    mut string modus
+    mut string lingua
 }
 
 main {
     # --- Basic field extraction ---
 
-    const _ persona ← Persona { nomen = "Marcus", aetas = 30, urbs = "Roma" }
+    let persona ← Persona { nomen = "Marcus", aetas = 30, urbs = "Roma" }
     from persona const nomen, aetas
 
     print nomen
@@ -105,7 +105,7 @@ main {
 
     # --- Extract with alias using 'ut' ---
 
-    const _ civis ← Civis { nomen = "Julia", epistula = "julia@roma.com" }
+    let civis ← Civis { nomen = "Julia", epistula = "julia@roma.com" }
     from civis const nomen as cognomen, epistula as epistula2
 
     print cognomen
@@ -113,8 +113,8 @@ main {
 
     # --- Mutable destructuring with varia ---
 
-    const _ datum ← Datum { numerus = 100, activus = true }
-    from datum var numerus, activus
+    let datum ← Datum { numerus = 100, activus = true }
+    from datum mut numerus, activus
 
     print numerus
     print activus
@@ -127,7 +127,7 @@ main {
 
     # --- Mixed alias and regular fields ---
 
-    const _ forma ← Forma { hospes = "localis", portus = 8080, tutus = true }
+    let forma ← Forma { hospes = "localis", portus = 8080, tutus = true }
     from forma const hospes, portus as porta, tutus
 
     print hospes
@@ -136,7 +136,7 @@ main {
 
     # --- Rest pattern with ceteri ---
 
-    const _ plenus ← Plenus { signum = 1, nomen = "Gaius", epistula = "g@roma.com", munus = "admin" }
+    let plenus ← Plenus { signum = 1, nomen = "Gaius", epistula = "g@roma.com", munus = "admin" }
     from plenus const signum, rest reliqua
 
     print signum
@@ -144,7 +144,7 @@ main {
 
     # --- Destructura ex nested path ---
 
-    const _ responsum ← Responsum { datum = Relatus { civis = Sodalis { nomen = "Claudia", probatus = true } } }
+    let responsum ← Responsum { datum = Relatus { civis = Sodalis { nomen = "Claudia", probatus = true } } }
     from responsum.datum.civis const nomen as internum, probatus
 
     print internum
@@ -152,7 +152,7 @@ main {
 
     # --- Single field extraction ---
 
-    const _ vestis ← Vestis { modus = "nigrum", lingua = "la" }
+    let vestis ← Vestis { modus = "nigrum", lingua = "la" }
     from vestis const modus
 
     print modus

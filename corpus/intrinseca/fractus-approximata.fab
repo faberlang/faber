@@ -37,28 +37,28 @@ locale = "en"
 #   verum
 
 main {
-    const float a ← 42.145
-    const float b ← 42.0
+    let float a ← 42.145
+    let float b ← 42.0
 
-    const bool near ← a.approx(b, 0.2)
-    const bool fuzzy ← a ≈ b
-    const bool exact_promo ← a ≅ b
+    let bool near ← a.approx(b, 0.2)
+    let bool fuzzy ← a ≈ b
+    let bool exact_promo ← a ≅ b
 
     print near
     print fuzzy
     print exact_promo
 
     # Cross-width and int↔float honesty rows follow the joined f64 formula.
-    const i64 above_precision ← 9007199254740993
-    const u64 below_precision ← 9007199254740992
-    const f64 float_boundary ← 9007199254740992.0
-    const bool fuzzy_cross_width ← above_precision ≈ below_precision
-    const bool fuzzy_int_float ← above_precision ≈ float_boundary
+    let i64 above_precision ← 9007199254740993
+    let u64 below_precision ← 9007199254740992
+    let f64 float_boundary ← 9007199254740992.0
+    let bool fuzzy_cross_width ← above_precision ≈ below_precision
+    let bool fuzzy_int_float ← above_precision ≈ float_boundary
 
     # Own-precision pin: both values round to 1.0 as f32 before isclose.
-    const f32 f32a ← 1.00000001 ∷ f32
-    const f32 f32b ← 1.0 ∷ f32
-    const bool fuzzy_f32 ← f32a ≈ f32b
+    let f32 f32a ← 1.00000001 ∷ f32
+    let f32 f32b ← 1.0 ∷ f32
+    let bool fuzzy_f32 ← f32a ≈ f32b
 
     print fuzzy_cross_width
     print fuzzy_int_float

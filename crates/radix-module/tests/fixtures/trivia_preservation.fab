@@ -17,7 +17,7 @@ genus Salutatio {
 # entry: comment before the entry block
 incipit {
     # statement: comment before a statement
-    fixum Salutatio salutatio ← Salutatio { nomen = "Salve" }
+    sit Salutatio salutatio ← Salutatio { nomen = "Salve" }
     nota salutatio.nomen
     # block-end: comment immediately before the closing brace
 }

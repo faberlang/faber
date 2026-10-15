@@ -36,10 +36,10 @@ locale = "en"
 #   10.0
 
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    var tf32[4] t ← flat ↦ tf32[4]
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    mut tf32[4] t ← flat ↦ tf32[4]
 
-    var f32 total ← 0.0
+    mut f32 total ← 0.0
     for from t const x {
         print x
         total ← total + x

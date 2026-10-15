@@ -14,9 +14,9 @@ functio paria<T>(T a, T b) → lista<T> {
 }
 
 incipit {
-    fixum numerus n ← identitas(42)
-    fixum textus s ← identitas("salve")
-    fixum lista<numerus> xs ← paria(1, 2)
+    sit numerus n ← identitas(42)
+    sit textus s ← identitas("salve")
+    sit lista<numerus> xs ← paria(1, 2)
     nota n
     nota s
     nota xs

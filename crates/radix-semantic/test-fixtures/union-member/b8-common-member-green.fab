@@ -1,10 +1,10 @@
 class Errata {
-    var string message
+    mut string message
 }
 
 class Signum {
-    var string message
-    var string tag
+    mut string message
+    mut string tag
 }
 
 fn probe(Errata ∪ Signum r) → string {

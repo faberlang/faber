@@ -58,8 +58,8 @@ fn describe(Forma f) → string {
 main {
     # --- Ad-hoc inline union values ---
 
-    const Valor a ← 42
-    const Valor b ← "salve"
+    let Valor a ← 42
+    let Valor b ← "salve"
     print a
     print b
 

@@ -76,8 +76,8 @@ fn policy_word_spelled_out_equals_the_default_int_names() {
     assert_accepts(&english(
         r"
 fn total(trapping<i64> x, trapping<u8> b) → int {
-    const u8 same ← b
-    const trapping<i64> y ← x
+    let u8 same ← b
+    let trapping<i64> y ← x
     return y
 }
 ",
@@ -168,8 +168,8 @@ fn policy_word_is_legal_wherever_a_type_goes() {
     assert_accepts(&english(
         r"
 fn positions(trapping<u8> p, list<trapping<u16>> xs, trapping<d64> money) → trapping<u8> {
-    const trapping<u8> local ← p
-    var list<trapping<i32>> ys ← empty
+    let trapping<u8> local ← p
+    mut list<trapping<i32>> ys ← empty
     ys.append(1)
     return local
 }
@@ -184,10 +184,10 @@ fn bare_markers_are_types_in_every_position_in_both_locales() {
     assert_accepts(&english(
         r"
 fn every(u8 a, i32 b, u64 c, f32 d, f64 e, d64 g, f16 h, bf16 i) → f32 {
-    const u8 x ← a
-    const f32 y ← d
-    const list<f16> hs ← empty
-    const tensor<f32, [2, 2]> t ← empty
+    let u8 x ← a
+    let f32 y ← d
+    let list<f16> hs ← empty
+    let tensor<f32, [2, 2]> t ← empty
     return y
 }
 fn pair((u8, i32) → f64 g, u8 ∪ none maybe) → (u8, i32) → f64 {
@@ -197,7 +197,7 @@ fn same<T>(T a) → T {
     return a
 }
 main {
-    const u8 w ← same<u8>(4)
+    let u8 w ← same<u8>(4)
     print w
 }
 ",
@@ -205,10 +205,10 @@ main {
     assert_accepts(&latin(
         r"
 functio omnes(u8 a, i32 b, u64 c, f32 d, f64 e, d64 g, f16 h, bf16 i) → f32 {
-    fixum u8 x ← a
-    fixum f32 y ← d
-    fixum lista<f16> hs ← vacua
-    fixum tensor<f32, [2, 2]> t ← vacua
+    sit u8 x ← a
+    sit f32 y ← d
+    sit lista<f16> hs ← vacua
+    sit tensor<f32, [2, 2]> t ← vacua
     redde y
 }
 functio par((u8, i32) → f64 g, u8 ∪ nihil forsan) → (u8, i32) → f64 {
@@ -226,10 +226,10 @@ fn policy_float_untyped_constants_adopt_the_cell() {
     assert_accepts(&english(
         r"
 main {
-    var trapping<f32> x ← 1.5
+    mut trapping<f32> x ← 1.5
     print x + 1
     x ← x + 2.5
-    const saturating<f32> a ← 1.5
+    let saturating<f32> a ← 1.5
     print a + a * a
     print -a
     print a ≺ 2
@@ -241,11 +241,11 @@ main {
 #[test]
 fn policy_float_typed_mixes_are_rejected_with_the_mixing_issue() {
     for body in [
-        "const trapping<f32> t ← 1.5\n const f32 b ← 2.5\n print t + b",
-        "const f32 b ← 2.5\n const saturating<f32> s ← 1.5\n print b * s",
-        "const saturating<f32> s ← 1.5\n const trapping<f32> t ← 1.5\n print s + t",
-        "const trapping<f32> t ← 1.5\n const trapping<f64> u ← 1.5\n print t - u",
-        "const saturating<f32> s ← 1.5\n const saturating<f64> u ← 1.5\n print s ≺ u",
+        "let trapping<f32> t ← 1.5\n let f32 b ← 2.5\n print t + b",
+        "let f32 b ← 2.5\n let saturating<f32> s ← 1.5\n print b * s",
+        "let saturating<f32> s ← 1.5\n let trapping<f32> t ← 1.5\n print s + t",
+        "let trapping<f32> t ← 1.5\n let trapping<f64> u ← 1.5\n print t - u",
+        "let saturating<f32> s ← 1.5\n let saturating<f64> u ← 1.5\n print s ≺ u",
     ] {
         let diagnostics = english(&format!("main {{\n{body}\n}}\n"));
         assert_issue(&diagnostics, "policy_float_family_mismatch");
@@ -261,7 +261,7 @@ fn policy_float_bare_float_into_a_cell_slot_needs_an_authored_conversion() {
         ("f32", "trapping<f32>"),
     ] {
         let diagnostics = english(&format!(
-            "fn pick({source} v) → {slot} {{\n const {slot} out ← v\n return out\n}}\n"
+            "fn pick({source} v) → {slot} {{\n let {slot} out ← v\n return out\n}}\n"
         ));
         assert_issue(&diagnostics, "expression_type_mismatch");
     }
@@ -272,14 +272,14 @@ fn policy_float_conversion_into_and_out_of_a_cell_is_typed() {
     assert_accepts(&english(
         r"
 main {
-    const f32 b ← 2.5
-    const trapping<f32> t ← b ↦ trapping<f32>
-    const f64 w ← t ↦ f64
-    const saturating<f64> s ← w ↦ saturating<f64>
-    const saturating<f32> s2 ← t ↦ saturating<f32>
-    const int n ← 3
-    const trapping<f32> t2 ← n ↦ trapping<f32>
-    const f64 total ← w + (s ↦ f64) + (s2 ↦ f64) + (t2 ↦ f64)
+    let f32 b ← 2.5
+    let trapping<f32> t ← b ↦ trapping<f32>
+    let f64 w ← t ↦ f64
+    let saturating<f64> s ← w ↦ saturating<f64>
+    let saturating<f32> s2 ← t ↦ saturating<f32>
+    let int n ← 3
+    let trapping<f32> t2 ← n ↦ trapping<f32>
+    let f64 total ← w + (s ↦ f64) + (s2 ↦ f64) + (t2 ↦ f64)
     print total
 }
 ",
@@ -289,11 +289,11 @@ main {
 #[test]
 fn policy_float_math_method_on_a_cell_names_the_interim_issue() {
     for method in ["abs", "floor"] {
-        let diagnostics = english(&format!("main {{\n const saturating<f32> s ← 1.5\n print s.{method}()\n}}\n"));
+        let diagnostics = english(&format!("main {{\n let saturating<f32> s ← 1.5\n print s.{method}()\n}}\n"));
         assert_issue(&diagnostics, "policy_float_math_not_built");
     }
     // A name the bare float does not have stays an unknown method.
-    let unknown = english("main {\n const saturating<f32> s ← 1.5\n print s.nope()\n}\n");
+    let unknown = english("main {\n let saturating<f32> s ← 1.5\n print s.nope()\n}\n");
     assert_issue(&unknown, "unknown_method");
     assert!(!has_issue(&unknown, "policy_float_math_not_built"));
 }
@@ -301,21 +301,21 @@ fn policy_float_math_method_on_a_cell_names_the_interim_issue() {
 #[test]
 fn policy_float_written_constants_are_range_checked_at_the_cell_width() {
     assert_issue(
-        &english("main {\n const trapping<f32> t ← 3.5e38\n print t\n}\n"),
+        &english("main {\n let trapping<f32> t ← 3.5e38\n print t\n}\n"),
         "float_constant_out_of_range",
     );
     assert_issue(
-        &english("main {\n const saturating<f16> s ← 70000\n print s\n}\n"),
+        &english("main {\n let saturating<f16> s ← 70000\n print s\n}\n"),
         "float_constant_out_of_range",
     );
-    assert_accepts(&english("main {\n const saturating<f64> s ← 3.5e38\n print s\n}\n"));
+    assert_accepts(&english("main {\n let saturating<f64> s ← 3.5e38\n print s\n}\n"));
 }
 
 #[test]
 fn policy_float_ascription_takes_a_written_constant_and_nothing_else() {
-    assert_accepts(&english("main {\n const trapping<f32> t ← 2.5 ∷ trapping<f32>\n print t\n}\n"));
+    assert_accepts(&english("main {\n let trapping<f32> t ← 2.5 ∷ trapping<f32>\n print t\n}\n"));
     assert_issue(
-        &english("main {\n const f32 b ← 2.5\n const trapping<f32> t ← b ∷ trapping<f32>\n print t\n}\n"),
+        &english("main {\n let f32 b ← 2.5\n let trapping<f32> t ← b ∷ trapping<f32>\n print t\n}\n"),
         "expression_type_mismatch",
     );
 }

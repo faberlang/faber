@@ -34,8 +34,8 @@ fn int_above_u8_range_fails_closed() {
     let issue = narrowing_issue(
         r"
 incipit {
-    fixum numerus n ← 300
-    fixum u8 b ← n ↦ u8
+    sit numerus n ← 300
+    sit u8 b ← n ↦ u8
     nota b
 }
 ",
@@ -48,8 +48,8 @@ fn int_above_i8_range_fails_closed() {
     let issue = narrowing_issue(
         r"
 incipit {
-    fixum numerus n ← 300
-    fixum i8 b ← n ↦ i8
+    sit numerus n ← 300
+    sit i8 b ← n ↦ i8
     nota b
 }
 ",
@@ -62,8 +62,8 @@ fn negative_into_unsigned_still_fails_closed() {
     let issue = narrowing_issue(
         r"
 incipit {
-    fixum numerus n ← -1
-    fixum u8 b ← n ↦ u8
+    sit numerus n ← -1
+    sit u8 b ← n ↦ u8
     nota b
 }
 ",
@@ -77,12 +77,12 @@ fn literal_recovery_shapes_to_the_target_width() {
     run_fixture_source(
         r"
 incipit {
-    fixum numerus n ← 300
-    fixum u8 b ← n ↦ u8 ⊥ 7
+    sit numerus n ← 300
+    sit u8 b ← n ↦ u8 ⊥ 7
     nota b
-    fixum i8 c ← n ↦ i8 ⊥ -7
+    sit i8 c ← n ↦ i8 ⊥ -7
     nota c
-    fixum u8 d ← 200 ↦ u8 ⊥ 7
+    sit u8 d ← 200 ↦ u8 ⊥ 7
     nota d
 }
 ",

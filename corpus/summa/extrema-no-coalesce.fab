@@ -23,13 +23,13 @@ locale = "en"
 #     identity tail.
 
 fn extrema(tf32[4] values) → list<f32> {
-    const f32 hi ← reduce via max from values
-    const f32 lo ← reduce via min from values
+    let f32 hi ← reduce via max from values
+    let f32 lo ← reduce via min from values
     return [hi, lo]
 }
 
 main {
-    const list<f32> flat ← [4.0, 1.0, 3.0, 2.0]
-    const tf32[4] values ← flat ↦ tf32[4]
+    let list<f32> flat ← [4.0, 1.0, 3.0, 2.0]
+    let tf32[4] values ← flat ↦ tf32[4]
     print extrema(values)
 }

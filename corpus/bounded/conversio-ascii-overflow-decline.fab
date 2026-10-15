@@ -30,6 +30,6 @@ locale = "en"
 # WHY: pins the fail-closed overflow token in conversio-ascii-overflow-decline.expected.
 
 main {
-    const ascii<4> a ← 'alpha' ↦ ascii<4>
+    let ascii<4> a ← 'alpha' ↦ ascii<4>
     print a
 }

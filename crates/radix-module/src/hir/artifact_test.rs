@@ -589,7 +589,7 @@ fn closure_parameter_hole_survives_the_fhir_round_trip() {
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "main {\n",
-        "    const regex word \u{2190} \"[a-z]+\" \u{21a6} regex\n",
+        "    let regex word \u{2190} \"[a-z]+\" \u{21a6} regex\n",
         "    print word.replace(\"ab cd e\", _ m \u{2234} m.text())\n",
         "}\n",
     );
@@ -625,13 +625,13 @@ fn transparent_alias_annotation_survives_the_fhir_round_trip() {
         "type Index = map<string, int>\n",
         "type NomenOptivum = string \u{222a} none\n\n",
         "main {\n",
-        "    const Signum signum \u{2190} 42\n",
-        "    const Cognomen cognomen \u{2190} \"Marcus\"\n",
-        "    const Viget viget \u{2190} true\n",
-        "    const Nomina sodales \u{2190} [\"Gaius\", \"Lucius\", \"Titus\"]\n",
-        "    const Puncta puncta \u{2190} [100, 95, 87]\n",
-        "    const Index index \u{2190} { \"a\": 1 }\n",
-        "    const NomenOptivum nomen \u{2190} null\n",
+        "    let Signum signum \u{2190} 42\n",
+        "    let Cognomen cognomen \u{2190} \"Marcus\"\n",
+        "    let Viget viget \u{2190} true\n",
+        "    let Nomina sodales \u{2190} [\"Gaius\", \"Lucius\", \"Titus\"]\n",
+        "    let Puncta puncta \u{2190} [100, 95, 87]\n",
+        "    let Index index \u{2190} { \"a\": 1 }\n",
+        "    let NomenOptivum nomen \u{2190} null\n",
         "    print signum\n",
         "    print cognomen\n",
         "    print viget\n",
@@ -797,7 +797,7 @@ fn fhir_artifact_keeps_inferred_set_literal_hole() {
     use crate::hir::serialize::from_analyzed;
     use radix_hir::{HirOwnerRef, HirTypeFormHead, HirTypeSlot};
 
-    let source = "+++\nlocale = \"en\"\n+++\n\nmain {\n    const set<int> s ← _ [1, 2]\n    print s.length()\n}\n";
+    let source = "+++\nlocale = \"en\"\n+++\n\nmain {\n    let set<int> s ← _ [1, 2]\n    print s.length()\n}\n";
     let session = Session::new(
         Config::default()
             .with_dev_locale_root()
@@ -1766,8 +1766,8 @@ fn struct_field_type_sites_remap_to_struct_owner_once() {
     use crate::hir::serialize::from_analyzed;
     use radix_hir::{HirItemKind, HirOwnerRef, HirTypeSite, HirTypeSlot};
 
-    let source = "class Point {\n    var int x\n    var int y\n}\n\
-                  class Label {\n    var string text\n    var bool visible\n}\n\
+    let source = "class Point {\n    mut int x\n    mut int y\n}\n\
+                  class Label {\n    mut string text\n    mut bool visible\n}\n\
                   fn identity(int value) → int { return value }\n";
     let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
         .expect("load English locale pack");
@@ -2262,7 +2262,7 @@ functio fallback<T = textus>() → textus {
 }
 
 incipit {
-    fixum _ a ← pick(1)
+    sit a ← pick(1)
     nota fallback()
 }
 "#;

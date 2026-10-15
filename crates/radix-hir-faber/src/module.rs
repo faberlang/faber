@@ -98,7 +98,7 @@ pub struct FaberCodegen<'a> {
     /// typecheck expanded from `t.summa(axis n)` / `t.media(axis n)`: those
     /// nodes re-emit as the authored call, never the grouped reduction.
     pub(crate) axis_sugar: FxHashMap<radix_hir::HirId, radix_hir::HirAxisSugar>,
-    /// Initializer-expression ids of authored discard bindings (`fixum T _ ← e`)
+    /// Initializer-expression ids of authored discard bindings (`sit T _ ← e`)
     /// with their declaration facts, for re-emitting the binding.
     pub(crate) discard_bindings: FxHashMap<radix_hir::HirId, radix_hir::HirDiscardBinding>,
     /// Authored destructuring declarations keyed by the first statement id

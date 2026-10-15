@@ -50,7 +50,7 @@ fn static_size_folds_in_tensor_shape() {
             .expect("load English locale pack"),
     );
     let result = analyze_source_with_config(
-        "fn main() {\n    const size N = 3\n    var tf32[N, 2] values ← tf32[N, 2] {}\n}\n",
+        "fn main() {\n    const size N = 3\n    mut tf32[N, 2] values ← tf32[N, 2] {}\n}\n",
         config,
     );
     assert!(
@@ -68,7 +68,7 @@ fn static_size_affine_extent_checks() {
             .expect("load English locale pack"),
     );
     let result = analyze_source_with_config(
-        "fn main() {\n    const size N = 3\n    const list<f32> zeros ← [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]\n    do {\n        var tf32[N + 1, 2] values ← zeros ↦ tf32[N + 1, 2]\n    }\n    catch err {\n    }\n}\n",
+        "fn main() {\n    const size N = 3\n    let list<f32> zeros ← [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]\n    do {\n        mut tf32[N + 1, 2] values ← zeros ↦ tf32[N + 1, 2]\n    }\n    catch err {\n    }\n}\n",
         config,
     );
     assert!(
@@ -90,7 +90,7 @@ fn static_size_affine_extent_rejects_provably_negative() {
             .expect("load English locale pack"),
     );
     let result = analyze_source_with_config(
-        "fn main() {\n    const size N = 0\n    const list<f32> zeros ← [0.0, 0.0]\n    var tf32[N - 1, 2] values ← zeros ↦ tf32[N - 1, 2]\n}\n",
+        "fn main() {\n    const size N = 0\n    let list<f32> zeros ← [0.0, 0.0]\n    mut tf32[N - 1, 2] values ← zeros ↦ tf32[N - 1, 2]\n}\n",
         config,
     );
     assert!(
@@ -111,7 +111,7 @@ fn runtime_size_affine_extent_checks() {
             .expect("load English locale pack"),
     );
     let result = analyze_source_with_config(
-        "fn probe(i32 h) {\n    const size H ← h\n    const list<f32> zeros ← [0.0, 0.0]\n    do {\n        var tf32[H + 1] values ← zeros ↦ tf32[H + 1]\n    }\n    catch err {\n    }\n}\n",
+        "fn probe(i32 h) {\n    const size H ← h\n    let list<f32> zeros ← [0.0, 0.0]\n    do {\n        mut tf32[H + 1] values ← zeros ↦ tf32[H + 1]\n    }\n    catch err {\n    }\n}\n",
         config,
     );
     assert!(

@@ -93,7 +93,7 @@ fn throw_guard_narrows_parameter() {
 #[test]
 fn throw_guard_narrows_local() {
     test_support::assert_accepts(
-        "functio f(textus ∪ nihil p) → numerus ⇥ textus {\n    fixum textus ∪ nihil x ← p\n    si x ≡ nulla { iace \"nihil\" }\n    redde x.longitudo()\n}",
+        "functio f(textus ∪ nihil p) → numerus ⇥ textus {\n    sit textus ∪ nihil x ← p\n    si x ≡ nulla { iace \"nihil\" }\n    redde x.longitudo()\n}",
     );
 }
 

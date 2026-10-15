@@ -44,7 +44,7 @@ fn middle_explicit(tf32[2, 3, 4] cube) → tf32[2, 4] {
 }
 
 main {
-    const list<f32> flat ← [
+    let list<f32> flat ← [
         1.0,
         2.0,
         3.0,
@@ -70,7 +70,7 @@ main {
         23.0,
         24.0
     ]
-    const tf32[2, 3, 4] cube ← flat ↦ tf32[2, 3, 4]
+    let tf32[2, 3, 4] cube ← flat ↦ tf32[2, 3, 4]
     print last_sugar(cube)
     print last_explicit(cube)
     print middle_sugar(cube)

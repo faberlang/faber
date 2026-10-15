@@ -28,8 +28,8 @@ ruling = "05ac0534"
 #     bits width.
 
 main {
-    const list<int> base ← [1, 2]
-    const list<int, 8> raw ← base ↦ list<int, 8>
-    const string<8> out ← raw ↦ string<8>
+    let list<int> base ← [1, 2]
+    let list<int, 8> raw ← base ↦ list<int, 8>
+    let string<8> out ← raw ↦ string<8>
     print out
 }

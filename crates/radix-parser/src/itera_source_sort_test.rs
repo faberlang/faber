@@ -47,7 +47,7 @@ fn bare_reduce_loop_source_is_refused_with_a_named_issue() {
 
 #[test]
 fn bound_name_loop_source_is_accepted() {
-    let source = "functio t(lista<numerus> xs) { fixum lista<numerus> ys ← ordinata via ascendens ex xs\n itera ex ys fixum x { nota x } }";
+    let source = "functio t(lista<numerus> xs) { sit lista<numerus> ys ← ordinata via ascendens ex xs\n itera ex ys fixum x { nota x } }";
     assert_eq!(refused(source), 0);
     parse_ok(source);
 }

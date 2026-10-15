@@ -158,7 +158,7 @@ impl super::FaberCodegen<'_> {
         {
             // Typed `↤` constant initializer: lowering stores the
             // binding as the assignment target, so re-emit as
-            // `fixum T name ↤ source [⊥ default]`.
+            // `sit T name ↤ source [⊥ default]`.
             writer.write(" ↤ ");
             self.write_expr_prec(source, 1, names, surface, writer);
             self.write_conversio_assign_via(params, surface, writer);

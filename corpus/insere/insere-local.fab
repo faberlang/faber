@@ -48,7 +48,7 @@ locale = "en"
 class Folium {
     static string TITULUS = embed "nuntius.txt"
     const string MONITUM = embed "nuntius.txt"
-    var list<b8> signum = embed "signum.bin"
+    mut list<b8> signum = embed "signum.bin"
 }
 
 const string SUMMA = comptime {
@@ -63,7 +63,7 @@ fn longitudo() → int {
 main {
     const string localis = embed "nuntius.txt"
     const list<b8> octeti = embed "signum.bin"
-    const Folium folium ← Folium {}
+    let Folium folium ← Folium {}
     print localis
     print octeti.length()
     print folium.MONITUM

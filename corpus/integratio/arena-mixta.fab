@@ -40,9 +40,9 @@ locale = "en"
 #   Go e2e whitelist — expression-valued block / arena typing not yet for Go.
 
 class Nauta {
-    var string nomen
-    var string navis optional
-    var int gradus = 0
+    mut string nomen
+    mut string navis optional
+    mut int gradus = 0
 
     fn titulus() → string {
         return "§@§"(self.nomen, self.navis coalesce "terra")
@@ -56,18 +56,18 @@ fn classificata(int n) → string {
 }
 
 main {
-    const list<Nauta, 3> nautae ← [Nauta { nomen = "Aelia", navis = "Fortuna", gradus = 12 }, Nauta { nomen = "Brutus", gradus = 3 }, Nauta { nomen = "Claudia", navis = "Aurora", gradus = 7 }]
-    const (Nauta) → string titulus ← Nauta n → string ∴ do {
-        const string navis ← n?.navis coalesce "nulla navis"
+    let list<Nauta, 3> nautae ← [Nauta { nomen = "Aelia", navis = "Fortuna", gradus = 12 }, Nauta { nomen = "Brutus", gradus = 3 }, Nauta { nomen = "Claudia", navis = "Aurora", gradus = 7 }]
+    let (Nauta) → string titulus ← Nauta n → string ∴ do {
+        let string navis ← n?.navis coalesce "nulla navis"
         return "§ :: § :: §"(n.nomen, navis, classificata(n.gradus))
     }
     for from nautae const n {
         print titulus(n)
     }
-    var list<int> gradus ← empty
+    mut list<int> gradus ← empty
     for range 0…6 step 2 const i {
         gradus.append(i * 3)
     }
-    const list<int> magni ← gradus.filter(int g ∴ g ≥ 6).map(int g ∴ g + 1)
+    let list<int> magni ← gradus.filter(int g ∴ g ≥ 6).map(int g ∴ g + 1)
     print magni
 }

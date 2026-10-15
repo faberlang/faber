@@ -44,6 +44,6 @@ fn unroll_admit() → void {
 # Admitted Line 3 shape: immutable let chain + returned path — inside the
 # scalar/let/call purity subset, no IO or monadic effect forms.
 fn purum(int x) → int {
-    const int s ← x
+    let int s ← x
     return s
 }

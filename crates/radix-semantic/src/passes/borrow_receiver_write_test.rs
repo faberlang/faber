@@ -62,35 +62,35 @@ fn assert_alias_write_rejected(body: &str) {
 #[test]
 fn alias_of_de_list_rejects_detrahe() {
     assert_alias_write_rejected(
-        "functio f(de lista<numerus> xs) → vacuum { fixum lista<numerus> ys ← xs\n ys.detrahe() }",
+        "functio f(de lista<numerus> xs) → vacuum { sit lista<numerus> ys ← xs\n ys.detrahe() }",
     );
 }
 
 #[test]
 fn alias_of_de_list_rejects_decapita() {
     assert_alias_write_rejected(
-        "functio f(de lista<numerus> xs) → vacuum { fixum lista<numerus> ys ← xs\n ys.decapita() }",
+        "functio f(de lista<numerus> xs) → vacuum { sit lista<numerus> ys ← xs\n ys.decapita() }",
     );
 }
 
 #[test]
 fn alias_of_de_tabula_rejects_bool_returning_dele() {
     assert_alias_write_rejected(
-        "functio f(de tabula<textus, numerus> m) → vacuum { fixum tabula<textus, numerus> n ← m\n n.dele(\"k\") }",
+        "functio f(de tabula<textus, numerus> m) → vacuum { sit tabula<textus, numerus> n ← m\n n.dele(\"k\") }",
     );
 }
 
 #[test]
 fn alias_of_de_list_vacuum_mutator_still_rejected() {
     assert_alias_write_rejected(
-        "functio f(de lista<numerus> xs) → vacuum { fixum lista<numerus> ys ← xs\n ys.appende(1) }",
+        "functio f(de lista<numerus> xs) → vacuum { sit lista<numerus> ys ← xs\n ys.appende(1) }",
     );
 }
 
 #[test]
 fn alias_of_de_list_read_methods_stay_legal() {
     let found = analyze(
-        "functio f(de lista<numerus> xs) → numerus { fixum lista<numerus> ys ← xs\n redde ys.longitudo() }",
+        "functio f(de lista<numerus> xs) → numerus { sit lista<numerus> ys ← xs\n redde ys.longitudo() }",
     );
     assert!(found.errors.is_empty(), "{:?}", found.errors);
 }

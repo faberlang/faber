@@ -36,16 +36,16 @@ locale = "en"
 #   [1.0, 4.0, 9.0, 16.0]
 
 main {
-    const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
-    const list<f32> flat_b ← [10.0, 20.0, 30.0, 40.0]
+    let list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
+    let list<f32> flat_b ← [10.0, 20.0, 30.0, 40.0]
 
-    var tf32[2, 2] a ← flat_a ↦ tf32[2, 2]
-    var tf32[2, 2] b ← flat_b ↦ tf32[2, 2]
+    mut tf32[2, 2] a ← flat_a ↦ tf32[2, 2]
+    mut tf32[2, 2] b ← flat_b ↦ tf32[2, 2]
 
-    const tf32[2, 2] sum ← a + b
-    const tf32[2, 2] diff ← sum - b
-    const tf32[2, 2] prod ← diff ⊙ a
+    let tf32[2, 2] sum ← a + b
+    let tf32[2, 2] diff ← sum - b
+    let tf32[2, 2] prod ← diff ⊙ a
 
-    const list<f32> out ← prod.flatten()
+    let list<f32> out ← prod.flatten()
     print out
 }

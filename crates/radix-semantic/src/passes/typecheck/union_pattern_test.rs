@@ -43,8 +43,8 @@ functio describe(Eventum e) → textus {
 }
 
 incipit {
-    fixum Eventum a ← finge Ictus { vis = 3 } ∷ Eventum
-    fixum Eventum b ← Eventum.Sonitus
+    sit Eventum a ← finge Ictus { vis = 3 } ∷ Eventum
+    sit Eventum b ← Eventum.Sonitus
     nota describe(a) + describe(b)
 }"#,
     );
@@ -64,7 +64,7 @@ functio describe(Eventum e) → textus {
 }
 
 incipit {
-    fixum Eventum e ← Eventum.Sonitus
+    sit Eventum e ← Eventum.Sonitus
     nota describe(e)
 }"#,
         "unknown_variant",
@@ -262,7 +262,7 @@ functio f(A a) → textus {
 }
 
 incipit {
-    fixum A a ← A.X
+    sit A a ← A.X
     nota f(a)
 }"#,
         "unknown_variant",
@@ -277,7 +277,7 @@ fn rejects_qualified_pattern_with_non_namespace_prefix() {
         r#"discretio A { X }
 
 functio f(A a) → textus {
-    fixum numerus missing ← 1
+    sit numerus missing ← 1
     discerne a {
         casu missing.A.X { redde "x" }
     }
@@ -301,7 +301,7 @@ functio f(A a) → textus {
 }
 
 incipit {
-    fixum A a ← A.X
+    sit A a ← A.X
     nota f(a)
 }"#,
     );
@@ -410,7 +410,7 @@ functio f(A a) → textus {
 }
 
 incipit {
-    fixum A a ← A.X
+    sit A a ← A.X
     nota f(a)
 }"#,
         "unknown_variant",
@@ -426,7 +426,7 @@ fn rejects_elige_casu_value_with_non_namespace_prefix() {
         r#"discretio A { X }
 
 functio f(A a) → textus {
-    fixum numerus missing ← 1
+    sit numerus missing ← 1
     elige a {
         casu missing.A.X { redde "x" }
         ceterum { redde "?" }
@@ -435,7 +435,7 @@ functio f(A a) → textus {
 }
 
 incipit {
-    fixum A a ← A.X
+    sit A a ← A.X
     nota f(a)
 }"#,
         "unknown_variant",
@@ -457,7 +457,7 @@ functio f(A a) → textus {
 }
 
 incipit {
-    fixum A a ← A.X
+    sit A a ← A.X
     nota f(a)
 }"#,
     );
@@ -496,7 +496,7 @@ fn elige_casu_reject_raises_resolve_stage_unknown_variant() {
         r#"discretio A { X }
 
 functio f(A a) → textus {
-    fixum numerus missing ← 1
+    sit numerus missing ← 1
     elige a {
         casu missing.A.X { redde "x" }
         ceterum { redde "?" }
@@ -505,7 +505,7 @@ functio f(A a) → textus {
 }
 
 incipit {
-    fixum A a ← A.X
+    sit A a ← A.X
     nota f(a)
 }"#,
     );

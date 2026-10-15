@@ -114,7 +114,7 @@ fn bracket_store_on_map_in_loop_is_accepted() {
 #[test]
 fn method_on_a_different_collection_in_loop_is_accepted() {
     test_support::assert_accepts(
-        "incipit {\n    fixum lista<numerus> xs ← [1, 2, 3]\n    varia lista<numerus> ys ← []\n    itera ex xs fixum x {\n        ys.appende(x)\n    }\n}",
+        "incipit {\n    sit lista<numerus> xs ← [1, 2, 3]\n    varia lista<numerus> ys ← []\n    itera ex xs fixum x {\n        ys.appende(x)\n    }\n}",
     );
 }
 

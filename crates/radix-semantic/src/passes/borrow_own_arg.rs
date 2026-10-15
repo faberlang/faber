@@ -8,7 +8,7 @@
 //!   value and an `own`/`copy` parameter are fine.
 //! - After `eat(own a)` the name `a` is dead. An exclusive (`own`/`copy`) source
 //!   is moved, so a later read is SEM050 `use_after_move` at the read. An
-//!   unmarked source is tentatively given away, exactly like `const T b ← own a`
+//!   unmarked source is tentatively given away, exactly like `let T b ← own a`
 //!   (`unmarked_own_binds`): a later use blames the **call argument** with
 //!   `use_after_own` and a `copy` suggestion, not the later read.
 //! - A move inside a loop body from a binding declared outside the loop moves

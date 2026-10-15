@@ -54,7 +54,7 @@ fn result_must_type_check_as_the_declared_type() {
 #[test]
 fn praefixum_outside_a_static_is_rejected() {
     assert_rejects_with_issue_la(
-        "incipit {\n    fixum numerus n ← praefixum {\n        redde 1\n    }\n}\n",
+        "incipit {\n    sit numerus n ← praefixum {\n        redde 1\n    }\n}\n",
         "praefixum_outside_constant",
     );
 }
@@ -63,7 +63,7 @@ fn praefixum_outside_a_static_is_rejected() {
 fn direct_ad_is_forbidden() {
     let err = rejection(
         "fixum textus T = praefixum {\n    \
-         fixum textus t ← ad 'runtime:echo' (\"salve\") ↦ textus\n    redde t\n}\n",
+         sit textus t ← ad 'runtime:echo' (\"salve\") ↦ textus\n    redde t\n}\n",
         "praefixum_forbidden",
     );
     assert_eq!(arg(&err, "effect"), Some("ad"));
@@ -74,7 +74,7 @@ fn direct_ad_is_forbidden() {
 fn transitive_ad_names_the_call_chain() {
     let err = rejection(
         "functio ima() → textus {\n    \
-         fixum textus t ← ad 'runtime:echo' (\"salve\") ↦ textus\n    redde t\n}\n\
+         sit textus t ← ad 'runtime:echo' (\"salve\") ↦ textus\n    redde t\n}\n\
          functio media() → textus {\n    redde ima()\n}\n\
          fixum textus T = praefixum {\n    redde media()\n}\n",
         "praefixum_forbidden",
@@ -87,7 +87,7 @@ fn transitive_ad_names_the_call_chain() {
 fn async_callee_is_forbidden() {
     let err = rejection(
         "functio lente() fiet → numerus {\n    redde 1\n}\n\
-         fixum numerus N = praefixum {\n    fixum _ f ← lente()\n    redde 1\n}\n",
+         fixum numerus N = praefixum {\n    sit f ← lente()\n    redde 1\n}\n",
         "praefixum_forbidden",
     );
     assert_eq!(arg(&err, "effect"), Some("async"));

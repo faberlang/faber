@@ -29,12 +29,12 @@ const COPY_PARAM: &str = r#"+++
 locale = "en"
 +++
 fn take(copy list<int> xs) → int {
-    var list<int> fresh ← xs
+    mut list<int> fresh ← xs
     fresh.append(5)
     return fresh.length()
 }
 main {
-    const list<int> a ← [1, 2]
+    let list<int> a ← [1, 2]
     print take(copy a)
     print a.length()
 }
@@ -50,12 +50,12 @@ const COPY_BIND_DEEP: &str = r#"+++
 locale = "en"
 +++
 class V3 {
-    var f64 x = 0.0
-    var list<int> ys = []
+    mut f64 x = 0.0
+    mut list<int> ys = []
 }
 main {
-    var V3 a ← V3 { x = 1.0 }
-    var V3 b ← copy a
+    mut V3 a ← V3 { x = 1.0 }
+    mut V3 b ← copy a
     b.x ← 5.0
     b.ys.append(1)
     print a.x
@@ -75,18 +75,18 @@ const COPY_GENUS_PARAM: &str = r#"+++
 locale = "en"
 +++
 class C {
-    var int n = 0
+    mut int n = 0
     fn inc() → void {
         self.n ← self.n + 1
     }
 }
 fn bumpcopy(copy C c) → void {
-    var C mine ← c
+    mut C mine ← c
     mine.inc()
     print mine.n
 }
 main {
-    var C c ← C {}
+    mut C c ← C {}
     c.inc()
     bumpcopy(copy c)
     print c.n
@@ -106,12 +106,12 @@ const COPY_BIND_THEN_ASSIGN: &str = r#"+++
 locale = "en"
 +++
 class Point {
-    var int x
+    mut int x
 }
 main {
-    const Point a ← Point { x = 1 }
-    const Point c ← Point { x = 2 }
-    var Point b ← copy a
+    let Point a ← Point { x = 1 }
+    let Point c ← Point { x = 2 }
+    mut Point b ← copy a
     b ← c
     b.x ← 5
     print a.x
@@ -129,11 +129,11 @@ const GENUS_BIND_ALIAS: &str = r#"+++
 locale = "en"
 +++
 class V3 {
-    var f64 x = 0.0
+    mut f64 x = 0.0
 }
 main {
-    var V3 a ← V3 { x = 1.0 }
-    var V3 b ← a
+    mut V3 a ← V3 { x = 1.0 }
+    mut V3 b ← a
     b.x ← 5.0
     print a.x
 }
@@ -186,10 +186,10 @@ const COPY_TENSOR: &str = r#"+++
 locale = "en"
 +++
 main {
-    var tf32[4] a ← tf32[4] {}.fill(1.5)
-    var tf32[4] w ← copy a
+    mut tf32[4] a ← tf32[4] {}.fill(1.5)
+    mut tf32[4] w ← copy a
     w[0] ← 9.0
-    const tf32[4] s ← w + a
+    let tf32[4] s ← w + a
     print s[0]
     print s[1]
     print a[0]
@@ -209,16 +209,16 @@ const COPY_TENSOR_RANK2_READ: &str = r#"+++
 locale = "en"
 +++
 main {
-    var tf32[2, 3] a ← tf32[2, 3] {}.fill(1.5)
-    var tf32[2, 3] w ← copy a
+    mut tf32[2, 3] a ← tf32[2, 3] {}.fill(1.5)
+    mut tf32[2, 3] w ← copy a
     a[[1, 2]] ← 7.0
     w[[0, 1]] ← 4.0
-    const u32 r ← 1
-    const u32 c ← 2
-    const f32 lit ← w[[1, 2]]
-    const f32 var_idx ← w[[r, c]]
-    const f32 written ← w[[0, 1]]
-    const f32 source ← a[[1, 2]]
+    let u32 r ← 1
+    let u32 c ← 2
+    let f32 lit ← w[[1, 2]]
+    let f32 var_idx ← w[[r, c]]
+    let f32 written ← w[[0, 1]]
+    let f32 source ← a[[1, 2]]
     print lit
     print var_idx
     print written

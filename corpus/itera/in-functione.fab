@@ -36,7 +36,7 @@ locale = "en"
 #   Sums, maxima, and counts above a threshold for sample listas.
 
 fn summa(list<int> numeri) → int {
-    var int total ← 0
+    mut int total ← 0
 
     for from numeri const n {
         total ← total + n
@@ -47,7 +47,7 @@ fn summa(list<int> numeri) → int {
 
 # Assumes non-empty lista (seed from first element)
 fn maximum(list<int> numeri) → int {
-    var int max ← numeri[0]
+    mut int max ← numeri[0]
 
     for from numeri const n {
         if n ≻ max {
@@ -59,7 +59,7 @@ fn maximum(list<int> numeri) → int {
 }
 
 fn supra(list<int> numeri, int limen) → int {
-    var int int ← 0
+    mut int int ← 0
 
     for from numeri const n {
         if n ≻ limen {
@@ -71,7 +71,7 @@ fn supra(list<int> numeri, int limen) → int {
 }
 
 main {
-    const _ numeri ← [1, 2, 3, 4, 5]
+    let numeri ← [1, 2, 3, 4, 5]
 
     print summa(numeri)
     print maximum(numeri)

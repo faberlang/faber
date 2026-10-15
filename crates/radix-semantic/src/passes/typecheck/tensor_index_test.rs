@@ -32,16 +32,16 @@ fn rejects_with_issue(source: &str, issue: &str) {
 fn bounded_tensor_literal_indices_reject_provable_oob_and_negative() {
     rejects_with_issue(
         r"incipit {
-  fixum tf32[3] grid ← vacua
-  fixum _ bad ← grid.accipe([3])
+  sit tf32[3] grid ← vacua
+  sit bad ← grid.accipe([3])
   nota bad
 }",
         "index_provably_out_of_bounds",
     );
     rejects_with_issue(
         r"incipit {
-  fixum tf32[3] grid ← vacua
-  fixum _ bad ← grid[-1]
+  sit tf32[3] grid ← vacua
+  sit bad ← grid[-1]
   nota bad
 }",
         "index_provably_out_of_bounds",
@@ -52,9 +52,9 @@ fn bounded_tensor_literal_indices_reject_provable_oob_and_negative() {
 fn bounded_tensor_literal_indices_in_bounds_still_accept() {
     accepts(
         r"incipit {
-  fixum tf32[3] grid ← vacua
-  fixum _ good ← grid.accipe([2])
-  fixum _ sugar ← grid[1]
+  sit tf32[3] grid ← vacua
+  sit good ← grid.accipe([2])
+  sit sugar ← grid[1]
 }",
     );
 }
@@ -63,8 +63,8 @@ fn bounded_tensor_literal_indices_in_bounds_still_accept() {
 fn tensor_param_and_dynamic_shapes_decline_static_oob_check() {
     accepts(
         r"functio read<magnitudo N>(tensor<f32, [N]> param, tf32[] dynamic) → vacuum {
-  fixum _ a ← param.accipe([9]) ⊥ 0.0
-  fixum _ b ← dynamic.accipe([9]) ⊥ 0.0
+  sit a ← param.accipe([9]) ⊥ 0.0
+  sit b ← dynamic.accipe([9]) ⊥ 0.0
 }",
     );
 }
@@ -73,9 +73,9 @@ fn tensor_param_and_dynamic_shapes_decline_static_oob_check() {
 fn tensor_structa_infers_shape_from_literal_shape_binding() {
     accepts(
         r"incipit {
-  fixum lista<f32> flat ← [1.0, 2.0]
-  fixum lista<numerus> shape ← [2, 1]
-  fixum tensor<f32, _> grid ← flat ↦ tensor<f32, shape>
+  sit lista<f32> flat ← [1.0, 2.0]
+  sit lista<numerus> shape ← [2, 1]
+  sit tensor<f32, _> grid ← flat ↦ tensor<f32, shape>
   nota grid.longitudo()
 }",
     );
@@ -85,8 +85,8 @@ fn tensor_structa_infers_shape_from_literal_shape_binding() {
 fn tensor_forma_infers_output_shape() {
     accepts(
         r"incipit {
-  fixum tensor<f32, [2, 2]> grid ← vacua
-  fixum tensor<f32, _> reshaped ← grid.forma([4, 1])
+  sit tensor<f32, [2, 2]> grid ← vacua
+  sit tensor<f32, _> reshaped ← grid.forma([4, 1])
   nota reshaped.longitudo()
 }",
     );
@@ -96,8 +96,8 @@ fn tensor_forma_infers_output_shape() {
 fn expression_shape_hole_is_admitted_in_reshape_shape_slot() {
     accepts(
         r"incipit {
-  fixum tensor<f32, [2, 2]> grid ← vacua
-  fixum tensor<f32, _> reshaped ← grid.forma([_, 4])
+  sit tensor<f32, [2, 2]> grid ← vacua
+  sit tensor<f32, _> reshaped ← grid.forma([_, 4])
   nota reshaped.longitudo()
 }",
     );
@@ -107,14 +107,14 @@ fn expression_shape_hole_is_admitted_in_reshape_shape_slot() {
 fn expression_shape_hole_is_rejected_outside_shape_argument_slots() {
     rejects_with_issue(
         r"incipit {
-  fixum _ values ← [_, 4]
+  sit values ← [_, 4]
 }",
         "tensor_shape_hole_requires_shape_argument",
     );
     rejects_with_issue(
         r"incipit {
-  fixum tensor<f32, [2]> grid ← vacua
-  fixum _ value ← grid.accipe([_])
+  sit tensor<f32, [2]> grid ← vacua
+  sit value ← grid.accipe([_])
 }",
         "tensor_shape_hole_requires_shape_argument",
     );
@@ -124,8 +124,8 @@ fn expression_shape_hole_is_rejected_outside_shape_argument_slots() {
 fn tensor_sugar_tf32_typechecks_with_inferred_shape() {
     accepts(
         r"incipit {
-  fixum lista<f32> flat ← [1.0, 2.0]
-  fixum lista<numerus> shape ← [2, 1]
+  sit lista<f32> flat ← [1.0, 2.0]
+  sit lista<numerus> shape ← [2, 1]
   sit grid ← flat ↦ tensor<f32, shape>
   nota grid.longitudo()
 }",
@@ -136,7 +136,7 @@ fn tensor_sugar_tf32_typechecks_with_inferred_shape() {
 fn tensor_shape_with_nested_infer_hole_rejects() {
     rejects_with_issue(
         r"incipit {
-  fixum tensor<textus, [_, 3]> grid ← vacua
+  sit tensor<textus, [_, 3]> grid ← vacua
   nota grid.longitudo()
 }",
         "cannot_infer_tensor_shape",
@@ -149,9 +149,9 @@ fn sparsa_sugar_typechecks_with_intrinsics() {
         r"incipit {
   varia sf32[2, 3] grid ← vacua
   grid.ponde([0, 1], 4.0)
-  fixum f32 stored ← grid.accipe([0, 1])
-  fixum numerus count ← grid.nonnihil()
-  fixum tf32[2, 3] dense ← grid.densata()
+  sit f32 stored ← grid.accipe([0, 1])
+  sit numerus count ← grid.nonnihil()
+  sit tf32[2, 3] dense ← grid.densata()
   nota stored, count, dense.longitudo()
 }",
     );
@@ -161,7 +161,7 @@ fn sparsa_sugar_typechecks_with_intrinsics() {
 fn standalone_f32_width_typechecks() {
     accepts(
         r"incipit {
-  fixum f32 y ← 1.0
+  sit f32 y ← 1.0
   nota y
 }",
     );
@@ -171,9 +171,9 @@ fn standalone_f32_width_typechecks() {
 fn lista_f32_literal_uses_declared_element_width() {
     accepts(
         r"incipit {
-  fixum lista<f32> flat ← [1.0, 2.0]
-  fixum tf32[1, 2] grid ← flat ↦ tf32[1, 2]
-  fixum f32 first ← grid.accipe([0, 0])
+  sit lista<f32> flat ← [1.0, 2.0]
+  sit tf32[1, 2] grid ← flat ↦ tf32[1, 2]
+  sit f32 first ← grid.accipe([0, 0])
   nota first
 }",
     );
@@ -183,8 +183,8 @@ fn lista_f32_literal_uses_declared_element_width() {
 fn tensor_sectio_infers_axis_zero_slice_shape() {
     accepts(
         r"incipit {
-  fixum tensor<numerus, [3, 2]> grid ← vacua
-  fixum tensor<numerus, _> slice ← grid.sectio(1, 3)
+  sit tensor<numerus, [3, 2]> grid ← vacua
+  sit tensor<numerus, _> slice ← grid.sectio(1, 3)
   nota slice.longitudo()
 }",
     );
@@ -194,8 +194,8 @@ fn tensor_sectio_infers_axis_zero_slice_shape() {
 fn tensor_sectio_step_infers_strided_axis_zero_shape() {
     accepts(
         r"incipit {
-  fixum tensor<numerus, [8, 2]> grid ← vacua
-  fixum tensor<numerus, [4, 2]> every_other ← grid.sectio(0, 8, 2)
+  sit tensor<numerus, [8, 2]> grid ← vacua
+  sit tensor<numerus, [4, 2]> every_other ← grid.sectio(0, 8, 2)
   nota every_other.longitudo()
 }",
     );
@@ -205,9 +205,9 @@ fn tensor_sectio_step_infers_strided_axis_zero_shape() {
 fn tensor_expande_allows_inserted_and_singleton_stretch_axes() {
     accepts(
         r"incipit {
-  fixum tensor<numerus, [3]> row ← vacua
-  fixum tensor<numerus, [1, 3]> inserted ← row.expande([1, 3])
-  fixum tensor<numerus, [4, 3]> broadcast ← inserted.expande([4, 3])
+  sit tensor<numerus, [3]> row ← vacua
+  sit tensor<numerus, [1, 3]> inserted ← row.expande([1, 3])
+  sit tensor<numerus, [4, 3]> broadcast ← inserted.expande([4, 3])
   nota broadcast.longitudo()
 }",
     );
@@ -217,8 +217,8 @@ fn tensor_expande_allows_inserted_and_singleton_stretch_axes() {
 fn tensor_expande_rejects_incompatible_non_singleton_axis() {
     rejects_with_issue(
         r"incipit {
-  fixum tensor<numerus, [2, 3]> grid ← vacua
-  fixum tensor<numerus, [4, 3]> invalid ← grid.expande([4, 3])
+  sit tensor<numerus, [2, 3]> grid ← vacua
+  sit tensor<numerus, [4, 3]> invalid ← grid.expande([4, 3])
   nota invalid.longitudo()
 }",
         "incompatible_tensor_index",
@@ -231,9 +231,9 @@ fn tensor_expande_rejects_incompatible_non_singleton_axis() {
 fn tensor_arithmetic_plus_same_shape_typechecks() {
     accepts(
         r"incipit {
-  fixum tf32[2] a ← vacua
-  fixum tf32[2] b ← vacua
-  fixum tf32[2] c ← a + b
+  sit tf32[2] a ← vacua
+  sit tf32[2] b ← vacua
+  sit tf32[2] c ← a + b
   nota c.longitudo()
 }",
     );
@@ -243,10 +243,10 @@ fn tensor_arithmetic_plus_same_shape_typechecks() {
 fn tensor_arithmetic_minus_hadamard_typecheck() {
     accepts(
         r"incipit {
-  fixum tf32[2] a ← vacua
-  fixum tf32[2] b ← vacua
-  fixum tf32[2] c ← a - b
-  fixum tf32[2] d ← c ⊙ b
+  sit tf32[2] a ← vacua
+  sit tf32[2] b ← vacua
+  sit tf32[2] c ← a - b
+  sit tf32[2] d ← c ⊙ b
   nota d.longitudo()
 }",
     );
@@ -257,9 +257,9 @@ fn tensor_arithmetic_expanded_operands_preserve_result_shape() {
     // Expand both [2] and [2, 1] explicitly before exact-shape addition.
     accepts(
         r"incipit {
-  fixum tf32[2] a ← vacua
-  fixum tf32[2, 1] b ← vacua
-  fixum tf32[2, 2] c ← a.expande([2, 2]) + b.expande([2, 2])
+  sit tf32[2] a ← vacua
+  sit tf32[2, 1] b ← vacua
+  sit tf32[2, 2] c ← a.expande([2, 2]) + b.expande([2, 2])
   nota c.longitudo()
 }",
     );
@@ -270,9 +270,9 @@ fn tensor_arithmetic_incompatible_expansion_rejects() {
     // [2] cannot expand to [3]; the attempted shape repair must reject.
     rejects_with_issue(
         r"incipit {
-  fixum tf32[3] a ← vacua
-  fixum tf32[2] b ← vacua
-  fixum tf32[3] c ← a + b.expande([3])
+  sit tf32[3] a ← vacua
+  sit tf32[2] b ← vacua
+  sit tf32[3] c ← a + b.expande([3])
   nota c.longitudo()
 }",
         "incompatible_tensor_index",
@@ -283,9 +283,9 @@ fn tensor_arithmetic_incompatible_expansion_rejects() {
 fn tensor_arithmetic_textus_element_rejects() {
     rejects_with_issue(
         r"incipit {
-  fixum tensor<textus, [2]> a ← vacua
-  fixum tensor<textus, [2]> b ← vacua
-  fixum tensor<textus, [2]> c ← a + b
+  sit tensor<textus, [2]> a ← vacua
+  sit tensor<textus, [2]> b ← vacua
+  sit tensor<textus, [2]> c ← a + b
   nota c.longitudo()
 }",
         "tensor_arithmetic_numeric_element_required",
@@ -298,9 +298,9 @@ fn tensor_arithmetic_mixed_width_result_cannot_narrow() {
     // still requires an explicit conversion rather than silent narrowing.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<i32, [2]> a ← vacua
-  fixum tensor<i64, [2]> b ← vacua
-  fixum tensor<i32, [2]> c ← a + b
+  sit tensor<i32, [2]> a ← vacua
+  sit tensor<i64, [2]> b ← vacua
+  sit tensor<i32, [2]> c ← a + b
   nota c.longitudo()
 }",
         "initializer_annotation_mismatch",
@@ -313,8 +313,8 @@ fn tensor_arithmetic_mixed_width_result_cannot_narrow() {
 fn tensor_reduction_summa_returns_element_type() {
     accepts(
         r"incipit {
-  fixum tf32[2, 3] grid ← vacua
-  fixum f32 total ← grid.summa()
+  sit tf32[2, 3] grid ← vacua
+  sit f32 total ← grid.summa()
   nota total
 }",
     );
@@ -324,8 +324,8 @@ fn tensor_reduction_summa_returns_element_type() {
 fn tensor_reduction_summa_integer_tensor_returns_numerus() {
     accepts(
         r"incipit {
-  fixum tensor<numerus, [3]> grid ← vacua
-  fixum numerus total ← grid.summa()
+  sit tensor<numerus, [3]> grid ← vacua
+  sit numerus total ← grid.summa()
   nota total
 }",
     );
@@ -336,8 +336,8 @@ fn tensor_reduction_summa_on_numerus_i32_tensor() {
     // EDGE: explicit-width integer tensor summa keeps the element width.
     accepts(
         r"incipit {
-  fixum tensor<i32, [3]> grid ← vacua
-  fixum i32 total ← grid.summa()
+  sit tensor<i32, [3]> grid ← vacua
+  sit i32 total ← grid.summa()
   nota total
 }",
     );
@@ -349,8 +349,8 @@ fn tensor_reduction_media_numerus_family_returns_f64() {
     // division never silently truncates the mean.
     accepts(
         r"incipit {
-  fixum tensor<numerus, [3]> grid ← vacua
-  fixum f64 mean ← grid.media()
+  sit tensor<numerus, [3]> grid ← vacua
+  sit f64 mean ← grid.media()
   nota mean
 }",
     );
@@ -360,8 +360,8 @@ fn tensor_reduction_media_numerus_family_returns_f64() {
 fn tensor_reduction_media_fractus_f32_keeps_width() {
     accepts(
         r"incipit {
-  fixum tf32[2, 3] grid ← vacua
-  fixum f32 mean ← grid.media()
+  sit tf32[2, 3] grid ← vacua
+  sit f32 mean ← grid.media()
   nota mean
 }",
     );
@@ -372,8 +372,8 @@ fn tensor_reduction_media_numerus_rejects_integer_return() {
     // media never returns an integer type; binding to numerus must fail.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<numerus, [3]> grid ← vacua
-  fixum numerus mean ← grid.media()
+  sit tensor<numerus, [3]> grid ← vacua
+  sit numerus mean ← grid.media()
   nota mean
 }",
         "initializer_annotation_mismatch",
@@ -384,8 +384,8 @@ fn tensor_reduction_media_numerus_rejects_integer_return() {
 fn tensor_reduction_textus_element_rejects() {
     rejects_with_issue(
         r"incipit {
-  fixum tensor<textus, [2]> grid ← vacua
-  fixum textus total ← grid.summa()
+  sit tensor<textus, [2]> grid ← vacua
+  sit textus total ← grid.summa()
   nota total
 }",
         "tensor_arithmetic_numeric_element_required",
@@ -399,9 +399,9 @@ fn tensor_matmul_same_inner_dim_typechecks() {
     // [2,3] × [3,4] → [2,4]. All dims static.
     accepts(
         r"incipit {
-  fixum tensor<numerus, [2, 3]> a ← vacua
-  fixum tensor<numerus, [3, 4]> b ← vacua
-  fixum tensor<numerus, [2, 4]> c ← a.matmul(b)
+  sit tensor<numerus, [2, 3]> a ← vacua
+  sit tensor<numerus, [3, 4]> b ← vacua
+  sit tensor<numerus, [2, 4]> c ← a.matmul(b)
   nota c.longitudo()
 }",
     );
@@ -412,9 +412,9 @@ fn tensor_matmul_static_result_shape() {
     // Verify the result shape is [M,N] concretely, not a fresh hole.
     accepts(
         r"incipit {
-  fixum tf32[2, 3] a ← vacua
-  fixum tf32[3, 4] b ← vacua
-  fixum tf32[2, 4] c ← a.matmul(b)
+  sit tf32[2, 3] a ← vacua
+  sit tf32[3, 4] b ← vacua
+  sit tf32[2, 4] c ← a.matmul(b)
   nota c.longitudo()
 }",
     );
@@ -425,9 +425,9 @@ fn tensor_matmul_rank_mismatch_rejects() {
     // [2] × [2,3] — receiver is rank-1, rejected.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<numerus, [2]> a ← vacua
-  fixum tensor<numerus, [2, 3]> b ← vacua
-  fixum tensor<numerus, [1, 3]> c ← a.matmul(b)
+  sit tensor<numerus, [2]> a ← vacua
+  sit tensor<numerus, [2, 3]> b ← vacua
+  sit tensor<numerus, [1, 3]> c ← a.matmul(b)
   nota c.longitudo()
 }",
         "matmul_receiver_rank_must_be_two",
@@ -439,9 +439,9 @@ fn tensor_matmul_rejects_rhs_rank_mismatch() {
     // [2,3] × [3] — RHS is rank-1, rejected.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<numerus, [2, 3]> a ← vacua
-  fixum tensor<numerus, [3]> b ← vacua
-  fixum tensor<numerus, [2, 1]> c ← a.matmul(b)
+  sit tensor<numerus, [2, 3]> a ← vacua
+  sit tensor<numerus, [3]> b ← vacua
+  sit tensor<numerus, [2, 1]> c ← a.matmul(b)
   nota c.longitudo()
 }",
         "matmul_argument_rank_must_be_two",
@@ -453,9 +453,9 @@ fn tensor_matmul_inner_dim_mismatch_rejects() {
     // [2,3] × [4,5] — inner dims 3 ≠ 4, rejected.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<numerus, [2, 3]> a ← vacua
-  fixum tensor<numerus, [4, 5]> b ← vacua
-  fixum tensor<numerus, [2, 5]> c ← a.matmul(b)
+  sit tensor<numerus, [2, 3]> a ← vacua
+  sit tensor<numerus, [4, 5]> b ← vacua
+  sit tensor<numerus, [2, 5]> c ← a.matmul(b)
   nota c.longitudo()
 }",
         "incompatible_tensor_index",
@@ -466,9 +466,9 @@ fn tensor_matmul_inner_dim_mismatch_rejects() {
 fn tensor_matmul_textus_element_rejects() {
     rejects_with_issue(
         r"incipit {
-  fixum tensor<textus, [2, 3]> a ← vacua
-  fixum tensor<textus, [3, 4]> b ← vacua
-  fixum tensor<textus, [2, 4]> c ← a.matmul(b)
+  sit tensor<textus, [2, 3]> a ← vacua
+  sit tensor<textus, [3, 4]> b ← vacua
+  sit tensor<textus, [2, 4]> c ← a.matmul(b)
   nota c.longitudo()
 }",
         "tensor_arithmetic_numeric_element_required",
@@ -628,12 +628,12 @@ fn generic_tensor_call_keeps_immutable_scalar_shape_witness_and_carrier_guards()
 }
 
 main {
-    const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    const int n ← data.length() / 2
-    const int m ← data.length() / 2
-    const tensor<f32, [size n, size n]> source ← data ↦ tensor<f32, [size n, size n]>
-    const tensor<f32, [size m, size n]> other ← data ↦ tensor<f32, [size m, size n]>
-    const tensor<f32, [size n, size n]> result ← keep_first(source, other)
+    let list<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    let int n ← data.length() / 2
+    let int m ← data.length() / 2
+    let tensor<f32, [size n, size n]> source ← data ↦ tensor<f32, [size n, size n]>
+    let tensor<f32, [size m, size n]> other ← data ↦ tensor<f32, [size m, size n]>
+    let tensor<f32, [size n, size n]> result ← keep_first(source, other)
 }
 "#,
         config,
@@ -761,9 +761,9 @@ fn batched_matmul_decode_shape_typechecks() {
     // (rectangular decode, never square).
     accepts(
         r"incipit {
-  fixum tensor<f32, [5, 3, 1, 64]> q ← vacua
-  fixum tensor<f32, [5, 64, 76]> kt ← vacua
-  fixum tensor<f32, [5, 3, 1, 76]> scores ← q · kt
+  sit tensor<f32, [5, 3, 1, 64]> q ← vacua
+  sit tensor<f32, [5, 64, 76]> kt ← vacua
+  sit tensor<f32, [5, 3, 1, 76]> scores ← q · kt
   nota scores.longitudo()
 }",
     );
@@ -774,9 +774,9 @@ fn batched_matmul_prefill_shape_typechecks() {
     // Prefill: [5,3,36,64] · [5,64,36] → [5,3,36,36].
     accepts(
         r"incipit {
-  fixum tensor<f32, [5, 3, 36, 64]> q ← vacua
-  fixum tensor<f32, [5, 64, 36]> kt ← vacua
-  fixum tensor<f32, [5, 3, 36, 36]> scores ← q · kt
+  sit tensor<f32, [5, 3, 36, 64]> q ← vacua
+  sit tensor<f32, [5, 64, 36]> kt ← vacua
+  sit tensor<f32, [5, 3, 36, 36]> scores ← q · kt
   nota scores.longitudo()
 }",
     );
@@ -788,9 +788,9 @@ fn batched_matmul_wrong_result_shape_rejects() {
     // [76]-major result shape contradicts the constraint.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<f32, [5, 3, 1, 64]> q ← vacua
-  fixum tensor<f32, [5, 64, 76]> kt ← vacua
-  fixum tensor<f32, [5, 3, 76, 1]> scores ← q · kt
+  sit tensor<f32, [5, 3, 1, 64]> q ← vacua
+  sit tensor<f32, [5, 64, 76]> kt ← vacua
+  sit tensor<f32, [5, 3, 76, 1]> scores ← q · kt
   nota scores.longitudo()
 }",
         "incompatible_tensor_index",
@@ -803,9 +803,9 @@ fn batched_matmul_prefix_mismatch_rejects() {
     // receiver's (kv-head share): 6 ≠ 5.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<f32, [5, 3, 1, 64]> q ← vacua
-  fixum tensor<f32, [6, 64, 76]> kt ← vacua
-  fixum tensor<f32, [5, 3, 1, 76]> scores ← q · kt
+  sit tensor<f32, [5, 3, 1, 64]> q ← vacua
+  sit tensor<f32, [6, 64, 76]> kt ← vacua
+  sit tensor<f32, [5, 3, 1, 76]> scores ← q · kt
   nota scores.longitudo()
 }",
         "incompatible_tensor_index",
@@ -817,9 +817,9 @@ fn batched_matmul_inner_dim_mismatch_rejects() {
     // K tail must unify: 64 ≠ 63.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<f32, [5, 3, 1, 64]> q ← vacua
-  fixum tensor<f32, [5, 63, 76]> kt ← vacua
-  fixum tensor<f32, [5, 3, 1, 76]> scores ← q · kt
+  sit tensor<f32, [5, 3, 1, 64]> q ← vacua
+  sit tensor<f32, [5, 63, 76]> kt ← vacua
+  sit tensor<f32, [5, 3, 1, 76]> scores ← q · kt
   nota scores.longitudo()
 }",
         "incompatible_tensor_index",
@@ -832,9 +832,9 @@ fn batched_matmul_rank1_argument_rejects() {
     // requires a trailing [K, N] matrix on the argument.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<f32, [5, 3, 1, 64]> q ← vacua
-  fixum tensor<f32, [64]> k ← vacua
-  fixum tensor<f32, [5, 3, 1]> scores ← q · k
+  sit tensor<f32, [5, 3, 1, 64]> q ← vacua
+  sit tensor<f32, [64]> k ← vacua
+  sit tensor<f32, [5, 3, 1]> scores ← q · k
   nota scores.longitudo()
 }",
         "matmul_argument_rank_must_be_two",
@@ -847,9 +847,9 @@ fn batched_matmul_rank5_receiver_still_rejects() {
     // closed with the existing receiver rank issue.
     rejects_with_issue(
         r"incipit {
-  fixum tensor<f32, [2, 2, 2, 2, 2]> a ← vacua
-  fixum tensor<f32, [2, 2, 2]> b ← vacua
-  fixum tensor<f32, [2, 2, 2, 2, 2]> c ← a · b
+  sit tensor<f32, [2, 2, 2, 2, 2]> a ← vacua
+  sit tensor<f32, [2, 2, 2]> b ← vacua
+  sit tensor<f32, [2, 2, 2, 2, 2]> c ← a · b
   nota c.longitudo()
 }",
         "matmul_receiver_rank_must_be_two",
@@ -862,9 +862,9 @@ fn batched_matmul_argument_rank_above_receiver_rejects() {
     // batch prefix than the receiver has is not a share).
     rejects_with_issue(
         r"incipit {
-  fixum tensor<f32, [5, 64, 76]> kt ← vacua
-  fixum tensor<f32, [3, 5, 64, 76]> q ← vacua
-  fixum tensor<f32, [3, 5, 64, 76]> scores ← kt · q
+  sit tensor<f32, [5, 64, 76]> kt ← vacua
+  sit tensor<f32, [3, 5, 64, 76]> q ← vacua
+  sit tensor<f32, [3, 5, 64, 76]> scores ← kt · q
   nota scores.longitudo()
 }",
         "matmul_argument_rank_must_be_two",
@@ -917,10 +917,10 @@ fn batched_masked_softmax_decode_shape_typechecks() {
     // axes remain rectangular, never required square.
     accepts(
         r"incipit {
-    fixum tensor<f32, [5, 3, 1, 76]> scores ← vacua
-    fixum tensor<f32, [1, 76]> length_mask ← vacua
-    fixum tensor<f32, [5, 3, 1, 76]> expanded_mask ← length_mask.expande([5, 3, 1, 76])
-    fixum tensor<f32, [5, 3, 1, 76]> probabilities ← (scores + expanded_mask).activatio_softmax()
+    sit tensor<f32, [5, 3, 1, 76]> scores ← vacua
+    sit tensor<f32, [1, 76]> length_mask ← vacua
+    sit tensor<f32, [5, 3, 1, 76]> expanded_mask ← length_mask.expande([5, 3, 1, 76])
+    sit tensor<f32, [5, 3, 1, 76]> probabilities ← (scores + expanded_mask).activatio_softmax()
     nota probabilities.longitudo()
 }",
     );
@@ -932,10 +932,10 @@ fn batched_masked_softmax_prefill_shape_typechecks() {
     // axes; exact-shape addition and last-axis softmax preserve [5,3,36,36].
     accepts(
         r"incipit {
-    fixum tensor<f32, [5, 3, 36, 36]> scores ← vacua
-    fixum tensor<f32, [36, 36]> causal_mask ← vacua
-    fixum tensor<f32, [5, 3, 36, 36]> expanded_mask ← causal_mask.expande([5, 3, 36, 36])
-    fixum tensor<f32, [5, 3, 36, 36]> probabilities ← (scores + expanded_mask).activatio_softmax()
+    sit tensor<f32, [5, 3, 36, 36]> scores ← vacua
+    sit tensor<f32, [36, 36]> causal_mask ← vacua
+    sit tensor<f32, [5, 3, 36, 36]> expanded_mask ← causal_mask.expande([5, 3, 36, 36])
+    sit tensor<f32, [5, 3, 36, 36]> probabilities ← (scores + expanded_mask).activatio_softmax()
     nota probabilities.longitudo()
 }",
     );
@@ -947,9 +947,9 @@ fn batched_masked_softmax_non_broadcast_mask_rejects() {
     // cannot expand to the score shape — the expansion fails typed.
     rejects_with_issue(
         r"incipit {
-    fixum tensor<f32, [5, 3, 1, 76]> scores ← vacua
-    fixum tensor<f32, [2, 38]> bad_mask ← vacua
-    fixum tensor<f32, [5, 3, 1, 76]> probabilities ← (scores + bad_mask.expande([5, 3, 1, 76])).activatio_softmax()
+    sit tensor<f32, [5, 3, 1, 76]> scores ← vacua
+    sit tensor<f32, [2, 38]> bad_mask ← vacua
+    sit tensor<f32, [5, 3, 1, 76]> probabilities ← (scores + bad_mask.expande([5, 3, 1, 76])).activatio_softmax()
     nota probabilities.longitudo()
 }",
         "incompatible_tensor_index",
@@ -960,8 +960,8 @@ fn batched_masked_softmax_non_broadcast_mask_rejects() {
 fn vector_constant_lane_index_accepts_in_bounds() {
     accepts(
         r"incipit {
-  fixum vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-  fixum f32 a ← v[2]
+  sit vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+  sit f32 a ← v[2]
   nota a
 }",
     );
@@ -973,7 +973,7 @@ fn vector_constant_lane_index_rejects_provable_oob_and_negative() {
         rejects_with_issue(
             &format!(
                 r"incipit {{
-  fixum vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+  sit vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
   nota v[{index}]
 }}"
             ),
@@ -1004,9 +1004,9 @@ fn tensor_constructor_shape_affine_scalar_expression_matches_annotation() {
 }
 
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0]
-    const int n ← runtime_size(4)
-    const tensor<f32, [size (n - 1)]> dynamic ← flat ↦ tensor<f32, [size (n - 1)]>
+    let list<f32> flat ← [1.0, 2.0, 3.0]
+    let int n ← runtime_size(4)
+    let tensor<f32, [size (n - 1)]> dynamic ← flat ↦ tensor<f32, [size (n - 1)]>
 }
 "#,
         config,
@@ -1024,12 +1024,12 @@ fn tensor_shape_of_static_rank_is_a_bounded_list_of_the_rank() {
 }
 
 incipit {
-  fixum tf32[2, 3] grid ← vacua
-  fixum numerus n ← runtime_extent(3)
-  fixum tf32[2, magnitudo n] dynamic ← vacua
-  fixum lista<numerus, 2> exact ← grid.magnitudines()
-  fixum lista<numerus, _> inferred ← dynamic.magnitudines()
-  fixum numerus second ← grid.magnitudines()[1] vel 0
+  sit tf32[2, 3] grid ← vacua
+  sit numerus n ← runtime_extent(3)
+  sit tf32[2, magnitudo n] dynamic ← vacua
+  sit lista<numerus, 2> exact ← grid.magnitudines()
+  sit lista<numerus, _> inferred ← dynamic.magnitudines()
+  sit numerus second ← grid.magnitudines()[1] vel 0
   nota exact.longitudo(), inferred.longitudo(), second
 }",
     );
@@ -1039,8 +1039,8 @@ incipit {
 fn tensor_shape_literal_index_past_the_rank_rejects() {
     rejects_with_issue(
         r"incipit {
-  fixum tf32[2, 3] grid ← vacua
-  fixum _ bad ← grid.magnitudines()[5]
+  sit tf32[2, 3] grid ← vacua
+  sit bad ← grid.magnitudines()[5]
   nota bad
 }",
         "index_provably_out_of_bounds",
@@ -1051,8 +1051,8 @@ fn tensor_shape_literal_index_past_the_rank_rejects() {
 fn tensor_shape_does_not_widen_to_an_unbounded_list_implicitly() {
     rejects_with_issue(
         r"incipit {
-  fixum tf32[2, 3] grid ← vacua
-  fixum lista<numerus> dims ← grid.magnitudines()
+  sit tf32[2, 3] grid ← vacua
+  sit lista<numerus> dims ← grid.magnitudines()
   nota dims.longitudo()
 }",
         "initializer_annotation_mismatch",
@@ -1063,8 +1063,8 @@ fn tensor_shape_does_not_widen_to_an_unbounded_list_implicitly() {
 fn tensor_shape_widens_to_an_unbounded_list_through_explicit_conversio() {
     accepts(
         r"incipit {
-  fixum tf32[2, 3] grid ← vacua
-  fixum lista<numerus> dims ← grid.magnitudines() ↦ lista<numerus>
+  sit tf32[2, 3] grid ← vacua
+  sit lista<numerus> dims ← grid.magnitudines() ↦ lista<numerus>
   nota dims.longitudo()
 }",
     );
@@ -1078,7 +1078,7 @@ fn tensor_shape_without_a_static_rank_stays_an_unbounded_list() {
     // against a guessed length).
     accepts(
         r#"functio second_extent<magnitudo S>(tensor<f32, S> value) → numerus {
-    fixum lista<numerus> dims ← value.magnitudines()
+    sit lista<numerus> dims ← value.magnitudines()
     redde dims[1] vel 0
 }
 

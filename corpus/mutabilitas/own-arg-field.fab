@@ -16,7 +16,7 @@ diagnostic = "SEM057:own_argument_not_local_binding"
 # This exemplum intentionally fails to compile.
 
 class Box {
-    var list<int> xs
+    mut list<int> xs
 }
 
 fn eat(own list<int> xs) → void {
@@ -24,6 +24,6 @@ fn eat(own list<int> xs) → void {
 }
 
 main {
-    const Box b ← Box { xs = [1, 2] }
+    let Box b ← Box { xs = [1, 2] }
     eat(own b.xs)
 }

@@ -52,11 +52,11 @@ functio transmitte(inf x) → inf {
 }
 
 incipit {
-    fixum inf x ← 0
-    fixum inf y ← transmitte(x)
-    fixum Capsa c ← Capsa { a = y, b = x }
-    fixum lista<inf> xs ← [x, y]
-    fixum inf z ← xs[0]
+    sit inf x ← 0
+    sit inf y ← transmitte(x)
+    sit Capsa c ← Capsa { a = y, b = x }
+    sit lista<inf> xs ← [x, y]
+    sit inf z ← xs[0]
     nota c.a
     nota z
 }
@@ -69,10 +69,10 @@ fn the_four_spellings_are_one_type() {
     assert_accepts_la(
         r"
 functio tere(inf a, exactus<inf> b, modulus<inf> c, saturatus<inf> d) → inf {
-    fixum exactus<inf> e ← a
-    fixum modulus<inf> f ← b
-    fixum saturatus<inf> g ← c
-    fixum inf h ← d
+    sit exactus<inf> e ← a
+    sit modulus<inf> f ← b
+    sit saturatus<inf> g ← c
+    sit inf h ← d
     redde h
 }
 ",
@@ -95,8 +95,8 @@ fn a_constant_lands_in_an_inf_slot() {
     assert_accepts_la(
         r"
 incipit {
-    fixum inf x ← 0
-    fixum inf y ← -5
+    sit inf x ← 0
+    sit inf y ← -5
     nota x
     nota y
 }
@@ -109,13 +109,13 @@ fn a_u64_sized_literal_lands_in_an_inf_slot_but_not_a_signed_one() {
     assert_accepts_la(
         r"
 incipit {
-    fixum inf x ← 18446744073709551615
+    sit inf x ← 18446744073709551615
     nota x
 }
 ",
     );
     assert_rejects_with_issue_la(
-        "incipit { fixum i64 x ← 18446744073709551615\n nota x }\n",
+        "incipit { sit i64 x ← 18446744073709551615\n nota x }\n",
         "store_constant_out_of_range",
     );
 }
@@ -129,8 +129,8 @@ functio elige(bivalens b, inf x, inf y) → inf {
 }
 
 incipit {
-    fixum inf x ← 1
-    fixum lista<inf> xs ← [x, 2, -3]
+    sit inf x ← 1
+    sit lista<inf> xs ← [x, 2, -3]
     nota elige(verum, x, 4)
     nota xs
 }
@@ -144,7 +144,7 @@ fn every_bounded_integer_width_widens_into_inf() {
         assert_accepts_la(&format!(
             r"
 functio amplia({width} x) → inf {{
-    fixum inf y ← x
+    sit inf y ← x
     redde y
 }}
 "
@@ -160,7 +160,7 @@ fn an_inf_into_a_bounded_slot_is_the_implicit_checked_narrowing() {
     assert_accepts_la(
         r"
 functio contrahe(inf x) → i64 {
-    fixum i64 y ← x
+    sit i64 y ← x
     redde y
 }
 ",
@@ -176,7 +176,7 @@ functio minor(inf a, inf b) → bivalens {
 }
 
 incipit {
-    fixum numerus inf ← 3
+    sit numerus inf ← 3
     nota inf
 }
 ",
@@ -204,8 +204,8 @@ fn a_prefixed_inf_name_is_an_ordinary_identifier() {
     assert_accepts_la(
         r"
 incipit {
-    fixum numerus linf ← 1
-    fixum numerus sinf ← 2
+    sit numerus linf ← 1
+    sit numerus sinf ← 2
     nota linf + sinf
 }
 ",
@@ -271,7 +271,7 @@ fn a_kernel_inf_local_is_host_only() {
 @ nucleum
 @ publica
 functio k(u32 x) → u32 {
-    fixum inf y ← 1
+    sit inf y ← 1
     redde x
 }
 ",
@@ -287,7 +287,7 @@ fn an_air_lane_inf_local_is_rejected() {
         r#"
 @ radix lane "air"
 functio pura(i32 n) → i32 {
-    fixum inf x ← 1
+    sit inf x ← 1
     redde n
 }
 "#,

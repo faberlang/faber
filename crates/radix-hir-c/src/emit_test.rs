@@ -56,7 +56,7 @@ fn a_text_program_includes_only_the_runtime() {
 #[test]
 fn constant_folding_is_exact_and_floors() {
     let code = emitted(
-        "main {\n    const int neg ← 0 - 7\n    print 2 * 3 + 4\n    print neg\n    print neg / 2\n    print neg % 2\n    print 9223372036854775807\n}",
+        "main {\n    let int neg ← 0 - 7\n    print 2 * 3 + 4\n    print neg\n    print neg / 2\n    print neg % 2\n    print 9223372036854775807\n}",
     );
     assert!(code.contains("INT64_C(10))"), "{code}");
     assert!(
@@ -114,7 +114,7 @@ fn question_marks_cannot_form_trigraphs() {
 #[test]
 fn locals_are_typed_const_and_read_back() {
     let code = emitted(
-        "main {\n    const int n ← 40 + 2\n    const string s ← \"x\"\n    var int m ← 1\n    var string t ← \"y\"\n    print n, s, m, t\n}",
+        "main {\n    let int n ← 40 + 2\n    let string s ← \"x\"\n    mut int m ← 1\n    mut string t ← \"y\"\n    print n, s, m, t\n}",
     );
     assert!(
         code.contains("    const int64_t l_n = INT64_C(42);\n"),
@@ -135,7 +135,7 @@ fn locals_are_typed_const_and_read_back() {
 #[test]
 fn c_words_do_not_collide_with_faber_names() {
     let code = emitted(
-        "main {\n    const int char ← 1\n    const int goto ← 2\n    const int stdout ← 3\n    const int INT64_MAX ← 4\n    print char, goto, stdout, INT64_MAX\n}",
+        "main {\n    let int char ← 1\n    let int goto ← 2\n    let int stdout ← 3\n    let int INT64_MAX ← 4\n    print char, goto, stdout, INT64_MAX\n}",
     );
     for decl in [
         "const int64_t l_char = INT64_C(1);",
@@ -171,7 +171,7 @@ fn loops_program_is_pinned() {
 /// helpers and is narrowed once, at the store, with the runner's wording.
 #[test]
 fn arithmetic_over_a_variable_is_exact_and_checked_at_the_store() {
-    let code = emitted("main {\n    var int n ← 1\n    n ← n + 1\n    print n\n}");
+    let code = emitted("main {\n    mut int n ← 1\n    n ← n + 1\n    print n\n}");
     assert!(
         code.contains(
             "    l_n = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_n, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_n, INT64_C(1)), \"assignment to `n`\") : faber_r; }));\n"
@@ -183,7 +183,7 @@ fn arithmetic_over_a_variable_is_exact_and_checked_at_the_store() {
 
 #[test]
 fn a_declaration_store_names_the_declaration() {
-    let code = emitted("main {\n    var int a ← 2\n    const int b ← a * 3\n    print b\n}");
+    let code = emitted("main {\n    mut int a ← 2\n    let int b ← a * 3\n    print b\n}");
     assert!(
         code.contains("faber_store_i64(faber_mul(l_a, INT64_C(3)), \"declaration of `b`\")"),
         "{code}"
@@ -194,7 +194,7 @@ fn a_declaration_store_names_the_declaration() {
 /// The runtime lives in `runtime/c/faber.h`: a program that uses it
 /// includes it once and defines none of it.
 fn the_runtime_is_included_not_inlined() {
-    let code = emitted("main {\n    var int n ← 1\n    n ← n + 1\n    print n\n}");
+    let code = emitted("main {\n    mut int n ← 1\n    n ← n + 1\n    print n\n}");
     assert_eq!(code.matches("#include").count(), 1, "{code}");
     assert!(code.contains("#include \"faber.h\"\n"), "{code}");
     assert!(
@@ -213,13 +213,13 @@ fn the_runtime_is_included_not_inlined() {
 #[test]
 /// A variable divisor can be zero or -1, so the exact helper stays.
 fn remainder_by_a_variable_uses_the_exact_helper() {
-    let code = emitted("main {\n    var int n ← 7\n    var int d ← 2\n    print n % d\n}");
+    let code = emitted("main {\n    mut int n ← 7\n    mut int d ← 2\n    print n % d\n}");
     assert!(code.contains("faber_rem(l_n, l_d)"), "{code}");
 }
 
 #[test]
 fn an_unstored_exact_value_prints_through_the_text_helper() {
-    let code = emitted("main {\n    var int n ← 1\n    print n + 1\n}");
+    let code = emitted("main {\n    mut int n ← 1\n    print n + 1\n}");
     assert!(
         code.contains(
             "printf(\"%s\\n\", faber_i128_text(faber_add(l_n, INT64_C(1)), (char[41]){0}));"
@@ -230,14 +230,14 @@ fn an_unstored_exact_value_prints_through_the_text_helper() {
 
 #[test]
 fn negation_of_a_variable_is_exact() {
-    let code = emitted("main {\n    var int n ← 1\n    print -n\n}");
+    let code = emitted("main {\n    mut int n ← 1\n    print -n\n}");
     assert!(code.contains("faber_sub(0, l_n)"), "{code}");
 }
 
 #[test]
 fn control_flow_is_c_control_flow() {
     let code = emitted(
-        "main {\n    var int i ← 0\n    while true {\n        i ← i + 1\n        if i ≡ 3 {\n            continue\n        } else {\n            print i\n        }\n        if i ≥ 5 and not (i ≡ 9) {\n            break\n        }\n    }\n}",
+        "main {\n    mut int i ← 0\n    while true {\n        i ← i + 1\n        if i ≡ 3 {\n            continue\n        } else {\n            print i\n        }\n        if i ≥ 5 and not (i ≡ 9) {\n            break\n        }\n    }\n}",
     );
     for line in [
         "    while (1) {\n",
@@ -290,7 +290,7 @@ fn calls_are_sequenced_left_to_right() {
 #[test]
 fn a_call_without_other_calls_is_not_sequenced() {
     let code = emitted(
-        "fn f(int x) → int {\n    return x\n}\nmain {\n    var int n ← 1\n    print f(n)\n}",
+        "fn f(int x) → int {\n    return x\n}\nmain {\n    mut int n ← 1\n    print f(n)\n}",
     );
     assert!(!code.contains("faber_t"), "{code}");
 }
@@ -298,7 +298,7 @@ fn a_call_without_other_calls_is_not_sequenced() {
 #[test]
 fn an_exact_argument_is_checked_like_a_store() {
     let code = emitted(
-        "fn f(int x) → int {\n    return x\n}\nmain {\n    var int n ← 1\n    print f(n + 1)\n}",
+        "fn f(int x) → int {\n    return x\n}\nmain {\n    mut int n ← 1\n    print f(n + 1)\n}",
     );
     assert!(
         code.contains("faber_o ? faber_store_i64(faber_add(l_n, INT64_C(1)), \"argument\")"),
@@ -308,7 +308,7 @@ fn an_exact_argument_is_checked_like_a_store() {
 
 #[test]
 fn booleans_print_through_the_module_display_tokens() {
-    let code = emitted("main {\n    var bool b ← 1 ≺ 2\n    print b\n}");
+    let code = emitted("main {\n    mut bool b ← 1 ≺ 2\n    print b\n}");
     assert!(
         code.contains("    bool l_b = (INT64_C(1) < INT64_C(2));\n"),
         "{code}"
@@ -340,7 +340,7 @@ fn narrowing_program_is_pinned() {
 /// -1 cannot leave `int64_t`, so they stay there with no exact helper.
 #[test]
 fn division_by_a_safe_constant_stays_in_int64() {
-    let code = emitted("main {\n    var int n ← 7\n    print n / 2, n % -3\n}");
+    let code = emitted("main {\n    mut int n ← 7\n    print n / 2, n % -3\n}");
     assert!(code.contains("faber_fdiv_i64(l_n, INT64_C(2))"), "{code}");
     assert!(code.contains("faber_fmod_i64(l_n, -INT64_C(3))"), "{code}");
     assert!(!code.contains("faber_i128"), "{code}");
@@ -350,7 +350,7 @@ fn division_by_a_safe_constant_stays_in_int64() {
 /// can be zero or -1, so both keep the exact helper.
 #[test]
 fn division_by_minus_one_or_a_variable_stays_exact() {
-    let code = emitted("main {\n    var int n ← 7\n    var int d ← 2\n    print n / -1, n / d\n}");
+    let code = emitted("main {\n    mut int n ← 7\n    mut int d ← 2\n    print n / -1, n / d\n}");
     assert!(code.contains("faber_div(l_n, -INT64_C(1))"), "{code}");
     assert!(code.contains("faber_div(l_n, l_d)"), "{code}");
     assert!(!code.contains("faber_fdiv_i64"), "{code}");
@@ -361,7 +361,7 @@ fn division_by_minus_one_or_a_variable_stays_exact() {
 #[test]
 fn an_expression_with_a_call_has_no_fast_path() {
     let code = emitted(
-        "fn f() → int {\n    print \"f\"\n    return 1\n}\nmain {\n    var int n ← 1\n    n ← n + f()\n    print n\n}",
+        "fn f() → int {\n    print \"f\"\n    return 1\n}\nmain {\n    mut int n ← 1\n    n ← n + f()\n    print n\n}",
     );
     assert!(!code.contains("faber_add_o"), "{code}");
     assert!(
@@ -377,7 +377,7 @@ fn an_expression_with_a_call_has_no_fast_path() {
 #[test]
 fn a_proven_range_narrows_through_fit() {
     let code = emitted(
-        "main {\n    var int big ← 9223372036854775807\n    var int back ← big + 1 - 1\n    print back, big\n}",
+        "main {\n    mut int big ← 9223372036854775807\n    mut int back ← big + 1 - 1\n    print back, big\n}",
     );
     assert!(code.contains("faber_o ? faber_fit_i64(faber_sub(faber_add(l_big, INT64_C(1)), INT64_C(1))) : faber_r;"), "{code}");
 }
@@ -420,7 +420,7 @@ fn an_allocating_program_threads_the_arena_from_main() {
 #[test]
 fn a_template_joins_its_pieces_in_one_allocation() {
     let code = emitted(
-        "main {\n    var int a ← 7\n    var string s ← \"x\"\n    print \"§1-§0 (§)\"(a, s)\n}",
+        "main {\n    mut int a ← 7\n    mut string s ← \"x\"\n    print \"§1-§0 (§)\"(a, s)\n}",
     );
     assert!(
         code.contains("faber_join(faber_a, 6, l_s, \"-\", faber_int_text(faber_a, l_a), \" (\", faber_int_text(faber_a, l_a), \")\")"),
@@ -488,7 +488,7 @@ fn list_functions_program_is_pinned() {
 #[test]
 fn lists_alias_and_emit_only_the_parts_used() {
     let code = emitted(
-        "main {\n    var list<int> xs ← [1, 2]\n    var list<int> ys ← xs\n    ys.append(3)\n    print xs.length()\n}",
+        "main {\n    mut list<int> xs ← [1, 2]\n    mut list<int> ys ← xs\n    ys.append(3)\n    print xs.length()\n}",
     );
     for line in [
         "    faber_list_i64 *l_xs = faber_list_i64_of(faber_a, 2, (int64_t[]){INT64_C(1), INT64_C(2)});\n",
@@ -514,7 +514,7 @@ fn lists_alias_and_emit_only_the_parts_used() {
 /// texts are the runtime's (`trap_index.fab` pins them against the runner).
 fn list_index_reads_and_writes_are_checked() {
     let code = emitted(
-        "main {\n    var list<int> xs ← [1, 2]\n    var int i ← 1\n    xs[i] ← 5\n    print xs[i - 1]\n}",
+        "main {\n    mut list<int> xs ← [1, 2]\n    mut int i ← 1\n    xs[i] ← 5\n    print xs[i - 1]\n}",
     );
     assert!(
         code.contains("    faber_list_i64_set(l_xs, l_i, INT64_C(5));\n"),
@@ -529,7 +529,7 @@ fn list_index_reads_and_writes_are_checked() {
 #[test]
 fn iteration_walks_the_list_by_index() {
     let code = emitted(
-        "main {\n    const list<string> names ← [\"a\", \"b\"]\n    for from names const n {\n        print n\n    }\n}",
+        "main {\n    let list<string> names ← [\"a\", \"b\"]\n    for from names const n {\n        print n\n    }\n}",
     );
     for line in [
         "        faber_list_text *const faber_t0 = l_names;\n",
@@ -543,7 +543,7 @@ fn iteration_walks_the_list_by_index() {
 #[test]
 fn a_mut_list_parameter_passes_the_callers_list() {
     let code = emitted(
-        "fn add(mut list<int> xs) {\n    xs.append(1)\n}\nmain {\n    var list<int> ys ← empty\n    add(mut ys)\n    print ys\n}",
+        "fn add(mut list<int> xs) {\n    xs.append(1)\n}\nmain {\n    mut list<int> ys ← empty\n    add(mut ys)\n    print ys\n}",
     );
     assert!(
         code.contains("static void f_add(faber_arena *faber_a, faber_list_i64 *p_xs) {"),
@@ -571,7 +571,7 @@ fn genus_nested_program_is_pinned() {
 #[test]
 fn genus_members_are_prefixed_and_forward_declared() {
     let code = emitted(
-        "class Pouch {\n    var int default = 1\n    var int static = 2\n}\nmain {\n    const Pouch p ← { default = 5 }\n    print p.default, p.static\n}",
+        "class Pouch {\n    mut int default = 1\n    mut int static = 2\n}\nmain {\n    let Pouch p ← { default = 5 }\n    print p.default, p.static\n}",
     );
     for line in [
         "typedef struct g_Pouch g_Pouch;\n",
@@ -587,7 +587,7 @@ fn genus_members_are_prefixed_and_forward_declared() {
 #[test]
 fn methods_take_the_receiver_after_the_arena() {
     let code = emitted(
-        "class C {\n    var int n = 0\n    fn bump(int by) {\n        self.n ← self.n + by\n    }\n}\nmain {\n    var C c ← { n = 1 }\n    c.bump(2)\n    print c.n\n}",
+        "class C {\n    mut int n = 0\n    fn bump(int by) {\n        self.n ← self.n + by\n    }\n}\nmain {\n    mut C c ← { n = 1 }\n    c.bump(2)\n    print c.n\n}",
     );
     for line in [
         "static void g_C_bump(faber_arena *, g_C *, int64_t);\n",
@@ -603,12 +603,11 @@ fn methods_take_the_receiver_after_the_arena() {
 #[test]
 fn genus_show_is_emitted_only_when_shown() {
     let quiet = emitted(
-        "class P {\n    var int x = 0\n}\nmain {\n    const P p ← { x = 1 }\n    print p.x\n}",
+        "class P {\n    mut int x = 0\n}\nmain {\n    let P p ← { x = 1 }\n    print p.x\n}",
     );
     assert!(!quiet.contains("g_P_show"), "{quiet}");
-    let shown = emitted(
-        "class P {\n    var int x = 0\n}\nmain {\n    const P p ← { x = 1 }\n    print p\n}",
-    );
+    let shown =
+        emitted("class P {\n    mut int x = 0\n}\nmain {\n    let P p ← { x = 1 }\n    print p\n}");
     assert!(
         shown.contains("return faber_join(faber_a, 4, \"P { \", \"x = \", faber_int_text(faber_a, value->m_x), \" }\");"),
         "{shown}"
@@ -627,7 +626,7 @@ fn floats_program_is_pinned() {
 #[test]
 fn float_arithmetic_is_plain_c() {
     let code =
-        emitted("main {\n    var float a ← 0.1\n    var float b ← 1\n    print a * b - 1e300\n}");
+        emitted("main {\n    mut float a ← 0.1\n    mut float b ← 1\n    print a * b - 1e300\n}");
     for line in [
         "    double l_a = 0.1;\n",
         "    double l_b = 1.0;\n",
@@ -643,7 +642,7 @@ fn float_arithmetic_is_plain_c() {
 #[test]
 fn float_operations_c_gets_wrong_use_the_runtime() {
     let code = emitted(
-        "main {\n    var float a ← -7.5\n    var int n ← 7\n    print a % 2.0, n ÷ 2, n ≺ a, a ≤ n\n}",
+        "main {\n    mut float a ← -7.5\n    mut int n ← 7\n    print a % 2.0, n ÷ 2, n ≺ a, a ≤ n\n}",
     );
     for call in [
         "faber_fmod_f64(l_a, 2.0)",
@@ -657,7 +656,7 @@ fn float_operations_c_gets_wrong_use_the_runtime() {
 
 #[test]
 fn rounding_saturates_through_the_runtime() {
-    let code = emitted("main {\n    var float a ← 2.5\n    print ⌊a⌉, ⌊a⌋, ⌈a⌉\n}");
+    let code = emitted("main {\n    mut float a ← 2.5\n    print ⌊a⌉, ⌊a⌋, ⌈a⌉\n}");
     for call in [
         "faber_nearest_i64(l_a)",
         "faber_floor_i64(l_a)",
@@ -669,7 +668,7 @@ fn rounding_saturates_through_the_runtime() {
 
 #[test]
 fn floats_print_and_show_through_the_runtime() {
-    let code = emitted("main {\n    var float a ← 0.5\n    print a\n    print \"a=§\"(a)\n}");
+    let code = emitted("main {\n    mut float a ← 0.5\n    print a\n    print \"a=§\"(a)\n}");
     assert!(
         code.contains("faber_f64_text(l_a, (char[FABER_F64_TEXT]){0})"),
         "{code}"

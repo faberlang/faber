@@ -40,9 +40,9 @@ locale = "en"
 #   aborts on a value that does not fit. No arithmetic wraps silently.
 
 main {
-    const int max ← 9223372036854775807
+    let int max ← 9223372036854775807
     print max + 1
     print max + 1 - 1
-    var int stored ← max + 1
+    mut int stored ← max + 1
     print stored
 }

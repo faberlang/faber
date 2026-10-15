@@ -42,10 +42,10 @@ fn twice(int n) → int {
 }
 
 main {
-    var list<int> a ← [1, 2, 3]
+    mut list<int> a ← [1, 2, 3]
     apply(peek, a)
-    const (list<int>) → void g ← peek
+    let (list<int>) → void g ← peek
     g(a)
-    const (int) → int t ← twice
+    let (int) → int t ← twice
     print t(21)
 }

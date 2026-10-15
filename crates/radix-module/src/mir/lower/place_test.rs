@@ -148,11 +148,11 @@ fn runtime_extent(int value) → int {
 }
 
 main {
-    const int n ← runtime_extent(3)
-    const tf32[4] fixed ← tf32[4] {}
-    var tf32[4] fixed_out ← tf32[4] {}
-    const tf32[size n] sized ← tf32[size n] {}
-    var tf32[size n] sized_out ← tf32[size n] {}
+    let int n ← runtime_extent(3)
+    let tf32[4] fixed ← tf32[4] {}
+    mut tf32[4] fixed_out ← tf32[4] {}
+    let tf32[size n] sized ← tf32[size n] {}
+    mut tf32[size n] sized_out ← tf32[size n] {}
     bump(fixed, mut fixed_out)
     bump(sized, mut sized_out)
 }

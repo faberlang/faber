@@ -21,12 +21,12 @@ fn run(source: &str) -> (Result<(), String>, Vec<String>) {
 #[test]
 fn list_window_copies_the_range_for_numerus_textus_and_bits() {
     let (result, lines) = run("incipit {
-    fixum lista<numerus> xs ← [10, 11, 12, 13, 14]
+    sit lista<numerus> xs ← [10, 11, 12, 13, 14]
     nota xs[1‥4]
     nota xs[1…3]
-    fixum lista<textus> ts ← [\"a\", \"b\", \"c\"]
+    sit lista<textus> ts ← [\"a\", \"b\", \"c\"]
     nota ts[0‥2]
-    fixum lista<b8> bs ← [0xde, 0xad, 0xbe, 0xef]
+    sit lista<b8> bs ← [0xde, 0xad, 0xbe, 0xef]
     nota bs[1‥3]
 }
 ");
@@ -37,8 +37,8 @@ fn list_window_copies_the_range_for_numerus_textus_and_bits() {
 #[test]
 fn list_window_empty_range_is_an_empty_list() {
     let (result, lines) = run("incipit {
-    fixum lista<numerus> xs ← [1, 2, 3]
-    fixum lista<numerus> w ← xs[2‥2]
+    sit lista<numerus> xs ← [1, 2, 3]
+    sit lista<numerus> w ← xs[2‥2]
     nota w.longitudo()
 }
 ");
@@ -49,7 +49,7 @@ fn list_window_empty_range_is_an_empty_list() {
 #[test]
 fn list_window_past_the_end_fails() {
     let (result, lines) = run("incipit {
-    fixum lista<numerus> xs ← [1, 2, 3]
+    sit lista<numerus> xs ← [1, 2, 3]
     nota xs[1‥4]
 }
 ");

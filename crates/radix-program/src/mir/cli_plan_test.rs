@@ -210,7 +210,7 @@ const OCTETI_OPTION_MAIN: &str = r#"
 @ cli "tool"
 @ option payload long "payload" type bytes
 main args args {
-  const bytes payload ← args.payload coalesce |21|
+  let bytes payload ← args.payload coalesce |21|
   print payload.length()
 }
 "#;

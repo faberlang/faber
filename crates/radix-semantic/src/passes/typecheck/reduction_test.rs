@@ -314,7 +314,7 @@ fn axis_reduction_named_integer_local_is_a_constant_axis() {
     assert_accepts(
         r"
 functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
-    fixum numerus k ← 1
+    sit numerus k ← 1
     redde g.summa(axis k)
 }
 ",
@@ -326,7 +326,7 @@ fn axis_reduction_named_float_local_is_not_a_constant_axis() {
     assert_rejects_with_issue(
         r"
 functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
-    fixum fractus k ← 1
+    sit fractus k ← 1
     redde g.summa(axis k)
 }
 ",

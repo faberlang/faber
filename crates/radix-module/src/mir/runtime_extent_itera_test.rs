@@ -38,11 +38,11 @@ fn runtime_extent_rank2_loop_reads_bounds_from_the_carrier() {
     let source = r"
 fn rt(int v) → int { return v }
 main {
-    const int n ← rt(3)
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[2, size n] a ← flat ↦ tf32[2, size n]
-    var f32 acc ← 0.0
-    var int coords ← 0
+    let int n ← rt(3)
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[2, size n] a ← flat ↦ tf32[2, size n]
+    mut f32 acc ← 0.0
+    mut int coords ← 0
     for from a at [i, j] const c {
         acc ← acc + c
         coords ← coords + i * 10 + j
@@ -59,12 +59,12 @@ fn runtime_extent_rank1_loops_run_with_and_without_a_coordinate() {
     let source = r"
 fn rt(int v) → int { return v }
 main {
-    const int n ← rt(3)
-    const list<f32> flat ← [1.0, 2.0, 3.0]
-    const tf32[size n] a ← flat ↦ tf32[size n]
-    var f32 plain ← 0.0
+    let int n ← rt(3)
+    let list<f32> flat ← [1.0, 2.0, 3.0]
+    let tf32[size n] a ← flat ↦ tf32[size n]
+    mut f32 plain ← 0.0
     for from a const c { plain ← plain + c }
-    var f32 coord ← 0.0
+    mut f32 coord ← 0.0
     for from a at [i] const c { coord ← coord + c }
     print plain
     print coord
@@ -78,18 +78,18 @@ fn zero_runtime_extent_runs_zero_iterations() {
     let source = r"
 fn rt(int v) → int { return v }
 main {
-    const int n ← rt(0)
-    const int m ← rt(2)
-    const list<f32> none ← []
-    const tf32[2, size n] a ← none ↦ tf32[2, size n]
-    const tf32[size n] b ← none ↦ tf32[size n]
-    const tf32[size m, 0] e ← none ↦ tf32[size m, 0]
-    var int rank2 ← 0
+    let int n ← rt(0)
+    let int m ← rt(2)
+    let list<f32> none ← []
+    let tf32[2, size n] a ← none ↦ tf32[2, size n]
+    let tf32[size n] b ← none ↦ tf32[size n]
+    let tf32[size m, 0] e ← none ↦ tf32[size m, 0]
+    mut int rank2 ← 0
     for from a at [i, j] const c { rank2 ← rank2 + 1 }
-    var int rank1 ← 0
+    mut int rank1 ← 0
     for from b const c { rank1 ← rank1 + 1 }
     for from b at [i] const c { rank1 ← rank1 + 1 }
-    var int empty_inner ← 0
+    mut int empty_inner ← 0
     for from e at [i, j] const c { empty_inner ← empty_inner + 1 }
     print rank2
     print rank1
@@ -104,16 +104,16 @@ fn size_generic_tensor_loop_runs_over_each_instance_shape() {
     let source = r"
 fn rt(int v) → int { return v }
 fn total<size H, size W>(tf32[H, W] src) → f32 {
-    var f32 acc ← 0.0
+    mut f32 acc ← 0.0
     for from src at [i, j] const c { acc ← acc + c }
     return acc
 }
 main {
-    const tf32[2, 3] a ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
+    let tf32[2, 3] a ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     print total(a)
-    const int n ← rt(2)
-    const list<f32> flat_b ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[size n, 2] b ← flat_b ↦ tf32[size n, 2]
+    let int n ← rt(2)
+    let list<f32> flat_b ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[size n, 2] b ← flat_b ↦ tf32[size n, 2]
     print total(b)
 }
 ";
@@ -129,7 +129,7 @@ fn bump(mut tf32[2, 3] dst) → void {
     }
 }
 main {
-    var tf32[2, 3] b ← tf32[2, 3] {}
+    mut tf32[2, 3] b ← tf32[2, 3] {}
     bump(mut b)
     print b.flatten()
 }
@@ -142,8 +142,8 @@ fn literal_extent_loop_keeps_literal_bounds_and_runtime_extent_reads_the_carrier
     let literal = dump(
         r"
 main {
-    const tf32[2, 3] a ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
-    var int acc ← 0
+    let tf32[2, 3] a ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
+    mut int acc ← 0
     for from a at [i, j] const c { acc ← acc + i * 10 + j }
     print acc
 }
@@ -158,10 +158,10 @@ main {
         r"
 fn rt(int v) → int { return v }
 main {
-    const int n ← rt(3)
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[2, size n] a ← flat ↦ tf32[2, size n]
-    var int acc ← 0
+    let int n ← rt(3)
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[2, size n] a ← flat ↦ tf32[2, size n]
+    mut int acc ← 0
     for from a at [i, j] const c { acc ← acc + i * 10 + j }
     print acc
 }

@@ -30,8 +30,8 @@ locale = "en"
 #   scriptum-display-option.expected — each template line, then the same values printed alone.
 
 main {
-    const int ∪ none absent ← null
-    const int ∪ none present ← 4
+    let int ∪ none absent ← null
+    let int ∪ none present ← 4
 
     print "absent=§"(absent)
     print "present=§"(present)

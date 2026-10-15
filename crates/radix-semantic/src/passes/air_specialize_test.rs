@@ -13,8 +13,8 @@ functio generic_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
 }
 
 incipit {
-    fixum tensor<f32, [4]> x ← vacua
-    fixum f32 y ← generic_sum(x)
+    sit tensor<f32, [4]> x ← vacua
+    sit f32 y ← generic_sum(x)
 }
 "#,
         Target::MirWasm,
@@ -64,11 +64,11 @@ functio generic_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
 }
 
 incipit {
-    fixum tensor<f32, [8]> x8 ← vacua
-    fixum tensor<f32, [64]> x64 ← vacua
-    fixum f32 first ← generic_sum(x8)
-    fixum f32 again ← generic_sum(x8)
-    fixum f32 other ← generic_sum(x64)
+    sit tensor<f32, [8]> x8 ← vacua
+    sit tensor<f32, [64]> x64 ← vacua
+    sit f32 first ← generic_sum(x8)
+    sit f32 again ← generic_sum(x8)
+    sit f32 other ← generic_sum(x64)
 }
 "#,
         Target::MirWasm,
@@ -112,8 +112,8 @@ functio outer<magnitudo N>(tensor<f32, [N]> x) → f32 {
 }
 
 incipit {
-    fixum tensor<f32, [8]> x ← vacua
-    fixum f32 y ← outer(x)
+    sit tensor<f32, [8]> x ← vacua
+    sit f32 y ← outer(x)
 }
 "#,
         Target::MirWasm,
@@ -168,9 +168,9 @@ functio generic_rope<magnitudo D>(tf32[2, D] x, tf32[2, 4, 3] table) → tf32[2,
 }
 
 incipit {
-    fixum tf32[2, 8] x ← vacua
-    fixum tf32[2, 4, 3] table ← vacua
-    fixum tf32[2, 8] y ← generic_rope(x, table)
+    sit tf32[2, 8] x ← vacua
+    sit tf32[2, 4, 3] table ← vacua
+    sit tf32[2, 8] y ← generic_rope(x, table)
 }
 "#,
         Target::MirWasm,

@@ -20,19 +20,19 @@ fn axis_marker_marked_call_is_accepted() {
     let source = "functio rows(axis numerus a) → numerus { redde a + 1 }\n\
 functio plain(numerus a) → numerus { redde a }\n\
 functio pass(axis numerus a) → numerus { redde rows(axis a) }\n\
-incipit {\n    fixum numerus x ← rows(axis 1)\n    fixum numerus y ← plain(2)\n    fixum numerus z ← pass(axis 3)\n}";
+incipit {\n    sit numerus x ← rows(axis 1)\n    sit numerus y ← plain(2)\n    sit numerus z ← pass(axis 3)\n}";
     let _ = analyze_ok(source);
 }
 
 #[test]
 fn axis_marker_bare_argument_to_axis_parameter_is_required() {
-    assert_rejects_with_issue(&call("fixum numerus x ← rows(1)"), "axis_marker_required");
+    assert_rejects_with_issue(&call("sit numerus x ← rows(1)"), "axis_marker_required");
 }
 
 #[test]
 fn axis_marker_on_plain_parameter_is_unexpected() {
     assert_rejects_with_issue(
-        &call("fixum numerus x ← plain(axis 1)"),
+        &call("sit numerus x ← plain(axis 1)"),
         "axis_marker_unexpected",
     );
 }
@@ -83,7 +83,7 @@ fn axis_builtin_bare_axis_is_required() {
 
 #[test]
 fn axis_marker_parameter_is_a_plain_int_inside() {
-    let source = "functio rows(axis numerus a) → numerus {\n    fixum numerus b ← a * 2\n    redde b + a\n}\nincipit {\n    fixum numerus x ← rows(axis 2)\n}";
+    let source = "functio rows(axis numerus a) → numerus {\n    sit numerus b ← a * 2\n    redde b + a\n}\nincipit {\n    sit numerus x ← rows(axis 2)\n}";
     let _ = analyze_ok(source);
 }
 

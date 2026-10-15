@@ -946,7 +946,7 @@ impl TypeChecker<'_> {
             return target_ty;
         }
         // The destination type must resolve before conversion checking: an
-        // inference-hole destination (e.g. `fixum _ xs ← []`) cannot name a
+        // inference-hole destination (e.g. `sit xs ← []`) cannot name a
         // conversion target.
         let target_resolved = self.resolve_inferred_type(target_ty);
         if self.destination_type_has_inference_hole(target_resolved) {

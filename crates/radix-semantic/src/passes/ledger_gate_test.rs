@@ -71,7 +71,7 @@ fn ledger_ops_index_read_yields_the_value_type() {
         "functio f(tabulae<textus, numerus> l) → numerus {\n    redde l[\"a\"]\n}\n",
     ));
     accepts(&compile(
-        "functio f(tabulae<textus, numerus> l) → vacuum {\n    fixum numerus v ← l[\"a\"]\n    nota v\n}\n",
+        "functio f(tabulae<textus, numerus> l) → vacuum {\n    sit numerus v ← l[\"a\"]\n    nota v\n}\n",
     ));
 }
 
@@ -85,7 +85,7 @@ fn ledger_ops_index_store_accepted_on_var_ledger() {
 #[test]
 fn ledger_ops_methods_type_like_the_map_twin() {
     accepts(&compile(
-        "functio f(tabulae<textus, numerus> l) → bivalens {\n    varia tabulae<textus, numerus> x ← vacua\n    x.pone(\"c\", 1)\n    fixum numerus ∪ nihil g ← x.accipe(\"a\")\n    fixum bivalens h ← x.habet(\"a\")\n    fixum bivalens d ← x.dele(\"a\")\n    fixum numerus n ← x.longitudo()\n    fixum bivalens e ← x.vacua()\n    fixum lista<textus> ks ← x.claves()\n    fixum lista<numerus> vs ← x.valores()\n    redde h aut d aut e\n}\n",
+        "functio f(tabulae<textus, numerus> l) → bivalens {\n    varia tabulae<textus, numerus> x ← vacua\n    x.pone(\"c\", 1)\n    sit numerus ∪ nihil g ← x.accipe(\"a\")\n    sit bivalens h ← x.habet(\"a\")\n    sit bivalens d ← x.dele(\"a\")\n    sit numerus n ← x.longitudo()\n    sit bivalens e ← x.vacua()\n    sit lista<textus> ks ← x.claves()\n    sit lista<numerus> vs ← x.valores()\n    redde h aut d aut e\n}\n",
     ));
 }
 
@@ -106,13 +106,13 @@ fn ledger_ops_membership_typechecks() {
 #[test]
 fn ledger_ops_three_loop_forms_typecheck() {
     accepts(&compile(
-        "functio f(tabulae<textus, numerus> l) → vacuum {\n    itera ex l fixum v {\n        fixum numerus x ← v\n        nota x\n    }\n}\n",
+        "functio f(tabulae<textus, numerus> l) → vacuum {\n    itera ex l fixum v {\n        sit numerus x ← v\n        nota x\n    }\n}\n",
     ));
     accepts(&compile(
-        "functio f(tabulae<textus, numerus> l) → vacuum {\n    itera de l fixum k {\n        fixum textus x ← k\n        nota x\n    }\n}\n",
+        "functio f(tabulae<textus, numerus> l) → vacuum {\n    itera de l fixum k {\n        sit textus x ← k\n        nota x\n    }\n}\n",
     ));
     accepts(&compile(
-        "functio f(tabulae<textus, numerus> l) → vacuum {\n    itera ex l apud [k] fixum v {\n        fixum textus a ← k\n        fixum numerus b ← v\n        nota a, b\n    }\n}\n",
+        "functio f(tabulae<textus, numerus> l) → vacuum {\n    itera ex l apud [k] fixum v {\n        sit textus a ← k\n        sit numerus b ← v\n        nota a, b\n    }\n}\n",
     ));
 }
 

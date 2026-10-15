@@ -35,8 +35,8 @@ locale = "en"
 #   Factorial and power-of-two growth samples.
 
 fn factorial(int n) → int {
-    var int value ← 1
-    var int currens ← n
+    mut int value ← 1
+    mut int currens ← n
     while currens ≻ 1 {
         value ← value * currens
         currens ← currens - 1
@@ -46,7 +46,7 @@ fn factorial(int n) → int {
 
 # Doubles until vis exceeds n (first power of two strictly greater than n)
 fn potentia(int n) → int {
-    var int vis ← 1
+    mut int vis ← 1
     while vis ≤ n {
         vis ← vis * 2
     }

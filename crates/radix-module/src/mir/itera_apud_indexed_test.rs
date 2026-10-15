@@ -33,7 +33,7 @@ fn sorted(mut lines: Vec<String>) -> Vec<String> {
 fn lista_apud_binds_position_and_element() {
     let lines = run(r#"
 incipit {
-    fixum lista<textus> xs ← ["a", "b", "c"]
+    sit lista<textus> xs ← ["a", "b", "c"]
     itera ex xs apud [i] fixum x {
         nota i, x
     }

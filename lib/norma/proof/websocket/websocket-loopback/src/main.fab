@@ -14,27 +14,27 @@ import from "norma:websocket" websocket
 import from "norma:fault" fault
 
 fn serve(server.Listener listener) async_generator → string ⇥ fault.IoFault {
-    const server.Incoming incoming ← listener.accept()
-    const string path ← incoming.req.path
-    const websocket.Socket sock ← websocket.accept(incoming.id)
-    const string got ← sock.receive() coalesce "nil"
+    let server.Incoming incoming ← listener.accept()
+    let string path ← incoming.req.path
+    let websocket.Socket sock ← websocket.accept(incoming.id)
+    let string got ← sock.receive() coalesce "nil"
     sock.send("pong")
-    const string tail ← sock.receive() coalesce "nil"
+    let string tail ← sock.receive() coalesce "nil"
     sock.close()
     yield "§|§|§"(path, got, tail)
 }
 
 main {
-    const server.Listener listener ← server.bind(0)
-    const int port ← listener.port()
+    let server.Listener listener ← server.bind(0)
+    let int port ← listener.port()
     assert port ≻ 0
 
-    const _ pending ← serve(listener)
+    let pending ← serve(listener)
 
-    const websocket.Socket client ← websocket.connect("ws://127.0.0.1:§/chat"(port))
+    let websocket.Socket client ← websocket.connect("ws://127.0.0.1:§/chat"(port))
     client.send("ping")
-    const string ∪ none reply ← client.receive()
-    const string pong ← reply coalesce "nil"
+    let string ∪ none reply ← client.receive()
+    let string pong ← reply coalesce "nil"
     assert pong ≡ "pong"
     client.close()
 

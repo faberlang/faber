@@ -80,7 +80,7 @@ fn contract_typed_local_mutates_the_live_value_through_self_and_mut_param() {
         "{FORMAE}
 incipit {{
     varia Quadratum q ← Quadratum {{ latus = 1 }}
-    fixum Crescens c ← q
+    sit Crescens c ← q
     c.cresce(1)
     varia numerus k ← 5
     c.adde(in k)

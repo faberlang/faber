@@ -14,15 +14,14 @@ fn run(body: &str) -> Result<Vec<String>, RunSourceError> {
 
 #[test]
 fn bounded_octeti_const_within_bound_reports_length_and_emptiness() {
-    let lines =
-        run("const bytes raw ← |61 62|\nconst bytes<8> a ← raw ↦ bytes<8>\nprint a.length()\nprint a.is_empty()")
-            .expect("runs");
+    let lines = run("let bytes raw ← |61 62|\nlet bytes<8> a ← raw ↦ bytes<8>\nprint a.length()\nprint a.is_empty()")
+        .expect("runs");
     assert_eq!(lines, ["2", "false"]);
 }
 
 #[test]
 fn bounded_octeti_store_over_the_bound_traps_with_the_rust_text() {
-    let error = run("const bytes raw ← |61 62 63|\nconst bytes<2> a ← raw ↦ bytes<2>\nprint a.length()")
+    let error = run("let bytes raw ← |61 62 63|\nlet bytes<2> a ← raw ↦ bytes<2>\nprint a.length()")
         .expect_err("overflow must fail");
     assert!(
         format!("{error:?}").contains("octeti to bounded octeti conversion failed"),
@@ -33,7 +32,7 @@ fn bounded_octeti_store_over_the_bound_traps_with_the_rust_text() {
 #[test]
 fn bounded_octeti_recovery_supplies_the_fallback_on_overflow() {
     let lines =
-        run("const bytes raw ← |61 62 63|\nconst bytes<2> a ← raw ↦ bytes<2> ⊥ (|7a| ↦ bytes<2>)\nprint a.length()")
+        run("let bytes raw ← |61 62 63|\nlet bytes<2> a ← raw ↦ bytes<2> ⊥ (|7a| ↦ bytes<2>)\nprint a.length()")
             .expect("runs");
     assert_eq!(lines, ["1"]);
 }
@@ -41,7 +40,7 @@ fn bounded_octeti_recovery_supplies_the_fallback_on_overflow() {
 #[test]
 fn bounded_octeti_widens_back_to_unbounded_bytes() {
     let lines = run(
-        "const bytes raw ← |61 62|\nconst bytes<2> a ← raw ↦ bytes<2>\nconst bytes back ← a ↦ bytes\nprint back.length()\nprint a.length()",
+        "let bytes raw ← |61 62|\nlet bytes<2> a ← raw ↦ bytes<2>\nlet bytes back ← a ↦ bytes\nprint back.length()\nprint a.length()",
     )
     .expect("runs");
     assert_eq!(lines, ["2", "2"]);
@@ -52,7 +51,7 @@ fn bounded_octeti_widens_back_to_unbounded_bytes() {
 /// bit round trip.
 fn scalar_round_trip_body(ty: &str, width: usize, value: &str, hint: &str) -> String {
     format!(
-        "const {ty} n ← {value}\nconst bytes<{width}> o ← n ↦ bytes<{width}> via {hint}\nconst bytes raw ← o ↦ bytes\nconst {ty} back ← raw ↦ {ty} via {hint}\nprint back"
+        "let {ty} n ← {value}\nlet bytes<{width}> o ← n ↦ bytes<{width}> via {hint}\nlet bytes raw ← o ↦ bytes\nlet {ty} back ← raw ↦ {ty} via {hint}\nprint back"
     )
 }
 
@@ -71,7 +70,7 @@ fn scalar_to_bounded_octeti_u16_be_round_trips() {
 #[test]
 fn scalar_to_bounded_octeti_byte_order_follows_the_hint() {
     let lines = run(
-        "const u16 n ← 258\nconst bytes<2> be ← n ↦ bytes<2> via Be\nconst u8 be_first ← (be ↦ bytes)[0] ↦ u8\nconst bytes<2> le ← n ↦ bytes<2> via Le\nconst u8 le_first ← (le ↦ bytes)[0] ↦ u8\nprint be_first\nprint le_first",
+        "let u16 n ← 258\nlet bytes<2> be ← n ↦ bytes<2> via Be\nlet u8 be_first ← (be ↦ bytes)[0] ↦ u8\nlet bytes<2> le ← n ↦ bytes<2> via Le\nlet u8 le_first ← (le ↦ bytes)[0] ↦ u8\nprint be_first\nprint le_first",
     )
     .expect("runs");
     assert_eq!(lines, ["1", "2"]);
@@ -102,7 +101,7 @@ fn scalar_to_bounded_octeti_all_widths_round_trip_le_and_be() {
 /// so this is a pure bit round trip.
 fn direct_round_trip_body(ty: &str, width: usize, value: &str, hint: &str) -> String {
     format!(
-        "const {ty} n ← {value}\nconst bytes<{width}> o ← n ↦ bytes<{width}> via {hint}\nconst {ty} back ← o ↦ {ty} via {hint}\nprint back"
+        "let {ty} n ← {value}\nlet bytes<{width}> o ← n ↦ bytes<{width}> via {hint}\nlet {ty} back ← o ↦ {ty} via {hint}\nprint back"
     )
 }
 
@@ -141,7 +140,7 @@ fn bounded_octeti_endian_read_all_widths_round_trip_le_and_be() {
 #[test]
 fn bounded_octeti_endian_read_follows_the_hint() {
     let lines =
-        run("const bytes raw ← |01 02|\nconst bytes<2> b ← raw ↦ bytes<2>\nprint b ↦ u16 via Be\nprint b ↦ u16 via Le")
+        run("let bytes raw ← |01 02|\nlet bytes<2> b ← raw ↦ bytes<2>\nprint b ↦ u16 via Be\nprint b ↦ u16 via Le")
             .expect("runs");
     assert_eq!(lines, ["258", "513"]);
 }
@@ -150,7 +149,7 @@ fn bounded_octeti_endian_read_follows_the_hint() {
 /// window feeds the same `↦ T via Le|Be` conversion as an unbounded carrier.
 fn window_round_trip_body(ty: &str, width: usize, value: &str, hint: &str) -> String {
     format!(
-        "const {ty} n ← {value}\nconst bytes<{width}> o ← n ↦ bytes<{width}> via {hint}\nconst {ty} back ← o[0‥{width}] ↦ {ty} via {hint}\nprint back"
+        "let {ty} n ← {value}\nlet bytes<{width}> o ← n ↦ bytes<{width}> via {hint}\nlet {ty} back ← o[0‥{width}] ↦ {ty} via {hint}\nprint back"
     )
 }
 
@@ -182,14 +181,14 @@ fn bounded_octeti_window_all_widths_round_trip() {
 
 #[test]
 fn bounded_octeti_window_inner_slice() {
-    let lines = run("const bytes raw ← |00 01 02 00|\nconst bytes<4> o ← raw ↦ bytes<4>\nprint o[1‥3] ↦ u16 via Be")
-        .expect("runs");
+    let lines =
+        run("let bytes raw ← |00 01 02 00|\nlet bytes<4> o ← raw ↦ bytes<4>\nprint o[1‥3] ↦ u16 via Be").expect("runs");
     assert_eq!(lines, ["258"]);
 }
 
 #[test]
 fn bounded_octeti_scalar_index_still_reads_a_byte() {
-    let lines = run("const bytes raw ← |07 08|\nconst bytes<2> o ← raw ↦ bytes<2>\nconst u8 first ← o[1]\nprint first")
+    let lines = run("let bytes raw ← |07 08|\nlet bytes<2> o ← raw ↦ bytes<2>\nlet u8 first ← o[1]\nprint first")
         .expect("runs");
     assert_eq!(lines, ["8"]);
 }

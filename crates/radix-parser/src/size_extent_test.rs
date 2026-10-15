@@ -19,7 +19,8 @@ impl KeywordPack for EnSizePack {
         match text {
             "size" => Some("magnitudo"),
             "const" => Some("fixum"),
-            "var" => Some("varia"),
+            "let" => Some("sit"),
+            "mut" => Some("varia"),
             _ => None,
         }
     }
@@ -35,7 +36,7 @@ fn parse_source(source: &str) -> ParseResult {
 
 #[test]
 fn spelled_lift_extent_parses_as_lift_shape() {
-    let result = parse_source("var tf32[2, size n] a ← tf32[2, size n] {}");
+    let result = parse_source("mut tf32[2, size n] a ← tf32[2, size n] {}");
     assert!(result.success(), "{:?}", result.errors);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[0].kind else {
@@ -59,7 +60,7 @@ fn spelled_lift_extent_parses_as_lift_shape() {
 
 #[test]
 fn static_spelled_lift_literal_parses() {
-    let result = parse_source("var tf32[2, size 3] a ← tf32[2, size 3] {}");
+    let result = parse_source("mut tf32[2, size 3] a ← tf32[2, size 3] {}");
     assert!(result.success(), "{:?}", result.errors);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[0].kind else {
@@ -82,7 +83,7 @@ fn static_spelled_lift_literal_parses() {
 
 #[test]
 fn construct_type_expression_parses_at_store_rhs() {
-    let result = parse_source("const size N = 2\nconst tf32[2, N] a ← tf32[2, N] {}");
+    let result = parse_source("const size N = 2\nlet tf32[2, N] a ← tf32[2, N] {}");
     assert!(result.success(), "{:?}", result.errors);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[1].kind else {
@@ -98,7 +99,7 @@ fn construct_type_expression_parses_at_store_rhs() {
 
 #[test]
 fn construct_type_expression_refuses_argument_position() {
-    let result = parse_source("const _ x ← f(tf32[2, 3])");
+    let result = parse_source("let x ← f(tf32[2, 3])");
     let error = result.errors.first().expect("expected parser refusal");
     assert!(
         error

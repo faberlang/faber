@@ -38,7 +38,7 @@ fn is_constant_index(kind: &HirExpressionKind, index: u64) -> bool {
 fn iuncta_label_member_access_typechecks() {
     let source = r"
 functio first(f32 a, numerus b) → f32 {
-    fixum iuncta<gx: f32, numerus> p ← iuncta<f32, numerus> [a, b]
+    sit iuncta<gx: f32, numerus> p ← iuncta<f32, numerus> [a, b]
     redde p.gx
 }
 ";
@@ -49,13 +49,13 @@ functio first(f32 a, numerus b) → f32 {
 fn iuncta_label_member_lowers_to_the_same_index_as_bracket() {
     let labeled = r"
 functio first(f32 a, numerus b) → f32 {
-    fixum iuncta<gx: f32, numerus> p ← iuncta<f32, numerus> [a, b]
+    sit iuncta<gx: f32, numerus> p ← iuncta<f32, numerus> [a, b]
     redde p.gx
 }
 ";
     let indexed = r"
 functio first(f32 a, numerus b) → f32 {
-    fixum iuncta<gx: f32, numerus> p ← iuncta<f32, numerus> [a, b]
+    sit iuncta<gx: f32, numerus> p ← iuncta<f32, numerus> [a, b]
     redde p[0]
 }
 ";
@@ -81,7 +81,7 @@ functio first(f32 a, numerus b) → f32 {
 fn iuncta_label_bracket_access_stays_legal() {
     let source = r"
 functio first(f32 a, numerus b) → f32 {
-    fixum iuncta<gx: f32, numerus> p ← iuncta<f32, numerus> [a, b]
+    sit iuncta<gx: f32, numerus> p ← iuncta<f32, numerus> [a, b]
     redde p[0]
 }
 ";
@@ -93,7 +93,7 @@ fn iuncta_unknown_label_member_is_rejected() {
     test_support::assert_rejects_with_issue(
         r"
 functio bad(f32 a, numerus b) → f32 {
-    fixum iuncta<gx: f32, numerus> p ← iuncta<f32, numerus> [a, b]
+    sit iuncta<gx: f32, numerus> p ← iuncta<f32, numerus> [a, b]
     redde p.other
 }
 ",
@@ -106,7 +106,7 @@ fn iuncta_unlabeled_member_access_is_rejected() {
     test_support::assert_rejects_with_issue(
         r"
 functio bad(f32 a, numerus b) → f32 {
-    fixum iuncta<f32, numerus> p ← iuncta<f32, numerus> [a, b]
+    sit iuncta<f32, numerus> p ← iuncta<f32, numerus> [a, b]
     redde p.gx
 }
 ",
@@ -118,8 +118,8 @@ functio bad(f32 a, numerus b) → f32 {
 fn iuncta_labeled_and_unlabeled_types_unify() {
     let source = r"
 functio same(f32 a, numerus b) → bivalens {
-    fixum iuncta<gx: f32, numerus> labeled ← iuncta<f32, numerus> [a, b]
-    fixum iuncta<f32, numerus> plain ← labeled
+    sit iuncta<gx: f32, numerus> labeled ← iuncta<f32, numerus> [a, b]
+    sit iuncta<f32, numerus> plain ← labeled
     redde labeled ≡ plain
 }
 ";
@@ -130,7 +130,7 @@ functio same(f32 a, numerus b) → bivalens {
 fn iuncta_keyword_label_member_access_typechecks() {
     let source = r"
 functio first(f32 a) → f32 {
-    fixum iuncta<fixum: f32> p ← iuncta<f32> [a]
+    sit iuncta<fixum: f32> p ← iuncta<f32> [a]
     redde p.fixum
 }
 ";

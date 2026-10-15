@@ -81,7 +81,7 @@ fn p_prod<size N>(tf32[N] a) → f32 {
     return reduce via product from a at [i] const s { return s }
 }
 main {
-    const tf32[4] a ← [3.0, 1.0, 4.0, 2.0] ↦ tf32[4]
+    let tf32[4] a ← [3.0, 1.0, 4.0, 2.0] ↦ tf32[4]
     print t_max(a, 0.0)
     print t_min(a, 9.0)
     print t_prod(a)
@@ -113,8 +113,8 @@ fn p_argmin<size N>(tf32[N] a) → int {
     return (reduce via argmin from a at [i] const s { return s }) coalesce -1
 }
 main {
-    const tf32[5] hi ← [3.0, 1.0, 3.0, 2.0, 3.0] ↦ tf32[5]
-    const tf32[5] lo ← [4.0, 2.0, 5.0, 2.0, 9.0] ↦ tf32[5]
+    let tf32[5] hi ← [3.0, 1.0, 3.0, 2.0, 3.0] ↦ tf32[5]
+    let tf32[5] lo ← [4.0, 2.0, 5.0, 2.0, 9.0] ↦ tf32[5]
     print t_argmax(hi)
     print t_argmin(lo)
     print p_argmax(hi)
@@ -144,11 +144,11 @@ fn p_lo<size H, size W>(tf32[H, W] m) → tuple<int, int> ∪ none {
     return reduce via argmin from m at [i, j] const s { return s }
 }
 main {
-    const tf32[2, 3] m ← [[1.0, 5.0, 2.0], [5.0, 0.0, 1.0]] ↦ tf32[2, 3]
-    const tuple<int, int> hi ← t_hi(m) coalesce tuple<int, int> [9, 9]
-    const tuple<int, int> lo ← t_lo(m) coalesce tuple<int, int> [9, 9]
-    const tuple<int, int> phi ← p_hi(m) coalesce tuple<int, int> [9, 9]
-    const tuple<int, int> plo ← p_lo(m) coalesce tuple<int, int> [9, 9]
+    let tf32[2, 3] m ← [[1.0, 5.0, 2.0], [5.0, 0.0, 1.0]] ↦ tf32[2, 3]
+    let tuple<int, int> hi ← t_hi(m) coalesce tuple<int, int> [9, 9]
+    let tuple<int, int> lo ← t_lo(m) coalesce tuple<int, int> [9, 9]
+    let tuple<int, int> phi ← p_hi(m) coalesce tuple<int, int> [9, 9]
+    let tuple<int, int> plo ← p_lo(m) coalesce tuple<int, int> [9, 9]
     print hi[0]
     print hi[1]
     print lo[0]
@@ -183,8 +183,8 @@ fn p_count<size N>(tf32[N] a, tensor<int, [N]> g) → tensor<int, [3]> {
     return reduce via count from a at [i] per g[i] const s { return s ≻ 2.5 }
 }
 main {
-    const tf32[6] a ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] ↦ tf32[6]
-    const tensor<int, [6]> g ← [0, 1, 0, 1, 0, 1] ↦ tensor<int, [6]>
+    let tf32[6] a ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] ↦ tf32[6]
+    let tensor<int, [6]> g ← [0, 1, 0, 1, 0, 1] ↦ tensor<int, [6]>
     print t_sum(a, g)
     print t_count(a, g)
     print p_sum(a, g)
@@ -225,7 +225,7 @@ fn p_count(tf32[0] a) → int {
     return reduce via count from a at [i] const s { return s ≻ 0.0 }
 }
 main {
-    const tf32[0] a ← empty
+    let tf32[0] a ← empty
     print t_max(a)
     print t_argmax(a)
     print t_count(a)
@@ -265,7 +265,7 @@ fn p_all<size N>(tf32[N] a) → bool {
     return reduce via all from a at [i] const s { return s ≻ 0.5 }
 }
 main {
-    const tf32[4] a ← [3.0, 1.0, 3.0, 2.0] ↦ tf32[4]
+    let tf32[4] a ← [3.0, 1.0, 3.0, 2.0] ↦ tf32[4]
     print t_count(a)
     print t_any(a)
     print t_all(a)

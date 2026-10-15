@@ -52,19 +52,19 @@ fn runtime_extent(int value) → int {
 }
 
 main {
-    const int n ← runtime_extent(3)
-    const list<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
-    const list<b8> short_raw ← |00 00 80 3f 00 00 00 40|
+    let int n ← runtime_extent(3)
+    let list<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
+    let list<b8> short_raw ← |00 00 80 3f 00 00 00 40|
 
-    const tensor<f32, [2, size n]> grid ← raw ↦ tensor<f32, [2, size n]> via Le
-    const list<int, _> dims ← grid.shape()
+    let tensor<f32, [2, size n]> grid ← raw ↦ tensor<f32, [2, size n]> via Le
+    let list<int, _> dims ← grid.shape()
 
     print grid[[0, 0]]
     print grid[[1, 2]]
     print dims
 
     do {
-        const tensor<f32, [2, size n]> bad ← short_raw ↦ tensor<f32, [2, size n]> via Le
+        let tensor<f32, [2, size n]> bad ← short_raw ↦ tensor<f32, [2, size n]> via Le
         print bad[[0, 0]]
     }
     catch err {

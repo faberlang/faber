@@ -162,7 +162,7 @@ impl TypeChecker<'_> {
 
         let inferred = match (&local.ty, &mut local.init) {
             (Some(ty), Some(init)) => {
-                // A conversion-directed initializer (`fixum T x ↤ value`) has
+                // A conversion-directed initializer (`sit T x ↤ value`) has
                 // the binding itself as its assignment target; the written type
                 // is the conversion destination. Make the binding visible to
                 // lvalue resolution while the initializer is checked.
@@ -264,7 +264,7 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// `const` is deep (need, rule 2): a plain `var T y ← x` of a
+    /// `const` is deep (need, rule 2): a plain `mut T y ← x` of a
     /// shareable (container or genus) value read through a `const` local or a
     /// module-level constant would make `y` a writable name for state `x`
     /// promises not to change.

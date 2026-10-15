@@ -10,6 +10,6 @@ fn partial() → int ⇥ int ∪ string {
 }
 
 main {
-    const ∪ r ← trap { partial() }
+    let ∪ r ← trap { partial() }
     print r
 }

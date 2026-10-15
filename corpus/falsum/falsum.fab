@@ -11,7 +11,7 @@ related = ["verum", "nihil"]
 locale = "en"
 +++
 test "falsum is the false literal" {
-    const bool inactive ← false
+    let bool inactive ← false
     assert inactive ≡ false
     assert not inactive
 }
@@ -44,6 +44,6 @@ test "falsum contrasts with verum" {
 #
 
 main {
-    const bool inactive ← false
+    let bool inactive ← false
     print inactive
 }

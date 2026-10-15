@@ -11,15 +11,15 @@ use crate::script::{BufferHost, interpret_source};
 const PUNCTUM: &str = "
 class Punctum {
     const int x
-    var int y
+    mut int y
     const list<int> gradus
 }
 ";
 
 const MUTABILE: &str = "
 class Mutabile {
-    var int n
-    var list<int> gradus
+    mut int n
+    mut list<int> gradus
 }
 ";
 
@@ -38,8 +38,8 @@ fn run(body: &str) -> Vec<String> {
 fn braced_fields_override_and_the_rest_copy_through() {
     let lines = run("
 main {
-    const Punctum p ← Punctum { x = 1, y = 2, gradus = [4] }
-    const Punctum q ← Punctum { y = 9 } from p
+    let Punctum p ← Punctum { x = 1, y = 2, gradus = [4] }
+    let Punctum q ← Punctum { y = 9 } from p
     print q.x
     print q.y
     print q.gradus.length()
@@ -53,8 +53,8 @@ main {
 fn list_fields_are_copied_from_the_source() {
     let lines = run("
 main {
-    var Mutabile p ← Mutabile { n = 1, gradus = [4] }
-    var Mutabile q ← Mutabile { n = 9 } from p
+    mut Mutabile p ← Mutabile { n = 1, gradus = [4] }
+    mut Mutabile q ← Mutabile { n = 9 } from p
     q.gradus.append(5)
     print p.gradus.length()
     print q.gradus.length()
@@ -67,18 +67,18 @@ main {
 fn nested_object_fields_are_copied_from_the_source() {
     let lines = run("
 class Intus {
-    var int n
+    mut int n
 }
 
 class Cista {
-    var int k
-    var Intus intus
-    var list<int> gradus
+    mut int k
+    mut Intus intus
+    mut list<int> gradus
 }
 
 main {
-    var Cista a ← Cista { k = 1, intus = Intus { n = 5 }, gradus = [1] }
-    var Cista b ← Cista { k = 9 } from a
+    mut Cista a ← Cista { k = 1, intus = Intus { n = 5 }, gradus = [1] }
+    mut Cista b ← Cista { k = 9 } from a
     b.intus.n ← 6
     b.gradus.append(2)
     print a.intus.n
@@ -95,8 +95,8 @@ main {
 fn an_explicit_field_is_not_replaced_by_the_source_copy() {
     let lines = run("
 main {
-    const Punctum p ← Punctum { x = 1, y = 2, gradus = [4] }
-    const Punctum q ← Punctum { gradus = [7, 8, 9] } from p
+    let Punctum p ← Punctum { x = 1, y = 2, gradus = [4] }
+    let Punctum q ← Punctum { gradus = [7, 8, 9] } from p
     print q.gradus.length()
     print q.gradus[0]
     print p.gradus.length()
@@ -119,7 +119,7 @@ fn septem() → int {
 }
 
 main {
-    const Punctum q ← Punctum { y = septem() } from fons()
+    let Punctum q ← Punctum { y = septem() } from fons()
     print q.y
 }
 "#);

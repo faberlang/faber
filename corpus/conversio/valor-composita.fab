@@ -34,40 +34,40 @@ locale = "en"
 # genus, widening, recovery and tag tests (valor-composita-deep).
 
 class Punctum {
-    var int x
-    var int y
+    mut int x
+    mut int y
 }
 
 main {
     # 1. A genus: the object prints in field order and comes back with its fields.
-    const Punctum punctum ← Punctum { x = 3, y = 4 }
-    const value boxedGenus ← punctum ↦ value
+    let Punctum punctum ← Punctum { x = 3, y = 4 }
+    let value boxedGenus ← punctum ↦ value
     print boxedGenus
-    const Punctum unboxed ← boxedGenus ↦ Punctum
+    let Punctum unboxed ← boxedGenus ↦ Punctum
     print unboxed.x
     print unboxed.y
 
     # 2. A lista: elements keep their type, so text is unquoted behind the valor and quoted again after.
-    const list<int> numeri ← [1, 2]
-    const value boxedNumeri ← numeri ↦ value
+    let list<int> numeri ← [1, 2]
+    let value boxedNumeri ← numeri ↦ value
     print boxedNumeri
-    const list<int> backNumeri ← boxedNumeri ↦ list<int>
+    let list<int> backNumeri ← boxedNumeri ↦ list<int>
     print backNumeri
-    const list<string> verba ← ["a", "b"]
-    const value boxedVerba ← verba ↦ value
+    let list<string> verba ← ["a", "b"]
+    let value boxedVerba ← verba ↦ value
     print boxedVerba
-    const list<string> backVerba ← boxedVerba ↦ list<string>
+    let list<string> backVerba ← boxedVerba ↦ list<string>
     print backVerba
 
     # 3. A tabula: keys print quoted, and the map comes back key for key.
-    const map<string, int> scores ← { "alpha": 10 }
-    const value boxedScores ← scores ↦ value
+    let map<string, int> scores ← { "alpha": 10 }
+    let value boxedScores ← scores ↦ value
     print boxedScores
-    const map<string, int> backScores ← boxedScores ↦ map<string, int>
+    let map<string, int> backScores ← boxedScores ↦ map<string, int>
     print backScores.get("alpha") coalesce 0
 
     # 4. A tensor: it prints flat.
-    const tensor<int, [2]> grid ← [5, 6] ↦ tensor<int, [2]>
-    const value boxedGrid ← grid ↦ value
+    let tensor<int, [2]> grid ← [5, 6] ↦ tensor<int, [2]>
+    let value boxedGrid ← grid ↦ value
     print boxedGrid
 }

@@ -221,7 +221,7 @@ functio bind(iuncta<gx: numerus, gw: numerus> pair) → vacuum {
     let looping = test_support::analyze_ok(
         r"
 functio loopum() → vacuum {
-    fixum lista<iuncta<gx: numerus, gw: numerus>> xs ← [
+    sit lista<iuncta<gx: numerus, gw: numerus>> xs ← [
         iuncta<numerus, numerus> [1, 2],
         iuncta<numerus, numerus> [3, 4]
     ]

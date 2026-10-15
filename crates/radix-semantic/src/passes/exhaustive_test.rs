@@ -878,8 +878,8 @@ functio describe(Eventum e) → textus {{
 }}
 
 incipit {{
-    fixum Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
-    fixum Eventum b ← Eventum.Sonitus
+    sit Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
+    sit Eventum b ← Eventum.Sonitus
     nota describe(a) + describe(b)
 }}"
     );
@@ -905,8 +905,8 @@ functio describe(Eventum e) → textus {{
 }}
 
 incipit {{
-    fixum Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
-    fixum Eventum b ← Eventum.Sonitus
+    sit Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
+    sit Eventum b ← Eventum.Sonitus
     nota describe(a) + describe(b)
 }}"#
     );
@@ -933,8 +933,8 @@ functio describe(Eventum e) → textus {{
 }}
 
 incipit {{
-    fixum Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
-    fixum Eventum b ← Eventum.Sonitus
+    sit Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
+    sit Eventum b ← Eventum.Sonitus
     nota describe(a) + describe(b)
 }}"#
     );
@@ -958,8 +958,8 @@ functio describe(Eventum e) → textus {{
 }}
 
 incipit {{
-    fixum Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
-    fixum Eventum b ← Eventum.Sonitus
+    sit Eventum a ← finge Ictus {{ vis = 3 }} ∷ Eventum
+    sit Eventum b ← Eventum.Sonitus
     nota describe(a) + describe(b)
 }}"
     );

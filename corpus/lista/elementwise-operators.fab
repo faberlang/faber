@@ -31,12 +31,12 @@ locale = "en"
 
 # A1 semantic anchor. Dynamic list length checking is A2's runtime contract.
 main {
-    const list<int> xs ← [10, 20, 30]
-    const list<int> ys ← [1, 2, 3]
-    const list<int> sums ← xs + ys
-    const list<int> differences ← xs - ys
-    const list<int> products ← 2 * xs
-    const list<int> quotients ← xs / 10
+    let list<int> xs ← [10, 20, 30]
+    let list<int> ys ← [1, 2, 3]
+    let list<int> sums ← xs + ys
+    let list<int> differences ← xs - ys
+    let list<int> products ← 2 * xs
+    let list<int> quotients ← xs / 10
     print sums
     print differences
     print products

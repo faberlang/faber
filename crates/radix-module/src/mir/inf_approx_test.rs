@@ -53,7 +53,7 @@ fn matrix(a: i128, b: i128) -> Vec<(&'static str, &'static str, [bool; 3])> {
         for (tb, nb, fits_b) in FAMILY {
             if fits_a(a) && fits_b(b) {
                 let i = pairs.len();
-                body += &format!("fixum {ta} a{i} ← {a}\nfixum {tb} b{i} ← {b}\n");
+                body += &format!("sit {ta} a{i} ← {a}\nsit {tb} b{i} ← {b}\n");
                 body += &format!("nota a{i} ≈ b{i}\nnota a{i} ≉ b{i}\nnota b{i} ≈ a{i}\n");
                 pairs.push((na, nb));
             }
@@ -127,24 +127,24 @@ fn inf_beyond_64_bits_uses_the_same_rule() {
     assert_family_agrees(two_64, two_64 + two_64 / 1_000_000_000);
     assert_family_agrees(two_64, two_64 + two_64 / 1_000_000_000 * 2);
     // Beyond i128: one inf of 10⋅2^400 against itself plus one.
-    let body = "fixum inf a ← 10 ⇐ 400\nfixum inf b ← a + 1\nfixum inf c ← a + a\n\
+    let body = "sit inf a ← 10 ⇐ 400\nsit inf b ← a + 1\nsit inf c ← a + a\n\
                 nota a ≈ b\nnota b ≈ a\nnota a ≉ b\nnota a ≈ c\nnota c ≈ a\nnota a ≉ c";
     assert_eq!(run(body), ["verum", "verum", "falsum", "falsum", "falsum", "verum"]);
 }
 
 #[test]
 fn inf_against_a_float_or_d64_keeps_the_float_joined_width() {
-    let body = "fixum inf x ← 18446744073709551617\nfixum fractus f ← 1.8446744073709552e19\n\
+    let body = "sit inf x ← 18446744073709551617\nsit fractus f ← 1.8446744073709552e19\n\
                 nota x ≈ f\nnota f ≈ x\n\
-                fixum inf m ← 1000000000000\nfixum fractus g ← 1000000000001.0\nnota m ≈ g\nnota g ≈ m\n\
-                fixum inf five ← 5\nfixum fractus six ← 6.0\nnota five ≈ six";
+                sit inf m ← 1000000000000\nsit fractus g ← 1000000000001.0\nnota m ≈ g\nnota g ≈ m\n\
+                sit inf five ← 5\nsit fractus six ← 6.0\nnota five ≈ six";
     assert_eq!(run(body), ["verum", "verum", "verum", "verum", "falsum"]);
     // `inf` beside `d64` is a float-width tolerance like `i64` beside `d64`; the
     // decimal carrier is unscaled, never read as an integer.
-    let d64 = "fixum inf seven ← 7\nfixum numerus sevenI ← 7\nfixum d64 d ← 7.0\n\
+    let d64 = "sit inf seven ← 7\nsit numerus sevenI ← 7\nsit d64 d ← 7.0\n\
                nota seven ≈ d\nnota d ≈ seven\nnota sevenI ≈ d\nnota seven ≉ d\n\
-               fixum inf m ← 10000000000\nfixum numerus mi ← 10000000000\nfixum d64 e ← 10000000001.0\n\
+               sit inf m ← 10000000000\nsit numerus mi ← 10000000000\nsit d64 e ← 10000000001.0\n\
                nota m ≈ e\nnota mi ≈ e\n\
-               fixum inf five ← 5\nfixum d64 six ← 6.0\nnota five ≈ six";
+               sit inf five ← 5\nsit d64 six ← 6.0\nnota five ≈ six";
     assert_eq!(run(d64), ["verum", "verum", "verum", "falsum", "verum", "verum", "falsum"]);
 }

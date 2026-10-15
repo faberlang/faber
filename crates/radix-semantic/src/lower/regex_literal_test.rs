@@ -29,12 +29,12 @@ fn assert_regex_init(unit: &test_support::AnalyzedFixture, expected: &str) {
 
 #[test]
 fn regex_type_word_literal_lowers_to_hir_regex() {
-    let unit = test_support::analyze_ok(r"incipit { fixum regex r ← regex /\d+/ }");
+    let unit = test_support::analyze_ok(r"incipit { sit regex r ← regex /\d+/ }");
     assert_regex_init(&unit, r"\d+");
 }
 
 #[test]
 fn inferred_regex_literal_lowers_to_hir_regex() {
-    let unit = test_support::analyze_ok(r"incipit { fixum regex r ← _ /a/ }");
+    let unit = test_support::analyze_ok(r"incipit { sit regex r ← _ /a/ }");
     assert_regex_init(&unit, "a");
 }

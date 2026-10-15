@@ -47,8 +47,8 @@ union IoFault {
 @ public
 @ conversion
 fn io_fault_from(value raw) → IoFault {
-    const string kind ← value.get(raw, "kind") ↦ string ⊥ ""
-    const string p ← value.get(raw, "path") ↦ string ⊥ ""
+    let string kind ← value.get(raw, "kind") ↦ string ⊥ ""
+    let string p ← value.get(raw, "path") ↦ string ⊥ ""
     if kind ≡ "NotFound" then return variant NotFound { path = p } ∷ IoFault
     if kind ≡ "Permission" then return variant Permission { path = p } ∷ IoFault
     if kind ≡ "NotADirectory" then return variant NotADirectory { path = p } ∷ IoFault

@@ -91,7 +91,7 @@ fn accepts_pure_scalar_air_function() {
         r#"
 @ radix lane "air"
 functio loss(i32 x, i32 y) → numerus {
-    fixum numerus sum ← x + y
+    sit numerus sum ← x + y
     si sum ≻ 0 {
         redde sum
     } secus {
@@ -933,7 +933,7 @@ fn ar2_dum_itera_cape_wrap_the_whole_loop_once() {
     let facts = ar2_facts(
         r"
 functio h(numerus n) → numerus {
-    fixum numerus total ← 0
+    sit numerus total ← 0
     dum n ≻ 0 {
         total ← 1
     } cape err { redde 0 }
@@ -1065,7 +1065,7 @@ functio d(bivalens bad) → numerus {
     fac {
         si bad { iace "x" }
         redde 1
-    } cape err { fixum numerus z ← 0 }
+    } cape err { sit numerus z ← 0 }
     redde 2
 }
 "#,
@@ -1080,7 +1080,7 @@ functio d(bivalens bad) → numerus {
 functio e(bivalens bad) → numerus {
     si bad {
         redde 1
-    } cape err { fixum numerus z ← 0 } secus {
+    } cape err { sit numerus z ← 0 } secus {
         redde 2
     }
 }
@@ -1162,7 +1162,7 @@ functio f(numerus x) → numerus ⇥ textus {
         r#"
 @ radix lane "air"
 functio g() → numerus {
-    fixum numerus v ← 1 ↦ numerus
+    sit numerus v ← 1 ↦ numerus
     redde v
 }
 "#,
@@ -1173,7 +1173,7 @@ functio g() → numerus {
         r#"
 @ radix lane "air"
 functio h() → numerus ∪ nihil {
-    fixum lista<numerus> xs ← [1, 2, 3]
+    sit lista<numerus> xs ← [1, 2, 3]
     redde xs?[0]
 }
 "#,
@@ -1191,7 +1191,7 @@ fn air_unroll_scan_rejects_handled_in_itera_body_causa_impure() {
         r#"
 @ radix lane "air"
 functio loop_with_handler() → f32 {
-    fixum f32 total ← 0.0
+    sit f32 total ← 0.0
     itera ab 0‥4 fixum i {
         fac {
             iace "boom"
@@ -1256,7 +1256,7 @@ fn air_lane_admits_inline_recovery_conversio() {
         r#"
 @ radix lane "air"
 functio parse_or_zero(textus s) → numerus {
-    fixum numerus v ← s ↦ numerus ⊥ 0
+    sit numerus v ← s ↦ numerus ⊥ 0
     redde v
 }
 "#,
@@ -1273,7 +1273,7 @@ fn air_lane_admits_inline_recovery_conversio_inside_handler_region() {
 functio in_region(textus s, bivalens bad) → numerus {
     fac {
         si bad { iace "x" }
-        fixum numerus v ← s ↦ numerus ⊥ 0
+        sit numerus v ← s ↦ numerus ⊥ 0
         redde v
     } cape err { redde 1 }
 }
@@ -1295,7 +1295,7 @@ fn air_lane_bare_conversio_declines_inside_admitted_handler_region() {
 functio in_region(textus s, bivalens bad) → numerus {
     fac {
         si bad { iace "x" }
-        fixum numerus v ← s ↦ numerus
+        sit numerus v ← s ↦ numerus
         redde v
     } cape err { redde 1 }
 }
@@ -1331,7 +1331,7 @@ fn air_lane_admits_non_literal_inline_recovery_expression() {
         r#"
 @ radix lane "air"
 functio parse_or_zero(textus s, numerus fallback) → numerus {
-    fixum numerus v ← s ↦ numerus ⊥ fallback
+    sit numerus v ← s ↦ numerus ⊥ fallback
     redde v
 }
 "#,
@@ -1480,7 +1480,7 @@ fn air_admits_apud_coordinate_arithmetic_proven_by_tensor_dims() {
 functio pick(tensor<f32, [4, 4]> x) → tensor<f32, [4, 4]> ⇥ textus {
     varia tensor<f32, [4, 4]> acc ← copy x
     itera ex x apud [i, j] fixum cell {
-        fixum numerus idx ← i * 2 + j
+        sit numerus idx ← i * 2 + j
         si idx ≻ 20 { iace "upper" }
         acc ← acc + x
     }
@@ -1505,7 +1505,7 @@ fn air_admits_range_loop_index_arithmetic_proven_by_constant_bounds() {
 functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
     varia tensor<f32, [2, 2]> acc ← copy x
     itera ab 0‥16 fixum i {
-        fixum numerus k ← i * 2 + 1
+        sit numerus k ← i * 2 + 1
         acc ← acc + x
     }
     redde acc
@@ -1521,7 +1521,7 @@ fn air_rejects_index_arithmetic_over_unbounded_operands() {
         r#"
 @ radix lane "air"
 functio pick(numerus a, numerus b) → numerus {
-    fixum numerus idx ← a * 2 + b
+    sit numerus idx ← a * 2 + b
     redde idx
 }
 "#,
@@ -1538,7 +1538,7 @@ fn air_rejects_apud_arithmetic_over_symbolic_tensor_dims() {
 @ radix lane "air"
 functio pick(numerus n, numerus m) → numerus {
     itera ab 0‥n fixum i {
-        fixum numerus k ← i * 2 + m
+        sit numerus k ← i * 2 + m
     }
     redde 0
 }
@@ -1561,8 +1561,8 @@ fn air_admits_arithmetic_over_inferred_fixum_of_proven_index_expression() {
 functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
     varia tensor<f32, [2, 2]> acc ← copy x
     itera ab 0‥16 fixum i {
-        fixum _ k ← i * 2 + 1
-        fixum _ m ← k * 2 + i
+        sit k ← i * 2 + 1
+        sit m ← k * 2 + i
         acc ← acc + x
     }
     redde acc
@@ -1582,8 +1582,8 @@ fn air_rejects_arithmetic_over_declared_numerus_binding_even_if_initializer_is_b
 functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
     varia tensor<f32, [2, 2]> acc ← copy x
     itera ab 0‥16 fixum i {
-        fixum numerus k ← i * 2 + 1
-        fixum numerus m ← k * k
+        sit numerus k ← i * 2 + 1
+        sit numerus m ← k * k
         acc ← acc + x
     }
     redde acc

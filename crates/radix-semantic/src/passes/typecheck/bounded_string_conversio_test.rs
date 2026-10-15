@@ -62,7 +62,7 @@ fn ascii8_to_ascii8_identity_accepts() {
 fn ascii_literal_over_capacity_rejects() {
     assert_rejects_with_issue_la(
         "incipit {
-    fixum _ s ← 'alpha' ↦ ascii<4>
+    sit s ← 'alpha' ↦ ascii<4>
 }",
         "ascii_literal_too_long",
     );
@@ -72,7 +72,7 @@ fn ascii_literal_over_capacity_rejects() {
 fn textus_literal_over_capacity_rejects() {
     assert_rejects_with_issue_la(
         "incipit {
-    fixum _ t ← \"abcdef\" ↦ textus<4>
+    sit t ← \"abcdef\" ↦ textus<4>
 }",
         "textus_literal_too_long",
     );

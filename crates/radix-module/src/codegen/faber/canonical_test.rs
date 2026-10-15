@@ -273,7 +273,7 @@ fn renders_unresolved_infer_as_marker() {
     };
 
     let code = generate_faber(&program, &types, &interner);
-    assert!(code.contains("_ x"));
+    assert!(code.contains("sit x"));
 }
 
 #[test]
@@ -314,7 +314,7 @@ fn renders_option_types_as_nullable_union() {
     };
 
     let code = generate_faber(&program, &types, &interner);
-    assert!(code.contains("fixum textus ∪ nihil maybe"));
+    assert!(code.contains("sit textus ∪ nihil maybe"));
     assert!(!code.contains("si textus"));
 }
 
@@ -1612,12 +1612,12 @@ fn localized_emit_round_trips_under_same_pack() {
     // Spellings must match locale/th-TH/pack.toml (EBNF.th-TH glossary).
     let source = "\
 ฟังก์ชัน salve(ข้อความ name) → ข้อความ {
-    คงที่ ข้อความ greeting ← จารึก(\"salve, §!\", name)
+    กำหนด ข้อความ greeting ← จารึก(\"salve, §!\", name)
     คืน greeting
 }
 
 เริ่ม {
-    คงที่ จำนวน score ← 82
+    กำหนด จำนวน score ← 82
     บันทึก score
 }
 ";
@@ -1814,10 +1814,10 @@ fn canonical_round_trip(source: &str) -> (String, String) {
 #[test]
 fn canonical_round_trips_conversio_assign() {
     // Expression-position `↤` through the HIR lane. The typed-initializer form
-    // (`fixum numerus n ↤ "42"`) round-trips at the author level (syntax);
+    // (`sit numerus n ↤ "42"`) round-trips at the author level (syntax);
     // its HIR-lane end-to-end proof lands with the U5 semantic scope
     // resolution (the binding must be visible while the initializer checks).
-    let source = "incipit {\n  fixum numerus n\n  n ↤ \"42\"\n}\n";
+    let source = "incipit {\n  sit numerus n\n  n ↤ \"42\"\n}\n";
     let (code, _) = canonical_round_trip(source);
     assert!(code.contains(" ↤ "), "↤ must survive canonical emit:\n{code}");
     assert!(!code.contains(" ← "), "must never rewrite ↤ to ←:\n{code}");
@@ -1826,7 +1826,7 @@ fn canonical_round_trips_conversio_assign() {
 
 #[test]
 fn canonical_round_trips_conversio_assign_recovery() {
-    let source = "incipit {\n  fixum numerus n\n  n ↤ \"x\" ⊥ 0\n}\n";
+    let source = "incipit {\n  sit numerus n\n  n ↤ \"x\" ⊥ 0\n}\n";
     let (code, _) = canonical_round_trip(source);
     assert!(code.contains(" ↤ "), "↤ must survive canonical emit:\n{code}");
     assert!(code.contains(" ⊥ 0"), "⊥ recovery must survive canonical emit:\n{code}");
@@ -1836,7 +1836,7 @@ fn canonical_round_trips_conversio_assign_recovery() {
 
 #[test]
 fn canonical_conversio_assign_matches_ordinary_assign_for_regular_stores() {
-    let source = "incipit {\n  fixum numerus n\n  n ← 5\n}\n";
+    let source = "incipit {\n  sit numerus n\n  n ← 5\n}\n";
     let (code, _) = canonical_round_trip(source);
     assert!(code.contains(" ← "), "ordinary ← must stay ←:\n{code}");
     assert!(!code.contains(" ↤ "), "ordinary ← must not become ↤:\n{code}");

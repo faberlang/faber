@@ -147,9 +147,9 @@ fn function_value_calls_use_the_function_type_modes() {
 
 #[test]
 fn closure_values_use_their_declared_parameter_modes() {
-    let ok = "incipit {\n    varia lista<numerus> a ← [1]\n    fixum _ g ← (in lista<numerus> ys) ∴ ys.appende(2)\n    g(in a)\n}";
+    let ok = "incipit {\n    varia lista<numerus> a ← [1]\n    sit g ← (in lista<numerus> ys) ∴ ys.appende(2)\n    g(in a)\n}";
     let _ = analyze_ok(ok);
-    let missing = "incipit {\n    varia lista<numerus> a ← [1]\n    fixum _ g ← (in lista<numerus> ys) ∴ ys.appende(2)\n    g(a)\n}";
+    let missing = "incipit {\n    varia lista<numerus> a ← [1]\n    sit g ← (in lista<numerus> ys) ∴ ys.appende(2)\n    g(a)\n}";
     assert_rejects_with_issue(missing, "call_marker_missing");
 }
 
@@ -179,7 +179,7 @@ fn issues_en(call: &str) -> Vec<String> {
 fn eat(own list<int> xs) → void {{ print xs[0] }}\n\
 fn dup(copy list<int> xs) → void {{ print xs[0] }}\n\
 fn peek(list<int> xs) → void {{ print xs[0] }}\n\
-main {{\n    var list<int> a ← [1, 2]\n    {call}\n}}\n"
+main {{\n    mut list<int> a ← [1, 2]\n    {call}\n}}\n"
     );
     analyze_en(&source)
         .diagnostics

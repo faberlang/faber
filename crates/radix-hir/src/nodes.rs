@@ -1889,7 +1889,7 @@ pub enum HirStoreKind {
     TuplePosition,
     /// The default of `x ↦ T ⊥ d`.
     ConversionDefault,
-    /// `fixum T x ↢ future`, `figendum T x ← e`: the awaited value.
+    /// `sit T x ↢ future`, `figendum T x ← e`: the awaited value.
     AwaitBinding,
 }
 
@@ -2369,7 +2369,7 @@ pub struct HirPresentation {
     pub axis_sugar: Vec<HirAxisSugar>,
 
     /// Initializer-expression ids of wildcard-bound declarations
-    /// (`fixum T _ ← expr`), which lower to bare expression statements.
+    /// (`sit T _ ← expr`), which lower to bare expression statements.
     /// Emission restores the authored discard binding for exactly these.
     #[serde(default)]
     pub discard_binding_stmts: Vec<HirDiscardBinding>,
@@ -2662,7 +2662,7 @@ pub struct HirOrdoEnum {
     pub members: Vec<HirOrdoMember>,
 }
 
-/// Authored facts for one wildcard-bound declaration (`fixum T _ ← expr`).
+/// Authored facts for one wildcard-bound declaration (`sit T _ ← expr`).
 ///
 /// Keyed by the initializer expression id; the lowered statement keeps no
 /// `HirLocal`, so these facts ride the presentation sidecar.

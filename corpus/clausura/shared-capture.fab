@@ -37,7 +37,7 @@ locale = "en"
 #   shared-capture.expected
 
 fn counter() → () → int {
-    var int c ← 0
+    mut int c ← 0
     return () → int ∴ do {
         c ← c + 1
         return c
@@ -50,31 +50,31 @@ fn adder(int k) → (int) → int {
 
 main {
     # An outer write after capture is visible inside.
-    var int n ← 1
-    const () → int peek ← () → int ∴ n
+    mut int n ← 1
+    let () → int peek ← () → int ∴ n
     n ← 5
     print peek()
 
     # A closure write is visible outside.
-    const () → void bump ← () → void ∴ do { n ← n + 1 }
+    let () → void bump ← () → void ∴ do { n ← n + 1 }
     bump()
     print n
 
     # Each escaping counter owns its binding.
-    const () → int k ← counter()
-    const () → int j ← counter()
+    let () → int k ← counter()
+    let () → int j ← counter()
     print k()
     print k()
     print j()
 
     # Loop bindings are fresh per iteration.
-    var list<() → int> fs ← empty
+    mut list<() → int> fs ← empty
     for range 0‥3 const i {
         fs.append(() → int ∴ i * 10)
     }
     for from fs const f { print f() }
 
     # An escaping closure keeps its captured parameter.
-    const (int) → int add5 ← adder(5)
+    let (int) → int add5 ← adder(5)
     print add5(1)
 }

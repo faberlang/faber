@@ -29,8 +29,8 @@ locale = "en"
 # =============================================================================
 
 class Circulus {
-    var string nomen
-    var int radius
+    mut string nomen
+    mut int radius
 
     fn area() → int {
         return 3 * self.radius * self.radius
@@ -42,8 +42,8 @@ class Circulus {
 }
 
 class Quadratum {
-    var string nomen
-    var int latus
+    mut string nomen
+    mut int latus
 
     fn area() → int {
         return self.latus * self.latus
@@ -61,8 +61,8 @@ fn describe(Figura f) → string {
 }
 
 main {
-    const Figura c ← Circulus { nomen = "rota", radius = 2 }
-    const Figura q ← Quadratum { nomen = "tabula", latus = 3 }
+    let Figura c ← Circulus { nomen = "rota", radius = 2 }
+    let Figura q ← Quadratum { nomen = "tabula", latus = 3 }
 
     # Shared method: each value runs its own member's `area`.
     print describe(c)
@@ -73,7 +73,7 @@ main {
     print q.scala(10)
 
     # Shared field write through the union.
-    var Figura f ← Quadratum { nomen = "tessera", latus = 4 }
+    mut Figura f ← Quadratum { nomen = "tessera", latus = 4 }
     f.nomen ← "mensa"
     print f.nomen
     print f.area()

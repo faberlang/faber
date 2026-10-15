@@ -100,7 +100,7 @@ fn array_rest_binds_the_tail() {
 #[test]
 fn rest_after_holes_skips_every_authored_position() {
     let unit = test_support::analyze_ok_la(
-        "incipit {\n    fixum _ xs ← [1, 2, 3, 4]\n    fixum [_, b, ceteri r] ← xs\n    nota b\n    nota r\n}\n",
+        "incipit {\n    sit xs ← [1, 2, 3, 4]\n    fixum [_, b, ceteri r] ← xs\n    nota b\n    nota r\n}\n",
     );
     let locals = entry_locals(&unit);
     let r = local(&unit, &locals, "r");
@@ -120,7 +120,7 @@ fn rest_after_holes_skips_every_authored_position() {
 #[test]
 fn place_subject_is_not_hoisted_and_call_subject_is() {
     let unit = test_support::analyze_ok_la(&format!(
-        "{PAR}incipit {{\n    fixum _ xs ← [1, 2]\n    fixum [a, b] ← xs\n    fixum [c, d] ← par()\n    nota a + b + c + d\n}}\n"
+        "{PAR}incipit {{\n    sit xs ← [1, 2]\n    fixum [a, b] ← xs\n    fixum [c, d] ← par()\n    nota a + b + c + d\n}}\n"
     ));
     let facts = &unit.presentation.destructure_bindings;
     assert_eq!(facts.len(), 2);
@@ -137,7 +137,7 @@ fn place_subject_is_not_hoisted_and_call_subject_is() {
 #[test]
 fn ex_extraction_binds_each_field_and_the_rest_source() {
     let unit = test_support::analyze_ok_la(
-        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nincipit {\n    fixum Punctum p ← Punctum { x = 1, y = 2 }\n    ex p fixum x, ceteri r\n}\n",
+        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nincipit {\n    sit Punctum p ← Punctum { x = 1, y = 2 }\n    ex p fixum x, ceteri r\n}\n",
     );
     let locals = entry_locals(&unit);
     let x = local(&unit, &locals, "x");

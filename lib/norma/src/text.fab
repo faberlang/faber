@@ -27,8 +27,8 @@ locale = "en"
 # Edge: v1 walks the compiler-owned sectio index space.
 @ public
 fn reverse(string s) → string {
-    var int i ← s.length()
-    var string out ← ""
+    mut int i ← s.length()
+    mut string out ← ""
 
     while i ≻ 0 {
         i ← i - 1
@@ -46,8 +46,8 @@ fn reverse(string s) → string {
 # Edge: An empty partes list returns the empty cord.
 @ public
 fn join(list<string> segments, string separator) → string {
-    var string out ← ""
-    var int index ← 0
+    mut string out ← ""
+    mut int index ← 0
 
     for from segments const pars {
         if index ≻ 0 {
@@ -68,9 +68,9 @@ fn join(list<string> segments, string separator) → string {
 # Edge: Empty quaesitum is defined as zero matches, not every boundary.
 @ public
 fn count(string s, string pattern) → int {
-    var int pos ← 0
-    var int count ← 0
-    const int pattern_length ← pattern.length()
+    mut int pos ← 0
+    mut int count ← 0
+    let int pattern_length ← pattern.length()
 
     if pattern_length ≡ 0 then return 0
 
@@ -110,8 +110,8 @@ fn is_palindrome(string s) → bool {
 # Edge: v1 follows the same sectio index model used by textus intrinsics.
 @ public
 fn chars(string s) → list<string> {
-    var list<string> out ← []
-    var int i ← 0
+    mut list<string> out ← []
+    mut int i ← 0
 
     while i ≺ s.length() {
         out.append(s.slice(i, i + 1))
@@ -128,11 +128,11 @@ fn chars(string s) → list<string> {
 # Edge: The predicate receives one scalar textus segment at a time.
 @ public
 fn keep_if(string s, (string) → bool pred) → string {
-    var list<string> kept ← []
-    var int i ← 0
+    mut list<string> kept ← []
+    mut int i ← 0
 
     while i ≺ s.length() {
-        const string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1)
         if pred(c) {
             kept.append(c)
         }
@@ -151,14 +151,14 @@ fn keep_if(string s, (string) → bool pred) → string {
 # nihil supremum means no upper bound.
 @ public
 fn keep_between(string s, string lower optional, string upper optional) → string {
-    var list<string> kept ← []
-    var int i ← 0
+    mut list<string> kept ← []
+    mut int i ← 0
 
     # Start optimistic for each scalar and rule it out only when a present
     # bound excludes it.
     while i ≺ s.length() {
-        const string c ← s.slice(i, i + 1)
-        var bool keep ← true
+        let string c ← s.slice(i, i + 1)
+        mut bool keep ← true
 
         if lower not is none and c ≺ lower {
             keep ← false
@@ -183,11 +183,11 @@ fn keep_between(string s, string lower optional, string upper optional) → stri
 # Edge: pred(c) = verum means c is removed, not retained.
 @ public
 fn drop_if(string s, (string) → bool pred) → string {
-    var list<string> kept ← []
-    var int i ← 0
+    mut list<string> kept ← []
+    mut int i ← 0
 
     while i ≺ s.length() {
-        const string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1)
         if pred(c) ≡ false {
             kept.append(c)
         }
@@ -206,14 +206,14 @@ fn drop_if(string s, (string) → bool pred) → string {
 # inside the open interval and is therefore purged.
 @ public
 fn drop_between(string s, string lower optional, string upper optional) → string {
-    var list<string> kept ← []
-    var int i ← 0
+    mut list<string> kept ← []
+    mut int i ← 0
 
     # Start with each scalar inside the purged interval; present bounds can
     # prove it lies outside and should be kept.
     while i ≺ s.length() {
-        const string c ← s.slice(i, i + 1)
-        var bool drop ← true
+        let string c ← s.slice(i, i + 1)
+        mut bool drop ← true
 
         if lower not is none and c ≺ lower {
             drop ← false
@@ -260,17 +260,17 @@ fn newline() → string {
 # Edge: A delimiter at document end is accepted as the closing fence.
 @ private
 fn delimiter_end(string document, string delimiter, int search_from) → int {
-    const int delim_len ← delimiter.length()
-    const string nl ← newline()
-    var int pos ← search_from
+    let int delim_len ← delimiter.length()
+    let string nl ← newline()
+    mut int pos ← search_from
 
     while pos ≺ document.length() {
         if document.slice(pos, pos + 1) ≡ nl {
-            const int line_start ← pos + 1
+            let int line_start ← pos + 1
 
             if line_start + delim_len ≤ document.length() {
                 if document.slice(line_start, line_start + delim_len) ≡ delimiter {
-                    const int line_end ← line_start + delim_len
+                    let int line_end ← line_start + delim_len
 
                     if line_end ≡ document.length() then return pos
                     if document.slice(line_end, line_end + 1) ≡ nl then return pos
@@ -292,8 +292,8 @@ fn delimiter_end(string document, string delimiter, int search_from) → int {
 # are line records, not significant terminal blank lines.
 @ private
 fn trim_trailing_newlines(string s) → string {
-    var int len ← s.length()
-    const string nl ← newline()
+    mut int len ← s.length()
+    let string nl ← newline()
 
     while len ≻ 0 and s.slice(len - 1, len) ≡ nl {
         len ← len - 1
@@ -312,7 +312,7 @@ fn trim_trailing_newlines(string s) → string {
 # exit channel instead of returning partial data.
 @ public
 fn split_frontmatter(string document, string delimiter) → list<string> ⇥ string {
-    const int delim_len ← delimiter.length()
+    let int delim_len ← delimiter.length()
 
     # Opening-fence validation is one cohesive guard paragraph. After this
     # block, delimiter slicing is safe and semantically meaningful.
@@ -320,25 +320,25 @@ fn split_frontmatter(string document, string delimiter) → list<string> ⇥ str
     if document.length() ≺ delim_len then throw "missing opening delimiter"
     if document.slice(0, delim_len) ≢ delimiter then throw "missing opening delimiter"
 
-    var int meta_start ← delim_len
-    const string nl ← newline()
+    mut int meta_start ← delim_len
+    let string nl ← newline()
 
     if meta_start ≺ document.length() and document.slice(meta_start, meta_start + 1) ≡ nl {
         meta_start ← meta_start + 1
     }
 
-    const int close_line ← delimiter_end(document, delimiter, delim_len)
+    let int close_line ← delimiter_end(document, delimiter, delim_len)
 
     if close_line ≺ 0 then throw "missing closing delimiter"
 
-    const string metadata ← trim_trailing_newlines(document.slice(meta_start, close_line))
-    var int corpus_start ← (close_line + 1) + delim_len
+    let string metadata ← trim_trailing_newlines(document.slice(meta_start, close_line))
+    mut int corpus_start ← (close_line + 1) + delim_len
 
     if corpus_start ≺ document.length() and document.slice(corpus_start, corpus_start + 1) ≡ nl {
         corpus_start ← corpus_start + 1
     }
 
-    const string body ← suffix(document, corpus_start)
+    let string body ← suffix(document, corpus_start)
     return [metadata, body]
 }
 
@@ -353,11 +353,11 @@ fn split_frontmatter(string document, string delimiter) → list<string> ⇥ str
 # normalization, not byte encoding.
 @ public
 fn collapse_spaces(string s) → string {
-    var string out ← ""
-    var bool in_space ← false
-    var int i ← 0
+    mut string out ← ""
+    mut bool in_space ← false
+    mut int i ← 0
     while i ≺ s.length() {
-        const string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1)
         if c ≡ " " {
             if not in_space {
                 out ← out + " "
@@ -412,11 +412,11 @@ fn try_to_ascii(string s) → ascii ∪ none {
 fn split_n(string s, string separator, int limit) → list<string> {
     if limit ≤ 0 then return empty
     if limit ≡ 1 then return [s]
-    var list<string> out ← []
-    var string rest ← s
-    var int cuts ← 0
+    mut list<string> out ← []
+    mut string rest ← s
+    mut int cuts ← 0
     while cuts ≺ limit - 1 {
-        const int pos ← index_of(rest, separator)
+        let int pos ← index_of(rest, separator)
         if pos ≺ 0 {
             out.append(rest)
             return out
@@ -431,9 +431,9 @@ fn split_n(string s, string separator, int limit) → list<string> {
 
 @ private
 fn index_of(string s, string needle) → int {
-    const int nlen ← needle.length()
+    let int nlen ← needle.length()
     if nlen ≡ 0 then return 0
-    var int i ← 0
+    mut int i ← 0
     while i + nlen ≤ s.length() {
         if s.slice(i, i + nlen) ≡ needle then return i
         i ← i + 1

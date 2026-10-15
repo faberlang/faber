@@ -57,7 +57,7 @@ const RISKY: &str = "fn risky(int i) → int ⇥ string {\n    if i ≡ 1 { thro
 #[test]
 fn do_catch_while_round_trips_with_cape_before_dum() {
     let la = assert_round_trips(&format!(
-        "{RISKY}main {{\n    var int n ← 0\n    do {{\n        n ↑\n        if n ≡ 2 {{ continue }}\n        print risky(n)\n    }} catch err {{\n        print \"caught\"\n    }} while n ≺ 4\n}}\n"
+        "{RISKY}main {{\n    mut int n ← 0\n    do {{\n        n ↑\n        if n ≡ 2 {{ continue }}\n        print risky(n)\n    }} catch err {{\n        print \"caught\"\n    }} while n ≺ 4\n}}\n"
     ));
     let cape_at = la.find("cape err").expect("handler must survive");
     let dum_at = la.find("dum n").expect("loop condition must survive");
@@ -67,7 +67,7 @@ fn do_catch_while_round_trips_with_cape_before_dum() {
 #[test]
 fn if_else_arm_catches_round_trip() {
     let la = assert_round_trips(&format!(
-        "{RISKY}main {{\n    const int x ← 1\n    if x ≡ 0 {{\n        print risky(0)\n    }} catch err {{\n        print \"first\"\n    }} else {{\n        print risky(1)\n    }} catch err {{\n        print \"else\"\n    }}\n}}\n"
+        "{RISKY}main {{\n    let int x ← 1\n    if x ≡ 0 {{\n        print risky(0)\n    }} catch err {{\n        print \"first\"\n    }} else {{\n        print risky(1)\n    }} catch err {{\n        print \"else\"\n    }}\n}}\n"
     ));
     assert_eq!(la.matches("cape err").count(), 2, "both arm handlers must survive:\n{la}");
     assert!(
@@ -79,7 +79,7 @@ fn if_else_arm_catches_round_trip() {
 #[test]
 fn elif_arm_catch_round_trips() {
     let la = assert_round_trips(&format!(
-        "{RISKY}main {{\n    const int x ← 1\n    if x ≡ 0 {{\n        print \"zero\"\n    }} elif x ≡ 1 {{\n        print risky(1)\n    }} catch err {{\n        print \"elif\"\n    }} else {{\n        print risky(1)\n    }} catch err {{\n        print \"else\"\n    }}\n}}\n"
+        "{RISKY}main {{\n    let int x ← 1\n    if x ≡ 0 {{\n        print \"zero\"\n    }} elif x ≡ 1 {{\n        print risky(1)\n    }} catch err {{\n        print \"elif\"\n    }} else {{\n        print risky(1)\n    }} catch err {{\n        print \"else\"\n    }}\n}}\n"
     ));
     assert!(la.contains("sin x ≡ 1"), "handled elif arm must stay a sin arm:\n{la}");
     assert_eq!(la.matches("cape err").count(), 2, "both arm handlers must survive:\n{la}");
@@ -88,13 +88,13 @@ fn elif_arm_catch_round_trips() {
 #[test]
 fn then_joint_arm_catches_round_trip() {
     assert_round_trips(&format!(
-        "{RISKY}main {{\n    const int x ← 1\n    if x ≡ 1 then print risky(1) catch err {{\n        print \"then\"\n    }}\n    if x ≡ 0 {{ print \"zero\" }} else then print risky(1) catch err {{\n        print \"else\"\n    }}\n}}\n"
+        "{RISKY}main {{\n    let int x ← 1\n    if x ≡ 1 then print risky(1) catch err {{\n        print \"then\"\n    }}\n    if x ≡ 0 {{ print \"zero\" }} else then print risky(1) catch err {{\n        print \"else\"\n    }}\n}}\n"
     ));
 }
 
 #[test]
 fn loop_and_switch_catches_round_trip() {
     assert_round_trips(&format!(
-        "{RISKY}main {{\n    var int n ← 0\n    while n ≺ 3 {{\n        print risky(n)\n        n ↑\n    }} catch err {{\n        print \"while\"\n    }}\n    for range 0‥3 const i {{\n        print risky(i)\n    }} catch err {{\n        print \"range\"\n    }}\n    const list<int> xs ← [0, 1, 2]\n    for from xs const x {{\n        print risky(x)\n    }} catch err {{\n        print \"from\"\n    }}\n    switch n {{\n        case 1 {{ print risky(1) }}\n        default {{ print \"other\" }}\n    }} catch err {{\n        print \"switch\"\n    }}\n}}\n"
+        "{RISKY}main {{\n    mut int n ← 0\n    while n ≺ 3 {{\n        print risky(n)\n        n ↑\n    }} catch err {{\n        print \"while\"\n    }}\n    for range 0‥3 const i {{\n        print risky(i)\n    }} catch err {{\n        print \"range\"\n    }}\n    let list<int> xs ← [0, 1, 2]\n    for from xs const x {{\n        print risky(x)\n    }} catch err {{\n        print \"from\"\n    }}\n    switch n {{\n        case 1 {{ print risky(1) }}\n        default {{ print \"other\" }}\n    }} catch err {{\n        print \"switch\"\n    }}\n}}\n"
     ));
 }

@@ -87,7 +87,7 @@ entry = "main.fab"
 "#,
     )
     .expect("write manifest");
-    fs::write(dir.join("src/main.fab"), "main { const int unused ← 1 }\n").expect("write entry");
+    fs::write(dir.join("src/main.fab"), "main { let int unused ← 1 }\n").expect("write entry");
 
     let config = Config::default().with_warn_policy(radix_module::driver::WarnPolicy {
         deny_all_warnings: true,
@@ -224,8 +224,8 @@ fn valor_octeti_body_extraction_emits_octeti_match() {
         dir.join("main.fab"),
         r"
 main {
-    const value body ← |09| ↦ value
-    const bytes payload ← body ↦ bytes
+    let value body ← |09| ↦ value
+    let bytes payload ← body ↦ bytes
     print payload.length()
 }
 ",
@@ -269,7 +269,7 @@ import from "./consumer_a" consumer_a
 import from "./consumer_b" consumer_b
 
 main {
-    const tf32[3] source ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    let tf32[3] source ← [1.0, 2.0, 3.0] ↦ tf32[3]
     print consumer_a.resolve_a(source).flatten()
     print consumer_b.resolve_b(source).flatten()
 }
@@ -360,7 +360,7 @@ fn render(shapes.Figurable f) → string {
 }
 
 main {
-    const shapes.Circle c ← shapes.Circle { radius = 25 }
+    let shapes.Circle c ← shapes.Circle { radius = 25 }
     print render(c)
 }
 "#,
@@ -378,7 +378,7 @@ interface Figurable {
 
 @ public
 class Circle implements Figurable {
-    var int radius = 10
+    mut int radius = 10
 
     fn draw() → string {
         return "circle §"(self.radius)

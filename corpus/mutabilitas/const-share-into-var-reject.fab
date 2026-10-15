@@ -4,7 +4,7 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
 category = "type"
 summary = "const is deep: a const list cannot be shared into a var name (SEM065)."
-syntax = "const list<int> xs ← [1]; var list<int> ys ← xs"
+syntax = "let list<int> xs ← [1]; var list<int> ys ← xs"
 related = ["fixum", "lista"]
 locale = "en"
 no_expected = "rejects"
@@ -17,8 +17,8 @@ diagnostic = "SEM065:const_shared_into_var"
 # Write `← copy xs` for an independent value or `← own xs` to take it over.
 
 main {
-    const list<int> xs ← [1]
-    var list<int> ys ← xs
+    let list<int> xs ← [1]
+    mut list<int> ys ← xs
     ys.append(2)
     print xs
 }

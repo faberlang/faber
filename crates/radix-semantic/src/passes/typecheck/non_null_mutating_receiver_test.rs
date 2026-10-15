@@ -27,7 +27,7 @@ fn arg<'a>(err: &'a crate::SemanticError, name: &str) -> Option<&'a str> {
 #[test]
 fn fixum_optional_list_non_null_appende_is_rejected() {
     let source = format!(
-        "{PRELUDE}incipit {{\n    fixum lista<numerus> ∪ nihil xs ← forte()\n    xs!.appende(1)\n}}"
+        "{PRELUDE}incipit {{\n    sit lista<numerus> ∪ nihil xs ← forte()\n    xs!.appende(1)\n}}"
     );
     let result = test_support::analyze_source(&source);
     let err = result
@@ -43,7 +43,7 @@ fn fixum_optional_list_non_null_detrahe_is_rejected() {
     // Value-returning in-place mutator: the registry predicate, not the
     // return type, decides.
     let source = format!(
-        "{PRELUDE}incipit {{\n    fixum lista<numerus> ∪ nihil xs ← forte()\n    xs!.detrahe()\n}}"
+        "{PRELUDE}incipit {{\n    sit lista<numerus> ∪ nihil xs ← forte()\n    xs!.detrahe()\n}}"
     );
     test_support::assert_rejects_with_issue(&source, ISSUE);
 }
@@ -68,7 +68,7 @@ fn varia_optional_list_non_null_appende_is_accepted() {
 #[test]
 fn fixum_optional_list_non_null_read_is_accepted() {
     let source = format!(
-        "{PRELUDE}incipit {{\n    fixum lista<numerus> ∪ nihil xs ← forte()\n    nota xs!.longitudo()\n}}"
+        "{PRELUDE}incipit {{\n    sit lista<numerus> ∪ nihil xs ← forte()\n    nota xs!.longitudo()\n}}"
     );
     test_support::assert_accepts(&source);
 }
@@ -80,14 +80,14 @@ fn non_null_field_receiver_keeps_shallow_behavior() {
     test_support::assert_accepts(
         "genus Punctum {\n    fixum lista<numerus> xs\n}\n\
          functio da() → Punctum ∪ nihil { redde Punctum { xs = [] } }\n\
-         incipit {\n    fixum Punctum ∪ nihil p ← da()\n    p!.xs.appende(3)\n}",
+         incipit {\n    sit Punctum ∪ nihil p ← da()\n    p!.xs.appende(3)\n}",
     );
 }
 
 #[test]
 fn sem020_names_binding_and_method_on_direct_receiver() {
     let result = test_support::analyze_source(
-        "incipit {\n    fixum lista<numerus> xs ← [3, 1, 2]\n    xs.appende(4)\n}",
+        "incipit {\n    sit lista<numerus> xs ← [3, 1, 2]\n    xs.appende(4)\n}",
     );
     let err = result
         .diagnostics
@@ -101,7 +101,7 @@ fn sem020_names_binding_and_method_on_direct_receiver() {
 #[test]
 fn sem020_names_binding_and_method_through_non_null() {
     let source = format!(
-        "{PRELUDE}incipit {{\n    fixum lista<numerus> ∪ nihil ys ← forte()\n    ys!.appende(1)\n}}"
+        "{PRELUDE}incipit {{\n    sit lista<numerus> ∪ nihil ys ← forte()\n    ys!.appende(1)\n}}"
     );
     let result = test_support::analyze_source(&source);
     let err = result

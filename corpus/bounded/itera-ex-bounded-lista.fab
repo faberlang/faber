@@ -34,7 +34,7 @@ no_expected = "declaration-only"
 # unit tests pin the N+1-arm switch and the N <= 10 decline.
 
 fn sumBounded(list<int, 8> xs) → int {
-    var int total ← 0
+    mut int total ← 0
     for from xs const x {
         total ← total + x
     }

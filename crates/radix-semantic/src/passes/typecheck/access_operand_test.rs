@@ -30,7 +30,7 @@ fn rejects_with_issue(source: &str, issue: &str) {
 fn textus_index_rejects_non_numeric_index_with_structured_issue_arg() {
     rejects_with_issue(
         r#"incipit {
-  fixum textus value ← "abc"
+  sit textus value ← "abc"
   nota value["x"]
 }"#,
         "textus_index_must_be_numerus_or_range",
@@ -41,7 +41,7 @@ fn textus_index_rejects_non_numeric_index_with_structured_issue_arg() {
 fn lista_index_rejects_non_numeric_index_with_structured_issue_arg() {
     rejects_with_issue(
         r#"incipit {
-  fixum lista<numerus> value ← [1, 2, 3]
+  sit lista<numerus> value ← [1, 2, 3]
   nota value["x"]
 }"#,
         "array_index_must_be_numerus",
@@ -52,7 +52,7 @@ fn lista_index_rejects_non_numeric_index_with_structured_issue_arg() {
 fn unsupported_index_receiver_uses_structured_issue_arg() {
     rejects_with_issue(
         r"incipit {
-  fixum numerus value ← 1
+  sit numerus value ← 1
   nota value[0]
 }",
         "indexing_requires_array_or_map",
@@ -63,7 +63,7 @@ fn unsupported_index_receiver_uses_structured_issue_arg() {
 fn map_index_type_mismatch_uses_structured_issue_arg() {
     rejects_with_issue(
         r"incipit {
-  fixum tabula<textus, numerus> value ← vacua
+  sit tabula<textus, numerus> value ← vacua
   nota value[1]
 }",
         "map_index_type_mismatch",
@@ -79,7 +79,7 @@ fn map_index_type_mismatch_uses_structured_issue_arg() {
 fn non_null_index_on_tuple_yields_the_element_type() {
     let result = compile(
         r"functio second(iuncta<numerus, textus> t) → textus {
-    fixum textus s ← t![1]
+    sit textus s ← t![1]
     redde s
 }",
     );
@@ -90,7 +90,7 @@ fn non_null_index_on_tuple_yields_the_element_type() {
 fn non_null_index_on_tuple_checks_the_bound() {
     rejects_with_issue(
         r"functio past(iuncta<numerus, textus> t) → numerus {
-    fixum numerus s ← t![5]
+    sit numerus s ← t![5]
     redde s
 }",
         "tuple_index_out_of_bounds",
@@ -101,7 +101,7 @@ fn non_null_index_on_tuple_checks_the_bound() {
 fn optional_chain_index_on_tuple_yields_the_element_type() {
     let accepted = compile(
         r"functio second(iuncta<numerus, textus> t) → textus ∪ nihil {
-    fixum textus ∪ nihil s ← t?[1]
+    sit textus ∪ nihil s ← t?[1]
     redde s
 }",
     );
@@ -109,7 +109,7 @@ fn optional_chain_index_on_tuple_yields_the_element_type() {
     // The element type is real: a mismatched slot is refused.
     let rejected = compile(
         r"functio wrong(iuncta<numerus, textus> t) → numerus ∪ nihil {
-    fixum numerus ∪ nihil s ← t?[1]
+    sit numerus ∪ nihil s ← t?[1]
     redde s
 }",
     );

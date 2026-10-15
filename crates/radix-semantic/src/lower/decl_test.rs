@@ -15,15 +15,15 @@ const IMPURE: &str = "conversio_impure_body";
 
 const PRELUDE: &str = "\
 class Celsius {
-    var float degrees
+    mut float degrees
 }
 
 class Fahrenheit {
-    var float degrees
+    mut float degrees
 }
 
 class Reading {
-    var int value
+    mut int value
 }
 
 union Condicio {
@@ -102,7 +102,7 @@ fn mutation_inside_si_else_branch_is_impure() {
 fn mutable_local_inside_si_is_impure() {
     assert_body_is_impure(
         "    if c.degrees ≻ 0.0 {
-        var float d ← c.degrees
+        mut float d ← c.degrees
         print d
     }",
     );
@@ -171,7 +171,7 @@ fn mutation_inside_discerne_arm_is_impure() {
         "{PRELUDE}\
 @ conversion
 fn toReading(Condicio s) → Reading {{
-    const Reading out ← Reading {{ value = 0 }}
+    let Reading out ← Reading {{ value = 0 }}
     match s {{
         case Agens {{
             out.value ← 1

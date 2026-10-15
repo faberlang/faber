@@ -133,7 +133,7 @@ fn iteration_local_scratch_inside_the_range_accepted() {
     accepted(&kernel(
         "varia f32 acc ← 0.0
         itera ab 0‥n fixum j {
-            fixum f32 term ← w[[i, j]] * x[[j]]
+            sit f32 term ← w[[i, j]] * x[[j]]
             acc ← acc + term
         }
         out[[i]] ← acc",
@@ -212,8 +212,8 @@ fn lockstep_loop_still_declined() {
         r"incipit {
     varia tensor<f32, [4]> rows ← vacua
     varia tensor<f32, [4]> out ← vacua
-    fixum lista<f32> xs ← [1.0, 2.0]
-    fixum lista<f32> ys ← [3.0, 4.0]
+    sit lista<f32> xs ← [1.0, 2.0]
+    sit lista<f32> ys ← [3.0, 4.0]
     itera ex rows apud [i] filum lane fixum e {
         itera ex xs, ys fixum a, b {
             out[[i]] ← a + b

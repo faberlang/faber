@@ -33,7 +33,7 @@ fn nested_error_span(source: &str, inner: &str) {
 
 #[test]
 fn check_ballot_parses_as_the_conditional_node() {
-    let ExprKind::Ternary(ternary) = initializer("fixum _ v ← c ✓ 1 ✗ 2") else {
+    let ExprKind::Ternary(ternary) = initializer("sit v ← c ✓ 1 ✗ 2") else {
         panic!("expected a conditional");
     };
     assert!(matches!(ternary.cond.kind, ExprKind::Ident(_)));
@@ -43,7 +43,7 @@ fn check_ballot_parses_as_the_conditional_node() {
 
 #[test]
 fn check_ballot_condition_binds_looser_than_aut() {
-    let ExprKind::Ternary(ternary) = initializer("fixum _ v ← a aut b ✓ 1 ✗ 2") else {
+    let ExprKind::Ternary(ternary) = initializer("sit v ← a aut b ✓ 1 ✗ 2") else {
         panic!("expected a conditional");
     };
     assert!(matches!(
@@ -54,19 +54,19 @@ fn check_ballot_condition_binds_looser_than_aut() {
 
 #[test]
 fn check_without_ballot_is_rejected() {
-    assert!(!parse_program("fixum _ v ← c ✓ 1").success());
+    assert!(!parse_program("sit v ← c ✓ 1").success());
 }
 
 #[test]
 fn sibling_conditionals_are_not_nested() {
-    let _ = parse_ok("fixum _ v ← f(c ✓ 1 ✗ 2, d ✓ 3 ✗ 4)");
-    let _ = parse_ok("fixum _ v ← c ✓ 1 ✗ 2\nfixum _ w ← d ✓ 3 ✗ 4");
+    let _ = parse_ok("sit v ← f(c ✓ 1 ✗ 2, d ✓ 3 ✗ 4)");
+    let _ = parse_ok("sit v ← c ✓ 1 ✗ 2\nsit w ← d ✓ 3 ✗ 4");
 }
 
 #[test]
 fn conditional_in_else_branch_is_rejected() {
     assert_parse_error_matches(
-        "fixum _ v ← c ✓ 1 ✗ d ✓ 2 ✗ 3",
+        "sit v ← c ✓ 1 ✗ d ✓ 2 ✗ 3",
         ParseExpectation::Issue("conditional_nested"),
     );
 }
@@ -74,11 +74,11 @@ fn conditional_in_else_branch_is_rejected() {
 #[test]
 fn conditional_in_then_branch_is_rejected() {
     assert_parse_error_matches(
-        "fixum _ v ← c ✓ (d ✓ 1 ✗ 2) ✗ 3",
+        "sit v ← c ✓ (d ✓ 1 ✗ 2) ✗ 3",
         ParseExpectation::Issue("conditional_nested"),
     );
     assert_parse_error_matches(
-        "fixum _ v ← c ✓ d ✓ 1 ✗ 2 ✗ 3",
+        "sit v ← c ✓ d ✓ 1 ✗ 2 ✗ 3",
         ParseExpectation::Issue("conditional_nested"),
     );
 }
@@ -86,7 +86,7 @@ fn conditional_in_then_branch_is_rejected() {
 #[test]
 fn conditional_deep_inside_a_branch_is_rejected() {
     assert_parse_error_matches(
-        "fixum _ v ← c ✓ f(d ✓ 1 ✗ 2) ✗ 3",
+        "sit v ← c ✓ f(d ✓ 1 ✗ 2) ✗ 3",
         ParseExpectation::Issue("conditional_nested"),
     );
 }
@@ -94,13 +94,13 @@ fn conditional_deep_inside_a_branch_is_rejected() {
 #[test]
 fn conditional_in_condition_is_rejected() {
     assert_parse_error_matches(
-        "fixum _ v ← (c ✓ a ✗ b) ✓ 1 ✗ 2",
+        "sit v ← (c ✓ a ✗ b) ✓ 1 ✗ 2",
         ParseExpectation::Issue("conditional_nested"),
     );
 }
 
 #[test]
 fn nested_diagnostic_points_at_the_inner_conditional() {
-    nested_error_span("fixum _ v ← c ✓ 1 ✗ d ✓ 2 ✗ 3", "d ✓");
-    nested_error_span("fixum _ v ← c ✓ f(d ✓ 1 ✗ 2) ✗ 3", "d ✓");
+    nested_error_span("sit v ← c ✓ 1 ✗ d ✓ 2 ✗ 3", "d ✓");
+    nested_error_span("sit v ← c ✓ f(d ✓ 1 ✗ 2) ✗ 3", "d ✓");
 }

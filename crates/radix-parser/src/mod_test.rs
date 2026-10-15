@@ -29,7 +29,7 @@ fn parses_capta_trap_expression() {
     // UT: `capta { ... }` parses in expression position; the block body is an
     // ordinary statement block whose trailing expression is the success value.
     let result = parse_ok(
-        "functio f() → numerus ⇥ textus { redde 1 }\nfunctio g() → vacuum { fixum ∪ r ← capta { f() } nota r }\n",
+        "functio f() → numerus ⇥ textus { redde 1 }\nfunctio g() → vacuum { sit ∪ r ← capta { f() } nota r }\n",
     );
     assert!(
         result.errors.is_empty(),
@@ -49,7 +49,7 @@ fn capta_stays_usable_as_ordinary_identifier() {
     // The keyword is contextual (expression-primary position only): a
     // binding named `capta` and a call `capta()` stay ordinary identifiers.
     let result = parse_ok(
-        "functio capta(numerus x) → numerus { redde x }\nfunctio g() → vacuum { fixum numerus capta ← capta(1) nota capta }\n",
+        "functio capta(numerus x) → numerus { redde x }\nfunctio g() → vacuum { sit numerus capta ← capta(1) nota capta }\n",
     );
     assert!(
         result.errors.is_empty(),
@@ -1198,7 +1198,7 @@ fn parses_following_variable_after_if_body_error() {
     let result = parse_program(
         r"
 si verum
-fixum numerus postea ← 2
+sit numerus postea ← 2
 ",
     );
 
@@ -1340,7 +1340,7 @@ fn import_record_privata_visibility_rejected() {
 
 #[test]
 fn parses_fixum_typed_variable() {
-    let result = parse_ok("fixum numerus count ← 1");
+    let result = parse_ok("sit numerus count ← 1");
     let program = result
         .program
         .as_ref()
@@ -1754,7 +1754,7 @@ fn import_name_inference_failed_rejected() {
 fn parses_infer_marker_as_type_annotation() {
     let result = parse_ok(
         r#"
-fixum _ name ← "Marcus"
+sit name ← "Marcus"
 varia _ count ← 1
 functio answer() → _ { redde 42 }
 "#,
@@ -1830,8 +1830,8 @@ fn parses_fixum_deferred_binding_without_initializer() {
     // TARGET: typed deferred immutable — `fixum numerus x` with no initializer.
     let result = parse_ok(
         r"
-fixum numerus pending
-fixum _ label
+sit numerus pending
+sit label
 ",
     );
     let program = result.program.as_ref().expect("program");
@@ -2015,9 +2015,9 @@ genus Point {
 }
 
 functio main() → numerus {
-    fixum _ p ← Point { x = 10, y = 20 }
-    fixum _ raw ← { "x": 10, "y": 20 }
-    fixum _ event ← finge Click { x = 1, y = 2 } ∷ Event
+    sit p ← Point { x = 10, y = 20 }
+    sit raw ← { "x": 10, "y": 20 }
+    sit event ← finge Click { x = 1, y = 2 } ∷ Event
     redde p.x
 }
 "#,
@@ -2281,7 +2281,7 @@ functio facere(numerus flag) → boolean {
 
 #[test]
 fn malformed_json_negative_number_reports_structured_unexpected_error() {
-    let source = r#"fixum _ value ← { "x": - }"#;
+    let source = r#"sit value ← { "x": - }"#;
     let result = parse_program(source);
     let err = result
         .errors
@@ -2312,7 +2312,7 @@ fn genus_field_colon_init_rejected() {
 #[test]
 fn finge_colon_field_rejected() {
     assert_parse_error_matches(
-        r"fixum _ event ← finge Click { x: 1 } ∷ Event",
+        r"sit event ← finge Click { x: 1 } ∷ Event",
         ParseExpectation::Issue("field_value_separator"),
     );
 }
@@ -2320,7 +2320,7 @@ fn finge_colon_field_rejected() {
 #[test]
 fn genus_colon_ctor_rejected() {
     assert_parse_error_matches(
-        r"fixum _ point ← Point { x: 10 }",
+        r"sit point ← Point { x: 10 }",
         ParseExpectation::Issue("expected_expression"),
     );
 }
@@ -2330,13 +2330,13 @@ fn bare_brace_equals_form_is_the_inferred_constructor() {
     // Operator ruling 2026-10-10: a bare `{ field = value }`
     // is sugar for `_ { field = value }`; the retired anonymous-record form
     // is gone, and the cell supplies the type (no cell is a checker error).
-    let result = parse_ok(r"fixum _ point ← { x = 10 }");
+    let result = parse_ok(r"sit point ← { x = 10 }");
     assert!(result.errors.is_empty());
 }
 
 #[test]
 fn bare_brace_colon_unquoted_key_rejected() {
-    assert_parse_error_issue(r"fixum _ point ← { x: 10 }", "json_quoted_key");
+    assert_parse_error_issue(r"sit point ← { x: 10 }", "json_quoted_key");
 }
 
 #[test]
@@ -2668,6 +2668,7 @@ impl KeywordPack for EnGuardPack {
             "range" => Some("ab"),
             "at" => Some("apud"),
             "const" => Some("fixum"),
+            "let" => Some("sit"),
             "fn" => Some("functio"),
             "size" => Some("magnitudo"),
             "coalesce" => Some("vel"),
@@ -2721,7 +2722,8 @@ impl KeywordPack for SurfaceArgsPack {
     fn keyword_latin_key(&self, text: &str) -> Option<&str> {
         match text {
             "const" => Some("fixum"),
-            "var" => Some("varia"),
+            "let" => Some("sit"),
+            "mut" => Some("varia"),
             "fn" => Some("functio"),
             "probandum" => Some("probandum"),
             "setup" => Some("praepara"),
@@ -3433,7 +3435,7 @@ fn rejects_ergo_keyword_as_clausura_joint() {
     let result = parse_program(
         r"
 incipit {
-    fixum _ dupla ← numerus x ergo x * 2
+    sit dupla ← numerus x ergo x * 2
 }
 ",
     );
@@ -3482,7 +3484,7 @@ fn rejects_itera_pro_mode() {
 
 #[test]
 fn parses_single_param_implicit_type_closure() {
-    let result = parse_ok("fixum _ a ← users.filtrata(_ user ∴ non user.activus)");
+    let result = parse_ok("sit a ← users.filtrata(_ user ∴ non user.activus)");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable");
@@ -3498,7 +3500,7 @@ fn parses_single_param_implicit_type_closure() {
 
 #[test]
 fn parses_single_param_explicit_type_closure() {
-    let result = parse_ok("fixum _ b ← users.filtrata(User user ∴ non user.activus)");
+    let result = parse_ok("sit b ← users.filtrata(User user ∴ non user.activus)");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable");
@@ -3514,7 +3516,7 @@ fn parses_single_param_explicit_type_closure() {
 
 #[test]
 fn parses_multi_param_implicit_type_closure() {
-    let result = parse_ok("fixum _ c ← numeri.compone((_ a, _ b) ∴ a + b)");
+    let result = parse_ok("sit c ← numeri.compone((_ a, _ b) ∴ a + b)");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable");
@@ -3530,8 +3532,7 @@ fn parses_multi_param_implicit_type_closure() {
 
 #[test]
 fn parses_multi_param_explicit_type_fac_closure() {
-    let result =
-        parse_ok("fixum _ d ← numeri.compone((numerus a, numerus b) ∴ fac { redde a + b })");
+    let result = parse_ok("sit d ← numeri.compone((numerus a, numerus b) ∴ fac { redde a + b })");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(block_var) = &program.statements[0].kind else {
         panic!("expected variable");
@@ -3549,7 +3550,7 @@ fn parses_multi_param_explicit_type_fac_closure() {
 #[test]
 fn parses_fallible_typed_closure() {
     let result = parse_ok(
-        "fixum _ e ← texts.mappata(textus s → numerus ⇥ ParseError ∴ fac { redde parse(s) } cape err { redde 0 })",
+        "sit e ← texts.mappata(textus s → numerus ⇥ ParseError ∴ fac { redde parse(s) } cape err { redde 0 })",
     );
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(fallible_var) = &program.statements[0].kind else {
@@ -3569,7 +3570,7 @@ fn parses_fallible_typed_closure() {
 #[test]
 fn closure_block_body_rejected_with_structured_error() {
     let result =
-        parse_program("fixum _ inactive ← users.filtrata(_ user ∴ { redde non user.activus })");
+        parse_program("sit inactive ← users.filtrata(_ user ∴ { redde non user.activus })");
     let err = result
         .errors
         .iter()
@@ -3595,7 +3596,7 @@ fn closure_block_body_rejected_with_structured_error() {
 #[test]
 fn closure_fac_body_dum_rejected() {
     assert_parse_error_matches(
-        "fixum _ inactive ← users.filtrata(_ user ∴ fac { redde non user.activus } dum user.activus)",
+        "sit inactive ← users.filtrata(_ user ∴ fac { redde non user.activus } dum user.activus)",
         ParseExpectation::Issue("closure_fac_body_dum"),
     );
 }
@@ -3685,8 +3686,8 @@ functio demum() → vacuum { tacet }
 functio emitte() → vacuum { tacet }
 functio pro() → vacuum { tacet }
 incipit {
-  fixum _ pro ← 1
-  fixum _ tempta ← 2
+  sit pro ← 1
+  sit tempta ← 2
   nota tempta
 }
 ",
@@ -3702,7 +3703,7 @@ fn modulus_type_and_itera_ab_range_iteration_stay_live() {
     let result = parse_ok(
         r"
 functio checksum() → numerus {
-  fixum modulus<u32> m ← 1779033703
+  sit modulus<u32> m ← 1779033703
   itera ab 0‥10 per 2 fixum i {
     nota i
   }
@@ -3778,10 +3779,10 @@ fn migrated_keywords_usable_as_contextual_identifiers() {
         "tacet",
     ];
     let name_position_templates = [
-        "fixum _ {word} ← 5\n",
+        "sit {word} ← 5\n",
         "functio {word}() → numerus {{ redde 0 }}\n",
         "functio f(numerus {word}) → numerus {{ redde 0 }}\n",
-        "incipit {{ fixum _ x ← 5\nnota x.{word}\n}}\n",
+        "incipit {{ sit x ← 5\nnota x.{word}\n}}\n",
     ];
     for word in words {
         for template in name_position_templates {
@@ -3838,7 +3839,7 @@ fn migrated_keywords_usable_as_contextual_identifiers() {
         "sponte",
         "tacet",
     ] {
-        let source = format!("functio f() → numerus {{ fixum _ {word} ← 5\nredde {word}\n}}\n");
+        let source = format!("functio f() → numerus {{ sit {word} ← 5\nredde {word}\n}}\n");
         let result = parse_program(&source);
         assert!(
             result.success(),
@@ -4124,7 +4125,7 @@ fn si_is_usable_as_a_type_name_after_tokenless_migration() {
     // position. Pre-migration the reserved Si token made these parse errors
     // (`legacy_si_*_rejected` family).
     for source in [
-        "fixum si x ← nulla\n",
+        "sit si x ← nulla\n",
         "functio f(si handle) → vacuum {}\n",
         "functio find() → si { redde nulla }\n",
         "typus MaybeSi = si\n",
@@ -4163,9 +4164,9 @@ fn name_slots_accept_keyword_spellings_on_latin_surface() {
         "functio lege(textus lege) → vacuum {}\n",
         "functio nota(textus nota) → vacuum {}\n",
         "functio print(textus print) → vacuum {}\n",
-        "fixum textus lege ← \"data\"\n",
-        "fixum textus nota ← \"print\"\n",
-        "fixum textus print ← \"print\"\n",
+        "sit textus lege ← \"data\"\n",
+        "sit textus nota ← \"print\"\n",
+        "sit textus print ← \"print\"\n",
     ] {
         let result = parse_program(source);
         assert!(
@@ -4183,7 +4184,7 @@ fn name_slots_accept_keyword_spellings_on_latin_surface() {
     assert_eq!(symbol_name(&func, decl.name.name), "lege");
     assert_eq!(symbol_name(&func, decl.params[0].name.name), "lege");
 
-    let bind = parse_ok("fixum textus lege ← \"data\"\n");
+    let bind = parse_ok("sit textus lege ← \"data\"\n");
     let program = bind.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -4197,7 +4198,7 @@ fn name_slots_accept_keyword_spellings_on_latin_surface() {
 #[test]
 fn legacy_question_mark_in_fixum_rejected() {
     assert_parse_error_matches(
-        r"fixum textus? maybe ← nulla",
+        r"sit textus? maybe ← nulla",
         ParseExpectation::Issue("expected_identifier"),
     );
 }
@@ -4332,7 +4333,7 @@ implendum Par {
 fn solum_keyword_usable_as_binding_name() {
     // No reserved words: `solum` (test annotation) is an ordinary identifier
     // outside its annotation slot.
-    let result = parse_ok(r"fixum _ solum ← 1");
+    let result = parse_ok(r"sit solum ← 1");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -4347,7 +4348,7 @@ fn solum_keyword_usable_as_binding_name() {
 fn mori_keyword_usable_as_binding_name() {
     // No reserved words: `mori` (panic statement) is an ordinary identifier
     // outside its statement slot.
-    let result = parse_ok(r"fixum _ mori ← 1");
+    let result = parse_ok(r"sit mori ← 1");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -4376,9 +4377,9 @@ fn parses_test_annotation_keywords_as_import_binding_names() {
 fn parses_tensor_bridge_member_method_names() {
     let result = parse_ok(
         r"incipit {
-  fixum tensor<f32, []> t ← vacua
-  fixum _ g ← t.strue(flat, shape)
-  fixum _ f ← g.planata()
+  sit tensor<f32, []> t ← vacua
+  sit g ← t.strue(flat, shape)
+  sit f ← g.planata()
 }",
     );
     let program = result.program.as_ref().expect("program");
@@ -4829,7 +4830,7 @@ fn parses_cede_as_yield_statement_only() {
 fn cede_keyword_usable_as_identifier_in_initializer() {
     // No reserved words: `cede` (yield) is an ordinary identifier outside its
     // generator-yield slot, so it is a valid initializer expression.
-    let result = parse_ok("functio f() fiunt → numerus { fixum _ x ← cede }");
+    let result = parse_ok("functio f() fiunt → numerus { sit x ← cede }");
     assert_eq!(
         result.program.as_ref().expect("program").statements.len(),
         1
@@ -4887,7 +4888,7 @@ fn parses_variandum_await_binding() {
 
 #[test]
 fn parses_await_directed_fixum_binding() {
-    let result = parse_ok("functio f() fiet → vacuum { fixum numerus x ↢ fut redde x }");
+    let result = parse_ok("functio f() fiet → vacuum { sit numerus x ↢ fut redde x }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -4934,7 +4935,7 @@ fn await_directed_assignment_is_not_a_general_expression_operator() {
 fn rejects_await_directed_destructuring_and_missing_initializers() {
     for source in [
         "functio f() fiet { fixum [x] ↢ future }",
-        "functio f() fiet { fixum numerus x ↢ }",
+        "functio f() fiet { sit numerus x ↢ }",
     ] {
         let result = parse_program(source);
         assert!(
@@ -4970,7 +4971,7 @@ fn parses_tacebit_await_discard() {
 fn posture_words_remain_legal_identifiers() {
     // fiet/fiunt/fient/figendum/variandum/reddet/tacebit must remain usable as
     // ordinary identifiers outside their grammar slots.
-    let result = parse_ok("functio f() → vacuum { fixum numerus fiet ← 1 redde fiet }");
+    let result = parse_ok("functio f() → vacuum { sit numerus fiet ← 1 redde fiet }");
     assert!(result.success());
 }
 
@@ -5021,7 +5022,7 @@ fn parses_posture_in_implendum_method_signature() {
 
 #[test]
 fn conversio_assign_typed_fixum_and_varia_initializers_parse() {
-    let result = parse_ok("fixum numerus n ↤ \"42\"\nvaria numerus count ↤ raw ⊥ 0");
+    let result = parse_ok("sit numerus n ↤ \"42\"\nvaria numerus count ↤ raw ⊥ 0");
     let program = result.program.as_ref().expect("program");
     assert_eq!(program.statements.len(), 2);
     for stmt in &program.statements {
@@ -5050,7 +5051,7 @@ fn conversio_assign_typed_fixum_and_varia_initializers_parse() {
 fn conversio_assign_untyped_fixum_initializer_rejects_with_concrete_type_issue() {
     // `fixum _` has no written type → no concrete conversion target.
     assert_parse_error_issue(
-        "incipit {\n  fixum _ answer ↤ \"42\"\n}",
+        "incipit {\n  sit answer ↤ \"42\"\n}",
         "conversio_assign_requires_concrete_type",
     );
 }
@@ -5153,7 +5154,7 @@ fn eot_legacy_import_output_and_input_forms_remain_accepted() {
         "mone \"legacy warning\"",
         "vide \"legacy debug\"",
         "scribe \"legacy compatibility\"",
-        "incipit { fixum _ input ← lege nota input }",
+        "incipit { sit input ← lege nota input }",
     ] {
         let result = parse_program(source);
         assert!(
@@ -5459,7 +5460,7 @@ fn eot_transfer_inside_assignment_value() {
     // `⇇` binds tighter than `←`: the copy-into is the assigned value. The
     // parser admits the shape; the semantic layer rejects it as a result used
     // as a value (`copy_into_value_used`).
-    let result = parse_ok(r#"fixum _ sink ← output ⇇ "a""#);
+    let result = parse_ok(r#"sit sink ← output ⇇ "a""#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -5499,7 +5500,8 @@ impl KeywordPack for EnSizePack {
         match text {
             "size" => Some("magnitudo"),
             "const" => Some("fixum"),
-            "var" => Some("varia"),
+            "let" => Some("sit"),
+            "mut" => Some("varia"),
             _ => None,
         }
     }
@@ -5531,7 +5533,7 @@ fn const_size_declaration_parses_and_bare_or_var_forms_are_rejected() {
 
     for (source, issue) in [
         ("{ size H ← 3 }", "size_requires_const"),
-        ("{ var size H ← 3 }", "size_is_write_once"),
+        ("{ mut size H ← 3 }", "size_is_write_once"),
     ] {
         let result = parse(lex_with_locale_pack(source, &EnSizePack));
         assert!(
@@ -5589,7 +5591,7 @@ fn with_inferred_constructor_init(init: &str, check: impl FnOnce(&ExprKind)) {
 /// resolve member-key and type-head symbols.
 fn with_inferred_constructor_init_result(init: &str, check: impl FnOnce(&ParseResult, &ExprKind)) {
     let result = parse_ok(&format!(
-        "incipit {{ fixum tabula<textus, numerus> m ← {init} }}"
+        "incipit {{ sit tabula<textus, numerus> m ← {init} }}"
     ));
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(entry) = &program.statements[0].kind else {

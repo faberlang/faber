@@ -66,14 +66,14 @@ fn client(port: u16, request: &'static [u8]) -> JoinHandle<String> {
 /// The listen/accept prelude: `bind`, then `incoming_of` on the raw carrier.
 fn serve_prelude(listen_args: &str) -> String {
     format!(
-        "  const list<value> opts ← [{listen_args}]\n  \
-         const int handle ← call 'http:listen' (opts) ↦ int\n  \
-         const value raw ← call 'http:accept' (handle) ↦ value\n  \
-         const map<string, value> fields ↤ raw\n  \
-         const string id ← fields[\"id\"] ↦ string\n  \
-         const string method ← fields[\"method\"] ↦ string\n  \
-         const string path ← fields[\"path\"] ↦ string\n  \
-         const int connection ← fields[\"connection\"] ↦ int\n"
+        "  let list<value> opts ← [{listen_args}]\n  \
+         let int handle ← call 'http:listen' (opts) ↦ int\n  \
+         let value raw ← call 'http:accept' (handle) ↦ value\n  \
+         let map<string, value> fields ↤ raw\n  \
+         let string id ← fields[\"id\"] ↦ string\n  \
+         let string method ← fields[\"method\"] ↦ string\n  \
+         let string path ← fields[\"path\"] ↦ string\n  \
+         let int connection ← fields[\"connection\"] ↦ int\n"
     )
 }
 
@@ -81,10 +81,10 @@ fn serve_prelude(listen_args: &str) -> String {
 fn a_thread_client_gets_200_from_health() {
     let port = free_port();
     let body = format!(
-        "{}  const list<value> headers ← []\n  \
-         const list<value> args ← [id ↦ value, 200 ↦ value, headers ↦ value, \"ok \" + method + \" \" + path ↦ value]\n  \
-         const void r1 ← call 'http:respond' (args) ↦ void\n  \
-         const void r2 ← call 'http:stop' (handle) ↦ void\n  \
+        "{}  let list<value> headers ← []\n  \
+         let list<value> args ← [id ↦ value, 200 ↦ value, headers ↦ value, \"ok \" + method + \" \" + path ↦ value]\n  \
+         let void r1 ← call 'http:respond' (args) ↦ void\n  \
+         let void r2 ← call 'http:stop' (handle) ↦ void\n  \
          print connection",
         serve_prelude(&format!("{port} ↦ value"))
     );
@@ -110,16 +110,16 @@ fn a_thread_client_gets_200_from_health() {
 fn sse_events_are_chunk_framed_through_open_chunk_finish() {
     let port = free_port();
     let body = format!(
-        "{}  const list<value> headers ← []\n  \
-         const list<value> open ← [id ↦ value, 200 ↦ value, headers ↦ value]\n  \
-         const int writer ← call 'http:respond_open' (open) ↦ int\n  \
-         const list<value> first ← [writer ↦ value, \"data: one\\n\\n\" ↦ bytes ↦ value]\n  \
-         const void r3 ← call 'http:respond_chunk' (first) ↦ void\n  \
-         const list<value> second ← [writer ↦ value, \"data: two\\n\\n\" ↦ bytes ↦ value]\n  \
-         const void r4 ← call 'http:respond_chunk' (second) ↦ void\n  \
-         const list<value> done ← [writer ↦ value, false ↦ value]\n  \
-         const void r5 ← call 'http:respond_finish' (done) ↦ void\n  \
-         const void r6 ← call 'http:stop' (handle) ↦ void",
+        "{}  let list<value> headers ← []\n  \
+         let list<value> open ← [id ↦ value, 200 ↦ value, headers ↦ value]\n  \
+         let int writer ← call 'http:respond_open' (open) ↦ int\n  \
+         let list<value> first ← [writer ↦ value, \"data: one\\n\\n\" ↦ bytes ↦ value]\n  \
+         let void r3 ← call 'http:respond_chunk' (first) ↦ void\n  \
+         let list<value> second ← [writer ↦ value, \"data: two\\n\\n\" ↦ bytes ↦ value]\n  \
+         let void r4 ← call 'http:respond_chunk' (second) ↦ void\n  \
+         let list<value> done ← [writer ↦ value, false ↦ value]\n  \
+         let void r5 ← call 'http:respond_finish' (done) ↦ void\n  \
+         let void r6 ← call 'http:stop' (handle) ↦ void",
         serve_prelude(&format!("{port} ↦ value"))
     );
     let reply = client(port, b"GET /events HTTP/1.1\r\nHost: localhost\r\n\r\n");
@@ -156,10 +156,10 @@ fn bind_limited_refuses_an_oversize_body() {
     // request is served once the ceiling fits the body.
     let port = free_port();
     let body = format!(
-        "{}  const list<value> headers ← []\n  \
-         const list<value> args ← [id ↦ value, 200 ↦ value, headers ↦ value, \"fits\" ↦ value]\n  \
-         const void r1 ← call 'http:respond' (args) ↦ void\n  \
-         const void r2 ← call 'http:stop' (handle) ↦ void",
+        "{}  let list<value> headers ← []\n  \
+         let list<value> args ← [id ↦ value, 200 ↦ value, headers ↦ value, \"fits\" ↦ value]\n  \
+         let void r1 ← call 'http:respond' (args) ↦ void\n  \
+         let void r2 ← call 'http:stop' (handle) ↦ void",
         serve_prelude(&format!("{port} ↦ value, 16 ↦ value"))
     );
     let reply = client(port, POST);

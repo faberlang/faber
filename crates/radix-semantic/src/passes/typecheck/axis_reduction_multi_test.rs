@@ -35,8 +35,8 @@ fn result_shape(source: &str) -> Vec<i64> {
 fn sum_over_two_axes_removes_both() {
     let shape = result_shape(
         r"incipit {
-    fixum tensor<f32, [2, 3, 4, 5]> g ← vacua
-    fixum tensor<f32, [2, 5]> kept ← g.summa(axis 1, axis 2)
+    sit tensor<f32, [2, 3, 4, 5]> g ← vacua
+    sit tensor<f32, [2, 5]> kept ← g.summa(axis 1, axis 2)
     nota kept
 }",
     );
@@ -47,8 +47,8 @@ fn sum_over_two_axes_removes_both() {
 fn repeated_axis_is_rejected() {
     assert_rejects_with_issue(
         r"incipit {
-    fixum tensor<f32, [2, 3, 4, 5]> g ← vacua
-    fixum tensor<f32, [2, 5]> kept ← g.summa(axis 1, axis 1)
+    sit tensor<f32, [2, 3, 4, 5]> g ← vacua
+    sit tensor<f32, [2, 5]> kept ← g.summa(axis 1, axis 1)
     nota kept
 }",
         "axis_reduction_repeated",
@@ -59,8 +59,8 @@ fn repeated_axis_is_rejected() {
 fn mean_over_two_axes_divides_by_product() {
     let shape = result_shape(
         r"incipit {
-    fixum tensor<f32, [2, 3, 4, 5]> g ← vacua
-    fixum tensor<f32, [2, 5]> kept ← g.media(axis 1, axis 2)
+    sit tensor<f32, [2, 3, 4, 5]> g ← vacua
+    sit tensor<f32, [2, 5]> kept ← g.media(axis 1, axis 2)
     nota kept
 }",
     );

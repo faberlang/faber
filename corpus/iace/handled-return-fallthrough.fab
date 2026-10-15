@@ -44,7 +44,7 @@ fn risky(int n) → int ⇥ string {
 # An empty handler: failure falls through to the code after the block.
 fn attempt(int n) → string ⇥ string {
     do {
-        const int v ← risky(n)
+        let int v ← risky(n)
         return "ok §"(v)
     }
     catch err {
@@ -55,7 +55,7 @@ fn attempt(int n) → string ⇥ string {
 # A handler with a side effect that still falls through.
 fn recover(int n) → string ⇥ string {
     do {
-        const int v ← risky(n)
+        let int v ← risky(n)
         return "ok §"(v)
     }
     catch err {
@@ -67,7 +67,7 @@ fn recover(int n) → string ⇥ string {
 # A handler that leaves: through the function's own ⇥ channel.
 fn escalate(int n) → string ⇥ string {
     do {
-        const int v ← risky(n)
+        let int v ← risky(n)
         return "ok §"(v)
     }
     catch err {

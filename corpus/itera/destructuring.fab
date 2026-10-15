@@ -51,35 +51,35 @@ locale = "en"
 #   destructuring.expected — sums and elements from every pattern form.
 
 class Punctum {
-    var int x
-    var int y
+    mut int x
+    mut int y
 }
 
 main {
     # --- Records: object_pattern over lista of genus elements ---
 
-    const _ puncta ← [Punctum { x = 1, y = 2 }, Punctum { x = 3, y = 4 }]
+    let puncta ← [Punctum { x = 1, y = 2 }, Punctum { x = 3, y = 4 }]
     for from puncta const {x, y} {
         print x + y
     }
 
     # --- Labeled tuples: object_pattern binds by label ---
 
-    const list<tuple<gx: int, int>> paria ← [tuple<int, int> [50, 60], tuple<int, int> [70, 80]]
+    let list<tuple<gx: int, int>> paria ← [tuple<int, int> [50, 60], tuple<int, int> [70, 80]]
     for from paria const {gx} {
         print gx
     }
 
     # --- Positional tuples: array_pattern over fixed-width rows ---
 
-    const list<tuple<int, int>> ordines ← [tuple<int, int> [10, 20], tuple<int, int> [30, 40]]
+    let list<tuple<int, int>> ordines ← [tuple<int, int> [10, 20], tuple<int, int> [30, 40]]
     for from ordines const [a, b] {
         print a + b
     }
 
     # --- Rest patterns: first element plus the remaining lista ---
 
-    const _ matricula ← [[1, 2, 3], [4, 5, 6]]
+    let matricula ← [[1, 2, 3], [4, 5, 6]]
     for from matricula const [caput, rest cauda] {
         print caput
         print cauda[1]

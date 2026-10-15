@@ -30,15 +30,15 @@ diagnostic = "SEM011:sorted_key_retired"
 # This exemplum intentionally fails to compile.
 
 class Persona {
-    var string nomen
-    var int aetas
+    mut string nomen
+    mut int aetas
 }
 
 main {
-    const list<Persona> personae ← [
+    let list<Persona> personae ← [
         Persona { nomen = "Livia", aetas = 30 },
         Persona { nomen = "Aulus", aetas = 25 }
     ]
-    const list<Persona> per_aetatem ← personae.sorted(Persona p ∴ p.aetas)
+    let list<Persona> per_aetatem ← personae.sorted(Persona p ∴ p.aetas)
     print per_aetatem.length()
 }

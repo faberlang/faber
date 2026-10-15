@@ -241,7 +241,7 @@ functio sum_rest(lista<lista<numerus>> rows) → numerus {
 }
 
 incipit {
-    fixum lista<lista<numerus>> rows ← [[1, 2, 3], [4, 5, 6]]
+    sit lista<lista<numerus>> rows ← [[1, 2, 3], [4, 5, 6]]
     nota sum_rest(rows)
 }
 ";
@@ -262,7 +262,7 @@ functio sum_pairs(lista<iuncta<numerus, numerus>> pairs) → numerus {
 }
 
 incipit {
-    fixum lista<iuncta<numerus, numerus>> pairs ← [
+    sit lista<iuncta<numerus, numerus>> pairs ← [
         iuncta<numerus, numerus> [1, 2],
         iuncta<numerus, numerus> [3, 4]
     ]
@@ -290,7 +290,7 @@ functio sum_points(lista<Point> points) → numerus {
 }
 
 incipit {
-    fixum lista<Point> points ← [
+    sit lista<Point> points ← [
         Point { x = 1, y = 2 },
         Point { x = 3, y = 4 }
     ]

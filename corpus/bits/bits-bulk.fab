@@ -31,17 +31,17 @@ locale = "en"
 # EXPECTED stdout: see bits-bulk.expected
 
 main {
-    const list<b8> raw ← [0x01, 0x02, 0x03, 0x04]
-    const list<u8> plain ← raw ↦ list<u8>
-    const list<b8> back ← plain ↦ list<b8>
+    let list<b8> raw ← [0x01, 0x02, 0x03, 0x04]
+    let list<u8> plain ← raw ↦ list<u8>
+    let list<b8> back ← plain ↦ list<b8>
     print plain
     print back
-    const list<u16> le ← raw ↦ list<u16> via Le
-    const list<u16> be ← raw ↦ list<u16> via Be
+    let list<u16> le ← raw ↦ list<u16> via Le
+    let list<u16> be ← raw ↦ list<u16> via Be
     print le
     print be
-    const list<b8> encoded ← le ↦ list<b8> via Le
+    let list<b8> encoded ← le ↦ list<b8> via Le
     print encoded
-    const list<b16> wide ← raw ↦ list<b16> via Be
+    let list<b16> wide ← raw ↦ list<b16> via Be
     print wide
 }

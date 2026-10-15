@@ -26,18 +26,18 @@ locale = "en"
 # =============================================================================
 
 main {
-    const list<int> bases ← [100, 200, 300]
-    const list<int> keys ← [1, 2, 3]
-    const list<int> payloads ← [10, 20, 30]
+    let list<int> bases ← [100, 200, 300]
+    let list<int> keys ← [1, 2, 3]
+    let list<int> payloads ← [10, 20, 30]
     for from bases, keys, payloads const base, key, payload {
-        const int total ← base + key + payload
+        let int total ← base + key + payload
         print total
     }
-    const list<int> rows ← [1, 2]
-    const list<int> cols ← [3, 4]
-    const list<int> cells ← [5, 6]
+    let list<int> rows ← [1, 2]
+    let list<int> cols ← [3, 4]
+    let list<int> cells ← [5, 6]
     for from rows, cols, cells const row, col, cell {
-        const int grid ← row * col + cell
+        let int grid ← row * col + cell
         print grid
     }
 }

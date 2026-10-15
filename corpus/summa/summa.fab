@@ -45,12 +45,12 @@ functio shifted(tensor<f32, [8]> a) → f32 {
 }
 
 incipit {
-    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-        fixum tf32[8] a ← flat ↦ tf32[8]
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+        sit tf32[8] a ← flat ↦ tf32[8]
 
-    fixum f32 per_summam ← a.summa()
-    fixum f32 plicatum ← identity(a)
-    fixum f32 summam_totam ← shifted(a)
+    sit f32 per_summam ← a.summa()
+    sit f32 plicatum ← identity(a)
+    sit f32 summam_totam ← shifted(a)
 
     nota per_summam
     nota plicatum

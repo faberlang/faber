@@ -28,8 +28,8 @@ no_expected = "needs-device"
 
 @ nucleum
 @ publica { }
-functio rank2(tensor<f32, [4, 8]> a, in tensor<f32, [1]> out) → vacuum {
-    fixum f32 total ← reducta via summa ex a apud [i, j] filum f fixum s {
+functio rank2(tensor<f32, [4, 8]> a, varia tensor<f32, [1]> out) → vacuum {
+    sit f32 total ← reducta via summa ex a apud [i, j] filum f fixum s {
         redde s
     }
     out[0] ← total

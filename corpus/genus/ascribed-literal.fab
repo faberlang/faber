@@ -22,13 +22,13 @@ locale = "en"
 # =============================================================================
 
 class Calc {
-    var bool flag = false
-    var int ∪ none bonus = null
+    mut bool flag = false
+    mut int ∪ none bonus = null
 }
 
 main {
-    const Calc a ← { flag = true, bonus = null } ∷ Calc
-    const Calc b ← { flag = false }
+    let Calc a ← { flag = true, bonus = null } ∷ Calc
+    let Calc b ← { flag = false }
     print a.flag
     print b.flag
     print a.bonus
