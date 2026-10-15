@@ -877,6 +877,27 @@ pub unsafe extern "C" fn __faber_clif_v1_list_sorted(list: *const List) -> *mut 
     list_new_from(items)
 }
 
+/// A new copy ordered stably by a parallel list of keys; a length mismatch
+/// ends the run.
+///
+/// # Safety
+///
+/// Both are live runtime lists.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_sorted_by_keys(
+    list: *const List,
+    keys: *const List,
+) -> *mut List {
+    let items = &unsafe { list_ref(list) }.items;
+    let keys = &unsafe { list_ref(keys) }.items;
+    if items.len() != keys.len() {
+        unsafe { __faber_clif_v1_trap(c"sort_by_keys length mismatch".as_ptr().cast(), 28) }
+    }
+    let mut order: Vec<usize> = (0..items.len()).collect();
+    order.sort_by(|&a, &b| element_order(keys[a].0, keys[a].1, keys[b].1));
+    list_new_from(order.into_iter().map(|at| items[at]).collect())
+}
+
 /// Print one list line.
 ///
 /// # Safety

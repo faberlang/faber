@@ -2008,6 +2008,19 @@ impl FunctionLower<'_, '_> {
                     Rep::Text,
                 )
             }
+            (MirCollectionOp::SortByKeys, Rep::List) => {
+                let [_, keys] = args else {
+                    return Err(Decline::new("sort by keys arity"));
+                };
+                let (keys, keys_rep) = self.scalar(keys)?;
+                if keys_rep != Rep::List {
+                    return Err(Decline::new("sort keys representation"));
+                }
+                (
+                    self.call_runtime(&abi::LIST_SORTED_BY_KEYS, &[handle, keys])?,
+                    Rep::List,
+                )
+            }
             (MirCollectionOp::AppendImmutable, Rep::List) => {
                 let [_, item] = args else {
                     return Err(Decline::new("append arity"));

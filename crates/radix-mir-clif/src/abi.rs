@@ -356,6 +356,12 @@ pub const LIST_SORTED: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr],
     ret: Some(Ptr),
 };
+/// A new copy ordered stably by a parallel list of keys.
+pub const LIST_SORTED_BY_KEYS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_sorted_by_keys",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
 /// Print a list line.
 pub const PRINT_LIST: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_print_list",
@@ -468,6 +474,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     LIST_CONTAINS,
     LIST_REVERSED,
     LIST_SORTED,
+    LIST_SORTED_BY_KEYS,
     PRINT_LIST,
     TEXT_FROM_LIST,
     MAP_NEW,
