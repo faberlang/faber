@@ -799,7 +799,22 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<Value, RunnerError> {
         match value {
             Value::Str(text) => {
-                self.bivalens_from_scalar_truthiness(!text.is_empty(), recovery, span)
+                // The code locale's own words, not JS-style truthiness: a
+                // `textus ↦ bivalens` parses exactly `true_`/`false_` and fails
+                // on anything else (operator ruling 2026-10-15, need).
+                // WHY clone first: `display_tokens` borrows `self`, and the
+                // failure path mutably borrows it through `recover_or_fail`.
+                let (true_word, false_word) = {
+                    let tokens = self.display_tokens();
+                    (tokens.true_.clone(), tokens.false_.clone())
+                };
+                if text == true_word {
+                    Ok(Value::Bool(true))
+                } else if text == false_word {
+                    Ok(Value::Bool(false))
+                } else {
+                    self.recover_or_fail(recovery, span, "text to bivalens conversion failed")
+                }
             }
             Value::Int(v) => self.bivalens_from_scalar_truthiness(v != 0, recovery, span),
             Value::UInt(v) => self.bivalens_from_scalar_truthiness(v != 0, recovery, span),
