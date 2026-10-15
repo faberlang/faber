@@ -71,9 +71,9 @@ fn a_switch_is_an_if_chain_over_once_evaluated_subjects() {
         "main {\n    const int code ← 404\n    switch code {\n        case 200 { print \"ok\" }\n        case 404 { print \"missing\" }\n        default { print \"other\" }\n    }\n}",
     );
     assert!(code.contains("int64_t faber_t0 = l_code;"), "{code}");
-    assert!(code.contains("if ((faber_t0 == INT64_C(200))) {"), "{code}");
+    assert!(code.contains("if (faber_t0 == INT64_C(200)) {"), "{code}");
     assert!(
-        code.contains("} else if ((faber_t0 == INT64_C(404))) {"),
+        code.contains("} else if (faber_t0 == INT64_C(404)) {"),
         "{code}"
     );
     assert!(code.contains("} else {"), "{code}");

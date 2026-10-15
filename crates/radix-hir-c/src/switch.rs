@@ -78,9 +78,15 @@ impl Emitter<'_> {
                 self.line(out, if opened { "} else {" } else { "{" });
                 done = true;
             } else {
-                let test = plan.tests.join(" && ");
+                // Each test carries its own parentheses; a lone one is the
+                // condition as it stands (a second pair trips clang's
+                // `-Wparentheses-equality`), several are joined and wrapped.
+                let test = match plan.tests.as_slice() {
+                    [only] => only.clone(),
+                    many => format!("({})", many.join(" && ")),
+                };
                 let head = if opened { "} else if" } else { "if" };
-                self.line(out, &format!("{head} ({test}) {{"));
+                self.line(out, &format!("{head} {test} {{"));
             }
             opened = true;
             self.depth += 1;
