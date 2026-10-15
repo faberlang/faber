@@ -350,6 +350,41 @@ impl Target {
         }
     }
 
+    /// Whether this target's driver arm lowers a CLI entry program.
+    ///
+    /// A target that returns `false` is refused by name with `CODEGEN002`
+    /// (`cli_codegen_rust_only`) before any emitter runs. Exhaustive, no
+    /// wildcard: a future variant must declare its answer here.
+    #[must_use]
+    pub fn lowers_cli_entry(self) -> bool {
+        match self {
+            Target::HirRust | Target::HirGo | Target::MirWasm => true,
+            Target::MirStepper
+            | Target::HirTypeScript
+            | Target::HirSwift
+            | Target::HirPython
+            | Target::HirHaskell
+            | Target::HirPascal
+            | Target::HirCobol
+            | Target::HirFortran
+            | Target::HirOdin
+            | Target::HirC
+            | Target::HirFaber
+            | Target::HirFhir
+            | Target::MirLlvm
+            | Target::MirLlvmHost
+            | Target::MirAmd
+            | Target::MirMetal
+            | Target::MirWgsl
+            | Target::MirSexp
+            | Target::MirBasic
+            | Target::MirScena
+            | Target::MirFmir
+            | Target::MirFmirBinary
+            | Target::MirFmirBundle => false,
+        }
+    }
+
     /// Leaves this target declares.
     ///
     /// Rust and the runner (`fmir*`, stepper) share `faber-leaf`. Faber

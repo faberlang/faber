@@ -202,3 +202,15 @@ fn availability_spellings_pin_rust_and_wasm() {
 fn output_mode_variants_are_distinct() {
     assert_ne!(OutputMode::Application, OutputMode::Library);
 }
+
+/// The CLI-entry capability is exactly Rust, Go, and wasm text: the driver
+/// gate refuses every other target by name with `cli_codegen_rust_only`.
+#[test]
+fn lowers_cli_entry_is_exactly_rust_go_wasm() {
+    let capable: Vec<Target> = Target::ALL
+        .iter()
+        .copied()
+        .filter(|target| target.lowers_cli_entry())
+        .collect();
+    assert_eq!(capable, [Target::HirRust, Target::HirGo, Target::MirWasm]);
+}
