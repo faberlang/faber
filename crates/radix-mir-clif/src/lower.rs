@@ -746,8 +746,51 @@ impl FunctionLower<'_, '_> {
                 let length = self.call_runtime(&abi::TEXT_LEN, &[handle])?;
                 self.define_result(destination, length, Rep::Int)
             }
+            MirIntrinsic::Assert => {
+                let Some(condition) = call.args.first() else {
+                    return Err(Decline::new("assert arity"));
+                };
+                let (flag, rep) = self.scalar(condition)?;
+                if rep != Rep::Bool {
+                    return Err(Decline::new("assert on a non-boolean"));
+                }
+                let failing = self.builder.create_block();
+                self.builder.set_cold_block(failing);
+                let next = self.builder.create_block();
+                self.builder.ins().brif(flag, next, &[], failing, &[]);
+                self.builder.switch_to_block(failing);
+                let message = match call.args.get(1) {
+                    Some(argument) => {
+                        let (value, rep) = self.scalar(argument)?;
+                        self.render_text(value, rep)?
+                    }
+                    None => self.text_literal(b"assertion failed")?,
+                };
+                self.abort_with(message)?;
+                self.builder.switch_to_block(next);
+                Ok(())
+            }
+            MirIntrinsic::Panic => {
+                let [argument] = call.args.as_slice() else {
+                    return Err(Decline::new("panic arity"));
+                };
+                let (value, rep) = self.scalar(argument)?;
+                let message = self.render_text(value, rep)?;
+                self.abort_with(message)?;
+                // The MIR block continues (a terminator follows the panic).
+                let dead = self.builder.create_block();
+                self.builder.switch_to_block(dead);
+                Ok(())
+            }
             _ => Err(Decline::new("runtime call")),
         }
+    }
+
+    /// Abort the process with `message`; the block ends in a trap.
+    fn abort_with(&mut self, message: Value) -> Lowered<()> {
+        self.call_runtime(&abi::ABORT_TEXT, &[message])?;
+        self.builder.ins().trap(TrapCode::unwrap_user(1));
+        Ok(())
     }
 
     /// Store `value` into `destination`, which must hold `rep`.
@@ -1280,19 +1323,37 @@ impl FunctionLower<'_, '_> {
                 cases,
                 default,
             } => {
-                let (value, _) = self.scalar(value)?;
+                let (value, rep) = self.scalar(value)?;
                 for case in cases {
-                    let literal = match &case.value {
-                        MirConstant::Int(literal) => *literal,
-                        MirConstant::Bool(literal) => i64::from(*literal),
+                    let hit = match (&case.value, rep) {
+                        (MirConstant::Int(literal), Rep::Int) => {
+                            let literal = self.builder.ins().iconst(types::I64, *literal);
+                            self.builder.ins().icmp(IntCC::Equal, value, literal)
+                        }
+                        (MirConstant::UInt(literal), Rep::Int) => {
+                            let literal = i64::try_from(*literal)
+                                .map_err(|_| Decline::new("switch case constant"))?;
+                            let literal = self.builder.ins().iconst(types::I64, literal);
+                            self.builder.ins().icmp(IntCC::Equal, value, literal)
+                        }
+                        (MirConstant::Bool(literal), Rep::Bool) => {
+                            let literal = self.builder.ins().iconst(types::I8, i64::from(*literal));
+                            self.builder.ins().icmp(IntCC::Equal, value, literal)
+                        }
+                        (MirConstant::Float(literal), Rep::Float) => {
+                            let literal = self.builder.ins().f64const(*literal);
+                            self.builder.ins().fcmp(FloatCC::Equal, value, literal)
+                        }
+                        (MirConstant::String(symbol), Rep::Text) => {
+                            let text = radix_lexer::textus_literal::decode_textus_literal(
+                                self.state.input.interner.resolve(*symbol),
+                            );
+                            let literal = self.text_literal(text.as_bytes())?;
+                            self.call_runtime(&abi::TEXT_EQ, &[value, literal])?
+                                .ok_or_else(|| Decline::new("text equality result"))?
+                        }
                         _ => return Err(Decline::new("switch case constant")),
                     };
-                    let literal = if self.builder.func.dfg.value_type(value) == types::I8 {
-                        self.builder.ins().iconst(types::I8, literal)
-                    } else {
-                        self.builder.ins().iconst(types::I64, literal)
-                    };
-                    let hit = self.builder.ins().icmp(IntCC::Equal, value, literal);
                     let target = self.block(case.target)?;
                     let next = self.builder.create_block();
                     self.builder.ins().brif(hit, target, &[], next, &[]);

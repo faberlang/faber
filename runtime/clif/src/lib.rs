@@ -272,6 +272,19 @@ pub unsafe extern "C" fn __faber_clif_v1_text_len(handle: *const u8) -> i64 {
     i64::try_from(count).unwrap_or(i64::MAX)
 }
 
+/// Abort with a text message, the runner's `abort: <message>` (D5).
+///
+/// # Safety
+///
+/// `handle` addresses a well-formed text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_abort_text(handle: *const u8) -> ! {
+    flush();
+    let mut stderr = std::io::stderr();
+    let _ = writeln!(stderr, "abort: {}", text_str(unsafe { text_bytes(handle) }));
+    std::process::exit(1);
+}
+
 /// Report a failed run and exit with the runner's code (D5).
 ///
 /// # Safety

@@ -93,6 +93,13 @@ pub const TEXT_LEN: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr],
     ret: Some(I64),
 };
+/// Abort with a text message (`abort: <message>` on stderr, exit 1). Never
+/// returns.
+pub const ABORT_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_abort_text",
+    params: &[Ptr],
+    ret: None,
+};
 /// Trap with a message: (pointer, length). Never returns.
 pub const TRAP: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_trap",
@@ -136,6 +143,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     TEXT_EQ,
     TEXT_CMP,
     TEXT_LEN,
+    ABORT_TEXT,
     TRAP,
     TRAP_STORE,
     SET_DISPLAY_TOKENS,
