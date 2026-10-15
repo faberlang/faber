@@ -2421,6 +2421,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         self.return_value = None;
         self.return_error = None;
         self.push_frame(func_id, MirBlockId(0));
+        let callee_slots = self.slot_types.get(&func_id);
         if let Some(frame) = self.frames.last_mut() {
             if let Some((local, value)) = closure_environment {
                 write_slot(&mut frame.locals, local.0 as usize, value, span, "local")?;
@@ -2445,6 +2446,16 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         },
                     );
                 } else {
+                    // Binding is a store into the parameter cell: a float
+                    // bound to a bare `f32` parameter rounds to binary32.
+                    let arg = match arg {
+                        Value::Float(v)
+                            if callee_slots.is_some_and(|slots| slots.local_is_f32(local)) =>
+                        {
+                            Value::Float(f64::from(v as f32))
+                        }
+                        other => other,
+                    };
                     write_slot(&mut frame.locals, local.0 as usize, arg, span, "local")?;
                 }
             }

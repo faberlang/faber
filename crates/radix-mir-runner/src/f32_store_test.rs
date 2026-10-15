@@ -6,9 +6,9 @@ use super::*;
 use radix_lexer::{Interner, Span};
 use radix_mir::{
     MirBlock, MirBlockId, MirConstant, MirFunction, MirFunctionId, MirLocal, MirLocalId,
-    MirOperand, MirPlace, MirProgram, MirStatement, MirStatementKind, MirTemp, MirTempId,
-    MirTerminator, MirTerminatorKind, MirType, MirValidationContext, MirValue, MirValueId,
-    MirValueKind,
+    MirOperand, MirParam, MirParamMode, MirPlace, MirProgram, MirStatement, MirStatementKind,
+    MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirValidationContext, MirValue,
+    MirValueId, MirValueKind,
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 
@@ -145,4 +145,86 @@ fn bare_f32_flag_excludes_f64_and_policy_cells() {
     assert!(!is_bare_f32(&types, policy_ty));
     let read = store_and_read_in(types, policy_ty, false, 0.1);
     assert_eq!(read, Value::Float(0.1));
+}
+
+/// A callee `f32 id(f32 x) → x` bound to the constant `0.1` and run through
+/// `invoke_call`: argument binding is a store into the parameter cell.
+#[test]
+fn f32_parameter_round_trip_rounds_to_binary32() {
+    let mut types = TypeTable::new();
+    let f32_ty = types.intern(float_ty(NumericWidth::F32));
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&types);
+    let span = Span::default();
+    let scalar = MirType::semantic(f32_ty);
+    let callee = MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: scalar,
+            mode: MirParamMode::Owned,
+            span,
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: scalar,
+            mutable: false,
+            span,
+        }],
+        temps: vec![],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(0),
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: scalar,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    };
+    let caller = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![],
+        temps: vec![],
+        blocks: vec![],
+        return_ty: scalar,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    };
+    let mut program = MirProgram::new();
+    program.functions.push(caller);
+    program.functions.push(callee);
+    let mut host = crate::host::BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    let outcome = runner
+        .invoke_call(
+            &MirCallee::Function(MirFunctionId(1)),
+            &[MirOperand::Constant(MirConstant::Float(0.1))],
+            span,
+        )
+        .expect("call");
+    let CallOutcome::Ok(value) = outcome else {
+        panic!("call raised an error value");
+    };
+    assert_eq!(value, Value::Float(f64::from(0.1_f64 as f32)));
+    assert_ne!(value, Value::Float(0.1));
 }
