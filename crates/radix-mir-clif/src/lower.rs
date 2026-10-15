@@ -7,7 +7,8 @@
 
 use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
 use cranelift_codegen::ir::{
-    AbiParam, Block, FuncRef, InstBuilder, Signature, TrapCode, Type as ClType, Value, types,
+    AbiParam, Block, FuncRef, InstBuilder, MemFlagsData, Signature, TrapCode, Type as ClType,
+    Value, types,
 };
 use cranelift_codegen::settings::{self, Configurable, Flags};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
@@ -63,6 +64,8 @@ pub(crate) enum Rep {
     Bool,
     /// A raw-bits value `bN`: the pattern zero-extended in an `i64`.
     Bits(BitsWidth),
+    /// `lista<T>`: a pointer to a runtime list of tagged elements.
+    List,
     /// `textus`: a pointer to `[len: i64][bytes...]` (see `abi::TEXT_HEADER`).
     Text,
     /// No value.
@@ -75,7 +78,7 @@ impl Rep {
             Self::Int => Some(types::I64),
             Self::Float => Some(types::F64),
             Self::Bool => Some(types::I8),
-            Self::Text | Self::Bits(_) => Some(types::I64),
+            Self::Text | Self::Bits(_) | Self::List => Some(types::I64),
             Self::Unit => None,
         }
     }
@@ -98,6 +101,10 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(Primitive::Bivalens) => Ok(Rep::Bool),
         Type::Primitive(Primitive::Textus) => Ok(Rep::Text),
         Type::Bits(width) => Ok(Rep::Bits(*width)),
+        Type::Array(element) => {
+            rep_of(table, MirType::semantic(*element))?;
+            Ok(Rep::List)
+        }
         Type::Primitive(Primitive::Vacuum | Primitive::Numquam) => Ok(Rep::Unit),
         Type::SizedNumeric(Primitive::Numerus, width) => match width {
             NumericWidth::I8
@@ -403,6 +410,7 @@ struct FunctionLower<'f, 'a> {
     state: &'f mut ModuleState<'a>,
     blocks: FxHashMap<MirBlockId, Block>,
     slots: FxHashMap<Slot, (Variable, Rep)>,
+    slot_tys: FxHashMap<Slot, MirType>,
     values: FxHashMap<MirValueId, (Option<Value>, Rep)>,
     refs: FxHashMap<&'static str, FuncRef>,
     function_refs: FxHashMap<MirFunctionId, FuncRef>,
@@ -430,6 +438,7 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             state,
             blocks: FxHashMap::default(),
             slots: FxHashMap::default(),
+            slot_tys: FxHashMap::default(),
             values: FxHashMap::default(),
             refs: FxHashMap::default(),
             function_refs: FxHashMap::default(),
@@ -468,10 +477,12 @@ impl FunctionLower<'_, '_> {
         for local in &function.locals {
             let rep = rep_of(table, local.ty)?;
             self.declare(Slot::Local(local.id), rep);
+            self.slot_tys.insert(Slot::Local(local.id), local.ty);
         }
         for temp in &function.temps {
             let rep = rep_of(table, temp.ty)?;
             self.declare(Slot::Temp(temp.id), rep);
+            self.slot_tys.insert(Slot::Temp(temp.id), temp.ty);
         }
         for (index, param) in function.params.iter().enumerate() {
             let rep = rep_of(table, param.ty)?;
@@ -521,7 +532,7 @@ impl FunctionLower<'_, '_> {
             Rep::Int => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Float => Some(self.builder.ins().f64const(0.0)),
             Rep::Bool => Some(self.builder.ins().iconst(types::I8, 0)),
-            Rep::Text | Rep::Bits(_) => Some(self.builder.ins().iconst(types::I64, 0)),
+            Rep::Text | Rep::Bits(_) | Rep::List => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Unit => None,
         }
     }
@@ -629,9 +640,315 @@ impl FunctionLower<'_, '_> {
         Ok(self.builder.inst_results(call).first().copied())
     }
 
+    // LISTS
+
+    fn base_slot(place: &MirPlace) -> Slot {
+        match place.base {
+            MirPlaceBase::Local(id) => Slot::Local(id),
+            MirPlaceBase::Temp(id) => Slot::Temp(id),
+        }
+    }
+
+    /// The element type of a list type.
+    fn element_type(&self, list: MirType) -> Lowered<MirType> {
+        match resolve(self.state.input.types, list.semantic_id()) {
+            Type::Array(element) => Ok(MirType::semantic(*element)),
+            _ => Err(Decline::new("index of a non-list")),
+        }
+    }
+
+    /// The static type of a place after its projections.
+    fn place_type(&self, place: &MirPlace) -> Lowered<MirType> {
+        let mut ty = *self
+            .slot_tys
+            .get(&Self::base_slot(place))
+            .ok_or_else(|| Decline::new("undeclared storage slot"))?;
+        for projection in &place.projections {
+            if !matches!(projection, MirProjection::Index(_)) {
+                return Err(Decline::new("place projection"));
+            }
+            ty = self.element_type(ty)?;
+        }
+        Ok(ty)
+    }
+
+    /// The static type of an operand when it is a plain place or temp.
+    fn operand_type(&self, operand: &MirOperand) -> Lowered<MirType> {
+        match operand {
+            MirOperand::Place(place) => self.place_type(place),
+            MirOperand::Temp(id) => self
+                .slot_tys
+                .get(&Slot::Temp(*id))
+                .copied()
+                .ok_or_else(|| Decline::new("undeclared storage slot")),
+            _ => Err(Decline::new("operand type unknown")),
+        }
+    }
+
+    /// The runtime tag of a list element of representation `rep`.
+    fn element_tag(rep: Rep) -> Lowered<i64> {
+        Ok(match rep {
+            Rep::Int => abi::TAG_INT,
+            Rep::Float => abi::TAG_FLOAT,
+            Rep::Bool => abi::TAG_BOOL,
+            Rep::Text => abi::TAG_TEXT,
+            Rep::Bits(width) => abi::TAG_BITS + i64::from(width.bits().trailing_zeros() - 3),
+            Rep::List => abi::TAG_LIST,
+            Rep::Unit => return Err(Decline::new("unit list element")),
+        })
+    }
+
+    /// A value as the 64 bits a list element stores.
+    fn element_bits(&mut self, value: Value, rep: Rep) -> Value {
+        match rep {
+            Rep::Float => self
+                .builder
+                .ins()
+                .bitcast(types::I64, MemFlagsData::new(), value),
+            Rep::Bool => self.builder.ins().uextend(types::I64, value),
+            _ => value,
+        }
+    }
+
+    /// The value held by 64 element bits of representation `rep`.
+    fn element_value(&mut self, bits: Value, rep: Rep) -> Value {
+        match rep {
+            Rep::Float => self
+                .builder
+                .ins()
+                .bitcast(types::F64, MemFlagsData::new(), bits),
+            Rep::Bool => self.builder.ins().ireduce(types::I8, bits),
+            _ => bits,
+        }
+    }
+
+    /// An operand that fills an element of type `element`: a bare literal into
+    /// a `bN` element is the pattern itself.
+    fn element_operand(&mut self, operand: &MirOperand, element: MirType) -> Lowered<(Value, Rep)> {
+        let rep = rep_of(self.state.input.types, element)?;
+        if let (Rep::Bits(width), MirOperand::Constant(constant)) = (rep, operand)
+            && let Some(value) = self.bits_constant(constant, width)?
+        {
+            return Ok((value, rep));
+        }
+        let (value, have) = self.scalar(operand)?;
+        if have != rep {
+            return Err(Decline::new("list element representation mismatch"));
+        }
+        Ok((value, rep))
+    }
+
+    /// Load a list element chain: every projection must be an index.
+    fn read_projected(&mut self, place: &MirPlace) -> Lowered<(Value, Rep)> {
+        let slot = Self::base_slot(place);
+        let (variable, rep) = self.slot(slot)?;
+        let mut ty = self.place_type(&MirPlace {
+            base: place.base.clone(),
+            projections: Vec::new(),
+        })?;
+        let mut current = self.builder.use_var(variable);
+        let mut current_rep = rep;
+        for projection in &place.projections {
+            let MirProjection::Index(index) = projection else {
+                return Err(Decline::new("place projection"));
+            };
+            if current_rep != Rep::List {
+                return Err(Decline::new("index of a non-list"));
+            }
+            let element = self.element_type(ty)?;
+            let element_rep = rep_of(self.state.input.types, element)?;
+            let (index, index_rep) = self.scalar(index)?;
+            if index_rep != Rep::Int {
+                return Err(Decline::new("list index representation"));
+            }
+            let bits = self
+                .call_runtime(&abi::LIST_GET, &[current, index])?
+                .ok_or_else(|| Decline::new("list get result"))?;
+            current = self.element_value(bits, element_rep);
+            current_rep = element_rep;
+            ty = element;
+        }
+        Ok((current, current_rep))
+    }
+
+    /// Store into `a[i]...[k]`: the list chain up to the last index is read,
+    /// the last index is a `list_set`.
+    fn write_projected(&mut self, place: &MirPlace, value: Value, rep: Rep) -> Lowered<()> {
+        let Some((last, prefix)) = place.projections.split_last() else {
+            return Err(Decline::new("place projection"));
+        };
+        let MirProjection::Index(last_index) = last else {
+            return Err(Decline::new("place projection"));
+        };
+        let container = MirPlace {
+            base: place.base.clone(),
+            projections: prefix.to_vec(),
+        };
+        let (list, list_rep) = if prefix.is_empty() {
+            let (variable, rep) = self.place_slot(&container)?;
+            (self.builder.use_var(variable), rep)
+        } else {
+            self.read_projected(&container)?
+        };
+        if list_rep != Rep::List {
+            return Err(Decline::new("index of a non-list"));
+        }
+        let (index, index_rep) = self.scalar(last_index)?;
+        if index_rep != Rep::Int {
+            return Err(Decline::new("list index representation"));
+        }
+        let tag = self
+            .builder
+            .ins()
+            .iconst(types::I32, Self::element_tag(rep)?);
+        let bits = self.element_bits(value, rep);
+        self.call_runtime(&abi::LIST_SET, &[list, index, tag, bits])?;
+        Ok(())
+    }
+
+    /// `[a, b, ...spread]` as a runtime list.
+    fn construct_array(&mut self, destination: &MirPlace, aggregate: &MirAggregate) -> Lowered<()> {
+        let element = self.element_type(aggregate.ty)?;
+        let element_rep = rep_of(self.state.input.types, element)?;
+        let MirAggregateFields::Ordered(items) = &aggregate.fields else {
+            return Err(Decline::new("list fields"));
+        };
+        let list = self
+            .call_runtime(&abi::LIST_NEW, &[])?
+            .ok_or_else(|| Decline::new("list new result"))?;
+        for item in items {
+            match item {
+                MirAggregateItem::Operand(operand) => {
+                    let (value, rep) = self.element_operand(operand, element)?;
+                    let tag = self
+                        .builder
+                        .ins()
+                        .iconst(types::I32, Self::element_tag(element_rep)?);
+                    let bits = self.element_bits(value, rep);
+                    self.call_runtime(&abi::LIST_PUSH, &[list, tag, bits])?;
+                }
+                MirAggregateItem::Spread(operand) => {
+                    let (source, rep) = self.scalar(operand)?;
+                    if rep != Rep::List {
+                        return Err(Decline::new("spread of a non-list"));
+                    }
+                    self.call_runtime(&abi::LIST_EXTEND, &[list, source])?;
+                }
+            }
+        }
+        let (variable, slot_rep) = self.place_slot(destination)?;
+        if slot_rep != Rep::List {
+            return Err(Decline::new("list destination representation"));
+        }
+        self.builder.def_var(variable, list);
+        Ok(())
+    }
+
+    /// Collection operations over lists (and text, where shared).
+    fn collection_op(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+    ) -> Lowered<()> {
+        let Some(receiver) = args.first() else {
+            return Err(Decline::new("collection arity"));
+        };
+        let (handle, rep) = self.scalar(receiver)?;
+        let result = match (op, rep) {
+            (MirCollectionOp::Length, Rep::Text) => {
+                (self.call_runtime(&abi::TEXT_LEN, &[handle])?, Rep::Int)
+            }
+            (MirCollectionOp::Length, Rep::List) => {
+                (self.call_runtime(&abi::LIST_LEN, &[handle])?, Rep::Int)
+            }
+            (MirCollectionOp::IsEmpty, Rep::Text | Rep::List) => {
+                let symbol = if rep == Rep::Text {
+                    &abi::TEXT_LEN
+                } else {
+                    &abi::LIST_LEN
+                };
+                let length = self
+                    .call_runtime(symbol, &[handle])?
+                    .ok_or_else(|| Decline::new("length result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                (
+                    Some(self.builder.ins().icmp(IntCC::Equal, length, zero)),
+                    Rep::Bool,
+                )
+            }
+            (MirCollectionOp::Index, Rep::List) => {
+                let [_, index] = args else {
+                    return Err(Decline::new("index arity"));
+                };
+                let (index, index_rep) = self.scalar(index)?;
+                if index_rep != Rep::Int {
+                    return Err(Decline::new("list index representation"));
+                }
+                let Some(destination) = destination else {
+                    return Err(Decline::new("index without destination"));
+                };
+                let element = self.place_type(destination)?;
+                let element_rep = rep_of(self.state.input.types, element)?;
+                let bits = self
+                    .call_runtime(&abi::LIST_GET, &[handle, index])?
+                    .ok_or_else(|| Decline::new("list get result"))?;
+                (Some(self.element_value(bits, element_rep)), element_rep)
+            }
+            (MirCollectionOp::Append, Rep::List) => {
+                let [_, item] = args else {
+                    return Err(Decline::new("append arity"));
+                };
+                let element = self.element_type(self.operand_type(receiver)?)?;
+                let (value, item_rep) = self.element_operand(item, element)?;
+                let tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(item_rep)?);
+                let bits = self.element_bits(value, item_rep);
+                self.call_runtime(&abi::LIST_PUSH, &[handle, tag, bits])?;
+                return Ok(());
+            }
+            (MirCollectionOp::Contains, Rep::List) => {
+                let [_, item] = args else {
+                    return Err(Decline::new("contains arity"));
+                };
+                let element = self.element_type(self.operand_type(receiver)?)?;
+                let (value, item_rep) = self.element_operand(item, element)?;
+                let tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(item_rep)?);
+                let bits = self.element_bits(value, item_rep);
+                (
+                    self.call_runtime(&abi::LIST_CONTAINS, &[handle, tag, bits])?,
+                    Rep::Bool,
+                )
+            }
+            (MirCollectionOp::Reverse, Rep::List) => (
+                self.call_runtime(&abi::LIST_REVERSED, &[handle])?,
+                Rep::List,
+            ),
+            (MirCollectionOp::Sort, Rep::List) => {
+                (self.call_runtime(&abi::LIST_SORTED, &[handle])?, Rep::List)
+            }
+            _ => return Err(Decline::new("collection operation")),
+        };
+        match (destination, result.0) {
+            (Some(destination), value @ Some(_)) => {
+                self.define_result(destination, value, result.1)
+            }
+            _ => Ok(()),
+        }
+    }
+
     fn operand(&mut self, operand: &MirOperand) -> Lowered<(Option<Value>, Rep)> {
         match operand {
             MirOperand::Constant(constant) => self.constant(constant),
+            MirOperand::Place(place) if !place.projections.is_empty() => {
+                let (value, rep) = self.read_projected(place)?;
+                Ok((Some(value), rep))
+            }
             MirOperand::Place(place) => {
                 let (variable, rep) = self.place_slot(place)?;
                 if rep == Rep::Unit {
@@ -666,14 +983,23 @@ impl FunctionLower<'_, '_> {
     fn statement(&mut self, statement: &MirStatement) -> Lowered<()> {
         match &statement.kind {
             MirStatementKind::Assign { place, value } => {
-                let (_, slot_rep) = self.place_slot(place)?;
-                let (computed, rep) = match (&value.kind, slot_rep) {
+                let target_rep = rep_of(self.state.input.types, self.place_type(place)?)?;
+                let (computed, rep) = match (&value.kind, target_rep) {
                     (MirValueKind::Operand(MirOperand::Constant(constant)), Rep::Bits(width)) => {
                         (self.bits_constant(constant, width)?, Rep::Bits(width))
                     }
                     _ => self.value(value)?,
                 };
                 self.values.insert(value.id, (computed, rep));
+                if !place.projections.is_empty() {
+                    let Some(computed) = computed else {
+                        return Err(Decline::new("unit element store"));
+                    };
+                    if target_rep != rep {
+                        return Err(Decline::new("assignment representation mismatch"));
+                    }
+                    return self.write_projected(place, computed, rep);
+                }
                 let (variable, slot_rep) = self.place_slot(place)?;
                 if let Some(computed) = computed {
                     if slot_rep != rep {
@@ -690,6 +1016,12 @@ impl FunctionLower<'_, '_> {
             } => self.call(destination.as_ref(), callee, args),
             MirStatementKind::RuntimeCall { destination, call } => {
                 self.runtime_call(destination.as_ref(), call)
+            }
+            MirStatementKind::Construct {
+                destination,
+                aggregate,
+            } if aggregate.kind == MirAggregateKind::Array => {
+                self.construct_array(destination, aggregate)
             }
             MirStatementKind::Construct { .. } => Err(Decline::new("aggregate construction")),
         }
@@ -758,17 +1090,7 @@ impl FunctionLower<'_, '_> {
                 };
                 self.format_string(destination, *template, &call.args)
             }
-            MirIntrinsic::Collection(MirCollectionOp::Length) => {
-                let (Some(destination), [receiver]) = (destination, call.args.as_slice()) else {
-                    return Err(Decline::new("length shape"));
-                };
-                let (handle, rep) = self.scalar(receiver)?;
-                if rep != Rep::Text {
-                    return Err(Decline::new("length of a non-text value"));
-                }
-                let length = self.call_runtime(&abi::TEXT_LEN, &[handle])?;
-                self.define_result(destination, length, Rep::Int)
-            }
+            MirIntrinsic::Collection(op) => self.collection_op(destination, *op, &call.args),
             MirIntrinsic::Assert => {
                 let Some(condition) = call.args.first() else {
                     return Err(Decline::new("assert arity"));
@@ -843,6 +1165,7 @@ impl FunctionLower<'_, '_> {
                 self.call_runtime(&abi::TEXT_FROM_F64, &[value, narrow])?
             }
             Rep::Bool => self.call_runtime(&abi::TEXT_FROM_BOOL, &[value])?,
+            Rep::List => self.call_runtime(&abi::TEXT_FROM_LIST, &[value])?,
             Rep::Bits(width) => {
                 let bits = self
                     .builder
@@ -953,7 +1276,10 @@ impl FunctionLower<'_, '_> {
         let (variable, slot_rep) = self.place_slot(destination)?;
         let stored = match (rep, slot_rep) {
             (Rep::Int, Rep::Int) => self.int_store(site, conversion.target_ty, value)?,
-            (Rep::Float, Rep::Float) | (Rep::Bool, Rep::Bool) | (Rep::Text, Rep::Text) => value,
+            (Rep::Float, Rep::Float)
+            | (Rep::Bool, Rep::Bool)
+            | (Rep::Text, Rep::Text)
+            | (Rep::List, Rep::List) => value,
             (Rep::Bits(from), Rep::Bits(to)) if from == to => value,
             _ => return Err(Decline::new("conversion between representations")),
         };
@@ -1090,6 +1416,10 @@ impl FunctionLower<'_, '_> {
                 let reference = self.runtime_ref(&abi::PRINT_BITS)?;
                 self.builder.ins().call(reference, &[stream, value, bits]);
             }
+            Rep::List => {
+                let reference = self.runtime_ref(&abi::PRINT_LIST)?;
+                self.builder.ins().call(reference, &[stream, value]);
+            }
             Rep::Text => {
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
                 self.builder.ins().call(reference, &[stream, value]);
@@ -1168,7 +1498,7 @@ impl FunctionLower<'_, '_> {
             Rep::Float => self.float_binary(op, a, b),
             Rep::Bool => self.bool_binary(op, a, b),
             Rep::Text => self.text_binary(op, a, b),
-            Rep::Bits(_) | Rep::Unit => Err(Decline::new("unit operands")),
+            Rep::Bits(_) | Rep::List | Rep::Unit => Err(Decline::new("unit operands")),
         }
     }
 

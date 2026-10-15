@@ -63,6 +63,82 @@ pub const TEXT_FROM_BITS: RuntimeSymbol = RuntimeSymbol {
     params: &[I64, I32],
     ret: Some(Ptr),
 };
+/// A list handle points at a runtime list of tagged elements; every element
+/// carries one of these tags so the runtime can display and compare it.
+pub const TAG_INT: i64 = 0;
+pub const TAG_FLOAT: i64 = 1;
+pub const TAG_BOOL: i64 = 2;
+pub const TAG_TEXT: i64 = 3;
+/// Raw-bits tags are `TAG_BITS + log2(width / 8)`: 4, 5, 6, 7.
+pub const TAG_BITS: i64 = 4;
+pub const TAG_LIST: i64 = 8;
+
+/// New empty list.
+pub const LIST_NEW: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_new",
+    params: &[],
+    ret: Some(Ptr),
+};
+/// Append one element: (list, tag, bits).
+pub const LIST_PUSH: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_push",
+    params: &[Ptr, I32, I64],
+    ret: None,
+};
+/// Append every element of the second list to the first.
+pub const LIST_EXTEND: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_extend",
+    params: &[Ptr, Ptr],
+    ret: None,
+};
+/// Number of elements.
+pub const LIST_LEN: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_len",
+    params: &[Ptr],
+    ret: Some(I64),
+};
+/// Element bits at an index; out of range aborts.
+pub const LIST_GET: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_get",
+    params: &[Ptr, I64],
+    ret: Some(I64),
+};
+/// Overwrite the element at an index: (list, index, tag, bits).
+pub const LIST_SET: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_set",
+    params: &[Ptr, I64, I32, I64],
+    ret: None,
+};
+/// Membership: (list, tag, bits) -> 0/1.
+pub const LIST_CONTAINS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_contains",
+    params: &[Ptr, I32, I64],
+    ret: Some(I8),
+};
+/// A new reversed copy.
+pub const LIST_REVERSED: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_reversed",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// A new sorted copy (ascending).
+pub const LIST_SORTED: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_sorted",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Print a list line.
+pub const PRINT_LIST: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_print_list",
+    params: &[I32, Ptr],
+    ret: None,
+};
+/// Render a list as text.
+pub const TEXT_FROM_LIST: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_from_list",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
 /// Concatenate two texts: (left, right) -> new text handle.
 pub const TEXT_CONCAT: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_text_concat",
@@ -147,6 +223,17 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     PRINT_I64,
     PRINT_F64,
     PRINT_BOOL,
+    LIST_NEW,
+    LIST_PUSH,
+    LIST_EXTEND,
+    LIST_LEN,
+    LIST_GET,
+    LIST_SET,
+    LIST_CONTAINS,
+    LIST_REVERSED,
+    LIST_SORTED,
+    PRINT_LIST,
+    TEXT_FROM_LIST,
     PRINT_TEXT,
     PRINT_BITS,
     TEXT_FROM_BITS,

@@ -185,8 +185,8 @@ impl<'a> ClifCapability<'a> {
             }
             Type::Primitive(Primitive::Nihil) => Some(Gap::Subset("none value".to_owned())),
             Type::Primitive(Primitive::Ignotum) => Some(Gap::Subset("unknown value".to_owned())),
-            Type::Array(_)
-            | Type::BoundedArray { .. }
+            Type::Array(element) => self.type_gap(MirType::semantic(*element)),
+            Type::BoundedArray { .. }
             | Type::Queue(_)
             | Type::BoundedQueue { .. }
             | Type::Stack(_)
@@ -302,7 +302,7 @@ impl<'a> ClifCapability<'a> {
     fn aggregate_gap(kind: &MirAggregateKind) -> Option<Gap> {
         match kind {
             MirAggregateKind::Tuple => Some(Gap::Subset("tuple construction".to_owned())),
-            MirAggregateKind::Array => Some(Gap::Subset("list construction".to_owned())),
+            MirAggregateKind::Array => None,
             MirAggregateKind::Map => Some(Gap::Subset("map construction".to_owned())),
             MirAggregateKind::Set => Some(Gap::Subset("set construction".to_owned())),
             MirAggregateKind::Record => Some(Gap::Subset("record construction".to_owned())),
@@ -423,7 +423,11 @@ impl MirVisitor for ClifCapability<'_> {
     }
 
     fn visit_place(&mut self, place: &MirPlace) {
-        if !place.projections.is_empty() {
+        if place
+            .projections
+            .iter()
+            .any(|projection| !matches!(projection, MirProjection::Index(_)))
+        {
             self.record(Gap::Subset("place projection".to_owned()));
         }
         radix_mir::visit::walk_place(self, place);
@@ -459,7 +463,15 @@ impl MirVisitor for ClifCapability<'_> {
                 MirIntrinsic::FormatString { .. }
                     | MirIntrinsic::Assert
                     | MirIntrinsic::Panic
-                    | MirIntrinsic::Collection(MirCollectionOp::Length)
+                    | MirIntrinsic::Collection(
+                        MirCollectionOp::Length
+                            | MirCollectionOp::Append
+                            | MirCollectionOp::IsEmpty
+                            | MirCollectionOp::Index
+                            | MirCollectionOp::Contains
+                            | MirCollectionOp::Reverse
+                            | MirCollectionOp::Sort
+                    )
             )
         {
             radix_mir::visit::walk_runtime_call(self, call);

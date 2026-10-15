@@ -205,10 +205,28 @@ fn gaps_keep_storage_order() {
 }
 
 #[test]
-fn collection_type_names_gap() {
+fn list_type_is_capable_and_set_type_names_gap() {
     let mut types = TypeTable::new();
     let numerus_id = types.primitive(Primitive::Numerus);
     let list = MirType::semantic(types.array(numerus_id));
+    let program = single_function(FunctionShape {
+        params: Vec::new(),
+        locals: vec![local(0, list)],
+        temps: Vec::new(),
+        statements: Vec::new(),
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: ty(&types, Primitive::Vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+    let verdict = classify_with_types(&program, &types);
+    assert!(
+        verdict.is_capable(),
+        "a list of numbers is inside the subset: {verdict:?}"
+    );
+
+    let list = MirType::semantic(types.set(numerus_id));
     let program = single_function(FunctionShape {
         params: Vec::new(),
         locals: vec![local(0, list)],

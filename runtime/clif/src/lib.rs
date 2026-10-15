@@ -204,6 +204,235 @@ pub extern "C" fn __faber_clif_v1_text_from_bits(pattern: i64, width: i32) -> *c
     text_new(bits_text(pattern, width).as_bytes())
 }
 
+/// A runtime list: tagged 64-bit elements (see `abi::TAG_*` in the generator).
+pub struct List {
+    items: Vec<(i32, i64)>,
+}
+
+const TAG_FLOAT: i32 = 1;
+const TAG_BOOL: i32 = 2;
+const TAG_TEXT: i32 = 3;
+const TAG_BITS: i32 = 4;
+const TAG_LIST: i32 = 8;
+
+/// # Safety
+///
+/// `handle` is a list returned by `__faber_clif_v1_list_new` family calls.
+unsafe fn list_ref<'a>(handle: *const List) -> &'a List {
+    unsafe { &*handle }
+}
+
+/// # Safety
+///
+/// As [`list_ref`], and no other reference to the list is live.
+#[allow(clippy::mut_from_ref)]
+unsafe fn list_mut<'a>(handle: *mut List) -> &'a mut List {
+    unsafe { &mut *handle }
+}
+
+fn list_new_from(items: Vec<(i32, i64)>) -> *mut List {
+    Box::into_raw(Box::new(List { items }))
+}
+
+/// Display one element; text elements are quoted as the runner quotes them.
+fn element_text(tag: i32, bits: i64) -> String {
+    match tag {
+        TAG_FLOAT => display_fractus(f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()))),
+        TAG_BOOL => display_bivalens(bits != 0, tokens()).to_owned(),
+        TAG_TEXT => format!("{:?}", text_str(unsafe { text_bytes(bits as *const u8) })),
+        TAG_LIST => list_text(unsafe { list_ref(bits as *const List) }),
+        tag if (TAG_BITS..TAG_BITS + 4).contains(&tag) => bits_text(bits, 8 << (tag - TAG_BITS)),
+        _ => bits.to_string(),
+    }
+}
+
+fn list_text(list: &List) -> String {
+    let parts: Vec<String> = list
+        .items
+        .iter()
+        .map(|&(tag, bits)| element_text(tag, bits))
+        .collect();
+    format!("[{}]", parts.join(", "))
+}
+
+/// New empty list.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_list_new() -> *mut List {
+    list_new_from(Vec::new())
+}
+
+/// Append one element.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_push(list: *mut List, tag: i32, bits: i64) {
+    unsafe { list_mut(list) }.items.push((tag, bits));
+}
+
+/// Append every element of `source` to `list`.
+///
+/// # Safety
+///
+/// Both are live runtime lists.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_extend(list: *mut List, source: *const List) {
+    let copied = unsafe { list_ref(source) }.items.clone();
+    unsafe { list_mut(list) }.items.extend(copied);
+}
+
+/// Number of elements.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_len(list: *const List) -> i64 {
+    i64::try_from(unsafe { list_ref(list) }.items.len()).unwrap_or(i64::MAX)
+}
+
+fn index_out_of_bounds() -> ! {
+    unsafe { __faber_clif_v1_trap(c"array index out of bounds".as_ptr().cast(), 25) }
+}
+
+/// Element bits at `index`; an index out of range ends the run.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_get(list: *const List, index: i64) -> i64 {
+    let list = unsafe { list_ref(list) };
+    match usize::try_from(index)
+        .ok()
+        .and_then(|at| list.items.get(at))
+    {
+        Some(&(_, bits)) => bits,
+        None => index_out_of_bounds(),
+    }
+}
+
+/// Overwrite the element at `index`; an index out of range ends the run.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_set(
+    list: *mut List,
+    index: i64,
+    tag: i32,
+    bits: i64,
+) {
+    let list = unsafe { list_mut(list) };
+    match usize::try_from(index)
+        .ok()
+        .and_then(|at| list.items.get_mut(at))
+    {
+        Some(slot) => *slot = (tag, bits),
+        None => index_out_of_bounds(),
+    }
+}
+
+fn element_equal(tag: i32, left: i64, right: i64) -> bool {
+    match tag {
+        TAG_FLOAT => {
+            f64::from_bits(u64::from_ne_bytes(left.to_ne_bytes()))
+                == f64::from_bits(u64::from_ne_bytes(right.to_ne_bytes()))
+        }
+        TAG_TEXT => unsafe { text_bytes(left as *const u8) == text_bytes(right as *const u8) },
+        TAG_LIST => unsafe {
+            let (left, right) = (
+                list_ref(left as *const List),
+                list_ref(right as *const List),
+            );
+            left.items.len() == right.items.len()
+                && left
+                    .items
+                    .iter()
+                    .zip(&right.items)
+                    .all(|(a, b)| a.0 == b.0 && element_equal(a.0, a.1, b.1))
+        },
+        _ => left == right,
+    }
+}
+
+/// Membership test.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_contains(
+    list: *const List,
+    tag: i32,
+    bits: i64,
+) -> i8 {
+    i8::from(
+        unsafe { list_ref(list) }
+            .items
+            .iter()
+            .any(|&(item_tag, item)| item_tag == tag && element_equal(tag, item, bits)),
+    )
+}
+
+/// A reversed copy.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_reversed(list: *const List) -> *mut List {
+    let mut items = unsafe { list_ref(list) }.items.clone();
+    items.reverse();
+    list_new_from(items)
+}
+
+fn element_order(tag: i32, left: i64, right: i64) -> std::cmp::Ordering {
+    match tag {
+        TAG_FLOAT => f64::from_bits(u64::from_ne_bytes(left.to_ne_bytes()))
+            .total_cmp(&f64::from_bits(u64::from_ne_bytes(right.to_ne_bytes()))),
+        TAG_TEXT => unsafe { text_bytes(left as *const u8).cmp(text_bytes(right as *const u8)) },
+        TAG_BITS..=7 => {
+            u64::from_ne_bytes(left.to_ne_bytes()).cmp(&u64::from_ne_bytes(right.to_ne_bytes()))
+        }
+        _ => left.cmp(&right),
+    }
+}
+
+/// An ascending sorted copy.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_sorted(list: *const List) -> *mut List {
+    let mut items = unsafe { list_ref(list) }.items.clone();
+    items.sort_by(|a, b| element_order(a.0, a.1, b.1));
+    list_new_from(items)
+}
+
+/// Print one list line.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_print_list(stream: i32, list: *const List) {
+    emit(stream, &list_text(unsafe { list_ref(list) }));
+}
+
+/// Render a list as text.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_from_list(list: *const List) -> *const u8 {
+    text_new(list_text(unsafe { list_ref(list) }).as_bytes())
+}
+
 /// Print one text line (stream 0 stdout, 1 stderr).
 ///
 /// # Safety
