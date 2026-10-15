@@ -6,9 +6,10 @@ const ADMITTED_INTRINSICS: &[&str] = &[
     "subtracta",
     "multiplicata",
     "divisa",
-    "subtrahe",
-    "multiplica",
-    "divisio",
+    // The pre-G-02 spellings `subtrahe`/`multiplica`/`divisio` were admitted
+    // only until ruling C of need renamed the Tensor registry rows.
+    // That rename landed in 43154f1f59, so they are retired and no longer
+    // belong on this list.
     "nega",
     "summa",
     "media",
