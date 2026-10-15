@@ -547,6 +547,18 @@ pub const TEXT_CHARS: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr],
     ret: Some(Ptr),
 };
+/// The `b16` pattern of an `f16` value held as `f64`: value -> pattern.
+pub const F16_TO_BITS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_f16_to_bits",
+    params: &[F64],
+    ret: Some(I64),
+};
+/// The `f16` value of a `b16` pattern, held as `f64`: pattern -> value.
+pub const F16_FROM_BITS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_f16_from_bits",
+    params: &[I64],
+    ret: Some(F64),
+};
 /// Install the program's output tokens (true, false, none, tuple), each as
 /// (pointer, length).
 pub const SET_DISPLAY_TOKENS: RuntimeSymbol = RuntimeSymbol {
@@ -756,6 +768,8 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     MAIN,
     PRINT_I64,
     PRINT_WIDE,
+    F16_TO_BITS,
+    F16_FROM_BITS,
     TEXT_CHARS,
     CHAR_FROM_TEXT,
     CHAR_FROM_CODE,

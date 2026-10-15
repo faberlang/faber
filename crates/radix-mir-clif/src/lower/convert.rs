@@ -132,19 +132,17 @@ pub(crate) fn numeric_conversion(
         // A signed integer or an unsigned one below 64 bits reads and writes
         // a same-width pattern; a u64 pattern would leave the carrier.
         (Num::Int(from), Num::Bits(width)) => {
-            from.policy == IntPolicy::Trap
-                && width.bits() == int_bits(from.width)
-                && (signed_width(from.width) || width.bits() < 64)
+            from.policy == IntPolicy::Trap && width.bits() == int_bits(from.width)
         }
         (Num::Bits(width), Num::Int(to)) => {
-            to.policy == IntPolicy::Trap
-                && width.bits() == int_bits(to.width)
-                && (signed_width(to.width) || width.bits() < 64)
+            to.policy == IntPolicy::Trap && width.bits() == int_bits(to.width)
         }
         (Num::Float(float), Num::Bits(width)) | (Num::Bits(width), Num::Float(float)) => {
             matches!(
                 (float, width),
-                (NumericWidth::F32, BitsWidth::B32) | (NumericWidth::F64, BitsWidth::B64)
+                (NumericWidth::F32, BitsWidth::B32)
+                    | (NumericWidth::F64, BitsWidth::B64)
+                    | (NumericWidth::F16, BitsWidth::B16)
             )
         }
         _ => false,
@@ -848,10 +846,37 @@ impl FunctionLower<'_, '_> {
                 (self.builder.ins().icmp(IntCC::NotEqual, length, zero), None)
             }
             (Num::Int(_), Num::Bits(width)) => (self.mask_pattern(value, width), None),
-            (Num::Bits(width), Num::Int(to)) => (
-                self.extend_pattern(value, width, signed_width(to.width)),
-                None,
-            ),
+            (Num::Bits(width), Num::Int(to)) => {
+                let read = self.extend_pattern(value, width, signed_width(to.width));
+                if to.width == NumericWidth::U64 {
+                    // A pattern with the top bit set is a u64 the i64 carrier
+                    // cannot hold: refuse it by name at run time.
+                    let zero = self.builder.ins().iconst(types::I64, 0);
+                    let beyond = self.builder.ins().icmp(IntCC::SignedLessThan, read, zero);
+                    return Ok((
+                        read,
+                        Some((
+                            beyond,
+                            Failure::Static(
+                                "u64 value beyond 2^63 is not carried by the clif target",
+                            ),
+                        )),
+                    ));
+                }
+                (read, None)
+            }
+            (Num::Float(NumericWidth::F16), Num::Bits(_)) => {
+                let pattern = self
+                    .call_runtime(&abi::F16_TO_BITS, &[value])?
+                    .ok_or_else(|| Decline::new("f16 pattern result"))?;
+                (pattern, None)
+            }
+            (Num::Bits(_), Num::Float(NumericWidth::F16)) => {
+                let float = self
+                    .call_runtime(&abi::F16_FROM_BITS, &[value])?
+                    .ok_or_else(|| Decline::new("f16 value result"))?;
+                (float, None)
+            }
             (Num::Float(_), Num::Bits(width)) => {
                 let pattern = if width == BitsWidth::B32 {
                     let narrow = self.builder.ins().fdemote(types::F32, value);

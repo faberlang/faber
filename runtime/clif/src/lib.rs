@@ -1182,6 +1182,94 @@ pub unsafe extern "C" fn __faber_clif_v1_text_chars(text: *const u8) -> *mut Lis
     list_new_from(items)
 }
 
+/// `f32` to the nearest `f16` pattern, ties to even.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss
+)]
+fn f32_to_f16(x: f32) -> u16 {
+    if x.is_nan() {
+        return 0x7e00;
+    }
+    let bits = x.to_bits();
+    let sign = ((bits >> 16) & 0x8000) as u16;
+    let exponent = ((bits >> 23) & 0xff) as i32;
+    let mantissa = bits & 0x7f_ffff;
+    if exponent == 0xff {
+        return sign | 0x7c00;
+    }
+    let biased = exponent - 127 + 15;
+    if biased >= 0x1f {
+        return sign | 0x7c00;
+    }
+    if biased <= 0 {
+        if biased < -10 {
+            return sign;
+        }
+        let shift = 14 - biased;
+        let half = mantissa | 0x80_0000;
+        let rounded = half + (1 << (shift - 1)) - 1 + ((half >> shift) & 1);
+        return sign | ((rounded >> shift) as u16);
+    }
+    let round_bits = mantissa & 0x1fff;
+    let mut half_mantissa = (mantissa >> 13) as u16;
+    if round_bits > 0x1000 || (round_bits == 0x1000 && (half_mantissa & 1) == 1) {
+        half_mantissa += 1;
+        if half_mantissa == 0x400 {
+            return sign | ((biased as u16 + 1) << 10);
+        }
+    }
+    sign | ((biased as u16) << 10) | half_mantissa
+}
+
+/// An `f16` pattern as `f32` (infinities and NaNs keep their sign).
+fn f16_to_f32(bits: u16) -> f32 {
+    let negative = bits & 0x8000 != 0;
+    let exponent = i32::from((bits >> 10) & 0x1f);
+    let mantissa = f32::from(bits & 0x3ff);
+    let magnitude = if exponent == 0 {
+        mantissa * 2f32.powi(-24)
+    } else if exponent == 0x1f {
+        if bits & 0x3ff == 0 {
+            f32::INFINITY
+        } else {
+            f32::NAN
+        }
+    } else {
+        (1.0 + mantissa / 1024.0) * 2f32.powi(exponent - 15)
+    };
+    if negative { -magnitude } else { magnitude }
+}
+
+/// The `b16` pattern of an `f16` value held as `f64`; a NaN keeps its sign
+/// and top payload bits and never collapses to infinity.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_f16_to_bits(value: f64) -> i64 {
+    #[allow(clippy::cast_possible_truncation)]
+    let wide = (value as f32).to_bits();
+    if value.is_nan() {
+        let payload = ((wide >> 13) & 0x03ff).max(0x0200);
+        return i64::from(((wide >> 16) & 0x8000) | 0x7c00 | payload);
+    }
+    #[allow(clippy::cast_possible_truncation)]
+    i64::from(f32_to_f16(value as f32))
+}
+
+/// The `f16` value of a `b16` pattern, held as `f64`; a NaN keeps its
+/// payload.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_f16_from_bits(pattern: i64) -> f64 {
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    let bits = (pattern as u64 & 0xffff) as u16;
+    if bits & 0x7c00 == 0x7c00 && bits & 0x03ff != 0 {
+        let sign = u32::from(bits >> 15) << 31;
+        let payload = u32::from(bits & 0x03ff) << 13;
+        return f64::from(f32::from_bits(sign | 0x7f80_0000 | payload));
+    }
+    f64::from(f16_to_f32(bits))
+}
+
 /// Render a float as text; `narrow` selects the `f32` display contract.
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_text_from_f64(value: f64, narrow: i32) -> *const u8 {
