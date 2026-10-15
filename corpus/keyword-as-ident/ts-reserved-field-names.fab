@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "identifier"
 canonical = true
 summary = "Genus fields, methods, variant fields, parameters and locals may be spelled like ECMAScript reserved words; a field is read, written and built under the name it was declared with."
-syntax = "class Pouch { var int yield; fn delete(int await) → int { let int let ← await + self.yield; return let } }"
+syntax = "class Pouch { mut int yield; fn delete(int await) → int { let int let ← await + self.yield; return let } }"
 related = ["keyword-as-ident", "rust-reserved-names"]
 locale = "en"
 +++

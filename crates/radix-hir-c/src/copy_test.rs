@@ -24,7 +24,7 @@ fn a_copy_argument_deep_duplicates_before_the_call() {
 #[test]
 fn a_copy_of_a_genus_generates_and_calls_its_clone() {
     let code = emitted(
-        "class Holder {\n    var int n = 0\n    var list<int> marks = []\n}\nmain {\n    let Holder a ← Holder { n = 1 }\n    mut Holder b ← copy a\n    print b.n\n}",
+        "class Holder {\n    mut int n = 0\n    mut list<int> marks = []\n}\nmain {\n    let Holder a ← Holder { n = 1 }\n    mut Holder b ← copy a\n    print b.n\n}",
     );
     assert!(code.contains("g_Holder_copy(faber_a, l_a)"), "{code}");
     assert!(
@@ -41,7 +41,7 @@ fn a_copy_of_a_genus_generates_and_calls_its_clone() {
 #[test]
 fn a_clone_is_emitted_once_even_when_asked_twice() {
     let code = emitted(
-        "class Counter {\n    var int n = 0\n}\nmain {\n    let Counter a ← Counter { n = 1 }\n    mut Counter b ← copy a\n    mut Counter c ← copy a\n    print b.n, c.n\n}",
+        "class Counter {\n    mut int n = 0\n}\nmain {\n    let Counter a ← Counter { n = 1 }\n    mut Counter b ← copy a\n    mut Counter c ← copy a\n    print b.n, c.n\n}",
     );
     // One definition (the prototype is the same text without the body).
     assert_eq!(

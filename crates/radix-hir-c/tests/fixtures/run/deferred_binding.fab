@@ -4,7 +4,7 @@ locale = "en"
 # A deferred binding: declared without an initializer, assigned before any
 # read. The C cell is declared unwritten and stored once.
 main {
-    const int pending
+    let int pending
     pending ← 7
     print pending
     let label

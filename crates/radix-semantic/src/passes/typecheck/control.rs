@@ -1146,12 +1146,17 @@ impl TypeChecker<'_> {
     /// Drop facts before checking an assignment, so its target is typed from
     /// the declared cell rather than from a stale pre-assignment refinement.
     pub(crate) fn invalidate_assignment_target(&mut self, target: &HirExpression) {
-        // Any store whose place is rooted at a binding — a bare path or a
-        // field chain (`p.nomen ← v`) — invalidates that binding's own fact
-        // and every field fact rooted at it (conservative over-invalidation
-        // across sibling fields).
-        if let Some((base, _)) = field_path_key(target) {
-            self.invalidate_flow_fact(base);
+        // A bare-path store re-points the binding: its own fact and every
+        // field fact rooted at it go. A field-chain store (`p.nomen ← v`)
+        // drops every field fact rooted at the base (conservative across
+        // sibling fields) but leaves the base's own fact: writing through a
+        // narrowed `ref Node ∪ none cur` does not make `cur` none again.
+        if let Some((base, path)) = field_path_key(target) {
+            if path.is_empty() {
+                self.invalidate_flow_fact(base);
+            } else {
+                self.field_facts.retain(|(root, _), _| *root != base);
+            }
         }
     }
 
@@ -1160,8 +1165,12 @@ impl TypeChecker<'_> {
     /// their target is typed; this post-pass covers assignments nested in a
     /// larger statement expression and inc/dec targets.
     pub(crate) fn invalidate_assignments_in_expr(&mut self, expr: &HirExpression) {
-        for def_id in assignment_targets_in_expr(expr) {
+        let (rebound, field_roots) = assignment_targets_in_expr(expr);
+        for def_id in rebound {
             self.invalidate_flow_fact(def_id);
+        }
+        for base in field_roots {
+            self.field_facts.retain(|(root, _), _| *root != base);
         }
     }
 
@@ -1323,15 +1332,18 @@ fn assignment_targets_in_block(block: &HirBlock) -> FxHashSet<DefId> {
     collector.targets
 }
 
-fn assignment_targets_in_expr(expr: &HirExpression) -> FxHashSet<DefId> {
+fn assignment_targets_in_expr(expr: &HirExpression) -> (FxHashSet<DefId>, FxHashSet<DefId>) {
     let mut collector = AssignmentTargetCollector::default();
     collector.visit_expr(expr);
-    collector.targets
+    (collector.targets, collector.field_roots)
 }
 
 #[derive(Default)]
 struct AssignmentTargetCollector {
+    /// Bindings re-pointed by a bare-path store.
     targets: FxHashSet<DefId>,
+    /// Bindings that root a field-chain store; only their field facts go.
+    field_roots: FxHashSet<DefId>,
 }
 
 impl HirVisitor for AssignmentTargetCollector {
@@ -1357,11 +1369,13 @@ impl HirVisitor for AssignmentTargetCollector {
 impl AssignmentTargetCollector {
     fn collect_target(&mut self, target: &HirExpression) {
         // A field-chain store (`p.nomen ← v`, `p.a.b ← v`) has its place
-        // rooted at the base binding: record the base so the collector
-        // invalidates that binding's own fact and every field fact rooted at
-        // it.
-        if let Some((base, _)) = field_path_key(target) {
-            self.targets.insert(base);
+        // rooted at the base binding: only the field facts rooted there go.
+        if let Some((base, path)) = field_path_key(target) {
+            if path.is_empty() {
+                self.targets.insert(base);
+            } else {
+                self.field_roots.insert(base);
+            }
         }
     }
 }

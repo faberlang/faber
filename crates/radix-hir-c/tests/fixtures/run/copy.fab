@@ -5,11 +5,11 @@ locale = "en"
 # gets a fresh arena array; a genus is duplicated field by field, so a list
 # field inside it is not shared.
 class Holder {
-    var float x = 0.0
-    var list<int> marks = []
+    mut float x = 0.0
+    mut list<int> marks = []
 }
 class Counter {
-    var int n = 0
+    mut int n = 0
 }
 fn take(copy list<int> items) → int {
     mut list<int> fresh ← items

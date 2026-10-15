@@ -211,10 +211,11 @@ fn ref_param_field_write_has_no_de_parameter_report() {
 }
 
 #[test]
-fn ref_param_whole_value_write_still_reports_de_parameter() {
-    assert_rejects_with_issue_la(
+fn ref_param_whole_value_write_re_points_the_name() {
+    // Binding-words ruling 2026-10-15: a ref (or bare) parameter's name is
+    // re-pointable inside the callee; only a write through it is refused.
+    crate::test_support::assert_accepts_la(
         "functio f(de numerus n) → vacuum { n ← 1 }\nincipit { }",
-        "assign_to_de_parameter",
     );
 }
 
@@ -245,17 +246,10 @@ fn ref_param_index_write_reports_exactly_one_diagnostic() {
 }
 
 #[test]
-fn ref_param_whole_value_write_keeps_second_assignment() {
-    let src = "genus Punctum { varia numerus x }\nfunctio f(de Punctum p, Punctum q) → vacuum { p ← q }\nincipit { }";
-    let result = crate::test_support::analyze_source_la(src);
-    let issues: Vec<_> = result
-        .diagnostics
-        .iter()
-        .filter(|d| d.is_error())
-        .filter_map(|d| crate::test_support::issue(d))
-        .collect();
-    assert!(
-        issues.contains(&"immutable_second_assignment"),
-        "whole-value write to a ref param stays write-once: {issues:?}"
+fn ref_param_whole_value_write_re_points_the_parameter() {
+    // Binding-words ruling 2026-10-15: `p ← q` re-points the ref parameter's
+    // name (callee-local); it is not a second assignment.
+    crate::test_support::assert_accepts_la(
+        "genus Punctum { varia numerus x }\nfunctio f(de Punctum p, Punctum q) → vacuum { p ← q }\nincipit { }",
     );
 }

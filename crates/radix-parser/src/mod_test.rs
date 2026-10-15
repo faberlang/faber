@@ -2190,7 +2190,7 @@ functio f(lista<numerus> xs) → vacuum {}
 
 functio facere() → lista<lista<numerus>> {
     f(lista<numerus>[1, 2])
-    fixum _ y ← (lista<numerus>[3, 4])
+    sit y ← (lista<numerus>[3, 4])
     redde lista<lista<numerus>>[lista<numerus>[1], lista<numerus>[2]]
 }
 ",

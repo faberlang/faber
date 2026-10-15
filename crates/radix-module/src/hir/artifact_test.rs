@@ -2563,9 +2563,9 @@ fn size_generic_genus_applied_to_size_survives_round_trip() {
         "}\n",
         "@ public\n",
         "fn box_inflated(Box<3> box, f32 amount) \u{2192} Box<3> {\n",
-        "    const vector<f32, 3> lo \u{2190} box.minima\n",
-        "    const vector<f32, 3> hi \u{2190} box.maxima\n",
-        "    const Box<3> expanded \u{2190} Box {minima = lo, maxima = hi}\n",
+        "    let vector<f32, 3> lo \u{2190} box.minima\n",
+        "    let vector<f32, 3> hi \u{2190} box.maxima\n",
+        "    let Box<3> expanded \u{2190} Box {minima = lo, maxima = hi}\n",
         "    return expanded\n",
         "}\n",
     );

@@ -455,7 +455,7 @@ fn praefixum_link_method_homonym_genus_evaluates_in_its_own_home() {
     write(
         dir,
         "b.fab",
-        "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        return self.n + 100\n    }\n}\n",
+        "@ public\nclass Box {\n    mut int n\n\n    fn get() → int {\n        return self.n + 100\n    }\n}\n",
     );
     write(
         dir,
@@ -474,8 +474,8 @@ fn praefixum_link_method_homonym_genus_evaluates_in_its_own_home() {
 /// is refused as forbidden.
 #[test]
 fn praefixum_link_method_homonym_genus_effect_is_its_own() {
-    let a_source = "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n";
-    let b_source = "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        print 7\n        return self.n\n    }\n}\n";
+    let a_source = "@ public\nclass Box {\n    mut int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n";
+    let b_source = "@ public\nclass Box {\n    mut int n\n\n    fn get() → int {\n        print 7\n        return self.n\n    }\n}\n";
     let main_source = |home: &str| {
         format!(
             "import from \"./a\" a\nimport from \"./b\" b\n\n\

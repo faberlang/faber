@@ -237,7 +237,7 @@ fn affine_inverse(matrix<f32, [4, 4]> m) → matrix<f32, [4, 4]> ∪ none {
 
 @ public
 class TransformPayload {
-    var list<f32> values
+    mut list<f32> values
 
     fn float_count() → int ∪ none {
         if self.values.length() ≢ 32 then return null
@@ -281,10 +281,10 @@ fn transform_payload(matrix<f32, [4, 4]> model, matrix<f32, [4, 4]> view_project
 
 @ public
 class Quaternion {
-    var f32 x
-    var f32 y
-    var f32 z
-    var f32 w
+    mut f32 x
+    mut f32 y
+    mut f32 z
+    mut f32 w
 
     fn multiply(ref Quaternion other) → Quaternion {
         return quaternion(((self.w * other.x + self.x * other.w) + self.y * other.z) - self.z * other.y, ((self.w * other.y - self.x * other.z) + self.y * other.w) + self.z * other.x, ((self.w * other.z + self.x * other.y) - self.y * other.x) + self.z * other.w, ((self.w * other.w - self.x * other.x) - self.y * other.y) - self.z * other.z)
@@ -315,9 +315,9 @@ class Quaternion {
 
 @ public
 class Color {
-    var f32 r
-    var f32 g
-    var f32 b
+    mut f32 r
+    mut f32 g
+    mut f32 b
 
     fn valid() → bool {
         if self.r ≺ 0.0 or self.r ≻ 1.0 then return false
@@ -333,10 +333,10 @@ class Color {
 
 @ public
 class Euler {
-    var f32 x
-    var f32 y
-    var f32 z
-    var string order = "XYZ"
+    mut f32 x
+    mut f32 y
+    mut f32 z
+    mut string order = "XYZ"
 
     fn to_quaternion() → Quaternion ∪ none {
         if self.order ≢ "XYZ" then return null
@@ -489,16 +489,16 @@ fn matrix_look_at(vector<f32, 3> eye, vector<f32, 3> target, vector<f32, 3> up) 
 
 @ public
 class Box<size N> {
-    var vector<f32, N> minima
-    var vector<f32, N> maxima
+    mut vector<f32, N> minima
+    mut vector<f32, N> maxima
 }
 
 @ public
 class BoxOverlapFacts {
-    var vector<f32, 3> overlap
-    var f32 x
-    var f32 y
-    var f32 z
+    mut vector<f32, 3> overlap
+    mut f32 x
+    mut f32 y
+    mut f32 z
 }
 
 @ public
@@ -660,8 +660,8 @@ fn box_translated(Box<3> box, vector<f32, 3> offset) → Box<3> {
 
 @ public
 class Sphere {
-    var vector<f32, 3> center
-    var f32 radius
+    mut vector<f32, 3> center
+    mut f32 radius
 
     fn contains(vector<f32, 3> point) → bool {
         return distance(self.center, point) ≤ self.radius
@@ -670,8 +670,8 @@ class Sphere {
 
 @ public
 class Plane {
-    var vector<f32, 3> normal
-    var f32 constant
+    mut vector<f32, 3> normal
+    mut f32 constant
 
     fn distance(vector<f32, 3> point) → f32 {
         return self.normal.dot(point) + self.constant
@@ -680,15 +680,15 @@ class Plane {
 
 @ public
 class RayInterval {
-    var f32 minimum
-    var f32 maximum
+    mut f32 minimum
+    mut f32 maximum
 }
 
 @ public
 class RayBoxHit {
-    var f32 distance
-    var vector<f32, 3> point
-    var vector<f32, 3> normal
+    mut f32 distance
+    mut vector<f32, 3> point
+    mut vector<f32, 3> normal
 
     fn hit_face_code() → int ∪ none {
         let f32 nx ← self.normal.dot(basis3(0))
@@ -759,8 +759,8 @@ fn hit_normal(Box<3> bounds, vector<f32, 3> point) → vector<f32, 3> {
 
 @ public
 class Ray {
-    var vector<f32, 3> origin
-    var vector<f32, 3> direction
+    mut vector<f32, 3> origin
+    mut vector<f32, 3> direction
 
     fn point_at(f32 distance) → vector<f32, 3> {
         let vector<f32, 3> stepped ← self.direction.multiplied(uniform3(distance))
@@ -798,14 +798,14 @@ class Ray {
 
 @ public
 class FaceCodeFacts {
-    var int code
-    var int axis_code
-    var int opposite_code
-    var int x_offset
-    var int y_offset
-    var int z_offset
-    var vector<f32, 3> normal
-    var Color color
+    mut int code
+    mut int axis_code
+    mut int opposite_code
+    mut int x_offset
+    mut int y_offset
+    mut int z_offset
+    mut vector<f32, 3> normal
+    mut Color color
 }
 
 @ public
@@ -901,13 +901,13 @@ fn face_code_facts(int code) → FaceCodeFacts ∪ none {
 
 @ public
 class CameraYawPitchFacts {
-    var f32 yaw_degrees
-    var f32 pitch_degrees
-    var f32 clamped_pitch_degrees
-    var vector<f32, 3> direction
-    var vector<f32, 3> planar_forward
-    var vector<f32, 3> planar_right
-    var Ray ray
+    mut f32 yaw_degrees
+    mut f32 pitch_degrees
+    mut f32 clamped_pitch_degrees
+    mut vector<f32, 3> direction
+    mut vector<f32, 3> planar_forward
+    mut vector<f32, 3> planar_right
+    mut Ray ray
 }
 
 @ public

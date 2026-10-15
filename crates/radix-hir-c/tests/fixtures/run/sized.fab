@@ -4,9 +4,9 @@ locale = "en"
 # Sized integers: stores check the range, reads widen, u64 reaches 2^64 - 1,
 # and a sized field, parameter and result all go through the same check.
 class Pixel {
-    var u8 red
-    var u8 green
-    var i16 offset
+    mut u8 red
+    mut u8 green
+    mut i16 offset
 }
 
 fn scale(u8 x, u8 by) → u16 {

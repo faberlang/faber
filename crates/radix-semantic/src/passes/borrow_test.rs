@@ -1476,7 +1476,7 @@ fn empty_function_body_has_no_borrow_errors() {
 // ---- CDA-U5: `↤` routes through borrow/ownership rules like `←` ----
 
 #[test]
-fn reports_conversio_assign_to_de_parameter() {
+fn reports_conversio_assign_through_ref_parameter() {
     // NO-BYPASS: `↤` stores through the target place exactly like `←`, so the
     // ownership-mode pass must flag an assignment through a `de` parameter
     // regardless of which operator was written.
@@ -1502,9 +1502,9 @@ incipit { }
         result.diagnostics.iter().any(|err| {
             err.args
                 .iter()
-                .any(|a| a.name == "issue" && a.value == "assign_to_de_parameter")
+                .any(|a| a.name == "issue" && a.value == "assign_through_ref")
         }),
-        "missing assign_to_de_parameter: {:?}",
+        "missing assign_through_ref: {:?}",
         result.diagnostics
     );
 }

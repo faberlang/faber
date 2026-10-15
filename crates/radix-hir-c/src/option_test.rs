@@ -41,7 +41,7 @@ fn coalesce_runs_its_fallback_only_for_none() {
 #[test]
 fn unwrap_aborts_on_none() {
     let code = emitted(
-        "class Box {\n    var int n\n}\nmain {\n    let Box ∪ none b ← null\n    print b!.n\n}",
+        "class Box {\n    mut int n\n}\nmain {\n    let Box ∪ none b ← null\n    print b!.n\n}",
     );
     assert!(code.contains("faber_abort(\"unwrap of nihil\");"), "{code}");
 }
@@ -58,7 +58,7 @@ fn an_optional_result_returns_the_struct() {
 #[test]
 fn a_creo_hook_runs_on_the_finished_object() {
     let code = crate::test_support::emitted(
-        "class Box {\n    var int n = 0\n    fn creo() → void {\n        if self.n ≻ 9 {\n            self.n ← 9\n        }\n    }\n}\nmain {\n    let Box b ← Box { n = 50 }\n    print b.n\n}",
+        "class Box {\n    mut int n = 0\n    fn creo() → void {\n        if self.n ≻ 9 {\n            self.n ← 9\n        }\n    }\n}\nmain {\n    let Box b ← Box { n = 50 }\n    print b.n\n}",
     );
     let set = code.find("->m_n = INT64_C(50);").expect("field set");
     let hook = code.find("g_Box_creo(faber_a, faber_t").expect("hook call");

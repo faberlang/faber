@@ -33,8 +33,8 @@ locale = "en"
 #   while the rest of the record is untouched.
 
 class Box {
-    var int count = 0
-    var string label = "alpha"
+    mut int count = 0
+    mut string label = "alpha"
 }
 
 fn setseven(mut int n) → void {
