@@ -22,7 +22,7 @@ use radix_hir::DefId;
 use radix_mir::visit::MirVisitor;
 use radix_mir::*;
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
-use radix_types::{NumericWidth, Primitive, Type, TypeTable};
+use radix_types::{NumericWidth, Primitive, SemanticMutability, Type, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Slug for shapes the CLIF subset does not cover yet.
@@ -185,12 +185,12 @@ impl<'a> ClifCapability<'a> {
             Type::PolicyFloat(..) => Some(Gap::Subset("policy float value".to_owned())),
             Type::Primitive(Primitive::Ascii) => None,
             Type::Primitive(Primitive::Littera) => Some(Gap::Subset("character value".to_owned())),
-            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => {
-                Some(Gap::Subset("byte buffer value".to_owned()))
+            Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti) => {
+                crate::lower::byte_element(self.types)
+                    .is_none()
+                    .then(|| Gap::Subset("byte buffer value".to_owned()))
             }
-            Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => {
-                Some(Gap::Subset("bounded buffer value".to_owned()))
-            }
+            Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => None,
             Type::Primitive(Primitive::Regex)
             | Type::Primitive(Primitive::Match)
             | Type::Primitive(Primitive::Json)
@@ -200,8 +200,8 @@ impl<'a> ClifCapability<'a> {
             Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => {
                 Some(Gap::Subset("instans value".to_owned()))
             }
-            Type::Primitive(Primitive::Nihil) => Some(Gap::Subset("none value".to_owned())),
-            Type::Primitive(Primitive::Ignotum) => Some(Gap::Subset("unknown value".to_owned())),
+            Type::Primitive(Primitive::Nihil) => None,
+            Type::Primitive(Primitive::Ignotum) => None,
             Type::Array(element) => self.type_gap(MirType::semantic(*element)),
             Type::BoundedArray { element, .. } => self.type_gap(MirType::semantic(*element)),
             Type::Map(key, value) => self
@@ -218,21 +218,29 @@ impl<'a> ClifCapability<'a> {
                 .values()
                 .find_map(|field| self.type_gap(MirType::semantic(*field))),
             Type::Enum(_) => None,
-            Type::Interface(_) => Some(Gap::Subset("enum value".to_owned())),
+            Type::Interface(_) => None,
             Type::Tuple(elements) => elements
                 .iter()
                 .find_map(|element| self.type_gap(MirType::semantic(*element))),
-            Type::Union(_) | Type::Intersection(_) => Some(Gap::Subset("union value".to_owned())),
+            Type::Union(members) => members.iter().find_map(|member| {
+                if matches!(
+                    self.types.get(*member),
+                    Type::Primitive(Primitive::Nihil | Primitive::Ignotum)
+                        | Type::Option(_)
+                        | Type::Bits(_)
+                        | Type::Union(_)
+                ) {
+                    return Some(Gap::Subset("union value".to_owned()));
+                }
+                self.type_gap(MirType::semantic(*member))
+            }),
+            Type::Intersection(_) => Some(Gap::Subset("union value".to_owned())),
             Type::Option(inner) => match self.types.get(*inner) {
                 Type::Option(_) => Some(Gap::Subset("optional value".to_owned())),
                 _ => self.type_gap(MirType::semantic(*inner)),
             },
             Type::Func(sig) => {
-                if !sig.type_params.is_empty()
-                    || sig.is_async
-                    || sig.is_generator
-                    || sig.err.is_some()
-                {
+                if !sig.type_params.is_empty() || sig.is_async || sig.is_generator {
                     return Some(Gap::Subset("function value".to_owned()));
                 }
                 sig.params
@@ -245,8 +253,29 @@ impl<'a> ClifCapability<'a> {
                         self.type_gap(MirType::semantic(value))
                     })
                     .or_else(|| self.type_gap(MirType::semantic(sig.ret)))
+                    .or_else(|| {
+                        sig.err
+                            .and_then(|err| self.type_gap(MirType::semantic(err)))
+                    })
             }
-            Type::Ref(..) => Some(Gap::Subset("reference value".to_owned())),
+            // A read-only reference is the value it borrows; a mutable one is
+            // only a shared handle for the kinds that are handles.
+            Type::Ref(SemanticMutability::Mutable, inner) => {
+                if matches!(
+                    self.types.get(*inner),
+                    Type::Array(_)
+                        | Type::BoundedArray { .. }
+                        | Type::Struct(_)
+                        | Type::Record(_)
+                        | Type::Map(..)
+                        | Type::Set(_)
+                ) {
+                    self.type_gap(MirType::semantic(*inner))
+                } else {
+                    Some(Gap::Subset("reference value".to_owned()))
+                }
+            }
+            Type::Ref(_, inner) => self.type_gap(MirType::semantic(*inner)),
             Type::ModularWord(width) | Type::SaturatingWord(width)
                 if width.integer_range().is_some() =>
             {
@@ -259,7 +288,11 @@ impl<'a> ClifCapability<'a> {
             Type::AsyncCursor(_, _) | Type::PromissumFailable(_, _) => {
                 Some(Gap::Subset("async value".to_owned()))
             }
-            Type::Intervallum(_) => Some(Gap::Subset("interval value".to_owned())),
+            Type::Intervallum(element) => (!matches!(
+                self.types.get(*element),
+                Type::Primitive(Primitive::Numerus)
+            ))
+            .then(|| Gap::Subset("interval value".to_owned())),
             Type::Tensor(..)
             | Type::Vector(..)
             | Type::Matrix(..)
@@ -361,19 +394,12 @@ impl<'a> ClifCapability<'a> {
             MirAggregateKind::Record => None,
             MirAggregateKind::Struct(_) => None,
             MirAggregateKind::EnumVariant(_) => None,
-            MirAggregateKind::ClosureEnvironment(_) => {
-                Some(Gap::Subset("closure construction".to_owned()))
-            }
-            MirAggregateKind::SharedCell => {
-                Some(Gap::Subset("shared cell construction".to_owned()))
-            }
+            MirAggregateKind::ClosureEnvironment(_) | MirAggregateKind::SharedCell => None,
             MirAggregateKind::Tensor
             | MirAggregateKind::SparseTensor
             | MirAggregateKind::Vector
             | MirAggregateKind::Matrix => Some(Gap::Policy("device construction".to_owned())),
-            MirAggregateKind::Interval { .. } => {
-                Some(Gap::Subset("interval construction".to_owned()))
-            }
+            MirAggregateKind::Interval { .. } => None,
         }
     }
 
@@ -382,7 +408,7 @@ impl<'a> ClifCapability<'a> {
             MirValueKind::Operand(_) | MirValueKind::Unary { .. } | MirValueKind::Binary { .. } => {
                 None
             }
-            MirValueKind::Closure(_) => Some(Gap::Subset("closure value".to_owned())),
+            MirValueKind::Closure(_) => None,
             MirValueKind::Option(MirOptionOp::Chain {
                 link: MirOptionChainLink::Field(_) | MirOptionChainLink::Index(_),
                 ..
@@ -488,6 +514,8 @@ impl MirVisitor for ClifCapability<'_> {
                 MirProjection::Index(_)
                     | MirProjection::Field(_)
                     | MirProjection::VariantField { .. }
+                    | MirProjection::ClosureCapture { .. }
+                    | MirProjection::SharedCell
             )
         }) {
             self.record(Gap::Subset("place projection".to_owned()));
@@ -501,6 +529,15 @@ impl MirVisitor for ClifCapability<'_> {
             && self.type_gap(conversion.source_ty).is_none()
             && self.type_gap(conversion.target_ty).is_none()
         {
+            radix_mir::visit::walk_runtime_call(self, call);
+            return;
+        }
+        // A stepped stream is lazy in the oracle: materializing it would change
+        // what the program prints, so it declines by name.
+        if let MirIntrinsic::CursorStream(stream) = &call.intrinsic
+            && stream.stepped
+        {
+            self.record(Gap::Subset("stepped cursor stream".to_owned()));
             radix_mir::visit::walk_runtime_call(self, call);
             return;
         }
@@ -532,51 +569,37 @@ impl MirVisitor for ClifCapability<'_> {
                         Type::Array(_)
                     )
         );
-        // `fractus(int)`: the exact widening of an integer to a float.
-        let int_to_float = matches!(
+        let numeric = matches!(
             &call.intrinsic,
             MirIntrinsic::Convert(conversion)
                 if conversion.store.is_none()
-                    && matches!(
-                        self.types.get(conversion.source_ty.semantic_id()),
-                        Type::Primitive(Primitive::Numerus)
-                    )
-                    && matches!(
-                        self.types.get(conversion.target_ty.semantic_id()),
-                        Type::Primitive(Primitive::Fractus)
-                    )
-        );
-        let int_to_int = matches!(
-            &call.intrinsic,
-            MirIntrinsic::Convert(conversion)
-                if conversion.store.is_none()
-                    && crate::lower::int_conversion(
+                    && crate::lower::numeric_conversion(
                         self.types,
                         conversion.source_ty.semantic_id(),
                         conversion.target_ty.semantic_id(),
                     )
                     .is_some()
         );
-        let is_float = |ty: MirType| {
-            matches!(
-                self.types.get(ty.semantic_id()),
-                Type::Primitive(Primitive::Fractus)
-            ) || matches!(
-                self.types.get(ty.semantic_id()),
-                Type::SizedNumeric(Primitive::Fractus, width) if width.is_float()
-            )
-        };
-        let float_to_float = matches!(
+        let type_check = matches!(
+            &call.intrinsic,
+            MirIntrinsic::TypeCheck(op)
+                if crate::lower::member_tests(self.types, op.ty.semantic_id()).is_some()
+        );
+        let sequence = matches!(
             &call.intrinsic,
             MirIntrinsic::Convert(conversion)
                 if conversion.store.is_none()
-                    && is_float(conversion.source_ty)
-                    && is_float(conversion.target_ty)
+                    && crate::lower::sequence_conversion(
+                        self.types,
+                        conversion.source_ty.semantic_id(),
+                        conversion.target_ty.semantic_id(),
+                    )
+                    .is_some()
         );
         if renders_text
-            || float_to_float
-            || int_to_int
-            || int_to_float
+            || numeric
+            || sequence
+            || type_check
             || set_to_list
             || matches!(
                 call.intrinsic,
@@ -626,6 +649,38 @@ impl MirVisitor for ClifCapability<'_> {
                             | MirCollectionOp::Signum
                             | MirCollectionOp::Minimum
                             | MirCollectionOp::Maximum
+                            | MirCollectionOp::Approximate
+                            | MirCollectionOp::ArgMax
+                            | MirCollectionOp::ArgMin
+                            | MirCollectionOp::ScalarMath(_)
+                            | MirCollectionOp::Union
+                            | MirCollectionOp::Intersection
+                            | MirCollectionOp::Difference
+                            | MirCollectionOp::SymmetricDifference
+                            | MirCollectionOp::IsSubset
+                            | MirCollectionOp::IsSuperset
+                            | MirCollectionOp::ArrayAdd
+                            | MirCollectionOp::ArraySub
+                            | MirCollectionOp::ArrayMul
+                            | MirCollectionOp::ArrayDiv
+                            | MirCollectionOp::ArrayMod
+                            | MirCollectionOp::ArrayTrueDiv
+                            | MirCollectionOp::ArrayNeg
+                            | MirCollectionOp::ArrayAnd
+                            | MirCollectionOp::ArrayOr
+                            | MirCollectionOp::ArrayNot
+                            | MirCollectionOp::ArrayLt
+                            | MirCollectionOp::ArrayGt
+                            | MirCollectionOp::ArrayLtEq
+                            | MirCollectionOp::ArrayGtEq
+                            | MirCollectionOp::ArrayValueEq
+                            | MirCollectionOp::ArrayValueNotEq
+                            | MirCollectionOp::IntervalLength
+                            | MirCollectionOp::IntervalContains
+                            | MirCollectionOp::IntervalClamp
+                            | MirCollectionOp::IntervalIntersect
+                            | MirCollectionOp::IntervalUnion
+                            | MirCollectionOp::IntervalMaterialize
                     )
             )
         {
@@ -652,10 +707,7 @@ impl MirVisitor for ClifCapability<'_> {
                     self.record(Gap::Abi("external definition call".to_owned()));
                 }
             }
-            MirCallee::Closure(_) => {
-                self.record(Gap::Subset("closure call".to_owned()));
-            }
-            MirCallee::Value(_) => {}
+            MirCallee::Closure(_) | MirCallee::Value(_) => {}
         }
         radix_mir::visit::walk_callee(self, callee);
     }

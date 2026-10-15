@@ -209,6 +209,7 @@ pub struct List {
     items: Vec<(i32, i64)>,
 }
 
+const TAG_INT: i32 = 0;
 const TAG_FLOAT: i32 = 1;
 const TAG_BOOL: i32 = 2;
 const TAG_TEXT: i32 = 3;
@@ -818,8 +819,28 @@ fn element_equal(tag: i32, left: i64, right: i64) -> bool {
                     .zip(&right.items)
                     .all(|(a, b)| a.0 == b.0 && element_equal(a.0, a.1, b.1))
         },
+        TAG_OPT => unsafe {
+            match (
+                (left as *const Present).as_ref(),
+                (right as *const Present).as_ref(),
+            ) {
+                (None, None) => true,
+                (Some(a), Some(b)) => a.tag == b.tag && element_equal(a.tag, a.bits, b.bits),
+                _ => false,
+            }
+        },
         _ => left == right,
     }
+}
+
+/// Structural equality of two lists or tuples.
+///
+/// # Safety
+///
+/// Both are live runtime lists.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_eq(left: *const List, right: *const List) -> i8 {
+    i8::from(element_equal(TAG_LIST, left as i64, right as i64))
 }
 
 /// Membership test.
@@ -861,8 +882,38 @@ fn element_order(tag: i32, left: i64, right: i64) -> std::cmp::Ordering {
         TAG_BITS..=7 => {
             u64::from_ne_bytes(left.to_ne_bytes()).cmp(&u64::from_ne_bytes(right.to_ne_bytes()))
         }
+        TAG_LIST => unsafe {
+            list_order(
+                list_ref(left as *const List),
+                list_ref(right as *const List),
+            )
+        },
         _ => left.cmp(&right),
     }
+}
+
+/// Lexicographic order of two lists (tuples compare the same way).
+fn list_order(left: &List, right: &List) -> std::cmp::Ordering {
+    for (a, b) in left.items.iter().zip(&right.items) {
+        let ordering = element_order(a.0, a.1, b.1);
+        if ordering.is_ne() {
+            return ordering;
+        }
+    }
+    left.items.len().cmp(&right.items.len())
+}
+
+/// Three-way compare of two tuples or lists: -1, 0 or 1.
+///
+/// # Safety
+///
+/// Both are live runtime lists.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_compare(
+    left: *const List,
+    right: *const List,
+) -> i64 {
+    list_order(unsafe { list_ref(left) }, unsafe { list_ref(right) }) as i64
 }
 
 /// An ascending sorted copy.
@@ -1220,10 +1271,10 @@ pub unsafe extern "C" fn __faber_clif_v1_text_test(
 ) -> i8 {
     let left = text_str(unsafe { text_bytes(left) });
     let right = text_str(unsafe { text_bytes(right) });
-    i8::from(if mode == 0 {
-        left.starts_with(&*right)
-    } else {
-        left.ends_with(&*right)
+    i8::from(match mode {
+        0 => left.starts_with(&*right),
+        1 => left.ends_with(&*right),
+        _ => left.contains(&*right),
     })
 }
 
@@ -1356,4 +1407,665 @@ pub unsafe extern "C" fn __faber_clif_v1_trap_store(
     let mut stderr = std::io::stderr();
     let _ = writeln!(stderr, "error: {message}");
     std::process::exit(1);
+}
+
+/// The outcome of the latest parse: 0 ok, 1 malformed integer, 2 integer out
+/// of range, 3 malformed float.
+static PARSE_STATUS: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+
+/// Parse a text as an integer in `radix`; a malformed text or a value outside
+/// `[low, high]` sets a nonzero status and returns 0.
+///
+/// # Safety
+///
+/// `text` is a well-formed text handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_parse_int(
+    text: *const u8,
+    radix: i32,
+    low: i64,
+    high: i64,
+) -> i64 {
+    let source = text_str(unsafe { text_bytes(text) });
+    let radix = u32::try_from(radix).unwrap_or(10);
+    let (status, value) = match i128::from_str_radix(&source, radix) {
+        Err(_) => (1, 0),
+        Ok(parsed) => {
+            if parsed >= i128::from(low) && parsed <= i128::from(high) {
+                (0, i64::try_from(parsed).unwrap_or(0))
+            } else {
+                (2, 0)
+            }
+        }
+    };
+    PARSE_STATUS.store(status, std::sync::atomic::Ordering::Relaxed);
+    value
+}
+
+/// Parse a text as a float; a malformed text sets status 3 and returns 0.
+///
+/// # Safety
+///
+/// `text` is a well-formed text handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_parse_f64(text: *const u8) -> f64 {
+    let source = text_str(unsafe { text_bytes(text) });
+    let (status, value) = match source.parse::<f64>() {
+        Ok(parsed) => (0, parsed),
+        Err(_) => (3, 0.0),
+    };
+    PARSE_STATUS.store(status, std::sync::atomic::Ordering::Relaxed);
+    value
+}
+
+/// The outcome of the latest parse.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_parse_status() -> i32 {
+    PARSE_STATUS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The failure text of a nonzero parse status (the runner's wording).
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_convert_message(status: i32) -> *const u8 {
+    let message = match status {
+        2 => "textus to numerus conversion out of range",
+        3 => "textus to fractus conversion failed",
+        _ => "textus to numerus conversion failed",
+    };
+    text_new(message.as_bytes())
+}
+
+/// Set algebra into a new set: 0 union, 1 intersection, 2 difference,
+/// 3 symmetric difference.
+///
+/// # Safety
+///
+/// Both are live runtime sets.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_set_algebra(
+    left: *const Map,
+    right: *const Map,
+    op: i32,
+) -> *mut Map {
+    let (left, right) = unsafe { (&*left, &*right) };
+    let has = |set: &Map, entry: &(i32, i64, i32, i64)| map_find(set, entry.0, entry.1).is_some();
+    let mut entries: Vec<(i32, i64, i32, i64)> = Vec::new();
+    match op {
+        0 => {
+            entries.extend(left.entries.iter().copied());
+            entries.extend(right.entries.iter().filter(|e| !has(left, e)).copied());
+        }
+        1 => entries.extend(left.entries.iter().filter(|e| has(right, e)).copied()),
+        2 => entries.extend(left.entries.iter().filter(|e| !has(right, e)).copied()),
+        _ => {
+            entries.extend(left.entries.iter().filter(|e| !has(right, e)).copied());
+            entries.extend(right.entries.iter().filter(|e| !has(left, e)).copied());
+        }
+    }
+    Box::into_raw(Box::new(Map { set: true, entries }))
+}
+
+/// Subset (mode 0: left within right) or superset (mode 1) test.
+///
+/// # Safety
+///
+/// Both are live runtime sets.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_set_subset(
+    left: *const Map,
+    right: *const Map,
+    mode: i32,
+) -> i8 {
+    let (left, right) = unsafe { (&*left, &*right) };
+    let (inner, outer) = if mode == 0 {
+        (left, right)
+    } else {
+        (right, left)
+    };
+    i8::from(
+        inner
+            .entries
+            .iter()
+            .all(|entry| map_find(outer, entry.0, entry.1).is_some()),
+    )
+}
+
+/// Scalar math the instruction set lacks: 0 exp, 1 ln, 2 log10, 3 sin,
+/// 4 cos, 5 tan (the same libm calls the runner makes).
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_math_f64(op: i32, value: f64) -> f64 {
+    match op {
+        0 => value.exp(),
+        1 => value.ln(),
+        2 => value.log10(),
+        3 => value.sin(),
+        4 => value.cos(),
+        _ => value.tan(),
+    }
+}
+
+/// `a % b` on floats: `fmod`, the sign of the dividend.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_float_rem(a: f64, b: f64) -> f64 {
+    a % b
+}
+
+/// Index of the largest (flag 1) or smallest (flag 0) element as an
+/// optional; NaN never replaces a number and the first of equals wins.
+///
+/// # Safety
+///
+/// `list` is a live runtime list of integers or floats.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_arg_extremum(
+    list: *const List,
+    want_max: i32,
+) -> *const Present {
+    let items = &unsafe { list_ref(list) }.items;
+    let mut winner: Option<usize> = None;
+    for (index, &(tag, bits)) in items.iter().enumerate() {
+        let Some(best) = winner else {
+            winner = Some(index);
+            continue;
+        };
+        let (best_tag, best_bits) = items[best];
+        let replaces = if tag == 0 && best_tag == 0 {
+            if want_max != 0 {
+                bits > best_bits
+            } else {
+                bits < best_bits
+            }
+        } else if tag == TAG_FLOAT && best_tag == TAG_FLOAT {
+            let best = f64::from_bits(u64::from_ne_bytes(best_bits.to_ne_bytes()));
+            let value = f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()));
+            if best.is_nan() {
+                !value.is_nan()
+            } else if value.is_nan() {
+                false
+            } else if want_max != 0 {
+                value > best
+            } else {
+                value < best
+            }
+        } else {
+            unsafe {
+                __faber_clif_v1_trap(c"argmax/argmin receiver type mismatch".as_ptr().cast(), 36)
+            }
+        };
+        if replaces {
+            winner = Some(index);
+        }
+    }
+    match winner {
+        Some(index) => Box::into_raw(Box::new(Present {
+            tag: 0,
+            bits: i64::try_from(index).unwrap_or(0),
+        })),
+        None => std::ptr::null(),
+    }
+}
+
+/// The exact integer `≈`: `10^9 · |a − b| ≤ max(|a|, |b|)`.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_approx_int(left: i64, right: i64) -> i8 {
+    let (x, y) = (i128::from(left), i128::from(right));
+    i8::from(1_000_000_000 * (x - y).abs() <= x.abs().max(y.abs()))
+}
+
+/// A list into a new set; equal elements collapse to the first.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_to_set(list: *const List) -> *mut Map {
+    let mut set = Map {
+        set: true,
+        entries: Vec::new(),
+    };
+    for &(tag, bits) in &unsafe { list_ref(list) }.items {
+        if map_find(&set, tag, bits).is_none() {
+            set.entries.push((tag, bits, 0, 0));
+        }
+    }
+    Box::into_raw(Box::new(set))
+}
+
+/// A copy of a list whose elements keep their bits under a new tag.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_retag(list: *const List, tag: i32) -> *mut List {
+    list_new_from(
+        unsafe { list_ref(list) }
+            .items
+            .iter()
+            .map(|&(_, bits)| (tag, bits))
+            .collect(),
+    )
+}
+
+/// A scalar read from a list of bytes; see the generator's `LIST_READ_SCALAR`.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_read_scalar(
+    list: *const List,
+    width: i32,
+    flags: i32,
+) -> i64 {
+    let width = usize::try_from(width).unwrap_or(0).min(8);
+    let items = &unsafe { list_ref(list) }.items;
+    let mut bytes = [0_u8; 8];
+    for (slot, &(_, bits)) in bytes.iter_mut().zip(items.iter()).take(width) {
+        *slot = bits as u8;
+    }
+    let mut pattern = 0_u64;
+    if flags & 1 != 0 {
+        for &byte in &bytes[..width] {
+            pattern = (pattern << 8) | u64::from(byte);
+        }
+    } else {
+        for (index, &byte) in bytes[..width].iter().enumerate() {
+            pattern |= u64::from(byte) << (8 * index);
+        }
+    }
+    if flags & 4 != 0 {
+        let value = if width == 4 {
+            f64::from(f32::from_bits(pattern as u32))
+        } else {
+            f64::from_bits(pattern)
+        };
+        return value.to_bits() as i64;
+    }
+    if flags & 2 != 0 && width < 8 {
+        let shift = 64 - 8 * width as u32;
+        return ((pattern << shift) as i64) >> shift;
+    }
+    pattern as i64
+}
+
+/// A scalar written as bytes in the byte order of a flag; see the generator's
+/// `SCALAR_BYTES`.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_scalar_bytes(bits: i64, width: i32, flags: i32) -> *mut List {
+    let width = usize::try_from(width).unwrap_or(0).min(8);
+    let pattern = if flags & 4 != 0 && width == 4 {
+        u64::from((f64::from_bits(bits as u64) as f32).to_bits())
+    } else {
+        bits as u64
+    };
+    let bytes = if flags & 1 != 0 {
+        pattern.to_be_bytes()[8 - width..].to_vec()
+    } else {
+        pattern.to_le_bytes()[..width].to_vec()
+    };
+    list_new_from(
+        bytes
+            .into_iter()
+            .map(|byte| (TAG_BITS, i64::from(byte)))
+            .collect(),
+    )
+}
+
+/// The `(start, end, inclusive)` of an integer interval.
+///
+/// # Safety
+///
+/// `handle` is a live interval: a list of two integers and a flag.
+unsafe fn interval_parts(handle: *const List) -> (i64, i64, bool) {
+    let items = &unsafe { list_ref(handle) }.items;
+    (items[0].1, items[1].1, items[2].1 != 0)
+}
+
+fn interval_list(start: i64, end: i64, inclusive: bool) -> *mut List {
+    list_new_from(vec![
+        (TAG_INT, start),
+        (TAG_INT, end),
+        (TAG_BOOL, i64::from(inclusive)),
+    ])
+}
+
+fn interval_box(start: i64, end: i64, inclusive: bool) -> *const Present {
+    let list = interval_list(start, end, inclusive);
+    __faber_clif_v1_opt_some(TAG_LIST, list as i64)
+}
+
+/// Intersection (mode 0) or union (mode 1) of two integer intervals, boxed as
+/// an optional; null when empty or disjoint.
+///
+/// # Safety
+///
+/// Both handles are live intervals.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_interval_combine(
+    mode: i32,
+    left: *const List,
+    right: *const List,
+) -> *const Present {
+    let (left_start, left_end, left_inclusive) = unsafe { interval_parts(left) };
+    let (right_start, right_end, right_inclusive) = unsafe { interval_parts(right) };
+    if mode == 0 {
+        let start = left_start.max(right_start);
+        let (end, inclusive) = if left_end < right_end {
+            (left_end, left_inclusive)
+        } else if right_end < left_end {
+            (right_end, right_inclusive)
+        } else {
+            (left_end, left_inclusive && right_inclusive)
+        };
+        if start < end || (inclusive && start == end) {
+            interval_box(start, end, inclusive)
+        } else {
+            std::ptr::null()
+        }
+    } else {
+        let (first, second) = if left_start <= right_start {
+            (
+                (left_start, left_end, left_inclusive),
+                (right_start, right_end, right_inclusive),
+            )
+        } else {
+            (
+                (right_start, right_end, right_inclusive),
+                (left_start, left_end, left_inclusive),
+            )
+        };
+        if second.0 > first.1 {
+            return std::ptr::null();
+        }
+        let (end, inclusive) = if second.1 > first.1 {
+            (second.1, second.2)
+        } else if first.1 > second.1 {
+            (first.1, first.2)
+        } else {
+            (first.1, first.2 || second.2)
+        };
+        interval_box(first.0, end, inclusive)
+    }
+}
+
+/// Length (mode 0), membership (mode 1) or clamping (mode 2) against an
+/// integer interval.
+///
+/// # Safety
+///
+/// `interval` is a live interval.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_interval_query(
+    mode: i32,
+    interval: *const List,
+    value: i64,
+) -> i64 {
+    let (start, end, inclusive) = unsafe { interval_parts(interval) };
+    match mode {
+        0 => end
+            .saturating_sub(start)
+            .saturating_add(i64::from(inclusive))
+            .max(0),
+        1 => i64::from(value >= start && if inclusive { value <= end } else { value < end }),
+        _ => {
+            let upper = if inclusive {
+                end
+            } else {
+                end.saturating_sub(1)
+            };
+            if upper < start {
+                value
+            } else {
+                value.clamp(start, upper)
+            }
+        }
+    }
+}
+
+/// The integers of an interval, in order.
+///
+/// # Safety
+///
+/// `interval` is a live interval.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_interval_materialize(interval: *const List) -> *mut List {
+    let (start, end, inclusive) = unsafe { interval_parts(interval) };
+    let items = if inclusive {
+        (start..=end).map(|value| (TAG_INT, value)).collect()
+    } else {
+        (start..end).map(|value| (TAG_INT, value)).collect()
+    };
+    list_new_from(items)
+}
+
+/// A copy of the range of a text (in characters) an interval names; null when
+/// the range does not lie fully inside the text.
+///
+/// # Safety
+///
+/// `text` is a well-formed text handle and `interval` a live interval.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_range(
+    text: *const u8,
+    interval: *const List,
+) -> *const u8 {
+    let (start, end, inclusive) = unsafe { interval_parts(interval) };
+    let text = text_str(unsafe { text_bytes(text) });
+    let chars: Vec<char> = text.chars().collect();
+    let end = if inclusive {
+        end.checked_add(1)
+    } else {
+        Some(end)
+    };
+    match (usize::try_from(start), end.map(usize::try_from)) {
+        (Ok(start), Some(Ok(end))) if start <= end && end <= chars.len() => {
+            let window: String = chars[start..end].iter().collect();
+            text_new(window.as_bytes())
+        }
+        _ => std::ptr::null(),
+    }
+}
+
+/// A copy of the range of a list an interval names; null when the range does
+/// not lie fully inside the list.
+///
+/// # Safety
+///
+/// `list` is a live list and `interval` a live interval.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_range(
+    list: *const List,
+    interval: *const List,
+) -> *mut List {
+    let (start, end, inclusive) = unsafe { interval_parts(interval) };
+    let items = &unsafe { list_ref(list) }.items;
+    let end = if inclusive {
+        end.checked_add(1)
+    } else {
+        Some(end)
+    };
+    match (usize::try_from(start), end.map(usize::try_from)) {
+        (Ok(start), Some(Ok(end))) if start <= end && end <= items.len() => {
+            list_new_from(items[start..end].to_vec())
+        }
+        _ => std::ptr::null_mut(),
+    }
+}
+
+/// A list regrouped at another element width through its byte string; null
+/// when the bytes do not divide into whole target elements.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_rewidth(
+    list: *const List,
+    from: i32,
+    to: i32,
+    flags: i32,
+) -> *mut List {
+    let (from, to) = (
+        usize::try_from(from / 8).unwrap_or(1),
+        usize::try_from(to / 8).unwrap_or(1),
+    );
+    let big = flags & 1 != 0;
+    let kind = (flags >> 1) & 3;
+    let items = &unsafe { list_ref(list) }.items;
+    let mut bytes = Vec::with_capacity(items.len() * from);
+    for &(_, bits) in items {
+        let pattern = bits as u64;
+        if big {
+            bytes.extend_from_slice(&pattern.to_be_bytes()[8 - from..]);
+        } else {
+            bytes.extend_from_slice(&pattern.to_le_bytes()[..from]);
+        }
+    }
+    if bytes.len() % to != 0 {
+        return std::ptr::null_mut();
+    }
+    let raw_tag = TAG_BITS + i32::try_from(to.trailing_zeros()).unwrap_or(0);
+    let out = bytes
+        .chunks_exact(to)
+        .map(|chunk| {
+            let mut pattern = 0_u64;
+            if big {
+                for &byte in chunk {
+                    pattern = (pattern << 8) | u64::from(byte);
+                }
+            } else {
+                for (index, &byte) in chunk.iter().enumerate() {
+                    pattern |= u64::from(byte) << (8 * index);
+                }
+            }
+            let shift = 64 - 8 * u32::try_from(to).unwrap_or(8);
+            match kind {
+                2 => (TAG_INT, ((pattern << shift) as i64) >> shift),
+                1 => (TAG_INT, pattern as i64),
+                _ => (raw_tag, pattern as i64),
+            }
+        })
+        .collect();
+    list_new_from(out)
+}
+
+/// A non-negative integer as fixed-width, zero-padded, lowercase digits in
+/// radix 2, 8 or 16; null when it is negative or wider than `width`.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_text_pack(value: i64, width: i64, radix: i32) -> *const u8 {
+    let Ok(magnitude) = u64::try_from(value) else {
+        return std::ptr::null();
+    };
+    let digits = match radix {
+        16 => format!("{magnitude:x}"),
+        2 => format!("{magnitude:b}"),
+        8 => format!("{magnitude:o}"),
+        _ => return std::ptr::null(),
+    };
+    let width = usize::try_from(width).unwrap_or(0);
+    if digits.len() > width {
+        return std::ptr::null();
+    }
+    text_new(format!("{digits:0>width$}").as_bytes())
+}
+
+/// Text to a list of UTF-8, UTF-16 or UTF-32 units tagged as raw bits.
+///
+/// # Safety
+///
+/// `text` is a well-formed text handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_encode(text: *const u8, width: i32) -> *mut List {
+    let source = text_str(unsafe { text_bytes(text) });
+    let (tag, units): (i32, Vec<i64>) = match width {
+        8 => (TAG_BITS, source.bytes().map(i64::from).collect()),
+        16 => (TAG_BITS + 1, source.encode_utf16().map(i64::from).collect()),
+        _ => (
+            TAG_BITS + 2,
+            source.chars().map(|ch| i64::from(u32::from(ch))).collect(),
+        ),
+    };
+    list_new_from(units.into_iter().map(|unit| (tag, unit)).collect())
+}
+
+/// A list of unit patterns to text; null when the list does not decode.
+///
+/// # Safety
+///
+/// `list` is a live runtime list of raw-bits elements.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_decode(list: *const List, mode: i32) -> *const u8 {
+    let units: Vec<u64> = unsafe { list_ref(list) }
+        .items
+        .iter()
+        .map(|&(_, bits)| u64::from_ne_bytes(bits.to_ne_bytes()))
+        .collect();
+    let decoded: Option<String> = match mode {
+        8 | 1 => units
+            .iter()
+            .map(|unit| u8::try_from(*unit).ok())
+            .collect::<Option<Vec<_>>>()
+            .and_then(|bytes| {
+                if mode == 1 && !bytes.is_ascii() {
+                    None
+                } else {
+                    String::from_utf8(bytes).ok()
+                }
+            }),
+        16 => units
+            .iter()
+            .map(|unit| u16::try_from(*unit).ok())
+            .collect::<Option<Vec<_>>>()
+            .and_then(|words| String::from_utf16(&words).ok()),
+        _ => units
+            .iter()
+            .map(|unit| u32::try_from(*unit).ok().and_then(char::from_u32))
+            .collect::<Option<String>>(),
+    };
+    decoded.map_or(std::ptr::null(), |text| text_new(text.as_bytes()))
+}
+
+/// Whether a boxed payload carries `tag`; null (a none) never does.
+///
+/// # Safety
+///
+/// `handle` is null or a live boxed payload.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_union_has_tag(handle: *const Present, tag: i32) -> i8 {
+    i8::from(unsafe { handle.as_ref() }.is_some_and(|present| present.tag == tag))
+}
+
+/// Whether a record is a `genus` instance named `name`.
+///
+/// # Safety
+///
+/// `record` is a live runtime record; `name` is a text handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_record_is_named(
+    record: *const Record,
+    name: *const u8,
+) -> i8 {
+    let record = unsafe { &*record };
+    i8::from(!record.variant && unsafe { text_bytes(record.name) == text_bytes(name) })
+}
+
+/// Whether a boxed payload is a `genus` instance named `name`.
+///
+/// # Safety
+///
+/// `handle` is null or a live boxed payload; `name` is a text handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_union_is_struct(
+    handle: *const Present,
+    name: *const u8,
+) -> i8 {
+    let Some(present) = (unsafe { handle.as_ref() }) else {
+        return 0;
+    };
+    if present.tag != TAG_STRUCT {
+        return 0;
+    }
+    let record = unsafe { &*(present.bits as *const Record) };
+    i8::from(!record.variant && unsafe { text_bytes(record.name) == text_bytes(name) })
 }

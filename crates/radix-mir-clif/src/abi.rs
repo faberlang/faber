@@ -160,7 +160,7 @@ pub const TEXT_MAP: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, I32],
     ret: Some(Ptr),
 };
-/// A text test against a second text: 0 starts-with, 1 ends-with.
+/// A text test against a second text: 0 starts-with, 1 ends-with, 2 contains.
 pub const TEXT_TEST: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_text_test",
     params: &[Ptr, Ptr, I32],
@@ -280,6 +280,12 @@ pub const RECORD_NEW: RuntimeSymbol = RuntimeSymbol {
 /// Structural equality of two records or variants.
 pub const RECORD_EQ: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_record_eq",
+    params: &[Ptr, Ptr],
+    ret: Some(I8),
+};
+/// Structural equality of two lists or tuples.
+pub const LIST_EQ: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_eq",
     params: &[Ptr, Ptr],
     ret: Some(I8),
 };
@@ -464,6 +470,195 @@ pub const SET_DISPLAY_TOKENS: RuntimeSymbol = RuntimeSymbol {
     ret: None,
 };
 
+/// Parse a text as an integer in a radix and range-check it against
+/// `[low, high]`: (text, radix, low, high) -> value. The outcome is read
+/// from [`PARSE_STATUS`] (0 ok, 1 malformed, 2 out of range).
+pub const PARSE_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_parse_int",
+    params: &[Ptr, I32, I64, I64],
+    ret: Some(I64),
+};
+/// Parse a text as a float: (text) -> value. Status 0 ok, 3 malformed.
+pub const PARSE_F64: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_parse_f64",
+    params: &[Ptr],
+    ret: Some(F64),
+};
+/// The outcome of the latest parse (see [`PARSE_INT`], [`PARSE_F64`]).
+pub const PARSE_STATUS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_parse_status",
+    params: &[],
+    ret: Some(I32),
+};
+/// The failure text of a nonzero parse status.
+pub const CONVERT_MESSAGE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_convert_message",
+    params: &[I32],
+    ret: Some(Ptr),
+};
+
+/// Three-way compare of two tuples or lists: -1, 0 or 1.
+pub const LIST_COMPARE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_compare",
+    params: &[Ptr, Ptr],
+    ret: Some(I64),
+};
+/// Set algebra into a new set: 0 union, 1 intersection, 2 difference,
+/// 3 symmetric difference.
+pub const SET_ALGEBRA: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_set_algebra",
+    params: &[Ptr, Ptr, I32],
+    ret: Some(Ptr),
+};
+/// Subset (mode 0) or superset (mode 1) test.
+pub const SET_SUBSET: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_set_subset",
+    params: &[Ptr, Ptr, I32],
+    ret: Some(I8),
+};
+/// Scalar math: 0 exp, 1 ln, 2 log10, 3 sin, 4 cos, 5 tan.
+pub const MATH_F64: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_math_f64",
+    params: &[I32, F64],
+    ret: Some(F64),
+};
+/// Float remainder with the sign of the dividend (`fmod`).
+pub const FLOAT_REM: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_float_rem",
+    params: &[F64, F64],
+    ret: Some(F64),
+};
+/// Index of the largest (flag 1) or smallest (flag 0) element, as an optional.
+pub const LIST_ARG_EXTREMUM: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_arg_extremum",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+/// The exact integer `≈`.
+pub const APPROX_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_approx_int",
+    params: &[I64, I64],
+    ret: Some(I8),
+};
+
+/// A list into a new set (duplicates collapse).
+pub const LIST_TO_SET: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_to_set",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// A list of integer or raw-bits elements regrouped at another width through
+/// the byte string they spell: (list, from bits, to bits, flags) -> list, or
+/// null when the bytes do not divide into whole target elements. Flag 1 is
+/// big-endian; bits 1 and 2 give the target kind (0 raw bits, 1 unsigned, 2
+/// signed).
+pub const LIST_REWIDTH: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_rewidth",
+    params: &[Ptr, I32, I32, I32],
+    ret: Some(Ptr),
+};
+/// A scalar read from a list of bytes in the byte order of a flag: (list,
+/// byte count, flags) -> 64 bits. Flag 1 is big-endian, 2 sign-extends, 4
+/// reads an IEEE float of that many bytes and returns it widened to f64 bits.
+/// A list of the wrong length reads zeros past its end.
+pub const LIST_READ_SCALAR: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_read_scalar",
+    params: &[Ptr, I32, I32],
+    ret: Some(I64),
+};
+/// A scalar written as bytes: (bits, byte count, flags) -> list of raw
+/// bytes. Flag 1 is big-endian; flag 4 takes the bits as an f64 and writes an
+/// IEEE float of that many bytes.
+pub const SCALAR_BYTES: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_scalar_bytes",
+    params: &[I64, I32, I32],
+    ret: Some(Ptr),
+};
+/// Intersection (mode 0) or union (mode 1) of two integer intervals:
+/// (mode, left, right) -> a boxed optional interval, null when the result is
+/// empty (intersection) or the parts are disjoint (union).
+pub const INTERVAL_COMBINE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_interval_combine",
+    params: &[I32, Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// A question about an integer interval and an integer: mode 0 length, 1
+/// contains, 2 clamp of the value into the interval. (mode, interval, value)
+/// -> integer.
+pub const INTERVAL_QUERY: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_interval_query",
+    params: &[I32, Ptr, I64],
+    ret: Some(I64),
+};
+/// The integers of an interval, in order: interval -> list.
+pub const INTERVAL_MATERIALIZE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_interval_materialize",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// A copy of the range of a text (in characters) an interval names; null when
+/// the range does not lie fully inside the text: (text, interval) -> text.
+pub const TEXT_RANGE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_range",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// A copy of the range of a list an interval names; null when the range does
+/// not lie fully inside the list: (list, interval) -> list.
+pub const LIST_RANGE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_range",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// A copy of a list with every element tag replaced.
+pub const LIST_RETAG: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_retag",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+
+/// Text to a list of UTF-8 (8), UTF-16 (16) or UTF-32 (32) units, tagged as
+/// raw bits of that width: (text, width) -> list.
+pub const TEXT_ENCODE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_encode",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+/// A non-negative integer as fixed-width zero-padded digits in radix 2, 8 or
+/// 16 (lowercase): (value, width, radix) -> text. Null when the value is
+/// negative or does not fit the width.
+pub const TEXT_PACK: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_pack",
+    params: &[I64, I64, I32],
+    ret: Some(Ptr),
+};
+/// A list of unit patterns to text: mode 8, 16 or 32 decodes UTF-8, UTF-16 or
+/// UTF-32, mode 1 narrows bytes to ascii. Null when the list is malformed.
+pub const LIST_DECODE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_decode",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+
+/// Whether a boxed union (or optional) payload carries a tag; null never does.
+pub const UNION_HAS_TAG: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_union_has_tag",
+    params: &[Ptr, I32],
+    ret: Some(I8),
+};
+/// Whether a record is a `genus` instance of the named type.
+pub const RECORD_IS_NAMED: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_record_is_named",
+    params: &[Ptr, Ptr],
+    ret: Some(I8),
+};
+/// Whether a boxed payload is a `genus` instance of the named type.
+pub const UNION_IS_STRUCT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_union_is_struct",
+    params: &[Ptr, Ptr],
+    ret: Some(I8),
+};
+
 /// The runtime entry the emitted `main` shim calls.
 pub const MAIN: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_main",
@@ -524,6 +719,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     DUPLICATE,
     RECORD_NEW,
     RECORD_EQ,
+    LIST_EQ,
     RECORD_SET,
     RECORD_GET,
     PRINT_RECORD,
@@ -542,6 +738,33 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     ABORT_TEXT,
     TRAP,
     TRAP_STORE,
+    PARSE_INT,
+    PARSE_F64,
+    PARSE_STATUS,
+    CONVERT_MESSAGE,
+    LIST_COMPARE,
+    SET_ALGEBRA,
+    SET_SUBSET,
+    MATH_F64,
+    FLOAT_REM,
+    LIST_ARG_EXTREMUM,
+    APPROX_INT,
+    LIST_TO_SET,
+    LIST_RETAG,
+    LIST_READ_SCALAR,
+    SCALAR_BYTES,
+    INTERVAL_COMBINE,
+    INTERVAL_QUERY,
+    INTERVAL_MATERIALIZE,
+    LIST_RANGE,
+    TEXT_RANGE,
+    LIST_REWIDTH,
+    TEXT_ENCODE,
+    TEXT_PACK,
+    LIST_DECODE,
+    UNION_HAS_TAG,
+    UNION_IS_STRUCT,
+    RECORD_IS_NAMED,
     SET_DISPLAY_TOKENS,
 ];
 

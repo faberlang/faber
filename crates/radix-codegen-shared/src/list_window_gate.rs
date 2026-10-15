@@ -24,9 +24,13 @@ use radix_types::{BitsWidth, Type, TypeId, TypeTable};
 const ISSUE: &str = "list_window_unsupported_on_target";
 
 /// Targets that carry a list window faithfully. The Faber re-emitter keeps the
-/// authored index; the MIR runner executes it and does not reach codegen.
+/// authored index; the MIR runner executes it and does not reach codegen; the
+/// clif backend lowers it to a runtime slice.
 fn target_admits_list_window(target: Target) -> bool {
-    matches!(target, Target::HirFaber | Target::MirStepper)
+    matches!(
+        target,
+        Target::HirFaber | Target::MirStepper | Target::MirClif
+    )
 }
 
 /// Targets whose emitters carry the byte window `bytes[lo‥hi]` of a

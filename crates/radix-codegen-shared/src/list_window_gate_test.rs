@@ -87,7 +87,7 @@ fn list_window_is_admitted_by_the_rust_emitter() {
 }
 
 #[test]
-fn list_window_is_admitted_by_the_faber_emitter_and_the_runner() {
+fn list_window_is_admitted_by_the_faber_emitter_the_runner_and_clif() {
     let mut types = TypeTable::new();
     let int = types.primitive(Primitive::Numerus);
     let list = types.array(int);
@@ -96,6 +96,7 @@ fn list_window_is_admitted_by_the_faber_emitter_and_the_runner() {
     reject_list_window(&module, &types, Target::HirFaber).expect("faber re-emits the window");
     reject_list_window(&module, &types, Target::MirStepper)
         .expect("the runner executes the window");
+    reject_list_window(&module, &types, Target::MirClif).expect("clif lowers the window");
 }
 
 #[test]
