@@ -1,0 +1,28 @@
+[package]
+name = "radix-mir-clif"
+version = "0.84.0"
+edition = "2024"
+description = "Public Cranelift backend for the Radix compiler: validated MIR to native object files"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Pins per the goal's D3 and the 2026-10-14 design review: per-crate feature
+# lists, because the uniform set (default-features = false + std/unwind/
+# host-arch on all five) does not resolve — cranelift-object has no `std`
+# feature. `timing` stays off (it lives in cranelift-codegen).
+[dependencies]
+cranelift-codegen = { version = "=0.136.2", default-features = false, features = ["std", "unwind", "host-arch"] }
+cranelift-frontend = "=0.136.2"
+cranelift-module = "=0.136.2"
+cranelift-native = "=0.136.2"
+cranelift-object = "=0.136.2"
+radix-hir = { path = "../radix-hir" }
+radix-mir = { path = "../radix-mir" }
+radix-types = { path = "../radix-types" }
+rustc-hash = "2"
+
+[dev-dependencies]
+radix-lexer = { path = "../radix-lexer" }
+
+[lints]
+workspace = true
