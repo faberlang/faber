@@ -24,6 +24,8 @@ use std::rc::Rc;
 
 mod aggregate;
 mod bits_list;
+#[cfg(test)]
+mod bivalens_text_test;
 mod inf;
 mod littera;
 #[cfg(test)]
