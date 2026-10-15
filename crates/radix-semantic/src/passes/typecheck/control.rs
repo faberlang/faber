@@ -1087,13 +1087,21 @@ impl TypeChecker<'_> {
         for frame in &mut self.assert_refinements {
             frame.retain(|(saved_def, _)| *saved_def != def_id);
         }
+        // A store rooted at this binding re-points the whole place, so every
+        // field fact rooted here is dropped too. Sibling-field facts go with
+        // it: conservative over-invalidation, and sound.
+        self.field_facts.retain(|(base, _), _| *base != def_id);
     }
 
     /// Drop facts before checking an assignment, so its target is typed from
     /// the declared cell rather than from a stale pre-assignment refinement.
     pub(crate) fn invalidate_assignment_target(&mut self, target: &HirExpression) {
-        if let HirExpressionKind::Path(def_id) = target.kind {
-            self.invalidate_flow_fact(def_id);
+        // Any store whose place is rooted at a binding — a bare path or a
+        // field chain (`p.nomen ← v`) — invalidates that binding's own fact
+        // and every field fact rooted at it (conservative over-invalidation
+        // across sibling fields).
+        if let Some((base, _)) = field_path_key(target) {
+            self.invalidate_flow_fact(base);
         }
     }
 
@@ -1298,8 +1306,12 @@ impl HirVisitor for AssignmentTargetCollector {
 
 impl AssignmentTargetCollector {
     fn collect_target(&mut self, target: &HirExpression) {
-        if let HirExpressionKind::Path(def_id) = target.kind {
-            self.targets.insert(def_id);
+        // A field-chain store (`p.nomen ← v`, `p.a.b ← v`) has its place
+        // rooted at the base binding: record the base so the collector
+        // invalidates that binding's own fact and every field fact rooted at
+        // it.
+        if let Some((base, _)) = field_path_key(target) {
+            self.targets.insert(base);
         }
     }
 }
