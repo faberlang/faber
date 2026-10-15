@@ -239,7 +239,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Vec<Value>, RunnerError> {
         let source_element = match self.types.get(source_ty) {
-            Type::Array(element) => Some(*element),
+            Type::Array(element) | Type::Queue(element) | Type::Stack(element) => Some(*element),
             Type::Tensor(element, _) | Type::Vector(element, _) | Type::Matrix(element, _) => {
                 Some(*element)
             }
@@ -339,6 +339,37 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             }
         }
         Ok(Value::Set(Rc::new(RefCell::new(out))))
+    }
+
+    /// `lista ↦ queue` and `lista ↦ stack`: all three collections share one
+    /// array carrier, so the conversion keeps the carrier order — queue FIFO is
+    /// list order, and the stack top is the last element, matching `Append`
+    /// pushing at the end and `RemoveLast` popping it. A `copia` source keeps
+    /// failing closed; only an array carrier converts.
+    pub(crate) fn convert_to_queue_stack(
+        &mut self,
+        value: Value,
+        source_ty: TypeId,
+        element: TypeId,
+        struct_defaults: &[MirStructFieldDefaults],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match value {
+            Value::Array(cell) => {
+                let items = self.convert_array_elements(
+                    &cell.borrow(),
+                    source_ty,
+                    element,
+                    struct_defaults,
+                    span,
+                )?;
+                Ok(Value::Array(Rc::new(RefCell::new(items))))
+            }
+            other => Err(RunnerError::unsupported(
+                span,
+                &format!("runtime conversio to queue/stack from {other:?}"),
+            )),
+        }
     }
 
     pub(crate) fn convert_to_eager_sequence(
