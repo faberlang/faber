@@ -190,6 +190,15 @@ impl ReferencePack {
         self.term_index.get(name).map(|index| &self.terms[*index])
     }
 
+    /// Raw embedded source of a corpus exemplum, by its primary path.
+    ///
+    /// Only files whose frontmatter carries a non-empty `explains` list are
+    /// retained, so this returns `None` for any other path.
+    #[cfg(test)]
+    pub(crate) fn source(&self, primary_path: &str) -> Option<&str> {
+        self.sources.get(primary_path).map(String::as_str)
+    }
+
     pub fn legacy_redirect(&self, name: &str) -> Option<&LegacyRedirect> {
         self.legacy_index
             .get(name)
