@@ -1378,7 +1378,9 @@ impl TypeChecker<'_> {
                     self.check_lista_arithmetic_bin(HirBinOp::Add, lhs, rhs, lhs_ty, rhs_ty)
                 {
                     result
-                } else if let Some(result) = self.check_addita_plus(lhs_ty, rhs_ty, lhs.span) {
+                } else if let Some(result) =
+                    self.check_addita_plus(HirBinOp::Add, lhs_ty, rhs_ty, lhs.span)
+                {
                     // Numeric tensor/vector/matrix `+` is the live `addita` / `.added()` op.
                     result
                 } else if let Some(result) =
@@ -1402,7 +1404,9 @@ impl TypeChecker<'_> {
                     self.check_lista_arithmetic_bin(HirBinOp::Sub, lhs, rhs, lhs_ty, rhs_ty)
                 {
                     result
-                } else if let Some(result) = self.check_addita_plus(lhs_ty, rhs_ty, lhs.span) {
+                } else if let Some(result) =
+                    self.check_addita_plus(HirBinOp::Sub, lhs_ty, rhs_ty, lhs.span)
+                {
                     // Numeric tensor/vector/matrix `-` is the live `subtracta` / `.subtract()` op.
                     // Same-shape / tensor-broadcast contract as `+` — no extra broadcast.
                     result
@@ -1901,6 +1905,7 @@ impl TypeChecker<'_> {
     /// `None` leaves scalar arithmetic and scalar lifting to their own paths.
     fn check_addita_plus(
         &mut self,
+        op: HirBinOp,
         lhs: TypeId,
         rhs: TypeId,
         span: radix_lexer::Span,
@@ -1916,11 +1921,12 @@ impl TypeChecker<'_> {
             self.types.get(lhs_resolved).clone(),
             self.types.get(rhs_resolved).clone(),
         ) {
-            (Type::Tensor(lhs_elem, lhs_shape), Type::Tensor(rhs_elem, rhs_shape)) => {
-                Some(self.check_tensor_addita_plus(lhs_shape, rhs_shape, lhs_elem, rhs_elem, span))
-            }
+            (Type::Tensor(lhs_elem, lhs_shape), Type::Tensor(rhs_elem, rhs_shape)) => Some(
+                self.check_tensor_addita_plus(op, lhs_shape, rhs_shape, lhs_elem, rhs_elem, span),
+            ),
             (Type::Vector(lhs_elem, _), Type::Vector(rhs_elem, _)) => {
                 Some(self.check_same_shape_addita_plus(
+                    op,
                     lhs_resolved,
                     rhs_resolved,
                     lhs_elem,
@@ -1931,6 +1937,7 @@ impl TypeChecker<'_> {
             }
             (Type::Matrix(lhs_elem, _), Type::Matrix(rhs_elem, _)) => {
                 Some(self.check_same_shape_addita_plus(
+                    op,
                     lhs_resolved,
                     rhs_resolved,
                     lhs_elem,
@@ -1945,6 +1952,7 @@ impl TypeChecker<'_> {
 
     fn check_tensor_addita_plus(
         &mut self,
+        op: HirBinOp,
         lhs_shape: IndexId,
         rhs_shape: IndexId,
         lhs_elem: TypeId,
@@ -1957,9 +1965,10 @@ impl TypeChecker<'_> {
             self.invalid_operand_types(TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED, span);
             return self.error_type;
         }
-        // F9: the element is the join of the operand elements (identical
-        // elements stay); each result element is stored under it.
-        let elem = self.lift_join_element((lhs_elem, None), (rhs_elem, None), span);
+        // The element takes the scalar range rule for `op` (operator ruling
+        // 2026-10-15): `tu8 + tu8` is `tu16`, `tu8 - tu8` is `ti16`, and the
+        // width applies only at the store.
+        let elem = self.lift_range_element(op, (lhs_elem, None), (rhs_elem, None), span);
         if self.is_error(elem) {
             return self.error_type;
         }
@@ -1972,8 +1981,10 @@ impl TypeChecker<'_> {
         self.types.intern(Type::Tensor(elem, shape))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn check_same_shape_addita_plus(
         &mut self,
+        op: HirBinOp,
         lhs_ty: TypeId,
         rhs_ty: TypeId,
         lhs_elem: TypeId,
@@ -1991,7 +2002,19 @@ impl TypeChecker<'_> {
             self.invalid_operand_types(ARGUMENT_TYPE_MISMATCH, span);
             return self.error_type;
         }
-        lhs_ty
+        // The element takes the scalar range rule for `op` and the width
+        // applies only at the store (operator ruling 2026-10-15).
+        let elem = self.lift_range_element(op, (lhs_elem, None), (rhs_elem, None), span);
+        if self.is_error(elem) {
+            return self.error_type;
+        }
+        if self.types.equals(elem, lhs_elem) {
+            return lhs_ty;
+        }
+        let Some(register) = self.register_operand(lhs_ty) else {
+            return lhs_ty;
+        };
+        self.register_result(&register, elem)
     }
 
     /// `⊙`/`⊘` Hadamard arithmetic: identical built-in shapes produce the identical shape.
