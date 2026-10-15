@@ -2540,3 +2540,43 @@ fn zz_debug_presentation() {
     );
     let _ = &mut artifact;
 }
+
+#[test]
+fn size_generic_genus_applied_to_size_survives_round_trip() {
+    // A size-generic genus applied to a concrete size (`Box<3>`) used to trip
+    // the FHIR unit gate twice. Lowering recorded no authored child form for
+    // the magnitude argument, so the witness carried one `AppliedArg::Size`
+    // while the authored form carried none and `validate_named_form` failed
+    // with `named_argument_arity`; once the producer records the size child,
+    // the validator's unconditional `AppliedArg::Size` rejection reported
+    // `named_size_argument`. Both slugs must round-trip green.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = concat!(
+        "+++\nlocale = \"en\"\n+++\n\n",
+        "@ public\n",
+        "class Box<size N> {\n",
+        "    var vector<f32, N> minima\n",
+        "    var vector<f32, N> maxima\n",
+        "}\n",
+        "@ public\n",
+        "fn box_inflated(Box<3> box, f32 amount) \u{2192} Box<3> {\n",
+        "    const vector<f32, 3> lo \u{2190} box.minima\n",
+        "    const vector<f32, 3> hi \u{2190} box.maxima\n",
+        "    const Box<3> expanded \u{2190} Box {minima = lo, maxima = hi}\n",
+        "    return expanded\n",
+        "}\n",
+    );
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "size-generic.fab", source, AnalyzeRequest::default())
+        .expect("size-generic fixture analyzes");
+    let artifact = from_analyzed(&original, "size-generic", "size-generic.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize size-generic artifact");
+    load_fhir(&bytes).expect("size-generic artifact must load");
+}

@@ -581,8 +581,13 @@ fn validate_named_form(
                     return Err(type_presentation_issue("named_argument_kind", site));
                 }
             },
-            radix_types::AppliedArg::Size(_) => {
-                return Err(type_presentation_issue("named_size_argument", site));
+            radix_types::AppliedArg::Size(expected) => {
+                // A size-generic genus applied to a size (`Box<3>`) binds a
+                // magnitude parameter; pair the authored `Size` with the
+                // semantic witness exactly as the tensor-family shape
+                // argument does. Any other authored kind still fails closed
+                // through `size_argument_kind`.
+                validate_size_arg(arg, expected, site, check_index)?;
             }
         }
     }
