@@ -343,12 +343,13 @@ pub fn classify_conversio_coverage(
             }
         }
         ConversioCoverageTarget::TypeScript => {
-            // `octeti ↦ tensor via Le|Be` and its inverse `tensor ↦ octeti via
-            // Le|Be` decline by name on TypeScript and Go
-            // (`ts_octeti_tensor_conversio_unsupported`,
-            // `go_octeti_tensor_conversio_unsupported`, and the
-            // `*_tensor_octeti_conversio_unsupported` pair).
-            if driver_modular_word_blocked(src, tgt) || octeti_tensor_declined(src, tgt) {
+            // `octeti ↦ tensor via Le|Be` reads the bytes through a `DataView`
+            // on TypeScript; its inverse `tensor ↦ octeti via Le|Be` declines
+            // by name (`ts_tensor_octeti_conversio_unsupported`). Go declines
+            // both directions.
+            if driver_modular_word_blocked(src, tgt)
+                || (src == ConversioTypeFamily::Tensor && tgt == ConversioTypeFamily::Octeti)
+            {
                 ConversioCoverage::NotEmitted
             } else if ts_has_dedicated_conversio_arm(src, tgt) {
                 ConversioCoverage::Dedicated
