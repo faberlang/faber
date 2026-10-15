@@ -1313,6 +1313,20 @@ impl TypeChecker<'_> {
         } else {
             MemberAccess::Read
         };
+        // A field-path null fact proven for this whole access node (need
+        // c58fff9c case 2) refines the receiver inside the branch body that
+        // proved it: the fact is keyed by the root binding plus the
+        // root-to-leaf name path (`base.a.b`). Everything above still runs, so
+        // namespace/static/generis and tensor-edge handling keep their say.
+        if !write && let Some((base, path)) = super::control::field_path_key(object) {
+            let mut key_path = path;
+            key_path.push(name);
+            if !key_path.is_empty()
+                && let Some(&ty) = self.field_facts.get(&(base, key_path))
+            {
+                return ty;
+            }
+        }
         self.check_field_access_from_type(obj_ty, name, object.span, access)
     }
 
