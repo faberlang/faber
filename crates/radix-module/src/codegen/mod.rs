@@ -870,7 +870,8 @@ fn generate_cobol_from_analyzed(
     analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
-    let r#gen = cobol::CobolCodegen::new(hir, analysis.interner());
+    let mut r#gen = cobol::CobolCodegen::new(hir, analysis.interner());
+    r#gen.set_display_tokens(analysis.display_tokens().clone());
     let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Cobol(crate::CobolOutput { code: output.code }))
 }
@@ -908,7 +909,8 @@ fn generate_pascal_from_analyzed(
     analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
-    let r#gen = pascal::PascalCodegen::new(hir, analysis.interner());
+    let mut r#gen = pascal::PascalCodegen::new(hir, analysis.interner());
+    r#gen.set_display_tokens(analysis.display_tokens().clone());
     let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Pascal(crate::PascalOutput { code: output.code }))
 }
@@ -926,7 +928,8 @@ fn generate_fortran_from_analyzed(
     analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
-    let r#gen = fortran::FortranCodegen::new(hir, analysis.interner());
+    let mut r#gen = fortran::FortranCodegen::new(hir, analysis.interner());
+    r#gen.set_display_tokens(analysis.display_tokens().clone());
     let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Fortran(crate::FortranOutput { code: output.code }))
 }
@@ -941,7 +944,8 @@ fn generate_fortran_from_analyzed(
 
 #[cfg(feature = "hir-odin")]
 fn generate_odin_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) -> Result<crate::Output, CodegenError> {
-    let r#gen = odin::OdinCodegen::new(hir, analysis.interner());
+    let mut r#gen = odin::OdinCodegen::new(hir, analysis.interner());
+    r#gen.set_display_tokens(analysis.display_tokens().clone());
     let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Odin(crate::OdinOutput { code: output.code }))
 }
