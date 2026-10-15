@@ -153,7 +153,9 @@ fn an_unnarrowed_optional_cursor_read_requires_the_chain() {
         "{NODE}fn f(Node head) → int {{\n    ref Node ∪ none cur ← head.next\n    return cur.value\n}}\nmain {{}}\n"
     ));
     assert!(
-        errors.iter().any(|e| e == "optional_receiver_requires_chain"),
+        errors
+            .iter()
+            .any(|e| e == "optional_receiver_requires_chain"),
         "{errors:?}"
     );
 }

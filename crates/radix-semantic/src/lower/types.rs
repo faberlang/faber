@@ -397,7 +397,10 @@ impl Lowerer<'_> {
         for (index, member) in members.iter().enumerate() {
             if let Some(mode) = member.mode {
                 seen_modes += 1;
-                if matches!(mode, radix_syntax::TypeMode::De | radix_syntax::TypeMode::In) {
+                if matches!(
+                    mode,
+                    radix_syntax::TypeMode::De | radix_syntax::TypeMode::In
+                ) {
                     marked_member = Some(index);
                 }
             }
