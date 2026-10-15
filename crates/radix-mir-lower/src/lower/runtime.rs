@@ -2938,7 +2938,9 @@ impl FunctionBuilder<'_> {
                 .copied()
                 .unwrap_or(false)
             && !self.callable_is_generator(callee)
-            && let Some(error_ty) = self.callable_error_ty(callee)
+            && let Some(error_ty) = self
+                .callable_error_ty(callee)
+                .or_else(|| self.callable_async_error_ty(callee))
         {
             let callee = MirCallee::definition_with_type_args(*def_id, explicit_type_args);
             return self.lower_failable_call(callee, lowered_args, ty, error_ty, conversion, expr.span);
@@ -3147,6 +3149,30 @@ impl FunctionBuilder<'_> {
             }
         }
         callee.ty.and_then(|ty| error_ty(self.types, ty))
+    }
+
+    /// The error half of an awaited `@ future` callee whose declared `⇥ E`
+    /// channel was folded into its wrapped `promissum<T ⇥ E>` return.
+    ///
+    /// A linked library function exported through the file interface has its
+    /// `⇥ E` channel re-wrapped by `import_callable_return_shape`, which clears
+    /// the interface `FuncSig.err`; [`Self::callable_error_ty`] therefore
+    /// cannot see it. Recovering `E` from the wrapped return keeps the awaited
+    /// linked call on the `TryCall` edge its sync twin already uses. Keyed on
+    /// the callee's async fact: a non-async callable may declare a `promissum`
+    /// return without being failable.
+    fn callable_async_error_ty(&self, callee: &HirExpression) -> Option<MirType> {
+        fn async_error(types: &TypeTable, ty: TypeId) -> Option<MirType> {
+            match types.get(ty) {
+                Type::Func(signature) if signature.is_async => match types.get(signature.ret) {
+                    Type::PromissumFailable(_, err) => Some(MirType::semantic(*err)),
+                    _ => None,
+                },
+                Type::Alias(_, inner) => async_error(types, *inner),
+                _ => None,
+            }
+        }
+        callee.ty.and_then(|ty| async_error(self.types, ty))
     }
 
     pub(super) fn callable_is_generator(&self, callee: &HirExpression) -> bool {
