@@ -33,9 +33,9 @@ incipit { }
         result.diagnostics.iter().any(|err| {
             err.args
                 .iter()
-                .any(|a| a.name == "issue" && a.value == "assign_to_de_parameter")
+                .any(|a| a.name == "issue" && a.value == "assign_through_ref")
         }),
-        "missing assign_to_de_parameter: {:?}",
+        "missing assign_through_ref: {:?}",
         result.diagnostics
     );
 }
@@ -65,7 +65,7 @@ incipit { }
             result.diagnostics.iter().any(|err| {
                 err.args
                     .iter()
-                    .any(|a| a.name == "issue" && a.value == "assign_to_de_parameter")
+                    .any(|a| a.name == "issue" && a.value == "assign_through_ref")
             }),
             "target {target:?}: {:?}",
             result.diagnostics

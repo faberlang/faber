@@ -47,7 +47,7 @@ main {
         print i, j
     }
     mut int total ← 0
-    for range 1…5 var n {
+    for range 1…5 mut n {
         n ← n * 10
         total ← total + n
     }

@@ -10,7 +10,7 @@ main {
     let label
     label ← "deferred"
     print label
-    var list<int> later
+    mut list<int> later
     later ← [1, 2]
     print later.length()
 }
