@@ -25,10 +25,10 @@ use super::tensor_edge::{
     resolve_custom_value,
 };
 use super::value::{
-    GradientStorage, LedgerValue, MapKey, TensorEdgeOp, TensorInverseMap, TensorValue, Value,
-    as_text_str, coordinate_fits, format_template_shaped, inverse_view_coordinate, modular_operand,
-    modular_word_reduce, modular_word_result, round_float, uint_width_checked_add, values_equal,
-    width_checked_add,
+    GradientStorage, LedgerValue, MapKey, MatrixValue, TensorEdgeOp, TensorInverseMap, TensorValue,
+    Value, as_text_str, coordinate_fits, format_template_shaped, inverse_view_coordinate,
+    modular_operand, modular_word_reduce, modular_word_result, round_float, uint_width_checked_add,
+    values_equal, width_checked_add,
 };
 use super::{
     CallOutcome, RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH, RUNNER_LISTA_LENGTH_MISMATCH, Runner,
@@ -207,6 +207,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
                 match self.host.read_line()? {
                     Some(line) => Ok(Value::Str(line)),
+                    None => Ok(Value::Nil),
+                }
+            }
+            MirIntrinsic::ReadAll => {
+                if !call.args.is_empty() {
+                    return Err(RunnerError::internal(span, "read_all runtime arity"));
+                }
+                match self.host.read_all()? {
+                    Some(text) => Ok(Value::Str(text)),
                     None => Ok(Value::Nil),
                 }
             }
@@ -1654,14 +1663,24 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 i128::abs,
                 Some(handroll::Magnus::abs),
             ),
-            MirCollectionOp::Signum => self.map_numeric(
-                args,
-                span,
-                return_ty,
-                f64::signum,
-                i128::signum,
-                Some(|value| handroll::Magnus::from_i64(i64::from(value.signum()))),
-            ),
+            MirCollectionOp::Signum => {
+                if self.resolve_int_width(return_ty).is_decimal() {
+                    let [receiver] = args else {
+                        return Err(RunnerError::internal(span, "numeric collection arity"));
+                    };
+                    let value = self.eval_operand(receiver, span)?;
+                    super::decimal::signum(&value, span)
+                } else {
+                    self.map_numeric(
+                        args,
+                        span,
+                        return_ty,
+                        f64::signum,
+                        i128::signum,
+                        Some(|value| handroll::Magnus::from_i64(i64::from(value.signum()))),
+                    )
+                }
+            }
             MirCollectionOp::Minimum => {
                 self.numeric_extremum(args, span, return_ty, numeric_min, false)
             }
@@ -1943,7 +1962,22 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [receiver, index] = args else {
             return Err(RunnerError::internal(span, "tensor get arity"));
         };
-        let tensor = self.tensor_arg(receiver, span)?;
+        let tensor = match self.eval_operand(receiver, span)? {
+            Value::Tensor(cell) => cell,
+            // A `matrix` receiver shares the coordinate read: the same index
+            // lista contract, the same invalid-index constant, and the same
+            // optional-vs-bare miss posture. It is a separate value kind, so
+            // it takes its own read helper rather than the tensor views.
+            Value::Matrix(matrix) => {
+                return self.matrix_tensor_get(&matrix, index, return_ty, span);
+            }
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("tensor receiver type mismatch: {other:?}"),
+                ));
+            }
+        };
         // The index lista is validated and read in place: no extent `Vec`, and
         // no clone of the tensor shape.
         let index = self.index_cells_arg(index, span, ERR_ACCIPE_INVALID_INDEX)?;
@@ -1980,6 +2014,34 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             self.tensor_read_at(&tensor, offset, span)?
         };
         match read {
+            Some(value) => Ok(value),
+            None if checked => Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX)),
+            None => Ok(Value::Nil),
+        }
+    }
+
+    /// Coordinate read through a `matrix` receiver. The coordinate contract is
+    /// the tensor one (two non-negative cells, the same invalid-index
+    /// constant, the same optional-vs-bare miss posture); the read itself is
+    /// row-major `row * columns + column` against the shared cell.
+    fn matrix_tensor_get(
+        &mut self,
+        matrix: &Rc<RefCell<MatrixValue>>,
+        index: &MirOperand,
+        return_ty: MirType,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let index = self.index_cells_arg(index, span, ERR_ACCIPE_INVALID_INDEX)?;
+        let checked = !matches!(self.types.get(return_ty.semantic_id()), Type::Option(_));
+        let cell = matrix_coordinates(&index.borrow()).and_then(|(row, column)| {
+            let borrow = matrix.borrow();
+            if row < borrow.rows && column < borrow.columns {
+                borrow.cell(row, column).cloned()
+            } else {
+                None
+            }
+        });
+        match cell {
             Some(value) => Ok(value),
             None if checked => Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX)),
             None => Ok(Value::Nil),
@@ -2168,7 +2230,20 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         value: &MirOperand,
         span: Span,
     ) -> Result<Value, RunnerError> {
-        let tensor = self.tensor_arg(receiver, span)?;
+        let tensor = match self.eval_operand(receiver, span)? {
+            Value::Tensor(cell) => cell,
+            // Stores through a matrix receiver write the shared `Rc`, so the
+            // aliasing `ponde` semantics match the tensor path.
+            Value::Matrix(matrix) => {
+                return self.write_matrix_element(&matrix, index, value, span);
+            }
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("tensor receiver type mismatch: {other:?}"),
+                ));
+            }
+        };
         let index = self.shape_arg(index, span, ERR_PONDE_INVALID_INDEX)?;
         let value = self.eval_operand(value, span)?;
         let borrow = tensor.borrow();
@@ -2182,6 +2257,34 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         borrow
             .set_value_at(offset, value)
             .ok_or_else(|| RunnerError::internal(span, ERR_PONDE_INVALID_INDEX))?;
+        Ok(Value::Unit)
+    }
+
+    /// Coordinate write through a `matrix` receiver. The store writes the
+    /// shared `Rc<RefCell<MatrixValue>>`, so a later read through the same
+    /// handle observes the cell; an off-rank or out-of-range coordinate takes
+    /// the tensor store's invalid-index error.
+    fn write_matrix_element(
+        &mut self,
+        matrix: &Rc<RefCell<MatrixValue>>,
+        index: &MirOperand,
+        value: &MirOperand,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let index = self.index_cells_arg(index, span, ERR_PONDE_INVALID_INDEX)?;
+        let value = self.eval_operand(value, span)?;
+        let written = matrix_coordinates(&index.borrow()).is_some_and(|(row, column)| {
+            let mut borrow = matrix.borrow_mut();
+            row < borrow.rows
+                && column < borrow.columns
+                && borrow
+                    .cell_mut(row, column)
+                    .map(|cell| *cell = value)
+                    .is_some()
+        });
+        if !written {
+            return Err(RunnerError::internal(span, ERR_PONDE_INVALID_INDEX));
+        }
         Ok(Value::Unit)
     }
 
@@ -5418,8 +5521,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let index = self.eval_operand(index, span)?;
                 Self::optional_collection_index(current, &index, span)
             }
-            MirOptionChainLink::Call { .. } => {
-                Err(RunnerError::unsupported(span, "option chain call"))
+            // WHY: a nil base short-circuits above, so the callee is only
+            // invoked when the optional base held a value.
+            MirOptionChainLink::Call { callee, args } => {
+                match self.invoke_call(callee, args, span)? {
+                    CallOutcome::Ok(value) => Ok(value),
+                    CallOutcome::Err(_) => Err(RunnerError::internal(
+                        span,
+                        "uncaught alternate return from option chain call",
+                    )),
+                }
             }
         }
     }
@@ -5781,6 +5892,17 @@ fn shape_element(
             format!("tensor shape element is not numerus: {other:?}"),
         )),
     }
+}
+
+/// `tensor_flat_offset` over an index already validated by `index_cells_arg`
+/// Two non-negative coordinates from an index already validated by
+/// `index_cells_arg` (every cell a non-negative `Value::Int`); `None` for any
+/// other rank, or for a coordinate beyond the `u8` row/column extent.
+fn matrix_coordinates(index: &[Value]) -> Option<(u8, u8)> {
+    let [Value::Int(row), Value::Int(column)] = index else {
+        return None;
+    };
+    Some((u8::try_from(*row).ok()?, u8::try_from(*column).ok()?))
 }
 
 /// `tensor_flat_offset` over an index already validated by `index_cells_arg`

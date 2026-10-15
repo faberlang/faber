@@ -63,8 +63,16 @@ mod kernel_ban_tests;
 mod lazy_cursor_tests;
 
 #[cfg(test)]
+#[path = "lege_read_test.rs"]
+mod lege_read_tests;
+
+#[cfg(test)]
 #[path = "vector_matrix_test.rs"]
 mod vector_matrix_tests;
+
+#[cfg(test)]
+#[path = "option_chain_call_test.rs"]
+mod option_chain_call_tests;
 
 #[cfg(test)]
 #[path = "rounding_conversio_run_test.rs"]

@@ -1501,6 +1501,65 @@ impl TypeChecker<'_> {
             return self.error_type;
         }
 
+        // An optional-chain member that is then called (`a?.method()`) parses
+        // as a `Call` whose callee is `OptionalChain(object, Member(name))`.
+        // A declared method on the nullable object's inner type is a valid
+        // callee; the chain keeps the call result option-wrapped. A miss on
+        // method lookup falls through to the generic callee path, so field
+        // access and the existing diagnostics are unchanged.
+        if let HirExpressionKind::OptionalChain(
+            object,
+            radix_hir::HirOptionalChainKind::Member(name),
+        ) = &mut callee.kind
+        {
+            let name = *name;
+            let object_ty = self.check_expr(object);
+            let inner_ty = match self.types.get(self.resolve_inferred_type(object_ty)) {
+                Type::Option(inner) => *inner,
+                _ => object_ty,
+            };
+            if let Some(sig) = self.lookup_method_signature(inner_ty, name) {
+                let sig = self.applied_method_signature(inner_ty, sig);
+                self.check_method_visibility(inner_ty, name, callee.span);
+                if self.report_unavailable_method(inner_ty, name, callee.span) {
+                    self.typecheck_call_arg_exprs(args);
+                    return self.error_type;
+                }
+                let method_def = self
+                    .struct_def_from_type(inner_ty)
+                    .and_then(|def| self.method_defs.get(&(def, name)).copied());
+                let ret = if let Some(method_def) = method_def {
+                    self.check_instantiated_method_call_for_callee(
+                        method_def,
+                        &sig,
+                        explicit_type_args,
+                        args,
+                        callee.span,
+                        expected,
+                    )
+                } else {
+                    self.check_instantiated_call_marked(
+                        &sig,
+                        explicit_type_args,
+                        args,
+                        callee.span,
+                        expected,
+                        None,
+                    )
+                };
+                let wrapped = if matches!(
+                    self.types.get(self.resolve_inferred_type(ret)),
+                    Type::Option(_)
+                ) {
+                    ret
+                } else {
+                    self.types.option(ret)
+                };
+                callee.ty = Some(wrapped);
+                return wrapped;
+            }
+        }
+
         if let HirExpressionKind::Path(def_id) = &callee.kind {
             if self.resolver.gpu_builtin(*def_id).is_some() {
                 if !explicit_type_args.is_empty() {

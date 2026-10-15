@@ -130,12 +130,29 @@ impl FunctionBuilder<'_> {
     }
 
     /// Lower a tuple literal into an ordered MIR aggregate temp.
+    ///
+    /// A numeric literal element takes its positional member's sized carrier.
+    /// Semantic analysis types an integer literal `numerus`, so a bare `Int`
+    /// constant reads as plain `numerus` at the validator and a `u8`/`i16`
+    /// member is rejected; the typed temp is the same fix `lower_call_arg_value`
+    /// applies to call arguments (d11-6 ruling 12a).
     pub(super) fn lower_tuple(&mut self, items: &[HirExpression], expr: &HirExpression) -> Option<MirOperand> {
-        let mut fields = Vec::with_capacity(items.len());
-        for item in items {
-            fields.push(MirAggregateItem::Operand(self.lower_expr_value(item)?));
-        }
         let ty = self.expr_ty(expr)?;
+        let member_tys: Vec<TypeId> = match self.normalized_type(ty.semantic_id()) {
+            Type::Tuple(elements) => elements.clone(),
+            _ => Vec::new(),
+        };
+        let mut fields = Vec::with_capacity(items.len());
+        for (index, item) in items.iter().enumerate() {
+            let value = self.lower_expr_value(item)?;
+            let value = match member_tys.get(index).copied() {
+                Some(member_ty) if is_numeric_literal(item) && self.takes_sized_member_type(member_ty) => {
+                    self.assign_temp(MirValueKind::Operand(value), MirType::semantic(member_ty), item.span)
+                }
+                _ => value,
+            };
+            fields.push(MirAggregateItem::Operand(value));
+        }
         Some(self.construct_temp(MirAggregateKind::Tuple, MirAggregateFields::Ordered(fields), ty, expr.span))
     }
 
@@ -304,7 +321,8 @@ impl FunctionBuilder<'_> {
                 let def_id = *def_id;
                 self.lower_verte_struct(def_id, target, entries, expr)
             }
-            Type::Record(_) => {
+            Type::Record(field_tys) => {
+                let field_tys = field_tys.clone();
                 let Some(entries) = entries else {
                     self.errors.push(MirError::unsupported(
                         expr.span,
@@ -312,7 +330,7 @@ impl FunctionBuilder<'_> {
                     ));
                     return None;
                 };
-                let fields = self.lower_record_object_fields(entries, expr.span)?;
+                let fields = self.lower_record_object_fields(entries, &field_tys, expr.span)?;
                 let ty = self.expr_ty(expr).unwrap_or(MirType::semantic(target));
                 Some(self.construct_temp(MirAggregateKind::Record, MirAggregateFields::Named(fields), ty, expr.span))
             }
@@ -534,8 +552,14 @@ impl FunctionBuilder<'_> {
 
     /// Labelled record literal entries, in written order (the runner renders a
     /// record in that order). A record has no defaults, spread or computed
-    /// keys: every label is written once with its value.
-    fn lower_record_object_fields(&mut self, entries: &[HirObjectField], span: Span) -> Option<Vec<MirNamedOperand>> {
+    /// keys: every label is written once with its value. A numeric literal
+    /// entry takes its field's sized carrier, exactly as a tuple element does.
+    fn lower_record_object_fields(
+        &mut self,
+        entries: &[HirObjectField],
+        field_tys: &FxHashMap<Symbol, TypeId>,
+        span: Span,
+    ) -> Option<Vec<MirNamedOperand>> {
         let mut fields = Vec::with_capacity(entries.len());
         for entry in entries {
             let name = match &entry.key {
@@ -549,7 +573,14 @@ impl FunctionBuilder<'_> {
                 }
             };
             let value = self.required_object_value(entry, span, "record")?;
-            fields.push(MirNamedOperand { name, value: self.lower_expr_value(value)? });
+            let lowered = self.lower_expr_value(value)?;
+            let lowered = match field_tys.get(&name).copied() {
+                Some(field_ty) if is_numeric_literal(value) && self.takes_sized_member_type(field_ty) => {
+                    self.assign_temp(MirValueKind::Operand(lowered), MirType::semantic(field_ty), value.span)
+                }
+                _ => lowered,
+            };
+            fields.push(MirNamedOperand { name, value: lowered });
         }
         Some(fields)
     }
@@ -845,4 +876,28 @@ impl FunctionBuilder<'_> {
             None
         }
     }
+
+    /// Whether an aggregate member slot requires a numeric literal at its own
+    /// sized carrier: a sized numeric (signed/unsigned/decimal), a float
+    /// width, or a wrapping/saturating word (whose store reduces at the temp).
+    ///
+    /// Mirrors the classification `lower_call_arg_value` uses for call
+    /// arguments (d11-6 ruling 12a).
+    fn takes_sized_member_type(&self, member_ty: TypeId) -> bool {
+        match self.normalized_type(self.types.peel_access_marker(member_ty).1) {
+            Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some() || width.is_decimal(),
+            Type::SizedNumeric(Primitive::Fractus, _) => true,
+            Type::ModularWord(_) | Type::SaturatingWord(_) => true,
+            _ => false,
+        }
+    }
+}
+
+/// Whether a HIR expression is an integer or decimal literal, the elements an
+/// aggregate member slot re-types to its sized carrier.
+fn is_numeric_literal(expr: &HirExpression) -> bool {
+    matches!(
+        expr.kind,
+        HirExpressionKind::Literal(HirLiteral::Int(_) | HirLiteral::Float(_) | HirLiteral::FloatText { .. })
+    )
 }

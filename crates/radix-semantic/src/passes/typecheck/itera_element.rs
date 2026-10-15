@@ -52,6 +52,10 @@ impl TypeChecker<'_> {
             Type::Map(_, value) | Type::Ledger(_, value) if ex => value,
             Type::Map(key, _) | Type::Ledger(key, _) => key,
             Type::Cursor(inner) | Type::AsyncCursor(inner, _) if ex => inner,
+            // An `ordo` source iterates its own members in declared order
+            //; the element is the enum itself. `de` over an
+            // enum stays refused below.
+            Type::Enum(_) if ex => dispatch_ty,
             Type::Cursor(_) | Type::AsyncCursor(_, _) => {
                 self.error_issue(
                     SemanticErrorKind::TypeMismatch,

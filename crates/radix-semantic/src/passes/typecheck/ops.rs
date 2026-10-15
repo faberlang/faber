@@ -1378,7 +1378,9 @@ impl TypeChecker<'_> {
                     self.check_lista_arithmetic_bin(HirBinOp::Add, lhs, rhs, lhs_ty, rhs_ty)
                 {
                     result
-                } else if let Some(result) = self.check_addita_plus(lhs_ty, rhs_ty, lhs.span) {
+                } else if let Some(result) =
+                    self.check_addita_plus(HirBinOp::Add, lhs_ty, rhs_ty, lhs.span)
+                {
                     // Numeric tensor/vector/matrix `+` is the live `addita` / `.added()` op.
                     result
                 } else if let Some(result) =
@@ -1402,7 +1404,9 @@ impl TypeChecker<'_> {
                     self.check_lista_arithmetic_bin(HirBinOp::Sub, lhs, rhs, lhs_ty, rhs_ty)
                 {
                     result
-                } else if let Some(result) = self.check_addita_plus(lhs_ty, rhs_ty, lhs.span) {
+                } else if let Some(result) =
+                    self.check_addita_plus(HirBinOp::Sub, lhs_ty, rhs_ty, lhs.span)
+                {
                     // Numeric tensor/vector/matrix `-` is the live `subtracta` / `.subtract()` op.
                     // Same-shape / tensor-broadcast contract as `+` — no extra broadcast.
                     result
@@ -1656,6 +1660,11 @@ impl TypeChecker<'_> {
             // order lexicographically.
             return result;
         }
+        if let Some(result) = self.check_ordo_order_compare(lhs, lhs_ty, rhs_ty) {
+            // Operator ruling 2026-10-15: two values of one
+            // `ordo` order by their declared discriminants.
+            return result;
+        }
         if self.is_instans(lhs_ty) && self.is_instans(rhs_ty) {
             self.instans_join(lhs_ty, rhs_ty, lhs.span);
         } else if self.is_textus(lhs_ty) && self.is_textus(rhs_ty) {
@@ -1674,6 +1683,44 @@ impl TypeChecker<'_> {
             self.numeric_ordering_bin(lhs_ty, rhs_ty, lhs.span);
         }
         self.bool_type()
+    }
+
+    /// Admission law for `≺ ≻ ≤ ≥` over two values of one `ordo` enum.
+    ///
+    /// Operator ruling 2026-10-15: two values of the same
+    /// `ordo` order by their declared discriminants, not by declaration
+    /// position. The resolved rows are recorded on the analyzed unit keyed by
+    /// the comparison's left-operand id, mirroring how `tensor_edge_policies`
+    /// is filled; lowering converts both operands to those integers. A
+    /// different enum on either side, or a string-valued `ordo` with no
+    /// numeric discriminants, keeps the ordinary mismatch path.
+    fn check_ordo_order_compare(
+        &mut self,
+        lhs: &HirExpression,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+    ) -> Option<TypeId> {
+        let ordo = self.ordo_def(lhs_ty)?;
+        if self.ordo_def(rhs_ty) != Some(ordo) {
+            return None;
+        }
+        let facts = self.ordo_members.get(&ordo)?;
+        let mut next = 0i64;
+        let mut rows = Vec::with_capacity(facts.len());
+        for fact in facts {
+            let value = match &fact.value {
+                Some(radix_hir::HirOrdoValue::Integer(value)) => *value,
+                Some(radix_hir::HirOrdoValue::String(_)) => return None,
+                None => next,
+            };
+            next = value.wrapping_add(1);
+            rows.push((fact.variant, value));
+        }
+        self.tensor_edge_policies
+            .ordo_order
+            .comparisons
+            .insert(lhs.id, rows);
+        Some(self.bool_type())
     }
 
     /// `·` inner product: contracts the inner dimension(s). vec·vec → scalar;
@@ -1901,6 +1948,7 @@ impl TypeChecker<'_> {
     /// `None` leaves scalar arithmetic and scalar lifting to their own paths.
     fn check_addita_plus(
         &mut self,
+        op: HirBinOp,
         lhs: TypeId,
         rhs: TypeId,
         span: radix_lexer::Span,
@@ -1916,11 +1964,12 @@ impl TypeChecker<'_> {
             self.types.get(lhs_resolved).clone(),
             self.types.get(rhs_resolved).clone(),
         ) {
-            (Type::Tensor(lhs_elem, lhs_shape), Type::Tensor(rhs_elem, rhs_shape)) => {
-                Some(self.check_tensor_addita_plus(lhs_shape, rhs_shape, lhs_elem, rhs_elem, span))
-            }
+            (Type::Tensor(lhs_elem, lhs_shape), Type::Tensor(rhs_elem, rhs_shape)) => Some(
+                self.check_tensor_addita_plus(op, lhs_shape, rhs_shape, lhs_elem, rhs_elem, span),
+            ),
             (Type::Vector(lhs_elem, _), Type::Vector(rhs_elem, _)) => {
                 Some(self.check_same_shape_addita_plus(
+                    op,
                     lhs_resolved,
                     rhs_resolved,
                     lhs_elem,
@@ -1931,6 +1980,7 @@ impl TypeChecker<'_> {
             }
             (Type::Matrix(lhs_elem, _), Type::Matrix(rhs_elem, _)) => {
                 Some(self.check_same_shape_addita_plus(
+                    op,
                     lhs_resolved,
                     rhs_resolved,
                     lhs_elem,
@@ -1945,6 +1995,7 @@ impl TypeChecker<'_> {
 
     fn check_tensor_addita_plus(
         &mut self,
+        op: HirBinOp,
         lhs_shape: IndexId,
         rhs_shape: IndexId,
         lhs_elem: TypeId,
@@ -1957,9 +2008,10 @@ impl TypeChecker<'_> {
             self.invalid_operand_types(TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED, span);
             return self.error_type;
         }
-        // F9: the element is the join of the operand elements (identical
-        // elements stay); each result element is stored under it.
-        let elem = self.lift_join_element((lhs_elem, None), (rhs_elem, None), span);
+        // The element takes the scalar range rule for `op` (operator ruling
+        // 2026-10-15): `tu8 + tu8` is `tu16`, `tu8 - tu8` is `ti16`, and the
+        // width applies only at the store.
+        let elem = self.lift_range_element(op, (lhs_elem, None), (rhs_elem, None), span);
         if self.is_error(elem) {
             return self.error_type;
         }
@@ -1972,8 +2024,10 @@ impl TypeChecker<'_> {
         self.types.intern(Type::Tensor(elem, shape))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn check_same_shape_addita_plus(
         &mut self,
+        op: HirBinOp,
         lhs_ty: TypeId,
         rhs_ty: TypeId,
         lhs_elem: TypeId,
@@ -1991,7 +2045,19 @@ impl TypeChecker<'_> {
             self.invalid_operand_types(ARGUMENT_TYPE_MISMATCH, span);
             return self.error_type;
         }
-        lhs_ty
+        // The element takes the scalar range rule for `op` and the width
+        // applies only at the store (operator ruling 2026-10-15).
+        let elem = self.lift_range_element(op, (lhs_elem, None), (rhs_elem, None), span);
+        if self.is_error(elem) {
+            return self.error_type;
+        }
+        if self.types.equals(elem, lhs_elem) {
+            return lhs_ty;
+        }
+        let Some(register) = self.register_operand(lhs_ty) else {
+            return lhs_ty;
+        };
+        self.register_result(&register, elem)
     }
 
     /// `⊙`/`⊘` Hadamard arithmetic: identical built-in shapes produce the identical shape.

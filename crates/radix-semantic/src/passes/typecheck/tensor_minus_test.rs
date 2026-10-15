@@ -39,8 +39,11 @@ fn tensor_minus_same_shape_typechecks() {
 
 #[test]
 fn tensor_minus_same_shape_integer_typechecks() {
+    // The element takes the scalar range rule (operator ruling 2026-10-15):
+    // `i32 - i32` is [-2^32+1, 2^32-1] → `i64`; the width applies only at the
+    // store.
     accepts(
-        r"functio diff(tensor<i32, [2, 2]> a, tensor<i32, [2, 2]> b) → tensor<i32, [2, 2]> {
+        r"functio diff(tensor<i32, [2, 2]> a, tensor<i32, [2, 2]> b) → tensor<i64, [2, 2]> {
     redde a - b
 }",
     );

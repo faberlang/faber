@@ -1,0 +1,37 @@
++++
+term = "cape"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "fac_stmt", "cape_clause", "si_stmt", "iace_stmt", "expression", "comparison", "additive_expr", "literal", "nota_stmt"]
+category = "errors"
+canonical = false
+summary = "A panic at the end of a do body is fatal and the catch cannot run."
+syntax = "do { … panic e } catch name { … }"
+related = ["cape", "mori", "fac"]
+locale = "en"
++++
+# =============================================================================
+# cape — A panic at the end of a do body is fatal and the catch cannot run.
+# =============================================================================
+#
+# What this teaches:
+#   • `panic` is fatal, not part of the `catch` channel — a `do` body that ends
+#     in `panic` aborts the process; its trailing `catch` handler is unreachable
+#   • Body prefix still runs — statements before the `panic` execute and print
+#     before the run ends on the trap
+#
+# Common mistakes:
+#   • Expecting `catch` to recover a `panic` — only `throw`/`iace` rides the
+#     recovery channel; use `throw` when a handler must intercept the failure
+#
+# See also: cape, mori, fac
+# =============================================================================
+
+main {
+    do {
+        print "in"
+        panic "x"
+    }
+    catch e {
+        print "caught"
+    }
+}

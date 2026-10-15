@@ -338,7 +338,7 @@ impl Validator<'_, '_> {
                 self.validate_operand(scope, index, span);
             }
             MirOptionChainLink::Call { callee, args } => {
-                let sig = self.validate_callee(scope, callee, span, false);
+                let sig = self.validate_option_chain_call_callee(scope, callee, span);
                 let mut generic_bindings = GenericTypeBindings::default();
                 let mut shape_bindings = MirShapeBindings::default();
                 self.validate_call_args(
@@ -351,6 +351,46 @@ impl Validator<'_, '_> {
                     &mut shape_bindings,
                 );
             }
+        }
+    }
+
+    /// Resolve the callable signature for a `?.` chain `Call` link.
+    ///
+    /// A chain call differs from a plain call in two ways. A `Value` callee
+    /// sits behind optionality: `f?(3)` on `(int) → int ∪ none` lowers to a
+    /// value callee whose operand type is `Option<Func>`, so the callable
+    /// signature comes from the nullable inner type rather than the operand
+    /// type itself. A `Definition` callee that names a genus method has its
+    /// receiver supplied by the chain base, so its self-first MIR signature
+    /// must drop that first parameter before argument checking.
+    fn validate_option_chain_call_callee(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        callee: &MirCallee,
+        span: Span,
+    ) -> Option<MirFunctionSignature> {
+        match callee {
+            MirCallee::Value(value) => {
+                let operand_ty = self.validate_operand(scope, value, span);
+                let sig = operand_ty.and_then(|ty| {
+                    let callable = self.nullable_inner_ty(ty).unwrap_or(ty);
+                    self.signature_from_semantic_callable_type(callable.semantic_id())
+                });
+                if operand_ty.is_some() && sig.is_none() {
+                    self.error(span, "value callee is not callable");
+                }
+                sig
+            }
+            MirCallee::Definition { source, .. } if self.context.method_defs.contains(source) => {
+                let mut sig = self.validate_callee(scope, callee, span, false);
+                if let Some(signature) = sig.as_mut()
+                    && !signature.params.is_empty()
+                {
+                    signature.params.remove(0);
+                }
+                sig
+            }
+            _ => self.validate_callee(scope, callee, span, false),
         }
     }
 }

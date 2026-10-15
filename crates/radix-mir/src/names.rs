@@ -138,10 +138,19 @@ impl<'a> MirNames<'a> {
 
     #[must_use]
     pub fn explicit_entry_function(&self) -> Option<&'a MirFunction> {
-        self.program
+        let vacuum = self
+            .program
             .functions
             .iter()
             .filter(|function| self.is_entry_function(function))
+            .max_by_key(|function| function.id.0);
+        if vacuum.is_some() {
+            return vacuum;
+        }
+        self.program
+            .functions
+            .iter()
+            .filter(|function| self.is_numerus_entry_function(function))
             .max_by_key(|function| function.id.0)
     }
 
@@ -198,6 +207,25 @@ impl<'a> MirNames<'a> {
             Type::Alias(_, target) => self.is_vacuum_ty(MirType::semantic(*target)),
             _ => false,
         }
+    }
+
+    fn is_numerus_ty(&self, ty: MirType) -> bool {
+        match self.types.get(ty.semantic_id()) {
+            Type::Primitive(Primitive::Numerus) => true,
+            Type::Alias(_, target) => self.is_numerus_ty(MirType::semantic(*target)),
+            _ => false,
+        }
+    }
+
+    /// A run-time entry whose expression form lowers to an `int` result
+    /// (ruling Q-T8): same shape as [`Self::is_entry_function`], but numerus
+    /// return instead of vacuum. Consulted only when no vacuum candidate exists.
+    fn is_numerus_entry_function(&self, function: &MirFunction) -> bool {
+        function.source.is_none()
+            && function.name.is_none()
+            && function.params.is_empty()
+            && self.is_numerus_ty(function.return_ty)
+            && !self.referenced.contains(&function.id)
     }
 }
 
