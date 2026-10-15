@@ -43,3 +43,9 @@ fn indexing_text_reads_a_code_point() {
         "{code}"
     );
 }
+
+#[test]
+fn an_ascii_literal_is_a_text_literal() {
+    let code = emitted("main {\n    const ascii route ← 'pg:query'\n    print route\n}");
+    assert!(code.contains("\"pg:query\""), "{code}");
+}

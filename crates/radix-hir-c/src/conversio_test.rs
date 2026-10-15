@@ -59,3 +59,11 @@ fn text_and_float_to_bool_and_bool_to_float() {
     assert!(code.contains("((l_f) != 0.0)"), "{code}");
     assert!(code.contains("? 1.0 : 0.0)"), "{code}");
 }
+
+#[test]
+fn a_bounded_text_conversion_checks_its_capacity() {
+    let code = emitted(
+        "main {\n    const string raw ← \"ab\"\n    const string<8> t ← raw ↦ string<8>\n    print t\n}",
+    );
+    assert!(code.contains("faber_bounded_text(l_raw, 8)"), "{code}");
+}

@@ -799,13 +799,24 @@ impl Emitter<'_> {
         if literal_first && args.len() <= 3 {
             return true;
         }
-        args.iter().all(|arg| {
-            arg.ty.is_some_and(|ty| {
-                classify(self.types, ty).is_ok_and(|class| {
-                    !matches!(class, Ty::Genus(_) | Ty::Opt(crate::ty::Inner::Genus(_)))
-                })
-            })
-        })
+        args.iter()
+            .all(|arg| arg.ty.is_some_and(|ty| self.argument_joins(ty)))
+    }
+
+    /// Whether one print argument has a shared rendering. A genus (and so an
+    /// enumeration, and an optional one) has none, and neither does `ascii` or
+    /// bounded text: the runner prints each on its own line. A sized integer
+    /// renders like any integer.
+    fn argument_joins(&self, ty: radix_types::TypeId) -> bool {
+        match self.types.get(ty) {
+            radix_types::Type::Alias(_, inner) => self.argument_joins(*inner),
+            radix_types::Type::Primitive(radix_types::Primitive::Ascii)
+            | radix_types::Type::BoundedAscii { .. }
+            | radix_types::Type::BoundedTextus { .. } => false,
+            _ => classify(self.types, ty).is_ok_and(|class| {
+                !matches!(class, Ty::Genus(_) | Ty::Opt(crate::ty::Inner::Genus(_)))
+            }),
+        }
     }
 
     /// One `printf` for `args`, space separated, ending the line.

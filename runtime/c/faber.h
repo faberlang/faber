@@ -1155,6 +1155,16 @@ static inline int64_t faber_text_length(faber_text text) {
     return count;
 }
 
+/* `textus ↦ string<N>`: the capacity is in code points and is checked at run
+ * time (the typechecker proves a literal fits). Mirrors the runner's
+ * bounded-text store. */
+static inline faber_text faber_bounded_text(faber_text text, int64_t capacity) {
+    if (faber_text_length(text) > capacity) {
+        faber_trap("textus to bounded textus conversion failed");
+    }
+    return text;
+}
+
 /* `s.slice(from, to)`: code-point positions, clamped to the text, empty when
  * `from` is not before `to`; a negative position traps as the runner does. */
 static inline faber_text faber_text_slice(faber_arena *arena, faber_text text, faber_i128 from,

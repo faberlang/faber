@@ -243,6 +243,12 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             _ => Err(unsupported(describe(types.get(ty)))),
         },
         Type::Primitive(Primitive::Textus) => Ok(Ty::Text),
+        // `ascii` is an ASCII-only text with no capacity; `ascii<N>` and
+        // `string<N>` are bounded text whose capacity the typechecker proves a
+        // literal fits and whose runtime conversion checks the rest. All are
+        // the counted UTF-8 text value the target already emits.
+        Type::Primitive(Primitive::Ascii) | Type::BoundedAscii { .. } => Ok(Ty::Text),
+        Type::BoundedTextus { .. } => Ok(Ty::Text),
         Type::Primitive(Primitive::Bivalens) => Ok(Ty::Bool),
         Type::Primitive(Primitive::Fractus)
         | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Ok(Ty::Float),

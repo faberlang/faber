@@ -682,7 +682,13 @@ impl Emitter<'_> {
             HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => {
                 Ok(self.float_literal(*value))
             }
-            HirLiteral::Ascii(_) => Err(unsupported("ascii text literal")),
+            // `ascii` is an ASCII-only text; the bytes are the same counted
+            // UTF-8 value a `string` literal is.
+            HirLiteral::Ascii(symbol) => {
+                let raw = self.names.resolve_symbol(*symbol);
+                let decoded = radix_codegen_shared::unescape_faber_text(raw);
+                Ok(Operand::new(c_string(&decoded)?, Value::Text))
+            }
             HirLiteral::Octeti(_) => Err(unsupported("byte-buffer literal")),
             HirLiteral::JsonValor(_) => Err(unsupported("json literal")),
             HirLiteral::Regex(..) => Err(unsupported("regex literal")),
