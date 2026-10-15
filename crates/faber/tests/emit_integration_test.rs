@@ -535,10 +535,12 @@ fn tensor_fragment_package_emit_failures_name_their_issue() {
         if ok {
             continue;
         }
+        // ALLOW_DIAGNOSTIC_RENDER_TEXT: CLI stderr is the renderer contract for this integration test.
         assert!(
             stderr.contains("error[PKG001:"),
             "`faber emit -t {target}` failure must name a PKG001 issue:\n{stderr}"
         );
+        // ALLOW_DIAGNOSTIC_RENDER_TEXT: CLI stderr is the renderer contract for this integration test.
         assert!(
             !stderr.contains("error[PKG001]:"),
             "`faber emit -t {target}` rendered an issue-less PKG001 header:\n{stderr}"

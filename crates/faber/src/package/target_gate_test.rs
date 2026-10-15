@@ -21,7 +21,8 @@ fn diagnostic_carries_issue_code_target_and_help() {
         assert_eq!(diag.issue(), Some(TARGET_NOT_IN_THIS_BUILD));
         assert_eq!(diag.code, Some("PKG001"));
         assert_eq!(arg(&diag, "target"), Some(target.as_str()));
-        assert!(diag.help.is_some());
+        let carries_help = diag.help.is_some();
+        assert!(carries_help);
     }
 }
 
@@ -60,5 +61,6 @@ fn rust_target_is_compiled_in_with_feature() {
 fn experimental_target_help_differs_from_release_target_help() {
     let experimental = target_not_in_this_build(Target::HirPascal);
     let release = target_not_in_this_build(Target::HirGo);
-    assert_ne!(experimental.help, release.help);
+    let (experimental_help, release_help) = (experimental.help, release.help);
+    assert_ne!(experimental_help, release_help);
 }
