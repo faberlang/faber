@@ -177,3 +177,52 @@ fn bounded_text_bytes_and_regrouped_lists_plan_by_type() {
     // A 64-bit unsigned element does not fit the carrier.
     assert_eq!(plan(&f, bytes, wide), None);
 }
+
+#[test]
+fn byte_lists_read_as_endian_scalars_and_not_as_u64() {
+    let mut f = Fixture::new();
+    let b8 = f.bits(BitsWidth::B8);
+    let bytes = f.types.array(b8);
+    let u32_ = f.sized(Primitive::Numerus, NumericWidth::U32);
+    let i16_ = f.sized(Primitive::Numerus, NumericWidth::I16);
+    let u64_ = f.sized(Primitive::Numerus, NumericWidth::U64);
+    let f32_ = f.sized(Primitive::Fractus, NumericWidth::F32);
+    let plan = |f: &Fixture, to| sequence_conversion(&f.types, bytes, to);
+    assert_eq!(
+        plan(&f, u32_),
+        Some(Seq::ReadScalar {
+            bytes: 4,
+            signed: false,
+            float: false
+        })
+    );
+    assert_eq!(
+        plan(&f, i16_),
+        Some(Seq::ReadScalar {
+            bytes: 2,
+            signed: true,
+            float: false
+        })
+    );
+    assert_eq!(
+        plan(&f, f32_),
+        Some(Seq::ReadScalar {
+            bytes: 4,
+            signed: false,
+            float: true
+        })
+    );
+    // A 64-bit unsigned value leaves the i64 carrier.
+    assert_eq!(plan(&f, u64_), None);
+}
+
+#[test]
+fn integer_intervals_are_values_and_others_are_not() {
+    let mut f = Fixture::new();
+    let int = f.primitive(Primitive::Numerus);
+    let float = f.primitive(Primitive::Fractus);
+    let ints = f.types.intervallum(int);
+    let floats = f.types.intervallum(float);
+    assert!(rep_of(&f.types, MirType::semantic(ints)).is_ok());
+    assert!(rep_of(&f.types, MirType::semantic(floats)).is_err());
+}

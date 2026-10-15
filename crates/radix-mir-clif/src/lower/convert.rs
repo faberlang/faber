@@ -171,6 +171,13 @@ pub(crate) enum Seq {
     /// byte order of the conversion's `via` hint; `kind` is the target
     /// element kind (0 raw bits, 1 unsigned, 2 signed).
     Rewidth { from: u32, to: u32, kind: i64 },
+    /// A list of bytes read as one scalar in the byte order of the
+    /// conversion's `via` hint; the list must hold exactly `bytes` bytes.
+    ReadScalar {
+        bytes: u32,
+        signed: bool,
+        float: bool,
+    },
     /// Text to a list of UTF-8, UTF-16 or UTF-32 units of the given width.
     Encode(u32),
     /// A list of unit patterns to text; 8, 16 and 32 decode UTF-8, UTF-16 and
@@ -217,6 +224,52 @@ fn bits_unsigned_pair(table: &TypeTable, a: TypeId, b: TypeId) -> bool {
     pair(a, b) || pair(b, a)
 }
 
+/// The scalar a byte list reads as: 2, 4 and 8 byte integers (a 64-bit
+/// unsigned is unrepresentable) and 4 and 8 byte floats.
+fn read_scalar(target: &Type) -> Option<Seq> {
+    Some(match target {
+        Type::SizedNumeric(Primitive::Numerus, width) => match width {
+            NumericWidth::I16 => Seq::ReadScalar {
+                bytes: 2,
+                signed: true,
+                float: false,
+            },
+            NumericWidth::U16 => Seq::ReadScalar {
+                bytes: 2,
+                signed: false,
+                float: false,
+            },
+            NumericWidth::I32 => Seq::ReadScalar {
+                bytes: 4,
+                signed: true,
+                float: false,
+            },
+            NumericWidth::U32 => Seq::ReadScalar {
+                bytes: 4,
+                signed: false,
+                float: false,
+            },
+            NumericWidth::I64 => Seq::ReadScalar {
+                bytes: 8,
+                signed: true,
+                float: false,
+            },
+            _ => return None,
+        },
+        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32) => Seq::ReadScalar {
+            bytes: 4,
+            signed: false,
+            float: true,
+        },
+        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Seq::ReadScalar {
+            bytes: 8,
+            signed: false,
+            float: true,
+        },
+        _ => return None,
+    })
+}
+
 /// An integer or raw-bits element: its width in bits and kind (0 raw bits, 1
 /// unsigned, 2 signed). A 64-bit unsigned element is unrepresentable.
 fn bits_cell(table: &TypeTable, id: TypeId) -> Option<(u32, i64)> {
@@ -257,6 +310,13 @@ pub(crate) fn sequence_conversion(
         _ => None,
     };
     match (resolve(table, source), target_type) {
+        (Type::Array(_) | Type::BoundedArray { .. } | Type::BoundedOcteti { .. }, scalar)
+            if list_element(table, source).is_some_and(|element| {
+                matches!(resolve(table, element), Type::Bits(BitsWidth::B8))
+            }) && read_scalar(scalar).is_some() =>
+        {
+            read_scalar(scalar)
+        }
         (
             Type::Primitive(Primitive::Textus) | Type::BoundedTextus { .. },
             Type::BoundedTextus { capacity },
@@ -501,6 +561,42 @@ impl FunctionLower<'_, '_> {
                     Some((failed, Failure::Static("bits list length mismatch"))),
                     Rep::List,
                 )
+            }
+            Seq::ReadScalar {
+                bytes,
+                signed,
+                float,
+            } => {
+                let big = conversion
+                    .params
+                    .iter()
+                    .find_map(|param| match self.state.input.interner.resolve(*param) {
+                        "be" | "Be" => Some(1),
+                        "le" | "Le" => Some(0),
+                        _ => None,
+                    })
+                    .ok_or_else(|| Decline::new("byte read without a byte order"))?;
+                let flags = big | if signed { 2 } else { 0 } | if float { 4 } else { 0 };
+                let width = self.builder.ins().iconst(types::I32, i64::from(bytes));
+                let flags = self.builder.ins().iconst(types::I32, flags);
+                let bits = self
+                    .call_runtime(&abi::LIST_READ_SCALAR, &[value, width, flags])?
+                    .ok_or_else(|| Decline::new("byte read result"))?;
+                let length = self
+                    .call_runtime(&abi::LIST_LEN, &[value])?
+                    .ok_or_else(|| Decline::new("length result"))?;
+                let need = self.builder.ins().iconst(types::I64, i64::from(bytes));
+                let wrong = self.builder.ins().icmp(IntCC::NotEqual, length, need);
+                let failure = Some((wrong, Failure::Static("octeti endian width mismatch")));
+                if float {
+                    let float = self
+                        .builder
+                        .ins()
+                        .bitcast(types::F64, MemFlagsData::new(), bits);
+                    (float, failure, Rep::Float)
+                } else {
+                    (bits, failure, Rep::Int)
+                }
             }
             Seq::Release => (value, None, Rep::Text),
             Seq::BoundText { capacity } => {

@@ -287,7 +287,11 @@ impl<'a> ClifCapability<'a> {
             Type::AsyncCursor(_, _) | Type::PromissumFailable(_, _) => {
                 Some(Gap::Subset("async value".to_owned()))
             }
-            Type::Intervallum(_) => Some(Gap::Subset("interval value".to_owned())),
+            Type::Intervallum(element) => (!matches!(
+                self.types.get(*element),
+                Type::Primitive(Primitive::Numerus)
+            ))
+            .then(|| Gap::Subset("interval value".to_owned())),
             Type::Tensor(..)
             | Type::Vector(..)
             | Type::Matrix(..)
@@ -394,9 +398,7 @@ impl<'a> ClifCapability<'a> {
             | MirAggregateKind::SparseTensor
             | MirAggregateKind::Vector
             | MirAggregateKind::Matrix => Some(Gap::Policy("device construction".to_owned())),
-            MirAggregateKind::Interval { .. } => {
-                Some(Gap::Subset("interval construction".to_owned()))
-            }
+            MirAggregateKind::Interval { .. } => None,
         }
     }
 
@@ -672,6 +674,12 @@ impl MirVisitor for ClifCapability<'_> {
                             | MirCollectionOp::ArrayGtEq
                             | MirCollectionOp::ArrayValueEq
                             | MirCollectionOp::ArrayValueNotEq
+                            | MirCollectionOp::IntervalLength
+                            | MirCollectionOp::IntervalContains
+                            | MirCollectionOp::IntervalClamp
+                            | MirCollectionOp::IntervalIntersect
+                            | MirCollectionOp::IntervalUnion
+                            | MirCollectionOp::IntervalMaterialize
                     )
             )
         {

@@ -271,6 +271,12 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             rep_of(table, MirType::semantic(*element))?;
             Ok(Rep::List)
         }
+        // An integer interval is a runtime list of start, end and the
+        // inclusive flag.
+        Type::Intervallum(element) => match resolve(table, *element) {
+            Type::Primitive(Primitive::Numerus) => Ok(Rep::Tuple),
+            _ => Err(Decline::new("interval of non-integers")),
+        },
         // A bounded byte buffer is a bounded list of raw bytes.
         Type::BoundedOcteti { .. } => {
             convert::byte_element(table).ok_or_else(|| Decline::new("byte buffer element"))?;
@@ -1726,6 +1732,55 @@ impl FunctionLower<'_, '_> {
         Ok(())
     }
 
+    /// An integer interval `start‥end` or `start‥=end`: a runtime list of the
+    /// two bounds and the inclusive flag. Reversed bounds fail.
+    fn construct_interval(
+        &mut self,
+        destination: &MirPlace,
+        aggregate: &MirAggregate,
+    ) -> Lowered<()> {
+        let MirAggregateKind::Interval { inclusive } = aggregate.kind else {
+            return Err(Decline::new("interval kind"));
+        };
+        let MirAggregateFields::Ordered(items) = &aggregate.fields else {
+            return Err(Decline::new("interval fields"));
+        };
+        let [
+            MirAggregateItem::Operand(start),
+            MirAggregateItem::Operand(end),
+        ] = items.as_slice()
+        else {
+            return Err(Decline::new("stepped interval"));
+        };
+        let (start, start_rep) = self.scalar(start)?;
+        let (end, end_rep) = self.scalar(end)?;
+        if start_rep != Rep::Int || end_rep != Rep::Int {
+            return Err(Decline::new("interval bound representation"));
+        }
+        let reversed = self
+            .builder
+            .ins()
+            .icmp(IntCC::SignedGreaterThan, start, end);
+        self.trap_if(reversed, "interval bounds must be monotonic (start ≤ end)")?;
+        let list = self
+            .call_runtime(&abi::LIST_NEW, &[])?
+            .ok_or_else(|| Decline::new("list new result"))?;
+        let flag = self.builder.ins().iconst(types::I64, i64::from(inclusive));
+        for (rep, bits) in [(Rep::Int, start), (Rep::Int, end), (Rep::Bool, flag)] {
+            let tag = self
+                .builder
+                .ins()
+                .iconst(types::I32, Self::element_tag(rep)?);
+            self.call_runtime(&abi::LIST_PUSH, &[list, tag, bits])?;
+        }
+        let (variable, slot_rep) = self.place_slot(destination)?;
+        if slot_rep != Rep::Tuple {
+            return Err(Decline::new("interval destination representation"));
+        }
+        self.builder.def_var(variable, list);
+        Ok(())
+    }
+
     /// `tabula` and `copia` literals.
     fn construct_map(&mut self, destination: &MirPlace, aggregate: &MirAggregate) -> Lowered<()> {
         let is_set = aggregate.kind == MirAggregateKind::Set;
@@ -2021,11 +2076,117 @@ impl FunctionLower<'_, '_> {
                     (Some(character), Rep::Text)
                 }
             }
+            (MirCollectionOp::IntervalClamp, Rep::Int) => {
+                let [_, target] = args else {
+                    return Err(Decline::new("interval clamp arity"));
+                };
+                let (target, target_rep) = self.scalar(target)?;
+                if target_rep != Rep::Tuple {
+                    return Err(Decline::new("interval clamp representation"));
+                }
+                let mode = self.builder.ins().iconst(types::I32, 2);
+                (
+                    self.call_runtime(&abi::INTERVAL_QUERY, &[mode, target, handle])?,
+                    Rep::Int,
+                )
+            }
+            (MirCollectionOp::IntervalClamp, Rep::Tuple) => {
+                let [_, other] = args else {
+                    return Err(Decline::new("interval clamp arity"));
+                };
+                let (other, other_rep) = self.scalar(other)?;
+                if other_rep != Rep::Tuple {
+                    return Err(Decline::new("interval clamp representation"));
+                }
+                let mode = self.builder.ins().iconst(types::I32, 0);
+                let boxed = self
+                    .call_runtime(&abi::INTERVAL_COMBINE, &[mode, handle, other])?
+                    .ok_or_else(|| Decline::new("interval clamp result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let empty = self.builder.ins().icmp(IntCC::Equal, boxed, zero);
+                self.trap_if(empty, "interval clamp produced an empty interval")?;
+                (self.call_runtime(&abi::OPT_BITS, &[boxed])?, Rep::Tuple)
+            }
+            (MirCollectionOp::IntervalLength | MirCollectionOp::IntervalContains, Rep::Tuple) => {
+                let (mode, value) = if op == MirCollectionOp::IntervalLength {
+                    (0, self.builder.ins().iconst(types::I64, 0))
+                } else {
+                    let [_, value] = args else {
+                        return Err(Decline::new("interval query arity"));
+                    };
+                    let (value, value_rep) = self.scalar(value)?;
+                    if value_rep != Rep::Int {
+                        return Err(Decline::new("interval query representation"));
+                    }
+                    (
+                        if op == MirCollectionOp::IntervalContains {
+                            1
+                        } else {
+                            2
+                        },
+                        value,
+                    )
+                };
+                let mode = self.builder.ins().iconst(types::I32, mode);
+                let answer = self
+                    .call_runtime(&abi::INTERVAL_QUERY, &[mode, handle, value])?
+                    .ok_or_else(|| Decline::new("interval query result"))?;
+                if op == MirCollectionOp::IntervalContains {
+                    let zero = self.builder.ins().iconst(types::I64, 0);
+                    (
+                        Some(self.builder.ins().icmp(IntCC::NotEqual, answer, zero)),
+                        Rep::Bool,
+                    )
+                } else {
+                    (Some(answer), Rep::Int)
+                }
+            }
+            (MirCollectionOp::IntervalIntersect | MirCollectionOp::IntervalUnion, Rep::Tuple) => {
+                let [_, other] = args else {
+                    return Err(Decline::new("interval combine arity"));
+                };
+                let (other, other_rep) = self.scalar(other)?;
+                if other_rep != Rep::Tuple {
+                    return Err(Decline::new("interval combine representation"));
+                }
+                let mode = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, i64::from(op == MirCollectionOp::IntervalUnion));
+                (
+                    self.call_runtime(&abi::INTERVAL_COMBINE, &[mode, handle, other])?,
+                    Rep::Opt,
+                )
+            }
+            (MirCollectionOp::IntervalMaterialize, Rep::Tuple) => {
+                if let Some(destination) = destination {
+                    let ty = self.place_type(destination)?;
+                    if rep_of(self.state.input.types, ty)? != Rep::List {
+                        return Err(Decline::new("interval materialized as a non-list"));
+                    }
+                }
+                (
+                    self.call_runtime(&abi::INTERVAL_MATERIALIZE, &[handle])?,
+                    Rep::List,
+                )
+            }
             (MirCollectionOp::Index, Rep::List) => {
                 let [_, index] = args else {
                     return Err(Decline::new("index arity"));
                 };
                 let (index, index_rep) = self.scalar(index)?;
+                if index_rep == Rep::Tuple {
+                    let window = self
+                        .call_runtime(&abi::LIST_RANGE, &[handle, index])?
+                        .ok_or_else(|| Decline::new("list window result"))?;
+                    let zero = self.builder.ins().iconst(types::I64, 0);
+                    let outside = self.builder.ins().icmp(IntCC::Equal, window, zero);
+                    self.trap_if(outside, "list window out of bounds")?;
+                    let Some(destination) = destination else {
+                        return Ok(());
+                    };
+                    return self.define_result(destination, Some(window), Rep::List);
+                }
                 if index_rep != Rep::Int {
                     return Err(Decline::new("list index representation"));
                 }
@@ -2789,6 +2950,12 @@ impl FunctionLower<'_, '_> {
                 aggregate,
             } if aggregate.kind == MirAggregateKind::Tuple => {
                 self.construct_tuple(destination, aggregate)
+            }
+            MirStatementKind::Construct {
+                destination,
+                aggregate,
+            } if matches!(aggregate.kind, MirAggregateKind::Interval { .. }) => {
+                self.construct_interval(destination, aggregate)
             }
             MirStatementKind::Construct {
                 destination,

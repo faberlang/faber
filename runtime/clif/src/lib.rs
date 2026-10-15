@@ -1647,6 +1647,201 @@ pub unsafe extern "C" fn __faber_clif_v1_list_retag(list: *const List, tag: i32)
     )
 }
 
+/// A scalar read from a list of bytes; see the generator's `LIST_READ_SCALAR`.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_read_scalar(
+    list: *const List,
+    width: i32,
+    flags: i32,
+) -> i64 {
+    let width = usize::try_from(width).unwrap_or(0).min(8);
+    let items = &unsafe { list_ref(list) }.items;
+    let mut bytes = [0_u8; 8];
+    for (slot, &(_, bits)) in bytes.iter_mut().zip(items.iter()).take(width) {
+        *slot = bits as u8;
+    }
+    let mut pattern = 0_u64;
+    if flags & 1 != 0 {
+        for &byte in &bytes[..width] {
+            pattern = (pattern << 8) | u64::from(byte);
+        }
+    } else {
+        for (index, &byte) in bytes[..width].iter().enumerate() {
+            pattern |= u64::from(byte) << (8 * index);
+        }
+    }
+    if flags & 4 != 0 {
+        let value = if width == 4 {
+            f64::from(f32::from_bits(pattern as u32))
+        } else {
+            f64::from_bits(pattern)
+        };
+        return value.to_bits() as i64;
+    }
+    if flags & 2 != 0 && width < 8 {
+        let shift = 64 - 8 * width as u32;
+        return ((pattern << shift) as i64) >> shift;
+    }
+    pattern as i64
+}
+
+/// The `(start, end, inclusive)` of an integer interval.
+///
+/// # Safety
+///
+/// `handle` is a live interval: a list of two integers and a flag.
+unsafe fn interval_parts(handle: *const List) -> (i64, i64, bool) {
+    let items = &unsafe { list_ref(handle) }.items;
+    (items[0].1, items[1].1, items[2].1 != 0)
+}
+
+fn interval_list(start: i64, end: i64, inclusive: bool) -> *mut List {
+    list_new_from(vec![
+        (TAG_INT, start),
+        (TAG_INT, end),
+        (TAG_BOOL, i64::from(inclusive)),
+    ])
+}
+
+fn interval_box(start: i64, end: i64, inclusive: bool) -> *const Present {
+    let list = interval_list(start, end, inclusive);
+    __faber_clif_v1_opt_some(TAG_LIST, list as i64)
+}
+
+/// Intersection (mode 0) or union (mode 1) of two integer intervals, boxed as
+/// an optional; null when empty or disjoint.
+///
+/// # Safety
+///
+/// Both handles are live intervals.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_interval_combine(
+    mode: i32,
+    left: *const List,
+    right: *const List,
+) -> *const Present {
+    let (left_start, left_end, left_inclusive) = unsafe { interval_parts(left) };
+    let (right_start, right_end, right_inclusive) = unsafe { interval_parts(right) };
+    if mode == 0 {
+        let start = left_start.max(right_start);
+        let (end, inclusive) = if left_end < right_end {
+            (left_end, left_inclusive)
+        } else if right_end < left_end {
+            (right_end, right_inclusive)
+        } else {
+            (left_end, left_inclusive && right_inclusive)
+        };
+        if start < end || (inclusive && start == end) {
+            interval_box(start, end, inclusive)
+        } else {
+            std::ptr::null()
+        }
+    } else {
+        let (first, second) = if left_start <= right_start {
+            (
+                (left_start, left_end, left_inclusive),
+                (right_start, right_end, right_inclusive),
+            )
+        } else {
+            (
+                (right_start, right_end, right_inclusive),
+                (left_start, left_end, left_inclusive),
+            )
+        };
+        if second.0 > first.1 {
+            return std::ptr::null();
+        }
+        let (end, inclusive) = if second.1 > first.1 {
+            (second.1, second.2)
+        } else if first.1 > second.1 {
+            (first.1, first.2)
+        } else {
+            (first.1, first.2 || second.2)
+        };
+        interval_box(first.0, end, inclusive)
+    }
+}
+
+/// Length (mode 0), membership (mode 1) or clamping (mode 2) against an
+/// integer interval.
+///
+/// # Safety
+///
+/// `interval` is a live interval.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_interval_query(
+    mode: i32,
+    interval: *const List,
+    value: i64,
+) -> i64 {
+    let (start, end, inclusive) = unsafe { interval_parts(interval) };
+    match mode {
+        0 => end
+            .saturating_sub(start)
+            .saturating_add(i64::from(inclusive))
+            .max(0),
+        1 => i64::from(value >= start && if inclusive { value <= end } else { value < end }),
+        _ => {
+            let upper = if inclusive {
+                end
+            } else {
+                end.saturating_sub(1)
+            };
+            if upper < start {
+                value
+            } else {
+                value.clamp(start, upper)
+            }
+        }
+    }
+}
+
+/// The integers of an interval, in order.
+///
+/// # Safety
+///
+/// `interval` is a live interval.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_interval_materialize(interval: *const List) -> *mut List {
+    let (start, end, inclusive) = unsafe { interval_parts(interval) };
+    let items = if inclusive {
+        (start..=end).map(|value| (TAG_INT, value)).collect()
+    } else {
+        (start..end).map(|value| (TAG_INT, value)).collect()
+    };
+    list_new_from(items)
+}
+
+/// A copy of the range of a list an interval names; null when the range does
+/// not lie fully inside the list.
+///
+/// # Safety
+///
+/// `list` is a live list and `interval` a live interval.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_range(
+    list: *const List,
+    interval: *const List,
+) -> *mut List {
+    let (start, end, inclusive) = unsafe { interval_parts(interval) };
+    let items = &unsafe { list_ref(list) }.items;
+    let end = if inclusive {
+        end.checked_add(1)
+    } else {
+        Some(end)
+    };
+    match (usize::try_from(start), end.map(usize::try_from)) {
+        (Ok(start), Some(Ok(end))) if start <= end && end <= items.len() => {
+            list_new_from(items[start..end].to_vec())
+        }
+        _ => std::ptr::null_mut(),
+    }
+}
+
 /// A list regrouped at another element width through its byte string; null
 /// when the bytes do not divide into whole target elements.
 ///

@@ -557,6 +557,44 @@ pub const LIST_REWIDTH: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, I32, I32, I32],
     ret: Some(Ptr),
 };
+/// A scalar read from a list of bytes in the byte order of a flag: (list,
+/// byte count, flags) -> 64 bits. Flag 1 is big-endian, 2 sign-extends, 4
+/// reads an IEEE float of that many bytes and returns it widened to f64 bits.
+/// A list of the wrong length reads zeros past its end.
+pub const LIST_READ_SCALAR: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_read_scalar",
+    params: &[Ptr, I32, I32],
+    ret: Some(I64),
+};
+/// Intersection (mode 0) or union (mode 1) of two integer intervals:
+/// (mode, left, right) -> a boxed optional interval, null when the result is
+/// empty (intersection) or the parts are disjoint (union).
+pub const INTERVAL_COMBINE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_interval_combine",
+    params: &[I32, Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// A question about an integer interval and an integer: mode 0 length, 1
+/// contains, 2 clamp of the value into the interval. (mode, interval, value)
+/// -> integer.
+pub const INTERVAL_QUERY: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_interval_query",
+    params: &[I32, Ptr, I64],
+    ret: Some(I64),
+};
+/// The integers of an interval, in order: interval -> list.
+pub const INTERVAL_MATERIALIZE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_interval_materialize",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// A copy of the range of a list an interval names; null when the range does
+/// not lie fully inside the list: (list, interval) -> list.
+pub const LIST_RANGE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_range",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
 /// A copy of a list with every element tag replaced.
 pub const LIST_RETAG: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_list_retag",
@@ -698,6 +736,11 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     APPROX_INT,
     LIST_TO_SET,
     LIST_RETAG,
+    LIST_READ_SCALAR,
+    INTERVAL_COMBINE,
+    INTERVAL_QUERY,
+    INTERVAL_MATERIALIZE,
+    LIST_RANGE,
     LIST_REWIDTH,
     TEXT_ENCODE,
     TEXT_PACK,
