@@ -41,15 +41,11 @@ const PRODUCTION_STACK_BYTES: usize = 8 * 1024 * 1024;
 type NestingShape = (&'static str, fn(usize) -> String);
 
 fn nested_parens(depth: usize) -> String {
-    format!(
-        "fixum _ value ← {}1{}",
-        "(".repeat(depth),
-        ")".repeat(depth)
-    )
+    format!("sit value ← {}1{}", "(".repeat(depth), ")".repeat(depth))
 }
 
 fn assignment_chain(depth: usize) -> String {
-    format!("fixum _ value ← {}1", "a ← ".repeat(depth))
+    format!("sit value ← {}1", "a ← ".repeat(depth))
 }
 
 /// Bare nested block statements: block nesting with no expression in the way,
@@ -71,7 +67,7 @@ fn nested_types(depth: usize) -> String {
 /// expression entry point, so a chain nests the `unary` rule without entering
 /// the budgeted expression entry.
 fn unary_prefix_chain(depth: usize) -> String {
-    format!("fixum _ value ← {}1", "-".repeat(depth))
+    format!("sit value ← {}1", "-".repeat(depth))
 }
 
 /// Nested JSON arrays inside one bare `{ }` literal. The island's values are
@@ -79,7 +75,7 @@ fn unary_prefix_chain(depth: usize) -> String {
 /// grammar.
 fn nested_json_arrays(depth: usize) -> String {
     format!(
-        "fixum _ value ← {{\"k\": {}1{}}}",
+        "sit value ← {{\"k\": {}1{}}}",
         "[".repeat(depth),
         "]".repeat(depth)
     )
@@ -87,19 +83,19 @@ fn nested_json_arrays(depth: usize) -> String {
 
 /// Nested array binding pattern: `[[[target]]]`.
 fn nested_array_pattern(depth: usize) -> String {
-    format!("fixum {}target{} ← 0", "[".repeat(depth), "]".repeat(depth))
+    format!("sit {}target{} ← 0", "[".repeat(depth), "]".repeat(depth))
 }
 
 fn flat_fold_chain(operators: usize) -> String {
-    format!("fixum _ value ← 1{}", " + 1".repeat(operators))
+    format!("sit value ← 1{}", " + 1".repeat(operators))
 }
 
 fn postfix_member_chain(members: usize) -> String {
-    format!("fixum _ value ← root{}", ".b".repeat(members))
+    format!("sit value ← root{}", ".b".repeat(members))
 }
 
 fn type_test_chain(tests: usize) -> String {
-    format!("fixum _ value ← root{}", " est T".repeat(tests))
+    format!("sit value ← root{}", " est T".repeat(tests))
 }
 
 fn nested_figura(depth: usize) -> String {
@@ -133,7 +129,7 @@ fn nested_figura_lift_parens(depth: usize) -> String {
 /// Two folded chains under one root expression.
 fn split_fold_chain(operators_per_side: usize) -> String {
     let side = format!("1{}", " + 1".repeat(operators_per_side));
-    format!("fixum _ value ← ({side}) + ({side})")
+    format!("sit value ← ({side}) + ({side})")
 }
 
 /// Records whether a walk reported the depth limit.
@@ -451,7 +447,7 @@ fn deep_nesting_with_a_long_fold_chain_inside_walker_budget() {
     let operators = MAX_PARSE_OPERATORS - 8;
     let chain = format!("1{}", " + 1".repeat(operators));
     let source = format!(
-        "fixum _ value ← {}{}{}",
+        "sit value ← {}{}{}",
         "(".repeat(depth),
         chain,
         ")".repeat(depth)

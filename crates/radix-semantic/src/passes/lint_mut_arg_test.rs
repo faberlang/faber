@@ -11,7 +11,7 @@
 use crate::test_support;
 use crate::{SemanticErrorKind, WarningKind};
 
-const POP: &str = "functio pop_unus(in lista<numerus> xs) → vacuum { xs.detrahe() }\n";
+const POP: &str = "functio pop_unus(varia lista<numerus> xs) → vacuum { xs.detrahe() }\n";
 const PEEK: &str = "functio specta(de lista<numerus> xs) → numerus { redde xs.longitudo() }\n";
 
 fn unnecessary_varia(source: &str) -> usize {
@@ -31,7 +31,7 @@ fn unnecessary_varia(source: &str) -> usize {
 #[test]
 fn varia_passed_only_to_mut_param_is_not_unnecessary() {
     let source = format!(
-        "{POP}incipit {{\n    varia lista<numerus> zs ← [1, 2, 3]\n    pop_unus(in zs)\n}}"
+        "{POP}incipit {{\n    varia lista<numerus> zs ← [1, 2, 3]\n    pop_unus(varia zs)\n}}"
     );
     assert_eq!(unnecessary_varia(&source), 0);
 }
@@ -39,7 +39,7 @@ fn varia_passed_only_to_mut_param_is_not_unnecessary() {
 #[test]
 fn varia_field_passed_only_to_mut_param_is_not_unnecessary() {
     let source = format!(
-        "genus Cumulus {{\n    varia lista<numerus> xs\n}}\n{POP}incipit {{\n    varia Cumulus c ← Cumulus {{ xs = [1, 2] }}\n    pop_unus(in c.xs)\n}}"
+        "genus Cumulus {{\n    varia lista<numerus> xs\n}}\n{POP}incipit {{\n    varia Cumulus c ← Cumulus {{ xs = [1, 2] }}\n    pop_unus(varia c.xs)\n}}"
     );
     assert_eq!(unnecessary_varia(&source), 0);
 }

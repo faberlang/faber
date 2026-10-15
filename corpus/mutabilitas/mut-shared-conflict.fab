@@ -4,7 +4,7 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
 category = "type"
 summary = "MU-4 red: mut local after a live ref local of the same source is SEM052."
-syntax = "const ref list<int> r ← a; var mut list<int> b ← a"
+syntax = "let ref list<int> r ← a; var mut list<int> b ← a"
 related = ["mut", "ref"]
 locale = "en"
 no_expected = "rejects"
@@ -16,9 +16,9 @@ diagnostic = "SEM052:mutable_borrow_conflict"
 # This exemplum intentionally fails to compile.
 
 main {
-    var list<int> a ← [1, 2, 3]
-    const ref list<int> r ← a
-    var mut list<int> b ← a
+    mut list<int> a ← [1, 2, 3]
+    let ref list<int> r ← a
+    mut mut list<int> b ← a
     print r.length()
     print b.length()
 }

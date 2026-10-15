@@ -37,7 +37,7 @@ fn reemit(source: &str, to: &str) -> String {
         .code
 }
 
-const BODY: &str = "fn f(int p) → int {\n    const int k = 3 * 4\n    const _ m = 7\n    const int r ← p + k\n    return r + m\n}\n\nmain {\n    print f(1)\n}\n";
+const BODY: &str = "fn f(int p) → int {\n    const int k = 3 * 4\n    const _ m = 7\n    let int r ← p + k\n    return r + m\n}\n\nmain {\n    print f(1)\n}\n";
 
 fn en_source() -> String {
     format!("+++\nlocale = \"en\"\n+++\n{BODY}")
@@ -48,14 +48,14 @@ fn en_format_keeps_the_equals_glyph_and_authored_initializer() {
     let formatted = reemit(&en_source(), "en");
     assert!(formatted.contains("    const int k = 3 * 4\n"), "{formatted}");
     assert!(formatted.contains("    const _ m = 7\n"), "{formatted}");
-    assert!(formatted.contains("    const int r ← p + k\n"), "{formatted}");
+    assert!(formatted.contains("    let int r ← p + k\n"), "{formatted}");
 }
 
 #[test]
 fn en_to_la_round_trip_keeps_the_equals_glyph() {
     let la = reemit(&en_source(), "la");
     assert!(la.contains("    fixum numerus k = 3 * 4\n"), "{la}");
-    assert!(la.contains("    fixum numerus r ← p + k\n"), "{la}");
+    assert!(la.contains("    sit numerus r ← p + k\n"), "{la}");
     assert_eq!(reemit(&la, "en"), reemit(&en_source(), "en"));
 }
 

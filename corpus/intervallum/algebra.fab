@@ -32,18 +32,18 @@ no_expected = "prints-nothing"
 #   none — stdout not pinned for this exemplum.
 
 main {
-    const intervallum<int> morning ← 0‥6
-    const intervallum<int> afternoon ← 4‥10
-    const intervallum<int> overlap ← morning.intersect(afternoon) coalesce 0‥0
-    const intervallum<int> early ← 0‥5
-    const intervallum<int> late ← 5‥10
-    const intervallum<int> workday ← early.union(late) coalesce 0‥0
-    const int overlap_span ← overlap.length()
-    const int workday_span ← workday.length()
+    let intervallum<int> morning ← 0‥6
+    let intervallum<int> afternoon ← 4‥10
+    let intervallum<int> overlap ← morning.intersect(afternoon) coalesce 0‥0
+    let intervallum<int> early ← 0‥5
+    let intervallum<int> late ← 5‥10
+    let intervallum<int> workday ← early.union(late) coalesce 0‥0
+    let int overlap_span ← overlap.length()
+    let int workday_span ← workday.length()
     assert overlap_span ≡ 2
     assert workday_span ≡ 10
-    const intervallum<int> gap_left ← 0‥3
-    const intervallum<int> gap_right ← 6‥9
-    const intervallum<int> ∪ none no_union ← gap_left.union(gap_right)
+    let intervallum<int> gap_left ← 0‥3
+    let intervallum<int> gap_right ← 6‥9
+    let intervallum<int> ∪ none no_union ← gap_left.union(gap_right)
     assert no_union is none
 }

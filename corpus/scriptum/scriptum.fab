@@ -38,18 +38,18 @@ locale = "en"
 #   Salve greeting, persona notice, and computed summa string.
 
 main {
-    const string nomen ← "Marcus"
-    const int aetas ← 30
+    let string nomen ← "Marcus"
+    let int aetas ← 30
 
     # One slot
-    const string salutatio ← "Salve, §!"(nomen)
+    let string salutatio ← "Salve, §!"(nomen)
     print salutatio
 
     # Multiple slots
-    const string notitia ← "§ habet annos §"(nomen, aetas)
+    let string notitia ← "§ habet annos §"(nomen, aetas)
     print notitia
 
     # With an expression
-    const string summa ← "10 + 20 ← §"(10 + 20)
+    let string summa ← "10 + 20 ← §"(10 + 20)
     print summa
 }

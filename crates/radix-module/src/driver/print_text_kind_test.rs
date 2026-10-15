@@ -25,14 +25,14 @@ fn run_en(body: &str) -> Vec<String> {
 }
 
 const RECORD: &str = "class Rec {
-    var char c
-    var ascii<3> a3
-    var ascii<1> a1
-    var ascii u
-    var string t
-    var list<char> cs
-    var list<ascii> us
-    var list<string> ts
+    mut char c
+    mut ascii<3> a3
+    mut ascii<1> a1
+    mut ascii u
+    mut string t
+    mut list<char> cs
+    mut list<ascii> us
+    mut list<string> ts
 }
 ";
 
@@ -41,9 +41,9 @@ fn genus_fields_quote_by_static_type() {
     let out = run_en(&format!(
         "{RECORD}
 main {{
-    const ascii<3> a3 ← 'abc'
-    const ascii<1> a1 ← 'z'
-    const Rec r ← Rec {{ c = 'q', a3 = a3, a1 = a1, u = 'q', t = \"q\", cs = ['x'], us = ['q', 'abc'], ts = [\"q\"] }}
+    let ascii<3> a3 ← 'abc'
+    let ascii<1> a1 ← 'z'
+    let Rec r ← Rec {{ c = 'q', a3 = a3, a1 = a1, u = 'q', t = \"q\", cs = ['x'], us = ['q', 'abc'], ts = [\"q\"] }}
     print r
 }}
 "
@@ -58,19 +58,19 @@ main {{
 fn lists_quote_by_static_type() {
     let out = run_en(
         "main {
-    const list<char> cs ← ['x', 'y']
+    let list<char> cs ← ['x', 'y']
     print cs
-    const list<ascii> us ← ['q', 'abc']
+    let list<ascii> us ← ['q', 'abc']
     print us
-    const ascii<1> b1 ← 'z'
-    const ascii<1> b2 ← 'y'
-    const list<ascii<1>> a1s ← [b1, b2]
+    let ascii<1> b1 ← 'z'
+    let ascii<1> b2 ← 'y'
+    let list<ascii<1>> a1s ← [b1, b2]
     print a1s
-    const ascii<3> c1 ← 'abc'
-    const ascii<3> c2 ← 'def'
-    const list<ascii<3>> a3s ← [c1, c2]
+    let ascii<3> c1 ← 'abc'
+    let ascii<3> c2 ← 'def'
+    let list<ascii<3>> a3s ← [c1, c2]
     print a3s
-    const list<string> ts ← ['q', \"r\"]
+    let list<string> ts ← ['q', \"r\"]
     print ts
 }
 ",
@@ -91,13 +91,13 @@ fn lists_quote_by_static_type() {
 fn top_level_scalars_print_bare() {
     let out = run_en(
         "main {
-    const char c ← 'q'
+    let char c ← 'q'
     print c
-    const ascii u ← 'q'
+    let ascii u ← 'q'
     print u
-    const ascii<1> a1 ← 'q'
+    let ascii<1> a1 ← 'q'
     print a1
-    const ascii<3> a3 ← 'abc'
+    let ascii<3> a3 ← 'abc'
     print a3
 }
 ",
@@ -109,8 +109,8 @@ fn top_level_scalars_print_bare() {
 fn interpolated_lists_quote_like_print() {
     let out = run_en(
         "main {
-    const list<char> cs ← ['x']
-    const list<ascii> us ← ['q']
+    let list<char> cs ← ['x']
+    let list<ascii> us ← ['q']
     print \"§ §\"(cs, us)
 }
 ",

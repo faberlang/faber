@@ -31,17 +31,17 @@ fn summa(map<string, int> m) → int {
 }
 
 main {
-    const map<string, int> puncta ← _ { "aelia": 95, "balbus": 87 }
+    let map<string, int> puncta ← _ { "aelia": 95, "balbus": 87 }
     print puncta["aelia"]
     print puncta["balbus"]
 
-    const map<string, int> p ← pondus()
+    let map<string, int> p ← pondus()
     print p["x"]
     print p["y"]
 
     print summa(_ { "a": 3, "b": 4 })
 
-    var map<string, int> vacuum ← _ {}
+    mut map<string, int> vacuum ← _ {}
     vacuum["k"] ← 5
     print vacuum["k"]
 }

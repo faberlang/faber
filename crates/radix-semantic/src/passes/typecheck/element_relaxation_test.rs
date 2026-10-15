@@ -32,9 +32,9 @@ fn rejects_with_issue(result: &crate::SemanticResult, issue: &str) {
 fn tensor_textus_construction_and_accipe_typecheck() {
     accepts(&compile(
         r#"incipit {
-  fixum lista<textus> flat ← ["a", "b", "c"]
-  fixum tensor<textus, [3]> grid ← flat ↦ tensor<textus, [3]>
-  fixum textus cell ← grid.accipe([0]) vel ""
+  sit lista<textus> flat ← ["a", "b", "c"]
+  sit tensor<textus, [3]> grid ← flat ↦ tensor<textus, [3]>
+  sit textus cell ← grid.accipe([0]) vel ""
   nota cell
 }"#,
     ));
@@ -45,10 +45,10 @@ fn tensor_textus_plus_rejects() {
     rejects_with_issue(
         &compile(
             r#"incipit {
-  fixum lista<textus> flat ← ["a", "b", "c"]
-  fixum tensor<textus, [3]> left ← flat ↦ tensor<textus, [3]>
-  fixum tensor<textus, [3]> right ← flat ↦ tensor<textus, [3]>
-  fixum _ sum ← left + right
+  sit lista<textus> flat ← ["a", "b", "c"]
+  sit tensor<textus, [3]> left ← flat ↦ tensor<textus, [3]>
+  sit tensor<textus, [3]> right ← flat ↦ tensor<textus, [3]>
+  sit sum ← left + right
 }"#,
         ),
         "tensor_arithmetic_numeric_element_required",

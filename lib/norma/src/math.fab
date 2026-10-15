@@ -168,11 +168,11 @@ fn shift_right(int a, int b) → int {
 fn sin(float x) → float {
     if not is_finite(x) then return nan
 
-    const float a ← x.abs()
+    let float a ← x.abs()
     if a ≤ 0.7853981633974483 then return sin_series(x)
 
-    const AngleReduction reduced ← reduce_half_pi(a)
-    var float v ← cos_series(reduced.angle)
+    let AngleReduction reduced ← reduce_half_pi(a)
+    mut float v ← cos_series(reduced.angle)
     if reduced.quadrant % 2 ≡ 0 then v ← sin_series(reduced.angle)
 
     if reduced.quadrant ≥ 2 then v ← -v
@@ -187,11 +187,11 @@ fn sin(float x) → float {
 fn cos(float x) → float {
     if not is_finite(x) then return nan
 
-    const float a ← x.abs()
+    let float a ← x.abs()
     if a ≤ 0.7853981633974483 then return cos_series(x)
 
-    const AngleReduction reduced ← reduce_half_pi(a)
-    var float v ← sin_series(reduced.angle)
+    let AngleReduction reduced ← reduce_half_pi(a)
+    mut float v ← sin_series(reduced.angle)
     if reduced.quadrant % 2 ≡ 0 then v ← cos_series(reduced.angle)
 
     if reduced.quadrant ≡ 1 or reduced.quadrant ≡ 2 then return -v
@@ -204,13 +204,13 @@ fn cos(float x) → float {
 fn tan(float x) → float {
     if not is_finite(x) then return nan
 
-    const float a ← x.abs()
+    let float a ← x.abs()
     if a ≤ 0.7853981633974483 then return sin_series(x) / cos_series(x)
 
-    const AngleReduction reduced ← reduce_half_pi(a)
-    const float s ← sin_series(reduced.angle)
-    const float c ← cos_series(reduced.angle)
-    var float v ← s / c
+    let AngleReduction reduced ← reduce_half_pi(a)
+    let float s ← sin_series(reduced.angle)
+    let float c ← cos_series(reduced.angle)
+    mut float v ← s / c
     if reduced.quadrant % 2 ≡ 1 then v ← -c / s
 
     if x ≺ 0.0 then return -v
@@ -227,9 +227,9 @@ fn exp(float x) → float {
 
     if x ≺ -745.1332191019412 then return 0.0
 
-    const int k ← (x * 1.4426950408889634).round()
-    const float kf ← k ↦ float
-    const float r ← (x - kf * LN2_HI()) - kf * LN2_LO()
+    let int k ← (x * 1.4426950408889634).round()
+    let float kf ← k ↦ float
+    let float r ← (x - kf * LN2_HI()) - kf * LN2_LO()
     return scale2(exp_series(r), k)
 }
 
@@ -245,8 +245,8 @@ fn ln(float x) → float {
 
     if x ≡ ∞ then return ∞
 
-    var float m ← x
-    var int e ← 0
+    mut float m ← x
+    mut int e ← 0
     if biased_exponent(m) ≡ 0 {
         m ← m * 18014398509481984.0
         e ← -54
@@ -257,7 +257,7 @@ fn ln(float x) → float {
         m ← m / 2.0
         e ← e + 1
     }
-    const float ef ← e ↦ float
+    let float ef ← e ↦ float
     return ef * LN2_HI() + (ln_series(m) + ef * LN2_LO())
 }
 
@@ -279,8 +279,8 @@ fn sqrt(float x) → float {
 
     if x ≡ ∞ then return x
 
-    var float m ← x
-    var int e ← 0
+    mut float m ← x
+    mut int e ← 0
     if biased_exponent(m) ≡ 0 {
         m ← m * 18014398509481984.0
         e ← -54
@@ -322,14 +322,14 @@ fn LN2_LO() → float {
 # Why: Raw IEEE binary64 payload of x.
 @ private
 fn bits(float x) → u64 {
-    const f64 wide ← x ↦ f64
+    let f64 wide ← x ↦ f64
     return wide ↦ b64 ↦ u64
 }
 
 # Why: Biased exponent field (0 = zero/subnormal, 2047 = ∞/NaN).
 @ private
 fn biased_exponent(float x) → int {
-    const u64 field ← (bits(x) ⇒ 52) ∧ (2047 ∷ u64)
+    let u64 field ← (bits(x) ⇒ 52) ∧ (2047 ∷ u64)
     # The 11-bit mask keeps field below 2048, so the default never applies.
     return field ↦ int ⊥ 0
 }
@@ -337,7 +337,7 @@ fn biased_exponent(float x) → int {
 # Why: NaN test on the bit fields — independent of each lane's NaN comparison.
 @ private
 fn is_nan(float x) → bool {
-    const u64 fraction ← bits(x) ∧ (4503599627370495 ∷ u64)
+    let u64 fraction ← bits(x) ∧ (4503599627370495 ∷ u64)
     return biased_exponent(x) ≡ 2047 and fraction ≢ (0 ∷ u64)
 }
 
@@ -350,9 +350,9 @@ fn is_finite(float x) → bool {
 # Why: Replace the exponent of normal x with 0 — mantissa in [1, 2).
 @ private
 fn unit_mantissa(float x) → float {
-    const u64 fraction ← bits(x) ∧ (4503599627370495 ∷ u64)
-    const u64 unit ← fraction ∨ (4607182418800017408 ∷ u64)
-    const f64 wide ← unit ↦ b64 ↦ f64
+    let u64 fraction ← bits(x) ∧ (4503599627370495 ∷ u64)
+    let u64 unit ← fraction ∨ (4607182418800017408 ∷ u64)
+    let f64 wide ← unit ↦ b64 ↦ f64
     return wide
 }
 
@@ -360,19 +360,19 @@ fn unit_mantissa(float x) → float {
 @ private
 fn pow2(int k) → float {
     # k ≥ -1022 keeps k + 1023 non-negative, so the default never applies.
-    const u64 field ← (k + 1023) ↦ u64 ⊥ 0
+    let u64 field ← (k + 1023) ↦ u64 ⊥ 0
     # The shift is bit movement: it acts on the b64 pattern, then the pattern
     # is read as a float.
-    const b64 shifted ← (field ↦ b64) ⇐ 52
-    const f64 wide ← shifted ↦ f64
+    let b64 shifted ← (field ↦ b64) ⇐ 52
+    let f64 wide ← shifted ↦ f64
     return wide
 }
 
 # Why: v · 2^k for k in [-2044, 2046] in at most three exact power-of-two steps.
 @ private
 fn scale2(float v, int k) → float {
-    var float out ← v
-    var int rest ← k
+    mut float out ← v
+    mut int rest ← k
     if rest ≻ 1023 {
         out ← out * pow2(1023)
         rest ← rest - 1023
@@ -391,8 +391,8 @@ fn scale2(float v, int k) → float {
 # Why: Quadrant (mod 4) and remainder in [-π/4, π/4] of a reduced angle.
 @ private
 class AngleReduction {
-    var int quadrant
-    var float angle
+    mut int quadrant
+    mut float angle
 }
 
 # Why: 2/π as 24-bit big-endian chunks: 2/π = Σ c[i]·2^(−24(i+1)); 1296 bits
@@ -407,38 +407,38 @@ fn two_over_pi() → list<int> {
 # 168 fraction bits), so no precision is lost for any f64 magnitude.
 @ private
 fn reduce_half_pi(float a) → AngleReduction {
-    const int mask ← 16777215
-    const u64 fraction ← bits(a) ∧ (4503599627370495 ∷ u64)
+    let int mask ← 16777215
+    let u64 fraction ← bits(a) ∧ (4503599627370495 ∷ u64)
     # fraction is masked to 52 bits, so the default never applies.
-    const int mantissa ← (fraction ↦ int ⊥ 0) + 4503599627370496
-    const int e ← biased_exponent(a) - 1075
-    const int q ← (e + 2400) / 24 - 100
-    const int s ← e - 24 * q
+    let int mantissa ← (fraction ↦ int ⊥ 0) + 4503599627370496
+    let int e ← biased_exponent(a) - 1075
+    let int q ← (e + 2400) / 24 - 100
+    let int s ← e - 24 * q
 
     # a = (mantissa · 2^s) · 2^(24q); split mantissa · 2^s into 24-bit limbs.
     # The top limb is nonzero only when s > 19 (shift counts stay below 64).
-    var int top ← 0
+    mut int top ← 0
     if s ≻ 19 then top ← mantissa ⇒ (72 - s)
 
-    const list<int> limbs ← [
+    let list<int> limbs ← [
         (mantissa ∧ ((1 ⇐ (24 - s)) - 1)) ⇐ s,
         (mantissa ⇒ (24 - s)) ∧ mask,
         (mantissa ⇒ (48 - s)) ∧ mask,
         top
     ]
-    const list<int> table ← two_over_pi()
+    let list<int> table ← two_over_pi()
 
     # acc[l] holds the coefficient of 2^(−24l); l = 0 is the integer part.
-    var list<int> acc ← [0, 0, 0, 0, 0, 0, 0, 0]
-    for range 0‥4 const j {
-        for range 0‥8 const l {
-            const int i ← l - 1 + q + j
+    mut list<int> acc ← [0, 0, 0, 0, 0, 0, 0, 0]
+    for range 0‥4 let j {
+        for range 0‥8 let l {
+            let int i ← l - 1 + q + j
             if i ≥ 0 and i ≺ table.length() {
                 acc[l] ← acc[l] + limbs[j] * table[i]
             }
         }
     }
-    var int l ← 7
+    mut int l ← 7
     while l ≻ 0 {
         acc[l - 1] ← acc[l - 1] + (acc[l] ⇒ 24)
         acc[l] ← acc[l] ∧ mask
@@ -446,14 +446,14 @@ fn reduce_half_pi(float a) → AngleReduction {
     }
 
     # Round to the nearest quadrant; take the fraction as ±(distance) in [0, ½].
-    var int quadrant ← acc[0] ∧ 7
-    const bool upper ← acc[1] ≥ 8388608
+    mut int quadrant ← acc[0] ∧ 7
+    let bool upper ← acc[1] ≥ 8388608
     if upper then quadrant ← quadrant + 1
 
-    var float f ← 0.0
+    mut float f ← 0.0
     l ← 7
     while l ≻ 0 {
-        var int limb ← acc[l]
+        mut int limb ← acc[l]
         if upper then limb ← mask - limb
 
         f ← (f + (limb ↦ float)) * 0.000000059604644775390625
@@ -474,10 +474,10 @@ fn reduce_half_pi(float a) → AngleReduction {
 # Why: Taylor series for sin(x) on |x| ≤ π/4 (12 terms, far below f64 ulp).
 @ private
 fn sin_series(float x) → float {
-    var float term ← x
-    var float sum ← x
-    const float x2 ← x * x
-    var float n ← 1.0
+    mut float term ← x
+    mut float sum ← x
+    let float x2 ← x * x
+    mut float n ← 1.0
     while n ≺ 12.0 {
         term ← (term * (-x2)) / ((2.0 * n) * (2.0 * n + 1.0))
         sum ← sum + term
@@ -489,10 +489,10 @@ fn sin_series(float x) → float {
 # Why: Taylor series for cos(x) on |x| ≤ π/4.
 @ private
 fn cos_series(float x) → float {
-    var float term ← 1.0
-    var float sum ← 1.0
-    const float x2 ← x * x
-    var float n ← 1.0
+    mut float term ← 1.0
+    mut float sum ← 1.0
+    let float x2 ← x * x
+    mut float n ← 1.0
     while n ≺ 12.0 {
         term ← (term * (-x2)) / ((2.0 * n - 1.0) * (2.0 * n))
         sum ← sum + term
@@ -504,9 +504,9 @@ fn cos_series(float x) → float {
 # Why: Taylor series for e^r on |r| ≤ ln2/2 (20 terms).
 @ private
 fn exp_series(float x) → float {
-    var float term ← 1.0
-    var float sum ← 1.0
-    var float n ← 1.0
+    mut float term ← 1.0
+    mut float sum ← 1.0
+    mut float n ← 1.0
     while n ≺ 20.0 {
         term ← (term * x) / n
         sum ← sum + term
@@ -518,12 +518,12 @@ fn exp_series(float x) → float {
 # Why: ln(m) = 2·atanh((m−1)/(m+1)) for m in [√½, √2], where |s| ≤ 0.172.
 @ private
 fn ln_series(float m) → float {
-    const float f ← m - 1.0
-    const float s ← f / (2.0 + f)
-    const float s2 ← s * s
-    var float term ← s
-    var float sum ← s
-    var float n ← 1.0
+    let float f ← m - 1.0
+    let float s ← f / (2.0 + f)
+    let float s2 ← s * s
+    mut float term ← s
+    mut float sum ← s
+    mut float n ← 1.0
     while n ≺ 16.0 {
         term ← term * s2
         sum ← sum + term / (2.0 * n + 1.0)
@@ -535,8 +535,8 @@ fn ln_series(float m) → float {
 # Why: Newton–Raphson square root for m in [1, 4); 6 steps from (m+1)/2 reach f64 precision.
 @ private
 fn sqrt_newton(float m) → float {
-    var float guess ← (m + 1.0) / 2.0
-    var int i ← 0
+    mut float guess ← (m + 1.0) / 2.0
+    mut int i ← 0
     while i ≺ 6 {
         guess ← (guess + m / guess) / 2.0
         i ← i + 1

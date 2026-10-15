@@ -1,10 +1,10 @@
 class Alpha {
-    var string tag
+    mut string tag
     fn code(int n) → int { return n }
 }
 
 class Beta {
-    var string tag
+    mut string tag
     fn code(string s) → int { return 1 }
 }
 

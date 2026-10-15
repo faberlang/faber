@@ -12,7 +12,7 @@ fn parses_path_patterns_with_binding_lists_and_et_separators() {
     let result = parse_ok_la(
         r"
 discerne event {
-    casu Result.Ok fixum payload, error et _ ergo redde payload
+    casu Result.Ok sit payload, error et _ ergo redde payload
 }
 ",
     );
@@ -50,7 +50,7 @@ discerne event {
 #[test]
 fn parses_type_pattern_atoms_and_null_member() {
     let result = parse_ok_la(
-        "genus Formal { varia textus greeting }\nfunctio f(Formal ∪ nihil u) → vacuum {\n    discerne u {\n        casu Formal fixum f { tacet }\n        casu nihil { tacet }\n    }\n}",
+        "genus Formal { varia textus greeting }\nfunctio f(Formal ∪ nihil u) → vacuum {\n    discerne u {\n        casu Formal sit f { tacet }\n        casu nihil { tacet }\n    }\n}",
     );
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[1].kind else {
@@ -69,7 +69,7 @@ fn parses_type_pattern_atoms_and_null_member() {
 #[test]
 fn bare_width_markers_are_type_patterns() {
     let result = parse_ok_la(
-        "functio f(u8 ∪ textus u) → vacuum {\n    discerne u {\n        casu u8 fixum b { tacet }\n        casu textus { tacet }\n    }\n}",
+        "functio f(u8 ∪ textus u) → vacuum {\n    discerne u {\n        casu u8 sit b { tacet }\n        casu textus { tacet }\n    }\n}",
     );
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {

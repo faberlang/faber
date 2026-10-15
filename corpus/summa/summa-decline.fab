@@ -4,7 +4,7 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "reducta_expr", "filum_clause", "apud_clause", "fixum_decl", "redde_stmt"]
 category = "collection"
 summary = "Reducta sum declines: filum placement outside @ nucleum, K % 32 ≠ 0 tails, and non-scalar terms fail closed."
-syntax = "reducta via summa ex <tensor> apud [coords] filum f fixum s { redde <term> }"
+syntax = "reducta via summa ex <tensor> apud [coords] filum f sit s { redde <term> }"
 related = ["summa", "filum", "nucleum", "apud", "tensor"]
 locale = "la"
 +++
@@ -34,18 +34,18 @@ locale = "la"
 
 # 1. placement — filum outside @ nucleum declines
 functio placement(tensor<f32, [32]> a) → f32 {
-    redde reducta via summa ex a apud [i] filum f fixum s { redde s }
+    redde reducta via summa ex a apud [i] filum f sit s { redde s }
 }
 
 # 2. tail — K = 8 not aligned to the 32-lane width declines
 @ nucleum
 @ publica
-functio tail(tensor<f32, [8]> a, in tf32[1] out) → vacuum {
-    fixum f32 total ← reducta via summa ex a apud [i] filum f fixum s { redde s }
+functio tail(tensor<f32, [8]> a, varia tf32[1] out) → vacuum {
+    sit f32 total ← reducta via summa ex a apud [i] filum f sit s { redde s }
     out[0] ← total
 }
 
 # 3. non-scalar term — a textus element is not a numeric scalar
 functio non_scalar(tensor<textus, [8]> t) → textus {
-    redde reducta via summa ex t apud [i] fixum s { redde s }
+    redde reducta via summa ex t apud [i] sit s { redde s }
 }

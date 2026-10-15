@@ -21,7 +21,7 @@ const SIZE_PARAMETER: &str = r#"+++
 locale = "en"
 +++
 class Box<size N> {
-    var vector<f32, N> minima
+    mut vector<f32, N> minima
 
     fn scalar() → f32 {
         return 1.5
@@ -29,8 +29,8 @@ class Box<size N> {
 }
 
 main {
-    const vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    const Box<3> b ← Box { minima = v }
+    let vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    let Box<3> b ← Box { minima = v }
     print b.scalar()
 }
 "#;
@@ -44,7 +44,7 @@ const TYPE_PARAMETER: &str = r#"+++
 locale = "en"
 +++
 class Cista<T> {
-    var T item
+    mut T item
 
     fn put(T value) {
         self.item ← value
@@ -56,9 +56,9 @@ class Cista<T> {
 }
 
 main {
-    var Cista<int> b ← Cista { item = 7 }
+    mut Cista<int> b ← Cista { item = 7 }
     b.put(41)
-    const int x ← b.get()
+    let int x ← b.get()
     print x
 }
 "#;

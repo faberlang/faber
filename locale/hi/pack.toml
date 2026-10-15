@@ -16,7 +16,7 @@ sit = "बैठा"
 typus = "प्रकार"
 schema = "स्कीमा"
 columna = "कॉलम"
-varia = "चर"
+varia = "परिवर्तनीय"
 ceteri = "बाकी"
 errata = "त्रुटि"
 exitus = "निर्गम"
@@ -95,7 +95,7 @@ maxima = "अधिकतम"
 minima = "न्यूनतम"
 de = "से"
 ex = "सेवन"
-in = "में"
+in = "परिवर्तनीय"
 own = "स्वामित्व"
 copy = "प्रतिलिपि"
 axis = "अक्ष"
@@ -404,10 +404,6 @@ help = "केवल एक '{keyword}' rest binding रखें"
 message = "'{keyword}' सीधे एक identifier bind करता है; '{keyword}' name ← expr का उपयोग करें"
 help = "'{keyword}' name ← expr लिखें या typed/destructured bindings के लिए fixum का उपयोग करें"
 
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit destructuring patterns का समर्थन नहीं करता"
-help = "destructuring pattern के साथ fixum का उपयोग करें"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "test case या setup अपेक्षित है"
 help = "body item को '{proba}', '{probandum}', या '{setup}' से शुरू करें"
@@ -543,6 +539,42 @@ help = "method को genus पर घोषित करें"
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "`{marker}` marker अब binding पर नहीं लगता; यह value पर लगता है"
 help = "`{keyword} T {name} ← {marker} value` लिखें; बाद का `{name} ← {marker} value` value को उसी तरह चिह्नित करता है, और parameter अपने type से पहले `{marker}` रखता है"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "रन-टाइम `{keyword}` घोषणा हटा दी गई है; `{name}` एक रन-टाइम नाम है"
+help = "`{sit} T {name} ← …` लिखें (प्रकार अनुमान के लिए `{sit} {name} ← …`); `{fixum}` कंपाइल-टाइम तथ्य बताता है और `=` के साथ आता है"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "`{keyword}` बाइंडर शब्द हटा दिया गया है"
+help = "बाइंडर `{sit}` (स्थिर नाम) या `{varia}` (लिखने योग्य नाम) लेते हैं; `{fixum}` कंपाइल-टाइम तथ्य बताता है और `=` के साथ आता है"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` बाइंडर शुरू नहीं कर सकता"
+help = "बाइंडर हर पुनरावृत्ति या मिलान के मान को नाम देता है; स्थिर नाम के लिए `{sit}` और लिखने योग्य नाम के लिए `{varia}` लिखें"
+
+[diagnostics.PARSE010.issues.field_fixum_retired]
+message = "`{keyword}` फ़ील्ड संशोधक हटा दिया गया है"
+help = "केवल-पठन फ़ील्ड `{sit}` से लिखा जाता है; `{fixum}` कंपाइल-टाइम तथ्य बताता है और `=` के साथ आता है"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` किसी फ़ील्ड को संशोधित नहीं कर सकता"
+help = "फ़ील्ड केवल-पठन (`{sit}`) या लिखने योग्य (`{varia}`) होता है; `{generis}` उसे प्रकार-स्तर का बनाता है"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "`{keyword}` लोकल को पढ़ने के लिए एक स्थान चाहिए: `{keyword} T name ← place`"
+help = "`{keyword} T name ← place` लिखें, या प्रारंभिक स्थान के बिना नाम के लिए `{sit}` या `{varia}` का उपयोग करें"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "`{keyword}` लोकल एक ही नाम बाँधता है; इसे विघटित नहीं किया जा सकता"
+help = "`{keyword} T name ← place` लिखें, फिर उस नाम से हिस्से पढ़ें"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "`{keyword}` लोकल एक स्थान पढ़ता है और `{marker}` मान नहीं ले सकता"
+help = "स्थान पढ़ने के लिए `{keyword} T name ← place` लिखें, या स्वतंत्र मान के लिए `{sit} T name ← {marker} place`"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "`{keyword}` घोषणा-शब्द हटा दिया गया है; `{name}` एक लिखने योग्य नाम है"
+help = "`{varia} T {name} ← …` लिखें; लिखने योग्य रन-टाइम नाम `{varia}` है"
 
 [diagnostics.PARSE011]
 message = "'{functio}' के बाद function नाम अपेक्षित है"

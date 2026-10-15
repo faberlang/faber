@@ -26,35 +26,35 @@ locale = "en"
 @ kernel
 @ public
 fn addita(f32 x) → f32 {
-    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
-    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    const vf32[4] c ← a.added(b)
+    let vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    let vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    let vf32[4] c ← a.added(b)
     return c.dot(b)
 }
 
 @ kernel
 @ public
 fn subtrahe(f32 x) → f32 {
-    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
-    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    const vf32[4] c ← a.subtracted(b)
+    let vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    let vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    let vf32[4] c ← a.subtracted(b)
     return c.dot(b)
 }
 
 @ kernel
 @ public
 fn multiplica(f32 x) → f32 {
-    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
-    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    const vf32[4] c ← a.multiplied(b)
+    let vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    let vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    let vf32[4] c ← a.multiplied(b)
     return c.dot(b)
 }
 
 @ kernel
 @ public
 fn divida(f32 x) → f32 {
-    const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
-    const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
-    const vf32[4] c ← a.divided(b)
+    let vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
+    let vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
+    let vf32[4] c ← a.divided(b)
     return c.dot(b)
 }

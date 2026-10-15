@@ -52,7 +52,7 @@ fn english_print_free_entry_carries_english_id_zero() {
 locale = \"en\"
 +++
 fn show() {
-    const int ∪ none x ← null
+    let int ∪ none x ← null
     print x
 }
 

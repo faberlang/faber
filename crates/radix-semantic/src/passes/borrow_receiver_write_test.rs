@@ -62,56 +62,56 @@ fn assert_alias_write_rejected(body: &str) {
 #[test]
 fn alias_of_de_list_rejects_detrahe() {
     assert_alias_write_rejected(
-        "functio f(de lista<numerus> xs) → vacuum { fixum lista<numerus> ys ← xs\n ys.detrahe() }",
+        "functio f(de lista<numerus> xs) → vacuum { sit lista<numerus> ys ← xs\n ys.detrahe() }",
     );
 }
 
 #[test]
 fn alias_of_de_list_rejects_decapita() {
     assert_alias_write_rejected(
-        "functio f(de lista<numerus> xs) → vacuum { fixum lista<numerus> ys ← xs\n ys.decapita() }",
+        "functio f(de lista<numerus> xs) → vacuum { sit lista<numerus> ys ← xs\n ys.decapita() }",
     );
 }
 
 #[test]
 fn alias_of_de_tabula_rejects_bool_returning_dele() {
     assert_alias_write_rejected(
-        "functio f(de tabula<textus, numerus> m) → vacuum { fixum tabula<textus, numerus> n ← m\n n.dele(\"k\") }",
+        "functio f(de tabula<textus, numerus> m) → vacuum { sit tabula<textus, numerus> n ← m\n n.dele(\"k\") }",
     );
 }
 
 #[test]
 fn alias_of_de_list_vacuum_mutator_still_rejected() {
     assert_alias_write_rejected(
-        "functio f(de lista<numerus> xs) → vacuum { fixum lista<numerus> ys ← xs\n ys.appende(1) }",
+        "functio f(de lista<numerus> xs) → vacuum { sit lista<numerus> ys ← xs\n ys.appende(1) }",
     );
 }
 
 #[test]
 fn alias_of_de_list_read_methods_stay_legal() {
     let found = analyze(
-        "functio f(de lista<numerus> xs) → numerus { fixum lista<numerus> ys ← xs\n redde ys.longitudo() }",
+        "functio f(de lista<numerus> xs) → numerus { sit lista<numerus> ys ← xs\n redde ys.longitudo() }",
     );
     assert!(found.errors.is_empty(), "{:?}", found.errors);
 }
 
 #[test]
 fn in_param_only_detrahe_does_not_suggest_ref() {
-    let found = analyze("functio f(in lista<numerus> xs) → vacuum { xs.detrahe() }");
+    let found = analyze("functio f(varia lista<numerus> xs) → vacuum { xs.detrahe() }");
     assert!(found.errors.is_empty(), "{:?}", found.errors);
     assert_eq!(found.unused_mut_params, 0, "pop-only `in` param is a write");
 }
 
 #[test]
 fn in_param_only_decapita_does_not_suggest_ref() {
-    let found = analyze("functio f(in lista<numerus> xs) → vacuum { xs.decapita() }");
+    let found = analyze("functio f(varia lista<numerus> xs) → vacuum { xs.decapita() }");
     assert!(found.errors.is_empty(), "{:?}", found.errors);
     assert_eq!(found.unused_mut_params, 0, "pop-only `in` param is a write");
 }
 
 #[test]
 fn in_param_only_dele_does_not_suggest_ref() {
-    let found = analyze("functio f(in tabula<textus, numerus> m) → vacuum { m.dele(\"k\") }");
+    let found = analyze("functio f(varia tabula<textus, numerus> m) → vacuum { m.dele(\"k\") }");
     assert!(found.errors.is_empty(), "{:?}", found.errors);
     assert_eq!(
         found.unused_mut_params, 0,
@@ -121,6 +121,6 @@ fn in_param_only_dele_does_not_suggest_ref() {
 
 #[test]
 fn in_param_only_read_still_suggests_ref() {
-    let found = analyze("functio f(in lista<numerus> xs) → numerus { redde xs.longitudo() }");
+    let found = analyze("functio f(varia lista<numerus> xs) → numerus { redde xs.longitudo() }");
     assert_eq!(found.unused_mut_params, 1, "{:?}", found.errors);
 }

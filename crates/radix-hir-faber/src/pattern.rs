@@ -12,7 +12,7 @@
 //! - Binding names prefer resolved definitions so renamed or shadowed symbols
 //!   follow the same name policy as expressions.
 //! - Aliases use the canonical `pattern ut name` spelling.
-//! - Variant patterns print the variant name followed by `fixum` bindings when
+//! - Variant patterns print the variant name followed by `sit` bindings when
 //!   the HIR pattern carries payload patterns.
 //! - Literal patterns share literal spelling with expression literals.
 
@@ -104,7 +104,7 @@ impl super::FaberCodegen<'_> {
                 writer.write(&spelling);
                 if !patterns.is_empty() {
                     writer.write(" ");
-                    writer.write(surface.contextual_keyword("fixum"));
+                    writer.write(surface.contextual_keyword("sit"));
                     writer.write(" ");
                     self.write_binding_patterns(patterns, names, surface, writer);
                 }
@@ -121,7 +121,7 @@ impl super::FaberCodegen<'_> {
                 }
                 if let Some((def_id, name)) = binding {
                     writer.write(" ");
-                    writer.write(surface.contextual_keyword("fixum"));
+                    writer.write(surface.contextual_keyword("sit"));
                     writer.write(" ");
                     let name = Self::resolved_binding_symbol(*def_id, *name, names);
                     writer.write(&self.symbol_to_string(name));

@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "Lockstep declines: source/binder arity, at-coordinate cardinality, and statically known unequal lengths fail closed."
-syntax = "for from <a>, <b> const <x> { }"
+syntax = "for from <a>, <b> let <x> { }"
 related = ["ex", "itera", "apud"]
 locale = "en"
 +++
@@ -40,19 +40,19 @@ locale = "en"
 # and the fail-closed equal-length admission for the lockstep series.
 
 fn arity(list<int> ks, list<int> vs) → void {
-    for from ks, vs const k {
+    for from ks, vs let k {
         print k
     }
 }
 
 fn cardinality(list<int> ks, list<int> vs) → void {
-    for from ks, vs at [i, j] const k, v {
+    for from ks, vs at [i, j] let k, v {
         print k
     }
 }
 
 fn lengths() → void {
-    for from [1, 2, 3], [4, 5] const k, v {
+    for from [1, 2, 3], [4, 5] let k, v {
         print k
     }
 }

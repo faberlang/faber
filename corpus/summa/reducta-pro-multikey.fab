@@ -8,21 +8,21 @@ canonical = false
 +++
 
 functio per_cellam(tf32[2, 2, 3] cubus) → tf32[2, 2] {
-    redde reducta via summa ex cubus apud [i, j, k] pro [i, j] fixum s { redde s }
+    redde reducta via summa ex cubus apud [i, j, k] pro [i, j] sit s { redde s }
 }
 functio magna_per_cellam(tf32[2, 2, 3] cubus) → tensor<numerus, [2, 2]> {
-    redde reducta via numeratio ex cubus apud [i, j, k] pro [i, j] fixum s { redde s ≻ 5.0 }
+    redde reducta via numeratio ex cubus apud [i, j, k] pro [i, j] sit s { redde s ≻ 5.0 }
 }
 functio per_alveum(tf32[6] pondera, tensor<numerus, [6]> ordines, tensor<numerus, [6]> columnae) → tf32[2, 3] {
-    redde reducta via summa ex pondera apud [i] pro [ordines[i], columnae[i]] fixum s { redde s }
+    redde reducta via summa ex pondera apud [i] pro [ordines[i], columnae[i]] sit s { redde s }
 }
 incipit {
-    fixum lista<f32> plana ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
-    fixum tf32[2, 2, 3] cubus ← plana ↦ tf32[2, 2, 3]
-    fixum lista<f32> soluta ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    fixum tf32[6] pondera ← soluta ↦ tf32[6]
-    fixum tensor<numerus, [6]> ordines ← [0, 0, 1, 1, 0, 1] ↦ tensor<numerus, [6]>
-    fixum tensor<numerus, [6]> columnae ← [0, 2, 1, 1, 0, 2] ↦ tensor<numerus, [6]>
+    sit lista<f32> plana ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
+    sit tf32[2, 2, 3] cubus ← plana ↦ tf32[2, 2, 3]
+    sit lista<f32> soluta ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    sit tf32[6] pondera ← soluta ↦ tf32[6]
+    sit tensor<numerus, [6]> ordines ← [0, 0, 1, 1, 0, 1] ↦ tensor<numerus, [6]>
+    sit tensor<numerus, [6]> columnae ← [0, 2, 1, 1, 0, 2] ↦ tensor<numerus, [6]>
     nota per_cellam(cubus)
     nota magna_per_cellam(cubus)
     nota per_alveum(pondera, ordines, columnae)

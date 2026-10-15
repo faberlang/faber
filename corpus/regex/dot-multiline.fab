@@ -39,7 +39,7 @@ locale = "en"
 # The one-letter text for a code point: characters that are invisible or look like another
 # letter are written by number, never as a literal.
 fn u(int n) → string {
-    const char c ← n ↦ char via Code ⊥ '?'
+    let char c ← n ↦ char via Code ⊥ '?'
     return c ↦ string
 }
 
@@ -47,7 +47,7 @@ fn u(int n) → string {
 # conversion rejects the pattern.
 fn hits(string pat, string text) → string {
     do {
-        const regex r ← pat ↦ regex
+        let regex r ← pat ↦ regex
         return r.matches(text) ✓ "y" ✗ "n"
     }
     catch err {
@@ -58,9 +58,9 @@ fn hits(string pat, string text) → string {
 # The code point span of every match, left to right, as ` (start,end)`; ` none` for no match.
 fn spans(string pat, string text) → string {
     do {
-        const regex r ← pat ↦ regex
-        var string out ← ""
-        for from r.find_all(text) const h {
+        let regex r ← pat ↦ regex
+        mut string out ← ""
+        for from r.find_all(text) let h {
             out ← out + " (§,§)"(h.start(), h.end())
         }
         if out ≡ "" {

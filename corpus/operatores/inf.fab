@@ -61,7 +61,7 @@ locale = "en"
 #   inf.expected — one result per print.
 
 class Sample {
-    const inf v
+    let inf v
 }
 
 fn factorial(inf n) → inf {
@@ -74,19 +74,19 @@ fn factorial(inf n) → inf {
 main {
     # 1. Opt-in declaration and a literal beyond u64. The three policy
     #    spellings are one type and add without any check.
-    const inf big ← 18446744073709551616
+    let inf big ← 18446744073709551616
     print big
-    const trapping<inf> five ← 5
-    const wrapping<inf> six ← 6
+    let trapping<inf> five ← 5
+    let wrapping<inf> six ← 6
     print five + six
 
     # 2. No size trap: 30! and 2^201 are exact.
     print factorial(30)
-    const inf pow ← 2 ⇐ 200
+    let inf pow ← 2 ⇐ 200
     print pow
 
     # 3. Floor division and remainder take the sign of the divisor.
-    const inf neg ← -7
+    let inf neg ← -7
     print neg / 2
     print neg % 2
 
@@ -97,9 +97,9 @@ main {
 
     # 5. Exact comparison across families. The float 2^64 is exactly 2^64,
     #    so one more is greater; a rounding comparison would call them equal.
-    const u64 top ← 18446744073709551615
-    const float flt ← 18446744073709551616.0
-    const d64 dec ← 1.5
+    let u64 top ← 18446744073709551615
+    let float flt ← 18446744073709551616.0
+    let d64 dec ← 1.5
     print big ≻ top
     print top ≺ big
     print big ≅ flt
@@ -109,47 +109,47 @@ main {
 
     # 5b. `≈` is the tolerance tier, the same rule for `inf` and bounded
     #     integers: one more than 2^64 is inside 1e-9, twice 2^64 is not.
-    const int near ← 1000000000000
-    const inf near_inf ← 1000000000001
+    let int near ← 1000000000000
+    let inf near_inf ← 1000000000001
     print near ≈ near_inf
     print big + 1 ≈ big
     print big ≈ big + big
 
     # 6. A u64 widens into inf without `↦`; `+ 1` past u64::MAX is exact.
-    const inf widened ← top
+    let inf widened ← top
     print widened + 1
 
     # 7. Checked narrowing: recovery when the value does not fit.
     print big ↦ u64 ⊥ 9
-    const inf small ← 200
+    let inf small ← 200
     print small ↦ u8 ⊥ 9
-    const inf over ← small + 100
+    let inf over ← small + 100
     print over ↦ u8 ⊥ 255
 
     # 8. Floats: finite, then beyond the float range.
     print small ↦ float
     print big ↦ float
-    const inf huge ← pow * pow * pow * pow * pow * pow * pow * pow * pow * pow
+    let inf huge ← pow * pow * pow * pow * pow * pow * pow * pow * pow * pow
     print huge ↦ float
-    const inf below ← 0 - huge
+    let inf below ← 0 - huge
     print below ↦ float
 
     # 9. Into inf: a float or d64 converts only with a rounding choice
     #    (`via Trunc` toward zero, `via HalfEven` ties to even); a NaN or
     #    infinite float fails.
-    const float frac ← 12.75
-    const float negfrac ← -12.75
-    const d64 half ← 12.5
-    const d64 threequarters ← 12.75
-    const float not_a_number ← 0.0 ÷ 0.0
-    const float float_infinity ← ∞
+    let float frac ← 12.75
+    let float negfrac ← -12.75
+    let d64 half ← 12.5
+    let d64 threequarters ← 12.75
+    let float not_a_number ← 0.0 ÷ 0.0
+    let float float_infinity ← ∞
     print frac ↦ inf via Trunc
     print negfrac ↦ inf via Trunc
     print half ↦ inf via HalfEven
     print threequarters ↦ inf via HalfEven
     print not_a_number ↦ inf via Trunc ⊥ 5
     print float_infinity ↦ inf via Trunc ⊥ 6
-    const inf trillions ← 100000000000000000000
+    let inf trillions ← 100000000000000000000
     print trillions ↦ d64 ⊥ 0.5
 
     # 10. Text: parse and render at a radix.
@@ -162,14 +162,14 @@ main {
     print big ¶ ".2"
 
     # 12. A field prints its digits; a list sums exactly.
-    const Sample sample ← Sample { v = 18446744073709551616 }
+    let Sample sample ← Sample { v = 18446744073709551616 }
     print sample
-    const list<inf> items ← [1, 18446744073709551616, 3]
+    let list<inf> items ← [1, 18446744073709551616, 3]
     print items.sum()
 
     # 13. `valor` carries an `inf` of any length and gives it back exactly.
-    const value boxed ← big ↦ value
+    let value boxed ← big ↦ value
     print boxed
-    const inf unboxed ← boxed ↦ inf
+    let inf unboxed ← boxed ↦ inf
     print unboxed + 1
 }

@@ -48,46 +48,46 @@ locale = "en"
 #   [1.0, 2.0, 2.0, 1.0]
 
 main {
-    const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
-    const list<f32> flat_b ← [4.0, 3.0, 2.0, 1.0]
-    var tensor<f32, [2, 2]> a ← flat_a ↦ tensor<f32, [2, 2]>
-    var tensor<f32, [2, 2]> b ← flat_b ↦ tensor<f32, [2, 2]>
+    let list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
+    let list<f32> flat_b ← [4.0, 3.0, 2.0, 1.0]
+    mut tensor<f32, [2, 2]> a ← flat_a ↦ tensor<f32, [2, 2]>
+    mut tensor<f32, [2, 2]> b ← flat_b ↦ tensor<f32, [2, 2]>
 
-    const tensor<f32, [2, 2]> plus ← a + 1.0
-    const list<f32> plus_out ← plus.flatten()
+    let tensor<f32, [2, 2]> plus ← a + 1.0
+    let list<f32> plus_out ← plus.flatten()
     print plus_out
-    const tensor<f32, [2, 2]> minus ← 10.0 - a
-    const list<f32> minus_out ← minus.flatten()
+    let tensor<f32, [2, 2]> minus ← 10.0 - a
+    let list<f32> minus_out ← minus.flatten()
     print minus_out
-    const tensor<f32, [2, 2]> times ← a * 0.5
-    const list<f32> times_out ← times.flatten()
+    let tensor<f32, [2, 2]> times ← a * 0.5
+    let list<f32> times_out ← times.flatten()
     print times_out
-    const tensor<f32, [2, 2]> divided ← a / 4.0
-    const list<f32> divided_out ← divided.flatten()
+    let tensor<f32, [2, 2]> divided ← a / 4.0
+    let list<f32> divided_out ← divided.flatten()
     print divided_out
-    const tensor<f32, [2, 2]> rest ← a % 3.0
-    const list<f32> rest_out ← rest.flatten()
+    let tensor<f32, [2, 2]> rest ← a % 3.0
+    let list<f32> rest_out ← rest.flatten()
     print rest_out
-    const tensor<f32, [2, 2]> negated ← -a
-    const list<f32> negated_out ← negated.flatten()
+    let tensor<f32, [2, 2]> negated ← -a
+    let list<f32> negated_out ← negated.flatten()
     print negated_out
 
-    const list<i16> flat_n ← [1, 2, 3, 4]
-    var tensor<i16, [4]> n ← flat_n ↦ tensor<i16, [4]>
-    const tensor<i16, [4]> floored ← n / 2
-    const list<i16> floored_out ← floored.flatten()
+    let list<i16> flat_n ← [1, 2, 3, 4]
+    mut tensor<i16, [4]> n ← flat_n ↦ tensor<i16, [4]>
+    let tensor<i16, [4]> floored ← n / 2
+    let list<i16> floored_out ← floored.flatten()
     print floored_out
-    const tensor<i16, [4]> odd ← n % 2
-    const list<i16> odd_out ← odd.flatten()
+    let tensor<i16, [4]> odd ← n % 2
+    let list<i16> odd_out ← odd.flatten()
     print odd_out
-    const tensor<f32, [4]> true_half ← n ÷ 2
-    const list<f32> true_half_out ← true_half.flatten()
+    let tensor<f32, [4]> true_half ← n ÷ 2
+    let list<f32> true_half_out ← true_half.flatten()
     print true_half_out
 
-    const tensor<f32, [2, 2]> larger ← a ⤒ b
-    const list<f32> larger_out ← larger.flatten()
+    let tensor<f32, [2, 2]> larger ← a ⤒ b
+    let list<f32> larger_out ← larger.flatten()
     print larger_out
-    const tensor<f32, [2, 2]> smaller ← a ⤓ b
-    const list<f32> smaller_out ← smaller.flatten()
+    let tensor<f32, [2, 2]> smaller ← a ⤓ b
+    let list<f32> smaller_out ← smaller.flatten()
     print smaller_out
 }

@@ -434,7 +434,12 @@ impl<'a> LintContext<'a> {
             self.warn_on_explicit_ignotum(ty, span);
         }
         if local.mutable {
-            self.mutable_locals.push((local.def_id, span));
+            // A `ref` local is writable only as a name (it may be re-pointed),
+            // so a ref local that is never re-pointed is not an unneeded `mut`.
+            let ref_local = local.ty.is_some_and(|ty| self.types.is_ref_view(ty));
+            if !ref_local {
+                self.mutable_locals.push((local.def_id, span));
+            }
             self.mutable_local_defs.insert(local.def_id);
         }
         if let Some(init) = &local.init {

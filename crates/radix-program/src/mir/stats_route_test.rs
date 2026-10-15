@@ -39,7 +39,7 @@ kind = "bin"
 const STATS_MAIN: &str =
     "fn dupla(int x) → int {\n    return x * 2\n}\n\nmain {\n    print dupla(21)\n}\n";
 const RUNTIME_ERROR_MAIN: &str =
-    "main {\n    print \"before\"\n    const list<int> base ← [1, 2]\n    print base[5]\n}\n";
+    "main {\n    print \"before\"\n    let list<int> base ← [1, 2]\n    print base[5]\n}\n";
 const COMPILE_ERROR_MAIN: &str = "main {\n    print numquam\n}\n";
 
 // ── focused tests ───────────────────────────────────────────────────────────

@@ -38,24 +38,24 @@ canonical = false
 # =============================================================================
 
 fn per_cell(tf32[2, 2, 3] cube) → tf32[2, 2] {
-    return reduce via sum from cube at [i, j, k] per [i, j] const s { return s }
+    return reduce via sum from cube at [i, j, k] per [i, j] let s { return s }
 }
 
 fn big_per_cell(tf32[2, 2, 3] cube) → tensor<int, [2, 2]> {
-    return reduce via count from cube at [i, j, k] per [i, j] const s { return s ≻ 5.0 }
+    return reduce via count from cube at [i, j, k] per [i, j] let s { return s ≻ 5.0 }
 }
 
 fn per_bucket(tf32[6] weights, tensor<int, [6]> rows, tensor<int, [6]> cols) → tf32[2, 3] {
-    return reduce via sum from weights at [i] per [rows[i], cols[i]] const s { return s }
+    return reduce via sum from weights at [i] per [rows[i], cols[i]] let s { return s }
 }
 
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
-    const tf32[2, 2, 3] cube ← flat ↦ tf32[2, 2, 3]
-    const list<f32> loose ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[6] weights ← loose ↦ tf32[6]
-    const tensor<int, [6]> rows ← [0, 0, 1, 1, 0, 1] ↦ tensor<int, [6]>
-    const tensor<int, [6]> cols ← [0, 2, 1, 1, 0, 2] ↦ tensor<int, [6]>
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
+    let tf32[2, 2, 3] cube ← flat ↦ tf32[2, 2, 3]
+    let list<f32> loose ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[6] weights ← loose ↦ tf32[6]
+    let tensor<int, [6]> rows ← [0, 0, 1, 1, 0, 1] ↦ tensor<int, [6]>
+    let tensor<int, [6]> cols ← [0, 2, 1, 1, 0, 2] ↦ tensor<int, [6]>
     print per_cell(cube)
     print big_per_cell(cube)
     print per_bucket(weights, rows, cols)

@@ -8,8 +8,8 @@ import from "norma:http/headers" headers
 
 describe "headers_import" {
     test "Headers and Header construct" {
-        const headers.Header line ← headers.Header { name = "Content-Type", value = "text/plain" }
-        const headers.Headers h ← headers.Headers { }
+        let headers.Header line ← headers.Header { name = "Content-Type", value = "text/plain" }
+        let headers.Headers h ← headers.Headers { }
         assert line.name ≡ "Content-Type"
         assert line.value ≡ "text/plain"
         print "headers constructed"

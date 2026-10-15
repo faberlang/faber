@@ -1,6 +1,6 @@
 //! The call-site storage-overlap rule is not tensor-specific: every type whose
 //! unmarked bind aliases under the reference model (list, map, genus) names
-//! one storage through `var alias ← g`, so `k(g, alias)` overlaps exactly like
+//! one storage through `mut alias ← g`, so `k(g, alias)` overlaps exactly like
 //! `k(g, g)`. Value types (numbers, text) copy at the bind and never alias.
 //! Alias-spelled overlaps are rejected with the issues the direct spelling
 //! produces; `copy`/`own` binds and read/read calls stay legal.
@@ -39,7 +39,7 @@ const MAP: Carrier = Carrier {
 
 const GENUS: Carrier = Carrier {
     ty: "Box",
-    decls: "class Box {\n    var int n\n}\n\n",
+    decls: "class Box {\n    mut int n\n}\n\n",
     init: "Box { n = 1 }",
     fresh: "Box { n = 2 }",
     mut_body: "a.n ← b.n",
@@ -78,8 +78,8 @@ fn read_read({ty} a, {ty} b) → void {{
 }}
 
 main {{
-    var {ty} g ← {init}
-    var {ty} fresh ← {fresh}
+    mut {ty} g ← {init}
+    mut {ty} fresh ← {fresh}
 {body}
 }}
 ",
@@ -118,7 +118,7 @@ fn assert_rejects(carrier: &Carrier, body: &str, expected: &str) {
 }
 
 fn bind(carrier: &Carrier, name: &str, source: &str) -> String {
-    format!("    var {} {name} ← {source}\n", carrier.ty)
+    format!("    mut {} {name} ← {source}\n", carrier.ty)
 }
 
 const ALL: [&Carrier; 3] = [&LIST, &MAP, &GENUS];
@@ -209,7 +209,7 @@ fn aliased_read_arguments_stay_legal() {
 #[test]
 fn copy_bind_does_not_alias() {
     for c in ALL {
-        let dup = format!("    var {} dup ← copy g\n", c.ty);
+        let dup = format!("    mut {} dup ← copy g\n", c.ty);
         assert_accepts(c, &(dup.clone() + "    mut_read(mut g, dup)"));
         assert_accepts(c, &(dup.clone() + "    mut_read(mut dup, g)"));
         assert_accepts(c, &(dup + "    mut_mut(mut g, mut dup)"));
@@ -220,7 +220,7 @@ fn copy_bind_does_not_alias() {
 fn own_bind_does_not_alias() {
     for c in ALL {
         let body = format!(
-            "    const {} taken ← own g\n    mut_mut(mut g, mut taken)",
+            "    let {} taken ← own g\n    mut_mut(mut g, mut taken)",
             c.ty
         );
         let found = errors_of(&program(c, &body));
@@ -267,8 +267,8 @@ fn number_bind_is_a_copy_not_an_alias() {
 }
 
 main {
-    var int g ← 1
-    var int copy_of_g ← g
+    mut int g ← 1
+    mut int copy_of_g ← g
     bump(mut g, copy_of_g)
     bump(mut copy_of_g, g)
 }
@@ -284,8 +284,8 @@ fn text_bind_is_a_copy_not_an_alias() {
 }
 
 main {
-    var string s ← "a"
-    var string copy_of_s ← s
+    mut string s ← "a"
+    mut string copy_of_s ← s
     join(mut s, copy_of_s)
     join(mut copy_of_s, s)
 }

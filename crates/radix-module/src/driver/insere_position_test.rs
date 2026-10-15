@@ -71,7 +71,7 @@ fn field_default_embed_reads_the_file_under_every_modifier() {
     let main = dir.path().join("main.fab");
     write(
         &main,
-        b"genus G {\n    fixum textus a = insere \"x.txt\"\n    varia textus b = insere \"x.txt\"\n    generis textus c = insere \"x.txt\"\n}\nincipit {\n    nota \"ok\"\n}\n",
+        b"genus G {\n    sit textus a = insere \"x.txt\"\n    varia textus b = insere \"x.txt\"\n    generis textus c = insere \"x.txt\"\n}\nincipit {\n    nota \"ok\"\n}\n",
     );
     let unit = analyze_file(&main).unwrap_or_else(|d| panic!("analysis failed: {d:?}"));
     let HirItemKind::Struct(genus) = &unit.hir.items[0].kind else {
@@ -143,7 +143,7 @@ fn praefixum_default_of_an_instance_field_evaluates_like_a_module_constant() {
     let main = dir.path().join("main.fab");
     write(
         &main,
-        b"genus G {\n    varia textus v = praefixum {\n        redde insere \"x.txt\"\n    }\n    fixum numerus n = praefixum {\n        redde 3 + 4\n    }\n}\nincipit {\n    nota \"ok\"\n}\n",
+        b"genus G {\n    varia textus v = praefixum {\n        redde insere \"x.txt\"\n    }\n    sit numerus n = praefixum {\n        redde 3 + 4\n    }\n}\nincipit {\n    nota \"ok\"\n}\n",
     );
     let unit = analyze_file(&main).unwrap_or_else(|d| panic!("analysis failed: {d:?}"));
     let HirItemKind::Struct(genus) = &unit.hir.items[0].kind else {
@@ -171,10 +171,10 @@ fn faber_reemission_prints_the_embed_at_every_position() {
     let dir = tempfile::tempdir().expect("tempdir");
     write(&dir.path().join("x.txt"), b"salve");
     let main = dir.path().join("main.fab");
-    let source = "genus G {\n    fixum textus a = insere \"x.txt\"\n    varia textus b = insere \"x.txt\"\n}\n\nincipit {\n    fixum textus l = insere \"x.txt\"\n    nota l\n}\n";
+    let source = "genus G {\n    sit textus a = insere \"x.txt\"\n    varia textus b = insere \"x.txt\"\n}\n\nincipit {\n    fixum textus l = insere \"x.txt\"\n    nota l\n}\n";
     write(&main, source.as_bytes());
     let code = faber_output(&main, source);
-    assert!(code.contains("fixum textus a = insere \"x.txt\""), "{code}");
+    assert!(code.contains("sit textus a = insere \"x.txt\""), "{code}");
     assert!(code.contains("varia textus b = insere \"x.txt\""), "{code}");
     assert!(code.contains("fixum textus l = insere \"x.txt\""), "{code}");
     assert!(!code.contains("salve"), "{code}");

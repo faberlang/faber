@@ -73,8 +73,8 @@ fn bounded_octeti_conversions_follow_d7() {
         r"typus OctetiOcto = lista<b8, 8>
 
 functio bridges(lista<b8, 8> bounded, lista<b8> unbounded) → vacuum {
-    fixum lista<b8> widened ← bounded ↦ lista<b8>
-    fixum OctetiOcto narrowed ← unbounded ↦ OctetiOcto
+    sit lista<b8> widened ← bounded ↦ lista<b8>
+    sit OctetiOcto narrowed ← unbounded ↦ OctetiOcto
     nota widened
     nota narrowed
 }
@@ -90,7 +90,7 @@ incipit {
 
     let implicit = analyze_and_get_diagnostics_la(
         r"functio assign(lista<b8> unbounded) → vacuum {
-    fixum lista<b8, 8> bounded ← unbounded
+    sit lista<b8, 8> bounded ← unbounded
     nota bounded
 }
 
@@ -105,8 +105,8 @@ incipit {
 
     let result = compile_and_get_result_la(
         r"functio bridges(lista<b8, 8> bounded, lista<b8> unbounded) → vacuum {
-    fixum lista<b8> widened ← bounded ↦ lista<b8>
-    fixum lista<b8, 8> narrowed ← unbounded ↦ lista<b8, 8>
+    sit lista<b8> widened ← bounded ↦ lista<b8>
+    sit lista<b8, 8> narrowed ← unbounded ↦ lista<b8, 8>
     nota widened
     nota narrowed
 }

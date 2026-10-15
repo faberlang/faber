@@ -128,20 +128,20 @@ fn sort_expression_round_trips_in_latin_and_english_and_typechecks() {
     let cases = [
         (
             "la",
-            "functio f(lista<numerus> xs, tabula<textus, numerus> m) → vacuum {\n    fixum lista<numerus> a ← ordinata via ascendens ex xs\n    fixum lista<textus> k ← ordinata via descendens de m\n    fixum lista<numerus> b ← ordinata via ascendens ex xs fixum p {\n        redde p\n    }\n    fixum lista<textus> s ← ordinata via ascendens de m\n    itera ex s fixum n {\n        scribe n\n    }\n    varia numerus ordinata ← 1\n    varia numerus ascendens ← 2\n    varia lista<numerus> ys ← [3, 1]\n    ys.ordina()\n}\n",
+            "functio f(lista<numerus> xs, tabula<textus, numerus> m) → vacuum {\n    sit lista<numerus> a ← ordinata via ascendens ex xs\n    sit lista<textus> k ← ordinata via descendens de m\n    sit lista<numerus> b ← ordinata via ascendens ex xs sit p {\n        redde p\n    }\n    sit lista<textus> s ← ordinata via ascendens de m\n    itera ex s sit n {\n        scribe n\n    }\n    varia numerus ordinata ← 1\n    varia numerus ascendens ← 2\n    varia lista<numerus> ys ← [3, 1]\n    ys.ordina()\n}\n",
             [
                 "ordinata via ascendens ex xs",
                 "ordinata via descendens de m",
-                "ordinata via ascendens ex xs fixum p {",
+                "ordinata via ascendens ex xs sit p {",
             ],
         ),
         (
             "en",
-            "fn f(list<int> xs, map<string, int> m) → none {\n    const list<int> a ← sort via asc from xs\n    const list<string> k ← sort via desc ref m\n    const list<int> b ← sort via asc from xs const p {\n        return p\n    }\n    const list<string> s ← sort via asc ref m\n    for from s const n {\n        print n\n    }\n    var int sort ← 1\n    var int asc ← 2\n    var list<int> ys ← [3, 1]\n    ys.sort()\n}\n",
+            "fn f(list<int> xs, map<string, int> m) → none {\n    let list<int> a ← sort via asc from xs\n    let list<string> k ← sort via desc ref m\n    let list<int> b ← sort via asc from xs let p {\n        return p\n    }\n    let list<string> s ← sort via asc ref m\n    for from s let n {\n        print n\n    }\n    mut int sort ← 1\n    mut int asc ← 2\n    mut list<int> ys ← [3, 1]\n    ys.sort()\n}\n",
             [
                 "sort via asc from xs",
                 "sort via desc ref m",
-                "sort via asc from xs const p {",
+                "sort via asc from xs let p {",
             ],
         ),
     ];
@@ -192,8 +192,8 @@ fn sort_expression_round_trips_in_latin_and_english_and_typechecks() {
 #[test]
 fn trap_body_comments_survive_round_trip() {
     for source in [
-        "functio f() { fixum ∪ r ← capta {\n# trap body\n1\n} }\n",
-        "functio f() { fixum ∪ r ← capta {\n# preamble\nfixum numerus x ← 1\n# trap body\n# second tail comment\nx\n# block end\n} }\n",
+        "functio f() { sit ∪ r ← capta {\n# trap body\n1\n} }\n",
+        "functio f() { sit ∪ r ← capta {\n# preamble\nsit numerus x ← 1\n# trap body\n# second tail comment\nx\n# block end\n} }\n",
     ] {
         let first = emit_once(source);
         let second = emit_once(&first);
@@ -207,11 +207,11 @@ fn trap_body_comments_survive_round_trip() {
 
 #[test]
 fn access_marked_parameter_forms_keep_their_inner_type() {
-    let source = "genus Box { varia numerus value }\nfunctio update(in Box box, de lista<numerus> items, in numerus count, de li32 compact) { tacet }\n";
+    let source = "genus Box { varia numerus value }\nfunctio update(varia Box box, de lista<numerus> items, varia numerus count, de li32 compact) { tacet }\n";
     let emitted = assert_idempotent(source);
-    assert!(emitted.contains("in Box box"), "{emitted}");
+    assert!(emitted.contains("varia Box box"), "{emitted}");
     assert!(emitted.contains("de lista<numerus> items"), "{emitted}");
-    assert!(emitted.contains("in numerus count"), "{emitted}");
+    assert!(emitted.contains("varia numerus count"), "{emitted}");
     assert!(emitted.contains("de li32 compact"), "{emitted}");
 }
 
@@ -221,12 +221,12 @@ fn access_marked_parameter_forms_keep_their_inner_type() {
 /// spelling.
 #[test]
 fn bare_numeric_markers_re_emit_unchanged() {
-    let source = "functio f(u8 a, f32 b, numerus n, exactus<u16> c, lista<i32> xs, u8 ∪ textus u) → f64 {\n    discerne u {\n        casu u8 fixum v { tacet }\n        casu textus { tacet }\n    }\n    fixum d64 d ← 1\n    redde b ↦ f64\n}\n";
+    let source = "functio f(u8 a, f32 b, numerus n, exactus<u16> c, lista<i32> xs, u8 ∪ textus u) → f64 {\n    discerne u {\n        casu u8 sit v { tacet }\n        casu textus { tacet }\n    }\n    sit d64 d ← 1\n    redde b ↦ f64\n}\n";
     let emitted = assert_idempotent(source);
     for expected in [
         "f(u8 a, f32 b, numerus n, exactus<u16> c, lista<i32> xs,",
-        "casu u8 fixum v",
-        "fixum d64 d",
+        "casu u8 sit v",
+        "sit d64 d",
         "b ↦ f64",
     ] {
         assert!(emitted.contains(expected), "missing `{expected}` in:\n{emitted}");
@@ -438,7 +438,7 @@ locale = "la"
 
 #[test]
 fn canonical_revalidation_rejects_swapped_same_typed_sites() {
-    let source = "functio swap() → numerus {\n    fixum lista<exactus<u32>> first ← vacua\n    fixum lista<u32> second ← vacua\n    redde 0\n}\n";
+    let source = "functio swap() → numerus {\n    sit lista<exactus<u32>> first ← vacua\n    sit lista<u32> second ← vacua\n    redde 0\n}\n";
     let latin = crate::locale::latin_locale_pack();
     let session = Session::new(Config::default().with_locale_pack(latin.clone()));
     let prepared =
@@ -562,7 +562,7 @@ fn conversio_via_clause_round_trips() {
     //
     // D5.7 retired top-level `fixum`; this binding moves inside `incipit`
     // (the clause spelling under test is unrelated to item vs. local scope).
-    let code = assert_idempotent("incipit {\n    fixum u32 le ← |de ad be ef|[0‥4] ↦ u32 via Be\n}\n");
+    let code = assert_idempotent("incipit {\n    sit u32 le ← |de ad be ef|[0‥4] ↦ u32 via Be\n}\n");
     assert!(
         code.contains("↦ u32 via Be"),
         "conversio hint must re-emit as a via clause:\n{code}"
@@ -573,7 +573,7 @@ fn conversio_via_clause_round_trips() {
 fn littera_code_via_clause_round_trips() {
     // D10.6 `n ↦ littera via Code`: the target stays the plain scalar head,
     // never a float-family width wrap.
-    let code = assert_idempotent("incipit {\n    fixum littera c ← 65 ↦ littera via Code ⊥ '?'\n    scribe c\n}\n");
+    let code = assert_idempotent("incipit {\n    sit littera c ← 65 ↦ littera via Code ⊥ '?'\n    scribe c\n}\n");
     assert!(
         code.contains("↦ littera via Code ⊥ '?'"),
         "the Code hint must re-emit as a via clause on the littera head:\n{code}"
@@ -605,13 +605,13 @@ fn empty_at_a_dense_slot_reemits_as_empty_in_each_locale() {
         ),
         (
             "en",
-            "fn f() → void {\n    var tf32[2, 3] blank ← empty\n}\n",
+            "fn f() → void {\n    mut tf32[2, 3] blank ← empty\n}\n",
             "blank ← empty",
             "{}",
         ),
         (
             "en",
-            "fn f() → void {\n    var vf32[4] lanes ← empty\n    var mf32[2, 2] grid ← empty\n}\n",
+            "fn f() → void {\n    mut vf32[4] lanes ← empty\n    mut mf32[2, 2] grid ← empty\n}\n",
             "grid ← empty",
             "{}",
         ),
@@ -662,7 +662,7 @@ fn axis_sugar_reemits_as_authored() {
         result.output.expect("emit should produce output").code
     };
     let source =
-        "fn f(tf32[2, 3] g) → void {\n    const tf32[3] d ← g.sum(axis 0)\n    const tf32[2] m ← g.mean(axis 1)\n}\n";
+        "fn f(tf32[2, 3] g) → void {\n    let tf32[3] d ← g.sum(axis 0)\n    let tf32[2] m ← g.mean(axis 1)\n}\n";
     let first = emit(source);
     assert!(first.contains("g.sum(axis 0)"), "authored sum axis must survive:\n{first}");
     assert!(first.contains("g.mean(axis 1)"), "authored mean axis must survive:\n{first}");
@@ -678,10 +678,10 @@ fn itera_coordinates_survive_reemission() {
     // D5.7 retired top-level `fixum`; the tensor binding moves inside
     // `incipit` (the coordinate spelling under test is unrelated to scope).
     let code = assert_idempotent(
-        "incipit {\n    fixum tensor<f32, [3]> linea ← vacua\n    itera ex linea apud [i] fixum n {\n        scribe i\n    }\n}\n",
+        "incipit {\n    sit tensor<f32, [3]> linea ← vacua\n    itera ex linea apud [i] sit n {\n        scribe i\n    }\n}\n",
     );
     assert!(
-        code.contains("itera ex linea apud [i] fixum n"),
+        code.contains("itera ex linea apud [i] sit n"),
         "itera apud coordinates must survive:\n{code}"
     );
 }
@@ -691,11 +691,11 @@ fn nested_filum_metadata_survives_reemission() {
     // K8-R: each `filum` lane binder rides its own loop head; dropping or
     // moving one changes which iterations the independence proof composes.
     let code = assert_idempotent(
-        "incipit {\n    varia tensor<numerus, [2]> rows ← vacua\n    varia tensor<numerus, [3]> cols ← vacua\n    varia tensor<numerus, [2, 3]> grid ← vacua\n    itera ex rows apud [i] filum outer fixum row {\n        itera ex cols apud [j] filum inner fixum col {\n            grid[[i, j]] ← row + col\n        }\n    }\n}\n",
+        "incipit {\n    varia tensor<numerus, [2]> rows ← vacua\n    varia tensor<numerus, [3]> cols ← vacua\n    varia tensor<numerus, [2, 3]> grid ← vacua\n    itera ex rows apud [i] filum outer sit row {\n        itera ex cols apud [j] filum inner sit col {\n            grid[[i, j]] ← row + col\n        }\n    }\n}\n",
     );
     assert!(
-        code.contains("itera ex rows apud [i] filum outer fixum row")
-            && code.contains("itera ex cols apud [j] filum inner fixum col"),
+        code.contains("itera ex rows apud [i] filum outer sit row")
+            && code.contains("itera ex cols apud [j] filum inner sit col"),
         "nested filum lane binders must survive:\n{code}"
     );
 }
@@ -722,10 +722,10 @@ fn scalar_math_and_vector_lift_survive_reemission() {
 #[test]
 fn reduction_sum_reemits_source_shape() {
     let code = assert_idempotent(
-        "functio total(tensor<f32, [8]> a) → f32 {\n    redde reducta via summa ex a apud [i] fixum s { redde s }\n}\n",
+        "functio total(tensor<f32, [8]> a) → f32 {\n    redde reducta via summa ex a apud [i] sit s { redde s }\n}\n",
     );
     assert!(
-        code.contains("reducta via summa ex a apud [i] fixum s"),
+        code.contains("reducta via summa ex a apud [i] sit s"),
         "sum reduction must re-emit its source shape:\n{code}"
     );
 }
@@ -755,13 +755,13 @@ fn reduction_as_a_binary_operand_stays_grouped() {
 
 #[test]
 fn inference_hole_locals_stay_holes() {
-    // `fixum _ x ← …` must not materialize the inferred type: a materialized
+    // `sit x ← …` must not materialize the inferred type: a materialized
     // bounded-lista annotation narrows later spread legality on re-check.
     //
     // D5.7 retired top-level `fixum`; this binding moves inside `incipit`
     // (the hole spelling under test is unrelated to item vs. local scope).
-    let code = assert_idempotent("incipit {\n    fixum _ numeri ← [1, 2, 3]\n    scribe numeri\n}\n");
-    assert!(code.contains("fixum _ numeri ←"), "inference hole must stay a hole:\n{code}");
+    let code = assert_idempotent("incipit {\n    sit numeri ← [1, 2, 3]\n    scribe numeri\n}\n");
+    assert!(code.contains("sit numeri ←"), "inference hole must stay a hole:\n{code}");
 }
 
 #[test]
@@ -773,7 +773,7 @@ fn ratio_authored_type_stays_stable_after_witness_normalization() {
     // D5.7 retired top-level `fixum`; this binding moves inside `incipit`
     // (the ratio-type spelling under test is unrelated to item vs. local scope).
     let code = assert_idempotent(
-        "incipit {\n    fixum ratio<g: f32, w: numerus> point ← ratio<g: f32, w: numerus> { g = 1.0, w = 2 }\n    scribe point.g\n    scribe point.w\n}\n",
+        "incipit {\n    sit ratio<g: f32, w: numerus> point ← ratio<g: f32, w: numerus> { g = 1.0, w = 2 }\n    scribe point.g\n    scribe point.w\n}\n",
     );
     assert!(
         code.contains("ratio<g: f32, w: numerus> point"),
@@ -796,7 +796,7 @@ fn union_hole_locals_stay_union_holes() {
             .as_ref()
             .expect("emission locale pack"),
         "union-hole.fab",
-        "main {\n    var ∪ mixed ← 1\n    mixed ← \"salve\"\n}\n",
+        "main {\n    mut ∪ mixed ← 1\n    mixed ← \"salve\"\n}\n",
     );
     assert!(
         result.success(),
@@ -808,7 +808,7 @@ fn union_hole_locals_stay_union_holes() {
             .collect::<Vec<_>>()
     );
     let code = result.output.expect("emit").code;
-    assert!(code.contains("var ∪ mixed ←"), "union hole must stay a union hole:\n{code}");
+    assert!(code.contains("mut ∪ mixed ←"), "union hole must stay a union hole:\n{code}");
 }
 
 #[test]
@@ -996,12 +996,12 @@ fn authored_discerne_wildcard_arm_stays_casu() {
 
 #[test]
 fn discard_binding_round_trips() {
-    // la fixture: `fixum T _ ← expr` is a discard binding, not a bare effect
+    // la fixture: `sit T _ ← expr` is a discard binding, not a bare effect
     // call; the arrow count must survive (gradus generation.fab elision).
-    let la = assert_idempotent("functio vacua() → numerus {\n    fixum numerus _ ← 6 * 7\n    redde 1\n}\n");
-    assert!(la.contains("fixum numerus _ ← 6 * 7"), "la discard binding must survive:\n{la}");
+    let la = assert_idempotent("functio vacua() → numerus {\n    sit numerus _ ← 6 * 7\n    redde 1\n}\n");
+    assert!(la.contains("sit numerus _ ← 6 * 7"), "la discard binding must survive:\n{la}");
 
-    // en fixture: `const T _ ← expr` keeps the authored declaration form.
+    // en fixture: `let T _ ← expr` keeps the authored declaration form.
     let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
@@ -1013,7 +1013,7 @@ fn discard_binding_round_trips() {
             .as_ref()
             .expect("emission locale pack"),
         "discard-en.fab",
-        "fn probe() → int {\n    const int _ ← 6 * 7\n    return 1\n}\n",
+        "fn probe() → int {\n    let int _ ← 6 * 7\n    return 1\n}\n",
     );
     assert!(
         result.success(),
@@ -1025,16 +1025,16 @@ fn discard_binding_round_trips() {
             .collect::<Vec<_>>()
     );
     let code = result.output.expect("emit").code;
-    assert!(code.contains("const int _ ← 6 * 7"), "en discard binding must survive:\n{code}");
+    assert!(code.contains("let int _ ← 6 * 7"), "en discard binding must survive:\n{code}");
 }
 
 #[test]
 fn await_assignment_and_morphology_keep_their_authored_forms() {
     let code = assert_idempotent(
-        "functio fetch() fiet → numerus {\n    redde 7\n}\n\nfunctio use_both() fiet → numerus {\n    fixum numerus arrow ↢ fetch()\n    figendum numerus morphology ← fetch()\n    redde arrow + morphology\n}\n",
+        "functio fetch() fiet → numerus {\n    redde 7\n}\n\nfunctio use_both() fiet → numerus {\n    sit numerus arrow ↢ fetch()\n    figendum numerus morphology ← fetch()\n    redde arrow + morphology\n}\n",
     );
     assert!(
-        code.contains("fixum numerus arrow ↢ fetch()"),
+        code.contains("sit numerus arrow ↢ fetch()"),
         "await-directed assignment must survive:\n{code}"
     );
     assert!(
@@ -1060,7 +1060,7 @@ fn ordo_enum_round_trips_discriminants() {
             .as_ref()
             .expect("emission locale pack"),
         "ordo-en.fab",
-        "enum Level {\n    One = 1,\n    Two = 2\n}\n\nmain {\n    const Level level ← One\n    print level\n}\n",
+        "enum Level {\n    One = 1,\n    Two = 2\n}\n\nmain {\n    let Level level ← One\n    print level\n}\n",
     );
     assert!(
         result.success(),
@@ -1079,34 +1079,34 @@ fn ordo_enum_round_trips_discriminants() {
 
 #[test]
 fn array_destructuring_reemits_as_pattern() {
-    let source = "incipit {\n    fixum _ xs ← [1, 2, 3, 4]\n    fixum [a, _, ceteri r] ← xs\n    varia [c, d] ← [5, 6]\n    nota a\n    nota r\n    nota c + d\n}\n";
+    let source = "incipit {\n    sit xs ← [1, 2, 3, 4]\n    sit [a, _, ceteri r] ← xs\n    varia [c, d] ← [5, 6]\n    nota a\n    nota r\n    nota c + d\n}\n";
     let emitted = assert_idempotent(source);
-    assert!(emitted.contains("fixum [a, _, ceteri r] ← xs\n"), "{emitted}");
+    assert!(emitted.contains("sit [a, _, ceteri r] ← xs\n"), "{emitted}");
     assert!(emitted.contains("varia [c, d] ← [5, 6]\n"), "{emitted}");
     assert!(!emitted.contains("__destructura"), "{emitted}");
 }
 
 #[test]
 fn object_destructuring_reemits_as_pattern() {
-    let source = "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    fixum {x, y ut z} ← fac()\n    nota x + z\n}\n";
+    let source = "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    sit {x, y ut z} ← fac()\n    nota x + z\n}\n";
     let emitted = assert_idempotent(source);
-    assert!(emitted.contains("fixum {x, y ut z} ← fac()\n"), "{emitted}");
+    assert!(emitted.contains("sit {x, y ut z} ← fac()\n"), "{emitted}");
 }
 
 #[test]
 fn itera_destructuring_binder_reemits_as_pattern() {
-    let source = "incipit {\n    fixum _ m ← [[1, 2, 3], [4, 5, 6]]\n    itera ex m fixum [caput, ceteri cauda] {\n        nota caput\n        nota cauda\n    }\n}\n";
+    let source = "incipit {\n    sit m ← [[1, 2, 3], [4, 5, 6]]\n    itera ex m sit [caput, ceteri cauda] {\n        nota caput\n        nota cauda\n    }\n}\n";
     let emitted = assert_idempotent(source);
-    assert!(emitted.contains("itera ex m fixum [caput, ceteri cauda] {\n"), "{emitted}");
+    assert!(emitted.contains("itera ex m sit [caput, ceteri cauda] {\n"), "{emitted}");
     assert!(!emitted.contains("__itera_element"), "{emitted}");
 }
 
 #[test]
 fn ordo_members_keep_their_authored_qualification() {
-    let source = "ordo Color {\n    rubrum,\n    viridis\n}\n\nincipit {\n    fixum Color color ← Color.rubrum\n    fixum Color bare ← viridis\n    elige color {\n        casu Color.rubrum {\n            nota \"rubrum\"\n        }\n        casu viridis {\n            nota \"viridis\"\n        }\n    }\n    nota bare\n}\n";
+    let source = "ordo Color {\n    rubrum,\n    viridis\n}\n\nincipit {\n    sit Color color ← Color.rubrum\n    sit Color bare ← viridis\n    elige color {\n        casu Color.rubrum {\n            nota \"rubrum\"\n        }\n        casu viridis {\n            nota \"viridis\"\n        }\n    }\n    nota bare\n}\n";
     let emitted = assert_idempotent(source);
     assert!(emitted.contains("ordo Color {"), "{emitted}");
-    assert!(emitted.contains("fixum Color color ← Color.rubrum"), "{emitted}");
+    assert!(emitted.contains("sit Color color ← Color.rubrum"), "{emitted}");
     assert!(emitted.contains("casu Color.rubrum {"), "{emitted}");
 }
 
@@ -1272,7 +1272,7 @@ fn elige_attached_cape_stays_attached() {
 #[test]
 fn float_literals_keep_their_authored_digits() {
     let source =
-        "incipit {\n    fixum fractus parvus ← 1e-5\n    fixum fractus magnus ← 1.0e15\n    nota parvus, magnus\n}\n";
+        "incipit {\n    sit fractus parvus ← 1e-5\n    sit fractus magnus ← 1.0e15\n    nota parvus, magnus\n}\n";
     let emitted = assert_idempotent(source);
     assert!(emitted.contains("← 1e-5"), "{emitted}");
     assert!(emitted.contains("← 1.0e15"), "{emitted}");
@@ -1305,11 +1305,11 @@ fn mixed_bare_and_qualified_variant_references_stay_provable() {
     // `casu Fons.Mala` is qualified while `finge Mala` is bare. The spelling
     // sidecar is keyed by variant, so the re-emitter falls back to bare for
     // both; the variant is the same, so the program is unchanged.
-    let source = "discretio Fons {\n    Mala {\n        textus detail\n    }\n}\n\nfunctio fac_malam() → Fons {\n    redde finge Mala { detail = \"x\" }\n}\n\nfunctio lege(Fons fons) → textus {\n    discerne fons {\n        casu Fons.Mala fixum detail {\n            redde detail\n        }\n    }\n}\n";
+    let source = "discretio Fons {\n    Mala {\n        textus detail\n    }\n}\n\nfunctio fac_malam() → Fons {\n    redde finge Mala { detail = \"x\" }\n}\n\nfunctio lege(Fons fons) → textus {\n    discerne fons {\n        casu Fons.Mala sit detail {\n            redde detail\n        }\n    }\n}\n";
     assert_idempotent(source);
 }
 
-const FLOAT_SLOT_INTEGER_SOURCE: &str = "genus Intervallum {\n    fixum fractus imum\n    fixum fractus summum\n    functio medium() → fractus {\n        redde (ego.imum + ego.summum) ÷ 2\n    }\n}\n\nfunctio cubus() → Intervallum {\n    redde Intervallum { imum = 0, summum = 255 }\n}\n";
+const FLOAT_SLOT_INTEGER_SOURCE: &str = "genus Intervallum {\n    sit fractus imum\n    sit fractus summum\n    functio medium() → fractus {\n        redde (ego.imum + ego.summum) ÷ 2\n    }\n}\n\nfunctio cubus() → Intervallum {\n    redde Intervallum { imum = 0, summum = 255 }\n}\n";
 
 /// web3: an integer literal in a `fractus` slot is retyped to a float constant
 /// by typecheck; its re-emitted `2.0` text re-parses as literal text. Both are
@@ -1379,7 +1379,7 @@ fn literal_only_float_expressions_keep_the_authors_text() {
     // F9 ruling 31 folds them for every compile; format and convert print the
     // author's expression, and the meaning re-validation still holds.
     let source =
-        "incipit {\n    fixum fractus c ← 0.1 + 0.2\n    fixum fractus g ← (0.1 + 0.2) * 10.0\n    nota 1.0 / 3.0\n}\n";
+        "incipit {\n    sit fractus c ← 0.1 + 0.2\n    sit fractus g ← (0.1 + 0.2) * 10.0\n    nota 1.0 / 3.0\n}\n";
     let emitted = assert_idempotent(source);
     for text in ["0.1 + 0.2", "(0.1 + 0.2) * 10.0", "1.0 / 3.0"] {
         assert!(emitted.contains(text), "{text}: {emitted}");
@@ -1390,7 +1390,7 @@ fn literal_only_float_expressions_keep_the_authors_text() {
 fn template_application_keeps_guillemets_when_the_text_holds_quotes() {
     // inf-json (U8b): a template with an embedded `"` must stay `«…»` in the
     // reader-locale emit, or the emitted text no longer lexes.
-    let source = "incipit {\n    fixum textus payload ← «{\"n\":§}»(\"7\")\n    nota payload\n}\n";
+    let source = "incipit {\n    sit textus payload ← «{\"n\":§}»(\"7\")\n    nota payload\n}\n";
     let emitted = assert_idempotent(source);
     assert!(emitted.contains("«{\"n\":§}»(\"7\")"), "{emitted}");
 }
@@ -1400,7 +1400,7 @@ fn template_application_keeps_guillemets_when_the_text_holds_quotes() {
 /// as call syntax after a statement-head `nota`.
 #[test]
 fn same_precedence_left_chain_re_emits_without_parens() {
-    let source = "incipit {\n    fixum numerus m ← 9\n    nota m + 1 - 1\n    nota m - 1 - 1\n    nota m / 2 * 3\n    nota m - (1 - 1)\n}\n";
+    let source = "incipit {\n    sit numerus m ← 9\n    nota m + 1 - 1\n    nota m - 1 - 1\n    nota m / 2 * 3\n    nota m - (1 - 1)\n}\n";
     let emitted = assert_idempotent(source);
     for expected in ["nota m + 1 - 1", "nota m - 1 - 1", "nota m / 2 * 3", "nota m - (1 - 1)"] {
         assert!(emitted.contains(expected), "missing `{expected}` in:\n{emitted}");
@@ -1412,7 +1412,7 @@ fn same_precedence_left_chain_re_emits_without_parens() {
 /// (the meaning gate would refuse the file as `hir_meaning_diverged`).
 #[test]
 fn latin_forma_method_name_is_not_a_forma_genus_use() {
-    let source = "incipit {\n    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]\n    fixum tf32[2, 2] grid ← flat ↦ tf32[2, 2]\n    fixum tensor<f32, [2, 2]> reshaped ← grid.forma([_, 2])\n    nota reshaped.magnitudines()\n}\n";
+    let source = "incipit {\n    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]\n    sit tf32[2, 2] grid ← flat ↦ tf32[2, 2]\n    sit tensor<f32, [2, 2]> reshaped ← grid.forma([_, 2])\n    nota reshaped.magnitudines()\n}\n";
     let emitted = assert_idempotent(source);
     assert!(emitted.contains("grid.forma([_, 2])"), "{emitted}");
 }
@@ -1421,7 +1421,7 @@ fn latin_forma_method_name_is_not_a_forma_genus_use() {
 /// witness is the erased bare carrier, so only the authored form has them.
 #[test]
 fn typed_sermo_annotation_keeps_its_arguments() {
-    let source = "@ ad 'numeri:twice'\nfunctio twice(numerus n) → numerus {\n    redde n * 2\n}\n\nincipit {\n    fixum sermo<numerus, numerus> t ← ad 'numeri:twice' (5)\n    fixum sermo loose ← t\n    nota loose ↦ numerus\n}\n";
+    let source = "@ ad 'numeri:twice'\nfunctio twice(numerus n) → numerus {\n    redde n * 2\n}\n\nincipit {\n    sit sermo<numerus, numerus> t ← ad 'numeri:twice' (5)\n    sit sermo loose ← t\n    nota loose ↦ numerus\n}\n";
     let emitted = assert_idempotent(source);
     assert!(emitted.contains("sermo<numerus, numerus> t"), "{emitted}");
     assert!(emitted.contains("sermo loose"), "{emitted}");
@@ -1462,13 +1462,13 @@ fn inferred_constructor_map_entries_reemit_as_the_hole() {
 
 #[test]
 fn inferred_constructor_empty_map_reemits_as_the_hole() {
-    let code = emit_en_idempotent("fn f() → void {\n    var map<string, int> m ← _ {}\n}\n");
+    let code = emit_en_idempotent("fn f() → void {\n    mut map<string, int> m ← _ {}\n}\n");
     assert!(code.contains("m ← _ {}"), "empty map hole must re-emit as the hole:\n{code}");
 }
 
 #[test]
 fn inferred_constructor_tensor_zero_reemits_as_the_hole() {
-    let code = emit_en_idempotent("fn f() → void {\n    var tf32[2, 3] blank ← _ {}\n}\n");
+    let code = emit_en_idempotent("fn f() → void {\n    mut tf32[2, 3] blank ← _ {}\n}\n");
     assert!(
         code.contains("blank ← _ {}"),
         "tensor zero hole must re-emit as the hole:\n{code}"
@@ -1478,7 +1478,7 @@ fn inferred_constructor_tensor_zero_reemits_as_the_hole() {
 #[test]
 fn inferred_constructor_genus_fields_reemit_as_the_hole() {
     let code = emit_en_idempotent(
-        "class Punctum {\n    var int x = 0\n    var int y = 0\n}\n\nfn origo() → Punctum {\n    return _ { x = 7, y = 9 }\n}\n",
+        "class Punctum {\n    mut int x = 0\n    mut int y = 0\n}\n\nfn origo() → Punctum {\n    return _ { x = 7, y = 9 }\n}\n",
     );
     assert!(
         code.contains("return _ { x = 7, y = 9 }"),
@@ -1489,7 +1489,7 @@ fn inferred_constructor_genus_fields_reemit_as_the_hole() {
 #[test]
 fn inferred_constructor_at_an_optional_slot_reemits_as_the_hole() {
     let code = emit_en_idempotent(
-        "class Punctum {\n    var int x = 0\n    var int y = 0\n}\n\nfn origo() → Punctum ∪ none {\n    return _ { x = 7, y = 9 }\n}\n\nfn pondus() → map<string, int> ∪ none {\n    return _ { \"a\": 3 }\n}\n",
+        "class Punctum {\n    mut int x = 0\n    mut int y = 0\n}\n\nfn origo() → Punctum ∪ none {\n    return _ { x = 7, y = 9 }\n}\n\nfn pondus() → map<string, int> ∪ none {\n    return _ { \"a\": 3 }\n}\n",
     );
     assert!(
         code.contains("return _ { x = 7, y = 9 }"),

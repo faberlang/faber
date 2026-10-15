@@ -226,7 +226,7 @@ fn forwarded_temp_keeps_the_bound_posture() {
     ));
 }
 
-/// `const T ∪ nihil maybe ← t.fill(v)` lowers the bound result through
+/// `let T ∪ nihil maybe ← t.fill(v)` lowers the bound result through
 /// `Some(temp)`. The scan once skipped option values, mistook that binding for
 /// a discarded fill, and mutated the source while binding a unit.
 #[test]

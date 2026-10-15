@@ -10,8 +10,8 @@ use crate::{IndexExpr, Type};
 fn bounded_lista_typechecks_as_bounded_array_distinct_from_unbounded() {
     let unit = analyze_ok_la(
         r"incipit {
-    fixum lista<numerus, 8> bounded ← vacua
-    fixum lista<numerus> unbounded ← vacua
+    sit lista<numerus, 8> bounded ← vacua
+    sit lista<numerus> unbounded ← vacua
     nota bounded
     nota unbounded
 }",
@@ -46,9 +46,9 @@ fn bounded_lista_typechecks_as_bounded_array_distinct_from_unbounded() {
 fn bounded_lista_longitudo_and_vacua_are_len_not_capacity() {
     assert_accepts_la(
         r"incipit {
-    fixum lista<numerus, 8> xs ← vacua
-    fixum numerus n ← xs.longitudo()
-    fixum bivalens empty ← xs.vacua()
+    sit lista<numerus, 8> xs ← vacua
+    sit numerus n ← xs.longitudo()
+    sit bivalens empty ← xs.vacua()
     nota n
     nota empty
 }",
@@ -60,8 +60,8 @@ fn bounded_lista_accipe_and_index_return_element() {
     assert_accepts_la(
         r"incipit {
     varia lista<numerus, 8> xs ← vacua
-    fixum numerus ∪ nihil got ← xs.accipe(0)
-    fixum numerus x ← xs[0]
+    sit numerus ∪ nihil got ← xs.accipe(0)
+    sit numerus x ← xs[0]
     nota got
     nota x
 }",
@@ -72,16 +72,16 @@ fn bounded_lista_accipe_and_index_return_element() {
 fn bounded_lista_literal_indices_reject_provable_oob_and_negative() {
     assert_rejects_with_issue_la(
         r"incipit {
-    fixum lista<numerus, 8> xs ← vacua
-    fixum _ bad ← xs[8]
+    sit lista<numerus, 8> xs ← vacua
+    sit bad ← xs[8]
     nota bad
 }",
         "index_provably_out_of_bounds",
     );
     assert_rejects_with_issue_la(
         r"incipit {
-    fixum lista<numerus, 8> xs ← vacua
-    fixum _ bad ← xs[-1]
+    sit lista<numerus, 8> xs ← vacua
+    sit bad ← xs[-1]
     nota bad
 }",
         "index_provably_out_of_bounds",
@@ -92,19 +92,19 @@ fn bounded_lista_literal_indices_reject_provable_oob_and_negative() {
 fn bounded_cord_literal_indices_reject_provable_oob_and_negative() {
     for source in [
         r#"incipit {
-    fixum textus raw ← "a"
-    fixum textus<8> text ← raw ↦ textus<8>
-    fixum _ bad ← text[8]
+    sit textus raw ← "a"
+    sit textus<8> text ← raw ↦ textus<8>
+    sit bad ← text[8]
     nota bad
 }"#,
         r"incipit {
-    fixum ascii<8> text ← 'a'
-    fixum _ bad ← text[-1]
+    sit ascii<8> text ← 'a'
+    sit bad ← text[-1]
     nota bad
 }",
         r"incipit {
-    fixum octeti<8> bytes ← |61| ↦ octeti<8>
-    fixum _ bad ← bytes[8]
+    sit octeti<8> bytes ← |61| ↦ octeti<8>
+    sit bad ← bytes[8]
     nota bad
 }",
     ] {
@@ -152,9 +152,9 @@ fn unbounded_lista_appende_stays_infallible() {
 fn bounded_lista_d7_conversions_are_explicit() {
     assert_accepts_la(
         r"incipit {
-    fixum lista<numerus> unbounded ← [1, 2]
-    fixum lista<numerus, 8> bounded ← unbounded ↦ lista<numerus, 8>
-    fixum lista<numerus> prefix ← bounded ↦ lista<numerus>
+    sit lista<numerus> unbounded ← [1, 2]
+    sit lista<numerus, 8> bounded ← unbounded ↦ lista<numerus, 8>
+    sit lista<numerus> prefix ← bounded ↦ lista<numerus>
     nota prefix
 }",
     );
@@ -164,8 +164,8 @@ fn bounded_lista_d7_conversions_are_explicit() {
 fn bounded_lista_assignment_is_not_implicit_conversion() {
     assert_rejects_with_issue_la(
         r"incipit {
-    fixum lista<numerus> unbounded ← [1, 2]
-    fixum lista<numerus, 8> bounded ← unbounded
+    sit lista<numerus> unbounded ← [1, 2]
+    sit lista<numerus, 8> bounded ← unbounded
     nota bounded
 }",
         "expression_type_mismatch",
@@ -176,7 +176,7 @@ fn bounded_lista_assignment_is_not_implicit_conversion() {
 fn unannotated_lista_literal_carries_exact_bound() {
     let unit = analyze_ok_la(
         r"incipit {
-    fixum _ xs ← [1, 2]
+    sit xs ← [1, 2]
     nota xs
 }",
     );
@@ -196,7 +196,7 @@ fn unannotated_lista_literal_carries_exact_bound() {
 fn bounded_lista_hole_solves_from_literal_witness() {
     let unit = analyze_ok_la(
         r"incipit {
-    fixum lista<numerus, _> xs ← [1, 2]
+    sit lista<numerus, _> xs ← [1, 2]
     nota xs
 }",
     );
@@ -214,9 +214,9 @@ fn bounded_lista_hole_solves_from_literal_witness() {
 
 #[test]
 fn explicit_bounded_lista_literal_checks_capacity() {
-    assert_accepts_la("incipit { fixum lista<numerus, 2> xs ← [1, 2] }");
+    assert_accepts_la("incipit { sit lista<numerus, 2> xs ← [1, 2] }");
     assert_rejects_with_issue_la(
-        "incipit { fixum lista<numerus, 3> xs ← [1, 2] }",
+        "incipit { sit lista<numerus, 3> xs ← [1, 2] }",
         "incompatible_tensor_index",
     );
 }
@@ -247,7 +247,7 @@ fn empty_list_literal_takes_the_bounded_cell_capacity() {
 #[test]
 fn unannotated_literal_pair_length_mismatch_rejects_at_typecheck() {
     assert_rejects_with_issue_la(
-        "incipit { fixum _ xs ← [1, 2] + [3] }",
+        "incipit { sit xs ← [1, 2] + [3] }",
         "lista_capacity_mismatch",
     );
 }

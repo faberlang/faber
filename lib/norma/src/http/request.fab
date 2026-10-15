@@ -14,11 +14,11 @@ import from "norma:http/headers" headers
 
 @ public
 class Request {
-    var string method = ""
-    var string path = ""
-    var string query = ""
-    var headers.Headers headers = headers.Headers { }
-    var string body = ""
+    mut string method = ""
+    mut string path = ""
+    mut string query = ""
+    mut headers.Headers headers = headers.Headers { }
+    mut string body = ""
 
     fn header(string name) → string ∪ none {
         return self.headers.get(name)
@@ -32,15 +32,15 @@ class Request {
 # Build a Request from a raw request-target (`path` or `path?query`).
 @ public
 fn from_target(string method, string target, headers.Headers headers, string body) → Request {
-    const string path ← target_path(target)
-    const string query ← target_query(target)
+    let string path ← target_path(target)
+    let string query ← target_query(target)
     return Request { method = method, path = path, query = query, headers = headers, body = body }
 }
 
 fn target_path(string target) → string {
-    var int i ← 0
+    mut int i ← 0
     while i ≺ target.length() {
-        const string c ← target.slice(i, i + 1)
+        let string c ← target.slice(i, i + 1)
         if c ≡ "?" or c ≡ "#" {
             return target.slice(0, i)
         }
@@ -50,15 +50,15 @@ fn target_path(string target) → string {
 }
 
 fn target_query(string target) → string {
-    var int i ← 0
+    mut int i ← 0
     while i ≺ target.length() {
-        const string c ← target.slice(i, i + 1)
+        let string c ← target.slice(i, i + 1)
         if c ≡ "#" {
             return ""
         }
         if c ≡ "?" {
-            const int start ← i + 1
-            var int j ← start
+            let int start ← i + 1
+            mut int j ← start
             while j ≺ target.length() {
                 if target.slice(j, j + 1) ≡ "#" {
                     return target.slice(start, j)
@@ -73,16 +73,16 @@ fn target_query(string target) → string {
 }
 
 fn decode_query_field(string query, string name) → string ∪ none {
-    const string want ← percent_decode(name)
-    var int i ← 0
+    let string want ← percent_decode(name)
+    mut int i ← 0
     while i ≤ query.length() {
-        var int amp ← i
+        mut int amp ← i
         while amp ≺ query.length() and query.slice(amp, amp + 1) ≢ "&" {
             amp ← amp + 1
         }
-        const string pair ← query.slice(i, amp)
-        var int eq ← 0
-        var bool has_eq ← false
+        let string pair ← query.slice(i, amp)
+        mut int eq ← 0
+        mut bool has_eq ← false
         while eq ≺ pair.length() {
             if pair.slice(eq, eq + 1) ≡ "=" {
                 has_eq ← true
@@ -90,8 +90,8 @@ fn decode_query_field(string query, string name) → string ∪ none {
             }
             eq ← eq + 1
         }
-        var string key ← pair
-        var string val ← ""
+        mut string key ← pair
+        mut string val ← ""
         if has_eq {
             key ← pair.slice(0, eq)
             val ← pair.slice(eq + 1, pair.length())
@@ -108,17 +108,17 @@ fn decode_query_field(string query, string name) → string ∪ none {
 }
 
 fn percent_decode(string s) → string {
-    var string out ← ""
-    var int i ← 0
+    mut string out ← ""
+    mut int i ← 0
     while i ≺ s.length() {
-        const string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1)
         if c ≡ "+" {
             out ← out + " "
             i ← i + 1
         }
         elif c ≡ "%" and i + 2 ≺ s.length() {
-            const int hi ← hex_value(s.slice(i + 1, i + 2))
-            const int lo ← hex_value(s.slice(i + 2, i + 3))
+            let int hi ← hex_value(s.slice(i + 1, i + 2))
+            let int lo ← hex_value(s.slice(i + 2, i + 3))
             if hi ≺ 0 or lo ≺ 0 {
                 out ← out + c
                 i ← i + 1
@@ -160,16 +160,16 @@ fn hex_value(string c) → int {
 # bytes outside the printable ASCII range are left as `?`.
 fn byte_char(int n) → string {
     if n ≺ 32 or n ≻ 126 then return "?"
-    const string printable ← « !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~»
+    let string printable ← « !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~»
     return printable.slice(n - 32, n - 31)
 }
 
 describe "request" {
     test "target splits path query headers and body" {
-        const headers.Headers head ← headers.Headers {
+        let headers.Headers head ← headers.Headers {
             entries = [headers.Header { name = "X-Trace", value = "yes" }]
         }
-        const Request req ← from_target(
+        let Request req ← from_target(
             "GET",
             "/search?q=hello+world&tag=%2B#ignored",
             head,
@@ -181,10 +181,10 @@ describe "request" {
         assert req.body ≡ "body"
         assert req.headers.entries[0].name ≡ "X-Trace"
         assert req.headers.entries[0].value ≡ "yes"
-        const string ∪ none query_value ← req.query_field("q")
+        let string ∪ none query_value ← req.query_field("q")
         assert query_value not is none
         assert (query_value ↦ string) ≡ "hello world"
-        const string ∪ none tag_value ← req.query_field("tag")
+        let string ∪ none tag_value ← req.query_field("tag")
         assert tag_value not is none
         assert (tag_value ↦ string) ≡ "+"
         assert req.query_field("missing") is none

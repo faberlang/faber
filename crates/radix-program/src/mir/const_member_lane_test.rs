@@ -235,7 +235,7 @@ locale = "en"
 +++
 
 @ public
-const set<string> KEYS ← ["a", "b"] ↦ set<string>
+let set<string> KEYS ← ["a", "b"] ↦ set<string>
 
 @ public
 fn admits(string k) → bool {

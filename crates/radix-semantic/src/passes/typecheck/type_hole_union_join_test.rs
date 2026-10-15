@@ -161,8 +161,8 @@ fn source_branch_join_accumulates_into_union_hole() {
     test_support::assert_analysis_accepts_la(
         r#"
 incipit {
-    fixum numerus x ← 1
-    fixum ∪ either ← x ≻ 0 ✓ 1 ✗ "x"
+    sit numerus x ← 1
+    sit ∪ either ← x ≻ 0 ✓ 1 ✗ "x"
     nota either
 }
 "#,
@@ -174,8 +174,8 @@ fn source_branch_join_homogeneous_under_concrete_expectation_unchanged() {
     test_support::assert_analysis_accepts_la(
         r"
 incipit {
-    fixum numerus x ← 1
-    fixum numerus y ← x ≻ 0 ✓ 1 ✗ 2
+    sit numerus x ← 1
+    sit numerus y ← x ≻ 0 ✓ 1 ✗ 2
     nota y
 }
 ",
@@ -187,7 +187,7 @@ fn source_array_accumulates_into_union_hole_elements() {
     test_support::assert_analysis_accepts_la(
         r#"
 incipit {
-    fixum lista<∪> xs ← [1, "x"]
+    sit lista<∪> xs ← [1, "x"]
     nota xs
 }
 "#,
@@ -199,8 +199,8 @@ fn source_array_accumulates_into_union_hole_with_spread() {
     test_support::assert_analysis_accepts_la(
         r"
 incipit {
-    fixum lista<numerus> ys ← [1, 2]
-    fixum lista<∪> xs ← [1, sparge ys]
+    sit lista<numerus> ys ← [1, 2]
+    sit lista<∪> xs ← [1, sparge ys]
     nota xs
 }
 ",
@@ -212,7 +212,7 @@ fn source_array_underscore_hole_still_rejects_heterogeneous() {
     test_support::assert_analysis_rejects_with_issue_la(
         r#"
 incipit {
-    fixum lista<_> xs ← [1, "x"]
+    sit lista<_> xs ← [1, "x"]
     nota xs
 }
 "#,
@@ -225,7 +225,7 @@ fn source_array_concrete_expected_rejects_heterogeneous() {
     test_support::assert_analysis_rejects_with_issue_la(
         r#"
 incipit {
-    fixum lista<numerus> xs ← [1, "x"]
+    sit lista<numerus> xs ← [1, "x"]
     nota xs
 }
 "#,
@@ -238,7 +238,7 @@ fn source_array_concrete_expected_accepts_homogeneous() {
     test_support::assert_analysis_accepts_la(
         r"
 incipit {
-    fixum lista<numerus> xs ← [1, 2]
+    sit lista<numerus> xs ← [1, 2]
     nota xs
 }
 ",
@@ -250,8 +250,8 @@ fn source_branch_join_heterogeneous_without_hole_still_mismatches() {
     test_support::assert_analysis_rejects_with_issue_la(
         r#"
 incipit {
-    fixum numerus x ← 1
-    fixum _ y ← x ≻ 0 ✓ 1 ✗ "x"
+    sit numerus x ← 1
+    sit y ← x ≻ 0 ✓ 1 ✗ "x"
     nota y
 }
 "#,

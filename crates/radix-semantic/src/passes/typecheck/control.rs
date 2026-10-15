@@ -153,7 +153,7 @@ impl TypeChecker<'_> {
         expected: Option<TypeId>,
         span: radix_lexer::Span,
     ) -> TypeId {
-        // An explicit `∪` annotation hole (`const ∪ r ← capta { … }`) owns the
+        // An explicit `∪` annotation hole (`let ∪ r ← capta { … }`) owns the
         // accumulation directly; anything else gets a fresh hole.
         let expected_var = expected
             .map(|ty| self.resolve_inferred_type(ty))
@@ -189,7 +189,7 @@ impl TypeChecker<'_> {
             return self.error_type;
         }
 
-        // `const _ r ← capta { ... }`: the monomorphic `_` hole binds to the
+        // `let r ← capta { ... }`: the monomorphic `_` hole binds to the
         // trap hole so the local's type is the solved union (the U-02 arm
         // would otherwise strand the `_` as an unbound pending member).
         if expected_var.is_none()
@@ -602,7 +602,11 @@ impl TypeChecker<'_> {
     /// narrows the taken branch, `x est nihil` the fallthrough, nn-u1).
     ///
     /// The operand is a binding, or a genus-field path rooted at a binding,
-    /// whose leaf type peels a null member.
+    /// whose leaf type peels a null member. An access-marker wrapper (Option
+    /// A: `ref Node ∪ none cur` lowers to `Ref(Option(Node))`) rides along:
+    /// the probe peels it, narrows the payload, and re-wraps the marker so a
+    /// narrowed `ref` cursor stays read-only through (the write-through
+    /// refusal still sees the marker).
     fn nil_probe_refinement(&mut self, positive: bool, expr: &HirExpression) -> LeafRefinement {
         let Some((base, path)) = field_path_key(expr) else {
             return (None, None);
@@ -624,9 +628,14 @@ impl TypeChecker<'_> {
             };
             ty = next;
         }
+        let (marker, payload_ty) = self.types.peel_access_marker(ty);
         let nihil = self.types.primitive(Primitive::Nihil);
-        let Some(refined) = self.peel_member_type(ty, nihil) else {
+        let Some(refined_payload) = self.peel_member_type(payload_ty, nihil) else {
             return (None, None);
+        };
+        let refined = match marker {
+            Some(marker) => self.types.access_marker(marker, refined_payload),
+            None => refined_payload,
         };
         let key = if path.is_empty() {
             FactKey::Binding(base)
@@ -873,6 +882,34 @@ impl TypeChecker<'_> {
         self.check_block(block, None);
     }
 
+    /// Check a `dum` body under its condition's taken-edge facts (Option A,
+    /// operator ruling 2026-10-15).
+    ///
+    /// The condition is re-tested before every iteration, so its then-facts
+    /// hold at body entry each time. The narrowing runs from the test to the
+    /// first re-point: `invalidate_assignment_target` (N3) restores the flow
+    /// base at each store, so `cur ← cur.next` inside the body ends the
+    /// narrowing for the rest of that iteration, and the next test re-arms
+    /// it. Facts never escape the loop body.
+    pub fn check_dum_block(&mut self, cond: &HirExpression, block: &mut HirBlock) {
+        let incoming = self.snapshot_flow_state();
+        self.remember_flow_bases(&incoming);
+        // Loop-entry policy (N3): facts proven before the loop are dropped
+        // for bindings the body touches — the body may re-point one, and the
+        // next iteration's reads would see a stale fact.
+        let touched = assignment_targets_in_block(block);
+        for def_id in touched {
+            self.invalidate_flow_fact(def_id);
+        }
+        // The condition is re-tested before every iteration, so its
+        // then-facts hold at body entry each time and are seeded fresh; a
+        // re-point inside the body ends them for the rest of that iteration
+        // (the store restores the flow base), and the next test re-arms them.
+        let (then_facts, _) = self.condition_refinement(cond);
+        self.check_block_with_refinement(block, None, then_facts);
+        self.restore_flow_state(&incoming);
+    }
+
     /// Snapshot the currently visible binding state for one control-flow edge.
     fn snapshot_flow_state(&self) -> FlowState {
         FlowState {
@@ -1091,6 +1128,19 @@ impl TypeChecker<'_> {
         // field fact rooted here is dropped too. Sibling-field facts go with
         // it: conservative over-invalidation, and sound.
         self.field_facts.retain(|(base, _), _| *base != def_id);
+    }
+
+    /// Re-install a flow fact saved immediately before an assignment's
+    /// target invalidation: the value expression is evaluated before the
+    /// store takes effect, so the pre-store fact still holds for it
+    /// (`cur ← cur.next` reads the narrowed cursor).
+    pub(crate) fn reinstate_flow_fact(&mut self, def_id: DefId, info: BindingInfo) {
+        for scope in &mut self.scopes {
+            if scope.contains_key(&def_id) {
+                scope.insert(def_id, info);
+            }
+        }
+        self.binding_shadow.insert(def_id, info);
     }
 
     /// Drop facts before checking an assignment, so its target is typed from

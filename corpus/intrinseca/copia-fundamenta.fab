@@ -41,13 +41,13 @@ locale = "en"
 # BACKEND: Go e2e whitelist — copia method surface not yet lowered for Go.
 
 main {
-    var set<int> numeri ← empty
+    mut set<int> numeri ← empty
     numeri.add(1)
     numeri.add(2)
     numeri.add(3)
-    const bool habetduo ← numeri.has(2)
-    const bool remotus ← numeri.delete(3)
-    const int longitudo ← numeri.length()
-    const bool vacuaest ← numeri.is_empty()
+    let bool habetduo ← numeri.has(2)
+    let bool remotus ← numeri.delete(3)
+    let int longitudo ← numeri.length()
+    let bool vacuaest ← numeri.is_empty()
     print habetduo, remotus, longitudo, vacuaest
 }

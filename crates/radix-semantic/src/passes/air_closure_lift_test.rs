@@ -59,7 +59,7 @@ fn capture_decline_names_the_local_and_capture_span() {
         r#"
 @ radix lane "air"
 functio loss(tf32[2, 2] x) → fractus {
-    fixum fractus seed ← 1.0
+    sit fractus seed ← 1.0
     redde x.reducta((fractus a, fractus b) ∴ a + b + seed, 0.0)
 }
 "#,

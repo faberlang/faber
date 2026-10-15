@@ -60,12 +60,12 @@ fn bits_equality_and_ordering_give_bool() {
 
 #[test]
 fn integer_literal_in_a_bits_slot_takes_the_bits_type() {
-    accepts("incipit { fixum b8 w ← 0xff }");
-    accepts("incipit { fixum b16 v ← 0xffff }");
-    accepts("incipit { fixum b32 v ← 0xffffffff }");
-    accepts("incipit { fixum b64 v ← 0xffffffffffffffff }");
-    accepts("incipit { fixum b8 z ← 0 }");
-    accepts("incipit { fixum b8 z ← 0b1010 }");
+    accepts("incipit { sit b8 w ← 0xff }");
+    accepts("incipit { sit b16 v ← 0xffff }");
+    accepts("incipit { sit b32 v ← 0xffffffff }");
+    accepts("incipit { sit b64 v ← 0xffffffffffffffff }");
+    accepts("incipit { sit b8 z ← 0 }");
+    accepts("incipit { sit b8 z ← 0b1010 }");
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn integer_literal_beside_a_bits_operand_takes_the_bits_type() {
     accepts("functio f(b8 a) → bivalens { redde a ≥ 0x80 }");
     accepts("functio f(b8 a) → b8 { redde a ∧ 0x0f }");
     accepts("functio f(b8 a) → b8 { redde 0xf0 ∨ a }");
-    accepts("incipit { fixum b8 m ← 0x0f\n fixum b8 n ← ¬ m }");
+    accepts("incipit { sit b8 m ← 0x0f\n sit b8 n ← ¬ m }");
 }
 
 // --- refused: arithmetic (3) ---
@@ -157,7 +157,7 @@ fn bits_is_not_a_number() {
     // B1: a bN is not assignable where a number is expected; `↦` comes
     // with the conversion unit.
     rejects_any("functio f(b8 a) → u8 { redde a }");
-    rejects_any("incipit { fixum b8 a ← 0x01\n fixum u8 z ← a }");
+    rejects_any("incipit { sit b8 a ← 0x01\n sit u8 z ← a }");
     rejects_any("functio f(u8 a) → b8 { redde a }");
 }
 
@@ -165,17 +165,14 @@ fn bits_is_not_a_number() {
 
 #[test]
 fn literal_wider_than_the_bits_slot_is_refused() {
+    rejects("incipit { sit b8 x ← 0x1ff }", "bits_literal_out_of_range");
+    rejects("incipit { sit b8 x ← 256 }", "bits_literal_out_of_range");
     rejects(
-        "incipit { fixum b8 x ← 0x1ff }",
-        "bits_literal_out_of_range",
-    );
-    rejects("incipit { fixum b8 x ← 256 }", "bits_literal_out_of_range");
-    rejects(
-        "incipit { fixum b16 x ← 0x10000 }",
+        "incipit { sit b16 x ← 0x10000 }",
         "bits_literal_out_of_range",
     );
     rejects(
-        "incipit { fixum b32 x ← 0x100000000 }",
+        "incipit { sit b32 x ← 0x100000000 }",
         "bits_literal_out_of_range",
     );
 }
@@ -185,9 +182,9 @@ fn literal_wider_than_the_bits_slot_is_refused() {
 #[test]
 fn refused_bits_literal_reports_once_without_cascade() {
     for source in [
-        "incipit { fixum b8 x ← 0x1ff }",
-        "incipit { fixum b16 x ← 0x1ffff }",
-        "incipit { fixum b8 x ← -1 }",
+        "incipit { sit b8 x ← 0x1ff }",
+        "incipit { sit b16 x ← 0x1ffff }",
+        "incipit { sit b8 x ← -1 }",
     ] {
         let issues: Vec<String> = test_support::analyze_source_la(source)
             .diagnostics
@@ -210,7 +207,7 @@ fn refused_bits_literal_reports_once_without_cascade() {
 
 #[test]
 fn negative_literal_in_a_bits_slot_is_refused() {
-    rejects("incipit { fixum b8 x ← -1 }", "bits_literal_out_of_range");
+    rejects("incipit { sit b8 x ← -1 }", "bits_literal_out_of_range");
 }
 
 #[test]
@@ -224,7 +221,7 @@ fn oversized_literal_beside_a_bits_operand_is_refused() {
 #[test]
 fn number_expression_in_a_bits_slot_is_refused() {
     // `3 ⇐ 2` is a number shift; only a written literal takes the cell type.
-    rejects_any("incipit { fixum b8 y ← 3 ⇐ 2 }");
+    rejects_any("incipit { sit b8 y ← 3 ⇐ 2 }");
 }
 
 // --- A5 regression: number types are unchanged ---
@@ -238,10 +235,10 @@ fn number_shifts_and_arithmetic_still_check() {
     accepts("functio f(u8 a, u8 b) → bivalens { redde a ≺ b }");
     accepts("functio f(u8 a) → u8 { redde ¬ a }");
     accepts("functio f(u8 a) → u8 { redde a ∧ 0x0f }");
-    accepts("incipit { fixum u8 x ← 0xff }");
+    accepts("incipit { sit u8 x ← 0xff }");
 }
 
 #[test]
 fn number_literal_overflow_diagnostics_are_unchanged() {
-    rejects_any("incipit { fixum u8 x ← 0x1ff }");
+    rejects_any("incipit { sit u8 x ← 0x1ff }");
 }

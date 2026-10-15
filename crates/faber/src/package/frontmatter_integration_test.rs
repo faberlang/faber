@@ -546,9 +546,9 @@ targets = ["rust"]
         src.join("math.fab"),
         r"@ public
 class Vector3 {
-    var f32 x
-    var f32 y
-    var f32 z
+    mut f32 x
+    mut f32 y
+    mut f32 z
 }
 
 @ public
@@ -563,7 +563,7 @@ fn vector3(f32 x, f32 y, f32 z) → Vector3 {
         r#"import from "./math" math
 
 test "vector3 builds" {
-    const math.Vector3 v ← math.vector3(1.0, 2.0, 3.0)
+    let math.Vector3 v ← math.vector3(1.0, 2.0, 3.0)
     assert v.x ≡ (1.0 ∷ f32)
 }
 "#,

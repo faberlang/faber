@@ -11,30 +11,30 @@ use crate::test_support::{assert_accepts, assert_rejects_with_issue};
 
 #[test]
 fn unbalanced_pattern_literal_is_accepted() {
-    assert_accepts(r"incipit { fixum regex r ← regex /(/ }");
+    assert_accepts(r"incipit { sit regex r ← regex /(/ }");
 }
 
 #[test]
 fn valid_literal_pattern_passes_check() {
-    assert_accepts(r"incipit { fixum regex r ← regex /a+(b|c)?/ }");
+    assert_accepts(r"incipit { sit regex r ← regex /a+(b|c)?/ }");
 }
 
 #[test]
 fn inline_flag_literal_pattern_passes_check() {
-    assert_accepts(r"incipit { fixum regex r ← regex /(?i)\d+/ }");
+    assert_accepts(r"incipit { sit regex r ← regex /(?i)\d+/ }");
 }
 
 #[test]
 fn engine_specific_patterns_pass_check_unchecked() {
     // Lookahead and a backreference: legal in some target engines, rejected
     // by the Rust engine; the checker does not inspect the body.
-    assert_accepts(r"incipit { fixum regex a ← regex /(?=a)b/ }");
-    assert_accepts(r"incipit { fixum regex b ← regex /(a)\1/ }");
+    assert_accepts(r"incipit { sit regex a ← regex /(?=a)b/ }");
+    assert_accepts(r"incipit { sit regex b ← regex /(a)\1/ }");
 }
 
 #[test]
 fn dynamic_conversion_stays_failable_not_check_time() {
-    assert_accepts(r#"incipit { fixum regex r ← "(" ↦ regex }"#);
+    assert_accepts(r#"incipit { sit regex r ← "(" ↦ regex }"#);
 }
 
 // `_ /pat/` is an inferred-constructor hole: it takes its type from the

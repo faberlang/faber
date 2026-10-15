@@ -65,10 +65,10 @@ use super::borrow_region_cfg::CfgNodeId;
 
 use crate::scope::ImportedFileInterfaceMethod;
 use crate::{
-    AccessMarker, FuncSig, ISSUE_ASSIGN_THROUGH_REF, ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL,
-    ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN, ParamType, Primitive, Resolver,
-    SUGGESTION_COPY, SemanticError, SemanticErrorKind, SemanticParamMode, Type, TypeId, TypeTable,
-    WarningKind,
+    AccessMarker, FuncSig, ISSUE_ASSIGN_THROUGH_REF, ISSUE_ASSIGN_TO_DE_PARAMETER,
+    ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL, ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN,
+    ParamType, Primitive, Resolver, SUGGESTION_COPY, SemanticError, SemanticErrorKind,
+    SemanticParamMode, Type, TypeId, TypeTable, WarningKind,
 };
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
@@ -79,7 +79,6 @@ use radix_intrinsics::{is_mutating_receiver, lookup_method_for_type_id};
 use radix_lexer::Interner;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-const ISSUE_ASSIGN_TO_DE_PARAMETER: &str = "assign_to_de_parameter";
 const ISSUE_BORROW_OF_MOVED: &str = "borrow_of_moved";
 const ISSUE_CANNOT_MOVE_WHILE_BORROWED: &str = "cannot_move_while_borrowed";
 const ISSUE_DE_TO_IN_OR_EX_POSITION: &str = "de_to_in_or_ex_position";
@@ -1084,24 +1083,33 @@ impl<'a> BorrowChecker<'a> {
 
     /// Access rules for writing `target`, shared by assignment and `⇇`.
     fn check_lvalue_access(&mut self, target: &HirExpression) {
-        let through_ref = Self::is_projection(target)
-            && Self::root_def_id(target).is_some_and(|def_id| self.ref_roots.contains(&def_id));
-        if through_ref {
-            self.error(
-                SemanticErrorKind::AssignToImmutableBorrow,
-                ISSUE_ASSIGN_THROUGH_REF,
-                target.span,
-            );
-        }
+        // One fault, one diagnostic: a write through an explicit `ref` view (a
+        // `ref` binding or `ref` parameter) is `assign_through_ref`; a write
+        // through a bare parameter or an alias of a `ref`/bare parameter is
+        // `assign_to_de_parameter`. Re-pointing the name itself is legal. A
+        // name that already took one of these read-only-through diagnostics
+        // does not also take the non-`mut` alias row — the alias error is for
+        // names whose own cell is writable (`mut alias of a bare parameter`),
+        // not for a `ref` cursor that is read-only through on its own account.
+        let mut refused_through_ref = false;
         if Self::is_projection(target)
             && let Some(def_id) = Self::root_def_id(target)
-            && self.de_aliases.contains(&def_id)
         {
-            self.error(
-                SemanticErrorKind::AssignToImmutableBorrow,
-                ISSUE_ASSIGN_TO_DE_PARAMETER,
-                target.span,
-            );
+            if self.ref_roots.contains(&def_id) {
+                self.error(
+                    SemanticErrorKind::AssignToImmutableBorrow,
+                    ISSUE_ASSIGN_THROUGH_REF,
+                    target.span,
+                );
+                refused_through_ref = true;
+            } else if self.is_de_param(def_id) || self.de_aliases.contains(&def_id) {
+                self.error(
+                    SemanticErrorKind::AssignToImmutableBorrow,
+                    ISSUE_ASSIGN_TO_DE_PARAMETER,
+                    target.span,
+                );
+                refused_through_ref = true;
+            }
         }
         if let Some(def_id) = Self::root_def_id(target) {
             if Self::is_projection(target)
@@ -1109,15 +1117,14 @@ impl<'a> BorrowChecker<'a> {
             {
                 self.nonmut_tensor_write_error(origin, target.span);
             }
-            if Self::is_projection(target)
+            if !refused_through_ref
+                && Self::is_projection(target)
                 && let Some(origin) = self.nonmut_agg_alias_origin(def_id)
             {
                 self.nonmut_agg_write_error(origin, target.span);
             }
             self.check_projection_inputs(target);
-            // One fault, one report: a projection write through a `de`
-            // parameter is `assign_through_ref` only.
-            self.write_use_reporting(def_id, target.span, !through_ref);
+            self.write_use(def_id, target.span);
         } else {
             self.check_expr(target);
         }
@@ -1796,7 +1803,7 @@ impl<'a> BorrowChecker<'a> {
             self.visit_expr(target);
             return;
         };
-        if self.de_aliases.contains(&root) {
+        if self.is_de_param(root) || self.de_aliases.contains(&root) {
             self.error(
                 SemanticErrorKind::AssignToImmutableBorrow,
                 ISSUE_ASSIGN_TO_DE_PARAMETER,
@@ -2327,34 +2334,21 @@ impl<'a> BorrowChecker<'a> {
         }
     }
 
-    fn write_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
-        self.write_use_reporting(def_id, span, true);
+    fn is_de_param(&self, def_id: DefId) -> bool {
+        self.param_usage
+            .get(&def_id)
+            .is_some_and(|usage| matches!(usage.mode, HirParamMode::De))
     }
 
-    /// `report_de_parameter` is false when the caller already reported the
-    /// write as `assign_through_ref`, so the `de` parameter is not named twice.
-    fn write_use_reporting(
-        &mut self,
-        def_id: DefId,
-        span: radix_lexer::Span,
-        report_de_parameter: bool,
-    ) {
+    fn write_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
         self.note_live_unmarked_own_bind(def_id);
         self.note_live_own_arg(def_id);
-        if let Some(usage) = self.param_usage.get_mut(&def_id) {
-            if matches!(usage.mode, HirParamMode::De) {
-                if report_de_parameter {
-                    self.error(
-                        SemanticErrorKind::AssignToImmutableBorrow,
-                        ISSUE_ASSIGN_TO_DE_PARAMETER,
-                        span,
-                    );
-                }
-            } else {
-                // `mut` writes the caller's value; `own`/`copy` write the
-                // callee's own value. Either way the parameter is mutated.
-                usage.mutated = true;
-            }
+        if let Some(usage) = self.param_usage.get_mut(&def_id)
+            && !matches!(usage.mode, HirParamMode::De)
+        {
+            // `mut` writes the caller's value; `own`/`copy` write the
+            // callee's own value. Either way the parameter is mutated.
+            usage.mutated = true;
         }
         let (_region_mut_live, region_any_live) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();
@@ -2910,7 +2904,7 @@ impl HirVisitor for BorrowChecker<'_> {
                 if is_mutating {
                     if let Some(def_id) = Self::root_def_id(receiver) {
                         self.check_projection_inputs(receiver);
-                        if self.de_aliases.contains(&def_id) {
+                        if self.is_de_param(def_id) || self.de_aliases.contains(&def_id) {
                             self.error(
                                 SemanticErrorKind::AssignToImmutableBorrow,
                                 ISSUE_ASSIGN_TO_DE_PARAMETER,

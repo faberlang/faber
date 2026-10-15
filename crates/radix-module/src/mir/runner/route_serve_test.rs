@@ -55,8 +55,8 @@ fn partem_reads_the_requested_range() {
     let host = run_ok(
         "route-partem.fab",
         &program(&format!(
-            "    fixum lista<valor> args ← [\"{path}\", 2, 3]\n    \
-             fixum octeti bytes ← ad 'solum:partem' (args) ↦ octeti\n    \
+            "    sit lista<valor> args ← [\"{path}\", 2, 3]\n    \
+             sit octeti bytes ← ad 'solum:partem' (args) ↦ octeti\n    \
              nota bytes[0] ↦ u8\n    nota bytes[2] ↦ u8"
         )),
     );
@@ -71,7 +71,7 @@ fn partem_honours_the_range_cap() {
     let errors = run_host(
         "route-partem-cap.fab",
         &program(&format!(
-            "    fixum lista<valor> args ← [\"{path}\", 0, {over}]\n    \
+            "    sit lista<valor> args ← [\"{path}\", 0, {over}]\n    \
              nota ad 'solum:partem' (args) ↦ octeti"
         )),
         &mut host,
@@ -87,10 +87,10 @@ fn hauri_returns_the_bytes_and_honours_the_ceiling() {
     let host = run_ok(
         "route-hauri.fab",
         &program(&format!(
-            "    fixum octeti all ← ad 'solum:hauri' (\"{path}\") ↦ octeti\n    \
+            "    sit octeti all ← ad 'solum:hauri' (\"{path}\") ↦ octeti\n    \
              nota all[0] ↦ u8\n    nota all[2] ↦ u8\n    \
-             fixum lista<valor> args ← [\"{path}\", 3]\n    \
-             fixum octeti capped ← ad 'solum:hauri' (args) ↦ octeti\n    \
+             sit lista<valor> args ← [\"{path}\", 3]\n    \
+             sit octeti capped ← ad 'solum:hauri' (args) ↦ octeti\n    \
              nota capped[1] ↦ u8"
         )),
     );
@@ -100,7 +100,7 @@ fn hauri_returns_the_bytes_and_honours_the_ceiling() {
     let errors = run_host(
         "route-hauri-ceiling.fab",
         &program(&format!(
-            "    fixum lista<valor> args ← [\"{path}\", 2]\n    \
+            "    sit lista<valor> args ← [\"{path}\", 2]\n    \
              nota ad 'solum:hauri' (args) ↦ octeti"
         )),
         &mut host,
@@ -135,8 +135,8 @@ fn dic_writes_stdout_and_mone_writes_stderr() {
         let host = run_ok(
             "route-console.fab",
             &program(
-                "    fixum vacuum a ← ad 'consolum:dic' (\"salve\") ↦ vacuum\n    \
-                 fixum vacuum b ← ad 'consolum:mone' (\"cave\") ↦ vacuum\n    \
+                "    sit vacuum a ← ad 'consolum:dic' (\"salve\") ↦ vacuum\n    \
+                 sit vacuum b ← ad 'consolum:mone' (\"cave\") ↦ vacuum\n    \
                  nota \"fin\"",
             ),
         );
@@ -169,7 +169,7 @@ fn dic_writes_stdout_and_mone_writes_stderr() {
 #[test]
 fn exi_exits_with_the_code() {
     let mut host = BufferHost::default();
-    let source = program("    fixum vacuum a ← ad 'processus:exi' (7) ↦ vacuum");
+    let source = program("    sit vacuum a ← ad 'processus:exi' (7) ↦ vacuum");
     let panic = catch_unwind(AssertUnwindSafe(|| {
         let _ = run_host("route-exi.fab", &source, &mut host);
     }))

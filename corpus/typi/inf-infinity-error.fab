@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "type"
 canonical = false
 summary = "`∞` is the float infinity, not an `inf` value: it does not initialise an `inf` slot."
-syntax = "const inf x ← ∞ — rejected; ∞ is a float"
+syntax = "let inf x ← ∞ — rejected; ∞ is a float"
 related = ["inf", "fractus"]
 locale = "en"
 +++
@@ -36,6 +36,6 @@ locale = "en"
 #   inf-infinity-error.expected — the stable diagnostic identity.
 
 main {
-    const inf infinite ← ∞
+    let inf infinite ← ∞
     print infinite
 }

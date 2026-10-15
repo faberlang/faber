@@ -72,20 +72,20 @@ fn ordering_takes_the_decimal_constant() {
 
 #[test]
 fn integer_constant_fills_a_d64_slot() {
-    let lines = run("incipit {\nfixum d64 e ← 5\nfixum d64 n ← -5\nfixum d64 s ← 1 + 2\nnota e\nnota n\nnota s\n}\n");
+    let lines = run("incipit {\nsit d64 e ← 5\nsit d64 n ← -5\nsit d64 s ← 1 + 2\nnota e\nnota n\nnota s\n}\n");
     assert_eq!(lines, ["5", "-5", "3"]);
 }
 
 #[test]
 fn decimal_constant_arithmetic_fills_a_d64_slot() {
-    assert_eq!(run("incipit {\nfixum d64 e ← 0.1 + 0.2\nnota e\n}\n"), ["0.3"]);
+    assert_eq!(run("incipit {\nsit d64 e ← 0.1 + 0.2\nnota e\n}\n"), ["0.3"]);
 }
 
 #[test]
 fn integer_constant_fills_a_d64_field_and_return() {
     let lines = run("genus P { varia d64 v }\n\
          functio five() → d64 { redde 5 }\n\
-         incipit {\nfixum P p ← P { v = 7 }\nnota p.v\nnota five()\n}\n");
+         incipit {\nsit P p ← P { v = 7 }\nnota p.v\nnota five()\n}\n");
     assert_eq!(lines, ["7", "5"]);
 }
 

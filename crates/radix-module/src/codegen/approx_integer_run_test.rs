@@ -153,7 +153,7 @@ fn python_prints_the_runner_verdicts() {
 /// const-checks every const item, so a non-const call would fail here).
 #[test]
 fn rust_static_field_approx_is_const_exact() {
-    let source = "+++\nlocale = \"en\"\n+++\nclass Cfg {\n    static bool CLOSE = 9007199254740993 ≈ 9007199254740992\n    static bool FAR = 5 ≉ -5\n    var int n\n}\nmain {\n    const Cfg c ← Cfg { n = 1 }\n    print c.n\n}\n";
+    let source = "+++\nlocale = \"en\"\n+++\nclass Cfg {\n    static bool CLOSE = 9007199254740993 ≈ 9007199254740992\n    static bool FAR = 5 ≉ -5\n    mut int n\n}\nmain {\n    let Cfg c ← Cfg { n = 1 }\n    print c.n\n}\n";
     let session = Session::new(
         Config::default()
             .with_target(Target::HirRust)

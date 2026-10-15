@@ -18,9 +18,9 @@ main {
     assert process.exec_async("printf proof-ok") ≡ "proof-ok"
 
     # A non-zero exit is a fault, not a value: the call must be caught.
-    var bool caught ← false
+    mut bool caught ← false
     do {
-        const string _ ← exit_faulted()
+        let string _ ← exit_faulted()
     }
     catch err {
         caught ← true

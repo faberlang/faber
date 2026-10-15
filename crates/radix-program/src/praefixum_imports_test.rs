@@ -117,9 +117,9 @@ fn method_answers(program: &AnalyzedProgram, dir: &Path) -> Vec<ImportedCallee> 
         .collect()
 }
 
-const SIBLING_GENUS: &str = "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n";
+const SIBLING_GENUS: &str = "@ public\nclass Box {\n    mut int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n";
 
-const MAIN_CALLS_METHOD: &str = "import from \"./consts\" consts\n\nfn probe() → int {\n    const consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n";
+const MAIN_CALLS_METHOD: &str = "import from \"./consts\" consts\n\nfn probe() → int {\n    let consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n";
 
 const MAIN_CALLS_SEVEN: &str = "import from \"./consts\" consts\n\nfn probe() {\n    consts.seven()\n}\n\nmain {\n    print 0\n}\n";
 
@@ -299,7 +299,7 @@ fn praefixum_imports_method_printing_body_names_the_method_hop() {
     write(
         dir,
         "consts.fab",
-        "@ public\nfn loud() {\n    print 1\n}\n\n@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        loud()\n        return self.n\n    }\n}\n",
+        "@ public\nfn loud() {\n    print 1\n}\n\n@ public\nclass Box {\n    mut int n\n\n    fn get() → int {\n        loud()\n        return self.n\n    }\n}\n",
     );
     write(dir, "main.fab", MAIN_CALLS_METHOD);
     let program = analyze(dir);
@@ -332,7 +332,7 @@ fn praefixum_imports_method_homonym_genus_resolves_to_qualified_home() {
     write(
         dir,
         "main.fab",
-        "import from \"./consts\" consts\nimport from \"./other\" other\n\nfn probe() → int {\n    const consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n",
+        "import from \"./consts\" consts\nimport from \"./other\" other\n\nfn probe() → int {\n    let consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n",
     );
     let program = analyze(dir);
     assert_eq!(method_answers(&program, dir), vec![ImportedCallee::Pure]);

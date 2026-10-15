@@ -27,7 +27,7 @@ locale = "en"
 # EXPECTED stdout is the .expected file beside this exemplar.
 
 main {
-    const list<f32> flat ← [
+    let list<f32> flat ← [
         1.0,
         2.0,
         3.0,
@@ -54,19 +54,19 @@ main {
         24.0
     ]
 
-    const tf32[2, 3, 4] cube ← flat ↦ tf32[2, 3, 4]
-    const tf32[3, 4] overFirst ← cube.sum(axis 0)
-    const tf32[2, 4] overSecond ← cube.sum(axis 1)
-    const tf32[2, 3] overThird ← cube.sum(axis 2)
+    let tf32[2, 3, 4] cube ← flat ↦ tf32[2, 3, 4]
+    let tf32[3, 4] overFirst ← cube.sum(axis 0)
+    let tf32[2, 4] overSecond ← cube.sum(axis 1)
+    let tf32[2, 3] overThird ← cube.sum(axis 2)
 
     print overFirst[[0, 0]]
     print overSecond[[0, 0]]
     print overSecond[[1, 3]]
     print overThird[[1, 2]]
 
-    const tf32[2, 3, 2, 2] quad ← flat ↦ tf32[2, 3, 2, 2]
-    const tf32[2, 2, 2] quadSecond ← quad.sum(axis 1)
-    const tf32[2, 3, 2] quadFourth ← quad.sum(axis 3)
+    let tf32[2, 3, 2, 2] quad ← flat ↦ tf32[2, 3, 2, 2]
+    let tf32[2, 2, 2] quadSecond ← quad.sum(axis 1)
+    let tf32[2, 3, 2] quadFourth ← quad.sum(axis 3)
 
     print quadSecond[[0, 0, 0]]
     print quadSecond[[1, 1, 1]]

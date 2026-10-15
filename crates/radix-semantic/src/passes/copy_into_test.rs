@@ -88,7 +88,7 @@ main {}",
 fn the_right_side_may_be_a_view_or_a_view_binding() {
     assert_accepts(
         r"fn copy_view(tf32[3, 2] input, mut tf32[2, 3] first, mut tf32[2, 3] second) → void {
-    const tf32[2, 3] view ← input.transpose()
+    let tf32[2, 3] view ← input.transpose()
     first ⇇ view
     second ⇇ input.transpose()
 }
@@ -110,8 +110,8 @@ main {}",
 fn a_field_root_is_writable_and_sibling_fields_do_not_alias() {
     assert_accepts(
         r"class Holder {
-    var tf32[3, 3] buf
-    var tf32[3, 3] other
+    mut tf32[3, 3] buf
+    mut tf32[3, 3] other
 }
 fn fill(mut Holder holder, tf32[3, 3] source) → void {
     holder.buf ⇇ source
@@ -126,7 +126,7 @@ main {}",
 fn a_var_local_is_writable_and_still_rebinds_with_the_arrow() {
     assert_accepts(
         r"fn locals(tf32[3, 3] source) → void {
-    var tf32[3, 3] local ← source + source
+    mut tf32[3, 3] local ← source + source
     local ← source + source
     local ⇇ source
     local ⇇ source.transpose()
@@ -166,9 +166,9 @@ main {}",
 #[test]
 fn a_var_tensor_written_only_by_copy_into_is_not_an_unnecessary_var() {
     let source = r"main {
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[2, 2] source ← flat ↦ tf32[2, 2]
-    var tf32[2, 2] target ← flat ↦ tf32[2, 2]
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[2, 2] source ← flat ↦ tf32[2, 2]
+    mut tf32[2, 2] target ← flat ↦ tf32[2, 2]
     target ⇇ source
 }";
     assert_no_issue(source, "unnecessary_varia");
@@ -268,7 +268,7 @@ main {}",
 fn r2_a_constant_target_is_rejected() {
     assert_rejects(
         r"fn t(tf32[3, 3] source) → void {
-    const tf32[3, 3] fixed ← source + source
+    let tf32[3, 3] fixed ← source + source
     fixed ⇇ source
 }
 main {}",
@@ -293,7 +293,7 @@ main {}",
 fn r2_a_field_of_a_non_mut_parameter_is_rejected() {
     assert_rejects(
         r"class Holder {
-    var tf32[3, 3] buf
+    mut tf32[3, 3] buf
 }
 fn t(Holder holder, tf32[3, 3] source) → void {
     holder.buf ⇇ source
@@ -352,7 +352,7 @@ main {}",
 fn r2_a_view_binding_target_is_rejected() {
     assert_rejects(
         r"fn t(tf32[3, 2] source, mut tf32[2, 3] output) → void {
-    const tf32[3, 2] view ← output.transpose()
+    let tf32[3, 2] view ← output.transpose()
     view ⇇ source
 }
 main {}",
@@ -420,7 +420,7 @@ main {}",
 fn r3_an_arrow_alias_of_the_target_counts() {
     assert_rejects(
         r"fn t(mut tf32[3, 3] a) → void {
-    var tf32[3, 3] c ← a
+    mut tf32[3, 3] c ← a
     c ⇇ a.transpose()
 }
 main {}",
@@ -433,7 +433,7 @@ main {}",
 fn r3_an_arrow_alias_on_the_value_side_counts() {
     assert_rejects(
         r"fn t(mut tf32[3, 3] a) → void {
-    var tf32[3, 3] c ← a
+    mut tf32[3, 3] c ← a
     a ⇇ c.transpose()
 }
 main {}",
@@ -446,8 +446,8 @@ main {}",
 fn r3_aliases_of_aliases_count() {
     assert_rejects(
         r"fn t(mut tf32[3, 3] a) → void {
-    var tf32[3, 3] c ← a
-    var tf32[3, 3] d ← c
+    mut tf32[3, 3] c ← a
+    mut tf32[3, 3] d ← c
     d ⇇ a.transpose()
 }
 main {}",
@@ -460,7 +460,7 @@ main {}",
 fn r3_a_rebound_name_no_longer_aliases_the_value() {
     assert_no_issue(
         r"fn t(tf32[3, 3] source, mut tf32[3, 3] a) → void {
-    var tf32[3, 3] c ← source + source
+    mut tf32[3, 3] c ← source + source
     c ← source + source
     c ⇇ a.transpose()
 }
@@ -473,8 +473,8 @@ main {}",
 fn r3_the_same_field_is_rejected() {
     assert_rejects(
         r"class Holder {
-    var tf32[3, 3] buf
-    var tf32[3, 3] other
+    mut tf32[3, 3] buf
+    mut tf32[3, 3] other
 }
 fn t(mut Holder holder) → void {
     holder.buf ⇇ holder.buf.transpose()
@@ -493,7 +493,7 @@ main {}",
 fn r4_a_copy_into_is_not_a_value_to_assign() {
     assert_rejects(
         r"fn t(tf32[3, 3] a, mut tf32[3, 3] b) → void {
-    var tf32[3, 3] c ← a + a
+    mut tf32[3, 3] c ← a + a
     c ← b ⇇ a
 }
 main {}",
@@ -506,7 +506,7 @@ main {}",
 fn r5_a_copy_into_is_not_a_value_to_initialize_with() {
     assert_rejects(
         r"fn t(tf32[3, 3] a, mut tf32[3, 3] b) → void {
-    const _ c ← b ⇇ a
+    let c ← b ⇇ a
 }
 main {}",
         SemanticErrorKind::TypeMismatch,
@@ -576,7 +576,7 @@ main {}",
 fn r6_the_arrow_still_rebinds_a_var_local_and_writes_one_element() {
     assert_no_issue(
         r"fn t(tf32[3, 3] a, mut tf32[3, 3] b) → void {
-    var tf32[3, 3] c ← a + a
+    mut tf32[3, 3] c ← a + a
     c ← a + a
     b[0, 0] ← 1.0
 }

@@ -7,15 +7,15 @@ use crate::driver::{Config, ModuleCompileRequest, Session};
 
 const SOURCE: &str = "
 incipit {
-    fixum ascii a ← 42 ↦ ascii
-    fixum littera d ← 7 ↦ littera ⊥ '?'
-    fixum numerus n ← d ↦ numerus ⊥ 0
-    fixum textus t ← \"x\"
-    fixum littera u ← t ↦ littera ⊥ '?'
-    fixum u32 c ← d ↦ u32 via Code
-    fixum littera b ← 65 ↦ littera via Code ⊥ '?'
-    fixum octeti raw ← |68 69|
-    fixum ascii h ← raw[0‥1] ↦ ascii ⊥ 'nn'
+    sit ascii a ← 42 ↦ ascii
+    sit littera d ← 7 ↦ littera ⊥ '?'
+    sit numerus n ← d ↦ numerus ⊥ 0
+    sit textus t ← \"x\"
+    sit littera u ← t ↦ littera ⊥ '?'
+    sit u32 c ← d ↦ u32 via Code
+    sit littera b ← 65 ↦ littera via Code ⊥ '?'
+    sit octeti raw ← |68 69|
+    sit ascii h ← raw[0‥1] ↦ ascii ⊥ 'nn'
     nota a
     nota n
     nota u

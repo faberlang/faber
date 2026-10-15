@@ -37,8 +37,8 @@ locale = "en"
 #   50, 30, falsum, then counter values 0, 1, 3
 
 class Forma {
-    var int latitudo = 1
-    var int altitudo = 1
+    mut int latitudo = 1
+    mut int altitudo = 1
 
     fn area() → int {
         return self.latitudo * self.altitudo
@@ -54,7 +54,7 @@ class Forma {
 }
 
 class Numerator {
-    var int numerus = 0
+    mut int numerus = 0
 
     fn auge() → void {
         # mutate instance state via ego
@@ -69,14 +69,14 @@ class Numerator {
 main {
     # --- Methods that return values ---
 
-    const Forma forma ← Forma { latitudo = 10, altitudo = 5 }
+    let Forma forma ← Forma { latitudo = 10, altitudo = 5 }
     print forma.area()
     print forma.ambitus()
     print forma.aequilatera()
 
     # --- Methods that modify state (varia instance binding) ---
 
-    var Numerator numerator ← Numerator {}
+    mut Numerator numerator ← Numerator {}
     print numerator.accipe()
     numerator.auge()
     print numerator.accipe()

@@ -11,7 +11,7 @@ ordo Status { pendens = 10, actum, finitum = -3 }
 incipit {
     nota Status.actum ↦ numerus
     nota Status.finitum ↦ textus
-    fixum Status s ← 11 ↦ Status ⊥ Status.pendens
+    sit Status s ← 11 ↦ Status ⊥ Status.pendens
     nota s ↦ numerus
 }
 ";

@@ -38,42 +38,42 @@ canonical = false
 
 @ kernel
 fn t_max(tf32[32] a) → f32 {
-    return reduce via max from a at [i] thread lane const s { return s }
+    return reduce via max from a at [i] thread lane let s { return s }
 }
 
 @ kernel
 fn t_min(tf32[32] a) → f32 {
-    return reduce via min from a at [i] thread lane const s { return s }
+    return reduce via min from a at [i] thread lane let s { return s }
 }
 
 @ kernel
 fn t_product(tf32[32] a) → f32 {
-    return reduce via product from a at [i] thread lane const s { return s }
+    return reduce via product from a at [i] thread lane let s { return s }
 }
 
 @ kernel
 fn t_argmax(tf32[32] a) → int {
-    return reduce via argmax from a at [i] thread lane const s { return s }
+    return reduce via argmax from a at [i] thread lane let s { return s }
 }
 
 @ kernel
 fn t_argmin(tf32[32] a) → int {
-    return reduce via argmin from a at [i] thread lane const s { return s }
+    return reduce via argmin from a at [i] thread lane let s { return s }
 }
 
 @ kernel
 fn t_count(tf32[32] a) → int {
-    return reduce via count from a at [i] thread lane const s { return s ≻ 2.0 }
+    return reduce via count from a at [i] thread lane let s { return s ≻ 2.0 }
 }
 
 @ kernel
 fn t_any(tf32[32] a) → bool {
-    return reduce via any from a at [i] thread lane const s { return s ≻ 3.5 }
+    return reduce via any from a at [i] thread lane let s { return s ≻ 3.5 }
 }
 
 @ kernel
 fn t_all(tf32[32] a) → bool {
-    return reduce via all from a at [i] thread lane const s { return s ≻ 0.5 }
+    return reduce via all from a at [i] thread lane let s { return s ≻ 0.5 }
 }
 
 @ kernel
@@ -91,39 +91,39 @@ fn entry(tf32[32] a, mut tensor<f32, [8]> out) → void {
 }
 
 fn p_max(tf32[4] a) → f32 {
-    return reduce via max from a at [i] const s { return s }
+    return reduce via max from a at [i] let s { return s }
 }
 
 fn p_min(tf32[4] a) → f32 {
-    return reduce via min from a at [i] const s { return s }
+    return reduce via min from a at [i] let s { return s }
 }
 
 fn p_product(tf32[4] a) → f32 {
-    return reduce via product from a at [i] const s { return s }
+    return reduce via product from a at [i] let s { return s }
 }
 
 fn p_argmax(tf32[4] a) → int {
-    return reduce via argmax from a at [i] const s { return s }
+    return reduce via argmax from a at [i] let s { return s }
 }
 
 fn p_argmin(tf32[4] a) → int {
-    return reduce via argmin from a at [i] const s { return s }
+    return reduce via argmin from a at [i] let s { return s }
 }
 
 fn p_count(tf32[4] a) → int {
-    return reduce via count from a at [i] const s { return s ≻ 2.0 }
+    return reduce via count from a at [i] let s { return s ≻ 2.0 }
 }
 
 fn p_any(tf32[4] a) → bool {
-    return reduce via any from a at [i] const s { return s ≻ 3.5 }
+    return reduce via any from a at [i] let s { return s ≻ 3.5 }
 }
 
 fn p_all(tf32[4] a) → bool {
-    return reduce via all from a at [i] const s { return s ≻ 0.5 }
+    return reduce via all from a at [i] let s { return s ≻ 0.5 }
 }
 
 main {
-    const tf32[4] a ← [3.0, 1.0, 3.0, 2.0] ↦ tf32[4]
+    let tf32[4] a ← [3.0, 1.0, 3.0, 2.0] ↦ tf32[4]
     print p_max(a)
     print p_min(a)
     print p_product(a)

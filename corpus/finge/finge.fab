@@ -65,18 +65,18 @@ union Responsum {
 main {
     # --- Unit variants with explicit type ---
 
-    const Condicio s1 ← variant Agens ∷ Condicio
-    const Condicio s2 ← variant Pendens ∷ Condicio
+    let Condicio s1 ← variant Agens ∷ Condicio
+    let Condicio s2 ← variant Pendens ∷ Condicio
 
     # --- Payload variants with explicit type ---
 
-    const Nuntius e1 ← variant Pulsus { x = 100, y = 200 } ∷ Nuntius
-    const Nuntius e2 ← variant Clavis { clavis = "intro" } ∷ Nuntius
-    const Nuntius e3 ← variant Finis ∷ Nuntius
+    let Nuntius e1 ← variant Pulsus { x = 100, y = 200 } ∷ Nuntius
+    let Nuntius e2 ← variant Clavis { clavis = "intro" } ∷ Nuntius
+    let Nuntius e3 ← variant Finis ∷ Nuntius
 
     # --- Responsum variants ---
 
-    const Responsum r1 ← variant Bonum { nuntius = "opus perfectum" } ∷ Responsum
-    const Responsum r2 ← variant Malum { causa = "opus fractum" } ∷ Responsum
+    let Responsum r1 ← variant Bonum { nuntius = "opus perfectum" } ∷ Responsum
+    let Responsum r2 ← variant Malum { causa = "opus fractum" } ∷ Responsum
     print "finge expressiones paratae"
 }

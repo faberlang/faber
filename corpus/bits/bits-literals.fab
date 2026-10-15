@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "literal"
 canonical = true
 summary = "A hex, binary or decimal integer literal in a bits cell takes the cell's type at all four widths."
-syntax = "const b8 x ← 0xff | const b16 x ← 0b1010 | const b64 x ← 255"
+syntax = "let b8 x ← 0xff | let b16 x ← 0b1010 | let b64 x ← 255"
 related = ["bits", "u8"]
 locale = "en"
 +++
@@ -29,18 +29,18 @@ locale = "en"
 # EXPECTED stdout: see bits-literals.expected
 
 main {
-    const b8 hex8 ← 0xff
-    const b8 bin8 ← 0b10100101
-    const b8 dec8 ← 255
-    const b16 hex16 ← 0xffff
-    const b16 bin16 ← 0b1010
-    const b16 dec16 ← 65535
-    const b32 hex32 ← 0xffffffff
-    const b32 bin32 ← 0b1
-    const b32 dec32 ← 4294967295
-    const b64 hex64 ← 0xffffffffffffffff
-    const b64 bin64 ← 0b1000
-    const b64 dec64 ← 255
+    let b8 hex8 ← 0xff
+    let b8 bin8 ← 0b10100101
+    let b8 dec8 ← 255
+    let b16 hex16 ← 0xffff
+    let b16 bin16 ← 0b1010
+    let b16 dec16 ← 65535
+    let b32 hex32 ← 0xffffffff
+    let b32 bin32 ← 0b1
+    let b32 dec32 ← 4294967295
+    let b64 hex64 ← 0xffffffffffffffff
+    let b64 bin64 ← 0b1000
+    let b64 dec64 ← 255
     print hex8
     print bin8
     print dec8

@@ -60,7 +60,7 @@ fn classify(Color c) → void {
 
 main {
     # list
-    const list<int> primi ← [2, 3, 5, 7]
+    let list<int> primi ← [2, 3, 5, 7]
     if 5 ∈ primi {
         print "list in"
     }
@@ -69,7 +69,7 @@ main {
     }
 
     # set
-    var set<string> visi ← empty
+    mut set<string> visi ← empty
     visi.add("alpha")
     visi.add("beta")
     if "alpha" ∈ visi {
@@ -80,11 +80,11 @@ main {
     }
 
     # map: the test is on the keys
-    var map<string, int> puncta ← empty
+    mut map<string, int> puncta ← empty
     puncta["alpha"] ← 1
     puncta["beta"] ← 2
-    const string present ← "beta"
-    const string absent ← "gamma"
+    let string present ← "beta"
+    let string absent ← "gamma"
     if present ∈ puncta {
         print "map key in"
     }

@@ -39,8 +39,8 @@ union ShapeError {
 
 @ public { }
 fn numel(list<int> shape) → int ⇥ ShapeError {
-    var int product ← 1
-    for from shape const dim {
+    mut int product ← 1
+    for from shape let dim {
         require dim ≥ 0 throw variant Negative { message = "neg" }
         product ← product * dim
     }
@@ -50,7 +50,7 @@ fn numel(list<int> shape) → int ⇥ ShapeError {
 @ public { }
 fn message(ShapeError err) → string {
     match err {
-        case Negative const message {
+        case Negative let message {
             return message
         }
     }
@@ -75,9 +75,9 @@ union TensorError {
 
 @ public { }
 class Tensor {
-    var dtype.DType dtype
-    var list<f32> data
-    var list<int> shape
+    mut dtype.DType dtype
+    mut list<f32> data
+    mut list<int> shape
 
     fn shape() → list<int> {
         return self.shape
@@ -85,7 +85,7 @@ class Tensor {
 
     fn get(list<int> indices) → f32 ⇥ TensorError {
         require indices.length() ≥ 1 throw variant OutOfBounds { message = "empty" }
-        const int i ← indices.get(0) coalesce 0
+        let int i ← indices.get(0) coalesce 0
         return self.data.get(i) coalesce 0.0
     }
 }
@@ -96,21 +96,21 @@ fn _numel_shape(list<int> shape) → int ⇥ TensorError {
         return shape.numel(shape)
     }
     catch err {
-        const string c ← shape.message(err)
+        let string c ← shape.message(err)
         throw variant InvalidShape { message = c }
     }
 }
 
 @ public { }
 fn construct(list<f32> data, list<int> shape) → Tensor ⇥ TensorError {
-    const int product ← _numel_shape(shape)
+    let int product ← _numel_shape(shape)
     require data.length() ≡ product throw variant OutOfBounds { message = "mismatch" }
     return Tensor { dtype = dtype.f32(), data = data, shape = shape }
 }
 
 @ public { }
 class Cache {
-    var Tensor key
+    mut Tensor key
 
     fn key() → Tensor {
         return self.key
@@ -119,7 +119,7 @@ class Cache {
 
 @ public { }
 fn sample() → Cache {
-    var Tensor t ← Tensor { dtype = dtype.f32(), data = [], shape = [] }
+    mut Tensor t ← Tensor { dtype = dtype.f32(), data = [], shape = [] }
     do {
         t ← construct([1.0, 2.0, 3.0, 4.0], [1, 4])
     }
@@ -136,7 +136,7 @@ locale = "en"
 import from "tensorlib:tensor" tensor
 
 main {
-    const tensor.Cache c ← tensor.sample()
+    let tensor.Cache c ← tensor.sample()
     print c.key().shape().length()
     do {
         print c.key().get([0])
@@ -153,7 +153,7 @@ locale = "en"
 import from "tensorlib:tensor" tensor
 
 fn prove_nested_tensor_methods() {
-    const tensor.Cache c ← tensor.sample()
+    let tensor.Cache c ← tensor.sample()
     print c.key().shape().length()
     do {
         print c.key().get([0])
@@ -370,7 +370,7 @@ fn red(int shade) → Color {
 @ public { }
 fn shade(Color c) → int {
     match c {
-        case Red const shade {
+        case Red let shade {
             return shade
         }
         case Blue {
@@ -399,7 +399,7 @@ fn dark(int shade) → Tone {
 @ public { }
 fn shade(Tone t) → int {
     match t {
-        case Dark const shade {
+        case Dark let shade {
             return shade
         }
         case Light {

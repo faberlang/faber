@@ -1310,8 +1310,10 @@ pub fn latin_locale_pack() -> LocalePack {
     // Registry keys whose Latin spelling differs from the registry text. The
     // installed `la` pack is authoritative for these (ruling 2026-09-30): the
     // registry keeps the English `own` / `copy` identity text while the Latin
-    // reader surface spells them `penes` / `exemplum`.
-    const LATIN_KEYWORD_SPELLINGS: &[(&str, &str)] = &[("own", "penes"), ("copy", "exemplum")];
+    // reader surface spells them `penes` / `exemplum`. The mut parameter
+    // marker `in` shares the writable-cell word `varia`.
+    const LATIN_KEYWORD_SPELLINGS: &[(&str, &str)] =
+        &[("own", "penes"), ("copy", "exemplum"), ("in", "varia")];
 
     let keywords = keyword_specs()
         .iter()
@@ -2188,7 +2190,19 @@ fn validate_unique_spellings(pack: &LocalePack, issues: &mut Vec<LocalePackIssue
     // `[keywords]` or within `[types]` is still a pack bug, but the same
     // spelling in both blocks is not.
     let mut keyword_spellings = BTreeSet::new();
-    for binding in pack.keywords.values() {
+    // `varia` (writable local) and `in` (writable parameter) are one binding
+    // cell: a pack spells both with one word, so the shared spelling is the
+    // single sanctioned duplicate.
+    let shared_cell_word = match (pack.keywords.get("varia"), pack.keywords.get("in")) {
+        (Some(local), Some(parameter)) if local.canonical == parameter.canonical => {
+            Some(parameter.canonical.clone())
+        }
+        _ => None,
+    };
+    for (latin, binding) in &pack.keywords {
+        if latin == "in" && shared_cell_word.as_deref() == Some(binding.canonical.as_str()) {
+            continue;
+        }
         insert_spelling(&mut keyword_spellings, &binding.canonical, issues);
         for alias in &binding.aliases {
             insert_spelling(&mut keyword_spellings, alias, issues);

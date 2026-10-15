@@ -26,9 +26,9 @@ fn vector_matrix_three_by_three_two_matches_hand_computed_result() {
 locale = "en"
 +++
 main {
-    const vf32[3] v ← [1.0, 2.0, 3.0] ↦ vf32[3]
-    const matrix<f32, [3, 2]> m ← [[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]] ↦ matrix<f32, [3, 2]>
-    const vf32[2] r ← v · m
+    let vf32[3] v ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    let matrix<f32, [3, 2]> m ← [[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]] ↦ matrix<f32, [3, 2]>
+    let vf32[2] r ← v · m
     print r
 }
 "#;
@@ -43,10 +43,10 @@ fn vector_matrix_is_not_the_matrix_vector_product() {
 locale = "en"
 +++
 main {
-    const vf32[2] v ← [1.0, 2.0] ↦ vf32[2]
-    const matrix<f32, [2, 2]> m ← [[1.0, 2.0], [3.0, 4.0]] ↦ matrix<f32, [2, 2]>
-    const vf32[2] left ← v · m
-    const vf32[2] right ← m · v
+    let vf32[2] v ← [1.0, 2.0] ↦ vf32[2]
+    let matrix<f32, [2, 2]> m ← [[1.0, 2.0], [3.0, 4.0]] ↦ matrix<f32, [2, 2]>
+    let vf32[2] left ← v · m
+    let vf32[2] right ← m · v
     print left
     print right
 }

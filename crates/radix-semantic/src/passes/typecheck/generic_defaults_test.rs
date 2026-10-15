@@ -93,7 +93,7 @@ fn explicit_type_arg_beats_declared_default() {
 }
 
 incipit {
-    fixum _ n ← pick<numerus>(1)
+    sit n ← pick<numerus>(1)
 }",
     );
     accepts(&fixture);
@@ -110,7 +110,7 @@ fn inferred_witness_beats_declared_default() {
 }
 
 incipit {
-    fixum _ n ← pick(1)
+    sit n ← pick(1)
 }",
     );
     accepts(&fixture);
@@ -144,7 +144,7 @@ fn size_param_absent_from_all_shapes_still_defaults() {
 }
 
 incipit {
-    fixum _ n ← sized(7)
+    sit n ← sized(7)
 }",
     );
     accepts(&fixture);
@@ -161,7 +161,7 @@ fn partial_type_prefix_defaults_trailing_suffix() {
 }
 
 incipit {
-    fixum _ n ← duo<numerus>(1)
+    sit n ← duo<numerus>(1)
 }",
     );
     accepts(&fixture);
@@ -181,7 +181,7 @@ fn partial_size_prefix_defaults_trailing_suffix() {
 }
 
 incipit {
-    fixum _ n ← tag<9>(1)
+    sit n ← tag<9>(1)
 }",
     );
     accepts(&fixture);
@@ -201,7 +201,7 @@ fn mixed_sort_vector_records_defaults_for_both_kinds() {
 }
 
 incipit {
-    fixum _ n ← trio(5)
+    sit n ← trio(5)
 }",
     );
     accepts(&fixture);
@@ -221,7 +221,7 @@ fn unresolved_size_param_without_default_still_rejected() {
 }
 
 incipit {
-    fixum _ n ← need(1)
+    sit n ← need(1)
 }",
     );
     rejects_with_issue(&fixture, "cannot_infer_tensor_shape");
@@ -261,7 +261,7 @@ fn natural_size_arg_on_typus_param_rejects_wrong_sort() {
 }
 
 incipit {
-    fixum _ x ← id<64>("salve")
+    sit x ← id<64>("salve")
 }"#,
     );
     rejects_with_issue(&fixture, "generic_type_arg_sort");
@@ -275,7 +275,7 @@ fn natural_prefix_leading_with_typus_param_rejects_wrong_sort() {
 }
 
 incipit {
-    fixum _ n ← duo<7>(1)
+    sit n ← duo<7>(1)
 }",
     );
     rejects_with_issue(&fixture, "generic_type_arg_sort");
@@ -289,7 +289,7 @@ fn too_many_explicit_type_args_rejected() {
 }
 
 incipit {
-    fixum _ x ← one<numerus, textus>(1)
+    sit x ← one<numerus, textus>(1)
 }",
     );
     rejects_with_issue(&fixture, "wrong_number_of_type_arguments");
@@ -303,7 +303,7 @@ fn prefix_shorter_than_required_params_rejected() {
 }
 
 incipit {
-    fixum _ n ← duo<numerus>(1, 2)
+    sit n ← duo<numerus>(1, 2)
 }",
     );
     rejects_with_issue(&fixture, "wrong_number_of_type_arguments");
@@ -317,7 +317,7 @@ fn explicit_witness_conflicting_with_argument_still_errors() {
 }
 
 incipit {
-    fixum _ x ← id<numerus>("salve")
+    sit x ← id<numerus>("salve")
 }"#,
     );
     rejects_with_issue(&fixture, "argument_type_mismatch");

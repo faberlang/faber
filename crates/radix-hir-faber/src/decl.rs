@@ -158,7 +158,7 @@ impl super::FaberCodegen<'_> {
         {
             // Typed `↤` constant initializer: lowering stores the
             // binding as the assignment target, so re-emit as
-            // `fixum T name ↤ source [⊥ default]`.
+            // `sit T name ↤ source [⊥ default]`.
             writer.write(" ↤ ");
             self.write_expr_prec(source, 1, names, surface, writer);
             self.write_conversio_assign_via(params, surface, writer);
@@ -425,7 +425,7 @@ impl super::FaberCodegen<'_> {
                 );
                 if let Some(modifier) = field.modifier {
                     writer.write(surface.keyword(match modifier {
-                        radix_syntax::FieldModifier::Fixum => TokenKind::Fixum,
+                        radix_syntax::FieldModifier::Fixum => TokenKind::Sit,
                         radix_syntax::FieldModifier::Varia => TokenKind::Varia,
                         radix_syntax::FieldModifier::Generis => TokenKind::Generis,
                     }));

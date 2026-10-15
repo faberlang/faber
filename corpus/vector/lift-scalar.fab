@@ -88,7 +88,7 @@ fn lowered(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
 }
 
 main {
-    const vector<f32, 3> a ← [1.0, 2.0, 4.0] ↦ vector<f32, 3>
+    let vector<f32, 3> a ← [1.0, 2.0, 4.0] ↦ vector<f32, 3>
     print scaled(a, 2.5)
     print scaled_left(a, 2.5)
     print shrunk(a, 4.0)
@@ -98,10 +98,10 @@ main {
     print lifted(a)
     print flipped(a)
     print a
-    const vector<f32, 4> w ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    let vector<f32, 4> w ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
     print halved(w)
     print true_scaled(a, 4.0)
-    const vector<f32, 3> b ← [4.0, 2.0, 1.0] ↦ vector<f32, 3>
+    let vector<f32, 3> b ← [4.0, 2.0, 1.0] ↦ vector<f32, 3>
     print true_paired(a, b)
     print raised(a, 2.0)
     print lowered(a, b)

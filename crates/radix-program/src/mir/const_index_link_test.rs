@@ -67,7 +67,7 @@ fn read_shifted(tensor<f32, [4]> t) → f32 {
 }
 
 main {
-    var tf32[4] a ← [1.0, 2.0, 3.0, 4.0] ↦ tf32[4]
+    mut tf32[4] a ← [1.0, 2.0, 3.0, 4.0] ↦ tf32[4]
     a[c.IDX] ← 9.0
     print read(a)
     print read_shifted(a)
@@ -86,7 +86,7 @@ fn read_shifted(tensor<f32, [4]> t) → f32 {
 }
 
 main {
-    var tf32[4] a ← [1.0, 2.0, 3.0, 4.0] ↦ tf32[4]
+    mut tf32[4] a ← [1.0, 2.0, 3.0, 4.0] ↦ tf32[4]
     a[[c.IDX]] ← 9.0
     print read(a)
     print read_shifted(a)
@@ -125,7 +125,7 @@ fn read(tensor<f32, [2, 2]> t) → f32 {
 }
 
 main {
-    const tf32[2, 2] a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
+    let tf32[2, 2] a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
     print read(a)
 }
 "#,

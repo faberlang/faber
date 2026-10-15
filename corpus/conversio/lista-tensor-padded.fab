@@ -41,9 +41,9 @@ no_expected = "declaration-only"
 
 # Zero-fill additive exit: maskless (0 is the additive neutral).
 fn sumPadded(list<float, 8> xs) → float {
-    const tensor<float, [8]> t ← xs ↦ tensor<float, [8]>
-    var float total ← 0.0
-    for from t const x {
+    let tensor<float, [8]> t ← xs ↦ tensor<float, [8]>
+    mut float total ← 0.0
+    for from t let x {
         total ← total + x
     }
     return total
@@ -51,9 +51,9 @@ fn sumPadded(list<float, 8> xs) → float {
 
 # A ⊥ default names a different dead-slot fill (element-typed).
 fn sumFilled(list<float, 8> xs) → float {
-    const tensor<float, [8]> t ← xs ↦ tensor<float, [8]> ⊥ 1.0
-    var float total ← 0.0
-    for from t const x {
+    let tensor<float, [8]> t ← xs ↦ tensor<float, [8]> ⊥ 1.0
+    mut float total ← 0.0
+    for from t let x {
         total ← total + x
     }
     return total
@@ -62,9 +62,9 @@ fn sumFilled(list<float, 8> xs) → float {
 # Non-neutral product exit: the caller builds the 0/1 len-mask outside the
 # region and passes it as an operand at the conversion site.
 fn productMasked(list<float, 8> xs, tensor<float, [8]> lenMask) → float {
-    const tensor<float, [8]> t ← xs ↦ tensor<float, [8]>
-    var float total ← 1.0
-    for from t const x {
+    let tensor<float, [8]> t ← xs ↦ tensor<float, [8]>
+    mut float total ← 1.0
+    for from t let x {
         total ← total * x
     }
     return total * lenMask.sum()

@@ -13,18 +13,18 @@ import from "norma:random" random
 main {
     # aleator:semina + aleator:sortire: the same seed replays the same draws.
     random.seed(7)
-    const int first ← random.random_int(1, 9)
-    const int second ← random.random_int(1, 9)
+    let int first ← random.random_int(1, 9)
+    let int second ← random.random_int(1, 9)
     random.seed(7)
-    const int replayFirst ← random.random_int(1, 9)
-    const int replaySecond ← random.random_int(1, 9)
+    let int replayFirst ← random.random_int(1, 9)
+    let int replaySecond ← random.random_int(1, 9)
     assert first ≡ replayFirst
     assert second ≡ replaySecond
 
     # aleator:sortire: every draw stays inside the inclusive range.
-    var int index ← 0
+    mut int index ← 0
     while index ≺ 50 {
-        const int value ← random.random_int(1, 9)
+        let int value ← random.random_int(1, 9)
         assert value ≥ 1
         assert value ≤ 9
         index ← index + 1
@@ -34,24 +34,24 @@ main {
     assert random.random_int(5, 5) ≡ 5
 
     # aleator:fractum: random_float lies in [0.0, 1.0).
-    const float fraction ← random.random_float()
+    let float fraction ← random.random_float()
     assert fraction ≥ 0.0
     assert fraction ≺ 1.0
 
     # aleator:octetos: the requested byte count, and the empty request.
-    const list<b8> bytes ← random.random_bytes(16)
+    let list<b8> bytes ← random.random_bytes(16)
     assert bytes.length() ≡ 16
-    const list<b8> emptyBytes ← random.random_bytes(0)
+    let list<b8> emptyBytes ← random.random_bytes(0)
     assert emptyBytes.length() ≡ 0
 
     # aleator:uuid: 8-4-4-4-12 hyphen shape, and two uuids differ.
-    const string id ← random.uuid()
+    let string id ← random.uuid()
     assert id.length() ≡ 36
     assert id.slice(8, 9) ≡ "-"
     assert id.slice(13, 14) ≡ "-"
     assert id.slice(18, 19) ≡ "-"
     assert id.slice(23, 24) ≡ "-"
-    const string other ← random.uuid()
+    let string other ← random.uuid()
     assert id ≢ other
 
     print "norma/entropy/entropy-routes ok"

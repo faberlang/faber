@@ -1,5 +1,5 @@
 # Fault: undeclared ASCII spelling of an accented name (LOCALE002 suggestion).
 bắtđầu {
-  hằng vănbản lời_nhắn ← "tạm biệt"
+  đặt vănbản lời_nhắn ← "tạm biệt"
   in loi_nhan
 }

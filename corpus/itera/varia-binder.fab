@@ -41,9 +41,9 @@ locale = "en"
 #   varia-binder.expected — each element doubled inside its own slot.
 
 main {
-    const list<int> valores ← [1, 2, 3]
+    let list<int> valores ← [1, 2, 3]
 
-    for from valores var v {
+    for from valores mut v {
         v ← v * 10
         print v
     }

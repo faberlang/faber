@@ -8,25 +8,25 @@ use crate::{Compiler, Config, Output};
 
 const SOURCE: &str = r"
 functio lege(tensor<f32, [2, 2]> grid) → f32 {
-    fixum f32 got ← grid.accipe([0, 1])
+    sit f32 got ← grid.accipe([0, 1])
     redde got
 }
 
 functio dynamica(tensor<f32, [2, 2]> grid, lista<numerus> idx) → f32 ⇥ textus {
-    fixum f32 got ← grid.accipe(idx)
+    sit f32 got ← grid.accipe(idx)
     redde got
 }
 
-functio pone(in tensor<f32, [2, 2]> grid, lista<numerus> idx, f32 v) → vacuum ⇥ textus {
+functio pone(varia tensor<f32, [2, 2]> grid, lista<numerus> idx, f32 v) → vacuum ⇥ textus {
     grid.ponde(idx, v)
 }
 
 functio praefinita(tensor<f32, [2, 2]> grid, lista<numerus> idx) → f32 {
-    fixum f32 got ← grid.accipe(idx) ⊥ 7.0
+    sit f32 got ← grid.accipe(idx) ⊥ 7.0
     redde got
 }
 
-functio cepit(in tensor<f32, [2, 2]> grid, lista<numerus> idx) → f32 {
+functio cepit(varia tensor<f32, [2, 2]> grid, lista<numerus> idx) → f32 {
     varia f32 r ← 0.0
     fac {
         r ← grid.accipe(idx)

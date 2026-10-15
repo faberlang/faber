@@ -8,9 +8,9 @@ canonical = true
 +++
 # Sorting an empty list gives an empty list in both directions.
 incipit {
-    fixum lista<numerus> xs ← vacua
-    fixum lista<numerus> up ← ordinata via ascendens ex xs
-    fixum lista<numerus> down ← ordinata via descendens ex xs
+    sit lista<numerus> xs ← vacua
+    sit lista<numerus> up ← ordinata via ascendens ex xs
+    sit lista<numerus> down ← ordinata via descendens ex xs
     nota up
     nota down
     nota up.longitudo()

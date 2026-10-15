@@ -26,10 +26,10 @@ union Shape {
 
 fn describe(Shape a, Shape b) → string {
     match a and b {
-        case Circle const r and Square const s {
+        case Circle let r and Square let s {
             return "circle-square §,§"(r, s)
         }
-        case Circle const r and _ {
+        case Circle let r and _ {
             return "circle-first §"(r)
         }
         case _ and Dot {
@@ -59,9 +59,9 @@ fn pair(Side a, Side b) → string {
 }
 
 main {
-    const Shape c ← variant Circle { r = 1 } ∷ Shape
-    const Shape q ← variant Square { s = 2 } ∷ Shape
-    const Shape d ← variant Dot { } ∷ Shape
+    let Shape c ← variant Circle { r = 1 } ∷ Shape
+    let Shape q ← variant Square { s = 2 } ∷ Shape
+    let Shape d ← variant Dot { } ∷ Shape
     print describe(c, q)
     print describe(c, d)
     print describe(q, d)

@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "async"
 canonical = true
 summary = "Awaits a promissum while initializing an ordinary binding."
-syntax = "fixum T name ↢ future"
+syntax = "sit T name ↢ future"
 related = ["figendum", "variandum", "fiet", "promissum"]
 locale = "la"
 +++
@@ -26,8 +26,8 @@ functio responde(numerus valor) fiet → numerus {
 }
 
 incipiet {
-    fixum promissum<numerus> futurum ← responde(7)
-    fixum numerus immotum ↢ futurum
+    sit promissum<numerus> futurum ← responde(7)
+    sit numerus immotum ↢ futurum
     varia numerus mutabile ↢ responde(8)
     sit illatum ↢ responde(9)
     mutabile ← mutabile + 1

@@ -53,9 +53,9 @@ fn run_causal_softmax_source(rows: usize, cols: usize, flat: &[f64]) -> Vec<f64>
     let flat_text: Vec<String> = flat.iter().map(|&v| f32_literal(v)).collect();
     let source = format!(
         "incipit {{
-    fixum lista<f32> flat ← [{}]
-    fixum tensor<f32, [{rows}, {cols}]> x ← flat ↦ tensor<f32, [{rows}, {cols}]>
-    fixum tensor<f32, [{rows}, {cols}]> y ← x.softmax_causal()
+    sit lista<f32> flat ← [{}]
+    sit tensor<f32, [{rows}, {cols}]> x ← flat ↦ tensor<f32, [{rows}, {cols}]>
+    sit tensor<f32, [{rows}, {cols}]> y ← x.softmax_causal()
     nota y
 }}",
         flat_text.join(", "),

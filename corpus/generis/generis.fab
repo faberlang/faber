@@ -39,10 +39,10 @@ locale = "en"
 
 class Color {
     static string ruber = "#ff0000"
-    var string nomen = "ruber"
+    mut string nomen = "ruber"
 }
 
 main {
-    const Color color ← Color {}
+    let Color color ← Color {}
     print color.nomen
 }

@@ -18,6 +18,6 @@ genus Persona {
 }
 
 incipit {
-    fixum lista<Persona> personae ← [Persona { nomen = "Livia", aetas = 30 }]
+    sit lista<Persona> personae ← [Persona { nomen = "Livia", aetas = 30 }]
     nota ordinata via ascendens ex personae
 }

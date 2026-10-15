@@ -67,7 +67,7 @@ import from "lib10:tensor" tensor
 @ public
 fn describe(tensor.TensorError err) → string {{
     match err {{
-        case tensor.TensorError.InvalidShape const message {{
+        case tensor.TensorError.InvalidShape let message {{
             return message
         }}
 {shape_failure_arm}
@@ -128,12 +128,12 @@ fn error_codes(dir: &Path, shape_failure_arm: &str) -> Vec<(Option<String>, Opti
 }
 
 const SHARED_AND_OWN_ARM: &str = "
-        case tensor.TensorError.ShapeFailure const message, _ {
+        case tensor.TensorError.ShapeFailure let message, _ {
             return message
         }";
 
 const SHARED_ONLY_ARM: &str = "
-        case tensor.TensorError.ShapeFailure const message {
+        case tensor.TensorError.ShapeFailure let message {
             return message
         }";
 

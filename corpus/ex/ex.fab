@@ -38,13 +38,13 @@ locale = "en"
 #
 
 class Persona {
-    var string nomen
-    var int aetas
+    mut string nomen
+    mut int aetas
 }
 
 main {
-    const _ p ← Persona { nomen = "Marcus", aetas = 30 }
-    from p const nomen, aetas
+    let p ← Persona { nomen = "Marcus", aetas = 30 }
+    from p let nomen, aetas
     print nomen
     print aetas
 }

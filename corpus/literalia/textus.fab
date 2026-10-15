@@ -35,9 +35,9 @@ locale = "en"
 #   Salve, Salve, Mundus!
 
 main {
-    const string greeting ← "Salve"
+    let string greeting ← "Salve"
     print greeting
-    const string nomen ← "Mundus"
-    const string message ← "Salve, §!"(nomen)
+    let string nomen ← "Mundus"
+    let string message ← "Salve, §!"(nomen)
     print message
 }

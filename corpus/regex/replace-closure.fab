@@ -45,30 +45,30 @@ locale = "en"
 
 main {
     # upper-case every word: the match text, changed
-    const regex word ← "[a-z]+" ↦ regex
+    let regex word ← "[a-z]+" ↦ regex
     print word.replace("ab cd e", _ m ∴ m.text().uppercase())
 
     # every accessor: text, start, end, a group and a named group
-    const regex pair ← "(?P<key>[a-z]+)=(?P<val>[0-9]+)" ↦ regex
+    let regex pair ← "(?P<key>[a-z]+)=(?P<val>[0-9]+)" ↦ regex
     print pair.replace("x=1 yy=22", _ m ∴ "[§ §-§ §=§]"(m.text(), m.start(), m.end(), m.group(1) coalesce "?", m.named("val") coalesce "?"))
 
     # a group that did not take part reads as none
-    const regex either ← "(a)|(b)" ↦ regex
+    let regex either ← "(a)|(b)" ↦ regex
     print either.replace("abc", _ m ∴ (m.group(1) coalesce "-") + (m.group(2) coalesce "-"))
 
     # the result is literal: `$1` and `${key}` are copied, not expanded
     print pair.replace("x=1", _ m ∴ "$1 ${key}")
 
     # a result is never searched again: each `a` becomes `aa`, once
-    const regex a ← "a" ↦ regex
+    let regex a ← "a" ↦ regex
     print a.replace("banana", _ m ∴ "aa")
 
     # the empty-match rule: the closure runs for (0,0) (1,4) (5,5)
-    const regex stars ← "a*" ↦ regex
+    let regex stars ← "a*" ↦ regex
     print stars.replace("baaac", _ m ∴ "<§-§>"(m.start(), m.end()))
 
     # no match is the text unchanged
-    const regex digits ← "[0-9]+" ↦ regex
+    let regex digits ← "[0-9]+" ↦ regex
     print digits.replace("none here", _ m ∴ "#")
 
     # offsets count code points

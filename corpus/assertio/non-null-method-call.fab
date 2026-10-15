@@ -49,13 +49,13 @@ fn greeting() → string ∪ none {
 }
 
 main {
-    const list<int> base ← [1, 2]
-    var list<int> ∪ none xs ← wrap(base)
+    let list<int> base ← [1, 2]
+    mut list<int> ∪ none xs ← wrap(base)
     xs!.append(3)
     xs!.append(4)
     print xs!.length()
 
-    const string ∪ none text ← greeting()
+    let string ∪ none text ← greeting()
     print text!.length()
 
     print xs![2]

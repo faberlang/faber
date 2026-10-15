@@ -19,7 +19,7 @@ locale = "en"
 #     IEEE gives. Nothing clamps to the largest finite value.
 #   • `trapping<f32>` is the same float, and it checks only where a value is
 #     stored into it. `print t * t` is unstored, so it prints `inf`; the store
-#     `const trapping<f32> u ← t * t` aborts with "inf does not fit in `f32`".
+#     `let trapping<f32> u ← t * t` aborts with "inf does not fit in `f32`".
 #   • A conversion into a cell is the conversion to the bare float of its width.
 #     `huge ↦ saturating<f64>` and `wide ↦ saturating<f32>` give infinity; the
 #     same conversion into a `trapping` cell raises the trapping overflow error.
@@ -45,19 +45,19 @@ locale = "en"
 #   goes to stderr and the exit status is 1).
 
 main {
-    const f32 m ← 3.4028235e38
-    const saturating<f32> s ← m ↦ saturating<f32>
+    let f32 m ← 3.4028235e38
+    let saturating<f32> s ← m ↦ saturating<f32>
     print s * s
-    const saturating<f32> p ← s * s
+    let saturating<f32> p ← s * s
     print p
-    const saturating<f32> zero ← 0.0
+    let saturating<f32> zero ← 0.0
     print zero / zero
-    const inf huge ← 2 ⇐ 2000
+    let inf huge ← 2 ⇐ 2000
     print huge ↦ saturating<f64>
-    const f64 wide ← 1.0e300
+    let f64 wide ← 1.0e300
     print wide ↦ saturating<f32>
-    const trapping<f32> t ← m ↦ trapping<f32>
+    let trapping<f32> t ← m ↦ trapping<f32>
     print t * t
-    const trapping<f32> u ← t * t
+    let trapping<f32> u ← t * t
     print u
 }

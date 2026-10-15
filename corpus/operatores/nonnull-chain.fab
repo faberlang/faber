@@ -36,14 +36,14 @@ locale = "en"
 #   Rust: non-null chain lowering gap (whitelist: operatores/nonnull-chain.fab).
 
 class Persona {
-    var string nomen
-    var string urbs optional
+    mut string nomen
+    mut string urbs optional
 }
 
 main {
-    const Persona ∪ none p ← Persona { nomen = "Marcus", urbs = "Roma" }
+    let Persona ∪ none p ← Persona { nomen = "Marcus", urbs = "Roma" }
     print p!.nomen
     print p!.urbs
-    const list<string, 3> litterae ← ["a", "b", "c"]
+    let list<string, 3> litterae ← ["a", "b", "c"]
     print litterae![0]
 }

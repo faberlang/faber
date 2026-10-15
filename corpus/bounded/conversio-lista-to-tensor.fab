@@ -40,9 +40,9 @@ locale = "en"
 #   conversio-lista-to-tensor.expected — shape, folded sum, and lane values.
 
 main {
-    const list<f32, 8> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-    const tf32[8] line ← flat ↦ tf32[8]
-    const list<int, _> dims ← line.shape()
+    let list<f32, 8> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    let tf32[8] line ← flat ↦ tf32[8]
+    let list<int, _> dims ← line.shape()
     print dims
     print line.sum()
     print line[0]

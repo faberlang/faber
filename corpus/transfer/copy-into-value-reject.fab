@@ -13,7 +13,7 @@ locale = "en"
 # R4: the statement result is `vacuum`; a copy-into cannot be bound, returned, or used as an operand.
 
 fn fill(mut tf32[2, 2] target, tf32[2, 2] source) → void {
-    const tf32[2, 2] result ← target ⇇ source
+    let tf32[2, 2] result ← target ⇇ source
 }
 
 main {}

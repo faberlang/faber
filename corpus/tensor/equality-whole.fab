@@ -40,35 +40,35 @@ fn runtime_extent(int value) → int {
 }
 
 main {
-    const tensor<f32, [4]> a ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
-    const tensor<f32, [4]> same ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
-    const tensor<f32, [4]> other ← [1.0, 2.0, 3.0, 5.0] ↦ tensor<f32, [4]>
+    let tensor<f32, [4]> a ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
+    let tensor<f32, [4]> same ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
+    let tensor<f32, [4]> other ← [1.0, 2.0, 3.0, 5.0] ↦ tensor<f32, [4]>
 
     print a ≡ same
     print a ≡ other
     print a ≢ other
     print a ≢ same
 
-    const tensor<bool, [4]> mask ← a ≅ other
+    let tensor<bool, [4]> mask ← a ≅ other
     print mask.flatten()
-    const tensor<bool, [4]> apart ← a ≇ other
+    let tensor<bool, [4]> apart ← a ≇ other
     print apart.flatten()
     print reduce via all from mask
     print reduce via any from apart
     print reduce via count from mask
 
-    const tensor<f32, [4]> zeros ← [0.0, 1.0, 2.0, 3.0] ↦ tensor<f32, [4]>
-    const tensor<f32, [4]> nans ← zeros ÷ zeros
+    let tensor<f32, [4]> zeros ← [0.0, 1.0, 2.0, 3.0] ↦ tensor<f32, [4]>
+    let tensor<f32, [4]> nans ← zeros ÷ zeros
     print nans.flatten()
     print nans ≡ nans
     print nans ≢ nans
 
-    const int n ← runtime_extent(2)
-    const int m ← runtime_extent(3)
-    const list<f32> flat_short ← [1.0, 2.0]
-    const list<f32> flat_long ← [1.0, 2.0, 3.0]
-    const tensor<f32, [size n]> short ← flat_short ↦ tensor<f32, [size n]>
-    const tensor<f32, [size m]> long ← flat_long ↦ tensor<f32, [size m]>
+    let int n ← runtime_extent(2)
+    let int m ← runtime_extent(3)
+    let list<f32> flat_short ← [1.0, 2.0]
+    let list<f32> flat_long ← [1.0, 2.0, 3.0]
+    let tensor<f32, [size n]> short ← flat_short ↦ tensor<f32, [size n]>
+    let tensor<f32, [size m]> long ← flat_long ↦ tensor<f32, [size m]>
     print short ≡ long
     print short ≢ long
     print short ≡ short

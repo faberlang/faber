@@ -133,7 +133,7 @@ fn analyze_box(source: &str) -> Result<AnalyzedModule, Vec<Diagnostic>> {
 /// does not declare; the genus literal itself is not an import reference.
 fn deferred_method_unit() -> AnalyzedModule {
     let source = format!(
-        "{IMPORT}fixum numerus M = praefixum {{\n    fixum consts.Box b ← consts.Box {{ n = 7 }}\n    redde b.get()\n}}\n"
+        "{IMPORT}fixum numerus M = praefixum {{\n    sit consts.Box b ← consts.Box {{ n = 7 }}\n    redde b.get()\n}}\n"
     );
     let unit = analyze_box(&source)
         .unwrap_or_else(|diagnostics| panic!("method-only deferral is not an error: {diagnostics:?}"));

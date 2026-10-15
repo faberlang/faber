@@ -31,8 +31,8 @@ fn crea_builds_zero_vector_at_each_admitted_width() {
     run_and_expect(
         "crea-vf32-1.fab",
         r"incipit {
-    fixum vf32[1] z ← [0.5] ↦ vf32[1]
-    fixum vf32[1] w ← z.crea()
+    sit vf32[1] z ← [0.5] ↦ vf32[1]
+    sit vf32[1] w ← z.crea()
     nota w
 }",
         &["[0.0]"],
@@ -40,8 +40,8 @@ fn crea_builds_zero_vector_at_each_admitted_width() {
     run_and_expect(
         "crea-vf32-2.fab",
         r"incipit {
-    fixum vf32[2] z ← [0.5, 0.5] ↦ vf32[2]
-    fixum vf32[2] w ← z.crea()
+    sit vf32[2] z ← [0.5, 0.5] ↦ vf32[2]
+    sit vf32[2] w ← z.crea()
     nota w
 }",
         &["[0.0, 0.0]"],
@@ -49,8 +49,8 @@ fn crea_builds_zero_vector_at_each_admitted_width() {
     run_and_expect(
         "crea-vf32-3.fab",
         r"incipit {
-    fixum vf32[3] z ← [0.5, 0.5, 0.5] ↦ vf32[3]
-    fixum vf32[3] w ← z.crea()
+    sit vf32[3] z ← [0.5, 0.5, 0.5] ↦ vf32[3]
+    sit vf32[3] w ← z.crea()
     nota w
 }",
         &["[0.0, 0.0, 0.0]"],
@@ -58,8 +58,8 @@ fn crea_builds_zero_vector_at_each_admitted_width() {
     run_and_expect(
         "crea-vf32-4.fab",
         r"incipit {
-    fixum vf32[4] z ← [0.5, 0.5, 0.5, 0.5] ↦ vf32[4]
-    fixum vf32[4] w ← z.crea()
+    sit vf32[4] z ← [0.5, 0.5, 0.5, 0.5] ↦ vf32[4]
+    sit vf32[4] w ← z.crea()
     nota w
 }",
         &["[0.0, 0.0, 0.0, 0.0]"],
@@ -71,8 +71,8 @@ fn crea_integer_element_lanes_are_integer_zero() {
     run_and_expect(
         "crea-vi32-3.fab",
         r"incipit {
-    fixum vi32[3] z ← [7, 7, 7] ↦ vi32[3]
-    fixum vi32[3] w ← z.crea()
+    sit vi32[3] z ← [7, 7, 7] ↦ vi32[3]
+    sit vi32[3] w ← z.crea()
     nota w
 }",
         &["[0, 0, 0]"],

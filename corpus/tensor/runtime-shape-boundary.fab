@@ -19,12 +19,12 @@ fn same_rows<size N>(ref tf32[N, 2] left, ref tf32[N, 2] right) → int ⇥ stri
 }
 
 main {
-    const int n ← runtime_extent(2)
-    const int m ← runtime_extent(3)
-    const list<f32> flat_left ← [1.0, 2.0, 3.0, 4.0]
-    const list<f32> flat_right ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[size n, 2] left ← flat_left ↦ tf32[size n, 2]
-    const tf32[size m, 2] right ← flat_right ↦ tf32[size m, 2]
+    let int n ← runtime_extent(2)
+    let int m ← runtime_extent(3)
+    let list<f32> flat_left ← [1.0, 2.0, 3.0, 4.0]
+    let list<f32> flat_right ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[size n, 2] left ← flat_left ↦ tf32[size n, 2]
+    let tf32[size m, 2] right ← flat_right ↦ tf32[size m, 2]
     do {
         print same_rows(left, left)
         print same_rows(left, right)

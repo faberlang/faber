@@ -555,7 +555,7 @@ fn risky(int n) → int ⇥ string {
 
 main {
     print risky(1)
-    const int x ← risky(-1)
+    let int x ← risky(-1)
     print x
 }
 "#,
@@ -1413,7 +1413,7 @@ fn run_cli_root_rest_text_operand_executes_without_cargo_or_rust_emit() {
 @ operand rest string files
 main args args {
   print args.input
-  const list<string> files ← args.files
+  let list<string> files ← args.files
   print files.length()
 }
 "#,
@@ -2386,7 +2386,7 @@ import from "norma:fault" fault
 
 main {
     do {
-        const string body ← fs.read_file<string>("__PATH__")
+        let string body ← fs.read_file<string>("__PATH__")
         print body
     }
     catch err {
@@ -2418,7 +2418,7 @@ fn uncaught_missing_file_read_prints_fault_code() {
     let source = r#"import from "norma:fs" fs
 
 main {
-    const string body ← fs.read_file<string>("__PATH__")
+    let string body ← fs.read_file<string>("__PATH__")
     print body
 }
 "#
@@ -2457,12 +2457,12 @@ import from "norma:fault" fault
 
 main {
     do {
-        const string body ← fs.read_file<string>("__PATH__")
+        let string body ← fs.read_file<string>("__PATH__")
         print body
     }
     catch err {
         match err {
-            case NotFound const path {
+            case NotFound let path {
                 print path
             }
             default {
@@ -2588,8 +2588,8 @@ entry = "main.fab"
 import from "norma:fault" fault
 
 main {
-  const _ partial ← (string msg) → void ⇥ fault.IoFault ∴ write_partial(msg)
-  const _ out_bytes ← (bytes data) → void ⇥ fault.IoFault ∴ write_bytes(data)
+  let partial ← (string msg) → void ⇥ fault.IoFault ∴ write_partial(msg)
+  let out_bytes ← (bytes data) → void ⇥ fault.IoFault ∴ write_bytes(data)
   partial("P")
   out_bytes(|41|)
   partial(read_line() coalesce "")
@@ -2640,10 +2640,10 @@ entry = "main.fab"
         r#"import from "norma:console" const read_line
 
 main {
-    var int lines ← 0
-    var bool done ← false
+    mut int lines ← 0
+    mut bool done ← false
     while (not done) and lines ≺ 10 {
-        const string ∪ none line ← read_line()
+        let string ∪ none line ← read_line()
         if line is none {
             done ← true
         }
@@ -2696,10 +2696,10 @@ entry = "main.fab"
         r#"import from "norma:console" const read_bytes
 
 main {
-    var int reads ← 0
-    var bool done ← false
+    mut int reads ← 0
+    mut bool done ← false
     while (not done) and reads ≺ 10 {
-        const bytes ∪ none chunk ← read_bytes(4)
+        let bytes ∪ none chunk ← read_bytes(4)
         if chunk is none {
             done ← true
         }
@@ -2708,8 +2708,8 @@ main {
         }
     }
     print reads
-    const bytes ∪ none zero ← read_bytes(0)
-    var bool absent ← false
+    let bytes ∪ none zero ← read_bytes(0)
+    mut bool absent ← false
     if zero is none {
         absent ← true
     }
@@ -2776,7 +2776,7 @@ fn run_panic_prints_abort_reason_to_stderr_and_exits_one() {
 fn run_negative_integer_exponent_trap_prints_reason_to_stderr() {
     let file = write_single_file(
         "run-negative-exponent-abort",
-        "main {\n    const int b ← 2\n    const int e ← -1\n    print \"before\"\n    print b.power(e)\n    print \"after\"\n}\n",
+        "main {\n    let int b ← 2\n    let int e ← -1\n    print \"before\"\n    print b.power(e)\n    print \"after\"\n}\n",
     );
 
     let (stdout, stderr, status) =

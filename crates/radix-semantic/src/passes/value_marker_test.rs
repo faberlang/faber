@@ -9,8 +9,8 @@ fn value_marker_copy_types_the_binding_as_a_copy_value() {
     let result = analyze_ok_la(
         r"
 incipit {
-    fixum lista<numerus> a ← [1, 2, 3]
-    fixum lista<numerus> b ← copy a
+    sit lista<numerus> a ← [1, 2, 3]
+    sit lista<numerus> b ← copy a
     nota a
     nota b
 }
@@ -28,8 +28,8 @@ fn value_marker_own_types_the_binding_as_an_owned_value() {
     let result = analyze_ok_la(
         r"
 incipit {
-    fixum lista<numerus> a ← own [1, 2, 3]
-    fixum lista<numerus> b ← own a
+    sit lista<numerus> a ← own [1, 2, 3]
+    sit lista<numerus> b ← own a
     nota b
 }
 ",
@@ -50,8 +50,8 @@ fn value_marker_own_use_after_transfer_is_rejected() {
     assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum lista<numerus> a ← own [1, 2, 3]
-    fixum lista<numerus> b ← own a
+    sit lista<numerus> a ← own [1, 2, 3]
+    sit lista<numerus> b ← own a
     nota a
     nota b
 }
@@ -65,7 +65,7 @@ fn value_marker_copy_assignment_checks() {
     let _ = analyze_ok_la(
         r"
 incipit {
-    fixum lista<numerus> c ← [1, 2, 3]
+    sit lista<numerus> c ← [1, 2, 3]
     varia lista<numerus> b ← [4]
     b ← copy c
     nota b
@@ -77,11 +77,11 @@ incipit {
 #[test]
 fn value_marker_copy_on_a_scalar_is_rejected() {
     assert_rejects_with_issue_la(
-        "incipit { fixum numerus x ← 5\n fixum numerus y ← copy x }",
+        "incipit { sit numerus x ← 5\n sit numerus y ← copy x }",
         ISSUE_SCALAR_ACCESS_MARKER,
     );
     assert_rejects_with_issue_la(
-        "incipit { fixum numerus x ← 5\n varia numerus y ← 1\n y ← copy x }",
+        "incipit { sit numerus x ← 5\n varia numerus y ← 1\n y ← copy x }",
         ISSUE_SCALAR_ACCESS_MARKER,
     );
 }

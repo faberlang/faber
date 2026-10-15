@@ -46,25 +46,25 @@ fn take(value ∪ none boxed) → inf {
 
 main {
     # 1. Integer payloads convert exactly, whatever the size.
-    const value ∪ none small ← 7 ↦ value
+    let value ∪ none small ← 7 ↦ value
     print take(small)
-    const value ∪ none big ← 18446744073709551616 ↦ value
+    let value ∪ none big ← 18446744073709551616 ↦ value
     print take(big)
-    const value ∪ none negative ← -18446744073709551617 ↦ value
+    let value ∪ none negative ← -18446744073709551617 ↦ value
     print take(negative)
 
     # 2. A float payload fails like the non-nullable `valor ↦ inf`: it never
     #    truncates, so even `3.0` fails.
-    const value ∪ none half ← 1.5 ↦ value
+    let value ∪ none half ← 1.5 ↦ value
     print take(half)
-    const value ∪ none whole ← 3.0 ↦ value
+    let value ∪ none whole ← 3.0 ↦ value
     print take(whole)
 
     # 3. An absent (none) value is not an integer and fails too.
-    const value ∪ none absent ← null
+    let value ∪ none absent ← null
     print take(absent)
 
     # 4. `⊥` names its own fallback.
-    const value ∪ none word ← "text" ↦ value
+    let value ∪ none word ← "text" ↦ value
     print word ↦ inf ⊥ 8
 }

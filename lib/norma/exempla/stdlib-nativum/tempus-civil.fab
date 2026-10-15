@@ -40,7 +40,7 @@ fn buildMoment(int y, int m, int d, int h, int min, int s) → instant {
 
 fn expectInvalid() → bool {
     do {
-        const _ bad ← tempus.construct(2026, 2, 30)
+        let bad ← tempus.construct(2026, 2, 30)
         return false
     }
     catch err {
@@ -49,7 +49,7 @@ fn expectInvalid() → bool {
 }
 
 main {
-    const instant t ← tempus.parse("1979-05-27T07:32:00Z")
+    let instant t ← tempus.parse("1979-05-27T07:32:00Z")
     assert tempus.render(t) ≡ "1979-05-27T07:32:00Z"
     assert tempus.year(t) ≡ 1979
     assert tempus.month(t) ≡ 5
@@ -58,10 +58,10 @@ main {
     assert tempus.minute(t) ≡ 32
     assert tempus.second(t) ≡ 0
 
-    const instant rebuilt ← buildMoment(1979, 5, 27, 7, 32, 0)
+    let instant rebuilt ← buildMoment(1979, 5, 27, 7, 32, 0)
     assert (rebuilt ↦ instant<ms>) ≡ (t ↦ instant<ms>)
 
-    const instant leap ← build(2024, 2, 29)
+    let instant leap ← build(2024, 2, 29)
     assert tempus.month(leap) ≡ 2
     assert tempus.day(leap) ≡ 29
     assert expectInvalid()
@@ -70,7 +70,7 @@ main {
     # structa: year=0 (out of range)
     # -----------------------------------------------------------------------
     do {
-        const instant bad ← tempus.construct(0, 1, 1)
+        let instant bad ← tempus.construct(0, 1, 1)
         assert false
     }
     catch err {
@@ -81,7 +81,7 @@ main {
     # structa: invalid month (month=13)
     # -----------------------------------------------------------------------
     do {
-        const instant bad ← tempus.construct(2026, 13, 1)
+        let instant bad ← tempus.construct(2026, 13, 1)
         assert false
     }
     catch err {
@@ -92,7 +92,7 @@ main {
     # structa: month=0 (out of range)
     # -----------------------------------------------------------------------
     do {
-        const instant bad ← tempus.construct(2026, 0, 1)
+        let instant bad ← tempus.construct(2026, 0, 1)
         assert false
     }
     catch err {
@@ -103,7 +103,7 @@ main {
     # structa_momenti: invalid hour (hour=25)
     # -----------------------------------------------------------------------
     do {
-        const instant bad ← tempus.construct_moment(2026, 1, 1, 25, 0, 0)
+        let instant bad ← tempus.construct_moment(2026, 1, 1, 25, 0, 0)
         assert false
     }
     catch err {
@@ -114,7 +114,7 @@ main {
     # structa_momenti: invalid minute (minute=60)
     # -----------------------------------------------------------------------
     do {
-        const instant bad ← tempus.construct_moment(2026, 1, 1, 0, 60, 0)
+        let instant bad ← tempus.construct_moment(2026, 1, 1, 0, 60, 0)
         assert false
     }
     catch err {
@@ -125,7 +125,7 @@ main {
     # structa_momenti: invalid second (second=61)
     # -----------------------------------------------------------------------
     do {
-        const instant bad ← tempus.construct_moment(2026, 1, 1, 0, 0, 61)
+        let instant bad ← tempus.construct_moment(2026, 1, 1, 0, 0, 61)
         assert false
     }
     catch err {
@@ -136,7 +136,7 @@ main {
     # solve: invalid wire format (non-RFC3339)
     # -----------------------------------------------------------------------
     do {
-        const instant bad ← tempus.parse("not-a-date")
+        let instant bad ← tempus.parse("not-a-date")
         assert false
     }
     catch err {

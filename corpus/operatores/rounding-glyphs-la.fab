@@ -23,7 +23,7 @@ locale = "la"
 #   2, 3, 2, 4, -2, 2, 3
 
 incipit {
-    fixum fractus dimidium ← 2.5
+    sit fractus dimidium ← 2.5
     nota ⌊dimidium⌋
     nota ⌈dimidium⌉
     nota ⌊dimidium⌉

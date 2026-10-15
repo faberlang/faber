@@ -2980,7 +2980,8 @@ impl<'a> FunctionBuilder<'a> {
         // payload type, like a `copy` / `own` parameter, so field projection
         // and method receivers see the struct, not the access wrapper.
         let copy_bind = self.types.is_copy_view(ty);
-        let mir_ty = if copy_bind || self.types.is_own_view(ty) {
+        // A `ref` local reads a place: its storage type is the payload too.
+        let mir_ty = if copy_bind || self.types.is_own_view(ty) || self.types.is_ref_view(ty) {
             MirType::semantic(self.types.peel_access_marker(ty).1)
         } else {
             MirType::semantic(ty)
@@ -2995,7 +2996,7 @@ impl<'a> FunctionBuilder<'a> {
 
         if let Some(init) = &local.init {
             if let HirExpressionKind::ConversioAssign { source, recovery, .. } = &init.kind {
-                // Typed `↤` initializer (`fixum numerus n ↤ "42"`): the node's
+                // Typed `↤` initializer (`sit numerus n ↤ "42"`): the node's
                 // target is this binding, so the destination is the local we
                 // just declared. Convert the source to the declared type and
                 // store once — no self-reference to resolve.
@@ -3405,13 +3406,17 @@ impl<'a> FunctionBuilder<'a> {
                 Some((MirPlace::local(binding.local), binding.ty))
             }
             HirExpressionKind::Field(object, name) => {
-                let (mut place, _) = self.lower_assignment_place_with_fallback(object, fallback_ty)?;
+                // The base lowers through the projectable-place path so a
+                // narrowed optional base (`cur not is none { cur.v ← 5 }`)
+                // unwraps before the projection; a non-narrowed base yields
+                // the same place the direct recursion produced.
+                let mut place = self.lower_projectable_place(object)?;
                 place.projections.push(MirProjection::Field(*name));
                 let ty = expr.ty.map_or(fallback_ty, MirType::semantic);
                 Some((place, ty))
             }
             HirExpressionKind::Index(object, index) => {
-                let (mut place, _) = self.lower_assignment_place_with_fallback(object, fallback_ty)?;
+                let mut place = self.lower_projectable_place(object)?;
                 let projection = self.lower_index_projection(&place, object.ty, index)?;
                 place.projections.push(projection);
                 let ty = expr.ty.map_or(fallback_ty, MirType::semantic);

@@ -532,14 +532,14 @@ import from "norma:fault" fault
 import from "norma:json" json
 
 main {
-    const json document ← json.parse(«{"kind":"NotFound","path":"/x"}»)
-    const value raw ← document ↦ value
-    const fault.IoFault got ← fault.io_fault_from(raw)
+    let json document ← json.parse(«{"kind":"NotFound","path":"/x"}»)
+    let value raw ← document ↦ value
+    let fault.IoFault got ← fault.io_fault_from(raw)
     match got {
-        case NotFound const path {
+        case NotFound let path {
             print path
         }
-        case Io const path {
+        case Io let path {
             print path
         }
         default {

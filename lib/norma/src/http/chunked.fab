@@ -16,8 +16,8 @@ fn encode(list<b8> data) → list<b8> {
     if data.length() ≡ 0 {
         return "0\r\n\r\n" ↦ list<b8>
     }
-    const string size_line ← hex_string(data.length()) + "\r\n"
-    var list<b8> out ← bytes_list(size_line ↦ list<b8>)
+    let string size_line ← hex_string(data.length()) + "\r\n"
+    mut list<b8> out ← bytes_list(size_line ↦ list<b8>)
     out ← extend(out, data)
     out ← extend(out, "\r\n0\r\n\r\n" ↦ list<b8>)
     return out
@@ -27,13 +27,13 @@ fn encode(list<b8> data) → list<b8> {
 # illegal extensions, missing CRLF, and trailing bytes after the last-chunk.
 @ public
 fn decode(list<b8> data) → list<b8> ⇥ string {
-    var list<b8> body ← []
-    var int i ← 0
-    const int n ← data.length()
+    mut list<b8> body ← []
+    mut int i ← 0
+    let int n ← data.length()
     while i ≺ n {
-        const int line_end ← find_crlf(data, i)
+        let int line_end ← find_crlf(data, i)
         if line_end ≺ 0 then throw "norma:http/chunked.decode: truncated"
-        const int size ← parse_size_line(data, i, line_end)
+        let int size ← parse_size_line(data, i, line_end)
         i ← line_end + 2
         if size ≡ 0 {
             i ← skip_trailers(data, i)
@@ -41,7 +41,7 @@ fn decode(list<b8> data) → list<b8> ⇥ string {
             return body
         }
         if i + size + 2 ≻ n then throw "norma:http/chunked.decode: truncated"
-        var int k ← 0
+        mut int k ← 0
         while k ≺ size {
             body.append(data.get(i + k) coalesce (0 ∷ b8))
             k ← k + 1
@@ -55,11 +55,11 @@ fn decode(list<b8> data) → list<b8> ⇥ string {
 
 fn hex_string(int n) → string {
     if n ≡ 0 then return "0"
-    const string digits ← "0123456789abcdef"
-    var string acc ← ""
-    var int v ← n
+    let string digits ← "0123456789abcdef"
+    mut string acc ← ""
+    mut int v ← n
     while v ≻ 0 {
-        const int d ← v % 16
+        let int d ← v % 16
         acc ← digits.slice(d, d + 1) + acc
         v ← v / 16
     }
@@ -67,8 +67,8 @@ fn hex_string(int n) → string {
 }
 
 fn bytes_list(list<b8> src) → list<b8> {
-    var list<b8> out ← []
-    var int i ← 0
+    mut list<b8> out ← []
+    mut int i ← 0
     while i ≺ src.length() {
         out.append(src.get(i) coalesce (0 ∷ b8))
         i ← i + 1
@@ -77,8 +77,8 @@ fn bytes_list(list<b8> src) → list<b8> {
 }
 
 fn extend(list<b8> dest, list<b8> src) → list<b8> {
-    var list<b8> out ← copy dest
-    var int i ← 0
+    mut list<b8> out ← copy dest
+    mut int i ← 0
     while i ≺ src.length() {
         out.append(src.get(i) coalesce (0 ∷ b8))
         i ← i + 1
@@ -96,7 +96,7 @@ fn at_crlf(list<b8> data, int i) → bool {
 }
 
 fn find_crlf(list<b8> data, int start) → int {
-    var int i ← start
+    mut int i ← start
     while i + 1 ≺ data.length() {
         if byte_at(data, i) ≡ 13 and byte_at(data, i + 1) ≡ 10 {
             return i
@@ -109,11 +109,11 @@ fn find_crlf(list<b8> data, int start) → int {
 # Size-line: 1*HEXDIG [chunk-ext] before the CRLF at `end`.
 fn parse_size_line(list<b8> data, int start, int end) → int ⇥ string {
     if start ≥ end then throw "norma:http/chunked.decode: invalid size line"
-    var int i ← start
-    var int extent ← 0
-    var int digits ← 0
+    mut int i ← start
+    mut int extent ← 0
+    mut int digits ← 0
     while i ≺ end {
-        const int d ← hex_digit(byte_at(data, i))
+        let int d ← hex_digit(byte_at(data, i))
         if d ≺ 0 then break
         digits ← digits + 1
         if digits ≻ 8 then throw "norma:http/chunked.decode: invalid size line"
@@ -136,7 +136,7 @@ fn hex_digit(int n) → int {
 
 # chunk-ext = *( BWS ";" BWS token [ BWS "=" BWS (token / quoted-string) ] )
 fn parse_extensions(list<b8> data, int start, int end) → void ⇥ string {
-    var int i ← skip_bws(data, start, end)
+    mut int i ← skip_bws(data, start, end)
     while i ≺ end {
         if byte_at(data, i) ≢ 59 then throw "norma:http/chunked.decode: illegal extension"
         i ← skip_bws(data, i + 1, end)
@@ -169,15 +169,15 @@ fn parse_extensions(list<b8> data, int start, int end) → void ⇥ string {
 }
 
 fn parse_quoted(list<b8> data, int start, int end) → int ⇥ string {
-    var int i ← start
+    mut int i ← start
     while i ≺ end {
-        const int n ← byte_at(data, i)
+        let int n ← byte_at(data, i)
         if n ≡ 13 or n ≡ 10 then throw "norma:http/chunked.decode: illegal extension"
         if n ≡ 34 then return i + 1
         if n ≡ 92 {
             i ← i + 1
             if i ≥ end then throw "norma:http/chunked.decode: illegal extension"
-            const int esc ← byte_at(data, i)
+            let int esc ← byte_at(data, i)
             if esc ≡ 13 or esc ≡ 10 then throw "norma:http/chunked.decode: illegal extension"
         }
         i ← i + 1
@@ -186,9 +186,9 @@ fn parse_quoted(list<b8> data, int start, int end) → int ⇥ string {
 }
 
 fn skip_bws(list<b8> data, int start, int end) → int {
-    var int i ← start
+    mut int i ← start
     while i ≺ end {
-        const int n ← byte_at(data, i)
+        let int n ← byte_at(data, i)
         if n ≢ 32 and n ≢ 9 then return i
         i ← i + 1
     }
@@ -218,10 +218,10 @@ fn is_tchar(int n) → bool {
 }
 
 fn skip_trailers(list<b8> data, int start) → int ⇥ string {
-    var int i ← start
-    const int n ← data.length()
+    mut int i ← start
+    let int n ← data.length()
     while i ≺ n {
-        const int line_end ← find_crlf(data, i)
+        let int line_end ← find_crlf(data, i)
         if line_end ≺ 0 then throw "norma:http/chunked.decode: truncated"
         if line_end ≡ i {
             return i + 2
@@ -233,7 +233,7 @@ fn skip_trailers(list<b8> data, int start) → int ⇥ string {
 
 fn bytes_eq(list<b8> a, list<b8> b) → bool {
     if a.length() ≢ b.length() then return false
-    var int i ← 0
+    mut int i ← 0
     while i ≺ a.length() {
         if (a.get(i) coalesce (0 ∷ b8)) ≢ (b.get(i) coalesce (1 ∷ b8)) {
             return false
@@ -244,8 +244,8 @@ fn bytes_eq(list<b8> a, list<b8> b) → bool {
 }
 
 fn must_decode(list<b8> data) → list<b8> {
-    var list<b8> out ↤ ""
-    var bool ok ← false
+    mut list<b8> out ↤ ""
+    mut bool ok ← false
     do {
         out ← decode(data)
         ok ← true
@@ -258,9 +258,9 @@ fn must_decode(list<b8> data) → list<b8> {
 }
 
 fn decode_msg(list<b8> data) → string {
-    var string msg ← ""
+    mut string msg ← ""
     do {
-        const list<b8> body ← decode(data)
+        let list<b8> body ← decode(data)
         msg ← body.length() ↦ string
     }
     catch err {
@@ -271,56 +271,56 @@ fn decode_msg(list<b8> data) → string {
 
 describe "chunked" {
     test "serialize hello golden" {
-        const list<b8> got ← encode(|68 65 6c 6c 6f|)
+        let list<b8> got ← encode(|68 65 6c 6c 6f|)
         assert bytes_eq(got, |35 0d 0a 68 65 6c 6c 6f 0d 0a 30 0d 0a 0d 0a|)
     }
 
     test "parse hello golden" {
-        const list<b8> got ← must_decode(|35 0d 0a 68 65 6c 6c 6f 0d 0a 30 0d 0a 0d 0a|)
+        let list<b8> got ← must_decode(|35 0d 0a 68 65 6c 6c 6f 0d 0a 30 0d 0a 0d 0a|)
         assert bytes_eq(got, |68 65 6c 6c 6f|)
     }
 
     test "roundtrip hello" {
-        const list<b8> raw ← |68 65 6c 6c 6f|
+        let list<b8> raw ← |68 65 6c 6c 6f|
         assert bytes_eq(must_decode(encode(raw)), raw)
     }
 
     test "roundtrip empty" {
-        const list<b8> raw ↤ ""
+        let list<b8> raw ↤ ""
         assert bytes_eq(must_decode(encode(raw)), raw)
         assert bytes_eq(encode(raw), |30 0d 0a 0d 0a|)
     }
 
     test "roundtrip sixteen bytes uses two hex digits" {
-        const list<b8> raw ← |78 78 78 78 78 78 78 78 78 78 78 78 78 78 78 78|
-        const list<b8> wire ← encode(raw)
+        let list<b8> raw ← |78 78 78 78 78 78 78 78 78 78 78 78 78 78 78 78|
+        let list<b8> wire ← encode(raw)
         assert byte_at(wire, 0) ≡ 0x31
         assert byte_at(wire, 1) ≡ 0x30
         assert bytes_eq(must_decode(wire), raw)
     }
 
     test "parse multi-chunk concatenates" {
-        const list<b8> got ← must_decode(|33 0d 0a 68 65 6c 0d 0a 32 0d 0a 6c 6f 0d 0a 30 0d 0a 0d 0a|)
+        let list<b8> got ← must_decode(|33 0d 0a 68 65 6c 0d 0a 32 0d 0a 6c 6f 0d 0a 30 0d 0a 0d 0a|)
         assert bytes_eq(got, |68 65 6c 6c 6f|)
     }
 
     test "parse uppercase size and last-chunk zeros" {
-        const list<b8> got ← must_decode(|41 0d 0a 30 31 32 33 34 35 36 37 38 39 0d 0a 30 30 0d 0a 0d 0a|)
+        let list<b8> got ← must_decode(|41 0d 0a 30 31 32 33 34 35 36 37 38 39 0d 0a 30 30 0d 0a 0d 0a|)
         assert bytes_eq(got, |30 31 32 33 34 35 36 37 38 39|)
     }
 
     test "parse well-formed extension" {
-        const list<b8> got ← must_decode(|35 3b 66 6f 6f 3d 62 61 72 0d 0a 68 65 6c 6c 6f 0d 0a 30 0d 0a 0d 0a|)
+        let list<b8> got ← must_decode(|35 3b 66 6f 6f 3d 62 61 72 0d 0a 68 65 6c 6c 6f 0d 0a 30 0d 0a 0d 0a|)
         assert bytes_eq(got, |68 65 6c 6c 6f|)
     }
 
     test "parse quoted extension" {
-        const list<b8> got ← must_decode(|35 3b 78 3d 22 61 5c 22 62 22 0d 0a 68 65 6c 6c 6f 0d 0a 30 0d 0a 0d 0a|)
+        let list<b8> got ← must_decode(|35 3b 78 3d 22 61 5c 22 62 22 0d 0a 68 65 6c 6c 6f 0d 0a 30 0d 0a 0d 0a|)
         assert bytes_eq(got, |68 65 6c 6c 6f|)
     }
 
     test "parse trailers after last-chunk" {
-        const list<b8> got ← must_decode(|30 0d 0a 58 2d 46 6f 6f 3a 20 62 61 72 0d 0a 0d 0a|)
+        let list<b8> got ← must_decode(|30 0d 0a 58 2d 46 6f 6f 3a 20 62 61 72 0d 0a 0d 0a|)
         assert bytes_eq(got, "" ↦ list<b8>)
     }
 

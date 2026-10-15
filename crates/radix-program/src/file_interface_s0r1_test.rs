@@ -286,7 +286,7 @@ fn solved_union_signature_round_trips_to_the_consumer() {
         r#"importa ex "math:union" math
 
 functio call_list() → vacuum {
-    fixum lista<numerus> xs ← [1, 2]
+    sit lista<numerus> xs ← [1, 2]
     math.probe(xs)
 }
 

@@ -12,9 +12,9 @@ use crate::{Primitive, Type};
 fn predicate_twins_accept_filtrata_shaped_lambdas_and_return_bool() {
     let unit = analyze_ok_la(
         r"incipit {
-    fixum lista<numerus> xs ← vacua
-    fixum bivalens all_ok ← xs.omnia(numerus d ∴ d ≥ 0)
-    fixum bivalens any_negative ← xs.quilibet(numerus d ∴ d ≺ 0)
+    sit lista<numerus> xs ← vacua
+    sit bivalens all_ok ← xs.omnia(numerus d ∴ d ≥ 0)
+    sit bivalens any_negative ← xs.quilibet(numerus d ∴ d ≺ 0)
     nota all_ok
     nota any_negative
 }",
@@ -37,7 +37,7 @@ fn predicate_twins_accept_filtrata_shaped_lambdas_and_return_bool() {
 fn predicate_twins_accept_empty_list_contract_without_special_type_path() {
     crate::test_support::assert_accepts_la(
         r"functio check() → bivalens {
-    fixum lista<numerus> xs ← vacua
+    sit lista<numerus> xs ← vacua
     redde xs.omnia(numerus d ∴ d ≥ 0) et non xs.quilibet(numerus d ∴ d ≺ 0)
 }",
     );

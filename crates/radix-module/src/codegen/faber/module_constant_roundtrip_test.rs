@@ -36,7 +36,7 @@ fn reemit(source: &str, to: &str) -> String {
         .code
 }
 
-const BODY: &str = "const int LIMIT = 4 * 1024\nconst _ INFERRED = 10\nconst string NAME = \"ab\" + \"cd\"\n\nclass Punctum {\n    const int x\n    static int Z = 3\n}\n\nmain {\n    print LIMIT\n}\n";
+const BODY: &str = "const int LIMIT = 4 * 1024\nconst _ INFERRED = 10\nconst string NAME = \"ab\" + \"cd\"\n\nclass Punctum {\n    let int x\n    static int Z = 3\n}\n\nmain {\n    print LIMIT\n}\n";
 
 fn en_source() -> String {
     format!("+++\nlocale = \"en\"\n+++\n{BODY}")

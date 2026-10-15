@@ -29,7 +29,7 @@ locale = "en"
 @ public
 class Tab {
     static int LIMIT = 7
-    var int w = 1
+    mut int w = 1
 }
 
 main {

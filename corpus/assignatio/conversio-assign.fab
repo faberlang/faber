@@ -21,7 +21,7 @@ locale = "la"
 # What this teaches:
 #   • Expression assignment — `place ↤ value` converts `value` to the place's
 #     type through the existing `↦` route, then stores it exactly once.
-#   • Typed initialization — `fixum numerus n ↤ "42"` converts to the written
+#   • Typed initialization — `sit numerus n ↤ "42"` converts to the written
 #     type, then initializes the binding.
 #   • Inline recovery — `place ↤ value ⊥ fallback` stores the fallback only
 #     when the conversion fails.
@@ -29,7 +29,7 @@ locale = "la"
 #     stores each link.
 #
 # Common mistakes:
-#   • using `↤` when the destination type is inferred — `fixum _ x ↤ …` is
+#   • using `↤` when the destination type is inferred — `sit x ↤ …` is
 #     rejected (no concrete conversion target).
 #   • `⊥` default on ordinary `←` — legal only on `↤`; `⇥` never takes a value.
 #
@@ -43,7 +43,7 @@ incipit {
     nota count
 
     # Typed initialization: convert to the written type, then initialize.
-    fixum numerus typed ↤ "7"
+    sit numerus typed ↤ "7"
     nota typed
 
     # Inline recovery: "x" cannot parse as numerus, so ⊥ 0 is stored.

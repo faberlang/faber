@@ -46,7 +46,7 @@ fn sort_values_and_keys_parse_with_direction_and_source_mode() {
 #[test]
 fn sort_body_binds_the_element_and_returns_the_key() {
     let (program, interner) = first_sort(
-        "functio t(lista<numerus> xs) → lista<numerus> { ordinata via ascendens ex xs fixum p { redde p } }",
+        "functio t(lista<numerus> xs) → lista<numerus> { ordinata via ascendens ex xs sit p { redde p } }",
     );
     let sort = sort_of(&program);
     assert_eq!(interner.resolve(sort.binding.as_ref().unwrap().name), "p");
@@ -85,7 +85,7 @@ fn itera_binder_is_not_claimed_as_a_sort_body() {
     // The bare sort source is refused (`itera_source_sort_reduce_unbound`,
     // need); the loop still parses, and the binder stays the loop's.
     let result = parse_program(
-        "functio t(tabula<textus, numerus> m) → vacuum { itera ex ordinata via ascendens de m fixum k { scribe k } }",
+        "functio t(tabula<textus, numerus> m) → vacuum { itera ex ordinata via ascendens de m sit k { scribe k } }",
     );
     assert_eq!(result.errors.len(), 1, "{:?}", result.errors);
     assert!(

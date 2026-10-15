@@ -110,8 +110,8 @@ fn a_successor_outside_the_whole_64_bit_range_is_the_range_trap() {
     range_trap("varia u64 u ← 18446744073709551615\nu ↑");
     range_trap(&format!("{}\np.u ↑", cell("u=18446744073709551615")));
     range_trap("varia lista<u64> xs ← [18446744073709551615]\nxs[0] ↑");
-    range_trap("varia i64 m ← -9223372036854775808\nfixum numerus r ← m - 1");
-    range_trap("varia u64 m ← 18446744073709551615\nfixum u64 r ← m + 1");
+    range_trap("varia i64 m ← -9223372036854775808\nsit numerus r ← m - 1");
+    range_trap("varia u64 m ← 18446744073709551615\nsit u64 r ← m + 1");
 }
 
 #[test]

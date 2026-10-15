@@ -50,9 +50,9 @@ fn numerus_to_ordo_matches_or_takes_the_default() {
     let lines = stdout(&format!(
         "{ORDINES}
 incipit {{
-    fixum Status hit ← -3 ↦ Status ⊥ Status.pendens
+    sit Status hit ← -3 ↦ Status ⊥ Status.pendens
     nota hit ↦ textus
-    fixum Color miss ← 9 ↦ Color ⊥ Color.rubrum
+    sit Color miss ← 9 ↦ Color ⊥ Color.rubrum
     nota miss ↦ textus
 }}
 "
@@ -91,7 +91,7 @@ incipit {{
 fn numerus_to_ordo_without_a_channel_aborts() {
     let mut host = BufferHost::default();
     let _ = run_fixture_source(
-        &format!("{ORDINES}\nincipit {{\n    fixum Color c ← 5 ↦ Color\n    nota c ↦ textus\n}}\n"),
+        &format!("{ORDINES}\nincipit {{\n    sit Color c ← 5 ↦ Color\n    nota c ↦ textus\n}}\n"),
         &mut host,
     );
 }

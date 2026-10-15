@@ -8,14 +8,14 @@ main {
     print "what??!"
     print "café"
     print "héab"
-    const int char ← 1
-    const int goto ← 2
-    const int stdout ← 3
-    const int size_t ← 4
-    const int INT64_MAX ← 5
-    const string printf ← "shadow"
+    let int char ← 1
+    let int goto ← 2
+    let int stdout ← 3
+    let int size_t ← 4
+    let int INT64_MAX ← 5
+    let string printf ← "shadow"
     print char, goto, stdout, size_t, INT64_MAX, printf
-    var int count ← 5
-    var string label ← "mutable"
+    mut int count ← 5
+    mut string label ← "mutable"
     print count, label
 }

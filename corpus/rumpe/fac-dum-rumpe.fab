@@ -27,7 +27,7 @@ locale = "en"
 # loop wins over enclosing fac — rumpe exits dum only
 
 main {
-    var int x ← 0
+    mut int x ← 0
     do {
         while x ≺ 3 {
             x ← x + 1

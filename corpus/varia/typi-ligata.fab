@@ -41,9 +41,9 @@ locale = "en"
 main {
     # --- Typed immutable declarations ---
 
-    const int aetas ← 30
-    const string nomen ← "Marcus"
-    const bool viget ← true
+    let int aetas ← 30
+    let string nomen ← "Marcus"
+    let bool viget ← true
 
     print aetas
     print nomen
@@ -51,9 +51,9 @@ main {
 
     # --- Typed mutable declarations ---
 
-    var int numeratio ← 0
-    var string condicio ← "pendens"
-    var bool currit ← false
+    mut int numeratio ← 0
+    mut string condicio ← "pendens"
+    mut bool currit ← false
 
     print numeratio
     print condicio
@@ -70,8 +70,8 @@ main {
 
     # --- Fractional (fractus) typed bindings ---
 
-    const float pi ← 3.14159
-    var float ratio ← 0.05
+    let float pi ← 3.14159
+    mut float ratio ← 0.05
 
     print pi
     print ratio

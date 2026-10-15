@@ -250,7 +250,7 @@ fn reports_mutable_borrow_conflict() {
 }
 
 #[test]
-fn reports_assign_to_de_parameter() {
+fn allows_repoint_of_de_parameter() {
     let types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let assign = HirExpression {
@@ -322,14 +322,10 @@ fn reports_assign_to_de_parameter() {
         entry_is_async: false,
     };
 
+    // Re-pointing the parameter name is legal; only a write through it is
+    // refused.
     let result = analyze(&program, &Resolver::new(), &types, &Interner::new());
-    assert!(result.is_err());
-    let errors = result.unwrap_err();
-    expect_structured_error(
-        &errors,
-        SemanticErrorKind::AssignToImmutableBorrow,
-        "assign_to_de_parameter",
-    );
+    assert!(result.is_ok(), "re-point of a ref parameter: {result:?}");
 }
 
 #[test]
@@ -1485,8 +1481,9 @@ fn reports_conversio_assign_to_de_parameter() {
     // ownership-mode pass must flag an assignment through a `de` parameter
     // regardless of which operator was written.
     let source = r#"
-functio mutate(de numerus x) → vacuum {
-  x ↤ "2"
+genus Punctum { varia numerus x }
+functio mutate(de Punctum p) → vacuum {
+  p.x ↤ "2"
 }
 incipit { }
 "#;
@@ -1773,8 +1770,8 @@ fn borrow_conflict_names_the_borrowed_place() {
     // diagnostic must still carry the binding name.
     let source = r"
 fn f(ref tf32[2, 2] a) → void {
-    var mut tf32[2, 2] x ← a
-    var mut tf32[2, 2] y ← a
+    mut mut tf32[2, 2] x ← a
+    mut mut tf32[2, 2] y ← a
     print x.flatten()
     print y.flatten()
 }

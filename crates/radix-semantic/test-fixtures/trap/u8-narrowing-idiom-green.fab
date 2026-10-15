@@ -13,7 +13,7 @@ fn failable(bool fail) → int ⇥ string {
 }
 
 main {
-    const int ∪ string r ← trap { failable(false) }
+    let int ∪ string r ← trap { failable(false) }
     if r is int {
         print r
     } else {

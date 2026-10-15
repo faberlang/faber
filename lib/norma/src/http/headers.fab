@@ -15,13 +15,13 @@ locale = "en"
 # lookup folds ASCII A–Z.
 @ public
 class Header {
-    var string name = ""
-    var string value = ""
+    mut string name = ""
+    mut string value = ""
 }
 
 @ public
 class Headers {
-    var list<Header> entries = []
+    mut list<Header> entries = []
 
     fn length() → int {
         return self.entries.length()
@@ -37,8 +37,8 @@ class Headers {
 
     # First value whose name matches under ASCII case-fold; nihil if absent.
     fn get(string name) → string ∪ none {
-        const string folded ← ascii_lower(name)
-        for from self.entries const entry {
+        let string folded ← ascii_lower(name)
+        for from self.entries let entry {
             if ascii_lower(entry.name) ≡ folded {
                 return entry.value
             }
@@ -48,9 +48,9 @@ class Headers {
 
     # Every value whose name matches under ASCII case-fold, in append order.
     fn values(string name) → list<string> {
-        const string folded ← ascii_lower(name)
-        var list<string> out ← []
-        for from self.entries const entry {
+        let string folded ← ascii_lower(name)
+        mut list<string> out ← []
+        for from self.entries let entry {
             if ascii_lower(entry.name) ≡ folded {
                 out.append(entry.value)
             }
@@ -65,8 +65,8 @@ fn empty() → Headers {
 }
 
 fn ascii_lower(string s) → string {
-    var string out ← ""
-    var int i ← 0
+    mut string out ← ""
+    mut int i ← 0
     while i ≺ s.length() {
         out ← out + lower_char(s.slice(i, i + 1))
         i ← i + 1
@@ -75,9 +75,9 @@ fn ascii_lower(string s) → string {
 }
 
 fn lower_char(string c) → string {
-    const string upper ← "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    const string lower ← "abcdefghijklmnopqrstuvwxyz"
-    var int i ← 0
+    let string upper ← "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    let string lower ← "abcdefghijklmnopqrstuvwxyz"
+    mut int i ← 0
     while i ≺ 26 {
         if upper.slice(i, i + 1) ≡ c {
             return lower.slice(i, i + 1)
@@ -89,7 +89,7 @@ fn lower_char(string c) → string {
 
 fn is_token(string name) → bool {
     if name.length() ≡ 0 then return false
-    var int i ← 0
+    mut int i ← 0
     while i ≺ name.length() {
         if not is_tchar(name.slice(i, i + 1)) then return false
         i ← i + 1
@@ -105,9 +105,9 @@ fn is_tchar(string c) → bool {
 }
 
 fn is_field_value(string value) → bool {
-    var int i ← 0
+    mut int i ← 0
     while i ≺ value.length() {
-        const string c ← value.slice(i, i + 1)
+        let string c ← value.slice(i, i + 1)
         if c ≡ "\r" or c ≡ "\n" then return false
         i ← i + 1
     }

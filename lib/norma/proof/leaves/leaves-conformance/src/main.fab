@@ -10,11 +10,11 @@ import from "norma:random" random
 
 main {
     time.sleep(0)
-    const int before ← time.monotonic()
-    const int after ← time.monotonic()
+    let int before ← time.monotonic()
+    let int after ← time.monotonic()
     assert after ≥ before
     random.seed(7)
-    const int first ← random.random_int(1, 9)
+    let int first ← random.random_int(1, 9)
     random.seed(7)
     assert random.random_int(1, 9) ≡ first
     assert process.exec("printf proba-ok") ≡ "proba-ok"

@@ -3,11 +3,11 @@ locale = "en"
 +++
 
 class Own {
-    var string message
+    mut string message
     fn message() → string { return self.message }
 }
 
 fn probe() → string {
-    const Own c ← Own {message = "hi"}
+    let Own c ← Own {message = "hi"}
     return c.message()
 }

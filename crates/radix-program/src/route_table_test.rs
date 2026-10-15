@@ -64,7 +64,7 @@ fn arg<'a>(diagnostic: &'a Diagnostic, name: &str) -> &'a str {
         .unwrap_or_else(|| panic!("missing arg {name}: {:?}", diagnostic.args))
 }
 
-const CALLER: &str = "+++\nlocale = \"en\"\n+++\n\nimport from \"shop:serve\" serve\n\nmain {\n    print serve.marker()\n    const int n ← call 'orders:list' (3) ↦ int\n    print n\n}\n";
+const CALLER: &str = "+++\nlocale = \"en\"\n+++\n\nimport from \"shop:serve\" serve\n\nmain {\n    print serve.marker()\n    let int n ← call 'orders:list' (3) ↦ int\n    print n\n}\n";
 
 #[test]
 fn library_handler_joins_the_program_table() {
@@ -87,7 +87,7 @@ fn local_handler_is_in_file_interface_and_table() {
     write_two_packages(
         &dir,
         &[],
-        "+++\nlocale = \"en\"\n+++\n\n@ call 'clock:now'\nfn now() → int {\n    return 1\n}\n\nmain {\n    const int n ← call 'clock:now' ↦ int\n    print n\n}\n",
+        "+++\nlocale = \"en\"\n+++\n\n@ call 'clock:now'\nfn now() → int {\n    return 1\n}\n\nmain {\n    let int n ← call 'clock:now' ↦ int\n    print n\n}\n",
     );
     let program = analyze(&dir).unwrap_or_else(|diagnostics| panic!("{diagnostics:?}"));
     let entry = program.entry_node().expect("entry node");
@@ -165,7 +165,7 @@ fn imported_handler_types_the_opener() {
     write_two_packages(
         &dir,
         &[("serve", SERVE_ORDERS)],
-        &caller_body("    const int n ← call 'orders:list' (\"three\") ↦ int\n    print n"),
+        &caller_body("    let int n ← call 'orders:list' (\"three\") ↦ int\n    print n"),
     );
     let Err(diagnostics) = analyze(&dir) else {
         panic!("opener mismatch must fail");
@@ -182,7 +182,7 @@ fn imported_handler_types_the_reply() {
     write_two_packages(
         &dir,
         &[("serve", SERVE_ORDERS)],
-        &caller_body("    const string n ← call 'orders:list' (3) ↦ string\n    print n"),
+        &caller_body("    let string n ← call 'orders:list' (3) ↦ string\n    print n"),
     );
     let Err(diagnostics) = analyze(&dir) else {
         panic!("reply mismatch must fail");

@@ -37,8 +37,8 @@ fn approximata_is_fractus_only_in_registry() {
 fn fractus_approximata_typechecks_and_emits_abs_compare() {
     let session = Session::new(Config::default().with_latin_locale());
     let source = r"incipit {
-    fixum fractus x ← 1.5
-    fixum bivalens near ← x.approximata(1.51, 0.05)
+    sit fractus x ← 1.5
+    sit bivalens near ← x.approximata(1.51, 0.05)
     nota near
 }";
     let result = analyze_source(&session, "fractus-approximata.fab", source, AnalyzeRequest::default());

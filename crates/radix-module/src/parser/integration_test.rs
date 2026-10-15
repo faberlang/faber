@@ -35,7 +35,7 @@ fn parse_ok(source: &str) -> ParseResult {
 
 #[test]
 fn conversio_vel_fallback_reports_migration_diagnostic() {
-    let source = r#"fixum _ n ← "bad" ↦ numerus vel 0"#;
+    let source = r#"sit n ← "bad" ↦ numerus vel 0"#;
     let result = parse(lex_with_locale_pack(source, &la_pack()));
     let err = result
         .errors
@@ -120,24 +120,24 @@ fn assert_call_form_constructor_rejected(source: &str) {
 
 #[test]
 fn retired_prefix_predicates_emit_rewrite_diagnostics() {
-    assert_retired_prefix_predicate("fixum _ x ← falsum disabled", "falsum", "value ≡ falsum");
-    assert_retired_prefix_predicate("fixum _ x ← verum enabled", "verum", "value ≡ verum");
+    assert_retired_prefix_predicate("sit x ← falsum disabled", "falsum", "value ≡ falsum");
+    assert_retired_prefix_predicate("sit x ← verum enabled", "verum", "value ≡ verum");
     // D23.2/D23.4: `nulla` is the null value literal, so it is a
     // literal-prefix form. `nihil` is no longer a value spelling.
-    assert_retired_prefix_predicate("fixum _ x ← nulla maybe", "nulla", "value est nihil");
+    assert_retired_prefix_predicate("sit x ← nulla maybe", "nulla", "value est nihil");
 }
 
 #[test]
 fn required_prefix_predicates_stay_rejected() {
-    assert_semantic_rejection("incipit { fixum _ x ← nonnihil maybe }");
-    assert_semantic_rejection("incipit { fixum _ x ← nonnulla maybe }");
-    assert_semantic_rejection("incipit { fixum _ x ← negativum count }");
-    assert_semantic_rejection("incipit { fixum _ x ← positivum count }");
+    assert_semantic_rejection("incipit { sit x ← nonnihil maybe }");
+    assert_semantic_rejection("incipit { sit x ← nonnulla maybe }");
+    assert_semantic_rejection("incipit { sit x ← negativum count }");
+    assert_semantic_rejection("incipit { sit x ← positivum count }");
 }
 
 #[test]
 fn postfix_array_variable_type_is_rejected() {
-    assert_semantic_rejection("incipit { fixum textus[] words ← vacua }");
+    assert_semantic_rejection("incipit { sit textus[] words ← vacua }");
 }
 
 // =============================================================================
@@ -146,7 +146,7 @@ fn postfix_array_variable_type_is_rejected() {
 
 #[test]
 fn expression_ad_rejects_block_form() {
-    let source = r"fixum _ s ← ad 'runtime:echo' { }";
+    let source = r"sit s ← ad 'runtime:echo' { }";
     let result = parse(lex_with_locale_pack(source, &la_pack()));
     let err = result
         .errors
@@ -172,7 +172,7 @@ fn expression_ad_rejects_block_form() {
 
 #[test]
 fn json_literal_rejects_bare_identifier_key() {
-    let source = r"fixum _ v ← { name: 1 }";
+    let source = r"sit v ← { name: 1 }";
     let result = parse(lex_with_locale_pack(source, &la_pack()));
     let err = result
         .errors
@@ -195,7 +195,7 @@ fn json_literal_rejects_bare_identifier_key() {
 #[test]
 fn json_literal_rejects_faber_keywords_as_values() {
     // verum/falsum/nihil are Faber keywords; JSON wants true/false/null.
-    let source = r#"fixum _ v ← { "x": verum }"#;
+    let source = r#"sit v ← { "x": verum }"#;
     let result = parse(lex_with_locale_pack(source, &la_pack()));
     let err = result
         .errors
@@ -221,27 +221,27 @@ fn json_literal_rejects_faber_keywords_as_values() {
 
 #[test]
 fn scalar_type_call_constructor_is_rejected() {
-    assert_semantic_rejection(r#"incipit { fixum _ n ← numerus("42") }"#);
+    assert_semantic_rejection(r#"incipit { sit n ← numerus("42") }"#);
 }
 
 #[test]
 fn lista_type_call_constructor_is_rejected() {
-    assert_semantic_rejection("incipit { fixum _ xs ← lista<numerus>([1, 2]) }");
+    assert_semantic_rejection("incipit { sit xs ← lista<numerus>([1, 2]) }");
 }
 
 #[test]
 fn tensor_long_constructor_is_rejected() {
-    assert_call_form_constructor_rejected("incipit { fixum _ t ← tensor<f32, [2]>([1.0, 2.0]) }");
+    assert_call_form_constructor_rejected("incipit { sit t ← tensor<f32, [2]>([1.0, 2.0]) }");
 }
 
 #[test]
 fn vector_long_constructor_is_rejected() {
-    assert_call_form_constructor_rejected("incipit { fixum _ v ← vector<f32, 4>(1.0, 2.0, 3.0, 4.0) }");
+    assert_call_form_constructor_rejected("incipit { sit v ← vector<f32, 4>(1.0, 2.0, 3.0, 4.0) }");
 }
 
 #[test]
 fn matrix_long_constructor_is_rejected() {
-    assert_call_form_constructor_rejected("incipit { fixum _ m ← matrix<f32, [2, 2]>(1.0, 0.0, 0.0, 1.0) }");
+    assert_call_form_constructor_rejected("incipit { sit m ← matrix<f32, [2, 2]>(1.0, 0.0, 0.0, 1.0) }");
 }
 
 fn assert_list_bracket_constructor_accepted(source: &str) {
@@ -280,7 +280,7 @@ fn list_bracket_constructor_bound_to_a_name_is_accepted() {
 
 #[test]
 fn vector_long_constructor_without_width_is_rejected() {
-    assert_semantic_rejection("incipit { fixum _ v ← vector<f32>(1.0) }");
+    assert_semantic_rejection("incipit { sit v ← vector<f32>(1.0) }");
 }
 
 // =============================================================================
@@ -289,24 +289,24 @@ fn vector_long_constructor_without_width_is_rejected() {
 
 #[test]
 fn tensor_sugar_constructor_is_rejected() {
-    assert_call_form_constructor_rejected("incipit { fixum _ t ← tf32[2]([1.0, 2.0]) }");
+    assert_call_form_constructor_rejected("incipit { sit t ← tf32[2]([1.0, 2.0]) }");
 }
 
 #[test]
 fn vector_sugar_constructor_is_rejected() {
-    assert_call_form_constructor_rejected("incipit { fixum _ v ← vf32[4](1.0, 2.0, 3.0, 4.0) }");
+    assert_call_form_constructor_rejected("incipit { sit v ← vf32[4](1.0, 2.0, 3.0, 4.0) }");
 }
 
 #[test]
 fn matrix_sugar_constructor_is_rejected() {
-    assert_call_form_constructor_rejected("incipit { fixum _ m ← mf32[2, 2](1.0, 0.0, 0.0, 1.0) }");
+    assert_call_form_constructor_rejected("incipit { sit m ← mf32[2, 2](1.0, 0.0, 0.0, 1.0) }");
 }
 
 // =============================================================================
 // Inline comment lex diagnostic bridge
 // =============================================================================
 
-const BRACE_INLINE_FIXTURE: &str = "functio f() → vacuum { fixum numerus x ← 1  # inline }\n";
+const BRACE_INLINE_FIXTURE: &str = "functio f() → vacuum { sit numerus x ← 1  # inline }\n";
 
 #[test]
 fn parser_bridge_normalizes_inline_comment_as_lex_diagnostic() {
@@ -338,7 +338,7 @@ fn rejects_bare_sparsa() {
     let result = crate::driver::analyze_source(
         &session,
         "bare-sparsa.fab",
-        "incipit { fixum sparsa x ← vacua }",
+        "incipit { sit sparsa x ← vacua }",
         AnalyzeRequest::default(),
     );
     let Some(diags) = result.err() else {
@@ -361,7 +361,7 @@ fn rejects_bare_sparsa() {
 
 #[test]
 fn retired_sic_conditional_reports_conditional_sic_removed() {
-    let source = "fixum _ v ← c sic 1 secus 2";
+    let source = "sit v ← c sic 1 secus 2";
     let result = parse(lex_with_locale_pack(source, &la_pack()));
     let err = result
         .errors

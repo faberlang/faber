@@ -36,10 +36,10 @@ locale = "en"
 #   Smoke asserts exit 0 only.
 
 main {
-    const string nuntius ← " Ave Roma "
-    const int longitudo ← nuntius.length()
-    const bool habetroma ← nuntius.contains("Roma")
-    const bool initiumest ← nuntius.starts_with(" Ave")
-    const bool finisest ← nuntius.ends_with(" ")
+    let string nuntius ← " Ave Roma "
+    let int longitudo ← nuntius.length()
+    let bool habetroma ← nuntius.contains("Roma")
+    let bool initiumest ← nuntius.starts_with(" Ave")
+    let bool finisest ← nuntius.ends_with(" ")
     print longitudo, habetroma, initiumest, finisest
 }

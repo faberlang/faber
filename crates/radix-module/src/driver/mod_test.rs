@@ -500,7 +500,7 @@ fn go_cli_program_accepts_modular_word() {
     let source = r#"
 @ cli "tool"
 incipit argumenta args {
-  fixum modulus<u32> x ← 5
+  sit modulus<u32> x ← 5
   nota x
 }
 "#;
@@ -619,7 +619,7 @@ fn compile_typescript_success_emits_output() {
 fn typescript_output_preserves_diagnostic_severity() {
     let session = test_session(Target::HirTypeScript);
     let source = r"incipit {
-  fixum _ unused ← 1
+  sit unused ← 1
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -701,7 +701,7 @@ fn mir_lowering_error_carries_source_span() {
 #[test]
 #[cfg(feature = "hir-faber")]
 fn user_defined_item_named_status_is_not_silently_dropped_from_faber_output() {
-    let source = "incipit {\n  fixum numerus custom_status ← 1\n}\n";
+    let source = "incipit {\n  sit numerus custom_status ← 1\n}\n";
 
     let result = faber_emit("custom_status.fab", source);
 
@@ -777,7 +777,7 @@ fn deny_warnings_suppresses_output_after_promotion() {
     let result = compile(
         &session,
         "deny-unused.fab",
-        "incipit { fixum numerus unused ← 1 }",
+        "incipit { sit numerus unused ← 1 }",
         ModuleCompileRequest::default(),
     );
 
@@ -840,8 +840,8 @@ fn deny_warnings_promotes_prefer_string_template_in_real_compile() {
         "pst-deny-warnings.fab",
         r#"
 incipit {
-    fixum textus x ← "seed"
-    fixum textus m ← "a" + x + "b"
+    sit textus x ← "seed"
+    sit textus m ← "a" + x + "b"
     nota m
 }
 "#,
@@ -878,8 +878,8 @@ fn deny_code_promotes_prefer_string_template_in_real_compile() {
         "pst-deny-code.fab",
         r#"
 incipit {
-    fixum textus x ← "seed"
-    fixum textus m ← "a" + x + "b"
+    sit textus x ← "seed"
+    sit textus m ← "a" + x + "b"
     nota m
 }
 "#,
@@ -920,8 +920,8 @@ fn deny_all_does_not_promote_two_operand_concat() {
         "pst-two-operand.fab",
         r#"
 incipit {
-    fixum textus x ← "seed"
-    fixum textus m ← "a" + x
+    sit textus x ← "seed"
+    sit textus m ← "a" + x
     nota m
 }
 "#,
@@ -966,10 +966,10 @@ fn deny_all_does_not_promote_pure_variable_chain() {
         "pst-pure-variable-chain.fab",
         r#"
 incipit {
-    fixum textus x ← "seed"
-    fixum textus y ← "more"
-    fixum textus z ← "again"
-    fixum textus m ← x + y + z
+    sit textus x ← "seed"
+    sit textus y ← "more"
+    sit textus z ← "again"
+    sit textus m ← x + y + z
     nota m
 }
 "#,

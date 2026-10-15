@@ -65,7 +65,7 @@ main {
 #[test]
 fn bound_fill_through_a_mut_param_is_not_a_write() {
     let source = r"fn fresh(mut tf32[2, 3] t) → tf32[2, 3] {
-    const tf32[2, 3] filled ← t.fill(4.0)
+    let tf32[2, 3] filled ← t.fill(4.0)
     return filled
 }
 main {
@@ -79,9 +79,9 @@ fn scalar_named_in_a_tensor_extent_is_used() {
     return value
 }
 main {
-    const list<f32> xs ← [1.0, 2.0, 3.0]
-    const int n ← runtime_size(4)
-    const tensor<f32, [size (n - 1)]> dynamic ← xs ↦ tensor<f32, [size (n - 1)]>
+    let list<f32> xs ← [1.0, 2.0, 3.0]
+    let int n ← runtime_size(4)
+    let tensor<f32, [size (n - 1)]> dynamic ← xs ↦ tensor<f32, [size (n - 1)]>
     print dynamic.length()
 }";
     assert_eq!(unused_variables(source), 0);
@@ -93,9 +93,9 @@ fn scalar_named_in_a_tf32_extent_is_used() {
     return value
 }
 main {
-    const int n ← runtime_extent(3)
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[2, size n] a ← flat ↦ tf32[2, size n]
+    let int n ← runtime_extent(3)
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[2, size n] a ← flat ↦ tf32[2, size n]
     print a.length()
 }";
     assert_eq!(unused_variables(source), 0);
@@ -107,10 +107,10 @@ fn genuinely_unused_scalar_still_warns() {
     return value
 }
 main {
-    const list<f32> xs ← [1.0, 2.0, 3.0]
-    const int n ← runtime_size(4)
-    const int dead ← runtime_size(2)
-    const tensor<f32, [size (n - 1)]> dynamic ← xs ↦ tensor<f32, [size (n - 1)]>
+    let list<f32> xs ← [1.0, 2.0, 3.0]
+    let int n ← runtime_size(4)
+    let int dead ← runtime_size(2)
+    let tensor<f32, [size (n - 1)]> dynamic ← xs ↦ tensor<f32, [size (n - 1)]>
     print dynamic.length()
 }";
     assert_eq!(unused_variables(source), 1);

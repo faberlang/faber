@@ -45,13 +45,13 @@ import from "norma:fs" charta
 import from "norma:process" process
 
 main {
-    const string textPath ← "§/faber-fs-lege-generic-§.txt"(charta.temp_dir(), process.pid())
+    let string textPath ← "§/faber-fs-lege-generic-§.txt"(charta.temp_dir(), process.pid())
     charta.write_file(textPath, "prima\nsecunda\n")
-    const string body ← charta.read_file<string>(textPath)
+    let string body ← charta.read_file<string>(textPath)
     assert body ≡ "prima\nsecunda\n"
-    const list<string> lineae ← call 'solum:carpe' (textPath) ↦ list<string>
+    let list<string> lineae ← call 'solum:carpe' (textPath) ↦ list<string>
     assert lineae ≡ (["prima", "secunda"] ↦ list<string>)
-    const list<b8> data ← call 'solum:hauri' (textPath) ↦ list<b8>
+    let list<b8> data ← call 'solum:hauri' (textPath) ↦ list<b8>
     assert data ≡ |70 72 69 6d 61 0a 73 65 63 75 6e 64 61 0a|
     print body
     print lineae

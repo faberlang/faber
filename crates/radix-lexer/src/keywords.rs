@@ -350,6 +350,14 @@ const BUILTIN_CALL: &[KeywordOwner] = &[KeywordOwner::BuiltinCall];
 const LITERAL: &[KeywordOwner] = &[KeywordOwner::Literal];
 const OPERATOR: &[KeywordOwner] = &[KeywordOwner::Operator];
 const DECLARATION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::DeclarationIntroducer];
+/// The writable-binding cell: `varia` (local, field, binder) and `in`
+/// (parameter, argument marker) are one cell, so a pack spells them with one
+/// word and the word is claimed in every position either key was.
+const MUT_CELL: &[KeywordOwner] = &[
+    KeywordOwner::DeclarationIntroducer,
+    KeywordOwner::ParameterMode,
+    KeywordOwner::IterationMode,
+];
 const CONTROL_FLOW: &[KeywordOwner] = &[KeywordOwner::ControlFlow];
 const EXPRESSION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::ExpressionIntroducer];
 const RANGE_OPERATOR: &[KeywordOwner] = &[KeywordOwner::RangeOperator];
@@ -519,7 +527,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "varia",
         token_kind: Some(TokenKind::Varia),
-        scope: KeywordScope::Contextual(DECLARATION_INTRODUCER),
+        scope: KeywordScope::Contextual(MUT_CELL),
         category: KeywordKind::Declaration,
     },
     // === Keywords: Modifiers ===
@@ -1090,7 +1098,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "in",
         token_kind: Some(TokenKind::In),
-        scope: KeywordScope::Contextual(PARAMETER_MODE),
+        scope: KeywordScope::Contextual(MUT_CELL),
         category: KeywordKind::Misc,
     },
     KeywordSpec {

@@ -43,7 +43,7 @@ locale = "en"
 main {
     # --- Mutable bindings with varia ---
 
-    var _ computus ← 0
+    mut _ computus ← 0
     print computus
 
     computus ← 1
@@ -54,7 +54,7 @@ main {
 
     # --- Immutable bindings: fixum _ and sit ---
 
-    const _ salutatio ← "Salve, Mundus!"
+    let salutatio ← "Salve, Mundus!"
     print salutatio
 
     # sit compresses repeated fixum _ when chaining inferred locals
@@ -65,7 +65,7 @@ main {
 
     # --- Reassign only varia bindings ---
 
-    var _ nuntius ← "Salve"
+    mut _ nuntius ← "Salve"
     nuntius ← "Vale"
     print nuntius
 }

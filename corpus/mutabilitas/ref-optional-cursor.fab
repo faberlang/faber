@@ -1,0 +1,77 @@
++++
+term = "ref-optional-cursor"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "ref_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "dum_stmt", "si_stmt", "arm", "redde_stmt", "assignment", "place", "member_suffix", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "typed_constructor", "field_list", "field_init", "nota_stmt", "incipit_stmt"]
+category = "binding"
+summary = "A ref cursor over T ∪ none walks a read-only linked list: the loop test narrows it, a re-point moves it."
+syntax = "ref <reference type> ∪ none <name> ← <place>"
+related = ["ref", "optional", "de", "mut"]
+locale = "en"
++++
+
+# =============================================================================
+# ref-optional-cursor — a re-pointable, read-only cursor over an optional
+# =============================================================================
+#
+# What this teaches:
+#   • `ref T ∪ none name ← place` — Option A (ruling 2026-10-15): a `ref`
+#     (or `mut`) local over an optional is legal when the non-none member is
+#     a reference type (genus, collection, text). `ref` over a scalar — plain
+#     or optional — is still refused (SEM008 scalar_access_marker).
+#   • narrowing — `while cur not is none` narrows `cur` to its non-none core
+#     inside the body, so `cur.value` needs no `?.`. The narrowing runs from
+#     the test to the first re-point: after `cur ← cur.next` the name is the
+#     full optional again until the next test.
+#   • re-point, never write — the walk only moves the name. A write through
+#     the cursor is refused (see ref-optional-write-reject).
+#
+# Common mistakes:
+#   • using `mut` for a read-only walk over a read-only parameter — SEM065
+#     (`const_shared_into_var`); the cursor is `ref` because it re-points but
+#     never writes
+#   • reading `.value` before the `not is none` test — the receiver is
+#     optional and needs the chain or the test
+#
+# EXPECTED OUTPUT:
+#   The last value of the list, then its length: 3, 3.
+#   3
+#   3
+# =============================================================================
+
+class Node {
+    mut int value
+    mut Node next optional
+}
+
+# Walk to the last node: the cursor starts at the bare (=ref) parameter and
+# re-points along `next` until there is none.
+fn last(Node head) → int {
+    ref Node ∪ none cur ← head
+    while cur not is none {
+        if cur.next is none {
+            return cur.value
+        }
+        cur ← cur.next
+    }
+    return head.value
+}
+
+# Count by the same cursor discipline: after the re-point the next test
+# re-narrows the name.
+fn length(Node head) → int {
+    ref Node ∪ none cur ← head
+    mut int count ← 0
+    while cur not is none {
+        count ← count + 1
+        cur ← cur.next
+    }
+    return count
+}
+
+main {
+    let Node c ← Node { value = 3 }
+    let Node b ← Node { value = 2, next = c }
+    let Node a ← Node { value = 1, next = b }
+    print last(a)
+    print length(a)
+}

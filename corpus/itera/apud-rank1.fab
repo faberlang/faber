@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "Coordinate iteration over a rank-1 tensor binds the axis index and the element together."
-syntax = "for from tensor at [i] const cell { }"
+syntax = "for from tensor at [i] let cell { }"
 related = ["apud", "itera", "ex", "tensor"]
 locale = "en"
 +++
@@ -29,7 +29,7 @@ locale = "en"
 
 # Rank-1 `apud [i]` over a literal-shaped tensor
 #
-# for from t at [i] const cell { <body> }
+# for from t at [i] let cell { <body> }
 #
 # GRAMMAR:
 #   iteraStmt :← 'for' 'from' expr ('at' '[' ident (',' ident)* ']')? …
@@ -38,10 +38,10 @@ locale = "en"
 #   lane index and element, one line per lane (0‥3).
 
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0]
-    var tf32[3] line ← flat ↦ tf32[3]
+    let list<f32> flat ← [1.0, 2.0, 3.0]
+    mut tf32[3] line ← flat ↦ tf32[3]
 
-    for from line at [i] const cell {
+    for from line at [i] let cell {
         print i, cell
     }
 }

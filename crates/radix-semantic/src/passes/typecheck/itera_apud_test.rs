@@ -55,10 +55,10 @@ fn rank2_tensor_apud_typechecks_element_and_numerus_coordinates() {
     test_support::assert_accepts(
         r"
 functio grid(tensor<f32, [2, 3]> m) → vacuum {
-    itera ex m apud [i, j] fixum cell {
-        fixum f32 x ← cell
-        fixum numerus a ← i
-        fixum numerus b ← j
+    itera ex m apud [i, j] sit cell {
+        sit f32 x ← cell
+        sit numerus a ← i
+        sit numerus b ← j
         nota x, a, b
     }
 }",
@@ -70,11 +70,11 @@ fn rank3_tensor_apud_typechecks_three_coordinates() {
     test_support::assert_accepts(
         r"
 functio cube(tensor<f32, [2, 3, 4]> t) → vacuum {
-    itera ex t apud [i, j, k] fixum cell {
-        fixum f32 x ← cell
-        fixum numerus a ← i
-        fixum numerus b ← j
-        fixum numerus c ← k
+    itera ex t apud [i, j, k] sit cell {
+        sit f32 x ← cell
+        sit numerus a ← i
+        sit numerus b ← j
+        sit numerus c ← k
         nota x, a, b, c
     }
 }",
@@ -86,9 +86,9 @@ fn rank1_tensor_apud_single_coordinate_typechecks() {
     test_support::assert_accepts(
         r"
 functio line(tensor<f32, [8]> t) → vacuum {
-    itera ex t apud [i] fixum cell {
-        fixum f32 x ← cell
-        fixum numerus a ← i
+    itera ex t apud [i] sit cell {
+        sit f32 x ← cell
+        sit numerus a ← i
         nota x, a
     }
 }",
@@ -100,10 +100,10 @@ fn matrix_apud_typechecks_element_and_two_coordinates() {
     test_support::assert_accepts(
         r"
 functio grid(matrix<f32, [2, 3]> m) → vacuum {
-    itera ex m apud [i, j] fixum cell {
-        fixum f32 x ← cell
-        fixum numerus a ← i
-        fixum numerus b ← j
+    itera ex m apud [i, j] sit cell {
+        sit f32 x ← cell
+        sit numerus a ← i
+        sit numerus b ← j
         nota x, a, b
     }
 }",
@@ -117,8 +117,8 @@ fn rank1_tensor_without_apud_keeps_element_binding() {
     test_support::assert_accepts(
         r"
 functio line(tensor<f32, [8]> t) → vacuum {
-    itera ex t fixum cell {
-        fixum f32 x ← cell
+    itera ex t sit cell {
+        sit f32 x ← cell
         nota x
     }
 }",
@@ -130,7 +130,7 @@ fn rank2_apud_single_coordinate_rejects_with_arity_issue() {
     assert_rejects_arity(
         r"
 functio grid(tensor<f32, [2, 3]> m) → vacuum {
-    itera ex m apud [i] fixum cell {
+    itera ex m apud [i] sit cell {
         tacet
     }
 }",
@@ -144,7 +144,7 @@ fn rank2_tensor_without_apud_rejects_with_arity_issue() {
     assert_rejects_arity(
         r"
 functio grid(tensor<f32, [2, 3]> m) → vacuum {
-    itera ex m fixum cell {
+    itera ex m sit cell {
         tacet
     }
 }",
@@ -158,7 +158,7 @@ fn rank2_apud_three_coordinates_rejects_with_arity_issue() {
     assert_rejects_arity(
         r"
 functio grid(tensor<f32, [2, 3]> m) → vacuum {
-    itera ex m apud [i, j, k] fixum cell {
+    itera ex m apud [i, j, k] sit cell {
         tacet
     }
 }",
@@ -172,7 +172,7 @@ fn matrix_apud_wrong_arity_rejects_with_arity_issue() {
     assert_rejects_arity(
         r"
 functio grid(matrix<f32, [2, 3]> m) → vacuum {
-    itera ex m apud [i] fixum cell {
+    itera ex m apud [i] sit cell {
         tacet
     }
 }",
@@ -186,7 +186,7 @@ fn matrix_without_apud_rejects_with_arity_issue() {
     assert_rejects_arity(
         r"
 functio grid(matrix<f32, [2, 3]> m) → vacuum {
-    itera ex m fixum cell {
+    itera ex m sit cell {
         tacet
     }
 }",
@@ -200,7 +200,7 @@ fn apud_on_ab_rejects_with_mode_issue() {
     let result = test_support::analyze_source(
         r"
 functio count() → vacuum {
-    itera ab 0‥3 apud [i] fixum x {
+    itera ab 0‥3 apud [i] sit x {
         tacet
     }
 }",
@@ -220,7 +220,7 @@ fn apud_on_de_rejects_with_mode_issue() {
     let result = test_support::analyze_source(
         r"
 functio indices(lista<numerus> xs) → vacuum {
-    itera de xs apud [i] fixum k {
+    itera de xs apud [i] sit k {
         tacet
     }
 }",
@@ -242,7 +242,7 @@ fn apud_on_ragged_nested_list_rejects_with_rank1_arity() {
     assert_rejects_arity(
         r"
 functio ragged(lista<lista<numerus>> pairs) → vacuum {
-    itera ex pairs apud [i, j] fixum cell {
+    itera ex pairs apud [i, j] sit cell {
         tacet
     }
 }",
@@ -256,9 +256,9 @@ fn apud_on_plain_list_binds_numerus_index_and_element() {
     test_support::assert_accepts(
         r"
 functio flat(lista<textus> xs) → vacuum {
-    itera ex xs apud [i] fixum cell {
-        fixum numerus n ← i
-        fixum textus t ← cell
+    itera ex xs apud [i] sit cell {
+        sit numerus n ← i
+        sit textus t ← cell
         nota n, t
     }
 }",
@@ -270,9 +270,9 @@ fn apud_on_tabula_binds_key_and_value() {
     test_support::assert_accepts(
         r"
 functio pairs(tabula<textus, numerus> m) → vacuum {
-    itera ex m apud [k] fixum v {
-        fixum textus key ← k
-        fixum numerus value ← v
+    itera ex m apud [k] sit v {
+        sit textus key ← k
+        sit numerus value ← v
         nota key, value
     }
 }",
@@ -284,10 +284,10 @@ fn apud_on_tuple_key_tabula_binds_each_key_part() {
     test_support::assert_accepts(
         r"
 functio sales(tabula<iuncta<textus, numerus>, numerus> m) → vacuum {
-    itera ex m apud [regio, annus] fixum v {
-        fixum textus r ← regio
-        fixum numerus a ← annus
-        fixum numerus value ← v
+    itera ex m apud [regio, annus] sit v {
+        sit textus r ← regio
+        sit numerus a ← annus
+        sit numerus value ← v
         nota r, a, value
     }
 }",
@@ -299,7 +299,7 @@ fn apud_on_tuple_key_tabula_with_one_name_rejects_arity() {
     assert_rejects_arity(
         r"
 functio sales(tabula<iuncta<textus, numerus>, numerus> m) → vacuum {
-    itera ex m apud [k] fixum v {
+    itera ex m apud [k] sit v {
         tacet
     }
 }",
@@ -324,7 +324,7 @@ fn apud_on_copia_rejects_as_not_indexed() {
     assert_rejects_indexed(
         r"
 functio members(copia<numerus> s) → vacuum {
-    itera ex s apud [i] fixum x {
+    itera ex s apud [i] sit x {
         tacet
     }
 }",
@@ -336,7 +336,7 @@ fn apud_on_cursor_rejects_as_not_indexed() {
     assert_rejects_indexed(
         r"
 functio stream(cursor<numerus> c) → vacuum {
-    itera ex c apud [i] fixum x {
+    itera ex c apud [i] sit x {
         tacet
     }
 }",
@@ -348,7 +348,7 @@ fn apud_on_sparsa_rejects_fail_closed() {
     assert_rejects_indexed(
         r"
 functio sparse(sparsa<f32, [2, 3]> s) → vacuum {
-    itera ex s apud [i, j] fixum cell {
+    itera ex s apud [i, j] sit cell {
         tacet
     }
 }",

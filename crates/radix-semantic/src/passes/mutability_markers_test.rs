@@ -16,9 +16,9 @@ fn own_and_copy_markers_carry_type_table_facts() {
     let result = analyze_ok(
         r"
 incipit {
-    fixum lista<numerus> owned ← own [1]
-    fixum lista<numerus> copied ← copy [2]
-    fixum de lista<numerus> shared
+    sit lista<numerus> owned ← own [1]
+    sit lista<numerus> copied ← copy [2]
+    sit de lista<numerus> shared
     varia in lista<numerus> exclusive
 }
 ",
@@ -48,8 +48,8 @@ fn own_and_copy_remain_identifier_bindings() {
     let _ = analyze_ok(
         r"
 incipit {
-    fixum numerus own ← 1
-    fixum numerus copy ← 2
+    sit numerus own ← 1
+    sit numerus copy ← 2
     nota own
     nota copy
 }
@@ -72,7 +72,7 @@ incipit {
 #[test]
 fn scalar_access_marker_rejects_at_the_marker() {
     assert_rejects_with_issue(
-        "incipit { fixum de numerus x ← 5 }",
+        "incipit { sit de numerus x ← 5 }",
         ISSUE_SCALAR_ACCESS_MARKER,
     );
     assert_rejects_with_issue(
@@ -80,11 +80,11 @@ fn scalar_access_marker_rejects_at_the_marker() {
         ISSUE_SCALAR_ACCESS_MARKER,
     );
     assert_rejects_with_issue(
-        "incipit { fixum numerus x ← own 5 }",
+        "incipit { sit numerus x ← own 5 }",
         ISSUE_SCALAR_ACCESS_MARKER,
     );
     assert_rejects_with_issue(
-        "incipit { fixum bivalens flag ← copy verum }",
+        "incipit { sit bivalens flag ← copy verum }",
         ISSUE_SCALAR_ACCESS_MARKER,
     );
 }

@@ -29,9 +29,9 @@ genus Konto {
 const MAIN: &str = r"
 incipit {
     check(1)
-    fixum numerus x ← risky(2)
+    sit numerus x ← risky(2)
     nota x + risky(3)
-    fixum Konto k ← Konto { saldo = 5 }
+    sit Konto k ← Konto { saldo = 5 }
     nota k.nimm(1)
 }
 ";
@@ -39,7 +39,7 @@ incipit {
 const HANDLED: &str = r"
 incipit {
     fac {
-        fixum numerus x ← risky(-1)
+        sit numerus x ← risky(-1)
         nota x
     } cape err {
         nota err

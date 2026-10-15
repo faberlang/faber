@@ -15,9 +15,9 @@ fn analyze(source: &str) -> AnalyzedModule {
 }
 
 const SOURCE: &str = r"incipit {
-    fixum f32 positive ← ∞
-    fixum f32 quiet ← nonnumerus
-    fixum f32 negative ← -∞
+    sit f32 positive ← ∞
+    sit f32 quiet ← nonnumerus
+    sit f32 negative ← -∞
     nota positive
     nota quiet
     nota negative

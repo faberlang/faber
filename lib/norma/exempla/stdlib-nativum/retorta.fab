@@ -18,6 +18,6 @@ locale = "en"
 import from "norma:chorda" chorda
 
 main {
-    const string reversed ← chorda.reverse("roma")
+    let string reversed ← chorda.reverse("roma")
     print reversed
 }

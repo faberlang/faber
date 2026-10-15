@@ -41,18 +41,18 @@ fn dynamic_pair(list<int> left, list<int> right) → list<int> {
 }
 
 main {
-    const list<int> dynamic_left ← [1, 2, 3]
-    const list<int> dynamic_right ← [10, 20, 30]
-    const list<int> dynamic_sum ← dynamic_pair(dynamic_left, dynamic_right)
-    const list<int, 3> inferred ← [4, 5, 6]
-    const list<int, 3> explicit ← [7, 8, 9]
+    let list<int> dynamic_left ← [1, 2, 3]
+    let list<int> dynamic_right ← [10, 20, 30]
+    let list<int> dynamic_sum ← dynamic_pair(dynamic_left, dynamic_right)
+    let list<int, 3> inferred ← [4, 5, 6]
+    let list<int, 3> explicit ← [7, 8, 9]
 
     # Both widening spellings are checked here. The dead branch keeps the
     # runnable output on the current list-literal runner path while the
     # conversion-only source contract remains executable compiler input.
     if false {
-        const list<int, 4> widened_expression ← dynamic_left ↦ list<int, 4>
-        var list<int, 4> widened_assignment ← [0, 0, 0, 0]
+        let list<int, 4> widened_expression ← dynamic_left ↦ list<int, 4>
+        mut list<int, 4> widened_assignment ← [0, 0, 0, 0]
         widened_assignment ↤ dynamic_left
         print widened_expression
         print widened_assignment

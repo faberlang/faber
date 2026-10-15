@@ -51,14 +51,14 @@ fn assert_accepted(body: &str) {
 #[test]
 fn vector_alias_of_de_param_rejects_element_write() {
     assert_rejected(
-        "functio f(de vector<f32, 4> v) → vacuum { fixum vector<f32, 4> w ← v\n w[0] ← 9.0 }",
+        "functio f(de vector<f32, 4> v) → vacuum { sit vector<f32, 4> w ← v\n w[0] ← 9.0 }",
     );
 }
 
 #[test]
 fn vector_alias_of_de_param_allows_reads() {
     assert_accepted(
-        "functio f(de vector<f32, 4> v) → fractus { fixum vector<f32, 4> w ← v\n redde w[0] }",
+        "functio f(de vector<f32, 4> v) → fractus { sit vector<f32, 4> w ← v\n redde w[0] }",
     );
 }
 
@@ -72,6 +72,6 @@ fn vector_alias_of_mutable_local_still_writes() {
 #[test]
 fn matrix_alias_of_de_param_allows_reads() {
     assert_accepted(
-        "functio f(de matrix<f32, [2, 2]> m) → vacuum { fixum matrix<f32, [2, 2]> n ← m }",
+        "functio f(de matrix<f32, [2, 2]> m) → vacuum { sit matrix<f32, [2, 2]> n ← m }",
     );
 }

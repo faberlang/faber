@@ -58,8 +58,8 @@ fn structured_control_flow_in_a_kernel_loop_is_legal() {
         r"
 @ nucleum
 @ publica
-functio relu(tensor<f32, [8]> x, in tensor<f32, [8]> out) → vacuum {
-    itera ex x apud [i] fixum v {
+functio relu(tensor<f32, [8]> x, varia tensor<f32, [8]> out) → vacuum {
+    itera ex x apud [i] sit v {
         si v ≻ 0.0 {
             out[i] ← v
         } secus {
@@ -82,8 +82,8 @@ functio bump(f32 x) → f32 {
 
 @ nucleum
 @ publica
-functio caller(tensor<f32, [8]> x, in tensor<f32, [8]> out) → vacuum {
-    itera ex x apud [i] fixum v {
+functio caller(tensor<f32, [8]> x, varia tensor<f32, [8]> out) → vacuum {
+    itera ex x apud [i] sit v {
         out[i] ← bump(v)
     }
 }
@@ -103,8 +103,8 @@ genus Pair {
 @ nucleum
 @ publica
 functio scratch(f32 x) → f32 {
-    fixum Pair p ← Pair { a = x, b = x }
-    fixum f32 y ← p.a + p.b
+    sit Pair p ← Pair { a = x, b = x }
+    sit f32 y ← p.a + p.b
     redde y
 }
 ",
@@ -118,7 +118,7 @@ fn a_bounded_kernel_local_collection_is_legal() {
 @ nucleum
 @ publica
 functio scratch(f32 x) → f32 {
-    fixum lista<f32, 4> s ← [x, x, x, x]
+    sit lista<f32, 4> s ← [x, x, x, x]
     redde s[0]
 }
 ",
@@ -132,8 +132,8 @@ fn a_text_literal_selector_on_a_device_intrinsic_is_legal() {
 @ nucleum
 @ publica
 functio swizzled(f32 x) → f32 {
-    fixum vector<f32, 4> a ← [x, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
-    fixum vector<f32, 4> b ← a.swizzle("wzyx")
+    sit vector<f32, 4> a ← [x, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    sit vector<f32, 4> b ← a.swizzle("wzyx")
     redde x
 }
 "#,
@@ -234,7 +234,7 @@ functio bis(numerus n) → numerus {
 @ nucleum
 @ publica
 functio talk(numerus n) → vacuum {
-    fixum sermo s ← ad 'numeri:bis' (n)
+    sit sermo s ← ad 'numeri:bis' (n)
 }
 ",
         "nucleum_host_effect",
@@ -359,7 +359,7 @@ fn a_host_typed_local_is_rejected() {
 @ nucleum
 @ publica
 functio k(f32 x) → f32 {
-    fixum lista<f32> xs ← [x, x]
+    sit lista<f32> xs ← [x, x]
     redde x
 }
 ",
@@ -527,8 +527,8 @@ fn a_call_default_in_a_kernel_selects_a_value_and_is_legal() {
         r"
 @ nucleum
 @ publica
-functio k(tensor<f32, [8]> x, in tensor<f32, [8]> out) → vacuum {
-    itera ex x apud [i] filum f fixum v {
+functio k(tensor<f32, [8]> x, varia tensor<f32, [8]> out) → vacuum {
+    itera ex x apud [i] filum f sit v {
         out[i] ← x.accipe([i + 1]) ⊥ 0.0
     }
 }
@@ -558,7 +558,7 @@ fn a_local_do_catch_is_still_a_recovery_next_to_a_call_default() {
 @ nucleum
 @ publica
 functio k(tensor<f32, [8]> x, numerus n) → f32 {
-    fixum f32 d ← x.accipe([n]) ⊥ 0.0
+    sit f32 d ← x.accipe([n]) ⊥ 0.0
     fac {
         redde d
     } cape err {
@@ -623,7 +623,7 @@ fn lane_id_local(builtin: radix_types::MirKernelBuiltin) -> String {
     } else {
         "u32"
     };
-    format!("fixum {ty} lane ← {}()", builtin.spelling())
+    format!("sit {ty} lane ← {}()", builtin.spelling())
 }
 
 #[test]
@@ -655,7 +655,7 @@ fn a_thread_id_builtin_is_rejected_inside_a_kernel_loop() {
 @ nucleum
 @ publica
 functio k(tensor<u32, [8]> x, tensor<u32, [8]> out) → vacuum {
-    itera ex x apud [i] fixum v {
+    itera ex x apud [i] sit v {
         out[global_invocation_x()] ← v
     }
 }
@@ -763,7 +763,7 @@ functio k(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 global_invocation
 fn a_positional_trailing_u32_lane_parameter_of_any_name_warns() {
     for name in ["id", "i", "lane", "anything_at_all"] {
         let source = format!(
-            "@ nucleum\n@ publica\nfunctio copy(tensor<u32, [4]> input, in tensor<u32, [4]> output, u32 {name}) → vacuum {{\n    output[{name}] ← input[{name}]\n}}\n"
+            "@ nucleum\n@ publica\nfunctio copy(tensor<u32, [4]> input, varia tensor<u32, [4]> output, u32 {name}) → vacuum {{\n    output[{name}] ← input[{name}]\n}}\n"
         );
         let warnings = lane_warnings(&source);
         assert_eq!(warnings.len(), 1, "{name}: {warnings:?}");
@@ -814,7 +814,7 @@ fn a_compiler_bound_lane_parameter_is_unaffected() {
     let source = r"
 @ nucleum
 @ publica
-functio copy(tensor<u32, [4]> input, in tensor<u32, [4]> output, u32 i) → vacuum {
+functio copy(tensor<u32, [4]> input, varia tensor<u32, [4]> output, u32 i) → vacuum {
     output[i] ← input[i]
 }
 ";
@@ -892,7 +892,7 @@ functio k() → saturatus<f32> {
 @ nucleum
 @ publica
 functio k(f32 x) → f32 {
-    fixum saturatus<f32> y ← 1.0
+    sit saturatus<f32> y ← 1.0
     redde x
 }
 "

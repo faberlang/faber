@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "Value iteration over a runtime-length list<T, N> (N <= 10) lowers to a static split on len; arm k unrolls k lanes; spare slots are never read."
-syntax = "for from list<T, N> const x { }"
+syntax = "for from list<T, N> let x { }"
 related = ["lista", "ex", "itera", "longitudo"]
 locale = "en"
 no_expected = "declaration-only"
@@ -34,8 +34,8 @@ no_expected = "declaration-only"
 # unit tests pin the N+1-arm switch and the N <= 10 decline.
 
 fn sumBounded(list<int, 8> xs) → int {
-    var int total ← 0
-    for from xs const x {
+    mut int total ← 0
+    for from xs let x {
         total ← total + x
     }
     return total

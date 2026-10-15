@@ -88,9 +88,18 @@ use a top-level function.
 ### Variables
 
 
-- `fixum` = immutable binding (write-once): it may be declared without an
-  initializer and assigned exactly once later, then frozen. `varia` = mutable
-  binding (reassignable), like `let`.
+- `sit` (en `let`) = run-time name, write-once: `sit T name ← e` states the
+  type, `sit name ← e` infers it. It may be declared without an initializer and
+  assigned exactly once later, then frozen. `varia` (en `mut`) = writable name
+  (reassignable). `fixum` (en `const`) = compile-time constant only, and it goes
+  with `=`: a run-time `fixum T name ← e` is `PARSE010` `runtime_const_retired`
+  (write `sit`), and the old English spelling `var` is `PARSE010` `var_retired`
+  (write `mut`).
+- `de T name ← place` (en `ref T name ← place`) is a re-pointable name that
+  reads through to a place: the name may be bound to another place, a write
+  through it is `SEM056` `assign_through_ref`, a scalar type takes no marker
+  (`SEM008` `scalar_access_marker`), and `copy`/`own` do not belong on it
+  (`PARSE010` `ref_local_value_marker`).
 - `figendum` / `variandum` await a `promissum<T>` or `promissum<T ⇥ E>`, bind
   the resolved `T`, and propagate a compatible alternate `E`.
 - `↢` is the await-directed initializer for an ordinary declaration:
@@ -98,13 +107,13 @@ use a top-level function.
   It has the same await and alternate-propagation semantics as
   `figendum T name ← future`, but it is not a general expression operator and
   cannot target an existing place.
-- Use `_` as the type annotation when the initializer determines the type: `fixum _ name ← value`
-- `sit name ← value` is sugar for `fixum _ name ← value` (inferred immutable local)
-- `sit name` (no initializer) is sugar for `fixum _ name` — the inferred deferred
+- Use `_` as the type annotation when the initializer determines the type: `varia _ name ← value`
+- `sit name ← value` is the inferred write-once local; `sit T name ← value` is the typed one
+- `sit name` (no initializer) is the inferred deferred
   immutable. Assign exactly once before any read.
-- Typed `fixum`/`varia` initializers accept `↤` (`fixum numerus x ↤ "42"`):
+- Typed `sit`/`varia` initializers accept `↤` (`sit numerus x ↤ "42"`):
   the written type is the conversion destination, then the binding is
-  initialized. `figendum`/`variandum` keep `←`; `fixum _`, `sit`, and untyped
+  initialized. `figendum`/`variandum` keep `←`; `varia _`, inferred `sit`, and untyped
   destructuring reject `↤` (no concrete destination type).
 - `fixum T x = e` (D5.10) declares a typed **constant**; at the top of a file
   the same declaration is the module-level constant (next section). `=` states a
@@ -115,7 +124,7 @@ use a top-level function.
   an ordinary immutable local of type `T`. `varia` never takes `=`
   (`varia_compile_time_initializer`), and a value that is not known at compile
   time is stored with `←` (`constant_initializer_not_constant`, SEM060).
-- Deferred init: `fixum numerus x` or `sit x` declares an uninitialized immutable
+- Deferred init: `sit numerus x` or `sit x` declares an uninitialized immutable
   slot that must be assigned exactly once before any read; a second assignment is
   rejected. The definite-assignment pass (semantic Phase 3a) enforces this.
 
@@ -263,7 +272,7 @@ construction literal (`Genus { field = value }`).
   count). Satisfaction stays nominal (D1.3): a witness must declare the bound
   itself.
 
-- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } ex source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `ex` must start on the closing `}`'s line — a line-leading `ex` is instead the extraction statement (`ex p fixum x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `ex`); the source must be the same genus type as the constructor. `sparge` was removed from construction literals (D15.4); it stays for lists and calls.
+- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } ex source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `ex` must start on the closing `}`'s line — a line-leading `ex` is instead the extraction statement (`ex p sit x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `ex`); the source must be the same genus type as the constructor. `sparge` was removed from construction literals (D15.4); it stays for lists and calls.
 
 ### Annotations
 
@@ -348,17 +357,18 @@ wire operation such as `json.pange(value ↦ json)`.
 - `implet` = implements (conformance to an `implendum` contract), written
   with the contract's type arguments in full
   (`genus Persona implet Orderable<Persona>`, D1.2).
-- Every `genus` field declares exactly one of `fixum` / `varia` / `generis`
+- Every `genus` field declares exactly one of `sit` (en `let`) / `varia` / `generis`
   (D16.1); there is no default — an unmarked field is a parse error: PARSE010
   `field_modifier_missing` (D5c). The `discretio` shared-field position
   (`union_member`) keeps today's unmarked form (fork F7 held).
-  `fixum T x`: per instance, set only in
+  `sit T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } ex p` copies it unchanged (D16.3), independent of visibility
-  (`@ privata` + `fixum` is legal). `varia T x`: per instance, reassignable.
+  (`@ privata` + `sit` is legal). `varia T x`: per instance, reassignable.
   `generis T X = …`: one per type, compile-time (the only remaining `generis` position). A write to a
-  `fixum` field outside a construction literal is `SEM020`
-  (`assignment_to_fixum_field`). The former `nexum` field modifier is removed
+  `sit` field outside a construction literal is `SEM020`
+  (`assignment_to_fixum_field`). The retired `fixum` (en `const`) field word is
+  PARSE010 `field_fixum_retired` and `de` (en `ref`) is `ref_field_refused`. The former `nexum` field modifier is removed
   and rejected with a migration diagnostic.
 - `genus` members are public by default (D5.2). `@ privata` on a member restricts it to the type's own methods: only code inside the type's own function bodies may read, write, or call it (D5.3); `@ interna` restricts it to code in the declaring package. A construction literal may still set a private field, from any file, and `Genus { … } ex p` copies it unchanged (D5.4). Reading, writing, or calling an inaccessible member from outside its allowed scope is `SEM063` (`member_private_read`/`_write`/`_call`, or `member_interna_read`/`_write`/`_call`); `@ publica` on a member is a redundant-annotation warning `WARN028` (`redundant_member_publica`), an error when warnings are denied.
 - A type may refer to itself: `discretio Expr { Adde { Expr sinister, Expr dexter } }`
@@ -1087,9 +1097,9 @@ prefer sugar. Choose per module or file.
 
 
 - `dum` = while
-- `itera ex...fixum`/`itera ex...varia` = for-of (values)
-- `itera de...fixum`/`itera de...varia` = for-in (keys)
-- `itera ab range fixum/varia i` = range iteration (e.g. `itera ab 0‥10 per 2 fixum i { nota i }`; `per` belongs to the range expression)
+- `itera ex...sit`/`itera ex...varia` = for-of (values)
+- `itera de...sit`/`itera de...varia` = for-in (keys)
+- `itera ab range sit/varia i` = range iteration (e.g. `itera ab 0‥10 per 2 sit i { nota i }`; `per` belongs to the range expression)
 
 **Range step and direction (`range_tail`, `per`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down
@@ -1134,7 +1144,7 @@ prints the same list shape up to element order.
 
 There is no iteration interface. `itera ex` works on the built-in iterable
 types and on cursors. A user type that should be iterable exposes an ordinary
-method that returns a cursor (`itera ex arbor.nodi() fixum n`); nothing is
+method that returns a cursor (`itera ex arbor.nodi() sit n`); nothing is
 called implicitly.
 
 **Changing the collection inside its own loop.** The rule is about the shape of
@@ -1204,7 +1214,7 @@ A negative number pattern is written with a leading minus (`casu -1`,
 `-` before anything else is not pattern syntax.
 
 `discerne` matches a closed set and nothing else: the variants of an `ordo` or
-`discretio`, or the members of a union (`casu numerus fixum n` over
+`discretio`, or the members of a union (`casu numerus sit n` over
 `numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
 pattern that is not a member of the scrutinee's closed set is rejected
 (`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
@@ -1393,7 +1403,7 @@ The `∷` glyph (U+2237, "proportion") explicitly ascribes a target type to an e
 Prefer typed construction for ordinary `genus` values and `vacua` for ordinary empty collection values:
 
 ```fab
-fixum _ point ← Point { x = 10 }
+sit point ← Point { x = 10 }
 fixum lista<numerus> xs ← vacua
 ```
 
@@ -1550,13 +1560,13 @@ Implementation status (2026-10-11):
 Inline block example:
 
 ```fab
-fixum _ tag ← «inline»
+sit tag ← «inline»
 ```
 
 Multiline block example (newline after opening `«`):
 
 ```fab
-fixum _ blob ← «
+sit blob ← «
     select id, email
     from accounts
 »
@@ -1565,14 +1575,14 @@ fixum _ blob ← «
 Captured template example:
 
 ```fab
-fixum _ q ← `select * from accounts where id = §`(accountId)
+sit q ← `select * from accounts where id = §`(accountId)
 ```
 
 Octeti hex literal example:
 
 ```fab
-fixum _ sig ← |de ad be ef|
-fixum _ hello ← |48 65 6c 6c 6f|
+sit sig ← |de ad be ef|
+sit hello ← |48 65 6c 6c 6f|
 ```
 
 ### Format-Template Application
@@ -1971,7 +1981,7 @@ forms `ordina()` / `ordinata()` sort by the element's natural order. Both are a
 **stable** sort. The key selector's result must be a number or `textus`; other
 key types are rejected.
 
-`ex` is used for iteration (`itera ex items fixum x`) and imports (`importa ex "path"`).
+`ex` is used for iteration (`itera ex items sit x`) and imports (`importa ex "path"`).
 
 ### Iteration coordinates (`apud`)
 
@@ -1980,9 +1990,9 @@ en reader spelling is "at": `itera ex grid apud [r, c]` reads as iterating
 `grid` at coordinates `[r, c]`.
 
 - **`lista`** (D3.1): one name binds the element's position
-  (`itera ex items apud [i] fixum v`).
+  (`itera ex items apud [i] sit v`).
 - **`tabula`** (D3.1-D3.3): one name binds the entry's key
-  (`itera ex m apud [k] fixum v`); a composite-key
+  (`itera ex m apud [k] sit v`); a composite-key
   `tabula<iuncta<K1, …, Kn>, V>` takes N names, one per part of the `iuncta`
   key, in declared part order.
 - **Tensor / matrix**: as before — one name per axis, first name = outermost
@@ -1997,8 +2007,8 @@ en reader spelling is "at": `itera ex grid apud [r, c]` reads as iterating
   distinct from the element binder that follows the clause.
 - **`filum` lane binder (FLD K2).** An optional `filum IDENTIFIER` clause
   (`filum_clause`, shared with `reducta`) follows the `apud` clause and
-  precedes the mutability marker: `itera ex t apud [i, j] filum f fixum v { … }`.
-  The clause also parses without `apud` (`itera ex t filum f fixum v { … }`).
+  precedes the mutability marker: `itera ex t apud [i, j] filum f sit v { … }`.
+  The clause also parses without `apud` (`itera ex t filum f sit v { … }`).
   The parser claims `filum` only in that slot, so a binder named `filum` after
   the mutability marker stays an ordinary name. The binder is declared
   metadata; semantic passes own what it binds.

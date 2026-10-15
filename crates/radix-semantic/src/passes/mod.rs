@@ -285,6 +285,9 @@ mod mutability_mut_test;
 #[cfg(test)]
 #[path = "own_param_writable_test.rs"]
 mod own_param_writable_test;
+#[cfg(test)]
+#[path = "ref_local_test.rs"]
+mod ref_local_test;
 
 #[cfg(test)]
 #[path = "call_marker_test.rs"]

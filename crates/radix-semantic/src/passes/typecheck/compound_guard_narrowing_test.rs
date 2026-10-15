@@ -65,7 +65,7 @@ fn or_guard_narrows_the_else_branch() {
 #[test]
 fn or_guard_in_a_loop_narrows_after_continue() {
     test_support::assert_accepts(
-        "functio f(lista<textus ∪ nihil> xs, bivalens a) → numerus {\n    varia numerus total ← 0\n    itera ex xs fixum x {\n        si a aut x est nihil { perge }\n        total ← total + x.longitudo()\n    }\n    redde total\n}",
+        "functio f(lista<textus ∪ nihil> xs, bivalens a) → numerus {\n    varia numerus total ← 0\n    itera ex xs sit x {\n        si a aut x est nihil { perge }\n        total ← total + x.longitudo()\n    }\n    redde total\n}",
     );
 }
 

@@ -40,7 +40,7 @@ locale = "en"
 #   Afternoon (hour=14 matches first sin branch).
 
 main {
-    const int hour ← 14
+    let int hour ← 14
     if hour ≺ 6 {
         print "Late night"
     }

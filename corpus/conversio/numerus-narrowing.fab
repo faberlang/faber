@@ -32,25 +32,25 @@ locale = "en"
 
 main {
     # in range: the value converts unchanged
-    const int small ← 200
-    const u8 fits ← small ↦ u8
+    let int small ← 200
+    let u8 fits ← small ↦ u8
     print fits
-    const int floor ← -128
-    const i8 lowest ← floor ↦ i8
+    let int floor ← -128
+    let i8 lowest ← floor ↦ i8
     print lowest
 
     # out of range: the check fails and the recovery supplies the value
-    const int big ← 300
-    const u8 recovered ← big ↦ u8 ⊥ 7
+    let int big ← 300
+    let u8 recovered ← big ↦ u8 ⊥ 7
     print recovered
-    const i8 signedRecovered ← big ↦ i8 ⊥ -1
+    let i8 signedRecovered ← big ↦ i8 ⊥ -1
     print signedRecovered
-    const u16 wide ← 300
-    const u8 fromWide ← wide ↦ u8 ⊥ 255
+    let u16 wide ← 300
+    let u8 fromWide ← wide ↦ u8 ⊥ 255
     print fromWide
 
     # negative into unsigned is out of range too
-    const int negative ← -1
-    const u8 fromNegative ← negative ↦ u8 ⊥ 0
+    let int negative ← -1
+    let u8 fromNegative ← negative ↦ u8 ⊥ 0
     print fromNegative
 }

@@ -82,27 +82,19 @@ const fn rejected(row: u8, source: &'static str) -> Case {
 /// One accept and at least one reject for each CS-1 §4 parser site.
 const CASES: &[Case] = &[
     // 1. array binding pattern elements
-    accept(1, "fixum [a, b] ← values"),
-    trailing(1, "array_binding_pattern", "fixum [a, b,] ← values"),
-    missing(1, "array_binding_pattern", "fixum [a b] ← values"),
+    accept(1, "sit [a, b] ← values"),
+    trailing(1, "array_binding_pattern", "sit [a, b,] ← values"),
+    missing(1, "array_binding_pattern", "sit [a b] ← values"),
     // 2. object binding pattern fields
-    accept(2, "fixum { a, b } ← obj"),
-    trailing(2, "object_binding_pattern", "fixum { a, b, } ← obj"),
-    missing(2, "object_binding_pattern", "fixum { a b } ← obj"),
+    accept(2, "sit { a, b } ← obj"),
+    trailing(2, "object_binding_pattern", "sit { a, b, } ← obj"),
+    missing(2, "object_binding_pattern", "sit { a b } ← obj"),
     // 3. object rest trailing-comma guard
-    accept(3, "fixum { a, ceteri rest } ← obj"),
-    trailing(
-        3,
-        "object_binding_pattern",
-        "fixum { a, ceteri rest, } ← obj",
-    ),
+    accept(3, "sit { a, ceteri rest } ← obj"),
+    trailing(3, "object_binding_pattern", "sit { a, ceteri rest, } ← obj"),
     // 4. array rest trailing-comma guard
-    accept(4, "fixum [a, ceteri rest] ← values"),
-    trailing(
-        4,
-        "array_binding_pattern",
-        "fixum [a, ceteri rest,] ← values",
-    ),
+    accept(4, "sit [a, ceteri rest] ← values"),
+    trailing(4, "array_binding_pattern", "sit [a, ceteri rest,] ← values"),
     // 5. function parameters
     accept(5, "functio f(numerus a, numerus b) → vacuum { }"),
     trailing(
@@ -207,56 +199,50 @@ functio f() → vacuum { }"#,
     ),
     missing(13, "generic_parameters", "functio f<T U>(T a) → vacuum { }"),
     // 14. gradient selectors
-    accept(14, "fixum _ g ← loss(x, y) ∇ [x, y]"),
-    trailing(14, "gradient_selectors", "fixum _ g ← loss(x, y) ∇ [x, y,]"),
-    missing(14, "gradient_selectors", "fixum _ g ← loss(x, y) ∇ [x y]"),
+    accept(14, "sit g ← loss(x, y) ∇ [x, y]"),
+    trailing(14, "gradient_selectors", "sit g ← loss(x, y) ∇ [x, y,]"),
+    missing(14, "gradient_selectors", "sit g ← loss(x, y) ∇ [x y]"),
     // 15. tensor/sparsa/vector/matrix shape-sugar separator (call-position type
     // args parse as ordinary generic calls; type-name callees reject in check)
     accept(15, "functio f(tensor<f32, [2, 3]> value) → vacuum { }"),
-    accept(15, "fixum _ t ← tensor<f32>(x)"),
-    rejected(15, "fixum _ t ← tensor<f32, [2],>(x)"),
+    accept(15, "sit t ← tensor<f32>(x)"),
+    rejected(15, "sit t ← tensor<f32, [2],>(x)"),
     // 16. finge named field initializers
-    accept(
-        16,
-        r#"fixum _ e ← finge Bonum { nuntius = "x", extra = 1 }"#,
-    ),
+    accept(16, r#"sit e ← finge Bonum { nuntius = "x", extra = 1 }"#),
     trailing(
         16,
         "variant_field_initializers",
-        r#"fixum _ e ← finge Bonum { nuntius = "x", extra = 1, }"#,
+        r#"sit e ← finge Bonum { nuntius = "x", extra = 1, }"#,
     ),
     missing(
         16,
         "variant_field_initializers",
-        r#"fixum _ e ← finge Bonum { nuntius = "x" extra = 1 }"#,
+        r#"sit e ← finge Bonum { nuntius = "x" extra = 1 }"#,
     ),
     // 17. iuncta elements
-    accept(
-        17,
-        r#"fixum _ pair ← iuncta<textus, numerus> ["salve", 42]"#,
-    ),
+    accept(17, r#"sit pair ← iuncta<textus, numerus> ["salve", 42]"#),
     trailing(
         17,
         "iuncta_elements",
-        r#"fixum _ pair ← iuncta<textus, numerus> ["salve", 42,]"#,
+        r#"sit pair ← iuncta<textus, numerus> ["salve", 42,]"#,
     ),
     missing(
         17,
         "iuncta_elements",
-        r#"fixum _ pair ← iuncta<textus, numerus> ["salve" 42]"#,
+        r#"sit pair ← iuncta<textus, numerus> ["salve" 42]"#,
     ),
     // 18. keyword-clausura signature params
-    accept(18, "fixum _ f ← clausura numerus a, numerus b: a"),
-    accept(18, "fixum _ f ← clausura numerus a { redde a }"),
+    accept(18, "sit f ← clausura numerus a, numerus b: a"),
+    accept(18, "sit f ← clausura numerus a { redde a }"),
     trailing(
         18,
         "closure_parameters",
-        "fixum _ f ← clausura numerus a, numerus b,: a",
+        "sit f ← clausura numerus a, numerus b,: a",
     ),
     missing(
         18,
         "closure_parameters",
-        "fixum _ f ← clausura numerus a numerus b: a",
+        "sit f ← clausura numerus a numerus b: a",
     ),
     // 19. compact-clausura param-list helper. Trailing/missing comma errors
     // are produced inside the helper, then compact-clausura speculation
@@ -264,75 +250,56 @@ functio f() → vacuum { }"#,
     // parenthesized-expression recovery fails. The family slug for this
     // position is proven by row 18; these cases prove the helper still
     // rejects the unlawful forms.
-    accept(19, "fixum _ f ← (numerus a, numerus b) ∴ a"),
-    rejected(19, "fixum _ f ← (numerus a, numerus b,) ∴ a"),
-    rejected(19, "fixum _ f ← (numerus a numerus b) ∴ a"),
+    accept(19, "sit f ← (numerus a, numerus b) ∴ a"),
+    rejected(19, "sit f ← (numerus a, numerus b,) ∴ a"),
+    rejected(19, "sit f ← (numerus a numerus b) ∴ a"),
     // 20. call arguments
-    accept(20, "fixum _ x ← f(1, 2)"),
-    trailing(20, "call_arguments", "fixum _ x ← f(1, 2,)"),
-    missing(20, "call_arguments", "fixum _ x ← f(1 2)"),
+    accept(20, "sit x ← f(1, 2)"),
+    trailing(20, "call_arguments", "sit x ← f(1, 2,)"),
+    missing(20, "call_arguments", "sit x ← f(1 2)"),
     // 21. array/list elements
-    accept(21, "fixum _ v ← [1, 2]"),
-    trailing(21, "array_elements", "fixum _ v ← [1, 2,]"),
-    missing(21, "array_elements", "fixum _ v ← [1 2]"),
+    accept(21, "sit v ← [1, 2]"),
+    trailing(21, "array_elements", "sit v ← [1, 2,]"),
+    missing(21, "array_elements", "sit v ← [1 2]"),
     // 22. typed object fields
     accept(
         22,
-        "genus Point { varia numerus x = 0 varia numerus y = 0 }\nfixum _ p ← Point { x = 10, y = 20 }",
+        "genus Point { varia numerus x = 0 varia numerus y = 0 }\nsit p ← Point { x = 10, y = 20 }",
     ),
     trailing(
         22,
         "object_fields",
-        "genus Point { varia numerus x = 0 varia numerus y = 0 }\nfixum _ p ← Point { x = 10, y = 20, }",
+        "genus Point { varia numerus x = 0 varia numerus y = 0 }\nsit p ← Point { x = 10, y = 20, }",
     ),
     missing(
         22,
         "object_fields",
-        "genus Point { varia numerus x = 0 varia numerus y = 0 }\nfixum _ p ← Point { x = 10 y = 20 }",
+        "genus Point { varia numerus x = 0 varia numerus y = 0 }\nsit p ← Point { x = 10 y = 20 }",
     ),
     // 23. JSON object members
-    accept(23, r#"fixum _ v ← { "a": 1, "b": 2 }"#),
-    trailing(
-        23,
-        "json_object_members",
-        r#"fixum _ v ← { "a": 1, "b": 2, }"#,
-    ),
-    missing(
-        23,
-        "json_object_members",
-        r#"fixum _ v ← { "a": 1 "b": 2 }"#,
-    ),
+    accept(23, r#"sit v ← { "a": 1, "b": 2 }"#),
+    trailing(23, "json_object_members", r#"sit v ← { "a": 1, "b": 2, }"#),
+    missing(23, "json_object_members", r#"sit v ← { "a": 1 "b": 2 }"#),
     // 24. JSON array elements
-    accept(24, r#"fixum _ v ← { "ids": [1, 2] }"#),
-    trailing(
-        24,
-        "json_array_elements",
-        r#"fixum _ v ← { "ids": [1, 2,] }"#,
-    ),
-    missing(24, "json_array_elements", r#"fixum _ v ← { "ids": [1 2] }"#),
+    accept(24, r#"sit v ← { "ids": [1, 2] }"#),
+    trailing(24, "json_array_elements", r#"sit v ← { "ids": [1, 2,] }"#),
+    missing(24, "json_array_elements", r#"sit v ← { "ids": [1 2] }"#),
     // 25. type arguments
-    accept(
-        25,
-        r#"fixum _ pair ← iuncta<textus, numerus> ["salve", 42]"#,
-    ),
+    accept(25, r#"sit pair ← iuncta<textus, numerus> ["salve", 42]"#),
     trailing(
         25,
         "type_arguments",
-        r#"fixum _ pair ← iuncta<textus, numerus,> ["salve", 42]"#,
+        r#"sit pair ← iuncta<textus, numerus,> ["salve", 42]"#,
     ),
     missing(
         25,
         "type_arguments",
-        r#"fixum _ pair ← iuncta<textus numerus> ["salve", 42]"#,
+        r#"sit pair ← iuncta<textus numerus> ["salve", 42]"#,
     ),
     // 26. scriptum arguments
-    accept(26, r#"fixum _ s ← scriptum("{0} {1}", 1, 2)"#),
-    trailing(
-        26,
-        "scriptum_arguments",
-        r#"fixum _ s ← scriptum("{0}", 1,)"#,
-    ),
-    missing(26, "scriptum_arguments", r#"fixum _ s ← scriptum("{0}" 1)"#),
+    accept(26, r#"sit s ← scriptum("{0} {1}", 1, 2)"#),
+    trailing(26, "scriptum_arguments", r#"sit s ← scriptum("{0}", 1,)"#),
+    missing(26, "scriptum_arguments", r#"sit s ← scriptum("{0}" 1)"#),
     // 27. atomic<T> singleton (comma forbidden)
     accept(27, "functio f(atomic<i32> cell) → vacuum { }"),
     fixed_issue(
@@ -404,11 +371,11 @@ functio f() → vacuum { }"#,
     missing(35, "extract_fields", "ex source varia nomen aetas"),
     trailing(35, "extract_fields", "ex source varia nomen, ceteri rest,"),
     // 37. pattern bindings
-    accept(37, "discerne event { casu Ok fixum payload, error { } }"),
+    accept(37, "discerne event { casu Ok sit payload, error { } }"),
     trailing(
         37,
         "pattern_bindings",
-        "discerne event { casu Ok fixum payload, error, { } }",
+        "discerne event { casu Ok sit payload, error, { } }",
     ),
     missing(
         37,

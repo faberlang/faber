@@ -38,11 +38,11 @@ locale = "en"
 
 class Tabula {
     @ private
-    var int summa
+    mut int summa
     @ private
-    var int numerus
+    mut int numerus
     @ internal
-    var string nomen
+    mut string nomen
 
     fn adde(int valor) → void {
         self.summa ← self.summa + valor
@@ -67,7 +67,7 @@ main {
     # A construction literal may set private fields; the binding is `var`
     # because `adde` changes the object in place, and a method that mutates its
     # receiver needs a `var` binding exactly as a field write does
-    var Tabula t ← Tabula { summa = 0, numerus = 0, nomen = "gradus" }
+    mut Tabula t ← Tabula { summa = 0, numerus = 0, nomen = "gradus" }
     t.adde(4)
     t.adde(8)
     print t.totum()
@@ -75,7 +75,7 @@ main {
     print t.nomen
 
     # Copy with changes carries the private fields across
-    const Tabula copia ← Tabula { nomen = "copia" } from t
+    let Tabula copia ← Tabula { nomen = "copia" } from t
     print copia.totum()
     print copia.mensura()
     print copia.nomen

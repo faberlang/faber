@@ -58,16 +58,16 @@ union Expr {
 
 fn evalua(Expr e) → int {
     match e {
-        case Numerus const valor {
+        case Numerus let valor {
             return valor
         }
-        case Nega const interior {
+        case Nega let interior {
             return 0 - evalua(interior)
         }
-        case Adde const sinister, dexter {
+        case Adde let sinister, dexter {
             return evalua(sinister) + evalua(dexter)
         }
-        case Multiplica const sinister, dexter {
+        case Multiplica let sinister, dexter {
             return evalua(sinister) * evalua(dexter)
         }
     }
@@ -75,24 +75,24 @@ fn evalua(Expr e) → int {
 
 fn depinge(Expr e) → string {
     match e {
-        case Numerus const valor {
+        case Numerus let valor {
             return "§"(valor)
         }
-        case Nega const interior {
+        case Nega let interior {
             return "-§"(depinge(interior))
         }
-        case Adde const sinister, dexter {
+        case Adde let sinister, dexter {
             return "(§ + §)"(depinge(sinister), depinge(dexter))
         }
-        case Multiplica const sinister, dexter {
+        case Multiplica let sinister, dexter {
             return "(§ * §)"(depinge(sinister), depinge(dexter))
         }
     }
 }
 
 class Nodus {
-    var int valor
-    var Nodus ∪ none sequens
+    mut int valor
+    mut Nodus ∪ none sequens
 }
 
 fn summa(Nodus ∪ none n) → int {
@@ -110,14 +110,14 @@ fn longitudo(Nodus ∪ none n) → int {
 }
 
 main {
-    const Expr tres ← variant Numerus { valor = 3 }
-    const Expr productum ← variant Multiplica { sinister = tres, dexter = variant Numerus { valor = 4 } }
-    const Expr arbor ← variant Adde { sinister = variant Numerus { valor = 2 }, dexter = productum }
+    let Expr tres ← variant Numerus { valor = 3 }
+    let Expr productum ← variant Multiplica { sinister = tres, dexter = variant Numerus { valor = 4 } }
+    let Expr arbor ← variant Adde { sinister = variant Numerus { valor = 2 }, dexter = productum }
     print evalua(arbor)
     print depinge(arbor)
     print evalua(variant Nega { interior = variant Adde { sinister = tres, dexter = variant Numerus { valor = 6 } } })
 
-    var Nodus caput ← Nodus { valor = 1, sequens = Nodus { valor = 2, sequens = Nodus { valor = 3, sequens = null } } }
+    mut Nodus caput ← Nodus { valor = 1, sequens = Nodus { valor = 2, sequens = Nodus { valor = 3, sequens = null } } }
     print summa(caput)
     print longitudo(caput)
     print caput?.sequens?.valor

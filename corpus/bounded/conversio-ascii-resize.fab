@@ -37,11 +37,11 @@ locale = "en"
 # runtime conversio (UnsupportedMir), so stdout stays unpinned.
 
 main {
-    const ascii<4> a ← 'ab'
-    const ascii<8> grown ← a ↦ ascii<8>
-    const ascii<8> b ← 'abcd'
-    const ascii<4> shrunk ← b ↦ ascii<4>
-    const ascii<8> same ← a ↦ ascii<8>
+    let ascii<4> a ← 'ab'
+    let ascii<8> grown ← a ↦ ascii<8>
+    let ascii<8> b ← 'abcd'
+    let ascii<4> shrunk ← b ↦ ascii<4>
+    let ascii<8> same ← a ↦ ascii<8>
     print grown
     print shrunk
     print same

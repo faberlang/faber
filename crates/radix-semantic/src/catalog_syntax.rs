@@ -651,9 +651,6 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
                     "{keyword} binds one identifier directly; use {keyword} name ← expr"
                 ));
             }
-            "sit_no_destructuring" => {
-                return Some("sit does not support destructuring patterns".to_owned());
-            }
             "test_case_or_setup" => return Some("expected test case or setup".to_owned()),
             "test_modifier_integer" => {
                 let modifier = quote_arg(args, "modifier")?;
@@ -755,16 +752,13 @@ fn expected_help_issue_late(issue: &str, args: &[DiagnosticArg]) -> Option<Strin
             return Some(format!("keep only one {keyword} rest binding"));
         }
         "mutability_marker" => {
-            return Some("add fixum or varia before the binding name".to_owned());
+            return Some("add sit or varia before the binding name".to_owned());
         }
         "sit_identifier_binding" => {
             let keyword = quote_arg(args, "keyword")?;
             return Some(format!(
-                "write {keyword} name ← expr or use fixum for typed/destructured bindings"
+                "write {keyword} name ← expr or use sit with a type or a destructuring pattern"
             ));
-        }
-        "sit_no_destructuring" => {
-            return Some("use fixum with a destructuring pattern".to_owned());
         }
         "test_case_or_setup" => {
             let proba = quote_arg(args, "proba")?;
@@ -885,7 +879,7 @@ fn unexpected_help(args: &[DiagnosticArg]) -> Option<String> {
         "json_integer_underflow" => Some("use a numerus value within range".to_owned()),
         "expected_json_number_after_minus" => Some("put a number after '-' in JSON".to_owned()),
         "conversio_assign_requires_concrete_type" => {
-            Some("write a concrete type for the binding, e.g. 'fixum numerus x ↤ value'".to_owned())
+            Some("write a concrete type for the binding, e.g. 'sit numerus x ↤ value'".to_owned())
         }
         "conversio_assign_await_unsupported" => {
             Some("keep '←' for 'figendum'/'variandum' awaited bindings".to_owned())
@@ -961,7 +955,7 @@ fn invalid_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
         }
         "unexpected_annotation_token" => Some("remove the trailing annotation token".to_owned()),
         "nucleum_lane_removed" => Some(
-            "bind the iteration coordinate with `apud` on a `filum` loop: `itera ex t apud [i] filum f fixum v`"
+            "bind the iteration coordinate with `apud` on a `filum` loop: `itera ex t apud [i] filum f sit v`"
                 .to_owned(),
         ),
         "wrong_locale_annotation" => {
@@ -1135,7 +1129,7 @@ fn invalid_expression_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("write one 'target ⇇ value' per statement; '⇇' has no result to chain".to_owned())
         }
         "itera_source_sort_reduce_unbound" => Some(
-            "bind it to a name first, then loop over the name: `const list<int> ys ← sort via asc from xs`, then `for from ys const x`"
+            "bind it to a name first, then loop over the name: `let list<int> ys ← sort via asc from xs`, then `for from ys const x`"
                 .to_owned(),
         ),
         "recovery_uses_exit_arrow" => {

@@ -40,12 +40,12 @@ locale = "en"
 # Contract 1 — first-index ties. [3, 1, 3, 2, 3]: three equal maxima, the
 # least index (0) wins; the mirror scan on minima keeps index 1.
 fn tie_max(list<int> xs) → int {
-    const int winner ← xs.argmax() coalesce 0
+    let int winner ← xs.argmax() coalesce 0
     return winner
 }
 
 fn tie_min(list<int> xs) → int {
-    const int winner ← xs.argmin() coalesce 0
+    let int winner ← xs.argmin() coalesce 0
     return winner
 }
 
@@ -53,31 +53,31 @@ fn tie_min(list<int> xs) → int {
 # [nan, 3.0, 1.0, 3.0]: NaN never wins, and the first 3.0 keeps the tie at
 # index 1.
 fn nan_max(list<f64> xs) → int {
-    const int winner ← xs.argmax() coalesce 0
+    let int winner ← xs.argmax() coalesce 0
     return winner
 }
 
 # The min mirror: [1.0, nan, 0.5, 0.5] — least value 0.5, first index wins.
 fn nan_min(list<f64> xs) → int {
-    const int winner ← xs.argmin() coalesce 0
+    let int winner ← xs.argmin() coalesce 0
     return winner
 }
 
 # Contract 3, all-NaN — index 0 is kept (carrying NaN); the mirror agrees.
 fn all_nan_argmax(list<f64> xs) → int {
-    const int winner ← xs.argmax() coalesce 0
+    let int winner ← xs.argmax() coalesce 0
     return winner
 }
 
 # Contract 2 — empty → nihil, no sentinel. The raw twin keeps the nullable
 # shape so the caller sees nihil and composes the default at the call site.
 fn raw_argmax(list<f64> xs) → int ∪ none {
-    const int ∪ none winner ← xs.argmax()
+    let int ∪ none winner ← xs.argmax()
     return winner
 }
 
 fn empty_or(list<f64> xs, int fallback) → int {
-    const int winner ← xs.argmin() coalesce fallback
+    let int winner ← xs.argmin() coalesce fallback
     return winner
 }
 
@@ -96,28 +96,28 @@ fn empty_or(list<f64> xs, int fallback) → int {
 
 main {
     # Contract 1 — first-index ties on both twins.
-    const list<int> ties ← [3, 1, 3, 2, 3]
+    let list<int> ties ← [3, 1, 3, 2, 3]
     print tie_max(ties)
     print tie_min(ties)
-    const list<int> min_ties ← [4, 2, 5, 2, 9]
+    let list<int> min_ties ← [4, 2, 5, 2, 9]
     print tie_min(min_ties)
 
     # Contract 3 — NaN loses to numbers on both twins.
-    const list<f64> with_nan ← [nan, 3.0, 1.0, 3.0]
+    let list<f64> with_nan ← [nan, 3.0, 1.0, 3.0]
     print nan_max(with_nan)
     print nan_min(with_nan)
-    const list<f64> min_nan ← [1.0, nan, 0.5, 0.5]
+    let list<f64> min_nan ← [1.0, nan, 0.5, 0.5]
     print nan_min(min_nan)
 
     # Contract 3 — all-NaN keeps index 0; argmin mirrors argmax.
-    const list<f64> all_nan ← [nan, nan]
+    let list<f64> all_nan ← [nan, nan]
     print all_nan_argmax(all_nan)
     print nan_min(all_nan)
 
     # Contract 2 — empty → nihil (never −1); coalesce composes the default.
-    const list<f64> vacua ← empty
+    let list<f64> vacua ← empty
     print raw_argmax(vacua)
     print empty_or(vacua, 0)
-    const int fallback ← 7
+    let int fallback ← 7
     print vacua.argmax() coalesce fallback
 }

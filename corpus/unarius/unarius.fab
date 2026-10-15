@@ -39,20 +39,20 @@ locale = "en"
 
 main {
     # Numeric negation
-    const int x ← 5
-    const int neg ← -x
+    let int x ← 5
+    let int neg ← -x
     # -5
     print neg
 
     # Logical negation
-    const bool flag ← true
-    const bool non_signum ← not flag
+    let bool flag ← true
+    let bool non_signum ← not flag
     # falsum
     print non_signum
 
     # Positive/negative checks
-    const int a ← 10
-    const int b ← -3
+    let int a ← 10
+    let int b ← -3
     # verum
     print a ≻ 0
     # falsum
@@ -63,12 +63,12 @@ main {
     print b ≺ 0
 
     # Null checks
-    const string ∪ none forsitan ← null
+    let string ∪ none forsitan ← null
     # verum
     print forsitan is none
     # falsum
     print forsitan not is none
-    const string ∪ none adest ← "salve"
+    let string ∪ none adest ← "salve"
     # falsum
     print adest is none
     # verum

@@ -44,6 +44,6 @@ main {
     print «she said "hi" and it's fine»
     print «hello, §»("me")
     print «line one\nline two»
-    const string a ← «x "y" z»
+    let string a ← «x "y" z»
     print «tab\there»
 }

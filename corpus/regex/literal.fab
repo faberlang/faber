@@ -44,8 +44,8 @@ locale = "en"
 
 main {
     # the inline literal: the type word, then the raw body
-    const regex digits ← regex /\d+/
-    const _ hit ← digits.find("order 42 placed")
+    let regex digits ← regex /\d+/
+    let hit ← digits.find("order 42 placed")
     print hit!.text()
 
     # the inferred form: `_ /pattern/` takes the type from the binding slot
@@ -54,10 +54,10 @@ main {
     print shout!.text()
 
     # an escaped slash: `\/` writes one `/`; no other escape is processed
-    const regex slash ← regex /a\/b/
+    let regex slash ← regex /a\/b/
     print slash.matches("a/b")
 
     # the text form still exists: build the pattern at run time
-    const regex dynamic ← "\\d+" ↦ regex
+    let regex dynamic ← "\\d+" ↦ regex
     print dynamic.matches("42")
 }

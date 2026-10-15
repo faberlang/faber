@@ -50,7 +50,7 @@ fn explicit_generic_call_binds_type_param() {
 }
 
 incipit {
-    fixum textus x ← id<textus>("salve")
+    sit textus x ← id<textus>("salve")
     nota x
 }"#,
     );
@@ -64,7 +64,7 @@ fn explicit_generic_call_rejects_argument_mismatch() {
 }
 
 incipit {
-    fixum _ x ← id<numerus>("salve")
+    sit x ← id<numerus>("salve")
 }"#,
         "argument_type_mismatch",
     );
@@ -78,7 +78,7 @@ fn explicit_generic_call_rejects_non_generic_callee() {
 }
 
 incipit {
-    fixum _ x ← plain<textus>("salve")
+    sit x ← plain<textus>("salve")
 }"#,
         "callee_type_args_unsupported",
     );
@@ -92,7 +92,7 @@ fn explicit_generic_call_rejects_wrong_type_arg_arity() {
 }
 
 incipit {
-    fixum _ x ← both<textus>(1, 2)
+    sit x ← both<textus>(1, 2)
 }",
         "wrong_number_of_type_arguments",
     );
@@ -106,7 +106,7 @@ fn explicit_generic_call_accepts_infer_hole() {
 }
 
 incipit {
-    fixum _ x ← id<_>(42)
+    sit x ← id<_>(42)
     nota x
 }",
     );
@@ -122,8 +122,8 @@ fn explicit_magnitudo_natural_args_bind_at_call_site() {
 }
 
 incipit {
-    fixum tensor<f32, [2, 2]> a ← vacua
-    fixum tensor<f32, [2, 2]> b ← take<2, 2>(a)
+    sit tensor<f32, [2, 2]> a ← vacua
+    sit tensor<f32, [2, 2]> b ← take<2, 2>(a)
     nota b.longitudo()
 }",
     );
@@ -144,8 +144,8 @@ functio forward<magnitudo T, magnitudo D>(tensor<f32, [T, D]> x) → tensor<f32,
 }
 
 incipit {
-    fixum tensor<f32, [3, 5]> a ← vacua
-    fixum tensor<f32, [3, 5]> b ← forward<3, 5>(a)
+    sit tensor<f32, [3, 5]> a ← vacua
+    sit tensor<f32, [3, 5]> b ← forward<3, 5>(a)
     nota b.longitudo()
 }",
     );
@@ -164,8 +164,8 @@ functio forward<magnitudo T>(tensor<f32, [T, 4]> x) → tensor<f32, [T, 4]> {
 }
 
 incipit {
-    fixum tensor<f32, [3, 4]> a ← vacua
-    fixum tensor<f32, [3, 4]> b ← forward<3>(a)
+    sit tensor<f32, [3, 4]> a ← vacua
+    sit tensor<f32, [3, 4]> b ← forward<3>(a)
     nota b.longitudo()
 }",
     );
@@ -187,12 +187,12 @@ functio cancel_offset<magnitudo N>(tensor<f32, [N - 1 + 1]> value) → tensor<f3
 }
 
 incipit {
-    fixum tensor<f32, [3]> three ← vacua
-    fixum tensor<f32, [3]> tail ← drop_one(three)
-    fixum tensor<f32, [4]> four ← vacua
-    fixum tensor<f32, [4]> half ← half_width(four)
-    fixum tensor<f32, [0]> zero ← vacua
-    fixum tensor<f32, [0]> canceled ← cancel_offset(zero)
+    sit tensor<f32, [3]> three ← vacua
+    sit tensor<f32, [3]> tail ← drop_one(three)
+    sit tensor<f32, [4]> four ← vacua
+    sit tensor<f32, [4]> half ← half_width(four)
+    sit tensor<f32, [0]> zero ← vacua
+    sit tensor<f32, [0]> canceled ← cancel_offset(zero)
     nota tail
     nota half
     nota canceled
@@ -207,8 +207,8 @@ fn odd_generic_extent_rejects_an_inexact_exact_division_argument() {
 }
 
 incipit {
-    fixum tensor<f32, [5]> full ← vacua
-    fixum tensor<f32, [2]> half ← vacua
+    sit tensor<f32, [5]> full ← vacua
+    sit tensor<f32, [2]> half ← vacua
     pair_widths(full, half)
 }",
         "incompatible_tensor_index",
@@ -241,8 +241,8 @@ fn explicit_magnitudo_natural_args_reject_wrong_arity() {
 }
 
 incipit {
-    fixum tensor<f32, [2, 2]> a ← vacua
-    fixum tensor<f32, [2, 2]> b ← take<2>(a)
+    sit tensor<f32, [2, 2]> a ← vacua
+    sit tensor<f32, [2, 2]> b ← take<2>(a)
 }",
         "wrong_number_of_type_arguments",
     );
@@ -256,8 +256,8 @@ fn explicit_magnitudo_natural_args_reject_wrong_kind() {
 }
 
 incipit {
-    fixum tensor<f32, [2, 2]> a ← vacua
-    fixum tensor<f32, [2, 2]> b ← take<textus, numerus>(a)
+    sit tensor<f32, [2, 2]> a ← vacua
+    sit tensor<f32, [2, 2]> b ← take<textus, numerus>(a)
 }",
         "callee_type_args_unsupported",
     );
@@ -271,7 +271,7 @@ fn explicit_generic_call_accepts_mixed_hole_and_concrete() {
 }
 
 incipit {
-    fixum _ x ← both<_, textus>(1, "k")
+    sit x ← both<_, textus>(1, "k")
     nota x
 }"#,
     );
@@ -285,7 +285,7 @@ fn mixed_hole_first_param_is_bare_numerus() {
 }
 
 incipit {
-    fixum _ x ← both<_, textus>(1, "k")
+    sit x ← both<_, textus>(1, "k")
     nota x
 }"#,
     );
@@ -309,7 +309,7 @@ fn mixed_hole_second_param_solves_from_argument() {
 }
 
 incipit {
-    fixum _ x ← both<numerus, _>(1, "k")
+    sit x ← both<numerus, _>(1, "k")
     nota x
 }"#,
     );
@@ -334,7 +334,7 @@ functio load<T>(T value) → T {
 }
 
 incipit {
-    fixum textus body ← load<_>("body")
+    sit textus body ← load<_>("body")
     nota body
 }"#,
     );
@@ -349,7 +349,7 @@ functio load<T>(T value) → T {
 }
 
 incipit {
-    fixum numerus n ← load<_>(1)
+    sit numerus n ← load<_>(1)
     nota n
 }",
         &[
@@ -369,7 +369,7 @@ fn explicit_generic_call_rejects_union_hole_in_second_slot() {
 }
 
 incipit {
-    fixum _ x ← both<textus, ∪>("k", 1)
+    sit x ← both<textus, ∪>("k", 1)
 }"#,
         "explicit_union_type_arg_unsupported",
     );
@@ -383,7 +383,7 @@ fn genus_applied_hole_solves_from_field() {
 }
 
 incipit {
-    fixum C<_> x ← C { value = 1 }
+    sit C<_> x ← C { value = 1 }
     nota x
 }",
     );
@@ -397,7 +397,7 @@ fn explicit_generic_call_hole_still_requires_exact_arity() {
 }
 
 incipit {
-    fixum _ x ← both<_>(1, "k")
+    sit x ← both<_>(1, "k")
 }"#,
         "wrong_number_of_type_arguments",
     );
@@ -411,7 +411,7 @@ fn explicit_generic_call_unsolved_hole_still_errors() {
 }
 
 incipit {
-    fixum _ x ← empty<_>()
+    sit x ← empty<_>()
 }",
         "cannot_infer_expression_type",
     );
@@ -425,7 +425,7 @@ fn explicit_generic_call_rejects_union_hole() {
 }
 
 incipit {
-    fixum _ x ← both<∪, textus>(1, "k")
+    sit x ← both<∪, textus>(1, "k")
 }"#,
         "explicit_union_type_arg_unsupported",
     );
@@ -491,8 +491,8 @@ fn explicit_hole_and_omitted_list_share_return_type_id() {
 }
 
 incipit {
-    fixum _ a ← id<_>(42)
-    fixum _ b ← id(42)
+    sit a ← id<_>(42)
+    sit b ← id(42)
     nota a
     nota b
 }";
@@ -536,9 +536,9 @@ functio load<T>(T value) → T {
 }
 
 incipit {
-    fixum textus body ← load<textus>("body")
-    fixum lista<textus> lines ← load<lista<textus>>(["a", "b"])
-    fixum octeti bytes ← load<octeti>(|ca fe|)
+    sit textus body ← load<textus>("body")
+    sit lista<textus> lines ← load<lista<textus>>(["a", "b"])
+    sit octeti bytes ← load<octeti>(|ca fe|)
     nota body
     nota lines
     nota bytes
@@ -555,7 +555,7 @@ functio load<T>(T value) → T {
 }
 
 incipit {
-    fixum numerus n ← load<numerus>(1)
+    sit numerus n ← load<numerus>(1)
     nota n
 }",
         &[
@@ -576,7 +576,7 @@ functio load<T>(T value) → T {
 }
 
 incipit {
-    fixum numerus n ← load(1)
+    sit numerus n ← load(1)
     nota n
 }",
         &[
@@ -598,8 +598,8 @@ functio id<T>(T x) → T {
 }
 
 incipit {
-    fixum i32 n ← id<i32>(1 ∷ i32)
-    fixum f32 f ← id<f32>(1.0 ∷ f32)
+    sit i32 n ← id<i32>(1 ∷ i32)
+    sit f32 f ← id<f32>(1.0 ∷ f32)
     nota n
     nota f
 }",
@@ -632,7 +632,7 @@ incipit {
 fn explicit_generic_call_rejects_template_application() {
     rejects_with_issue(
         r#"incipit {
-    fixum _ s ← "§"<textus>("x")
+    sit s ← "§"<textus>("x")
 }"#,
         "template_type_args",
     );
@@ -646,7 +646,7 @@ fn explicit_generic_call_rejects_ignotum_callee() {
 }
 
 incipit {
-    fixum ignotum callee ← box(1)
+    sit ignotum callee ← box(1)
     callee<textus>("a")
 }"#,
         &[DiagnosticArg::new("issue", "dynamic_callee_type_args")],
@@ -672,7 +672,7 @@ fn explicit_generic_call_rejects_ignotum_receiver_method() {
 }
 
 incipit {
-    fixum ignotum receiver ← box(1)
+    sit ignotum receiver ← box(1)
     receiver.meth<textus>()
 }",
         &[DiagnosticArg::new(
@@ -697,8 +697,8 @@ fn explicit_generic_call_rejects_inferred_receiver_method() {
 fn explicit_generic_call_rejects_intrinsic_method_type_args() {
     rejects_with_args(
         r"incipit {
-    fixum lista<numerus> xs ← [1, 2, 3]
-    fixum _ n ← xs.longitudo<textus>()
+    sit lista<numerus> xs ← [1, 2, 3]
+    sit n ← xs.longitudo<textus>()
 }",
         &[DiagnosticArg::new("issue", "intrinsic_method_type_args")],
     );
@@ -708,7 +708,7 @@ fn explicit_generic_call_rejects_intrinsic_method_type_args() {
 fn empty_generic_catalog_row_rejects_type_args_without_a_method_name_branch() {
     rejects_with_issue(
         r"incipit {
-    fixum lista<numerus> xs ← [1, 2, 3]
+    sit lista<numerus> xs ← [1, 2, 3]
     varia _ ok ← xs.continet<textus>(1)
 }",
         "intrinsic_method_type_args",
@@ -719,9 +719,9 @@ fn empty_generic_catalog_row_rejects_type_args_without_a_method_name_branch() {
 fn sermo_tuus_typed_view_typechecks_in_iteration() {
     accepts(
         r#"incipit {
-    fixum sermo s ← ad 'runtime:echo' ("salve")
-    fixum tuus<textus> t ← s.tuus<textus>()
-    itera ex t.cursor() fixum frame {
+    sit sermo s ← ad 'runtime:echo' ("salve")
+    sit tuus<textus> t ← s.tuus<textus>()
+    itera ex t.cursor() sit frame {
         adfirma frame.data ≡ "salve"
     }
 }"#,
@@ -732,10 +732,10 @@ fn sermo_tuus_typed_view_typechecks_in_iteration() {
 fn sermo_tuus_bare_view_defaults_to_valor_frames() {
     accepts(
         r#"incipit {
-    fixum sermo s ← ad 'runtime:echo' ("salve")
-    fixum tuus<valor> t ← s.tuus()
-    itera ex t.cursor() fixum frame {
-        fixum valor data ← frame.data
+    sit sermo s ← ad 'runtime:echo' ("salve")
+    sit tuus<valor> t ← s.tuus()
+    itera ex t.cursor() sit frame {
+        sit valor data ← frame.data
         nota data
     }
 }"#,
@@ -746,14 +746,14 @@ fn sermo_tuus_bare_view_defaults_to_valor_frames() {
 fn sermo_directional_live_methods_typecheck() {
     accepts(
         r#"incipit {
-    fixum sermo s ← ad 'runtime:echo' ("salve")
-    fixum meus<textus> m ← s.meus<textus>()
-    fixum tuus<textus> t ← s.tuus<textus>()
+    sit sermo s ← ad 'runtime:echo' ("salve")
+    sit meus<textus> m ← s.meus<textus>()
+    sit tuus<textus> t ← s.tuus<textus>()
     m.da("salve")
-    fixum scrinium<textus> ∪ nihil reply ← t.accipe()
-    fixum textus drained ← t.exhauri()
-    fixum status outbound ← m.fini()
-    fixum status inbound ← t.fini()
+    sit scrinium<textus> ∪ nihil reply ← t.accipe()
+    sit textus drained ← t.exhauri()
+    sit status outbound ← m.fini()
+    sit status inbound ← t.fini()
     nota reply
     nota drained
     nota outbound
@@ -766,8 +766,8 @@ fn sermo_directional_live_methods_typecheck() {
 fn sermo_tuus_rejects_more_than_one_payload_type_arg() {
     rejects_with_args(
         r#"incipit {
-    fixum sermo s ← ad 'runtime:echo' ("salve")
-    fixum _ frames ← s.tuus<textus, numerus>()
+    sit sermo s ← ad 'runtime:echo' ("salve")
+    sit frames ← s.tuus<textus, numerus>()
 }"#,
         &[
             DiagnosticArg::new("issue", "sermo_view_payload_type_arg_count"),
@@ -780,8 +780,8 @@ fn sermo_tuus_rejects_more_than_one_payload_type_arg() {
 fn sermo_meus_bare_view_typechecks() {
     accepts(
         r#"incipit {
-    fixum sermo s ← ad 'runtime:echo' ("salve")
-    fixum _ sink ← s.meus()
+    sit sermo s ← ad 'runtime:echo' ("salve")
+    sit sink ← s.meus()
 }"#,
     );
 }
@@ -790,8 +790,8 @@ fn sermo_meus_bare_view_typechecks() {
 fn sermo_meus_typed_view_typechecks() {
     accepts(
         r#"incipit {
-    fixum sermo s ← ad 'runtime:echo' ("salve")
-    fixum _ sink ← s.meus<octeti>()
+    sit sermo s ← ad 'runtime:echo' ("salve")
+    sit sink ← s.meus<octeti>()
 }"#,
     );
 }
@@ -800,8 +800,8 @@ fn sermo_meus_typed_view_typechecks() {
 fn sermo_meus_rejects_more_than_one_payload_type_arg() {
     rejects_with_args(
         r#"incipit {
-    fixum sermo s ← ad 'runtime:echo' ("salve")
-    fixum _ sink ← s.meus<textus, numerus>()
+    sit sermo s ← ad 'runtime:echo' ("salve")
+    sit sink ← s.meus<textus, numerus>()
 }"#,
         &[
             DiagnosticArg::new("issue", "sermo_view_payload_type_arg_count"),
@@ -818,7 +818,7 @@ fn inferred_generic_call_still_works() {
 }
 
 incipit {
-    fixum numerus n ← id(42)
+    sit numerus n ← id(42)
     nota n
 }",
     );
@@ -994,9 +994,9 @@ fn imported_namespace_generic_call_host_expected_control() {
         r#"importa ex "./math" math
 
 incipit {
-    fixum tensor<f32, [4, 8]> a ← vacua
-    fixum tensor<f32, [4, 8]> b ← vacua
-    fixum tensor<f32, [4, 8]> r ← math.add(a, b)
+    sit tensor<f32, [4, 8]> a ← vacua
+    sit tensor<f32, [4, 8]> b ← vacua
+    sit tensor<f32, [4, 8]> r ← math.add(a, b)
     nota r
 }"#,
     );
@@ -1102,7 +1102,7 @@ fn namespace_call_without_import_surface_keeps_bare_driver_leniency() {
         r#"importa ex "./math" math
 
 functio _probe(tensor<f32, [4, 8]> a, tensor<f32, [4, 8]> b) → tensor<f32, [4, 8]> {
-    fixum ignotum r ← math.add(a, b)
+    sit ignotum r ← math.add(a, b)
     redde a
 }"#,
         BTreeMap::new(),
@@ -1126,7 +1126,7 @@ fn ignotum_value_receiver_method_keeps_dynamic_route() {
 }
 
 incipit {
-    fixum ignotum receiver ← box(1)
+    sit ignotum receiver ← box(1)
     receiver.meth<textus>()
 }",
         &[DiagnosticArg::new(
@@ -1153,7 +1153,7 @@ fn spread_argument_diagnostic_is_reported_once() {
 }
 
 incipit {
-    fixum numerus n ← duo(sparge (1 + "a"))
+    sit numerus n ← duo(sparge (1 + "a"))
     nota n
 }"#,
     );
@@ -1163,7 +1163,7 @@ incipit {
 }
 
 incipit {
-    fixum numerus n ← duo((1 + "a"), 2)
+    sit numerus n ← duo((1 + "a"), 2)
     nota n
 }"#,
     );

@@ -84,7 +84,7 @@ fn method_inside_genus_stays_legal() {
 #[test]
 fn statements_after_a_rejected_declaration_still_parse() {
     let result = parse_program_la(
-        "incipit {\n    functio g() → numerus { redde 1 }\n    fixum numerus n ← 2\n}",
+        "incipit {\n    functio g() → numerus { redde 1 }\n    sit numerus n ← 2\n}",
     );
     assert_eq!(result.errors.len(), 1, "errors: {:?}", result.errors);
 }

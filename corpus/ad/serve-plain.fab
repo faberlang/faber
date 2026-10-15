@@ -34,6 +34,6 @@ functio saluta(textus nomen) → textus {
 }
 
 incipit {
-    fixum textus responsum ← ad 'salutatio:saluta' ("munde") ↦ textus
+    sit textus responsum ← ad 'salutatio:saluta' ("munde") ↦ textus
     nota responsum
 }

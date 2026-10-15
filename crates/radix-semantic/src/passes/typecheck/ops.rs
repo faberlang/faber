@@ -842,6 +842,16 @@ impl TypeChecker<'_> {
         target: &mut HirExpression,
         value: &mut HirExpression,
     ) -> TypeId {
+        // The value is evaluated before the store takes effect, so a flow
+        // fact on the target still holds for the value expression. Save it,
+        // type the lvalue from the declared cell, re-arm the fact for the
+        // value check, and drop it again once the store is checked.
+        let saved_target_fact = match &target.kind {
+            HirExpressionKind::Path(def_id) => {
+                self.lookup_binding(*def_id).map(|info| (*def_id, info))
+            }
+            _ => None,
+        };
         self.invalidate_assignment_target(target);
         let target_ty = self.check_lvalue(target);
         if target_ty == self.error_type {
@@ -861,7 +871,11 @@ impl TypeChecker<'_> {
             return target_ty;
         }
         let site = self.assignment_store_site(target);
+        if let Some((def_id, info)) = saved_target_fact {
+            self.reinstate_flow_fact(def_id, info);
+        }
         let value_ty = self.check_store_expr(value, target_ty, site);
+        self.invalidate_assignment_target(target);
         let unresolved_edge_view = self
             .tensor_edge_policies
             .shifted_expressions
@@ -946,7 +960,7 @@ impl TypeChecker<'_> {
             return target_ty;
         }
         // The destination type must resolve before conversion checking: an
-        // inference-hole destination (e.g. `fixum _ xs ← []`) cannot name a
+        // inference-hole destination (e.g. `sit xs ← []`) cannot name a
         // conversion target.
         let target_resolved = self.resolve_inferred_type(target_ty);
         if self.destination_type_has_inference_hole(target_resolved) {

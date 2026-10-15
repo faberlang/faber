@@ -47,18 +47,18 @@ main {
     print 1.0 / 3.0
 
     # 2. The same digits as typed operands round per operation.
-    const float a ← 0.1
-    const float b ← 0.2
+    let float a ← 0.1
+    let float b ← 0.2
     print a + b
 
     # 3. The folded value lands in the slot it is stored in.
-    const float sum ← 0.1 + 0.2
+    let float sum ← 0.1 + 0.2
     print sum
-    const f32 narrow ← 0.1 + 0.2
+    let f32 narrow ← 0.1 + 0.2
     print narrow
 
     # 4. Narrow slots round once: this exact value sits just above the midpoint
     #    of two f32 neighbours, so a rounding through f64 would choose 1.0.
-    const f32 above ← 1.00000005960464477539062501 + 0.0
+    let f32 above ← 1.00000005960464477539062501 + 0.0
     print above
 }

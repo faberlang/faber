@@ -40,7 +40,7 @@ locale = "en"
 
 main {
     # ceterum handles unmatched cases
-    const _ dies ← "mercurii"
+    let dies ← "mercurii"
 
     switch dies {
         case "lunae" {
@@ -55,7 +55,7 @@ main {
     }
 
     # ceterum with unknown input
-    const _ command ← "ignotum"
+    let command ← "ignotum"
 
     switch command {
         case "incipe" {
@@ -73,7 +73,7 @@ main {
     }
 
     # Multiple statements in ceterum
-    const _ gradus ← 99
+    let gradus ← 99
 
     switch gradus {
         case 1 {

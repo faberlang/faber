@@ -35,7 +35,7 @@ main {
     print fib(LIMIT)
     print noisy(1) + noisy(2)
     print noisy(3), noisy(4)
-    var bool flag ← is_even(LIMIT)
+    mut bool flag ← is_even(LIMIT)
     print flag, is_even(7), LOUD
     shout(GREETING, LOUD)
     shout("quiet", false)

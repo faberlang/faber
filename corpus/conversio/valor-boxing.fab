@@ -33,29 +33,29 @@ locale = "en"
 # reads its fields back instead of printing the object text.
 
 class Punctum {
-    var int x
-    var int y
+    mut int x
+    mut int y
 }
 
 main {
-    const int n ← 42
-    const value scalar ← n ↦ value
+    let int n ← 42
+    let value scalar ← n ↦ value
     print scalar
-    const list<b8> bytes ← |de ad|
-    const value boxedBytes ← bytes ↦ value
+    let list<b8> bytes ← |de ad|
+    let value boxedBytes ← bytes ↦ value
     print boxedBytes
-    const list<int> numeri ← [1, 2]
-    const value boxedList ← numeri ↦ value
+    let list<int> numeri ← [1, 2]
+    let value boxedList ← numeri ↦ value
     print boxedList
-    const map<string, int> scores ← { "alpha": 10 }
-    const value boxedMap ← scores ↦ value
+    let map<string, int> scores ← { "alpha": 10 }
+    let value boxedMap ← scores ↦ value
     print boxedMap
-    const Punctum punctum ← Punctum { x = 3, y = 4 }
-    const value boxedGenus ← punctum ↦ value
-    const Punctum unboxed ← boxedGenus ↦ Punctum
+    let Punctum punctum ← Punctum { x = 3, y = 4 }
+    let value boxedGenus ← punctum ↦ value
+    let Punctum unboxed ← boxedGenus ↦ Punctum
     print unboxed.x
     print unboxed.y
-    const tensor<int, [2]> grid ← [5, 6] ↦ tensor<int, [2]>
-    const value boxedTensor ← grid ↦ value
+    let tensor<int, [2]> grid ← [5, 6] ↦ tensor<int, [2]>
+    let value boxedTensor ← grid ↦ value
     print boxedTensor
 }

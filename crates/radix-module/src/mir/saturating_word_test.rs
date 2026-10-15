@@ -38,16 +38,16 @@ fn saturating_unsigned_arithmetic_is_exact_and_the_store_clamps_at_both_ends() {
     let lines = run_lines(
         r"
 incipit {
-    fixum saturatus<u8> high ← 250
-    fixum saturatus<u8> low ← 5
+    sit saturatus<u8> high ← 250
+    sit saturatus<u8> low ← 5
     nota high + 10
     nota low - 10
     nota high * 2
     nota high + 5
     nota low - 5
-    fixum saturatus<u8> up ← high + 10
-    fixum saturatus<u8> down ← low - 10
-    fixum saturatus<u8> twice ← high * 2
+    sit saturatus<u8> up ← high + 10
+    sit saturatus<u8> down ← low - 10
+    sit saturatus<u8> twice ← high * 2
     nota up
     nota down
     nota twice
@@ -62,17 +62,17 @@ fn saturating_signed_arithmetic_is_exact_and_the_store_clamps_at_both_ends() {
     let lines = run_lines(
         r"
 incipit {
-    fixum saturatus<i16> big ← 30000
-    fixum saturatus<i16> small ← -30000
+    sit saturatus<i16> big ← 30000
+    sit saturatus<i16> small ← -30000
     nota big + 10000
     nota small - 10000
     nota big * 2
     nota big * -2
     nota small + 10000
-    fixum saturatus<i16> up ← big + 10000
-    fixum saturatus<i16> down ← small - 10000
-    fixum saturatus<i16> twice ← big * 2
-    fixum saturatus<i16> negTwice ← big * -2
+    sit saturatus<i16> up ← big + 10000
+    sit saturatus<i16> down ← small - 10000
+    sit saturatus<i16> twice ← big * 2
+    sit saturatus<i16> negTwice ← big * -2
     nota up
     nota down
     nota twice
@@ -93,14 +93,14 @@ fn saturating_signed_min_negation_and_division_are_exact_until_stored() {
     let lines = run_lines(
         r"
 incipit {
-    fixum saturatus<i8> low ← -100
-    fixum saturatus<i8> floor ← low - 100
+    sit saturatus<i8> low ← -100
+    sit saturatus<i8> floor ← low - 100
     nota floor
     nota -floor
     nota floor / -1
     nota floor % -1
-    fixum saturatus<i8> negated ← -floor
-    fixum saturatus<i8> quotient ← floor / -1
+    sit saturatus<i8> negated ← -floor
+    sit saturatus<i8> quotient ← floor / -1
     nota negated
     nota quotient
 }
@@ -116,14 +116,14 @@ fn saturating_chain_clamps_once_at_the_store() {
     let lines = run_lines(
         r"
 incipit {
-    fixum saturatus<u8> x ← 250
-    fixum saturatus<u8> small ← 10
-    fixum saturatus<u8> wide ← 200
-    fixum saturatus<u8> up ← x + 200 - 100
-    fixum saturatus<u8> down ← small - 300 + 100
-    fixum saturatus<u8> quotient ← wide * 2 / 4
-    fixum saturatus<u8> fits ← x + x - x
-    fixum saturatus<u8> long ← small - wide - wide + wide + wide
+    sit saturatus<u8> x ← 250
+    sit saturatus<u8> small ← 10
+    sit saturatus<u8> wide ← 200
+    sit saturatus<u8> up ← x + 200 - 100
+    sit saturatus<u8> down ← small - 300 + 100
+    sit saturatus<u8> quotient ← wide * 2 / 4
+    sit saturatus<u8> fits ← x + x - x
+    sit saturatus<u8> long ← small - wide - wide + wide + wide
     nota up
     nota down
     nota quotient
@@ -143,9 +143,9 @@ incipit {
     varia saturatus<u8> level ← 200
     level ← level + 100 - 50
     nota level
-    fixum saturatus<i8> low ← -100
-    fixum saturatus<i8> same ← low - 100 + 100
-    fixum saturatus<i8> top ← -low * 3 / 2
+    sit saturatus<i8> low ← -100
+    sit saturatus<i8> same ← low - 100 + 100
+    sit saturatus<i8> top ← -low * 3 / 2
     nota same
     nota top
 }
@@ -161,15 +161,15 @@ fn saturating_64_bit_widths_clamp_exactly() {
     let lines = run_lines(
         r"
 incipit {
-    fixum saturatus<u64> zero ← 0
-    fixum saturatus<i64> high ← 9223372036854775807
-    fixum saturatus<i64> low ← -9223372036854775807
+    sit saturatus<u64> zero ← 0
+    sit saturatus<i64> high ← 9223372036854775807
+    sit saturatus<i64> low ← -9223372036854775807
     nota high + 1
     nota low - 1
-    fixum saturatus<i64> up ← high + 1
-    fixum saturatus<i64> down ← low - 1
-    fixum saturatus<u64> floor ← zero - 5
-    fixum saturatus<u64> lifted ← zero + 18446744073709551615
+    sit saturatus<i64> up ← high + 1
+    sit saturatus<i64> down ← low - 1
+    sit saturatus<u64> floor ← zero - 5
+    sit saturatus<u64> lifted ← zero + 18446744073709551615
     nota up
     nota down
     nota floor
@@ -197,8 +197,8 @@ fn saturating_division_by_zero_is_an_integer_division_failure() {
         let source = format!(
             r"
 incipit {{
-    fixum saturatus<u8> level ← 9
-    fixum saturatus<u8> zero ← 0
+    sit saturatus<u8> level ← 9
+    sit saturatus<u8> zero ← 0
     {body}
 }}
 "
@@ -220,11 +220,11 @@ fn saturating_conversio_clamps_and_never_fails() {
         run_lines(
             r"
 incipit {
-    fixum numerus n ← 200
-    fixum numerus over ← 300
-    fixum numerus under ← -5
-    fixum numerus neg ← -200
-    fixum saturatus<u8> level ← n ↦ saturatus<u8>
+    sit numerus n ← 200
+    sit numerus over ← 300
+    sit numerus under ← -5
+    sit numerus neg ← -200
+    sit saturatus<u8> level ← n ↦ saturatus<u8>
     nota level + 100
     nota level ↦ numerus
     nota over ↦ saturatus<u8>

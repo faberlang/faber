@@ -16,10 +16,10 @@ diagnostic = "SEM056:mutating_receiver_through_ref"
 # This exemplum intentionally fails to compile.
 
 class Person {
-    var list<int> friends
+    mut list<int> friends
 }
 
 main {
-    const ref Person p ← Person { friends = [1, 2] }
+    let ref Person p ← Person { friends = [1, 2] }
     p.friends.append(3)
 }

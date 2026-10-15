@@ -163,9 +163,9 @@ fn glyph_dot_matvec_width_mismatch_rejects() {
 fn glyph_dot_scalar_operands_do_not_silently_pass() {
     rejects_with_issue(
         r"incipit {
-  fixum numerus a ← 1
-  fixum numerus b ← 2
-  fixum _ c ← a · b
+  sit numerus a ← 1
+  sit numerus b ← 2
+  sit c ← a · b
 }",
         "glyph_operands_unsupported",
         "·",

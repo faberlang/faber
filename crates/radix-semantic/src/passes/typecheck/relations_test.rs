@@ -69,7 +69,7 @@ fn probe(Greets g) → string {
 }
 
 main {
-    const Hello h ← Hello {}
+    let Hello h ← Hello {}
     probe(h)
 }
 ",
@@ -88,7 +88,7 @@ class Hello implements Greets {
 }
 
 fn probe() → string {
-    const Greets g ← Hello {}
+    let Greets g ← Hello {}
     return g.greet()
 }
 
@@ -141,11 +141,11 @@ fn greet_of(Greets g) → string {
 }
 
 main {
-    const Formal a ← Formal {}
-    const Casual b ← Casual {}
-    const string out1 ← greet_of(a)
+    let Formal a ← Formal {}
+    let Casual b ← Casual {}
+    let string out1 ← greet_of(a)
     print out1
-    const string out2 ← greet_of(b)
+    let string out2 ← greet_of(b)
     print out2
 }
 ",
@@ -158,11 +158,11 @@ main {
 fn implet_naming_non_implendum_is_rejected() {
     assert_en_rejects_with_issue(
         "class Base {
-    var string message
+    mut string message
 }
 
 class Weird implements Base {
-    var string note
+    mut string note
 }
 
 main {
@@ -189,8 +189,8 @@ fn probe(list<Greets> xs) → void {
 }
 
 main {
-    const Hello h ← Hello {}
-    const list<Hello> hs ← [h]
+    let Hello h ← Hello {}
+    let list<Hello> hs ← [h]
     probe(hs)
 }
 ",
@@ -202,11 +202,11 @@ main {
 fn genus_does_not_flow_into_an_unrelated_genus() {
     assert_en_rejects_with_issue(
         "class Base {
-    var string message
+    mut string message
 }
 
 class Other {
-    var string message
+    mut string message
 }
 
 fn probe(Base b) → string {
@@ -214,7 +214,7 @@ fn probe(Base b) → string {
 }
 
 main {
-    const Other o ← Other {message = \"hi\"}
+    let Other o ← Other {message = \"hi\"}
     probe(o)
 }
 ",
@@ -236,7 +236,7 @@ class Hello implements Greets {
 }
 
 fn failable() → void ⇥ Greets ∪ string {
-    const Hello h ← Hello {}
+    let Hello h ← Hello {}
     throw h
 }
 
@@ -274,7 +274,7 @@ fn probe(Reversible r) → void {
 }
 
 main {
-    const Doc d ← Doc {}
+    let Doc d ← Doc {}
     probe(d)
 }
 ",

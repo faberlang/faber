@@ -443,8 +443,8 @@ pub enum ClassMemberKind {
 
 /// Leading modifier of a `genus` field (DECISIONS D16.1).
 ///
-/// A field declares exactly one: `fixum` (per instance, set only at
-/// construction), `varia` (per instance, reassignable) or `generis` (one per
+/// A field declares exactly one: `sit` (en `let`; per instance, set only at
+/// construction; the variant keeps its historical `Fixum` name), `varia` (per instance, reassignable) or `generis` (one per
 /// type, compile-time). The modifier is optional until the D5c tightening
 /// makes it mandatory; `None` is an unmarked field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

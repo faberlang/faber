@@ -16,7 +16,7 @@ sit = "ليكن"
 typus = "نمط"
 schema = "مخطط"
 columna = "عمود"
-varia = "متغير"
+varia = "قابل_للتغيير"
 ceteri = "باقي"
 errata = "مخطئ"
 exitus = "مخرج"
@@ -95,7 +95,7 @@ maxima = "الأقصى"
 minima = "الأدنى"
 de = "عن"
 ex = "من"
-in = "في"
+in = "قابل_للتغيير"
 own = "ملك"
 copy = "نسخة"
 axis = "محور"
@@ -404,10 +404,6 @@ help = "احتفظ بربط rest واحد فقط '{keyword}'"
 message = "'{keyword}' يربط معرفا واحدا مباشرة؛ استخدم '{keyword}' name ← expr"
 help = "اكتب '{keyword}' name ← expr أو استخدم {fixum} للارتباطات المنمطة/المفككة"
 
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "{sit} لا يدعم أنماط التفكيك"
-help = "استخدم {fixum} مع نمط تفكيك"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "مطلوب test case أو setup"
 help = "ابدأ عنصر الجسم بـ '{proba}' أو '{probandum}' أو '{setup}'"
@@ -543,6 +539,42 @@ help = "أعلن الـ method على genus بدلا من ذلك"
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "علامة `{marker}` لم تعد توضع على الارتباط؛ بل توضع على القيمة"
 help = "اكتب `{keyword} T {name} ← {marker} value`؛ و`{name} ← {marker} value` اللاحق يعلّم القيمة بالطريقة نفسها، ويحتفظ المعامل بـ `{marker}` قبل نوعه"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "تم إلغاء تصريح `{keyword}` وقت التشغيل؛ `{name}` اسم وقت تشغيل"
+help = "اكتب `{sit} T {name} ← …` (أو `{sit} {name} ← …` لاستنتاج النوع)؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "تم إلغاء كلمة الربط `{keyword}`"
+help = "تستخدم الروابط `{sit}` (اسم ثابت) أو `{varia}` (اسم قابل للكتابة)؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "لا يمكن أن يبدأ `{keyword}` رابطًا"
+help = "الرابط يسمّي قيمة كل تكرار أو مطابقة؛ اكتب `{sit}` لاسم ثابت أو `{varia}` لاسم قابل للكتابة"
+
+[diagnostics.PARSE010.issues.field_fixum_retired]
+message = "تم إلغاء مُعدِّل الحقل `{keyword}`"
+help = "الحقل للقراءة فقط يُكتب `{sit}`؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "لا يمكن لـ `{keyword}` أن يعدّل حقلًا"
+help = "الحقل للقراءة فقط (`{sit}`) أو قابل للكتابة (`{varia}`)؛ و`{generis}` يجعله خاصًا بالنوع"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "المتغير المحلي `{keyword}` يحتاج إلى موضع للقراءة: `{keyword} T name ← place`"
+help = "اكتب `{keyword} T name ← place`، أو استخدم `{sit}` أو `{varia}` لاسم بلا موضع ابتدائي"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "المتغير المحلي `{keyword}` يربط اسمًا واحدًا؛ لا يمكن تفكيكه"
+help = "اكتب `{keyword} T name ← place` ثم اقرأ الأجزاء عبر الاسم"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "المتغير المحلي `{keyword}` يقرأ موضعًا ولا يقبل قيمة `{marker}`"
+help = "اكتب `{keyword} T name ← place` لقراءة موضع، أو `{sit} T name ← {marker} place` للحصول على قيمة مستقلة"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "تم إلغاء كلمة التصريح `{keyword}`؛ `{name}` اسم قابل للكتابة"
+help = "اكتب `{varia} T {name} ← …`؛ الاسم القابل للكتابة وقت التشغيل هو `{varia}`"
 
 [diagnostics.PARSE011]
 message = "مطلوب اسم دالة بعد {functio}"

@@ -34,29 +34,29 @@ locale = "en"
 # recovers on variant mismatch.
 
 main {
-    const value asInt ← 42
-    const int count ← asInt ↦ int
+    let value asInt ← 42
+    let int count ← asInt ↦ int
     assert count ≡ 42
-    const value asFloat ← 3.5
-    const float ratio ← asFloat ↦ float
+    let value asFloat ← 3.5
+    let float ratio ← asFloat ↦ float
     assert ratio ≡ 3.5
-    const value intForFloat ← 7
-    const float widened ← intForFloat ↦ float
+    let value intForFloat ← 7
+    let float widened ← intForFloat ↦ float
     assert widened ≡ 7.0
-    const value asBool ← true
-    const bool flag ← asBool ↦ bool
+    let value asBool ← true
+    let bool flag ← asBool ↦ bool
     assert flag ≡ true
-    const value asText ← "salve"
-    const string greeting ← asText ↦ string
+    let value asText ← "salve"
+    let string greeting ← asText ↦ string
     assert greeting ≡ "salve"
-    const value asWire ← "1979-05-27T07:32:00Z"
-    const string wire ← asWire ↦ string
+    let value asWire ← "1979-05-27T07:32:00Z"
+    let string wire ← asWire ↦ string
     assert wire ≡ "1979-05-27T07:32:00Z"
-    const value asAscii ← 'yes'
-    const ascii token ← asAscii ↦ ascii
+    let value asAscii ← 'yes'
+    let ascii token ← asAscii ↦ ascii
     assert token ≡ 'yes'
-    const value bad ← "not-a-number"
-    const int recovered ← bad ↦ int ⊥ 0
+    let value bad ← "not-a-number"
+    let int recovered ← bad ↦ int ⊥ 0
     assert recovered ≡ 0
     print count
     print ratio

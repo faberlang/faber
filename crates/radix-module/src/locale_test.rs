@@ -1521,11 +1521,11 @@ fn en_pack_empty_marker_rejects_vacua_alias() {
 
 #[test]
 fn en_empty_named_binding_rhs_claims_as_marker() {
-    // Parse pin: `var list<int> empty ← empty` — the binding is legal; the
+    // Parse pin: `mut list<int> empty ← empty` — the binding is legal; the
     // RHS spelling claims as the marker. The name is unreferenceable in
     // expression position (null-like shadowing).
     let pack = installed_pack("en");
-    let result = parse(lex_with_locale_pack("var list<int> empty ← empty", &pack));
+    let result = parse(lex_with_locale_pack("mut list<int> empty ← empty", &pack));
     assert!(
         result.success(),
         "en empty-named binding with marker RHS must parse: {:?}",
@@ -1571,12 +1571,12 @@ fn marker_named_bindings_warn_under_en_and_la_packs() {
     for (locale, source, issue) in [
         (
             "en",
-            "main { const list<int> empty ← [1] print empty.length() }",
+            "main { let list<int> empty ← [1] print empty.length() }",
             "empty_marker_shadowing",
         ),
         (
             "la",
-            "incipit { fixum lista<numerus> vacua ← [1] nota vacua }",
+            "incipit { sit lista<numerus> vacua ← [1] nota vacua }",
             "empty_marker_shadowing",
         ),
     ] {
@@ -1610,7 +1610,7 @@ fn marker_named_bindings_warn_under_en_and_la_packs() {
 #[test]
 fn en_vacua_spelling_does_not_claim_marker() {
     let pack = installed_pack("en");
-    let result = parse(lex_with_locale_pack("var list<int> xs ← vacua", &pack));
+    let result = parse(lex_with_locale_pack("mut list<int> xs ← vacua", &pack));
     assert!(
         result.success(),
         "en `vacua` must parse as an ordinary identifier: {:?}",
@@ -1732,7 +1732,7 @@ fn installed_packs_resolve_batch_e_keyword_surfaces() {
         ("type", "typus"),
         ("union", "discretio"),
         ("const", "fixum"),
-        ("var", "varia"),
+        ("mut", "varia"),
         ("let", "sit"),
     ] {
         assert_eq!(

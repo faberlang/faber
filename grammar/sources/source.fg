@@ -201,7 +201,7 @@ glyph = "←"
 codepoint = "U+2190"
 unicode_name = "LEFTWARDS ARROW"
 role = "assignment"
-claiming_slots = ["array_destruct", "assignment", "figendum_decl", "object_destruct", "sit_decl", "fixum_decl"]
+claiming_slots = ["array_destruct", "assignment", "figendum_decl", "object_destruct", "ref_decl", "sit_decl", "fixum_decl"]
 
 [[glyphs]]
 glyph = "↑"
@@ -229,7 +229,7 @@ glyph = "↤"
 codepoint = "U+21A4"
 unicode_name = "LEFTWARDS ARROW FROM BAR"
 role = "assignment"
-claiming_slots = ["assignment", "fixum_decl"]
+claiming_slots = ["assignment", "fixum_decl", "sit_decl"]
 
 [[glyphs]]
 glyph = "↦"
@@ -958,7 +958,7 @@ statement_core := importa_decl | binding_decl | functio_decl | genus_decl | impl
                | adfirma_stmt | requirit_stmt | reice_stmt | nota_stmt | incipit_stmt | incipiet_stmt
                | ex_stmt | probandum_decl | proba_stmt | block_stmt
                | inc_dec_stmt | expr_stmt
-binding_decl   := fixum_decl | sit_decl | array_destruct | object_destruct | figendum_decl
+binding_decl   := fixum_decl | sit_decl | ref_decl | array_destruct | object_destruct | figendum_decl
 expr_stmt      := expression
 block_stmt     := '{' statement* '}'
 # `const_init` (D8.10, st1 R4): the initializer of an `=` binding is either the
@@ -1001,11 +1001,25 @@ insere_expr    := 'insere' STRING
 # The `copy`/`own` marker sits on the value (`value_marker`), never on the
 # declared type: the binding-side spelling `varia copy T b ← a` is retired and
 # reported as `PARSE010 binding_marker_moved_to_value` (FABER-2-SUNSET).
-fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' value_marker? expression) | ('=' const_init) | ('↤' assignment inline_default?) | ('↢' expression))?
+# `fixum` is the compile-time constant only (`=`); the run-time write-once name is
+# `sit`, typed or inferred, and `varia` is the writable name. A run-time `fixum`
+# declaration (`fixum T x ← e`) parses whole for recovery and is reported as
+# `PARSE010 runtime_const_retired`; the retired English spelling `var` is
+# `PARSE010 var_retired` (the writable word is `mut`). `ref_decl` (the `de`
+# mode, en `ref`) names a place and may be re-pointed: it takes `←` only, a
+# `copy`/`own` marker is `PARSE010 ref_local_value_marker`, a pattern is
+# `PARSE010 ref_local_requires_name`, and a scalar type takes no marker
+# (`SEM008 scalar_access_marker`). The type may be an optional union of a
+# reference type (`de Node ∪ none cur ← head`, ruling 2026-10-15 option A): the
+# marker covers the whole cell, so the type slot is `concrete_type`; whether
+# the members are reference types is a semantic rule (`SEM008
+# scalar_access_marker`, `nested_access_marker`), not a grammar one.
+fixum_decl      := ('fixum' type_annotation IDENTIFIER '=' const_init) | ('varia' type_annotation IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?)
 figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
-sit_decl      := 'sit' IDENTIFIER (('←' | '↢') expression)?
-array_destruct := ('fixum' | 'varia') array_pattern '←' expression
-object_destruct := ('fixum' | 'varia') object_pattern '←' expression
+sit_decl      := 'sit' type_annotation? IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?
+ref_decl      := 'de' concrete_type IDENTIFIER '←' expression
+array_destruct := ('sit' | 'varia') array_pattern '←' expression
+object_destruct := ('sit' | 'varia') object_pattern '←' expression
 
 functio_decl     := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 param_list    := (parameter (',' parameter)*)?
@@ -1072,21 +1086,22 @@ genus_member  := annotation* (genus_field_decl | functio_method_decl) | nondum_m
 # function_body_absent`.
 nondum_method_decl := annotation* nondum_annotation annotation* 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
 # `genus_field_decl` (D16.1-D16.3, D5c): every `genus` field declares exactly one
-# of `fixum` / `varia` / `generis` — there is no default, and an unmarked genus
+# of `sit` (en `let`) / `varia` / `generis` — there is no default, and an unmarked genus
 # field is PARSE010 `field_modifier_missing`. The unmarked form survives only
 # in the `discretio` shared-field position (`union_member` → `field_decl`, fork
 # F7 held).
-# `fixum T x`: set only in a construction literal (`Genus { … }`), never
+# `sit T x`: set only in a construction literal (`Genus { … }`), never
 # reassigned (`SEM020 assignment_to_fixum_field`); `Genus { … } ex p` copies
 # it unchanged. `varia T x`: reassignable per instance. `generis T X = …`: one
-# per type, compile-time. Independent of visibility (`@ privata` + `fixum` is
+# per type, compile-time. Independent of visibility (`@ privata` + `sit` is
 # legal). The initializer is `const_init` (D8.10): under all three modifiers a
 # field default may be an ordinary expression, the build-time `insere_expr`, or
-# a `praefixum { … }` block.
-genus_field_decl := ('fixum' | 'varia' | 'generis') type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
+# a `praefixum { … }` block. The retired `fixum` (en `const`) field word is
+# PARSE010 `field_fixum_retired` and `de` (en `ref`) is `ref_field_refused`.
+genus_field_decl := ('sit' | 'varia' | 'generis') type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
 # `field_decl` is the `discretio` shared-field form, where the modifier stays
 # optional (F7 held); `genus_field_decl` above is the `genus` form.
-field_decl    := ('fixum' | 'varia' | 'generis')? type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
+field_decl    := ('sit' | 'varia' | 'generis')? type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
 functio_method_decl   := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 
 annotation            := nucleum_annotation | radix_annotation | braced_annotation | annotation_sugar
@@ -1189,10 +1204,10 @@ concrete_type   := intersection_type ('∪' intersection_type)*
 # whole type, so a following `∪` or `∩` (`∪ ∪ A`, `∪ ∩ A`) is a parse error
 # (`unexpected_cup_after_union_hole`), and it is never a member of a union or
 # intersection. The monomorphic hole `_` (`hole_type`) has no such rule.
-union_hole_type := ('de' | 'in' | 'own' | 'copy')? '∪'
+union_hole_type := ('de' | 'varia' | 'own' | 'copy')? '∪'
 # `∩` binds tighter than `∪`: the cup tail parses at intersection level.
 intersection_type := owned_type ('∩' owned_type)*
-owned_type      := ('de' | 'in' | 'own' | 'copy')? base_type
+owned_type      := ('de' | 'varia' | 'own' | 'copy')? base_type
 # There is no grouping parenthesis in type position: `(` opens a function type
 # only, so `(A ∪ B)` is a parse error. A union member that needs its own access
 # marker is written on the member (`de A ∪ B`).
@@ -1257,7 +1272,7 @@ dum_stmt  := 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
 # identifier, not a destructuring wildcard. `ex` and `ab` admit the
 # comma-separated source series (`ex` lockstep zip, `ab` Cartesian product);
 # `de` stays single-source. Patterns bind only the single-source form.
-itera_stmt  := 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? filum_clause? ('fixum' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt  := 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? filum_clause? ('sit' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 itera_binding := array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # `apud` (C7, D3.1-D3.4): one name binds a `lista` position, a `tabula` key,
 # or (for a composite `tabula<iuncta<K1, …, Kn>, V>`) N names for the parts of
@@ -1302,14 +1317,14 @@ negated_number := '-' NUMBER
 # collection (`lista<T, 4>`) or a numeric width (`u32` over `numerus`) — parses
 # but is rejected (`SEM010 discerne_pattern_not_in_closed_set`).
 type_pattern := IDENTIFIER type_arguments? ut_pattern?
-ut_pattern  := ('ut' IDENTIFIER) | (('fixum' | 'varia') pattern_binding (',' pattern_binding)*)
+ut_pattern  := ('ut' IDENTIFIER) | (('sit' | 'varia') pattern_binding (',' pattern_binding)*)
 pattern_binding := IDENTIFIER ('ut' IDENTIFIER)?
 
 custodi_stmt   := 'custodi' '{' si_guard_clause+ '}'
 si_guard_clause := 'si' expression (block_stmt | ergo_joint statement)
 
 
-ex_stmt   := 'ex' expression ('fixum' | 'varia') extract_fields
+ex_stmt   := 'ex' expression ('sit' | 'varia') extract_fields
 extract_fields := extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
 extract_field  := IDENTIFIER ('ut' IDENTIFIER)?
 ceteri_field     := 'ceteri' IDENTIFIER
@@ -1463,7 +1478,7 @@ argument_list  := (argument (',' argument)*)?
 # the second kind: it says what a number means, and a parameter declares it
 # before its type (`axis int a`) with the call echoing it (`t.mean(axis 1)`).
 argument      := template_argument | (call_marker | 'axis')? 'sparge'? expression
-call_marker   := 'de' | 'in' | 'own' | 'copy'
+call_marker   := 'de' | 'varia' | 'own' | 'copy'
 template_argument := 'sparge'? IDENTIFIER ':' expression
 
 # `∞` and `nonnumerus` are non-finite floating-point literals; `nonnumerus`
@@ -1586,7 +1601,7 @@ first_match_expr := 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFI
 reducta_expr := 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
 reducta_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio'
 reducta_group := 'pro' expression
-reducta_body := ('fixum' | 'varia') IDENTIFIER block_stmt
+reducta_body := ('sit' | 'varia') IDENTIFIER block_stmt
 reducta_identity := 'vel' expression
 # Sort expression. `via` is mandatory and selects the direction; `ex` sorts a
 # list, set or map's values and `de` sorts a map's keys. The optional body is
@@ -1595,7 +1610,7 @@ reducta_identity := 'vel' expression
 # `ascendens` and `descendens` stay ordinary identifiers outside their slots.
 sort_expr := 'ordinata' 'via' sort_direction ('ex' | 'de') expression sort_body?
 sort_direction := 'ascendens' | 'descendens'
-sort_body := ('fixum' | 'varia') IDENTIFIER block_stmt
+sort_body := ('sit' | 'varia') IDENTIFIER block_stmt
 # `filum` is claimed by exact spelling only inside a reduction production.
 filum_clause := 'filum' IDENTIFIER
 # Capture boundary: `capta` claims its spelling only in expression-primary

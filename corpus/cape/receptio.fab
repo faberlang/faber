@@ -87,7 +87,7 @@ functio electio(bivalens malum) → numerus {
 # recovery-arm conversion — the inline ⊥ default resolves a failed
 # conversion inside its own expression (no handler needed)
 functio lectio(textus s) → numerus {
-    fixum numerus v ↤ s ⊥ 0
+    sit numerus v ↤ s ⊥ 0
     redde v
 }
 

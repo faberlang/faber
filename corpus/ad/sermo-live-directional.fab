@@ -32,19 +32,19 @@ locale = "en"
 # ordered consumption is intentional.
 
 main {
-    const channel s ← call 'runtime:echo' ("salve")
-    const send<string> m ← s.meus<string>()
+    let channel s ← call 'runtime:echo' ("salve")
+    let send<string> m ← s.meus<string>()
     m.da("ping")
-    const status outbound ← m.fini()
-    const recv<string> t ← s.tuus<string>()
-    for from t.cursor() const frame {
+    let status outbound ← m.fini()
+    let recv<string> t ← s.tuus<string>()
+    for from t.cursor() let frame {
         assert frame.data ≡ "salve"
     }
-    const status inbound ← t.fini()
-    const channel s2 ← call 'runtime:echo' ("salve")
-    const recv<string> t2 ← s2.tuus<string>()
-    const frame<string> ∪ none got ← t2.accipe()
-    const status accipe_done ← t2.fini()
+    let status inbound ← t.fini()
+    let channel s2 ← call 'runtime:echo' ("salve")
+    let recv<string> t2 ← s2.tuus<string>()
+    let frame<string> ∪ none got ← t2.accipe()
+    let status accipe_done ← t2.fini()
     print outbound
     print inbound
     print got?.data

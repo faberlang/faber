@@ -5,7 +5,7 @@ use crate::driver::{Config, ModuleCompileRequest, Session};
 
 const INLINE_FS: &str = r#"
 incipit {
-    fixum textus body ← ad 'solum:lege' ("x") ↦ textus
+    sit textus body ← ad 'solum:lege' ("x") ↦ textus
     nota body
 }
 "#;

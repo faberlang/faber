@@ -12,8 +12,8 @@ fn write_then_read(string path, string payload) → string {
 
 describe "fs leaf" {
     test "write_file then read_file returns the payload" {
-        const string dir ← fs.temp_dir()
-        const string path ← fs.join([dir, "core-norma-fs-proba.txt"])
+        let string dir ← fs.temp_dir()
+        let string path ← fs.join([dir, "core-norma-fs-proba.txt"])
         assert write_then_read(path, "proba-ok") ≡ "proba-ok"
         assert fs.exists(path)
         fs.delete(path)

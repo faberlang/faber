@@ -57,38 +57,38 @@ locale = "en"
 #   argument; the clause is a spelling, not a new row.
 
 main {
-    const list<b8> raw ← |3c 00|
+    let list<b8> raw ← |3c 00|
 
     # Endian unpack of an exact-width window.
-    const u16 little ← raw[0‥2] ↦ u16 via Le
+    let u16 little ← raw[0‥2] ↦ u16 via Le
     print little
-    const u16 big ← raw[0‥2] ↦ u16 via Be
+    let u16 big ← raw[0‥2] ↦ u16 via Be
     print big
 
     # A chain: parse hex text as u32, then widen the number to f64.
-    const f64 widened ← "ff" ↦ u32 via Hex ↦ f64
+    let f64 widened ← "ff" ↦ u32 via Hex ↦ f64
     print widened
 
     # Text parse at a radix; the clause is finished before the default.
-    const i32 parsed ← "ff" ↦ i32 via Hex
+    let i32 parsed ← "ff" ↦ i32 via Hex
     print parsed
-    const i32 rescued ← "zz" ↦ i32 via Hex ⊥ -1
+    let i32 rescued ← "zz" ↦ i32 via Hex ⊥ -1
     print rescued
 
     # Code points: read one from a char, build a char from one.
-    const char letter ← 'A'
-    const u32 code ← letter ↦ u32 via Code
+    let char letter ← 'A'
+    let u32 code ← letter ↦ u32 via Code
     print code
-    const char built ← 65 ↦ char via Code ⊥ '?'
+    let char built ← 65 ↦ char via Code ⊥ '?'
     print built
 
     # Bit reinterpretation goes through the bN marker, not a hint: the
     # pattern 0x3f800000 is the float 1.0.
-    const u32 pattern ← 1065353216
-    const f32 one ← pattern ↦ b32 ↦ f32
+    let u32 pattern ← 1065353216
+    let f32 one ← pattern ↦ b32 ↦ f32
     print one
 
     # `via` is an ordinary name outside the clause.
-    const int via ← 7
+    let int via ← 7
     print via
 }

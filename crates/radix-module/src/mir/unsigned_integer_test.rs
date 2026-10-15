@@ -34,7 +34,7 @@ fn unsigned_integer_runner_preserves_i64_max_plus_one() {
     run_fixture_source(
         r"
 incipit {
-    fixum u64 sha ← 9223372036854775808
+    sit u64 sha ← 9223372036854775808
     nota sha
 }
 ",
@@ -50,7 +50,7 @@ fn unsigned_integer_runner_preserves_u64_max() {
     run_fixture_source(
         r"
 incipit {
-    fixum u64 max ← 18446744073709551615
+    sit u64 max ← 18446744073709551615
     nota max
     nota max ↦ textus
 }
@@ -69,7 +69,7 @@ fn unsigned_integer_runner_does_not_encode_upper_half_as_negative() {
     run_fixture_source(
         r"
 incipit {
-    fixum u64 high ← 18446744073709551615
+    sit u64 high ← 18446744073709551615
     nota high ≻ 9223372036854775807
 }
 ",
@@ -139,22 +139,22 @@ fn modular_width_vector_source(vector: &ModularWidthVector) -> String {
     format!(
         r"
 incipit {{
-    fixum modulus<{w}> max ← {max}
-    fixum modulus<{w}> one ← 1
-    fixum modulus<{w}> zero ← 0
-    fixum modulus<{w}> two ← 2
+    sit modulus<{w}> max ← {max}
+    sit modulus<{w}> one ← 1
+    sit modulus<{w}> zero ← 0
+    sit modulus<{w}> two ← 2
 
-    fixum modulus<{w}> r0 ← max + one
+    sit modulus<{w}> r0 ← max + one
     nota r0
-    fixum modulus<{w}> r1 ← zero - one
+    sit modulus<{w}> r1 ← zero - one
     nota r1
-    fixum modulus<{w}> r2 ← max * two
+    sit modulus<{w}> r2 ← max * two
     nota r2
-    fixum modulus<{w}> r3 ← -one
+    sit modulus<{w}> r3 ← -one
     nota r3
-    fixum modulus<{w}> r4 ← ¬zero
+    sit modulus<{w}> r4 ← ¬zero
     nota r4
-    fixum modulus<{w}> r5 ← one ⇐ {shift}
+    sit modulus<{w}> r5 ← one ⇐ {shift}
     nota r5
     nota max ⇒ {shift}
     nota max / two
@@ -168,14 +168,14 @@ incipit {{
     dec ↓
     nota dec
 
-    fixum modulus<{w}> t0 ← max.addita(one)
+    sit modulus<{w}> t0 ← max.addita(one)
     nota t0
     nota max.subtrahe(one)
-    fixum modulus<{w}> t1 ← one.sinistrata({shift})
+    sit modulus<{w}> t1 ← one.sinistrata({shift})
     nota t1
     nota max.dextrata({shift})
 
-    fixum modulus<{w}> roundTrip ← max ↦ {w} ↦ modulus<{w}>
+    sit modulus<{w}> roundTrip ← max ↦ {w} ↦ modulus<{w}>
     nota roundTrip
 }}
 "
@@ -242,11 +242,11 @@ fn mir_modular_word_runner_u64_upper_half_sha_constants_stay_exact() {
     run_fixture_source(
         r"
 incipit {
-    fixum modulus<u64> k ← 15165310421466868936
-    fixum modulus<u64> w ← 18268729513060379306
-    fixum modulus<u64> sum ← k + w
+    sit modulus<u64> k ← 15165310421466868936
+    sit modulus<u64> w ← 18268729513060379306
+    sit modulus<u64> sum ← k + w
     nota sum
-    fixum modulus<u64> back ← sum - w
+    sit modulus<u64> back ← sum - w
     nota back
 }
 ",
@@ -268,11 +268,11 @@ fn unsigned_integer_runner_mixed_carrier_equality_is_value_correct() {
     run_fixture_source(
         r"
 incipit {
-    fixum modulus<u64> one ← 1
-    fixum modulus<u64> uno ← 1 ↦ modulus<u64>
+    sit modulus<u64> one ← 1
+    sit modulus<u64> uno ← 1 ↦ modulus<u64>
     nota one ≡ uno
     nota one ≡ one + 0
-    fixum u64 wrapped ← 1
+    sit u64 wrapped ← 1
     nota wrapped ≡ (1 ↦ u64)
     nota wrapped ≡ wrapped + 0
 }
@@ -289,9 +289,9 @@ fn unsigned_integer_runner_mixed_carrier_tabula_and_copia_keys() {
     run_fixture_source(
         r#"
 incipit {
-    fixum u64 five ← 5
-    fixum u64 big ← 9223372036854775808
-    fixum u64 computed ← big - 9223372036854775808 + 5
+    sit u64 five ← 5
+    sit u64 big ← 9223372036854775808
+    sit u64 computed ← big - 9223372036854775808 + 5
     varia tabula<u64, textus> t ← vacua
     t.pone(five, "quinque")
     nota t.accipe(computed) vel "absens"
@@ -314,12 +314,12 @@ fn unsigned_integer_runner_mixed_carrier_elige_matches_by_value() {
     run_fixture_source(
         r#"
 incipit {
-    fixum modulus<u64> one ← 1
+    sit modulus<u64> one ← 1
     elige one + 0 {
         casu 1 { nota "primus" }
         ceterum { nota "aliud" }
     }
-    fixum u64 two ← 2
+    sit u64 two ← 2
     elige two ↦ u64 {
         casu 2 { nota "secundus" }
         ceterum { nota "aliud" }
@@ -338,7 +338,7 @@ fn unsigned_integer_runner_upper_half_bitwise_accepts_small_literals() {
     run_fixture_source(
         r"
 incipit {
-    fixum u64 big ← 15165310421466868936
+    sit u64 big ← 15165310421466868936
     nota big ∧ 255
     nota big ∨ 255
     nota big ⊻ 255
@@ -367,7 +367,7 @@ fn unsigned_integer_runner_upper_half_left_shift_traps_past_the_range() {
     let errors = run_fixture_source(
         r"
 incipit {
-    fixum u64 big ← 15165310421466868936
+    sit u64 big ← 15165310421466868936
     nota big ⇐ 1
 }
 ",
@@ -385,11 +385,11 @@ fn unsigned_integer_runner_upper_half_sha512_k_and_shift_pattern() {
     run_fixture_source(
         r"
 incipit {
-    fixum modulus<u64> k ← 15165310421466868936
-    fixum modulus<u64> w ← 7017280452245743616
-    fixum modulus<u64> masked ← (k ∧ 255) + (w ∧ 255)
+    sit modulus<u64> k ← 15165310421466868936
+    sit modulus<u64> w ← 7017280452245743616
+    sit modulus<u64> masked ← (k ∧ 255) + (w ∧ 255)
     nota masked
-    fixum modulus<u64> rotated ← k ⇐ 1 ∨ k ⇒ 63
+    sit modulus<u64> rotated ← k ⇐ 1 ∨ k ⇒ 63
     nota rotated
 }
 ",
@@ -446,7 +446,7 @@ fn unsigned_integer_runner_modular_collection_literals_validate() {
     run_fixture_source(
         r#"
 incipit {
-    fixum lista<modulus<u32>> ws ← [4294967295, 3, 10]
+    sit lista<modulus<u32>> ws ← [4294967295, 3, 10]
     nota ws.longitudo()
     varia tabula<modulus<u32>, textus> t ← vacua
     t.pone(4294967295, "max")
@@ -457,7 +457,7 @@ incipit {
     c.adde(18446744073709551615)
     c.adde(3)
     nota c.habet(18446744073709551615)
-    fixum lista<modulus<u64>> big ← [18446744073709551615, 3, 10]
+    sit lista<modulus<u64>> big ← [18446744073709551615, 3, 10]
     nota big.longitudo()
 }
 "#,

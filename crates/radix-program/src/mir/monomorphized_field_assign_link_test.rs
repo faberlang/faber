@@ -32,13 +32,13 @@ use radix_module::semantic::{IndexExpr, Type};
 
 const SEAM_UTIL: &str = r"@ public
 class Box<size D, size Q> {
-    var tensor<f32, [D]> ln1
-    var tensor<f32, [D, Q]> wq
+    mut tensor<f32, [D]> ln1
+    mut tensor<f32, [D, Q]> wq
 }
 
 @ public
 fn make<size D, size Q>(tensor<f32, [D]> ln1, tensor<f32, [D, Q]> wq) → Box<D, Q> {
-    const Box<D, Q> b ← Box { ln1 = ln1, wq = wq }
+    let Box<D, Q> b ← Box { ln1 = ln1, wq = wq }
     return b
 }
 
@@ -47,14 +47,14 @@ fn make<size D, size Q>(tensor<f32, [D]> ln1, tensor<f32, [D, Q]> wq) → Box<D,
 # Expand the projected row to x's shape before exact-shape addition.
 @ public
 fn axis0_cells<size T, size D, size Q>(tensor<f32, [T, D]> x, Box<D, Q> layer) → int {
-    const tensor<f32, [T, D]> y ← x + layer.ln1.expanded(x.shape())
-    const list<f32> data ← y ↦ list<f32>
+    let tensor<f32, [T, D]> y ← x + layer.ln1.expanded(x.shape())
+    let list<f32> data ← y ↦ list<f32>
     return data.length()
 }
 
 @ public
 fn width_of<size A, size B>(tensor<f32, [A, B]> t) → int {
-    const list<f32> data ← t ↦ list<f32>
+    let list<f32> data ← t ↦ list<f32>
     return data.length()
 }
 ";
@@ -62,8 +62,8 @@ fn width_of<size A, size B>(tensor<f32, [A, B]> t) → int {
 const SEAM_MODEL: &str = r#"import from "./util" util
 
 fn flat(int n) → list<f32> {
-    var list<f32> out ← empty
-    for range 0‥n const i {
+    mut list<f32> out ← empty
+    for range 0‥n let i {
         out.append(1.0)
     }
     return out
@@ -72,14 +72,14 @@ fn flat(int n) → list<f32> {
 @ public
 fn typed_seam() → int {
     do {
-        const tensor<f32, [4]> ln1 ← flat(4) ↦ tensor<f32, [4]>
-        const tensor<f32, [4, 4]> wq ← flat(16) ↦ tensor<f32, [4, 4]>
-        const util.Box<4, 4> made ← util.make<4, 4>(ln1, wq)
-        const list<util.Box<4, 4>> layers ← [made]
-        const tensor<f32, [2, 4]> x ← flat(8) ↦ tensor<f32, [2, 4]>
-        var int total ← 0
-        for from layers const layer {
-            const util.Box<4, 4> typed ← util.Box { ln1 = layer.ln1, wq = layer.wq }
+        let tensor<f32, [4]> ln1 ← flat(4) ↦ tensor<f32, [4]>
+        let tensor<f32, [4, 4]> wq ← flat(16) ↦ tensor<f32, [4, 4]>
+        let util.Box<4, 4> made ← util.make<4, 4>(ln1, wq)
+        let list<util.Box<4, 4>> layers ← [made]
+        let tensor<f32, [2, 4]> x ← flat(8) ↦ tensor<f32, [2, 4]>
+        mut int total ← 0
+        for from layers let layer {
+            let util.Box<4, 4> typed ← util.Box { ln1 = layer.ln1, wq = layer.wq }
             total ← util.axis0_cells<2, 4, 4>(x, typed)
             total ← total + util.width_of(typed.wq)
         }
@@ -94,8 +94,8 @@ fn typed_seam() → int {
 const SEAM_MODEL_WRONG_FIELD: &str = r#"import from "./util" util
 
 fn flat(int n) → list<f32> {
-    var list<f32> out ← empty
-    for range 0‥n const i {
+    mut list<f32> out ← empty
+    for range 0‥n let i {
         out.append(1.0)
     }
     return out
@@ -104,10 +104,10 @@ fn flat(int n) → list<f32> {
 @ public
 fn typed_seam_wrong_field() → int {
     do {
-        const tensor<f32, [8]> too_wide ← flat(8) ↦ tensor<f32, [8]>
-        const tensor<f32, [4, 4]> wq ← flat(16) ↦ tensor<f32, [4, 4]>
-        const util.Box<4, 4> typed ← util.Box { ln1 = too_wide, wq = wq }
-        const list<f32> data ← typed.ln1 ↦ list<f32>
+        let tensor<f32, [8]> too_wide ← flat(8) ↦ tensor<f32, [8]>
+        let tensor<f32, [4, 4]> wq ← flat(16) ↦ tensor<f32, [4, 4]>
+        let util.Box<4, 4> typed ← util.Box { ln1 = too_wide, wq = wq }
+        let list<f32> data ← typed.ln1 ↦ list<f32>
         return data.length()
     }
     catch err {
@@ -119,8 +119,8 @@ fn typed_seam_wrong_field() → int {
 const SEAM_MODEL_WRONG_SIZE_ARG: &str = r#"import from "./util" util
 
 fn flat(int n) → list<f32> {
-    var list<f32> out ← empty
-    for range 0‥n const i {
+    mut list<f32> out ← empty
+    for range 0‥n let i {
         out.append(1.0)
     }
     return out
@@ -129,10 +129,10 @@ fn flat(int n) → list<f32> {
 @ public
 fn typed_seam_wrong_size_arg() → int {
     do {
-        const tensor<f32, [4]> ln1 ← flat(4) ↦ tensor<f32, [4]>
-        const tensor<f32, [4, 4]> wq ← flat(16) ↦ tensor<f32, [4, 4]>
-        const util.Box<4, 4> made ← util.make<4, 4>(ln1, wq)
-        const tensor<f32, [2, 4]> x ← flat(8) ↦ tensor<f32, [2, 4]>
+        let tensor<f32, [4]> ln1 ← flat(4) ↦ tensor<f32, [4]>
+        let tensor<f32, [4, 4]> wq ← flat(16) ↦ tensor<f32, [4, 4]>
+        let util.Box<4, 4> made ← util.make<4, 4>(ln1, wq)
+        let tensor<f32, [2, 4]> x ← flat(8) ↦ tensor<f32, [2, 4]>
         return util.axis0_cells<2, 8, 4>(x, made)
     }
     catch err {

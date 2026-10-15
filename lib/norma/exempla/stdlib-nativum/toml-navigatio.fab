@@ -23,19 +23,19 @@ id = "sample"»
 }
 
 main {
-    const value doc ← toml.parse(sampleToml())
+    let value doc ← toml.parse(sampleToml())
 
     assert value.is_map(doc)
     assert value.is_string(value.get(doc, "name"))
     assert value.is_int(value.get(doc, "version"))
     assert value.is_null(doc) ≡ false
 
-    const string name ↤ value.get(doc, "name") ⊥ "missing"
-    const int version ↤ value.get(doc, "version") ⊥ 0
-    const string id ↤ value.find(doc, "id") ⊥ "missing"
+    let string name ↤ value.get(doc, "name") ⊥ "missing"
+    let int version ↤ value.get(doc, "version") ⊥ 0
+    let string id ↤ value.find(doc, "id") ⊥ "missing"
 
     do {
-        const string required ← value.require_string(doc, "id")
+        let string required ← value.require_string(doc, "id")
         assert required ≡ "sample"
     }
     catch err {

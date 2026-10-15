@@ -14,9 +14,9 @@ import from "norma:http/headers" headers
 
 @ public
 class Response {
-    var int status = 0
-    var headers.Headers headers = headers.Headers { }
-    var string body = ""
+    mut int status = 0
+    mut headers.Headers headers = headers.Headers { }
+    mut string body = ""
 
     fn header(string name) → string ∪ none {
         return self.headers.get(name)

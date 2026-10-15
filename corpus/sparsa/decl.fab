@@ -41,8 +41,8 @@ fn identity(sparsa<f32, [2, 3]> value) → sparsa<f32, [2, 3]> {
 }
 
 main {
-    const sparsa<f32, [2, 3]> empty ← empty
-    const sparsa<f32, [2, 3]> roundtrip ← identity(empty)
+    let sparsa<f32, [2, 3]> empty ← empty
+    let sparsa<f32, [2, 3]> roundtrip ← identity(empty)
 
     print roundtrip.length(), roundtrip.count_nonzero()
 }

@@ -13,7 +13,7 @@ fn n2_range_product_typechecks_through_the_driver() {
     assert_analysis_accepts(
         r"
 functio grid(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, 0‥n fixum i, j {
+    itera ab 0‥m, 0‥n sit i, j {
         nota i
     }
 }
@@ -26,7 +26,7 @@ fn n3_range_product_typechecks_through_the_driver() {
     assert_analysis_accepts(
         r"
 functio cube(numerus m, numerus n, numerus k) → vacuum {
-    itera ab 0‥m, 0‥n, 0‥k fixum i, j, p {
+    itera ab 0‥m, 0‥n, 0‥k sit i, j, p {
         nota p
     }
 }
@@ -39,7 +39,7 @@ fn n1_range_keeps_the_shared_itera_path_through_the_driver() {
     assert_analysis_accepts(
         r"
 functio line(numerus m) → vacuum {
-    itera ab 0‥m fixum i {
+    itera ab 0‥m sit i {
         nota i
     }
 }
@@ -52,7 +52,7 @@ fn driver_rejects_range_product_count_mismatch() {
     assert_analysis_rejects_with_issue(
         r"
 functio short(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, 0‥n fixum i {
+    itera ab 0‥m, 0‥n sit i {
         nota i
     }
 }
@@ -66,7 +66,7 @@ fn driver_rejects_range_product_extent_binder_shadowing() {
     assert_analysis_rejects_with_issue(
         r"
 functio shadow(numerus m, numerus k) → vacuum {
-    itera ab 0‥m, 0‥k fixum i, k {
+    itera ab 0‥m, 0‥k sit i, k {
         nota i
     }
 }
@@ -80,7 +80,7 @@ fn driver_rejects_range_product_mixed_member() {
     assert_analysis_rejects_with_issue(
         r"
 functio mixed(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, n fixum i, j {
+    itera ab 0‥m, n sit i, j {
         nota i
     }
 }
@@ -94,7 +94,7 @@ fn driver_rejects_range_product_apud_clause() {
     assert_analysis_rejects_with_issue(
         r"
 functio coord(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, 0‥n apud [c] fixum i, j {
+    itera ab 0‥m, 0‥n apud [c] sit i, j {
         nota i
     }
 }
@@ -110,7 +110,7 @@ fn driver_keeps_lockstep_laws_off_the_range_product_route() {
     assert_analysis_rejects_with_issue(
         r"
 functio zip(lista<numerus> xs, lista<numerus> ys) → vacuum {
-    itera ex xs, ys fixum x {
+    itera ex xs, ys sit x {
         nota x
     }
 }
@@ -130,7 +130,7 @@ fn rust_target_emits_the_range_product_through_the_driver() {
     assert_accepts(
         r"
 functio grid(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, 0‥n fixum i, j {
+    itera ab 0‥m, 0‥n sit i, j {
         nota i
     }
 }

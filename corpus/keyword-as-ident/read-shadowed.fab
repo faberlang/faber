@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "identifier"
 canonical = true
 summary = "A binding named read wins over the lege builtin."
-syntax = "const string read ← \"data\"; print read"
+syntax = "let string read ← \"data\"; print read"
 related = ["lege", "nota"]
 locale = "en"
 +++
@@ -27,7 +27,7 @@ locale = "en"
 # =============================================================================
 #
 # Operator example:
-#   const string read ← "data"
+#   let string read ← "data"
 #   print read
 #
 # GRAMMAR:
@@ -37,6 +37,6 @@ locale = "en"
 #   read-shadowed.expected — data
 
 main {
-    const string read ← "data"
+    let string read ← "data"
     print read
 }

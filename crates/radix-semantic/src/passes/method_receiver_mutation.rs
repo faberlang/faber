@@ -15,7 +15,7 @@
 //! ======
 //! - Only methods declared in the analyzed module are known; a call to an
 //!   imported class's method is not classified.
-//! - A write through a local alias of a field (`var list<int> v ← ego.xs`) is
+//! - A write through a local alias of a field (`mut list<int> v ← ego.xs`) is
 //!   not followed; the rule errs toward accepting.
 
 use crate::{Type, TypeId, TypeTable};

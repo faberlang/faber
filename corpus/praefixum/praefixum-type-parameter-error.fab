@@ -38,7 +38,7 @@ locale = "en"
 
 fn longitudo<T>(T x) → int {
     const int n = comptime {
-        var list<T> xs ← empty
+        mut list<T> xs ← empty
         return xs.length()
     }
     return n

@@ -31,13 +31,13 @@ locale = "en"
 # invalid carriers recover through `⇥`.
 
 main {
-    const value utc ← "1979-05-27T07:32:00Z"
-    const value offset ← "1979-05-27T16:32:00+0900"
-    const instant seconds ← utc ↦ instant
-    const instant<ms> millis ← utc ↦ instant<ms>
-    const instant normalized ← offset ↦ instant
-    const value bad ← "not-a-datetime"
-    const instant recovered ← bad ↦ instant ⊥ seconds
+    let value utc ← "1979-05-27T07:32:00Z"
+    let value offset ← "1979-05-27T16:32:00+0900"
+    let instant seconds ← utc ↦ instant
+    let instant<ms> millis ← utc ↦ instant<ms>
+    let instant normalized ← offset ↦ instant
+    let value bad ← "not-a-datetime"
+    let instant recovered ← bad ↦ instant ⊥ seconds
     print seconds ↦ string
     print millis ↦ string
     print normalized ↦ string

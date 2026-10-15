@@ -250,8 +250,8 @@ locale = "en"
 import from "rlib:g" g
 
 test "sibling closure captures param" {
-    const list<u8> b ← [1, 2, 3]
-    const int out ← g.inspect_wrap(b)
+    let list<u8> b ← [1, 2, 3]
+    let int out ← g.inspect_wrap(b)
     print out ≡ 4
     assert out ≡ 4
 }
@@ -282,7 +282,7 @@ fn _add3(int a, int b, int base) → int {
 
 @ public
 fn inspect_local(int n) → int {
-    const int base ← 2
+    let int base ← 2
     return _fold((int a, int b) → int ∴ _add3(a, b, base), n)
 }
 
@@ -298,7 +298,7 @@ locale = "en"
 import from "rlib:g" g
 
 test "sibling closure captures local" {
-    const int out ← g.inspect_local(1)
+    let int out ← g.inspect_local(1)
     print out ≡ 4
     assert out ≡ 4
 }
@@ -349,7 +349,7 @@ locale = "en"
 import from "rlib:g" g
 
 test "sibling closure captures module const" {
-    const int out ← g.inspect_limit(1)
+    let int out ← g.inspect_limit(1)
     print out ≡ 9
     assert out ≡ 9
 }
@@ -411,7 +411,7 @@ locale = "en"
 import from "rlib:g" g
 
 test "sibling closure captures cross-unit const" {
-    const int out ← g.inspect_cross(1)
+    let int out ← g.inspect_cross(1)
     print out ≡ 9
     assert out ≡ 9
 }
@@ -444,8 +444,8 @@ fn _fold((int, int) → int f, int n) → int {
 }
 
 test "entry closure captures param" {
-    const list<u8> b ← [1, 2, 3]
-    const int out ← _fold((int start, int length) → int ∴ _cut(b, start, length), b.length())
+    let list<u8> b ← [1, 2, 3]
+    let int out ← _fold((int start, int length) → int ∴ _cut(b, start, length), b.length())
     print out ≡ 4
     assert out ≡ 4
 }
@@ -488,7 +488,7 @@ locale = "en"
 import from "rlib:g" g
 
 test "sibling closure captures nothing" {
-    const int out ← g.inspect_pure(3)
+    let int out ← g.inspect_pure(3)
     print out ≡ 4
     assert out ≡ 4
 }
@@ -517,7 +517,7 @@ locale = "en"
 import from "clib:ops" ops
 
 test "library closure captures const" {
-    const int out ← ops.inspect_limit(1)
+    let int out ← ops.inspect_limit(1)
     print out ≡ 9
     assert out ≡ 9
 }

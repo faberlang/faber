@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "A loop over a tensor whose extent is a run-time int reads its bounds from the tensor, so it visits every cell."
-syntax = "for from a at [i, j] const c { }"
+syntax = "for from a at [i, j] let c { }"
 related = ["tensor", "apud", "itera", "magnitudo"]
 locale = "en"
 +++
@@ -30,12 +30,12 @@ fn runtime_extent(int value) → int {
 }
 
 main {
-    const int n ← runtime_extent(3)
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[2, size n] a ← flat ↦ tf32[2, size n]
-    var f32 total ← 0.0
-    var int coordinates ← 0
-    for from a at [i, j] const c {
+    let int n ← runtime_extent(3)
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[2, size n] a ← flat ↦ tf32[2, size n]
+    mut f32 total ← 0.0
+    mut int coordinates ← 0
+    for from a at [i, j] let c {
         total ← total + c
         coordinates ← coordinates + i * 10 + j
     }

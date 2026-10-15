@@ -8,7 +8,7 @@ import from "./error_conversio" conversion
 
 test "declared arm carries the original source error" {
     do {
-        const string _ ← conversion.inspect_after()
+        let string _ ← conversion.inspect_after()
         assert false
     }
     catch err {
@@ -21,6 +21,6 @@ test "missing direct arm is a named fail-closed decline" {
     # error_conversio.fab: a source/destination pair without a declared arm
     # must report `failable_call_conversion_absent`, rather than composing an
     # arm transitively.
-    const string expected_issue ← "failable_call_conversion_absent"
+    let string expected_issue ← "failable_call_conversion_absent"
     assert expected_issue ≡ "failable_call_conversion_absent"
 }

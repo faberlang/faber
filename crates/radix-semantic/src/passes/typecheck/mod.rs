@@ -367,7 +367,7 @@ pub(crate) struct TypeChecker<'a> {
 
     /// Read-only parameters (unmarked or `de`) seen while checking bodies.
     /// Like a `const` local, such a parameter is a read-only value: a plain
-    /// `var T y ← p` of a shareable value is SEM065. DefIds
+    /// `mut T y ← p` of a shareable value is SEM065. DefIds
     /// are unique, so the set needs no per-body scope.
     pub read_only_param_roots: FxHashSet<DefId>,
 

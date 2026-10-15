@@ -8,7 +8,7 @@
 //! - `varia T x = e` is a parse error naming the `=` rule;
 //! - a constant is an ordinary immutable local of type `T`, usable in
 //!   arithmetic;
-//! - `←` keeps its runtime meaning: `fixum T x ← e` accepts a runtime value.
+//! - `←` keeps its runtime meaning: `sit T x ← e` accepts a runtime value.
 
 use crate::PassConfig;
 use crate::locale::LocalePack;
@@ -24,7 +24,7 @@ fn constant_initializer_is_accepted() {
 #[test]
 fn constant_is_recorded_in_the_presentation_sidecar() {
     let fixture = analyze_source_with_config(
-        "functio f() → numerus {\n    fixum numerus n = 4\n    fixum numerus m ← 5\n    redde n + m\n}\n",
+        "functio f() → numerus {\n    fixum numerus n = 4\n    sit numerus m ← 5\n    redde n + m\n}\n",
         PassConfig::for_target(Target::HirRust),
     );
     assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
@@ -123,7 +123,7 @@ fn non_constant_initializer_is_rejected() {
 #[test]
 fn runtime_local_is_not_a_constant() {
     assert_rejects_with_issue(
-        "functio f() → numerus {\n    fixum numerus r ← 5\n    fixum numerus n = r + 1\n    redde n\n}\n",
+        "functio f() → numerus {\n    sit numerus r ← 5\n    fixum numerus n = r + 1\n    redde n\n}\n",
         "constant_initializer_not_constant",
     );
 }
@@ -139,9 +139,7 @@ fn call_initializer_is_rejected() {
 
 #[test]
 fn arrow_initializer_accepts_a_runtime_value() {
-    assert_accepts(
-        "functio f(numerus p) → numerus {\n    fixum numerus n ← p + 1\n    redde n\n}\n",
-    );
+    assert_accepts("functio f(numerus p) → numerus {\n    sit numerus n ← p + 1\n    redde n\n}\n");
 }
 
 #[test]

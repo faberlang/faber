@@ -16,7 +16,7 @@ sit = "đặt"
 typus = "kiểu_tên"
 schema = "lược_đồ"
 columna = "cột"
-varia = "biến"
+varia = "khả_biến"
 ceteri = "còn_lại"
 errata = "lỗi"
 exitus = "thoát"
@@ -95,7 +95,7 @@ maxima = "lớn_nhất"
 minima = "nhỏ_nhất"
 de = "ra"
 ex = "từ"
-in = "vào"
+in = "khả_biến"
 own = "sở_hữu"
 copy = "sao_chép"
 axis = "trục"
@@ -404,10 +404,6 @@ help = "chỉ giữ một binding rest '{keyword}'"
 message = "'{keyword}' liên kết trực tiếp với một identifier; dùng '{keyword}' name ← expr"
 help = "viết '{keyword}' name ← expr hoặc dùng fixum cho binding có kiểu hoặc destructure"
 
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit không hỗ trợ pattern destructure"
-help = "dùng fixum với pattern destructure"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "cần test case hoặc setup"
 help = "bắt đầu mục body bằng '{proba}', '{probandum}' hoặc '{setup}'"
@@ -543,6 +539,42 @@ help = "khai báo method trên genus thay thế"
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "dấu `{marker}` không còn đặt trên binding; nó đặt trên giá trị"
 help = "viết `{keyword} T {name} ← {marker} value`; một `{name} ← {marker} value` sau đó đánh dấu giá trị theo cùng cách, và parameter giữ `{marker}` trước kiểu của nó"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "khai báo `{keyword}` lúc chạy đã bị loại bỏ; `{name}` là một tên lúc chạy"
+help = "hãy viết `{sit} T {name} ← …` (hoặc `{sit} {name} ← …` để suy ra kiểu); `{fixum}` nêu một sự thật lúc biên dịch và đi với `=`"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "từ gắn tên `{keyword}` đã bị loại bỏ"
+help = "tên gắn dùng `{sit}` (tên cố định) hoặc `{varia}` (tên có thể ghi); `{fixum}` nêu một sự thật lúc biên dịch và đi với `=`"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` không thể mở đầu một tên gắn"
+help = "tên gắn đặt tên cho giá trị của mỗi lần lặp hoặc khớp; hãy viết `{sit}` cho tên cố định hoặc `{varia}` cho tên có thể ghi"
+
+[diagnostics.PARSE010.issues.field_fixum_retired]
+message = "bộ sửa đổi trường `{keyword}` đã bị loại bỏ"
+help = "trường chỉ đọc viết là `{sit}`; `{fixum}` nêu một sự thật lúc biên dịch và đi với `=`"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` không thể sửa đổi một trường"
+help = "trường là chỉ đọc (`{sit}`) hoặc có thể ghi (`{varia}`); `{generis}` biến nó thành của kiểu"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "biến cục bộ `{keyword}` cần một vị trí để đọc: `{keyword} T name ← place`"
+help = "hãy viết `{keyword} T name ← place`, hoặc dùng `{sit}` hay `{varia}` cho tên không có vị trí ban đầu"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "biến cục bộ `{keyword}` chỉ gắn một tên; không thể tách cấu trúc"
+help = "hãy viết `{keyword} T name ← place`, rồi đọc từng phần qua tên đó"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "biến cục bộ `{keyword}` đọc một vị trí và không nhận giá trị `{marker}`"
+help = "hãy viết `{keyword} T name ← place` để đọc một vị trí, hoặc `{sit} T name ← {marker} place` để có một giá trị độc lập"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "từ khai báo `{keyword}` đã bị loại bỏ; `{name}` là một tên có thể ghi"
+help = "hãy viết `{varia} T {name} ← …`; tên lúc chạy có thể ghi là `{varia}`"
 
 [diagnostics.PARSE011]
 message = "cần tên hàm sau '{functio}'"

@@ -27,15 +27,15 @@ locale = "en"
 #   1.5
 
 main {
-    const int scalar ← 2 ⤒ 5
+    let int scalar ← 2 ⤒ 5
     print scalar
 
-    const list<int> values ← [1, 5, 9]
-    const list<int> clamped ← values ⤒ 4 ⤓ 8
+    let list<int> values ← [1, 5, 9]
+    let list<int> clamped ← values ⤒ 4 ⤓ 8
     print clamped.sum()
 
-    const list<f32> flat ← [-1.0, 0.5, 2.0]
-    const tf32[3] values_tensor ← flat ↦ tf32[3]
-    const tf32[3] clamped_tensor ← values_tensor ⤒ 0.0 ⤓ 1.0
+    let list<f32> flat ← [-1.0, 0.5, 2.0]
+    let tf32[3] values_tensor ← flat ↦ tf32[3]
+    let tf32[3] clamped_tensor ← values_tensor ⤒ 0.0 ⤓ 1.0
     print clamped_tensor.sum()
 }

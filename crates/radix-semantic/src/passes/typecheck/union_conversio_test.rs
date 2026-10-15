@@ -76,7 +76,7 @@ functio target() → vacuum ⇥ Destinatio {{ redde source() }}
 fn explicit_conversio_resolves_the_same_row() {
     let fixture = test_support::analyze_source_la(&format!(
         "{VALID_ROW}\
-incipit {{ fixum Destinatio d ← finge Failed {{}} ∷ Sourceum ↦ Destinatio }}
+incipit {{ sit Destinatio d ← finge Failed {{}} ∷ Sourceum ↦ Destinatio }}
 "
     ));
     assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);

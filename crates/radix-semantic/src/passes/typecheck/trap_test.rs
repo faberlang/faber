@@ -19,12 +19,12 @@ use crate::types::{Primitive, Type};
 
 #[test]
 fn trap_binds_inference_hole_to_solved_union() {
-    // The canonical idiom: `fixum _ r ← capta { f() }` checks green with
+    // The canonical idiom: `sit r ← capta { f() }` checks green with
     // `r : numerus ∪ textus`. The `_` hole binds to the trap hole, so the
     // binding's finalized type is the solved two-member union.
     let result = test_support::analyze_ok(concat!(
         "functio f() → numerus ⇥ textus {\n    redde 42\n}\n\n",
-        "incipit {\n    fixum _ r ← capta { f() }\n    nota r\n}\n",
+        "incipit {\n    sit r ← capta { f() }\n    nota r\n}\n",
     ));
     let tys = entry_local_tys(&result);
     let [local_ty] = tys[..] else {
@@ -46,11 +46,11 @@ fn trap_binds_inference_hole_to_solved_union() {
 
 #[test]
 fn trap_with_union_hole_annotation_owns_accumulation() {
-    // `fixum ∪ r ← capta { f() }`: the annotation hole IS the trap hole, so
+    // `sit ∪ r ← capta { f() }`: the annotation hole IS the trap hole, so
     // the solved members land on the binding without an inference round trip.
     let result = test_support::analyze_ok(concat!(
         "functio f() → numerus ⇥ textus {\n    redde 42\n}\n\n",
-        "incipit {\n    fixum ∪ r ← capta { f() }\n    nota r\n}\n",
+        "incipit {\n    sit ∪ r ← capta { f() }\n    nota r\n}\n",
     ));
     let tys = entry_local_tys(&result);
     assert_eq!(union_members(&result, tys[0]).len(), 2);
@@ -63,7 +63,7 @@ fn trap_of_vacuum_success_is_distinguishable_two_member_union() {
     // and success/failure stay distinguishable.
     let result = test_support::analyze_ok(concat!(
         "functio f() → vacuum ⇥ textus {\n    redde\n}\n\n",
-        "incipit {\n    fixum ∪ r ← capta { f() }\n    nota r\n}\n",
+        "incipit {\n    sit ∪ r ← capta { f() }\n    nota r\n}\n",
     ));
     let tys = entry_local_tys(&result);
     let members = union_members(&result, tys[0]);
@@ -91,7 +91,7 @@ fn trap_supports_explicit_union_annotation_and_narrowing() {
     test_support::assert_accepts(concat!(
         "functio f() → numerus ⇥ textus {\n    redde 42\n}\n\n",
         "incipit {\n",
-        "    fixum numerus ∪ textus r ← capta { f() }\n",
+        "    sit numerus ∪ textus r ← capta { f() }\n",
         "    si r est numerus {\n        nota r\n    } secus {\n",
         "        nota r.longitudo()\n    }\n",
         "}\n",
@@ -106,7 +106,7 @@ fn trap_inferred_hole_narrows_under_is_test() {
     test_support::assert_accepts(concat!(
         "functio f() → numerus ⇥ textus {\n    redde 42\n}\n\n",
         "incipit {\n",
-        "    fixum _ r ← capta { f() }\n",
+        "    sit r ← capta { f() }\n",
         "    si r est numerus {\n        nota r\n    } secus {\n",
         "        nota r.longitudo()\n    }\n",
         "}\n",
@@ -122,7 +122,7 @@ fn trap_inferred_hole_narrowed_branch_is_the_tested_member() {
         concat!(
             "functio f() → numerus ⇥ textus {\n    redde 42\n}\n\n",
             "incipit {\n",
-            "    fixum _ r ← capta { f() }\n",
+            "    sit r ← capta { f() }\n",
             "    si r est numerus {\n        nota r.longitudo()\n    }\n",
             "}\n",
         ),
@@ -136,11 +136,11 @@ fn trap_captures_iace_payload() {
     // same trap hole — no channel-specific typing.
     test_support::assert_accepts(concat!(
         "functio f() → numerus ⇥ textus {\n    iace \"boom\"\n}\n\n",
-        "incipit {\n    fixum ∪ r ← capta { f() }\n    nota r\n}\n",
+        "incipit {\n    sit ∪ r ← capta { f() }\n    nota r\n}\n",
     ));
     let result = test_support::analyze_ok(concat!(
         "functio f() → numerus ⇥ textus {\n    iace \"boom\"\n}\n\n",
-        "incipit {\n    fixum ∪ r ← capta { f() }\n    nota r\n}\n",
+        "incipit {\n    sit ∪ r ← capta { f() }\n    nota r\n}\n",
     ));
     let tys = entry_local_tys(&result);
     assert_eq!(union_members(&result, tys[0]).len(), 2);
@@ -171,7 +171,7 @@ fn trap_does_not_leak_past_its_boundary() {
         concat!(
             "functio f() → numerus ⇥ textus {\n    redde 42\n}\n\n",
             "functio g() → vacuum {\n",
-            "    fixum ∪ r ← capta { f() }\n",
+            "    sit ∪ r ← capta { f() }\n",
             "    nota r\n",
             "    f()\n",
             "}\n",
@@ -192,7 +192,7 @@ fn trap_union_collapse_is_rejected_fail_closed() {
         concat!(
             "genus Pondero {\n    varia textus nuntius\n}\n\n",
             "functio f() → Pondero ⇥ Pondero {\n    redde Pondero { nuntius = \"x\" }\n}\n\n",
-            "incipit {\n    fixum ∪ r ← capta { f() }\n    nota r\n}\n",
+            "incipit {\n    sit ∪ r ← capta { f() }\n    nota r\n}\n",
         ),
         "trap_union_collapsed",
     );
@@ -205,7 +205,7 @@ fn trap_partial_overlap_stays_legal() {
     // shape the programmer declared.
     test_support::assert_accepts(concat!(
         "functio f() → numerus ⇥ numerus ∪ textus {\n    redde 1\n}\n\n",
-        "incipit {\n    fixum ∪ r ← capta { f() }\n    nota r\n}\n",
+        "incipit {\n    sit ∪ r ← capta { f() }\n    nota r\n}\n",
     ));
 }
 
@@ -220,7 +220,7 @@ fn trap_of_infallible_body_solves_degenerately_with_warn017() {
     // T ≡ E guard does not (nothing collapsed).
     let result = test_support::analyze_source(concat!(
         "functio f() → numerus {\n    redde 42\n}\n\n",
-        "incipit {\n    fixum ∪ r ← capta { f() }\n    nota r\n}\n",
+        "incipit {\n    sit ∪ r ← capta { f() }\n    nota r\n}\n",
     ));
     assert!(
         result.diagnostics.iter().any(|diag| !diag.is_error()

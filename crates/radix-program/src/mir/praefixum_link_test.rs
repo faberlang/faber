@@ -274,7 +274,7 @@ fn praefixum_link_endless_imported_callee_hits_the_step_limit() {
     write(
         dir,
         "consts.fab",
-        "@ public\nfn spin() → int {\n    var int i ← 0\n    while true {\n        i ← i + 1\n    }\n    return i\n}\n",
+        "@ public\nfn spin() → int {\n    mut int i ← 0\n    while true {\n        i ← i + 1\n    }\n    return i\n}\n",
     );
     write(
         dir,
@@ -327,7 +327,7 @@ fn praefixum_link_imported_genus_result_is_the_importers_own() {
     write(
         dir,
         "consts.fab",
-        "@ public\nclass Box {\n    var int n\n}\n",
+        "@ public\nclass Box {\n    mut int n\n}\n",
     );
     write(
         dir,
@@ -399,13 +399,13 @@ fn praefixum_link_method_call_evaluates_to_literal() {
     write(
         dir,
         "consts.fab",
-        "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n",
+        "@ public\nclass Box {\n    mut int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n",
     );
     write(
         dir,
         "main.fab",
         "import from \"./consts\" consts\n\n\
-         const int M = comptime {\n    const consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\n\
+         const int M = comptime {\n    let consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\n\
          main {\n    print M\n}\n",
     );
     let package = analyze(dir);
@@ -420,13 +420,13 @@ fn praefixum_link_method_that_prints_is_forbidden() {
     write(
         dir,
         "consts.fab",
-        "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        print 7\n        return self.n\n    }\n}\n",
+        "@ public\nclass Box {\n    mut int n\n\n    fn get() → int {\n        print 7\n        return self.n\n    }\n}\n",
     );
     write(
         dir,
         "main.fab",
         "import from \"./consts\" consts\n\n\
-         const int M = comptime {\n    const consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\n\
+         const int M = comptime {\n    let consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\n\
          main {\n    print M\n}\n",
     );
     let diagnostics = analyze_err(dir);
@@ -450,7 +450,7 @@ fn praefixum_link_method_homonym_genus_evaluates_in_its_own_home() {
     write(
         dir,
         "a.fab",
-        "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n",
+        "@ public\nclass Box {\n    mut int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n",
     );
     write(
         dir,
@@ -461,7 +461,7 @@ fn praefixum_link_method_homonym_genus_evaluates_in_its_own_home() {
         dir,
         "main.fab",
         "import from \"./a\" a\nimport from \"./b\" b\n\n\
-         const int M = comptime {\n    const a.Box x ← a.Box { n = 7 }\n    return x.get()\n}\n\n\
+         const int M = comptime {\n    let a.Box x ← a.Box { n = 7 }\n    return x.get()\n}\n\n\
          main {\n    print M\n}\n",
     );
     let package = analyze(dir);

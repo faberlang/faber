@@ -56,27 +56,27 @@ fn explora_bivalens(bool x) → string {
 
 main {
     # Null checking with est
-    const int ∪ none forsitan ← null
-    const _ nihil_est ← forsitan is none
+    let int ∪ none forsitan ← null
+    let nihil_est ← forsitan is none
     print nihil_est
 
     # Boolean true comparison with ≡
-    const _ enabled ← true
-    const _ verum_est ← enabled ≡ true
+    let enabled ← true
+    let verum_est ← enabled ≡ true
     print verum_est
 
     # Boolean false comparison with ≡
-    const _ disabled ← false
-    const _ falsum_est ← disabled ≡ false
+    let disabled ← false
+    let falsum_est ← disabled ≡ false
     print falsum_est
 
     # Chained with logical operators
-    const string ∪ none nomen ← null
-    const _ defectum_debet ← nomen is none and enabled ≡ true
+    let string ∪ none nomen ← null
+    let defectum_debet ← nomen is none and enabled ≡ true
     print defectum_debet
 
     # Parenthesized for clarity
-    const _ utraque_nihil ← forsitan is none and nomen is none
+    let utraque_nihil ← forsitan is none and nomen is none
     print utraque_nihil
 
     # Dynamic ignotum dispatch for nihil and exact boolean checks on bivalens
@@ -91,11 +91,11 @@ main {
     # not checked (width and element types are erased at Valor boxing time
     # by design — see docs/factory/est-variant-check/goal.md).
 
-    const value name ← "faber" ↦ value
-    const value quantitas ← 42 ↦ value
-    const value notae ← ["a", "b"] ↦ value
-    const value active ← true ↦ value
-    const value proportio ← 1.5 ↦ value
+    let value name ← "faber" ↦ value
+    let value quantitas ← 42 ↦ value
+    let value notae ← ["a", "b"] ↦ value
+    let value active ← true ↦ value
+    let value proportio ← 1.5 ↦ value
     assert name is string
     assert quantitas is int
     assert notae is list<value>

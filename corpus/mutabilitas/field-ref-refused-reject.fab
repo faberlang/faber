@@ -1,0 +1,26 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "genus_field_decl", "type_annotation", "base_type", "incipit_stmt", "block_stmt", "nota_stmt"]
+category = "binding"
+summary = "A field is read-only or writable per instance; ref cannot modify one."
+syntax = "class P { ref int x }"
+related = ["sit", "varia", "de", "genus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE010:ref_field_refused"
++++
+# =============================================================================
+# mutabilitas — ref is refused on fields
+# =============================================================================
+# A field is `let` (read-only after construction) or `mut` (reassignable).
+# `ref` names a re-pointable read-only view, which a field never is.
+
+class Punctum {
+    ref int x
+    mut int y
+}
+
+main {
+    print "unreachable"
+}

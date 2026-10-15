@@ -1,0 +1,22 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "binding"
+summary = "const is compile-time only: a run-time const declaration is retired (write let)."
+syntax = "const int x ← 5"
+related = ["sit", "varia", "de"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE010:runtime_const_retired"
++++
+# =============================================================================
+# mutabilitas — run-time const is retired
+# =============================================================================
+# `const` states a compile-time fact and goes with `=`. A run-time name that is
+# written once is `let`: `let int x ← 5`.
+
+main {
+    const int x ← 5
+    print x
+}

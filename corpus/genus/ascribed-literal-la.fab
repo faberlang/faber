@@ -27,8 +27,8 @@ genus Calc {
 }
 
 incipit {
-    fixum Calc a ← { flag = verum, bonus = nulla } ∷ Calc
-    fixum Calc b ← { flag = falsum }
+    sit Calc a ← { flag = verum, bonus = nulla } ∷ Calc
+    sit Calc b ← { flag = falsum }
     nota a.flag
     nota b.flag
     nota a.bonus

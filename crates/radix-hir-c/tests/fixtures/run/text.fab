@@ -13,16 +13,16 @@ fn quiet() → int {
 }
 
 main {
-    var int a ← 7
-    var string s ← "x"
+    mut int a ← 7
+    mut string s ← "x"
     print "a=§, s=§, again §0 §1"(a, s)
     print "§1-§0"(a, s)
     print "sum §, flag §, big §"(a + 1, a ≻ 3, a * 1000000000000)
-    var string t ← "<" + s + ">"
+    mut string t ← "<" + s + ">"
     print t
     print label("item", quiet())
-    var string acc ← ""
-    var int i ← 0
+    mut string acc ← ""
+    mut int i ← 0
     while i ≺ 5 {
         acc ← acc + "§,"(i)
         i ← i + 1

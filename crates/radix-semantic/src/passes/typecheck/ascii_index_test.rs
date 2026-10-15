@@ -54,8 +54,8 @@ fn rejects_with_issue(source: &str, issue: &str) {
 fn scalar_textus_index_infers_ascii() {
     accepts(
         r#"incipit {
-    fixum textus s ← "ab"
-    fixum ascii<1> c ← s[0]
+    sit textus s ← "ab"
+    sit ascii<1> c ← s[0]
     nota c
 }"#,
     );
@@ -66,8 +66,8 @@ fn scalar_textus_index_infers_ascii() {
 fn scalar_ascii_index_infers_littera() {
     accepts(
         r"incipit {
-    fixum ascii s ← 'ab'
-    fixum littera c ← s[1]
+    sit ascii s ← 'ab'
+    sit littera c ← s[1]
     nota c
 }",
     );
@@ -119,7 +119,7 @@ fn scalar_index_type_is_ascii_one_for_textus_littera_for_ascii() {
 fn scalar_index_eq_ascii_literals_compile() {
     accepts(
         r#"incipit {
-    fixum textus s ← "hello\nworld"
+    sit textus s ← "hello\nworld"
     si s[0] ≡ 'a' { nota "first" }
     si s[5] ≡ '\n' { nota "newline" }
     nota s
@@ -134,14 +134,14 @@ fn scalar_index_eq_ascii_literals_compile() {
 fn range_index_still_textus() {
     accepts(
         r#"incipit {
-    fixum textus s ← "hello"
-    fixum textus slice ← s[0‥2]
+    sit textus s ← "hello"
+    sit textus slice ← s[0‥2]
     nota slice
 }"#,
     );
     rejects_with_issue(
         r#"incipit {
-    fixum textus s ← "hello"
+    sit textus s ← "hello"
     si s[0‥2] ≡ 'h' { nota "bad" }
 }"#,
         EXACT_EQ_ISSUE,
@@ -154,7 +154,7 @@ fn range_index_still_textus() {
 fn scalar_index_eq_numerus_rejects_with_sem010() {
     let result = compile(
         r#"incipit {
-    fixum textus s ← "ab"
+    sit textus s ← "ab"
     si s[0] ≡ 97 { nota "bad" }
 }"#,
     );
@@ -176,11 +176,11 @@ fn scalar_index_eq_numerus_rejects_with_sem010() {
 #[test]
 fn ascii_literal_capacity_boundary() {
     accepts(&format!(
-        "incipit {{ fixum ascii ok ← '{}' nota ok }}",
+        "incipit {{ sit ascii ok ← '{}' nota ok }}",
         "a".repeat(64)
     ));
     accepts(&format!(
-        "incipit {{ fixum ascii big ← '{}' nota big }}",
+        "incipit {{ sit ascii big ← '{}' nota big }}",
         "a".repeat(65)
     ));
 }
@@ -190,11 +190,11 @@ fn ascii_literal_capacity_boundary() {
 #[test]
 fn bounded_ascii_literal_rejects_payload_over_capacity() {
     rejects_with_issue(
-        "incipit { fixum ascii<8> too_long ← 'abcdefghi' nota too_long }",
+        "incipit { sit ascii<8> too_long ← 'abcdefghi' nota too_long }",
         "ascii_literal_too_long",
     );
     accepts(&format!(
-        "incipit {{ fixum ascii<8> fits ← '{}' nota fits }}",
+        "incipit {{ sit ascii<8> fits ← '{}' nota fits }}",
         "a".repeat(8)
     ));
 }
@@ -203,8 +203,8 @@ fn bounded_ascii_literal_rejects_payload_over_capacity() {
 fn bounded_ascii_scalar_index_returns_littera() {
     accepts(
         r"incipit {
-    fixum ascii<8> source ← 'abc'
-    fixum littera c ← source[1]
+    sit ascii<8> source ← 'abc'
+    sit littera c ← source[1]
     nota c
 }",
     );
@@ -214,15 +214,15 @@ fn bounded_ascii_scalar_index_returns_littera() {
 fn bounded_ascii_capacity_widens_only_directionally() {
     accepts(
         r"incipit {
-    fixum ascii<8> narrow ← 'abc'
-    fixum ascii<16> wide ← narrow
+    sit ascii<8> narrow ← 'abc'
+    sit ascii<16> wide ← narrow
     nota wide
 }",
     );
     rejects_with_issue(
         r"incipit {
-    fixum ascii<16> wide ← 'abc'
-    fixum ascii<8> narrow ← wide
+    sit ascii<16> wide ← 'abc'
+    sit ascii<8> narrow ← wide
     nota narrow
 }",
         "incompatible_tensor_index",
@@ -233,10 +233,10 @@ fn bounded_ascii_capacity_widens_only_directionally() {
 fn bounded_ascii_d7_conversions_are_explicit() {
     accepts(
         r"incipit {
-    fixum ascii<8> bounded ← 'abc'
-    fixum ascii unbounded ← bounded ↦ ascii
-    fixum textus text ← bounded ↦ textus
-    fixum ascii<8> roundtrip ← unbounded ↦ ascii<8>
+    sit ascii<8> bounded ← 'abc'
+    sit ascii unbounded ← bounded ↦ ascii
+    sit textus text ← bounded ↦ textus
+    sit ascii<8> roundtrip ← unbounded ↦ ascii<8>
     nota roundtrip
 }",
     );
@@ -246,8 +246,8 @@ fn bounded_ascii_d7_conversions_are_explicit() {
 fn bounded_ascii_equivalence_stays_same_type_only() {
     rejects_with_issue(
         r"incipit {
-    fixum ascii<8> narrow ← 'abc'
-    fixum ascii<16> wide ← 'abc'
+    sit ascii<8> narrow ← 'abc'
+    sit ascii<16> wide ← 'abc'
     si narrow ≡ wide { nota 'same' }
 }",
         EXACT_EQ_ISSUE,
@@ -259,7 +259,7 @@ fn bounded_ascii_equivalence_stays_same_type_only() {
 fn ascii_unicode_escape_in_ascii_literal_checks() {
     accepts(
         r"incipit {
-    fixum ascii a ← '\u{41}'
+    sit ascii a ← '\u{41}'
     nota a
 }",
     );
@@ -270,7 +270,7 @@ fn ascii_unicode_escape_in_ascii_literal_checks() {
 fn ascii_unicode_escape_above_7f_is_invalid_escape() {
     rejects_with_issue(
         r"incipit {
-    fixum ascii a ← '\u{E9}'
+    sit ascii a ← '\u{E9}'
     nota a
 }",
         "ascii_literal_invalid_escape",

@@ -35,21 +35,21 @@ locale = "en"
 
 main {
     # Iterate over number lista
-    const list<int, 5> numeri ← [1, 2, 3, 4, 5]
-    for from numeri const n {
+    let list<int, 5> numeri ← [1, 2, 3, 4, 5]
+    for from numeri let n {
         print n
     }
 
     # Iterate over textus lista
-    const list<string, 3> nomina ← ["Marcus", "Julia", "Claudia"]
-    for from nomina const nomen {
+    let list<string, 3> nomina ← ["Marcus", "Julia", "Claudia"]
+    for from nomina let nomen {
         print nomen
     }
 
     # Transform values
-    const list<int, 3> valores ← [10, 20, 30]
-    for from valores const v {
-        const int duplex ← v * 2
+    let list<int, 3> valores ← [10, 20, 30]
+    for from valores let v {
+        let int duplex ← v * 2
         print duplex
     }
 }

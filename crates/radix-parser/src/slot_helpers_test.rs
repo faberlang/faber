@@ -42,7 +42,7 @@ impl KeywordPack for SlotTestPack {
             // end.
             "genus" => Some("genus"),
             "fn" => Some("functio"),
-            "var" => Some("varia"),
+            "mut" => Some("varia"),
             "if" => Some("si"),
             "then" => Some("ergo"),
             "return" => Some("redde"),
@@ -264,7 +264,7 @@ fn name_slots_accept_keyword_spellings_on_en_pack_surface() {
         assert_eq!(param, expected, "parameter surface spelling for {source}");
     }
 
-    let bind = parse_ok_with_slot_pack("var string read ← \"data\"\n");
+    let bind = parse_ok_with_slot_pack("mut string read ← \"data\"\n");
     let program = bind.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -283,7 +283,7 @@ fn localized_type_spelling_after_initialized_field_is_not_an_operand() {
     // and the retired `true`-prefix predicate check fired (PARSE001) on
     // `bool visible = true` followed by `string name`.
     let mut parser =
-        parser_over_with_pack("genus X {\n    var bool visible = true\n    var string name\n}\n");
+        parser_over_with_pack("genus X {\n    mut bool visible = true\n    mut string name\n}\n");
     let result = parser.parse_program();
     assert!(
         result.errors.is_empty(),
@@ -299,7 +299,7 @@ fn statement_terminal_literal_is_not_a_retired_predicate() {
     // fired PARSE001. A literal in operand position is a value; only a
     // statement-start literal followed by an operand is the retired form.
     let mut parser = parser_over_with_pack(
-        "genus X {\n    fn f() → bool {\n        var int j ← 0\n        if j ≡ 1 then return false\n        j ← j + 1\n        return true\n    }\n}\n",
+        "genus X {\n    fn f() → bool {\n        mut int j ← 0\n        if j ≡ 1 then return false\n        j ← j + 1\n        return true\n    }\n}\n",
     );
     let result = parser.parse_program();
     assert!(
@@ -350,7 +350,7 @@ fn vacua_claim_is_surface_gated() {
     // Pack-authoritative (non-`la` pack): the pack does not declare `vacua`,
     // so the undeclared Latin spelling is an ordinary identifier expression
     // and must not claim the empty-collection marker.
-    let mut parser = parser_over_with_pack("var list words ← vacua");
+    let mut parser = parser_over_with_pack("mut list words ← vacua");
     let result = parser.parse_program();
     assert!(
         result.errors.is_empty(),

@@ -86,7 +86,7 @@ incipit = "incipit"
 ad = "ad"
 de = "de"
 ex = "ex"
-in = "in"
+in = "varia"
 own = "penes"
 copy = "exemplum"
 axis = "axis"
@@ -431,11 +431,11 @@ help = "use \"arena\" or \"page\" as the allocator kind"
 
 [diagnostics.PARSE001.issues.mutability_marker]
 message = "expected {expected}"
-help = "add fixum or varia before the binding name"
+help = "add sit or varia before the binding name"
 
 [diagnostics.PARSE001.issues.itera_de_requires_fixum]
-message = "itera de bindings are always const; use {expected}"
-help = "de binds an index or key, not a mutable element; use the const form"
+message = "itera de bindings are always fixed; use {expected}"
+help = "de binds an index or key, not a mutable element; use the sit form"
 
 [diagnostics.PARSE001.issues.duplicate_rest_pattern]
 message = "rest pattern already specified"
@@ -443,11 +443,7 @@ help = "keep only one '{keyword}' rest binding"
 
 [diagnostics.PARSE001.issues.sit_identifier_binding]
 message = "'{keyword}' binds one identifier directly; use '{keyword}' name ← expr"
-help = "write '{keyword}' name ← expr or use fixum for typed/destructured bindings"
-
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit does not support destructuring patterns"
-help = "use fixum with a destructuring pattern"
+help = "write '{keyword}' name ← expr or use sit with a type or a destructuring pattern"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "expected test case or setup"
@@ -584,7 +580,7 @@ help = "put a number after '-' in JSON"
 
 [diagnostics.PARSE002.issues.conversio_assign_requires_concrete_type]
 message = "conversion-directed assignment '↤' requires a concrete destination type"
-help = "write a concrete type for the binding, e.g. 'fixum numerus x ↤ value'"
+help = "write a concrete type for the binding, e.g. 'sit numerus x ↤ value'"
 
 [diagnostics.PARSE002.issues.conversio_assign_await_unsupported]
 message = "'↤' is not supported on awaited bindings"
@@ -638,6 +634,42 @@ help = "declare the method on a genus instead"
 message = "the module-level `{keyword}` declaration was removed; `{name}` is a constant"
 help = "write `{fixum} T {name} = …`; a module-level constant is spelled like a local one, and `{generis}` remains only the genus field modifier"
 
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "a run-time `{keyword}` declaration was retired; `{name}` is a run-time name"
+help = "write `{sit} T {name} ← …` (or `{sit} {name} ← …` to infer the type); `{fixum}` states a compile-time fact and goes with `=`"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "a `{keyword}` binder was retired"
+help = "binders take `{sit}` (a fixed name) or `{varia}` (a writable name); `{fixum}` states a compile-time fact and goes with `=`"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` cannot introduce a binder"
+help = "a binder names a value per iteration or match; write `{sit}` for a fixed name or `{varia}` for a writable one"
+
+[diagnostics.PARSE010.issues.field_fixum_retired]
+message = "a `{keyword}` field modifier was retired"
+help = "a read-only field is spelled `{sit}`; `{fixum}` states a compile-time fact and goes with `=`"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` cannot modify a field"
+help = "a field is read-only (`{sit}`) or writable (`{varia}`); `{generis}` makes it per-type"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "a `{keyword}` local needs a place to read: `{keyword} T name ← place`"
+help = "write `{keyword} T name ← place`, or use `{sit}` or `{varia}` for a name without an initial place"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "a `{keyword}` local binds one name; it cannot destructure"
+help = "write `{keyword} T name ← place`, then read the parts through the name"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "a `{keyword}` local reads a place and cannot take a `{marker}` value"
+help = "write `{keyword} T name ← place` to read a place, or `{sit} T name ← {marker} place` for an independent value"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "the `{keyword}` declaration word was retired; `{name}` is a writable name"
+help = "write `{varia} T {name} ← …`; the writable run-time name is `{varia}`"
+
 [diagnostics.PARSE010.issues.varia_compile_time_initializer]
 message = "a {varia} binding cannot be a compile-time constant; `=` states a compile-time fact and `←` stores at runtime"
 help = "write `{varia} T name ← value` for a mutable binding, or `{fixum} T name = value` for a constant"
@@ -647,12 +679,12 @@ message = "a compile-time constant binds one name; `=` cannot initialize a destr
 help = "write `{fixum} T name = value`, or destructure with `←`"
 
 [diagnostics.PARSE010.issues.field_modifier_repeated]
-message = "a field takes exactly one of {fixum}, {varia} or {generis}"
+message = "a field takes exactly one of {sit}, {varia} or {generis}"
 help = "keep one modifier; a {generis} field is already immutable"
 
 [diagnostics.PARSE010.issues.field_modifier_missing]
-message = "a {genus} field must declare {fixum}, {varia} or {generis}"
-help = "write `{varia} T name` to keep today's meaning (or {fixum} when never reassigned); `faber field-modifier-codemod <PATH>` migrates whole files"
+message = "a {genus} field must declare {sit}, {varia} or {generis}"
+help = "write `{varia} T name` to keep today's meaning (or {sit} when never reassigned); `faber field-modifier-codemod <PATH>` migrates whole files"
 
 [diagnostics.PARSE010.issues.module_declaration_misplaced]
 message = "a {regio} declaration must be the first declaration of the file, before any {importa}"
@@ -868,7 +900,7 @@ help = "scribe `{replacement}` pro `{glyph}`; omne signum negationis easdem line
 
 [diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
 message = "expressio ordinata vel reducta fons itera esse non potest"
-help = "liga eam prius ad nomen, deinde itera per nomen: `fixum lista<numerus> ys ← ordinata via ascendens ex xs`, deinde `itera ex ys fixum x`"
+help = "liga eam prius ad nomen, deinde itera per nomen: `sit lista<numerus> ys ← ordinata via ascendens ex xs`, deinde `itera ex ys fixum x`"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
@@ -2129,7 +2161,7 @@ help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.conversio_assign_inference_hole_destination]
 message = "conversion-directed assignment '↤' requires a resolved destination type"
-help = "write a concrete type for the destination, e.g. 'fixum numerus x ↤ value'"
+help = "write a concrete type for the destination, e.g. 'sit numerus x ↤ value'"
 
 [diagnostics.SEM010.issues.cursor_iteration_requires_ex]
 message = "cursor iteration supports {itera} {ex} only"
@@ -3852,8 +3884,8 @@ message = "assignment to commune field"
 help = "commune fields are read-only through the union projection"
 
 [diagnostics.SEM020.issues.assignment_to_fixum_field]
-message = "assignment to {fixum} field '{field}'"
-help = "a {fixum} field is set only in a construction literal; declare it {varia} to allow reassignment"
+message = "assignment to {sit} field '{field}'"
+help = "a {sit} field is set only in a construction literal; declare it {varia} to allow reassignment"
 
 [diagnostics.SEM020.issues.union_member_not_varia]
 message = "union field '{member}' is not {varia} in: {members}"
@@ -4052,8 +4084,8 @@ message = "assignment to immutable borrow"
 help = "declare the parameter as '{in}' if mutation is intended"
 
 [diagnostics.SEM056.issues.assign_to_de_parameter]
-message = "cannot assign to `de` parameter"
-help = "declare the parameter as '{in}' if mutation is intended"
+message = "cannot write through a `ref` or unmarked parameter"
+help = "declare the parameter '{in}' if the caller's value should change; re-pointing the name is allowed"
 
 [diagnostics.SEM056.issues.assign_to_nonmut_tensor_param]
 message = "cannot write through tensor parameter{?name| '|'} that is not marked `mut`"

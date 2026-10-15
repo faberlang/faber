@@ -31,7 +31,7 @@ fn intrinsic_methods_check_on_applied_alias_receivers() {
     test_support::assert_accepts(&format!(
         "{LOCAL_ALIASES}\
 functio probe(Vector<3> a, Vector<3> b) → f32 {{
-    fixum Vector<3> swapped ← a.swizzle(\"zyx\")
+    sit Vector<3> swapped ← a.swizzle(\"zyx\")
     redde a.addita(b).productum(a) + swapped.productum(a) + a.transversum(b).productum(a)
 }}"
     ));
@@ -42,9 +42,9 @@ fn glyph_operators_check_on_applied_alias_operands() {
     test_support::assert_accepts(&format!(
         "{LOCAL_ALIASES}\
 functio probe(Vector<3> a, Vector<2> b) → f32 {{
-    fixum Matrix<3, 2> outer ← a ⊗ b
-    fixum Matrix<2, 3> inner ← b ⊗ a
-    fixum Matrix<3, 3> product ← outer · inner
+    sit Matrix<3, 2> outer ← a ⊗ b
+    sit Matrix<2, 3> inner ← b ⊗ a
+    sit Matrix<3, 3> product ← outer · inner
     redde (product · a).productum(a)
 }}"
     ));
@@ -55,9 +55,9 @@ fn literal_conversio_targets_applied_alias() {
     test_support::assert_accepts(&format!(
         "{LOCAL_ALIASES}\
 functio probe() → f32 {{
-    fixum Vector<2> a ← [1.0, 2.0] ↦ Vector<2>
-    fixum Vector<3> b ← [1.0, 2.0, 3.0] ↦ Vector<3>
-    fixum Vector<4> c ← [1.0, 2.0, 3.0, 4.0] ↦ Vector<4>
+    sit Vector<2> a ← [1.0, 2.0] ↦ Vector<2>
+    sit Vector<3> b ← [1.0, 2.0, 3.0] ↦ Vector<3>
+    sit Vector<4> c ← [1.0, 2.0, 3.0, 4.0] ↦ Vector<4>
     redde a.productum(a) + b.productum(b) + c.productum(c)
 }}"
     ));
@@ -70,9 +70,9 @@ fn builtin_value_assigns_to_alias_annotation() {
     test_support::assert_accepts(&format!(
         "{LOCAL_ALIASES}\
 functio probe() → f32 {{
-    fixum vector<f32, 4> s ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
-    fixum vector<f32, 3> t ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    fixum Matrix<4, 3> outer ← s ⊗ t
+    sit vector<f32, 4> s ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    sit vector<f32, 3> t ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    sit Matrix<4, 3> outer ← s ⊗ t
     redde (outer · t).productum(s)
 }}"
     ));
@@ -87,9 +87,9 @@ functio addita2<magnitudo N>(Vector<N> a, Vector<N> b) → Vector<N> {{
 }}
 
 functio probe() → f32 {{
-    fixum Vector<2> a ← [1.0, 2.0] ↦ Vector<2>
-    fixum Vector<2> b ← [2.0, 4.0] ↦ Vector<2>
-    fixum Vector<2> s ← addita2(a, b)
+    sit Vector<2> a ← [1.0, 2.0] ↦ Vector<2>
+    sit Vector<2> b ← [2.0, 4.0] ↦ Vector<2>
+    sit Vector<2> s ← addita2(a, b)
     redde s.productum(b)
 }}"
     ));
@@ -106,8 +106,8 @@ functio transversum3(Vector<3> a, Vector<3> b) → Vector<3> {{
 }}
 
 functio probe() → f32 {{
-    fixum Vector<3> a ← [1.0, 2.0, 3.0] ↦ Vector<3>
-    fixum Vector<3> x ← transversum3(a, a)
+    sit Vector<3> a ← [1.0, 2.0, 3.0] ↦ Vector<3>
+    sit Vector<3> x ← transversum3(a, a)
     redde x.productum(a)
 }}"
     ));
@@ -124,7 +124,7 @@ fn wrong_width_literal_conversio_keeps_builtin_diagnostic() {
         &format!(
             "{LOCAL_ALIASES}\
 functio probe() → f32 {{
-    fixum Vector<3> v ← [1.0, 2.0] ↦ Vector<3>
+    sit Vector<3> v ← [1.0, 2.0] ↦ Vector<3>
     redde v.productum(v)
 }}"
         ),
@@ -138,9 +138,9 @@ fn builtin_to_alias_wrong_width_assignment_still_rejects() {
         &format!(
             "{LOCAL_ALIASES}\
 functio probe() → f32 {{
-    fixum vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    fixum vector<f32, 4> t ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
-    fixum Matrix<4, 3> bad ← s ⊗ t
+    sit vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    sit vector<f32, 4> t ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    sit Matrix<4, 3> bad ← s ⊗ t
     redde bad.productum(bad)
 }}"
         ),
@@ -158,9 +158,9 @@ functio addita2<magnitudo N>(Vector<N> a, Vector<N> b) → Vector<N> {{
 }}
 
 functio probe() → f32 {{
-    fixum Vector<2> a ← [1.0, 2.0] ↦ Vector<2>
-    fixum Vector<3> b ← [1.0, 2.0, 3.0] ↦ Vector<3>
-    fixum Vector<2> s ← addita2(a, b)
+    sit Vector<2> a ← [1.0, 2.0] ↦ Vector<2>
+    sit Vector<3> b ← [1.0, 2.0, 3.0] ↦ Vector<3>
+    sit Vector<2> s ← addita2(a, b)
     redde s.productum(a)
 }}"
         ),
@@ -253,9 +253,9 @@ fn imported_alias_application_is_value_transparent() {
         r#"importa ex "./gmt" gmt
 
 functio probe() → f32 {
-    fixum vector<f32, 4> s ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
-    fixum vector<f32, 3> t ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    fixum gmt.Matrix<4, 3> outer ← s ⊗ t
+    sit vector<f32, 4> s ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    sit vector<f32, 3> t ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    sit gmt.Matrix<4, 3> outer ← s ⊗ t
     redde (outer · t).productum(s)
 }"#,
     );
@@ -272,9 +272,9 @@ fn imported_alias_wrong_width_still_rejects() {
         r#"importa ex "./gmt" gmt
 
 functio probe() → f32 {
-    fixum vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    fixum vector<f32, 4> t ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
-    fixum gmt.Matrix<4, 3> bad ← s ⊗ t
+    sit vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    sit vector<f32, 4> t ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    sit gmt.Matrix<4, 3> bad ← s ⊗ t
     redde (bad · t).productum(t)
 }"#,
     );

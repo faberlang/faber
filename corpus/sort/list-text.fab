@@ -8,7 +8,7 @@ canonical = true
 +++
 # Text sorts by code point: uppercase before lowercase, accents after ASCII.
 incipit {
-    fixum lista<textus> names ← ["marcus", "Livia", "aulus", "Cornelia", "émilia"]
+    sit lista<textus> names ← ["marcus", "Livia", "aulus", "Cornelia", "émilia"]
     nota ordinata via ascendens ex names
     nota ordinata via descendens ex names
     nota names

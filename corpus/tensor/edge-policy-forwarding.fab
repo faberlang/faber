@@ -31,9 +31,9 @@ fn resolve_shift<P>(tf32[3] source) → tf32[3] {
 }
 
 main {
-    const tf32[3] source ← [1.0, 2.0, 3.0] ↦ tf32[3]
-    const tf32[3] generic_clamp ← resolve_shift<clamp>(source)
-    const tf32[3] generic_custom ← resolve_shift<ZeroGhost>(source)
+    let tf32[3] source ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    let tf32[3] generic_clamp ← resolve_shift<clamp>(source)
+    let tf32[3] generic_custom ← resolve_shift<ZeroGhost>(source)
     print generic_clamp.flatten()
     print generic_custom.flatten()
 }

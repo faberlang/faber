@@ -43,7 +43,7 @@ fn assert_constructs_genus(source: &str, fields: usize) {
 #[test]
 fn keyed_literal_ascribed_to_genus_constructs_the_genus() {
     assert_constructs_genus(
-        &format!("{GENUS} incipit {{ fixum P p ← {{ x = 1, y = 2 }} ∷ P nota p.x }}"),
+        &format!("{GENUS} incipit {{ sit P p ← {{ x = 1, y = 2 }} ∷ P nota p.x }}"),
         2,
     );
 }
@@ -51,7 +51,7 @@ fn keyed_literal_ascribed_to_genus_constructs_the_genus() {
 #[test]
 fn inferred_constructor_ascribed_to_genus_constructs_the_genus() {
     assert_constructs_genus(
-        &format!("{GENUS} incipit {{ fixum P p ← _ {{ x = 1 }} ∷ P nota p.x }}"),
+        &format!("{GENUS} incipit {{ sit P p ← _ {{ x = 1 }} ∷ P nota p.x }}"),
         1,
     );
 }
@@ -59,7 +59,7 @@ fn inferred_constructor_ascribed_to_genus_constructs_the_genus() {
 #[test]
 fn unknown_field_literal_ascribed_to_genus_is_named_error() {
     test_support::assert_rejects_with_issue_la(
-        &format!("{GENUS} incipit {{ fixum P p ← {{ bogus = 1 }} ∷ P nota p.x }}"),
+        &format!("{GENUS} incipit {{ sit P p ← {{ bogus = 1 }} ∷ P nota p.x }}"),
         "unknown_field",
     );
 }
@@ -68,7 +68,7 @@ fn unknown_field_literal_ascribed_to_genus_is_named_error() {
 fn missing_required_field_literal_ascribed_to_genus_is_named_error() {
     const REQUIRED: &str = "genus Q { varia numerus x varia numerus y = 0 }";
     test_support::assert_rejects_with_issue_la(
-        &format!("{REQUIRED} incipit {{ fixum Q q ← {{ y = 1 }} ∷ Q nota q.y }}"),
+        &format!("{REQUIRED} incipit {{ sit Q q ← {{ y = 1 }} ∷ Q nota q.y }}"),
         "missing_required_struct_field",
     );
 }
@@ -76,7 +76,7 @@ fn missing_required_field_literal_ascribed_to_genus_is_named_error() {
 #[test]
 fn quoted_key_literal_ascribed_to_genus_is_named_error() {
     test_support::assert_rejects_with_issue_la(
-        &format!("{GENUS} incipit {{ fixum P p ← {{ \"x\": 1 }} ∷ P nota p.x }}"),
+        &format!("{GENUS} incipit {{ sit P p ← {{ \"x\": 1 }} ∷ P nota p.x }}"),
         "inferred_constructor_entries_need_map",
     );
 }
@@ -84,6 +84,6 @@ fn quoted_key_literal_ascribed_to_genus_is_named_error() {
 #[test]
 fn quoted_key_literal_ascribed_to_map_is_still_accepted() {
     test_support::assert_accepts_la(
-        "incipit { fixum tabula<textus, numerus> m ← { \"a\": 1 } ∷ tabula<textus, numerus> nota m }",
+        "incipit { sit tabula<textus, numerus> m ← { \"a\": 1 } ∷ tabula<textus, numerus> nota m }",
     );
 }

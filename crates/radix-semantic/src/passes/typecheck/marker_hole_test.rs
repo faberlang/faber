@@ -69,8 +69,8 @@ fn resolve_interns_marker_holes() {
 #[test]
 fn the_numeric_marker_holes_are_retired_with_the_wrapper() {
     for source in [
-        "incipit {\n    fixum numerus<_> n ← 1\n    nota n\n}",
-        "incipit {\n    fixum fractus<_> x ← 1.0\n    nota x\n}",
+        "incipit {\n    sit numerus<_> n ← 1\n    nota n\n}",
+        "incipit {\n    sit fractus<_> x ← 1.0\n    nota x\n}",
         "functio k() → numerus<_> {\n    tacet\n}",
     ] {
         test_support::assert_rejects_with_issue_la(source, "numeric_wrapper_retired");
@@ -81,7 +81,7 @@ fn the_numeric_marker_holes_are_retired_with_the_wrapper() {
 fn bare_numerus_still_accepts_i32_via_default_path() {
     test_support::assert_accepts_la(
         r"incipit {
-    fixum numerus n ← 1 ∷ i32
+    sit numerus n ← 1 ∷ i32
     nota n
 }",
     );
@@ -91,8 +91,8 @@ fn bare_numerus_still_accepts_i32_via_default_path() {
 fn modulus_hole_solves_exact_width() {
     test_support::assert_analysis_accepts_la(
         r"incipit {
-    fixum modulus<_> m ← 1 ∷ modulus<u32>
-    fixum modulus<u32> n ← m
+    sit modulus<_> m ← 1 ∷ modulus<u32>
+    sit modulus<u32> n ← m
     nota n
 }",
     );
@@ -102,7 +102,7 @@ fn modulus_hole_solves_exact_width() {
 fn instans_hole_solves_exact_precision() {
     test_support::assert_analysis_accepts_la(
         r"functio pin(instans<ms> t) → instans<ms> {
-    fixum instans<_> hole ← t
+    sit instans<_> hole ← t
     redde hole
 }",
     );
@@ -112,7 +112,7 @@ fn instans_hole_solves_exact_precision() {
 fn modulus_hole_interns_u32() {
     let unit = test_support::analyze_ok_la(
         r"incipit {
-    fixum modulus<_> m ← 1 ∷ modulus<u32>
+    sit modulus<_> m ← 1 ∷ modulus<u32>
     nota m
 }",
     );
@@ -129,7 +129,7 @@ fn modulus_hole_interns_u32() {
 fn modulus_hole_rejects_signed_numerus() {
     test_support::assert_analysis_rejects_with_issue_la(
         r"incipit {
-    fixum modulus<_> m ← 1 ∷ i32
+    sit modulus<_> m ← 1 ∷ i32
     nota m
 }",
         "expression_type_mismatch",
@@ -140,7 +140,7 @@ fn modulus_hole_rejects_signed_numerus() {
 fn instans_hole_interns_millis() {
     let unit = test_support::analyze_ok_la(
         r"functio pin(instans<ms> t) → vacuum {
-    fixum instans<_> hole ← t
+    sit instans<_> hole ← t
     nota hole
 }",
     );
@@ -166,7 +166,7 @@ fn instans_hole_interns_millis() {
 fn instans_hole_rejects_numerus_witness() {
     test_support::assert_rejects_with_issue_la(
         r"incipit {
-    fixum instans<_> t ← 1
+    sit instans<_> t ← 1
     nota t
 }",
         "expression_type_mismatch",
@@ -177,7 +177,7 @@ fn instans_hole_rejects_numerus_witness() {
 fn instans_hole_from_bare_stays_seconds() {
     let unit = test_support::analyze_ok_la(
         r"functio pin(instans t) → vacuum {
-    fixum instans<_> hole ← t
+    sit instans<_> hole ← t
     nota hole
 }",
     );

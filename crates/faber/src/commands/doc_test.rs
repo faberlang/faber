@@ -67,7 +67,7 @@ fn statement_comments_inside_bodies_are_never_extracted() {
 #[test]
 fn genus_members_render_under_their_type_unless_privata() {
     let file = doc_for(
-        "# A point.\n@ publica\ngenus Punctum {\n    # Horizontal.\n    fixum numerus x\n    @ privata\n    fixum numerus secretum\n    @ interna\n    fixum numerus intra\n\n    # Length from origin.\n    functio longitudo() → numerus {\n        redde ego.x\n    }\n}\n",
+        "# A point.\n@ publica\ngenus Punctum {\n    # Horizontal.\n    sit numerus x\n    @ privata\n    sit numerus secretum\n    @ interna\n    sit numerus intra\n\n    # Length from origin.\n    functio longitudo() → numerus {\n        redde ego.x\n    }\n}\n",
     );
     let punctum = item(&file, "Punctum");
     assert_eq!(punctum.kind, "genus");
@@ -86,7 +86,7 @@ fn genus_members_render_under_their_type_unless_privata() {
         ]
     );
     assert_eq!(punctum.members[0].doc.as_deref(), Some("Horizontal."));
-    assert_eq!(punctum.members[0].signature, "fixum numerus x");
+    assert_eq!(punctum.members[0].signature, "sit numerus x");
     assert_eq!(
         punctum.members[2].signature,
         "functio longitudo() → numerus"

@@ -33,13 +33,13 @@ locale = "en"
 #   3
 
 main {
-    const inf x ← 5
-    const list<inf> xs ← [x, x]
+    let inf x ← 5
+    let list<inf> xs ← [x, x]
     print xs.length()
     print x
 
-    const string s ← "hi"
-    const list<string> ss ← [s, s, s]
+    let string s ← "hi"
+    let list<string> ss ← [s, s, s]
     print ss.length() - 1
     print s
     print ss.length()

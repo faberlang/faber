@@ -267,9 +267,9 @@ functio computa(numerus x) → numerus {
 }
 
 incipit {
-    fixum Event event ← finge Click { x = 7 }
+    sit Event event ← finge Click { x = 7 }
     discerne event {
-        casu Click fixum x { nota computa(x) }
+        casu Click sit x { nota computa(x) }
         casu Quit { nota "quit" }
     }
 }
@@ -280,7 +280,7 @@ fn aux_equivalence_source() -> &'static str {
     r"
 @ publica
 functio auxilia(numerus x) → numerus {
-    fixum numerus duplum ← x * 2
+    sit numerus duplum ← x * 2
     redde duplum + 1
 }
 "
@@ -915,7 +915,7 @@ fn device_callee_in_a_copy_into_value_is_recorded() {
 functio emit(tf32[4] x) → tf32[4] { redde x }
 
 @ nucleum
-functio k(tf32[4] x, in tf32[4] out) → vacuum {
+functio k(tf32[4] x, varia tf32[4] out) → vacuum {
     out ⇇ emit(x)
 }
 ",

@@ -48,7 +48,7 @@ main {
     print describe(1.0)
 
     # The same negative literals work on a local value.
-    const int floor ← -3
+    let int floor ← -3
     switch floor {
         case -3 {
             print "basement three"

@@ -34,12 +34,12 @@ locale = "en"
 #   fac-dum.expected
 
 main {
-    var int counter ← 0
+    mut int counter ← 0
     do {
         counter ← counter + 1
         print "Iteration §"(counter)
     } while counter ≺ 3
-    var int attempts ← 0
+    mut int attempts ← 0
     do {
         attempts ← attempts + 1
         print "Attempt §"(attempts)

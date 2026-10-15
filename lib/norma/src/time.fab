@@ -29,7 +29,7 @@ fn pad2(int n) → string {
 # Why: Pad a year (or similar) to four decimal digits on the wire.
 @ private
 fn pad4(int n) → string {
-    var string out ↤ n
+    mut string out ↤ n
     while out.length() ≺ 4 {
         out ← "0§"(out)
     }
@@ -39,7 +39,7 @@ fn pad4(int n) → string {
 # Why: Slice a fixed wire substring and parse it as a civil integer field.
 @ private
 fn field(instant t, int start, int end) → int {
-    const string wire ↤ t
+    let string wire ↤ t
     # An instant's canonical wire has digits at every civil position, so the default never applies.
     return wire.slice(start, end) ↦ int ⊥ 0
 }
@@ -114,7 +114,7 @@ fn second(instant t) → int {
 # Why: midnight UTC from calendar date; invalid civil input throws.
 @ public
 fn construct(int year, int month, int day) → instant ⇥ string {
-    const string wire_text ← wire(year, month, day, 0, 0, 0)
+    let string wire_text ← wire(year, month, day, 0, 0, 0)
     return wire_text ↦ instant
 }
 
@@ -122,7 +122,7 @@ fn construct(int year, int month, int day) → instant ⇥ string {
 # Why: UTC instant from all civil components; invalid input throws.
 @ public
 fn construct_moment(int year, int month, int day, int hour, int minute, int second) → instant ⇥ string {
-    const string wire_text ← wire(year, month, day, hour, minute, second)
+    let string wire_text ← wire(year, month, day, hour, minute, second)
     return wire_text ↦ instant
 }
 
@@ -181,7 +181,7 @@ fn sleep(int ms) → void {
 # the opener is a `Ticker` handle: each `next` sleeps then yields `now`.
 @ public
 class Ticker {
-    var int period_ms = 0
+    mut int period_ms = 0
 
     fn next() → instant<ns> {
         return tick(self)

@@ -74,7 +74,7 @@ fn float_policy_cells_compare_against_a_literal_under_exact_equality() {
 
 #[test]
 fn policy_cell_literal_equality_holds_in_an_if_condition() {
-    assert_accepts("main {\n    const saturating<u8> x ← 250\n    if x ≡ 250 {\n        print \"eq\"\n    }\n}\n");
+    assert_accepts("main {\n    let saturating<u8> x ← 250\n    if x ≡ 250 {\n        print \"eq\"\n    }\n}\n");
 }
 
 #[test]

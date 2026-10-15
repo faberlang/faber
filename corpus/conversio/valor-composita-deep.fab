@@ -34,52 +34,52 @@ locale = "en"
 #   valor-composita-deep.expected — one line per print.
 
 class Punctum {
-    var int x
-    var int y
+    mut int x
+    mut int y
 }
 
 class Linea {
-    var string nomen
-    var list<Punctum> puncta
+    mut string nomen
+    mut list<Punctum> puncta
 }
 
 class Figura {
-    var Linea basis
-    var list<int> notae
+    mut Linea basis
+    mut list<int> notae
 }
 
 main {
     # 1. A genus nested in a genus or a lista keeps its fields at every depth.
-    const Punctum punctum ← Punctum { x = 3, y = 4 }
-    const Linea linea ← Linea { nomen = "recta", puncta = [punctum] }
-    const value boxedLinea ← linea ↦ value
+    let Punctum punctum ← Punctum { x = 3, y = 4 }
+    let Linea linea ← Linea { nomen = "recta", puncta = [punctum] }
+    let value boxedLinea ← linea ↦ value
     print boxedLinea
-    const Linea backLinea ← boxedLinea ↦ Linea
+    let Linea backLinea ← boxedLinea ↦ Linea
     print backLinea.nomen
     print backLinea.puncta.length()
-    const Figura figura ← Figura { basis = linea, notae = [1, 2] }
-    const value boxedFigura ← figura ↦ value
+    let Figura figura ← Figura { basis = linea, notae = [1, 2] }
+    let value boxedFigura ← figura ↦ value
     print boxedFigura
-    const Figura backFigura ← boxedFigura ↦ Figura
+    let Figura backFigura ← boxedFigura ↦ Figura
     print backFigura.basis.nomen
-    const list<Punctum> ordo ← [punctum]
-    const value boxedOrdo ← ordo ↦ value
+    let list<Punctum> ordo ← [punctum]
+    let value boxedOrdo ← ordo ↦ value
     print boxedOrdo
-    const list<Punctum> backOrdo ← boxedOrdo ↦ list<Punctum>
+    let list<Punctum> backOrdo ← boxedOrdo ↦ list<Punctum>
     print backOrdo.length()
 
     # 2. Integer elements widen to float; the wrong shape takes the recovery.
-    const list<int> numeri ← [1, 2]
-    const value boxedNumeri ← numeri ↦ value
-    const list<float> widened ← boxedNumeri ↦ list<float>
+    let list<int> numeri ← [1, 2]
+    let value boxedNumeri ← numeri ↦ value
+    let list<float> widened ← boxedNumeri ↦ list<float>
     print widened
-    const list<string> wrong ← boxedNumeri ↦ list<string> ⊥ ["none"]
+    let list<string> wrong ← boxedNumeri ↦ list<string> ⊥ ["none"]
     print wrong
-    const Punctum missing ← boxedNumeri ↦ Punctum ⊥ punctum
+    let Punctum missing ← boxedNumeri ↦ Punctum ⊥ punctum
     print missing.x
 
     # 3. A tensor behind a valor prints as the flat list of its elements.
-    const tensor<f32, [2]> grid ← [1.5, 2.5] ↦ tensor<f32, [2]>
-    const value boxedGrid ← grid ↦ value
+    let tensor<f32, [2]> grid ← [1.5, 2.5] ↦ tensor<f32, [2]>
+    let value boxedGrid ← grid ↦ value
     print boxedGrid
 }

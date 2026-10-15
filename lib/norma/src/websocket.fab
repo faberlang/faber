@@ -19,7 +19,7 @@ fn fault_from(value raw) → fault.IoFault {
 
 @ public
 class Socket {
-    var int id = 0
+    mut int id = 0
 
     fn send(string text) → void ⇥ fault.IoFault {
         return send_text(self, text)
@@ -36,13 +36,13 @@ class Socket {
 
 @ public
 fn connect(string url) → Socket ⇥ fault.IoFault {
-    const int id ↤ call 'websocket:connect' ([url ↦ value])
+    let int id ↤ call 'websocket:connect' ([url ↦ value])
     return Socket { id = id }
 }
 
 @ public
 fn connect_tls(string url, string ca_path) → Socket ⇥ fault.IoFault {
-    const int id ↤ call 'websocket:connect' ([url ↦ value, ca_path ↦ value])
+    let int id ↤ call 'websocket:connect' ([url ↦ value, ca_path ↦ value])
     return Socket { id = id }
 }
 
@@ -63,7 +63,7 @@ fn connect_finish(Socket socket) → void ⇥ fault.IoFault {
 
 @ public
 fn accept(string request_id) → Socket ⇥ fault.IoFault {
-    const int id ↤ call 'websocket:accept' ([request_id ↦ value])
+    let int id ↤ call 'websocket:accept' ([request_id ↦ value])
     return Socket { id = id }
 }
 
@@ -75,10 +75,10 @@ fn send_text(Socket socket, string text) → void ⇥ fault.IoFault {
 # A clean close is a `done` frame today (not a `Closed` error).
 @ public
 fn receive_text(Socket socket) → string ∪ none ⇥ fault.IoFault {
-    const value raw ← call 'websocket:receive' ([socket.id ↦ value]) ↦ value
+    let value raw ← call 'websocket:receive' ([socket.id ↦ value]) ↦ value
     do {
-        const map<string, value> fields ↤ raw
-        const bool done ← fields["done"] ↦ bool ⊥ false
+        let map<string, value> fields ↤ raw
+        let bool done ← fields["done"] ↦ bool ⊥ false
         if done then return null
         return fields["text"] ↦ string
     }

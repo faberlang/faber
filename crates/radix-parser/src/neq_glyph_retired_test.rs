@@ -45,7 +45,7 @@ fn retired_not_equal_glyph_names_the_replacement() {
 
 #[test]
 fn every_retired_not_equal_site_reports() {
-    assert_eq!(retired("fixum _ x ← a ≠ b aut c ≠ d").len(), 2);
+    assert_eq!(retired("sit x ← a ≠ b aut c ≠ d").len(), 2);
 }
 
 #[test]

@@ -881,7 +881,7 @@ impl TypeChecker<'_> {
             }
             HirExpressionKind::Dum(cond, block) => {
                 self.check_condition(cond);
-                self.check_loop_block(block);
+                self.check_dum_block(cond, block);
                 self.vacuum_type()
             }
             HirExpressionKind::Itera {

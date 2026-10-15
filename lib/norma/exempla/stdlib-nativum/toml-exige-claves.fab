@@ -22,12 +22,12 @@ id = "sample"»
 }
 
 main {
-    const value doc ← toml.parse(sampleToml())
+    let value doc ← toml.parse(sampleToml())
 
     do {
         value.require_strings(doc, ["id", "name"])
-        const string name ↤ value.get(doc, "name") ⊥ "missing"
-        const string id ↤ value.get(doc, "id") ⊥ "missing"
+        let string name ↤ value.get(doc, "name") ⊥ "missing"
+        let string id ↤ value.get(doc, "id") ⊥ "missing"
         print name, id
     }
     catch err {

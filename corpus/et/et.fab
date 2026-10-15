@@ -19,9 +19,9 @@ test "and requires both operands" {
 }
 
 test "and mirrors the incipit smoke" {
-    const bool paratus ← true
-    const bool licet ← true
-    const bool currit ← paratus and licet
+    let bool paratus ← true
+    let bool licet ← true
+    let bool currit ← paratus and licet
     assert currit ≡ true
 }
 # =============================================================================
@@ -51,10 +51,10 @@ test "and mirrors the incipit smoke" {
 
 main {
     # left operand: verum
-    const bool paratus ← true
+    let bool paratus ← true
     # right operand: verum
-    const bool licet ← true
+    let bool licet ← true
     # verum et verum → verum
-    const bool currit ← paratus and licet
+    let bool currit ← paratus and licet
     print currit
 }

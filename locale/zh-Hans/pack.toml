@@ -16,7 +16,7 @@ sit = "设"
 typus = "类型"
 schema = "架构"
 columna = "列"
-varia = "变量"
+varia = "可变"
 ceteri = "其余"
 errata = "勘误"
 exitus = "退出"
@@ -95,7 +95,7 @@ maxima = "最大"
 minima = "最小"
 de = "借自"
 ex = "取自"
-in = "传入"
+in = "可变"
 own = "拥有"
 copy = "拷贝"
 axis = "轴"
@@ -404,10 +404,6 @@ help = "只保留一个 '{keyword}' rest binding"
 message = "'{keyword}' 直接绑定单个标识符；请使用 '{keyword}' name ← expr"
 help = "写成 '{keyword}' name ← expr，或对 typed/destructured bindings 使用 fixum"
 
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit 不支持 destructuring patterns"
-help = "对 destructuring pattern 使用 fixum"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "需要 test case 或 setup"
 help = "用 '{proba}'、'{probandum}' 或 '{setup}' 开始 body item"
@@ -587,6 +583,42 @@ help = "请在 genus 上声明 method"
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "`{marker}` 标记不再放在 binding 上，而是放在值上"
 help = "写成 `{keyword} T {name} ← {marker} value`；后面的 `{name} ← {marker} value` 以同样方式标记该值，parameter 则把 `{marker}` 保留在类型之前"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "运行时的 `{keyword}` 声明已废弃；`{name}` 是运行时名称"
+help = "写成 `{sit} T {name} ← …`（或用 `{sit} {name} ← …` 推断类型）；`{fixum}` 表示编译期事实，与 `=` 搭配"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "`{keyword}` 绑定词已废弃"
+help = "绑定名使用 `{sit}`（固定名称）或 `{varia}`（可写名称）；`{fixum}` 表示编译期事实，与 `=` 搭配"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` 不能引入绑定名"
+help = "绑定名对应每次迭代或匹配的值；固定名称写 `{sit}`，可写名称写 `{varia}`"
+
+[diagnostics.PARSE010.issues.field_fixum_retired]
+message = "`{keyword}` 字段修饰词已废弃"
+help = "只读字段写 `{sit}`；`{fixum}` 表示编译期事实，与 `=` 搭配"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` 不能修饰字段"
+help = "字段是只读（`{sit}`）或可写（`{varia}`）；`{generis}` 使其属于类型"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "`{keyword}` 局部变量需要一个可读取的位置：`{keyword} T name ← place`"
+help = "写成 `{keyword} T name ← place`，若不需要初始位置，请使用 `{sit}` 或 `{varia}`"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "`{keyword}` 局部变量只绑定一个名称，不能解构"
+help = "写成 `{keyword} T name ← place`，再通过该名称读取各部分"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "`{keyword}` 局部变量读取的是位置，不能接受 `{marker}` 值"
+help = "要读取位置，写成 `{keyword} T name ← place`；要得到独立的值，写成 `{sit} T name ← {marker} place`"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "`{keyword}` 声明词已废弃；`{name}` 是可写名称"
+help = "写成 `{varia} T {name} ← …`；可写的运行时名称用 `{varia}`"
 
 [diagnostics.PARSE011]
 message = "在 {functio} 后需要函数名"

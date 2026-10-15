@@ -221,7 +221,7 @@ fn reference_to_top_level_fixum_rejects_the_fixum_itself() {
     // that references it never reaches the "not constant" fold check —
     // the fixum's own top_level_binding error is what's reported.
     assert_rejects_with_issue(
-        "fixum numerus A ← 1\nfixum numerus N = A + 1\n",
+        "sit numerus A ← 1\nfixum numerus N = A + 1\n",
         "top_level_binding",
     );
 }
@@ -284,7 +284,7 @@ fn statics_are_immutable() {
 
 #[test]
 fn top_level_fixum_rejects_with_migration_issue() {
-    assert_rejects_with_issue("fixum numerus N ← 4\n", "top_level_binding");
+    assert_rejects_with_issue("sit numerus N ← 4\n", "top_level_binding");
 }
 
 #[test]

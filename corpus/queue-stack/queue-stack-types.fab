@@ -34,13 +34,13 @@ fn accepts(queue<int> q, queue<int, 8> bounded_q, stack<string> s, stack<string,
 # =============================================================================
 
 fn queue_walk(queue<int> input) → int ∪ none {
-    var queue<int> q ← copy input
+    mut queue<int> q ← copy input
     q.append(1)
     return q.remove_first()
 }
 
 fn stack_walk(stack<string> input) → string ∪ none {
-    var stack<string> s ← copy input
+    mut stack<string> s ← copy input
     s.append("top")
     return s.remove_last()
 }
@@ -51,7 +51,7 @@ fn queue_length(queue<int> input) → int {
 
 # Bounded push remains a recoverable alternate exit; empty pop is nullable.
 fn bounded_queue_push(queue<int, 2> input) → void ⇥ string {
-    var queue<int, 2> q ← copy input
+    mut queue<int, 2> q ← copy input
     q.append(1)
 }
 
@@ -61,14 +61,14 @@ fn bounded_queue_push(queue<int, 2> input) → void ⇥ string {
 
 # `for from` reads a queue in insertion order (FIFO).
 fn queue_iteration(queue<int> input) → void {
-    for from input const item {
+    for from input let item {
         print item
     }
 }
 
 # `for from` reads a stack in removal order (top-first LIFO).
 fn stack_iteration(stack<int> input) → void {
-    for from input const item {
+    for from input let item {
         print item
     }
 }
@@ -76,12 +76,12 @@ fn stack_iteration(stack<int> input) → void {
 # Empty pop is T ∪ null, so coalesce recovers a value instead of entering ⇥.
 # The in-place pop lands on a local copy, like the C2 walkers above.
 fn queue_pop_recover(queue<int> input) → int {
-    var queue<int> q ← copy input
+    mut queue<int> q ← copy input
     return q.remove_first() coalesce 0
 }
 
 fn stack_pop_recover(stack<int> input) → int {
-    var stack<int> s ← copy input
+    mut stack<int> s ← copy input
     return s.remove_last() coalesce 0
 }
 

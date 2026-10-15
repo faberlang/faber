@@ -4,7 +4,7 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
 category = "type"
 summary = "MU-3: own bind from a fresh literal is legal."
-syntax = "const list<int> xs ← own [1, 2, 3]"
+syntax = "let list<int> xs ← own [1, 2, 3]"
 related = ["own", "lista"]
 locale = "en"
 +++
@@ -13,6 +13,6 @@ locale = "en"
 # =============================================================================
 
 main {
-    const list<int> xs ← own [1, 2, 3]
+    let list<int> xs ← own [1, 2, 3]
     print xs.length()
 }

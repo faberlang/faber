@@ -8,7 +8,7 @@ const F32_TYPE: &str = include_str!("../tests/fixtures/reject/f32_type.fab");
 #[test]
 fn integer_beyond_the_representation_cap() {
     assert_eq!(
-        rejected("main {\n    const int a ← 9223372036854775807\n    print a * a\n}"),
+        rejected("main {\n    let int a ← 9223372036854775807\n    print a * a\n}"),
         "integer constant beyond the 64-bit representation cap"
     );
 }
@@ -32,7 +32,7 @@ fn integer_remainder_by_zero() {
 #[test]
 fn integer_division_by_zero_constant() {
     assert_eq!(
-        rejected("main {\n    const int z ← 0\n    print 7 / z\n}"),
+        rejected("main {\n    let int z ← 0\n    print 7 / z\n}"),
         "integer division by zero"
     );
 }
@@ -49,7 +49,7 @@ fn policy_float_type() {
 #[test]
 fn unbounded_integer_type() {
     assert_eq!(
-        rejected("main {\n    var inf n ← 5\n    print n\n}"),
+        rejected("main {\n    mut inf n ← 5\n    print n\n}"),
         "unbounded integer type (inf)"
     );
 }
@@ -65,7 +65,7 @@ fn generic_function() {
 #[test]
 fn nested_list_type() {
     assert_eq!(
-        rejected("main {\n    const list<list<int>> grid ← [[1], [2]]\n    print grid\n}"),
+        rejected("main {\n    let list<list<int>> grid ← [[1], [2]]\n    print grid\n}"),
         "nested list type"
     );
 }
@@ -76,7 +76,7 @@ fn nested_list_type() {
 fn access_marker_on_a_scalar_parameter() {
     assert_eq!(
         rejected(
-            "fn bump(mut int x) {\n    x ← x + 1\n}\nmain {\n    var int n ← 1\n    bump(mut n)\n    print n\n}"
+            "fn bump(mut int x) {\n    x ← x + 1\n}\nmain {\n    mut int n ← 1\n    bump(mut n)\n    print n\n}"
         ),
         "ref or mut access to a scalar"
     );
@@ -86,7 +86,7 @@ fn access_marker_on_a_scalar_parameter() {
 fn list_of_genus() {
     assert_eq!(
         rejected(
-            "class P {\n    var int x = 0\n}\nmain {\n    const list<P> ps ← [{ x = 1 }]\n    print ps.length()\n}"
+            "class P {\n    mut int x = 0\n}\nmain {\n    let list<P> ps ← [{ x = 1 }]\n    print ps.length()\n}"
         ),
         "list of genus"
     );
@@ -96,7 +96,7 @@ fn list_of_genus() {
 fn static_field() {
     assert_eq!(
         rejected(
-            "class P {\n    static int count = 0\n    var int x = 0\n}\nmain {\n    const P p ← { x = 1 }\n    print p.x\n}"
+            "class P {\n    static int count = 0\n    mut int x = 0\n}\nmain {\n    let P p ← { x = 1 }\n    print p.x\n}"
         ),
         "static (generis) field"
     );

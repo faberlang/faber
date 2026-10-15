@@ -41,23 +41,23 @@ locale = "en"
 #   Go e2e whitelist — expression-valued block / typing not yet for Go.
 
 fn summa(list<int> numeri) → int {
-    var _ total ← 0
-    for from numeri const n {
+    mut _ total ← 0
+    for from numeri let n {
         total ← total + n
     }
     return total
 }
 
 main {
-    const _ prima ← [1, 2]
-    const _ secunda ← [3, 4]
-    const _ omnes ← [0, spread prima, spread secunda, 5]
+    let prima ← [1, 2]
+    let secunda ← [3, 4]
+    let omnes ← [0, spread prima, spread secunda, 5]
 
-    const [initium, alterum, tertium] ← omnes
+    let [initium, alterum, tertium] ← omnes
     print "caput: § § §"(initium, alterum, tertium)
 
-    const _ paria ← omnes.filter(int n ∴ n % 2 ≡ 0)
-    const _ aucta ← paria.map(int n → int ∴ do {
+    let paria ← omnes.filter(int n ∴ n % 2 ≡ 0)
+    let aucta ← paria.map(int n → int ∴ do {
         return n + 10
     })
 

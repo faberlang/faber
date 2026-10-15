@@ -14,8 +14,8 @@ import from "norma:http/server" server
 import from "norma:websocket" websocket
 
 main {
-    const server.Listener listener ← server.bind(0)
-    const int port ← listener.port()
+    let server.Listener listener ← server.bind(0)
+    let int port ← listener.port()
     assert port ≻ 0
 
     # Client half one: TCP connect plus the upgrade request, no read yet.

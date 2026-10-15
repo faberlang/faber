@@ -30,6 +30,6 @@ locale = "en"
 # WHY: pins the fail-closed overflow token in conversio-textus-overflow-decline.expected.
 
 main {
-    const string<4> t ← "abcdef" ↦ string<4>
+    let string<4> t ← "abcdef" ↦ string<4>
     print t
 }

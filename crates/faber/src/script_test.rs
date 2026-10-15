@@ -185,9 +185,9 @@ fn lane(vector<f32, 3> v, int i) → f32 {
 }
 
 main {
-    const vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    var f32 sum ← 0.0
-    var int i ← 0
+    let vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    mut f32 sum ← 0.0
+    mut int i ← 0
     while i ≺ 3 {
         sum ← sum + lane(v, i)
         i ← i + 1
@@ -206,7 +206,7 @@ fn item(list<f32> xs, int i) → f32 {
 }
 
 main {
-    const list<f32> xs ← [1.0, 2.0, 3.0]
+    let list<f32> xs ← [1.0, 2.0, 3.0]
     print item(xs, 3)
 }
 ",
