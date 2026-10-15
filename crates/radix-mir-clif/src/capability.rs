@@ -201,7 +201,7 @@ impl<'a> ClifCapability<'a> {
                 Some(Gap::Subset("instans value".to_owned()))
             }
             Type::Primitive(Primitive::Nihil) => None,
-            Type::Primitive(Primitive::Ignotum) => Some(Gap::Subset("unknown value".to_owned())),
+            Type::Primitive(Primitive::Ignotum) => None,
             Type::Array(element) => self.type_gap(MirType::semantic(*element)),
             Type::BoundedArray { element, .. } => self.type_gap(MirType::semantic(*element)),
             Type::Map(key, value) => self

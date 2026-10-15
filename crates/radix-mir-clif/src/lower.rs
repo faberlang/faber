@@ -278,8 +278,9 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             }
         }
         Type::Ref(_, inner) => rep_of(table, MirType::semantic(*inner)),
-        // The type of `null`: an optional that is always none.
-        Type::Primitive(Primitive::Nihil) => Ok(Rep::Opt),
+        // The type of `null`: an optional that is always none. An unknown
+        // value is a box of any tagged payload, or none.
+        Type::Primitive(Primitive::Nihil | Primitive::Ignotum) => Ok(Rep::Opt),
         Type::Primitive(Primitive::Vacuum | Primitive::Numquam) => Ok(Rep::Unit),
         Type::SizedNumeric(Primitive::Numerus, width) => match width {
             NumericWidth::I8
@@ -736,12 +737,7 @@ impl FunctionLower<'_, '_> {
         self.builder.switch_to_block(entry);
 
         let table = self.state.input.types;
-        let unknown = |ty: MirType| {
-            matches!(
-                resolve(table, ty.semantic_id()),
-                Type::Primitive(Primitive::Ignotum)
-            )
-        };
+        let unknown = |_: MirType| false;
         let environment = self.state.closure_environment(function.id);
         let (cells, environments) = closure::construction_slots(function);
         self.cells = cells;
@@ -1356,6 +1352,13 @@ impl FunctionLower<'_, '_> {
             // A base that is already present: only the link's own optional.
             let wrapped = self.chain_step(handle, base_ty, link)?;
             return Ok((wrapped, Rep::Opt));
+        }
+        if matches!(
+            resolve(self.state.input.types, base_ty.semantic_id()),
+            Type::Primitive(Primitive::Nihil)
+        ) {
+            // A chain off the type of `null` stays none.
+            return Ok((self.builder.ins().iconst(types::I64, 0), Rep::Opt));
         }
         let Type::Option(inner) = resolve(self.state.input.types, base_ty.semantic_id()) else {
             return Err(Decline::new("chain of a non-optional"));
@@ -2648,7 +2651,7 @@ impl FunctionLower<'_, '_> {
         self.operand_type(operand).is_ok_and(|ty| {
             matches!(
                 resolve(self.state.input.types, ty.semantic_id()),
-                Type::Union(_)
+                Type::Union(_) | Type::Primitive(Primitive::Ignotum)
             )
         })
     }

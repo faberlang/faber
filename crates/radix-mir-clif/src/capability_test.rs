@@ -589,6 +589,8 @@ fn none_typed_local_is_capable() {
     let types = TypeTable::new();
     let verdict = local_verdict(&types, ty(&types, Primitive::Nihil));
     assert!(verdict.is_capable(), "the type of null: {verdict:?}");
+    let verdict = local_verdict(&types, ty(&types, Primitive::Ignotum));
+    assert!(verdict.is_capable(), "an unknown value: {verdict:?}");
 }
 
 #[test]
