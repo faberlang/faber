@@ -692,6 +692,14 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "annotation `@ {annotation}` chưa được khai báo trên bề mặt reader này"
 help = "dùng `@ {expected}` cho locale reader của tệp này"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum]
+message = "một khai báo mang nhiều hơn một annotation `@ nucleum`"
+help = "giữ lại một annotation nucleum duy nhất"
+
+[diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
+message = "fragment `@ nucleum` xung đột với graphics fragment annotation"
+help = "xóa một trong các fragment annotation"
+
 [diagnostics.PARSE019]
 message = "modifier bị lặp"
 help = "xóa modifier bị lặp"
@@ -715,6 +723,10 @@ help = "ngăn cách các đối tượng bằng '{et}'"
 [diagnostics.PARSE020.issues.discerne_subject_not_path]
 message = "đối tượng của '{discerne}' phải là một tên hoặc đường dẫn thành viên"
 help = "gán giá trị cho một tên trước, rồi dùng '{discerne}' trên tên đó"
+
+[diagnostics.PARSE020.issues.nesting_too_deep]
+message = "nguồn lồng sâu hơn giới hạn parser là {limit}"
+help = "tách cấu trúc thành các binding có tên"
 
 [diagnostics.PARSE021]
 message = "thiếu điều kiện"
@@ -795,6 +807,10 @@ help = "viết thân clausura rút gọn sau ∴ dưới dạng {fac_body}"
 [diagnostics.PARSE030.issues.closure_fac_body_dum]
 message = "thân fac của clausura không thể dùng 'dum'"
 help = "xóa dum khỏi các thân fac của clausura"
+
+[diagnostics.PARSE030.issues.expression_too_long]
+message = "biểu thức vượt quá giới hạn {limit} toán tử của parser"
+help = "tách biểu thức thành các binding có tên"
 
 [diagnostics.PARSE031]
 message = "literal không hợp lệ"

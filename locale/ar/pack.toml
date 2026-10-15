@@ -692,6 +692,14 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "التعليق التوضيحي `@ {annotation}` غير معلن في سطح القارئ هذا"
 help = "استخدم `@ {expected}` للغة القارئ في هذا الملف"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum]
+message = "يوجد في الإعلان أكثر من تعليمة `@ nucleum`"
+help = "أبقِ على تعليمة nucleum واحدة"
+
+[diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
+message = "جزء `@ nucleum` يتعارض مع تعليمة جزء رسومي"
+help = "أزل إحدى تعليمتي الجزء"
+
 [diagnostics.PARSE019]
 message = "معدل مكرر"
 help = "أزل المعدل المكرر"
@@ -715,6 +723,10 @@ help = "افصل بين الموضوعات بـ '{et}'"
 [diagnostics.PARSE020.issues.discerne_subject_not_path]
 message = "يجب أن يكون موضوع '{discerne}' اسمًا أو مسار عضو"
 help = "اربط القيمة باسم أولًا، ثم استخدم '{discerne}' على ذلك الاسم"
+
+[diagnostics.PARSE020.issues.nesting_too_deep]
+message = "المصدر أعمق من حد المحلل البالغ {limit}"
+help = "قسّم البناء إلى ارتباطات مسماة"
 
 [diagnostics.PARSE021]
 message = "شرط مفقود"
@@ -795,6 +807,10 @@ help = "اكتب compact closure body بعد ∴ بالشكل {fac_body}"
 [diagnostics.PARSE030.issues.closure_fac_body_dum]
 message = "closure {fac} body لا يمكن أن يستخدم '{dum}'"
 help = "أزل {dum} من closure {fac} bodies"
+
+[diagnostics.PARSE030.issues.expression_too_long]
+message = "يتجاوز التعبير حد المحلل البالغ {limit} من العوامل"
+help = "قسّم التعبير إلى ارتباطات مسماة"
 
 [diagnostics.PARSE031]
 message = "حرفية غير صالحة"

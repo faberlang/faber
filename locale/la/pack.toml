@@ -862,6 +862,14 @@ help = "utere `@ {expected}` pro lingua lectoris huius fasciculi"
 message = "unknown `@ annotatio` target"
 help = "use `target = {functio}` in v1"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum]
+message = "a declaration carries more than one `@ nucleum` annotation"
+help = "keep a single nucleum annotation"
+
+[diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
+message = "a `@ nucleum` fragment conflicts with a graphics fragment annotation"
+help = "remove one of the fragment annotations"
+
 [diagnostics.PARSE019]
 message = "duplicate modifier"
 help = "remove the duplicate modifier"
@@ -885,6 +893,10 @@ help = "separa subiecta per '{et}'"
 [diagnostics.PARSE020.issues.discerne_subject_not_path]
 message = "subiectum '{discerne}' nomen vel via membri esse debet"
 help = "liga valorem prius ad nomen, deinde '{discerne}' in illo nomine"
+
+[diagnostics.PARSE020.issues.nesting_too_deep]
+message = "source nests deeper than the parser limit of {limit}"
+help = "split the construct into named bindings"
 
 [diagnostics.PARSE021]
 message = "missing condition"
@@ -1025,6 +1037,10 @@ help = "write the compact closure body after ∴ as {fac_body}"
 [diagnostics.PARSE030.issues.closure_fac_body_dum]
 message = "closure {fac} body cannot use '{dum}'"
 help = "remove {dum} from closure {fac} bodies"
+
+[diagnostics.PARSE030.issues.expression_too_long]
+message = "expression exceeds the parser limit of {limit} operators"
+help = "split the expression into named bindings"
 
 [diagnostics.PARSE031]
 message = "invalid literal"
