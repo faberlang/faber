@@ -1584,3 +1584,94 @@ pub extern "C" fn __faber_clif_v1_approx_int(left: i64, right: i64) -> i8 {
     let (x, y) = (i128::from(left), i128::from(right));
     i8::from(1_000_000_000 * (x - y).abs() <= x.abs().max(y.abs()))
 }
+
+/// A list into a new set; equal elements collapse to the first.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_to_set(list: *const List) -> *mut Map {
+    let mut set = Map {
+        set: true,
+        entries: Vec::new(),
+    };
+    for &(tag, bits) in &unsafe { list_ref(list) }.items {
+        if map_find(&set, tag, bits).is_none() {
+            set.entries.push((tag, bits, 0, 0));
+        }
+    }
+    Box::into_raw(Box::new(set))
+}
+
+/// A copy of a list whose elements keep their bits under a new tag.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_retag(list: *const List, tag: i32) -> *mut List {
+    list_new_from(
+        unsafe { list_ref(list) }
+            .items
+            .iter()
+            .map(|&(_, bits)| (tag, bits))
+            .collect(),
+    )
+}
+
+/// Text to a list of UTF-8, UTF-16 or UTF-32 units tagged as raw bits.
+///
+/// # Safety
+///
+/// `text` is a well-formed text handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_encode(text: *const u8, width: i32) -> *mut List {
+    let source = text_str(unsafe { text_bytes(text) });
+    let (tag, units): (i32, Vec<i64>) = match width {
+        8 => (TAG_BITS, source.bytes().map(i64::from).collect()),
+        16 => (TAG_BITS + 1, source.encode_utf16().map(i64::from).collect()),
+        _ => (
+            TAG_BITS + 2,
+            source.chars().map(|ch| i64::from(u32::from(ch))).collect(),
+        ),
+    };
+    list_new_from(units.into_iter().map(|unit| (tag, unit)).collect())
+}
+
+/// A list of unit patterns to text; null when the list does not decode.
+///
+/// # Safety
+///
+/// `list` is a live runtime list of raw-bits elements.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_decode(list: *const List, mode: i32) -> *const u8 {
+    let units: Vec<u64> = unsafe { list_ref(list) }
+        .items
+        .iter()
+        .map(|&(_, bits)| u64::from_ne_bytes(bits.to_ne_bytes()))
+        .collect();
+    let decoded: Option<String> = match mode {
+        8 | 1 => units
+            .iter()
+            .map(|unit| u8::try_from(*unit).ok())
+            .collect::<Option<Vec<_>>>()
+            .and_then(|bytes| {
+                if mode == 1 && !bytes.is_ascii() {
+                    None
+                } else {
+                    String::from_utf8(bytes).ok()
+                }
+            }),
+        16 => units
+            .iter()
+            .map(|unit| u16::try_from(*unit).ok())
+            .collect::<Option<Vec<_>>>()
+            .and_then(|words| String::from_utf16(&words).ok()),
+        _ => units
+            .iter()
+            .map(|unit| u32::try_from(*unit).ok().and_then(char::from_u32))
+            .collect::<Option<String>>(),
+    };
+    decoded.map_or(std::ptr::null(), |text| text_new(text.as_bytes()))
+}

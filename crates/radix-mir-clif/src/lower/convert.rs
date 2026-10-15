@@ -154,6 +154,117 @@ fn int_bits(width: NumericWidth) -> u32 {
     }
 }
 
+/// A list, set or map conversion that lowers to runtime calls.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Seq {
+    /// A list to a set (duplicates collapse).
+    ToSet,
+    /// A map to the list of its keys or its values.
+    MapProject { values: bool },
+    /// A list copied into a list or a bounded list of the same element type;
+    /// a capacity makes an over-long source fail.
+    Copy { capacity: Option<u64> },
+    /// A list whose elements keep their bits and change element tag
+    /// (`list<b8>` and `list<u8>`).
+    Retag(i64),
+    /// Text to a list of UTF-8, UTF-16 or UTF-32 units of the given width.
+    Encode(u32),
+    /// A list of unit patterns to text; 8, 16 and 32 decode UTF-8, UTF-16 and
+    /// UTF-32, and 1 narrows bytes to ascii. A malformed list fails.
+    Decode(u32),
+}
+
+fn list_element(table: &TypeTable, id: TypeId) -> Option<TypeId> {
+    match resolve(table, id) {
+        Type::Array(element) | Type::BoundedArray { element, .. } => Some(*element),
+        _ => None,
+    }
+}
+
+fn same_type(table: &TypeTable, a: TypeId, b: TypeId) -> bool {
+    table.equals(a, b)
+}
+
+/// A bits element and an unsigned integer of the same width hold the same
+/// pattern: only the element tag differs.
+fn bits_unsigned_pair(table: &TypeTable, a: TypeId, b: TypeId) -> bool {
+    let pair = |bits: &Type, int: &Type| match (bits, int) {
+        (Type::Bits(width), Type::SizedNumeric(Primitive::Numerus, int_width)) => {
+            width.bits() < 64 && int_bits(*int_width) == width.bits() && !signed_width(*int_width)
+        }
+        _ => false,
+    };
+    let (a, b) = (resolve(table, a), resolve(table, b));
+    pair(a, b) || pair(b, a)
+}
+
+/// The plan for an explicit collection conversion, or `None` when the pair
+/// is outside the lowered set.
+pub(crate) fn sequence_conversion(
+    table: &TypeTable,
+    source: TypeId,
+    target: TypeId,
+) -> Option<Seq> {
+    let rep_ok = |id: TypeId| rep_of(table, MirType::semantic(id)).is_ok();
+    let target_type = resolve(table, target);
+    match (resolve(table, source), target_type) {
+        (Type::Array(from) | Type::BoundedArray { element: from, .. }, Type::Set(to))
+            if same_type(table, *from, *to) && rep_ok(*to) =>
+        {
+            Some(Seq::ToSet)
+        }
+        (Type::Primitive(Primitive::Textus | Primitive::Ascii), Type::Array(to)) => {
+            match resolve(table, *to) {
+                Type::Bits(width) => Some(Seq::Encode(width.bits())),
+                _ => None,
+            }
+        }
+        (Type::Array(from), Type::Primitive(Primitive::Textus)) => match resolve(table, *from) {
+            Type::Bits(width) => Some(Seq::Decode(width.bits())),
+            _ => None,
+        },
+        (Type::Array(from), Type::Primitive(Primitive::Ascii)) => match resolve(table, *from) {
+            Type::Bits(BitsWidth::B8) => Some(Seq::Decode(1)),
+            _ => None,
+        },
+        (Type::Map(key, value), Type::Array(to)) => {
+            if same_type(table, *key, *to) && rep_ok(*to) {
+                Some(Seq::MapProject { values: false })
+            } else if same_type(table, *value, *to) && rep_ok(*to) {
+                Some(Seq::MapProject { values: true })
+            } else {
+                None
+            }
+        }
+        (_, Type::Array(to) | Type::BoundedArray { element: to, .. }) => {
+            let from = list_element(table, source)?;
+            let capacity = match target_type {
+                Type::BoundedArray { capacity, .. } => match table.get_index(*capacity) {
+                    radix_types::IndexExpr::Literal(bound) => Some(*bound),
+                    _ => return None,
+                },
+                _ => None,
+            };
+            if same_type(table, from, *to) {
+                rep_ok(*to).then_some(Seq::Copy { capacity })
+            } else if capacity.is_none() && bits_unsigned_pair(table, from, *to) {
+                let rep = rep_of(table, MirType::semantic(*to)).ok()?;
+                let tag = match rep {
+                    Rep::Int => abi::TAG_INT,
+                    Rep::Bits(width) => {
+                        abi::TAG_BITS + i64::from(width.bits().trailing_zeros() - 3)
+                    }
+                    _ => return None,
+                };
+                Some(Seq::Retag(tag))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
 /// The failure text a conversion raises.
 #[derive(Clone, Copy)]
 enum Failure {
@@ -176,32 +287,146 @@ impl FunctionLower<'_, '_> {
             None => None,
         };
         let (converted, failed) = self.numeric_value(plan, conversion, value)?;
+        let want = match plan.target {
+            Num::Int(_) => Rep::Int,
+            Num::Float(_) => Rep::Float,
+            Num::Bool => Rep::Bool,
+            Num::Bits(width) => Rep::Bits(width),
+            Num::Text => return Err(Decline::new("text conversion target")),
+        };
         let converted = match (failed, recovery) {
-            (Some(failed), Some((default, rep))) => {
-                let want = match plan.target {
-                    Num::Int(_) => Rep::Int,
-                    Num::Float(_) => Rep::Float,
-                    Num::Bool => Rep::Bool,
-                    Num::Bits(width) => Rep::Bits(width),
-                    Num::Text => return Err(Decline::new("text conversion target")),
-                };
-                let default = self.coerce(default, rep, want)?;
-                self.builder.ins().select(failed.0, default, converted)
-            }
-            (Some(failed), None) => {
-                self.raise(failed.0, failed.1)?;
-                converted
-            }
-            // `⊥` on a truthiness conversion supplies the default for a falsy source.
             (None, Some((default, rep)))
                 if plan.target == Num::Bool && plan.source != Num::Bool =>
             {
+                // `⊥` on a truthiness conversion supplies the default for a falsy source.
                 let default = self.coerce(default, rep, Rep::Bool)?;
                 let truthy = self.builder.ins().iconst(types::I8, 1);
                 self.builder.ins().select(converted, truthy, default)
             }
-            (None, _) => converted,
+            (failed, recovery) => self.finish_conversion(converted, failed, recovery, want)?,
         };
+        self.builder.def_var(variable, converted);
+        Ok(())
+    }
+
+    /// Apply a conversion's failure: the `⊥` default replaces the value, and
+    /// without one the failure is raised.
+    fn finish_conversion(
+        &mut self,
+        converted: Value,
+        failed: Option<(Value, Failure)>,
+        recovery: Option<(Value, Rep)>,
+        want: Rep,
+    ) -> Lowered<Value> {
+        Ok(match (failed, recovery) {
+            (Some((failed, _)), Some((default, rep))) => {
+                let default = self.coerce(default, rep, want)?;
+                self.builder.ins().select(failed, default, converted)
+            }
+            (Some((failed, failure)), None) => {
+                self.raise(failed, failure)?;
+                converted
+            }
+            (None, _) => converted,
+        })
+    }
+
+    /// Lower an explicit list, set or map conversion into `variable`.
+    pub(super) fn sequence_convert(
+        &mut self,
+        plan: Seq,
+        conversion: &MirConversion,
+        value: Value,
+        variable: Variable,
+    ) -> Lowered<()> {
+        let recovery = match &conversion.recovery {
+            Some(operand) => Some(self.scalar(operand)?),
+            None => None,
+        };
+        let (converted, failed, want) = match plan {
+            Seq::ToSet => (
+                self.call_runtime(&abi::LIST_TO_SET, &[value])?
+                    .ok_or_else(|| Decline::new("set result"))?,
+                None,
+                Rep::Set,
+            ),
+            Seq::MapProject { values } => {
+                let symbol = if values {
+                    &abi::MAP_VALUES
+                } else {
+                    &abi::MAP_KEYS
+                };
+                (
+                    self.call_runtime(symbol, &[value])?
+                        .ok_or_else(|| Decline::new("projection result"))?,
+                    None,
+                    Rep::List,
+                )
+            }
+            Seq::Retag(tag) => {
+                let tag = self.builder.ins().iconst(types::I32, tag);
+                (
+                    self.call_runtime(&abi::LIST_RETAG, &[value, tag])?
+                        .ok_or_else(|| Decline::new("retag result"))?,
+                    None,
+                    Rep::List,
+                )
+            }
+            Seq::Encode(width) => {
+                let width = self.builder.ins().iconst(types::I32, i64::from(width));
+                (
+                    self.call_runtime(&abi::TEXT_ENCODE, &[value, width])?
+                        .ok_or_else(|| Decline::new("encode result"))?,
+                    None,
+                    Rep::List,
+                )
+            }
+            Seq::Decode(mode) => {
+                let mode = self.builder.ins().iconst(types::I32, i64::from(mode));
+                let decoded = self
+                    .call_runtime(&abi::LIST_DECODE, &[value, mode])?
+                    .ok_or_else(|| Decline::new("decode result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, decoded, zero);
+                (
+                    decoded,
+                    Some((
+                        failed,
+                        Failure::Static("bits list to textus conversion failed"),
+                    )),
+                    Rep::Text,
+                )
+            }
+            Seq::Copy { capacity } => {
+                let start = self.builder.ins().iconst(types::I64, 0);
+                let end = self.builder.ins().iconst(types::I64, i64::MAX);
+                let copied = self
+                    .call_runtime(&abi::LIST_SLICE, &[value, start, end])?
+                    .ok_or_else(|| Decline::new("copy result"))?;
+                let failed = match capacity {
+                    Some(capacity) => {
+                        let length = self
+                            .call_runtime(&abi::LIST_LEN, &[value])?
+                            .ok_or_else(|| Decline::new("length result"))?;
+                        let bound = self.builder.ins().iconst(
+                            types::I64,
+                            i64::try_from(capacity).map_err(|_| Decline::new("capacity"))?,
+                        );
+                        let over = self
+                            .builder
+                            .ins()
+                            .icmp(IntCC::SignedGreaterThan, length, bound);
+                        Some((
+                            over,
+                            Failure::Static("lista conversion exceeds the bounded capacity"),
+                        ))
+                    }
+                    None => None,
+                };
+                (copied, failed, Rep::List)
+            }
+        };
+        let converted = self.finish_conversion(converted, failed, recovery, want)?;
         self.builder.def_var(variable, converted);
         Ok(())
     }

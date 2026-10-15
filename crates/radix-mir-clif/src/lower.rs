@@ -22,7 +22,7 @@ use rustc_hash::FxHashMap;
 use crate::abi::{self, AbiTy, RuntimeSymbol};
 
 mod convert;
-pub(crate) use convert::numeric_conversion;
+pub(crate) use convert::{numeric_conversion, sequence_conversion};
 
 /// A named refusal discovered during lowering.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -3050,6 +3050,13 @@ impl FunctionLower<'_, '_> {
                     .ok_or_else(|| Decline::new("set keys result"))?;
                 self.builder.def_var(variable, keys);
                 return Ok(());
+            }
+            if let Some(plan) = sequence_conversion(
+                self.state.input.types,
+                conversion.source_ty.semantic_id(),
+                conversion.target_ty.semantic_id(),
+            ) {
+                return self.sequence_convert(plan, conversion, value, variable);
             }
             if let Some(plan) = numeric_conversion(
                 self.state.input.types,

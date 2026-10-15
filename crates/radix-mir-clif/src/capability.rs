@@ -552,8 +552,20 @@ impl MirVisitor for ClifCapability<'_> {
                     )
                     .is_some()
         );
+        let sequence = matches!(
+            &call.intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && crate::lower::sequence_conversion(
+                        self.types,
+                        conversion.source_ty.semantic_id(),
+                        conversion.target_ty.semantic_id(),
+                    )
+                    .is_some()
+        );
         if renders_text
             || numeric
+            || sequence
             || set_to_list
             || matches!(
                 call.intrinsic,

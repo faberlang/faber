@@ -529,6 +529,34 @@ pub const APPROX_INT: RuntimeSymbol = RuntimeSymbol {
     ret: Some(I8),
 };
 
+/// A list into a new set (duplicates collapse).
+pub const LIST_TO_SET: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_to_set",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// A copy of a list with every element tag replaced.
+pub const LIST_RETAG: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_retag",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+
+/// Text to a list of UTF-8 (8), UTF-16 (16) or UTF-32 (32) units, tagged as
+/// raw bits of that width: (text, width) -> list.
+pub const TEXT_ENCODE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_encode",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+/// A list of unit patterns to text: mode 8, 16 or 32 decodes UTF-8, UTF-16 or
+/// UTF-32, mode 1 narrows bytes to ascii. Null when the list is malformed.
+pub const LIST_DECODE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_decode",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+
 /// The runtime entry the emitted `main` shim calls.
 pub const MAIN: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_main",
@@ -617,6 +645,10 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     MATH_F64,
     LIST_ARG_EXTREMUM,
     APPROX_INT,
+    LIST_TO_SET,
+    LIST_RETAG,
+    TEXT_ENCODE,
+    LIST_DECODE,
     SET_DISPLAY_TOKENS,
 ];
 
