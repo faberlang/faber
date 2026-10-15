@@ -74,6 +74,74 @@ pub const TAG_BITS: i64 = 4;
 pub const TAG_LIST: i64 = 8;
 pub const TAG_STRUCT: i64 = 9;
 pub const TAG_OPT: i64 = 10;
+pub const TAG_MAP: i64 = 11;
+
+/// New empty map (flag 0) or set (flag 1).
+pub const MAP_NEW: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_map_new",
+    params: &[I32],
+    ret: Some(Ptr),
+};
+/// Insert or replace: (map, key tag, key bits, value tag, value bits).
+pub const MAP_SET: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_map_set",
+    params: &[Ptr, I32, I64, I32, I64],
+    ret: None,
+};
+/// Value bits for a key; a missing key ends the run.
+pub const MAP_GET: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_map_get",
+    params: &[Ptr, I32, I64],
+    ret: Some(I64),
+};
+/// Value as an optional: present value or none.
+pub const MAP_GET_OPT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_map_get_opt",
+    params: &[Ptr, I32, I64],
+    ret: Some(Ptr),
+};
+/// Key membership.
+pub const MAP_HAS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_map_has",
+    params: &[Ptr, I32, I64],
+    ret: Some(I8),
+};
+/// Remove a key; true when it was present.
+pub const MAP_REMOVE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_map_remove",
+    params: &[Ptr, I32, I64],
+    ret: Some(I8),
+};
+/// Entry count.
+pub const MAP_LEN: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_map_len",
+    params: &[Ptr],
+    ret: Some(I64),
+};
+/// Keys as a new list.
+pub const MAP_KEYS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_map_keys",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Values as a new list.
+pub const MAP_VALUES: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_map_values",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Print a map or set line.
+pub const PRINT_MAP: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_print_map",
+    params: &[I32, Ptr],
+    ret: None,
+};
+/// Render a map or set as text.
+pub const TEXT_FROM_MAP: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_from_map",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
 
 /// Box a present optional payload: (tag, bits) -> optional handle (null is none).
 pub const OPT_SOME: RuntimeSymbol = RuntimeSymbol {
@@ -317,6 +385,17 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     LIST_SORTED,
     PRINT_LIST,
     TEXT_FROM_LIST,
+    MAP_NEW,
+    MAP_SET,
+    MAP_GET,
+    MAP_GET_OPT,
+    MAP_HAS,
+    MAP_REMOVE,
+    MAP_LEN,
+    MAP_KEYS,
+    MAP_VALUES,
+    PRINT_MAP,
+    TEXT_FROM_MAP,
     OPT_SOME,
     OPT_BITS,
     OPT_BITS_OR,

@@ -205,7 +205,7 @@ fn gaps_keep_storage_order() {
 }
 
 #[test]
-fn list_type_is_capable_and_set_type_names_gap() {
+fn list_type_is_capable_and_queue_type_names_gap() {
     let mut types = TypeTable::new();
     let numerus_id = types.primitive(Primitive::Numerus);
     let list = MirType::semantic(types.array(numerus_id));
@@ -226,7 +226,7 @@ fn list_type_is_capable_and_set_type_names_gap() {
         "a list of numbers is inside the subset: {verdict:?}"
     );
 
-    let list = MirType::semantic(types.set(numerus_id));
+    let list = MirType::semantic(types.queue(numerus_id));
     let program = single_function(FunctionShape {
         params: Vec::new(),
         locals: vec![local(0, list)],

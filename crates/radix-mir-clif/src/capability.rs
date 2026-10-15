@@ -187,13 +187,15 @@ impl<'a> ClifCapability<'a> {
             Type::Primitive(Primitive::Ignotum) => Some(Gap::Subset("unknown value".to_owned())),
             Type::Array(element) => self.type_gap(MirType::semantic(*element)),
             Type::BoundedArray { element, .. } => self.type_gap(MirType::semantic(*element)),
+            Type::Map(key, value) => self
+                .type_gap(MirType::semantic(*key))
+                .or_else(|| self.type_gap(MirType::semantic(*value))),
+            Type::Set(element) => self.type_gap(MirType::semantic(*element)),
             Type::Queue(_)
             | Type::BoundedQueue { .. }
             | Type::Stack(_)
             | Type::BoundedStack { .. }
-            | Type::Map(_, _)
-            | Type::Ledger(_, _)
-            | Type::Set(_) => Some(Gap::Subset("collection value".to_owned())),
+            | Type::Ledger(_, _) => Some(Gap::Subset("collection value".to_owned())),
             Type::Struct(_) => None,
             Type::Record(_) => Some(Gap::Subset("record value".to_owned())),
             Type::Enum(_) => None,
@@ -315,8 +317,7 @@ impl<'a> ClifCapability<'a> {
         match kind {
             MirAggregateKind::Tuple => Some(Gap::Subset("tuple construction".to_owned())),
             MirAggregateKind::Array => None,
-            MirAggregateKind::Map => Some(Gap::Subset("map construction".to_owned())),
-            MirAggregateKind::Set => Some(Gap::Subset("set construction".to_owned())),
+            MirAggregateKind::Map | MirAggregateKind::Set => None,
             MirAggregateKind::Record => Some(Gap::Subset("record construction".to_owned())),
             MirAggregateKind::Struct(_) => None,
             MirAggregateKind::EnumVariant(_) => None,
@@ -472,7 +473,21 @@ impl MirVisitor for ClifCapability<'_> {
                         Type::Primitive(Primitive::Textus)
                     )
         );
+        let set_to_list = matches!(
+            &call.intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && matches!(
+                        self.types.get(conversion.source_ty.semantic_id()),
+                        Type::Set(_)
+                    )
+                    && matches!(
+                        self.types.get(conversion.target_ty.semantic_id()),
+                        Type::Array(_)
+                    )
+        );
         if renders_text
+            || set_to_list
             || matches!(
                 call.intrinsic,
                 MirIntrinsic::FormatString { .. }
@@ -488,6 +503,10 @@ impl MirVisitor for ClifCapability<'_> {
                             | MirCollectionOp::Contains
                             | MirCollectionOp::Reverse
                             | MirCollectionOp::Sort
+                            | MirCollectionOp::Put
+                            | MirCollectionOp::Delete
+                            | MirCollectionOp::Keys
+                            | MirCollectionOp::Values
                     )
             )
         {

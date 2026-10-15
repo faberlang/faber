@@ -109,6 +109,10 @@ pub(crate) enum Rep {
     List,
     /// A `genus` instance: a pointer to a runtime record.
     Record,
+    /// `tabula<K, V>`: a pointer to a runtime map.
+    Map,
+    /// `copia<T>`: a pointer to a runtime set.
+    Set,
     /// `T ∪ none`: null for none, else a pointer to a boxed payload.
     Opt,
     /// `textus`: a pointer to `[len: i64][bytes...]` (see `abi::TEXT_HEADER`).
@@ -123,7 +127,13 @@ impl Rep {
             Self::Int => Some(types::I64),
             Self::Float => Some(types::F64),
             Self::Bool => Some(types::I8),
-            Self::Text | Self::Bits(_) | Self::List | Self::Record | Self::Opt => Some(types::I64),
+            Self::Text
+            | Self::Bits(_)
+            | Self::List
+            | Self::Record
+            | Self::Opt
+            | Self::Map
+            | Self::Set => Some(types::I64),
             Self::Unit => None,
         }
     }
@@ -147,6 +157,15 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(Primitive::Textus) => Ok(Rep::Text),
         Type::Bits(width) => Ok(Rep::Bits(*width)),
         Type::Struct(_) | Type::Enum(_) => Ok(Rep::Record),
+        Type::Map(key, value) => {
+            rep_of(table, MirType::semantic(*key))?;
+            rep_of(table, MirType::semantic(*value))?;
+            Ok(Rep::Map)
+        }
+        Type::Set(element) => {
+            rep_of(table, MirType::semantic(*element))?;
+            Ok(Rep::Set)
+        }
         Type::Option(inner) => {
             if matches!(table.get(*inner), Type::Option(_)) {
                 return Err(Decline::new("nested optional value"));
@@ -619,7 +638,7 @@ impl FunctionLower<'_, '_> {
             Rep::Int => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Float => Some(self.builder.ins().f64const(0.0)),
             Rep::Bool => Some(self.builder.ins().iconst(types::I8, 0)),
-            Rep::Text | Rep::Bits(_) | Rep::List | Rep::Record | Rep::Opt => {
+            Rep::Text | Rep::Bits(_) | Rep::List | Rep::Record | Rep::Opt | Rep::Map | Rep::Set => {
                 Some(self.builder.ins().iconst(types::I64, 0))
             }
             Rep::Unit => None,
@@ -749,6 +768,14 @@ impl FunctionLower<'_, '_> {
         }
     }
 
+    /// Key and value types of a map type.
+    fn map_types(&self, ty: MirType) -> Lowered<(MirType, MirType)> {
+        match resolve(self.state.input.types, ty.semantic_id()) {
+            Type::Map(key, value) => Ok((MirType::semantic(*key), MirType::semantic(*value))),
+            _ => Err(Decline::new("key access of a non-map")),
+        }
+    }
+
     /// The `genus` definition behind a struct type.
     fn struct_def(&self, ty: MirType) -> Lowered<radix_hir::DefId> {
         match resolve(self.state.input.types, ty.semantic_id()) {
@@ -803,7 +830,10 @@ impl FunctionLower<'_, '_> {
     /// The type after one projection step.
     fn projected_type(&self, ty: MirType, projection: &MirProjection) -> Lowered<MirType> {
         match projection {
-            MirProjection::Index(_) => self.element_type(ty),
+            MirProjection::Index(_) => match resolve(self.state.input.types, ty.semantic_id()) {
+                Type::Map(_, value) => Ok(MirType::semantic(*value)),
+                _ => self.element_type(ty),
+            },
             MirProjection::Field(name) => Ok(self.field_slot(ty, *name)?.2),
             MirProjection::VariantField { variant, field } => {
                 Ok(self.variant_slot(*variant, *field)?.1)
@@ -848,6 +878,7 @@ impl FunctionLower<'_, '_> {
             Rep::List => abi::TAG_LIST,
             Rep::Record => abi::TAG_STRUCT,
             Rep::Opt => abi::TAG_OPT,
+            Rep::Map | Rep::Set => abi::TAG_MAP,
             Rep::Unit => return Err(Decline::new("unit list element")),
         })
     }
@@ -996,6 +1027,16 @@ impl FunctionLower<'_, '_> {
             let next = self.projected_type(ty, projection)?;
             let next_rep = rep_of(self.state.input.types, next)?;
             let bits = match projection {
+                MirProjection::Index(index) if current_rep == Rep::Map => {
+                    let (key_ty, _) = self.map_types(ty)?;
+                    let (key, key_rep) = self.element_operand(index, key_ty)?;
+                    let tag = self
+                        .builder
+                        .ins()
+                        .iconst(types::I32, Self::element_tag(key_rep)?);
+                    let key = self.element_bits(key, key_rep);
+                    self.call_runtime(&abi::MAP_GET, &[current, tag, key])?
+                }
                 MirProjection::Index(index) => {
                     if current_rep != Rep::List {
                         return Err(Decline::new("index of a non-list"));
@@ -1061,6 +1102,16 @@ impl FunctionLower<'_, '_> {
             .iconst(types::I32, Self::element_tag(rep)?);
         let bits = self.element_bits(value, rep);
         match last {
+            MirProjection::Index(last_index) if handle_rep == Rep::Map => {
+                let (key_ty, _) = self.map_types(container_ty)?;
+                let (key, key_rep) = self.element_operand(last_index, key_ty)?;
+                let key_tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(key_rep)?);
+                let key = self.element_bits(key, key_rep);
+                self.call_runtime(&abi::MAP_SET, &[handle, key_tag, key, tag, bits])?;
+            }
             MirProjection::Index(last_index) => {
                 if handle_rep != Rep::List {
                     return Err(Decline::new("index of a non-list"));
@@ -1137,6 +1188,64 @@ impl FunctionLower<'_, '_> {
             return Err(Decline::new("list destination representation"));
         }
         self.builder.def_var(variable, list);
+        Ok(())
+    }
+
+    /// `tabula` and `copia` literals.
+    fn construct_map(&mut self, destination: &MirPlace, aggregate: &MirAggregate) -> Lowered<()> {
+        let is_set = aggregate.kind == MirAggregateKind::Set;
+        let flag = self.builder.ins().iconst(types::I32, i64::from(is_set));
+        let map = self
+            .call_runtime(&abi::MAP_NEW, &[flag])?
+            .ok_or_else(|| Decline::new("map new result"))?;
+        if is_set {
+            let element = match resolve(self.state.input.types, aggregate.ty.semantic_id()) {
+                Type::Set(element) => MirType::semantic(*element),
+                _ => return Err(Decline::new("set type")),
+            };
+            let MirAggregateFields::Ordered(items) = &aggregate.fields else {
+                return Err(Decline::new("set fields"));
+            };
+            for item in items {
+                let MirAggregateItem::Operand(operand) = item else {
+                    return Err(Decline::new("set spread"));
+                };
+                let (value, rep) = self.element_operand(operand, element)?;
+                let tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(rep)?);
+                let bits = self.element_bits(value, rep);
+                let zero_tag = self.builder.ins().iconst(types::I32, 0);
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                self.call_runtime(&abi::MAP_SET, &[map, tag, bits, zero_tag, zero])?;
+            }
+        } else {
+            let (key_ty, value_ty) = self.map_types(aggregate.ty)?;
+            let MirAggregateFields::Keyed(entries) = &aggregate.fields else {
+                return Err(Decline::new("map fields"));
+            };
+            for entry in entries {
+                let (key, key_rep) = self.element_operand(&entry.key, key_ty)?;
+                let (value, value_rep) = self.element_operand(&entry.value, value_ty)?;
+                let key_tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(key_rep)?);
+                let key = self.element_bits(key, key_rep);
+                let value_tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(value_rep)?);
+                let value = self.element_bits(value, value_rep);
+                self.call_runtime(&abi::MAP_SET, &[map, key_tag, key, value_tag, value])?;
+            }
+        }
+        let (variable, slot_rep) = self.place_slot(destination)?;
+        if slot_rep != (if is_set { Rep::Set } else { Rep::Map }) {
+            return Err(Decline::new("map destination representation"));
+        }
+        self.builder.def_var(variable, map);
         Ok(())
     }
 
@@ -1294,6 +1403,121 @@ impl FunctionLower<'_, '_> {
                     Rep::Bool,
                 )
             }
+            (MirCollectionOp::Length, Rep::Map | Rep::Set) => {
+                (self.call_runtime(&abi::MAP_LEN, &[handle])?, Rep::Int)
+            }
+            (MirCollectionOp::IsEmpty, Rep::Map | Rep::Set) => {
+                let length = self
+                    .call_runtime(&abi::MAP_LEN, &[handle])?
+                    .ok_or_else(|| Decline::new("length result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                (
+                    Some(self.builder.ins().icmp(IntCC::Equal, length, zero)),
+                    Rep::Bool,
+                )
+            }
+            (MirCollectionOp::Index, Rep::Map) => {
+                let [_, key] = args else {
+                    return Err(Decline::new("index arity"));
+                };
+                let Some(destination) = destination else {
+                    return Err(Decline::new("index without destination"));
+                };
+                let (key_ty, _) = self.map_types(self.operand_type(receiver)?)?;
+                let (key, key_rep) = self.element_operand(key, key_ty)?;
+                let key_tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(key_rep)?);
+                let key = self.element_bits(key, key_rep);
+                let result_rep = rep_of(self.state.input.types, self.place_type(destination)?)?;
+                if result_rep == Rep::Opt {
+                    (
+                        self.call_runtime(&abi::MAP_GET_OPT, &[handle, key_tag, key])?,
+                        Rep::Opt,
+                    )
+                } else {
+                    let bits = self
+                        .call_runtime(&abi::MAP_GET, &[handle, key_tag, key])?
+                        .ok_or_else(|| Decline::new("map get result"))?;
+                    (Some(self.element_value(bits, result_rep)), result_rep)
+                }
+            }
+            (MirCollectionOp::Contains | MirCollectionOp::Delete, Rep::Map | Rep::Set) => {
+                let [_, key] = args else {
+                    return Err(Decline::new("key arity"));
+                };
+                let key_ty = match resolve(
+                    self.state.input.types,
+                    self.operand_type(receiver)?.semantic_id(),
+                ) {
+                    Type::Map(key, _) | Type::Set(key) => MirType::semantic(*key),
+                    _ => return Err(Decline::new("key access of a non-map")),
+                };
+                let (key, key_rep) = self.element_operand(key, key_ty)?;
+                let key_tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(key_rep)?);
+                let key = self.element_bits(key, key_rep);
+                let symbol = if op == MirCollectionOp::Delete {
+                    &abi::MAP_REMOVE
+                } else {
+                    &abi::MAP_HAS
+                };
+                (
+                    self.call_runtime(symbol, &[handle, key_tag, key])?,
+                    Rep::Bool,
+                )
+            }
+            (MirCollectionOp::Put, Rep::Map) => {
+                let [_, key, value] = args else {
+                    return Err(Decline::new("put arity"));
+                };
+                let (key_ty, value_ty) = self.map_types(self.operand_type(receiver)?)?;
+                let (key, key_rep) = self.element_operand(key, key_ty)?;
+                let (value, value_rep) = self.element_operand(value, value_ty)?;
+                let key_tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(key_rep)?);
+                let key = self.element_bits(key, key_rep);
+                let value_tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(value_rep)?);
+                let value = self.element_bits(value, value_rep);
+                self.call_runtime(&abi::MAP_SET, &[handle, key_tag, key, value_tag, value])?;
+                return Ok(());
+            }
+            (MirCollectionOp::Append, Rep::Set) => {
+                let [_, item] = args else {
+                    return Err(Decline::new("append arity"));
+                };
+                let element = match resolve(
+                    self.state.input.types,
+                    self.operand_type(receiver)?.semantic_id(),
+                ) {
+                    Type::Set(element) => MirType::semantic(*element),
+                    _ => return Err(Decline::new("set type")),
+                };
+                let (value, rep) = self.element_operand(item, element)?;
+                let tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(rep)?);
+                let bits = self.element_bits(value, rep);
+                let zero_tag = self.builder.ins().iconst(types::I32, 0);
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                self.call_runtime(&abi::MAP_SET, &[handle, tag, bits, zero_tag, zero])?;
+                return Ok(());
+            }
+            (MirCollectionOp::Keys, Rep::Map) => {
+                (self.call_runtime(&abi::MAP_KEYS, &[handle])?, Rep::List)
+            }
+            (MirCollectionOp::Values, Rep::Map) => {
+                (self.call_runtime(&abi::MAP_VALUES, &[handle])?, Rep::List)
+            }
             (MirCollectionOp::Reverse, Rep::List) => (
                 self.call_runtime(&abi::LIST_REVERSED, &[handle])?,
                 Rep::List,
@@ -1387,6 +1611,16 @@ impl FunctionLower<'_, '_> {
                 aggregate,
             } if aggregate.kind == MirAggregateKind::Array => {
                 self.construct_array(destination, aggregate)
+            }
+            MirStatementKind::Construct {
+                destination,
+                aggregate,
+            } if matches!(
+                aggregate.kind,
+                MirAggregateKind::Map | MirAggregateKind::Set
+            ) =>
+            {
+                self.construct_map(destination, aggregate)
             }
             MirStatementKind::Construct {
                 destination,
@@ -1594,7 +1828,7 @@ impl FunctionLower<'_, '_> {
                     return Err(Decline::new("duplicate shape"));
                 };
                 let (value, rep) = self.scalar(argument)?;
-                let copied = if matches!(rep, Rep::List | Rep::Record) {
+                let copied = if matches!(rep, Rep::List | Rep::Record | Rep::Map | Rep::Set) {
                     let tag = self
                         .builder
                         .ins()
@@ -1689,6 +1923,7 @@ impl FunctionLower<'_, '_> {
             Rep::List => self.call_runtime(&abi::TEXT_FROM_LIST, &[value])?,
             Rep::Record => self.call_runtime(&abi::TEXT_FROM_RECORD, &[value])?,
             Rep::Opt => self.call_runtime(&abi::TEXT_FROM_OPT, &[value])?,
+            Rep::Map | Rep::Set => self.call_runtime(&abi::TEXT_FROM_MAP, &[value])?,
             Rep::Bits(width) => {
                 let bits = self
                     .builder
@@ -1788,6 +2023,13 @@ impl FunctionLower<'_, '_> {
         let Some(site) = &conversion.store else {
             let (value, rep) = self.scalar(argument)?;
             let (variable, slot_rep) = self.place_slot(destination)?;
+            if rep == Rep::Set && slot_rep == Rep::List {
+                let keys = self
+                    .call_runtime(&abi::MAP_KEYS, &[value])?
+                    .ok_or_else(|| Decline::new("set keys result"))?;
+                self.builder.def_var(variable, keys);
+                return Ok(());
+            }
             if slot_rep != Rep::Text || rep == Rep::Unit {
                 return Err(Decline::new("explicit conversion"));
             }
@@ -1804,7 +2046,9 @@ impl FunctionLower<'_, '_> {
             | (Rep::Text, Rep::Text)
             | (Rep::List, Rep::List)
             | (Rep::Record, Rep::Record)
-            | (Rep::Opt, Rep::Opt) => value,
+            | (Rep::Opt, Rep::Opt)
+            | (Rep::Map, Rep::Map)
+            | (Rep::Set, Rep::Set) => value,
             (Rep::Bits(from), Rep::Bits(to)) if from == to => value,
             _ => return Err(Decline::new("conversion between representations")),
         };
@@ -1953,6 +2197,10 @@ impl FunctionLower<'_, '_> {
                 let reference = self.runtime_ref(&abi::PRINT_OPT)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
+            Rep::Map | Rep::Set => {
+                let reference = self.runtime_ref(&abi::PRINT_MAP)?;
+                self.builder.ins().call(reference, &[stream, value]);
+            }
             Rep::Text => {
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
                 self.builder.ins().call(reference, &[stream, value]);
@@ -2073,7 +2321,7 @@ impl FunctionLower<'_, '_> {
             Rep::Float => self.float_binary(op, a, b),
             Rep::Bool => self.bool_binary(op, a, b),
             Rep::Text => self.text_binary(op, a, b),
-            Rep::Bits(_) | Rep::List | Rep::Record | Rep::Opt | Rep::Unit => {
+            Rep::Bits(_) | Rep::List | Rep::Record | Rep::Opt | Rep::Map | Rep::Set | Rep::Unit => {
                 Err(Decline::new("unit operands"))
             }
         }

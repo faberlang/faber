@@ -216,6 +216,14 @@ const TAG_BITS: i32 = 4;
 const TAG_LIST: i32 = 8;
 const TAG_STRUCT: i32 = 9;
 const TAG_OPT: i32 = 10;
+const TAG_MAP: i32 = 11;
+
+/// A runtime map (`set` false) or set (`set` true): tagged key/value entries
+/// in insertion order.
+pub struct Map {
+    set: bool,
+    entries: Vec<(i32, i64, i32, i64)>,
+}
 
 /// A present optional payload.
 pub struct Present {
@@ -262,6 +270,7 @@ fn element_text(tag: i32, bits: i64) -> String {
             Some(present) => element_text(present.tag, present.bits),
             None => tokens().none.clone(),
         },
+        TAG_MAP => map_text(unsafe { &*(bits as *const Map) }),
         tag if (TAG_BITS..TAG_BITS + 4).contains(&tag) => bits_text(bits, 8 << (tag - TAG_BITS)),
         _ => bits.to_string(),
     }
@@ -301,6 +310,18 @@ fn record_text(record: &Record) -> String {
 
 fn duplicate(tag: i32, bits: i64) -> i64 {
     match tag {
+        TAG_MAP => {
+            let source = unsafe { &*(bits as *const Map) };
+            let entries = source
+                .entries
+                .iter()
+                .map(|&(kt, kb, vt, vb)| (kt, duplicate(kt, kb), vt, duplicate(vt, vb)))
+                .collect();
+            Box::into_raw(Box::new(Map {
+                set: source.set,
+                entries,
+            })) as i64
+        }
         TAG_OPT => match unsafe { (bits as *const Present).as_ref() } {
             Some(present) => Box::into_raw(Box::new(Present {
                 tag: present.tag,
@@ -342,6 +363,192 @@ fn duplicate(tag: i32, bits: i64) -> i64 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_duplicate(tag: i32, bits: i64) -> i64 {
     duplicate(tag, bits)
+}
+
+fn map_text(map: &Map) -> String {
+    if map.set {
+        let parts: Vec<String> = map
+            .entries
+            .iter()
+            .map(|&(tag, bits, _, _)| element_text(tag, bits))
+            .collect();
+        return format!("[{}]", parts.join(", "));
+    }
+    let parts: Vec<String> = map
+        .entries
+        .iter()
+        .map(|&(kt, kb, vt, vb)| {
+            let key = if kt == TAG_TEXT {
+                format!("\"{}\"", text_str(unsafe { text_bytes(kb as *const u8) }))
+            } else {
+                element_text(kt, kb)
+            };
+            let value = if vt == TAG_TEXT {
+                text_str(unsafe { text_bytes(vb as *const u8) }).into_owned()
+            } else {
+                element_text(vt, vb)
+            };
+            format!("{key}: {value}")
+        })
+        .collect();
+    format!("{{{}}}", parts.join(", "))
+}
+
+fn map_find(map: &Map, tag: i32, bits: i64) -> Option<usize> {
+    map.entries
+        .iter()
+        .position(|&(kt, kb, _, _)| kt == tag && element_equal(tag, kb, bits))
+}
+
+/// New empty map (flag 0) or set (flag 1).
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_map_new(set: i32) -> *mut Map {
+    Box::into_raw(Box::new(Map {
+        set: set != 0,
+        entries: Vec::new(),
+    }))
+}
+
+/// Insert or replace an entry.
+///
+/// # Safety
+///
+/// `map` is a live runtime map.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_map_set(
+    map: *mut Map,
+    key_tag: i32,
+    key: i64,
+    value_tag: i32,
+    value: i64,
+) {
+    let map = unsafe { &mut *map };
+    match map_find(map, key_tag, key) {
+        Some(at) => map.entries[at] = (key_tag, key, value_tag, value),
+        None => map.entries.push((key_tag, key, value_tag, value)),
+    }
+}
+
+/// Value bits for a key; a missing key ends the run.
+///
+/// # Safety
+///
+/// `map` is a live runtime map.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_map_get(map: *const Map, key_tag: i32, key: i64) -> i64 {
+    let map = unsafe { &*map };
+    match map_find(map, key_tag, key) {
+        Some(at) => map.entries[at].3,
+        None => unsafe { __faber_clif_v1_trap(c"key not found".as_ptr().cast(), 13) },
+    }
+}
+
+/// Value as an optional.
+///
+/// # Safety
+///
+/// `map` is a live runtime map.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_map_get_opt(
+    map: *const Map,
+    key_tag: i32,
+    key: i64,
+) -> *const Present {
+    let map = unsafe { &*map };
+    match map_find(map, key_tag, key) {
+        Some(at) => {
+            let (_, _, tag, bits) = map.entries[at];
+            Box::into_raw(Box::new(Present { tag, bits }))
+        }
+        None => std::ptr::null(),
+    }
+}
+
+/// Key membership.
+///
+/// # Safety
+///
+/// `map` is a live runtime map.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_map_has(map: *const Map, key_tag: i32, key: i64) -> i8 {
+    i8::from(map_find(unsafe { &*map }, key_tag, key).is_some())
+}
+
+/// Remove a key; true when it was present.
+///
+/// # Safety
+///
+/// `map` is a live runtime map.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_map_remove(map: *mut Map, key_tag: i32, key: i64) -> i8 {
+    let map = unsafe { &mut *map };
+    match map_find(map, key_tag, key) {
+        Some(at) => {
+            map.entries.remove(at);
+            1
+        }
+        None => 0,
+    }
+}
+
+/// Entry count.
+///
+/// # Safety
+///
+/// `map` is a live runtime map.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_map_len(map: *const Map) -> i64 {
+    i64::try_from(unsafe { &*map }.entries.len()).unwrap_or(i64::MAX)
+}
+
+/// Keys as a new list.
+///
+/// # Safety
+///
+/// `map` is a live runtime map.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_map_keys(map: *const Map) -> *mut List {
+    let items = unsafe { &*map }
+        .entries
+        .iter()
+        .map(|&(tag, bits, _, _)| (tag, bits))
+        .collect();
+    list_new_from(items)
+}
+
+/// Values as a new list.
+///
+/// # Safety
+///
+/// `map` is a live runtime map.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_map_values(map: *const Map) -> *mut List {
+    let items = unsafe { &*map }
+        .entries
+        .iter()
+        .map(|&(_, _, tag, bits)| (tag, bits))
+        .collect();
+    list_new_from(items)
+}
+
+/// Print one map or set line.
+///
+/// # Safety
+///
+/// `map` is a live runtime map.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_print_map(stream: i32, map: *const Map) {
+    emit(stream, &map_text(unsafe { &*map }));
+}
+
+/// Render a map or set as text.
+///
+/// # Safety
+///
+/// `map` is a live runtime map.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_from_map(map: *const Map) -> *const u8 {
+    text_new(map_text(unsafe { &*map }).as_bytes())
 }
 
 /// Box a present optional payload.
