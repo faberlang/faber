@@ -1433,6 +1433,10 @@ mod octeti_tensor_bytes_list_test;
 mod ordo_conversio_test;
 
 #[cfg(test)]
+#[path = "ordo_order_test.rs"]
+mod ordo_order_test;
+
+#[cfg(test)]
 #[path = "conversio_function_route_test.rs"]
 mod conversio_function_route_test;
 

@@ -1660,6 +1660,11 @@ impl TypeChecker<'_> {
             // order lexicographically.
             return result;
         }
+        if let Some(result) = self.check_ordo_order_compare(lhs, lhs_ty, rhs_ty) {
+            // Operator ruling 2026-10-15: two values of one
+            // `ordo` order by their declared discriminants.
+            return result;
+        }
         if self.is_instans(lhs_ty) && self.is_instans(rhs_ty) {
             self.instans_join(lhs_ty, rhs_ty, lhs.span);
         } else if self.is_textus(lhs_ty) && self.is_textus(rhs_ty) {
@@ -1678,6 +1683,44 @@ impl TypeChecker<'_> {
             self.numeric_ordering_bin(lhs_ty, rhs_ty, lhs.span);
         }
         self.bool_type()
+    }
+
+    /// Admission law for `≺ ≻ ≤ ≥` over two values of one `ordo` enum.
+    ///
+    /// Operator ruling 2026-10-15: two values of the same
+    /// `ordo` order by their declared discriminants, not by declaration
+    /// position. The resolved rows are recorded on the analyzed unit keyed by
+    /// the comparison's left-operand id, mirroring how `tensor_edge_policies`
+    /// is filled; lowering converts both operands to those integers. A
+    /// different enum on either side, or a string-valued `ordo` with no
+    /// numeric discriminants, keeps the ordinary mismatch path.
+    fn check_ordo_order_compare(
+        &mut self,
+        lhs: &HirExpression,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+    ) -> Option<TypeId> {
+        let ordo = self.ordo_def(lhs_ty)?;
+        if self.ordo_def(rhs_ty) != Some(ordo) {
+            return None;
+        }
+        let facts = self.ordo_members.get(&ordo)?;
+        let mut next = 0i64;
+        let mut rows = Vec::with_capacity(facts.len());
+        for fact in facts {
+            let value = match &fact.value {
+                Some(radix_hir::HirOrdoValue::Integer(value)) => *value,
+                Some(radix_hir::HirOrdoValue::String(_)) => return None,
+                None => next,
+            };
+            next = value.wrapping_add(1);
+            rows.push((fact.variant, value));
+        }
+        self.tensor_edge_policies
+            .ordo_order
+            .comparisons
+            .insert(lhs.id, rows);
+        Some(self.bool_type())
     }
 
     /// `·` inner product: contracts the inner dimension(s). vec·vec → scalar;

@@ -3981,6 +3981,21 @@ impl<'a> FunctionBuilder<'a> {
         {
             return self.lower_tuple_order(op, lhs, rhs, expr);
         }
+        // Operator ruling 2026-10-15: `≺ ≻ ≤ ≥` over two values
+        // of one `ordo` order by their declared discriminants. Typecheck
+        // recorded the rows keyed by the left operand; convert both operands to
+        // those integers and compare.
+        if matches!(op, HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq)
+            && let Some(rows) = self
+                .context
+                .tensor_edge_policies
+                .ordo_order
+                .comparisons
+                .get(&lhs.id)
+                .cloned()
+        {
+            return self.lower_ordo_order_compare(op, &rows, lhs, rhs, expr);
+        }
         let Some(mir_op) = mir_bin_op(op) else {
             self.errors
                 .push(MirError::unsupported(expr.span, "binary operator without a MIR primitive"));
@@ -4009,6 +4024,82 @@ impl<'a> FunctionBuilder<'a> {
         let ty = self.expr_ty(expr)?;
 
         Some(self.assign_temp(MirValueKind::Binary { op: mir_op, lhs, rhs }, ty, expr.span))
+    }
+
+    /// Lower an `ordo` ordering comparison by converting both operands to their
+    /// declared discriminants and comparing the integers.
+    fn lower_ordo_order_compare(
+        &mut self,
+        op: HirBinOp,
+        rows: &[(DefId, i64)],
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let int_ty = self.types.primitive(Primitive::Numerus);
+        let lhs_value = self.lower_ordo_operand_discriminant(lhs, rows, int_ty)?;
+        let rhs_value = self.lower_ordo_operand_discriminant(rhs, rows, int_ty)?;
+        let mir_op = mir_bin_op(op)?;
+        let result_ty = self.expr_ty(expr)?;
+        Some(self.assign_temp(
+            MirValueKind::Binary { op: mir_op, lhs: lhs_value, rhs: rhs_value },
+            result_ty,
+            expr.span,
+        ))
+    }
+
+    /// Convert one `ordo` operand to its declared discriminant: an equality
+    /// chain over the members, in declaration order, that writes one integer
+    /// temp — the same shape `lower_ordo_conversio` emits for `Ordo ↦ numerus`.
+    fn lower_ordo_operand_discriminant(
+        &mut self,
+        source: &HirExpression,
+        rows: &[(DefId, i64)],
+        int_ty: TypeId,
+    ) -> Option<MirOperand> {
+        let span = source.span;
+        let source_ty = self.expr_ty(source)?;
+        let value = self.lower_expr_value(source)?;
+        let mir_int_ty = MirType::semantic(int_ty);
+        let result = MirPlace::temp(self.push_temp(mir_int_ty, span));
+        let join_id = self.fresh_block(span);
+        let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let mut reaches_join = false;
+
+        for (variant, declared) in rows {
+            let probe = self.construct_temp(
+                MirAggregateKind::EnumVariant(*variant),
+                MirAggregateFields::Ordered(Vec::new()),
+                source_ty,
+                span,
+            );
+            let condition = self.binary_temp(MirBinOp::Eq, value.clone(), probe, bool_ty, span);
+            let then_id = self.fresh_block(span);
+            let else_id = self.fresh_block(span);
+            self.terminate_current(
+                MirTerminatorKind::Branch { condition, then_block: then_id, else_block: else_id },
+                span,
+            );
+            self.switch_to(then_id);
+            self.assign(
+                result.clone(),
+                MirOperand::Constant(MirConstant::Int(*declared)),
+                mir_int_ty,
+                span,
+            );
+            reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
+            self.switch_to(else_id);
+        }
+
+        // Every `ordo` value is one of the members, so the fall-through cannot
+        // be reached.
+        self.terminate_current(MirTerminatorKind::Unreachable, span);
+        if reaches_join {
+            self.switch_to(join_id);
+        } else {
+            self.seal_unreachable(join_id, span);
+        }
+        Some(MirOperand::Place(result))
     }
 
     fn lower_between_comparison(
