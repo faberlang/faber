@@ -260,7 +260,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         // A promise carrier is its payload: async functions run to
         // completion and `cede` reads the value.
         Type::Promissum(inner) => rep_of(table, MirType::semantic(*inner)),
-        Type::Array(element) | Type::BoundedArray { element, .. } => {
+        Type::Array(element) | Type::BoundedArray { element, .. } | Type::Cursor(element) => {
             rep_of(table, MirType::semantic(*element))?;
             Ok(Rep::List)
         }

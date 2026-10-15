@@ -255,7 +255,8 @@ impl<'a> ClifCapability<'a> {
             Type::ModularWord(_) => Some(Gap::Subset("wrapping value".to_owned())),
             Type::SaturatingWord(_) => Some(Gap::Subset("saturating value".to_owned())),
             Type::Promissum(inner) => self.type_gap(MirType::semantic(*inner)),
-            Type::Cursor(_) | Type::AsyncCursor(_, _) | Type::PromissumFailable(_, _) => {
+            Type::Cursor(element) => self.type_gap(MirType::semantic(*element)),
+            Type::AsyncCursor(_, _) | Type::PromissumFailable(_, _) => {
                 Some(Gap::Subset("async value".to_owned()))
             }
             Type::Intervallum(_) => Some(Gap::Subset("interval value".to_owned())),
