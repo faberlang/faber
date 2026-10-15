@@ -151,6 +151,9 @@ impl Emitter<'_> {
             return Err(unsupported("local without a resolved type"));
         };
         let class = classify(self.types, ty)?;
+        // A declaration initializer's `copy` lands on the declared type; the
+        // bind deep-duplicates its source (R7).
+        let copy = crate::ty::is_copy_marker(self.types, ty);
         let Some(init) = &local.init else {
             if entry_args && class == Ty::List(crate::ty::Elem::Text) {
                 return self.entry_arguments(out, local);
@@ -158,6 +161,11 @@ impl Emitter<'_> {
             return Err(unsupported("local without an initializer"));
         };
         let value = self.expr(init)?;
+        let value = if copy {
+            self.copy_value(value)?
+        } else {
+            value
+        };
         let value = self.settle(value, class)?;
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));

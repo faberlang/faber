@@ -11,9 +11,9 @@
 use crate::Emitter;
 use crate::error::unsupported;
 use crate::expr::{Operand, Value, c_string};
-use crate::helpers::Helper;
+use crate::helpers::{Helper, ListOp};
 use crate::names::Namer;
-use crate::ty::{Ty, classify};
+use crate::ty::{Inner, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{DefId, HirExpression, HirStruct};
 use radix_lexer::Symbol;
@@ -468,6 +468,86 @@ impl Emitter<'_> {
             .ok();
         }
         Ok((prototypes, definitions))
+    }
+
+    /// Deep-copy functions for the genera a `copy` asked for (R7). The body
+    /// allocates a fresh object and copies every field: a list a fresh array,
+    /// a genus a recursive clone, a scalar / text (immutable) / scalar
+    /// optional by assignment. Nested clones join the worklist as they are
+    /// named, so one call emits the whole closure.
+    pub(crate) fn copy_functions(&mut self) -> Result<(String, String), CodegenError> {
+        let mut prototypes = String::new();
+        let mut definitions = String::new();
+        let mut done = 0;
+        let mut emitted: Vec<DefId> = Vec::new();
+        while done < self.copies.len() {
+            let def_id = self.copies[done];
+            done += 1;
+            if emitted.contains(&def_id) {
+                continue;
+            }
+            emitted.push(def_id);
+            let (c_name, fields) = {
+                let genus = self.genus(def_id)?;
+                (genus.c_name.clone(), genus.fields.clone())
+            };
+            let signature = format!(
+                "static {c_name} *{c_name}_copy(faber_arena *faber_a, const {c_name} *faber_self)"
+            );
+            prototypes.push_str(&signature);
+            prototypes.push_str(";\n");
+            self.support.need(Helper::Arena);
+            let mut body = String::new();
+            if fields.is_empty() {
+                body.push_str("    (void)faber_self;\n");
+            }
+            for field in &fields {
+                let read = format!("faber_self->{}", field.c_name);
+                let written = self.copy_field(&read, field.ty)?;
+                writeln!(body, "    faber_copy->{} = {written};", field.c_name).ok();
+            }
+            write!(
+                definitions,
+                "{signature} {{\n    {c_name} *faber_copy = faber_alloc(faber_a, sizeof *faber_copy);\n{body}    return faber_copy;\n}}\n\n"
+            )
+            .ok();
+        }
+        Ok((prototypes, definitions))
+    }
+
+    /// One field's deep copy, read from `read`.
+    fn copy_field(&mut self, read: &str, ty: Ty) -> Result<String, CodegenError> {
+        Ok(match ty {
+            Ty::List(elem) => {
+                self.support.need(Helper::List(elem, ListOp::Of));
+                format!("faber_list_{}_copy(faber_a, {read})", elem.suffix())
+            }
+            Ty::Genus(inner) => self.genus_copy_call(inner, read)?,
+            Ty::Opt(inner) => match inner {
+                // Text is immutable, so sharing the pointer is a copy; a
+                // scalar optional is a value struct.
+                Inner::Text | Inner::Int | Inner::Bool | Inner::Float => read.to_owned(),
+                Inner::List(elem) => {
+                    self.support.need(Helper::List(elem, ListOp::Of));
+                    format!(
+                        "({read} == NULL ? NULL : faber_list_{}_copy(faber_a, {read}))",
+                        elem.suffix()
+                    )
+                }
+                Inner::Genus(id) => {
+                    let clone = self.genus_copy_call(id, read)?;
+                    format!("({read} == NULL ? NULL : {clone})")
+                }
+            },
+            _ => read.to_owned(),
+        })
+    }
+
+    /// `g_<Name>_copy(faber_a, read)`, requesting the clone.
+    fn genus_copy_call(&mut self, def_id: DefId, read: &str) -> Result<String, CodegenError> {
+        let c_name = self.genus(def_id)?.c_name.clone();
+        self.copies.push(def_id);
+        Ok(format!("{c_name}_copy(faber_a, {read})"))
     }
 
     /// One field as a genus shows it: text quoted, like a list element.

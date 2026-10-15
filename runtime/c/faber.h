@@ -777,6 +777,13 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         return list;                                                                    \
     }                                                                                   \
                                                                                         \
+    /* The `copy` marker (R7): a fresh array, never the source's. An element   \
+     * that is itself a pointer (text) is immutable, so sharing it is a copy. */\
+    static inline faber_list_##NAME *faber_list_##NAME##_copy(                          \
+        faber_arena *arena, const faber_list_##NAME *list) {                            \
+        return faber_list_##NAME##_of(arena, list->len, list->items);                   \
+    }                                                                                   \
+                                                                                        \
     static inline void faber_list_##NAME##_push(faber_arena *arena,                     \
                                                 faber_list_##NAME *list, TYPE item) {   \
         if (list->len == list->cap) {                                                   \

@@ -204,11 +204,25 @@ impl Ty {
     }
 }
 
+/// Whether a slot's declared type carries the value-side `copy` marker (R7).
+/// A declaration initializer's `copy` lands on the declared type, so the
+/// local's own type says the bind deep-duplicates its source.
+pub(crate) fn is_copy_marker(types: &TypeTable, ty: TypeId) -> bool {
+    match types.get(ty) {
+        Type::Alias(_, inner) => is_copy_marker(types, *inner),
+        Type::Ref(SemanticMutability::Copy, _) => true,
+        _ => false,
+    }
+}
+
 /// Classify a semantic type, rejecting everything outside the subset by name.
 pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError> {
     match types.get(ty) {
         Type::Alias(_, inner) => classify(types, *inner),
-        Type::Ref(SemanticMutability::Copy, _) => Err(unsupported("copy marker")),
+        // A `copy` parameter's storage is its declared class: the caller
+        // passes a deep duplicate (the call-site marker drives `copy_value`),
+        // so the callee sees an ordinary value.
+        Type::Ref(SemanticMutability::Copy, inner) => classify(types, *inner),
         // A `ref` or `mut` view of a list or a genus is the same pointer: both
         // already alias (R1). A view of a scalar would need a pointer to the
         // caller's cell, which this subset does not emit.

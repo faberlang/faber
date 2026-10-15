@@ -239,6 +239,15 @@ impl Emitter<'_> {
             HirExpressionKind::Vacua => self.empty_list(expr),
             HirExpressionKind::Array(elements) => self.list_literal(expr, elements),
             HirExpressionKind::Index(base, index) => self.list_read(base, index),
+            // `copy x` on a value (a bind or a return), `own x` a transfer.
+            HirExpressionKind::Marked { marker, expr } => match marker {
+                radix_hir::HirArgMarker::Copy => {
+                    let value = self.expr(expr)?;
+                    self.copy_value(value)
+                }
+                radix_hir::HirArgMarker::Own => self.expr(expr),
+                _ => Err(unsupported("value-side copy or own marker")),
+            },
             HirExpressionKind::MethodCall(receiver, method, type_args, args, arm) => {
                 if !type_args.is_empty() || arm.is_some() {
                     return Err(unsupported("generic or propagating method call"));
@@ -447,20 +456,34 @@ impl Emitter<'_> {
                     Omission::Omitted => (None, None),
                 },
             };
-            let list_view = matches!(
-                marker,
+            let shared = matches!(param, Ty::List(_) | Ty::Genus(_));
+            match marker {
+                // `ref` / `mut` alias the caller's pointer: only a list or a
+                // genus has one. `copy` (deep) and `own` (transfer) apply to
+                // any value; a scalar copies by assignment either way.
                 Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
-            ) && matches!(param, Ty::List(_) | Ty::Genus(_));
-            if marker.is_some() && !list_view {
-                return Err(unsupported(
-                    "access marker on an argument that is not a list or genus",
-                ));
+                    if !shared =>
+                {
+                    return Err(unsupported(
+                        "access marker on an argument that is not a list or genus",
+                    ));
+                }
+                Some(radix_hir::HirArgMarker::Axis) => {
+                    return Err(unsupported(
+                        "access marker on an argument that is not a list or genus",
+                    ));
+                }
+                _ => {}
             }
             let Some(expr) = expr else {
                 operands.push(self.none_of(*param)?);
                 continue;
             };
             let mut operand = self.expr(expr)?;
+            // `copy x` at the call site deep-duplicates before the call (R7).
+            if marker == Some(radix_hir::HirArgMarker::Copy) {
+                operand = self.copy_value(operand)?;
+            }
             // An argument carries no store node in HIR, but the runner checks
             // it as a store and names it `argument`; the C target does the same.
             if let Ty::Sized(width) = param {
@@ -926,6 +949,35 @@ impl Emitter<'_> {
             "(__extension__ ({{ int faber_o = 0; int64_t faber_r = {}; faber_o ? {exact} : faber_r; }}))",
             narrow.text
         )
+    }
+
+    /// The `copy` marker (R7): a deep duplicate. A list gets a fresh arena
+    /// array (its elements are values, or immutable text); a genus is
+    /// duplicated field by field through the `g_<Name>_copy` generated on
+    /// request; a scalar, text or optional copies by assignment. The source
+    /// is evaluated once, as the call's argument.
+    pub(crate) fn copy_value(&mut self, value: Operand) -> Result<Operand, CodegenError> {
+        let effect = value.effect;
+        match value.value {
+            Value::List(elem) => {
+                self.support.need(Helper::Arena);
+                self.support
+                    .need(Helper::List(elem, crate::helpers::ListOp::Of));
+                let text = format!("faber_list_{}_copy(faber_a, {})", elem.suffix(), value.text);
+                Ok(Operand::new(text, Value::List(elem)).with_effect(effect))
+            }
+            Value::Genus(def_id) => {
+                self.support.need(Helper::Arena);
+                let Some(genus) = self.genera.get(&def_id) else {
+                    return Err(unsupported("copy of a genus outside the program"));
+                };
+                let c_name = genus.c_name.clone();
+                self.copies.push(def_id);
+                let text = format!("{c_name}_copy(faber_a, {})", value.text);
+                Ok(Operand::new(text, Value::Genus(def_id)).with_effect(effect))
+            }
+            _ => Ok(value),
+        }
     }
 
     /// Integer comparison by exact value: C's usual arithmetic conversions

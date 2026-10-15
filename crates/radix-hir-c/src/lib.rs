@@ -45,6 +45,8 @@ mod control_test;
 #[cfg(test)]
 mod conversio_test;
 #[cfg(test)]
+mod copy_test;
+#[cfg(test)]
 mod emit_test;
 #[cfg(test)]
 mod enumeration_test;
@@ -159,6 +161,7 @@ impl CCodegen<'_> {
             arena,
             genera: FxHashMap::default(),
             shows: Vec::new(),
+            copies: Vec::new(),
             variants: FxHashMap::default(),
             equals: Vec::new(),
             sponte_params: FxHashSet::default(),
@@ -209,6 +212,8 @@ pub(crate) struct Emitter<'a> {
     genera: FxHashMap<DefId, crate::genus::Genus>,
     /// Genera whose show function the program asked for, in request order.
     shows: Vec<DefId>,
+    /// Genera whose deep-copy function (`copy`, R7) the program asked for.
+    copies: Vec<DefId>,
     /// Each enumeration variant: the enumeration and its position.
     variants: FxHashMap<DefId, (DefId, usize)>,
     /// Enumerations whose structural equality function was asked for.
@@ -250,6 +255,7 @@ impl Emitter<'_> {
         // helpers too.
         let (show_prototypes, show_definitions) = self.show_functions()?;
         let (equal_prototypes, equal_definitions) = self.equal_functions()?;
+        let (copy_prototypes, copy_definitions) = self.copy_functions()?;
         if hir.entry.is_none() {
             self.support.need(crate::helpers::Helper::Trap);
         }
@@ -260,7 +266,7 @@ impl Emitter<'_> {
             out.push('\n');
         }
         let prototypes = format!(
-            "{}{show_prototypes}{equal_prototypes}",
+            "{}{show_prototypes}{equal_prototypes}{copy_prototypes}",
             items.prototypes(&self.called)
         );
         if !prototypes.is_empty() {
@@ -270,6 +276,7 @@ impl Emitter<'_> {
         out.push_str(&items.definitions(&self.called));
         out.push_str(&show_definitions);
         out.push_str(&equal_definitions);
+        out.push_str(&copy_definitions);
         if self.uses_args {
             out.push_str("int main(int argc, char **argv) {\n");
         } else {
