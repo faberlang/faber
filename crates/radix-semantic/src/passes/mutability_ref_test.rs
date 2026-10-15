@@ -190,3 +190,30 @@ incipit {
         ISSUE_ASSIGN_THROUGH_REF,
     );
 }
+
+#[test]
+fn ref_param_field_write_has_no_de_parameter_report() {
+    let src = "genus Punctum { varia numerus x }\nfunctio f(de Punctum p) → vacuum { p.x ← 1 }\nincipit { }";
+    let result = crate::test_support::analyze_source_la(src);
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert!(
+        errors
+            .iter()
+            .any(|e| crate::test_support::issue(e) == Some(ISSUE_ASSIGN_THROUGH_REF)),
+        "{errors:?}"
+    );
+    assert!(
+        errors
+            .iter()
+            .all(|e| crate::test_support::issue(e) != Some("assign_to_de_parameter")),
+        "one fault, one report: {errors:?}"
+    );
+}
+
+#[test]
+fn ref_param_whole_value_write_still_reports_de_parameter() {
+    assert_rejects_with_issue_la(
+        "functio f(de numerus n) → vacuum { n ← 1 }\nincipit { }",
+        "assign_to_de_parameter",
+    );
+}

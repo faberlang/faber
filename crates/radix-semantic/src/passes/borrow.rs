@@ -1084,10 +1084,9 @@ impl<'a> BorrowChecker<'a> {
 
     /// Access rules for writing `target`, shared by assignment and `⇇`.
     fn check_lvalue_access(&mut self, target: &HirExpression) {
-        if Self::is_projection(target)
-            && let Some(def_id) = Self::root_def_id(target)
-            && self.ref_roots.contains(&def_id)
-        {
+        let through_ref = Self::is_projection(target)
+            && Self::root_def_id(target).is_some_and(|def_id| self.ref_roots.contains(&def_id));
+        if through_ref {
             self.error(
                 SemanticErrorKind::AssignToImmutableBorrow,
                 ISSUE_ASSIGN_THROUGH_REF,
@@ -1116,7 +1115,9 @@ impl<'a> BorrowChecker<'a> {
                 self.nonmut_agg_write_error(origin, target.span);
             }
             self.check_projection_inputs(target);
-            self.write_use(def_id, target.span);
+            // One fault, one report: a projection write through a `de`
+            // parameter is `assign_through_ref` only.
+            self.write_use_reporting(def_id, target.span, !through_ref);
         } else {
             self.check_expr(target);
         }
@@ -2327,15 +2328,28 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn write_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
+        self.write_use_reporting(def_id, span, true);
+    }
+
+    /// `report_de_parameter` is false when the caller already reported the
+    /// write as `assign_through_ref`, so the `de` parameter is not named twice.
+    fn write_use_reporting(
+        &mut self,
+        def_id: DefId,
+        span: radix_lexer::Span,
+        report_de_parameter: bool,
+    ) {
         self.note_live_unmarked_own_bind(def_id);
         self.note_live_own_arg(def_id);
         if let Some(usage) = self.param_usage.get_mut(&def_id) {
             if matches!(usage.mode, HirParamMode::De) {
-                self.error(
-                    SemanticErrorKind::AssignToImmutableBorrow,
-                    ISSUE_ASSIGN_TO_DE_PARAMETER,
-                    span,
-                );
+                if report_de_parameter {
+                    self.error(
+                        SemanticErrorKind::AssignToImmutableBorrow,
+                        ISSUE_ASSIGN_TO_DE_PARAMETER,
+                        span,
+                    );
+                }
             } else {
                 // `mut` writes the caller's value; `own`/`copy` write the
                 // callee's own value. Either way the parameter is mutated.
