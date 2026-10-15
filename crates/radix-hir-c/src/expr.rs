@@ -11,7 +11,7 @@
 use crate::Emitter;
 use crate::error::unsupported;
 use crate::helpers::Helper;
-use crate::ty::{Elem, Ty, classify};
+use crate::ty::{Elem, Inner, IntWidth, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{
     DefId, HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral,
@@ -48,17 +48,23 @@ pub(crate) enum Value {
     Genus(DefId),
     /// A binary64 value (`double`).
     Float,
+    /// An optional: a pointer that may be `NULL`, or a presence-flag struct.
+    Opt(Inner),
 }
 
 impl From<Ty> for Value {
     fn from(ty: Ty) -> Self {
         match ty {
             Ty::Int => Value::Int,
+            // `u64` does not fit an `int64_t`, so it reads as an exact value.
+            Ty::Sized(IntWidth::U64) => Value::Exact,
+            Ty::Sized(_) => Value::Int,
             Ty::Text => Value::Text,
             Ty::Bool => Value::Truth,
             Ty::List(elem) => Value::List(elem),
             Ty::Genus(def_id) => Value::Genus(def_id),
             Ty::Float => Value::Float,
+            Ty::Opt(inner) => Value::Opt(inner),
         }
     }
 }
@@ -75,6 +81,9 @@ pub(crate) struct Operand {
     /// The same value computed in `int64_t` on the C4 fast path, present only
     /// for a pure integer expression whose leaves are `int64_t` values.
     pub(crate) narrow: Option<Narrow>,
+    /// The cell class whose range check this value already went through (the
+    /// store node typecheck put around it), so a store does not check twice.
+    pub(crate) stored: Option<Ty>,
 }
 
 /// An integer expression in `int64_t` that sets `faber_o` on any overflow,
@@ -123,6 +132,7 @@ impl Operand {
             constant: None,
             effect: false,
             narrow: None,
+            stored: None,
         }
     }
 
@@ -152,7 +162,25 @@ fn c_int64(value: i64) -> String {
 impl Emitter<'_> {
     pub(crate) fn expr(&mut self, expr: &HirExpression) -> Result<Operand, CodegenError> {
         match &expr.kind {
-            HirExpressionKind::Path(def_id) => self.path(*def_id),
+            HirExpressionKind::Path(def_id) => {
+                let operand = self.path(*def_id)?;
+                // Typecheck narrows the type of a read the guard proved
+                // present; the cell is still the optional.
+                if let (Value::Opt(inner), Some(ty)) = (operand.value, expr.ty)
+                    && classify(self.types, ty).is_ok_and(|class| class == inner.ty())
+                {
+                    return Ok(Self::narrow_read(&operand, inner));
+                }
+                Ok(operand)
+            }
+            HirExpressionKind::NonNull(subject, kind) => {
+                let unwrapped = self.unwrap(subject)?;
+                match kind {
+                    radix_hir::HirNonNullKind::Value => Ok(unwrapped),
+                    radix_hir::HirNonNullKind::Member(name) => self.field_from(&unwrapped, *name),
+                    _ => Err(unsupported("non-null assertion followed by an index")),
+                }
+            }
             HirExpressionKind::Literal(literal) => {
                 // An integer literal typed as a float is that float (`1` in a
                 // `float` slot is `1.0`); typecheck admits no other crossing.
@@ -160,6 +188,7 @@ impl Emitter<'_> {
                     classify(self.types, ty).is_ok_and(|class| class == Ty::Float)
                 });
                 match literal {
+                    HirLiteral::Nil => self.none_value(expr),
                     HirLiteral::Int(value) if as_float =>
                     {
                         #[expect(clippy::cast_precision_loss)]
@@ -178,7 +207,21 @@ impl Emitter<'_> {
                 recovery: None,
                 ..
             } => self.implicit_store(source, *slot, site),
+            HirExpressionKind::Conversio {
+                source,
+                target: HirConversioTarget::Type(target),
+                params,
+                recovery,
+                route: None,
+                implicit: None,
+            } => self.conversion(source, *target, params, recovery.as_deref()),
             HirExpressionKind::Scriptum(template, args) => self.template(*template, args),
+            HirExpressionKind::Si {
+                cond,
+                then_block,
+                then_catch: None,
+                else_block: Some(else_block),
+            } => self.conditional(expr, cond, then_block, else_block),
             HirExpressionKind::Vacua => self.empty_list(expr),
             HirExpressionKind::Array(elements) => self.list_literal(expr, elements),
             HirExpressionKind::Index(base, index) => self.list_read(base, index),
@@ -195,8 +238,20 @@ impl Emitter<'_> {
                     let receiver = self.expr(receiver)?;
                     return self.float_method(&receiver, receiver_ty, *method, args);
                 }
+                if let (Some(Ty::Text), Some(receiver_ty)) = (class, receiver.ty) {
+                    let receiver = self.expr(receiver)?;
+                    return self.text_method(receiver, receiver_ty, *method, args);
+                }
                 self.list_method(receiver, *method, args)
             }
+            HirExpressionKind::Sort {
+                direction,
+                source_mode: radix_hir::HirSortSource::Values,
+                source,
+                binding: None,
+                body: None,
+                ..
+            } => self.sort_values(*direction, source),
             HirExpressionKind::Struct(def_id, fields) => {
                 let given = fields
                     .iter()
@@ -212,6 +267,42 @@ impl Emitter<'_> {
                 Ty::Genus(def_id) => self.construct_entries(def_id, entries),
                 _ => Err(unsupported("object literal that is not a genus")),
             },
+            // `value ∷ T`: the value, checked against the type it is given.
+            HirExpressionKind::Verte {
+                source,
+                target,
+                entries: None,
+            } => {
+                let class = classify(self.types, *target)?;
+                if Self::is_none_literal(source) {
+                    return self.none_of(class);
+                }
+                // `[1, 2, 3] ∷ list<int>`: the literal's own type is bounded
+                // by its length; the ascription makes it growable.
+                let literal = matches!(
+                    source.kind,
+                    HirExpressionKind::Array(_) | HirExpressionKind::Vacua
+                );
+                let widen =
+                    literal && matches!(class, Ty::List(_)) && !self.is_bounded_type(*target);
+                let before = self.unbounded_literals;
+                self.unbounded_literals = before || widen;
+                let value = self.expr(source);
+                self.unbounded_literals = before;
+                self.settle(value?, class)
+            }
+            // `x is none` / `x not is none`.
+            HirExpressionKind::TypeCheck {
+                positive,
+                expr: subject,
+                ty,
+            } if matches!(
+                self.types.get(*ty),
+                radix_types::Type::Primitive(radix_types::Primitive::Nihil)
+            ) =>
+            {
+                self.none_test(*positive, subject)
+            }
             HirExpressionKind::Field(base, name) => self.field_read(base, *name),
             HirExpressionKind::Call(callee, type_args, args, arm) => {
                 if !type_args.is_empty() || arm.is_some() {
@@ -221,6 +312,51 @@ impl Emitter<'_> {
             }
             other => Err(unsupported(construct_name(other))),
         }
+    }
+
+    /// `c ✓ a ✗ b`, and `if` in value position: C's `?:`, which also runs
+    /// only the branch taken. Each arm is a block holding just its value.
+    fn conditional(
+        &mut self,
+        expr: &HirExpression,
+        cond: &HirExpression,
+        then_block: &radix_hir::HirBlock,
+        else_block: &radix_hir::HirBlock,
+    ) -> Result<Operand, CodegenError> {
+        fn arm(block: &radix_hir::HirBlock) -> Option<&HirExpression> {
+            if block.statements.is_empty() {
+                block.expr.as_deref()
+            } else {
+                None
+            }
+        }
+        let (Some(then_expr), Some(else_expr)) = (arm(then_block), arm(else_block)) else {
+            return Err(unsupported("conditional with statements in a branch"));
+        };
+        let Some(ty) = expr.ty else {
+            return Err(unsupported("conditional without a resolved type"));
+        };
+        let class = classify(self.types, ty)?;
+        let test = self.expr(cond)?;
+        if test.value != Value::Truth {
+            return Err(unsupported("condition that is not a boolean"));
+        }
+        let mut then_value = self.expr(then_expr)?;
+        let mut else_value = self.expr(else_expr)?;
+        then_value = self.settle(then_value, class)?;
+        else_value = self.settle(else_value, class)?;
+        if then_value.value != Value::from(class) || else_value.value != Value::from(class) {
+            return Err(unsupported("conditional arms of different value classes"));
+        }
+        let effect = test.effect || then_value.effect || else_value.effect;
+        Ok(Operand::new(
+            format!(
+                "({} ? {} : {})",
+                test.text, then_value.text, else_value.text
+            ),
+            Value::from(class),
+        )
+        .with_effect(effect))
     }
 
     /// A call to a function this program defines. Arguments arrive wrapped in
@@ -249,6 +385,11 @@ impl Emitter<'_> {
             return Err(unsupported("call to a function outside the program"));
         };
         let (name, params, ret) = (function.name.clone(), function.params.clone(), function.ret);
+        // A call from a function to itself is no use: a function only it
+        // calls is as unused as one nothing calls.
+        if self.current != Some(def_id) {
+            self.called.insert(def_id);
+        }
         if receiver.is_some() != function.receiver.is_some() {
             return Err(unsupported("method called without a receiver"));
         }
@@ -273,7 +414,13 @@ impl Emitter<'_> {
             let mut operand = self.expr(&arg.expr)?;
             // An argument carries no store node in HIR, but the runner checks
             // it as a store and names it `argument`; the C target does the same.
-            if operand.value == Value::Exact && param == Ty::Int {
+            if let Ty::Sized(width) = param {
+                if matches!(operand.value, Value::Int | Value::Exact)
+                    && operand.stored != Some(param)
+                {
+                    operand = self.store_sized(&operand, width, "\"argument\"");
+                }
+            } else if operand.value == Value::Exact && param == Ty::Int {
                 if operand.constant.is_some() {
                     return Err(unsupported("integer constant beyond i64"));
                 }
@@ -294,7 +441,15 @@ impl Emitter<'_> {
         slots.extend(operands.iter().map(|operand| operand.text.as_str()));
         let list = slots.join(", ");
         let value = ret.map_or(Value::Void, Value::from);
-        let text = wrap(&prelude, &format!("{name}({list})"));
+        let mut call = format!("{name}({list})");
+        // A sized result is a C `intN_t`; it widens to the value form the
+        // arithmetic and `print` take.
+        match ret {
+            Some(Ty::Sized(IntWidth::U64)) => call = format!("((faber_i128){call})"),
+            Some(Ty::Sized(_)) => call = format!("((int64_t){call})"),
+            _ => {}
+        }
+        let text = wrap(&prelude, &call);
         // A boolean result carries its own parentheses like every truth operand.
         let text = if value == Value::Truth && prelude.is_empty() {
             format!("({text})")
@@ -340,6 +495,11 @@ impl Emitter<'_> {
             Value::List(Elem::Bool) => "faber_list_bool *".to_owned(),
             Value::List(Elem::Float) => "faber_list_f64 *".to_owned(),
             Value::Float => "double ".to_owned(),
+            Value::Opt(inner) => match self.c_type(Ty::Opt(inner)) {
+                Ok(c_type) if c_type.ends_with('*') => c_type,
+                Ok(c_type) => format!("{c_type} "),
+                Err(_) => return String::new(),
+            },
             Value::Genus(def_id) => match self.c_type(Ty::Genus(def_id)) {
                 Ok(c_type) => c_type,
                 Err(_) => return String::new(),
@@ -361,7 +521,7 @@ impl Emitter<'_> {
     /// A folded integer constant. Inside `i64` it is an `int64_t` literal;
     /// between `2^63` and the cap it is an exact intermediate that only a
     /// print or a wider store can take.
-    fn int(&mut self, value: i128) -> Result<Operand, CodegenError> {
+    pub(crate) fn int(&mut self, value: i128) -> Result<Operand, CodegenError> {
         if !(CAP_MIN..=CAP_MAX).contains(&value) {
             return Err(unsupported(
                 "integer constant beyond the 64-bit representation cap",
@@ -383,24 +543,41 @@ impl Emitter<'_> {
             constant: Some(value),
             effect: false,
             narrow,
+            stored: None,
         })
     }
 
     fn path(&self, def_id: radix_hir::DefId) -> Result<Operand, CodegenError> {
         match self.locals.get(&def_id) {
-            // A truth operand carries its own parentheses.
-            Some(local) => Ok(Operand {
-                text: if local.ty == Ty::Bool {
-                    format!("({})", local.name)
-                } else {
-                    local.name.clone()
-                },
-                value: local.ty.into(),
-                constant: local.constant,
-                effect: false,
-                narrow: (local.ty == Ty::Int).then(|| Narrow::leaf(&local.name)),
-            }),
+            Some(local) => {
+                let mut operand = Self::cell_read(&local.name, local.ty);
+                operand.constant = local.constant;
+                Ok(operand)
+            }
             None => Err(unsupported("reference to a name that is not a local")),
+        }
+    }
+
+    /// A read of a cell of class `ty`, written `cell` in C. A sized integer
+    /// widens to the value form the arithmetic takes: `int64_t`, or an exact
+    /// value for `u64`.
+    pub(crate) fn cell_read(cell: &str, ty: Ty) -> Operand {
+        match ty {
+            // A truth operand carries its own parentheses.
+            Ty::Bool => Operand::new(format!("({cell})"), Value::Truth),
+            Ty::Sized(IntWidth::U64) => Operand::new(format!("((faber_i128){cell})"), Value::Exact),
+            Ty::Sized(_) => {
+                let text = format!("((int64_t){cell})");
+                let mut operand = Operand::new(text.clone(), Value::Int);
+                operand.narrow = Some(Narrow::leaf(&text));
+                operand
+            }
+            Ty::Int => {
+                let mut operand = Operand::new(cell.to_owned(), Value::Int);
+                operand.narrow = Some(Narrow::leaf(cell));
+                operand
+            }
+            other => Operand::new(cell.to_owned(), other.into()),
         }
     }
 
@@ -466,6 +643,23 @@ impl Emitter<'_> {
         left: &HirExpression,
         right: &HirExpression,
     ) -> Result<Operand, CodegenError> {
+        // `x ≡ null` and `null ≡ x` test for none like `x is none`.
+        let equality = match op {
+            HirBinOp::Is | HirBinOp::Eq | HirBinOp::StrictEq => Some(true),
+            HirBinOp::IsNot | HirBinOp::NotEq | HirBinOp::StrictNotEq => Some(false),
+            _ => None,
+        };
+        if let Some(is_none) = equality {
+            if Self::is_none_literal(right) {
+                return self.none_test(is_none, left);
+            }
+            if Self::is_none_literal(left) {
+                return self.none_test(is_none, right);
+            }
+        }
+        if op == HirBinOp::Coalesce {
+            return self.coalesce(left, right);
+        }
         let l = self.expr(left)?;
         let r = self.expr(right)?;
         if l.value == Value::Float || r.value == Value::Float || op == HirBinOp::TrueDiv {
@@ -631,8 +825,10 @@ impl Emitter<'_> {
         l: Operand,
         r: Operand,
     ) -> Result<Operand, CodegenError> {
-        if !l.is_integer() || !r.is_integer() {
-            return Err(unsupported("comparison of text or booleans"));
+        let text_pair = l.value == Value::Text && r.value == Value::Text;
+        let truth_pair = l.value == Value::Truth && r.value == Value::Truth;
+        if !text_pair && !truth_pair && (!l.is_integer() || !r.is_integer()) {
+            return Err(unsupported("comparison of values of different classes"));
         }
         let glyph = match op {
             HirBinOp::Lt => "<",
@@ -643,11 +839,21 @@ impl Emitter<'_> {
             HirBinOp::NotEq | HirBinOp::StrictNotEq => "!=",
             other => return Err(unsupported(binary_name(other))),
         };
+        if truth_pair && !matches!(glyph, "==" | "!=") {
+            return Err(unsupported("ordering of booleans"));
+        }
         let effect = l.effect || r.effect;
         let mut operands = [l, r];
         let prelude = self.sequence(&mut operands);
         let [l, r] = operands;
-        let text = wrap(&prelude, &format!("({} {glyph} {})", l.text, r.text));
+        // Text orders by code point, which is the order of its UTF-8 bytes
+        // read as unsigned: exactly what `strcmp` compares.
+        let body = if text_pair {
+            format!("(strcmp({}, {}) {glyph} 0)", l.text, r.text)
+        } else {
+            format!("({} {glyph} {})", l.text, r.text)
+        };
+        let text = wrap(&prelude, &body);
         Ok(Operand::new(text, Value::Truth).with_effect(effect))
     }
 
@@ -700,7 +906,86 @@ impl Emitter<'_> {
                 let text = self.store_exact(&value, &at);
                 Ok(Operand::new(text, Value::Int).with_effect(value.effect))
             }
+            (Ty::Sized(width), Value::Int | Value::Exact) => {
+                let at = c_string(&self.store_position(site))?;
+                Ok(self.store_sized(&value, width, &at))
+            }
+            (Ty::Opt(slot), Value::Opt(inner)) if slot == inner => Ok(value),
+            (Ty::Opt(inner), form) if form == Value::from(inner.ty()) => {
+                Ok(self.some_value(&value, inner))
+            }
+            // An exact value stored into `int ∪ none` narrows to `int` first.
+            (Ty::Opt(inner), Value::Exact) if inner == Inner::Int => {
+                let narrowed = self.store(value, Ty::Int, site)?;
+                Ok(self.some_value(&narrowed, inner))
+            }
             _ => Err(unsupported("conversion between value classes")),
+        }
+    }
+
+    /// Narrow an integer into a cell of width `width`: in range at emit time
+    /// it needs no check; otherwise `faber_store_<w>` checks it and writes the
+    /// runner's `<n> does not fit in `<w>` (<at>)`.
+    pub(crate) fn store_sized(&mut self, value: &Operand, width: IntWidth, at: &str) -> Operand {
+        let class = Ty::Sized(width);
+        let (low, high) = width.range();
+        let mut operand = if value.constant.is_some_and(|c| (low..=high).contains(&c)) {
+            let mut operand = Self::cell_read(&value.text, class);
+            // A constant keeps its own literal text; only the cell's value
+            // form matters here.
+            operand.text.clone_from(&value.text);
+            operand.value = Value::from(class);
+            operand.constant = value.constant;
+            operand.narrow = value.narrow.clone();
+            operand
+        } else {
+            self.support.need(Helper::SizedStore);
+            let call = format!("faber_store_{}({}, {at})", width.marker(), value.text);
+            if width == IntWidth::U64 {
+                Operand::new(format!("((faber_i128){call})"), Value::Exact)
+            } else {
+                Operand::new(format!("((int64_t){call})"), Value::Int)
+            }
+        };
+        operand.effect = value.effect;
+        operand.stored = Some(class);
+        operand
+    }
+
+    /// An integer that reached a cell of `class` with no store node: an `int`
+    /// narrows by its expression type, a sized cell checks its range (typecheck
+    /// proved it, so a miss is `numerus overflow`, never a truncation).
+    pub(crate) fn settle(&mut self, value: Operand, class: Ty) -> Result<Operand, CodegenError> {
+        match class {
+            Ty::Int => self.fit(value),
+            Ty::Sized(width) => {
+                let integer = matches!(value.value, Value::Int | Value::Exact);
+                let (low, high) = width.range();
+                let proved = value.stored == Some(class)
+                    || value.constant.is_some_and(|c| (low..=high).contains(&c));
+                if !integer || proved {
+                    return Ok(value);
+                }
+                self.support.need(Helper::SizedStore);
+                let call = format!("faber_fit_{}({})", width.marker(), value.text);
+                let mut operand = if width == IntWidth::U64 {
+                    Operand::new(format!("((faber_i128){call})"), Value::Exact)
+                } else {
+                    Operand::new(format!("((int64_t){call})"), Value::Int)
+                };
+                operand.effect = value.effect;
+                operand.stored = Some(class);
+                Ok(operand)
+            }
+            Ty::Opt(inner) if value.value != Value::Opt(inner) => {
+                let value = self.settle(value, inner.ty())?;
+                if value.value == Value::from(inner.ty()) {
+                    Ok(self.some_value(&value, inner))
+                } else {
+                    Ok(value)
+                }
+            }
+            _ => Ok(value),
         }
     }
 

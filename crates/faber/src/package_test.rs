@@ -5831,6 +5831,11 @@ main {
     assert!(output.code.contains("pub(crate) fn read_bytes"));
     assert!(output.code.contains("consolum:lege"));
     assert!(output.code.contains("consolum:hauri"));
+    assert!(
+        output.code.contains("consolum:desinit"),
+        "expected console readers to probe consolum:desinit before reading:\n{}",
+        output.code
+    );
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(!output.code.contains("norma::console::read_line"));
     assert!(!output.code.contains("norma::console::read_bytes"));
@@ -5905,6 +5910,11 @@ incipit {
     );
     assert!(output.code.contains("consolum:lege"));
     assert!(output.code.contains("consolum:hauri"));
+    assert!(
+        output.code.contains("consolum:desinit"),
+        "expected console readers to probe consolum:desinit before reading:\n{}",
+        output.code
+    );
     assert!(output.code.contains("solum:lege"));
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(!output.code.contains("norma::console::read_line"));
