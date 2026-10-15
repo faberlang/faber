@@ -252,6 +252,14 @@ help = "ปิดลิเทอรัลสตริงก่อนจบบร
 message = "ลิเทอรัล octeti ไม่ปิดท้าย"
 help = "ปิดลิเทอรัลสตริงก่อนจบบรรทัดหรือไฟล์"
 
+[diagnostics.LEX001.issues.unterminated_regex_literal]
+message = "ลิเทอรัล regex ไม่ปิดท้าย"
+help = "ปิดลิเทอรัล regex ก่อนจบบรรทัดหรือไฟล์"
+
+[diagnostics.LEX001.issues.empty_regex_literal]
+message = "ลิเทอรัล regex ว่างเปล่า; เขียนแพตเทิร์นระหว่างเครื่องหมายทับ"
+help = "เขียนแพตเทิร์นระหว่างเครื่องหมายทับ"
+
 [diagnostics.LEX001.issues.unterminated_string_literal]
 message = "ลิเทอรัลสตริงไม่ปิดท้าย"
 help = "ปิดลิเทอรัลสตริงก่อนจบบรรทัดหรือไฟล์"
@@ -2616,6 +2624,10 @@ help = "แปลงความกว้างองค์ประกอบอ
 message = "การส่งต่อความล้มเหลวของ conversio ต้องมีช่องทาง alternate-exit เป็น `textus`"
 help = "ประกาศช่องทาง alternate-exit เป็น textus หรือระบุการกู้คืนแบบอินไลน์"
 
+[diagnostics.SEM016.issues.conversio_failure_channel_value_required]
+message = "การส่งต่อความล้มเหลวของการ materialize sermo ต้องมีช่องทาง alternate-exit เป็น `value`"
+help = "ประกาศช่องทาง alternate-exit เป็น value, unknown หรือการแปลงค่า value ที่ลงทะเบียนไว้"
+
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "การแปลง regex ต้องการ operand เป็น textus หรือ ascii"
 help = "แปลงค่า textus หรือ ascii เป็น regex"
@@ -3687,9 +3699,21 @@ message = "ต้องมี reduction source หลัง reduction operator"
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "ต้องมี '{lege}' หรือ '{lineam}'"
 
+[diagnostics.PARSE001.issues.expected_identifier]
+message = "ต้องมีตัวระบุ"
+help = "ใส่ชื่อตัวระบุตรงนี้"
+
+[diagnostics.PARSE001.issues.expected_string_literal]
+message = "ต้องมีลิเทอรัลสตริง"
+help = "ใส่ลิเทอรัลสตริงในเครื่องหมายคำพูดตรงนี้"
+
 [diagnostics.PARSE001.issues.expected_mutability_keyword]
 message = "ต้องมี '{fixum}' หรือ '{varia}'"
 help = "เริ่ม declaration ด้วยคำสำคัญบอกความเปลี่ยนแปลง"
+
+[diagnostics.PARSE001.issues.await_binding_requires_name]
+message = "ต้องมี binding ที่มีชื่อก่อน '↢'"
+help = "ผูก '↢' กับชื่อเดียว; การแยกโครงสร้างใช้ '←'"
 
 [diagnostics.PARSE001.issues.expected_method_declaration]
 message = "ต้องมี method declaration"
@@ -3699,6 +3723,10 @@ help = "เขียน method เป็น declaration '{functio}'"
 message = "ต้องมีฮุก '{praepara}'"
 help = "เขียน '{praepara}', '{praeparabit}', '{postpara}' หรือ '{postparabit}'"
 
+[diagnostics.PARSE001.issues.expected_lane_value]
+message = "ต้องมีลิเทอรัลสตริงหรือตัวระบุ"
+help = "เขียนค่า lane เป็นสตริงในเครื่องหมายคำพูดหรือชื่อเปล่า"
+
 [diagnostics.PARSE001.issues.expected_scribe_keyword]
 message = "ต้องมีคำสำคัญ '{scribe}'"
 help = "เขียน '{scribe}', '{vide}', '{mone}' หรือ '{nota}'"
@@ -3706,6 +3734,14 @@ help = "เขียน '{scribe}', '{vide}', '{mone}' หรือ '{nota}'"
 [diagnostics.PARSE001.issues.expected_incipit_keyword]
 message = "ต้องมี '{incipit}' หรือ '{incipiet}'"
 help = "เริ่มจุดเข้าด้วย '{incipit}' หรือ '{incipiet}'"
+
+[diagnostics.PARSE001.issues.enum_member_value_number]
+message = "ต้องมีตัวเลขหลัง '='"
+help = "เขียนจำนวนเต็มหลัง '=' หรือลบ '=' ออก"
+
+[diagnostics.PARSE001.issues.enum_member_value]
+message = "ต้องมีค่าของสมาชิก enum"
+help = "เขียนจำนวนเต็มหรือสตริงหลัง '='"
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี elige"
