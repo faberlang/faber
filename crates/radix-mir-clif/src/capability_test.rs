@@ -267,7 +267,7 @@ fn unresolved_param_type_names_layout_gap() {
 }
 
 #[test]
-fn try_call_names_gap() {
+fn try_call_is_capable() {
     let types = TypeTable::new();
     let numerus = ty(&types, Primitive::Numerus);
     let (program, types) = minimal(FunctionShape {
@@ -290,12 +290,14 @@ fn try_call_names_gap() {
     });
 
     let verdict = classify_with_types(&program, &types);
-    assert_eq!(verdict.gaps().len(), 1);
-    assert_eq!(verdict.gaps()[0].shape(), "try_call");
+    assert!(
+        verdict.is_capable(),
+        "try_call is inside the subset: {verdict:?}"
+    );
 }
 
 #[test]
-fn error_typed_function_names_gap() {
+fn error_typed_function_is_capable() {
     let types = TypeTable::new();
     let (program, types) = minimal(FunctionShape {
         params: Vec::new(),
@@ -310,8 +312,10 @@ fn error_typed_function_names_gap() {
     });
 
     let verdict = classify_with_types(&program, &types);
-    assert!(!verdict.gaps().is_empty());
-    assert_eq!(verdict.gaps()[0].shape(), "error-typed function");
+    assert!(
+        verdict.is_capable(),
+        "an error channel is inside the subset: {verdict:?}"
+    );
 }
 
 #[test]

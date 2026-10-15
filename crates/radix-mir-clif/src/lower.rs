@@ -189,8 +189,17 @@ impl<'a> ModuleState<'a> {
             signature.params.push(AbiParam::new(cl));
         }
         let rep = rep_of(self.input.types, function.return_ty)?;
+        // A failable function returns its status, then its result, then the
+        // error payload bits.
+        if function.error_ty.is_some() {
+            signature.returns.push(AbiParam::new(types::I8));
+        }
         if let Some(cl) = rep.cl_type() {
             signature.returns.push(AbiParam::new(cl));
+        }
+        if let Some(error_ty) = function.error_ty {
+            rep_of(self.input.types, error_ty)?;
+            signature.returns.push(AbiParam::new(types::I64));
         }
         Ok(signature)
     }
@@ -437,6 +446,7 @@ struct FunctionLower<'f, 'a> {
     slots: FxHashMap<Slot, (Variable, Rep)>,
     slot_tys: FxHashMap<Slot, MirType>,
     ret_rep: Rep,
+    error_rep: Option<Rep>,
     values: FxHashMap<MirValueId, (Option<Value>, Rep)>,
     refs: FxHashMap<&'static str, FuncRef>,
     function_refs: FxHashMap<MirFunctionId, FuncRef>,
@@ -448,13 +458,14 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
         .functions
         .get(&function.id)
         .ok_or_else(|| Decline::new("function not declared"))?;
-    if function.error_ty.is_some() {
-        return Err(Decline::new("error-typed function"));
-    }
     if function.is_generator {
         return Err(Decline::new("generator function"));
     }
     let ret_rep = rep_of(state.input.types, function.return_ty)?;
+    let error_rep = function
+        .error_ty
+        .map(|error_ty| rep_of(state.input.types, error_ty))
+        .transpose()?;
     let mut context = state.module.make_context();
     context.func.signature = signature;
     let mut builder_context = FunctionBuilderContext::new();
@@ -467,6 +478,7 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             slots: FxHashMap::default(),
             slot_tys: FxHashMap::default(),
             ret_rep,
+            error_rep,
             values: FxHashMap::default(),
             refs: FxHashMap::default(),
             function_refs: FxHashMap::default(),
@@ -1310,6 +1322,16 @@ impl FunctionLower<'_, '_> {
                 .map(|param| rep_of(self.state.input.types, param.ty))
                 .collect::<Lowered<_>>()?
         };
+        if self
+            .state
+            .input
+            .program
+            .functions
+            .iter()
+            .any(|function| function.id == id && function.error_ty.is_some())
+        {
+            return Err(Decline::new("failable call outside a try"));
+        }
         let mut values = Vec::with_capacity(args.len());
         for (position, arg) in args.iter().enumerate() {
             let (value, have) = self.scalar(arg)?;
@@ -1327,6 +1349,99 @@ impl FunctionLower<'_, '_> {
                 self.builder.def_var(variable, *result);
             }
         }
+        Ok(())
+    }
+
+    /// A call to a failable function: branch on its status.
+    fn try_call(
+        &mut self,
+        destination: Option<&MirPlace>,
+        callee: &MirCallee,
+        args: &[MirOperand],
+        ok_block: MirBlockId,
+        error_place: &MirPlace,
+        error_block: MirBlockId,
+    ) -> Lowered<()> {
+        let id = match callee {
+            MirCallee::Function(id) => *id,
+            MirCallee::Definition { source, type_args } if type_args.is_empty() => {
+                let mut matches = self
+                    .state
+                    .input
+                    .program
+                    .functions
+                    .iter()
+                    .filter(|function| function.source == Some(*source));
+                match (matches.next(), matches.next()) {
+                    (Some(function), None) => function.id,
+                    _ => return Err(Decline::new("ambiguous definition call")),
+                }
+            }
+            _ => return Err(Decline::new("indirect call")),
+        };
+        let (param_reps, result_rep, error_rep) = {
+            let target = self
+                .state
+                .input
+                .program
+                .functions
+                .iter()
+                .find(|function| function.id == id)
+                .ok_or_else(|| Decline::new("unknown callee"))?;
+            let types = self.state.input.types;
+            let params = target
+                .params
+                .iter()
+                .map(|param| rep_of(types, param.ty))
+                .collect::<Lowered<Vec<_>>>()?;
+            let error = target
+                .error_ty
+                .map(|ty| rep_of(types, ty))
+                .transpose()?
+                .ok_or_else(|| Decline::new("try of a non-failable callee"))?;
+            (params, rep_of(types, target.return_ty)?, error)
+        };
+        let reference = self.function_ref(id)?;
+        let mut values = Vec::with_capacity(args.len());
+        for (position, arg) in args.iter().enumerate() {
+            let (value, have) = self.scalar(arg)?;
+            let value = match param_reps.get(position) {
+                Some(want) => self.coerce(value, have, *want)?,
+                None => value,
+            };
+            values.push(value);
+        }
+        let call = self.builder.ins().call(reference, &values);
+        let results = self.builder.inst_results(call).to_vec();
+        let status = *results
+            .first()
+            .ok_or_else(|| Decline::new("failable call status"))?;
+        let payload = *results
+            .last()
+            .ok_or_else(|| Decline::new("failable call payload"))?;
+        let ok_target = self.block(ok_block)?;
+        let error_target = self.block(error_block)?;
+        let failed = self.builder.create_block();
+        let succeeded = self.builder.create_block();
+        self.builder.ins().brif(status, failed, &[], succeeded, &[]);
+
+        self.builder.switch_to_block(succeeded);
+        if let (Some(destination), true) = (destination, result_rep != Rep::Unit) {
+            let result = *results
+                .get(1)
+                .ok_or_else(|| Decline::new("failable call result"))?;
+            let (variable, slot_rep) = self.place_slot(destination)?;
+            let result = self.coerce(result, result_rep, slot_rep)?;
+            self.builder.def_var(variable, result);
+        }
+        self.builder.ins().jump(ok_target, &[]);
+
+        self.builder.switch_to_block(failed);
+        let (variable, slot_rep) = self.place_slot(error_place)?;
+        let error = self.element_value(payload, error_rep);
+        let error = self.coerce(error, error_rep, slot_rep)?;
+        self.builder.def_var(variable, error);
+        self.builder.ins().jump(error_target, &[]);
         Ok(())
     }
 
@@ -2082,22 +2197,52 @@ impl FunctionLower<'_, '_> {
     fn terminator(&mut self, terminator: &MirTerminator) -> Lowered<()> {
         match &terminator.kind {
             MirTerminatorKind::Return(value) => {
-                match value {
-                    Some(operand) => match self.operand(operand)? {
-                        (Some(value), have) => {
-                            let value = self.coerce(value, have, self.ret_rep)?;
-                            self.builder.ins().return_(&[value]);
-                        }
-                        (None, _) => {
-                            self.builder.ins().return_(&[]);
-                        }
-                    },
-                    None => {
-                        self.builder.ins().return_(&[]);
-                    }
+                let mut results = Vec::new();
+                if self.error_rep.is_some() {
+                    results.push(self.builder.ins().iconst(types::I8, 0));
                 }
+                if let Some(operand) = value
+                    && let (Some(value), have) = self.operand(operand)?
+                {
+                    results.push(self.coerce(value, have, self.ret_rep)?);
+                }
+                if self.error_rep.is_some() {
+                    results.push(self.builder.ins().iconst(types::I64, 0));
+                }
+                self.builder.ins().return_(&results);
                 Ok(())
             }
+            MirTerminatorKind::ReturnError(operand) => {
+                let Some(error_rep) = self.error_rep else {
+                    return Err(Decline::new("error return outside a failable function"));
+                };
+                let (value, have) = self.scalar(operand)?;
+                let value = self.coerce(value, have, error_rep)?;
+                let payload = self.element_bits(value, error_rep);
+                let mut results = vec![self.builder.ins().iconst(types::I8, 1)];
+                let ret_rep = self.ret_rep;
+                if let Some(zero) = self.zero(ret_rep) {
+                    results.push(zero);
+                }
+                results.push(payload);
+                self.builder.ins().return_(&results);
+                Ok(())
+            }
+            MirTerminatorKind::TryCall {
+                destination,
+                callee,
+                args,
+                ok_block,
+                error_place,
+                error_block,
+            } => self.try_call(
+                destination.as_ref(),
+                callee,
+                args,
+                *ok_block,
+                error_place,
+                *error_block,
+            ),
             MirTerminatorKind::Goto(target) => {
                 let block = self.block(*target)?;
                 self.builder.ins().jump(block, &[]);
@@ -2164,9 +2309,6 @@ impl FunctionLower<'_, '_> {
             MirTerminatorKind::Unreachable => {
                 self.builder.ins().trap(TrapCode::unwrap_user(2));
                 Ok(())
-            }
-            MirTerminatorKind::ReturnError(_) | MirTerminatorKind::TryCall { .. } => {
-                Err(Decline::new("error channel"))
             }
         }
     }

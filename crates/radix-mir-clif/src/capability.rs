@@ -358,9 +358,6 @@ impl MirVisitor for ClifCapability<'_> {
         if function.shader_stage.is_some() {
             self.record(Gap::Policy("shader function".to_owned()));
         }
-        if function.error_ty.is_some() {
-            self.record(Gap::Subset("error-typed function".to_owned()));
-        }
         self.check_type(function.return_ty);
         if let Some(error_ty) = function.error_ty {
             self.check_type(error_ty);
@@ -503,11 +500,9 @@ impl MirVisitor for ClifCapability<'_> {
 
     fn visit_terminator(&mut self, terminator: &MirTerminator) {
         match &terminator.kind {
-            MirTerminatorKind::TryCall { .. } => self.record(Gap::Subset("try_call".to_owned())),
-            MirTerminatorKind::ReturnError(_) => {
-                self.record(Gap::Subset("error return".to_owned()))
-            }
-            MirTerminatorKind::Return(_)
+            MirTerminatorKind::TryCall { .. }
+            | MirTerminatorKind::ReturnError(_)
+            | MirTerminatorKind::Return(_)
             | MirTerminatorKind::Goto(_)
             | MirTerminatorKind::Branch { .. }
             | MirTerminatorKind::Switch { .. }
