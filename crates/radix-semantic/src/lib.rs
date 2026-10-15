@@ -704,6 +704,7 @@ pub fn analyze_with_cli(
                 &lowered.presentation,
                 &types,
                 interner,
+                &resolver,
             ));
         }
         // `praefixum` bodies: transitive purity and static cycles (D8.6);

@@ -169,6 +169,36 @@ fn praefixum_link_exported_comptime_feeds_ordinary_constant() {
     assert_eq!(int_literal(constant(main, "TOP")), 7);
 }
 
+/// The exported `comptime` chain also feeds a function-local constant
+/// (`const T x = e` in a block): the interface an importer reads must be the
+/// one republished after the deferred fold, or the block site sees `mid.MID`
+/// as non-constant. Success is the assertion — no walk into function bodies
+/// for the local `X` exists in this file.
+#[test]
+fn praefixum_link_exported_comptime_feeds_block_constant() {
+    let dir = test_temp_dir("praefixum-link-block-const");
+    let dir = dir.as_ref();
+    write(dir, "base.fab", "@ public\nconst int BASE = 5\n");
+    write(
+        dir,
+        "mid.fab",
+        "import from \"./base\" base\n\n\
+         @ public\nconst int MID = comptime {\n    return base.BASE + 1\n}\n",
+    );
+    write(
+        dir,
+        "main.fab",
+        "import from \"./mid\" mid\n\n\
+         fn seven() → int {\n    const int X = mid.MID + 1\n    return X\n}\n\n\
+         main {\n    print seven()\n}\n",
+    );
+    let package = analyze(dir);
+    assert!(
+        package.node_by_path(&dir.join("main.fab")).is_some(),
+        "main.fab analyzes with the exported comptime chain feeding the block constant"
+    );
+}
+
 #[test]
 fn praefixum_link_carried_provider_holds_evaluated_constant() {
     let dir = test_temp_dir("praefixum-link-carried-provider");
