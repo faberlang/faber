@@ -187,6 +187,10 @@ pub enum Output {
     #[cfg(feature = "mir-llvm")]
     LlvmText(LlvmTextOutput),
 
+    /// Native object file emitted from validated MIR by the Cranelift backend.
+    #[cfg(feature = "mir-clif")]
+    ClifObject(ClifObjectOutput),
+
     /// Experimental Metal Shading Language source emitted from validated MIR.
     #[cfg(feature = "mir-metal")]
     MetalText(MetalTextOutput),
@@ -294,6 +298,13 @@ pub struct WasmTextOutput {
 pub struct LlvmTextOutput {
     /// Complete generated LLVM text source.
     pub code: String,
+}
+
+/// Native object output of the public Cranelift target.
+#[cfg(feature = "mir-clif")]
+pub struct ClifObjectOutput {
+    /// Relocatable object file bytes for the host triple.
+    pub bytes: Vec<u8>,
 }
 
 /// Experimental Metal Shading Language source output.

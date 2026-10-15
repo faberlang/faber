@@ -22,7 +22,7 @@ use radix_hir::DefId;
 use radix_mir::visit::MirVisitor;
 use radix_mir::*;
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
-use radix_types::{Primitive, Type, TypeTable};
+use radix_types::{NumericWidth, Primitive, Type, TypeTable};
 use rustc_hash::FxHashSet;
 
 /// Slug for shapes the CLIF subset does not cover yet.
@@ -32,29 +32,29 @@ pub const SLUG_CLIF_POLICY: &str = "clif-policy";
 
 /// A gap kind plus its stable shape text.
 enum Gap {
-    Subset(&'static str),
-    Policy(&'static str),
-    Layout(&'static str),
-    Abi(&'static str),
+    Subset(String),
+    Policy(String),
+    Layout(String),
+    Abi(String),
 }
 
 impl Gap {
     fn into_capability_gap(self) -> CapabilityGap {
         match self {
             Self::Subset(shape) => CapabilityGap::UnsupportedMirShape {
-                shape: shape.to_owned(),
+                shape,
                 slug: SLUG_CLIF_SUBSET,
             },
             Self::Policy(shape) => CapabilityGap::TargetPolicyRejection {
-                shape: shape.to_owned(),
+                shape,
                 slug: SLUG_CLIF_POLICY,
             },
             Self::Layout(shape) => CapabilityGap::MissingLayoutFact {
-                shape: shape.to_owned(),
+                shape,
                 slug: "missing-layout-fact",
             },
             Self::Abi(shape) => CapabilityGap::MissingAbiFact {
-                shape: shape.to_owned(),
+                shape,
                 slug: "missing-abi-fact",
             },
         }
@@ -109,27 +109,31 @@ impl<'a> ClifCapability<'a> {
             | Type::Primitive(Primitive::Bivalens)
             | Type::Primitive(Primitive::Vacuum)
             | Type::Primitive(Primitive::Numquam)
-            | Type::SizedNumeric(..)
-            | Type::PolicyFloat(..) => None,
+            | Type::SizedNumeric(Primitive::Numerus, _)
+            | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => None,
+            Type::SizedNumeric(..) => Some(Gap::Subset("sized numeric value".to_owned())),
+            Type::PolicyFloat(..) => Some(Gap::Subset("policy float value".to_owned())),
             Type::Primitive(Primitive::Textus) | Type::Primitive(Primitive::Ascii) => {
-                Some(Gap::Subset("string value"))
+                Some(Gap::Subset("string value".to_owned()))
             }
-            Type::Primitive(Primitive::Littera) => Some(Gap::Subset("character value")),
+            Type::Primitive(Primitive::Littera) => Some(Gap::Subset("character value".to_owned())),
             Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => {
-                Some(Gap::Subset("byte buffer value"))
+                Some(Gap::Subset("byte buffer value".to_owned()))
             }
             Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => {
-                Some(Gap::Subset("bounded buffer value"))
+                Some(Gap::Subset("bounded buffer value".to_owned()))
             }
             Type::Primitive(Primitive::Regex)
             | Type::Primitive(Primitive::Match)
             | Type::Primitive(Primitive::Json)
-            | Type::Primitive(Primitive::Valor) => Some(Gap::Subset("dynamic data value")),
-            Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => {
-                Some(Gap::Subset("instans value"))
+            | Type::Primitive(Primitive::Valor) => {
+                Some(Gap::Subset("dynamic data value".to_owned()))
             }
-            Type::Primitive(Primitive::Nihil) => Some(Gap::Subset("none value")),
-            Type::Primitive(Primitive::Ignotum) => Some(Gap::Subset("unknown value")),
+            Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => {
+                Some(Gap::Subset("instans value".to_owned()))
+            }
+            Type::Primitive(Primitive::Nihil) => Some(Gap::Subset("none value".to_owned())),
+            Type::Primitive(Primitive::Ignotum) => Some(Gap::Subset("unknown value".to_owned())),
             Type::Array(_)
             | Type::BoundedArray { .. }
             | Type::Queue(_)
@@ -138,29 +142,34 @@ impl<'a> ClifCapability<'a> {
             | Type::BoundedStack { .. }
             | Type::Map(_, _)
             | Type::Ledger(_, _)
-            | Type::Set(_) => Some(Gap::Subset("collection value")),
-            Type::Record(_) | Type::Struct(_) => Some(Gap::Subset("record value")),
-            Type::Enum(_) | Type::Interface(_) => Some(Gap::Subset("enum value")),
-            Type::Tuple(_) => Some(Gap::Subset("tuple value")),
-            Type::Union(_) | Type::Intersection(_) => Some(Gap::Subset("union value")),
-            Type::Option(_) => Some(Gap::Subset("optional value")),
-            Type::Func(_) => Some(Gap::Subset("function value")),
-            Type::Ref(..) => Some(Gap::Subset("reference value")),
-            Type::ModularWord(_) => Some(Gap::Subset("wrapping value")),
-            Type::SaturatingWord(_) => Some(Gap::Subset("saturating value")),
+            | Type::Set(_) => Some(Gap::Subset("collection value".to_owned())),
+            Type::Record(_) | Type::Struct(_) => Some(Gap::Subset("record value".to_owned())),
+            Type::Enum(_) | Type::Interface(_) => Some(Gap::Subset("enum value".to_owned())),
+            Type::Tuple(_) => Some(Gap::Subset("tuple value".to_owned())),
+            Type::Union(_) | Type::Intersection(_) => Some(Gap::Subset("union value".to_owned())),
+            Type::Option(_) => Some(Gap::Subset("optional value".to_owned())),
+            Type::Func(_) => Some(Gap::Subset("function value".to_owned())),
+            Type::Ref(..) => Some(Gap::Subset("reference value".to_owned())),
+            Type::ModularWord(width) | Type::SaturatingWord(width)
+                if width.integer_range().is_some() =>
+            {
+                None
+            }
+            Type::ModularWord(_) => Some(Gap::Subset("wrapping value".to_owned())),
+            Type::SaturatingWord(_) => Some(Gap::Subset("saturating value".to_owned())),
             Type::Cursor(_)
             | Type::AsyncCursor(_, _)
             | Type::Promissum(_)
-            | Type::PromissumFailable(_, _) => Some(Gap::Subset("async value")),
-            Type::Intervallum(_) => Some(Gap::Subset("interval value")),
+            | Type::PromissumFailable(_, _) => Some(Gap::Subset("async value".to_owned())),
+            Type::Intervallum(_) => Some(Gap::Subset("interval value".to_owned())),
             Type::Tensor(..)
             | Type::Vector(..)
             | Type::Matrix(..)
             | Type::Sparsa(..)
-            | Type::Atomic(_) => Some(Gap::Policy("device value")),
-            Type::TensorEdgePolicy(_) => Some(Gap::Policy("device value")),
+            | Type::Atomic(_) => Some(Gap::Policy("device value".to_owned())),
+            Type::TensorEdgePolicy(_) => Some(Gap::Policy("device value".to_owned())),
             Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::Error => {
-                Some(Gap::Layout("unresolved type"))
+                Some(Gap::Layout("unresolved type".to_owned()))
             }
             Type::Alias(_, inner) => {
                 let mut inner = *inner;
@@ -171,7 +180,7 @@ impl<'a> ClifCapability<'a> {
                             let probe = MirType::semantic(inner);
                             return match resolved {
                                 Type::Param(_) | Type::Infer(_) | Type::Error => {
-                                    Some(Gap::Layout("unresolved type"))
+                                    Some(Gap::Layout("unresolved type".to_owned()))
                                 }
                                 _ => self.type_gap(probe),
                             };
@@ -179,7 +188,42 @@ impl<'a> ClifCapability<'a> {
                     }
                 }
             }
-            _ => Some(Gap::Subset("unsupported type")),
+            _ => Some(Gap::Subset("unsupported type".to_owned())),
+        }
+    }
+
+    /// Short readable type-kind name for gap shapes.
+    fn kind_name(&self, ty: MirType) -> String {
+        let debug = format!("{:?}", self.types.get(ty.semantic_id()));
+        let end = debug.find(['(', '{', ' ']).unwrap_or(debug.len());
+        let head = &debug[..end];
+        if head == "Primitive" {
+            let inner = debug[end..].trim_start_matches('(');
+            let stop = inner.find([')', '(', '{']).unwrap_or(inner.len());
+            return inner[..stop].to_owned();
+        }
+        head.to_owned()
+    }
+
+    /// Readable intrinsic name for gap shapes (family plus operation).
+    fn intrinsic_name(&self, intrinsic: &MirIntrinsic) -> String {
+        match intrinsic {
+            MirIntrinsic::Convert(conversion) => format!(
+                "Convert {:?} {} {}->{}",
+                conversion.flavor,
+                if conversion.store.is_some() {
+                    "store"
+                } else {
+                    "explicit"
+                },
+                self.kind_name(conversion.source_ty),
+                self.kind_name(conversion.target_ty),
+            ),
+            other => {
+                let debug = format!("{other:?}");
+                let end = debug.find(['{', ' ']).unwrap_or(debug.len());
+                debug[..end].chars().take(64).collect()
+            }
         }
     }
 
@@ -193,32 +237,42 @@ impl<'a> ClifCapability<'a> {
         match constant {
             MirConstant::Int(_) | MirConstant::UInt(_) | MirConstant::Float(_) => None,
             MirConstant::Bool(_) | MirConstant::Unit => None,
-            MirConstant::String(_) | MirConstant::Ascii(_) => Some(Gap::Subset("string constant")),
-            MirConstant::Octeti(_) => Some(Gap::Subset("byte constant")),
-            MirConstant::Regex { .. } => Some(Gap::Subset("regex constant")),
-            MirConstant::Nil => Some(Gap::Subset("none constant")),
-            MirConstant::Function(_) => Some(Gap::Subset("function constant")),
-            MirConstant::Magnus(_) => Some(Gap::Subset("inf constant")),
-            MirConstant::ShapeSize { .. } => Some(Gap::Policy("device constant")),
+            MirConstant::String(_) | MirConstant::Ascii(_) => {
+                Some(Gap::Subset("string constant".to_owned()))
+            }
+            MirConstant::Octeti(_) => Some(Gap::Subset("byte constant".to_owned())),
+            MirConstant::Regex { .. } => Some(Gap::Subset("regex constant".to_owned())),
+            MirConstant::Nil => Some(Gap::Subset("none constant".to_owned())),
+            MirConstant::Function(_) => Some(Gap::Subset("function constant".to_owned())),
+            MirConstant::Magnus(_) => Some(Gap::Subset("inf constant".to_owned())),
+            MirConstant::ShapeSize { .. } => Some(Gap::Policy("device constant".to_owned())),
         }
     }
 
     fn aggregate_gap(kind: &MirAggregateKind) -> Option<Gap> {
         match kind {
-            MirAggregateKind::Tuple => Some(Gap::Subset("tuple construction")),
-            MirAggregateKind::Array => Some(Gap::Subset("list construction")),
-            MirAggregateKind::Map => Some(Gap::Subset("map construction")),
-            MirAggregateKind::Set => Some(Gap::Subset("set construction")),
-            MirAggregateKind::Record => Some(Gap::Subset("record construction")),
-            MirAggregateKind::Struct(_) => Some(Gap::Subset("struct construction")),
-            MirAggregateKind::EnumVariant(_) => Some(Gap::Subset("enum variant construction")),
-            MirAggregateKind::ClosureEnvironment(_) => Some(Gap::Subset("closure construction")),
-            MirAggregateKind::SharedCell => Some(Gap::Subset("shared cell construction")),
+            MirAggregateKind::Tuple => Some(Gap::Subset("tuple construction".to_owned())),
+            MirAggregateKind::Array => Some(Gap::Subset("list construction".to_owned())),
+            MirAggregateKind::Map => Some(Gap::Subset("map construction".to_owned())),
+            MirAggregateKind::Set => Some(Gap::Subset("set construction".to_owned())),
+            MirAggregateKind::Record => Some(Gap::Subset("record construction".to_owned())),
+            MirAggregateKind::Struct(_) => Some(Gap::Subset("struct construction".to_owned())),
+            MirAggregateKind::EnumVariant(_) => {
+                Some(Gap::Subset("enum variant construction".to_owned()))
+            }
+            MirAggregateKind::ClosureEnvironment(_) => {
+                Some(Gap::Subset("closure construction".to_owned()))
+            }
+            MirAggregateKind::SharedCell => {
+                Some(Gap::Subset("shared cell construction".to_owned()))
+            }
             MirAggregateKind::Tensor
             | MirAggregateKind::SparseTensor
             | MirAggregateKind::Vector
-            | MirAggregateKind::Matrix => Some(Gap::Policy("device construction")),
-            MirAggregateKind::Interval { .. } => Some(Gap::Subset("interval construction")),
+            | MirAggregateKind::Matrix => Some(Gap::Policy("device construction".to_owned())),
+            MirAggregateKind::Interval { .. } => {
+                Some(Gap::Subset("interval construction".to_owned()))
+            }
         }
     }
 
@@ -227,9 +281,9 @@ impl<'a> ClifCapability<'a> {
             MirValueKind::Operand(_) | MirValueKind::Unary { .. } | MirValueKind::Binary { .. } => {
                 None
             }
-            MirValueKind::Closure(_) => Some(Gap::Subset("closure value")),
-            MirValueKind::Option(_) => Some(Gap::Subset("optional value")),
-            MirValueKind::TensorExtent { .. } => Some(Gap::Policy("device value")),
+            MirValueKind::Closure(_) => Some(Gap::Subset("closure value".to_owned())),
+            MirValueKind::Option(_) => Some(Gap::Subset("optional value".to_owned())),
+            MirValueKind::TensorExtent { .. } => Some(Gap::Policy("device value".to_owned())),
         }
     }
 }
@@ -237,16 +291,16 @@ impl<'a> ClifCapability<'a> {
 impl MirVisitor for ClifCapability<'_> {
     fn visit_function(&mut self, function: &MirFunction) {
         if function.is_async {
-            self.record(Gap::Subset("async function"));
+            self.record(Gap::Subset("async function".to_owned()));
         }
         if function.is_generator {
-            self.record(Gap::Subset("generator function"));
+            self.record(Gap::Subset("generator function".to_owned()));
         }
         if function.shader_stage.is_some() {
-            self.record(Gap::Policy("shader function"));
+            self.record(Gap::Policy("shader function".to_owned()));
         }
         if function.error_ty.is_some() {
-            self.record(Gap::Subset("error-typed function"));
+            self.record(Gap::Subset("error-typed function".to_owned()));
         }
         self.check_type(function.return_ty);
         if let Some(error_ty) = function.error_ty {
@@ -281,27 +335,27 @@ impl MirVisitor for ClifCapability<'_> {
                     | MirBinOp::Shr
             )
         {
-            self.record(Gap::Subset("bit operation"));
+            self.record(Gap::Subset("bit operation".to_owned()));
         }
         if let MirValueKind::Binary {
             op: MirBinOp::Coalesce,
             ..
         } = &value.kind
         {
-            self.record(Gap::Subset("optional value"));
+            self.record(Gap::Subset("optional value".to_owned()));
         }
         if let MirValueKind::Unary {
             op: MirUnOp::IsNil, ..
         } = &value.kind
         {
-            self.record(Gap::Subset("optional value"));
+            self.record(Gap::Subset("optional value".to_owned()));
         }
         if let MirValueKind::Unary {
             op: MirUnOp::BitNot,
             ..
         } = &value.kind
         {
-            self.record(Gap::Subset("bit operation"));
+            self.record(Gap::Subset("bit operation".to_owned()));
         }
         radix_mir::visit::walk_value(self, value);
     }
@@ -317,13 +371,26 @@ impl MirVisitor for ClifCapability<'_> {
 
     fn visit_place(&mut self, place: &MirPlace) {
         if !place.projections.is_empty() {
-            self.record(Gap::Subset("place projection"));
+            self.record(Gap::Subset("place projection".to_owned()));
         }
         radix_mir::visit::walk_place(self, place);
     }
 
     fn visit_runtime_call(&mut self, call: &MirRuntimeCall) {
-        self.record(Gap::Subset("runtime call"));
+        if let MirIntrinsic::Convert(conversion) = &call.intrinsic
+            && conversion.store.is_some()
+            && self.type_gap(conversion.source_ty).is_none()
+            && self.type_gap(conversion.target_ty).is_none()
+        {
+            radix_mir::visit::walk_runtime_call(self, call);
+            return;
+        }
+        if matches!(call.intrinsic, MirIntrinsic::Diagnostic(_)) && call.args.len() == 1 {
+            radix_mir::visit::walk_runtime_call(self, call);
+            return;
+        }
+        let name = self.intrinsic_name(&call.intrinsic);
+        self.record(Gap::Subset(format!("runtime call {name}")));
         radix_mir::visit::walk_runtime_call(self, call);
     }
 
@@ -339,14 +406,14 @@ impl MirVisitor for ClifCapability<'_> {
             MirCallee::Function(_) => {}
             MirCallee::Definition { source, .. } => {
                 if !self.function_sources.contains(source) {
-                    self.record(Gap::Abi("external definition call"));
+                    self.record(Gap::Abi("external definition call".to_owned()));
                 }
             }
             MirCallee::Closure(_) => {
-                self.record(Gap::Subset("closure call"));
+                self.record(Gap::Subset("closure call".to_owned()));
             }
             MirCallee::Value(_) => {
-                self.record(Gap::Subset("indirect call"));
+                self.record(Gap::Subset("indirect call".to_owned()));
             }
         }
         radix_mir::visit::walk_callee(self, callee);
@@ -354,8 +421,10 @@ impl MirVisitor for ClifCapability<'_> {
 
     fn visit_terminator(&mut self, terminator: &MirTerminator) {
         match &terminator.kind {
-            MirTerminatorKind::TryCall { .. } => self.record(Gap::Subset("try_call")),
-            MirTerminatorKind::ReturnError(_) => self.record(Gap::Subset("error return")),
+            MirTerminatorKind::TryCall { .. } => self.record(Gap::Subset("try_call".to_owned())),
+            MirTerminatorKind::ReturnError(_) => {
+                self.record(Gap::Subset("error return".to_owned()))
+            }
             MirTerminatorKind::Return(_)
             | MirTerminatorKind::Goto(_)
             | MirTerminatorKind::Branch { .. }

@@ -14,10 +14,11 @@ radix-program = { path = "../radix-program", default-features = false }
 
 [features]
 default = ["full-targets"]
-full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
+full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "mir-clif", "runner"]
 hir-faber = ["radix-module/hir-faber", "radix-program/hir-faber"]
 hir-fhir = ["radix-module/hir-fhir", "radix-program/hir-fhir"]
 mir-fmir = ["mir-core", "radix-module/mir-fmir", "radix-program/mir-fmir"]
+mir-clif = ["mir-core", "radix-module/mir-clif", "radix-program/mir-clif"]
 mir-core = ["radix-module/mir-core"]
 runner = ["mir-core", "radix-module/runner", "radix-program/runner"]
 hir-c = ["radix-module/hir-c", "radix-program/hir-c"]

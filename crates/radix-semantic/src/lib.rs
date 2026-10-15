@@ -741,6 +741,7 @@ pub fn analyze_with_cli(
                 | Target::MirWasm
                 | Target::MirLlvm
                 | Target::MirLlvmHost
+                | Target::MirClif
                 | Target::MirAmd
                 | Target::MirMetal
                 | Target::MirWgsl

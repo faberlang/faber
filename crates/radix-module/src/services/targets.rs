@@ -22,7 +22,7 @@
 /// this test until it joins this list or is named hidden — the list can no
 /// longer silently drop a backend. The order is the report's presentation
 /// order and is preserved verbatim for the printed row output.
-const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 23] = [
+const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 24] = [
     crate::codegen::Target::HirRust,
     crate::codegen::Target::MirFmir,
     crate::codegen::Target::MirFmirBinary,
@@ -41,6 +41,7 @@ const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 23] = [
     crate::codegen::Target::MirWasm,
     crate::codegen::Target::MirLlvm,
     crate::codegen::Target::MirLlvmHost,
+    crate::codegen::Target::MirClif,
     crate::codegen::Target::MirMetal,
     crate::codegen::Target::MirWgsl,
     crate::codegen::Target::MirSexp,
@@ -97,6 +98,7 @@ pub fn target_extension(target: crate::codegen::Target) -> &'static str {
         crate::codegen::Target::MirWasm => "wat",
         crate::codegen::Target::MirLlvm => "ll",
         crate::codegen::Target::MirLlvmHost => "run",
+        crate::codegen::Target::MirClif => "o",
         crate::codegen::Target::MirAmd => "ll",
         crate::codegen::Target::MirMetal => "metal",
         crate::codegen::Target::MirWgsl => "wgsl",
@@ -284,6 +286,13 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             run: false,
             package: false,
             note: "native host executable product target delegated to `faber build/run --target llvm-host`; radix emit rejects this target",
+        },
+        crate::codegen::Target::MirClif => TargetCapabilities {
+            check: true,
+            build: true,
+            run: false,
+            package: false,
+            note: "public MIR-backed Cranelift native object for the host triple (fail-closed subset; named gaps); linked against the `runtime/clif` archive by `faber build --target clif`",
         },
         crate::codegen::Target::MirAmd => TargetCapabilities {
             check: true,

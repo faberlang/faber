@@ -463,6 +463,7 @@ pub fn generate_from_analyzed_with_options(
         | Target::MirWasm
         | Target::MirLlvm
         | Target::MirLlvmHost
+        | Target::MirClif
         | Target::MirAmd
         | Target::MirMetal
         | Target::MirWgsl

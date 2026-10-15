@@ -696,6 +696,10 @@ fn generate_output(
         }
         #[cfg(not(feature = "mir-llvm"))]
         Target::MirLlvm | Target::MirLlvmHost => Err(unavailable_target_spanned(Target::MirLlvm)),
+        #[cfg(feature = "mir-clif")]
+        Target::MirClif => generate_clif_object_output(analysis, no_fuse),
+        #[cfg(not(feature = "mir-clif"))]
+        Target::MirClif => Err(unavailable_target_spanned(Target::MirClif)),
         Target::MirAmd => {
             // AMD-A2 fail-closed lane diagnostic (goal AC1 / DDCP0
             // feature-gate policy): without the `mir-amd` feature the AMD
@@ -1013,6 +1017,25 @@ fn generate_llvm_text_output(
         };
         Ok(crate::Output::LlvmText(crate::LlvmTextOutput { code }))
     }
+}
+
+/// Lower one unit to a native Cranelift object (public `clif` target).
+#[cfg(feature = "mir-clif")]
+fn generate_clif_object_output(
+    analysis: &mut AnalyzedModule,
+    no_fuse: bool,
+) -> Result<crate::Output, SpannedCodegenError> {
+    prepare_mir_lowering_interner(analysis);
+    let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+    let object = radix_mir_clif::emit_object(&mir.validated, &mir.interner).map_err(|error| codegen::CodegenError {
+        message: error.message,
+        args: vec![
+            DiagnosticArg::new("category", error.category),
+            DiagnosticArg::new("shape", error.shape),
+            DiagnosticArg::new("detail", error.detail),
+        ],
+    })?;
+    Ok(crate::Output::ClifObject(crate::ClifObjectOutput { bytes: object.bytes }))
 }
 
 /// Build the NVVM kernel descriptor JSON sidecar for a source unit targeting
@@ -4160,6 +4183,7 @@ fn collect_target_policy_diagnostics(
         | Target::MirFmir
         | Target::MirLlvm
         | Target::MirLlvmHost
+        | Target::MirClif
         | Target::MirAmd
         | Target::MirMetal
         | Target::MirScena

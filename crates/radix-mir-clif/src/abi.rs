@@ -1,0 +1,89 @@
+//! The generator side of the CLIF runtime ABI (goal `radix-mir-clif`, D3).
+//!
+//! One declaration table names every runtime symbol the generated code may
+//! call, with its signature. `runtime/clif` must export exactly these names
+//! (checked by `tests/abi_symbols.rs`); the generator imports a symbol only
+//! through [`RuntimeSymbol`], so an emitted call outside the table cannot be
+//! written.
+
+/// A scalar ABI type; handles and pointers travel as the pointer type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AbiTy {
+    I8,
+    I32,
+    I64,
+    F64,
+    Ptr,
+}
+
+/// One runtime symbol: C name, parameters, optional return.
+#[derive(Debug, Clone, Copy)]
+pub struct RuntimeSymbol {
+    pub name: &'static str,
+    pub params: &'static [AbiTy],
+    pub ret: Option<AbiTy>,
+}
+
+use AbiTy::{F64, I8, I32, I64, Ptr};
+
+/// Print one signed integer line: (stream, value). Stream 0 is stdout
+/// (`nota`, `scribe`), 1 is stderr (`vide`, `mone`).
+pub const PRINT_I64: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_print_i64",
+    params: &[I32, I64],
+    ret: None,
+};
+/// Print one float line: (stream, value, f32 flag).
+pub const PRINT_F64: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_print_f64",
+    params: &[I32, F64, I32],
+    ret: None,
+};
+/// Print one boolean line: (stream, value).
+pub const PRINT_BOOL: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_print_bool",
+    params: &[I32, I8],
+    ret: None,
+};
+/// Trap with a message: (pointer, length). Never returns.
+pub const TRAP: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_trap",
+    params: &[Ptr, I64],
+    ret: None,
+};
+/// Trap on a failed implicit store: (value, suffix pointer, suffix length,
+/// unsigned-slot flag). The runtime words it `error: <value><suffix>`, adding
+/// the unsigned-slot note for a negative value.
+pub const TRAP_STORE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_trap_store",
+    params: &[I64, Ptr, I64, I8],
+    ret: None,
+};
+/// Install the program's output tokens (true, false, none, tuple), each as
+/// (pointer, length).
+pub const SET_DISPLAY_TOKENS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_set_display_tokens",
+    params: &[Ptr, I64, Ptr, I64, Ptr, I64, Ptr, I64],
+    ret: None,
+};
+
+/// The runtime entry the emitted `main` shim calls.
+pub const MAIN: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_main",
+    params: &[I32, Ptr],
+    ret: Some(I32),
+};
+
+/// Every symbol the generated code may import (the runtime must export all).
+pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
+    MAIN,
+    PRINT_I64,
+    PRINT_F64,
+    PRINT_BOOL,
+    TRAP,
+    TRAP_STORE,
+    SET_DISPLAY_TOKENS,
+];
+
+/// The program entry the runtime calls (exported by generated code).
+pub const PROGRAM_INCIPIT: &str = "faber_clif_incipit";
