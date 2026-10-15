@@ -1,10 +1,12 @@
 //! Inline regex literals (ruling d381ae56): `regex /pattern/` (the locale's
-//! regex type word) and `_ /pattern/` parse to `Literal::Regex`; a bare `/` in
-//! operand position stays division.
+//! regex type word) is the self-typed `Literal::Regex`; `_ /pattern/` builds
+//! the inferred-constructor hole — an `ExprKind::Verte` carrying an `Infer`
+//! type over the regex literal, the same node as `_ [ … ]` (ruling
+//! 44def1ae, need). A bare `/` in operand position stays division.
 
 use crate::ParseResult;
 use crate::test_support::{parse_ok, symbol_name};
-use radix_syntax::{BinOp, Expr, ExprKind, IfBody, Literal, Stmt, StmtKind};
+use radix_syntax::{BinOp, Expr, ExprKind, IfBody, Literal, Stmt, StmtKind, TypeExprKind};
 
 fn var_initializer(statement: &Stmt) -> &Expr {
     let StmtKind::Var(var) = &statement.kind else {
@@ -43,10 +45,17 @@ fn regex_type_word_literal_parses() {
 fn inferred_regex_literal_parses() {
     let result = parse_ok(r"incipit { fixum regex r ← _ /a/ }");
     let init = entry_initializer(&result);
-    let ExprKind::Literal(Literal::Regex(pattern)) = init.kind else {
-        panic!("expected regex literal, got {:?}", init.kind);
+    let ExprKind::Verte(verte) = &init.kind else {
+        panic!("expected inferred hole, got {:?}", init.kind);
     };
-    assert_eq!(symbol_name(&result, pattern), "a");
+    let ExprKind::Literal(Literal::Regex(pattern)) = &verte.expr.kind else {
+        panic!(
+            "expected regex literal inside the hole, got {:?}",
+            verte.expr.kind
+        );
+    };
+    assert_eq!(symbol_name(&result, *pattern), "a");
+    assert!(matches!(verte.ty.kind, TypeExprKind::Infer));
 }
 
 #[test]

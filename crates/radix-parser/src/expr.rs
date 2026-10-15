@@ -2247,12 +2247,42 @@ impl Parser {
         // the lexer emits `RegexString` only directly after the type word or
         // `_`, so the pair claims this literal slot before any identifier or
         // inferred-expression handling. A `RegexString` anywhere else stays the
-        // fallback arm's `expected expression` error.
+        // fallback arm's `expected expression` error. The explicit `regex`
+        // form is the self-typed literal; `_ /pattern/` builds the
+        // inferred-constructor hole — the same `Verte` node as `_ [ … ]` —
+        // which needs an expected type from the checker (rulings 44def1ae /
+        // d381ae56, need).
         if matches!(
             self.peek().kind,
             TokenKind::Ident(_) | TokenKind::Underscore(_)
         ) && let TokenKind::RegexString(pattern) = self.peek_at(1).kind
         {
+            if matches!(self.peek().kind, TokenKind::Underscore(_)) {
+                let hole_span = self.peek().span;
+                self.advance();
+                self.advance();
+                let literal = Expr {
+                    id: self.next_id(),
+                    kind: ExprKind::Literal(Literal::Regex(pattern)),
+                    span: hole_span.merge(self.previous_span()),
+                };
+                let ty = TypeExpr {
+                    nullable: false,
+                    mode: None,
+                    kind: TypeExprKind::Infer,
+                    span: hole_span,
+                    form: TypeFormLevel::LONG,
+                    iuncta_label: None,
+                };
+                return Ok(Expr {
+                    id,
+                    kind: ExprKind::Verte(VerteExpr {
+                        expr: Box::new(literal),
+                        ty,
+                    }),
+                    span: start.merge(self.previous_span()),
+                });
+            }
             self.advance();
             self.advance();
             return Ok(Expr {
