@@ -356,6 +356,22 @@ help = "แก้ข้อผิดพลาดของ lexer ก่อน ก�
 message = "ต้องมีโทเค็น"
 help = "ตรวจให้แน่ใจว่ามีโทเค็นที่คาดไว้ในตำแหน่งนี้"
 
+[diagnostics.PARSE001.issues.annotation_field_name]
+message = "ฟิลด์ annotation ต้องเป็นตัวระบุ"
+help = "เขียนชื่อฟิลด์ธรรมดาภายในวงเล็บปีกกาของ annotation"
+
+[diagnostics.PARSE001.issues.label_bind_distinction]
+message = "ไวยากรณ์ป้ายกำกับใช้ `{label_operator}` ไม่ใช่ตัวดำเนินการผูกมัด `{binding_operator}`"
+help = "เขียน `{label}{label_operator} value` สำหรับอาร์กิวเมนต์ที่มีป้ายกำกับ หรือส่งตามตำแหน่ง"
+
+[diagnostics.PARSE001.issues.labeled_actual_non_template_call]
+message = "การเรียกนี้ไม่รับอาร์กิวเมนต์ที่มีป้ายกำกับ; ป้ายกำกับเป็นของการเรียกเทมเพลต"
+help = "ลบป้ายกำกับ `{label}` และส่งค่าตามตำแหน่ง หรือเรียก template literal"
+
+[diagnostics.PARSE001.issues.labeled_actual_spread_unsupported]
+message = "อาร์กิวเมนต์ spread ไม่สามารถมีป้ายกำกับได้"
+help = "ลบป้ายกำกับออกจากอาร์กิวเมนต์ spread"
+
 [diagnostics.PARSE001.issues.copy_into_value_expected]
 message = "ต้องมีค่าหลังตัวดำเนินการคัดลอกเข้า `{operator}`"
 help = "เขียนนิพจน์ต้นทางหลัง `⇇`"

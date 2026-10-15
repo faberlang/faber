@@ -356,6 +356,22 @@ help = "पहले lexer error ठीक करें; parsing साफ token
 message = "token अपेक्षित है"
 help = "सुनिश्चित करें कि इस स्थान पर अपेक्षित token मौजूद है"
 
+[diagnostics.PARSE001.issues.annotation_field_name]
+message = "annotation फ़ील्ड एक पहचानकर्ता होना चाहिए"
+help = "annotation ब्रेसिज़ के भीतर फ़ील्ड का सरल नाम लिखें"
+
+[diagnostics.PARSE001.issues.label_bind_distinction]
+message = "लेबल सिंटैक्स `{label_operator}` का उपयोग करता है, बाइंडिंग ऑपरेटर `{binding_operator}` का नहीं"
+help = "लेबल वाले तर्क के लिए `{label}{label_operator} value` लिखें, या उसे स्थिति से पास करें"
+
+[diagnostics.PARSE001.issues.labeled_actual_non_template_call]
+message = "यह कॉल लेबल वाले तर्क स्वीकार नहीं करता; लेबल टेम्पलेट कॉल के लिए होते हैं"
+help = "लेबल `{label}` हटाएँ और मान स्थिति से पास करें, या टेम्पलेट लिटरल कॉल करें"
+
+[diagnostics.PARSE001.issues.labeled_actual_spread_unsupported]
+message = "spread तर्क लेबल नहीं रख सकता"
+help = "spread तर्क से लेबल हटा दें"
+
 [diagnostics.PARSE001.issues.copy_into_value_expected]
 message = "कॉपी-इन ऑपरेटर `{operator}` के बाद एक मान आवश्यक है"
 help = "`⇇` के बाद स्रोत अभिव्यक्ति लिखें"

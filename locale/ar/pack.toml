@@ -356,6 +356,22 @@ help = "أصلح خطأ المحلل المعجمي أولا؛ يستمر الت
 message = "مطلوب{?expected| |}"
 help = "أضف{?expected| |} في هذا الموضع"
 
+[diagnostics.PARSE001.issues.annotation_field_name]
+message = "يجب أن يكون حقل التعليمة معرّفًا"
+help = "اكتب اسم حقل بسيطًا داخل أقواس التعليمة"
+
+[diagnostics.PARSE001.issues.label_bind_distinction]
+message = "بنية التسمية تستخدم `{label_operator}`، وليس عامل الربط `{binding_operator}`"
+help = "اكتب `{label}{label_operator} value` لوسيط مسمّى، أو مرّر القيمة موضعيًا"
+
+[diagnostics.PARSE001.issues.labeled_actual_non_template_call]
+message = "هذا الاستدعاء لا يقبل وسائط مسمّاة؛ التسميات مخصصة لاستدعاءات القوالب"
+help = "احذف التسمية `{label}` ومرّر القيمة موضعيًا، أو استدعِ نص قالب"
+
+[diagnostics.PARSE001.issues.labeled_actual_spread_unsupported]
+message = "وسيط spread لا يمكن أن يحمل تسمية"
+help = "احذف التسمية من وسيط spread"
+
 [diagnostics.PARSE001.issues.copy_into_value_expected]
 message = "مطلوب قيمة بعد عامل النسخ الداخلي `{operator}`"
 help = "اكتب تعبير المصدر بعد `⇇`"

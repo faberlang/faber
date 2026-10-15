@@ -356,6 +356,22 @@ help = "sửa lỗi lexer trước; quá trình phân tích tiếp tục từ c�
 message = "cần token"
 help = "đảm bảo token cần thiết có mặt tại vị trí này"
 
+[diagnostics.PARSE001.issues.annotation_field_name]
+message = "trường annotation phải là một định danh"
+help = "viết một tên trường đơn giản bên trong dấu ngoặc nhọn của annotation"
+
+[diagnostics.PARSE001.issues.label_bind_distinction]
+message = "cú pháp nhãn dùng `{label_operator}`, không phải toán tử gán `{binding_operator}`"
+help = "viết `{label}{label_operator} value` cho một đối số có nhãn, hoặc truyền theo vị trí"
+
+[diagnostics.PARSE001.issues.labeled_actual_non_template_call]
+message = "lời gọi này không nhận đối số có nhãn; nhãn thuộc về lời gọi template"
+help = "bỏ nhãn `{label}` và truyền giá trị theo vị trí, hoặc gọi một template literal"
+
+[diagnostics.PARSE001.issues.labeled_actual_spread_unsupported]
+message = "đối số spread không thể mang nhãn"
+help = "bỏ nhãn khỏi đối số spread"
+
 [diagnostics.PARSE001.issues.copy_into_value_expected]
 message = "cần một giá trị sau toán tử sao chép vào `{operator}`"
 help = "viết biểu thức nguồn sau `⇇`"
