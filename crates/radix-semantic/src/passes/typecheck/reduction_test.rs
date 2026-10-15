@@ -300,6 +300,16 @@ functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis 0 -
 }
 
 #[test]
+fn axis_reduction_negative_literal_axis_is_out_of_range() {
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis -1) }
+",
+        "axis_reduction_out_of_range",
+    );
+}
+
+#[test]
 fn axis_reduction_run_time_axis_is_named() {
     assert_rejects_with_issue(
         r"

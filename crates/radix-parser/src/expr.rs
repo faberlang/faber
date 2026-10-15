@@ -3317,7 +3317,25 @@ impl Parser {
 
     /// Whether the marker word at the cursor is followed by an operand start
     /// and is not the head of a compact closure (`in x ∴ body`).
+    ///
+    /// A negative integer literal counts as an operand when the sign is glued
+    /// to the digits and separated from the word by whitespace (`axis -1`);
+    /// `axis - 1` and `axis-1` stay a binary subtraction of the word. In that
+    /// negative form the closure head sits after the integer (`peek_at(3)`).
     fn marker_word_precedes_operand(&self) -> bool {
+        if matches!(self.peek_at(1).kind, TokenKind::Minus)
+            && matches!(self.peek_at(2).kind, TokenKind::Integer(_))
+        {
+            let word = self.peek_at(0).span;
+            let minus = self.peek_at(1).span;
+            let integer = self.peek_at(2).span;
+            return word.end < minus.start
+                && minus.end == integer.start
+                && !matches!(
+                    self.peek_at(3).kind,
+                    TokenKind::Therefore | TokenKind::Arrow
+                );
+        }
         matches!(
             self.peek_at(1).kind,
             TokenKind::Ident(_)
