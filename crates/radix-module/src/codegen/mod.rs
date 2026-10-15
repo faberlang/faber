@@ -1269,6 +1269,37 @@ pub fn generate_go_cli(
     }
 }
 
+/// Emit TypeScript CLI product code for the narrow single-command slice.
+///
+/// # Errors
+///
+/// Returns [`CodegenError`] if the HIR contains error recovery expressions, a
+/// target-unsupported type or leaf, or the CLI surface is beyond the narrow
+/// slice (options, subcommands, non-text operands, operand defaults, or a
+/// non-fixed exit).
+pub fn generate_ts_cli(
+    #[cfg_attr(not(feature = "hir-ts"), allow(unused_variables))] hir: &HirModule,
+    #[cfg_attr(not(feature = "hir-ts"), allow(unused_variables))] types: &TypeTable,
+    #[cfg_attr(not(feature = "hir-ts"), allow(unused_variables))] interner: &Interner,
+    #[cfg_attr(not(feature = "hir-ts"), allow(unused_variables))] cli_program: &crate::cli::CliProgram,
+) -> Result<crate::TypeScriptOutput, CodegenError> {
+    #[cfg(feature = "hir-ts")]
+    {
+        radix_codegen_shared::reject_hir_errors(hir)?;
+        radix_codegen_shared::reject_bits_type(types, Target::HirTypeScript)?;
+        radix_codegen_shared::reject_ledger_type(types, Target::HirTypeScript)?;
+        reject_leaf_routes_in_hir(hir, interner, Target::HirTypeScript)?;
+        let ir = cli_ir::to_cli_ir(cli_program);
+        let hir = hir.without_unavailable_declarations(interner);
+        let output = ts::TsCodegen::new(&hir, types, interner).generate_cli(&hir, types, interner, &ir)?;
+        Ok(crate::TypeScriptOutput { code: output.code })
+    }
+    #[cfg(not(feature = "hir-ts"))]
+    {
+        Err(unavailable_target_error(Target::HirTypeScript))
+    }
+}
+
 /// Collect `ad` routes from this module, imported handlers, and carried
 /// provider units (Norma wrappers live there on single-file emit).
 ///

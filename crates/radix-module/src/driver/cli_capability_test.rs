@@ -25,7 +25,7 @@ fn refused_by_capability_gate(diagnostics: &[Diagnostic]) -> bool {
 
 #[test]
 fn cli_capability_gate_refuses_incapable_targets_by_name() {
-    for target in [Target::HirTypeScript, Target::HirPython, Target::HirSwift] {
+    for target in [Target::HirPython, Target::HirSwift] {
         if !target.is_available() {
             continue;
         }
@@ -50,8 +50,8 @@ fn cli_capability_gate_refuses_incapable_targets_by_name() {
 }
 
 #[test]
-fn cli_capability_gate_admits_rust_and_go() {
-    for target in [Target::HirRust, Target::HirGo] {
+fn cli_capability_gate_admits_capable_targets() {
+    for target in [Target::HirRust, Target::HirGo, Target::HirTypeScript] {
         if !target.is_available() {
             continue;
         }
