@@ -3538,9 +3538,17 @@ impl FunctionBuilder<'_> {
     }
 
     /// Lower `lege` into a target-neutral stdin read intrinsic.
+    ///
+    /// Q-E5 (ruled 2026-10-15): `read` returns all of stdin to EOF; `read
+    /// line` one line without its terminator.
     pub(super) fn lower_read_line(&mut self, expr: &HirExpression) -> Option<MirOperand> {
         let ty = self.expr_ty(expr)?;
-        Some(self.runtime_call_value(MirIntrinsic::ReadLine, Vec::new(), ty, expr.span))
+        let intrinsic = match expr.kind {
+            HirExpressionKind::ReadLine(true) => MirIntrinsic::ReadLine,
+            HirExpressionKind::ReadLine(false) => MirIntrinsic::ReadAll,
+            _ => MirIntrinsic::ReadLine,
+        };
+        Some(self.runtime_call_value(intrinsic, Vec::new(), ty, expr.span))
     }
 
     /// Lower diagnostic output expressions to diagnostic intrinsics.
