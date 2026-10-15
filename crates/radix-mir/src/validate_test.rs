@@ -1016,6 +1016,108 @@ fn tuple_aggregate_spread_rejected() {
     );
 }
 
+/// Program constructing `[0, spread source]` into an array of `numerus`,
+/// where local 1 (the spread source) has type `source_ty`.
+fn array_spread_program(array_ty: TypeId, source_ty: TypeId) -> MirProgram {
+    let array_mty = MirType::semantic(array_ty);
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: array_mty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: MirType::semantic(source_ty),
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(0)),
+                            projections: vec![],
+                        },
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Array,
+                            ty: array_mty,
+                            fields: MirAggregateFields::Ordered(vec![
+                                MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(
+                                    0,
+                                ))),
+                                MirAggregateItem::Spread(MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(1)),
+                                    projections: vec![],
+                                })),
+                            ]),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace {
+                        base: MirPlaceBase::Local(MirLocalId(0)),
+                        projections: vec![],
+                    }))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: array_mty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
+#[test]
+fn array_aggregate_accepts_spread_of_bounded_array() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let array_tid = types.array(numerus);
+    let cap = types.intern_index(IndexExpr::Literal(2));
+    let bounded_tid = types.bounded_array(numerus, cap);
+
+    let program = array_spread_program(array_tid, bounded_tid);
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+#[test]
+fn array_aggregate_rejects_spread_of_mismatched_element() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let array_tid = types.array(numerus);
+    let cap = types.intern_index(IndexExpr::Literal(2));
+    let bounded_tid = types.bounded_array(bivalens, cap);
+
+    let program = array_spread_program(array_tid, bounded_tid);
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("aggregate spread type mismatch")),
+        "expected 'aggregate spread type mismatch' error, got: {errors:?}"
+    );
+}
+
 #[test]
 fn tuple_aggregate_empty() {
     let mut types = TypeTable::new();
