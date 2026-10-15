@@ -372,7 +372,8 @@ impl Target {
             | Target::HirGo
             | Target::HirTypeScript
             | Target::HirPython
-            | Target::MirWasm => true,
+            | Target::MirWasm
+            | Target::MirClif => true,
             Target::MirStepper
             | Target::HirSwift
             | Target::HirHaskell
