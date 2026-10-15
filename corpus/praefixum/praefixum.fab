@@ -44,8 +44,8 @@ locale = "en"
 #   praefixum.expected — the values computed at build time.
 
 class Punctum {
-    const int x
-    const int y
+    let int x
+    let int y
 }
 
 fn quadratum(int n) → int {

@@ -562,7 +562,7 @@ impl Parser {
             TokenKind::Ident(sym) => self.interner.resolve(sym).to_owned(),
             _ => String::new(),
         };
-        let mut field = self.parse_field_decl()?;
+        let mut field = self.parse_field_decl(false)?;
         // The old surface also took `←` here (a named error then); consume the
         // initializer so the whole declaration is skipped, not half of it.
         if field.init.is_none() && self.eat(&TokenKind::Assign) {
@@ -1278,9 +1278,16 @@ impl Parser {
     }
 
     /// Parse the field portion shared by genus and union declaration members.
-    fn parse_field_decl(&mut self) -> Result<FieldDecl, ParseError> {
-        let modifier = self.eat_field_modifier();
-        if modifier.is_some() && self.current_field_modifier().is_some() {
+    ///
+    /// `genus_member` is true for a `genus` field, where a leading `de` is the
+    /// refused `ref` modifier; a `discretio` shared field is unmarked by
+    /// design, so there a leading `de` is the access marker of its type.
+    fn parse_field_decl(&mut self, genus_member: bool) -> Result<FieldDecl, ParseError> {
+        let modifier = self.eat_field_modifier(genus_member);
+        if modifier.is_some()
+            && (self.current_field_modifier().is_some()
+                || self.check_keyword_ident(TokenKind::Fixum))
+        {
             return Err(ParseError::structured(
                 ParseErrorKind::DeclarationInvalid,
                 self.current_span(),
@@ -1312,11 +1319,26 @@ impl Parser {
     }
 
     /// The field modifier the current word spells, if any (DECISIONS D16.1).
+    ///
+    /// `sit` (en `let`) is the read-only field modifier. The retired `fixum`
+    /// (en `const`) and the refused `de` (en `ref`) are not modifiers; they are
+    /// recognised by `retired_field_modifier_issue` so the parser can name them.
     fn current_field_modifier(&self) -> Option<FieldModifier> {
         match self.current_keyword_ident()? {
-            TokenKind::Fixum => Some(FieldModifier::Fixum),
+            TokenKind::Sit => Some(FieldModifier::Fixum),
             TokenKind::Varia => Some(FieldModifier::Varia),
             TokenKind::Generis => Some(FieldModifier::Generis),
+            _ => None,
+        }
+    }
+
+    /// The named diagnostic for a leading `fixum` (retired) or `de` (refused)
+    /// field word. A `de` after a modifier is not a modifier at all: it is the
+    /// access marker of the field's type (`varia de Node next`).
+    fn retired_field_modifier_issue(&self, genus_member: bool) -> Option<&'static str> {
+        match self.current_keyword_ident()? {
+            TokenKind::Fixum => Some("field_fixum_retired"),
+            TokenKind::De if genus_member => Some("ref_field_refused"),
             _ => None,
         }
     }
@@ -1324,13 +1346,28 @@ impl Parser {
     /// Consume one leading field modifier, if present.
     ///
     /// GRAMMAR:
-    ///   field-decl := ('fixum' | 'varia' | 'generis') type ident 'sponte'? ('=' expr)?
+    ///   field-decl := ('sit' | 'varia' | 'generis') type ident 'sponte'? ('=' expr)?
     ///
-    /// Exactly one modifier: a second one (`generis fixum`, `generis varia`,
-    /// `fixum varia`) is rejected here; a missing one on a `genus` field is
+    /// Exactly one modifier: a second one (`generis sit`, `generis varia`,
+    /// `sit varia`) is rejected here; a missing one on a `genus` field is
     /// rejected by `parse_class_member`. `discretio` shared fields stay
     /// unmarked (fork F7 held), so the modifier is optional at this level.
-    fn eat_field_modifier(&mut self) -> Option<FieldModifier> {
+    ///
+    /// A retired `fixum` or refused `de` word is recorded as `PARSE010
+    /// field_fixum_retired` / `ref_field_refused` and read as the read-only
+    /// modifier, so recovery resumes after the field.
+    fn eat_field_modifier(&mut self, genus_member: bool) -> Option<FieldModifier> {
+        if let Some(issue) = self.retired_field_modifier_issue(genus_member) {
+            let span = self.current_span();
+            let keyword = self.current_word();
+            self.advance();
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, span)
+                    .with_arg("issue", issue)
+                    .with_arg("keyword", keyword),
+            );
+            return Some(FieldModifier::Fixum);
+        }
         let modifier = self.current_field_modifier()?;
         self.advance();
         Some(modifier)
@@ -1394,7 +1431,7 @@ impl Parser {
             ClassMemberKind::Method(func)
         } else {
             let field_start = self.current_span();
-            let field = self.parse_field_decl()?;
+            let field = self.parse_field_decl(true)?;
             if field.modifier.is_none() {
                 // D16.1: every genus field declares exactly one modifier.
                 // Recoverable, so one run reports every unmarked field; the
@@ -1767,7 +1804,7 @@ impl Parser {
                     if self.skip_sum_type_function(Some(start))? {
                         continue;
                     }
-                    let field = self.parse_field_decl()?;
+                    let field = self.parse_field_decl(false)?;
                     shared_fields.push(UnionField {
                         leading_trivia,
                         annotations,
@@ -1779,7 +1816,7 @@ impl Parser {
 
                 if declaration_region_started {
                     let checkpoint = self.checkpoint();
-                    if let Ok(field) = self.parse_field_decl() {
+                    if let Ok(field) = self.parse_field_decl(false) {
                         shared_fields.push(UnionField {
                             leading_trivia,
                             annotations: Vec::new(),

@@ -47,7 +47,7 @@ locale = "en"
 
 class Folium {
     static string TITULUS = embed "nuntius.txt"
-    const string MONITUM = embed "nuntius.txt"
+    let string MONITUM = embed "nuntius.txt"
     mut list<b8> signum = embed "signum.bin"
 }
 

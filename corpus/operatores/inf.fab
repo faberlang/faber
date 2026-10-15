@@ -61,7 +61,7 @@ locale = "en"
 #   inf.expected — one result per print.
 
 class Sample {
-    const inf v
+    let inf v
 }
 
 fn factorial(inf n) → inf {

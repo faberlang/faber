@@ -1028,8 +1028,8 @@ fn xyz(vector<f32, 4> v) → vector<f32, 3> {
 fn genus_field_arguments_instantiate() {
     let source = r"
 class Params {
-    const f32 scale
-    const vector<f32, 3> axis
+    let f32 scale
+    let vector<f32, 3> axis
 }
 
 @ kernel

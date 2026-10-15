@@ -29,7 +29,7 @@ fn field_modifiers(source: &str) -> Vec<Option<FieldModifier>> {
 #[test]
 fn field_records_each_modifier() {
     let modifiers = field_modifiers(
-        "genus Punctum {\n    fixum numerus x\n    varia numerus y\n    generis numerus Z = 3\n}\n",
+        "genus Punctum {\n    sit numerus x\n    varia numerus y\n    generis numerus Z = 3\n}\n",
     );
     assert_eq!(
         modifiers,
@@ -44,7 +44,7 @@ fn field_records_each_modifier() {
 #[test]
 fn modifier_keeps_sponte_and_default() {
     let modifiers = field_modifiers(
-        "genus Punctum {\n    varia numerus x sponte\n    fixum textus nomen = \"a\"\n}\n",
+        "genus Punctum {\n    varia numerus x sponte\n    sit textus nomen = \"a\"\n}\n",
     );
     assert_eq!(
         modifiers,
@@ -57,7 +57,7 @@ fn generis_with_fixum_or_varia_is_rejected() {
     for source in [
         "genus Punctum {\n    generis fixum numerus Z = 3\n}\n",
         "genus Punctum {\n    generis varia numerus Z = 3\n}\n",
-        "genus Punctum {\n    fixum varia numerus x\n}\n",
+        "genus Punctum {\n    sit varia numerus x\n}\n",
         "genus Punctum {\n    varia generis numerus x\n}\n",
     ] {
         assert_parse_error_matches(

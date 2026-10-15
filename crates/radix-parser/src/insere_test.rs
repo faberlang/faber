@@ -45,7 +45,7 @@ fn genus_static_field_initializer_claims_insere() {
 
 #[test]
 fn every_field_modifier_default_claims_insere() {
-    for modifier in ["fixum", "varia", "generis"] {
+    for modifier in ["sit", "varia", "generis"] {
         let source = format!("genus G {{\n    {modifier} textus s = insere \"x.txt\"\n}}\n");
         let init = first_class_field_init_kind(&source);
         assert!(
@@ -96,6 +96,6 @@ fn insere_call_stays_a_call() {
 #[test]
 fn insere_without_a_string_path_is_not_an_embed_anywhere() {
     // A field default `insere x` is no embed; it fails as ordinary syntax.
-    let result = parse_program_la("genus G {\n    fixum textus s = insere x\n}\n");
+    let result = parse_program_la("genus G {\n    sit textus s = insere x\n}\n");
     assert!(!result.success());
 }

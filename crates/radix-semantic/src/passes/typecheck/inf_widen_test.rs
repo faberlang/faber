@@ -109,7 +109,7 @@ fn a_return_is_widened() {
 
 #[test]
 fn a_field_initializer_is_widened() {
-    let source = "genus Capsa {\nfixum inf a\n}\n\
+    let source = "genus Capsa {\nsit inf a\n}\n\
         incipit {\nsit u64 u ← 5\nsit Capsa c ← Capsa { a = u }\nnota c.a\n}\n";
     assert_eq!(widens_of(source), vec![widened(U64, "path")]);
 }
@@ -144,7 +144,7 @@ fn a_method_call_result_is_widened() {
 
 #[test]
 fn a_field_read_and_an_index_read_are_widened() {
-    let source = "genus Capsa {\nfixum u64 a\n}\n\
+    let source = "genus Capsa {\nsit u64 a\n}\n\
         incipit {\nsit Capsa c ← Capsa { a = 5 }\nsit lista<u8> xs ← [1, 2]\n\
         sit inf p ← c.a\nsit inf q ← xs[0]\nnota p\nnota q\n}\n";
     assert_eq!(

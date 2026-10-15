@@ -520,6 +520,14 @@ help = "تستخدم الروابط `{sit}` (اسم ثابت) أو `{varia}` (ا
 message = "لا يمكن أن يبدأ `{keyword}` رابطًا"
 help = "الرابط يسمّي قيمة كل تكرار أو مطابقة؛ اكتب `{sit}` لاسم ثابت أو `{varia}` لاسم قابل للكتابة"
 
+[diagnostics.PARSE010.issues.field_fixum_retired]
+message = "تم إلغاء مُعدِّل الحقل `{keyword}`"
+help = "الحقل للقراءة فقط يُكتب `{sit}`؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "لا يمكن لـ `{keyword}` أن يعدّل حقلًا"
+help = "الحقل للقراءة فقط (`{sit}`) أو قابل للكتابة (`{varia}`)؛ و`{generis}` يجعله خاصًا بالنوع"
+
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "المتغير المحلي `{keyword}` يحتاج إلى موضع للقراءة: `{keyword} T name ← place`"
 help = "اكتب `{keyword} T name ← place`، أو استخدم `{sit}` أو `{varia}` لاسم بلا موضع ابتدائي"

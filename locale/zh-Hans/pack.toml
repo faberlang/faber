@@ -520,6 +520,14 @@ help = "绑定名使用 `{sit}`（固定名称）或 `{varia}`（可写名称）
 message = "`{keyword}` 不能引入绑定名"
 help = "绑定名对应每次迭代或匹配的值；固定名称写 `{sit}`，可写名称写 `{varia}`"
 
+[diagnostics.PARSE010.issues.field_fixum_retired]
+message = "`{keyword}` 字段修饰词已废弃"
+help = "只读字段写 `{sit}`；`{fixum}` 表示编译期事实，与 `=` 搭配"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` 不能修饰字段"
+help = "字段是只读（`{sit}`）或可写（`{varia}`）；`{generis}` 使其属于类型"
+
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "`{keyword}` 局部变量需要一个可读取的位置：`{keyword} T name ← place`"
 help = "写成 `{keyword} T name ← place`，若不需要初始位置，请使用 `{sit}` 或 `{varia}`"

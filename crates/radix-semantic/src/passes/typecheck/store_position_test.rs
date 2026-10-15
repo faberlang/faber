@@ -260,7 +260,7 @@ fn row_11_throw_is_a_store_against_the_declared_error_type() {
 // Rows 12-16: constructors, elements, positions, conversion default
 // ---------------------------------------------------------------------------
 
-const ARCA: &str = "genus Arca {\n    fixum u8 a\n}\n";
+const ARCA: &str = "genus Arca {\n    sit u8 a\n}\n";
 
 #[test]
 fn row_12_typed_constructor_fields_are_stores() {
@@ -324,9 +324,9 @@ fn row_17_generis_constant_must_fit_whatever_the_policy() {
 
 #[test]
 fn row_18_field_default_constant_must_fit() {
-    let fits = "genus G {\n    fixum u8 b = 5\n}\n";
+    let fits = "genus G {\n    sit u8 b = 5\n}\n";
     assert!(kinds(fits).is_empty());
-    let too_big = "genus G {\n    fixum u8 b = 300\n}\n";
+    let too_big = "genus G {\n    sit u8 b = 300\n}\n";
     assert_issue(too_big, "store_constant_out_of_range");
 }
 

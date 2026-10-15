@@ -364,7 +364,7 @@ fn policy_float_store_position_throw() {
 
 #[test]
 fn policy_float_store_position_field() {
-    let source = "genus Arca {\n    fixum exactus<f32> a\n}\n\
+    let source = "genus Arca {\n    sit exactus<f32> a\n}\n\
                   incipit {\nsit exactus<f32> t ← 1.5\nsit Arca b ← Arca { a = t * t }\nsit Arca c ← Arca { a = t }\n}\n";
     assert_eq!(kinds(source), vec![HirStoreKind::Field]);
 }

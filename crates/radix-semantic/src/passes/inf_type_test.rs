@@ -43,7 +43,7 @@ fn inf_is_a_type_for_locals_params_returns_fields_and_list_elements() {
     assert_accepts_la(
         r"
 genus Capsa {
-    fixum inf a
+    sit inf a
     varia inf b
 }
 

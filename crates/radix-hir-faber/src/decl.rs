@@ -425,7 +425,7 @@ impl super::FaberCodegen<'_> {
                 );
                 if let Some(modifier) = field.modifier {
                     writer.write(surface.keyword(match modifier {
-                        radix_syntax::FieldModifier::Fixum => TokenKind::Fixum,
+                        radix_syntax::FieldModifier::Fixum => TokenKind::Sit,
                         radix_syntax::FieldModifier::Varia => TokenKind::Varia,
                         radix_syntax::FieldModifier::Generis => TokenKind::Generis,
                     }));

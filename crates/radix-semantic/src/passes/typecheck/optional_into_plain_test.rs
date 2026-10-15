@@ -97,7 +97,7 @@ fn optional_return_into_plain_return_type_is_rejected() {
 #[test]
 fn optional_field_initializer_into_plain_field_is_rejected() {
     assert_rejects_with_issue_la(
-        "genus Arca {\n    fixum numerus a\n}\nfunctio f(numerus ∪ nihil x) → Arca {\n    redde Arca { a = x }\n}",
+        "genus Arca {\n    sit numerus a\n}\nfunctio f(numerus ∪ nihil x) → Arca {\n    redde Arca { a = x }\n}",
         ISSUE,
     );
 }

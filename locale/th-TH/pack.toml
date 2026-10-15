@@ -520,6 +520,14 @@ help = "ตัวผูกชื่อใช้ `{sit}` (ชื่อคงท�
 message = "`{keyword}` เริ่มตัวผูกชื่อไม่ได้"
 help = "ตัวผูกชื่อตั้งชื่อให้ค่าในแต่ละรอบหรือการจับคู่; เขียน `{sit}` สำหรับชื่อคงที่ หรือ `{varia}` สำหรับชื่อที่เขียนได้"
 
+[diagnostics.PARSE010.issues.field_fixum_retired]
+message = "ตัวปรับแต่งฟิลด์ `{keyword}` ถูกยกเลิกแล้ว"
+help = "ฟิลด์แบบอ่านอย่างเดียวเขียนว่า `{sit}`; `{fixum}` ระบุข้อเท็จจริงตอนคอมไพล์และใช้คู่กับ `=`"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` ปรับแต่งฟิลด์ไม่ได้"
+help = "ฟิลด์เป็นแบบอ่านอย่างเดียว (`{sit}`) หรือเขียนได้ (`{varia}`); `{generis}` ทำให้เป็นของระดับชนิด"
+
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "ตัวแปรโลคัล `{keyword}` ต้องมีตำแหน่งให้อ่าน: `{keyword} T name ← place`"
 help = "เขียน `{keyword} T name ← place` หรือใช้ `{sit}` หรือ `{varia}` สำหรับชื่อที่ไม่มีตำแหน่งเริ่มต้น"

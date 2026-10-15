@@ -842,6 +842,14 @@ help = "binders take `{sit}` (a fixed name) or `{varia}` (a writable name); `{fi
 message = "`{keyword}` cannot introduce a binder"
 help = "a binder names a value per iteration or match; write `{sit}` for a fixed name or `{varia}` for a writable one"
 
+[diagnostics.PARSE010.issues.field_fixum_retired]
+message = "a `{keyword}` field modifier was retired"
+help = "a read-only field is spelled `{sit}`; `{fixum}` states a compile-time fact and goes with `=`"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` cannot modify a field"
+help = "a field is read-only (`{sit}`) or writable (`{varia}`); `{generis}` makes it per-type"
+
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "a `{keyword}` local needs a place to read: `{keyword} T name ← place`"
 help = "write `{keyword} T name ← place`, or use `{sit}` or `{varia}` for a name without an initial place"
@@ -867,12 +875,12 @@ message = "a compile-time constant binds one name; `=` cannot initialize a destr
 help = "write `{fixum} T name = value`, or destructure with `←`"
 
 [diagnostics.PARSE010.issues.field_modifier_repeated]
-message = "a field takes exactly one of {fixum}, {varia} or {generis}"
+message = "a field takes exactly one of {sit}, {varia} or {generis}"
 help = "keep one modifier; a {generis} field is already immutable"
 
 [diagnostics.PARSE010.issues.field_modifier_missing]
-message = "a {genus} field must declare {fixum}, {varia} or {generis}"
-help = "write `{varia} T name` to keep today's meaning (or {fixum} when never reassigned); `faber field-modifier-codemod <PATH>` migrates whole files"
+message = "a {genus} field must declare {sit}, {varia} or {generis}"
+help = "write `{varia} T name` to keep today's meaning (or {sit} when never reassigned); `faber field-modifier-codemod <PATH>` migrates whole files"
 
 [diagnostics.PARSE010.issues.module_declaration_misplaced]
 message = "a {regio} declaration must be the first declaration of the file, before any {importa}"
@@ -4252,8 +4260,8 @@ message = "assignment to commune field"
 help = "commune fields are read-only through the union projection"
 
 [diagnostics.SEM020.issues.assignment_to_fixum_field]
-message = "assignment to {fixum} field '{field}'"
-help = "a {fixum} field is set only in a construction literal; declare it {varia} to allow reassignment"
+message = "assignment to {sit} field '{field}'"
+help = "a {sit} field is set only in a construction literal; declare it {varia} to allow reassignment"
 
 [diagnostics.SEM020.issues.union_member_not_varia]
 message = "union field '{member}' is not {varia} in: {members}"

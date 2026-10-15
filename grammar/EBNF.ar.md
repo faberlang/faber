@@ -43,7 +43,7 @@ figendum_decl ::= ('انتظر_ثابت' | 'انتظر_متغير') type_annotat
 # [016] sit_decl
 sit_decl ::= 'ليكن' type_annotation? IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?
 # [017] ref_decl
-ref_decl ::= 'عن' base_type IDENTIFIER '←' expression
+ref_decl ::= 'عن' concrete_type IDENTIFIER '←' expression
 # [018] array_destruct
 array_destruct ::= ('ليكن' | 'متغير') array_pattern '←' expression
 # [019] object_destruct
@@ -113,9 +113,9 @@ genus_member ::= annotation* (genus_field_decl | functio_method_decl) | nondum_m
 # [051] nondum_method_decl
 nondum_method_decl ::= annotation* nondum_annotation annotation* 'دالة' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
 # [052] genus_field_decl
-genus_field_decl ::= ('ثابت' | 'متغير' | 'سكوني') type_annotation IDENTIFIER 'اختياري'? ('=' const_init)?
+genus_field_decl ::= ('ليكن' | 'متغير' | 'سكوني') type_annotation IDENTIFIER 'اختياري'? ('=' const_init)?
 # [053] field_decl
-field_decl ::= ('ثابت' | 'متغير' | 'سكوني')? type_annotation IDENTIFIER 'اختياري'? ('=' const_init)?
+field_decl ::= ('ليكن' | 'متغير' | 'سكوني')? type_annotation IDENTIFIER 'اختياري'? ('=' const_init)?
 # [054] functio_method_decl
 functio_method_decl ::= 'دالة' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 # [055] annotation
@@ -1410,17 +1410,18 @@ wire operation such as `json.pange(value ↦ json)`.
 - `حقق` = implements (conformance to an `عقد` contract), written
   with the contract's type arguments in full
   (`صنف Persona حقق Orderable<Persona>`, D1.2).
-- Every `صنف` field declares exactly one of `ثابت` / `متغير` / `سكوني`
+- Every `صنف` field declares exactly one of `ليكن` (en `let`) / `متغير` / `سكوني`
   (D16.1); there is no default — an unmarked field is a parse error: PARSE010
   `field_modifier_missing` (D5c). The `تمايز` shared-field position
   (`union_member`) keeps today's unmarked form (fork F7 held).
-  `ثابت T x`: per instance, set only in
+  `ليكن T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } من p` copies it unchanged (D16.3), independent of visibility
-  (`@ privata` + `ثابت` is legal). `متغير T x`: per instance, reassignable.
+  (`@ privata` + `ليكن` is legal). `متغير T x`: per instance, reassignable.
   `سكوني T X = …`: one per type, compile-time (the only remaining `سكوني` position). A write to a
-  `ثابت` field outside a construction literal is `SEM020`
-  (`assignment_to_fixum_field`). The former `nexum` field modifier is removed
+  `ليكن` field outside a construction literal is `SEM020`
+  (`assignment_to_fixum_field`). The retired `ثابت` (en `const`) field word is
+  PARSE010 `field_fixum_retired` and `عن` (en `ref`) is `ref_field_refused`. The former `nexum` field modifier is removed
   and rejected with a migration diagnostic.
 - `صنف` members are public by default (D5.2). `@ privata` on a member restricts it to the type's own methods: only code inside the type's own function bodies may read, write, or call it (D5.3); `@ interna` restricts it to code in the declaring package. A construction literal may still set a private field, from any file, and `Genus { … } من p` copies it unchanged (D5.4). Reading, writing, or calling an inaccessible member from outside its allowed scope is `SEM063` (`member_private_read`/`_write`/`_call`, or `member_interna_read`/`_write`/`_call`); `@ عام` on a member is a redundant-annotation warning `WARN028` (`redundant_member_publica`), an error when warnings are denied.
 - A type may refer to itself: `تمايز Expr { Adde { Expr sinister, Expr dexter } }`

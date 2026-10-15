@@ -13998,8 +13998,8 @@ main {
 
 const WEB4_SPAN_SOURCE: &str = r"@ public
 class Span {
-    const int low
-    const int high
+    let int low
+    let int high
     fn middle() → f64 { return (self.low + self.high) ÷ 2 }
 }
 ";

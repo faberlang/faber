@@ -15,13 +15,13 @@ use crate::test_support;
 
 const TYPES: &str = "\
 genus Punctum {
-    fixum numerus x
+    sit numerus x
     varia numerus y
-    fixum lista<numerus> xs
+    sit lista<numerus> xs
 }
 
 genus Alius {
-    fixum numerus x
+    sit numerus x
 }
 
 ";

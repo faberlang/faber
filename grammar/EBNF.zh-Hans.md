@@ -43,7 +43,7 @@ figendum_decl ::= ('等定' | '等变') type_annotation IDENTIFIER '←' express
 # [016] sit_decl
 sit_decl ::= '设' type_annotation? IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?
 # [017] ref_decl
-ref_decl ::= '借自' base_type IDENTIFIER '←' expression
+ref_decl ::= '借自' concrete_type IDENTIFIER '←' expression
 # [018] array_destruct
 array_destruct ::= ('设' | '变量') array_pattern '←' expression
 # [019] object_destruct
@@ -113,9 +113,9 @@ genus_member ::= annotation* (genus_field_decl | functio_method_decl) | nondum_m
 # [051] nondum_method_decl
 nondum_method_decl ::= annotation* nondum_annotation annotation* '函数' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
 # [052] genus_field_decl
-genus_field_decl ::= ('常量' | '变量' | '静态') type_annotation IDENTIFIER '可选'? ('=' const_init)?
+genus_field_decl ::= ('设' | '变量' | '静态') type_annotation IDENTIFIER '可选'? ('=' const_init)?
 # [053] field_decl
-field_decl ::= ('常量' | '变量' | '静态')? type_annotation IDENTIFIER '可选'? ('=' const_init)?
+field_decl ::= ('设' | '变量' | '静态')? type_annotation IDENTIFIER '可选'? ('=' const_init)?
 # [054] functio_method_decl
 functio_method_decl ::= '函数' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 # [055] annotation
@@ -1410,17 +1410,18 @@ wire operation such as `json.pange(value ↦ json)`.
 - `实现` = implements (conformance to an `契约` contract), written
   with the contract's type arguments in full
   (`类 Persona 实现 Orderable<Persona>`, D1.2).
-- Every `类` field declares exactly one of `常量` / `变量` / `静态`
+- Every `类` field declares exactly one of `设` (en `let`) / `变量` / `静态`
   (D16.1); there is no default — an unmarked field is a parse error: PARSE010
   `field_modifier_missing` (D5c). The `判别` shared-field position
   (`union_member`) keeps today's unmarked form (fork F7 held).
-  `常量 T x`: per instance, set only in
+  `设 T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } 取自 p` copies it unchanged (D16.3), independent of visibility
-  (`@ privata` + `常量` is legal). `变量 T x`: per instance, reassignable.
+  (`@ privata` + `设` is legal). `变量 T x`: per instance, reassignable.
   `静态 T X = …`: one per type, compile-time (the only remaining `静态` position). A write to a
-  `常量` field outside a construction literal is `SEM020`
-  (`assignment_to_fixum_field`). The former `nexum` field modifier is removed
+  `设` field outside a construction literal is `SEM020`
+  (`assignment_to_fixum_field`). The retired `常量` (en `const`) field word is
+  PARSE010 `field_fixum_retired` and `借自` (en `ref`) is `ref_field_refused`. The former `nexum` field modifier is removed
   and rejected with a migration diagnostic.
 - `类` members are public by default (D5.2). `@ privata` on a member restricts it to the type's own methods: only code inside the type's own function bodies may read, write, or call it (D5.3); `@ interna` restricts it to code in the declaring package. A construction literal may still set a private field, from any file, and `Genus { … } 取自 p` copies it unchanged (D5.4). Reading, writing, or calling an inaccessible member from outside its allowed scope is `SEM063` (`member_private_read`/`_write`/`_call`, or `member_interna_read`/`_write`/`_call`); `@ 公开` on a member is a redundant-annotation warning `WARN028` (`redundant_member_publica`), an error when warnings are denied.
 - A type may refer to itself: `判别 Expr { Adde { Expr sinister, Expr dexter } }`

@@ -1009,11 +1009,15 @@ insere_expr    := 'insere' STRING
 # mode, en `ref`) names a place and may be re-pointed: it takes `←` only, a
 # `copy`/`own` marker is `PARSE010 ref_local_value_marker`, a pattern is
 # `PARSE010 ref_local_requires_name`, and a scalar type takes no marker
-# (`SEM008 scalar_access_marker`).
+# (`SEM008 scalar_access_marker`). The type may be an optional union of a
+# reference type (`de Node ∪ none cur ← head`, ruling 2026-10-15 option A): the
+# marker covers the whole cell, so the type slot is `concrete_type`; whether
+# the members are reference types is a semantic rule (`SEM008
+# scalar_access_marker`, `nested_access_marker`), not a grammar one.
 fixum_decl      := ('fixum' type_annotation IDENTIFIER '=' const_init) | ('varia' type_annotation IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?)
 figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
 sit_decl      := 'sit' type_annotation? IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?
-ref_decl      := 'de' base_type IDENTIFIER '←' expression
+ref_decl      := 'de' concrete_type IDENTIFIER '←' expression
 array_destruct := ('sit' | 'varia') array_pattern '←' expression
 object_destruct := ('sit' | 'varia') object_pattern '←' expression
 
@@ -1082,21 +1086,22 @@ genus_member  := annotation* (genus_field_decl | functio_method_decl) | nondum_m
 # function_body_absent`.
 nondum_method_decl := annotation* nondum_annotation annotation* 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
 # `genus_field_decl` (D16.1-D16.3, D5c): every `genus` field declares exactly one
-# of `fixum` / `varia` / `generis` — there is no default, and an unmarked genus
+# of `sit` (en `let`) / `varia` / `generis` — there is no default, and an unmarked genus
 # field is PARSE010 `field_modifier_missing`. The unmarked form survives only
 # in the `discretio` shared-field position (`union_member` → `field_decl`, fork
 # F7 held).
-# `fixum T x`: set only in a construction literal (`Genus { … }`), never
+# `sit T x`: set only in a construction literal (`Genus { … }`), never
 # reassigned (`SEM020 assignment_to_fixum_field`); `Genus { … } ex p` copies
 # it unchanged. `varia T x`: reassignable per instance. `generis T X = …`: one
-# per type, compile-time. Independent of visibility (`@ privata` + `fixum` is
+# per type, compile-time. Independent of visibility (`@ privata` + `sit` is
 # legal). The initializer is `const_init` (D8.10): under all three modifiers a
 # field default may be an ordinary expression, the build-time `insere_expr`, or
-# a `praefixum { … }` block.
-genus_field_decl := ('fixum' | 'varia' | 'generis') type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
+# a `praefixum { … }` block. The retired `fixum` (en `const`) field word is
+# PARSE010 `field_fixum_retired` and `de` (en `ref`) is `ref_field_refused`.
+genus_field_decl := ('sit' | 'varia' | 'generis') type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
 # `field_decl` is the `discretio` shared-field form, where the modifier stays
 # optional (F7 held); `genus_field_decl` above is the `genus` form.
-field_decl    := ('fixum' | 'varia' | 'generis')? type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
+field_decl    := ('sit' | 'varia' | 'generis')? type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
 functio_method_decl   := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 
 annotation            := nucleum_annotation | radix_annotation | braced_annotation | annotation_sugar

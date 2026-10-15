@@ -61,10 +61,10 @@ fn expect<'a>(diagnostics: &'a [Diagnostic], code: &str, issue: &str) -> &'a Dia
 
 const INF_FILE: &str = r"
 genus Capsa {
-    fixum inf a
-    fixum exactus<inf> b
-    fixum modulus<inf> c
-    fixum saturatus<inf> d
+    sit inf a
+    sit exactus<inf> b
+    sit modulus<inf> c
+    sit saturatus<inf> d
 }
 
 functio transmitte(inf x) → inf {
@@ -99,10 +99,10 @@ fn the_english_spellings_check_clean() {
     assert_accepts(&english(
         r"
 class Box {
-    const inf a
-    const trapping<inf> b
-    const wrapping<inf> c
-    const saturating<inf> d
+    let inf a
+    let trapping<inf> b
+    let wrapping<inf> c
+    let saturating<inf> d
 }
 
 fn carry(inf x) → saturating<inf> {

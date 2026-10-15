@@ -284,3 +284,74 @@ fn a_let_binder_pattern_list_keeps_the_et_separator_law() {
         result.errors
     );
 }
+
+// Genus field modifiers take the binding words: `let`/`sit` is the read-only
+// field, `mut`/`varia` the writable one, `generis` stays per-type. The retired
+// `const`/`fixum` field word is `PARSE010 field_fixum_retired` and `ref`/`de`
+// is `PARSE010 ref_field_refused`; both are recorded and read as the read-only
+// modifier so recovery resumes after the field.
+
+fn field_modifiers(result: &ParseResult) -> Vec<Option<radix_syntax::FieldModifier>> {
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Class(class) = &program.statements[0].kind else {
+        panic!("expected class declaration");
+    };
+    class
+        .members
+        .iter()
+        .filter_map(|member| match &member.kind {
+            radix_syntax::ClassMemberKind::Field(field) => Some(field.modifier),
+            radix_syntax::ClassMemberKind::Method(_) => None,
+        })
+        .collect()
+}
+
+#[test]
+fn let_and_mut_field_modifiers_parse_in_english_and_latin() {
+    use radix_syntax::FieldModifier::{Fixum, Varia};
+    let english = parse_en("class P {\n    let int x\n    mut int y = 3\n}\n");
+    assert!(english.success(), "{:?}", english.errors);
+    assert_eq!(field_modifiers(&english), vec![Some(Fixum), Some(Varia)]);
+    let latin = parse_program("genus P {\n    sit numerus x\n    varia numerus y = 3\n}\n");
+    assert!(latin.success(), "{:?}", latin.errors);
+    assert_eq!(field_modifiers(&latin), vec![Some(Fixum), Some(Varia)]);
+}
+
+#[test]
+fn a_const_field_modifier_is_retired() {
+    let english = parse_en("class P {\n    const int x\n}\n");
+    assert_issue(&english, "field_fixum_retired", "const", None);
+    assert_eq!(
+        field_modifiers(&english),
+        vec![Some(radix_syntax::FieldModifier::Fixum)]
+    );
+    let latin = parse_program("genus P {\n    fixum numerus x = 1\n    varia numerus y\n}\n");
+    assert_issue(&latin, "field_fixum_retired", "fixum", None);
+}
+
+#[test]
+fn a_ref_field_modifier_is_refused() {
+    let english = parse_en("class P {\n    ref int x\n}\n");
+    assert_issue(&english, "ref_field_refused", "ref", None);
+    let latin = parse_program("genus P {\n    de numerus x\n}\n");
+    assert_issue(&latin, "ref_field_refused", "de", None);
+}
+
+#[test]
+fn a_retired_field_word_followed_by_a_modifier_is_a_repeat() {
+    for source in [
+        "genus P {\n    fixum varia numerus x\n}\n",
+        "genus P {\n    sit fixum numerus x\n}\n",
+        "genus P {\n    de varia numerus x\n}\n",
+    ] {
+        let result = parse_program(source);
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|err| has_arg(err, "issue", "field_modifier_repeated")),
+            "{source}: {:?}",
+            result.errors
+        );
+    }
+}

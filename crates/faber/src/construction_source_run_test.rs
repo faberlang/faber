@@ -10,9 +10,9 @@ use crate::script::{BufferHost, interpret_source};
 
 const PUNCTUM: &str = "
 class Punctum {
-    const int x
+    let int x
     mut int y
-    const list<int> gradus
+    let list<int> gradus
 }
 ";
 

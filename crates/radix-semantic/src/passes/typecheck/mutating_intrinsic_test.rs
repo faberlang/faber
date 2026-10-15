@@ -105,7 +105,7 @@ fn fixum_field_list_contents_stay_mutable() {
     // A `varia` object's field contents stay mutable. (A `fixum` object's do
     // not: see `const_object_field_list_append_is_rejected`.)
     test_support::assert_accepts(
-        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
+        "genus Punctum {\n    sit lista<numerus> xs\n}\n\n\
          incipit {\n    varia Punctum p ← Punctum { xs = [] }\n    p.xs.appende(3)\n    nota p.xs\n}",
     );
 }
@@ -128,7 +128,7 @@ fn const_object_field_list_append_is_rejected() {
     // `const` is deep: a field of a const object is not
     // reachable for in-place mutation.
     rejects_through_const(
-        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
+        "genus Punctum {\n    sit lista<numerus> xs\n}\n\n\
          incipit {\n    sit Punctum p ← Punctum { xs = [] }\n    p.xs.appende(3)\n}",
     );
 }
@@ -136,8 +136,8 @@ fn const_object_field_list_append_is_rejected() {
 #[test]
 fn const_object_nested_field_list_append_is_rejected() {
     rejects_through_const(
-        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
-         genus Cista {\n    fixum Punctum p\n}\n\n\
+        "genus Punctum {\n    sit lista<numerus> xs\n}\n\n\
+         genus Cista {\n    sit Punctum p\n}\n\n\
          incipit {\n    sit Cista c ← Cista { p = Punctum { xs = [] } }\n    c.p.xs.appende(3)\n}",
     );
 }
@@ -152,7 +152,7 @@ fn const_list_direct_append_keeps_its_own_issue() {
 #[test]
 fn const_object_field_list_read_stays_accepted() {
     test_support::assert_accepts(
-        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
+        "genus Punctum {\n    sit lista<numerus> xs\n}\n\n\
          incipit {\n    sit Punctum p ← Punctum { xs = [] }\n    nota p.xs.longitudo()\n}",
     );
 }

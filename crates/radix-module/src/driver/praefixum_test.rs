@@ -107,7 +107,7 @@ fn list_result_is_an_array_literal() {
 #[test]
 fn genus_result_is_a_typed_construction_literal() {
     let unit = analyze_ok(
-        "genus Punctum {\n    fixum numerus x\n    fixum numerus y\n}\n\
+        "genus Punctum {\n    sit numerus x\n    sit numerus y\n}\n\
          fixum Punctum P = praefixum {\n    redde Punctum { x = 2 * 3, y = 0 - 1 }\n}\n",
     );
     let HirExpressionKind::Verte { entries: Some(entries), .. } = static_value(&unit, "P").kind else {

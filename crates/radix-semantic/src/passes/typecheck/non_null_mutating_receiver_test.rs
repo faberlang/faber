@@ -78,7 +78,7 @@ fn non_null_field_receiver_keeps_shallow_behavior() {
     // `p!.xs.appende(3)`: the non-null boundary is a field access on `p`, not
     // the method callee; the receiver is a field place (shallow D-1).
     test_support::assert_accepts(
-        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\
+        "genus Punctum {\n    sit lista<numerus> xs\n}\n\
          functio da() → Punctum ∪ nihil { redde Punctum { xs = [] } }\n\
          incipit {\n    sit Punctum ∪ nihil p ← da()\n    p!.xs.appende(3)\n}",
     );

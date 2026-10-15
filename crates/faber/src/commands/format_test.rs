@@ -625,7 +625,7 @@ fn format_stdin_preserves_comments_in_expression_owned_blocks() {
             cases.push((
                 format!("{kind} class field default"),
                 format!(
-                    "{FRONT}genus G {{\n    fixum numerus x = {}\n}}\n",
+                    "{FRONT}genus G {{\n    sit numerus x = {}\n}}\n",
                     block("    ")
                 ),
             ));

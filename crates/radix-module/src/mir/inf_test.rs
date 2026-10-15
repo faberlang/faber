@@ -147,7 +147,7 @@ fn a_bounded_value_widens_into_every_inf_slot_exactly() {
     // carrier, so a `u64` beyond `i64` keeps its value at every site.
     let items = "functio take(inf x) → inf {\n redde x\n}\n\
                  functio give(u64 v) → inf {\n redde v\n}\n\
-                 genus Capsa {\n fixum inf f\n}";
+                 genus Capsa {\n sit inf f\n}";
     let (out, errors) = run_items(
         items,
         "sit u64 u ← 18446744073709551615\nvaria inf w ← 0\nw ← u\nnota w + 1\n\
@@ -436,7 +436,7 @@ fn lista_of_inf_sums_exactly_and_orders_totally() {
 fn genus_fields_and_functions_carry_inf() {
     // ruling 43: fields, calls and returns; ruling 42: D2.8 composite display.
     let (out, errors) = run_items(
-        "genus Capsa {\n fixum inf a\n fixum inf b\n}\nfunctio duplica(inf x) → inf {\n redde x + x\n}\n",
+        "genus Capsa {\n sit inf a\n sit inf b\n}\nfunctio duplica(inf x) → inf {\n redde x + x\n}\n",
         &format!("sit inf big ← {TWO_64}\nsit Capsa c ← Capsa {{ a = big, b = duplica(big) }}\nnota c\nnota c.b - c.a"),
     );
     assert!(errors.is_empty(), "{errors:?}");

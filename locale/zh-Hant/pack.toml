@@ -520,6 +520,14 @@ help = "繫結名使用 `{sit}`（固定名稱）或 `{varia}`（可寫名稱）
 message = "`{keyword}` 不能引入繫結名"
 help = "繫結名對應每次迭代或匹配的值；固定名稱寫 `{sit}`，可寫名稱寫 `{varia}`"
 
+[diagnostics.PARSE010.issues.field_fixum_retired]
+message = "`{keyword}` 欄位修飾詞已廢止"
+help = "唯讀欄位寫 `{sit}`；`{fixum}` 表示編譯期事實，與 `=` 搭配"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` 不能修飾欄位"
+help = "欄位是唯讀（`{sit}`）或可寫（`{varia}`）；`{generis}` 使其屬於型別"
+
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "`{keyword}` 區域變數需要一個可讀取的位置：`{keyword} T name ← place`"
 help = "寫成 `{keyword} T name ← place`，若不需要初始位置，請使用 `{sit}` 或 `{varia}`"

@@ -39,8 +39,8 @@ locale = "en"
 #   clamp-families.expected — one result per print.
 
 class Span {
-    const f64 low
-    const f64 high
+    let f64 low
+    let f64 high
 
     fn center() → f64 {
         return (self.low + self.high) ÷ 2.0

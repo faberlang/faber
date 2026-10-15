@@ -1309,7 +1309,7 @@ fn mixed_bare_and_qualified_variant_references_stay_provable() {
     assert_idempotent(source);
 }
 
-const FLOAT_SLOT_INTEGER_SOURCE: &str = "genus Intervallum {\n    fixum fractus imum\n    fixum fractus summum\n    functio medium() → fractus {\n        redde (ego.imum + ego.summum) ÷ 2\n    }\n}\n\nfunctio cubus() → Intervallum {\n    redde Intervallum { imum = 0, summum = 255 }\n}\n";
+const FLOAT_SLOT_INTEGER_SOURCE: &str = "genus Intervallum {\n    sit fractus imum\n    sit fractus summum\n    functio medium() → fractus {\n        redde (ego.imum + ego.summum) ÷ 2\n    }\n}\n\nfunctio cubus() → Intervallum {\n    redde Intervallum { imum = 0, summum = 255 }\n}\n";
 
 /// web3: an integer literal in a `fractus` slot is retyped to a float constant
 /// by typecheck; its re-emitted `2.0` text re-parses as literal text. Both are

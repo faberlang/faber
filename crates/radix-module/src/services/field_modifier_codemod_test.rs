@@ -18,14 +18,14 @@ fn strip_inserted(output: &str, word: &str) -> String {
     output.replace(&format!("{word} "), "")
 }
 
-const EN: &str = "+++\nlocale = \"en\"\n+++\n# header comment\n@ public\nclass Punctum {\n    # doc for x\n    int  x\n    const int y\n    static int Z = 3\n    @ private\n    list<int> xs\n    string ∪ none label optional\n\n    fn norm() → int {\n        let int local ← 1\n        return self.x + local\n    }\n}\n\nunion Figura {\n    Circulus { float radius }\n}\n";
+const EN: &str = "+++\nlocale = \"en\"\n+++\n# header comment\n@ public\nclass Punctum {\n    # doc for x\n    int  x\n    let int y\n    static int Z = 3\n    @ private\n    list<int> xs\n    string ∪ none label optional\n\n    fn norm() → int {\n        let int local ← 1\n        return self.x + local\n    }\n}\n\nunion Figura {\n    Circulus { float radius }\n}\n";
 
 #[test]
 fn en_inserts_mut_before_unmarked_fields_only() {
     let result = insert_field_modifiers(&pack("en"), EN).expect("codemod");
     assert_eq!(result.inserted, 3);
     assert!(result.source.contains("    mut int  x\n"), "{}", result.source);
-    assert!(result.source.contains("    const int y\n"), "{}", result.source);
+    assert!(result.source.contains("    let int y\n"), "{}", result.source);
     assert!(result.source.contains("    static int Z = 3\n"), "{}", result.source);
     assert!(
         result
@@ -63,10 +63,10 @@ fn codemod_is_idempotent() {
 
 #[test]
 fn latin_file_gets_varia() {
-    let source = "genus Punctum {\n    numerus x\n    fixum numerus y\n}\n";
+    let source = "genus Punctum {\n    numerus x\n    sit numerus y\n}\n";
     let result = insert_field_modifiers(&pack("la"), source).expect("codemod");
     assert_eq!(result.inserted, 1);
-    assert_eq!(result.source, "genus Punctum {\n    varia numerus x\n    fixum numerus y\n}\n");
+    assert_eq!(result.source, "genus Punctum {\n    varia numerus x\n    sit numerus y\n}\n");
 }
 
 #[test]

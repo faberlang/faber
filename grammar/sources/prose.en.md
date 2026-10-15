@@ -357,17 +357,18 @@ wire operation such as `json.pange(value ↦ json)`.
 - `implet` = implements (conformance to an `implendum` contract), written
   with the contract's type arguments in full
   (`genus Persona implet Orderable<Persona>`, D1.2).
-- Every `genus` field declares exactly one of `fixum` / `varia` / `generis`
+- Every `genus` field declares exactly one of `sit` (en `let`) / `varia` / `generis`
   (D16.1); there is no default — an unmarked field is a parse error: PARSE010
   `field_modifier_missing` (D5c). The `discretio` shared-field position
   (`union_member`) keeps today's unmarked form (fork F7 held).
-  `fixum T x`: per instance, set only in
+  `sit T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } ex p` copies it unchanged (D16.3), independent of visibility
-  (`@ privata` + `fixum` is legal). `varia T x`: per instance, reassignable.
+  (`@ privata` + `sit` is legal). `varia T x`: per instance, reassignable.
   `generis T X = …`: one per type, compile-time (the only remaining `generis` position). A write to a
-  `fixum` field outside a construction literal is `SEM020`
-  (`assignment_to_fixum_field`). The former `nexum` field modifier is removed
+  `sit` field outside a construction literal is `SEM020`
+  (`assignment_to_fixum_field`). The retired `fixum` (en `const`) field word is
+  PARSE010 `field_fixum_retired` and `de` (en `ref`) is `ref_field_refused`. The former `nexum` field modifier is removed
   and rejected with a migration diagnostic.
 - `genus` members are public by default (D5.2). `@ privata` on a member restricts it to the type's own methods: only code inside the type's own function bodies may read, write, or call it (D5.3); `@ interna` restricts it to code in the declaring package. A construction literal may still set a private field, from any file, and `Genus { … } ex p` copies it unchanged (D5.4). Reading, writing, or calling an inaccessible member from outside its allowed scope is `SEM063` (`member_private_read`/`_write`/`_call`, or `member_interna_read`/`_write`/`_call`); `@ publica` on a member is a redundant-annotation warning `WARN028` (`redundant_member_publica`), an error when warnings are denied.
 - A type may refer to itself: `discretio Expr { Adde { Expr sinister, Expr dexter } }`

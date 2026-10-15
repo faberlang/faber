@@ -1,0 +1,27 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "genus_field_decl", "type_annotation", "base_type", "incipit_stmt", "block_stmt", "nota_stmt"]
+category = "binding"
+summary = "A read-only genus field is let; the old const field modifier is retired."
+syntax = "class P { const int x }"
+related = ["sit", "varia", "genus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE010:field_fixum_retired"
++++
+# =============================================================================
+# mutabilitas — const field modifiers are retired
+# =============================================================================
+# A genus field takes `let` (set only at construction), `mut` (reassignable)
+# or `static` (one per type). `const` states a compile-time fact and goes
+# with `=`, so it no longer introduces a field.
+
+class Punctum {
+    const int x
+    mut int y
+}
+
+main {
+    print "unreachable"
+}

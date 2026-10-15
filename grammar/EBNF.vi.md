@@ -43,7 +43,7 @@ figendum_decl ::= ('đợi_hằng' | 'đợi_biến') type_annotation IDENTIFIER
 # [016] sit_decl
 sit_decl ::= 'đặt' type_annotation? IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?
 # [017] ref_decl
-ref_decl ::= 'ra' base_type IDENTIFIER '←' expression
+ref_decl ::= 'ra' concrete_type IDENTIFIER '←' expression
 # [018] array_destruct
 array_destruct ::= ('đặt' | 'biến') array_pattern '←' expression
 # [019] object_destruct
@@ -113,9 +113,9 @@ genus_member ::= annotation* (genus_field_decl | functio_method_decl) | nondum_m
 # [051] nondum_method_decl
 nondum_method_decl ::= annotation* nondum_annotation annotation* 'hàm' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
 # [052] genus_field_decl
-genus_field_decl ::= ('hằng' | 'biến' | 'tĩnh') type_annotation IDENTIFIER 'tự_nguyện'? ('=' const_init)?
+genus_field_decl ::= ('đặt' | 'biến' | 'tĩnh') type_annotation IDENTIFIER 'tự_nguyện'? ('=' const_init)?
 # [053] field_decl
-field_decl ::= ('hằng' | 'biến' | 'tĩnh')? type_annotation IDENTIFIER 'tự_nguyện'? ('=' const_init)?
+field_decl ::= ('đặt' | 'biến' | 'tĩnh')? type_annotation IDENTIFIER 'tự_nguyện'? ('=' const_init)?
 # [054] functio_method_decl
 functio_method_decl ::= 'hàm' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 # [055] annotation
@@ -1410,17 +1410,18 @@ wire operation such as `json.pange(value ↦ json)`.
 - `thực_thi` = implements (conformance to an `giao_ước` contract), written
   with the contract's type arguments in full
   (`kiểu Persona thực_thi Orderable<Persona>`, D1.2).
-- Every `kiểu` field declares exactly one of `hằng` / `biến` / `tĩnh`
+- Every `kiểu` field declares exactly one of `đặt` (en `let`) / `biến` / `tĩnh`
   (D16.1); there is no default — an unmarked field is a parse error: PARSE010
   `field_modifier_missing` (D5c). The `hợp_nhất` shared-field position
   (`union_member`) keeps today's unmarked form (fork F7 held).
-  `hằng T x`: per instance, set only in
+  `đặt T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } từ p` copies it unchanged (D16.3), independent of visibility
-  (`@ privata` + `hằng` is legal). `biến T x`: per instance, reassignable.
+  (`@ privata` + `đặt` is legal). `biến T x`: per instance, reassignable.
   `tĩnh T X = …`: one per type, compile-time (the only remaining `tĩnh` position). A write to a
-  `hằng` field outside a construction literal is `SEM020`
-  (`assignment_to_fixum_field`). The former `nexum` field modifier is removed
+  `đặt` field outside a construction literal is `SEM020`
+  (`assignment_to_fixum_field`). The retired `hằng` (en `const`) field word is
+  PARSE010 `field_fixum_retired` and `ra` (en `ref`) is `ref_field_refused`. The former `nexum` field modifier is removed
   and rejected with a migration diagnostic.
 - `kiểu` members are public by default (D5.2). `@ privata` on a member restricts it to the type's own methods: only code inside the type's own function bodies may read, write, or call it (D5.3); `@ interna` restricts it to code in the declaring package. A construction literal may still set a private field, from any file, and `Genus { … } từ p` copies it unchanged (D5.4). Reading, writing, or calling an inaccessible member from outside its allowed scope is `SEM063` (`member_private_read`/`_write`/`_call`, or `member_interna_read`/`_write`/`_call`); `@ công_khai` on a member is a redundant-annotation warning `WARN028` (`redundant_member_publica`), an error when warnings are denied.
 - A type may refer to itself: `hợp_nhất Expr { Adde { Expr sinister, Expr dexter } }`
