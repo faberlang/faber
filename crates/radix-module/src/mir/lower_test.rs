@@ -4227,9 +4227,9 @@ fn lowers_generic_tensor_formata_to_tensor_reshape() {
     let dump = dump_source(
         r"
 incipit {
-    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
     varia tf32[2, 2] grid ← flat ↦ tf32[2, 2]
-    fixum tf32[4] view ← grid.formata<tf32[4]>()
+    sit tf32[4] view ← grid.formata<tf32[4]>()
     nota view.longitudo()
 }
 ",
