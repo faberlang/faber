@@ -188,7 +188,7 @@ fn portable_default_init_check_build_run_clean_room() {
     let (run_stdout, stderr, ok) = run_faber_clean_room(&["run", package_str]);
     assert!(ok, "clean-room run failed:\n{stderr}");
     assert_eq!(
-        run_stdout, "Salve, munde!\n",
+        run_stdout, "Hello, world!\n",
         "clean-room run must execute the fresh package through FMIR from loaded FHIR"
     );
 }
