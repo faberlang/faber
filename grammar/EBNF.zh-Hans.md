@@ -209,11 +209,11 @@ type_annotation ::= union_hole_type | concrete_type
 # [099] concrete_type
 concrete_type ::= intersection_type ('∪' intersection_type)*
 # [100] union_hole_type
-union_hole_type ::= ('借自' | '传入' | '拥有' | '拷贝')? '∪'
+union_hole_type ::= ('借自' | '变量' | '拥有' | '拷贝')? '∪'
 # [101] intersection_type
 intersection_type ::= owned_type ('∩' owned_type)*
 # [102] owned_type
-owned_type ::= ('借自' | '传入' | '拥有' | '拷贝')? base_type
+owned_type ::= ('借自' | '变量' | '拥有' | '拷贝')? base_type
 # [103] base_type
 base_type ::= hole_type | function_type | width_type_sugar | ratio_type | failable_promissum_type | qualified_type type_arguments?
 # [104] failable_promissum_type
@@ -423,7 +423,7 @@ argument_list ::= (argument (',' argument)*)?
 # [206] argument
 argument ::= template_argument | (call_marker | '轴')? '展开'? expression
 # [207] call_marker
-call_marker ::= '借自' | '传入' | '拥有' | '拷贝'
+call_marker ::= '借自' | '变量' | '拥有' | '拷贝'
 # [208] template_argument
 template_argument ::= '展开'? IDENTIFIER ':' expression
 # [209] literal

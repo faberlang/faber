@@ -1199,10 +1199,10 @@ concrete_type   := intersection_type ('∪' intersection_type)*
 # whole type, so a following `∪` or `∩` (`∪ ∪ A`, `∪ ∩ A`) is a parse error
 # (`unexpected_cup_after_union_hole`), and it is never a member of a union or
 # intersection. The monomorphic hole `_` (`hole_type`) has no such rule.
-union_hole_type := ('de' | 'in' | 'own' | 'copy')? '∪'
+union_hole_type := ('de' | 'varia' | 'own' | 'copy')? '∪'
 # `∩` binds tighter than `∪`: the cup tail parses at intersection level.
 intersection_type := owned_type ('∩' owned_type)*
-owned_type      := ('de' | 'in' | 'own' | 'copy')? base_type
+owned_type      := ('de' | 'varia' | 'own' | 'copy')? base_type
 # There is no grouping parenthesis in type position: `(` opens a function type
 # only, so `(A ∪ B)` is a parse error. A union member that needs its own access
 # marker is written on the member (`de A ∪ B`).
@@ -1473,7 +1473,7 @@ argument_list  := (argument (',' argument)*)?
 # the second kind: it says what a number means, and a parameter declares it
 # before its type (`axis int a`) with the call echoing it (`t.mean(axis 1)`).
 argument      := template_argument | (call_marker | 'axis')? 'sparge'? expression
-call_marker   := 'de' | 'in' | 'own' | 'copy'
+call_marker   := 'de' | 'varia' | 'own' | 'copy'
 template_argument := 'sparge'? IDENTIFIER ':' expression
 
 # `∞` and `nonnumerus` are non-finite floating-point literals; `nonnumerus`

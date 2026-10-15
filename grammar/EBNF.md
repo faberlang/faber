@@ -209,11 +209,11 @@ type_annotation ::= union_hole_type | concrete_type
 # [099] concrete_type
 concrete_type ::= intersection_type ('∪' intersection_type)*
 # [100] union_hole_type
-union_hole_type ::= ('de' | 'in' | 'own' | 'copy')? '∪'
+union_hole_type ::= ('de' | 'varia' | 'own' | 'copy')? '∪'
 # [101] intersection_type
 intersection_type ::= owned_type ('∩' owned_type)*
 # [102] owned_type
-owned_type ::= ('de' | 'in' | 'own' | 'copy')? base_type
+owned_type ::= ('de' | 'varia' | 'own' | 'copy')? base_type
 # [103] base_type
 base_type ::= hole_type | function_type | width_type_sugar | ratio_type | failable_promissum_type | qualified_type type_arguments?
 # [104] failable_promissum_type
@@ -423,7 +423,7 @@ argument_list ::= (argument (',' argument)*)?
 # [206] argument
 argument ::= template_argument | (call_marker | 'axis')? 'sparge'? expression
 # [207] call_marker
-call_marker ::= 'de' | 'in' | 'own' | 'copy'
+call_marker ::= 'de' | 'varia' | 'own' | 'copy'
 # [208] template_argument
 template_argument ::= 'sparge'? IDENTIFIER ':' expression
 # [209] literal
