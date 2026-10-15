@@ -483,6 +483,12 @@ pub(crate) struct FunctionSlots {
     locals: Vec<Option<TypeId>>,
     temps: Vec<Option<TypeId>>,
     param_locals: Vec<MirLocalId>,
+    /// Locals whose declared type is a bare `f32` (through aliases): a float
+    /// stored there rounds to binary32. A `PolicyFloat` cell is not flagged;
+    /// it keeps the bare float and its own store check.
+    f32_locals: Vec<bool>,
+    /// Temps whose declared type is a bare `f32`, like `f32_locals`.
+    f32_temps: Vec<bool>,
 }
 
 impl FunctionSlots {
@@ -493,13 +499,42 @@ impl FunctionSlots {
     pub(crate) fn temp_ty(&self, id: MirTempId) -> Option<TypeId> {
         self.temps.get(id.0 as usize).copied().flatten()
     }
+
+    fn local_is_f32(&self, id: MirLocalId) -> bool {
+        self.f32_locals.get(id.0 as usize).copied().unwrap_or(false)
+    }
+
+    fn temp_is_f32(&self, id: MirTempId) -> bool {
+        self.f32_temps.get(id.0 as usize).copied().unwrap_or(false)
+    }
+}
+
+/// `true` when `ty`, resolved through aliases, is the bare `f32` float type.
+fn is_bare_f32(types: &TypeTable, mut ty: TypeId) -> bool {
+    loop {
+        match types.get(ty) {
+            Type::Alias(_, inner) => ty = *inner,
+            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32) => return true,
+            _ => return false,
+        }
+    }
+}
+
+fn f32_slot_flags(types: &TypeTable, slots: &[Option<TypeId>]) -> Vec<bool> {
+    slots
+        .iter()
+        .map(|ty| ty.is_some_and(|ty| is_bare_f32(types, ty)))
+        .collect()
 }
 
 fn slot_table_len(ids: impl Iterator<Item = u32>) -> usize {
     ids.map(|id| id as usize + 1).max().unwrap_or(0)
 }
 
-fn index_slot_types(program: &MirProgram) -> FxHashMap<MirFunctionId, FunctionSlots> {
+fn index_slot_types(
+    program: &MirProgram,
+    types: &TypeTable,
+) -> FxHashMap<MirFunctionId, FunctionSlots> {
     let mut table = FxHashMap::default();
     for function in &program.functions {
         let mut locals = vec![
@@ -526,12 +561,16 @@ fn index_slot_types(program: &MirProgram) -> FxHashMap<MirFunctionId, FunctionSl
         for temp in &function.temps {
             temps[temp.id.0 as usize] = Some(temp.ty.semantic_id());
         }
+        let f32_locals = f32_slot_flags(types, &locals);
+        let f32_temps = f32_slot_flags(types, &temps);
         table.insert(
             function.id,
             FunctionSlots {
                 locals,
                 temps,
                 param_locals,
+                f32_locals,
+                f32_temps,
             },
         );
     }
@@ -679,7 +718,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             ascii_literals: RefCell::new(FxHashMap::default()),
             value_types: index_value_types(program),
             value_reading_functions: index_value_reading_functions(program),
-            slot_types: index_slot_types(program),
+            slot_types: index_slot_types(program, types),
             kernel_policy: RunnerKernelPolicy::Refuse,
             kernel_dispatcher: None,
             next_block_id: 1,
@@ -3020,6 +3059,20 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             .frames
             .get_mut(frame_index)
             .ok_or_else(|| RunnerError::internal(span, "no active frame"))?;
+        // A value has no width until it is stored: a float stored into a bare
+        // `f32` cell rounds to the nearest binary32 (ties to even).
+        let narrows_to_f32 = matches!(value, Value::Float(_))
+            && self
+                .slot_types
+                .get(&frame.function)
+                .is_some_and(|slots| match base {
+                    MirPlaceBase::Local(id) => slots.local_is_f32(*id),
+                    MirPlaceBase::Temp(id) => slots.temp_is_f32(*id),
+                });
+        let value = match value {
+            Value::Float(v) if narrows_to_f32 => Value::Float(f64::from(v as f32)),
+            other => other,
+        };
         match base {
             MirPlaceBase::Local(id) => {
                 write_slot(&mut frame.locals, id.0 as usize, value, span, "local")?;
@@ -3959,6 +4012,10 @@ mod decimal_test;
 #[cfg(test)]
 #[path = "policy_float_test.rs"]
 mod policy_float_test;
+
+#[cfg(test)]
+#[path = "f32_store_test.rs"]
+mod f32_store_test;
 
 #[cfg(test)]
 #[path = "narrowing_conversio_test.rs"]
