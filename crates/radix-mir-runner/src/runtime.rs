@@ -210,6 +210,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     None => Ok(Value::Nil),
                 }
             }
+            MirIntrinsic::ReadAll => {
+                if !call.args.is_empty() {
+                    return Err(RunnerError::internal(span, "read_all runtime arity"));
+                }
+                match self.host.read_all()? {
+                    Some(text) => Ok(Value::Str(text)),
+                    None => Ok(Value::Nil),
+                }
+            }
             MirIntrinsic::Provider(provider) => self.eval_provider(provider, span),
             MirIntrinsic::SermoOpen => self.eval_sermo_open(&call.args, span),
             MirIntrinsic::SermoSetOpener => self.eval_sermo_set_opener(&call.args, span),
