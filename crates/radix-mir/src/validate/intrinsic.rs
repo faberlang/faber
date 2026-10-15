@@ -1482,6 +1482,15 @@ impl Validator<'_, '_> {
                                 "list slice result type mismatch",
                             );
                         }
+                        // A standalone non-empty list literal types as the
+                        // exact-length witness `lista<T, N>`. Slicing it yields
+                        // the unbounded list of the same element type.
+                        Type::BoundedArray { element, .. } => {
+                            match self.type_kind(call.return_ty) {
+                                Type::Array(inner) if *inner == *element => {}
+                                _ => self.error(span, "list slice result type mismatch"),
+                            }
+                        }
                         _ => self.error(span, "slice receiver is not textus or lista"),
                     }
                 }
