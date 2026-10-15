@@ -1186,6 +1186,16 @@ impl FunctionLower<'_, '_> {
         let mut current = self.builder.use_var(variable);
         let mut current_rep = rep;
         for projection in &place.projections {
+            if let (MirProjection::Index(index), Rep::Text) = (projection, current_rep) {
+                let (index, index_rep) = self.scalar(index)?;
+                if index_rep != Rep::Int {
+                    return Err(Decline::new("text index representation"));
+                }
+                current = self
+                    .call_runtime(&abi::TEXT_INDEX, &[current, index])?
+                    .ok_or_else(|| Decline::new("text index result"))?;
+                continue;
+            }
             let next = self.projected_type(ty, projection)?;
             let next_rep = rep_of(self.state.input.types, next)?;
             let bits = match projection {
@@ -1592,6 +1602,33 @@ impl FunctionLower<'_, '_> {
                     Rep::Bool,
                 )
             }
+            (MirCollectionOp::Index, Rep::Text) => {
+                let [_, index] = args else {
+                    return Err(Decline::new("index arity"));
+                };
+                let (index, index_rep) = self.scalar(index)?;
+                if index_rep != Rep::Int {
+                    return Err(Decline::new("text index representation"));
+                }
+                let optional = match destination {
+                    Some(destination) => {
+                        let ty = self.place_type(destination)?;
+                        rep_of(self.state.input.types, ty)? == Rep::Opt
+                    }
+                    None => false,
+                };
+                if optional {
+                    let found = self
+                        .call_runtime(&abi::TEXT_INDEX_OPT, &[handle, index])?
+                        .ok_or_else(|| Decline::new("text index result"))?;
+                    (Some(found), Rep::Opt)
+                } else {
+                    let character = self
+                        .call_runtime(&abi::TEXT_INDEX, &[handle, index])?
+                        .ok_or_else(|| Decline::new("text index result"))?;
+                    (Some(character), Rep::Text)
+                }
+            }
             (MirCollectionOp::Index, Rep::List) => {
                 let [_, index] = args else {
                     return Err(Decline::new("index arity"));
@@ -1605,10 +1642,20 @@ impl FunctionLower<'_, '_> {
                 };
                 let element = self.place_type(destination)?;
                 let element_rep = rep_of(self.state.input.types, element)?;
-                let bits = self
-                    .call_runtime(&abi::LIST_GET, &[handle, index])?
-                    .ok_or_else(|| Decline::new("list get result"))?;
-                (Some(self.element_value(bits, element_rep)), element_rep)
+                let list_element = self.element_type(self.operand_type(&args[0])?)?;
+                if element_rep == Rep::Opt
+                    && rep_of(self.state.input.types, list_element)? != Rep::Opt
+                {
+                    let found = self
+                        .call_runtime(&abi::LIST_GET_OPT, &[handle, index])?
+                        .ok_or_else(|| Decline::new("list get result"))?;
+                    (Some(found), Rep::Opt)
+                } else {
+                    let bits = self
+                        .call_runtime(&abi::LIST_GET, &[handle, index])?
+                        .ok_or_else(|| Decline::new("list get result"))?;
+                    (Some(self.element_value(bits, element_rep)), element_rep)
+                }
             }
             (MirCollectionOp::Append, Rep::List) => {
                 let [_, item] = args else {

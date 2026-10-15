@@ -983,6 +983,73 @@ pub unsafe extern "C" fn __faber_clif_v1_text_len(handle: *const u8) -> i64 {
     i64::try_from(count).unwrap_or(i64::MAX)
 }
 
+/// The character at `index`; an index out of range ends the run.
+///
+/// # Safety
+///
+/// `handle` addresses a well-formed text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_index(handle: *const u8, index: i64) -> *const u8 {
+    let text = text_str(unsafe { text_bytes(handle) });
+    match usize::try_from(index)
+        .ok()
+        .and_then(|at| text.chars().nth(at))
+    {
+        Some(found) => {
+            let mut buffer = [0_u8; 4];
+            text_new(found.encode_utf8(&mut buffer).as_bytes())
+        }
+        None => unsafe { __faber_clif_v1_trap(c"text index out of bounds".as_ptr().cast(), 24) },
+    }
+}
+
+/// The character at `index` as an optional: none out of range.
+///
+/// # Safety
+///
+/// `handle` addresses a well-formed text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_index_opt(
+    handle: *const u8,
+    index: i64,
+) -> *const Present {
+    let text = text_str(unsafe { text_bytes(handle) });
+    match usize::try_from(index)
+        .ok()
+        .and_then(|at| text.chars().nth(at))
+    {
+        Some(found) => {
+            let mut buffer = [0_u8; 4];
+            let character = text_new(found.encode_utf8(&mut buffer).as_bytes());
+            Box::into_raw(Box::new(Present {
+                tag: TAG_TEXT,
+                bits: character as i64,
+            }))
+        }
+        None => std::ptr::null(),
+    }
+}
+
+/// The element at `index` as an optional: none out of range.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_get_opt(
+    list: *const List,
+    index: i64,
+) -> *const Present {
+    let list = unsafe { list_ref(list) };
+    match usize::try_from(index)
+        .ok()
+        .and_then(|at| list.items.get(at))
+    {
+        Some(&(tag, bits)) => Box::into_raw(Box::new(Present { tag, bits })),
+        None => std::ptr::null(),
+    }
+}
+
 /// Abort with a text message, the runner's `abort: <message>` (D5).
 ///
 /// # Safety

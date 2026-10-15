@@ -100,6 +100,18 @@ pub const MAP_GET_OPT: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, I32, I64],
     ret: Some(Ptr),
 };
+/// Element at an index as an optional: present element or none.
+pub const LIST_GET_OPT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_get_opt",
+    params: &[Ptr, I64],
+    ret: Some(Ptr),
+};
+/// Character at an index as an optional: present text or none.
+pub const TEXT_INDEX_OPT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_index_opt",
+    params: &[Ptr, I64],
+    ret: Some(Ptr),
+};
 /// Key membership.
 pub const MAP_HAS: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_map_has",
@@ -290,6 +302,13 @@ pub const TEXT_FROM_LIST: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr],
     ret: Some(Ptr),
 };
+/// One character of a text: (text, index) -> new text handle. An index out of
+/// range ends the run.
+pub const TEXT_INDEX: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_index",
+    params: &[Ptr, I64],
+    ret: Some(Ptr),
+};
 /// Concatenate two texts: (left, right) -> new text handle.
 pub const TEXT_CONCAT: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_text_concat",
@@ -389,6 +408,8 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     MAP_SET,
     MAP_GET,
     MAP_GET_OPT,
+    LIST_GET_OPT,
+    TEXT_INDEX_OPT,
     MAP_HAS,
     MAP_REMOVE,
     MAP_LEN,
@@ -419,6 +440,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     TEXT_EQ,
     TEXT_CMP,
     TEXT_LEN,
+    TEXT_INDEX,
     ABORT_TEXT,
     TRAP,
     TRAP_STORE,
