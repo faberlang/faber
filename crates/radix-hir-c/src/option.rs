@@ -91,7 +91,7 @@ impl Emitter<'_> {
                 Some(name) => (
                     format!("{name} {t} = {}; ", l.text),
                     format!("{t}.has"),
-                    (format!("{t}"), r.text, Value::Opt(inner)),
+                    (t.clone(), r.text, Value::Opt(inner)),
                 ),
                 None => (
                     format!("{} {t} = {}; ", self.c_type(class)?, l.text),
