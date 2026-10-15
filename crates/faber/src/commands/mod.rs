@@ -343,6 +343,9 @@ fn dispatch(command: Command) {
                 #[cfg(feature = "mir-llvm")]
                 cuda_descriptor: None,
             };
+            if !package::target_gate::target_compiled_in(emit_command.target) {
+                package::target_gate::exit_target_not_in_this_build(emit_command.target);
+            }
             if emit::is_faber_emit(args.target) {
                 emit::cmd_emit_faber(emit_command, args.format, args.linter);
             } else if package::use_package_compiler_from_args(

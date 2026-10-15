@@ -96,27 +96,11 @@ fn fail(message: &str) -> ! {
     std::process::exit(1);
 }
 
-/// Message for a build target that this `faber` binary lacks the feature for.
-///
-/// WHY: takes the `Target`, not a spelling, so the name shown is always the
-/// canonical one (`wasm-text`) and never a caller-surface alias (`wasm`) the
-/// user may not have typed.
-#[cfg(any(
-    test,
-    not(feature = "hir-fhir"),
-    not(feature = "mir-llvm"),
-    not(feature = "mir-wasm"),
-    not(feature = "mir-metal"),
-    not(feature = "hir-go"),
-))]
-fn target_feature_unavailable_message(target: Target, feature: &str) -> String {
-    format!(
-        "error: target `{}` is not available in this faber build; rebuild with feature `{feature}`",
-        target.as_str()
-    )
-}
-
 /// Exit when a build target was requested but this `faber` binary lacks its feature.
+///
+/// WHY: the gate takes the `Target`, not a spelling, so the name shown is
+/// always the canonical one (`wasm-text`) and never a caller-surface alias
+/// (`wasm`) the user may not have typed.
 #[cfg(any(
     not(feature = "hir-fhir"),
     not(feature = "mir-llvm"),
@@ -124,9 +108,8 @@ fn target_feature_unavailable_message(target: Target, feature: &str) -> String {
     not(feature = "mir-metal"),
     not(feature = "hir-go"),
 ))]
-fn exit_target_feature_unavailable(target: Target, feature: &str) -> ! {
-    eprintln!("{}", target_feature_unavailable_message(target, feature));
-    std::process::exit(1);
+fn exit_target_feature_unavailable(target: Target) -> ! {
+    super::target_gate::exit_target_not_in_this_build(target)
 }
 
 #[cfg(not(feature = "runner"))]
@@ -187,6 +170,9 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
 
     let raw_input_path = PathBuf::from(&command.input);
     let target = resolve_build_target(&command, &raw_input_path);
+    if !super::target_gate::target_compiled_in(target) {
+        super::target_gate::exit_target_not_in_this_build(target);
+    }
     let is_package = use_package_compiler(target, &raw_input_path, command.package);
     let input_path = if is_package {
         super::absolutize_path(&raw_input_path)
@@ -314,7 +300,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
 
     if is_package && target == Target::HirFhir {
         #[cfg(not(feature = "hir-fhir"))]
-        exit_target_feature_unavailable(Target::HirFhir, "hir-fhir");
+        exit_target_feature_unavailable(Target::HirFhir);
         #[cfg(feature = "hir-fhir")]
         let artifact = match radix::program::fhir::build_package_fhir(
             &config,
@@ -341,7 +327,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
     // runtime archive is unavailable or the host triple is unsupported.
     if is_package && target == Target::MirLlvmHost {
         #[cfg(not(feature = "mir-llvm"))]
-        exit_target_feature_unavailable(Target::MirLlvmHost, "mir-llvm");
+        exit_target_feature_unavailable(Target::MirLlvmHost);
         #[cfg(feature = "mir-llvm")]
         {
             let profile = if command.release {
@@ -369,7 +355,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
     // an external-tool step (`wat2wasm` / `wasm-tools parse`).
     if is_package && target == Target::MirWasm {
         #[cfg(not(feature = "mir-wasm"))]
-        exit_target_feature_unavailable(Target::MirWasm, "mir-wasm");
+        exit_target_feature_unavailable(Target::MirWasm);
         #[cfg(feature = "mir-wasm")]
         {
             let output_dir = match discover_build_layout(&input_path, &command.out_dir) {
@@ -401,7 +387,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
     // lane has no registrations and fails the empty-kernels gate.
     if is_package && target == Target::MirMetal {
         #[cfg(not(feature = "mir-metal"))]
-        exit_target_feature_unavailable(Target::MirMetal, "mir-metal");
+        exit_target_feature_unavailable(Target::MirMetal);
         #[cfg(feature = "mir-metal")]
         {
             let code = match compile_package_metal_text(&config, &input_path) {
@@ -458,7 +444,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
     // itself (FBR-P2-003) — no hidden thread-local state.
     if is_package && target == Target::HirGo {
         #[cfg(not(feature = "hir-go"))]
-        exit_target_feature_unavailable(Target::HirGo, "hir-go");
+        exit_target_feature_unavailable(Target::HirGo);
         #[cfg(feature = "hir-go")]
         {
             let go_result = radix::program::emit::compile_package_result(
@@ -954,7 +940,7 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
         && command.target == Target::MirMetal
     {
         #[cfg(not(feature = "mir-metal"))]
-        exit_target_feature_unavailable(Target::MirMetal, "mir-metal");
+        exit_target_feature_unavailable(Target::MirMetal);
         #[cfg(feature = "mir-metal")]
         {
             let path = super::absolutize_path(std::path::Path::new(&command.input[0]));
