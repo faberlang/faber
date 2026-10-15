@@ -106,7 +106,10 @@ impl Emitter<'_> {
     }
 
     fn local(&mut self, out: &mut String, local: &HirLocal) -> Result<(), CodegenError> {
-        if local.is_await || local.runtime_provided || local.await_store.is_some() {
+        // The entry's arguments are the one runtime-provided binding.
+        let entry_args = local.init.is_none() && self.entry_args == Some(local.name);
+        if local.is_await || (local.runtime_provided && !entry_args) || local.await_store.is_some()
+        {
             return Err(unsupported("await or runtime-provided binding"));
         }
         let Some(ty) = local
@@ -117,6 +120,9 @@ impl Emitter<'_> {
         };
         let class = classify(self.types, ty)?;
         let Some(init) = &local.init else {
+            if entry_args && class == Ty::List(crate::ty::Elem::Text) {
+                return self.entry_arguments(out, local);
+            }
             return Err(unsupported("local without an initializer"));
         };
         let value = self.expr(init)?;
@@ -147,6 +153,36 @@ impl Emitter<'_> {
                 name,
                 ty: class,
                 constant,
+            },
+        );
+        Ok(())
+    }
+
+    /// `main args xs`: the arguments after the program name, as a text list.
+    fn entry_arguments(&mut self, out: &mut String, local: &HirLocal) -> Result<(), CodegenError> {
+        let Some(kind) = self.names.binding_kind(local.def_id) else {
+            return Err(unsupported("local the name catalog does not classify"));
+        };
+        let raw = self.names.resolve_symbol(local.name);
+        let name = self.scope.claim(&prefixed_binding_name(kind, raw));
+        let class = Ty::List(crate::ty::Elem::Text);
+        self.need_class(class);
+        self.support.need(Helper::List(
+            crate::ty::Elem::Text,
+            crate::helpers::ListOp::Push,
+        ));
+        self.uses_args = true;
+        let declaration = self.declare(class, &name, local.mutable)?;
+        self.line(
+            out,
+            &format!("{declaration} = faber_argv_text(faber_a, argc, argv);"),
+        );
+        self.locals.insert(
+            local.def_id,
+            Local {
+                name,
+                ty: class,
+                constant: None,
             },
         );
         Ok(())

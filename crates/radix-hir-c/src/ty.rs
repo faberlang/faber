@@ -130,6 +130,14 @@ fn describe(ty: &Type) -> &'static str {
             "float width other than f64"
         }
         Type::Primitive(Primitive::Vacuum) => "value-less type",
+        Type::Primitive(Primitive::Regex | Primitive::Match) => "regex type",
+        Type::Primitive(Primitive::Ascii) => "ascii text type",
+        Type::Primitive(Primitive::Littera) => "character type",
+        Type::Primitive(Primitive::Octeti) => "byte buffer type",
+        Type::Primitive(Primitive::Json | Primitive::Valor) => "json or data value type",
+        Type::Primitive(Primitive::Instans) => "time instant type",
+        Type::Primitive(Primitive::Ignotum) => "unknown (ignotum) type",
+        Type::Primitive(Primitive::Nihil | Primitive::Numquam) => "null or never type",
         // `inf` needs an arena-backed bignum (a C port of `Magnus`); goal unit C6.
         Type::SizedNumeric(Primitive::Numerus, NumericWidth::Inf) => "unbounded integer type (inf)",
         Type::SizedNumeric(..) => "sized integer type",

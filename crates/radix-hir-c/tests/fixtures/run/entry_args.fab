@@ -1,0 +1,13 @@
++++
+locale = "en"
++++
+# The entry binds the arguments after the program name; with none given the
+# list is empty. A test block is not part of the program.
+test "not run" {
+    assert 1 ≡ 2
+}
+
+main args args {
+    print args.length()
+    print args
+}

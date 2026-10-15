@@ -75,6 +75,8 @@ report. It checks the runtime first: `faber.h` compiles on its own and
 | list position `for from xs at [i] const x` | the walk's index as `const int64_t l_i` |
 | `debug` and `warn` | `fprintf(stderr, …)`, the same format as `print`; `write` is a stdout line like `print` |
 | `type` aliases | resolved in the type table, nothing emitted |
+| `test "…" { … }` blocks | not emitted: `faber run` runs the entry block only, so the program is the same without them (`faber test` is another route) |
+| `main args xs` | `int main(int argc, char **argv)`, and `xs` is a `list<string>` of `argv[1..]` (`faber_argv_text`) |
 | local names | the shared binding policy (`prefixed_binding_name`): `l_<name>`. Nothing C reserves starts with `l_`, so `char`, `goto`, `stdout` or `INT64_MAX` need no keyword table |
 
 ## Rejected by name
@@ -85,7 +87,7 @@ other list methods, lists of genus, `ref` / `mut` on scalars, generic genera,
 contracts, static and optional fields, shorthand object-literal fields,
 bitwise operators, shifts, other `for` loops (lockstep, map and text sources), generic, async, device, error-channel
 and command functions, parameter access markers and optional parameters,
-function values, enums, maps and every other collection, tensors,
+function values, async entries, enums, maps and every other collection, tensors,
 closures, annotations, imports, and every other expression and statement
 kind. Each is an `unsupported(<construct>)` site; the construct name tables are
 in `expr.rs` and `ty.rs`.
@@ -101,5 +103,5 @@ fallback on intermediates that overflow `int64_t` but not the cap. `loops.fab` r
 jumps, the logical operators, and an unstored 2^63. The `trap_*.fab` fixtures
 trap at a store, a call argument, a division by zero, and an intermediate
 beyond the cap, and
-must exit 1 with the runner's partial stdout. `tests/fixtures/reject/*.fab`
+must exit 1 with the runner's partial stdout. `entry_args.fab` runs `main args` with none given (checked by hand with arguments). `tests/fixtures/reject/*.fab`
 must fail with the named rejection.

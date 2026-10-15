@@ -123,6 +123,8 @@ impl CCodegen<'_> {
             functions: FxHashMap::default(),
             called: FxHashSet::default(),
             current: None,
+            entry_args: None,
+            uses_args: false,
             support: Support::default(),
             depth: 0,
             loops: 0,
@@ -152,6 +154,10 @@ pub(crate) struct Emitter<'a> {
     called: FxHashSet<DefId>,
     /// The function or method whose body is being written; `None` in `main`.
     current: Option<DefId>,
+    /// The name the entry gives the program's arguments (`main args xs`).
+    entry_args: Option<radix_lexer::Symbol>,
+    /// The entry reads its arguments, so `main` takes `argc` and `argv`.
+    uses_args: bool,
     support: Support,
     /// Nesting depth of the statement being written (a function body is 1).
     depth: usize,
@@ -182,10 +188,10 @@ pub(crate) struct Local {
 impl Emitter<'_> {
     /// The translation unit, and whether it allocates.
     fn program(mut self, hir: &HirModule) -> Result<(String, bool), CodegenError> {
-        if hir.entry_args_name.is_some() || hir.entry_is_async || !hir.entry_annotations.is_empty()
-        {
-            return Err(unsupported("entry with arguments, async, or annotations"));
+        if hir.entry_is_async || !hir.entry_annotations.is_empty() {
+            return Err(unsupported("async entry or entry annotations"));
         }
+        self.entry_args = hir.entry_args_name;
         let items = self.items(hir)?;
         self.scope = Namer::program_scope();
         self.loops = 0;
@@ -213,7 +219,11 @@ impl Emitter<'_> {
         }
         out.push_str(&items.definitions(&self.called));
         out.push_str(&show_definitions);
-        out.push_str("int main(void) {\n");
+        if self.uses_args {
+            out.push_str("int main(int argc, char **argv) {\n");
+        } else {
+            out.push_str("int main(void) {\n");
+        }
         if self.arena {
             // The root arena: `main` owns it and every call chain starts here
             // (operator, 2026-10-14). It lives until the process exits.

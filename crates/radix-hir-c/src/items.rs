@@ -122,6 +122,9 @@ impl Emitter<'_> {
                 return Err(unsupported("annotation"));
             }
             match &item.kind {
+                // A test function is not part of the program: `faber run`
+                // runs the entry block only, and `faber test` is another route.
+                HirItemKind::Function(function) if function.test.is_some() => {}
                 HirItemKind::Function(function) => {
                     self.signature(item.def_id, function, None)?;
                     functions.push((item.def_id, &**function));

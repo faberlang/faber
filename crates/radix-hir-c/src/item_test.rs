@@ -60,3 +60,21 @@ fn a_literal_constant_stays_at_file_scope() {
         "{code}"
     );
 }
+
+#[test]
+fn a_test_function_is_not_part_of_the_program() {
+    let code =
+        emitted("test \"never emitted\" {\n    assert 1 ≡ 2\n}\nmain {\n    print \"run\"\n}");
+    assert!(!code.contains("never"), "{code}");
+    assert!(code.contains("printf(\"%s\\n\", \"run\");"), "{code}");
+}
+
+#[test]
+fn entry_arguments_are_the_text_list_after_the_program_name() {
+    let code = emitted("main args args {\n    print args\n}");
+    assert!(code.contains("int main(int argc, char **argv) {"), "{code}");
+    assert!(
+        code.contains("faber_list_text *const l_args = faber_argv_text(faber_a, argc, argv);"),
+        "{code}"
+    );
+}

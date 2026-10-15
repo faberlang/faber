@@ -615,6 +615,16 @@ FABER_LIST_FAMILY(f64, double)
 
 /* How a list shows, as the runner prints it: `[1, 2]`, `["a", "b"]`,
  * `[true, false]` in the module's display tokens. */
+/* `main args xs`: the arguments after the program name. The strings are the
+ * process's own and live as long as it does. */
+static inline faber_list_text *faber_argv_text(faber_arena *arena, int argc, char **argv) {
+    faber_list_text *list = faber_list_text_new(arena, argc > 1 ? (int64_t)argc - 1 : 0);
+    for (int index = 1; index < argc; index++) {
+        faber_list_text_push(arena, list, argv[index]);
+    }
+    return list;
+}
+
 static inline faber_text faber_list_i64_show(faber_arena *arena, const faber_list_i64 *list) {
     size_t capacity = 3 + (size_t)list->len * 22;
     char *out = faber_alloc(arena, capacity);
