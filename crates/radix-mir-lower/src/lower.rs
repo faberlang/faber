@@ -2893,6 +2893,20 @@ impl<'a> FunctionBuilder<'a> {
         self.runtime_record_fields(fields, span)
     }
 
+    /// Whether every parsed field names a field of the record type. The
+    /// planner keys parsed values by binding name, so an entry record and a
+    /// command record that share a binding name (`cli/cli.fab`) both see the
+    /// command's fields; the record whose type lacks them takes its
+    /// descriptor-derived fields instead.
+    fn cli_fields_fit_record(&self, ty: TypeId, fields: &[MirRuntimeRecordField]) -> bool {
+        match self.types.get(ty) {
+            Type::Record(declared) => fields
+                .iter()
+                .all(|field| declared.iter().any(|(name, _)| *name == field.name)),
+            _ => true,
+        }
+    }
+
     /// Lower a CLI-bound record (param or runtime-provided local) into a
     /// constructed record aggregate assigned to `id`. Field sources: S8.2
     /// runtime-filled adapter temps, parsed runtime fields for this local, or
@@ -2902,7 +2916,13 @@ impl<'a> FunctionBuilder<'a> {
             // S8.2: the record reads runtime-filled temps; the emitted adapter
             // seeds them from the typed value table.
             self.runtime_adapter_record_fields(ty, span)
-        } else if let Some(fields) = self.context.cli_record_fields_by_local.get(&name).cloned() {
+        } else if let Some(fields) = self
+            .context
+            .cli_record_fields_by_local
+            .get(&name)
+            .filter(|fields| self.cli_fields_fit_record(ty, fields))
+            .cloned()
+        {
             self.runtime_record_fields(fields, span)
         } else {
             self.cli_record_fields_for_type(ty, span)
