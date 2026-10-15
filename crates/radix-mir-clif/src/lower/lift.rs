@@ -220,10 +220,8 @@ impl FunctionLower<'_, '_> {
                 let a = self.lift_float(*a, *a_rep)?;
                 let b = self.lift_float(*b, *b_rep)?;
                 if op == MirBinOp::Mod {
-                    let rest = self
-                        .call_runtime(&abi::FLOAT_REM, &[a, b])?
-                        .ok_or_else(|| Decline::new("float remainder result"))?;
-                    return Ok((rest, Rep::Float));
+                    // The floor remainder, as the scalar operator.
+                    return Ok((self.float_floor_rem(a, b)?, Rep::Float));
                 }
                 self.float_binary(op, a, b)
             }

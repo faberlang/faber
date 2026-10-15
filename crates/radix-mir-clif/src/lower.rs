@@ -4568,14 +4568,9 @@ impl FunctionLower<'_, '_> {
                     .get(position)
                     .copied()
                     .ok_or_else(|| Decline::new("reference parameter"))?;
-                // A whole variable receives the callee's final value; a part
-                // of one (a field, an element) is lent as a copy, as the
-                // runner lends it.
-                let writes_back = match arg {
-                    MirOperand::Place(place) => place.projections.is_empty(),
-                    MirOperand::Temp(_) => true,
-                    _ => false,
-                };
+                // The place passed receives the callee's final value, whole
+                // variable or part of one (a field, an element).
+                let writes_back = matches!(arg, MirOperand::Place(_) | MirOperand::Temp(_));
                 let slot = self.builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     8,
