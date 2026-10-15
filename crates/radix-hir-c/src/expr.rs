@@ -1497,9 +1497,6 @@ impl Emitter<'_> {
             | (Ty::Float, Value::Float) => Ok(value),
             (Ty::List(slot), Value::List(elem)) if slot == elem => Ok(value),
             (Ty::Genus(slot), Value::Genus(genus)) if slot == genus => Ok(value),
-            (Ty::Int, Value::Exact) if value.constant.is_some() => {
-                Err(unsupported("integer constant beyond i64"))
-            }
             (Ty::Int, Value::Exact) => {
                 let at = c_string(&self.store_position(site))?;
                 let text = self.store_exact(&value, &at);

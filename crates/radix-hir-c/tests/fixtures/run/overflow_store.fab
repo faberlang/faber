@@ -1,0 +1,13 @@
++++
+locale = "en"
++++
+# An exact constant beyond `i64` is a runtime trap at its store, not an emit
+# rejection: the runner prints everything before the store and then exits 1
+# with the store's position, and so does the emitted program.
+main {
+    let int max ← 9223372036854775807
+    print max + 1
+    print max + 1 - 1
+    mut int stored ← max + 1
+    print stored
+}
