@@ -338,6 +338,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         value: Value,
         target_ty: TypeId,
         _struct_defaults: &[MirStructFieldDefaults],
+        recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
         match self.types.get(target_ty) {
@@ -353,19 +354,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 // deep-copying data/shape into a fresh RefCell.
                 Value::Tensor(cell) => Ok(Value::Tensor(cell)),
                 Value::Array(cell) => {
-                    // WHY: typed `lista ↦ tensor` must lower through
-                    // `TensorFromFlat` and MIR validation rejects the generic
-                    // route. This remains for dynamic/non-canonical Convert
-                    // producers, not as a second compiler lowering path.
-                    let data = cell.borrow().clone();
-                    let shape = lista_to_tensor_shape(target_ty, self.types, data.len());
-                    crate::runtime::tensor_value_typed(
-                        self.types,
-                        data,
-                        Some(*element),
-                        shape,
-                        span,
-                    )
+                    let element = *element;
+                    self.convert_lista_to_tensor(&cell, target_ty, element, recovery, span)
                 }
                 other => Err(RunnerError::internal(
                     span,
@@ -399,6 +389,38 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 ),
             )),
         }
+    }
+
+    /// `lista<E> ↦ tensor<E, [literal shape]>` through the generic Convert.
+    ///
+    /// WHY: a conversio carrying a `⊥` recovery legitimately arrives here (the
+    /// typed no-recovery route lowers through `TensorFromFlat`), so the
+    /// element count is checked against the declared extents and a mismatch
+    /// takes the recovery instead of building a tensor of the wrong shape. A
+    /// shape that is not all-literal keeps the flat inference.
+    fn convert_lista_to_tensor(
+        &mut self,
+        items: &Rc<RefCell<Vec<Value>>>,
+        target_ty: TypeId,
+        element: TypeId,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let data = items.borrow().clone();
+        if let Some(ListaToTensorShape::Literal(dims)) =
+            resolve_lista_to_tensor_shape(target_ty, self.types)
+        {
+            let expected = dims.iter().try_fold(1usize, |count, dim| {
+                usize::try_from(*dim)
+                    .ok()
+                    .and_then(|extent| count.checked_mul(extent))
+            });
+            if expected != Some(data.len()) {
+                return self.recover_or_fail(recovery, span, "lista to tensor conversion failed");
+            }
+        }
+        let shape = lista_to_tensor_shape(target_ty, self.types, data.len());
+        crate::runtime::tensor_value_typed(self.types, data, Some(element), shape, span)
     }
 
     /// `tabula<K, V> ↦ lista<T>`: the target element type picks the
