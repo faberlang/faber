@@ -714,7 +714,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             other => other,
         };
         match value {
+            // Text parses as `f64` then narrows: a double rounding for `f32`,
+            // accepted for text sources.
             Value::Str(text) => match text.parse::<f64>() {
+                Ok(v) if matches!(width, NumericWidth::F32) => {
+                    Ok(Value::Float(f64::from(v as f32)))
+                }
                 Ok(v) => Ok(Value::Float(v)),
                 Err(_) => {
                     self.recover_or_fail(recovery, span, "textus to fractus conversion failed")
@@ -732,6 +737,11 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Int(v) => Ok(Value::Float(v as f64)),
             Value::UInt(v) => Ok(Value::Float(v as f64)),
             Value::Bool(v) => Ok(Value::Float(if v { 1.0 } else { 0.0 })),
+            // `f64 ↦ f32` rounds to the nearest binary32, ties to even;
+            // overflow is ±inf (IEEE), nothing clamps.
+            Value::Float(v) if matches!(width, NumericWidth::F32) => {
+                Ok(Value::Float(f64::from(v as f32)))
+            }
             Value::Float(v) => Ok(Value::Float(v)),
             other => Err(RunnerError::internal(
                 span,
