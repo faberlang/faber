@@ -47,6 +47,7 @@ const RUNTIME_ROOTS: &[&str] = &[
     "runtime/typescript",
     "runtime/swift",
     "runtime/llvm",
+    "runtime/c",
     "crates/radix-abi",
     "crates/faber-leaf",
     "lib/norma/src",

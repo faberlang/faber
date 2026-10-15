@@ -1,18 +1,26 @@
 # radix-hir-c
 
 Novelty C target: one C translation unit from checked HIR. CLI target `c`,
-Cargo feature `hir-c`, default-off and outside `full-targets`. No goal doc
-yet.
+Cargo feature `hir-c`, default-off and outside `full-targets`. Goal:
+`docs/factory/hir-c/goal.md`.
 
-This is a **spike**: an integer-and-text subset with real codegen (exact
-arithmetic over variables, loops, conditionals). Everything else fails closed
+This is a **spike** growing by units: exact integer arithmetic, control flow,
+functions, text, lists and genera so far. Everything else fails closed
 with `unsupported on target c: <construct>`, never an approximation. The leaf
 never invokes a C compiler (the `no_toolchain_command_new` ratchet forbids
 it); `scripta/diffcheck` builds the emitted program and runs the built binary.
 
+The runtime is **`runtime/c/faber.h`**, header-only (`static inline`), the C
+sibling of `runtime/rust`: exact arithmetic and traps, the 64-bit fast path,
+the arena, text, and the list families. The `faber` binary embeds it like the
+other in-tree runtimes. A generated program that uses it starts with
+`#include "faber.h"` and builds with `-I <runtime>/c`; one that needs nothing
+from it includes nothing. The emitter writes only what is specific to the
+program: genus structs and their show functions, functions, and `main`.
+`runtime/c/tests/faber_test.c` checks the runtime on its own.
+
 The output needs GCC or Clang: it uses `__int128`, the `__builtin_*_overflow`
-family and statement expressions. No runtime library is emitted; headers and
-helper functions are written into the program only when it uses them.
+family and statement expressions.
 
 Memory is an arena: chunks from `malloc`, bump allocation aligned to
 `max_align_t`, nothing freed while the program runs. `main` owns the root
@@ -28,7 +36,8 @@ program may reach undefined behavior.** `scripta/diffcheck` builds every run
 fixture with `-std=c11 -pedantic -Wall -Wextra -Werror` and
 UndefinedBehaviorSanitizer and AddressSanitizer with recovery off (leak
 detection off: the arena frees nothing by design), and fails on any sanitizer
-report.
+report. It checks the runtime first: `faber.h` compiles on its own and
+`tests/faber_test.c` passes.
 
 | Faber rule | C hazard | This target |
 | --- | --- | --- |

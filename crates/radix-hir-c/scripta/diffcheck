@@ -40,7 +40,25 @@ echo "cc: $("$cc" --version 2>&1 | head -n 1)"
 echo "cflags: $cflags"
 faber=$radix/target/debug/faber
 work=$radix/target/c-diffcheck
+runtime=$radix/runtime/c
 mkdir -p "$work"
+# The runtime first: the header compiles cleanly on its own (included, as a
+# program includes it), and its own checks pass under the sanitizers.
+printf '#include "faber.h"\n' >"$work/header.c"
+# shellcheck disable=SC2086 # cflags is a word list on purpose
+if ! "$cc" $cflags -I "$runtime" -fsyntax-only "$work/header.c" >"$work/header.out" 2>&1; then
+  echo "FAIL runtime: faber.h does not compile on its own"
+  head -n 8 "$work/header.out"
+  exit 1
+fi
+# shellcheck disable=SC2086
+if ! "$cc" $cflags -I "$runtime" -o "$work/faber_test" "$runtime/tests/faber_test.c" >"$work/faber_test.out" 2>&1 \
+  || ! "$work/faber_test" >>"$work/faber_test.out" 2>&1; then
+  echo "FAIL runtime: runtime/c/tests/faber_test.c"
+  head -n 12 "$work/faber_test.out"
+  exit 1
+fi
+echo "ok   runtime (faber.h, tests/faber_test.c)"
 (cd "$radix" && cargo build -q -p faber --features mir-basic,hir-pascal,hir-cobol,hir-fortran,hir-odin,hir-c 2>"$work/cargo.err") || {
   echo "FAIL: could not build faber with the novelty features" >&2
   tail -n 30 "$work/cargo.err" >&2
@@ -68,7 +86,7 @@ for fab in "${fixtures[@]}"; do
     continue
   fi
   # shellcheck disable=SC2086 # cflags is a word list on purpose
-  if ! "$cc" $cflags -o "$work/$name" "$src" >"$work/$name.cc.out" 2>&1; then
+  if ! "$cc" $cflags -I "$runtime" -o "$work/$name" "$src" >"$work/$name.cc.out" 2>&1; then
     echo "FAIL $name: the C compiler rejected the program"
     head -n 8 "$work/$name.cc.out"
     fail=$((fail + 1))
