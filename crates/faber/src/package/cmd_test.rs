@@ -1,4 +1,3 @@
-use super::target_feature_unavailable_message;
 #[cfg(feature = "hir-rust")]
 use super::{discover_build_layout, is_manifestless_single_file};
 #[cfg(feature = "hir-rust")]
@@ -79,31 +78,23 @@ fn manifest_backed_package_keeps_its_own_target_tree() {
 }
 
 #[test]
-fn unavailable_wasm_target_message_names_canonical_wasm_text() {
-    let message = target_feature_unavailable_message(Target::MirWasm, "mir-wasm");
-    assert!(
-        message.contains("target `wasm-text`"),
-        "`-t wasm-text` must be reported by its canonical name, got: {message}"
-    );
-    assert!(
-        message.contains("feature `mir-wasm`"),
-        "message must name the missing feature, got: {message}"
-    );
-}
-
-#[test]
-fn unavailable_target_message_uses_canonical_spelling_for_every_gated_target() {
-    for (target, feature) in [
-        (Target::HirFhir, "hir-fhir"),
-        (Target::MirLlvmHost, "mir-llvm"),
-        (Target::MirWasm, "mir-wasm"),
-        (Target::MirMetal, "mir-metal"),
-        (Target::HirGo, "hir-go"),
+fn target_not_in_this_build_uses_canonical_spelling_for_every_gated_target() {
+    for target in [
+        Target::HirFhir,
+        Target::MirLlvmHost,
+        Target::MirWasm,
+        Target::MirMetal,
+        Target::HirGo,
+        Target::HirRust,
+        Target::HirTypeScript,
     ] {
-        let message = target_feature_unavailable_message(target, feature);
-        assert!(
-            message.contains(&format!("target `{}`", target.as_str())),
-            "{message}"
-        );
+        let diag = super::super::target_gate::target_not_in_this_build(target);
+        assert_eq!(diag.issue(), Some("target_not_in_this_build"));
+        let reported = diag
+            .args
+            .iter()
+            .find(|arg| arg.name == "target")
+            .map(|arg| arg.value.as_str());
+        assert_eq!(reported, Some(target.as_str()));
     }
 }

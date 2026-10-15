@@ -13,6 +13,8 @@ mod rust;
 
 use crate::cli::CorpusArgs;
 use faber_cli::package;
+#[cfg(any(not(feature = "hir-rust"), not(feature = "mir-llvm")))]
+use radix::module::codegen::Target;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -380,7 +382,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
 
     if args.target == "rust" {
         #[cfg(not(feature = "hir-rust"))]
-        fail("the rust corpus target requires the faber hir-rust feature");
+        package::target_gate::exit_target_not_in_this_build(Target::HirRust);
         #[cfg(feature = "hir-rust")]
         {
             rust::execute(
@@ -400,7 +402,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
     }
     if args.target == "canonical" {
         #[cfg(not(feature = "hir-rust"))]
-        fail("the canonical corpus target requires the faber hir-rust feature");
+        package::target_gate::exit_target_not_in_this_build(Target::HirRust);
         #[cfg(feature = "hir-rust")]
         {
             canonical::execute(
@@ -422,7 +424,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
     }
     if args.target == "gpu" {
         #[cfg(not(feature = "mir-llvm"))]
-        fail("the gpu corpus target requires the faber mir-llvm feature");
+        package::target_gate::exit_target_not_in_this_build(Target::MirLlvm);
         #[cfg(feature = "mir-llvm")]
         {
             gpu::execute(&suite.cases, &input, discover_ms, started);
