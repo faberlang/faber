@@ -847,7 +847,7 @@ impl TypeChecker<'_> {
         // re-point inside the body ends them for the rest of that iteration
         // (the store restores the flow base), and the next test re-arms them.
         let (then_facts, _) = self.condition_refinement(cond);
-        let _ = self.check_block_with_refinement(block, None, then_facts);
+        self.check_block_with_refinement(block, None, then_facts);
         self.restore_flow_state(&incoming);
     }
 
