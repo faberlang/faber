@@ -20,6 +20,7 @@
 //! target dispatch.
 
 mod conversio;
+mod enumeration;
 mod error;
 mod expr;
 mod float;
@@ -44,6 +45,8 @@ mod control_test;
 mod conversio_test;
 #[cfg(test)]
 mod emit_test;
+#[cfg(test)]
+mod enumeration_test;
 #[cfg(test)]
 mod item_test;
 #[cfg(test)]
@@ -153,6 +156,8 @@ impl CCodegen<'_> {
             arena,
             genera: FxHashMap::default(),
             shows: Vec::new(),
+            variants: FxHashMap::default(),
+            equals: Vec::new(),
         }
         .program(hir)
     }
@@ -200,6 +205,10 @@ pub(crate) struct Emitter<'a> {
     genera: FxHashMap<DefId, crate::genus::Genus>,
     /// Genera whose show function the program asked for, in request order.
     shows: Vec<DefId>,
+    /// Each enumeration variant: the enumeration and its position.
+    variants: FxHashMap<DefId, (DefId, usize)>,
+    /// Enumerations whose structural equality function was asked for.
+    equals: Vec<DefId>,
 }
 
 /// One local, parameter or module constant, by its C identifier.
@@ -232,6 +241,7 @@ impl Emitter<'_> {
         // generated last; the support text follows them, since they need
         // helpers too.
         let (show_prototypes, show_definitions) = self.show_functions()?;
+        let (equal_prototypes, equal_definitions) = self.equal_functions()?;
         if hir.entry.is_none() {
             self.support.need(crate::helpers::Helper::Trap);
         }
@@ -241,13 +251,17 @@ impl Emitter<'_> {
             out.push_str(&items.constants);
             out.push('\n');
         }
-        let prototypes = format!("{}{show_prototypes}", items.prototypes(&self.called));
+        let prototypes = format!(
+            "{}{show_prototypes}{equal_prototypes}",
+            items.prototypes(&self.called)
+        );
         if !prototypes.is_empty() {
             out.push_str(&prototypes);
             out.push('\n');
         }
         out.push_str(&items.definitions(&self.called));
         out.push_str(&show_definitions);
+        out.push_str(&equal_definitions);
         if self.uses_args {
             out.push_str("int main(int argc, char **argv) {\n");
         } else {

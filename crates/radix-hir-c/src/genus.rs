@@ -28,6 +28,28 @@ pub(crate) struct Genus {
     pub(crate) fields: Vec<Field>,
     /// Method source names and their definitions.
     pub(crate) methods: Vec<(String, DefId)>,
+    pub(crate) shape: Shape,
+}
+
+/// What kind of declaration a [`Genus`] record stands for.
+#[derive(Clone)]
+pub(crate) enum Shape {
+    /// A `class`: fields and methods.
+    Class,
+    /// An `ordo` (`ordo`) or a tagged union: variants with a tag each.
+    Enum { variants: Vec<Variant> },
+}
+
+/// One variant of an enumeration.
+#[derive(Clone)]
+pub(crate) struct Variant {
+    pub(crate) def_id: DefId,
+    pub(crate) name: String,
+    /// The variant's position in its declaration.
+    pub(crate) tag: i64,
+    /// The static object a payload-less value points at.
+    pub(crate) static_name: String,
+    pub(crate) fields: Vec<Field>,
 }
 
 /// One instance field.
@@ -129,6 +151,7 @@ impl Emitter<'_> {
                 name,
                 fields,
                 methods,
+                shape: Shape::Class,
             },
         );
         Ok(())
@@ -149,6 +172,10 @@ impl Emitter<'_> {
             let Some(genus) = self.genera.get(def_id) else {
                 continue;
             };
+            if matches!(genus.shape, Shape::Enum { .. }) {
+                out.push_str(&self.enum_body(genus)?);
+                continue;
+            }
             writeln!(out, "struct {} {{", genus.c_name).ok();
             if genus.fields.is_empty() {
                 // C forbids an empty struct; the member is never read.
@@ -256,7 +283,11 @@ impl Emitter<'_> {
 
     /// A value stored into a field of class `ty`; an unwrapped exact value
     /// narrows like any unwrapped store.
-    fn field_value(&mut self, value: &HirExpression, ty: Ty) -> Result<Operand, CodegenError> {
+    pub(crate) fn field_value(
+        &mut self,
+        value: &HirExpression,
+        ty: Ty,
+    ) -> Result<Operand, CodegenError> {
         let operand = self.expr(value)?;
         let operand = self.settle(operand, ty)?;
         if operand.value != Value::from(ty) {
@@ -360,10 +391,13 @@ impl Emitter<'_> {
     /// How `print` and a template hole show a genus.
     pub(crate) fn show_genus(&mut self, text: &str, def_id: DefId) -> Result<String, CodegenError> {
         self.need_show(def_id);
-        Ok(format!(
-            "{}_show(faber_a, {text})",
-            self.genus(def_id)?.c_name
-        ))
+        let genus = self.genus(def_id)?;
+        // A payload-less enumeration shows from a name table and takes no
+        // arena.
+        let plain = matches!(&genus.shape, Shape::Enum { variants }
+            if variants.iter().all(|variant| variant.fields.is_empty()));
+        let arena = if plain { "" } else { "faber_a, " };
+        Ok(format!("{}_show({arena}{text})", genus.c_name))
     }
 
     /// The prototypes and definitions of every show function asked for,
@@ -375,6 +409,12 @@ impl Emitter<'_> {
         while done < self.shows.len() {
             let def_id = self.shows[done];
             done += 1;
+            if matches!(self.genus(def_id)?.shape, Shape::Enum { .. }) {
+                let (prototype, definition) = self.enum_show(def_id)?;
+                prototypes.push_str(&prototype);
+                definitions.push_str(&definition);
+                continue;
+            }
             let (c_name, name, fields) = {
                 let genus = self.genus(def_id)?;
                 (
@@ -389,6 +429,16 @@ impl Emitter<'_> {
             prototypes.push_str(&signature);
             prototypes.push_str(";\n");
             // `Point { x = 1, tag = "p" }`, as the runner shows a genus.
+            // A genus with no fields shows as `Name {}`.
+            if fields.is_empty() {
+                write!(
+                    definitions,
+                    "{signature} {{\n    (void)value;\n    (void)faber_a;\n    return {};\n}}\n\n",
+                    c_string(&format!("{name} {{}}"))?
+                )
+                .ok();
+                continue;
+            }
             let mut parts = vec![c_string(&format!("{name} {{ "))?];
             for (position, field) in fields.iter().enumerate() {
                 let separator = if position == 0 { "" } else { ", " };
@@ -411,7 +461,7 @@ impl Emitter<'_> {
     }
 
     /// One field as a genus shows it: text quoted, like a list element.
-    fn show_field(&mut self, read: &str, ty: Ty) -> Result<String, CodegenError> {
+    pub(crate) fn show_field(&mut self, read: &str, ty: Ty) -> Result<String, CodegenError> {
         if ty == Ty::Text {
             self.support.need(Helper::Quoted);
             return Ok(format!("faber_quoted(faber_a, {read})"));

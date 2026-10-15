@@ -13,6 +13,50 @@ use radix_codegen_shared::CodegenError;
 use radix_hir::{HirExpression, HirExpressionKind, HirLiteral};
 
 impl Emitter<'_> {
+    /// `a?.b`: none when `a` is none, else the field `b` as an optional. A
+    /// field that is itself an optional is the result as it stands, so a
+    /// chain `a?.b?.c` is one level of optional throughout.
+    pub(crate) fn optional_member(
+        &mut self,
+        expr: &HirExpression,
+        subject: &HirExpression,
+        kind: &radix_hir::HirOptionalChainKind,
+    ) -> Result<Operand, CodegenError> {
+        let radix_hir::HirOptionalChainKind::Member(name) = kind else {
+            return Err(unsupported("optional chaining other than a member"));
+        };
+        let base = self.expr(subject)?;
+        // A genus that is not optional is always present: the chain is then
+        // the plain field read, wrapped.
+        let (Value::Opt(Inner::Genus(def_id)) | Value::Genus(def_id)) = base.value else {
+            return Err(unsupported(
+                "optional chaining over a value that is not an optional genus",
+            ));
+        };
+        let Some(ty) = expr.ty else {
+            return Err(unsupported("optional chaining without a resolved type"));
+        };
+        let Ty::Opt(inner) = classify(self.types, ty)? else {
+            return Err(unsupported("optional chaining that is not an optional"));
+        };
+        let n = self.temps;
+        self.temps += 1;
+        let held = format!("faber_c{n}");
+        let object = Operand::new(held.clone(), Value::Genus(def_id));
+        let field = self.field_from(&object, *name)?;
+        let present = match field.value {
+            Value::Opt(_) => field,
+            _ => self.some_value(&field, inner),
+        };
+        let none = self.none_of(Ty::Opt(inner))?;
+        let c_type = self.c_type(Ty::Genus(def_id))?;
+        let text = format!(
+            "(__extension__ ({{ {c_type}{held} = {}; {held} == NULL ? {} : {}; }}))",
+            base.text, none.text, present.text
+        );
+        Ok(Operand::new(text, Value::Opt(inner)).with_effect(base.effect))
+    }
+
     /// The `null` literal, given the optional class typecheck assigned it.
     pub(crate) fn none_value(&mut self, expr: &HirExpression) -> Result<Operand, CodegenError> {
         let Some(ty) = expr.ty else {

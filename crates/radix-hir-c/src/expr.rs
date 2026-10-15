@@ -149,7 +149,7 @@ impl Operand {
 /// An `int64_t` constant expression for `value`. `INT64_C` takes an unsuffixed
 /// integer constant, so a negative value is a negation of one; the minimum has
 /// no positive counterpart and is spelled `INT64_MIN`.
-fn c_int64(value: i64) -> String {
+pub(crate) fn c_int64(value: i64) -> String {
     if value == i64::MIN {
         "INT64_MIN".to_owned()
     } else if value < 0 {
@@ -172,6 +172,9 @@ impl Emitter<'_> {
                     return Ok(Self::narrow_read(&operand, inner));
                 }
                 Ok(operand)
+            }
+            HirExpressionKind::OptionalChain(subject, kind) => {
+                self.optional_member(expr, subject, kind)
             }
             HirExpressionKind::NonNull(subject, kind) => {
                 let unwrapped = self.unwrap(subject)?;
@@ -215,6 +218,14 @@ impl Emitter<'_> {
                 route: None,
                 implicit: None,
             } => self.conversion(source, *target, params, recovery.as_deref()),
+            HirExpressionKind::Conversio {
+                source,
+                target: HirConversioTarget::Type(_),
+                recovery,
+                route: Some(radix_hir::HirConversioRoute::Ordo { row, members }),
+                implicit: None,
+                ..
+            } => self.ordo_conversion(source, *row, members, recovery.as_deref()),
             HirExpressionKind::Scriptum(template, args) => self.template(*template, args),
             HirExpressionKind::Si {
                 cond,
@@ -257,6 +268,9 @@ impl Emitter<'_> {
                     .iter()
                     .map(|(symbol, value)| (*symbol, value))
                     .collect::<Vec<_>>();
+                if self.variant(*def_id).is_some() {
+                    return self.construct_variant(*def_id, &given);
+                }
                 self.construct(*def_id, &given)
             }
             HirExpressionKind::Verte {
@@ -369,6 +383,9 @@ impl Emitter<'_> {
         let HirExpressionKind::Path(def_id) = &callee.kind else {
             return Err(unsupported("call through a value"));
         };
+        if self.variant(*def_id).is_some() {
+            return self.construct_variant_call(*def_id, args);
+        }
         self.invoke(*def_id, None, args)
     }
 
@@ -427,6 +444,10 @@ impl Emitter<'_> {
                 operand.text = self.store_exact(&operand, "\"argument\"");
                 operand.value = Value::Int;
                 operand.narrow = None;
+            }
+            // A present value passed to an optional parameter is wrapped.
+            if matches!(param, Ty::Opt(_)) {
+                operand = self.settle(operand, param)?;
             }
             if operand.value != Value::from(param) {
                 return Err(unsupported("value stored without a store check"));
@@ -554,7 +575,9 @@ impl Emitter<'_> {
                 operand.constant = local.constant;
                 Ok(operand)
             }
-            None => Err(unsupported("reference to a name that is not a local")),
+            None => self
+                .unit_variant(def_id)
+                .ok_or_else(|| unsupported("reference to a name that is not a local")),
         }
     }
 
@@ -825,6 +848,15 @@ impl Emitter<'_> {
         l: Operand,
         r: Operand,
     ) -> Result<Operand, CodegenError> {
+        if let (Value::Genus(left), Value::Genus(right)) = (l.value, r.value)
+            && left == right
+            && matches!(
+                op,
+                HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::NotEq | HirBinOp::StrictNotEq
+            )
+        {
+            return self.enum_comparison(op, left, l, r);
+        }
         let text_pair = l.value == Value::Text && r.value == Value::Text;
         let truth_pair = l.value == Value::Truth && r.value == Value::Truth;
         if !text_pair && !truth_pair && (!l.is_integer() || !r.is_integer()) {

@@ -246,7 +246,8 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::Genus(_) => Err(unsupported("list of genus")),
             }
         }
-        Type::Struct(def_id) => Ok(Ty::Genus(*def_id)),
+        // An enumeration is a genus-shaped value: a tagged pointer.
+        Type::Struct(def_id) | Type::Enum(def_id) => Ok(Ty::Genus(*def_id)),
         Type::Option(inner) => match Inner::from_ty(classify(types, *inner)?) {
             Some(inner) => Ok(Ty::Opt(inner)),
             None => Err(unsupported("optional of a sized integer or an optional")),
@@ -259,7 +260,9 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
 pub(crate) fn returns(types: &TypeTable, ty: TypeId) -> Result<Option<Ty>, CodegenError> {
     match types.get(ty) {
         Type::Alias(_, inner) => returns(types, *inner),
-        Type::Primitive(Primitive::Vacuum) => Ok(None),
+        // `→ none` names a function that returns nothing; a use of its
+        // result as a value is rejected where it is used.
+        Type::Primitive(Primitive::Vacuum | Primitive::Nihil) => Ok(None),
         _ => classify(types, ty).map(Some),
     }
 }
@@ -307,7 +310,6 @@ fn describe(ty: &Type) -> &'static str {
         Type::Queue(_) | Type::BoundedQueue { .. } | Type::Stack(_) | Type::BoundedStack { .. } => {
             "queue or stack type"
         }
-        Type::Enum(_) => "enum type",
         Type::Interface(_) => "interface type",
         Type::Option(_) => "optional (nullable) type",
         Type::Union(_) => "union type",

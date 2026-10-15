@@ -1,0 +1,17 @@
++++
+locale = "en"
++++
+# A number no ordo member has ends the program with the runner's abort text;
+# what was printed before it stays written.
+enum Level {
+    low = 1,
+    high = 2
+}
+
+main {
+    print "before"
+    const Level ok ← 2 ↦ Level
+    print ok
+    const Level bad ← 7 ↦ Level
+    print bad
+}

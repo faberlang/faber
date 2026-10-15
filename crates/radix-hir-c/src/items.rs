@@ -107,12 +107,22 @@ impl Emitter<'_> {
     pub(crate) fn items(&mut self, hir: &HirModule) -> Result<Items, CodegenError> {
         let mut order = Vec::new();
         for item in &hir.items {
-            if let HirItemKind::Struct(genus) = &item.kind {
-                if !item.annotations.is_empty() {
-                    return Err(unsupported("annotation"));
+            match &item.kind {
+                HirItemKind::Struct(genus) => {
+                    if !item.annotations.is_empty() {
+                        return Err(unsupported("annotation"));
+                    }
+                    self.collect_genus(item.def_id, genus)?;
+                    order.push(item.def_id);
                 }
-                self.collect_genus(item.def_id, genus)?;
-                order.push(item.def_id);
+                HirItemKind::Enum(declaration) => {
+                    if !item.annotations.is_empty() {
+                        return Err(unsupported("annotation"));
+                    }
+                    self.collect_enum(item.def_id, declaration)?;
+                    order.push(item.def_id);
+                }
+                _ => {}
             }
         }
         let mut items = Items::default();
@@ -138,7 +148,8 @@ impl Emitter<'_> {
                         functions.push((method.def_id, &method.func));
                     }
                 }
-                HirItemKind::Enum(_) => return Err(unsupported("enum declaration")),
+                // Collected with the genera, whose types it shares.
+                HirItemKind::Enum(_) => {}
                 HirItemKind::Interface(_) => return Err(unsupported("interface declaration")),
                 // An alias is resolved in the type table; a use of one that
                 // names an unsupported type is rejected where it is used.

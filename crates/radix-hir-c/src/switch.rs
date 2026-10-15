@@ -27,7 +27,15 @@ struct Subject {
 /// binds to the subjects.
 struct Arm {
     tests: Vec<String>,
-    binds: Vec<(DefId, Symbol, usize)>,
+    binds: Vec<Bind>,
+}
+
+/// One name an arm binds: the C expression it reads and that value's class.
+struct Bind {
+    def_id: DefId,
+    name: Symbol,
+    ty: Ty,
+    text: String,
 }
 
 impl Emitter<'_> {
@@ -90,8 +98,8 @@ impl Emitter<'_> {
             }
             opened = true;
             self.depth += 1;
-            for (def_id, name, index) in &plan.binds {
-                self.bind_subject(out, *def_id, *name, &subjects[*index])?;
+            for bind in &plan.binds {
+                self.bind_subject(out, bind)?;
             }
             self.depth -= 1;
             match &arm.body.kind {
@@ -124,8 +132,8 @@ impl Emitter<'_> {
             tests: Vec::new(),
             binds: Vec::new(),
         };
-        for (index, pattern) in patterns.iter().enumerate() {
-            self.pattern(&subjects[index], index, pattern, &mut arm)?;
+        for (subject, pattern) in subjects.iter().zip(patterns) {
+            self.pattern(subject, pattern, &mut arm)?;
         }
         Ok(arm)
     }
@@ -133,19 +141,28 @@ impl Emitter<'_> {
     fn pattern(
         &mut self,
         subject: &Subject,
-        index: usize,
         pattern: &HirPattern,
         arm: &mut Arm,
     ) -> Result<(), CodegenError> {
         match pattern {
             HirPattern::Wildcard => Ok(()),
             HirPattern::Binding(def_id, name) => {
-                arm.binds.push((*def_id, *name, index));
+                arm.binds.push(Bind {
+                    def_id: *def_id,
+                    name: *name,
+                    ty: subject.ty,
+                    text: subject.name.clone(),
+                });
                 Ok(())
             }
             HirPattern::Alias(def_id, name, inner) => {
-                arm.binds.push((*def_id, *name, index));
-                self.pattern(subject, index, inner, arm)
+                arm.binds.push(Bind {
+                    def_id: *def_id,
+                    name: *name,
+                    ty: subject.ty,
+                    text: subject.name.clone(),
+                });
+                self.pattern(subject, inner, arm)
             }
             HirPattern::Literal(literal) => {
                 let test = self.literal_test(subject, literal, false)?;
@@ -164,7 +181,7 @@ impl Emitter<'_> {
                         tests: Vec::new(),
                         binds: Vec::new(),
                     };
-                    self.pattern(subject, index, alternative, &mut inner)?;
+                    self.pattern(subject, alternative, &mut inner)?;
                     if !inner.binds.is_empty() {
                         return Err(unsupported("alternative pattern that binds a name"));
                     }
@@ -178,7 +195,9 @@ impl Emitter<'_> {
                 arm.tests.push(format!("({})", tests.join(" || ")));
                 Ok(())
             }
-            HirPattern::Variant(..) => Err(unsupported("variant pattern")),
+            HirPattern::Variant(def_id, parts) => {
+                self.variant_pattern(subject, *def_id, parts, arm)
+            }
             HirPattern::TypeTest { .. } => Err(unsupported("type-test pattern")),
         }
     }
@@ -217,13 +236,8 @@ impl Emitter<'_> {
     }
 
     /// `const T l_name = subject;`, registered as a local.
-    fn bind_subject(
-        &mut self,
-        out: &mut String,
-        def_id: DefId,
-        name: Symbol,
-        subject: &Subject,
-    ) -> Result<(), CodegenError> {
+    fn bind_subject(&mut self, out: &mut String, bind: &Bind) -> Result<(), CodegenError> {
+        let (def_id, name) = (bind.def_id, bind.name);
         let Some(kind) = self.names.binding_kind(def_id) else {
             return Err(unsupported(
                 "pattern binding the name catalog does not classify",
@@ -231,17 +245,51 @@ impl Emitter<'_> {
         };
         let raw = self.names.resolve_symbol(name);
         let c_name = self.scope.claim(&prefixed_binding_name(kind, raw));
-        self.need_class(subject.ty);
-        let declaration = self.declare(subject.ty, &c_name, false)?;
-        self.line(out, &format!("{declaration} = {};", subject.name));
+        self.need_class(bind.ty);
+        let declaration = self.declare(bind.ty, &c_name, false)?;
+        self.line(out, &format!("{declaration} = {};", bind.text));
         self.locals.insert(
             def_id,
             Local {
                 name: c_name,
-                ty: subject.ty,
+                ty: bind.ty,
                 constant: None,
             },
         );
+        Ok(())
+    }
+
+    /// `casu Circ const r`: the tag test, then each sub-pattern binds the
+    /// variant's field at its position. Only names and wildcards nest.
+    fn variant_pattern(
+        &mut self,
+        subject: &Subject,
+        def_id: DefId,
+        parts: &[HirPattern],
+        arm: &mut Arm,
+    ) -> Result<(), CodegenError> {
+        let Some((enum_def, variant)) = self.variant(def_id) else {
+            return Err(unsupported(
+                "variant pattern of a name that is not a variant",
+            ));
+        };
+        if subject.value != Value::Genus(enum_def) {
+            return Err(unsupported("variant pattern over a different value class"));
+        }
+        let (tag, fields) = (variant.tag, variant.fields.clone());
+        arm.tests.push(format!("({}->tag == {tag})", subject.name));
+        for (part, field) in parts.iter().zip(&fields) {
+            match part {
+                HirPattern::Wildcard => {}
+                HirPattern::Binding(def_id, name) => arm.binds.push(Bind {
+                    def_id: *def_id,
+                    name: *name,
+                    ty: field.ty,
+                    text: format!("{}->{}", subject.name, field.c_name),
+                }),
+                _ => return Err(unsupported("nested pattern inside a variant pattern")),
+            }
+        }
         Ok(())
     }
 }

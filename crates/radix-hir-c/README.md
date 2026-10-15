@@ -94,6 +94,8 @@ report. It checks the runtime first: `faber.h` compiles on its own and
 | the `creo` method | the post-construction hook: called once on the finished object, after every field is set, whichever way it was built |
 | bounded lists `list<T, N>`, and a literal's own length-bounded type | the same list class, with `fixed` set at run time: a literal is `faber_list_<e>_of_fixed` (capacity its length), `empty` is `_new_fixed(N)`, and a push at capacity ends the program with `bounded collection push at capacity`. `[…] ∷ list<T>` is written growable. A list is not converted to a bounded list at run time (the runner does not either) |
 | list methods `first`, `last`, `get`, `contains`, `remove_first`, `remove_last`, `invert`, `reverse`, `sorted`, `added`, `slice`, `take`, `take_last`, `drop`, `sum`, `argmax`, `argmin`, and `sort via asc\|desc from xs` | `faber_list_<e>_*` in the runtime. An element read or removal is an optional (`int ∪ none` is `faber_opt_i64`, text is a nullable pointer); `get` of a negative or past-the-end position is none; `slice` / `take` / `drop` clamp and a negative position traps `expected non-negative numerus index`; floats order by IEEE totalOrder (`-0.0` before `0.0`), text by code point, bool `false` before `true`. `sum` and `argmax` / `argmin` are over `list<int>` (the sum is exact and checked against the cap). A method that changes the list is an effect, so print arguments keep their written order |
+| `ordo` and `discretio` (`enum`, `union`), `variant V { f = x } ∷ T`, `Type.member`, `discerne`/`match` over variants, `ordo ↦ int`, `ordo ↦ string`, `int ↦ ordo [⊥ default]` | a genus-shaped value: a pointer to `{ int64_t tag; <every variant's fields> }`; a variant with no payload is one static object, so payload-less values compare by pointer. A payload variant is one arena allocation; a variant pattern tests the tag and binds payload fields by position (names and wildcards only). `≡` on a payload union is a generated structural function over int, bool, text and nested union payloads. The tag is the position; an `ordo` discriminant is read from the `↦` route. A number no member has aborts `no ordo member has this value`. Rejected: generic unions, unions with shared (commune) fields, text discriminants |
+| `a?.b` | none when `a` is none, else the field as an optional (a field that is already optional stays one level). A base that is not optional is the plain read, wrapped |
 | local names | the shared binding policy (`prefixed_binding_name`): `l_<name>`. Nothing C reserves starts with `l_`, so `char`, `goto`, `stdout` or `INT64_MAX` need no keyword table |
 
 ## Rejected by name
@@ -104,7 +106,7 @@ other list methods, lists of genus, `ref` / `mut` on scalars, generic genera,
 contracts, static and optional fields, shorthand object-literal fields,
 bitwise operators, shifts, other `for` loops (lockstep, map and text sources), generic, async, device, error-channel
 and command functions, parameter access markers and optional parameters,
-function values, async entries, enums, maps and every other collection, tensors,
+function values, async entries, maps and every other collection, tensors,
 closures, annotations, imports, and every other expression and statement
 kind. Each is an `unsupported(<construct>)` site; the construct name tables are
 in `expr.rs` and `ty.rs`.

@@ -1,0 +1,12 @@
++++
+locale = "en"
++++
+# A genus with no fields shows as `Name {}`.
+class Marker {
+}
+
+main {
+    const Marker m ← Marker {}
+    print m
+    print "§"(m)
+}

@@ -648,7 +648,7 @@ impl Emitter<'_> {
             return self.print_line(out, kind, args);
         }
         // The runner prints each argument as its own line when one of them
-        // has no shared rendering (a sized integer, a genus).
+        // has no shared rendering (a genus).
         for arg in args {
             self.print_line(out, kind, std::slice::from_ref(arg))?;
         }
@@ -657,8 +657,10 @@ impl Emitter<'_> {
 
     /// Whether the runner writes these arguments as one space-joined line:
     /// a single argument, a literal text first with up to two more (its
-    /// format-string form), or every argument having a shared rendering.
-    /// Sized integers and genera keep the per-argument path.
+    /// format-string form), or every argument having a shared rendering. A
+    /// genus value (and so an enumeration, and an optional one) has none, so
+    /// a statement that carries one prints each argument on its own line. A
+    /// sized integer renders like any integer.
     fn print_joins(&self, args: &[HirExpression]) -> bool {
         if args.len() <= 1 {
             return true;
@@ -672,8 +674,9 @@ impl Emitter<'_> {
         }
         args.iter().all(|arg| {
             arg.ty.is_some_and(|ty| {
-                classify(self.types, ty)
-                    .is_ok_and(|class| !matches!(class, Ty::Sized(_) | Ty::Genus(_)))
+                classify(self.types, ty).is_ok_and(|class| {
+                    !matches!(class, Ty::Genus(_) | Ty::Opt(crate::ty::Inner::Genus(_)))
+                })
             })
         })
     }
