@@ -1045,7 +1045,7 @@ fn init_scaffold_is_en_surface_so_fresh_package_checks() {
     crate::commands::init::scaffold(&project, "demo").expect("scaffold");
     let entry = std::fs::read_to_string(project.join("src/main.fab")).expect("read scaffold");
     assert!(
-        entry.starts_with("main {") && entry.contains("print \"Salve, munde!\""),
+        entry.starts_with("main {") && entry.contains("print \"Hello, world!\""),
         "scaffold must be en surface, got: {entry}"
     );
     std::fs::remove_dir_all(&dir).ok();
