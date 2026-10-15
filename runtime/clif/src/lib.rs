@@ -2384,3 +2384,61 @@ pub unsafe extern "C" fn __faber_clif_v1_union_is_struct(
     let record = unsafe { &*(present.bits as *const Record) };
     i8::from(!record.variant && unsafe { text_bytes(record.name) == text_bytes(name) })
 }
+
+/// A list or map element as an open-data element: a box of its tagged payload,
+/// with nested lists and maps boxed the same way. An element with no open-data
+/// form ends the run.
+fn box_open_element(tag: i32, bits: i64) -> (i32, i64) {
+    let payload = match tag {
+        TAG_OPT => return (tag, bits),
+        TAG_INT | TAG_FLOAT | TAG_BOOL | TAG_TEXT | TAG_CHAR => (tag, bits),
+        TAG_LIST => {
+            let list = unsafe { list_ref(bits as *const List) };
+            let items = list
+                .items
+                .iter()
+                .map(|&(tag, bits)| box_open_element(tag, bits))
+                .collect();
+            (TAG_LIST, list_new_from(items) as i64)
+        }
+        TAG_MAP => {
+            let map = unsafe { &*(bits as *const Map) };
+            let entries = map
+                .entries
+                .iter()
+                .map(|&(key_tag, key, value_tag, value)| {
+                    let (value_tag, value) = if map.set {
+                        (value_tag, value)
+                    } else {
+                        box_open_element(value_tag, value)
+                    };
+                    (key_tag, key, value_tag, value)
+                })
+                .collect();
+            (
+                TAG_MAP,
+                Box::into_raw(Box::new(Map {
+                    set: map.set,
+                    entries,
+                })) as i64,
+            )
+        }
+        _ => exact_trap("this value has no open-data form on the clif target"),
+    };
+    let boxed = Box::into_raw(Box::new(Present {
+        tag: payload.0,
+        bits: payload.1,
+    }));
+    (TAG_OPT, boxed as i64)
+}
+
+/// A list or map as open data: a box whose elements are open-data boxes.
+///
+/// # Safety
+///
+/// `bits` is a live runtime list (tag `TAG_LIST`) or map (tag `TAG_MAP`).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_dyn_box(tag: i32, bits: i64) -> *const Present {
+    let (_, boxed) = box_open_element(tag, bits);
+    boxed as *const Present
+}

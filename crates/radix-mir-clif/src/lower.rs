@@ -264,8 +264,9 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             for member in members {
                 if matches!(
                     resolve(table, *member),
-                    Type::Primitive(Primitive::Nihil | Primitive::Ignotum)
-                        | Type::Option(_)
+                    Type::Primitive(
+                        Primitive::Nihil | Primitive::Ignotum | Primitive::Json | Primitive::Valor
+                    ) | Type::Option(_)
                         | Type::Bits(_)
                         | Type::Union(_)
                 ) {
@@ -276,7 +277,10 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             Ok(Rep::Opt)
         }
         Type::Option(inner) => {
-            if matches!(table.get(*inner), Type::Option(_)) {
+            if matches!(
+                resolve(table, *inner),
+                Type::Option(_) | Type::Primitive(Primitive::Json | Primitive::Valor)
+            ) {
                 return Err(Decline::new("nested optional value"));
             }
             rep_of(table, MirType::semantic(*inner))?;
@@ -311,7 +315,10 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Ref(_, inner) => rep_of(table, MirType::semantic(*inner)),
         // The type of `null`: an optional that is always none. An unknown
         // value is a box of any tagged payload, or none.
-        Type::Primitive(Primitive::Nihil | Primitive::Ignotum) => Ok(Rep::Opt),
+        // Open data (`json`, `valor`) is a box of any tagged payload, as `ignotum`.
+        Type::Primitive(
+            Primitive::Nihil | Primitive::Ignotum | Primitive::Json | Primitive::Valor,
+        ) => Ok(Rep::Opt),
         Type::Primitive(Primitive::Vacuum | Primitive::Numquam) => Ok(Rep::Unit),
         Type::SizedNumeric(Primitive::Numerus, width) => match width {
             NumericWidth::I8
@@ -1870,6 +1877,10 @@ impl FunctionLower<'_, '_> {
     /// `tabula` and `copia` literals.
     fn construct_map(&mut self, destination: &MirPlace, aggregate: &MirAggregate) -> Lowered<()> {
         let is_set = aggregate.kind == MirAggregateKind::Set;
+        let dynamic = matches!(
+            resolve(self.state.input.types, aggregate.ty.semantic_id()),
+            Type::Primitive(Primitive::Json | Primitive::Valor)
+        );
         let flag = self.builder.ins().iconst(types::I32, i64::from(is_set));
         let map = self
             .call_runtime(&abi::MAP_NEW, &[flag])?
@@ -1897,7 +1908,15 @@ impl FunctionLower<'_, '_> {
                 self.call_runtime(&abi::MAP_SET, &[map, tag, bits, zero_tag, zero])?;
             }
         } else {
-            let (key_ty, value_ty) = self.map_types(aggregate.ty)?;
+            let (key_ty, value_ty) = if dynamic {
+                // An object literal of open data: text keys, boxed values.
+                (
+                    MirType::semantic(self.state.input.types.primitive(Primitive::Textus)),
+                    aggregate.ty,
+                )
+            } else {
+                self.map_types(aggregate.ty)?
+            };
             let MirAggregateFields::Keyed(entries) = &aggregate.fields else {
                 return Err(Decline::new("map fields"));
             };
@@ -1918,6 +1937,11 @@ impl FunctionLower<'_, '_> {
             }
         }
         let (variable, slot_rep) = self.place_slot(destination)?;
+        if dynamic && slot_rep == Rep::Opt && !is_set {
+            let boxed = self.wrap_some(map, Rep::Map)?;
+            self.builder.def_var(variable, boxed);
+            return Ok(());
+        }
         if slot_rep != (if is_set { Rep::Set } else { Rep::Map }) {
             return Err(Decline::new("map destination representation"));
         }
@@ -3896,6 +3920,23 @@ impl FunctionLower<'_, '_> {
                     .call_runtime(&abi::MAP_KEYS, &[value])?
                     .ok_or_else(|| Decline::new("set keys result"))?;
                 self.builder.def_var(variable, keys);
+                return Ok(());
+            }
+            if matches!(rep, Rep::List | Rep::Map)
+                && slot_rep == Rep::Opt
+                && matches!(
+                    resolve(self.state.input.types, conversion.target_ty.semantic_id()),
+                    Type::Primitive(Primitive::Json | Primitive::Valor)
+                )
+            {
+                let tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(rep)?);
+                let boxed = self
+                    .call_runtime(&abi::DYN_BOX, &[tag, value])?
+                    .ok_or_else(|| Decline::new("open data result"))?;
+                self.builder.def_var(variable, boxed);
                 return Ok(());
             }
             if let Some(plan) = sequence_conversion(

@@ -1013,6 +1013,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     DEC_FROM_TEXT,
     DEC_TO_FLOAT,
     DEC_TO_INT,
+    DYN_BOX,
 ];
 
 /// A stored `d64` carrier (scale 8) -> decimal handle.
@@ -1099,6 +1100,14 @@ pub const DEC_TO_INT: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_dec_to_int",
     params: &[Ptr, I32, I64, I64],
     ret: Some(I64),
+};
+
+/// A list or map as open data (element tag, handle): a box whose elements are
+/// themselves boxes.
+pub const DYN_BOX: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dyn_box",
+    params: &[I32, I64],
+    ret: Some(Ptr),
 };
 
 /// A text handle points at `[len: i64][bytes...]`; literals are static data in

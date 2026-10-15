@@ -192,9 +192,7 @@ impl<'a> ClifCapability<'a> {
             }
             Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => None,
             Type::Primitive(Primitive::Regex | Primitive::Match) => None,
-            Type::Primitive(Primitive::Json) | Type::Primitive(Primitive::Valor) => {
-                Some(Gap::Subset("dynamic data value".to_owned()))
-            }
+            Type::Primitive(Primitive::Json | Primitive::Valor) => None,
             Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => {
                 Some(Gap::Subset("instans value".to_owned()))
             }
@@ -232,8 +230,9 @@ impl<'a> ClifCapability<'a> {
             Type::Union(members) => members.iter().find_map(|member| {
                 if matches!(
                     self.types.get(*member),
-                    Type::Primitive(Primitive::Nihil | Primitive::Ignotum)
-                        | Type::Option(_)
+                    Type::Primitive(
+                        Primitive::Nihil | Primitive::Ignotum | Primitive::Json | Primitive::Valor
+                    ) | Type::Option(_)
                         | Type::Bits(_)
                         | Type::Union(_)
                 ) {
@@ -243,7 +242,9 @@ impl<'a> ClifCapability<'a> {
             }),
             Type::Intersection(_) => Some(Gap::Subset("union value".to_owned())),
             Type::Option(inner) => match self.types.get(*inner) {
-                Type::Option(_) => Some(Gap::Subset("optional value".to_owned())),
+                Type::Option(_) | Type::Primitive(Primitive::Json | Primitive::Valor) => {
+                    Some(Gap::Subset("optional value".to_owned()))
+                }
                 _ => self.type_gap(MirType::semantic(*inner)),
             },
             Type::Func(sig) => {
@@ -609,7 +610,21 @@ impl MirVisitor for ClifCapability<'_> {
                     )
                     .is_some()
         );
+        let open_data = matches!(
+            &call.intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && matches!(
+                        self.types.get(conversion.source_ty.semantic_id()),
+                        Type::Array(_) | Type::BoundedArray { .. } | Type::Map(..)
+                    )
+                    && matches!(
+                        self.types.get(conversion.target_ty.semantic_id()),
+                        Type::Primitive(Primitive::Json | Primitive::Valor)
+                    )
+        );
         if renders_text
+            || open_data
             || numeric
             || sequence
             || type_check

@@ -191,12 +191,13 @@ fn littera_is_capable_and_a_map_of_letters_names_gap() {
 
 #[test]
 fn gaps_keep_storage_order() {
-    let types = TypeTable::new();
-    let string = ty(&types, Primitive::Json);
+    let mut types = TypeTable::new();
     let instans = ty(&types, Primitive::Instans);
+    let numerus_id = types.primitive(Primitive::Numerus);
+    let queue = MirType::semantic(types.intern(radix_types::Type::Queue(numerus_id)));
     let program = single_function(FunctionShape {
-        params: vec![param(0, string)],
-        locals: vec![local(1, instans)],
+        params: vec![param(0, instans)],
+        locals: vec![local(1, queue)],
         temps: Vec::new(),
         statements: Vec::new(),
         terminator: MirTerminatorKind::Return(None),
@@ -209,12 +210,8 @@ fn gaps_keep_storage_order() {
     let verdict = classify_with_types(&program, &types);
     let gaps = verdict.gaps();
     assert_eq!(gaps.len(), 2, "two gaps expected: {gaps:?}");
-    assert_eq!(
-        gaps[0].shape(),
-        "dynamic data value",
-        "param walks before local"
-    );
-    assert_eq!(gaps[1].shape(), "instans value");
+    assert_eq!(gaps[0].shape(), "instans value", "param walks before local");
+    assert_eq!(gaps[1].shape(), "collection value");
 }
 
 #[test]

@@ -42,6 +42,8 @@ pub(crate) enum Num {
     Regex,
     /// A `d64`: an exact decimal behind a handle.
     Dec,
+    /// Open data (`valor`, `json`): a box of one tagged payload.
+    Dyn,
     Bits(BitsWidth),
 }
 
@@ -83,6 +85,7 @@ fn num_of(table: &TypeTable, id: TypeId) -> Option<Num> {
         Type::Primitive(Primitive::Textus | Primitive::Ascii) => Some(Num::Text),
         Type::Primitive(Primitive::Littera) => Some(Num::Char),
         Type::Primitive(Primitive::Regex) => Some(Num::Regex),
+        Type::Primitive(Primitive::Json | Primitive::Valor) => Some(Num::Dyn),
         Type::Bits(width) => Some(Num::Bits(*width)),
         _ => None,
     }
@@ -147,6 +150,12 @@ pub(crate) fn numeric_conversion(
         (Num::Float(_) | Num::Text, Num::Dec) | (Num::Dec, Num::Float(_)) => true,
         (Num::Dec, Num::Int(to)) => to.policy == IntPolicy::Trap && carrier_exact(to),
         (Num::Dec, Num::Dec) => true,
+        // Open data boxes a scalar and unboxes by its tag; a mismatch fails.
+        (Num::Int(from), Num::Dyn) => from.policy == IntPolicy::Trap && carrier_exact(from),
+        (Num::Float(_) | Num::Bool | Num::Text | Num::Char, Num::Dyn) => true,
+        (Num::Dyn, Num::Int(to)) => to.policy == IntPolicy::Trap && to.width == NumericWidth::I64,
+        (Num::Dyn, Num::Float(width)) => width == NumericWidth::F64,
+        (Num::Dyn, Num::Bool | Num::Text) => true,
         (Num::Char, Num::Int(to)) => to.policy == IntPolicy::Trap,
         // A signed integer or an unsigned one below 64 bits reads and writes
         // a same-width pattern; a u64 pattern would leave the carrier.
@@ -492,6 +501,8 @@ impl FunctionLower<'_, '_> {
             Num::Char => Rep::Char,
             Num::Regex => Rep::Regex,
             Num::Dec => Rep::Dec,
+            Num::Dyn => Rep::Opt,
+            Num::Text if plan.source == Num::Dyn => Rep::Text,
             Num::Text => return Err(Decline::new("text conversion target")),
         };
         let converted = match (failed, recovery) {
@@ -803,6 +814,49 @@ impl FunctionLower<'_, '_> {
             (Num::Float(_), Num::Float(_)) => (value, None),
             (Num::Float(_), Num::Int(to)) => self.float_to_int(conversion, to, value)?,
             (Num::Text, Num::Int(to)) => self.text_to_int(conversion, to, value)?,
+            (Num::Int(_) | Num::Float(_) | Num::Bool | Num::Text | Num::Char, Num::Dyn) => {
+                let rep = match plan.source {
+                    Num::Int(_) => Rep::Int,
+                    Num::Float(_) => Rep::Float,
+                    Num::Bool => Rep::Bool,
+                    Num::Char => Rep::Char,
+                    _ => Rep::Text,
+                };
+                (self.wrap_some(value, rep)?, None)
+            }
+            (Num::Dyn, target) => {
+                let (tag, rep, label) = match target {
+                    Num::Int(_) => (abi::TAG_INT, Rep::Int, "numerus"),
+                    Num::Float(_) => (abi::TAG_FLOAT, Rep::Float, "fractus"),
+                    Num::Bool => (abi::TAG_BOOL, Rep::Bool, "bivalens"),
+                    _ => (abi::TAG_TEXT, Rep::Text, "textus"),
+                };
+                let wanted = self.builder.ins().iconst(types::I32, tag);
+                let has = self
+                    .call_runtime(&abi::UNION_HAS_TAG, &[value, wanted])?
+                    .ok_or_else(|| Decline::new("tag test result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let bits = self
+                    .call_runtime(&abi::OPT_BITS_OR, &[value, zero])?
+                    .ok_or_else(|| Decline::new("payload result"))?;
+                let mut extracted = self.element_value(bits, rep);
+                let mut has = has;
+                // A float also takes an integer payload, widened.
+                if rep == Rep::Float {
+                    let int_tag = self.builder.ins().iconst(types::I32, abi::TAG_INT);
+                    let is_int = self
+                        .call_runtime(&abi::UNION_HAS_TAG, &[value, int_tag])?
+                        .ok_or_else(|| Decline::new("tag test result"))?;
+                    let widened = self.builder.ins().fcvt_from_sint(types::F64, bits);
+                    extracted = self.builder.ins().select(is_int, widened, extracted);
+                    has = self.builder.ins().bor(has, is_int);
+                }
+                let one = self.builder.ins().iconst(types::I8, 1);
+                let failed = self.builder.ins().bxor(has, one);
+                let message = format!("valor to {label} conversion failed");
+                let message = Box::leak(message.into_boxed_str());
+                (extracted, Some((failed, Failure::Static(message))))
+            }
             (Num::Int(_), Num::Dec) => self.decimal_in(&abi::DEC_FROM_INT, value)?,
             (Num::Float(_), Num::Dec) => self.decimal_in(&abi::DEC_FROM_FLOAT, value)?,
             (Num::Text, Num::Dec) => self.decimal_in(&abi::DEC_FROM_TEXT, value)?,
