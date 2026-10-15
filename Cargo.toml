@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/radix-hygiene",
+    "runtime/clif",
     "crates/handroll",
     "crates/faber-leaf",
     "crates/radix",
@@ -37,6 +38,7 @@ resolver = "2"
 # `-p` selection.
 default-members = [
     "crates/radix-hygiene",
+    "runtime/clif",
     "crates/handroll",
     "crates/radix",
     "crates/radix-module",

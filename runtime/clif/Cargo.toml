@@ -1,0 +1,23 @@
+[package]
+name = "faber-host-clif"
+version = "0.84.0"
+edition = "2024"
+description = "Public host runtime for Faber CLIF executables (goal radix-mir-clif)"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Unlike runtime/rust and runtime/llvm (standalone workspace roots), this
+# crate is a radix workspace member per the goal's recommendation part 1:
+# it is public and must build from public source with the compiler tree.
+[lib]
+name = "faber_rt_clif"
+crate-type = ["staticlib", "rlib"]
+
+[lints]
+workspace = true
+
+[dependencies]
+radix-runtime-contract = { path = "../../crates/radix-runtime-contract" }
+
+[dev-dependencies]
+radix-mir-clif = { path = "../../crates/radix-mir-clif" }
