@@ -1,7 +1,9 @@
 //! Package-lowering diagnostics keep the error's span, physical line, named
-//! issue and secondary definition span.
+//! issue and secondary definition span; validation diagnostics keep the named
+//! issue and never name a line past the end of the unit file.
 
-use super::diag::mir_error_diag;
+use super::diag::{mir_error_diag, mir_validation_diag};
+use radix_mir::MirValidationError;
 use radix_mir_lower::lower::MirError;
 use radix_module::lexer::Span;
 use std::path::PathBuf;
@@ -57,4 +59,46 @@ fn lowering_error_diagnostic_without_a_span_stays_spanless() {
     let diagnostic = mir_error_diag(&PathBuf::from("unit.fab"), error(Span::default(), None));
     assert_eq!(diagnostic.span, None, "a defaulted span is no location");
     assert_eq!(arg(&diagnostic, "issue"), Some("nucleum_fragment_type"));
+}
+
+fn validation_error(span: Span) -> MirValidationError {
+    MirValidationError {
+        message: "prose that tests do not assert".to_owned(),
+        issue: "mir_validation_example".to_owned(),
+        span,
+    }
+}
+
+#[test]
+fn validation_error_diagnostic_carries_the_named_issue() {
+    let source = "first line\nsecond line\nthird line\n";
+    let path: PathBuf = std::env::temp_dir().join(format!(
+        "faber-diag-validation-test-{}.fab",
+        std::process::id()
+    ));
+    std::fs::write(&path, source).expect("write fixture source");
+    let diagnostic = mir_validation_diag(&path, validation_error(Span::new(11, 17)));
+    std::fs::remove_file(&path).expect("remove fixture source");
+
+    assert_eq!(arg(&diagnostic, "issue"), Some("mir_validation_example"));
+    assert!(diagnostic.span.is_some());
+    assert_eq!(diagnostic.line, Some(2), "span offset 11 is on line 2");
+}
+
+#[test]
+fn validation_error_diagnostic_past_the_end_of_the_file_keeps_issue_without_span() {
+    let source = "a\nb\nc\n";
+    let path: PathBuf = std::env::temp_dir().join(format!(
+        "faber-diag-validation-past-end-test-{}.fab",
+        std::process::id()
+    ));
+    std::fs::write(&path, source).expect("write fixture source");
+    let diagnostic = mir_validation_diag(&path, validation_error(Span::new(4000, 4010)));
+    std::fs::remove_file(&path).expect("remove fixture source");
+
+    assert_eq!(arg(&diagnostic, "issue"), Some("mir_validation_example"));
+    assert_eq!(diagnostic.span, None);
+    assert_eq!(diagnostic.line, None);
+    assert_eq!(arg(&diagnostic, "span_start"), Some("4000"));
+    assert_eq!(arg(&diagnostic, "span_end"), Some("4010"));
 }
