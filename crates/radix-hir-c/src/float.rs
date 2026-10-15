@@ -129,7 +129,7 @@ impl Emitter<'_> {
     /// by operation. The result is an `int`, saturating as the runner does.
     pub(crate) fn float_method(
         &mut self,
-        receiver: &Operand,
+        receiver: Operand,
         receiver_ty: TypeId,
         method: Symbol,
         args: &[HirCallArg],
@@ -144,11 +144,57 @@ impl Emitter<'_> {
             IntrinsicMirKind::Collection(MirCollectionOp::Floor) => "faber_floor_i64",
             IntrinsicMirKind::Collection(MirCollectionOp::Ceiling) => "faber_ceil_i64",
             IntrinsicMirKind::Collection(MirCollectionOp::Round) => "faber_nearest_i64",
-            _ => return Err(unsupported("float method outside the subset")),
+            IntrinsicMirKind::Collection(MirCollectionOp::Truncate) => "faber_trunc_i64",
+            _ => return self.float_value_method(entry.mir_kind, receiver, args),
         };
         self.support.need(Helper::Float);
         self.support.need_ints();
         let effect = receiver.effect;
         Ok(Operand::new(format!("{helper}({})", receiver.text), Value::Int).with_effect(effect))
+    }
+
+    /// A float method that yields a float: `absolutum`, `signum`, and the
+    /// two-operand `minimus` / `maximus` (IEEE, NaN propagates).
+    fn float_value_method(
+        &mut self,
+        kind: IntrinsicMirKind,
+        receiver: Operand,
+        args: &[HirCallArg],
+    ) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::Float);
+        let effect = receiver.effect;
+        let text = match kind {
+            IntrinsicMirKind::Collection(MirCollectionOp::Absolute) => {
+                format!("faber_abs_f64({})", receiver.text)
+            }
+            IntrinsicMirKind::Collection(MirCollectionOp::Signum) => {
+                format!("faber_signum_f64({})", receiver.text)
+            }
+            IntrinsicMirKind::Collection(MirCollectionOp::Minimum)
+            | IntrinsicMirKind::Collection(MirCollectionOp::Maximum) => {
+                let Some(arg) = args.first() else {
+                    return Err(unsupported("float method outside the subset"));
+                };
+                let helper = if matches!(
+                    kind,
+                    IntrinsicMirKind::Collection(MirCollectionOp::Minimum)
+                ) {
+                    "faber_minimum_f64"
+                } else {
+                    "faber_maximum_f64"
+                };
+                let mut operands = [receiver, self.expr(&arg.expr)?];
+                if operands[1].value != Value::Float {
+                    return Err(unsupported("float method argument that is not a float"));
+                }
+                let prelude = self.sequence(&mut operands);
+                let [left, right] = operands;
+                let effect = effect || right.effect;
+                let call = format!("{helper}({}, {})", left.text, right.text);
+                return Ok(Operand::new(wrap(&prelude, &call), Value::Float).with_effect(effect));
+            }
+            _ => return Err(unsupported("float method outside the subset")),
+        };
+        Ok(Operand::new(text, Value::Float).with_effect(effect))
     }
 }

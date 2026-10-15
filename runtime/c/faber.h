@@ -256,6 +256,46 @@ static inline int64_t faber_nearest_i64(double value) {
     return faber_saturate_i64(rint(value));
 }
 
+/* `⌊x⌋` toward zero. */
+static inline int64_t faber_trunc_i64(double value) {
+    return faber_saturate_i64(trunc(value));
+}
+
+/* `|x|`, `signum`: the runner is `f64::abs` / `f64::signum`. Rust's `signum`
+ * maps `+0.0` to `1.0`, `-0.0` to `-1.0`, and propagates NaN. */
+static inline double faber_abs_f64(double value) {
+    return fabs(value);
+}
+
+static inline double faber_signum_f64(double value) {
+    if (isnan(value)) {
+        return value;
+    }
+    return signbit(value) ? -1.0 : 1.0;
+}
+
+/* IEEE 754-2019 `minimum` / `maximum`: NaN in either operand propagates, and
+ * `-0.0` orders below `+0.0` (`ieee_minimum` / `ieee_maximum` in the runner). */
+static inline double faber_minimum_f64(double a, double b) {
+    if (isnan(a) || isnan(b)) {
+        return a + b;
+    }
+    if (a < b || (a == b && signbit(a))) {
+        return a;
+    }
+    return b;
+}
+
+static inline double faber_maximum_f64(double a, double b) {
+    if (isnan(a) || isnan(b)) {
+        return a + b;
+    }
+    if (a > b || (a == b && !signbit(a))) {
+        return a;
+    }
+    return b;
+}
+
 /* An exact comparison of an integer with a float by their true values:
  * -1 (less), 0 (equal), 1 (greater), 2 (unordered: NaN). A C comparison would
  * round the integer to binary64 first. Mirrors `faber::exact::cmp_int_float`. */

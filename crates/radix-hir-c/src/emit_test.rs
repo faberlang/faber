@@ -668,6 +668,22 @@ fn rounding_saturates_through_the_runtime() {
 }
 
 #[test]
+fn truncate_and_the_float_valued_methods_use_the_runtime() {
+    let code = emitted(
+        "main {\n    var float a ← -3.75\n    print a.truncate()\n    print a.abs()\n    print a.sign()\n    print a.minimum(2.5)\n    print a.maximum(2.5)\n}",
+    );
+    for call in [
+        "faber_trunc_i64(l_a)",
+        "faber_abs_f64(l_a)",
+        "faber_signum_f64(l_a)",
+        "faber_minimum_f64(l_a, 2.5)",
+        "faber_maximum_f64(l_a, 2.5)",
+    ] {
+        assert!(code.contains(call), "{call:?} missing in {code}");
+    }
+}
+
+#[test]
 fn floats_print_and_show_through_the_runtime() {
     let code = emitted("main {\n    var float a ← 0.5\n    print a\n    print \"a=§\"(a)\n}");
     assert!(
