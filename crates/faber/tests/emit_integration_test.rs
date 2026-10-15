@@ -518,3 +518,30 @@ fn emit_faber_target_localizes_reader_locale() {
         "localized emit should not emit the Latin keyword: {stdout}"
     );
 }
+
+/// `PKG001` has no locale-pack template, so a package emit failure shows only
+/// the `error[PKG001:<issue>]` header. An issue-less `error[PKG001]:` header
+/// renders as an empty body, so every failure must name its issue.
+#[cfg(all(feature = "hir-go", feature = "hir-ts", feature = "mir-sexp"))]
+#[test]
+fn tensor_fragment_package_emit_failures_name_their_issue() {
+    let package = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("corpus-product/tensor-fragment/tiny-linear");
+    let package = package.to_str().expect("package path");
+
+    for target in ["go", "ts", "sexp"] {
+        let (_stdout, stderr, ok) = run_faber_emit(&["emit", "-t", target, package]);
+        if ok {
+            continue;
+        }
+        assert!(
+            stderr.contains("error[PKG001:"),
+            "`faber emit -t {target}` failure must name a PKG001 issue:\n{stderr}"
+        );
+        assert!(
+            !stderr.contains("error[PKG001]:"),
+            "`faber emit -t {target}` rendered an issue-less PKG001 header:\n{stderr}"
+        );
+    }
+}
