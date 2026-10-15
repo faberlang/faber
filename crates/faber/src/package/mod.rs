@@ -66,6 +66,7 @@ mod runtime_dependency;
 mod runtime_sources;
 #[cfg(feature = "hir-rust")]
 mod rust_runtime_dependency;
+pub mod target_gate;
 mod temp_dir;
 mod test_route;
 
