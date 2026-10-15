@@ -356,6 +356,22 @@ help = "先修正 lexer 错误；解析会从干净的 tokens 继续"
 message = "需要 token"
 help = "确保此位置存在期望的 token"
 
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "复制入运算符 `{operator}` 后需要一个值"
+help = "在 `⇇` 之后写源表达式"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "元组元素标签 `{label}` 被使用了多次"
+help = "为每个元素取不同的标签，或去掉标签"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "implements 槽位必须命名一个契约；`_` 不是一致性声明"
+help = "在 implements 子句中写契约名"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "导入字段必须是标识符"
+help = "为导入的字段写一个普通名称"
+
 [diagnostics.PARSE001.issues.annotation_name]
 message = "需要注解名称"
 help = "在 @ 后添加注解名称"

@@ -356,6 +356,22 @@ help = "sửa lỗi lexer trước; quá trình phân tích tiếp tục từ c�
 message = "cần token"
 help = "đảm bảo token cần thiết có mặt tại vị trí này"
 
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "cần một giá trị sau toán tử sao chép vào `{operator}`"
+help = "viết biểu thức nguồn sau `⇇`"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "nhãn phần tử tuple `{label}` được dùng nhiều hơn một lần"
+help = "đặt nhãn khác nhau cho mỗi phần tử, hoặc bỏ nhãn"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "ô implements phải nêu tên một hợp đồng; `_` không phải là khai báo tuân thủ"
+help = "viết tên hợp đồng trong mệnh đề implements"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "trường nhập phải là một định danh"
+help = "viết một tên đơn giản cho trường được nhập"
+
 [diagnostics.PARSE001.issues.annotation_name]
 message = "cần tên annotation"
 help = "thêm tên annotation sau @"
