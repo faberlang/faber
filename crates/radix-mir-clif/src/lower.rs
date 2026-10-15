@@ -7,8 +7,8 @@
 
 use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
 use cranelift_codegen::ir::{
-    AbiParam, Block, BlockArg, FuncRef, InstBuilder, MemFlagsData, Signature, TrapCode,
-    Type as ClType, Value, types,
+    AbiParam, Block, BlockArg, FuncRef, InstBuilder, MemFlagsData, Signature, StackSlot,
+    StackSlotData, StackSlotKind, TrapCode, Type as ClType, Value, types,
 };
 use cranelift_codegen::settings::{self, Configurable, Flags};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
@@ -63,6 +63,22 @@ pub struct StructMeta {
     pub optional_params: FxHashMap<(MirFunctionId, usize), MirType>,
     /// Captured-closure environments by id.
     pub environments: FxHashMap<MirClosureEnvironmentId, MirClosureEnvironment>,
+}
+
+/// Whether a parameter of type `ty` is passed by address when declared `mut`:
+/// the callee may rebind it, and the caller sees the new value.
+fn pointer_rep(table: &TypeTable, ty: MirType) -> bool {
+    rep_of(table, ty).is_ok_and(|rep| rep != Rep::Unit)
+}
+
+/// Whether parameter `index` of `function` is passed by address: a `mut`
+/// parameter of a value kind, whose new value the caller must see.
+fn pointer_param(table: &TypeTable, function: &MirFunction, index: usize) -> bool {
+    !function.is_generator
+        && function
+            .params
+            .get(index)
+            .is_some_and(|param| param.mode == MirParamMode::MutRef && pointer_rep(table, param.ty))
 }
 
 /// Whether `function` rebinds local `id` as a whole. A reference parameter
@@ -209,17 +225,16 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             Ok(Rep::Record)
         }
         Type::Func(signature) => {
-            if !signature.type_params.is_empty()
-                || signature.is_async
-                || signature.is_generator
-                || signature.err.is_some()
-            {
+            if !signature.type_params.is_empty() || signature.is_async || signature.is_generator {
                 return Err(Decline::new("function value"));
             }
             for param in &signature.params {
                 rep_of(table, MirType::semantic(param_value_type(table, param.ty)))?;
             }
             rep_of(table, MirType::semantic(signature.ret))?;
+            if let Some(err) = signature.err {
+                rep_of(table, MirType::semantic(err))?;
+            }
             Ok(Rep::Func)
         }
         // An inline union is a box of one tagged payload, the optional's
@@ -340,9 +355,14 @@ impl<'a> ModuleState<'a> {
             if !matches!(
                 param.mode,
                 MirParamMode::Owned | MirParamMode::Ref | MirParamMode::MutRef | MirParamMode::Move
-            ) || (param.mode != MirParamMode::Owned && rebinds_local(function, param.local))
+            ) || (matches!(param.mode, MirParamMode::Ref | MirParamMode::MutRef)
+                && !pointer_param(self.input.types, function, index)
+                && rebinds_local(function, param.local))
             {
-                return Err(Decline::new("reference parameter"));
+                return Err(Decline::new(format!(
+                    "reference parameter {index} mode {:?} of f{}",
+                    param.mode, function.id.0
+                )));
             }
             let rep = rep_of(
                 self.input.types,
@@ -351,7 +371,11 @@ impl<'a> ModuleState<'a> {
             let Some(cl) = rep.cl_type() else {
                 return Err(Decline::new("unit parameter"));
             };
-            signature.params.push(AbiParam::new(cl));
+            if pointer_param(self.input.types, function, index) {
+                signature.params.push(AbiParam::new(types::I64));
+            } else {
+                signature.params.push(AbiParam::new(cl));
+            }
         }
         let rep = rep_of(self.input.types, function.return_ty)?;
         if function.is_generator {
@@ -640,6 +664,9 @@ struct FunctionLower<'f, 'a> {
     cells: rustc_hash::FxHashSet<Slot>,
     /// The next scratch temporary id above every declared one.
     scratch_floor: u32,
+    /// `mut` parameters passed by address: the slot, the address and the
+    /// representation to write back at every exit.
+    pointer_params: Vec<(Slot, Variable, Rep)>,
 }
 
 fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowered<()> {
@@ -676,6 +703,7 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             generator: function.is_generator,
             cells: rustc_hash::FxHashSet::default(),
             scratch_floor: 0,
+            pointer_params: Vec::new(),
         };
         lower.run(function)?;
         lower.builder.seal_all_blocks();
@@ -772,8 +800,19 @@ impl FunctionLower<'_, '_> {
             let rep = rep_of(table, self.state.param_type(function.id, index, param.ty))?;
             let value = self.builder.block_params(entry)[index + offset];
             let (variable, _) = self.slot(Slot::Local(param.local))?;
-            self.builder.def_var(variable, value);
-            let _ = rep;
+            if pointer_param(self.state.input.types, function, index) {
+                let cl = rep
+                    .cl_type()
+                    .ok_or_else(|| Decline::new("unit parameter"))?;
+                let address = self.builder.declare_var(types::I64);
+                self.builder.def_var(address, value);
+                let loaded = self.builder.ins().load(cl, MemFlagsData::new(), value, 0);
+                self.builder.def_var(variable, loaded);
+                self.pointer_params
+                    .push((Slot::Local(param.local), address, rep));
+            } else {
+                self.builder.def_var(variable, value);
+            }
         }
         // Locals start zeroed so every variable is defined on every path.
         for (slot, (variable, rep)) in &self.slots.clone() {
@@ -2836,21 +2875,16 @@ impl FunctionLower<'_, '_> {
         }
         let mut values = Vec::with_capacity(args.len() + 1);
         values.extend(environment);
-        for (position, arg) in args.iter().enumerate() {
-            let (value, have) = self.scalar(arg)?;
-            let value = match params.get(position) {
-                Some(want) => self.coerce(value, have, *want)?,
-                None => value,
-            };
-            values.push(value);
-        }
+        let by_address = self.address_flags(id);
+        let returns = self.call_arguments(&by_address, args, &params, &mut values)?;
         let call = self.builder.ins().call(reference, &values);
-        if let Some(destination) = destination {
-            let results = self.builder.inst_results(call).to_vec();
-            if let Some(result) = results.first() {
-                let (variable, _) = self.place_slot(destination)?;
-                self.builder.def_var(variable, *result);
-            }
+        let results = self.builder.inst_results(call).to_vec();
+        self.read_back_arguments(args, &returns)?;
+        if let Some(destination) = destination
+            && let Some(result) = results.first()
+        {
+            let (variable, _) = self.place_slot(destination)?;
+            self.builder.def_var(variable, *result);
         }
         Ok(())
     }
@@ -2928,13 +2962,19 @@ impl FunctionLower<'_, '_> {
         let Type::Func(signature) = resolve(table, ty.semantic_id()) else {
             return Err(Decline::new("call of a non-function"));
         };
+        let flags = self.type_address_flags(signature);
         let mut abi_signature = self.state.module.make_signature();
         abi_signature.params.push(AbiParam::new(types::I64));
         let mut wanted = Vec::with_capacity(signature.params.len());
-        for param in &signature.params {
+        for (position, param) in signature.params.iter().enumerate() {
             let rep = rep_of(table, MirType::semantic(param_value_type(table, param.ty)))?;
             let Some(cl) = rep.cl_type() else {
                 return Err(Decline::new("unit parameter"));
+            };
+            let cl = if flags.get(position).copied().unwrap_or(false) {
+                types::I64
+            } else {
+                cl
             };
             abi_signature.params.push(AbiParam::new(cl));
             wanted.push(rep);
@@ -2945,19 +2985,13 @@ impl FunctionLower<'_, '_> {
         }
         let mut values = Vec::with_capacity(args.len() + 1);
         values.push(environment);
-        for (position, arg) in args.iter().enumerate() {
-            let (value, have) = self.scalar(arg)?;
-            let value = match wanted.get(position) {
-                Some(want) => self.coerce(value, have, *want)?,
-                None => value,
-            };
-            values.push(value);
-        }
+        let returns = self.call_arguments(&flags, args, &wanted, &mut values)?;
         let signature_ref = self.builder.import_signature(abi_signature);
         let call = self
             .builder
             .ins()
             .call_indirect(signature_ref, pointer, &values);
+        self.read_back_arguments(args, &returns)?;
         if let Some(destination) = destination {
             let results = self.builder.inst_results(call).to_vec();
             if let Some(result) = results.first() {
@@ -2979,57 +3013,144 @@ impl FunctionLower<'_, '_> {
         error_place: &MirPlace,
         error_block: MirBlockId,
     ) -> Lowered<()> {
-        let id = match callee {
-            MirCallee::Function(id) => *id,
-            MirCallee::Definition { source, type_args } if type_args.is_empty() => {
-                let mut matches = self
-                    .state
-                    .input
-                    .program
-                    .functions
-                    .iter()
-                    .filter(|function| function.source == Some(*source));
-                match (matches.next(), matches.next()) {
-                    (Some(function), None) => function.id,
-                    _ => return Err(Decline::new("ambiguous definition call")),
-                }
-            }
-            _ => return Err(Decline::new("indirect call")),
-        };
-        let (param_reps, result_rep, error_rep) = {
-            let target = self
-                .state
-                .input
-                .program
-                .functions
-                .iter()
-                .find(|function| function.id == id)
-                .ok_or_else(|| Decline::new("unknown callee"))?;
-            let types = self.state.input.types;
-            let params = target
-                .params
-                .iter()
-                .enumerate()
-                .map(|(index, param)| rep_of(types, self.state.param_type(id, index, param.ty)))
-                .collect::<Lowered<Vec<_>>>()?;
-            let error = target
-                .error_ty
-                .map(|ty| rep_of(types, ty))
-                .transpose()?
-                .ok_or_else(|| Decline::new("try of a non-failable callee"))?;
-            (params, rep_of(types, target.return_ty)?, error)
-        };
-        let reference = self.function_ref(id)?;
-        let mut values = Vec::with_capacity(args.len());
-        for (position, arg) in args.iter().enumerate() {
-            let (value, have) = self.scalar(arg)?;
-            let value = match param_reps.get(position) {
-                Some(want) => self.coerce(value, have, *want)?,
-                None => value,
-            };
-            values.push(value);
+        /// Where a failable call goes.
+        enum Target {
+            Direct(MirFunctionId, Option<Value>),
+            Indirect(Value, Value),
         }
-        let call = self.builder.ins().call(reference, &values);
+        let types_table = self.state.input.types;
+        let (target, param_reps, result_rep, error_rep, abi_signature, indirect_flags) =
+            match callee {
+                MirCallee::Function(_) | MirCallee::Definition { .. } | MirCallee::Closure(_) => {
+                    let mut environment = None;
+                    let id = match callee {
+                        MirCallee::Function(id) => *id,
+                        MirCallee::Definition { source, type_args } if type_args.is_empty() => {
+                            let mut matches = self
+                                .state
+                                .input
+                                .program
+                                .functions
+                                .iter()
+                                .filter(|function| function.source == Some(*source));
+                            match (matches.next(), matches.next()) {
+                                (Some(function), None) => function.id,
+                                _ => return Err(Decline::new("ambiguous definition call")),
+                            }
+                        }
+                        MirCallee::Closure(closure) => {
+                            let (record, rep) = self.scalar(&closure.environment)?;
+                            if rep != Rep::Record {
+                                return Err(Decline::new("closure environment representation"));
+                            }
+                            environment = Some(record);
+                            closure.function
+                        }
+                        _ => return Err(Decline::new("indirect call")),
+                    };
+                    let target = self
+                        .state
+                        .input
+                        .program
+                        .functions
+                        .iter()
+                        .find(|function| function.id == id)
+                        .ok_or_else(|| Decline::new("unknown callee"))?;
+                    let params = target
+                        .params
+                        .iter()
+                        .enumerate()
+                        .map(|(index, param)| {
+                            rep_of(types_table, self.state.param_type(id, index, param.ty))
+                        })
+                        .collect::<Lowered<Vec<_>>>()?;
+                    let error = target
+                        .error_ty
+                        .map(|ty| rep_of(types_table, ty))
+                        .transpose()?
+                        .ok_or_else(|| Decline::new("try of a non-failable callee"))?;
+                    let result = rep_of(types_table, target.return_ty)?;
+                    (
+                        Target::Direct(id, environment),
+                        params,
+                        result,
+                        error,
+                        None,
+                        Vec::new(),
+                    )
+                }
+                MirCallee::Value(operand) => {
+                    let (object, rep) = self.scalar(operand)?;
+                    if rep != Rep::Func {
+                        return Err(Decline::new("call of a non-function"));
+                    }
+                    let ty = self.operand_type(operand)?;
+                    let Type::Func(signature) = resolve(types_table, ty.semantic_id()) else {
+                        return Err(Decline::new("call of a non-function"));
+                    };
+                    let Some(err) = signature.err else {
+                        return Err(Decline::new("try of a non-failable callee"));
+                    };
+                    let flags = self.type_address_flags(signature);
+                    let mut abi_signature = self.state.module.make_signature();
+                    abi_signature.params.push(AbiParam::new(types::I64));
+                    let mut params = Vec::with_capacity(signature.params.len());
+                    for (position, param) in signature.params.iter().enumerate() {
+                        let rep = rep_of(
+                            types_table,
+                            MirType::semantic(param_value_type(types_table, param.ty)),
+                        )?;
+                        let Some(cl) = rep.cl_type() else {
+                            return Err(Decline::new("unit parameter"));
+                        };
+                        let cl = if flags.get(position).copied().unwrap_or(false) {
+                            types::I64
+                        } else {
+                            cl
+                        };
+                        abi_signature.params.push(AbiParam::new(cl));
+                        params.push(rep);
+                    }
+                    let result = rep_of(types_table, MirType::semantic(signature.ret))?;
+                    let error = rep_of(types_table, MirType::semantic(err))?;
+                    abi_signature.returns.push(AbiParam::new(types::I8));
+                    if let Some(cl) = result.cl_type() {
+                        abi_signature.returns.push(AbiParam::new(cl));
+                    }
+                    abi_signature.returns.push(AbiParam::new(types::I64));
+                    let (code, environment) = self.function_parts(object)?;
+                    (
+                        Target::Indirect(code, environment),
+                        params,
+                        result,
+                        error,
+                        Some(abi_signature),
+                        flags,
+                    )
+                }
+            };
+        let mut values = Vec::with_capacity(args.len() + 1);
+        if let Target::Direct(_, Some(environment)) | Target::Indirect(_, environment) = &target {
+            values.push(*environment);
+        }
+        let by_address = match &target {
+            Target::Direct(id, _) => self.address_flags(*id),
+            Target::Indirect(..) => indirect_flags.clone(),
+        };
+        let returns = self.call_arguments(&by_address, args, &param_reps, &mut values)?;
+        let call = match target {
+            Target::Direct(id, _) => {
+                let reference = self.function_ref(id)?;
+                self.builder.ins().call(reference, &values)
+            }
+            Target::Indirect(code, _) => {
+                let signature = abi_signature.ok_or_else(|| Decline::new("indirect signature"))?;
+                let signature_ref = self.builder.import_signature(signature);
+                self.builder
+                    .ins()
+                    .call_indirect(signature_ref, code, &values)
+            }
+        };
         let results = self.builder.inst_results(call).to_vec();
         let status = *results
             .first()
@@ -3044,6 +3165,7 @@ impl FunctionLower<'_, '_> {
         self.builder.ins().brif(status, failed, &[], succeeded, &[]);
 
         self.builder.switch_to_block(succeeded);
+        self.read_back_arguments(args, &returns)?;
         if let (Some(destination), true) = (destination, result_rep != Rep::Unit) {
             let result = *results
                 .get(1)
@@ -3055,6 +3177,7 @@ impl FunctionLower<'_, '_> {
         self.builder.ins().jump(ok_target, &[]);
 
         self.builder.switch_to_block(failed);
+        self.read_back_arguments(args, &returns)?;
         let (variable, slot_rep) = self.place_slot(error_place)?;
         let error = self.element_value(payload, error_rep);
         let error = self.coerce(error, error_rep, slot_rep)?;
@@ -4187,6 +4310,130 @@ impl FunctionLower<'_, '_> {
 
     // TERMINATORS
 
+    /// Store each by-address `mut` parameter's final value through its address.
+    fn write_back_pointer_params(&mut self) -> Lowered<()> {
+        for (slot, address, _) in self.pointer_params.clone() {
+            let (variable, _) = self.slot(slot)?;
+            let value = self.builder.use_var(variable);
+            let address = self.builder.use_var(address);
+            self.builder
+                .ins()
+                .store(MemFlagsData::new(), value, address, 0);
+        }
+        Ok(())
+    }
+
+    /// Which parameters of function `id` are passed by address.
+    fn address_flags(&self, id: MirFunctionId) -> Vec<bool> {
+        let table = self.state.input.types;
+        self.state
+            .input
+            .program
+            .functions
+            .iter()
+            .find(|function| function.id == id)
+            .map(|function| {
+                (0..function.params.len())
+                    .map(|index| pointer_param(table, function, index))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Which parameters of a function type are passed by address.
+    fn type_address_flags(&self, signature: &radix_types::FuncSig) -> Vec<bool> {
+        let table = self.state.input.types;
+        signature
+            .params
+            .iter()
+            .map(|param| match table.get(param.ty) {
+                Type::Ref(SemanticMutability::Mutable, inner) => {
+                    pointer_rep(table, MirType::semantic(*inner))
+                }
+                _ => false,
+            })
+            .collect()
+    }
+
+    /// The argument values of a call to `target`, a `mut` parameter the
+    /// callee rebinds going through a stack slot that is read back after.
+    fn call_arguments(
+        &mut self,
+        by_address: &[bool],
+        args: &[MirOperand],
+        param_reps: &[Rep],
+        values: &mut Vec<Value>,
+    ) -> Lowered<Vec<(StackSlot, usize, Rep)>> {
+        let mut returns = Vec::new();
+        for (position, arg) in args.iter().enumerate() {
+            let (value, have) = self.scalar(arg)?;
+            let value = match param_reps.get(position) {
+                Some(want) => self.coerce(value, have, *want)?,
+                None => value,
+            };
+            if by_address.get(position).copied().unwrap_or(false) {
+                let rep = param_reps
+                    .get(position)
+                    .copied()
+                    .ok_or_else(|| Decline::new("reference parameter"))?;
+                // A whole variable receives the callee's final value; a part
+                // of one (a field, an element) is lent as a copy, as the
+                // runner lends it.
+                let writes_back = match arg {
+                    MirOperand::Place(place) => place.projections.is_empty(),
+                    MirOperand::Temp(_) => true,
+                    _ => false,
+                };
+                let slot = self.builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    8,
+                    3,
+                ));
+                let pointer = self.state.pointer;
+                let address = self.builder.ins().stack_addr(pointer, slot, 0);
+                self.builder
+                    .ins()
+                    .store(MemFlagsData::new(), value, address, 0);
+                values.push(address);
+                if writes_back {
+                    returns.push((slot, position, rep));
+                }
+            } else {
+                values.push(value);
+            }
+        }
+        Ok(returns)
+    }
+
+    /// Read back the by-address arguments after the call.
+    fn read_back_arguments(
+        &mut self,
+        args: &[MirOperand],
+        returns: &[(StackSlot, usize, Rep)],
+    ) -> Lowered<()> {
+        for (slot, position, rep) in returns {
+            let cl = rep
+                .cl_type()
+                .ok_or_else(|| Decline::new("unit parameter"))?;
+            let pointer = self.state.pointer;
+            let address = self.builder.ins().stack_addr(pointer, *slot, 0);
+            let value = self.builder.ins().load(cl, MemFlagsData::new(), address, 0);
+            match &args[*position] {
+                MirOperand::Place(place) if place.projections.is_empty() => {
+                    let (variable, _) = self.place_slot(place)?;
+                    self.builder.def_var(variable, value);
+                }
+                MirOperand::Place(place) => self.write_projected(place, value, *rep)?,
+                MirOperand::Temp(id) => {
+                    let (variable, _) = self.slot(Slot::Temp(*id))?;
+                    self.builder.def_var(variable, value);
+                }
+                _ => return Err(Decline::new("reference argument")),
+            }
+        }
+        Ok(())
+    }
+
     fn terminator(&mut self, terminator: &MirTerminator) -> Lowered<()> {
         match &terminator.kind {
             MirTerminatorKind::Return(_) if self.generator => {
@@ -4194,6 +4441,7 @@ impl FunctionLower<'_, '_> {
                 Ok(())
             }
             MirTerminatorKind::Return(value) => {
+                self.write_back_pointer_params()?;
                 let mut results = Vec::new();
                 if self.error_rep.is_some() {
                     results.push(self.builder.ins().iconst(types::I8, 0));
@@ -4216,6 +4464,7 @@ impl FunctionLower<'_, '_> {
                 let (value, have) = self.scalar(operand)?;
                 let value = self.coerce(value, have, error_rep)?;
                 let payload = self.element_bits(value, error_rep);
+                self.write_back_pointer_params()?;
                 let mut results = vec![self.builder.ins().iconst(types::I8, 1)];
                 let ret_rep = self.ret_rep;
                 if let Some(zero) = self.zero(ret_rep) {

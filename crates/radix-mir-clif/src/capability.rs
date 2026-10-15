@@ -240,11 +240,7 @@ impl<'a> ClifCapability<'a> {
                 _ => self.type_gap(MirType::semantic(*inner)),
             },
             Type::Func(sig) => {
-                if !sig.type_params.is_empty()
-                    || sig.is_async
-                    || sig.is_generator
-                    || sig.err.is_some()
-                {
+                if !sig.type_params.is_empty() || sig.is_async || sig.is_generator {
                     return Some(Gap::Subset("function value".to_owned()));
                 }
                 sig.params
@@ -257,6 +253,10 @@ impl<'a> ClifCapability<'a> {
                         self.type_gap(MirType::semantic(value))
                     })
                     .or_else(|| self.type_gap(MirType::semantic(sig.ret)))
+                    .or_else(|| {
+                        sig.err
+                            .and_then(|err| self.type_gap(MirType::semantic(err)))
+                    })
             }
             // A read-only reference is the value it borrows; a mutable one is
             // only a shared handle for the kinds that are handles.
