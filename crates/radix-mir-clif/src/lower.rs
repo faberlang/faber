@@ -57,6 +57,9 @@ pub struct StructMeta {
     pub names: FxHashMap<radix_hir::DefId, String>,
     /// The variants of each `discretio`, for fields declared shared.
     pub enum_variants: FxHashMap<radix_hir::DefId, Vec<radix_hir::DefId>>,
+    /// Parameters that admit none although declared with a plain type (the
+    /// `optional` modifier): function, position and the optional type.
+    pub optional_params: FxHashMap<(MirFunctionId, usize), MirType>,
 }
 
 /// Whether `function` rebinds local `id` as a whole. A reference parameter
@@ -307,13 +310,23 @@ struct ModuleState<'a> {
 }
 
 impl<'a> ModuleState<'a> {
+    /// The type a parameter is passed as: an optional parameter admits none.
+    fn param_type(&self, function: MirFunctionId, index: usize, declared: MirType) -> MirType {
+        self.input
+            .structs
+            .optional_params
+            .get(&(function, index))
+            .copied()
+            .unwrap_or(declared)
+    }
+
     fn signature_for(&self, function: &MirFunction) -> Lowered<Signature> {
         let mut signature = self.module.make_signature();
         if function.is_generator {
             // The collector: a runtime list every `cede` appends to.
             signature.params.push(AbiParam::new(types::I64));
         }
-        for param in &function.params {
+        for (index, param) in function.params.iter().enumerate() {
             if !matches!(
                 param.mode,
                 MirParamMode::Owned | MirParamMode::Ref | MirParamMode::MutRef | MirParamMode::Move
@@ -321,7 +334,10 @@ impl<'a> ModuleState<'a> {
             {
                 return Err(Decline::new("reference parameter"));
             }
-            let rep = rep_of(self.input.types, param.ty)?;
+            let rep = rep_of(
+                self.input.types,
+                self.param_type(function.id, index, param.ty),
+            )?;
             let Some(cl) = rep.cl_type() else {
                 return Err(Decline::new("unit parameter"));
             };
@@ -678,9 +694,16 @@ impl FunctionLower<'_, '_> {
             if unknown(local.ty) {
                 continue;
             }
-            let rep = rep_of(table, local.ty)?;
+            let declared = function
+                .params
+                .iter()
+                .position(|param| param.local == local.id)
+                .map_or(local.ty, |index| {
+                    self.state.param_type(function.id, index, local.ty)
+                });
+            let rep = rep_of(table, declared)?;
             self.declare(Slot::Local(local.id), rep);
-            self.slot_tys.insert(Slot::Local(local.id), local.ty);
+            self.slot_tys.insert(Slot::Local(local.id), declared);
         }
         for temp in &function.temps {
             if unknown(temp.ty) {
@@ -695,7 +718,7 @@ impl FunctionLower<'_, '_> {
             self.collector = Some(self.builder.block_params(entry)[0]);
         }
         for (index, param) in function.params.iter().enumerate() {
-            let rep = rep_of(table, param.ty)?;
+            let rep = rep_of(table, self.state.param_type(function.id, index, param.ty))?;
             let value = self.builder.block_params(entry)[index + offset];
             let (variable, _) = self.slot(Slot::Local(param.local))?;
             self.builder.def_var(variable, value);
@@ -1126,6 +1149,16 @@ impl FunctionLower<'_, '_> {
             Ok(value)
         } else if want == Rep::Opt && have != Rep::Unit {
             self.wrap_some(value, have)
+        } else if have == Rep::Opt && want != Rep::Unit {
+            // A parameter or field declared `optional` keeps its plain type:
+            // where a value is required it is known to be present.
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let absent = self.builder.ins().icmp(IntCC::Equal, value, zero);
+            self.trap_if(absent, "none where a value is required")?;
+            let bits = self
+                .call_runtime(&abi::OPT_BITS, &[value])?
+                .ok_or_else(|| Decline::new("unwrap result"))?;
+            Ok(self.element_value(bits, want))
         } else {
             Err(Decline::new(format!(
                 "representation mismatch {have:?} to {want:?}"
@@ -1174,7 +1207,13 @@ impl FunctionLower<'_, '_> {
             MirOptionOp::IsNil(operand) | MirOptionOp::IsNotNil(operand) => {
                 let (value, rep) = self.scalar(operand)?;
                 if rep != Rep::Opt {
-                    return Err(Decline::new("nil test of a non-optional"));
+                    // Nothing that is not an optional is ever none.
+                    let never = matches!(op, MirOptionOp::IsNil(_));
+                    let _ = value;
+                    return Ok((
+                        self.builder.ins().iconst(types::I8, i64::from(!never)),
+                        Rep::Bool,
+                    ));
                 }
                 let zero = self.builder.ins().iconst(types::I64, 0);
                 let cc = if matches!(op, MirOptionOp::IsNil(_)) {
@@ -1678,15 +1717,19 @@ impl FunctionLower<'_, '_> {
             .call_runtime(&abi::RECORD_NEW, &[name, variant_flag])?
             .ok_or_else(|| Decline::new("record new result"))?;
         for (position, field) in order.iter().enumerate() {
-            let Some(item) = supplied.iter().find(|item| item.name == *field) else {
-                return Err(Decline::new("genus field without a value"));
-            };
             let field_ty = if variant {
                 self.variant_slot(def, *field)?.1
             } else {
                 self.field_slot(aggregate.ty, *field)?.1
             };
-            let (value, rep) = self.element_operand(&item.value, field_ty)?;
+            let (value, rep) = match supplied.iter().find(|item| item.name == *field) {
+                Some(item) => self.element_operand(&item.value, field_ty)?,
+                // An omitted optional field is none.
+                None if rep_of(self.state.input.types, field_ty)? == Rep::Opt => {
+                    (self.builder.ins().iconst(types::I64, 0), Rep::Opt)
+                }
+                None => return Err(Decline::new("genus field without a value")),
+            };
             let position = self.builder.ins().iconst(
                 types::I64,
                 i64::try_from(position).map_err(|_| Decline::new("field index"))?,
@@ -2631,7 +2674,13 @@ impl FunctionLower<'_, '_> {
             callee
                 .params
                 .iter()
-                .map(|param| rep_of(self.state.input.types, param.ty))
+                .enumerate()
+                .map(|(index, param)| {
+                    rep_of(
+                        self.state.input.types,
+                        self.state.param_type(id, index, param.ty),
+                    )
+                })
                 .collect::<Lowered<_>>()?
         };
         if self
@@ -2700,7 +2749,13 @@ impl FunctionLower<'_, '_> {
         let params: Vec<Rep> = target
             .params
             .iter()
-            .map(|param| rep_of(self.state.input.types, param.ty))
+            .enumerate()
+            .map(|(index, param)| {
+                rep_of(
+                    self.state.input.types,
+                    self.state.param_type(id, index, param.ty),
+                )
+            })
             .collect::<Lowered<_>>()?;
         let reference = self.function_ref(id)?;
         let list = self
@@ -2819,7 +2874,8 @@ impl FunctionLower<'_, '_> {
             let params = target
                 .params
                 .iter()
-                .map(|param| rep_of(types, param.ty))
+                .enumerate()
+                .map(|(index, param)| rep_of(types, self.state.param_type(id, index, param.ty)))
                 .collect::<Lowered<Vec<_>>>()?;
             let error = target
                 .error_ty
@@ -3544,6 +3600,13 @@ impl FunctionLower<'_, '_> {
                 };
                 Ok((self.builder.ins().icmp(cc, value, zero), Rep::Bool))
             }
+            // Nothing that is not an optional is ever none.
+            (MirUnOp::IsNil | MirUnOp::IsNotNil, _) => Ok((
+                self.builder
+                    .ins()
+                    .iconst(types::I8, i64::from(op == MirUnOp::IsNotNil)),
+                Rep::Bool,
+            )),
             (MirUnOp::Sqrt, Rep::Float | Rep::Int) => {
                 let number = if rep == Rep::Int {
                     self.builder.ins().fcvt_from_sint(types::F64, value)
