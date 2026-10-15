@@ -1940,6 +1940,8 @@ impl<'a> MirLowerer<'a> {
     /// diagnostics as unsupported function contents.
     fn lower_entry(&mut self, entry: &HirBlock, body_ctx: &BodyLoweringContext<'_, '_>) {
         let vacuum = self.types.primitive(Primitive::Vacuum);
+        let numerus = self.types.primitive(Primitive::Numerus);
+        let mut entry_return_ty = MirType::semantic(vacuum);
         let context = self.builder_context(body_ctx);
         #[expect(
             clippy::cast_possible_truncation,
@@ -1964,8 +1966,24 @@ impl<'a> MirLowerer<'a> {
             }
             if consts_lowered {
                 builder.lower_raw_entry_args(entry, self.unit.hir.entry_args_name);
-                builder.visit_block(entry);
-                builder.terminate_open_current(MirTerminatorKind::Return(None), entry.span);
+                if let Some(expr) = entry
+                    .expr
+                    .as_deref()
+                    .filter(|expr| expr.ty == Some(numerus))
+                {
+                    match builder.lower_block_expr(entry, expr) {
+                        Some(operand) => {
+                            entry_return_ty = MirType::semantic(numerus);
+                            builder.terminate_open_current(MirTerminatorKind::Return(Some(operand)), entry.span);
+                        }
+                        None => {
+                            builder.terminate_open_current(MirTerminatorKind::Return(None), entry.span);
+                        }
+                    }
+                } else {
+                    builder.visit_block(entry);
+                    builder.terminate_open_current(MirTerminatorKind::Return(None), entry.span);
+                }
             }
             let blocks = builder.finish_blocks();
             let synthetics = builder.take_synthetic_functions();
@@ -1995,7 +2013,7 @@ impl<'a> MirLowerer<'a> {
                 locals,
                 temps,
                 blocks,
-                return_ty: MirType::semantic(vacuum),
+                return_ty: entry_return_ty,
                 error_ty: None,
                 is_async: false,
                 is_generator: false,
