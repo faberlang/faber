@@ -50,6 +50,28 @@ main {
 }
 
 #[test]
+fn bounded_lista_for_ref_runs_indices_end_to_end() {
+    let mut host = BufferHost::default();
+    let status = run_source(
+        r#"
+main {
+    const list<int, 3> numeri ← [10, 20, 30]
+    for ref numeri const index {
+        print index
+    }
+}
+"#,
+        &mut host,
+    )
+    .expect("bounded lista for ref run succeeds");
+    assert_eq!(status, ExitCode::SUCCESS);
+    assert_eq!(
+        host.stdout_lines,
+        vec!["0".to_owned(), "1".to_owned(), "2".to_owned()]
+    );
+}
+
+#[test]
 fn run_named_uses_diagnostic_identity() {
     let mut host = BufferHost::default();
     let status = run_named(
