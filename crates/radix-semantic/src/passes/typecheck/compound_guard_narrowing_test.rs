@@ -149,3 +149,25 @@ fn assignment_invalidates_a_compound_fact() {
         NOT_NARROWED,
     );
 }
+
+#[test]
+fn and_narrows_the_right_conjunct_inside_the_condition() {
+    test_support::assert_accepts(
+        "functio f(textus ∪ nihil x) → bivalens {\n    redde x non est nihil et x.longitudo() ≻ 0\n}",
+    );
+}
+
+#[test]
+fn and_threading_narrows_at_any_depth() {
+    test_support::assert_accepts(
+        "functio f(textus ∪ nihil x, bivalens a) → bivalens {\n    redde a et x non est nihil et x.longitudo() ≻ 0\n}",
+    );
+}
+
+#[test]
+fn or_does_not_narrow_the_right_disjunct_inside_the_condition() {
+    test_support::assert_rejects_with_issue(
+        "functio f(textus ∪ nihil x, bivalens a) → bivalens {\n    redde a aut x.longitudo() ≻ 0\n}",
+        NOT_NARROWED,
+    );
+}
