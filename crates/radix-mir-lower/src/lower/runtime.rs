@@ -2870,6 +2870,14 @@ impl FunctionBuilder<'_> {
 
         let lowered_args = self.lower_direct_call_args(*def_id, args, expr.span)?;
         let ty = self.expr_ty(expr)?;
+        let callee_async = self
+            .context
+            .function_async
+            .get(def_id)
+            .copied()
+            .unwrap_or(false)
+            || self.callable_is_async(callee);
+        let ty = if callee_async { self.async_payload_ty(ty) } else { ty };
 
         if let Some(import) = self.context.provider_imports.get(def_id).cloned() {
             self.emit_call_shape_check(expr.id, &lowered_args, 0, expr.span)?;
@@ -3088,6 +3096,11 @@ impl FunctionBuilder<'_> {
     ) -> Option<MirOperand> {
         self.emit_call_shape_check(expr.id, &lowered_args, callee_parameter_offset, expr.span)?;
         let ty = self.expr_ty(expr)?;
+        let ty = if self.definition_call_is_async(def_id, expr) {
+            self.async_payload_ty(ty)
+        } else {
+            ty
+        };
         let callee = MirCallee::definition_with_type_args(def_id, explicit_type_args);
 
         if self
@@ -3145,6 +3158,41 @@ impl FunctionBuilder<'_> {
             }
         }
         callee.ty.is_some_and(|ty| is_generator(self.types, ty))
+    }
+
+    pub(super) fn callable_is_async(&self, callee: &HirExpression) -> bool {
+        fn is_async(types: &TypeTable, ty: TypeId) -> bool {
+            match types.get(ty) {
+                Type::Func(signature) => signature.is_async,
+                Type::Alias(_, inner) => is_async(types, *inner),
+                _ => false,
+            }
+        }
+        callee.ty.is_some_and(|ty| is_async(self.types, ty))
+    }
+
+    /// The success payload of an awaited `@ future` call result: a
+    /// `promissum<T>`/`promissum<T ⇥ E>` call yields `T` (`async_surface.rs`).
+    fn async_payload_ty(&self, ty: MirType) -> MirType {
+        match self.normalized_type(ty.semantic_id()) {
+            Type::Promissum(inner) | Type::PromissumFailable(inner, _) => MirType::semantic(*inner),
+            _ => ty,
+        }
+    }
+
+    /// Whether the definition call named by `def_id` resolves to an async
+    /// callee. In-unit facts live in the async registry; a linked or provider
+    /// callee is resolved through its HIR signature.
+    fn definition_call_is_async(&self, def_id: DefId, expr: &HirExpression) -> bool {
+        self.context
+            .function_async
+            .get(&def_id)
+            .copied()
+            .unwrap_or(false)
+            || match &expr.kind {
+                HirExpressionKind::Call(callee, ..) => self.callable_is_async(callee),
+                _ => false,
+            }
     }
 
     // consumes callee and args into MIR statements

@@ -411,11 +411,6 @@ impl<'a> LoweringContextMaps<'a> {
                     .types
                     .find_equal(&Type::AsyncCursor(return_ty, alternate))
                     .unwrap_or(return_ty)
-            } else if function.is_async {
-                self.validation
-                    .types
-                    .find_equal(&Type::Promissum(return_ty))
-                    .unwrap_or(return_ty)
             } else {
                 return_ty
             };
