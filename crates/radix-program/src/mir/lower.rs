@@ -17,11 +17,11 @@ use super::{
     SourceRewrites, Symbol, Type, TypeId, TypeTable, build_nominal_remap, build_variant_remap,
     exported_nominal_names, extend_unmapped_library_sources, import_semantic_type_with_nominal,
     library_cached_analysis, library_cached_file_interface, lower_analyzed_unit, mir_diag,
-    mir_error_diag, mir_issue_diag, mir_lowering_diag, push_type_rewrite, record_shared_nominals,
-    remap_function_text_symbols, remap_optional_symbol, remap_program_text_symbols,
-    rewrite_analysis_namespace_calls, rewrite_closure_environment_sources,
-    rewrite_generic_param_sources, rewrite_program_sources, rewrite_templates_sources,
-    source_nominal_names, with_library_cached_analysis_mut,
+    mir_error_diag, mir_issue_diag, mir_lowering_diag, mir_validation_diag, push_type_rewrite,
+    record_shared_nominals, remap_function_text_symbols, remap_optional_symbol,
+    remap_program_text_symbols, rewrite_analysis_namespace_calls,
+    rewrite_closure_environment_sources, rewrite_generic_param_sources, rewrite_program_sources,
+    rewrite_templates_sources, source_nominal_names, with_library_cached_analysis_mut,
 };
 use radix_mir::MirFunctionSignature;
 use radix_mir::device::MirDeviceFunctionMetadataMap;
@@ -2300,7 +2300,7 @@ fn validation_diagnostics(
 ) -> Vec<Diagnostic> {
     errors
         .into_iter()
-        .map(|error| mir_lowering_diag(diagnostic_path, error.message).with_span(error.span))
+        .map(|error| mir_validation_diag(diagnostic_path, error))
         .collect()
 }
 

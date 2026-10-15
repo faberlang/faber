@@ -6,7 +6,8 @@ use super::{
     MirSeams, ModuleId, PackageMirConsumer, PackageMirLinks, Path, PathBuf, PreparedPackageMir,
     TestFunctionIds, TestPackageScope, air_specialize, canonicalize_direct_definition_callees,
     collect_package_runtime_requirements, local_namespace_call_targets, lower_package_units,
-    mir_diag, mir_lowering_diag, plan_cli_package, rewrite_unit_namespace_calls, validate_program,
+    mir_diag, mir_validation_diag, plan_cli_package, rewrite_unit_namespace_calls,
+    validate_program,
 };
 
 struct PackageMirPreparation<'a> {
@@ -194,7 +195,7 @@ pub(crate) fn link_package_functions<R>(
         |errors| {
             errors
                 .into_iter()
-                .map(|error| mir_lowering_diag(&anchor_path, error.message).with_span(error.span))
+                .map(|error| mir_validation_diag(&anchor_path, error))
                 .collect::<Vec<_>>()
         },
     )?;
@@ -373,7 +374,7 @@ fn prepare_package_mir<R>(
         |errors| {
             errors
                 .into_iter()
-                .map(|error| mir_lowering_diag(&entry_path, error.message).with_span(error.span))
+                .map(|error| mir_validation_diag(&entry_path, error))
                 .collect::<Vec<_>>()
         },
     )?;

@@ -601,7 +601,9 @@ use cli_values::{
     is_package_mir_supported_option, matching_cli_command, package_mir_cli_exit_code,
     plan_cli_command_records, push_cli_option_default_diagnostic, unsupported_cli_diagnostic,
 };
-use diag::{mir_error_diag, mir_issue_diag, mir_lowering_diag, runner_diagnostics};
+use diag::{
+    mir_error_diag, mir_issue_diag, mir_lowering_diag, mir_validation_diag, runner_diagnostics,
+};
 use driver::{
     with_prepared_package_mir, with_prepared_package_mir_from_loaded,
     with_prepared_package_mir_with_cli_mode,
