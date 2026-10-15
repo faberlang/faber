@@ -6,4 +6,5 @@ input = "functio/fn-value-closure-mut.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

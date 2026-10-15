@@ -6,4 +6,5 @@ input = "conversio/bits-conversio.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false
