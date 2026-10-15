@@ -150,6 +150,13 @@ impl Emitter<'_> {
                 // A test function is not part of the program: `faber run`
                 // runs the entry block only, and `faber test` is another route.
                 HirItemKind::Function(function) if function.test.is_some() => {}
+                // A generic function has no C body until it is instantiated at
+                // a concrete type. One nothing calls contributes nothing to the
+                // program (`faber run` runs the entry only), so it is skipped;
+                // a call to one is refused where it is written.
+                HirItemKind::Function(function) if !function.type_params.is_empty() => {
+                    self.generics.insert(item.def_id);
+                }
                 HirItemKind::Function(function) => {
                     self.signature(item.def_id, function, None)?;
                     functions.push((item.def_id, &**function));

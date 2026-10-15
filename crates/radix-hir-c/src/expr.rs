@@ -415,6 +415,9 @@ impl Emitter<'_> {
         args: &[radix_hir::HirCallArg],
     ) -> Result<Operand, CodegenError> {
         let Some(function) = self.functions.get(&def_id) else {
+            if self.generics.contains(&def_id) {
+                return Err(unsupported("generic function"));
+            }
             return Err(unsupported("call to a function outside the program"));
         };
         let (name, params, omissions, ret) = (

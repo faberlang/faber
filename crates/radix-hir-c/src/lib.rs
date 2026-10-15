@@ -162,6 +162,7 @@ impl CCodegen<'_> {
             genera: FxHashMap::default(),
             shows: Vec::new(),
             copies: Vec::new(),
+            generics: FxHashSet::default(),
             variants: FxHashMap::default(),
             equals: Vec::new(),
             sponte_params: FxHashSet::default(),
@@ -214,6 +215,9 @@ pub(crate) struct Emitter<'a> {
     shows: Vec<DefId>,
     /// Genera whose deep-copy function (`copy`, R7) the program asked for.
     copies: Vec<DefId>,
+    /// Generic functions, skipped until instantiated; a call to one is
+    /// refused by name (a call to one nothing wrote contributes nothing).
+    generics: FxHashSet<DefId>,
     /// Each enumeration variant: the enumeration and its position.
     variants: FxHashMap<DefId, (DefId, usize)>,
     /// Enumerations whose structural equality function was asked for.
