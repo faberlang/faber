@@ -459,3 +459,83 @@ fn bounded_lista_conversio_overflow_without_recovery_errs() {
     );
     assert_eq!(error.code, crate::RUNNER_CODE_CONVERSION);
 }
+
+/// Run `ascii<8> ↦ ascii<capacity>` over `text`, with an optional `⊥`
+/// recovery constant.
+fn run_bounded_ascii_resize(
+    capacity: u64,
+    text: &str,
+    recovery: Option<radix_mir::MirOperand>,
+) -> Result<Value, RunnerError> {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{MirConversion, MirConversionFlavor, MirProgram, MirValidationContext};
+    use radix_types::{IndexExpr, TypeTable};
+
+    let mut types = TypeTable::new();
+    let source_capacity = types.intern_index(IndexExpr::Literal(8));
+    let source_ty = types.intern(Type::BoundedAscii {
+        capacity: source_capacity,
+    });
+    let target_capacity = types.intern_index(IndexExpr::Literal(capacity));
+    let target_ty = types.intern(Type::BoundedAscii {
+        capacity: target_capacity,
+    });
+    let interner = Interner::new();
+    let program = MirProgram {
+        functions: vec![function(
+            0,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            radix_mir::MirType::semantic(target_ty),
+            None,
+        )],
+    };
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    let conversion = MirConversion {
+        store: None,
+        flavor: MirConversionFlavor::Runtime,
+        source_ty: radix_mir::MirType::semantic(source_ty),
+        target_ty: radix_mir::MirType::semantic(target_ty),
+        params: Vec::new(),
+        recovery,
+        struct_defaults: Vec::new(),
+    };
+    runner.eval_runtime_convert(&conversion, Value::Str(text.to_string()), span())
+}
+
+/// A bounded ascii grows into a larger capacity with the same text.
+#[test]
+fn bounded_ascii_resize_grows() {
+    let result = run_bounded_ascii_resize(8, "ab", None).expect("fits capacity 8");
+    assert_eq!(result, Value::Str("ab".to_string()));
+}
+
+/// A source over the target capacity takes the `⊥` recovery value.
+#[test]
+fn bounded_ascii_resize_over_capacity_recovers() {
+    use radix_mir::{MirConstant, MirOperand};
+
+    let recovery = MirOperand::Constant(MirConstant::Int(7));
+    let result = run_bounded_ascii_resize(4, "abcdef", Some(recovery))
+        .expect("overflow recovers with the ⊥ value");
+    assert_eq!(result, Value::Int(7));
+}
+
+/// A source over the target capacity with no `⊥` fails the conversion; it is
+/// a conversion failure, not an unsupported target.
+#[test]
+fn bounded_ascii_resize_over_capacity_fails_without_recovery() {
+    let error = run_bounded_ascii_resize(4, "abcdef", None)
+        .expect_err("overflow without recovery fails the conversion");
+    assert_eq!(error.code, crate::RUNNER_CODE_CONVERSION);
+    assert_ne!(
+        error.issue,
+        "runner_faberscript_unsupported_runtime_conversio_to_bounded_ascii"
+    );
+}
