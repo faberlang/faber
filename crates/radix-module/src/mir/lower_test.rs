@@ -1604,6 +1604,51 @@ function f0 -> ty#1 {
 }
 
 #[test]
+fn verum_dum_tail_return_lowers_valid_mir() {
+    // `while true { ... return i }` never exits through its condition, so the
+    // loop's after-block is dead. The implicit function return must not land
+    // there: a `return` in that block is rejected for a value-returning
+    // function.
+    let dump = dump_source(
+        r#"+++
+locale = "en"
++++
+fn f() → int {
+    mut int i ← 0
+    while true {
+        i ← i + 1
+        if i ≡ 3 {
+            return i
+        }
+    }
+}
+main {
+    print f()
+}
+"#,
+    );
+    assert!(dump.contains("bb0:"), "valid MIR must be emitted:\n{dump}");
+}
+
+#[test]
+fn verum_dum_loop_in_vacuum_main_stays_valid() {
+    // An intentional infinite loop in a void function still lowers: the sealed
+    // after-block must not be the only terminator path.
+    let dump = dump_source(
+        r#"+++
+locale = "en"
++++
+main {
+    while true {
+        print "x"
+    }
+}
+"#,
+    );
+    assert!(dump.contains("bb0:"), "valid MIR must be emitted:\n{dump}");
+}
+
+#[test]
 fn lowers_rumpe_inside_fac_to_breakable_exit() {
     let dump = dump_source("functio exemplo() → numerus { fac { rumpe } cape err { redde 0 } redde 1 }");
     // WHY: the entry block must reach the after-block via the rumpe goto edge,
