@@ -504,7 +504,24 @@ fn cli_codegen_diagnostic(target: Target, name: &str, analysis: &AnalyzedModule)
         }
         // Python lowers the narrow CLI slice inside its own emitter; a
         // surface beyond the slice fails closed there with a stable issue.
-        Target::HirPython => None,
+        // An unsupported `exitus` expression is reported early here so the
+        // diagnostic is identical to the Rust arm's CODEGEN004.
+        Target::HirPython => {
+            if matches!(cli_program.exit, Some(crate::cli::CliExit::Unsupported)) {
+                return Some(
+                    codegen_diagnostic(
+                        name,
+                        "CODEGEN004",
+                        "CLI exitus code generation supports numeric literals, bindings, and args fields in Phase 03",
+                    )
+                    .with_args(vec![
+                        DiagnosticArg::new("issue", "py_cli_exit_unsupported"),
+                        DiagnosticArg::new("target", "python"),
+                    ]),
+                );
+            }
+            None
+        }
         // Wasm text routes CLI programs through the ordinary emit path (the
         // shared MIR CLI lowering already produced the entry/argv/exit
         // shapes); the emitter fails closed on unsupported shapes itself.
