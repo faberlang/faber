@@ -857,6 +857,23 @@ pub const TRAP_TEXT_WINDOW: RuntimeItem = RuntimeItem {
     targets: &[Target::HirGo],
 };
 
+/// `text` rows (Go): the text operations whose Go standard-library spelling
+/// differs from the MIR runner's, so they are runtime helpers. `split` keeps the
+/// empty pieces around an empty separator; `upper` and `lower` apply the full
+/// Unicode case mapping (`ß` to `SS`, the final sigma).
+const fn text_row(name: &'static str) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Text,
+        name,
+        kind: RuntimeKind::Fn,
+        targets: &[Target::HirGo],
+    }
+}
+
+pub const TEXT_SPLIT: RuntimeItem = text_row("split");
+pub const TEXT_UPPER: RuntimeItem = text_row("upper");
+pub const TEXT_LOWER: RuntimeItem = text_row("lower");
+
 /// The property a thrown TypeScript assertion failure carries. It is a marker
 /// on the thrown `Error`, not a runtime helper, so it has no table row; the
 /// failable conversion wrapper reads it to rethrow a program defect instead of
@@ -1327,6 +1344,9 @@ pub const TABLE: &[RuntimeItem] = &[
     SERMO_DRAIN,
     SERMO_READ_LINE,
     TRAP_TEXT_WINDOW,
+    TEXT_SPLIT,
+    TEXT_UPPER,
+    TEXT_LOWER,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,
@@ -1394,11 +1414,12 @@ pub enum Namespace {
     Gen,
     Float,
     Trap,
+    Text,
 }
 
 impl Namespace {
     /// Every namespace, in declaration order.
-    pub const ALL: [Namespace; 26] = [
+    pub const ALL: [Namespace; 27] = [
         Namespace::Exact,
         Namespace::Dec,
         Namespace::Inf,
@@ -1425,6 +1446,7 @@ impl Namespace {
         Namespace::Gen,
         Namespace::Float,
         Namespace::Trap,
+        Namespace::Text,
     ];
 
     /// The `lower_snake_case` spelling of the namespace.
@@ -1457,6 +1479,7 @@ impl Namespace {
             Namespace::Gen => "gen",
             Namespace::Float => "float",
             Namespace::Trap => "trap",
+            Namespace::Text => "text",
         }
     }
 }
