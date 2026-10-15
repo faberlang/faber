@@ -2112,16 +2112,21 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
-                let Type::Tensor(element, _) = self.type_kind(receiver_ty) else {
-                    self.error(span, "tensor get receiver is not tensor");
-                    return;
+                // The coordinate read admits a `matrix<T, [R, C]>` receiver on
+                // the same element/result contract as a tensor.
+                let element = match self.type_kind(receiver_ty) {
+                    Type::Tensor(element, _) | Type::Matrix(element, _) => *element,
+                    _ => {
+                        self.error(span, "tensor get receiver is not tensor");
+                        return;
+                    }
                 };
                 let result_ok = match self.type_kind(call.return_ty) {
-                    Type::Option(inner) => self.context.types.equals(*inner, *element),
+                    Type::Option(inner) => self.context.types.equals(*inner, element),
                     _ => self
                         .context
                         .types
-                        .equals(call.return_ty.semantic_id(), *element),
+                        .equals(call.return_ty.semantic_id(), element),
                 };
                 if !result_ok {
                     self.error(
@@ -2138,7 +2143,7 @@ impl Validator<'_, '_> {
                     "tensor mutation result is not vacuum",
                 );
                 if let Some(receiver_ty) = first_arg_ty {
-                    self.require_tensor_type(
+                    self.require_tensor_or_matrix_type(
                         receiver_ty,
                         span,
                         "tensor mutation receiver type mismatch",
@@ -2487,6 +2492,19 @@ impl Validator<'_, '_> {
 
     pub(crate) fn require_tensor_type(&mut self, ty: MirType, span: Span, message: &'static str) {
         if !matches!(self.type_kind(ty), Type::Tensor(_, _)) {
+            self.error(span, message);
+        }
+    }
+
+    /// The coordinate read/write surface admits a `matrix` receiver on the
+    /// same contract as a tensor (ruling 2026-10-15).
+    pub(crate) fn require_tensor_or_matrix_type(
+        &mut self,
+        ty: MirType,
+        span: Span,
+        message: &'static str,
+    ) {
+        if !matches!(self.type_kind(ty), Type::Tensor(_, _) | Type::Matrix(_, _)) {
             self.error(span, message);
         }
     }

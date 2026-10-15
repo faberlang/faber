@@ -5831,3 +5831,102 @@ fn with_types_carries_struct_contracts() {
 
     assert_eq!(rehomed.struct_contracts, context.struct_contracts);
 }
+
+// -----------------------------------------------------------------------
+// Ruling 2026-10-15 – matrix receivers on the tensor coordinate ops
+// -----------------------------------------------------------------------
+
+/// A `matrix<f32, [2, 2]>` receiver on `TensorGet` (return `Option<f32>`) and
+/// on `TensorSet` (return `vacuum`) validates: the coordinate read/write is
+/// admitted on the matrix path, not only on tensors.
+#[test]
+fn matrix_receiver_coordinate_get_and_set_validate() {
+    let mut types = TypeTable::new();
+    let f32_element = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let rows = types.intern_index(IndexExpr::Literal(2));
+    let columns = types.intern_index(IndexExpr::Literal(2));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![rows, columns]));
+    let matrix = MirType::semantic(types.matrix_with_shape(f32_element, shape));
+    let index = MirType::semantic(types.array(types.primitive(Primitive::Numerus)));
+    let optional = MirType::semantic(types.option(f32_element));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let receiver = MirOperand::Place(MirPlace::local(MirLocalId(0)));
+    let coordinates = MirOperand::Place(MirPlace::local(MirLocalId(1)));
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    name: None,
+                    ty: matrix,
+                    mutable: true,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    name: None,
+                    ty: index,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![crate::MirTemp {
+                id: crate::MirTempId(0),
+                ty: optional,
+                span: Span::default(),
+            }],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![
+                    MirStatement {
+                        kind: MirStatementKind::RuntimeCall {
+                            destination: Some(MirPlace::temp(crate::MirTempId(0))),
+                            call: MirRuntimeCall {
+                                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorGet),
+                                args: vec![receiver.clone(), coordinates.clone()],
+                                return_ty: optional,
+                            },
+                        },
+                        span: Span::default(),
+                    },
+                    MirStatement {
+                        kind: MirStatementKind::RuntimeCall {
+                            destination: None,
+                            call: MirRuntimeCall {
+                                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSet),
+                                args: vec![
+                                    receiver,
+                                    coordinates,
+                                    MirOperand::Constant(MirConstant::Float(1.0)),
+                                ],
+                                return_ty: vacuum,
+                            },
+                        },
+                        span: Span::default(),
+                    },
+                ],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "a matrix receiver must admit the tensor coordinate read/write, got: {errors:?}"
+    );
+}
