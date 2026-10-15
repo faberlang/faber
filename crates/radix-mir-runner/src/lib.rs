@@ -4077,6 +4077,10 @@ mod collection_index_plain_test;
 mod tensor_get_direct_test;
 
 #[cfg(test)]
+#[path = "matrix_get_set_test.rs"]
+mod matrix_get_set_test;
+
+#[cfg(test)]
 #[path = "capability_test.rs"]
 mod capability_test;
 
