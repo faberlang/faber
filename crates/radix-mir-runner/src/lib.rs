@@ -4101,6 +4101,10 @@ mod policy_float_test;
 mod f32_store_test;
 
 #[cfg(test)]
+#[path = "host_read_all_test.rs"]
+mod host_read_all_test;
+
+#[cfg(test)]
 #[path = "narrowing_conversio_test.rs"]
 mod narrowing_conversio_test;
 
