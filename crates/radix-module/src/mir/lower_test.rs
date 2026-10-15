@@ -5406,6 +5406,28 @@ incipit {
 }
 
 #[test]
+fn lowers_function_typed_genus_field_call_as_value_callee() {
+    let dump = dump_source(
+        r"genus H {
+  varia (numerus) → numerus f
+}
+incipit {
+  sit h ← H { f = numerus x ∴ x + 100 }
+  nota h.f(1)
+  sit g ← h.f
+  nota g(2)
+}",
+    );
+    assert!(
+        !dump.contains("method call before runtime/provider MIR lowering"),
+        "a function-typed genus field call lowers as a value call:\n{dump}"
+    );
+    assert!(dump.contains("const int 1"), "both call arguments lower:\n{dump}");
+    assert!(dump.contains("const int 2"), "both call arguments lower:\n{dump}");
+    assert!(dump.contains("call "), "the value call is emitted:\n{dump}");
+}
+
+#[test]
 // ===========================================================================
 // Section K: Generic monomorphization & explicit type args
 // ===========================================================================

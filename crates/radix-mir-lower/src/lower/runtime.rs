@@ -643,6 +643,42 @@ impl FunctionBuilder<'_> {
             ));
         }
 
+        // A function-typed genus field (`h.f(1)`) is a callable value stored
+        // in a struct field, not a method: lower the call through the field's
+        // projected place like any other value callee. Local struct fields
+        // only; an imported function-typed field stays fail-closed.
+        if let Some(receiver_ty) = receiver.ty
+            && let Some(def_id) = self.method_receiver_struct_def(receiver_ty)
+            && let Some(field_ty) = self
+                .context
+                .struct_field_types
+                .get(&def_id)
+                .and_then(|fields| fields.get(&method))
+                .copied()
+        {
+            let field_signature = match self.normalized_type(field_ty.semantic_id()) {
+                Type::Func(signature) => Some(signature.clone()),
+                _ => None,
+            };
+            if let Some(signature) = field_signature {
+                let callee = self.lower_field(receiver, method, expr)?;
+                let lowered_args = self.lower_positional_call_args(args)?;
+                self.emit_call_shape_check(expr.id, &lowered_args, 0, expr.span)?;
+                let ty = self.expr_ty(expr)?;
+                if let Some(err) = signature.err {
+                    return self.lower_failable_call(
+                        MirCallee::Value(callee),
+                        lowered_args,
+                        ty,
+                        MirType::semantic(err),
+                        conversion,
+                        expr.span,
+                    );
+                }
+                return Some(self.call_value_operand(callee, lowered_args, ty, expr.span));
+            }
+        }
+
         let method_name = self.resolve_method_name(method)?.to_owned();
         if let Some(receiver_ty) = receiver.ty {
             let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
