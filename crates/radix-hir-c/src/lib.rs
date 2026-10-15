@@ -21,6 +21,7 @@
 
 mod error;
 mod expr;
+mod float;
 mod genus;
 mod helpers;
 mod items;
@@ -218,6 +219,7 @@ impl Emitter<'_> {
         match class {
             Ty::Int => self.support.need_ints(),
             Ty::Bool => self.support.need_bool(),
+            Ty::Float => self.support.need(crate::helpers::Helper::Float),
             Ty::Text | Ty::Genus(_) => {}
             Ty::List(elem) => {
                 self.support.need(crate::helpers::Helper::List(

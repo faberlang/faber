@@ -1,0 +1,9 @@
++++
+locale = "en"
++++
+main {
+    var int n ← 7
+    var int z ← 0
+    print "before"
+    print n ÷ z
+}

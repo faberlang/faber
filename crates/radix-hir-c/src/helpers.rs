@@ -34,6 +34,10 @@ pub(crate) enum Helper {
     MulO,
     FdivI64,
     FmodI64,
+    /// Float arithmetic, rounding and printing (no allocation).
+    Float,
+    /// A float's text in the arena.
+    FloatText,
 }
 
 /// One operation of a list family (`faber_list_<elem>_<op>`).
@@ -58,6 +62,7 @@ impl Helper {
             | Helper::ExactText
             | Helper::Join
             | Helper::Quoted
+            | Helper::FloatText
             | Helper::List(_, ListOp::New | ListOp::Of | ListOp::Push | ListOp::Show) => true,
             Helper::Types
             | Helper::Trap
@@ -74,7 +79,8 @@ impl Helper {
             | Helper::SubO
             | Helper::MulO
             | Helper::FdivI64
-            | Helper::FmodI64 => false,
+            | Helper::FmodI64
+            | Helper::Float => false,
         }
     }
 }

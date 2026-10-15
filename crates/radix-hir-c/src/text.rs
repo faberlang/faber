@@ -149,6 +149,10 @@ impl Emitter<'_> {
             }
             Value::List(elem) => self.show_list(&operand.text, elem),
             Value::Genus(def_id) => self.show_genus(&operand.text, def_id),
+            Value::Float => {
+                self.support.need(Helper::FloatText);
+                Ok(format!("faber_float_text(faber_a, {})", operand.text))
+            }
             Value::Void => Err(unsupported("showing a call with no result")),
         }
     }

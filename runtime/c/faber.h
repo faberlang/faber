@@ -18,17 +18,33 @@
  *
  * Needs GCC or Clang: `__int128` and the `__builtin_*_overflow` family.
  * `__extension__` keeps `-pedantic` quiet about the 128-bit typedefs.
+ *
+ * Floats are IEEE binary64 and must stay bit-exact with the runner: no
+ * fused multiply-add contraction (the pragmas below turn it off for clang
+ * and gcc in every language mode), no `-ffast-math`, and link `-lm`.
  */
 #ifndef FABER_H
 #define FABER_H
 
+#include <float.h>
 #include <inttypes.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* No fused multiply-add contraction, in every language mode: clang honors
+ * the standard pragma; gcc ignores it and contracts by default in its GNU
+ * modes (`-std=gnu11`, and no `-std` at all), so it gets its own pragma,
+ * which covers every function defined after this header. */
+#if defined(__clang__)
+#pragma STDC FP_CONTRACT OFF
+#elif defined(__GNUC__)
+#pragma GCC optimize("fp-contract=off")
+#endif
 
 __extension__ typedef __int128 faber_i128;
 __extension__ typedef unsigned __int128 faber_u128;
@@ -132,6 +148,179 @@ static inline int64_t faber_store_i64(faber_i128 value, const char *at) {
         exit(1);
     }
     return (int64_t)value;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Floats                                                                   */
+/* ------------------------------------------------------------------------ */
+
+/* `a ÷ b` on integers: both convert to binary64 (round to nearest, the
+ * runner's rule), and a zero divisor traps like integer division. */
+static inline double faber_true_div(faber_i128 a, faber_i128 b) {
+    if (b == 0) {
+        faber_trap("numerus division failed");
+    }
+    return (double)a / (double)b;
+}
+
+/* Floor remainder on floats: the divisor's sign, and a zero result takes the
+ * divisor's sign too (the runner's and the Rust runtime's rule). */
+static inline double faber_fmod_f64(double a, double b) {
+    double remainder = fmod(a, b);
+    if (remainder == 0.0) {
+        return b < 0.0 ? -0.0 : 0.0;
+    }
+    if ((remainder < 0.0) != (b < 0.0)) {
+        return remainder + b;
+    }
+    return remainder;
+}
+
+/* A rounded float as an `int`: the runner saturates at the int64 range and
+ * maps NaN to 0, where a plain C cast would be undefined behavior. */
+static inline int64_t faber_saturate_i64(double value) {
+    if (value != value) {
+        return 0;
+    }
+    if (value >= 9223372036854775808.0) {
+        return INT64_MAX;
+    }
+    if (value < -9223372036854775808.0) {
+        return INT64_MIN;
+    }
+    return (int64_t)value;
+}
+
+/* `⌊x⌋`, `⌈x⌉`, and `⌊x⌉` (nearest, ties to the even neighbour: `rint` in the
+ * default rounding mode, never `round`, which ties away from zero). */
+static inline int64_t faber_floor_i64(double value) {
+    return faber_saturate_i64(floor(value));
+}
+
+static inline int64_t faber_ceil_i64(double value) {
+    return faber_saturate_i64(ceil(value));
+}
+
+static inline int64_t faber_nearest_i64(double value) {
+    return faber_saturate_i64(rint(value));
+}
+
+/* An exact comparison of an integer with a float by their true values:
+ * -1 (less), 0 (equal), 1 (greater), 2 (unordered: NaN). A C comparison would
+ * round the integer to binary64 first. Mirrors `faber::exact::cmp_int_float`. */
+static inline int faber_cmp_int_float(faber_i128 integer, double value) {
+    const double limit = 170141183460469231731687303715884105728.0;
+    faber_i128 whole;
+    double fraction;
+    if (value != value) {
+        return 2;
+    }
+    if (value >= limit) {
+        return -1;
+    }
+    if (value <= -limit) {
+        return 1;
+    }
+    whole = (faber_i128)value;
+    if (integer != whole) {
+        return integer < whole ? -1 : 1;
+    }
+    fraction = value - (double)whole;
+    return fraction > 0.0 ? -1 : fraction < 0.0 ? 1 : 0;
+}
+
+static inline bool faber_int_lt_float(faber_i128 a, double b) {
+    return faber_cmp_int_float(a, b) == -1;
+}
+
+static inline bool faber_int_le_float(faber_i128 a, double b) {
+    int order = faber_cmp_int_float(a, b);
+    return order == -1 || order == 0;
+}
+
+static inline bool faber_int_gt_float(faber_i128 a, double b) {
+    return faber_cmp_int_float(a, b) == 1;
+}
+
+static inline bool faber_int_ge_float(faber_i128 a, double b) {
+    int order = faber_cmp_int_float(a, b);
+    return order == 1 || order == 0;
+}
+
+/* The text of a float, as the runner prints it (`display_float_at_width`):
+ * an integral value prints its exact decimal expansion and `.0`
+ * (`123456789012345683968.0`, `-0.0`); any other finite value prints its
+ * shortest round-trip digits positionally, never in exponent form
+ * (`0.30000000000000004`, `0.0000001`); the specials are `inf`, `-inf`,
+ * `NaN`. Writes into `buffer`, which holds FABER_F64_TEXT bytes.
+ *
+ * The shortest digits come from trying 1 to 17 significant digits with
+ * `%.*e` and keeping the first that `strtod` reads back as the same value.
+ * With a correctly rounding C library (glibc, musl, Apple) that is the
+ * shortest representation, and the closest one at that length, which is
+ * what the runner's Rust formatting picks. */
+#define FABER_F64_TEXT 400
+
+static inline const char *faber_f64_text(double value, char *buffer) {
+    char scientific[32];
+    char digits[20];
+    size_t count = 0;
+    int exponent;
+    int precision;
+    size_t at = 0;
+    const char *cursor;
+    if (value != value) {
+        return "NaN";
+    }
+    if (value > DBL_MAX) {
+        return "inf";
+    }
+    if (value < -DBL_MAX) {
+        return "-inf";
+    }
+    /* Every binary64 at or beyond 2^52 in magnitude is integral. */
+    if ((value < 0.0 ? -value : value) >= 4503599627370496.0 || value == (double)(int64_t)value) {
+        snprintf(buffer, FABER_F64_TEXT, "%.1f", value);
+        return buffer;
+    }
+    for (precision = 1; precision <= 17; precision++) {
+        snprintf(scientific, sizeof scientific, "%.*e", precision - 1, value);
+        if (strtod(scientific, NULL) == value) {
+            break;
+        }
+    }
+    /* `scientific` is [-]d[.ddd]e(+|-)xx: collect the digits and exponent. */
+    cursor = scientific;
+    if (*cursor == '-') {
+        buffer[at++] = '-';
+        cursor++;
+    }
+    for (; *cursor != 'e'; cursor++) {
+        if (*cursor != '.') {
+            digits[count++] = *cursor;
+        }
+    }
+    exponent = atoi(cursor + 1);
+    /* A non-integral value has fraction digits, so the point falls inside or
+     * before the digits: `exponent < count - 1`. */
+    if (exponent >= 0) {
+        memcpy(buffer + at, digits, (size_t)exponent + 1);
+        at += (size_t)exponent + 1;
+        buffer[at++] = '.';
+        memcpy(buffer + at, digits + exponent + 1, count - (size_t)exponent - 1);
+        at += count - (size_t)exponent - 1;
+    } else {
+        int zeros;
+        buffer[at++] = '0';
+        buffer[at++] = '.';
+        for (zeros = 0; zeros < -exponent - 1; zeros++) {
+            buffer[at++] = '0';
+        }
+        memcpy(buffer + at, digits, count);
+        at += count;
+    }
+    buffer[at] = '\0';
+    return buffer;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -278,6 +467,16 @@ static inline faber_text faber_join(faber_arena *arena, int count, ...) {
     return out;
 }
 
+/* A float's text in the arena, for a template hole or a display. */
+static inline faber_text faber_float_text(faber_arena *arena, double value) {
+    char buffer[FABER_F64_TEXT];
+    const char *text = faber_f64_text(value, buffer);
+    size_t length = strlen(text);
+    char *out = faber_alloc(arena, length + 1);
+    memcpy(out, text, length + 1);
+    return out;
+}
+
 /* Text as a list element or a genus field shows it: the runner's escapes
  * (Rust's debug form: \" \\ \n \t \r, \u{..} for other control bytes, other
  * bytes verbatim). Writes when `out` is not NULL; returns the length either
@@ -405,6 +604,7 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
 FABER_LIST_FAMILY(i64, int64_t)
 FABER_LIST_FAMILY(text, faber_text)
 FABER_LIST_FAMILY(bool, bool)
+FABER_LIST_FAMILY(f64, double)
 
 /* How a list shows, as the runner prints it: `[1, 2]`, `["a", "b"]`,
  * `[true, false]` in the module's display tokens. */
@@ -467,6 +667,28 @@ static inline faber_text faber_list_bool_show(faber_arena *arena, const faber_li
             out[at++] = ' ';
         }
         memcpy(out + at, word, length);
+        at += length;
+    }
+    out[at++] = ']';
+    out[at] = '\0';
+    return out;
+}
+
+static inline faber_text faber_list_f64_show(faber_arena *arena, const faber_list_f64 *list) {
+    size_t capacity = 3 + (size_t)list->len * (FABER_F64_TEXT + 2);
+    char *out = faber_alloc(arena, capacity);
+    size_t at = 0;
+    int64_t index;
+    out[at++] = '[';
+    for (index = 0; index < list->len; index++) {
+        char buffer[FABER_F64_TEXT];
+        const char *text = faber_f64_text(list->items[index], buffer);
+        size_t length = strlen(text);
+        if (index > 0) {
+            out[at++] = ',';
+            out[at++] = ' ';
+        }
+        memcpy(out + at, text, length);
         at += length;
     }
     out[at++] = ']';

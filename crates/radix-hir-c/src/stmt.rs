@@ -399,6 +399,13 @@ impl Emitter<'_> {
                 Value::Truth => ("%s", format!("({} ? {yes} : {no})", value.text)),
                 Value::List(elem) => ("%s", self.show_list(&value.text, elem)?),
                 Value::Genus(def_id) => ("%s", self.show_genus(&value.text, def_id)?),
+                Value::Float => (
+                    "%s",
+                    format!(
+                        "faber_f64_text({}, (char[FABER_F64_TEXT]){{0}})",
+                        value.text
+                    ),
+                ),
                 Value::Void => return Err(unsupported("printing a call with no result")),
             };
             specs.push(spec);

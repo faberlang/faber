@@ -3,20 +3,7 @@
 
 use crate::test_support::{rejected, rejected_construct};
 
-const FLOAT_PRINT: &str = include_str!("../tests/fixtures/reject/float_print.fab");
-
-#[test]
-fn float_literal() {
-    assert_eq!(rejected("main {\n    print 1.5\n}"), "float literal");
-}
-
-#[test]
-fn float_fixture() {
-    assert_eq!(
-        rejected_construct("float_print.fab", FLOAT_PRINT),
-        "float literal"
-    );
-}
+const F32_TYPE: &str = include_str!("../tests/fixtures/reject/f32_type.fab");
 
 #[test]
 fn integer_beyond_the_representation_cap() {
@@ -141,5 +128,15 @@ fn static_field() {
             "class P {\n    static int count = 0\n    var int x = 0\n}\nmain {\n    const P p ← { x = 1 }\n    print p.x\n}"
         ),
         "static (generis) field"
+    );
+}
+
+/// `f32` math runs at full precision and narrows at the store (goal unit C7,
+/// step 4); until then the width is rejected by name.
+#[test]
+fn f32_fixture() {
+    assert_eq!(
+        rejected_construct("f32_type.fab", F32_TYPE),
+        "float width other than f64"
     );
 }

@@ -14,6 +14,8 @@ pub(crate) enum Ty {
     Text,
     /// `bool`: C `bool` from `<stdbool.h>`.
     Bool,
+    /// `float` (binary64): C `double`.
+    Float,
     /// `list<int>`, `list<string>` or `list<bool>`: a pointer to an
     /// arena-allocated `faber_list_<elem>`, so every bind aliases (R1).
     List(Elem),
@@ -28,6 +30,7 @@ pub(crate) enum Elem {
     Int,
     Text,
     Bool,
+    Float,
 }
 
 impl Elem {
@@ -37,6 +40,7 @@ impl Elem {
             Elem::Int => "i64",
             Elem::Text => "text",
             Elem::Bool => "bool",
+            Elem::Float => "f64",
         }
     }
 
@@ -46,6 +50,7 @@ impl Elem {
             Elem::Int => "int64_t",
             Elem::Text => "faber_text",
             Elem::Bool => "bool",
+            Elem::Float => "double",
         }
     }
 
@@ -55,6 +60,7 @@ impl Elem {
             Elem::Int => Ty::Int,
             Elem::Text => Ty::Text,
             Elem::Bool => Ty::Bool,
+            Elem::Float => Ty::Float,
         }
     }
 }
@@ -68,6 +74,8 @@ impl Ty {
             Ty::Int => Some("int64_t"),
             Ty::Text => Some("const char *"),
             Ty::Bool => Some("bool"),
+            Ty::Float => Some("double"),
+            Ty::List(Elem::Float) => Some("faber_list_f64 *"),
             Ty::List(Elem::Int) => Some("faber_list_i64 *"),
             Ty::List(Elem::Text) => Some("faber_list_text *"),
             Ty::List(Elem::Bool) => Some("faber_list_bool *"),
@@ -92,10 +100,13 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
         | Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64) => Ok(Ty::Int),
         Type::Primitive(Primitive::Textus) => Ok(Ty::Text),
         Type::Primitive(Primitive::Bivalens) => Ok(Ty::Bool),
+        Type::Primitive(Primitive::Fractus)
+        | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Ok(Ty::Float),
         Type::Array(inner) => match classify(types, *inner)? {
             Ty::Int => Ok(Ty::List(Elem::Int)),
             Ty::Text => Ok(Ty::List(Elem::Text)),
             Ty::Bool => Ok(Ty::List(Elem::Bool)),
+            Ty::Float => Ok(Ty::List(Elem::Float)),
             Ty::List(_) => Err(unsupported("nested list type")),
             Ty::Genus(_) => Err(unsupported("list of genus")),
         },
@@ -116,7 +127,7 @@ pub(crate) fn returns(types: &TypeTable, ty: TypeId) -> Result<Option<Ty>, Codeg
 fn describe(ty: &Type) -> &'static str {
     match ty {
         Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
-            "float type"
+            "float width other than f64"
         }
         Type::Primitive(Primitive::Vacuum) => "value-less type",
         // `inf` needs an arena-backed bignum (a C port of `Magnus`); goal unit C6.

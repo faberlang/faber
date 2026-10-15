@@ -72,6 +72,40 @@ int main(void) {
     check_text("bool show", faber_list_bool_show(&arena, flags, "true", "false"), "[true, false]");
     check_text("empty show", faber_list_i64_show(&arena, faber_list_i64_new(&arena, 0)), "[]");
 
+    /* Floats print as the runner prints them. */
+    {
+        char text[FABER_F64_TEXT];
+        double zero = 0.0;
+        check_text("f64 0.1+0.2", faber_f64_text(0.1 + 0.2, text), "0.30000000000000004");
+        check_text("f64 1/3", faber_f64_text(1.0 / 3.0, text), "0.3333333333333333");
+        check_text("f64 1e-7", faber_f64_text(1e-7, text), "0.0000001");
+        check_text("f64 -2.5", faber_f64_text(-2.5, text), "-2.5");
+        check_text("f64 1.0", faber_f64_text(1.0, text), "1.0");
+        check_text("f64 -0.0", faber_f64_text(-0.0, text), "-0.0");
+        check_text("f64 big", faber_f64_text(123456789012345680000.0, text), "123456789012345683968.0");
+        check_text("f64 1e22", faber_f64_text(1e22, text), "10000000000000000000000.0");
+        check_text("f64 inf", faber_f64_text(1.0 / zero, text), "inf");
+        check_text("f64 -inf", faber_f64_text(-1.0 / zero, text), "-inf");
+        check_text("f64 nan", faber_f64_text(zero / zero, text), "NaN");
+        {
+            /* The smallest subnormal: "0.", 323 zeros, "5" (checked against
+             * `faber run`). */
+            char want[330] = "0.";
+            memset(want + 2, '0', 323);
+            want[325] = '5';
+            want[326] = '\0';
+            check_text("f64 tiny", faber_f64_text(5e-324, text), want);
+        }
+    }
+    check_int("fmod -7.5%2", (faber_i128)(faber_fmod_f64(-7.5, 2.0) * 10), 5);
+    check_int("fmod 7.5%-2", (faber_i128)(faber_fmod_f64(7.5, -2.0) * 10), -5);
+    check_int("nearest 2.5", faber_nearest_i64(2.5), 2);
+    check_int("nearest 3.5", faber_nearest_i64(3.5), 4);
+    check_int("nearest -2.5", faber_nearest_i64(-2.5), -2);
+    check_int("saturate big", faber_nearest_i64(1e300), INT64_MAX);
+    check_int("int < float exact", faber_int_lt_float(9007199254740993, 9007199254740992.0), 0);
+    check_int("int > float exact", faber_int_gt_float(9007199254740993, 9007199254740992.0), 1);
+
     if (failures != 0) {
         fprintf(stderr, "faber_test: %d failed\n", failures);
         return 1;

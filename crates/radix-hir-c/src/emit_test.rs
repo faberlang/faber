@@ -12,6 +12,7 @@ const LISTS: &str = include_str!("../tests/fixtures/run/lists.c");
 const LIST_FUNCTIONS: &str = include_str!("../tests/fixtures/run/list_functions.c");
 const GENUS: &str = include_str!("../tests/fixtures/run/genus.c");
 const GENUS_NESTED: &str = include_str!("../tests/fixtures/run/genus_nested.c");
+const FLOATS: &str = include_str!("../tests/fixtures/run/floats.c");
 
 #[test]
 fn scalars_program_is_pinned() {
@@ -612,4 +613,66 @@ fn genus_show_is_emitted_only_when_shown() {
         shown.contains("return faber_join(faber_a, 4, \"P { \", \"x = \", faber_int_text(faber_a, value->m_x), \" }\");"),
         "{shown}"
     );
+}
+
+#[test]
+fn floats_program_is_pinned() {
+    let source = include_str!("../tests/fixtures/run/floats.fab");
+    let source = crate::test_support::program("floats.fab", source);
+    assert_eq!(source, FLOATS);
+}
+
+/// Float arithmetic is plain C; a float literal is its shortest round-trip
+/// digits; an integer literal typed as a float is that float.
+#[test]
+fn float_arithmetic_is_plain_c() {
+    let code =
+        emitted("main {\n    var float a ← 0.1\n    var float b ← 1\n    print a * b - 1e300\n}");
+    for line in [
+        "    double l_a = 0.1;\n",
+        "    double l_b = 1.0;\n",
+        "((l_a * l_b) - 1e300)",
+    ] {
+        assert!(code.contains(line), "{line:?} missing in {code}");
+    }
+}
+
+/// What C would get wrong goes through the runtime: the floored `%`, `÷` on
+/// integers, and the exact comparison of an integer with a float, in either
+/// operand order.
+#[test]
+fn float_operations_c_gets_wrong_use_the_runtime() {
+    let code = emitted(
+        "main {\n    var float a ← -7.5\n    var int n ← 7\n    print a % 2.0, n ÷ 2, n ≺ a, a ≤ n\n}",
+    );
+    for call in [
+        "faber_fmod_f64(l_a, 2.0)",
+        "faber_true_div(l_n, INT64_C(2))",
+        "(faber_int_lt_float(l_n, l_a))",
+        "(faber_int_ge_float(l_n, l_a))",
+    ] {
+        assert!(code.contains(call), "{call:?} missing in {code}");
+    }
+}
+
+#[test]
+fn rounding_saturates_through_the_runtime() {
+    let code = emitted("main {\n    var float a ← 2.5\n    print ⌊a⌉, ⌊a⌋, ⌈a⌉\n}");
+    for call in [
+        "faber_nearest_i64(l_a)",
+        "faber_floor_i64(l_a)",
+        "faber_ceil_i64(l_a)",
+    ] {
+        assert!(code.contains(call), "{call:?} missing in {code}");
+    }
+}
+
+#[test]
+fn floats_print_and_show_through_the_runtime() {
+    let code = emitted("main {\n    var float a ← 0.5\n    print a\n    print \"a=§\"(a)\n}");
+    assert!(
+        code.contains("faber_f64_text(l_a, (char[FABER_F64_TEXT]){0})"),
+        "{code}"
+    );
+    assert!(code.contains("faber_float_text(faber_a, l_a)"), "{code}");
 }

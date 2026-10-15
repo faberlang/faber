@@ -46,6 +46,8 @@ pub(crate) enum Value {
     List(Elem),
     /// A pointer to an arena-allocated genus.
     Genus(DefId),
+    /// A binary64 value (`double`).
+    Float,
 }
 
 impl From<Ty> for Value {
@@ -56,6 +58,7 @@ impl From<Ty> for Value {
             Ty::Bool => Value::Truth,
             Ty::List(elem) => Value::List(elem),
             Ty::Genus(def_id) => Value::Genus(def_id),
+            Ty::Float => Value::Float,
         }
     }
 }
@@ -150,7 +153,21 @@ impl Emitter<'_> {
     pub(crate) fn expr(&mut self, expr: &HirExpression) -> Result<Operand, CodegenError> {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => self.path(*def_id),
-            HirExpressionKind::Literal(literal) => self.literal(literal),
+            HirExpressionKind::Literal(literal) => {
+                // An integer literal typed as a float is that float (`1` in a
+                // `float` slot is `1.0`); typecheck admits no other crossing.
+                let as_float = expr.ty.is_some_and(|ty| {
+                    classify(self.types, ty).is_ok_and(|class| class == Ty::Float)
+                });
+                match literal {
+                    HirLiteral::Int(value) if as_float =>
+                    {
+                        #[expect(clippy::cast_precision_loss)]
+                        Ok(self.float_literal(*value as f64))
+                    }
+                    _ => self.literal(literal),
+                }
+            }
             HirExpressionKind::Binary(op, left, right) => self.binary(*op, left, right),
             HirExpressionKind::Unary(op, operand) => self.unary(*op, operand),
             HirExpressionKind::Conversio {
@@ -173,6 +190,10 @@ impl Emitter<'_> {
                 if let Some(Ty::Genus(_)) = class {
                     let receiver = self.expr(receiver)?;
                     return self.genus_method(receiver, *method, args);
+                }
+                if let (Some(Ty::Float), Some(receiver_ty)) = (class, receiver.ty) {
+                    let receiver = self.expr(receiver)?;
+                    return self.float_method(&receiver, receiver_ty, *method, args);
                 }
                 self.list_method(receiver, *method, args)
             }
@@ -317,6 +338,8 @@ impl Emitter<'_> {
             Value::List(Elem::Int) => "faber_list_i64 *".to_owned(),
             Value::List(Elem::Text) => "faber_list_text *".to_owned(),
             Value::List(Elem::Bool) => "faber_list_bool *".to_owned(),
+            Value::List(Elem::Float) => "faber_list_f64 *".to_owned(),
+            Value::Float => "double ".to_owned(),
             Value::Genus(def_id) => match self.c_type(Ty::Genus(def_id)) {
                 Ok(c_type) => c_type,
                 Err(_) => return String::new(),
@@ -397,8 +420,8 @@ impl Emitter<'_> {
                 Value::Truth,
             )),
             HirLiteral::BigInt(_) => Err(unsupported("integer literal beyond u64")),
-            HirLiteral::Float(_) | HirLiteral::FloatText { .. } => {
-                Err(unsupported("float literal"))
+            HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => {
+                Ok(self.float_literal(*value))
             }
             HirLiteral::Ascii(_) => Err(unsupported("ascii text literal")),
             HirLiteral::Octeti(_) => Err(unsupported("byte-buffer literal")),
@@ -411,6 +434,7 @@ impl Emitter<'_> {
     fn unary(&mut self, op: HirUnOp, operand: &HirExpression) -> Result<Operand, CodegenError> {
         let inner = self.expr(operand)?;
         match op {
+            HirUnOp::Neg if inner.value == Value::Float => Ok(Self::float_negate(&inner)),
             HirUnOp::Neg if !inner.is_integer() => Err(unsupported("negation of a non-integer")),
             HirUnOp::Neg => {
                 if let Some(value) = inner.constant {
@@ -444,6 +468,9 @@ impl Emitter<'_> {
     ) -> Result<Operand, CodegenError> {
         let l = self.expr(left)?;
         let r = self.expr(right)?;
+        if l.value == Value::Float || r.value == Value::Float || op == HirBinOp::TrueDiv {
+            return self.float_binary(op, l, r);
+        }
         match op {
             HirBinOp::Add if l.value == Value::Text && r.value == Value::Text => {
                 Ok(self.concat(l, r))
@@ -659,7 +686,10 @@ impl Emitter<'_> {
         site: &HirStoreSite,
     ) -> Result<Operand, CodegenError> {
         match (class, value.value) {
-            (Ty::Int, Value::Int) | (Ty::Text, Value::Text) | (Ty::Bool, Value::Truth) => Ok(value),
+            (Ty::Int, Value::Int)
+            | (Ty::Text, Value::Text)
+            | (Ty::Bool, Value::Truth)
+            | (Ty::Float, Value::Float) => Ok(value),
             (Ty::List(slot), Value::List(elem)) if slot == elem => Ok(value),
             (Ty::Genus(slot), Value::Genus(genus)) if slot == genus => Ok(value),
             (Ty::Int, Value::Exact) if value.constant.is_some() => {

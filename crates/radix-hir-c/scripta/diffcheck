@@ -52,7 +52,7 @@ if ! "$cc" $cflags -I "$runtime" -fsyntax-only "$work/header.c" >"$work/header.o
   exit 1
 fi
 # shellcheck disable=SC2086
-if ! "$cc" $cflags -I "$runtime" -o "$work/faber_test" "$runtime/tests/faber_test.c" >"$work/faber_test.out" 2>&1 \
+if ! "$cc" $cflags -I "$runtime" -o "$work/faber_test" "$runtime/tests/faber_test.c" -lm >"$work/faber_test.out" 2>&1 \
   || ! "$work/faber_test" >>"$work/faber_test.out" 2>&1; then
   echo "FAIL runtime: runtime/c/tests/faber_test.c"
   head -n 12 "$work/faber_test.out"
@@ -86,7 +86,7 @@ for fab in "${fixtures[@]}"; do
     continue
   fi
   # shellcheck disable=SC2086 # cflags is a word list on purpose
-  if ! "$cc" $cflags -I "$runtime" -o "$work/$name" "$src" >"$work/$name.cc.out" 2>&1; then
+  if ! "$cc" $cflags -I "$runtime" -o "$work/$name" "$src" -lm >"$work/$name.cc.out" 2>&1; then
     echo "FAIL $name: the C compiler rejected the program"
     head -n 8 "$work/$name.cc.out"
     fail=$((fail + 1))
