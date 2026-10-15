@@ -2533,6 +2533,89 @@ fn installed_packs_render_parse001_annotation_label_spread_rows() {
     }
 }
 
+/// The three `ratio`/`promissum` type-syntax rows and the PARSE002
+/// declaration-block comma row (corpus coverage I3, batch 4) are owned and
+/// rendered by every installed pack, with the placeholders each template names.
+/// The absent-row budget gate counts missing rows, so it would accept a pack
+/// that deletes one of these and adds an unrelated row elsewhere; name each row
+/// here so a deletion fails by name.
+///
+/// `promissum_alternate_uses_exit_arrow` is emitted with
+/// `ParseErrorKind::TypeInvalid` (`crates/radix-parser/src/types.rs:399`), which
+/// `catalog_syntax::parse_spec` maps to PARSE040 — not PARSE001. The renderer
+/// looks a row up by the diagnostic's code, so the row is owned under PARSE040.
+#[test]
+fn installed_packs_render_parse001_ratio_and_parse002_declaration_block_comma_rows() {
+    const ROWS: &[(ParseErrorKind, &str, &str, &[(&str, &str)])] = &[
+        (ParseErrorKind::Expected, "PARSE001", "ratio_field_list_hole_not_sole", &[]),
+        (ParseErrorKind::Expected, "PARSE001", "ratio_type_arg_label_required", &[]),
+        (
+            ParseErrorKind::TypeInvalid,
+            "PARSE040",
+            "promissum_alternate_uses_exit_arrow",
+            &[],
+        ),
+        (
+            ParseErrorKind::Unexpected,
+            "PARSE002",
+            "declaration_block_comma",
+            &[("family", "declaration_block"), ("position", "field")],
+        ),
+    ];
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let owned = owned_pack(locale);
+        for &(kind, code, issue, args) in ROWS {
+            let row = owned
+                .diagnostics
+                .get(code)
+                .and_then(|template| template.issues.get(issue))
+                .unwrap_or_else(|| panic!("{locale} must own {code}.{issue}"));
+            assert!(
+                !row.message.trim().is_empty(),
+                "{locale} {code}.{issue} message must not be empty"
+            );
+            assert!(
+                row.help
+                    .as_deref()
+                    .is_some_and(|help| !help.trim().is_empty()),
+                "{locale} {code}.{issue} help must not be empty"
+            );
+            let mut diagnostic_args = vec![diagnostic_arg("issue", issue)];
+            diagnostic_args.extend(
+                args.iter()
+                    .map(|(name, value)| diagnostic_arg(name, *value)),
+            );
+            let diagnostic = parse_diagnostic(kind, diagnostic_args);
+            assert_eq!(
+                diagnostic.code,
+                Some(code),
+                "{locale} {code}.{issue} emission code must match the owned row"
+            );
+            let rendered = installed_pack(locale)
+                .render_diagnostic_text(&diagnostic)
+                .unwrap_or_else(|err| panic!("{locale} {code}.{issue} template should render: {err:?}"))
+                .unwrap_or_else(|| panic!("{locale} {code} row should exist"));
+            assert!(
+                !rendered.message.contains("locale pack missing row"),
+                "{locale} {code}.{issue}: {}",
+                rendered.message
+            );
+            assert!(
+                !rendered
+                    .message
+                    .contains("locale pack template missing placeholder")
+                    && !rendered
+                        .help
+                        .as_deref()
+                        .is_some_and(|help| help.contains("locale pack template missing placeholder")),
+                "{locale} {code}.{issue} must not miss a template placeholder: {} / {:?}",
+                rendered.message,
+                rendered.help
+            );
+        }
+    }
+}
+
 /// Assert every installed pack owns `code.issue` and renders it with its own
 /// spellings of the named keyword identities.
 fn assert_every_installed_pack_renders_issue(kind: ParseErrorKind, code: &str, issue: &str, keywords: &[&str]) {

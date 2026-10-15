@@ -356,6 +356,14 @@ help = "先修正 lexer 错误；解析会从干净的 tokens 继续"
 message = "需要 token"
 help = "确保此位置存在期望的 token"
 
+[diagnostics.PARSE001.issues.ratio_field_list_hole_not_sole]
+message = "ratio 字段列表中的 `…` 空洞必须是唯一元素"
+help = "字段列表中最多使用一个空洞"
+
+[diagnostics.PARSE001.issues.ratio_type_arg_label_required]
+message = "ratio 类型实参必须带有标签"
+help = "在实参之前写出标签"
+
 [diagnostics.PARSE001.issues.annotation_field_name]
 message = "注解字段必须是标识符"
 help = "在注解的花括号内写一个普通字段名"
@@ -563,6 +571,10 @@ help = "在 '=' 之后写整数或字符串"
 [diagnostics.PARSE002]
 message = "意外标记"
 help = "删除该标记，或把它移到正确位置"
+
+[diagnostics.PARSE002.issues.declaration_block_comma]
+message = "逗号不能分隔声明块的成员"
+help = "删除逗号；声明成员由换行分隔"
 
 [diagnostics.PARSE002.issues.json_unknown_identifier_value]
 message = "JSON 标识符不是有效的 JSON 值"
@@ -839,6 +851,10 @@ help = "只能赋值给有效的左值"
 [diagnostics.PARSE040]
 message = "无效类型"
 help = "检查类型语法"
+
+[diagnostics.PARSE040.issues.promissum_alternate_uses_exit_arrow]
+message = "promissum 的备用分支必须使用错误箭头 `⇥`，而不是返回箭头 `→`"
+help = "用 `⇥` 写出备用分支"
 
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "需要类型名"

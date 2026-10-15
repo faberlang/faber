@@ -356,6 +356,14 @@ help = "أصلح خطأ المحلل المعجمي أولا؛ يستمر الت
 message = "مطلوب{?expected| |}"
 help = "أضف{?expected| |} في هذا الموضع"
 
+[diagnostics.PARSE001.issues.ratio_field_list_hole_not_sole]
+message = "يجب أن تكون فتحة `…` في قائمة حقول ratio هي العنصر الوحيد"
+help = "استخدم فتحة واحدة على الأكثر في قائمة الحقول"
+
+[diagnostics.PARSE001.issues.ratio_type_arg_label_required]
+message = "يجب أن يكون معامل نوع ratio موسومًا"
+help = "اكتب التسمية قبل المعامل"
+
 [diagnostics.PARSE001.issues.annotation_field_name]
 message = "يجب أن يكون حقل التعليمة معرّفًا"
 help = "اكتب اسم حقل بسيطًا داخل أقواس التعليمة"
@@ -519,6 +527,10 @@ help = "أزل الفاصلة قبل الفاصل الختامي"
 [diagnostics.PARSE002]
 message = "رمز غير متوقع"
 help = "أزل الرمز أو انقله إلى موضع صحيح"
+
+[diagnostics.PARSE002.issues.declaration_block_comma]
+message = "الفواصل لا تفصل أعضاء كتلة الإعلان"
+help = "أزل الفاصلة؛ تُفصل أعضاء الإعلان بأسطر جديدة"
 
 [diagnostics.PARSE002.issues.json_unknown_identifier_value]
 message = "معرفات JSON ليست قيما صالحة في JSON"
@@ -795,6 +807,10 @@ help = "أسند فقط إلى lvalues صالحة"
 [diagnostics.PARSE040]
 message = "نوع غير صالح"
 help = "تحقق من صياغة النوع"
+
+[diagnostics.PARSE040.issues.promissum_alternate_uses_exit_arrow]
+message = "يجب أن يستخدم البديل في promissum سهم الخطأ `⇥`، لا سهم العودة `→`"
+help = "اكتب فرع البديل باستخدام `⇥`"
 
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "اسم نوع مطلوب"
