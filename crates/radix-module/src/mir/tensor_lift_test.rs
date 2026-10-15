@@ -89,9 +89,9 @@ fn times_divide_and_remainder_lift_against_a_scalar() {
 fn integer_division_and_remainder_floor_per_element() {
     let program = "incipit {
 sit tensor<i32, [4]> a ← [7, -7, 9, -9] ↦ tensor<i32, [4]>
-sit tensor<i32, [4]> q ← a / 2
-sit tensor<i32, [4]> r ← a % 2
-sit tensor<i32, [4]> s ← a % -2
+sit tensor<i64, [4]> q ← a / 2
+sit tensor<u8, [4]> r ← a % 2
+sit tensor<i8, [4]> s ← a % -2
 nota q.planata()
 nota r.planata()
 nota s.planata()
@@ -105,7 +105,7 @@ fn a_zero_integer_divisor_traps_and_a_zero_float_divisor_is_ieee() {
         "incipit {
 sit tensor<i32, [2]> a ← [4, 8] ↦ tensor<i32, [2]>
 nota \"a\"
-sit tensor<i32, [2]> r ← a / 0
+sit tensor<i64, [2]> r ← a / 0
 nota r.planata()
 }",
     );
@@ -121,23 +121,28 @@ nota r.planata()
 }
 
 #[test]
-fn u8_elements_are_stored_per_element_and_trap_past_the_type() {
+fn u8_lanes_widen_at_the_operation_and_trap_at_the_store() {
     let setup = "sit tensor<u8, [3]> a ← [200, 1, 100] ↦ tensor<u8, [3]>\n";
-    // Fits: each element is stored under `u8`.
-    let fits = format!("incipit {{\n{setup}sit tensor<u8, [3]> r ← a + 50\nnota r.planata()\n}}");
+    // Q-X3 (operator ruling 2026-10-15, need): intermediates use
+    // the scalar range rule; width applies only at the store. `a + 50` is u16.
+    let fits = format!("incipit {{\n{setup}sit tensor<u16, [3]> r ← a + 50\nnota r.planata()\n}}");
     assert_eq!(ok(&fits), ["[250, 51, 150]"]);
-    // 200 + 100 leaves `u8`: the element store traps with its identity.
-    let over = format!("incipit {{\n{setup}nota \"a\"\nsit tensor<u8, [3]> r ← a + 100\nnota r.planata()\n}}");
+    // Store the widened result through a `u8` lane; that checked store traps.
+    let over = format!(
+        "incipit {{\n{setup}nota \"a\"\nsit tensor<u16, [3]> wide ← a + 100\nvaria tensor<u8, [3]> r ← [0, 0, 0] ↦ tensor<u8, [3]>\nr[0] ← wide[0]\nnota r.planata()\n}}"
+    );
     let (out, issue, message) = trap(&over);
     assert_eq!(out, ["a"]);
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(message.contains("300 does not fit in `u8`"), "{message}");
-    // Below zero: `1 - 2` does not fit an unsigned element.
-    let under = format!("incipit {{\n{setup}sit tensor<u8, [3]> r ← a - 2\nnota r.planata()\n}}");
+    // A negative `i16` intermediate also fails at the `u8` lane store.
+    let under = format!(
+        "incipit {{\n{setup}sit tensor<i16, [3]> wide ← a - 2\nvaria tensor<u8, [3]> r ← [0, 0, 0] ↦ tensor<u8, [3]>\nr[1] ← wide[1]\nnota r.planata()\n}}"
+    );
     let (_, issue, message) = trap(&under);
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(message.contains("-1 does not fit in `u8`"), "{message}");
-    // Negation of an unsigned element is a store too.
+    // Unary minus keeps its operand element type, so this store still traps.
     let neg = format!("incipit {{\n{setup}sit tensor<u8, [3]> r ← -a\nnota r.planata()\n}}");
     let (_, issue, _) = trap(&neg);
     assert_eq!(issue, "implicit_store_out_of_range");
