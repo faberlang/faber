@@ -1249,6 +1249,8 @@ pub fn generate_go_cli(
     #[cfg_attr(not(feature = "hir-go"), allow(unused_variables))] types: &TypeTable,
     #[cfg_attr(not(feature = "hir-go"), allow(unused_variables))] interner: &Interner,
     #[cfg_attr(not(feature = "hir-go"), allow(unused_variables))] cli_program: &crate::cli::CliProgram,
+    #[cfg_attr(not(feature = "hir-go"), allow(unused_variables))]
+    display_tokens: radix_codegen_shared::names::DisplayTokens,
 ) -> Result<crate::GoOutput, CodegenError> {
     #[cfg(feature = "hir-go")]
     {
@@ -1256,7 +1258,7 @@ pub fn generate_go_cli(
         radix_codegen_shared::reject_ledger_type(types, Target::HirGo)?;
         reject_leaf_routes_in_hir(hir, interner, Target::HirGo)?;
         let hir = hir.without_unavailable_declarations(interner);
-        go::generate_go_cli(&hir, types, interner, cli_program)
+        go::generate_go_cli(&hir, types, interner, cli_program, display_tokens)
     }
     #[cfg(not(feature = "hir-go"))]
     {
