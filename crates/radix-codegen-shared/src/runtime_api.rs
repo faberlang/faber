@@ -860,7 +860,7 @@ pub const TRAP_TEXT_WINDOW: RuntimeItem = RuntimeItem {
 /// `text` rows (Go): the text operations whose Go standard-library spelling
 /// differs from the MIR runner's, so they are runtime helpers. `split` keeps the
 /// empty pieces around an empty separator; `parse_float` takes the runner's
-/// float grammar; `upper` and `lower` apply the full
+/// float grammar and `float` renders a float as plain digits; `upper` and `lower` apply the full
 /// Unicode case mapping (`ß` to `SS`, the final sigma).
 const fn text_row(name: &'static str) -> RuntimeItem {
     RuntimeItem {
@@ -875,6 +875,7 @@ pub const TEXT_SPLIT: RuntimeItem = text_row("split");
 pub const TEXT_UPPER: RuntimeItem = text_row("upper");
 pub const TEXT_LOWER: RuntimeItem = text_row("lower");
 pub const TEXT_PARSE_FLOAT: RuntimeItem = text_row("parse_float");
+pub const TEXT_FLOAT: RuntimeItem = text_row("float");
 
 /// The property a thrown TypeScript assertion failure carries. It is a marker
 /// on the thrown `Error`, not a runtime helper, so it has no table row; the
@@ -1350,6 +1351,7 @@ pub const TABLE: &[RuntimeItem] = &[
     TEXT_UPPER,
     TEXT_LOWER,
     TEXT_PARSE_FLOAT,
+    TEXT_FLOAT,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,
