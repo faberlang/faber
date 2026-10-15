@@ -632,7 +632,9 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
     static inline faber_list_##NAME *faber_list_##NAME##_of(                            \
         faber_arena *arena, int64_t count, const TYPE *items) {                         \
         faber_list_##NAME *list = faber_list_##NAME##_new(arena, count);                \
-        memcpy(list->items, items, (size_t)count * sizeof *items);                      \
+        if (count > 0) {                                                                \
+            memcpy(list->items, items, (size_t)count * sizeof *items);                  \
+        }                                                                               \
         list->len = count;                                                              \
         return list;                                                                    \
     }                                                                                   \
@@ -775,6 +777,192 @@ static inline faber_text faber_list_f64_show(faber_arena *arena, const faber_lis
     out[at++] = ']';
     out[at] = '\0';
     return out;
+}
+
+/* ------------------------------------------------------------------------ */
+/* List operations beyond the family: queries, copies, ends, ordering       */
+/* ------------------------------------------------------------------------ */
+
+/* IEEE 754 totalOrder as a signed key: -0.0 sorts before +0.0, NaNs at the
+ * ends, as the runner's float sort orders them. */
+static inline int64_t faber_f64_total_key(double value) {
+    int64_t bits;
+    memcpy(&bits, &value, sizeof bits);
+    return bits ^ (int64_t)((uint64_t)(bits >> 63) >> 1);
+}
+
+#define FABER_LIST_EQ_SCALAR(a, b) ((a) == (b))
+#define FABER_LIST_LT_SCALAR(a, b) ((a) < (b))
+#define FABER_LIST_EQ_TEXT(a, b) (strcmp((a), (b)) == 0)
+#define FABER_LIST_LT_TEXT(a, b) (strcmp((a), (b)) < 0)
+#define FABER_LIST_LT_F64(a, b) (faber_f64_total_key(a) < faber_f64_total_key(b))
+
+#define FABER_LIST_OPS(NAME, TYPE, EQ, LT)                                              \
+    /* `xs.get(i)` / `first` / `last`: false when there is no such element. */          \
+    static inline bool faber_list_##NAME##_get(const faber_list_##NAME *list,           \
+                                               faber_i128 index, TYPE *out) {           \
+        if (index < 0 || index >= list->len) {                                          \
+            return false;                                                               \
+        }                                                                               \
+        *out = list->items[index];                                                      \
+        return true;                                                                    \
+    }                                                                                   \
+                                                                                        \
+    static inline bool faber_list_##NAME##_contains(const faber_list_##NAME *list,      \
+                                                    TYPE item) {                        \
+        int64_t at;                                                                     \
+        for (at = 0; at < list->len; at++) {                                            \
+            if (EQ(list->items[at], item)) {                                            \
+                return true;                                                            \
+            }                                                                           \
+        }                                                                               \
+        return false;                                                                   \
+    }                                                                                   \
+                                                                                        \
+    /* A new growable list of `count` items starting at `from`. */                      \
+    static inline faber_list_##NAME *faber_list_##NAME##_range(                         \
+        faber_arena *arena, const faber_list_##NAME *list, int64_t from, int64_t count) {\
+        if (count == 0) {                                                               \
+            return faber_list_##NAME##_new(arena, 0);                                   \
+        }                                                                               \
+        return faber_list_##NAME##_of(arena, count, list->items + from);                \
+    }                                                                                   \
+                                                                                        \
+    static inline faber_list_##NAME *faber_list_##NAME##_slice(                         \
+        faber_arena *arena, const faber_list_##NAME *list, faber_i128 from,             \
+        faber_i128 to) {                                                                \
+        if (from < 0 || to < 0) {                                                       \
+            faber_trap("expected non-negative numerus index");                          \
+        }                                                                               \
+        if (to > list->len) {                                                           \
+            to = list->len;                                                             \
+        }                                                                               \
+        if (from >= to) {                                                               \
+            return faber_list_##NAME##_new(arena, 0);                                   \
+        }                                                                               \
+        return faber_list_##NAME##_range(arena, list, (int64_t)from, (int64_t)(to - from));\
+    }                                                                                   \
+                                                                                        \
+    static inline faber_list_##NAME *faber_list_##NAME##_take_last(                     \
+        faber_arena *arena, const faber_list_##NAME *list, faber_i128 count) {          \
+        if (count < 0) {                                                                \
+            faber_trap("expected non-negative numerus index");                          \
+        }                                                                               \
+        return faber_list_##NAME##_slice(arena, list,                                   \
+                                         count > list->len ? 0 : list->len - count,     \
+                                         list->len);                                    \
+    }                                                                                   \
+                                                                                        \
+    static inline faber_list_##NAME *faber_list_##NAME##_added(                         \
+        faber_arena *arena, const faber_list_##NAME *list, TYPE item) {                 \
+        faber_list_##NAME *out = faber_list_##NAME##_new(arena, list->len + 1);         \
+        if (list->len > 0) {                                                            \
+            memcpy(out->items, list->items, (size_t)list->len * sizeof *list->items);   \
+        }                                                                               \
+        out->items[list->len] = item;                                                   \
+        out->len = list->len + 1;                                                       \
+        return out;                                                                     \
+    }                                                                                   \
+                                                                                        \
+    static inline faber_list_##NAME *faber_list_##NAME##_inverted(                      \
+        faber_arena *arena, const faber_list_##NAME *list) {                            \
+        faber_list_##NAME *out = faber_list_##NAME##_new(arena, list->len);             \
+        int64_t at;                                                                     \
+        for (at = 0; at < list->len; at++) {                                            \
+            out->items[at] = list->items[list->len - 1 - at];                           \
+        }                                                                               \
+        out->len = list->len;                                                           \
+        return out;                                                                     \
+    }                                                                                   \
+                                                                                        \
+    static inline void faber_list_##NAME##_reverse(faber_list_##NAME *list) {           \
+        int64_t low = 0;                                                                \
+        int64_t high = list->len - 1;                                                   \
+        for (; low < high; low++, high--) {                                             \
+            TYPE swap = list->items[low];                                               \
+            list->items[low] = list->items[high];                                       \
+            list->items[high] = swap;                                                   \
+        }                                                                               \
+    }                                                                                   \
+                                                                                        \
+    static inline int faber_list_##NAME##_compare(const void *left, const void *right) {\
+        TYPE x = *(const TYPE *)left;                                                   \
+        TYPE y = *(const TYPE *)right;                                                  \
+        return LT(x, y) ? -1 : LT(y, x) ? 1 : 0;                                        \
+    }                                                                                   \
+                                                                                        \
+    static inline faber_list_##NAME *faber_list_##NAME##_sorted(                        \
+        faber_arena *arena, const faber_list_##NAME *list) {                            \
+        faber_list_##NAME *out = faber_list_##NAME##_range(arena, list, 0, list->len);  \
+        if (out->len > 1) {                                                             \
+            qsort(out->items, (size_t)out->len, sizeof *out->items,                     \
+                  faber_list_##NAME##_compare);                                         \
+        }                                                                               \
+        return out;                                                                     \
+    }                                                                                   \
+                                                                                        \
+    /* `remove_first` / `remove_last`: take an end off, false when empty. */            \
+    static inline bool faber_list_##NAME##_remove_first(faber_list_##NAME *list,        \
+                                                        TYPE *out) {                    \
+        if (list->len == 0) {                                                           \
+            return false;                                                               \
+        }                                                                               \
+        *out = list->items[0];                                                          \
+        memmove(list->items, list->items + 1, (size_t)(list->len - 1) * sizeof *list->items);\
+        list->len--;                                                                    \
+        return true;                                                                    \
+    }                                                                                   \
+                                                                                        \
+    static inline bool faber_list_##NAME##_remove_last(faber_list_##NAME *list,         \
+                                                       TYPE *out) {                     \
+        if (list->len == 0) {                                                           \
+            return false;                                                               \
+        }                                                                               \
+        *out = list->items[--list->len];                                                \
+        return true;                                                                    \
+    }
+
+FABER_LIST_OPS(i64, int64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(text, faber_text, FABER_LIST_EQ_TEXT, FABER_LIST_LT_TEXT)
+FABER_LIST_OPS(bool, bool, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64)
+
+/* Integer lists: the exact sum, and the first index of the extreme. */
+static inline faber_i128 faber_list_i64_sum(const faber_list_i64 *list) {
+    faber_i128 total = 0;
+    int64_t at;
+    for (at = 0; at < list->len; at++) {
+        total = faber_add(total, list->items[at]);
+    }
+    return total;
+}
+
+static inline bool faber_list_i64_argmax(const faber_list_i64 *list, int64_t *out) {
+    int64_t at;
+    if (list->len == 0) {
+        return false;
+    }
+    *out = 0;
+    for (at = 1; at < list->len; at++) {
+        if (list->items[at] > list->items[*out]) {
+            *out = at;
+        }
+    }
+    return true;
+}
+
+static inline bool faber_list_i64_argmin(const faber_list_i64 *list, int64_t *out) {
+    int64_t at;
+    if (list->len == 0) {
+        return false;
+    }
+    *out = 0;
+    for (at = 1; at < list->len; at++) {
+        if (list->items[at] < list->items[*out]) {
+            *out = at;
+        }
+    }
+    return true;
 }
 
 /* ------------------------------------------------------------------------ */

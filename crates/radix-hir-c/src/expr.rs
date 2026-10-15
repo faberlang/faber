@@ -244,6 +244,14 @@ impl Emitter<'_> {
                 }
                 self.list_method(receiver, *method, args)
             }
+            HirExpressionKind::Sort {
+                direction,
+                source_mode: radix_hir::HirSortSource::Values,
+                source,
+                binding: None,
+                body: None,
+                ..
+            } => self.sort_values(*direction, source),
             HirExpressionKind::Struct(def_id, fields) => {
                 let given = fields
                     .iter()

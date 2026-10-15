@@ -7,10 +7,10 @@ use crate::Emitter;
 use crate::error::unsupported;
 use crate::expr::{Operand, Value, wrap};
 use crate::helpers::{Helper, ListOp};
-use crate::ty::{Elem, Ty, classify};
+use crate::ty::{Elem, Inner, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{HirArrayElement, HirCallArg, HirExpression};
-use radix_intrinsics::IntrinsicMirKind;
+use radix_intrinsics::{IntrinsicMirKind, IntrinsicReturnKind};
 use radix_lexer::Symbol;
 use radix_types::MirCollectionOp;
 
@@ -275,8 +275,240 @@ impl Emitter<'_> {
                 );
                 Ok(Operand::new(wrap(&prelude, &call), Value::Void).with_effect(effect))
             }
+            IntrinsicMirKind::Collection(op) => self.list_query(list, elem, op, entry, args),
             _ => Err(unsupported("list method outside the subset")),
         }
+    }
+
+    /// `sort via asc|desc from xs`: a new list, ordered by value. Equal
+    /// elements are identical, so stability cannot show; floats order by
+    /// IEEE totalOrder, text by code point.
+    pub(crate) fn sort_values(
+        &mut self,
+        direction: radix_hir::HirSortDirection,
+        source: &HirExpression,
+    ) -> Result<Operand, CodegenError> {
+        let list = self.expr(source)?;
+        let Value::List(elem) = list.value else {
+            return Err(unsupported("sort of a value that is not a list"));
+        };
+        self.support.need(Helper::List(elem, ListOp::New));
+        let sorted = format!(
+            "faber_list_{}_sorted(faber_a, {})",
+            elem.suffix(),
+            list.text
+        );
+        let text = match direction {
+            radix_hir::HirSortDirection::Ascending => sorted,
+            radix_hir::HirSortDirection::Descending => {
+                format!("faber_list_{}_inverted(faber_a, {sorted})", elem.suffix())
+            }
+        };
+        Ok(self.list_operand(text, elem).with_effect(list.effect))
+    }
+
+    /// The rest of the list methods this target has: reads of an end or an
+    /// element (an optional), membership, copies, ordering, the ends removed.
+    fn list_query(
+        &mut self,
+        list: Operand,
+        elem: Elem,
+        op: MirCollectionOp,
+        entry: &radix_intrinsics::MethodIntrinsic,
+        args: &[HirCallArg],
+    ) -> Result<Operand, CodegenError> {
+        let suffix = elem.suffix();
+        let inner = Inner::from_ty(elem.ty())
+            .ok_or_else(|| unsupported("list element without an optional form"))?;
+        let mut effect = list.effect;
+        // An element argument or an index argument, evaluated after the list.
+        let mut operands = vec![list];
+        match (op, args) {
+            (MirCollectionOp::Contains | MirCollectionOp::AppendImmutable, [arg]) => {
+                operands.push(self.element(&arg.expr, elem)?);
+            }
+            (
+                MirCollectionOp::Index
+                | MirCollectionOp::Take
+                | MirCollectionOp::TakeLast
+                | MirCollectionOp::DropFirst,
+                [arg],
+            ) => {
+                let index = self.expr(&arg.expr)?;
+                if !matches!(index.value, Value::Int | Value::Exact) {
+                    return Err(unsupported("list position that is not an integer"));
+                }
+                operands.push(index);
+            }
+            (MirCollectionOp::Slice, [from, to]) => {
+                for arg in [from, to] {
+                    let index = self.expr(&arg.expr)?;
+                    if !matches!(index.value, Value::Int | Value::Exact) {
+                        return Err(unsupported("list position that is not an integer"));
+                    }
+                    operands.push(index);
+                }
+            }
+            (_, []) => {}
+            _ => return Err(unsupported("list method outside the subset")),
+        }
+        // A method that changes the list is an effect: where it runs
+        // relative to its siblings shows in what they read.
+        effect |= operands.iter().any(|operand| operand.effect)
+            || matches!(
+                op,
+                MirCollectionOp::RemoveFirst
+                    | MirCollectionOp::RemoveLast
+                    | MirCollectionOp::ReverseInPlace
+            );
+        let prelude = self.sequence(&mut operands);
+        let o = |at: usize| operands[at].text.clone();
+        self.support.need(Helper::List(elem, ListOp::At));
+        self.need_class(Ty::Opt(inner));
+        let operand = match op {
+            MirCollectionOp::First => {
+                let slot = format!("faber_o{}", self.temps);
+                let call = format!("faber_list_{suffix}_get({}, 0, &{slot})", o(0));
+                self.optional_call(elem, inner, &slot, call)
+            }
+            MirCollectionOp::Last => {
+                let slot = format!("faber_o{}", self.temps);
+                let call = format!(
+                    "faber_list_{suffix}_get({0}, ({0})->len - 1, &{slot})",
+                    o(0)
+                );
+                self.optional_call(elem, inner, &slot, call)
+            }
+            MirCollectionOp::Index if entry.return_kind == IntrinsicReturnKind::OptionInner => {
+                let slot = format!("faber_o{}", self.temps);
+                let call = format!("faber_list_{suffix}_get({}, {}, &{slot})", o(0), o(1));
+                self.optional_call(elem, inner, &slot, call)
+            }
+            MirCollectionOp::RemoveFirst => {
+                let slot = format!("faber_o{}", self.temps);
+                let call = format!("faber_list_{suffix}_remove_first({}, &{slot})", o(0));
+                self.optional_call(elem, inner, &slot, call)
+            }
+            MirCollectionOp::RemoveLast => {
+                let slot = format!("faber_o{}", self.temps);
+                let call = format!("faber_list_{suffix}_remove_last({}, &{slot})", o(0));
+                self.optional_call(elem, inner, &slot, call)
+            }
+            MirCollectionOp::ArgMax | MirCollectionOp::ArgMin if elem == Elem::Int => {
+                let which = if op == MirCollectionOp::ArgMax {
+                    "argmax"
+                } else {
+                    "argmin"
+                };
+                self.support.need_ints();
+                let n = self.temps;
+                self.temps += 1;
+                let t = format!("faber_o{n}");
+                let text = format!(
+                    "(__extension__ ({{ int64_t {t} = 0; bool {t}h = faber_list_i64_{which}({}, &{t}); ((faber_opt_i64){{{t}h, {t}}}); }}))",
+                    o(0)
+                );
+                self.need_class(Ty::Opt(Inner::Int));
+                Operand::new(text, Value::Opt(Inner::Int))
+            }
+            MirCollectionOp::Contains => Operand::new(
+                format!("(faber_list_{suffix}_contains({}, {}))", o(0), o(1)),
+                Value::Truth,
+            ),
+            MirCollectionOp::ReverseInPlace => Operand::new(
+                format!("faber_list_{suffix}_reverse({})", o(0)),
+                Value::Void,
+            ),
+            MirCollectionOp::Reverse => {
+                self.support.need(Helper::List(elem, ListOp::New));
+                self.list_operand(
+                    format!("faber_list_{suffix}_inverted(faber_a, {})", o(0)),
+                    elem,
+                )
+            }
+            MirCollectionOp::Sort => {
+                self.support.need(Helper::List(elem, ListOp::New));
+                self.list_operand(
+                    format!("faber_list_{suffix}_sorted(faber_a, {})", o(0)),
+                    elem,
+                )
+            }
+            MirCollectionOp::AppendImmutable => {
+                self.support.need(Helper::List(elem, ListOp::New));
+                self.list_operand(
+                    format!("faber_list_{suffix}_added(faber_a, {}, {})", o(0), o(1)),
+                    elem,
+                )
+            }
+            MirCollectionOp::Slice => {
+                self.support.need(Helper::List(elem, ListOp::New));
+                self.list_operand(
+                    format!(
+                        "faber_list_{suffix}_slice(faber_a, {}, {}, {})",
+                        o(0),
+                        o(1),
+                        o(2)
+                    ),
+                    elem,
+                )
+            }
+            MirCollectionOp::Take => {
+                self.support.need(Helper::List(elem, ListOp::New));
+                self.list_operand(
+                    format!("faber_list_{suffix}_slice(faber_a, {}, 0, {})", o(0), o(1)),
+                    elem,
+                )
+            }
+            MirCollectionOp::DropFirst => {
+                self.support.need(Helper::List(elem, ListOp::New));
+                self.list_operand(
+                    format!(
+                        "faber_list_{suffix}_slice(faber_a, {}, {}, ({})->len)",
+                        o(0),
+                        o(1),
+                        o(0)
+                    ),
+                    elem,
+                )
+            }
+            MirCollectionOp::TakeLast => {
+                self.support.need(Helper::List(elem, ListOp::New));
+                self.list_operand(
+                    format!("faber_list_{suffix}_take_last(faber_a, {}, {})", o(0), o(1)),
+                    elem,
+                )
+            }
+            MirCollectionOp::Sum if elem == Elem::Int => {
+                self.support.need(Helper::Types);
+                self.support.need(Helper::Add);
+                Operand::new(format!("faber_list_i64_sum({})", o(0)), Value::Exact)
+            }
+            _ => return Err(unsupported("list method outside the subset")),
+        };
+        let text = wrap(&prelude, &operand.text);
+        let value = operand.value;
+        let text = if value == Value::Truth && !prelude.is_empty() {
+            format!("({text})")
+        } else {
+            text
+        };
+        Ok(Operand::new(text, value).with_effect(effect))
+    }
+
+    /// An optional element read: `call` fills the slot named `slot` and says
+    /// whether there was one.
+    fn optional_call(&mut self, elem: Elem, inner: Inner, slot: &str, call: String) -> Operand {
+        self.temps += 1;
+        let c_type = elem.c_type();
+        let text = match inner.scalar_struct() {
+            Some(name) => format!(
+                "(__extension__ ({{ {c_type} {slot} = 0; bool {slot}h = {call}; (({name}){{{slot}h, {slot}}}); }}))"
+            ),
+            None => {
+                format!("(__extension__ ({{ {c_type} {slot} = NULL; (void){call}; {slot}; }}))")
+            }
+        };
+        Operand::new(text, Value::Opt(inner))
     }
 
     /// How `print` and a template hole show a list, as the runner does.

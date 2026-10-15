@@ -47,6 +47,8 @@ mod emit_test;
 #[cfg(test)]
 mod item_test;
 #[cfg(test)]
+mod list_test;
+#[cfg(test)]
 mod names_test;
 #[cfg(test)]
 mod option_test;
