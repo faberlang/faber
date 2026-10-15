@@ -1,0 +1,36 @@
++++
+locale = "en"
++++
+# `wrapping<W>` reduces modulo 2^W at the store and `saturating<W>` clamps
+# there; arithmetic is exact until the store. Shifts, bitwise not, negation,
+# division and the rounded conversions all land through the same store.
+
+main {
+    var wrapping<u8> max ← 255
+    const wrapping<u8> one ← 1
+    const wrapping<u8> ring1 ← max + one
+    print ring1
+    const wrapping<u8> ring2 ← max * 2
+    print ring2
+    print max ⇒ 8
+    print one ⇐ 8
+    max ↑
+    print max
+    const wrapping<i8> m ← -128
+    print m / -1
+    print ¬m
+    const int wide ← 300
+    print wide ↦ wrapping<i8>
+    const wrapping<u64> big ← 18446744073709551615
+    const wrapping<u64> one64 ← 1
+    const wrapping<u64> wrapped ← big + one64
+    print wrapped
+    const saturating<u8> high ← 250
+    const saturating<u8> clamped ← high + 100
+    print clamped
+    const saturating<u8> low ← 5
+    print low - 10
+    print high * 2
+    const wrapping<u8> fromInt ← 300
+    print fromInt
+}

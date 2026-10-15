@@ -93,7 +93,9 @@ impl Inner {
             Ty::Float => Some(Inner::Float),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
-            Ty::Sized(_) | Ty::Opt(_) | Ty::None | Ty::Decimal => None,
+            Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) | Ty::Opt(_) | Ty::None | Ty::Decimal => {
+                None
+            }
         }
     }
 
@@ -127,6 +129,12 @@ pub(crate) enum Ty {
     /// value for `u64`, which does not fit one) and written only through a
     /// range-checked store.
     Sized(IntWidth),
+    /// `wrapping<W>` (a `modulus<W>`): the plain C width, read widened, and
+    /// written only through a store that reduces modulo 2^W.
+    Modular(IntWidth),
+    /// `saturating<W>`: the plain C width, read widened, and written only
+    /// through a store that clamps to the width's ends.
+    Saturating(IntWidth),
     /// `string`: a NUL-terminated C string of UTF-8 bytes. Text literals
     /// containing NUL are rejected, so the terminator is never ambiguous.
     Text,
@@ -194,7 +202,9 @@ impl Ty {
         match self {
             Ty::Int => Some("int64_t"),
             Ty::None => Some("int"),
-            Ty::Sized(width) => Some(width.c_type()),
+            Ty::Sized(width) | Ty::Modular(width) | Ty::Saturating(width) => {
+                Some(width.c_type())
+            }
             Ty::Opt(Inner::Genus(_)) => None,
             Ty::Opt(inner) => inner
                 .scalar_struct()
@@ -220,6 +230,21 @@ pub(crate) fn is_copy_marker(types: &TypeTable, ty: TypeId) -> bool {
         Type::Alias(_, inner) => is_copy_marker(types, *inner),
         Type::Ref(SemanticMutability::Copy, _) => true,
         _ => false,
+    }
+}
+
+/// The [`IntWidth`] of a numeric width marker, when it is an integer or
+/// word width. `f32`/`f64`/`d64`/`inf` are not.
+fn int_width(width: NumericWidth) -> Option<IntWidth> {
+    match width {
+        NumericWidth::I8 => Some(IntWidth::I8),
+        NumericWidth::I16 => Some(IntWidth::I16),
+        NumericWidth::I32 => Some(IntWidth::I32),
+        NumericWidth::U8 => Some(IntWidth::U8),
+        NumericWidth::U16 => Some(IntWidth::U16),
+        NumericWidth::U32 => Some(IntWidth::U32),
+        NumericWidth::U64 => Some(IntWidth::U64),
+        _ => None,
     }
 }
 
@@ -251,6 +276,14 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             NumericWidth::U64 => Ok(Ty::Sized(IntWidth::U64)),
             _ => Err(unsupported(describe(types.get(ty)))),
         },
+        Type::ModularWord(width) => match int_width(*width) {
+            Some(width) => Ok(Ty::Modular(width)),
+            None => Err(unsupported(describe(types.get(ty)))),
+        },
+        Type::SaturatingWord(width) => match int_width(*width) {
+            Some(width) => Ok(Ty::Saturating(width)),
+            None => Err(unsupported(describe(types.get(ty)))),
+        },
         Type::Primitive(Primitive::Textus) => Ok(Ty::Text),
         // `ascii` is an ASCII-only text with no capacity; `ascii<N>` and
         // `string<N>` are bounded text whose capacity the typechecker proves a
@@ -276,6 +309,8 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::List(_) => Err(unsupported("nested list type")),
                 Ty::Genus(_) => Err(unsupported("list of genus")),
                 Ty::Decimal => Err(unsupported("list of decimals")),
+                Ty::Modular(_) => Err(unsupported("list of wrapping words")),
+                Ty::Saturating(_) => Err(unsupported("list of saturating words")),
                 Ty::None => Err(unsupported("list of none")),
             }
         }

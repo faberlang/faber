@@ -134,6 +134,85 @@ static inline faber_i128 faber_rem(faber_i128 a, faber_i128 b) {
     return a - b * faber_div(a, b);
 }
 
+/* Integer comparisons over the exact window. A helper rather than a bare C
+ * operator so a provably-constant comparison (`a > -1` where `a` is `u8`)
+ * does not trip `-Wtype-limits`; the helper is also the exact model's. */
+static inline bool faber_int_lt(faber_i128 a, faber_i128 b) { return a < b; }
+static inline bool faber_int_gt(faber_i128 a, faber_i128 b) { return a > b; }
+static inline bool faber_int_le(faber_i128 a, faber_i128 b) { return a <= b; }
+static inline bool faber_int_ge(faber_i128 a, faber_i128 b) { return a >= b; }
+static inline bool faber_int_eq(faber_i128 a, faber_i128 b) { return a == b; }
+static inline bool faber_int_ne(faber_i128 a, faber_i128 b) { return a != b; }
+
+/* The same operations modulo 2^128 (the `faber_u128` ring): a `wrapping<W>`
+ * intermediate is the true value modulo 2^W, and reducing modulo 2^128 first
+ * is compatible with the later store's modulo-2^W reduction for every
+ * operation that is a ring homomorphism. No operation traps except a zero
+ * divisor. */
+static inline faber_i128 faber_add_wide(faber_i128 a, faber_i128 b) {
+    return (faber_i128)((faber_u128)a + (faber_u128)b);
+}
+
+static inline faber_i128 faber_sub_wide(faber_i128 a, faber_i128 b) {
+    return (faber_i128)((faber_u128)a - (faber_u128)b);
+}
+
+static inline faber_i128 faber_mul_wide(faber_i128 a, faber_i128 b) {
+    return (faber_i128)((faber_u128)a * (faber_u128)b);
+}
+
+static inline faber_i128 faber_div_wide(faber_i128 a, faber_i128 b) {
+    faber_i128 quotient;
+    if (b == 0) {
+        faber_trap("numerus division failed");
+    }
+    quotient = a / b;
+    if (a % b != 0 && ((a < 0) != (b < 0))) {
+        quotient -= 1;
+    }
+    return quotient;
+}
+
+static inline faber_i128 faber_rem_wide(faber_i128 a, faber_i128 b) {
+    return faber_sub_wide(a, faber_mul_wide(b, faber_div_wide(a, b)));
+}
+
+static inline faber_i128 faber_bit_not_wide(faber_i128 value) {
+    return ~value;
+}
+
+static inline faber_i128 faber_bit_and_wide(faber_i128 a, faber_i128 b) {
+    return a & b;
+}
+
+static inline faber_i128 faber_bit_or_wide(faber_i128 a, faber_i128 b) {
+    return a | b;
+}
+
+static inline faber_i128 faber_bit_xor_wide(faber_i128 a, faber_i128 b) {
+    return a ^ b;
+}
+
+static inline faber_i128 faber_shl_wide(faber_i128 value, faber_i128 count) {
+    if (count < 0) {
+        faber_trap("negative shift count");
+    }
+    if (count >= 128) {
+        return 0;
+    }
+    return (faber_i128)((faber_u128)value << (int)count);
+}
+
+static inline faber_i128 faber_shr_wide(faber_i128 value, faber_i128 count) {
+    if (count < 0) {
+        faber_trap("negative shift count");
+    }
+    if (count >= 127) {
+        return value < 0 ? -1 : 0;
+    }
+    return value >> (int)count;
+}
+
 /* Bitwise `∧ ∨ ⊻` and `¬`. Two's complement on the exact window can leave the
  * cap (`i64::MIN ^ u64::MAX`), so the result is range-checked like every other
  * exact operation. Mirrors `faber::exact::int(Some(a & b))` and friends. */
@@ -283,6 +362,53 @@ FABER_SIZED(u8, uint8_t, 0, UINT8_MAX)
 FABER_SIZED(u16, uint16_t, 0, UINT16_MAX)
 FABER_SIZED(u32, uint32_t, 0, UINT32_MAX)
 FABER_SIZED(u64, uint64_t, 0, UINT64_MAX)
+
+/* Modular (`wrapping<W>` / `modulus<W>`) and saturating (`saturating<W>`)
+ * word stores. Arithmetic is exact until the store; the wrapping store
+ * reduces modulo 2^W, the saturating store clamps at the width's ends. The
+ * modular reduction uses unsigned conversion (well-defined modulo 2^W) and
+ * an `i128` difference into the signed range, so no conversion is
+ * out of range. */
+#define FABER_WRAP_UNSIGNED(NAME, TYPE)                                              \
+    static inline TYPE faber_store_wrapping_##NAME(faber_i128 value) {               \
+        return (TYPE)value;                                                          \
+    }
+
+#define FABER_WRAP_SIGNED(NAME, TYPE, UTYPE, HALF)                                   \
+    static inline TYPE faber_store_wrapping_##NAME(faber_i128 value) {               \
+        UTYPE low = (UTYPE)value;                                                    \
+        return (TYPE)((faber_i128)low                                              \
+                      - (low < (UTYPE)HALF ? 0 : (faber_i128)HALF * 2));            \
+    }
+
+FABER_WRAP_SIGNED(i8, int8_t, uint8_t, 128)
+FABER_WRAP_SIGNED(i16, int16_t, uint16_t, 32768)
+FABER_WRAP_SIGNED(i32, int32_t, uint32_t, 2147483648u)
+FABER_WRAP_SIGNED(i64, int64_t, uint64_t, 9223372036854775808u)
+FABER_WRAP_UNSIGNED(u8, uint8_t)
+FABER_WRAP_UNSIGNED(u16, uint16_t)
+FABER_WRAP_UNSIGNED(u32, uint32_t)
+FABER_WRAP_UNSIGNED(u64, uint64_t)
+
+#define FABER_SATURATE(NAME, TYPE, MIN, MAX)                                         \
+    static inline TYPE faber_store_saturating_##NAME(faber_i128 value) {             \
+        if (value < (faber_i128)(MIN)) {                                             \
+            return (TYPE)(MIN);                                                      \
+        }                                                                            \
+        if (value > (faber_i128)(MAX)) {                                             \
+            return (TYPE)(MAX);                                                      \
+        }                                                                            \
+        return (TYPE)value;                                                          \
+    }
+
+FABER_SATURATE(i8, int8_t, INT8_MIN, INT8_MAX)
+FABER_SATURATE(i16, int16_t, INT16_MIN, INT16_MAX)
+FABER_SATURATE(i32, int32_t, INT32_MIN, INT32_MAX)
+FABER_SATURATE(i64, int64_t, INT64_MIN, INT64_MAX)
+FABER_SATURATE(u8, uint8_t, 0, UINT8_MAX)
+FABER_SATURATE(u16, uint16_t, 0, UINT16_MAX)
+FABER_SATURATE(u32, uint32_t, 0, UINT32_MAX)
+FABER_SATURATE(u64, uint64_t, 0, UINT64_MAX)
 
 /* An optional scalar: the value and whether it is present. Text, lists and
  * genera are pointers, so their none is NULL and they need no struct. */

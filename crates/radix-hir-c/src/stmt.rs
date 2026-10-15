@@ -455,24 +455,57 @@ impl Emitter<'_> {
                 "increment or decrement of a name that is not a local",
             ));
         };
-        if local.ty != Ty::Int {
-            return Err(unsupported("increment or decrement of a non-integer"));
-        }
         let name = local.name.clone();
         let Ok(written) = self.names.resolve_def(*def_id) else {
             return Err(unsupported("increment of a name the catalog does not hold"));
         };
-        let (helper, call) = match inc_dec.op {
-            radix_hir::HirIncDecOp::Inc => (Helper::Add, "faber_add"),
-            radix_hir::HirIncDecOp::Dec => (Helper::Sub, "faber_sub"),
-        };
-        self.support.need(helper);
-        self.support.need(Helper::StoreI64);
-        let at = c_string(&format!("assignment to `{written}`"))?;
-        self.line(
-            out,
-            &format!("{name} = faber_store_i64({call}({name}, 1), {at});"),
-        );
+        let inc = inc_dec.op == radix_hir::HirIncDecOp::Inc;
+        match local.ty {
+            Ty::Int => {
+                let (helper, call) = if inc {
+                    (Helper::Add, "faber_add")
+                } else {
+                    (Helper::Sub, "faber_sub")
+                };
+                self.support.need(helper);
+                self.support.need(Helper::StoreI64);
+                let at = c_string(&format!("assignment to `{written}`"))?;
+                self.line(
+                    out,
+                    &format!("{name} = faber_store_i64({call}({name}, 1), {at});"),
+                );
+            }
+            Ty::Sized(width) => {
+                let call = if inc { "faber_add" } else { "faber_sub" };
+                self.support.need(Helper::SizedStore);
+                let at = c_string(&format!("assignment to `{written}`"))?;
+                self.line(
+                    out,
+                    &format!(
+                        "{name} = faber_store_{}({call}({name}, 1), {at});",
+                        width.marker()
+                    ),
+                );
+            }
+            Ty::Modular(width) | Ty::Saturating(width) => {
+                self.support.need(Helper::Wide);
+                self.support.need_ints();
+                let call = if inc { "faber_add_wide" } else { "faber_sub_wide" };
+                let kind = if matches!(local.ty, Ty::Modular(_)) {
+                    "wrapping"
+                } else {
+                    "saturating"
+                };
+                self.line(
+                    out,
+                    &format!(
+                        "{name} = faber_store_{kind}_{}({call}({name}, 1));",
+                        width.marker()
+                    ),
+                );
+            }
+            _ => return Err(unsupported("increment or decrement of a non-integer")),
+        }
         Ok(())
     }
 

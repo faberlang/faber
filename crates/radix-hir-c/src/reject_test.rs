@@ -38,9 +38,9 @@ fn integer_division_by_zero_constant() {
 }
 
 #[test]
-fn policy_integer_type() {
+fn policy_float_type() {
     assert_eq!(
-        rejected("main {\n    const wrapping<u8> n ← 5\n    print n\n}"),
+        rejected("main {\n    const saturating<f64> x ← 1.0\n    print x\n}"),
         "wrapping, saturating, or policy numeric type"
     );
 }

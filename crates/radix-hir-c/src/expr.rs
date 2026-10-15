@@ -62,8 +62,10 @@ impl From<Ty> for Value {
         match ty {
             Ty::Int => Value::Int,
             // `u64` does not fit an `int64_t`, so it reads as an exact value.
-            Ty::Sized(IntWidth::U64) => Value::Exact,
-            Ty::Sized(_) => Value::Int,
+            Ty::Sized(IntWidth::U64) | Ty::Modular(IntWidth::U64) | Ty::Saturating(IntWidth::U64) => {
+                Value::Exact
+            }
+            Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) => Value::Int,
             Ty::Text => Value::Text,
             Ty::Bool => Value::Truth,
             Ty::List(elem) => Value::List(elem),
@@ -242,6 +244,20 @@ impl Emitter<'_> {
                 implicit: None,
                 ..
             } => self.ordo_conversion(source, *row, members, recovery.as_deref()),
+            // `place ↤ source`: the value is `source` converted to the node's
+            // resolved target type. A declaration (the common form) then binds
+            // that value; a statement form assigns it, handled in `stmt`.
+            HirExpressionKind::ConversioAssign {
+                source,
+                recovery,
+                params,
+                ..
+            } => {
+                let Some(ty) = expr.ty else {
+                    return Err(unsupported("conversion assignment without a target type"));
+                };
+                self.conversion(source, ty, params, recovery.as_deref())
+            }
             HirExpressionKind::Scriptum(template, args) => self.template(*template, args),
             HirExpressionKind::Si {
                 cond,
@@ -538,8 +554,14 @@ impl Emitter<'_> {
         // A sized result is a C `intN_t`; it widens to the value form the
         // arithmetic and `print` take.
         match ret {
-            Some(Ty::Sized(IntWidth::U64)) => call = format!("((faber_i128){call})"),
-            Some(Ty::Sized(_)) => call = format!("((int64_t){call})"),
+            Some(
+                Ty::Sized(IntWidth::U64)
+                | Ty::Modular(IntWidth::U64)
+                | Ty::Saturating(IntWidth::U64),
+            ) => call = format!("((faber_i128){call})"),
+            Some(Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_)) => {
+                call = format!("((int64_t){call})");
+            }
             _ => {}
         }
         let text = wrap(&prelude, &call);
@@ -884,6 +906,15 @@ impl Emitter<'_> {
             // A stored decimal is a `faber_dec` pair at scale 8; a read is the
             // pair itself.
             Ty::Decimal => Operand::new(cell.to_owned(), Value::Decimal),
+            // A modular or saturating word reads widened like a sized integer,
+            // but with no `int64_t` fast path: its arithmetic must stay exact
+            // until the store reduces or clamps.
+            Ty::Modular(IntWidth::U64) | Ty::Saturating(IntWidth::U64) => {
+                Operand::new(format!("((faber_i128){cell})"), Value::Exact)
+            }
+            Ty::Modular(_) | Ty::Saturating(_) => {
+                Operand::new(format!("((int64_t){cell})"), Value::Int)
+            }
             other => Operand::new(cell.to_owned(), other.into()),
         }
     }
@@ -924,6 +955,9 @@ impl Emitter<'_> {
     }
 
     fn unary(&mut self, op: HirUnOp, operand: &HirExpression) -> Result<Operand, CodegenError> {
+        let wide = operand.ty.is_some_and(|ty| {
+            matches!(classify(self.types, ty), Ok(Ty::Modular(_)))
+        });
         let inner = self.expr(operand)?;
         match op {
             HirUnOp::Neg if inner.value == Value::Float => Ok(Self::float_negate(&inner)),
@@ -932,6 +966,14 @@ impl Emitter<'_> {
             HirUnOp::Neg => {
                 if let Some(value) = inner.constant {
                     return self.int(-value);
+                }
+                if wide {
+                    self.support.need(Helper::Wide);
+                    return Ok(Operand::new(
+                        format!("faber_sub_wide(0, {})", inner.text),
+                        Value::Exact,
+                    )
+                    .with_effect(inner.effect));
                 }
                 self.support.need(Helper::Sub);
                 let narrow = inner
@@ -952,6 +994,14 @@ impl Emitter<'_> {
             HirUnOp::BitNot => {
                 if !inner.is_integer() {
                     return Err(unsupported("bitwise not of a non-integer"));
+                }
+                if wide {
+                    self.support.need(Helper::Wide);
+                    return Ok(Operand::new(
+                        format!("faber_bit_not_wide({})", inner.text),
+                        Value::Exact,
+                    )
+                    .with_effect(inner.effect));
                 }
                 if let Some(value) = inner.constant {
                     return self.int(!value);
@@ -1003,20 +1053,30 @@ impl Emitter<'_> {
             return self.decimal_binary(op, l, r);
         }
         if l.value == Value::Float || r.value == Value::Float || op == HirBinOp::TrueDiv {
+            // The runner's `÷` is `f32` for 8- and 16-bit operands and `f64`
+            // otherwise. This target has no `f32` (C7's open question), so it
+            // rejects the narrow form by name rather than approximate it.
+            if op == HirBinOp::TrueDiv
+                && (Self::narrow_width(self.types, left.ty)
+                    || Self::narrow_width(self.types, right.ty))
+            {
+                return Err(unsupported("true division of 8- or 16-bit operands (f32)"));
+            }
             return self.float_binary(op, l, r);
         }
+        let wide = ty.is_some_and(|t| matches!(classify(self.types, t), Ok(Ty::Modular(_))));
         match op {
             HirBinOp::Add if l.value == Value::Text && r.value == Value::Text => {
                 Ok(self.concat(l, r))
             }
             HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod => {
-                self.arithmetic(op, l, r)
+                self.arithmetic(op, l, r, wide)
             }
             HirBinOp::BitAnd
             | HirBinOp::BitOr
             | HirBinOp::BitXor
             | HirBinOp::Shl
-            | HirBinOp::Shr => self.bitwise(op, l, r),
+            | HirBinOp::Shr => self.bitwise(op, l, r, wide),
             // `≅` / `≇` is exact value equality, including across families.
             HirBinOp::ApproxEq | HirBinOp::ApproxNotEq => self.comparison(op, l, r),
             HirBinOp::Lt
@@ -1032,11 +1092,23 @@ impl Emitter<'_> {
         }
     }
 
+    /// Whether a type classifies to an 8- or 16-bit integer, the widths the
+    /// runner's `÷` computes in `f32`.
+    fn narrow_width(types: &radix_types::TypeTable, ty: Option<radix_types::TypeId>) -> bool {
+        matches!(
+            ty.and_then(|ty| classify(types, ty).ok()),
+            Some(Ty::Sized(
+                IntWidth::I8 | IntWidth::I16 | IntWidth::U8 | IntWidth::U16
+            ))
+        )
+    }
+
     fn arithmetic(
         &mut self,
         op: HirBinOp,
         l: Operand,
         r: Operand,
+        wide: bool,
     ) -> Result<Operand, CodegenError> {
         if !l.is_integer() || !r.is_integer() {
             return Err(unsupported("arithmetic on text or a boolean"));
@@ -1049,8 +1121,20 @@ impl Emitter<'_> {
             HirBinOp::Mod => (floor_mod, Helper::Rem, "faber_rem"),
             other => return Err(unsupported(binary_name(other))),
         };
+        let (helper, name) = if wide {
+            let name = match op {
+                HirBinOp::Add => "faber_add_wide",
+                HirBinOp::Sub => "faber_sub_wide",
+                HirBinOp::Mul => "faber_mul_wide",
+                HirBinOp::Div => "faber_div_wide",
+                _ => "faber_rem_wide",
+            };
+            (Helper::Wide, name)
+        } else {
+            (helper, name)
+        };
         let (Some(a), Some(b)) = (l.constant, r.constant) else {
-            return Ok(self.runtime_arithmetic(op, helper, name, l, r));
+            return Ok(self.runtime_arithmetic(op, helper, name, l, r, wide));
         };
         if b == 0 {
             match op {
@@ -1100,14 +1184,20 @@ impl Emitter<'_> {
         op: HirBinOp,
         l: Operand,
         r: Operand,
+        wide: bool,
     ) -> Result<Operand, CodegenError> {
         if !l.is_integer() || !r.is_integer() {
             return Err(unsupported(binary_name(op)));
         }
         let name = match op {
+            HirBinOp::BitAnd if wide => "faber_bit_and_wide",
+            HirBinOp::BitOr if wide => "faber_bit_or_wide",
+            HirBinOp::BitXor if wide => "faber_bit_xor_wide",
             HirBinOp::BitAnd => "faber_bit_and",
             HirBinOp::BitOr => "faber_bit_or",
             HirBinOp::BitXor => "faber_bit_xor",
+            HirBinOp::Shl if wide => "faber_shl_wide",
+            HirBinOp::Shr if wide => "faber_shr_wide",
             HirBinOp::Shl => "faber_shl",
             HirBinOp::Shr => "faber_shr",
             other => return Err(unsupported(binary_name(other))),
@@ -1140,8 +1230,17 @@ impl Emitter<'_> {
         name: &str,
         l: Operand,
         r: Operand,
+        wide: bool,
     ) -> Operand {
         let effect = l.effect || r.effect;
+        if wide {
+            self.support.need(helper);
+            let mut operands = [l, r];
+            let prelude = self.sequence(&mut operands);
+            let [l, r] = operands;
+            let text = wrap(&prelude, &format!("{name}({}, {})", l.text, r.text));
+            return Operand::new(text, Value::Exact).with_effect(effect);
+        }
         let floor = match op {
             HirBinOp::Div => Some(Helper::FdivI64),
             HirBinOp::Mod => Some(Helper::FmodI64),
@@ -1297,11 +1396,39 @@ impl Emitter<'_> {
         // read as unsigned: exactly what `strcmp` compares.
         let body = if text_pair {
             format!("(strcmp({}, {}) {glyph} 0)", l.text, r.text)
-        } else {
+        } else if truth_pair
+            || (l.constant.is_some() && r.constant.is_some())
+            || !Self::negative_constant(&l, &r)
+        {
             format!("({} {glyph} {})", l.text, r.text)
+        } else {
+            // A helper, not a bare operator: a sized or word read compared
+            // with a negative constant can be provably constant (`u8 > -1`),
+            // which `-Wtype-limits` rejects; the helper is the exact model's
+            // too.
+            let helper = match op {
+                HirBinOp::Lt => "faber_int_lt",
+                HirBinOp::Gt => "faber_int_gt",
+                HirBinOp::LtEq => "faber_int_le",
+                HirBinOp::GtEq => "faber_int_ge",
+                HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::ApproxEq => "faber_int_eq",
+                _ => "faber_int_ne",
+            };
+            self.support.need(Helper::IntCmp);
+            format!("({helper}({}, {}))", l.text, r.text)
         };
         let text = wrap(&prelude, &body);
         Ok(Operand::new(text, Value::Truth).with_effect(effect))
+    }
+
+    /// Whether one operand is a negative constant and the other is not a
+    /// constant: the comparison could be provably constant for an unsigned
+    /// read and trip `-Wtype-limits`, so it takes the helper form.
+    fn negative_constant(l: &Operand, r: &Operand) -> bool {
+        match (l.constant, r.constant) {
+            (Some(value), None) | (None, Some(value)) => value < 0,
+            _ => false,
+        }
     }
 
     /// `and` / `or` short-circuit, as C's `&&` / `||` do, and C sequences the
@@ -1357,6 +1484,14 @@ impl Emitter<'_> {
                 let at = c_string(&self.store_position(site))?;
                 Ok(self.store_sized(&value, width, &at))
             }
+            // A modular word reduces modulo 2^W at the store; a saturating
+            // word clamps. Both are total (they never trap).
+            (Ty::Modular(width), Value::Int | Value::Exact) => {
+                Ok(self.store_word(&value, Ty::Modular(width), "wrapping", width))
+            }
+            (Ty::Saturating(width), Value::Int | Value::Exact) => {
+                Ok(self.store_word(&value, Ty::Saturating(width), "saturating", width))
+            }
             (Ty::Opt(slot), Value::Opt(inner)) if slot == inner => Ok(value),
             (Ty::Opt(inner), form) if form == Value::from(inner.ty()) => {
                 Ok(self.some_value(&value, inner))
@@ -1406,6 +1541,31 @@ impl Emitter<'_> {
             } else {
                 Operand::new(format!("((int64_t){call})"), Value::Int)
             }
+        };
+        operand.effect = value.effect;
+        operand.stored = Some(class);
+        operand
+    }
+
+    /// A store into a modular or saturating word: the helper reduces modulo
+    /// 2^W or clamps, then the value widens to the class's read form.
+    pub(crate) fn store_word(
+        &mut self,
+        value: &Operand,
+        class: Ty,
+        kind: &str,
+        width: IntWidth,
+    ) -> Operand {
+        self.support.need_ints();
+        let call = format!(
+            "faber_store_{kind}_{}({})",
+            width.marker(),
+            value.text
+        );
+        let mut operand = if width == IntWidth::U64 {
+            Operand::new(format!("((faber_i128){call})"), Value::Exact)
+        } else {
+            Operand::new(format!("((int64_t){call})"), Value::Int)
         };
         operand.effect = value.effect;
         operand.stored = Some(class);
@@ -1472,6 +1632,18 @@ impl Emitter<'_> {
                 let mut operand = Operand::new(stored, Value::Decimal).with_effect(value.effect);
                 operand.stored = Some(Ty::Decimal);
                 Ok(operand)
+            }
+            Ty::Modular(width) => {
+                if value.stored == Some(class) || !matches!(value.value, Value::Int | Value::Exact) {
+                    return Ok(value);
+                }
+                Ok(self.store_word(&value, class, "wrapping", width))
+            }
+            Ty::Saturating(width) => {
+                if value.stored == Some(class) || !matches!(value.value, Value::Int | Value::Exact) {
+                    return Ok(value);
+                }
+                Ok(self.store_word(&value, class, "saturating", width))
             }
             _ => Ok(value),
         }
