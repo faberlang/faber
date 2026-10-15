@@ -68,10 +68,15 @@ pub(crate) fn canonicalize_direct_definition_callees(
         errors
             .into_iter()
             .map(|error| {
-                crate::package_diagnostic_error(error.message)
+                let diagnostic = crate::package_diagnostic_error(error.message)
                     .with_file(diagnostic_path.display().to_string())
                     .with_phase(DiagnosticPhase::Mir)
-                    .with_span(error.span)
+                    .with_span(error.span);
+                if error.issue.is_empty() {
+                    diagnostic
+                } else {
+                    diagnostic.with_arg("issue", error.issue)
+                }
             })
             .collect::<Vec<_>>()
     })?;

@@ -11,5 +11,5 @@ check_only = true
 [targets.runner]
 outcome = "known-fail"
 phase = "run"
-diagnostic_contains = "invalid_mir_destination_type_mismatch"
-known_fail_why = "The generated MIR for the async clock sleep stores a value into a destination of the wrong type, so MIR validation rejects the program before the runner can execute it."
+diagnostic_contains = "mir_validation_destination_type_mismatch"
+known_fail_why = "The program fails MIR validation after package linking with issue mir_validation_destination_type_mismatch, so the runner never executes it."
