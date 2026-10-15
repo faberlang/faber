@@ -182,10 +182,13 @@ impl Emitter<'_> {
     /// no store node narrows like any unwrapped store.
     fn element(&mut self, value: &HirExpression, elem: Elem) -> Result<Operand, CodegenError> {
         let operand = self.expr(value)?;
-        let operand = if elem == Elem::Int {
-            self.fit(operand)?
-        } else {
-            operand
+        let operand = match elem {
+            Elem::Int => self.fit(operand)?,
+            // A modular word reduces modulo 2^W at the element store, exactly
+            // as a scalar store does; a value that already carries the class
+            // is left alone.
+            Elem::Modular(width) => self.settle(operand, Ty::Modular(width))?,
+            _ => operand,
         };
         if operand.value != Value::from(elem.ty()) {
             return Err(unsupported("value stored without a store check"));

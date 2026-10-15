@@ -606,10 +606,7 @@ impl Emitter<'_> {
                 self.support.need_bool();
                 "bool ".to_owned()
             }
-            Value::List(Elem::Int) => "faber_list_i64 *".to_owned(),
-            Value::List(Elem::Text) => "faber_list_text *".to_owned(),
-            Value::List(Elem::Bool) => "faber_list_bool *".to_owned(),
-            Value::List(Elem::Float) => "faber_list_f64 *".to_owned(),
+            Value::List(elem) => elem.list_c_pointer().to_owned(),
             Value::Float => "double ".to_owned(),
             Value::Decimal => {
                 self.support.need(Helper::Decimal);
