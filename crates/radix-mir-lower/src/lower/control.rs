@@ -3451,10 +3451,19 @@ impl FunctionBuilder<'_> {
         });
         self.switch_to(body_id);
         self.visit_block(body);
-        self.breakables.pop();
+        let loop_rumpe_used = self.breakables.pop().is_some_and(|ctx| ctx.rumpe_used);
         self.terminate_open_current(MirTerminatorKind::Goto(cond_id), span);
 
-        self.switch_to(after_id);
+        // `while true` never exits through its condition, so with no `rumpe` the
+        // after-block is dead; sealing it keeps the implicit function return out
+        // of a block the loop cannot reach. The `Branch` terminator above stays:
+        // its else edge is what keeps an exit-less `while true { }` loop a valid
+        // terminator path.
+        if hir_cond_is_literal_true(cond) && !loop_rumpe_used {
+            self.seal_unreachable(after_id, span);
+        } else {
+            self.switch_to(after_id);
+        }
     }
 
     fn lower_range_itera(&mut self, range: RangeIteraLowering<'_>) -> Option<()> {
@@ -5535,6 +5544,11 @@ impl FunctionBuilder<'_> {
             self.visit_expr(expr);
         }
     }
+}
+
+/// Whether `cond` is the literal boolean `true`.
+fn hir_cond_is_literal_true(expr: &HirExpression) -> bool {
+    matches!(&expr.kind, HirExpressionKind::Literal(radix_hir::HirLiteral::Bool(true)))
 }
 
 /// Whether a handled body is a `fac omnia` block or loop.
