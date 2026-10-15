@@ -497,19 +497,19 @@ impl Parser {
         } else {
             let first = self.current_span();
             let ty = self.parse_type()?;
-            // The word read as a type is followed by an initializer operator:
-            // it was the name, and the type slot is missing.
-            if matches!(
-                self.peek().kind,
-                TokenKind::Assign
-                    | TokenKind::Eq
-                    | TokenKind::ConversioAssign
-                    | TokenKind::AwaitAssign
-            ) {
-                let name = match &ty.kind {
-                    TypeExprKind::Named(ident, _) => self.interner.resolve(ident.name).to_owned(),
-                    _ => String::new(),
-                };
+            // A lone word read as a type and followed by an initializer
+            // operator was the name: the type slot is missing.
+            if let TypeExprKind::Named(ident, args) = &ty.kind
+                && args.is_empty()
+                && matches!(
+                    self.peek().kind,
+                    TokenKind::Assign
+                        | TokenKind::Eq
+                        | TokenKind::ConversioAssign
+                        | TokenKind::AwaitAssign
+                )
+            {
+                let name = self.interner.resolve(ident.name).to_owned();
                 return Err(
                     ParseError::structured(ParseErrorKind::DeclarationInvalid, first)
                         .with_arg("issue", "binding_type_slot_required")

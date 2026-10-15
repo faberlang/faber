@@ -348,7 +348,7 @@ fn accepts_sit_deferred_init_single_assignment() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens cond) → numerus {
-    sit value
+    sit _ value
     si cond { value ← 1 } secus { value ← 2 }
     redde value
 }
@@ -365,7 +365,7 @@ fn rejects_second_assignment_to_sit_deferred_init() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
-    sit value
+    sit _ value
     value ← 1
     value ← 2
     redde value
@@ -413,7 +413,7 @@ fn rejects_read_before_sit_deferred_init_assignment() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
-    sit value
+    sit _ value
     nota value
     value ← 1
     redde value
@@ -461,7 +461,7 @@ fn rejects_sit_deferred_init_after_partial_branch_assignment() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens cond) → numerus {
-    sit value
+    sit _ value
     si cond { value ← 1 }
     redde value
 }
@@ -576,7 +576,7 @@ fn driver_accepts_fixum_and_sit_deferred_init_in_incipit() {
         r"
 incipit {
     sit numerus typed
-    sit inferred
+    sit _ inferred
     typed ← 7
     inferred ← 8
     nota typed
@@ -753,7 +753,7 @@ fn discerne_pattern_join_accepts_all_arms_initialized() {
     let result = crate::test_support::analyze_source_la(
         r#"
 functio pick() → bivalens {
-    sit value
+    sit _ value
     value ← verum
     discerne value {
         casu verum { nota "a" }

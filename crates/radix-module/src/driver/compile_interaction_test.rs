@@ -534,7 +534,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     let source = r"函数 checksum() → numerus {
   设 numerus x ← 5
   变量 numerus y ← 6
-  设 z ← 7
+  设 _ z ← 7
   redde x
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -628,7 +628,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     let session = Session::new(config);
     let source = r"函数 checksum() → numerus {
   设 numerus x ← 0
-  设 r ← 1 到 5
+  设 _ r ← 1 到 5
   返回 x
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());

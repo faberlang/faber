@@ -72,7 +72,7 @@ fn a_negated_big_literal_is_accepted_in_an_inf_slot() {
 
 #[test]
 fn a_literal_beyond_u64_is_out_of_range_everywhere_else() {
-    for slot in ["", "numerus ", "u64 ", "i64 ", "u8 "] {
+    for slot in ["_ ", "numerus ", "u64 ", "i64 ", "u8 "] {
         assert_rejects(
             &format!("incipit {{\nsit {slot}x ← {TWO_TO_64}\nnota x\n}}\n"),
             "numerus_literal_out_of_range",

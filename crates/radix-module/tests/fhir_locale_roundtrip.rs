@@ -152,7 +152,7 @@ fn fhir_core_renders_localized_surfaces_and_reparses_idempotently() {
     );
     assert!(th.contains("เริ่ม {"), "th entry keyword must localize:\n{th}");
     assert!(
-        th.contains("กำหนด salve ← \"salve\""),
+        th.contains("กำหนด _ salve ← \"salve\""),
         "th const binding must preserve the authored inferred-type marker:\n{th}"
     );
     assert!(th.contains("บันทึก salve"), "th nota must localize:\n{th}");
