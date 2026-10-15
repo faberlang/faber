@@ -735,12 +735,15 @@ impl TypeChecker<'_> {
         self.error_type
     }
 
-    /// Unify two canonical intersection member lists position by position.
+    /// Unify two canonical intersection member lists by structural pairing.
     ///
-    /// `TypeTable::intern` sorts members by `TypeId` ordinal, so the generic
-    /// call-site substitution (`T ∩ Contract` → `Infer ∩ Contract`) leaves the
-    /// fresh hole in the same sorted position as the concrete argument's
-    /// member it must bind to.
+    /// `TypeTable::intern` sorts members by `TypeId` ordinal, which follows
+    /// arena allocation order, so list position says nothing about which
+    /// source member a destination member corresponds to. Every destination
+    /// member that is not an inference hole is first paired with the source
+    /// member of the same `TypeId`. Only the members left over, which is where
+    /// the call-site holes (`T ∩ Contract` → `Infer ∩ Contract`) bind, are
+    /// paired in their remaining list order.
     fn unify_intersection_members(
         &mut self,
         from: Vec<TypeId>,
@@ -753,8 +756,25 @@ impl TypeChecker<'_> {
             self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
             return self.error_type;
         }
-        let mut members = Vec::with_capacity(from.len());
-        for (from_member, to_member) in from.into_iter().zip(to) {
+        let mut from_pool = from;
+        let mut open_to = Vec::with_capacity(to.len());
+        let mut pairs = Vec::with_capacity(from_pool.len());
+        for to_member in to {
+            let resolved = self.resolve_inferred_type(to_member);
+            if self.infer_var_of(resolved).is_none()
+                && let Some(index) = from_pool
+                    .iter()
+                    .position(|member| self.resolve_inferred_type(*member) == resolved)
+            {
+                pairs.push((from_pool.remove(index), to_member));
+                continue;
+            }
+            open_to.push(to_member);
+        }
+        pairs.extend(from_pool.into_iter().zip(open_to));
+
+        let mut members = Vec::with_capacity(pairs.len());
+        for (from_member, to_member) in pairs {
             let unified = self.unify_with_policy(from_member, to_member, span, issue, policy);
             if unified == self.error_type {
                 return self.error_type;

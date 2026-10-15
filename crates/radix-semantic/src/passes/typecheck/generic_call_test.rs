@@ -1265,6 +1265,111 @@ functio caller_genus(Civis c) → numerus {
 }
 
 #[test]
+fn inferred_generic_intersection_with_prior_concrete_use() {
+    accepts(
+        r#"implendum Nomen {
+    functio nomen() → textus
+}
+
+implendum Salutans {
+    functio saluta() → textus
+}
+
+functio early(Salutans x) → numerus {
+    redde 1
+}
+
+functio peek<T>(T ∩ Nomen x) → numerus {
+    redde 0
+}
+
+functio caller(Nomen ∩ Salutans ns) → numerus {
+    redde peek(ns)
+}"#,
+    );
+}
+
+#[test]
+fn inferred_generic_intersection_prior_use_of_other_member() {
+    accepts(
+        r#"implendum Nomen {
+    functio nomen() → textus
+}
+
+implendum Salutans {
+    functio saluta() → textus
+}
+
+functio early(Nomen x) → numerus {
+    redde 1
+}
+
+functio peek<T>(T ∩ Nomen x) → numerus {
+    redde 0
+}
+
+functio caller(Nomen ∩ Salutans ns) → numerus {
+    redde peek(ns)
+}"#,
+    );
+}
+
+#[test]
+fn inferred_generic_intersection_constraint_position() {
+    accepts(
+        r#"implendum Nomen {
+    functio nomen() → textus
+}
+
+implendum Salutans {
+    functio saluta() → textus
+}
+
+functio early(Salutans x) → numerus {
+    redde 1
+}
+
+functio peek<T>(Nomen ∩ T x) → numerus {
+    redde 0
+}
+
+functio caller(Salutans ∩ Nomen ns) → numerus {
+    redde peek(ns)
+}"#,
+    );
+}
+
+#[test]
+fn inferred_generic_intersection_rejects_missing_member() {
+    rejects_with_issue(
+        r#"implendum Nomen {
+    functio nomen() → textus
+}
+
+implendum Salutans {
+    functio saluta() → textus
+}
+
+implendum Alius {
+    functio alius() → textus
+}
+
+functio early(Salutans x) → numerus {
+    redde 1
+}
+
+functio peek<T>(T ∩ Nomen x) → numerus {
+    redde 0
+}
+
+functio caller(Salutans ∩ Alius sa) → numerus {
+    redde peek(sa)
+}"#,
+        "argument_type_mismatch",
+    );
+}
+
+#[test]
 fn inferred_generic_call_rejects_container_element_mismatch() {
     rejects_with_issue(
         r#"functio wants(queue<numerus> q) → numerus {
