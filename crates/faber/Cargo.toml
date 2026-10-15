@@ -64,7 +64,7 @@ radix-hygiene = { path = "../radix-hygiene" }
 tempfile = "3"
 
 [features]
-default = ["full-targets"]
+default = ["full-targets", "hir-c"]
 full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
 hir-faber = ["radix/hir-faber"]
 hir-c = ["radix/hir-c"]
