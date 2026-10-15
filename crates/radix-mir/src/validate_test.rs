@@ -1683,6 +1683,105 @@ fn accepts_detached_conversion_recovery_region() {
     );
 }
 
+/// Build a runtime `convert` lowering a flat `lista<f64>` to
+/// `tensor<f64, [2, 8]>`, with an optional `⊥` recovery operand.
+fn lista_to_tensor_convert_program(recovery: Option<MirOperand>) -> (TypeTable, MirProgram) {
+    let mut types = TypeTable::new();
+    let f64_id = types.primitive(Primitive::Fractus);
+    let lista_ty = MirType::semantic(types.array(f64_id));
+    let vacuum_ty = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let tensor_ty = MirType::semantic(tensor_type(&mut types, Primitive::Fractus, &[2, 8]));
+
+    let mut temps = vec![
+        crate::MirTemp {
+            id: crate::MirTempId(0),
+            ty: tensor_ty,
+            span: Span::default(),
+        },
+        crate::MirTemp {
+            id: crate::MirTempId(1),
+            ty: lista_ty,
+            span: Span::default(),
+        },
+    ];
+    if recovery.is_some() {
+        temps.push(crate::MirTemp {
+            id: crate::MirTempId(2),
+            ty: tensor_ty,
+            span: Span::default(),
+        });
+    }
+
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![],
+            temps,
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::temp(crate::MirTempId(0))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Convert(crate::MirConversion {
+                                store: None,
+                                flavor: crate::MirConversionFlavor::Runtime,
+                                source_ty: lista_ty,
+                                target_ty: tensor_ty,
+                                params: vec![],
+                                recovery,
+                                struct_defaults: vec![],
+                            }),
+                            args: vec![MirOperand::Temp(crate::MirTempId(1))],
+                            return_ty: tensor_ty,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum_ty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    (types, program)
+}
+
+#[test]
+fn recovered_lista_to_tensor_conversio_validates() {
+    let (types, program) =
+        lista_to_tensor_convert_program(Some(MirOperand::Temp(crate::MirTempId(2))));
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "a recovered lista ↦ tensor conversio may ride the runtime convert — \
+         tensor_from_flat has no failure channel, got: {errors:?}"
+    );
+}
+
+#[test]
+fn unrecovered_lista_to_tensor_conversio_rejected() {
+    let (types, program) = lista_to_tensor_convert_program(None);
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("must lower to tensor_from_flat")),
+        "expected the recovery-free lista ↦ tensor route rejection, got: {errors:?}"
+    );
+}
+
 #[test]
 fn rejects_function_with_only_goto_cycle() {
     let types = TypeTable::new();
