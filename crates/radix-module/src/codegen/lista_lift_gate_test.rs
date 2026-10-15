@@ -1,9 +1,11 @@
 //! The elementwise list forms added with the 2026-10-04 aggregate operator
 //! rulings (`%` and `÷` over a list, unary `-`, the glyph forms `⊙ ⊘`, and a
 //! list against a scalar that joins to a wider element) have only the MIR
-//! runner as their executor. Every HIR-backed source target rejects them with
-//! the named `lista_lift_unsupported_on_target` diagnostic instead of printing
-//! the scalar operator between a list and a number. `+ -` between two lists and
+//! runner as their executor — except on the Python target, which lowers them
+//! as comprehensions with the runner's equal-length trap. Every other
+//! HIR-backed source target rejects them with the named
+//! `lista_lift_unsupported_on_target` diagnostic instead of printing the
+//! scalar operator between a list and a number. `+ -` between two lists and
 //! `+ - * /` against a scalar of the element type keep their own emitters.
 
 use crate::codegen::Target;
@@ -82,14 +84,33 @@ fn rust_rejects_the_runner_only_list_forms() {
 
 #[cfg(feature = "hir-swift")]
 #[test]
-fn swift_python_and_haskell_never_emit_the_runner_only_list_forms() {
-    for target in [Target::HirSwift, Target::HirPython, Target::HirHaskell] {
+fn swift_and_haskell_never_emit_the_runner_only_list_forms() {
+    for target in [Target::HirSwift, Target::HirHaskell] {
         for body in RUNNER_ONLY {
             let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
             let source = format!("incipit {{\n{PRELUDE}{body}\n}}\n");
             let result = crate::driver::compile(&session, "<test>", &source, ModuleCompileRequest::default());
             assert!(result.output.is_none(), "{target:?} `{body}` emitted code");
         }
+    }
+}
+
+#[cfg(feature = "hir-python")]
+#[test]
+fn python_lowers_the_runner_only_list_forms() {
+    // The Python emitter owns the elementwise lowering (comprehensions with
+    // the runner's equal-length trap), so every gated form emits instead of
+    // failing closed; the corpus files lista/lift-scalar and
+    // lista/elementwise-comparison pin the outputs end to end.
+    for body in RUNNER_ONLY {
+        let session = Session::new(
+            Config::default()
+                .with_target(Target::HirPython)
+                .with_dev_locale_root(),
+        );
+        let source = format!("incipit {{\n{PRELUDE}{body}\n}}\n");
+        let result = crate::driver::compile(&session, "<test>", &source, ModuleCompileRequest::default());
+        assert!(result.output.is_some(), "{body} refused: {:?}", result.diagnostics);
     }
 }
 
