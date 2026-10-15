@@ -75,6 +75,9 @@ pub const TAG_LIST: i64 = 8;
 pub const TAG_STRUCT: i64 = 9;
 pub const TAG_OPT: i64 = 10;
 pub const TAG_MAP: i64 = 11;
+/// A `littera` element: the payload is a text handle of one letter; it
+/// displays quoted with single quotes inside a collection.
+pub const TAG_CHAR: i64 = 12;
 
 /// New empty map (flag 0) or set (flag 1).
 pub const MAP_NEW: RuntimeSymbol = RuntimeSymbol {
@@ -504,6 +507,46 @@ pub const WIDE_HI: RuntimeSymbol = RuntimeSymbol {
     params: &[],
     ret: Some(I64),
 };
+/// A one-letter text from a text of exactly one Unicode scalar: text -> the
+/// same handle, or null when the text does not hold exactly one scalar.
+pub const CHAR_FROM_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_char_from_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// A one-letter text from a code point: value -> text handle, or null for a
+/// surrogate or a value outside Unicode.
+pub const CHAR_FROM_CODE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_char_from_code",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// A one-letter text from a decimal digit: value -> text handle, or null
+/// outside 0 to 9.
+pub const CHAR_FROM_DIGIT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_char_from_digit",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// The code point of a one-letter text.
+pub const CHAR_CODE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_char_code",
+    params: &[Ptr],
+    ret: Some(I64),
+};
+/// The decimal digit a one-letter text holds, or -1.
+pub const CHAR_DIGIT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_char_digit",
+    params: &[Ptr],
+    ret: Some(I64),
+};
+/// The letters of a text as a list: text -> list of one-letter texts, one
+/// per Unicode scalar.
+pub const TEXT_CHARS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_chars",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
 /// Install the program's output tokens (true, false, none, tuple), each as
 /// (pointer, length).
 pub const SET_DISPLAY_TOKENS: RuntimeSymbol = RuntimeSymbol {
@@ -713,6 +756,12 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     MAIN,
     PRINT_I64,
     PRINT_WIDE,
+    TEXT_CHARS,
+    CHAR_FROM_TEXT,
+    CHAR_FROM_CODE,
+    CHAR_FROM_DIGIT,
+    CHAR_CODE,
+    CHAR_DIGIT,
     TEXT_FROM_WIDE,
     TRAP_STORE_WIDE,
     WIDE_MUL,

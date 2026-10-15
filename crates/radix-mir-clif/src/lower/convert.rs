@@ -36,6 +36,8 @@ pub(crate) enum Num {
     Float(NumericWidth),
     Bool,
     Text,
+    /// A `littera`: a text handle of one letter.
+    Char,
     Bits(BitsWidth),
 }
 
@@ -69,6 +71,7 @@ fn num_of(table: &TypeTable, id: TypeId) -> Option<Num> {
         }
         Type::Primitive(Primitive::Bivalens) => Some(Num::Bool),
         Type::Primitive(Primitive::Textus | Primitive::Ascii) => Some(Num::Text),
+        Type::Primitive(Primitive::Littera) => Some(Num::Char),
         Type::Bits(width) => Some(Num::Bits(*width)),
         _ => None,
     }
@@ -122,6 +125,10 @@ pub(crate) fn numeric_conversion(
         (Num::Text | Num::Float(_) | Num::Int(_), Num::Bool) => true,
         (Num::Bool, Num::Int(to)) => to.policy == IntPolicy::Trap,
         (Num::Text, Num::Float(_)) => true,
+        // A letter is a one-letter text: digits and code points convert both
+        // ways, and a text converts when it holds exactly one letter.
+        (Num::Text | Num::Int(_), Num::Char) => true,
+        (Num::Char, Num::Int(to)) => to.policy == IntPolicy::Trap,
         // A signed integer or an unsigned one below 64 bits reads and writes
         // a same-width pattern; a u64 pattern would leave the carrier.
         (Num::Int(from), Num::Bits(width)) => {
@@ -463,6 +470,7 @@ impl FunctionLower<'_, '_> {
             Num::Float(_) => Rep::Float,
             Num::Bool => Rep::Bool,
             Num::Bits(width) => Rep::Bits(width),
+            Num::Char => Rep::Char,
             Num::Text => return Err(Decline::new("text conversion target")),
         };
         let converted = match (failed, recovery) {
@@ -774,6 +782,44 @@ impl FunctionLower<'_, '_> {
             (Num::Float(_), Num::Float(_)) => (value, None),
             (Num::Float(_), Num::Int(to)) => self.float_to_int(conversion, to, value)?,
             (Num::Text, Num::Int(to)) => self.text_to_int(conversion, to, value)?,
+            (Num::Text, Num::Char) => {
+                let letter = self
+                    .call_runtime(&abi::CHAR_FROM_TEXT, &[value])?
+                    .ok_or_else(|| Decline::new("letter result"))?;
+                self.letter_or_failure(letter)
+            }
+            (Num::Int(_), Num::Char) => {
+                let symbol = if self.has_code_point_hint(&conversion.params) {
+                    &abi::CHAR_FROM_CODE
+                } else {
+                    &abi::CHAR_FROM_DIGIT
+                };
+                let letter = self
+                    .call_runtime(symbol, &[value])?
+                    .ok_or_else(|| Decline::new("letter result"))?;
+                self.letter_or_failure(letter)
+            }
+            (Num::Char, Num::Int(_)) => {
+                if self.has_code_point_hint(&conversion.params) {
+                    let code = self
+                        .call_runtime(&abi::CHAR_CODE, &[value])?
+                        .ok_or_else(|| Decline::new("code point result"))?;
+                    (code, None)
+                } else {
+                    let digit = self
+                        .call_runtime(&abi::CHAR_DIGIT, &[value])?
+                        .ok_or_else(|| Decline::new("digit result"))?;
+                    let zero = self.builder.ins().iconst(types::I64, 0);
+                    let failed = self.builder.ins().icmp(IntCC::SignedLessThan, digit, zero);
+                    (
+                        digit,
+                        Some((
+                            failed,
+                            Failure::Static("littera to numerus conversion failed"),
+                        )),
+                    )
+                }
+            }
             (Num::Text, Num::Float(_)) => {
                 let parsed = self
                     .call_runtime(&abi::PARSE_F64, &[value])?
@@ -838,6 +884,23 @@ impl FunctionLower<'_, '_> {
             }
             _ => return Err(Decline::new("explicit numeric conversion")),
         })
+    }
+
+    /// A letter result: null is the failure.
+    fn letter_or_failure(&mut self, letter: Value) -> (Value, Option<(Value, Failure)>) {
+        let zero = self.builder.ins().iconst(types::I64, 0);
+        let failed = self.builder.ins().icmp(IntCC::Equal, letter, zero);
+        (
+            letter,
+            Some((failed, Failure::Static("littera conversion failed"))),
+        )
+    }
+
+    /// Whether a conversion names the `Code` hint.
+    fn has_code_point_hint(&self, params: &[radix_lexer::Symbol]) -> bool {
+        params
+            .iter()
+            .any(|param| radix_types::is_code_point_hint(self.state.input.interner.resolve(*param)))
     }
 
     fn parse_status(&mut self) -> Lowered<Value> {

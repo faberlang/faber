@@ -159,31 +159,40 @@ fn text_local_is_capable() {
 }
 
 #[test]
-fn littera_local_names_gap() {
-    let types = TypeTable::new();
-    let program = single_function(FunctionShape {
-        params: Vec::new(),
-        locals: vec![local(0, ty(&types, Primitive::Littera))],
-        temps: Vec::new(),
-        statements: Vec::new(),
-        terminator: MirTerminatorKind::Return(None),
-        return_ty: ty(&types, Primitive::Vacuum),
-        error_ty: None,
-        is_async: false,
-        is_generator: false,
-    });
+fn littera_is_capable_and_a_map_of_letters_names_gap() {
+    let mut types = TypeTable::new();
+    let littera = types.primitive(Primitive::Littera);
+    let numerus = types.primitive(Primitive::Numerus);
+    let map = MirType::semantic(types.map(numerus, littera));
+    let vacuum = ty(&types, Primitive::Vacuum);
+    let shape = |local_ty: MirType| {
+        single_function(FunctionShape {
+            params: Vec::new(),
+            locals: vec![local(0, local_ty)],
+            temps: Vec::new(),
+            statements: Vec::new(),
+            terminator: MirTerminatorKind::Return(None),
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+        })
+    };
+    let program = shape(MirType::semantic(littera));
+    assert!(classify_with_types(&program, &types).is_capable());
 
+    let program = shape(map);
     let verdict = classify_with_types(&program, &types);
     let gaps = verdict.gaps();
     assert_eq!(gaps.len(), 1, "one gap expected: {gaps:?}");
-    assert_eq!(gaps[0].shape(), "character value");
+    assert_eq!(gaps[0].shape(), "character in a map");
     assert_eq!(gaps[0].slug(), SLUG_CLIF_SUBSET);
 }
 
 #[test]
 fn gaps_keep_storage_order() {
     let types = TypeTable::new();
-    let string = ty(&types, Primitive::Littera);
+    let string = ty(&types, Primitive::Regex);
     let instans = ty(&types, Primitive::Instans);
     let program = single_function(FunctionShape {
         params: vec![param(0, string)],
@@ -202,7 +211,7 @@ fn gaps_keep_storage_order() {
     assert_eq!(gaps.len(), 2, "two gaps expected: {gaps:?}");
     assert_eq!(
         gaps[0].shape(),
-        "character value",
+        "dynamic data value",
         "param walks before local"
     );
     assert_eq!(gaps[1].shape(), "instans value");

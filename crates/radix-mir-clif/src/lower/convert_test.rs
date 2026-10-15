@@ -255,3 +255,25 @@ fn scalars_write_into_a_byte_buffer_of_their_width() {
     // The capacity must equal the scalar's width.
     assert_eq!(plan(&f, u16_, bytes4), None);
 }
+
+#[test]
+fn letters_convert_to_and_from_numbers_and_texts() {
+    let mut f = Fixture::new();
+    let letter = f.primitive(Primitive::Littera);
+    let text = f.primitive(Primitive::Textus);
+    let int = f.primitive(Primitive::Numerus);
+    let u32_ = f.sized(Primitive::Numerus, NumericWidth::U32);
+    let wrapping_u8 = f.modular(NumericWidth::U8);
+    assert!(f.supported(text, letter));
+    assert!(f.supported(int, letter));
+    assert!(f.supported(letter, int));
+    assert!(f.supported(letter, u32_));
+    // A letter becomes text through the display path, not a plan.
+    assert!(!f.supported(letter, text));
+    // A policy word target stays declined.
+    assert!(!f.supported(letter, wrapping_u8));
+    assert_eq!(
+        rep_of(&f.types, MirType::semantic(letter)),
+        Ok(super::Rep::Char)
+    );
+}

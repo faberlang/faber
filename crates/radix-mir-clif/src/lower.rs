@@ -154,6 +154,9 @@ pub(crate) enum Rep {
     Tuple,
     /// `textus`: a pointer to `[len: i64][bytes...]` (see `abi::TEXT_HEADER`).
     Text,
+    /// `littera`: a text handle of one letter. It displays as that letter
+    /// alone, and quoted with single quotes inside a collection.
+    Char,
     /// No value.
     Unit,
 }
@@ -165,6 +168,7 @@ impl Rep {
             Self::Float => Some(types::F64),
             Self::Bool => Some(types::I8),
             Self::Text
+            | Self::Char
             | Self::Bits(_)
             | Self::List
             | Self::Record
@@ -201,6 +205,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
     match resolve(table, ty.semantic_id()) {
         Type::Primitive(Primitive::Numerus) => Ok(Rep::Int),
         Type::Primitive(Primitive::Fractus) => Ok(Rep::Float),
+        Type::Primitive(Primitive::Littera) => Ok(Rep::Char),
         Type::Primitive(Primitive::Bivalens) => Ok(Rep::Bool),
         Type::Primitive(Primitive::Textus | Primitive::Ascii)
         | Type::BoundedTextus { .. }
@@ -907,6 +912,7 @@ impl FunctionLower<'_, '_> {
             Rep::Float => Some(self.builder.ins().f64const(0.0)),
             Rep::Bool => Some(self.builder.ins().iconst(types::I8, 0)),
             Rep::Text
+            | Rep::Char
             | Rep::Bits(_)
             | Rep::List
             | Rep::Record
@@ -1227,6 +1233,7 @@ impl FunctionLower<'_, '_> {
             Rep::Float => abi::TAG_FLOAT,
             Rep::Bool => abi::TAG_BOOL,
             Rep::Text => abi::TAG_TEXT,
+            Rep::Char => abi::TAG_CHAR,
             Rep::Bits(width) => abi::TAG_BITS + i64::from(width.bits().trailing_zeros() - 3),
             Rep::List => abi::TAG_LIST,
             Rep::Record => abi::TAG_STRUCT,
@@ -1277,7 +1284,12 @@ impl FunctionLower<'_, '_> {
     /// pass through, a plain value stored where an optional is expected is
     /// boxed as present.
     fn coerce(&mut self, value: Value, have: Rep, want: Rep) -> Lowered<Value> {
-        if have == want {
+        if have == want
+            || matches!(
+                (have, want),
+                (Rep::Text, Rep::Char) | (Rep::Char, Rep::Text)
+            )
+        {
             Ok(value)
         } else if want == Rep::Opt && have != Rep::Unit {
             self.wrap_some(value, have)
@@ -3452,6 +3464,31 @@ impl FunctionLower<'_, '_> {
                 };
                 self.format_string(destination, *template, &call.args)
             }
+            MirIntrinsic::Collection(MirCollectionOp::CordCursor) => {
+                let ([text], Some(destination)) = (call.args.as_slice(), destination) else {
+                    return Err(Decline::new("cord cursor shape"));
+                };
+                let (text, rep) = self.scalar(text)?;
+                if !matches!(rep, Rep::Text | Rep::Char) {
+                    return Err(Decline::new("cord cursor over a non-text"));
+                }
+                let letters = self.call_runtime(&abi::TEXT_CHARS, &[text])?;
+                self.define_result(destination, letters, Rep::List)
+            }
+            // An eager cursor is its list of items: draining copies it.
+            MirIntrinsic::Sermo(MirSermoOp::DrainCursor) => {
+                let ([cursor], Some(destination)) = (call.args.as_slice(), destination) else {
+                    return Err(Decline::new("cursor drain shape"));
+                };
+                let (cursor, rep) = self.scalar(cursor)?;
+                if rep != Rep::List {
+                    return Err(Decline::new("cursor drain of a non-list"));
+                }
+                let start = self.builder.ins().iconst(types::I64, 0);
+                let end = self.builder.ins().iconst(types::I64, i64::MAX);
+                let copied = self.call_runtime(&abi::LIST_SLICE, &[cursor, start, end])?;
+                self.define_result(destination, copied, Rep::List)
+            }
             MirIntrinsic::Collection(op) => self.collection_op(destination, *op, &call.args),
             MirIntrinsic::TypeCheck(op) => {
                 let ([operand], Some(destination)) = (call.args.as_slice(), destination) else {
@@ -3620,7 +3657,7 @@ impl FunctionLower<'_, '_> {
 
     fn render_text_at(&mut self, value: Value, rep: Rep, narrow: i64) -> Lowered<Value> {
         let rendered = match rep {
-            Rep::Text => return Ok(value),
+            Rep::Text | Rep::Char => return Ok(value),
             Rep::Int if self.is_wide(value) => self.text_from_wide(value)?,
             Rep::Int => self.call_runtime(&abi::TEXT_FROM_I64, &[value])?,
             Rep::Float => {
@@ -3983,7 +4020,7 @@ impl FunctionLower<'_, '_> {
                 let reference = self.runtime_ref(&abi::PRINT_MAP)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
-            Rep::Text => {
+            Rep::Text | Rep::Char => {
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
@@ -4299,6 +4336,11 @@ impl FunctionLower<'_, '_> {
         {
             return self.bits_binary(op, (lhs, a, a_rep), (rhs, b, b_rep), width);
         }
+        // A letter and a text compare as texts.
+        let (a_rep, b_rep) = match (a_rep, b_rep) {
+            (Rep::Char, Rep::Text | Rep::Char) | (Rep::Text, Rep::Char) => (Rep::Text, Rep::Text),
+            other => other,
+        };
         if a_rep != b_rep {
             return Err(Decline::new("mixed-representation operands"));
         }
@@ -4307,7 +4349,8 @@ impl FunctionLower<'_, '_> {
             Rep::Float => self.float_binary(op, a, b),
             Rep::Bool => self.bool_binary(op, a, b),
             Rep::Text => self.text_binary(op, a, b),
-            Rep::Bits(_)
+            Rep::Char
+            | Rep::Bits(_)
             | Rep::List
             | Rep::Record
             | Rep::Opt

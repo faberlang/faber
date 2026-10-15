@@ -303,6 +303,7 @@ const TAG_LIST: i32 = 8;
 const TAG_STRUCT: i32 = 9;
 const TAG_OPT: i32 = 10;
 const TAG_MAP: i32 = 11;
+const TAG_CHAR: i32 = 12;
 
 /// A runtime map (`set` false) or set (`set` true): tagged key/value entries
 /// in insertion order.
@@ -350,6 +351,13 @@ fn element_text(tag: i32, bits: i64) -> String {
         TAG_FLOAT => display_fractus(f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()))),
         TAG_BOOL => display_bivalens(bits != 0, tokens()).to_owned(),
         TAG_TEXT => format!("{:?}", text_str(unsafe { text_bytes(bits as *const u8) })),
+        TAG_CHAR => format!(
+            "{:?}",
+            text_str(unsafe { text_bytes(bits as *const u8) })
+                .chars()
+                .next()
+                .unwrap_or_default()
+        ),
         TAG_LIST => list_text(unsafe { list_ref(bits as *const List) }),
         TAG_STRUCT => record_text(unsafe { &*(bits as *const Record) }),
         TAG_OPT => match unsafe { (bits as *const Present).as_ref() } {
@@ -683,7 +691,7 @@ pub unsafe extern "C" fn __faber_clif_v1_opt_eq(left: *const Present, right: *co
 fn opt_top_text(handle: *const Present) -> String {
     match unsafe { handle.as_ref() } {
         None => tokens().none.clone(),
-        Some(present) if present.tag == TAG_TEXT => {
+        Some(present) if present.tag == TAG_TEXT || present.tag == TAG_CHAR => {
             text_str(unsafe { text_bytes(present.bits as *const u8) }).into_owned()
         }
         Some(present) => element_text(present.tag, present.bits),
@@ -888,7 +896,9 @@ fn element_equal(tag: i32, left: i64, right: i64) -> bool {
             f64::from_bits(u64::from_ne_bytes(left.to_ne_bytes()))
                 == f64::from_bits(u64::from_ne_bytes(right.to_ne_bytes()))
         }
-        TAG_TEXT => unsafe { text_bytes(left as *const u8) == text_bytes(right as *const u8) },
+        TAG_TEXT | TAG_CHAR => unsafe {
+            text_bytes(left as *const u8) == text_bytes(right as *const u8)
+        },
         TAG_STRUCT => unsafe {
             record_equal(&*(left as *const Record), &*(right as *const Record))
         },
@@ -963,7 +973,9 @@ fn element_order(tag: i32, left: i64, right: i64) -> std::cmp::Ordering {
     match tag {
         TAG_FLOAT => f64::from_bits(u64::from_ne_bytes(left.to_ne_bytes()))
             .total_cmp(&f64::from_bits(u64::from_ne_bytes(right.to_ne_bytes()))),
-        TAG_TEXT => unsafe { text_bytes(left as *const u8).cmp(text_bytes(right as *const u8)) },
+        TAG_TEXT | TAG_CHAR => unsafe {
+            text_bytes(left as *const u8).cmp(text_bytes(right as *const u8))
+        },
         TAG_BITS..=7 => {
             u64::from_ne_bytes(left.to_ne_bytes()).cmp(&u64::from_ne_bytes(right.to_ne_bytes()))
         }
@@ -1085,6 +1097,89 @@ pub unsafe extern "C" fn __faber_clif_v1_text_concat(
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_text_from_i64(value: i64) -> *const u8 {
     text_new(value.to_string().as_bytes())
+}
+
+/// The only Unicode scalar of a text, if it holds exactly one.
+fn only_scalar(bytes: &[u8]) -> Option<char> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    let mut chars = text.chars();
+    let first = chars.next()?;
+    chars.next().is_none().then_some(first)
+}
+
+fn char_text(ch: char) -> *const u8 {
+    let mut buffer = [0u8; 4];
+    text_new(ch.encode_utf8(&mut buffer).as_bytes())
+}
+
+/// A one-letter text from a text of exactly one scalar; null otherwise.
+///
+/// # Safety
+///
+/// `text` is a live runtime text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_char_from_text(text: *const u8) -> *const u8 {
+    match only_scalar(unsafe { text_bytes(text) }) {
+        Some(_) => text,
+        None => std::ptr::null(),
+    }
+}
+
+/// A one-letter text from a code point; null for a surrogate or past Unicode.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_char_from_code(value: i64) -> *const u8 {
+    match u32::try_from(value).ok().and_then(char::from_u32) {
+        Some(ch) => char_text(ch),
+        None => std::ptr::null(),
+    }
+}
+
+/// A one-letter text from a decimal digit; null outside 0 to 9.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_char_from_digit(value: i64) -> *const u8 {
+    match u32::try_from(value)
+        .ok()
+        .and_then(|digit| char::from_digit(digit, 10))
+    {
+        Some(ch) => char_text(ch),
+        None => std::ptr::null(),
+    }
+}
+
+/// The code point of a one-letter text.
+///
+/// # Safety
+///
+/// `text` is a live runtime text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_char_code(text: *const u8) -> i64 {
+    only_scalar(unsafe { text_bytes(text) }).map_or(0, |ch| i64::from(u32::from(ch)))
+}
+
+/// The decimal digit a one-letter text holds, or -1.
+///
+/// # Safety
+///
+/// `text` is a live runtime text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_char_digit(text: *const u8) -> i64 {
+    only_scalar(unsafe { text_bytes(text) })
+        .and_then(|ch| ch.to_digit(10))
+        .map_or(-1, i64::from)
+}
+
+/// The letters of a text: a list of one-letter texts, one per scalar.
+///
+/// # Safety
+///
+/// `text` is a live runtime text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_chars(text: *const u8) -> *mut List {
+    let items = text_str(unsafe { text_bytes(text) })
+        .chars()
+        .map(|ch| (TAG_CHAR, char_text(ch) as i64))
+        .collect();
+    list_new_from(items)
 }
 
 /// Render a float as text; `narrow` selects the `f32` display contract.

@@ -22,7 +22,7 @@ use radix_hir::DefId;
 use radix_mir::visit::MirVisitor;
 use radix_mir::*;
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
-use radix_types::{NumericWidth, Primitive, SemanticMutability, Type, TypeTable};
+use radix_types::{NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Slug for shapes the CLIF subset does not cover yet.
@@ -184,7 +184,7 @@ impl<'a> ClifCapability<'a> {
             Type::SizedNumeric(..) => Some(Gap::Subset("sized numeric value".to_owned())),
             Type::PolicyFloat(..) => Some(Gap::Subset("policy float value".to_owned())),
             Type::Primitive(Primitive::Ascii) => None,
-            Type::Primitive(Primitive::Littera) => Some(Gap::Subset("character value".to_owned())),
+            Type::Primitive(Primitive::Littera) => None,
             Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti) => {
                 crate::lower::byte_element(self.types)
                     .is_none()
@@ -206,8 +206,17 @@ impl<'a> ClifCapability<'a> {
             Type::BoundedArray { element, .. } => self.type_gap(MirType::semantic(*element)),
             Type::Map(key, value) => self
                 .type_gap(MirType::semantic(*key))
-                .or_else(|| self.type_gap(MirType::semantic(*value))),
-            Type::Set(element) => self.type_gap(MirType::semantic(*element)),
+                .or_else(|| self.type_gap(MirType::semantic(*value)))
+                .or_else(|| {
+                    [*key, *value]
+                        .into_iter()
+                        .any(|member| self.is_letter(member))
+                        .then(|| Gap::Subset("character in a map".to_owned()))
+                }),
+            Type::Set(element) => self.type_gap(MirType::semantic(*element)).or_else(|| {
+                self.is_letter(*element)
+                    .then(|| Gap::Subset("character in a set".to_owned()))
+            }),
             Type::Queue(_)
             | Type::BoundedQueue { .. }
             | Type::Stack(_)
@@ -321,6 +330,12 @@ impl<'a> ClifCapability<'a> {
             }
             _ => Some(Gap::Subset("unsupported type".to_owned())),
         }
+    }
+
+    /// Whether `id` is a `littera`: a map or set display of one is not
+    /// lowered (the runner's quoting of a letter there is not pinned).
+    fn is_letter(&self, id: TypeId) -> bool {
+        matches!(self.types.get(id), Type::Primitive(Primitive::Littera))
     }
 
     /// Short readable type-kind name for gap shapes.
@@ -553,7 +568,7 @@ impl MirVisitor for ClifCapability<'_> {
                     && self.type_gap(conversion.source_ty).is_none()
                     && matches!(
                         self.types.get(conversion.target_ty.semantic_id()),
-                        Type::Primitive(Primitive::Textus)
+                        Type::Primitive(Primitive::Textus | Primitive::Ascii)
                     )
         );
         let set_to_list = matches!(
@@ -609,6 +624,7 @@ impl MirVisitor for ClifCapability<'_> {
                     | MirIntrinsic::Panic
                     | MirIntrinsic::Cede
                     | MirIntrinsic::Duplicate
+                    | MirIntrinsic::Sermo(MirSermoOp::DrainCursor)
                     | MirIntrinsic::Collection(
                         MirCollectionOp::Length
                             | MirCollectionOp::Append
@@ -645,6 +661,7 @@ impl MirVisitor for ClifCapability<'_> {
                             | MirCollectionOp::Ceiling
                             | MirCollectionOp::Round
                             | MirCollectionOp::Truncate
+                            | MirCollectionOp::CordCursor
                             | MirCollectionOp::Absolute
                             | MirCollectionOp::Signum
                             | MirCollectionOp::Minimum
