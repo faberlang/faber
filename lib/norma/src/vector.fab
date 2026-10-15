@@ -13,17 +13,17 @@ fn add<elem, size N>(vector<elem, N> a, vector<elem, N> b) → vector<elem, N> {
 
 @ public
 fn subtract<elem, size N>(vector<elem, N> a, vector<elem, N> b) → vector<elem, N> {
-    return a.subtract(b)
+    return a.subtracted(b)
 }
 
 @ public
 fn multiply<elem, size N>(vector<elem, N> a, vector<elem, N> b) → vector<elem, N> {
-    return a.multiply(b)
+    return a.multiplied(b)
 }
 
 @ public
 fn divide<elem, size N>(vector<elem, N> a, vector<elem, N> b) → vector<elem, N> {
-    return a.divide(b)
+    return a.divided(b)
 }
 
 @ public

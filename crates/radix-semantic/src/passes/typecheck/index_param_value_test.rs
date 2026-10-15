@@ -112,11 +112,11 @@ fn size_param_reads_as_int_value() {
 
 #[test]
 fn size_param_at_non_index_intrinsic_slot_still_rejects() {
-    // Live `divisio` takes a TensorPeer operand, not an index: the size name
+    // Live `divisa` takes a TensorPeer operand, not an index: the size name
     // reads as an int, so the tensor slot rejects it on argument type.
     rejects_with_issue(
         r"functio bad<T, magnitudo d>(tensor<T, [8, d]> input) → tensor<T, [8, d]> {
-    redde input.divisio(d)
+    redde input.divisa(d)
 }",
         "argument_type_mismatch",
     );

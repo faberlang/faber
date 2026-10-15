@@ -498,10 +498,11 @@ fn parametric_vector_intrinsic_method_keeps_rigid_width() {
 #[test]
 fn parametric_vector_scalar_multiplica_splats() {
     // Scalar-operand elementwise multiply: the scalar broadcasts across the
-    // lanes; the result keeps the receiver shape at any width.
+    // lanes; the result keeps the receiver shape at any width. The copy-out
+    // elementwise method is the perfect form `multiplicata`.
     accepts(
         r"functio scala<magnitudo N>(vector<f32, N> v, f32 s) → vector<f32, N> {
-    redde v.multiplica(s)
+    redde v.multiplicata(s)
 }",
     );
 }
@@ -510,7 +511,7 @@ fn parametric_vector_scalar_multiplica_splats() {
 fn vector_scalar_multiplica_rejects_foreign_element() {
     rejects_with_issue(
         r"functio scala(vector<f32, 3> v, numerus n) → vector<f32, 3> {
-    redde v.multiplica(n)
+    redde v.multiplicata(n)
 }",
         "argument_type_mismatch",
     );

@@ -603,7 +603,7 @@ fn tensor_divide_en_surface_preserves_same_generic_shape() {
         r#"@ kernel
 @ public
 fn divide_sym<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor<f32, [M, N]> {
-    return a.divide(b)
+    return a.divided(b)
 }
 "#,
         config,
