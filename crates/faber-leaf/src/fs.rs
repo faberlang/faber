@@ -645,9 +645,17 @@ fn home(args: &[Arg]) -> Result<Reply, FsError> {
 fn temp_dir(args: &[Arg]) -> Result<Reply, FsError> {
     const ROUTE: &str = "solum:temporarium";
     empty_ok(ROUTE, args)?;
-    Ok(Reply::Str(
-        std::env::temp_dir().to_string_lossy().into_owned(),
-    ))
+    let raw = std::env::temp_dir();
+    // WHY: the platform temp dir may be a symlinked path with a trailing
+    // separator (macOS `/var/folders/xx/T/`); `processus:sedes` reports the
+    // canonical working directory, so the two must agree after a chdir.
+    let path = std::fs::canonicalize(&raw).unwrap_or(raw);
+    let text = path.to_string_lossy().into_owned();
+    if path.parent().is_none() {
+        return Ok(Reply::Str(text));
+    }
+    let trimmed = text.trim_end_matches(std::path::is_separator);
+    Ok(Reply::Str(trimmed.to_owned()))
 }
 
 fn refuse_directory(route: &'static str, path: &str) -> Result<(), FsError> {
