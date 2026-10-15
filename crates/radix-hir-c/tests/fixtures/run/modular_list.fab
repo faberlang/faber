@@ -5,19 +5,19 @@ locale = "en"
 # modulo 2^W, its read widens, and `get` carries the word's optional.
 
 main {
-    const list<wrapping<u8>> bytes ← [255, 1]
+    let list<wrapping<u8>> bytes ← [255, 1]
     print bytes
     print bytes.get(0) coalesce 0 ∷ wrapping<u8>
     print bytes.get(1) coalesce 0 ∷ wrapping<u8>
     print bytes.get(9) coalesce 0 ∷ wrapping<u8>
 
-    const list<wrapping<u16>> shorts ← [65535, 2]
+    let list<wrapping<u16>> shorts ← [65535, 2]
     print shorts
 
-    const list<wrapping<i32>> signed ← [-1, 2]
+    let list<wrapping<i32>> signed ← [-1, 2]
     print signed
 
-    var list<wrapping<u64>> big ← [18446744073709551615, 3, 10, 2]
+    mut list<wrapping<u64>> big ← [18446744073709551615, 3, 10, 2]
     big.sort()
     print big
 }

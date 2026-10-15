@@ -5,21 +5,21 @@ locale = "en"
 # source is longer. `↤` converts then stores in one step.
 
 main {
-    const list<int> base ← [1, 2]
-    const list<int, 8> raw ← base ↦ list<int, 8>
-    const list<int, 4> out ← raw ↦ list<int, 4>
+    let list<int> base ← [1, 2]
+    let list<int, 8> raw ← base ↦ list<int, 8>
+    let list<int, 4> out ← raw ↦ list<int, 4>
     print out
 
-    const list<int> big ← [1, 2, 3]
-    const list<int, 2> over ← big ↦ list<int, 2> ⊥ [7, 8]
+    let list<int> big ← [1, 2, 3]
+    let list<int, 2> over ← big ↦ list<int, 2> ⊥ [7, 8]
     print over
     print over.length()
 
-    const list<int> small ← [4, 5]
-    const list<int, 2> fits ← small ↦ list<int, 2> ⊥ [7, 8]
+    let list<int> small ← [4, 5]
+    let list<int, 2> fits ← small ↦ list<int, 2> ⊥ [7, 8]
     print fits
 
-    var int count ← 0
+    mut int count ← 0
     count ↤ "42"
     print count
 }
