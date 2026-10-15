@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/cape/panic-in-do.fab"
+group = "language"
+input_root = "corpus"
+input = "cape/panic-in-do.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "abort: x"
+check_only = false
