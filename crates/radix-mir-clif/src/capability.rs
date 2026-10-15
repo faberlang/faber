@@ -204,7 +204,9 @@ impl<'a> ClifCapability<'a> {
             | Type::BoundedStack { .. }
             | Type::Ledger(_, _) => Some(Gap::Subset("collection value".to_owned())),
             Type::Struct(_) => None,
-            Type::Record(_) => Some(Gap::Subset("record value".to_owned())),
+            Type::Record(fields) => fields
+                .values()
+                .find_map(|field| self.type_gap(MirType::semantic(*field))),
             Type::Enum(_) => None,
             Type::Interface(_) => Some(Gap::Subset("enum value".to_owned())),
             Type::Tuple(_) => Some(Gap::Subset("tuple value".to_owned())),
@@ -341,7 +343,7 @@ impl<'a> ClifCapability<'a> {
             MirAggregateKind::Tuple => Some(Gap::Subset("tuple construction".to_owned())),
             MirAggregateKind::Array => None,
             MirAggregateKind::Map | MirAggregateKind::Set => None,
-            MirAggregateKind::Record => Some(Gap::Subset("record construction".to_owned())),
+            MirAggregateKind::Record => None,
             MirAggregateKind::Struct(_) => None,
             MirAggregateKind::EnumVariant(_) => None,
             MirAggregateKind::ClosureEnvironment(_) => {

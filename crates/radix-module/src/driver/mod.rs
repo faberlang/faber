@@ -389,6 +389,16 @@ fn compile_cli_program(
         // (wasm-host-parity P1 residual — the ten CLI fixtures emit and
         // wasm-tools validate). The emitter fails closed on any shape it
         // does not support.
+        // Cranelift: the shared MIR CLI-program lowering already produced the
+        // entry/argv/exit shapes; the classifier declines any it cannot lower.
+        #[cfg(feature = "mir-clif")]
+        Target::MirClif => {
+            let mut analysis = analysis;
+            match generate_clif_object_output(&mut analysis, no_fuse) {
+                Ok(output) => CompileResult { output: Some(output), diagnostics: analysis.diagnostics },
+                Err(err) => compile_codegen_error(analysis, name, source, err),
+            }
+        }
         #[cfg(feature = "mir-wasm")]
         Target::MirWasm => {
             let mut analysis = analysis;
@@ -454,7 +464,7 @@ fn cli_codegen_diagnostic(target: Target, name: &str, analysis: &AnalyzedModule)
         // Wasm text routes CLI programs through the ordinary emit path (the
         // shared MIR CLI lowering already produced the entry/argv/exit
         // shapes); the emitter fails closed on unsupported shapes itself.
-        Target::MirWasm => None,
+        Target::MirWasm | Target::MirClif => None,
         _ => Some(
             codegen_diagnostic(
                 name,

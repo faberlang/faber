@@ -169,6 +169,12 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             rep_of(table, MirType::semantic(*element))?;
             Ok(Rep::Set)
         }
+        Type::Record(fields) => {
+            for field in fields.values() {
+                rep_of(table, MirType::semantic(*field))?;
+            }
+            Ok(Rep::Record)
+        }
         Type::Func(signature) => {
             if !signature.type_params.is_empty()
                 || signature.is_async
@@ -814,12 +820,29 @@ impl FunctionLower<'_, '_> {
         }
     }
 
+    /// Fields of an anonymous record in name order: a record's runtime layout
+    /// is its field names sorted, so every site agrees on indices.
+    fn anonymous_fields(&self, ty: MirType) -> Option<Vec<(String, TypeId)>> {
+        let Type::Record(fields) = resolve(self.state.input.types, ty.semantic_id()) else {
+            return None;
+        };
+        let mut named: Vec<(String, TypeId)> = fields
+            .iter()
+            .map(|(name, ty)| (self.state.input.interner.resolve(*name).to_owned(), *ty))
+            .collect();
+        named.sort_by(|a, b| a.0.cmp(&b.0));
+        Some(named)
+    }
     /// Declaration index and type of field `name` of a `genus`.
-    fn field_slot(
-        &self,
-        ty: MirType,
-        name: radix_lexer::Symbol,
-    ) -> Lowered<(radix_hir::DefId, usize, MirType)> {
+    fn field_slot(&self, ty: MirType, name: radix_lexer::Symbol) -> Lowered<(usize, MirType)> {
+        if let Some(fields) = self.anonymous_fields(ty) {
+            let wanted = self.state.input.interner.resolve(name);
+            let index = fields
+                .iter()
+                .position(|(field, _)| field == wanted)
+                .ok_or_else(|| Decline::new("unknown field"))?;
+            return Ok((index, MirType::semantic(fields[index].1)));
+        }
         let def = self.struct_def(ty)?;
         let meta = self.state.input.structs;
         let index = meta
@@ -833,7 +856,7 @@ impl FunctionLower<'_, '_> {
             .and_then(|fields| fields.get(&name))
             .copied()
             .ok_or_else(|| Decline::new("unknown field"))?;
-        Ok((def, index, field_ty))
+        Ok((index, field_ty))
     }
 
     /// Declaration index and type of field `name` of an enum variant.
@@ -864,7 +887,7 @@ impl FunctionLower<'_, '_> {
                 Type::Map(_, value) => Ok(MirType::semantic(*value)),
                 _ => self.element_type(ty),
             },
-            MirProjection::Field(name) => Ok(self.field_slot(ty, *name)?.2),
+            MirProjection::Field(name) => Ok(self.field_slot(ty, *name)?.1),
             MirProjection::VariantField { variant, field } => {
                 Ok(self.variant_slot(*variant, *field)?.1)
             }
@@ -1082,7 +1105,7 @@ impl FunctionLower<'_, '_> {
                     if current_rep != Rep::Record {
                         return Err(Decline::new("field of a non-genus"));
                     }
-                    let (_, position, _) = self.field_slot(ty, *name)?;
+                    let (position, _) = self.field_slot(ty, *name)?;
                     let position = self.builder.ins().iconst(
                         types::I64,
                         i64::try_from(position).map_err(|_| Decline::new("field index"))?,
@@ -1157,7 +1180,7 @@ impl FunctionLower<'_, '_> {
                 if handle_rep != Rep::Record {
                     return Err(Decline::new("field of a non-genus"));
                 }
-                let (_, position, _) = self.field_slot(container_ty, *name)?;
+                let (position, _) = self.field_slot(container_ty, *name)?;
                 let position = self.builder.ins().iconst(
                     types::I64,
                     i64::try_from(position).map_err(|_| Decline::new("field index"))?,
@@ -1282,11 +1305,59 @@ impl FunctionLower<'_, '_> {
 
     /// A `genus` construction: fields supplied by name, stored in declaration
     /// order.
+    /// An anonymous record literal: fields stored in name order.
+    fn construct_anonymous(
+        &mut self,
+        destination: &MirPlace,
+        aggregate: &MirAggregate,
+    ) -> Lowered<()> {
+        let MirAggregateFields::Named(supplied) = &aggregate.fields else {
+            return Err(Decline::new("record fields"));
+        };
+        let fields = self
+            .anonymous_fields(aggregate.ty)
+            .ok_or_else(|| Decline::new("record type"))?;
+        let name = self.text_literal(b"")?;
+        let variant_flag = self.builder.ins().iconst(types::I32, 0);
+        let record = self
+            .call_runtime(&abi::RECORD_NEW, &[name, variant_flag])?
+            .ok_or_else(|| Decline::new("record new result"))?;
+        for (position, (field, field_ty)) in fields.iter().enumerate() {
+            let Some(item) = supplied
+                .iter()
+                .find(|item| self.state.input.interner.resolve(item.name) == field.as_str())
+            else {
+                return Err(Decline::new("record field without a value"));
+            };
+            let (value, rep) = self.element_operand(&item.value, MirType::semantic(*field_ty))?;
+            let position = self.builder.ins().iconst(
+                types::I64,
+                i64::try_from(position).map_err(|_| Decline::new("field index"))?,
+            );
+            let text = self.text_literal(field.as_bytes())?;
+            let tag = self
+                .builder
+                .ins()
+                .iconst(types::I32, Self::element_tag(rep)?);
+            let bits = self.element_bits(value, rep);
+            self.call_runtime(&abi::RECORD_SET, &[record, position, text, tag, bits])?;
+        }
+        let (variable, slot_rep) = self.place_slot(destination)?;
+        if slot_rep != Rep::Record {
+            return Err(Decline::new("record destination representation"));
+        }
+        self.builder.def_var(variable, record);
+        Ok(())
+    }
+
     fn construct_struct(
         &mut self,
         destination: &MirPlace,
         aggregate: &MirAggregate,
     ) -> Lowered<()> {
+        if aggregate.kind == MirAggregateKind::Record {
+            return self.construct_anonymous(destination, aggregate);
+        }
         let (def, variant) = match aggregate.kind {
             MirAggregateKind::Struct(def) => (def, false),
             MirAggregateKind::EnumVariant(def) => (def, true),
@@ -1320,7 +1391,7 @@ impl FunctionLower<'_, '_> {
             let field_ty = if variant {
                 self.variant_slot(def, *field)?.1
             } else {
-                self.field_slot(aggregate.ty, *field)?.2
+                self.field_slot(aggregate.ty, *field)?.1
             };
             let (value, rep) = self.element_operand(&item.value, field_ty)?;
             let position = self.builder.ins().iconst(
@@ -1658,7 +1729,9 @@ impl FunctionLower<'_, '_> {
                 aggregate,
             } if matches!(
                 aggregate.kind,
-                MirAggregateKind::Struct(_) | MirAggregateKind::EnumVariant(_)
+                MirAggregateKind::Struct(_)
+                    | MirAggregateKind::EnumVariant(_)
+                    | MirAggregateKind::Record
             ) =>
             {
                 self.construct_struct(destination, aggregate)
