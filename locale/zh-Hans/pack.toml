@@ -596,13 +596,21 @@ help = "绑定名使用 `{sit}`（固定名称）或 `{varia}`（可写名称）
 message = "`{keyword}` 不能引入绑定名"
 help = "绑定名对应每次迭代或匹配的值；固定名称写 `{sit}`，可写名称写 `{varia}`"
 
-[diagnostics.PARSE010.issues.field_fixum_retired]
-message = "`{keyword}` 字段修饰词已废弃"
-help = "只读字段写 `{sit}`；`{fixum}` 表示编译期事实，与 `=` 搭配"
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "成员修饰词 `{keyword}` 已移除；类型级成员是常量"
+help = "写 `{fixum} T NAME = …`；`{fixum}` 表示编译期事实，类成员同样适用"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "`{fixum}` 成员需要编译期的值"
+help = "写 `{fixum} T NAME = value`；每个实例各有的字段用 `{sit}` 或 `{varia}`"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "`{fixum}` 成员用 `=` 初始化，不用 `←`"
+help = "`=` 表示编译期事实：写 `{fixum} T NAME = value`"
 
 [diagnostics.PARSE010.issues.ref_field_refused]
 message = "`{keyword}` 不能修饰字段"
-help = "字段是只读（`{sit}`）或可写（`{varia}`）；`{generis}` 使其属于类型"
+help = "字段是只读（`{sit}`）或可写（`{varia}`）；类型级常量写作 `{fixum} T X = …`"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "`{keyword}` 局部变量需要一个可读取的位置：`{keyword} T name ← place`"
@@ -2871,6 +2879,10 @@ help = "使用 `varia` binding 允许重新赋值，或移除多余赋值"
 [diagnostics.SEM020.issues.assignment_to_constant]
 message = "向 constant 赋值"
 help = "使用 `varia` binding 允许重新赋值，或移除多余赋值"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "对 {fixum} 成员 '{field}' 赋值"
+help = "{fixum} 成员是类型的编译期常量，不能被写入；会变化的状态请用 {varia} 字段"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "第二次赋值给 immutable binding"

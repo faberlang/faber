@@ -38,14 +38,14 @@ fn module_constant_initializer_claims_insere() {
 #[test]
 fn genus_static_field_initializer_claims_insere() {
     let init = first_class_field_init_kind(
-        "genus Icon {\n    generis octeti LOGO = insere \"logo.png\"\n}\n",
+        "genus Icon {\n    fixum octeti LOGO = insere \"logo.png\"\n}\n",
     );
     assert!(init.starts_with("Insere("), "got {init}");
 }
 
 #[test]
 fn every_field_modifier_default_claims_insere() {
-    for modifier in ["sit", "varia", "generis"] {
+    for modifier in ["sit", "varia", "fixum"] {
         let source = format!("genus G {{\n    {modifier} textus s = insere \"x.txt\"\n}}\n");
         let init = first_class_field_init_kind(&source);
         assert!(

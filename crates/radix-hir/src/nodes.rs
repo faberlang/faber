@@ -605,8 +605,8 @@ pub struct HirField {
     pub name: Symbol,
     pub ty: TypeId,
 
-    /// Authored leading modifier (DECISIONS D16.1): `fixum`, `varia`, or
-    /// `generis` (belongs to the type rather than instances). `None` is an
+    /// Authored leading modifier (DECISIONS D16.1): `sit` (read-only per
+    /// instance), `varia`, or `fixum` (a type-level constant, not per instance). `None` is an
     /// unmarked field, legal until the D5c tightening.
     pub modifier: Option<FieldModifier>,
 
@@ -620,13 +620,13 @@ pub struct HirField {
 }
 
 impl HirField {
-    /// Whether this field belongs to the type (`generis`) rather than instances.
+    /// Whether this field belongs to the type (a `fixum` constant member) rather than instances.
     #[must_use]
     pub fn is_static(&self) -> bool {
-        self.modifier == Some(FieldModifier::Generis)
+        self.modifier == Some(FieldModifier::Const)
     }
 
-    /// Whether this field is `fixum`: set only by construction (D16.3).
+    /// Whether this field is `sit` (read-only): set only by construction (D16.3).
     #[must_use]
     pub fn is_fixum(&self) -> bool {
         self.modifier == Some(FieldModifier::Fixum)

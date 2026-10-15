@@ -66,6 +66,11 @@ term = "nonnulla"
 canonical = "≢"
 message = "Retired prefix predicate; use value ≢ nulla (D23.4)."
 
+[[redirects]]
+term = "generis"
+canonical = "fixum"
+message = "Retired class member modifier (en `static`); a type-level member is the constant `fixum T X = e` (PARSE010 static_member_retired)."
+
 # The `nulla` redirect is retired with D23.4 (2026-09-27): `nulla` is the null
 # value literal again, so a bare `nulla` is an expression, not a predicate.
 # The prefix-predicate form `nulla value` still has no exemplum; its message is

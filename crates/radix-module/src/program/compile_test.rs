@@ -3803,7 +3803,7 @@ fn import_contract_carries_static_field_default_from_sibling() {
         r"
 @ publica
 genus Tab {
-    generis numerus LIMES = 7
+    fixum numerus LIMES = 7
     varia numerus w = 1
 }
 ",

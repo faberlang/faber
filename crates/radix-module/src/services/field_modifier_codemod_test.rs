@@ -18,7 +18,7 @@ fn strip_inserted(output: &str, word: &str) -> String {
     output.replace(&format!("{word} "), "")
 }
 
-const EN: &str = "+++\nlocale = \"en\"\n+++\n# header comment\n@ public\nclass Punctum {\n    # doc for x\n    int  x\n    let int y\n    static int Z = 3\n    @ private\n    list<int> xs\n    string ∪ none label optional\n\n    fn norm() → int {\n        let int local ← 1\n        return self.x + local\n    }\n}\n\nunion Figura {\n    Circulus { float radius }\n}\n";
+const EN: &str = "+++\nlocale = \"en\"\n+++\n# header comment\n@ public\nclass Punctum {\n    # doc for x\n    int  x\n    let int y\n    const int Z = 3\n    @ private\n    list<int> xs\n    string ∪ none label optional\n\n    fn norm() → int {\n        let int local ← 1\n        return self.x + local\n    }\n}\n\nunion Figura {\n    Circulus { float radius }\n}\n";
 
 #[test]
 fn en_inserts_mut_before_unmarked_fields_only() {
@@ -26,7 +26,7 @@ fn en_inserts_mut_before_unmarked_fields_only() {
     assert_eq!(result.inserted, 3);
     assert!(result.source.contains("    mut int  x\n"), "{}", result.source);
     assert!(result.source.contains("    let int y\n"), "{}", result.source);
-    assert!(result.source.contains("    static int Z = 3\n"), "{}", result.source);
+    assert!(result.source.contains("    const int Z = 3\n"), "{}", result.source);
     assert!(
         result
             .source

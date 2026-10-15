@@ -59,7 +59,7 @@ pub struct FaberCodegen<'a> {
     /// value position is a `ego` (self) reference and must re-emit as the
     /// self keyword, not the type name.
     pub(crate) self_def_ids: FxHashSet<DefId>,
-    /// `(struct def, field name)` of this unit's static (`generis`) fields: a
+    /// `(struct def, field name)` of this unit's const-member (`fixum`) fields: a
     /// `Field(Path(struct), name)` read of one of these is the authored
     /// type-qualified read `Tab.Z`, not an `ego` member read.
     pub(crate) static_fields: FxHashSet<(DefId, Symbol)>,

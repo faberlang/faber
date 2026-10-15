@@ -552,13 +552,21 @@ help = "tên gắn dùng `{sit}` (tên cố định) hoặc `{varia}` (tên có 
 message = "`{keyword}` không thể mở đầu một tên gắn"
 help = "tên gắn đặt tên cho giá trị của mỗi lần lặp hoặc khớp; hãy viết `{sit}` cho tên cố định hoặc `{varia}` cho tên có thể ghi"
 
-[diagnostics.PARSE010.issues.field_fixum_retired]
-message = "bộ sửa đổi trường `{keyword}` đã bị loại bỏ"
-help = "trường chỉ đọc viết là `{sit}`; `{fixum}` nêu một sự thật lúc biên dịch và đi với `=`"
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "bộ sửa đổi thành viên `{keyword}` đã bị loại bỏ; thành viên cấp kiểu là một hằng"
+help = "viết `{fixum} T NAME = …`; `{fixum}` nêu một sự thật lúc biên dịch và thành viên của lớp cũng dùng được"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "thành viên `{fixum}` cần một giá trị lúc biên dịch"
+help = "viết `{fixum} T NAME = value`; với trường theo từng thể hiện dùng `{sit}` hoặc `{varia}`"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "thành viên `{fixum}` được khởi tạo bằng `=`, không phải `←`"
+help = "`=` nêu một sự thật lúc biên dịch: viết `{fixum} T NAME = value`"
 
 [diagnostics.PARSE010.issues.ref_field_refused]
 message = "`{keyword}` không thể sửa đổi một trường"
-help = "trường là chỉ đọc (`{sit}`) hoặc có thể ghi (`{varia}`); `{generis}` biến nó thành của kiểu"
+help = "trường là chỉ đọc (`{sit}`) hoặc có thể ghi (`{varia}`); hằng cấp kiểu viết là `{fixum} T X = …`"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "biến cục bộ `{keyword}` cần một vị trí để đọc: `{keyword} T name ← place`"
@@ -2827,6 +2835,10 @@ help = "sử dụng liên kết `varia` để cho phép gán lại, hoặc xóa 
 [diagnostics.SEM020.issues.assignment_to_constant]
 message = "gán cho hằng số"
 help = "sử dụng liên kết `varia` để cho phép gán lại, hoặc xóa phép gán bổ sung"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "gán cho thành viên {fixum} '{field}'"
+help = "thành viên {fixum} là hằng lúc biên dịch của kiểu và không bao giờ được ghi; dùng trường {varia} cho trạng thái thay đổi"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "phép gán thứ hai cho liên kết bất biến"

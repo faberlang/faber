@@ -166,13 +166,24 @@ impl TypeChecker<'_> {
             }
             return;
         }
-        if self.declared_field_modifier(object_ty, name) == Some(radix_syntax::FieldModifier::Fixum)
-        {
-            self.immutable_assignment_with_args(
-                "assignment_to_fixum_field",
-                span,
-                &[("field", self.member_display_name(name))],
-            );
+        match self.declared_field_modifier(object_ty, name) {
+            Some(radix_syntax::FieldModifier::Fixum) => {
+                self.immutable_assignment_with_args(
+                    "assignment_to_fixum_field",
+                    span,
+                    &[("field", self.member_display_name(name))],
+                );
+            }
+            // A `const` member is a compile-time constant of the type: no
+            // store reaches it, through the type name, `self` or an instance.
+            Some(radix_syntax::FieldModifier::Const) => {
+                self.immutable_assignment_with_args(
+                    "assignment_to_const_member",
+                    span,
+                    &[("field", self.member_display_name(name))],
+                );
+            }
+            _ => {}
         }
     }
 
@@ -1303,7 +1314,7 @@ impl TypeChecker<'_> {
         if !write
             && type_name_def.is_none()
             && self.declared_field_modifier(obj_ty, name)
-                == Some(radix_syntax::FieldModifier::Generis)
+                == Some(radix_syntax::FieldModifier::Const)
         {
             self.undefined_member_with_args(
                 "static_field_read_through_instance",
@@ -1334,7 +1345,7 @@ impl TypeChecker<'_> {
         self.check_field_access_from_type(obj_ty, name, object.span, access)
     }
 
-    /// Type a read through a genus name (`Tab.Z`): only a `generis` field is
+    /// Type a read through a genus name (`Tab.Z`): only a `const` member is
     /// readable there, and its type is the declared field type.
     fn check_static_field_read(
         &mut self,
@@ -1353,7 +1364,7 @@ impl TypeChecker<'_> {
             self.undefined_member("unknown_struct_field", span);
             return self.error_type;
         };
-        if field.modifier != Some(radix_syntax::FieldModifier::Generis) {
+        if field.modifier != Some(radix_syntax::FieldModifier::Const) {
             self.undefined_member_with_args(
                 "instance_field_read_through_type",
                 span,

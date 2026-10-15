@@ -1,6 +1,6 @@
 //! Genus field modifiers survive Faber re-emission (DECISIONS D16.1).
 //!
-//! `fixum` / `varia` / `generis` are recorded on the field and re-emitted in
+//! `sit` / `varia` / `fixum` are recorded on the field and re-emitted in
 //! the target locale (`const` / `var` / `static` in en). An unmarked field
 //! is a parse error (D5c), so every re-emitted field carries its modifier.
 
@@ -36,7 +36,7 @@ fn reemit(source: &str, to: &str) -> String {
         .code
 }
 
-const BODY: &str = "class Punctum {\n    let int x\n    mut int y\n    static int Z = 3\n}\n\nmain {\n    let Punctum p ← Punctum { x = 1, y = 2 }\n    print p.x\n}\n";
+const BODY: &str = "class Punctum {\n    let int x\n    mut int y\n    const int Z = 3\n}\n\nmain {\n    let Punctum p ← Punctum { x = 1, y = 2 }\n    print p.x\n}\n";
 
 #[test]
 fn en_format_keeps_each_field_modifier() {
@@ -44,7 +44,7 @@ fn en_format_keeps_each_field_modifier() {
     let formatted = reemit(&en, "en");
     assert!(formatted.contains("    let int x\n"), "{formatted}");
     assert!(formatted.contains("    mut int y\n"), "{formatted}");
-    assert!(formatted.contains("    static int Z = 3\n"), "{formatted}");
+    assert!(formatted.contains("    const int Z = 3\n"), "{formatted}");
 }
 
 #[test]
@@ -53,6 +53,6 @@ fn en_to_la_round_trip_keeps_field_modifiers() {
     let la = reemit(&en, "la");
     assert!(la.contains("    sit numerus x\n"), "{la}");
     assert!(la.contains("    varia numerus y\n"), "{la}");
-    assert!(la.contains("    generis numerus Z = 3\n"), "{la}");
+    assert!(la.contains("    fixum numerus Z = 3\n"), "{la}");
     assert_eq!(reemit(&la, "en"), reemit(&en, "en"));
 }

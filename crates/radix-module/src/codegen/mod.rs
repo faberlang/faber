@@ -714,7 +714,7 @@ fn generate_go_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) ->
     let mut statics = rustc_hash::FxHashMap::default();
     for (def_id, fields, _, _) in analysis.resolver().imported_file_structs() {
         for field in fields {
-            if field.modifier == Some(radix_syntax::FieldModifier::Generis)
+            if field.modifier == Some(radix_syntax::FieldModifier::Const)
                 && let Some(init) = field.init
             {
                 statics.insert((def_id, field.name), init.clone());

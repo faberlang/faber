@@ -7,7 +7,7 @@ category = "comptime"
 canonical = true
 summary = "Computes a module constant's value at build time."
 syntax = "const <type> <name> = comptime { … return <value> }"
-related = ["generis", "insere", "redde"]
+related = ["fixum", "insere", "redde"]
 locale = "en"
 +++
 # =============================================================================
@@ -32,7 +32,7 @@ locale = "en"
 #   • Reaching I/O, `call`, or async code — the build rejects the constant and
 #     names the call chain that got there.
 #
-# See also: generis, insere
+# See also: fixum, insere
 # =============================================================================
 
 # GRAMMAR:

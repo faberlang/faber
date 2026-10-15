@@ -1931,7 +1931,7 @@ fn parses_generic_genus_with_implements_and_members() {
 genus Animal<T> implet Canens, Currens {
     @ futura
     functio canta(textus vox) → vacuum {}
-    generis textus nomen = "leo"
+    fixum textus nomen = "leo"
 }
 "#,
     );

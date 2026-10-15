@@ -7,7 +7,7 @@ canonical = false
 summary = "fixum T x = e declares a typed local compile-time constant; the value is a compile-time fact that must fit T."
 syntax = "fixum <type|_> <name> = <expression>"
 aliases = ["const T x = e", "local constant"]
-related = ["fixum", "varia", "generis", "←", "praefixum"]
+related = ["fixum", "varia", "←", "praefixum"]
 locale = "en"
 +++
 # =============================================================================
@@ -33,7 +33,7 @@ locale = "en"
 #   • `const u8 d = 300` — the constant does not fit `u8`
 #     (`store_constant_out_of_range`).
 #
-# See also: fixum, varia, generis, ←
+# See also: fixum, varia, ←
 # =============================================================================
 
 # fixum = — local compile-time constants

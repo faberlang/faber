@@ -552,13 +552,21 @@ help = "تستخدم الروابط `{sit}` (اسم ثابت) أو `{varia}` (ا
 message = "لا يمكن أن يبدأ `{keyword}` رابطًا"
 help = "الرابط يسمّي قيمة كل تكرار أو مطابقة؛ اكتب `{sit}` لاسم ثابت أو `{varia}` لاسم قابل للكتابة"
 
-[diagnostics.PARSE010.issues.field_fixum_retired]
-message = "تم إلغاء مُعدِّل الحقل `{keyword}`"
-help = "الحقل للقراءة فقط يُكتب `{sit}`؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "تم إلغاء مُعدِّل العضو `{keyword}`؛ العضو على مستوى النوع ثابت"
+help = "اكتب `{fixum} T NAME = …`؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويقبله عضو الصنف أيضًا"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "العضو `{fixum}` يحتاج إلى قيمة وقت الترجمة"
+help = "اكتب `{fixum} T NAME = value`؛ وللحقل الخاص بكل نسخة استخدم `{sit}` أو `{varia}`"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "العضو `{fixum}` يُهيَّأ بـ `=` وليس بـ `←`"
+help = "`=` تعبّر عن حقيقة وقت الترجمة: اكتب `{fixum} T NAME = value`"
 
 [diagnostics.PARSE010.issues.ref_field_refused]
 message = "لا يمكن لـ `{keyword}` أن يعدّل حقلًا"
-help = "الحقل للقراءة فقط (`{sit}`) أو قابل للكتابة (`{varia}`)؛ و`{generis}` يجعله خاصًا بالنوع"
+help = "الحقل للقراءة فقط (`{sit}`) أو قابل للكتابة (`{varia}`)؛ والثابت الخاص بالنوع يُكتب `{fixum} T X = …`"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "المتغير المحلي `{keyword}` يحتاج إلى موضع للقراءة: `{keyword} T name ← place`"
@@ -2827,6 +2835,10 @@ help = "استخدم ربط `{varia}` للسماح بإعادة الإسناد �
 [diagnostics.SEM020.issues.assignment_to_constant]
 message = "إسناد إلى constant"
 help = "استخدم ربط `{varia}` للسماح بإعادة الإسناد أو أزل الإسناد الإضافي"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "إسناد إلى العضو {fixum} '{field}'"
+help = "العضو {fixum} ثابت وقت الترجمة للنوع ولا يُكتب إليه أبدًا؛ استخدم حقل {varia} للحالة المتغيرة"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "إسناد ثان إلى immutable binding"

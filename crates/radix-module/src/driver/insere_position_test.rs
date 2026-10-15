@@ -71,7 +71,7 @@ fn field_default_embed_reads_the_file_under_every_modifier() {
     let main = dir.path().join("main.fab");
     write(
         &main,
-        b"genus G {\n    sit textus a = insere \"x.txt\"\n    varia textus b = insere \"x.txt\"\n    generis textus c = insere \"x.txt\"\n}\nincipit {\n    nota \"ok\"\n}\n",
+        b"genus G {\n    sit textus a = insere \"x.txt\"\n    varia textus b = insere \"x.txt\"\n    fixum textus c = insere \"x.txt\"\n}\nincipit {\n    nota \"ok\"\n}\n",
     );
     let unit = analyze_file(&main).unwrap_or_else(|d| panic!("analysis failed: {d:?}"));
     let HirItemKind::Struct(genus) = &unit.hir.items[0].kind else {

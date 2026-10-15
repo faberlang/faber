@@ -531,14 +531,14 @@ fn dangling_defid_repro_comptime_block_local() {
 
 #[test]
 fn dangling_defid_repro_comptime_class_static_local() {
-    // A class `static` field initialized by `comptime` with a referenced
-    // local (`static int X = comptime { const int t = 3; return t }`) read as
+    // A class `const` member initialized by `comptime` with a referenced
+    // local (`const int X = comptime { const int t = 3; return t }`) read as
     // `Tab.X` from `main` also yields `DanglingIndex { kind: "DefId" }`.
     // Printed once: index 1000000, arena size 2.
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "class Tab {\n",
-        "    static int X = comptime {\n",
+        "    const int X = comptime {\n",
         "        const int t = 3\n",
         "        return t\n",
         "    }\n",

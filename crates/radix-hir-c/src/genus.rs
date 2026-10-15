@@ -120,7 +120,7 @@ impl Emitter<'_> {
         let mut fields = Vec::with_capacity(genus.fields.len());
         for field in &genus.fields {
             if field.is_static() {
-                return Err(unsupported("static (generis) field"));
+                return Err(unsupported("const member"));
             }
             if !field.annotations.is_empty() {
                 return Err(unsupported("field annotation"));

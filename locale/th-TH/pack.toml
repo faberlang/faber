@@ -552,13 +552,21 @@ help = "ตัวผูกชื่อใช้ `{sit}` (ชื่อคงท�
 message = "`{keyword}` เริ่มตัวผูกชื่อไม่ได้"
 help = "ตัวผูกชื่อตั้งชื่อให้ค่าในแต่ละรอบหรือการจับคู่; เขียน `{sit}` สำหรับชื่อคงที่ หรือ `{varia}` สำหรับชื่อที่เขียนได้"
 
-[diagnostics.PARSE010.issues.field_fixum_retired]
-message = "ตัวปรับแต่งฟิลด์ `{keyword}` ถูกยกเลิกแล้ว"
-help = "ฟิลด์แบบอ่านอย่างเดียวเขียนว่า `{sit}`; `{fixum}` ระบุข้อเท็จจริงตอนคอมไพล์และใช้คู่กับ `=`"
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "ตัวปรับแต่งสมาชิก `{keyword}` ถูกลบแล้ว; สมาชิกระดับชนิดคือค่าคงที่"
+help = "เขียน `{fixum} T NAME = …`; `{fixum}` ระบุข้อเท็จจริงตอนคอมไพล์ และสมาชิกของคลาสก็ใช้ได้"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "สมาชิก `{fixum}` ต้องมีค่าตอนคอมไพล์"
+help = "เขียน `{fixum} T NAME = value`; สำหรับฟิลด์ต่ออินสแตนซ์ใช้ `{sit}` หรือ `{varia}`"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "สมาชิก `{fixum}` กำหนดค่าเริ่มต้นด้วย `=` ไม่ใช่ `←`"
+help = "`=` ระบุข้อเท็จจริงตอนคอมไพล์: เขียน `{fixum} T NAME = value`"
 
 [diagnostics.PARSE010.issues.ref_field_refused]
 message = "`{keyword}` ปรับแต่งฟิลด์ไม่ได้"
-help = "ฟิลด์เป็นแบบอ่านอย่างเดียว (`{sit}`) หรือเขียนได้ (`{varia}`); `{generis}` ทำให้เป็นของระดับชนิด"
+help = "ฟิลด์เป็นแบบอ่านอย่างเดียว (`{sit}`) หรือเขียนได้ (`{varia}`); ค่าคงที่ระดับชนิดเขียนว่า `{fixum} T X = …`"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "ตัวแปรโลคัล `{keyword}` ต้องมีตำแหน่งให้อ่าน: `{keyword} T name ← place`"
@@ -2839,6 +2847,10 @@ help = "ใช้ binding `varia` เพื่อให้กำหนดค่�
 [diagnostics.SEM020.issues.assignment_to_constant]
 message = "การกำหนดค่าให้ค่าคงที่"
 help = "ใช้ binding `varia` เพื่อให้กำหนดค่าใหม่ได้ หรือนำการกำหนดค่าเพิ่มเติมออก"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "การกำหนดค่าให้สมาชิก {fixum} '{field}'"
+help = "สมาชิก {fixum} เป็นค่าคงที่ตอนคอมไพล์ของชนิดและไม่เคยถูกเขียนทับ; ใช้ฟิลด์ {varia} สำหรับสถานะที่เปลี่ยนได้"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "การกำหนดค่าครั้งที่สองให้ binding ที่เปลี่ยนแปลงไม่ได้"

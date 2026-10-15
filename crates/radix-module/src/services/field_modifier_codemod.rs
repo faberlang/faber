@@ -1,6 +1,6 @@
 //! Span-based `varia` insertion for unmarked `genus` fields (DECISIONS D16.4(1)).
 //!
-//! D16.1 makes every field declare `fixum` / `varia` / `generis`. Existing
+//! D16.1 makes every field declare `sit` / `varia` / `fixum`. Existing
 //! sources are migrated by inserting the reader pack's `varia` spelling
 //! (`var` in en) before each unmarked field. The meaning is unchanged: an
 //! unmarked field is writable today.

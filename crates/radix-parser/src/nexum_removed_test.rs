@@ -22,9 +22,9 @@ fn nexum_field_reports_nexum_removed() {
 }
 
 #[test]
-fn nexum_after_generis_reports_nexum_removed() {
+fn nexum_after_fixum_reports_nexum_removed() {
     assert_parse_error_matches(
-        "genus Animal {\n    generis nexum textus nomen = \"leo\"\n}",
+        "genus Animal {\n    fixum nexum textus nomen = \"leo\"\n}",
         ParseExpectation::Args(&[("issue", "nexum_removed")]),
     );
 }

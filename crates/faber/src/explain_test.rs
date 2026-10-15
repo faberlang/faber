@@ -67,7 +67,9 @@ fn all_entries_validate() {
     // (197) plus the legacy redirects (13). The `nulla` redirect retired with
     // D23.4 (8c5cc3de4), so 197 + 13 = 210 (mg5a folds inter+intra into one
     // term; need adds `guillemet`); 211 = 198 + 13 (need
-    // adds trapped); see reference_test for history.
+    // adds trapped); `generis` moved from an explained term to a legacy
+    // redirect (the retired static member word): 197 + 14 = 211. See
+    // reference_test for history.
     assert_eq!(registry.entries().len(), 211);
 
     for entry in registry.entries() {
