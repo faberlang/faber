@@ -324,8 +324,8 @@ fn praefixum_imports_method_printing_body_names_the_method_hop() {
 }
 
 #[test]
-fn praefixum_imports_method_ambiguous_genus_in_two_siblings_is_unavailable() {
-    let dir = test_temp_dir("imports-method-ambiguous");
+fn praefixum_imports_method_homonym_genus_resolves_to_qualified_home() {
+    let dir = test_temp_dir("imports-method-homonym");
     let dir = dir.as_ref();
     write(dir, "consts.fab", SIBLING_GENUS);
     write(dir, "other.fab", SIBLING_GENUS);
@@ -335,10 +335,50 @@ fn praefixum_imports_method_ambiguous_genus_in_two_siblings_is_unavailable() {
         "import from \"./consts\" consts\nimport from \"./other\" other\n\nfn probe() → int {\n    const consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n",
     );
     let program = analyze(dir);
+    assert_eq!(method_answers(&program, dir), vec![ImportedCallee::Pure]);
+}
+
+/// The method's home is the module whose export the receiver's `DefId`
+/// names, so a homonym genus in the other sibling cannot lend its effects to
+/// the qualified one.
+#[test]
+fn praefixum_imports_method_homonym_genus_effect_stays_with_its_own_module() {
+    let pure_dir = test_temp_dir("imports-method-homonym-pure");
+    let pure_dir = pure_dir.as_ref();
+    let loud_dir = test_temp_dir("imports-method-homonym-loud");
+    let loud_dir = loud_dir.as_ref();
+    let consts = SIBLING_GENUS;
+    let other = "@ public\nfn loud() {\n    print 1\n}\n\n@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        loud()\n        return self.n\n    }\n}\n";
+    let main_consts = "import from \"./consts\" consts\nimport from \"./other\" other\n\nfn probe() → int {\n    const consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n";
+    let main_other = "import from \"./consts\" consts\nimport from \"./other\" other\n\nfn probe() → int {\n    const other.Box b ← other.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n";
+    for (dir, main) in [(pure_dir, main_consts), (loud_dir, main_other)] {
+        write(dir, "consts.fab", consts);
+        write(dir, "other.fab", other);
+        write(dir, "main.fab", main);
+    }
+
+    let program = analyze(pure_dir);
     assert_eq!(
-        method_answers(&program, dir),
-        vec![ImportedCallee::Unavailable]
+        method_answers(&program, pure_dir),
+        vec![ImportedCallee::Pure]
     );
+
+    let program = analyze(loud_dir);
+    let (id, node) = program.node_by_path(&loud_dir.join("main.fab")).unwrap();
+    let probe = top_level_function(&node.analysis, "probe").unwrap();
+    let mut effects = PackageImportEffects::new(&program.nodes, &program.imports, id.clone());
+    let answer = function_effect(
+        &node.analysis.hir,
+        &node.analysis.types,
+        &node.analysis.interner,
+        probe,
+        &mut effects,
+    );
+    let ImportedCallee::Effect { effect, chain } = answer else {
+        panic!("expected one Effect answer");
+    };
+    assert_eq!(effect, EFFECT);
+    assert_eq!(chain.last().map(String::as_str), Some("loud"));
 }
 
 /// The first import reference of `probe` in a program whose `probe` calls
