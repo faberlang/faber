@@ -1712,6 +1712,20 @@ pub unsafe extern "C" fn __faber_clif_v1_union_has_tag(handle: *const Present, t
     i8::from(unsafe { handle.as_ref() }.is_some_and(|present| present.tag == tag))
 }
 
+/// Whether a record is a `genus` instance named `name`.
+///
+/// # Safety
+///
+/// `record` is a live runtime record; `name` is a text handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_record_is_named(
+    record: *const Record,
+    name: *const u8,
+) -> i8 {
+    let record = unsafe { &*record };
+    i8::from(!record.variant && unsafe { text_bytes(record.name) == text_bytes(name) })
+}
+
 /// Whether a boxed payload is a `genus` instance named `name`.
 ///
 /// # Safety

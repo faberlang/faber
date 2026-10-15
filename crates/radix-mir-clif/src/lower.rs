@@ -16,7 +16,10 @@ use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module, default
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use radix_lexer::Interner;
 use radix_mir::*;
-use radix_types::{BitsWidth, MirMathFunction, NumericWidth, Primitive, Type, TypeId, TypeTable};
+use radix_types::{
+    BitsWidth, MirMathFunction, NumericWidth, Primitive, SemanticMutability, Type, TypeId,
+    TypeTable,
+};
 use rustc_hash::FxHashMap;
 
 use crate::abi::{self, AbiTy, RuntimeSymbol};
@@ -52,6 +55,8 @@ pub struct StructMeta {
     pub order: FxHashMap<radix_hir::DefId, Vec<radix_lexer::Symbol>>,
     pub fields: FxHashMap<radix_hir::DefId, FxHashMap<radix_lexer::Symbol, MirType>>,
     pub names: FxHashMap<radix_hir::DefId, String>,
+    /// The variants of each `discretio`, for fields declared shared.
+    pub enum_variants: FxHashMap<radix_hir::DefId, Vec<radix_hir::DefId>>,
 }
 
 /// Whether `function` rebinds local `id` as a whole. A reference parameter
@@ -175,7 +180,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(Primitive::Bivalens) => Ok(Rep::Bool),
         Type::Primitive(Primitive::Textus | Primitive::Ascii) => Ok(Rep::Text),
         Type::Bits(width) => Ok(Rep::Bits(*width)),
-        Type::Struct(_) | Type::Enum(_) => Ok(Rep::Record),
+        Type::Struct(_) | Type::Enum(_) | Type::Interface(_) => Ok(Rep::Record),
         Type::Map(key, value) => {
             rep_of(table, MirType::semantic(*key))?;
             rep_of(table, MirType::semantic(*value))?;
@@ -243,6 +248,17 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             rep_of(table, MirType::semantic(*element))?;
             Ok(Rep::List)
         }
+        // A read-only reference is the value it borrows; a mutable one is a
+        // shared handle, which only the handle kinds are.
+        Type::Ref(SemanticMutability::Mutable, inner) => {
+            match rep_of(table, MirType::semantic(*inner))? {
+                rep @ (Rep::List | Rep::Record | Rep::Map | Rep::Set) => Ok(rep),
+                _ => Err(Decline::new("reference value")),
+            }
+        }
+        Type::Ref(_, inner) => rep_of(table, MirType::semantic(*inner)),
+        // The type of `null`: an optional that is always none.
+        Type::Primitive(Primitive::Nihil) => Ok(Rep::Opt),
         Type::Primitive(Primitive::Vacuum | Primitive::Numquam) => Ok(Rep::Unit),
         Type::SizedNumeric(Primitive::Numerus, width) => match width {
             NumericWidth::I8
@@ -697,10 +713,28 @@ impl FunctionLower<'_, '_> {
             }
         }
 
+        // A block no edge reaches never runs: it is closed with a trap
+        // instead of being lowered, so dead code cannot decline the program.
+        let mut reachable: rustc_hash::FxHashSet<MirBlockId> = rustc_hash::FxHashSet::default();
+        let mut pending = vec![function.blocks[0].id];
+        while let Some(id) = pending.pop() {
+            if !reachable.insert(id) {
+                continue;
+            }
+            if let Some(block) = function.blocks.iter().find(|block| block.id == id) {
+                pending.extend(radix_mir::visit::terminator_successors(
+                    &block.terminator.kind,
+                ));
+            }
+        }
         for (position, block) in function.blocks.iter().enumerate() {
             let created = self.blocks[&block.id];
             if position != 0 {
                 self.builder.switch_to_block(created);
+            }
+            if !reachable.contains(&block.id) {
+                self.builder.ins().trap(TrapCode::unwrap_user(1));
+                continue;
             }
             for statement in &block.statements {
                 self.statement(statement)?;
@@ -909,6 +943,9 @@ impl FunctionLower<'_, '_> {
                 .ok_or_else(|| Decline::new("unknown field"))?;
             return Ok((index, MirType::semantic(fields[index].1)));
         }
+        if let Type::Enum(def) = resolve(self.state.input.types, ty.semantic_id()) {
+            return self.shared_field_slot(*def, name);
+        }
         let def = self.struct_def(ty)?;
         let meta = self.state.input.structs;
         let index = meta
@@ -923,6 +960,36 @@ impl FunctionLower<'_, '_> {
             .copied()
             .ok_or_else(|| Decline::new("unknown field"))?;
         Ok((index, field_ty))
+    }
+
+    /// A field declared shared by every variant of `enum_def`: the position
+    /// must agree across the variants that carry it, or the access is declined.
+    fn shared_field_slot(
+        &self,
+        enum_def: radix_hir::DefId,
+        name: radix_lexer::Symbol,
+    ) -> Lowered<(usize, MirType)> {
+        let meta = self.state.input.structs;
+        let variants = meta
+            .enum_variants
+            .get(&enum_def)
+            .ok_or_else(|| Decline::new("field of a non-genus"))?;
+        let mut found: Option<(usize, MirType)> = None;
+        for variant in variants {
+            let Some(order) = meta.order.get(variant) else {
+                continue;
+            };
+            let Some(position) = order.iter().position(|field| *field == name) else {
+                return Err(Decline::new("field absent from a variant"));
+            };
+            let field_ty = self.variant_slot(*variant, name)?.1;
+            match found {
+                None => found = Some((position, field_ty)),
+                Some((seen, _)) if seen == position => {}
+                Some(_) => return Err(Decline::new("shared field at differing positions")),
+            }
+        }
+        found.ok_or_else(|| Decline::new("unknown field"))
     }
 
     /// Declaration index and type of field `name` of an enum variant.
@@ -1074,7 +1141,9 @@ impl FunctionLower<'_, '_> {
         result: Rep,
     ) -> Lowered<(Value, Rep)> {
         if lhs.1 != Rep::Opt {
-            return Err(Decline::new("coalesce of a non-optional"));
+            // A left side that can never be none is the answer.
+            let value = self.coerce(lhs.0, lhs.1, result)?;
+            return Ok((value, result));
         }
         if result == Rep::Opt {
             let fallback = self.coerce(rhs.0, rhs.1, Rep::Opt)?;
@@ -3475,6 +3544,58 @@ impl FunctionLower<'_, '_> {
                 };
                 Ok((self.builder.ins().icmp(cc, value, zero), Rep::Bool))
             }
+            (MirUnOp::Sqrt, Rep::Float | Rep::Int) => {
+                let number = if rep == Rep::Int {
+                    self.builder.ins().fcvt_from_sint(types::F64, value)
+                } else {
+                    value
+                };
+                let zero = self.builder.ins().f64const(0.0);
+                let valid = self
+                    .builder
+                    .ins()
+                    .fcmp(FloatCC::GreaterThanOrEqual, number, zero);
+                let one = self.builder.ins().iconst(types::I8, 1);
+                let invalid = self.builder.ins().bxor(valid, one);
+                self.trap_if(invalid, "sqrt of negative float")?;
+                Ok((self.builder.ins().sqrt(number), Rep::Float))
+            }
+            (MirUnOp::Exp | MirUnOp::Log, Rep::Float | Rep::Int) => {
+                let number = if rep == Rep::Int {
+                    self.builder.ins().fcvt_from_sint(types::F64, value)
+                } else {
+                    value
+                };
+                let logarithm = op == MirUnOp::Log;
+                if logarithm {
+                    let zero = self.builder.ins().f64const(0.0);
+                    let positive = self.builder.ins().fcmp(FloatCC::GreaterThan, number, zero);
+                    let one = self.builder.ins().iconst(types::I8, 1);
+                    let invalid = self.builder.ins().bxor(positive, one);
+                    self.trap_if(invalid, "log requires positive input")?;
+                }
+                let code = self.builder.ins().iconst(types::I32, i64::from(logarithm));
+                let result = self
+                    .call_runtime(&abi::MATH_F64, &[code, number])?
+                    .ok_or_else(|| Decline::new("math result"))?;
+                let magnitude = self.builder.ins().fabs(result);
+                let infinity = self.builder.ins().f64const(f64::INFINITY);
+                let finite = self
+                    .builder
+                    .ins()
+                    .fcmp(FloatCC::LessThan, magnitude, infinity);
+                let one = self.builder.ins().iconst(types::I8, 1);
+                let infinite = self.builder.ins().bxor(finite, one);
+                self.trap_if(
+                    infinite,
+                    if logarithm {
+                        "log produced non-finite result"
+                    } else {
+                        "exp overflow"
+                    },
+                )?;
+                Ok((result, Rep::Float))
+            }
             (MirUnOp::BitNot, Rep::Int) => Ok((self.builder.ins().bnot(value), Rep::Int)),
             (MirUnOp::BitNot, Rep::Bits(width)) => {
                 let mask = if width == BitsWidth::B64 {
@@ -3485,7 +3606,7 @@ impl FunctionLower<'_, '_> {
                 let mask = self.builder.ins().iconst(types::I64, mask);
                 Ok((self.builder.ins().bxor(value, mask), Rep::Bits(width)))
             }
-            _ => Err(Decline::new("unary operation")),
+            _ => Err(Decline::new(format!("unary operation {op:?} on {rep:?}"))),
         }
     }
 
@@ -3626,14 +3747,33 @@ impl FunctionLower<'_, '_> {
             MirBinOp::Sub => (self.builder.ins().fsub(a, b), Rep::Float),
             MirBinOp::Mul => (self.builder.ins().fmul(a, b), Rep::Float),
             MirBinOp::Div => (self.builder.ins().fdiv(a, b), Rep::Float),
+            MirBinOp::Mod => (self.float_floor_rem(a, b)?, Rep::Float),
             MirBinOp::Eq => compare(self, FloatCC::Equal),
             MirBinOp::NotEq => compare(self, FloatCC::NotEqual),
             MirBinOp::Lt => compare(self, FloatCC::LessThan),
             MirBinOp::Gt => compare(self, FloatCC::GreaterThan),
             MirBinOp::LtEq => compare(self, FloatCC::LessThanOrEqual),
             MirBinOp::GtEq => compare(self, FloatCC::GreaterThanOrEqual),
-            _ => return Err(Decline::new("float operation")),
+            _ => return Err(Decline::new(format!("float operation {op:?}"))),
         })
+    }
+
+    /// Float `%` takes the sign of the divisor: `fmod`, then the divisor once
+    /// when the signs disagree; an exact multiple is a zero with the divisor's
+    /// sign.
+    fn float_floor_rem(&mut self, a: Value, b: Value) -> Lowered<Value> {
+        let rest = self
+            .call_runtime(&abi::FLOAT_REM, &[a, b])?
+            .ok_or_else(|| Decline::new("float remainder result"))?;
+        let zero = self.builder.ins().f64const(0.0);
+        let exact = self.builder.ins().fcmp(FloatCC::Equal, rest, zero);
+        let signed_zero = self.builder.ins().fcopysign(zero, b);
+        let rest_negative = self.builder.ins().fcmp(FloatCC::LessThan, rest, zero);
+        let divisor_negative = self.builder.ins().fcmp(FloatCC::LessThan, b, zero);
+        let differ = self.builder.ins().bxor(rest_negative, divisor_negative);
+        let shifted = self.builder.ins().fadd(rest, b);
+        let adjusted = self.builder.ins().select(differ, shifted, rest);
+        Ok(self.builder.ins().select(exact, signed_zero, adjusted))
     }
 
     /// A bits operand as its zero-extended pattern: a bare literal operand is

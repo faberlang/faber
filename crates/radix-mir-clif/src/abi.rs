@@ -575,6 +575,12 @@ pub const UNION_HAS_TAG: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, I32],
     ret: Some(I8),
 };
+/// Whether a record is a `genus` instance of the named type.
+pub const RECORD_IS_NAMED: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_record_is_named",
+    params: &[Ptr, Ptr],
+    ret: Some(I8),
+};
 /// Whether a boxed payload is a `genus` instance of the named type.
 pub const UNION_IS_STRUCT: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_union_is_struct",
@@ -678,6 +684,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     LIST_DECODE,
     UNION_HAS_TAG,
     UNION_IS_STRUCT,
+    RECORD_IS_NAMED,
     SET_DISPLAY_TOKENS,
 ];
 

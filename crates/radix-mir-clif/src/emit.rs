@@ -95,6 +95,11 @@ pub fn emit_object(
             .iter()
             .map(|(def, name)| (*def, name.clone()))
             .collect(),
+        enum_variants: validation
+            .enum_variants
+            .iter()
+            .map(|(def, variants)| (*def, variants.clone()))
+            .collect(),
     };
     emit_program(program, types, interner, entry, tokens, &structs)
 }

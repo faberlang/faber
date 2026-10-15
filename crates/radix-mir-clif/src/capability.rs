@@ -22,7 +22,7 @@ use radix_hir::DefId;
 use radix_mir::visit::MirVisitor;
 use radix_mir::*;
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
-use radix_types::{NumericWidth, Primitive, Type, TypeTable};
+use radix_types::{NumericWidth, Primitive, SemanticMutability, Type, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Slug for shapes the CLIF subset does not cover yet.
@@ -200,7 +200,7 @@ impl<'a> ClifCapability<'a> {
             Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => {
                 Some(Gap::Subset("instans value".to_owned()))
             }
-            Type::Primitive(Primitive::Nihil) => Some(Gap::Subset("none value".to_owned())),
+            Type::Primitive(Primitive::Nihil) => None,
             Type::Primitive(Primitive::Ignotum) => Some(Gap::Subset("unknown value".to_owned())),
             Type::Array(element) => self.type_gap(MirType::semantic(*element)),
             Type::BoundedArray { element, .. } => self.type_gap(MirType::semantic(*element)),
@@ -218,7 +218,7 @@ impl<'a> ClifCapability<'a> {
                 .values()
                 .find_map(|field| self.type_gap(MirType::semantic(*field))),
             Type::Enum(_) => None,
-            Type::Interface(_) => Some(Gap::Subset("enum value".to_owned())),
+            Type::Interface(_) => None,
             Type::Tuple(elements) => elements
                 .iter()
                 .find_map(|element| self.type_gap(MirType::semantic(*element))),
@@ -258,7 +258,24 @@ impl<'a> ClifCapability<'a> {
                     })
                     .or_else(|| self.type_gap(MirType::semantic(sig.ret)))
             }
-            Type::Ref(..) => Some(Gap::Subset("reference value".to_owned())),
+            // A read-only reference is the value it borrows; a mutable one is
+            // only a shared handle for the kinds that are handles.
+            Type::Ref(SemanticMutability::Mutable, inner) => {
+                if matches!(
+                    self.types.get(*inner),
+                    Type::Array(_)
+                        | Type::BoundedArray { .. }
+                        | Type::Struct(_)
+                        | Type::Record(_)
+                        | Type::Map(..)
+                        | Type::Set(_)
+                ) {
+                    self.type_gap(MirType::semantic(*inner))
+                } else {
+                    Some(Gap::Subset("reference value".to_owned()))
+                }
+            }
+            Type::Ref(_, inner) => self.type_gap(MirType::semantic(*inner)),
             Type::ModularWord(width) | Type::SaturatingWord(width)
                 if width.integer_range().is_some() =>
             {

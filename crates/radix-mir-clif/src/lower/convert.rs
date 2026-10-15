@@ -797,7 +797,7 @@ impl FunctionLower<'_, '_> {
         operand: &MirOperand,
     ) -> Lowered<Value> {
         let (handle, rep) = self.scalar(operand)?;
-        if rep != Rep::Opt {
+        if !matches!(rep, Rep::Opt | Rep::Record) {
             return Err(Decline::new("type check of a non-union"));
         }
         let tests = member_tests(self.state.input.types, op.ty.semantic_id())
@@ -805,6 +805,22 @@ impl FunctionLower<'_, '_> {
         let mut found: Option<Value> = None;
         for test in tests {
             let hit = match test {
+                // A genus or interface value is never none and has no tag.
+                MemberTest::Nil | MemberTest::Tag(_) if rep == Rep::Record => {
+                    Some(self.builder.ins().iconst(types::I8, 0))
+                }
+                MemberTest::Struct(def) if rep == Rep::Record => {
+                    let name = self
+                        .state
+                        .input
+                        .structs
+                        .names
+                        .get(&def)
+                        .ok_or_else(|| Decline::new("type check of an unnamed definition"))?
+                        .clone();
+                    let name = self.text_literal(name.as_bytes())?;
+                    self.call_runtime(&abi::RECORD_IS_NAMED, &[handle, name])?
+                }
                 MemberTest::Nil => {
                     let zero = self.builder.ins().iconst(types::I64, 0);
                     Some(self.builder.ins().icmp(IntCC::Equal, handle, zero))
