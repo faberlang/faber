@@ -25,6 +25,7 @@ mod helpers;
 mod items;
 mod names;
 mod stmt;
+mod text;
 mod ty;
 
 #[cfg(test)]
@@ -85,7 +86,27 @@ impl Codegen for CCodegen<'_> {
         _interner: &Interner,
     ) -> Result<COutput, CodegenError> {
         radix_codegen_shared::reject_hir_errors(hir)?;
-        let code = Emitter {
+        // A program that never allocates keeps signatures without the arena.
+        // Whether it allocates is known only after emission, so a program
+        // that does is emitted a second time with the arena threaded through.
+        let (code, allocates) = self.emit(hir, types, false)?;
+        let code = if allocates {
+            self.emit(hir, types, true)?.0
+        } else {
+            code
+        };
+        Ok(COutput { code })
+    }
+}
+
+impl CCodegen<'_> {
+    fn emit(
+        &self,
+        hir: &HirModule,
+        types: &TypeTable,
+        arena: bool,
+    ) -> Result<(String, bool), CodegenError> {
+        Emitter {
             names: &self.names,
             types,
             scope: Namer::program_scope(),
@@ -97,9 +118,9 @@ impl Codegen for CCodegen<'_> {
             loops: 0,
             returns: Returns::Main,
             temps: 0,
+            arena,
         }
-        .program(hir)?;
-        Ok(COutput { code })
+        .program(hir)
     }
 }
 
@@ -123,6 +144,9 @@ pub(crate) struct Emitter<'a> {
     returns: Returns,
     /// Sequencing temporaries claimed so far (`faber_t<n>`).
     temps: u32,
+    /// Every function takes the arena as its hidden first parameter
+    /// `faber_a`, and `main` owns the root arena.
+    arena: bool,
 }
 
 /// One local, parameter or module constant, by its C identifier.
@@ -135,7 +159,8 @@ pub(crate) struct Local {
 }
 
 impl Emitter<'_> {
-    fn program(mut self, hir: &HirModule) -> Result<String, CodegenError> {
+    /// The translation unit, and whether it allocates.
+    fn program(mut self, hir: &HirModule) -> Result<(String, bool), CodegenError> {
         if hir.entry_args_name.is_some() || hir.entry_is_async || !hir.entry_annotations.is_empty()
         {
             return Err(unsupported("entry with arguments, async, or annotations"));
@@ -151,9 +176,18 @@ impl Emitter<'_> {
         let mut out = self.support.text();
         out.push_str(&items);
         out.push_str("int main(void) {\n");
+        if self.arena {
+            // The root arena: `main` owns it and every call chain starts here
+            // (operator, 2026-10-14). It lives until the process exits.
+            out.push_str("    faber_arena faber_root = {0};\n");
+            out.push_str("    faber_arena *const faber_a = &faber_root;\n");
+            if !mentions_arena(&body) {
+                out.push_str("    (void)faber_a;\n");
+            }
+        }
         out.push_str(&body);
         out.push_str("    return 0;\n}\n");
-        Ok(out)
+        Ok((out, self.support.uses_arena()))
     }
 
     /// Headers a class needs wherever it is declared.
@@ -164,4 +198,15 @@ impl Emitter<'_> {
             Ty::Text => {}
         }
     }
+}
+
+/// True when emitted C reads the hidden arena `faber_a` (as a name, not as
+/// the prefix of a helper such as `faber_add`).
+pub(crate) fn mentions_arena(text: &str) -> bool {
+    text.match_indices("faber_a").any(|(at, _)| {
+        !text[at + "faber_a".len()..]
+            .chars()
+            .next()
+            .is_some_and(|next| next == '_' || next.is_ascii_alphanumeric())
+    })
 }

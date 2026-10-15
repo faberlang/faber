@@ -107,7 +107,7 @@ impl Narrow {
 }
 
 impl Operand {
-    fn new(text: String, value: Value) -> Self {
+    pub(crate) fn new(text: String, value: Value) -> Self {
         Self {
             text,
             value,
@@ -117,7 +117,7 @@ impl Operand {
         }
     }
 
-    fn with_effect(mut self, effect: bool) -> Self {
+    pub(crate) fn with_effect(mut self, effect: bool) -> Self {
         self.effect = effect;
         self
     }
@@ -155,6 +155,7 @@ impl Emitter<'_> {
                 recovery: None,
                 ..
             } => self.implicit_store(source, *slot, site),
+            HirExpressionKind::Scriptum(template, args) => self.template(*template, args),
             HirExpressionKind::Call(callee, type_args, args, arm) => {
                 if !type_args.is_empty() || arm.is_some() {
                     return Err(unsupported("generic or propagating call"));
@@ -204,11 +205,12 @@ impl Emitter<'_> {
             operands.push(operand);
         }
         let prelude = self.sequence(&mut operands);
-        let list = operands
-            .iter()
-            .map(|operand| operand.text.as_str())
-            .collect::<Vec<_>>()
-            .join(", ");
+        let mut slots = Vec::with_capacity(operands.len() + 1);
+        if self.arena {
+            slots.push("faber_a");
+        }
+        slots.extend(operands.iter().map(|operand| operand.text.as_str()));
+        let list = slots.join(", ");
         let value = ret.map_or(Value::Void, Value::from);
         let text = wrap(&prelude, &format!("{name}({list})"));
         // A boolean result carries its own parentheses like every truth operand.
@@ -233,29 +235,36 @@ impl Emitter<'_> {
         }
         let mut prelude = String::new();
         for operand in operands.iter_mut() {
-            if operand.constant.is_some() {
-                continue;
+            if operand.constant.is_none() {
+                prelude.push_str(&self.bind(operand));
             }
-            let c_type = match operand.value {
-                Value::Int => "int64_t ",
-                Value::Exact => "faber_i128 ",
-                Value::Text => "const char *",
-                Value::Truth => {
-                    self.support.need_bool();
-                    "bool "
-                }
-                Value::Void => continue,
-            };
-            let name = format!("faber_t{}", self.temps);
-            self.temps += 1;
-            write!(prelude, "{c_type}{name} = {}; ", operand.text).ok();
-            operand.text = if operand.value == Value::Truth {
-                format!("({name})")
-            } else {
-                name
-            };
         }
         prelude
+    }
+
+    /// Bind `operand` to a fresh temporary: returns its declaration and
+    /// rewrites the operand to read the temporary.
+    pub(crate) fn bind(&mut self, operand: &mut Operand) -> String {
+        let c_type = match operand.value {
+            Value::Int => "int64_t ",
+            Value::Exact => "faber_i128 ",
+            Value::Text => "const char *",
+            Value::Truth => {
+                self.support.need_bool();
+                "bool "
+            }
+            Value::Void => return String::new(),
+        };
+        let name = format!("faber_t{}", self.temps);
+        self.temps += 1;
+        let declaration = format!("{c_type}{name} = {}; ", operand.text);
+        operand.text = if operand.value == Value::Truth {
+            format!("({name})")
+        } else {
+            name
+        };
+        operand.narrow = None;
+        declaration
     }
 
     /// A folded integer constant. Inside `i64` it is an `int64_t` literal;
@@ -368,6 +377,9 @@ impl Emitter<'_> {
         let l = self.expr(left)?;
         let r = self.expr(right)?;
         match op {
+            HirBinOp::Add if l.value == Value::Text && r.value == Value::Text => {
+                Ok(self.concat(l, r))
+            }
             HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod => {
                 self.arithmetic(op, l, r)
             }
@@ -610,7 +622,7 @@ impl Emitter<'_> {
 /// `prelude` and `expr` as one GNU statement expression when the prelude
 /// declared temporaries, else `expr`. `__extension__` keeps `-pedantic`
 /// quiet; the outer parentheses keep a truth operand self-parenthesized.
-fn wrap(prelude: &str, expr: &str) -> String {
+pub(crate) fn wrap(prelude: &str, expr: &str) -> String {
     if prelude.is_empty() {
         expr.to_owned()
     } else {

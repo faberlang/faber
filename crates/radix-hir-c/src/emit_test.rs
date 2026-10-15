@@ -7,6 +7,7 @@ const C_EDGES: &str = include_str!("../tests/fixtures/run/c_edges.c");
 const LOOPS: &str = include_str!("../tests/fixtures/run/loops.c");
 const FUNCTIONS: &str = include_str!("../tests/fixtures/run/functions.c");
 const NARROWING: &str = include_str!("../tests/fixtures/run/narrowing.c");
+const TEXT: &str = include_str!("../tests/fixtures/run/text.c");
 
 #[test]
 fn scalars_program_is_pinned() {
@@ -372,4 +373,91 @@ fn a_proven_range_narrows_through_fit() {
         "main {\n    var int big ← 9223372036854775807\n    var int back ← big + 1 - 1\n    print back, big\n}",
     );
     assert!(code.contains("faber_o ? faber_fit_i64(faber_sub(faber_add(l_big, INT64_C(1)), INT64_C(1))) : faber_r;"), "{code}");
+}
+
+#[test]
+fn text_program_is_pinned() {
+    let source = include_str!("../tests/fixtures/run/text.fab");
+    let source = crate::test_support::program("text.fab", source);
+    assert_eq!(source, TEXT);
+}
+
+/// A program that builds no text keeps signatures without the arena.
+#[test]
+fn a_program_that_never_allocates_has_no_arena() {
+    let code = emitted("fn f(int x) → int {\n    return x\n}\nmain {\n    print f(1)\n}");
+    assert!(!code.contains("faber_a"), "{code}");
+    assert!(code.contains("static int64_t f_f(int64_t p_x) {"), "{code}");
+}
+
+/// Once anything allocates, every function takes the arena first, every call
+/// passes it, and `main` owns the root.
+#[test]
+fn an_allocating_program_threads_the_arena_from_main() {
+    let code = emitted(
+        "fn tag(string s) → string {\n    return \"<\" + s\n}\nfn one() → int {\n    return 1\n}\nmain {\n    print tag(\"x\"), one()\n}",
+    );
+    for line in [
+        "static const char *f_tag(faber_arena *, const char *);\n",
+        "static const char *f_tag(faber_arena *faber_a, const char *p_s) {\n",
+        "    return faber_concat(faber_a, \"<\", p_s);\n",
+        "static int64_t f_one(faber_arena *faber_a) {\n    (void)faber_a;\n",
+        "    faber_arena faber_root = {0};\n    faber_arena *const faber_a = &faber_root;\n",
+        "f_tag(faber_a, \"x\")",
+        "f_one(faber_a)",
+    ] {
+        assert!(code.contains(line), "{line:?} missing in {code}");
+    }
+}
+
+#[test]
+fn a_template_joins_its_pieces_in_one_allocation() {
+    let code = emitted(
+        "main {\n    var int a ← 7\n    var string s ← \"x\"\n    print \"§1-§0 (§)\"(a, s)\n}",
+    );
+    assert!(
+        code.contains("faber_join(faber_a, 6, l_s, \"-\", faber_int_text(faber_a, l_a), \" (\", faber_int_text(faber_a, l_a), \")\")"),
+        "{code}"
+    );
+}
+
+/// A hole may show an argument twice or not at all, so an argument that is
+/// not a plain name is evaluated once, in order, before the join.
+#[test]
+fn template_arguments_are_evaluated_once_in_order() {
+    let code = emitted(
+        "fn f(int x) → int {\n    print x\n    return x\n}\nmain {\n    print \"§0 §0 §1\"(f(1), f(2))\n}",
+    );
+    assert!(
+        code.contains("int64_t faber_t0 = f_f(faber_a, INT64_C(1)); int64_t faber_t1 = f_f(faber_a, INT64_C(2)); faber_join("),
+        "{code}"
+    );
+}
+
+#[test]
+fn template_pieces_split_on_holes_before_decoding() {
+    use crate::text::{Piece, template_pieces};
+    assert_eq!(
+        template_pieces("a=§, b=§, a again §0"),
+        vec![
+            Piece::Text("a=".to_owned()),
+            Piece::Hole(0),
+            Piece::Text(", b=".to_owned()),
+            Piece::Hole(1),
+            Piece::Text(", a again ".to_owned()),
+            Piece::Hole(0),
+        ]
+    );
+    // `\u{a7}` decodes to `§` but stays text: the split runs on the raw source.
+    assert_eq!(
+        template_pieces("x\\u{a7}y§"),
+        vec![Piece::Text("x\u{a7}y".to_owned()), Piece::Hole(0)]
+    );
+}
+
+#[test]
+fn the_arena_name_is_not_a_helper_prefix() {
+    assert!(crate::mentions_arena("f(faber_a, 1)"));
+    assert!(crate::mentions_arena("g(faber_a)"));
+    assert!(!crate::mentions_arena("faber_add(x, y) faber_alloc"));
 }

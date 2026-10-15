@@ -19,14 +19,6 @@ fn float_fixture() {
 }
 
 #[test]
-fn text_concatenation_is_not_folded() {
-    assert_eq!(
-        rejected("main {\n    print \"a\" + \"b\"\n}"),
-        "arithmetic on text or a boolean"
-    );
-}
-
-#[test]
 fn integer_beyond_the_representation_cap() {
     assert_eq!(
         rejected("main {\n    const int a ← 9223372036854775807\n    print a * a\n}"),

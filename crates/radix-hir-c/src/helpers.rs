@@ -21,6 +21,11 @@ pub(crate) enum Helper {
     Types,
     Trap,
     Text,
+    Arena,
+    Concat,
+    IntText,
+    ExactText,
+    Join,
     Cap,
     Add,
     Sub,
@@ -50,6 +55,9 @@ impl Helper {
             | Helper::FdivI64
             | Helper::FmodI64 => &[],
             Helper::Text => &[Helper::Types],
+            Helper::Arena => &[Helper::Trap],
+            Helper::Concat | Helper::IntText | Helper::Join => &[Helper::Arena],
+            Helper::ExactText => &[Helper::Arena, Helper::Text],
             Helper::Cap | Helper::Div | Helper::FitI64 => &[Helper::Types, Helper::Trap],
             Helper::Add | Helper::Sub | Helper::Mul => &[Helper::Cap],
             Helper::Rem => &[Helper::Div],
@@ -62,6 +70,11 @@ impl Helper {
             Helper::Types => TYPES,
             Helper::Trap => TRAP,
             Helper::Text => TEXT,
+            Helper::Arena => ARENA,
+            Helper::Concat => CONCAT,
+            Helper::IntText => INT_TEXT,
+            Helper::ExactText => EXACT_TEXT,
+            Helper::Join => JOIN,
             Helper::Cap => CAP,
             Helper::Add => ADD,
             Helper::Sub => SUB,
@@ -106,6 +119,103 @@ static const char *faber_i128_text(faber_i128 value, char *buffer) {
         *--cursor = '-';
     }
     return cursor;
+}
+";
+
+/// The arena (goal unit C5): chunks from `malloc`, bump allocation aligned to
+/// `max_align_t`, nothing freed while the program runs. The root arena belongs
+/// to `main` and reaches every function as the hidden first parameter
+/// `faber_a`; there is no global current arena (goal open question 3).
+const ARENA: &str = "\
+typedef struct faber_chunk {
+    struct faber_chunk *next;
+    size_t size;
+    size_t used;
+    unsigned char data[];
+} faber_chunk;
+
+typedef struct faber_arena {
+    faber_chunk *head;
+} faber_arena;
+
+static void *faber_alloc(faber_arena *arena, size_t size) {
+    const size_t align = _Alignof(max_align_t);
+    faber_chunk *chunk = arena->head;
+    size_t capacity;
+    if (chunk != NULL) {
+        unsigned char *next = chunk->data + chunk->used;
+        size_t pad = (align - (uintptr_t)next % align) % align;
+        if (pad <= chunk->size - chunk->used && size <= chunk->size - chunk->used - pad) {
+            chunk->used += pad + size;
+            return next + pad;
+        }
+    }
+    if (size > SIZE_MAX - sizeof(faber_chunk) - align) {
+        faber_trap(\"out of memory\");
+    }
+    capacity = size + align > 65536 ? size + align : 65536;
+    chunk = malloc(sizeof(faber_chunk) + capacity);
+    if (chunk == NULL) {
+        faber_trap(\"out of memory\");
+    }
+    chunk->next = arena->head;
+    chunk->size = capacity;
+    chunk->used = 0;
+    arena->head = chunk;
+    return faber_alloc(arena, size);
+}
+";
+
+const CONCAT: &str = "\
+static const char *faber_concat(faber_arena *arena, const char *a, const char *b) {
+    size_t a_len = strlen(a);
+    size_t b_len = strlen(b);
+    char *out = faber_alloc(arena, a_len + b_len + 1);
+    memcpy(out, a, a_len);
+    memcpy(out + a_len, b, b_len + 1);
+    return out;
+}
+";
+
+const INT_TEXT: &str = "\
+static const char *faber_int_text(faber_arena *arena, int64_t value) {
+    char *out = faber_alloc(arena, 21);
+    snprintf(out, 21, \"%\" PRId64, value);
+    return out;
+}
+";
+
+const EXACT_TEXT: &str = "\
+static const char *faber_exact_text(faber_arena *arena, faber_i128 value) {
+    return faber_i128_text(value, faber_alloc(arena, 41));
+}
+";
+
+/// A template: `count` text pieces joined in one allocation.
+const JOIN: &str = "\
+static const char *faber_join(faber_arena *arena, int count, ...) {
+    va_list pieces;
+    size_t total = 1;
+    char *out;
+    char *cursor;
+    int index;
+    va_start(pieces, count);
+    for (index = 0; index < count; index++) {
+        total += strlen(va_arg(pieces, const char *));
+    }
+    va_end(pieces);
+    out = faber_alloc(arena, total);
+    cursor = out;
+    va_start(pieces, count);
+    for (index = 0; index < count; index++) {
+        const char *piece = va_arg(pieces, const char *);
+        size_t length = strlen(piece);
+        memcpy(cursor, piece, length);
+        cursor += length;
+    }
+    va_end(pieces);
+    *cursor = '\\0';
+    return out;
 }
 ";
 
@@ -251,24 +361,33 @@ static inline int64_t faber_fmod_i64(int64_t a, int64_t b) {
 /// (alphabetical).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Header {
-    /// `int64_t`, `INT64_C`, `INT64_MIN`, `UINT64_MAX` and `PRId64`;
-    /// `<inttypes.h>` includes `<stdint.h>`.
+    /// `int64_t`, `INT64_C`, `INT64_MIN`, `UINT64_MAX`, `uintptr_t`,
+    /// `SIZE_MAX` and `PRId64`; `<inttypes.h>` includes `<stdint.h>`.
     Inttypes,
+    /// `va_list`.
+    Stdarg,
     /// `bool`.
     Stdbool,
-    /// `printf`, `fprintf`.
+    /// `size_t`, `max_align_t`.
+    Stddef,
+    /// `printf`, `fprintf`, `snprintf`.
     Stdio,
-    /// `exit`.
+    /// `exit`, `malloc`.
     Stdlib,
+    /// `strlen`, `memcpy`.
+    String,
 }
 
 impl Header {
     fn include(self) -> &'static str {
         match self {
             Header::Inttypes => "#include <inttypes.h>\n",
+            Header::Stdarg => "#include <stdarg.h>\n",
             Header::Stdbool => "#include <stdbool.h>\n",
+            Header::Stddef => "#include <stddef.h>\n",
             Header::Stdio => "#include <stdio.h>\n",
             Header::Stdlib => "#include <stdlib.h>\n",
+            Header::String => "#include <string.h>\n",
         }
     }
 }
@@ -302,13 +421,23 @@ impl Support {
             return;
         }
         self.headers.insert(Header::Inttypes);
-        if matches!(helper, Helper::Trap | Helper::StoreI64) {
-            self.headers.insert(Header::Stdio);
-            self.headers.insert(Header::Stdlib);
-        }
+        let headers: &[Header] = match helper {
+            Helper::Trap | Helper::StoreI64 => &[Header::Stdio, Header::Stdlib],
+            Helper::Arena => &[Header::Stddef, Header::Stdlib],
+            Helper::Concat => &[Header::String],
+            Helper::IntText => &[Header::Stdio],
+            Helper::Join => &[Header::Stdarg, Header::String],
+            _ => &[],
+        };
+        self.headers.extend(headers.iter().copied());
         for dependency in helper.needs() {
             self.need(*dependency);
         }
+    }
+
+    /// The program allocates, so every function carries the arena.
+    pub(crate) fn uses_arena(&self) -> bool {
+        self.helpers.contains(&Helper::Arena)
     }
 
     /// The `#include` lines in alphabetical order, then the helpers in

@@ -1,0 +1,31 @@
++++
+locale = "en"
++++
+# Text built at run time in the arena: concatenation, templates with
+# sequential and indexed holes, holes showing exact values and booleans, a
+# function returning built text, and text grown in a loop.
+fn label(string name, int n) → string {
+    return "<" + name + ":" + "§"(n) + ">"
+}
+
+fn quiet() → int {
+    return 3
+}
+
+main {
+    var int a ← 7
+    var string s ← "x"
+    print "a=§, s=§, again §0 §1"(a, s)
+    print "§1-§0"(a, s)
+    print "sum §, flag §, big §"(a + 1, a ≻ 3, a * 1000000000000)
+    var string t ← "<" + s + ">"
+    print t
+    print label("item", quiet())
+    var string acc ← ""
+    var int i ← 0
+    while i ≺ 5 {
+        acc ← acc + "§,"(i)
+        i ← i + 1
+    }
+    print acc
+}

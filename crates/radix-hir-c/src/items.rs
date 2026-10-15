@@ -173,15 +173,15 @@ impl Emitter<'_> {
             return Err(unsupported("function without a recorded signature"));
         };
         let ret = function.ret.map_or("void", Ty::c_type);
-        let params = if function.params.is_empty() {
+        let mut slots = Vec::with_capacity(function.params.len() + 1);
+        if self.arena {
+            slots.push("faber_arena *".to_owned());
+        }
+        slots.extend(function.params.iter().map(|ty| ty.c_type().to_owned()));
+        let params = if slots.is_empty() {
             "void".to_owned()
         } else {
-            function
-                .params
-                .iter()
-                .map(|ty| ty.c_type().to_owned())
-                .collect::<Vec<_>>()
-                .join(", ")
+            slots.join(", ")
         };
         let space = if ret.ends_with('*') { "" } else { " " };
         Ok(format!("static {ret}{space}{}({params})", function.name))
@@ -203,7 +203,10 @@ impl Emitter<'_> {
         self.scope = Namer::program_scope();
         self.loops = 0;
         self.returns = ret.map_or(Returns::Void, Returns::Value);
-        let mut params = Vec::with_capacity(function.params.len());
+        let mut params = Vec::with_capacity(function.params.len() + 1);
+        if self.arena {
+            params.push("faber_arena *faber_a".to_owned());
+        }
         for (param, ty) in function.params.iter().zip(param_types) {
             let Some(kind) = self.names.binding_kind(param.def_id) else {
                 return Err(unsupported("parameter the name catalog does not classify"));
@@ -226,6 +229,11 @@ impl Emitter<'_> {
             return Err(unsupported("function without a body"));
         };
         self.block(&mut body, block)?;
+        // Every function takes the arena; one that neither allocates nor calls
+        // still declares it, so the parameter is marked used.
+        if self.arena && !crate::mentions_arena(&body) {
+            body.insert_str(0, "    (void)faber_a;\n");
+        }
         // Typecheck proves every path of a function with a result returns; C
         // cannot always see that (`-Wreturn-type`), so a body that does not end
         // in `return` gets an unreachable trap rather than undefined behavior.
