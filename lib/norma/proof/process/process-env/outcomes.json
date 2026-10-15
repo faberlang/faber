@@ -1,11 +1,5 @@
 {
   "targets": {
-    "runner": {
-      "outcome": "known-fail",
-      "phase": "run",
-      "diagnostic_contains": "Unset",
-      "reason": "processus:lege (process.read_env) reports an unset variable as the leaf's fatal Unset error instead of the wrapper's declared none, so the required `unset_value is none` assertion aborts at run phase."
-    },
     "rust": {
       "outcome": "known-fail",
       "phase": "build",

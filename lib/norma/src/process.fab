@@ -137,10 +137,19 @@ fn exec_async(string command) → string ⇥ fault.IoFault {
 # Why: Same verb as file reading - context (processus vs solum) disambiguates.
 # Maps to: Bun.env[name] / process.env[name]
 
-# Read environment variable (Imperativus: fails when unset; set-to-empty → "")
+# Read environment variable: unset is `none`, set-to-empty is the present empty string
 @ public
 fn read_env(string name) → string ∪ none {
-    return call 'processus:lege' (name) ↦ string
+    const value raw ← call 'processus:lege' (name) ↦ value
+    do {
+        const map<string, value> fields ↤ raw
+        const bool present ← fields["present"] ↦ bool ⊥ false
+        if present then return fields["value"] ↦ string
+        return null
+    }
+    catch err {
+        panic "norma:process.read_env: malformed carrier: §"(err)
+    }
 }
 
 # =========================================================================
