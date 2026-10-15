@@ -570,7 +570,7 @@ message = "invalid escape sequence"
 help = "use a supported escape sequence or escape the backslash"
 
 [diagnostics.LEX003.issues.unknown_escape]
-message = "unknown escape `\\{escape}`; a literal escapes only its own delimiter, backslash, n, t, r and u{...}"
+message = "unknown escape `\\{escape}`; a literal escapes only its own delimiter, backslash, n, t, r and u{{...}"
 help = "remove the backslash, or write `\\\\` for a backslash"
 
 [diagnostics.LEX004]
@@ -864,7 +864,7 @@ help = "delete 'nexum' and declare an ordinary field: '<type> <name>'"
 
 [diagnostics.PARSE002.issues.construction_spread_removed]
 message = "'{sparge}' is not valid in a construction literal"
-help = "name each field; copy-with-changes is 'Genus { field = value } {ex} source'"
+help = "name each field; copy-with-changes is 'Genus {{ field = value } {ex} source'"
 
 [diagnostics.PARSE002.issues.construction_source_repeated]
 message = "a construction literal takes exactly one '{ex}' source"
@@ -3968,8 +3968,8 @@ message = "a conversion into wrapping or saturating cannot fail"
 help = "remove the `⊥` default; a conversion into wrapping or saturating cannot fail"
 
 [diagnostics.SEM016.issues.record_conversion_requires_reconstruction]
-message = "record conversion requires reconstruction; write `Type { field = value, … }` instead of converting with `↦`"
-help = "reconstruct by writing `Type { field = value, … }` instead of converting with `↦`"
+message = "record conversion requires reconstruction; write `Type {{ field = value, … }` instead of converting with `↦`"
+help = "reconstruct by writing `Type {{ field = value, … }` instead of converting with `↦`"
 
 [diagnostics.SEM016.issues.ordo_conversio_string_member]
 message = "this {ordo} has a string-valued member, so it has no int conversion"
@@ -3988,19 +3988,19 @@ message = "regex conversion does not support a `⊥` default; regex has no liter
 help = "remove the recovery arm from this regex conversion"
 
 [diagnostics.SEM016.issues.inferred_constructor_no_expected_type]
-message = "`_ { … }` builds the expected type, but there is none here"
-help = "name the type: write `Type { … }`, or give the binding, parameter or return an explicit type"
+message = "`_ {{ … }` builds the expected type, but there is none here"
+help = "name the type: write `Type {{ … }`, or give the binding, parameter or return an explicit type"
 
 [diagnostics.SEM016.issues.inferred_constructor_ambiguous_union]
-message = "`_ { … }` builds the expected type, but the expected type is a union of several types"
-help = "write the explicit `Type { … }` for the member you mean"
+message = "`_ {{ … }` builds the expected type, but the expected type is a union of several types"
+help = "write the explicit `Type {{ … }` for the member you mean"
 
 [diagnostics.SEM016.issues.inferred_constructor_entries_need_map]
-message = "`_ { \"key\": value, … }` gives entries, but the expected type is not a map"
+message = "`_ {{ \"key\": value, … }` gives entries, but the expected type is not a map"
 help = "entries `\"key\": value` build a map; for a genus or class write fields `name = value`"
 
 [diagnostics.SEM016.issues.inferred_constructor_fields_for_map]
-message = "`_ { name = value, … }` gives fields, but the expected type is a map"
+message = "`_ {{ name = value, … }` gives fields, but the expected type is a map"
 help = "a map takes entries `\"key\": value`; fields `name = value` build a genus or class"
 
 [diagnostics.SEM016.issues.valor_verte_unsupported]

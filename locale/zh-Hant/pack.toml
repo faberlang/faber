@@ -309,7 +309,7 @@ message = "無效跳脫序列"
 help = "使用受支援的跳脫序列，或跳脫反斜線"
 
 [diagnostics.LEX003.issues.unknown_escape]
-message = "未知跳脫 `\\{escape}`；字面值只能跳脫其自身的定界符、反斜線、n、t、r 和 u{...}"
+message = "未知跳脫 `\\{escape}`；字面值只能跳脫其自身的定界符、反斜線、n、t、r 和 u{{...}"
 help = "移除反斜線，或寫 `\\\\` 表示反斜線"
 
 [diagnostics.LEX004]
