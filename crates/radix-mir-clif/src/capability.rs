@@ -196,7 +196,8 @@ impl<'a> ClifCapability<'a> {
             | Type::Set(_) => Some(Gap::Subset("collection value".to_owned())),
             Type::Struct(_) => None,
             Type::Record(_) => Some(Gap::Subset("record value".to_owned())),
-            Type::Enum(_) | Type::Interface(_) => Some(Gap::Subset("enum value".to_owned())),
+            Type::Enum(_) => None,
+            Type::Interface(_) => Some(Gap::Subset("enum value".to_owned())),
             Type::Tuple(_) => Some(Gap::Subset("tuple value".to_owned())),
             Type::Union(_) | Type::Intersection(_) => Some(Gap::Subset("union value".to_owned())),
             Type::Option(inner) => match self.types.get(*inner) {
@@ -311,9 +312,7 @@ impl<'a> ClifCapability<'a> {
             MirAggregateKind::Set => Some(Gap::Subset("set construction".to_owned())),
             MirAggregateKind::Record => Some(Gap::Subset("record construction".to_owned())),
             MirAggregateKind::Struct(_) => None,
-            MirAggregateKind::EnumVariant(_) => {
-                Some(Gap::Subset("enum variant construction".to_owned()))
-            }
+            MirAggregateKind::EnumVariant(_) => None,
             MirAggregateKind::ClosureEnvironment(_) => {
                 Some(Gap::Subset("closure construction".to_owned()))
             }
@@ -414,7 +413,9 @@ impl MirVisitor for ClifCapability<'_> {
         if place.projections.iter().any(|projection| {
             !matches!(
                 projection,
-                MirProjection::Index(_) | MirProjection::Field(_)
+                MirProjection::Index(_)
+                    | MirProjection::Field(_)
+                    | MirProjection::VariantField { .. }
             )
         }) {
             self.record(Gap::Subset("place projection".to_owned()));

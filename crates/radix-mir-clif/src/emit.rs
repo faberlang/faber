@@ -81,11 +81,13 @@ pub fn emit_object(
         order: validation
             .struct_field_order
             .iter()
+            .chain(validation.variant_field_order.iter())
             .map(|(def, order)| (*def, order.clone()))
             .collect(),
         fields: validation
             .struct_fields
             .iter()
+            .chain(validation.variant_fields.iter())
             .map(|(def, fields)| (*def, fields.iter().map(|(n, t)| (*n, *t)).collect()))
             .collect(),
         names: validation

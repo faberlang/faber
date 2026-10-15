@@ -112,11 +112,18 @@ pub const TEXT_FROM_OPT: RuntimeSymbol = RuntimeSymbol {
     ret: Some(Ptr),
 };
 
-/// New empty record (`genus` instance): (name text handle).
+/// New empty record: (name text handle, variant flag). A variant with no
+/// fields displays as its bare name.
 pub const RECORD_NEW: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_record_new",
-    params: &[Ptr],
+    params: &[Ptr, I32],
     ret: Some(Ptr),
+};
+/// Structural equality of two records or variants.
+pub const RECORD_EQ: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_record_eq",
+    params: &[Ptr, Ptr],
+    ret: Some(I8),
 };
 /// Set field `index`: (record, index, field-name text handle, tag, bits).
 pub const RECORD_SET: RuntimeSymbol = RuntimeSymbol {
@@ -318,6 +325,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     TEXT_FROM_OPT,
     DUPLICATE,
     RECORD_NEW,
+    RECORD_EQ,
     RECORD_SET,
     RECORD_GET,
     PRINT_RECORD,

@@ -115,7 +115,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(Primitive::Bivalens) => Ok(Rep::Bool),
         Type::Primitive(Primitive::Textus) => Ok(Rep::Text),
         Type::Bits(width) => Ok(Rep::Bits(*width)),
-        Type::Struct(_) => Ok(Rep::Record),
+        Type::Struct(_) | Type::Enum(_) => Ok(Rep::Record),
         Type::Option(inner) => {
             if matches!(table.get(*inner), Type::Option(_)) {
                 return Err(Decline::new("nested optional value"));
@@ -730,11 +730,35 @@ impl FunctionLower<'_, '_> {
         Ok((def, index, field_ty))
     }
 
+    /// Declaration index and type of field `name` of an enum variant.
+    fn variant_slot(
+        &self,
+        variant: radix_hir::DefId,
+        name: radix_lexer::Symbol,
+    ) -> Lowered<(usize, MirType)> {
+        let meta = self.state.input.structs;
+        let index = meta
+            .order
+            .get(&variant)
+            .and_then(|order| order.iter().position(|field| *field == name))
+            .ok_or_else(|| Decline::new("unknown variant field"))?;
+        let field_ty = meta
+            .fields
+            .get(&variant)
+            .and_then(|fields| fields.get(&name))
+            .copied()
+            .ok_or_else(|| Decline::new("unknown variant field"))?;
+        Ok((index, field_ty))
+    }
+
     /// The type after one projection step.
     fn projected_type(&self, ty: MirType, projection: &MirProjection) -> Lowered<MirType> {
         match projection {
             MirProjection::Index(_) => self.element_type(ty),
             MirProjection::Field(name) => Ok(self.field_slot(ty, *name)?.2),
+            MirProjection::VariantField { variant, field } => {
+                Ok(self.variant_slot(*variant, *field)?.1)
+            }
             _ => Err(Decline::new("place projection")),
         }
     }
@@ -944,6 +968,17 @@ impl FunctionLower<'_, '_> {
                     );
                     self.call_runtime(&abi::RECORD_GET, &[current, position])?
                 }
+                MirProjection::VariantField { variant, field } => {
+                    if current_rep != Rep::Record {
+                        return Err(Decline::new("variant field of a non-enum"));
+                    }
+                    let (position, _) = self.variant_slot(*variant, *field)?;
+                    let position = self.builder.ins().iconst(
+                        types::I64,
+                        i64::try_from(position).map_err(|_| Decline::new("field index"))?,
+                    );
+                    self.call_runtime(&abi::RECORD_GET, &[current, position])?
+                }
                 _ => return Err(Decline::new("place projection")),
             }
             .ok_or_else(|| Decline::new("projection result"))?;
@@ -1000,6 +1035,19 @@ impl FunctionLower<'_, '_> {
                 let field = self.text_literal(field.as_bytes())?;
                 self.call_runtime(&abi::RECORD_SET, &[handle, position, field, tag, bits])?;
             }
+            MirProjection::VariantField { variant, field } => {
+                if handle_rep != Rep::Record {
+                    return Err(Decline::new("variant field of a non-enum"));
+                }
+                let (position, _) = self.variant_slot(*variant, *field)?;
+                let position = self.builder.ins().iconst(
+                    types::I64,
+                    i64::try_from(position).map_err(|_| Decline::new("field index"))?,
+                );
+                let name = self.state.input.interner.resolve(*field).to_owned();
+                let name = self.text_literal(name.as_bytes())?;
+                self.call_runtime(&abi::RECORD_SET, &[handle, position, name, tag, bits])?;
+            }
             _ => return Err(Decline::new("place projection")),
         }
         Ok(())
@@ -1050,32 +1098,41 @@ impl FunctionLower<'_, '_> {
         destination: &MirPlace,
         aggregate: &MirAggregate,
     ) -> Lowered<()> {
-        let MirAggregateKind::Struct(def) = aggregate.kind else {
-            return Err(Decline::new("struct kind"));
+        let (def, variant) = match aggregate.kind {
+            MirAggregateKind::Struct(def) => (def, false),
+            MirAggregateKind::EnumVariant(def) => (def, true),
+            _ => return Err(Decline::new("struct kind")),
         };
-        let MirAggregateFields::Named(supplied) = &aggregate.fields else {
-            return Err(Decline::new("struct fields"));
+        let supplied: &[MirNamedOperand] = match &aggregate.fields {
+            MirAggregateFields::Named(supplied) => supplied,
+            MirAggregateFields::Ordered(items) if items.is_empty() => &[],
+            _ => return Err(Decline::new("struct fields")),
         };
         let meta = self.state.input.structs;
-        let order = meta
-            .order
-            .get(&def)
-            .ok_or_else(|| Decline::new("unknown genus"))?
-            .clone();
+        let order = match meta.order.get(&def) {
+            Some(order) => order.clone(),
+            None if variant => Vec::new(),
+            None => return Err(Decline::new("unknown genus")),
+        };
         let name = meta
             .names
             .get(&def)
             .cloned()
             .unwrap_or_else(|| format!("def{}", def.0));
         let name = self.text_literal(name.as_bytes())?;
+        let variant_flag = self.builder.ins().iconst(types::I32, i64::from(variant));
         let record = self
-            .call_runtime(&abi::RECORD_NEW, &[name])?
+            .call_runtime(&abi::RECORD_NEW, &[name, variant_flag])?
             .ok_or_else(|| Decline::new("record new result"))?;
         for (position, field) in order.iter().enumerate() {
             let Some(item) = supplied.iter().find(|item| item.name == *field) else {
                 return Err(Decline::new("genus field without a value"));
             };
-            let (_, _, field_ty) = self.field_slot(aggregate.ty, *field)?;
+            let field_ty = if variant {
+                self.variant_slot(def, *field)?.1
+            } else {
+                self.field_slot(aggregate.ty, *field)?.2
+            };
             let (value, rep) = self.element_operand(&item.value, field_ty)?;
             let position = self.builder.ins().iconst(
                 types::I64,
@@ -1276,7 +1333,11 @@ impl FunctionLower<'_, '_> {
             MirStatementKind::Construct {
                 destination,
                 aggregate,
-            } if matches!(aggregate.kind, MirAggregateKind::Struct(_)) => {
+            } if matches!(
+                aggregate.kind,
+                MirAggregateKind::Struct(_) | MirAggregateKind::EnumVariant(_)
+            ) =>
+            {
                 self.construct_struct(destination, aggregate)
             }
             MirStatementKind::Construct { .. } => Err(Decline::new("aggregate construction")),
@@ -1918,6 +1979,19 @@ impl FunctionLower<'_, '_> {
             let same = self
                 .call_runtime(&abi::OPT_EQ, &[a, b])?
                 .ok_or_else(|| Decline::new("optional equality result"))?;
+            if op == MirBinOp::Eq {
+                return Ok((same, Rep::Bool));
+            }
+            let one = self.builder.ins().iconst(types::I8, 1);
+            return Ok((self.builder.ins().bxor(same, one), Rep::Bool));
+        }
+        if a_rep == Rep::Record
+            && b_rep == Rep::Record
+            && matches!(op, MirBinOp::Eq | MirBinOp::NotEq)
+        {
+            let same = self
+                .call_runtime(&abi::RECORD_EQ, &[a, b])?
+                .ok_or_else(|| Decline::new("record equality result"))?;
             if op == MirBinOp::Eq {
                 return Ok((same, Rep::Bool));
             }

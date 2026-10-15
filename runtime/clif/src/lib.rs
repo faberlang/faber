@@ -227,6 +227,7 @@ pub struct Present {
 /// declaration order.
 pub struct Record {
     name: *const u8,
+    variant: bool,
     fields: Vec<(*const u8, i32, i64)>,
 }
 
@@ -278,7 +279,11 @@ fn list_text(list: &List) -> String {
 fn record_text(record: &Record) -> String {
     let name = text_str(unsafe { text_bytes(record.name) }).into_owned();
     if record.fields.is_empty() {
-        return format!("{name} {{}}");
+        return if record.variant {
+            name
+        } else {
+            format!("{name} {{}}")
+        };
     }
     let parts: Vec<String> = record
         .fields
@@ -321,6 +326,7 @@ fn duplicate(tag: i32, bits: i64) -> i64 {
                 .collect();
             Box::into_raw(Box::new(Record {
                 name: source.name,
+                variant: source.variant,
                 fields,
             })) as i64
         }
@@ -417,11 +423,35 @@ pub unsafe extern "C" fn __faber_clif_v1_text_from_opt(handle: *const Present) -
 ///
 /// `name` addresses a well-formed text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_record_new(name: *const u8) -> *mut Record {
+pub unsafe extern "C" fn __faber_clif_v1_record_new(name: *const u8, variant: i32) -> *mut Record {
     Box::into_raw(Box::new(Record {
         name,
+        variant: variant != 0,
         fields: Vec::new(),
     }))
+}
+
+fn record_equal(left: &Record, right: &Record) -> bool {
+    (unsafe { text_bytes(left.name) == text_bytes(right.name) })
+        && left.fields.len() == right.fields.len()
+        && left
+            .fields
+            .iter()
+            .zip(&right.fields)
+            .all(|(a, b)| a.1 == b.1 && element_equal(a.1, a.2, b.2))
+}
+
+/// Structural equality of two records or variants.
+///
+/// # Safety
+///
+/// Both are live runtime records.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_record_eq(
+    left: *const Record,
+    right: *const Record,
+) -> i8 {
+    i8::from(record_equal(unsafe { &*left }, unsafe { &*right }))
 }
 
 /// Set (or extend to) field `index`.
@@ -566,6 +596,9 @@ fn element_equal(tag: i32, left: i64, right: i64) -> bool {
                 == f64::from_bits(u64::from_ne_bytes(right.to_ne_bytes()))
         }
         TAG_TEXT => unsafe { text_bytes(left as *const u8) == text_bytes(right as *const u8) },
+        TAG_STRUCT => unsafe {
+            record_equal(&*(left as *const Record), &*(right as *const Record))
+        },
         TAG_LIST => unsafe {
             let (left, right) = (
                 list_ref(left as *const List),
