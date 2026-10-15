@@ -1,0 +1,8 @@
++++
+locale = "en"
++++
+# A float too large for any integer ends the program.
+main {
+    const float f ← 1e30
+    print f ↦ int via Trunc
+}

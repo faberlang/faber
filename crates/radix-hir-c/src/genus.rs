@@ -43,6 +43,11 @@ pub(crate) struct Field {
 impl Emitter<'_> {
     /// The C spelling of a class.
     pub(crate) fn c_type(&self, ty: Ty) -> Result<String, CodegenError> {
+        // An optional genus is the genus's pointer, `NULL` for none.
+        let ty = match ty {
+            Ty::Opt(crate::ty::Inner::Genus(def_id)) => Ty::Genus(def_id),
+            other => other,
+        };
         if let Some(builtin) = ty.builtin_c_type() {
             return Ok(builtin.to_owned());
         }
@@ -206,6 +211,25 @@ impl Emitter<'_> {
             let operand = self.field_value(default, field.ty)?;
             write!(body, "{target}->{} = {}; ", field.c_name, operand.text).ok();
         }
+        // The `creo` hook runs once on the finished object, after every field
+        // is set (the runner's construction does the same).
+        let hook = self
+            .genus(def_id)?
+            .methods
+            .iter()
+            .find(|(name, _)| name == "creo")
+            .map(|(_, def)| *def);
+        if let Some(hook) = hook {
+            let Some(function) = self.functions.get(&hook) else {
+                return Err(unsupported(
+                    "construction with a creo hook before its signature is known",
+                ));
+            };
+            let arena = if self.arena { "faber_a, " } else { "" };
+            write!(body, "{}({arena}{target}); ", function.name).ok();
+            self.called.insert(hook);
+            effect = true;
+        }
         let text = format!("(__extension__ ({{ {body}{target}; }}))");
         Ok(Operand::new(text, Value::Genus(def_id)).with_effect(effect))
     }
@@ -234,11 +258,7 @@ impl Emitter<'_> {
     /// narrows like any unwrapped store.
     fn field_value(&mut self, value: &HirExpression, ty: Ty) -> Result<Operand, CodegenError> {
         let operand = self.expr(value)?;
-        let operand = if ty == Ty::Int {
-            self.fit(operand)?
-        } else {
-            operand
-        };
+        let operand = self.settle(operand, ty)?;
         if operand.value != Value::from(ty) {
             return Err(unsupported("value stored without a store check"));
         }
@@ -267,19 +287,22 @@ impl Emitter<'_> {
         name: Symbol,
     ) -> Result<Operand, CodegenError> {
         let base = self.expr(base)?;
-        let field = self.field_of(&base, name)?;
+        self.field_from(&base, name)
+    }
+
+    /// The field `name` of an already evaluated genus value.
+    pub(crate) fn field_from(
+        &mut self,
+        base: &Operand,
+        name: Symbol,
+    ) -> Result<Operand, CodegenError> {
+        let field = self.field_of(base, name)?;
         let text = format!("({})->{}", base.text, field.c_name);
-        // A truth operand carries its own parentheses.
-        let text = if field.ty == Ty::Bool {
-            format!("({text})")
-        } else {
-            text
-        };
-        // A pure read of an `int` field is a 64-bit fast-path leaf (C4).
-        let narrow =
-            (field.ty == Ty::Int && !base.effect).then(|| crate::expr::Narrow::leaf(&text));
-        let mut operand = Operand::new(text, Value::from(field.ty)).with_effect(base.effect);
-        operand.narrow = narrow;
+        let mut operand = Self::cell_read(&text, field.ty).with_effect(base.effect);
+        // A read behind a call is not a pure 64-bit fast-path leaf (C4).
+        if base.effect {
+            operand.narrow = None;
+        }
         Ok(operand)
     }
 

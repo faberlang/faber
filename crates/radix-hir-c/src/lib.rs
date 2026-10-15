@@ -19,6 +19,7 @@
 //! `radix-module` re-exports this leaf through its codegen surface and owns
 //! target dispatch.
 
+mod conversio;
 mod error;
 mod expr;
 mod float;
@@ -27,18 +28,40 @@ mod helpers;
 mod items;
 mod list;
 mod names;
+mod option;
+mod range;
 mod stmt;
+mod switch;
 mod text;
+mod textops;
 mod ty;
 
 #[cfg(test)]
+mod bounded_test;
+#[cfg(test)]
+mod control_test;
+#[cfg(test)]
+mod conversio_test;
+#[cfg(test)]
 mod emit_test;
+#[cfg(test)]
+mod item_test;
+#[cfg(test)]
+mod list_test;
 #[cfg(test)]
 mod names_test;
 #[cfg(test)]
+mod option_test;
+#[cfg(test)]
+mod range_test;
+#[cfg(test)]
 mod reject_test;
 #[cfg(test)]
+mod sized_test;
+#[cfg(test)]
 mod test_support;
+#[cfg(test)]
+mod textops_test;
 
 use crate::error::unsupported;
 use crate::helpers::Support;
@@ -50,7 +73,7 @@ use radix_codegen_shared::{Codegen, CodegenError};
 use radix_hir::{DefId, HirModule};
 use radix_lexer::Interner;
 use radix_types::TypeTable;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 /// C backend output.
 #[derive(Debug, Clone)]
@@ -116,6 +139,12 @@ impl CCodegen<'_> {
             items_scope: Namer::program_scope(),
             locals: FxHashMap::default(),
             functions: FxHashMap::default(),
+            called: FxHashSet::default(),
+            current: None,
+            entry_args: None,
+            uses_args: false,
+            fac_exits: Vec::new(),
+            unbounded_literals: false,
             support: Support::default(),
             depth: 0,
             loops: 0,
@@ -140,6 +169,21 @@ pub(crate) struct Emitter<'a> {
     /// ids are unique across the module, so one table serves every function.
     locals: FxHashMap<DefId, Local>,
     functions: FxHashMap<DefId, Function>,
+    /// Functions and methods some written call reaches; the rest are marked
+    /// unused so `-Wunused-function` stays quiet.
+    called: FxHashSet<DefId>,
+    /// The function or method whose body is being written; `None` in `main`.
+    current: Option<DefId>,
+    /// The name the entry gives the program's arguments (`main args xs`).
+    entry_args: Option<radix_lexer::Symbol>,
+    /// The entry reads its arguments, so `main` takes `argc` and `argv`.
+    uses_args: bool,
+    /// Plain `fac` blocks being written: the loop depth they opened at, the
+    /// label `rumpe` jumps to, and whether any `rumpe` did.
+    fac_exits: Vec<(usize, String, bool)>,
+    /// A list literal is being written under `∷ list<T>`: it is growable
+    /// whatever length its own type has.
+    unbounded_literals: bool,
     support: Support,
     /// Nesting depth of the statement being written (a function body is 1).
     depth: usize,
@@ -170,15 +214,17 @@ pub(crate) struct Local {
 impl Emitter<'_> {
     /// The translation unit, and whether it allocates.
     fn program(mut self, hir: &HirModule) -> Result<(String, bool), CodegenError> {
-        if hir.entry_args_name.is_some() || hir.entry_is_async || !hir.entry_annotations.is_empty()
-        {
-            return Err(unsupported("entry with arguments, async, or annotations"));
+        if hir.entry_is_async || !hir.entry_annotations.is_empty() {
+            return Err(unsupported("async entry or entry annotations"));
         }
+        self.entry_args = hir.entry_args_name;
         let items = self.items(hir)?;
         self.scope = Namer::program_scope();
         self.loops = 0;
         self.returns = Returns::Main;
-        let mut body = String::new();
+        self.current = None;
+        // Constants built at run time are set before the entry block runs.
+        let mut body = items.initializers.clone();
         if let Some(entry) = &hir.entry {
             self.block(&mut body, entry)?;
         }
@@ -186,20 +232,27 @@ impl Emitter<'_> {
         // generated last; the support text follows them, since they need
         // helpers too.
         let (show_prototypes, show_definitions) = self.show_functions()?;
+        if hir.entry.is_none() {
+            self.support.need(crate::helpers::Helper::Trap);
+        }
         let mut out = self.support.text();
         out.push_str(&items.genera);
         if !items.constants.is_empty() {
             out.push_str(&items.constants);
             out.push('\n');
         }
-        let prototypes = format!("{}{show_prototypes}", items.prototypes);
+        let prototypes = format!("{}{show_prototypes}", items.prototypes(&self.called));
         if !prototypes.is_empty() {
             out.push_str(&prototypes);
             out.push('\n');
         }
-        out.push_str(&items.definitions);
+        out.push_str(&items.definitions(&self.called));
         out.push_str(&show_definitions);
-        out.push_str("int main(void) {\n");
+        if self.uses_args {
+            out.push_str("int main(int argc, char **argv) {\n");
+        } else {
+            out.push_str("int main(void) {\n");
+        }
         if self.arena {
             // The root arena: `main` owns it and every call chain starts here
             // (operator, 2026-10-14). It lives until the process exits.
@@ -210,14 +263,21 @@ impl Emitter<'_> {
             }
         }
         out.push_str(&body);
-        out.push_str("    return 0;\n}\n");
+        if hir.entry.is_none() {
+            // A module with no entry block has nothing to run: `faber run`
+            // reports it and exits 1, and so does this program.
+            out.push_str("    faber_trap(\"no entry function in MIR program\");\n}\n");
+        } else {
+            out.push_str("    return 0;\n}\n");
+        }
         Ok((out, self.support.uses_arena()))
     }
 
     /// Headers a class needs wherever it is declared.
     pub(crate) fn need_class(&mut self, class: Ty) {
         match class {
-            Ty::Int => self.support.need_ints(),
+            Ty::Int | Ty::Sized(_) => self.support.need_ints(),
+            Ty::Opt(inner) => self.need_class(inner.ty()),
             Ty::Bool => self.support.need_bool(),
             Ty::Float => self.support.need(crate::helpers::Helper::Float),
             Ty::Text | Ty::Genus(_) => {}

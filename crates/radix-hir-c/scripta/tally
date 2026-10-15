@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# Corpus breadth for the c target: the first rejection per exemplar, and (with
+# --run) whether every exemplar that emits builds and matches its expected
+# output. This is the measure goal decision 6 names in place of a
+# `faber corpus` recipe: pick the next unit from the biggest bucket.
+#
+#   scripta/tally                       first-blocker tally over radix/corpus
+#   scripta/tally --run                 also build, run and compare each emitter
+#   scripta/tally --files <text>        list the exemplars whose class or detail
+#                                       contains <text> (after the tally)
+#   scripta/tally [--run] <dir|file>... tally only these paths
+#
+# Per exemplar, `faber emit -t c` gives one class:
+#   emits         a program was written
+#   unsupported   rejected by name; the detail is the construct
+#   frontend      stopped before the C emitter (parse, semantic, or a target
+#                 gate such as CODEGEN001 bits_type_unsupported_on_target);
+#                 most are deliberate negative exemplars
+#   timeout       emit took over 60 s
+# With --run, an emitting exemplar is built under the diffcheck flags and run;
+# its stdout and exit status are compared with `faber run`. Verdicts: pass, MISMATCH, cc-fail, run-fail (sanitizer or
+# signal). Tables go to target/c-tally/{tally,run}.tsv.
+#
+# Run by hand from anywhere; no crate test depends on it. Compiler lookup
+# order: $CC, then cc, gcc, clang; $CFLAGS replaces the default flags.
+set -u
+here=$(cd "$(dirname "$0")/.." && pwd)
+radix=$(cd "$here/../.." && pwd)
+faber=$radix/target/debug/faber
+runtime=$radix/runtime/c
+work=$radix/target/c-tally
+cflags=${CFLAGS:--std=c11 -pedantic -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=undefined,address -fno-sanitize-recover=all}
+export ASAN_OPTIONS=${ASAN_OPTIONS:-detect_leaks=0}
+
+cc=${CC:-}
+for candidate in cc gcc clang; do
+  [ -n "$cc" ] && break
+  cc=$(command -v "$candidate" || true)
+done
+
+# Internal: one exemplar, one tab-separated row on stdout.
+if [ "${1:-}" = "--probe" ]; then
+  f=$2
+  err=$(timeout 60 "$faber" emit -t c "$f" 2>&1 >/dev/null)
+  rc=$?
+  if [ $rc -eq 0 ]; then printf 'emits\t-\t%s\n' "$f"; exit 0; fi
+  if [ $rc -eq 124 ]; then printf 'timeout\t-\t%s\n' "$f"; exit 0; fi
+  construct=$(printf '%s\n' "$err" | grep -m1 'unsupported on target c' | sed -e 's/.*unsupported on target c: *//' -e 's/ (byte [0-9]*)$//')
+  if [ -n "$construct" ]; then printf 'unsupported\t%s\t%s\n' "$construct" "$f"; exit 0; fi
+  code=$(printf '%s\n' "$err" | grep -m1 -o '^error\[[A-Za-z0-9_:]*\]')
+  printf 'frontend\t%s\t%s\n' "${code:-$(printf '%s' "$err" | head -n 1 | cut -c1-80)}" "$f"
+  exit 0
+fi
+
+if [ "${1:-}" = "--exec" ]; then
+  f=$2
+  w=$(mktemp -d -p "$work")
+  trap 'rm -rf "$w"' EXIT
+  if ! "$faber" emit -t c "$f" >"$w/p.c" 2>/dev/null; then printf 'emit-fail\t%s\t\n' "$f"; exit 0; fi
+  # shellcheck disable=SC2086 # cflags is a word list on purpose
+  if ! "$cc" $cflags -I "$runtime" "$w/p.c" -o "$w/p" -lm 2>"$w/cc.err"; then
+    printf 'cc-fail\t%s\t%s\n' "$f" "$(grep -m1 'error' "$w/cc.err" | sed "s|$w/||" | cut -c1-140)"
+    exit 0
+  fi
+  timeout 60 "$w/p" >"$w/out" 2>"$w/err"
+  code=$?
+  if grep -qE "runtime error:|ERROR: AddressSanitizer" "$w/err"; then
+    printf 'run-fail\t%s\tsanitizer: %s\n' "$f" "$(grep -m1 -E 'runtime error:|ERROR: AddressSanitizer' "$w/err" | cut -c1-120)"
+    exit 0
+  fi
+  # The reference is `faber run`, the runner this target must match (stdout
+  # and exit status), as diffcheck compares. An `.expected` file is not the
+  # reference: some exemplars are check-only and were written with arguments.
+  timeout 60 "$faber" run "$f" >"$w/ref" 2>/dev/null
+  ref_code=$?
+  if [ "$code" -eq "$ref_code" ] && cmp -s "$w/out" "$w/ref"; then
+    printf 'pass\t%s\texit=%s\n' "$f" "$code"
+  else
+    printf 'MISMATCH\t%s\texit c=%s runner=%s\n' "$f" "$code" "$ref_code"
+  fi
+  exit 0
+fi
+
+run=0
+files_filter=
+paths=()
+while [ $# -gt 0 ]; do
+  case $1 in
+    --run) run=1 ;;
+    --files)
+      shift
+      files_filter=${1:-}
+      ;;
+    *) paths+=("$1") ;;
+  esac
+  shift
+done
+[ ${#paths[@]} -eq 0 ] && paths=("$radix/corpus")
+
+if [ "$run" -eq 1 ] && { [ -z "$cc" ] || ! command -v "$cc" >/dev/null 2>&1; }; then
+  echo "SKIPPED: no C compiler (cc, gcc, clang) found; --run needs one." >&2
+  exit 77
+fi
+mkdir -p "$work"
+(cd "$radix" && cargo build -q -p faber --features mir-basic,hir-pascal,hir-cobol,hir-fortran,hir-odin,hir-c 2>"$work/cargo.err") || {
+  echo "FAIL: could not build faber with the novelty features" >&2
+  tail -n 30 "$work/cargo.err" >&2
+  exit 1
+}
+
+find "${paths[@]}" -name '*.fab' | sort >"$work/files.txt"
+total=$(wc -l <"$work/files.txt")
+if [ "$total" -eq 0 ]; then
+  echo "FAIL: no .fab files under ${paths[*]}; nothing was checked" >&2
+  exit 1
+fi
+jobs=${JOBS:-$(nproc 2>/dev/null || echo 8)}
+xargs -a "$work/files.txt" -P "$jobs" -n 1 "$0" --probe >"$work/tally.tsv"
+
+echo "c target, $total exemplars (first rejection per file)"
+cut -f1 "$work/tally.tsv" | sort | uniq -c | sort -rn | sed 's/^/  /'
+echo
+echo "first blockers (unsupported on target c)"
+awk -F'\t' '$1 == "unsupported" { print $2 }' "$work/tally.tsv" | sort | uniq -c | sort -rn | head -n 30 | sed 's/^/  /'
+echo
+echo "stopped before the emitter"
+awk -F'\t' '$1 == "frontend" { print $2 }' "$work/tally.tsv" | sort | uniq -c | sort -rn | head -n 8 | sed 's/^/  /'
+
+status=0
+if [ "$run" -eq 1 ]; then
+  awk -F'\t' '$1 == "emits" { print $3 }' "$work/tally.tsv" >"$work/emits.txt"
+  xargs -a "$work/emits.txt" -P "$jobs" -n 1 "$0" --exec >"$work/run.tsv"
+  echo
+  echo "emitting exemplars, built with: $cflags"
+  cut -f1 "$work/run.tsv" | sort | uniq -c | sort -rn | sed 's/^/  /'
+  if grep -qv '^pass' "$work/run.tsv"; then
+    status=1
+    grep -v '^pass' "$work/run.tsv" | cut -f1-3 | sed 's/^/  /'
+  fi
+fi
+
+if [ -n "$files_filter" ]; then
+  echo
+  echo "exemplars matching \"$files_filter\""
+  awk -F'\t' -v want="$files_filter" 'index($1 " " $2, want) { print "  " $3 "  (" $2 ")" }' "$work/tally.tsv"
+fi
+echo
+echo "tables: $work/tally.tsv$([ "$run" -eq 1 ] && echo ", $work/run.tsv")"
+exit $status

@@ -1,0 +1,8 @@
++++
+locale = "en"
++++
+# Text that is not a number ends the program with the runner's text.
+main {
+    print "ok"
+    print "x" ↦ int
+}
