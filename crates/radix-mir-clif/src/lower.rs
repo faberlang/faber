@@ -314,6 +314,10 @@ struct ModuleState<'a> {
 impl<'a> ModuleState<'a> {
     fn signature_for(&self, function: &MirFunction) -> Lowered<Signature> {
         let mut signature = self.module.make_signature();
+        if function.is_generator {
+            // The collector: a runtime list every `cede` appends to.
+            signature.params.push(AbiParam::new(types::I64));
+        }
         for param in &function.params {
             if !matches!(
                 param.mode,
@@ -329,6 +333,9 @@ impl<'a> ModuleState<'a> {
             signature.params.push(AbiParam::new(cl));
         }
         let rep = rep_of(self.input.types, function.return_ty)?;
+        if function.is_generator {
+            return Ok(signature);
+        }
         // A failable function returns its status, then its result, then the
         // error payload bits.
         if function.error_ty.is_some() {
@@ -590,6 +597,9 @@ struct FunctionLower<'f, 'a> {
     values: FxHashMap<MirValueId, (Option<Value>, Rep)>,
     refs: FxHashMap<&'static str, FuncRef>,
     function_refs: FxHashMap<MirFunctionId, FuncRef>,
+    /// A generator's collector list, its leading parameter.
+    collector: Option<Value>,
+    generator: bool,
 }
 
 fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowered<()> {
@@ -598,8 +608,8 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
         .functions
         .get(&function.id)
         .ok_or_else(|| Decline::new("function not declared"))?;
-    if function.is_generator {
-        return Err(Decline::new("generator function"));
+    if function.is_generator && function.error_ty.is_some() {
+        return Err(Decline::new("failable generator function"));
     }
     let ret_rep = rep_of(state.input.types, function.return_ty)?;
     let error_rep = function
@@ -622,6 +632,8 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             values: FxHashMap::default(),
             refs: FxHashMap::default(),
             function_refs: FxHashMap::default(),
+            collector: None,
+            generator: function.is_generator,
         };
         lower.run(function)?;
         lower.builder.seal_all_blocks();
@@ -676,9 +688,13 @@ impl FunctionLower<'_, '_> {
             self.declare(Slot::Temp(temp.id), rep);
             self.slot_tys.insert(Slot::Temp(temp.id), temp.ty);
         }
+        let offset = usize::from(function.is_generator);
+        if function.is_generator {
+            self.collector = Some(self.builder.block_params(entry)[0]);
+        }
         for (index, param) in function.params.iter().enumerate() {
             let rep = rep_of(table, param.ty)?;
-            let value = self.builder.block_params(entry)[index];
+            let value = self.builder.block_params(entry)[index + offset];
             let (variable, _) = self.slot(Slot::Local(param.local))?;
             self.builder.def_var(variable, value);
             let _ = rep;
@@ -2194,6 +2210,16 @@ impl FunctionLower<'_, '_> {
         {
             return Err(Decline::new("failable call outside a try"));
         }
+        if self
+            .state
+            .input
+            .program
+            .functions
+            .iter()
+            .any(|function| function.id == id && function.is_generator)
+        {
+            return Err(Decline::new("direct call of a generator"));
+        }
         let mut values = Vec::with_capacity(args.len());
         for (position, arg) in args.iter().enumerate() {
             let (value, have) = self.scalar(arg)?;
@@ -2211,6 +2237,56 @@ impl FunctionLower<'_, '_> {
                 self.builder.def_var(variable, *result);
             }
         }
+        Ok(())
+    }
+
+    /// `@ cursor` consumed eagerly: run the generator to completion against a
+    /// fresh collector list and read the list.
+    fn cursor_stream(
+        &mut self,
+        destination: &MirPlace,
+        callee: radix_hir::DefId,
+        args: &[MirOperand],
+    ) -> Lowered<()> {
+        let mut matches = self
+            .state
+            .input
+            .program
+            .functions
+            .iter()
+            .filter(|function| function.source == Some(callee));
+        let target = match (matches.next(), matches.next()) {
+            (Some(function), None) => function,
+            _ => return Err(Decline::new("ambiguous generator")),
+        };
+        if !target.is_generator {
+            return Err(Decline::new("cursor stream of a non-generator"));
+        }
+        let id = target.id;
+        let params: Vec<Rep> = target
+            .params
+            .iter()
+            .map(|param| rep_of(self.state.input.types, param.ty))
+            .collect::<Lowered<_>>()?;
+        let reference = self.function_ref(id)?;
+        let list = self
+            .call_runtime(&abi::LIST_NEW, &[])?
+            .ok_or_else(|| Decline::new("list new result"))?;
+        let mut values = vec![list];
+        for (position, arg) in args.iter().enumerate() {
+            let (value, have) = self.scalar(arg)?;
+            let value = match params.get(position) {
+                Some(want) => self.coerce(value, have, *want)?,
+                None => value,
+            };
+            values.push(value);
+        }
+        self.builder.ins().call(reference, &values);
+        let (variable, slot_rep) = self.place_slot(destination)?;
+        if slot_rep != Rep::List {
+            return Err(Decline::new("cursor stream destination"));
+        }
+        self.builder.def_var(variable, list);
         Ok(())
     }
 
@@ -2408,7 +2484,21 @@ impl FunctionLower<'_, '_> {
                     return Err(Decline::new("cede shape"));
                 };
                 let (value, rep) = self.operand(argument)?;
+                if let (Some(collector), Some(item)) = (self.collector, value) {
+                    let tag = self
+                        .builder
+                        .ins()
+                        .iconst(types::I32, Self::element_tag(rep)?);
+                    let bits = self.element_bits(item, rep);
+                    self.call_runtime(&abi::LIST_PUSH, &[collector, tag, bits])?;
+                }
                 self.define_result(destination, value, rep)
+            }
+            MirIntrinsic::CursorStream(stream) => {
+                let Some(destination) = destination else {
+                    return Err(Decline::new("cursor stream without destination"));
+                };
+                self.cursor_stream(destination, stream.callee, &call.args)
             }
             MirIntrinsic::Assert => {
                 let Some(condition) = call.args.first() else {
@@ -3357,6 +3447,10 @@ impl FunctionLower<'_, '_> {
 
     fn terminator(&mut self, terminator: &MirTerminator) -> Lowered<()> {
         match &terminator.kind {
+            MirTerminatorKind::Return(_) if self.generator => {
+                self.builder.ins().return_(&[]);
+                Ok(())
+            }
             MirTerminatorKind::Return(value) => {
                 let mut results = Vec::new();
                 if self.error_rep.is_some() {

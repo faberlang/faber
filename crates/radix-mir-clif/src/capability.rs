@@ -98,6 +98,15 @@ impl MirVisitor for DirectCallees<'_> {
         }
         radix_mir::visit::walk_operand(self, operand);
     }
+
+    fn visit_runtime_call(&mut self, call: &MirRuntimeCall) {
+        if let MirIntrinsic::CursorStream(stream) = &call.intrinsic
+            && let Some(id) = self.sources.get(&stream.callee)
+        {
+            self.found.push(*id);
+        }
+        radix_mir::visit::walk_runtime_call(self, call);
+    }
 }
 
 /// The functions reachable from `entry` through direct calls.
@@ -393,8 +402,8 @@ impl MirVisitor for ClifCapability<'_> {
         {
             return;
         }
-        if function.is_generator {
-            self.record(Gap::Subset("generator function".to_owned()));
+        if function.is_generator && function.error_ty.is_some() {
+            self.record(Gap::Subset("failable generator function".to_owned()));
         }
         if function.shader_stage.is_some() {
             self.record(Gap::Policy("shader function".to_owned()));
@@ -571,6 +580,7 @@ impl MirVisitor for ClifCapability<'_> {
             || matches!(
                 call.intrinsic,
                 MirIntrinsic::FormatString { .. }
+                    | MirIntrinsic::CursorStream(_)
                     | MirIntrinsic::Assert
                     | MirIntrinsic::Panic
                     | MirIntrinsic::Cede
