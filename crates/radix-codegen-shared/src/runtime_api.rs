@@ -743,6 +743,10 @@ pub const ORDER_COMPARE: RuntimeItem = RuntimeItem {
     kind: RuntimeKind::Fn,
     targets: CARRIER_GO_TS,
 };
+/// `order.float_less`: whether one float sorts before another in the total
+/// order (NaN last, `-0` before `+0`), the test a sort of floats uses.
+pub const ORDER_FLOAT_LESS: RuntimeItem =
+    carrier_row(Namespace::Order, "float_less", RuntimeKind::Fn);
 /// `order.equal`: the structural `≡` / `≢` over a genus (a Go `*Name` compares
 /// by identity under `==`), a list, map, set, tuple or optional of one.
 pub const ORDER_EQUAL: RuntimeItem = carrier_row(Namespace::Order, "equal", RuntimeKind::Fn);
@@ -1313,6 +1317,7 @@ pub const TABLE: &[RuntimeItem] = &[
     SPARSA_NEW,
     ORDER_ORDER,
     ORDER_COMPARE,
+    ORDER_FLOAT_LESS,
     ORDER_EQUAL,
     ORDER_TEXT_COMPARE,
     DUP_DUPLICATE,
