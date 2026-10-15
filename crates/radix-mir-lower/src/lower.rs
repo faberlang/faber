@@ -55,7 +55,8 @@ use radix_mir::{
     MirRuntimeCall, MirShapeBinding, MirShapeCheck, MirShapeExpr, MirShapeRelation, MirStatement, MirStatementKind,
     MirStructFieldDefaults, MirSwitchCase, MirSyntheticFunctionIdentity, MirTemp, MirTempId, MirTerminator,
     MirTerminatorKind, MirType, MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
-    MirVectorOp, ValidatedMir, dump_program, instantiate_existing_generic_type, type_contains_param,
+    MirVectorOp, ValidatedMir, dump_program, instantiate_existing_generic_type, terminator_successors,
+    type_contains_param,
 };
 use radix_semantic::analyzed_application::AnalyzedModuleApplicationView;
 use radix_semantic::cli::{CliDefault, CliOperand, CliOption, CliType};
@@ -2486,6 +2487,10 @@ pub struct FunctionBuilder<'a> {
     pub temps: Vec<MirTemp>,
     pub blocks: Vec<OpenBlock>,
     current: Option<MirBlockId>,
+    /// The block that received the most recent terminator. A body that ends in
+    /// `mori` leaves this as the diverging block even when the block was
+    /// created before the body began.
+    last_terminated: Option<MirBlockId>,
     breakables: Vec<BreakableContext>,
     reduction_fold: Option<ReductionFoldContext>,
     /// Active `reducta via summa … filum` term capture (SFR-5): a valued
@@ -2572,6 +2577,7 @@ impl<'a> FunctionBuilder<'a> {
             temps: Vec::new(),
             blocks: Vec::new(),
             current: None,
+            last_terminated: None,
             breakables: Vec::new(),
             reduction_fold: None,
             filum_capture: None,
@@ -4702,6 +4708,7 @@ impl<'a> FunctionBuilder<'a> {
 
         block.terminator = Some(MirTerminator { kind, span });
         self.current = None;
+        self.last_terminated = Some(current);
         true
     }
 

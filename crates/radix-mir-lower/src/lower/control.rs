@@ -351,10 +351,33 @@ impl FunctionBuilder<'_> {
         self.close_device_block(span);
         let body_reaches = self.terminate_open_current(MirTerminatorKind::Goto(after_id), span);
 
-        self.switch_to(handler_id);
-        self.emit_device_handler_exit(catch.span);
-        self.visit_block(&catch.body);
-        let handler_reaches = self.terminate_open_current(MirTerminatorKind::Goto(after_id), catch.span);
+        // A diverging tail (`mori`) can end the body with no error edge into
+        // the handler. When nothing targets the handler *and* the body itself
+        // diverged, the catch is dead: sealing it keeps `after_id` free of
+        // orphaned successor targets. A body that terminates any other way
+        // with no error edge is a lowering defect, not a dead catch, so it
+        // keeps the old shape and is reported by post-lowering validation.
+        let handler_entered = self.blocks.iter().any(|block| {
+            block
+                .terminator
+                .as_ref()
+                .is_some_and(|terminator| terminator_successors(&terminator.kind).contains(&handler_id))
+        });
+        let body_diverges = self.last_terminated.is_some_and(|block| {
+            self.block(block)
+                .terminator
+                .as_ref()
+                .is_some_and(|terminator| matches!(terminator.kind, MirTerminatorKind::Unreachable))
+        });
+        let handler_reaches = if handler_entered || !body_diverges {
+            self.switch_to(handler_id);
+            self.emit_device_handler_exit(catch.span);
+            self.visit_block(&catch.body);
+            self.terminate_open_current(MirTerminatorKind::Goto(after_id), catch.span)
+        } else {
+            self.seal_unreachable(handler_id, catch.span);
+            false
+        };
 
         if body_reaches || handler_reaches {
             self.switch_to(after_id);
