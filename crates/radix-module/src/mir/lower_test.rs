@@ -3206,6 +3206,27 @@ functio primus() → numerus {
 }
 
 #[test]
+fn lowers_array_literal_with_spread_of_inferred_lists() {
+    // WHY: the spread sources are inferred bounded-array literals; the outer
+    // list construction routes through an inferred local because a
+    // return-position spread of a bounded local is rejected by the frontend
+    // expected-element check, not by MIR lowering.
+    let dump = dump_source(
+        r"
+functio build() → lista<numerus> {
+    fixum _ a ← [1, 2]
+    fixum _ b ← [3, 4]
+    fixum _ c ← [0, sparge a, sparge b, 5]
+    redde c
+}
+",
+    );
+
+    assert!(dump.contains("construct array"));
+    assert!(dump.contains("[const int 0, ..._"));
+}
+
+#[test]
 fn lowers_nested_json_valor_literal() {
     let dump = dump_source(
         r#"
