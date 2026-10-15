@@ -1602,7 +1602,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_split(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_text_replace(
     handle: *const u8,
-    from: *let u8,
+    from: *const u8,
     to: *const u8,
 ) -> *const u8 {
     let text = text_str(unsafe { text_bytes(handle) });
