@@ -1821,12 +1821,23 @@ impl Validator<'_, '_> {
             | MirCollectionOp::Floor
             | MirCollectionOp::Ceiling
             | MirCollectionOp::Truncate => {
-                self.require_exact(
-                    call.return_ty,
-                    self.primitive(Primitive::Numerus),
-                    span,
-                    "numeric rounding result is not numerus",
-                );
+                // A rounding expression is typed by its destination slot, so an
+                // explicit signed integer slot reaches MIR as a sized signed
+                // result. Unsigned widths convert before this call. The runner
+                // handles sized results, so accept every signed width.
+                if !matches!(
+                    self.type_kind(call.return_ty),
+                    Type::Primitive(Primitive::Numerus)
+                        | Type::SizedNumeric(
+                            Primitive::Numerus,
+                            NumericWidth::I8
+                                | NumericWidth::I16
+                                | NumericWidth::I32
+                                | NumericWidth::I64
+                        )
+                ) {
+                    self.error(span, "numeric rounding result is not numerus");
+                }
                 if let Some(receiver_ty) = first_arg_ty
                     && !matches!(
                         self.type_kind(receiver_ty),

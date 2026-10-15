@@ -3718,6 +3718,49 @@ fn rounding_rejects_numerus_receiver() {
     }
 }
 
+// The frontend types a rounding expression by its destination (contextual
+// slot typing), so an explicit signed slot carries a `SizedNumeric(Numerus, _)`
+// result into MIR. The runtime handles that result, so validation must accept
+// every signed width while still rejecting a `fractus` return.
+#[test]
+fn rounding_sized_signed_result_valid_for_all_rounding_ops() {
+    for op in ROUNDING_OPS {
+        for width in [
+            radix_types::NumericWidth::I8,
+            radix_types::NumericWidth::I16,
+            radix_types::NumericWidth::I32,
+            radix_types::NumericWidth::I64,
+        ] {
+            let mut types = TypeTable::new();
+            let receiver_ty = f32_receiver_mty(&mut types);
+            let return_ty = MirType::semantic(types.sized_numeric(Primitive::Numerus, width));
+            let program = unary_scalar_collection_program(&mut types, op, receiver_ty, return_ty);
+            let errors = validate(&program, &types);
+            assert!(
+                errors.is_empty(),
+                "expected a valid sized signed result for {op:?} {width:?}, got: {errors:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn rounding_fractus_result_is_still_rejected() {
+    for op in ROUNDING_OPS {
+        let mut types = TypeTable::new();
+        let receiver_ty = f32_receiver_mty(&mut types);
+        let return_ty = MirType::semantic(types.primitive(Primitive::Fractus));
+        let program = unary_scalar_collection_program(&mut types, op, receiver_ty, return_ty);
+        let errors = validate(&program, &types);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("numeric rounding result is not numerus")),
+            "expected the numerus-result diagnostic for {op:?}, got: {errors:?}"
+        );
+    }
+}
+
 // ── Approximate comparison: fractus-family receivers ───────────────────
 
 #[test]
