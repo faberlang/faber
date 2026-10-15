@@ -143,6 +143,13 @@ pub(super) fn execute(
         println!("{row}");
     }
     let status = summary_status(passed + rejected, expected_failures, failed);
+    // WHY: harnesses and unit proofs grep leg logs for `failed: <n>`; the
+    // compact JSON summary cannot carry that literal, so print one greppable
+    // human line next to it. JSON-lines consumers skip non-JSON lines.
+    println!(
+        "corpus {target} summary: {} case(s): {passed} passed, {rejected} rejected, {expected_failures} expected-fail, {not_applicable} not-applicable, failed: {failed} [{status}]",
+        cases.len()
+    );
     println!(
         "{}",
         json!({
