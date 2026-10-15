@@ -5,7 +5,7 @@ use crate::test_support::emitted;
 #[test]
 fn a_copy_bind_deep_duplicates_a_list() {
     let code = emitted(
-        "main {\n    const list<int> a ← [1]\n    mut list<int> b ← copy a\n    print b.length()\n}",
+        "main {\n    let list<int> a ← [1]\n    mut list<int> b ← copy a\n    print b.length()\n}",
     );
     assert!(code.contains("faber_list_i64_copy(faber_a, l_a)"), "{code}");
 }
@@ -13,7 +13,7 @@ fn a_copy_bind_deep_duplicates_a_list() {
 #[test]
 fn a_copy_argument_deep_duplicates_before_the_call() {
     let code = emitted(
-        "fn take(copy list<int> items) → int {\n    return items.length()\n}\nmain {\n    const list<int> a ← [1]\n    print take(copy a)\n}",
+        "fn take(copy list<int> items) → int {\n    return items.length()\n}\nmain {\n    let list<int> a ← [1]\n    print take(copy a)\n}",
     );
     assert!(
         code.contains("f_take(faber_a, faber_list_i64_copy(faber_a, l_a))"),

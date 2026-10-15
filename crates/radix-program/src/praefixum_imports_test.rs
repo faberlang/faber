@@ -349,8 +349,8 @@ fn praefixum_imports_method_homonym_genus_effect_stays_with_its_own_module() {
     let loud_dir = loud_dir.as_ref();
     let consts = SIBLING_GENUS;
     let other = "@ public\nfn loud() {\n    print 1\n}\n\n@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        loud()\n        return self.n\n    }\n}\n";
-    let main_consts = "import from \"./consts\" consts\nimport from \"./other\" other\n\nfn probe() → int {\n    const consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n";
-    let main_other = "import from \"./consts\" consts\nimport from \"./other\" other\n\nfn probe() → int {\n    const other.Box b ← other.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n";
+    let main_consts = "import from \"./consts\" consts\nimport from \"./other\" other\n\nfn probe() → int {\n    let consts.Box b ← consts.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n";
+    let main_other = "import from \"./consts\" consts\nimport from \"./other\" other\n\nfn probe() → int {\n    let other.Box b ← other.Box { n = 7 }\n    return b.get()\n}\n\nmain {\n    print 0\n}\n";
     for (dir, main) in [(pure_dir, main_consts), (loud_dir, main_other)] {
         write(dir, "consts.fab", consts);
         write(dir, "other.fab", other);

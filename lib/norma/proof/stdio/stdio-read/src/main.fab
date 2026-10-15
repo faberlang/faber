@@ -29,23 +29,23 @@ main {
 
     # End-of-input behaviour. The byte read above took only "gam", so stdin
     # still holds `ma\n\n`: the rest of the gamma line, then one blank line.
-    const string ∪ none rest ← console.read_line()
+    let string ∪ none rest ← console.read_line()
     assert rest not is none
     let string rest_text ↤ rest
     assert rest_text ≡ "ma"
 
     # A blank line is a present empty string, not end of input.
-    const string ∪ none blank ← console.read_line()
+    let string ∪ none blank ← console.read_line()
     assert blank not is none
     let string blank_text ↤ blank
     assert blank_text ≡ ""
 
     # Only past the last byte does a line read report none, and a byte read
     # at end of input is none as well (not an empty list).
-    const string ∪ none eof ← console.read_line()
+    let string ∪ none eof ← console.read_line()
     assert eof is none
 
-    const list<b8> ∪ none tail ← console.read_bytes(4)
+    let list<b8> ∪ none tail ← console.read_bytes(4)
     assert tail is none
 
     console.write_line("stdio-read-ok")

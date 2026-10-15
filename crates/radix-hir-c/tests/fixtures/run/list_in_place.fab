@@ -10,7 +10,7 @@ main {
     print values
     values.sort()
     print values
-    const list<int> fresh ← values.invert()
+    let list<int> fresh ← values.invert()
     print fresh
     print values
     mut list<string> names ← ["beta", "alpha", "gamma"]

@@ -74,7 +74,7 @@ fn inferred_regex_return_context_accepts() {
 
 #[test]
 fn inferred_regex_optional_slot_accepts() {
-    assert_accepts(r"incipit { fixum regex ∪ nihil r ← _ /a/ }");
+    assert_accepts(r"incipit { sit regex ∪ nihil r ← _ /a/ }");
 }
 
 #[test]

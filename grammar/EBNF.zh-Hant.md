@@ -2457,7 +2457,7 @@ Prefer typed construction for ordinary `類型` values and `vacua` for ordinary 
 
 ```fab
 sit point ← Point { x = 10 }
-fixum lista<numerus> xs ← vacua
+sit lista<numerus> xs ← vacua
 ```
 
 Only the `∷` glyph is accepted as the postfix static type-ascription operator. The Latin forms `qua`, `innatum`, and `novum` were aliases and have been removed (see verte-alias-clean-break).

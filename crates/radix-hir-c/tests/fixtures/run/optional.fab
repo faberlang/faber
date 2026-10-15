@@ -27,8 +27,8 @@ fn expensive() → int {
 }
 
 main {
-    const int ∪ none a ← 5
-    const int ∪ none b ← null
+    let int ∪ none a ← 5
+    let int ∪ none b ← null
     print a, b
     print find(3), find(-1)
     print a coalesce 9, b coalesce 9
@@ -44,17 +44,17 @@ main {
         print "a some"
     }
     print name(true), name(false)
-    const string ∪ none who ← name(true)
+    let string ∪ none who ← name(true)
     if who not is none {
         print "hello", who
     }
-    const bool ∪ none flag ← true
+    let bool ∪ none flag ← true
     print flag
-    const float ∪ none ratio ← 0.5
+    let float ∪ none ratio ← 0.5
     print ratio
-    const Box ∪ none held ← Box { n = 3 }
+    let Box ∪ none held ← Box { n = 3 }
     print held!.n
-    const Box ∪ none empty ← null
+    let Box ∪ none empty ← null
     print empty is none
     print empty!.n
 }

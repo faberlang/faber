@@ -4,9 +4,8 @@ use crate::test_support::emitted;
 
 #[test]
 fn an_optional_scalar_is_a_flag_and_a_value() {
-    let code = emitted(
-        "main {\n    const int ∪ none a ← 5\n    const int ∪ none b ← null\n    print a, b\n}",
-    );
+    let code =
+        emitted("main {\n    let int ∪ none a ← 5\n    let int ∪ none b ← null\n    print a, b\n}");
     assert!(
         code.contains("const faber_opt_i64 l_a = ((faber_opt_i64){1, INT64_C(5)});"),
         "{code}"
@@ -24,7 +23,7 @@ fn an_optional_scalar_is_a_flag_and_a_value() {
 #[test]
 fn an_optional_text_is_a_nullable_pointer() {
     let code = emitted(
-        "main {\n    const string ∪ none s ← null\n    if s is none {\n        print \"none\"\n    }\n}",
+        "main {\n    let string ∪ none s ← null\n    if s is none {\n        print \"none\"\n    }\n}",
     );
     assert!(code.contains("const char *const l_s = NULL;"), "{code}");
     assert!(code.contains("if (l_s == NULL) {"), "{code}");
@@ -32,7 +31,7 @@ fn an_optional_text_is_a_nullable_pointer() {
 
 #[test]
 fn coalesce_runs_its_fallback_only_for_none() {
-    let code = emitted("main {\n    const int ∪ none a ← null\n    print a coalesce 9\n}");
+    let code = emitted("main {\n    let int ∪ none a ← null\n    print a coalesce 9\n}");
     assert!(
         code.contains("faber_c0.has ? faber_c0.value : INT64_C(9)"),
         "{code}"
@@ -42,7 +41,7 @@ fn coalesce_runs_its_fallback_only_for_none() {
 #[test]
 fn unwrap_aborts_on_none() {
     let code = emitted(
-        "class Box {\n    var int n\n}\nmain {\n    const Box ∪ none b ← null\n    print b!.n\n}",
+        "class Box {\n    var int n\n}\nmain {\n    let Box ∪ none b ← null\n    print b!.n\n}",
     );
     assert!(code.contains("faber_abort(\"unwrap of nihil\");"), "{code}");
 }
@@ -100,9 +99,8 @@ fn an_optional_coalesce_parameter_keeps_its_declared_type() {
 
 #[test]
 fn an_assertion_index_reads_the_element() {
-    let code = emitted(
-        "main {\n    const list<string, 3> xs ← [\"a\", \"b\", \"c\"]\n    print xs![0]\n}",
-    );
+    let code =
+        emitted("main {\n    let list<string, 3> xs ← [\"a\", \"b\", \"c\"]\n    print xs![0]\n}");
     assert!(code.contains("faber_list_text_at("), "{code}");
 }
 

@@ -51,7 +51,7 @@ fn a_range_product_evaluates_every_bound_before_the_walk() {
 #[test]
 fn a_list_position_binds_the_loop_index() {
     let code = emitted(
-        "main {\n    const list<int> xs ← [5, 6]\n    for from xs at [i] let x {\n        print i, x\n    }\n}",
+        "main {\n    let list<int> xs ← [5, 6]\n    for from xs at [i] let x {\n        print i, x\n    }\n}",
     );
     assert!(code.contains("const int64_t l_i = faber_i0;"), "{code}");
     assert!(
@@ -80,7 +80,7 @@ fn a_type_alias_is_resolved_not_emitted() {
 #[test]
 fn a_lockstep_walk_is_one_index_over_every_source() {
     let code = emitted(
-        "main {\n    const list<string> labels ← [\"a\", \"b\"]\n    const list<int> values ← [1, 2]\n    for from labels, values at [i] let label, value {\n        print i, label, value\n    }\n}",
+        "main {\n    let list<string> labels ← [\"a\", \"b\"]\n    let list<int> values ← [1, 2]\n    for from labels, values at [i] let label, value {\n        print i, label, value\n    }\n}",
     );
     assert!(
         code.contains("faber_abort(\"itera lockstep sources must have equal length\");"),

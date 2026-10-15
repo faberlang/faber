@@ -52,7 +52,7 @@ main {
         total ← total + n
     }
     print total
-    const list<string> days ← ["mon", "tue", "wed"]
+    let list<string> days ← ["mon", "tue", "wed"]
     for from days at [i] let day {
         print i, day
     }

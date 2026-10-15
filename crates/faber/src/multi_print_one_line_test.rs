@@ -18,8 +18,8 @@ fn run(body: &str) -> Vec<String> {
 fn policy_cells_print_on_one_line() {
     let lines = run("
 main {
-    const wrapping<u8> w ← 44
-    const saturating<u8> c ← 255
+    let wrapping<u8> w ← 44
+    let saturating<u8> c ← 255
     print w, c
 }
 ");
@@ -61,7 +61,7 @@ main {
 fn mixed_plain_policy_and_bits_print_on_one_line() {
     let separate = run("
 main {
-    const wrapping<u8> w ← 44
+    let wrapping<u8> w ← 44
     let b8 p ← 0xf3
     print 1
     print w
@@ -71,7 +71,7 @@ main {
     assert_eq!(separate.len(), 3);
     let joined = run("
 main {
-    const wrapping<u8> w ← 44
+    let wrapping<u8> w ← 44
     let b8 p ← 0xf3
     print 1, w, p
 }

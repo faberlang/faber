@@ -37,20 +37,20 @@ Outer product `⊗`, matrix product `·`, element-wise product `⊙` and transpo
 
 ```fab
 main {
-    const vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
-    const vf32[2] p ← [1.0, 1.0] ↦ vf32[2]
-    const vf32[4] s ← [1.0, 2.0, 3.0, 4.0] ↦ vf32[4]
+    let vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    let vf32[2] p ← [1.0, 1.0] ↦ vf32[2]
+    let vf32[4] s ← [1.0, 2.0, 3.0, 4.0] ↦ vf32[4]
 
-    const matrix<f32, [3, 2]> left ← a ⊗ p
-    const matrix<f32, [2, 4]> right ← p ⊗ s
-    const matrix<f32, [3, 4]> product ← left · right
+    let matrix<f32, [3, 2]> left ← a ⊗ p
+    let matrix<f32, [2, 4]> right ← p ⊗ s
+    let matrix<f32, [3, 4]> product ← left · right
     print product
 
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[2, 3] m ← flat ↦ tf32[2, 3]
-    const tf32[3, 2] t ← mᵀ.materialize()
-    const tf32[2, 2] gram ← m · t
-    const tf32[2, 3] squares ← m ⊙ m
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[2, 3] m ← flat ↦ tf32[2, 3]
+    let tf32[3, 2] t ← mᵀ.materialize()
+    let tf32[2, 2] gram ← m · t
+    let tf32[2, 3] squares ← m ⊙ m
     print gram.flatten()
     print squares.sum()
 }
@@ -77,15 +77,15 @@ main {
         print row * col
     }
 
-    const list<int> price ← [4, 9, 2]
-    const list<int> count ← [3, 1, 5]
+    let list<int> price ← [4, 9, 2]
+    let list<int> count ← [3, 1, 5]
     mut int bill ← 0
     for from price, count let p, n {
         bill ← bill + p * n
     }
     print bill
 
-    const tf32[5] x ← [3.0, 1.0, 4.0, 1.0, 5.0] ↦ tf32[5]
+    let tf32[5] x ← [3.0, 1.0, 4.0, 1.0, 5.0] ↦ tf32[5]
     print reduce via max from x
     print reduce via argmax from x at [i] let s { return s }
     print reduce via count from x at [i] let s { return s ≻ 2.0 }
@@ -163,18 +163,18 @@ cell traps, and only the store that does not fit traps.
 
 ```fab
 main {
-    const wrapping<u8> a ← 200
-    const wrapping<u8> b ← 100
-    const wrapping<u8> mean ← (a + b) / 2
+    let wrapping<u8> a ← 200
+    let wrapping<u8> b ← 100
+    let wrapping<u8> mean ← (a + b) / 2
     print mean
 
-    const saturating<u8> hi ← 250
-    const saturating<u8> chain ← hi + 200 - 100
+    let saturating<u8> hi ← 250
+    let saturating<u8> chain ← hi + 200 - 100
     print chain
 
     let int big ← 300
-    const wrapping<u8> wrapped ← big ↦ wrapping<u8>
-    const saturating<u8> clamped ← big ↦ saturating<u8>
+    let wrapping<u8> wrapped ← big ↦ wrapping<u8>
+    let saturating<u8> clamped ← big ↦ saturating<u8>
     print wrapped
     print clamped
 
@@ -242,8 +242,8 @@ main {
     let int parsed ← "4x" ↦ int ⊥ -1
     print parsed
 
-    const list<int> xs ← [10, 20, 30]
-    const int ∪ none tenth ← xs.get(9)
+    let list<int> xs ← [10, 20, 30]
+    let int ∪ none tenth ← xs.get(9)
     print tenth
     print tenth coalesce 0
 }

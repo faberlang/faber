@@ -337,7 +337,7 @@ fn axis_reduction_named_modular_local_uses_the_reduced_value() {
     assert_accepts(
         r"
 functio cols(tensor<f32, [2, 3]> g) → tensor<f32, [3]> {
-    fixum modulus<u8> k ← 256
+    sit modulus<u8> k ← 256
     redde g.summa(axis k)
 }
 ",
@@ -350,7 +350,7 @@ fn axis_reduction_named_saturating_local_uses_the_clamped_value() {
     assert_rejects_with_issue(
         r"
 functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
-    fixum saturatus<u8> k ← 300
+    sit saturatus<u8> k ← 300
     redde g.summa(axis k)
 }
 ",
@@ -363,7 +363,7 @@ fn axis_reduction_named_modular_local_in_range_keeps_its_value() {
     assert_accepts(
         r"
 functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
-    fixum modulus<u8> k ← 1
+    sit modulus<u8> k ← 1
     redde g.summa(axis k)
 }
 ",

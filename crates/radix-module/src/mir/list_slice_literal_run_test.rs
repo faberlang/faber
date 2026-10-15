@@ -19,7 +19,7 @@ fn run(source: &str) -> (Result<(), String>, Vec<String>) {
 fn list_literal_slice_runs() {
     let (result, lines) = run("main {
     print [1, 2, 3, 4].slice(1, 3)
-    const list<int> w ← [1, 2, 3, 4].slice(1, 3)
+    let list<int> w ← [1, 2, 3, 4].slice(1, 3)
     print w
 }
 ");

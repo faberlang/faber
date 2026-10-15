@@ -29,9 +29,9 @@ fn first_or<T>(list<T> xs, T fallback) → T {
 }
 
 main {
-    const list<int> xs ← [1, 2, 3]
+    let list<int> xs ← [1, 2, 3]
     print first_or(xs, 9)
-    const list<string> ys ← empty
+    let list<string> ys ← empty
     print first_or(ys, "vacua")
 }
 "#);

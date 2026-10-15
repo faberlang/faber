@@ -22,7 +22,7 @@ fn bump(copy Counter c) → int {
     return mine.n
 }
 main {
-    const list<int> a ← [1, 2]
+    let list<int> a ← [1, 2]
     print take(copy a)
     print a.length()
 

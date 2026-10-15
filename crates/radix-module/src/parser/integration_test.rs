@@ -266,12 +266,12 @@ fn list_bracket_constructor_as_call_argument_is_accepted() {
 
 #[test]
 fn list_bracket_constructor_parenthesized_is_accepted() {
-    assert_list_bracket_constructor_accepted("incipit { fixum lista<numerus> xs ← (lista<numerus>[1, 2])\n nota xs }");
+    assert_list_bracket_constructor_accepted("incipit { sit lista<numerus> xs ← (lista<numerus>[1, 2])\n nota xs }");
 }
 
 #[test]
 fn list_bracket_constructor_bound_to_a_name_is_accepted() {
-    assert_list_bracket_constructor_accepted("incipit { fixum lista<numerus> xs ← lista<numerus>[1, 2]\n nota xs }");
+    assert_list_bracket_constructor_accepted("incipit { sit lista<numerus> xs ← lista<numerus>[1, 2]\n nota xs }");
 }
 
 // =============================================================================

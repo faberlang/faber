@@ -573,7 +573,7 @@ locale = "en"
 main args args {
   let bool b ← true
   print b
-  const int ∪ none o ← null
+  let int ∪ none o ← null
   print o
 }
 "#;

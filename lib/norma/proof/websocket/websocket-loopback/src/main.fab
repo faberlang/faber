@@ -19,20 +19,20 @@ main {
     assert port ≻ 0
 
     # Client half one: TCP connect plus the upgrade request, no read yet.
-    const websocket.Socket client ← websocket.connect_open("ws://127.0.0.1:§/chat"(port))
+    let websocket.Socket client ← websocket.connect_open("ws://127.0.0.1:§/chat"(port))
 
     # Server half: the request bytes are buffered, so accept completes and
     # websocket.accept writes the 101.
-    const server.Incoming incoming ← listener.accept()
+    let server.Incoming incoming ← listener.accept()
     let string path ← incoming.req.path
-    const websocket.Socket sock ← websocket.accept(incoming.id)
+    let websocket.Socket sock ← websocket.accept(incoming.id)
     websocket.connect_finish(client)
 
     # Echo exchange, strictly alternating so neither side waits on the other.
     client.send("ping")
     let string got ← sock.receive() coalesce "nil"
     sock.send("pong")
-    const string ∪ none reply ← client.receive()
+    let string ∪ none reply ← client.receive()
     let string pong ← reply coalesce "nil"
     assert pong ≡ "pong"
     client.close()

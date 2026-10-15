@@ -6,8 +6,8 @@ locale = "en"
 # comparisons (a list of bool), and whole-list `≡`.
 
 main {
-    const list<int> xs ← [10, 20, 30]
-    const list<int> ys ← [1, 2, 3]
+    let list<int> xs ← [10, 20, 30]
+    let list<int> ys ← [1, 2, 3]
     print xs + ys
     print xs - ys
     print 2 * xs
@@ -20,8 +20,8 @@ main {
     print xs ≅ xs
     print xs ≡ ys
     print xs ≡ xs
-    const list<float> fs ← [1.5, 2.5]
-    const list<float> gs ← [0.5, 0.5]
+    let list<float> fs ← [1.5, 2.5]
+    let list<float> gs ← [0.5, 0.5]
     print fs + gs
     print fs * 2.0
     print fs ≻ gs

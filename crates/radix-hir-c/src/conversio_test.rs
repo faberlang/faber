@@ -38,7 +38,7 @@ fn a_float_to_integer_conversion_needs_its_rounding_hint() {
 #[test]
 fn a_list_is_not_converted_to_a_bounded_list_at_run_time() {
     assert_eq!(
-        rejected("main {\n    const list<int> d ← [1, 2, 3]\n    print d ↦ list<int, 2>\n}"),
+        rejected("main {\n    let list<int> d ← [1, 2, 3]\n    print d ↦ list<int, 2>\n}"),
         "conversion to a bounded list"
     );
 }
@@ -63,7 +63,7 @@ fn text_and_float_to_bool_and_bool_to_float() {
 #[test]
 fn a_bounded_text_conversion_checks_its_capacity() {
     let code = emitted(
-        "main {\n    let string raw ← \"ab\"\n    const string<8> t ← raw ↦ string<8>\n    print t\n}",
+        "main {\n    let string raw ← \"ab\"\n    let string<8> t ← raw ↦ string<8>\n    print t\n}",
     );
     assert!(code.contains("faber_bounded_text(l_raw, 8)"), "{code}");
 }

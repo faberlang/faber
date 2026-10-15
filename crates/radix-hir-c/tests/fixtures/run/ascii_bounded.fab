@@ -7,8 +7,8 @@ locale = "en"
 main {
     let ascii route ← 'pg:query'
     print route
-    const ascii<8> a ← 'ab'
-    const ascii<8> b ← 'ab'
+    let ascii<8> a ← 'ab'
+    let ascii<8> b ← 'ab'
     print a.length(), a.is_empty()
     if a ≡ b {
         print 1
@@ -16,14 +16,14 @@ main {
     let string s ← a ↦ string
     print s
     let string raw ← "héj"
-    const string<8> t ← raw ↦ string<8>
+    let string<8> t ← raw ↦ string<8>
     print t
     print t.slice(0, 2)
-    const string<8> u ← t ↦ string<8>
+    let string<8> u ← t ↦ string<8>
     print u
     # The capacity is in code points: these two fit `string<2>` / `string<4>`
     # though their UTF-8 is three and four bytes.
-    const string<2> acute ← "hé" ↦ string<2>
-    const string<4> emoji ← "😀" ↦ string<4>
+    let string<2> acute ← "hé" ↦ string<2>
+    let string<4> emoji ← "😀" ↦ string<4>
     print acute, emoji
 }
