@@ -6,4 +6,5 @@ input = "importa/imported-constant.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

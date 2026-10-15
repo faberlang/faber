@@ -6,4 +6,5 @@ input = "functio/fn-value-named-mut.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

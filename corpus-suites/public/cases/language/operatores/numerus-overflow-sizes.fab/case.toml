@@ -6,7 +6,8 @@ input = "operatores/numerus-overflow-sizes.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false
 
 [targets.runner]
 outcome = "pass"

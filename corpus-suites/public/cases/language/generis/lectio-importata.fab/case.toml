@@ -6,4 +6,5 @@ input = "generis/lectio-importata.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

@@ -6,4 +6,5 @@ input = "tensor/batched-view-matmul.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false
