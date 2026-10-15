@@ -2859,6 +2859,33 @@ impl FunctionBuilder<'_> {
         conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        if let HirExpressionKind::OptionalChain(object, HirOptionalChainKind::Member(method)) = &callee.kind
+            && let Some(object_ty) = object.ty
+            && let Type::Option(inner) = *self.types.get(self.method_receiver_payload_id(object_ty))
+            && let Some(def) = self.method_receiver_struct_def(inner)
+            && let Some(target) = self.context.method_targets.get(&(def, *method)).copied()
+        {
+            // `a?.method(args)`: chain base becomes arg 0 of the genus method,
+            // receiver-first exactly like the genus branch of lower_method_call_on_receiver.
+            let base = self.lower_expr_value(object)?;
+            let mut call_args = Vec::with_capacity(args.len() + 1);
+            call_args.push(base.clone());
+            call_args.extend(self.lower_hir_call_args(args)?);
+            self.emit_call_shape_check(expr.id, &call_args, 1, expr.span)?;
+            let ty = self.expr_ty(expr)?;
+            return Some(self.assign_temp(
+                MirValueKind::Option(MirOptionOp::Chain {
+                    base,
+                    link: MirOptionChainLink::Call {
+                        callee: MirCallee::definition_with_type_args(target.def_id, Vec::new()),
+                        args: call_args,
+                    },
+                }),
+                ty,
+                expr.span,
+            ));
+        }
+
         // Callable value: a local binding or non-path expression. Positional args,
         // indirect call via MirCallee::Value.
         let value_callee = match &callee.kind {
