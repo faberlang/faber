@@ -82,6 +82,7 @@ impl Emitter<'_> {
                 c_name,
                 name,
                 fields,
+                consts: Vec::new(),
                 methods: Vec::new(),
                 shape: Shape::Enum { variants },
             },

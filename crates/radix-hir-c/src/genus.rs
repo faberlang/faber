@@ -26,9 +26,21 @@ pub(crate) struct Genus {
     /// The source name, as the runner shows it.
     pub(crate) name: String,
     pub(crate) fields: Vec<Field>,
+    /// Type-level constants (`const T X = e`), by source name. They belong to
+    /// the type and are read through it (`Color.RUBER`), never from an
+    /// instance; `c_name` is the file-scope C name.
+    pub(crate) consts: Vec<(String, ClassConst)>,
     /// Method source names and their definitions.
     pub(crate) methods: Vec<(String, DefId)>,
     pub(crate) shape: Shape,
+}
+
+/// One type-level constant of a genus.
+#[derive(Clone)]
+pub(crate) struct ClassConst {
+    pub(crate) c_name: String,
+    pub(crate) ty: Ty,
+    pub(crate) value: HirExpression,
 }
 
 /// What kind of declaration a [`Genus`] record stands for.
@@ -118,12 +130,30 @@ impl Emitter<'_> {
         let c_name = self.items_scope.claim(&format!("g_{name}"));
         let mut members = Namer::program_scope();
         let mut fields = Vec::with_capacity(genus.fields.len());
+        let mut consts = Vec::new();
         for field in &genus.fields {
-            if field.is_static() {
-                return Err(unsupported("const member"));
-            }
             if !field.annotations.is_empty() {
                 return Err(unsupported("field annotation"));
+            }
+            if field.is_static() {
+                // A type-level constant: `const T X = e`, read through the
+                // type name. It is never an instance member; its value is a
+                // folded compile-time fact.
+                let Some(init) = &field.init else {
+                    return Err(unsupported("class constant without a value"));
+                };
+                let field_name = self.names.resolve_symbol(field.name).to_owned();
+                let ty = classify(self.types, field.ty)?;
+                let c_name = self.items_scope.claim(&format!("k_{name}_{field_name}"));
+                consts.push((
+                    field_name,
+                    ClassConst {
+                        c_name,
+                        ty,
+                        value: init.clone(),
+                    },
+                ));
+                continue;
             }
             let field_name = self.names.resolve_symbol(field.name).to_owned();
             let declared = classify(self.types, field.ty)?;
@@ -159,6 +189,7 @@ impl Emitter<'_> {
                 c_name,
                 name,
                 fields,
+                consts,
                 methods,
                 shape: Shape::Class,
             },
@@ -329,8 +360,55 @@ impl Emitter<'_> {
         base: &HirExpression,
         name: Symbol,
     ) -> Result<Operand, CodegenError> {
+        // `Type.NAME` names a type-level constant, not an instance field: the
+        // base is the genus path, not a value. The runner reads the folded
+        // fact through the type.
+        if let radix_hir::HirExpressionKind::Path(def_id) = &base.kind {
+            let field_name = self.names.resolve_symbol(name).to_owned();
+            if let Some((c_name, ty)) = self.class_const(*def_id, &field_name) {
+                return Ok(Self::cell_read(&c_name, ty));
+            }
+        }
         let base = self.expr(base)?;
         self.field_from(&base, name)
+    }
+
+    /// The C name and class of a genus's type-level constant, by source name.
+    fn class_const(&self, def_id: DefId, name: &str) -> Option<(String, Ty)> {
+        let genus = self.genera.get(&def_id)?;
+        genus
+            .consts
+            .iter()
+            .find(|(source, _)| source == name)
+            .map(|(_, konst)| (konst.c_name.clone(), konst.ty))
+    }
+
+    /// The file-scope declarations of a genus's type-level constants. They
+    /// carry `__attribute__((unused))`: a constant no code reads is still a
+    /// legal declaration, and an unused `static const` is a warning under the
+    /// target's `-Werror`.
+    pub(crate) fn class_constants(&mut self, def_id: DefId) -> Result<String, CodegenError> {
+        let consts = self
+            .genera
+            .get(&def_id)
+            .map(|genus| genus.consts.clone())
+            .unwrap_or_default();
+        let mut out = String::new();
+        for (_, konst) in consts {
+            let value = self.expr(&konst.value)?;
+            if value.value != Value::from(konst.ty) {
+                return Err(unsupported("class constant without a folded value"));
+            }
+            self.need_class(konst.ty);
+            writeln!(
+                out,
+                "static {} __attribute__((unused)) = {};",
+                self.declare(konst.ty, &konst.c_name, false)?,
+                value.text
+            )
+            .ok();
+        }
+        Ok(out)
     }
 
     /// The field `name` of an already evaluated genus value.

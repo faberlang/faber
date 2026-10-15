@@ -92,16 +92,6 @@ fn list_of_genus() {
     );
 }
 
-#[test]
-fn static_field() {
-    assert_eq!(
-        rejected(
-            "class P {\n    const int count = 0\n    mut int x = 0\n}\nmain {\n    let P p ← { x = 1 }\n    print p.x\n}"
-        ),
-        "const member"
-    );
-}
-
 /// `f32` math runs at full precision and narrows at the store (goal unit C7,
 /// step 4); until then the width is rejected by name.
 #[test]

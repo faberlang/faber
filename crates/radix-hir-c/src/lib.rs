@@ -41,6 +41,8 @@ mod ty;
 #[cfg(test)]
 mod bounded_test;
 #[cfg(test)]
+mod class_const_test;
+#[cfg(test)]
 mod control_test;
 #[cfg(test)]
 mod conversio_test;
