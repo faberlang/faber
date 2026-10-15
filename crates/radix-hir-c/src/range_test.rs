@@ -76,3 +76,23 @@ fn a_type_alias_is_resolved_not_emitted() {
     let code = emitted("type Count = int\nmain {\n    const Count n ← 3\n    print n\n}");
     assert!(code.contains("const int64_t l_n = INT64_C(3);"), "{code}");
 }
+
+#[test]
+fn a_lockstep_walk_is_one_index_over_every_source() {
+    let code = emitted(
+        "main {\n    const list<string> labels ← [\"a\", \"b\"]\n    const list<int> values ← [1, 2]\n    for from labels, values at [i] const label, value {\n        print i, label, value\n    }\n}",
+    );
+    assert!(
+        code.contains("faber_abort(\"itera lockstep sources must have equal length\");"),
+        "{code}"
+    );
+    assert!(
+        code.contains("const char *const l_label = faber_t0->items[faber_i2];"),
+        "{code}"
+    );
+    assert!(
+        code.contains("const int64_t l_value = faber_t1->items[faber_i2];"),
+        "{code}"
+    );
+    assert!(code.contains("const int64_t l_i = faber_i2;"), "{code}");
+}

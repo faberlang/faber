@@ -1,0 +1,21 @@
++++
+locale = "en"
++++
+# Float methods: rounding to an integer (toward zero as well as floor, ceiling
+# and ties-to-even) and the float-valued absolute, sign, minimum and maximum.
+main {
+    const float value ← -3.75
+    print value.truncate()
+    print value.floor()
+    print value.ceiling()
+    print value.round()
+    print value.abs()
+    print value.sign()
+    print value.minimum(2.5)
+    print value.maximum(2.5)
+    const float zero ← 0.0
+    print zero.sign()
+    # `potentia` is libm `pow` (IEEE 754), no domain guard.
+    print value.power(2.0)
+    print value.power(-1.0)
+}

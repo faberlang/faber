@@ -61,6 +61,11 @@ impl Emitter<'_> {
         if matches!(self.types.get(target), Type::BoundedArray { .. }) {
             return Err(unsupported("conversion to a bounded list"));
         }
+        // `↦ ascii<N>` (resize or radix formatting) is not part of the subset;
+        // the runner's resize path is itself unsupported.
+        if matches!(self.types.get(target), Type::BoundedAscii { .. }) {
+            return Err(unsupported("conversion to bounded ascii"));
+        }
         let class = classify(self.types, target)?;
         let value = self.expr(source)?;
         let integer = matches!(value.value, Value::Int | Value::Exact);
@@ -107,9 +112,47 @@ impl Emitter<'_> {
                 self.fallible_int(&value, class, Kind::FloatInt, Some(mode), params, recovery)?
             }
             (Value::Text, Ty::Float) => self.text_to_float(&value, recovery)?,
+            // `text ↦ bool` is non-empty; a text value cannot hold a NUL, so
+            // the first byte decides. `fractus ↦ bool` is non-zero (`-0.0` is
+            // false, NaN is true). `bool ↦ fractus` is 1.0 / 0.0.
+            (Value::Text, Ty::Bool) => {
+                Operand::new(format!("(({})[0] != '\\0')", value.text), Value::Truth)
+            }
+            (Value::Float, Ty::Bool) => {
+                Operand::new(format!("(({}) != 0.0)", value.text), Value::Truth)
+            }
+            (Value::Truth, Ty::Float) => {
+                Operand::new(format!("(({}) ? 1.0 : 0.0)", value.text), Value::Float)
+            }
             _ => return Err(unsupported("conversion between these value classes")),
         };
+        // `textus ↦ string<N>`: the capacity check is a runtime store.
+        let operand = match self.text_capacity(target) {
+            Some(capacity) if operand.value == Value::Text => {
+                self.support.need(Helper::TextRead);
+                Operand::new(
+                    format!("faber_bounded_text({}, {capacity})", operand.text),
+                    Value::Text,
+                )
+            }
+            _ => operand,
+        };
         Ok(operand.with_effect(effect))
+    }
+
+    /// The capacity of a bounded text type (`string<N>`, `ascii<N>`), peeling
+    /// aliases; `None` for an unbounded text or a non-literal capacity.
+    fn text_capacity(&self, ty: TypeId) -> Option<u64> {
+        match self.types.get(ty) {
+            Type::Alias(_, inner) => self.text_capacity(*inner),
+            Type::BoundedTextus { capacity } | Type::BoundedAscii { capacity } => {
+                match self.types.get_index(*capacity) {
+                    radix_types::IndexExpr::Literal(value) => Some(*value),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
     }
 
     /// The `via` hint of a float-to-integer conversion, as `faber_try_float_int`'s

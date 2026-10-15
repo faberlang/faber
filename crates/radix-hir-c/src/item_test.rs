@@ -78,3 +78,14 @@ fn entry_arguments_are_the_text_list_after_the_program_name() {
         "{code}"
     );
 }
+
+#[test]
+fn an_uncalled_generic_function_is_skipped() {
+    // `faber run` runs the entry only; a generic body has no C text until it
+    // is instantiated, and one nothing calls contributes nothing.
+    let code = emitted(
+        "fn id<T>(T x) → T {\n    return x\n}\nmain {\n    print \"ok\"\n}",
+    );
+    assert!(!code.contains("f_id"), "{code}");
+    assert!(code.contains("\"ok\""), "{code}");
+}

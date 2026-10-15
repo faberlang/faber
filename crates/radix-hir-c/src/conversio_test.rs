@@ -48,3 +48,22 @@ fn a_radix_hint_reads_digits_of_that_radix() {
     let code = emitted("main {\n    print \"ff\" ↦ i32 via Hex\n}");
     assert!(code.contains("faber_try_text_int(\"ff\", 16,"), "{code}");
 }
+
+#[test]
+fn text_and_float_to_bool_and_bool_to_float() {
+    let code = emitted(
+        "main {\n    const float f ← 2.5\n    print \"\" ↦ bool\n    print f ↦ bool\n    print true ↦ float\n}",
+    );
+    // `text ↦ bool` is non-empty; `fractus ↦ bool` is non-zero.
+    assert!(code.contains("((\"\")[0] != '\\0')"), "{code}");
+    assert!(code.contains("((l_f) != 0.0)"), "{code}");
+    assert!(code.contains("? 1.0 : 0.0)"), "{code}");
+}
+
+#[test]
+fn a_bounded_text_conversion_checks_its_capacity() {
+    let code = emitted(
+        "main {\n    const string raw ← \"ab\"\n    const string<8> t ← raw ↦ string<8>\n    print t\n}",
+    );
+    assert!(code.contains("faber_bounded_text(l_raw, 8)"), "{code}");
+}

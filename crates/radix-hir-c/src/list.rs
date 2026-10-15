@@ -90,6 +90,12 @@ impl Emitter<'_> {
         if elements.is_empty() {
             return self.empty_list(expr);
         }
+        if elements
+            .iter()
+            .any(|element| matches!(element, HirArrayElement::Spread(_)))
+        {
+            return self.list_spread_literal(elements, elem);
+        }
         let mut operands = Vec::with_capacity(elements.len());
         for element in elements {
             let HirArrayElement::Expr(value) = element else {
@@ -119,6 +125,57 @@ impl Emitter<'_> {
         );
         let operand = self.list_operand(wrap(&prelude, &call), elem);
         Ok(operand.with_effect(effect))
+    }
+
+    /// A list literal carrying a `spread`: the length is known only at run
+    /// time, so the list is built by pushing each element (a spread list
+    /// appends all of its elements) in source order into one statement
+    /// expression. The result is growable, as the runner's is.
+    fn list_spread_literal(
+        &mut self,
+        elements: &[HirArrayElement],
+        elem: Elem,
+    ) -> Result<Operand, CodegenError> {
+        let suffix = elem.suffix();
+        self.support.need(Helper::List(elem, ListOp::New));
+        self.support.need(Helper::List(elem, ListOp::Push));
+        let target = format!("faber_t{}", self.temps);
+        self.temps += 1;
+        let mut body = format!(
+            "faber_list_{suffix} *{target} = faber_list_{suffix}_new(faber_a, 0); "
+        );
+        let mut effect = true;
+        for element in elements {
+            match element {
+                HirArrayElement::Expr(value) => {
+                    let item = self.element(value, elem)?;
+                    effect |= item.effect;
+                    body.push_str(&format!(
+                        "faber_list_{suffix}_push(faber_a, {target}, {}); ",
+                        item.text
+                    ));
+                }
+                HirArrayElement::Spread(value) => {
+                    let list = self.expr(value)?;
+                    let Value::List(inner) = list.value else {
+                        return Err(unsupported("spread of a value that is not a list"));
+                    };
+                    if inner != elem {
+                        return Err(unsupported("spread of a list of another element class"));
+                    }
+                    effect |= list.effect;
+                    body.push_str(&format!(
+                        "faber_list_{suffix}_push_all(faber_a, {target}, {}); ",
+                        list.text
+                    ));
+                }
+                HirArrayElement::Infer(_) => {
+                    return Err(unsupported("spread or inferred list element"));
+                }
+            }
+        }
+        let text = format!("(__extension__ ({{ {body}{target}; }}))");
+        Ok(self.list_operand(text, elem).with_effect(effect))
     }
 
     /// One element value of class `elem`: an exact value that arrives with
@@ -153,6 +210,17 @@ impl Emitter<'_> {
         if !matches!(position.value, Value::Int | Value::Exact) {
             return Err(unsupported("list index that is not an integer"));
         }
+        Ok(self.list_at_operands(list, position, elem))
+    }
+
+    /// The checked element read from already-evaluated list and position
+    /// operands. Shared by the plain read and the `x![i]` assertion read.
+    pub(crate) fn list_at_operands(
+        &mut self,
+        list: Operand,
+        position: Operand,
+        elem: Elem,
+    ) -> Operand {
         let effect = list.effect || position.effect;
         let mut operands = [list, position];
         let prelude = self.sequence(&mut operands);
@@ -171,7 +239,7 @@ impl Emitter<'_> {
         } else {
             text
         };
-        Ok(Operand::new(text, Value::from(elem.ty())).with_effect(effect))
+        Operand::new(text, Value::from(elem.ty())).with_effect(effect)
     }
 
     /// `xs[i] ← value` as a statement line.
@@ -276,6 +344,16 @@ impl Emitter<'_> {
                 Ok(Operand::new(wrap(&prelude, &call), Value::Void).with_effect(effect))
             }
             IntrinsicMirKind::Collection(op) => self.list_query(list, elem, op, entry, args),
+            // `ordina`: the in-place counterpart of `ordinata` (`Sort`), which
+            // the catalog marks codegen-only (it has no MIR kind).
+            _ if name == "ordina" && args.is_empty() => {
+                self.support.need(Helper::List(elem, ListOp::At));
+                Ok(Operand::new(
+                    format!("faber_list_{}_sort({})", elem.suffix(), list.text),
+                    Value::Void,
+                )
+                .with_effect(true))
+            }
             _ => Err(unsupported("list method outside the subset")),
         }
     }
@@ -497,7 +575,7 @@ impl Emitter<'_> {
 
     /// An optional element read: `call` fills the slot named `slot` and says
     /// whether there was one.
-    fn optional_call(&mut self, elem: Elem, inner: Inner, slot: &str, call: String) -> Operand {
+    pub(crate) fn optional_call(&mut self, elem: Elem, inner: Inner, slot: &str, call: String) -> Operand {
         self.temps += 1;
         let c_type = elem.c_type();
         let text = match inner.scalar_struct() {

@@ -1,0 +1,11 @@
++++
+locale = "en"
++++
+# A runtime negative shift count traps `negative shift count`, as the runner's
+# `faber::exact::shr` does. A constant count is a frontend error instead.
+fn ident(int x) → int {
+    return x
+}
+main {
+    print 5 ⇒ ident(0 - 1)
+}

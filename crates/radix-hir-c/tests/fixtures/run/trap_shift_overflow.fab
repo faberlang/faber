@@ -1,0 +1,11 @@
++++
+locale = "en"
++++
+# A runtime left shift past `2^64` traps `numerus overflow`, as the runner's
+# `faber::exact::shl` does.
+fn ident(int x) → int {
+    return x
+}
+main {
+    print 1 ⇐ ident(64)
+}

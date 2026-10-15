@@ -8,13 +8,11 @@ fn a_sized_local_is_a_c_integer_of_that_width() {
     assert!(code.contains("const uint8_t l_a = INT64_C(200);"), "{code}");
     assert!(code.contains("int32_t l_b = -INT64_C(5);"), "{code}");
     // Read as `int64_t`, so `%PRId64` always gets what it asks for; the
-    // runner prints sized values one to a line.
+    // runner joins sized integers into one line like any other integer.
     assert!(
-        code.contains("printf(\"%\" PRId64 \"\\n\", ((int64_t)l_a));"),
-        "{code}"
-    );
-    assert!(
-        code.contains("printf(\"%\" PRId64 \"\\n\", ((int64_t)l_b));"),
+        code.contains(
+            "printf(\"%\" PRId64 \" %\" PRId64 \"\\n\", ((int64_t)l_a), ((int64_t)l_b));"
+        ),
         "{code}"
     );
 }

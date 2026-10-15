@@ -134,6 +134,104 @@ static inline faber_i128 faber_rem(faber_i128 a, faber_i128 b) {
     return a - b * faber_div(a, b);
 }
 
+/* Bitwise `∧ ∨ ⊻` and `¬`. Two's complement on the exact window can leave the
+ * cap (`i64::MIN ^ u64::MAX`), so the result is range-checked like every other
+ * exact operation. Mirrors `faber::exact::int(Some(a & b))` and friends. */
+static inline faber_i128 faber_bit_and(faber_i128 a, faber_i128 b) {
+    return faber_cap(a & b);
+}
+
+static inline faber_i128 faber_bit_or(faber_i128 a, faber_i128 b) {
+    return faber_cap(a | b);
+}
+
+static inline faber_i128 faber_bit_xor(faber_i128 a, faber_i128 b) {
+    return faber_cap(a ^ b);
+}
+
+static inline faber_i128 faber_bit_not(faber_i128 value) {
+    return faber_cap(~value);
+}
+
+/* Unmasked shifts, the exact model (`faber::exact::shl` / `shr`): a negative
+ * count traps, a left shift past `2^64` traps, a right shift of 127 or more
+ * fills with the sign. Only `value == 0` needs no cap check. */
+static inline faber_i128 faber_shl(faber_i128 value, faber_i128 count) {
+    faber_i128 product;
+    if (count < 0) {
+        faber_trap("negative shift count");
+    }
+    if (value == 0) {
+        return 0;
+    }
+    if (count > 64) {
+        faber_trap("numerus overflow");
+    }
+    if (__builtin_mul_overflow(value, (faber_i128)1 << (int)count, &product)) {
+        faber_trap("numerus overflow");
+    }
+    return faber_cap(product);
+}
+
+static inline faber_i128 faber_shr(faber_i128 value, faber_i128 count) {
+    if (count < 0) {
+        faber_trap("negative shift count");
+    }
+    if (count >= 127) {
+        return value < 0 ? -1 : 0;
+    }
+    return value >> (int)count;
+}
+
+/* `≈` / `≉` between integers: `10^9 · |a − b| ≤ max(|a|, |b|)` over the exact
+ * values, never through a float. Mirrors `faber::exact::approx_int`. */
+static inline bool faber_approx_int(faber_i128 a, faber_i128 b) {
+    faber_i128 a_abs = a < 0 ? -a : a;
+    faber_i128 b_abs = b < 0 ? -b : b;
+    faber_i128 larger = a_abs >= b_abs ? a_abs : b_abs;
+    faber_i128 difference = a - b;
+    if (difference < 0) {
+        difference = -difference;
+    }
+    return (faber_i128)1000000000 * difference <= larger;
+}
+
+/* The two integer method twins with no operator: `absolutum` and `potentia`
+ * (`faber::exact::pow`); `abs` can reach `2^63` for `i64::MIN`, still in the
+ * cap. A negative exponent aborts as the runner's `pow` panics. */
+static inline faber_i128 faber_abs(faber_i128 value) {
+    return value < 0 ? faber_cap(-value) : value;
+}
+
+static inline faber_i128 faber_sign(faber_i128 value) {
+    return (faber_i128)((value > 0) - (value < 0));
+}
+
+static inline faber_i128 faber_min_i128(faber_i128 a, faber_i128 b) {
+    return a < b ? a : b;
+}
+
+static inline faber_i128 faber_max_i128(faber_i128 a, faber_i128 b) {
+    return a > b ? a : b;
+}
+
+static inline faber_i128 faber_pow(faber_i128 base, faber_i128 exponent) {
+    faber_i128 accumulator = 1;
+    if (exponent < 0) {
+        faber_abort("numerus potentia failed: negative exponent");
+    }
+    while (exponent > 0) {
+        if (exponent % 2 != 0) {
+            accumulator = faber_mul(accumulator, base);
+        }
+        exponent /= 2;
+        if (exponent > 0) {
+            base = faber_mul(base, base);
+        }
+    }
+    return accumulator;
+}
+
 /* Narrowing an exact value to its own expression type where typecheck put no
  * store node, because its range rule proved the result fits (`big + 1 - 1`
  * is `int` though `big + 1` is not). The check cannot fail on a proven
@@ -256,6 +354,66 @@ static inline int64_t faber_nearest_i64(double value) {
     return faber_saturate_i64(rint(value));
 }
 
+/* `⌊x⌋` toward zero. */
+static inline int64_t faber_trunc_i64(double value) {
+    return faber_saturate_i64(trunc(value));
+}
+
+/* `|x|`, `signum`: the runner is `f64::abs` / `f64::signum`. Rust's `signum`
+ * maps `+0.0` to `1.0`, `-0.0` to `-1.0`, and propagates NaN. */
+static inline double faber_abs_f64(double value) {
+    return fabs(value);
+}
+
+static inline double faber_signum_f64(double value) {
+    if (isnan(value)) {
+        return value;
+    }
+    return signbit(value) ? -1.0 : 1.0;
+}
+
+/* IEEE 754-2019 `minimum` / `maximum`: NaN in either operand propagates, and
+ * `-0.0` orders below `+0.0` (`ieee_minimum` / `ieee_maximum` in the runner). */
+static inline double faber_minimum_f64(double a, double b) {
+    if (isnan(a) || isnan(b)) {
+        return a + b;
+    }
+    if (a < b || (a == b && signbit(a))) {
+        return a;
+    }
+    return b;
+}
+
+static inline double faber_maximum_f64(double a, double b) {
+    if (isnan(a) || isnan(b)) {
+        return a + b;
+    }
+    if (a > b || (a == b && !signbit(a))) {
+        return a;
+    }
+    return b;
+}
+
+/* `≈` / `≉` between floats: `|a − b| <= 1e-9 · max(|a|, |b|)` (`approx_f64`). */
+static inline bool faber_approx_f64(double a, double b) {
+    double difference = a - b;
+    double scale = a < 0 ? -a : a;
+    double other = b < 0 ? -b : b;
+    if (difference < 0) {
+        difference = -difference;
+    }
+    if (other > scale) {
+        scale = other;
+    }
+    return difference <= 1e-9 * scale;
+}
+
+/* `fractus.potentia(n)`: IEEE 754 `pow` with no domain guard (`f64::powf`,
+ * which the runner uses). */
+static inline double faber_pow_f64(double base, double exponent) {
+    return pow(base, exponent);
+}
+
 /* An exact comparison of an integer with a float by their true values:
  * -1 (less), 0 (equal), 1 (greater), 2 (unordered: NaN). A C comparison would
  * round the integer to binary64 first. Mirrors `faber::exact::cmp_int_float`. */
@@ -278,6 +436,11 @@ static inline int faber_cmp_int_float(faber_i128 integer, double value) {
     }
     fraction = value - (double)whole;
     return fraction > 0.0 ? -1 : fraction < 0.0 ? 1 : 0;
+}
+
+/* `≅` / `≇` of an integer and a float, by true value (`cmp_int_float == 0`). */
+static inline bool faber_int_eq_float(faber_i128 integer, double value) {
+    return faber_cmp_int_float(integer, value) == 0;
 }
 
 static inline bool faber_int_lt_float(faber_i128 a, double b) {
@@ -646,6 +809,13 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         return list;                                                                    \
     }                                                                                   \
                                                                                         \
+    /* The `copy` marker (R7): a fresh array, never the source's. An element   \
+     * that is itself a pointer (text) is immutable, so sharing it is a copy. */\
+    static inline faber_list_##NAME *faber_list_##NAME##_copy(                          \
+        faber_arena *arena, const faber_list_##NAME *list) {                            \
+        return faber_list_##NAME##_of(arena, list->len, list->items);                   \
+    }                                                                                   \
+                                                                                        \
     static inline void faber_list_##NAME##_push(faber_arena *arena,                     \
                                                 faber_list_##NAME *list, TYPE item) {   \
         if (list->len == list->cap) {                                                   \
@@ -662,6 +832,16 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
             list->cap = capacity;                                                       \
         }                                                                               \
         list->items[list->len++] = item;                                                \
+    }                                                                                   \
+                                                                                        \
+    /* `[1, spread xs, 4]`: append every element of `other` in order. */                 \
+    static inline void faber_list_##NAME##_push_all(faber_arena *arena,                 \
+                                                    faber_list_##NAME *list,            \
+                                                    const faber_list_##NAME *other) {   \
+        int64_t at;                                                                     \
+        for (at = 0; at < other->len; at++) {                                           \
+            faber_list_##NAME##_push(arena, list, other->items[at]);                    \
+        }                                                                               \
     }                                                                                   \
                                                                                         \
     static inline TYPE faber_list_##NAME##_at(const faber_list_##NAME *list,            \
@@ -901,6 +1081,14 @@ static inline int64_t faber_f64_total_key(double value) {
         return out;                                                                     \
     }                                                                                   \
                                                                                         \
+    /* `ordina` sorts in place, where `ordinata` yields a new list. */                   \
+    static inline void faber_list_##NAME##_sort(faber_list_##NAME *list) {              \
+        if (list->len > 1) {                                                            \
+            qsort(list->items, (size_t)list->len, sizeof *list->items,                  \
+                  faber_list_##NAME##_compare);                                         \
+        }                                                                               \
+    }                                                                                   \
+                                                                                        \
     /* `remove_first` / `remove_last`: take an end off, false when empty. */            \
     static inline bool faber_list_##NAME##_remove_first(faber_list_##NAME *list,        \
                                                         TYPE *out) {                    \
@@ -1015,6 +1203,16 @@ static inline int64_t faber_text_length(faber_text text) {
         count++;
     }
     return count;
+}
+
+/* `textus ↦ string<N>`: the capacity is in code points and is checked at run
+ * time (the typechecker proves a literal fits). Mirrors the runner's
+ * bounded-text store. */
+static inline faber_text faber_bounded_text(faber_text text, int64_t capacity) {
+    if (faber_text_length(text) > capacity) {
+        faber_trap("textus to bounded textus conversion failed");
+    }
+    return text;
 }
 
 /* `s.slice(from, to)`: code-point positions, clamped to the text, empty when

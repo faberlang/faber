@@ -93,7 +93,7 @@ impl Inner {
             Ty::Float => Some(Inner::Float),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
-            Ty::Sized(_) | Ty::Opt(_) => None,
+            Ty::Sized(_) | Ty::Opt(_) | Ty::None => None,
         }
     }
 
@@ -137,6 +137,9 @@ pub(crate) enum Ty {
     /// A genus (`class`): a pointer to an arena-allocated C struct, so every
     /// bind aliases (R1).
     Genus(DefId),
+    /// A bare `none` value (the type is `none`): the only value is `null`, and
+    /// it prints as the locale's none word. C carries a dummy `int` 0.
+    None,
 }
 
 /// The element kinds a list carries in this subset.
@@ -187,6 +190,7 @@ impl Ty {
     pub(crate) fn builtin_c_type(self) -> Option<&'static str> {
         match self {
             Ty::Int => Some("int64_t"),
+            Ty::None => Some("int"),
             Ty::Sized(width) => Some(width.c_type()),
             Ty::Opt(Inner::Genus(_)) => None,
             Ty::Opt(inner) => inner
@@ -204,11 +208,25 @@ impl Ty {
     }
 }
 
+/// Whether a slot's declared type carries the value-side `copy` marker (R7).
+/// A declaration initializer's `copy` lands on the declared type, so the
+/// local's own type says the bind deep-duplicates its source.
+pub(crate) fn is_copy_marker(types: &TypeTable, ty: TypeId) -> bool {
+    match types.get(ty) {
+        Type::Alias(_, inner) => is_copy_marker(types, *inner),
+        Type::Ref(SemanticMutability::Copy, _) => true,
+        _ => false,
+    }
+}
+
 /// Classify a semantic type, rejecting everything outside the subset by name.
 pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError> {
     match types.get(ty) {
         Type::Alias(_, inner) => classify(types, *inner),
-        Type::Ref(SemanticMutability::Copy, _) => Err(unsupported("copy marker")),
+        // A `copy` parameter's storage is its declared class: the caller
+        // passes a deep duplicate (the call-site marker drives `copy_value`),
+        // so the callee sees an ordinary value.
+        Type::Ref(SemanticMutability::Copy, inner) => classify(types, *inner),
         // A `ref` or `mut` view of a list or a genus is the same pointer: both
         // already alias (R1). A view of a scalar would need a pointer to the
         // caller's cell, which this subset does not emit.
@@ -229,6 +247,14 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             _ => Err(unsupported(describe(types.get(ty)))),
         },
         Type::Primitive(Primitive::Textus) => Ok(Ty::Text),
+        // `ascii` is an ASCII-only text with no capacity; `ascii<N>` and
+        // `string<N>` are bounded text whose capacity the typechecker proves a
+        // literal fits and whose runtime conversion checks the rest. All are
+        // the counted UTF-8 text value the target already emits.
+        Type::Primitive(Primitive::Ascii) | Type::BoundedAscii { .. } => Ok(Ty::Text),
+        // A bare `none` (`const none nothing ← null`): its only value is null.
+        Type::Primitive(Primitive::Nihil) => Ok(Ty::None),
+        Type::BoundedTextus { .. } => Ok(Ty::Text),
         Type::Primitive(Primitive::Bivalens) => Ok(Ty::Bool),
         Type::Primitive(Primitive::Fractus)
         | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Ok(Ty::Float),
@@ -244,9 +270,11 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::Float => Ok(Ty::List(Elem::Float)),
                 Ty::List(_) => Err(unsupported("nested list type")),
                 Ty::Genus(_) => Err(unsupported("list of genus")),
+                Ty::None => Err(unsupported("list of none")),
             }
         }
-        Type::Struct(def_id) => Ok(Ty::Genus(*def_id)),
+        // An enumeration is a genus-shaped value: a tagged pointer.
+        Type::Struct(def_id) | Type::Enum(def_id) => Ok(Ty::Genus(*def_id)),
         Type::Option(inner) => match Inner::from_ty(classify(types, *inner)?) {
             Some(inner) => Ok(Ty::Opt(inner)),
             None => Err(unsupported("optional of a sized integer or an optional")),
@@ -259,7 +287,10 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
 pub(crate) fn returns(types: &TypeTable, ty: TypeId) -> Result<Option<Ty>, CodegenError> {
     match types.get(ty) {
         Type::Alias(_, inner) => returns(types, *inner),
-        Type::Primitive(Primitive::Vacuum) => Ok(None),
+        // `→ none` names a function that returns nothing, and `→ never` one
+        // that does not return at all (its body panics or traps); a use of
+        // either result as a value is rejected where it is used.
+        Type::Primitive(Primitive::Vacuum | Primitive::Nihil | Primitive::Numquam) => Ok(None),
         _ => classify(types, ty).map(Some),
     }
 }
@@ -307,7 +338,6 @@ fn describe(ty: &Type) -> &'static str {
         Type::Queue(_) | Type::BoundedQueue { .. } | Type::Stack(_) | Type::BoundedStack { .. } => {
             "queue or stack type"
         }
-        Type::Enum(_) => "enum type",
         Type::Interface(_) => "interface type",
         Type::Option(_) => "optional (nullable) type",
         Type::Union(_) => "union type",

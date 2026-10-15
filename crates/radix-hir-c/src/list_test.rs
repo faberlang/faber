@@ -42,3 +42,18 @@ fn integer_lists_sum_exactly() {
         emitted("main {\n    const list<int> xs ← [1, 2] ∷ list<int>\n    print xs.sum()\n}");
     assert!(code.contains("faber_list_i64_sum(l_xs)"), "{code}");
 }
+
+#[test]
+fn in_place_sort_uses_the_sort_helper() {
+    let code = emitted("main {\n    var list<int> v ← [2, 1]\n    v.sort()\n    print v\n}");
+    assert!(code.contains("faber_list_i64_sort(l_v)"), "{code}");
+}
+
+#[test]
+fn a_spread_literal_pushes_each_element_in_order() {
+    let code = emitted(
+        "main {\n    const list<int> xs ← [2]\n    const list<int> ys ← [1, spread xs, 3]\n    print ys\n}",
+    );
+    assert!(code.contains("faber_list_i64_push_all(faber_a, faber_t0, l_xs)"), "{code}");
+    assert!(code.contains("faber_list_i64_new(faber_a, 0)"), "{code}");
+}

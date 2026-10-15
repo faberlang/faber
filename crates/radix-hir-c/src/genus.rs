@@ -11,9 +11,9 @@
 use crate::Emitter;
 use crate::error::unsupported;
 use crate::expr::{Operand, Value, c_string};
-use crate::helpers::Helper;
+use crate::helpers::{Helper, ListOp};
 use crate::names::Namer;
-use crate::ty::{Ty, classify};
+use crate::ty::{Inner, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{DefId, HirExpression, HirStruct};
 use radix_lexer::Symbol;
@@ -28,6 +28,28 @@ pub(crate) struct Genus {
     pub(crate) fields: Vec<Field>,
     /// Method source names and their definitions.
     pub(crate) methods: Vec<(String, DefId)>,
+    pub(crate) shape: Shape,
+}
+
+/// What kind of declaration a [`Genus`] record stands for.
+#[derive(Clone)]
+pub(crate) enum Shape {
+    /// A `class`: fields and methods.
+    Class,
+    /// An `ordo` (`ordo`) or a tagged union: variants with a tag each.
+    Enum { variants: Vec<Variant> },
+}
+
+/// One variant of an enumeration.
+#[derive(Clone)]
+pub(crate) struct Variant {
+    pub(crate) def_id: DefId,
+    pub(crate) name: String,
+    /// The variant's position in its declaration.
+    pub(crate) tag: i64,
+    /// The static object a payload-less value points at.
+    pub(crate) static_name: String,
+    pub(crate) fields: Vec<Field>,
 }
 
 /// One instance field.
@@ -38,6 +60,9 @@ pub(crate) struct Field {
     pub(crate) ty: Ty,
     /// The compile-time default (`= value`) a construction falls back to.
     pub(crate) default: Option<HirExpression>,
+    /// An `optional` field: its class is the optional of the declared type
+    /// and a construction that omits it leaves none.
+    pub(crate) sponte: bool,
 }
 
 impl Emitter<'_> {
@@ -89,9 +114,6 @@ impl Emitter<'_> {
         if !genus.type_params.is_empty() {
             return Err(unsupported("generic genus"));
         }
-        if !genus.implements.is_empty() {
-            return Err(unsupported("genus implementing a contract"));
-        }
         let name = self.names.resolve_symbol(genus.name).to_owned();
         let c_name = self.items_scope.claim(&format!("g_{name}"));
         let mut members = Namer::program_scope();
@@ -100,18 +122,25 @@ impl Emitter<'_> {
             if field.is_static() {
                 return Err(unsupported("static (generis) field"));
             }
-            if field.sponte {
-                return Err(unsupported("optional (sponte) field"));
-            }
             if !field.annotations.is_empty() {
                 return Err(unsupported("field annotation"));
             }
             let field_name = self.names.resolve_symbol(field.name).to_owned();
+            let declared = classify(self.types, field.ty)?;
+            let ty = if field.sponte {
+                match crate::ty::Inner::from_ty(declared) {
+                    Some(inner) => Ty::Opt(inner),
+                    None => return Err(unsupported("optional field of a sized integer or optional")),
+                }
+            } else {
+                declared
+            };
             fields.push(Field {
                 c_name: members.claim(&format!("m_{field_name}")),
                 name: field_name,
-                ty: classify(self.types, field.ty)?,
+                ty,
                 default: field.init.clone(),
+                sponte: field.sponte,
             });
         }
         let mut methods = Vec::with_capacity(genus.methods.len());
@@ -129,6 +158,7 @@ impl Emitter<'_> {
                 name,
                 fields,
                 methods,
+                shape: Shape::Class,
             },
         );
         Ok(())
@@ -149,6 +179,10 @@ impl Emitter<'_> {
             let Some(genus) = self.genera.get(def_id) else {
                 continue;
             };
+            if matches!(genus.shape, Shape::Enum { .. }) {
+                out.push_str(&self.enum_body(genus)?);
+                continue;
+            }
             writeln!(out, "struct {} {{", genus.c_name).ok();
             if genus.fields.is_empty() {
                 // C forbids an empty struct; the member is never read.
@@ -203,12 +237,15 @@ impl Emitter<'_> {
             if assigned.contains(&field.name) {
                 continue;
             }
-            let Some(default) = &field.default else {
-                return Err(unsupported(
-                    "construction that omits a field without a default",
-                ));
+            let operand = match (&field.default, field.sponte) {
+                (Some(default), _) => self.field_value(default, field.ty)?,
+                (None, true) => self.none_of(field.ty)?,
+                (None, false) => {
+                    return Err(unsupported(
+                        "construction that omits a field without a default",
+                    ));
+                }
             };
-            let operand = self.field_value(default, field.ty)?;
             write!(body, "{target}->{} = {}; ", field.c_name, operand.text).ok();
         }
         // The `creo` hook runs once on the finished object, after every field
@@ -256,7 +293,11 @@ impl Emitter<'_> {
 
     /// A value stored into a field of class `ty`; an unwrapped exact value
     /// narrows like any unwrapped store.
-    fn field_value(&mut self, value: &HirExpression, ty: Ty) -> Result<Operand, CodegenError> {
+    pub(crate) fn field_value(
+        &mut self,
+        value: &HirExpression,
+        ty: Ty,
+    ) -> Result<Operand, CodegenError> {
         let operand = self.expr(value)?;
         let operand = self.settle(operand, ty)?;
         if operand.value != Value::from(ty) {
@@ -360,10 +401,13 @@ impl Emitter<'_> {
     /// How `print` and a template hole show a genus.
     pub(crate) fn show_genus(&mut self, text: &str, def_id: DefId) -> Result<String, CodegenError> {
         self.need_show(def_id);
-        Ok(format!(
-            "{}_show(faber_a, {text})",
-            self.genus(def_id)?.c_name
-        ))
+        let genus = self.genus(def_id)?;
+        // A payload-less enumeration shows from a name table and takes no
+        // arena.
+        let plain = matches!(&genus.shape, Shape::Enum { variants }
+            if variants.iter().all(|variant| variant.fields.is_empty()));
+        let arena = if plain { "" } else { "faber_a, " };
+        Ok(format!("{}_show({arena}{text})", genus.c_name))
     }
 
     /// The prototypes and definitions of every show function asked for,
@@ -375,6 +419,12 @@ impl Emitter<'_> {
         while done < self.shows.len() {
             let def_id = self.shows[done];
             done += 1;
+            if matches!(self.genus(def_id)?.shape, Shape::Enum { .. }) {
+                let (prototype, definition) = self.enum_show(def_id)?;
+                prototypes.push_str(&prototype);
+                definitions.push_str(&definition);
+                continue;
+            }
             let (c_name, name, fields) = {
                 let genus = self.genus(def_id)?;
                 (
@@ -389,6 +439,16 @@ impl Emitter<'_> {
             prototypes.push_str(&signature);
             prototypes.push_str(";\n");
             // `Point { x = 1, tag = "p" }`, as the runner shows a genus.
+            // A genus with no fields shows as `Name {}`.
+            if fields.is_empty() {
+                write!(
+                    definitions,
+                    "{signature} {{\n    (void)value;\n    (void)faber_a;\n    return {};\n}}\n\n",
+                    c_string(&format!("{name} {{}}"))?
+                )
+                .ok();
+                continue;
+            }
             let mut parts = vec![c_string(&format!("{name} {{ "))?];
             for (position, field) in fields.iter().enumerate() {
                 let separator = if position == 0 { "" } else { ", " };
@@ -410,8 +470,88 @@ impl Emitter<'_> {
         Ok((prototypes, definitions))
     }
 
+    /// Deep-copy functions for the genera a `copy` asked for (R7). The body
+    /// allocates a fresh object and copies every field: a list a fresh array,
+    /// a genus a recursive clone, a scalar / text (immutable) / scalar
+    /// optional by assignment. Nested clones join the worklist as they are
+    /// named, so one call emits the whole closure.
+    pub(crate) fn copy_functions(&mut self) -> Result<(String, String), CodegenError> {
+        let mut prototypes = String::new();
+        let mut definitions = String::new();
+        let mut done = 0;
+        let mut emitted: Vec<DefId> = Vec::new();
+        while done < self.copies.len() {
+            let def_id = self.copies[done];
+            done += 1;
+            if emitted.contains(&def_id) {
+                continue;
+            }
+            emitted.push(def_id);
+            let (c_name, fields) = {
+                let genus = self.genus(def_id)?;
+                (genus.c_name.clone(), genus.fields.clone())
+            };
+            let signature = format!(
+                "static {c_name} *{c_name}_copy(faber_arena *faber_a, const {c_name} *faber_self)"
+            );
+            prototypes.push_str(&signature);
+            prototypes.push_str(";\n");
+            self.support.need(Helper::Arena);
+            let mut body = String::new();
+            if fields.is_empty() {
+                body.push_str("    (void)faber_self;\n");
+            }
+            for field in &fields {
+                let read = format!("faber_self->{}", field.c_name);
+                let written = self.copy_field(&read, field.ty)?;
+                writeln!(body, "    faber_copy->{} = {written};", field.c_name).ok();
+            }
+            write!(
+                definitions,
+                "{signature} {{\n    {c_name} *faber_copy = faber_alloc(faber_a, sizeof *faber_copy);\n{body}    return faber_copy;\n}}\n\n"
+            )
+            .ok();
+        }
+        Ok((prototypes, definitions))
+    }
+
+    /// One field's deep copy, read from `read`.
+    fn copy_field(&mut self, read: &str, ty: Ty) -> Result<String, CodegenError> {
+        Ok(match ty {
+            Ty::List(elem) => {
+                self.support.need(Helper::List(elem, ListOp::Of));
+                format!("faber_list_{}_copy(faber_a, {read})", elem.suffix())
+            }
+            Ty::Genus(inner) => self.genus_copy_call(inner, read)?,
+            Ty::Opt(inner) => match inner {
+                // Text is immutable, so sharing the pointer is a copy; a
+                // scalar optional is a value struct.
+                Inner::Text | Inner::Int | Inner::Bool | Inner::Float => read.to_owned(),
+                Inner::List(elem) => {
+                    self.support.need(Helper::List(elem, ListOp::Of));
+                    format!(
+                        "({read} == NULL ? NULL : faber_list_{}_copy(faber_a, {read}))",
+                        elem.suffix()
+                    )
+                }
+                Inner::Genus(id) => {
+                    let clone = self.genus_copy_call(id, read)?;
+                    format!("({read} == NULL ? NULL : {clone})")
+                }
+            },
+            _ => read.to_owned(),
+        })
+    }
+
+    /// `g_<Name>_copy(faber_a, read)`, requesting the clone.
+    fn genus_copy_call(&mut self, def_id: DefId, read: &str) -> Result<String, CodegenError> {
+        let c_name = self.genus(def_id)?.c_name.clone();
+        self.copies.push(def_id);
+        Ok(format!("{c_name}_copy(faber_a, {read})"))
+    }
+
     /// One field as a genus shows it: text quoted, like a list element.
-    fn show_field(&mut self, read: &str, ty: Ty) -> Result<String, CodegenError> {
+    pub(crate) fn show_field(&mut self, read: &str, ty: Ty) -> Result<String, CodegenError> {
         if ty == Ty::Text {
             self.support.need(Helper::Quoted);
             return Ok(format!("faber_quoted(faber_a, {read})"));

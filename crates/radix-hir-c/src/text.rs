@@ -154,6 +154,7 @@ impl Emitter<'_> {
                 Ok(format!("faber_float_text(faber_a, {})", operand.text))
             }
             Value::Opt(inner) => self.show_option(&operand.text, inner),
+            Value::None => Ok(c_string(&self.names.display_tokens().none)?),
             Value::Void => Err(unsupported("showing a call with no result")),
         }
     }

@@ -1,0 +1,11 @@
++++
+locale = "en"
++++
+# A negative integer exponent aborts `numerus potentia failed: negative
+# exponent`, as the runner's `faber::exact::pow` panics.
+fn ident(int x) → int {
+    return x
+}
+main {
+    print 2.power(ident(0 - 1))
+}

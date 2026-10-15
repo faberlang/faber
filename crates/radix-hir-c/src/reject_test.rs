@@ -38,25 +38,10 @@ fn integer_division_by_zero_constant() {
 }
 
 #[test]
-fn bitwise_operator() {
-    assert_eq!(rejected("main {\n    print 1 ∧ 3\n}"), "bitwise operator");
-}
-
-#[test]
 fn policy_integer_type() {
     assert_eq!(
         rejected("main {\n    const wrapping<u8> n ← 5\n    print n\n}"),
         "wrapping, saturating, or policy numeric type"
-    );
-}
-
-#[test]
-fn lockstep_iteration_loop() {
-    assert_eq!(
-        rejected(
-            "main {\n    const list<int> a ← [1, 2]\n    const list<int> b ← [3, 4]\n    for from a, b const x, y {\n        print x + y\n    }\n}"
-        ),
-        "lockstep iteration loop"
     );
 }
 
