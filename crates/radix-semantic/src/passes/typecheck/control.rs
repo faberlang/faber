@@ -68,8 +68,9 @@ type Facts = Vec<(FactKey, TypeId)>;
 
 /// The subject of a flow fact: a visible binding, or a field path rooted at a
 /// visible binding (`base.path…`).
-// `Field` is consumed by the field-path narrowing unit (need case 2);
-// no producer constructs it yet.
+// `Field` is produced by the field-path narrowing producer (need case
+// 2); every fact consumer still skips it until the insertion and join units
+// land.
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 enum FactKey {
@@ -598,22 +599,42 @@ impl TypeChecker<'_> {
     /// Refinement for a type test against the null type (`x non est nihil`
     /// narrows the taken branch, `x est nihil` the fallthrough, nn-u1).
     ///
-    /// The operand must be a binding path whose type peels a null member.
+    /// The operand is a binding, or a genus-field path rooted at a binding,
+    /// whose leaf type peels a null member.
     fn nil_probe_refinement(&mut self, positive: bool, expr: &HirExpression) -> LeafRefinement {
-        let HirExpressionKind::Path(def_id) = &expr.kind else {
+        let Some((base, path)) = field_path_key(expr) else {
             return (None, None);
         };
-        let Some(binding_ty) = self.lookup_binding(*def_id).map(|binding| binding.ty) else {
+        let Some(mut ty) = self.lookup_binding(base).map(|binding| binding.ty) else {
             return (None, None);
         };
+        for index in 1..=path.len() {
+            let known = self
+                .field_facts
+                .get(&(base, path[..index].to_vec()))
+                .copied();
+            if let Some(known) = known {
+                ty = known;
+                continue;
+            }
+            let Some(next) = self.try_genus_field_type(ty, path[index - 1]) else {
+                return (None, None);
+            };
+            ty = next;
+        }
         let nihil = self.types.primitive(Primitive::Nihil);
-        let Some(refined) = self.peel_member_type(binding_ty, nihil) else {
+        let Some(refined) = self.peel_member_type(ty, nihil) else {
             return (None, None);
+        };
+        let key = if path.is_empty() {
+            FactKey::Binding(base)
+        } else {
+            FactKey::Field { base, path }
         };
         if positive {
-            (None, Some((FactKey::Binding(*def_id), refined)))
+            (None, Some((key, refined)))
         } else {
-            (Some((FactKey::Binding(*def_id), refined)), None)
+            (Some((key, refined)), None)
         }
     }
 
@@ -1195,6 +1216,29 @@ impl TypeChecker<'_> {
                 self.block_diverges(body) && self.block_diverges(&catch.body)
             }
             _ => false,
+        }
+    }
+}
+
+/// The field path of a null-probe operand, rooted at a binding.
+///
+/// A bare binding path keys the fact by that binding; a chain of field
+/// accesses (`base.a.b`) keys it by the root binding plus the root-to-leaf
+/// name path. Any other root yields no key.
+pub(super) fn field_path_key(expr: &HirExpression) -> Option<(DefId, Vec<Symbol>)> {
+    let mut names = Vec::new();
+    let mut current = expr;
+    loop {
+        match &current.kind {
+            HirExpressionKind::Field(object, name) => {
+                names.push(*name);
+                current = object;
+            }
+            HirExpressionKind::Path(def_id) => {
+                names.reverse();
+                return Some((*def_id, names));
+            }
+            _ => return None,
         }
     }
 }
