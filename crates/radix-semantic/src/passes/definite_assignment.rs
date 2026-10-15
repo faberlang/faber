@@ -364,7 +364,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
         };
         object
             .ty
-            .is_some_and(|ty| crate::tensor_bracket::is_tensor_type(self.types, ty))
+            .is_some_and(|ty| crate::tensor_bracket::is_coordinate_bracket_receiver(self.types, ty))
     }
 
     /// Read-modify-write of an lvalue: visit projection inputs once, read the
