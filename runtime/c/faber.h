@@ -1374,6 +1374,25 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         return list;                                                                    \
     }                                                                                   \
                                                                                         \
+    /* `xs ↦ list<T, N>`: a copy that carries capacity N, or false when the      \
+     * source is longer. The copy is fixed, so a later push at capacity traps. */ \
+    static inline bool faber_list_##NAME##_bounded(faber_arena *arena,                 \
+                                                   const faber_list_##NAME *list,       \
+                                                   int64_t capacity,                    \
+                                                   faber_list_##NAME **out) {           \
+        faber_list_##NAME *copy;                                                        \
+        if (list->len > capacity) {                                                     \
+            return false;                                                               \
+        }                                                                               \
+        copy = faber_list_##NAME##_new_fixed(arena, capacity);                          \
+        if (list->len > 0) {                                                            \
+            memcpy(copy->items, list->items, (size_t)list->len * sizeof *copy->items);  \
+        }                                                                               \
+        copy->len = list->len;                                                          \
+        *out = copy;                                                                    \
+        return true;                                                                    \
+    }                                                                                   \
+                                                                                        \
     /* The `copy` marker (R7): a fresh array, never the source's. An element   \
      * that is itself a pointer (text) is immutable, so sharing it is a copy. */\
     static inline faber_list_##NAME *faber_list_##NAME##_copy(                          \

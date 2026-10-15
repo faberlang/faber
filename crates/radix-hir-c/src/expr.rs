@@ -246,17 +246,33 @@ impl Emitter<'_> {
             } => self.ordo_conversion(source, *row, members, recovery.as_deref()),
             // `place ↤ source`: the value is `source` converted to the node's
             // resolved target type. A declaration (the common form) then binds
-            // that value; a statement form assigns it, handled in `stmt`.
+            // that value; a statement form assigns it, handled in `stmt`. When
+            // the place is an already-declared local (a nested `a ↤ (b ↤ x)`),
+            // the store happens here and the expression yields the stored value.
             HirExpressionKind::ConversioAssign {
+                target,
                 source,
                 recovery,
                 params,
-                ..
             } => {
                 let Some(ty) = expr.ty else {
                     return Err(unsupported("conversion assignment without a target type"));
                 };
-                self.conversion(source, ty, params, recovery.as_deref())
+                let value = self.conversion(source, ty, params, recovery.as_deref())?;
+                let HirExpressionKind::Path(def_id) = &target.kind else {
+                    return Ok(value);
+                };
+                let Some(local) = self.locals.get(def_id) else {
+                    // The enclosing declaration binds it; no store here.
+                    return Ok(value);
+                };
+                let (name, class) = (local.name.clone(), local.ty);
+                let value = self.settle(value, class)?;
+                if value.value != Value::from(class) {
+                    return Err(unsupported("value stored without a store check"));
+                }
+                let text = format!("(__extension__ ({{ {name} = {}; {name}; }}))", value.text);
+                Ok(Operand::new(text, Value::from(class)).with_effect(true))
             }
             HirExpressionKind::Scriptum(template, args) => self.template(*template, args),
             HirExpressionKind::Si {

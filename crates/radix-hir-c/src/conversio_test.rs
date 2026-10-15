@@ -1,6 +1,6 @@
 //! Explicit conversions: the call chosen and where recovery goes.
 
-use crate::test_support::{emitted, rejected};
+use crate::test_support::emitted;
 
 #[test]
 fn an_infallible_conversion_is_one_expression() {
@@ -36,11 +36,21 @@ fn a_float_to_integer_conversion_needs_its_rounding_hint() {
 }
 
 #[test]
-fn a_list_is_not_converted_to_a_bounded_list_at_run_time() {
-    assert_eq!(
-        rejected("main {\n    const list<int> d ← [1, 2, 3]\n    print d ↦ list<int, 2>\n}"),
-        "conversion to a bounded list"
+fn a_list_converts_to_a_fixed_bounded_copy() {
+    let code = emitted("main {\n    const list<int> d ← [1, 2, 3]\n    print d ↦ list<int, 2>\n}");
+    assert!(
+        code.contains("faber_list_i64_bounded(faber_a, l_d, 2,"),
+        "{code}"
     );
+}
+
+#[test]
+fn a_bounded_list_conversion_with_recovery_takes_the_fallback() {
+    let code = emitted(
+        "main {\n    const list<int> d ← [1, 2, 3]\n    print d ↦ list<int, 2> ⊥ [7, 8]\n}",
+    );
+    assert!(code.contains("faber_list_i64_bounded(faber_a, l_d, 2,"), "{code}");
+    assert!(code.contains("faber_list_i64_of"), "{code}");
 }
 
 #[test]

@@ -1,0 +1,25 @@
++++
+locale = "en"
++++
+# `list<T> ↦ list<T, N>`: a fixed-capacity copy, or the `⊥` fallback when the
+# source is longer. `↤` converts then stores in one step.
+
+main {
+    const list<int> base ← [1, 2]
+    const list<int, 8> raw ← base ↦ list<int, 8>
+    const list<int, 4> out ← raw ↦ list<int, 4>
+    print out
+
+    const list<int> big ← [1, 2, 3]
+    const list<int, 2> over ← big ↦ list<int, 2> ⊥ [7, 8]
+    print over
+    print over.length()
+
+    const list<int> small ← [4, 5]
+    const list<int, 2> fits ← small ↦ list<int, 2> ⊥ [7, 8]
+    print fits
+
+    var int count ← 0
+    count ↤ "42"
+    print count
+}
