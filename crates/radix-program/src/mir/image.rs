@@ -840,6 +840,20 @@ pub(super) fn fmir_image_decode_error(
         .with_arg("backend", backend)
         .with_arg("actual", actual.to_string())
         .with_arg("accepted", accepted.to_string())],
+        FmirImageError::ArtifactReflectionVersionMismatch {
+            backend,
+            actual,
+            expected,
+        } => vec![mir_issue_diag(
+            path,
+            "fmir_image_artifact_reflection_version_unsupported",
+            format!(
+                "unsupported artifact reflection version {actual} for backend `{backend}`; expected {expected}"
+            ),
+        )
+        .with_arg("backend", backend)
+        .with_arg("actual", actual.to_string())
+        .with_arg("expected", expected.to_string())],
         FmirImageError::IncompatibleArtifactCombination { backend, detail } => vec![
             mir_issue_diag(
                 path,
