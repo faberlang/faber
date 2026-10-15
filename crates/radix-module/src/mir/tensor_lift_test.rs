@@ -155,13 +155,16 @@ nota r.planata()
 }
 
 #[test]
-fn mixed_integer_widths_join_losslessly_between_tensors() {
+fn mixed_integer_widths_take_the_range_rule_between_tensors() {
+    // Operator ruling 2026-10-15: `+` between two aggregates
+    // takes the scalar range rule. `u8 + u16` is `[0, 65790]` → `u32`, while the
+    // glyph max keeps the element join → `u16`; only the bound changes.
     let program = "incipit {
 sit lista<u8> a_data ← [200, 100]
 sit tensor<u8, [2]> a ← a_data ↦ tensor<u8, [2]>
 sit lista<u16> b_data ← [1000, 2]
 sit tensor<u16, [2]> b ← b_data ↦ tensor<u16, [2]>
-sit tensor<u16, [2]> r ← a + b
+sit tensor<u32, [2]> r ← a + b
 nota r.planata()
 sit tensor<u16, [2]> m ← a ⤒ b
 nota m.planata()
