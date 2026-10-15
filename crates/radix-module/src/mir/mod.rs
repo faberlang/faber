@@ -376,6 +376,9 @@ mod infinity_literal_tests;
 #[path = "layout_test.rs"]
 mod layout_tests;
 #[cfg(test)]
+#[path = "list_slice_literal_run_test.rs"]
+mod list_slice_literal_run_tests;
+#[cfg(test)]
 #[path = "list_window_test.rs"]
 mod list_window_tests;
 #[cfg(test)]
