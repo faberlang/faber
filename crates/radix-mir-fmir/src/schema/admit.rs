@@ -16,7 +16,7 @@ use super::{
     WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION, logical_distributed_plan_hash,
     validate_wire_distributed_section, validate_wire_program, validate_wire_session_section,
 };
-use crate::schema::ARTIFACT_ABI_VERSION;
+use crate::schema::{ARTIFACT_ABI_VERSION, ARTIFACT_REFLECTION_VERSION};
 
 /// Fail-closed artifact-version gate. Versions ratchet as clean breaks;
 /// there is no compatibility decoder.
@@ -192,6 +192,31 @@ pub(crate) fn check_artifact_abi_versions(
                 actual: artifact.abi_version,
                 accepted: ARTIFACT_ABI_VERSION,
             });
+        }
+    }
+    Ok(())
+}
+
+/// Fail-closed artifact reflection-version admission: a carried reflection's
+/// own nested `v` must equal [`ARTIFACT_REFLECTION_VERSION`] (exact-match
+/// clean break). The carrier version is checked independently of the artifact
+/// ABI version and the outer image versions, because `packet_sha256` folds the
+/// supplied `v` without validating it — a re-hashed packet with a foreign `v`
+/// is otherwise self-consistent.
+pub(crate) fn check_artifact_reflection_versions(
+    device: &FmirDeviceSection,
+) -> Result<(), crate::error::FmirImageError> {
+    for artifact in &device.artifacts.artifact {
+        if let Some(reflection) = &artifact.reflection
+            && reflection.v != ARTIFACT_REFLECTION_VERSION
+        {
+            return Err(
+                crate::error::FmirImageError::ArtifactReflectionVersionMismatch {
+                    backend: artifact.backend.spelling(),
+                    actual: reflection.v,
+                    expected: ARTIFACT_REFLECTION_VERSION,
+                },
+            );
         }
     }
     Ok(())
@@ -454,7 +479,9 @@ fn admit_executor_plan_entries(
 ///
 /// # Errors
 /// Returns `FmirImageError` when the nested device-program version mismatches,
-/// the program fails wire validation, or the executor-plan section is invalid.
+/// the program fails wire validation, the executor-plan section is invalid, or
+/// an artifact's ABI version or nested reflection version is not the accepted
+/// one.
 pub fn admit_device_section_with_compat(
     device: &FmirDeviceSection,
     table: &ArtifactCompatibilityTable,
@@ -473,6 +500,7 @@ pub fn admit_device_section_with_compat(
     }
     check_artifact_encodings(device)?;
     check_artifact_abi_versions(device)?;
+    check_artifact_reflection_versions(device)?;
     check_artifact_targets(device, table)?;
     check_artifact_entrypoints(device)?;
     check_artifact_digests(device)?;
