@@ -358,10 +358,13 @@ impl Target {
     #[must_use]
     pub fn lowers_cli_entry(self) -> bool {
         match self {
-            Target::HirRust | Target::HirGo | Target::HirTypeScript | Target::MirWasm => true,
+            Target::HirRust
+            | Target::HirGo
+            | Target::HirTypeScript
+            | Target::HirPython
+            | Target::MirWasm => true,
             Target::MirStepper
             | Target::HirSwift
-            | Target::HirPython
             | Target::HirHaskell
             | Target::HirPascal
             | Target::HirCobol
