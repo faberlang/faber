@@ -171,6 +171,7 @@ impl<'a> ClifCapability<'a> {
             | Type::Primitive(Primitive::Textus)
             | Type::Bits(_)
             | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => None,
+            Type::SizedNumeric(Primitive::Fractus, width) if width.is_float() => None,
             Type::SizedNumeric(..) => Some(Gap::Subset("sized numeric value".to_owned())),
             Type::PolicyFloat(..) => Some(Gap::Subset("policy float value".to_owned())),
             Type::Primitive(Primitive::Ascii) => Some(Gap::Subset("string value".to_owned())),
@@ -546,7 +547,24 @@ impl MirVisitor for ClifCapability<'_> {
                     )
                     .is_some()
         );
+        let is_float = |ty: MirType| {
+            matches!(
+                self.types.get(ty.semantic_id()),
+                Type::Primitive(Primitive::Fractus)
+            ) || matches!(
+                self.types.get(ty.semantic_id()),
+                Type::SizedNumeric(Primitive::Fractus, width) if width.is_float()
+            )
+        };
+        let float_to_float = matches!(
+            &call.intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && is_float(conversion.source_ty)
+                    && is_float(conversion.target_ty)
+        );
         if renders_text
+            || float_to_float
             || int_to_int
             || int_to_float
             || set_to_list

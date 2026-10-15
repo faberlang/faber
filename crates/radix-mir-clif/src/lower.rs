@@ -281,7 +281,9 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         {
             Ok(Rep::Int)
         }
-        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Ok(Rep::Float),
+        // Narrow floats are carried as f64 and narrowed only on display, as
+        // the runner carries them.
+        Type::SizedNumeric(Primitive::Fractus, width) if width.is_float() => Ok(Rep::Float),
         Type::SizedNumeric(Primitive::Fractus, _) => Err(Decline::new("narrow float value")),
         _ => Err(Decline::new("non-scalar value")),
     }
@@ -2453,11 +2455,31 @@ impl FunctionLower<'_, '_> {
 
     /// The text handle that displays `value`.
     fn render_text(&mut self, value: Value, rep: Rep) -> Lowered<Value> {
+        self.render_text_at(value, rep, 0)
+    }
+
+    /// `1` when the operand is a float narrower than `f64`: it displays at
+    /// its own width.
+    fn float_narrow(&self, operand: &MirOperand) -> i64 {
+        let Ok(ty) = self.operand_type(operand) else {
+            return 0;
+        };
+        match resolve(self.state.input.types, ty.semantic_id()) {
+            Type::SizedNumeric(Primitive::Fractus, width)
+                if width.is_float() && *width != NumericWidth::F64 =>
+            {
+                1
+            }
+            _ => 0,
+        }
+    }
+
+    fn render_text_at(&mut self, value: Value, rep: Rep, narrow: i64) -> Lowered<Value> {
         let rendered = match rep {
             Rep::Text => return Ok(value),
             Rep::Int => self.call_runtime(&abi::TEXT_FROM_I64, &[value])?,
             Rep::Float => {
-                let narrow = self.builder.ins().iconst(types::I32, 0);
+                let narrow = self.builder.ins().iconst(types::I32, narrow);
                 self.call_runtime(&abi::TEXT_FROM_F64, &[value, narrow])?
             }
             Rep::Bool => self.call_runtime(&abi::TEXT_FROM_BOOL, &[value])?,
@@ -2491,7 +2513,8 @@ impl FunctionLower<'_, '_> {
         let mut rendered: Vec<Value> = Vec::with_capacity(args.len());
         for arg in args {
             let (value, rep) = self.scalar(arg)?;
-            rendered.push(self.render_text(value, rep)?);
+            let narrow = self.float_narrow(arg);
+            rendered.push(self.render_text_at(value, rep, narrow)?);
         }
         enum Part {
             Literal(String),
@@ -2593,6 +2616,10 @@ impl FunctionLower<'_, '_> {
                     None => Err(Decline::new("explicit integer conversion")),
                 };
             }
+            if rep == Rep::Float && slot_rep == Rep::Float {
+                self.builder.def_var(variable, value);
+                return Ok(());
+            }
             if rep == Rep::Int && slot_rep == Rep::Float {
                 let widened = self.builder.ins().fcvt_from_sint(types::F64, value);
                 self.builder.def_var(variable, widened);
@@ -2601,7 +2628,8 @@ impl FunctionLower<'_, '_> {
             if slot_rep != Rep::Text || rep == Rep::Unit {
                 return Err(Decline::new("explicit conversion"));
             }
-            let rendered = self.render_text(value, rep)?;
+            let narrow = self.float_narrow(argument);
+            let rendered = self.render_text_at(value, rep, narrow)?;
             self.builder.def_var(variable, rendered);
             return Ok(());
         };
@@ -2740,7 +2768,8 @@ impl FunctionLower<'_, '_> {
             }
             Rep::Float => {
                 let reference = self.runtime_ref(&abi::PRINT_F64)?;
-                let narrow = self.builder.ins().iconst(types::I32, 0);
+                let narrow = self.float_narrow(argument);
+                let narrow = self.builder.ins().iconst(types::I32, narrow);
                 self.builder.ins().call(reference, &[stream, value, narrow]);
             }
             Rep::Bool => {
