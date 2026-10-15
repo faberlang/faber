@@ -42,5 +42,9 @@ fn inferred_regex_literal_lowers_to_hir_regex() {
 #[test]
 fn repro_nota_hole_accepts_today() {
     let unit = test_support::analyze_source(r"incipit { nota _ /a/ }");
-    panic!("repro: success={:?} errs={:?}", unit.is_ok(), unit.err().map(|e| e.len()));
+    panic!(
+        "repro: success={:?} errs={:?}",
+        unit.is_ok(),
+        unit.err().map(|e| e.len())
+    );
 }
