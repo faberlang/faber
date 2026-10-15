@@ -3547,9 +3547,13 @@ impl FunctionBuilder<'_> {
     /// convert or format (`display_fractus` semantics for fractus), opaque
     /// collections format in their Debug shape, and option values render
     /// their payload or `nihil` via an explicit presence branch. Sized
-    /// numeric/fractus widths and types without a shared render (instans
-    /// Debug shape, regex, structs, nested options) keep the per-argument
-    /// diagnostic path below, which retains its specialized carriers.
+    /// numerics, bN bit words and the modular/saturating/policy-float cells
+    /// render through the single-opaque-arg format carrier, which every MIR
+    /// consumer renders at the operand's own declared width, so the grouped
+    /// line prints the same text the per-argument path would. Types without
+    /// a shared render (regex, structs, nested options) keep the
+    /// per-argument diagnostic path below, which retains its specialized
+    /// carriers.
     fn scribe_arg_renders_to_text(&self, arg_ty: MirType, text_ty: MirType) -> bool {
         if arg_ty == text_ty {
             return true;
@@ -3569,7 +3573,11 @@ impl FunctionBuilder<'_> {
             | Type::Array(_)
             | Type::Map(_, _)
             | Type::Set(_)
-            | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
+            | Type::SizedNumeric(_, _)
+            | Type::Bits(_)
+            | Type::ModularWord(_)
+            | Type::SaturatingWord(_)
+            | Type::PolicyFloat(_, _)
             | Type::Primitive(Primitive::Instans)
             | Type::SizedInstans(_) => true,
             // Option payloads render as a bare value (`display_option`
@@ -3596,7 +3604,11 @@ impl FunctionBuilder<'_> {
             // through the opaque format carrier (the runtime's arena lookup
             // renders the handle like `__faber_rt_v1_instans_display`).
             Type::Primitive(Primitive::Bivalens | Primitive::Fractus)
-            | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
+            | Type::SizedNumeric(_, _)
+            | Type::Bits(_)
+            | Type::ModularWord(_)
+            | Type::SaturatingWord(_)
+            | Type::PolicyFloat(_, _)
             | Type::Primitive(Primitive::Instans)
             | Type::SizedInstans(_) => self.runtime_call_value(
                 MirIntrinsic::FormatString { template: self.context.diagnostic_format_templates[0] },

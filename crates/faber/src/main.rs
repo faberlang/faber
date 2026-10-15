@@ -22,6 +22,10 @@ mod script_test;
 #[path = "construction_source_run_test.rs"]
 mod construction_source_run_test;
 
+#[cfg(test)]
+#[path = "multi_print_one_line_test.rs"]
+mod multi_print_one_line_test;
+
 fn main() {
     commands::run();
 }
