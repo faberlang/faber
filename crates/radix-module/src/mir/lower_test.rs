@@ -2726,6 +2726,29 @@ fn lowers_fac_cape_iace_to_local_handler_edge() {
 }
 
 #[test]
+fn mori_ending_a_cape_body_keeps_mir_valid() {
+    // A body that ends in `mori` diverges before any error edge can enter
+    // the handler. The catch is dead, but the handler must not leave the
+    // join as an orphaned successor target of an unreachable block.
+    let dump = dump_source(
+        r#"+++
+locale = "en"
++++
+main {
+    do {
+        print "in"
+        panic "x"
+    } catch e {
+        print "caught"
+    }
+}
+"#,
+    );
+
+    assert!(dump.contains("bb0:"), "{dump}");
+}
+
+#[test]
 fn lowers_trap_failable_call_to_try_call_carrier_wrap_never_return_error() {
     // UT: `capta` lowers the failable call through the existing try_call
     // whose error block wraps the payload into the trap carrier (the
