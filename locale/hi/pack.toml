@@ -520,13 +520,21 @@ help = "बाइंडर `{sit}` (स्थिर नाम) या `{varia}` 
 message = "`{keyword}` बाइंडर शुरू नहीं कर सकता"
 help = "बाइंडर हर पुनरावृत्ति या मिलान के मान को नाम देता है; स्थिर नाम के लिए `{sit}` और लिखने योग्य नाम के लिए `{varia}` लिखें"
 
-[diagnostics.PARSE010.issues.field_fixum_retired]
-message = "`{keyword}` फ़ील्ड संशोधक हटा दिया गया है"
-help = "केवल-पठन फ़ील्ड `{sit}` से लिखा जाता है; `{fixum}` कंपाइल-टाइम तथ्य बताता है और `=` के साथ आता है"
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "सदस्य संशोधक `{keyword}` हटा दिया गया है; प्रकार-स्तर का सदस्य एक स्थिरांक है"
+help = "`{fixum} T NAME = …` लिखें; `{fixum}` कंपाइल-टाइम तथ्य बताता है और क्लास सदस्य भी इसे लेता है"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "`{fixum}` सदस्य को कंपाइल-टाइम मान चाहिए"
+help = "`{fixum} T NAME = value` लिखें; प्रति-इंस्टेंस फ़ील्ड के लिए `{sit}` या `{varia}` इस्तेमाल करें"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "`{fixum}` सदस्य `=` से आरंभ होता है, `←` से नहीं"
+help = "`=` कंपाइल-टाइम तथ्य बताता है: `{fixum} T NAME = value` लिखें"
 
 [diagnostics.PARSE010.issues.ref_field_refused]
 message = "`{keyword}` किसी फ़ील्ड को संशोधित नहीं कर सकता"
-help = "फ़ील्ड केवल-पठन (`{sit}`) या लिखने योग्य (`{varia}`) होता है; `{generis}` उसे प्रकार-स्तर का बनाता है"
+help = "फ़ील्ड केवल-पठन (`{sit}`) या लिखने योग्य (`{varia}`) होता है; प्रकार-स्तर का स्थिरांक `{fixum} T X = …` लिखा जाता है"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "`{keyword}` लोकल को पढ़ने के लिए एक स्थान चाहिए: `{keyword} T name ← place`"
@@ -2799,6 +2807,10 @@ help = "reassignment की अनुमति के लिए `varia` binding 
 [diagnostics.SEM020.issues.assignment_to_constant]
 message = "constant को assignment"
 help = "reassignment की अनुमति के लिए `varia` binding का उपयोग करें, या अतिरिक्त assignment हटाएँ"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "{fixum} सदस्य '{field}' में असाइनमेंट"
+help = "{fixum} सदस्य प्रकार का कंपाइल-टाइम स्थिरांक है और उसमें कभी लिखा नहीं जाता; बदलने वाली स्थिति के लिए {varia} फ़ील्ड इस्तेमाल करें"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "अपरिवर्तनीय binding को दूसरा assignment"

@@ -1,39 +1,41 @@
 +++
-term = "generis read"
+term = "class constant read"
 kind = "operator-group"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "expression", "literal", "member_suffix", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "genus_const_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "expression", "literal", "member_suffix", "nota_stmt"]
 category = "type"
 canonical = false
-summary = "A generis field is read through the type name; its initializer may be a literal, a comptime body, or an embed."
+summary = "A class constant is read through the type name; its initializer may be a literal, a comptime body, or an embed."
 syntax = "<Type>.<field>"
-aliases = ["static field read", "type-name field read"]
-related = ["generis", "genus", "praefixum", "insere"]
+aliases = ["class constant read", "type-name constant read"]
+related = ["fixum", "genus", "praefixum", "insere"]
 locale = "en"
 +++
 # =============================================================================
-# generis read — a static genus field read through the type name
+# class constant read — a genus constant read through the type name
 # =============================================================================
 #
 # What this teaches:
-#   • `Tab.Z` reads the static field `Z` of the genus `Tab`; no instance is needed.
-#   • The field's initializer is its value: a literal, a `comptime` body, or an
+#   • `Tab.LIMIT` reads the class constant `LIMIT` of the genus `Tab`; no instance
+#     is needed.
+#   • The constant's initializer is its value: a literal, a `comptime` body, or an
 #     `embed` of a package file (here the sibling `generis.expected`, read as bytes).
-#   • Reading a static field through an instance (`t.Z`) and an instance field
-#     through the type (`Tab.w`) are compile errors.
+#   • Reading a class constant through an instance (`t.LIMIT`) and an instance
+#     field through the type (`Tab.w`) are compile errors; storing to a class
+#     constant is a compile error too (`assignment_to_const_member`).
 #
 # EXPECTED OUTPUT:
 #   read.expected
 
 class Tab {
-    static int LIMIT = 3
-    static int SQUARES = comptime {
+    const int LIMIT = 3
+    const int SQUARES = comptime {
         mut int total ← 0
         for range 1‥4 let i {
             total ← total + i * i
         }
         return total
     }
-    static list<b8> DATA = embed "generis.expected"
+    const list<b8> DATA = embed "generis.expected"
     mut int w = 1
 }
 

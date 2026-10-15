@@ -562,6 +562,9 @@ impl Parser {
             TokenKind::Ident(sym) => self.interner.resolve(sym).to_owned(),
             _ => String::new(),
         };
+        // The keyword is consumed here, so the member-level retirement
+        // diagnostic does not stack on the module-level one.
+        self.advance();
         let mut field = self.parse_field_decl(false)?;
         // The old surface also took `←` here (a named error then); consume the
         // initializer so the whole declaration is skipped, not half of it.
@@ -1282,12 +1285,17 @@ impl Parser {
     /// `genus_member` is true for a `genus` field, where a leading `de` is the
     /// refused `ref` modifier; a `discretio` shared field is unmarked by
     /// design, so there a leading `de` is the access marker of its type.
+    ///
+    /// A `const` member is the type-level compile-time constant: it takes the
+    /// `=` initializer, and only that. A missing initializer is `PARSE010
+    /// const_member_requires_initializer`; the run-time arrow is `PARSE010
+    /// const_member_assign_initializer`. Both are recoverable.
     fn parse_field_decl(&mut self, genus_member: bool) -> Result<FieldDecl, ParseError> {
-        let modifier = self.eat_field_modifier(genus_member);
-        if modifier.is_some()
-            && (self.current_field_modifier().is_some()
-                || self.check_keyword_ident(TokenKind::Fixum))
-        {
+        let (modifier, retired) = match self.eat_field_modifier(genus_member) {
+            Some((modifier, retired)) => (Some(modifier), retired),
+            None => (None, false),
+        };
+        if modifier.is_some() && self.current_field_modifier().is_some() {
             return Err(ParseError::structured(
                 ParseErrorKind::DeclarationInvalid,
                 self.current_span(),
@@ -1303,11 +1311,28 @@ impl Parser {
         let ty = self.parse_type()?;
         let name = self.parse_param_name()?;
         let sponte = self.parse_post_name_marker();
+        let is_const = modifier == Some(FieldModifier::Const) && !retired;
         let init = if self.eat(&TokenKind::Eq) {
+            Some(Box::new(self.parse_expression()?))
+        } else if is_const && self.check(&TokenKind::Assign) {
+            // `const T X ← e`: a constant is a compile-time fact, so the
+            // run-time arrow is named. The initializer is parsed whole so
+            // recovery resumes after the member.
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, self.current_span())
+                    .with_arg("issue", "const_member_assign_initializer"),
+            );
+            self.advance();
             Some(Box::new(self.parse_expression()?))
         } else {
             None
         };
+        if is_const && init.is_none() {
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, name.span)
+                    .with_arg("issue", "const_member_requires_initializer"),
+            );
+        }
 
         Ok(FieldDecl {
             modifier,
@@ -1320,44 +1345,52 @@ impl Parser {
 
     /// The field modifier the current word spells, if any (DECISIONS D16.1).
     ///
-    /// `sit` (en `let`) is the read-only field modifier. The retired `fixum`
-    /// (en `const`) and the refused `de` (en `ref`) are not modifiers; they are
-    /// recognised by `retired_field_modifier_issue` so the parser can name them.
+    /// `sit` (en `let`) is the read-only instance field, `varia` (en `mut`) the
+    /// writable one, `fixum` (en `const`) the type-level compile-time
+    /// constant. The retired `generis` (en `static`) and the refused `de` (en
+    /// `ref`) are not modifiers; they are recognised by
+    /// `retired_field_modifier_issue` so the parser can name them.
     fn current_field_modifier(&self) -> Option<FieldModifier> {
         match self.current_keyword_ident()? {
             TokenKind::Sit => Some(FieldModifier::Fixum),
             TokenKind::Varia => Some(FieldModifier::Varia),
-            TokenKind::Generis => Some(FieldModifier::Generis),
+            TokenKind::Fixum => Some(FieldModifier::Const),
             _ => None,
         }
     }
 
-    /// The named diagnostic for a leading `fixum` (retired) or `de` (refused)
-    /// field word. A `de` after a modifier is not a modifier at all: it is the
-    /// access marker of the field's type (`varia de Node next`).
-    fn retired_field_modifier_issue(&self, genus_member: bool) -> Option<&'static str> {
+    /// The named diagnostic for a leading `generis` (retired) or `de`
+    /// (refused) field word, with the modifier it is read as. A `de` after a
+    /// modifier is not a modifier at all: it is the access marker of the
+    /// field's type (`varia de Node next`).
+    fn retired_field_modifier_issue(
+        &self,
+        genus_member: bool,
+    ) -> Option<(&'static str, FieldModifier)> {
         match self.current_keyword_ident()? {
-            TokenKind::Fixum => Some("field_fixum_retired"),
-            TokenKind::De if genus_member => Some("ref_field_refused"),
+            TokenKind::Generis => Some(("static_member_retired", FieldModifier::Const)),
+            TokenKind::De if genus_member => Some(("ref_field_refused", FieldModifier::Fixum)),
             _ => None,
         }
     }
 
-    /// Consume one leading field modifier, if present.
+    /// Consume one leading field modifier, if present; the flag is true when
+    /// the word was retired or refused rather than a live modifier.
     ///
     /// GRAMMAR:
-    ///   field-decl := ('sit' | 'varia' | 'generis') type ident 'sponte'? ('=' expr)?
+    ///   field-decl := ('sit' | 'varia' | 'fixum') type ident 'sponte'? ('=' expr)?
     ///
-    /// Exactly one modifier: a second one (`generis sit`, `generis varia`,
+    /// Exactly one modifier: a second one (`fixum sit`, `fixum varia`,
     /// `sit varia`) is rejected here; a missing one on a `genus` field is
     /// rejected by `parse_class_member`. `discretio` shared fields stay
     /// unmarked (fork F7 held), so the modifier is optional at this level.
     ///
-    /// A retired `fixum` or refused `de` word is recorded as `PARSE010
-    /// field_fixum_retired` / `ref_field_refused` and read as the read-only
-    /// modifier, so recovery resumes after the field.
-    fn eat_field_modifier(&mut self, genus_member: bool) -> Option<FieldModifier> {
-        if let Some(issue) = self.retired_field_modifier_issue(genus_member) {
+    /// A retired `generis` or refused `de` word is recorded as `PARSE010
+    /// static_member_retired` / `ref_field_refused` and read as the modifier it
+    /// became (the constant, the read-only field), so recovery resumes after
+    /// the field.
+    fn eat_field_modifier(&mut self, genus_member: bool) -> Option<(FieldModifier, bool)> {
+        if let Some((issue, read_as)) = self.retired_field_modifier_issue(genus_member) {
             let span = self.current_span();
             let keyword = self.current_word();
             self.advance();
@@ -1366,11 +1399,11 @@ impl Parser {
                     .with_arg("issue", issue)
                     .with_arg("keyword", keyword),
             );
-            return Some(FieldModifier::Fixum);
+            return Some((read_as, true));
         }
         let modifier = self.current_field_modifier()?;
         self.advance();
-        Some(modifier)
+        Some((modifier, false))
     }
 
     /// Whether the current word is the removed `nexum` field modifier.

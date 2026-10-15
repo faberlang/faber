@@ -1,0 +1,28 @@
++++
+term = "class constant store"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "genus_field_decl", "genus_const_decl", "type_annotation", "base_type", "incipit_stmt", "block_stmt", "assignment", "place", "expression", "literal", "member_suffix", "nota_stmt"]
+category = "type"
+summary = "A class constant is a compile-time fact and is never stored to."
+syntax = "Tab.LIMIT ← 9"
+related = ["fixum", "genus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM020:assignment_to_const_member"
++++
+# =============================================================================
+# class constant store — a store into a const member is a check error
+# =============================================================================
+# A class `const` is read-only for the whole program: no store reaches it
+# through the type name, `self`, or an instance. State that changes belongs in
+# a `mut` field.
+
+class Tab {
+    const int LIMIT = 7
+    mut int w = 1
+}
+
+main {
+    Tab.LIMIT ← 9
+    print Tab.LIMIT
+}

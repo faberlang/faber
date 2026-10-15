@@ -608,7 +608,7 @@ help = "declare the method on a genus instead"
 
 [diagnostics.PARSE010.issues.static_decl_retired]
 message = "the module-level `{keyword}` declaration was removed; `{name}` is a constant"
-help = "write `{fixum} T {name} = …`; a module-level constant is spelled like a local one, and `{generis}` remains only the genus field modifier"
+help = "write `{fixum} T {name} = …`; a module-level constant is spelled like a local one, and a class member takes the same word"
 
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "a run-time `{keyword}` declaration was retired; `{name}` is a run-time name"
@@ -622,13 +622,21 @@ help = "binders take `{sit}` (a fixed name) or `{varia}` (a writable name); `{fi
 message = "`{keyword}` cannot introduce a binder"
 help = "a binder names a value per iteration or match; write `{sit}` for a fixed name or `{varia}` for a writable one"
 
-[diagnostics.PARSE010.issues.field_fixum_retired]
-message = "a `{keyword}` field modifier was retired"
-help = "a read-only field is spelled `{sit}`; `{fixum}` states a compile-time fact and goes with `=`"
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "the `{keyword}` member modifier was removed; a type-level member is a constant"
+help = "write `{fixum} T NAME = …`; `{fixum}` states a compile-time fact and a class member takes it too"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "a `{fixum}` member needs a compile-time value"
+help = "write `{fixum} T NAME = value`; for a per-instance field use `{sit}` or `{varia}`"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "a `{fixum}` member is initialized with `=`, not `←`"
+help = "`=` states a compile-time fact: write `{fixum} T NAME = value`"
 
 [diagnostics.PARSE010.issues.ref_field_refused]
 message = "`{keyword}` cannot modify a field"
-help = "a field is read-only (`{sit}`) or writable (`{varia}`); `{generis}` makes it per-type"
+help = "a field is read-only (`{sit}`) or writable (`{varia}`); a per-type constant is `{fixum} T X = …`"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "a `{keyword}` local needs a place to read: `{keyword} T name ← place`"
@@ -655,11 +663,11 @@ message = "a compile-time constant binds one name; `=` cannot initialize a destr
 help = "write `{fixum} T name = value`, or destructure with `←`"
 
 [diagnostics.PARSE010.issues.field_modifier_repeated]
-message = "a field takes exactly one of {sit}, {varia} or {generis}"
-help = "keep one modifier; a {generis} field is already immutable"
+message = "a field takes exactly one of {sit}, {varia} or {fixum}"
+help = "keep one modifier; a {fixum} member is already read-only"
 
 [diagnostics.PARSE010.issues.field_modifier_missing]
-message = "a {genus} field must declare {sit}, {varia} or {generis}"
+message = "a {genus} field must declare {sit}, {varia} or {fixum}"
 help = "write `{varia} T name` to keep today's meaning (or {sit} when never reassigned); `faber field-modifier-codemod <PATH>` migrates whole files"
 
 [diagnostics.PARSE010.issues.module_declaration_misplaced]
@@ -1228,11 +1236,11 @@ help = "built-in types expose methods, not fields; check the receiver type and m
 
 [diagnostics.SEM004.issues.static_field_read_through_instance]
 message = "static field '{field}' is read through the type name, not an instance"
-help = "read a `generis` field through the type name (`Type.field`), not an instance"
+help = "read a `{fixum}` member through the type name (`Type.field`), not an instance"
 
 [diagnostics.SEM004.issues.instance_field_read_through_type]
 message = "field '{field}' is an instance field and cannot be read through the type name"
-help = "read an instance field through an instance; only a `generis` field reads through the type name"
+help = "read an instance field through an instance; only a `{fixum}` member reads through the type name"
 
 [diagnostics.SEM004.issues.unknown_union_field]
 message = "unknown union field"
@@ -3858,6 +3866,10 @@ help = "commune fields are read-only through the union projection"
 [diagnostics.SEM020.issues.assignment_to_fixum_field]
 message = "assignment to {sit} field '{field}'"
 help = "a {sit} field is set only in a construction literal; declare it {varia} to allow reassignment"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "assignment to {fixum} member '{field}'"
+help = "a {fixum} member is a compile-time constant of the type and is never stored to; use a {varia} field for state that changes"
 
 [diagnostics.SEM020.issues.union_member_not_varia]
 message = "union field '{member}' is not {varia} in: {members}"

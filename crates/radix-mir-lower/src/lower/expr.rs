@@ -474,7 +474,7 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
     }
 
     fn visit_field_expr(&mut self, object: &HirExpression, name: Symbol, expr: &HirExpression) -> Option<MirOperand> {
-        // A static (`generis`) field read through the type name (`Tab.Z`) is the
+        // A const-member (`fixum`) read through the type name (`Tab.Z`) is the
         // field's folded initializer: statics are not instance storage, so no
         // projection exists to lower.
         if let HirExpressionKind::Path(def_id) = &object.kind

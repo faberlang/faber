@@ -1,34 +1,34 @@
 +++
-term = "generis read"
+term = "class constant export"
 kind = "operator-group"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "literal", "incipit_stmt", "expression", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "genus_decl", "genus_member", "genus_field_decl", "genus_const_decl", "type_annotation", "owned_type", "base_type", "literal", "incipit_stmt", "expression", "nota_stmt"]
 category = "type"
 canonical = false
-summary = "Sibling module exporting a genus whose static field an importer reads through the module and the type name."
-syntax = "@ public class <Type> { static <type> <field> = <expression> }"
-aliases = ["static field read across modules"]
-related = ["generis", "genus", "importa"]
+summary = "Sibling module exporting a genus whose class constant an importer reads through the module and the type name."
+syntax = "@ public class <Type> { const <type> <NAME> = <expression> }"
+aliases = ["class constant read across modules"]
+related = ["fixum", "genus", "importa"]
 locale = "en"
 +++
 # =============================================================================
-# generis read — Sibling module exporting a genus with a static field
+# class constant export — Sibling module exporting a genus with a class constant
 # =============================================================================
 #
 # What this teaches:
-#   • An exported genus carries its static field and the field's initializer
-#     through the file interface, so an importing module reads `module.Tab.Z`.
+#   • An exported genus carries its class constant and the constant's initializer
+#     through the file interface, so an importing module reads `module.Tab.LIMIT`.
 #
-# See also: generis, genus, importa
+# See also: fixum, genus, importa
 # =============================================================================
 
-# generis read lectio — sibling module for generis/lectio-importata.fab
+# class constant export — sibling module for generis/lectio-importata.fab
 #
 # EXPECTED OUTPUT:
 #   7 when run standalone.
 
 @ public
 class Tab {
-    static int LIMIT = 7
+    const int LIMIT = 7
     mut int w = 1
 }
 

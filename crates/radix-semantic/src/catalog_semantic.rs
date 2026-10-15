@@ -1093,10 +1093,10 @@ fn semantic_undefined_member_help(args: &[DiagnosticArg]) -> Option<String> {
         "struct_field_requires_value" => Some("provide a value for the struct field".to_owned()),
         "unknown_field" | "unknown_struct_field" => Some("check the struct field name".to_owned()),
         "static_field_read_through_instance" => Some(
-            "read a `generis` field through the type name (`Type.field`), not an instance".to_owned(),
+            "read a `const` member through the type name (`Type.field`), not an instance".to_owned(),
         ),
         "instance_field_read_through_type" => Some(
-            "read an instance field through an instance; only a `generis` field reads through the type name"
+            "read an instance field through an instance; only a `const` member reads through the type name"
                 .to_owned(),
         ),
         "unknown_method" => Some("check the receiver type and method name".to_owned()),

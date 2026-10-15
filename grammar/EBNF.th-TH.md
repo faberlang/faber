@@ -113,464 +113,466 @@ genus_member ::= annotation* (genus_field_decl | functio_method_decl) | nondum_m
 # [051] nondum_method_decl
 nondum_method_decl ::= annotation* nondum_annotation annotation* 'ฟังก์ชัน' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
 # [052] genus_field_decl
-genus_field_decl ::= ('กำหนด' | 'แปร' | 'ของชนิด') type_annotation IDENTIFIER 'สมัครใจ'? ('=' const_init)?
-# [053] field_decl
-field_decl ::= ('กำหนด' | 'แปร' | 'ของชนิด')? type_annotation IDENTIFIER 'สมัครใจ'? ('=' const_init)?
-# [054] functio_method_decl
+genus_field_decl ::= (('กำหนด' | 'แปร') type_annotation IDENTIFIER 'สมัครใจ'? ('=' const_init)?) | genus_const_decl
+# [053] genus_const_decl
+genus_const_decl ::= 'คงที่' type_annotation IDENTIFIER '=' const_init
+# [054] field_decl
+field_decl ::= (('กำหนด' | 'แปร')? type_annotation IDENTIFIER 'สมัครใจ'? ('=' const_init)?) | genus_const_decl
+# [055] functio_method_decl
 functio_method_decl ::= 'ฟังก์ชัน' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
-# [055] annotation
+# [056] annotation
 annotation ::= nucleum_annotation | radix_annotation | braced_annotation | annotation_sugar
-# [056] annotation_name
+# [057] annotation_name
 annotation_name ::= ANNOTATION_NAME
-# [057] braced_annotation
+# [058] braced_annotation
 braced_annotation ::= '@' annotation_name '{' annotation_field_list? '}'
-# [058] annotation_field_list
+# [059] annotation_field_list
 annotation_field_list ::= annotation_field (',' annotation_field)*
-# [059] annotation_field
+# [060] annotation_field
 annotation_field ::= ANNOTATION_FIELD_NAME '=' (expression | concrete_type)
-# [060] annotation_sugar
+# [061] annotation_sugar
 annotation_sugar ::= '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
-# [061] nucleum_annotation
+# [062] nucleum_annotation
 nucleum_annotation ::= nucleum_sugar | nucleum_braced
-# [062] nucleum_sugar
+# [063] nucleum_sugar
 nucleum_sugar ::= '@' 'เคอร์เนล' nucleum_modifier? NEWLINE
-# [063] nucleum_braced
+# [064] nucleum_braced
 nucleum_braced ::= '@' 'เคอร์เนล' '{' nucleum_field_list? '}'
-# [064] nucleum_modifier
+# [065] nucleum_modifier
 nucleum_modifier ::= 'ส่วนย่อย'
-# [065] nucleum_field_list
+# [066] nucleum_field_list
 nucleum_field_list ::= nucleum_field (',' nucleum_field)*
-# [066] nucleum_field
+# [067] nucleum_field
 nucleum_field ::= 'ส่วนย่อย' '=' ('จริง' | 'เท็จ')
-# [067] radix_annotation
+# [068] radix_annotation
 radix_annotation ::= '@' 'radix' radix_directive NEWLINE
-# [068] radix_directive
+# [069] radix_directive
 radix_directive ::= 'เลน' STRING | 'backward' STRING | 'contract' STRING | 'ชนิดนามแฝง' IDENTIFIER 'ใน' concrete_type+
-# [069] ad_annotation
+# [070] ad_annotation
 ad_annotation ::= '@' 'ถึง' ASCII_STRING NEWLINE
-# [070] nondum_annotation
+# [071] nondum_annotation
 nondum_annotation ::= '@' 'ไม่เสถียร' NON_NEWLINE_TOKEN* NEWLINE | '@' 'ไม่เสถียร' '{' annotation_field_list? '}'
-# [071] implendum_decl
+# [072] implendum_decl
 implendum_decl ::= 'สัญญา' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
-# [072] implendum_method_decl
+# [073] implendum_method_decl
 implendum_method_decl ::= annotation* 'ฟังก์ชัน' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
-# [073] typus_decl
+# [074] typus_decl
 typus_decl ::= 'ชนิดนามแฝง' IDENTIFIER generic_params? '=' type_annotation
-# [074] ordo_decl
+# [075] ordo_decl
 ordo_decl ::= 'ลำดับ' IDENTIFIER '{' enum_member (',' enum_member)* '}'
-# [075] enum_member
+# [076] enum_member
 enum_member ::= IDENTIFIER ('=' ('-'? NUMBER | STRING))?
-# [076] discretio_decl
+# [077] discretio_decl
 discretio_decl ::= 'สหภาพแยก' IDENTIFIER generic_params? '{' union_fields? variant (',' variant)* '}'
-# [077] union_fields
+# [078] union_fields
 union_fields ::= annotation+ field_decl union_member*
-# [078] union_member
+# [079] union_member
 union_member ::= annotation* field_decl
-# [079] variant
+# [080] variant
 variant ::= IDENTIFIER ('{' variant_fields '}')?
-# [080] variant_fields
+# [081] variant_fields
 variant_fields ::= (type_annotation IDENTIFIER)*
-# [081] schema_decl
+# [082] schema_decl
 schema_decl ::= 'สคีมา' IDENTIFIER '{' (schema_column (NEWLINE schema_column)*)? '}'
-# [082] schema_column
+# [083] schema_column
 schema_column ::= 'คอลัมน์' type_annotation IDENTIFIER (':' IDENTIFIER)?
-# [083] importa_decl
+# [084] importa_decl
 importa_decl ::= importa_record | importa_sugar
-# [084] importa_record
+# [085] importa_record
 importa_record ::= 'นำเข้า' '{' import_field_list '}'
-# [085] import_field_list
+# [086] import_field_list
 import_field_list ::= import_field (',' import_field)*
-# [086] import_field
+# [087] import_field
 import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_field
-# [087] ex_field
+# [088] ex_field
 ex_field ::= 'ออก' '=' STRING
-# [088] visibilitas_field
+# [089] visibilitas_field
 visibilitas_field ::= 'visibilitas' '=' publica
-# [089] nomen_field
+# [090] nomen_field
 nomen_field ::= 'ชื่อ' '=' IDENTIFIER
-# [090] ut_field
+# [091] ut_field
 ut_field ::= 'ในชื่อ' '=' IDENTIFIER
-# [091] omnia_field
+# [092] omnia_field
 omnia_field ::= 'ทั้งหมด' '=' IDENTIFIER
-# [092] importa_sugar
+# [093] importa_sugar
 importa_sugar ::= 'นำเข้า' 'ออก' STRING publica? (named_import | wildcard_import | selective_import)?
-# [093] publica
+# [094] publica
 publica ::= 'สาธารณะ'
-# [094] named_import
+# [095] named_import
 named_import ::= IDENTIFIER ('ในชื่อ' IDENTIFIER)?
-# [095] wildcard_import
+# [096] wildcard_import
 wildcard_import ::= '*' 'ในชื่อ' IDENTIFIER
-# [096] selective_import
+# [097] selective_import
 selective_import ::= 'คงที่' import_value_binding (',' import_value_binding)*
-# [097] import_value_binding
+# [098] import_value_binding
 import_value_binding ::= IDENTIFIER ('ในชื่อ' IDENTIFIER)?
-# [098] type_annotation
+# [099] type_annotation
 type_annotation ::= union_hole_type | concrete_type
-# [099] concrete_type
+# [100] concrete_type
 concrete_type ::= intersection_type ('∪' intersection_type)*
-# [100] union_hole_type
+# [101] union_hole_type
 union_hole_type ::= ('จาก' | 'แปร' | 'เป็นเจ้าของ' | 'สำเนา')? '∪'
-# [101] intersection_type
+# [102] intersection_type
 intersection_type ::= owned_type ('∩' owned_type)*
-# [102] owned_type
+# [103] owned_type
 owned_type ::= ('จาก' | 'แปร' | 'เป็นเจ้าของ' | 'สำเนา')? base_type
-# [103] base_type
+# [104] base_type
 base_type ::= hole_type | function_type | width_type_sugar | ratio_type | failable_promissum_type | qualified_type type_arguments?
-# [104] failable_promissum_type
+# [105] failable_promissum_type
 failable_promissum_type ::= IDENTIFIER '<' type_annotation alternate_exit_clause '>'
-# [105] ratio_type
+# [106] ratio_type
 ratio_type ::= 'ratio' '<' ('*' | labeled_type_argument (',' labeled_type_argument)*) '>'
-# [106] hole_type
+# [107] hole_type
 hole_type ::= '_'
-# [107] qualified_type
+# [108] qualified_type
 qualified_type ::= type_head ('.' IDENTIFIER)*
-# [108] type_head
+# [109] type_head
 type_head ::= IDENTIFIER | 'โมดูลัส'
-# [109] type_arguments
+# [110] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
-# [110] type_argument
+# [111] type_argument
 type_argument ::= labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
-# [111] labeled_type_argument
+# [112] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
-# [112] width_type_sugar
+# [113] width_type_sugar
 width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
-# [113] shape_suffix
+# [114] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
-# [114] figura
+# [115] figura
 figura ::= spelled_lift | figura_product (('+' | '-') NATURAL)*
-# [115] spelled_lift
+# [116] spelled_lift
 spelled_lift ::= 'ขนาด' lift_extent
-# [116] lift_extent
+# [117] lift_extent
 lift_extent ::= NATURAL | '-' NATURAL | '(' figura ')' | IDENTIFIER
-# [117] figura_product
+# [118] figura_product
 figura_product ::= figura_primary ('/' NATURAL)*
-# [118] figura_primary
+# [119] figura_primary
 figura_primary ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']' | '(' figura ')'
-# [119] figura_list
+# [120] figura_list
 figura_list ::= figura (',' figura)*
-# [120] function_type
+# [121] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# [121] type_list
+# [122] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# [122] si_stmt
+# [123] si_stmt
 si_stmt ::= 'ถ้า' si_tail
-# [123] si_tail
+# [124] si_tail
 si_tail ::= expression arm ('ถ้าไม่ก็' si_tail | secus_clause)?
-# [124] secus_clause
+# [125] secus_clause
 secus_clause ::= 'มิฉะนั้น' else_arm
-# [125] arm
+# [126] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [126] else_arm
+# [127] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [127] dum_stmt
+# [128] dum_stmt
 dum_stmt ::= 'ขณะ' expression (block_stmt | ergo_joint statement) cape_clause?
-# [128] itera_stmt
+# [129] itera_stmt
 itera_stmt ::= 'วน' ('ออก' expression (',' expression)* | 'จาก' expression | 'ช่วง' expression (',' expression)*) apud_clause? filum_clause? ('กำหนด' | 'แปร') itera_binding (block_stmt | ergo_joint statement) cape_clause?
-# [129] itera_binding
+# [130] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
-# [130] apud_clause
+# [131] apud_clause
 apud_clause ::= 'ที่' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# [131] elige_stmt
+# [132] elige_stmt
 elige_stmt ::= 'เลือก' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# [132] casu_elige_clause
+# [133] casu_elige_clause
 casu_elige_clause ::= 'กรณี' expression (block_stmt | ergo_joint statement)
-# [133] ceterum_clause
+# [134] ceterum_clause
 ceterum_clause ::= 'อื่น' (block_stmt | ergo_joint statement)
-# [134] discerne_stmt
+# [135] discerne_stmt
 discerne_stmt ::= 'แยก' 'ทั้งหมด'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [135] discriminants
+# [136] discriminants
 discriminants ::= subject_path ('และ' subject_path)*
-# [136] subject_path
+# [137] subject_path
 subject_path ::= IDENTIFIER ('.' IDENTIFIER)*
-# [137] casu_variant_clause
+# [138] casu_variant_clause
 casu_variant_clause ::= 'กรณี' patterns (block_stmt | ergo_joint statement)
-# [138] patterns
+# [139] patterns
 patterns ::= pattern ('และ' pattern)*
-# [139] pattern
+# [140] pattern
 pattern ::= pattern_atom ('หรือ' pattern_atom)*
-# [140] pattern_atom
+# [141] pattern_atom
 pattern_atom ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [141] negated_number
+# [142] negated_number
 negated_number ::= '-' NUMBER
-# [142] type_pattern
+# [143] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [143] ut_pattern
+# [144] ut_pattern
 ut_pattern ::= ('ในชื่อ' IDENTIFIER) | (('กำหนด' | 'แปร') pattern_binding (',' pattern_binding)*)
-# [144] pattern_binding
+# [145] pattern_binding
 pattern_binding ::= IDENTIFIER ('ในชื่อ' IDENTIFIER)?
-# [145] custodi_stmt
+# [146] custodi_stmt
 custodi_stmt ::= 'คุ้มครอง' '{' si_guard_clause+ '}'
-# [146] si_guard_clause
+# [147] si_guard_clause
 si_guard_clause ::= 'ถ้า' expression (block_stmt | ergo_joint statement)
-# [147] ex_stmt
+# [148] ex_stmt
 ex_stmt ::= 'ออก' expression ('กำหนด' | 'แปร') extract_fields
-# [148] extract_fields
+# [149] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# [149] extract_field
+# [150] extract_field
 extract_field ::= IDENTIFIER ('ในชื่อ' IDENTIFIER)?
-# [150] ceteri_field
+# [151] ceteri_field
 ceteri_field ::= 'ที่เหลือ' IDENTIFIER
-# [151] redde_stmt
+# [152] redde_stmt
 redde_stmt ::= 'คืน' expression?
-# [152] reddet_stmt
+# [153] reddet_stmt
 reddet_stmt ::= 'รอคืน' expression
-# [153] tacebit_stmt
+# [154] tacebit_stmt
 tacebit_stmt ::= 'รอทิ้ง' expression
-# [154] cede_stmt
+# [155] cede_stmt
 cede_stmt ::= 'ให้' expression
-# [155] rumpe_stmt
+# [156] rumpe_stmt
 rumpe_stmt ::= 'หยุด'
-# [156] perge_stmt
+# [157] perge_stmt
 perge_stmt ::= 'ไปต่อ'
-# [157] tacet_stmt
+# [158] tacet_stmt
 tacet_stmt ::= 'เงียบ'
-# [158] iace_stmt
+# [159] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# [159] iace_expr
+# [160] iace_expr
 iace_expr ::= ('โยน' | 'ตาย') expression
-# [160] iace_guarded_expr
+# [161] iace_guarded_expr
 iace_guarded_expr ::= ('โยน' | 'ตาย') expression NO_NEWLINE 'ถ้า' expression
-# [161] cape_clause
+# [162] cape_clause
 cape_clause ::= 'จับ' IDENTIFIER block_stmt
-# [162] adfirma_stmt
+# [163] adfirma_stmt
 adfirma_stmt ::= 'ยืนยัน' expression ('ตาย' expression)?
-# [163] requirit_stmt
+# [164] requirit_stmt
 requirit_stmt ::= 'ต้องการ' expression 'โยน' expression
-# [164] reice_stmt
+# [165] reice_stmt
 reice_stmt ::= 'ปฏิเสธ' expression 'โยน' expression
-# [165] expression
+# [166] expression
 expression ::= assignment
-# [166] transfer
+# [167] transfer
 transfer ::= ternary ('⇇' ternary)?
-# [167] value_marker
+# [168] value_marker
 value_marker ::= 'เป็นเจ้าของ' | 'สำเนา'
-# [168] assignment
+# [169] assignment
 assignment ::= transfer ('←' 'สำเนา'? assignment | '↤' assignment via_clause? inline_default?)?
-# [169] inc_dec_stmt
+# [170] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [170] place
+# [171] place
 place ::= call_expr
-# [171] ternary
+# [172] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [172] aut_expr
+# [173] aut_expr
 aut_expr ::= et_expr (('หรือ') et_expr)*
-# [173] et_expr
+# [174] et_expr
 et_expr ::= equality (('และ') equality)*
-# [174] equality
+# [175] equality
 equality ::= comparison equality_tail*
-# [175] equality_tail
+# [176] equality_tail
 equality_tail ::= ('≡' | '≢' | '≅' | '≇' | '≈' | '≉') comparison | ('เป็น' | 'ไม่' 'เป็น') type_annotation
-# [176] comparison
+# [177] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
-# [177] format_expr
+# [178] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [178] bitwise_or_expr
+# [179] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [179] bitwise_xor_expr
+# [180] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [180] bitwise_and_expr
+# [181] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [181] shift_expr
+# [182] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [182] range_expr
+# [183] range_expr
 range_expr ::= additive_expr range_tail?
-# [183] range_tail
+# [184] range_tail
 range_tail ::= ('‥' | '…' | 'ก่อน' | 'จนถึง') additive_expr ('ต่อ' additive_expr)?
-# [184] additive_expr
+# [185] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [185] multiplicative_expr
+# [186] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [186] vel_expr
+# [187] vel_expr
 vel_expr ::= unary_expr ('หรือว่าง' vel_rhs)*
-# [187] vel_rhs
+# [188] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [188] vel_range_tail
+# [189] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | 'ก่อน' | 'จนถึง') unary_expr ('ต่อ' unary_expr)?
-# [189] unary_expr
+# [190] unary_expr
 unary_expr ::= ('-' | '¬' | 'ไม่') unary_expr | rounding_expr | finge_expr | cast_expr
-# [190] rounding_expr
+# [191] rounding_expr
 rounding_expr ::= '⌊' expression ('⌋' | '⌉') | '⌈' expression '⌉'
-# [191] gradient_expr
+# [192] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [192] gradient_selection
+# [193] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [193] gradient_place
+# [194] gradient_place
 gradient_place ::= expression
-# [194] cast_expr
+# [195] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-# [195] conversio_expr
+# [196] conversio_expr
 conversio_expr ::= '↦' (type_annotation | interval_target) via_clause? inline_default?
-# [196] interval_target
+# [197] interval_target
 interval_target ::= range_expr
-# [197] via_clause
+# [198] via_clause
 via_clause ::= 'ผ่านทาง' IDENTIFIER
-# [198] inline_default
+# [199] inline_default
 inline_default ::= '⊥' unary_expr
-# [199] call_expr
+# [200] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [200] call_suffix
+# [201] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [201] member_suffix
+# [202] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [202] transpose_suffix
+# [203] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [203] optional_suffix
+# [204] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [204] non_null_suffix
+# [205] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [205] argument_list
+# [206] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [206] argument
+# [207] argument
 argument ::= template_argument | (call_marker | 'แกน')? 'กระจาย'? expression
-# [207] call_marker
+# [208] call_marker
 call_marker ::= 'จาก' | 'แปร' | 'เป็นเจ้าของ' | 'สำเนา'
-# [208] template_argument
+# [209] template_argument
 template_argument ::= 'กระจาย'? IDENTIFIER ':' expression
-# [209] literal
+# [210] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'จริง' | 'เท็จ' | 'ว่างเปล่า' | '∞' | 'nan'
-# [210] regex_literal
+# [211] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
-# [211] primary
+# [212] primary
 primary ::= IDENTIFIER | literal | regex_literal | 'ตัวฉัน' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
-# [212] ad_expr
+# [213] ad_expr
 ad_expr ::= 'ถึง' ASCII_STRING ad_opener?
-# [213] ad_opener
+# [214] ad_opener
 ad_opener ::= '(' expression ')'
-# [214] array_literal
+# [215] array_literal
 array_literal ::= '[' array_element_list? ']'
-# [215] array_element_list
+# [216] array_element_list
 array_element_list ::= array_element (',' array_element)*
-# [216] array_element
+# [217] array_element
 array_element ::= argument | '_'
-# [217] iuncta_expr
+# [218] iuncta_expr
 iuncta_expr ::= 'ทูเพิล' type_arguments '[' argument_list? ']'
-# [218] json_literal
+# [219] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [219] json_member
+# [220] json_member
 json_member ::= STRING ':' json_value
-# [220] typed_constructor
+# [221] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | type_annotation json_literal | hole_type json_literal | '{' field_list '}' construction_source? | type_annotation '[' array_element_list? ']'
-# [221] field_list
+# [222] field_list
 field_list ::= field_init (',' field_init)*
-# [222] field_init
+# [223] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [223] field_key
+# [224] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [224] construction_source
+# [225] construction_source
 construction_source ::= 'ออก' call_expr
-# [225] json_value
+# [226] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [226] json_object
+# [227] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [227] json_array
+# [228] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [228] json_string
+# [229] json_string
 json_string ::= STRING
-# [229] json_number
+# [230] json_number
 json_number ::= NUMBER
-# [230] finge_expr
+# [231] finge_expr
 finge_expr ::= 'สร้าง' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [231] qualified_ident
+# [232] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [232] praefixum_expr
+# [233] praefixum_expr
 praefixum_expr ::= 'นำหน้า' block_stmt
-# [233] scriptum_expr
+# [234] scriptum_expr
 scriptum_expr ::= 'จารึก' '(' STRING (',' expression)* ')'
-# [234] lege_expr
+# [235] lege_expr
 lege_expr ::= 'อ่าน' 'บรรทัด'?
-# [235] first_match_expr
+# [236] first_match_expr
 first_match_expr ::= 'ตรงแรก' '(' expression apud_clause? ',' 'ที่ซึ่ง' IDENTIFIER block_stmt ')'
-# [236] reducta_expr
+# [237] reducta_expr
 reducta_expr ::= 'ลดรูป' 'ผ่านทาง' reducta_op 'ออก' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [237] reducta_op
+# [238] reducta_op
 reducta_op ::= 'ผลรวม' | 'ผลคูณ' | 'สูงสุด' | 'ต่ำสุด' | 'ดัชนีค่าสูงสุด' | 'ดัชนีค่าต่ําสุด' | 'ทั้งหมด' | 'ใดก็ได้' | 'นับ'
-# [238] reducta_group
+# [239] reducta_group
 reducta_group ::= 'ตาม' expression
-# [239] reducta_body
+# [240] reducta_body
 reducta_body ::= ('กำหนด' | 'แปร') IDENTIFIER block_stmt
-# [240] reducta_identity
+# [241] reducta_identity
 reducta_identity ::= 'หรือว่าง' expression
-# [241] sort_expr
+# [242] sort_expr
 sort_expr ::= 'เรียง' 'ผ่านทาง' sort_direction ('ออก' | 'จาก') expression sort_body?
-# [242] sort_direction
+# [243] sort_direction
 sort_direction ::= 'น้อยไปมาก' | 'มากไปน้อย'
-# [243] sort_body
+# [244] sort_body
 sort_body ::= ('กำหนด' | 'แปร') IDENTIFIER block_stmt
-# [244] filum_clause
+# [245] filum_clause
 filum_clause ::= 'เส้นใย' IDENTIFIER
-# [245] capta_expr
+# [246] capta_expr
 capta_expr ::= 'ดัก' block_stmt
-# [246] object_pattern
+# [247] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [247] pattern_property
+# [248] pattern_property
 pattern_property ::= 'ที่เหลือ'? IDENTIFIER ('ในชื่อ' IDENTIFIER)?
-# [248] array_pattern
+# [249] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [249] array_pattern_element
+# [250] array_pattern_element
 array_pattern_element ::= '_' | 'ที่เหลือ'? IDENTIFIER
-# [250] nota_stmt
+# [251] nota_stmt
 nota_stmt ::= ('บันทึก' | 'ดู' | 'เตือน' | 'เขียน') expression (',' expression)*
-# [251] entry_header
+# [252] entry_header
 entry_header ::= ('อาร์กิวเมนต์' IDENTIFIER)? ('ทางออก' expression)?
-# [252] incipit_stmt
+# [253] incipit_stmt
 incipit_stmt ::= 'เริ่ม' entry_header block_stmt
-# [253] incipiet_stmt
+# [254] incipiet_stmt
 incipiet_stmt ::= 'เริ่มอะซิงก์' entry_header block_stmt
-# [254] probandum_decl
+# [255] probandum_decl
 probandum_decl ::= 'ทดสอบชุด' STRING proba_modifier* '{' probandum_body '}'
-# [255] probandum_body
+# [256] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [256] proba_stmt
+# [257] proba_stmt
 proba_stmt ::= 'ทดสอบ' STRING proba_modifier* block_stmt
-# [257] proba_modifier
+# [258] proba_modifier
 proba_modifier ::= 'คาดหวัง_ล้มเหลว' | 'ละเว้น' STRING | 'ค้าง' STRING | 'เฉพาะ' | 'แท็ก' STRING | 'เวลา' NATURAL | 'วัด' | 'ทำซ้ำ' NATURAL | 'เปราะบาง' NATURAL | 'เฉพาะใน' STRING
-# [258] praepara_block
+# [259] praepara_block
 praepara_block ::= ('เตรียม' | 'จะเตรียม' | 'หลังเตรียม' | 'จะหลังเตรียม') 'ทั้งหมด'? block_stmt
-# [259] fac_stmt
+# [260] fac_stmt
 fac_stmt ::= 'ทำ' block_stmt cape_clause? ('ขณะ' expression)?
-# [260] IDENTIFIER
+# [261] IDENTIFIER
 IDENTIFIER ::=
-# [261] NUMBER
+# [262] NUMBER
 NUMBER ::=
-# [262] NATURAL
+# [263] NATURAL
 NATURAL ::=
-# [263] STRING
+# [264] STRING
 STRING ::=
-# [264] ASCII_STRING
+# [265] ASCII_STRING
 ASCII_STRING ::=
-# [265] BACKTICK_STRING
+# [266] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [266] OCTETI_STRING
+# [267] OCTETI_STRING
 OCTETI_STRING ::=
-# [267] REGEX_TYPE_WORD
+# [268] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [268] REGEX_BODY
+# [269] REGEX_BODY
 REGEX_BODY ::=
-# [269] NEWLINE
+# [270] NEWLINE
 NEWLINE ::=
-# [270] WIDTH_MARKER
+# [271] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [271] LISTA_WIDTH_SUGAR
+# [272] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [272] TENSOR_WIDTH_SUGAR
+# [273] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [273] SPARSA_WIDTH_SUGAR
+# [274] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [274] VECTOR_WIDTH_SUGAR
+# [275] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [275] MATRIX_WIDTH_SUGAR
+# [276] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [276] FRONTMATTER_DELIMITER
+# [277] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [277] TOML_LINES
+# [278] TOML_LINES
 TOML_LINES ::=
-# [278] ANNOTATION_NAME
+# [279] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [279] ANNOTATION_FIELD_NAME
+# [280] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [280] NON_NEWLINE_TOKEN
+# [281] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [281] NO_NEWLINE
+# [282] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -652,6 +654,7 @@ NO_NEWLINE ::=
 | [`genus_member`](#genus-member) | `#ชนิด-member` | live |
 | [`nondum_method_decl`](#nondum-method-decl) | `#ไม่เสถียร-method-decl` | live |
 | [`genus_field_decl`](#genus-field-decl) | `#ชนิด-field-decl` | live |
+| [`genus_const_decl`](#genus-const-decl) | `#ชนิด-const-decl` | live |
 | [`field_decl`](#field-decl) | `#field-decl` | live |
 | [`functio_method_decl`](#functio-method-decl) | `#ฟังก์ชัน-method-decl` | live |
 | [`annotation`](#annotation) | `#annotation` | live |
@@ -949,7 +952,6 @@ productions. It is not a second keyword authority.
 | Annotation | `ส่วนย่อย` | nucleum fragment |
 | Declarations | `ฟังก์ชัน` | function |
 | Testing | `ค้าง` | future |
-| Genus | `ของชนิด` | static member |
 | Declarations | `ชนิด` | class |
 | Error | `โยน` | throw |
 | Error | `โยนผล` | throws marker |
@@ -1221,14 +1223,15 @@ function. `แปร T X = e` stays `varia_compile_time_initializer`, and a
 top-level declaration with no initializer is SEM008 `top_level_initializer`.
 `คงที่ _ X = 10` infers `int` as it does for a local.
 
-**Retired spelling.** The module-level static `ของชนิด T X = e` (en
-`static T X = e`) no longer exists. A statement-initial `ของชนิด` followed by an
+**Retired spelling.** The module-level static `generis T X = e` (en
+`static T X = e`) no longer exists. A statement-initial `generis` followed by an
 identifier or `(`, at the top level or in a block, parses as the old
 declaration whole and is reported as `PARSE010 static_decl_retired` (args
 `keyword`, the spelling written, and `name`; the help names the `คงที่`
-spelling); there is no alias period, and the diagnostic stays. `ของชนิด`
-followed by anything else is an ordinary identifier. `ของชนิด` survives only as
-the `ชนิด` field modifier (see Classes).
+spelling); there is no alias period, and the diagnostic stays. `generis`
+followed by anything else is an ordinary identifier. In a `ชนิด` body the
+same word is the separate `PARSE010 static_member_retired`; the type-level
+member is the constant `คงที่ T X = e` (see Classes).
 
 Constants are **immutable and initialized with `=` only** (D5.9), never `←`.
 The initializer must be evaluable at compile time: literals;
@@ -1256,7 +1259,7 @@ the one that contains it, and a cycle through a site is `constant_cycle`.
 
 **Build-time file embed, `ฝัง` (en `embed`, D8.10).** An `=` constant at
 module level or block level, or a `ชนิด` field default under any modifier
-(`ของชนิด`, `คงที่`, `แปร`), may take `ฝัง "path"` as its initializer
+(`คงที่` constant member, `กำหนด`, `แปร`), may take `ฝัง "path"` as its initializer
 instead of an ordinary expression:
 `คงที่ textus LICENSE = ฝัง "LICENSE.txt"`. `ฝัง` is contextual (the
 parser claims it in expression position when directly followed by a string
@@ -1301,7 +1304,7 @@ construction literal (`Genus { field = value }`).
 
 - **No static methods.** A `ชนิด` declares instance methods only. A function
   about a type is a top-level function in the type's file, reached through the
-  import alias. `ของชนิด` marks a type-level field, never a method.
+  import alias. A type-level member is a `คงที่` constant, never a method.
 - **A newtype is a one-field `ชนิด`.** There is no separate newtype
   declaration. Units that need arithmetic wait on operator overloading.
 - **No macros and no user derive.** What you read is what runs. Code
@@ -1410,18 +1413,25 @@ wire operation such as `json.pange(value ↦ json)`.
 - `เติมเต็ม` = implements (conformance to an `สัญญา` contract), written
   with the contract's type arguments in full
   (`ชนิด Persona เติมเต็ม Orderable<Persona>`, D1.2).
-- Every `ชนิด` field declares exactly one of `กำหนด` (en `let`) / `แปร` / `ของชนิด`
-  (D16.1); there is no default — an unmarked field is a parse error: PARSE010
+- Every `ชนิด` member declares exactly one of `กำหนด` (en `let`) / `แปร` (en `mut`)
+  / `คงที่` (en `const`) (D16.1); there is no default — an unmarked field is a parse error: PARSE010
   `field_modifier_missing` (D5c). The `สหภาพแยก` shared-field position
   (`union_member`) keeps today's unmarked form (fork F7 held).
   `กำหนด T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } ออก p` copies it unchanged (D16.3), independent of visibility
   (`@ privata` + `กำหนด` is legal). `แปร T x`: per instance, reassignable.
-  `ของชนิด T X = …`: one per type, compile-time (the only remaining `ของชนิด` position). A write to a
+  `คงที่ T X = …` (en `const T X = …`): the type-level constant, one per type,
+  compile-time and read-only, with the same `=` initializer as a module or
+  block constant (foldable expressions, `นำหน้า`, `ฝัง`). It is read
+  through the type name (`Tab.X`); a store to it, through the type name, `ตัวฉัน`
+  or an instance, is `SEM020` (`assignment_to_const_member`), a missing `=` is
+  `PARSE010` `const_member_requires_initializer` and `←` is
+  `const_member_assign_initializer`. A write to a
   `กำหนด` field outside a construction literal is `SEM020`
-  (`assignment_to_fixum_field`). The retired `คงที่` (en `const`) field word is
-  PARSE010 `field_fixum_retired` and `จาก` (en `ref`) is `ref_field_refused`. The former `nexum` field modifier is removed
+  (`assignment_to_fixum_field`). The retired `generis` (en `static`) member
+  word is `PARSE010 static_member_retired` (there is no alias) and `จาก` (en
+  `ref`) is `ref_field_refused`. The former `nexum` field modifier is removed
   and rejected with a migration diagnostic.
 - `ชนิด` members are public by default (D5.2). `@ privata` on a member restricts it to the type's own methods: only code inside the type's own function bodies may read, write, or call it (D5.3); `@ interna` restricts it to code in the declaring package. A construction literal may still set a private field, from any file, and `Genus { … } ออก p` copies it unchanged (D5.4). Reading, writing, or calling an inaccessible member from outside its allowed scope is `SEM063` (`member_private_read`/`_write`/`_call`, or `member_interna_read`/`_write`/`_call`); `@ สาธารณะ` on a member is a redundant-annotation warning `WARN028` (`redundant_member_publica`), an error when warnings are denied.
 - A type may refer to itself: `สหภาพแยก Expr { Adde { Expr sinister, Expr dexter } }`
@@ -1779,7 +1789,7 @@ family a store into a narrower width applies the slot's policy
 `↦`. A constant stored with `←` follows the slot's policy
 (`saturating<u8> w ← 300` is 255, `wrapping<u8> w ← -1` is 255, and a trapping
 slot's certain trap is a compile error); a constant in an `=` position
-(a `คงที่ T X = e` constant at module level or in a block, `ของชนิด`, field
+(a `คงที่ T X = e` constant at module level, in a block or as a `ชนิด` member, field
 default, enum member) must fit `W` whatever the policy. Literals in `โมดูลัส<W>` and `saturatus<W>` slots must fit `W`.
 The unbounded integer `inf` (D11.5) is a type (see its subsection below), so a
 bounded expression still obeys the 64-bit range above and an `inf` slot never

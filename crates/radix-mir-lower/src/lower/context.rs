@@ -67,10 +67,10 @@ struct FrozenMaps<'a> {
     variant_field_tys: Arc<FxHashMap<DefId, FxHashMap<Symbol, MirType>>>,
     conversion_rows: Arc<FxHashMap<ConversionPair, DefId>>,
     top_level_consts: Arc<FxHashMap<DefId, &'a HirConst>>,
-    /// Static (`generis`) genus fields keyed by `(struct, field)`; a read through
+    /// Const-member (`fixum`) genus fields keyed by `(struct, field)`; a read through
     /// the type name inlines the field's folded initializer.
     static_fields: Arc<FxHashMap<(DefId, Symbol), &'a HirField>>,
-    /// Static (`generis`) fields of imported genus exports by `(struct, field)`:
+    /// Const-member (`fixum`) fields of imported genus exports by `(struct, field)`:
     /// the interface's folded initializer, inlined by a `module.Tab.Z` read.
     imported_static_fields: Arc<FxHashMap<(DefId, Symbol), HirExpression>>,
     /// Folded scalar values of imported module constants by `(module, member)`:
@@ -624,7 +624,7 @@ impl<'a> LoweringContextMaps<'a> {
             for field in imported_fields {
                 fields.insert(field.name, MirType::semantic(field.ty));
                 if let Some(init) = field.init {
-                    if field.modifier == Some(radix_syntax::FieldModifier::Generis) {
+                    if field.modifier == Some(radix_syntax::FieldModifier::Const) {
                         self.imported_static_fields
                             .insert((def_id, field.name), init.clone());
                     }

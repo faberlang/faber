@@ -125,9 +125,9 @@ fn list_of_genus() {
 fn static_field() {
     assert_eq!(
         rejected(
-            "class P {\n    static int count = 0\n    mut int x = 0\n}\nmain {\n    let P p ← { x = 1 }\n    print p.x\n}"
+            "class P {\n    const int count = 0\n    mut int x = 0\n}\nmain {\n    let P p ← { x = 1 }\n    print p.x\n}"
         ),
-        "static (generis) field"
+        "const member"
     );
 }
 

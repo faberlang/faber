@@ -66,7 +66,7 @@ const ISSUE_TYPE_PARAMETER: &str = "praefixum_type_parameter";
 pub enum PraefixumSiteKind {
     /// A module constant: `fixum T X = praefixum { … }`.
     Constant,
-    /// A genus field default (`generis`, `fixum` or `varia`).
+    /// A genus field default (`fixum` constant, `sit` or `varia`).
     Field,
     /// A block-level constant inside a function, method, closure or the
     /// entry block. The driver keeps no authored copy: Faber re-emission

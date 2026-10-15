@@ -989,7 +989,7 @@ impl<'a> TypeChecker<'a> {
         for (def_id, fields, methods, type_params) in self.resolver.imported_file_structs() {
             let instance_field_count = fields
                 .iter()
-                .filter(|field| field.modifier != Some(radix_syntax::FieldModifier::Generis))
+                .filter(|field| field.modifier != Some(radix_syntax::FieldModifier::Const))
                 .count();
             // Imported generic structs substitute construction size args into
             // field types exactly like local ones (S0-G1); without this entry

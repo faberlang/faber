@@ -2,7 +2,7 @@
 //!
 //! A top-level `fixum T X = e` is the module constant, so it re-emits with the
 //! pack's `fixum` spelling (en `const`) and the authored initializer as
-//! written. The genus `generis` field keeps its modifier.
+//! written. The genus `fixum` constant member keeps its modifier.
 
 use crate::codegen::Target;
 use crate::driver::reemit_faber;
@@ -36,7 +36,7 @@ fn reemit(source: &str, to: &str) -> String {
         .code
 }
 
-const BODY: &str = "const int LIMIT = 4 * 1024\nconst _ INFERRED = 10\nconst string NAME = \"ab\" + \"cd\"\n\nclass Punctum {\n    let int x\n    static int Z = 3\n}\n\nmain {\n    print LIMIT\n}\n";
+const BODY: &str = "const int LIMIT = 4 * 1024\nconst _ INFERRED = 10\nconst string NAME = \"ab\" + \"cd\"\n\nclass Punctum {\n    let int x\n    const int Z = 3\n}\n\nmain {\n    print LIMIT\n}\n";
 
 fn en_source() -> String {
     format!("+++\nlocale = \"en\"\n+++\n{BODY}")
@@ -48,7 +48,7 @@ fn en_format_spells_module_constants_const_and_keeps_the_field_modifier() {
     assert!(formatted.contains("const int LIMIT = 4 * 1024\n"), "{formatted}");
     assert!(formatted.contains("const _ INFERRED = 10\n"), "{formatted}");
     assert!(formatted.contains("const string NAME = \"ab\" + \"cd\"\n"), "{formatted}");
-    assert!(formatted.contains("    static int Z = 3\n"), "{formatted}");
+    assert!(formatted.contains("    const int Z = 3\n"), "{formatted}");
     assert!(!formatted.contains("\nstatic "), "{formatted}");
 }
 
@@ -63,6 +63,6 @@ fn en_to_la_prints_fixum_and_round_trips() {
     let la = reemit(&en_source(), "la");
     assert!(la.contains("fixum numerus LIMIT = 4 * 1024\n"), "{la}");
     assert!(la.contains("fixum _ INFERRED = 10\n"), "{la}");
-    assert!(la.contains("    generis numerus Z = 3\n"), "{la}");
+    assert!(la.contains("    fixum numerus Z = 3\n"), "{la}");
     assert_eq!(reemit(&la, "en"), reemit(&en_source(), "en"));
 }

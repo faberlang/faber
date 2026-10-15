@@ -318,15 +318,15 @@ fn let_and_mut_field_modifiers_parse_in_english_and_latin() {
 }
 
 #[test]
-fn a_const_field_modifier_is_retired() {
-    let english = parse_en("class P {\n    const int x\n}\n");
-    assert_issue(&english, "field_fixum_retired", "const", None);
+fn a_const_field_modifier_is_the_type_level_constant() {
+    let english = parse_en("class P {\n    const int X = 4\n}\n");
+    assert!(english.success(), "{:?}", english.errors);
     assert_eq!(
         field_modifiers(&english),
-        vec![Some(radix_syntax::FieldModifier::Fixum)]
+        vec![Some(radix_syntax::FieldModifier::Const)]
     );
-    let latin = parse_program("genus P {\n    fixum numerus x = 1\n    varia numerus y\n}\n");
-    assert_issue(&latin, "field_fixum_retired", "fixum", None);
+    let latin = parse_program("genus P {\n    fixum numerus X = 1\n    varia numerus y\n}\n");
+    assert!(latin.success(), "{:?}", latin.errors);
 }
 
 #[test]

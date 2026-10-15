@@ -24,7 +24,7 @@ locale = "en"
 #     quotes, never the length. At the top level `print 'q'` shows `q`.
 #   • An absent optional field prints `nihil`; a present one prints its bare
 #     value (`opt = 3`); booleans print `verum` and `falsum`.
-#   • A `generis` static is not part of the construction literal.
+#   • A `const` class member is not part of the construction literal.
 #   • A discretio variant prints `Type.Variant { … }`; a variant with no fields
 #     prints `Type.Variant` with no braces, as does every member of an all-unit
 #     discretio and of an `ordo`. A genus with no fields keeps `Name {}`.
@@ -53,7 +53,7 @@ class Rec {
     mut list<string> names
     mut d64 price
     mut f32 ratio
-    static int LIMIT = 4
+    const int LIMIT = 4
 }
 
 class Vacuus {

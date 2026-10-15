@@ -520,13 +520,21 @@ help = "繫結名使用 `{sit}`（固定名稱）或 `{varia}`（可寫名稱）
 message = "`{keyword}` 不能引入繫結名"
 help = "繫結名對應每次迭代或匹配的值；固定名稱寫 `{sit}`，可寫名稱寫 `{varia}`"
 
-[diagnostics.PARSE010.issues.field_fixum_retired]
-message = "`{keyword}` 欄位修飾詞已廢止"
-help = "唯讀欄位寫 `{sit}`；`{fixum}` 表示編譯期事實，與 `=` 搭配"
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "成員修飾詞 `{keyword}` 已移除；型別層級成員是常數"
+help = "寫 `{fixum} T NAME = …`；`{fixum}` 表示編譯期事實，類別成員同樣適用"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "`{fixum}` 成員需要編譯期的值"
+help = "寫 `{fixum} T NAME = value`；每個實例各有的欄位用 `{sit}` 或 `{varia}`"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "`{fixum}` 成員用 `=` 初始化，不用 `←`"
+help = "`=` 表示編譯期事實：寫 `{fixum} T NAME = value`"
 
 [diagnostics.PARSE010.issues.ref_field_refused]
 message = "`{keyword}` 不能修飾欄位"
-help = "欄位是唯讀（`{sit}`）或可寫（`{varia}`）；`{generis}` 使其屬於型別"
+help = "欄位是唯讀（`{sit}`）或可寫（`{varia}`）；型別層級常數寫作 `{fixum} T X = …`"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "`{keyword}` 區域變數需要一個可讀取的位置：`{keyword} T name ← place`"
@@ -2787,6 +2795,10 @@ help = "使用 `varia` binding 以允許重新指派，或移除額外的指派"
 [diagnostics.SEM020.issues.assignment_to_constant]
 message = "指派至常數"
 help = "使用 `varia` binding 以允許重新指派，或移除額外的指派"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "對 {fixum} 成員 '{field}' 賦值"
+help = "{fixum} 成員是型別的編譯期常數，不能被寫入；會變動的狀態請用 {varia} 欄位"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "第二次指派至不可變 binding"

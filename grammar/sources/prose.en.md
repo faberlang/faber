@@ -174,8 +174,9 @@ identifier or `(`, at the top level or in a block, parses as the old
 declaration whole and is reported as `PARSE010 static_decl_retired` (args
 `keyword`, the spelling written, and `name`; the help names the `fixum`
 spelling); there is no alias period, and the diagnostic stays. `generis`
-followed by anything else is an ordinary identifier. `generis` survives only as
-the `genus` field modifier (see Classes).
+followed by anything else is an ordinary identifier. In a `genus` body the
+same word is the separate `PARSE010 static_member_retired`; the type-level
+member is the constant `fixum T X = e` (see Classes).
 
 Constants are **immutable and initialized with `=` only** (D5.9), never `←`.
 The initializer must be evaluable at compile time: literals;
@@ -203,7 +204,7 @@ the one that contains it, and a cycle through a site is `constant_cycle`.
 
 **Build-time file embed, `insere` (en `embed`, D8.10).** An `=` constant at
 module level or block level, or a `genus` field default under any modifier
-(`generis`, `fixum`, `varia`), may take `insere "path"` as its initializer
+(`fixum` constant member, `sit`, `varia`), may take `insere "path"` as its initializer
 instead of an ordinary expression:
 `fixum textus LICENSE = insere "LICENSE.txt"`. `insere` is contextual (the
 parser claims it in expression position when directly followed by a string
@@ -248,7 +249,7 @@ construction literal (`Genus { field = value }`).
 
 - **No static methods.** A `genus` declares instance methods only. A function
   about a type is a top-level function in the type's file, reached through the
-  import alias. `generis` marks a type-level field, never a method.
+  import alias. A type-level member is a `fixum` constant, never a method.
 - **A newtype is a one-field `genus`.** There is no separate newtype
   declaration. Units that need arithmetic wait on operator overloading.
 - **No macros and no user derive.** What you read is what runs. Code
@@ -357,18 +358,25 @@ wire operation such as `json.pange(value ↦ json)`.
 - `implet` = implements (conformance to an `implendum` contract), written
   with the contract's type arguments in full
   (`genus Persona implet Orderable<Persona>`, D1.2).
-- Every `genus` field declares exactly one of `sit` (en `let`) / `varia` / `generis`
-  (D16.1); there is no default — an unmarked field is a parse error: PARSE010
+- Every `genus` member declares exactly one of `sit` (en `let`) / `varia` (en `mut`)
+  / `fixum` (en `const`) (D16.1); there is no default — an unmarked field is a parse error: PARSE010
   `field_modifier_missing` (D5c). The `discretio` shared-field position
   (`union_member`) keeps today's unmarked form (fork F7 held).
   `sit T x`: per instance, set only in
   a construction literal (`Genus { field = value }`), never reassigned;
   `Genus { … } ex p` copies it unchanged (D16.3), independent of visibility
   (`@ privata` + `sit` is legal). `varia T x`: per instance, reassignable.
-  `generis T X = …`: one per type, compile-time (the only remaining `generis` position). A write to a
+  `fixum T X = …` (en `const T X = …`): the type-level constant, one per type,
+  compile-time and read-only, with the same `=` initializer as a module or
+  block constant (foldable expressions, `praefixum`, `insere`). It is read
+  through the type name (`Tab.X`); a store to it, through the type name, `ego`
+  or an instance, is `SEM020` (`assignment_to_const_member`), a missing `=` is
+  `PARSE010` `const_member_requires_initializer` and `←` is
+  `const_member_assign_initializer`. A write to a
   `sit` field outside a construction literal is `SEM020`
-  (`assignment_to_fixum_field`). The retired `fixum` (en `const`) field word is
-  PARSE010 `field_fixum_retired` and `de` (en `ref`) is `ref_field_refused`. The former `nexum` field modifier is removed
+  (`assignment_to_fixum_field`). The retired `generis` (en `static`) member
+  word is `PARSE010 static_member_retired` (there is no alias) and `de` (en
+  `ref`) is `ref_field_refused`. The former `nexum` field modifier is removed
   and rejected with a migration diagnostic.
 - `genus` members are public by default (D5.2). `@ privata` on a member restricts it to the type's own methods: only code inside the type's own function bodies may read, write, or call it (D5.3); `@ interna` restricts it to code in the declaring package. A construction literal may still set a private field, from any file, and `Genus { … } ex p` copies it unchanged (D5.4). Reading, writing, or calling an inaccessible member from outside its allowed scope is `SEM063` (`member_private_read`/`_write`/`_call`, or `member_interna_read`/`_write`/`_call`); `@ publica` on a member is a redundant-annotation warning `WARN028` (`redundant_member_publica`), an error when warnings are denied.
 - A type may refer to itself: `discretio Expr { Adde { Expr sinister, Expr dexter } }`
@@ -726,7 +734,7 @@ family a store into a narrower width applies the slot's policy
 `↦`. A constant stored with `←` follows the slot's policy
 (`saturating<u8> w ← 300` is 255, `wrapping<u8> w ← -1` is 255, and a trapping
 slot's certain trap is a compile error); a constant in an `=` position
-(a `fixum T X = e` constant at module level or in a block, `generis`, field
+(a `fixum T X = e` constant at module level, in a block or as a `genus` member, field
 default, enum member) must fit `W` whatever the policy. Literals in `modulus<W>` and `saturatus<W>` slots must fit `W`.
 The unbounded integer `inf` (D11.5) is a type (see its subsection below), so a
 bounded expression still obeys the 64-bit range above and an `inf` slot never
