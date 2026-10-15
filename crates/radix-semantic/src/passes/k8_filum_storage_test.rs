@@ -268,7 +268,7 @@ fn write_through_a_read_param_is_a_borrow_error_not_an_independence_one() {
     assert!(
         errors
             .iter()
-            .any(|d| d.issue() == Some("assign_to_de_parameter")),
+            .any(|d| d.issue() == Some("assign_through_ref")),
         "{errors:?}"
     );
     assert!(
