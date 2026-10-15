@@ -62,6 +62,13 @@ static inline _Noreturn void faber_trap(const char *reason) {
     exit(1);
 }
 
+/* A panic: the runner's `abort: <reason>` (a violated precondition rather than
+ * a failed store), exit status 1. */
+static inline _Noreturn void faber_abort(const char *reason) {
+    fprintf(stderr, "abort: %s\n", reason);
+    exit(1);
+}
+
 /* Decimal text of an exact value into a caller buffer of at least 41 bytes
  * (39 digits, a sign and the terminator). */
 static inline const char *faber_i128_text(faber_i128 value, char *buffer) {

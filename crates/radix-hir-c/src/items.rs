@@ -139,7 +139,9 @@ impl Emitter<'_> {
                 }
                 HirItemKind::Enum(_) => return Err(unsupported("enum declaration")),
                 HirItemKind::Interface(_) => return Err(unsupported("interface declaration")),
-                HirItemKind::TypeAlias(_) => return Err(unsupported("type alias")),
+                // An alias is resolved in the type table; a use of one that
+                // names an unsupported type is rejected where it is used.
+                HirItemKind::TypeAlias(_) => {}
                 HirItemKind::Schema(_) => return Err(unsupported("schema declaration")),
                 HirItemKind::Import(_) => return Err(unsupported("import (library modules)")),
             }

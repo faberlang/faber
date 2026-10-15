@@ -35,7 +35,7 @@ impl Emitter<'_> {
         "    ".repeat(self.depth)
     }
 
-    fn line(&self, out: &mut String, text: &str) {
+    pub(crate) fn line(&self, out: &mut String, text: &str) {
         out.push_str(&self.indent());
         out.push_str(text);
         out.push('\n');
@@ -186,8 +186,34 @@ impl Emitter<'_> {
                 iter,
                 body,
                 mutable,
+            } if coordinates.len() <= 1 => self.itera(
+                out,
+                coordinates.first().copied(),
+                (*binding, *binding_name),
+                iter,
+                body,
+                *mutable,
+            ),
+            HirExpressionKind::Itera {
+                mode: HirIteraMode::Ab,
+                coordinates,
+                filum: None,
+                binding,
+                binding_name,
+                iter,
+                body,
+                mutable,
             } if coordinates.is_empty() => {
-                self.itera(out, *binding, *binding_name, iter, body, *mutable)
+                self.range_loop(out, (*binding, *binding_name), iter, body, *mutable)
+            }
+            HirExpressionKind::IteraRange {
+                ranges,
+                bindings,
+                body,
+                mutable,
+            } => {
+                let ranges: Vec<&HirExpression> = ranges.iter().collect();
+                self.range_product(out, &ranges, bindings, body, *mutable)
             }
             HirExpressionKind::Block(block) => {
                 self.line(out, "{");
@@ -205,8 +231,8 @@ impl Emitter<'_> {
     fn itera(
         &mut self,
         out: &mut String,
-        binding: radix_hir::DefId,
-        binding_name: radix_lexer::Symbol,
+        coordinate: Option<(radix_hir::DefId, radix_lexer::Symbol)>,
+        (binding, binding_name): (radix_hir::DefId, radix_lexer::Symbol),
         iter: &HirExpression,
         body: &HirBlock,
         mutable: bool,
@@ -252,6 +278,26 @@ impl Emitter<'_> {
                 self.declare(class, &name, mutable)?
             ),
         );
+        // `apud i`: the position, read before the element.
+        if let Some((position, position_name)) = coordinate {
+            let Some(position_kind) = self.names.binding_kind(position) else {
+                return Err(unsupported(
+                    "loop coordinate the name catalog does not classify",
+                ));
+            };
+            let raw = self.names.resolve_symbol(position_name);
+            let c_name = self.scope.claim(&prefixed_binding_name(position_kind, raw));
+            let declaration = self.declare(Ty::Int, &c_name, false)?;
+            self.line(out, &format!("{declaration} = {index};"));
+            self.locals.insert(
+                position,
+                Local {
+                    name: c_name,
+                    ty: Ty::Int,
+                    constant: None,
+                },
+            );
+        }
         self.depth -= 1;
         self.locals.insert(
             binding,
@@ -360,11 +406,6 @@ impl Emitter<'_> {
         kind: HirScribeKind,
         args: &[HirExpression],
     ) -> Result<(), CodegenError> {
-        if kind != HirScribeKind::Nota {
-            return Err(unsupported(
-                "write, debug, or warn output (only print is supported)",
-            ));
-        }
         let mut operands = Vec::with_capacity(args.len());
         for arg in args {
             // The absent-option token waits on the option type.
@@ -412,7 +453,13 @@ impl Emitter<'_> {
             values.push(text);
         }
         self.support.need_stdio();
-        let mut line = format!("printf(\"{}\\n\"", specs.join(" "));
+        // `debug` and `warn` write their line to standard error; `print` and
+        // `write` to standard output.
+        let call = match kind {
+            HirScribeKind::Vide | HirScribeKind::Mone => "fprintf(stderr, ",
+            HirScribeKind::Nota | HirScribeKind::Scribe => "printf(",
+        };
+        let mut line = format!("{call}\"{}\\n\"", specs.join(" "));
         for value in values {
             line.push_str(", ");
             line.push_str(&value);

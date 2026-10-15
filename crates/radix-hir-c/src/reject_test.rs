@@ -51,14 +51,6 @@ fn sized_integer_type() {
 }
 
 #[test]
-fn write_output_is_not_print() {
-    assert_eq!(
-        rejected("main {\n    warn \"w\"\n}"),
-        "write, debug, or warn output (only print is supported)"
-    );
-}
-
-#[test]
 fn text_comparison() {
     assert_eq!(
         rejected("main {\n    if \"a\" ≡ \"b\" {\n        print 1\n    }\n}"),
@@ -67,10 +59,12 @@ fn text_comparison() {
 }
 
 #[test]
-fn iteration_loop() {
+fn lockstep_iteration_loop() {
     assert_eq!(
-        rejected("main {\n    for range 0‥3 const i {\n        print i\n    }\n}"),
-        "iteration loop"
+        rejected(
+            "main {\n    const list<int> a ← [1, 2]\n    const list<int> b ← [3, 4]\n    for from a, b const x, y {\n        print x + y\n    }\n}"
+        ),
+        "lockstep iteration loop"
     );
 }
 

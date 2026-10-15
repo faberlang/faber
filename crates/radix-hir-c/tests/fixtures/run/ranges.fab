@@ -1,0 +1,61 @@
++++
+locale = "en"
++++
+# Range loops: direction from the bounds, a positive written step, inclusive
+# ends, the counter running past i64, the product, and the list position.
+main {
+    for range 0‥4 const i {
+        print i
+    }
+    for range 0…4 const i {
+        print i
+    }
+    for range 4‥0 const i {
+        print i
+    }
+    for range 4…0 const i {
+        print i
+    }
+    for range 10‥0 step 3 const i {
+        print i
+    }
+    for range 0…10 step 5 const i {
+        print i
+    }
+    for range 3‥3 const i {
+        print i
+    }
+    for range 3…3 const i {
+        print i
+    }
+    for range 9223372036854775806…9223372036854775807 const i {
+        print i
+    }
+    for range 0‥6 const i {
+        if i ≡ 1 {
+            continue
+        }
+        if i ≡ 4 {
+            break
+        }
+        print i
+    }
+    for range 0‥2, 0‥3 const i, j {
+        if j ≡ 2 {
+            break
+        }
+        print i, j
+    }
+    var int total ← 0
+    for range 1…5 var n {
+        n ← n * 10
+        total ← total + n
+    }
+    print total
+    const list<string> days ← ["mon", "tue", "wed"]
+    for from days at [i] const day {
+        print i, day
+    }
+    debug "to stderr"
+    warn "also stderr"
+}

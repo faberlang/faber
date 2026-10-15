@@ -71,6 +71,10 @@ report. It checks the runtime first: `faber.h` compiles on its own and
 | `list<int>`, `list<string>`, `list<bool>` | a pointer to an arena-allocated `faber_list_<elem>`, so binds alias (R1); one helper per operation, emitted only when used: literals, `empty`, `length`, `is_empty`, `append`, checked `xs[i]` reads and writes with the runner's trap texts, `for from` iteration, display with the runner's escapes. `ref` / `mut` on a list parameter passes the same pointer |
 | genera (`class`) | an arena-allocated struct `g_<Name>` handled by pointer, so binds alias (R1); forward typedefs first; members `m_<name>` (a field may be a C keyword). Construction, from a struct literal or a typed object literal, allocates and then assigns the given fields in literal order and the omitted fields' defaults. Methods are `g_<Genus>_<method>` with the receiver `faber_self` after the arena. Display matches the runner (`Point { x = 1, tag = "p" }`), recursing into nested genera and lists. `ref` / `mut` on a genus parameter passes the same pointer |
 | `float` (binary64) | C `double`; arithmetic is plain C, bit-exact once fused multiply-add is off (the runtime's pragmas cover clang and gcc in every mode). Display matches the runner: integral values print their exact expansion and `.0`, others their shortest round-trip digits positionally, and `inf`, `-inf`, `NaN`. `%` floors with the divisor's sign; `÷` on integers traps on zero; `⌊x⌋` `⌈x⌉` `⌊x⌉` round (ties to even) and saturate to `int` as the runner does; an integer compared with a float compares true values. `list<float>` is a list family. Programs link `-lm` |
+| range loops `for range a‥b [step s] const i`, ranges with `…`, and the range product `for range a‥b, c‥d const i, j` | an exact `faber_i128` counter and bounds evaluated once in source order (the runner's: an inclusive walk to `i64::MAX` steps past it, and only a step beyond the cap traps `numerus overflow`); the bounds pick the direction (`start ≤ end` ascends), a written step must be positive or the program aborts (`abort: range step must be positive`); the binder is `int64_t` read from the counter each pass; C's `break` / `continue` act on the innermost axis |
+| list position `for from xs at [i] const x` | the walk's index as `const int64_t l_i` |
+| `debug` and `warn` | `fprintf(stderr, …)`, the same format as `print`; `write` is a stdout line like `print` |
+| `type` aliases | resolved in the type table, nothing emitted |
 | local names | the shared binding policy (`prefixed_binding_name`): `l_<name>`. Nothing C reserves starts with `l_`, so `char`, `goto`, `stdout` or `INT64_MAX` need no keyword table |
 
 ## Rejected by name
@@ -79,7 +83,7 @@ report. It checks the runtime first: `faber.h` compiles on its own and
 options, sized integers, `inf`, text comparison, nested lists,
 other list methods, lists of genus, `ref` / `mut` on scalars, generic genera,
 contracts, static and optional fields, shorthand object-literal fields,
-bitwise operators, shifts, `for` loops, generic, async, device, error-channel
+bitwise operators, shifts, other `for` loops (lockstep, map and text sources), generic, async, device, error-channel
 and command functions, parameter access markers and optional parameters,
 function values, enums, maps and every other collection, tensors,
 closures, annotations, imports, and every other expression and statement
@@ -92,7 +96,7 @@ in `expr.rs` and `ty.rs`.
 (stdout and exit status); `scalars.c`, `c_edges.c`, `loops.c` and
 `functions.c` and `narrowing.c` are pinned. `functions.fab` runs recursion, call order with
 printing callees, booleans, module constants and a function without a result.
-`narrowing.fab` checks the fast path at the `int64_t` extremes and its exact
+`ranges.fab` runs every range form and edge, including an inclusive walk to `i64::MAX`; `trap_range_step.fab` and `trap_range_cap.fab` abort and trap as the runner does. `narrowing.fab` checks the fast path at the `int64_t` extremes and its exact
 fallback on intermediates that overflow `int64_t` but not the cap. `loops.fab` runs Collatz, floor division over negative variables, both loop
 jumps, the logical operators, and an unstored 2^63. The `trap_*.fab` fixtures
 trap at a store, a call argument, a division by zero, and an intermediate

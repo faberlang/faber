@@ -27,6 +27,7 @@ mod helpers;
 mod items;
 mod list;
 mod names;
+mod range;
 mod stmt;
 mod text;
 mod ty;
@@ -37,6 +38,8 @@ mod emit_test;
 mod item_test;
 #[cfg(test)]
 mod names_test;
+#[cfg(test)]
+mod range_test;
 #[cfg(test)]
 mod reject_test;
 #[cfg(test)]
