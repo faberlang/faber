@@ -115,6 +115,8 @@ pub(crate) enum Rep {
     Set,
     /// `T ∪ none`: null for none, else a pointer to a boxed payload.
     Opt,
+    /// A function value: the address of a compiled function.
+    Func,
     /// `textus`: a pointer to `[len: i64][bytes...]` (see `abi::TEXT_HEADER`).
     Text,
     /// No value.
@@ -133,7 +135,8 @@ impl Rep {
             | Self::Record
             | Self::Opt
             | Self::Map
-            | Self::Set => Some(types::I64),
+            | Self::Set
+            | Self::Func => Some(types::I64),
             Self::Unit => None,
         }
     }
@@ -165,6 +168,20 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Set(element) => {
             rep_of(table, MirType::semantic(*element))?;
             Ok(Rep::Set)
+        }
+        Type::Func(signature) => {
+            if !signature.type_params.is_empty()
+                || signature.is_async
+                || signature.is_generator
+                || signature.err.is_some()
+            {
+                return Err(Decline::new("function value"));
+            }
+            for param in &signature.params {
+                rep_of(table, MirType::semantic(param.ty))?;
+            }
+            rep_of(table, MirType::semantic(signature.ret))?;
+            Ok(Rep::Func)
         }
         Type::Option(inner) => {
             if matches!(table.get(*inner), Type::Option(_)) {
@@ -638,9 +655,14 @@ impl FunctionLower<'_, '_> {
             Rep::Int => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Float => Some(self.builder.ins().f64const(0.0)),
             Rep::Bool => Some(self.builder.ins().iconst(types::I8, 0)),
-            Rep::Text | Rep::Bits(_) | Rep::List | Rep::Record | Rep::Opt | Rep::Map | Rep::Set => {
-                Some(self.builder.ins().iconst(types::I64, 0))
-            }
+            Rep::Text
+            | Rep::Bits(_)
+            | Rep::List
+            | Rep::Record
+            | Rep::Opt
+            | Rep::Map
+            | Rep::Set
+            | Rep::Func => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Unit => None,
         }
     }
@@ -708,6 +730,14 @@ impl FunctionLower<'_, '_> {
             ),
             MirConstant::Unit => (None, Rep::Unit),
             MirConstant::Nil => (Some(self.builder.ins().iconst(types::I64, 0)), Rep::Opt),
+            MirConstant::Function(id) => {
+                let reference = self.function_ref(*id)?;
+                let pointer = self.state.pointer;
+                (
+                    Some(self.builder.ins().func_addr(pointer, reference)),
+                    Rep::Func,
+                )
+            }
             MirConstant::String(symbol) => {
                 let text = radix_lexer::textus_literal::decode_textus_literal(
                     self.state.input.interner.resolve(*symbol),
@@ -879,6 +909,7 @@ impl FunctionLower<'_, '_> {
             Rep::Record => abi::TAG_STRUCT,
             Rep::Opt => abi::TAG_OPT,
             Rep::Map | Rep::Set => abi::TAG_MAP,
+            Rep::Func => return Err(Decline::new("function value element")),
             Rep::Unit => return Err(Decline::new("unit list element")),
         })
     }
@@ -1657,6 +1688,9 @@ impl FunctionLower<'_, '_> {
                     _ => return Err(Decline::new("ambiguous definition call")),
                 }
             }
+            MirCallee::Value(operand) => {
+                return self.indirect_call(destination, operand, args);
+            }
             _ => return Err(Decline::new("indirect call")),
         };
         let reference = self.function_ref(id)?;
@@ -1700,6 +1734,61 @@ impl FunctionLower<'_, '_> {
             if let Some(result) = results.first() {
                 let (variable, _) = self.place_slot(destination)?;
                 self.builder.def_var(variable, *result);
+            }
+        }
+        Ok(())
+    }
+
+    /// A call through a function value.
+    fn indirect_call(
+        &mut self,
+        destination: Option<&MirPlace>,
+        callee: &MirOperand,
+        args: &[MirOperand],
+    ) -> Lowered<()> {
+        let (pointer, rep) = self.scalar(callee)?;
+        if rep != Rep::Func {
+            return Err(Decline::new("call of a non-function"));
+        }
+        let ty = self.operand_type(callee)?;
+        let table = self.state.input.types;
+        let Type::Func(signature) = resolve(table, ty.semantic_id()) else {
+            return Err(Decline::new("call of a non-function"));
+        };
+        let mut abi_signature = self.state.module.make_signature();
+        let mut wanted = Vec::with_capacity(signature.params.len());
+        for param in &signature.params {
+            let rep = rep_of(table, MirType::semantic(param.ty))?;
+            let Some(cl) = rep.cl_type() else {
+                return Err(Decline::new("unit parameter"));
+            };
+            abi_signature.params.push(AbiParam::new(cl));
+            wanted.push(rep);
+        }
+        let result_rep = rep_of(table, MirType::semantic(signature.ret))?;
+        if let Some(cl) = result_rep.cl_type() {
+            abi_signature.returns.push(AbiParam::new(cl));
+        }
+        let mut values = Vec::with_capacity(args.len());
+        for (position, arg) in args.iter().enumerate() {
+            let (value, have) = self.scalar(arg)?;
+            let value = match wanted.get(position) {
+                Some(want) => self.coerce(value, have, *want)?,
+                None => value,
+            };
+            values.push(value);
+        }
+        let signature_ref = self.builder.import_signature(abi_signature);
+        let call = self
+            .builder
+            .ins()
+            .call_indirect(signature_ref, pointer, &values);
+        if let Some(destination) = destination {
+            let results = self.builder.inst_results(call).to_vec();
+            if let Some(result) = results.first() {
+                let (variable, slot_rep) = self.place_slot(destination)?;
+                let result = self.coerce(*result, result_rep, slot_rep)?;
+                self.builder.def_var(variable, result);
             }
         }
         Ok(())
@@ -1931,6 +2020,7 @@ impl FunctionLower<'_, '_> {
                     .iconst(types::I32, i64::from(width.bits()));
                 self.call_runtime(&abi::TEXT_FROM_BITS, &[value, bits])?
             }
+            Rep::Func => return Err(Decline::new("function value as text")),
             Rep::Unit => return Err(Decline::new("unit rendered as text")),
         };
         rendered.ok_or_else(|| Decline::new("text rendering result"))
@@ -2048,7 +2138,8 @@ impl FunctionLower<'_, '_> {
             | (Rep::Record, Rep::Record)
             | (Rep::Opt, Rep::Opt)
             | (Rep::Map, Rep::Map)
-            | (Rep::Set, Rep::Set) => value,
+            | (Rep::Set, Rep::Set)
+            | (Rep::Func, Rep::Func) => value,
             (Rep::Bits(from), Rep::Bits(to)) if from == to => value,
             _ => return Err(Decline::new("conversion between representations")),
         };
@@ -2205,6 +2296,7 @@ impl FunctionLower<'_, '_> {
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
+            Rep::Func => return Err(Decline::new("function value print")),
             Rep::Unit => return Err(Decline::new("unit print")),
         }
         Ok(())
@@ -2321,9 +2413,14 @@ impl FunctionLower<'_, '_> {
             Rep::Float => self.float_binary(op, a, b),
             Rep::Bool => self.bool_binary(op, a, b),
             Rep::Text => self.text_binary(op, a, b),
-            Rep::Bits(_) | Rep::List | Rep::Record | Rep::Opt | Rep::Map | Rep::Set | Rep::Unit => {
-                Err(Decline::new("unit operands"))
-            }
+            Rep::Bits(_)
+            | Rep::List
+            | Rep::Record
+            | Rep::Opt
+            | Rep::Map
+            | Rep::Set
+            | Rep::Func
+            | Rep::Unit => Err(Decline::new("unit operands")),
         }
     }
 

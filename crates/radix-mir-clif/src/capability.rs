@@ -22,7 +22,7 @@ use radix_hir::DefId;
 use radix_mir::visit::MirVisitor;
 use radix_mir::*;
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
-use radix_types::{NumericWidth, Primitive, Type, TypeTable};
+use radix_types::{NumericWidth, Primitive, SemanticParamMode, Type, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Slug for shapes the CLIF subset does not cover yet.
@@ -90,6 +90,13 @@ impl MirVisitor for DirectCallees<'_> {
             MirCallee::Closure(_) | MirCallee::Value(_) => {}
         }
         radix_mir::visit::walk_callee(self, callee);
+    }
+
+    fn visit_operand(&mut self, operand: &MirOperand) {
+        if let MirOperand::Constant(MirConstant::Function(id)) = operand {
+            self.found.push(*id);
+        }
+        radix_mir::visit::walk_operand(self, operand);
     }
 }
 
@@ -206,7 +213,23 @@ impl<'a> ClifCapability<'a> {
                 Type::Option(_) => Some(Gap::Subset("optional value".to_owned())),
                 _ => self.type_gap(MirType::semantic(*inner)),
             },
-            Type::Func(_) => Some(Gap::Subset("function value".to_owned())),
+            Type::Func(sig) => {
+                if !sig.type_params.is_empty()
+                    || sig.is_async
+                    || sig.is_generator
+                    || sig.err.is_some()
+                    || sig
+                        .params
+                        .iter()
+                        .any(|param| param.mode != SemanticParamMode::Owned)
+                {
+                    return Some(Gap::Subset("function value".to_owned()));
+                }
+                sig.params
+                    .iter()
+                    .find_map(|param| self.type_gap(MirType::semantic(param.ty)))
+                    .or_else(|| self.type_gap(MirType::semantic(sig.ret)))
+            }
             Type::Ref(..) => Some(Gap::Subset("reference value".to_owned())),
             Type::ModularWord(width) | Type::SaturatingWord(width)
                 if width.integer_range().is_some() =>
@@ -307,7 +330,7 @@ impl<'a> ClifCapability<'a> {
             MirConstant::Octeti(_) => Some(Gap::Subset("byte constant".to_owned())),
             MirConstant::Regex { .. } => Some(Gap::Subset("regex constant".to_owned())),
             MirConstant::Nil => None,
-            MirConstant::Function(_) => Some(Gap::Subset("function constant".to_owned())),
+            MirConstant::Function(_) => None,
             MirConstant::Magnus(_) => Some(Gap::Subset("inf constant".to_owned())),
             MirConstant::ShapeSize { .. } => Some(Gap::Policy("device constant".to_owned())),
         }
@@ -536,9 +559,7 @@ impl MirVisitor for ClifCapability<'_> {
             MirCallee::Closure(_) => {
                 self.record(Gap::Subset("closure call".to_owned()));
             }
-            MirCallee::Value(_) => {
-                self.record(Gap::Subset("indirect call".to_owned()));
-            }
+            MirCallee::Value(_) => {}
         }
         radix_mir::visit::walk_callee(self, callee);
     }
