@@ -596,6 +596,13 @@ pub const INTERVAL_MATERIALIZE: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr],
     ret: Some(Ptr),
 };
+/// A copy of the range of a text (in characters) an interval names; null when
+/// the range does not lie fully inside the text: (text, interval) -> text.
+pub const TEXT_RANGE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_range",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
 /// A copy of the range of a list an interval names; null when the range does
 /// not lie fully inside the list: (list, interval) -> list.
 pub const LIST_RANGE: RuntimeSymbol = RuntimeSymbol {
@@ -750,6 +757,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     INTERVAL_QUERY,
     INTERVAL_MATERIALIZE,
     LIST_RANGE,
+    TEXT_RANGE,
     LIST_REWIDTH,
     TEXT_ENCODE,
     TEXT_PACK,

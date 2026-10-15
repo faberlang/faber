@@ -1839,6 +1839,34 @@ pub unsafe extern "C" fn __faber_clif_v1_interval_materialize(interval: *const L
     list_new_from(items)
 }
 
+/// A copy of the range of a text (in characters) an interval names; null when
+/// the range does not lie fully inside the text.
+///
+/// # Safety
+///
+/// `text` is a well-formed text handle and `interval` a live interval.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_range(
+    text: *const u8,
+    interval: *const List,
+) -> *const u8 {
+    let (start, end, inclusive) = unsafe { interval_parts(interval) };
+    let text = text_str(unsafe { text_bytes(text) });
+    let chars: Vec<char> = text.chars().collect();
+    let end = if inclusive {
+        end.checked_add(1)
+    } else {
+        Some(end)
+    };
+    match (usize::try_from(start), end.map(usize::try_from)) {
+        (Ok(start), Some(Ok(end))) if start <= end && end <= chars.len() => {
+            let window: String = chars[start..end].iter().collect();
+            text_new(window.as_bytes())
+        }
+        _ => std::ptr::null(),
+    }
+}
+
 /// A copy of the range of a list an interval names; null when the range does
 /// not lie fully inside the list.
 ///

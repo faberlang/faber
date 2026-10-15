@@ -1482,6 +1482,16 @@ impl FunctionLower<'_, '_> {
         for projection in &place.projections {
             if let (MirProjection::Index(index), Rep::Text) = (projection, current_rep) {
                 let (index, index_rep) = self.scalar(index)?;
+                if index_rep == Rep::Tuple {
+                    let window = self
+                        .call_runtime(&abi::TEXT_RANGE, &[current, index])?
+                        .ok_or_else(|| Decline::new("text window result"))?;
+                    let zero = self.builder.ins().iconst(types::I64, 0);
+                    let outside = self.builder.ins().icmp(IntCC::Equal, window, zero);
+                    self.trap_if(outside, "textus index out of bounds")?;
+                    current = window;
+                    continue;
+                }
                 if index_rep != Rep::Int {
                     return Err(Decline::new("text index representation"));
                 }
