@@ -1081,6 +1081,8 @@ pub enum MirIntrinsic {
     /// Operate on a compiler-owned live sermo directional view.
     Sermo(MirSermoOp),
     ReadLine,
+    /// Read all of stdin to EOF (`lege` with no line argument).
+    ReadAll,
     /// Async suspend (`cede`) or generator yield (`cede` inside `@ cursor`).
     Cede,
     /// Read one compiler-owned GPU execution builtin inside a device function.
