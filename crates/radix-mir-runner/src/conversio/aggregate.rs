@@ -57,6 +57,47 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// `lista<T> ↦ lista<T, N>`: the store-time capacity check. A bounded
+    /// list is held as an ordinary `Value::Array`; a source longer than `N`
+    /// fails the conversion, and `⊥` recovery supplies the fallback, as for
+    /// the other failable conversions.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn convert_to_bounded_array(
+        &mut self,
+        value: Value,
+        source_ty: radix_types::TypeId,
+        element: radix_types::TypeId,
+        capacity: radix_types::IndexId,
+        recovery: Option<&MirOperand>,
+        struct_defaults: &[MirStructFieldDefaults],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let radix_types::IndexExpr::Literal(capacity) = self.types.get_index(capacity) else {
+            return Err(RunnerError::internal(
+                span,
+                "bounded lista requires a literal capacity",
+            ));
+        };
+        let capacity = usize::try_from(*capacity).unwrap_or(usize::MAX);
+        let converted =
+            match self.convert_to_array_inner(value, source_ty, element, struct_defaults, span) {
+                Ok(converted) => converted,
+                Err(_) => {
+                    return self.recover_or_fail(
+                        recovery,
+                        span,
+                        "lista to bounded lista conversion failed",
+                    );
+                }
+            };
+        let fits = matches!(&converted, Value::Array(cell) if cell.borrow().len() <= capacity);
+        if fits {
+            Ok(converted)
+        } else {
+            self.recover_or_fail(recovery, span, "lista to bounded lista conversion failed")
+        }
+    }
+
     fn convert_octeti_to_lista_u8(
         &mut self,
         bytes: Vec<u8>,

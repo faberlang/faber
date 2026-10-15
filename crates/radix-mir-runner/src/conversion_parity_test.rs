@@ -366,20 +366,24 @@ fn float_to_numerus_runtime_conversion_is_a_check() {
     assert_eq!(run(&mut runner, &recovering, 3.7).unwrap(), Value::UInt(3));
 }
 
-/// P5: an unsupported bounded-list conversio reports a stable issue slug; a
-/// `Debug` dump of the target would carry `TypeId`/`IndexId`, which churn with
-/// any type-table edit.
-#[test]
-fn bounded_lista_conversio_unsupported_has_a_stable_issue() {
+/// Run `lista<numerus> ↦ lista<numerus, capacity>` over `items`, with an
+/// optional `⊥` recovery constant.
+fn run_bounded_lista_conversio(
+    capacity: u64,
+    items: &[i64],
+    recovery: Option<radix_mir::MirOperand>,
+) -> Result<Value, RunnerError> {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::{MirConversion, MirConversionFlavor, MirProgram, MirValidationContext};
     use radix_types::{IndexExpr, Primitive, TypeTable};
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     let mut types = TypeTable::new();
     let element = types.primitive(Primitive::Numerus);
     let source_ty = types.intern(Type::Array(element));
-    let capacity = types.intern_index(IndexExpr::Literal(4));
+    let capacity = types.intern_index(IndexExpr::Literal(capacity));
     let target_ty = types.intern(Type::BoundedArray { element, capacity });
     let interner = Interner::new();
     let program = MirProgram {
@@ -403,14 +407,55 @@ fn bounded_lista_conversio_unsupported_has_a_stable_issue() {
         source_ty: radix_mir::MirType::semantic(source_ty),
         target_ty: radix_mir::MirType::semantic(target_ty),
         params: Vec::new(),
-        recovery: None,
+        recovery,
         struct_defaults: Vec::new(),
     };
-    let error = runner
-        .eval_runtime_convert(&conversion, Value::Unit, span())
-        .expect_err("bounded lista has no runtime conversion carrier");
-    assert_eq!(
+    let source = Value::Array(Rc::new(RefCell::new(
+        items.iter().copied().map(Value::Int).collect(),
+    )));
+    runner.eval_runtime_convert(&conversion, source, span())
+}
+
+fn int_array(items: &[i64]) -> Value {
+    Value::Array(std::rc::Rc::new(std::cell::RefCell::new(
+        items.iter().copied().map(Value::Int).collect(),
+    )))
+}
+
+/// A list shorter than the capacity converts to the same elements.
+#[test]
+fn bounded_lista_conversio_fits() {
+    let result = run_bounded_lista_conversio(4, &[1, 2, 3], None).expect("fits capacity 4");
+    assert_eq!(result, int_array(&[1, 2, 3]));
+}
+
+/// A list exactly at the capacity converts.
+#[test]
+fn bounded_lista_conversio_exact() {
+    let result = run_bounded_lista_conversio(3, &[1, 2, 3], None).expect("fits capacity 3");
+    assert_eq!(result, int_array(&[1, 2, 3]));
+}
+
+/// A list over the capacity takes the `⊥` recovery value.
+#[test]
+fn bounded_lista_conversio_overflow_takes_recovery() {
+    use radix_mir::{MirConstant, MirOperand};
+
+    let recovery = MirOperand::Constant(MirConstant::Int(7));
+    let result = run_bounded_lista_conversio(2, &[1, 2, 3], Some(recovery))
+        .expect("overflow recovers with the ⊥ value");
+    assert_eq!(result, Value::Int(7));
+}
+
+/// A list over the capacity with no `⊥` fails the conversion; it is a
+/// conversion failure, not an unsupported target.
+#[test]
+fn bounded_lista_conversio_overflow_without_recovery_errs() {
+    let error = run_bounded_lista_conversio(2, &[1, 2, 3], None)
+        .expect_err("overflow without recovery fails the conversion");
+    assert_ne!(
         error.issue,
         "runner_faberscript_unsupported_runtime_conversio_to_bounded_lista"
     );
+    assert_eq!(error.code, crate::RUNNER_CODE_CONVERSION);
 }
