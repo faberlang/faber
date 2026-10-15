@@ -258,6 +258,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Type::BoundedAscii { capacity } => {
                 if self.numerus_radix(params).is_some() {
                     self.convert_to_ascii_format_pack(value, *capacity, params, recovery, span)
+                } else if matches!(value, Value::Str(_)) {
+                    self.convert_ascii_to_bounded_ascii(value, *capacity, recovery, span)
                 } else {
                     Err(RunnerError::unsupported(
                         span,
