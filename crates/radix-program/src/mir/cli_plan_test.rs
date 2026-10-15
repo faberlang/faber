@@ -283,12 +283,16 @@ fn greet() args args {
   print args.name
 }
 "#;
-    let lines = run_cli_package("cli-shared-binding-name", &[("main.fab", main)], &["greet", "Ian"])
-        .unwrap_or_else(|diagnostics| {
-            panic!(
-                "entry and command records must each take their own fields, got {:?}",
-                diagnostic_identities(&diagnostics)
-            )
-        });
+    let lines = run_cli_package(
+        "cli-shared-binding-name",
+        &[("main.fab", main)],
+        &["greet", "Ian"],
+    )
+    .unwrap_or_else(|diagnostics| {
+        panic!(
+            "entry and command records must each take their own fields, got {:?}",
+            diagnostic_identities(&diagnostics)
+        )
+    });
     assert_eq!(lines, vec!["Ian".to_owned()]);
 }
