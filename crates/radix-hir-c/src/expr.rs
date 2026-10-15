@@ -250,7 +250,7 @@ impl Emitter<'_> {
                 }
                 if let (Some(Ty::Float), Some(receiver_ty)) = (class, receiver.ty) {
                     let receiver = self.expr(receiver)?;
-                    return self.float_method(&receiver, receiver_ty, *method, args);
+                    return self.float_method(receiver, receiver_ty, *method, args);
                 }
                 if let (Some(Ty::Text), Some(receiver_ty)) = (class, receiver.ty) {
                     let receiver = self.expr(receiver)?;
