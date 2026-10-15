@@ -127,6 +127,17 @@ fn union_targets_test_each_member_and_reject_unlowered_members() {
     assert!(tests.contains(&MemberTest::Tag(crate::abi::TAG_TEXT)));
     assert_eq!(member_tests(&f.types, none), Some(vec![MemberTest::Nil]));
     assert_eq!(member_tests(&f.types, regex), None);
+    // An unbounded integer is an integer in `i64` (plain tag) or beyond it.
+    let inf = f.sized(Primitive::Numerus, NumericWidth::Inf);
+    assert_eq!(
+        member_tests(&f.types, inf),
+        Some(vec![
+            MemberTest::Tag(crate::abi::TAG_INT),
+            MemberTest::Tag(crate::abi::TAG_INF)
+        ])
+    );
+    let d64 = f.sized(Primitive::Numerus, NumericWidth::D64);
+    assert_eq!(member_tests(&f.types, d64), None);
     // A boxed union lowers; a none member would collide with the optional's
     // null and a member outside the subset is refused.
     assert!(rep_of(&f.types, MirType::semantic(mixed)).is_ok());

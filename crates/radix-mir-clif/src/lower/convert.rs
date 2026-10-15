@@ -1493,9 +1493,16 @@ pub(crate) fn member_tests(table: &TypeTable, target: TypeId) -> Option<Vec<Memb
             }
             return Some(tests);
         }
-        // A decimal or an unbounded integer has its own payload and its own
-        // type-test meaning: not the plain integer tag.
-        Type::SizedNumeric(Primitive::Numerus, NumericWidth::D64 | NumericWidth::Inf) => {
+        // An unbounded integer is an integer inside `i64` (the plain tag) or
+        // one beyond it (the inf tag): `est inf` holds for every integer.
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::Inf) => {
+            return Some(vec![
+                MemberTest::Tag(abi::TAG_INT),
+                MemberTest::Tag(abi::TAG_INF),
+            ]);
+        }
+        // A decimal has its own payload and no open-data box.
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::D64) => {
             return None;
         }
         Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
