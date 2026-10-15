@@ -1689,6 +1689,29 @@ pub unsafe extern "C" fn __faber_clif_v1_list_read_scalar(
     pattern as i64
 }
 
+/// A scalar written as bytes in the byte order of a flag; see the generator's
+/// `SCALAR_BYTES`.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_scalar_bytes(bits: i64, width: i32, flags: i32) -> *mut List {
+    let width = usize::try_from(width).unwrap_or(0).min(8);
+    let pattern = if flags & 4 != 0 && width == 4 {
+        u64::from((f64::from_bits(bits as u64) as f32).to_bits())
+    } else {
+        bits as u64
+    };
+    let bytes = if flags & 1 != 0 {
+        pattern.to_be_bytes()[8 - width..].to_vec()
+    } else {
+        pattern.to_le_bytes()[..width].to_vec()
+    };
+    list_new_from(
+        bytes
+            .into_iter()
+            .map(|byte| (TAG_BITS, i64::from(byte)))
+            .collect(),
+    )
+}
+
 /// The `(start, end, inclusive)` of an integer interval.
 ///
 /// # Safety

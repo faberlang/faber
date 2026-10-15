@@ -178,6 +178,9 @@ pub(crate) enum Seq {
         signed: bool,
         float: bool,
     },
+    /// A scalar written as its own bytes in the byte order of the conversion's
+    /// `via` hint, into a byte buffer of exactly that capacity.
+    WriteScalar { bytes: u32, float: bool },
     /// Text to a list of UTF-8, UTF-16 or UTF-32 units of the given width.
     Encode(u32),
     /// A list of unit patterns to text; 8, 16 and 32 decode UTF-8, UTF-16 and
@@ -196,7 +199,7 @@ pub(crate) enum Seq {
 fn list_element(table: &TypeTable, id: TypeId) -> Option<TypeId> {
     match resolve(table, id) {
         Type::Array(element) | Type::BoundedArray { element, .. } => Some(*element),
-        Type::BoundedOcteti { .. } => byte_element(table),
+        Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti) => byte_element(table),
         _ => None,
     }
 }
@@ -310,12 +313,32 @@ pub(crate) fn sequence_conversion(
         _ => None,
     };
     match (resolve(table, source), target_type) {
-        (Type::Array(_) | Type::BoundedArray { .. } | Type::BoundedOcteti { .. }, scalar)
-            if list_element(table, source).is_some_and(|element| {
-                matches!(resolve(table, element), Type::Bits(BitsWidth::B8))
-            }) && read_scalar(scalar).is_some() =>
+        (
+            Type::Array(_)
+            | Type::BoundedArray { .. }
+            | Type::BoundedOcteti { .. }
+            | Type::Primitive(Primitive::Octeti),
+            scalar,
+        ) if list_element(table, source).is_some_and(|element| {
+            matches!(resolve(table, element), Type::Bits(BitsWidth::B8))
+        }) && read_scalar(scalar).is_some() =>
         {
             read_scalar(scalar)
+        }
+        (Type::SizedNumeric(kind, width), Type::BoundedOcteti { capacity }) => {
+            let seq = match (kind, width) {
+                (Primitive::Numerus, NumericWidth::I16 | NumericWidth::U16) => (2, false),
+                (Primitive::Numerus, NumericWidth::I32 | NumericWidth::U32) => (4, false),
+                (Primitive::Numerus, NumericWidth::I64) => (8, false),
+                (Primitive::Fractus, NumericWidth::F32) => (4, true),
+                (Primitive::Fractus, NumericWidth::F64) => (8, true),
+                _ => return None,
+            };
+            byte_element(table)?;
+            (literal(capacity)? == u64::from(seq.0)).then_some(Seq::WriteScalar {
+                bytes: seq.0,
+                float: seq.1,
+            })
         }
         (
             Type::Primitive(Primitive::Textus) | Type::BoundedTextus { .. },
@@ -372,7 +395,13 @@ pub(crate) fn sequence_conversion(
             Type::Array(_) | Type::BoundedArray { .. } | Type::BoundedOcteti { .. },
             Type::Array(to),
         ) if rewidth(table, source, *to).is_some() => rewidth(table, source, *to),
-        (_, Type::Array(_) | Type::BoundedArray { .. } | Type::BoundedOcteti { .. }) => {
+        (
+            _,
+            Type::Array(_)
+            | Type::BoundedArray { .. }
+            | Type::BoundedOcteti { .. }
+            | Type::Primitive(Primitive::Octeti),
+        ) => {
             let to = &match target_type {
                 Type::Array(to) | Type::BoundedArray { element: to, .. } => *to,
                 _ => byte_element(table)?,
@@ -597,6 +626,35 @@ impl FunctionLower<'_, '_> {
                 } else {
                     (bits, failure, Rep::Int)
                 }
+            }
+            Seq::WriteScalar { bytes, float } => {
+                let big = conversion
+                    .params
+                    .iter()
+                    .find_map(|param| match self.state.input.interner.resolve(*param) {
+                        "be" | "Be" => Some(1),
+                        "le" | "Le" => Some(0),
+                        _ => None,
+                    })
+                    .ok_or_else(|| Decline::new("byte write without a byte order"))?;
+                let bits = if float {
+                    self.builder
+                        .ins()
+                        .bitcast(types::I64, MemFlagsData::new(), value)
+                } else {
+                    value
+                };
+                let width = self.builder.ins().iconst(types::I32, i64::from(bytes));
+                let flags = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, big | if float { 4 } else { 0 });
+                (
+                    self.call_runtime(&abi::SCALAR_BYTES, &[bits, width, flags])?
+                        .ok_or_else(|| Decline::new("byte write result"))?,
+                    None,
+                    Rep::List,
+                )
             }
             Seq::Release => (value, None, Rep::Text),
             Seq::BoundText { capacity } => {

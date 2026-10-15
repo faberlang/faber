@@ -185,10 +185,11 @@ impl<'a> ClifCapability<'a> {
             Type::PolicyFloat(..) => Some(Gap::Subset("policy float value".to_owned())),
             Type::Primitive(Primitive::Ascii) => None,
             Type::Primitive(Primitive::Littera) => Some(Gap::Subset("character value".to_owned())),
-            Type::BoundedOcteti { .. } => crate::lower::byte_element(self.types)
-                .is_none()
-                .then(|| Gap::Subset("byte buffer value".to_owned())),
-            Type::Primitive(Primitive::Octeti) => Some(Gap::Subset("byte buffer value".to_owned())),
+            Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti) => {
+                crate::lower::byte_element(self.types)
+                    .is_none()
+                    .then(|| Gap::Subset("byte buffer value".to_owned()))
+            }
             Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => None,
             Type::Primitive(Primitive::Regex)
             | Type::Primitive(Primitive::Match)

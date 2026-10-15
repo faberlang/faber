@@ -278,7 +278,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             _ => Err(Decline::new("interval of non-integers")),
         },
         // A bounded byte buffer is a bounded list of raw bytes.
-        Type::BoundedOcteti { .. } => {
+        Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti) => {
             convert::byte_element(table).ok_or_else(|| Decline::new("byte buffer element"))?;
             Ok(Rep::List)
         }
@@ -1019,9 +1019,11 @@ impl FunctionLower<'_, '_> {
             Type::Array(element) | Type::BoundedArray { element, .. } => {
                 Ok(MirType::semantic(*element))
             }
-            Type::BoundedOcteti { .. } => convert::byte_element(self.state.input.types)
-                .map(MirType::semantic)
-                .ok_or_else(|| Decline::new("byte buffer element")),
+            Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti) => {
+                convert::byte_element(self.state.input.types)
+                    .map(MirType::semantic)
+                    .ok_or_else(|| Decline::new("byte buffer element"))
+            }
             _ => Err(Decline::new("index of a non-list")),
         }
     }

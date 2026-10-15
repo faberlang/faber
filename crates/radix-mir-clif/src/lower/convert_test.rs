@@ -226,3 +226,32 @@ fn integer_intervals_are_values_and_others_are_not() {
     assert!(rep_of(&f.types, MirType::semantic(ints)).is_ok());
     assert!(rep_of(&f.types, MirType::semantic(floats)).is_err());
 }
+
+#[test]
+fn scalars_write_into_a_byte_buffer_of_their_width() {
+    let mut f = Fixture::new();
+    f.bits(BitsWidth::B8);
+    let u16_ = f.sized(Primitive::Numerus, NumericWidth::U16);
+    let f32_ = f.sized(Primitive::Fractus, NumericWidth::F32);
+    let two = f.types.intern_index(radix_types::IndexExpr::Literal(2));
+    let four = f.types.intern_index(radix_types::IndexExpr::Literal(4));
+    let bytes2 = f.types.bounded_octeti(two);
+    let bytes4 = f.types.bounded_octeti(four);
+    let plan = |f: &Fixture, from, to| sequence_conversion(&f.types, from, to);
+    assert_eq!(
+        plan(&f, u16_, bytes2),
+        Some(Seq::WriteScalar {
+            bytes: 2,
+            float: false
+        })
+    );
+    assert_eq!(
+        plan(&f, f32_, bytes4),
+        Some(Seq::WriteScalar {
+            bytes: 4,
+            float: true
+        })
+    );
+    // The capacity must equal the scalar's width.
+    assert_eq!(plan(&f, u16_, bytes4), None);
+}

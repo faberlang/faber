@@ -566,6 +566,14 @@ pub const LIST_READ_SCALAR: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, I32, I32],
     ret: Some(I64),
 };
+/// A scalar written as bytes: (bits, byte count, flags) -> list of raw
+/// bytes. Flag 1 is big-endian; flag 4 takes the bits as an f64 and writes an
+/// IEEE float of that many bytes.
+pub const SCALAR_BYTES: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_scalar_bytes",
+    params: &[I64, I32, I32],
+    ret: Some(Ptr),
+};
 /// Intersection (mode 0) or union (mode 1) of two integer intervals:
 /// (mode, left, right) -> a boxed optional interval, null when the result is
 /// empty (intersection) or the parts are disjoint (union).
@@ -737,6 +745,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     LIST_TO_SET,
     LIST_RETAG,
     LIST_READ_SCALAR,
+    SCALAR_BYTES,
     INTERVAL_COMBINE,
     INTERVAL_QUERY,
     INTERVAL_MATERIALIZE,
