@@ -44,6 +44,8 @@ pub(crate) enum Helper {
     TextAlloc,
     /// Text operations that only read (`faber_text_length`, …).
     TextRead,
+    /// `faber_try_*` and `faber_conv_fail` (no allocation).
+    Conv,
 }
 
 /// One operation of a list family (`faber_list_<elem>_<op>`).
@@ -89,6 +91,7 @@ impl Helper {
             | Helper::FdivI64
             | Helper::FmodI64
             | Helper::TextRead
+            | Helper::Conv
             | Helper::Float => false,
         }
     }

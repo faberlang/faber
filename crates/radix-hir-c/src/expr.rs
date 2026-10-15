@@ -207,6 +207,14 @@ impl Emitter<'_> {
                 recovery: None,
                 ..
             } => self.implicit_store(source, *slot, site),
+            HirExpressionKind::Conversio {
+                source,
+                target: HirConversioTarget::Type(target),
+                params,
+                recovery,
+                route: None,
+                implicit: None,
+            } => self.conversion(source, *target, params, recovery.as_deref()),
             HirExpressionKind::Scriptum(template, args) => self.template(*template, args),
             HirExpressionKind::Si {
                 cond,

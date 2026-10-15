@@ -55,3 +55,13 @@ fn an_optional_result_returns_the_struct() {
     assert!(code.contains("return ((faber_opt_i64){1, p_n});"), "{code}");
     assert!(code.contains("return ((faber_opt_i64){0});"), "{code}");
 }
+
+#[test]
+fn a_creo_hook_runs_on_the_finished_object() {
+    let code = crate::test_support::emitted(
+        "class Box {\n    var int n = 0\n    fn creo() → void {\n        if self.n ≻ 9 {\n            self.n ← 9\n        }\n    }\n}\nmain {\n    const Box b ← Box { n = 50 }\n    print b.n\n}",
+    );
+    let set = code.find("->m_n = INT64_C(50);").expect("field set");
+    let hook = code.find("g_Box_creo(faber_a, faber_t").expect("hook call");
+    assert!(set < hook, "{code}");
+}

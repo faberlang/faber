@@ -1,0 +1,42 @@
++++
+locale = "en"
++++
+# The creo hook runs once on the finished object, whichever way it was built.
+class Terminus {
+    var int valor = 0
+
+    fn creo() → void {
+        if self.valor ≺ 0 {
+            self.valor ← 0
+        }
+        if self.valor ≻ 100 {
+            self.valor ← 100
+        }
+    }
+
+    fn accipe() → int {
+        return self.valor
+    }
+}
+
+class Circulus {
+    var int radius = 1
+    var int diameter = 0
+    var float area = 0
+
+    fn creo() → void {
+        self.diameter ← self.radius * 2
+        self.area ← 3.14159 * (self.radius ↦ float) * (self.radius ↦ float)
+    }
+}
+
+const Terminus FIXED = Terminus { valor = 500 }
+
+main {
+    print Terminus { valor = 50 }.accipe()
+    print Terminus { valor = 200 }.accipe()
+    print Terminus { valor = -4 }.accipe()
+    print FIXED.accipe()
+    const Circulus c ← Circulus { radius = 5 }
+    print c.radius, c.diameter, c.area
+}

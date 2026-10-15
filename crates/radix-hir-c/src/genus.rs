@@ -211,6 +211,25 @@ impl Emitter<'_> {
             let operand = self.field_value(default, field.ty)?;
             write!(body, "{target}->{} = {}; ", field.c_name, operand.text).ok();
         }
+        // The `creo` hook runs once on the finished object, after every field
+        // is set (the runner's construction does the same).
+        let hook = self
+            .genus(def_id)?
+            .methods
+            .iter()
+            .find(|(name, _)| name == "creo")
+            .map(|(_, def)| *def);
+        if let Some(hook) = hook {
+            let Some(function) = self.functions.get(&hook) else {
+                return Err(unsupported(
+                    "construction with a creo hook before its signature is known",
+                ));
+            };
+            let arena = if self.arena { "faber_a, " } else { "" };
+            write!(body, "{}({arena}{target}); ", function.name).ok();
+            self.called.insert(hook);
+            effect = true;
+        }
         let text = format!("(__extension__ ({{ {body}{target}; }}))");
         Ok(Operand::new(text, Value::Genus(def_id)).with_effect(effect))
     }

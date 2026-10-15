@@ -19,6 +19,7 @@
 //! `radix-module` re-exports this leaf through its codegen surface and owns
 //! target dispatch.
 
+mod conversio;
 mod error;
 mod expr;
 mod float;
@@ -37,6 +38,8 @@ mod ty;
 
 #[cfg(test)]
 mod control_test;
+#[cfg(test)]
+mod conversio_test;
 #[cfg(test)]
 mod emit_test;
 #[cfg(test)]

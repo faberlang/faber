@@ -129,11 +129,9 @@ impl Emitter<'_> {
                     self.signature(item.def_id, function, None)?;
                     functions.push((item.def_id, &**function));
                 }
-                HirItemKind::Constant(constant) => {
-                    let (declaration, initializer) = self.constant(item, constant)?;
-                    items.constants.push_str(&declaration);
-                    items.initializers.push_str(&initializer);
-                }
+                // Constants wait for every signature: a value built with a
+                // genus's `creo` hook calls a method.
+                HirItemKind::Constant(_) => {}
                 HirItemKind::Struct(genus) => {
                     for method in &genus.methods {
                         self.signature(method.def_id, &method.func, Some(item.def_id))?;
@@ -147,6 +145,13 @@ impl Emitter<'_> {
                 HirItemKind::TypeAlias(_) => {}
                 HirItemKind::Schema(_) => return Err(unsupported("schema declaration")),
                 HirItemKind::Import(_) => return Err(unsupported("import (library modules)")),
+            }
+        }
+        for item in &hir.items {
+            if let HirItemKind::Constant(constant) = &item.kind {
+                let (declaration, initializer) = self.constant(item, constant)?;
+                items.constants.push_str(&declaration);
+                items.initializers.push_str(&initializer);
             }
         }
         items.genera = self.genus_declarations(&order)?;

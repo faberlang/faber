@@ -998,4 +998,190 @@ static inline faber_text faber_text_replace(faber_arena *arena, faber_text text,
     return out;
 }
 
+/* ------------------------------------------------------------------------ */
+/* Conversions (`↦`): each "try" reports 0 or why it failed; the program    */
+/* either recovers (`⊥`) or ends with the runner's text for that failure    */
+/* ------------------------------------------------------------------------ */
+
+enum {
+    FABER_CONV_OK = 0,
+    FABER_CONV_SYNTAX = 1, /* the text is not a number */
+    FABER_CONV_RANGE = 2   /* a number, but outside the target */
+};
+
+enum {
+    FABER_CONV_TEXT_INT = 0,
+    FABER_CONV_TEXT_FLOAT = 1,
+    FABER_CONV_INT_INT = 2,
+    FABER_CONV_FLOAT_INT = 3
+};
+
+static inline _Noreturn void faber_conv_fail(int kind, int why) {
+    switch (kind) {
+    case FABER_CONV_TEXT_INT:
+        faber_trap(why == FABER_CONV_SYNTAX ? "textus to numerus conversion failed"
+                                            : "textus to numerus conversion out of range");
+    case FABER_CONV_TEXT_FLOAT:
+        faber_trap("textus to fractus conversion failed");
+    case FABER_CONV_INT_INT:
+        faber_trap("numerus to numerus conversion out of range");
+    default:
+        faber_trap("fractus to numerus conversion out of range");
+    }
+}
+
+/* `numerus ↦ numerus` into a width: in range or not. */
+static inline int faber_try_int(faber_i128 value, faber_i128 low, faber_i128 high,
+                                faber_i128 *out) {
+    *out = value;
+    return value >= low && value <= high ? FABER_CONV_OK : FABER_CONV_RANGE;
+}
+
+/* `textus ↦ numerus [via Hex|Bin|Oct]`: an optional sign, then digits of the
+ * radix and nothing else. A run of digits past the exact range is a number
+ * outside every width. */
+static inline int faber_try_text_int(faber_text text, int radix, faber_i128 low, faber_i128 high,
+                                     faber_i128 *out) {
+    const char *p = text;
+    bool negative = false;
+    faber_i128 value = 0;
+    const faber_i128 saturated = (faber_i128)1 << 100;
+    if (*p == '+' || *p == '-') {
+        negative = *p == '-';
+        p++;
+    }
+    if (*p == '\0') {
+        return FABER_CONV_SYNTAX;
+    }
+    for (; *p != '\0'; p++) {
+        int digit;
+        if (*p >= '0' && *p <= '9') {
+            digit = *p - '0';
+        } else if (*p >= 'a' && *p <= 'z') {
+            digit = *p - 'a' + 10;
+        } else if (*p >= 'A' && *p <= 'Z') {
+            digit = *p - 'A' + 10;
+        } else {
+            return FABER_CONV_SYNTAX;
+        }
+        if (digit >= radix) {
+            return FABER_CONV_SYNTAX;
+        }
+        if (value < saturated) {
+            value = value * radix + digit;
+        }
+    }
+    *out = negative ? -value : value;
+    return *out >= low && *out <= high ? FABER_CONV_OK : FABER_CONV_RANGE;
+}
+
+static inline bool faber_ascii_equal_nocase(const char *a, const char *b) {
+    for (; *a != '\0' && *b != '\0'; a++, b++) {
+        char x = *a >= 'A' && *a <= 'Z' ? (char)(*a - 'A' + 'a') : *a;
+        if (x != *b) {
+            return false;
+        }
+    }
+    return *a == '\0' && *b == '\0';
+}
+
+/* `textus ↦ fractus`, as Rust's `f64::from_str` reads it: an optional sign,
+ * then `inf`, `infinity`, `nan` (any case) or decimal digits with an optional
+ * point and exponent. No whitespace, no hex, no digit separators. */
+static inline int faber_try_text_float(faber_text text, double *out) {
+    const char *p = text;
+    size_t digits = 0;
+    if (*p == '+' || *p == '-') {
+        p++;
+    }
+    if (faber_ascii_equal_nocase(p, "inf") || faber_ascii_equal_nocase(p, "infinity") ||
+        faber_ascii_equal_nocase(p, "nan")) {
+        *out = strtod(text, NULL);
+        return FABER_CONV_OK;
+    }
+    while (*p >= '0' && *p <= '9') {
+        p++;
+        digits++;
+    }
+    if (*p == '.') {
+        p++;
+        while (*p >= '0' && *p <= '9') {
+            p++;
+            digits++;
+        }
+    }
+    if (digits == 0) {
+        return FABER_CONV_SYNTAX;
+    }
+    if (*p == 'e' || *p == 'E') {
+        size_t exponent = 0;
+        p++;
+        if (*p == '+' || *p == '-') {
+            p++;
+        }
+        while (*p >= '0' && *p <= '9') {
+            p++;
+            exponent++;
+        }
+        if (exponent == 0) {
+            return FABER_CONV_SYNTAX;
+        }
+    }
+    if (*p != '\0') {
+        return FABER_CONV_SYNTAX;
+    }
+    *out = strtod(text, NULL);
+    return FABER_CONV_OK;
+}
+
+/* `fractus ↦ numerus via <mode>`: 0 floor, 1 ceiling, 2 truncate, 3 nearest
+ * with ties to the even neighbour. NaN and anything outside the cap fail. */
+static inline int faber_try_float_int(double value, int mode, faber_i128 low, faber_i128 high,
+                                      faber_i128 *out) {
+    double rounded;
+    if (value != value) {
+        return FABER_CONV_RANGE;
+    }
+    switch (mode) {
+    case 0:
+        rounded = floor(value);
+        break;
+    case 1:
+        rounded = ceil(value);
+        break;
+    case 2:
+        rounded = trunc(value);
+        break;
+    default: {
+        double below = floor(value);
+        double gap = value - below;
+        if (gap < 0.5) {
+            rounded = below;
+        } else if (gap > 0.5) {
+            rounded = below + 1.0;
+        } else {
+            rounded = fmod(below, 2.0) == 0.0 ? below : below + 1.0;
+        }
+        break;
+    }
+    }
+    if (!(rounded >= -9223372036854775808.0 && rounded < 18446744073709551616.0)) {
+        return FABER_CONV_RANGE;
+    }
+    *out = (faber_i128)rounded;
+    return *out >= low && *out <= high ? FABER_CONV_OK : FABER_CONV_RANGE;
+}
+
+/* `fractus ↦ textus`: the shortest digits that read back, and no `.0` on an
+ * integral value (`1.0 ↦ textus` is `1`), as Rust's `Display` writes it. */
+static inline faber_text faber_float_display(faber_arena *arena, double value) {
+    char buffer[FABER_F64_TEXT];
+    const char *shown = faber_f64_text(value, buffer);
+    size_t length = strlen(shown);
+    if (length >= 2 && shown[length - 2] == '.' && shown[length - 1] == '0') {
+        length -= 2;
+    }
+    return faber_text_copy(arena, shown, length);
+}
+
 #endif /* FABER_H */
