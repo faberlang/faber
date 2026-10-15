@@ -46,7 +46,13 @@ const SCRINIUM_FIELDS: &[(&str, FieldTypeFn)] = &[
 ];
 
 fn define_builtin_symbol(resolver: &mut Resolver, symbol: crate::Symbol) {
-    debug_assert!(resolver.define(symbol).is_ok());
+    // The registration is a side effect: it must happen in every profile. A
+    // `debug_assert!` around the call itself compiles the whole expression out
+    // of release builds, which dropped every builtin frame symbol (`sermo`,
+    // `scrinium`, `status`, `meus`, `tuus`) and made release reject programs a
+    // debug build accepts.
+    let defined = resolver.define(symbol);
+    debug_assert!(defined.is_ok(), "builtin frame symbol registers exactly once");
 }
 
 const STATUS_VARIANTS: &[&str] = &["request", "item", "byte", "bulk", "done", "error", "cancel"];
