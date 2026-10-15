@@ -107,6 +107,18 @@ impl Emitter<'_> {
                 self.fallible_int(&value, class, Kind::FloatInt, Some(mode), params, recovery)?
             }
             (Value::Text, Ty::Float) => self.text_to_float(&value, recovery)?,
+            // `text ↦ bool` is non-empty; a text value cannot hold a NUL, so
+            // the first byte decides. `fractus ↦ bool` is non-zero (`-0.0` is
+            // false, NaN is true). `bool ↦ fractus` is 1.0 / 0.0.
+            (Value::Text, Ty::Bool) => {
+                Operand::new(format!("(({})[0] != '\\0')", value.text), Value::Truth)
+            }
+            (Value::Float, Ty::Bool) => {
+                Operand::new(format!("(({}) != 0.0)", value.text), Value::Truth)
+            }
+            (Value::Truth, Ty::Float) => {
+                Operand::new(format!("(({}) ? 1.0 : 0.0)", value.text), Value::Float)
+            }
             _ => return Err(unsupported("conversion between these value classes")),
         };
         Ok(operand.with_effect(effect))
