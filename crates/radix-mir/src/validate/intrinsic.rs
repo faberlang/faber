@@ -316,6 +316,18 @@ impl Validator<'_, '_> {
                     _ => self.error(span, "read_line runtime call does not return textus option"),
                 }
             }
+            MirIntrinsic::ReadAll => {
+                self.require_arg_count(call.args.len(), 0, span, "read_all runtime call");
+                match self.type_kind(call.return_ty) {
+                    Type::Option(inner) => self.require_exact(
+                        MirType::semantic(*inner),
+                        self.primitive(Primitive::Textus),
+                        span,
+                        "read_all runtime call does not return textus option",
+                    ),
+                    _ => self.error(span, "read_all runtime call does not return textus option"),
+                }
+            }
             MirIntrinsic::Gradient(op) => {
                 self.validate_gradient_call(scope, *op, call, span);
             }
