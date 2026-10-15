@@ -1,0 +1,106 @@
+//! The explicit numeric conversion matrix: which source/target pairs lower,
+//! and which stay declined by name.
+
+use super::convert::{Num, numeric_conversion};
+use radix_types::{BitsWidth, NumericWidth, Primitive, Type, TypeId, TypeTable};
+
+struct Fixture {
+    types: TypeTable,
+}
+
+impl Fixture {
+    fn new() -> Self {
+        Self {
+            types: TypeTable::new(),
+        }
+    }
+
+    fn primitive(&self, primitive: Primitive) -> TypeId {
+        self.types.primitive(primitive)
+    }
+
+    fn sized(&mut self, primitive: Primitive, width: NumericWidth) -> TypeId {
+        self.types.intern(Type::SizedNumeric(primitive, width))
+    }
+
+    fn modular(&mut self, width: NumericWidth) -> TypeId {
+        self.types.intern(Type::ModularWord(width))
+    }
+
+    fn saturating(&mut self, width: NumericWidth) -> TypeId {
+        self.types.intern(Type::SaturatingWord(width))
+    }
+
+    fn bits(&mut self, width: BitsWidth) -> TypeId {
+        self.types.intern(Type::Bits(width))
+    }
+
+    fn supported(&self, source: TypeId, target: TypeId) -> bool {
+        numeric_conversion(&self.types, source, target).is_some()
+    }
+}
+
+#[test]
+fn integer_narrowing_widening_and_policy_words_lower() {
+    let mut f = Fixture::new();
+    let int = f.primitive(Primitive::Numerus);
+    let u8_ = f.sized(Primitive::Numerus, NumericWidth::U8);
+    let i8_ = f.sized(Primitive::Numerus, NumericWidth::I8);
+    let wrapping_i8 = f.modular(NumericWidth::I8);
+    let wrapping_u64 = f.modular(NumericWidth::U64);
+    let saturating_u8 = f.saturating(NumericWidth::U8);
+    assert!(f.supported(int, u8_));
+    assert!(f.supported(u8_, int));
+    assert!(f.supported(i8_, u8_));
+    assert!(f.supported(int, wrapping_i8));
+    assert!(f.supported(int, saturating_u8));
+    // A wrapping u64 result leaves the i64 carrier.
+    assert!(!f.supported(int, wrapping_u64));
+}
+
+#[test]
+fn float_text_and_bool_pairs() {
+    let mut f = Fixture::new();
+    let int = f.primitive(Primitive::Numerus);
+    let float = f.primitive(Primitive::Fractus);
+    let text = f.primitive(Primitive::Textus);
+    let boolean = f.primitive(Primitive::Bivalens);
+    let u64_ = f.sized(Primitive::Numerus, NumericWidth::U64);
+    let wrapping_u8 = f.modular(NumericWidth::U8);
+    assert!(f.supported(float, int));
+    assert!(f.supported(text, int));
+    assert!(f.supported(text, float));
+    assert!(f.supported(text, boolean));
+    assert!(f.supported(int, boolean));
+    assert!(f.supported(boolean, float));
+    // The u64 range exceeds the signed carrier: declined, not approximated.
+    assert!(!f.supported(float, u64_));
+    assert!(!f.supported(text, u64_));
+    // Float and text sources never feed a policy word here.
+    assert!(!f.supported(float, wrapping_u8));
+    assert!(!f.supported(int, text));
+}
+
+#[test]
+fn raw_bits_pair_only_with_same_width_scalars() {
+    let mut f = Fixture::new();
+    let i32_ = f.sized(Primitive::Numerus, NumericWidth::I32);
+    let u32_ = f.sized(Primitive::Numerus, NumericWidth::U32);
+    let u64_ = f.sized(Primitive::Numerus, NumericWidth::U64);
+    let f32_ = f.sized(Primitive::Fractus, NumericWidth::F32);
+    let f16_ = f.sized(Primitive::Fractus, NumericWidth::F16);
+    let b32 = f.bits(BitsWidth::B32);
+    let b16 = f.bits(BitsWidth::B16);
+    let b64 = f.bits(BitsWidth::B64);
+    assert!(f.supported(i32_, b32));
+    assert!(f.supported(b32, u32_));
+    assert!(f.supported(f32_, b32));
+    assert!(f.supported(b32, f32_));
+    assert!(!f.supported(i32_, b16));
+    assert!(!f.supported(f16_, b16));
+    assert!(!f.supported(u64_, b64));
+    assert!(matches!(
+        numeric_conversion(&f.types, i32_, b32).map(|plan| plan.target()),
+        Some(Num::Bits(BitsWidth::B32))
+    ));
+}

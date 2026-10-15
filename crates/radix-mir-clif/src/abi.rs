@@ -464,6 +464,33 @@ pub const SET_DISPLAY_TOKENS: RuntimeSymbol = RuntimeSymbol {
     ret: None,
 };
 
+/// Parse a text as an integer in a radix and range-check it against
+/// `[low, high]`: (text, radix, low, high) -> value. The outcome is read
+/// from [`PARSE_STATUS`] (0 ok, 1 malformed, 2 out of range).
+pub const PARSE_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_parse_int",
+    params: &[Ptr, I32, I64, I64],
+    ret: Some(I64),
+};
+/// Parse a text as a float: (text) -> value. Status 0 ok, 3 malformed.
+pub const PARSE_F64: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_parse_f64",
+    params: &[Ptr],
+    ret: Some(F64),
+};
+/// The outcome of the latest parse (see [`PARSE_INT`], [`PARSE_F64`]).
+pub const PARSE_STATUS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_parse_status",
+    params: &[],
+    ret: Some(I32),
+};
+/// The failure text of a nonzero parse status.
+pub const CONVERT_MESSAGE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_convert_message",
+    params: &[I32],
+    ret: Some(Ptr),
+};
+
 /// The runtime entry the emitted `main` shim calls.
 pub const MAIN: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_main",
@@ -542,6 +569,10 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     ABORT_TEXT,
     TRAP,
     TRAP_STORE,
+    PARSE_INT,
+    PARSE_F64,
+    PARSE_STATUS,
+    CONVERT_MESSAGE,
     SET_DISPLAY_TOKENS,
 ];
 

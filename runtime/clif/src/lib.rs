@@ -1357,3 +1357,69 @@ pub unsafe extern "C" fn __faber_clif_v1_trap_store(
     let _ = writeln!(stderr, "error: {message}");
     std::process::exit(1);
 }
+
+/// The outcome of the latest parse: 0 ok, 1 malformed integer, 2 integer out
+/// of range, 3 malformed float.
+static PARSE_STATUS: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+
+/// Parse a text as an integer in `radix`; a malformed text or a value outside
+/// `[low, high]` sets a nonzero status and returns 0.
+///
+/// # Safety
+///
+/// `text` is a well-formed text handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_parse_int(
+    text: *const u8,
+    radix: i32,
+    low: i64,
+    high: i64,
+) -> i64 {
+    let source = text_str(unsafe { text_bytes(text) });
+    let radix = u32::try_from(radix).unwrap_or(10);
+    let (status, value) = match i128::from_str_radix(&source, radix) {
+        Err(_) => (1, 0),
+        Ok(parsed) => {
+            if parsed >= i128::from(low) && parsed <= i128::from(high) {
+                (0, i64::try_from(parsed).unwrap_or(0))
+            } else {
+                (2, 0)
+            }
+        }
+    };
+    PARSE_STATUS.store(status, std::sync::atomic::Ordering::Relaxed);
+    value
+}
+
+/// Parse a text as a float; a malformed text sets status 3 and returns 0.
+///
+/// # Safety
+///
+/// `text` is a well-formed text handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_parse_f64(text: *const u8) -> f64 {
+    let source = text_str(unsafe { text_bytes(text) });
+    let (status, value) = match source.parse::<f64>() {
+        Ok(parsed) => (0, parsed),
+        Err(_) => (3, 0.0),
+    };
+    PARSE_STATUS.store(status, std::sync::atomic::Ordering::Relaxed);
+    value
+}
+
+/// The outcome of the latest parse.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_parse_status() -> i32 {
+    PARSE_STATUS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The failure text of a nonzero parse status (the runner's wording).
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_convert_message(status: i32) -> *const u8 {
+    let message = match status {
+        2 => "textus to numerus conversion out of range",
+        3 => "textus to fractus conversion failed",
+        _ => "textus to numerus conversion failed",
+    };
+    text_new(message.as_bytes())
+}

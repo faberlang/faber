@@ -522,3 +522,47 @@ fn bit_operation_names_gap() {
     assert_eq!(verdict.gaps().len(), 1);
     assert_eq!(verdict.gaps()[0].shape(), "bit operation");
 }
+
+fn cursor_stream_gaps(stepped: bool) -> Vec<String> {
+    let types = TypeTable::new();
+    let numerus = ty(&types, Primitive::Numerus);
+    let (program, types) = minimal(FunctionShape {
+        params: Vec::new(),
+        locals: vec![local(0, numerus)],
+        temps: Vec::new(),
+        statements: vec![MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: None,
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::CursorStream(MirCursorStream {
+                        callee: radix_hir::DefId(0),
+                        stepped,
+                    }),
+                    args: Vec::new(),
+                    return_ty: ty(&types, Primitive::Vacuum),
+                },
+            },
+            span: sample_span(),
+        }],
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: ty(&types, Primitive::Vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+    classify_with_types(&program, &types)
+        .gaps()
+        .iter()
+        .map(|gap| gap.shape().to_owned())
+        .collect()
+}
+
+#[test]
+fn stepped_cursor_stream_names_gap() {
+    assert_eq!(cursor_stream_gaps(true), ["stepped cursor stream"]);
+}
+
+#[test]
+fn unstepped_cursor_stream_is_capable() {
+    assert!(cursor_stream_gaps(false).is_empty());
+}

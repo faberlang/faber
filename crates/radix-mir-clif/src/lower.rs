@@ -21,6 +21,9 @@ use rustc_hash::FxHashMap;
 
 use crate::abi::{self, AbiTy, RuntimeSymbol};
 
+mod convert;
+pub(crate) use convert::numeric_conversion;
+
 /// A named refusal discovered during lowering.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Decline {
@@ -151,49 +154,6 @@ fn param_value_type(table: &TypeTable, id: TypeId) -> TypeId {
     match table.get(id) {
         Type::Ref(_, inner) => *inner,
         _ => id,
-    }
-}
-
-/// How an explicit integer-to-integer conversion lowers without a runtime
-/// check: `Identity` when every source value fits the target, `Wrap` when
-/// the target is a modular word.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum IntConversion {
-    Identity,
-    Wrap(i64),
-}
-
-fn int_range(table: &TypeTable, id: TypeId) -> Option<(i128, i128)> {
-    match resolve(table, id) {
-        Type::Primitive(Primitive::Numerus) => Some((i128::from(i64::MIN), i128::from(i64::MAX))),
-        Type::SizedNumeric(Primitive::Numerus, width)
-        | Type::ModularWord(width)
-        | Type::SaturatingWord(width) => width.integer_range(),
-        _ => None,
-    }
-}
-
-pub(crate) fn int_conversion(
-    table: &TypeTable,
-    source: TypeId,
-    target: TypeId,
-) -> Option<IntConversion> {
-    let (low, high) = int_range(table, source)?;
-    if let Type::ModularWord(width) = resolve(table, target) {
-        return match width {
-            NumericWidth::U8 => Some(IntConversion::Wrap(0xff)),
-            NumericWidth::U16 => Some(IntConversion::Wrap(0xffff)),
-            NumericWidth::U32 => Some(IntConversion::Wrap(0xffff_ffff)),
-            _ => None,
-        };
-    }
-    let (target_low, target_high) = int_range(table, target)?;
-    // A u64 source can exceed the i64 carrier; only identity into a 64-bit
-    // target that holds the same carrier is safe.
-    if low >= target_low && high <= target_high && high <= i128::from(i64::MAX) {
-        Some(IntConversion::Identity)
-    } else {
-        None
     }
 }
 
@@ -572,6 +532,13 @@ fn define_entry_shims(state: &mut ModuleState<'_>, entry: Option<FuncId>) -> Low
 }
 
 /// The policy family of an integer store slot.
+/// How a modular word result reduces to its representative.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Reduction {
+    Mask(i64),
+    Sign(u32),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum StorePolicy {
     Trapping,
@@ -2611,6 +2578,9 @@ impl FunctionLower<'_, '_> {
                 self.define_result(destination, value, rep)
             }
             MirIntrinsic::CursorStream(stream) => {
+                if stream.stepped {
+                    return Err(Decline::new("stepped cursor stream"));
+                }
                 let Some(destination) = destination else {
                     return Err(Decline::new("cursor stream without destination"));
                 };
@@ -2857,34 +2827,12 @@ impl FunctionLower<'_, '_> {
                 self.builder.def_var(variable, keys);
                 return Ok(());
             }
-            if rep == Rep::Int && slot_rep == Rep::Int {
-                let table = self.state.input.types;
-                return match int_conversion(
-                    table,
-                    conversion.source_ty.semantic_id(),
-                    conversion.target_ty.semantic_id(),
-                ) {
-                    Some(IntConversion::Identity) => {
-                        self.builder.def_var(variable, value);
-                        Ok(())
-                    }
-                    Some(IntConversion::Wrap(mask)) => {
-                        let mask = self.builder.ins().iconst(types::I64, mask);
-                        let wrapped = self.builder.ins().band(value, mask);
-                        self.builder.def_var(variable, wrapped);
-                        Ok(())
-                    }
-                    None => Err(Decline::new("explicit integer conversion")),
-                };
-            }
-            if rep == Rep::Float && slot_rep == Rep::Float {
-                self.builder.def_var(variable, value);
-                return Ok(());
-            }
-            if rep == Rep::Int && slot_rep == Rep::Float {
-                let widened = self.builder.ins().fcvt_from_sint(types::F64, value);
-                self.builder.def_var(variable, widened);
-                return Ok(());
+            if let Some(plan) = numeric_conversion(
+                self.state.input.types,
+                conversion.source_ty.semantic_id(),
+                conversion.target_ty.semantic_id(),
+            ) {
+                return self.numeric_convert(plan, conversion, value, variable);
             }
             if slot_rep != Rep::Text || rep == Rep::Unit {
                 return Err(Decline::new("explicit conversion"));
@@ -2967,6 +2915,10 @@ impl FunctionLower<'_, '_> {
                     let mask = self.builder.ins().iconst(types::I64, high);
                     Ok(self.builder.ins().band(value, mask))
                 }
+                NumericWidth::I8 => Ok(self.reduce_word(value, Reduction::Sign(8))),
+                NumericWidth::I16 => Ok(self.reduce_word(value, Reduction::Sign(16))),
+                NumericWidth::I32 => Ok(self.reduce_word(value, Reduction::Sign(32))),
+                NumericWidth::I64 => Ok(value),
                 _ => Err(Decline::new("wrapping store at this width")),
             },
         }
@@ -3076,20 +3028,44 @@ impl FunctionLower<'_, '_> {
 
     // VALUES
 
-    /// The all-ones mask of a `wrapping<u8|u16|u32>` result type.
-    fn word_mask(&self, ty: MirType) -> Option<i64> {
+    /// How a `wrapping<W>` result type reduces: unsigned words mask, signed
+    /// words sign-extend from their width.
+    fn word_reduction(&self, ty: MirType) -> Option<Reduction> {
         match resolve(self.state.input.types, ty.semantic_id()) {
-            Type::ModularWord(NumericWidth::U8) => Some(0xff),
-            Type::ModularWord(NumericWidth::U16) => Some(0xffff),
-            Type::ModularWord(NumericWidth::U32) => Some(0xffff_ffff),
+            Type::ModularWord(NumericWidth::U8) => Some(Reduction::Mask(0xff)),
+            Type::ModularWord(NumericWidth::U16) => Some(Reduction::Mask(0xffff)),
+            Type::ModularWord(NumericWidth::U32) => Some(Reduction::Mask(0xffff_ffff)),
+            Type::ModularWord(NumericWidth::I8) => Some(Reduction::Sign(8)),
+            Type::ModularWord(NumericWidth::I16) => Some(Reduction::Sign(16)),
+            Type::ModularWord(NumericWidth::I32) => Some(Reduction::Sign(32)),
+            Type::ModularWord(NumericWidth::I64) => Some(Reduction::Sign(64)),
             _ => None,
+        }
+    }
+
+    fn reduce_word(&mut self, value: Value, reduction: Reduction) -> Value {
+        match reduction {
+            Reduction::Mask(mask) => {
+                let mask = self.builder.ins().iconst(types::I64, mask);
+                self.builder.ins().band(value, mask)
+            }
+            Reduction::Sign(64) => value,
+            Reduction::Sign(bits) => {
+                let shift = i64::from(64 - bits);
+                let raised = self.builder.ins().ishl_imm_u(value, shift);
+                self.builder.ins().sshr_imm_u(raised, shift)
+            }
         }
     }
 
     /// An operation whose result is a modular word: computed modulo 2^64
     /// (the low bits agree with every narrower modulus) and masked to the
     /// word, as the runner wraps each word operation.
-    fn word_value(&mut self, value: &MirValue, mask: i64) -> Lowered<Option<(Value, Rep)>> {
+    fn word_value(
+        &mut self,
+        value: &MirValue,
+        reduction: Reduction,
+    ) -> Lowered<Option<(Value, Rep)>> {
         let computed = match &value.kind {
             MirValueKind::Unary { op, operand } if matches!(op, MirUnOp::BitNot | MirUnOp::Neg) => {
                 let (operand, rep) = self.scalar(operand)?;
@@ -3108,6 +3084,8 @@ impl FunctionLower<'_, '_> {
                     MirBinOp::Add
                         | MirBinOp::Sub
                         | MirBinOp::Mul
+                        | MirBinOp::Div
+                        | MirBinOp::Mod
                         | MirBinOp::BitAnd
                         | MirBinOp::BitOr
                         | MirBinOp::BitXor
@@ -3124,6 +3102,10 @@ impl FunctionLower<'_, '_> {
                     MirBinOp::Add => self.builder.ins().iadd(a, b),
                     MirBinOp::Sub => self.builder.ins().isub(a, b),
                     MirBinOp::Mul => self.builder.ins().imul(a, b),
+                    // Division acts on the reduced representatives; only the
+                    // result is reduced (`-128 / -1` is 128, which wraps).
+                    MirBinOp::Div => self.floor_div(a, b, false)?,
+                    MirBinOp::Mod => self.floor_div(a, b, true)?,
                     MirBinOp::BitAnd => self.builder.ins().band(a, b),
                     MirBinOp::BitOr => self.builder.ins().bor(a, b),
                     MirBinOp::BitXor => self.builder.ins().bxor(a, b),
@@ -3140,19 +3122,20 @@ impl FunctionLower<'_, '_> {
                     _ => {
                         let limit = self.builder.ins().iconst(types::I64, 63);
                         let clamped = self.builder.ins().umin(b, limit);
-                        self.builder.ins().ushr(a, clamped)
+                        // The representative is non-negative for an unsigned
+                        // word, so the arithmetic shift is its floor division.
+                        self.builder.ins().sshr(a, clamped)
                     }
                 }
             }
             _ => return Ok(None),
         };
-        let mask = self.builder.ins().iconst(types::I64, mask);
-        Ok(Some((self.builder.ins().band(computed, mask), Rep::Int)))
+        Ok(Some((self.reduce_word(computed, reduction), Rep::Int)))
     }
 
     fn value(&mut self, value: &MirValue) -> Lowered<(Option<Value>, Rep)> {
-        if let Some(mask) = self.word_mask(value.ty)
-            && let Some((computed, rep)) = self.word_value(value, mask)?
+        if let Some(reduction) = self.word_reduction(value.ty)
+            && let Some((computed, rep)) = self.word_value(value, reduction)?
         {
             return Ok((Some(computed), rep));
         }

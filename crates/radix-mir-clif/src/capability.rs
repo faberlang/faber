@@ -504,6 +504,15 @@ impl MirVisitor for ClifCapability<'_> {
             radix_mir::visit::walk_runtime_call(self, call);
             return;
         }
+        // A stepped stream is lazy in the oracle: materializing it would change
+        // what the program prints, so it declines by name.
+        if let MirIntrinsic::CursorStream(stream) = &call.intrinsic
+            && stream.stepped
+        {
+            self.record(Gap::Subset("stepped cursor stream".to_owned()));
+            radix_mir::visit::walk_runtime_call(self, call);
+            return;
+        }
         if matches!(call.intrinsic, MirIntrinsic::Diagnostic(_)) && call.args.len() == 1 {
             radix_mir::visit::walk_runtime_call(self, call);
             return;
@@ -532,51 +541,19 @@ impl MirVisitor for ClifCapability<'_> {
                         Type::Array(_)
                     )
         );
-        // `fractus(int)`: the exact widening of an integer to a float.
-        let int_to_float = matches!(
+        let numeric = matches!(
             &call.intrinsic,
             MirIntrinsic::Convert(conversion)
                 if conversion.store.is_none()
-                    && matches!(
-                        self.types.get(conversion.source_ty.semantic_id()),
-                        Type::Primitive(Primitive::Numerus)
-                    )
-                    && matches!(
-                        self.types.get(conversion.target_ty.semantic_id()),
-                        Type::Primitive(Primitive::Fractus)
-                    )
-        );
-        let int_to_int = matches!(
-            &call.intrinsic,
-            MirIntrinsic::Convert(conversion)
-                if conversion.store.is_none()
-                    && crate::lower::int_conversion(
+                    && crate::lower::numeric_conversion(
                         self.types,
                         conversion.source_ty.semantic_id(),
                         conversion.target_ty.semantic_id(),
                     )
                     .is_some()
         );
-        let is_float = |ty: MirType| {
-            matches!(
-                self.types.get(ty.semantic_id()),
-                Type::Primitive(Primitive::Fractus)
-            ) || matches!(
-                self.types.get(ty.semantic_id()),
-                Type::SizedNumeric(Primitive::Fractus, width) if width.is_float()
-            )
-        };
-        let float_to_float = matches!(
-            &call.intrinsic,
-            MirIntrinsic::Convert(conversion)
-                if conversion.store.is_none()
-                    && is_float(conversion.source_ty)
-                    && is_float(conversion.target_ty)
-        );
         if renders_text
-            || float_to_float
-            || int_to_int
-            || int_to_float
+            || numeric
             || set_to_list
             || matches!(
                 call.intrinsic,
