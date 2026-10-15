@@ -181,11 +181,7 @@ impl Emitter<'_> {
             return Ok(());
         };
         let value = self.expr(init)?;
-        let value = if copy {
-            self.copy_value(value)?
-        } else {
-            value
-        };
+        let value = if copy { self.copy_value(value)? } else { value };
         let value = self.settle(value, class)?;
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
@@ -582,7 +578,9 @@ impl Emitter<'_> {
         mutable: bool,
     ) -> Result<(), CodegenError> {
         if sources.is_empty() || sources.len() != bindings.len() {
-            return Err(unsupported("lockstep iteration without one source per binder"));
+            return Err(unsupported(
+                "lockstep iteration without one source per binder",
+            ));
         }
         if coordinates.len() > 1 {
             return Err(unsupported("lockstep iteration with several coordinates"));
@@ -629,8 +627,7 @@ impl Emitter<'_> {
             ),
         );
         self.depth += 1;
-        for ((name, (_, elem)), (binding, binding_name)) in names.iter().zip(lists).zip(bindings)
-        {
+        for ((name, (_, elem)), (binding, binding_name)) in names.iter().zip(lists).zip(bindings) {
             let Some(kind) = self.names.binding_kind(*binding) else {
                 return Err(unsupported(
                     "loop binding the name catalog does not classify",

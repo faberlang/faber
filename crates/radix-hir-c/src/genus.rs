@@ -130,7 +130,9 @@ impl Emitter<'_> {
             let ty = if field.sponte {
                 match crate::ty::Inner::from_ty(declared) {
                     Some(inner) => Ty::Opt(inner),
-                    None => return Err(unsupported("optional field of a sized integer or optional")),
+                    None => {
+                        return Err(unsupported("optional field of a sized integer or optional"));
+                    }
                 }
             } else {
                 declared

@@ -186,7 +186,9 @@ impl Emitter<'_> {
                 match kind {
                     radix_hir::HirNonNullKind::Value => Ok(unwrapped),
                     radix_hir::HirNonNullKind::Member(name) => self.field_from(&unwrapped, *name),
-                    radix_hir::HirNonNullKind::Index(index) => self.asserted_index(unwrapped, index),
+                    radix_hir::HirNonNullKind::Index(index) => {
+                        self.asserted_index(unwrapped, index)
+                    }
                     _ => Err(unsupported("non-null assertion followed by a call")),
                 }
             }
@@ -456,7 +458,7 @@ impl Emitter<'_> {
                 }
                 None => match &omissions[index] {
                     Omission::Required => {
-                        return Err(unsupported("call with omitted or extra arguments"))
+                        return Err(unsupported("call with omitted or extra arguments"));
                     }
                     Omission::Default(default) => (Some(default), None),
                     Omission::Omitted => (None, None),
@@ -467,9 +469,7 @@ impl Emitter<'_> {
                 // `ref` / `mut` alias the caller's pointer: only a list or a
                 // genus has one. `copy` (deep) and `own` (transfer) apply to
                 // any value; a scalar copies by assignment either way.
-                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
-                    if !shared =>
-                {
+                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut) if !shared => {
                     return Err(unsupported(
                         "access marker on an argument that is not a list or genus",
                     ));
@@ -846,7 +846,9 @@ impl Emitter<'_> {
         } else if l.value == Value::Float && r.value == Value::Float {
             "faber_approx_f64"
         } else {
-            return Err(unsupported("approximate equality between different classes"));
+            return Err(unsupported(
+                "approximate equality between different classes",
+            ));
         };
         self.support.need(Helper::Approx);
         let effect = l.effect || r.effect;
@@ -866,12 +868,7 @@ impl Emitter<'_> {
     /// range-checked (`faber::exact`), so there is no `int64_t` fast path:
     /// two's complement on the exact window can leave the cap. A constant pair
     /// folds with the same rules; the frontend folds most of these first.
-    fn bitwise(
-        &mut self,
-        op: HirBinOp,
-        l: Operand,
-        r: Operand,
-    ) -> Result<Operand, CodegenError> {
+    fn bitwise(&mut self, op: HirBinOp, l: Operand, r: Operand) -> Result<Operand, CodegenError> {
         if !l.is_integer() || !r.is_integer() {
             return Err(unsupported(binary_name(op)));
         }

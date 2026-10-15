@@ -75,9 +75,15 @@ fn a_sponte_parameter_is_the_optional_of_its_declared_type() {
         "fn pick(int x optional) → int {\n    return x coalesce 3\n}\nmain {\n    print pick()\n    print pick(9)\n}",
     );
     assert!(code.contains("faber_opt_i64 p_x"), "{code}");
-    assert!(code.contains("faber_c0.has ? faber_c0.value : INT64_C(3)"), "{code}");
+    assert!(
+        code.contains("faber_c0.has ? faber_c0.value : INT64_C(3)"),
+        "{code}"
+    );
     assert!(code.contains("f_pick(((faber_opt_i64){0}))"), "{code}");
-    assert!(code.contains("f_pick(((faber_opt_i64){1, INT64_C(9)}))"), "{code}");
+    assert!(
+        code.contains("f_pick(((faber_opt_i64){1, INT64_C(9)}))"),
+        "{code}"
+    );
 }
 
 #[test]

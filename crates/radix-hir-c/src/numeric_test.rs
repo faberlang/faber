@@ -19,7 +19,9 @@ fn bitwise_operators_use_the_exact_helpers() {
 
 #[test]
 fn shifts_use_the_exact_helpers() {
-    let code = emitted("main {\n    var int a ← 12\n    var int n ← 2\n    print a ⇐ n\n    print a ⇒ n\n}");
+    let code = emitted(
+        "main {\n    var int a ← 12\n    var int n ← 2\n    print a ⇐ n\n    print a ⇒ n\n}",
+    );
     for call in ["faber_shl(l_a, l_n)", "faber_shr(l_a, l_n)"] {
         assert!(code.contains(call), "{call:?} missing in {code}");
     }
@@ -27,7 +29,8 @@ fn shifts_use_the_exact_helpers() {
 
 #[test]
 fn bitwise_constant_folds_with_the_cap() {
-    let code = emitted("main {\n    print 0b1010 ∧ 0b1100\n    print 1 ⇐ 4\n    print 0 - 1 ⇒ 200\n}");
+    let code =
+        emitted("main {\n    print 0b1010 ∧ 0b1100\n    print 1 ⇐ 4\n    print 0 - 1 ⇒ 200\n}");
     assert!(code.contains("INT64_C(8)"), "{code}");
     assert!(code.contains("INT64_C(16)"), "{code}");
     // A right shift past the width fills with the sign, not by truncating.
@@ -69,7 +72,10 @@ fn fuzzy_equality_uses_the_tolerance_helper() {
 #[test]
 fn value_equality_crosses_families_without_rounding() {
     let code = emitted("main {\n    print 1 ≅ 1.0\n}");
-    assert!(code.contains("faber_int_eq_float(INT64_C(1), 1.0)"), "{code}");
+    assert!(
+        code.contains("faber_int_eq_float(INT64_C(1), 1.0)"),
+        "{code}"
+    );
 }
 
 #[test]

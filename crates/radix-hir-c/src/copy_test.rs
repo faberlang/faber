@@ -27,9 +27,15 @@ fn a_copy_of_a_genus_generates_and_calls_its_clone() {
         "class Holder {\n    var int n = 0\n    var list<int> marks = []\n}\nmain {\n    const Holder a ← Holder { n = 1 }\n    var Holder b ← copy a\n    print b.n\n}",
     );
     assert!(code.contains("g_Holder_copy(faber_a, l_a)"), "{code}");
-    assert!(code.contains("g_Holder_copy(faber_arena *faber_a, const g_Holder *faber_self)"), "{code}");
+    assert!(
+        code.contains("g_Holder_copy(faber_arena *faber_a, const g_Holder *faber_self)"),
+        "{code}"
+    );
     // The list field is deep-duplicated, not shared.
-    assert!(code.contains("faber_list_i64_copy(faber_a, faber_self->m_marks)"), "{code}");
+    assert!(
+        code.contains("faber_list_i64_copy(faber_a, faber_self->m_marks)"),
+        "{code}"
+    );
 }
 
 #[test]
