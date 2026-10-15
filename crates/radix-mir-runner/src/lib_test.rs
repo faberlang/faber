@@ -196,6 +196,138 @@ fn scalar_mut_param_propagates_through_runner_frames() {
 }
 
 #[test]
+fn scalar_mut_param_field_projection_writes_back_through_runner_frames() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirLocal, MirParam, MirParamMode, MirStatement, MirStatementKind, MirTerminator,
+        MirTerminatorKind, MirValue, MirValueKind,
+    };
+    use radix_types::{Primitive, TypeTable};
+    use rustc_hash::FxHashMap;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let vacuum = types.primitive(Primitive::Vacuum);
+    let scalar = MirType::semantic(numerus);
+    let span = Span::default();
+    let mut interner = Interner::new();
+    let mut program = MirProgram::new();
+    let count = interner.intern("count");
+    let label = interner.intern("label");
+    program.functions.push(MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: scalar,
+            mutable: true,
+            span,
+        }],
+        temps: vec![],
+        blocks: vec![],
+        return_ty: MirType::semantic(vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    });
+    program.functions.push(MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(1),
+            name: None,
+            ty: scalar,
+            mode: MirParamMode::MutRef,
+            span,
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(1),
+            name: None,
+            ty: scalar,
+            mutable: true,
+            span,
+        }],
+        temps: vec![],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Assign {
+                    place: MirPlace::local(MirLocalId(1)),
+                    value: MirValue {
+                        id: MirValueId(0),
+                        kind: MirValueKind::Operand(MirOperand::Constant(MirConstant::Int(7))),
+                        ty: scalar,
+                        span,
+                    },
+                },
+                span,
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            span,
+        }],
+        return_ty: MirType::semantic(vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    });
+
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    let fields = FxHashMap::from_iter([
+        (count, Value::Int(3)),
+        (label, Value::Str("kept".to_owned())),
+    ]);
+    runner.frames.last_mut().expect("caller frame").seed_local(
+        MirLocalId(0),
+        Value::Record(Rc::new(RefCell::new(fields)), Rc::from([count, label])),
+    );
+
+    // Before the write-back ruling this call copied the record field into
+    // the callee cell and left the caller's `count` at 3.
+    let outcome = runner
+        .invoke_call(
+            &MirCallee::Function(MirFunctionId(1)),
+            &[MirOperand::Place(MirPlace {
+                base: MirPlaceBase::Local(MirLocalId(0)),
+                projections: vec![MirProjection::Field(count)],
+            })],
+            span,
+        )
+        .expect("mut call through a projected place should execute");
+    assert!(matches!(outcome, CallOutcome::Ok(Value::Unit)));
+
+    // Surgical write-back: only `count` moves, the record itself survives.
+    let Value::Record(fields, order) = runner
+        .read_local(MirLocalId(0), span)
+        .expect("caller value")
+    else {
+        panic!("caller local must still hold the record");
+    };
+    assert_eq!(fields.borrow().get(&count), Some(&Value::Int(7)));
+    assert_eq!(
+        fields.borrow().get(&label),
+        Some(&Value::Str("kept".to_owned()))
+    );
+    assert_eq!(order.as_ref(), &[count, label]);
+}
+
+#[test]
 fn vide_writes_stderr_and_nota_writes_stdout() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
