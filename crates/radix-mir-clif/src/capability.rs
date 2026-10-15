@@ -603,6 +603,16 @@ impl MirVisitor for ClifCapability<'_> {
                             | MirCollectionOp::Signum
                             | MirCollectionOp::Minimum
                             | MirCollectionOp::Maximum
+                            | MirCollectionOp::Approximate
+                            | MirCollectionOp::ArgMax
+                            | MirCollectionOp::ArgMin
+                            | MirCollectionOp::ScalarMath(_)
+                            | MirCollectionOp::Union
+                            | MirCollectionOp::Intersection
+                            | MirCollectionOp::Difference
+                            | MirCollectionOp::SymmetricDifference
+                            | MirCollectionOp::IsSubset
+                            | MirCollectionOp::IsSuperset
                     )
             )
         {

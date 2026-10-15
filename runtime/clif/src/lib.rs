@@ -861,8 +861,38 @@ fn element_order(tag: i32, left: i64, right: i64) -> std::cmp::Ordering {
         TAG_BITS..=7 => {
             u64::from_ne_bytes(left.to_ne_bytes()).cmp(&u64::from_ne_bytes(right.to_ne_bytes()))
         }
+        TAG_LIST => unsafe {
+            list_order(
+                list_ref(left as *const List),
+                list_ref(right as *const List),
+            )
+        },
         _ => left.cmp(&right),
     }
+}
+
+/// Lexicographic order of two lists (tuples compare the same way).
+fn list_order(left: &List, right: &List) -> std::cmp::Ordering {
+    for (a, b) in left.items.iter().zip(&right.items) {
+        let ordering = element_order(a.0, a.1, b.1);
+        if ordering.is_ne() {
+            return ordering;
+        }
+    }
+    left.items.len().cmp(&right.items.len())
+}
+
+/// Three-way compare of two tuples or lists: -1, 0 or 1.
+///
+/// # Safety
+///
+/// Both are live runtime lists.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_compare(
+    left: *const List,
+    right: *const List,
+) -> i64 {
+    list_order(unsafe { list_ref(left) }, unsafe { list_ref(right) }) as i64
 }
 
 /// An ascending sorted copy.
@@ -1220,10 +1250,10 @@ pub unsafe extern "C" fn __faber_clif_v1_text_test(
 ) -> i8 {
     let left = text_str(unsafe { text_bytes(left) });
     let right = text_str(unsafe { text_bytes(right) });
-    i8::from(if mode == 0 {
-        left.starts_with(&*right)
-    } else {
-        left.ends_with(&*right)
+    i8::from(match mode {
+        0 => left.starts_with(&*right),
+        1 => left.ends_with(&*right),
+        _ => left.contains(&*right),
     })
 }
 
@@ -1422,4 +1452,135 @@ pub extern "C" fn __faber_clif_v1_convert_message(status: i32) -> *const u8 {
         _ => "textus to numerus conversion failed",
     };
     text_new(message.as_bytes())
+}
+
+/// Set algebra into a new set: 0 union, 1 intersection, 2 difference,
+/// 3 symmetric difference.
+///
+/// # Safety
+///
+/// Both are live runtime sets.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_set_algebra(
+    left: *const Map,
+    right: *const Map,
+    op: i32,
+) -> *mut Map {
+    let (left, right) = unsafe { (&*left, &*right) };
+    let has = |set: &Map, entry: &(i32, i64, i32, i64)| map_find(set, entry.0, entry.1).is_some();
+    let mut entries: Vec<(i32, i64, i32, i64)> = Vec::new();
+    match op {
+        0 => {
+            entries.extend(left.entries.iter().copied());
+            entries.extend(right.entries.iter().filter(|e| !has(left, e)).copied());
+        }
+        1 => entries.extend(left.entries.iter().filter(|e| has(right, e)).copied()),
+        2 => entries.extend(left.entries.iter().filter(|e| !has(right, e)).copied()),
+        _ => {
+            entries.extend(left.entries.iter().filter(|e| !has(right, e)).copied());
+            entries.extend(right.entries.iter().filter(|e| !has(left, e)).copied());
+        }
+    }
+    Box::into_raw(Box::new(Map { set: true, entries }))
+}
+
+/// Subset (mode 0: left within right) or superset (mode 1) test.
+///
+/// # Safety
+///
+/// Both are live runtime sets.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_set_subset(
+    left: *const Map,
+    right: *const Map,
+    mode: i32,
+) -> i8 {
+    let (left, right) = unsafe { (&*left, &*right) };
+    let (inner, outer) = if mode == 0 {
+        (left, right)
+    } else {
+        (right, left)
+    };
+    i8::from(
+        inner
+            .entries
+            .iter()
+            .all(|entry| map_find(outer, entry.0, entry.1).is_some()),
+    )
+}
+
+/// Scalar math the instruction set lacks: 0 exp, 1 ln, 2 log10, 3 sin,
+/// 4 cos, 5 tan (the same libm calls the runner makes).
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_math_f64(op: i32, value: f64) -> f64 {
+    match op {
+        0 => value.exp(),
+        1 => value.ln(),
+        2 => value.log10(),
+        3 => value.sin(),
+        4 => value.cos(),
+        _ => value.tan(),
+    }
+}
+
+/// Index of the largest (flag 1) or smallest (flag 0) element as an
+/// optional; NaN never replaces a number and the first of equals wins.
+///
+/// # Safety
+///
+/// `list` is a live runtime list of integers or floats.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_arg_extremum(
+    list: *const List,
+    want_max: i32,
+) -> *const Present {
+    let items = &unsafe { list_ref(list) }.items;
+    let mut winner: Option<usize> = None;
+    for (index, &(tag, bits)) in items.iter().enumerate() {
+        let Some(best) = winner else {
+            winner = Some(index);
+            continue;
+        };
+        let (best_tag, best_bits) = items[best];
+        let replaces = if tag == 0 && best_tag == 0 {
+            if want_max != 0 {
+                bits > best_bits
+            } else {
+                bits < best_bits
+            }
+        } else if tag == TAG_FLOAT && best_tag == TAG_FLOAT {
+            let best = f64::from_bits(u64::from_ne_bytes(best_bits.to_ne_bytes()));
+            let value = f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()));
+            if best.is_nan() {
+                !value.is_nan()
+            } else if value.is_nan() {
+                false
+            } else if want_max != 0 {
+                value > best
+            } else {
+                value < best
+            }
+        } else {
+            unsafe {
+                __faber_clif_v1_trap(c"argmax/argmin receiver type mismatch".as_ptr().cast(), 36)
+            }
+        };
+        if replaces {
+            winner = Some(index);
+        }
+    }
+    match winner {
+        Some(index) => Box::into_raw(Box::new(Present {
+            tag: 0,
+            bits: i64::try_from(index).unwrap_or(0),
+        })),
+        None => std::ptr::null(),
+    }
+}
+
+/// The exact integer `≈`: `10^9 · |a − b| ≤ max(|a|, |b|)`.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_approx_int(left: i64, right: i64) -> i8 {
+    let (x, y) = (i128::from(left), i128::from(right));
+    i8::from(1_000_000_000 * (x - y).abs() <= x.abs().max(y.abs()))
 }

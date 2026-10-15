@@ -160,7 +160,7 @@ pub const TEXT_MAP: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, I32],
     ret: Some(Ptr),
 };
-/// A text test against a second text: 0 starts-with, 1 ends-with.
+/// A text test against a second text: 0 starts-with, 1 ends-with, 2 contains.
 pub const TEXT_TEST: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_text_test",
     params: &[Ptr, Ptr, I32],
@@ -491,6 +491,44 @@ pub const CONVERT_MESSAGE: RuntimeSymbol = RuntimeSymbol {
     ret: Some(Ptr),
 };
 
+/// Three-way compare of two tuples or lists: -1, 0 or 1.
+pub const LIST_COMPARE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_compare",
+    params: &[Ptr, Ptr],
+    ret: Some(I64),
+};
+/// Set algebra into a new set: 0 union, 1 intersection, 2 difference,
+/// 3 symmetric difference.
+pub const SET_ALGEBRA: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_set_algebra",
+    params: &[Ptr, Ptr, I32],
+    ret: Some(Ptr),
+};
+/// Subset (mode 0) or superset (mode 1) test.
+pub const SET_SUBSET: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_set_subset",
+    params: &[Ptr, Ptr, I32],
+    ret: Some(I8),
+};
+/// Scalar math: 0 exp, 1 ln, 2 log10, 3 sin, 4 cos, 5 tan.
+pub const MATH_F64: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_math_f64",
+    params: &[I32, F64],
+    ret: Some(F64),
+};
+/// Index of the largest (flag 1) or smallest (flag 0) element, as an optional.
+pub const LIST_ARG_EXTREMUM: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_arg_extremum",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+/// The exact integer `≈`.
+pub const APPROX_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_approx_int",
+    params: &[I64, I64],
+    ret: Some(I8),
+};
+
 /// The runtime entry the emitted `main` shim calls.
 pub const MAIN: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_main",
@@ -573,6 +611,12 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     PARSE_F64,
     PARSE_STATUS,
     CONVERT_MESSAGE,
+    LIST_COMPARE,
+    SET_ALGEBRA,
+    SET_SUBSET,
+    MATH_F64,
+    LIST_ARG_EXTREMUM,
+    APPROX_INT,
     SET_DISPLAY_TOKENS,
 ];
 

@@ -16,7 +16,7 @@ use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module, default
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use radix_lexer::Interner;
 use radix_mir::*;
-use radix_types::{BitsWidth, NumericWidth, Primitive, Type, TypeId, TypeTable};
+use radix_types::{BitsWidth, MirMathFunction, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
 
 use crate::abi::{self, AbiTy, RuntimeSymbol};
@@ -1933,7 +1933,10 @@ impl FunctionLower<'_, '_> {
                     Rep::Text,
                 )
             }
-            (MirCollectionOp::StartsWith | MirCollectionOp::EndsWith, Rep::Text) => {
+            (
+                MirCollectionOp::StartsWith | MirCollectionOp::EndsWith | MirCollectionOp::Contains,
+                Rep::Text,
+            ) => {
                 let [_, other] = args else {
                     return Err(Decline::new("text test arity"));
                 };
@@ -1941,7 +1944,11 @@ impl FunctionLower<'_, '_> {
                 if other_rep != Rep::Text {
                     return Err(Decline::new("text test operand"));
                 }
-                let mode = i64::from(op == MirCollectionOp::EndsWith);
+                let mode = match op {
+                    MirCollectionOp::StartsWith => 0,
+                    MirCollectionOp::EndsWith => 1,
+                    _ => 2,
+                };
                 let mode = self.builder.ins().iconst(types::I32, mode);
                 (
                     self.call_runtime(&abi::TEXT_TEST, &[handle, other, mode])?,
@@ -2115,6 +2122,114 @@ impl FunctionLower<'_, '_> {
                 self.call_runtime(&abi::LIST_REVERSE_IN_PLACE, &[handle])?;
                 return Ok(());
             }
+            (MirCollectionOp::Signum, Rep::Float) => {
+                // `f64::signum`: the sign of the operand, NaN stays NaN.
+                let one = self.builder.ins().f64const(1.0);
+                let signed = self.builder.ins().fcopysign(one, handle);
+                let nan = self.builder.ins().fcmp(FloatCC::Unordered, handle, handle);
+                (
+                    Some(self.builder.ins().select(nan, handle, signed)),
+                    Rep::Float,
+                )
+            }
+            (MirCollectionOp::Compare, Rep::Tuple | Rep::List) => {
+                let [_, other] = args else {
+                    return Err(Decline::new("compare arity"));
+                };
+                let (other, other_rep) = self.scalar(other)?;
+                if other_rep != rep {
+                    return Err(Decline::new("compare operand representation"));
+                }
+                (
+                    self.call_runtime(&abi::LIST_COMPARE, &[handle, other])?,
+                    Rep::Int,
+                )
+            }
+            (MirCollectionOp::ScalarMath(function), Rep::Float | Rep::Int) => {
+                let Some(destination) = destination else {
+                    return Err(Decline::new("scalar math without destination"));
+                };
+                let number = if rep == Rep::Int {
+                    self.builder.ins().fcvt_from_sint(types::F64, handle)
+                } else {
+                    handle
+                };
+                let computed = match function {
+                    MirMathFunction::Abs => self.builder.ins().fabs(number),
+                    MirMathFunction::Sqrt => self.builder.ins().sqrt(number),
+                    other => {
+                        let code = match other {
+                            MirMathFunction::Exp => 0,
+                            MirMathFunction::Ln => 1,
+                            MirMathFunction::Log10 => 2,
+                            MirMathFunction::Sin => 3,
+                            MirMathFunction::Cos => 4,
+                            _ => 5,
+                        };
+                        let code = self.builder.ins().iconst(types::I32, code);
+                        self.call_runtime(&abi::MATH_F64, &[code, number])?
+                            .ok_or_else(|| Decline::new("math result"))?
+                    }
+                };
+                // The result rounds to the destination's float width.
+                let rounded = if self.float_narrow_place(destination) == 1 {
+                    let narrow = self.builder.ins().fdemote(types::F32, computed);
+                    self.builder.ins().fpromote(types::F64, narrow)
+                } else {
+                    computed
+                };
+                (Some(rounded), Rep::Float)
+            }
+            (MirCollectionOp::Approximate, Rep::Float | Rep::Int) => self.approximate(args)?,
+            (MirCollectionOp::ArgMax | MirCollectionOp::ArgMin, Rep::List) => {
+                let flag = i64::from(op == MirCollectionOp::ArgMax);
+                let flag = self.builder.ins().iconst(types::I32, flag);
+                (
+                    self.call_runtime(&abi::LIST_ARG_EXTREMUM, &[handle, flag])?,
+                    Rep::Opt,
+                )
+            }
+            (
+                MirCollectionOp::Union
+                | MirCollectionOp::Intersection
+                | MirCollectionOp::Difference
+                | MirCollectionOp::SymmetricDifference,
+                Rep::Set,
+            ) => {
+                let [_, other] = args else {
+                    return Err(Decline::new("set algebra arity"));
+                };
+                let (other, other_rep) = self.scalar(other)?;
+                if other_rep != Rep::Set {
+                    return Err(Decline::new("set algebra operand"));
+                }
+                let code = match op {
+                    MirCollectionOp::Union => 0,
+                    MirCollectionOp::Intersection => 1,
+                    MirCollectionOp::Difference => 2,
+                    _ => 3,
+                };
+                let code = self.builder.ins().iconst(types::I32, code);
+                (
+                    self.call_runtime(&abi::SET_ALGEBRA, &[handle, other, code])?,
+                    Rep::Set,
+                )
+            }
+            (MirCollectionOp::IsSubset | MirCollectionOp::IsSuperset, Rep::Set) => {
+                let [_, other] = args else {
+                    return Err(Decline::new("set algebra arity"));
+                };
+                let (other, other_rep) = self.scalar(other)?;
+                if other_rep != Rep::Set {
+                    return Err(Decline::new("set algebra operand"));
+                }
+                let mode = i64::from(op == MirCollectionOp::IsSuperset);
+                let mode = self.builder.ins().iconst(types::I32, mode);
+                (
+                    self.call_runtime(&abi::SET_SUBSET, &[handle, other, mode])?,
+                    Rep::Bool,
+                )
+            }
             (MirCollectionOp::Reverse, Rep::List) => (
                 self.call_runtime(&abi::LIST_REVERSED, &[handle])?,
                 Rep::List,
@@ -2122,13 +2237,122 @@ impl FunctionLower<'_, '_> {
             (MirCollectionOp::Sort, Rep::List) => {
                 (self.call_runtime(&abi::LIST_SORTED, &[handle])?, Rep::List)
             }
-            _ => return Err(Decline::new("collection operation")),
+            _ => {
+                return Err(Decline::new(format!(
+                    "collection operation {op:?} on {rep:?}"
+                )));
+            }
         };
         match (destination, result.0) {
             (Some(destination), value @ Some(_)) => {
                 self.define_result(destination, value, result.1)
             }
             _ => Ok(()),
+        }
+    }
+
+    /// 1 when `place` holds a float narrower than `f64`, else 0.
+    fn float_narrow_place(&self, place: &MirPlace) -> i64 {
+        let Ok(ty) = self.place_type(place) else {
+            return 0;
+        };
+        match resolve(self.state.input.types, ty.semantic_id()) {
+            Type::SizedNumeric(Primitive::Fractus, width)
+                if width.is_float() && *width != NumericWidth::F64 =>
+            {
+                1
+            }
+            _ => 0,
+        }
+    }
+
+    /// An operand as a float; integers convert exactly as the runner does.
+    fn float_operand(&mut self, operand: &MirOperand) -> Lowered<Value> {
+        let (value, rep) = self.scalar(operand)?;
+        match rep {
+            Rep::Float => Ok(value),
+            Rep::Int => Ok(self.builder.ins().fcvt_from_sint(types::F64, value)),
+            _ => Err(Decline::new("approximate operand")),
+        }
+    }
+
+    /// `f64::max`: a NaN operand yields the other one.
+    fn rust_fmax(&mut self, a: Value, b: Value) -> Value {
+        let greater = self.builder.ins().fcmp(FloatCC::GreaterThan, a, b);
+        let picked = self.builder.ins().select(greater, a, b);
+        let b_nan = self.builder.ins().fcmp(FloatCC::Unordered, b, b);
+        self.builder.ins().select(b_nan, a, picked)
+    }
+
+    /// `≈` and `.approx`: the exact integer rule between two integers at the
+    /// default tolerances, a float tolerance test otherwise.
+    fn approximate(&mut self, args: &[MirOperand]) -> Lowered<(Option<Value>, Rep)> {
+        match args {
+            [left, right, tolerance] => {
+                let left = self.float_operand(left)?;
+                let right = self.float_operand(right)?;
+                let tolerance = self.float_operand(tolerance)?;
+                let difference = self.builder.ins().fsub(left, right);
+                let distance = self.builder.ins().fabs(difference);
+                let within = self
+                    .builder
+                    .ins()
+                    .fcmp(FloatCC::LessThanOrEqual, distance, tolerance);
+                Ok((Some(within), Rep::Bool))
+            }
+            [left, right, relative, absolute, negated] => {
+                let (negated, negated_rep) = self.scalar(negated)?;
+                if negated_rep != Rep::Bool {
+                    return Err(Decline::new("approximate negation flag"));
+                }
+                let default_tolerance = matches!(
+                    (relative, absolute),
+                    (
+                        MirOperand::Constant(MirConstant::Float(relative)),
+                        MirOperand::Constant(MirConstant::Float(absolute)),
+                    ) if (*relative - 1e-9).abs() == 0.0 && *absolute == 0.0
+                );
+                let (a, a_rep) = self.scalar(left)?;
+                let (b, b_rep) = self.scalar(right)?;
+                let equal = if a_rep == Rep::Int && b_rep == Rep::Int && default_tolerance {
+                    self.call_runtime(&abi::APPROX_INT, &[a, b])?
+                        .ok_or_else(|| Decline::new("approximate result"))?
+                } else {
+                    let narrow = [left, right].iter().all(|operand| {
+                        self.operand_type(operand)
+                            .map(|ty| {
+                                matches!(
+                                    resolve(self.state.input.types, ty.semantic_id()),
+                                    Type::SizedNumeric(Primitive::Fractus, width)
+                                        if *width != NumericWidth::F64
+                                )
+                            })
+                            .unwrap_or(false)
+                    });
+                    let mut a = self.float_operand(left)?;
+                    let mut b = self.float_operand(right)?;
+                    let mut relative = self.float_operand(relative)?;
+                    let mut absolute = self.float_operand(absolute)?;
+                    if narrow {
+                        for value in [&mut a, &mut b, &mut relative, &mut absolute] {
+                            let reduced = self.builder.ins().fdemote(types::F32, *value);
+                            *value = self.builder.ins().fpromote(types::F64, reduced);
+                        }
+                    }
+                    let magnitude_a = self.builder.ins().fabs(a);
+                    let magnitude_b = self.builder.ins().fabs(b);
+                    let larger = self.rust_fmax(magnitude_a, magnitude_b);
+                    let scaled = self.builder.ins().fmul(relative, larger);
+                    let limit = self.rust_fmax(scaled, absolute);
+                    let difference = self.builder.ins().fsub(a, b);
+                    let distance = self.builder.ins().fabs(difference);
+                    self.builder
+                        .ins()
+                        .fcmp(FloatCC::LessThanOrEqual, distance, limit)
+                };
+                Ok((Some(self.builder.ins().bxor(equal, negated)), Rep::Bool))
+            }
+            _ => Err(Decline::new("approximate arity")),
         }
     }
 
