@@ -92,6 +92,12 @@ pub const RECORD_GET: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, I64],
     ret: Some(I64),
 };
+/// Deep copy of a list or record: (tag, bits) -> bits.
+pub const DUPLICATE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_duplicate",
+    params: &[I32, I64],
+    ret: Some(I64),
+};
 /// Print a record line.
 pub const PRINT_RECORD: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_print_record",
@@ -266,6 +272,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     LIST_SORTED,
     PRINT_LIST,
     TEXT_FROM_LIST,
+    DUPLICATE,
     RECORD_NEW,
     RECORD_SET,
     RECORD_GET,

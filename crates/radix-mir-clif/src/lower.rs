@@ -1235,6 +1235,22 @@ impl FunctionLower<'_, '_> {
                 self.format_string(destination, *template, &call.args)
             }
             MirIntrinsic::Collection(op) => self.collection_op(destination, *op, &call.args),
+            MirIntrinsic::Duplicate => {
+                let ([argument], Some(destination)) = (call.args.as_slice(), destination) else {
+                    return Err(Decline::new("duplicate shape"));
+                };
+                let (value, rep) = self.scalar(argument)?;
+                let copied = if matches!(rep, Rep::List | Rep::Record) {
+                    let tag = self
+                        .builder
+                        .ins()
+                        .iconst(types::I32, Self::element_tag(rep)?);
+                    self.call_runtime(&abi::DUPLICATE, &[tag, value])?
+                } else {
+                    Some(value)
+                };
+                self.define_result(destination, copied, rep)
+            }
             MirIntrinsic::Cede => {
                 let ([argument], Some(destination)) = (call.args.as_slice(), destination) else {
                     return Err(Decline::new("cede shape"));

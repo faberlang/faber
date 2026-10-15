@@ -463,6 +463,7 @@ impl MirVisitor for ClifCapability<'_> {
                     | MirIntrinsic::Assert
                     | MirIntrinsic::Panic
                     | MirIntrinsic::Cede
+                    | MirIntrinsic::Duplicate
                     | MirIntrinsic::Collection(
                         MirCollectionOp::Length
                             | MirCollectionOp::Append

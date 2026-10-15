@@ -283,6 +283,43 @@ fn record_text(record: &Record) -> String {
     format!("{name} {{ {} }}", parts.join(", "))
 }
 
+fn duplicate(tag: i32, bits: i64) -> i64 {
+    match tag {
+        TAG_LIST => {
+            let source = unsafe { list_ref(bits as *const List) };
+            let items = source
+                .items
+                .iter()
+                .map(|&(tag, bits)| (tag, duplicate(tag, bits)))
+                .collect();
+            list_new_from(items) as i64
+        }
+        TAG_STRUCT => {
+            let source = unsafe { &*(bits as *const Record) };
+            let fields = source
+                .fields
+                .iter()
+                .map(|&(name, tag, bits)| (name, tag, duplicate(tag, bits)))
+                .collect();
+            Box::into_raw(Box::new(Record {
+                name: source.name,
+                fields,
+            })) as i64
+        }
+        _ => bits,
+    }
+}
+
+/// Deep copy of a list or record value; other values copy as themselves.
+///
+/// # Safety
+///
+/// `bits` is a live handle of the kind `tag` names.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_duplicate(tag: i32, bits: i64) -> i64 {
+    duplicate(tag, bits)
+}
+
 /// New empty record.
 ///
 /// # Safety
