@@ -11698,6 +11698,132 @@ main args args exit 0 {
     );
 }
 
+#[cfg(feature = "hir-ts")]
+#[test]
+fn ts_package_emit_folds_sibling_module_into_one_stream() {
+    // regio shape (corpus-product/regio): the entry imports `./planum` with no
+    // binding, the sibling declares `module geometry`, and the fold must drop
+    // the sibling import because the unit body now lives in the same stream.
+    let dir = test_temp_dir("ts-fold");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "ts-fold"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        dir.join("src/planum.fab"),
+        "module geometry\n\n@ public\nfn area(int width, int height) → int {\n  return width * height\n}\n",
+    )
+    .expect("planum");
+    fs::write(
+        dir.join("src/main.fab"),
+        "import from \"./planum\"\n\nmain {\n  print geometry.area(3, 4)\n}\n",
+    )
+    .expect("entry");
+
+    let result =
+        compile_with_faber_seams(&Config::default().with_target(Target::HirTypeScript), &dir);
+    assert!(
+        result.success(),
+        "expected TS package fold to succeed: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| diagnostic_has_issue(d, "package_target_assembly_pending")),
+        "TS fold must not report a pending assembly: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::TypeScript(output)) = result.output else {
+        panic!("expected TypeScript output");
+    };
+    assert!(
+        output
+            .code
+            .lines()
+            .any(|line| line.contains("function area")),
+        "folded stream must declare area: {}",
+        output.code
+    );
+    assert!(
+        !output
+            .code
+            .lines()
+            .any(|line| line.contains("from \"./planum\"")),
+        "folded stream must not re-import the sibling: {}",
+        output.code
+    );
+}
+
+#[cfg(feature = "hir-ts")]
+#[test]
+fn ts_package_emit_reports_merge_collision() {
+    // Two non-entry units export the same top-level function name; folding them
+    // into one stream must fail closed with the named merge diagnostic.
+    let dir = test_temp_dir("ts-merge-collision");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "ts-merge-collision"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        dir.join("src/a.fab"),
+        "@ public\nfn identity(string s) → string {\n  return s\n}\n",
+    )
+    .expect("a");
+    fs::write(
+        dir.join("src/b.fab"),
+        "@ public\nfn identity(string s) → string {\n  return s + \"!\"\n}\n",
+    )
+    .expect("b");
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"
+import from "./a" a
+import from "./b" b
+@ cli "tool"
+@ operand rest string ignored
+main args args exit 0 {
+  const string _ ← a.identity("x")
+  const string __ ← b.identity("y")
+}
+"#,
+    )
+    .expect("entry");
+
+    let result =
+        compile_with_faber_seams(&Config::default().with_target(Target::HirTypeScript), &dir);
+    assert!(!result.success(), "expected TS merge collision failure");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| diagnostic_has_issue(d, "package_ts_merge_collision")),
+        "expected package_ts_merge_collision diagnostic: {:?}",
+        result.diagnostics
+    );
+}
+
 #[cfg(feature = "hir-go")]
 #[test]
 fn go_compile_repeated_and_nested_calls_do_not_exchange_modules() {
