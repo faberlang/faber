@@ -139,7 +139,7 @@ impl FunctionLower<'_, '_> {
         wide
     }
 
-    fn wide_const(&mut self, value: i128) -> Value {
+    pub(super) fn wide_const(&mut self, value: i128) -> Value {
         let low = self.builder.ins().iconst(types::I64, value as i64);
         let high = self.builder.ins().iconst(types::I64, (value >> 64) as i64);
         self.builder.ins().iconcat(low, high)
@@ -167,6 +167,9 @@ impl FunctionLower<'_, '_> {
     pub(super) fn narrow(&mut self, value: Value) -> Lowered<Value> {
         if !self.is_wide(value) {
             return Ok(value);
+        }
+        if self.huge.contains(&value) {
+            return Err(Decline::new("integer constant beyond i64"));
         }
         let low = self.builder.ins().ireduce(types::I64, value);
         let back = self.builder.ins().sextend(types::I128, low);

@@ -44,6 +44,10 @@ pub(crate) enum Num {
     Dec,
     /// Open data (`valor`, `json`): a box of one tagged payload.
     Dyn,
+    /// An unbounded integer behind a handle.
+    Inf,
+    /// The absent value.
+    Nil,
     Bits(BitsWidth),
 }
 
@@ -69,6 +73,17 @@ fn int_kind(table: &TypeTable, id: TypeId) -> Option<IntKind> {
 fn num_of(table: &TypeTable, id: TypeId) -> Option<Num> {
     if matches!(
         resolve(table, id),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::Inf)
+            | Type::ModularWord(NumericWidth::Inf)
+            | Type::SaturatingWord(NumericWidth::Inf)
+    ) {
+        return Some(Num::Inf);
+    }
+    if matches!(resolve(table, id), Type::Primitive(Primitive::Nihil)) {
+        return Some(Num::Nil);
+    }
+    if matches!(
+        resolve(table, id),
         Type::SizedNumeric(Primitive::Numerus, NumericWidth::D64)
     ) {
         return Some(Num::Dec);
@@ -86,6 +101,15 @@ fn num_of(table: &TypeTable, id: TypeId) -> Option<Num> {
         Type::Primitive(Primitive::Littera) => Some(Num::Char),
         Type::Primitive(Primitive::Regex) => Some(Num::Regex),
         Type::Primitive(Primitive::Json | Primitive::Valor) => Some(Num::Dyn),
+        // An absent open-data value is the box's null.
+        Type::Option(inner)
+            if matches!(
+                resolve(table, *inner),
+                Type::Primitive(Primitive::Json | Primitive::Valor)
+            ) =>
+        {
+            Some(Num::Dyn)
+        }
         Type::Bits(width) => Some(Num::Bits(*width)),
         _ => None,
     }
@@ -156,6 +180,12 @@ pub(crate) fn numeric_conversion(
         (Num::Dyn, Num::Int(to)) => to.policy == IntPolicy::Trap && to.width == NumericWidth::I64,
         (Num::Dyn, Num::Float(width)) => width == NumericWidth::F64,
         (Num::Dyn, Num::Bool | Num::Text) => true,
+        (Num::Nil, Num::Dyn) => true,
+        // An inf takes any carried integer and narrows with a range check; open
+        // data boxes it and unboxes an integer or inf payload.
+        (Num::Int(from), Num::Inf) => from.policy == IntPolicy::Trap && carrier_exact(from),
+        (Num::Inf, Num::Int(to)) => to.policy == IntPolicy::Trap && carrier_exact(to),
+        (Num::Inf, Num::Dyn) | (Num::Dyn, Num::Inf) => true,
         (Num::Char, Num::Int(to)) => to.policy == IntPolicy::Trap,
         // A signed integer or an unsigned one below 64 bits reads and writes
         // a same-width pattern; a u64 pattern would leave the carrier.
@@ -502,6 +532,8 @@ impl FunctionLower<'_, '_> {
             Num::Regex => Rep::Regex,
             Num::Dec => Rep::Dec,
             Num::Dyn => Rep::Opt,
+            Num::Inf => Rep::Inf,
+            Num::Nil => return Err(Decline::new("conversion to the absent value")),
             Num::Text if plan.source == Num::Dyn => Rep::Text,
             Num::Text => return Err(Decline::new("text conversion target")),
         };
@@ -824,7 +856,7 @@ impl FunctionLower<'_, '_> {
                 };
                 (self.wrap_some(value, rep)?, None)
             }
-            (Num::Dyn, target) => {
+            (Num::Dyn, target) if target != Num::Inf => {
                 let (tag, rep, label) = match target {
                     Num::Int(_) => (abi::TAG_INT, Rep::Int, "numerus"),
                     Num::Float(_) => (abi::TAG_FLOAT, Rep::Float, "fractus"),
@@ -856,6 +888,44 @@ impl FunctionLower<'_, '_> {
                 let message = format!("valor to {label} conversion failed");
                 let message = Box::leak(message.into_boxed_str());
                 (extracted, Some((failed, Failure::Static(message))))
+            }
+            (Num::Nil, Num::Dyn) => (value, None),
+            (Num::Int(_), Num::Inf) => {
+                let big = self
+                    .call_runtime(&abi::INF_INT, &[value])?
+                    .ok_or_else(|| Decline::new("inf result"))?;
+                (big, None)
+            }
+            (Num::Inf, Num::Int(to)) => {
+                let low = self.builder.ins().iconst(types::I64, to.low);
+                let high = self.builder.ins().iconst(types::I64, to.high);
+                let integer = self
+                    .call_runtime(&abi::INF_TO_INT, &[value, low, high])?
+                    .ok_or_else(|| Decline::new("inf integer result"))?;
+                let status = self.parse_status()?;
+                let zero = self.builder.ins().iconst(types::I32, 0);
+                let failed = self.builder.ins().icmp(IntCC::NotEqual, status, zero);
+                (integer, Some((failed, Failure::Code(status))))
+            }
+            (Num::Inf, Num::Dyn) => {
+                let boxed = self
+                    .call_runtime(&abi::INF_BOX, &[value])?
+                    .ok_or_else(|| Decline::new("open data result"))?;
+                (boxed, None)
+            }
+            (Num::Dyn, Num::Inf) => {
+                let big = self
+                    .call_runtime(&abi::INF_UNBOX, &[value])?
+                    .ok_or_else(|| Decline::new("inf result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, big, zero);
+                (
+                    big,
+                    Some((
+                        failed,
+                        Failure::Static("valor to numerus conversion failed"),
+                    )),
+                )
             }
             (Num::Int(_), Num::Dec) => self.decimal_in(&abi::DEC_FROM_INT, value)?,
             (Num::Float(_), Num::Dec) => self.decimal_in(&abi::DEC_FROM_FLOAT, value)?,
@@ -1330,6 +1400,11 @@ pub(crate) fn member_tests(table: &TypeTable, target: TypeId) -> Option<Vec<Memb
                 tests.extend(member_tests(table, *member)?);
             }
             return Some(tests);
+        }
+        // A decimal or an unbounded integer has its own payload and its own
+        // type-test meaning: not the plain integer tag.
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::D64 | NumericWidth::Inf) => {
+            return None;
         }
         Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
             MemberTest::Tag(abi::TAG_INT)

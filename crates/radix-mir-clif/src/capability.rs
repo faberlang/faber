@@ -242,9 +242,7 @@ impl<'a> ClifCapability<'a> {
             }),
             Type::Intersection(_) => Some(Gap::Subset("union value".to_owned())),
             Type::Option(inner) => match self.types.get(*inner) {
-                Type::Option(_) | Type::Primitive(Primitive::Json | Primitive::Valor) => {
-                    Some(Gap::Subset("optional value".to_owned()))
-                }
+                Type::Option(_) => Some(Gap::Subset("optional value".to_owned())),
                 _ => self.type_gap(MirType::semantic(*inner)),
             },
             Type::Func(sig) => {
@@ -395,7 +393,7 @@ impl<'a> ClifCapability<'a> {
             MirConstant::Regex { .. } => None,
             MirConstant::Nil => None,
             MirConstant::Function(_) => None,
-            MirConstant::Magnus(_) => Some(Gap::Subset("inf constant".to_owned())),
+            MirConstant::Magnus(_) => None,
             MirConstant::ShapeSize { .. } => Some(Gap::Policy("device constant".to_owned())),
         }
     }

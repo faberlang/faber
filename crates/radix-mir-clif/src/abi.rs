@@ -1014,6 +1014,16 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     DEC_TO_FLOAT,
     DEC_TO_INT,
     DYN_BOX,
+    INF_INT,
+    INF_WIDE,
+    INF_DIGITS,
+    INF_BINARY,
+    INF_NEG,
+    INF_COMPARE,
+    INF_TEXT,
+    INF_TO_INT,
+    INF_BOX,
+    INF_UNBOX,
 ];
 
 /// A stored `d64` carrier (scale 8) -> decimal handle.
@@ -1107,6 +1117,69 @@ pub const DEC_TO_INT: RuntimeSymbol = RuntimeSymbol {
 pub const DYN_BOX: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_dyn_box",
     params: &[I32, I64],
+    ret: Some(Ptr),
+};
+
+/// Element tag of an `inf` handle.
+pub const TAG_INF: i64 = 16;
+/// An integer as an `inf` handle.
+pub const INF_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_int",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// An exact 128-bit intermediate (low, high) as an `inf` handle.
+pub const INF_WIDE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_wide",
+    params: &[I64, I64],
+    ret: Some(Ptr),
+};
+/// A constant's decimal digits as an `inf` handle.
+pub const INF_DIGITS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_digits",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// `left op right` over infs, op 0 `+`, 1 `-`, 2 `*`, 3 `/` (floor), 4 `%` (floor).
+pub const INF_BINARY: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_binary",
+    params: &[Ptr, Ptr, I32],
+    ret: Some(Ptr),
+};
+/// `-value` over an inf.
+pub const INF_NEG: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_neg",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Three-way inf comparison: -1, 0, 1.
+pub const INF_COMPARE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_compare",
+    params: &[Ptr, Ptr],
+    ret: Some(I32),
+};
+/// An inf as decimal text.
+pub const INF_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// An inf as an integer in [low, high]; parse status 6 when it does not fit.
+pub const INF_TO_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_to_int",
+    params: &[Ptr, I64, I64],
+    ret: Some(I64),
+};
+/// An inf as open data (a plain integer payload when it fits `i64`).
+pub const INF_BOX: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_box",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// The inf an open-data box holds, or null.
+pub const INF_UNBOX: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_unbox",
+    params: &[Ptr],
     ret: Some(Ptr),
 };
 

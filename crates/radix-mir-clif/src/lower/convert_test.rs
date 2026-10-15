@@ -301,3 +301,25 @@ fn decimals_convert_with_integers_floats_and_texts() {
     assert!(!f.supported(d64, u64_));
     assert!(!f.supported(d64, text));
 }
+
+#[test]
+fn open_data_and_unbounded_integers_convert_by_tag_and_range() {
+    let mut f = Fixture::new();
+    let inf = f.sized(Primitive::Numerus, NumericWidth::Inf);
+    let int = f.primitive(Primitive::Numerus);
+    let u8_ = f.sized(Primitive::Numerus, NumericWidth::U8);
+    let u64_ = f.sized(Primitive::Numerus, NumericWidth::U64);
+    let valor = f.primitive(Primitive::Valor);
+    let text = f.primitive(Primitive::Textus);
+    let float = f.primitive(Primitive::Fractus);
+    assert!(f.supported(int, inf));
+    assert!(f.supported(inf, u8_));
+    assert!(f.supported(inf, valor));
+    assert!(f.supported(valor, inf));
+    assert!(f.supported(int, valor));
+    assert!(f.supported(valor, text));
+    assert!(f.supported(valor, float));
+    // A 64-bit unsigned cell reaches beyond the carrier.
+    assert!(!f.supported(inf, u64_));
+    assert!(!f.supported(valor, u64_));
+}
