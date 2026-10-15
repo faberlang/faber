@@ -139,10 +139,9 @@ incipit {
 
 #[test]
 fn unsupported_targets_reject_the_assertion_by_name() {
-    for (target, issue) in [
-        (Target::HirPython, "python_target_unsupported"),
-        (Target::HirHaskell, "haskell_target_unsupported"),
-    ] {
+    // The Python leaf lowers the assertion (a `_faber_nonnull` guard), so only
+    // the targets with no lowering remain here.
+    for (target, issue) in [(Target::HirHaskell, "haskell_target_unsupported")] {
         let result = compile(target);
         assert!(!result.success(), "{target} must not accept `!.`");
         assert!(

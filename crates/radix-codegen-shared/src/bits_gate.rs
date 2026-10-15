@@ -34,6 +34,7 @@ fn target_admits_bits(target: Target) -> bool {
             | Target::HirTypeScript
             | Target::HirGo
             | Target::HirSwift
+            | Target::HirPython
             | Target::MirSexp
             | Target::MirWasm
             | Target::MirLlvm
