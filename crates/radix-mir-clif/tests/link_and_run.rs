@@ -12,7 +12,7 @@ use std::process::{Command, Output};
 
 use radix_lexer::{Interner, Span};
 use radix_mir::*;
-use radix_types::{Primitive, TypeTable};
+use radix_types::{NumericWidth, Primitive, Type, TypeTable};
 
 /// Build `faber-host-clif` into the profile directory this test executable
 /// lives in (`<target>/<profile>/deps/<exe>`) and return the archive path.
@@ -389,4 +389,79 @@ fn exact_intermediates_pass_the_i64_carrier() {
         "stderr: {}",
         String::from_utf8_lossy(&run.stderr)
     );
+}
+
+/// A `d64` computes exactly until a store: a product keeps its sixteen fraction
+/// digits, a quotient rounds half-even at the larger operand scale, and a
+/// comparison with a whole number scales the integer.
+#[test]
+fn decimals_compute_exactly_and_print_shortest() {
+    let (_, mut table) = fixture(vec![], vec![]);
+    let d64 =
+        MirType::semantic(table.intern(Type::SizedNumeric(Primitive::Numerus, NumericWidth::D64)));
+    let bivalens = MirType::semantic(table.primitive(Primitive::Bivalens));
+    let vacuum = MirType::semantic(table.primitive(Primitive::Vacuum));
+    let carrier = |value: i64| MirOperand::Constant(MirConstant::Int(value));
+    let wide = |temp: u32| MirOperand::Temp(MirTempId(temp));
+    let tail = vec![
+        // 4.2 and 0.1 as scale-8 carriers.
+        assign(
+            MirPlace::temp(MirTempId(1)),
+            10,
+            d64,
+            MirValueKind::Operand(carrier(420_000_000)),
+        ),
+        assign(
+            MirPlace::temp(MirTempId(2)),
+            11,
+            d64,
+            MirValueKind::Operand(carrier(10_000_000)),
+        ),
+        assign(
+            MirPlace::temp(MirTempId(3)),
+            12,
+            d64,
+            binary(MirBinOp::Mul, wide(1), wide(2)),
+        ),
+        nota(wide(3), vacuum),
+        assign(
+            MirPlace::temp(MirTempId(4)),
+            13,
+            d64,
+            binary(MirBinOp::Div, wide(1), wide(2)),
+        ),
+        nota(wide(4), vacuum),
+        assign(
+            MirPlace::temp(MirTempId(5)),
+            14,
+            d64,
+            binary(MirBinOp::Sub, wide(2), wide(1)),
+        ),
+        nota(wide(5), vacuum),
+        assign(
+            MirPlace::temp(MirTempId(6)),
+            15,
+            bivalens,
+            binary(MirBinOp::Gt, wide(1), carrier(4)),
+        ),
+        nota(wide(6), vacuum),
+    ];
+    let temps = vec![
+        temp(1, d64),
+        temp(2, d64),
+        temp(3, d64),
+        temp(4, d64),
+        temp(5, d64),
+        temp(6, bivalens),
+    ];
+    let (program, _) = fixture(tail, temps);
+    let run = build_and_run("decimals", &program, &table);
+    let stdout = String::from_utf8_lossy(&run.stdout).into_owned();
+    assert_eq!(
+        stdout,
+        "3628800\n1.5\ntrue\n0.42\n42\n-4.1\ntrue\n",
+        "stderr: {}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    assert_eq!(run.status.code(), Some(0));
 }

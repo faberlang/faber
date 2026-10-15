@@ -161,6 +161,8 @@ pub(crate) enum Rep {
     Regex,
     /// `match`: a handle to one match record.
     Match,
+    /// `d64`: a handle to an exact decimal (carrier and scale).
+    Dec,
     /// No value.
     Unit,
 }
@@ -175,6 +177,7 @@ impl Rep {
             | Self::Char
             | Self::Regex
             | Self::Match
+            | Self::Dec
             | Self::Bits(_)
             | Self::List
             | Self::Record
@@ -319,6 +322,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             | NumericWidth::U16
             | NumericWidth::U32
             | NumericWidth::U64 => Ok(Rep::Int),
+            NumericWidth::D64 => Ok(Rep::Dec),
             _ => Err(Decline::new("sized integer value")),
         },
         Type::ModularWord(width) | Type::SaturatingWord(width)
@@ -923,6 +927,7 @@ impl FunctionLower<'_, '_> {
             | Rep::Char
             | Rep::Regex
             | Rep::Match
+            | Rep::Dec
             | Rep::Bits(_)
             | Rep::List
             | Rep::Record
@@ -1265,6 +1270,7 @@ impl FunctionLower<'_, '_> {
             Rep::Char => abi::TAG_CHAR,
             Rep::Regex => abi::TAG_REGEX,
             Rep::Match => abi::TAG_MATCH,
+            Rep::Dec => abi::TAG_DEC,
             Rep::Bits(width) => abi::TAG_BITS + i64::from(width.bits().trailing_zeros() - 3),
             Rep::List => abi::TAG_LIST,
             Rep::Record => abi::TAG_STRUCT,
@@ -1322,6 +1328,8 @@ impl FunctionLower<'_, '_> {
             )
         {
             Ok(value)
+        } else if have == Rep::Int && want == Rep::Dec {
+            self.decimal_operand(value, have, true)
         } else if want == Rep::Opt && have != Rep::Unit {
             self.wrap_some(value, have)
         } else if have == Rep::Opt && want != Rep::Unit {
@@ -3768,6 +3776,7 @@ impl FunctionLower<'_, '_> {
             Rep::Text | Rep::Char => return Ok(value),
             Rep::Regex => self.call_runtime(&abi::REGEX_TEXT, &[value])?,
             Rep::Match => self.call_runtime(&abi::MATCH_TEXT, &[value])?,
+            Rep::Dec => self.call_runtime(&abi::DEC_TEXT, &[value])?,
             Rep::Int if self.is_wide(value) => self.text_from_wide(value)?,
             Rep::Int => self.call_runtime(&abi::TEXT_FROM_I64, &[value])?,
             Rep::Float => {
@@ -3914,6 +3923,16 @@ impl FunctionLower<'_, '_> {
         };
         let (value, rep) = self.scalar_wide(argument)?;
         let (variable, slot_rep) = self.place_slot(destination)?;
+        let (value, rep) = if rep == Rep::Int && slot_rep == Rep::Dec {
+            (self.decimal_operand(value, rep, true)?, Rep::Dec)
+        } else {
+            (value, rep)
+        };
+        if rep == Rep::Dec && slot_rep == Rep::Dec {
+            let stored = self.decimal_store(site, value)?;
+            self.builder.def_var(variable, stored);
+            return Ok(());
+        }
         let stored = match (rep, slot_rep) {
             (Rep::Int, Rep::Int) => self.int_store(site, conversion.target_ty, value)?,
             (Rep::Float, Rep::Float)
@@ -3937,6 +3956,153 @@ impl FunctionLower<'_, '_> {
         };
         self.builder.def_var(variable, stored);
         Ok(())
+    }
+
+    /// A decimal handle for an operand: a decimal as is, an integer as the
+    /// scale-8 carrier (`carrier`, arithmetic) or as a whole number.
+    fn decimal_operand(&mut self, value: Value, rep: Rep, carrier: bool) -> Lowered<Value> {
+        let value = match rep {
+            Rep::Dec => return Ok(value),
+            Rep::Int => self.narrow(value)?,
+            _ => return Err(Decline::new("decimal and non-decimal operands")),
+        };
+        let symbol = if carrier {
+            &abi::DEC_STORED
+        } else {
+            &abi::DEC_INT
+        };
+        self.call_runtime(symbol, &[value])?
+            .ok_or_else(|| Decline::new("decimal operand result"))
+    }
+
+    /// A binary operation with a decimal operand or result.
+    fn dec_binary(
+        &mut self,
+        op: MirBinOp,
+        lhs: (Value, Rep),
+        rhs: (Value, Rep),
+    ) -> Lowered<(Value, Rep)> {
+        let arithmetic = match op {
+            MirBinOp::Add => Some(0),
+            MirBinOp::Sub => Some(1),
+            MirBinOp::Mul => Some(2),
+            MirBinOp::Div => Some(3),
+            MirBinOp::Mod => Some(4),
+            _ => None,
+        };
+        let a = self.decimal_operand(lhs.0, lhs.1, arithmetic.is_some())?;
+        let b = self.decimal_operand(rhs.0, rhs.1, arithmetic.is_some())?;
+        if let Some(code) = arithmetic {
+            let code = self.builder.ins().iconst(types::I32, code);
+            let result = self
+                .call_runtime(&abi::DEC_BINARY, &[a, b, code])?
+                .ok_or_else(|| Decline::new("decimal result"))?;
+            return Ok((result, Rep::Dec));
+        }
+        let cc = match op {
+            MirBinOp::Eq => IntCC::Equal,
+            MirBinOp::NotEq => IntCC::NotEqual,
+            MirBinOp::Lt => IntCC::SignedLessThan,
+            MirBinOp::Gt => IntCC::SignedGreaterThan,
+            MirBinOp::LtEq => IntCC::SignedLessThanOrEqual,
+            MirBinOp::GtEq => IntCC::SignedGreaterThanOrEqual,
+            _ => return Err(Decline::new("decimal operation")),
+        };
+        let order = self
+            .call_runtime(&abi::DEC_COMPARE, &[a, b])?
+            .ok_or_else(|| Decline::new("decimal comparison result"))?;
+        let zero = self.builder.ins().iconst(types::I32, 0);
+        Ok((self.builder.ins().icmp(cc, order, zero), Rep::Bool))
+    }
+
+    /// An integer against a float, compared exactly (the integer is never
+    /// rounded to a float first).
+    fn int_float_compare(
+        &mut self,
+        op: MirBinOp,
+        lhs: (Value, Rep),
+        rhs: (Value, Rep),
+    ) -> Lowered<(Value, Rep)> {
+        let (int, float, flipped) = if lhs.1 == Rep::Int {
+            (lhs.0, rhs.0, false)
+        } else {
+            (rhs.0, lhs.0, true)
+        };
+        let int = self.narrow(int)?;
+        let op = match (op, flipped) {
+            (MirBinOp::Lt, true) => MirBinOp::Gt,
+            (MirBinOp::Gt, true) => MirBinOp::Lt,
+            (MirBinOp::LtEq, true) => MirBinOp::GtEq,
+            (MirBinOp::GtEq, true) => MirBinOp::LtEq,
+            (other, _) => other,
+        };
+        let order = self
+            .call_runtime(&abi::INT_FLOAT_COMPARE, &[int, float])?
+            .ok_or_else(|| Decline::new("comparison result"))?;
+        let at = |this: &mut Self, cc: IntCC, value: i64| {
+            let value = this.builder.ins().iconst(types::I32, value);
+            this.builder.ins().icmp(cc, order, value)
+        };
+        let result = match op {
+            MirBinOp::Eq => at(self, IntCC::Equal, 0),
+            // An unordered pair (NaN) is unequal.
+            MirBinOp::NotEq => at(self, IntCC::NotEqual, 0),
+            MirBinOp::Lt => at(self, IntCC::Equal, -1),
+            MirBinOp::Gt => at(self, IntCC::Equal, 1),
+            MirBinOp::LtEq => {
+                let less = at(self, IntCC::Equal, -1);
+                let same = at(self, IntCC::Equal, 0);
+                self.builder.ins().bor(less, same)
+            }
+            MirBinOp::GtEq => {
+                let more = at(self, IntCC::Equal, 1);
+                let same = at(self, IntCC::Equal, 0);
+                self.builder.ins().bor(more, same)
+            }
+            _ => return Err(Decline::new("mixed integer and float operation")),
+        };
+        Ok((result, Rep::Bool))
+    }
+
+    /// An exact decimal lands in a `d64` slot: round half-even to scale 8, trap
+    /// outside the `i64` carrier.
+    fn decimal_store(&mut self, site: &radix_hir::HirStoreSite, value: Value) -> Lowered<Value> {
+        let stored = self
+            .call_runtime(&abi::DEC_STORE, &[value])?
+            .ok_or_else(|| Decline::new("decimal store result"))?;
+        let slot = site
+            .slot
+            .map(|slot| self.state.input.interner.resolve(slot).to_owned());
+        let suffix = radix_mir::store_trap::store_trap_suffix(
+            site,
+            slot.as_deref(),
+            NumericWidth::D64.rust_type(),
+            false,
+        );
+        let zero = self.builder.ins().iconst(types::I64, 0);
+        let outside = self.builder.ins().icmp(IntCC::Equal, stored, zero);
+        let trap = self.builder.create_block();
+        self.builder.set_cold_block(trap);
+        let next = self.builder.create_block();
+        self.builder.ins().brif(outside, trap, &[], next, &[]);
+        self.builder.switch_to_block(trap);
+        let data = self.state.string_data(suffix.as_bytes())?;
+        let global = self
+            .state
+            .module
+            .declare_data_in_func(data, self.builder.func);
+        let pointer = self.builder.ins().symbol_value(self.state.pointer, global);
+        let length = self
+            .builder
+            .ins()
+            .iconst(types::I64, i64::try_from(suffix.len()).unwrap_or(0));
+        let reference = self.runtime_ref(&abi::DEC_TRAP_STORE)?;
+        self.builder
+            .ins()
+            .call(reference, &[value, pointer, length]);
+        self.builder.ins().trap(TrapCode::unwrap_user(1));
+        self.builder.switch_to_block(next);
+        Ok(stored)
     }
 
     fn int_store(
@@ -4130,7 +4296,7 @@ impl FunctionLower<'_, '_> {
                 let reference = self.runtime_ref(&abi::PRINT_MAP)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
-            Rep::Regex | Rep::Match => {
+            Rep::Regex | Rep::Match | Rep::Dec => {
                 let text = self.render_text(value, rep)?;
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
                 self.builder.ins().call(reference, &[stream, text]);
@@ -4263,6 +4429,13 @@ impl FunctionLower<'_, '_> {
             MirValueKind::Operand(operand) => self.operand(operand),
             MirValueKind::Unary { op, operand } => {
                 let cap = wide::cap_int(self.state.input.types, value.ty);
+                if *op == MirUnOp::Neg && rep_of(self.state.input.types, value.ty)? == Rep::Dec {
+                    let (carrier, rep) = self.scalar_wide(operand)?;
+                    let handle = self.decimal_operand(carrier, rep, true)?;
+                    let negated = self.call_runtime(&abi::DEC_NEG, &[handle])?;
+                    let negated = negated.ok_or_else(|| Decline::new("decimal result"))?;
+                    return Ok((Some(negated), Rep::Dec));
+                }
                 let (computed, rep) = self.unary(*op, operand, cap)?;
                 Ok((Some(computed), rep))
             }
@@ -4283,6 +4456,13 @@ impl FunctionLower<'_, '_> {
 
     fn unary(&mut self, op: MirUnOp, operand: &MirOperand, cap: bool) -> Lowered<(Value, Rep)> {
         let (value, rep) = self.scalar_wide(operand)?;
+        if rep == Rep::Dec && op == MirUnOp::Neg {
+            let negated = self.call_runtime(&abi::DEC_NEG, &[value])?;
+            return Ok((
+                negated.ok_or_else(|| Decline::new("decimal result"))?,
+                Rep::Dec,
+            ));
+        }
         if (cap || self.is_wide(value)) && rep == Rep::Int {
             match op {
                 MirUnOp::Neg => return Ok((self.wide_negate(value)?, Rep::Int)),
@@ -4397,6 +4577,19 @@ impl FunctionLower<'_, '_> {
     ) -> Lowered<(Value, Rep)> {
         let (mut a, a_rep) = self.scalar_wide(lhs)?;
         let (mut b, b_rep) = self.scalar_wide(rhs)?;
+        if (a_rep == Rep::Dec || b_rep == Rep::Dec || result == Rep::Dec)
+            && op != MirBinOp::Coalesce
+            && a_rep != Rep::Opt
+            && b_rep != Rep::Opt
+        {
+            return self.dec_binary(op, (a, a_rep), (b, b_rep));
+        }
+        if matches!(
+            (a_rep, b_rep),
+            (Rep::Int, Rep::Float) | (Rep::Float, Rep::Int)
+        ) {
+            return self.int_float_compare(op, (a, a_rep), (b, b_rep));
+        }
         let exact = a_rep == Rep::Int && b_rep == Rep::Int;
         if exact && op != MirBinOp::Coalesce {
             return self.int_binary(op, a, b, cap);
@@ -4467,6 +4660,7 @@ impl FunctionLower<'_, '_> {
             Rep::Char
             | Rep::Regex
             | Rep::Match
+            | Rep::Dec
             | Rep::Bits(_)
             | Rep::List
             | Rep::Record

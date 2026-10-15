@@ -40,6 +40,8 @@ pub(crate) enum Num {
     Char,
     /// A `regex`: a compiled program behind a handle.
     Regex,
+    /// A `d64`: an exact decimal behind a handle.
+    Dec,
     Bits(BitsWidth),
 }
 
@@ -63,6 +65,12 @@ fn int_kind(table: &TypeTable, id: TypeId) -> Option<IntKind> {
 
 /// The cell kind of `id` when it takes part in a numeric conversion.
 fn num_of(table: &TypeTable, id: TypeId) -> Option<Num> {
+    if matches!(
+        resolve(table, id),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::D64)
+    ) {
+        return Some(Num::Dec);
+    }
     if let Some(kind) = int_kind(table, id) {
         return Some(Num::Int(kind));
     }
@@ -133,6 +141,12 @@ pub(crate) fn numeric_conversion(
         (Num::Text | Num::Int(_), Num::Char) => true,
         // A pattern compiles once, in the conversion, and fails when rejected.
         (Num::Text, Num::Regex) => true,
+        // A decimal is exact: integers, floats and texts convert in with a
+        // range check, and out by the `via` rounding (half-even by default).
+        (Num::Int(from), Num::Dec) => from.policy == IntPolicy::Trap && carrier_exact(from),
+        (Num::Float(_) | Num::Text, Num::Dec) | (Num::Dec, Num::Float(_)) => true,
+        (Num::Dec, Num::Int(to)) => to.policy == IntPolicy::Trap && carrier_exact(to),
+        (Num::Dec, Num::Dec) => true,
         (Num::Char, Num::Int(to)) => to.policy == IntPolicy::Trap,
         // A signed integer or an unsigned one below 64 bits reads and writes
         // a same-width pattern; a u64 pattern would leave the carrier.
@@ -477,6 +491,7 @@ impl FunctionLower<'_, '_> {
             Num::Bits(width) => Rep::Bits(width),
             Num::Char => Rep::Char,
             Num::Regex => Rep::Regex,
+            Num::Dec => Rep::Dec,
             Num::Text => return Err(Decline::new("text conversion target")),
         };
         let converted = match (failed, recovery) {
@@ -788,6 +803,52 @@ impl FunctionLower<'_, '_> {
             (Num::Float(_), Num::Float(_)) => (value, None),
             (Num::Float(_), Num::Int(to)) => self.float_to_int(conversion, to, value)?,
             (Num::Text, Num::Int(to)) => self.text_to_int(conversion, to, value)?,
+            (Num::Int(_), Num::Dec) => self.decimal_in(&abi::DEC_FROM_INT, value)?,
+            (Num::Float(_), Num::Dec) => self.decimal_in(&abi::DEC_FROM_FLOAT, value)?,
+            (Num::Text, Num::Dec) => self.decimal_in(&abi::DEC_FROM_TEXT, value)?,
+            // The same width: the value lands at scale 8, or fails out of range.
+            (Num::Dec, Num::Dec) => {
+                let stored = self
+                    .call_runtime(&abi::DEC_STORE, &[value])?
+                    .ok_or_else(|| Decline::new("decimal store result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, stored, zero);
+                (
+                    stored,
+                    Some((
+                        failed,
+                        Failure::Static("textus to numerus conversion out of range"),
+                    )),
+                )
+            }
+            (Num::Dec, Num::Float(width)) => {
+                let narrow = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, i64::from(width != NumericWidth::F64));
+                let float = self
+                    .call_runtime(&abi::DEC_TO_FLOAT, &[value, narrow])?
+                    .ok_or_else(|| Decline::new("decimal float result"))?;
+                (float, None)
+            }
+            (Num::Dec, Num::Int(to)) => {
+                let mode = match self.rounding_mode_or(&conversion.params, Rounding::HalfEven) {
+                    Rounding::Floor => 0,
+                    Rounding::Ceil => 1,
+                    Rounding::HalfEven => 2,
+                    Rounding::Trunc => 3,
+                };
+                let mode = self.builder.ins().iconst(types::I32, mode);
+                let low = self.builder.ins().iconst(types::I64, to.low);
+                let high = self.builder.ins().iconst(types::I64, to.high);
+                let integer = self
+                    .call_runtime(&abi::DEC_TO_INT, &[value, mode, low, high])?
+                    .ok_or_else(|| Decline::new("decimal integer result"))?;
+                let status = self.parse_status()?;
+                let zero = self.builder.ins().iconst(types::I32, 0);
+                let failed = self.builder.ins().icmp(IntCC::NotEqual, status, zero);
+                (integer, Some((failed, Failure::Code(status))))
+            }
             (Num::Text, Num::Regex) => {
                 let program = self
                     .call_runtime(&abi::REGEX_COMPILE, &[value])?
@@ -1080,6 +1141,25 @@ impl FunctionLower<'_, '_> {
     }
 
     fn rounding_mode(&self, params: &[radix_lexer::Symbol]) -> Rounding {
+        self.rounding_mode_or(params, Rounding::Trunc)
+    }
+
+    /// A decimal or text converting in: the handle, or a failure by status.
+    fn decimal_in(
+        &mut self,
+        symbol: &'static abi::RuntimeSymbol,
+        value: Value,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        let decimal = self
+            .call_runtime(symbol, &[value])?
+            .ok_or_else(|| Decline::new("decimal result"))?;
+        let status = self.parse_status()?;
+        let zero = self.builder.ins().iconst(types::I32, 0);
+        let failed = self.builder.ins().icmp(IntCC::NotEqual, status, zero);
+        Ok((decimal, Some((failed, Failure::Code(status)))))
+    }
+
+    fn rounding_mode_or(&self, params: &[radix_lexer::Symbol], default: Rounding) -> Rounding {
         params
             .iter()
             .find_map(|param| match self.state.input.interner.resolve(*param) {
@@ -1089,7 +1169,7 @@ impl FunctionLower<'_, '_> {
                 "trunc" | "Trunc" => Some(Rounding::Trunc),
                 _ => None,
             })
-            .unwrap_or(Rounding::Trunc)
+            .unwrap_or(default)
     }
 
     /// `textus ↦ int`: a parse by the `hex`/`bin`/`oct` radix hint (decimal

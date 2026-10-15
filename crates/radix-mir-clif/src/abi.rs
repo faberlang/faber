@@ -83,6 +83,8 @@ pub const TAG_MATCH: i64 = 13;
 /// A `regex` element: a handle to a compiled program; it displays as its
 /// pattern.
 pub const TAG_REGEX: i64 = 14;
+/// Element tag of a `d64` handle.
+pub const TAG_DEC: i64 = 15;
 
 /// New empty map (flag 0) or set (flag 1).
 pub const MAP_NEW: RuntimeSymbol = RuntimeSymbol {
@@ -997,7 +999,107 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     UNION_IS_STRUCT,
     RECORD_IS_NAMED,
     SET_DISPLAY_TOKENS,
+    DEC_STORED,
+    DEC_INT,
+    DEC_BINARY,
+    DEC_NEG,
+    DEC_COMPARE,
+    DEC_STORE,
+    DEC_TEXT,
+    DEC_TRAP_STORE,
+    INT_FLOAT_COMPARE,
+    DEC_FROM_INT,
+    DEC_FROM_FLOAT,
+    DEC_FROM_TEXT,
+    DEC_TO_FLOAT,
+    DEC_TO_INT,
 ];
+
+/// A stored `d64` carrier (scale 8) -> decimal handle.
+pub const DEC_STORED: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_stored",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// An integer -> decimal handle (scale 0).
+pub const DEC_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_int",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// `left op right` over decimals, op 0 `+`, 1 `-`, 2 `*`, 3 `/`, 4 `%`.
+pub const DEC_BINARY: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_binary",
+    params: &[Ptr, Ptr, I32],
+    ret: Some(Ptr),
+};
+/// `-value` over a decimal.
+pub const DEC_NEG: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_neg",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Three-way decimal comparison: -1, 0, 1.
+pub const DEC_COMPARE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_compare",
+    params: &[Ptr, Ptr],
+    ret: Some(I32),
+};
+/// A decimal rounded to a `d64` slot, or null when it does not fit.
+pub const DEC_STORE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_store",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// A decimal as its shortest text.
+pub const DEC_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// End the run: a decimal does not fit its slot (value, suffix pointer, suffix length).
+pub const DEC_TRAP_STORE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_trap_store",
+    params: &[Ptr, Ptr, I64],
+    ret: None,
+};
+/// Exact order of an integer and a float: -1, 0, 1, or 2 when unordered.
+pub const INT_FLOAT_COMPARE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_int_float_compare",
+    params: &[I64, F64],
+    ret: Some(I32),
+};
+
+/// An integer converted to a stored decimal; null (parse status 2) when the scaled value does not fit.
+pub const DEC_FROM_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_from_int",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// A float converted to a stored decimal; null (status 1 or 2) when it is not a decimal number or does not fit.
+pub const DEC_FROM_FLOAT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_from_float",
+    params: &[F64],
+    ret: Some(Ptr),
+};
+/// A text converted to a stored decimal; null (status 1 or 2) when malformed or out of range.
+pub const DEC_FROM_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_from_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// A decimal as a float (the flag rounds it through `f32`).
+pub const DEC_TO_FLOAT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_to_float",
+    params: &[Ptr, I32],
+    ret: Some(F64),
+};
+/// A decimal rounded to an integer in [low, high] (mode 0 floor, 1 ceil, 2 half-even, 3 trunc); a nonzero parse status when it does not fit.
+pub const DEC_TO_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_to_int",
+    params: &[Ptr, I32, I64, I64],
+    ret: Some(I64),
+};
 
 /// A text handle points at `[len: i64][bytes...]`; literals are static data in
 /// that shape, runtime-built texts are leaked allocations of it.

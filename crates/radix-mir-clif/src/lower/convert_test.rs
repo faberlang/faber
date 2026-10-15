@@ -280,3 +280,24 @@ fn letters_convert_to_and_from_numbers_and_texts() {
         Ok(super::Rep::Char)
     );
 }
+
+#[test]
+fn decimals_convert_with_integers_floats_and_texts() {
+    let mut f = Fixture::new();
+    let d64 = f.sized(Primitive::Numerus, NumericWidth::D64);
+    let int = f.primitive(Primitive::Numerus);
+    let u64_ = f.sized(Primitive::Numerus, NumericWidth::U64);
+    let float = f.primitive(Primitive::Fractus);
+    let text = f.primitive(Primitive::Textus);
+    assert!(f.supported(int, d64));
+    assert!(f.supported(float, d64));
+    assert!(f.supported(text, d64));
+    assert!(f.supported(d64, int));
+    assert!(f.supported(d64, float));
+    assert!(f.supported(d64, d64));
+    // A 64-bit unsigned cell reaches beyond the carrier, and a decimal does
+    // not render through the numeric plans (it renders as text directly).
+    assert!(!f.supported(u64_, d64));
+    assert!(!f.supported(d64, u64_));
+    assert!(!f.supported(d64, text));
+}
