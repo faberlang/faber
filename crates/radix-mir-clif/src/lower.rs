@@ -7,8 +7,8 @@
 
 use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
 use cranelift_codegen::ir::{
-    AbiParam, Block, FuncRef, InstBuilder, MemFlagsData, Signature, TrapCode, Type as ClType,
-    Value, types,
+    AbiParam, Block, BlockArg, FuncRef, InstBuilder, MemFlagsData, Signature, TrapCode,
+    Type as ClType, Value, types,
 };
 use cranelift_codegen::settings::{self, Configurable, Flags};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
@@ -117,6 +117,8 @@ pub(crate) enum Rep {
     Opt,
     /// A function value: the address of a compiled function.
     Func,
+    /// A tuple: a pointer to a runtime list of tagged items.
+    Tuple,
     /// `textus`: a pointer to `[len: i64][bytes...]` (see `abi::TEXT_HEADER`).
     Text,
     /// No value.
@@ -136,7 +138,8 @@ impl Rep {
             | Self::Opt
             | Self::Map
             | Self::Set
-            | Self::Func => Some(types::I64),
+            | Self::Func
+            | Self::Tuple => Some(types::I64),
             Self::Unit => None,
         }
     }
@@ -168,6 +171,12 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Set(element) => {
             rep_of(table, MirType::semantic(*element))?;
             Ok(Rep::Set)
+        }
+        Type::Tuple(elements) => {
+            for element in elements {
+                rep_of(table, MirType::semantic(*element))?;
+            }
+            Ok(Rep::Tuple)
         }
         Type::Record(fields) => {
             for field in fields.values() {
@@ -668,7 +677,8 @@ impl FunctionLower<'_, '_> {
             | Rep::Opt
             | Rep::Map
             | Rep::Set
-            | Rep::Func => Some(self.builder.ins().iconst(types::I64, 0)),
+            | Rep::Func
+            | Rep::Tuple => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Unit => None,
         }
     }
@@ -883,10 +893,22 @@ impl FunctionLower<'_, '_> {
     /// The type after one projection step.
     fn projected_type(&self, ty: MirType, projection: &MirProjection) -> Lowered<MirType> {
         match projection {
-            MirProjection::Index(_) => match resolve(self.state.input.types, ty.semantic_id()) {
-                Type::Map(_, value) => Ok(MirType::semantic(*value)),
-                _ => self.element_type(ty),
-            },
+            MirProjection::Index(index) => {
+                match resolve(self.state.input.types, ty.semantic_id()) {
+                    Type::Map(_, value) => Ok(MirType::semantic(*value)),
+                    Type::Tuple(elements) => match index {
+                        MirOperand::Constant(MirConstant::Int(position)) => {
+                            usize::try_from(*position)
+                                .ok()
+                                .and_then(|position| elements.get(position))
+                                .map(|element| MirType::semantic(*element))
+                                .ok_or_else(|| Decline::new("tuple index"))
+                        }
+                        _ => Err(Decline::new("tuple index")),
+                    },
+                    _ => self.element_type(ty),
+                }
+            }
             MirProjection::Field(name) => Ok(self.field_slot(ty, *name)?.1),
             MirProjection::VariantField { variant, field } => {
                 Ok(self.variant_slot(*variant, *field)?.1)
@@ -933,6 +955,7 @@ impl FunctionLower<'_, '_> {
             Rep::Opt => abi::TAG_OPT,
             Rep::Map | Rep::Set => abi::TAG_MAP,
             Rep::Func => return Err(Decline::new("function value element")),
+            Rep::Tuple => return Err(Decline::new("tuple element")),
             Rep::Unit => return Err(Decline::new("unit list element")),
         })
     }
@@ -1049,8 +1072,84 @@ impl FunctionLower<'_, '_> {
                 let rhs = self.scalar(fallback)?;
                 self.coalesce(lhs, rhs, result)
             }
-            MirOptionOp::Chain { .. } => Err(Decline::new("optional chain")),
+            MirOptionOp::Chain { base, link } => self.option_chain(base, link),
         }
+    }
+
+    /// `base?.field`: none when the base is none, else the field (boxed as
+    /// present unless the field is itself optional).
+    fn option_chain(
+        &mut self,
+        base: &MirOperand,
+        link: &MirOptionChainLink,
+    ) -> Lowered<(Value, Rep)> {
+        if !matches!(
+            link,
+            MirOptionChainLink::Field(_) | MirOptionChainLink::Index(_)
+        ) {
+            return Err(Decline::new("optional chain link"));
+        }
+        let (handle, rep) = self.scalar(base)?;
+        if rep != Rep::Opt {
+            return Err(Decline::new("chain of a non-optional"));
+        }
+        let base_ty = self.operand_type(base)?;
+        let Type::Option(inner) = resolve(self.state.input.types, base_ty.semantic_id()) else {
+            return Err(Decline::new("chain of a non-optional"));
+        };
+        let inner = MirType::semantic(*inner);
+        let inner_rep = rep_of(self.state.input.types, inner)?;
+        let done = self.builder.create_block();
+        self.builder.append_block_param(done, types::I64);
+        let present = self.builder.create_block();
+        let zero = self.builder.ins().iconst(types::I64, 0);
+        let is_none = self.builder.ins().icmp(IntCC::Equal, handle, zero);
+        self.builder
+            .ins()
+            .brif(is_none, done, &[BlockArg::Value(zero)], present, &[]);
+        self.builder.switch_to_block(present);
+        let payload = self
+            .call_runtime(&abi::OPT_BITS, &[handle])?
+            .ok_or_else(|| Decline::new("chain base result"))?;
+        let wrapped = match link {
+            MirOptionChainLink::Field(name) => {
+                if inner_rep != Rep::Record {
+                    return Err(Decline::new("chain field of a non-genus"));
+                }
+                let (position, field_ty) = self.field_slot(inner, *name)?;
+                let field_rep = rep_of(self.state.input.types, field_ty)?;
+                let position = self.builder.ins().iconst(
+                    types::I64,
+                    i64::try_from(position).map_err(|_| Decline::new("field index"))?,
+                );
+                let bits = self
+                    .call_runtime(&abi::RECORD_GET, &[payload, position])?
+                    .ok_or_else(|| Decline::new("chain field result"))?;
+                let value = self.element_value(bits, field_rep);
+                self.coerce(value, field_rep, Rep::Opt)?
+            }
+            MirOptionChainLink::Index(index) => {
+                if inner_rep != Rep::Map {
+                    return Err(Decline::new("chain index of a non-map"));
+                }
+                let (key_ty, value_ty) = self.map_types(inner)?;
+                if rep_of(self.state.input.types, value_ty)? == Rep::Opt {
+                    return Err(Decline::new("chain index of an optional value"));
+                }
+                let (key, key_rep) = self.element_operand(index, key_ty)?;
+                let tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(key_rep)?);
+                let key = self.element_bits(key, key_rep);
+                self.call_runtime(&abi::MAP_GET_OPT, &[payload, tag, key])?
+                    .ok_or_else(|| Decline::new("chain index result"))?
+            }
+            _ => return Err(Decline::new("optional chain link")),
+        };
+        self.builder.ins().jump(done, &[BlockArg::Value(wrapped)]);
+        self.builder.switch_to_block(done);
+        Ok((self.builder.block_params(done)[0], Rep::Opt))
     }
 
     /// An operand that fills an element of type `element`: a bare literal into
@@ -1092,7 +1191,7 @@ impl FunctionLower<'_, '_> {
                     self.call_runtime(&abi::MAP_GET, &[current, tag, key])?
                 }
                 MirProjection::Index(index) => {
-                    if current_rep != Rep::List {
+                    if current_rep != Rep::List && current_rep != Rep::Tuple {
                         return Err(Decline::new("index of a non-list"));
                     }
                     let (index, index_rep) = self.scalar(index)?;
@@ -1240,6 +1339,42 @@ impl FunctionLower<'_, '_> {
         let (variable, slot_rep) = self.place_slot(destination)?;
         if slot_rep != Rep::List {
             return Err(Decline::new("list destination representation"));
+        }
+        self.builder.def_var(variable, list);
+        Ok(())
+    }
+
+    /// A tuple literal: tagged items in a runtime list.
+    fn construct_tuple(&mut self, destination: &MirPlace, aggregate: &MirAggregate) -> Lowered<()> {
+        let Type::Tuple(elements) = resolve(self.state.input.types, aggregate.ty.semantic_id())
+        else {
+            return Err(Decline::new("tuple type"));
+        };
+        let elements = elements.clone();
+        let MirAggregateFields::Ordered(items) = &aggregate.fields else {
+            return Err(Decline::new("tuple fields"));
+        };
+        if items.len() != elements.len() {
+            return Err(Decline::new("tuple arity"));
+        }
+        let list = self
+            .call_runtime(&abi::LIST_NEW, &[])?
+            .ok_or_else(|| Decline::new("list new result"))?;
+        for (item, element) in items.iter().zip(elements) {
+            let MirAggregateItem::Operand(operand) = item else {
+                return Err(Decline::new("tuple spread"));
+            };
+            let (value, rep) = self.element_operand(operand, MirType::semantic(element))?;
+            let tag = self
+                .builder
+                .ins()
+                .iconst(types::I32, Self::element_tag(rep)?);
+            let bits = self.element_bits(value, rep);
+            self.call_runtime(&abi::LIST_PUSH, &[list, tag, bits])?;
+        }
+        let (variable, slot_rep) = self.place_slot(destination)?;
+        if slot_rep != Rep::Tuple {
+            return Err(Decline::new("tuple destination representation"));
         }
         self.builder.def_var(variable, list);
         Ok(())
@@ -1736,6 +1871,12 @@ impl FunctionLower<'_, '_> {
             {
                 self.construct_struct(destination, aggregate)
             }
+            MirStatementKind::Construct {
+                destination,
+                aggregate,
+            } if aggregate.kind == MirAggregateKind::Tuple => {
+                self.construct_tuple(destination, aggregate)
+            }
             MirStatementKind::Construct { .. } => Err(Decline::new("aggregate construction")),
         }
     }
@@ -2094,6 +2235,7 @@ impl FunctionLower<'_, '_> {
                 self.call_runtime(&abi::TEXT_FROM_BITS, &[value, bits])?
             }
             Rep::Func => return Err(Decline::new("function value as text")),
+            Rep::Tuple => return Err(Decline::new("tuple as text")),
             Rep::Unit => return Err(Decline::new("unit rendered as text")),
         };
         rendered.ok_or_else(|| Decline::new("text rendering result"))
@@ -2212,7 +2354,8 @@ impl FunctionLower<'_, '_> {
             | (Rep::Opt, Rep::Opt)
             | (Rep::Map, Rep::Map)
             | (Rep::Set, Rep::Set)
-            | (Rep::Func, Rep::Func) => value,
+            | (Rep::Func, Rep::Func)
+            | (Rep::Tuple, Rep::Tuple) => value,
             (Rep::Bits(from), Rep::Bits(to)) if from == to => value,
             _ => return Err(Decline::new("conversion between representations")),
         };
@@ -2370,6 +2513,7 @@ impl FunctionLower<'_, '_> {
                 self.builder.ins().call(reference, &[stream, value]);
             }
             Rep::Func => return Err(Decline::new("function value print")),
+            Rep::Tuple => return Err(Decline::new("tuple print")),
             Rep::Unit => return Err(Decline::new("unit print")),
         }
         Ok(())
@@ -2493,6 +2637,7 @@ impl FunctionLower<'_, '_> {
             | Rep::Map
             | Rep::Set
             | Rep::Func
+            | Rep::Tuple
             | Rep::Unit => Err(Decline::new("unit operands")),
         }
     }

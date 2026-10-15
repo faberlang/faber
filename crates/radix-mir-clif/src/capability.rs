@@ -209,7 +209,9 @@ impl<'a> ClifCapability<'a> {
                 .find_map(|field| self.type_gap(MirType::semantic(*field))),
             Type::Enum(_) => None,
             Type::Interface(_) => Some(Gap::Subset("enum value".to_owned())),
-            Type::Tuple(_) => Some(Gap::Subset("tuple value".to_owned())),
+            Type::Tuple(elements) => elements
+                .iter()
+                .find_map(|element| self.type_gap(MirType::semantic(*element))),
             Type::Union(_) | Type::Intersection(_) => Some(Gap::Subset("union value".to_owned())),
             Type::Option(inner) => match self.types.get(*inner) {
                 Type::Option(_) => Some(Gap::Subset("optional value".to_owned())),
@@ -340,7 +342,7 @@ impl<'a> ClifCapability<'a> {
 
     fn aggregate_gap(kind: &MirAggregateKind) -> Option<Gap> {
         match kind {
-            MirAggregateKind::Tuple => Some(Gap::Subset("tuple construction".to_owned())),
+            MirAggregateKind::Tuple => None,
             MirAggregateKind::Array => None,
             MirAggregateKind::Map | MirAggregateKind::Set => None,
             MirAggregateKind::Record => None,
@@ -368,6 +370,10 @@ impl<'a> ClifCapability<'a> {
                 None
             }
             MirValueKind::Closure(_) => Some(Gap::Subset("closure value".to_owned())),
+            MirValueKind::Option(MirOptionOp::Chain {
+                link: MirOptionChainLink::Field(_) | MirOptionChainLink::Index(_),
+                ..
+            }) => None,
             MirValueKind::Option(MirOptionOp::Chain { .. }) => {
                 Some(Gap::Subset("optional chain".to_owned()))
             }
