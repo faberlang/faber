@@ -101,6 +101,9 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(Primitive::Bivalens) => Ok(Rep::Bool),
         Type::Primitive(Primitive::Textus) => Ok(Rep::Text),
         Type::Bits(width) => Ok(Rep::Bits(*width)),
+        // A promise carrier is its payload: async functions run to
+        // completion and `cede` reads the value.
+        Type::Promissum(inner) => rep_of(table, MirType::semantic(*inner)),
         Type::Array(element) => {
             rep_of(table, MirType::semantic(*element))?;
             Ok(Rep::List)
@@ -425,8 +428,8 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
     if function.error_ty.is_some() {
         return Err(Decline::new("error-typed function"));
     }
-    if function.is_async || function.is_generator {
-        return Err(Decline::new("async or generator function"));
+    if function.is_generator {
+        return Err(Decline::new("generator function"));
     }
     let mut context = state.module.make_context();
     context.func.signature = signature;
@@ -1091,6 +1094,13 @@ impl FunctionLower<'_, '_> {
                 self.format_string(destination, *template, &call.args)
             }
             MirIntrinsic::Collection(op) => self.collection_op(destination, *op, &call.args),
+            MirIntrinsic::Cede => {
+                let ([argument], Some(destination)) = (call.args.as_slice(), destination) else {
+                    return Err(Decline::new("cede shape"));
+                };
+                let (value, rep) = self.operand(argument)?;
+                self.define_result(destination, value, rep)
+            }
             MirIntrinsic::Assert => {
                 let Some(condition) = call.args.first() else {
                     return Err(Decline::new("assert arity"));

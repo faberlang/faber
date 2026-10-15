@@ -208,10 +208,10 @@ impl<'a> ClifCapability<'a> {
             }
             Type::ModularWord(_) => Some(Gap::Subset("wrapping value".to_owned())),
             Type::SaturatingWord(_) => Some(Gap::Subset("saturating value".to_owned())),
-            Type::Cursor(_)
-            | Type::AsyncCursor(_, _)
-            | Type::Promissum(_)
-            | Type::PromissumFailable(_, _) => Some(Gap::Subset("async value".to_owned())),
+            Type::Promissum(inner) => self.type_gap(MirType::semantic(*inner)),
+            Type::Cursor(_) | Type::AsyncCursor(_, _) | Type::PromissumFailable(_, _) => {
+                Some(Gap::Subset("async value".to_owned()))
+            }
             Type::Intervallum(_) => Some(Gap::Subset("interval value".to_owned())),
             Type::Tensor(..)
             | Type::Vector(..)
@@ -345,9 +345,6 @@ impl MirVisitor for ClifCapability<'_> {
         {
             return;
         }
-        if function.is_async {
-            self.record(Gap::Subset("async function".to_owned()));
-        }
         if function.is_generator {
             self.record(Gap::Subset("generator function".to_owned()));
         }
@@ -463,6 +460,7 @@ impl MirVisitor for ClifCapability<'_> {
                 MirIntrinsic::FormatString { .. }
                     | MirIntrinsic::Assert
                     | MirIntrinsic::Panic
+                    | MirIntrinsic::Cede
                     | MirIntrinsic::Collection(
                         MirCollectionOp::Length
                             | MirCollectionOp::Append
