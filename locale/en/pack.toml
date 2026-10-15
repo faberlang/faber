@@ -617,6 +617,22 @@ help = "fix the lexer error first; parsing continues from clean tokens"
 message = "expected token"
 help = "ensure the expected token is present in this position"
 
+[diagnostics.PARSE001.issues.annotation_field_name]
+message = "an annotation field must be an identifier"
+help = "write a plain field name inside the annotation braces"
+
+[diagnostics.PARSE001.issues.label_bind_distinction]
+message = "label syntax uses `{label_operator}`, not the binding operator `{binding_operator}`"
+help = "write `{label}{label_operator} value` for a labeled argument, or pass it by position"
+
+[diagnostics.PARSE001.issues.labeled_actual_non_template_call]
+message = "this call does not accept labeled arguments; labels belong to template calls"
+help = "drop the label `{label}` and pass the value by position, or call a template literal"
+
+[diagnostics.PARSE001.issues.labeled_actual_spread_unsupported]
+message = "a spread argument cannot carry a label"
+help = "remove the label from the spread argument"
+
 [diagnostics.PARSE001.issues.copy_into_value_expected]
 message = "a value is required after the copy-in operator `{operator}`"
 help = "write the source expression after `⇇`"
