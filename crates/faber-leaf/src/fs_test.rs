@@ -75,6 +75,20 @@ fn temp_dir_is_non_empty() {
 }
 
 #[test]
+fn temp_dir_is_canonical_without_trailing_separator() {
+    let Reply::Str(path) = serve_ok("solum:temporarium", &[]) else {
+        panic!("expected string reply");
+    };
+    assert!(
+        path == "/" || !path.ends_with('/'),
+        "trailing slash: {path}"
+    );
+    if let Ok(canonical) = fs::canonicalize(std::env::temp_dir()) {
+        assert_eq!(path, canonical.to_string_lossy());
+    }
+}
+
+#[test]
 fn status_reports_byte_length() {
     let path = temp_path("status");
     let path_text = path.to_string_lossy().into_owned();
