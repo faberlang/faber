@@ -768,6 +768,11 @@ impl Emitter<'_> {
         }
         let l = self.expr(left)?;
         let r = self.expr(right)?;
+        // `≈` / `≉` is tolerance equality over either family, never the C `==`
+        // a float operand would make it.
+        if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq) {
+            return self.fuzzy(op, l, r);
+        }
         if l.value == Value::Float || r.value == Value::Float || op == HirBinOp::TrueDiv {
             return self.float_binary(op, l, r);
         }
@@ -783,6 +788,8 @@ impl Emitter<'_> {
             | HirBinOp::BitXor
             | HirBinOp::Shl
             | HirBinOp::Shr => self.bitwise(op, l, r),
+            // `≅` / `≇` is exact value equality, including across families.
+            HirBinOp::ApproxEq | HirBinOp::ApproxNotEq => self.comparison(op, l, r),
             HirBinOp::Lt
             | HirBinOp::Gt
             | HirBinOp::LtEq
@@ -829,6 +836,30 @@ impl Emitter<'_> {
                 "integer constant beyond the 64-bit representation cap",
             )),
         }
+    }
+
+    /// `≈` / `≉`: `10^9 · |a − b| ≤ max(|a|, |b|)` between integers, the same
+    /// tolerance rule between floats. Both sides are the same family.
+    fn fuzzy(&mut self, op: HirBinOp, l: Operand, r: Operand) -> Result<Operand, CodegenError> {
+        let name = if l.is_integer() && r.is_integer() {
+            "faber_approx_int"
+        } else if l.value == Value::Float && r.value == Value::Float {
+            "faber_approx_f64"
+        } else {
+            return Err(unsupported("approximate equality between different classes"));
+        };
+        self.support.need(Helper::Approx);
+        let effect = l.effect || r.effect;
+        let mut operands = [l, r];
+        let prelude = self.sequence(&mut operands);
+        let [l, r] = operands;
+        let call = format!("{name}({}, {})", l.text, r.text);
+        let text = if op == HirBinOp::FuzzyNotEq {
+            format!("(!{call})")
+        } else {
+            call
+        };
+        Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect))
     }
 
     /// Bitwise `∧ ∨ ⊻` and the shifts `⇐ ⇒`. All of them are exact and
@@ -1022,8 +1053,8 @@ impl Emitter<'_> {
             HirBinOp::Gt => ">",
             HirBinOp::LtEq => "<=",
             HirBinOp::GtEq => ">=",
-            HirBinOp::Eq | HirBinOp::StrictEq => "==",
-            HirBinOp::NotEq | HirBinOp::StrictNotEq => "!=",
+            HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::ApproxEq => "==",
+            HirBinOp::NotEq | HirBinOp::StrictNotEq | HirBinOp::ApproxNotEq => "!=",
             other => return Err(unsupported(binary_name(other))),
         };
         if truth_pair && !matches!(glyph, "==" | "!=") {
@@ -1150,7 +1181,21 @@ impl Emitter<'_> {
                 let (low, high) = width.range();
                 let proved = value.stored == Some(class)
                     || value.constant.is_some_and(|c| (low..=high).contains(&c));
-                if !integer || proved {
+                if !integer {
+                    return Ok(value);
+                }
+                if proved {
+                    // A `u64` cell reads as an exact value (`Value::Exact`); a
+                    // proved in-range constant that never went through a store
+                    // arrives as an `int64_t` value, so it is wrapped here.
+                    if width == IntWidth::U64 && value.value == Value::Int {
+                        let mut operand =
+                            Operand::new(format!("((faber_i128){})", value.text), Value::Exact);
+                        operand.constant = value.constant;
+                        operand.effect = value.effect;
+                        operand.stored = Some(class);
+                        return Ok(operand);
+                    }
                     return Ok(value);
                 }
                 self.support.need(Helper::SizedStore);

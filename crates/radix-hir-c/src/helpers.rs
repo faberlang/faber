@@ -31,6 +31,8 @@ pub(crate) enum Helper {
     Bitwise,
     /// The integer methods `absolutum`, `signum`, `minimus`, `maximus`, `potentia`.
     IntMethod,
+    /// `≈` / `≉` tolerance equality (`approx_int`, `approx_f64`).
+    Approx,
     FitI64,
     StoreI64,
     /// `faber_store_<w>` / `faber_fit_<w>` for the sized integers.
@@ -88,6 +90,7 @@ impl Helper {
             | Helper::Rem
             | Helper::Bitwise
             | Helper::IntMethod
+            | Helper::Approx
             | Helper::FitI64
             | Helper::StoreI64
             | Helper::SizedStore

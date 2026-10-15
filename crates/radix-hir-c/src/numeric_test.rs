@@ -55,3 +55,25 @@ fn float_power_uses_libm_pow() {
     let code = emitted("main {\n    var float a ← 2.0\n    print a.power(3.0)\n}");
     assert!(code.contains("faber_pow_f64(l_a, 3.0)"), "{code}");
 }
+
+#[test]
+fn fuzzy_equality_uses_the_tolerance_helper() {
+    let code = emitted(
+        "main {\n    var int a ← 5\n    var int b ← 5\n    print a ≈ b\n    print a ≉ b\n    var float x ← 1.0\n    print x ≈ x\n}",
+    );
+    assert!(code.contains("faber_approx_int(l_a, l_b)"), "{code}");
+    assert!(code.contains("(!faber_approx_int(l_a, l_b))"), "{code}");
+    assert!(code.contains("faber_approx_f64(l_x, l_x)"), "{code}");
+}
+
+#[test]
+fn value_equality_crosses_families_without_rounding() {
+    let code = emitted("main {\n    print 1 ≅ 1.0\n}");
+    assert!(code.contains("faber_int_eq_float(INT64_C(1), 1.0)"), "{code}");
+}
+
+#[test]
+fn a_u64_constant_that_fits_i64_reads_exact() {
+    let code = emitted("main {\n    const u64 b ← 9007199254740992\n    print b\n}");
+    assert!(code.contains("((faber_i128)"), "{code}");
+}

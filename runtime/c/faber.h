@@ -183,6 +183,19 @@ static inline faber_i128 faber_shr(faber_i128 value, faber_i128 count) {
     return value >> (int)count;
 }
 
+/* `≈` / `≉` between integers: `10^9 · |a − b| ≤ max(|a|, |b|)` over the exact
+ * values, never through a float. Mirrors `faber::exact::approx_int`. */
+static inline bool faber_approx_int(faber_i128 a, faber_i128 b) {
+    faber_i128 a_abs = a < 0 ? -a : a;
+    faber_i128 b_abs = b < 0 ? -b : b;
+    faber_i128 larger = a_abs >= b_abs ? a_abs : b_abs;
+    faber_i128 difference = a - b;
+    if (difference < 0) {
+        difference = -difference;
+    }
+    return (faber_i128)1000000000 * difference <= larger;
+}
+
 /* The two integer method twins with no operator: `absolutum` and `potentia`
  * (`faber::exact::pow`); `abs` can reach `2^63` for `i64::MIN`, still in the
  * cap. A negative exponent aborts as the runner's `pow` panics. */
@@ -381,6 +394,20 @@ static inline double faber_maximum_f64(double a, double b) {
     return b;
 }
 
+/* `≈` / `≉` between floats: `|a − b| <= 1e-9 · max(|a|, |b|)` (`approx_f64`). */
+static inline bool faber_approx_f64(double a, double b) {
+    double difference = a - b;
+    double scale = a < 0 ? -a : a;
+    double other = b < 0 ? -b : b;
+    if (difference < 0) {
+        difference = -difference;
+    }
+    if (other > scale) {
+        scale = other;
+    }
+    return difference <= 1e-9 * scale;
+}
+
 /* `fractus.potentia(n)`: IEEE 754 `pow` with no domain guard (`f64::powf`,
  * which the runner uses). */
 static inline double faber_pow_f64(double base, double exponent) {
@@ -409,6 +436,11 @@ static inline int faber_cmp_int_float(faber_i128 integer, double value) {
     }
     fraction = value - (double)whole;
     return fraction > 0.0 ? -1 : fraction < 0.0 ? 1 : 0;
+}
+
+/* `≅` / `≇` of an integer and a float, by true value (`cmp_int_float == 0`). */
+static inline bool faber_int_eq_float(faber_i128 integer, double value) {
+    return faber_cmp_int_float(integer, value) == 0;
 }
 
 static inline bool faber_int_lt_float(faber_i128 a, double b) {

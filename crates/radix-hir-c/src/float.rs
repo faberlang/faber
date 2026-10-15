@@ -59,6 +59,23 @@ impl Emitter<'_> {
         let integer = |operand: &Operand| matches!(operand.value, Value::Int | Value::Exact);
         let effect = l.effect || r.effect;
         let both_float = l.value == Value::Float && r.value == Value::Float;
+        // `≅` / `≇` across families compares true values, never rounding the
+        // integer to binary64 first.
+        if matches!(op, HirBinOp::ApproxEq | HirBinOp::ApproxNotEq) && (integer(&l) || integer(&r))
+        {
+            self.support.need(Helper::Approx);
+            let (exact, float) = if integer(&l) { (l, r) } else { (r, l) };
+            let mut operands = [exact, float];
+            let prelude = self.sequence(&mut operands);
+            let [exact, float] = operands;
+            let call = format!("faber_int_eq_float({}, {})", exact.text, float.text);
+            let text = if op == HirBinOp::ApproxNotEq {
+                format!("(!{call})")
+            } else {
+                call
+            };
+            return Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect));
+        }
         let (call, value): (fn(&str, &str) -> String, Value) = match op {
             // `÷` on integers: both become binary64, and a zero divisor traps.
             HirBinOp::TrueDiv if integer(&l) && integer(&r) => {
@@ -77,12 +94,13 @@ impl Emitter<'_> {
             HirBinOp::Gt if both_float => (|a, b| format!("({a} > {b})"), Value::Truth),
             HirBinOp::LtEq if both_float => (|a, b| format!("({a} <= {b})"), Value::Truth),
             HirBinOp::GtEq if both_float => (|a, b| format!("({a} >= {b})"), Value::Truth),
-            HirBinOp::Eq | HirBinOp::StrictEq if both_float => {
+            HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::ApproxEq if both_float => {
                 (|a, b| format!("({a} == {b})"), Value::Truth)
             }
-            HirBinOp::NotEq | HirBinOp::StrictNotEq if both_float => {
+            HirBinOp::NotEq | HirBinOp::StrictNotEq | HirBinOp::ApproxNotEq if both_float => {
                 (|a, b| format!("({a} != {b})"), Value::Truth)
             }
+
             // An integer against a float compares true values; C would round
             // the integer to binary64 first.
             HirBinOp::Lt if integer(&l) => {
