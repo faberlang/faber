@@ -60,6 +60,9 @@ pub(crate) struct Field {
     pub(crate) ty: Ty,
     /// The compile-time default (`= value`) a construction falls back to.
     pub(crate) default: Option<HirExpression>,
+    /// An `optional` field: its class is the optional of the declared type
+    /// and a construction that omits it leaves none.
+    pub(crate) sponte: bool,
 }
 
 impl Emitter<'_> {
@@ -111,9 +114,6 @@ impl Emitter<'_> {
         if !genus.type_params.is_empty() {
             return Err(unsupported("generic genus"));
         }
-        if !genus.implements.is_empty() {
-            return Err(unsupported("genus implementing a contract"));
-        }
         let name = self.names.resolve_symbol(genus.name).to_owned();
         let c_name = self.items_scope.claim(&format!("g_{name}"));
         let mut members = Namer::program_scope();
@@ -122,18 +122,25 @@ impl Emitter<'_> {
             if field.is_static() {
                 return Err(unsupported("static (generis) field"));
             }
-            if field.sponte {
-                return Err(unsupported("optional (sponte) field"));
-            }
             if !field.annotations.is_empty() {
                 return Err(unsupported("field annotation"));
             }
             let field_name = self.names.resolve_symbol(field.name).to_owned();
+            let declared = classify(self.types, field.ty)?;
+            let ty = if field.sponte {
+                match crate::ty::Inner::from_ty(declared) {
+                    Some(inner) => Ty::Opt(inner),
+                    None => return Err(unsupported("optional field of a sized integer or optional")),
+                }
+            } else {
+                declared
+            };
             fields.push(Field {
                 c_name: members.claim(&format!("m_{field_name}")),
                 name: field_name,
-                ty: classify(self.types, field.ty)?,
+                ty,
                 default: field.init.clone(),
+                sponte: field.sponte,
             });
         }
         let mut methods = Vec::with_capacity(genus.methods.len());
@@ -230,12 +237,15 @@ impl Emitter<'_> {
             if assigned.contains(&field.name) {
                 continue;
             }
-            let Some(default) = &field.default else {
-                return Err(unsupported(
-                    "construction that omits a field without a default",
-                ));
+            let operand = match (&field.default, field.sponte) {
+                (Some(default), _) => self.field_value(default, field.ty)?,
+                (None, true) => self.none_of(field.ty)?,
+                (None, false) => {
+                    return Err(unsupported(
+                        "construction that omits a field without a default",
+                    ));
+                }
             };
-            let operand = self.field_value(default, field.ty)?;
             write!(body, "{target}->{} = {}; ", field.c_name, operand.text).ok();
         }
         // The `creo` hook runs once on the finished object, after every field

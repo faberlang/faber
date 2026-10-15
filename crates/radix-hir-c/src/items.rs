@@ -9,13 +9,13 @@
 use crate::error::unsupported;
 use crate::expr::Value;
 use crate::names::Namer;
-use crate::ty::{Ty, classify, returns};
+use crate::ty::{Inner, Ty, classify, returns};
 use crate::{Emitter, Local};
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
 use radix_hir::{
-    DefId, HirConst, HirExpressionKind, HirFunction, HirItem, HirItemKind, HirModule, HirParamMode,
-    HirStatementKind,
+    DefId, HirConst, HirExpression, HirExpressionKind, HirFunction, HirItem, HirItemKind,
+    HirModule, HirParamMode, HirStatementKind,
 };
 use rustc_hash::FxHashSet;
 
@@ -23,10 +23,25 @@ use rustc_hash::FxHashSet;
 pub(crate) struct Function {
     pub(crate) name: String,
     pub(crate) params: Vec<Ty>,
+    /// Per parameter, what a call that omits its argument passes. Parallel to
+    /// `params`; the runner fills a default at the call site, or none for a
+    /// plain `optional` slot (`lower_direct_call_args`).
+    pub(crate) omissions: Vec<Omission>,
     /// `None` for a function with no result (`void`).
     pub(crate) ret: Option<Ty>,
     /// The genus a method belongs to; its receiver follows the arena.
     pub(crate) receiver: Option<DefId>,
+}
+
+/// What fills an argument a call leaves out, per parameter.
+#[derive(Debug, Clone)]
+pub(crate) enum Omission {
+    /// The call must provide it.
+    Required,
+    /// `optional` with no default: the call passes none.
+    Omitted,
+    /// `optional coalesce <expr>`: the call evaluates the default.
+    Default(HirExpression),
 }
 
 /// What a `return` in the body being written means.
@@ -150,7 +165,13 @@ impl Emitter<'_> {
                 }
                 // Collected with the genera, whose types it shares.
                 HirItemKind::Enum(_) => {}
-                HirItemKind::Interface(_) => return Err(unsupported("interface declaration")),
+                // A contract is a name for what genera provide; a value typed
+                // as one is rejected where its type is classified.
+                HirItemKind::Interface(interface) => {
+                    if !interface.type_params.is_empty() {
+                        return Err(unsupported("generic interface declaration"));
+                    }
+                }
                 // An alias is resolved in the type table; a use of one that
                 // names an unsupported type is rejected where it is used.
                 HirItemKind::TypeAlias(_) => {}
@@ -259,11 +280,35 @@ impl Emitter<'_> {
             return Err(unsupported("function without a body"));
         }
         let mut params = Vec::with_capacity(function.params.len());
+        let mut omissions = Vec::with_capacity(function.params.len());
         for param in &function.params {
-            if param.optional || param.default.is_some() {
-                return Err(unsupported("optional parameter"));
-            }
             let class = classify(self.types, param.ty)?;
+            // A bare `optional` slot is the optional of its declared type: a
+            // call that omits it passes none. `optional coalesce <expr>` is
+            // the declared type alone, because the call site fills the
+            // default (the runner does this in `lower_direct_call_args`).
+            let class = match (param.optional, param.default.is_some()) {
+                (true, false) => {
+                    // The C storage is the optional of the declared type; the
+                    // HIR type stays the payload, so a body read must not be
+                    // guard-narrowed (the runner keeps the none for coalesce).
+                    self.sponte_params.insert(param.def_id);
+                    match Inner::from_ty(class) {
+                        Some(inner) => Ty::Opt(inner),
+                        None => {
+                            return Err(unsupported(
+                                "optional parameter of a sized integer or optional",
+                            ))
+                        }
+                    }
+                }
+                _ => class,
+            };
+            omissions.push(match (param.optional, &param.default) {
+                (true, Some(default)) => Omission::Default(default.clone()),
+                (true, None) => Omission::Omitted,
+                (false, _) => Omission::Required,
+            });
             self.need_class(class);
             // `ref` / `mut` on a list or genus passes the caller's pointer,
             // which is what an unmarked one passes too.
@@ -302,6 +347,7 @@ impl Emitter<'_> {
             Function {
                 name,
                 params,
+                omissions,
                 ret,
                 receiver,
             },
@@ -358,6 +404,7 @@ impl Emitter<'_> {
         self.current = Some(def_id);
         self.returns = ret.map_or(Returns::Void, Returns::Value);
         let mut params = Vec::with_capacity(function.params.len() + 2);
+        let mut param_names = Vec::with_capacity(function.params.len());
         if self.arena {
             params.push("faber_arena *faber_a".to_owned());
         }
@@ -381,6 +428,7 @@ impl Emitter<'_> {
             let c_name = self.scope.claim(&prefixed_binding_name(kind, raw));
             self.need_class(ty);
             params.push(self.declare(ty, &c_name, true)?);
+            param_names.push(c_name.clone());
             self.locals.insert(
                 param.def_id,
                 Local {
@@ -399,6 +447,14 @@ impl Emitter<'_> {
         // still declares it, so the parameter is marked used.
         if self.arena && !crate::mentions_arena(&body) {
             body.insert_str(0, "    (void)faber_a;\n");
+        }
+        // A parameter the body never reads is still declared (an `optional`
+        // slot a callee ignores is one); mark it used so
+        // `-Werror=unused-parameter` stays quiet.
+        for name in param_names {
+            if !crate::mentions_name(&body, &name) {
+                body.insert_str(0, &format!("    (void){name};\n"));
+            }
         }
         // Typecheck proves every path of a function with a result returns; C
         // cannot always see that (`-Wreturn-type`), so a body that does not end

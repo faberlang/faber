@@ -8,6 +8,7 @@
 use crate::Emitter;
 use crate::error::unsupported;
 use crate::expr::{Operand, Value, c_string, wrap};
+use crate::helpers::Helper;
 use crate::ty::{Inner, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{HirExpression, HirExpressionKind, HirLiteral};
@@ -22,8 +23,14 @@ impl Emitter<'_> {
         subject: &HirExpression,
         kind: &radix_hir::HirOptionalChainKind,
     ) -> Result<Operand, CodegenError> {
-        let radix_hir::HirOptionalChainKind::Member(name) = kind else {
-            return Err(unsupported("optional chaining other than a member"));
+        let name = match kind {
+            radix_hir::HirOptionalChainKind::Member(name) => name,
+            radix_hir::HirOptionalChainKind::Index(index) => {
+                return self.optional_index(subject, index);
+            }
+            radix_hir::HirOptionalChainKind::Call(_) => {
+                return Err(unsupported("optional call chaining"));
+            }
         };
         let base = self.expr(subject)?;
         // A genus that is not optional is always present: the chain is then
@@ -55,6 +62,64 @@ impl Emitter<'_> {
             base.text, none.text, present.text
         );
         Ok(Operand::new(text, Value::Opt(inner)).with_effect(base.effect))
+    }
+
+    /// `list?[i]`: the element at `i` as an optional, none past either end
+    /// (the list's `get`).
+    fn optional_index(
+        &mut self,
+        subject: &HirExpression,
+        index: &HirExpression,
+    ) -> Result<Operand, CodegenError> {
+        let list = self.expr(subject)?;
+        let Value::List(elem) = list.value else {
+            return Err(unsupported("optional index over a value that is not a list"));
+        };
+        let at = self.expr(index)?;
+        if !matches!(at.value, Value::Int | Value::Exact) {
+            return Err(unsupported("list position that is not an integer"));
+        }
+        let Some(inner) = Inner::from_ty(elem.ty()) else {
+            return Err(unsupported("optional index over a list of this element class"));
+        };
+        let effect = list.effect || at.effect;
+        let mut operands = [list, at];
+        let prelude = self.sequence(&mut operands);
+        let [list, at] = operands;
+        self.support
+            .need(Helper::List(elem, crate::helpers::ListOp::At));
+        self.need_class(Ty::Opt(inner));
+        let slot = format!("faber_o{}", self.temps);
+        let call = format!(
+            "faber_list_{}_get({}, {}, &{slot})",
+            elem.suffix(),
+            list.text,
+            at.text
+        );
+        let operand = self.optional_call(elem, inner, &slot, call);
+        Ok(Operand::new(wrap(&prelude, &operand.text), operand.value).with_effect(effect))
+    }
+
+    /// `x![i]`: the assertion has run in `unwrap`; what is left is the
+    /// plain index read on what it left.
+    pub(crate) fn asserted_index(
+        &mut self,
+        base: Operand,
+        index: &HirExpression,
+    ) -> Result<Operand, CodegenError> {
+        if base.value == Value::Text {
+            return self.text_index(base, index);
+        }
+        if let Value::List(elem) = base.value {
+            let position = self.expr(index)?;
+            if !matches!(position.value, Value::Int | Value::Exact) {
+                return Err(unsupported("list index that is not an integer"));
+            }
+            return Ok(self.list_at_operands(base, position, elem));
+        }
+        Err(unsupported(
+            "non-null assertion followed by an index on this class",
+        ))
     }
 
     /// The `null` literal, given the optional class typecheck assigned it.

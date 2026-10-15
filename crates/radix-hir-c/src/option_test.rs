@@ -65,3 +65,45 @@ fn a_creo_hook_runs_on_the_finished_object() {
     let hook = code.find("g_Box_creo(faber_a, faber_t").expect("hook call");
     assert!(set < hook, "{code}");
 }
+
+#[test]
+fn a_sponte_parameter_is_the_optional_of_its_declared_type() {
+    // The bare `optional` slot: the C storage is the optional, a body read
+    // keeps the none (the runner holds the omitted nil for coalesce), and an
+    // omitted call passes none.
+    let code = emitted(
+        "fn pick(int x optional) → int {\n    return x coalesce 3\n}\nmain {\n    print pick()\n    print pick(9)\n}",
+    );
+    assert!(code.contains("faber_opt_i64 p_x"), "{code}");
+    assert!(code.contains("faber_c0.has ? faber_c0.value : INT64_C(3)"), "{code}");
+    assert!(code.contains("f_pick(((faber_opt_i64){0}))"), "{code}");
+    assert!(code.contains("f_pick(((faber_opt_i64){1, INT64_C(9)}))"), "{code}");
+}
+
+#[test]
+fn an_optional_coalesce_parameter_keeps_its_declared_type() {
+    // `optional coalesce <expr>`: the call site runs the default, so the
+    // parameter is the plain declared type and the body adds without a none.
+    let code = emitted(
+        "fn page(int n optional coalesce 1) → int {\n    return n + 1\n}\nmain {\n    print page()\n    print page(7)\n}",
+    );
+    assert!(code.contains("f_page(int64_t p_n)"), "{code}");
+    assert!(code.contains("f_page(INT64_C(1))"), "{code}");
+    assert!(code.contains("f_page(INT64_C(7))"), "{code}");
+}
+
+#[test]
+fn an_assertion_index_reads_the_element() {
+    let code = emitted(
+        "main {\n    const list<string, 3> xs ← [\"a\", \"b\", \"c\"]\n    print xs![0]\n}",
+    );
+    assert!(code.contains("faber_list_text_at("), "{code}");
+}
+
+#[test]
+fn a_sponte_parameter_that_is_ignored_is_marked_used() {
+    let code = emitted(
+        "fn greet(string nomen, string titulus optional) → string {\n    return nomen\n}\nmain {\n    print greet(\"a\")\n}",
+    );
+    assert!(code.contains("(void)p_titulus;"), "{code}");
+}

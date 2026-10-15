@@ -59,6 +59,7 @@ impl Emitter<'_> {
                     name: field_name,
                     ty: classify(self.types, field.ty)?,
                     default: None,
+                    sponte: false,
                 });
             }
             fields.extend(own.iter().cloned());

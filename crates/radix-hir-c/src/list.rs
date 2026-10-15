@@ -153,6 +153,17 @@ impl Emitter<'_> {
         if !matches!(position.value, Value::Int | Value::Exact) {
             return Err(unsupported("list index that is not an integer"));
         }
+        Ok(self.list_at_operands(list, position, elem))
+    }
+
+    /// The checked element read from already-evaluated list and position
+    /// operands. Shared by the plain read and the `x![i]` assertion read.
+    pub(crate) fn list_at_operands(
+        &mut self,
+        list: Operand,
+        position: Operand,
+        elem: Elem,
+    ) -> Operand {
         let effect = list.effect || position.effect;
         let mut operands = [list, position];
         let prelude = self.sequence(&mut operands);
@@ -171,7 +182,7 @@ impl Emitter<'_> {
         } else {
             text
         };
-        Ok(Operand::new(text, Value::from(elem.ty())).with_effect(effect))
+        Operand::new(text, Value::from(elem.ty())).with_effect(effect)
     }
 
     /// `xs[i] ← value` as a statement line.
@@ -497,7 +508,7 @@ impl Emitter<'_> {
 
     /// An optional element read: `call` fills the slot named `slot` and says
     /// whether there was one.
-    fn optional_call(&mut self, elem: Elem, inner: Inner, slot: &str, call: String) -> Operand {
+    pub(crate) fn optional_call(&mut self, elem: Elem, inner: Inner, slot: &str, call: String) -> Operand {
         self.temps += 1;
         let c_type = elem.c_type();
         let text = match inner.scalar_struct() {

@@ -11,6 +11,7 @@
 use crate::Emitter;
 use crate::error::unsupported;
 use crate::helpers::Helper;
+use crate::items::Omission;
 use crate::ty::{Elem, Inner, IntWidth, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{
@@ -168,6 +169,7 @@ impl Emitter<'_> {
                 // present; the cell is still the optional.
                 if let (Value::Opt(inner), Some(ty)) = (operand.value, expr.ty)
                     && classify(self.types, ty).is_ok_and(|class| class == inner.ty())
+                    && !self.sponte_params.contains(def_id)
                 {
                     return Ok(Self::narrow_read(&operand, inner));
                 }
@@ -181,7 +183,8 @@ impl Emitter<'_> {
                 match kind {
                     radix_hir::HirNonNullKind::Value => Ok(unwrapped),
                     radix_hir::HirNonNullKind::Member(name) => self.field_from(&unwrapped, *name),
-                    _ => Err(unsupported("non-null assertion followed by an index")),
+                    radix_hir::HirNonNullKind::Index(index) => self.asserted_index(unwrapped, index),
+                    _ => Err(unsupported("non-null assertion followed by a call")),
                 }
             }
             HirExpressionKind::Literal(literal) => {
@@ -401,7 +404,12 @@ impl Emitter<'_> {
         let Some(function) = self.functions.get(&def_id) else {
             return Err(unsupported("call to a function outside the program"));
         };
-        let (name, params, ret) = (function.name.clone(), function.params.clone(), function.ret);
+        let (name, params, omissions, ret) = (
+            function.name.clone(),
+            function.params.clone(),
+            function.omissions.clone(),
+            function.ret,
+        );
         // A call from a function to itself is no use: a function only it
         // calls is as unused as one nothing calls.
         if self.current != Some(def_id) {
@@ -410,34 +418,55 @@ impl Emitter<'_> {
         if receiver.is_some() != function.receiver.is_some() {
             return Err(unsupported("method called without a receiver"));
         }
-        if args.len() != params.len() {
+        if args.len() > params.len() {
             return Err(unsupported("call with omitted or extra arguments"));
         }
-        let mut operands = Vec::with_capacity(args.len() + 1);
+        let mut operands = Vec::with_capacity(params.len() + 1);
         operands.extend(receiver);
-        for (arg, param) in args.iter().zip(params) {
-            if arg.name.is_some() || arg.spread {
-                return Err(unsupported("named or spread argument"));
-            }
+        for (index, param) in params.iter().enumerate() {
+            // What fills this argument slot: a given argument, the
+            // parameter's default, or none. The runner fills a default at
+            // the call site (`lower_direct_call_args`), so the same
+            // evaluation happens here, in the caller.
+            let (expr, marker) = match args.get(index) {
+                Some(arg) => {
+                    if arg.name.is_some() || arg.spread {
+                        return Err(unsupported("named or spread argument"));
+                    }
+                    (Some(&arg.expr), arg.marker)
+                }
+                None => match &omissions[index] {
+                    Omission::Required => {
+                        return Err(unsupported("call with omitted or extra arguments"))
+                    }
+                    Omission::Default(default) => (Some(default), None),
+                    Omission::Omitted => (None, None),
+                },
+            };
             let list_view = matches!(
-                arg.marker,
+                marker,
                 Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
             ) && matches!(param, Ty::List(_) | Ty::Genus(_));
-            if arg.marker.is_some() && !list_view {
+            if marker.is_some() && !list_view {
                 return Err(unsupported(
                     "access marker on an argument that is not a list or genus",
                 ));
             }
-            let mut operand = self.expr(&arg.expr)?;
+            let Some(expr) = expr else {
+                operands.push(self.none_of(*param)?);
+                continue;
+            };
+            let mut operand = self.expr(expr)?;
             // An argument carries no store node in HIR, but the runner checks
             // it as a store and names it `argument`; the C target does the same.
             if let Ty::Sized(width) = param {
+                let width = *width;
                 if matches!(operand.value, Value::Int | Value::Exact)
-                    && operand.stored != Some(param)
+                    && operand.stored != Some(*param)
                 {
                     operand = self.store_sized(&operand, width, "\"argument\"");
                 }
-            } else if operand.value == Value::Exact && param == Ty::Int {
+            } else if operand.value == Value::Exact && *param == Ty::Int {
                 if operand.constant.is_some() {
                     return Err(unsupported("integer constant beyond i64"));
                 }
@@ -447,9 +476,9 @@ impl Emitter<'_> {
             }
             // A present value passed to an optional parameter is wrapped.
             if matches!(param, Ty::Opt(_)) {
-                operand = self.settle(operand, param)?;
+                operand = self.settle(operand, *param)?;
             }
-            if operand.value != Value::from(param) {
+            if operand.value != Value::from(*param) {
                 return Err(unsupported("value stored without a store check"));
             }
             operands.push(operand);

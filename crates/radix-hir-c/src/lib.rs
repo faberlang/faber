@@ -158,6 +158,7 @@ impl CCodegen<'_> {
             shows: Vec::new(),
             variants: FxHashMap::default(),
             equals: Vec::new(),
+            sponte_params: FxHashSet::default(),
         }
         .program(hir)
     }
@@ -209,6 +210,10 @@ pub(crate) struct Emitter<'a> {
     variants: FxHashMap<DefId, (DefId, usize)>,
     /// Enumerations whose structural equality function was asked for.
     equals: Vec<DefId>,
+    /// Parameters declared `optional` with no default: their C storage is the
+    /// optional of the declared type, but the HIR type is the payload, so a
+    /// body read must not be guard-narrowed (the runner keeps the none).
+    sponte_params: FxHashSet<DefId>,
 }
 
 /// One local, parameter or module constant, by its C identifier.
@@ -311,8 +316,14 @@ impl Emitter<'_> {
 /// True when emitted C reads the hidden arena `faber_a` (as a name, not as
 /// the prefix of a helper such as `faber_add`).
 pub(crate) fn mentions_arena(text: &str) -> bool {
-    text.match_indices("faber_a").any(|(at, _)| {
-        !text[at + "faber_a".len()..]
+    mentions_name(text, "faber_a")
+}
+
+/// Whether `text` reads `name` as a whole identifier (not as the prefix of a
+/// longer one, which the namer can produce for a collision).
+pub(crate) fn mentions_name(text: &str, name: &str) -> bool {
+    text.match_indices(name).any(|(at, _)| {
+        !text[at + name.len()..]
             .chars()
             .next()
             .is_some_and(|next| next == '_' || next.is_ascii_alphanumeric())
