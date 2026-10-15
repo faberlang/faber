@@ -361,7 +361,7 @@ fn aggregate_construction_names_gap() {
             kind: MirStatementKind::Construct {
                 destination: MirPlace::local(MirLocalId(0)),
                 aggregate: MirAggregate {
-                    kind: MirAggregateKind::Tuple,
+                    kind: MirAggregateKind::Tensor,
                     ty: numerus,
                     fields: MirAggregateFields::Ordered(Vec::new()),
                 },
@@ -377,7 +377,7 @@ fn aggregate_construction_names_gap() {
 
     let verdict = classify_with_types(&program, &types);
     assert_eq!(verdict.gaps().len(), 1);
-    assert_eq!(verdict.gaps()[0].shape(), "tuple construction");
+    assert_eq!(verdict.gaps()[0].shape(), "device construction");
 }
 
 #[test]
