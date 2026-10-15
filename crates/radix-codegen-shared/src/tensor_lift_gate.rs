@@ -289,7 +289,8 @@ fn lifted_form(
         }
         // `≡ ≢` between two tensors compare whole values: one verdict, gated
         // under its own issue. The TypeScript emitter compares shape then
-        // elements itself, so that target is exempt from this family only.
+        // elements itself and the Rust runtime has `Tensor::aequalis`, so those
+        // targets are exempt from this family only.
         HirExpressionKind::Binary(
             op @ (HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::NotEq | HirBinOp::StrictNotEq),
             lhs,
@@ -297,7 +298,7 @@ fn lifted_form(
         ) => {
             tensor_element(types, lhs.ty)?;
             tensor_element(types, rhs.ty)?;
-            if matches!(target, Target::HirTypeScript) {
+            if matches!(target, Target::HirTypeScript | Target::HirRust) {
                 return None;
             }
             let spelling = if matches!(op, HirBinOp::Eq | HirBinOp::StrictEq) {
