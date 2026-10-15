@@ -186,6 +186,23 @@ impl TypeChecker<'_> {
                 // annotation's named size terms instead of failing the check.
                 let prev_store_expr = self.current_store_expr.replace(init.id);
                 let init_ty = self.check_store_expr(init, *ty, site);
+                if self
+                    .tensor_edge_policies
+                    .shifted_expressions
+                    .contains(&init.id)
+                {
+                    let resolved_ty = self.resolve_inferred_type(*ty);
+                    if let Type::Tensor(element, _) = self.types.get(resolved_ty) {
+                        let element = *element;
+                        let resolved_element = self.resolve_inferred_type(element);
+                        if !matches!(self.types.get(resolved_element), Type::Option(_)) {
+                            self.invalid_operand_types(
+                                super::intrinsics::ISSUE_TENSOR_EDGE_VIEW_REQUIRES_RESOLUTION,
+                                init.span,
+                            );
+                        }
+                    }
+                }
                 // Z1: an annotated declaration store folds static
                 // `const size` values into its affine extents; a provably
                 // negative extent fails the size lift at this store.
