@@ -5,12 +5,6 @@
       "phase": "run",
       "diagnostic_contains": "invalid MIR: destination type mismatch",
       "reason": "The runner rejects the async fs read wrappers during MIR lowering: the solum:lege calls behind read_file_async<textus> fail to type their MIR destination, the same runner gap pinned for corpus/ad/async-solum-leget.fab."
-    },
-    "rust": {
-      "outcome": "known-fail",
-      "phase": "run",
-      "diagnostic_contains": "failable call failed: IoFault.InvalidArgument",
-      "reason": "The generated Rust leaf dispatch converts the solum:funde octeti argument of write_bytes_async to a numeric list, so it panics with IoFault.InvalidArgument; the remaining async fs routes pass before that call."
     }
   }
 }
