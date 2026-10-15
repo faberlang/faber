@@ -19,6 +19,16 @@ use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
 
+/// Message carried by a [`MirGenericError`] when a substituted type has no
+/// interned semantic identity yet.
+///
+/// The read-only existing-type instantiation helpers cannot intern the missing
+/// type themselves, so they report this message. Callers that can intern (the
+/// monomorphizer's finalize pass) recognize it through
+/// [`MirGenericError::is_missing_metadata`] and defer instead of failing.
+pub const MISSING_SEMANTIC_METADATA: &str =
+    "instantiated generic type is missing semantic metadata";
+
 pub type MirGenericBindings = FxHashMap<Symbol, MirType>;
 
 /// Shape-param bindings (`magnitudo N`) parallel to [`MirGenericBindings`].
@@ -40,6 +50,14 @@ impl MirGenericError {
             message: message.into(),
             span,
         }
+    }
+
+    /// Whether this error is the deferred-interning signal
+    /// [`MISSING_SEMANTIC_METADATA`]: the substituted type is well formed but
+    /// not yet interned in the caller's table.
+    #[must_use]
+    pub fn is_missing_metadata(&self) -> bool {
+        self.message == MISSING_SEMANTIC_METADATA
     }
 }
 
@@ -1350,12 +1368,9 @@ fn find_existing_type(
     span: Span,
     index: &ExistingTypeIndex,
 ) -> Result<TypeId, MirGenericError> {
-    index.find(types, candidate).ok_or_else(|| {
-        MirGenericError::new(
-            span,
-            "instantiated generic type is missing semantic metadata",
-        )
-    })
+    index
+        .find(types, candidate)
+        .ok_or_else(|| MirGenericError::new(span, MISSING_SEMANTIC_METADATA))
 }
 
 // ---------------------------------------------------------------------------
@@ -1455,12 +1470,7 @@ fn find_existing_index(
     (0..types.index_count())
         .map(index_id_at)
         .find(|id| index_expr_matches(types, *id, candidate))
-        .ok_or_else(|| {
-            MirGenericError::new(
-                span,
-                "instantiated generic type is missing semantic metadata",
-            )
-        })
+        .ok_or_else(|| MirGenericError::new(span, MISSING_SEMANTIC_METADATA))
 }
 
 fn index_expr_matches(types: &TypeTable, id: IndexId, candidate: &IndexExpr) -> bool {
