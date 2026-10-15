@@ -7,15 +7,16 @@ use super::*;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
     MirBlockId, MirCallee, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirGradientOp,
-    MirIntrinsic, MirLocal, MirLocalId, MirNamedOperand, MirOperand, MirParam, MirParamMode,
-    MirPlace, MirPlaceBase, MirProgram, MirProjection, MirRuntimeCall, MirStatement,
-    MirStatementKind, MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue,
-    MirValueId, MirValueKind,
+    MirIntrinsic, MirLocal, MirLocalId, MirNamedOperand, MirOperand, MirOptionChainLink,
+    MirOptionOp, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection,
+    MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase, MirTerminator,
+    MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
 };
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_types::{
-    AppliedArg, IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable,
+    AppliedArg, FuncSig, IndexExpr, NumericWidth, ParamType, Primitive, RuntimeExtentId,
+    SemanticParamMode, Type, TypeId, TypeTable,
 };
 use rustc_hash::FxHashMap;
 
@@ -5928,5 +5929,196 @@ fn matrix_receiver_coordinate_get_and_set_validate() {
     assert!(
         errors.is_empty(),
         "a matrix receiver must admit the tensor coordinate read/write, got: {errors:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// Optional-chain call links
+// -----------------------------------------------------------------------
+
+/// Build a one-function program whose block assigns an optional chain call to
+/// a result local: `result ← base?.call(args)`.
+fn option_chain_call_program(
+    types: &mut TypeTable,
+    base_ty: MirType,
+    result_ty: MirType,
+    callee: MirCallee,
+    args: Vec<MirOperand>,
+) -> MirProgram {
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    ty: base_ty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    ty: result_ty,
+                    name: None,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace::local(MirLocalId(1)),
+                        value: MirValue {
+                            id: MirValueId(0),
+                            ty: result_ty,
+                            kind: MirValueKind::Option(MirOptionOp::Chain {
+                                base: MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                                link: MirOptionChainLink::Call { callee, args },
+                            }),
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: MirType::semantic(types.primitive(Primitive::Vacuum)),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
+/// `?.` on an `(int) → int` value must unwrap the option before resolving the
+/// callee's signature; the old path looked the signature up on `Option<Func>`
+/// and reported "value callee is not callable".
+#[test]
+fn option_chain_call_value_callee_unwraps_option() {
+    let mut types = TypeTable::new();
+    let int = types.primitive(Primitive::Numerus);
+    let fn_ty = types.intern(Type::Func(FuncSig {
+        type_params: Vec::new(),
+        params: vec![ParamType {
+            ty: int,
+            mode: SemanticParamMode::Owned,
+            optional: false,
+            sponte: false,
+        }],
+        ret: int,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    }));
+    let option_fn = MirType::semantic(types.option(fn_ty));
+    let option_int = MirType::semantic(types.option(int));
+    let program = option_chain_call_program(
+        &mut types,
+        option_fn,
+        option_int,
+        MirCallee::Value(MirOperand::Place(MirPlace::local(MirLocalId(0)))),
+        vec![MirOperand::Constant(MirConstant::Int(5))],
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "an optional function value must be callable through ?., got: {errors:?}"
+    );
+}
+
+/// A method called through `?.` gets its receiver from the chain base, so the
+/// self-first MIR signature must drop the receiver before argument checking.
+#[test]
+fn option_chain_call_method_callee_skips_receiver_param() {
+    let mut types = TypeTable::new();
+    let string = types.primitive(Primitive::Textus);
+    let int = types.primitive(Primitive::Numerus);
+    let option_string = MirType::semantic(types.option(string));
+    let option_int = MirType::semantic(types.option(int));
+    let program = option_chain_call_program(
+        &mut types,
+        option_string,
+        option_int,
+        MirCallee::definition(DefId(7)),
+        vec![MirOperand::Constant(MirConstant::Int(5))],
+    );
+    let mut context = MirValidationContext::new(&types);
+    context.functions.insert(
+        DefId(7),
+        MirFunctionSignature {
+            params: vec![
+                MirParamSignature {
+                    ty: MirType::semantic(string),
+                    optional: false,
+                },
+                MirParamSignature {
+                    ty: MirType::semantic(int),
+                    optional: false,
+                },
+            ],
+            return_ty: MirType::semantic(int),
+            error_ty: None,
+        },
+    );
+    context.method_defs.insert(DefId(7));
+    let errors = validate_with(&program, &context);
+    assert!(
+        errors.is_empty(),
+        "a method called through ?. must not count the chain base as a receiver argument, got: {errors:?}"
+    );
+}
+
+/// The receiver exemption must not swallow arity checking: with no arguments
+/// the remaining `int` parameter is still required.
+#[test]
+fn option_chain_call_method_callee_arity_still_checked() {
+    let mut types = TypeTable::new();
+    let string = types.primitive(Primitive::Textus);
+    let int = types.primitive(Primitive::Numerus);
+    let option_string = MirType::semantic(types.option(string));
+    let option_int = MirType::semantic(types.option(int));
+    let program = option_chain_call_program(
+        &mut types,
+        option_string,
+        option_int,
+        MirCallee::definition(DefId(7)),
+        vec![],
+    );
+    let mut context = MirValidationContext::new(&types);
+    context.functions.insert(
+        DefId(7),
+        MirFunctionSignature {
+            params: vec![
+                MirParamSignature {
+                    ty: MirType::semantic(string),
+                    optional: false,
+                },
+                MirParamSignature {
+                    ty: MirType::semantic(int),
+                    optional: false,
+                },
+            ],
+            return_ty: MirType::semantic(int),
+            error_ty: None,
+        },
+    );
+    context.method_defs.insert(DefId(7));
+    let errors = validate_with(&program, &context);
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.contains("call argument count mismatch")),
+        "a method call through ?. must still require its non-receiver arguments, got: {errors:?}"
     );
 }
