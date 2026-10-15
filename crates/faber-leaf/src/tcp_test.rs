@@ -102,7 +102,9 @@ fn plaintext_echo_round_trips() {
 fn hold_guard_and_bump(counter: &std::sync::atomic::AtomicUsize) {
     let _guard = crate::test_support::handle_table_guard();
     assert!(
-        counter.load(std::sync::atomic::Ordering::SeqCst).is_multiple_of(2),
+        counter
+            .load(std::sync::atomic::Ordering::SeqCst)
+            .is_multiple_of(2),
         "another test held the guard concurrently"
     );
     thread::yield_now();
