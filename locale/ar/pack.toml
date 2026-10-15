@@ -252,6 +252,14 @@ help = "أغلق حرفية السلسلة قبل نهاية السطر أو ا�
 message = "حرفية octeti غير مغلقة"
 help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
 
+[diagnostics.LEX001.issues.unterminated_regex_literal]
+message = "حرفية regex غير مغلقة"
+help = "أغلق حرفية regex قبل نهاية السطر أو الملف"
+
+[diagnostics.LEX001.issues.empty_regex_literal]
+message = "حرفية regex فارغة؛ اكتب نمطا بين الشرطتين المائلتين"
+help = "اكتب نمطا بين الشرطتين المائلتين"
+
 [diagnostics.LEX001.issues.unterminated_string_literal]
 message = "حرفية سلسلة غير مغلقة"
 help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
@@ -2604,6 +2612,10 @@ help = "حول element widths صراحة قبل تغيير representation"
 message = "propagating conversio failure يتطلب alternate-exit channel من نوع `{textus}`"
 help = "صرح alternate-exit channel كـ {textus} أو قدم inline recovery"
 
+[diagnostics.SEM016.issues.conversio_failure_channel_value_required]
+message = "نشر فشل materialization لـ sermo يتطلب alternate-exit channel من نوع `value`"
+help = "صرح alternate-exit channel كـ value أو unknown أو تحويل value مسجل"
+
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "{regex} conversion يتطلب {textus} أو {ascii} operand"
 help = "حول {textus} أو {ascii} values إلى {regex}"
@@ -3675,9 +3687,21 @@ message = "مطلوب مصدر الاختزال بعد معامل الاختزا
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "مطلوب '{lege}' أو '{lineam}'"
 
+[diagnostics.PARSE001.issues.expected_identifier]
+message = "مطلوب معرّف"
+help = "ضع اسم معرّف هنا"
+
+[diagnostics.PARSE001.issues.expected_string_literal]
+message = "مطلوب حرفية سلسلة"
+help = "ضع حرفية سلسلة بين علامتي تنصيص هنا"
+
 [diagnostics.PARSE001.issues.expected_mutability_keyword]
 message = "مطلوب '{fixum}' أو '{varia}'"
 help = "ابدأ التعريف بكلمة مفتاحية للقابلية للتغيير"
+
+[diagnostics.PARSE001.issues.await_binding_requires_name]
+message = "مطلوب ربط مسمّى قبل '↢'"
+help = "اربط '↢' باسم واحد؛ التفكيك يستخدم '←'"
 
 [diagnostics.PARSE001.issues.expected_method_declaration]
 message = "مطلوب تصريح دالة"
@@ -3687,6 +3711,10 @@ help = "اكتب الدالة كتصريح '{functio}'"
 message = "مطلوب خطاف '{praepara}'"
 help = "اكتب '{praepara}' أو '{praeparabit}' أو '{postpara}' أو '{postparabit}'"
 
+[diagnostics.PARSE001.issues.expected_lane_value]
+message = "مطلوب حرفية سلسلة أو معرّف"
+help = "اكتب قيمة lane كسلسلة بين علامتي تنصيص أو كاسم مجرد"
+
 [diagnostics.PARSE001.issues.expected_scribe_keyword]
 message = "مطلوب كلمة مفتاحية '{scribe}'"
 help = "اكتب '{scribe}' أو '{vide}' أو '{mone}' أو '{nota}'"
@@ -3694,6 +3722,14 @@ help = "اكتب '{scribe}' أو '{vide}' أو '{mone}' أو '{nota}'"
 [diagnostics.PARSE001.issues.expected_incipit_keyword]
 message = "مطلوب '{incipit}' أو '{incipiet}'"
 help = "ابدأ نقطة الدخول بـ '{incipit}' أو '{incipiet}'"
+
+[diagnostics.PARSE001.issues.enum_member_value_number]
+message = "مطلوب رقم بعد '='"
+help = "اكتب عددا صحيحا بعد '=' أو أزل '='"
+
+[diagnostics.PARSE001.issues.enum_member_value]
+message = "مطلوب قيمة عضو enum"
+help = "اكتب عددا صحيحا أو سلسلة بعد '='"
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "مطلوب قوس فتح لجسم elige"
