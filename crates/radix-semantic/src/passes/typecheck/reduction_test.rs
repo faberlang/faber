@@ -322,6 +322,58 @@ functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
 }
 
 #[test]
+fn axis_reduction_named_modular_local_uses_the_reduced_value() {
+    // `modulus<u8>` stores 256 as 0, so the axis is 0 and the result is [3].
+    assert_accepts(
+        r"
+functio cols(tensor<f32, [2, 3]> g) → tensor<f32, [3]> {
+    fixum modulus<u8> k ← 256
+    redde g.summa(axis k)
+}
+",
+    );
+}
+
+#[test]
+fn axis_reduction_named_saturating_local_uses_the_clamped_value() {
+    // `saturatus<u8>` stores 300 as 255, which is no axis of a rank-two tensor.
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
+    fixum saturatus<u8> k ← 300
+    redde g.summa(axis k)
+}
+",
+        "axis_reduction_out_of_range",
+    );
+}
+
+#[test]
+fn axis_reduction_named_modular_local_in_range_keeps_its_value() {
+    assert_accepts(
+        r"
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
+    fixum modulus<u8> k ← 1
+    redde g.summa(axis k)
+}
+",
+    );
+}
+
+#[test]
+fn axis_reduction_named_local_chained_through_another_local() {
+    assert_accepts(
+        r"
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> {
+    fixum numerus a ← 1
+    fixum numerus k ← a
+    redde g.summa(axis k)
+}
+",
+    );
+}
+
+#[test]
 fn axis_reduction_named_float_local_is_not_a_constant_axis() {
     assert_rejects_with_issue(
         r"
