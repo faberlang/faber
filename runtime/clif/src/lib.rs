@@ -14,6 +14,8 @@
 //! what a `static` demands.
 
 mod dec;
+mod format_rt;
+mod format_spec;
 mod inf;
 mod ins;
 #[allow(dead_code, clippy::all, clippy::pedantic)]

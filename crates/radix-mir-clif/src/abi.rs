@@ -1031,6 +1031,12 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     INS_COMPARE,
     INS_BOX,
     INS_UNBOX,
+    FORMAT_INT,
+    FORMAT_FLOAT,
+    FORMAT_TEXT,
+    FORMAT_DEC,
+    FORMAT_INF,
+    FORMAT_INS,
 ];
 
 /// A stored `d64` carrier (scale 8) -> decimal handle.
@@ -1241,3 +1247,40 @@ pub const TEXT_HEADER: usize = 8;
 
 /// The program entry the runtime calls (exported by generated code).
 pub const PROGRAM_INCIPIT: &str = "faber_clif_incipit";
+
+/// `value ¶ "spec"` over an integer: (low half, high half, spec text) -> text.
+pub const FORMAT_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_format_int",
+    params: &[I64, I64, Ptr],
+    ret: Some(Ptr),
+};
+/// `value ¶ "spec"` over a float: (value, f32 flag, spec text) -> text.
+pub const FORMAT_FLOAT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_format_float",
+    params: &[F64, I32, Ptr],
+    ret: Some(Ptr),
+};
+/// `value ¶ "spec"` over a text: (text, spec text) -> text.
+pub const FORMAT_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_format_text",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// `value ¶ "spec"` over a decimal: (decimal, spec text) -> text.
+pub const FORMAT_DEC: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_format_dec",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// `value ¶ "spec"` over an inf: (inf, spec text) -> text.
+pub const FORMAT_INF: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_format_inf",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// `value ¶ "spec"` over an instant preset: (instant, spec text) -> text.
+pub const FORMAT_INS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_format_ins",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};

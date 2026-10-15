@@ -1521,6 +1521,36 @@ pub(crate) fn member_tests(table: &TypeTable, target: TypeId) -> Option<Vec<Memb
 }
 
 impl FunctionLower<'_, '_> {
+    /// `value ¶ "spec"`: the operand's rep picks the renderer, the spec
+    /// travels as a text and is parsed by the runtime.
+    pub(super) fn format_value(
+        &mut self,
+        spec: radix_lexer::Symbol,
+        operand: &MirOperand,
+    ) -> Lowered<Value> {
+        let narrow = self.float_narrow(operand);
+        let (value, rep) = self.scalar_wide(operand)?;
+        let text = self.state.input.interner.resolve(spec).to_owned();
+        let spec = self.text_literal(text.as_bytes())?;
+        let rendered = match rep {
+            Rep::Int => {
+                let wide = self.widen(value);
+                let (low, high) = self.split_wide(wide);
+                self.call_runtime(&abi::FORMAT_INT, &[low, high, spec])?
+            }
+            Rep::Float => {
+                let narrow = self.builder.ins().iconst(types::I32, narrow);
+                self.call_runtime(&abi::FORMAT_FLOAT, &[value, narrow, spec])?
+            }
+            Rep::Text => self.call_runtime(&abi::FORMAT_TEXT, &[value, spec])?,
+            Rep::Dec => self.call_runtime(&abi::FORMAT_DEC, &[value, spec])?,
+            Rep::Inf => self.call_runtime(&abi::FORMAT_INF, &[value, spec])?,
+            Rep::Ins => self.call_runtime(&abi::FORMAT_INS, &[value, spec])?,
+            _ => return Err(Decline::new("format of this value")),
+        };
+        rendered.ok_or_else(|| Decline::new("format result"))
+    }
+
     /// `x est T` / `x non est T` over a boxed union payload.
     pub(super) fn type_check(
         &mut self,

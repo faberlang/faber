@@ -628,6 +628,7 @@ impl MirVisitor for ClifCapability<'_> {
             || matches!(
                 call.intrinsic,
                 MirIntrinsic::FormatString { .. }
+                    | MirIntrinsic::FormatValue { .. }
                     | MirIntrinsic::CursorStream(_)
                     | MirIntrinsic::Assert
                     | MirIntrinsic::Panic

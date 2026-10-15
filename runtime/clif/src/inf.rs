@@ -20,6 +20,15 @@ unsafe fn big<'a>(handle: *const u8) -> &'a Magnus {
     unsafe { &*handle.cast::<Magnus>() }
 }
 
+/// The bignum behind an inf handle.
+///
+/// # Safety
+///
+/// `handle` came from this module.
+pub(crate) unsafe fn magnus<'a>(handle: *const u8) -> &'a Magnus {
+    unsafe { big(handle) }
+}
+
 /// Order of two inf handles, for the element comparisons of the runtime.
 ///
 /// # Safety

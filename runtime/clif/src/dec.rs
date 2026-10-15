@@ -60,6 +60,13 @@ fn make(carrier: i128, scale: u32) -> *const u8 {
 /// # Safety
 ///
 /// `handle` came from this module.
+pub(crate) unsafe fn raw(handle: *const u8) -> (i128, u32) {
+    unsafe { parts(handle) }
+}
+
+/// # Safety
+///
+/// `handle` came from this module.
 unsafe fn parts(handle: *const u8) -> (i128, u32) {
     let dec = unsafe { &*handle.cast::<Dec>() };
     (dec.carrier, dec.scale)

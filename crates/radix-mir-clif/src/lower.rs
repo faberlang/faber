@@ -3710,6 +3710,13 @@ impl FunctionLower<'_, '_> {
                 };
                 self.format_string(destination, *template, &call.args)
             }
+            MirIntrinsic::FormatValue { spec } => {
+                let ([operand], Some(destination)) = (call.args.as_slice(), destination) else {
+                    return Err(Decline::new("format value shape"));
+                };
+                let rendered = self.format_value(*spec, operand)?;
+                self.define_result(destination, Some(rendered), Rep::Text)
+            }
             MirIntrinsic::Collection(MirCollectionOp::CordCursor) => {
                 let ([text], Some(destination)) = (call.args.as_slice(), destination) else {
                     return Err(Decline::new("cord cursor shape"));
@@ -3887,7 +3894,7 @@ impl FunctionLower<'_, '_> {
 
     /// `1` when the operand is a float narrower than `f64`: it displays at
     /// its own width.
-    fn float_narrow(&self, operand: &MirOperand) -> i64 {
+    pub(super) fn float_narrow(&self, operand: &MirOperand) -> i64 {
         let Ok(ty) = self.operand_type(operand) else {
             return 0;
         };
