@@ -153,7 +153,7 @@ impl MirRuntimeAbi {
                 MirRuntimeAbiKind::HostIntegration,
                 false,
             ),
-            MirIntrinsic::ReadLine => (
+            MirIntrinsic::ReadLine | MirIntrinsic::ReadAll => (
                 MirRuntimeAbiFamily::RuntimeReadLine,
                 MirRuntimeAbiKind::HostIntegration,
                 false,

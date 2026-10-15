@@ -130,7 +130,7 @@ pub(super) fn collect_runtime_call_requirement(
         | MirIntrinsic::VectorOp(_)
         | MirIntrinsic::Duplicate
         | MirIntrinsic::CursorStream(_) => {}
-        MirIntrinsic::ReadLine => {
+        MirIntrinsic::ReadLine | MirIntrinsic::ReadAll => {
             requirements.insert("host:stdin".to_owned());
         }
     }
