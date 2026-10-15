@@ -357,9 +357,6 @@ fn compile_package_ts(
     seams: &EmissionSeams,
 ) -> PackageCompileResult {
     #[cfg(not(feature = "hir-ts"))]
-    let _ = (package, seams);
-
-    #[cfg(not(feature = "hir-ts"))]
     return compile_failure(vec![
         crate::package_diagnostic_error(
             "target `ts` is not available in this faber build; rebuild with feature `hir-ts`",
