@@ -70,25 +70,25 @@ body.
 
 ```fab
 main {
-    for range 10‥0 step 4 const i {
+    for range 10‥0 step 4 let i {
         print i
     }
-    for range 1…2, 1…3 const row, col {
+    for range 1…2, 1…3 let row, col {
         print row * col
     }
 
     const list<int> price ← [4, 9, 2]
     const list<int> count ← [3, 1, 5]
     mut int bill ← 0
-    for from price, count const p, n {
+    for from price, count let p, n {
         bill ← bill + p * n
     }
     print bill
 
     const tf32[5] x ← [3.0, 1.0, 4.0, 1.0, 5.0] ↦ tf32[5]
     print reduce via max from x
-    print reduce via argmax from x at [i] const s { return s }
-    print reduce via count from x at [i] const s { return s ≻ 2.0 }
+    print reduce via argmax from x at [i] let s { return s }
+    print reduce via count from x at [i] let s { return s ≻ 2.0 }
 }
 ```
 
@@ -132,8 +132,8 @@ fn report(int a, int b) → string {
     }
     catch err {
         match err {
-            case ByZero const n { return "cannot divide § by zero"(n) }
-            case Negative const d { return "negative divisor §"(d) }
+            case ByZero let n { return "cannot divide § by zero"(n) }
+            case Negative let d { return "negative divisor §"(d) }
         }
     }
 }
