@@ -9,7 +9,6 @@ summary = "Attaches a description string to CLI metadata."
 syntax = "@ descriptio <string>"
 related = ["versio"]
 locale = "en"
-no_expected = "prints-nothing"
 +++
 
 # =============================================================================
@@ -32,7 +31,7 @@ no_expected = "prints-nothing"
 #   annotation :← '@' 'descriptio' stringLit
 #
 # EXPECTED OUTPUT:
-#   No incipit — declaration or test-runner surface only.
+#   none — the runner executes the entry and prints nothing; empty golden.
 #
 # BACKEND:
 #   declaration-only CLI metadata (whitelist: descriptio/descriptio.fab).

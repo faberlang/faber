@@ -9,7 +9,6 @@ summary = "Attaches a version string to a CLI root."
 syntax = "@ versio <string>"
 related = ["cli", "descriptio"]
 locale = "en"
-no_expected = "prints-nothing"
 +++
 
 # =============================================================================
@@ -32,7 +31,7 @@ no_expected = "prints-nothing"
 #   annotation :← '@' 'versio' stringLit
 #
 # EXPECTED OUTPUT:
-#   No incipit runtime — declaration-only CLI metadata.
+#   none — the runner executes the entry and prints nothing; empty golden.
 #
 # BACKEND:
 #   declaration-only CLI metadata (whitelist: meta/versio.fab).
