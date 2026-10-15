@@ -712,13 +712,22 @@ fn from_type_maps_collection_and_ml_families() {
 }
 
 #[test]
-fn tensor_octeti_is_dedicated_on_rust_and_declined_by_name_on_ts_go_sexp() {
+fn tensor_octeti_is_dedicated_on_rust_and_declined_by_name_on_go_sexp_and_ts_encode() {
     use ConversioCoverageTarget::{Go, Rust, Sexp, TypeScript};
     use ConversioTypeFamily::{Octeti, Tensor};
     for (src, tgt) in [(Tensor, Octeti), (Octeti, Tensor)] {
         assert_eq!(classify_conversio_coverage(src, tgt, Rust), ConversioCoverage::Dedicated);
-        for target in [TypeScript, Go, Sexp] {
+        for target in [Go, Sexp] {
             assert_eq!(classify_conversio_coverage(src, tgt, target), ConversioCoverage::NotEmitted);
         }
     }
+    // TypeScript reads bytes into a tensor and declines only the encode.
+    assert_eq!(
+        classify_conversio_coverage(Tensor, Octeti, TypeScript),
+        ConversioCoverage::NotEmitted
+    );
+    assert_ne!(
+        classify_conversio_coverage(Octeti, Tensor, TypeScript),
+        ConversioCoverage::NotEmitted
+    );
 }
