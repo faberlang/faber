@@ -4,6 +4,8 @@ group = "language"
 input_root = "corpus"
 input = "argumenta/argumenta-raw.fab"
 
+args = ["a", "b"]
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false
