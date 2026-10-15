@@ -490,7 +490,18 @@ fn cli_codegen_diagnostic(target: Target, name: &str, analysis: &AnalyzedModule)
         Target::HirGo => go_cli_codegen_diagnostic(name, cli_program),
         // TypeScript lowers the narrow CLI slice inside its own emitter; a
         // surface beyond the slice fails closed there with a stable issue.
-        Target::HirTypeScript => None,
+        // An unsupported `exitus` expression is reported early here so the
+        // diagnostic is identical to the Rust arm's CODEGEN004.
+        Target::HirTypeScript => {
+            if matches!(cli_program.exit, Some(crate::cli::CliExit::Unsupported)) {
+                return Some(codegen_diagnostic(
+                    name,
+                    "CODEGEN004",
+                    "CLI exitus code generation supports numeric literals, bindings, and args fields in Phase 03",
+                ));
+            }
+            None
+        }
         // Python lowers the narrow CLI slice inside its own emitter; a
         // surface beyond the slice fails closed there with a stable issue.
         Target::HirPython => None,
