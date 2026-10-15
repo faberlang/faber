@@ -802,6 +802,16 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         list->items[list->len++] = item;                                                \
     }                                                                                   \
                                                                                         \
+    /* `[1, spread xs, 4]`: append every element of `other` in order. */                 \
+    static inline void faber_list_##NAME##_push_all(faber_arena *arena,                 \
+                                                    faber_list_##NAME *list,            \
+                                                    const faber_list_##NAME *other) {   \
+        int64_t at;                                                                     \
+        for (at = 0; at < other->len; at++) {                                           \
+            faber_list_##NAME##_push(arena, list, other->items[at]);                    \
+        }                                                                               \
+    }                                                                                   \
+                                                                                        \
     static inline TYPE faber_list_##NAME##_at(const faber_list_##NAME *list,            \
                                               faber_i128 index) {                       \
         return list->items[faber_list_index(index, list->len)];                         \

@@ -90,6 +90,12 @@ impl Emitter<'_> {
         if elements.is_empty() {
             return self.empty_list(expr);
         }
+        if elements
+            .iter()
+            .any(|element| matches!(element, HirArrayElement::Spread(_)))
+        {
+            return self.list_spread_literal(elements, elem);
+        }
         let mut operands = Vec::with_capacity(elements.len());
         for element in elements {
             let HirArrayElement::Expr(value) = element else {
@@ -119,6 +125,57 @@ impl Emitter<'_> {
         );
         let operand = self.list_operand(wrap(&prelude, &call), elem);
         Ok(operand.with_effect(effect))
+    }
+
+    /// A list literal carrying a `spread`: the length is known only at run
+    /// time, so the list is built by pushing each element (a spread list
+    /// appends all of its elements) in source order into one statement
+    /// expression. The result is growable, as the runner's is.
+    fn list_spread_literal(
+        &mut self,
+        elements: &[HirArrayElement],
+        elem: Elem,
+    ) -> Result<Operand, CodegenError> {
+        let suffix = elem.suffix();
+        self.support.need(Helper::List(elem, ListOp::New));
+        self.support.need(Helper::List(elem, ListOp::Push));
+        let target = format!("faber_t{}", self.temps);
+        self.temps += 1;
+        let mut body = format!(
+            "faber_list_{suffix} *{target} = faber_list_{suffix}_new(faber_a, 0); "
+        );
+        let mut effect = true;
+        for element in elements {
+            match element {
+                HirArrayElement::Expr(value) => {
+                    let item = self.element(value, elem)?;
+                    effect |= item.effect;
+                    body.push_str(&format!(
+                        "faber_list_{suffix}_push(faber_a, {target}, {}); ",
+                        item.text
+                    ));
+                }
+                HirArrayElement::Spread(value) => {
+                    let list = self.expr(value)?;
+                    let Value::List(inner) = list.value else {
+                        return Err(unsupported("spread of a value that is not a list"));
+                    };
+                    if inner != elem {
+                        return Err(unsupported("spread of a list of another element class"));
+                    }
+                    effect |= list.effect;
+                    body.push_str(&format!(
+                        "faber_list_{suffix}_push_all(faber_a, {target}, {}); ",
+                        list.text
+                    ));
+                }
+                HirArrayElement::Infer(_) => {
+                    return Err(unsupported("spread or inferred list element"));
+                }
+            }
+        }
+        let text = format!("(__extension__ ({{ {body}{target}; }}))");
+        Ok(self.list_operand(text, elem).with_effect(effect))
     }
 
     /// One element value of class `elem`: an exact value that arrives with
