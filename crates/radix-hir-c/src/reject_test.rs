@@ -45,16 +45,6 @@ fn policy_integer_type() {
     );
 }
 
-#[test]
-fn lockstep_iteration_loop() {
-    assert_eq!(
-        rejected(
-            "main {\n    const list<int> a ← [1, 2]\n    const list<int> b ← [3, 4]\n    for from a, b const x, y {\n        print x + y\n    }\n}"
-        ),
-        "lockstep iteration loop"
-    );
-}
-
 /// `inf` needs an arena-backed bignum (goal unit C6); until then it is named.
 #[test]
 fn unbounded_integer_type() {

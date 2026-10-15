@@ -279,6 +279,13 @@ impl Emitter<'_> {
                 let ranges: Vec<&HirExpression> = ranges.iter().collect();
                 self.range_product(out, &ranges, bindings, body, *mutable)
             }
+            HirExpressionKind::IteraLockstep {
+                sources,
+                coordinates,
+                bindings,
+                body,
+                mutable,
+            } => self.lockstep(out, sources, coordinates, bindings, body, *mutable),
             HirExpressionKind::Discerne {
                 scrutinees, arms, ..
             } => self.switch(out, scrutinees, arms),
@@ -523,6 +530,118 @@ impl Emitter<'_> {
                 constant: None,
             },
         );
+        self.loops += 1;
+        self.block(out, body)?;
+        self.loops -= 1;
+        self.line(out, "}");
+        self.depth -= 1;
+        self.line(out, "}");
+        Ok(())
+    }
+
+    /// `for from xs, ys const x, y { … }`: a lockstep walk. Every source is
+    /// evaluated once, all must have the same length (a run-time abort as the
+    /// runner's, `itera lockstep sources must have equal length`), and the
+    /// binders read the aligned element of each. The optional `apud [i]`
+    /// coordinate binds the shared index. Typecheck forbids a shape change.
+    fn lockstep(
+        &mut self,
+        out: &mut String,
+        sources: &[HirExpression],
+        coordinates: &[(radix_hir::DefId, radix_lexer::Symbol)],
+        bindings: &[(radix_hir::DefId, radix_lexer::Symbol)],
+        body: &HirBlock,
+        mutable: bool,
+    ) -> Result<(), CodegenError> {
+        if sources.is_empty() || sources.len() != bindings.len() {
+            return Err(unsupported("lockstep iteration without one source per binder"));
+        }
+        if coordinates.len() > 1 {
+            return Err(unsupported("lockstep iteration with several coordinates"));
+        }
+        let coordinate = coordinates.first();
+        let mut lists = Vec::with_capacity(sources.len());
+        for source in sources {
+            let value = self.expr(source)?;
+            let Value::List(elem) = value.value else {
+                return Err(unsupported("lockstep source that is not a list"));
+            };
+            lists.push((value.text, elem));
+        }
+        self.support.need(Helper::Trap);
+        self.line(out, "{");
+        self.depth += 1;
+        let mut names = Vec::with_capacity(lists.len());
+        for (text, elem) in &lists {
+            let name = format!("faber_t{}", self.temps);
+            self.temps += 1;
+            self.line(
+                out,
+                &format!("faber_list_{} *const {name} = {text};", elem.suffix()),
+            );
+            names.push(name);
+        }
+        for name in &names[1..] {
+            self.line(
+                out,
+                &format!(
+                    "if ({name}->len != {}->len) faber_abort(\"itera lockstep sources must have equal length\");",
+                    names[0]
+                ),
+            );
+        }
+        let index = format!("faber_i{}", self.temps);
+        self.temps += 1;
+        self.line(out, &format!("int64_t {index};"));
+        self.line(
+            out,
+            &format!(
+                "for ({index} = 0; {index} < {}->len; {index}++) {{",
+                names[0]
+            ),
+        );
+        self.depth += 1;
+        for ((name, (_, elem)), (binding, binding_name)) in names.iter().zip(lists).zip(bindings)
+        {
+            let Some(kind) = self.names.binding_kind(*binding) else {
+                return Err(unsupported(
+                    "loop binding the name catalog does not classify",
+                ));
+            };
+            let raw = self.names.resolve_symbol(*binding_name);
+            let c_name = self.scope.claim(&prefixed_binding_name(kind, raw));
+            let class = elem.ty();
+            self.need_class(class);
+            let declaration = self.declare(class, &c_name, mutable)?;
+            self.line(out, &format!("{declaration} = {name}->items[{index}];"));
+            self.locals.insert(
+                *binding,
+                Local {
+                    name: c_name,
+                    ty: class,
+                    constant: None,
+                },
+            );
+        }
+        if let Some((position, position_name)) = coordinate {
+            let Some(kind) = self.names.binding_kind(*position) else {
+                return Err(unsupported(
+                    "loop coordinate the name catalog does not classify",
+                ));
+            };
+            let raw = self.names.resolve_symbol(*position_name);
+            let c_name = self.scope.claim(&prefixed_binding_name(kind, raw));
+            let declaration = self.declare(Ty::Int, &c_name, false)?;
+            self.line(out, &format!("{declaration} = {index};"));
+            self.locals.insert(
+                *position,
+                Local {
+                    name: c_name,
+                    ty: Ty::Int,
+                    constant: None,
+                },
+            );
+        }
         self.loops += 1;
         self.block(out, body)?;
         self.loops -= 1;
