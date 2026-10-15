@@ -137,11 +137,33 @@ fn scalar_core_is_capable() {
 }
 
 #[test]
-fn string_local_names_gap() {
+fn text_local_is_capable() {
     let types = TypeTable::new();
     let program = single_function(FunctionShape {
         params: Vec::new(),
         locals: vec![local(0, ty(&types, Primitive::Textus))],
+        temps: Vec::new(),
+        statements: Vec::new(),
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: ty(&types, Primitive::Vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+
+    let verdict = classify_with_types(&program, &types);
+    assert!(
+        verdict.is_capable(),
+        "text is inside the subset: {verdict:?}"
+    );
+}
+
+#[test]
+fn ascii_local_names_gap() {
+    let types = TypeTable::new();
+    let program = single_function(FunctionShape {
+        params: Vec::new(),
+        locals: vec![local(0, ty(&types, Primitive::Ascii))],
         temps: Vec::new(),
         statements: Vec::new(),
         terminator: MirTerminatorKind::Return(None),
@@ -161,7 +183,7 @@ fn string_local_names_gap() {
 #[test]
 fn gaps_keep_storage_order() {
     let types = TypeTable::new();
-    let string = ty(&types, Primitive::Textus);
+    let string = ty(&types, Primitive::Ascii);
     let instans = ty(&types, Primitive::Instans);
     let program = single_function(FunctionShape {
         params: vec![param(0, string)],

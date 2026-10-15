@@ -164,6 +164,114 @@ pub extern "C" fn __faber_clif_v1_print_bool(stream: i32, value: i8) {
     emit(stream, display_bivalens(value != 0, tokens()));
 }
 
+/// Text handles point at `[len: i64][bytes...]` (literals are static data in
+/// that shape; computed texts are leaked allocations of it).
+///
+/// # Safety
+///
+/// `handle` addresses a well-formed text.
+unsafe fn text_bytes<'a>(handle: *const u8) -> &'a [u8] {
+    let length = unsafe { std::ptr::read_unaligned(handle.cast::<i64>()) };
+    unsafe { std::slice::from_raw_parts(handle.add(8), usize::try_from(length).unwrap_or(0)) }
+}
+
+fn text_new(bytes: &[u8]) -> *const u8 {
+    let mut buffer = Vec::with_capacity(8 + bytes.len());
+    buffer.extend_from_slice(&i64::try_from(bytes.len()).unwrap_or(0).to_ne_bytes());
+    buffer.extend_from_slice(bytes);
+    Box::leak(buffer.into_boxed_slice()).as_ptr()
+}
+
+fn text_str(bytes: &[u8]) -> std::borrow::Cow<'_, str> {
+    String::from_utf8_lossy(bytes)
+}
+
+/// Print one text line (stream 0 stdout, 1 stderr).
+///
+/// # Safety
+///
+/// `handle` addresses a well-formed text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_print_text(stream: i32, handle: *const u8) {
+    emit(stream, &text_str(unsafe { text_bytes(handle) }));
+}
+
+/// Concatenate two texts into a new text.
+///
+/// # Safety
+///
+/// Both handles address well-formed texts.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_concat(
+    left: *const u8,
+    right: *const u8,
+) -> *const u8 {
+    let (left, right) = unsafe { (text_bytes(left), text_bytes(right)) };
+    let mut joined = Vec::with_capacity(left.len() + right.len());
+    joined.extend_from_slice(left);
+    joined.extend_from_slice(right);
+    text_new(&joined)
+}
+
+/// Render an integer as text.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_text_from_i64(value: i64) -> *const u8 {
+    text_new(value.to_string().as_bytes())
+}
+
+/// Render a float as text; `narrow` selects the `f32` display contract.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_text_from_f64(value: f64, narrow: i32) -> *const u8 {
+    #[allow(clippy::cast_possible_truncation)]
+    let text = if narrow == 0 {
+        display_fractus(value)
+    } else {
+        display_fractus(value as f32)
+    };
+    text_new(text.as_bytes())
+}
+
+/// Render a boolean as text with the program's output tokens.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_text_from_bool(value: i8) -> *const u8 {
+    text_new(display_bivalens(value != 0, tokens()).as_bytes())
+}
+
+/// Text equality.
+///
+/// # Safety
+///
+/// Both handles address well-formed texts.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_eq(left: *const u8, right: *const u8) -> i8 {
+    i8::from(unsafe { text_bytes(left) == text_bytes(right) })
+}
+
+/// Text ordering by bytes: -1, 0 or 1.
+///
+/// # Safety
+///
+/// Both handles address well-formed texts.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_cmp(left: *const u8, right: *const u8) -> i64 {
+    match unsafe { text_bytes(left).cmp(text_bytes(right)) } {
+        std::cmp::Ordering::Less => -1,
+        std::cmp::Ordering::Equal => 0,
+        std::cmp::Ordering::Greater => 1,
+    }
+}
+
+/// Text length in characters.
+///
+/// # Safety
+///
+/// `handle` addresses a well-formed text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_len(handle: *const u8) -> i64 {
+    let count = text_str(unsafe { text_bytes(handle) }).chars().count();
+    i64::try_from(count).unwrap_or(i64::MAX)
+}
+
 /// Report a failed run and exit with the runner's code (D5).
 ///
 /// # Safety

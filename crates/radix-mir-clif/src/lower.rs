@@ -61,6 +61,8 @@ pub(crate) enum Rep {
     Float,
     /// `bool` as `i8` 0/1.
     Bool,
+    /// `textus`: a pointer to `[len: i64][bytes...]` (see `abi::TEXT_HEADER`).
+    Text,
     /// No value.
     Unit,
 }
@@ -71,6 +73,7 @@ impl Rep {
             Self::Int => Some(types::I64),
             Self::Float => Some(types::F64),
             Self::Bool => Some(types::I8),
+            Self::Text => Some(types::I64),
             Self::Unit => None,
         }
     }
@@ -91,6 +94,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(Primitive::Numerus) => Ok(Rep::Int),
         Type::Primitive(Primitive::Fractus) => Ok(Rep::Float),
         Type::Primitive(Primitive::Bivalens) => Ok(Rep::Bool),
+        Type::Primitive(Primitive::Textus) => Ok(Rep::Text),
         Type::Primitive(Primitive::Vacuum | Primitive::Numquam) => Ok(Rep::Unit),
         Type::SizedNumeric(Primitive::Numerus, width) => match width {
             NumericWidth::I8
@@ -133,6 +137,7 @@ struct ModuleState<'a> {
     pending: Vec<MirFunctionId>,
     runtime: FxHashMap<&'static str, FuncId>,
     strings: FxHashMap<Vec<u8>, DataId>,
+    texts: FxHashMap<Vec<u8>, DataId>,
 }
 
 impl<'a> ModuleState<'a> {
@@ -203,6 +208,28 @@ impl<'a> ModuleState<'a> {
         Ok(id)
     }
 
+    /// A text literal as static data in the text handle layout.
+    fn text_data(&mut self, bytes: &[u8]) -> Lowered<DataId> {
+        if let Some(found) = self.texts.get(bytes) {
+            return Ok(*found);
+        }
+        let id = self
+            .module
+            .declare_anonymous_data(false, false)
+            .map_err(cranelift_error)?;
+        let mut body = Vec::with_capacity(abi::TEXT_HEADER + bytes.len());
+        body.extend_from_slice(&i64::try_from(bytes.len()).unwrap_or(0).to_ne_bytes());
+        body.extend_from_slice(bytes);
+        let mut description = DataDescription::new();
+        description.define(body.into_boxed_slice());
+        description.set_align(8);
+        self.module
+            .define_data(id, &description)
+            .map_err(cranelift_error)?;
+        self.texts.insert(bytes.to_vec(), id);
+        Ok(id)
+    }
+
     fn string_data(&mut self, bytes: &[u8]) -> Lowered<DataId> {
         if let Some(found) = self.strings.get(bytes) {
             return Ok(*found);
@@ -245,6 +272,7 @@ pub fn lower_program(input: &ProgramInput<'_>) -> Result<Vec<u8>, Decline> {
         pending: Vec::new(),
         runtime: FxHashMap::default(),
         strings: FxHashMap::default(),
+        texts: FxHashMap::default(),
     };
 
     let entry = match input.entry {
@@ -490,6 +518,7 @@ impl FunctionLower<'_, '_> {
             Rep::Int => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Float => Some(self.builder.ins().f64const(0.0)),
             Rep::Bool => Some(self.builder.ins().iconst(types::I8, 0)),
+            Rep::Text => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Unit => None,
         }
     }
@@ -556,8 +585,31 @@ impl FunctionLower<'_, '_> {
                 Rep::Bool,
             ),
             MirConstant::Unit => (None, Rep::Unit),
+            MirConstant::String(symbol) => {
+                let text = radix_lexer::textus_literal::decode_textus_literal(
+                    self.state.input.interner.resolve(*symbol),
+                );
+                (Some(self.text_literal(text.as_bytes())?), Rep::Text)
+            }
             _ => return Err(Decline::new("constant")),
         })
+    }
+
+    /// The handle of a static text literal.
+    fn text_literal(&mut self, bytes: &[u8]) -> Lowered<Value> {
+        let data = self.state.text_data(bytes)?;
+        let global = self
+            .state
+            .module
+            .declare_data_in_func(data, self.builder.func);
+        Ok(self.builder.ins().symbol_value(self.state.pointer, global))
+    }
+
+    /// Call a runtime symbol; returns its first result when it has one.
+    fn call_runtime(&mut self, symbol: &RuntimeSymbol, args: &[Value]) -> Lowered<Option<Value>> {
+        let reference = self.runtime_ref(symbol)?;
+        let call = self.builder.ins().call(reference, args);
+        Ok(self.builder.inst_results(call).first().copied())
     }
 
     fn operand(&mut self, operand: &MirOperand) -> Lowered<(Option<Value>, Rep)> {
@@ -677,8 +729,130 @@ impl FunctionLower<'_, '_> {
                 };
                 self.convert(destination, conversion, &call.args)
             }
+            MirIntrinsic::FormatString { template } => {
+                let Some(destination) = destination else {
+                    return Err(Decline::new("format without destination"));
+                };
+                self.format_string(destination, *template, &call.args)
+            }
+            MirIntrinsic::Collection(MirCollectionOp::Length) => {
+                let (Some(destination), [receiver]) = (destination, call.args.as_slice()) else {
+                    return Err(Decline::new("length shape"));
+                };
+                let (handle, rep) = self.scalar(receiver)?;
+                if rep != Rep::Text {
+                    return Err(Decline::new("length of a non-text value"));
+                }
+                let length = self.call_runtime(&abi::TEXT_LEN, &[handle])?;
+                self.define_result(destination, length, Rep::Int)
+            }
             _ => Err(Decline::new("runtime call")),
         }
+    }
+
+    /// Store `value` into `destination`, which must hold `rep`.
+    fn define_result(
+        &mut self,
+        destination: &MirPlace,
+        value: Option<Value>,
+        rep: Rep,
+    ) -> Lowered<()> {
+        let (variable, slot_rep) = self.place_slot(destination)?;
+        if slot_rep != rep {
+            return Err(Decline::new("result representation mismatch"));
+        }
+        if let Some(value) = value {
+            self.builder.def_var(variable, value);
+        }
+        Ok(())
+    }
+
+    /// The text handle that displays `value`.
+    fn render_text(&mut self, value: Value, rep: Rep) -> Lowered<Value> {
+        let rendered = match rep {
+            Rep::Text => return Ok(value),
+            Rep::Int => self.call_runtime(&abi::TEXT_FROM_I64, &[value])?,
+            Rep::Float => {
+                let narrow = self.builder.ins().iconst(types::I32, 0);
+                self.call_runtime(&abi::TEXT_FROM_F64, &[value, narrow])?
+            }
+            Rep::Bool => self.call_runtime(&abi::TEXT_FROM_BOOL, &[value])?,
+            Rep::Unit => return Err(Decline::new("unit rendered as text")),
+        };
+        rendered.ok_or_else(|| Decline::new("text rendering result"))
+    }
+
+    /// Interpolation: the template's `§` placeholders become display calls and
+    /// concatenations, split once at compile time.
+    fn format_string(
+        &mut self,
+        destination: &MirPlace,
+        template: radix_lexer::Symbol,
+        args: &[MirOperand],
+    ) -> Lowered<()> {
+        let template = self.state.input.interner.resolve(template).to_owned();
+        let mut rendered: Vec<Value> = Vec::with_capacity(args.len());
+        for arg in args {
+            let (value, rep) = self.scalar(arg)?;
+            rendered.push(self.render_text(value, rep)?);
+        }
+        enum Part {
+            Literal(String),
+            Argument(usize),
+        }
+        let mut parts: Vec<Part> = Vec::new();
+        let mut literal = String::new();
+        let mut chars = template.chars().peekable();
+        let mut next_arg = 0usize;
+        while let Some(ch) = chars.next() {
+            if ch != '§' {
+                literal.push(ch);
+                continue;
+            }
+            let mut index = String::new();
+            while chars.peek().is_some_and(char::is_ascii_digit) {
+                if let Some(digit) = chars.next() {
+                    index.push(digit);
+                }
+            }
+            let arg_index = if index.is_empty() {
+                let current = next_arg;
+                next_arg += 1;
+                current
+            } else {
+                index.parse::<usize>().unwrap_or(usize::MAX)
+            };
+            if arg_index < rendered.len() {
+                if !literal.is_empty() {
+                    parts.push(Part::Literal(std::mem::take(&mut literal)));
+                }
+                parts.push(Part::Argument(arg_index));
+            } else {
+                literal.push('§');
+                literal.push_str(&index);
+            }
+        }
+        if !literal.is_empty() {
+            parts.push(Part::Literal(literal));
+        }
+        let mut accumulated: Option<Value> = None;
+        for part in parts {
+            let piece = match part {
+                Part::Literal(text) => self.text_literal(text.as_bytes())?,
+                Part::Argument(index) => rendered[index],
+            };
+            accumulated = Some(match accumulated {
+                None => piece,
+                Some(left) => self
+                    .call_runtime(&abi::TEXT_CONCAT, &[left, piece])?
+                    .ok_or_else(|| Decline::new("text concat result"))?,
+            });
+        }
+        let result = match accumulated {
+            Some(value) => value,
+            None => self.text_literal(b"")?,
+        };
+        self.define_result(destination, Some(result), Rep::Text)
     }
 
     /// An implicit store into a typed integer slot (policy applied once, at
@@ -689,17 +863,24 @@ impl FunctionLower<'_, '_> {
         conversion: &MirConversion,
         args: &[MirOperand],
     ) -> Lowered<()> {
-        let Some(site) = &conversion.store else {
-            return Err(Decline::new("explicit conversion"));
-        };
         let [argument] = args else {
             return Err(Decline::new("conversion arity"));
+        };
+        let Some(site) = &conversion.store else {
+            let (value, rep) = self.scalar(argument)?;
+            let (variable, slot_rep) = self.place_slot(destination)?;
+            if slot_rep != Rep::Text || rep == Rep::Unit {
+                return Err(Decline::new("explicit conversion"));
+            }
+            let rendered = self.render_text(value, rep)?;
+            self.builder.def_var(variable, rendered);
+            return Ok(());
         };
         let (value, rep) = self.scalar(argument)?;
         let (variable, slot_rep) = self.place_slot(destination)?;
         let stored = match (rep, slot_rep) {
             (Rep::Int, Rep::Int) => self.int_store(site, conversion.target_ty, value)?,
-            (Rep::Float, Rep::Float) | (Rep::Bool, Rep::Bool) => value,
+            (Rep::Float, Rep::Float) | (Rep::Bool, Rep::Bool) | (Rep::Text, Rep::Text) => value,
             _ => return Err(Decline::new("conversion between representations")),
         };
         self.builder.def_var(variable, stored);
@@ -827,6 +1008,10 @@ impl FunctionLower<'_, '_> {
                 let reference = self.runtime_ref(&abi::PRINT_BOOL)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
+            Rep::Text => {
+                let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
+                self.builder.ins().call(reference, &[stream, value]);
+            }
             Rep::Unit => return Err(Decline::new("unit print")),
         }
         Ok(())
@@ -883,6 +1068,7 @@ impl FunctionLower<'_, '_> {
             Rep::Int => self.int_binary(op, a, b),
             Rep::Float => self.float_binary(op, a, b),
             Rep::Bool => self.bool_binary(op, a, b),
+            Rep::Text => self.text_binary(op, a, b),
             Rep::Unit => Err(Decline::new("unit operands")),
         }
     }
@@ -920,6 +1106,39 @@ impl FunctionLower<'_, '_> {
             MirBinOp::GtEq => compare(self, FloatCC::GreaterThanOrEqual),
             _ => return Err(Decline::new("float operation")),
         })
+    }
+
+    fn text_binary(&mut self, op: MirBinOp, a: Value, b: Value) -> Lowered<(Value, Rep)> {
+        let equal = |this: &mut Self| -> Lowered<Value> {
+            this.call_runtime(&abi::TEXT_EQ, &[a, b])?
+                .ok_or_else(|| Decline::new("text equality result"))
+        };
+        let order = |this: &mut Self, cc: IntCC| -> Lowered<(Value, Rep)> {
+            let ordering = this
+                .call_runtime(&abi::TEXT_CMP, &[a, b])?
+                .ok_or_else(|| Decline::new("text ordering result"))?;
+            let zero = this.builder.ins().iconst(types::I64, 0);
+            Ok((this.builder.ins().icmp(cc, ordering, zero), Rep::Bool))
+        };
+        match op {
+            MirBinOp::Add => {
+                let joined = self
+                    .call_runtime(&abi::TEXT_CONCAT, &[a, b])?
+                    .ok_or_else(|| Decline::new("text concat result"))?;
+                Ok((joined, Rep::Text))
+            }
+            MirBinOp::Eq => Ok((equal(self)?, Rep::Bool)),
+            MirBinOp::NotEq => {
+                let same = equal(self)?;
+                let one = self.builder.ins().iconst(types::I8, 1);
+                Ok((self.builder.ins().bxor(same, one), Rep::Bool))
+            }
+            MirBinOp::Lt => order(self, IntCC::SignedLessThan),
+            MirBinOp::Gt => order(self, IntCC::SignedGreaterThan),
+            MirBinOp::LtEq => order(self, IntCC::SignedLessThanOrEqual),
+            MirBinOp::GtEq => order(self, IntCC::SignedGreaterThanOrEqual),
+            _ => Err(Decline::new("text operation")),
+        }
     }
 
     fn bool_binary(&mut self, op: MirBinOp, a: Value, b: Value) -> Lowered<(Value, Rep)> {

@@ -161,12 +161,11 @@ impl<'a> ClifCapability<'a> {
             | Type::Primitive(Primitive::Vacuum)
             | Type::Primitive(Primitive::Numquam)
             | Type::SizedNumeric(Primitive::Numerus, _)
+            | Type::Primitive(Primitive::Textus)
             | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => None,
             Type::SizedNumeric(..) => Some(Gap::Subset("sized numeric value".to_owned())),
             Type::PolicyFloat(..) => Some(Gap::Subset("policy float value".to_owned())),
-            Type::Primitive(Primitive::Textus) | Type::Primitive(Primitive::Ascii) => {
-                Some(Gap::Subset("string value".to_owned()))
-            }
+            Type::Primitive(Primitive::Ascii) => Some(Gap::Subset("string value".to_owned())),
             Type::Primitive(Primitive::Littera) => Some(Gap::Subset("character value".to_owned())),
             Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => {
                 Some(Gap::Subset("byte buffer value".to_owned()))
@@ -288,9 +287,8 @@ impl<'a> ClifCapability<'a> {
         match constant {
             MirConstant::Int(_) | MirConstant::UInt(_) | MirConstant::Float(_) => None,
             MirConstant::Bool(_) | MirConstant::Unit => None,
-            MirConstant::String(_) | MirConstant::Ascii(_) => {
-                Some(Gap::Subset("string constant".to_owned()))
-            }
+            MirConstant::String(_) => None,
+            MirConstant::Ascii(_) => Some(Gap::Subset("string constant".to_owned())),
             MirConstant::Octeti(_) => Some(Gap::Subset("byte constant".to_owned())),
             MirConstant::Regex { .. } => Some(Gap::Subset("regex constant".to_owned())),
             MirConstant::Nil => Some(Gap::Subset("none constant".to_owned())),
@@ -442,6 +440,27 @@ impl MirVisitor for ClifCapability<'_> {
             return;
         }
         if matches!(call.intrinsic, MirIntrinsic::Diagnostic(_)) && call.args.len() == 1 {
+            radix_mir::visit::walk_runtime_call(self, call);
+            return;
+        }
+        // Scalar to text rendering, interpolation, and text length.
+        let renders_text = matches!(
+            &call.intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && self.type_gap(conversion.source_ty).is_none()
+                    && matches!(
+                        self.types.get(conversion.target_ty.semantic_id()),
+                        Type::Primitive(Primitive::Textus)
+                    )
+        );
+        if renders_text
+            || matches!(
+                call.intrinsic,
+                MirIntrinsic::FormatString { .. }
+                    | MirIntrinsic::Collection(MirCollectionOp::Length)
+            )
+        {
             radix_mir::visit::walk_runtime_call(self, call);
             return;
         }

@@ -45,6 +45,54 @@ pub const PRINT_BOOL: RuntimeSymbol = RuntimeSymbol {
     params: &[I32, I8],
     ret: None,
 };
+/// Print one text line: (stream, text handle).
+pub const PRINT_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_print_text",
+    params: &[I32, Ptr],
+    ret: None,
+};
+/// Concatenate two texts: (left, right) -> new text handle.
+pub const TEXT_CONCAT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_concat",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// Render an integer as text: value -> text handle.
+pub const TEXT_FROM_I64: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_from_i64",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// Render a float as text: (value, f32 flag) -> text handle.
+pub const TEXT_FROM_F64: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_from_f64",
+    params: &[F64, I32],
+    ret: Some(Ptr),
+};
+/// Render a boolean as text with the program's output tokens.
+pub const TEXT_FROM_BOOL: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_from_bool",
+    params: &[I8],
+    ret: Some(Ptr),
+};
+/// Text equality: (left, right) -> 0/1.
+pub const TEXT_EQ: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_eq",
+    params: &[Ptr, Ptr],
+    ret: Some(I8),
+};
+/// Text ordering by bytes: (left, right) -> -1, 0 or 1.
+pub const TEXT_CMP: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_cmp",
+    params: &[Ptr, Ptr],
+    ret: Some(I64),
+};
+/// Text length in characters.
+pub const TEXT_LEN: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_len",
+    params: &[Ptr],
+    ret: Some(I64),
+};
 /// Trap with a message: (pointer, length). Never returns.
 pub const TRAP: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_trap",
@@ -80,10 +128,22 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     PRINT_I64,
     PRINT_F64,
     PRINT_BOOL,
+    PRINT_TEXT,
+    TEXT_CONCAT,
+    TEXT_FROM_I64,
+    TEXT_FROM_F64,
+    TEXT_FROM_BOOL,
+    TEXT_EQ,
+    TEXT_CMP,
+    TEXT_LEN,
     TRAP,
     TRAP_STORE,
     SET_DISPLAY_TOKENS,
 ];
+
+/// A text handle points at `[len: i64][bytes...]`; literals are static data in
+/// that shape, runtime-built texts are leaked allocations of it.
+pub const TEXT_HEADER: usize = 8;
 
 /// The program entry the runtime calls (exported by generated code).
 pub const PROGRAM_INCIPIT: &str = "faber_clif_incipit";
