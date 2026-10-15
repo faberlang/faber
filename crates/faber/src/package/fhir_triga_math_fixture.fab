@@ -1,0 +1,958 @@
+# Triga math: language vectors/matrices plus graphics-domain genera.
+#
+# Public import: import from "triga:math" math
+#
+# Carriers: vector<f32, N> and matrix<f32, [R, C]> are language types.
+# Triga owns Box<N>, TransformPayload, Quaternion, Euler, Color, Sphere,
+# Plane, Ray, and face/camera fact genera.
+#
+# Construction: [x, y, z] ↦ vector<f32, 3>. Matrix builders are
+# matrix_identity / matrix_translation / matrix_scale / matrix_compose /
+# matrix_perspective / matrix_look_at. Multiply matrices with ·.
+#
+# See docs/module-map.md and docs/factory/faber-native-surface/GOAL.md.
+
+# --- LANE AND SCALAR HELPERS ---
+
+fn basis3(int index) → vector<f32, 3> {
+    if index ≡ 0 then return [1.0, 0.0, 0.0] ↦ vector<f32, 3>
+    if index ≡ 1 then return [0.0, 1.0, 0.0] ↦ vector<f32, 3>
+    return [0.0, 0.0, 1.0] ↦ vector<f32, 3>
+}
+
+fn basis4(int index) → vector<f32, 4> {
+    if index ≡ 0 then return [1.0, 0.0, 0.0, 0.0] ↦ vector<f32, 4>
+    if index ≡ 1 then return [0.0, 1.0, 0.0, 0.0] ↦ vector<f32, 4>
+    if index ≡ 2 then return [0.0, 0.0, 1.0, 0.0] ↦ vector<f32, 4>
+    return [0.0, 0.0, 0.0, 1.0] ↦ vector<f32, 4>
+}
+
+@ public
+fn x(vector<f32, 3> v) → f32 {
+    return v.dot(basis3(0))
+}
+
+@ public
+fn y(vector<f32, 3> v) → f32 {
+    return v.dot(basis3(1))
+}
+
+@ public
+fn z(vector<f32, 3> v) → f32 {
+    return v.dot(basis3(2))
+}
+
+fn uniform3(f32 value) → vector<f32, 3> {
+    const vector<f32, 3> seed ← [value, 0.0, 0.0] ↦ vector<f32, 3>
+    return seed.swizzle("xxx")
+}
+
+fn uniform4(f32 value) → vector<f32, 4> {
+    const vector<f32, 4> seed ← [value, 0.0, 0.0, 0.0] ↦ vector<f32, 4>
+    return seed.swizzle("xxxx")
+}
+
+@ public
+fn sqrt_f32(f32 value) → f32 {
+    if value ≤ 0.0 then return 0.0
+    var f32 estimate ← value
+    for range 0‥12 const _ {
+        estimate ← (estimate + value / estimate) * 0.5
+    }
+    return estimate
+}
+
+@ public
+fn scale3(vector<f32, 3> v, f32 scalar) → vector<f32, 3> {
+    return v.multiplied(uniform3(scalar))
+}
+
+@ public
+fn scale4(vector<f32, 4> v, f32 scalar) → vector<f32, 4> {
+    return v.multiplied(uniform4(scalar))
+}
+
+@ public
+fn length<size N>(vector<f32, N> v) → f32 {
+    return sqrt_f32(v.dot(v))
+}
+
+@ public
+fn normalized3(vector<f32, 3> v) → vector<f32, 3> {
+    const f32 len ← length(v)
+    if len ≤ 0.000001 then return [0.0, 0.0, 0.0] ↦ vector<f32, 3>
+    return v.multiplied(uniform3(1.0 / len))
+}
+
+@ public
+fn distance<size N>(vector<f32, N> a, vector<f32, N> b) → f32 {
+    return length(a.subtracted(b))
+}
+
+@ public
+fn lerp3(vector<f32, 3> a, vector<f32, 3> b, f32 amount) → vector<f32, 3> {
+    const vector<f32, 3> delta ← b.subtracted(a)
+    const vector<f32, 3> scaled ← delta.multiplied(uniform3(amount))
+    return a.added(scaled)
+}
+
+@ public
+fn project3(vector<f32, 3> v, vector<f32, 3> axis) → vector<f32, 3> {
+    const f32 denominator ← axis.dot(axis)
+    if denominator ≤ 0.000001 then return [0.0, 0.0, 0.0] ↦ vector<f32, 3>
+    const f32 scale ← v.dot(axis) / denominator
+    return axis.multiplied(uniform3(scale))
+}
+
+# --- MATRIX BUILDERS ---
+
+fn matrix_from_columns(vector<f32, 4> c0, vector<f32, 4> c1, vector<f32, 4> c2, vector<f32, 4> c3) → matrix<f32, [4, 4]> {
+    const vector<f32, 4> e0 ← [1.0, 0.0, 0.0, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> e1 ← [0.0, 1.0, 0.0, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> e2 ← [0.0, 0.0, 1.0, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> e3 ← [0.0, 0.0, 0.0, 1.0] ↦ vector<f32, 4>
+    const matrix<f32, [4, 4]> m0 ← c0 ⊗ e0
+    const matrix<f32, [4, 4]> m1 ← c1 ⊗ e1
+    const matrix<f32, [4, 4]> m2 ← c2 ⊗ e2
+    const matrix<f32, [4, 4]> m3 ← c3 ⊗ e3
+    const matrix<f32, [4, 4]> s01 ← m0.added(m1)
+    const matrix<f32, [4, 4]> s012 ← s01.added(m2)
+    return s012.added(m3)
+}
+
+@ public
+fn matrix_column(matrix<f32, [4, 4]> m, int index) → vector<f32, 4> {
+    return m.apply(basis4(index))
+}
+
+@ public
+fn matrix_element(matrix<f32, [4, 4]> m, int row, int col) → f32 {
+    return matrix_column(m, col).dot(basis4(row))
+}
+
+@ public
+fn matrix_identity() → matrix<f32, [4, 4]> {
+    return matrix_from_columns(basis4(0), basis4(1), basis4(2), basis4(3))
+}
+
+@ public
+fn matrix_translation(vector<f32, 3> offset) → matrix<f32, [4, 4]> {
+    const f32 tx ← offset.dot(basis3(0))
+    const f32 ty ← offset.dot(basis3(1))
+    const f32 tz ← offset.dot(basis3(2))
+    const vector<f32, 4> t ← [tx, ty, tz, 1.0] ↦ vector<f32, 4>
+    return matrix_from_columns(basis4(0), basis4(1), basis4(2), t)
+}
+
+@ public
+fn matrix_scale(vector<f32, 3> scale_vector) → matrix<f32, [4, 4]> {
+    const f32 sx ← scale_vector.dot(basis3(0))
+    const f32 sy ← scale_vector.dot(basis3(1))
+    const f32 sz ← scale_vector.dot(basis3(2))
+    const vector<f32, 4> c0 ← [sx, 0.0, 0.0, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> c1 ← [0.0, sy, 0.0, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> c2 ← [0.0, 0.0, sz, 0.0] ↦ vector<f32, 4>
+    return matrix_from_columns(c0, c1, c2, basis4(3))
+}
+
+@ public
+fn transpose(matrix<f32, [4, 4]> m) → matrix<f32, [4, 4]> {
+    const vector<f32, 4> r0 ← [matrix_element(m, 0, 0), matrix_element(m, 0, 1), matrix_element(m, 0, 2), matrix_element(m, 0, 3)] ↦ vector<f32, 4>
+    const vector<f32, 4> r1 ← [matrix_element(m, 1, 0), matrix_element(m, 1, 1), matrix_element(m, 1, 2), matrix_element(m, 1, 3)] ↦ vector<f32, 4>
+    const vector<f32, 4> r2 ← [matrix_element(m, 2, 0), matrix_element(m, 2, 1), matrix_element(m, 2, 2), matrix_element(m, 2, 3)] ↦ vector<f32, 4>
+    const vector<f32, 4> r3 ← [matrix_element(m, 3, 0), matrix_element(m, 3, 1), matrix_element(m, 3, 2), matrix_element(m, 3, 3)] ↦ vector<f32, 4>
+    return matrix_from_columns(r0, r1, r2, r3)
+}
+
+@ public
+fn affine_determinant(matrix<f32, [4, 4]> m) → f32 {
+    const f32 a00 ← matrix_element(m, 0, 0)
+    const f32 a01 ← matrix_element(m, 0, 1)
+    const f32 a02 ← matrix_element(m, 0, 2)
+    const f32 a10 ← matrix_element(m, 1, 0)
+    const f32 a11 ← matrix_element(m, 1, 1)
+    const f32 a12 ← matrix_element(m, 1, 2)
+    const f32 a20 ← matrix_element(m, 2, 0)
+    const f32 a21 ← matrix_element(m, 2, 1)
+    const f32 a22 ← matrix_element(m, 2, 2)
+    return (a00 * (a11 * a22 - a12 * a21) - a01 * (a10 * a22 - a12 * a20)) + a02 * (a10 * a21 - a11 * a20)
+}
+
+@ public
+fn apply_point(matrix<f32, [4, 4]> m, vector<f32, 3> point) → vector<f32, 3> {
+    const f32 px ← point.dot(basis3(0))
+    const f32 py ← point.dot(basis3(1))
+    const f32 pz ← point.dot(basis3(2))
+    const vector<f32, 4> p ← [px, py, pz, 1.0] ↦ vector<f32, 4>
+    const vector<f32, 4> applied ← m.apply(p)
+    const f32 w ← applied.dot(basis4(3))
+    var f32 divisor ← w
+    if w.abs() ≤ 0.000001 {
+        divisor ← 1.0
+    }
+    const vector<f32, 4> divided ← applied.multiplied(uniform4(1.0 / divisor))
+    const f32 rx ← divided.dot(basis4(0))
+    const f32 ry ← divided.dot(basis4(1))
+    const f32 rz ← divided.dot(basis4(2))
+    return [rx, ry, rz] ↦ vector<f32, 3>
+}
+
+@ public
+fn affine_inverse(matrix<f32, [4, 4]> m) → matrix<f32, [4, 4]> ∪ none {
+    const f32 determinant ← affine_determinant(m)
+    if determinant.abs() ≤ 0.000001 then return null
+    const f32 d ← 1.0 / determinant
+    const f32 a00 ← matrix_element(m, 0, 0)
+    const f32 a01 ← matrix_element(m, 0, 1)
+    const f32 a02 ← matrix_element(m, 0, 2)
+    const f32 a10 ← matrix_element(m, 1, 0)
+    const f32 a11 ← matrix_element(m, 1, 1)
+    const f32 a12 ← matrix_element(m, 1, 2)
+    const f32 a20 ← matrix_element(m, 2, 0)
+    const f32 a21 ← matrix_element(m, 2, 1)
+    const f32 a22 ← matrix_element(m, 2, 2)
+    const f32 tx ← matrix_element(m, 0, 3)
+    const f32 ty ← matrix_element(m, 1, 3)
+    const f32 tz ← matrix_element(m, 2, 3)
+    const f32 i00 ← (a11 * a22 - a12 * a21) * d
+    const f32 i01 ← (a02 * a21 - a01 * a22) * d
+    const f32 i02 ← (a01 * a12 - a02 * a11) * d
+    const f32 i10 ← (a12 * a20 - a10 * a22) * d
+    const f32 i11 ← (a00 * a22 - a02 * a20) * d
+    const f32 i12 ← (a02 * a10 - a00 * a12) * d
+    const f32 i20 ← (a10 * a21 - a11 * a20) * d
+    const f32 i21 ← (a01 * a20 - a00 * a21) * d
+    const f32 i22 ← (a00 * a11 - a01 * a10) * d
+    const vector<f32, 4> c0 ← [i00, i10, i20, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> c1 ← [i01, i11, i21, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> c2 ← [i02, i12, i22, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> c3 ← [-((i00 * tx + i01 * ty) + i02 * tz), -((i10 * tx + i11 * ty) + i12 * tz), -((i20 * tx + i21 * ty) + i22 * tz), 1.0] ↦ vector<f32, 4>
+    return matrix_from_columns(c0, c1, c2, c3)
+}
+
+# --- TRANSFORM PAYLOAD ---
+# 32-float / 128-byte wire: model then view-projection, column-major.
+# Flatten through `for from m at [r, c]` so the write order does not depend
+# on the carrier's internal layout. matrix<f32, [4, 4]> is always 16 lanes.
+
+@ public
+class TransformPayload {
+    var list<f32> values
+
+    fn float_count() → int ∪ none {
+        if self.values.length() ≢ 32 then return null
+        return self.values.length()
+    }
+
+    fn byte_count() → int ∪ none {
+        if self.values.length() ≢ 32 then return null
+        return self.values.length() * 4
+    }
+
+    fn model_value(int index) → f32 ∪ none {
+        if self.values.length() ≢ 32 then return null
+        if index ≺ 0 or index ≥ 16 then return null
+        return self.values[index]
+    }
+
+    fn view_projection_value(int index) → f32 ∪ none {
+        if self.values.length() ≢ 32 then return null
+        if index ≺ 0 or index ≥ 16 then return null
+        return self.values[index + 16]
+    }
+}
+
+@ public
+fn transform_payload(matrix<f32, [4, 4]> model, matrix<f32, [4, 4]> view_projection) → TransformPayload {
+    var list<f32> values ← empty
+    for range 0‥32 const _ {
+        values.append(0.0)
+    }
+    for from model at [r, c] const cell {
+        values[c * 4 + r] ← cell
+    }
+    for from view_projection at [r, c] const cell {
+        values[16 + c * 4 + r] ← cell
+    }
+    return TransformPayload {values = values}
+}
+
+# --- ROTATION AND COLOR ---
+
+@ public
+class Quaternion {
+    var f32 x
+    var f32 y
+    var f32 z
+    var f32 w
+
+    fn multiply(ref Quaternion other) → Quaternion {
+        return quaternion(((self.w * other.x + self.x * other.w) + self.y * other.z) - self.z * other.y, ((self.w * other.y - self.x * other.z) + self.y * other.w) + self.z * other.x, ((self.w * other.z + self.x * other.y) - self.y * other.x) + self.z * other.w, ((self.w * other.w - self.x * other.x) - self.y * other.y) - self.z * other.z)
+    }
+
+    fn normalized() → Quaternion {
+        const f32 len ← sqrt_f32(((self.x * self.x + self.y * self.y) + self.z * self.z) + self.w * self.w)
+        if len ≤ 0.000001 then return quaternion(0.0, 0.0, 0.0, 1.0)
+        return quaternion(self.x / len, self.y / len, self.z / len, self.w / len)
+    }
+
+    fn lerp(ref Quaternion other, f32 ratio) → Quaternion {
+        var f32 bx ← other.x
+        var f32 by ← other.y
+        var f32 bz ← other.z
+        var f32 bw ← other.w
+        const f32 alignment ← ((self.x * bx + self.y * by) + self.z * bz) + self.w * bw
+        if alignment ≺ 0.0 {
+            bx ← -bx
+            by ← -by
+            bz ← -bz
+            bw ← -bw
+        }
+        const Quaternion mixed ← quaternion(self.x + (bx - self.x) * ratio, self.y + (by - self.y) * ratio, self.z + (bz - self.z) * ratio, self.w + (bw - self.w) * ratio)
+        return mixed.normalized()
+    }
+}
+
+@ public
+class Color {
+    var f32 r
+    var f32 g
+    var f32 b
+
+    fn valid() → bool {
+        if self.r ≺ 0.0 or self.r ≻ 1.0 then return false
+        if self.g ≺ 0.0 or self.g ≻ 1.0 then return false
+        if self.b ≺ 0.0 or self.b ≻ 1.0 then return false
+        return true
+    }
+
+    fn lerp(ref Color other, f32 ratio) → Color {
+        return Color {r = self.r + (other.r - self.r) * ratio, g = self.g + (other.g - self.g) * ratio, b = self.b + (other.b - self.b) * ratio}
+    }
+}
+
+@ public
+class Euler {
+    var f32 x
+    var f32 y
+    var f32 z
+    var string order = "XYZ"
+
+    fn to_quaternion() → Quaternion ∪ none {
+        if self.order ≢ "XYZ" then return null
+        const f32 hx ← self.x * 0.5
+        const f32 hy ← self.y * 0.5
+        const f32 hz ← self.z * 0.5
+        const f32 sx ← sin_f32(hx)
+        const f32 cx ← cos_f32(hx)
+        const f32 sy ← sin_f32(hy)
+        const f32 cy ← cos_f32(hy)
+        const f32 sz ← sin_f32(hz)
+        const f32 cz ← cos_f32(hz)
+        const Quaternion raw ← quaternion((sx * cy) * cz + (cx * sy) * sz, (cx * sy) * cz - (sx * cy) * sz, (cx * cy) * sz + (sx * sy) * cz, (cx * cy) * cz - (sx * sy) * sz)
+        return raw.normalized()
+    }
+
+    fn compose(ref Euler other) → Quaternion ∪ none {
+        const Quaternion ∪ none qa ← self.to_quaternion()
+        if qa is none then return null
+        const Quaternion ∪ none qb ← other.to_quaternion()
+        if qb is none then return null
+        const Quaternion av ← qa
+        const Quaternion bv ← qb
+        const Quaternion product ← av.multiply(bv)
+        return product.normalized()
+    }
+
+    fn lerp(ref Euler other, f32 ratio) → Euler ∪ none {
+        if self.order ≢ other.order then return null
+        if self.order ≢ "XYZ" then return null
+        return Euler {x = self.x + (other.x - self.x) * ratio, y = self.y + (other.y - self.y) * ratio, z = self.z + (other.z - self.z) * ratio, order = "XYZ"}
+    }
+}
+
+@ public
+fn quaternion(f32 x, f32 y, f32 z, f32 w) → Quaternion {
+    return Quaternion {x = x, y = y, z = z, w = w}
+}
+
+@ public
+fn euler(f32 x, f32 y, f32 z) → Euler {
+    return Euler {x = x, y = y, z = z, order = "XYZ"}
+}
+
+@ public
+fn matrix_compose(vector<f32, 3> position, ref Quaternion rotation, vector<f32, 3> scale_vector) → matrix<f32, [4, 4]> {
+    const Quaternion q ← rotation.normalized()
+    const f32 xx ← q.x * q.x
+    const f32 yy ← q.y * q.y
+    const f32 zz ← q.z * q.z
+    const f32 xy ← q.x * q.y
+    const f32 xz ← q.x * q.z
+    const f32 yz ← q.y * q.z
+    const f32 wx ← q.w * q.x
+    const f32 wy ← q.w * q.y
+    const f32 wz ← q.w * q.z
+    const f32 sx ← scale_vector.dot(basis3(0))
+    const f32 sy ← scale_vector.dot(basis3(1))
+    const f32 sz ← scale_vector.dot(basis3(2))
+    const vector<f32, 4> c0 ← [(1.0 - 2.0 * (yy + zz)) * sx, (2.0 * (xy + wz)) * sx, (2.0 * (xz - wy)) * sx, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> c1 ← [(2.0 * (xy - wz)) * sy, (1.0 - 2.0 * (xx + zz)) * sy, (2.0 * (yz + wx)) * sy, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> c2 ← [(2.0 * (xz + wy)) * sz, (2.0 * (yz - wx)) * sz, (1.0 - 2.0 * (xx + yy)) * sz, 0.0] ↦ vector<f32, 4>
+    const f32 px ← position.dot(basis3(0))
+    const f32 py ← position.dot(basis3(1))
+    const f32 pz ← position.dot(basis3(2))
+    const vector<f32, 4> c3 ← [px, py, pz, 1.0] ↦ vector<f32, 4>
+    return matrix_from_columns(c0, c1, c2, c3)
+}
+
+fn reduced_angle(f32 angle) → f32 {
+    var f32 reduced ← angle
+    while reduced ≻ 3.14159265 {
+        reduced ← reduced - 6.2831853
+    }
+    while reduced ≺ -3.14159265 {
+        reduced ← reduced + 6.2831853
+    }
+    return reduced
+}
+
+fn sin_f32(f32 angle) → f32 {
+    const f32 t ← reduced_angle(angle)
+    const f32 t2 ← t * t
+    const f32 t4 ← t2 * t2
+    const f32 t6 ← t4 * t2
+    const f32 t8 ← t6 * t2
+    return t * ((((1.0 - t2 / 6.0) + t4 / 120.0) - t6 / 5040.0) + t8 / 362880.0)
+}
+
+fn cos_f32(f32 angle) → f32 {
+    const f32 t ← reduced_angle(angle)
+    const f32 t2 ← t * t
+    const f32 t4 ← t2 * t2
+    const f32 t6 ← t4 * t2
+    const f32 t8 ← t6 * t2
+    return (((1.0 - t2 / 2.0) + t4 / 24.0) - t6 / 720.0) + t8 / 40320.0
+}
+
+@ public
+fn radians_from_degrees(f32 degrees) → f32 {
+    return degrees * 0.017453292519943295
+}
+
+@ public
+fn matrix_perspective(f32 fov_y_degrees, f32 aspect, f32 near, f32 far) → matrix<f32, [4, 4]> ∪ none {
+    if fov_y_degrees ≤ 0.0 or fov_y_degrees ≥ 180.0 then return null
+    if aspect ≤ 0.0 then return null
+    if near ≤ 0.0 or far ≤ near then return null
+    const f32 half_angle ← radians_from_degrees(fov_y_degrees) * 0.5
+    const f32 sine ← sin_f32(half_angle)
+    if sine.abs() ≤ 0.000001 then return null
+    const f32 focal ← cos_f32(half_angle) / sine
+    const f32 depth ← far / (near - far)
+    const vector<f32, 4> c0 ← [focal / aspect, 0.0, 0.0, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> c1 ← [0.0, focal, 0.0, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> c2 ← [0.0, 0.0, depth, -1.0 ∷ f32] ↦ vector<f32, 4>
+    const vector<f32, 4> c3 ← [0.0, 0.0, near * depth, 0.0] ↦ vector<f32, 4>
+    return matrix_from_columns(c0, c1, c2, c3)
+}
+
+@ public
+fn matrix_look_at(vector<f32, 3> eye, vector<f32, 3> target, vector<f32, 3> up) → matrix<f32, [4, 4]> ∪ none {
+    const vector<f32, 3> toward ← target.subtracted(eye)
+    const vector<f32, 3> forward ← normalized3(toward)
+    if length(forward) ≤ 0.000001 then return null
+    const vector<f32, 3> crossed ← forward.cross(up)
+    const vector<f32, 3> side ← normalized3(crossed)
+    if length(side) ≤ 0.000001 then return null
+    const vector<f32, 3> camera_up ← side.cross(forward)
+    const f32 fx ← forward.dot(basis3(0))
+    const f32 fy ← forward.dot(basis3(1))
+    const f32 fz ← forward.dot(basis3(2))
+    const f32 sx ← side.dot(basis3(0))
+    const f32 sy ← side.dot(basis3(1))
+    const f32 sz ← side.dot(basis3(2))
+    const f32 ux ← camera_up.dot(basis3(0))
+    const f32 uy ← camera_up.dot(basis3(1))
+    const f32 uz ← camera_up.dot(basis3(2))
+    const vector<f32, 4> c0 ← [sx, ux, -fx, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> c1 ← [sy, uy, -fy, 0.0] ↦ vector<f32, 4>
+    const vector<f32, 4> c2 ← [sz, uz, -fz, 0.0] ↦ vector<f32, 4>
+    const f32 ex ← side.dot(eye)
+    const f32 ey ← camera_up.dot(eye)
+    const f32 ez ← forward.dot(eye)
+    const vector<f32, 4> c3 ← [-ex, -ey, ez, 1.0] ↦ vector<f32, 4>
+    return matrix_from_columns(c0, c1, c2, c3)
+}
+
+# --- BOX ---
+
+@ public
+class Box<size N> {
+    var vector<f32, N> minima
+    var vector<f32, N> maxima
+}
+
+@ public
+class BoxOverlapFacts {
+    var vector<f32, 3> overlap
+    var f32 x
+    var f32 y
+    var f32 z
+}
+
+@ public
+fn box_valid(Box<3> box) → bool {
+    const vector<f32, 3> measure ← box.maxima.subtracted(box.minima)
+    const f32 dx ← measure.dot(basis3(0))
+    const f32 dy ← measure.dot(basis3(1))
+    const f32 dz ← measure.dot(basis3(2))
+    return (dx ≥ 0.0 and dy ≥ 0.0) and dz ≥ 0.0
+}
+
+@ public
+fn box_contains(Box<3> box, vector<f32, 3> point) → bool {
+    const f32 px ← point.dot(basis3(0))
+    const f32 py ← point.dot(basis3(1))
+    const f32 pz ← point.dot(basis3(2))
+    const f32 minx ← box.minima.dot(basis3(0))
+    const f32 miny ← box.minima.dot(basis3(1))
+    const f32 minz ← box.minima.dot(basis3(2))
+    const f32 maxx ← box.maxima.dot(basis3(0))
+    const f32 maxy ← box.maxima.dot(basis3(1))
+    const f32 maxz ← box.maxima.dot(basis3(2))
+    return ((((px ≥ minx and px ≤ maxx) and py ≥ miny) and py ≤ maxy) and pz ≥ minz) and pz ≤ maxz
+}
+
+@ public
+fn box_intersects(Box<3> a, Box<3> b) → bool {
+    const f32 amaxx ← a.maxima.dot(basis3(0))
+    const f32 amaxy ← a.maxima.dot(basis3(1))
+    const f32 amaxz ← a.maxima.dot(basis3(2))
+    const f32 aminx ← a.minima.dot(basis3(0))
+    const f32 aminy ← a.minima.dot(basis3(1))
+    const f32 aminz ← a.minima.dot(basis3(2))
+    const f32 bminx ← b.minima.dot(basis3(0))
+    const f32 bminy ← b.minima.dot(basis3(1))
+    const f32 bminz ← b.minima.dot(basis3(2))
+    const f32 bmaxx ← b.maxima.dot(basis3(0))
+    const f32 bmaxy ← b.maxima.dot(basis3(1))
+    const f32 bmaxz ← b.maxima.dot(basis3(2))
+    if amaxx ≺ bminx or aminx ≻ bmaxx then return false
+    if amaxy ≺ bminy or aminy ≻ bmaxy then return false
+    if amaxz ≺ bminz or aminz ≻ bmaxz then return false
+    return true
+}
+
+@ public
+fn box_inflated(Box<3> box, f32 amount) → Box<3> {
+    const vector<f32, 3> lo ← box.minima.subtracted(uniform3(amount))
+    const vector<f32, 3> hi ← box.maxima.added(uniform3(amount))
+    const Box<3> expanded ← Box {minima = lo, maxima = hi}
+    return expanded
+}
+
+@ public
+fn box_center(Box<3> box) → vector<f32, 3> ∪ none {
+    if not box_valid(box) then return null
+    const vector<f32, 3> sum ← box.minima.added(box.maxima)
+    return sum.multiplied(uniform3(0.5))
+}
+
+@ public
+fn box_contains_box(Box<3> box, Box<3> other) → bool {
+    return box_contains(box, other.minima) and box_contains(box, other.maxima)
+}
+
+@ public
+fn box_overlap(Box<3> a, Box<3> b) → vector<f32, 3> ∪ none {
+    if not box_intersects(a, b) then return null
+    const f32 amaxx ← a.maxima.dot(basis3(0))
+    const f32 amaxy ← a.maxima.dot(basis3(1))
+    const f32 amaxz ← a.maxima.dot(basis3(2))
+    const f32 aminx ← a.minima.dot(basis3(0))
+    const f32 aminy ← a.minima.dot(basis3(1))
+    const f32 aminz ← a.minima.dot(basis3(2))
+    const f32 bmaxx ← b.maxima.dot(basis3(0))
+    const f32 bmaxy ← b.maxima.dot(basis3(1))
+    const f32 bmaxz ← b.maxima.dot(basis3(2))
+    const f32 bminx ← b.minima.dot(basis3(0))
+    const f32 bminy ← b.minima.dot(basis3(1))
+    const f32 bminz ← b.minima.dot(basis3(2))
+    const f32 ox ← (amaxx ⤓ bmaxx) - (aminx ⤒ bminx)
+    const f32 oy ← (amaxy ⤓ bmaxy) - (aminy ⤒ bminy)
+    const f32 oz ← (amaxz ⤓ bmaxz) - (aminz ⤒ bminz)
+    return [ox, oy, oz] ↦ vector<f32, 3>
+}
+
+@ public
+fn box_overlap_facts(Box<3> a, Box<3> b) → BoxOverlapFacts ∪ none {
+    const vector<f32, 3> ∪ none overlap_result ← box_overlap(a, b)
+    if overlap_result is none then return null
+    const vector<f32, 3> overlap ← overlap_result
+    const f32 ox ← overlap.dot(basis3(0))
+    const f32 oy ← overlap.dot(basis3(1))
+    const f32 oz ← overlap.dot(basis3(2))
+    return BoxOverlapFacts {overlap = overlap, x = ox, y = oy, z = oz}
+}
+
+@ public
+fn box_union(Box<3> a, Box<3> b) → Box<3> ∪ none {
+    if not box_valid(a) or not box_valid(b) then return null
+    const f32 minx ← a.minima.dot(basis3(0)) ⤓ b.minima.dot(basis3(0))
+    const f32 miny ← a.minima.dot(basis3(1)) ⤓ b.minima.dot(basis3(1))
+    const f32 minz ← a.minima.dot(basis3(2)) ⤓ b.minima.dot(basis3(2))
+    const f32 maxx ← a.maxima.dot(basis3(0)) ⤒ b.maxima.dot(basis3(0))
+    const f32 maxy ← a.maxima.dot(basis3(1)) ⤒ b.maxima.dot(basis3(1))
+    const f32 maxz ← a.maxima.dot(basis3(2)) ⤒ b.maxima.dot(basis3(2))
+    const vector<f32, 3> lo ← [minx, miny, minz] ↦ vector<f32, 3>
+    const vector<f32, 3> hi ← [maxx, maxy, maxz] ↦ vector<f32, 3>
+    const Box<3> united ← Box {minima = lo, maxima = hi}
+    return united
+}
+
+@ public
+fn box_from_min_max(vector<f32, 3> minimum, vector<f32, 3> maximum) → Box<3> ∪ none {
+    const Box<3> bounds ← Box {minima = minimum, maxima = maximum}
+    if not box_valid(bounds) then return null
+    return bounds
+}
+
+@ public
+fn box_from_min_and_size(vector<f32, 3> minimum, vector<f32, 3> size_vector) → Box<3> ∪ none {
+    const f32 sx ← size_vector.dot(basis3(0))
+    const f32 sy ← size_vector.dot(basis3(1))
+    const f32 sz ← size_vector.dot(basis3(2))
+    if (sx ≤ 0.0 or sy ≤ 0.0) or sz ≤ 0.0 then return null
+    const vector<f32, 3> maximum ← minimum.added(size_vector)
+    const Box<3> bounds ← Box {minima = minimum, maxima = maximum}
+    return bounds
+}
+
+@ public
+fn box_from_center_and_size(vector<f32, 3> center, vector<f32, 3> size_vector) → Box<3> ∪ none {
+    const f32 sx ← size_vector.dot(basis3(0))
+    const f32 sy ← size_vector.dot(basis3(1))
+    const f32 sz ← size_vector.dot(basis3(2))
+    if (sx ≤ 0.0 or sy ≤ 0.0) or sz ≤ 0.0 then return null
+    const vector<f32, 3> half ← size_vector.multiplied(uniform3(0.5))
+    const vector<f32, 3> lo ← center.subtracted(half)
+    const vector<f32, 3> hi ← center.added(half)
+    const Box<3> bounds ← Box {minima = lo, maxima = hi}
+    return bounds
+}
+
+@ public
+fn box_size(Box<3> box) → vector<f32, 3> ∪ none {
+    if not box_valid(box) then return null
+    return box.maxima.subtracted(box.minima)
+}
+
+@ public
+fn box_translated(Box<3> box, vector<f32, 3> offset) → Box<3> {
+    const vector<f32, 3> lo ← box.minima.added(offset)
+    const vector<f32, 3> hi ← box.maxima.added(offset)
+    const Box<3> moved ← Box {minima = lo, maxima = hi}
+    return moved
+}
+
+# --- SPHERE, PLANE, RAY ---
+
+@ public
+class Sphere {
+    var vector<f32, 3> center
+    var f32 radius
+
+    fn contains(vector<f32, 3> point) → bool {
+        return distance(self.center, point) ≤ self.radius
+    }
+}
+
+@ public
+class Plane {
+    var vector<f32, 3> normal
+    var f32 constant
+
+    fn distance(vector<f32, 3> point) → f32 {
+        return self.normal.dot(point) + self.constant
+    }
+}
+
+@ public
+class RayInterval {
+    var f32 minimum
+    var f32 maximum
+}
+
+@ public
+class RayBoxHit {
+    var f32 distance
+    var vector<f32, 3> point
+    var vector<f32, 3> normal
+
+    fn hit_face_code() → int ∪ none {
+        const f32 nx ← self.normal.dot(basis3(0))
+        const f32 ny ← self.normal.dot(basis3(1))
+        const f32 nz ← self.normal.dot(basis3(2))
+        if nx ≡ -1.0 ∷ f32 then return 1
+        if nx ≡ 1.0 ∷ f32 then return 2
+        if ny ≡ -1.0 ∷ f32 then return 3
+        if ny ≡ 1.0 ∷ f32 then return 4
+        if nz ≡ -1.0 ∷ f32 then return 5
+        if nz ≡ 1.0 ∷ f32 then return 6
+        return null
+    }
+
+    fn hit_face_offset_x() → int ∪ none {
+        const int ∪ none code_result ← self.hit_face_code()
+        if code_result is none then return null
+        return face_code_x_offset(code_result)
+    }
+
+    fn hit_face_offset_y() → int ∪ none {
+        const int ∪ none code_result ← self.hit_face_code()
+        if code_result is none then return null
+        return face_code_y_offset(code_result)
+    }
+
+    fn hit_face_offset_z() → int ∪ none {
+        const int ∪ none code_result ← self.hit_face_code()
+        if code_result is none then return null
+        return face_code_z_offset(code_result)
+    }
+
+    fn hit_face_facts() → FaceCodeFacts ∪ none {
+        const int ∪ none code_result ← self.hit_face_code()
+        if code_result is none then return null
+        return face_code_facts(code_result)
+    }
+}
+
+fn axis_interval(f32 origin, f32 direction, f32 minimum, f32 maximum) → RayInterval ∪ none {
+    if direction.abs() ≤ 0.000001 {
+        if origin ≺ minimum or origin ≻ maximum then return null
+        return RayInterval {minimum = -1000000000.0, maximum = 1000000000.0}
+    }
+    const f32 first ← (minimum - origin) / direction
+    const f32 second ← (maximum - origin) / direction
+    return RayInterval {minimum = first ⤓ second, maximum = first ⤒ second}
+}
+
+fn hit_normal(Box<3> bounds, vector<f32, 3> point) → vector<f32, 3> {
+    const f32 px ← point.dot(basis3(0))
+    const f32 py ← point.dot(basis3(1))
+    const f32 pz ← point.dot(basis3(2))
+    const f32 minx ← bounds.minima.dot(basis3(0))
+    const f32 miny ← bounds.minima.dot(basis3(1))
+    const f32 minz ← bounds.minima.dot(basis3(2))
+    const f32 maxx ← bounds.maxima.dot(basis3(0))
+    const f32 maxy ← bounds.maxima.dot(basis3(1))
+    const f32 maxz ← bounds.maxima.dot(basis3(2))
+    if (px - minx).abs() ≤ 0.0001 then return [-1.0, 0.0, 0.0] ↦ vector<f32, 3>
+    if (px - maxx).abs() ≤ 0.0001 then return [1.0, 0.0, 0.0] ↦ vector<f32, 3>
+    if (py - miny).abs() ≤ 0.0001 then return [0.0, -1.0, 0.0] ↦ vector<f32, 3>
+    if (py - maxy).abs() ≤ 0.0001 then return [0.0, 1.0, 0.0] ↦ vector<f32, 3>
+    if (pz - minz).abs() ≤ 0.0001 then return [0.0, 0.0, -1.0] ↦ vector<f32, 3>
+    if (pz - maxz).abs() ≤ 0.0001 then return [0.0, 0.0, 1.0] ↦ vector<f32, 3>
+    return [0.0, 0.0, 0.0] ↦ vector<f32, 3>
+}
+
+@ public
+class Ray {
+    var vector<f32, 3> origin
+    var vector<f32, 3> direction
+
+    fn point_at(f32 distance) → vector<f32, 3> {
+        const vector<f32, 3> stepped ← self.direction.multiplied(uniform3(distance))
+        return self.origin.added(stepped)
+    }
+
+    fn intersects_box(Box<3> box, f32 max_distance) → f32 ∪ none {
+        if not box_valid(box) then return null
+        if max_distance ≺ 0.0 then return null
+        const RayInterval ∪ none x_interval ← axis_interval(self.origin.dot(basis3(0)), self.direction.dot(basis3(0)), box.minima.dot(basis3(0)), box.maxima.dot(basis3(0)))
+        if x_interval is none then return null
+        const RayInterval ∪ none y_interval ← axis_interval(self.origin.dot(basis3(1)), self.direction.dot(basis3(1)), box.minima.dot(basis3(1)), box.maxima.dot(basis3(1)))
+        if y_interval is none then return null
+        const RayInterval ∪ none z_interval ← axis_interval(self.origin.dot(basis3(2)), self.direction.dot(basis3(2)), box.minima.dot(basis3(2)), box.maxima.dot(basis3(2)))
+        if z_interval is none then return null
+        const RayInterval x_axis ← x_interval
+        const RayInterval y_axis ← y_interval
+        const RayInterval z_axis ← z_interval
+        const f32 entry ← (((x_axis.minimum ⤒ y_axis.minimum) ⤒ z_axis.minimum) ⤒ 0.0)
+        const f32 exit ← (((x_axis.maximum ⤓ y_axis.maximum) ⤓ z_axis.maximum) ⤓ max_distance)
+        if entry ≻ exit then return null
+        return entry
+    }
+
+    fn box_hit(Box<3> box, f32 max_distance) → RayBoxHit ∪ none {
+        const f32 ∪ none distance_result ← self.intersects_box(box, max_distance)
+        if distance_result is none then return null
+        const f32 distance ← distance_result
+        const vector<f32, 3> point ← self.point_at(distance)
+        return RayBoxHit {distance = distance, point = point, normal = hit_normal(box, point)}
+    }
+}
+
+# --- FACE CODES ---
+
+@ public
+class FaceCodeFacts {
+    var int code
+    var int axis_code
+    var int opposite_code
+    var int x_offset
+    var int y_offset
+    var int z_offset
+    var vector<f32, 3> normal
+    var Color color
+}
+
+@ public
+fn face_code_valid(int code) → bool {
+    return code ≥ 1 and code ≤ 6
+}
+
+@ public
+fn face_code_axis_code(int code) → int ∪ none {
+    if not face_code_valid(code) then return null
+    if code ≤ 2 then return 1
+    if code ≤ 4 then return 2
+    return 3
+}
+
+@ public
+fn face_code_opposite(int code) → int ∪ none {
+    if not face_code_valid(code) then return null
+    if code % 2 ≡ 1 then return code + 1
+    return code - 1
+}
+
+@ public
+fn face_code_x_offset(int code) → int ∪ none {
+    if not face_code_valid(code) then return null
+    const int negative ← -1
+    if code ≡ 1 then return negative
+    if code ≡ 2 then return 1
+    return 0
+}
+
+@ public
+fn face_code_y_offset(int code) → int ∪ none {
+    if not face_code_valid(code) then return null
+    const int negative ← -1
+    if code ≡ 3 then return negative
+    if code ≡ 4 then return 1
+    return 0
+}
+
+@ public
+fn face_code_z_offset(int code) → int ∪ none {
+    if not face_code_valid(code) then return null
+    const int negative ← -1
+    if code ≡ 5 then return negative
+    if code ≡ 6 then return 1
+    return 0
+}
+
+@ public
+fn face_code_normal(int code) → vector<f32, 3> ∪ none {
+    if code ≡ 1 then return [-1.0, 0.0, 0.0] ↦ vector<f32, 3>
+    if code ≡ 2 then return [1.0, 0.0, 0.0] ↦ vector<f32, 3>
+    if code ≡ 3 then return [0.0, -1.0, 0.0] ↦ vector<f32, 3>
+    if code ≡ 4 then return [0.0, 1.0, 0.0] ↦ vector<f32, 3>
+    if code ≡ 5 then return [0.0, 0.0, -1.0] ↦ vector<f32, 3>
+    if code ≡ 6 then return [0.0, 0.0, 1.0] ↦ vector<f32, 3>
+    return null
+}
+
+@ public
+fn face_code_color(int code) → Color ∪ none {
+    if code ≡ 1 then return Color {r = 0.8, g = 0.1, b = 0.1}
+    if code ≡ 2 then return Color {r = 1.0, g = 0.4, b = 0.4}
+    if code ≡ 3 then return Color {r = 0.1, g = 0.7, b = 0.1}
+    if code ≡ 4 then return Color {r = 0.4, g = 1.0, b = 0.4}
+    if code ≡ 5 then return Color {r = 0.1, g = 0.1, b = 0.8}
+    if code ≡ 6 then return Color {r = 0.4, g = 0.4, b = 1.0}
+    return null
+}
+
+@ public
+fn face_code_facts(int code) → FaceCodeFacts ∪ none {
+    if not face_code_valid(code) then return null
+    const int ∪ none axis_result ← face_code_axis_code(code)
+    if axis_result is none then return null
+    const int ∪ none opposite_result ← face_code_opposite(code)
+    if opposite_result is none then return null
+    const int ∪ none x_offset_result ← face_code_x_offset(code)
+    if x_offset_result is none then return null
+    const int ∪ none y_offset_result ← face_code_y_offset(code)
+    if y_offset_result is none then return null
+    const int ∪ none z_offset_result ← face_code_z_offset(code)
+    if z_offset_result is none then return null
+    const vector<f32, 3> ∪ none normal_result ← face_code_normal(code)
+    if normal_result is none then return null
+    const Color ∪ none color_result ← face_code_color(code)
+    if color_result is none then return null
+    return FaceCodeFacts {code = code, axis_code = axis_result, opposite_code = opposite_result, x_offset = x_offset_result, y_offset = y_offset_result, z_offset = z_offset_result, normal = normal_result, color = color_result}
+}
+
+# --- CAMERA ---
+
+@ public
+class CameraYawPitchFacts {
+    var f32 yaw_degrees
+    var f32 pitch_degrees
+    var f32 clamped_pitch_degrees
+    var vector<f32, 3> direction
+    var vector<f32, 3> planar_forward
+    var vector<f32, 3> planar_right
+    var Ray ray
+}
+
+@ public
+fn camera_pitch_clamped(f32 pitch_degrees) → f32 {
+    return pitch_degrees ⤒ -89.0 ⤓ 89.0
+}
+
+@ public
+fn camera_direction_from_yaw_pitch(f32 yaw_degrees, f32 pitch_degrees) → vector<f32, 3> {
+    const f32 yaw ← radians_from_degrees(yaw_degrees)
+    const f32 pitch ← radians_from_degrees(camera_pitch_clamped(pitch_degrees))
+    const f32 horizontal ← cos_f32(pitch)
+    return normalized3([sin_f32(yaw) * horizontal, sin_f32(pitch), -cos_f32(yaw) * horizontal] ↦ vector<f32, 3>)
+}
+
+@ public
+fn camera_planar_forward_from_yaw(f32 yaw_degrees) → vector<f32, 3> {
+    const f32 yaw ← radians_from_degrees(yaw_degrees)
+    return normalized3([sin_f32(yaw), 0.0, -cos_f32(yaw)] ↦ vector<f32, 3>)
+}
+
+@ public
+fn camera_right_from_yaw(f32 yaw_degrees) → vector<f32, 3> {
+    const f32 yaw ← radians_from_degrees(yaw_degrees)
+    return normalized3([cos_f32(yaw), 0.0, sin_f32(yaw)] ↦ vector<f32, 3>)
+}
+
+@ public
+fn camera_planar_motion_from_yaw(f32 yaw_degrees, f32 forward_amount, f32 right_amount, f32 speed, f32 delta_seconds) → vector<f32, 3> {
+    if speed ≤ 0.0 or delta_seconds ≤ 0.0 then return [0.0, 0.0, 0.0] ↦ vector<f32, 3>
+    const vector<f32, 3> forward ← camera_planar_forward_from_yaw(yaw_degrees)
+    const vector<f32, 3> right ← camera_right_from_yaw(yaw_degrees)
+    const vector<f32, 3> forward_step ← scale3(forward, forward_amount)
+    const vector<f32, 3> right_step ← scale3(right, right_amount)
+    const vector<f32, 3> mixed ← forward_step.added(right_step)
+    const vector<f32, 3> directed ← normalized3(mixed)
+    return scale3(directed, speed * delta_seconds)
+}
+
+@ public
+fn camera_ray_from_yaw_pitch(vector<f32, 3> origin, f32 yaw_degrees, f32 pitch_degrees) → Ray {
+    return Ray {origin = origin, direction = camera_direction_from_yaw_pitch(yaw_degrees, pitch_degrees)}
+}
+
+@ public
+fn camera_yaw_pitch_facts(vector<f32, 3> origin, f32 yaw_degrees, f32 pitch_degrees) → CameraYawPitchFacts {
+    return CameraYawPitchFacts {yaw_degrees = yaw_degrees, pitch_degrees = pitch_degrees, clamped_pitch_degrees = camera_pitch_clamped(pitch_degrees), direction = camera_direction_from_yaw_pitch(yaw_degrees, pitch_degrees), planar_forward = camera_planar_forward_from_yaw(yaw_degrees), planar_right = camera_right_from_yaw(yaw_degrees), ray = camera_ray_from_yaw_pitch(origin, yaw_degrees, pitch_degrees)}
+}

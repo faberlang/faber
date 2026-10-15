@@ -415,6 +415,43 @@ targets = ["rust"]
     dir.to_path_buf()
 }
 
+/// `kind = "lib"` package whose source root holds a frozen copy of the live
+/// `triga` `src/math.fab` (provenance: frozen copy of triga src/math.fab,
+/// 2026-10-15). Returns the package ROOT; the module file is the build
+/// input, matching `faber build <lib>/src/math.fab` — a lib package without
+/// `paths.entry` records the source-root directory as its entry, so its
+/// artifact is not loadable.
+fn write_triga_math_lib_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "libpkg"
+version = "0.0.0"
+edition = "2026"
+
+[library]
+provider = "libpkg"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(
+        src.join("math.fab"),
+        include_str!("fhir_triga_math_fixture.fab"),
+    )
+    .expect("write math.fab");
+    dir.to_path_buf()
+}
+
 /// Extract the code string from a codegen [`radix::module::Output`].
 fn output_code(output: &radix::module::Output) -> &str {
     match output {
@@ -447,6 +484,27 @@ fn lib_package_directory_input_builds_fhir_package() {
     // Control: the entry-file input was already supported and must stay so.
     let entry = package_root.join("src/main.fab");
     build_fhir_with_faber_seams(&Config::default(), &entry).expect("entry-file input must stay Ok");
+}
+
+#[test]
+fn triga_math_content_builds_fhir_package() {
+    let dir = test_temp_dir("fhir-triga-math");
+    let package_root = write_triga_math_lib_package(&dir);
+    let artifact =
+        build_fhir_with_faber_seams(&Config::default(), &package_root.join("src/math.fab"))
+            .expect("triga math.fab content must build FHIR");
+    assert!(
+        artifact.package_path.is_file(),
+        "package artifact written: {}",
+        artifact.package_path.display()
+    );
+    assert_eq!(
+        artifact.package_path,
+        package_root.join("target/faber-fhir/package.fhirpkg")
+    );
+    // The build re-decodes each unit for MessagePack embedding, so a
+    // successful load proves the encode/decode gates pass on this content.
+    load_package_fhir(&artifact.package_path).expect("load FHIR package");
 }
 
 #[test]
