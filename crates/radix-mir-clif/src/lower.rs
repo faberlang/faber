@@ -1602,6 +1602,64 @@ impl FunctionLower<'_, '_> {
                     Rep::Bool,
                 )
             }
+            (
+                MirCollectionOp::Floor
+                | MirCollectionOp::Ceiling
+                | MirCollectionOp::Round
+                | MirCollectionOp::Truncate,
+                Rep::Float,
+            ) => {
+                let rounded = match op {
+                    MirCollectionOp::Floor => self.builder.ins().floor(handle),
+                    MirCollectionOp::Ceiling => self.builder.ins().ceil(handle),
+                    MirCollectionOp::Round => self.builder.ins().nearest(handle),
+                    _ => self.builder.ins().trunc(handle),
+                };
+                (
+                    Some(self.builder.ins().fcvt_to_sint(types::I64, rounded)),
+                    Rep::Int,
+                )
+            }
+            (MirCollectionOp::Absolute, Rep::Int) => {
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let negative = self.builder.ins().icmp(IntCC::SignedLessThan, handle, zero);
+                let flipped = self.builder.ins().ineg(handle);
+                (
+                    Some(self.builder.ins().select(negative, flipped, handle)),
+                    Rep::Int,
+                )
+            }
+            (MirCollectionOp::Absolute, Rep::Float) => {
+                (Some(self.builder.ins().fabs(handle)), Rep::Float)
+            }
+            (MirCollectionOp::Signum, Rep::Int) => {
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let positive = self
+                    .builder
+                    .ins()
+                    .icmp(IntCC::SignedGreaterThan, handle, zero);
+                let negative = self.builder.ins().icmp(IntCC::SignedLessThan, handle, zero);
+                let positive = self.builder.ins().uextend(types::I64, positive);
+                let negative = self.builder.ins().uextend(types::I64, negative);
+                (Some(self.builder.ins().isub(positive, negative)), Rep::Int)
+            }
+            (MirCollectionOp::Minimum | MirCollectionOp::Maximum, Rep::Int | Rep::Float) => {
+                let [_, other] = args else {
+                    return Err(Decline::new("minimum arity"));
+                };
+                let (other, other_rep) = self.scalar(other)?;
+                if other_rep != rep {
+                    return Err(Decline::new("minimum operand representation"));
+                }
+                let smallest = op == MirCollectionOp::Minimum;
+                let picked = match (rep, smallest) {
+                    (Rep::Int, true) => self.builder.ins().smin(handle, other),
+                    (Rep::Int, false) => self.builder.ins().smax(handle, other),
+                    (_, true) => self.builder.ins().fmin(handle, other),
+                    (_, false) => self.builder.ins().fmax(handle, other),
+                };
+                (Some(picked), rep)
+            }
             (MirCollectionOp::Index, Rep::Text) => {
                 let [_, index] = args else {
                     return Err(Decline::new("index arity"));

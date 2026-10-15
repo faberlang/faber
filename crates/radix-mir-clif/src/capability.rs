@@ -555,6 +555,14 @@ impl MirVisitor for ClifCapability<'_> {
                             | MirCollectionOp::Delete
                             | MirCollectionOp::Keys
                             | MirCollectionOp::Values
+                            | MirCollectionOp::Floor
+                            | MirCollectionOp::Ceiling
+                            | MirCollectionOp::Round
+                            | MirCollectionOp::Truncate
+                            | MirCollectionOp::Absolute
+                            | MirCollectionOp::Signum
+                            | MirCollectionOp::Minimum
+                            | MirCollectionOp::Maximum
                     )
             )
         {
