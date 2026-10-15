@@ -15,16 +15,16 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • `for from valores var v { ... }` binds each element to a fresh mutable
+#   • `for from valores mut v { ... }` binds each element to a fresh mutable
 #     slot — writes inside the body are legal and never leak across
 #     iterations, so the loop needs no manual reset
-#   • the binder is an ordinary `varia` binding: runtime assignment (`←`)
+#   • the binder is an ordinary `mut` binding: runtime assignment (`←`)
 #     inside the body works exactly as it does on any mutable local
 #
 # Common mistakes:
 #   • expecting writes to the binder to accumulate across iterations — each
 #     element gets its own slot
-#   • reading `var` as permission to mutate the source collection — the
+#   • reading `mut` as permission to mutate the source collection — the
 #     element is a copy
 #
 # See also: ex, fixum, de
@@ -32,10 +32,10 @@ locale = "en"
 
 # itera — mutable varia binder
 #
-# for from <collection> var <binder> { <body> }
+# for from <collection> mut <binder> { <body> }
 #
 # GRAMMAR:
-#   forInStmt :← 'itera' 'ex' expr ('fixum' | 'varia') ident block
+#   forInStmt :← 'itera' 'ex' expr ('sit' | 'varia') ident block
 #
 # EXPECTED OUTPUT:
 #   varia-binder.expected — each element doubled inside its own slot.

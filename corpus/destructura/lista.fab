@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "destructuring"
 canonical = true
 summary = "Extracts fields from a value into local bindings."
-syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
+syntax = "ex <expression> <sit|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
 locale = "en"
 +++
@@ -14,8 +14,8 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Lista destructuring — `fixum [a, b, c] ← lista` extracts elements from a lista into individual bindings.
-#   • Rest patterns — `fixum [caput, ceteri cauda] ← lista` captures remaining elements.
+#   • Lista destructuring — `sit [a, b, c] ← lista` extracts elements from a lista into individual bindings.
+#   • Rest patterns — `sit [caput, ceteri cauda] ← lista` captures remaining elements.
 #   • Mutable destructuring — `varia [x, y] ← lista` for mutable bindings.
 #   • Skip and nested patterns — underscore `_` skips elements; nested listas destructure recursively.
 #
@@ -28,13 +28,13 @@ locale = "en"
 
 # destructura — lista destructuring patterns
 #
-# fixum [a, b, c] ← lista
+# sit [a, b, c] ← lista
 # varia [x, y, z] ← lista
-# fixum [caput, ceteri cauda] ← lista
-# fixum [_, medius, _] ← lista
+# sit [caput, ceteri cauda] ← lista
+# sit [_, medius, _] ← lista
 #
 # GRAMMAR:
-#   destructStmt :← ('fixum' | 'varia') '[' patternList ']' '←' expr
+#   destructStmt :← ('sit' | 'varia') '[' patternList ']' '←' expr
 #
 # EXPECTED OUTPUT:
 #   Element values from inline and bound listas, rest slices, nested rows.

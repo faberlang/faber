@@ -378,7 +378,7 @@ fn hmac(string alg, list<b8> key, list<b8> data) → list<b8> ⇥ string {
         throw "norma:crypto.hmac: algorithm must be hmac-sha256, hmac-sha384, or hmac-sha512"
     }
     # SEM065: `key` is an unmarked read-only parameter and `bytes` is a
-    # shareable container payload, so `var` cannot bind it directly; the
+    # shareable container payload, so `mut` cannot bind it directly; the
     # `copy` makes an independently mutable working key for the block branch.
     mut list<b8> k ← copy key
     if k.length() ≻ block {

@@ -36,7 +36,7 @@ locale = "en"
 
 # itera — destructuring loop binders
 #
-# for from <collection> <const|var> <pattern> { <body> }
+# for from <collection> <let|mut> <pattern> { <body> }
 #
 # The binder accepts the same array/object patterns as binding position:
 #   [a, b]              positional slots
@@ -45,7 +45,7 @@ locale = "en"
 #   [_, x]              holes
 #
 # GRAMMAR:
-#   forInStmt :← 'itera' 'ex' expr ('fixum' | 'varia') pattern block
+#   forInStmt :← 'itera' 'ex' expr ('sit' | 'varia') pattern block
 #
 # EXPECTED OUTPUT:
 #   destructuring.expected — sums and elements from every pattern form.

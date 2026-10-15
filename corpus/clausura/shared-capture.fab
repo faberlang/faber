@@ -18,7 +18,7 @@ locale = "en"
 #   • By reference — an unmarked closure does not copy what it captures; a
 #     captured name IS the enclosing binding, so a later outer write is
 #     visible inside the closure
-#   • Writes flow out — a closure that assigns a captured `var` changes the
+#   • Writes flow out — a closure that assigns a captured `mut` binding changes the
 #     enclosing binding; an escaping closure (`counter`) keeps its own
 #     binding alive
 #   • Fresh loop bindings — `for … let i` binds a new `i` each iteration,
@@ -26,7 +26,7 @@ locale = "en"
 #
 # Common mistakes:
 #   • expecting a snapshot — capture is not a copy; read the value into a
-#     `const` first if a snapshot is wanted
+#     `let` first if a snapshot is wanted
 #
 # See also: clausura, ∴
 # =============================================================================

@@ -12,7 +12,7 @@ locale = "en"
 # A match over two scrutinees. The header is `match a and b`; every arm lists
 # one pattern per subject joined by `and`; the arms are tried in order and the
 # first arm whose patterns all match runs. `_` matches anything for its subject,
-# and `default` is the catch-all arm. A pattern with `const` binds the
+# and `default` is the catch-all arm. A pattern with `let` binds the
 # variant's fields for that arm only.
 union Shape {
     Circle {

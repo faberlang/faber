@@ -26,12 +26,12 @@ locale = "en"
 
 # itera ex — nested loops (Cartesian product)
 #
-# itera ex <collection> fixum <item> { <body> }
-# itera ab <start>‥<end> fixum <item> { <body> }
+# itera ex <collection> sit <item> { <body> }
+# itera ab <start>‥<end> sit <item> { <body> }
 #
 # GRAMMAR:
-#   forInStmt    :← 'itera' 'ex' expr 'fixum' ident block
-#   forRangeStmt :← 'itera' 'ab' rangeExpr 'fixum' ident block
+#   forInStmt    :← 'itera' 'ex' expr 'sit' ident block
+#   forRangeStmt :← 'itera' 'ab' rangeExpr 'sit' ident block
 #
 # EXPECTED OUTPUT:
 #   none — row/col pairs, multiplication table, coordinate grids.

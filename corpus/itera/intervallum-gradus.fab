@@ -27,11 +27,11 @@ locale = "en"
 
 # itera ab — ranges with step using per
 #
-# itera ab <start>‥<end> per <step> fixum <item> { <body> }
-# itera ab <start>…<end> per <step> fixum <item> { <body> }
+# itera ab <start>‥<end> per <step> sit <item> { <body> }
+# itera ab <start>…<end> per <step> sit <item> { <body> }
 #
 # GRAMMAR:
-#   forRangeStmt :← 'itera' 'ab' rangeExpr 'per' expr ('fixum' | 'varia') ident block
+#   forRangeStmt :← 'itera' 'ab' rangeExpr 'per' expr ('sit' | 'varia') ident block
 #
 # EXPECTED OUTPUT:
 #   intervallum-gradus.expected — positive-step, inclusive, and descending

@@ -26,8 +26,7 @@ fn carum() → bool {
 #     (`sic/secus`), and bitwise (`∧ ∨ ⊻ ⇐ ⇒`)
 #   • Assignment patterns — explicit assignment (`←`) and postfix increment
 #     (`↑ ↓` statements)
-#   • `sit` sugar — compact inference syntax alongside explicit `fixum _`
-#     type inference
+#   • `sit` — inferred write-once locals alongside explicitly typed ones
 #
 # Common mistakes:
 #   • confusing `≡` (equality comparison) with `=` (structural field init) or `←` (assignment) — each operator has a distinct role
@@ -44,8 +43,7 @@ fn carum() → bool {
 # GRAMMAR:
 #   binaryExpr :← expr (arithOp | cmpOp | logicOp | bitwiseOp) expr
 #
-# Inferred result locals below mix fixum _ (explicit infer marker) with sit
-# (compact sugar) so both spellings stay visible in one tour.
+# Inferred result locals below use sit; typed locals state their type.
 #
 # EXPECTED OUTPUT:
 #   binarius.expected

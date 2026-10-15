@@ -26,7 +26,7 @@ locale = "en"
 # integratio — dense syntax tour (genus, closures, ranges, optional chaining)
 #
 # genus G { field sponte; field = default; functio … }
-# fixum T f ← T x ∴ fac { … }
+# sit T f ← T x ∴ fac { … }
 # n?.field vel default
 # itera ab lo usque hi per step { … }
 #

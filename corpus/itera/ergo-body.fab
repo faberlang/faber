@@ -35,7 +35,7 @@ locale = "en"
 # for from [10, 20, 30] let x then print x*2  -- value head (ex)
 #
 # GRAMMAR:
-#   iteraStmt :← 'itera' (('ex' | 'de') expr | 'ab' expr) … ('fixum' | 'varia')
+#   iteraStmt :← 'itera' (('ex' | 'de') expr | 'ab' expr) … ('sit' | 'varia')
 #                  IDENTIFIER (block_stmt | ergo_joint statement) cape_clause?
 #
 # EXPECTED OUTPUT:

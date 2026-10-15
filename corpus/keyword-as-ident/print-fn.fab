@@ -23,7 +23,7 @@ locale = "en"
 # Common mistakes:
 #   • Writing `print(x)` when the output statement is wanted — use the bare
 #     form `print x`.
-#   • Pairing `fn print` with a local `const string print` in the same scope —
+#   • Pairing `fn print` with a local `let string print` in the same scope —
 #     the binding shadows the function, so `print(...)` is no longer callable.
 #
 # See also: nota, functio, print-binding.fab, print-call.fab

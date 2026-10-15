@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "destructuring"
 canonical = true
 summary = "Extracts fields from a value into local bindings."
-syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
+syntax = "ex <expression> <sit|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
 locale = "en"
 no_expected = "awaiting-ruling"
@@ -17,11 +17,11 @@ ruling = "6e66822e"
 # =============================================================================
 #
 # What this teaches:
-#   • Field destructuring — `ex <expr> fixum <field>, ...` extracts named fields from genus records into local bindings.
-#   • Aliasing — `ex <expr> fixum <field> ut <alias>` renames extracted fields.
+#   • Field destructuring — `ex <expr> sit <field>, ...` extracts named fields from genus records into local bindings.
+#   • Aliasing — `ex <expr> sit <field> ut <alias>` renames extracted fields.
 #   • Mutable extraction — `ex <expr> varia <field>, ...` for mutable field bindings.
-#   • Rest pattern — `ex <expr> fixum <field>, ceteri <rest>` captures remaining fields as a tabula.
-#   • Nested paths — `ex <expr>.<field> fixum ...` destructures through nested paths.
+#   • Rest pattern — `ex <expr> sit <field>, ceteri <rest>` captures remaining fields as a tabula.
+#   • Nested paths — `ex <expr>.<field> sit ...` destructures through nested paths.
 #
 # Common mistakes:
 #   • Destructuring a field that does not exist on the target type — the field must be present in the genus definition or the type must support open shapes.
@@ -32,17 +32,17 @@ ruling = "6e66822e"
 
 # destructura — field destructuring with `ex`
 #
-# ex <expr> fixum <field>, ...
+# ex <expr> sit <field>, ...
 # ex <expr> varia <field>, ...
-# ex <expr> fixum <field> ut <alias>
-# ex <expr> fixum <field>, ceteri <rest>
+# ex <expr> sit <field> ut <alias>
+# ex <expr> sit <field>, ceteri <rest>
 #
 # Field destructuring works on genus records (fixed fields) and tabula/valor
 # (open shapes). This tour uses genus types so that field names are statically
 # known and codegen-complete.
 #
 # GRAMMAR:
-#   destructStmt :← 'ex' expr ('fixum' | 'varia') patternList
+#   destructStmt :← 'ex' expr ('sit' | 'varia') patternList
 #
 # EXPECTED OUTPUT:
 #   Extracted field values, aliased names, mutated varia bindings, rest maps.

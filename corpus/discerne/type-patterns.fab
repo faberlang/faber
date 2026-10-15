@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = true
 summary = "Discerne cases can test nominal type members and bind the narrowed value."
-syntax = "discerne <union> { casu <type> fixum <name> { ... } }"
+syntax = "discerne <union> { casu <type> sit <name> { ... } }"
 related = ["discerne", "casu", "discretio", "est"]
 locale = "en"
 +++

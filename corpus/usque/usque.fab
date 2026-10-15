@@ -30,7 +30,7 @@ locale = "en"
 
 # usque — inclusive upper bound for range iteration
 #
-# itera ab <initium> usque <finis> <var> { … }   -- both endpoints included
+# itera ab <initium> usque <finis> <binder> { … }   -- both endpoints included
 #
 # GRAMMAR:
 #   iterStmt :← 'itera' 'ab' expr 'usque' expr binding block

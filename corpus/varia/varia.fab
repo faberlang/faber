@@ -18,10 +18,10 @@ locale = "en"
 #
 # What this teaches:
 #   • Mutable bindings — `varia` for values that can be reassigned after declaration
-#   • Immutable bindings — `fixum` and `sit` for values that cannot be reassigned
+#   • Write-once bindings — `sit` for values that cannot be reassigned
 #
 # Common mistakes:
-#   • declaring varia when the binding is never reassigned — use fixum instead (WARN013)
+#   • declaring varia when the binding is never reassigned — use sit instead (WARN013)
 #
 # See also: fixum, ←, ↑
 # =============================================================================
@@ -32,10 +32,10 @@ locale = "en"
 # Mutable and immutable variable declarations
 #
 # varia <nomen> ← <expr>   -- mutable binding (may reassign)
-# fixum <nomen> ← <expr>   -- immutable binding (see fixum/fixum.fab)
+# sit <nomen> ← <expr>     -- write-once binding (see sit/sit.fab)
 #
 # GRAMMAR:
-#   bindingStmt :← ('varia' | 'fixum') type? ident '←' expr
+#   bindingStmt :← ('varia' | 'sit') type? ident '←' expr
 #
 # EXPECTED OUTPUT:
 #   0, 1, 11, "Salve, Mundus!", 30, "Vale"
@@ -52,12 +52,12 @@ main {
     computus ← computus + 10
     print computus
 
-    # --- Immutable bindings: fixum _ and sit ---
+    # --- Write-once bindings: sit ---
 
     let salutatio ← "Salve, Mundus!"
     print salutatio
 
-    # sit compresses repeated fixum _ when chaining inferred locals
+    # sit infers the type of each local
     let x ← 10
     let y ← 20
     let summa ← x + y

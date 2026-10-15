@@ -16,7 +16,7 @@ locale = "en"
 # What this teaches:
 #   • `sort via asc from list let x { return key }` returns a new list
 #     ordered by the key each element maps to; `desc` reverses the order
-#   • `sort(key)` reorders a `var` list in place
+#   • `sort(key)` reorders a `mut` list in place
 #   • keys are numbers or text; text orders by Unicode code point
 #   • the sort is stable: elements with equal keys keep their source order
 #

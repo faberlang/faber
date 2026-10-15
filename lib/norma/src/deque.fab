@@ -30,7 +30,7 @@ locale = "en"
 # is identical (append, pop_front, pop_back) so users cross-walking between
 # lista and deque see the same verbs; deque adds prepend (head push) because
 # lista has no head-push intrinsic. Imperativus throughout for mutation
-# (var receiver required); nominal for projections (length, first,
+# (mut receiver required); nominal for projections (length, first,
 # last); present-predicate for state (is_empty); Perfectum for copy-out
 # (to_list).
 
@@ -57,7 +57,7 @@ class Deque<T> {
     }
 
     # =========================================================================
-    # MUTATION (Imperativus — in-place on a var receiver)
+    # MUTATION (Imperativus — in-place on a mut receiver)
     # =========================================================================
 
     fn append(T v) → void {

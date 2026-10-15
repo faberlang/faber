@@ -30,11 +30,11 @@ locale = "en"
 # Numeric/tensor modules may use lf32/lu32 sugar; see docs/design/numeric-type-sugar.md.
 #
 # lista<T> nomen ← vacua        -- typed empty collection (forma innata)
-# fixum _ nomen ← [elem, …]     -- list literal
+# sit nomen ← [elem, …]     -- list literal
 # [sparge expr, …]              -- splice into literal
 #
 # GRAMMAR:
-#   listDecl :← ('varia' | 'fixum') 'lista<' type '>' ident '←' expr
+#   listDecl :← ('varia' | 'sit') 'lista<' type '>' ident '←' expr
 #   listLit  :← '[' (expr | sparge)* ']'
 #
 # EXPECTED OUTPUT:

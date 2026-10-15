@@ -14,7 +14,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Binding targets accept keyword spellings — `const string print` is a
+#   • Binding targets accept keyword spellings — `let string print` is a
 #     user name, not a reserved word.
 #   • Bare `print print` is the output intrinsic of that binding.
 #

@@ -29,10 +29,10 @@ locale = "en"
 
 # itera ex — cursor function return iteration
 #
-# itera ex <cursor-call> fixum <item> { <body> }
+# itera ex <cursor-call> sit <item> { <body> }
 #
 # GRAMMAR:
-#   forInStmt  :← 'itera' 'ex' callExpr 'fixum' ident block
+#   forInStmt  :← 'itera' 'ex' callExpr 'sit' ident block
 #   cursorDecl :← funcDecl 'fiunt' | funcDecl 'fient'
 #
 # EXPECTED OUTPUT:

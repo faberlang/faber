@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "destructuring"
 canonical = true
 summary = "Extracts fields from a value into local bindings."
-syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
+syntax = "ex <expression> <sit|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
 locale = "en"
 +++
@@ -25,10 +25,10 @@ locale = "en"
 
 # itera ex — for-in value iteration over listas
 #
-# itera ex <collection> fixum <item> { <body> }
+# itera ex <collection> sit <item> { <body> }
 #
 # GRAMMAR:
-#   forInStmt :← 'itera' 'ex' expr 'fixum' ident block
+#   forInStmt :← 'itera' 'ex' expr 'sit' ident block
 #
 # EXPECTED OUTPUT:
 #   ex.expected — numbers, names, and doubled values.

@@ -26,11 +26,11 @@ no_expected = "nondeterministic-by-design"
 
 # itera de — for-in key and index iteration
 #
-# itera de <objectum> fixum <key> { <body> }
-# itera de <lista> fixum <index> { <body> }
+# itera de <objectum> sit <key> { <body> }
+# itera de <lista> sit <index> { <body> }
 #
 # GRAMMAR:
-#   forDeStmt :← 'itera' 'de' expr 'fixum' ident block
+#   forDeStmt :← 'itera' 'de' expr 'sit' ident block
 #
 # EXPECTED OUTPUT:
 #   none — stdout not pinned for this exemplum.

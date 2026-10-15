@@ -17,7 +17,7 @@ locale = "en"
 #   • `Genus { field = value } from source` builds a new value: the braced
 #     fields override, every other field is copied from `source`.
 #   • The change comes first and the source last; there is exactly one source.
-#   • A `const` field can be set here, because this is a construction literal.
+#   • A `let` field can be set here, because this is a construction literal.
 #   • The copy is shallow: a list field is shared with the source. Use the
 #     `copy` marker on the value when you need an independent list.
 #
@@ -59,7 +59,7 @@ main {
     print q.y
     print q.nomen
 
-    # const fields can be set: this is still a construction literal
+    # let fields can be set: this is still a construction literal
     let Punctum r ← Punctum { x = 5, nomen = "finis" } from q
     print r.x
     print r.y
