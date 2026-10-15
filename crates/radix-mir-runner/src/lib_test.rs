@@ -3179,6 +3179,71 @@ fn sum_numeric_width_boundary_succeeds() {
     );
 }
 
+/// The flat sum hands the exact total to the store: a partial sum that exceeds
+/// `i64` mid-fold but fits at the end returns the exact `Int`, and a total that
+/// exceeds `i64` only at the end returns the exact `UInt` an `inf` destination
+/// converts (d11-6 ruling 17 residual: only a total beyond `u64::MAX` traps).
+#[test]
+fn sum_numeric_i64_exact_total_flows_to_the_store() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext, MirValueId,
+    };
+    use radix_types::{NumericWidth, Primitive, TypeTable};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let mut type_table = TypeTable::new();
+    let i64_ty = type_table.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    // Exceeds i64 mid-fold, fits at the end: MAX + MAX - MAX = MAX.
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        crate::Value::Array(Rc::new(RefCell::new(vec![
+            crate::Value::Int(i64::MAX),
+            crate::Value::Int(i64::MAX),
+            crate::Value::Int(-i64::MAX),
+        ]))),
+    );
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::Sum),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(i64_ty),
+    };
+    let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+    assert_eq!(
+        result.expect("a total that fits i64 at the end must succeed"),
+        crate::Value::Int(i64::MAX)
+    );
+
+    // Exceeds i64 at the end: MAX + MAX = 2^64 - 2, still inside the exact
+    // carrier and exactly what an `inf` store converts.
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        crate::Value::Array(Rc::new(RefCell::new(vec![
+            crate::Value::Int(i64::MAX),
+            crate::Value::Int(i64::MAX),
+        ]))),
+    );
+    let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+    assert_eq!(
+        result.expect("a total past i64 but inside u64 must stay exact, not trap"),
+        crate::Value::UInt(18_446_744_073_709_551_614)
+    );
+}
+
 /// `check_int_width` must not wrap `numerus<u64>` results above `i64::MAX` into
 /// a negative i64 — the i64 carrier cannot encode them, so the add fails
 /// closed exactly like every other out-of-width result.
