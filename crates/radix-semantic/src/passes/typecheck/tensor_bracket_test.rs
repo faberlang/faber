@@ -1,8 +1,6 @@
 //! Tensor bracket access: a read yields `T` or traps (like a list index);
 //! a write is `ponde` sugar.
 
-use radix_diagnostics::DiagnosticArg;
-
 fn accepts(source: &str) {
     let result = crate::test_support::analyze_source(source);
     assert!(
@@ -22,7 +20,7 @@ fn rejects_with_issue(source: &str, issue: &str) {
     assert!(
         diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.args == vec![DiagnosticArg::new("issue", issue)]),
+            .any(|diagnostic| diagnostic.issue() == Some(issue)),
         "expected a diagnostic with issue `{issue}`, got: {diagnostics:?}"
     );
 }
@@ -128,5 +126,53 @@ fn tensor_bracket_rejects_u64_scalar_index() {
     redde input[id]
 }",
         "tensor_bracket_index_integer_or_lista",
+    );
+}
+
+#[test]
+fn matrix_bracket_read_yields_element() {
+    accepts(
+        r"functio cell(matrix<f32, [2, 2]> m, numerus r, numerus c) → f32 {
+    redde m[[r, c]]
+}",
+    );
+}
+
+#[test]
+fn matrix_bracket_write_accepts_coordinate() {
+    accepts(
+        r"functio put(varia matrix<f32, [2, 2]> m, numerus r, numerus c, f32 v) → vacuum {
+    m[[r, c]] ← v
+}",
+    );
+}
+
+#[test]
+fn matrix_bracket_rejects_scalar_index() {
+    rejects_with_issue(
+        r"functio bad(matrix<f32, [2, 2]> m, numerus r) → f32 {
+    redde m[r]
+}",
+        "tensor_scalar_index_rank",
+    );
+}
+
+#[test]
+fn matrix_bracket_rejects_float_coordinate() {
+    rejects_with_issue(
+        r"functio bad(matrix<f32, [2, 2]> m) → f32 {
+    redde m[[1.5, 0]]
+}",
+        "tensor_index_vector_integer_elements",
+    );
+}
+
+#[test]
+fn matrix_bracket_rejects_literal_out_of_range() {
+    rejects_with_issue(
+        r"functio bad(matrix<f32, [2, 2]> m) → f32 {
+    redde m[[2, 0]]
+}",
+        "index_provably_out_of_bounds",
     );
 }

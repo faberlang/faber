@@ -23,6 +23,18 @@ pub fn is_tensor_type(types: &TypeTable, ty: TypeId) -> bool {
     )
 }
 
+/// Whether `ty` is a coordinate-bracket receiver: a tensor or a matrix.
+///
+/// The coordinate form (`m[[r, c]]`) is shared; `is_tensor_type` keeps its
+/// tensor-only meaning for the kernel/filum/borrow passes.
+#[must_use]
+pub fn is_coordinate_bracket_receiver(types: &TypeTable, ty: TypeId) -> bool {
+    matches!(
+        types.get(types.peel_access_marker(ty).1),
+        Type::Tensor(_, _) | Type::Matrix(_, _)
+    )
+}
+
 /// Whether `ty` is a list-shaped bracket index (`lista<…>`).
 #[must_use]
 pub fn is_bracket_index_list_type(types: &TypeTable, ty: TypeId) -> bool {
