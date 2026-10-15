@@ -70,6 +70,35 @@ fn plain_render_uses_issue_in_compact_code_label() {
     assert_eq!(render_plain(&diagnostic), "error[SEM001:unknown_identifier]: input.fab:5");
 }
 
+/// Need: PKG001 arms carry ad-hoc prose with no catalog row and no
+/// locale-pack template, so an issue-less PKG001 must render its message;
+/// an issue'd PKG001 stays compact (the `package_path_missing` contract in
+/// `crates/faber/tests/run_integration_test.rs` forbids raw io prose).
+#[test]
+fn plain_render_shows_message_for_issueless_pkg001() {
+    let diagnostic = Diagnostic::error("could not encode FHIR package: boom")
+        .with_code("PKG001")
+        .with_file("foo");
+
+    let rendered = render_plain(&diagnostic);
+
+    assert!(rendered.contains("error[PKG001]: foo"), "{rendered}");
+    assert!(rendered.contains(diagnostic.message.as_str()), "{rendered}");
+}
+
+#[test]
+fn plain_render_keeps_compact_header_for_pkg001_with_issue() {
+    let diagnostic = Diagnostic::error("could not encode FHIR package: boom")
+        .with_code("PKG001")
+        .with_file("foo")
+        .with_args(vec![DiagnosticArg::new("issue", "package_path_missing")]);
+
+    let rendered = render_plain(&diagnostic);
+
+    assert!(rendered.contains("error[PKG001:package_path_missing]: foo"), "{rendered}");
+    assert!(!rendered.contains(diagnostic.message.as_str()), "{rendered}");
+}
+
 #[test]
 fn plain_render_wraps_embedded_source_line_in_bidi_isolation() {
     let diagnostic = Diagnostic::error("expected identifier")

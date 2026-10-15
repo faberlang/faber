@@ -304,7 +304,16 @@ fn diagnostic_display_text(
         }
     }
 
-    if diag.code.is_none() || diag.phase == DiagnosticPhase::Codegen {
+    // Need: PKG001 arms carry ad-hoc prose with no catalog row and
+    // no locale-pack template, so an issue-less PKG001 must render its message.
+    // An issue'd PKG001 stays compact: the reader-locale contract in
+    // crates/faber/tests/run_integration_test.rs
+    // (reader_locale_missing_package_path_surfaces_missing_path_error) forbids
+    // the raw io prose of `package_path_missing` from rendering.
+    if diag.code.is_none()
+        || diag.phase == DiagnosticPhase::Codegen
+        || (diag.code == Some("PKG001") && diag.issue().is_none())
+    {
         return Ok(Some(DiagnosticDisplayText {
             message: diag.message.clone(),
             help: diag.help.clone(),
