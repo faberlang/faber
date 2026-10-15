@@ -84,7 +84,7 @@ functio g(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde 2.0 * a }
 functio h(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde a / 2.0 }
 functio i(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde a % 2.0 }
 functio j(tensor<numerus, [4]> a) → tensor<numerus, [4]> { redde a / 3 }
-functio k(tensor<numerus, [4]> a) → tensor<numerus, [4]> { redde a % 3 }",
+functio k(tensor<numerus, [4]> a) → tensor<u8, [4]> { redde a % 3 }",
     );
 }
 
@@ -115,7 +115,9 @@ fn tensor_times_tensor_rejects_with_the_rule_alternatives() {
 fn an_untyped_constant_adopts_the_tensor_element_type() {
     accepts("functio f(tensor<f32, [2]> a) → tensor<f32, [2]> { redde a * 2 }");
     accepts("functio f(tensor<f32, [2]> a) → tensor<f32, [2]> { redde a + 0.25 }");
-    accepts("functio f(tensor<u8, [2]> a) → tensor<u8, [2]> { redde a + 1 }");
+    // The constant takes part by value and the range rule widens the
+    // intermediate: [0,255] + 1 is [1,256] → `u16`.
+    accepts("functio f(tensor<u8, [2]> a) → tensor<u16, [2]> { redde a + 1 }");
     // A constant beside an integer tensor joins by value: 300 needs `u16`.
     accepts("functio f(tensor<u8, [2]> a) → tensor<u16, [2]> { redde a + 300 }");
 }
@@ -137,7 +139,7 @@ fn integer_elements_follow_the_lossless_join_per_element() {
     // Same-width mixes join by the lattice; a wider scalar joins the tensor.
     accepts(
         r"functio f(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<u16, [2]> { redde a + b }
-functio g(tensor<u8, [2]> a, u16 s) → tensor<u16, [2]> { redde a + s }
+functio g(tensor<u8, [2]> a, u16 s) → tensor<u32, [2]> { redde a + s }
 functio h(tensor<i8, [2]> a, tensor<u8, [2]> b) → tensor<i16, [2]> { redde a - b }",
     );
     // A float pair joins by the lossless lattice like the scalar rule.

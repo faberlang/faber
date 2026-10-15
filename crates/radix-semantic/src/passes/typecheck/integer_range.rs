@@ -1133,6 +1133,38 @@ impl TypeChecker<'_> {
         Some(self.join_range_type(joined, span))
     }
 
+    /// Element type of a lifted integer arithmetic operator (operator ruling
+    /// 2026-10-15, need): the scalar range rule for `op` over the
+    /// operand ranges, an untyped constant taking part by value. `None` unless
+    /// both sides are trapping integers — a word, float, decimal, `inf`,
+    /// inference hole or device function keeps the caller's F9 join.
+    pub(super) fn integer_arith_element_type(
+        &mut self,
+        op: HirBinOp,
+        l: (TypeId, Option<i128>),
+        r: (TypeId, Option<i128>),
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if self.current_device_function {
+            return None;
+        }
+        let (wa, wb) = (self.plain_int_width(l.0)?, self.plain_int_width(r.0)?);
+        if wa == NumericWidth::Inf || wb == NumericWidth::Inf {
+            return Some(self.inf_type());
+        }
+        // Ruling 8: a `u64` beside a signed typed operand has no lossless join.
+        if l.1.is_none() && r.1.is_none() && u64_meets_signed(wa, wb) {
+            self.invalid_operand_types(U64_SIGNED_ARITHMETIC_REQUIRES_CONVERSION, span);
+            return Some(self.error_type);
+        }
+        let (a, b) = (
+            Self::width_or_const_range(wa, l.1)?,
+            Self::width_or_const_range(wb, r.1)?,
+        );
+        let result = Self::scalar_binary_range(op, a, b)?;
+        Some(self.width_type(range::smallest_width(result)))
+    }
+
     /// The type of a joined range, or the ruling-8 error when it spans both
     /// negative values and values above `i64::MAX`.
     fn join_range_type(&mut self, joined: IntRange, span: radix_lexer::Span) -> TypeId {
