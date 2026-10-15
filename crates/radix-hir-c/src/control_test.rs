@@ -95,3 +95,10 @@ fn a_module_without_an_entry_fails_as_the_runner_does() {
         "{code}"
     );
 }
+
+#[test]
+fn a_deferred_binding_is_declared_unwritten() {
+    let code = emitted("main {\n    const int pending\n    pending ← 7\n    print pending\n}");
+    assert!(code.contains("int64_t l_pending;"), "{code}");
+    assert!(code.contains("l_pending = INT64_C(7);"), "{code}");
+}

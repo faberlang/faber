@@ -158,7 +158,27 @@ impl Emitter<'_> {
             if entry_args && class == Ty::List(crate::ty::Elem::Text) {
                 return self.entry_arguments(out, local);
             }
-            return Err(unsupported("local without an initializer"));
+            // A deferred binding (`const int pending` then `pending ← 7`): the
+            // frontend proves it is assigned before any read, so the C cell is
+            // declared without an initializer and written once. It is declared
+            // writable so that one store compiles.
+            self.need_class(class);
+            let Some(kind) = self.names.binding_kind(local.def_id) else {
+                return Err(unsupported("local the name catalog does not classify"));
+            };
+            let raw = self.names.resolve_symbol(local.name);
+            let name = self.scope.claim(&prefixed_binding_name(kind, raw));
+            let line = format!("{};", self.declare(class, &name, true)?);
+            self.line(out, &line);
+            self.locals.insert(
+                local.def_id,
+                Local {
+                    name,
+                    ty: class,
+                    constant: None,
+                },
+            );
+            return Ok(());
         };
         let value = self.expr(init)?;
         let value = if copy {
