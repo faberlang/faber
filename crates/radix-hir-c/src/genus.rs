@@ -234,11 +234,7 @@ impl Emitter<'_> {
     /// narrows like any unwrapped store.
     fn field_value(&mut self, value: &HirExpression, ty: Ty) -> Result<Operand, CodegenError> {
         let operand = self.expr(value)?;
-        let operand = if ty == Ty::Int {
-            self.fit(operand)?
-        } else {
-            operand
-        };
+        let operand = self.settle(operand, ty)?;
         if operand.value != Value::from(ty) {
             return Err(unsupported("value stored without a store check"));
         }
@@ -269,17 +265,11 @@ impl Emitter<'_> {
         let base = self.expr(base)?;
         let field = self.field_of(&base, name)?;
         let text = format!("({})->{}", base.text, field.c_name);
-        // A truth operand carries its own parentheses.
-        let text = if field.ty == Ty::Bool {
-            format!("({text})")
-        } else {
-            text
-        };
-        // A pure read of an `int` field is a 64-bit fast-path leaf (C4).
-        let narrow =
-            (field.ty == Ty::Int && !base.effect).then(|| crate::expr::Narrow::leaf(&text));
-        let mut operand = Operand::new(text, Value::from(field.ty)).with_effect(base.effect);
-        operand.narrow = narrow;
+        let mut operand = Self::cell_read(&text, field.ty).with_effect(base.effect);
+        // A read behind a call is not a pure 64-bit fast-path leaf (C4).
+        if base.effect {
+            operand.narrow = None;
+        }
         Ok(operand)
     }
 

@@ -157,6 +157,35 @@ static inline int64_t faber_store_i64(faber_i128 value, const char *at) {
     return (int64_t)value;
 }
 
+/* The sized integers: a cell of `i8` ... `u64` is the plain C type, and the
+ * only way into it is a store that checks the range. `faber_store_<w>` is that
+ * store (the runner's `<n> does not fit in `<w>` (<at>)`); `faber_fit_<w>` is
+ * the same range check where typecheck put no store node. */
+#define FABER_SIZED(NAME, TYPE, MIN, MAX)                                            \
+    static inline TYPE faber_store_##NAME(faber_i128 value, const char *at) {        \
+        if (value < (faber_i128)(MIN) || value > (faber_i128)(MAX)) {                \
+            char text[41];                                                           \
+            fprintf(stderr, "error: %s does not fit in `" #NAME "` (%s)\n",          \
+                    faber_i128_text(value, text), at);                               \
+            exit(1);                                                                 \
+        }                                                                            \
+        return (TYPE)value;                                                          \
+    }                                                                                \
+    static inline TYPE faber_fit_##NAME(faber_i128 value) {                          \
+        if (value < (faber_i128)(MIN) || value > (faber_i128)(MAX)) {                \
+            faber_trap("numerus overflow");                                          \
+        }                                                                            \
+        return (TYPE)value;                                                          \
+    }
+
+FABER_SIZED(i8, int8_t, INT8_MIN, INT8_MAX)
+FABER_SIZED(i16, int16_t, INT16_MIN, INT16_MAX)
+FABER_SIZED(i32, int32_t, INT32_MIN, INT32_MAX)
+FABER_SIZED(u8, uint8_t, 0, UINT8_MAX)
+FABER_SIZED(u16, uint16_t, 0, UINT16_MAX)
+FABER_SIZED(u32, uint32_t, 0, UINT32_MAX)
+FABER_SIZED(u64, uint64_t, 0, UINT64_MAX)
+
 /* ------------------------------------------------------------------------ */
 /* Floats                                                                   */
 /* ------------------------------------------------------------------------ */

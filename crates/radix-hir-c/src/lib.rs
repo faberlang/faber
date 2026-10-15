@@ -46,6 +46,8 @@ mod range_test;
 #[cfg(test)]
 mod reject_test;
 #[cfg(test)]
+mod sized_test;
+#[cfg(test)]
 mod test_support;
 
 use crate::error::unsupported;
@@ -257,7 +259,7 @@ impl Emitter<'_> {
     /// Headers a class needs wherever it is declared.
     pub(crate) fn need_class(&mut self, class: Ty) {
         match class {
-            Ty::Int => self.support.need_ints(),
+            Ty::Int | Ty::Sized(_) => self.support.need_ints(),
             Ty::Bool => self.support.need_bool(),
             Ty::Float => self.support.need(crate::helpers::Helper::Float),
             Ty::Text | Ty::Genus(_) => {}

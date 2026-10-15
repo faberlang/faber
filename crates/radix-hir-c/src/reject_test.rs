@@ -43,10 +43,10 @@ fn bitwise_operator() {
 }
 
 #[test]
-fn sized_integer_type() {
+fn policy_integer_type() {
     assert_eq!(
-        rejected("main {\n    const u8 n ← 5\n    print n\n}"),
-        "sized integer type"
+        rejected("main {\n    const wrapping<u8> n ← 5\n    print n\n}"),
+        "wrapping, saturating, or policy numeric type"
     );
 }
 

@@ -109,11 +109,7 @@ impl Emitter<'_> {
             (Returns::Void, None) => self.line(out, "return;"),
             (Returns::Value(class), Some(value)) => {
                 let operand = self.expr(value)?;
-                let operand = if class == Ty::Int {
-                    self.fit(operand)?
-                } else {
-                    operand
-                };
+                let operand = self.settle(operand, class)?;
                 if operand.value != crate::expr::Value::from(class) {
                     return Err(unsupported("value stored without a store check"));
                 }
@@ -154,11 +150,7 @@ impl Emitter<'_> {
             return Err(unsupported("local without an initializer"));
         };
         let value = self.expr(init)?;
-        let value = if class == Ty::Int {
-            self.fit(value)?
-        } else {
-            value
-        };
+        let value = self.settle(value, class)?;
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
         }
@@ -625,11 +617,7 @@ impl Emitter<'_> {
         };
         let (name, class) = (local.name.clone(), local.ty);
         let value = self.expr(value)?;
-        let value = if class == Ty::Int {
-            self.fit(value)?
-        } else {
-            value
-        };
+        let value = self.settle(value, class)?;
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
         }
@@ -643,6 +631,47 @@ impl Emitter<'_> {
     /// `%` in Faber text prints as itself. An exact value prints through
     /// `faber_i128_text` into a block-scoped compound-literal buffer.
     fn print(
+        &mut self,
+        out: &mut String,
+        kind: HirScribeKind,
+        args: &[HirExpression],
+    ) -> Result<(), CodegenError> {
+        if self.print_joins(args) {
+            return self.print_line(out, kind, args);
+        }
+        // The runner prints each argument as its own line when one of them
+        // has no shared rendering (a sized integer, a genus).
+        for arg in args {
+            self.print_line(out, kind, std::slice::from_ref(arg))?;
+        }
+        Ok(())
+    }
+
+    /// Whether the runner writes these arguments as one space-joined line:
+    /// a single argument, a literal text first with up to two more (its
+    /// format-string form), or every argument having a shared rendering.
+    /// Sized integers and genera keep the per-argument path.
+    fn print_joins(&self, args: &[HirExpression]) -> bool {
+        if args.len() <= 1 {
+            return true;
+        }
+        let literal_first = matches!(
+            args[0].kind,
+            HirExpressionKind::Literal(radix_hir::HirLiteral::String(_))
+        );
+        if literal_first && args.len() <= 3 {
+            return true;
+        }
+        args.iter().all(|arg| {
+            arg.ty.is_some_and(|ty| {
+                classify(self.types, ty)
+                    .is_ok_and(|class| !matches!(class, Ty::Sized(_) | Ty::Genus(_)))
+            })
+        })
+    }
+
+    /// One `printf` for `args`, space separated, ending the line.
+    fn print_line(
         &mut self,
         out: &mut String,
         kind: HirScribeKind,

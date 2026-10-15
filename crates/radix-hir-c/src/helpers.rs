@@ -29,6 +29,8 @@ pub(crate) enum Helper {
     Rem,
     FitI64,
     StoreI64,
+    /// `faber_store_<w>` / `faber_fit_<w>` for the sized integers.
+    SizedStore,
     AddO,
     SubO,
     MulO,
@@ -75,6 +77,7 @@ impl Helper {
             | Helper::Rem
             | Helper::FitI64
             | Helper::StoreI64
+            | Helper::SizedStore
             | Helper::AddO
             | Helper::SubO
             | Helper::MulO
