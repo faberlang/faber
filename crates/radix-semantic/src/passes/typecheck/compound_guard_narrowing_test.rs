@@ -1,7 +1,8 @@
 //! Narrowing through compound conditions: `A et B` holds both
 //! parts' facts in the taken branch, a diverging `si A aut B { <leave> }`
 //! leaves both negations for the rest of the block, and `non (...)` swaps the
-//! two edges. A field path stays un-narrowed.
+//! two edges. A field path narrows inside the branch body that proves it, but
+//! never across a branch edge (need case 2).
 //!
 //! Fixtures use the latin spellings (`et`, `aut`, `non`); the unit-test
 //! harness compiles bare source without the en-locale lex pack. The en
@@ -133,10 +134,16 @@ fn field_guard_in_or_is_not_narrowed() {
 }
 
 #[test]
-fn field_guard_in_and_is_not_narrowed() {
-    test_support::assert_rejects_with_issue(
+fn field_guard_in_and_narrows() {
+    test_support::assert_accepts(
         "genus G {\n    varia textus ∪ nihil nomen\n}\n\nfunctio f(G g, bivalens a) → numerus {\n    si a et g.nomen non est nihil {\n        redde g.nomen.longitudo()\n    }\n    redde 0\n}",
-        NOT_NARROWED,
+    );
+}
+
+#[test]
+fn field_path_null_check_narrows_the_branch_body() {
+    test_support::assert_accepts(
+        "genus G {\n    varia textus ∪ nihil nomen\n}\n\nfunctio f(G g) → numerus {\n    si g.nomen non est nihil {\n        redde g.nomen.longitudo()\n    }\n    redde 0\n}",
     );
 }
 

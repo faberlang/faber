@@ -69,8 +69,8 @@ type Facts = Vec<(FactKey, TypeId)>;
 /// The subject of a flow fact: a visible binding, or a field path rooted at a
 /// visible binding (`base.path…`).
 // `Field` is produced by the field-path narrowing producer (need case
-// 2); every fact consumer still skips it until the insertion and join units
-// land.
+// 2) and consumed only inside the proving branch body; the branch-edge and
+// assertion consumers still skip it until the join units land.
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 enum FactKey {
@@ -814,12 +814,22 @@ impl TypeChecker<'_> {
         refine: Facts,
     ) -> (TypeId, FlowState) {
         let mut saved: Vec<(DefId, Option<BindingInfo>)> = Vec::new();
+        let mut field_saved: Vec<(DefId, Vec<Symbol>)> = Vec::new();
         for (key, ty) in refine {
-            // Field facts are not carried on this branch edge in this need.
-            let FactKey::Binding(def_id) = key else {
-                continue;
-            };
-            saved.push((def_id, self.override_binding(def_id, ty)));
+            match key {
+                // A binding fact overrides the visible binding for the branch
+                // body; the incoming binding returns when the scope ends.
+                FactKey::Binding(def_id) => {
+                    saved.push((def_id, self.override_binding(def_id, ty)));
+                }
+                // A field fact is visible only inside the branch body: it is
+                // inserted here and removed at block exit, so it never reaches
+                // the branch join or the implicit fallthrough.
+                FactKey::Field { base, path } => {
+                    self.field_facts.insert((base, path.clone()), ty);
+                    field_saved.push((base, path));
+                }
+            }
         }
 
         self.push_scope();
@@ -841,6 +851,9 @@ impl TypeChecker<'_> {
             if let Some(original) = original {
                 self.restore_binding(def_id, original);
             }
+        }
+        for (base, path) in field_saved.into_iter().rev() {
+            self.field_facts.remove(&(base, path));
         }
         (ty, state)
     }
