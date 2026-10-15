@@ -718,10 +718,15 @@ impl TypeChecker<'_> {
             return result_ty;
         }
 
+        let faber_served = matches!(
+            &source.kind,
+            HirExpressionKind::Ad { route, .. } if self.ad_routes.contains_key(route)
+        );
         if let Some(result_ty) = self.check_sermo_materialize_conversio(
             source_ty,
             target_resolved,
             recovery.is_none(),
+            faber_served,
             span,
         ) {
             if let Some(recovery) = recovery {
@@ -1103,6 +1108,7 @@ impl TypeChecker<'_> {
         source_ty: TypeId,
         target_resolved: TypeId,
         propagates: bool,
+        faber_served: bool,
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
         if !self.is_sermo_type(source_ty) {
@@ -1116,7 +1122,7 @@ impl TypeChecker<'_> {
             return Some(self.error_type);
         }
         if propagates {
-            self.check_sermo_failure_channel(span);
+            self.check_sermo_failure_channel(source_ty, target_resolved, faber_served, span);
         }
         Some(target_resolved)
     }
@@ -3181,21 +3187,32 @@ impl TypeChecker<'_> {
     }
 
     /// A bare failable `sermo ↦ T` materialization propagates the leaf failure
-    /// record (`valor`, holding `kind` and `path`), so the active alternate-exit
-    /// channel is admitted only when it can accept that payload: the `ignotum`
-    /// escape, a `valor` channel, or a registered `@ conversio` row from
-    /// `valor` to the declared channel type. The row's own `⇥ E` composes
+    /// record (`valor`, holding `kind` and `path`), except for a route served by
+    /// a visible Faber handler, whose thrown failure is `textus`. For a leaf
+    /// failure, the active channel can accept `valor` via the `ignotum` escape,
+    /// a `valor` channel, or a registered `@ conversio` row from `valor` to the
+    /// declared channel type. The row's own `⇥ E` composes
     /// through the use-site channel exactly as `reject_failable_call` does,
     /// and its function is recorded on `pending_conversion` so lowering applies
     /// it. Without an active channel the hard-failure posture stands: the
     /// materialization panics (or is caught by a surrounding `fac`/`cape`).
-    pub(super) fn check_sermo_failure_channel(&mut self, span: radix_lexer::Span) {
+    pub(super) fn check_sermo_failure_channel(
+        &mut self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        faber_served: bool,
+        span: radix_lexer::Span,
+    ) {
         let Some(error_ty) = self.current_error.map(|sink| match sink {
             ErrorSink::Function(ty) | ErrorSink::Local(ty) => ty,
             ErrorSink::Trap(var) => self.trap_sink_type(var),
         }) else {
             return;
         };
+        if faber_served {
+            self.check_text_failure_channel(source_ty, target_resolved, span);
+            return;
+        }
         let value_ty = self.types.primitive(Primitive::Valor);
         // UT: a bare failable `↦` inside a `capta` accumulates its failure
         // payload into the trap hole, exactly as a failable call's error type
