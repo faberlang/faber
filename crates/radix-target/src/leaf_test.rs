@@ -1,6 +1,7 @@
 //! Leaf identity pins: route prefixes, builtins, and the N2 set.
 
 use super::Leaf;
+use crate::Target;
 
 #[test]
 fn from_route_maps_each_n2_family() {
@@ -36,4 +37,47 @@ fn all_is_the_n2_set() {
             Leaf::Websocket
         ]
     );
+}
+
+#[test]
+fn supported_leaves_go_is_exactly_the_ported_set() {
+    assert_eq!(
+        Target::HirGo.supported_leaves(),
+        &[Leaf::Stdio, Leaf::Clock, Leaf::Entropy]
+    );
+    for leaf in [
+        Leaf::Fs,
+        Leaf::Process,
+        Leaf::Tcp,
+        Leaf::Http,
+        Leaf::Websocket,
+    ] {
+        assert!(
+            !Target::HirGo.supports_leaf(leaf),
+            "go must refuse {leaf:?}: no native port"
+        );
+    }
+}
+
+#[test]
+fn supported_leaves_other_emit_targets_refuse_every_leaf() {
+    for target in Target::ALL {
+        if matches!(
+            target,
+            Target::HirRust
+                | Target::MirStepper
+                | Target::MirFmir
+                | Target::MirFmirBinary
+                | Target::MirFmirBundle
+                | Target::HirFaber
+                | Target::HirFhir
+                | Target::HirGo
+        ) {
+            continue;
+        }
+        assert!(
+            target.supported_leaves().is_empty(),
+            "{target} has no native leaf port and must fail closed"
+        );
+    }
 }

@@ -416,7 +416,10 @@ fn rust_and_runner_declare_the_n2_leaves() {
     ] {
         assert_eq!(target_leaves(target), Leaf::ALL, "{target} must declare N2 leaves");
     }
-    assert!(target_leaves(crate::codegen::Target::HirGo).is_empty());
+    assert_eq!(
+        target_leaves(crate::codegen::Target::HirGo),
+        &[Leaf::Stdio, Leaf::Clock, Leaf::Entropy]
+    );
 }
 
 #[test]

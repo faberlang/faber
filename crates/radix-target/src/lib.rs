@@ -390,8 +390,11 @@ impl Target {
     /// Leaves this target declares.
     ///
     /// Rust and the runner (`fmir*`, stepper) share `faber-leaf`. Faber
-    /// re-emit and FHIR keep the `call` in the artifact. Every other emit
-    /// target has no native leaf crate and must fail closed.
+    /// re-emit and FHIR keep the `call` in the artifact. Go declares exactly
+    /// the leaves its `runtime/go` ports implement (clock 4/4, entropy 5/5,
+    /// stdio 16/17 routes — `consolum:desinit` is still pending and stays
+    /// refused). Every other emit target has no native leaf port and must
+    /// fail closed.
     #[must_use]
     pub fn supported_leaves(self) -> &'static [Leaf] {
         match self {
@@ -402,8 +405,8 @@ impl Target {
             | Target::MirFmirBundle
             | Target::HirFaber
             | Target::HirFhir => Leaf::ALL,
+            Target::HirGo => &[Leaf::Stdio, Leaf::Clock, Leaf::Entropy],
             Target::HirTypeScript
-            | Target::HirGo
             | Target::HirSwift
             | Target::HirPython
             | Target::HirHaskell
