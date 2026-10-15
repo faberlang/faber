@@ -264,6 +264,14 @@ help = "在行尾或文件结束前闭合字符串字面量"
 message = "未闭合 guillemet block string 字面量"
 help = "在行尾或文件结束前闭合字符串字面量"
 
+[diagnostics.LEX001.issues.unterminated_regex_literal]
+message = "未闭合 regex 字面量"
+help = "在行尾或文件结束前闭合 regex 字面量"
+
+[diagnostics.LEX001.issues.empty_regex_literal]
+message = "空的 regex 字面量；请在斜杠之间写出模式"
+help = "在斜杠之间写出模式"
+
 [diagnostics.LEX002]
 message = "无效数字字面量"
 help = "检查 numeric separators 和 base prefixes"
@@ -471,6 +479,50 @@ help = "在项之间加逗号（模式之间用 '{et}'）"
 [diagnostics.PARSE001.issues.item_list_trailing_comma]
 message = "列表不得在结束定界符之前以逗号结尾"
 help = "删除结束定界符之前的逗号"
+
+[diagnostics.PARSE001.issues.expected_identifier]
+message = "需要标识符"
+help = "在此处写入标识符名称"
+
+[diagnostics.PARSE001.issues.expected_string_literal]
+message = "需要字符串字面量"
+help = "在此处写入带引号的字符串字面量"
+
+[diagnostics.PARSE001.issues.expected_mutability_keyword]
+message = "需要 '{fixum}' 或 '{varia}'"
+help = "用可变性关键字开始该声明"
+
+[diagnostics.PARSE001.issues.await_binding_requires_name]
+message = "'↢' 之前需要具名绑定"
+help = "把 '↢' 绑定到单个名称；解构使用 '←'"
+
+[diagnostics.PARSE001.issues.expected_method_declaration]
+message = "需要方法声明"
+help = "把方法写成 '{functio}' 声明"
+
+[diagnostics.PARSE001.issues.expected_praepara_hook]
+message = "需要 '{praepara}' 钩子"
+help = "写 '{praepara}'、'{praeparabit}'、'{postpara}' 或 '{postparabit}'"
+
+[diagnostics.PARSE001.issues.expected_lane_value]
+message = "需要字符串字面量或标识符"
+help = "把 lane 值写成带引号的字符串或裸名称"
+
+[diagnostics.PARSE001.issues.expected_scribe_keyword]
+message = "需要 '{scribe}' 关键字"
+help = "写 '{scribe}'、'{vide}'、'{mone}' 或 '{nota}'"
+
+[diagnostics.PARSE001.issues.expected_incipit_keyword]
+message = "需要 '{incipit}' 或 '{incipiet}'"
+help = "用 '{incipit}' 或 '{incipiet}' 开始入口点"
+
+[diagnostics.PARSE001.issues.enum_member_value_number]
+message = "'=' 之后需要数字"
+help = "在 '=' 之后写整数，或删除 '='"
+
+[diagnostics.PARSE001.issues.enum_member_value]
+message = "需要枚举成员值"
+help = "在 '=' 之后写整数或字符串"
 
 [diagnostics.PARSE002]
 message = "意外标记"
@@ -2603,6 +2655,10 @@ help = "更改 representation 前显式 convert element widths"
 [diagnostics.SEM016.issues.conversio_failure_channel_textus_required]
 message = "propagating conversio failure 需要 `textus` alternate-exit channel"
 help = "把 alternate-exit channel 声明为 textus，或提供 inline recovery"
+
+[diagnostics.SEM016.issues.conversio_failure_channel_value_required]
+message = "propagating sermo materialization failure 需要 `value` alternate-exit channel"
+help = "把 alternate-exit channel 声明为 value、unknown，或已注册的 value conversion"
 
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "regex conversion 需要 textus 或 ascii operand"
