@@ -1009,7 +1009,7 @@ impl FunctionLower<'_, '_> {
             Rep::Opt => abi::TAG_OPT,
             Rep::Map | Rep::Set => abi::TAG_MAP,
             Rep::Func => return Err(Decline::new("function value element")),
-            Rep::Tuple => return Err(Decline::new("tuple element")),
+            Rep::Tuple => abi::TAG_LIST,
             Rep::Unit => return Err(Decline::new("unit list element")),
         })
     }
@@ -1144,15 +1144,16 @@ impl FunctionLower<'_, '_> {
             return Err(Decline::new("optional chain link"));
         }
         let (handle, rep) = self.scalar(base)?;
-        if rep != Rep::Opt {
-            return Err(Decline::new("chain of a non-optional"));
-        }
         let base_ty = self.operand_type(base)?;
+        if rep != Rep::Opt {
+            // A base that is already present: only the link's own optional.
+            let wrapped = self.chain_step(handle, base_ty, link)?;
+            return Ok((wrapped, Rep::Opt));
+        }
         let Type::Option(inner) = resolve(self.state.input.types, base_ty.semantic_id()) else {
             return Err(Decline::new("chain of a non-optional"));
         };
         let inner = MirType::semantic(*inner);
-        let inner_rep = rep_of(self.state.input.types, inner)?;
         let done = self.builder.create_block();
         self.builder.append_block_param(done, types::I64);
         let present = self.builder.create_block();
@@ -1165,7 +1166,21 @@ impl FunctionLower<'_, '_> {
         let payload = self
             .call_runtime(&abi::OPT_BITS, &[handle])?
             .ok_or_else(|| Decline::new("chain base result"))?;
-        let wrapped = match link {
+        let wrapped = self.chain_step(payload, inner, link)?;
+        self.builder.ins().jump(done, &[BlockArg::Value(wrapped)]);
+        self.builder.switch_to_block(done);
+        Ok((self.builder.block_params(done)[0], Rep::Opt))
+    }
+
+    /// One chain link applied to a present base of type `inner`: an optional.
+    fn chain_step(
+        &mut self,
+        payload: Value,
+        inner: MirType,
+        link: &MirOptionChainLink,
+    ) -> Lowered<Value> {
+        let inner_rep = rep_of(self.state.input.types, inner)?;
+        Ok(match link {
             MirOptionChainLink::Field(name) => {
                 if inner_rep != Rep::Record {
                     return Err(Decline::new("chain field of a non-genus"));
@@ -1182,10 +1197,7 @@ impl FunctionLower<'_, '_> {
                 let value = self.element_value(bits, field_rep);
                 self.coerce(value, field_rep, Rep::Opt)?
             }
-            MirOptionChainLink::Index(index) => {
-                if inner_rep != Rep::Map {
-                    return Err(Decline::new("chain index of a non-map"));
-                }
+            MirOptionChainLink::Index(index) if inner_rep == Rep::Map => {
                 let (key_ty, value_ty) = self.map_types(inner)?;
                 if rep_of(self.state.input.types, value_ty)? == Rep::Opt {
                     return Err(Decline::new("chain index of an optional value"));
@@ -1199,11 +1211,20 @@ impl FunctionLower<'_, '_> {
                 self.call_runtime(&abi::MAP_GET_OPT, &[payload, tag, key])?
                     .ok_or_else(|| Decline::new("chain index result"))?
             }
+            MirOptionChainLink::Index(index) if inner_rep == Rep::List => {
+                let element = self.element_type(inner)?;
+                if rep_of(self.state.input.types, element)? == Rep::Opt {
+                    return Err(Decline::new("chain index of an optional element"));
+                }
+                let (index, index_rep) = self.scalar(index)?;
+                if index_rep != Rep::Int {
+                    return Err(Decline::new("list index representation"));
+                }
+                self.call_runtime(&abi::LIST_GET_OPT, &[payload, index])?
+                    .ok_or_else(|| Decline::new("chain index result"))?
+            }
             _ => return Err(Decline::new("optional chain link")),
-        };
-        self.builder.ins().jump(done, &[BlockArg::Value(wrapped)]);
-        self.builder.switch_to_block(done);
-        Ok((self.builder.block_params(done)[0], Rep::Opt))
+        })
     }
 
     /// An operand that fills an element of type `element`: a bare literal into
@@ -2458,6 +2479,39 @@ impl FunctionLower<'_, '_> {
         self.render_text_at(value, rep, 0)
     }
 
+    /// A value that holds a tuple inside a collection or optional displays
+    /// through the runtime's list rendering, which has no tuple head: decline
+    /// to display it rather than print it wrong.
+    fn refuse_nested_tuple_display(&self, operand: &MirOperand) -> Lowered<()> {
+        let Ok(ty) = self.operand_type(operand) else {
+            return Ok(());
+        };
+        let table = self.state.input.types;
+        let mut pending = vec![ty.semantic_id()];
+        let mut depth = 0;
+        while let Some(id) = pending.pop() {
+            depth += 1;
+            if depth > 32 {
+                break;
+            }
+            match resolve(table, id) {
+                Type::Tuple(_) if id != ty.semantic_id() => {
+                    return Err(Decline::new("display of a nested tuple"));
+                }
+                Type::Array(element) | Type::BoundedArray { element, .. } | Type::Set(element) => {
+                    pending.push(*element);
+                }
+                Type::Option(inner) => pending.push(*inner),
+                Type::Map(key, value) => {
+                    pending.push(*key);
+                    pending.push(*value);
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
     /// `1` when the operand is a float narrower than `f64`: it displays at
     /// its own width.
     fn float_narrow(&self, operand: &MirOperand) -> i64 {
@@ -2513,6 +2567,7 @@ impl FunctionLower<'_, '_> {
         let mut rendered: Vec<Value> = Vec::with_capacity(args.len());
         for arg in args {
             let (value, rep) = self.scalar(arg)?;
+            self.refuse_nested_tuple_display(arg)?;
             let narrow = self.float_narrow(arg);
             rendered.push(self.render_text_at(value, rep, narrow)?);
         }
@@ -2628,6 +2683,7 @@ impl FunctionLower<'_, '_> {
             if slot_rep != Rep::Text || rep == Rep::Unit {
                 return Err(Decline::new("explicit conversion"));
             }
+            self.refuse_nested_tuple_display(argument)?;
             let narrow = self.float_narrow(argument);
             let rendered = self.render_text_at(value, rep, narrow)?;
             self.builder.def_var(variable, rendered);
@@ -2761,6 +2817,7 @@ impl FunctionLower<'_, '_> {
         };
         let stream = self.builder.ins().iconst(types::I32, stream);
         let (value, rep) = self.scalar(argument)?;
+        self.refuse_nested_tuple_display(argument)?;
         match rep {
             Rep::Int => {
                 let reference = self.runtime_ref(&abi::PRINT_I64)?;
