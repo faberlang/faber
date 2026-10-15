@@ -2169,7 +2169,11 @@ impl Parser {
             None
         };
         if long_form_type.is_some() || self.extent_constructor_head() {
-            if self.expression_contexts > 1 {
+            // Only the typed-zero heads are store-position-only; a `list<..>`
+            // bracket constructor is a plain value expression at any depth.
+            let typed_zero_head = self.extent_constructor_head()
+                || long_form_type.as_ref().is_some_and(Self::is_extent_type);
+            if self.expression_contexts > 1 && typed_zero_head {
                 return Err(
                     ParseError::structured(ParseErrorKind::ExpressionInvalid, start)
                         .with_arg("issue", "constructor_store_position_only"),
