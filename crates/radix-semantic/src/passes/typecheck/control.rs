@@ -961,6 +961,32 @@ impl TypeChecker<'_> {
         state
     }
 
+    /// Check the right conjunct of `et` under the left conjunct's then-facts.
+    ///
+    /// `et` short-circuits: the right conjunct is evaluated only when the left
+    /// holds, so every then-fact the left conjunct establishes is in force
+    /// while the right conjunct is typed. The facts are applied to the
+    /// bindings, the right conjunct is checked, and every saved original is
+    /// restored in reverse so the caller sees the un-narrowed state.
+    pub(super) fn check_conjunct_rhs_narrowed(
+        &mut self,
+        lhs: &HirExpression,
+        rhs: &mut HirExpression,
+    ) -> TypeId {
+        let (facts, _) = self.condition_refinement(lhs);
+        let saved: Vec<(DefId, Option<BindingInfo>)> = facts
+            .into_iter()
+            .map(|(def_id, ty)| (def_id, self.override_binding(def_id, ty)))
+            .collect();
+        let rhs_ty = self.check_expr(rhs);
+        for (def_id, original) in saved.into_iter().rev() {
+            if let Some(original) = original {
+                self.restore_binding(def_id, original);
+            }
+        }
+        rhs_ty
+    }
+
     /// The saved declared type a currently open assert-refinement frame holds
     /// for `def_id`, if any frame registered one.
     fn saved_assert_refinement(&self, def_id: DefId) -> Option<BindingInfo> {
