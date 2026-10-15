@@ -410,12 +410,12 @@ fn praefixum_link_method_that_prints_is_forbidden() {
     );
 }
 
-/// ST2-2.11c: both sibling modules export a genus named `Box`, so the method
-/// resolver finds two candidate homes for the genus (and none for `get` in
-/// particular) and refuses the site as unavailable.
+/// Two sibling modules export a genus named `Box`; the receiver is `a.Box`, so
+/// the method home is `a` by receiver DefId and `b`'s different `get` body
+/// (which would add 100) must not contaminate the evaluation.
 #[test]
-fn praefixum_link_method_two_sibling_homes_is_unavailable() {
-    let dir = test_temp_dir("praefixum-link-two-sibling-homes");
+fn praefixum_link_method_homonym_genus_evaluates_in_its_own_home() {
+    let dir = test_temp_dir("praefixum-link-homonym-genus");
     let dir = dir.as_ref();
     write(
         dir,
@@ -425,7 +425,7 @@ fn praefixum_link_method_two_sibling_homes_is_unavailable() {
     write(
         dir,
         "b.fab",
-        "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n",
+        "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        return self.n + 100\n    }\n}\n",
     );
     write(
         dir,
@@ -434,20 +434,43 @@ fn praefixum_link_method_two_sibling_homes_is_unavailable() {
          const int M = comptime {\n    const a.Box x ← a.Box { n = 7 }\n    return x.get()\n}\n\n\
          main {\n    print M\n}\n",
     );
-    let diagnostics = analyze_err(dir);
-    let matches: Vec<&Diagnostic> = diagnostics
-        .iter()
-        .filter(|diagnostic| {
-            diagnostic.code == Some("SEM064")
-                && diagnostic.issue() == Some("praefixum_import_unavailable")
-        })
-        .collect();
-    assert_eq!(
-        matches.len(),
-        1,
-        "two sibling homes must yield exactly one unavailable refusal: {diagnostics:?}"
-    );
-    assert_eq!(arg(matches[0], "name"), "M");
+    let package = analyze(dir);
+    let (_, node) = package.node_by_path(&dir.join("main.fab")).unwrap();
+    assert_eq!(int_literal(constant(node, "M")), 7);
+}
+
+/// The effect set of a homonym genus method is its own: `b.Box.get` prints and
+/// `a.Box.get` is pure, so a site on `a.Box` evaluates and a site on `b.Box`
+/// is refused as forbidden.
+#[test]
+fn praefixum_link_method_homonym_genus_effect_is_its_own() {
+    let a_source = "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        return self.n\n    }\n}\n";
+    let b_source = "@ public\nclass Box {\n    var int n\n\n    fn get() → int {\n        print 7\n        return self.n\n    }\n}\n";
+    let main_source = |home: &str| {
+        format!(
+            "import from \"./a\" a\nimport from \"./b\" b\n\n\
+             const int M = comptime {{\n    const {home}.Box x ← {home}.Box {{ n = 7 }}\n    return x.get()\n}}\n\n\
+             main {{\n    print M\n}}\n"
+        )
+    };
+
+    let pure_dir = test_temp_dir("praefixum-link-homonym-effect-pure");
+    let pure_dir = pure_dir.as_ref();
+    write(pure_dir, "a.fab", a_source);
+    write(pure_dir, "b.fab", b_source);
+    write(pure_dir, "main.fab", &main_source("a"));
+    let package = analyze(pure_dir);
+    let (_, node) = package.node_by_path(&pure_dir.join("main.fab")).unwrap();
+    assert_eq!(int_literal(constant(node, "M")), 7);
+
+    let effect_dir = test_temp_dir("praefixum-link-homonym-effect-prints");
+    let effect_dir = effect_dir.as_ref();
+    write(effect_dir, "a.fab", a_source);
+    write(effect_dir, "b.fab", b_source);
+    write(effect_dir, "main.fab", &main_source("b"));
+    let diagnostics = analyze_err(effect_dir);
+    let diagnostic = sem064(&diagnostics, "praefixum_forbidden");
+    assert_eq!(arg(diagnostic, "name"), "M");
 }
 
 /// ST2-2.11c: a library callee is available only when the analyzed body of
