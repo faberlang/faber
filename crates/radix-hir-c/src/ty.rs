@@ -93,9 +93,12 @@ impl Inner {
             Ty::Float => Some(Inner::Float),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
-            Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) | Ty::Opt(_) | Ty::None | Ty::Decimal => {
-                None
-            }
+            Ty::Sized(_)
+            | Ty::Modular(_)
+            | Ty::Saturating(_)
+            | Ty::Opt(_)
+            | Ty::None
+            | Ty::Decimal => None,
         }
     }
 
@@ -202,9 +205,7 @@ impl Ty {
         match self {
             Ty::Int => Some("int64_t"),
             Ty::None => Some("int"),
-            Ty::Sized(width) | Ty::Modular(width) | Ty::Saturating(width) => {
-                Some(width.c_type())
-            }
+            Ty::Sized(width) | Ty::Modular(width) | Ty::Saturating(width) => Some(width.c_type()),
             Ty::Opt(Inner::Genus(_)) => None,
             Ty::Opt(inner) => inner
                 .scalar_struct()

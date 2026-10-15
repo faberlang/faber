@@ -486,7 +486,11 @@ impl Emitter<'_> {
             Ty::Modular(width) | Ty::Saturating(width) => {
                 self.support.need(Helper::Wide);
                 self.support.need_ints();
-                let call = if inc { "faber_add_wide" } else { "faber_sub_wide" };
+                let call = if inc {
+                    "faber_add_wide"
+                } else {
+                    "faber_sub_wide"
+                };
                 let kind = if matches!(local.ty, Ty::Modular(_)) {
                     "wrapping"
                 } else {

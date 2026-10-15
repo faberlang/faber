@@ -62,9 +62,9 @@ impl From<Ty> for Value {
         match ty {
             Ty::Int => Value::Int,
             // `u64` does not fit an `int64_t`, so it reads as an exact value.
-            Ty::Sized(IntWidth::U64) | Ty::Modular(IntWidth::U64) | Ty::Saturating(IntWidth::U64) => {
-                Value::Exact
-            }
+            Ty::Sized(IntWidth::U64)
+            | Ty::Modular(IntWidth::U64)
+            | Ty::Saturating(IntWidth::U64) => Value::Exact,
             Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) => Value::Int,
             Ty::Text => Value::Text,
             Ty::Bool => Value::Truth,
@@ -677,12 +677,18 @@ impl Emitter<'_> {
             self.support.need(Helper::Types);
             format!("(faber_i128)UINT64_C({value})")
         };
-        Ok(Operand::new(format!("faber_dec_int({text})"), Value::Decimal))
+        Ok(Operand::new(
+            format!("faber_dec_int({text})"),
+            Value::Decimal,
+        ))
     }
 
     /// A `d64` decimal literal, carried exactly as its digit text (the
     /// frontend proves it fits the declared width and never rounds it).
-    fn decimal_text_literal(&mut self, symbol: radix_lexer::Symbol) -> Result<Operand, CodegenError> {
+    fn decimal_text_literal(
+        &mut self,
+        symbol: radix_lexer::Symbol,
+    ) -> Result<Operand, CodegenError> {
         let raw = self.names.resolve_symbol(symbol);
         let decoded = radix_codegen_shared::unescape_faber_text(raw);
         let Some(carrier) = radix_codegen_shared::decimal::decimal_text_to_carrier(
@@ -825,12 +831,11 @@ impl Emitter<'_> {
             let prelude = self.sequence(&mut operands);
             let [l, r] = operands;
             let call = format!("faber_list_{suffix}_equal({}, {})", l.text, r.text);
-            let negate = matches!(op, HirBinOp::NotEq | HirBinOp::StrictNotEq | HirBinOp::ApproxNotEq);
-            let text = if negate {
-                format!("(!{call})")
-            } else {
-                call
-            };
+            let negate = matches!(
+                op,
+                HirBinOp::NotEq | HirBinOp::StrictNotEq | HirBinOp::ApproxNotEq
+            );
+            let text = if negate { format!("(!{call})") } else { call };
             return Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect));
         }
         let op_name = match op {
@@ -862,7 +867,12 @@ impl Emitter<'_> {
         );
         let value = if matches!(
             op,
-            HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq | HirBinOp::ApproxEq | HirBinOp::ApproxNotEq
+            HirBinOp::Lt
+                | HirBinOp::Gt
+                | HirBinOp::LtEq
+                | HirBinOp::GtEq
+                | HirBinOp::ApproxEq
+                | HirBinOp::ApproxNotEq
         ) {
             Value::List(Elem::Bool)
         } else {
@@ -955,9 +965,9 @@ impl Emitter<'_> {
     }
 
     fn unary(&mut self, op: HirUnOp, operand: &HirExpression) -> Result<Operand, CodegenError> {
-        let wide = operand.ty.is_some_and(|ty| {
-            matches!(classify(self.types, ty), Ok(Ty::Modular(_)))
-        });
+        let wide = operand
+            .ty
+            .is_some_and(|ty| matches!(classify(self.types, ty), Ok(Ty::Modular(_))));
         let inner = self.expr(operand)?;
         match op {
             HirUnOp::Neg if inner.value == Value::Float => Ok(Self::float_negate(&inner)),
@@ -1508,10 +1518,7 @@ impl Emitter<'_> {
             (Ty::Decimal, Value::Decimal) => {
                 let at = c_string(&self.store_position(site))?;
                 self.support.need(Helper::Decimal);
-                let text = format!(
-                    "faber_dec_of(faber_dec_store({}, {at}, \"\"))",
-                    value.text
-                );
+                let text = format!("faber_dec_of(faber_dec_store({}, {at}, \"\"))", value.text);
                 let mut operand = Operand::new(text, Value::Decimal).with_effect(value.effect);
                 operand.stored = Some(Ty::Decimal);
                 Ok(operand)
@@ -1559,11 +1566,7 @@ impl Emitter<'_> {
         width: IntWidth,
     ) -> Operand {
         self.support.need_ints();
-        let call = format!(
-            "faber_store_{kind}_{}({})",
-            width.marker(),
-            value.text
-        );
+        let call = format!("faber_store_{kind}_{}({})", width.marker(), value.text);
         let mut operand = if width == IntWidth::U64 {
             Operand::new(format!("((faber_i128){call})"), Value::Exact)
         } else {
@@ -1636,13 +1639,15 @@ impl Emitter<'_> {
                 Ok(operand)
             }
             Ty::Modular(width) => {
-                if value.stored == Some(class) || !matches!(value.value, Value::Int | Value::Exact) {
+                if value.stored == Some(class) || !matches!(value.value, Value::Int | Value::Exact)
+                {
                     return Ok(value);
                 }
                 Ok(self.store_word(&value, class, "wrapping", width))
             }
             Ty::Saturating(width) => {
-                if value.stored == Some(class) || !matches!(value.value, Value::Int | Value::Exact) {
+                if value.stored == Some(class) || !matches!(value.value, Value::Int | Value::Exact)
+                {
                     return Ok(value);
                 }
                 Ok(self.store_word(&value, class, "saturating", width))
