@@ -99,8 +99,10 @@ fn raw_bits_pair_only_with_same_width_scalars() {
     assert!(f.supported(f32_, b32));
     assert!(f.supported(b32, f32_));
     assert!(!f.supported(i32_, b16));
-    assert!(!f.supported(f16_, b16));
-    assert!(!f.supported(u64_, b64));
+    assert!(f.supported(f16_, b16));
+    assert!(f.supported(b16, f16_));
+    assert!(f.supported(u64_, b64));
+    assert!(f.supported(b64, u64_));
     assert!(matches!(
         numeric_conversion(&f.types, i32_, b32).map(|plan| plan.target()),
         Some(Num::Bits(BitsWidth::B32))
@@ -116,7 +118,8 @@ fn union_targets_test_each_member_and_reject_unlowered_members() {
     let regex = f.primitive(Primitive::Regex);
     let mixed = f.types.intern(Type::Union(vec![int, text]));
     let with_none = f.types.intern(Type::Union(vec![int, none]));
-    let with_regex = f.types.intern(Type::Union(vec![int, regex]));
+    let json = f.primitive(Primitive::Json);
+    let with_json = f.types.intern(Type::Union(vec![int, json]));
     // Union members are stored in id order, so the tests come in either order.
     let tests = member_tests(&f.types, mixed).expect("a union of scalars tests by tag");
     assert_eq!(tests.len(), 2);
@@ -124,11 +127,22 @@ fn union_targets_test_each_member_and_reject_unlowered_members() {
     assert!(tests.contains(&MemberTest::Tag(crate::abi::TAG_TEXT)));
     assert_eq!(member_tests(&f.types, none), Some(vec![MemberTest::Nil]));
     assert_eq!(member_tests(&f.types, regex), None);
+    // An unbounded integer is an integer in `i64` (plain tag) or beyond it.
+    let inf = f.sized(Primitive::Numerus, NumericWidth::Inf);
+    assert_eq!(
+        member_tests(&f.types, inf),
+        Some(vec![
+            MemberTest::Tag(crate::abi::TAG_INT),
+            MemberTest::Tag(crate::abi::TAG_INF)
+        ])
+    );
+    let d64 = f.sized(Primitive::Numerus, NumericWidth::D64);
+    assert_eq!(member_tests(&f.types, d64), None);
     // A boxed union lowers; a none member would collide with the optional's
     // null and a member outside the subset is refused.
     assert!(rep_of(&f.types, MirType::semantic(mixed)).is_ok());
     assert!(rep_of(&f.types, MirType::semantic(with_none)).is_err());
-    assert!(rep_of(&f.types, MirType::semantic(with_regex)).is_err());
+    assert!(rep_of(&f.types, MirType::semantic(with_json)).is_err());
 }
 
 #[test]
@@ -254,4 +268,69 @@ fn scalars_write_into_a_byte_buffer_of_their_width() {
     );
     // The capacity must equal the scalar's width.
     assert_eq!(plan(&f, u16_, bytes4), None);
+}
+
+#[test]
+fn letters_convert_to_and_from_numbers_and_texts() {
+    let mut f = Fixture::new();
+    let letter = f.primitive(Primitive::Littera);
+    let text = f.primitive(Primitive::Textus);
+    let int = f.primitive(Primitive::Numerus);
+    let u32_ = f.sized(Primitive::Numerus, NumericWidth::U32);
+    let wrapping_u8 = f.modular(NumericWidth::U8);
+    assert!(f.supported(text, letter));
+    assert!(f.supported(int, letter));
+    assert!(f.supported(letter, int));
+    assert!(f.supported(letter, u32_));
+    // A letter becomes text through the display path, not a plan.
+    assert!(!f.supported(letter, text));
+    // A policy word target stays declined.
+    assert!(!f.supported(letter, wrapping_u8));
+    assert_eq!(
+        rep_of(&f.types, MirType::semantic(letter)),
+        Ok(super::Rep::Char)
+    );
+}
+
+#[test]
+fn decimals_convert_with_integers_floats_and_texts() {
+    let mut f = Fixture::new();
+    let d64 = f.sized(Primitive::Numerus, NumericWidth::D64);
+    let int = f.primitive(Primitive::Numerus);
+    let u64_ = f.sized(Primitive::Numerus, NumericWidth::U64);
+    let float = f.primitive(Primitive::Fractus);
+    let text = f.primitive(Primitive::Textus);
+    assert!(f.supported(int, d64));
+    assert!(f.supported(float, d64));
+    assert!(f.supported(text, d64));
+    assert!(f.supported(d64, int));
+    assert!(f.supported(d64, float));
+    assert!(f.supported(d64, d64));
+    // A 64-bit unsigned cell reaches beyond the carrier, and a decimal does
+    // not render through the numeric plans (it renders as text directly).
+    assert!(!f.supported(u64_, d64));
+    assert!(!f.supported(d64, u64_));
+    assert!(!f.supported(d64, text));
+}
+
+#[test]
+fn open_data_and_unbounded_integers_convert_by_tag_and_range() {
+    let mut f = Fixture::new();
+    let inf = f.sized(Primitive::Numerus, NumericWidth::Inf);
+    let int = f.primitive(Primitive::Numerus);
+    let u8_ = f.sized(Primitive::Numerus, NumericWidth::U8);
+    let u64_ = f.sized(Primitive::Numerus, NumericWidth::U64);
+    let valor = f.primitive(Primitive::Valor);
+    let text = f.primitive(Primitive::Textus);
+    let float = f.primitive(Primitive::Fractus);
+    assert!(f.supported(int, inf));
+    assert!(f.supported(inf, u8_));
+    assert!(f.supported(inf, valor));
+    assert!(f.supported(valor, inf));
+    assert!(f.supported(int, valor));
+    assert!(f.supported(valor, text));
+    assert!(f.supported(valor, float));
+    // A 64-bit unsigned cell reaches beyond the carrier.
+    assert!(!f.supported(inf, u64_));
+    assert!(!f.supported(valor, u64_));
 }

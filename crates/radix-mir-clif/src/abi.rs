@@ -75,6 +75,16 @@ pub const TAG_LIST: i64 = 8;
 pub const TAG_STRUCT: i64 = 9;
 pub const TAG_OPT: i64 = 10;
 pub const TAG_MAP: i64 = 11;
+/// A `littera` element: the payload is a text handle of one letter; it
+/// displays quoted with single quotes inside a collection.
+pub const TAG_CHAR: i64 = 12;
+/// A `match` element: a handle to a match record; it displays as its text.
+pub const TAG_MATCH: i64 = 13;
+/// A `regex` element: a handle to a compiled program; it displays as its
+/// pattern.
+pub const TAG_REGEX: i64 = 14;
+/// Element tag of a `d64` handle.
+pub const TAG_DEC: i64 = 15;
 
 /// New empty map (flag 0) or set (flag 1).
 pub const MAP_NEW: RuntimeSymbol = RuntimeSymbol {
@@ -462,6 +472,199 @@ pub const TRAP_STORE: RuntimeSymbol = RuntimeSymbol {
     params: &[I64, Ptr, I64, I8],
     ret: None,
 };
+/// Print one signed integer line for an exact intermediate beyond the 64-bit
+/// carrier: (stream, low half, high half).
+pub const PRINT_WIDE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_print_wide",
+    params: &[I32, I64, I64],
+    ret: None,
+};
+/// Render an exact intermediate as text: (low half, high half) -> text handle.
+pub const TEXT_FROM_WIDE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_from_wide",
+    params: &[I64, I64],
+    ret: Some(Ptr),
+};
+/// [`TRAP_STORE`] for an exact intermediate: (low half, high half, suffix
+/// pointer, suffix length, unsigned-slot flag).
+pub const TRAP_STORE_WIDE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_trap_store_wide",
+    params: &[I64, I64, Ptr, I64, I8],
+    ret: None,
+};
+/// Exact product of two 128-bit intermediates: (a low, a high, b low, b high)
+/// -> low half; the high half is read from [`WIDE_HI`]. A product outside the
+/// exact range [-2^63, 2^64 - 1] ends the run with the runner's wording.
+pub const WIDE_MUL: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_wide_mul",
+    params: &[I64, I64, I64, I64],
+    ret: Some(I64),
+};
+/// Floor quotient (remainder flag 0) or floor remainder (flag 1) of two
+/// 128-bit intermediates: (a low, a high, b low, b high, flag) -> low half;
+/// the high half is read from [`WIDE_HI`]. A zero divisor ends the run.
+pub const WIDE_DIV: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_wide_div",
+    params: &[I64, I64, I64, I64, I32],
+    ret: Some(I64),
+};
+/// The high half of the latest [`WIDE_MUL`] or [`WIDE_DIV`] result.
+pub const WIDE_HI: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_wide_hi",
+    params: &[],
+    ret: Some(I64),
+};
+/// A one-letter text from a text of exactly one Unicode scalar: text -> the
+/// same handle, or null when the text does not hold exactly one scalar.
+pub const CHAR_FROM_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_char_from_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// A one-letter text from a code point: value -> text handle, or null for a
+/// surrogate or a value outside Unicode.
+pub const CHAR_FROM_CODE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_char_from_code",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// A one-letter text from a decimal digit: value -> text handle, or null
+/// outside 0 to 9.
+pub const CHAR_FROM_DIGIT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_char_from_digit",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// The code point of a one-letter text.
+pub const CHAR_CODE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_char_code",
+    params: &[Ptr],
+    ret: Some(I64),
+};
+/// The decimal digit a one-letter text holds, or -1.
+pub const CHAR_DIGIT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_char_digit",
+    params: &[Ptr],
+    ret: Some(I64),
+};
+/// The letters of a text as a list: text -> list of one-letter texts, one
+/// per Unicode scalar.
+pub const TEXT_CHARS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_chars",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// The `b16` pattern of an `f16` value held as `f64`: value -> pattern.
+pub const F16_TO_BITS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_f16_to_bits",
+    params: &[F64],
+    ret: Some(I64),
+};
+/// The `f16` value of a `b16` pattern, held as `f64`: pattern -> value.
+pub const F16_FROM_BITS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_f16_from_bits",
+    params: &[I64],
+    ret: Some(F64),
+};
+/// Compile a pattern text: text -> regex handle, or null when the pattern is
+/// rejected (its payload is [`REGEX_ERROR`]).
+pub const REGEX_COMPILE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_compile",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// The payload of the latest rejected pattern, as a text.
+pub const REGEX_ERROR: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_error",
+    params: &[],
+    ret: Some(Ptr),
+};
+/// A regex literal's pattern text -> regex handle; an invalid constant ends
+/// the run.
+pub const REGEX_LITERAL: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_literal",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Whether a regex matches anywhere in a text: (regex, text) -> bool.
+pub const REGEX_MATCHES: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_matches",
+    params: &[Ptr, Ptr],
+    ret: Some(I8),
+};
+/// The leftmost-first match: (regex, text) -> a present optional or null.
+pub const REGEX_FIND: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_find",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// Every non-overlapping match: (regex, text) -> list of matches.
+pub const REGEX_FIND_ALL: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_find_all",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// The pieces between the matches: (regex, text) -> list of texts.
+pub const REGEX_SPLIT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_split",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// Every match replaced by a literal text: (regex, text, replacement) -> text.
+pub const REGEX_REPLACE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_replace",
+    params: &[Ptr, Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// The i-th match replaced by the i-th text of a list: (regex, text,
+/// replacements) -> text.
+pub const REGEX_REPLACE_EACH: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_replace_each",
+    params: &[Ptr, Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// The text of a match.
+pub const MATCH_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_match_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// The code-point offset where a match starts.
+pub const MATCH_START: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_match_start",
+    params: &[Ptr],
+    ret: Some(I64),
+};
+/// The code-point offset where a match ends.
+pub const MATCH_END: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_match_end",
+    params: &[Ptr],
+    ret: Some(I64),
+};
+/// A numbered group: (match, index) -> a present text or null.
+pub const MATCH_GROUP: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_match_group",
+    params: &[Ptr, I64],
+    ret: Some(Ptr),
+};
+/// A named group: (match, name) -> a present text or null.
+pub const MATCH_NAMED: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_match_named",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// A pattern text matching the text literally.
+pub const TEXT_ESCAPE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_escape",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// The pattern of a regex, as a text (its display).
+pub const REGEX_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
 /// Install the program's output tokens (true, false, none, tuple), each as
 /// (pointer, length).
 pub const SET_DISPLAY_TOKENS: RuntimeSymbol = RuntimeSymbol {
@@ -670,6 +873,36 @@ pub const MAIN: RuntimeSymbol = RuntimeSymbol {
 pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     MAIN,
     PRINT_I64,
+    PRINT_WIDE,
+    REGEX_COMPILE,
+    REGEX_ERROR,
+    REGEX_LITERAL,
+    REGEX_MATCHES,
+    REGEX_FIND,
+    REGEX_FIND_ALL,
+    REGEX_SPLIT,
+    REGEX_REPLACE,
+    REGEX_REPLACE_EACH,
+    MATCH_TEXT,
+    MATCH_START,
+    MATCH_END,
+    MATCH_GROUP,
+    MATCH_NAMED,
+    TEXT_ESCAPE,
+    REGEX_TEXT,
+    F16_TO_BITS,
+    F16_FROM_BITS,
+    TEXT_CHARS,
+    CHAR_FROM_TEXT,
+    CHAR_FROM_CODE,
+    CHAR_FROM_DIGIT,
+    CHAR_CODE,
+    CHAR_DIGIT,
+    TEXT_FROM_WIDE,
+    TRAP_STORE_WIDE,
+    WIDE_MUL,
+    WIDE_DIV,
+    WIDE_HI,
     PRINT_F64,
     PRINT_BOOL,
     LIST_NEW,
@@ -766,7 +999,247 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     UNION_IS_STRUCT,
     RECORD_IS_NAMED,
     SET_DISPLAY_TOKENS,
+    DEC_STORED,
+    DEC_INT,
+    DEC_BINARY,
+    DEC_NEG,
+    DEC_COMPARE,
+    DEC_STORE,
+    DEC_TEXT,
+    DEC_TRAP_STORE,
+    INT_FLOAT_COMPARE,
+    DEC_FROM_INT,
+    DEC_FROM_FLOAT,
+    DEC_FROM_TEXT,
+    DEC_TO_FLOAT,
+    DEC_TO_INT,
+    DYN_BOX,
+    INF_INT,
+    INF_WIDE,
+    INF_DIGITS,
+    INF_BINARY,
+    INF_NEG,
+    INF_COMPARE,
+    INF_TEXT,
+    INF_TO_INT,
+    INF_BOX,
+    INF_UNBOX,
+    INS_PARSE,
+    INS_FROM_EPOCH,
+    INS_RETAG,
+    INS_TEXT,
+    INS_COMPARE,
+    INS_BOX,
+    INS_UNBOX,
+    FORMAT_INT,
+    FORMAT_FLOAT,
+    FORMAT_TEXT,
+    FORMAT_DEC,
+    FORMAT_INF,
+    FORMAT_INS,
 ];
+
+/// A stored `d64` carrier (scale 8) -> decimal handle.
+pub const DEC_STORED: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_stored",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// An integer -> decimal handle (scale 0).
+pub const DEC_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_int",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// `left op right` over decimals, op 0 `+`, 1 `-`, 2 `*`, 3 `/`, 4 `%`.
+pub const DEC_BINARY: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_binary",
+    params: &[Ptr, Ptr, I32],
+    ret: Some(Ptr),
+};
+/// `-value` over a decimal.
+pub const DEC_NEG: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_neg",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Three-way decimal comparison: -1, 0, 1.
+pub const DEC_COMPARE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_compare",
+    params: &[Ptr, Ptr],
+    ret: Some(I32),
+};
+/// A decimal rounded to a `d64` slot, or null when it does not fit.
+pub const DEC_STORE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_store",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// A decimal as its shortest text.
+pub const DEC_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// End the run: a decimal does not fit its slot (value, suffix pointer, suffix length).
+pub const DEC_TRAP_STORE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_trap_store",
+    params: &[Ptr, Ptr, I64],
+    ret: None,
+};
+/// Exact order of an integer and a float: -1, 0, 1, or 2 when unordered.
+pub const INT_FLOAT_COMPARE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_int_float_compare",
+    params: &[I64, F64],
+    ret: Some(I32),
+};
+
+/// An integer converted to a stored decimal; null (parse status 2) when the scaled value does not fit.
+pub const DEC_FROM_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_from_int",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// A float converted to a stored decimal; null (status 1 or 2) when it is not a decimal number or does not fit.
+pub const DEC_FROM_FLOAT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_from_float",
+    params: &[F64],
+    ret: Some(Ptr),
+};
+/// A text converted to a stored decimal; null (status 1 or 2) when malformed or out of range.
+pub const DEC_FROM_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_from_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// A decimal as a float (the flag rounds it through `f32`).
+pub const DEC_TO_FLOAT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_to_float",
+    params: &[Ptr, I32],
+    ret: Some(F64),
+};
+/// A decimal rounded to an integer in [low, high] (mode 0 floor, 1 ceil, 2 half-even, 3 trunc); a nonzero parse status when it does not fit.
+pub const DEC_TO_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dec_to_int",
+    params: &[Ptr, I32, I64, I64],
+    ret: Some(I64),
+};
+
+/// A list or map as open data (element tag, handle): a box whose elements are
+/// themselves boxes.
+pub const DYN_BOX: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_dyn_box",
+    params: &[I32, I64],
+    ret: Some(Ptr),
+};
+
+/// Element tag of an `inf` handle.
+pub const TAG_INF: i64 = 16;
+/// An integer as an `inf` handle.
+pub const INF_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_int",
+    params: &[I64],
+    ret: Some(Ptr),
+};
+/// An exact 128-bit intermediate (low, high) as an `inf` handle.
+pub const INF_WIDE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_wide",
+    params: &[I64, I64],
+    ret: Some(Ptr),
+};
+/// A constant's decimal digits as an `inf` handle.
+pub const INF_DIGITS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_digits",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// `left op right` over infs, op 0 `+`, 1 `-`, 2 `*`, 3 `/` (floor), 4 `%` (floor).
+pub const INF_BINARY: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_binary",
+    params: &[Ptr, Ptr, I32],
+    ret: Some(Ptr),
+};
+/// `-value` over an inf.
+pub const INF_NEG: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_neg",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Three-way inf comparison: -1, 0, 1.
+pub const INF_COMPARE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_compare",
+    params: &[Ptr, Ptr],
+    ret: Some(I32),
+};
+/// An inf as decimal text.
+pub const INF_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// An inf as an integer in [low, high]; parse status 6 when it does not fit.
+pub const INF_TO_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_to_int",
+    params: &[Ptr, I64, I64],
+    ret: Some(I64),
+};
+/// An inf as open data (a plain integer payload when it fits `i64`).
+pub const INF_BOX: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_box",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// The inf an open-data box holds, or null.
+pub const INF_UNBOX: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_inf_unbox",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+
+/// Element tag of an `instans` handle.
+pub const TAG_INS: i64 = 17;
+/// An instant from RFC 3339 text at a precision code (0 s, 1 ms, 2 us, 3 ns); null when malformed.
+pub const INS_PARSE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_parse",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+/// An instant from an epoch integer in the precision's native units.
+pub const INS_FROM_EPOCH: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_from_epoch",
+    params: &[I64, I32],
+    ret: Some(Ptr),
+};
+/// An instant at another precision.
+pub const INS_RETAG: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_retag",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
+/// An instant as RFC 3339 text at its precision.
+pub const INS_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Three-way instant comparison at the coarser precision: -1, 0, 1.
+pub const INS_COMPARE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_compare",
+    params: &[Ptr, Ptr],
+    ret: Some(I32),
+};
+/// An instant as open data.
+pub const INS_BOX: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_box",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// The instant an open-data box holds at a precision, or null.
+pub const INS_UNBOX: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_ins_unbox",
+    params: &[Ptr, I32],
+    ret: Some(Ptr),
+};
 
 /// A text handle points at `[len: i64][bytes...]`; literals are static data in
 /// that shape, runtime-built texts are leaked allocations of it.
@@ -774,3 +1247,40 @@ pub const TEXT_HEADER: usize = 8;
 
 /// The program entry the runtime calls (exported by generated code).
 pub const PROGRAM_INCIPIT: &str = "faber_clif_incipit";
+
+/// `value ¶ "spec"` over an integer: (low half, high half, spec text) -> text.
+pub const FORMAT_INT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_format_int",
+    params: &[I64, I64, Ptr],
+    ret: Some(Ptr),
+};
+/// `value ¶ "spec"` over a float: (value, f32 flag, spec text) -> text.
+pub const FORMAT_FLOAT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_format_float",
+    params: &[F64, I32, Ptr],
+    ret: Some(Ptr),
+};
+/// `value ¶ "spec"` over a text: (text, spec text) -> text.
+pub const FORMAT_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_format_text",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// `value ¶ "spec"` over a decimal: (decimal, spec text) -> text.
+pub const FORMAT_DEC: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_format_dec",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// `value ¶ "spec"` over an inf: (inf, spec text) -> text.
+pub const FORMAT_INF: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_format_inf",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// `value ¶ "spec"` over an instant preset: (instant, spec text) -> text.
+pub const FORMAT_INS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_format_ins",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};

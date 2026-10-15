@@ -36,6 +36,20 @@ pub(crate) enum Num {
     Float(NumericWidth),
     Bool,
     Text,
+    /// A `littera`: a text handle of one letter.
+    Char,
+    /// A `regex`: a compiled program behind a handle.
+    Regex,
+    /// A `d64`: an exact decimal behind a handle.
+    Dec,
+    /// Open data (`valor`, `json`): a box of one tagged payload.
+    Dyn,
+    /// An unbounded integer behind a handle.
+    Inf,
+    /// An instant at a precision code (0 s, 1 ms, 2 us, 3 ns).
+    Ins(i64),
+    /// The absent value.
+    Nil,
     Bits(BitsWidth),
 }
 
@@ -59,6 +73,34 @@ fn int_kind(table: &TypeTable, id: TypeId) -> Option<IntKind> {
 
 /// The cell kind of `id` when it takes part in a numeric conversion.
 fn num_of(table: &TypeTable, id: TypeId) -> Option<Num> {
+    match resolve(table, id) {
+        Type::Primitive(Primitive::Instans) => return Some(Num::Ins(0)),
+        Type::SizedInstans(precision) => {
+            return Some(Num::Ins(match precision {
+                radix_types::InstansPrecision::Millis => 1,
+                radix_types::InstansPrecision::Micros => 2,
+                radix_types::InstansPrecision::Nanos => 3,
+            }));
+        }
+        _ => {}
+    }
+    if matches!(
+        resolve(table, id),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::Inf)
+            | Type::ModularWord(NumericWidth::Inf)
+            | Type::SaturatingWord(NumericWidth::Inf)
+    ) {
+        return Some(Num::Inf);
+    }
+    if matches!(resolve(table, id), Type::Primitive(Primitive::Nihil)) {
+        return Some(Num::Nil);
+    }
+    if matches!(
+        resolve(table, id),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::D64)
+    ) {
+        return Some(Num::Dec);
+    }
     if let Some(kind) = int_kind(table, id) {
         return Some(Num::Int(kind));
     }
@@ -69,6 +111,18 @@ fn num_of(table: &TypeTable, id: TypeId) -> Option<Num> {
         }
         Type::Primitive(Primitive::Bivalens) => Some(Num::Bool),
         Type::Primitive(Primitive::Textus | Primitive::Ascii) => Some(Num::Text),
+        Type::Primitive(Primitive::Littera) => Some(Num::Char),
+        Type::Primitive(Primitive::Regex) => Some(Num::Regex),
+        Type::Primitive(Primitive::Json | Primitive::Valor) => Some(Num::Dyn),
+        // An absent open-data value is the box's null.
+        Type::Option(inner)
+            if matches!(
+                resolve(table, *inner),
+                Type::Primitive(Primitive::Json | Primitive::Valor)
+            ) =>
+        {
+            Some(Num::Dyn)
+        }
         Type::Bits(width) => Some(Num::Bits(*width)),
         _ => None,
     }
@@ -122,22 +176,48 @@ pub(crate) fn numeric_conversion(
         (Num::Text | Num::Float(_) | Num::Int(_), Num::Bool) => true,
         (Num::Bool, Num::Int(to)) => to.policy == IntPolicy::Trap,
         (Num::Text, Num::Float(_)) => true,
+        // A letter is a one-letter text: digits and code points convert both
+        // ways, and a text converts when it holds exactly one letter.
+        (Num::Text | Num::Int(_), Num::Char) => true,
+        // A pattern compiles once, in the conversion, and fails when rejected.
+        (Num::Text, Num::Regex) => true,
+        // A decimal is exact: integers, floats and texts convert in with a
+        // range check, and out by the `via` rounding (half-even by default).
+        (Num::Int(from), Num::Dec) => from.policy == IntPolicy::Trap && carrier_exact(from),
+        (Num::Float(_) | Num::Text, Num::Dec) | (Num::Dec, Num::Float(_)) => true,
+        (Num::Dec, Num::Int(to)) => to.policy == IntPolicy::Trap && carrier_exact(to),
+        (Num::Dec, Num::Dec) => true,
+        // Open data boxes a scalar and unboxes by its tag; a mismatch fails.
+        (Num::Int(from), Num::Dyn) => from.policy == IntPolicy::Trap && carrier_exact(from),
+        (Num::Float(_) | Num::Bool | Num::Text | Num::Char, Num::Dyn) => true,
+        (Num::Dyn, Num::Int(to)) => to.policy == IntPolicy::Trap && to.width == NumericWidth::I64,
+        (Num::Dyn, Num::Float(width)) => width == NumericWidth::F64,
+        (Num::Dyn, Num::Bool | Num::Text) => true,
+        (Num::Nil, Num::Dyn) => true,
+        // An instant parses from text, reads an epoch integer, changes
+        // precision, and boxes into and unboxes from open data.
+        (Num::Text | Num::Ins(_) | Num::Dyn, Num::Ins(_)) | (Num::Ins(_), Num::Dyn) => true,
+        (Num::Int(from), Num::Ins(_)) => from.policy == IntPolicy::Trap && carrier_exact(from),
+        // An inf takes any carried integer and narrows with a range check; open
+        // data boxes it and unboxes an integer or inf payload.
+        (Num::Int(from), Num::Inf) => from.policy == IntPolicy::Trap && carrier_exact(from),
+        (Num::Inf, Num::Int(to)) => to.policy == IntPolicy::Trap && carrier_exact(to),
+        (Num::Inf, Num::Dyn) | (Num::Dyn, Num::Inf) => true,
+        (Num::Char, Num::Int(to)) => to.policy == IntPolicy::Trap,
         // A signed integer or an unsigned one below 64 bits reads and writes
         // a same-width pattern; a u64 pattern would leave the carrier.
         (Num::Int(from), Num::Bits(width)) => {
-            from.policy == IntPolicy::Trap
-                && width.bits() == int_bits(from.width)
-                && (signed_width(from.width) || width.bits() < 64)
+            from.policy == IntPolicy::Trap && width.bits() == int_bits(from.width)
         }
         (Num::Bits(width), Num::Int(to)) => {
-            to.policy == IntPolicy::Trap
-                && width.bits() == int_bits(to.width)
-                && (signed_width(to.width) || width.bits() < 64)
+            to.policy == IntPolicy::Trap && width.bits() == int_bits(to.width)
         }
         (Num::Float(float), Num::Bits(width)) | (Num::Bits(width), Num::Float(float)) => {
             matches!(
                 (float, width),
-                (NumericWidth::F32, BitsWidth::B32) | (NumericWidth::F64, BitsWidth::B64)
+                (NumericWidth::F32, BitsWidth::B32)
+                    | (NumericWidth::F64, BitsWidth::B64)
+                    | (NumericWidth::F16, BitsWidth::B16)
             )
         }
         _ => false,
@@ -442,6 +522,8 @@ enum Failure {
     Static(&'static str),
     /// A runtime status code (see `abi::CONVERT_MESSAGE`).
     Code(Value),
+    /// A message text already built.
+    Message(Value),
 }
 
 impl FunctionLower<'_, '_> {
@@ -453,9 +535,10 @@ impl FunctionLower<'_, '_> {
         value: Value,
         variable: Variable,
     ) -> Lowered<()> {
-        let recovery = match &conversion.recovery {
-            Some(operand) => Some(self.scalar(operand)?),
-            None => None,
+        let region = self.recovery_region(conversion);
+        let recovery = match (&conversion.recovery, region) {
+            (Some(operand), None) => Some(self.scalar(operand)?),
+            _ => None,
         };
         let (converted, failed) = self.numeric_value(plan, conversion, value)?;
         let want = match plan.target {
@@ -463,6 +546,14 @@ impl FunctionLower<'_, '_> {
             Num::Float(_) => Rep::Float,
             Num::Bool => Rep::Bool,
             Num::Bits(width) => Rep::Bits(width),
+            Num::Char => Rep::Char,
+            Num::Regex => Rep::Regex,
+            Num::Dec => Rep::Dec,
+            Num::Dyn => Rep::Opt,
+            Num::Inf => Rep::Inf,
+            Num::Ins(_) => Rep::Ins,
+            Num::Nil => return Err(Decline::new("conversion to the absent value")),
+            Num::Text if plan.source == Num::Dyn => Rep::Text,
             Num::Text => return Err(Decline::new("text conversion target")),
         };
         let converted = match (failed, recovery) {
@@ -474,10 +565,22 @@ impl FunctionLower<'_, '_> {
                 let truthy = self.builder.ins().iconst(types::I8, 1);
                 self.builder.ins().select(converted, truthy, default)
             }
-            (failed, recovery) => self.finish_conversion(converted, failed, recovery, want)?,
+            (failed, recovery) => {
+                self.finish_conversion(converted, failed, recovery, want, region)?
+            }
         };
         self.builder.def_var(variable, converted);
         Ok(())
+    }
+
+    /// The recovery region a conversion falls into on failure, when its `⊥`
+    /// fallback is a side-effecting region rather than a value in hand.
+    fn recovery_region(&self, conversion: &MirConversion) -> Option<cranelift_codegen::ir::Block> {
+        let Some(MirOperand::Temp(id)) = &conversion.recovery else {
+            return None;
+        };
+        let entry = self.recovery_regions.get(id)?;
+        self.blocks.get(entry).copied()
     }
 
     /// Apply a conversion's failure: the `⊥` default replaces the value, and
@@ -488,7 +591,15 @@ impl FunctionLower<'_, '_> {
         failed: Option<(Value, Failure)>,
         recovery: Option<(Value, Rep)>,
         want: Rep,
+        region: Option<cranelift_codegen::ir::Block>,
     ) -> Lowered<Value> {
+        if let (Some(region), Some((failed, _))) = (region, &failed) {
+            // The fallback runs as its own blocks and stores the destination.
+            let next = self.builder.create_block();
+            self.builder.ins().brif(*failed, region, &[], next, &[]);
+            self.builder.switch_to_block(next);
+            return Ok(converted);
+        }
         Ok(match (failed, recovery) {
             (Some((failed, _)), Some((default, rep))) => {
                 let default = self.coerce(default, rep, want)?;
@@ -510,9 +621,10 @@ impl FunctionLower<'_, '_> {
         value: Value,
         variable: Variable,
     ) -> Lowered<()> {
-        let recovery = match &conversion.recovery {
-            Some(operand) => Some(self.scalar(operand)?),
-            None => None,
+        let region = self.recovery_region(conversion);
+        let recovery = match (&conversion.recovery, region) {
+            (Some(operand), None) => Some(self.scalar(operand)?),
+            _ => None,
         };
         let (converted, failed, want) = match plan {
             Seq::ToSet => (
@@ -715,7 +827,7 @@ impl FunctionLower<'_, '_> {
                 (copied, failed, Rep::List)
             }
         };
-        let converted = self.finish_conversion(converted, failed, recovery, want)?;
+        let converted = self.finish_conversion(converted, failed, recovery, want, region)?;
         self.builder.def_var(variable, converted);
         Ok(())
     }
@@ -774,6 +886,234 @@ impl FunctionLower<'_, '_> {
             (Num::Float(_), Num::Float(_)) => (value, None),
             (Num::Float(_), Num::Int(to)) => self.float_to_int(conversion, to, value)?,
             (Num::Text, Num::Int(to)) => self.text_to_int(conversion, to, value)?,
+            (Num::Int(_) | Num::Float(_) | Num::Bool | Num::Text | Num::Char, Num::Dyn) => {
+                let rep = match plan.source {
+                    Num::Int(_) => Rep::Int,
+                    Num::Float(_) => Rep::Float,
+                    Num::Bool => Rep::Bool,
+                    Num::Char => Rep::Char,
+                    _ => Rep::Text,
+                };
+                (self.wrap_some(value, rep)?, None)
+            }
+            (Num::Dyn, target)
+                if matches!(target, Num::Int(_) | Num::Float(_) | Num::Bool | Num::Text) =>
+            {
+                let (tag, rep, label) = match target {
+                    Num::Int(_) => (abi::TAG_INT, Rep::Int, "numerus"),
+                    Num::Float(_) => (abi::TAG_FLOAT, Rep::Float, "fractus"),
+                    Num::Bool => (abi::TAG_BOOL, Rep::Bool, "bivalens"),
+                    _ => (abi::TAG_TEXT, Rep::Text, "textus"),
+                };
+                let wanted = self.builder.ins().iconst(types::I32, tag);
+                let has = self
+                    .call_runtime(&abi::UNION_HAS_TAG, &[value, wanted])?
+                    .ok_or_else(|| Decline::new("tag test result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let bits = self
+                    .call_runtime(&abi::OPT_BITS_OR, &[value, zero])?
+                    .ok_or_else(|| Decline::new("payload result"))?;
+                let mut extracted = self.element_value(bits, rep);
+                let mut has = has;
+                // A float also takes an integer payload, widened.
+                if rep == Rep::Float {
+                    let int_tag = self.builder.ins().iconst(types::I32, abi::TAG_INT);
+                    let is_int = self
+                        .call_runtime(&abi::UNION_HAS_TAG, &[value, int_tag])?
+                        .ok_or_else(|| Decline::new("tag test result"))?;
+                    let widened = self.builder.ins().fcvt_from_sint(types::F64, bits);
+                    extracted = self.builder.ins().select(is_int, widened, extracted);
+                    has = self.builder.ins().bor(has, is_int);
+                }
+                let one = self.builder.ins().iconst(types::I8, 1);
+                let failed = self.builder.ins().bxor(has, one);
+                let message = format!("valor to {label} conversion failed");
+                let message = Box::leak(message.into_boxed_str());
+                (extracted, Some((failed, Failure::Static(message))))
+            }
+            (Num::Nil, Num::Dyn) => (value, None),
+            (Num::Text, Num::Ins(code)) => {
+                let code = self.builder.ins().iconst(types::I32, code);
+                let instant = self
+                    .call_runtime(&abi::INS_PARSE, &[value, code])?
+                    .ok_or_else(|| Decline::new("instant result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, instant, zero);
+                (
+                    instant,
+                    Some((
+                        failed,
+                        Failure::Static("textus to instans conversion failed"),
+                    )),
+                )
+            }
+            (Num::Int(_), Num::Ins(code)) => {
+                let code = self.builder.ins().iconst(types::I32, code);
+                let instant = self
+                    .call_runtime(&abi::INS_FROM_EPOCH, &[value, code])?
+                    .ok_or_else(|| Decline::new("instant result"))?;
+                (instant, None)
+            }
+            (Num::Ins(_), Num::Ins(code)) => {
+                let code = self.builder.ins().iconst(types::I32, code);
+                let instant = self
+                    .call_runtime(&abi::INS_RETAG, &[value, code])?
+                    .ok_or_else(|| Decline::new("instant result"))?;
+                (instant, None)
+            }
+            (Num::Ins(_), Num::Dyn) => {
+                let boxed = self
+                    .call_runtime(&abi::INS_BOX, &[value])?
+                    .ok_or_else(|| Decline::new("open data result"))?;
+                (boxed, None)
+            }
+            (Num::Dyn, Num::Ins(code)) => {
+                let code = self.builder.ins().iconst(types::I32, code);
+                let instant = self
+                    .call_runtime(&abi::INS_UNBOX, &[value, code])?
+                    .ok_or_else(|| Decline::new("instant result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, instant, zero);
+                (
+                    instant,
+                    Some((
+                        failed,
+                        Failure::Static("valor to instans conversion failed"),
+                    )),
+                )
+            }
+            (Num::Int(_), Num::Inf) => {
+                let big = self
+                    .call_runtime(&abi::INF_INT, &[value])?
+                    .ok_or_else(|| Decline::new("inf result"))?;
+                (big, None)
+            }
+            (Num::Inf, Num::Int(to)) => {
+                let low = self.builder.ins().iconst(types::I64, to.low);
+                let high = self.builder.ins().iconst(types::I64, to.high);
+                let integer = self
+                    .call_runtime(&abi::INF_TO_INT, &[value, low, high])?
+                    .ok_or_else(|| Decline::new("inf integer result"))?;
+                let status = self.parse_status()?;
+                let zero = self.builder.ins().iconst(types::I32, 0);
+                let failed = self.builder.ins().icmp(IntCC::NotEqual, status, zero);
+                (integer, Some((failed, Failure::Code(status))))
+            }
+            (Num::Inf, Num::Dyn) => {
+                let boxed = self
+                    .call_runtime(&abi::INF_BOX, &[value])?
+                    .ok_or_else(|| Decline::new("open data result"))?;
+                (boxed, None)
+            }
+            (Num::Dyn, Num::Inf) => {
+                let big = self
+                    .call_runtime(&abi::INF_UNBOX, &[value])?
+                    .ok_or_else(|| Decline::new("inf result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, big, zero);
+                (
+                    big,
+                    Some((
+                        failed,
+                        Failure::Static("valor to numerus conversion failed"),
+                    )),
+                )
+            }
+            (Num::Int(_), Num::Dec) => self.decimal_in(&abi::DEC_FROM_INT, value)?,
+            (Num::Float(_), Num::Dec) => self.decimal_in(&abi::DEC_FROM_FLOAT, value)?,
+            (Num::Text, Num::Dec) => self.decimal_in(&abi::DEC_FROM_TEXT, value)?,
+            // The same width: the value lands at scale 8, or fails out of range.
+            (Num::Dec, Num::Dec) => {
+                let stored = self
+                    .call_runtime(&abi::DEC_STORE, &[value])?
+                    .ok_or_else(|| Decline::new("decimal store result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, stored, zero);
+                (
+                    stored,
+                    Some((
+                        failed,
+                        Failure::Static("textus to numerus conversion out of range"),
+                    )),
+                )
+            }
+            (Num::Dec, Num::Float(width)) => {
+                let narrow = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, i64::from(width != NumericWidth::F64));
+                let float = self
+                    .call_runtime(&abi::DEC_TO_FLOAT, &[value, narrow])?
+                    .ok_or_else(|| Decline::new("decimal float result"))?;
+                (float, None)
+            }
+            (Num::Dec, Num::Int(to)) => {
+                let mode = match self.rounding_mode_or(&conversion.params, Rounding::HalfEven) {
+                    Rounding::Floor => 0,
+                    Rounding::Ceil => 1,
+                    Rounding::HalfEven => 2,
+                    Rounding::Trunc => 3,
+                };
+                let mode = self.builder.ins().iconst(types::I32, mode);
+                let low = self.builder.ins().iconst(types::I64, to.low);
+                let high = self.builder.ins().iconst(types::I64, to.high);
+                let integer = self
+                    .call_runtime(&abi::DEC_TO_INT, &[value, mode, low, high])?
+                    .ok_or_else(|| Decline::new("decimal integer result"))?;
+                let status = self.parse_status()?;
+                let zero = self.builder.ins().iconst(types::I32, 0);
+                let failed = self.builder.ins().icmp(IntCC::NotEqual, status, zero);
+                (integer, Some((failed, Failure::Code(status))))
+            }
+            (Num::Text, Num::Regex) => {
+                let program = self
+                    .call_runtime(&abi::REGEX_COMPILE, &[value])?
+                    .ok_or_else(|| Decline::new("regex result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, program, zero);
+                let message = self
+                    .call_runtime(&abi::REGEX_ERROR, &[])?
+                    .ok_or_else(|| Decline::new("regex error result"))?;
+                (program, Some((failed, Failure::Message(message))))
+            }
+            (Num::Text, Num::Char) => {
+                let letter = self
+                    .call_runtime(&abi::CHAR_FROM_TEXT, &[value])?
+                    .ok_or_else(|| Decline::new("letter result"))?;
+                self.letter_or_failure(letter)
+            }
+            (Num::Int(_), Num::Char) => {
+                let symbol = if self.has_code_point_hint(&conversion.params) {
+                    &abi::CHAR_FROM_CODE
+                } else {
+                    &abi::CHAR_FROM_DIGIT
+                };
+                let letter = self
+                    .call_runtime(symbol, &[value])?
+                    .ok_or_else(|| Decline::new("letter result"))?;
+                self.letter_or_failure(letter)
+            }
+            (Num::Char, Num::Int(_)) => {
+                if self.has_code_point_hint(&conversion.params) {
+                    let code = self
+                        .call_runtime(&abi::CHAR_CODE, &[value])?
+                        .ok_or_else(|| Decline::new("code point result"))?;
+                    (code, None)
+                } else {
+                    let digit = self
+                        .call_runtime(&abi::CHAR_DIGIT, &[value])?
+                        .ok_or_else(|| Decline::new("digit result"))?;
+                    let zero = self.builder.ins().iconst(types::I64, 0);
+                    let failed = self.builder.ins().icmp(IntCC::SignedLessThan, digit, zero);
+                    (
+                        digit,
+                        Some((
+                            failed,
+                            Failure::Static("littera to numerus conversion failed"),
+                        )),
+                    )
+                }
+            }
             (Num::Text, Num::Float(_)) => {
                 let parsed = self
                     .call_runtime(&abi::PARSE_F64, &[value])?
@@ -802,10 +1142,37 @@ impl FunctionLower<'_, '_> {
                 (self.builder.ins().icmp(IntCC::NotEqual, length, zero), None)
             }
             (Num::Int(_), Num::Bits(width)) => (self.mask_pattern(value, width), None),
-            (Num::Bits(width), Num::Int(to)) => (
-                self.extend_pattern(value, width, signed_width(to.width)),
-                None,
-            ),
+            (Num::Bits(width), Num::Int(to)) => {
+                let read = self.extend_pattern(value, width, signed_width(to.width));
+                if to.width == NumericWidth::U64 {
+                    // A pattern with the top bit set is a u64 the i64 carrier
+                    // cannot hold: refuse it by name at run time.
+                    let zero = self.builder.ins().iconst(types::I64, 0);
+                    let beyond = self.builder.ins().icmp(IntCC::SignedLessThan, read, zero);
+                    return Ok((
+                        read,
+                        Some((
+                            beyond,
+                            Failure::Static(
+                                "u64 value beyond 2^63 is not carried by the clif target",
+                            ),
+                        )),
+                    ));
+                }
+                (read, None)
+            }
+            (Num::Float(NumericWidth::F16), Num::Bits(_)) => {
+                let pattern = self
+                    .call_runtime(&abi::F16_TO_BITS, &[value])?
+                    .ok_or_else(|| Decline::new("f16 pattern result"))?;
+                (pattern, None)
+            }
+            (Num::Bits(_), Num::Float(NumericWidth::F16)) => {
+                let float = self
+                    .call_runtime(&abi::F16_FROM_BITS, &[value])?
+                    .ok_or_else(|| Decline::new("f16 value result"))?;
+                (float, None)
+            }
             (Num::Float(_), Num::Bits(width)) => {
                 let pattern = if width == BitsWidth::B32 {
                     let narrow = self.builder.ins().fdemote(types::F32, value);
@@ -838,6 +1205,23 @@ impl FunctionLower<'_, '_> {
             }
             _ => return Err(Decline::new("explicit numeric conversion")),
         })
+    }
+
+    /// A letter result: null is the failure.
+    fn letter_or_failure(&mut self, letter: Value) -> (Value, Option<(Value, Failure)>) {
+        let zero = self.builder.ins().iconst(types::I64, 0);
+        let failed = self.builder.ins().icmp(IntCC::Equal, letter, zero);
+        (
+            letter,
+            Some((failed, Failure::Static("littera conversion failed"))),
+        )
+    }
+
+    /// Whether a conversion names the `Code` hint.
+    fn has_code_point_hint(&self, params: &[radix_lexer::Symbol]) -> bool {
+        params
+            .iter()
+            .any(|param| radix_types::is_code_point_hint(self.state.input.interner.resolve(*param)))
     }
 
     fn parse_status(&mut self) -> Lowered<Value> {
@@ -973,6 +1357,25 @@ impl FunctionLower<'_, '_> {
     }
 
     fn rounding_mode(&self, params: &[radix_lexer::Symbol]) -> Rounding {
+        self.rounding_mode_or(params, Rounding::Trunc)
+    }
+
+    /// A decimal or text converting in: the handle, or a failure by status.
+    fn decimal_in(
+        &mut self,
+        symbol: &'static abi::RuntimeSymbol,
+        value: Value,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        let decimal = self
+            .call_runtime(symbol, &[value])?
+            .ok_or_else(|| Decline::new("decimal result"))?;
+        let status = self.parse_status()?;
+        let zero = self.builder.ins().iconst(types::I32, 0);
+        let failed = self.builder.ins().icmp(IntCC::NotEqual, status, zero);
+        Ok((decimal, Some((failed, Failure::Code(status)))))
+    }
+
+    fn rounding_mode_or(&self, params: &[radix_lexer::Symbol], default: Rounding) -> Rounding {
         params
             .iter()
             .find_map(|param| match self.state.input.interner.resolve(*param) {
@@ -982,7 +1385,7 @@ impl FunctionLower<'_, '_> {
                 "trunc" | "Trunc" => Some(Rounding::Trunc),
                 _ => None,
             })
-            .unwrap_or(Rounding::Trunc)
+            .unwrap_or(default)
     }
 
     /// `textus ↦ int`: a parse by the `hex`/`bin`/`oct` radix hint (decimal
@@ -1024,6 +1427,7 @@ impl FunctionLower<'_, '_> {
         self.builder.switch_to_block(raise);
         let message = match failure {
             Failure::Static(text) => self.text_literal(text.as_bytes())?,
+            Failure::Message(text) => text,
             Failure::Code(code) => self
                 .call_runtime(&abi::CONVERT_MESSAGE, &[code])?
                 .ok_or_else(|| Decline::new("conversion message result"))?,
@@ -1089,6 +1493,18 @@ pub(crate) fn member_tests(table: &TypeTable, target: TypeId) -> Option<Vec<Memb
             }
             return Some(tests);
         }
+        // An unbounded integer is an integer inside `i64` (the plain tag) or
+        // one beyond it (the inf tag): `est inf` holds for every integer.
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::Inf) => {
+            return Some(vec![
+                MemberTest::Tag(abi::TAG_INT),
+                MemberTest::Tag(abi::TAG_INF),
+            ]);
+        }
+        // A decimal has its own payload and no open-data box.
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::D64) => {
+            return None;
+        }
         Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
             MemberTest::Tag(abi::TAG_INT)
         }
@@ -1105,6 +1521,36 @@ pub(crate) fn member_tests(table: &TypeTable, target: TypeId) -> Option<Vec<Memb
 }
 
 impl FunctionLower<'_, '_> {
+    /// `value ¶ "spec"`: the operand's rep picks the renderer, the spec
+    /// travels as a text and is parsed by the runtime.
+    pub(super) fn format_value(
+        &mut self,
+        spec: radix_lexer::Symbol,
+        operand: &MirOperand,
+    ) -> Lowered<Value> {
+        let narrow = self.float_narrow(operand);
+        let (value, rep) = self.scalar_wide(operand)?;
+        let text = self.state.input.interner.resolve(spec).to_owned();
+        let spec = self.text_literal(text.as_bytes())?;
+        let rendered = match rep {
+            Rep::Int => {
+                let wide = self.widen(value);
+                let (low, high) = self.split_wide(wide);
+                self.call_runtime(&abi::FORMAT_INT, &[low, high, spec])?
+            }
+            Rep::Float => {
+                let narrow = self.builder.ins().iconst(types::I32, narrow);
+                self.call_runtime(&abi::FORMAT_FLOAT, &[value, narrow, spec])?
+            }
+            Rep::Text => self.call_runtime(&abi::FORMAT_TEXT, &[value, spec])?,
+            Rep::Dec => self.call_runtime(&abi::FORMAT_DEC, &[value, spec])?,
+            Rep::Inf => self.call_runtime(&abi::FORMAT_INF, &[value, spec])?,
+            Rep::Ins => self.call_runtime(&abi::FORMAT_INS, &[value, spec])?,
+            _ => return Err(Decline::new("format of this value")),
+        };
+        rendered.ok_or_else(|| Decline::new("format result"))
+    }
+
     /// `x est T` / `x non est T` over a boxed union payload.
     pub(super) fn type_check(
         &mut self,

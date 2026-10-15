@@ -27,6 +27,7 @@ use crate::abi::{self, AbiTy, RuntimeSymbol};
 mod closure;
 mod convert;
 mod lift;
+mod wide;
 pub(crate) use convert::{byte_element, member_tests, numeric_conversion, sequence_conversion};
 
 /// A named refusal discovered during lowering.
@@ -127,8 +128,9 @@ pub struct ProgramInput<'a> {
 /// Runtime representation of a scalar MIR type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Rep {
-    /// Integers of every width, held as `i64` (exact within the 64-bit range;
-    /// an operation leaving it traps).
+    /// Integers of every width, held as `i64` in a variable. An expression at
+    /// the cap computes in an `i128` carrier (see `lower/wide.rs`) and the
+    /// store narrows it.
     Int,
     /// `f64`.
     Float,
@@ -152,6 +154,19 @@ pub(crate) enum Rep {
     Tuple,
     /// `textus`: a pointer to `[len: i64][bytes...]` (see `abi::TEXT_HEADER`).
     Text,
+    /// `littera`: a text handle of one letter. It displays as that letter
+    /// alone, and quoted with single quotes inside a collection.
+    Char,
+    /// `regex`: a handle to a compiled program.
+    Regex,
+    /// `match`: a handle to one match record.
+    Match,
+    /// `d64`: a handle to an exact decimal (carrier and scale).
+    Dec,
+    /// `inf`: a handle to an unbounded integer.
+    Inf,
+    /// `instans`: a handle to a nanosecond count and its precision.
+    Ins,
     /// No value.
     Unit,
 }
@@ -163,6 +178,12 @@ impl Rep {
             Self::Float => Some(types::F64),
             Self::Bool => Some(types::I8),
             Self::Text
+            | Self::Char
+            | Self::Regex
+            | Self::Match
+            | Self::Dec
+            | Self::Inf
+            | Self::Ins
             | Self::Bits(_)
             | Self::List
             | Self::Record
@@ -199,6 +220,9 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
     match resolve(table, ty.semantic_id()) {
         Type::Primitive(Primitive::Numerus) => Ok(Rep::Int),
         Type::Primitive(Primitive::Fractus) => Ok(Rep::Float),
+        Type::Primitive(Primitive::Littera) => Ok(Rep::Char),
+        Type::Primitive(Primitive::Regex) => Ok(Rep::Regex),
+        Type::Primitive(Primitive::Match) => Ok(Rep::Match),
         Type::Primitive(Primitive::Bivalens) => Ok(Rep::Bool),
         Type::Primitive(Primitive::Textus | Primitive::Ascii)
         | Type::BoundedTextus { .. }
@@ -246,8 +270,9 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             for member in members {
                 if matches!(
                     resolve(table, *member),
-                    Type::Primitive(Primitive::Nihil | Primitive::Ignotum)
-                        | Type::Option(_)
+                    Type::Primitive(
+                        Primitive::Nihil | Primitive::Ignotum | Primitive::Json | Primitive::Valor
+                    ) | Type::Option(_)
                         | Type::Bits(_)
                         | Type::Union(_)
                 ) {
@@ -258,7 +283,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             Ok(Rep::Opt)
         }
         Type::Option(inner) => {
-            if matches!(table.get(*inner), Type::Option(_)) {
+            if matches!(resolve(table, *inner), Type::Option(_)) {
                 return Err(Decline::new("nested optional value"));
             }
             rep_of(table, MirType::semantic(*inner))?;
@@ -293,7 +318,11 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Ref(_, inner) => rep_of(table, MirType::semantic(*inner)),
         // The type of `null`: an optional that is always none. An unknown
         // value is a box of any tagged payload, or none.
-        Type::Primitive(Primitive::Nihil | Primitive::Ignotum) => Ok(Rep::Opt),
+        // Open data (`json`, `valor`) is a box of any tagged payload, as `ignotum`.
+        Type::Primitive(
+            Primitive::Nihil | Primitive::Ignotum | Primitive::Json | Primitive::Valor,
+        ) => Ok(Rep::Opt),
+        Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => Ok(Rep::Ins),
         Type::Primitive(Primitive::Vacuum | Primitive::Numquam) => Ok(Rep::Unit),
         Type::SizedNumeric(Primitive::Numerus, width) => match width {
             NumericWidth::I8
@@ -304,8 +333,13 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             | NumericWidth::U16
             | NumericWidth::U32
             | NumericWidth::U64 => Ok(Rep::Int),
+            NumericWidth::D64 => Ok(Rep::Dec),
+            NumericWidth::Inf => Ok(Rep::Inf),
             _ => Err(Decline::new("sized integer value")),
         },
+        Type::ModularWord(NumericWidth::Inf) | Type::SaturatingWord(NumericWidth::Inf) => {
+            Ok(Rep::Inf)
+        }
         Type::ModularWord(width) | Type::SaturatingWord(width)
             if width.integer_range().is_some() =>
         {
@@ -681,6 +715,16 @@ struct FunctionLower<'f, 'a> {
     /// `mut` parameters passed by address: the slot, the address and the
     /// representation to write back at every exit.
     pointer_params: Vec<(Slot, Variable, Rep)>,
+    /// Temporaries that hold the wide integer carrier.
+    wide_slots: rustc_hash::FxHashSet<Slot>,
+    /// Wide values known to be an `i64` extended.
+    narrow: rustc_hash::FxHashSet<Value>,
+    /// Wide constants beyond the `i64` carrier (a `u64` literal at or above
+    /// 2^63): narrowing one is declined, not trapped at run time.
+    huge: rustc_hash::FxHashSet<Value>,
+    /// The recovery region (an orphan block chain the success path skips) that
+    /// defines each recovery temp: a failing conversion branches to it.
+    recovery_regions: rustc_hash::FxHashMap<MirTempId, MirBlockId>,
 }
 
 fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowered<()> {
@@ -718,6 +762,10 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             cells: rustc_hash::FxHashSet::default(),
             scratch_floor: 0,
             pointer_params: Vec::new(),
+            wide_slots: rustc_hash::FxHashSet::default(),
+            narrow: rustc_hash::FxHashSet::default(),
+            huge: rustc_hash::FxHashSet::default(),
+            recovery_regions: rustc_hash::FxHashMap::default(),
         };
         lower.run(function)?;
         lower.builder.seal_all_blocks();
@@ -780,11 +828,22 @@ impl FunctionLower<'_, '_> {
             self.declare(slot, rep);
             self.slot_tys.insert(slot, declared);
         }
+        let wide_temps = wide::wide_temps(table, function);
         for temp in &function.temps {
             if unknown(temp.ty) && !environments.contains(&Slot::Temp(temp.id)) {
                 continue;
             }
             let slot = Slot::Temp(temp.id);
+            if wide_temps.contains(&temp.id)
+                && !self.cells.contains(&slot)
+                && !environments.contains(&slot)
+            {
+                let variable = self.builder.declare_var(types::I128);
+                self.slots.insert(slot, (variable, Rep::Int));
+                self.slot_tys.insert(slot, temp.ty);
+                self.wide_slots.insert(slot);
+                continue;
+            }
             let rep = if self.cells.contains(&slot) {
                 Rep::List
             } else if environments.contains(&slot) {
@@ -830,7 +889,11 @@ impl FunctionLower<'_, '_> {
             if is_param {
                 continue;
             }
-            let zero = self.zero(*rep);
+            let zero = if self.wide_slots.contains(slot) {
+                Some(self.wide_zero())
+            } else {
+                self.zero(*rep)
+            };
             if let Some(zero) = zero {
                 self.builder.def_var(*variable, zero);
             }
@@ -838,16 +901,91 @@ impl FunctionLower<'_, '_> {
 
         // A block no edge reaches never runs: it is closed with a trap
         // instead of being lowered, so dead code cannot decline the program.
-        let mut reachable: rustc_hash::FxHashSet<MirBlockId> = rustc_hash::FxHashSet::default();
-        let mut pending = vec![function.blocks[0].id];
-        while let Some(id) = pending.pop() {
-            if !reachable.insert(id) {
+        // A recovery region (a side-effecting `⊥` fallback) has no edge in the
+        // graph: the failing conversion branches to it.
+        let successors_of = |id: MirBlockId| -> Vec<MirBlockId> {
+            function
+                .blocks
+                .iter()
+                .find(|block| block.id == id)
+                .map(|block| radix_mir::visit::terminator_successors(&block.terminator.kind))
+                .unwrap_or_default()
+        };
+        let closure_from = |roots: Vec<MirBlockId>,
+                            stop: &rustc_hash::FxHashSet<MirBlockId>|
+         -> rustc_hash::FxHashSet<MirBlockId> {
+            let mut seen: rustc_hash::FxHashSet<MirBlockId> = rustc_hash::FxHashSet::default();
+            let mut pending = roots;
+            while let Some(id) = pending.pop() {
+                if stop.contains(&id) || !seen.insert(id) {
+                    continue;
+                }
+                pending.extend(successors_of(id));
+            }
+            seen
+        };
+        let none: rustc_hash::FxHashSet<MirBlockId> = rustc_hash::FxHashSet::default();
+        let mut reachable = closure_from(vec![function.blocks[0].id], &none);
+        let mut has_predecessor: rustc_hash::FxHashSet<MirBlockId> =
+            rustc_hash::FxHashSet::default();
+        for block in &function.blocks {
+            has_predecessor.extend(radix_mir::visit::terminator_successors(
+                &block.terminator.kind,
+            ));
+        }
+        let main = reachable.clone();
+        for block in &function.blocks {
+            if main.contains(&block.id) || has_predecessor.contains(&block.id) {
                 continue;
             }
-            if let Some(block) = function.blocks.iter().find(|block| block.id == id) {
-                pending.extend(radix_mir::visit::terminator_successors(
-                    &block.terminator.kind,
-                ));
+            let region = closure_from(vec![block.id], &main);
+            for member in function.blocks.iter().filter(|b| region.contains(&b.id)) {
+                for statement in &member.statements {
+                    let defined = match &statement.kind {
+                        MirStatementKind::Assign { place, .. } => Some(place),
+                        MirStatementKind::Call { destination, .. }
+                        | MirStatementKind::RuntimeCall { destination, .. } => destination.as_ref(),
+                        MirStatementKind::Construct { destination, .. } => Some(destination),
+                    };
+                    if let Some(place) = defined
+                        && place.projections.is_empty()
+                        && let MirPlaceBase::Temp(id) = place.base
+                    {
+                        self.recovery_regions.entry(id).or_insert(block.id);
+                    }
+                }
+            }
+        }
+        // Regions a reachable conversion can fall into run as well.
+        loop {
+            let mut grew = false;
+            let live = reachable.clone();
+            for block in function.blocks.iter().filter(|b| live.contains(&b.id)) {
+                for statement in &block.statements {
+                    let MirStatementKind::RuntimeCall {
+                        call:
+                            MirRuntimeCall {
+                                intrinsic: MirIntrinsic::Convert(conversion),
+                                ..
+                            },
+                        ..
+                    } = &statement.kind
+                    else {
+                        continue;
+                    };
+                    let Some(MirOperand::Temp(id)) = &conversion.recovery else {
+                        continue;
+                    };
+                    let Some(entry) = self.recovery_regions.get(id).copied() else {
+                        continue;
+                    };
+                    for member in closure_from(vec![entry], &main) {
+                        grew |= reachable.insert(member);
+                    }
+                }
+            }
+            if !grew {
+                break;
             }
         }
         for (position, block) in function.blocks.iter().enumerate() {
@@ -884,6 +1022,12 @@ impl FunctionLower<'_, '_> {
             Rep::Float => Some(self.builder.ins().f64const(0.0)),
             Rep::Bool => Some(self.builder.ins().iconst(types::I8, 0)),
             Rep::Text
+            | Rep::Char
+            | Rep::Regex
+            | Rep::Match
+            | Rep::Dec
+            | Rep::Inf
+            | Rep::Ins
             | Rep::Bits(_)
             | Rep::List
             | Rep::Record
@@ -950,10 +1094,19 @@ impl FunctionLower<'_, '_> {
                 Some(self.builder.ins().iconst(types::I64, *value)),
                 Rep::Int,
             ),
-            MirConstant::UInt(value) => {
-                let value = i64::try_from(*value)
-                    .map_err(|_| Decline::new("integer constant beyond i64"))?;
-                (Some(self.builder.ins().iconst(types::I64, value)), Rep::Int)
+            MirConstant::UInt(value) => match i64::try_from(*value) {
+                Ok(value) => (Some(self.builder.ins().iconst(types::I64, value)), Rep::Int),
+                // Beyond the i64 carrier: an exact intermediate.
+                Err(_) => {
+                    let constant = self.wide_const(i128::from(*value));
+                    self.huge.insert(constant);
+                    (Some(constant), Rep::Int)
+                }
+            },
+            MirConstant::Magnus(digits) => {
+                let text = self.text_literal(digits.as_bytes())?;
+                let big = self.call_runtime(&abi::INF_DIGITS, &[text])?;
+                (big, Rep::Inf)
             }
             MirConstant::Float(value) => (Some(self.builder.ins().f64const(*value)), Rep::Float),
             MirConstant::Bool(value) => (
@@ -963,6 +1116,25 @@ impl FunctionLower<'_, '_> {
             MirConstant::Unit => (None, Rep::Unit),
             MirConstant::Nil => (Some(self.builder.ins().iconst(types::I64, 0)), Rep::Opt),
             MirConstant::Function(id) => (Some(self.plain_function_value(*id)?), Rep::Func),
+            MirConstant::Regex { pattern, flags } => {
+                // The body is raw; the flags prefix an inline group, as the
+                // runner builds it.
+                let pattern = self.state.input.interner.resolve(*pattern).to_owned();
+                let flags = flags.map(|flags| self.state.input.interner.resolve(flags).to_owned());
+                let mapped: String = flags
+                    .iter()
+                    .flat_map(|flags| flags.chars())
+                    .filter(|flag| matches!(flag, 'i' | 'm' | 's' | 'u' | 'U' | 'x'))
+                    .collect();
+                let text = if mapped.is_empty() {
+                    pattern
+                } else {
+                    format!("(?{mapped}){pattern}")
+                };
+                let literal = self.text_literal(text.as_bytes())?;
+                let program = self.call_runtime(&abi::REGEX_LITERAL, &[literal])?;
+                (program, Rep::Regex)
+            }
             MirConstant::String(symbol) | MirConstant::Ascii(symbol) => {
                 let text = radix_lexer::textus_literal::decode_textus_literal(
                     self.state.input.interner.resolve(*symbol),
@@ -1204,6 +1376,12 @@ impl FunctionLower<'_, '_> {
             Rep::Float => abi::TAG_FLOAT,
             Rep::Bool => abi::TAG_BOOL,
             Rep::Text => abi::TAG_TEXT,
+            Rep::Char => abi::TAG_CHAR,
+            Rep::Regex => abi::TAG_REGEX,
+            Rep::Match => abi::TAG_MATCH,
+            Rep::Dec => abi::TAG_DEC,
+            Rep::Inf => abi::TAG_INF,
+            Rep::Ins => abi::TAG_INS,
             Rep::Bits(width) => abi::TAG_BITS + i64::from(width.bits().trailing_zeros() - 3),
             Rep::List => abi::TAG_LIST,
             Rep::Record => abi::TAG_STRUCT,
@@ -1254,8 +1432,17 @@ impl FunctionLower<'_, '_> {
     /// pass through, a plain value stored where an optional is expected is
     /// boxed as present.
     fn coerce(&mut self, value: Value, have: Rep, want: Rep) -> Lowered<Value> {
-        if have == want {
+        if have == want
+            || matches!(
+                (have, want),
+                (Rep::Text, Rep::Char) | (Rep::Char, Rep::Text)
+            )
+        {
             Ok(value)
+        } else if have == Rep::Int && want == Rep::Dec {
+            self.decimal_operand(value, have, true)
+        } else if have == Rep::Int && want == Rep::Inf {
+            self.inf_operand(value, have)
         } else if want == Rep::Opt && have != Rep::Unit {
             self.wrap_some(value, have)
         } else if have == Rep::Opt && want != Rep::Unit {
@@ -1796,6 +1983,10 @@ impl FunctionLower<'_, '_> {
     /// `tabula` and `copia` literals.
     fn construct_map(&mut self, destination: &MirPlace, aggregate: &MirAggregate) -> Lowered<()> {
         let is_set = aggregate.kind == MirAggregateKind::Set;
+        let dynamic = matches!(
+            resolve(self.state.input.types, aggregate.ty.semantic_id()),
+            Type::Primitive(Primitive::Json | Primitive::Valor)
+        );
         let flag = self.builder.ins().iconst(types::I32, i64::from(is_set));
         let map = self
             .call_runtime(&abi::MAP_NEW, &[flag])?
@@ -1823,7 +2014,15 @@ impl FunctionLower<'_, '_> {
                 self.call_runtime(&abi::MAP_SET, &[map, tag, bits, zero_tag, zero])?;
             }
         } else {
-            let (key_ty, value_ty) = self.map_types(aggregate.ty)?;
+            let (key_ty, value_ty) = if dynamic {
+                // An object literal of open data: text keys, boxed values.
+                (
+                    MirType::semantic(self.state.input.types.primitive(Primitive::Textus)),
+                    aggregate.ty,
+                )
+            } else {
+                self.map_types(aggregate.ty)?
+            };
             let MirAggregateFields::Keyed(entries) = &aggregate.fields else {
                 return Err(Decline::new("map fields"));
             };
@@ -1844,6 +2043,11 @@ impl FunctionLower<'_, '_> {
             }
         }
         let (variable, slot_rep) = self.place_slot(destination)?;
+        if dynamic && slot_rep == Rep::Opt && !is_set {
+            let boxed = self.wrap_some(map, Rep::Map)?;
+            self.builder.def_var(variable, boxed);
+            return Ok(());
+        }
         if slot_rep != (if is_set { Rep::Set } else { Rep::Map }) {
             return Err(Decline::new("map destination representation"));
         }
@@ -2060,6 +2264,83 @@ impl FunctionLower<'_, '_> {
                     (_, false) => self.builder.ins().fmax(handle, other),
                 };
                 (Some(picked), rep)
+            }
+            (MirCollectionOp::TextEscape, Rep::Text) => {
+                (self.call_runtime(&abi::TEXT_ESCAPE, &[handle])?, Rep::Text)
+            }
+            (
+                MirCollectionOp::RegexMatches
+                | MirCollectionOp::RegexFind
+                | MirCollectionOp::RegexFindAll
+                | MirCollectionOp::RegexSplit,
+                Rep::Regex,
+            ) => {
+                let [_, text] = args else {
+                    return Err(Decline::new("regex operation arity"));
+                };
+                let (text, text_rep) = self.scalar(text)?;
+                if !matches!(text_rep, Rep::Text | Rep::Char) {
+                    return Err(Decline::new("regex operation on a non-text"));
+                }
+                let (symbol, result) = match op {
+                    MirCollectionOp::RegexMatches => (&abi::REGEX_MATCHES, Rep::Bool),
+                    MirCollectionOp::RegexFind => (&abi::REGEX_FIND, Rep::Opt),
+                    MirCollectionOp::RegexFindAll => (&abi::REGEX_FIND_ALL, Rep::List),
+                    _ => (&abi::REGEX_SPLIT, Rep::List),
+                };
+                (self.call_runtime(symbol, &[handle, text])?, result)
+            }
+            (MirCollectionOp::RegexReplace | MirCollectionOp::RegexReplaceEach, Rep::Regex) => {
+                let [_, text, replacement] = args else {
+                    return Err(Decline::new("regex replace arity"));
+                };
+                let (text, text_rep) = self.scalar(text)?;
+                let (replacement, replacement_rep) = self.scalar(replacement)?;
+                let wanted = if op == MirCollectionOp::RegexReplace {
+                    Rep::Text
+                } else {
+                    Rep::List
+                };
+                if !matches!(text_rep, Rep::Text | Rep::Char)
+                    || (replacement_rep != wanted
+                        && !(wanted == Rep::Text && replacement_rep == Rep::Char))
+                {
+                    return Err(Decline::new("regex replace operands"));
+                }
+                let symbol = if op == MirCollectionOp::RegexReplace {
+                    &abi::REGEX_REPLACE
+                } else {
+                    &abi::REGEX_REPLACE_EACH
+                };
+                (
+                    self.call_runtime(symbol, &[handle, text, replacement])?,
+                    Rep::Text,
+                )
+            }
+            (
+                MirCollectionOp::MatchText
+                | MirCollectionOp::MatchStart
+                | MirCollectionOp::MatchEnd,
+                Rep::Match,
+            ) => {
+                let (symbol, result) = match op {
+                    MirCollectionOp::MatchText => (&abi::MATCH_TEXT, Rep::Text),
+                    MirCollectionOp::MatchStart => (&abi::MATCH_START, Rep::Int),
+                    _ => (&abi::MATCH_END, Rep::Int),
+                };
+                (self.call_runtime(symbol, &[handle])?, result)
+            }
+            (MirCollectionOp::MatchGroup | MirCollectionOp::MatchNamed, Rep::Match) => {
+                let [_, selector] = args else {
+                    return Err(Decline::new("match group arity"));
+                };
+                let (selector, selector_rep) = self.scalar(selector)?;
+                let symbol = match (op, selector_rep) {
+                    (MirCollectionOp::MatchGroup, Rep::Int) => &abi::MATCH_GROUP,
+                    (MirCollectionOp::MatchNamed, Rep::Text | Rep::Char) => &abi::MATCH_NAMED,
+                    _ => return Err(Decline::new("match group selector")),
+                };
+                (self.call_runtime(symbol, &[handle, selector])?, Rep::Opt)
             }
             (MirCollectionOp::Index, Rep::Text) => {
                 let [_, index] = args else {
@@ -2868,7 +3149,26 @@ impl FunctionLower<'_, '_> {
         }
     }
 
+    /// An operand, possibly unit, with an integer in the `i64` carrier.
+    fn operand_narrow(&mut self, operand: &MirOperand) -> Lowered<(Option<Value>, Rep)> {
+        match self.operand(operand)? {
+            (Some(value), Rep::Int) => Ok((Some(self.narrow(value)?), Rep::Int)),
+            other => Ok(other),
+        }
+    }
+
+    /// A scalar operand with an integer in the `i64` carrier: a wide
+    /// intermediate narrows, trapping when it does not fit.
     fn scalar(&mut self, operand: &MirOperand) -> Lowered<(Value, Rep)> {
+        let (value, rep) = self.scalar_wide(operand)?;
+        if rep == Rep::Int {
+            return Ok((self.narrow(value)?, rep));
+        }
+        Ok((value, rep))
+    }
+
+    /// A scalar operand as computed: an integer may be a wide intermediate.
+    fn scalar_wide(&mut self, operand: &MirOperand) -> Lowered<(Value, Rep)> {
         match self.operand(operand)? {
             (Some(value), rep) => Ok((value, rep)),
             (None, _) => Err(Decline::new("unit operand")),
@@ -2888,6 +3188,14 @@ impl FunctionLower<'_, '_> {
                     _ => self.value(value)?,
                 };
                 self.values.insert(value.id, (computed, rep));
+                let computed = match computed {
+                    Some(computed) if rep == Rep::Int && target_rep != Rep::Inf => {
+                        let wide = place.projections.is_empty()
+                            && self.wide_slots.contains(&Self::base_slot(place));
+                        Some(self.fit_int(computed, wide)?)
+                    }
+                    other => other,
+                };
                 if !place.projections.is_empty() {
                     let Some(computed) = computed else {
                         return Err(Decline::new("unit element store"));
@@ -3402,6 +3710,38 @@ impl FunctionLower<'_, '_> {
                 };
                 self.format_string(destination, *template, &call.args)
             }
+            MirIntrinsic::FormatValue { spec } => {
+                let ([operand], Some(destination)) = (call.args.as_slice(), destination) else {
+                    return Err(Decline::new("format value shape"));
+                };
+                let rendered = self.format_value(*spec, operand)?;
+                self.define_result(destination, Some(rendered), Rep::Text)
+            }
+            MirIntrinsic::Collection(MirCollectionOp::CordCursor) => {
+                let ([text], Some(destination)) = (call.args.as_slice(), destination) else {
+                    return Err(Decline::new("cord cursor shape"));
+                };
+                let (text, rep) = self.scalar(text)?;
+                if !matches!(rep, Rep::Text | Rep::Char) {
+                    return Err(Decline::new("cord cursor over a non-text"));
+                }
+                let letters = self.call_runtime(&abi::TEXT_CHARS, &[text])?;
+                self.define_result(destination, letters, Rep::List)
+            }
+            // An eager cursor is its list of items: draining copies it.
+            MirIntrinsic::Sermo(MirSermoOp::DrainCursor) => {
+                let ([cursor], Some(destination)) = (call.args.as_slice(), destination) else {
+                    return Err(Decline::new("cursor drain shape"));
+                };
+                let (cursor, rep) = self.scalar(cursor)?;
+                if rep != Rep::List {
+                    return Err(Decline::new("cursor drain of a non-list"));
+                }
+                let start = self.builder.ins().iconst(types::I64, 0);
+                let end = self.builder.ins().iconst(types::I64, i64::MAX);
+                let copied = self.call_runtime(&abi::LIST_SLICE, &[cursor, start, end])?;
+                self.define_result(destination, copied, Rep::List)
+            }
             MirIntrinsic::Collection(op) => self.collection_op(destination, *op, &call.args),
             MirIntrinsic::TypeCheck(op) => {
                 let ([operand], Some(destination)) = (call.args.as_slice(), destination) else {
@@ -3430,7 +3770,7 @@ impl FunctionLower<'_, '_> {
                 let ([argument], Some(destination)) = (call.args.as_slice(), destination) else {
                     return Err(Decline::new("cede shape"));
                 };
-                let (value, rep) = self.operand(argument)?;
+                let (value, rep) = self.operand_narrow(argument)?;
                 if let (Some(collector), Some(item)) = (self.collector, value) {
                     let tag = self
                         .builder
@@ -3554,7 +3894,7 @@ impl FunctionLower<'_, '_> {
 
     /// `1` when the operand is a float narrower than `f64`: it displays at
     /// its own width.
-    fn float_narrow(&self, operand: &MirOperand) -> i64 {
+    pub(super) fn float_narrow(&self, operand: &MirOperand) -> i64 {
         let Ok(ty) = self.operand_type(operand) else {
             return 0;
         };
@@ -3570,7 +3910,13 @@ impl FunctionLower<'_, '_> {
 
     fn render_text_at(&mut self, value: Value, rep: Rep, narrow: i64) -> Lowered<Value> {
         let rendered = match rep {
-            Rep::Text => return Ok(value),
+            Rep::Text | Rep::Char => return Ok(value),
+            Rep::Regex => self.call_runtime(&abi::REGEX_TEXT, &[value])?,
+            Rep::Match => self.call_runtime(&abi::MATCH_TEXT, &[value])?,
+            Rep::Dec => self.call_runtime(&abi::DEC_TEXT, &[value])?,
+            Rep::Inf => self.call_runtime(&abi::INF_TEXT, &[value])?,
+            Rep::Ins => self.call_runtime(&abi::INS_TEXT, &[value])?,
+            Rep::Int if self.is_wide(value) => self.text_from_wide(value)?,
             Rep::Int => self.call_runtime(&abi::TEXT_FROM_I64, &[value])?,
             Rep::Float => {
                 let narrow = self.builder.ins().iconst(types::I32, narrow);
@@ -3606,7 +3952,7 @@ impl FunctionLower<'_, '_> {
         let template = self.state.input.interner.resolve(template).to_owned();
         let mut rendered: Vec<Value> = Vec::with_capacity(args.len());
         for arg in args {
-            let (value, rep) = self.scalar(arg)?;
+            let (value, rep) = self.scalar_wide(arg)?;
             self.refuse_nested_tuple_display(arg)?;
             let narrow = self.float_narrow(arg);
             rendered.push(self.render_text_at(value, rep, narrow)?);
@@ -3691,6 +4037,23 @@ impl FunctionLower<'_, '_> {
                 self.builder.def_var(variable, keys);
                 return Ok(());
             }
+            if matches!(rep, Rep::List | Rep::Map)
+                && slot_rep == Rep::Opt
+                && matches!(
+                    resolve(self.state.input.types, conversion.target_ty.semantic_id()),
+                    Type::Primitive(Primitive::Json | Primitive::Valor)
+                )
+            {
+                let tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(rep)?);
+                let boxed = self
+                    .call_runtime(&abi::DYN_BOX, &[tag, value])?
+                    .ok_or_else(|| Decline::new("open data result"))?;
+                self.builder.def_var(variable, boxed);
+                return Ok(());
+            }
             if let Some(plan) = sequence_conversion(
                 self.state.input.types,
                 conversion.source_ty.semantic_id(),
@@ -3714,8 +4077,18 @@ impl FunctionLower<'_, '_> {
             self.builder.def_var(variable, rendered);
             return Ok(());
         };
-        let (value, rep) = self.scalar(argument)?;
+        let (value, rep) = self.scalar_wide(argument)?;
         let (variable, slot_rep) = self.place_slot(destination)?;
+        let (value, rep) = if rep == Rep::Int && slot_rep == Rep::Dec {
+            (self.decimal_operand(value, rep, true)?, Rep::Dec)
+        } else {
+            (value, rep)
+        };
+        if rep == Rep::Dec && slot_rep == Rep::Dec {
+            let stored = self.decimal_store(site, value)?;
+            self.builder.def_var(variable, stored);
+            return Ok(());
+        }
         let stored = match (rep, slot_rep) {
             (Rep::Int, Rep::Int) => self.int_store(site, conversion.target_ty, value)?,
             (Rep::Float, Rep::Float)
@@ -3731,8 +4104,215 @@ impl FunctionLower<'_, '_> {
             (Rep::Bits(from), Rep::Bits(to)) if from == to => value,
             _ => return Err(Decline::new("conversion between representations")),
         };
+        let stored = if rep == Rep::Int {
+            let wide = self.wide_slots.contains(&Self::base_slot(destination));
+            self.fit_int(stored, wide)?
+        } else {
+            stored
+        };
         self.builder.def_var(variable, stored);
         Ok(())
+    }
+
+    /// A decimal handle for an operand: a decimal as is, an integer as the
+    /// scale-8 carrier (`carrier`, arithmetic) or as a whole number.
+    fn decimal_operand(&mut self, value: Value, rep: Rep, carrier: bool) -> Lowered<Value> {
+        let value = match rep {
+            Rep::Dec => return Ok(value),
+            Rep::Int => self.narrow(value)?,
+            _ => return Err(Decline::new("decimal and non-decimal operands")),
+        };
+        let symbol = if carrier {
+            &abi::DEC_STORED
+        } else {
+            &abi::DEC_INT
+        };
+        self.call_runtime(symbol, &[value])?
+            .ok_or_else(|| Decline::new("decimal operand result"))
+    }
+
+    /// An inf handle for an operand: an inf as is, an integer by value.
+    fn inf_operand(&mut self, value: Value, rep: Rep) -> Lowered<Value> {
+        let result = match rep {
+            Rep::Inf => return Ok(value),
+            Rep::Int if self.is_wide(value) => {
+                let (low, high) = self.split_wide(value);
+                self.call_runtime(&abi::INF_WIDE, &[low, high])?
+            }
+            Rep::Int => self.call_runtime(&abi::INF_INT, &[value])?,
+            _ => return Err(Decline::new("inf and non-integer operands")),
+        };
+        result.ok_or_else(|| Decline::new("inf operand result"))
+    }
+
+    /// A binary operation with an `inf` operand or result.
+    fn inf_binary(
+        &mut self,
+        op: MirBinOp,
+        lhs: (Value, Rep),
+        rhs: (Value, Rep),
+    ) -> Lowered<(Value, Rep)> {
+        let a = self.inf_operand(lhs.0, lhs.1)?;
+        let b = self.inf_operand(rhs.0, rhs.1)?;
+        let arithmetic = match op {
+            MirBinOp::Add => Some(0),
+            MirBinOp::Sub => Some(1),
+            MirBinOp::Mul => Some(2),
+            MirBinOp::Div => Some(3),
+            MirBinOp::Mod => Some(4),
+            _ => None,
+        };
+        if let Some(code) = arithmetic {
+            let code = self.builder.ins().iconst(types::I32, code);
+            let result = self
+                .call_runtime(&abi::INF_BINARY, &[a, b, code])?
+                .ok_or_else(|| Decline::new("inf result"))?;
+            return Ok((result, Rep::Inf));
+        }
+        let cc = match op {
+            MirBinOp::Eq => IntCC::Equal,
+            MirBinOp::NotEq => IntCC::NotEqual,
+            MirBinOp::Lt => IntCC::SignedLessThan,
+            MirBinOp::Gt => IntCC::SignedGreaterThan,
+            MirBinOp::LtEq => IntCC::SignedLessThanOrEqual,
+            MirBinOp::GtEq => IntCC::SignedGreaterThanOrEqual,
+            _ => return Err(Decline::new("inf operation")),
+        };
+        let order = self
+            .call_runtime(&abi::INF_COMPARE, &[a, b])?
+            .ok_or_else(|| Decline::new("inf comparison result"))?;
+        let zero = self.builder.ins().iconst(types::I32, 0);
+        Ok((self.builder.ins().icmp(cc, order, zero), Rep::Bool))
+    }
+
+    /// A binary operation with a decimal operand or result.
+    fn dec_binary(
+        &mut self,
+        op: MirBinOp,
+        lhs: (Value, Rep),
+        rhs: (Value, Rep),
+    ) -> Lowered<(Value, Rep)> {
+        let arithmetic = match op {
+            MirBinOp::Add => Some(0),
+            MirBinOp::Sub => Some(1),
+            MirBinOp::Mul => Some(2),
+            MirBinOp::Div => Some(3),
+            MirBinOp::Mod => Some(4),
+            _ => None,
+        };
+        let a = self.decimal_operand(lhs.0, lhs.1, arithmetic.is_some())?;
+        let b = self.decimal_operand(rhs.0, rhs.1, arithmetic.is_some())?;
+        if let Some(code) = arithmetic {
+            let code = self.builder.ins().iconst(types::I32, code);
+            let result = self
+                .call_runtime(&abi::DEC_BINARY, &[a, b, code])?
+                .ok_or_else(|| Decline::new("decimal result"))?;
+            return Ok((result, Rep::Dec));
+        }
+        let cc = match op {
+            MirBinOp::Eq => IntCC::Equal,
+            MirBinOp::NotEq => IntCC::NotEqual,
+            MirBinOp::Lt => IntCC::SignedLessThan,
+            MirBinOp::Gt => IntCC::SignedGreaterThan,
+            MirBinOp::LtEq => IntCC::SignedLessThanOrEqual,
+            MirBinOp::GtEq => IntCC::SignedGreaterThanOrEqual,
+            _ => return Err(Decline::new("decimal operation")),
+        };
+        let order = self
+            .call_runtime(&abi::DEC_COMPARE, &[a, b])?
+            .ok_or_else(|| Decline::new("decimal comparison result"))?;
+        let zero = self.builder.ins().iconst(types::I32, 0);
+        Ok((self.builder.ins().icmp(cc, order, zero), Rep::Bool))
+    }
+
+    /// An integer against a float, compared exactly (the integer is never
+    /// rounded to a float first).
+    fn int_float_compare(
+        &mut self,
+        op: MirBinOp,
+        lhs: (Value, Rep),
+        rhs: (Value, Rep),
+    ) -> Lowered<(Value, Rep)> {
+        let (int, float, flipped) = if lhs.1 == Rep::Int {
+            (lhs.0, rhs.0, false)
+        } else {
+            (rhs.0, lhs.0, true)
+        };
+        let int = self.narrow(int)?;
+        let op = match (op, flipped) {
+            (MirBinOp::Lt, true) => MirBinOp::Gt,
+            (MirBinOp::Gt, true) => MirBinOp::Lt,
+            (MirBinOp::LtEq, true) => MirBinOp::GtEq,
+            (MirBinOp::GtEq, true) => MirBinOp::LtEq,
+            (other, _) => other,
+        };
+        let order = self
+            .call_runtime(&abi::INT_FLOAT_COMPARE, &[int, float])?
+            .ok_or_else(|| Decline::new("comparison result"))?;
+        let at = |this: &mut Self, cc: IntCC, value: i64| {
+            let value = this.builder.ins().iconst(types::I32, value);
+            this.builder.ins().icmp(cc, order, value)
+        };
+        let result = match op {
+            MirBinOp::Eq => at(self, IntCC::Equal, 0),
+            // An unordered pair (NaN) is unequal.
+            MirBinOp::NotEq => at(self, IntCC::NotEqual, 0),
+            MirBinOp::Lt => at(self, IntCC::Equal, -1),
+            MirBinOp::Gt => at(self, IntCC::Equal, 1),
+            MirBinOp::LtEq => {
+                let less = at(self, IntCC::Equal, -1);
+                let same = at(self, IntCC::Equal, 0);
+                self.builder.ins().bor(less, same)
+            }
+            MirBinOp::GtEq => {
+                let more = at(self, IntCC::Equal, 1);
+                let same = at(self, IntCC::Equal, 0);
+                self.builder.ins().bor(more, same)
+            }
+            _ => return Err(Decline::new("mixed integer and float operation")),
+        };
+        Ok((result, Rep::Bool))
+    }
+
+    /// An exact decimal lands in a `d64` slot: round half-even to scale 8, trap
+    /// outside the `i64` carrier.
+    fn decimal_store(&mut self, site: &radix_hir::HirStoreSite, value: Value) -> Lowered<Value> {
+        let stored = self
+            .call_runtime(&abi::DEC_STORE, &[value])?
+            .ok_or_else(|| Decline::new("decimal store result"))?;
+        let slot = site
+            .slot
+            .map(|slot| self.state.input.interner.resolve(slot).to_owned());
+        let suffix = radix_mir::store_trap::store_trap_suffix(
+            site,
+            slot.as_deref(),
+            NumericWidth::D64.rust_type(),
+            false,
+        );
+        let zero = self.builder.ins().iconst(types::I64, 0);
+        let outside = self.builder.ins().icmp(IntCC::Equal, stored, zero);
+        let trap = self.builder.create_block();
+        self.builder.set_cold_block(trap);
+        let next = self.builder.create_block();
+        self.builder.ins().brif(outside, trap, &[], next, &[]);
+        self.builder.switch_to_block(trap);
+        let data = self.state.string_data(suffix.as_bytes())?;
+        let global = self
+            .state
+            .module
+            .declare_data_in_func(data, self.builder.func);
+        let pointer = self.builder.ins().symbol_value(self.state.pointer, global);
+        let length = self
+            .builder
+            .ins()
+            .iconst(types::I64, i64::try_from(suffix.len()).unwrap_or(0));
+        let reference = self.runtime_ref(&abi::DEC_TRAP_STORE)?;
+        self.builder
+            .ins()
+            .call(reference, &[value, pointer, length]);
+        self.builder.ins().trap(TrapCode::unwrap_user(1));
+        self.builder.switch_to_block(next);
+        Ok(stored)
     }
 
     fn int_store(
@@ -3743,7 +4323,7 @@ impl FunctionLower<'_, '_> {
     ) -> Lowered<Value> {
         let table = self.state.input.types;
         let (policy, width) = match resolve(table, target.semantic_id()) {
-            Type::Primitive(Primitive::Numerus) => return Ok(value),
+            Type::Primitive(Primitive::Numerus) => (StorePolicy::Trapping, NumericWidth::I64),
             Type::SizedNumeric(Primitive::Numerus, width) => (StorePolicy::Trapping, *width),
             Type::ModularWord(width) => (StorePolicy::Wrapping, *width),
             Type::SaturatingWord(width) => (StorePolicy::Saturating, *width),
@@ -3756,42 +4336,73 @@ impl FunctionLower<'_, '_> {
         // A u64 slot's upper bound is beyond the i64 carrier: only the sign
         // can fail there.
         let high = i64::try_from(high).unwrap_or(i64::MAX);
+        let wide = self.is_wide(value);
         match policy {
             StorePolicy::Trapping => {
-                if width == NumericWidth::I64 {
+                if width == NumericWidth::I64 && !wide {
                     return Ok(value);
                 }
                 let below = {
-                    let bound = self.builder.ins().iconst(types::I64, low);
+                    let bound = self.bound_const(low, wide);
                     self.builder.ins().icmp(IntCC::SignedLessThan, value, bound)
                 };
                 let above = {
-                    let bound = self.builder.ins().iconst(types::I64, high);
+                    let bound = self.bound_const(high, wide);
                     self.builder
                         .ins()
                         .icmp(IntCC::SignedGreaterThan, value, bound)
                 };
-                let outside = self.builder.ins().bor(below, above);
+                let outside = if wide && width == NumericWidth::U64 {
+                    // A u64 at or above 2^63 is a valid value the i64 carrier
+                    // cannot hold: refuse it by name at run time.
+                    self.trap_if(
+                        above,
+                        "u64 value beyond 2^63 is not carried by the clif target",
+                    )?;
+                    below
+                } else {
+                    self.builder.ins().bor(below, above)
+                };
                 self.trap_store_if(outside, value, site, width)?;
-                Ok(value)
+                self.narrow(value)
             }
             StorePolicy::Saturating => {
-                let low = self.builder.ins().iconst(types::I64, low);
-                let high = self.builder.ins().iconst(types::I64, high);
+                let low = self.bound_const(low, wide);
+                let high = self.bound_const(high, wide);
                 let raised = self.builder.ins().smax(value, low);
-                Ok(self.builder.ins().smin(raised, high))
+                let clamped = self.builder.ins().smin(raised, high);
+                self.narrow(clamped)
             }
-            StorePolicy::Wrapping => match width {
-                NumericWidth::U8 | NumericWidth::U16 | NumericWidth::U32 => {
-                    let mask = self.builder.ins().iconst(types::I64, high);
-                    Ok(self.builder.ins().band(value, mask))
+            StorePolicy::Wrapping => {
+                // The low 64 bits agree with every narrower modulus.
+                let value = if wide {
+                    self.builder.ins().ireduce(types::I64, value)
+                } else {
+                    value
+                };
+                match width {
+                    NumericWidth::U8 | NumericWidth::U16 | NumericWidth::U32 => {
+                        let mask = self.builder.ins().iconst(types::I64, high);
+                        Ok(self.builder.ins().band(value, mask))
+                    }
+                    NumericWidth::I8 => Ok(self.reduce_word(value, Reduction::Sign(8))),
+                    NumericWidth::I16 => Ok(self.reduce_word(value, Reduction::Sign(16))),
+                    NumericWidth::I32 => Ok(self.reduce_word(value, Reduction::Sign(32))),
+                    NumericWidth::I64 => Ok(value),
+                    _ => Err(Decline::new("wrapping store at this width")),
                 }
-                NumericWidth::I8 => Ok(self.reduce_word(value, Reduction::Sign(8))),
-                NumericWidth::I16 => Ok(self.reduce_word(value, Reduction::Sign(16))),
-                NumericWidth::I32 => Ok(self.reduce_word(value, Reduction::Sign(32))),
-                NumericWidth::I64 => Ok(value),
-                _ => Err(Decline::new("wrapping store at this width")),
-            },
+            }
+        }
+    }
+
+    /// A signed bound in the carrier of the value it is compared with.
+    fn bound_const(&mut self, bound: i64, wide: bool) -> Value {
+        if wide {
+            let low = self.builder.ins().iconst(types::I64, bound);
+            let high = self.builder.ins().iconst(types::I64, bound >> 63);
+            self.builder.ins().iconcat(low, high)
+        } else {
+            self.builder.ins().iconst(types::I64, bound)
         }
     }
 
@@ -3830,10 +4441,18 @@ impl FunctionLower<'_, '_> {
             .builder
             .ins()
             .iconst(types::I8, i64::from(width.is_unsigned_int()));
-        let reference = self.runtime_ref(&abi::TRAP_STORE)?;
-        self.builder
-            .ins()
-            .call(reference, &[value, pointer, length, unsigned]);
+        if self.is_wide(value) {
+            let (low, high) = self.split_wide(value);
+            let reference = self.runtime_ref(&abi::TRAP_STORE_WIDE)?;
+            self.builder
+                .ins()
+                .call(reference, &[low, high, pointer, length, unsigned]);
+        } else {
+            let reference = self.runtime_ref(&abi::TRAP_STORE)?;
+            self.builder
+                .ins()
+                .call(reference, &[value, pointer, length, unsigned]);
+        }
         self.builder.ins().trap(TrapCode::unwrap_user(1));
         self.builder.switch_to_block(next);
         Ok(())
@@ -3845,9 +4464,10 @@ impl FunctionLower<'_, '_> {
             MirDiagnosticKind::Vide | MirDiagnosticKind::Mone => 1,
         };
         let stream = self.builder.ins().iconst(types::I32, stream);
-        let (value, rep) = self.scalar(argument)?;
+        let (value, rep) = self.scalar_wide(argument)?;
         self.refuse_nested_tuple_display(argument)?;
         match rep {
+            Rep::Int if self.is_wide(value) => self.print_wide(stream, value)?,
             Rep::Int => {
                 let reference = self.runtime_ref(&abi::PRINT_I64)?;
                 self.builder.ins().call(reference, &[stream, value]);
@@ -3886,7 +4506,12 @@ impl FunctionLower<'_, '_> {
                 let reference = self.runtime_ref(&abi::PRINT_MAP)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
-            Rep::Text => {
+            Rep::Regex | Rep::Match | Rep::Dec | Rep::Inf | Rep::Ins => {
+                let text = self.render_text(value, rep)?;
+                let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
+                self.builder.ins().call(reference, &[stream, text]);
+            }
+            Rep::Text | Rep::Char => {
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
@@ -4013,7 +4638,22 @@ impl FunctionLower<'_, '_> {
         match &value.kind {
             MirValueKind::Operand(operand) => self.operand(operand),
             MirValueKind::Unary { op, operand } => {
-                let (computed, rep) = self.unary(*op, operand)?;
+                let cap = wide::cap_int(self.state.input.types, value.ty);
+                if *op == MirUnOp::Neg && rep_of(self.state.input.types, value.ty)? == Rep::Dec {
+                    let (carrier, rep) = self.scalar_wide(operand)?;
+                    let handle = self.decimal_operand(carrier, rep, true)?;
+                    let negated = self.call_runtime(&abi::DEC_NEG, &[handle])?;
+                    let negated = negated.ok_or_else(|| Decline::new("decimal result"))?;
+                    return Ok((Some(negated), Rep::Dec));
+                }
+                if *op == MirUnOp::Neg && rep_of(self.state.input.types, value.ty)? == Rep::Inf {
+                    let (integer, rep) = self.scalar_wide(operand)?;
+                    let handle = self.inf_operand(integer, rep)?;
+                    let negated = self.call_runtime(&abi::INF_NEG, &[handle])?;
+                    let negated = negated.ok_or_else(|| Decline::new("inf result"))?;
+                    return Ok((Some(negated), Rep::Inf));
+                }
+                let (computed, rep) = self.unary(*op, operand, cap)?;
                 Ok((Some(computed), rep))
             }
             MirValueKind::Option(op) => {
@@ -4022,7 +4662,8 @@ impl FunctionLower<'_, '_> {
             }
             MirValueKind::Binary { op, lhs, rhs } => {
                 let result = rep_of(self.state.input.types, value.ty)?;
-                let (computed, rep) = self.binary(*op, lhs, rhs, result)?;
+                let cap = wide::cap_int(self.state.input.types, value.ty);
+                let (computed, rep) = self.binary(*op, lhs, rhs, result, cap)?;
                 Ok((Some(computed), rep))
             }
             MirValueKind::Closure(closure) => Ok((Some(self.closure_value(closure)?), Rep::Func)),
@@ -4030,8 +4671,31 @@ impl FunctionLower<'_, '_> {
         }
     }
 
-    fn unary(&mut self, op: MirUnOp, operand: &MirOperand) -> Lowered<(Value, Rep)> {
-        let (value, rep) = self.scalar(operand)?;
+    fn unary(&mut self, op: MirUnOp, operand: &MirOperand, cap: bool) -> Lowered<(Value, Rep)> {
+        let (value, rep) = self.scalar_wide(operand)?;
+        if rep == Rep::Inf && op == MirUnOp::Neg {
+            let negated = self.call_runtime(&abi::INF_NEG, &[value])?;
+            return Ok((negated.ok_or_else(|| Decline::new("inf result"))?, Rep::Inf));
+        }
+        if rep == Rep::Dec && op == MirUnOp::Neg {
+            let negated = self.call_runtime(&abi::DEC_NEG, &[value])?;
+            return Ok((
+                negated.ok_or_else(|| Decline::new("decimal result"))?,
+                Rep::Dec,
+            ));
+        }
+        if (cap || self.is_wide(value)) && rep == Rep::Int {
+            match op {
+                MirUnOp::Neg => return Ok((self.wide_negate(value)?, Rep::Int)),
+                MirUnOp::BitNot => return Ok((self.wide_bit_not(value)?, Rep::Int)),
+                _ => {}
+            }
+        }
+        let value = if rep == Rep::Int {
+            self.narrow(value)?
+        } else {
+            value
+        };
         match (op, rep) {
             (MirUnOp::Neg, Rep::Int) => {
                 let zero = self.builder.ins().iconst(types::I64, 0);
@@ -4130,9 +4794,56 @@ impl FunctionLower<'_, '_> {
         lhs: &MirOperand,
         rhs: &MirOperand,
         result: Rep,
+        cap: bool,
     ) -> Lowered<(Value, Rep)> {
-        let (a, a_rep) = self.scalar(lhs)?;
-        let (b, b_rep) = self.scalar(rhs)?;
+        let (mut a, a_rep) = self.scalar_wide(lhs)?;
+        let (mut b, b_rep) = self.scalar_wide(rhs)?;
+        if (a_rep == Rep::Dec || b_rep == Rep::Dec || result == Rep::Dec)
+            && op != MirBinOp::Coalesce
+            && a_rep != Rep::Opt
+            && b_rep != Rep::Opt
+        {
+            return self.dec_binary(op, (a, a_rep), (b, b_rep));
+        }
+        if a_rep == Rep::Ins && b_rep == Rep::Ins {
+            let cc = match op {
+                MirBinOp::Eq => IntCC::Equal,
+                MirBinOp::NotEq => IntCC::NotEqual,
+                MirBinOp::Lt => IntCC::SignedLessThan,
+                MirBinOp::Gt => IntCC::SignedGreaterThan,
+                MirBinOp::LtEq => IntCC::SignedLessThanOrEqual,
+                MirBinOp::GtEq => IntCC::SignedGreaterThanOrEqual,
+                _ => return Err(Decline::new("instant operation")),
+            };
+            let order = self
+                .call_runtime(&abi::INS_COMPARE, &[a, b])?
+                .ok_or_else(|| Decline::new("instant comparison result"))?;
+            let zero = self.builder.ins().iconst(types::I32, 0);
+            return Ok((self.builder.ins().icmp(cc, order, zero), Rep::Bool));
+        }
+        if (a_rep == Rep::Inf || b_rep == Rep::Inf || result == Rep::Inf)
+            && op != MirBinOp::Coalesce
+            && a_rep != Rep::Opt
+            && b_rep != Rep::Opt
+        {
+            return self.inf_binary(op, (a, a_rep), (b, b_rep));
+        }
+        if matches!(
+            (a_rep, b_rep),
+            (Rep::Int, Rep::Float) | (Rep::Float, Rep::Int)
+        ) {
+            return self.int_float_compare(op, (a, a_rep), (b, b_rep));
+        }
+        let exact = a_rep == Rep::Int && b_rep == Rep::Int;
+        if exact && op != MirBinOp::Coalesce {
+            return self.int_binary(op, a, b, cap);
+        }
+        if a_rep == Rep::Int {
+            a = self.narrow(a)?;
+        }
+        if b_rep == Rep::Int {
+            b = self.narrow(b)?;
+        }
         if op == MirBinOp::Coalesce {
             return self.coalesce((a, a_rep), (b, b_rep), result);
         }
@@ -4177,15 +4888,26 @@ impl FunctionLower<'_, '_> {
         {
             return self.bits_binary(op, (lhs, a, a_rep), (rhs, b, b_rep), width);
         }
+        // A letter and a text compare as texts.
+        let (a_rep, b_rep) = match (a_rep, b_rep) {
+            (Rep::Char, Rep::Text | Rep::Char) | (Rep::Text, Rep::Char) => (Rep::Text, Rep::Text),
+            other => other,
+        };
         if a_rep != b_rep {
             return Err(Decline::new("mixed-representation operands"));
         }
         match a_rep {
-            Rep::Int => self.int_binary(op, a, b),
+            Rep::Int => self.int_binary(op, a, b, cap),
             Rep::Float => self.float_binary(op, a, b),
             Rep::Bool => self.bool_binary(op, a, b),
             Rep::Text => self.text_binary(op, a, b),
-            Rep::Bits(_)
+            Rep::Char
+            | Rep::Regex
+            | Rep::Match
+            | Rep::Dec
+            | Rep::Inf
+            | Rep::Ins
+            | Rep::Bits(_)
             | Rep::List
             | Rep::Record
             | Rep::Opt
@@ -4199,8 +4921,13 @@ impl FunctionLower<'_, '_> {
         }
     }
 
-    fn int_binary(&mut self, op: MirBinOp, a: Value, b: Value) -> Lowered<(Value, Rep)> {
-        let compare = |this: &mut Self, cc: IntCC| (this.builder.ins().icmp(cc, a, b), Rep::Bool);
+    fn int_binary(&mut self, op: MirBinOp, a: Value, b: Value, cap: bool) -> Lowered<(Value, Rep)> {
+        // A wide operand makes the operation exact whatever its result type
+        // says (`(max + 1) % 1000` is typed by its divisor).
+        if wide::arithmetic(op) && (cap || self.is_wide(a) || self.is_wide(b)) {
+            return Ok((self.wide_arithmetic(op, a, b)?, Rep::Int));
+        }
+        let compare = |this: &mut Self, cc: IntCC| (this.wide_compare(cc, a, b), Rep::Bool);
         Ok(match op {
             MirBinOp::Add => (self.checked_add(a, b)?, Rep::Int),
             MirBinOp::Sub => (self.checked_sub(a, b)?, Rep::Int),
@@ -4608,11 +5335,15 @@ impl FunctionLower<'_, '_> {
             match &args[*position] {
                 MirOperand::Place(place) if place.projections.is_empty() => {
                     let (variable, _) = self.place_slot(place)?;
+                    let wide = self.wide_slots.contains(&Self::base_slot(place));
+                    let value = self.fit_int(value, wide && *rep == Rep::Int)?;
                     self.builder.def_var(variable, value);
                 }
                 MirOperand::Place(place) => self.write_projected(place, value, *rep)?,
                 MirOperand::Temp(id) => {
                     let (variable, _) = self.slot(Slot::Temp(*id))?;
+                    let wide = self.wide_slots.contains(&Slot::Temp(*id));
+                    let value = self.fit_int(value, wide && *rep == Rep::Int)?;
                     self.builder.def_var(variable, value);
                 }
                 _ => return Err(Decline::new("reference argument")),
@@ -4634,7 +5365,7 @@ impl FunctionLower<'_, '_> {
                     results.push(self.builder.ins().iconst(types::I8, 0));
                 }
                 if let Some(operand) = value
-                    && let (Some(value), have) = self.operand(operand)?
+                    && let (Some(value), have) = self.operand_narrow(operand)?
                 {
                     results.push(self.coerce(value, have, self.ret_rep)?);
                 }

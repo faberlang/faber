@@ -22,7 +22,7 @@ use radix_hir::DefId;
 use radix_mir::visit::MirVisitor;
 use radix_mir::*;
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
-use radix_types::{NumericWidth, Primitive, SemanticMutability, Type, TypeTable};
+use radix_types::{NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Slug for shapes the CLIF subset does not cover yet.
@@ -184,30 +184,33 @@ impl<'a> ClifCapability<'a> {
             Type::SizedNumeric(..) => Some(Gap::Subset("sized numeric value".to_owned())),
             Type::PolicyFloat(..) => Some(Gap::Subset("policy float value".to_owned())),
             Type::Primitive(Primitive::Ascii) => None,
-            Type::Primitive(Primitive::Littera) => Some(Gap::Subset("character value".to_owned())),
+            Type::Primitive(Primitive::Littera) => None,
             Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti) => {
                 crate::lower::byte_element(self.types)
                     .is_none()
                     .then(|| Gap::Subset("byte buffer value".to_owned()))
             }
             Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => None,
-            Type::Primitive(Primitive::Regex)
-            | Type::Primitive(Primitive::Match)
-            | Type::Primitive(Primitive::Json)
-            | Type::Primitive(Primitive::Valor) => {
-                Some(Gap::Subset("dynamic data value".to_owned()))
-            }
-            Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => {
-                Some(Gap::Subset("instans value".to_owned()))
-            }
+            Type::Primitive(Primitive::Regex | Primitive::Match) => None,
+            Type::Primitive(Primitive::Json | Primitive::Valor) => None,
+            Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => None,
             Type::Primitive(Primitive::Nihil) => None,
             Type::Primitive(Primitive::Ignotum) => None,
             Type::Array(element) => self.type_gap(MirType::semantic(*element)),
             Type::BoundedArray { element, .. } => self.type_gap(MirType::semantic(*element)),
             Type::Map(key, value) => self
                 .type_gap(MirType::semantic(*key))
-                .or_else(|| self.type_gap(MirType::semantic(*value))),
-            Type::Set(element) => self.type_gap(MirType::semantic(*element)),
+                .or_else(|| self.type_gap(MirType::semantic(*value)))
+                .or_else(|| {
+                    [*key, *value]
+                        .into_iter()
+                        .any(|member| self.is_letter(member))
+                        .then(|| Gap::Subset("character in a map".to_owned()))
+                }),
+            Type::Set(element) => self.type_gap(MirType::semantic(*element)).or_else(|| {
+                self.is_letter(*element)
+                    .then(|| Gap::Subset("character in a set".to_owned()))
+            }),
             Type::Queue(_)
             | Type::BoundedQueue { .. }
             | Type::Stack(_)
@@ -225,8 +228,9 @@ impl<'a> ClifCapability<'a> {
             Type::Union(members) => members.iter().find_map(|member| {
                 if matches!(
                     self.types.get(*member),
-                    Type::Primitive(Primitive::Nihil | Primitive::Ignotum)
-                        | Type::Option(_)
+                    Type::Primitive(
+                        Primitive::Nihil | Primitive::Ignotum | Primitive::Json | Primitive::Valor
+                    ) | Type::Option(_)
                         | Type::Bits(_)
                         | Type::Union(_)
                 ) {
@@ -323,6 +327,12 @@ impl<'a> ClifCapability<'a> {
         }
     }
 
+    /// Whether `id` is a `littera`: a map or set display of one is not
+    /// lowered (the runner's quoting of a letter there is not pinned).
+    fn is_letter(&self, id: TypeId) -> bool {
+        matches!(self.types.get(id), Type::Primitive(Primitive::Littera))
+    }
+
     /// Short readable type-kind name for gap shapes.
     fn kind_name(&self, ty: MirType) -> String {
         let debug = format!("{:?}", self.types.get(ty.semantic_id()));
@@ -378,10 +388,10 @@ impl<'a> ClifCapability<'a> {
             MirConstant::String(_) => None,
             MirConstant::Ascii(_) => None,
             MirConstant::Octeti(_) => Some(Gap::Subset("byte constant".to_owned())),
-            MirConstant::Regex { .. } => Some(Gap::Subset("regex constant".to_owned())),
+            MirConstant::Regex { .. } => None,
             MirConstant::Nil => None,
             MirConstant::Function(_) => None,
-            MirConstant::Magnus(_) => Some(Gap::Subset("inf constant".to_owned())),
+            MirConstant::Magnus(_) => None,
             MirConstant::ShapeSize { .. } => Some(Gap::Policy("device constant".to_owned())),
         }
     }
@@ -553,7 +563,7 @@ impl MirVisitor for ClifCapability<'_> {
                     && self.type_gap(conversion.source_ty).is_none()
                     && matches!(
                         self.types.get(conversion.target_ty.semantic_id()),
-                        Type::Primitive(Primitive::Textus)
+                        Type::Primitive(Primitive::Textus | Primitive::Ascii)
                     )
         );
         let set_to_list = matches!(
@@ -596,7 +606,21 @@ impl MirVisitor for ClifCapability<'_> {
                     )
                     .is_some()
         );
+        let open_data = matches!(
+            &call.intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && matches!(
+                        self.types.get(conversion.source_ty.semantic_id()),
+                        Type::Array(_) | Type::BoundedArray { .. } | Type::Map(..)
+                    )
+                    && matches!(
+                        self.types.get(conversion.target_ty.semantic_id()),
+                        Type::Primitive(Primitive::Json | Primitive::Valor)
+                    )
+        );
         if renders_text
+            || open_data
             || numeric
             || sequence
             || type_check
@@ -604,11 +628,13 @@ impl MirVisitor for ClifCapability<'_> {
             || matches!(
                 call.intrinsic,
                 MirIntrinsic::FormatString { .. }
+                    | MirIntrinsic::FormatValue { .. }
                     | MirIntrinsic::CursorStream(_)
                     | MirIntrinsic::Assert
                     | MirIntrinsic::Panic
                     | MirIntrinsic::Cede
                     | MirIntrinsic::Duplicate
+                    | MirIntrinsic::Sermo(MirSermoOp::DrainCursor)
                     | MirIntrinsic::Collection(
                         MirCollectionOp::Length
                             | MirCollectionOp::Append
@@ -645,6 +671,19 @@ impl MirVisitor for ClifCapability<'_> {
                             | MirCollectionOp::Ceiling
                             | MirCollectionOp::Round
                             | MirCollectionOp::Truncate
+                            | MirCollectionOp::CordCursor
+                            | MirCollectionOp::TextEscape
+                            | MirCollectionOp::RegexMatches
+                            | MirCollectionOp::RegexFind
+                            | MirCollectionOp::RegexFindAll
+                            | MirCollectionOp::RegexSplit
+                            | MirCollectionOp::RegexReplace
+                            | MirCollectionOp::RegexReplaceEach
+                            | MirCollectionOp::MatchText
+                            | MirCollectionOp::MatchStart
+                            | MirCollectionOp::MatchEnd
+                            | MirCollectionOp::MatchGroup
+                            | MirCollectionOp::MatchNamed
                             | MirCollectionOp::Absolute
                             | MirCollectionOp::Signum
                             | MirCollectionOp::Minimum

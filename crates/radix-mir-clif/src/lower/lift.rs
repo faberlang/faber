@@ -212,7 +212,9 @@ impl FunctionLower<'_, '_> {
                 };
                 Ok((self.builder.ins().icmp(cc, *a, *b), Rep::Bool))
             }
-            (Lift::Binary(op), [(a, Rep::Int), (b, Rep::Int)]) => self.int_binary(op, *a, *b),
+            (Lift::Binary(op), [(a, Rep::Int), (b, Rep::Int)]) => {
+                self.int_binary(op, *a, *b, false)
+            }
             (Lift::Binary(op), [(a, a_rep), (b, b_rep)])
                 if matches!(a_rep, Rep::Int | Rep::Float)
                     && matches!(b_rep, Rep::Int | Rep::Float) =>

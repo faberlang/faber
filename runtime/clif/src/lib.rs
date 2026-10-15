@@ -13,6 +13,17 @@
 //! blocks are declined), so the process-global state needs no locking beyond
 //! what a `static` demands.
 
+mod dec;
+mod format_rt;
+mod format_spec;
+mod inf;
+mod ins;
+#[allow(dead_code, clippy::all, clippy::pedantic)]
+#[path = "../../rust/src/magnus.rs"]
+mod magnus;
+mod regex_program;
+mod regex_rt;
+
 use std::ffi::CStr;
 use std::ffi::c_char;
 use std::io::Write;
@@ -146,6 +157,91 @@ pub extern "C" fn __faber_clif_v1_print_i64(stream: i32, value: i64) {
     emit(stream, &value.to_string());
 }
 
+/// Print one signed integer line for an exact intermediate beyond the 64-bit
+/// carrier, given as its low and high halves.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_print_wide(stream: i32, low: i64, high: i64) {
+    emit(stream, &join_wide(low, high).to_string());
+}
+
+/// Render an exact intermediate as text.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_text_from_wide(low: i64, high: i64) -> *const u8 {
+    text_new(join_wide(low, high).to_string().as_bytes())
+}
+
+/// The smallest and largest exact integer (ruling 17a).
+const EXACT_MIN: i128 = i64::MIN as i128;
+const EXACT_MAX: i128 = u64::MAX as i128;
+
+/// High half of the latest wide result (the runtime is single-threaded).
+static WIDE_HIGH: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
+#[allow(clippy::cast_sign_loss)]
+fn join_wide(low: i64, high: i64) -> i128 {
+    (i128::from(high) << 64) | i128::from(low as u64)
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn return_wide(value: i128) -> i64 {
+    WIDE_HIGH.store((value >> 64) as i64, std::sync::atomic::Ordering::Relaxed);
+    value as i64
+}
+
+fn exact_trap(message: &str) -> ! {
+    flush();
+    let mut stderr = std::io::stderr();
+    let _ = writeln!(stderr, "error: {message}");
+    std::process::exit(1);
+}
+
+/// Exact product of two intermediates; outside the exact range is an overflow.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_wide_mul(
+    a_low: i64,
+    a_high: i64,
+    b_low: i64,
+    b_high: i64,
+) -> i64 {
+    let product = join_wide(a_low, a_high).checked_mul(join_wide(b_low, b_high));
+    match product {
+        Some(value) if (EXACT_MIN..=EXACT_MAX).contains(&value) => return_wide(value),
+        _ => exact_trap("numerus overflow"),
+    }
+}
+
+/// Floor quotient (`remainder == 0`) or floor remainder of two intermediates.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_wide_div(
+    a_low: i64,
+    a_high: i64,
+    b_low: i64,
+    b_high: i64,
+    remainder: i32,
+) -> i64 {
+    let (a, b) = (join_wide(a_low, a_high), join_wide(b_low, b_high));
+    if b == 0 {
+        exact_trap("numerus division failed");
+    }
+    let quotient = a / b;
+    let floored = if a % b != 0 && ((a < 0) != (b < 0)) {
+        quotient - 1
+    } else {
+        quotient
+    };
+    if remainder == 0 {
+        return_wide(floored)
+    } else {
+        return_wide(a - b * floored)
+    }
+}
+
+/// The high half of the latest wide result.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_wide_hi() -> i64 {
+    WIDE_HIGH.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// Print one float line; `narrow` selects the `f32` display contract.
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_print_f64(stream: i32, value: f64, narrow: i32) {
@@ -218,6 +314,12 @@ const TAG_LIST: i32 = 8;
 const TAG_STRUCT: i32 = 9;
 const TAG_OPT: i32 = 10;
 const TAG_MAP: i32 = 11;
+const TAG_CHAR: i32 = 12;
+const TAG_MATCH: i32 = 13;
+const TAG_REGEX: i32 = 14;
+const TAG_DEC: i32 = 15;
+const TAG_INF: i32 = 16;
+const TAG_INS: i32 = 17;
 
 /// A runtime map (`set` false) or set (`set` true): tagged key/value entries
 /// in insertion order.
@@ -265,6 +367,18 @@ fn element_text(tag: i32, bits: i64) -> String {
         TAG_FLOAT => display_fractus(f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()))),
         TAG_BOOL => display_bivalens(bits != 0, tokens()).to_owned(),
         TAG_TEXT => format!("{:?}", text_str(unsafe { text_bytes(bits as *const u8) })),
+        TAG_CHAR => format!(
+            "{:?}",
+            text_str(unsafe { text_bytes(bits as *const u8) })
+                .chars()
+                .next()
+                .unwrap_or_default()
+        ),
+        TAG_DEC => unsafe { dec::text(bits as *const u8) },
+        TAG_INF => unsafe { inf::text(bits as *const u8) },
+        TAG_INS => unsafe { ins::text(bits as *const u8) },
+        TAG_MATCH => regex_rt::match_element_text(bits),
+        TAG_REGEX => regex_rt::regex_element_text(bits),
         TAG_LIST => list_text(unsafe { list_ref(bits as *const List) }),
         TAG_STRUCT => record_text(unsafe { &*(bits as *const Record) }),
         TAG_OPT => match unsafe { (bits as *const Present).as_ref() } {
@@ -598,7 +712,7 @@ pub unsafe extern "C" fn __faber_clif_v1_opt_eq(left: *const Present, right: *co
 fn opt_top_text(handle: *const Present) -> String {
     match unsafe { handle.as_ref() } {
         None => tokens().none.clone(),
-        Some(present) if present.tag == TAG_TEXT => {
+        Some(present) if present.tag == TAG_TEXT || present.tag == TAG_CHAR => {
             text_str(unsafe { text_bytes(present.bits as *const u8) }).into_owned()
         }
         Some(present) => element_text(present.tag, present.bits),
@@ -803,7 +917,14 @@ fn element_equal(tag: i32, left: i64, right: i64) -> bool {
             f64::from_bits(u64::from_ne_bytes(left.to_ne_bytes()))
                 == f64::from_bits(u64::from_ne_bytes(right.to_ne_bytes()))
         }
-        TAG_TEXT => unsafe { text_bytes(left as *const u8) == text_bytes(right as *const u8) },
+        TAG_TEXT | TAG_CHAR => unsafe {
+            text_bytes(left as *const u8) == text_bytes(right as *const u8)
+        },
+        TAG_DEC => unsafe { dec::order(left as *const u8, right as *const u8) }.is_eq(),
+        TAG_INF => unsafe { inf::order(left as *const u8, right as *const u8) }.is_eq(),
+        TAG_INS => unsafe { ins::order(left as *const u8, right as *const u8) }.is_eq(),
+        TAG_MATCH => regex_rt::match_element_equal(left, right),
+        TAG_REGEX => regex_rt::regex_element_equal(left, right),
         TAG_STRUCT => unsafe {
             record_equal(&*(left as *const Record), &*(right as *const Record))
         },
@@ -878,7 +999,12 @@ fn element_order(tag: i32, left: i64, right: i64) -> std::cmp::Ordering {
     match tag {
         TAG_FLOAT => f64::from_bits(u64::from_ne_bytes(left.to_ne_bytes()))
             .total_cmp(&f64::from_bits(u64::from_ne_bytes(right.to_ne_bytes()))),
-        TAG_TEXT => unsafe { text_bytes(left as *const u8).cmp(text_bytes(right as *const u8)) },
+        TAG_TEXT | TAG_CHAR => unsafe {
+            text_bytes(left as *const u8).cmp(text_bytes(right as *const u8))
+        },
+        TAG_DEC => unsafe { dec::order(left as *const u8, right as *const u8) },
+        TAG_INF => unsafe { inf::order(left as *const u8, right as *const u8) },
+        TAG_INS => unsafe { ins::order(left as *const u8, right as *const u8) },
         TAG_BITS..=7 => {
             u64::from_ne_bytes(left.to_ne_bytes()).cmp(&u64::from_ne_bytes(right.to_ne_bytes()))
         }
@@ -1000,6 +1126,177 @@ pub unsafe extern "C" fn __faber_clif_v1_text_concat(
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_text_from_i64(value: i64) -> *const u8 {
     text_new(value.to_string().as_bytes())
+}
+
+/// The only Unicode scalar of a text, if it holds exactly one.
+fn only_scalar(bytes: &[u8]) -> Option<char> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    let mut chars = text.chars();
+    let first = chars.next()?;
+    chars.next().is_none().then_some(first)
+}
+
+fn char_text(ch: char) -> *const u8 {
+    let mut buffer = [0u8; 4];
+    text_new(ch.encode_utf8(&mut buffer).as_bytes())
+}
+
+/// A one-letter text from a text of exactly one scalar; null otherwise.
+///
+/// # Safety
+///
+/// `text` is a live runtime text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_char_from_text(text: *const u8) -> *const u8 {
+    match only_scalar(unsafe { text_bytes(text) }) {
+        Some(_) => text,
+        None => std::ptr::null(),
+    }
+}
+
+/// A one-letter text from a code point; null for a surrogate or past Unicode.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_char_from_code(value: i64) -> *const u8 {
+    match u32::try_from(value).ok().and_then(char::from_u32) {
+        Some(ch) => char_text(ch),
+        None => std::ptr::null(),
+    }
+}
+
+/// A one-letter text from a decimal digit; null outside 0 to 9.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_char_from_digit(value: i64) -> *const u8 {
+    match u32::try_from(value)
+        .ok()
+        .and_then(|digit| char::from_digit(digit, 10))
+    {
+        Some(ch) => char_text(ch),
+        None => std::ptr::null(),
+    }
+}
+
+/// The code point of a one-letter text.
+///
+/// # Safety
+///
+/// `text` is a live runtime text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_char_code(text: *const u8) -> i64 {
+    only_scalar(unsafe { text_bytes(text) }).map_or(0, |ch| i64::from(u32::from(ch)))
+}
+
+/// The decimal digit a one-letter text holds, or -1.
+///
+/// # Safety
+///
+/// `text` is a live runtime text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_char_digit(text: *const u8) -> i64 {
+    only_scalar(unsafe { text_bytes(text) })
+        .and_then(|ch| ch.to_digit(10))
+        .map_or(-1, i64::from)
+}
+
+/// The letters of a text: a list of one-letter texts, one per scalar.
+///
+/// # Safety
+///
+/// `text` is a live runtime text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_chars(text: *const u8) -> *mut List {
+    let items = text_str(unsafe { text_bytes(text) })
+        .chars()
+        .map(|ch| (TAG_CHAR, char_text(ch) as i64))
+        .collect();
+    list_new_from(items)
+}
+
+/// `f32` to the nearest `f16` pattern, ties to even.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss
+)]
+fn f32_to_f16(x: f32) -> u16 {
+    if x.is_nan() {
+        return 0x7e00;
+    }
+    let bits = x.to_bits();
+    let sign = ((bits >> 16) & 0x8000) as u16;
+    let exponent = ((bits >> 23) & 0xff) as i32;
+    let mantissa = bits & 0x7f_ffff;
+    if exponent == 0xff {
+        return sign | 0x7c00;
+    }
+    let biased = exponent - 127 + 15;
+    if biased >= 0x1f {
+        return sign | 0x7c00;
+    }
+    if biased <= 0 {
+        if biased < -10 {
+            return sign;
+        }
+        let shift = 14 - biased;
+        let half = mantissa | 0x80_0000;
+        let rounded = half + (1 << (shift - 1)) - 1 + ((half >> shift) & 1);
+        return sign | ((rounded >> shift) as u16);
+    }
+    let round_bits = mantissa & 0x1fff;
+    let mut half_mantissa = (mantissa >> 13) as u16;
+    if round_bits > 0x1000 || (round_bits == 0x1000 && (half_mantissa & 1) == 1) {
+        half_mantissa += 1;
+        if half_mantissa == 0x400 {
+            return sign | ((biased as u16 + 1) << 10);
+        }
+    }
+    sign | ((biased as u16) << 10) | half_mantissa
+}
+
+/// An `f16` pattern as `f32` (infinities and NaNs keep their sign).
+fn f16_to_f32(bits: u16) -> f32 {
+    let negative = bits & 0x8000 != 0;
+    let exponent = i32::from((bits >> 10) & 0x1f);
+    let mantissa = f32::from(bits & 0x3ff);
+    let magnitude = if exponent == 0 {
+        mantissa * 2f32.powi(-24)
+    } else if exponent == 0x1f {
+        if bits & 0x3ff == 0 {
+            f32::INFINITY
+        } else {
+            f32::NAN
+        }
+    } else {
+        (1.0 + mantissa / 1024.0) * 2f32.powi(exponent - 15)
+    };
+    if negative { -magnitude } else { magnitude }
+}
+
+/// The `b16` pattern of an `f16` value held as `f64`; a NaN keeps its sign
+/// and top payload bits and never collapses to infinity.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_f16_to_bits(value: f64) -> i64 {
+    #[allow(clippy::cast_possible_truncation)]
+    let wide = (value as f32).to_bits();
+    if value.is_nan() {
+        let payload = ((wide >> 13) & 0x03ff).max(0x0200);
+        return i64::from(((wide >> 16) & 0x8000) | 0x7c00 | payload);
+    }
+    #[allow(clippy::cast_possible_truncation)]
+    i64::from(f32_to_f16(value as f32))
+}
+
+/// The `f16` value of a `b16` pattern, held as `f64`; a NaN keeps its
+/// payload.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_f16_from_bits(pattern: i64) -> f64 {
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    let bits = (pattern as u64 & 0xffff) as u16;
+    if bits & 0x7c00 == 0x7c00 && bits & 0x03ff != 0 {
+        let sign = u32::from(bits >> 15) << 31;
+        let payload = u32::from(bits & 0x03ff) << 13;
+        return f64::from(f32::from_bits(sign | 0x7f80_0000 | payload));
+    }
+    f64::from(f16_to_f32(bits))
 }
 
 /// Render a float as text; `narrow` selects the `f32` display contract.
@@ -1409,6 +1706,37 @@ pub unsafe extern "C" fn __faber_clif_v1_trap_store(
     std::process::exit(1);
 }
 
+/// [`__faber_clif_v1_trap_store`] for an exact intermediate beyond the 64-bit
+/// carrier.
+///
+/// # Safety
+///
+/// `suffix` is null or points to `length` readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_trap_store_wide(
+    low: i64,
+    high: i64,
+    suffix: *const u8,
+    length: i64,
+    unsigned_slot: i8,
+) -> ! {
+    flush();
+    let length = usize::try_from(length).unwrap_or(0);
+    let bytes = if suffix.is_null() {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(suffix, length) }
+    };
+    let value = join_wide(low, high);
+    let mut message = format!("{value}{}", String::from_utf8_lossy(bytes));
+    if value < 0 && unsigned_slot != 0 {
+        message.push_str(" (a negative value cannot be stored in an unsigned slot)");
+    }
+    let mut stderr = std::io::stderr();
+    let _ = writeln!(stderr, "error: {message}");
+    std::process::exit(1);
+}
+
 /// The outcome of the latest parse: 0 ok, 1 malformed integer, 2 integer out
 /// of range, 3 malformed float.
 static PARSE_STATUS: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
@@ -1470,6 +1798,9 @@ pub extern "C" fn __faber_clif_v1_convert_message(status: i32) -> *const u8 {
     let message = match status {
         2 => "textus to numerus conversion out of range",
         3 => "textus to fractus conversion failed",
+        4 => "decimal to numerus conversion out of range",
+        5 => "decimal to numerus conversion failed",
+        6 => "numerus to numerus conversion out of range",
         _ => "textus to numerus conversion failed",
     };
     text_new(message.as_bytes())
@@ -2068,4 +2399,62 @@ pub unsafe extern "C" fn __faber_clif_v1_union_is_struct(
     }
     let record = unsafe { &*(present.bits as *const Record) };
     i8::from(!record.variant && unsafe { text_bytes(record.name) == text_bytes(name) })
+}
+
+/// A list or map element as an open-data element: a box of its tagged payload,
+/// with nested lists and maps boxed the same way. An element with no open-data
+/// form ends the run.
+fn box_open_element(tag: i32, bits: i64) -> (i32, i64) {
+    let payload = match tag {
+        TAG_OPT => return (tag, bits),
+        TAG_INT | TAG_FLOAT | TAG_BOOL | TAG_TEXT | TAG_CHAR => (tag, bits),
+        TAG_LIST => {
+            let list = unsafe { list_ref(bits as *const List) };
+            let items = list
+                .items
+                .iter()
+                .map(|&(tag, bits)| box_open_element(tag, bits))
+                .collect();
+            (TAG_LIST, list_new_from(items) as i64)
+        }
+        TAG_MAP => {
+            let map = unsafe { &*(bits as *const Map) };
+            let entries = map
+                .entries
+                .iter()
+                .map(|&(key_tag, key, value_tag, value)| {
+                    let (value_tag, value) = if map.set {
+                        (value_tag, value)
+                    } else {
+                        box_open_element(value_tag, value)
+                    };
+                    (key_tag, key, value_tag, value)
+                })
+                .collect();
+            (
+                TAG_MAP,
+                Box::into_raw(Box::new(Map {
+                    set: map.set,
+                    entries,
+                })) as i64,
+            )
+        }
+        _ => exact_trap("this value has no open-data form on the clif target"),
+    };
+    let boxed = Box::into_raw(Box::new(Present {
+        tag: payload.0,
+        bits: payload.1,
+    }));
+    (TAG_OPT, boxed as i64)
+}
+
+/// A list or map as open data: a box whose elements are open-data boxes.
+///
+/// # Safety
+///
+/// `bits` is a live runtime list (tag `TAG_LIST`) or map (tag `TAG_MAP`).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_dyn_box(tag: i32, bits: i64) -> *const Present {
+    let (_, boxed) = box_open_element(tag, bits);
+    boxed as *const Present
 }
