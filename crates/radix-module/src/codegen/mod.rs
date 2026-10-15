@@ -25,6 +25,7 @@
 pub use radix_semantic::coverage;
 #[cfg(feature = "hir-c")]
 pub mod c;
+pub mod cli_ir;
 #[cfg(feature = "hir-cobol")]
 pub mod cobol;
 pub mod conversio_coverage;
@@ -1233,7 +1234,7 @@ pub fn generate_rust_cli(
         reject_rust_unsupported_types(types)?;
         let hir = hir.without_unavailable_declarations(interner);
         let hir = &*hir;
-        let ir = rust::to_cli_ir(cli_program);
+        let ir = cli_ir::to_cli_ir(cli_program);
         let mut codegen = rust::RustCodegen::new_with_types(hir, interner, types);
         codegen.set_display_tokens(display_tokens.clone());
         let output = codegen.generate_cli(hir, types, &ir)?;
