@@ -126,7 +126,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         // A promise carrier is its payload: async functions run to
         // completion and `cede` reads the value.
         Type::Promissum(inner) => rep_of(table, MirType::semantic(*inner)),
-        Type::Array(element) => {
+        Type::Array(element) | Type::BoundedArray { element, .. } => {
             rep_of(table, MirType::semantic(*element))?;
             Ok(Rep::List)
         }
@@ -695,7 +695,9 @@ impl FunctionLower<'_, '_> {
     /// The element type of a list type.
     fn element_type(&self, list: MirType) -> Lowered<MirType> {
         match resolve(self.state.input.types, list.semantic_id()) {
-            Type::Array(element) => Ok(MirType::semantic(*element)),
+            Type::Array(element) | Type::BoundedArray { element, .. } => {
+                Ok(MirType::semantic(*element))
+            }
             _ => Err(Decline::new("index of a non-list")),
         }
     }
@@ -1210,6 +1212,15 @@ impl FunctionLower<'_, '_> {
                 let [_, item] = args else {
                     return Err(Decline::new("append arity"));
                 };
+                if matches!(
+                    resolve(
+                        self.state.input.types,
+                        self.operand_type(receiver)?.semantic_id()
+                    ),
+                    Type::BoundedArray { .. }
+                ) {
+                    return Err(Decline::new("append to a bounded list"));
+                }
                 let element = self.element_type(self.operand_type(receiver)?)?;
                 let (value, item_rep) = self.element_operand(item, element)?;
                 let tag = self

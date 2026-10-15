@@ -186,8 +186,8 @@ impl<'a> ClifCapability<'a> {
             Type::Primitive(Primitive::Nihil) => Some(Gap::Subset("none value".to_owned())),
             Type::Primitive(Primitive::Ignotum) => Some(Gap::Subset("unknown value".to_owned())),
             Type::Array(element) => self.type_gap(MirType::semantic(*element)),
-            Type::BoundedArray { .. }
-            | Type::Queue(_)
+            Type::BoundedArray { element, .. } => self.type_gap(MirType::semantic(*element)),
+            Type::Queue(_)
             | Type::BoundedQueue { .. }
             | Type::Stack(_)
             | Type::BoundedStack { .. }
