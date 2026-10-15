@@ -1,0 +1,54 @@
++++
+term = "valor"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "inline_default", "expression", "unary_expr", "literal"]
+category = "conversion"
+canonical = false
+summary = "valor ↦ W magnitude-checks the boxed width: fits converts, out of range fails and `⊥` recovers."
+syntax = "<valor-expression> ↦ <integer-width> [⊥ <default>]"
+related = ["↦", "⊥", "numerus", "valor"]
+locale = "en"
++++
+# =============================================================================
+# valor — Boxing a numeric value then narrowing to a sized width.
+# =============================================================================
+#
+# What this teaches:
+#   • `valor ↦ W` (a bare integer width marker) magnitude-checks the boxed
+#     value against W's range — a value that fits converts unchanged; one that
+#     does not fails (D1.11). It never wraps (`300 ↦ u8` is not 44) and never
+#     relabels (it is not 300 in a u8).
+#   • `⊥ default` supplies the target-typed value when the check fails.
+#   • A negative value into an unsigned target is out of range the same way.
+#
+# Common mistakes:
+#   • Expecting C-style truncation — narrowing without `⊥` aborts the program
+#     when the value does not fit.
+#
+# See also: ↦, ⊥, numerus, valor
+# =============================================================================
+
+main {
+    # in range: the boxed value converts unchanged
+    const value inRange ← 200
+    const u8 fits ← inRange ↦ u8
+    print fits
+    const value boundary ← 255
+    const u8 upper ← boundary ↦ u8
+    print upper
+
+    # out of range: the check fails and the recovery supplies the value
+    const value overflow ← 300
+    const u8 recovered ← overflow ↦ u8 ⊥ 7
+    print recovered
+
+    # negative into unsigned is out of range too
+    const value negative ← 0 - 1
+    const u8 unsigned ← negative ↦ u8 ⊥ 0
+    print unsigned
+
+    # the signed width keeps the negative value
+    const value signedLow ← 0 - 128
+    const i8 lowest ← signedLow ↦ i8
+    print lowest
+}

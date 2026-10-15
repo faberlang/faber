@@ -2,10 +2,10 @@
 
 use super::{
     AnalyzedProgram, AnalyzedProgramNode, CliCommand, CliDefault, CliExit, CliOperand, CliOption,
-    CliRecordFieldsByLocal, CliType, Diagnostic, HashMap, MirConstant, MirOperand,
+    CliRecordFieldsByType, CliType, Diagnostic, HashMap, MirConstant, MirOperand,
     MirRuntimeRecordField, MirRuntimeRecordValue, MirType, ModuleId, Path, PlannedCliOperand,
-    PlannedCliOption, Primitive, Symbol, TypeId, parse_cli_arguments, planned_cli_operands,
-    planned_cli_options,
+    PlannedCliOption, Primitive, Symbol, TypeId, command_cli_args_type, parse_cli_arguments,
+    planned_cli_operands, planned_cli_options,
 };
 
 pub(super) fn plan_cli_command_records(
@@ -15,7 +15,7 @@ pub(super) fn plan_cli_command_records(
     global_fields: Vec<MirRuntimeRecordField>,
     global_operands: &[PlannedCliOperand<'_>],
     diagnostics: &mut Vec<Diagnostic>,
-) -> Option<Option<CliRecordFieldsByLocal>> {
+) -> Option<Option<CliRecordFieldsByType>> {
     let mut operands = global_operands.to_vec();
     operands.extend(planned_cli_operands(
         &unit.analysis.interner,
@@ -31,7 +31,7 @@ pub(super) fn plan_cli_command_records(
         &parsed.positionals,
         diagnostics,
     )?);
-    let Some(args_binding) = &command.args_binding else {
+    let Some(_args_binding) = &command.args_binding else {
         if !fields.is_empty() {
             diagnostics.push(unsupported_cli_diagnostic(
                 &unit.path,
@@ -41,8 +41,17 @@ pub(super) fn plan_cli_command_records(
         }
         return Some(None);
     };
-    let args_symbol = unit.analysis.interner.intern(args_binding);
-    Some(Some(HashMap::from([(args_symbol, fields)])))
+    let record_ty = match command_cli_args_type(unit, command) {
+        Some(record_ty) => record_ty,
+        None => {
+            diagnostics.push(unsupported_cli_diagnostic(
+                &unit.path,
+                "CLI argument records",
+            ));
+            return None;
+        }
+    };
+    Some(Some(HashMap::from([(record_ty, fields)])))
 }
 
 pub(super) fn cli_operand_record_fields(

@@ -296,6 +296,14 @@ help = "numeric separators और base prefixes जांचें"
 message = "अमान्य integer"
 help = "numeric separators और base prefixes जांचें"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "फ़्लोट अक्षर बहुत बड़ा है; यह अनंत तक अतिप्रवाहित हो जाता है"
+help = "छोटा परिमाण लिखें, या इकाई को मापें"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "फ़्लोट अक्षर बहुत छोटा है; यह शून्य तक अधःप्रवाहित हो जाता है"
+help = "बड़ा परिमाण लिखें, या इकाई को मापें"
+
 [diagnostics.LEX003]
 message = "अमान्य escape sequence"
 help = "समर्थित escape sequence का उपयोग करें या backslash escape करें"
@@ -347,6 +355,22 @@ help = "पहले lexer error ठीक करें; parsing साफ token
 [diagnostics.PARSE001]
 message = "token अपेक्षित है"
 help = "सुनिश्चित करें कि इस स्थान पर अपेक्षित token मौजूद है"
+
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "कॉपी-इन ऑपरेटर `{operator}` के बाद एक मान आवश्यक है"
+help = "`⇇` के बाद स्रोत अभिव्यक्ति लिखें"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "टपल तत्व लेबल `{label}` एक से अधिक बार प्रयोग किया गया है"
+help = "प्रत्येक तत्व को अलग लेबल दें, या लेबल हटा दें"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "implements स्लॉट को एक अनुबंध का नाम देना चाहिए; `_` अनुरूपता घोषणा नहीं है"
+help = "implements क्लॉज़ में अनुबंध का नाम लिखें"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "आयात फ़ील्ड एक पहचानकर्ता होना चाहिए"
+help = "आयातित फ़ील्ड के लिए एक सरल नाम लिखें"
 
 [diagnostics.PARSE001.issues.annotation_name]
 message = "annotation नाम अपेक्षित है"
@@ -1051,6 +1075,10 @@ help = "lowering के लिए AST construct ठीक करें"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "टिप्पणी जोड़ने के लिए कोई lowered statement या item नहीं है"
 help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "`@ conversion` फ़ंक्शन को ठीक एक पैरामीटर लेना चाहिए और ठीक एक रिटर्न प्रकार घोषित करना चाहिए"
+help = "रूपांतरण जोड़ी के लिए `functio name(Source) → Destination` लिखें"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia के लिए एक type parameter आवश्यक है"

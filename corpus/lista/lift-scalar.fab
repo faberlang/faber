@@ -19,6 +19,7 @@ locale = "en"
 #   • Between two lists `⊙` multiplies and `⊘` divides per element; `xs * ys` and
 #     `xs / ys` are errors that name them, as they are for vectors and tensors
 #   • An untyped literal adopts the list's element type — `xs * 2.0` stays `f32`
+#   • A float lift floors like the scalar `%` — the remainder takes the divisor's sign (`[-7.5] % 2.0` is `[0.5]`)
 #   • Operand order is kept — `0.5 - xs` is `0.5 - xs[i]` for each element
 #   • The sum is exact — `list<u8> + list<u8>` stores into a `list<u16>`; the range
 #     check happens only at the store (a `list<u8>` target would trap)
@@ -73,6 +74,12 @@ main {
     print shifted(a)
     print a % 2.0
     print 9.0 % b
+    # A float lift floors like the scalar operator (ruling 14, F9 ruling 29):
+    # the remainder takes the divisor's sign.
+    const list<f32> signs ← [-7.5, 7.5]
+    const f32 neg_two ← -2.0
+    print signs % 2.0
+    print signs % neg_two
     print a ÷ b
     print 3.0 ÷ b
     print -a

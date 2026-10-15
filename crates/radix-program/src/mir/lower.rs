@@ -3463,7 +3463,7 @@ pub(super) fn lower_unit<'a>(
         lower_analyzed_unit(
             unit.analysis.application_view(),
             radix_mir_lower::lower::MirLoweringOptions {
-                cli_record_fields_by_local: std::sync::Arc::new(fields.into_iter().collect()),
+                cli_parsed_record_fields_by_type: std::sync::Arc::new(fields.into_iter().collect()),
                 kernel_lowering,
                 ..Default::default()
             },

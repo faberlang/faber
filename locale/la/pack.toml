@@ -337,6 +337,14 @@ help = "check numeric separators and base prefixes"
 message = "invalid integer"
 help = "check numeric separators and base prefixes"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "float literal is too large; it overflows to infinity"
+help = "write a smaller magnitude, or scale the unit"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "float literal is too small; it underflows to zero"
+help = "write a larger magnitude, or scale the unit"
+
 [diagnostics.LEX003]
 message = "invalid escape sequence"
 help = "use a supported escape sequence or escape the backslash"
@@ -388,6 +396,22 @@ help = "fix the lexer error first; parsing continues from clean tokens"
 [diagnostics.PARSE001]
 message = "expected token"
 help = "ensure the expected token is present in this position"
+
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "a value is required after the copy-in operator `{operator}`"
+help = "write the source expression after `⇇`"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "tuple element label `{label}` is used more than once"
+help = "give each element a distinct label, or drop the labels"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "an implements slot must name a contract; `_` is not a conformance declaration"
+help = "write the contract name in the implements clause"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "an import field must be an identifier"
+help = "write a plain name for the imported field"
 
 [diagnostics.PARSE001.issues.annotation_name]
 message = "expected annotation name"
@@ -1365,6 +1389,10 @@ help = "emenda structuram AST ad demittendum"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "commentarium enuntiatum vel articulum demissum cui adhaereat non habet"
 help = "emenda structuram AST ad demittendum"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "a `@ conversion` function must take exactly one parameter and declare exactly one return type"
+help = "write `functio name(Source) → Destination` for the conversion pair"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia requires one type parameter"

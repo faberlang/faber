@@ -37,6 +37,7 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
     // same finalized witnesses as HIR while retaining authored source shape.
     let mut presentation = unit.presentation.clone();
     normalize_presentation_witnesses(&unit.hir, &mut presentation, &unit.types);
+    record_named_size_args(&mut presentation, &unit.types);
 
     HirArtifact {
         schema_version: SCHEMA_VERSION,
@@ -94,6 +95,59 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
             tuple: unit.display_tokens.tuple.clone(),
         },
     }
+}
+
+/// Record the size arguments a size-generic genus application binds
+/// (`Box<3>`) in the authored form.
+///
+/// Lowering captures an authored child form for every *type* argument but not
+/// for the magnitude argument a `size` parameter binds, so a `Named` form
+/// whose witness is `Type::Applied(_, args)` can reach the artifact missing
+/// its size children. The validator pairs each authored `Size` with its
+/// witness argument and the Faber re-emitter renders the authored argument
+/// list, so re-align the authored list with the witness before serializing.
+/// The witness index is authoritative — lowering already resolved the authored
+/// figura, exactly as `normalize_size_arg` does for tensor shape arguments.
+fn record_named_size_args(presentation: &mut radix_hir::HirPresentation, types: &radix_types::TypeTable) {
+    for authored in &mut presentation.authored_types {
+        if !matches!(authored.form.head, radix_hir::HirTypeFormHead::Named { .. }) {
+            continue;
+        }
+        let radix_types::Type::Applied(_, applied) = types.get(authored.form.ty) else {
+            continue;
+        };
+        let applied = applied.clone();
+        align_named_form_args(&mut authored.form, &applied);
+    }
+}
+
+/// Insert the witness's size arguments into a `Named` form's authored argument
+/// list at their declaration positions, leaving the authored type children in
+/// order. A size argument the producer already recorded is kept as authored, so
+/// repeated serialization is idempotent.
+fn align_named_form_args(form: &mut radix_hir::HirTypeForm, applied: &[radix_types::AppliedArg]) {
+    let mut authored = std::mem::take(&mut form.args).into_iter().peekable();
+    let mut rebuilt = Vec::with_capacity(applied.len());
+    for expected in applied {
+        match expected {
+            radix_types::AppliedArg::Type(_) => {
+                if let Some(arg) = authored.next() {
+                    rebuilt.push(arg);
+                }
+            }
+            radix_types::AppliedArg::Size(index) => {
+                if matches!(authored.peek(), Some(radix_hir::HirTypeFormArg::Size(_))) {
+                    if let Some(arg) = authored.next() {
+                        rebuilt.push(arg);
+                    }
+                } else {
+                    rebuilt.push(radix_hir::HirTypeFormArg::Size(*index));
+                }
+            }
+        }
+    }
+    rebuilt.extend(authored);
+    form.args = rebuilt;
 }
 
 fn resolved_tensor_edge_policy_wire(policy: radix_hir::ResolvedTensorEdgePolicy) -> ResolvedTensorEdgePolicyWire {

@@ -296,6 +296,14 @@ help = "檢查數字分隔符和進位前綴"
 message = "無效整數"
 help = "檢查數字分隔符和進位前綴"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "浮點字面量過大；會溢位為無限大"
+help = "寫一個更小的數量級，或縮放單位"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "浮點字面量過小；會下溢為零"
+help = "寫一個更大的數量級，或縮放單位"
+
 [diagnostics.LEX003]
 message = "無效跳脫序列"
 help = "使用受支援的跳脫序列，或跳脫反斜線"
@@ -347,6 +355,22 @@ help = "先修正詞法分析器錯誤；剖析會從乾淨的標記繼續"
 [diagnostics.PARSE001]
 message = "需要標記"
 help = "確保此位置存在預期的標記"
+
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "複製入運算子 `{operator}` 後需要一個值"
+help = "在 `⇇` 之後寫來源運算式"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "元組元素標籤 `{label}` 被使用了多次"
+help = "為每個元素取不同的標籤，或去掉標籤"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "implements 槽位必須命名一個契約；`_` 不是一致性宣告"
+help = "在 implements 子句中寫契約名"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "匯入欄位必須是識別碼"
+help = "為匯入的欄位寫一個普通名稱"
 
 [diagnostics.PARSE001.issues.annotation_name]
 message = "需要註解名稱"
@@ -1083,6 +1107,10 @@ help = "修正用於降階的 AST 結構"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "此註解沒有可附加的已降階敘述或項目"
 help = "修正用於降階的 AST 結構"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "`@ conversion` 函式必須恰好接受一個參數，並恰好宣告一個傳回型別"
+help = "為轉換對寫 `functio name(Source) → Destination`"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia 需要一個型別參數"

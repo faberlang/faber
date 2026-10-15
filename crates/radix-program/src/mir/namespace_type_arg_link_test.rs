@@ -911,3 +911,57 @@ kind = "bin"
         panic!("norma:time awaited sleep_async package must lower, got {facts:?}");
     }
 }
+
+const NORMA_FS_AWAITED_READ_FILE_ASYNC_MAIN: &str = r#"import from "norma:fs" charta
+
+async_main {
+    await_const string body ← charta.read_file_async<string>("probe.txt")
+    assert body ≡ "v"
+}
+"#;
+
+/// The awaited `charta.read_file_async<string>("probe.txt")` call in a
+/// package `async_main` must link and validate, with the destination carrying
+/// the instantiated payload `string` against the linked template's `T := string`.
+/// Before c75db9ed-11.1 the linked program failed MIR validation with issue
+/// `mir_validation_destination_type_mismatch`: the generic linked future call's
+/// destination carried the uninstantiated payload type.
+#[test]
+fn package_mir_links_norma_fs_awaited_read_file_async_string() {
+    let dir = crate::test_support::test_temp_dir("norma-fs-read-file-async");
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "norma-fs-read-file-async"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("main.fab"), NORMA_FS_AWAITED_READ_FILE_ASYNC_MAIN).expect("write main.fab");
+    let entry = src.join("main.fab");
+
+    let result = with_lowered_package_mir(
+        &Config::default(),
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        |_| {},
+    );
+    if let Err(diagnostics) = &result {
+        let facts = diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+            .collect::<Vec<_>>();
+        panic!("norma:fs awaited read_file_async package must lower, got {facts:?}");
+    }
+}

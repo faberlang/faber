@@ -2347,6 +2347,125 @@ fn installed_packs_render_frontend_review_issue_rows() {
     }
 }
 
+/// The LEX002 float-overflow/underflow rows and the SEM008 conversion-signature
+/// row (corpus coverage I3, batch 1) are owned and rendered by every installed
+/// pack. The absent-row budget gate counts missing rows, so it would accept a
+/// pack that deletes one of these and adds an unrelated row elsewhere; name each
+/// row here so a deletion fails by name.
+#[test]
+fn installed_packs_render_lex002_float_and_sem008_conversio_signature_rows() {
+    const ROWS: &[(&str, &str)] = &[
+        ("LEX002", "float_overflow"),
+        ("LEX002", "float_underflow"),
+        ("SEM008", "conversio_signature"),
+    ];
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let owned = owned_pack(locale);
+        for &(code, issue) in ROWS {
+            let row = owned
+                .diagnostics
+                .get(code)
+                .and_then(|template| template.issues.get(issue))
+                .unwrap_or_else(|| panic!("{locale} must own {code}.{issue}"));
+            assert!(
+                !row.message.trim().is_empty(),
+                "{locale} {code}.{issue} message must not be empty"
+            );
+            assert!(
+                row.help
+                    .as_deref()
+                    .is_some_and(|help| !help.trim().is_empty()),
+                "{locale} {code}.{issue} help must not be empty"
+            );
+            let diagnostic = diagnostic_with_code(code, vec![diagnostic_arg("issue", issue)]);
+            let rendered = installed_pack(locale)
+                .render_diagnostic_text(&diagnostic)
+                .unwrap_or_else(|err| panic!("{locale} {code}.{issue} template should render: {err:?}"))
+                .unwrap_or_else(|| panic!("{locale} {code} row should exist"));
+            assert!(
+                !rendered.message.contains("locale pack missing row"),
+                "{locale} {code}.{issue}: {}",
+                rendered.message
+            );
+            assert!(
+                !rendered
+                    .message
+                    .contains("locale pack template missing placeholder")
+                    && !rendered
+                        .help
+                        .as_deref()
+                        .is_some_and(|help| help.contains("locale pack template missing placeholder")),
+                "{locale} {code}.{issue} must not miss a template placeholder: {} / {:?}",
+                rendered.message,
+                rendered.help
+            );
+        }
+    }
+}
+
+/// The four PARSE001 rows for the copy-in operator, duplicate tuple element
+/// labels, named `implements` slots and imported field names (corpus coverage
+/// I3, batch 2) are owned and rendered by every installed pack, with the
+/// placeholders each template names. The absent-row budget gate counts missing
+/// rows, so it would accept a pack that deletes one of these and adds an
+/// unrelated row elsewhere; name each row here so a deletion fails by name.
+#[test]
+fn installed_packs_render_parse001_copy_duplicate_implements_import_rows() {
+    const ROWS: &[(&str, &[(&str, &str)])] = &[
+        ("copy_into_value_expected", &[("operator", "⇇")]),
+        ("duplicate_tuple_element_label", &[("label", "a")]),
+        ("implements_slot_requires_name", &[]),
+        ("import_field_name", &[("expected", "identifier")]),
+    ];
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let owned = owned_pack(locale);
+        for &(issue, args) in ROWS {
+            let row = owned
+                .diagnostics
+                .get("PARSE001")
+                .and_then(|template| template.issues.get(issue))
+                .unwrap_or_else(|| panic!("{locale} must own PARSE001.{issue}"));
+            assert!(
+                !row.message.trim().is_empty(),
+                "{locale} PARSE001.{issue} message must not be empty"
+            );
+            assert!(
+                row.help
+                    .as_deref()
+                    .is_some_and(|help| !help.trim().is_empty()),
+                "{locale} PARSE001.{issue} help must not be empty"
+            );
+            let mut diagnostic_args = vec![diagnostic_arg("issue", issue)];
+            diagnostic_args.extend(
+                args.iter()
+                    .map(|(name, value)| diagnostic_arg(name, *value)),
+            );
+            let diagnostic = parse_diagnostic(ParseErrorKind::Expected, diagnostic_args);
+            let rendered = installed_pack(locale)
+                .render_diagnostic_text(&diagnostic)
+                .unwrap_or_else(|err| panic!("{locale} PARSE001.{issue} template should render: {err:?}"))
+                .unwrap_or_else(|| panic!("{locale} PARSE001 row should exist"));
+            assert!(
+                !rendered.message.contains("locale pack missing row"),
+                "{locale} PARSE001.{issue}: {}",
+                rendered.message
+            );
+            assert!(
+                !rendered
+                    .message
+                    .contains("locale pack template missing placeholder")
+                    && !rendered
+                        .help
+                        .as_deref()
+                        .is_some_and(|help| help.contains("locale pack template missing placeholder")),
+                "{locale} PARSE001.{issue} must not miss a template placeholder: {} / {:?}",
+                rendered.message,
+                rendered.help
+            );
+        }
+    }
+}
+
 /// Assert every installed pack owns `code.issue` and renders it with its own
 /// spellings of the named keyword identities.
 fn assert_every_installed_pack_renders_issue(kind: ParseErrorKind, code: &str, issue: &str, keywords: &[&str]) {

@@ -296,6 +296,14 @@ help = "ตรวจตัวคั่นตัวเลขและคำนำ
 message = "จำนวนเต็มไม่ถูกต้อง"
 help = "ตรวจตัวคั่นตัวเลขและคำนำหน้าฐาน"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "ลิเทอรัลทศนิยมมีขนาดใหญ่เกินไป; มันล้นเป็นอนันต์"
+help = "เขียนขนาดที่เล็กลง หรือปรับสเกลหน่วย"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "ลิเทอรัลทศนิยมมีขนาดเล็กเกินไป; มันล้นลงเป็นศูนย์"
+help = "เขียนขนาดที่ใหญ่ขึ้น หรือปรับสเกลหน่วย"
+
 [diagnostics.LEX003]
 message = "ลำดับ escape ไม่ถูกต้อง"
 help = "ใช้ลำดับ escape ที่รองรับ หรือ escape backslash"
@@ -347,6 +355,22 @@ help = "แก้ข้อผิดพลาดของ lexer ก่อน ก�
 [diagnostics.PARSE001]
 message = "ต้องมีโทเค็น"
 help = "ตรวจให้แน่ใจว่ามีโทเค็นที่คาดไว้ในตำแหน่งนี้"
+
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "ต้องมีค่าหลังตัวดำเนินการคัดลอกเข้า `{operator}`"
+help = "เขียนนิพจน์ต้นทางหลัง `⇇`"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "ป้ายกำกับสมาชิกทูเพิล `{label}` ถูกใช้มากกว่าหนึ่งครั้ง"
+help = "ตั้งป้ายกำกับที่แตกต่างกันให้แต่ละสมาชิก หรือลบป้ายกำกับออก"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "ช่อง implements ต้องระบุชื่อสัญญา; `_` ไม่ใช่การประกาศความสอดคล้อง"
+help = "เขียนชื่อสัญญาในประโยค implements"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "ฟิลด์นำเข้าต้องเป็นตัวระบุ"
+help = "เขียนชื่อธรรมดาสำหรับฟิลด์ที่นำเข้า"
 
 [diagnostics.PARSE001.issues.annotation_name]
 message = "ต้องมีชื่อ annotation"
@@ -1051,6 +1075,10 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "ไม่มีคำสั่งหรือรายการที่ผ่านการ lowering ให้ผูกกับความคิดเห็นนี้"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "ฟังก์ชัน `@ conversion` ต้องรับพารามิเตอร์หนึ่งตัวและประกาศชนิดผลลัพธ์หนึ่งชนิดเท่านั้น"
+help = "เขียน `functio name(Source) → Destination` สำหรับคู่การแปลง"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia ต้องมีพารามิเตอร์ชนิดหนึ่งรายการ"

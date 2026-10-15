@@ -63,11 +63,12 @@ fn every_declared_term_resolves() {
 #[test]
 fn all_entries_validate() {
     let registry = disk_registry();
-    // 216 → 210 → 211 → 210: the registry follows the canonical term count
+    // 216 → 210 → 211 → 210 → 211: the registry follows the canonical term count
     // (197) plus the legacy redirects (13). The `nulla` redirect retired with
     // D23.4 (8c5cc3de4), so 197 + 13 = 210 (mg5a folds inter+intra into one
-    // term; need adds `guillemet`); see reference_test for history.
-    assert_eq!(registry.entries().len(), 210);
+    // term; need adds `guillemet`); 211 = 198 + 13 (need
+    // adds trapped); see reference_test for history.
+    assert_eq!(registry.entries().len(), 211);
 
     for entry in registry.entries() {
         assert!(!entry.term.is_empty());

@@ -296,6 +296,14 @@ help = "تحقق من فواصل الأرقام وبادئات الأساس"
 message = "عدد صحيح غير صالح"
 help = "تحقق من فواصل الأرقام وبادئات الأساس"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "حرف عشري كبير جدًا؛ فهو يتجاوز الحد إلى ما لا نهاية"
+help = "اكتب مقدارًا أصغر، أو قسّم الوحدة"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "حرف عشري صغير جدًا؛ فهو ينخفض دون الحد إلى الصفر"
+help = "اكتب مقدارًا أكبر، أو قسّم الوحدة"
+
 [diagnostics.LEX003]
 message = "تسلسل escape غير صالح"
 help = "استخدم تسلسل escape مدعوما أو اهرب backslash"
@@ -347,6 +355,22 @@ help = "أصلح خطأ المحلل المعجمي أولا؛ يستمر الت
 [diagnostics.PARSE001]
 message = "مطلوب{?expected| |}"
 help = "أضف{?expected| |} في هذا الموضع"
+
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "مطلوب قيمة بعد عامل النسخ الداخلي `{operator}`"
+help = "اكتب تعبير المصدر بعد `⇇`"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "تسمية عنصر الصف `{label}` مستخدمة أكثر من مرة"
+help = "أعطِ كل عنصر تسمية مختلفة، أو احذف التسميات"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "يجب أن يسمّي فتحة implements عقدًا؛ `_` ليس إعلان مطابقة"
+help = "اكتب اسم العقد في جملة implements"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "يجب أن يكون حقل الاستيراد معرّفًا"
+help = "اكتب اسمًا بسيطًا للحقل المستورد"
 
 [diagnostics.PARSE001.issues.annotation_name]
 message = "مطلوب اسم تعليمة"
@@ -1039,6 +1063,10 @@ help = "أصلح بنية AST للتخفيض"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "لا يوجد تصريح أو عنصر مخفَّض لإرفاق التعليق به"
 help = "أصلح بنية AST للتخفيض"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "يجب أن تأخذ دالة `@ conversion` معاملاً واحدًا بالضبط وأن تُعلن نوع إرجاع واحدًا بالضبط"
+help = "اكتب `functio name(Source) → Destination` لزوج التحويل"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "{copia} يتطلب معامل نوع واحدا"

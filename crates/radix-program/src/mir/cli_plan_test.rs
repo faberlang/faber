@@ -296,3 +296,32 @@ fn greet() args args {
     });
     assert_eq!(lines, vec!["Ian".to_owned()]);
 }
+
+#[test]
+fn package_mir_cli_entry_and_command_sharing_a_binding_name_keep_their_own_fields() {
+    let main = r#"
+@ cli "tool"
+@ option verbose long "verbose" type bool global
+main args args {
+}
+
+@ command "greet"
+@ operand string nomen
+fn greet() args args {
+  print args.verbose
+  print args.nomen
+}
+"#;
+    let lines = run_cli_package(
+        "cli-shared-args-binding",
+        &[("main.fab", main)],
+        &["--verbose", "greet", "Ian"],
+    )
+    .unwrap_or_else(|diagnostics| {
+        panic!(
+            "entry and command sharing the `args` binding must keep their own record fields, got {:?}",
+            diagnostic_identities(&diagnostics)
+        )
+    });
+    assert_eq!(lines, vec!["true".to_owned(), "Ian".to_owned()]);
+}

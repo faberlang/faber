@@ -3785,11 +3785,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor sum_axis arity"));
         }
         // Partial sums are exact; only the finished result element is stored
-        // under its type's slot policy (ruling 19).
-        let width = NumericWidth::I64;
+        // under its type's slot policy (ruling 19). The element width picks
+        // the carrier of an exact finished cell before that one store.
         let element = self
             .tensor_element_type(return_ty)
             .unwrap_or_else(|| return_ty.semantic_id());
+        let element_width = effective_width(self.types, element).unwrap_or(NumericWidth::I64);
         let axis = match &args[1] {
             MirOperand::Constant(MirConstant::Int(i)) => *i,
             other => {
@@ -3823,16 +3824,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
         if rank == 1 {
             // Sum over the only axis → scalar.
-            let mut sum = Value::Float(0.0);
-            let mut first = true;
-            for item in &values {
-                if first {
-                    sum = item.clone();
-                    first = false;
-                } else {
-                    sum = numeric_add(&sum, item, width, span)?;
-                }
-            }
+            let cell: Vec<&Value> = values.iter().collect();
+            let sum = sum_axis_cell(&cell, element_width, span)?;
             return self.store_tensor_element(element, sum, span);
         }
         // rank == 2
@@ -3840,18 +3833,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let cols = shape[1] as usize;
         if axis == 0 {
             // Sum across rows → result has shape [cols].
-            let mut result = vec![Value::Float(0.0); cols];
-            for (ci, slot) in result.iter_mut().enumerate() {
-                let mut first = true;
-                for ri in 0..rows {
-                    let val = &values[ri * cols + ci];
-                    if first {
-                        *slot = val.clone();
-                        first = false;
-                    } else {
-                        *slot = numeric_add(slot, val, width, span)?;
-                    }
-                }
+            let mut result = Vec::with_capacity(cols);
+            for ci in 0..cols {
+                let cell: Vec<&Value> = (0..rows).map(|ri| &values[ri * cols + ci]).collect();
+                result.push(sum_axis_cell(&cell, element_width, span)?);
             }
             let result = self.store_tensor_elements(element, result, span)?;
             tensor_value_typed(self.types, result, Some(element), vec![cols as i64], span)
@@ -3859,18 +3844,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             // axis == 1 (last axis) — sum across columns → result has shape [rows].
             let mut result = Vec::with_capacity(rows);
             for ri in 0..rows {
-                let mut first = true;
-                let mut sum = Value::Float(0.0);
-                for ci in 0..cols {
-                    let val = &values[ri * cols + ci];
-                    if first {
-                        sum = val.clone();
-                        first = false;
-                    } else {
-                        sum = numeric_add(&sum, val, width, span)?;
-                    }
-                }
-                result.push(sum);
+                let cell: Vec<&Value> = values[ri * cols..(ri + 1) * cols].iter().collect();
+                result.push(sum_axis_cell(&cell, element_width, span)?);
             }
             let result = self.store_tensor_elements(element, result, span)?;
             tensor_value_typed(self.types, result, Some(element), vec![rows as i64], span)
@@ -6655,6 +6630,41 @@ fn numeric_add(
         super::value::uint_width_checked_add,
         |a, b| a + b,
     )
+}
+
+/// One `tensor_sum_axis` output cell. Integer elements fold exact in the
+/// ether (ruling 17): every partial is held in `i128` and checked against
+/// the single 64-bit range `EXACT_MIN..=EXACT_MAX` at every step, so a
+/// transient excursion outside the element width does not trap; only the
+/// finished cell reaches the caller's element-width store. Any non-integer
+/// element keeps the historical width-checked `numeric_add` fold.
+fn sum_axis_cell(values: &[&Value], width: NumericWidth, span: Span) -> Result<Value, RunnerError> {
+    let overflow = || RunnerError::internal(span, "numerus overflow");
+    let ints: Option<Vec<_>> = values
+        .iter()
+        .map(|value| super::exact_int::int_value(value))
+        .collect();
+    if let Some(ints) = ints {
+        let total = ints.into_iter().try_fold(0_i128, |total, item| {
+            let next = total.checked_add(item).ok_or_else(overflow)?;
+            if !(super::exact_int::EXACT_MIN..=super::exact_int::EXACT_MAX).contains(&next) {
+                return Err(overflow());
+            }
+            Ok(next)
+        })?;
+        return super::exact_int::exact_carrier(total, width).ok_or_else(overflow);
+    }
+    let mut sum = Value::Float(0.0);
+    let mut first = true;
+    for item in values {
+        if first {
+            sum = (*item).clone();
+            first = false;
+        } else {
+            sum = numeric_add(&sum, item, NumericWidth::I64, span)?;
+        }
+    }
+    Ok(sum)
 }
 
 fn numeric_sub(

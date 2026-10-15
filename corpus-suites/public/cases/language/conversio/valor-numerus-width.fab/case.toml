@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/valor-numerus-width.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/valor-numerus-width.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
