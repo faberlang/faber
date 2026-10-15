@@ -2008,6 +2008,52 @@ impl FunctionLower<'_, '_> {
                     Rep::Text,
                 )
             }
+            (MirCollectionOp::Sum, Rep::List) => {
+                let element = self.element_type(self.operand_type(receiver)?)?;
+                match rep_of(self.state.input.types, element)? {
+                    Rep::Int => (self.call_runtime(&abi::LIST_SUM_I64, &[handle])?, Rep::Int),
+                    Rep::Float => (
+                        self.call_runtime(&abi::LIST_SUM_F64, &[handle])?,
+                        Rep::Float,
+                    ),
+                    _ => return Err(Decline::new("sum of a non-number list")),
+                }
+            }
+            (MirCollectionOp::Compare, Rep::Int | Rep::Float | Rep::Text) => {
+                let [_, other] = args else {
+                    return Err(Decline::new("compare arity"));
+                };
+                let (other, other_rep) = self.scalar(other)?;
+                if other_rep != rep {
+                    return Err(Decline::new("compare operand representation"));
+                }
+                let ordering = match rep {
+                    Rep::Text => self
+                        .call_runtime(&abi::TEXT_CMP, &[handle, other])?
+                        .ok_or_else(|| Decline::new("compare result"))?,
+                    Rep::Int => {
+                        let less = self
+                            .builder
+                            .ins()
+                            .icmp(IntCC::SignedLessThan, handle, other);
+                        let more = self
+                            .builder
+                            .ins()
+                            .icmp(IntCC::SignedGreaterThan, handle, other);
+                        let less = self.builder.ins().uextend(types::I64, less);
+                        let more = self.builder.ins().uextend(types::I64, more);
+                        self.builder.ins().isub(more, less)
+                    }
+                    _ => {
+                        let less = self.builder.ins().fcmp(FloatCC::LessThan, handle, other);
+                        let more = self.builder.ins().fcmp(FloatCC::GreaterThan, handle, other);
+                        let less = self.builder.ins().uextend(types::I64, less);
+                        let more = self.builder.ins().uextend(types::I64, more);
+                        self.builder.ins().isub(more, less)
+                    }
+                };
+                (Some(ordering), Rep::Int)
+            }
             (MirCollectionOp::SortByKeys, Rep::List) => {
                 let [_, keys] = args else {
                     return Err(Decline::new("sort by keys arity"));

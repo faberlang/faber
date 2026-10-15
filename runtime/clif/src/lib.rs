@@ -1263,6 +1263,37 @@ pub unsafe extern "C" fn __faber_clif_v1_text_replace(
     text_new(text.replace(&*from, &to).as_bytes())
 }
 
+/// Checked sum of an integer list; an overflow ends the run.
+///
+/// # Safety
+///
+/// `list` is a live runtime list of integers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_sum_i64(list: *const List) -> i64 {
+    let mut total: i64 = 0;
+    for &(_, bits) in &unsafe { list_ref(list) }.items {
+        match total.checked_add(bits) {
+            Some(next) => total = next,
+            None => unsafe { __faber_clif_v1_trap(c"numerus overflow".as_ptr().cast(), 16) },
+        }
+    }
+    total
+}
+
+/// Sum of a float list.
+///
+/// # Safety
+///
+/// `list` is a live runtime list of floats.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_sum_f64(list: *const List) -> f64 {
+    unsafe { list_ref(list) }
+        .items
+        .iter()
+        .map(|&(_, bits)| f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes())))
+        .sum()
+}
+
 /// Abort with a text message, the runner's `abort: <message>` (D5).
 ///
 /// # Safety

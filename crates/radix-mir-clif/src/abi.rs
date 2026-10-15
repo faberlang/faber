@@ -178,6 +178,18 @@ pub const TEXT_REPLACE: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, Ptr, Ptr],
     ret: Some(Ptr),
 };
+/// Checked sum of an integer list.
+pub const LIST_SUM_I64: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_sum_i64",
+    params: &[Ptr],
+    ret: Some(I64),
+};
+/// Sum of a float list.
+pub const LIST_SUM_F64: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_sum_f64",
+    params: &[Ptr],
+    ret: Some(F64),
+};
 /// Key membership.
 pub const MAP_HAS: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_map_has",
@@ -482,6 +494,8 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     MAP_GET,
     MAP_GET_OPT,
     LIST_GET_OPT,
+    LIST_SUM_I64,
+    LIST_SUM_F64,
     TEXT_MAP,
     TEXT_TEST,
     TEXT_SPLIT,
