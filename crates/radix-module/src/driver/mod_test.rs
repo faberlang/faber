@@ -562,6 +562,36 @@ fn compile_rust_success_emits_output() {
     assert!(output.code.contains("println!"));
 }
 
+#[cfg(feature = "hir-rust")]
+#[test]
+fn en_cli_program_emits_english_display_tokens() {
+    let session = test_session(Target::HirRust);
+    let source = r#"+++
+locale = "en"
++++
+@ cli "tool"
+main args args {
+  const bool b ← true
+  print b
+  const int ∪ none o ← null
+  print o
+}
+"#;
+    let result = compile(&session, "cli.fab", source, ModuleCompileRequest::default());
+
+    assert!(result.success(), "en CLI must compile: {:?}", result.diagnostics);
+    let code = rust_output(result).code;
+    assert!(code.contains("fn parse_cli_args_or_exit()"), "{code}");
+    assert!(code.contains("faber::display::bivalens_with("), "{code}");
+    assert!(code.contains("faber::display::option_with("), "{code}");
+    assert!(
+        code.contains("true_: \"true\", false_: \"false\", none: \"none\", tuple: \"tuple\""),
+        "{code}"
+    );
+    assert!(!code.contains("faber::display::bivalens("), "{code}");
+    assert!(!code.contains("iuncta"), "{code}");
+}
+
 #[test]
 #[cfg(feature = "hir-faber")]
 fn compile_faber_success_emits_output() {

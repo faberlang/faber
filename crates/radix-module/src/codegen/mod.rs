@@ -1217,6 +1217,8 @@ pub fn generate_rust_cli(
     #[cfg_attr(not(feature = "hir-rust"), allow(unused_variables))] types: &TypeTable,
     #[cfg_attr(not(feature = "hir-rust"), allow(unused_variables))] interner: &Interner,
     #[cfg_attr(not(feature = "hir-rust"), allow(unused_variables))] cli_program: &crate::cli::CliProgram,
+    #[cfg_attr(not(feature = "hir-rust"), allow(unused_variables))]
+    display_tokens: &radix_codegen_shared::names::DisplayTokens,
 ) -> Result<crate::RustOutput, CodegenError> {
     #[cfg(not(feature = "hir-rust"))]
     {
@@ -1232,7 +1234,9 @@ pub fn generate_rust_cli(
         let hir = hir.without_unavailable_declarations(interner);
         let hir = &*hir;
         let ir = rust::to_cli_ir(cli_program);
-        let output = rust::RustCodegen::new_with_types(hir, interner, types).generate_cli(hir, types, &ir)?;
+        let mut codegen = rust::RustCodegen::new_with_types(hir, interner, types);
+        codegen.set_display_tokens(display_tokens.clone());
+        let output = codegen.generate_cli(hir, types, &ir)?;
         Ok(crate::RustOutput { code: output.code })
     }
 }

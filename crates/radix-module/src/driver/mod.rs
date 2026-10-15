@@ -401,7 +401,13 @@ fn compile_cli_program(
             let Some(cli_program) = analysis.cli_program.as_ref() else {
                 return missing_cli_program(analysis, name);
             };
-            match codegen::generate_rust_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
+            match codegen::generate_rust_cli(
+                &analysis.hir,
+                &analysis.types,
+                &analysis.interner,
+                cli_program,
+                &analysis.display_tokens,
+            ) {
                 Ok(output) => {
                     CompileResult { output: Some(crate::Output::Rust(output)), diagnostics: analysis.diagnostics }
                 }
