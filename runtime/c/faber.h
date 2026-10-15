@@ -1549,6 +1549,133 @@ FABER_LIST_OPS(text, faber_text, FABER_LIST_EQ_TEXT, FABER_LIST_LT_TEXT)
 FABER_LIST_OPS(bool, bool, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64)
 
+/* ------------------------------------------------------------------------ */
+/* Elementwise list operators                                               */
+/* ------------------------------------------------------------------------ */
+
+/* The aggregate-operator rulings lift `+ - * /` and the per-element
+ * comparisons over a list (scalar broadcast on either side), pairing two
+ * lists by position and requiring equal lengths. The runner's element
+ * arithmetic is exact until the element store, so the integer pairs go
+ * through the exact helpers and `faber_store_i64`. Mirrors the MIR runner's
+ * `array_lift` / `array_elementwise`. */
+
+#define FABER_LIST_GT_SCALAR(a, b) ((a) > (b))
+#define FABER_LIST_LE_SCALAR(a, b) ((a) <= (b))
+#define FABER_LIST_GE_SCALAR(a, b) ((a) >= (b))
+#define FABER_LIST_NE_SCALAR(a, b) ((a) != (b))
+#define FABER_LIST_GT_F64(a, b) (faber_f64_total_key(a) > faber_f64_total_key(b))
+#define FABER_LIST_LE_F64(a, b) (faber_f64_total_key(a) <= faber_f64_total_key(b))
+#define FABER_LIST_GE_F64(a, b) (faber_f64_total_key(a) >= faber_f64_total_key(b))
+#define FABER_LIST_EQ_F64(a, b) ((a) == (b))
+#define FABER_LIST_NE_F64(a, b) ((a) != (b))
+
+static inline int64_t faber_i64_lift_add(int64_t x, int64_t y) {
+    return faber_store_i64(faber_add(x, y), "element");
+}
+
+static inline int64_t faber_i64_lift_sub(int64_t x, int64_t y) {
+    return faber_store_i64(faber_sub(x, y), "element");
+}
+
+static inline int64_t faber_i64_lift_mul(int64_t x, int64_t y) {
+    return faber_store_i64(faber_mul(x, y), "element");
+}
+
+static inline int64_t faber_i64_lift_div(int64_t x, int64_t y) {
+    return faber_store_i64(faber_div(x, y), "element");
+}
+
+static inline double faber_f64_lift_add(double x, double y) { return x + y; }
+static inline double faber_f64_lift_sub(double x, double y) { return x - y; }
+static inline double faber_f64_lift_mul(double x, double y) { return x * y; }
+static inline double faber_f64_lift_div(double x, double y) { return x / y; }
+
+/* One lift family: `_pair` over two equal-length lists, `_left` and `_right`
+ * for a scalar on the right or left. `OP` is the element operation. */
+#define FABER_LIST_LIFT(FN, INTYPE, INLIST, OUTTYPE, OUTLIST, OP)                        \
+    static inline OUTLIST *faber_list_##FN##_lift_pair(faber_arena *arena,               \
+                                                       const INLIST *a,                  \
+                                                       const INLIST *b) {                \
+        int64_t at;                                                                      \
+        OUTLIST *out;                                                                    \
+        if (a->len != b->len) {                                                          \
+            faber_trap("lista elementwise length mismatch");                            \
+        }                                                                                \
+        out = OUTLIST##_new(arena, a->len);                                              \
+        for (at = 0; at < a->len; at++) {                                                \
+            out->items[at] = (OUTTYPE)OP(a->items[at], b->items[at]);                    \
+        }                                                                                \
+        out->len = a->len;                                                               \
+        return out;                                                                      \
+    }                                                                                    \
+                                                                                         \
+    static inline OUTLIST *faber_list_##FN##_lift_left(faber_arena *arena,               \
+                                                       const INLIST *a, INTYPE y) {      \
+        int64_t at;                                                                      \
+        OUTLIST *out = OUTLIST##_new(arena, a->len);                                     \
+        for (at = 0; at < a->len; at++) {                                                \
+            out->items[at] = (OUTTYPE)OP(a->items[at], y);                               \
+        }                                                                                \
+        out->len = a->len;                                                               \
+        return out;                                                                      \
+    }                                                                                    \
+                                                                                         \
+    static inline OUTLIST *faber_list_##FN##_lift_right(faber_arena *arena,              \
+                                                        INTYPE x, const INLIST *a) {     \
+        int64_t at;                                                                      \
+        OUTLIST *out = OUTLIST##_new(arena, a->len);                                     \
+        for (at = 0; at < a->len; at++) {                                                \
+            out->items[at] = (OUTTYPE)OP(x, a->items[at]);                               \
+        }                                                                                \
+        out->len = a->len;                                                               \
+        return out;                                                                      \
+    }
+
+FABER_LIST_LIFT(i64_add, int64_t, faber_list_i64, int64_t, faber_list_i64, faber_i64_lift_add)
+FABER_LIST_LIFT(i64_sub, int64_t, faber_list_i64, int64_t, faber_list_i64, faber_i64_lift_sub)
+FABER_LIST_LIFT(i64_mul, int64_t, faber_list_i64, int64_t, faber_list_i64, faber_i64_lift_mul)
+FABER_LIST_LIFT(i64_div, int64_t, faber_list_i64, int64_t, faber_list_i64, faber_i64_lift_div)
+FABER_LIST_LIFT(f64_add, double, faber_list_f64, double, faber_list_f64, faber_f64_lift_add)
+FABER_LIST_LIFT(f64_sub, double, faber_list_f64, double, faber_list_f64, faber_f64_lift_sub)
+FABER_LIST_LIFT(f64_mul, double, faber_list_f64, double, faber_list_f64, faber_f64_lift_mul)
+FABER_LIST_LIFT(f64_div, double, faber_list_f64, double, faber_list_f64, faber_f64_lift_div)
+
+FABER_LIST_LIFT(i64_lt, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_LT_SCALAR)
+FABER_LIST_LIFT(i64_gt, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_GT_SCALAR)
+FABER_LIST_LIFT(i64_le, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_LE_SCALAR)
+FABER_LIST_LIFT(i64_ge, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_GE_SCALAR)
+FABER_LIST_LIFT(i64_eq, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_EQ_SCALAR)
+FABER_LIST_LIFT(i64_ne, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_NE_SCALAR)
+FABER_LIST_LIFT(f64_lt, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_LT_F64)
+FABER_LIST_LIFT(f64_gt, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_GT_F64)
+FABER_LIST_LIFT(f64_le, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_LE_F64)
+FABER_LIST_LIFT(f64_ge, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_GE_F64)
+FABER_LIST_LIFT(f64_eq, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_EQ_F64)
+FABER_LIST_LIFT(f64_ne, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_NE_F64)
+
+/* Whole-list equality (`≡` / `≢`): a length check then per-element equality,
+ * one `bool` (the lifted comparisons are the ones with a list result). */
+#define FABER_LIST_EQUAL(FN, ELEM, EQ)                                                    \
+    static inline bool faber_list_##FN##_equal(const faber_list_##FN *a,                  \
+                                                const faber_list_##FN *b) {               \
+        int64_t at;                                                                      \
+        if (a->len != b->len) {                                                          \
+            return false;                                                                \
+        }                                                                                \
+        for (at = 0; at < a->len; at++) {                                                \
+            if (!(EQ(a->items[at], b->items[at]))) {                                     \
+                return false;                                                            \
+            }                                                                            \
+        }                                                                                \
+        return true;                                                                     \
+    }
+
+FABER_LIST_EQUAL(i64, int64_t, FABER_LIST_EQ_SCALAR)
+FABER_LIST_EQUAL(text, faber_text, FABER_LIST_EQ_TEXT)
+FABER_LIST_EQUAL(bool, bool, FABER_LIST_EQ_SCALAR)
+FABER_LIST_EQUAL(f64, double, FABER_LIST_EQ_F64)
+
 /* Integer lists: the exact sum, and the first index of the extreme. */
 static inline faber_i128 faber_list_i64_sum(const faber_list_i64 *list) {
     faber_i128 total = 0;

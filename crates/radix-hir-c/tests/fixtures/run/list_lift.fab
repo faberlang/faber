@@ -1,0 +1,29 @@
++++
+locale = "en"
++++
+# The lifted list operators: `+ -` between two equal-length numeric lists,
+# `+ - * /` between a list and a scalar (either side), the per-element
+# comparisons (a list of bool), and whole-list `≡`.
+
+main {
+    const list<int> xs ← [10, 20, 30]
+    const list<int> ys ← [1, 2, 3]
+    print xs + ys
+    print xs - ys
+    print 2 * xs
+    print xs * 2
+    print xs / 10
+    print xs ≤ 20
+    print 20 ≤ xs
+    print xs ≺ ys
+    print xs ≥ ys
+    print xs ≅ xs
+    print xs ≡ ys
+    print xs ≡ xs
+    const list<float> fs ← [1.5, 2.5]
+    const list<float> gs ← [0.5, 0.5]
+    print fs + gs
+    print fs * 2.0
+    print fs ≻ gs
+    print fs ≡ fs
+}

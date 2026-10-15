@@ -57,6 +57,9 @@ pub(crate) enum Helper {
     Decimal,
     /// `faber_dec_fmt`: a decimal's text in the arena.
     DecimalText,
+    /// A list elementwise operator (`faber_list_<e>_<op>_lift_pair`, …),
+    /// which allocates its result list.
+    ListLift,
 }
 
 /// One operation of a list family (`faber_list_<elem>_<op>`).
@@ -83,6 +86,7 @@ impl Helper {
             | Helper::Quoted
             | Helper::FloatText
             | Helper::DecimalText
+            | Helper::ListLift
             | Helper::TextAlloc
             | Helper::List(_, ListOp::New | ListOp::Of | ListOp::Push | ListOp::Show) => true,
             Helper::Types

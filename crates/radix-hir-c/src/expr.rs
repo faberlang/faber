@@ -216,7 +216,7 @@ impl Emitter<'_> {
                     _ => self.literal(literal),
                 }
             }
-            HirExpressionKind::Binary(op, left, right) => self.binary(*op, left, right),
+            HirExpressionKind::Binary(op, left, right) => self.binary(*op, left, right, expr.ty),
             HirExpressionKind::Unary(op, operand) => self.unary(*op, operand),
             HirExpressionKind::Conversio {
                 source,
@@ -750,6 +750,105 @@ impl Emitter<'_> {
         Ok(Operand::new(wrap(&prelude, &call), Value::Decimal).with_effect(effect))
     }
 
+    /// The element kind of a list-typed expression, if it is one.
+    fn list_element(&self, ty: Option<radix_types::TypeId>) -> Option<Elem> {
+        match classify(self.types, ty?).ok()? {
+            Ty::List(elem) => Some(elem),
+            _ => None,
+        }
+    }
+
+    /// The lifted list operators: `xs + ys`, `2 * xs`, `xs / 10`, the
+    /// per-element comparisons `xs ≺ ys` / `xs ≤ 3`, and whole-list `≡`.
+    /// Called only when at least one operand is a list.
+    fn list_binary(
+        &mut self,
+        op: HirBinOp,
+        left: &HirExpression,
+        right: &HirExpression,
+        ty: Option<radix_types::TypeId>,
+        l: Operand,
+        r: Operand,
+    ) -> Result<Operand, CodegenError> {
+        let left_elem = self.list_element(left.ty);
+        let right_elem = self.list_element(right.ty);
+        let Some(elem) = left_elem.or(right_elem) else {
+            return Err(unsupported("elementwise operator without a list operand"));
+        };
+        let suffix = match elem {
+            Elem::Int => "i64",
+            Elem::Float => "f64",
+            _ => return Err(unsupported("elementwise operator on a non-numeric list")),
+        };
+        let result_is_list = ty.is_some_and(|ty| {
+            classify(self.types, ty).is_ok_and(|class| matches!(class, Ty::List(_)))
+        });
+        // Whole-list equality is one `bool` over the element equality; the
+        // lifted comparison is a list of `bool`.
+        let whole_equality = matches!(
+            op,
+            HirBinOp::Eq
+                | HirBinOp::StrictEq
+                | HirBinOp::NotEq
+                | HirBinOp::StrictNotEq
+                | HirBinOp::ApproxEq
+                | HirBinOp::ApproxNotEq
+        ) && !result_is_list
+            && left_elem.is_some()
+            && right_elem.is_some();
+        if whole_equality {
+            self.support.need(Helper::ListLift);
+            let effect = l.effect || r.effect;
+            let mut operands = [l, r];
+            let prelude = self.sequence(&mut operands);
+            let [l, r] = operands;
+            let call = format!("faber_list_{suffix}_equal({}, {})", l.text, r.text);
+            let negate = matches!(op, HirBinOp::NotEq | HirBinOp::StrictNotEq | HirBinOp::ApproxNotEq);
+            let text = if negate {
+                format!("(!{call})")
+            } else {
+                call
+            };
+            return Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect));
+        }
+        let op_name = match op {
+            HirBinOp::Add => "add",
+            HirBinOp::Sub => "sub",
+            HirBinOp::Mul => "mul",
+            HirBinOp::Div => "div",
+            HirBinOp::Lt => "lt",
+            HirBinOp::Gt => "gt",
+            HirBinOp::LtEq => "le",
+            HirBinOp::GtEq => "ge",
+            HirBinOp::ApproxEq => "eq",
+            HirBinOp::ApproxNotEq => "ne",
+            _ => return Err(unsupported(binary_name(op))),
+        };
+        let side = match (left_elem.is_some(), right_elem.is_some()) {
+            (true, true) => "pair",
+            (true, false) => "left",
+            _ => "right",
+        };
+        self.support.need(Helper::ListLift);
+        let effect = l.effect || r.effect;
+        let mut operands = [l, r];
+        let prelude = self.sequence(&mut operands);
+        let [l, r] = operands;
+        let call = format!(
+            "faber_list_{suffix}_{op_name}_lift_{side}(faber_a, {}, {})",
+            l.text, r.text
+        );
+        let value = if matches!(
+            op,
+            HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq | HirBinOp::ApproxEq | HirBinOp::ApproxNotEq
+        ) {
+            Value::List(Elem::Bool)
+        } else {
+            Value::List(elem)
+        };
+        Ok(Operand::new(wrap(&prelude, &call), value).with_effect(effect))
+    }
+
     fn path(&self, def_id: radix_hir::DefId) -> Result<Operand, CodegenError> {
         match self.locals.get(&def_id) {
             Some(local) => {
@@ -871,6 +970,7 @@ impl Emitter<'_> {
         op: HirBinOp,
         left: &HirExpression,
         right: &HirExpression,
+        ty: Option<radix_types::TypeId>,
     ) -> Result<Operand, CodegenError> {
         // `x ≡ null` and `null ≡ x` test for none like `x is none`.
         let equality = match op {
@@ -895,6 +995,9 @@ impl Emitter<'_> {
         // a float operand would make it.
         if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq) {
             return self.fuzzy(op, l, r);
+        }
+        if self.list_element(left.ty).is_some() || self.list_element(right.ty).is_some() {
+            return self.list_binary(op, left, right, ty, l, r);
         }
         if l.value == Value::Decimal || r.value == Value::Decimal {
             return self.decimal_binary(op, l, r);
