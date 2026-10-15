@@ -287,6 +287,16 @@ impl Emitter<'_> {
                 Ok(Operand::new(wrap(&prelude, &call), Value::Void).with_effect(effect))
             }
             IntrinsicMirKind::Collection(op) => self.list_query(list, elem, op, entry, args),
+            // `ordina`: the in-place counterpart of `ordinata` (`Sort`), which
+            // the catalog marks codegen-only (it has no MIR kind).
+            _ if name == "ordina" && args.is_empty() => {
+                self.support.need(Helper::List(elem, ListOp::At));
+                Ok(Operand::new(
+                    format!("faber_list_{}_sort({})", elem.suffix(), list.text),
+                    Value::Void,
+                )
+                .with_effect(true))
+            }
             _ => Err(unsupported("list method outside the subset")),
         }
     }

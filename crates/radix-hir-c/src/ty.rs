@@ -280,9 +280,10 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
 pub(crate) fn returns(types: &TypeTable, ty: TypeId) -> Result<Option<Ty>, CodegenError> {
     match types.get(ty) {
         Type::Alias(_, inner) => returns(types, *inner),
-        // `→ none` names a function that returns nothing; a use of its
-        // result as a value is rejected where it is used.
-        Type::Primitive(Primitive::Vacuum | Primitive::Nihil) => Ok(None),
+        // `→ none` names a function that returns nothing, and `→ never` one
+        // that does not return at all (its body panics or traps); a use of
+        // either result as a value is rejected where it is used.
+        Type::Primitive(Primitive::Vacuum | Primitive::Nihil | Primitive::Numquam) => Ok(None),
         _ => classify(types, ty).map(Some),
     }
 }

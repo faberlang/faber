@@ -1039,6 +1039,14 @@ static inline int64_t faber_f64_total_key(double value) {
         return out;                                                                     \
     }                                                                                   \
                                                                                         \
+    /* `ordina` sorts in place, where `ordinata` yields a new list. */                   \
+    static inline void faber_list_##NAME##_sort(faber_list_##NAME *list) {              \
+        if (list->len > 1) {                                                            \
+            qsort(list->items, (size_t)list->len, sizeof *list->items,                  \
+                  faber_list_##NAME##_compare);                                         \
+        }                                                                               \
+    }                                                                                   \
+                                                                                        \
     /* `remove_first` / `remove_last`: take an end off, false when empty. */            \
     static inline bool faber_list_##NAME##_remove_first(faber_list_##NAME *list,        \
                                                         TYPE *out) {                    \

@@ -1,0 +1,19 @@
++++
+locale = "en"
++++
+# In-place list methods: `reverse()` and `sort()` (`ordina`) mutate the list
+# object the bind already points at, where `invert()` and `sorted()` return a
+# new one.
+main {
+    var list<int> values ← [3, 1, 2]
+    values.reverse()
+    print values
+    values.sort()
+    print values
+    const list<int> fresh ← values.invert()
+    print fresh
+    print values
+    var list<string> names ← ["beta", "alpha", "gamma"]
+    names.sort()
+    print names
+}

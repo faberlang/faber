@@ -42,3 +42,9 @@ fn integer_lists_sum_exactly() {
         emitted("main {\n    const list<int> xs ← [1, 2] ∷ list<int>\n    print xs.sum()\n}");
     assert!(code.contains("faber_list_i64_sum(l_xs)"), "{code}");
 }
+
+#[test]
+fn in_place_sort_uses_the_sort_helper() {
+    let code = emitted("main {\n    var list<int> v ← [2, 1]\n    v.sort()\n    print v\n}");
+    assert!(code.contains("faber_list_i64_sort(l_v)"), "{code}");
+}
