@@ -71,6 +71,10 @@ mod lege_read_tests;
 mod vector_matrix_tests;
 
 #[cfg(test)]
+#[path = "option_chain_call_test.rs"]
+mod option_chain_call_tests;
+
+#[cfg(test)]
 #[path = "rounding_conversio_run_test.rs"]
 mod rounding_conversio_run_tests;
 

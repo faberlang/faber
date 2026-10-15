@@ -5511,8 +5511,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let index = self.eval_operand(index, span)?;
                 Self::optional_collection_index(current, &index, span)
             }
-            MirOptionChainLink::Call { .. } => {
-                Err(RunnerError::unsupported(span, "option chain call"))
+            // WHY: a nil base short-circuits above, so the callee is only
+            // invoked when the optional base held a value.
+            MirOptionChainLink::Call { callee, args } => {
+                match self.invoke_call(callee, args, span)? {
+                    CallOutcome::Ok(value) => Ok(value),
+                    CallOutcome::Err(_) => Err(RunnerError::internal(
+                        span,
+                        "uncaught alternate return from option chain call",
+                    )),
+                }
             }
         }
     }
