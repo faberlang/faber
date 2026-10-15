@@ -18,6 +18,12 @@ fn la_pack() -> crate::locale::LocalePack {
         .expect("installed la pack should load")
 }
 
+/// The built-in English (`en`) reader pack: the default user-facing surface.
+fn en_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+        .expect("installed en pack should load")
+}
+
 fn parse_program(source: &str) -> crate::parser::ParseResult {
     let result = parse(lex_with_locale_pack(source, &la_pack()));
     assert!(
@@ -34,6 +40,20 @@ fn parse_program(source: &str) -> crate::parser::ParseResult {
 
 fn analyze_source(source: &str) -> super::CliAnalysis {
     let result = parse_program(source);
+    analyze(result.program.as_ref().expect("program"), &result.interner)
+}
+
+fn analyze_en_source(source: &str) -> super::CliAnalysis {
+    let result = parse(lex_with_locale_pack(source, &en_pack()));
+    assert!(
+        result.errors.is_empty(),
+        "expected parse success, got {:?}",
+        result
+            .errors
+            .iter()
+            .map(|err| format!("{err:?}"))
+            .collect::<Vec<_>>()
+    );
     analyze(result.program.as_ref().expect("program"), &result.interner)
 }
 
@@ -130,6 +150,26 @@ incipit argumenta args {}
     assert!(matches!(program.options[1].default, Some(super::CliDefault::Bool(false))));
     assert_eq!(program.operands.len(), 1);
     assert!(program.operands[0].rest);
+}
+
+#[test]
+fn braced_operand_rest_key_is_accepted_on_the_en_surface() {
+    let analysis = analyze_en_source(
+        r#"
+@ cli { name = "tool" }
+@ operand { binding = files, type = string, rest = true, description = "Extra files" }
+main args args {
+}
+"#,
+    );
+
+    assert!(analysis.errors.is_empty(), "{:?}", messages(&analysis));
+    let program = analysis.program.expect("cli program");
+    assert_eq!(program.mode, CliMode::SingleCommand);
+    assert_eq!(program.operands.len(), 1);
+    assert!(program.operands[0].rest);
+    assert_eq!(program.operands[0].binding, "files");
+    assert_eq!(program.operands[0].ty, CliType::Textus);
 }
 
 #[test]
