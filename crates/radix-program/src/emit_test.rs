@@ -23,12 +23,22 @@ fn test_seams() -> EmissionSeams {
         analysis: test_analysis_seams(),
         #[cfg(feature = "hir-go")]
         emit_go: never_exercised_go_emission,
+        #[cfg(feature = "hir-ts")]
+        emit_ts: never_exercised_ts_emission,
     }
 }
 
 #[cfg(feature = "hir-go")]
 fn never_exercised_go_emission(_package: &AnalyzedProgram, _input: &Path) -> PackageCompileResult {
     unreachable!("go emission is a faber-side seam; radix-program tests only run the Rust path")
+}
+
+#[cfg(feature = "hir-ts")]
+fn never_exercised_ts_emission(
+    _package: &AnalyzedProgram,
+    _input: &Path,
+) -> radix_module::CompileResult {
+    unreachable!("ts emission is a faber-side seam; radix-program tests only run the Rust path")
 }
 
 /// Real Go emission seam for the single-stream merge test: one full Go file
@@ -156,11 +166,11 @@ fn answer() → int {
 }
 
 #[test]
-fn compile_package_rust_targets_plan_go_and_ts() {
+fn compile_package_rust_targets_plan_go_and_python() {
     // Target-neutral planning parity: the Rust emission entry must reject
     // non-HIR package targets through the same plan gates the dispatcher
-    // applies (plan-supported targets reach the assembly-pending diagnostic;
-    // unsupported targets are rejected).
+    // applies (unsupported targets are rejected; Go and TypeScript dispatch to
+    // product seams, while python exercises the assembly-pending branch).
     let dir = temp_dir("plan-gates");
     fs::create_dir_all(dir.join("src")).expect("create src");
     fs::write(
@@ -195,23 +205,26 @@ entry = "main.fab"
             .collect::<Vec<_>>()
     );
 
-    let pending = compile_package(
-        &Config::default().with_target(Target::HirTypeScript),
-        &dir,
-        &test_seams(),
-    );
-    assert!(
-        pending
-            .diagnostics
-            .iter()
-            .any(|diag| diag.issue() == Some("package_target_assembly_pending")),
-        "expected package_target_assembly_pending, got {:?}",
-        pending
-            .diagnostics
-            .iter()
-            .map(|diag| diag.issue())
-            .collect::<Vec<_>>()
-    );
+    #[cfg(feature = "hir-python")]
+    {
+        let pending = compile_package(
+            &Config::default().with_target(Target::HirPython),
+            &dir,
+            &test_seams(),
+        );
+        assert!(
+            pending
+                .diagnostics
+                .iter()
+                .any(|diag| diag.issue() == Some("package_target_assembly_pending")),
+            "expected package_target_assembly_pending, got {:?}",
+            pending
+                .diagnostics
+                .iter()
+                .map(|diag| diag.issue())
+                .collect::<Vec<_>>()
+        );
+    }
 }
 
 #[cfg(feature = "hir-rust")]
@@ -392,6 +405,8 @@ class Circle implements Figurable {
         analysis: test_analysis_seams(),
         #[cfg(feature = "hir-go")]
         emit_go: go_package_test_emission,
+        #[cfg(feature = "hir-ts")]
+        emit_ts: never_exercised_ts_emission,
     };
     let result = compile_package(
         &Config::default().with_target(Target::HirGo),

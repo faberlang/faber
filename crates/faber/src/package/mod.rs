@@ -69,6 +69,8 @@ mod rust_runtime_dependency;
 pub mod target_gate;
 mod temp_dir;
 mod test_route;
+#[cfg(feature = "hir-ts")]
+mod ts_package;
 
 #[cfg(feature = "hir-rust")]
 #[cfg(test)]
@@ -555,6 +557,8 @@ pub fn faber_emission_seams() -> radix::program::emit::EmissionSeams {
         analysis: faber_analysis_seams(),
         #[cfg(feature = "hir-go")]
         emit_go: go_build::generate_package_go_result,
+        #[cfg(feature = "hir-ts")]
+        emit_ts: ts_package::generate_package_ts_result,
     }
 }
 
