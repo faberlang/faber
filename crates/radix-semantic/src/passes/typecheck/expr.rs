@@ -1368,8 +1368,20 @@ impl TypeChecker<'_> {
         iter: &mut Box<HirExpression>,
         block: &mut HirBlock,
     ) -> TypeId {
+        // An `ordo` name in `itera ex` source position names the enum's own
+        // member series, which the ordinary expression checker
+        // rejects as a type-kind name. Use the enum type as the source type;
+        // every other expression still checks normally.
+        let enum_source_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
+            None
+        } else {
+            self.enum_iteration_source_type(iter)
+        };
         let iter_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
             self.check_expr_allowing_direct_intervallum_step(iter)
+        } else if let Some(ty) = enum_source_ty {
+            iter.ty = Some(ty);
+            ty
         } else {
             self.check_expr(iter)
         };
@@ -1460,6 +1472,22 @@ impl TypeChecker<'_> {
         self.check_loop_block_over(std::iter::once(&**iter), block);
         self.pop_scope();
         self.vacuum_type()
+    }
+
+    /// Enum type of an `itera ex` / `itera de` source that is exactly a bare
+    /// `ordo` name, or `None` for every other expression.
+    ///
+    /// `Color` in `itera ex Color` names the enum's member series, not a
+    /// value; the ordinary expression checker would reject the type-kind name
+    /// before element dispatch could type the members. The caller uses this to
+    /// keep the source type and let [`TypeChecker::itera_element_type`] decide
+    /// the mode (members for `ex`, refusal for `de`).
+    fn enum_iteration_source_type(&mut self, iter: &HirExpression) -> Option<TypeId> {
+        let HirExpressionKind::Path(def_id) = &iter.kind else {
+            return None;
+        };
+        let symbol = self.resolver.get_symbol(*def_id)?;
+        (symbol.kind == crate::SymbolKind::Enum).then(|| self.types.intern(Type::Enum(*def_id)))
     }
 
     /// Unify a synthesized expression type with the expected type.

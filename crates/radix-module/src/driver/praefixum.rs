@@ -63,9 +63,9 @@ mod evaluation {
         ImportedCallee, ImportedEffects, ImportedReference, PraefixumSite, imported_references,
     };
     use crate::semantic::{self, SemanticError, SemanticErrorKind};
-    use radix_hir::visit::{HirVisitorMut, walk_local_mut};
-    use radix_hir::{DefId, HirExpression, HirItemKind, HirLocal};
-    use radix_lexer::Span;
+    use radix_hir::visit::{HirVisitor, HirVisitorMut, walk_expr, walk_local_mut, walk_stmt};
+    use radix_hir::{DefId, HirExpression, HirId, HirItemKind, HirLocal, HirStatement};
+    use radix_lexer::{Span, Symbol};
     use radix_mir_runner::Value;
 
     /// Step budget for one `praefixum` body. One step is one MIR basic-block
@@ -285,6 +285,38 @@ mod evaluation {
             } else if let (Some(init), Some(f)) = (local.init.as_mut(), self.f.take()) {
                 self.out = Some(f(init));
             }
+        }
+    }
+
+    /// The HIR node ids and definition ids a praefixum fold kills: when
+    /// install_value replaces the initializer, every node of the authored body
+    /// leaves the live HIR.
+    #[expect(dead_code, reason = "wired into install_value by unit 6990bd5c-5.1.2")]
+    struct DeadNodes {
+        hirs: rustc_hash::FxHashSet<HirId>,
+        defs: rustc_hash::FxHashSet<DefId>,
+    }
+
+    #[expect(dead_code, reason = "wired into install_value by unit 6990bd5c-5.1.2")]
+    impl DeadNodes {
+        fn of(body: &HirExpression) -> DeadNodes {
+            let mut dead = DeadNodes { hirs: rustc_hash::FxHashSet::default(), defs: rustc_hash::FxHashSet::default() };
+            dead.visit_expr(body);
+            dead
+        }
+    }
+
+    impl radix_hir::visit::HirVisitor for DeadNodes {
+        fn visit_def(&mut self, def_id: DefId, _name: Symbol) {
+            self.defs.insert(def_id);
+        }
+        fn visit_stmt(&mut self, stmt: &HirStatement) {
+            self.hirs.insert(stmt.id);
+            walk_stmt(self, stmt);
+        }
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            self.hirs.insert(expr.id);
+            walk_expr(self, expr);
         }
     }
 

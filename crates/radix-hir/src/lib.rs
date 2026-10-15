@@ -28,6 +28,19 @@ pub use tensor_edge_policy::{
     TensorEdgePolicyTable, TensorShiftContext,
 };
 
+/// Resolved `ordo` order rows for enum ordering comparisons.
+///
+/// Operator ruling 2026-10-15: `≺ ≻ ≤ ≥` order two values of
+/// one `ordo` by their declared discriminant, not by declaration position.
+/// Typecheck resolves each member's discriminant and records the ordered rows
+/// keyed by the comparison's left-operand HIR id; every backend lowers the same
+/// decision (an integer comparison over the declared values).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OrdoOrderTable {
+    /// Ordered `(variant, declared discriminant)` rows per comparison site.
+    pub comparisons: FxHashMap<HirId, Vec<(DefId, i64)>>,
+}
+
 /// Function facts installed by analyzed HIR consumers at the codegen boundary.
 ///
 /// Every non-Rust HIR backend consumes the same semantic fact surface. Keeping

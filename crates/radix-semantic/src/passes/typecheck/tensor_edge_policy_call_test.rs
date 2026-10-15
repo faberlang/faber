@@ -36,6 +36,25 @@ fn tensor_seed() -> &'static str {
 }
 
 #[test]
+fn shifted_view_into_a_plain_tensor_initializer_is_rejected() {
+    rejects_with_issue(
+        &format!(
+            "main {{\n{}\nlet tf32[3] s ← base.shift([1])\n }}",
+            tensor_seed()
+        ),
+        "tensor_edge_view_requires_resolution",
+    );
+}
+
+#[test]
+fn shifted_view_into_an_optional_element_slot_stays_pending() {
+    accepts(&format!(
+        "main {{\n{}\nlet tensor<f32 ∪ none, [3]> s ← base.shift([1])\nlet tf32[3] w ← s.limes<wrap>()\nprint w.flatten()\n}}",
+        tensor_seed()
+    ));
+}
+
+#[test]
 fn shifted_optional_view_resolves_after_a_local_binding_or_coalesce() {
     accepts(&format!(
         "main {{\n{}\nlet _ pending ← base.shift([1])\nlet tf32[3] wrapped ← pending.limes<wrap>()\nlet tf32[3] filled ← base.shift([1]) coalesce 0.0\nprint wrapped.flatten()\nprint filled.flatten()\n}}",

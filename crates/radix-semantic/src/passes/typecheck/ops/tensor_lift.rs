@@ -7,11 +7,12 @@
 //!   the `✓ ✗` select lift over a tensor against a scalar or a same-shape
 //!   tensor. `* / %` lift only against a scalar (`tensor * tensor` keeps its
 //!   K10 status quo: not handled here).
-//! - The element type is the F9 join of the operand element types: identical
-//!   types stay, integers join by the smallest type holding both ranges (an
-//!   untyped constant takes part by value), floats join by the lossless
-//!   lattice, and a family crossing needs `↦`. Each result element is stored
-//!   under that element type at the operation (ruling 19(g)).
+//! - The element type of a lifted integer operator is the scalar range rule
+//!   for that operator (`u8 + u8` → `u16`, `u8 - u8` → `i16`, `u8 / u8` →
+//!   `u8`, an untyped constant taking part by value); width applies only at
+//!   the store (operator ruling 2026-10-15, need, superseding ruling
+//!   19(g)'s per-operation element store). Floats keep the lossless F9 join
+//!   lattice; `wrapping`/`saturating` word elements keep the word ring.
 //! - `÷` takes its width from ruling 23 per element. Comparisons produce
 //!   `tensor<bivalens, S>`.
 //! - No implicit broadcasting is added: two tensors must have the same shape.
@@ -220,9 +221,9 @@ impl TypeChecker<'_> {
         } else {
             (scalar_ty, register.elem)
         };
-        // The element is the F9 join of the operands, as for a tensor. Each
-        // lane is stored under it at the operation (ruling 19(g)): an integer
-        // lane is exact and traps where it leaves the element's range.
+        // The integer element takes the scalar range rule per operator (an
+        // intermediate widens; the width applies only at the store). Every
+        // other shape keeps the F9 join of the operands.
         let elem = self.lift_arith_element(op, lhs, rhs, l_elem, r_elem, span);
         if self.is_error(elem) {
             return Some(self.error_type);
@@ -447,8 +448,8 @@ impl TypeChecker<'_> {
         false
     }
 
-    /// Element type of a lifted `+ - * / % ÷`: the F9 join of the operand
-    /// elements, `÷` by ruling 23.
+    /// Element type of a lifted `+ - * / % ÷`: the scalar range rule per
+    /// operator for integers, `÷` by ruling 23.
     fn lift_arith_element(
         &mut self,
         op: HirBinOp,
@@ -461,11 +462,30 @@ impl TypeChecker<'_> {
         if op == HirBinOp::TrueDiv {
             return self.true_division_type(lhs, rhs, l_elem, r_elem, span);
         }
-        self.lift_join_element(
+        self.lift_range_element(
+            op,
             (l_elem, const_int_value(lhs)),
             (r_elem, const_int_value(rhs)),
             span,
         )
+    }
+
+    /// Element type of a lifted integer arithmetic pair under `op`: the scalar
+    /// range rule per operator (operator ruling 2026-10-15, need), so
+    /// an intermediate widens and the width applies only at the store. A word,
+    /// float, decimal, `inf`, inference hole or device function keeps the F9
+    /// join of [`Self::lift_join_element`].
+    pub(in crate::passes::typecheck) fn lift_range_element(
+        &mut self,
+        op: HirBinOp,
+        l: (TypeId, Option<i128>),
+        r: (TypeId, Option<i128>),
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        if let Some(elem) = self.integer_arith_element_type(op, l, r, span) {
+            return elem;
+        }
+        self.lift_join_element(l, r, span)
     }
 
     /// The element type two operands of an elementwise operator join to.

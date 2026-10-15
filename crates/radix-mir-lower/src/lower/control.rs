@@ -351,10 +351,33 @@ impl FunctionBuilder<'_> {
         self.close_device_block(span);
         let body_reaches = self.terminate_open_current(MirTerminatorKind::Goto(after_id), span);
 
-        self.switch_to(handler_id);
-        self.emit_device_handler_exit(catch.span);
-        self.visit_block(&catch.body);
-        let handler_reaches = self.terminate_open_current(MirTerminatorKind::Goto(after_id), catch.span);
+        // A diverging tail (`mori`) can end the body with no error edge into
+        // the handler. When nothing targets the handler *and* the body itself
+        // diverged, the catch is dead: sealing it keeps `after_id` free of
+        // orphaned successor targets. A body that terminates any other way
+        // with no error edge is a lowering defect, not a dead catch, so it
+        // keeps the old shape and is reported by post-lowering validation.
+        let handler_entered = self.blocks.iter().any(|block| {
+            block
+                .terminator
+                .as_ref()
+                .is_some_and(|terminator| terminator_successors(&terminator.kind).contains(&handler_id))
+        });
+        let body_diverges = self.last_terminated.is_some_and(|block| {
+            self.block(block)
+                .terminator
+                .as_ref()
+                .is_some_and(|terminator| matches!(terminator.kind, MirTerminatorKind::Unreachable))
+        });
+        let handler_reaches = if handler_entered || !body_diverges {
+            self.switch_to(handler_id);
+            self.emit_device_handler_exit(catch.span);
+            self.visit_block(&catch.body);
+            self.terminate_open_current(MirTerminatorKind::Goto(after_id), catch.span)
+        } else {
+            self.seal_unreachable(handler_id, catch.span);
+            false
+        };
 
         if body_reaches || handler_reaches {
             self.switch_to(after_id);
@@ -3358,7 +3381,7 @@ impl FunctionBuilder<'_> {
 
         self.terminate_current(MirTerminatorKind::Goto(body_id), expr.span);
         self.switch_to(body_id);
-        let Some((body, test, _)) = block.fac_dum_parts() else {
+        let Some((body, test, cond)) = block.fac_dum_parts() else {
             self.breakables.push(BreakableContext {
                 perge_target: Some(body_id),
                 rumpe_target: after_id,
@@ -3386,6 +3409,14 @@ impl FunctionBuilder<'_> {
             }
             self.visit_stmt(stmt);
         }
+        // The synthesized `si ¬cond { rumpe }` test is lowered while this
+        // breakable context is still on the stack, so snapshot the body's
+        // `rumpe` flag first: the test's own `rumpe` must not count as a user
+        // break out of the loop.
+        let body_rumpe_used = self
+            .breakables
+            .last()
+            .is_some_and(|context| context.rumpe_used);
         self.terminate_open_current(MirTerminatorKind::Goto(test_id), test.span);
         self.switch_to(test_id);
         if block.breakable == Some(radix_hir::HirBreakableKind::FacOmniaLoop) && self.context.fault_delivery {
@@ -3395,7 +3426,16 @@ impl FunctionBuilder<'_> {
         self.visit_stmt(test);
         self.breakables.pop();
         self.terminate_open_current(MirTerminatorKind::Goto(body_id), expr.span);
-        self.switch_to(after_id);
+        // `fac { … } dum verum` is the do-while spelling of `while true`: the
+        // synthesized `si ¬verum { rumpe }` is unreachable, so with no user
+        // `rumpe` the exit block must not carry the implicit function return,
+        // and the dead rumpe edge still reaches the sealed block keeping the
+        // loop a valid terminator path.
+        if hir_cond_is_literal_true(cond) && !body_rumpe_used {
+            self.seal_unreachable(after_id, expr.span);
+        } else {
+            self.switch_to(after_id);
+        }
         Some(MirOperand::Constant(MirConstant::Unit))
     }
 
@@ -3428,10 +3468,19 @@ impl FunctionBuilder<'_> {
         });
         self.switch_to(body_id);
         self.visit_block(body);
-        self.breakables.pop();
+        let loop_rumpe_used = self.breakables.pop().is_some_and(|ctx| ctx.rumpe_used);
         self.terminate_open_current(MirTerminatorKind::Goto(cond_id), span);
 
-        self.switch_to(after_id);
+        // `while true` never exits through its condition, so with no `rumpe` the
+        // after-block is dead; sealing it keeps the implicit function return out
+        // of a block the loop cannot reach. The `Branch` terminator above stays:
+        // its else edge is what keeps an exit-less `while true { }` loop a valid
+        // terminator path.
+        if hir_cond_is_literal_true(cond) && !loop_rumpe_used {
+            self.seal_unreachable(after_id, span);
+        } else {
+            self.switch_to(after_id);
+        }
     }
 
     fn lower_range_itera(&mut self, range: RangeIteraLowering<'_>) -> Option<()> {
@@ -4120,13 +4169,69 @@ impl FunctionBuilder<'_> {
         Some(bounds)
     }
 
+    /// The declared member series of the enum named by a bare `itera ex`
+    /// source, or `None` when the source is not an enum path.
+    fn enum_member_variants(&self, source: &HirExpression, mode: HirIteraMode) -> Option<Vec<DefId>> {
+        if !matches!(mode, HirIteraMode::Ex) {
+            return None;
+        }
+        let HirExpressionKind::Path(def_id) = &source.kind else {
+            return None;
+        };
+        self.context.enum_variants.get(def_id).cloned()
+    }
+
+    /// Materialize an enum's declared member series as a constant
+    /// `lista<Enum>` temp: one unit-variant operand per member,
+    /// in declaration order, so the ordinary list-iteration machinery walks
+    /// the members in that same order.
+    fn construct_enum_member_list(
+        &mut self,
+        enum_ty: TypeId,
+        variants: &[DefId],
+        span: Span,
+    ) -> Option<(MirOperand, TypeId)> {
+        let array_ty = self.require_array(enum_ty, span, "itera enum member list")?;
+        let mir_enum_ty = MirType::semantic(enum_ty);
+        let fields = variants
+            .iter()
+            .map(|variant| {
+                MirAggregateItem::Operand(self.construct_temp(
+                    MirAggregateKind::EnumVariant(*variant),
+                    MirAggregateFields::Ordered(Vec::new()),
+                    mir_enum_ty,
+                    span,
+                ))
+            })
+            .collect();
+        let operand = self.construct_temp(
+            MirAggregateKind::Array,
+            MirAggregateFields::Ordered(fields),
+            MirType::semantic(array_ty),
+            span,
+        );
+        Some((operand, array_ty))
+    }
+
     fn lower_array_itera(&mut self, iter: ArrayIteraLowering<'_>) -> Option<()> {
         let Some(iter_ty) = iter.iter.ty else {
             self.errors
                 .push(MirError::missing_type(iter.iter.span, "itera collection source"));
             return None;
         };
-        let collection_kind = self.classify_collection_itera(iter_ty, iter.mode, iter.coordinates.len());
+        // Enum-member iteration: a bare enum name as the
+        // source of an `itera ex` names the enum's member series, not a
+        // value. Materialize the declared unit variants as a `lista<Enum>`
+        // temp so the ordinary list-iteration machinery below walks them in
+        // declaration order.
+        let enum_member_array = match self.enum_member_variants(iter.iter, iter.mode) {
+            Some(variants) => Some(self.construct_enum_member_list(iter_ty, &variants, iter.iter.span)?),
+            None => None,
+        };
+        let collection_kind = match &enum_member_array {
+            Some(_) => CollectionIteraKind::Array(iter_ty),
+            None => self.classify_collection_itera(iter_ty, iter.mode, iter.coordinates.len()),
+        };
         if matches!(&collection_kind, CollectionIteraKind::Unsupported) {
             // Only map-value iteration carries the tabula decline; tensor and
             // bounded-lista declines keep the generic iterator diagnostic.
@@ -4147,11 +4252,20 @@ impl FunctionBuilder<'_> {
         // A borrowed receiver types its loop-local collection by the payload
         // under the `Ref` marker, so a borrowed receiver and its by-value twin
         // lower byte-identically.
-        let collection_semantic = match self.normalized_type(iter_ty) {
-            Type::Ref(_, inner) => *inner,
-            _ => iter_ty,
+        // An enum-member source lowers to a materialized `lista<Enum>` temp,
+        // so the loop-local collection is typed by that array; every other
+        // source keeps the receiver's own (peeled) type.
+        let collection_semantic = match &enum_member_array {
+            Some((_, array_ty)) => *array_ty,
+            None => match self.normalized_type(iter_ty) {
+                Type::Ref(_, inner) => *inner,
+                _ => iter_ty,
+            },
         };
-        let collection = self.lower_expr_value(iter.iter)?;
+        let collection = match enum_member_array {
+            Some((operand, _)) => operand,
+            None => self.lower_expr_value(iter.iter)?,
+        };
         // D6.6: a direct generator call feeding `itera ex` is walked stepwise,
         // so a suspending backend resumes the producer once per step.
         let stepped_callee = self.mark_stepped_cursor_stream(&collection, &collection_kind, iter.mode);
@@ -5512,6 +5626,11 @@ impl FunctionBuilder<'_> {
             self.visit_expr(expr);
         }
     }
+}
+
+/// Whether `cond` is the literal boolean `true`.
+fn hir_cond_is_literal_true(expr: &HirExpression) -> bool {
+    matches!(&expr.kind, HirExpressionKind::Literal(radix_hir::HirLiteral::Bool(true)))
 }
 
 /// Whether a handled body is a `fac omnia` block or loop.

@@ -1,0 +1,29 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "binding_decl", "sit_decl", "type_annotation", "base_type", "expression", "literal", "array_literal", "itera_stmt", "nota_stmt"]
+category = "binding"
+summary = "A let loop binder is written once by the loop; a store through it is a second assignment."
+syntax = "for from ps let q { q.x ← 7 }"
+related = ["sit", "varia", "itera"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM020:immutable_second_assignment"
++++
+# =============================================================================
+# mutabilitas — no store through a let loop binder
+# =============================================================================
+# A loop binder is `let` (a fixed name, written once by the loop head) or
+# `mut` (a writable name). Writing through a `let` binder is a second
+# assignment; declare the binder `mut` to write through it.
+
+class P {
+    mut int x = 0
+}
+
+main {
+    mut list<P> ps ← [P { x = 1 }]
+    for from ps let q {
+        q.x ← 7
+    }
+}

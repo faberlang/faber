@@ -11,7 +11,7 @@ use radix_mir::{
     MirStructFieldDefaults, MirType, MirValidationContext,
 };
 use radix_types::{IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -258,5 +258,50 @@ fn matrix_to_tensor_of_mismatched_literal_shape_fails_without_recovery() {
     assert!(
         result.is_err(),
         "a 2x2 matrix must not become a five-cell rank-1 tensor: {result:?}"
+    );
+}
+
+#[test]
+fn lista_conversio_to_queue_and_stack_preserves_order() {
+    let mut types = TypeTable::new();
+    let element = types.primitive(Primitive::Numerus);
+    let lista_ty = types.intern(Type::Array(element));
+    let queue_ty = types.intern(Type::Queue(element));
+    let stack_ty = types.intern(Type::Stack(element));
+    let copia_ty = types.intern(Type::Set(element));
+    let context = MirValidationContext::new(&types);
+
+    let items = || {
+        Value::Array(Rc::new(RefCell::new(vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+        ])))
+    };
+
+    // queue FIFO and stack top-last both keep the lista carrier order; the
+    // runtime carrier is the shared array cell either way.
+    for target in [queue_ty, stack_ty] {
+        let converted = convert_register(&types, &context, lista_ty, target, items())
+            .expect("lista conversio into queue/stack");
+        let Value::Array(out) = converted else {
+            panic!("expected an array carrier, got {converted:?}");
+        };
+        assert_eq!(
+            out.borrow().as_slice(),
+            &[Value::Int(1), Value::Int(2), Value::Int(3)]
+        );
+    }
+
+    let from_copia = convert_register(
+        &types,
+        &context,
+        copia_ty,
+        queue_ty,
+        Value::Set(Rc::new(RefCell::new(FxHashSet::default()))),
+    );
+    assert!(
+        from_copia.is_err(),
+        "a copia source must keep failing closed: {from_copia:?}"
     );
 }
