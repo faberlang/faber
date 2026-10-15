@@ -1,0 +1,34 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
+category = "conversion"
+summary = "A list longer than the target capacity takes the recovery value; one that fits converts."
+syntax = "lista<T> ↦ lista<T, N> ⊥ [7, 8]"
+related = ["↦", "⊥", "lista", "bounded"]
+locale = "en"
++++
+# =============================================================================
+# bounded lista overflow — the length check runs at the conversion
+# =============================================================================
+#
+# What this teaches:
+#   • `list<int> ↦ list<int, 2>` checks the source length against the
+#     capacity when the conversion runs.
+#   • A source longer than the capacity takes the `⊥` recovery value.
+#   • A source that fits converts unchanged.
+#
+# Common mistakes:
+#   • expecting the longer list to be truncated or stored as is.
+
+main {
+    const list<int> big ← [1, 2, 3]
+    const list<int> small ← [4, 5]
+
+    const list<int, 2> over ← big ↦ list<int, 2> ⊥ [7, 8]
+    print over
+    print over.length()
+
+    const list<int, 2> fits ← small ↦ list<int, 2> ⊥ [7, 8]
+    print fits
+}

@@ -1,0 +1,31 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
+category = "conversion"
+summary = "A list longer than an aliased bounded list's capacity takes the recovery value."
+syntax = "lista<T> ↦ lista<T, N> ⊥ [7, 8]"
+related = ["↦", "⊥", "lista", "bounded"]
+locale = "en"
++++
+# =============================================================================
+# bounded lista alias overflow — the alias carries the capacity
+# =============================================================================
+#
+# What this teaches:
+#   • `list<int> ↦ Pair`, with `type Pair = list<int, 2>`, checks the source
+#     length against the alias's capacity when the conversion runs.
+#   • A source longer than the capacity takes the `⊥` recovery value.
+#
+# Common mistakes:
+#   • expecting the longer list to be truncated or stored as is.
+
+type Pair = list<int, 2>
+
+main {
+    const list<int> big ← [1, 2, 3]
+
+    const Pair over ← big ↦ Pair ⊥ [7, 8]
+    print over
+    print over.length()
+}
