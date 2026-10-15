@@ -311,7 +311,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     let bytes = bytes_of_list(&cell.borrow(), span)?;
                     self.convert_octeti_to_tensor(bytes, target_ty, None, params, recovery, span)
                 }
-                value => self.convert_to_eager_sequence(value, target_ty, struct_defaults, span),
+                value => self.convert_to_eager_sequence(
+                    value,
+                    target_ty,
+                    struct_defaults,
+                    recovery,
+                    span,
+                ),
             },
             Type::Struct(def_id) => {
                 self.convert_to_struct(value, source_ty, *def_id, recovery, struct_defaults, span)

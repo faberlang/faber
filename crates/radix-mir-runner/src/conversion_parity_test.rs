@@ -539,3 +539,97 @@ fn bounded_ascii_resize_over_capacity_fails_without_recovery() {
         "runner_faberscript_unsupported_runtime_conversio_to_bounded_ascii"
     );
 }
+
+/// Run `lista<f32> ↦ tensor<f32, [2, 8]>` over `count` elements. With
+/// `recover`, the `⊥` operand reads a one-element recovery tensor held in
+/// local 0, so a taken recovery is distinguishable from the declared shape.
+fn run_lista_to_tensor_conversio(count: usize, recover: bool) -> Result<Value, RunnerError> {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirConversion, MirConversionFlavor, MirLocalId, MirPlace, MirProgram, MirValidationContext,
+    };
+    use radix_types::{IndexExpr, Primitive, TypeTable};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let mut types = TypeTable::new();
+    let element = types.primitive(Primitive::Fractus);
+    let source_ty = types.intern(Type::Array(element));
+    let rows = types.intern_index(IndexExpr::Literal(2));
+    let columns = types.intern_index(IndexExpr::Literal(8));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![rows, columns]));
+    let target_ty = types.tensor_with_shape(element, shape);
+    let interner = Interner::new();
+    let program = MirProgram {
+        functions: vec![function(
+            0,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            radix_mir::MirType::semantic(target_ty),
+            None,
+        )],
+    };
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    runner.frames[0].seed_local(
+        MirLocalId(0),
+        Value::Tensor(Rc::new(RefCell::new(value::TensorValue::contiguous(
+            vec![Value::Float(0.0)],
+            vec![1],
+        )))),
+    );
+    let recovery = recover.then(|| MirOperand::Place(MirPlace::local(MirLocalId(0))));
+    let conversion = MirConversion {
+        store: None,
+        flavor: MirConversionFlavor::Runtime,
+        source_ty: radix_mir::MirType::semantic(source_ty),
+        target_ty: radix_mir::MirType::semantic(target_ty),
+        params: Vec::new(),
+        recovery,
+        struct_defaults: Vec::new(),
+    };
+    let source = Value::Array(Rc::new(RefCell::new(
+        (0..count).map(|index| Value::Float(index as f64)).collect(),
+    )));
+    runner.eval_runtime_convert(&conversion, source, span())
+}
+
+fn tensor_shape(value: &Value) -> Vec<i64> {
+    match value {
+        Value::Tensor(cell) => cell.borrow().shape.clone(),
+        other => panic!("expected a tensor, got {other:?}"),
+    }
+}
+
+/// A list whose length differs from the declared `[2, 8]` extents takes the
+/// `⊥` recovery value instead of building a mis-shaped tensor.
+#[test]
+fn lista_to_tensor_conversio_recovers_on_length_mismatch() {
+    let result =
+        run_lista_to_tensor_conversio(3, true).expect("length mismatch recovers with the ⊥ value");
+    assert_eq!(tensor_shape(&result), vec![1]);
+}
+
+/// A length mismatch with no `⊥` fails the conversion; it is a conversion
+/// failure, not an unsupported target.
+#[test]
+fn lista_to_tensor_conversio_fails_on_length_mismatch_without_recovery() {
+    let error = run_lista_to_tensor_conversio(3, false)
+        .expect_err("length mismatch without recovery fails the conversion");
+    assert_eq!(error.code, crate::RUNNER_CODE_CONVERSION);
+}
+
+/// A list holding exactly the product of the declared extents builds the
+/// tensor in the declared shape, with or without a `⊥` operand.
+#[test]
+fn lista_to_tensor_conversio_matching_length_builds_tensor() {
+    let plain = run_lista_to_tensor_conversio(16, false).expect("16 elements fill [2, 8]");
+    assert_eq!(tensor_shape(&plain), vec![2, 8]);
+    let guarded = run_lista_to_tensor_conversio(16, true).expect("16 elements fill [2, 8]");
+    assert_eq!(tensor_shape(&guarded), vec![2, 8]);
+}
