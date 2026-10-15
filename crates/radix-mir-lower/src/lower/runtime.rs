@@ -22,6 +22,7 @@
 use super::*;
 use radix_hir::HirCallArg;
 use radix_hir::visit::{HirVisitor, walk_expr};
+use radix_mir::lane_op::stored_lane;
 use radix_semantic::IndexExpr;
 use radix_semantic::lista_tensor_conversio::{
     ListaToTensorShape, analyze_rectangular_lista_literal, lista_numerus_type, padded_literal_facts,
@@ -2358,6 +2359,7 @@ impl FunctionBuilder<'_> {
                 expr.span,
             );
         }
+        let checked = self.register_lanes_are_checked(expr);
         let mut fields = Vec::with_capacity(usize::from(rows) * usize::from(rhs_columns));
         for row in 0..rows {
             for column in 0..rhs_columns {
@@ -2386,7 +2388,8 @@ impl FunctionBuilder<'_> {
                         expr.span,
                     );
                 }
-                fields.push(MirAggregateItem::Operand(acc));
+                let mut lanes = super::register_lift::MatrixLanes { builder: self, span: expr.span };
+                fields.push(MirAggregateItem::Operand(stored_lane(&mut lanes, acc, elem_ty, checked)));
             }
         }
         self.construct_temp(
