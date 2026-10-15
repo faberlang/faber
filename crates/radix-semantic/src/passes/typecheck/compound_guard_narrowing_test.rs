@@ -168,6 +168,25 @@ fn assignment_invalidates_a_compound_fact() {
 }
 
 #[test]
+fn field_store_between_test_and_use_ends_narrowing() {
+    // A store through the tested field path re-points the place: the fact
+    // established by the test no longer describes the value the use reads.
+    test_support::assert_rejects_with_issue(
+        "genus G {\n    varia textus ∪ nihil nomen\n}\n\nfunctio f(G g) → numerus {\n    varia G p ← copy g\n    si p.nomen non est nihil {\n        p.nomen ← nulla\n        redde p.nomen.longitudo()\n    }\n    redde 0\n}",
+        NOT_NARROWED,
+    );
+}
+
+#[test]
+fn base_reassignment_between_test_and_use_ends_narrowing() {
+    // Re-pointing the root binding drops every field fact rooted at it.
+    test_support::assert_rejects_with_issue(
+        "genus G {\n    varia textus ∪ nihil nomen\n}\n\nfunctio f(G g) → numerus {\n    varia G p ← copy g\n    si p.nomen non est nihil {\n        p ← G { nomen = nulla }\n        redde p.nomen.longitudo()\n    }\n    redde 0\n}",
+        NOT_NARROWED,
+    );
+}
+
+#[test]
 fn and_narrows_the_right_conjunct_inside_the_condition() {
     test_support::assert_accepts(
         "functio f(textus ∪ nihil x) → bivalens {\n    redde x non est nihil et x.longitudo() ≻ 0\n}",
