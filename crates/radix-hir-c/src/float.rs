@@ -140,6 +140,9 @@ impl Emitter<'_> {
         else {
             return Err(unsupported("method call"));
         };
+        if name == "potentia" {
+            return self.float_power(receiver, args);
+        }
         let helper = match entry.mir_kind {
             IntrinsicMirKind::Collection(MirCollectionOp::Floor) => "faber_floor_i64",
             IntrinsicMirKind::Collection(MirCollectionOp::Ceiling) => "faber_ceil_i64",
@@ -151,6 +154,28 @@ impl Emitter<'_> {
         self.support.need_ints();
         let effect = receiver.effect;
         Ok(Operand::new(format!("{helper}({})", receiver.text), Value::Int).with_effect(effect))
+    }
+
+    /// `x.potentia(n)`: IEEE 754 `pow`, no domain guard (`f64::powf`).
+    fn float_power(
+        &mut self,
+        receiver: Operand,
+        args: &[HirCallArg],
+    ) -> Result<Operand, CodegenError> {
+        let [arg] = args else {
+            return Err(unsupported("float potentia without one argument"));
+        };
+        let exponent = self.expr(&arg.expr)?;
+        if exponent.value != Value::Float {
+            return Err(unsupported("float potentia exponent that is not a float"));
+        }
+        self.support.need(Helper::Float);
+        let effect = receiver.effect || exponent.effect;
+        let mut operands = [receiver, exponent];
+        let prelude = self.sequence(&mut operands);
+        let [base, exponent] = operands;
+        let call = format!("faber_pow_f64({}, {})", base.text, exponent.text);
+        Ok(Operand::new(wrap(&prelude, &call), Value::Float).with_effect(effect))
     }
 
     /// A float method that yields a float: `absolutum`, `signum`, and the

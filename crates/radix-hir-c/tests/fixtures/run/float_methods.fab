@@ -15,4 +15,7 @@ main {
     print value.maximum(2.5)
     const float zero ← 0.0
     print zero.sign()
+    # `potentia` is libm `pow` (IEEE 754), no domain guard.
+    print value.power(2.0)
+    print value.power(-1.0)
 }

@@ -142,7 +142,7 @@ impl Operand {
         self
     }
 
-    fn is_integer(&self) -> bool {
+    pub(crate) fn is_integer(&self) -> bool {
         matches!(self.value, Value::Int | Value::Exact)
     }
 }
@@ -251,6 +251,10 @@ impl Emitter<'_> {
                 if let (Some(Ty::Float), Some(receiver_ty)) = (class, receiver.ty) {
                     let receiver = self.expr(receiver)?;
                     return self.float_method(receiver, receiver_ty, *method, args);
+                }
+                if let (Some(Ty::Int | Ty::Sized(_)), Some(receiver_ty)) = (class, receiver.ty) {
+                    let receiver = self.expr(receiver)?;
+                    return self.int_method(receiver, receiver_ty, *method, args);
                 }
                 if let (Some(Ty::Text), Some(receiver_ty)) = (class, receiver.ty) {
                     let receiver = self.expr(receiver)?;
@@ -685,7 +689,19 @@ impl Emitter<'_> {
                     .with_effect(inner.effect))
             }
             HirUnOp::Not => Err(unsupported("logical not of a non-boolean")),
-            HirUnOp::BitNot => Err(unsupported("bitwise not")),
+            HirUnOp::BitNot => {
+                if !inner.is_integer() {
+                    return Err(unsupported("bitwise not of a non-integer"));
+                }
+                if let Some(value) = inner.constant {
+                    return self.int(!value);
+                }
+                self.support.need(Helper::Bitwise);
+                Ok(
+                    Operand::new(format!("faber_bit_not({})", inner.text), Value::Exact)
+                        .with_effect(inner.effect),
+                )
+            }
         }
     }
 
@@ -724,6 +740,11 @@ impl Emitter<'_> {
             HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod => {
                 self.arithmetic(op, l, r)
             }
+            HirBinOp::BitAnd
+            | HirBinOp::BitOr
+            | HirBinOp::BitXor
+            | HirBinOp::Shl
+            | HirBinOp::Shr => self.bitwise(op, l, r),
             HirBinOp::Lt
             | HirBinOp::Gt
             | HirBinOp::LtEq
@@ -765,6 +786,44 @@ impl Emitter<'_> {
             }
         }
         match fold(a, b) {
+            Some(value) => self.int(value),
+            None => Err(unsupported(
+                "integer constant beyond the 64-bit representation cap",
+            )),
+        }
+    }
+
+    /// Bitwise `∧ ∨ ⊻` and the shifts `⇐ ⇒`. All of them are exact and
+    /// range-checked (`faber::exact`), so there is no `int64_t` fast path:
+    /// two's complement on the exact window can leave the cap. A constant pair
+    /// folds with the same rules; the frontend folds most of these first.
+    fn bitwise(
+        &mut self,
+        op: HirBinOp,
+        l: Operand,
+        r: Operand,
+    ) -> Result<Operand, CodegenError> {
+        if !l.is_integer() || !r.is_integer() {
+            return Err(unsupported(binary_name(op)));
+        }
+        let name = match op {
+            HirBinOp::BitAnd => "faber_bit_and",
+            HirBinOp::BitOr => "faber_bit_or",
+            HirBinOp::BitXor => "faber_bit_xor",
+            HirBinOp::Shl => "faber_shl",
+            HirBinOp::Shr => "faber_shr",
+            other => return Err(unsupported(binary_name(other))),
+        };
+        let (Some(a), Some(b)) = (l.constant, r.constant) else {
+            self.support.need(Helper::Bitwise);
+            let effect = l.effect || r.effect;
+            let mut operands = [l, r];
+            let prelude = self.sequence(&mut operands);
+            let [l, r] = operands;
+            let text = wrap(&prelude, &format!("{name}({}, {})", l.text, r.text));
+            return Ok(Operand::new(text, Value::Exact).with_effect(effect));
+        };
+        match fold_bitwise(op, a, b) {
             Some(value) => self.int(value),
             None => Err(unsupported(
                 "integer constant beyond the 64-bit representation cap",
@@ -1107,6 +1166,36 @@ fn floor_div(a: i128, b: i128) -> Option<i128> {
 fn floor_mod(a: i128, b: i128) -> Option<i128> {
     let quotient = floor_div(a, b)?;
     Some(a - quotient * b)
+}
+
+/// The emit-time fold of a bitwise or shift operator, under the runner's exact
+/// rules (`faber::exact`): a result outside the cap is `None`, as is a
+/// negative count or a left shift past `2^64`. The frontend rejects the
+/// constant forms of those first, so this is the backstop for an unfolded pair.
+fn fold_bitwise(op: HirBinOp, a: i128, b: i128) -> Option<i128> {
+    let value = match op {
+        HirBinOp::BitAnd => a & b,
+        HirBinOp::BitOr => a | b,
+        HirBinOp::BitXor => a ^ b,
+        HirBinOp::Shl => {
+            if b < 0 || (a != 0 && b > 64) {
+                return None;
+            }
+            a.checked_mul(1_i128 << b)?
+        }
+        HirBinOp::Shr => {
+            if b < 0 {
+                return None;
+            }
+            if b >= 127 {
+                if a < 0 { -1 } else { 0 }
+            } else {
+                a >> b
+            }
+        }
+        _ => return None,
+    };
+    (CAP_MIN..=CAP_MAX).contains(&value).then_some(value)
 }
 
 /// A C string literal holding the UTF-8 bytes of `text`.

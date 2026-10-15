@@ -29,6 +29,7 @@ mod helpers;
 mod items;
 mod list;
 mod names;
+mod numeric;
 mod option;
 mod range;
 mod stmt;
@@ -53,6 +54,8 @@ mod item_test;
 mod list_test;
 #[cfg(test)]
 mod names_test;
+#[cfg(test)]
+mod numeric_test;
 #[cfg(test)]
 mod option_test;
 #[cfg(test)]

@@ -27,6 +27,10 @@ pub(crate) enum Helper {
     Mul,
     Div,
     Rem,
+    /// Bitwise `∧ ∨ ⊻ ¬` and the shifts, all exact and range-checked.
+    Bitwise,
+    /// The integer methods `absolutum`, `signum`, `minimus`, `maximus`, `potentia`.
+    IntMethod,
     FitI64,
     StoreI64,
     /// `faber_store_<w>` / `faber_fit_<w>` for the sized integers.
@@ -82,6 +86,8 @@ impl Helper {
             | Helper::Mul
             | Helper::Div
             | Helper::Rem
+            | Helper::Bitwise
+            | Helper::IntMethod
             | Helper::FitI64
             | Helper::StoreI64
             | Helper::SizedStore

@@ -134,6 +134,91 @@ static inline faber_i128 faber_rem(faber_i128 a, faber_i128 b) {
     return a - b * faber_div(a, b);
 }
 
+/* Bitwise `∧ ∨ ⊻` and `¬`. Two's complement on the exact window can leave the
+ * cap (`i64::MIN ^ u64::MAX`), so the result is range-checked like every other
+ * exact operation. Mirrors `faber::exact::int(Some(a & b))` and friends. */
+static inline faber_i128 faber_bit_and(faber_i128 a, faber_i128 b) {
+    return faber_cap(a & b);
+}
+
+static inline faber_i128 faber_bit_or(faber_i128 a, faber_i128 b) {
+    return faber_cap(a | b);
+}
+
+static inline faber_i128 faber_bit_xor(faber_i128 a, faber_i128 b) {
+    return faber_cap(a ^ b);
+}
+
+static inline faber_i128 faber_bit_not(faber_i128 value) {
+    return faber_cap(~value);
+}
+
+/* Unmasked shifts, the exact model (`faber::exact::shl` / `shr`): a negative
+ * count traps, a left shift past `2^64` traps, a right shift of 127 or more
+ * fills with the sign. Only `value == 0` needs no cap check. */
+static inline faber_i128 faber_shl(faber_i128 value, faber_i128 count) {
+    faber_i128 product;
+    if (count < 0) {
+        faber_trap("negative shift count");
+    }
+    if (value == 0) {
+        return 0;
+    }
+    if (count > 64) {
+        faber_trap("numerus overflow");
+    }
+    if (__builtin_mul_overflow(value, (faber_i128)1 << (int)count, &product)) {
+        faber_trap("numerus overflow");
+    }
+    return faber_cap(product);
+}
+
+static inline faber_i128 faber_shr(faber_i128 value, faber_i128 count) {
+    if (count < 0) {
+        faber_trap("negative shift count");
+    }
+    if (count >= 127) {
+        return value < 0 ? -1 : 0;
+    }
+    return value >> (int)count;
+}
+
+/* The two integer method twins with no operator: `absolutum` and `potentia`
+ * (`faber::exact::pow`); `abs` can reach `2^63` for `i64::MIN`, still in the
+ * cap. A negative exponent aborts as the runner's `pow` panics. */
+static inline faber_i128 faber_abs(faber_i128 value) {
+    return value < 0 ? faber_cap(-value) : value;
+}
+
+static inline faber_i128 faber_sign(faber_i128 value) {
+    return (faber_i128)((value > 0) - (value < 0));
+}
+
+static inline faber_i128 faber_min_i128(faber_i128 a, faber_i128 b) {
+    return a < b ? a : b;
+}
+
+static inline faber_i128 faber_max_i128(faber_i128 a, faber_i128 b) {
+    return a > b ? a : b;
+}
+
+static inline faber_i128 faber_pow(faber_i128 base, faber_i128 exponent) {
+    faber_i128 accumulator = 1;
+    if (exponent < 0) {
+        faber_abort("numerus potentia failed: negative exponent");
+    }
+    while (exponent > 0) {
+        if (exponent % 2 != 0) {
+            accumulator = faber_mul(accumulator, base);
+        }
+        exponent /= 2;
+        if (exponent > 0) {
+            base = faber_mul(base, base);
+        }
+    }
+    return accumulator;
+}
+
 /* Narrowing an exact value to its own expression type where typecheck put no
  * store node, because its range rule proved the result fits (`big + 1 - 1`
  * is `int` though `big + 1` is not). The check cannot fail on a proven
@@ -294,6 +379,12 @@ static inline double faber_maximum_f64(double a, double b) {
         return a;
     }
     return b;
+}
+
+/* `fractus.potentia(n)`: IEEE 754 `pow` with no domain guard (`f64::powf`,
+ * which the runner uses). */
+static inline double faber_pow_f64(double base, double exponent) {
+    return pow(base, exponent);
 }
 
 /* An exact comparison of an integer with a float by their true values:

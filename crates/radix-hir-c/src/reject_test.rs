@@ -38,11 +38,6 @@ fn integer_division_by_zero_constant() {
 }
 
 #[test]
-fn bitwise_operator() {
-    assert_eq!(rejected("main {\n    print 1 ∧ 3\n}"), "bitwise operator");
-}
-
-#[test]
 fn policy_integer_type() {
     assert_eq!(
         rejected("main {\n    const wrapping<u8> n ← 5\n    print n\n}"),
