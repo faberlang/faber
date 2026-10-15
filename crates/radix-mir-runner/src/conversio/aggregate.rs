@@ -147,6 +147,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 struct_defaults,
                 span,
             )?,
+            // Register matrices flatten row-major into the same flat list as
+            // a tensor; the source element type picks any element conversion.
+            Value::Matrix(cell) => {
+                let data = cell.borrow().data.clone();
+                self.convert_array_elements(&data, source_ty, element, struct_defaults, span)?
+            }
             Value::Set(cell) => {
                 let mut items: Vec<Value> = cell.borrow().iter().map(MapKey::to_value).collect();
                 // D19.2/D19.6: copia order is unspecified; shuffle under the
@@ -234,7 +240,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<Vec<Value>, RunnerError> {
         let source_element = match self.types.get(source_ty) {
             Type::Array(element) => Some(*element),
-            Type::Tensor(element, _) | Type::Vector(element, _) => Some(*element),
+            Type::Tensor(element, _) | Type::Vector(element, _) | Type::Matrix(element, _) => {
+                Some(*element)
+            }
             _ => None,
         };
         let Some(source_element) = source_element else {
@@ -336,8 +344,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     pub(crate) fn convert_to_eager_sequence(
         &mut self,
         value: Value,
+        source_ty: TypeId,
         target_ty: TypeId,
-        _struct_defaults: &[MirStructFieldDefaults],
+        struct_defaults: &[MirStructFieldDefaults],
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
@@ -356,6 +365,36 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 Value::Array(cell) => {
                     let element = *element;
                     self.convert_lista_to_tensor(&cell, target_ty, element, recovery, span)
+                }
+                // A register matrix converts like its flat cell list: the
+                // row-major data flattened, element-converted when the
+                // declared element differs, and built at the target shape.
+                Value::Matrix(cell) => {
+                    let data = cell.borrow().data.clone();
+                    self.convert_register_to_tensor(
+                        &data,
+                        source_ty,
+                        target_ty,
+                        *element,
+                        struct_defaults,
+                        recovery,
+                        "matrix to tensor conversion failed",
+                        span,
+                    )
+                }
+                // A register vector converts like its flat lane list.
+                Value::Vector(cell) => {
+                    let lanes = cell.borrow().clone();
+                    self.convert_register_to_tensor(
+                        &lanes,
+                        source_ty,
+                        target_ty,
+                        *element,
+                        struct_defaults,
+                        recovery,
+                        "vector to tensor conversion failed",
+                        span,
+                    )
                 }
                 other => Err(RunnerError::internal(
                     span,
@@ -417,6 +456,40 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             });
             if expected != Some(data.len()) {
                 return self.recover_or_fail(recovery, span, "lista to tensor conversion failed");
+            }
+        }
+        let shape = lista_to_tensor_shape(target_ty, self.types, data.len());
+        crate::runtime::tensor_value_typed(self.types, data, Some(element), shape, span)
+    }
+
+    /// `matrix<E, [R, C]> ↦ tensor<E2, S>` and `vector<E, N> ↦ tensor<E2, S>`:
+    /// the row-major cells or lanes become the tensor's flat data, with any
+    /// declared element conversion applied. A literal target shape must match
+    /// the cell count; a mismatch takes the recovery instead of building a
+    /// tensor of the wrong shape, as for `lista ↦ tensor`.
+    #[allow(clippy::too_many_arguments)]
+    fn convert_register_to_tensor(
+        &mut self,
+        cells: &[Value],
+        source_ty: TypeId,
+        target_ty: TypeId,
+        element: TypeId,
+        struct_defaults: &[MirStructFieldDefaults],
+        recovery: Option<&MirOperand>,
+        mismatch_message: &str,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let data = self.convert_array_elements(cells, source_ty, element, struct_defaults, span)?;
+        if let Some(ListaToTensorShape::Literal(dims)) =
+            resolve_lista_to_tensor_shape(target_ty, self.types)
+        {
+            let expected = dims.iter().try_fold(1usize, |count, dim| {
+                usize::try_from(*dim)
+                    .ok()
+                    .and_then(|extent| count.checked_mul(extent))
+            });
+            if expected != Some(data.len()) {
+                return self.recover_or_fail(recovery, span, mismatch_message);
             }
         }
         let shape = lista_to_tensor_shape(target_ty, self.types, data.len());
