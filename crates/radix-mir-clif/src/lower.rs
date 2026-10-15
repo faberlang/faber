@@ -145,6 +145,15 @@ impl Rep {
     }
 }
 
+/// A function-type parameter's value type: a reference mode wraps the type
+/// of the shared handle the callee receives.
+fn param_value_type(table: &TypeTable, id: TypeId) -> TypeId {
+    match table.get(id) {
+        Type::Ref(_, inner) => *inner,
+        _ => id,
+    }
+}
+
 fn resolve(table: &TypeTable, mut id: TypeId) -> &Type {
     loop {
         match table.get(id) {
@@ -193,7 +202,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
                 return Err(Decline::new("function value"));
             }
             for param in &signature.params {
-                rep_of(table, MirType::semantic(param.ty))?;
+                rep_of(table, MirType::semantic(param_value_type(table, param.ty)))?;
             }
             rep_of(table, MirType::semantic(signature.ret))?;
             Ok(Rep::Func)
@@ -1972,7 +1981,7 @@ impl FunctionLower<'_, '_> {
         let mut abi_signature = self.state.module.make_signature();
         let mut wanted = Vec::with_capacity(signature.params.len());
         for param in &signature.params {
-            let rep = rep_of(table, MirType::semantic(param.ty))?;
+            let rep = rep_of(table, MirType::semantic(param_value_type(table, param.ty)))?;
             let Some(cl) = rep.cl_type() else {
                 return Err(Decline::new("unit parameter"));
             };
@@ -2333,6 +2342,11 @@ impl FunctionLower<'_, '_> {
                     .call_runtime(&abi::MAP_KEYS, &[value])?
                     .ok_or_else(|| Decline::new("set keys result"))?;
                 self.builder.def_var(variable, keys);
+                return Ok(());
+            }
+            if rep == Rep::Int && slot_rep == Rep::Float {
+                let widened = self.builder.ins().fcvt_from_sint(types::F64, value);
+                self.builder.def_var(variable, widened);
                 return Ok(());
             }
             if slot_rep != Rep::Text || rep == Rep::Unit {

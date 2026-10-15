@@ -22,7 +22,7 @@ use radix_hir::DefId;
 use radix_mir::visit::MirVisitor;
 use radix_mir::*;
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
-use radix_types::{NumericWidth, Primitive, SemanticParamMode, Type, TypeTable};
+use radix_types::{NumericWidth, Primitive, Type, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Slug for shapes the CLIF subset does not cover yet.
@@ -222,16 +222,18 @@ impl<'a> ClifCapability<'a> {
                     || sig.is_async
                     || sig.is_generator
                     || sig.err.is_some()
-                    || sig
-                        .params
-                        .iter()
-                        .any(|param| param.mode != SemanticParamMode::Owned)
                 {
                     return Some(Gap::Subset("function value".to_owned()));
                 }
                 sig.params
                     .iter()
-                    .find_map(|param| self.type_gap(MirType::semantic(param.ty)))
+                    .find_map(|param| {
+                        let value = match self.types.get(param.ty) {
+                            Type::Ref(_, inner) => *inner,
+                            _ => param.ty,
+                        };
+                        self.type_gap(MirType::semantic(value))
+                    })
                     .or_else(|| self.type_gap(MirType::semantic(sig.ret)))
             }
             Type::Ref(..) => Some(Gap::Subset("reference value".to_owned())),
@@ -517,7 +519,22 @@ impl MirVisitor for ClifCapability<'_> {
                         Type::Array(_)
                     )
         );
+        // `fractus(int)`: the exact widening of an integer to a float.
+        let int_to_float = matches!(
+            &call.intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && matches!(
+                        self.types.get(conversion.source_ty.semantic_id()),
+                        Type::Primitive(Primitive::Numerus)
+                    )
+                    && matches!(
+                        self.types.get(conversion.target_ty.semantic_id()),
+                        Type::Primitive(Primitive::Fractus)
+                    )
+        );
         if renders_text
+            || int_to_float
             || set_to_list
             || matches!(
                 call.intrinsic,
