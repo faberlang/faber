@@ -356,6 +356,14 @@ help = "sửa lỗi lexer trước; quá trình phân tích tiếp tục từ c�
 message = "cần token"
 help = "đảm bảo token cần thiết có mặt tại vị trí này"
 
+[diagnostics.PARSE001.issues.ratio_field_list_hole_not_sole]
+message = "lỗ hổng `…` trong danh sách trường ratio phải là phần tử duy nhất"
+help = "dùng nhiều nhất một lỗ hổng trong danh sách trường"
+
+[diagnostics.PARSE001.issues.ratio_type_arg_label_required]
+message = "đối số kiểu ratio phải có nhãn"
+help = "viết nhãn trước đối số"
+
 [diagnostics.PARSE001.issues.annotation_field_name]
 message = "trường annotation phải là một định danh"
 help = "viết một tên trường đơn giản bên trong dấu ngoặc nhọn của annotation"
@@ -519,6 +527,10 @@ help = "xóa dấu phẩy trước dấu đóng"
 [diagnostics.PARSE002]
 message = "token không mong đợi"
 help = "xóa hoặc chuyển token không mong đợi đến vị trí đúng"
+
+[diagnostics.PARSE002.issues.declaration_block_comma]
+message = "dấu phẩy không phân tách các thành viên của declaration block"
+help = "bỏ dấu phẩy; các thành viên declaration được phân tách bằng dòng mới"
 
 [diagnostics.PARSE002.issues.json_unknown_identifier_value]
 message = "identifier JSON không phải giá trị JSON hợp lệ"
@@ -795,6 +807,10 @@ help = "chỉ gán cho các lvalue hợp lệ"
 [diagnostics.PARSE040]
 message = "kiểu không hợp lệ"
 help = "kiểm tra cú pháp kiểu"
+
+[diagnostics.PARSE040.issues.promissum_alternate_uses_exit_arrow]
+message = "nhánh thay thế của promissum phải dùng mũi tên lỗi `⇥`, không phải mũi tên trả về `→`"
+help = "viết nhánh thay thế bằng `⇥`"
 
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "cần tên kiểu"

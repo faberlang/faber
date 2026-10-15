@@ -356,6 +356,14 @@ help = "先修正詞法分析器錯誤；剖析會從乾淨的標記繼續"
 message = "需要標記"
 help = "確保此位置存在預期的標記"
 
+[diagnostics.PARSE001.issues.ratio_field_list_hole_not_sole]
+message = "ratio 欄位列表中的 `…` 空洞必須是唯一元素"
+help = "欄位列表中最多使用一個空洞"
+
+[diagnostics.PARSE001.issues.ratio_type_arg_label_required]
+message = "ratio 型別實參必須帶有標籤"
+help = "在實參之前寫出標籤"
+
 [diagnostics.PARSE001.issues.annotation_field_name]
 message = "註解欄位必須是識別碼"
 help = "在註解的花括號內寫一個普通欄位名"
@@ -563,6 +571,10 @@ help = "在 '=' 之後寫整數或字串"
 [diagnostics.PARSE002]
 message = "非預期標記"
 help = "刪除該標記，或將它移到正確位置"
+
+[diagnostics.PARSE002.issues.declaration_block_comma]
+message = "逗號不能分隔宣告區塊的成員"
+help = "刪除逗號；宣告成員由換行分隔"
 
 [diagnostics.PARSE002.issues.json_unknown_identifier_value]
 message = "JSON 識別符不是有效的 JSON 值"
@@ -839,6 +851,10 @@ help = "只指派給有效的左值"
 [diagnostics.PARSE040]
 message = "無效型別"
 help = "檢查型別語法"
+
+[diagnostics.PARSE040.issues.promissum_alternate_uses_exit_arrow]
+message = "promissum 的備用分支必須使用錯誤箭頭 `⇥`，而不是返回箭頭 `→`"
+help = "用 `⇥` 寫出備用分支"
 
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "需要型別名稱"

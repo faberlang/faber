@@ -356,6 +356,14 @@ help = "पहले lexer error ठीक करें; parsing साफ token
 message = "token अपेक्षित है"
 help = "सुनिश्चित करें कि इस स्थान पर अपेक्षित token मौजूद है"
 
+[diagnostics.PARSE001.issues.ratio_field_list_hole_not_sole]
+message = "ratio फ़ील्ड सूची में `…` होल ही एकमात्र तत्व होना चाहिए"
+help = "फ़ील्ड सूची में अधिकतम एक होल रखें"
+
+[diagnostics.PARSE001.issues.ratio_type_arg_label_required]
+message = "ratio प्रकार तर्क पर लेबल होना चाहिए"
+help = "तर्क से पहले लेबल लिखें"
+
 [diagnostics.PARSE001.issues.annotation_field_name]
 message = "annotation फ़ील्ड एक पहचानकर्ता होना चाहिए"
 help = "annotation ब्रेसिज़ के भीतर फ़ील्ड का सरल नाम लिखें"
@@ -519,6 +527,10 @@ help = "समापन सीमांकक से पहले का अल�
 [diagnostics.PARSE002]
 message = "अनपेक्षित token"
 help = "अनपेक्षित token हटाएं या उसका स्थान बदलें"
+
+[diagnostics.PARSE002.issues.declaration_block_comma]
+message = "अल्पविराम declaration block के सदस्यों को अलग नहीं करते"
+help = "अल्पविराम हटाएँ; declaration सदस्य नई पंक्तियों से अलग होते हैं"
 
 [diagnostics.PARSE002.issues.json_unknown_identifier_value]
 message = "JSON identifiers मान्य JSON values नहीं हैं"
@@ -795,6 +807,10 @@ help = "केवल मान्य lvalues को assign करें"
 [diagnostics.PARSE040]
 message = "अमान्य प्रकार"
 help = "प्रकार syntax जांचें"
+
+[diagnostics.PARSE040.issues.promissum_alternate_uses_exit_arrow]
+message = "promissum विकल्प को त्रुटि तीर `⇥` का उपयोग करना चाहिए, वापसी तीर `→` का नहीं"
+help = "विकल्प शाखा को `⇥` के साथ लिखें"
 
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "प्रकार नाम अपेक्षित है"

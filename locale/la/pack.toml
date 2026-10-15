@@ -397,6 +397,14 @@ help = "fix the lexer error first; parsing continues from clean tokens"
 message = "expected token"
 help = "ensure the expected token is present in this position"
 
+[diagnostics.PARSE001.issues.ratio_field_list_hole_not_sole]
+message = "a `…` hole in a ratio field list must be the only element"
+help = "use at most one hole in the field list"
+
+[diagnostics.PARSE001.issues.ratio_type_arg_label_required]
+message = "a ratio type argument must be labeled"
+help = "write the label before the argument"
+
 [diagnostics.PARSE001.issues.annotation_field_name]
 message = "an annotation field must be an identifier"
 help = "write a plain field name inside the annotation braces"
@@ -573,6 +581,10 @@ help = "remove the comma before the closing delimiter"
 [diagnostics.PARSE002]
 message = "unexpected token"
 help = "remove or reposition the unexpected token"
+
+[diagnostics.PARSE002.issues.declaration_block_comma]
+message = "commas do not separate members of a declaration block"
+help = "remove the comma; declaration members are separated by newlines"
 
 [diagnostics.PARSE002.issues.json_unknown_identifier_value]
 message = "JSON identifiers are not valid JSON values"
@@ -1025,6 +1037,10 @@ help = "assign only to valid lvalues"
 [diagnostics.PARSE040]
 message = "invalid type"
 help = "check type syntax"
+
+[diagnostics.PARSE040.issues.promissum_alternate_uses_exit_arrow]
+message = "a promissum alternate must use the error arrow `⇥`, not the return arrow `→`"
+help = "write the alternate arm with `⇥`"
 
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "expected type name"
