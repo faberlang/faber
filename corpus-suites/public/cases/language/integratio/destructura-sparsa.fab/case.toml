@@ -6,14 +6,10 @@ input = "integratio/destructura-sparsa.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false
 
 [targets.mir]
 outcome = "known-fail"
 phase = "emit"
-diagnostic_contains = "invalid MIR: aggregate spread type mismatch"
-
-[targets.runner]
-outcome = "known-fail"
-phase = "run"
 diagnostic_contains = "invalid MIR: aggregate spread type mismatch"
