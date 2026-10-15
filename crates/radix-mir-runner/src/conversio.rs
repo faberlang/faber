@@ -210,10 +210,14 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // `.parse::<W>()` does — a value outside `W`'s signed range is a
                 // conversion failure (SA-002). Unsized numerus defaults to i64.
                 // D10.6: a `littera` source parses its digit (or, with
-                // `Code`, reads its code point) — never a text parse.
+                // `Code`, reads its code point) — never a text parse. A
+                // one-letter literal is `ascii<1>`, so its rows ride the same
+                // path; a multi-letter `ascii<N>` arrives as `Value::Str` and
+                // keeps the whole-string digits parse below.
                 if matches!(
                     self.types.get(source_ty),
-                    Type::Primitive(Primitive::Littera)
+                    Type::Primitive(Primitive::Littera | Primitive::Ascii)
+                        | Type::BoundedAscii { .. }
                 ) && let Some(ch) = littera::littera_value(&value)
                 {
                     return self.convert_littera_to_numerus(ch, params, recovery, span);

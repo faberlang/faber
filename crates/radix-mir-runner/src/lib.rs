@@ -4033,6 +4033,10 @@ mod f32_store_test;
 mod narrowing_conversio_test;
 
 #[cfg(test)]
+#[path = "ascii_conversio_test.rs"]
+mod ascii_conversio_test;
+
+#[cfg(test)]
 #[path = "inf_test.rs"]
 mod inf_test;
 
