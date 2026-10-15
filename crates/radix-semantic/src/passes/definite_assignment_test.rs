@@ -815,3 +815,71 @@ functio pick() → numerus {
         "immutable_second_assignment",
     );
 }
+
+// ---- U5dccc092: `let`/`mut` loop binders are write-once ----
+//
+// A loop binder declared without `varia`/`mut` is a fixed (`sit`) name: it is
+// written once per iteration by the loop itself, so a store through it is a
+// second assignment and must be rejected. A `varia`/`mut` binder stays
+// writable (it owns a mutable copy of the element).
+
+#[test]
+fn let_loop_binder_field_store_is_rejected() {
+    crate::test_support::assert_rejects_with_issue_la(
+        r"
+genus P { varia numerus x = 0 }
+functio f(lista<P> ps) {
+    itera ex ps sit q { q.x ← 7 }
+}
+",
+        "immutable_second_assignment",
+    );
+}
+
+#[test]
+fn mut_loop_binder_field_store_stays_accepted() {
+    crate::test_support::assert_accepts_la(
+        r"
+genus P { varia numerus x = 0 }
+functio f(lista<P> ps) {
+    itera ex ps varia q { q.x ← 7 }
+}
+",
+    );
+}
+
+#[test]
+fn let_loop_binder_rebind_is_rejected() {
+    crate::test_support::assert_rejects_with_issue_la(
+        r"
+functio f(lista<numerus> xs) {
+    itera ex xs sit x { x ← x + 1 }
+}
+",
+        "immutable_second_assignment",
+    );
+}
+
+#[test]
+fn let_lockstep_binder_store_is_rejected() {
+    crate::test_support::assert_rejects_with_issue_la(
+        r"
+functio f(lista<numerus> xs, lista<numerus> ys) {
+    itera ex xs, ys sit a, b { a ← 1 }
+}
+",
+        "immutable_second_assignment",
+    );
+}
+
+#[test]
+fn let_range_product_binder_store_is_rejected() {
+    crate::test_support::assert_rejects_with_issue_la(
+        r"
+functio f() {
+    itera ab 0‥3, 0‥3 sit i, j { i ← 1 }
+}
+",
+        "immutable_second_assignment",
+    );
+}
