@@ -441,8 +441,10 @@ impl MirVisitor for ClifCapability<'_> {
         };
         // Bitwise work on raw-bits values lowers at the type's width; on
         // numbers it is not lowered yet.
-        let integer_result = matches!(&value.kind, MirValueKind::Binary { .. })
-            && self.type_gap(value.ty).is_none()
+        let integer_result = matches!(
+            &value.kind,
+            MirValueKind::Binary { .. } | MirValueKind::Unary { .. }
+        ) && self.type_gap(value.ty).is_none()
             && matches!(
                 self.types.get(value.ty.semantic_id()),
                 Type::Primitive(Primitive::Numerus)
@@ -533,7 +535,19 @@ impl MirVisitor for ClifCapability<'_> {
                         Type::Primitive(Primitive::Fractus)
                     )
         );
+        let int_to_int = matches!(
+            &call.intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && crate::lower::int_conversion(
+                        self.types,
+                        conversion.source_ty.semantic_id(),
+                        conversion.target_ty.semantic_id(),
+                    )
+                    .is_some()
+        );
         if renders_text
+            || int_to_int
             || int_to_float
             || set_to_list
             || matches!(

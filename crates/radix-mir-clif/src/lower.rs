@@ -154,6 +154,49 @@ fn param_value_type(table: &TypeTable, id: TypeId) -> TypeId {
     }
 }
 
+/// How an explicit integer-to-integer conversion lowers without a runtime
+/// check: `Identity` when every source value fits the target, `Wrap` when
+/// the target is a modular word.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum IntConversion {
+    Identity,
+    Wrap(i64),
+}
+
+fn int_range(table: &TypeTable, id: TypeId) -> Option<(i128, i128)> {
+    match resolve(table, id) {
+        Type::Primitive(Primitive::Numerus) => Some((i128::from(i64::MIN), i128::from(i64::MAX))),
+        Type::SizedNumeric(Primitive::Numerus, width)
+        | Type::ModularWord(width)
+        | Type::SaturatingWord(width) => width.integer_range(),
+        _ => None,
+    }
+}
+
+pub(crate) fn int_conversion(
+    table: &TypeTable,
+    source: TypeId,
+    target: TypeId,
+) -> Option<IntConversion> {
+    let (low, high) = int_range(table, source)?;
+    if let Type::ModularWord(width) = resolve(table, target) {
+        return match width {
+            NumericWidth::U8 => Some(IntConversion::Wrap(0xff)),
+            NumericWidth::U16 => Some(IntConversion::Wrap(0xffff)),
+            NumericWidth::U32 => Some(IntConversion::Wrap(0xffff_ffff)),
+            _ => None,
+        };
+    }
+    let (target_low, target_high) = int_range(table, target)?;
+    // A u64 source can exceed the i64 carrier; only identity into a 64-bit
+    // target that holds the same carrier is safe.
+    if low >= target_low && high <= target_high && high <= i128::from(i64::MAX) {
+        Some(IntConversion::Identity)
+    } else {
+        None
+    }
+}
+
 fn resolve(table: &TypeTable, mut id: TypeId) -> &Type {
     loop {
         match table.get(id) {
@@ -2530,6 +2573,26 @@ impl FunctionLower<'_, '_> {
                 self.builder.def_var(variable, keys);
                 return Ok(());
             }
+            if rep == Rep::Int && slot_rep == Rep::Int {
+                let table = self.state.input.types;
+                return match int_conversion(
+                    table,
+                    conversion.source_ty.semantic_id(),
+                    conversion.target_ty.semantic_id(),
+                ) {
+                    Some(IntConversion::Identity) => {
+                        self.builder.def_var(variable, value);
+                        Ok(())
+                    }
+                    Some(IntConversion::Wrap(mask)) => {
+                        let mask = self.builder.ins().iconst(types::I64, mask);
+                        let wrapped = self.builder.ins().band(value, mask);
+                        self.builder.def_var(variable, wrapped);
+                        Ok(())
+                    }
+                    None => Err(Decline::new("explicit integer conversion")),
+                };
+            }
             if rep == Rep::Int && slot_rep == Rep::Float {
                 let widened = self.builder.ins().fcvt_from_sint(types::F64, value);
                 self.builder.def_var(variable, widened);
@@ -2721,7 +2784,86 @@ impl FunctionLower<'_, '_> {
 
     // VALUES
 
+    /// The all-ones mask of a `wrapping<u8|u16|u32>` result type.
+    fn word_mask(&self, ty: MirType) -> Option<i64> {
+        match resolve(self.state.input.types, ty.semantic_id()) {
+            Type::ModularWord(NumericWidth::U8) => Some(0xff),
+            Type::ModularWord(NumericWidth::U16) => Some(0xffff),
+            Type::ModularWord(NumericWidth::U32) => Some(0xffff_ffff),
+            _ => None,
+        }
+    }
+
+    /// An operation whose result is a modular word: computed modulo 2^64
+    /// (the low bits agree with every narrower modulus) and masked to the
+    /// word, as the runner wraps each word operation.
+    fn word_value(&mut self, value: &MirValue, mask: i64) -> Lowered<Option<(Value, Rep)>> {
+        let computed = match &value.kind {
+            MirValueKind::Unary { op, operand } if matches!(op, MirUnOp::BitNot | MirUnOp::Neg) => {
+                let (operand, rep) = self.scalar(operand)?;
+                if rep != Rep::Int {
+                    return Ok(None);
+                }
+                if *op == MirUnOp::BitNot {
+                    self.builder.ins().bnot(operand)
+                } else {
+                    self.builder.ins().ineg(operand)
+                }
+            }
+            MirValueKind::Binary { op, lhs, rhs }
+                if matches!(
+                    op,
+                    MirBinOp::Add
+                        | MirBinOp::Sub
+                        | MirBinOp::Mul
+                        | MirBinOp::BitAnd
+                        | MirBinOp::BitOr
+                        | MirBinOp::BitXor
+                        | MirBinOp::Shl
+                        | MirBinOp::Shr
+                ) =>
+            {
+                let (a, a_rep) = self.scalar(lhs)?;
+                let (b, b_rep) = self.scalar(rhs)?;
+                if a_rep != Rep::Int || b_rep != Rep::Int {
+                    return Ok(None);
+                }
+                match op {
+                    MirBinOp::Add => self.builder.ins().iadd(a, b),
+                    MirBinOp::Sub => self.builder.ins().isub(a, b),
+                    MirBinOp::Mul => self.builder.ins().imul(a, b),
+                    MirBinOp::BitAnd => self.builder.ins().band(a, b),
+                    MirBinOp::BitOr => self.builder.ins().bor(a, b),
+                    MirBinOp::BitXor => self.builder.ins().bxor(a, b),
+                    MirBinOp::Shl => {
+                        let zero = self.builder.ins().iconst(types::I64, 0);
+                        let limit = self.builder.ins().iconst(types::I64, 64);
+                        let large =
+                            self.builder
+                                .ins()
+                                .icmp(IntCC::UnsignedGreaterThanOrEqual, b, limit);
+                        let moved = self.builder.ins().ishl(a, b);
+                        self.builder.ins().select(large, zero, moved)
+                    }
+                    _ => {
+                        let limit = self.builder.ins().iconst(types::I64, 63);
+                        let clamped = self.builder.ins().umin(b, limit);
+                        self.builder.ins().ushr(a, clamped)
+                    }
+                }
+            }
+            _ => return Ok(None),
+        };
+        let mask = self.builder.ins().iconst(types::I64, mask);
+        Ok(Some((self.builder.ins().band(computed, mask), Rep::Int)))
+    }
+
     fn value(&mut self, value: &MirValue) -> Lowered<(Option<Value>, Rep)> {
+        if let Some(mask) = self.word_mask(value.ty)
+            && let Some((computed, rep)) = self.word_value(value, mask)?
+        {
+            return Ok((Some(computed), rep));
+        }
         match &value.kind {
             MirValueKind::Operand(operand) => self.operand(operand),
             MirValueKind::Unary { op, operand } => {
@@ -2762,6 +2904,7 @@ impl FunctionLower<'_, '_> {
                 };
                 Ok((self.builder.ins().icmp(cc, value, zero), Rep::Bool))
             }
+            (MirUnOp::BitNot, Rep::Int) => Ok((self.builder.ins().bnot(value), Rep::Int)),
             (MirUnOp::BitNot, Rep::Bits(width)) => {
                 let mask = if width == BitsWidth::B64 {
                     -1
