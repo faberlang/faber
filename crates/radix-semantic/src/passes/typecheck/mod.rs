@@ -719,6 +719,12 @@ pub(crate) struct TypeChecker<'a> {
     /// of treating the narrowed type as the binding's new declaration.
     pub(crate) flow_bases: FxHashMap<DefId, BindingInfo>,
 
+    /// Field-path narrowing facts in force for the current branch body (need
+    /// c58fff9c): (base binding, root-to-leaf path) -> narrowed type. Inserted
+    /// by check_block_with_refinement, removed at block exit; joins and the
+    /// implicit fallthrough never carry them.
+    pub(crate) field_facts: FxHashMap<(DefId, Vec<Symbol>), TypeId>,
+
     /// Conversation types of the `@ ad` routes this module can see, keyed
     /// by route (D6.11). Routes absent here type as bare `sermo`.
     pub ad_routes: FxHashMap<Symbol, sermo_route::AdRouteTypes>,
@@ -960,6 +966,7 @@ impl<'a> TypeChecker<'a> {
             locale_pack: None,
             assert_refinements: Vec::new(),
             flow_bases: FxHashMap::default(),
+            field_facts: FxHashMap::default(),
             ad_routes: FxHashMap::default(),
             current_member_owner: None,
             cross_package_structs: FxHashSet::default(),
