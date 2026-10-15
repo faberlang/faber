@@ -8,13 +8,15 @@ int main(void) {
     printf("%s\n", "what\?\?!");
     printf("%s\n", "caf\303\251");
     printf("%s\n", "h\303\251ab");
-    const int64_t stdout_1 = INT64_C(1);
-    const int64_t size_t_v = INT64_C(2);
-    const int64_t v_INT64_MAX = INT64_C(3);
-    const char *const printf_1 = "shadow";
-    printf("%" PRId64 " %" PRId64 " %" PRId64 " %s\n", stdout_1, size_t_v, v_INT64_MAX, printf_1);
-    int64_t count = INT64_C(5);
-    const char *label = "mutable";
-    printf("%" PRId64 " %s\n", count, label);
+    const int64_t l_char = INT64_C(1);
+    const int64_t l_goto = INT64_C(2);
+    const int64_t l_stdout = INT64_C(3);
+    const int64_t l_size_t = INT64_C(4);
+    const int64_t l_INT64_MAX = INT64_C(5);
+    const char *const l_printf = "shadow";
+    printf("%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %s\n", l_char, l_goto, l_stdout, l_size_t, l_INT64_MAX, l_printf);
+    int64_t l_count = INT64_C(5);
+    const char *l_label = "mutable";
+    printf("%" PRId64 " %s\n", l_count, l_label);
     return 0;
 }

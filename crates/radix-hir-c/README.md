@@ -38,7 +38,7 @@ rejected until its exact form lands:
 | integer literals and constant folding of `+ - * / %` (floor `/` and `%`) | folded at emit time, emitted as `INT64_C(n)`, `-INT64_C(n)`, or `INT64_MIN` |
 | `int` and `string` locals, and reads of them | `const int64_t` / `int64_t`, `const char *const` / `const char *`; an immutable integer local with a folded initializer folds when read |
 | text literals | C string literal of the UTF-8 bytes: non-ASCII and control bytes as three-digit octal escapes (a `\x` escape would swallow a following hex digit), `?` escaped so no trigraph forms |
-| Faber names that C or its headers reserve | keywords (C23) and used library names (`printf`, `stdout`, `EOF`, ...) take a numeric suffix; reserved patterns are rewritten: `_X`/`__x` → `v__X`, `*_t` → `*_t_v`, `INT*`/`UINT*` macro spellings and `PRI*`/`SCN*` → `v_*` |
+| local names | the shared binding policy (`prefixed_binding_name`), as on the Rust, Go, TS, Swift, Python and Haskell targets: `l_<name>`. Nothing C reserves starts with `l_`, so a Faber local named `char`, `goto`, `stdout` or `INT64_MAX` is `l_char`, `l_goto`, `l_stdout`, `l_INT64_MAX`, with no keyword table; non-ASCII is sanitized and a resulting clash takes a numeric suffix |
 
 Headers are included only when used: `<inttypes.h>` for any integer,
 `<stdio.h>` for any print. `main` ends with `return 0;`.
@@ -60,4 +60,5 @@ and `ty.rs`.
 (stdout and exit status); `scalars.c` and `c_edges.c` are the pinned emitted
 programs. `tests/fixtures/reject/*.fab` must fail with the named rejection.
 `c_edges.fab` covers the C-specific edges: `INT64_MIN`, `%` in text, `??!`,
-non-ASCII followed by hex digits, and Faber names C reserves.
+non-ASCII followed by hex digits, and Faber locals named like C keywords,
+header objects and macros.

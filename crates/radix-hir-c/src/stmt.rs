@@ -5,6 +5,7 @@ use crate::expr::construct_name;
 use crate::ty::{Ty, classify};
 use crate::{Emitter, Local};
 use radix_codegen_shared::CodegenError;
+use radix_codegen_shared::names::prefixed_binding_name;
 use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirLocal, HirScribeKind, HirStatement,
     HirStatementKind,
@@ -68,7 +69,11 @@ impl Emitter<'_> {
         if class == Ty::Int {
             self.includes.need_ints();
         }
-        let name = self.scope.claim(self.names.resolve_symbol(local.name));
+        let Some(kind) = self.names.binding_kind(local.def_id) else {
+            return Err(unsupported("local the name catalog does not classify"));
+        };
+        let raw = self.names.resolve_symbol(local.name);
+        let name = self.scope.claim(&prefixed_binding_name(kind, raw));
         let line = format!(
             "    {} = {};\n",
             class.declare(&name, local.mutable),

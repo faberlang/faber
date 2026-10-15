@@ -47,8 +47,11 @@ fn constant_folding_is_exact_and_floors() {
         "main {\n    const int neg ← 0 - 7\n    print 2 * 3 + 4\n    print neg\n    print neg / 2\n    print neg % 2\n    print 9223372036854775807\n}",
     );
     assert!(code.contains("INT64_C(10))"), "{code}");
-    assert!(code.contains("const int64_t neg = -INT64_C(7);"), "{code}");
-    assert!(code.contains("\\n\", neg);"), "{code}");
+    assert!(
+        code.contains("const int64_t l_neg = -INT64_C(7);"),
+        "{code}"
+    );
+    assert!(code.contains("\\n\", l_neg);"), "{code}");
     assert!(code.contains("-INT64_C(4))"), "{code}");
     assert!(code.contains("INT64_C(1))"), "{code}");
     assert!(code.contains("INT64_C(9223372036854775807))"), "{code}");
@@ -102,36 +105,38 @@ fn locals_are_typed_const_and_read_back() {
         "main {\n    const int n ← 40 + 2\n    const string s ← \"x\"\n    var int m ← 1\n    var string t ← \"y\"\n    print n, s, m, t\n}",
     );
     assert!(
-        code.contains("    const int64_t n = INT64_C(42);\n"),
+        code.contains("    const int64_t l_n = INT64_C(42);\n"),
         "{code}"
     );
     assert!(
-        code.contains("    const char *const s = \"x\";\n"),
+        code.contains("    const char *const l_s = \"x\";\n"),
         "{code}"
     );
-    assert!(code.contains("    int64_t m = INT64_C(1);\n"), "{code}");
-    assert!(code.contains("    const char *t = \"y\";\n"), "{code}");
-    assert!(code.contains(", n, s, m, t);"), "{code}");
+    assert!(code.contains("    int64_t l_m = INT64_C(1);\n"), "{code}");
+    assert!(code.contains("    const char *l_t = \"y\";\n"), "{code}");
+    assert!(code.contains(", l_n, l_s, l_m, l_t);"), "{code}");
 }
 
+/// Names that are ordinary in Faber but reserved in C (keywords, header
+/// objects and macros) take the shared `l_` prefix like every other local, so
+/// the C keeps the source spelling after the prefix.
 #[test]
 fn c_words_do_not_collide_with_faber_names() {
     let code = emitted(
-        "main {\n    const int stdout ← 1\n    const int printf ← 2\n    const int size_t ← 3\n    print stdout, printf, size_t\n}",
+        "main {\n    const int char ← 1\n    const int goto ← 2\n    const int stdout ← 3\n    const int INT64_MAX ← 4\n    print char, goto, stdout, INT64_MAX\n}",
     );
+    for decl in [
+        "const int64_t l_char = INT64_C(1);",
+        "const int64_t l_goto = INT64_C(2);",
+        "const int64_t l_stdout = INT64_C(3);",
+        "const int64_t l_INT64_MAX = INT64_C(4);",
+    ] {
+        assert!(code.contains(decl), "{decl} in {code}");
+    }
     assert!(
-        code.contains("const int64_t stdout_1 = INT64_C(1);"),
+        code.contains(", l_char, l_goto, l_stdout, l_INT64_MAX);"),
         "{code}"
     );
-    assert!(
-        code.contains("const int64_t printf_1 = INT64_C(2);"),
-        "{code}"
-    );
-    assert!(
-        code.contains("const int64_t size_t_v = INT64_C(3);"),
-        "{code}"
-    );
-    assert!(code.contains(", stdout_1, printf_1, size_t_v);"), "{code}");
 }
 
 #[test]
