@@ -2176,6 +2176,81 @@ functio facere() → lista<numerus> {
 }
 
 #[test]
+fn parses_list_bracket_constructor_in_nested_positions() {
+    // The stated bracket constructor is a value expression at any depth: a
+    // call argument, a parenthesized initializer, and the elements of another
+    // list constructor all build the `verte` over an array.
+    let result = parse_ok(
+        r"
+functio f(lista<numerus> xs) → vacuum {}
+
+functio facere() → lista<lista<numerus>> {
+    f(lista<numerus>[1, 2])
+    fixum _ y ← (lista<numerus>[3, 4])
+    redde lista<lista<numerus>>[lista<numerus>[1], lista<numerus>[2]]
+}
+",
+    );
+
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    let StmtKind::Func(func) = &program.statements[1].kind else {
+        panic!("expected function declaration");
+    };
+    let Some(body) = &func.body else {
+        panic!("expected function body");
+    };
+
+    let StmtKind::Expr(call_stmt) = &body.statements[0].kind else {
+        panic!(
+            "expected expression statement, got {:?}",
+            body.statements[0].kind
+        );
+    };
+    let ExprKind::Call(call) = &call_stmt.expr.kind else {
+        panic!("expected call, got {:?}", call_stmt.expr.kind);
+    };
+    let ExprKind::Verte(verte) = &call.args[0].value.kind else {
+        panic!(
+            "expected verte constructor argument, got {:?}",
+            call.args[0].value.kind
+        );
+    };
+    assert!(
+        matches!(verte.expr.kind, ExprKind::Array(_)),
+        "expected array target, got {:?}",
+        verte.expr.kind
+    );
+
+    let StmtKind::Redde(ret) = &body.statements[2].kind else {
+        panic!(
+            "expected return statement, got {:?}",
+            body.statements[2].kind
+        );
+    };
+    let ret_value = ret.value.as_deref().expect("return value");
+    let ExprKind::Verte(outer) = &ret_value.kind else {
+        panic!("expected verte constructor, got {:?}", ret_value.kind);
+    };
+    let ExprKind::Array(outer_array) = &outer.expr.kind else {
+        panic!("expected array target, got {:?}", outer.expr.kind);
+    };
+    assert_eq!(outer_array.elements.len(), 2);
+}
+
+#[test]
+fn tensor_long_form_constructor_stays_store_position_only() {
+    // Only the collection head's bracket constructor moves into nested
+    // positions; the typed-zero heads keep the store-position refusal.
+    assert_parse_error_issue(
+        "functio f(tensor<f32, [2]> t) → vacuum {}\nincipit { f(tensor<f32, [2]> {}) }",
+        "constructor_store_position_only",
+    );
+}
+
+#[test]
 fn parses_qualified_applied_generic_typed_constructor() {
     let result = parse_ok(
         r"

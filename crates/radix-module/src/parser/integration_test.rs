@@ -244,19 +244,7 @@ fn matrix_long_constructor_is_rejected() {
     assert_call_form_constructor_rejected("incipit { fixum _ m ← matrix<f32, [2, 2]>(1.0, 0.0, 0.0, 1.0) }");
 }
 
-#[test]
-fn list_bracket_constructor_as_call_argument_is_store_position_only() {
-    // The stated bracket constructor is a store-position form: inside a call
-    // argument the parser refuses it with the store-position issue rather
-    // than treating `f(lista<numerus>[1, 2])` as an expression.
-    assert_call_form_constructor_rejected(
-        "functio f(lista<numerus> xs) → vacuum {}\nincipit { f(lista<numerus>[1, 2]) }",
-    );
-}
-
-#[test]
-fn list_bracket_constructor_bound_to_a_name_is_accepted() {
-    let source = "incipit { fixum lista<numerus> xs ← lista<numerus>[1, 2]\n nota xs }";
+fn assert_list_bracket_constructor_accepted(source: &str) {
     let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let analyzed = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default())
         .unwrap_or_else(|diags| panic!("expected the stated bracket constructor to be accepted, got: {diags:?}"));
@@ -265,6 +253,25 @@ fn list_bracket_constructor_bound_to_a_name_is_accepted() {
         "expected no diagnostics for the stated bracket constructor, got: {:?}",
         analyzed.diagnostics
     );
+}
+
+#[test]
+fn list_bracket_constructor_as_call_argument_is_accepted() {
+    // The stated bracket constructor is a value expression at any depth: a
+    // call argument builds the `verte` over the array like an initializer.
+    assert_list_bracket_constructor_accepted(
+        "functio f(lista<numerus> xs) → vacuum { nota xs }\nincipit { f(lista<numerus>[1, 2]) }",
+    );
+}
+
+#[test]
+fn list_bracket_constructor_parenthesized_is_accepted() {
+    assert_list_bracket_constructor_accepted("incipit { fixum lista<numerus> xs ← (lista<numerus>[1, 2])\n nota xs }");
+}
+
+#[test]
+fn list_bracket_constructor_bound_to_a_name_is_accepted() {
+    assert_list_bracket_constructor_accepted("incipit { fixum lista<numerus> xs ← lista<numerus>[1, 2]\n nota xs }");
 }
 
 // =============================================================================
