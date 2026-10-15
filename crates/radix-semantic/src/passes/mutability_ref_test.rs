@@ -217,3 +217,45 @@ fn ref_param_whole_value_write_still_reports_de_parameter() {
         "assign_to_de_parameter",
     );
 }
+
+#[test]
+fn ref_param_field_write_reports_exactly_one_diagnostic() {
+    let src = "genus Punctum { varia numerus x }\nfunctio f(de Punctum p) → vacuum { p.x ← 1 }\nincipit { }";
+    let result = crate::test_support::analyze_source_la(src);
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert_eq!(errors.len(), 1, "one fault, one report: {errors:?}");
+    assert_eq!(
+        crate::test_support::issue(errors[0]),
+        Some(ISSUE_ASSIGN_THROUGH_REF),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn ref_param_index_write_reports_exactly_one_diagnostic() {
+    let src = "functio f(de lista<numerus> xs) → vacuum { xs[0] ← 9 }\nincipit { }";
+    let result = crate::test_support::analyze_source_la(src);
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert_eq!(errors.len(), 1, "one fault, one report: {errors:?}");
+    assert_eq!(
+        crate::test_support::issue(errors[0]),
+        Some(ISSUE_ASSIGN_THROUGH_REF),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn ref_param_whole_value_write_keeps_second_assignment() {
+    let src = "genus Punctum { varia numerus x }\nfunctio f(de Punctum p, Punctum q) → vacuum { p ← q }\nincipit { }";
+    let result = crate::test_support::analyze_source_la(src);
+    let issues: Vec<_> = result
+        .diagnostics
+        .iter()
+        .filter(|d| d.is_error())
+        .filter_map(|d| crate::test_support::issue(d))
+        .collect();
+    assert!(
+        issues.contains(&"immutable_second_assignment"),
+        "whole-value write to a ref param stays write-once: {issues:?}"
+    );
+}

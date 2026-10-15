@@ -78,6 +78,10 @@ struct DefiniteAssignmentChecker<'a> {
     /// Write-once bindings: `fixum` locals and (immutable) parameters. A second
     /// assignment to any of these is rejected; the first initializes them.
     write_once: FxHashSet<DefId>,
+    /// Function-level `de` (ref-view) parameters. A projection write through
+    /// one is the borrow pass's `assign_through_ref` fault alone (one fault,
+    /// one report); only whole-value writes keep the write-once report.
+    ref_params: FxHashSet<DefId>,
     errors: Vec<SemanticError>,
     /// Type table for tensor-index-mutation detection (bracket `ponde` sugar).
     types: &'a TypeTable,
@@ -101,6 +105,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
             states: FxHashMap::default(),
             sponte_slots: FxHashSet::default(),
             write_once: FxHashSet::default(),
+            ref_params: FxHashSet::default(),
             errors: Vec::new(),
             types,
         }
@@ -137,6 +142,9 @@ impl<'a> DefiniteAssignmentChecker<'a> {
         self.reset();
         for param in &func.params {
             self.register_param(param);
+            if self.types.is_ref_view(param.ty) {
+                self.ref_params.insert(param.def_id);
+            }
         }
         if let Some(cli_args) = &func.cli_args {
             self.register_param(cli_args);
@@ -151,6 +159,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
         self.states.clear();
         self.sponte_slots.clear();
         self.write_once.clear();
+        self.ref_params.clear();
     }
 
     fn register_param(&mut self, param: &HirParam) {
@@ -320,7 +329,9 @@ impl<'a> DefiniteAssignmentChecker<'a> {
             // mutability (allowed on `fixum`), not the write-once rule for
             // scalar/struct bindings. The HIR object carries its typecheck
             // type, so a tensor-typed index base is a mutation, not an assign.
-            if !self.is_tensor_index_mutation(target) {
+            if !self.is_tensor_index_mutation(target)
+                && !self.is_ref_param_projection_write(target, def_id)
+            {
                 self.enforce_write_once(def_id, target.span);
                 self.mark_assigned(def_id);
             }
@@ -341,13 +352,38 @@ impl<'a> DefiniteAssignmentChecker<'a> {
             .is_some_and(|ty| crate::tensor_bracket::is_tensor_type(self.types, ty))
     }
 
+    /// Whether a write to `target` is a projection (field/index/deref) write
+    /// through a function-level `de` (ref-view) parameter. The parameter slot
+    /// is caller-initialized, but the projection names the referent's storage,
+    /// and the borrow pass already reports that write as `assign_through_ref`,
+    /// so write-once stays silent (one fault, one report). A whole-value write
+    /// (`p ← q`, plain path target) still rebinds the write-once slot and
+    /// keeps its report. Only function parameters qualify; the borrow pass
+    /// knows ref roots at the function boundary, not closure params.
+    fn is_ref_param_projection_write(&self, target: &HirExpression, def_id: DefId) -> bool {
+        Self::is_projection(target) && self.ref_params.contains(&def_id)
+    }
+
+    /// Whether `target` is a projection (`Field`/`Index`/`Deref`) rather than a
+    /// whole binding path.
+    fn is_projection(expr: &HirExpression) -> bool {
+        matches!(
+            expr.kind,
+            HirExpressionKind::Field(..)
+                | HirExpressionKind::Index(..)
+                | HirExpressionKind::Deref(..)
+        )
+    }
+
     /// Read-modify-write of an lvalue: visit projection inputs once, read the
     /// root binding, then mark it assigned. Used by compound assignments.
     fn op_assign(&mut self, target: &HirExpression) {
         if let Some(def_id) = Self::root_def_id(target) {
             self.check_projection_inputs(target);
             self.read_binding(def_id, target.span);
-            self.enforce_write_once(def_id, target.span);
+            if !self.is_ref_param_projection_write(target, def_id) {
+                self.enforce_write_once(def_id, target.span);
+            }
             self.mark_assigned(def_id);
         } else {
             self.visit_expr(target);
