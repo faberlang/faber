@@ -135,16 +135,20 @@ impl TypeChecker<'_> {
         }
         // Need: an immutable compile-time integer binding is a valid
         // `axis` argument. Record its exact value; a `var` binding is not
-        // recorded, so a named mutable axis stays the named refusal. Only a
-        // binding with no declared type or an integer declared type is an
-        // integer binding: `fractus k ← 1` must not become a constant axis
-        // just because its initializer folds to an integer.
-        let declares_integer = local.ty.is_none_or(|ty| self.is_integer(ty));
-        if !local.mutable && declares_integer {
-            let value = local.init.as_ref().and_then(|init| {
-                super::integer_range::const_int_value_resolved(init, &self.const_int_values)
-            });
-            if let Some(value) = value {
+        // recorded, so a named mutable axis stays the named refusal. The
+        // recorded value is what the declared cell holds after the store, not
+        // the raw initializer (`fixum modulus<u8> k ← 256` holds 0), and a
+        // cell that is not an integer is not recorded: `fractus k ← 1` must
+        // not become a constant axis just because its initializer folds.
+        if !local.mutable {
+            let stored = local
+                .init
+                .as_ref()
+                .and_then(|init| {
+                    super::integer_range::const_int_value_resolved(init, &self.const_int_values)
+                })
+                .and_then(|value| self.stored_const_int(local.ty, value));
+            if let Some(value) = stored {
                 self.const_int_values.insert(local.def_id, value);
             }
         }
