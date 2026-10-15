@@ -528,6 +528,22 @@ help = "أزل الفاصلة قبل الفاصل الختامي"
 message = "رمز غير متوقع"
 help = "أزل الرمز أو انقله إلى موضع صحيح"
 
+[diagnostics.PARSE002.issues.enum_value_out_of_range]
+message = "قيمة عضو enum خارج نطاق 64 بت الموقّع"
+help = "اختر قيمة بين −2^63 و 2^63−1"
+
+[diagnostics.PARSE002.issues.exitus_value_out_of_range]
+message = "رمز exitus خارج نطاق 64 بت الموقّع"
+help = "اختر قيمة بين −2^63 و 2^63−1"
+
+[diagnostics.PARSE002.issues.json_integer_overflow]
+message = "عدد صحيح في حرفية json خارج نطاق 64 بت الموقّع"
+help = "اكتب القيمة كعدد عشري أو كسلسلة"
+
+[diagnostics.PARSE002.issues.test_modifier_integer_out_of_range]
+message = "العدد الصحيح للمُعدِّل `{modifier}` خارج نطاق 64 بت الموقّع"
+help = "اختر قيمة أصغر"
+
 [diagnostics.PARSE002.issues.declaration_block_comma]
 message = "الفواصل لا تفصل أعضاء كتلة الإعلان"
 help = "أزل الفاصلة؛ تُفصل أعضاء الإعلان بأسطر جديدة"
