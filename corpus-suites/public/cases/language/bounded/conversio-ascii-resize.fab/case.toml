@@ -7,8 +7,3 @@ input = "bounded/conversio-ascii-resize.fab"
 
 [expect]
 check_only = true
-
-[targets.runner]
-outcome = "known-fail"
-phase = "run"
-diagnostic_contains = "faberscript unsupported: runtime conversio to BoundedAscii { capacity: IndexId(7) }"

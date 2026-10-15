@@ -12,8 +12,3 @@ check_only = true
 outcome = "known-fail"
 phase = "emit"
 diagnostic_contains = "unsupported MIR lowering: itera collection before iterator MIR lowering"
-
-[targets.runner]
-outcome = "known-fail"
-phase = "run"
-diagnostic_contains = "unsupported MIR lowering: itera collection before iterator MIR lowering"
