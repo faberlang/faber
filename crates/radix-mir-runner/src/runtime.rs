@@ -5290,7 +5290,14 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             return Ok(crate::inf::from_magnus(total));
         }
-        if !values.iter().any(|v| matches!(v, Value::Float(_))) {
+        // A declared float result selects the float fold even when the source
+        // has no Float element (an empty `lista<fractus>`): the integer path
+        // would return an `Int` zero where the type demands a float zero.
+        let float_result = matches!(
+            width,
+            NumericWidth::F16 | NumericWidth::BF16 | NumericWidth::F32 | NumericWidth::F64
+        );
+        if !float_result && !values.iter().any(|v| matches!(v, Value::Float(_))) {
             let overflow = || RunnerError::internal(span, "numerus overflow");
             let mut total: i128 = 0;
             for value in &values {
