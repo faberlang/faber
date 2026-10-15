@@ -21,20 +21,6 @@ const EN_PACK: &str = "../../locale/en/pack.toml";
 // Pre-existing gaps the scan reports today.
 // debt: shrink only; need
 const KNOWN_MISSING_ROWS: &[&str] = &[
-    "annotation_field_name",
-    "declaration_block_comma",
-    "duplicate_nucleum",
-    "enum_value_out_of_range",
-    "exitus_value_out_of_range",
-    "expression_too_long",
-    "label_bind_distinction",
-    "labeled_actual_spread_unsupported",
-    "nesting_too_deep",
-    "nucleum_fragment_conflicts_with_fragment",
-    "promissum_alternate_uses_exit_arrow",
-    "ratio_field_list_hole_not_sole",
-    "ratio_type_arg_label_required",
-    "test_modifier_integer_out_of_range",
     "unexpected_cap_after_union_hole",
     "unexpected_cup_after_union_hole",
 ];
