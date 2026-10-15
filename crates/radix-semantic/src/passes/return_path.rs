@@ -25,9 +25,13 @@
 //!
 //! A `→ T` function body is valid iff it `Terminates`. Loops (`dum`, `itera`)
 //! always `FallsThrough` because their bodies may execute zero times; a bare
-//! `loop` `Terminates` only when no `rumpe` can escape it. `rumpe`/`perge`
-//! transfer control to an enclosing breakable scope, so at function level they
-//! do not satisfy the return contract and are treated as `FallsThrough`.
+//! `loop` `Terminates` only when no `rumpe` can escape it. The do-while
+//! spelling `fac { … } dum verum` lowers to the same `loop` shape and is
+//! accepted by the same rule: its synthesized `si ¬verum { rumpe }` tail is
+//! unreachable, so only a user-written `rumpe` counts as an escape.
+//! `rumpe`/`perge` transfer control to an enclosing breakable scope, so at
+//! function level they do not satisfy the return contract and are treated as
+//! `FallsThrough`.
 //!
 //! The error channel (`iace`, `⇥ E`) does not satisfy the normal `→ T`
 //! channel: a function that only throws on every path still owes a value on
@@ -250,8 +254,22 @@ fn expr_terminates(
         // `dum`/`itera` always fall through because their bodies may run zero
         // times, so they are excluded here — except `dum verum`, whose constant
         // true condition makes the loop provably infinite when no `rumpe`
-        // escapes it.
-        HirExpressionKind::Loop(body) => !contains_rumpe_block(body),
+        // escapes it. The do-while spelling `fac { … } dum cond` lowers to a
+        // `Loop` block, and mirrors the `Dum` arm through that desugaring: for
+        // a literal-true test the synthesized `si ¬cond { rumpe }` tail is
+        // unreachable, so it must not count as an escape. A non-literal-true
+        // condition falls through exactly like `Dum`.
+        HirExpressionKind::Loop(body) => match body.fac_dum_parts() {
+            Some((stmts, _test, cond)) => {
+                is_literal_true(cond)
+                    && stmts.iter().all(|stmt| !contains_rumpe_stmt(stmt))
+                    && body
+                        .expr
+                        .as_ref()
+                        .is_none_or(|expr| !contains_rumpe_expr(expr))
+            }
+            None => !contains_rumpe_block(body),
+        },
         HirExpressionKind::Dum(cond, body) => is_literal_true(cond) && !contains_rumpe_block(body),
         // `Handled` (`fac { … } cape err { … }`) terminates when both the body
         // and the catch terminate: the body may throw into the catch, and the
