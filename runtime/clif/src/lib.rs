@@ -1646,6 +1646,26 @@ pub unsafe extern "C" fn __faber_clif_v1_list_retag(list: *const List, tag: i32)
     )
 }
 
+/// A non-negative integer as fixed-width, zero-padded, lowercase digits in
+/// radix 2, 8 or 16; null when it is negative or wider than `width`.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_text_pack(value: i64, width: i64, radix: i32) -> *const u8 {
+    let Ok(magnitude) = u64::try_from(value) else {
+        return std::ptr::null();
+    };
+    let digits = match radix {
+        16 => format!("{magnitude:x}"),
+        2 => format!("{magnitude:b}"),
+        8 => format!("{magnitude:o}"),
+        _ => return std::ptr::null(),
+    };
+    let width = usize::try_from(width).unwrap_or(0);
+    if digits.len() > width {
+        return std::ptr::null();
+    }
+    text_new(format!("{digits:0>width$}").as_bytes())
+}
+
 /// Text to a list of UTF-8, UTF-16 or UTF-32 units tagged as raw bits.
 ///
 /// # Safety

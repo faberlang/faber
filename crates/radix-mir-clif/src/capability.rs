@@ -188,9 +188,7 @@ impl<'a> ClifCapability<'a> {
             Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => {
                 Some(Gap::Subset("byte buffer value".to_owned()))
             }
-            Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => {
-                Some(Gap::Subset("bounded buffer value".to_owned()))
-            }
+            Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => None,
             Type::Primitive(Primitive::Regex)
             | Type::Primitive(Primitive::Match)
             | Type::Primitive(Primitive::Json)

@@ -200,7 +200,9 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(Primitive::Numerus) => Ok(Rep::Int),
         Type::Primitive(Primitive::Fractus) => Ok(Rep::Float),
         Type::Primitive(Primitive::Bivalens) => Ok(Rep::Bool),
-        Type::Primitive(Primitive::Textus | Primitive::Ascii) => Ok(Rep::Text),
+        Type::Primitive(Primitive::Textus | Primitive::Ascii)
+        | Type::BoundedTextus { .. }
+        | Type::BoundedAscii { .. } => Ok(Rep::Text),
         Type::Bits(width) => Ok(Rep::Bits(*width)),
         Type::Struct(_) | Type::Enum(_) | Type::Interface(_) => Ok(Rep::Record),
         Type::Map(key, value) => {

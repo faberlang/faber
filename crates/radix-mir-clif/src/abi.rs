@@ -561,6 +561,14 @@ pub const TEXT_ENCODE: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, I32],
     ret: Some(Ptr),
 };
+/// A non-negative integer as fixed-width zero-padded digits in radix 2, 8 or
+/// 16 (lowercase): (value, width, radix) -> text. Null when the value is
+/// negative or does not fit the width.
+pub const TEXT_PACK: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_pack",
+    params: &[I64, I64, I32],
+    ret: Some(Ptr),
+};
 /// A list of unit patterns to text: mode 8, 16 or 32 decodes UTF-8, UTF-16 or
 /// UTF-32, mode 1 narrows bytes to ascii. Null when the list is malformed.
 pub const LIST_DECODE: RuntimeSymbol = RuntimeSymbol {
@@ -681,6 +689,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     LIST_TO_SET,
     LIST_RETAG,
     TEXT_ENCODE,
+    TEXT_PACK,
     LIST_DECODE,
     UNION_HAS_TAG,
     UNION_IS_STRUCT,

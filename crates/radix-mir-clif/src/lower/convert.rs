@@ -172,6 +172,14 @@ pub(crate) enum Seq {
     /// A list of unit patterns to text; 8, 16 and 32 decode UTF-8, UTF-16 and
     /// UTF-32, and 1 narrows bytes to ascii. A malformed list fails.
     Decode(u32),
+    /// Text into a bounded text or ascii; a source of more scalars than the
+    /// capacity fails.
+    BoundText { capacity: u64 },
+    /// A bounded text or ascii released to its unbounded text.
+    Release,
+    /// A non-negative integer as zero-padded digits filling a bounded ascii
+    /// (the radix comes from the conversion's `via` hint).
+    Pack { capacity: u64 },
 }
 
 fn list_element(table: &TypeTable, id: TypeId) -> Option<TypeId> {
@@ -207,7 +215,34 @@ pub(crate) fn sequence_conversion(
 ) -> Option<Seq> {
     let rep_ok = |id: TypeId| rep_of(table, MirType::semantic(id)).is_ok();
     let target_type = resolve(table, target);
+    let literal = |capacity: &radix_types::IndexId| match table.get_index(*capacity) {
+        radix_types::IndexExpr::Literal(bound) => Some(*bound),
+        _ => None,
+    };
     match (resolve(table, source), target_type) {
+        (
+            Type::Primitive(Primitive::Textus) | Type::BoundedTextus { .. },
+            Type::BoundedTextus { capacity },
+        )
+        | (
+            Type::Primitive(Primitive::Ascii) | Type::BoundedAscii { .. },
+            Type::BoundedAscii { capacity },
+        ) => Some(Seq::BoundText {
+            capacity: literal(capacity)?,
+        }),
+        (
+            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _),
+            Type::BoundedAscii { capacity },
+        ) => match resolve(table, source) {
+            Type::SizedNumeric(_, NumericWidth::U64) => None,
+            _ => Some(Seq::Pack {
+                capacity: literal(capacity)?,
+            }),
+        },
+        (Type::BoundedTextus { .. }, Type::Primitive(Primitive::Textus))
+        | (Type::BoundedAscii { .. }, Type::Primitive(Primitive::Textus | Primitive::Ascii)) => {
+            Some(Seq::Release)
+        }
         (Type::Array(from) | Type::BoundedArray { element: from, .. }, Type::Set(to))
             if same_type(table, *from, *to) && rep_ok(*to) =>
         {
@@ -394,6 +429,55 @@ impl FunctionLower<'_, '_> {
                         failed,
                         Failure::Static("bits list to textus conversion failed"),
                     )),
+                    Rep::Text,
+                )
+            }
+            Seq::Release => (value, None, Rep::Text),
+            Seq::BoundText { capacity } => {
+                let length = self
+                    .call_runtime(&abi::TEXT_LEN, &[value])?
+                    .ok_or_else(|| Decline::new("length result"))?;
+                let bound = self.builder.ins().iconst(
+                    types::I64,
+                    i64::try_from(capacity).map_err(|_| Decline::new("capacity"))?,
+                );
+                let over = self
+                    .builder
+                    .ins()
+                    .icmp(IntCC::SignedGreaterThan, length, bound);
+                (
+                    value,
+                    Some((
+                        over,
+                        Failure::Static("text to bounded text conversion failed"),
+                    )),
+                    Rep::Text,
+                )
+            }
+            Seq::Pack { capacity } => {
+                let radix = conversion
+                    .params
+                    .iter()
+                    .find_map(|param| match self.state.input.interner.resolve(*param) {
+                        "hex" | "Hex" => Some(16),
+                        "bin" | "Bin" => Some(2),
+                        "oct" | "Oct" => Some(8),
+                        _ => None,
+                    })
+                    .ok_or_else(|| Decline::new("ascii pack without a radix"))?;
+                let width = self.builder.ins().iconst(
+                    types::I64,
+                    i64::try_from(capacity).map_err(|_| Decline::new("capacity"))?,
+                );
+                let radix = self.builder.ins().iconst(types::I32, radix);
+                let packed = self
+                    .call_runtime(&abi::TEXT_PACK, &[value, width, radix])?
+                    .ok_or_else(|| Decline::new("pack result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, packed, zero);
+                (
+                    packed,
+                    Some((failed, Failure::Static("ascii_pack_width_overflow"))),
                     Rep::Text,
                 )
             }

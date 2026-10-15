@@ -594,6 +594,23 @@ fn none_typed_local_is_capable() {
 }
 
 #[test]
+fn bounded_text_is_capable_and_bounded_bytes_are_not() {
+    let mut types = TypeTable::new();
+    let capacity = types.intern_index(radix_types::IndexExpr::Literal(8));
+    let text = MirType::semantic(types.bounded_textus(capacity));
+    let ascii = MirType::semantic(types.bounded_ascii(capacity));
+    for ty in [text, ascii] {
+        let verdict = local_verdict(&types, ty);
+        assert!(verdict.is_capable(), "a bounded text: {verdict:?}");
+    }
+    let bytes = MirType::semantic(types.bounded_octeti(capacity));
+    let verdict = local_verdict(&types, bytes);
+    let gaps = verdict.gaps();
+    assert_eq!(gaps.len(), 1, "{gaps:?}");
+    assert_eq!(gaps[0].shape(), "byte buffer value");
+}
+
+#[test]
 fn references_are_values_or_shared_handles() {
     let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
