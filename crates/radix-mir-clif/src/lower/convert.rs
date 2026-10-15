@@ -38,6 +38,8 @@ pub(crate) enum Num {
     Text,
     /// A `littera`: a text handle of one letter.
     Char,
+    /// A `regex`: a compiled program behind a handle.
+    Regex,
     Bits(BitsWidth),
 }
 
@@ -72,6 +74,7 @@ fn num_of(table: &TypeTable, id: TypeId) -> Option<Num> {
         Type::Primitive(Primitive::Bivalens) => Some(Num::Bool),
         Type::Primitive(Primitive::Textus | Primitive::Ascii) => Some(Num::Text),
         Type::Primitive(Primitive::Littera) => Some(Num::Char),
+        Type::Primitive(Primitive::Regex) => Some(Num::Regex),
         Type::Bits(width) => Some(Num::Bits(*width)),
         _ => None,
     }
@@ -128,6 +131,8 @@ pub(crate) fn numeric_conversion(
         // A letter is a one-letter text: digits and code points convert both
         // ways, and a text converts when it holds exactly one letter.
         (Num::Text | Num::Int(_), Num::Char) => true,
+        // A pattern compiles once, in the conversion, and fails when rejected.
+        (Num::Text, Num::Regex) => true,
         (Num::Char, Num::Int(to)) => to.policy == IntPolicy::Trap,
         // A signed integer or an unsigned one below 64 bits reads and writes
         // a same-width pattern; a u64 pattern would leave the carrier.
@@ -447,6 +452,8 @@ enum Failure {
     Static(&'static str),
     /// A runtime status code (see `abi::CONVERT_MESSAGE`).
     Code(Value),
+    /// A message text already built.
+    Message(Value),
 }
 
 impl FunctionLower<'_, '_> {
@@ -469,6 +476,7 @@ impl FunctionLower<'_, '_> {
             Num::Bool => Rep::Bool,
             Num::Bits(width) => Rep::Bits(width),
             Num::Char => Rep::Char,
+            Num::Regex => Rep::Regex,
             Num::Text => return Err(Decline::new("text conversion target")),
         };
         let converted = match (failed, recovery) {
@@ -780,6 +788,17 @@ impl FunctionLower<'_, '_> {
             (Num::Float(_), Num::Float(_)) => (value, None),
             (Num::Float(_), Num::Int(to)) => self.float_to_int(conversion, to, value)?,
             (Num::Text, Num::Int(to)) => self.text_to_int(conversion, to, value)?,
+            (Num::Text, Num::Regex) => {
+                let program = self
+                    .call_runtime(&abi::REGEX_COMPILE, &[value])?
+                    .ok_or_else(|| Decline::new("regex result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::Equal, program, zero);
+                let message = self
+                    .call_runtime(&abi::REGEX_ERROR, &[])?
+                    .ok_or_else(|| Decline::new("regex error result"))?;
+                (program, Some((failed, Failure::Message(message))))
+            }
             (Num::Text, Num::Char) => {
                 let letter = self
                     .call_runtime(&abi::CHAR_FROM_TEXT, &[value])?
@@ -1112,6 +1131,7 @@ impl FunctionLower<'_, '_> {
         self.builder.switch_to_block(raise);
         let message = match failure {
             Failure::Static(text) => self.text_literal(text.as_bytes())?,
+            Failure::Message(text) => text,
             Failure::Code(code) => self
                 .call_runtime(&abi::CONVERT_MESSAGE, &[code])?
                 .ok_or_else(|| Decline::new("conversion message result"))?,

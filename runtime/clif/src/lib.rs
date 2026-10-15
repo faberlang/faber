@@ -13,6 +13,9 @@
 //! blocks are declined), so the process-global state needs no locking beyond
 //! what a `static` demands.
 
+mod regex_program;
+mod regex_rt;
+
 use std::ffi::CStr;
 use std::ffi::c_char;
 use std::io::Write;
@@ -304,6 +307,8 @@ const TAG_STRUCT: i32 = 9;
 const TAG_OPT: i32 = 10;
 const TAG_MAP: i32 = 11;
 const TAG_CHAR: i32 = 12;
+const TAG_MATCH: i32 = 13;
+const TAG_REGEX: i32 = 14;
 
 /// A runtime map (`set` false) or set (`set` true): tagged key/value entries
 /// in insertion order.
@@ -358,6 +363,8 @@ fn element_text(tag: i32, bits: i64) -> String {
                 .next()
                 .unwrap_or_default()
         ),
+        TAG_MATCH => regex_rt::match_element_text(bits),
+        TAG_REGEX => regex_rt::regex_element_text(bits),
         TAG_LIST => list_text(unsafe { list_ref(bits as *const List) }),
         TAG_STRUCT => record_text(unsafe { &*(bits as *const Record) }),
         TAG_OPT => match unsafe { (bits as *const Present).as_ref() } {
@@ -899,6 +906,8 @@ fn element_equal(tag: i32, left: i64, right: i64) -> bool {
         TAG_TEXT | TAG_CHAR => unsafe {
             text_bytes(left as *const u8) == text_bytes(right as *const u8)
         },
+        TAG_MATCH => regex_rt::match_element_equal(left, right),
+        TAG_REGEX => regex_rt::regex_element_equal(left, right),
         TAG_STRUCT => unsafe {
             record_equal(&*(left as *const Record), &*(right as *const Record))
         },

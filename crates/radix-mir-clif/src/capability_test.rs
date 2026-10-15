@@ -192,7 +192,7 @@ fn littera_is_capable_and_a_map_of_letters_names_gap() {
 #[test]
 fn gaps_keep_storage_order() {
     let types = TypeTable::new();
-    let string = ty(&types, Primitive::Regex);
+    let string = ty(&types, Primitive::Json);
     let instans = ty(&types, Primitive::Instans);
     let program = single_function(FunctionShape {
         params: vec![param(0, string)],

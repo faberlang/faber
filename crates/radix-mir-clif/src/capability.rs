@@ -191,10 +191,8 @@ impl<'a> ClifCapability<'a> {
                     .then(|| Gap::Subset("byte buffer value".to_owned()))
             }
             Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => None,
-            Type::Primitive(Primitive::Regex)
-            | Type::Primitive(Primitive::Match)
-            | Type::Primitive(Primitive::Json)
-            | Type::Primitive(Primitive::Valor) => {
+            Type::Primitive(Primitive::Regex | Primitive::Match) => None,
+            Type::Primitive(Primitive::Json) | Type::Primitive(Primitive::Valor) => {
                 Some(Gap::Subset("dynamic data value".to_owned()))
             }
             Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => {
@@ -393,7 +391,7 @@ impl<'a> ClifCapability<'a> {
             MirConstant::String(_) => None,
             MirConstant::Ascii(_) => None,
             MirConstant::Octeti(_) => Some(Gap::Subset("byte constant".to_owned())),
-            MirConstant::Regex { .. } => Some(Gap::Subset("regex constant".to_owned())),
+            MirConstant::Regex { .. } => None,
             MirConstant::Nil => None,
             MirConstant::Function(_) => None,
             MirConstant::Magnus(_) => Some(Gap::Subset("inf constant".to_owned())),
@@ -662,6 +660,18 @@ impl MirVisitor for ClifCapability<'_> {
                             | MirCollectionOp::Round
                             | MirCollectionOp::Truncate
                             | MirCollectionOp::CordCursor
+                            | MirCollectionOp::TextEscape
+                            | MirCollectionOp::RegexMatches
+                            | MirCollectionOp::RegexFind
+                            | MirCollectionOp::RegexFindAll
+                            | MirCollectionOp::RegexSplit
+                            | MirCollectionOp::RegexReplace
+                            | MirCollectionOp::RegexReplaceEach
+                            | MirCollectionOp::MatchText
+                            | MirCollectionOp::MatchStart
+                            | MirCollectionOp::MatchEnd
+                            | MirCollectionOp::MatchGroup
+                            | MirCollectionOp::MatchNamed
                             | MirCollectionOp::Absolute
                             | MirCollectionOp::Signum
                             | MirCollectionOp::Minimum

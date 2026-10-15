@@ -157,6 +157,10 @@ pub(crate) enum Rep {
     /// `littera`: a text handle of one letter. It displays as that letter
     /// alone, and quoted with single quotes inside a collection.
     Char,
+    /// `regex`: a handle to a compiled program.
+    Regex,
+    /// `match`: a handle to one match record.
+    Match,
     /// No value.
     Unit,
 }
@@ -169,6 +173,8 @@ impl Rep {
             Self::Bool => Some(types::I8),
             Self::Text
             | Self::Char
+            | Self::Regex
+            | Self::Match
             | Self::Bits(_)
             | Self::List
             | Self::Record
@@ -206,6 +212,8 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(Primitive::Numerus) => Ok(Rep::Int),
         Type::Primitive(Primitive::Fractus) => Ok(Rep::Float),
         Type::Primitive(Primitive::Littera) => Ok(Rep::Char),
+        Type::Primitive(Primitive::Regex) => Ok(Rep::Regex),
+        Type::Primitive(Primitive::Match) => Ok(Rep::Match),
         Type::Primitive(Primitive::Bivalens) => Ok(Rep::Bool),
         Type::Primitive(Primitive::Textus | Primitive::Ascii)
         | Type::BoundedTextus { .. }
@@ -913,6 +921,8 @@ impl FunctionLower<'_, '_> {
             Rep::Bool => Some(self.builder.ins().iconst(types::I8, 0)),
             Rep::Text
             | Rep::Char
+            | Rep::Regex
+            | Rep::Match
             | Rep::Bits(_)
             | Rep::List
             | Rep::Record
@@ -992,6 +1002,25 @@ impl FunctionLower<'_, '_> {
             MirConstant::Unit => (None, Rep::Unit),
             MirConstant::Nil => (Some(self.builder.ins().iconst(types::I64, 0)), Rep::Opt),
             MirConstant::Function(id) => (Some(self.plain_function_value(*id)?), Rep::Func),
+            MirConstant::Regex { pattern, flags } => {
+                // The body is raw; the flags prefix an inline group, as the
+                // runner builds it.
+                let pattern = self.state.input.interner.resolve(*pattern).to_owned();
+                let flags = flags.map(|flags| self.state.input.interner.resolve(flags).to_owned());
+                let mapped: String = flags
+                    .iter()
+                    .flat_map(|flags| flags.chars())
+                    .filter(|flag| matches!(flag, 'i' | 'm' | 's' | 'u' | 'U' | 'x'))
+                    .collect();
+                let text = if mapped.is_empty() {
+                    pattern
+                } else {
+                    format!("(?{mapped}){pattern}")
+                };
+                let literal = self.text_literal(text.as_bytes())?;
+                let program = self.call_runtime(&abi::REGEX_LITERAL, &[literal])?;
+                (program, Rep::Regex)
+            }
             MirConstant::String(symbol) | MirConstant::Ascii(symbol) => {
                 let text = radix_lexer::textus_literal::decode_textus_literal(
                     self.state.input.interner.resolve(*symbol),
@@ -1234,6 +1263,8 @@ impl FunctionLower<'_, '_> {
             Rep::Bool => abi::TAG_BOOL,
             Rep::Text => abi::TAG_TEXT,
             Rep::Char => abi::TAG_CHAR,
+            Rep::Regex => abi::TAG_REGEX,
+            Rep::Match => abi::TAG_MATCH,
             Rep::Bits(width) => abi::TAG_BITS + i64::from(width.bits().trailing_zeros() - 3),
             Rep::List => abi::TAG_LIST,
             Rep::Record => abi::TAG_STRUCT,
@@ -2095,6 +2126,83 @@ impl FunctionLower<'_, '_> {
                     (_, false) => self.builder.ins().fmax(handle, other),
                 };
                 (Some(picked), rep)
+            }
+            (MirCollectionOp::TextEscape, Rep::Text) => {
+                (self.call_runtime(&abi::TEXT_ESCAPE, &[handle])?, Rep::Text)
+            }
+            (
+                MirCollectionOp::RegexMatches
+                | MirCollectionOp::RegexFind
+                | MirCollectionOp::RegexFindAll
+                | MirCollectionOp::RegexSplit,
+                Rep::Regex,
+            ) => {
+                let [_, text] = args else {
+                    return Err(Decline::new("regex operation arity"));
+                };
+                let (text, text_rep) = self.scalar(text)?;
+                if !matches!(text_rep, Rep::Text | Rep::Char) {
+                    return Err(Decline::new("regex operation on a non-text"));
+                }
+                let (symbol, result) = match op {
+                    MirCollectionOp::RegexMatches => (&abi::REGEX_MATCHES, Rep::Bool),
+                    MirCollectionOp::RegexFind => (&abi::REGEX_FIND, Rep::Opt),
+                    MirCollectionOp::RegexFindAll => (&abi::REGEX_FIND_ALL, Rep::List),
+                    _ => (&abi::REGEX_SPLIT, Rep::List),
+                };
+                (self.call_runtime(symbol, &[handle, text])?, result)
+            }
+            (MirCollectionOp::RegexReplace | MirCollectionOp::RegexReplaceEach, Rep::Regex) => {
+                let [_, text, replacement] = args else {
+                    return Err(Decline::new("regex replace arity"));
+                };
+                let (text, text_rep) = self.scalar(text)?;
+                let (replacement, replacement_rep) = self.scalar(replacement)?;
+                let wanted = if op == MirCollectionOp::RegexReplace {
+                    Rep::Text
+                } else {
+                    Rep::List
+                };
+                if !matches!(text_rep, Rep::Text | Rep::Char)
+                    || (replacement_rep != wanted
+                        && !(wanted == Rep::Text && replacement_rep == Rep::Char))
+                {
+                    return Err(Decline::new("regex replace operands"));
+                }
+                let symbol = if op == MirCollectionOp::RegexReplace {
+                    &abi::REGEX_REPLACE
+                } else {
+                    &abi::REGEX_REPLACE_EACH
+                };
+                (
+                    self.call_runtime(symbol, &[handle, text, replacement])?,
+                    Rep::Text,
+                )
+            }
+            (
+                MirCollectionOp::MatchText
+                | MirCollectionOp::MatchStart
+                | MirCollectionOp::MatchEnd,
+                Rep::Match,
+            ) => {
+                let (symbol, result) = match op {
+                    MirCollectionOp::MatchText => (&abi::MATCH_TEXT, Rep::Text),
+                    MirCollectionOp::MatchStart => (&abi::MATCH_START, Rep::Int),
+                    _ => (&abi::MATCH_END, Rep::Int),
+                };
+                (self.call_runtime(symbol, &[handle])?, result)
+            }
+            (MirCollectionOp::MatchGroup | MirCollectionOp::MatchNamed, Rep::Match) => {
+                let [_, selector] = args else {
+                    return Err(Decline::new("match group arity"));
+                };
+                let (selector, selector_rep) = self.scalar(selector)?;
+                let symbol = match (op, selector_rep) {
+                    (MirCollectionOp::MatchGroup, Rep::Int) => &abi::MATCH_GROUP,
+                    (MirCollectionOp::MatchNamed, Rep::Text | Rep::Char) => &abi::MATCH_NAMED,
+                    _ => return Err(Decline::new("match group selector")),
+                };
+                (self.call_runtime(symbol, &[handle, selector])?, Rep::Opt)
             }
             (MirCollectionOp::Index, Rep::Text) => {
                 let [_, index] = args else {
@@ -3658,6 +3766,8 @@ impl FunctionLower<'_, '_> {
     fn render_text_at(&mut self, value: Value, rep: Rep, narrow: i64) -> Lowered<Value> {
         let rendered = match rep {
             Rep::Text | Rep::Char => return Ok(value),
+            Rep::Regex => self.call_runtime(&abi::REGEX_TEXT, &[value])?,
+            Rep::Match => self.call_runtime(&abi::MATCH_TEXT, &[value])?,
             Rep::Int if self.is_wide(value) => self.text_from_wide(value)?,
             Rep::Int => self.call_runtime(&abi::TEXT_FROM_I64, &[value])?,
             Rep::Float => {
@@ -4020,6 +4130,11 @@ impl FunctionLower<'_, '_> {
                 let reference = self.runtime_ref(&abi::PRINT_MAP)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
+            Rep::Regex | Rep::Match => {
+                let text = self.render_text(value, rep)?;
+                let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
+                self.builder.ins().call(reference, &[stream, text]);
+            }
             Rep::Text | Rep::Char => {
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
                 self.builder.ins().call(reference, &[stream, value]);
@@ -4350,6 +4465,8 @@ impl FunctionLower<'_, '_> {
             Rep::Bool => self.bool_binary(op, a, b),
             Rep::Text => self.text_binary(op, a, b),
             Rep::Char
+            | Rep::Regex
+            | Rep::Match
             | Rep::Bits(_)
             | Rep::List
             | Rep::Record

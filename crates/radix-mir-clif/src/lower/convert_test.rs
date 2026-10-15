@@ -118,7 +118,8 @@ fn union_targets_test_each_member_and_reject_unlowered_members() {
     let regex = f.primitive(Primitive::Regex);
     let mixed = f.types.intern(Type::Union(vec![int, text]));
     let with_none = f.types.intern(Type::Union(vec![int, none]));
-    let with_regex = f.types.intern(Type::Union(vec![int, regex]));
+    let json = f.primitive(Primitive::Json);
+    let with_json = f.types.intern(Type::Union(vec![int, json]));
     // Union members are stored in id order, so the tests come in either order.
     let tests = member_tests(&f.types, mixed).expect("a union of scalars tests by tag");
     assert_eq!(tests.len(), 2);
@@ -130,7 +131,7 @@ fn union_targets_test_each_member_and_reject_unlowered_members() {
     // null and a member outside the subset is refused.
     assert!(rep_of(&f.types, MirType::semantic(mixed)).is_ok());
     assert!(rep_of(&f.types, MirType::semantic(with_none)).is_err());
-    assert!(rep_of(&f.types, MirType::semantic(with_regex)).is_err());
+    assert!(rep_of(&f.types, MirType::semantic(with_json)).is_err());
 }
 
 #[test]

@@ -78,6 +78,11 @@ pub const TAG_MAP: i64 = 11;
 /// A `littera` element: the payload is a text handle of one letter; it
 /// displays quoted with single quotes inside a collection.
 pub const TAG_CHAR: i64 = 12;
+/// A `match` element: a handle to a match record; it displays as its text.
+pub const TAG_MATCH: i64 = 13;
+/// A `regex` element: a handle to a compiled program; it displays as its
+/// pattern.
+pub const TAG_REGEX: i64 = 14;
 
 /// New empty map (flag 0) or set (flag 1).
 pub const MAP_NEW: RuntimeSymbol = RuntimeSymbol {
@@ -559,6 +564,105 @@ pub const F16_FROM_BITS: RuntimeSymbol = RuntimeSymbol {
     params: &[I64],
     ret: Some(F64),
 };
+/// Compile a pattern text: text -> regex handle, or null when the pattern is
+/// rejected (its payload is [`REGEX_ERROR`]).
+pub const REGEX_COMPILE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_compile",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// The payload of the latest rejected pattern, as a text.
+pub const REGEX_ERROR: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_error",
+    params: &[],
+    ret: Some(Ptr),
+};
+/// A regex literal's pattern text -> regex handle; an invalid constant ends
+/// the run.
+pub const REGEX_LITERAL: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_literal",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Whether a regex matches anywhere in a text: (regex, text) -> bool.
+pub const REGEX_MATCHES: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_matches",
+    params: &[Ptr, Ptr],
+    ret: Some(I8),
+};
+/// The leftmost-first match: (regex, text) -> a present optional or null.
+pub const REGEX_FIND: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_find",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// Every non-overlapping match: (regex, text) -> list of matches.
+pub const REGEX_FIND_ALL: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_find_all",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// The pieces between the matches: (regex, text) -> list of texts.
+pub const REGEX_SPLIT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_split",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// Every match replaced by a literal text: (regex, text, replacement) -> text.
+pub const REGEX_REPLACE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_replace",
+    params: &[Ptr, Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// The i-th match replaced by the i-th text of a list: (regex, text,
+/// replacements) -> text.
+pub const REGEX_REPLACE_EACH: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_replace_each",
+    params: &[Ptr, Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// The text of a match.
+pub const MATCH_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_match_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// The code-point offset where a match starts.
+pub const MATCH_START: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_match_start",
+    params: &[Ptr],
+    ret: Some(I64),
+};
+/// The code-point offset where a match ends.
+pub const MATCH_END: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_match_end",
+    params: &[Ptr],
+    ret: Some(I64),
+};
+/// A numbered group: (match, index) -> a present text or null.
+pub const MATCH_GROUP: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_match_group",
+    params: &[Ptr, I64],
+    ret: Some(Ptr),
+};
+/// A named group: (match, name) -> a present text or null.
+pub const MATCH_NAMED: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_match_named",
+    params: &[Ptr, Ptr],
+    ret: Some(Ptr),
+};
+/// A pattern text matching the text literally.
+pub const TEXT_ESCAPE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_escape",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// The pattern of a regex, as a text (its display).
+pub const REGEX_TEXT: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_regex_text",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
 /// Install the program's output tokens (true, false, none, tuple), each as
 /// (pointer, length).
 pub const SET_DISPLAY_TOKENS: RuntimeSymbol = RuntimeSymbol {
@@ -768,6 +872,22 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     MAIN,
     PRINT_I64,
     PRINT_WIDE,
+    REGEX_COMPILE,
+    REGEX_ERROR,
+    REGEX_LITERAL,
+    REGEX_MATCHES,
+    REGEX_FIND,
+    REGEX_FIND_ALL,
+    REGEX_SPLIT,
+    REGEX_REPLACE,
+    REGEX_REPLACE_EACH,
+    MATCH_TEXT,
+    MATCH_START,
+    MATCH_END,
+    MATCH_GROUP,
+    MATCH_NAMED,
+    TEXT_ESCAPE,
+    REGEX_TEXT,
     F16_TO_BITS,
     F16_FROM_BITS,
     TEXT_CHARS,
