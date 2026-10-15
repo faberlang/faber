@@ -14,7 +14,13 @@
 //! - Latin fallback is explicit pack data.
 //! - Diagnostic templates use named placeholders only. Positional placeholders
 //!   such as `{0}` are rejected before a renderer sees them. Optional fragments
-//!   may be gated by a named placeholder with `{?name|prefix|suffix}`.
+//!   may be gated by a named placeholder with `{?name|prefix|suffix}`. A doubled
+//!   open brace `{{` renders one literal `{` (there is no `}}` form, and a lone
+//!   `}` stays literal).
+//!
+//!   WHY: diagnostics must be able to quote the language's own braced syntax —
+//!   LEX003's `u{...}` hex escape, SEM016's `_ { … }` — without the renderer
+//!   reading those braces as placeholders.
 //! - A library may ship member-only packs at `<lib>/locale/<id>/pack.toml`.
 //!   Those files are not reader packs: they carry `[pack]` + `[[library_members]]`
 //!   and are merged into the consumer reader pack before projection. A missing
@@ -556,7 +562,8 @@ impl LocalePack {
     /// # Errors
     ///
     /// Returns [`DiagnosticTemplateRenderError`] if a template contains unclosed
-    /// or malformed placeholders or a required placeholder value is missing.
+    /// or malformed placeholders or a required placeholder value is missing. A
+    /// doubled open brace `{{` is the literal-brace escape, not an error.
     pub fn render_diagnostic_text(
         &self,
         diagnostic: &Diagnostic,
@@ -595,6 +602,12 @@ impl LocalePack {
         Ok(Some(RenderedDiagnosticText { message, help }))
     }
 
+    /// Render one template, substituting placeholders from `args`.
+    ///
+    /// `{{` is the literal-brace escape: the pair renders one `{` and is not a
+    /// placeholder. This lets a diagnostic quote the language's braced syntax
+    /// (`u{...}`, `_ { … }`). A lone `}` is literal, and a single-brace
+    /// placeholder's behavior is unchanged.
     fn render_template(
         &self,
         code: &str,
@@ -608,6 +621,13 @@ impl LocalePack {
         while let Some(start) = rest.find('{') {
             rendered.push_str(&rest[..start]);
             let after_open = &rest[start + 1..];
+            // WHY: `{{` is the literal-brace escape, so a diagnostic can quote
+            // the language's braced forms without a placeholder parse.
+            if let Some(literal) = after_open.strip_prefix('{') {
+                rendered.push('{');
+                rest = literal;
+                continue;
+            }
             let Some(end) = after_open.find('}') else {
                 return Err(DiagnosticTemplateRenderError::UnclosedPlaceholder {
                     code: code.to_string(),
@@ -2289,6 +2309,12 @@ fn validate_template(
 
     while let Some(start) = rest.find('{') {
         let after_open = &rest[start + 1..];
+        // WHY: `{{` is the literal-brace escape; it must validate the same way
+        // it renders, so pack rows can quote the language's braced forms.
+        if let Some(literal) = after_open.strip_prefix('{') {
+            rest = literal;
+            continue;
+        }
         let Some(end) = after_open.find('}') else {
             issues.push(LocalePackIssue::UnclosedTemplatePlaceholder {
                 code: code.to_string(),
