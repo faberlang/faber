@@ -356,6 +356,22 @@ help = "पहले lexer error ठीक करें; parsing साफ token
 message = "token अपेक्षित है"
 help = "सुनिश्चित करें कि इस स्थान पर अपेक्षित token मौजूद है"
 
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "कॉपी-इन ऑपरेटर `{operator}` के बाद एक मान आवश्यक है"
+help = "`⇇` के बाद स्रोत अभिव्यक्ति लिखें"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "टपल तत्व लेबल `{label}` एक से अधिक बार प्रयोग किया गया है"
+help = "प्रत्येक तत्व को अलग लेबल दें, या लेबल हटा दें"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "implements स्लॉट को एक अनुबंध का नाम देना चाहिए; `_` अनुरूपता घोषणा नहीं है"
+help = "implements क्लॉज़ में अनुबंध का नाम लिखें"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "आयात फ़ील्ड एक पहचानकर्ता होना चाहिए"
+help = "आयातित फ़ील्ड के लिए एक सरल नाम लिखें"
+
 [diagnostics.PARSE001.issues.annotation_name]
 message = "annotation नाम अपेक्षित है"
 help = "@ के बाद annotation नाम जोड़ें"

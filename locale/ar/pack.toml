@@ -356,6 +356,22 @@ help = "أصلح خطأ المحلل المعجمي أولا؛ يستمر الت
 message = "مطلوب{?expected| |}"
 help = "أضف{?expected| |} في هذا الموضع"
 
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "مطلوب قيمة بعد عامل النسخ الداخلي `{operator}`"
+help = "اكتب تعبير المصدر بعد `⇇`"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "تسمية عنصر الصف `{label}` مستخدمة أكثر من مرة"
+help = "أعطِ كل عنصر تسمية مختلفة، أو احذف التسميات"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "يجب أن يسمّي فتحة implements عقدًا؛ `_` ليس إعلان مطابقة"
+help = "اكتب اسم العقد في جملة implements"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "يجب أن يكون حقل الاستيراد معرّفًا"
+help = "اكتب اسمًا بسيطًا للحقل المستورد"
+
 [diagnostics.PARSE001.issues.annotation_name]
 message = "مطلوب اسم تعليمة"
 help = "أضف اسم التعليمة بعد @"
