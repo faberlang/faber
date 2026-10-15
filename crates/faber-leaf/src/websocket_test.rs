@@ -3,7 +3,10 @@
 use super::{empty_text_frame, is_route, reset_handles, serve, split_ws_url, wrap_tls};
 use crate::http;
 use crate::value::{Arg, Reply};
+use std::io::Read;
+use std::net::TcpListener;
 use std::thread;
+use std::time::Duration;
 
 fn serve_ok(route: &str, args: &[Arg]) -> Reply {
     serve(route, args)
@@ -97,6 +100,44 @@ fn echo_round_trips() {
         panic!("client receive: {got:?}");
     };
     assert!(fields.contains(&("text".to_owned(), Reply::Str("ping".to_owned()))));
+}
+
+#[test]
+fn connect_open_writes_upgrade_request_and_pends() {
+    let _guard = crate::test_support::handle_table_guard();
+    reset_handles();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let url = format!("ws://127.0.0.1:{port}/chat");
+    let id = match serve_ok("websocket:connect_open", &[Arg::Str(url)]) {
+        Reply::Int(id) => id,
+        other => panic!("connect_open: {other:?}"),
+    };
+    let (mut peer, _) = listener.accept().unwrap();
+    peer.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let mut request = Vec::new();
+    let mut buffer = [0_u8; 512];
+    while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+        let count = peer.read(&mut buffer).unwrap();
+        assert_ne!(count, 0, "peer closed before the upgrade headers arrived");
+        request.extend_from_slice(&buffer[..count]);
+    }
+    let request = String::from_utf8(request).unwrap();
+    assert!(request.starts_with("GET /chat HTTP/1.1\r\n"));
+    assert!(request.contains("Upgrade: websocket\r\n"));
+    assert!(request.contains("Connection: Upgrade\r\n"));
+    assert!(request.contains("Sec-WebSocket-Version: 13\r\n"));
+    let key = request
+        .lines()
+        .find_map(|line| line.strip_prefix("Sec-WebSocket-Key:"))
+        .map(str::trim)
+        .unwrap_or_default();
+    assert!(!key.is_empty(), "missing Sec-WebSocket-Key value");
+    assert!(matches!(
+        serve("websocket:send", &[Arg::Int(id), Arg::Str("x".into())]),
+        Some(Err(_))
+    ));
+    reset_handles();
 }
 
 #[test]

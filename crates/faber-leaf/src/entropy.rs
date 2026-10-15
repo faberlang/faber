@@ -232,6 +232,17 @@ fn splitmix64(seed: &mut u64) -> u64 {
     z ^ (z >> 31)
 }
 
+pub(crate) fn fill_random(buf: &mut [u8]) {
+    if os_entropy(buf).is_err() {
+        with_rng(|rng| {
+            for chunk in buf.chunks_mut(8) {
+                let bytes = rng.next_u64().to_le_bytes();
+                chunk.copy_from_slice(&bytes[..chunk.len()]);
+            }
+        });
+    }
+}
+
 #[cfg(unix)]
 fn os_entropy(buf: &mut [u8]) -> io::Result<()> {
     std::fs::File::open("/dev/urandom")?.read_exact(buf)
