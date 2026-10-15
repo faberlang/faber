@@ -317,6 +317,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
                 value => self.convert_to_eager_sequence(
                     value,
+                    source_ty,
                     target_ty,
                     struct_defaults,
                     recovery,
