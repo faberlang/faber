@@ -230,6 +230,10 @@ impl Emitter<'_> {
                     let receiver = self.expr(receiver)?;
                     return self.float_method(&receiver, receiver_ty, *method, args);
                 }
+                if let (Some(Ty::Text), Some(receiver_ty)) = (class, receiver.ty) {
+                    let receiver = self.expr(receiver)?;
+                    return self.text_method(receiver, receiver_ty, *method, args);
+                }
                 self.list_method(receiver, *method, args)
             }
             HirExpressionKind::Struct(def_id, fields) => {

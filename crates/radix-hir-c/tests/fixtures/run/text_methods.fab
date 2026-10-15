@@ -1,0 +1,35 @@
++++
+locale = "en"
++++
+# Text methods count code points, as the runner does; case mapping is ASCII.
+main {
+    const string s ← "héllo😀 Wörld"
+    print s.length()
+    print "Hello World".uppercase()
+    print "Hello World".lowercase()
+    print "  pad  ".trim()
+    print s.contains("llo")
+    print s.slice(1, 4)
+    print "a,b,,c".split(",")
+    print "aXbXc".replace("X", "--")
+    print s.starts_with("hé"), s.ends_with("ld"), s.is_empty()
+    print "\t x\n".trim()
+    print "abcdef".slice(2, 100)
+    print "abcdef".slice(4, 2)
+    print "[" + "abcdef".slice(3, 3) + "]"
+    print "abc".split("")
+    print "".split(",")
+    print "abc".split("abc")
+    print "aaa".replace("a", "bb")
+    print "abc".replace("", "-")
+    print "abc".replace("zz", "-")
+    print "abc".contains("")
+    print "".is_empty()
+    print "a\u{00A0}b".trim().length()
+    print "\u{00A0} x \u{3000}".trim()
+    print s[1]
+    print s[5]
+    const string t ← "xyz"
+    print t[2]
+    print t[3]
+}

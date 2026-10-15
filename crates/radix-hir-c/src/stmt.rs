@@ -61,6 +61,15 @@ impl Emitter<'_> {
         out: &mut String,
         statement: &HirStatement,
     ) -> Result<(), CodegenError> {
+        self.statement_kind(out, statement)
+            .map_err(|error| located(error, statement.span.start))
+    }
+
+    fn statement_kind(
+        &mut self,
+        out: &mut String,
+        statement: &HirStatement,
+    ) -> Result<(), CodegenError> {
         match &statement.kind {
             HirStatementKind::Local(local) => self.local(out, local),
             HirStatementKind::Expr(expr) => self.expr_statement(out, expr),
@@ -744,4 +753,19 @@ impl Emitter<'_> {
         }
         Ok(())
     }
+}
+
+/// Name the byte offset of the innermost statement a rejection came from, so
+/// a corpus tally can say where a construct sits. The `construct` fact is
+/// unchanged; only the first (innermost) statement adds the offset.
+fn located(mut error: CodegenError, offset: u32) -> CodegenError {
+    if error.args.iter().any(|arg| arg.name == "offset") {
+        return error;
+    }
+    error.args.push(radix_diagnostics::DiagnosticArg::new(
+        "offset",
+        offset.to_string(),
+    ));
+    error.message = format!("{} (byte {offset})", error.message);
+    error
 }

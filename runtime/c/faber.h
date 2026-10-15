@@ -757,4 +757,245 @@ static inline faber_text faber_list_f64_show(faber_arena *arena, const faber_lis
     return out;
 }
 
+/* ------------------------------------------------------------------------ */
+/* Text operations: UTF-8, counted in code points as the runner counts      */
+/* ------------------------------------------------------------------------ */
+
+/* The byte length of the code point that starts at `p`, never past the
+ * terminator (argument text need not be valid UTF-8). */
+static inline size_t faber_utf8_step(const unsigned char *p) {
+    size_t want = p[0] < 0x80 ? 1 : p[0] >= 0xF0 ? 4 : p[0] >= 0xE0 ? 3 : 2;
+    size_t have = 1;
+    while (have < want && p[have] != 0) {
+        have++;
+    }
+    return have;
+}
+
+static inline uint32_t faber_utf8_decode(const unsigned char *p, size_t length) {
+    uint32_t cp;
+    switch (length) {
+    case 1:
+        return p[0];
+    case 2:
+        cp = (uint32_t)(p[0] & 0x1F) << 6;
+        return cp | (uint32_t)(p[1] & 0x3F);
+    case 3:
+        cp = (uint32_t)(p[0] & 0x0F) << 12;
+        cp |= (uint32_t)(p[1] & 0x3F) << 6;
+        return cp | (uint32_t)(p[2] & 0x3F);
+    default:
+        cp = (uint32_t)(p[0] & 0x07) << 18;
+        cp |= (uint32_t)(p[1] & 0x3F) << 12;
+        cp |= (uint32_t)(p[2] & 0x3F) << 6;
+        return cp | (uint32_t)(p[3] & 0x3F);
+    }
+}
+
+static inline faber_text faber_text_copy(faber_arena *arena, const char *from, size_t length) {
+    char *out = faber_alloc(arena, length + 1);
+    memcpy(out, from, length);
+    out[length] = '\0';
+    return out;
+}
+
+static inline int64_t faber_text_length(faber_text text) {
+    const unsigned char *p = (const unsigned char *)text;
+    int64_t count = 0;
+    while (*p != 0) {
+        p += faber_utf8_step(p);
+        count++;
+    }
+    return count;
+}
+
+/* `s.slice(from, to)`: code-point positions, clamped to the text, empty when
+ * `from` is not before `to`; a negative position traps as the runner does. */
+static inline faber_text faber_text_slice(faber_arena *arena, faber_text text, faber_i128 from,
+                                          faber_i128 to) {
+    const unsigned char *start = (const unsigned char *)text;
+    const unsigned char *end;
+    faber_i128 index = 0;
+    if (from < 0 || to < 0) {
+        faber_trap("expected non-negative numerus index");
+    }
+    if (from >= to) {
+        return "";
+    }
+    while (*start != 0 && index < from) {
+        start += faber_utf8_step(start);
+        index++;
+    }
+    end = start;
+    while (*end != 0 && index < to) {
+        end += faber_utf8_step(end);
+        index++;
+    }
+    return faber_text_copy(arena, (const char *)start, (size_t)(end - start));
+}
+
+/* `s[i]`: the code point at `index` as text. */
+static inline faber_text faber_text_at(faber_arena *arena, faber_text text, faber_i128 index) {
+    const unsigned char *p = (const unsigned char *)text;
+    faber_i128 at = 0;
+    if (index < 0) {
+        faber_trap("expected non-negative numerus index");
+    }
+    while (*p != 0 && at < index) {
+        p += faber_utf8_step(p);
+        at++;
+    }
+    if (*p == 0) {
+        faber_trap("text index out of bounds");
+    }
+    return faber_text_copy(arena, (const char *)p, faber_utf8_step(p));
+}
+
+static inline bool faber_text_contains(faber_text text, faber_text needle) {
+    return strstr(text, needle) != NULL;
+}
+
+static inline bool faber_text_starts_with(faber_text text, faber_text prefix) {
+    return strncmp(text, prefix, strlen(prefix)) == 0;
+}
+
+static inline bool faber_text_ends_with(faber_text text, faber_text suffix) {
+    size_t text_length = strlen(text);
+    size_t suffix_length = strlen(suffix);
+    return suffix_length <= text_length &&
+           memcmp(text + text_length - suffix_length, suffix, suffix_length) == 0;
+}
+
+/* Case mapping is ASCII only: a byte outside ASCII would need the Unicode
+ * tables, so it stops the program rather than answer differently from the
+ * runner. */
+static inline faber_text faber_text_case(faber_arena *arena, faber_text text, bool upper) {
+    size_t length = strlen(text);
+    char *out = faber_alloc(arena, length + 1);
+    size_t index;
+    for (index = 0; index < length; index++) {
+        unsigned char c = (unsigned char)text[index];
+        if (c >= 0x80) {
+            faber_abort("unsupported on target c: case mapping of non-ASCII text");
+        }
+        if (upper && c >= 'a' && c <= 'z') {
+            c = (unsigned char)(c - 'a' + 'A');
+        } else if (!upper && c >= 'A' && c <= 'Z') {
+            c = (unsigned char)(c - 'A' + 'a');
+        }
+        out[index] = (char)c;
+    }
+    out[length] = '\0';
+    return out;
+}
+
+/* Unicode White_Space, which `trim` strips from both ends. */
+static inline bool faber_is_space(uint32_t cp) {
+    return (cp >= 0x09 && cp <= 0x0D) || cp == 0x20 || cp == 0x85 || cp == 0xA0 ||
+           cp == 0x1680 || (cp >= 0x2000 && cp <= 0x200A) || cp == 0x2028 || cp == 0x2029 ||
+           cp == 0x202F || cp == 0x205F || cp == 0x3000;
+}
+
+static inline faber_text faber_text_trim(faber_arena *arena, faber_text text) {
+    const unsigned char *start = (const unsigned char *)text;
+    const unsigned char *end = start + strlen(text);
+    while (*start != 0) {
+        size_t step = faber_utf8_step(start);
+        if (!faber_is_space(faber_utf8_decode(start, step))) {
+            break;
+        }
+        start += step;
+    }
+    while (end > start) {
+        const unsigned char *lead = end - 1;
+        while (lead > start && (*lead & 0xC0) == 0x80) {
+            lead--;
+        }
+        if (!faber_is_space(faber_utf8_decode(lead, (size_t)(end - lead)))) {
+            break;
+        }
+        end = lead;
+    }
+    return faber_text_copy(arena, (const char *)start, (size_t)(end - start));
+}
+
+/* `s.split(sep)`, as Rust's `str::split`: an empty separator splits around
+ * every code point, with an empty piece at each end. */
+static inline faber_list_text *faber_text_split(faber_arena *arena, faber_text text,
+                                                faber_text separator) {
+    faber_list_text *list = faber_list_text_new(arena, 0);
+    size_t separator_length = strlen(separator);
+    const char *cursor = text;
+    if (separator_length == 0) {
+        const unsigned char *p = (const unsigned char *)text;
+        faber_list_text_push(arena, list, "");
+        while (*p != 0) {
+            size_t step = faber_utf8_step(p);
+            faber_list_text_push(arena, list, faber_text_copy(arena, (const char *)p, step));
+            p += step;
+        }
+        faber_list_text_push(arena, list, "");
+        return list;
+    }
+    for (;;) {
+        const char *hit = strstr(cursor, separator);
+        if (hit == NULL) {
+            faber_list_text_push(arena, list, faber_text_copy(arena, cursor, strlen(cursor)));
+            return list;
+        }
+        faber_list_text_push(arena, list, faber_text_copy(arena, cursor, (size_t)(hit - cursor)));
+        cursor = hit + separator_length;
+    }
+}
+
+/* `s.replace(from, to)`, as Rust's `str::replace`: an empty `from` matches
+ * before every code point and at the end. */
+static inline faber_text faber_text_replace(faber_arena *arena, faber_text text, faber_text from,
+                                            faber_text to) {
+    size_t from_length = strlen(from);
+    size_t to_length = strlen(to);
+    size_t text_length = strlen(text);
+    size_t matches = 0;
+    char *out;
+    char *cursor;
+    if (from_length == 0) {
+        matches = (size_t)faber_text_length(text) + 1;
+        out = faber_alloc(arena, text_length + matches * to_length + 1);
+        cursor = out;
+        for (const unsigned char *p = (const unsigned char *)text;; p += faber_utf8_step(p)) {
+            memcpy(cursor, to, to_length);
+            cursor += to_length;
+            if (*p == 0) {
+                break;
+            }
+            memcpy(cursor, p, faber_utf8_step(p));
+            cursor += faber_utf8_step(p);
+        }
+        *cursor = '\0';
+        return out;
+    }
+    for (const char *scan = strstr(text, from); scan != NULL; scan = strstr(scan + from_length, from)) {
+        matches++;
+    }
+    out = faber_alloc(arena, text_length + matches * to_length + 1);
+    out[0] = '\0';
+    cursor = out;
+    for (const char *rest = text;;) {
+        const char *hit = strstr(rest, from);
+        if (hit == NULL) {
+            size_t tail = strlen(rest);
+            memcpy(cursor, rest, tail);
+            cursor += tail;
+            break;
+        }
+        memcpy(cursor, rest, (size_t)(hit - rest));
+        cursor += hit - rest;
+        memcpy(cursor, to, to_length);
+        cursor += to_length;
+        rest = hit + from_length;
+    }
+    *cursor = '\0';
+    return out;
+}
+
 #endif /* FABER_H */

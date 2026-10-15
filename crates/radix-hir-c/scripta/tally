@@ -45,7 +45,7 @@ if [ "${1:-}" = "--probe" ]; then
   rc=$?
   if [ $rc -eq 0 ]; then printf 'emits\t-\t%s\n' "$f"; exit 0; fi
   if [ $rc -eq 124 ]; then printf 'timeout\t-\t%s\n' "$f"; exit 0; fi
-  construct=$(printf '%s\n' "$err" | grep -m1 'unsupported on target c' | sed 's/.*unsupported on target c: *//')
+  construct=$(printf '%s\n' "$err" | grep -m1 'unsupported on target c' | sed -e 's/.*unsupported on target c: *//' -e 's/ (byte [0-9]*)$//')
   if [ -n "$construct" ]; then printf 'unsupported\t%s\t%s\n' "$construct" "$f"; exit 0; fi
   code=$(printf '%s\n' "$err" | grep -m1 -o '^error\[[A-Za-z0-9_:]*\]')
   printf 'frontend\t%s\t%s\n' "${code:-$(printf '%s' "$err" | head -n 1 | cut -c1-80)}" "$f"

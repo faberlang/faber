@@ -97,6 +97,9 @@ impl Emitter<'_> {
         index: &HirExpression,
     ) -> Result<Operand, CodegenError> {
         let list = self.expr(base)?;
+        if list.value == Value::Text {
+            return self.text_index(list, index);
+        }
         let Value::List(elem) = list.value else {
             return Err(unsupported("index access on a value that is not a list"));
         };

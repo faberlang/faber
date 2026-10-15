@@ -32,6 +32,7 @@ mod range;
 mod stmt;
 mod switch;
 mod text;
+mod textops;
 mod ty;
 
 #[cfg(test)]
@@ -52,6 +53,8 @@ mod reject_test;
 mod sized_test;
 #[cfg(test)]
 mod test_support;
+#[cfg(test)]
+mod textops_test;
 
 use crate::error::unsupported;
 use crate::helpers::Support;
