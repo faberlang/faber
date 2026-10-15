@@ -28,6 +28,31 @@ jobs:
       - name: Workspace tests
         run: cargo test --workspace
       - name: Public corpus suite on the runner
-        run: target/release/faber corpus corpus-suites/public --target runner > corpus-runner.jsonl
+        run: |
+          set +e
+          target/release/faber corpus corpus-suites/public --target runner > corpus-runner.jsonl
+          code=$?
+          jq -c 'select(.type=="summary" or (.type=="case" and .status!="pass")) | if .type=="summary" then . else {case,status,reason} end' corpus-runner.jsonl
+          exit $code
+      - name: Upload runner corpus results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corpus-runner-${{ matrix.os }}
+          path: corpus-runner.jsonl
+          if-no-files-found: warn
       - name: Faber round trip
-        run: target/release/faber corpus corpus-suites/public --target roundtrip > corpus-roundtrip.jsonl
+        if: always()
+        run: |
+          set +e
+          target/release/faber corpus corpus-suites/public --target roundtrip > corpus-roundtrip.jsonl
+          code=$?
+          jq -c 'select(.type=="summary" or (.type=="case" and .status!="pass")) | if .type=="summary" then . else {case,status,reason} end' corpus-roundtrip.jsonl
+          exit $code
+      - name: Upload round trip corpus results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corpus-roundtrip-${{ matrix.os }}
+          path: corpus-roundtrip.jsonl
+          if-no-files-found: warn
