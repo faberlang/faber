@@ -367,17 +367,6 @@ impl<'a> DefiniteAssignmentChecker<'a> {
             .is_some_and(|ty| crate::tensor_bracket::is_tensor_type(self.types, ty))
     }
 
-    /// Whether `target` is a projection (`Field`/`Index`/`Deref`) rather than a
-    /// whole binding path.
-    fn is_projection(expr: &HirExpression) -> bool {
-        matches!(
-            expr.kind,
-            HirExpressionKind::Field(..)
-                | HirExpressionKind::Index(..)
-                | HirExpressionKind::Deref(..)
-        )
-    }
-
     /// Read-modify-write of an lvalue: visit projection inputs once, read the
     /// root binding, then mark it assigned. Used by compound assignments.
     fn op_assign(&mut self, target: &HirExpression) {
