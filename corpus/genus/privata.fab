@@ -64,9 +64,9 @@ class Tabula {
 }
 
 main {
-    # A construction literal may set private fields; the binding is `var`
+    # A construction literal may set private fields; the binding is `mut`
     # because `adde` changes the object in place, and a method that mutates its
-    # receiver needs a `var` binding exactly as a field write does
+    # receiver needs a `mut` binding exactly as a field write does
     mut Tabula t ← Tabula { summa = 0, numerus = 0, nomen = "gradus" }
     t.adde(4)
     t.adde(8)

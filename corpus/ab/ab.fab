@@ -28,7 +28,7 @@ locale = "en"
 # ab — bounded iteration step
 #
 # GRAMMAR:
-#   iteraStmt :← 'itera' 'ab' expr '‥' expr step? 'fixum' ident block
+#   iteraStmt :← 'itera' 'ab' expr '‥' expr step? 'sit' ident block
 #
 # EXPECTED OUTPUT:
 #   Scalar stdout smoke (see body).

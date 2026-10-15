@@ -27,7 +27,7 @@ locale = "en"
 # mySortedMap.get(), ...). Stems reuse builtin tabula stems where the
 # operation is identical (put, get, delete, has) so users cross-walking
 # between tabula and ordinata see the same verbs. Imperativus for in-place
-# mutation (varia receiver required); nominal for projections (length,
+# mutation (mut receiver required); nominal for projections (length,
 # keys, values); the sorted-iteration surface (keys, values) is
 # what ordinata adds on top of tabula.
 #
@@ -80,7 +80,7 @@ class SortedMap<K, V> {
     }
 
     # =========================================================================
-    # MUTATION (Imperativus — in-place on a varia receiver)
+    # MUTATION (Imperativus — in-place on a mut receiver)
     # =========================================================================
 
     # Insert or update a binding. Maintains the sorted key index.

@@ -4,13 +4,13 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
 category = "type"
 canonical = true
-summary = "MU-1 baseline narrowed by tcs1: in-place list mutation requires a var binding."
-syntax = "var list<int> xs"
+summary = "MU-1 baseline narrowed by tcs1: in-place list mutation requires a mut binding."
+syntax = "mut list<int> xs"
 related = ["fixum", "lista"]
 locale = "en"
 +++
 # =============================================================================
-# mutabilitas — in-place list mutation needs var (D-1 shallow law, tcs1)
+# mutabilitas — in-place list mutation needs mut (D-1 shallow law, tcs1)
 # =============================================================================
 
 main {

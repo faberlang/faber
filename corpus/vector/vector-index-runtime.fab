@@ -18,7 +18,7 @@ locale = "en"
 #     select: it reads lane `i` when `0 ≤ i < N`
 #   • A loop can walk the lanes: `v[i]` is typed as the element `T`
 #   • A named constant used as the index is a run-time index too: `v[k]`
-#   • A lane of a `var` vector can be written with a run-time index
+#   • A lane of a `mut` vector can be written with a run-time index
 #   • An index outside `0 ≤ i < N` fails exactly like an out-of-range `lista`
 #     index: a trap that ends the run (`lane(v, 3)` here would end it), never
 #     a silent wrap or clamp. This file runs only in-range lanes so it stays

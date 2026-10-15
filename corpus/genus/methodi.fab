@@ -18,7 +18,7 @@ locale = "en"
 #   • Related keywords: genus, ego, functio
 #
 # Common mistakes:
-#   • Mutating `ego` fields on a `fixum` instance — methods that mutate state via `ego` require the instance to be bound with `varia`.
+#   • Mutating `ego` fields on a `sit` instance — methods that mutate state via `ego` require the instance to be bound with `varia`.
 #
 # See also: genus, ego, functio
 # =============================================================================
@@ -74,7 +74,7 @@ main {
     print forma.ambitus()
     print forma.aequilatera()
 
-    # --- Methods that modify state (varia instance binding) ---
+    # --- Methods that modify state (mut instance binding) ---
 
     mut Numerator numerator ← Numerator {}
     print numerator.accipe()

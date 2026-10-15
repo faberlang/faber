@@ -18,7 +18,7 @@ locale = "en"
 #   • Related keywords: numerus, fractus, mathesis
 #
 # Common mistakes:
-#   • Calling operator methods like `.add()` on a `fixum` binding — imperative mutation methods require `varia`.
+#   • Calling operator methods like `.add()` on a `sit` binding — imperative mutation methods require `varia`.
 #
 # See also: numerus, fractus, mathesis
 # =============================================================================

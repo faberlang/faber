@@ -3,7 +3,7 @@ term = "mutabilitas"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
 category = "type"
-summary = "const is deep: a const list cannot be shared into a var name (SEM065)."
+summary = "A let list is read-only all the way down and cannot be shared into a mut name (SEM065)."
 syntax = "let list<int> xs ← [1]; mut list<int> ys ← xs"
 related = ["fixum", "lista"]
 locale = "en"
@@ -11,9 +11,9 @@ no_expected = "rejects"
 diagnostic = "SEM065:const_shared_into_var"
 +++
 # =============================================================================
-# mutabilitas — const shared into var (need, rule 2)
+# mutabilitas — let shared into mut (need, rule 2)
 # =============================================================================
-# `var list<int> ys ← xs` with `xs` const would let `ys.append(2)` change `xs`.
+# `mut list<int> ys ← xs` with `xs` a `let` would let `ys.append(2)` change `xs`.
 # Write `← copy xs` for an independent value or `← own xs` to take it over.
 
 main {

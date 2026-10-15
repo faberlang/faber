@@ -18,7 +18,7 @@ locale = "en"
 # the diagnostic. The accepted spellings are:
 #   • a length:        if values.length() <= 4 { ... }
 #   • a width / range: if n is u32 { ... }   (an `is` test)
-#   • a union member:  match v { case int const n ... case string const s ... }
+#   • a union member:  match v { case int let n ... case string let s ... }
 
 # A length bound is not a member of list<int>.
 fn classify(list<int> values) → string {

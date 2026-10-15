@@ -25,12 +25,12 @@ locale = "en"
 
 # integratio — destructuring, sparge, and lista methodi together
 #
-# fixum [a, b, c] ← lista
+# sit [a, b, c] ← lista
 # [sparge expr, …]
 # lista.filter(T x ∴ …) | lista.map(T x → T ∴ fac { … })
 #
 # GRAMMAR:
-#   bindingStmt :← 'fixum' destructure '←' expr
+#   bindingStmt :← 'sit' destructure '←' expr
 #   spargeField :← 'sparge' expr
 #   methodCall  :← expr '.' ident '(' … ')'
 #

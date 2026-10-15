@@ -36,7 +36,7 @@ locale = "en"
 # for from <tabula> let <value> { <body> }
 #
 # GRAMMAR:
-#   iteraStmt :← 'itera' 'ex' expr ('fixum' | 'varia') IDENTIFIER block
+#   iteraStmt :← 'itera' 'ex' expr ('sit' | 'varia') IDENTIFIER block
 #
 # EXPECTED OUTPUT:
 #   ex-tabula.expected — sorted values (1, 2, 3), then the order-independent

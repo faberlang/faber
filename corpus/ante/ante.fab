@@ -30,7 +30,7 @@ locale = "en"
 
 # ante — exclusive upper bound for range iteration
 #
-# itera ab <initium> ante <finis> <var> { … }
+# itera ab <initium> ante <finis> <binder> { … }
 #
 # GRAMMAR:
 #   iterStmt :← 'itera' 'ab' expr 'ante' expr binding '{' stmt* '}'

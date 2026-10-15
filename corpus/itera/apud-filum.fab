@@ -39,7 +39,7 @@ locale = "en"
 #
 # GRAMMAR:
 #   iteraStmt :← 'for' 'from' expr ('at' '[' ident (',' ident)* ']')?
-#               ('thread' ident)? ('const' | 'var') binder …
+#               ('thread' ident)? ('let' | 'mut') binder …
 #
 # EXPECTED OUTPUT:
 #   lane index and element, one line per lane (0‥3) — identical to the

@@ -16,7 +16,7 @@ locale = "en"
 # What this teaches:
 #   • Some width markers have prefixed sugar (`lf32` is a list of `f32`, `tf32`
 #     a tensor). `inf` has none: `linf`, `tinf`, `vinf`, `minf` and `sinf`
-#     stay ordinary identifiers, so `const linf x` names an unknown type
+#     stay ordinary identifiers, so `let linf x` names an unknown type
 #     (`unknown_type`).
 #   • Write the collection out: `lista<inf>`.
 #

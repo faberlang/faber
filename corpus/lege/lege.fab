@@ -27,8 +27,8 @@ no_expected = "reads-stdin"
 
 # lege and regex conversio — I/O read and compiled pattern expressions
 #
-# fixum _ pattern ← "\d+" ↦ regex   -- compiled regex from textus
-# fixum _ input ← lege                  -- stdin line read
+# sit pattern ← "\d+" ↦ regex   -- compiled regex from textus
+# sit input ← lege                  -- stdin line read
 #
 # GRAMMAR:
 #   conversio :← stringLit '↦' 'regex'

@@ -17,7 +17,7 @@ locale = "en"
 # What this teaches:
 #   • One initializer surface — `embed "path"` takes the same positions a
 #     module constant does: a block-level `const T x = embed "p"`, a genus
-#     field default under any modifier (`static`, `const`, `var`), and the
+#     field default under any modifier (`const`, `let`, `mut`), and the
 #     `return` of a `comptime { … }` body.
 #   • The slot types the embed — the declared type decides: `string` takes the
 #     file as UTF-8 text, `bytes` takes the raw bytes. Inside a `comptime`

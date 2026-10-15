@@ -16,7 +16,7 @@ no_expected = "nondeterministic-by-design"
 # =============================================================================
 #
 # What this teaches:
-#   • Borrowed iteration — `itera de <expr> fixum <ident> { ... }` iterates over a collection without taking ownership.
+#   • Borrowed iteration — `itera de <expr> sit <ident> { ... }` iterates over a collection without taking ownership.
 #   • Tabula key iteration — iterating over tabula keys via borrowed iteration.
 #   • Index iteration — iterating over lista indices via `de`.
 #
@@ -29,7 +29,7 @@ no_expected = "nondeterministic-by-design"
 # de — borrowed iteration / parameters
 #
 # GRAMMAR:
-#   forDeStmt :← 'itera' 'de' expr 'fixum' ident block
+#   forDeStmt :← 'itera' 'de' expr 'sit' ident block
 #
 # EXPECTED OUTPUT:
 #   Scalar stdout smoke (see body).

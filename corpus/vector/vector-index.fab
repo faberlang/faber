@@ -18,7 +18,7 @@ locale = "en"
 #     the element `T` (f32 and i32 alike), with `k` a constant below `N`.
 #   • After a null assertion the same form reads a lane: `hit![0]`.
 #   • A lane read is a value, so a sum over lanes needs no loop.
-#   • A lane of a `var` vector can be written: `v[1] ← 9.0`.
+#   • A lane of a `mut` vector can be written: `v[1] ← 9.0`.
 #
 # Common mistakes:
 #   • indexing with a constant outside the width — `v[3]` on a three-lane

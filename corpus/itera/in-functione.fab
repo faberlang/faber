@@ -27,10 +27,10 @@ locale = "en"
 
 # itera ex — accumulator pattern inside functio
 #
-# itera ex <lista> fixum <item> { <body> }
+# itera ex <lista> sit <item> { <body> }
 #
 # GRAMMAR:
-#   forInStmt :← 'itera' 'ex' expr 'fixum' ident block
+#   forInStmt :← 'itera' 'ex' expr 'sit' ident block
 #
 # EXPECTED OUTPUT:
 #   Sums, maxima, and counts above a threshold for sample listas.

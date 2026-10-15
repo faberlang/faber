@@ -15,8 +15,8 @@ locale = "en"
 # untouched. The callee owns the duplicate, and it may change it exactly as far
 # as an ordinary binding allows: a field write (`c.n ← 1`) and a mutating
 # method call (`c.inc()`) follow one rule. A parameter is an immutable binding
-# and has no `var` spelling, so both are rejected on the parameter itself.
-# To modify the duplicate, bind it to a `var` local first, as `take` and `bump`
+# and has no `mut` spelling, so both are rejected on the parameter itself.
+# To modify the duplicate, bind it to a `mut` local first, as `take` and `bump`
 # do below.
 
 class Counter {

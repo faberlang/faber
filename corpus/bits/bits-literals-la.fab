@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "literal"
 canonical = true
 summary = "A hex, binary or decimal integer literal in a bits cell takes the cell's type at all four widths."
-syntax = "const b8 x ← 0xff | const b16 x ← 0b1010 | const b64 x ← 255"
+syntax = "sit b8 x ← 0xff | sit b16 x ← 0b1010 | sit b64 x ← 255"
 related = ["bits", "u8"]
 locale = "la"
 +++

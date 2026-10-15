@@ -26,7 +26,7 @@ locale = "en"
 
 # per — step size for range iteration
 #
-# itera ab <initium>‥<finis> per <gradus> <var> { … }   -- half-open range step
+# itera ab <initium>‥<finis> per <gradus> <binder> { … }   -- half-open range step
 #
 # GRAMMAR:
 #   iterStmt :← 'itera' 'ab' expr '‥' expr 'per' expr binding block

@@ -20,8 +20,8 @@ locale = "en"
 #   • A read method (`length`) and an in-place writer (`append`) both go
 #     through the assertion; the writer mutates the stored list, so the
 #     length after two appends is 4.
-#   • The binding must be `var` for an in-place writer; reading through `!.`
-#     only needs `const`.
+#   • The binding must be `mut` for an in-place writer; reading through `!.`
+#     only needs `let`.
 #   • The assertion traps like any other `!` use when the value is `nihil`.
 #
 # Common mistakes:

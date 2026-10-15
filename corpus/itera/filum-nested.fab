@@ -27,7 +27,7 @@ locale = "en"
 #   • writing `grid[[i + 1, j]]` or `grid[[i, 0]]` from the inner loop — another
 #     iteration owns or also writes that cell, so the body is declined with an
 #     independence diagnostic
-#   • updating an outer iteration's `var` from an inner `thread` loop — a plain
+#   • updating an outer iteration's `mut` from an inner `thread` loop — a plain
 #     inner loop may do it, a `thread` loop may not
 #
 # See also: apud, itera, ex, filum, thread
