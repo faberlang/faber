@@ -549,12 +549,24 @@ impl FunctionLower<'_, '_> {
         self.builder.switch_to_block(entry);
 
         let table = self.state.input.types;
+        let unknown = |ty: MirType| {
+            matches!(
+                resolve(table, ty.semantic_id()),
+                Type::Primitive(Primitive::Ignotum)
+            )
+        };
         for local in &function.locals {
+            if unknown(local.ty) {
+                continue;
+            }
             let rep = rep_of(table, local.ty)?;
             self.declare(Slot::Local(local.id), rep);
             self.slot_tys.insert(Slot::Local(local.id), local.ty);
         }
         for temp in &function.temps {
+            if unknown(temp.ty) {
+                continue;
+            }
             let rep = rep_of(table, temp.ty)?;
             self.declare(Slot::Temp(temp.id), rep);
             self.slot_tys.insert(Slot::Temp(temp.id), temp.ty);

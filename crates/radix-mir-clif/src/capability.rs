@@ -283,6 +283,13 @@ impl<'a> ClifCapability<'a> {
         }
     }
 
+    fn is_unknown(&self, ty: MirType) -> bool {
+        matches!(
+            self.types.get(ty.semantic_id()),
+            Type::Primitive(Primitive::Ignotum)
+        )
+    }
+
     fn check_type(&mut self, ty: MirType) {
         if let Some(gap) = self.type_gap(ty) {
             self.record(gap);
@@ -368,12 +375,18 @@ impl MirVisitor for ClifCapability<'_> {
         self.check_type(param.ty);
     }
 
+    // An unknown-typed slot (a catch binding on a path nothing reaches) has no
+    // storage; a use of it declines when it is lowered.
     fn visit_local(&mut self, local: &MirLocal) {
-        self.check_type(local.ty);
+        if !self.is_unknown(local.ty) {
+            self.check_type(local.ty);
+        }
     }
 
     fn visit_temp(&mut self, temp: &MirTemp) {
-        self.check_type(temp.ty);
+        if !self.is_unknown(temp.ty) {
+            self.check_type(temp.ty);
+        }
     }
 
     fn visit_value(&mut self, value: &MirValue) {
