@@ -112,6 +112,48 @@ pub const TEXT_INDEX_OPT: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, I64],
     ret: Some(Ptr),
 };
+/// A new list with one element appended.
+pub const LIST_APPENDED: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_appended",
+    params: &[Ptr, I32, I64],
+    ret: Some(Ptr),
+};
+/// A new list of the clamped range `start..end`.
+pub const LIST_SLICE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_slice",
+    params: &[Ptr, I64, I64],
+    ret: Some(Ptr),
+};
+/// A new text of the clamped character range `start..end`.
+pub const TEXT_SLICE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_slice",
+    params: &[Ptr, I64, I64],
+    ret: Some(Ptr),
+};
+/// A new list: 0 take, 1 take-last, 2 drop-first, by count.
+pub const LIST_WINDOW: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_window",
+    params: &[Ptr, I32, I64],
+    ret: Some(Ptr),
+};
+/// Remove and return the first element as an optional.
+pub const LIST_REMOVE_FIRST: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_remove_first",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Remove and return the last element as an optional.
+pub const LIST_REMOVE_LAST: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_remove_last",
+    params: &[Ptr],
+    ret: Some(Ptr),
+};
+/// Reverse a list in place.
+pub const LIST_REVERSE_IN_PLACE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_reverse_in_place",
+    params: &[Ptr],
+    ret: None,
+};
 /// Key membership.
 pub const MAP_HAS: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_map_has",
@@ -409,6 +451,13 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     MAP_GET,
     MAP_GET_OPT,
     LIST_GET_OPT,
+    LIST_APPENDED,
+    LIST_SLICE,
+    TEXT_SLICE,
+    LIST_WINDOW,
+    LIST_REMOVE_FIRST,
+    LIST_REMOVE_LAST,
+    LIST_REVERSE_IN_PLACE,
     TEXT_INDEX_OPT,
     MAP_HAS,
     MAP_REMOVE,

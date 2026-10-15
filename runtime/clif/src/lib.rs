@@ -1050,6 +1050,126 @@ pub unsafe extern "C" fn __faber_clif_v1_list_get_opt(
     }
 }
 
+/// A new list with one element appended.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_appended(
+    list: *const List,
+    tag: i32,
+    bits: i64,
+) -> *mut List {
+    let mut items = unsafe { list_ref(list) }.items.clone();
+    items.push((tag, bits));
+    list_new_from(items)
+}
+
+fn clamp_range(start: i64, end: i64, length: usize) -> (usize, usize) {
+    let end = usize::try_from(end).unwrap_or(0).min(length);
+    let start = usize::try_from(start).unwrap_or(0).min(end);
+    (start, end)
+}
+
+/// A new list of the clamped range `start..end`.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_slice(
+    list: *const List,
+    start: i64,
+    end: i64,
+) -> *mut List {
+    let items = &unsafe { list_ref(list) }.items;
+    let (start, end) = clamp_range(start, end, items.len());
+    list_new_from(items[start..end].to_vec())
+}
+
+/// A new text of the clamped character range `start..end`.
+///
+/// # Safety
+///
+/// `handle` addresses a well-formed text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_slice(
+    handle: *const u8,
+    start: i64,
+    end: i64,
+) -> *const u8 {
+    let text = text_str(unsafe { text_bytes(handle) });
+    let chars: Vec<char> = text.chars().collect();
+    let (start, end) = clamp_range(start, end, chars.len());
+    let sliced: String = chars[start..end].iter().collect();
+    text_new(sliced.as_bytes())
+}
+
+/// A new list: 0 take, 1 take-last, 2 drop-first, by count.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_window(
+    list: *const List,
+    mode: i32,
+    count: i64,
+) -> *mut List {
+    let items = &unsafe { list_ref(list) }.items;
+    let length = items.len();
+    let count = usize::try_from(count).unwrap_or(0);
+    let (start, end) = match mode {
+        0 => (0, count.min(length)),
+        1 => (length.saturating_sub(count), length),
+        _ => (count.min(length), length),
+    };
+    list_new_from(items[start..end].to_vec())
+}
+
+fn present_box(item: Option<(i32, i64)>) -> *const Present {
+    match item {
+        Some((tag, bits)) => Box::into_raw(Box::new(Present { tag, bits })),
+        None => std::ptr::null(),
+    }
+}
+
+/// Remove and return the first element as an optional.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_remove_first(list: *mut List) -> *const Present {
+    let items = &mut unsafe { list_mut(list) }.items;
+    present_box(if items.is_empty() {
+        None
+    } else {
+        Some(items.remove(0))
+    })
+}
+
+/// Remove and return the last element as an optional.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_remove_last(list: *mut List) -> *const Present {
+    present_box(unsafe { list_mut(list) }.items.pop())
+}
+
+/// Reverse a list in place.
+///
+/// # Safety
+///
+/// `list` is a live runtime list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_reverse_in_place(list: *mut List) {
+    unsafe { list_mut(list) }.items.reverse();
+}
+
 /// Abort with a text message, the runner's `abort: <message>` (D5).
 ///
 /// # Safety

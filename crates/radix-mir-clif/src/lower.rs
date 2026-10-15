@@ -1869,6 +1869,87 @@ impl FunctionLower<'_, '_> {
             (MirCollectionOp::Values, Rep::Map) => {
                 (self.call_runtime(&abi::MAP_VALUES, &[handle])?, Rep::List)
             }
+            (MirCollectionOp::AppendImmutable, Rep::List) => {
+                let [_, item] = args else {
+                    return Err(Decline::new("append arity"));
+                };
+                let element = self.element_type(self.operand_type(receiver)?)?;
+                let (value, item_rep) = self.element_operand(item, element)?;
+                let tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(item_rep)?);
+                let bits = self.element_bits(value, item_rep);
+                (
+                    self.call_runtime(&abi::LIST_APPENDED, &[handle, tag, bits])?,
+                    Rep::List,
+                )
+            }
+            (MirCollectionOp::Slice, Rep::List | Rep::Text) => {
+                let [_, start, end] = args else {
+                    return Err(Decline::new("slice arity"));
+                };
+                let (start, start_rep) = self.scalar(start)?;
+                let (end, end_rep) = self.scalar(end)?;
+                if start_rep != Rep::Int || end_rep != Rep::Int {
+                    return Err(Decline::new("slice bound representation"));
+                }
+                let symbol = if rep == Rep::Text {
+                    &abi::TEXT_SLICE
+                } else {
+                    &abi::LIST_SLICE
+                };
+                (self.call_runtime(symbol, &[handle, start, end])?, rep)
+            }
+            (
+                MirCollectionOp::Take | MirCollectionOp::TakeLast | MirCollectionOp::DropFirst,
+                Rep::List,
+            ) => {
+                let [_, count] = args else {
+                    return Err(Decline::new("window arity"));
+                };
+                let (count, count_rep) = self.scalar(count)?;
+                if count_rep != Rep::Int {
+                    return Err(Decline::new("window count representation"));
+                }
+                let mode = match op {
+                    MirCollectionOp::Take => 0,
+                    MirCollectionOp::TakeLast => 1,
+                    _ => 2,
+                };
+                let mode = self.builder.ins().iconst(types::I32, mode);
+                (
+                    self.call_runtime(&abi::LIST_WINDOW, &[handle, mode, count])?,
+                    Rep::List,
+                )
+            }
+            (MirCollectionOp::First | MirCollectionOp::Last, Rep::List) => {
+                let index = if op == MirCollectionOp::First {
+                    self.builder.ins().iconst(types::I64, 0)
+                } else {
+                    let length = self
+                        .call_runtime(&abi::LIST_LEN, &[handle])?
+                        .ok_or_else(|| Decline::new("length result"))?;
+                    let one = self.builder.ins().iconst(types::I64, 1);
+                    self.builder.ins().isub(length, one)
+                };
+                (
+                    self.call_runtime(&abi::LIST_GET_OPT, &[handle, index])?,
+                    Rep::Opt,
+                )
+            }
+            (MirCollectionOp::RemoveFirst | MirCollectionOp::RemoveLast, Rep::List) => {
+                let symbol = if op == MirCollectionOp::RemoveFirst {
+                    &abi::LIST_REMOVE_FIRST
+                } else {
+                    &abi::LIST_REMOVE_LAST
+                };
+                (self.call_runtime(symbol, &[handle])?, Rep::Opt)
+            }
+            (MirCollectionOp::ReverseInPlace, Rep::List) => {
+                self.call_runtime(&abi::LIST_REVERSE_IN_PLACE, &[handle])?;
+                return Ok(());
+            }
             (MirCollectionOp::Reverse, Rep::List) => (
                 self.call_runtime(&abi::LIST_REVERSED, &[handle])?,
                 Rep::List,

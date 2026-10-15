@@ -555,6 +555,16 @@ impl MirVisitor for ClifCapability<'_> {
                             | MirCollectionOp::Delete
                             | MirCollectionOp::Keys
                             | MirCollectionOp::Values
+                            | MirCollectionOp::AppendImmutable
+                            | MirCollectionOp::Slice
+                            | MirCollectionOp::Take
+                            | MirCollectionOp::TakeLast
+                            | MirCollectionOp::DropFirst
+                            | MirCollectionOp::First
+                            | MirCollectionOp::Last
+                            | MirCollectionOp::RemoveFirst
+                            | MirCollectionOp::RemoveLast
+                            | MirCollectionOp::ReverseInPlace
                             | MirCollectionOp::Floor
                             | MirCollectionOp::Ceiling
                             | MirCollectionOp::Round
