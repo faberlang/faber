@@ -158,28 +158,53 @@ static int64_t faber_store_i64(faber_i128 value, const char *at) {
 }
 ";
 
+/// A standard header. The variant order is the `#include` order
+/// (alphabetical).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Header {
+    /// `int64_t`, `INT64_C`, `INT64_MIN`, `UINT64_MAX` and `PRId64`;
+    /// `<inttypes.h>` includes `<stdint.h>`.
+    Inttypes,
+    /// `bool`.
+    Stdbool,
+    /// `printf`, `fprintf`.
+    Stdio,
+    /// `exit`.
+    Stdlib,
+}
+
+impl Header {
+    fn include(self) -> &'static str {
+        match self {
+            Header::Inttypes => "#include <inttypes.h>\n",
+            Header::Stdbool => "#include <stdbool.h>\n",
+            Header::Stdio => "#include <stdio.h>\n",
+            Header::Stdlib => "#include <stdlib.h>\n",
+        }
+    }
+}
+
 /// Headers and helpers the emitted program needs, filled while emitting.
 #[derive(Default)]
 pub(crate) struct Support {
-    /// `int64_t`, `INT64_C`, `INT64_MIN`, `UINT64_MAX` and `PRId64`;
-    /// `<inttypes.h>` includes `<stdint.h>`.
-    ints: bool,
-    /// `printf`, `fprintf`.
-    stdio: bool,
-    /// `exit`.
-    stdlib: bool,
+    headers: BTreeSet<Header>,
     helpers: BTreeSet<Helper>,
 }
 
 impl Support {
     /// The program declares or prints a 64-bit integer.
     pub(crate) fn need_ints(&mut self) {
-        self.ints = true;
+        self.headers.insert(Header::Inttypes);
     }
 
     /// The program prints through `printf`.
     pub(crate) fn need_stdio(&mut self) {
-        self.stdio = true;
+        self.headers.insert(Header::Stdio);
+    }
+
+    /// The program declares a `bool`.
+    pub(crate) fn need_bool(&mut self) {
+        self.headers.insert(Header::Stdbool);
     }
 
     /// The program calls `helper`, and so everything `helper` calls.
@@ -187,10 +212,10 @@ impl Support {
         if !self.helpers.insert(helper) {
             return;
         }
-        self.ints = true;
+        self.headers.insert(Header::Inttypes);
         if matches!(helper, Helper::Trap | Helper::StoreI64) {
-            self.stdio = true;
-            self.stdlib = true;
+            self.headers.insert(Header::Stdio);
+            self.headers.insert(Header::Stdlib);
         }
         for dependency in helper.needs() {
             self.need(*dependency);
@@ -202,14 +227,8 @@ impl Support {
     /// program needs nothing.
     pub(crate) fn text(&self) -> String {
         let mut out = String::new();
-        if self.ints {
-            out.push_str("#include <inttypes.h>\n");
-        }
-        if self.stdio {
-            out.push_str("#include <stdio.h>\n");
-        }
-        if self.stdlib {
-            out.push_str("#include <stdlib.h>\n");
+        for header in &self.headers {
+            out.push_str(header.include());
         }
         if !out.is_empty() {
             out.push('\n');

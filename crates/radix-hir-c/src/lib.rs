@@ -22,6 +22,7 @@
 mod error;
 mod expr;
 mod helpers;
+mod items;
 mod names;
 mod stmt;
 mod ty;
@@ -37,11 +38,12 @@ mod test_support;
 
 use crate::error::unsupported;
 use crate::helpers::Support;
+use crate::items::{Function, Returns};
 use crate::names::Namer;
 use crate::ty::Ty;
-use radix_codegen_shared::names::NameCatalog;
+use radix_codegen_shared::names::{DisplayTokens, NameCatalog};
 use radix_codegen_shared::{Codegen, CodegenError};
-use radix_hir::{DefId, HirItemKind, HirModule};
+use radix_hir::{DefId, HirModule};
 use radix_lexer::Interner;
 use radix_types::TypeTable;
 use rustc_hash::FxHashMap;
@@ -66,6 +68,11 @@ impl<'a> CCodegen<'a> {
             names: NameCatalog::new(hir, interner),
         }
     }
+
+    /// Install the module's output tokens (`true` / `false` in its locale).
+    pub fn set_display_tokens(&mut self, tokens: DisplayTokens) {
+        self.names.set_display_tokens(tokens);
+    }
 }
 
 impl Codegen for CCodegen<'_> {
@@ -82,10 +89,14 @@ impl Codegen for CCodegen<'_> {
             names: &self.names,
             types,
             scope: Namer::program_scope(),
+            items_scope: Namer::program_scope(),
             locals: FxHashMap::default(),
+            functions: FxHashMap::default(),
             support: Support::default(),
             depth: 0,
             loops: 0,
+            returns: Returns::Main,
+            temps: 0,
         }
         .program(hir)?;
         Ok(COutput { code })
@@ -95,18 +106,26 @@ impl Codegen for CCodegen<'_> {
 pub(crate) struct Emitter<'a> {
     names: &'a NameCatalog<'a>,
     types: &'a TypeTable,
-    /// Names claimed in `main` (the only scope in this subset).
+    /// Names claimed in the function being written; reset per function.
     scope: Namer,
-    /// Locals of `main`, by definition.
+    /// File-scope names: functions (`f_`) and constants (`k_`).
+    items_scope: Namer,
+    /// Locals, parameters and module constants, by definition. Definition
+    /// ids are unique across the module, so one table serves every function.
     locals: FxHashMap<DefId, Local>,
+    functions: FxHashMap<DefId, Function>,
     support: Support,
-    /// Nesting depth of the statement being written (`main`'s body is 1).
+    /// Nesting depth of the statement being written (a function body is 1).
     depth: usize,
     /// Enclosing loops of the statement being written.
     loops: usize,
+    /// What `return` means in the body being written.
+    returns: Returns,
+    /// Sequencing temporaries claimed so far (`faber_t<n>`).
+    temps: u32,
 }
 
-/// One local of `main`.
+/// One local, parameter or module constant, by its C identifier.
 pub(crate) struct Local {
     pub(crate) name: String,
     pub(crate) ty: Ty,
@@ -121,35 +140,28 @@ impl Emitter<'_> {
         {
             return Err(unsupported("entry with arguments, async, or annotations"));
         }
-        Self::check_items(hir)?;
+        let items = self.items(hir)?;
+        self.scope = Namer::program_scope();
+        self.loops = 0;
+        self.returns = Returns::Main;
         let mut body = String::new();
         if let Some(entry) = &hir.entry {
             self.block(&mut body, entry)?;
         }
         let mut out = self.support.text();
+        out.push_str(&items);
         out.push_str("int main(void) {\n");
         out.push_str(&body);
         out.push_str("    return 0;\n}\n");
         Ok(out)
     }
 
-    /// The subset has no file-scope items: the first one is rejected by name.
-    fn check_items(hir: &HirModule) -> Result<(), CodegenError> {
-        let Some(item) = hir.items.first() else {
-            return Ok(());
-        };
-        if !item.annotations.is_empty() {
-            return Err(unsupported("annotation"));
+    /// Headers a class needs wherever it is declared.
+    pub(crate) fn need_class(&mut self, class: Ty) {
+        match class {
+            Ty::Int => self.support.need_ints(),
+            Ty::Bool => self.support.need_bool(),
+            Ty::Text => {}
         }
-        Err(unsupported(match &item.kind {
-            HirItemKind::Function(_) => "function declaration",
-            HirItemKind::Constant(_) => "module constant",
-            HirItemKind::Struct(_) => "genus declaration",
-            HirItemKind::Enum(_) => "enum declaration",
-            HirItemKind::Interface(_) => "interface declaration",
-            HirItemKind::TypeAlias(_) => "type alias",
-            HirItemKind::Schema(_) => "schema declaration",
-            HirItemKind::Import(_) => "import (library modules)",
-        }))
     }
 }

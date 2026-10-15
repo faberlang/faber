@@ -19,24 +19,6 @@ fn float_fixture() {
 }
 
 #[test]
-fn boolean_literal() {
-    assert_eq!(rejected("main {\n    print true\n}"), "printing a boolean");
-}
-
-#[test]
-fn boolean_comparison_print() {
-    assert_eq!(rejected("main {\n    print 1 ≺ 2\n}"), "printing a boolean");
-}
-
-#[test]
-fn function_declaration() {
-    assert_eq!(
-        rejected("fn f() → int {\n    return 1\n}\nmain {\n    print 1\n}"),
-        "function declaration"
-    );
-}
-
-#[test]
 fn text_concatenation_is_not_folded() {
     assert_eq!(
         rejected("main {\n    print \"a\" + \"b\"\n}"),
@@ -98,14 +80,6 @@ fn list_type() {
 }
 
 #[test]
-fn module_constant() {
-    assert_eq!(
-        rejected("const int LIMIT = 3\nmain {\n    print 1\n}"),
-        "module constant"
-    );
-}
-
-#[test]
 fn write_output_is_not_print() {
     assert_eq!(
         rejected("main {\n    warn \"w\"\n}"),
@@ -126,5 +100,22 @@ fn iteration_loop() {
     assert_eq!(
         rejected("main {\n    for range 0‥3 const i {\n        print i\n    }\n}"),
         "iteration loop"
+    );
+}
+
+/// `inf` needs an arena-backed bignum (goal unit C6); until then it is named.
+#[test]
+fn unbounded_integer_type() {
+    assert_eq!(
+        rejected("main {\n    var inf n ← 5\n    print n\n}"),
+        "unbounded integer type (inf)"
+    );
+}
+
+#[test]
+fn generic_function() {
+    assert_eq!(
+        rejected("fn id<T>(T x) → T {\n    return x\n}\nmain {\n    print id(1)\n}"),
+        "generic function"
     );
 }

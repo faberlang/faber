@@ -956,7 +956,8 @@ fn generate_odin_from_analyzed(
 
 #[cfg(feature = "hir-c")]
 fn generate_c_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) -> Result<crate::Output, CodegenError> {
-    let r#gen = c::CCodegen::new(hir, analysis.interner());
+    let mut r#gen = c::CCodegen::new(hir, analysis.interner());
+    r#gen.set_display_tokens(analysis.display_tokens().clone());
     let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::C(crate::COutput { code: output.code }))
 }

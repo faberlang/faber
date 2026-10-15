@@ -5,6 +5,7 @@ use crate::test_support::emitted;
 const SCALARS: &str = include_str!("../tests/fixtures/run/scalars.c");
 const C_EDGES: &str = include_str!("../tests/fixtures/run/c_edges.c");
 const LOOPS: &str = include_str!("../tests/fixtures/run/loops.c");
+const FUNCTIONS: &str = include_str!("../tests/fixtures/run/functions.c");
 
 #[test]
 fn scalars_program_is_pinned() {
@@ -238,4 +239,83 @@ fn control_flow_is_c_control_flow() {
     ] {
         assert!(code.contains(line), "{line:?} missing in {code}");
     }
+}
+
+#[test]
+fn functions_program_is_pinned() {
+    let source = include_str!("../tests/fixtures/run/functions.fab");
+    let source = crate::test_support::program("functions.fab", source);
+    assert_eq!(source, FUNCTIONS);
+}
+
+#[test]
+fn functions_get_prototypes_and_prefixed_names() {
+    let code = emitted(
+        "fn twice(int x) → int {\n    return x * 2\n}\nfn hello() {\n    print \"hi\"\n}\nmain {\n    hello()\n    print twice(4)\n}",
+    );
+    for line in [
+        "static int64_t f_twice(int64_t);\n",
+        "static void f_hello(void);\n",
+        "static int64_t f_twice(int64_t p_x) {\n",
+        "    return faber_store_i64(faber_mul(p_x, INT64_C(2)), \"return\");\n",
+        "    f_hello();\n",
+    ] {
+        assert!(code.contains(line), "{line:?} missing in {code}");
+    }
+}
+
+/// C leaves argument and operand order unspecified; Faber is left to right,
+/// so operands that share an evaluation with a call are bound in order.
+#[test]
+fn calls_are_sequenced_left_to_right() {
+    let code = emitted(
+        "fn f(int x) → int {\n    print x\n    return x\n}\nmain {\n    print f(1) + f(2)\n}",
+    );
+    assert!(
+        code.contains("int64_t faber_t0 = f_f(INT64_C(1)); int64_t faber_t1 = f_f(INT64_C(2)); faber_add(faber_t0, faber_t1);"),
+        "{code}"
+    );
+}
+
+#[test]
+fn a_call_without_other_calls_is_not_sequenced() {
+    let code = emitted(
+        "fn f(int x) → int {\n    return x\n}\nmain {\n    var int n ← 1\n    print f(n)\n}",
+    );
+    assert!(!code.contains("faber_t"), "{code}");
+}
+
+#[test]
+fn an_exact_argument_is_checked_like_a_store() {
+    let code = emitted(
+        "fn f(int x) → int {\n    return x\n}\nmain {\n    var int n ← 1\n    print f(n + 1)\n}",
+    );
+    assert!(
+        code.contains("f_f(faber_store_i64(faber_add(l_n, INT64_C(1)), \"argument\"))"),
+        "{code}"
+    );
+}
+
+#[test]
+fn booleans_print_through_the_module_display_tokens() {
+    let code = emitted("main {\n    var bool b ← 1 ≺ 2\n    print b\n}");
+    assert!(code.contains("#include <stdbool.h>"), "{code}");
+    assert!(
+        code.contains("    bool l_b = (INT64_C(1) < INT64_C(2));\n"),
+        "{code}"
+    );
+    assert!(
+        code.contains("printf(\"%s\\n\", ((l_b) ? \"true\" : \"false\"));"),
+        "{code}"
+    );
+}
+
+#[test]
+fn module_constants_are_static_const() {
+    let code = emitted("const int LIMIT = 3\nmain {\n    print LIMIT\n}");
+    assert!(
+        code.contains("static const int64_t k_LIMIT = INT64_C(3);\n"),
+        "{code}"
+    );
+    assert!(code.contains(", k_LIMIT);"), "{code}");
 }

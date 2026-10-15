@@ -1,0 +1,44 @@
++++
+locale = "en"
++++
+# Recursion, call order, booleans through the locale display tokens, module
+# constants, and a function without a result.
+const int LIMIT = 10
+const string GREETING = "hi"
+const bool LOUD = true
+
+fn fib(int n) → int {
+    if n ≺ 2 {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+
+fn noisy(int x) → int {
+    print "noisy", x
+    return x
+}
+
+fn is_even(int n) → bool {
+    return n % 2 ≡ 0
+}
+
+fn shout(string s, bool loud) {
+    if loud {
+        print s, "!"
+    } else {
+        print s
+    }
+}
+
+main {
+    print fib(LIMIT)
+    print noisy(1) + noisy(2)
+    print noisy(3), noisy(4)
+    var bool flag ← is_even(LIMIT)
+    print flag, is_even(7), LOUD
+    shout(GREETING, LOUD)
+    shout("quiet", false)
+    flag ← not flag
+    print flag
+}

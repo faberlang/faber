@@ -37,9 +37,11 @@ pub(crate) enum Value {
     Exact,
     /// A text value (`const char *`).
     Text,
-    /// A C truth value from a comparison or a logical operator; only a
-    /// condition reads one.
+    /// A C `bool`: a comparison, a logical operator, or a boolean value. The
+    /// text always carries its own parentheses.
     Truth,
+    /// A call to a function with no result; only a statement holds one.
+    Void,
 }
 
 impl From<Ty> for Value {
@@ -47,16 +49,20 @@ impl From<Ty> for Value {
         match ty {
             Ty::Int => Value::Int,
             Ty::Text => Value::Text,
+            Ty::Bool => Value::Truth,
         }
     }
 }
 
-/// One emitted expression: C text, what it holds, and its value when it is a
-/// folded integer constant.
+/// One emitted expression: C text, what it holds, its value when it is a
+/// folded integer constant, and whether it contains a call.
 pub(crate) struct Operand {
     pub(crate) text: String,
     pub(crate) value: Value,
     pub(crate) constant: Option<i128>,
+    /// The expression calls a function, so where it runs relative to its
+    /// siblings can show in the output (see [`Emitter::sequence`]).
+    pub(crate) effect: bool,
 }
 
 impl Operand {
@@ -65,7 +71,13 @@ impl Operand {
             text,
             value,
             constant: None,
+            effect: false,
         }
+    }
+
+    fn with_effect(mut self, effect: bool) -> Self {
+        self.effect = effect;
+        self
     }
 
     fn is_integer(&self) -> bool {
@@ -101,8 +113,107 @@ impl Emitter<'_> {
                 recovery: None,
                 ..
             } => self.implicit_store(source, *slot, site),
+            HirExpressionKind::Call(callee, type_args, args, arm) => {
+                if !type_args.is_empty() || arm.is_some() {
+                    return Err(unsupported("generic or propagating call"));
+                }
+                self.call(callee, args)
+            }
             other => Err(unsupported(construct_name(other))),
         }
+    }
+
+    /// A call to a function this program defines. Arguments arrive wrapped in
+    /// their `argument` store, so each already has its parameter's class.
+    fn call(
+        &mut self,
+        callee: &HirExpression,
+        args: &[radix_hir::HirCallArg],
+    ) -> Result<Operand, CodegenError> {
+        let HirExpressionKind::Path(def_id) = &callee.kind else {
+            return Err(unsupported("call through a value"));
+        };
+        let Some(function) = self.functions.get(def_id) else {
+            return Err(unsupported("call to a function outside the program"));
+        };
+        let (name, params, ret) = (function.name.clone(), function.params.clone(), function.ret);
+        if args.len() != params.len() {
+            return Err(unsupported("call with omitted or extra arguments"));
+        }
+        let mut operands = Vec::with_capacity(args.len());
+        for (arg, param) in args.iter().zip(params) {
+            if arg.name.is_some() || arg.spread || arg.marker.is_some() {
+                return Err(unsupported("named, spread, or marked argument"));
+            }
+            let mut operand = self.expr(&arg.expr)?;
+            // An argument carries no store node in HIR, but the runner checks
+            // it as a store and names it `argument`; the C target does the same.
+            if operand.value == Value::Exact && param == Ty::Int {
+                if operand.constant.is_some() {
+                    return Err(unsupported("integer constant beyond i64"));
+                }
+                self.support.need(Helper::StoreI64);
+                operand.text = format!("faber_store_i64({}, \"argument\")", operand.text);
+                operand.value = Value::Int;
+            }
+            if operand.value != Value::from(param) {
+                return Err(unsupported("value stored without a store check"));
+            }
+            operands.push(operand);
+        }
+        let prelude = self.sequence(&mut operands);
+        let list = operands
+            .iter()
+            .map(|operand| operand.text.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let value = ret.map_or(Value::Void, Value::from);
+        let text = wrap(&prelude, &format!("{name}({list})"));
+        // A boolean result carries its own parentheses like every truth operand.
+        let text = if value == Value::Truth && prelude.is_empty() {
+            format!("({text})")
+        } else {
+            text
+        };
+        Ok(Operand::new(text, value).with_effect(true))
+    }
+
+    /// C leaves the order of function arguments, and of the two operands of a
+    /// helper call, unspecified; Faber evaluates left to right. When two or more
+    /// operands share one evaluation and any of them calls a function, each
+    /// non-constant operand is bound to a temporary in source order, and the
+    /// returned prelude declares them. A call can print, and a sibling can trap,
+    /// so the order shows in stdout. Without a call no operand has an effect
+    /// that order could reveal: traps all end the program with status 1.
+    pub(crate) fn sequence(&mut self, operands: &mut [Operand]) -> String {
+        if operands.len() < 2 || !operands.iter().any(|operand| operand.effect) {
+            return String::new();
+        }
+        let mut prelude = String::new();
+        for operand in operands.iter_mut() {
+            if operand.constant.is_some() {
+                continue;
+            }
+            let c_type = match operand.value {
+                Value::Int => "int64_t ",
+                Value::Exact => "faber_i128 ",
+                Value::Text => "const char *",
+                Value::Truth => {
+                    self.support.need_bool();
+                    "bool "
+                }
+                Value::Void => continue,
+            };
+            let name = format!("faber_t{}", self.temps);
+            self.temps += 1;
+            write!(prelude, "{c_type}{name} = {}; ", operand.text).ok();
+            operand.text = if operand.value == Value::Truth {
+                format!("({name})")
+            } else {
+                name
+            };
+        }
+        prelude
     }
 
     /// A folded integer constant. Inside `i64` it is an `int64_t` literal;
@@ -114,7 +225,10 @@ impl Emitter<'_> {
                 "integer constant beyond the 64-bit representation cap",
             ));
         }
+        // The literal spells `INT64_C` / `INT64_MIN` wherever it lands, so it
+        // needs `<inttypes.h>` itself, not only when stored or printed.
         let (text, class) = if let Ok(narrow) = i64::try_from(value) {
+            self.support.need_ints();
             (c_int64(narrow), Value::Int)
         } else {
             self.support.need(Helper::Types);
@@ -124,15 +238,22 @@ impl Emitter<'_> {
             text,
             value: class,
             constant: Some(value),
+            effect: false,
         })
     }
 
     fn path(&self, def_id: radix_hir::DefId) -> Result<Operand, CodegenError> {
         match self.locals.get(&def_id) {
+            // A truth operand carries its own parentheses.
             Some(local) => Ok(Operand {
-                text: local.name.clone(),
+                text: if local.ty == Ty::Bool {
+                    format!("({})", local.name)
+                } else {
+                    local.name.clone()
+                },
                 value: local.ty.into(),
                 constant: local.constant,
+                effect: false,
             }),
             None => Err(unsupported("reference to a name that is not a local")),
         }
@@ -174,13 +295,14 @@ impl Emitter<'_> {
                     return self.int(-value);
                 }
                 self.support.need(Helper::Sub);
-                Ok(Operand::new(
-                    format!("faber_sub(0, {})", inner.text),
-                    Value::Exact,
-                ))
+                Ok(
+                    Operand::new(format!("faber_sub(0, {})", inner.text), Value::Exact)
+                        .with_effect(inner.effect),
+                )
             }
             HirUnOp::Not if inner.value == Value::Truth => {
-                Ok(Operand::new(format!("(!{})", inner.text), Value::Truth))
+                Ok(Operand::new(format!("(!{})", inner.text), Value::Truth)
+                    .with_effect(inner.effect))
             }
             HirUnOp::Not => Err(unsupported("logical not of a non-boolean")),
             HirUnOp::BitNot => Err(unsupported("bitwise not")),
@@ -197,7 +319,7 @@ impl Emitter<'_> {
         let r = self.expr(right)?;
         match op {
             HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod => {
-                self.arithmetic(op, &l, &r)
+                self.arithmetic(op, l, r)
             }
             HirBinOp::Lt
             | HirBinOp::Gt
@@ -206,7 +328,7 @@ impl Emitter<'_> {
             | HirBinOp::Eq
             | HirBinOp::NotEq
             | HirBinOp::StrictEq
-            | HirBinOp::StrictNotEq => Self::comparison(op, &l, &r),
+            | HirBinOp::StrictNotEq => self.comparison(op, l, r),
             HirBinOp::And | HirBinOp::Or => Self::logical(op, &l, &r),
             other => Err(unsupported(binary_name(other))),
         }
@@ -215,8 +337,8 @@ impl Emitter<'_> {
     fn arithmetic(
         &mut self,
         op: HirBinOp,
-        l: &Operand,
-        r: &Operand,
+        l: Operand,
+        r: Operand,
     ) -> Result<Operand, CodegenError> {
         if !l.is_integer() || !r.is_integer() {
             return Err(unsupported("arithmetic on text or a boolean"));
@@ -231,10 +353,12 @@ impl Emitter<'_> {
         };
         let (Some(a), Some(b)) = (l.constant, r.constant) else {
             self.support.need(helper);
-            return Ok(Operand::new(
-                format!("{name}({}, {})", l.text, r.text),
-                Value::Exact,
-            ));
+            let effect = l.effect || r.effect;
+            let mut operands = [l, r];
+            let prelude = self.sequence(&mut operands);
+            let [l, r] = operands;
+            let text = wrap(&prelude, &format!("{name}({}, {})", l.text, r.text));
+            return Ok(Operand::new(text, Value::Exact).with_effect(effect));
         };
         if b == 0 {
             match op {
@@ -253,7 +377,12 @@ impl Emitter<'_> {
 
     /// Integer comparison by exact value: C's usual arithmetic conversions
     /// widen an `int64_t` operand to `faber_i128` when the other is exact.
-    fn comparison(op: HirBinOp, l: &Operand, r: &Operand) -> Result<Operand, CodegenError> {
+    fn comparison(
+        &mut self,
+        op: HirBinOp,
+        l: Operand,
+        r: Operand,
+    ) -> Result<Operand, CodegenError> {
         if !l.is_integer() || !r.is_integer() {
             return Err(unsupported("comparison of text or booleans"));
         }
@@ -266,22 +395,25 @@ impl Emitter<'_> {
             HirBinOp::NotEq | HirBinOp::StrictNotEq => "!=",
             other => return Err(unsupported(binary_name(other))),
         };
-        Ok(Operand::new(
-            format!("({} {glyph} {})", l.text, r.text),
-            Value::Truth,
-        ))
+        let effect = l.effect || r.effect;
+        let mut operands = [l, r];
+        let prelude = self.sequence(&mut operands);
+        let [l, r] = operands;
+        let text = wrap(&prelude, &format!("({} {glyph} {})", l.text, r.text));
+        Ok(Operand::new(text, Value::Truth).with_effect(effect))
     }
 
-    /// `and` / `or` short-circuit, as C's `&&` / `||` do.
+    /// `and` / `or` short-circuit, as C's `&&` / `||` do, and C sequences the
+    /// left operand before the right, so no temporaries are needed.
     fn logical(op: HirBinOp, l: &Operand, r: &Operand) -> Result<Operand, CodegenError> {
         if l.value != Value::Truth || r.value != Value::Truth {
             return Err(unsupported("logical operator on a non-boolean"));
         }
         let glyph = if op == HirBinOp::And { "&&" } else { "||" };
-        Ok(Operand::new(
-            format!("({} {glyph} {})", l.text, r.text),
-            Value::Truth,
-        ))
+        Ok(
+            Operand::new(format!("({} {glyph} {})", l.text, r.text), Value::Truth)
+                .with_effect(l.effect || r.effect),
+        )
     }
 
     /// Typecheck's implicit store around a value: the one place an exact
@@ -306,33 +438,62 @@ impl Emitter<'_> {
         site: &HirStoreSite,
     ) -> Result<Operand, CodegenError> {
         match (class, value.value) {
-            (Ty::Int, Value::Int) | (Ty::Text, Value::Text) => Ok(value),
+            (Ty::Int, Value::Int) | (Ty::Text, Value::Text) | (Ty::Bool, Value::Truth) => Ok(value),
             (Ty::Int, Value::Exact) if value.constant.is_some() => {
                 Err(unsupported("integer constant beyond i64"))
             }
             (Ty::Int, Value::Exact) => {
                 self.support.need(Helper::StoreI64);
                 let at = c_string(&self.store_position(site))?;
-                Ok(Operand::new(
-                    format!("faber_store_i64({}, {at})", value.text),
-                    Value::Int,
-                ))
+                Ok(
+                    Operand::new(format!("faber_store_i64({}, {at})", value.text), Value::Int)
+                        .with_effect(value.effect),
+                )
             }
             _ => Err(unsupported("conversion between value classes")),
         }
     }
 
     /// How a trap names the store, worded as the runner and the Rust target
-    /// word it.
+    /// (`exact_int.rs` `store_position`) word it.
     fn store_position(&self, site: &HirStoreSite) -> String {
         let slot = site.slot.map(|slot| self.names.resolve_symbol(slot));
         match (site.kind, slot) {
             (HirStoreKind::Declaration, Some(slot)) => format!("declaration of `{slot}`"),
             (HirStoreKind::Assignment, Some(slot)) => format!("assignment to `{slot}`"),
-            (HirStoreKind::Declaration, None) => "declaration".to_owned(),
-            (HirStoreKind::Assignment, None) => "assignment".to_owned(),
-            _ => "store".to_owned(),
+            (HirStoreKind::Argument, Some(slot)) => format!("argument `{slot}`"),
+            (HirStoreKind::Field, Some(slot)) => format!("field `{slot}`"),
+            (HirStoreKind::AwaitBinding, Some(slot)) => format!("await-binding `{slot}`"),
+            (kind, _) => store_kind_phrase(kind).to_owned(),
         }
+    }
+}
+
+/// `prelude` and `expr` as one GNU statement expression when the prelude
+/// declared temporaries, else `expr`. `__extension__` keeps `-pedantic`
+/// quiet; the outer parentheses keep a truth operand self-parenthesized.
+fn wrap(prelude: &str, expr: &str) -> String {
+    if prelude.is_empty() {
+        expr.to_owned()
+    } else {
+        format!("(__extension__ ({{ {prelude}{expr}; }}))")
+    }
+}
+
+fn store_kind_phrase(kind: HirStoreKind) -> &'static str {
+    match kind {
+        HirStoreKind::Declaration => "declaration",
+        HirStoreKind::Assignment => "assignment",
+        HirStoreKind::Argument => "argument",
+        HirStoreKind::ParameterDefault => "parameter default",
+        HirStoreKind::Return => "return",
+        HirStoreKind::Yield => "yield",
+        HirStoreKind::Throw => "throw",
+        HirStoreKind::Field => "field",
+        HirStoreKind::Element => "collection element",
+        HirStoreKind::TuplePosition => "tuple position",
+        HirStoreKind::ConversionDefault => "conversion default",
+        HirStoreKind::AwaitBinding => "await-binding",
     }
 }
 

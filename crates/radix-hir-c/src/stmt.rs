@@ -1,8 +1,9 @@
 //! Statement emission: locals, assignment, control flow, and print.
 
 use crate::error::unsupported;
-use crate::expr::{Value, construct_name};
+use crate::expr::{Value, c_string, construct_name};
 use crate::helpers::Helper;
+use crate::items::Returns;
 use crate::ty::classify;
 use crate::{Emitter, Local};
 use radix_codegen_shared::CodegenError;
@@ -11,7 +12,7 @@ use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirLocal, HirScribeKind, HirStatement,
     HirStatementKind,
 };
-use radix_types::{Primitive, Type};
+use radix_types::Type;
 
 impl Emitter<'_> {
     /// Emit a block's statements one level deeper than the current line.
@@ -48,11 +49,7 @@ impl Emitter<'_> {
         match &statement.kind {
             HirStatementKind::Local(local) => self.local(out, local),
             HirStatementKind::Expr(expr) => self.expr_statement(out, expr),
-            HirStatementKind::Redde(None) => {
-                self.line(out, "return 0;");
-                Ok(())
-            }
-            HirStatementKind::Redde(Some(_)) => Err(unsupported("return with a value")),
+            HirStatementKind::Redde(value) => self.redde(out, value.as_ref()),
             HirStatementKind::Rumpe => self.loop_jump(out, "break;"),
             HirStatementKind::Perge => self.loop_jump(out, "continue;"),
             HirStatementKind::Tacet => Ok(()),
@@ -68,6 +65,38 @@ impl Emitter<'_> {
             return Err(unsupported("loop jump outside a loop"));
         }
         self.line(out, text);
+        Ok(())
+    }
+
+    /// `return` by context: the entry block ends the program with status 0, a
+    /// function with a result returns its value (already wrapped in the
+    /// `return` store by typecheck).
+    fn redde(
+        &mut self,
+        out: &mut String,
+        value: Option<&HirExpression>,
+    ) -> Result<(), CodegenError> {
+        match (self.returns, value) {
+            (Returns::Main, None) => self.line(out, "return 0;"),
+            (Returns::Void, None) => self.line(out, "return;"),
+            (Returns::Value(class), Some(value)) => {
+                let operand = self.expr(value)?;
+                if operand.value != crate::expr::Value::from(class) {
+                    return Err(unsupported("value stored without a store check"));
+                }
+                self.line(out, &format!("return {};", operand.text));
+            }
+            (Returns::Main | Returns::Void, Some(_)) => {
+                return Err(unsupported(
+                    "return with a value from a function without one",
+                ));
+            }
+            (Returns::Value(_), None) => {
+                return Err(unsupported(
+                    "return without a value from a function with one",
+                ));
+            }
+        }
         Ok(())
     }
 
@@ -89,9 +118,7 @@ impl Emitter<'_> {
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
         }
-        if value.value == Value::Int {
-            self.support.need_ints();
-        }
+        self.need_class(class);
         let Some(kind) = self.names.binding_kind(local.def_id) else {
             return Err(unsupported("local the name catalog does not classify"));
         };
@@ -118,6 +145,16 @@ impl Emitter<'_> {
     ) -> Result<(), CodegenError> {
         match &expr.kind {
             HirExpressionKind::Scribe(kind, args) => self.print(out, *kind, args),
+            HirExpressionKind::Call(..) => {
+                let call = self.expr(expr)?;
+                let line = if call.value == Value::Void {
+                    format!("{};", call.text)
+                } else {
+                    format!("(void){};", call.text)
+                };
+                self.line(out, &line);
+                Ok(())
+            }
             HirExpressionKind::Assign(place, value) => self.assign(out, place, value),
             HirExpressionKind::Si {
                 cond,
@@ -216,21 +253,22 @@ impl Emitter<'_> {
                 "write, debug, or warn output (only print is supported)",
             ));
         }
-        let mut specs = Vec::with_capacity(args.len());
-        let mut values = Vec::with_capacity(args.len());
+        let mut operands = Vec::with_capacity(args.len());
         for arg in args {
-            // Display tokens for booleans and absent options wait on the
-            // boolean and option types; no print path may render one yet.
-            if let Some(ty) = arg.ty {
-                match self.types.get(ty) {
-                    Type::Primitive(Primitive::Bivalens) => {
-                        return Err(unsupported("printing a boolean"));
-                    }
-                    Type::Option(_) => return Err(unsupported("printing an absent option")),
-                    _ => {}
-                }
+            // The absent-option token waits on the option type.
+            if let Some(ty) = arg.ty
+                && matches!(self.types.get(ty), Type::Option(_))
+            {
+                return Err(unsupported("printing an absent option"));
             }
-            let value = self.expr(arg)?;
+            operands.push(self.expr(arg)?);
+        }
+        let prelude = self.sequence(&mut operands);
+        let tokens = self.names.display_tokens();
+        let (yes, no) = (c_string(&tokens.true_)?, c_string(&tokens.false_)?);
+        let mut specs = Vec::with_capacity(operands.len());
+        let mut values = Vec::with_capacity(operands.len());
+        for value in operands {
             let (spec, text) = match value.value {
                 Value::Int => {
                     self.support.need_ints();
@@ -244,7 +282,10 @@ impl Emitter<'_> {
                     )
                 }
                 Value::Text => ("%s", value.text),
-                Value::Truth => return Err(unsupported("printing a boolean")),
+                // The module's locale words: `true` / `false` for an `en`
+                // program, `verum` / `falsum` for a `la` one.
+                Value::Truth => ("%s", format!("({} ? {yes} : {no})", value.text)),
+                Value::Void => return Err(unsupported("printing a call with no result")),
             };
             specs.push(spec);
             values.push(text);
@@ -256,7 +297,18 @@ impl Emitter<'_> {
             line.push_str(&value);
         }
         line.push_str(");");
-        self.line(out, &line);
+        if prelude.is_empty() {
+            self.line(out, &line);
+        } else {
+            // Arguments with calls are bound in source order first; the block
+            // scopes the temporaries.
+            self.line(out, "{");
+            self.depth += 1;
+            self.line(out, prelude.trim_end());
+            self.line(out, &line);
+            self.depth -= 1;
+            self.line(out, "}");
+        }
         Ok(())
     }
 }

@@ -1,0 +1,14 @@
++++
+locale = "en"
++++
+# A call argument is checked like a store: the runner reports
+# `does not fit in `i64` (argument)` and exits 1.
+fn echo(int x) → int {
+    return x
+}
+
+main {
+    var int n ← 9223372036854775807
+    print "before"
+    print echo(n + 1)
+}
