@@ -7101,6 +7101,102 @@ incipiet {
     );
 }
 
+/// An awaited in-unit generic `@ future` call instantiates its payload, so the
+/// call destination temp carries the concrete `T` (`textus` here) rather than
+/// the callee's declared `promissum<T>` handle. Pins the non-void generic case
+/// the void-only async tests could not see (c75db9ed-13.1).
+#[test]
+fn await_generic_future_call_destination_is_instantiated() {
+    let source = r#"
+functio lege<T>(T x) fiet → T {
+    redde x
+}
+
+incipiet {
+    figendum textus corpus ← lege<textus>("verbum")
+    nota 1
+}
+"#;
+    let analysis = analyze(source);
+    let lowered = lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default())
+        .expect("lower awaited generic unit");
+
+    let dump = crate::mir::dump_program(lowered.validated.program());
+    assert!(
+        !dump.contains("unsupported"),
+        "no unsupported surface in the awaited generic unit:\n{dump}"
+    );
+
+    let lege = lowered
+        .validated
+        .program()
+        .functions
+        .iter()
+        .find(|function| {
+            function
+                .name
+                .is_some_and(|name| lowered.interner.resolve(name) == "lege")
+        })
+        .and_then(|function| function.source)
+        .expect("lege function must lower with a source definition");
+
+    let types = lowered.validated.validation().types.as_table();
+
+    let mut destination_types = Vec::new();
+    for function in &lowered.validated.program().functions {
+        for block in &function.blocks {
+            for statement in &block.statements {
+                let MirStatementKind::Call { destination, callee, .. } = &statement.kind else {
+                    continue;
+                };
+                // The generic callee monomorphizes to a definition-backed
+                // `Function`; a non-generic in-unit callee stays `Definition`.
+                // Resolve either back to `lege`'s source definition.
+                let callee_source = match callee {
+                    MirCallee::Definition { source, .. } => Some(*source),
+                    MirCallee::Function(id) => lowered
+                        .validated
+                        .program()
+                        .functions
+                        .iter()
+                        .find(|candidate| candidate.id == *id)
+                        .and_then(|candidate| candidate.source),
+                    MirCallee::Closure(_) | MirCallee::Value(_) => None,
+                };
+                if callee_source != Some(lege) {
+                    continue;
+                }
+                let place = destination
+                    .as_ref()
+                    .expect("an awaited non-void generic call must carry a destination temp");
+                let MirPlaceBase::Temp(temp_id) = place.base else {
+                    panic!("awaited generic call destination must be an unprojected temp: {place:?}");
+                };
+                let temp = function
+                    .temps
+                    .iter()
+                    .find(|temp| temp.id == temp_id)
+                    .expect("destination temp must exist on the owning function");
+                destination_types.push(temp.ty.semantic_id());
+            }
+        }
+    }
+
+    assert!(
+        !destination_types.is_empty(),
+        "the await of lege<textus>() must lower to a definition call"
+    );
+    let textus = Type::Primitive(Primitive::Textus);
+    assert!(
+        destination_types.iter().all(|id| types.get(*id) == &textus),
+        "awaited generic call destination must carry the instantiated payload, not promissum<textus>: {:?}",
+        destination_types
+            .iter()
+            .map(|id| types.get(*id))
+            .collect::<Vec<_>>()
+    );
+}
+
 // ===========================================================================
 // Section N — CDA-U6: `↤` conversion-directed assignment lowering
 // ===========================================================================
