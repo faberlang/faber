@@ -6,7 +6,7 @@ use radix_mir::{MirProgram, ValidatedMir};
 use radix_types::TypeTable;
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
 
-use crate::capability::{SLUG_CLIF_SUBSET, classify_clif_lowerability};
+use crate::capability::{SLUG_CLIF_SUBSET, classify_clif_reachable};
 use crate::lower::{ProgramInput, lower_program};
 
 /// A relocatable native object for the host triple.
@@ -64,14 +64,14 @@ pub fn emit_object(
     validated: &ValidatedMir<'_>,
     interner: &Interner,
 ) -> Result<ClifObject, ClifError> {
-    if let Lowerability::Rejected(gaps) = classify_clif_lowerability(validated) {
-        return Err(ClifError::from_gaps(&gaps));
-    }
     let program = validated.program();
     let types = validated.validation().types.as_table();
     let entry = MirNames::new(program, types, interner)
         .explicit_entry_function()
         .map(|function| function.id);
+    if let Lowerability::Rejected(gaps) = classify_clif_reachable(validated, entry) {
+        return Err(ClifError::from_gaps(&gaps));
+    }
     let tokens = match entry {
         Some(id) => display_tokens(validated, id),
         None => ["true", "false", "none", "tuple"].map(str::to_owned),

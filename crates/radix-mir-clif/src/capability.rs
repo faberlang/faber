@@ -23,7 +23,7 @@ use radix_mir::visit::MirVisitor;
 use radix_mir::*;
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
 use radix_types::{NumericWidth, Primitive, Type, TypeTable};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Slug for shapes the CLIF subset does not cover yet.
 pub const SLUG_CLIF_SUBSET: &str = "clif-subset";
@@ -66,7 +66,57 @@ impl Gap {
 pub struct ClifCapability<'a> {
     types: &'a TypeTable,
     function_sources: FxHashSet<DefId>,
+    /// When set, only these functions are classified (the entry's call
+    /// closure); unreachable library code is never lowered, so it is never a gap.
+    reachable: Option<FxHashSet<MirFunctionId>>,
     gaps: Vec<CapabilityGap>,
+}
+
+/// Collects the functions a body calls directly.
+struct DirectCallees<'a> {
+    sources: &'a FxHashMap<DefId, MirFunctionId>,
+    found: Vec<MirFunctionId>,
+}
+
+impl MirVisitor for DirectCallees<'_> {
+    fn visit_callee(&mut self, callee: &MirCallee) {
+        match callee {
+            MirCallee::Function(id) => self.found.push(*id),
+            MirCallee::Definition { source, .. } => {
+                if let Some(id) = self.sources.get(source) {
+                    self.found.push(*id);
+                }
+            }
+            MirCallee::Closure(_) | MirCallee::Value(_) => {}
+        }
+        radix_mir::visit::walk_callee(self, callee);
+    }
+}
+
+/// The functions reachable from `entry` through direct calls.
+fn reachable_from(program: &MirProgram, entry: Option<MirFunctionId>) -> FxHashSet<MirFunctionId> {
+    let sources: FxHashMap<DefId, MirFunctionId> = program
+        .functions
+        .iter()
+        .filter_map(|function| function.source.map(|source| (source, function.id)))
+        .collect();
+    let mut seen = FxHashSet::default();
+    let mut work: Vec<MirFunctionId> = entry.into_iter().collect();
+    while let Some(id) = work.pop() {
+        if !seen.insert(id) {
+            continue;
+        }
+        let Some(function) = program.functions.iter().find(|function| function.id == id) else {
+            continue;
+        };
+        let mut collector = DirectCallees {
+            sources: &sources,
+            found: Vec::new(),
+        };
+        collector.visit_function(function);
+        work.extend(collector.found);
+    }
+    seen
 }
 
 impl<'a> ClifCapability<'a> {
@@ -74,6 +124,7 @@ impl<'a> ClifCapability<'a> {
         Self {
             types,
             function_sources: FxHashSet::default(),
+            reachable: None,
             gaps: Vec::new(),
         }
     }
@@ -290,6 +341,11 @@ impl<'a> ClifCapability<'a> {
 
 impl MirVisitor for ClifCapability<'_> {
     fn visit_function(&mut self, function: &MirFunction) {
+        if let Some(reachable) = &self.reachable
+            && !reachable.contains(&function.id)
+        {
+            return;
+        }
         if function.is_async {
             self.record(Gap::Subset("async function".to_owned()));
         }
@@ -440,6 +496,19 @@ impl MirVisitor for ClifCapability<'_> {
 pub fn classify_clif_lowerability(validated: &ValidatedMir<'_>) -> Lowerability {
     ClifCapability::new(validated.validation().types.as_table())
         .classify_program(validated.program())
+}
+
+/// Classify only the functions reachable from `entry` (what the lowering will
+/// actually emit). A program with no entry emits nothing, so it is capable.
+#[must_use]
+pub fn classify_clif_reachable(
+    validated: &ValidatedMir<'_>,
+    entry: Option<MirFunctionId>,
+) -> Lowerability {
+    let program = validated.program();
+    let mut classifier = ClifCapability::new(validated.validation().types.as_table());
+    classifier.reachable = Some(reachable_from(program, entry));
+    classifier.classify_program(program)
 }
 
 /// Classify with an explicit type table (fixture entry; same walk).
