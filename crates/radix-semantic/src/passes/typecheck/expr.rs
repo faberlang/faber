@@ -950,6 +950,24 @@ impl TypeChecker<'_> {
                 target,
                 entries,
             } => {
+                // `_ /pattern/`: the inferred regex hole takes its type from
+                // the expected slot and is a named error without one (BUG-01,
+                // need). The explicit `regex /pattern/` form stays a
+                // self-typed literal and never reaches this hole shape.
+                if entries.is_none()
+                    && self.is_infer(self.resolve_inferred_type(*target))
+                    && matches!(
+                        &source.kind,
+                        HirExpressionKind::Literal(HirLiteral::Regex(..))
+                    )
+                    && !expected.is_some_and(|ty| !self.is_infer(self.resolve_inferred_type(ty)))
+                {
+                    self.invalid_conversion(
+                        super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
+                        expr.span,
+                    );
+                    return self.error_type;
+                }
                 if entries.is_some() && self.is_infer(self.resolve_inferred_type(*target)) {
                     // `_ { … }`: the hole before braces builds the expected
                     // type. No concrete expected type is a named error.
