@@ -20,6 +20,7 @@ hir-fhir = ["radix-module/hir-fhir", "radix-program/hir-fhir"]
 mir-fmir = ["mir-core", "radix-module/mir-fmir", "radix-program/mir-fmir"]
 mir-core = ["radix-module/mir-core"]
 runner = ["mir-core", "radix-module/runner", "radix-program/runner"]
+hir-c = ["radix-module/hir-c", "radix-program/hir-c"]
 ts-import = ["radix-module/ts-import"]
 hir-lean = ["radix-module/hir-lean"]
 

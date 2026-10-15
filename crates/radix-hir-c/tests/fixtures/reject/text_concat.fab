@@ -1,0 +1,6 @@
++++
+locale = "en"
++++
+main {
+    print "a" + "b"
+}

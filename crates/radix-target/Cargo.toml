@@ -15,6 +15,7 @@ workspace = true
 
 [features]
 hir-faber = []
+hir-c = []
 hir-fhir = []
 
 [dev-dependencies]

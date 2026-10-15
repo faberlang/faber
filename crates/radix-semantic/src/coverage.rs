@@ -87,6 +87,7 @@ pub fn from_target(target: Target) -> Option<HirCoverageTarget> {
         | Target::HirCobol
         | Target::HirFortran
         | Target::HirOdin
+        | Target::HirC
         | Target::MirWasm
         | Target::MirLlvm
         | Target::MirLlvmHost

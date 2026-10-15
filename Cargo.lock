@@ -875,6 +875,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "radix-hir-c"
+version = "0.84.0"
+dependencies = [
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-hygiene",
+ "radix-lexer",
+ "radix-module",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
 name = "radix-hir-faber"
 version = "0.84.0"
 dependencies = [
@@ -1021,6 +1035,7 @@ dependencies = [
  "radix-codegen-shared",
  "radix-diagnostics",
  "radix-hir",
+ "radix-hir-c",
  "radix-hir-faber",
  "radix-hir-fhir",
  "radix-hygiene",

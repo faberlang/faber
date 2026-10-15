@@ -92,6 +92,9 @@ pub enum FaberCliTarget {
     /// Novelty Odin program (default-off `hir-odin` feature).
     #[value(name = "odin")]
     HirOdin,
+    /// Novelty C11 program (default-off `hir-c` feature).
+    #[value(name = "c")]
+    HirC,
 
     /// Experimental MIR-backed WebAssembly text target. Emits `.wat` text
     /// only; `wasm` is an alias kept for compatibility (binary conversion is
@@ -167,6 +170,7 @@ impl FaberCliTarget {
             FaberCliTarget::HirCobol => Target::HirCobol,
             FaberCliTarget::HirFortran => Target::HirFortran,
             FaberCliTarget::HirOdin => Target::HirOdin,
+            FaberCliTarget::HirC => Target::HirC,
             FaberCliTarget::MirWasm => Target::MirWasm,
             FaberCliTarget::MirLlvm => Target::MirLlvm,
             FaberCliTarget::MirMetal => Target::MirMetal,
