@@ -5,6 +5,7 @@ use crate::value::{Arg, Reply};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
+use std::time::Duration;
 
 fn serve_ok(route: &str, args: &[Arg]) -> Reply {
     serve(route, args)
@@ -327,6 +328,160 @@ fn request_open_reassembles_content_length_body_across_segments() {
     }
     server.join().expect("server");
     assert_eq!(body, b"1234567890");
+}
+
+#[test]
+fn request_send_writes_request_and_pends() {
+    let _guard = crate::test_support::handle_table_guard();
+    reset_handles();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    let server = thread::spawn(move || {
+        let (mut socket, _) = listener.accept().expect("accept");
+        socket
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("timeout");
+        read_request_head(&mut socket)
+    });
+    let url = format!("http://127.0.0.1:{port}/send");
+    let id = match serve_ok(
+        "http:request_send",
+        &[
+            Arg::Str("GET".to_owned()),
+            Arg::Str(url),
+            Arg::List(vec![Arg::Map(vec![
+                ("name".to_owned(), "x-split".to_owned()),
+                ("value".to_owned(), "yes".to_owned()),
+            ])]),
+            Arg::Str(String::new()),
+        ],
+    ) {
+        Reply::Int(id) => id,
+        other => panic!("request_send: {other:?}"),
+    };
+    let request = server.join().expect("server");
+    assert!(request.starts_with("GET /send HTTP/1.1"), "{request}");
+    assert!(request.contains("Host: 127.0.0.1:"), "{request}");
+    assert!(request.contains("Connection: close"), "{request}");
+    assert!(request.contains("x-split: yes"), "{request}");
+    // A pending request is not a reader.
+    let read = serve("http:read", &[Arg::Int(id)]).expect("route");
+    assert!(read.is_err(), "{read:?}");
+}
+
+#[test]
+fn request_head_completes_split_exchange() {
+    let _guard = crate::test_support::handle_table_guard();
+    reset_handles();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    let server = thread::spawn(move || {
+        let (mut socket, _) = listener.accept().expect("accept");
+        socket
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("timeout");
+        let request = read_request_head(&mut socket);
+        let body = read_request_body(&mut socket, &request, 7);
+        socket
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\nx-split: yes\r\n\r\nhello")
+            .expect("write response");
+        socket.flush().expect("flush response");
+        (request, body)
+    });
+    let url = format!("http://127.0.0.1:{port}/split");
+    let id = match serve_ok(
+        "http:request_send",
+        &[
+            Arg::Str("POST".to_owned()),
+            Arg::Str(url),
+            Arg::List(Vec::new()),
+            Arg::Str("payload".to_owned()),
+        ],
+    ) {
+        Reply::Int(id) => id,
+        other => panic!("request_send: {other:?}"),
+    };
+    let opened = serve_ok("http:request_head", &[Arg::Int(id)]);
+    let (request, body) = server.join().expect("server");
+    assert!(request.contains("Content-Length: 7"), "{request}");
+    assert_eq!(body, b"payload");
+    let Reply::Map(fields) = opened else {
+        panic!("request_head: {opened:?}");
+    };
+    assert!(fields.contains(&("status".to_owned(), Reply::Int(200))));
+    let headers = fields
+        .iter()
+        .find(|(key, _)| key == "headers")
+        .map(|(_, value)| value)
+        .expect("headers");
+    let Reply::List(entries) = headers else {
+        panic!("headers: {headers:?}");
+    };
+    assert!(entries.contains(&Reply::Map(vec![
+        ("name".to_owned(), Reply::Str("x-split".to_owned())),
+        ("value".to_owned(), Reply::Str("yes".to_owned())),
+    ])));
+    let reader = fields
+        .iter()
+        .find(|(key, _)| key == "reader")
+        .and_then(|(_, value)| match value {
+            Reply::Int(reader) => Some(*reader),
+            _ => None,
+        })
+        .expect("reader");
+    let chunk = serve_ok("http:read", &[Arg::Int(reader)]);
+    let Reply::Map(chunk_fields) = chunk else {
+        panic!("read: {chunk:?}");
+    };
+    let bytes = chunk_fields
+        .iter()
+        .find(|(key, _)| key == "bytes")
+        .and_then(|(_, value)| match value {
+            Reply::Bytes(bytes) => Some(bytes.clone()),
+            Reply::Str(text) => Some(text.as_bytes().to_vec()),
+            _ => None,
+        })
+        .expect("bytes");
+    let done = chunk_fields
+        .iter()
+        .find(|(key, _)| key == "done")
+        .and_then(|(_, value)| match value {
+            Reply::Bool(done) => Some(*done),
+            _ => None,
+        })
+        .expect("done");
+    assert_eq!(bytes, b"hello");
+    assert!(done);
+}
+
+/// Read raw bytes up to and including the request head terminator.
+fn read_request_head(socket: &mut TcpStream) -> String {
+    let mut request = Vec::new();
+    let mut buf = [0_u8; 1024];
+    while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+        let n = socket.read(&mut buf).expect("read head");
+        if n == 0 {
+            break;
+        }
+        request.extend_from_slice(&buf[..n]);
+    }
+    String::from_utf8_lossy(&request).into_owned()
+}
+
+/// Read the declared request body after `head`, including bytes already read.
+fn read_request_body(socket: &mut TcpStream, head: &str, want: usize) -> Vec<u8> {
+    let header_end = head.find("\r\n\r\n").map_or(head.len(), |index| index + 4);
+    let mut body = head.as_bytes()[header_end..].to_vec();
+    let mut buf = [0_u8; 1024];
+    while body.len() < want {
+        let n = socket.read(&mut buf).expect("read body");
+        if n == 0 {
+            break;
+        }
+        body.extend_from_slice(&buf[..n]);
+    }
+    body.truncate(want);
+    body
 }
 
 #[test]
