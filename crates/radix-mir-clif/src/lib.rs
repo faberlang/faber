@@ -7,6 +7,11 @@
 //! and per-crate feature lists live in `Cargo.toml` per D3 and the
 //! 2026-10-14 design review.
 
+pub mod capability;
+
+#[cfg(test)]
+mod capability_test;
+
 use cranelift_codegen::ir::AbiParam;
 use cranelift_codegen::ir::InstBuilder;
 use cranelift_codegen::ir::types;

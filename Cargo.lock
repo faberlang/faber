@@ -1193,6 +1193,11 @@ dependencies = [
  "cranelift-module",
  "cranelift-native",
  "cranelift-object",
+ "radix-hir",
+ "radix-lexer",
+ "radix-mir",
+ "radix-types",
+ "rustc-hash",
 ]
 
 [[package]]
