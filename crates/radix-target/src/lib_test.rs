@@ -203,11 +203,11 @@ fn output_mode_variants_are_distinct() {
     assert_ne!(OutputMode::Application, OutputMode::Library);
 }
 
-/// The CLI-entry capability is exactly Rust, TypeScript, Go, and wasm text:
-/// the driver gate refuses every other target by name with
+/// The CLI-entry capability is exactly Rust, TypeScript, Python, Go, and wasm
+/// text: the driver gate refuses every other target by name with
 /// `cli_codegen_rust_only`.
 #[test]
-fn lowers_cli_entry_is_exactly_rust_ts_go_wasm() {
+fn lowers_cli_entry_is_exactly_rust_ts_py_go_wasm() {
     let capable: Vec<Target> = Target::ALL
         .iter()
         .copied()
@@ -219,6 +219,7 @@ fn lowers_cli_entry_is_exactly_rust_ts_go_wasm() {
             Target::HirRust,
             Target::HirTypeScript,
             Target::HirGo,
+            Target::HirPython,
             Target::MirWasm
         ]
     );
