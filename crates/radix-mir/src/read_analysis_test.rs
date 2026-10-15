@@ -538,3 +538,80 @@ fn index_operand_local_bare_destination_stays_a_write() {
     };
     assert!(statement_read_locals(&statement).is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// Slot index-operand reads: the slot walkers mirror the local walkers, so the
+// `Temp(0)` named by an `Index` projection of `Local(1)` is a read in operand
+// and destination positions alike.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn index_operand_slot_counts_in_returned_place() {
+    let terminator = MirTerminatorKind::Return(Some(MirOperand::Place(index_operand_place())));
+    // The operand's base slot first, then the slot its index reads.
+    assert_eq!(
+        terminator_read_slots(&terminator),
+        vec![
+            MirPlaceBase::Local(MirLocalId(1)),
+            MirPlaceBase::Temp(MirTempId(0))
+        ]
+    );
+}
+
+#[test]
+fn index_operand_slot_counts_in_assign_destination() {
+    let statement = MirStatement {
+        kind: MirStatementKind::Assign {
+            place: index_operand_place(),
+            value: int_zero_value(),
+        },
+        span: Span::default(),
+    };
+    // Temp 0 is read through the destination's index; local 1 is only the
+    // written base.
+    assert_eq!(
+        statement_read_slots(&statement),
+        vec![MirPlaceBase::Temp(MirTempId(0))]
+    );
+}
+
+#[test]
+fn index_operand_slot_counts_in_call_destination() {
+    let mut call = test_call(MirCallee::Function(MirFunctionId(0)), Vec::new());
+    let MirStatementKind::Call { destination, .. } = &mut call.kind else {
+        panic!("test_call builds a Call statement");
+    };
+    *destination = Some(index_operand_place());
+    assert_eq!(
+        statement_read_slots(&call),
+        vec![MirPlaceBase::Temp(MirTempId(0))]
+    );
+}
+
+#[test]
+fn index_operand_slot_counts_in_try_call_error_place() {
+    let terminator = MirTerminatorKind::TryCall {
+        destination: None,
+        callee: MirCallee::Function(MirFunctionId(0)),
+        args: Vec::new(),
+        ok_block: MirBlockId(0),
+        error_place: index_operand_place(),
+        error_block: MirBlockId(1),
+    };
+    assert_eq!(
+        terminator_read_slots(&terminator),
+        vec![MirPlaceBase::Temp(MirTempId(0))]
+    );
+}
+
+#[test]
+fn index_operand_slot_bare_destination_stays_a_write() {
+    let statement = MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::temp(MirTempId(0)),
+            value: int_zero_value(),
+        },
+        span: Span::default(),
+    };
+    assert!(statement_read_slots(&statement).is_empty());
+}
