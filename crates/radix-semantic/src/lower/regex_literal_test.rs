@@ -40,11 +40,9 @@ fn inferred_regex_literal_lowers_to_hir_regex() {
 }
 
 #[test]
-fn repro_nota_hole_accepts_today() {
-    let unit = test_support::analyze_source(r"incipit { nota _ /a/ }");
-    panic!(
-        "repro: success={:?} errs={:?}",
-        unit.is_ok(),
-        unit.err().map(|e| e.len())
+fn repro_nota_hole_without_expected_type_is_named_error() {
+    test_support::assert_rejects_with_issue(
+        r"incipit { nota _ /a/ }",
+        "inferred_constructor_no_expected_type",
     );
 }
