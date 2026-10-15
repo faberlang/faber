@@ -4,9 +4,9 @@ locale = "en"
 # `a?.b`: none when the base is none, else the field as an optional; a chain
 # stays one level of optional; a base that is always present is a plain read.
 class Node {
-    var int value
-    var string label
-    var Node ∪ none next
+    mut int value
+    mut string label
+    mut Node ∪ none next
 }
 
 fn total(Node ∪ none n) → int {
@@ -17,8 +17,8 @@ fn total(Node ∪ none n) → int {
 }
 
 main {
-    const Node ∪ none missing ← null
-    var Node head ← Node { value = 1, label = "a", next = Node { value = 2, label = "b", next = null } }
+    let Node ∪ none missing ← null
+    mut Node head ← Node { value = 1, label = "a", next = Node { value = 2, label = "b", next = null } }
     print head?.next?.value
     print head?.next?.next?.value
     print head?.label

@@ -4,19 +4,19 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "assignment", "place", "expression", "literal", "nota_stmt"]
 category = "binding"
 canonical = false
-summary = "Type-first fixum and varia bindings with explicit types."
-syntax = "varia <type> <name> ← <expr> | fixum <type> <name> ← <expr>"
+summary = "Type-first sit and varia bindings with explicit types."
+syntax = "varia <type> <name> ← <expr> | sit <type> <name> ← <expr>"
 related = ["varia", "fixum", "←"]
 locale = "en"
 +++
 
 # =============================================================================
-# varia — Type-first fixum and varia bindings with explicit types.
+# varia — Type-first sit and varia bindings with explicit types.
 # =============================================================================
 #
 # What this teaches:
-#   • Typed declarations — `varia <type> <name>` and `fixum <type> <name>` with explicit type annotations
-#   • Mutability — `varia` for mutable bindings, `fixum` for immutable
+#   • Typed declarations — `varia <type> <name>` and `sit <type> <name>` with explicit type annotations
+#   • Mutability — `varia` for mutable bindings, `sit` for write-once
 #
 # Common mistakes:
 #   • providing a type annotation that doesn't match the assigned expression's type — the compiler checks exact type agreement
@@ -30,10 +30,10 @@ locale = "en"
 # Typed variable declarations (type-first syntax)
 #
 # varia <type> <nomen> ← <expr>   -- typed mutable
-# fixum <type> <nomen> ← <expr>   -- typed immutable
+# sit <type> <nomen> ← <expr>     -- typed write-once
 #
 # GRAMMAR:
-#   bindingStmt :← ('varia' | 'fixum') type ident '←' expr
+#   bindingStmt :← ('varia' | 'sit') type ident '←' expr
 #
 # EXPECTED OUTPUT:
 #   Prints initial and updated values for numerus, textus, bivalens, and fractus.
@@ -41,9 +41,9 @@ locale = "en"
 main {
     # --- Typed immutable declarations ---
 
-    const int aetas ← 30
-    const string nomen ← "Marcus"
-    const bool viget ← true
+    let int aetas ← 30
+    let string nomen ← "Marcus"
+    let bool viget ← true
 
     print aetas
     print nomen
@@ -51,15 +51,15 @@ main {
 
     # --- Typed mutable declarations ---
 
-    var int numeratio ← 0
-    var string condicio ← "pendens"
-    var bool currit ← false
+    mut int numeratio ← 0
+    mut string condicio ← "pendens"
+    mut bool currit ← false
 
     print numeratio
     print condicio
     print currit
 
-    # Reassign mutable typed variables (fixum bindings cannot be reassigned)
+    # Reassign mutable typed variables (sit bindings cannot be reassigned)
     numeratio ← 100
     condicio ← "perfectum"
     currit ← true
@@ -70,8 +70,8 @@ main {
 
     # --- Fractional (fractus) typed bindings ---
 
-    const float pi ← 3.14159
-    var float ratio ← 0.05
+    let float pi ← 3.14159
+    mut float ratio ← 0.05
 
     print pi
     print ratio

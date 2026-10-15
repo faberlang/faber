@@ -28,7 +28,7 @@ locale = "en"
 @ kernel
 @ public
 fn densa(f32 x) → f32 {
-    var f32 n ← 0.0
+    mut f32 n ← 0.0
     if x ≻ 1.0 { n ← 1.0 }
     if x ≻ 2.0 { n ← 2.0 }
     return n
@@ -37,13 +37,13 @@ fn densa(f32 x) → f32 {
 @ kernel
 @ public
 fn quieta(f32 x) → f32 {
-    var f32 n ← 0.0
+    mut f32 n ← 0.0
     if x ≻ 1.0 { n ← 1.0 }
     return n
 }
 
 fn hosta(int seed) → int {
-    var int n ← 0
+    mut int n ← 0
     if seed ≡ 1 { n ← 1 }
     if seed ≡ 2 { n ← 2 }
     if seed ≡ 3 { n ← 3 }
@@ -52,7 +52,7 @@ fn hosta(int seed) → int {
 }
 
 fn brancha(int seed) → int {
-    var int n ← 0
+    mut int n ← 0
     if seed ≡ 1 { n ← 1 }
     if seed ≡ 2 { n ← 2 }
     if seed ≡ 3 { n ← 3 }
@@ -69,8 +69,8 @@ fn brancha(int seed) → int {
 }
 
 main {
-    const _ h ← hosta(3)
-    const _ b ← brancha(4)
+    let h ← hosta(3)
+    let b ← brancha(4)
     print "probe"
 }
 "#;

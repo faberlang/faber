@@ -22,6 +22,7 @@ impl KeywordPack for EnAnnotationPack {
         match text {
             "fn" => Some("functio"),
             "const" => Some("fixum"),
+            "let" => Some("sit"),
             "kernel" => Some("nucleum"),
             "fragment" => Some("fragment"),
             "lane" => Some("lane"),

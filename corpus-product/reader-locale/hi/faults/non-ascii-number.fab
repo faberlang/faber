@@ -1,5 +1,5 @@
 # Fault: Devanagari digit in a numeric literal (LEX004 unexpected_character).
 आरंभ {
-  स्थिर संख्या गिनती ← ७
+  बैठा संख्या गिनती ← ७
   दिखाओ गिनती
 }

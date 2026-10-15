@@ -92,7 +92,7 @@ fn comment_before_implendum_close_is_invalid() {
 
 #[test]
 fn comment_inside_expression_is_invalid() {
-    let source = "fixum numerus x ← 1 +\n# mid\n2\n";
+    let source = "sit numerus x ← 1 +\n# mid\n2\n";
     let result = parse_source(source);
     assert_invalid_comment_placement(&result, " mid");
 }
@@ -106,7 +106,7 @@ fn comment_between_condition_and_ergo_is_invalid() {
 
 #[test]
 fn comment_inside_check_ballot_conditional_is_invalid() {
-    let source = "fixum numerus x ← verum ✓\n# mid\n1 ✗ 2\n";
+    let source = "sit numerus x ← verum ✓\n# mid\n1 ✗ 2\n";
     let result = parse_source(source);
     assert_invalid_comment_placement(&result, " mid");
 }
@@ -118,7 +118,7 @@ fn comments_in_closure_comptime_and_trap_blocks_are_claimed() {
     for source in [
         "functio f() → vacuum { clausura → vacuum {\n# closure body\ntacet\n} }\n",
         "fixum numerus x = praefixum {\n# comptime body\n1\n}\n",
-        "functio f() → vacuum { fixum ∪ r ← capta {\n# trap body\n1\n} }\n",
+        "functio f() → vacuum { sit ∪ r ← capta {\n# trap body\n1\n} }\n",
     ] {
         let result = parse_source(source);
         assert!(
@@ -149,7 +149,7 @@ fn assert_expression_block_comment_claimed(source: &str) {
 #[test]
 fn expression_block_comment_lambda_initializer() {
     assert_expression_block_comment_claimed(
-        "functio f() → vacuum { fixum _ x ← clausura → vacuum {\n# lambda body\ntacet\n} }\n",
+        "functio f() → vacuum { sit x ← clausura → vacuum {\n# lambda body\ntacet\n} }\n",
     );
 }
 
@@ -170,7 +170,7 @@ fn expression_block_comment_lambda_expression_statement() {
 #[test]
 fn expression_block_comment_comptime_initializer() {
     assert_expression_block_comment_claimed(
-        "functio f() → vacuum { fixum numerus x ← praefixum {\n# comptime body\n1\n} }\n",
+        "functio f() → vacuum { sit numerus x ← praefixum {\n# comptime body\n1\n} }\n",
     );
 }
 
@@ -191,7 +191,7 @@ fn expression_block_comment_comptime_expression_statement() {
 #[test]
 fn expression_block_comment_trap_initializer() {
     assert_expression_block_comment_claimed(
-        "functio f() → vacuum { fixum ∪ x ← capta {\n# trap body\n1\n} }\n",
+        "functio f() → vacuum { sit ∪ x ← capta {\n# trap body\n1\n} }\n",
     );
 }
 

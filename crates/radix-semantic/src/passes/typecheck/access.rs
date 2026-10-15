@@ -166,13 +166,24 @@ impl TypeChecker<'_> {
             }
             return;
         }
-        if self.declared_field_modifier(object_ty, name) == Some(radix_syntax::FieldModifier::Fixum)
-        {
-            self.immutable_assignment_with_args(
-                "assignment_to_fixum_field",
-                span,
-                &[("field", self.member_display_name(name))],
-            );
+        match self.declared_field_modifier(object_ty, name) {
+            Some(radix_syntax::FieldModifier::Fixum) => {
+                self.immutable_assignment_with_args(
+                    "assignment_to_fixum_field",
+                    span,
+                    &[("field", self.member_display_name(name))],
+                );
+            }
+            // A `const` member is a compile-time constant of the type: no
+            // store reaches it, through the type name, `self` or an instance.
+            Some(radix_syntax::FieldModifier::Const) => {
+                self.immutable_assignment_with_args(
+                    "assignment_to_const_member",
+                    span,
+                    &[("field", self.member_display_name(name))],
+                );
+            }
+            _ => {}
         }
     }
 
@@ -438,7 +449,11 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> TypeId {
         let resolved = self.resolve_inferred_type(object_ty);
-        if matches!(self.types.get(resolved), Type::Option(_)) {
+        // An access-marker wrapper rides the receiver (Option A: a `ref`
+        // cursor over `T ∪ none` reads through the marker); the optionality
+        // test sees the payload.
+        let (_, payload) = self.types.peel_access_marker(resolved);
+        if matches!(self.types.get(payload), Type::Option(_)) {
             self.undefined_member("optional_receiver_requires_chain", span);
             return self.error_type;
         }
@@ -506,6 +521,33 @@ impl TypeChecker<'_> {
         }
         self.report_fieldless_type_access(object_ty, name, span);
         self.error_type
+    }
+
+    /// Quiet genus-field projection: the struct arm of
+    /// [`Self::field_type_from_type`] with no diagnostic anywhere.
+    ///
+    /// The field-path narrowing producer needs a named genus field's type on a
+    /// best-effort basis; any shape that is not an ordinary struct field
+    /// (optional receiver, union, map, record, unknown field) yields `None`
+    /// instead of an error.
+    pub(super) fn try_genus_field_type(
+        &mut self,
+        object_ty: TypeId,
+        name: Symbol,
+    ) -> Option<TypeId> {
+        let resolved = self.resolve_inferred_type(object_ty);
+        if matches!(self.types.get(resolved), Type::Option(_)) {
+            return None;
+        }
+        let struct_def = self.struct_def_from_type(object_ty)?;
+        let field = self.structs.get(&struct_def)?.fields.get(&name).copied()?;
+        let field_ty = self.applied_field_type(object_ty, struct_def, field.ty);
+        let field_ty = if field.optional {
+            self.types.option(field_ty)
+        } else {
+            field_ty
+        };
+        Some(self.project_ref_view(object_ty, field_ty))
     }
 
     /// The `.nuntius` built-in field read: `textus` and `ignotum` receivers
@@ -1272,7 +1314,7 @@ impl TypeChecker<'_> {
         if !write
             && type_name_def.is_none()
             && self.declared_field_modifier(obj_ty, name)
-                == Some(radix_syntax::FieldModifier::Generis)
+                == Some(radix_syntax::FieldModifier::Const)
         {
             self.undefined_member_with_args(
                 "static_field_read_through_instance",
@@ -1286,10 +1328,24 @@ impl TypeChecker<'_> {
         } else {
             MemberAccess::Read
         };
+        // A field-path null fact proven for this whole access node (need
+        // c58fff9c case 2) refines the receiver inside the branch body that
+        // proved it: the fact is keyed by the root binding plus the
+        // root-to-leaf name path (`base.a.b`). Everything above still runs, so
+        // namespace/static/generis and tensor-edge handling keep their say.
+        if !write && let Some((base, path)) = super::control::field_path_key(object) {
+            let mut key_path = path;
+            key_path.push(name);
+            if !key_path.is_empty()
+                && let Some(&ty) = self.field_facts.get(&(base, key_path))
+            {
+                return ty;
+            }
+        }
         self.check_field_access_from_type(obj_ty, name, object.span, access)
     }
 
-    /// Type a read through a genus name (`Tab.Z`): only a `generis` field is
+    /// Type a read through a genus name (`Tab.Z`): only a `const` member is
     /// readable there, and its type is the declared field type.
     fn check_static_field_read(
         &mut self,
@@ -1308,7 +1364,7 @@ impl TypeChecker<'_> {
             self.undefined_member("unknown_struct_field", span);
             return self.error_type;
         };
-        if field.modifier != Some(radix_syntax::FieldModifier::Generis) {
+        if field.modifier != Some(radix_syntax::FieldModifier::Const) {
             self.undefined_member_with_args(
                 "instance_field_read_through_type",
                 span,

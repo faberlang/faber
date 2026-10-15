@@ -6,4 +6,5 @@ input = "mutabilitas/own-arg-local.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

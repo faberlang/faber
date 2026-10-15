@@ -24,8 +24,8 @@ fn numeric_value_equality_cases() -> Vec<ValueEqualityCase> {
             name: "u8_default_numerus_approx_accepts",
             source: r"
 incipit {
-    fixum u8 port ← 42 ∷ u8
-    fixum numerus count ← 42
+    sit u8 port ← 42 ∷ u8
+    sit numerus count ← 42
     adfirma port ≅ count
 }
 ",
@@ -35,8 +35,8 @@ incipit {
             name: "u8_default_numerus_exact_rejects",
             source: r"
 incipit {
-    fixum u8 port ← 42 ∷ u8
-    fixum numerus count ← 42
+    sit u8 port ← 42 ∷ u8
+    sit numerus count ← 42
     adfirma port ≡ count
 }
 ",
@@ -102,8 +102,8 @@ functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
             name: "signed_unsigned_approx_accepts",
             source: r"
 incipit {
-    fixum i32 signed ← -1
-    fixum u8 unsigned ← 255 ∷ u8
+    sit i32 signed ← -1
+    sit u8 unsigned ← 255 ∷ u8
     adfirma signed ≅ unsigned
 }
 ",
@@ -227,8 +227,8 @@ fn sign_boundary_row_admits() {
     let result = compile(
         r"
 incipit {
-    fixum i64 n ← -1
-    fixum u64 u ← 18446744073709551615
+    sit i64 n ← -1
+    sit u64 u ← 18446744073709551615
     adfirma n ≅ u
 }
 ",
@@ -245,8 +245,8 @@ fn cross_width_row_admits() {
     let result = compile(
         r"
 incipit {
-    fixum i64 n ← 9007199254740993 ∷ i64
-    fixum u64 u ← 9007199254740992 ∷ u64
+    sit i64 n ← 9007199254740993 ∷ i64
+    sit u64 u ← 9007199254740992 ∷ u64
     adfirma n ≅ u
 }
 ",

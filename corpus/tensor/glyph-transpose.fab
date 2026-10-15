@@ -35,9 +35,9 @@ fn transpose_demo(tensor<f32, [2, 2]> input) → tensor<f32, [2, 2]> {
 }
 
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    var tf32[2, 2] input ← flat ↦ tf32[2, 2]
-    var tf32[2, 2] output ← transpose_demo(input)
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    mut tf32[2, 2] input ← flat ↦ tf32[2, 2]
+    mut tf32[2, 2] output ← transpose_demo(input)
     print output.get([0, 0])
     print output.get([0, 1])
     print output.get([1, 0])

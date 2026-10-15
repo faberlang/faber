@@ -2,10 +2,12 @@
 //!
 //! A local constant is an ordinary immutable local whose initializer is a
 //! compile-time fact. Its initializer must be evaluable by the same evaluator
-//! that folds module constants ([`super::statica::fold`]), so this pass hands
-//! that evaluator a scratch module made of the already-folded module
-//! constants plus every local constant, and reports what it rejects under the
-//! same issue names (one condition, one identity). The scratch module is
+//! that folds module constants ([`super::statica::fold_with_imports`]), so
+//! this pass hands that evaluator a scratch module made of the already-folded
+//! module constants plus every local constant, and reports what it rejects
+//! under the same issue names (one condition, one identity). `module.NAME`
+//! references to imported constants resolve through the resolver, exactly as
+//! they do for module constants. The scratch module is
 //! discarded: the local keeps its authored initializer, so every backend and
 //! Faber re-emission see an ordinary immutable local.
 //!
@@ -15,7 +17,7 @@
 //! overflow policy (`=` states a compile-time fact).
 
 use super::statica;
-use crate::{SemanticError, TypeTable};
+use crate::{Resolver, SemanticError, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_local, walk_program};
 use radix_hir::{
     DefId, HirConst, HirId, HirItem, HirItemKind, HirLocal, HirModule, HirPresentation, HirStatic,
@@ -34,6 +36,7 @@ pub fn check(
     presentation: &HirPresentation,
     types: &TypeTable,
     interner: &mut Interner,
+    resolver: &Resolver,
 ) -> Vec<SemanticError> {
     if presentation.compile_time_locals.is_empty() {
         return Vec::new();
@@ -83,7 +86,7 @@ pub fn check(
         next_id += 1;
     }
 
-    statica::fold(&mut scratch, types, interner)
+    statica::fold_with_imports(&mut scratch, types, interner, resolver)
 }
 
 struct Collector<'a> {

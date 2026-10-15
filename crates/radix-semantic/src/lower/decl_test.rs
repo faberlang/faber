@@ -15,15 +15,15 @@ const IMPURE: &str = "conversio_impure_body";
 
 const PRELUDE: &str = "\
 class Celsius {
-    var float degrees
+    mut float degrees
 }
 
 class Fahrenheit {
-    var float degrees
+    mut float degrees
 }
 
 class Reading {
-    var int value
+    mut int value
 }
 
 union Condicio {
@@ -102,7 +102,7 @@ fn mutation_inside_si_else_branch_is_impure() {
 fn mutable_local_inside_si_is_impure() {
     assert_body_is_impure(
         "    if c.degrees ≻ 0.0 {
-        var float d ← c.degrees
+        mut float d ← c.degrees
         print d
     }",
     );
@@ -120,7 +120,7 @@ fn mutation_inside_dum_is_impure() {
 #[test]
 fn mutation_inside_itera_is_impure() {
     assert_body_is_impure(
-        "    for range 0‥3 const _ {
+        "    for range 0‥3 let _ {
         c.degrees ← 1.0
     }",
     );
@@ -153,7 +153,7 @@ fn increment_inside_nested_control_flow_is_impure() {
         "{PRELUDE}\
 @ conversion
 fn toFahrenheit(Reading r) → Fahrenheit {{
-    for range 0‥3 const _ {{
+    for range 0‥3 let _ {{
         if r.value ≻ 0 {{
             r.value ↑
         }}
@@ -171,7 +171,7 @@ fn mutation_inside_discerne_arm_is_impure() {
         "{PRELUDE}\
 @ conversion
 fn toReading(Condicio s) → Reading {{
-    const Reading out ← Reading {{ value = 0 }}
+    let Reading out ← Reading {{ value = 0 }}
     match s {{
         case Agens {{
             out.value ← 1
@@ -196,7 +196,7 @@ fn control_flow_without_mutation_stays_pure() {
     else {
         print \"warm\"
     }
-    for range 0‥3 const _ {
+    for range 0‥3 let _ {
         print c.degrees
     }",
     ));

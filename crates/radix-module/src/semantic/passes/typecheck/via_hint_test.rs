@@ -123,25 +123,25 @@ const ROWS: &[Row] = &[
     },
     Row {
         name: "Be",
-        frame: "incipit {{ fixum _ v ← |de ad be ef|[0‥4] {} }}",
+        frame: "incipit {{ sit v ← |de ad be ef|[0‥4] {} }}",
         legacy: "↦ numerus<u32, Be>",
         via: "↦ u32 via Be",
     },
     Row {
         name: "Le",
-        frame: "incipit {{ fixum _ v ← |de ad be ef|[0‥4] {} }}",
+        frame: "incipit {{ sit v ← |de ad be ef|[0‥4] {} }}",
         legacy: "↦ numerus<u32, Le>",
         via: "↦ u32 via Le",
     },
     Row {
         name: "Be float",
-        frame: "incipit {{ fixum _ v ← |3f 80 00 00|[0‥4] {} }}",
+        frame: "incipit {{ sit v ← |3f 80 00 00|[0‥4] {} }}",
         legacy: "↦ fractus<f32, Be>",
         via: "↦ f32 via Be",
     },
     Row {
         name: "Le float",
-        frame: "incipit {{ fixum _ v ← |00 00 80 3f|[0‥4] {} }}",
+        frame: "incipit {{ sit v ← |00 00 80 3f|[0‥4] {} }}",
         legacy: "↦ fractus<f32, Le>",
         via: "↦ f32 via Le",
     },
@@ -177,7 +177,7 @@ const ROWS: &[Row] = &[
     },
     Row {
         name: "ascii solved hole",
-        frame: "incipit {{ fixum _ v ← 255 {} }}",
+        frame: "incipit {{ sit v ← 255 {} }}",
         legacy: "↦ ascii<_, Hex>",
         via: "↦ ascii<_> via Hex",
     },
@@ -235,7 +235,7 @@ fn every_hint_routes_under_the_english_surface() {
     for source in [
         "fn f(string s) → i32 { return s ↦ i32 via Hex ⊥ 0 }",
         "fn f(char c) → u32 { return c ↦ u32 via Code }",
-        "main { const _ v ← |de ad be ef|[0‥4] ↦ u32 via Be }",
+        "main { let v ← |de ad be ef|[0‥4] ↦ u32 via Be }",
     ] {
         let _ = rust_code(english_config(), source);
     }
@@ -245,9 +245,9 @@ fn every_hint_routes_under_the_english_surface() {
 fn the_conversion_node_carries_the_via_hint() {
     let via = entry_conversions(
         r#"incipit {
-    fixum _ a ← "ff" ↦ i32 via Hex
-    fixum littera big ← 'A'
-    fixum _ b ← big ↦ u32 via Code
+    sit a ← "ff" ↦ i32 via Hex
+    sit littera big ← 'A'
+    sit b ← big ↦ u32 via Code
 }"#,
     );
     let hints: Vec<_> = via.iter().map(|(_, hints)| hints.clone()).collect();
@@ -257,14 +257,14 @@ fn the_conversion_node_carries_the_via_hint() {
 #[test]
 fn via_bits_is_the_retirement_diagnostic_not_a_hint() {
     assert_issue(
-        &diagnostics_with(latin_config(), "incipit { fixum u16 n ← 15360\n fixum _ x ← n ↦ f16 via Bits }"),
+        &diagnostics_with(latin_config(), "incipit { sit u16 n ← 15360\n sit x ← n ↦ f16 via Bits }"),
         "conversio_via_bits_retired",
     );
 }
 
 #[test]
 fn a_plain_conversion_carries_no_hint() {
-    let hints = entry_conversions(r#"incipit { fixum _ a ← "22" ↦ numerus }"#);
+    let hints = entry_conversions(r#"incipit { sit a ← "22" ↦ numerus }"#);
     assert_eq!(hints.len(), 1);
     assert!(hints[0].1.is_empty());
 }
@@ -278,8 +278,7 @@ fn the_default_binds_after_the_via_clause() {
 
 #[test]
 fn chained_conversions_carry_one_hint_per_hop() {
-    let via =
-        entry_conversions("incipit { fixum octeti b ← |3c 00|\n fixum _ x ← b[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32 }");
+    let via = entry_conversions("incipit { sit octeti b ← |3c 00|\n sit x ← b[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32 }");
     let hints: Vec<_> = via.iter().map(|(_, hints)| hints.clone()).collect();
     assert_eq!(
         hints,
@@ -366,7 +365,7 @@ fn via_stays_an_ordinary_name_in_a_program_that_also_uses_the_clause() {
     let code = rust_code(
         latin_config(),
         r"functio f(textus via) → i32 {
-    fixum _ n ← via ↦ i32 via Hex ⊥ 0
+    sit n ← via ↦ i32 via Hex ⊥ 0
     redde n
 }",
     );

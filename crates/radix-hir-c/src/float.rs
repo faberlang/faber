@@ -218,14 +218,12 @@ impl Emitter<'_> {
                 let Some(arg) = args.first() else {
                     return Err(unsupported("float method outside the subset"));
                 };
-                let helper = if matches!(
-                    kind,
-                    IntrinsicMirKind::Collection(MirCollectionOp::Minimum)
-                ) {
-                    "faber_minimum_f64"
-                } else {
-                    "faber_maximum_f64"
-                };
+                let helper =
+                    if matches!(kind, IntrinsicMirKind::Collection(MirCollectionOp::Minimum)) {
+                        "faber_minimum_f64"
+                    } else {
+                        "faber_maximum_f64"
+                    };
                 let mut operands = [receiver, self.expr(&arg.expr)?];
                 if operands[1].value != Value::Float {
                     return Err(unsupported("float method argument that is not a float"));

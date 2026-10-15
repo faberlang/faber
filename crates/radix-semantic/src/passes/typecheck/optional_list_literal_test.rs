@@ -13,7 +13,7 @@ fn rejected(source: &str) -> bool {
 fn list_literal_checks_against_optional_list_slot() {
     assert_accepts_la(
         r"incipit {
-    fixum lista<numerus> ∪ nihil a ← [1, 2]
+    sit lista<numerus> ∪ nihil a ← [1, 2]
     varia lista<numerus> ∪ nihil b ← nulla
     b ← [3]
     nota a
@@ -26,8 +26,8 @@ fn list_literal_checks_against_optional_list_slot() {
 fn optional_list_slot_elements_are_stores_into_the_element_type() {
     // The element is range-checked against `i8` through the
     // optional slot, as it is for the plain slot.
-    let plain = "incipit { fixum lista<i8> a ← [300] nota a }";
-    let optional = "incipit { fixum lista<i8> ∪ nihil a ← [300] nota a }";
+    let plain = "incipit { sit lista<i8> a ← [300] nota a }";
+    let optional = "incipit { sit lista<i8> ∪ nihil a ← [300] nota a }";
     assert!(
         rejected(plain),
         "plain slot rejects an out-of-range element"
@@ -36,17 +36,17 @@ fn optional_list_slot_elements_are_stores_into_the_element_type() {
         rejected(optional),
         "optional slot rejects an out-of-range element"
     );
-    assert_accepts_la("incipit { fixum lista<i8> ∪ nihil a ← [100] nota a }");
+    assert_accepts_la("incipit { sit lista<i8> ∪ nihil a ← [100] nota a }");
 }
 
 #[test]
 fn vacua_stores_into_optional_collection_slots() {
     assert_accepts_la(
         r"incipit {
-    fixum lista<numerus> ∪ nihil a ← vacua
+    sit lista<numerus> ∪ nihil a ← vacua
     varia lista<numerus> ∪ nihil b ← nulla
     b ← vacua
-    fixum tabula<textus, numerus> ∪ nihil c ← vacua
+    sit tabula<textus, numerus> ∪ nihil c ← vacua
     nota a
     nota b
     nota c
@@ -57,11 +57,9 @@ fn vacua_stores_into_optional_collection_slots() {
 #[test]
 fn vacua_still_needs_exactly_one_collection_member() {
     // No collection member, or two (the literal's shape is then ambiguous).
+    assert!(rejected("incipit { sit numerus ∪ nihil a ← vacua nota a }"));
     assert!(rejected(
-        "incipit { fixum numerus ∪ nihil a ← vacua nota a }"
-    ));
-    assert!(rejected(
-        "incipit { fixum lista<numerus> ∪ tabula<textus, numerus> a ← vacua nota a }"
+        "incipit { sit lista<numerus> ∪ tabula<textus, numerus> a ← vacua nota a }"
     ));
 }
 
@@ -72,11 +70,11 @@ fn tuple_constructor_stores_into_optional_tuple_slot() {
     // into `i8`.
     assert_accepts_la(
         r"incipit {
-    fixum iuncta<i8, numerus> ∪ nihil a ← iuncta<i8, numerus> [100, 2]
+    sit iuncta<i8, numerus> ∪ nihil a ← iuncta<i8, numerus> [100, 2]
     nota a
 }",
     );
     assert!(rejected(
-        "incipit { fixum iuncta<i8, numerus> ∪ nihil a ← iuncta<i8, numerus> [300, 2] nota a }"
+        "incipit { sit iuncta<i8, numerus> ∪ nihil a ← iuncta<i8, numerus> [300, 2] nota a }"
     ));
 }

@@ -5,7 +5,7 @@ use crate::test_support::emitted;
 #[test]
 fn bitwise_operators_use_the_exact_helpers() {
     let code = emitted(
-        "main {\n    var int a ← 12\n    var int b ← 10\n    print a ∧ b\n    print a ∨ b\n    print a ⊻ b\n    print ¬ a\n}",
+        "main {\n    mut int a ← 12\n    mut int b ← 10\n    print a ∧ b\n    print a ∨ b\n    print a ⊻ b\n    print ¬ a\n}",
     );
     for call in [
         "faber_bit_and(l_a, l_b)",
@@ -19,7 +19,9 @@ fn bitwise_operators_use_the_exact_helpers() {
 
 #[test]
 fn shifts_use_the_exact_helpers() {
-    let code = emitted("main {\n    var int a ← 12\n    var int n ← 2\n    print a ⇐ n\n    print a ⇒ n\n}");
+    let code = emitted(
+        "main {\n    mut int a ← 12\n    mut int n ← 2\n    print a ⇐ n\n    print a ⇒ n\n}",
+    );
     for call in ["faber_shl(l_a, l_n)", "faber_shr(l_a, l_n)"] {
         assert!(code.contains(call), "{call:?} missing in {code}");
     }
@@ -27,7 +29,8 @@ fn shifts_use_the_exact_helpers() {
 
 #[test]
 fn bitwise_constant_folds_with_the_cap() {
-    let code = emitted("main {\n    print 0b1010 ∧ 0b1100\n    print 1 ⇐ 4\n    print 0 - 1 ⇒ 200\n}");
+    let code =
+        emitted("main {\n    print 0b1010 ∧ 0b1100\n    print 1 ⇐ 4\n    print 0 - 1 ⇒ 200\n}");
     assert!(code.contains("INT64_C(8)"), "{code}");
     assert!(code.contains("INT64_C(16)"), "{code}");
     // A right shift past the width fills with the sign, not by truncating.
@@ -37,7 +40,7 @@ fn bitwise_constant_folds_with_the_cap() {
 #[test]
 fn integer_methods_use_the_exact_helpers() {
     let code = emitted(
-        "main {\n    var int a ← 0 - 7\n    print a.abs()\n    print a.sign()\n    print a.minimum(3)\n    print a.maximum(3)\n    print a.power(2)\n}",
+        "main {\n    mut int a ← 0 - 7\n    print a.abs()\n    print a.sign()\n    print a.minimum(3)\n    print a.maximum(3)\n    print a.power(2)\n}",
     );
     for call in [
         "faber_abs(l_a)",
@@ -52,14 +55,14 @@ fn integer_methods_use_the_exact_helpers() {
 
 #[test]
 fn float_power_uses_libm_pow() {
-    let code = emitted("main {\n    var float a ← 2.0\n    print a.power(3.0)\n}");
+    let code = emitted("main {\n    mut float a ← 2.0\n    print a.power(3.0)\n}");
     assert!(code.contains("faber_pow_f64(l_a, 3.0)"), "{code}");
 }
 
 #[test]
 fn fuzzy_equality_uses_the_tolerance_helper() {
     let code = emitted(
-        "main {\n    var int a ← 5\n    var int b ← 5\n    print a ≈ b\n    print a ≉ b\n    var float x ← 1.0\n    print x ≈ x\n}",
+        "main {\n    mut int a ← 5\n    mut int b ← 5\n    print a ≈ b\n    print a ≉ b\n    mut float x ← 1.0\n    print x ≈ x\n}",
     );
     assert!(code.contains("faber_approx_int(l_a, l_b)"), "{code}");
     assert!(code.contains("(!faber_approx_int(l_a, l_b))"), "{code}");
@@ -69,11 +72,14 @@ fn fuzzy_equality_uses_the_tolerance_helper() {
 #[test]
 fn value_equality_crosses_families_without_rounding() {
     let code = emitted("main {\n    print 1 ≅ 1.0\n}");
-    assert!(code.contains("faber_int_eq_float(INT64_C(1), 1.0)"), "{code}");
+    assert!(
+        code.contains("faber_int_eq_float(INT64_C(1), 1.0)"),
+        "{code}"
+    );
 }
 
 #[test]
 fn a_u64_constant_that_fits_i64_reads_exact() {
-    let code = emitted("main {\n    const u64 b ← 9007199254740992\n    print b\n}");
+    let code = emitted("main {\n    let u64 b ← 9007199254740992\n    print b\n}");
     assert!(code.contains("((faber_i128)"), "{code}");
 }

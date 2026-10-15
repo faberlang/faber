@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "literal"
 canonical = true
 summary = "A hex, binary or decimal integer literal in a bits cell takes the cell's type at all four widths."
-syntax = "const b8 x ← 0xff | const b16 x ← 0b1010 | const b64 x ← 255"
+syntax = "sit b8 x ← 0xff | sit b16 x ← 0b1010 | sit b64 x ← 255"
 related = ["bits", "u8"]
 locale = "la"
 +++
@@ -29,18 +29,18 @@ locale = "la"
 # EXPECTED stdout: see bits-literals-la.expected
 
 incipit {
-    fixum b8 hex8 ← 0xff
-    fixum b8 bin8 ← 0b10100101
-    fixum b8 dec8 ← 255
-    fixum b16 hex16 ← 0xffff
-    fixum b16 bin16 ← 0b1010
-    fixum b16 dec16 ← 65535
-    fixum b32 hex32 ← 0xffffffff
-    fixum b32 bin32 ← 0b1
-    fixum b32 dec32 ← 4294967295
-    fixum b64 hex64 ← 0xffffffffffffffff
-    fixum b64 bin64 ← 0b1000
-    fixum b64 dec64 ← 255
+    sit b8 hex8 ← 0xff
+    sit b8 bin8 ← 0b10100101
+    sit b8 dec8 ← 255
+    sit b16 hex16 ← 0xffff
+    sit b16 bin16 ← 0b1010
+    sit b16 dec16 ← 65535
+    sit b32 hex32 ← 0xffffffff
+    sit b32 bin32 ← 0b1
+    sit b32 dec32 ← 4294967295
+    sit b64 hex64 ← 0xffffffffffffffff
+    sit b64 bin64 ← 0b1000
+    sit b64 dec64 ← 255
     nota hex8
     nota bin8
     nota dec8

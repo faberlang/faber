@@ -9,9 +9,9 @@ locale = "en"
 import from "norma:time" time
 
 async_main {
-    const int before ← time.monotonic()
+    let int before ← time.monotonic()
     await time.sleep_async(5)
-    const int after ← time.monotonic()
+    let int after ← time.monotonic()
     assert after - before ≥ 4000000
 
     print "norma/clock/clock-routes-async ok"

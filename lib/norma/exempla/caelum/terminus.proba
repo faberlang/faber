@@ -4,7 +4,7 @@ import from "norma:caelum/terminus" terminus
 
 describe "terminus_construction" {
     test "host and port round-trip" {
-        const terminus.Endpoint t ← terminus.Endpoint { host = "127.0.0.1", port = 8080 }
+        let terminus.Endpoint t ← terminus.Endpoint { host = "127.0.0.1", port = 8080 }
         assert t.host ≡ "127.0.0.1"
         assert t.port ≡ 8080
     }
@@ -12,8 +12,8 @@ describe "terminus_construction" {
 
 describe "terminus_different_endpoints" {
     test "different endpoints" {
-        const terminus.Endpoint local ← terminus.Endpoint { host = "127.0.0.1", port = 8080 }
-        const terminus.Endpoint remote ← terminus.Endpoint { host = "192.168.1.1", port = 443 }
+        let terminus.Endpoint local ← terminus.Endpoint { host = "127.0.0.1", port = 8080 }
+        let terminus.Endpoint remote ← terminus.Endpoint { host = "192.168.1.1", port = 443 }
         assert local.host ≢ remote.host
         assert local.port ≢ remote.port
     }

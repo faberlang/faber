@@ -194,7 +194,7 @@ fn contract_non_constant_fact_argument_is_structured_diagnostic() {
         r#"
 {VERTEX_LAYOUT_FN}
 incipit {{
-fixum numerus location ← 0
+sit numerus location ← 0
 adfirma vertex_layout_matches(0, 0, "position", location, 3, 0, 12, 1, 1) mori "position layout"
 }}
 "#
@@ -370,7 +370,7 @@ fn contract_bound_resource_binding_non_constant_argument_is_diagnostic() {
         r#"
 {BOUND_RESOURCE_BINDING_FN}
 incipit {{
-fixum numerus binding ← 2
+sit numerus binding ← 2
 adfirma bound_resource_binding_matches(1, binding, "tex") mori "tex binding"
 }}
 "#

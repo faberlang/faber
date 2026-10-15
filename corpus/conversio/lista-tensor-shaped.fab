@@ -32,10 +32,10 @@ locale = "en"
 # explicit tensor construction method.
 
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[2, 2] grid ← flat ↦ tf32[2, 2]
-    const list<int, _> dims ← grid.shape()
-    const list<f32> out ← grid.flatten()
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[2, 2] grid ← flat ↦ tf32[2, 2]
+    let list<int, _> dims ← grid.shape()
+    let list<f32> out ← grid.flatten()
 
     print dims
     print grid.length()

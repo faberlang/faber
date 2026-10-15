@@ -33,30 +33,30 @@ no_expected = "prints-nothing"
 
 main {
     # --- value clamp (half-open interior vs inclusive endpoint) ---
-    const int half ← 15 ↦ 0‥10
-    const int closed ← 15 ↦ 0…10
+    let int half ← 15 ↦ 0‥10
+    let int closed ← 15 ↦ 0…10
     assert half ≡ 9
     assert closed ≡ 10
 
     # --- materialize to lista or 1-d tensor ---
-    const list<int> half_list ← 0‥10 ↦ list<int>
-    const list<int> closed_list ← 0…3 ↦ list<int>
-    const tensor<int, [10]> half_grid ← 0‥10 ↦ tensor<int, [10]>
-    const tensor<int, [4]> closed_grid ← 0…3 ↦ tensor<int, [4]>
-    const list<int> half_flat ← half_grid.flatten()
-    const list<int> closed_flat ← closed_grid.flatten()
+    let list<int> half_list ← 0‥10 ↦ list<int>
+    let list<int> closed_list ← 0…3 ↦ list<int>
+    let tensor<int, [10]> half_grid ← 0‥10 ↦ tensor<int, [10]>
+    let tensor<int, [4]> closed_grid ← 0…3 ↦ tensor<int, [4]>
+    let list<int> half_flat ← half_grid.flatten()
+    let list<int> closed_flat ← closed_grid.flatten()
     assert half_list.length() ≡ 10
     assert closed_list.length() ≡ 4
     assert half_flat.length() ≡ 10
     assert closed_flat.length() ≡ 4
 
     # --- range-to-range clamp inherits target inclusivity ---
-    const intervallum<int> wide ← 0‥100
-    const intervallum<int> narrow ← wide ↦ 10…50
+    let intervallum<int> wide ← 0‥100
+    let intervallum<int> narrow ← wide ↦ 10…50
     assert narrow.length() ≡ 41
 
     # --- stored containment via continet (`∈` over a range tests the same containment) ---
-    const intervallum<int> fines ← 0‥10
-    const bool inside ← fines.contains(5)
+    let intervallum<int> fines ← 0‥10
+    let bool inside ← fines.contains(5)
     assert inside
 }

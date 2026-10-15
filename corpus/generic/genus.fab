@@ -51,10 +51,10 @@ interface Reponens<T> {
 
 fn describe(Resultatus<int> r) → string {
     match r {
-        case Ok const value {
+        case Ok let value {
             return "ok: §"(value)
         }
-        case Err const nuntius {
+        case Err let nuntius {
             return "err: §"(nuntius)
         }
     }

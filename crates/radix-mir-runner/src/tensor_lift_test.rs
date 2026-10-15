@@ -137,6 +137,27 @@ fn integer_division_floors_and_a_zero_divisor_traps() {
 }
 
 #[test]
+fn float_mod_floors_and_takes_the_divisor_sign() {
+    let positive = lift(
+        MirLiftOp::Mod,
+        f32_element(),
+        vec![floats(&[-7.5, 7.5], &[2]), Value::Float(2.0)],
+    )
+    .unwrap();
+    assert_eq!(data(&positive), vec![Value::Float(0.5), Value::Float(1.5)]);
+    let negative = lift(
+        MirLiftOp::Mod,
+        f32_element(),
+        vec![floats(&[-7.5, 7.5], &[2]), Value::Float(-2.0)],
+    )
+    .unwrap();
+    assert_eq!(
+        data(&negative),
+        vec![Value::Float(-1.5), Value::Float(-0.5)]
+    );
+}
+
+#[test]
 fn true_division_converts_integers_and_traps_only_an_integer_zero() {
     let quotient = lift(
         MirLiftOp::TrueDiv,

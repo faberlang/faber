@@ -5,21 +5,21 @@ locale = "en"
 # ÷ on integers, rounding (ties to even, saturating), exact int/float
 # comparison, and floats through functions, lists, templates and a genus.
 class Reading {
-    var string label = "r"
-    var float value = 0.5
+    mut string label = "r"
+    mut float value = 0.5
 }
 
 fn mean(list<float> xs) → float {
-    var float total ← 0.0
-    for from xs const x {
+    mut float total ← 0.0
+    for from xs let x {
         total ← total + x
     }
     return total / 2.0
 }
 
 main {
-    var float a ← 0.1
-    var float b ← a + 0.2
+    mut float a ← 0.1
+    mut float b ← a + 0.2
     print b
     print 1.0
     print -2.5
@@ -27,7 +27,7 @@ main {
     print 123456789012345680000.0
     print 1e-7
     print 1.0 / 3.0
-    var float zero ← 0.0
+    mut float zero ← 0.0
     print 1.0 / zero
     print -1.0 / zero
     print zero / zero
@@ -36,7 +36,7 @@ main {
     print -7.5 % 2.0
     print 7.5 % -2.0
     print 6.0 % -2.0
-    var int n ← 7
+    mut int n ← 7
     print n ÷ 2
     print ⌊2.5⌉
     print ⌊3.5⌉
@@ -44,17 +44,17 @@ main {
     print ⌊b⌋
     print ⌈b⌉
     print ⌊1e300⌉
-    var int edge ← 9007199254740993
-    var float near ← 9007199254740992.0
+    mut int edge ← 9007199254740993
+    mut float near ← 9007199254740992.0
     print edge ≻ near
     print near ≺ edge
     print edge ≤ near
     print b ≺ 1.0
     print a ≡ 0.1
-    const list<float> xs ← [1.5, 2.25]
+    let list<float> xs ← [1.5, 2.25]
     print xs
     print mean(xs)
     print "b=§, n÷2=§"(b, n ÷ 2)
-    var Reading r ← { value = 2.0 }
+    mut Reading r ← { value = 2.0 }
     print r
 }

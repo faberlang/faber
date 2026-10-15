@@ -45,9 +45,9 @@ locale = "en"
         r"
 @ public
 class Vector3 {
-    var int x
-    var int y
-    var int z
+    mut int x
+    mut int y
+    mut int z
 
     fn quadratum() → int {
         return self.x * self.x + self.y * self.y + self.z * self.z
@@ -87,7 +87,7 @@ locale = "en"
 import from "recvlib:math" math
 
 fn prove_same_unit_method() {
-    const math.Vector3 v ← math.sample()
+    let math.Vector3 v ← math.sample()
     print math.probe(v)
     print math.dot(v)
 }

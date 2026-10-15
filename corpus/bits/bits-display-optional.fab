@@ -33,24 +33,24 @@ locale = "en"
 
 main {
     # a present optional scalar prints as the b8 it holds
-    const b8 sample ← 0xff
-    const b8 ∪ none present ← sample
+    let b8 sample ← 0xff
+    let b8 ∪ none present ← sample
     print present
 
     # an absent optional scalar prints none
-    const b8 ∪ none absent ← null
+    let b8 ∪ none absent ← null
     print absent
 
     # a present optional list prints each element in hex
-    const list<b8> raw ← [0xde, 0xad]
-    const list<b8> ∪ none bytes ← raw
+    let list<b8> raw ← [0xde, 0xad]
+    let list<b8> ∪ none bytes ← raw
     print bytes
 
     # an absent optional list prints none
-    const list<b8> ∪ none missing ← null
+    let list<b8> ∪ none missing ← null
     print missing
 
     # a nested list keeps its inner brackets
-    const list<list<b8>> rows ← [[0x01], [0x02, 0xff]]
+    let list<list<b8>> rows ← [[0x01], [0x02, 0xff]]
     print rows
 }

@@ -12,7 +12,7 @@ diagnostic = "SEM010:sort_ref_requires_map"
 
 # This exemplum intentionally fails to compile: `ref` is admitted on a map only.
 main {
-    var set<int> s ← empty
+    mut set<int> s ← empty
     s.add(1)
     print sort via asc ref s
 }

@@ -54,7 +54,7 @@ fn aetas(int natus, int nunc) → int {
 
 # Validate result before returning
 fn absolutum(int n) → int {
-    var int value ← n
+    mut int value ← n
     if n ≺ 0 {
         value ← -n
     }
@@ -63,10 +63,10 @@ fn absolutum(int n) → int {
 }
 
 main {
-    const int quotiens ← divide(20, 4)
+    let int quotiens ← divide(20, 4)
     assert quotiens ≡ 5
-    const int annorum ← aetas(1990, 2024)
+    let int annorum ← aetas(1990, 2024)
     assert annorum ≡ 34
-    const int abs ← absolutum(-42)
+    let int abs ← absolutum(-42)
     assert abs ≡ 42
 }

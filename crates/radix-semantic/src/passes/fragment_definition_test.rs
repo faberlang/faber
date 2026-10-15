@@ -67,7 +67,7 @@ fn accepts_scalar_ops_structured_control_and_locals() {
         r"
 @ nucleum fragment
 functio helper(numerus x) → numerus {
-    fixum numerus doubled ← x * 2
+    sit numerus doubled ← x * 2
     si doubled ≻ 0 {
         redde doubled
     } secus {
@@ -129,7 +129,7 @@ fn accepts_explicit_argument_writes() {
     let report = check_source(
         r"
 @ nucleum fragment
-functio scale(in numerus value) → numerus {
+functio scale(varia numerus value) → numerus {
     value ← value * 2
     redde value
 }
@@ -367,7 +367,7 @@ functio host_add(numerus x) → numerus {
 
 @ nucleum fragment
 functio helper() → vacuum {
-    fixum _ f ← host_add
+    sit f ← host_add
     redde
 }
 ",

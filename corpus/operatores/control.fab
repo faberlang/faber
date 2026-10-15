@@ -43,7 +43,7 @@ fn clamp(int x) → int {
 }
 
 fn inveni(list<int> res, int quaesitum) → int ∪ none {
-    for from res const item {
+    for from res let item {
         if item ≡ quaesitum then return item
     }
     return null

@@ -14,8 +14,8 @@ const LOCALES: [&str; 8] = ["en", "la", "ar", "hi", "vi", "th-TH", "zh-Hans", "z
 
 /// Minimal broken source per statement-level token contract.
 const STMT_CASES: [(&str, &str); 8] = [
-    ("apud_coordinates_start", "itera ex m apud fixum cell { }"),
-    ("apud_coordinates_end", "itera ex m apud [i fixum cell { }"),
+    ("apud_coordinates_start", "itera ex m apud sit cell { }"),
+    ("apud_coordinates_end", "itera ex m apud [i sit cell { }"),
     ("elige_body_start", "elige x"),
     ("elige_body_end", "elige x { casu 1 { }"),
     ("discerne_body_start", "discerne x"),

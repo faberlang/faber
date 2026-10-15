@@ -18,7 +18,7 @@ fn compile(source: &str) -> crate::CompileResult {
     .compile_str("test.fab", source)
 }
 
-/// The resolved operator of every `fixum _ ← <binary>` local in the entry block.
+/// The resolved operator of every `sit _ ← <binary>` local in the entry block.
 fn resolved_ops(source: &str) -> Vec<HirBinOp> {
     let unit = analyze_ok_la(source);
     let entry = unit.hir.entry.as_ref().expect("incipit");
@@ -54,34 +54,32 @@ fn rejects(source: &str, code: &'static str, issue: &str) {
 
 #[test]
 fn range_right_operand_resolves_to_in_range() {
-    let ops = resolved_ops("incipit { fixum numerus x ← 5\n fixum bivalens r ← x ∈ 0‥10 }");
+    let ops = resolved_ops("incipit { sit numerus x ← 5\n sit bivalens r ← x ∈ 0‥10 }");
     assert_eq!(ops, [HirBinOp::InRange]);
 }
 
 #[test]
 fn range_right_operand_negated_resolves_to_not_in_range() {
-    let ops = resolved_ops("incipit { fixum numerus x ← 5\n fixum bivalens r ← x ∉ 0‥10 }");
+    let ops = resolved_ops("incipit { sit numerus x ← 5\n sit bivalens r ← x ∉ 0‥10 }");
     assert_eq!(ops, [HirBinOp::NotInRange]);
 }
 
 #[test]
 fn collection_right_operand_resolves_to_between() {
-    let ops =
-        resolved_ops("incipit { fixum numerus x ← 5\n fixum lista<numerus> xs ← [1, 2]\n fixum bivalens r ← x ∈ xs }");
+    let ops = resolved_ops("incipit { sit numerus x ← 5\n sit lista<numerus> xs ← [1, 2]\n sit bivalens r ← x ∈ xs }");
     assert_eq!(ops, [HirBinOp::Between]);
 }
 
 #[test]
 fn collection_right_operand_negated_resolves_to_not_between() {
-    let ops =
-        resolved_ops("incipit { fixum numerus x ← 5\n fixum lista<numerus> xs ← [1, 2]\n fixum bivalens r ← x ∉ xs }");
+    let ops = resolved_ops("incipit { sit numerus x ← 5\n sit lista<numerus> xs ← [1, 2]\n sit bivalens r ← x ∉ xs }");
     assert_eq!(ops, [HirBinOp::NotBetween]);
 }
 
 #[test]
 fn range_held_in_a_binding_resolves_by_its_type() {
     let ops = resolved_ops(
-        "incipit { fixum numerus x ← 5\n fixum intervallum<numerus> fines ← 0‥10\n fixum bivalens r ← x ∈ fines }",
+        "incipit { sit numerus x ← 5\n sit intervallum<numerus> fines ← 0‥10\n sit bivalens r ← x ∈ fines }",
     );
     assert_eq!(ops, [HirBinOp::InRange]);
 }
@@ -90,8 +88,8 @@ fn range_held_in_a_binding_resolves_by_its_type() {
 fn retired_keyword_spellings_fail_at_parse_with_the_migration_diagnostic() {
     // `intra` / `inter` are not operators any more; `∈` is the one spelling.
     for source in [
-        "incipit { fixum numerus x ← 5\n fixum lista<numerus> xs ← [1]\n nota x inter xs }",
-        "incipit { fixum numerus x ← 5\n nota x intra 0‥10 }",
+        "incipit { sit numerus x ← 5\n sit lista<numerus> xs ← [1]\n nota x inter xs }",
+        "incipit { sit numerus x ← 5\n nota x intra 0‥10 }",
     ] {
         rejects(source, "PARSE001", "membership_keyword_retired");
     }
@@ -101,8 +99,8 @@ fn retired_keyword_spellings_fail_at_parse_with_the_migration_diagnostic() {
 fn text_right_operand_is_rejected_in_both_polarities() {
     // OD-1: membership never applies to text; the text method does.
     for source in [
-        "incipit { fixum textus t ← \"abc\"\n nota \"a\" ∈ t }",
-        "incipit { fixum textus t ← \"abc\"\n nota \"a\" ∉ t }",
+        "incipit { sit textus t ← \"abc\"\n nota \"a\" ∈ t }",
+        "incipit { sit textus t ← \"abc\"\n nota \"a\" ∉ t }",
         "incipit { nota \"a\" ∈ \"abc\" }",
     ] {
         rejects(source, "SEM010", "membership_over_text");
@@ -112,12 +110,12 @@ fn text_right_operand_is_rejected_in_both_polarities() {
 #[test]
 fn scalar_right_operand_is_rejected_with_its_type() {
     rejects(
-        "incipit { fixum numerus x ← 5\n nota x ∈ 5 }",
+        "incipit { sit numerus x ← 5\n nota x ∈ 5 }",
         "SEM010",
         "membership_requires_collection",
     );
     rejects(
-        "incipit { fixum numerus x ← 5\n nota x ∉ 5 }",
+        "incipit { sit numerus x ← 5\n nota x ∉ 5 }",
         "SEM010",
         "membership_requires_collection",
     );
@@ -125,21 +123,21 @@ fn scalar_right_operand_is_rejected_with_its_type() {
 
 #[test]
 fn collection_shapes_accept() {
-    assert_accepts("incipit { fixum lista<numerus> xs ← [1, 2]\n nota 1 ∈ xs\n nota 3 ∉ xs }");
+    assert_accepts("incipit { sit lista<numerus> xs ← [1, 2]\n nota 1 ∈ xs\n nota 3 ∉ xs }");
     assert_accepts("incipit { varia copia<numerus> xs ← vacua\n nota 1 ∈ xs }");
-    assert_accepts("incipit { fixum tabula<textus, numerus> m ← {\"a\": 1}\n nota \"a\" ∈ m\n nota \"b\" ∉ m }");
+    assert_accepts("incipit { sit tabula<textus, numerus> m ← {\"a\": 1}\n nota \"a\" ∈ m\n nota \"b\" ∉ m }");
 }
 
 #[test]
 fn range_accepts_numeric_left_and_rejects_text_left() {
-    assert_accepts("incipit { fixum numerus n ← 5\n nota n ∈ 0‥10\n nota n ∉ 0‥10 }");
+    assert_accepts("incipit { sit numerus n ← 5\n nota n ∈ 0‥10\n nota n ∉ 0‥10 }");
     rejects("incipit { nota \"text\" ∈ 0‥3 }", "SEM011", "range_operand_must_be_numeric");
 }
 
 #[test]
 fn float_left_is_not_a_range_bound() {
     rejects(
-        "incipit { fixum fractus f ← 5.0\n nota f ∈ 0‥10 }",
+        "incipit { sit fractus f ← 5.0\n nota f ∈ 0‥10 }",
         "SEM011",
         "range_operand_must_be_numeric",
     );
@@ -148,14 +146,14 @@ fn float_left_is_not_a_range_bound() {
 #[test]
 fn enum_value_set_checks() {
     assert_accepts(
-        "ordo Color { rubrum, viridis, caeruleus }\nincipit { fixum Color c ← Color.rubrum\n nota c ∈ [Color.rubrum, Color.viridis]\n nota c ∉ [Color.viridis, Color.caeruleus] }",
+        "ordo Color { rubrum, viridis, caeruleus }\nincipit { sit Color c ← Color.rubrum\n nota c ∈ [Color.rubrum, Color.viridis]\n nota c ∉ [Color.viridis, Color.caeruleus] }",
     );
 }
 
 #[test]
 fn mixed_value_set_fails_common_type() {
     rejects(
-        "ordo Color { rubrum, viridis }\nincipit { fixum Color c ← Color.rubrum\n nota c ∈ [Color.rubrum, 3] }",
+        "ordo Color { rubrum, viridis }\nincipit { sit Color c ← Color.rubrum\n nota c ∈ [Color.rubrum, 3] }",
         "SEM010",
         "common_type_mismatch",
     );
@@ -185,7 +183,7 @@ fn empty_list_right_operand_is_unresolved_in_both_polarities() {
 
 #[test]
 fn unresolved_container_element_is_reported_once_at_the_right_operand() {
-    let source = "incipit { fixum _ xs ← []\n nota 1 ∈ xs }";
+    let source = "incipit { sit xs ← []\n nota 1 ∈ xs }";
     let found = issues(source);
     let count = found
         .iter()
@@ -201,7 +199,7 @@ fn unannotated_hole_right_operand_is_unresolved() {
 
 #[test]
 fn resolved_empty_collections_are_not_unresolved() {
-    assert_accepts("incipit { fixum lista<numerus> xs ← []\n nota 1 ∈ xs }");
+    assert_accepts("incipit { sit lista<numerus> xs ← []\n nota 1 ∈ xs }");
     assert_accepts("incipit { varia copia<numerus> xs ← vacua\n nota 1 ∉ xs }");
 }
 
@@ -219,7 +217,7 @@ fn generic_right_operand_is_rejected_by_the_collection_rule_not_this_one() {
 #[test]
 fn unresolved_left_operand_still_binds_the_bound_type() {
     for source in [
-        "incipit { fixum lista<numerus> xs ← [1]\n varia _ y\n nota y ∈ xs }",
+        "incipit { sit lista<numerus> xs ← [1]\n varia _ y\n nota y ∈ xs }",
         "incipit { varia _ y\n nota y ∈ 0‥10 }",
     ] {
         assert_eq!(unresolved_found(source), None, "{source}");

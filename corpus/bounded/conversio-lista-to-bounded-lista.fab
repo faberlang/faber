@@ -22,8 +22,8 @@ locale = "en"
 #   • assigning between capacities with a bare `←`.
 
 main {
-    const list<int> base ← [1, 2]
-    const list<int, 8> raw ← base ↦ list<int, 8>
-    const list<int, 4> out ← raw ↦ list<int, 4>
+    let list<int> base ← [1, 2]
+    let list<int, 8> raw ← base ↦ list<int, 8>
+    let list<int, 4> out ← raw ↦ list<int, 4>
     print out
 }

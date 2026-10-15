@@ -49,23 +49,23 @@ locale = "en"
 # peer exactly. Decimal/fractus remains rejected by the cross-family gate.
 
 main {
-    const int small ← 3
-    const float lata ← 3.5
-    const bool int_lt ← small ≺ lata
+    let int small ← 3
+    let float lata ← 3.5
+    let bool int_lt ← small ≺ lata
     print int_lt
-    const bool int_gt ← small ≻ lata
+    let bool int_gt ← small ≻ lata
     print int_gt
-    const int above ← 9007199254740993
-    const float boundary ← 9007199254740992.0
-    const bool exact_lt ← above ≺ boundary
+    let int above ← 9007199254740993
+    let float boundary ← 9007199254740992.0
+    let bool exact_lt ← above ≺ boundary
     print exact_lt
-    const bool exact_gt ← above ≻ boundary
+    let bool exact_gt ← above ≻ boundary
     print exact_gt
-    const d64 narrow_decimal ← 4.2
-    const d64 wide_decimal ← 1.0
-    const bool decimal_width_gt ← narrow_decimal ≻ wide_decimal
+    let d64 narrow_decimal ← 4.2
+    let d64 wide_decimal ← 1.0
+    let bool decimal_width_gt ← narrow_decimal ≻ wide_decimal
     print decimal_width_gt
-    const int integer_limit ← 10
-    const bool decimal_integer_gt ← narrow_decimal ≻ integer_limit
+    let int integer_limit ← 10
+    let bool decimal_integer_gt ← narrow_decimal ≻ integer_limit
     print decimal_integer_gt
 }

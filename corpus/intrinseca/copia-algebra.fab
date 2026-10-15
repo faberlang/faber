@@ -42,29 +42,29 @@ locale = "en"
 # BACKEND: Go e2e whitelist — copia method surface not yet lowered for Go.
 
 main {
-    var set<int> primi ← empty
+    mut set<int> primi ← empty
     primi.add(1)
     primi.add(2)
     primi.add(3)
-    var set<int> pares ← empty
+    mut set<int> pares ← empty
     pares.add(2)
     pares.add(4)
     pares.add(6)
-    const set<int> omnes ← primi.union(pares)
-    const set<int> communia ← primi.intersection(pares)
-    const set<int> reliqua ← primi.difference(pares)
-    const set<int> disiuncta ← primi.difference_symmetric(pares)
-    const bool subcopiaest ← communia.is_subset(omnes)
-    const bool supercopiaest ← omnes.is_superset(communia)
+    let set<int> omnes ← primi.union(pares)
+    let set<int> communia ← primi.intersection(pares)
+    let set<int> reliqua ← primi.difference(pares)
+    let set<int> disiuncta ← primi.difference_symmetric(pares)
+    let bool subcopiaest ← communia.is_subset(omnes)
+    let bool supercopiaest ← omnes.is_superset(communia)
 
     # copia iteration order is unspecified (D19.2) — sort before printing
-    var list<int> omnesOrd ← omnes ↦ list<int>
+    mut list<int> omnesOrd ← omnes ↦ list<int>
     omnesOrd.sort()
-    var list<int> communiaOrd ← communia ↦ list<int>
+    mut list<int> communiaOrd ← communia ↦ list<int>
     communiaOrd.sort()
-    var list<int> reliquaOrd ← reliqua ↦ list<int>
+    mut list<int> reliquaOrd ← reliqua ↦ list<int>
     reliquaOrd.sort()
-    var list<int> disiunctaOrd ← disiuncta ↦ list<int>
+    mut list<int> disiunctaOrd ← disiuncta ↦ list<int>
     disiunctaOrd.sort()
     print omnesOrd, communiaOrd, reliquaOrd, disiunctaOrd
     print subcopiaest, supercopiaest

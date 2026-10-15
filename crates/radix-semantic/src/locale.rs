@@ -14,7 +14,13 @@
 //! - Latin fallback is explicit pack data.
 //! - Diagnostic templates use named placeholders only. Positional placeholders
 //!   such as `{0}` are rejected before a renderer sees them. Optional fragments
-//!   may be gated by a named placeholder with `{?name|prefix|suffix}`.
+//!   may be gated by a named placeholder with `{?name|prefix|suffix}`. A doubled
+//!   open brace `{{` renders one literal `{` (there is no `}}` form, and a lone
+//!   `}` stays literal).
+//!
+//!   WHY: diagnostics must be able to quote the language's own braced syntax —
+//!   LEX003's `u{...}` hex escape, SEM016's `_ { … }` — without the renderer
+//!   reading those braces as placeholders.
 //! - A library may ship member-only packs at `<lib>/locale/<id>/pack.toml`.
 //!   Those files are not reader packs: they carry `[pack]` + `[[library_members]]`
 //!   and are merged into the consumer reader pack before projection. A missing
@@ -556,7 +562,8 @@ impl LocalePack {
     /// # Errors
     ///
     /// Returns [`DiagnosticTemplateRenderError`] if a template contains unclosed
-    /// or malformed placeholders or a required placeholder value is missing.
+    /// or malformed placeholders or a required placeholder value is missing. A
+    /// doubled open brace `{{` is the literal-brace escape, not an error.
     pub fn render_diagnostic_text(
         &self,
         diagnostic: &Diagnostic,
@@ -595,6 +602,12 @@ impl LocalePack {
         Ok(Some(RenderedDiagnosticText { message, help }))
     }
 
+    /// Render one template, substituting placeholders from `args`.
+    ///
+    /// `{{` is the literal-brace escape: the pair renders one `{` and is not a
+    /// placeholder. This lets a diagnostic quote the language's braced syntax
+    /// (`u{...}`, `_ { … }`). A lone `}` is literal, and a single-brace
+    /// placeholder's behavior is unchanged.
     fn render_template(
         &self,
         code: &str,
@@ -608,6 +621,13 @@ impl LocalePack {
         while let Some(start) = rest.find('{') {
             rendered.push_str(&rest[..start]);
             let after_open = &rest[start + 1..];
+            // WHY: `{{` is the literal-brace escape, so a diagnostic can quote
+            // the language's braced forms without a placeholder parse.
+            if let Some(literal) = after_open.strip_prefix('{') {
+                rendered.push('{');
+                rest = literal;
+                continue;
+            }
             let Some(end) = after_open.find('}') else {
                 return Err(DiagnosticTemplateRenderError::UnclosedPlaceholder {
                     code: code.to_string(),
@@ -1290,8 +1310,10 @@ pub fn latin_locale_pack() -> LocalePack {
     // Registry keys whose Latin spelling differs from the registry text. The
     // installed `la` pack is authoritative for these (ruling 2026-09-30): the
     // registry keeps the English `own` / `copy` identity text while the Latin
-    // reader surface spells them `penes` / `exemplum`.
-    const LATIN_KEYWORD_SPELLINGS: &[(&str, &str)] = &[("own", "penes"), ("copy", "exemplum")];
+    // reader surface spells them `penes` / `exemplum`. The mut parameter
+    // marker `in` shares the writable-cell word `varia`.
+    const LATIN_KEYWORD_SPELLINGS: &[(&str, &str)] =
+        &[("own", "penes"), ("copy", "exemplum"), ("in", "varia")];
 
     let keywords = keyword_specs()
         .iter()
@@ -2168,7 +2190,19 @@ fn validate_unique_spellings(pack: &LocalePack, issues: &mut Vec<LocalePackIssue
     // `[keywords]` or within `[types]` is still a pack bug, but the same
     // spelling in both blocks is not.
     let mut keyword_spellings = BTreeSet::new();
-    for binding in pack.keywords.values() {
+    // `varia` (writable local) and `in` (writable parameter) are one binding
+    // cell: a pack spells both with one word, so the shared spelling is the
+    // single sanctioned duplicate.
+    let shared_cell_word = match (pack.keywords.get("varia"), pack.keywords.get("in")) {
+        (Some(local), Some(parameter)) if local.canonical == parameter.canonical => {
+            Some(parameter.canonical.clone())
+        }
+        _ => None,
+    };
+    for (latin, binding) in &pack.keywords {
+        if latin == "in" && shared_cell_word.as_deref() == Some(binding.canonical.as_str()) {
+            continue;
+        }
         insert_spelling(&mut keyword_spellings, &binding.canonical, issues);
         for alias in &binding.aliases {
             insert_spelling(&mut keyword_spellings, alias, issues);
@@ -2289,6 +2323,12 @@ fn validate_template(
 
     while let Some(start) = rest.find('{') {
         let after_open = &rest[start + 1..];
+        // WHY: `{{` is the literal-brace escape; it must validate the same way
+        // it renders, so pack rows can quote the language's braced forms.
+        if let Some(literal) = after_open.strip_prefix('{') {
+            rest = literal;
+            continue;
+        }
         let Some(end) = after_open.find('}') else {
             issues.push(LocalePackIssue::UnclosedTemplatePlaceholder {
                 code: code.to_string(),

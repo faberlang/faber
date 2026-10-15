@@ -2268,7 +2268,7 @@ fn folded_elementwise_destination_consumed_by_later_subchain_is_exposed() {
         first.outputs,
         vec![MirLocalId(2), MirLocalId(4)],
         "subchain 0 must expose the recipe result h1 (primary) and the gelu \
-         destination a1 (read by subchain 1), in that deterministic order"
+         destination a1 (read by subchain 1), varia that deterministic order"
     );
     assert!(
         !first.outputs.contains(&MirLocalId(3)),
@@ -2578,7 +2578,7 @@ fn tuple_return_fields_map_full_result_tuple_indices_to_locals() {
         decomposition.subchains[3].outputs,
         vec![MirLocalId(6)],
         "the tuple-return last subchain's output set is the return-tuple field \
-         it writes (the loss), in full-tuple index order — never the nested \
+         it writes (the loss), varia full-tuple index order — never the nested \
          return-tuple local"
     );
 }

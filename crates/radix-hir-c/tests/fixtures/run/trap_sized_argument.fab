@@ -7,7 +7,7 @@ fn id(i16 x) → i16 {
 }
 
 main {
-    var int n ← 40000
+    mut int n ← 40000
     print id(30000)
     print id(n)
 }

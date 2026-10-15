@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "`apud [i]` over a lista binds each position next to its element (enumerate)."
-syntax = "for from <lista> at [i] const <element> { }"
+syntax = "for from <lista> at [i] let <element> { }"
 related = ["apud", "itera", "ex", "lista"]
 locale = "en"
 +++
@@ -27,14 +27,14 @@ locale = "en"
 # See also: apud, itera, ex, lista
 # =============================================================================
 
-# for from <lista> at [i] const <element> { <body> }
+# for from <lista> at [i] let <element> { <body> }
 #
 # EXPECTED OUTPUT:
 #   one line per element: its position, then the element.
 
 main {
-    const list<string> days ← ["mon", "tue", "wed"]
-    for from days at [i] const day {
+    let list<string> days ← ["mon", "tue", "wed"]
+    for from days at [i] let day {
         print i, day
     }
 }

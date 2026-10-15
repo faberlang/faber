@@ -11,10 +11,10 @@ fn session() -> Session {
 #[test]
 fn integer_potentia_runner_handles_negative_base_and_zero_exponent() {
     let source = r"incipit {
-    fixum numerus base ← -2
-    fixum numerus odd ← base.potentia(3)
-    fixum numerus even ← base.potentia(4)
-    fixum numerus identity ← base.potentia(0)
+    sit numerus base ← -2
+    sit numerus odd ← base.potentia(3)
+    sit numerus even ← base.potentia(4)
+    sit numerus identity ← base.potentia(0)
     nota odd
     nota even
     nota identity
@@ -44,9 +44,9 @@ fn run_lines(name: &str, source: &str) -> Vec<String> {
 #[test]
 fn fractus_potentia_runner_follows_ieee_pow_for_negative_and_zero_bases() {
     let source = r"incipit {
-    fixum fractus neg ← -2.0
-    fixum fractus zero ← 0.0
-    fixum fractus negzero ← -0.0
+    sit fractus neg ← -2.0
+    sit fractus zero ← 0.0
+    sit fractus negzero ← -0.0
     nota neg.potentia(2.0)
     nota neg.potentia(3.0)
     nota neg.potentia(0.5)
@@ -66,9 +66,9 @@ fn fractus_potentia_runner_follows_ieee_pow_for_negative_and_zero_bases() {
 #[test]
 fn fractus_potentia_runner_is_exact_for_integral_exponents() {
     let source = r"incipit {
-    fixum fractus two ← 2.0
-    fixum fractus ten ← 10.0
-    fixum fractus three ← 3.0
+    sit fractus two ← 2.0
+    sit fractus ten ← 10.0
+    sit fractus three ← 3.0
     nota two.potentia(3.0)
     nota two.potentia(-2.0)
     nota ten.potentia(2.0)
@@ -86,13 +86,13 @@ fn fractus_potentia_runner_is_exact_for_integral_exponents() {
 #[test]
 fn fractus_potentia_runner_follows_ieee_pow_for_nan_and_infinity() {
     let source = r"incipit {
-    fixum fractus n ← nonnumerus
-    fixum fractus one ← 1.0
-    fixum fractus minus_one ← -1.0
-    fixum fractus two ← 2.0
-    fixum fractus half ← 0.5
-    fixum fractus ten ← 10.0
-    fixum fractus neg_inf ← -∞
+    sit fractus n ← nonnumerus
+    sit fractus one ← 1.0
+    sit fractus minus_one ← -1.0
+    sit fractus two ← 2.0
+    sit fractus half ← 0.5
+    sit fractus ten ← 10.0
+    sit fractus neg_inf ← -∞
     nota n.potentia(0.0)
     nota one.potentia(nonnumerus)
     nota two.potentia(nonnumerus)

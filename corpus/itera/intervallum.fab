@@ -28,12 +28,12 @@ locale = "en"
 
 # itera ab — range expressions with exclusive and inclusive bounds
 #
-# itera ab <start>‥<end> fixum <item> { <body> }       — exclusive end
-# itera ab <start> ante <end> fixum <item> { <body> }  — explicit exclusive
-# itera ab <start>…<end> fixum <item> { <body> }        — inclusive end
+# itera ab <start>‥<end> sit <item> { <body> }       — exclusive end
+# itera ab <start> ante <end> sit <item> { <body> }  — explicit exclusive
+# itera ab <start>…<end> sit <item> { <body> }        — inclusive end
 #
 # GRAMMAR:
-#   forRangeStmt :← 'itera' 'ab' rangeExpr ('fixum' | 'varia') ident block
+#   forRangeStmt :← 'itera' 'ab' rangeExpr ('sit' | 'varia') ident block
 #
 # EXPECTED OUTPUT:
 #   intervallum.expected — exclusive, ante-exclusive, inclusive, non-zero,
@@ -41,27 +41,27 @@ locale = "en"
 
 main {
     # Basic range (exclusive: 0, 1, 2, 3, 4)
-    for range 0‥5 const i {
+    for range 0‥5 let i {
         print i
     }
 
     # Explicit exclusive with ante (same as ‥)
-    for range 0 before 5 const i {
+    for range 0 before 5 let i {
         print i
     }
 
     # Inclusive range with … (0, 1, 2, 3, 4, 5)
-    for range 0…5 const i {
+    for range 0…5 let i {
         print i
     }
 
     # Range starting from non-zero
-    for range 5‥10 const i {
+    for range 5‥10 let i {
         print i
     }
 
     # Descending direction
-    for range 5‥0 const i {
+    for range 5‥0 let i {
         print i
     }
 }

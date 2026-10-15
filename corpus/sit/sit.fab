@@ -17,13 +17,13 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Immutable binding sugar — `sit name` is a compact alternative to
-#     `fixum _ name` for inferred-type immutable locals
+#   • Write-once binding — `sit name` declares an inferred-type local that
+#     is written once
 #   • Supports immediate init (`sit x ← expr`) and deferred init
 #     (`sit x` then `x ← expr` later)
 #
 # Common mistakes:
-#   • Confusing `sit` (sugar for `fixum _`) with `varia` — `sit` creates an immutable binding.
+#   • Confusing `sit` with `varia` — `sit` creates a write-once binding.
 #
 # See also: fixum, varia, ←
 # =============================================================================
@@ -33,14 +33,14 @@ locale = "en"
 # sit — inferred immutable bindings
 #
 # Immediate init:
-#   sit nomen ← expr        -- compact sugar for fixum _ nomen ← expr
+#   sit nomen ← expr        -- inferred write-once local
 #
 # Deferred init:
-#   sit nomen               -- compact sugar for fixum _ nomen (assign once later)
+#   sit nomen               -- deferred: assign once later
 #   nomen ← expr
 #
-# Prefer sit when a block chains several inferred locals; keep fixum _ when
-# teaching the explicit infer marker or mixing typed and inferred bindings.
+# `sit` infers the type; write `sit T nomen ← expr` to state it. `fixum` is for
+# compile-time constants only.
 #
 # GRAMMAR:
 #   sitDecl := 'sit' IDENTIFIER ('←' expression)?
@@ -59,6 +59,6 @@ main {
     label ← "deferred"
     print label
 
-    const _ idem ← nuntius
+    let idem ← nuntius
     print idem
 }

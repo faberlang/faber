@@ -43,6 +43,7 @@ radix-hir-c = { path = "../radix-hir-c", optional = true }
 radix-hir-faber = { path = "../radix-hir-faber", optional = true }
 radix-mir = { path = "../radix-mir", optional = true }
 radix-mir-lower = { path = "../radix-mir-lower", optional = true }
+radix-mir-clif = { path = "../radix-mir-clif", optional = true }
 radix-abi = { path = "../radix-abi" }
 radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-mir-runner = { path = "../radix-mir-runner", optional = true }
@@ -76,10 +77,11 @@ metal = "0.33"
 
 [features]
 default = ["full-targets"]
-full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
+full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "mir-clif", "runner"]
 hir-faber = ["dep:radix-hir-faber", "radix-target/hir-faber"]
 hir-fhir = ["mir-core", "dep:radix-hir-fhir", "radix-target/hir-fhir", "radix-semantic/hir-fhir"]
 mir-fmir = ["mir-core"]
+mir-clif = ["mir-core", "dep:radix-mir-clif", "radix-target/mir-clif"]
 mir-core = ["dep:radix-mir", "dep:radix-mir-lower"]
 runner = ["mir-core", "dep:radix-mir-runner"]
 test-support = ["dep:tempfile"]

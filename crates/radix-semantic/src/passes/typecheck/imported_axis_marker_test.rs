@@ -105,7 +105,7 @@ fn analyze_imported(source: &str) -> AnalyzedFixture {
 fn local_axis_parameter_requires_the_marker() {
     let unit = test_support::analyze_source(
         "functio rows(axis numerus a) → numerus { redde a + 1 }\n\
-incipit {\n    fixum numerus x ← rows(1)\n}",
+incipit {\n    sit numerus x ← rows(1)\n}",
     );
     assert!(
         has_issue(&unit, ISSUE),
@@ -135,7 +135,7 @@ fn imported_axis_parameter_requires_the_marker() {
         r#"importa ex "./lib" lib
 
 incipit {
-    fixum numerus x ← lib.rows(1)
+    sit numerus x ← lib.rows(1)
 }"#,
     );
     assert!(
@@ -151,7 +151,7 @@ fn imported_axis_parameter_accepts_the_marker() {
         r#"importa ex "./lib" lib
 
 incipit {
-    fixum numerus x ← lib.rows(axis 1)
+    sit numerus x ← lib.rows(axis 1)
 }"#,
     );
     assert!(

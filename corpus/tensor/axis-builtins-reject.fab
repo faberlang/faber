@@ -14,7 +14,7 @@ diagnostic = "SEM010:axis_reduction_out_of_range"
 # axis out of range: a rank-2 tensor has axes 0 and 1, so `axis 2` is refused.
 
 main {
-    const list<f32> flat ← [
+    let list<f32> flat ← [
         1.0,
         2.0,
         3.0,
@@ -22,9 +22,9 @@ main {
         5.0,
         6.0
     ]
-    const tf32[2, 3] grid ← flat ↦ tf32[2, 3]
+    let tf32[2, 3] grid ← flat ↦ tf32[2, 3]
 
-    const tf32[3] bad ← grid.sum(axis 2)
+    let tf32[3] bad ← grid.sum(axis 2)
 
     print bad[0]
 }

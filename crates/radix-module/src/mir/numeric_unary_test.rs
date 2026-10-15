@@ -40,8 +40,8 @@ fn negativa_returns_negation_on_numerus_and_fractus() {
     run_and_expect(
         "negativa-numerus.fab",
         r"incipit {
-    fixum numerus x ← 3
-    fixum numerus y ← x.negativa()
+    sit numerus x ← 3
+    sit numerus y ← x.negativa()
     nota y
     nota x
 }",
@@ -50,8 +50,8 @@ fn negativa_returns_negation_on_numerus_and_fractus() {
     run_and_expect(
         "negativa-fractus.fab",
         r"incipit {
-    fixum fractus x ← 1.5
-    fixum fractus y ← x.negativa()
+    sit fractus x ← 1.5
+    sit fractus y ← x.negativa()
     nota y
 }",
         &["-1.5"],
@@ -76,8 +76,8 @@ fn complementata_returns_complement_on_numerus() {
     run_and_expect(
         "complementata-numerus.fab",
         r"incipit {
-    fixum numerus x ← 5
-    fixum numerus y ← x.complementata()
+    sit numerus x ← 5
+    sit numerus y ← x.complementata()
     nota y
     nota x
 }",

@@ -17,7 +17,7 @@ locale = "en"
 #   • `r.find(text)` returns `match ∪ none`: the leftmost match (RE2 rules,
 #     leftmost-first) or `none` when the pattern matches nowhere
 #   • a match has no source-level type name; hold it in an inferred binding
-#     (`const _ m ← …`) and read it with `m!.text()`, `m!.start()`,
+#     (`let m ← …`) and read it with `m!.text()`, `m!.start()`,
 #     `m!.end()`, `m!.group(n)` and `m!.named(name)`
 #   • `start` and `end` are code point offsets, half-open, never bytes: the
 #     emoji and the accented letter below each count as one
@@ -44,10 +44,10 @@ locale = "en"
 #   last group, and a span over a string with non-BMP and accented characters.
 
 main {
-    const regex pair ← "(?P<key>[a-z]+)=(?P<val>[0-9]+)" ↦ regex
+    let regex pair ← "(?P<key>[a-z]+)=(?P<val>[0-9]+)" ↦ regex
 
     # hit
-    const _ hit ← pair.find("x: size=42;")
+    let hit ← pair.find("x: size=42;")
     print hit!.text()
     print hit!.start()
     print hit!.end()
@@ -58,14 +58,14 @@ main {
     print hit!.named("val")
 
     # miss
-    const _ miss ← pair.find("no pairs here")
+    let miss ← pair.find("no pairs here")
     if miss ≡ null {
         print "miss: none"
     }
 
     # a group that did not take part in the match
-    const regex either ← "(a)|(b)" ↦ regex
-    const _ second ← either.find("xb")
+    let regex either ← "(a)|(b)" ↦ regex
+    let second ← either.find("xb")
     if second!.group(1) ≡ null {
         print "group 1: none"
     }
@@ -81,8 +81,8 @@ main {
     }
 
     # offsets count code points: the emoji and the accented letter are one each
-    const regex word ← "[a-z]+" ↦ regex
-    const _ wide ← word.find("😀é abc")
+    let regex word ← "[a-z]+" ↦ regex
+    let wide ← word.find("😀é abc")
     print wide!.text()
     print wide!.start()
     print wide!.end()

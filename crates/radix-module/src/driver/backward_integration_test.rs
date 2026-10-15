@@ -358,11 +358,11 @@ functio nil() → vacuum {
 }
 
 incipit {
-    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0]
-    fixum tf32[5] x ← flat ↦ tf32[5]
-    fixum tf32[5] y ← flat ↦ tf32[5]
-    fixum fractus upstream ← 1.0
-    fixum _ grads ← mean_backward(x, y, nil(), upstream)
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0]
+    sit tf32[5] x ← flat ↦ tf32[5]
+    sit tf32[5] y ← flat ↦ tf32[5]
+    sit fractus upstream ← 1.0
+    sit grads ← mean_backward(x, y, nil(), upstream)
 }
 "#;
 

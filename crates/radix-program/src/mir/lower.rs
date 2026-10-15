@@ -1978,7 +1978,7 @@ fn transplant_expr(
         }
         // Static type ascription (`∷`): the source expression and the target
         // type both travel. Const data members across library boundaries use
-        // this shape for typed literals (`fixum f32 GELU_ALPHA ← (0.79… ∷
+        // this shape for typed literals (`sit f32 GELU_ALPHA ← (0.79… ∷
         // f32)`), so the transplant must carry it through the entry's
         // top-level-const seam instead of failing closed.
         HirExpressionKind::Verte {
@@ -2166,7 +2166,7 @@ fn transplant_expr(
             }
         }
         // Const-to-const reference: the initializer names another linked
-        // const data member of the same source unit (e.g. `ELEMENTS ← N *
+        // let data member of the same source unit (e.g. `ELEMENTS ← N *
         // K` in gradus kernel.fab). Rewriting to that member's synthetic def
         // id materializes the reference through the entry's top-level-const
         // seam, exactly like the entry's own rewritten member references.
@@ -3463,7 +3463,7 @@ pub(super) fn lower_unit<'a>(
         lower_analyzed_unit(
             unit.analysis.application_view(),
             radix_mir_lower::lower::MirLoweringOptions {
-                cli_record_fields_by_local: std::sync::Arc::new(fields.into_iter().collect()),
+                cli_parsed_record_fields_by_type: std::sync::Arc::new(fields.into_iter().collect()),
                 kernel_lowering,
                 ..Default::default()
             },

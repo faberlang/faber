@@ -27,8 +27,8 @@ functio fragment_output_matches(
 
 @ fragment
 functio shader_uv_fragment() → vacuum {
-    fixum f32 energy ← uv · uv
-    fixum vector<f32, 3> shaded ↤ [energy, energy, energy]
+    sit f32 energy ← uv · uv
+    sit vector<f32, 3> shaded ↤ [energy, energy, energy]
     out_color ← shaded
 }
 

@@ -31,6 +31,6 @@ locale = "en"
 # means "drain to terminal and ignore payloads."
 
 main {
-    const void v ← call 'runtime:echo' ("salve") ↦ void
+    let void v ← call 'runtime:echo' ("salve") ↦ void
     assert true
 }

@@ -32,9 +32,7 @@ fn shape(source: &str) -> String {
 }
 
 fn program(condition: &str) -> String {
-    format!(
-        "incipit {{\n    fixum lista<numerus> xs ← [1, 2]\n    si {condition} {{\n        nota \"hit\"\n    }}\n}}\n"
-    )
+    format!("incipit {{\n    sit lista<numerus> xs ← [1, 2]\n    si {condition} {{\n        nota \"hit\"\n    }}\n}}\n")
 }
 
 fn run(condition: &str) -> Vec<String> {
@@ -100,21 +98,21 @@ fn verdicts(declarations: &str, conditions: &[&str]) -> Vec<String> {
 
 #[test]
 fn literal_range_lowers_to_scalar_compares_with_no_interval_object() {
-    let dump = dump("incipit {\n    fixum numerus x ← 5\n    si x ∈ 0‥10 { nota \"hit\" }\n}\n");
+    let dump = dump("incipit {\n    sit numerus x ← 5\n    si x ∈ 0‥10 { nota \"hit\" }\n}\n");
     assert!(!dump.contains("interval_contains"), "{dump}");
     assert!(!dump.contains("interval"), "{dump}");
     assert_eq!(dump.matches(" >= ").count(), 1, "{dump}");
     assert_eq!(dump.matches(" < ").count(), 1, "{dump}");
-    let inclusive = self::dump("incipit {\n    fixum numerus x ← 5\n    si x ∈ 0…10 { nota \"hit\" }\n}\n");
+    let inclusive = self::dump("incipit {\n    sit numerus x ← 5\n    si x ∈ 0…10 { nota \"hit\" }\n}\n");
     assert_eq!(inclusive.matches(" <= ").count(), 1, "{inclusive}");
-    let outside = self::dump("incipit {\n    fixum numerus x ← 5\n    si x ∉ 0‥10 { nota \"hit\" }\n}\n");
+    let outside = self::dump("incipit {\n    sit numerus x ← 5\n    si x ∉ 0‥10 { nota \"hit\" }\n}\n");
     assert_eq!(outside.matches(" = not %").count(), 1, "{outside}");
 }
 
 #[test]
 fn exclusive_literal_range_includes_low_and_excludes_high() {
     let out = verdicts(
-        "    fixum numerus lo ← 0\n    fixum numerus mid ← 3\n    fixum numerus hi ← 4\n    fixum numerus below ← -1",
+        "    sit numerus lo ← 0\n    sit numerus mid ← 3\n    sit numerus hi ← 4\n    sit numerus below ← -1",
         &[
             "lo ∈ 0‥4",
             "mid ∈ 0‥4",
@@ -130,7 +128,7 @@ fn exclusive_literal_range_includes_low_and_excludes_high() {
 #[test]
 fn inclusive_literal_range_includes_both_ends() {
     let out = verdicts(
-        "    fixum numerus lo ← 0\n    fixum numerus hi ← 4\n    fixum numerus over ← 5",
+        "    sit numerus lo ← 0\n    sit numerus hi ← 4\n    sit numerus over ← 5",
         &["lo ∈ 0…4", "hi ∈ 0…4", "over ∈ 0…4", "hi ∉ 0…4", "over ∉ 0…4"],
     );
     assert_eq!(out, ["yes", "yes", "no", "no", "yes"]);
@@ -145,7 +143,7 @@ fn literal_ranges_accept_constants_on_the_left() {
 #[test]
 fn sized_integer_operands_use_the_same_bounds() {
     let out = verdicts(
-        "    fixum i32 a ← 1\n    fixum i32 b ← 3\n    fixum u8 c ← 4",
+        "    sit i32 a ← 1\n    sit i32 b ← 3\n    sit u8 c ← 4",
         &["a ∈ 1‥3", "b ∈ 1‥3", "b ∈ 1…3", "c ∈ 1…3", "c ∉ 1…3"],
     );
     assert_eq!(out, ["yes", "no", "yes", "no", "yes"]);
@@ -154,7 +152,7 @@ fn sized_integer_operands_use_the_same_bounds() {
 #[test]
 fn stored_interval_value_uses_the_interval_bounds_and_exclusivity() {
     let out = verdicts(
-        "    fixum intervallum<numerus> half ← 0‥4\n    fixum intervallum<numerus> closed ← 0…4",
+        "    sit intervallum<numerus> half ← 0‥4\n    sit intervallum<numerus> closed ← 0…4",
         &[
             "3 ∈ half",
             "4 ∈ half",
@@ -170,7 +168,7 @@ fn stored_interval_value_uses_the_interval_bounds_and_exclusivity() {
 
 #[test]
 fn stored_interval_membership_is_one_interval_contains_call() {
-    let dump = dump("incipit {\n    fixum intervallum<numerus> r ← 0‥4\n    si 3 ∉ r { nota \"hit\" }\n}\n");
+    let dump = dump("incipit {\n    sit intervallum<numerus> r ← 0‥4\n    si 3 ∉ r { nota \"hit\" }\n}\n");
     assert_eq!(dump.matches("interval_contains").count(), 1, "{dump}");
     assert_eq!(dump.matches(" = not %").count(), 1, "{dump}");
 }
@@ -189,7 +187,7 @@ const KERNEL: &str = r"
 @ kernel
 @ public
 fn k(ti32[8] a, mut ti32[8] o) → void {
-    for from a at [i] thread lane const c {
+    for from a at [i] thread lane let c {
         if c ∈ 1‥3 {
             o[i] ← 1
         } else {
@@ -201,13 +199,13 @@ fn k(ti32[8] a, mut ti32[8] o) → void {
     }
 }
 main {
-    var ti32[8] a ← ti32[8] {}
+    mut ti32[8] a ← ti32[8] {}
     a[0] ← 0
     a[1] ← 1
     a[2] ← 2
     a[3] ← 3
     a[4] ← 4
-    var ti32[8] b ← ti32[8] {}
+    mut ti32[8] b ← ti32[8] {}
     k(a, mut b)
     print b[0]
     print b[1]

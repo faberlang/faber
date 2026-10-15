@@ -9,8 +9,8 @@ use crate::test_support::{analyze_ok_la, assert_accepts_la, entry_local_tys};
 fn text_get_infers_optional_textus() {
     let unit = analyze_ok_la(
         r#"incipit {
-    fixum textus s ← "hé"
-    fixum _ found ← s.accipe(0)
+    sit textus s ← "hé"
+    sit found ← s.accipe(0)
     nota found
 }"#,
     );
@@ -28,8 +28,8 @@ fn text_get_infers_optional_textus() {
 fn text_get_composes_with_vel() {
     assert_accepts_la(
         r#"incipit {
-    fixum textus s ← "hé"
-    fixum textus picked ← s.accipe(9) vel "?"
+    sit textus s ← "hé"
+    sit textus picked ← s.accipe(9) vel "?"
     nota picked
 }"#,
     );

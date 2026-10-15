@@ -1,7 +1,7 @@
 //! Z2-P: opaque-return binding-site pin store checks.
 //!
 //! `fn load(string path) → tf32[_, _]` returns per-call opaque axes. A
-//! declaration store `const tf32[H, W] elev ← load(path)` pins those opaque
+//! declaration store `let tf32[H, W] elev ← load(path)` pins those opaque
 //! axes to the annotation's named size terms at the store: the check is
 //! green and the extent equality is recorded as a runtime-recoverable store
 //! obligation. Literal mismatches stay red.
@@ -42,7 +42,7 @@ fn rejects_with_issue(source: &str, issue: &str) {
 }
 
 const LOAD_FN: &str = "fn load(string path) → tf32[_, _] {
-    const tf32[2, 3] t ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
+    let tf32[2, 3] t ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     return t
 }
 ";
@@ -53,7 +53,7 @@ fn pin_store_opaque_axes_pin_to_named_sizes_green() {
         "{LOAD_FN}main {{
     const size H ← 2
     const size W ← 3
-    const tf32[H, W] elev ← load(\"x\")
+    let tf32[H, W] elev ← load(\"x\")
     print elev.shape().get(0)
     print elev.shape().get(1)
 }}"
@@ -65,12 +65,12 @@ fn pin_store_literal_mismatch_initializer_stays_red() {
     rejects_with_issue(
         &format!(
             "{LOAD_FN}main {{
-    const tf32[2, 3] t ← seed_return()
-    const tf32[3, 2] x ← t
+    let tf32[2, 3] t ← seed_return()
+    let tf32[3, 2] x ← t
 }}
 
 fn seed_return() → tf32[2, 3] {{
-    const tf32[2, 3] t ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
+    let tf32[2, 3] t ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     return t
 }}"
         ),
@@ -82,7 +82,7 @@ fn seed_return() → tf32[2, 3] {{
 fn pin_store_opaque_into_infer_annotation_stays_green() {
     accepts(&format!(
         "{LOAD_FN}main {{
-    const tf32[_, _] a ← load(\"x\")
+    let tf32[_, _] a ← load(\"x\")
     print a.shape().get(0)
     print a.shape().get(1)
 }}"

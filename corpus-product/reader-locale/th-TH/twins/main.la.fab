@@ -2,7 +2,7 @@
 locale = "la"
 +++
 functio ต้อนรับ(textus who) → textus {
-    fixum textus line ← "ขอต้อนรับ, §!"(who)
+    sit textus line ← "ขอต้อนรับ, §!"(who)
     redde line
 }
 
@@ -14,7 +14,7 @@ functio สอบผ่าน(numerus mark) → bivalens {
 
 functio นับคะแนน(lista<numerus> marks) → numerus {
     varia numerus total ← 0
-    itera de marks fixum mark {
+    itera de marks sit mark {
         si mark ≺ 0 {
             perge
         }
@@ -37,9 +37,9 @@ functio ลดลง(numerus start) → numerus {
 }
 
 incipit {
-    fixum textus message ← ต้อนรับ("ทุกคน")
-    fixum numerus mark ← 77
-    fixum lista<numerus> marks ← [-1, 95, 30, 55, 61]
+    sit textus message ← ต้อนรับ("ทุกคน")
+    sit numerus mark ← 77
+    sit lista<numerus> marks ← [-1, 95, 30, 55, 61]
     nota message
     nota สอบผ่าน(mark)
     nota นับคะแนน(marks)

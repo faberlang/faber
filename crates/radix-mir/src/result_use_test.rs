@@ -176,7 +176,7 @@ fn a_forwarded_result_is_returned_as_the_end_of_the_chain() {
     );
 }
 
-/// `var y ← x.softmax(); y ← other; return y` returns `other`, not the recipe's
+/// `mut y ← x.softmax(); y ← other; return y` returns `other`, not the recipe's
 /// result: a backend that treated `y` as the recipe's destination would skip
 /// storing `other` and return the wrong tensor.
 #[test]

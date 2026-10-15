@@ -14,7 +14,7 @@ const INIT_MISMATCH: &str = "initializer_annotation_mismatch";
 fn ascii_scalar_index_binds_littera() {
     test_support::assert_accepts_la(
         "functio f(ascii s) → vacuum {
-    fixum littera c ← s[0]
+    sit littera c ← s[0]
     nota c
 }",
     );
@@ -24,7 +24,7 @@ fn ascii_scalar_index_binds_littera() {
 fn ascii_scalar_index_is_not_ascii_one() {
     test_support::assert_rejects_with_issue_la(
         "functio f(ascii s) → vacuum {
-    fixum ascii<1> c ← s[0]
+    sit ascii<1> c ← s[0]
     nota c
 }",
         INIT_MISMATCH,
@@ -35,7 +35,7 @@ fn ascii_scalar_index_is_not_ascii_one() {
 fn bounded_ascii_scalar_index_binds_littera() {
     test_support::assert_accepts_la(
         "functio f(ascii<4> s) → vacuum {
-    fixum littera c ← s[1]
+    sit littera c ← s[1]
     nota c
 }",
     );
@@ -46,7 +46,7 @@ fn bounded_ascii_scalar_index_binds_littera() {
 fn textus_scalar_index_keeps_ascii_one() {
     test_support::assert_accepts_la(
         "functio f(textus s) → vacuum {
-    fixum ascii<1> c ← s[0]
+    sit ascii<1> c ← s[0]
     nota c
 }",
     );
@@ -56,8 +56,8 @@ fn textus_scalar_index_keeps_ascii_one() {
 fn itera_ex_textus_binds_littera() {
     test_support::assert_accepts_la(
         "functio f(textus s) → vacuum {
-    itera ex s fixum c {
-        fixum littera x ← c
+    itera ex s sit c {
+        sit littera x ← c
         nota x
     }
 }",
@@ -68,8 +68,8 @@ fn itera_ex_textus_binds_littera() {
 fn itera_ex_textus_element_is_not_ascii_one() {
     test_support::assert_rejects_with_issue_la(
         "functio f(textus s) → vacuum {
-    itera ex s fixum c {
-        fixum ascii<1> x ← c
+    itera ex s sit c {
+        sit ascii<1> x ← c
         nota x
     }
 }",
@@ -81,8 +81,8 @@ fn itera_ex_textus_element_is_not_ascii_one() {
 fn itera_ex_ascii_binds_littera() {
     test_support::assert_accepts_la(
         "functio f(ascii s) → vacuum {
-    itera ex s fixum c {
-        fixum littera x ← c
+    itera ex s sit c {
+        sit littera x ← c
         nota x
     }
 }",
@@ -112,7 +112,7 @@ fn littera_equals_char_literal_either_side() {
     test_support::assert_accepts_la(
         "functio f(textus s) → numerus {
     varia numerus n ← 0
-    itera ex s fixum c {
+    itera ex s sit c {
         si c ≡ 'o' { n ← n + 1 }
         si 'a' ≡ c { n ← n + 1 }
         si c ≢ 'z' { n ← n + 1 }
@@ -145,7 +145,7 @@ fn littera_equality_with_textus_rejects() {
 fn ascii_one_widens_to_littera() {
     test_support::assert_accepts_la(
         "incipit {
-    fixum littera c ← 'x'
+    sit littera c ← 'x'
     nota c
 }",
     );
@@ -155,7 +155,7 @@ fn ascii_one_widens_to_littera() {
 fn multi_char_ascii_does_not_widen_to_littera() {
     test_support::assert_rejects_with_issue_la(
         "incipit {
-    fixum littera c ← 'xy'
+    sit littera c ← 'xy'
     nota c
 }",
         INIT_MISMATCH,
@@ -166,7 +166,7 @@ fn multi_char_ascii_does_not_widen_to_littera() {
 fn littera_widens_to_textus() {
     test_support::assert_accepts_la(
         "functio f(littera c) → textus {
-    fixum textus t ← c
+    sit textus t ← c
     redde t
 }",
     );
@@ -176,7 +176,7 @@ fn littera_widens_to_textus() {
 fn textus_does_not_narrow_to_littera() {
     test_support::assert_rejects_with_issue_la(
         "functio f(textus t) → vacuum {
-    fixum littera c ← t
+    sit littera c ← t
     nota c
 }",
         INIT_MISMATCH,
@@ -209,7 +209,7 @@ fn octetus_is_retired_with_named_issue() {
 fn octeti_resolves_to_lista_b8() {
     test_support::assert_accepts_la(
         "functio f(octeti b) → vacuum {
-    fixum lista<b8> c ← b
+    sit lista<b8> c ← b
     nota c
 }",
     );
@@ -219,8 +219,8 @@ fn octeti_resolves_to_lista_b8() {
 fn octeti_elements_are_b8() {
     test_support::assert_accepts_la(
         "functio f(octeti b) → vacuum {
-    itera ex b fixum x {
-        fixum b8 y ← x
+    itera ex b sit x {
+        sit b8 y ← x
         nota y
     }
 }",
@@ -242,7 +242,7 @@ fn octeti_is_exactly_lista_b8() {
 fn textus_cursor_is_not_cursor_of_ascii_one() {
     test_support::assert_rejects_with_issue_la(
         "functio f(textus s) → vacuum {
-    fixum cursor<ascii<1>> k ← s.cursor()
+    sit cursor<ascii<1>> k ← s.cursor()
     nota k
 }",
         INIT_MISMATCH,

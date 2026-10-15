@@ -9,12 +9,12 @@ import from "./server" server
 
 describe "server_construct" {
     test "Listener Incoming and Stream construct" {
-        const server.Listener listener ← server.Listener { handle = 2 }
-        const server.Incoming incoming ← server.Incoming {
+        let server.Listener listener ← server.Listener { handle = 2 }
+        let server.Incoming incoming ← server.Incoming {
             id = "http-1",
             connection = 4
         }
-        const server.Stream stream ← server.Stream { writer = 8 }
+        let server.Stream stream ← server.Stream { writer = 8 }
         assert listener.handle ≡ 2
         assert incoming.id ≡ "http-1"
         assert incoming.connection ≡ 4

@@ -23,10 +23,10 @@ fn english_module_prints_true_false_none_through_the_runner() {
 locale = "en"
 +++
 main {
-    const bool yes ← true
+    let bool yes ← true
     print yes
     print not yes
-    const int ∪ none absent ← null
+    let int ∪ none absent ← null
     print absent
 }
 "#;
@@ -39,11 +39,11 @@ fn latin_module_prints_verum_falsum_nihil_through_the_runner() {
 locale = "la"
 +++
 incipit {
-    fixum bivalens ita ← verum
+    sit bivalens ita ← verum
     nota ita
-    fixum bivalens non_ita ← falsum
+    sit bivalens non_ita ← falsum
     nota non_ita
-    fixum numerus ∪ nihil absens ← nulla
+    sit numerus ∪ nihil absens ← nulla
     nota absens
 }
 "#;
@@ -56,7 +56,7 @@ fn english_multi_argument_print_prints_none_through_the_tokens() {
 locale = "en"
 +++
 main {
-    const int ∪ none absent ← null
+    let int ∪ none absent ← null
     print 1, absent, true
 }
 "#;
@@ -69,7 +69,7 @@ fn latin_multi_argument_print_prints_nihil() {
 locale = "la"
 +++
 incipit {
-    fixum numerus ∪ nihil absens ← nulla
+    sit numerus ∪ nihil absens ← nulla
     nota 1, absens, verum
 }
 "#;

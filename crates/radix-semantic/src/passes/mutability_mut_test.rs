@@ -72,12 +72,12 @@ incipit {
 fn mut_param_does_not_warn_as_a_local() {
     let result = analyze_ok_la(
         r"
-functio poke(in lista<numerus> xs) → vacuum {
+functio poke(varia lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
-    poke(in a)
+    poke(varia a)
 }
 ",
     );
@@ -166,7 +166,7 @@ fn ref_local_then_mut_local_conflicts() {
         r"
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
-    fixum de lista<numerus> r ← a
+    sit de lista<numerus> r ← a
     varia in lista<numerus> b ← a
     nota r.longitudo()
     nota b.longitudo()
@@ -180,26 +180,26 @@ incipit {
 fn overlapping_mut_args_conflict() {
     assert_rejects_with_issue_la(
         r"
-functio swap(in lista<numerus> a, in lista<numerus> b) → vacuum {
+functio swap(varia lista<numerus> a, varia lista<numerus> b) → vacuum {
     a.appende(1)
     b.appende(2)
 }
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    swap(in xs, in xs)
+    swap(varia xs, varia xs)
 }
 ",
         "mutable_borrow_conflict",
     );
     assert_language_rejects(
         r"
-functio swap(in lista<numerus> a, in lista<numerus> b) → vacuum {
+functio swap(varia lista<numerus> a, varia lista<numerus> b) → vacuum {
     a.appende(1)
     b.appende(2)
 }
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    swap(in xs, in xs)
+    swap(varia xs, varia xs)
 }
 ",
         "mutable_borrow_conflict",
@@ -210,12 +210,12 @@ incipit {
 fn sequential_mut_param_use_stays_legal() {
     let _ = analyze_ok_la(
         r"
-functio poke(in lista<numerus> xs) → vacuum {
+functio poke(varia lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
-    poke(in a)
+    poke(varia a)
     nota a.longitudo()
 }
 ",
@@ -264,15 +264,15 @@ incipit {
 }
 
 const MUT_SCALAR_SWAP: &str = r"
-functio swap(in numerus a, in numerus b) → vacuum {
-    fixum numerus held ← a
+functio swap(varia numerus a, varia numerus b) → vacuum {
+    sit numerus held ← a
     a ← b
     b ← held
 }
 incipit {
     varia numerus x ← 1
     varia numerus y ← 2
-    swap(in x, in y)
+    swap(varia x, varia y)
     nota x
     nota y
 }
@@ -283,14 +283,14 @@ fn scalar_assignment_between_mut_params_retains_no_borrow() {
     let _ = analyze_ok_la(MUT_SCALAR_SWAP);
     assert_language_accepts(MUT_SCALAR_SWAP);
     let source = r"
-functio copy_then_set(in numerus a, in numerus b) → vacuum {
+functio copy_then_set(varia numerus a, varia numerus b) → vacuum {
     a ← b
     b ← 9
 }
 incipit {
     varia numerus x ← 1
     varia numerus y ← 2
-    copy_then_set(in x, in y)
+    copy_then_set(varia x, varia y)
 }
 ";
     let _ = analyze_ok_la(source);
@@ -300,8 +300,8 @@ incipit {
 #[test]
 fn three_mut_scalar_param_rotation_retains_no_borrow() {
     let source = r"
-functio rotate(in numerus a, in numerus b, in numerus c) → vacuum {
-    fixum numerus held ← a
+functio rotate(varia numerus a, varia numerus b, varia numerus c) → vacuum {
+    sit numerus held ← a
     a ← b
     b ← c
     c ← held
@@ -310,7 +310,7 @@ incipit {
     varia numerus x ← 1
     varia numerus y ← 2
     varia numerus z ← 3
-    rotate(in x, in y, in z)
+    rotate(varia x, varia y, varia z)
 }
 ";
     let _ = analyze_ok_la(source);
@@ -320,14 +320,14 @@ incipit {
 #[test]
 fn passing_one_scalar_variable_to_two_mut_params_still_conflicts() {
     let source = r"
-functio swap(in numerus a, in numerus b) → vacuum {
-    fixum numerus held ← a
+functio swap(varia numerus a, varia numerus b) → vacuum {
+    sit numerus held ← a
     a ← b
     b ← held
 }
 incipit {
     varia numerus x ← 1
-    swap(in x, in x)
+    swap(varia x, varia x)
 }
 ";
     assert_rejects_with_issue_la(source, "mutable_borrow_conflict");
@@ -338,12 +338,12 @@ incipit {
 fn borrow_conflict_names_the_place_whose_borrow_is_live() {
     let result = analyze_source_la(
         r"
-functio swap(in numerus a, in numerus b) → vacuum {
+functio swap(varia numerus a, varia numerus b) → vacuum {
     a ← b
 }
 incipit {
     varia numerus x ← 1
-    swap(in x, in x)
+    swap(varia x, varia x)
 }
 ",
     );
@@ -363,12 +363,12 @@ incipit {
 #[test]
 fn narrower_cell_passed_to_wider_mut_param_is_rejected() {
     let source = r"
-functio setit(in numerus x) → vacuum {
+functio setit(varia numerus x) → vacuum {
     x ← 300
 }
 incipit {
     varia u8 small ← 7
-    setit(in small)
+    setit(varia small)
     nota small
 }
 ";
@@ -379,24 +379,24 @@ incipit {
 fn exact_width_cell_passed_to_mut_param_is_accepted() {
     let _ = analyze_ok_la(
         r"
-functio setit(in u8 x) → vacuum {
+functio setit(varia u8 x) → vacuum {
     x ← 200
 }
 incipit {
     varia u8 small ← 7
-    setit(in small)
+    setit(varia small)
     nota small
 }
 ",
     );
     let _ = analyze_ok_la(
         r"
-functio setit(in numerus x) → vacuum {
+functio setit(varia numerus x) → vacuum {
     x ← 300
 }
 incipit {
     varia numerus big ← 7
-    setit(in big)
+    setit(varia big)
     nota big
 }
 ",

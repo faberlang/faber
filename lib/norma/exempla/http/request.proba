@@ -7,7 +7,7 @@ import from "norma:http/request" request
 
 describe "request_import" {
     test "Request constructs" {
-        const request.Request r ← request.Request {
+        let request.Request r ← request.Request {
             method = "GET",
             path = "/health",
             query = "",

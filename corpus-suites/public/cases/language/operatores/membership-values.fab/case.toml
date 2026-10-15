@@ -6,4 +6,5 @@ input = "operatores/membership-values.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

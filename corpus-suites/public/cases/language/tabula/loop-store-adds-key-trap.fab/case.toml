@@ -6,7 +6,8 @@ input = "tabula/loop-store-adds-key-trap.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false
 
 [targets.runner]
 outcome = "pass"

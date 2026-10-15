@@ -45,8 +45,8 @@ fn cycle_warnings(source: &str) -> Vec<(String, String)> {
 fn sermo_close_defaults_on_failure() {
     test_support::assert_accepts_la(
         "incipit {\n\
-         fixum sermo s ← ad 'runtime:echo' (\"x\")\n\
-         fixum bivalens clausa ← s.close() ⊥ falsum\n\
+         sit sermo s ← ad 'runtime:echo' (\"x\")\n\
+         sit bivalens clausa ← s.close() ⊥ falsum\n\
          nota clausa\n\
          }\n",
     );
@@ -61,7 +61,7 @@ fn typed_sermo_close_propagates_textus() {
          redde s.close()\n\
          }\n\
          incipit {\n\
-         fixum _ s ← ad 'numeri:bis' (2)\n\
+         sit s ← ad 'numeri:bis' (2)\n\
          nota finis(s) ⊥ falsum\n\
          }\n",
     );
@@ -72,8 +72,8 @@ fn sermo_close_needs_an_error_sink() {
     test_support::assert_rejects_with_issue_la(
         // D17.8: `incipit` (main) is exempt; the rule applies in a helper.
         "functio g() → vacuum {\n\
-         fixum sermo s ← ad 'runtime:echo' (\"x\")\n\
-         fixum bivalens clausa ← s.close()\n\
+         sit sermo s ← ad 'runtime:echo' (\"x\")\n\
+         sit bivalens clausa ← s.close()\n\
          }\n",
         "failable_call_requires_handler",
     );
@@ -83,8 +83,8 @@ fn sermo_close_needs_an_error_sink() {
 fn sermo_close_takes_no_arguments() {
     test_support::assert_rejects_with_issue_la(
         "incipit {\n\
-         fixum sermo s ← ad 'runtime:echo' (\"x\")\n\
-         fixum bivalens clausa ← s.close(1) ⊥ falsum\n\
+         sit sermo s ← ad 'runtime:echo' (\"x\")\n\
+         sit bivalens clausa ← s.close(1) ⊥ falsum\n\
          }\n",
         "method_accepts_no_arguments",
     );
@@ -94,7 +94,7 @@ fn sermo_close_takes_no_arguments() {
 fn sermo_satisfies_the_closing_contract() {
     test_support::assert_accepts_la(&with_closable(
         "incipit {\n\
-         fixum sermo s ← ad 'runtime:echo' (\"x\")\n\
+         sit sermo s ← ad 'runtime:echo' (\"x\")\n\
          nota claude(s) ⊥ falsum\n\
          }\n",
     ));
@@ -124,7 +124,7 @@ fn closing_mark_requires_the_close_shape() {
 #[test]
 fn sermo_field_on_a_cycle_warns() {
     let warnings = cycle_warnings(
-        "genus Nodus {\n    varia Nodus ∪ nihil sequens\n    varia sermo canalis\n}\nincipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+        "genus Nodus {\n    varia Nodus ∪ nihil sequens\n    varia sermo canalis\n}\nincipit {\n    sit sermo s ← ad 'runtime:echo' (1)\n}\n",
     );
     assert_eq!(warnings, vec![("Nodus".to_owned(), "canalis".to_owned())]);
 }
@@ -133,7 +133,7 @@ fn sermo_field_on_a_cycle_warns() {
 fn sermo_list_on_a_mutual_cycle_warns() {
     let warnings = cycle_warnings(
         "genus A {\n    varia B ∪ nihil b\n    varia lista<sermo> canales\n}\n\
-         genus B {\n    varia lista<A> filii\n}\nincipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+         genus B {\n    varia lista<A> filii\n}\nincipit {\n    sit sermo s ← ad 'runtime:echo' (1)\n}\n",
     );
     assert_eq!(warnings, vec![("A".to_owned(), "canales".to_owned())]);
 }
@@ -141,7 +141,7 @@ fn sermo_list_on_a_mutual_cycle_warns() {
 #[test]
 fn sermo_field_off_a_cycle_does_not_warn() {
     let warnings = cycle_warnings(
-        "genus Piscina {\n    varia tabula<textus, sermo> canales\n}\nincipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+        "genus Piscina {\n    varia tabula<textus, sermo> canales\n}\nincipit {\n    sit sermo s ← ad 'runtime:echo' (1)\n}\n",
     );
     assert!(warnings.is_empty(), "{warnings:?}");
 }
@@ -165,7 +165,7 @@ fn closable_held_through_a_plain_genus_on_a_cycle_warns() {
     let warnings = cycle_warnings(
         "genus Tenens {\n    varia sermo canalis\n}\n\
          genus Nodus {\n    varia Nodus ∪ nihil sequens\n    varia Tenens t\n}\n\
-         incipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+         incipit {\n    sit sermo s ← ad 'runtime:echo' (1)\n}\n",
     );
     assert_eq!(warnings, vec![("Nodus".to_owned(), "t".to_owned())]);
 }
@@ -177,7 +177,7 @@ fn closable_held_through_a_struct_that_is_itself_cyclic_warns_once() {
     let warnings = cycle_warnings(
         "genus A {\n    varia B ∪ nihil b\n}\n\
          genus B {\n    varia A ∪ nihil a\n    varia sermo canalis\n}\n\
-         incipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+         incipit {\n    sit sermo s ← ad 'runtime:echo' (1)\n}\n",
     );
     assert_eq!(warnings, vec![("B".to_owned(), "canalis".to_owned())]);
 }
@@ -187,7 +187,7 @@ fn failable_promissum_of_a_sermo_on_a_cycle_warns() {
     // A-195: `promissum<T ⇥ E>` is `PromissumFailable`, not `Promissum`.
     let warnings = cycle_warnings(
         "genus Nodus {\n    varia Nodus ∪ nihil sequens\n    varia promissum<sermo ⇥ textus> f\n}\n\
-         incipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+         incipit {\n    sit sermo s ← ad 'runtime:echo' (1)\n}\n",
     );
     assert_eq!(warnings, vec![("Nodus".to_owned(), "f".to_owned())]);
 }
@@ -196,7 +196,7 @@ fn failable_promissum_of_a_sermo_on_a_cycle_warns() {
 fn infallible_promissum_of_a_sermo_on_a_cycle_warns() {
     let warnings = cycle_warnings(
         "genus Nodus {\n    varia Nodus ∪ nihil sequens\n    varia promissum<sermo> f\n}\n\
-         incipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+         incipit {\n    sit sermo s ← ad 'runtime:echo' (1)\n}\n",
     );
     assert_eq!(warnings, vec![("Nodus".to_owned(), "f".to_owned())]);
 }

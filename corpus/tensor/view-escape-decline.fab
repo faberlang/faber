@@ -15,7 +15,7 @@ fn escape(ref tf32[2, 2] base) → tf32[2, 2] {
 }
 
 fn mutable_view(ref tf32[2, 2] base) → void {
-    var tf32[1, 2] view ← base.slice(0, 1)
+    mut tf32[1, 2] view ← base.slice(0, 1)
 }
 
 main {}

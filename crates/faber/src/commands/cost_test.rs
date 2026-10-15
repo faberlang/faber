@@ -184,8 +184,8 @@ fn folded() → int ⇥ string {
 }
 
 fn hot_cast(int n) → float {
-    var _ i ← 0
-    var _ acc ← 0.0
+    mut _ i ← 0
+    mut _ acc ← 0.0
     while i ≺ n {
         acc ← acc + (n ↦ float)
         i ← i + 1
@@ -195,13 +195,13 @@ fn hot_cast(int n) → float {
 
 main {
     do {
-        const float a ← as_float(1)
-        const int b ← parse_int("7")
-        const regex r ← compile_re("x")
-        const json j ← encode({ "k": 1 } ↦ value)
-        const bool flag ← as_flag("x")
-        const int f ← folded()
-        const float h ← hot_cast(2)
+        let float a ← as_float(1)
+        let int b ← parse_int("7")
+        let regex r ← compile_re("x")
+        let json j ← encode({ "k": 1 } ↦ value)
+        let bool flag ← as_flag("x")
+        let int f ← folded()
+        let float h ← hot_cast(2)
         print a
         print b
         print r

@@ -464,6 +464,15 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
         println!("{result}");
     }
     let status = summary_status(passed + rejected, expected_failures, failed);
+    // WHY: harnesses and unit proofs grep leg logs for `failed: <n>`; the
+    // compact JSON summary cannot carry that literal. stdout is a JSON-lines
+    // stream that parsers consume line by line, so the human summary goes to
+    // stderr and stdout stays pure JSON.
+    eprintln!(
+        "corpus {} summary: {} case(s): {passed} passed, {rejected} rejected, {expected_failures} expected-fail, {not_applicable} not-applicable, failed: {failed} [{status}]",
+        args.target,
+        suite.cases.len()
+    );
     println!(
         "{}",
         json!({

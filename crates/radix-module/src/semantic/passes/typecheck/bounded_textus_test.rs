@@ -46,8 +46,8 @@ fn bounded_textus_conversions_follow_d7() {
         r"typus TextusOcto = textus<8>
 
 functio bridges(textus<8> bounded, textus unbounded) → vacuum {
-    fixum textus widened ← bounded ↦ textus
-    fixum TextusOcto narrowed ← unbounded ↦ TextusOcto
+    sit textus widened ← bounded ↦ textus
+    sit TextusOcto narrowed ← unbounded ↦ TextusOcto
     nota widened
     nota narrowed
 }
@@ -62,8 +62,11 @@ incipit {
     );
 }
 
+/// TypeScript carries bounded text as the plain string with the capacity erased
+/// at the type and checked at conversions.
+#[cfg(feature = "hir-ts")]
 #[test]
-fn bounded_textus_rejects_non_rust_targets_fail_closed() {
+fn bounded_textus_is_carried_on_typescript() {
     let source = r"functio probe(textus<32> xs) → ascii<1> {
     redde xs[0]
 }
@@ -71,18 +74,20 @@ fn bounded_textus_rejects_non_rust_targets_fail_closed() {
 incipit {
     nota 0
 }";
-    for target in [Target::HirTypeScript] {
-        let result = compile_for_target_and_get_result_la(source, target);
-        assert!(!result.success(), "target {target:?} must reject bounded textus");
-        assert!(
-            result
-                .diagnostics
-                .iter()
-                .any(|diagnostic| { diagnostic.is_error() && diagnostic.issue().is_some() }),
-            "target {target:?} must carry a structured error: {:?}",
-            result.diagnostics
-        );
-    }
+    let result = compile_for_target_and_get_result_la(source, Target::HirTypeScript);
+    assert!(
+        result.success(),
+        "TypeScript must carry bounded textus: {:?}",
+        result.diagnostics
+    );
+    let emitted = match &result.output {
+        Some(crate::Output::TypeScript(output)) => output.code.as_str(),
+        _ => "",
+    };
+    assert!(
+        emitted.contains("p_xs: string"),
+        "bounded textus must be the string carrier: {emitted}"
+    );
 }
 
 /// Go carries bounded text as plain Go text with the capacity erased at the

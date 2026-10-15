@@ -30,26 +30,26 @@ locale = "en"
 # Numeric/tensor modules may use lf32/lu32 sugar; see docs/design/numeric-type-sugar.md.
 #
 # lista<T> nomen ← vacua        -- typed empty collection (forma innata)
-# fixum _ nomen ← [elem, …]     -- list literal
+# sit nomen ← [elem, …]     -- list literal
 # [sparge expr, …]              -- splice into literal
 #
 # GRAMMAR:
-#   listDecl :← ('varia' | 'fixum') 'lista<' type '>' ident '←' expr
+#   listDecl :← ('varia' | 'sit') 'lista<' type '>' ident '←' expr
 #   listLit  :← '[' (expr | sparge)* ']'
 #
 # EXPECTED OUTPUT:
 #   Scalar longitudo() and indexed accipe only (lista.expected).
 
 main {
-    const list<int> vacuares ← empty
-    const _ numeri ← [1, 2, 3, 4, 5]
-    const _ nomina ← ["Marcus", "Julia", "Gaius"]
-    const _ vexilla ← [true, false, true]
-    const _ matrix ← [[1, 2], [3, 4], [5, 6]]
-    const list<int> primum ← [1, 2, 3]
-    const list<int> secundum ← [4, 5, 6]
-    const _ coniuncta ← [spread primum, spread secundum]
-    const _ aucta ← [0, spread primum, 99]
+    let list<int> vacuares ← empty
+    let numeri ← [1, 2, 3, 4, 5]
+    let nomina ← ["Marcus", "Julia", "Gaius"]
+    let vexilla ← [true, false, true]
+    let matrix ← [[1, 2], [3, 4], [5, 6]]
+    let list<int> primum ← [1, 2, 3]
+    let list<int> secundum ← [4, 5, 6]
+    let coniuncta ← [spread primum, spread secundum]
+    let aucta ← [0, spread primum, 99]
     print vacuares.length()
     print numeri.length()
     print numeri[0]

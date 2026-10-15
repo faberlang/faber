@@ -1,3 +1,4 @@
+use crate::script::source_declares_cli_entry;
 use crate::script::source_declares_non_kernel_import;
 use crate::script::{
     BufferHost, RunSourceError, interpret_source, print_run_source_error, run_named, run_source,
@@ -46,6 +47,28 @@ main {
     .expect("embed run succeeds");
     assert_eq!(status, ExitCode::SUCCESS);
     assert_eq!(host.stdout_lines, vec!["salve".to_owned()]);
+}
+
+#[test]
+fn bounded_lista_for_ref_runs_indices_end_to_end() {
+    let mut host = BufferHost::default();
+    let status = run_source(
+        r#"
+main {
+    let list<int, 3> numeri ← [10, 20, 30]
+    for ref numeri let index {
+        print index
+    }
+}
+"#,
+        &mut host,
+    )
+    .expect("bounded lista for ref run succeeds");
+    assert_eq!(status, ExitCode::SUCCESS);
+    assert_eq!(
+        host.stdout_lines,
+        vec!["0".to_owned(), "1".to_owned(), "2".to_owned()]
+    );
 }
 
 #[test]
@@ -162,9 +185,9 @@ fn lane(vector<f32, 3> v, int i) → f32 {
 }
 
 main {
-    const vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    var f32 sum ← 0.0
-    var int i ← 0
+    let vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    mut f32 sum ← 0.0
+    mut int i ← 0
     while i ≺ 3 {
         sum ← sum + lane(v, i)
         i ← i + 1
@@ -183,7 +206,7 @@ fn item(list<f32> xs, int i) → f32 {
 }
 
 main {
-    const list<f32> xs ← [1.0, 2.0, 3.0]
+    let list<f32> xs ← [1.0, 2.0, 3.0]
     print item(xs, 3)
 }
 ",
@@ -209,4 +232,35 @@ fn source_declares_non_kernel_import_classifies_imports() {
         "<source>",
         "main { print 1 }\n"
     ));
+}
+
+#[test]
+fn source_declares_cli_entry_classifies_sources() {
+    // Sugared `@ cli "tool"` on the en surface.
+    assert!(source_declares_cli_entry(
+        "<source>",
+        "\n@ cli \"tool\"\nincipit {}\n"
+    ));
+    // Braced form on the pack-less (Latin) surface.
+    assert!(source_declares_cli_entry(
+        "<source>",
+        "\n@ cli { nomen = \"tool\" }\nincipit {}\n"
+    ));
+    // No `@ cli` root: not a CLI program.
+    assert!(!source_declares_cli_entry("<source>", "\nincipit {}\n"));
+    // A comment-only mention is not an annotation.
+    assert!(!source_declares_cli_entry(
+        "<source>",
+        "\n# @ cli mention\nincipit {}\n"
+    ));
+}
+
+#[test]
+fn run_named_binds_cli_operands_for_single_file_source() {
+    const SOURCE: &str = "+++\nlocale = \"en\"\n+++\n\n@ cli \"greeter\"\n@ operand string who\nmain args args {\n  print args.who\n}\n";
+    let mut host = BufferHost::with_argumenta(vec!["Anna".to_owned()]);
+    let status =
+        run_named("cli-tool.fab", SOURCE, &mut host).expect("cli single-file run succeeds");
+    assert_eq!(status, ExitCode::SUCCESS);
+    assert_eq!(host.stdout_lines, vec!["Anna".to_owned()]);
 }

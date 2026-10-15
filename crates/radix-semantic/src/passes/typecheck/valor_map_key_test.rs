@@ -8,8 +8,8 @@ use crate::passes::typecheck::test_support;
 fn valor_to_map_with_int_key_is_rejected() {
     test_support::assert_rejects_with_issue_la(
         r#"incipit {
-  fixum valor v ← { "a": 1 } ↦ valor
-  fixum tabula<numerus, textus> m ← v ↦ tabula<numerus, textus>
+  sit valor v ← { "a": 1 } ↦ valor
+  sit tabula<numerus, textus> m ← v ↦ tabula<numerus, textus>
 }"#,
         "conversio_map_key_not_textus",
     );
@@ -19,8 +19,8 @@ fn valor_to_map_with_int_key_is_rejected() {
 fn map_with_int_key_to_value_is_rejected() {
     test_support::assert_rejects_with_issue_la(
         r"incipit {
-  fixum tabula<numerus, textus> m ← vacua
-  fixum valor v ← m ↦ valor
+  sit tabula<numerus, textus> m ← vacua
+  sit valor v ← m ↦ valor
 }",
         "conversio_map_key_not_textus",
     );
@@ -30,8 +30,8 @@ fn map_with_int_key_to_value_is_rejected() {
 fn valor_to_map_with_text_key_checks() {
     test_support::assert_accepts_la(
         r#"incipit {
-  fixum valor v ← { "a": 1 } ↦ valor
-  fixum tabula<textus, numerus> m ← v ↦ tabula<textus, numerus>
+  sit valor v ← { "a": 1 } ↦ valor
+  sit tabula<textus, numerus> m ← v ↦ tabula<textus, numerus>
 }"#,
     );
 }
@@ -40,8 +40,8 @@ fn valor_to_map_with_text_key_checks() {
 fn valor_to_nested_map_with_int_key_is_rejected() {
     test_support::assert_rejects_with_issue_la(
         r#"incipit {
-  fixum valor v ← { "a": 1 } ↦ valor
-  fixum lista<tabula<numerus, textus>> m ← v ↦ lista<tabula<numerus, textus>>
+  sit valor v ← { "a": 1 } ↦ valor
+  sit lista<tabula<numerus, textus>> m ← v ↦ lista<tabula<numerus, textus>>
 }"#,
         "conversio_map_key_not_textus",
     );

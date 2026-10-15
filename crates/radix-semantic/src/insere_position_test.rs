@@ -112,7 +112,7 @@ fn block_level_octeti_embed_folds_to_raw_bytes() {
 
 #[test]
 fn every_field_modifier_default_embed_folds() {
-    for modifier in ["fixum", "varia", "generis"] {
+    for modifier in ["sit", "varia", "fixum"] {
         let source = format!("genus G {{\n    {modifier} textus s = insere \"n.txt\"\n}}\n");
         let found = survivors(&source, text_config());
         assert_folded_text(&found, modifier);
@@ -156,7 +156,7 @@ fn embed_outside_a_constant_initializer_is_rejected() {
     for body in [
         "nota insere \"n.txt\"",
         "varia textus x ← \"a\"\n    x ← insere \"n.txt\"",
-        "fixum textus x ← insere \"n.txt\"",
+        "sit textus x ← insere \"n.txt\"",
     ] {
         let source = format!("incipit {{\n    {body}\n}}\n");
         rejects_with(&source, text_config(), "insere_outside_constant");

@@ -22,9 +22,9 @@ fn nexum_field_reports_nexum_removed() {
 }
 
 #[test]
-fn nexum_after_generis_reports_nexum_removed() {
+fn nexum_after_fixum_reports_nexum_removed() {
     assert_parse_error_matches(
-        "genus Animal {\n    generis nexum textus nomen = \"leo\"\n}",
+        "genus Animal {\n    fixum nexum textus nomen = \"leo\"\n}",
         ParseExpectation::Args(&[("issue", "nexum_removed")]),
     );
 }
@@ -47,6 +47,6 @@ fn nexum_is_an_ordinary_identifier_elsewhere() {
     };
     assert_eq!(class.members.len(), 2);
     assert!(matches!(class.members[0].kind, ClassMemberKind::Field(_)));
-    let bindings = parse_ok("fixum _ nexum ← 5\nfixum _ alius ← nexum\n");
+    let bindings = parse_ok("sit nexum ← 5\nsit alius ← nexum\n");
     assert_eq!(bindings.program.expect("program").statements.len(), 2);
 }

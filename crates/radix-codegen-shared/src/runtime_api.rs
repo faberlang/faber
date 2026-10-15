@@ -635,6 +635,7 @@ const fn format_row(
 /// into a bounded cell.
 pub const FORMAT_FMT: RuntimeItem = format_row("Fmt", RuntimeKind::Type, FORMAT_RUST);
 pub const FORMAT_SPEC: RuntimeItem = format_row("Spec", RuntimeKind::Type, FORMAT_GO);
+pub const FORMAT_DECIMAL: RuntimeItem = format_row("decimal", RuntimeKind::Fn, FORMAT_RUST_GO);
 pub const FORMAT_FLOAT: RuntimeItem = format_row("float", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
 pub const FORMAT_INSTANS: RuntimeItem = format_row("instans", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
 pub const FORMAT_INT: RuntimeItem = format_row("int", RuntimeKind::Fn, FORMAT_RUST_GO_TS);
@@ -742,6 +743,10 @@ pub const ORDER_COMPARE: RuntimeItem = RuntimeItem {
     kind: RuntimeKind::Fn,
     targets: CARRIER_GO_TS,
 };
+/// `order.float_less`: whether one float sorts before another in the total
+/// order (NaN last, `-0` before `+0`), the test a sort of floats uses.
+pub const ORDER_FLOAT_LESS: RuntimeItem =
+    carrier_row(Namespace::Order, "float_less", RuntimeKind::Fn);
 /// `order.equal`: the structural `≡` / `≢` over a genus (a Go `*Name` compares
 /// by identity under `==`), a list, map, set, tuple or optional of one.
 pub const ORDER_EQUAL: RuntimeItem = carrier_row(Namespace::Order, "equal", RuntimeKind::Fn);
@@ -855,6 +860,26 @@ pub const TRAP_TEXT_WINDOW: RuntimeItem = RuntimeItem {
     kind: RuntimeKind::Fn,
     targets: &[Target::HirGo],
 };
+
+/// `text` rows (Go): the text operations whose Go standard-library spelling
+/// differs from the MIR runner's, so they are runtime helpers. `split` keeps the
+/// empty pieces around an empty separator; `parse_float` takes the runner's
+/// float grammar and `float` renders a float as plain digits; `upper` and `lower` apply the full
+/// Unicode case mapping (`ß` to `SS`, the final sigma).
+const fn text_row(name: &'static str) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Text,
+        name,
+        kind: RuntimeKind::Fn,
+        targets: &[Target::HirGo],
+    }
+}
+
+pub const TEXT_SPLIT: RuntimeItem = text_row("split");
+pub const TEXT_UPPER: RuntimeItem = text_row("upper");
+pub const TEXT_LOWER: RuntimeItem = text_row("lower");
+pub const TEXT_PARSE_FLOAT: RuntimeItem = text_row("parse_float");
+pub const TEXT_FLOAT: RuntimeItem = text_row("float");
 
 /// The property a thrown TypeScript assertion failure carries. It is a marker
 /// on the thrown `Error`, not a runtime helper, so it has no table row; the
@@ -1260,6 +1285,7 @@ pub const TABLE: &[RuntimeItem] = &[
     INF_CLAMP,
     FORMAT_FMT,
     FORMAT_SPEC,
+    FORMAT_DECIMAL,
     FORMAT_FLOAT,
     FORMAT_INSTANS,
     FORMAT_INT,
@@ -1292,6 +1318,7 @@ pub const TABLE: &[RuntimeItem] = &[
     SPARSA_NEW,
     ORDER_ORDER,
     ORDER_COMPARE,
+    ORDER_FLOAT_LESS,
     ORDER_EQUAL,
     ORDER_TEXT_COMPARE,
     DUP_DUPLICATE,
@@ -1326,6 +1353,11 @@ pub const TABLE: &[RuntimeItem] = &[
     SERMO_DRAIN,
     SERMO_READ_LINE,
     TRAP_TEXT_WINDOW,
+    TEXT_SPLIT,
+    TEXT_UPPER,
+    TEXT_LOWER,
+    TEXT_PARSE_FLOAT,
+    TEXT_FLOAT,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,
@@ -1393,11 +1425,12 @@ pub enum Namespace {
     Gen,
     Float,
     Trap,
+    Text,
 }
 
 impl Namespace {
     /// Every namespace, in declaration order.
-    pub const ALL: [Namespace; 26] = [
+    pub const ALL: [Namespace; 27] = [
         Namespace::Exact,
         Namespace::Dec,
         Namespace::Inf,
@@ -1424,6 +1457,7 @@ impl Namespace {
         Namespace::Gen,
         Namespace::Float,
         Namespace::Trap,
+        Namespace::Text,
     ];
 
     /// The `lower_snake_case` spelling of the namespace.
@@ -1456,6 +1490,7 @@ impl Namespace {
             Namespace::Gen => "gen",
             Namespace::Float => "float",
             Namespace::Trap => "trap",
+            Namespace::Text => "text",
         }
     }
 }

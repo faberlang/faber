@@ -16,7 +16,7 @@ sit = "設為"
 typus = "型別"
 schema = "結構"
 columna = "欄位"
-varia = "變值"
+varia = "可變"
 ceteri = "其餘"
 errata = "錯誤"
 exitus = "出口"
@@ -95,7 +95,7 @@ maxima = "最大"
 minima = "最小"
 de = "從"
 ex = "取自"
-in = "傳入"
+in = "可變"
 own = "擁有"
 copy = "拷貝"
 axis = "軸"
@@ -252,6 +252,14 @@ help = "在行尾或檔案結束前結束字串字面值"
 message = "未結束的 octeti 字面值"
 help = "在行尾或檔案結束前結束字串字面值"
 
+[diagnostics.LEX001.issues.unterminated_regex_literal]
+message = "未結束的 regex 字面值"
+help = "在行尾或檔案結束前結束 regex 字面值"
+
+[diagnostics.LEX001.issues.empty_regex_literal]
+message = "空的 regex 字面值；請在斜線之間寫出模式"
+help = "在斜線之間寫出模式"
+
 [diagnostics.LEX001.issues.unterminated_string_literal]
 message = "未結束的字串字面值"
 help = "在行尾或檔案結束前結束字串字面值"
@@ -287,6 +295,14 @@ help = "檢查數字分隔符和進位前綴"
 [diagnostics.LEX002.issues.invalid_integer]
 message = "無效整數"
 help = "檢查數字分隔符和進位前綴"
+
+[diagnostics.LEX002.issues.float_overflow]
+message = "浮點字面量過大；會溢位為無限大"
+help = "寫一個更小的數量級，或縮放單位"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "浮點字面量過小；會下溢為零"
+help = "寫一個更大的數量級，或縮放單位"
 
 [diagnostics.LEX003]
 message = "無效跳脫序列"
@@ -340,6 +356,22 @@ help = "先修正詞法分析器錯誤；剖析會從乾淨的標記繼續"
 message = "需要標記"
 help = "確保此位置存在預期的標記"
 
+[diagnostics.PARSE001.issues.copy_into_value_expected]
+message = "複製入運算子 `{operator}` 後需要一個值"
+help = "在 `⇇` 之後寫來源運算式"
+
+[diagnostics.PARSE001.issues.duplicate_tuple_element_label]
+message = "元組元素標籤 `{label}` 被使用了多次"
+help = "為每個元素取不同的標籤，或去掉標籤"
+
+[diagnostics.PARSE001.issues.implements_slot_requires_name]
+message = "implements 槽位必須命名一個契約；`_` 不是一致性宣告"
+help = "在 implements 子句中寫契約名"
+
+[diagnostics.PARSE001.issues.import_field_name]
+message = "匯入欄位必須是識別碼"
+help = "為匯入的欄位寫一個普通名稱"
+
 [diagnostics.PARSE001.issues.annotation_name]
 message = "需要註解名稱"
 help = "在 @ 後加入註解名稱"
@@ -371,10 +403,6 @@ help = "只保留一個 '{keyword}' rest 綁定"
 [diagnostics.PARSE001.issues.sit_identifier_binding]
 message = "'{keyword}' 直接綁定一個識別符；請使用 '{keyword}' name ← expr"
 help = "寫成 '{keyword}' name ← expr，或對具型別／解構綁定使用 fixum"
-
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit 不支援解構模式"
-help = "對解構模式使用 fixum"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "需要測試案例或 setup"
@@ -472,6 +500,50 @@ help = "在項目之間加逗號（模式之間用 '{et}'）"
 message = "列表不得在結束定界符之前以逗號結尾"
 help = "刪除結束定界符之前的逗號"
 
+[diagnostics.PARSE001.issues.expected_identifier]
+message = "需要識別符"
+help = "在此處寫入識別符名稱"
+
+[diagnostics.PARSE001.issues.expected_string_literal]
+message = "需要字串字面值"
+help = "在此處寫入帶引號的字串字面值"
+
+[diagnostics.PARSE001.issues.expected_mutability_keyword]
+message = "需要 '{fixum}' 或 '{varia}'"
+help = "用可變性關鍵字開始該宣告"
+
+[diagnostics.PARSE001.issues.await_binding_requires_name]
+message = "'↢' 之前需要具名綁定"
+help = "把 '↢' 綁定到單一名稱；解構使用 '←'"
+
+[diagnostics.PARSE001.issues.expected_method_declaration]
+message = "需要方法宣告"
+help = "把方法寫成 '{functio}' 宣告"
+
+[diagnostics.PARSE001.issues.expected_praepara_hook]
+message = "需要 '{praepara}' 鉤子"
+help = "寫 '{praepara}'、'{praeparabit}'、'{postpara}' 或 '{postparabit}'"
+
+[diagnostics.PARSE001.issues.expected_lane_value]
+message = "需要字串字面值或識別符"
+help = "把 lane 值寫成帶引號的字串或裸名稱"
+
+[diagnostics.PARSE001.issues.expected_scribe_keyword]
+message = "需要 '{scribe}' 關鍵字"
+help = "寫 '{scribe}'、'{vide}'、'{mone}' 或 '{nota}'"
+
+[diagnostics.PARSE001.issues.expected_incipit_keyword]
+message = "需要 '{incipit}' 或 '{incipiet}'"
+help = "用 '{incipit}' 或 '{incipiet}' 開始進入點"
+
+[diagnostics.PARSE001.issues.enum_member_value_number]
+message = "'=' 之後需要數字"
+help = "在 '=' 之後寫整數，或刪除 '='"
+
+[diagnostics.PARSE001.issues.enum_member_value]
+message = "需要列舉成員值"
+help = "在 '=' 之後寫整數或字串"
+
 [diagnostics.PARSE002]
 message = "非預期標記"
 help = "刪除該標記，或將它移到正確位置"
@@ -511,6 +583,50 @@ help = "請在 genus 上宣告 method"
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "`{marker}` 標記不再放在繫結上，而是放在值上"
 help = "寫成 `{keyword} T {name} ← {marker} value`；之後的 `{name} ← {marker} value` 以相同方式標記值，而參數則將 `{marker}` 保留在其型別之前"
+
+[diagnostics.PARSE010.issues.runtime_const_retired]
+message = "執行期的 `{keyword}` 宣告已廢止；`{name}` 是執行期名稱"
+help = "寫成 `{sit} T {name} ← …`（或用 `{sit} {name} ← …` 推斷型別）；`{fixum}` 表示編譯期事實，與 `=` 搭配"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "`{keyword}` 繫結詞已廢止"
+help = "繫結名使用 `{sit}`（固定名稱）或 `{varia}`（可寫名稱）；`{fixum}` 表示編譯期事實，與 `=` 搭配"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` 不能引入繫結名"
+help = "繫結名對應每次迭代或匹配的值；固定名稱寫 `{sit}`，可寫名稱寫 `{varia}`"
+
+[diagnostics.PARSE010.issues.static_member_retired]
+message = "成員修飾詞 `{keyword}` 已移除；型別層級成員是常數"
+help = "寫 `{fixum} T NAME = …`；`{fixum}` 表示編譯期事實，類別成員同樣適用"
+
+[diagnostics.PARSE010.issues.const_member_requires_initializer]
+message = "`{fixum}` 成員需要編譯期的值"
+help = "寫 `{fixum} T NAME = value`；每個實例各有的欄位用 `{sit}` 或 `{varia}`"
+
+[diagnostics.PARSE010.issues.const_member_assign_initializer]
+message = "`{fixum}` 成員用 `=` 初始化，不用 `←`"
+help = "`=` 表示編譯期事實：寫 `{fixum} T NAME = value`"
+
+[diagnostics.PARSE010.issues.ref_field_refused]
+message = "`{keyword}` 不能修飾欄位"
+help = "欄位是唯讀（`{sit}`）或可寫（`{varia}`）；型別層級常數寫作 `{fixum} T X = …`"
+
+[diagnostics.PARSE010.issues.ref_local_requires_initializer]
+message = "`{keyword}` 區域變數需要一個可讀取的位置：`{keyword} T name ← place`"
+help = "寫成 `{keyword} T name ← place`，若不需要初始位置，請使用 `{sit}` 或 `{varia}`"
+
+[diagnostics.PARSE010.issues.ref_local_requires_name]
+message = "`{keyword}` 區域變數只繫結一個名稱，不能解構"
+help = "寫成 `{keyword} T name ← place`，再透過該名稱讀取各部分"
+
+[diagnostics.PARSE010.issues.ref_local_value_marker]
+message = "`{keyword}` 區域變數讀取的是位置，不能接受 `{marker}` 值"
+help = "要讀取位置，寫成 `{keyword} T name ← place`；要得到獨立的值，寫成 `{sit} T name ← {marker} place`"
+
+[diagnostics.PARSE010.issues.var_retired]
+message = "`{keyword}` 宣告詞已廢止；`{name}` 是可寫名稱"
+help = "寫成 `{varia} T {name} ← …`；可寫的執行期名稱用 `{varia}`"
 
 [diagnostics.PARSE011]
 message = "在 {functio} 後需要函式名稱"
@@ -1031,6 +1147,10 @@ help = "修正用於降階的 AST 結構"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "此註解沒有可附加的已降階敘述或項目"
 help = "修正用於降階的 AST 結構"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "`@ conversion` 函式必須恰好接受一個參數，並恰好宣告一個傳回型別"
+help = "為轉換對寫 `functio name(Source) → Destination`"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia 需要一個型別參數"
@@ -2604,6 +2724,10 @@ help = "明確轉換元素寬度，再變更表示法"
 message = "傳遞 conversio 失敗需要 `textus` 替代退出通道"
 help = "將替代退出通道宣告為 textus，或提供內嵌復原"
 
+[diagnostics.SEM016.issues.conversio_failure_channel_value_required]
+message = "傳遞 sermo 具現化失敗需要 `value` 替代退出通道"
+help = "將替代退出通道宣告為 value、unknown，或已註冊的 value 轉換"
+
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "regex 轉換需要 textus 或 ascii 運算元"
 help = "將 textus 或 ascii 值轉換為 regex"
@@ -2755,6 +2879,10 @@ help = "使用 `varia` binding 以允許重新指派，或移除額外的指派"
 [diagnostics.SEM020.issues.assignment_to_constant]
 message = "指派至常數"
 help = "使用 `varia` binding 以允許重新指派，或移除額外的指派"
+
+[diagnostics.SEM020.issues.assignment_to_const_member]
+message = "對 {fixum} 成員 '{field}' 賦值"
+help = "{fixum} 成員是型別的編譯期常數，不能被寫入；會變動的狀態請用 {varia} 欄位"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "第二次指派至不可變 binding"

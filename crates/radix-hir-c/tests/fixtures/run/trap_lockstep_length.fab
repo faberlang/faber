@@ -4,10 +4,10 @@ locale = "en"
 # A lockstep walk over sources of unequal length aborts
 # `itera lockstep sources must have equal length`, as the runner does.
 main {
-    const list<int> a ← [1, 2, 3]
-    const list<int> b ← [10, 20]
+    let list<int> a ← [1, 2, 3]
+    let list<int> b ← [10, 20]
     print 1
-    for from a, b const x, y {
+    for from a, b let x, y {
         print x + y
     }
     print 99

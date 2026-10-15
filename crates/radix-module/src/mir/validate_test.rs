@@ -1557,7 +1557,7 @@ fn representative_lowered_phase_3_to_7_mir_validates() {
         r"functio arithmetic(numerus a, numerus b) → numerus { redde a + b }",
         r"functio choose(bivalens ready) → numerus { si ready { redde 1 } secus { redde 2 } }",
         r#"functio maybe(textus ∪ nihil name) → textus { redde name vel "ignotus" }"#,
-        r#"genus Persona { varia textus nomen varia numerus aetas = 0 } functio age() → numerus { fixum Persona p ← Persona { nomen = "Ada" } redde p.aetas }"#,
+        r#"genus Persona { varia textus nomen varia numerus aetas = 0 } functio age() → numerus { sit Persona p ← Persona { nomen = "Ada" } redde p.aetas }"#,
         r"genus VacuumStruct {} functio empty_struct() → VacuumStruct { redde {} ∷ VacuumStruct }",
         r"discretio Status { Active } functio active() → Status { redde finge Active ∷ Status }",
         r"functio count(lista<numerus> xs) → numerus { redde xs.longitudo() }",

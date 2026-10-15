@@ -16,7 +16,7 @@ locale = "en"
 # What this teaches:
 #   • `size N` binds the width from the argument: calling with a
 #     `vector<f32, 3>` makes the result `vector<f32, 3>`.
-#   • The call result needs no annotation: `const _ w ← idv(v)` infers the
+#   • The call result needs no annotation: `let w ← idv(v)` infers the
 #     bound width, and a call can be printed directly.
 #   • The body can compute with the generic width (`v + v`).
 #
@@ -39,9 +39,9 @@ fn dbl<size N>(vector<f32, N> v) → vector<f32, N> {
 }
 
 main {
-    const vector<f32, 3> v ← [3.0, 4.0, 0.0] ↦ vector<f32, 3>
+    let vector<f32, 3> v ← [3.0, 4.0, 0.0] ↦ vector<f32, 3>
     print idv(v)
-    const _ w ← dbl(v)
+    let w ← dbl(v)
     print w
     print dbl(idv(v))
 }

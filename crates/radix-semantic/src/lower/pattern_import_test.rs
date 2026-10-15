@@ -87,7 +87,7 @@ fn local_class_arm_lowers_as_type_pattern() {
 
 functio area(Circle ∪ nihil u) → numerus {
     discerne u {
-        casu Circle fixum c { redde c.radius }
+        casu Circle sit c { redde c.radius }
         casu nihil { redde 0 }
     }
 }"#,
@@ -101,7 +101,7 @@ fn selectively_imported_class_arm_lowers_as_type_pattern() {
 
 functio area(Circle ∪ nihil u) → numerus {
     discerne u {
-        casu Circle fixum c { redde c.radius }
+        casu Circle sit c { redde c.radius }
         casu nihil { redde 0 }
     }
 }"#,
@@ -115,7 +115,7 @@ fn qualified_imported_class_arm_lowers_as_type_pattern() {
 
 functio area(geo.Circle ∪ nihil u) → numerus {
     discerne u {
-        casu geo.Circle fixum c { redde c.radius }
+        casu geo.Circle sit c { redde c.radius }
         casu nihil { redde 0 }
     }
 }"#,
@@ -131,7 +131,7 @@ fn unknown_namespace_member_still_fails_closed() {
 
 functio area(geo.Circle ∪ nihil u) → numerus {
     discerne u {
-        casu geo.Missing fixum c { redde c.radius }
+        casu geo.Missing sit c { redde c.radius }
         casu nihil { redde 0 }
     }
 }"#,

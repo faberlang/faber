@@ -35,15 +35,15 @@ locale = "en"
 #   rank-0 tensor's rank).
 
 main {
-    const tf32[2, 3] grid ← empty
+    let tf32[2, 3] grid ← empty
     print grid.shape()
     print grid[[1, 2]]
-    const tensor<vector<f32, 4>, [2]> lanes ← empty
+    let tensor<vector<f32, 4>, [2]> lanes ← empty
     print lanes.shape()
-    const vector<f32, 4> v ← empty
+    let vector<f32, 4> v ← empty
     print v[3]
-    const mf32[2, 2] m ← empty
+    let mf32[2, 2] m ← empty
     print m
-    const tensor<f32, []> single ← empty
+    let tensor<f32, []> single ← empty
     print single.shape().length()
 }

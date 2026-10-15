@@ -29,6 +29,6 @@ locale = "en"
 #   pg:query
 
 main {
-    const ascii route ← 'pg:query'
+    let ascii route ← 'pg:query'
     print route
 }

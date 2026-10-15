@@ -82,6 +82,11 @@ pub enum Target {
     /// orchestration. Driver generation uses the same MIR-to-LLVM emitter.
     MirLlvmHost,
 
+    /// Public Cranelift native-object target (`faber build --target clif`).
+    /// Emits a relocatable object for the host triple; Faber owns the link
+    /// step against the `runtime/clif` archive.
+    MirClif,
+
     /// AMD GPU via the AMDGPU/HIP LLVM emitter family.
     ///
     /// Internal variant on the `mir-llvm` emit surface — not a discoverable
@@ -154,6 +159,7 @@ impl Target {
             Target::MirWasm => "wasm-text",
             Target::MirLlvm => "llvm-text",
             Target::MirLlvmHost => "llvm-host",
+            Target::MirClif => "clif",
             Target::MirAmd => "amd",
             Target::MirMetal => "metal-text",
             Target::MirWgsl => "wgsl-text",
@@ -208,6 +214,7 @@ impl Target {
             Target::HirFhir => &["fhir"],
             Target::MirWasm => &["wasm", "wasm-text", "wat"],
             Target::MirLlvm | Target::MirLlvmHost => &["llvm", "llvm-host", "llvm-text"],
+            Target::MirClif => &["clif", "cranelift"],
             Target::MirMetal => &["metal", "metal-text"],
             Target::MirAmd => &["amd"],
             Target::MirWgsl => &["wgsl", "wgsl-text"],
@@ -248,6 +255,7 @@ impl Target {
         Target::MirWasm,
         Target::MirLlvm,
         Target::MirLlvmHost,
+        Target::MirClif,
         Target::MirAmd,
         Target::MirMetal,
         Target::MirWgsl,
@@ -303,6 +311,7 @@ impl Target {
             Target::MirWasm => Some("mir-wasm"),
             Target::MirWgsl => Some("mir-wgsl"),
             Target::MirLlvm | Target::MirLlvmHost => Some("mir-llvm"),
+            Target::MirClif => Some("mir-clif"),
             // Ungated variants, named (no `_`) so a future variant without
             // arms here is a compile error, never a silent `None`.
             Target::MirStepper
@@ -340,6 +349,7 @@ impl Target {
             Target::MirWasm => cfg!(feature = "mir-wasm"),
             Target::MirWgsl => cfg!(feature = "mir-wgsl"),
             Target::MirLlvm | Target::MirLlvmHost => cfg!(feature = "mir-llvm"),
+            Target::MirClif => cfg!(feature = "mir-clif"),
             // Ungated variants, named (no `_`) so a future variant without
             // arms here is a compile error, never a silent `true`.
             Target::MirStepper
@@ -350,11 +360,52 @@ impl Target {
         }
     }
 
+    /// Whether this target's driver arm lowers a CLI entry program.
+    ///
+    /// A target that returns `false` is refused by name with `CODEGEN002`
+    /// (`cli_codegen_rust_only`) before any emitter runs. Exhaustive, no
+    /// wildcard: a future variant must declare its answer here.
+    #[must_use]
+    pub fn lowers_cli_entry(self) -> bool {
+        match self {
+            Target::HirRust
+            | Target::HirGo
+            | Target::HirTypeScript
+            | Target::HirPython
+            | Target::MirWasm
+            | Target::MirClif => true,
+            Target::MirStepper
+            | Target::HirSwift
+            | Target::HirHaskell
+            | Target::HirPascal
+            | Target::HirCobol
+            | Target::HirFortran
+            | Target::HirOdin
+            | Target::HirC
+            | Target::HirFaber
+            | Target::HirFhir
+            | Target::MirLlvm
+            | Target::MirLlvmHost
+            | Target::MirAmd
+            | Target::MirMetal
+            | Target::MirWgsl
+            | Target::MirSexp
+            | Target::MirBasic
+            | Target::MirScena
+            | Target::MirFmir
+            | Target::MirFmirBinary
+            | Target::MirFmirBundle => false,
+        }
+    }
+
     /// Leaves this target declares.
     ///
     /// Rust and the runner (`fmir*`, stepper) share `faber-leaf`. Faber
-    /// re-emit and FHIR keep the `call` in the artifact. Every other emit
-    /// target has no native leaf crate and must fail closed.
+    /// re-emit and FHIR keep the `call` in the artifact. Go declares exactly
+    /// the leaves its `runtime/go` ports implement (clock 4/4, entropy 5/5,
+    /// stdio 16/17 routes — `consolum:desinit` is still pending and stays
+    /// refused). Every other emit target has no native leaf port and must
+    /// fail closed.
     #[must_use]
     pub fn supported_leaves(self) -> &'static [Leaf] {
         match self {
@@ -365,8 +416,8 @@ impl Target {
             | Target::MirFmirBundle
             | Target::HirFaber
             | Target::HirFhir => Leaf::ALL,
+            Target::HirGo => &[Leaf::Stdio, Leaf::Clock, Leaf::Entropy],
             Target::HirTypeScript
-            | Target::HirGo
             | Target::HirSwift
             | Target::HirPython
             | Target::HirHaskell
@@ -378,6 +429,7 @@ impl Target {
             | Target::MirWasm
             | Target::MirLlvm
             | Target::MirLlvmHost
+            | Target::MirClif
             | Target::MirAmd
             | Target::MirMetal
             | Target::MirWgsl

@@ -4,6 +4,6 @@ locale = "en"
 # A bare `none` value: the only value is `null`, and it prints as the
 # locale's none word.
 main {
-    const none nothing ← null
+    let none nothing ← null
     print nothing
 }

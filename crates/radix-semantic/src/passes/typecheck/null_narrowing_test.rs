@@ -1,7 +1,7 @@
 //! Flow-refinement tests for null checks (nn-u1 refinement core).
 //!
 //! The assignment-path probe is recorded here first, fixture before claim:
-//! `const T y ← x` compiles **outside** any null-check block because the
+//! `let T y ← x` compiles **outside** any null-check block because the
 //! source spelling `T ∪ null` lowers to `Type::Option(T)` (hir/lower/types.rs
 //! `lower_union_type`) and `TypeTable::is_assignable` permits `Option(T) → T`
 //! assignment generally (implicit unwrap; Rust codegen unwraps). Since need
@@ -33,10 +33,10 @@ use crate::test_support;
 fn assignment_of_option_outside_null_check_is_rejected() {
     // Recorded 2026-08-10 as accepted (`TypeTable::is_assignable` unwraps
     // `Option(T)` into `T`); need closed that for declaration and
-    // assignment stores: `fixum textus y ← x` with `x : textus ∪ nihil` and no
+    // assignment stores: `sit textus y ← x` with `x : textus ∪ nihil` and no
     // null check is `SEM010 optional_into_plain_cell`.
     test_support::assert_rejects_with_issue(
-        "functio f(textus ∪ nihil x) → textus {\n    fixum textus y ← x\n    redde y\n}",
+        "functio f(textus ∪ nihil x) → textus {\n    sit textus y ← x\n    redde y\n}",
         "optional_into_plain_cell",
     );
 }
@@ -45,7 +45,7 @@ fn assignment_of_option_outside_null_check_is_rejected() {
 fn probe_capture_idiom_compiles_inside_block() {
     // The shipping capture idiom (tela browser.fab, rivus pilot) stays green.
     test_support::assert_accepts(
-        "functio f(textus ∪ nihil x) → textus {\n    si x non est nihil {\n        fixum textus y ← x\n        redde y\n    }\n    redde \"\"\n}",
+        "functio f(textus ∪ nihil x) → textus {\n    si x non est nihil {\n        sit textus y ← x\n        redde y\n    }\n    redde \"\"\n}",
     );
 }
 

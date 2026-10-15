@@ -737,7 +737,7 @@ impl Lowerer<'_> {
                 ClassMemberKind::Field(field) => {
                     let annotations = self.lower_annotations(&member.annotations);
                     // A field default is a compile-time initializer tree under
-                    // every modifier (`fixum`, `varia`, `generis`): the one `=`
+                    // every modifier (`sit`, `varia`, `fixum`): the one `=`
                     // surface admits `insere` and `praefixum` here as it does
                     // for a module constant.
                     let init = field

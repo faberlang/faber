@@ -9,6 +9,6 @@ locale = "en"
 
 @ public
 class Endpoint {
-    var string host
-    var int port
+    mut string host
+    mut int port
 }

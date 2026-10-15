@@ -123,7 +123,7 @@ fn two_bool_scrutinees_with_wildcard_rows_definitely_return() {
 fn statement_bool_match_missing_falsum_is_rejected() {
     assert_missing(
         "incipit {
-            fixum bivalens b ← verum
+            sit bivalens b ← verum
             discerne b {
                 casu verum { nota \"sic\" }
             }
@@ -258,8 +258,8 @@ fn multi_scrutinee_missing_row_is_no_longer_silent() {
     // Before D4.8 a multi-scrutinee statement match was skipped outright.
     assert_missing(
         "incipit {
-            fixum bivalens a ← verum
-            fixum bivalens b ← verum
+            sit bivalens a ← verum
+            sit bivalens b ← verum
             discerne a et b {
                 casu verum et verum { nota \"unum\" }
                 casu _ et falsum { nota \"falsum\" }
@@ -276,7 +276,7 @@ fn multi_scrutinee_missing_row_is_no_longer_silent() {
 fn elige_over_open_space_without_ceterum_keeps_switch_default() {
     assert_clean(
         "incipit {
-            fixum numerus n ← 1
+            sit numerus n ← 1
             elige n {
                 casu 1 { nota \"unum\" }
                 casu 2 { nota \"duo\" }
@@ -289,7 +289,7 @@ fn elige_over_open_space_without_ceterum_keeps_switch_default() {
 fn elige_over_bivalens_missing_falsum_is_rejected() {
     assert_missing(
         "incipit {
-            fixum bivalens b ← verum
+            sit bivalens b ← verum
             elige b {
                 casu verum { nota \"sic\" }
             }

@@ -30,23 +30,23 @@ locale = "en"
 # (recoverable via a `⊥` default). Extra JSON keys are ignored.
 
 class Persona {
-    var string nomen
-    var int aetas optional
-    var string regio = "Roma"
-    var instant born
+    mut string nomen
+    mut int aetas optional
+    mut string regio = "Roma"
+    mut instant born
 }
 
 main {
-    const value payload ← { "nomen": "Marcus", "born": "1979-05-27T07:32:00Z", "extra": "ignored" } ↦ value
-    const Persona good ← payload ↦ Persona
+    let value payload ← { "nomen": "Marcus", "born": "1979-05-27T07:32:00Z", "extra": "ignored" } ↦ value
+    let Persona good ← payload ↦ Persona
     assert good.nomen ≡ "Marcus"
     assert good.aetas ≡ null
     assert good.regio ≡ "Roma"
-    const value stale ← { "nomen": "Livia" } ↦ value
-    const Persona recovered ← stale ↦ Persona ⊥ good
+    let value stale ← { "nomen": "Livia" } ↦ value
+    let Persona recovered ← stale ↦ Persona ⊥ good
     assert recovered.nomen ≡ "Marcus"
-    const value boxed ← recovered ↦ value
-    const Persona roundtrip ← boxed ↦ Persona
+    let value boxed ← recovered ↦ value
+    let Persona roundtrip ← boxed ↦ Persona
     assert roundtrip.nomen ≡ "Marcus"
     assert roundtrip.regio ≡ "Roma"
     print roundtrip.nomen

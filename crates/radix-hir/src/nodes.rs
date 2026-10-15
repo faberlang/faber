@@ -605,8 +605,8 @@ pub struct HirField {
     pub name: Symbol,
     pub ty: TypeId,
 
-    /// Authored leading modifier (DECISIONS D16.1): `fixum`, `varia`, or
-    /// `generis` (belongs to the type rather than instances). `None` is an
+    /// Authored leading modifier (DECISIONS D16.1): `sit` (read-only per
+    /// instance), `varia`, or `fixum` (a type-level constant, not per instance). `None` is an
     /// unmarked field, legal until the D5c tightening.
     pub modifier: Option<FieldModifier>,
 
@@ -620,13 +620,13 @@ pub struct HirField {
 }
 
 impl HirField {
-    /// Whether this field belongs to the type (`generis`) rather than instances.
+    /// Whether this field belongs to the type (a `fixum` constant member) rather than instances.
     #[must_use]
     pub fn is_static(&self) -> bool {
-        self.modifier == Some(FieldModifier::Generis)
+        self.modifier == Some(FieldModifier::Const)
     }
 
-    /// Whether this field is `fixum`: set only by construction (D16.3).
+    /// Whether this field is `sit` (read-only): set only by construction (D16.3).
     #[must_use]
     pub fn is_fixum(&self) -> bool {
         self.modifier == Some(FieldModifier::Fixum)
@@ -1889,7 +1889,7 @@ pub enum HirStoreKind {
     TuplePosition,
     /// The default of `x ↦ T ⊥ d`.
     ConversionDefault,
-    /// `fixum T x ↢ future`, `figendum T x ← e`: the awaited value.
+    /// `sit T x ↢ future`, `figendum T x ← e`: the awaited value.
     AwaitBinding,
 }
 
@@ -2369,7 +2369,7 @@ pub struct HirPresentation {
     pub axis_sugar: Vec<HirAxisSugar>,
 
     /// Initializer-expression ids of wildcard-bound declarations
-    /// (`fixum T _ ← expr`), which lower to bare expression statements.
+    /// (`sit T _ ← expr`), which lower to bare expression statements.
     /// Emission restores the authored discard binding for exactly these.
     #[serde(default)]
     pub discard_binding_stmts: Vec<HirDiscardBinding>,
@@ -2662,7 +2662,7 @@ pub struct HirOrdoEnum {
     pub members: Vec<HirOrdoMember>,
 }
 
-/// Authored facts for one wildcard-bound declaration (`fixum T _ ← expr`).
+/// Authored facts for one wildcard-bound declaration (`sit T _ ← expr`).
 ///
 /// Keyed by the initializer expression id; the lowered statement keeps no
 /// `HirLocal`, so these facts ride the presentation sidecar.

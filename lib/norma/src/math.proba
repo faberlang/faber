@@ -8,17 +8,17 @@ fn sum_pi(float x) → float {
 
 # Relative error against a reference value (absolute when the reference is 0).
 fn close(float actual, float expected) → bool {
-    const float scale ← expected.abs().maximum(1.0e-300)
+    let float scale ← expected.abs().maximum(1.0e-300)
     return (actual - expected).abs() / scale ≤ 1.0e-12
 }
 
 # NaN check through the IEEE bit fields — independent of how any lane
 # evaluates `x ≠ x`.
 fn is_nan(float x) → bool {
-    const f64 wide ← x ↦ f64
-    const u64 bits ← wide ↦ b64 ↦ u64
-    const u64 exponent ← (bits ⇒ 52) ∧ (2047 ∷ u64)
-    const u64 fraction ← bits ∧ (4503599627370495 ∷ u64)
+    let f64 wide ← x ↦ f64
+    let u64 bits ← wide ↦ b64 ↦ u64
+    let u64 exponent ← (bits ⇒ 52) ∧ (2047 ∷ u64)
+    let u64 fraction ← bits ∧ (4503599627370495 ∷ u64)
     return exponent ≡ (2047 ∷ u64) and fraction ≢ (0 ∷ u64)
 }
 

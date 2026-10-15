@@ -6,4 +6,5 @@ input = "transfer/copy-into-alias.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

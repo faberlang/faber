@@ -11,6 +11,6 @@ class Hello implements Greets {
 }
 
 fn probe() → string {
-    const Greets g ← Hello {}
+    let Greets g ← Hello {}
     return g.greet()
 }

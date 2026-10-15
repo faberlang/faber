@@ -73,8 +73,8 @@ fn bounded_octeti_conversions_follow_d7() {
         r"typus OctetiOcto = lista<b8, 8>
 
 functio bridges(lista<b8, 8> bounded, lista<b8> unbounded) → vacuum {
-    fixum lista<b8> widened ← bounded ↦ lista<b8>
-    fixum OctetiOcto narrowed ← unbounded ↦ OctetiOcto
+    sit lista<b8> widened ← bounded ↦ lista<b8>
+    sit OctetiOcto narrowed ← unbounded ↦ OctetiOcto
     nota widened
     nota narrowed
 }
@@ -90,7 +90,7 @@ incipit {
 
     let implicit = analyze_and_get_diagnostics_la(
         r"functio assign(lista<b8> unbounded) → vacuum {
-    fixum lista<b8, 8> bounded ← unbounded
+    sit lista<b8, 8> bounded ← unbounded
     nota bounded
 }
 
@@ -105,8 +105,8 @@ incipit {
 
     let result = compile_and_get_result_la(
         r"functio bridges(lista<b8, 8> bounded, lista<b8> unbounded) → vacuum {
-    fixum lista<b8> widened ← bounded ↦ lista<b8>
-    fixum lista<b8, 8> narrowed ← unbounded ↦ lista<b8, 8>
+    sit lista<b8> widened ← bounded ↦ lista<b8>
+    sit lista<b8, 8> narrowed ← unbounded ↦ lista<b8, 8>
     nota widened
     nota narrowed
 }
@@ -127,8 +127,11 @@ incipit {
     );
 }
 
+/// TypeScript carries bounded octeti as the plain byte array with the capacity
+/// erased at the type and checked at conversions.
+#[cfg(feature = "hir-ts")]
 #[test]
-fn bounded_octeti_rejects_non_rust_targets_fail_closed() {
+fn bounded_octeti_is_carried_on_typescript() {
     let source = r"functio probe(lista<b8, 8> xs) → u8 {
     redde xs[0]
 }
@@ -136,26 +139,20 @@ fn bounded_octeti_rejects_non_rust_targets_fail_closed() {
 incipit {
     nota 0
 }";
-    for target in [Target::HirTypeScript] {
-        let result = compile_for_target_and_get_result_la(source, target);
-        assert!(!result.success(), "target {target:?} must reject bounded octeti");
-        assert!(
-            result
-                .diagnostics
-                .iter()
-                .any(|diagnostic| { diagnostic.is_error() && diagnostic.issue().is_some() }),
-            "target {target:?} must carry a structured error: {:?}",
-            result.diagnostics
-        );
-        let emitted = match &result.output {
-            Some(crate::Output::TypeScript(output)) => output.code.as_str(),
-            _ => "",
-        };
-        assert!(
-            !emitted.contains("Uint8Array"),
-            "target {target:?} must not approximate octeti<N> as Uint8Array: {emitted}"
-        );
-    }
+    let result = compile_for_target_and_get_result_la(source, Target::HirTypeScript);
+    assert!(
+        result.success(),
+        "TypeScript must carry bounded octeti: {:?}",
+        result.diagnostics
+    );
+    let emitted = match &result.output {
+        Some(crate::Output::TypeScript(output)) => output.code.as_str(),
+        _ => "",
+    };
+    assert!(
+        emitted.contains("p_xs: Array<number>"),
+        "bounded octeti must be the byte array carrier: {emitted}"
+    );
 }
 
 /// Go carries bounded octeti as a plain byte slice with the capacity erased at
@@ -180,5 +177,48 @@ incipit {
     assert!(
         code.contains("func probe(p_xs []byte)"),
         "bounded octeti must be a plain Go byte slice parameter, got: {code}"
+    );
+}
+
+/// An octeti to tensor conversion whose extent is a size parameter that no
+/// value binding supplies on TypeScript is declined by name, never emitted
+/// with a scalar shape. A tensor parameter whose axis names the size is the
+/// witness the entry scan binds it from, so that form emits.
+#[cfg(feature = "hir-ts")]
+#[test]
+fn octeti_to_tensor_with_an_unbound_size_extent_is_declined_on_typescript() {
+    let source = r"functio decode<magnitudo N>(lista<b8> raw) → tensor<f32, [N]> ⇥ textus {
+    redde raw ↦ tensor<f32, [N]> via Le
+}
+
+incipit {
+    nota 0
+}";
+    let result = compile_for_target_and_get_result_la(source, Target::HirTypeScript);
+    assert!(!result.success(), "an unbound extent must not emit");
+    assert!(
+        result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.is_error() && diagnostic.issue() == Some("ts_octeti_tensor_shape_unresolved")
+        }),
+        "diagnostics: {:?}",
+        result.diagnostics
+    );
+}
+
+#[cfg(feature = "hir-ts")]
+#[test]
+fn octeti_to_tensor_with_a_witnessed_size_extent_emits_on_typescript() {
+    let source = r"functio decode<magnitudo N>(tensor<f32, [N]> proto, lista<b8> raw) → tensor<f32, [N]> ⇥ textus {
+    redde raw ↦ tensor<f32, [N]> via Le
+}
+
+incipit {
+    nota 0
+}";
+    let result = compile_for_target_and_get_result_la(source, Target::HirTypeScript);
+    assert!(
+        result.success(),
+        "a size parameter bound from a tensor parameter axis must emit: {:?}",
+        result.diagnostics
     );
 }

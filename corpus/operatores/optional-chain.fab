@@ -37,23 +37,23 @@ locale = "en"
 #   Optional call ?( — syntax in frontmatter; Rust e2e defers to driver optional-chain tests.
 
 class Locus {
-    var string urbs
-    var string regio optional
+    mut string urbs
+    mut string regio optional
 }
 
 class Civis {
-    var string nomen
-    var Locus locus optional
+    mut string nomen
+    mut Locus locus optional
 }
 
 main {
-    const Civis aelia ← Civis { nomen = "Aelia", locus = Locus { urbs = "Roma", regio = "Italia" } }
+    let Civis aelia ← Civis { nomen = "Aelia", locus = Locus { urbs = "Roma", regio = "Italia" } }
     print aelia?.locus?.urbs
     print aelia?.locus?.regio
-    const Civis brutus ← Civis { nomen = "Brutus" }
+    let Civis brutus ← Civis { nomen = "Brutus" }
     print brutus?.locus?.urbs
     print brutus?.locus?.regio
-    const list<string, 3> litterae ← ["a", "b", "c"]
+    let list<string, 3> litterae ← ["a", "b", "c"]
     print litterae?[0]
     print litterae?[10]
 }

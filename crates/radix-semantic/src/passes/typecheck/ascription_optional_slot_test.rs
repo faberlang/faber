@@ -22,7 +22,7 @@ fn rejects(result: &crate::SemanticResult) {
 fn declaration_form_list_with_nihil_elements_checks() {
     accepts(&compile(
         r#"incipit {
-  fixum lista<numerus ∪ nihil> xs ← [nulla, 1, 2, nulla]
+  sit lista<numerus ∪ nihil> xs ← [nulla, 1, 2, nulla]
   nota xs
 }"#,
     ));
@@ -32,7 +32,7 @@ fn declaration_form_list_with_nihil_elements_checks() {
 fn ascribed_list_with_nihil_elements_checks() {
     accepts(&compile(
         r#"incipit {
-  fixum lista<numerus ∪ nihil> xs ← [nulla, 1, 2, nulla] ∷ lista<numerus ∪ nihil>
+  sit lista<numerus ∪ nihil> xs ← [nulla, 1, 2, nulla] ∷ lista<numerus ∪ nihil>
   nota xs
 }"#,
     ));
@@ -42,7 +42,7 @@ fn ascribed_list_with_nihil_elements_checks() {
 fn ascribed_map_with_nihil_value_checks() {
     accepts(&compile(
         r#"incipit {
-  fixum tabula<textus, numerus ∪ nihil> m ← {"a": null} ∷ tabula<textus, numerus ∪ nihil>
+  sit tabula<textus, numerus ∪ nihil> m ← {"a": null} ∷ tabula<textus, numerus ∪ nihil>
   nota m
 }"#,
     ));
@@ -52,7 +52,7 @@ fn ascribed_map_with_nihil_value_checks() {
 fn ascribed_nested_list_with_nihil_elements_checks() {
     accepts(&compile(
         r#"incipit {
-  fixum lista<lista<numerus ∪ nihil>> n ← [[nulla, 1], [2]] ∷ lista<lista<numerus ∪ nihil>>
+  sit lista<lista<numerus ∪ nihil>> n ← [[nulla, 1], [2]] ∷ lista<lista<numerus ∪ nihil>>
   nota n
 }"#,
     ));
@@ -62,7 +62,7 @@ fn ascribed_nested_list_with_nihil_elements_checks() {
 fn ascribed_list_with_wrong_element_still_rejects() {
     rejects(&compile(
         r#"incipit {
-  fixum lista<numerus ∪ nihil> xs ← [nulla, "x"] ∷ lista<numerus ∪ nihil>
+  sit lista<numerus ∪ nihil> xs ← [nulla, "x"] ∷ lista<numerus ∪ nihil>
   nota xs
 }"#,
     ));
@@ -75,7 +75,7 @@ fn ascribed_list_with_wrong_element_still_rejects() {
 fn declaration_form_nested_json_map_rejects_requires_valor() {
     crate::test_support::assert_rejects_with_issue_la(
         r#"incipit {
-  fixum tabula<textus, tabula<textus, numerus>> n ← {"a": {"b": 1}}
+  sit tabula<textus, tabula<textus, numerus>> n ← {"a": {"b": 1}}
   nota n
 }"#,
         "json_nested_value_requires_valor",
@@ -86,7 +86,7 @@ fn declaration_form_nested_json_map_rejects_requires_valor() {
 fn ascribed_nested_json_map_rejects_requires_valor() {
     crate::test_support::assert_rejects_with_issue_la(
         r#"incipit {
-  fixum _ n ← {"a": {"b": 1}} ∷ tabula<textus, tabula<textus, numerus>>
+  sit n ← {"a": {"b": 1}} ∷ tabula<textus, tabula<textus, numerus>>
   nota n
 }"#,
         "json_nested_value_requires_valor",
@@ -97,7 +97,7 @@ fn ascribed_nested_json_map_rejects_requires_valor() {
 fn declaration_form_list_of_json_maps_checks() {
     accepts(&compile(
         r#"incipit {
-  fixum lista<tabula<textus, numerus>> l ← [{"a": 1}]
+  sit lista<tabula<textus, numerus>> l ← [{"a": 1}]
   nota l
 }"#,
     ));
@@ -107,7 +107,7 @@ fn declaration_form_list_of_json_maps_checks() {
 fn ascribed_list_of_json_maps_checks() {
     accepts(&compile(
         r#"incipit {
-  fixum _ l ← [{"a": 1}] ∷ lista<tabula<textus, numerus>>
+  sit l ← [{"a": 1}] ∷ lista<tabula<textus, numerus>>
   nota l
 }"#,
     ));
@@ -117,7 +117,7 @@ fn ascribed_list_of_json_maps_checks() {
 fn ascribed_list_of_json_maps_with_wrong_value_rejects() {
     rejects(&compile(
         r#"incipit {
-  fixum _ l ← [{"a": "x"}] ∷ lista<tabula<textus, numerus>>
+  sit l ← [{"a": "x"}] ∷ lista<tabula<textus, numerus>>
   nota l
 }"#,
     ));

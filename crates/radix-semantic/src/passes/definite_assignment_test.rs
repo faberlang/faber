@@ -49,7 +49,7 @@ fn rejects_read_of_uninitialized_local() {
     let result = crate::test_support::analyze_source_la(
         r"
 incipit {
-    fixum numerus value
+    sit numerus value
     nota value
 }
 ",
@@ -97,7 +97,7 @@ fn rejects_read_before_assignment_in_branch() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens cond) → numerus {
-    fixum numerus value
+    sit numerus value
     si cond {
         nota value
         value ← 1
@@ -191,7 +191,7 @@ functio pick(bivalens flag) → numerus {
 
 #[test]
 fn driver_accepts_initialized_local_with_initializer() {
-    let result = crate::test_support::analyze_source_la(r"incipit { fixum numerus n ← 1 nota n }");
+    let result = crate::test_support::analyze_source_la(r"incipit { sit numerus n ← 1 nota n }");
     if result.is_err() {
         let errors = result.diagnostics.clone();
         panic!("expected initialized local to pass definite assignment: {errors:?}");
@@ -205,7 +205,7 @@ fn accepts_fixum_late_init_single_assignment() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens cond) → numerus {
-    fixum numerus value
+    sit numerus value
     si cond { value ← 1 } secus { value ← 2 }
     redde value
 }
@@ -222,7 +222,7 @@ fn rejects_second_assignment_to_fixum_with_initializer() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
-    fixum numerus value ← 1
+    sit numerus value ← 1
     value ← 2
     redde value
 }
@@ -245,7 +245,7 @@ fn rejects_second_assignment_to_fixum_late_init() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
-    fixum numerus value
+    sit numerus value
     value ← 1
     value ← 2
     redde value
@@ -283,9 +283,9 @@ functio pick() → numerus {
 }
 
 #[test]
-fn rejects_reassignment_of_immutable_parameter() {
-    // EDGE: owned/de/ex parameters are write-once and already initialized by the
-    // caller; reassigning them in the body is a second assignment.
+fn accepts_repoint_of_bare_parameter() {
+    // A bare parameter is `ref` by default: the callee may re-point the name.
+    // A write through it stays refused (see `rejects_field_write_through_bare_parameter`).
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick(numerus value) → numerus {
@@ -294,15 +294,32 @@ functio pick(numerus value) → numerus {
 }
 ",
     );
+    if result.is_err() {
+        let errors = result.diagnostics.clone();
+        panic!("expected re-point of a bare parameter to pass: {errors:?}");
+    }
+}
+
+#[test]
+fn rejects_field_write_through_bare_parameter() {
+    let result = crate::test_support::analyze_source_la(
+        r"
+genus Punctum { varia numerus x }
+functio pick(Punctum p) → numerus {
+    p.x ← 2
+    redde p.x
+}
+",
+    );
     assert!(
         !result.is_ok(),
-        "expected reassignment of owned parameter to be rejected"
+        "expected a write through a bare parameter to be rejected"
     );
     let errors = result.diagnostics.clone();
     expect_structured_error(
         &errors,
-        SemanticErrorKind::ImmutableAssignment,
-        "immutable_second_assignment",
+        SemanticErrorKind::AssignToImmutableBorrow,
+        "assign_to_de_parameter",
     );
 }
 
@@ -312,7 +329,7 @@ fn accepts_in_parameter_reassignment() {
     // may be reassigned freely, unlike owned/de/ex parameters.
     let result = crate::test_support::analyze_source_la(
         r"
-functio pick(in numerus value) → numerus {
+functio pick(varia numerus value) → numerus {
     value ← value * 2
     redde value
 }
@@ -372,7 +389,7 @@ fn rejects_read_before_fixum_late_init_assignment() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
-    fixum numerus value
+    sit numerus value
     nota value
     value ← 1
     redde value
@@ -421,7 +438,7 @@ fn rejects_fixum_late_init_after_partial_branch_assignment() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens cond) → numerus {
-    fixum numerus value
+    sit numerus value
     si cond { value ← 1 }
     redde value
 }
@@ -492,7 +509,7 @@ fn rejects_postfix_increment_before_fixum_late_init() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
-    fixum numerus total
+    sit numerus total
     total ↑
     redde total
 }
@@ -515,7 +532,7 @@ fn rejects_second_postfix_increment_to_fixum_late_init() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
-    fixum numerus total
+    sit numerus total
     total ← 1
     total ↑
     redde total
@@ -541,7 +558,7 @@ fn accepts_fixum_late_init_assigned_inside_dum_loop() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick() → numerus {
-    fixum numerus value
+    sit numerus value
     dum verum { value ← 1 }
     redde value
 }
@@ -558,7 +575,7 @@ fn driver_accepts_fixum_and_sit_deferred_init_in_incipit() {
     let result = crate::test_support::analyze_source_la(
         r"
 incipit {
-    fixum numerus typed
+    sit numerus typed
     sit inferred
     typed ← 7
     inferred ← 8
@@ -579,7 +596,7 @@ fn rejects_read_after_nested_branch_partial_init() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens outer, bivalens inner) → numerus {
-    fixum numerus value
+    sit numerus value
     si outer {
         si inner { value ← 1 }
     }
@@ -628,7 +645,7 @@ fn rejects_fixum_late_init_after_si_sin_partial_assignment() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens c1, bivalens c2) → numerus {
-    fixum numerus value
+    sit numerus value
     si c1 { value ← 1 } sin c2 { tacet }
     redde value
 }
@@ -653,7 +670,7 @@ fn rejects_fixum_late_init_after_sin_only_assignment() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens c1, bivalens c2) → numerus {
-    fixum numerus value
+    sit numerus value
     si c1 { tacet } sin c2 { value ← 1 }
     redde value
 }
@@ -678,7 +695,7 @@ fn rejects_fixum_late_init_after_custodi_partial_assignment() {
     let result = crate::test_support::analyze_source_la(
         r"
 functio pick(bivalens c1, bivalens c2) → numerus {
-    fixum numerus value
+    sit numerus value
     custodi {
         si c1 ergo value ← 1
         si c2 ergo tacet
@@ -762,7 +779,7 @@ fn accepts_conversio_assign_single_fixum_late_init() {
     let result = crate::test_support::analyze_source_la(
         r#"
 functio pick() → numerus ⇥ textus {
-    fixum numerus value
+    sit numerus value
     value ↤ "7"
     redde value
 }
@@ -781,7 +798,7 @@ fn rejects_conversio_assign_second_assignment_to_fixum() {
     let result = crate::test_support::analyze_source_la(
         r#"
 functio pick() → numerus {
-    fixum numerus value ← 1
+    sit numerus value ← 1
     value ↤ "2"
     redde value
 }

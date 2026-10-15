@@ -48,6 +48,8 @@ pub fn output_code(output: crate::Output) -> String {
         crate::Output::WasmText(out) => out.code,
         #[cfg(feature = "mir-llvm")]
         crate::Output::LlvmText(out) => out.code,
+        #[cfg(feature = "mir-clif")]
+        crate::Output::ClifObject(_) => String::new(),
         #[cfg(feature = "mir-metal")]
         crate::Output::MetalText(out) => out.code,
         #[cfg(feature = "mir-wgsl")]

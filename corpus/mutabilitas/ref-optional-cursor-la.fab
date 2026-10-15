@@ -1,0 +1,65 @@
++++
+term = "ref-optional-cursor"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "ref_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "dum_stmt", "si_stmt", "arm", "redde_stmt", "assignment", "place", "member_suffix", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "typed_constructor", "field_list", "field_init", "nota_stmt", "incipit_stmt"]
+category = "binding"
+summary = "de cursor over T ∪ nihil walks a read-only list: the dum test narrows it, a re-point moves it."
+syntax = "de <reference type> ∪ nihil <name> ← <place>"
+related = ["de", "nihil", "sit", "varia"]
+locale = "la"
++++
+
+# =============================================================================
+# de-cursor-optionalis — cursor lectissimus, solum legens, super optionalem
+# =============================================================================
+#
+# What this teaches:
+#   • `de T ∪ nihil nomen ← locus` (Optio A, decretum 2026-10-15): `de` aut
+#     `varia` super optionalem legitur cum socius non-nihil typus referentiae
+#     sit (genus, collectio, textus). `de` super numerum — nudum aut
+#     optionalem — adhuc recusatur (SEM008 scalar_access_marker).
+#   • angustatio — `dum cursus non est nihil` angustat `cursum` ad socium
+#     non-nihil intra corpus, ita `cursus.valor` sine `?.` legitur.
+#     Angustatio a probatione usque ad primam re-indicationem durat.
+#   • re-indicare, numquam scribere — ambulatio solum nomen movet. Scriptio
+#     per cursorem recusatur (vide ref-optional-write-reject).
+#
+# EXPECTED OUTPUT:
+#   Valor postremus, deinde longitudo: 3, 3.
+#   3
+#   3
+# =============================================================================
+
+genus Nodus {
+    varia numerus valor
+    varia Nodus proximus sponte
+}
+
+functio ultimus(Nodus caput) → numerus {
+    de Nodus ∪ nihil cursus ← caput
+    dum cursus non est nihil {
+        si cursus.proximus est nihil {
+            redde cursus.valor
+        }
+        cursus ← cursus.proximus
+    }
+    redde caput.valor
+}
+
+functio longitudo(Nodus caput) → numerus {
+    de Nodus ∪ nihil cursus ← caput
+    varia numerus mensura ← 0
+    dum cursus non est nihil {
+        mensura ← mensura + 1
+        cursus ← cursus.proximus
+    }
+    redde mensura
+}
+
+incipit {
+    sit Nodus c ← Nodus { valor = 3 }
+    sit Nodus b ← Nodus { valor = 2, proximus = c }
+    sit Nodus a ← Nodus { valor = 1, proximus = b }
+    nota ultimus(a)
+    nota longitudo(a)
+}

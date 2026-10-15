@@ -145,7 +145,10 @@ impl Emitter<'_> {
             }
             (Value::Text, Ty::Decimal) => {
                 self.support.need(Helper::Decimal);
-                Operand::new(format!("faber_dec_parse({}, 8)", value.text), Value::Decimal)
+                Operand::new(
+                    format!("faber_dec_parse({}, 8)", value.text),
+                    Value::Decimal,
+                )
             }
             // `↦ wrapping<W>` reduces modulo 2^W; `↦ saturating<W>` clamps.
             // Both are total, so a recovery is never taken.

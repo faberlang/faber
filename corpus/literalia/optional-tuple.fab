@@ -48,18 +48,18 @@ fn make() → tuple<int, int> ∪ none {
 }
 
 main {
-    const tuple<int, int> ∪ none declared ← tuple<int, int> [7, 8]
+    let tuple<int, int> ∪ none declared ← tuple<int, int> [7, 8]
     print first(declared)
 
-    var tuple<int, int> ∪ none later ← null
+    mut tuple<int, int> ∪ none later ← null
     later ← tuple<int, int> [3, 4]
     print first(later)
 
     print first(tuple<int, int> [9, 10])
 
-    const tuple<int, int> ∪ none returned ← make()
+    let tuple<int, int> ∪ none returned ← make()
     print first(returned)
 
-    const tuple<int, int> ∪ none absent ← null
+    let tuple<int, int> ∪ none absent ← null
     print first(absent)
 }

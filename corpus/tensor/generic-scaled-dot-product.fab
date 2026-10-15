@@ -37,11 +37,11 @@ locale = "la"
 # `generic_scaled_dot_product_method_body_typechecks`.
 
 functio scaled_dot_product<magnitudo B, magnitudo D>(tensor<f32, [B, D]> qb, tensor<f32, [B, D]> kb, tensor<f32, [B, D]> vb, tensor<f32, [B, B]> scale) → tensor<f32, [B, D]> {
-    fixum tensor<f32, [D, B]> kt ← kb.transpone()
-    fixum tensor<f32, [B, B]> scores ← qb.matmul(kt)
-    fixum tensor<f32, [B, B]> scaled ← scores ⊙ scale
-    fixum tensor<f32, [B, B]> attn ← scaled.activatio_softmax()
-    fixum tensor<f32, [B, D]> context ← attn.matmul(vb)
+    sit tensor<f32, [D, B]> kt ← kb.transpone()
+    sit tensor<f32, [B, B]> scores ← qb.matmul(kt)
+    sit tensor<f32, [B, B]> scaled ← scores ⊙ scale
+    sit tensor<f32, [B, B]> attn ← scaled.activatio_softmax()
+    sit tensor<f32, [B, D]> context ← attn.matmul(vb)
     redde context
 }
 

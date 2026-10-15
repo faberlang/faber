@@ -31,22 +31,22 @@ fn dextra(wrapping<u32> value, wrapping<u32> count) → wrapping<u32> {
 }
 
 main {
-    const wrapping<u32> a ← 1779033703
-    const wrapping<u32> b ← 3144134277
-    const wrapping<u32> c ← 1013904242
-    const wrapping<u32> d ← 2773480762
-    const wrapping<u32> e ← 1359893119
-    const wrapping<u32> f ← 2600822924
-    const wrapping<u32> g ← 528734635
-    const wrapping<u32> h ← 1541459225
-    const wrapping<u32> w ← 1633837952
-    const wrapping<u32> k ← 1116352408
-    const wrapping<u32> sigma1 ← dextra(e, 6 ∷ wrapping<u32>) ⊻ dextra(e, 11 ∷ wrapping<u32>) ⊻ dextra(e, 25 ∷ wrapping<u32>)
-    const wrapping<u32> choose ← e ∧ f ⊻ ¬e ∧ g
-    const wrapping<u32> temp1 ← h + sigma1 + choose + k + w
-    const wrapping<u32> sigma0 ← dextra(a, 2 ∷ wrapping<u32>) ⊻ dextra(a, 13 ∷ wrapping<u32>) ⊻ dextra(a, 22 ∷ wrapping<u32>)
-    const wrapping<u32> majority ← a ∧ b ⊻ a ∧ c ⊻ b ∧ c
-    const wrapping<u32> temp2 ← sigma0 + majority
+    let wrapping<u32> a ← 1779033703
+    let wrapping<u32> b ← 3144134277
+    let wrapping<u32> c ← 1013904242
+    let wrapping<u32> d ← 2773480762
+    let wrapping<u32> e ← 1359893119
+    let wrapping<u32> f ← 2600822924
+    let wrapping<u32> g ← 528734635
+    let wrapping<u32> h ← 1541459225
+    let wrapping<u32> w ← 1633837952
+    let wrapping<u32> k ← 1116352408
+    let wrapping<u32> sigma1 ← dextra(e, 6 ∷ wrapping<u32>) ⊻ dextra(e, 11 ∷ wrapping<u32>) ⊻ dextra(e, 25 ∷ wrapping<u32>)
+    let wrapping<u32> choose ← e ∧ f ⊻ ¬e ∧ g
+    let wrapping<u32> temp1 ← h + sigma1 + choose + k + w
+    let wrapping<u32> sigma0 ← dextra(a, 2 ∷ wrapping<u32>) ⊻ dextra(a, 13 ∷ wrapping<u32>) ⊻ dextra(a, 22 ∷ wrapping<u32>)
+    let wrapping<u32> majority ← a ∧ b ⊻ a ∧ c ⊻ b ∧ c
+    let wrapping<u32> temp2 ← sigma0 + majority
     print temp1 + temp2
     print d + temp1
 }

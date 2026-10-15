@@ -7,7 +7,7 @@ category = "comptime"
 canonical = true
 summary = "Embeds a package file into a module constant at build time."
 syntax = "const <type> <name> = embed \"<path>\""
-related = ["generis", "textus", "octeti", "praefixum"]
+related = ["fixum", "textus", "octeti", "praefixum"]
 locale = "en"
 +++
 # =============================================================================
@@ -24,7 +24,7 @@ locale = "en"
 #   • Declaring `string` for a binary file — invalid UTF-8 is a compile error; declare `bytes`.
 #   • Expecting a runtime read — changing the file needs a rebuild; for run-time I/O use a `call` route.
 #
-# See also: generis, textus, octeti, praefixum
+# See also: fixum, textus, octeti, praefixum
 # =============================================================================
 
 # insere — build-time file embed (en `embed`)
@@ -44,7 +44,7 @@ const string NUNTIUS = embed "nuntius.txt"
 const list<b8> SIGNUM = embed "signum.bin"
 
 class Tabula {
-    static string TITULUS = embed "nuntius.txt"
+    const string TITULUS = embed "nuntius.txt"
 }
 
 # `embed` is contextual: directly before a string literal it is the embed; any

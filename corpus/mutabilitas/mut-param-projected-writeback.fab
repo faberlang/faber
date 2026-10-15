@@ -1,0 +1,49 @@
++++
+term = "mutabilitas"
+kind = "concept"
+grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "function_type", "type_list", "expression", "literal", "expr_stmt", "call_expr", "call_suffix", "member_suffix", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "argument_list", "argument", "array_literal", "assignment", "clausura_expr", "genus_decl", "genus_member", "field_decl"]
+category = "type"
+canonical = false
+summary = "A field projection passed to a mut parameter is rebound by the callee and the write lands back in the caller's field."
+syntax = "setseven(mut b.count)"
+related = ["mut", "genus", "functio"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — projected field write-through via a mut parameter
+# =============================================================================
+#
+# What this teaches:
+#   • A field projection (`b.count`) is a writable place, so it may be passed
+#     to a `mut` parameter: the callee rebinds it and the final value lands
+#     back in the caller's field at return. The record itself survives; only
+#     the projected field moves.
+#
+# See also: mutabilitas, functio, mut
+# =============================================================================
+
+# mutabilitas mut-param-projected-writeback — projected field write-through
+#
+# EXPECTED OUTPUT:
+#   mut-param-projected-writeback.expected
+#
+# BACKEND:
+#   Runner: a call bound from a projected caller place writes the callee's
+#   final value back into that place at return, so the caller's field changes
+#   while the rest of the record is untouched.
+
+class Box {
+    mut int count = 0
+    mut string label = "alpha"
+}
+
+fn setseven(mut int n) → void {
+    n ← 7
+}
+
+main {
+    mut Box b ← Box {}
+    setseven(mut b.count)
+    print b.count
+    print b.label
+}

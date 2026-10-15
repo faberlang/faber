@@ -44,11 +44,11 @@ fn take(value v) → inf {
 
 main {
     # 1. Integer payloads convert exactly.
-    const int small ← 7
-    const u8 byte ← 200
-    const inf big ← 18446744073709551616
-    const inf big_negative ← -18446744073709551617
-    const inf edge ← 9223372036854775808
+    let int small ← 7
+    let u8 byte ← 200
+    let inf big ← 18446744073709551616
+    let inf big_negative ← -18446744073709551617
+    let inf edge ← 9223372036854775808
     print take(small ↦ value)
     print take(byte ↦ value)
     print take(big ↦ value)
@@ -56,15 +56,15 @@ main {
     print take(edge ↦ value)
 
     # 2. A stored conversion reads the integer and keeps every digit.
-    const value boxed ← big ↦ value
-    const inf taken ← boxed ↦ inf
+    let value boxed ← big ↦ value
+    let inf taken ← boxed ↦ inf
     print taken
     print taken + 1
 
     # 3. Anything that is not an integer fails.
-    const float half ← 1.5
-    const float exact_three ← 3.0
-    const bool truth ← true
+    let float half ← 1.5
+    let float exact_three ← 3.0
+    let bool truth ← true
     print take(half ↦ value)
     print take(exact_three ↦ value)
     print take("7" ↦ value)
@@ -72,6 +72,6 @@ main {
     print take(null ↦ value)
 
     # 4. `⊥` names its own fallback.
-    const value word ← "text" ↦ value
+    let value word ← "text" ↦ value
     print word ↦ inf ⊥ 8
 }

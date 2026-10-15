@@ -29,7 +29,7 @@ diagnostic = "SEM011:bits_operand_mismatch"
 # This exemplum intentionally fails to compile.
 
 main {
-    const b8 a ← 0x0f
-    const u8 n ← 3
+    let b8 a ← 0x0f
+    let u8 n ← 3
     print a ∧ n
 }

@@ -27,11 +27,11 @@ locale = "en"
 
 # itera ab — ranges with step using per
 #
-# itera ab <start>‥<end> per <step> fixum <item> { <body> }
-# itera ab <start>…<end> per <step> fixum <item> { <body> }
+# itera ab <start>‥<end> per <step> sit <item> { <body> }
+# itera ab <start>…<end> per <step> sit <item> { <body> }
 #
 # GRAMMAR:
-#   forRangeStmt :← 'itera' 'ab' rangeExpr 'per' expr ('fixum' | 'varia') ident block
+#   forRangeStmt :← 'itera' 'ab' rangeExpr 'per' expr ('sit' | 'varia') ident block
 #
 # EXPECTED OUTPUT:
 #   intervallum-gradus.expected — positive-step, inclusive, and descending
@@ -39,27 +39,27 @@ locale = "en"
 
 main {
     # Step by 2 (exclusive: 0, 2, 4, 6, 8)
-    for range 0‥10 step 2 const i {
+    for range 0‥10 step 2 let i {
         print i
     }
 
     # Step by 2 (inclusive: 0, 2, 4, 6, 8, 10)
-    for range 0…10 step 2 const i {
+    for range 0…10 step 2 let i {
         print i
     }
 
     # Step by 3
-    for range 0‥15 step 3 const i {
+    for range 0‥15 step 3 let i {
         print i
     }
 
     # Descending: the bounds pick the direction, the step stays positive
-    for range 10‥0 step 1 const i {
+    for range 10‥0 step 1 let i {
         print i
     }
 
     # Descending by 2
-    for range 10‥0 step 2 const i {
+    for range 10‥0 step 2 let i {
         print i
     }
 }

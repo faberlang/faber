@@ -15,7 +15,7 @@ fn ref_list_read_methods_are_legal() {
     let _ = analyze_ok_la(
         r"
 incipit {
-    fixum de lista<numerus> xs ← [1, 2, 3]
+    sit de lista<numerus> xs ← [1, 2, 3]
     nota xs.longitudo()
 }
 ",
@@ -27,7 +27,7 @@ fn ref_list_mutating_receiver_rejects() {
     assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum de lista<numerus> xs ← [1, 2, 3]
+    sit de lista<numerus> xs ← [1, 2, 3]
     xs.appende(4)
 }
 ",
@@ -52,7 +52,7 @@ fn projection_assignment_through_ref_rejects() {
     assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum de lista<numerus> xs ← [1, 2, 3]
+    sit de lista<numerus> xs ← [1, 2, 3]
     xs[0] ← 9
 }
 ",
@@ -76,12 +76,12 @@ incipit {
 fn ref_to_mut_position_rejects() {
     assert_rejects_with_issue_la(
         r"
-functio poke(in lista<numerus> xs) → vacuum {
+functio poke(varia lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
-    fixum de lista<numerus> a ← [1, 2, 3]
-    poke(in a)
+    sit de lista<numerus> a ← [1, 2, 3]
+    poke(varia a)
 }
 ",
         ISSUE_REF_TO_MUT_OR_OWN_POSITION,
@@ -96,7 +96,7 @@ functio take(own lista<numerus> xs) → vacuum {
     nota xs.longitudo()
 }
 incipit {
-    fixum de lista<numerus> a ← [1, 2, 3]
+    sit de lista<numerus> a ← [1, 2, 3]
     take(own a)
 }
 ",
@@ -108,12 +108,12 @@ incipit {
 fn unmarked_into_mut_param_stays_legal() {
     let _ = analyze_ok_la(
         r"
-functio poke(in lista<numerus> xs) → vacuum {
+functio poke(varia lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
-    poke(in a)
+    poke(varia a)
 }
 ",
     );
@@ -127,7 +127,7 @@ genus Persona {
     varia lista<numerus> amici
 }
 incipit {
-    fixum de Persona p ← Persona { amici = [1, 2] }
+    sit de Persona p ← Persona { amici = [1, 2] }
     nota p.amici
 }
 ",
@@ -167,7 +167,7 @@ genus Persona {
     varia lista<numerus> amici
 }
 incipit {
-    fixum de Persona p ← Persona { amici = [1, 2] }
+    sit de Persona p ← Persona { amici = [1, 2] }
     p.amici.appende(3)
 }
 ",
@@ -183,10 +183,73 @@ genus Persona {
     varia lista<numerus> amici
 }
 incipit {
-    fixum de Persona p ← Persona { amici = [1, 2] }
+    sit de Persona p ← Persona { amici = [1, 2] }
     p.amici[0] ← 9
 }
 ",
         ISSUE_ASSIGN_THROUGH_REF,
+    );
+}
+
+#[test]
+fn ref_param_field_write_has_no_de_parameter_report() {
+    let src = "genus Punctum { varia numerus x }\nfunctio f(de Punctum p) → vacuum { p.x ← 1 }\nincipit { }";
+    let result = crate::test_support::analyze_source_la(src);
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert!(
+        errors
+            .iter()
+            .any(|e| crate::test_support::issue(e) == Some(ISSUE_ASSIGN_THROUGH_REF)),
+        "{errors:?}"
+    );
+    assert!(
+        errors
+            .iter()
+            .all(|e| crate::test_support::issue(e) != Some("assign_to_de_parameter")),
+        "one fault, one report: {errors:?}"
+    );
+}
+
+#[test]
+fn ref_param_whole_value_write_re_points_the_name() {
+    // Binding-words ruling 2026-10-15: a ref (or bare) parameter's name is
+    // re-pointable inside the callee; only a write through it is refused.
+    crate::test_support::assert_accepts_la(
+        "functio f(de numerus n) → vacuum { n ← 1 }\nincipit { }",
+    );
+}
+
+#[test]
+fn ref_param_field_write_reports_exactly_one_diagnostic() {
+    let src = "genus Punctum { varia numerus x }\nfunctio f(de Punctum p) → vacuum { p.x ← 1 }\nincipit { }";
+    let result = crate::test_support::analyze_source_la(src);
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert_eq!(errors.len(), 1, "one fault, one report: {errors:?}");
+    assert_eq!(
+        crate::test_support::issue(errors[0]),
+        Some(ISSUE_ASSIGN_THROUGH_REF),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn ref_param_index_write_reports_exactly_one_diagnostic() {
+    let src = "functio f(de lista<numerus> xs) → vacuum { xs[0] ← 9 }\nincipit { }";
+    let result = crate::test_support::analyze_source_la(src);
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert_eq!(errors.len(), 1, "one fault, one report: {errors:?}");
+    assert_eq!(
+        crate::test_support::issue(errors[0]),
+        Some(ISSUE_ASSIGN_THROUGH_REF),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn ref_param_whole_value_write_re_points_the_parameter() {
+    // Binding-words ruling 2026-10-15: `p ← q` re-points the ref parameter's
+    // name (callee-local); it is not a second assignment.
+    crate::test_support::assert_accepts_la(
+        "genus Punctum { varia numerus x }\nfunctio f(de Punctum p, Punctum q) → vacuum { p ← q }\nincipit { }",
     );
 }

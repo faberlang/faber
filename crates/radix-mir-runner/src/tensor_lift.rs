@@ -10,7 +10,7 @@
 //! of `And`/`Or` and all three of `Select` are already evaluated values, so
 //! nothing short-circuits.
 
-use super::exact_int::{exact_neg, int_value};
+use super::exact_int::{exact_neg, float_floor_rem, int_value};
 use super::value::{
     Value, compare_values, effective_width, ieee_maximum, ieee_minimum, numeric_binop, round_float,
     values_equal,
@@ -145,11 +145,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 width,
                 span,
             )?,
+            // WHY: float % floors with the divisor's sign (F9 ruling 29), the same closure
+            // as the scalar MirBinOp::Mod path.
             MirLiftOp::Mod => numeric_binop(
                 v[0].clone(),
                 v[1].clone(),
                 MirBinOp::Mod,
-                |a, b| a % b,
+                float_floor_rem,
                 width,
                 span,
             )?,

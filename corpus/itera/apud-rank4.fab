@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "Coordinate iteration over a rank-4 tensor binds four coordinates — outermost axis first."
-syntax = "for from tensor at [i, j, k, l] const cell { }"
+syntax = "for from tensor at [i, j, k, l] let cell { }"
 related = ["apud", "itera", "ex", "tensor"]
 locale = "en"
 +++
@@ -29,7 +29,7 @@ locale = "en"
 
 # Rank-4 `apud [i, j, k, l]` over a literal-shaped 2×2×2×2 tensor
 #
-# for from hypercube at [i, j, k, l] const cell { <body> }
+# for from hypercube at [i, j, k, l] let cell { <body> }
 #
 # GRAMMAR:
 #   iteraStmt :← 'for' 'from' expr ('at' '[' ident (',' ident)* ']')? …
@@ -38,10 +38,10 @@ locale = "en"
 #   i, j, k, l, cell per line — sixteen lanes in i-outer, l-inner order.
 
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0]
-    const tf32[2, 2, 2, 2] hypercube ← flat ↦ tf32[2, 2, 2, 2]
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0]
+    let tf32[2, 2, 2, 2] hypercube ← flat ↦ tf32[2, 2, 2, 2]
 
-    for from hypercube at [i, j, k, l] const cell {
+    for from hypercube at [i, j, k, l] let cell {
         print i, j, k, l, cell
     }
 }

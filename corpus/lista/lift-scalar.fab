@@ -19,6 +19,7 @@ locale = "en"
 #   • Between two lists `⊙` multiplies and `⊘` divides per element; `xs * ys` and
 #     `xs / ys` are errors that name them, as they are for vectors and tensors
 #   • An untyped literal adopts the list's element type — `xs * 2.0` stays `f32`
+#   • A float lift floors like the scalar `%` — the remainder takes the divisor's sign (`[-7.5] % 2.0` is `[0.5]`)
 #   • Operand order is kept — `0.5 - xs` is `0.5 - xs[i]` for each element
 #   • The sum is exact — `list<u8> + list<u8>` stores into a `list<u16>`; the range
 #     check happens only at the store (a `list<u8>` target would trap)
@@ -62,39 +63,45 @@ fn quotients(list<int> xs, list<int> ys) → list<int> {
 }
 
 fn total(list<f32, 4> x, list<f32, 4> y) → int {
-    const list<f32, 4> sum ← x + y
+    let list<f32, 4> sum ← x + y
     return sum.length()
 }
 
 main {
-    const list<f32> a ← [1.5, 2.5, 4.0]
-    const list<f32> b ← [2.0, 4.0, 8.0]
+    let list<f32> a ← [1.5, 2.5, 4.0]
+    let list<f32> b ← [2.0, 4.0, 8.0]
     print scaled(a)
     print shifted(a)
     print a % 2.0
     print 9.0 % b
+    # A float lift floors like the scalar operator (ruling 14, F9 ruling 29):
+    # the remainder takes the divisor's sign.
+    let list<f32> signs ← [-7.5, 7.5]
+    let f32 neg_two ← -2.0
+    print signs % 2.0
+    print signs % neg_two
     print a ÷ b
     print 3.0 ÷ b
     print -a
-    const list<int> n ← [7, 8, -9]
-    const list<int> m ← [2, 3, 4]
+    let list<int> n ← [7, 8, -9]
+    let list<int> m ← [2, 3, 4]
     print products(n, m)
     print quotients(n, m)
     print n % 4
     print n ÷ m
     print -n
-    const list<u8> bytes ← [200, 100, 50]
-    const list<u8> more ← [100, 100, 100]
-    const list<u16> wide ← bytes + more
+    let list<u8> bytes ← [200, 100, 50]
+    let list<u8> more ← [100, 100, 100]
+    let list<u16> wide ← bytes + more
     print wide
 
-    var list<f32, 4> p ← empty
+    mut list<f32, 4> p ← empty
     p.append(1.0)
     p.append(2.0)
-    var list<f32, 4> q ← empty
+    mut list<f32, 4> q ← empty
     q.append(4.0)
     q.append(5.0)
-    const list<f32, 4> sum ← p + q
+    let list<f32, 4> sum ← p + q
     print sum
     print sum.length()
     print 10.0 - p

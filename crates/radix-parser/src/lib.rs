@@ -851,7 +851,7 @@ impl Parser {
 
     /// Peek at the non-trivia token `offset` steps ahead without consuming.
     ///
-    /// WHY: Distinguishes forms such as `fixum _ name ←` from `fixum type name ←`
+    /// WHY: Distinguishes forms such as `sit name ←` from `sit type name ←`
     /// without consuming tokens.
     ///
     /// Uses the precomputed non-trivia index. When `non_trivia_cursor` is stale,
@@ -940,7 +940,14 @@ impl Parser {
             return None;
         };
         let latin = self.keyword_claim_key(sym)?;
-        lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone())
+        let kind = lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone());
+        // `varia` (the writable local) and `in` (the writable parameter) are one
+        // binding cell: a pack may spell both with one word, so the identity
+        // is shared and every position accepts either key.
+        match kind {
+            Some(TokenKind::In) => Some(TokenKind::Varia),
+            other => other,
+        }
     }
 
     /// Check whether the current word is the given keyword, by identity.
@@ -1852,6 +1859,10 @@ mod region_decl_test;
 #[cfg(test)]
 #[path = "static_decl_test.rs"]
 mod static_decl_test;
+
+#[cfg(test)]
+#[path = "binding_words_test.rs"]
+mod binding_words_test;
 
 #[cfg(test)]
 #[path = "nondum_function_test.rs"]

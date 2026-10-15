@@ -1,6 +1,7 @@
-//! A static (`generis`) genus field reads through the type name; a static read
-//! through an instance and an instance field read through the type name are
-//! named compile errors. Inside the genus's own members the path `Tab` is also
+//! A const (`fixum`, en `const`) genus member reads through the type name; a
+//! const read through an instance and an instance field read through the type
+//! name are named compile errors, and a store into a const member is
+//! `assignment_to_const_member` however it is reached. Inside the genus's own members the path `Tab` is also
 //! the receiver (`ego` lowers to the same path), so the receiver keeps reading.
 //!
 //! Fixtures use latin spellings because the radix unit-test harness compiles
@@ -8,7 +9,7 @@
 
 use crate::test_support;
 
-const TAB: &str = "genus Tab {\n    generis numerus Z = 3\n    varia numerus w = 1\n    functio f() → numerus { redde ego.w + ego.Z }\n}\n";
+const TAB: &str = "genus Tab {\n    fixum numerus Z = 3\n    varia numerus w = 1\n    functio f() → numerus { redde ego.w + ego.Z }\n}\n";
 
 #[test]
 fn static_field_read_through_type_name_is_accepted() {
@@ -29,6 +30,31 @@ fn static_field_read_of_instance_field_through_type_is_named() {
         &format!("{TAB}functio g() → numerus {{ redde Tab.w }}"),
         "instance_field_read_through_type",
     );
+}
+
+#[test]
+fn store_into_const_member_through_type_name_is_named() {
+    test_support::assert_rejects_with_issue(
+        &format!("{TAB}functio g() {{ Tab.Z ← 9 }}"),
+        "assignment_to_const_member",
+    );
+}
+
+#[test]
+fn store_into_const_member_through_instance_or_receiver_is_named() {
+    test_support::assert_rejects_with_issue(
+        &format!("{TAB}functio g(varia Tab t) {{ t.Z ← 9 }}"),
+        "assignment_to_const_member",
+    );
+    test_support::assert_rejects_with_issue(
+        "genus Tab {\n    fixum numerus Z = 3\n    functio f() → vacuum { ego.Z ← 1 }\n}\n",
+        "assignment_to_const_member",
+    );
+}
+
+#[test]
+fn store_into_per_instance_field_stays_accepted() {
+    test_support::assert_accepts(&format!("{TAB}functio g(varia Tab t) {{ t.w ← 9 }}"));
 }
 
 #[test]
@@ -82,7 +108,7 @@ mod imported {
                 name: "Tab".to_owned(),
                 params: Vec::new(),
                 fields: vec![
-                    field("Z", FieldModifier::Generis),
+                    field("Z", FieldModifier::Const),
                     field("w", FieldModifier::Varia),
                 ],
                 methods: Vec::new(),

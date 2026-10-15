@@ -39,8 +39,8 @@ fn construct<T, size Shape>(list<T> data) → tensor<T, Shape> ⇥ string {
 # Why: Product of dimension sizes; empty shape → 1 (scalar degenerate).
 @ public
 fn product(list<int> shape) → int {
-    var int product ← 1
-    for from shape const dim {
+    mut int product ← 1
+    for from shape let dim {
         product ← product * dim
     }
     return product
@@ -57,9 +57,9 @@ fn product(list<int> shape) → int {
 # pins the strict context — the fallback returns the untouched grid.
 @ public
 fn apply<T, size Shape>(tensor<T, Shape> grid, (T) → T f) → tensor<T, Shape> {
-    const list<T> flat ↤ grid
-    var list<T> mapped ← []
-    for from flat const elem {
+    let list<T> flat ↤ grid
+    mut list<T> mapped ← []
+    for from flat let elem {
         mapped.append(f(elem))
     }
     do {

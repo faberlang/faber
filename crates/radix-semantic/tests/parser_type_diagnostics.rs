@@ -30,7 +30,7 @@ fn load_pack(locale: &str) -> LocalePack {
 
 #[test]
 fn parser_type_diagnostic_resolves_through_two_locale_templates() {
-    let source = "incipit { fixum atomic<numerus value ← 0 }";
+    let source = "incipit { sit atomic<numerus value ← 0 }";
     let parsed = parse(lex(source));
     let error = parsed
         .errors

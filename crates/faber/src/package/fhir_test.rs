@@ -69,7 +69,7 @@ const LOCAL_LOCALE_UTIL: &str = "@ public\nfn salutare() → string {\n    retur
 // The `triga:` provider is an inline fixture library (see
 // `fixture_library_home`), not the live triga sibling, so a sibling's API
 // churn cannot break this test. The fixture names are source-canonical.
-const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:text\" text\n\nfn run() → string {\n    const math.Point3 origin ← math.point3(1.0, 0.0, 0.0)\n    const string reversed ← text.reverse(\"abc\")\n    const string joined ← text.join([reversed, \"abc\"], \",\")\n    print joined\n    return joined\n}\n\nmain {\n    print run()\n}\n";
+const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:text\" text\n\nfn run() → string {\n    let math.Point3 origin ← math.point3(1.0, 0.0, 0.0)\n    let string reversed ← text.reverse(\"abc\")\n    let string joined ← text.join([reversed, \"abc\"], \",\")\n    print joined\n    return joined\n}\n\nmain {\n    print run()\n}\n";
 const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:text\" chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
 
 /// A library home with the real Norma stdlib (symlinked) and an inline
@@ -87,7 +87,7 @@ fn fixture_library_home(dir: &Path) -> PathBuf {
     .expect("write fixture triga manifest");
     fs::write(
         triga_src.join("math.fab"),
-        "@ public\nclass Point3 {\n    var f32 x\n    var f32 y\n    var f32 z\n}\n\n@ public\nfn point3(f32 x, f32 y, f32 z) → Point3 {\n    return Point3 { x = x, y = y, z = z }\n}\n",
+        "@ public\nclass Point3 {\n    mut f32 x\n    mut f32 y\n    mut f32 z\n}\n\n@ public\nfn point3(f32 x, f32 y, f32 z) → Point3 {\n    return Point3 { x = x, y = y, z = z }\n}\n",
     )
     .expect("write fixture triga math");
     #[cfg(unix)]
@@ -322,8 +322,8 @@ kind = "bin"
 
 fn describe(Forma f) → string {
     match f {
-        case Numerus const v { return "n: §"(v) }
-        case Textus const v { return "t: §"(v) }
+        case Numerus let v { return "n: §"(v) }
+        case Textus let v { return "t: §"(v) }
     }
 }
 
@@ -381,6 +381,77 @@ kind = "bin"
     src.join("main.fab")
 }
 
+/// Trivial `kind = "lib"` package with no `paths.entry`: the shape a
+/// library package has when the source root is the whole module set. Returns
+/// the package ROOT.
+fn write_trivial_lib_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "libpkg"
+version = "0.0.0"
+edition = "2026"
+
+[library]
+provider = "libpkg"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(
+        src.join("main.fab"),
+        "@ public\nfn salute() → string {\n    return \"salve\"\n}\n",
+    )
+    .expect("write main.fab");
+    dir.to_path_buf()
+}
+
+/// `kind = "lib"` package whose source root holds a frozen copy of the live
+/// `triga` `src/math.fab` (provenance: frozen copy of triga src/math.fab,
+/// 2026-10-15). Returns the package ROOT; the module file is the build
+/// input, matching `faber build <lib>/src/math.fab` — a lib package without
+/// `paths.entry` records the source-root directory as its entry, so its
+/// artifact is not loadable.
+fn write_triga_math_lib_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "libpkg"
+version = "0.0.0"
+edition = "2026"
+
+[library]
+provider = "libpkg"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(
+        src.join("math.fab"),
+        include_str!("fhir_triga_math_fixture.fab"),
+    )
+    .expect("write math.fab");
+    dir.to_path_buf()
+}
+
 /// Extract the code string from a codegen [`radix::module::Output`].
 fn output_code(output: &radix::module::Output) -> &str {
     match output {
@@ -393,6 +464,48 @@ fn output_code(output: &radix::module::Output) -> &str {
 // ---------------------------------------------------------------------------
 // Stage 2: build/load round trip
 // ---------------------------------------------------------------------------
+
+#[test]
+fn lib_package_directory_input_builds_fhir_package() {
+    let dir = test_temp_dir("fhir-trivial-lib");
+    let package_root = write_trivial_lib_package(&dir);
+    let artifact = build_fhir_with_faber_seams(&Config::default(), &package_root)
+        .expect("an un-targeted lib package directory must build FHIR");
+    assert!(
+        artifact.package_path.is_file(),
+        "package artifact written: {}",
+        artifact.package_path.display()
+    );
+    assert_eq!(
+        artifact.package_path,
+        package_root.join("target/faber-fhir/package.fhirpkg")
+    );
+
+    // Control: the entry-file input was already supported and must stay so.
+    let entry = package_root.join("src/main.fab");
+    build_fhir_with_faber_seams(&Config::default(), &entry).expect("entry-file input must stay Ok");
+}
+
+#[test]
+fn triga_math_content_builds_fhir_package() {
+    let dir = test_temp_dir("fhir-triga-math");
+    let package_root = write_triga_math_lib_package(&dir);
+    let artifact =
+        build_fhir_with_faber_seams(&Config::default(), &package_root.join("src/math.fab"))
+            .expect("triga math.fab content must build FHIR");
+    assert!(
+        artifact.package_path.is_file(),
+        "package artifact written: {}",
+        artifact.package_path.display()
+    );
+    assert_eq!(
+        artifact.package_path,
+        package_root.join("target/faber-fhir/package.fhirpkg")
+    );
+    // The build re-decodes each unit for MessagePack embedding, so a
+    // successful load proves the encode/decode gates pass on this content.
+    load_package_fhir(&artifact.package_path).expect("load FHIR package");
+}
 
 #[test]
 fn build_load_round_trip_with_local_import() {

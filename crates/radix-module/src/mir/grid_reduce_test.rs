@@ -61,7 +61,7 @@ fn reduce_kernel(op: &str, element: &str) -> String {
 @ kernel
 @ public
 fn k(tensor<f32, [_, _]> state, mut tensor<{element}, [4]> out) → void {{
-    out[0] ← reduce via {op} from state at [i, j] thread lane const s {{ return s * 2.0 }}{coalesce}
+    out[0] ← reduce via {op} from state at [i, j] thread lane let s {{ return s * 2.0 }}{coalesce}
 }}
 main {{}}
 "
@@ -115,7 +115,7 @@ fn sum_count_and_argmax_lower_to_their_ops() {
 @ kernel
 @ public
 fn k(tensor<f32, [_]> state, mut tensor<{element}, [4]> out) → void {{
-    out[0] ← reduce via {op} from state at [i] thread lane const s {{ return s }} coalesce 0
+    out[0] ← reduce via {op} from state at [i] thread lane let s {{ return s }} coalesce 0
 }}
 main {{}}
 "
@@ -126,7 +126,7 @@ main {{}}
 @ kernel
 @ public
 fn k(tensor<f32, [_, _]> state, mut tensor<{element}, [4]> out) → void {{
-    out[0] ← reduce via {op} from state at [i, j] thread lane const s {{ return s ≻ 0.0 }}
+    out[0] ← reduce via {op} from state at [i, j] thread lane let s {{ return s ≻ 0.0 }}
 }}
 main {{}}
 "
@@ -156,8 +156,8 @@ fn a_reduce_nested_in_a_lane_loop_is_refused_by_name() {
 @ kernel
 @ public
 fn k(tensor<f32, [_, _]> state, mut tensor<f32, [_, _]> out) → void {
-    for from state at [i, j] thread lane const v {
-        out[[i, j]] ← reduce via max from state at [a, b] thread lane const s { return s } coalesce 0.0
+    for from state at [i, j] thread lane let v {
+        out[[i, j]] ← reduce via max from state at [a, b] thread lane let s { return s } coalesce 0.0
     }
 }
 main {}
@@ -177,7 +177,7 @@ const SECOND_SOURCE: &str = r"
 @ kernel
 @ public
 fn k(tensor<f32, [_, _]> mask, tensor<f32, [_, _]> state, mut tensor<f32, [4]> out) → void {
-    out[0] ← reduce via max from state at [i, j] thread lane const s { return s * 2.0 } coalesce 0.0
+    out[0] ← reduce via max from state at [i, j] thread lane let s { return s * 2.0 } coalesce 0.0
 }
 main {}
 ";
@@ -186,7 +186,7 @@ const LOOP_KERNEL: &str = r"
 @ kernel
 @ public
 fn k(tensor<f32, [_, _]> src, mut tensor<f32, [_, _]> dst) → void {
-    for from src at [i, j] thread lane const v {
+    for from src at [i, j] thread lane let v {
         dst[[i, j]] ← v
     }
 }
@@ -272,7 +272,7 @@ fn clampabs(f32 v) → f32 {
 @ kernel
 @ public
 fn k(f32 bias, tensor<f32, [_, _]> state, mut tensor<f32, [4]> out) → void {
-    out[0] ← reduce via max from state at [i, j] thread lane const s { return clampabs(s - bias) } coalesce 0.0
+    out[0] ← reduce via max from state at [i, j] thread lane let s { return clampabs(s - bias) } coalesce 0.0
 }
 main {}
 ";

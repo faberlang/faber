@@ -44,9 +44,9 @@ fn pick(map<string, value> members, string key) → value {
 
 main {
     # 1. JSON integer tokens keep every digit; a fraction is a float.
-    const json document ← json.parse(«{"a": 18446744073709551616, "b": -18446744073709551617, "c": 18446744073709551615, "d": -5, "e": 1.5}»)
-    const value root ← document ↦ value
-    const map<string, value> members ← root ↦ map<string, value>
+    let json document ← json.parse(«{"a": 18446744073709551616, "b": -18446744073709551617, "c": 18446744073709551615, "d": -5, "e": 1.5}»)
+    let value root ← document ↦ value
+    let map<string, value> members ← root ↦ map<string, value>
     print pick(members, "a") ↦ inf
     print pick(members, "b") ↦ inf
     print pick(members, "c") ↦ inf
@@ -54,21 +54,21 @@ main {
     print pick(members, "e") ↦ inf ⊥ 0
 
     # 2. A thousand digits survive parse, extraction and stringify.
-    var string digits ← "9"
-    for range 1‥1000 const i {
+    mut string digits ← "9"
+    for range 1‥1000 let i {
         digits ← digits + "7"
     }
-    const string payload ← «{"n":§}»(digits)
-    const json parsed ← json.parse(payload)
-    const value parsed_root ← parsed ↦ value
-    const map<string, value> parsed_members ← parsed_root ↦ map<string, value>
-    const inf thousand ← pick(parsed_members, "n") ↦ inf
-    const string back ← thousand ↦ string
+    let string payload ← «{"n":§}»(digits)
+    let json parsed ← json.parse(payload)
+    let value parsed_root ← parsed ↦ value
+    let map<string, value> parsed_members ← parsed_root ↦ map<string, value>
+    let inf thousand ← pick(parsed_members, "n") ↦ inf
+    let string back ← thousand ↦ string
     print back.length()
     print back ≡ digits
     print thousand % 1000
     print thousand / (thousand / 10)
-    const json reparsed ← json.parse(payload)
-    const string rendered ← json.stringify(reparsed)
+    let json reparsed ← json.parse(payload)
+    let string rendered ← json.stringify(reparsed)
     print rendered ≡ payload
 }

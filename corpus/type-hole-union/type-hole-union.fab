@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "types"
 canonical = true
 summary = "The `_` hole infers one inhabitant type; the `∪` hole infers a finite union; `T ∪ nihil` stays a single optional inhabitant."
-syntax = "fixum _ x ← value; fixum ∪ x ← a; x ← b; fixum lista<∪> xs ← [a, b]"
+syntax = "sit x ← value; sit ∪ x ← a; x ← b; sit lista<∪> xs ← [a, b]"
 aliases = []
 related = ["unio", "nihil"]
 locale = "en"
@@ -17,9 +17,9 @@ locale = "en"
 #
 # What this teaches:
 #   • `_` is the monomorphic hole: it infers exactly ONE inhabitant type.
-#     `const _ count ← 3` solves `count : int`.
+#     `let count ← 3` solves `count : int`.
 #   • `∪` is the union hole: the slot accumulates a member type from every
-#     direct flow. `var ∪ mixed ← 1` then `mixed ← "salve"` solves
+#     direct flow. `mut ∪ mixed ← 1` then `mixed ← "salve"` solves
 #     `mixed : int ∪ string` without authoring the member list by hand.
 #   • `list<∪>` learns heterogeneous element types the same way:
 #     `list<∪> nodes ← [1, "two", 3]` solves to `list<int ∪ string>`.
@@ -41,7 +41,7 @@ locale = "en"
 
 # `_` infers exactly one inhabitant type from the initializer: `n` is `int`.
 fn member_count(list<int ∪ string> xs) → int {
-    const _ n ← xs.length()
+    let n ← xs.length()
     if n ≻ 0 then return 1
     return 0
 }
@@ -50,10 +50,10 @@ fn member_count(list<int ∪ string> xs) → int {
 # members, and an `if` inside an arm tests the value.
 fn consume(int ∪ string value) → int {
     match value {
-        case int const n {
+        case int let n {
             if n ≡ 7 then return 1
         }
-        case string const s {
+        case string let s {
             if s ≡ "x" then return 2
         }
     }
@@ -70,22 +70,22 @@ fn maybe_len(string ∪ none value) → int {
 
 test "the two hole kinds infer cleanly without shape warnings" {
     # `_`: exactly one inhabitant type.
-    const _ count ← 3
+    let count ← 3
 
     # `∪`: every direct flow adds a member — solves to `int ∪ string`.
-    var ∪ mixed ← 1
+    mut ∪ mixed ← 1
     mixed ← "salve"
 
     # `list<∪>`: heterogeneous elements solve to `list<int ∪ string>`.
-    const list<∪> nodes ← [1, "two", 3]
+    let list<∪> nodes ← [1, "two", 3]
 
     # `T ∪ null`: one optional inhabitant — `_` over it stays quiet.
-    const string ∪ none opt ← "text"
-    const _ maybe ← opt
+    let string ∪ none opt ← "text"
+    let maybe ← opt
 
-    const _ m ← member_count(nodes)
-    const _ n ← consume(mixed)
-    const _ o ← maybe_len(maybe)
+    let m ← member_count(nodes)
+    let n ← consume(mixed)
+    let o ← maybe_len(maybe)
 
     assert count ≡ 3
     assert m ≡ 1
@@ -97,22 +97,22 @@ test "the two hole kinds infer cleanly without shape warnings" {
 # so the script harness has an exact stdout oracle (`type-hole-union.expected`).
 main {
     # `_`: exactly one inhabitant type.
-    const _ count ← 3
+    let count ← 3
 
     # `∪`: every direct flow adds a member — solves to `int ∪ string`.
-    var ∪ mixed ← 1
+    mut ∪ mixed ← 1
     mixed ← "salve"
 
     # `list<∪>`: heterogeneous elements solve to `list<int ∪ string>`.
-    const list<∪> nodes ← [1, "two", 3]
+    let list<∪> nodes ← [1, "two", 3]
 
     # `T ∪ null`: one optional inhabitant — `_` over it stays quiet.
-    const string ∪ none opt ← "text"
-    const _ maybe ← opt
+    let string ∪ none opt ← "text"
+    let maybe ← opt
 
-    const _ m ← member_count(nodes)
-    const _ n ← consume(mixed)
-    const _ o ← maybe_len(maybe)
+    let m ← member_count(nodes)
+    let n ← consume(mixed)
+    let o ← maybe_len(maybe)
 
     assert count ≡ 3
     assert m ≡ 1

@@ -36,8 +36,8 @@ locale = "en"
 #   none — output mixes diagnostic channels; no .expected sidecar.
 
 main {
-    const string condicio ← "currit"
-    const int quantitas ← 42
+    let string condicio ← "currit"
+    let int quantitas ← 42
 
     # Neutral diagnostic note
     print "opus initum"

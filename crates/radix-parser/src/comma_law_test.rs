@@ -55,7 +55,7 @@ fn item_list_trailing_comma_is_targeted() {
 #[test]
 fn iuncta_type_arguments_trailing_comma_is_targeted() {
     assert_issue(
-        "incipit { fixum _ pair ← iuncta<textus, numerus,> [\"salve\", 42] }",
+        "incipit { sit pair ← iuncta<textus, numerus,> [\"salve\", 42] }",
         "item_list_trailing_comma",
         "type_arguments",
     );

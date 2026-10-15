@@ -7,7 +7,7 @@ locale = "en"
 # `trap_union_collapsed` diagnostic.
 
 class Payload {
-    var string message
+    mut string message
 }
 
 fn same() → Payload ⇥ Payload {
@@ -15,6 +15,6 @@ fn same() → Payload ⇥ Payload {
 }
 
 main {
-    const ∪ r ← trap { same() }
+    let ∪ r ← trap { same() }
     print r
 }

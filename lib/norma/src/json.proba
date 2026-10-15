@@ -7,16 +7,16 @@ import from "./json" json_codec
 
 @ json
 class Payload {
-    var string name
-    var list<int> counts
-    var bool active
+    mut string name
+    mut list<int> counts
+    mut bool active
 }
 
 @ json
 class EscapedText {
-    var string control
-    var string text
-    var string unicode
+    mut string control
+    mut string text
+    mut string unicode
 }
 
 fn rejects(string wire) → bool {
@@ -42,7 +42,7 @@ fn parse_valid(string wire) → json {
 # away, so these helpers panic like parse_valid does.
 fn map_of(value tree) → map<string, value> {
     do {
-        const map<string, value> root ↤ tree
+        let map<string, value> root ↤ tree
         return root
     }
     catch err {
@@ -88,10 +88,10 @@ fn json_of(EscapedText payload) → json {
 
 describe "JSON parsing" {
     test "parses a typed object with nested values" {
-        const json document ← parse_valid(
+        let json document ← parse_valid(
             "{\"name\":\"Ada\",\"counts\":[1,2,3],\"active\":true}"
         )
-        const Payload payload ← payload_of(document)
+        let Payload payload ← payload_of(document)
         assert payload.name ≡ "Ada"
         assert payload.counts.length() ≡ 3
         assert (payload.counts.get(1) coalesce 0) ≡ 2
@@ -99,11 +99,11 @@ describe "JSON parsing" {
     }
 
     test "accepts whitespace and JSON number forms" {
-        const json document ← parse_valid(
+        let json document ← parse_valid(
             " \n { \"zero\" : 0, \"negative\" : -12, \"fraction\" : 1.25, \"exponent\" : 2e3 } \t "
         )
-        const value tree ← document ↦ value
-        const map<string, value> root ← map_of(tree)
+        let value tree ← document ↦ value
+        let map<string, value> root ← map_of(tree)
         assert (root.get("zero") ↦ int) ≡ 0
         assert (root.get("negative") ↦ int) ≡ -12
         assert (root.get("fraction") ↦ float) ≈ 1.25
@@ -111,48 +111,48 @@ describe "JSON parsing" {
     }
 
     test "reads integers at and beyond the int boundary exactly" {
-        const json document ← parse_valid(
+        let json document ← parse_valid(
             «{"max":9223372036854775807,"min":-9223372036854775808,"over":9223372036854775808,"under":-9223372036854775809,"wide":18446744073709551616}»
         )
-        const value tree ← document ↦ value
-        const map<string, value> root ← map_of(tree)
+        let value tree ← document ↦ value
+        let map<string, value> root ← map_of(tree)
         assert (root.get("max") ↦ int) ≡ 9223372036854775807
         assert (root.get("min") ↦ int) ≡ -9223372036854775807 - 1
-        const inf over ← 9223372036854775807
+        let inf over ← 9223372036854775807
         assert (root.get("over") ↦ inf) ≡ over + 1
         assert (root.get("under") ↦ inf) ≡ -over - 2
         assert (root.get("wide") ↦ inf) ≡ over * 2 + 2
     }
 
     test "decodes ordinary string escapes" {
-        const json document ← parse_valid(
+        let json document ← parse_valid(
             "{\"text\":\"line\\nquote: \\\" slash: \\\\ solidus: \\/\"}"
         )
-        const value tree ← document ↦ value
-        const map<string, value> root ← map_of(tree)
+        let value tree ← document ↦ value
+        let map<string, value> root ← map_of(tree)
         assert (root.get("text") ↦ string) ≡ "line\nquote: \" slash: \\ solidus: /"
     }
 
     test "decodes Unicode escapes and surrogate pairs" {
-        const json document ← parse_valid(
+        let json document ← parse_valid(
             "{\"bmp\":\"\\u03BB\",\"pair\":\"\\uD834\\uDD1E\",\"raw\":\"λ\"}"
         )
-        const value tree ← document ↦ value
-        const map<string, value> root ← map_of(tree)
+        let value tree ← document ↦ value
+        let map<string, value> root ← map_of(tree)
         assert (root.get("bmp") ↦ string) ≡ "λ"
         assert (root.get("pair") ↦ string) ≡ "𝄞"
         assert (root.get("raw") ↦ string) ≡ "λ"
     }
 
     test "preserves null and empty collections" {
-        const json document ← parse_valid(
+        let json document ← parse_valid(
             "{\"nothing\":null,\"object\":{},\"array\":[]}"
         )
-        const value tree ← document ↦ value
-        const map<string, value> root ← map_of(tree)
+        let value tree ← document ↦ value
+        let map<string, value> root ← map_of(tree)
         assert root.get("nothing") is none
-        const map<string, value> object ↤ root.get("object")
-        const list<value> array ↤ root.get("array")
+        let map<string, value> object ↤ root.get("object")
+        let list<value> array ↤ root.get("array")
         assert object.length() ≡ 0
         assert array.length() ≡ 0
     }
@@ -183,7 +183,7 @@ describe "JSON parsing" {
 
 describe "JSON serialization" {
     test "serializes every JSON value kind" {
-        const json document ← {
+        let json document ← {
             "text": "Ada",
             "integer": 3,
             "fraction": 1.25,
@@ -191,63 +191,63 @@ describe "JSON serialization" {
             "nothing": null,
             "items": [1, false, {"nested": "yes"}]
         }
-        const string wire ← json_codec.stringify(document)
+        let string wire ← json_codec.stringify(document)
         assert wire ≡ «{"active":true,"fraction":1.25,"integer":3,"items":[1,false,{"nested":"yes"}],"nothing":null,"text":"Ada"}»
     }
 
     test "escapes strings and preserves Unicode" {
-        const string control ← byte_text(1)
-        const string backspace ← byte_text(8)
-        const string formfeed ← byte_text(12)
-        const EscapedText payload ← EscapedText {
+        let string control ← byte_text(1)
+        let string backspace ← byte_text(8)
+        let string formfeed ← byte_text(12)
+        let EscapedText payload ← EscapedText {
             control = control,
             text = «line§quote: § slash: § tab:§ back:§ form:§»(
                 "\n", «"», "\\", "\t", backspace, formfeed
             ),
             unicode = "λ𝄞"
         }
-        const json document ← json_of(payload)
-        const string wire ← json_codec.stringify(document)
-        const string expected ← «{"control":"\\u0001","text":"line\\nquote: \\" slash: \\\\ tab:\\t back:\\b form:\\f","unicode":"λ𝄞"}»
+        let json document ← json_of(payload)
+        let string wire ← json_codec.stringify(document)
+        let string expected ← «{"control":"\\u0001","text":"line\\nquote: \\" slash: \\\\ tab:\\t back:\\b form:\\f","unicode":"λ𝄞"}»
         assert wire ≡ expected
-        const EscapedText roundtrip ← escaped_of(parse_valid(wire))
+        let EscapedText roundtrip ← escaped_of(parse_valid(wire))
         assert roundtrip.control ≡ payload.control
         assert roundtrip.text ≡ payload.text
         assert roundtrip.unicode ≡ payload.unicode
     }
 
     test "serializes integers at and beyond the int boundary as bare numbers" {
-        const string wire ← «{"max":9223372036854775807,"min":-9223372036854775808,"over":9223372036854775808,"under":-9223372036854775809}»
+        let string wire ← «{"max":9223372036854775807,"min":-9223372036854775808,"over":9223372036854775808,"under":-9223372036854775809}»
         assert json_codec.stringify(parse_valid(wire)) ≡ wire
     }
 
     test "round trips a thousand-digit integer" {
-        var string digits ← "9"
-        for range 1‥1000 const i {
+        mut string digits ← "9"
+        for range 1‥1000 let i {
             digits ← digits + "7"
         }
-        const string wire ← «{"n":§}»(digits)
-        const json document ← parse_valid(wire)
+        let string wire ← «{"n":§}»(digits)
+        let json document ← parse_valid(wire)
         assert json_codec.stringify(document) ≡ wire
-        const value tree ← document ↦ value
-        const map<string, value> root ← map_of(tree)
+        let value tree ← document ↦ value
+        let map<string, value> root ← map_of(tree)
         assert ((root.get("n") ↦ inf) ↦ string) ≡ digits
         assert json_codec.stringify(parse_valid(json_codec.stringify(document))) ≡ wire
     }
 
     test "round trips through the public facade" {
-        const json original ← {
+        let json original ← {
             "model": "gpt-test",
             "messages": [{"role": "user", "content": "hello"}],
             "stream": false
         }
-        const json reparsed ← parse_valid(json_codec.stringify(original))
-        const value tree ← reparsed ↦ value
-        const map<string, value> root ← map_of(tree)
+        let json reparsed ← parse_valid(json_codec.stringify(original))
+        let value tree ← reparsed ↦ value
+        let map<string, value> root ← map_of(tree)
         assert (root.get("model") ↦ string) ≡ "gpt-test"
         assert (root.get("stream") ↦ bool) ≡ false
-        const list<value> messages ↤ root.get("messages")
-        const map<string, value> first ↤ messages.get(0)
+        let list<value> messages ↤ root.get("messages")
+        let map<string, value> first ↤ messages.get(0)
         assert (first.get("role") ↦ string) ≡ "user"
         assert (first.get("content") ↦ string) ≡ "hello"
     }

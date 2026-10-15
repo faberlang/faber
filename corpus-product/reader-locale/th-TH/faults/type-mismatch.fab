@@ -1,5 +1,5 @@
 # Fault: text literal bound to a number-typed constant (SEM010).
 เริ่ม {
-  คงที่ จำนวน ผิดชนิด ← "ข้อความ"
+  กำหนด จำนวน ผิดชนิด ← "ข้อความ"
   บันทึก ผิดชนิด
 }

@@ -36,9 +36,9 @@ fn matrix_elementwise_methods_typecheck_same_shape() {
     accepts(
         r"
 functio matrix_ops(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2, 2]> {
-    fixum matrix<f32, [2, 2]> c ← a.addita(b)
-    fixum matrix<f32, [2, 2]> d ← c.subtracta(b)
-    fixum matrix<f32, [2, 2]> e ← d.multiplicata(b)
+    sit matrix<f32, [2, 2]> c ← a.addita(b)
+    sit matrix<f32, [2, 2]> d ← c.subtracta(b)
+    sit matrix<f32, [2, 2]> e ← d.multiplicata(b)
     redde e.divisa(b)
 }
 ",

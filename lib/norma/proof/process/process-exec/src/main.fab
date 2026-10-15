@@ -23,7 +23,7 @@ main {
 
     # exec failure: `exit 3` is a non-zero status, so the route faults and
     # the enclosing catch intercepts it.
-    var bool caught ← false
+    mut bool caught ← false
     do {
         process.exec("exit 3")
     }
@@ -34,9 +34,9 @@ main {
 
     # capture success: argv exec, and the carrier exposes stdout and status.
     do {
-        const value captured ← process.capture(["printf", "proof-ok"])
-        const string out ← value.get(captured, "stdout") ↦ string ⊥ ""
-        const int status ← value.get(captured, "status") ↦ int ⊥ -1
+        let value captured ← process.capture(["printf", "proof-ok"])
+        let string out ← value.get(captured, "stdout") ↦ string ⊥ ""
+        let int status ← value.get(captured, "status") ↦ int ⊥ -1
         assert out ≡ "proof-ok"
         assert status ≡ 0
     }

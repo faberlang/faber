@@ -38,8 +38,8 @@ locale = "en"
 type Fascis = list<b8>
 
 main {
-    const list<b8> sig ← |de ad be ef|
-    const list<b8> hello ← |48 65 6c 6c 6f|
-    const list<b8> empty ← ||
+    let list<b8> sig ← |de ad be ef|
+    let list<b8> hello ← |48 65 6c 6c 6f|
+    let list<b8> empty ← ||
     print "octeti typus notus"
 }

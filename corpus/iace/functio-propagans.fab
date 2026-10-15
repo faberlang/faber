@@ -49,7 +49,7 @@ fn divide(int a, int b) → int ⇥ string {
 # Propagating caller: divide's ⇥ error re-throws through this function's ⇥ exit
 # with no fac/cape ceremony. Equivalent to `redde divide(a, b)?` in Rust.
 fn propagans(int a, int b) → int ⇥ string {
-    const int q ← divide(a, b)
+    let int q ← divide(a, b)
     return q * 2
 }
 

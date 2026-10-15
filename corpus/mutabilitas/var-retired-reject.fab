@@ -1,0 +1,21 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "binding"
+summary = "The writable-name declaration word is mut; the old var spelling is retired."
+syntax = "var int x ← 5"
+related = ["sit", "varia", "de"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE010:var_retired"
++++
+# =============================================================================
+# mutabilitas — var is retired
+# =============================================================================
+# The writable run-time name is `mut`: `mut int x ← 5`.
+
+main {
+    var int x ← 5
+    print x
+}

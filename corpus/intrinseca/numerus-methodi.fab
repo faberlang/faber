@@ -39,10 +39,10 @@ locale = "en"
 #   Smoke asserts exit 0 only.
 
 main {
-    const int value ← -7
-    const int absolutus ← value.abs()
-    const int signum ← value.sign()
-    const int minor ← value.minimum(3)
-    const int maior ← value.maximum(3)
+    let int value ← -7
+    let int absolutus ← value.abs()
+    let int signum ← value.sign()
+    let int minor ← value.minimum(3)
+    let int maior ← value.maximum(3)
     print absolutus, signum, minor, maior
 }

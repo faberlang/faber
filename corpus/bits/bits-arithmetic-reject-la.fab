@@ -29,7 +29,7 @@ diagnostic = "SEM011:bits_arithmetic_refused"
 # This exemplum intentionally fails to compile.
 
 incipit {
-    fixum b8 a ← 0x01
-    fixum b8 b ← 0x02
+    sit b8 a ← 0x01
+    sit b8 b ← 0x02
     nota a + b
 }

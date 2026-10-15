@@ -40,7 +40,7 @@ locale = "en"
 #
 
 main {
-    var int attempt ← 0
+    mut int attempt ← 0
     do {
         attempt ← attempt + 1
         if attempt ≻ 1 {

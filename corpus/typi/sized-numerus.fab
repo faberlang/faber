@@ -32,10 +32,10 @@ locale = "en"
 # WHY: a bare marker (`i32`, `u64`, `f32`) carries the explicit target width in type position.
 
 main {
-    const i32 narrow ← 7 ∷ i32
-    const u64 wide ← 255 ∷ u64
-    const i64 signed ← narrow
-    const f32 single ← 1.5 ∷ f32
+    let i32 narrow ← 7 ∷ i32
+    let u64 wide ← 255 ∷ u64
+    let i64 signed ← narrow
+    let f32 single ← 1.5 ∷ f32
 
     print narrow
     print wide

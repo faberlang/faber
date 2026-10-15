@@ -13,8 +13,8 @@ use crate::test_support::{
 fn argmaxima_resolves_on_numeric_lista_as_numerus_option() {
     let unit = analyze_ok_la(
         r"incipit {
-    fixum lista<fractus> xs ← vacua
-    fixum numerus ∪ nihil winner ← xs.argmaxima()
+    sit lista<fractus> xs ← vacua
+    sit numerus ∪ nihil winner ← xs.argmaxima()
     nota winner
 }",
     );
@@ -32,11 +32,11 @@ fn argmaxima_resolves_on_numeric_lista_as_numerus_option() {
 fn argmaxima_empty_result_composes_with_vel() {
     assert_accepts_la(
         r"incipit {
-    fixum lista<fractus> xs ← vacua
-    fixum numerus literal ← xs.argmaxima() vel 0
-    fixum numerus fallback ← 0
-    fixum numerus from_var ← xs.argmaxima() vel fallback
-    fixum numerus mirrored ← xs.argminima() vel 0
+    sit lista<fractus> xs ← vacua
+    sit numerus literal ← xs.argmaxima() vel 0
+    sit numerus fallback ← 0
+    sit numerus from_var ← xs.argmaxima() vel fallback
+    sit numerus mirrored ← xs.argminima() vel 0
     nota literal
     nota from_var
     nota mirrored
@@ -48,8 +48,8 @@ fn argmaxima_empty_result_composes_with_vel() {
 fn argminima_mirrors_argmaxima_on_numeric_lista() {
     let unit = analyze_ok_la(
         r"incipit {
-    fixum lista<fractus> xs ← vacua
-    fixum numerus ∪ nihil winner ← xs.argminima()
+    sit lista<fractus> xs ← vacua
+    sit numerus ∪ nihil winner ← xs.argminima()
     nota winner
 }",
     );
@@ -66,16 +66,16 @@ fn argminima_mirrors_argmaxima_on_numeric_lista() {
 fn argmaxima_rejects_non_numeric_lista_elements() {
     assert_rejects_with_issue_la(
         r"incipit {
-    fixum lista<textus> xs ← vacua
-    fixum numerus ∪ nihil winner ← xs.argmaxima()
+    sit lista<textus> xs ← vacua
+    sit numerus ∪ nihil winner ← xs.argmaxima()
     nota winner
 }",
         "numeric_lista_elements_required",
     );
     assert_rejects_with_issue_la(
         r"incipit {
-    fixum lista<textus> xs ← vacua
-    fixum numerus ∪ nihil winner ← xs.argminima()
+    sit lista<textus> xs ← vacua
+    sit numerus ∪ nihil winner ← xs.argminima()
     nota winner
 }",
         "numeric_lista_elements_required",

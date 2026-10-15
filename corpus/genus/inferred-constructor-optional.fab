@@ -23,8 +23,8 @@ locale = "en"
 # =============================================================================
 
 class Punctum {
-    var int x = 0
-    var int y = 0
+    mut int x = 0
+    mut int y = 0
 }
 
 fn origo() → Punctum ∪ none {
@@ -40,17 +40,17 @@ fn pondus(map<string, int> ∪ none m) → int {
 }
 
 main {
-    const Punctum ∪ none a ← _ { x = 1, y = 2 }
+    let Punctum ∪ none a ← _ { x = 1, y = 2 }
     print a?.x coalesce -1
     print a?.y coalesce -1
 
-    const Punctum ∪ none b ← origo()
+    let Punctum ∪ none b ← origo()
     print b?.x coalesce -1
     print b?.y coalesce -1
 
     print abscissa(_ { x = 5 })
 
-    const map<string, int> ∪ none m ← _ { "a": 3 }
+    let map<string, int> ∪ none m ← _ { "a": 3 }
     print m?["a"] coalesce -1
     print pondus(_ { "a": 4 })
 }

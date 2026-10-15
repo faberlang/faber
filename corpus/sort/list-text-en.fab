@@ -9,7 +9,7 @@ canonical = true
 
 # Text sorts by code point: uppercase before lowercase, accents after ASCII.
 main {
-    const list<string> names ← ["marcus", "Livia", "aulus", "Cornelia", "émilia"]
+    let list<string> names ← ["marcus", "Livia", "aulus", "Cornelia", "émilia"]
     print sort via asc from names
     print sort via desc from names
     print names

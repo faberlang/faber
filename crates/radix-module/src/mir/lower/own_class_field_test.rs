@@ -19,8 +19,8 @@ fn own_bind_of_class_value_reads_field_on_runner() {
 }
 
 incipit {
-    fixum Holder d ← Holder { x = 2.0 }
-    fixum Holder f ← own d
+    sit Holder d ← Holder { x = 2.0 }
+    sit Holder f ← own d
     nota f.x
 }
 ";

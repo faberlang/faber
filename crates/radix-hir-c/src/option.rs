@@ -73,14 +73,18 @@ impl Emitter<'_> {
     ) -> Result<Operand, CodegenError> {
         let list = self.expr(subject)?;
         let Value::List(elem) = list.value else {
-            return Err(unsupported("optional index over a value that is not a list"));
+            return Err(unsupported(
+                "optional index over a value that is not a list",
+            ));
         };
         let at = self.expr(index)?;
         if !matches!(at.value, Value::Int | Value::Exact) {
             return Err(unsupported("list position that is not an integer"));
         }
         let Some(inner) = Inner::from_ty(elem.ty()) else {
-            return Err(unsupported("optional index over a list of this element class"));
+            return Err(unsupported(
+                "optional index over a list of this element class",
+            ));
         };
         let effect = list.effect || at.effect;
         let mut operands = [list, at];

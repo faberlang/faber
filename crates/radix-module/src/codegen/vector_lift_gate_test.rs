@@ -11,11 +11,11 @@
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
-const PRELUDE: &str = "fixum vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-fixum vector<f32, 3> b ← [3.0, 2.0, 1.0] ↦ vector<f32, 3>
-fixum matrix<f32, [2, 2]> m ← [[1.0, 2.0], [3.0, 4.0]] ↦ matrix<f32, [2, 2]>
-fixum matrix<f32, [2, 2]> n ← [[4.0, 3.0], [2.0, 1.0]] ↦ matrix<f32, [2, 2]>
-fixum f32 s ← 2.0
+const PRELUDE: &str = "sit vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+sit vector<f32, 3> b ← [3.0, 2.0, 1.0] ↦ vector<f32, 3>
+sit matrix<f32, [2, 2]> m ← [[1.0, 2.0], [3.0, 4.0]] ↦ matrix<f32, [2, 2]>
+sit matrix<f32, [2, 2]> n ← [[4.0, 3.0], [2.0, 1.0]] ↦ matrix<f32, [2, 2]>
+sit f32 s ← 2.0
 ";
 
 const VECTOR_ISSUE: &str = "vector_lift_unsupported_on_target";
@@ -39,52 +39,52 @@ fn rejected_with(target: Target, body: &str, issue: &str) -> bool {
 }
 
 const LIFTED: &[&str] = &[
-    "fixum vector<f32, 3> r ← a * s",
-    "fixum vector<f32, 3> r ← s * a",
-    "fixum vector<f32, 3> r ← a / s",
-    "fixum vector<f32, 3> r ← s - a",
-    "fixum vector<f32, 3> r ← a + 1.0",
-    "fixum vector<f32, 3> r ← -a",
-    "fixum vector<f32, 3> r ← a ÷ s",
-    "fixum vector<f32, 3> r ← a ÷ b",
-    "fixum vector<f32, 3> r ← a ⤒ s",
-    "fixum vector<f32, 3> r ← a ⤓ b",
-    "fixum vector<bivalens, 3> r ← a ≺ b",
-    "fixum vector<bivalens, 3> r ← a ≥ s",
-    "fixum vector<bivalens, 3> r ← s ≻ a",
-    "fixum vector<bivalens, 3> r ← a ≅ b",
-    "fixum vector<bivalens, 3> r ← a ≇ s",
+    "sit vector<f32, 3> r ← a * s",
+    "sit vector<f32, 3> r ← s * a",
+    "sit vector<f32, 3> r ← a / s",
+    "sit vector<f32, 3> r ← s - a",
+    "sit vector<f32, 3> r ← a + 1.0",
+    "sit vector<f32, 3> r ← -a",
+    "sit vector<f32, 3> r ← a ÷ s",
+    "sit vector<f32, 3> r ← a ÷ b",
+    "sit vector<f32, 3> r ← a ⤒ s",
+    "sit vector<f32, 3> r ← a ⤓ b",
+    "sit vector<bivalens, 3> r ← a ≺ b",
+    "sit vector<bivalens, 3> r ← a ≥ s",
+    "sit vector<bivalens, 3> r ← s ≻ a",
+    "sit vector<bivalens, 3> r ← a ≅ b",
+    "sit vector<bivalens, 3> r ← a ≇ s",
 ];
 
 const LIFTED_MATRIX: &[&str] = &[
-    "fixum matrix<f32, [2, 2]> r ← m * s",
-    "fixum matrix<f32, [2, 2]> r ← s * m",
-    "fixum matrix<f32, [2, 2]> r ← m / s",
-    "fixum matrix<f32, [2, 2]> r ← s - m",
-    "fixum matrix<f32, [2, 2]> r ← m + 1.0",
-    "fixum matrix<f32, [2, 2]> r ← -m",
-    "fixum matrix<f32, [2, 2]> r ← m ÷ s",
-    "fixum matrix<f32, [2, 2]> r ← m ÷ n",
-    "fixum matrix<f32, [2, 2]> r ← m ⤒ s",
-    "fixum matrix<f32, [2, 2]> r ← m ⤓ n",
-    "fixum matrix<bivalens, [2, 2]> r ← m ≺ n",
-    "fixum matrix<bivalens, [2, 2]> r ← m ≥ s",
-    "fixum matrix<bivalens, [2, 2]> r ← s ≻ m",
-    "fixum matrix<bivalens, [2, 2]> r ← m ≅ n",
-    "fixum matrix<bivalens, [2, 2]> r ← m ≇ s",
+    "sit matrix<f32, [2, 2]> r ← m * s",
+    "sit matrix<f32, [2, 2]> r ← s * m",
+    "sit matrix<f32, [2, 2]> r ← m / s",
+    "sit matrix<f32, [2, 2]> r ← s - m",
+    "sit matrix<f32, [2, 2]> r ← m + 1.0",
+    "sit matrix<f32, [2, 2]> r ← -m",
+    "sit matrix<f32, [2, 2]> r ← m ÷ s",
+    "sit matrix<f32, [2, 2]> r ← m ÷ n",
+    "sit matrix<f32, [2, 2]> r ← m ⤒ s",
+    "sit matrix<f32, [2, 2]> r ← m ⤓ n",
+    "sit matrix<bivalens, [2, 2]> r ← m ≺ n",
+    "sit matrix<bivalens, [2, 2]> r ← m ≥ s",
+    "sit matrix<bivalens, [2, 2]> r ← s ≻ m",
+    "sit matrix<bivalens, [2, 2]> r ← m ≅ n",
+    "sit matrix<bivalens, [2, 2]> r ← m ≇ s",
 ];
 
 /// The logic and select forms over a bool register mask, with the masks
 /// taken as parameters so each form is the first one the gate meets.
 const MASKED: &[(&str, &str)] = &[
-    ("fixum vector<bivalens, 3> r ← k et k", VECTOR_ISSUE),
-    ("fixum vector<bivalens, 3> r ← k aut verum", VECTOR_ISSUE),
-    ("fixum vector<bivalens, 3> r ← non k", VECTOR_ISSUE),
-    ("fixum vector<f32, 3> r ← k ✓ a ✗ b", VECTOR_ISSUE),
-    ("fixum matrix<bivalens, [2, 2]> r ← j et j", MATRIX_ISSUE),
-    ("fixum matrix<bivalens, [2, 2]> r ← j aut verum", MATRIX_ISSUE),
-    ("fixum matrix<bivalens, [2, 2]> r ← non j", MATRIX_ISSUE),
-    ("fixum matrix<f32, [2, 2]> r ← j ✓ m ✗ n", MATRIX_ISSUE),
+    ("sit vector<bivalens, 3> r ← k et k", VECTOR_ISSUE),
+    ("sit vector<bivalens, 3> r ← k aut verum", VECTOR_ISSUE),
+    ("sit vector<bivalens, 3> r ← non k", VECTOR_ISSUE),
+    ("sit vector<f32, 3> r ← k ✓ a ✗ b", VECTOR_ISSUE),
+    ("sit matrix<bivalens, [2, 2]> r ← j et j", MATRIX_ISSUE),
+    ("sit matrix<bivalens, [2, 2]> r ← j aut verum", MATRIX_ISSUE),
+    ("sit matrix<bivalens, [2, 2]> r ← non j", MATRIX_ISSUE),
+    ("sit matrix<f32, [2, 2]> r ← j ✓ m ✗ n", MATRIX_ISSUE),
 ];
 
 fn masked_issues(target: Target, body: &str) -> (Vec<String>, bool) {
@@ -121,12 +121,20 @@ fn go_rejects_register_logic_and_select_by_name() {
     }
 }
 
+/// The Rust emitter lifts the register forms itself, so a float or boolean
+/// lane form reaches output with no lift issue.
 #[cfg(feature = "hir-rust")]
 #[test]
-fn rust_rejects_register_logic_and_select_by_name() {
-    for (body, issue) in MASKED {
-        let (found, _) = masked_issues(Target::HirRust, body);
-        assert!(found.iter().any(|found| found == issue), "`{body}`: {found:?}");
+fn rust_emits_register_logic_and_select() {
+    for (body, _) in MASKED {
+        let (found, emitted) = masked_issues(Target::HirRust, body);
+        assert!(emitted, "`{body}`: {found:?}");
+        assert!(
+            !found
+                .iter()
+                .any(|issue| issue == VECTOR_ISSUE || issue == MATRIX_ISSUE),
+            "`{body}`: {found:?}"
+        );
     }
 }
 
@@ -179,12 +187,15 @@ fn go_rejects_the_lifted_register_forms() {
 
 #[cfg(feature = "hir-rust")]
 #[test]
-fn rust_rejects_the_lifted_register_forms() {
-    for body in LIFTED {
-        assert!(rejected_with(Target::HirRust, body, VECTOR_ISSUE), "`{body}`");
-    }
-    for body in LIFTED_MATRIX {
-        assert!(rejected_with(Target::HirRust, body, MATRIX_ISSUE), "`{body}`");
+fn rust_emits_the_lifted_register_forms() {
+    for body in LIFTED.iter().chain(LIFTED_MATRIX) {
+        let found = issues(Target::HirRust, body);
+        assert!(
+            !found
+                .iter()
+                .any(|issue| issue == VECTOR_ISSUE || issue == MATRIX_ISSUE),
+            "`{body}`: {found:?}"
+        );
     }
 }
 
@@ -221,9 +232,9 @@ fn faber_reemission_keeps_the_lifted_register_forms() {
 #[test]
 fn register_with_register_plus_keeps_its_rust_emitter() {
     for body in [
-        "fixum vector<f32, 3> r ← a + b",
-        "fixum matrix<f32, [2, 2]> r ← m + n",
-        "fixum matrix<f32, [2, 2]> r ← m ⊙ n",
+        "sit vector<f32, 3> r ← a + b",
+        "sit matrix<f32, [2, 2]> r ← m + n",
+        "sit matrix<f32, [2, 2]> r ← m ⊙ n",
     ] {
         let found = issues(Target::HirRust, body);
         assert!(

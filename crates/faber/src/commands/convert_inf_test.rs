@@ -14,13 +14,13 @@ const EN_SOURCE: &str = r#"+++
 locale = "en"
 +++
 fn keep(inf a, trapping<inf> b, wrapping<inf> c, saturating<inf> d) → inf {
-    const inf plain ← a
-    const trapping<inf> t ← b
-    const wrapping<inf> w ← c
-    const saturating<inf> s ← d
-    const inf long_form ← a
-    const list<inf> items ← empty
-    const list<wrapping<inf>> nested ← empty
+    let inf plain ← a
+    let trapping<inf> t ← b
+    let wrapping<inf> w ← c
+    let saturating<inf> s ← d
+    let inf long_form ← a
+    let list<inf> items ← empty
+    let list<wrapping<inf>> nested ← empty
     return plain
 }
 "#;
@@ -38,16 +38,13 @@ fn convert_keeps_each_inf_spelling_across_locales() {
         ),
         "{latin}"
     );
-    assert!(latin.contains("fixum inf plain"), "{latin}");
-    assert!(latin.contains("fixum exactus<inf> t"), "{latin}");
-    assert!(latin.contains("fixum modulus<inf> w"), "{latin}");
-    assert!(latin.contains("fixum saturatus<inf> s"), "{latin}");
-    assert!(latin.contains("fixum inf long_form"), "{latin}");
-    assert!(latin.contains("fixum lista<inf> items"), "{latin}");
-    assert!(
-        latin.contains("fixum lista<modulus<inf>> nested"),
-        "{latin}"
-    );
+    assert!(latin.contains("sit inf plain"), "{latin}");
+    assert!(latin.contains("sit exactus<inf> t"), "{latin}");
+    assert!(latin.contains("sit modulus<inf> w"), "{latin}");
+    assert!(latin.contains("sit saturatus<inf> s"), "{latin}");
+    assert!(latin.contains("sit inf long_form"), "{latin}");
+    assert!(latin.contains("sit lista<inf> items"), "{latin}");
+    assert!(latin.contains("sit lista<modulus<inf>> nested"), "{latin}");
 
     fs::write(&fixture, &latin).expect("rewrite latin fixture");
     let english = run_faber(&["convert", "--to", "en", "--stdout", path]);
@@ -57,13 +54,13 @@ fn convert_keeps_each_inf_spelling_across_locales() {
             .contains("fn keep(inf a, trapping<inf> b, wrapping<inf> c, saturating<inf> d) → inf"),
         "{english}"
     );
-    assert!(english.contains("const inf plain"), "{english}");
-    assert!(english.contains("const trapping<inf> t"), "{english}");
-    assert!(english.contains("const wrapping<inf> w"), "{english}");
-    assert!(english.contains("const saturating<inf> s"), "{english}");
-    assert!(english.contains("const inf long_form"), "{english}");
+    assert!(english.contains("let inf plain"), "{english}");
+    assert!(english.contains("let trapping<inf> t"), "{english}");
+    assert!(english.contains("let wrapping<inf> w"), "{english}");
+    assert!(english.contains("let saturating<inf> s"), "{english}");
+    assert!(english.contains("let inf long_form"), "{english}");
     assert!(
-        english.contains("const list<wrapping<inf>> nested"),
+        english.contains("let list<wrapping<inf>> nested"),
         "{english}"
     );
 }
@@ -82,10 +79,10 @@ fn format_is_a_fixed_point_on_the_inf_spellings() {
         "trapping<inf> b",
         "wrapping<inf> c",
         "saturating<inf> d",
-        "const trapping<inf> t",
-        "const wrapping<inf> w",
-        "const saturating<inf> s",
-        "const inf long_form",
+        "let trapping<inf> t",
+        "let wrapping<inf> w",
+        "let saturating<inf> s",
+        "let inf long_form",
     ] {
         assert!(once.contains(spelling), "lost `{spelling}`:\n{once}");
     }

@@ -360,7 +360,7 @@ enum EscapeContext {
     Conversio,
     /// `itera ex <live cursor>` — the only allowed expression use of a bound cursor.
     IteraSource,
-    /// `fixum cursor<scrinium<T>> c ← t.cursor()` — the only allowed direct `tuus.cursor()` site.
+    /// `sit cursor<scrinium<T>> c ← t.cursor()` — the only allowed direct `tuus.cursor()` site.
     LocalInit,
     /// Array/tuple/scribe literal elements that would store a live cursor value.
     AggregateElement,

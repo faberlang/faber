@@ -5,8 +5,8 @@ locale = "en"
 # websocket.fab — WebSocket client and HTTP-upgrade accept
 #
 # Public import: import from "norma:websocket" websocket
-# Leaves: websocket:connect, websocket:accept, websocket:send,
-# websocket:receive, websocket:close.
+# Leaves: websocket:connect, websocket:connect_open, websocket:connect_finish,
+# websocket:accept, websocket:send, websocket:receive, websocket:close.
 
 import from "norma:fault" fault
 
@@ -19,7 +19,7 @@ fn fault_from(value raw) → fault.IoFault {
 
 @ public
 class Socket {
-    var int id = 0
+    mut int id = 0
 
     fn send(string text) → void ⇥ fault.IoFault {
         return send_text(self, text)
@@ -36,19 +36,34 @@ class Socket {
 
 @ public
 fn connect(string url) → Socket ⇥ fault.IoFault {
-    const int id ↤ call 'websocket:connect' ([url ↦ value])
+    let int id ↤ call 'websocket:connect' ([url ↦ value])
     return Socket { id = id }
 }
 
 @ public
 fn connect_tls(string url, string ca_path) → Socket ⇥ fault.IoFault {
-    const int id ↤ call 'websocket:connect' ([url ↦ value, ca_path ↦ value])
+    let int id ↤ call 'websocket:connect' ([url ↦ value, ca_path ↦ value])
+    return Socket { id = id }
+}
+
+# Split handshake: connect_open writes the upgrade request and returns;
+# connect_finish reads the 101 after the server accepted. One thread can
+# interleave the server side between the halves, the same split as the http
+# open/receive pair over http:request_open.
+@ public
+fn connect_open(string url) → Socket ⇥ fault.IoFault {
+    let int id ↤ call 'websocket:connect_open' ([url ↦ value])
     return Socket { id = id }
 }
 
 @ public
+fn connect_finish(Socket socket) → void ⇥ fault.IoFault {
+    return call 'websocket:connect_finish' ([socket.id ↦ value]) ↦ void
+}
+
+@ public
 fn accept(string request_id) → Socket ⇥ fault.IoFault {
-    const int id ↤ call 'websocket:accept' ([request_id ↦ value])
+    let int id ↤ call 'websocket:accept' ([request_id ↦ value])
     return Socket { id = id }
 }
 
@@ -60,10 +75,10 @@ fn send_text(Socket socket, string text) → void ⇥ fault.IoFault {
 # A clean close is a `done` frame today (not a `Closed` error).
 @ public
 fn receive_text(Socket socket) → string ∪ none ⇥ fault.IoFault {
-    const value raw ← call 'websocket:receive' ([socket.id ↦ value]) ↦ value
+    let value raw ← call 'websocket:receive' ([socket.id ↦ value]) ↦ value
     do {
-        const map<string, value> fields ↤ raw
-        const bool done ← fields["done"] ↦ bool ⊥ false
+        let map<string, value> fields ↤ raw
+        let bool done ← fields["done"] ↦ bool ⊥ false
         if done then return null
         return fields["text"] ↦ string
     }

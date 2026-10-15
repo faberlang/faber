@@ -23,7 +23,7 @@ ruling = "6a13d711"
 #     `list<u8>`.
 
 main {
-    const list<b8, 8> raw ← |61 62| ↦ list<b8, 8>
-    const list<u8> out ← raw ↦ list<u8>
+    let list<b8, 8> raw ← |61 62| ↦ list<b8, 8>
+    let list<u8> out ← raw ↦ list<u8>
     print out
 }

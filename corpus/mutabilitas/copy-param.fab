@@ -15,12 +15,12 @@ locale = "en"
 # untouched. The callee owns the duplicate, and it may change it exactly as far
 # as an ordinary binding allows: a field write (`c.n ← 1`) and a mutating
 # method call (`c.inc()`) follow one rule. A parameter is an immutable binding
-# and has no `var` spelling, so both are rejected on the parameter itself.
-# To modify the duplicate, bind it to a `var` local first, as `take` and `bump`
+# and has no `mut` spelling, so both are rejected on the parameter itself.
+# To modify the duplicate, bind it to a `mut` local first, as `take` and `bump`
 # do below.
 
 class Counter {
-    var int n = 0
+    mut int n = 0
 
     fn inc() → void {
         self.n ← self.n + 1
@@ -28,22 +28,22 @@ class Counter {
 }
 
 fn take(copy list<int> items) → int {
-    var list<int> fresh ← items
+    mut list<int> fresh ← items
     fresh.append(5)
     return fresh.length()
 }
 
 fn bump(copy Counter c) → int {
-    var Counter mine ← c
+    mut Counter mine ← c
     mine.inc()
     return mine.n
 }
 
 main {
-    const list<int> a ← [1, 2]
+    let list<int> a ← [1, 2]
     print take(copy a)
     print a.length()
-    var Counter c ← Counter {}
+    mut Counter c ← Counter {}
     c.inc()
     print bump(copy c)
     print c.n

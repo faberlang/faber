@@ -31,41 +31,41 @@ fn truncate(float x) → int ⇥ string {
 }
 
 main {
-    const int big ← 300
-    const float huge ← 1e300
-    const float zero ← 0.0
-    const float nan ← zero / zero
+    let int big ← 300
+    let float huge ← 1e300
+    let float zero ← 0.0
+    let float nan ← zero / zero
 
     do {
-        const u8 a ← big ↦ u8
+        let u8 a ← big ↦ u8
         print a
     }
     catch err {
         print "caught direct narrowing"
     }
     do {
-        const u8 b ← narrow(big)
+        let u8 b ← narrow(big)
         print b
     }
     catch err {
         print "caught propagated narrowing"
     }
     do {
-        const int c ← huge ↦ int via Trunc
+        let int c ← huge ↦ int via Trunc
         print c
     }
     catch err {
         print "caught direct float overflow"
     }
     do {
-        const int d ← truncate(nan)
+        let int d ← truncate(nan)
         print d
     }
     catch err {
         print "caught propagated NaN"
     }
     do {
-        const int e ← truncate(2.5)
+        let int e ← truncate(2.5)
         print e
     }
     catch err {

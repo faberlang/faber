@@ -39,7 +39,7 @@ fn tensor_bracket_read_accepts_rank1_scalar_index() {
 #[test]
 fn tensor_bracket_write_accepts_rank1_scalar_index() {
     accepts(
-        r"functio put(in tf32[16] output, numerus id, f32 value) → vacuum {
+        r"functio put(varia tf32[16] output, numerus id, f32 value) → vacuum {
     output[id] ← value
 }",
     );
@@ -48,7 +48,7 @@ fn tensor_bracket_write_accepts_rank1_scalar_index() {
 #[test]
 fn tensor_bracket_write_rhs_is_element_not_option() {
     accepts(
-        r"functio put(in tf32[16] output, numerus id) → vacuum {
+        r"functio put(varia tf32[16] output, numerus id) → vacuum {
     output[id] ← 1.0
 }",
     );
@@ -75,7 +75,7 @@ fn tensor_accipe_method_is_failable_with_a_default() {
 #[test]
 fn tensor_bracket_accepts_rank2_list_literal_index() {
     accepts(
-        r"functio put(in tf32[4, 4] grid, numerus r, numerus c, f32 value) → f32 {
+        r"functio put(varia tf32[4, 4] grid, numerus r, numerus c, f32 value) → f32 {
     grid[[r, c]] ← value
     redde grid[[r, c]]
 }",
@@ -86,7 +86,7 @@ fn tensor_bracket_accepts_rank2_list_literal_index() {
 fn tensor_bracket_accepts_bound_u32_index_list() {
     accepts(
         r"functio pick(tf32[4, 4] grid, u32 r, u32 c) → f32 {
-    fixum lista<u32> origin ← [r, c]
+    sit lista<u32> origin ← [r, c]
     redde grid[origin]
 }",
     );

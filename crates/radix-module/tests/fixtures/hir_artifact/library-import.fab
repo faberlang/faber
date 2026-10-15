@@ -13,6 +13,6 @@ functio salve() → textus {
 }
 
 incipit {
-    fixum textus msg ← salve()
+    sit textus msg ← salve()
     nota msg
 }

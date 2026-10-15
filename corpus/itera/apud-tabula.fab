@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "`apud [k]` over a tabula binds each key next to its value."
-syntax = "for from <tabula> at [k] const <value> { }"
+syntax = "for from <tabula> at [k] let <value> { }"
 related = ["apud", "itera", "ex", "tabula", "ordina"]
 locale = "en"
 +++
@@ -16,7 +16,7 @@ locale = "en"
 # What this teaches:
 #   • the `at` names are exactly what goes in the index brackets to get the
 #     element back: `stock[name]` is `count`, so `at [name]` binds the key
-#   • `for from m const v` alone still binds only the value
+#   • `for from m let v` alone still binds only the value
 #   • map iteration order is unspecified: collect rows and `sort` them when
 #     the output must be stable
 #
@@ -27,22 +27,22 @@ locale = "en"
 # See also: apud, itera, ex, tabula
 # =============================================================================
 
-# for from <tabula> at [k] const <value> { <body> }
+# for from <tabula> at [k] let <value> { <body> }
 #
 # EXPECTED OUTPUT:
 #   key=value rows in sorted key order.
 
 main {
-    var map<string, int> stock ← empty
+    mut map<string, int> stock ← empty
     stock["pear"] ← 3
     stock["apple"] ← 5
     stock["fig"] ← 1
-    var list<string> rows ← empty
-    for from stock at [name] const count {
+    mut list<string> rows ← empty
+    for from stock at [name] let count {
         rows.append("§=§"(name, count))
     }
     rows.sort()
-    for from rows const row {
+    for from rows let row {
         print row
     }
 }

@@ -305,7 +305,7 @@ impl Emitter<'_> {
                         None => {
                             return Err(unsupported(
                                 "optional parameter of a sized integer or optional",
-                            ))
+                            ));
                         }
                     }
                 }

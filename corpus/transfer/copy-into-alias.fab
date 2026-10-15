@@ -26,11 +26,11 @@ locale = "en"
 #   [1.0, 2.0, 3.0, 4.0]
 
 main {
-    const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
-    const list<f32> flat_b ← [10.0, 20.0, 30.0, 40.0]
-    const tf32[2, 2] source ← flat_a ↦ tf32[2, 2]
-    var tf32[2, 2] target ← flat_b ↦ tf32[2, 2]
-    const tf32[2, 2] alias ← target
+    let list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
+    let list<f32> flat_b ← [10.0, 20.0, 30.0, 40.0]
+    let tf32[2, 2] source ← flat_a ↦ tf32[2, 2]
+    mut tf32[2, 2] target ← flat_b ↦ tf32[2, 2]
+    let tf32[2, 2] alias ← target
     target ⇇ source
     print alias.flatten()
     print target.flatten()

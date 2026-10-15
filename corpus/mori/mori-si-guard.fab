@@ -62,15 +62,15 @@ fn accessus(list<int> res, int index) → int {
 
 main {
     # Happy path — guards not triggered
-    const int n ← clamp(5, 0, 10)
+    let int n ← clamp(5, 0, 10)
     print "within range"
 
     # Happy path — empty list guard not triggered
-    const list<int> xs ← [1, 2, 3]
-    const int y ← accessus(xs, 1)
+    let list<int> xs ← [1, 2, 3]
+    let int y ← accessus(xs, 1)
     print "positive"
 
-    const list<int> ys ← [42]
-    const int z ← accessus(ys, 0)
+    let list<int> ys ← [42]
+    let int z ← accessus(ys, 0)
     print "not empty"
 }

@@ -61,7 +61,7 @@ genus Stencil {
     }
 
     @ nucleum
-    functio put_into(in tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
+    functio put_into(varia tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
         target[at] ← v
     }
 
@@ -102,14 +102,14 @@ genus Stencil {
     }
 
     @ nucleum
-    functio both(in tensor<f32, [4]> left, in tensor<f32, [4]> right, numerus at) → vacuum {
+    functio both(varia tensor<f32, [4]> left, varia tensor<f32, [4]> right, numerus at) → vacuum {
         left[at] ← 1.0
         right[at] ← 2.0
     }
 
     @ nucleum
     functio put_via_function(numerus at, f32 v) → vacuum {
-        field_store(in ego.data, at, v)
+        field_store(varia ego.data, at, v)
     }
 
     functio host_method(f32 x) → f32 {
@@ -118,7 +118,7 @@ genus Stencil {
 }
 
 @ nucleum
-functio field_store(in tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
+functio field_store(varia tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
     target[at] ← v
 }
 ";
@@ -152,7 +152,7 @@ fn kernel_with(extra: &str, setup: &str, statement: &str) -> String {
 @ publica
 functio k(in {GRID} out, de {GRID} src) → vacuum {{
     {setup}
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         {statement}
     }}
 }}
@@ -169,7 +169,7 @@ const OVER_SRC: &str = "varia Stencil t ← Stencil { data = src, gain = 2.0 }";
 
 #[test]
 fn method_writing_a_mut_tensor_param_at_the_loop_coordinate_is_accepted() {
-    accepted(&kernel(OVER_SRC, "t.put_into(in out, i, value)"));
+    accepted(&kernel(OVER_SRC, "t.put_into(varia out, i, value)"));
 }
 
 #[test]
@@ -200,7 +200,7 @@ fn method_reading_a_neighbour_of_the_written_tensor_is_rejected() {
     rejected(
         &kernel(
             OVER_OUT,
-            "s.put(i, value)\n        fixum f32 next ← s.peek(i)",
+            "s.put(i, value)\n        sit f32 next ← s.peek(i)",
         ),
         "written_storage_neighbor_read",
     );
@@ -255,8 +255,8 @@ fn method_through_a_receiver_that_holds_no_known_storage_is_declined() {
             r"{STENCIL}
 @ nucleum
 @ publica
-functio k(in Stencil s, de {GRID} src) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
+functio k(varia Stencil s, de {GRID} src) → vacuum {{
+    itera ex src apud [i] filum lane sit value {{
         s.put(i, value)
     }}
 }}
@@ -316,7 +316,7 @@ genus Arca<T> {{
 @ publica
 functio k(in {GRID} out, de {GRID} src) → vacuum {{
     varia Arca<f32> s ← Arca<f32> {{ data = out }}
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         {statement}
     }}
 }}
@@ -342,7 +342,7 @@ functio shown(f32 x) → f32 { redde x * 2.0 }
 
 @ nucleum
 @ publica
-functio shown_store(in tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
+functio shown_store(varia tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
     target[at] ← v
 }
 ";
@@ -353,7 +353,7 @@ fn function_kernel(helpers: &str, statement: &str) -> String {
 @ nucleum
 @ publica
 functio k(in {GRID} out, de {GRID} src) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         {statement}
     }}
 }}
@@ -364,13 +364,13 @@ functio k(in {GRID} out, de {GRID} src) → vacuum {{
 #[test]
 fn public_kernel_called_from_a_kernel_is_accepted() {
     accepted(&function_kernel(SHOWN, "out[i] ← shown(value)"));
-    accepted(&function_kernel(SHOWN, "shown_store(in out, i, value)"));
+    accepted(&function_kernel(SHOWN, "shown_store(varia out, i, value)"));
 }
 
 #[test]
 fn public_kernel_writing_elsewhere_is_rejected() {
     rejected(
-        &function_kernel(SHOWN, "shown_store(in out, 0, value)"),
+        &function_kernel(SHOWN, "shown_store(varia out, 0, value)"),
         "write_not_own_coordinate",
     );
 }
@@ -385,7 +385,7 @@ fn overlapping_mut_arguments_of_a_method_call_are_a_borrow_error() {
     // 1ce9ea98 hole 1), so two `in` arguments naming one tensor are rejected
     // there first. The filum pass still declines the same call on its own, so
     // both diagnostics are present; the second owner is not leaned on.
-    let result = analyze_source_la(&kernel(OVER_OUT, "s.both(in out, in out, i)"));
+    let result = analyze_source_la(&kernel(OVER_OUT, "s.both(varia out, varia out, i)"));
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
         errors
@@ -407,7 +407,7 @@ fn overlapping_mut_arguments_through_the_receiver_are_declined_by_the_pass() {
     // different places to it, though `s` holds `out`. Only the filum pass maps
     // the receiver's field to the storage it holds, so it is the sole owner of
     // this spelling.
-    let source = kernel(OVER_OUT, "s.both(in out, in s.data, i)");
+    let source = kernel(OVER_OUT, "s.both(varia out, varia s.data, i)");
     let result = analyze_source_la(&source);
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
@@ -424,8 +424,8 @@ fn overlapping_mut_arguments_through_the_receiver_are_declined_by_the_pass() {
 @ publica
 functio k(in {GRID} out, in {GRID} aux, de {GRID} src) → vacuum {{
     varia Stencil s ← Stencil {{ data = src, gain = 2.0 }}
-    itera ex src apud [i] filum lane fixum value {{
-        s.both(in out, in aux, i)
+    itera ex src apud [i] filum lane sit value {{
+        s.both(varia out, varia aux, i)
     }}
 }}
 "
@@ -435,7 +435,7 @@ functio k(in {GRID} out, in {GRID} aux, de {GRID} src) → vacuum {{
 #[test]
 fn receiver_field_overlapping_a_method_argument_is_declined() {
     rejected(
-        &kernel(OVER_OUT, "s.put_into(in out, i, value)"),
+        &kernel(OVER_OUT, "s.put_into(varia out, i, value)"),
         "overlapping_call_arguments",
     );
 }
@@ -445,12 +445,12 @@ fn function_call_with_aliased_mut_arguments_is_still_a_borrow_error() {
     let result = analyze_source_la(&function_kernel(
         r"
 @ nucleum
-functio both(in tensor<f32, [4]> left, in tensor<f32, [4]> right, numerus at) → vacuum {
+functio both(varia tensor<f32, [4]> left, varia tensor<f32, [4]> right, numerus at) → vacuum {
     left[at] ← 1.0
     right[at] ← 2.0
 }
 ",
-        "both(in out, in out, i)",
+        "both(varia out, varia out, i)",
     ));
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
@@ -507,8 +507,8 @@ genus Unus implet Numerabile {
 
 @ nucleum
 @ publica
-functio k(in tensor<f32, [4]> out, de tensor<f32, [4]> src, Numerabile n) → vacuum {
-    itera ex src apud [i] filum lane fixum value {
+functio k(varia tensor<f32, [4]> out, de tensor<f32, [4]> src, Numerabile n) → vacuum {
+    itera ex src apud [i] filum lane sit value {
         out[i] ← n.valor()
     }
 }
@@ -533,9 +533,9 @@ genus Counter {
 
 @ nucleum
 @ publica
-functio k(in tensor<numerus, [4]> grid) → vacuum {
+functio k(varia tensor<numerus, [4]> grid) → vacuum {
     varia Counter counter ← Counter { count = 0 }
-    itera ex grid apud [i] filum lane fixum value {
+    itera ex grid apud [i] filum lane sit value {
         grid[i] ← counter.accipe(i)
     }
 }
@@ -555,7 +555,7 @@ fn reduction_term_may_call_a_method_kernel_that_reads() {
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
     varia Stencil s ← Stencil {{ data = xs, gain = 2.0 }}
-    redde reducta via summa ex xs apud [i] fixum v {{ redde v + s.here(i) }}
+    redde reducta via summa ex xs apud [i] sit v {{ redde v + s.here(i) }}
 }}
 "
     ));
@@ -570,7 +570,7 @@ fn reduction_term_may_call_a_public_kernel() {
 functio shown(f32 x) → f32 { redde x }
 @ nucleum
 functio k(tensor<f32, [32]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] fixum s { redde shown(s) }
+    redde reducta via summa ex xs apud [i] sit s { redde shown(s) }
 }
 ",
     );
@@ -584,7 +584,7 @@ fn reduction_term_calling_a_host_function_is_still_rejected() {
 functio host(f32 x) → f32 {{ redde x }}
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
-    redde reducta via summa ex xs apud [i] fixum v {{ redde host(v) }}
+    redde reducta via summa ex xs apud [i] sit v {{ redde host(v) }}
 }}
 "
         ),
@@ -600,7 +600,7 @@ fn reduction_term_calling_a_host_method_is_still_rejected() {
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
     varia Stencil s ← Stencil {{ data = xs, gain = 2.0 }}
-    redde reducta via summa ex xs apud [i] fixum v {{ redde s.host_method(v) }}
+    redde reducta via summa ex xs apud [i] sit v {{ redde s.host_method(v) }}
 }}
 "
         ),
@@ -615,7 +615,7 @@ fn reduction_term_method_kernel_that_writes_is_rejected() {
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
     varia Stencil s ← Stencil {{ data = xs, gain = 2.0 }}
-    redde reducta via summa ex xs apud [i] fixum v {{
+    redde reducta via summa ex xs apud [i] sit v {{
         s.put(i, v)
         redde v
     }}
@@ -638,7 +638,7 @@ fn reduction_term_method_kernel_with_a_host_call_inside_is_rejected() {
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
     varia Leaky s ← Leaky {{ data = xs }}
-    redde reducta via summa ex xs apud [i] fixum v {{ redde s.calls_host(v) }}
+    redde reducta via summa ex xs apud [i] sit v {{ redde s.calls_host(v) }}
 }}
 "
     ));

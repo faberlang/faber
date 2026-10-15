@@ -35,16 +35,16 @@ fn name(Color c) → string {
 
 fn area(Shape s) → int {
     match s {
-        case Circle const radius { return radius * radius * 3 }
-        case Rect const w, h { return w * h }
-        case Label const text { return text.length() }
+        case Circle let radius { return radius * radius * 3 }
+        case Rect let w, h { return w * h }
+        case Label let text { return text.length() }
         case Nothing { return 0 }
     }
 }
 
 fn classify_shape(Shape s) → none {
     match s {
-        case Rect const w, _ {
+        case Rect let w, _ {
             print "wide §"(w)
         }
         case Nothing {
@@ -57,32 +57,32 @@ fn classify_shape(Shape s) → none {
 }
 
 main {
-    const Color c ← Color.green
+    let Color c ← Color.green
     print c, name(c), c ↦ int, c ↦ string
     print Status.active ↦ int, Status.archived ↦ int, Status.done ↦ int
-    const Color found ← 6 ↦ Color ⊥ Color.red
-    const Color missing ← 9 ↦ Color ⊥ Color.red
+    let Color found ← 6 ↦ Color ⊥ Color.red
+    let Color missing ← 9 ↦ Color ⊥ Color.red
     print found, missing
-    const bool same ← c ≡ Color.green
-    const bool other ← c ≢ Color.green
+    let bool same ← c ≡ Color.green
+    let bool other ← c ≢ Color.green
     print same, other
 
-    const Shape a ← variant Circle { radius = 3 } ∷ Shape
-    const Shape b ← variant Circle { radius = 3 } ∷ Shape
-    const Shape r ← variant Rect { w = 2, h = 5 } ∷ Shape
-    const Shape l ← variant Label { text = "abc" } ∷ Shape
-    const Shape n ← variant Nothing ∷ Shape
+    let Shape a ← variant Circle { radius = 3 } ∷ Shape
+    let Shape b ← variant Circle { radius = 3 } ∷ Shape
+    let Shape r ← variant Rect { w = 2, h = 5 } ∷ Shape
+    let Shape l ← variant Label { text = "abc" } ∷ Shape
+    let Shape n ← variant Nothing ∷ Shape
     print a, r, l, n
     print area(a), area(r), area(l), area(n)
-    const bool t1 ← a ≡ b
-    const bool t2 ← a ≡ r
-    const bool t3 ← l ≡ variant Label { text = "abc" } ∷ Shape
+    let bool t1 ← a ≡ b
+    let bool t2 ← a ≡ r
+    let bool t3 ← l ≡ variant Label { text = "abc" } ∷ Shape
     print t1, t2, t3
     classify_shape(r)
     classify_shape(n)
     classify_shape(a)
     print "§ and §"(r, c)
-    var Shape v ← a
+    mut Shape v ← a
     v ← l
     print v
 }

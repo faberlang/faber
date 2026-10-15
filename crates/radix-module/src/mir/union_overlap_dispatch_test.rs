@@ -52,8 +52,8 @@ fn overlap_method_call_dispatches_to_each_member() {
 functio area_of(Figura f) → numerus {{ redde f.area() }}
 
 incipit {{
-    fixum Figura c ← Circulus {{ nomen = \"c\", radius = 2 }}
-    fixum Figura q ← Quadratum {{ nomen = \"q\", latus = 3 }}
+    sit Figura c ← Circulus {{ nomen = \"c\", radius = 2 }}
+    sit Figura q ← Quadratum {{ nomen = \"q\", latus = 3 }}
     nota area_of(c)
     nota area_of(q)
     nota c.scala(10)

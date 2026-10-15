@@ -78,8 +78,17 @@ pub fn reject_tensor_lift(
                 return;
             }
             self.found = lifted_form(self.types, self.interner, self.target, expr)
+                .filter(|_| !matches!(self.target, Target::HirRust))
                 .map(|(family, label)| (family, label, Operands::Scalar))
-                .or_else(|| register_form(self.types, self.interner, expr));
+                .or_else(|| {
+                    // The Rust emitter lifts the register forms itself and
+                    // refuses a lane combination it cannot spell by the same
+                    // named issues.
+                    if matches!(self.target, Target::HirRust) {
+                        return None;
+                    }
+                    register_form(self.types, self.interner, expr)
+                });
             if self.found.is_none() {
                 walk_expr(self, expr);
             }
@@ -89,7 +98,10 @@ pub fn reject_tensor_lift(
         return Ok(());
     }
     // The elementwise list forms only the MIR runner executes fail closed too.
-    crate::lista_lift_gate::reject_lista_lift(hir, types, target)?;
+    // The Rust emitter lifts the list forms itself.
+    if !matches!(target, Target::HirRust) {
+        crate::lista_lift_gate::reject_lista_lift(hir, types, target)?;
+    }
     crate::list_window_gate::reject_list_window(hir, types, target)?;
     let mut gate = Gate {
         types,
@@ -289,7 +301,8 @@ fn lifted_form(
         }
         // `≡ ≢` between two tensors compare whole values: one verdict, gated
         // under its own issue. The TypeScript emitter compares shape then
-        // elements itself, so that target is exempt from this family only.
+        // elements itself and the Rust runtime has `Tensor::aequalis`, so those
+        // targets are exempt from this family only.
         HirExpressionKind::Binary(
             op @ (HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::NotEq | HirBinOp::StrictNotEq),
             lhs,
@@ -297,7 +310,7 @@ fn lifted_form(
         ) => {
             tensor_element(types, lhs.ty)?;
             tensor_element(types, rhs.ty)?;
-            if matches!(target, Target::HirTypeScript) {
+            if matches!(target, Target::HirTypeScript | Target::HirRust) {
                 return None;
             }
             let spelling = if matches!(op, HirBinOp::Eq | HirBinOp::StrictEq) {

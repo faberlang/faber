@@ -45,7 +45,7 @@ pub(crate) fn scaffold(root: &std::path::Path, package_name: &str) -> Result<(),
 
     // Untagged sources parse on the `en` reader surface by default, so the
     // scaffold must be en-surface or the fresh package fails its own check.
-    if let Err(err) = std::fs::write(&entry, "main {\n    print \"Salve, munde!\"\n}\n") {
+    if let Err(err) = std::fs::write(&entry, "main {\n    print \"Hello, world!\"\n}\n") {
         return Err(format!("failed to write '{}': {}", entry.display(), err));
     }
 

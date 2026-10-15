@@ -15,7 +15,7 @@ fn accepts(result: &crate::SemanticResult) {
 fn scalar_longitudo_sectio_loop_typechecks_for_non_ascii_text() {
     accepts(&compile(
         r#"incipit {
-    fixum textus s ← "café"
+    sit textus s ← "café"
     varia numerus i ← 0
     varia textus out ← ""
     dum i ≺ s.longitudo() {

@@ -52,6 +52,10 @@ fn is_top_level_only_declaration(kind: &StmtKind) -> bool {
 
 // STATEMENT DISPATCH
 
+/// Former spellings of the writable-local word, now ordinary identifiers: en
+/// `var` and the six translated packs' old `varia` rows.
+const RETIRED_VAR_WORDS: &[&str] = &["var", "متغير", "चर", "แปร", "biến", "变量", "變值"];
+
 impl Parser {
     /// Dispatch a top-level or nested statement by its leading token.
     ///
@@ -75,6 +79,14 @@ impl Parser {
             TokenKind::Ident(_) => match self.current_keyword_ident() {
                 Some(TokenKind::Discretio) => self.parse_union_decl()?,
                 Some(TokenKind::Fixum | TokenKind::Varia) => self.parse_var_decl()?,
+                // The retired spelling of the writable local (en `var`, and each
+                // translated pack's former `varia` word): diagnosed, then parsed
+                // as the `mut` declaration it was.
+                None if self.at_retired_var_decl() => self.parse_retired_var_decl()?,
+                // `ref T name ← place`: a read-only-through, re-pointable
+                // local. Claimed only when a type word follows; a lone `ref`
+                // stays an ordinary identifier.
+                Some(TokenKind::De) if self.at_ref_local_decl() => self.parse_ref_decl()?,
                 Some(TokenKind::Magnitudo) => {
                     let suggestion = match self.peek_at(1).kind {
                         TokenKind::Ident(symbol) => {
@@ -203,6 +215,7 @@ impl Parser {
     /// rejected with a structured diagnostic.
     pub(super) fn parse_var_decl(&mut self) -> Result<StmtKind, ParseError> {
         let keyword = self.current_word();
+        let keyword_span = self.current_span();
         let mutability = if self.eat_keyword_ident(TokenKind::Fixum) {
             AstMutability::Immutable
         } else if self.eat_keyword_ident(TokenKind::Varia) {
@@ -219,21 +232,75 @@ impl Parser {
             return self.parse_size_decl(mutability);
         }
 
+        let stmt = self.parse_var_decl_rest(mutability, keyword.clone(), true)?;
+        // A run-time `fixum` of a simple binding is the retired spelling of
+        // typed `sit` (`PARSE010 runtime_const_retired`): `fixum` states a
+        // compile-time fact and goes with `=`. The declaration is parsed whole
+        // so recovery resumes after it. Destructuring has no `sit` form yet and
+        // keeps `fixum`.
+        if mutability == AstMutability::Immutable
+            && let StmtKind::Var(decl) = &stmt
+            && !decl.compile_time
+            && decl
+                .await_form
+                .is_none_or(|form| form == AwaitBindingForm::Assignment)
+            && matches!(
+                decl.binding,
+                BindingPattern::Ident(_) | BindingPattern::Wildcard(_)
+            )
+        {
+            let name = match &decl.binding {
+                BindingPattern::Ident(ident) => self.interner.resolve(ident.name).to_owned(),
+                _ => "_".to_owned(),
+            };
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, keyword_span)
+                    .with_arg("issue", "runtime_const_retired")
+                    .with_arg("keyword", keyword)
+                    .with_arg("name", name),
+            );
+        } else if mutability == AstMutability::Immutable
+            && let StmtKind::Var(decl) = &stmt
+            && !decl.compile_time
+            && matches!(
+                decl.binding,
+                BindingPattern::Array { .. } | BindingPattern::Object { .. }
+            )
+        {
+            // A destructuring head is a binder: it takes `sit`/`varia`.
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, keyword_span)
+                    .with_arg("issue", "binder_fixum_retired")
+                    .with_arg("keyword", keyword),
+            );
+        }
+        Ok(stmt)
+    }
+
+    /// Everything after the declaration word of a typed binding: the optional
+    /// type, the binding pattern and the initializer. `allow_compile_time`
+    /// admits the `=` form (`fixum`/`varia` only; `sit` is run-time).
+    fn parse_var_decl_rest(
+        &mut self,
+        mutability: AstMutability,
+        keyword: String,
+        allow_compile_time: bool,
+    ) -> Result<StmtKind, ParseError> {
         let (mut ty, binding) = self.parse_typed_binding(keyword)?;
 
         let mut compile_time = false;
         let (init, await_form) = if self.eat(&TokenKind::Assign) {
-            // Value-side marker (`var T b ← copy a`, `var T b ← own a`): the
+            // Value-side marker (`mut T b ← copy a`, `mut T b ← own a`): the
             // marker names what happens to the initializer, and the binding
             // gets the exclusive-value type mode. The binding-side spelling
-            // (`var copy T b ← a`) is retired (PARSE010).
+            // (`mut copy T b ← a`) is retired (PARSE010).
             if let Some(slot) = ty.as_mut().filter(|slot| slot.mode.is_none())
                 && let Some(mode) = self.parse_value_marker(None)
             {
                 slot.mode = Some(mode);
             }
             (Some(Box::new(self.parse_expression()?)), None)
-        } else if self.check(&TokenKind::Eq) {
+        } else if allow_compile_time && self.check(&TokenKind::Eq) {
             compile_time = true;
             self.parse_compile_time_initializer(mutability, &binding)?
         } else if self.check(&TokenKind::ConversioAssign) {
@@ -268,22 +335,131 @@ impl Parser {
         }))
     }
 
+    /// Whether the current word is a retired writable-local word opening a
+    /// declaration: the word is not a keyword of the active pack, a type word
+    /// follows, and a name or a type tail follows that.
+    fn at_retired_var_decl(&self) -> bool {
+        if self.keyword_ident_at(0).is_some() {
+            return false;
+        }
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return false;
+        };
+        if !RETIRED_VAR_WORDS.contains(&self.interner.resolve(sym)) {
+            return false;
+        }
+        matches!(
+            self.peek_at(1).kind,
+            TokenKind::Ident(_) | TokenKind::Underscore(_)
+        ) && matches!(
+            self.peek_at(2).kind,
+            TokenKind::Ident(_)
+                | TokenKind::Underscore(_)
+                | TokenKind::LtAscii
+                | TokenKind::LBracket
+                | TokenKind::Cup
+        )
+    }
+
+    /// Diagnose the retired writable-local word (`PARSE010 var_retired`, args
+    /// `keyword` as written and `name`) and parse the declaration whole as the
+    /// `mut` binding it was.
+    ///
+    /// FABER-2-SUNSET: delete with the other retired-word diagnostics.
+    fn parse_retired_var_decl(&mut self) -> Result<StmtKind, ParseError> {
+        let keyword = self.current_word();
+        let keyword_span = self.current_span();
+        self.advance();
+        let stmt = self.parse_var_decl_rest(AstMutability::Mutable, keyword.clone(), true)?;
+        let name = match &stmt {
+            StmtKind::Var(decl) => match &decl.binding {
+                BindingPattern::Ident(ident) => self.interner.resolve(ident.name).to_owned(),
+                _ => "_".to_owned(),
+            },
+            _ => "_".to_owned(),
+        };
+        self.errors.push(
+            ParseError::structured(ParseErrorKind::DeclarationInvalid, keyword_span)
+                .with_arg("issue", "var_retired")
+                .with_arg("keyword", keyword)
+                .with_arg("name", name),
+        );
+        Ok(stmt)
+    }
+
+    /// Whether the `ref` word at statement start opens a local declaration:
+    /// a type word follows (`ref Node cur ← head`).
+    fn at_ref_local_decl(&self) -> bool {
+        matches!(
+            self.peek_at(1).kind,
+            TokenKind::Ident(_) | TokenKind::Underscore(_)
+        )
+    }
+
+    /// Parse `ref T name ← place`: a run-time name that can be re-pointed and
+    /// is read-only through. It is the existing `ref` access view of a
+    /// writable-name cell, so the checker's `ref` rules apply unchanged.
+    ///
+    /// `ref` takes a place to read, never a new owned value: `← copy e` and
+    /// `← own e` are `PARSE010 ref_local_value_marker`; a missing `←` is
+    /// `PARSE010 ref_local_requires_initializer`; destructuring is
+    /// `PARSE010 ref_local_requires_name`. The declaration is parsed whole so
+    /// recovery resumes after it.
+    fn parse_ref_decl(&mut self) -> Result<StmtKind, ParseError> {
+        let keyword = self.current_word();
+        let keyword_span = self.current_span();
+        let (ty, binding) = self.parse_typed_binding(keyword.clone())?;
+        if !matches!(binding, BindingPattern::Ident(_)) {
+            return Err(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, keyword_span)
+                    .with_arg("issue", "ref_local_requires_name")
+                    .with_arg("keyword", keyword),
+            );
+        }
+        if !self.eat(&TokenKind::Assign) {
+            return Err(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, keyword_span)
+                    .with_arg("issue", "ref_local_requires_initializer")
+                    .with_arg("keyword", keyword),
+            );
+        }
+        let marker_span = self.current_span();
+        let marker = self.current_word();
+        if self.parse_value_marker(None).is_some() {
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, marker_span)
+                    .with_arg("issue", "ref_local_value_marker")
+                    .with_arg("keyword", keyword)
+                    .with_arg("marker", marker),
+            );
+        }
+        let init = Box::new(self.parse_expression()?);
+        Ok(StmtKind::Var(VarDecl {
+            mutability: AstMutability::Mutable,
+            await_form: None,
+            ty,
+            binding,
+            init: Some(init),
+            compile_time: false,
+        }))
+    }
+
     /// Spelling of the identifier word at the cursor (empty for any other
     /// token), as written in the source.
-    fn current_word(&self) -> String {
+    pub(super) fn current_word(&self) -> String {
         match self.peek().kind {
             TokenKind::Ident(sym) => self.interner.resolve(sym).to_owned(),
             _ => String::new(),
         }
     }
 
-    /// Record the retired binding-side marker (`var copy T b ← a`,
-    /// `var own T b ← a`): `PARSE010 binding_marker_moved_to_value`, args
+    /// Record the retired binding-side marker (`mut copy T b ← a`,
+    /// `mut own T b ← a`): `PARSE010 binding_marker_moved_to_value`, args
     /// `keyword` (the declaration word as written), `marker` (the marker word
     /// as written) and `name`.
     ///
     /// FABER-2-SUNSET: delete with the retired-word diagnostics; the marker
-    /// goes on the value (`var T b ← copy a`). The declaration is still
+    /// goes on the value (`mut T b ← copy a`). The declaration is still
     /// parsed whole so recovery resumes after it. Parameter markers
     /// (`fn f(copy T p)`) are not affected: only the binding position.
     fn record_binding_marker_retired(
@@ -386,7 +562,10 @@ impl Parser {
             TokenKind::Ident(sym) => self.interner.resolve(sym).to_owned(),
             _ => String::new(),
         };
-        let mut field = self.parse_field_decl()?;
+        // The keyword is consumed here, so the member-level retirement
+        // diagnostic does not stack on the module-level one.
+        self.advance();
+        let mut field = self.parse_field_decl(false)?;
         // The old surface also took `←` here (a named error then); consume the
         // initializer so the whole declaration is skipped, not half of it.
         if field.init.is_none() && self.eat(&TokenKind::Assign) {
@@ -554,17 +733,61 @@ impl Parser {
         }))
     }
 
+    /// Whether the cursor (just after `sit`) starts a written type before the
+    /// name. The inferred shorthand is a name followed by an initializer
+    /// operator, a line break or a block end; everything else is a type.
+    fn at_typed_sit_decl(&self) -> bool {
+        if !matches!(self.peek().kind, TokenKind::Ident(_)) {
+            return !matches!(self.peek().kind, TokenKind::LBracket | TokenKind::LBrace);
+        }
+        // A mode word opens a type only when a type word follows it; a
+        // binding may still be named like a mode word (`sit copy ← 1`).
+        if (self.check_keyword_ident(TokenKind::De)
+            || self.check_keyword_ident(TokenKind::Varia)
+            || self.check_keyword_ident(TokenKind::Own)
+            || self.check_keyword_ident(TokenKind::Copy))
+            && matches!(
+                self.peek_at(1).kind,
+                TokenKind::Ident(_) | TokenKind::Underscore(_) | TokenKind::LParen
+            )
+        {
+            return true;
+        }
+        match self.peek_at(1).kind {
+            TokenKind::Assign
+            | TokenKind::ConversioAssign
+            | TokenKind::AwaitAssign
+            | TokenKind::Eq
+            | TokenKind::RBrace
+            | TokenKind::Eof => false,
+            _ => !self.raw_newline_between_words(0, 1),
+        }
+    }
+
+    /// Whether a raw `Newline` token separates the non-trivia words at
+    /// `first` and `second` (lookahead offsets from the cursor).
+    fn raw_newline_between_words(&self, first: usize, second: usize) -> bool {
+        let base = self.non_trivia_indices.partition_point(|&i| i < self.pos);
+        let (Some(&a), Some(&b)) = (
+            self.non_trivia_indices.get(base + first),
+            self.non_trivia_indices.get(base + second),
+        ) else {
+            return true;
+        };
+        self.tokens[a..b]
+            .iter()
+            .any(|token| token.kind == TokenKind::Newline)
+    }
+
     /// Parse `sit` inferred immutable binding declarations.
     fn parse_sit_decl(&mut self) -> Result<StmtKind, ParseError> {
         let start = self.current_span();
+        let keyword = self.current_word();
         self.expect_keyword_ident(TokenKind::Sit)?;
 
+        // Destructuring head: `sit [a, b] ← e` / `sit { a, b } ← e`.
         if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
-            return Err(
-                ParseError::structured(ParseErrorKind::Expected, self.current_span())
-                    .with_arg("issue", "sit_no_destructuring")
-                    .with_arg("keyword", "sit"),
-            );
+            return self.parse_var_decl_rest(AstMutability::Immutable, keyword, false);
         }
 
         if matches!(self.peek().kind, TokenKind::Underscore(_)) {
@@ -573,6 +796,12 @@ impl Parser {
                     .with_arg("issue", "sit_identifier_binding")
                     .with_arg("keyword", "sit"),
             );
+        }
+
+        // Typed form `sit T name ← e`: the run-time, fixed-name, read-only
+        // declaration. The inferred shorthand `sit name ← e` stays.
+        if self.at_typed_sit_decl() {
+            return self.parse_var_decl_rest(AstMutability::Immutable, keyword, false);
         }
 
         let ident = self.parse_ident()?;
@@ -1052,8 +1281,20 @@ impl Parser {
     }
 
     /// Parse the field portion shared by genus and union declaration members.
-    fn parse_field_decl(&mut self) -> Result<FieldDecl, ParseError> {
-        let modifier = self.eat_field_modifier();
+    ///
+    /// `genus_member` is true for a `genus` field, where a leading `de` is the
+    /// refused `ref` modifier; a `discretio` shared field is unmarked by
+    /// design, so there a leading `de` is the access marker of its type.
+    ///
+    /// A `const` member is the type-level compile-time constant: it takes the
+    /// `=` initializer, and only that. A missing initializer is `PARSE010
+    /// const_member_requires_initializer`; the run-time arrow is `PARSE010
+    /// const_member_assign_initializer`. Both are recoverable.
+    fn parse_field_decl(&mut self, genus_member: bool) -> Result<FieldDecl, ParseError> {
+        let (modifier, retired) = match self.eat_field_modifier(genus_member) {
+            Some((modifier, retired)) => (Some(modifier), retired),
+            None => (None, false),
+        };
         if modifier.is_some() && self.current_field_modifier().is_some() {
             return Err(ParseError::structured(
                 ParseErrorKind::DeclarationInvalid,
@@ -1070,11 +1311,28 @@ impl Parser {
         let ty = self.parse_type()?;
         let name = self.parse_param_name()?;
         let sponte = self.parse_post_name_marker();
+        let is_const = modifier == Some(FieldModifier::Const) && !retired;
         let init = if self.eat(&TokenKind::Eq) {
+            Some(Box::new(self.parse_expression()?))
+        } else if is_const && self.check(&TokenKind::Assign) {
+            // `const T X ← e`: a constant is a compile-time fact, so the
+            // run-time arrow is named. The initializer is parsed whole so
+            // recovery resumes after the member.
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, self.current_span())
+                    .with_arg("issue", "const_member_assign_initializer"),
+            );
+            self.advance();
             Some(Box::new(self.parse_expression()?))
         } else {
             None
         };
+        if is_const && init.is_none() {
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, name.span)
+                    .with_arg("issue", "const_member_requires_initializer"),
+            );
+        }
 
         Ok(FieldDecl {
             modifier,
@@ -1086,28 +1344,66 @@ impl Parser {
     }
 
     /// The field modifier the current word spells, if any (DECISIONS D16.1).
+    ///
+    /// `sit` (en `let`) is the read-only instance field, `varia` (en `mut`) the
+    /// writable one, `fixum` (en `const`) the type-level compile-time
+    /// constant. The retired `generis` (en `static`) and the refused `de` (en
+    /// `ref`) are not modifiers; they are recognised by
+    /// `retired_field_modifier_issue` so the parser can name them.
     fn current_field_modifier(&self) -> Option<FieldModifier> {
         match self.current_keyword_ident()? {
-            TokenKind::Fixum => Some(FieldModifier::Fixum),
+            TokenKind::Sit => Some(FieldModifier::Fixum),
             TokenKind::Varia => Some(FieldModifier::Varia),
-            TokenKind::Generis => Some(FieldModifier::Generis),
+            TokenKind::Fixum => Some(FieldModifier::Const),
             _ => None,
         }
     }
 
-    /// Consume one leading field modifier, if present.
+    /// The named diagnostic for a leading `generis` (retired) or `de`
+    /// (refused) field word, with the modifier it is read as. A `de` after a
+    /// modifier is not a modifier at all: it is the access marker of the
+    /// field's type (`varia de Node next`).
+    fn retired_field_modifier_issue(
+        &self,
+        genus_member: bool,
+    ) -> Option<(&'static str, FieldModifier)> {
+        match self.current_keyword_ident()? {
+            TokenKind::Generis => Some(("static_member_retired", FieldModifier::Const)),
+            TokenKind::De if genus_member => Some(("ref_field_refused", FieldModifier::Fixum)),
+            _ => None,
+        }
+    }
+
+    /// Consume one leading field modifier, if present; the flag is true when
+    /// the word was retired or refused rather than a live modifier.
     ///
     /// GRAMMAR:
-    ///   field-decl := ('fixum' | 'varia' | 'generis') type ident 'sponte'? ('=' expr)?
+    ///   field-decl := ('sit' | 'varia' | 'fixum') type ident 'sponte'? ('=' expr)?
     ///
-    /// Exactly one modifier: a second one (`generis fixum`, `generis varia`,
-    /// `fixum varia`) is rejected here; a missing one on a `genus` field is
+    /// Exactly one modifier: a second one (`fixum sit`, `fixum varia`,
+    /// `sit varia`) is rejected here; a missing one on a `genus` field is
     /// rejected by `parse_class_member`. `discretio` shared fields stay
     /// unmarked (fork F7 held), so the modifier is optional at this level.
-    fn eat_field_modifier(&mut self) -> Option<FieldModifier> {
+    ///
+    /// A retired `generis` or refused `de` word is recorded as `PARSE010
+    /// static_member_retired` / `ref_field_refused` and read as the modifier it
+    /// became (the constant, the read-only field), so recovery resumes after
+    /// the field.
+    fn eat_field_modifier(&mut self, genus_member: bool) -> Option<(FieldModifier, bool)> {
+        if let Some((issue, read_as)) = self.retired_field_modifier_issue(genus_member) {
+            let span = self.current_span();
+            let keyword = self.current_word();
+            self.advance();
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, span)
+                    .with_arg("issue", issue)
+                    .with_arg("keyword", keyword),
+            );
+            return Some((read_as, true));
+        }
         let modifier = self.current_field_modifier()?;
         self.advance();
-        Some(modifier)
+        Some((modifier, false))
     }
 
     /// Whether the current word is the removed `nexum` field modifier.
@@ -1168,7 +1464,7 @@ impl Parser {
             ClassMemberKind::Method(func)
         } else {
             let field_start = self.current_span();
-            let field = self.parse_field_decl()?;
+            let field = self.parse_field_decl(true)?;
             if field.modifier.is_none() {
                 // D16.1: every genus field declares exactly one modifier.
                 // Recoverable, so one run reports every unmarked field; the
@@ -1541,7 +1837,7 @@ impl Parser {
                     if self.skip_sum_type_function(Some(start))? {
                         continue;
                     }
-                    let field = self.parse_field_decl()?;
+                    let field = self.parse_field_decl(false)?;
                     shared_fields.push(UnionField {
                         leading_trivia,
                         annotations,
@@ -1553,7 +1849,7 @@ impl Parser {
 
                 if declaration_region_started {
                     let checkpoint = self.checkpoint();
-                    if let Ok(field) = self.parse_field_decl() {
+                    if let Ok(field) = self.parse_field_decl(false) {
                         shared_fields.push(UnionField {
                             leading_trivia,
                             annotations: Vec::new(),
@@ -1913,7 +2209,7 @@ impl Parser {
     /// member list instead of starting a following `fixum` statement.
     ///
     /// The following-statement reading wins when the token after `fixum` is a
-    /// name followed by an expression continuation (`fixum count ← …`, typed
+    /// name followed by an expression continuation (`sit count ← …`, typed
     /// declarations, postfix access). The selective reading wins when the list
     /// is closed or continued (`fixum` at EOF, `fixum dic,`), a wildcard or
     /// orphaned `ut` member is attempted, or the first member is followed by
@@ -2927,6 +3223,13 @@ impl Parser {
     fn next_annotation_ident_is(&self, expected: TokenKind) -> bool {
         // `expected` is a keyword identity; the current word resolves to its
         // identity through the registry in any reader locale.
+        // The `in` word is the writable-binding cell's parameter spelling;
+        // identity resolution canonicalizes it to `varia`.
+        let expected = if expected == TokenKind::In {
+            TokenKind::Varia
+        } else {
+            expected
+        };
         self.current_keyword_ident() == Some(expected)
     }
 

@@ -56,7 +56,7 @@ functio n() → numerus {
   redde 7
 }
 incipit {
-  fixum numerus v ← n()
+  sit numerus v ← n()
 }
 ",
         AnalyzeRequest::default(),
@@ -86,7 +86,7 @@ fn top_level_const_vacua_rejects_as_top_level_binding() {
     // surface (D5.9), so there is no static equivalent to redirect this
     // fixture to; assert the SEM062 rejection instead.
     let result = Compiler::new(Config::default().with_target(Target::HirRust))
-        .compile_str("vacua.fab", "fixum lista<numerus> name ← vacua");
+        .compile_str("vacua.fab", "sit lista<numerus> name ← vacua");
     assert!(
         !result.success(),
         "top-level fixum vacua must fail closed, got: {:?}",

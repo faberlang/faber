@@ -2,8 +2,8 @@
 locale = "en"
 +++
 main {
-    var list<int> xs ← [1, 2]
-    var int i ← 0 - 1
+    mut list<int> xs ← [1, 2]
+    mut int i ← 0 - 1
     print "before"
     print xs[i]
 }

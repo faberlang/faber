@@ -28,14 +28,14 @@ locale = "en"
 # ab — bounded iteration step
 #
 # GRAMMAR:
-#   iteraStmt :← 'itera' 'ab' expr '‥' expr step? 'fixum' ident block
+#   iteraStmt :← 'itera' 'ab' expr '‥' expr step? 'sit' ident block
 #
 # EXPECTED OUTPUT:
 #   Scalar stdout smoke (see body).
 #
 
 main {
-    for range 0‥10 step 2 const i {
+    for range 0‥10 step 2 let i {
         print i
     }
 }

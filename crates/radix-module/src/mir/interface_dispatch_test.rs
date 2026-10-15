@@ -28,7 +28,7 @@ fn run(source: &str) -> Vec<String> {
 const FORMAE: &str = r"
 implendum Crescens {
     functio cresce(numerus per) → vacuum
-    functio adde(in numerus k) → vacuum
+    functio adde(varia numerus k) → vacuum
     functio mensura() → numerus
 }
 
@@ -36,7 +36,7 @@ genus Quadratum implet Crescens {
     varia numerus latus
 
     functio cresce(numerus per) → vacuum { ego.latus ← ego.latus + per }
-    functio adde(in numerus k) → vacuum {
+    functio adde(varia numerus k) → vacuum {
         ego.latus ← ego.latus + k
         k ← k + 100
     }
@@ -51,7 +51,7 @@ genus Rectum implet Crescens {
         ego.lat ← ego.lat + per
         ego.alt ← ego.alt + per
     }
-    functio adde(in numerus k) → vacuum { ego.lat ← ego.lat + k }
+    functio adde(varia numerus k) → vacuum { ego.lat ← ego.lat + k }
     functio mensura() → numerus { redde ego.lat * ego.alt }
 }
 ";
@@ -80,10 +80,10 @@ fn contract_typed_local_mutates_the_live_value_through_self_and_mut_param() {
         "{FORMAE}
 incipit {{
     varia Quadratum q ← Quadratum {{ latus = 1 }}
-    fixum Crescens c ← q
+    sit Crescens c ← q
     c.cresce(1)
     varia numerus k ← 5
-    c.adde(in k)
+    c.adde(varia k)
     nota k
     nota c.mensura()
     nota q.mensura()

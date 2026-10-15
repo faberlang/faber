@@ -6,4 +6,5 @@ input = "genus/ascribed-literal-la.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

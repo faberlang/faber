@@ -53,9 +53,7 @@ impl Emitter<'_> {
                 self.support.need(Helper::IntMethod);
                 Ok(Self::exact_call("faber_sign", &receiver, effect))
             }
-            IntrinsicMirKind::Collection(
-                MirCollectionOp::Minimum | MirCollectionOp::Maximum,
-            ) => {
+            IntrinsicMirKind::Collection(MirCollectionOp::Minimum | MirCollectionOp::Maximum) => {
                 let minimum =
                     entry.mir_kind == IntrinsicMirKind::Collection(MirCollectionOp::Minimum);
                 self.int_binary_method(receiver, effect, minimum, args)
@@ -84,7 +82,9 @@ impl Emitter<'_> {
         };
         let argument = self.expr(&arg.expr)?;
         if !argument.is_integer() {
-            return Err(unsupported("integer method argument that is not an integer"));
+            return Err(unsupported(
+                "integer method argument that is not an integer",
+            ));
         }
         self.support.need(Helper::IntMethod);
         let helper = if minimum {
@@ -113,7 +113,9 @@ impl Emitter<'_> {
         };
         let exponent = self.expr(&arg.expr)?;
         if !exponent.is_integer() {
-            return Err(unsupported("integer potentia exponent that is not an integer"));
+            return Err(unsupported(
+                "integer potentia exponent that is not an integer",
+            ));
         }
         self.support.need(Helper::IntMethod);
         let mut operands = [receiver, exponent];

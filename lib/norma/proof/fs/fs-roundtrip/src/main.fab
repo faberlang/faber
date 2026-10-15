@@ -8,8 +8,8 @@ locale = "en"
 import from "norma:fs" fs
 
 main {
-    const string dir ← fs.temp_dir()
-    const string path ← fs.join([dir, "core-norma-fs-roundtrip.txt"])
+    let string dir ← fs.temp_dir()
+    let string path ← fs.join([dir, "core-norma-fs-roundtrip.txt"])
     fs.write_file(path, "roundtrip-ok")
     print fs.read_file<string>(path)
 }

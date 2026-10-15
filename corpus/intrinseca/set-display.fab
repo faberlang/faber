@@ -33,22 +33,22 @@ locale = "en"
 #   [3, 5, 7]
 
 main {
-    var set<int> one ← empty
+    mut set<int> one ← empty
     one.add(3)
     print one
 
-    var set<string> name ← empty
+    mut set<string> name ← empty
     name.add("x")
     print name
 
-    const set<int> blank ← empty
+    let set<int> blank ← empty
     print blank
 
-    var set<int> several ← empty
+    mut set<int> several ← empty
     several.add(7)
     several.add(3)
     several.add(5)
-    var list<int> ordered ← several ↦ list<int>
+    mut list<int> ordered ← several ↦ list<int>
     ordered.sort()
     print ordered
 }

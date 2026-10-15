@@ -13,24 +13,24 @@ locale = "en"
 # list. A single shape-list hole in the conversion target is solved from the
 # flat count; reshape solves its hole from the receiver's element count.
 main {
-    const tf32[] seed ← empty
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[] seed ← empty
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
 
-    const tensor<f32, _> shaped ← flat ↦ tensor<f32, [2, _]>
-    const tensor<f32, _> reshaped ← shaped.reshape([_, 2])
+    let tensor<f32, _> shaped ← flat ↦ tensor<f32, [2, _]>
+    let tensor<f32, _> reshaped ← shaped.reshape([_, 2])
 
     # The canonical generic form uses a whole-shape `_`; the shape argument
     # supplies a tuple and therefore a static rank witness.
-    const tensor<f32, _> whole_shape ← flat ↦ tensor<f32, [2, 2]>
+    let tensor<f32, _> whole_shape ← flat ↦ tensor<f32, [2, 2]>
 
     # The first target hole is mapped from the source axis.
-    const tf32[2, 3] grid ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
-    const tensor<f32, _> mapped ← grid.expanded([_, 3])
+    let tf32[2, 3] grid ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
+    let tensor<f32, _> mapped ← grid.expanded([_, 3])
 
     # The source extent maps to the exact second axis. The unmatched first
     # target axis comes from the expected result shape.
-    const tf32[3] row ← [1.0, 2.0, 3.0] ↦ tf32[3]
-    const tf32[2, 3] witnessed ← row.expanded([_, 3])
+    let tf32[3] row ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    let tf32[2, 3] witnessed ← row.expanded([_, 3])
 
     print shaped.shape()
     print reshaped.shape()

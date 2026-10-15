@@ -3,7 +3,7 @@ locale = "en"
 +++
 # The creo hook runs once on the finished object, whichever way it was built.
 class Terminus {
-    var int valor = 0
+    mut int valor = 0
 
     fn creo() → void {
         if self.valor ≺ 0 {
@@ -20,9 +20,9 @@ class Terminus {
 }
 
 class Circulus {
-    var int radius = 1
-    var int diameter = 0
-    var float area = 0
+    mut int radius = 1
+    mut int diameter = 0
+    mut float area = 0
 
     fn creo() → void {
         self.diameter ← self.radius * 2
@@ -37,6 +37,6 @@ main {
     print Terminus { valor = 200 }.accipe()
     print Terminus { valor = -4 }.accipe()
     print FIXED.accipe()
-    const Circulus c ← Circulus { radius = 5 }
+    let Circulus c ← Circulus { radius = 5 }
     print c.radius, c.diameter, c.area
 }

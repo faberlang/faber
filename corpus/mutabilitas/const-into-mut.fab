@@ -3,13 +3,13 @@ term = "mutabilitas"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "functio_decl", "param_list", "parameter", "func_modifier", "argument_list", "argument"]
 category = "type"
-summary = "MU-1 baseline: mutation through a var into a mut param lands."
+summary = "MU-1 baseline: mutation through a mut into a mut param lands."
 syntax = "fn poke(mut list<int> xs)"
 related = ["in", "lista"]
 locale = "en"
 +++
 # =============================================================================
-# mutabilitas — var into mut param (D-1; a const binding is not a writable place)
+# mutabilitas — mut into mut param (D-1; a let binding is not a writable place)
 # =============================================================================
 
 fn poke(mut list<int> xs) → void {
@@ -17,7 +17,7 @@ fn poke(mut list<int> xs) → void {
 }
 
 main {
-    var list<int> a ← [1, 2, 3]
+    mut list<int> a ← [1, 2, 3]
     poke(mut a)
     print a.length()
 }

@@ -4,9 +4,8 @@ use crate::test_support::emitted;
 
 #[test]
 fn an_optional_scalar_is_a_flag_and_a_value() {
-    let code = emitted(
-        "main {\n    const int ∪ none a ← 5\n    const int ∪ none b ← null\n    print a, b\n}",
-    );
+    let code =
+        emitted("main {\n    let int ∪ none a ← 5\n    let int ∪ none b ← null\n    print a, b\n}");
     assert!(
         code.contains("const faber_opt_i64 l_a = ((faber_opt_i64){1, INT64_C(5)});"),
         "{code}"
@@ -24,7 +23,7 @@ fn an_optional_scalar_is_a_flag_and_a_value() {
 #[test]
 fn an_optional_text_is_a_nullable_pointer() {
     let code = emitted(
-        "main {\n    const string ∪ none s ← null\n    if s is none {\n        print \"none\"\n    }\n}",
+        "main {\n    let string ∪ none s ← null\n    if s is none {\n        print \"none\"\n    }\n}",
     );
     assert!(code.contains("const char *const l_s = NULL;"), "{code}");
     assert!(code.contains("if (l_s == NULL) {"), "{code}");
@@ -32,7 +31,7 @@ fn an_optional_text_is_a_nullable_pointer() {
 
 #[test]
 fn coalesce_runs_its_fallback_only_for_none() {
-    let code = emitted("main {\n    const int ∪ none a ← null\n    print a coalesce 9\n}");
+    let code = emitted("main {\n    let int ∪ none a ← null\n    print a coalesce 9\n}");
     assert!(
         code.contains("faber_c0.has ? faber_c0.value : INT64_C(9)"),
         "{code}"
@@ -42,7 +41,7 @@ fn coalesce_runs_its_fallback_only_for_none() {
 #[test]
 fn unwrap_aborts_on_none() {
     let code = emitted(
-        "class Box {\n    var int n\n}\nmain {\n    const Box ∪ none b ← null\n    print b!.n\n}",
+        "class Box {\n    mut int n\n}\nmain {\n    let Box ∪ none b ← null\n    print b!.n\n}",
     );
     assert!(code.contains("faber_abort(\"unwrap of nihil\");"), "{code}");
 }
@@ -59,7 +58,7 @@ fn an_optional_result_returns_the_struct() {
 #[test]
 fn a_creo_hook_runs_on_the_finished_object() {
     let code = crate::test_support::emitted(
-        "class Box {\n    var int n = 0\n    fn creo() → void {\n        if self.n ≻ 9 {\n            self.n ← 9\n        }\n    }\n}\nmain {\n    const Box b ← Box { n = 50 }\n    print b.n\n}",
+        "class Box {\n    mut int n = 0\n    fn creo() → void {\n        if self.n ≻ 9 {\n            self.n ← 9\n        }\n    }\n}\nmain {\n    let Box b ← Box { n = 50 }\n    print b.n\n}",
     );
     let set = code.find("->m_n = INT64_C(50);").expect("field set");
     let hook = code.find("g_Box_creo(faber_a, faber_t").expect("hook call");
@@ -75,9 +74,15 @@ fn a_sponte_parameter_is_the_optional_of_its_declared_type() {
         "fn pick(int x optional) → int {\n    return x coalesce 3\n}\nmain {\n    print pick()\n    print pick(9)\n}",
     );
     assert!(code.contains("faber_opt_i64 p_x"), "{code}");
-    assert!(code.contains("faber_c0.has ? faber_c0.value : INT64_C(3)"), "{code}");
+    assert!(
+        code.contains("faber_c0.has ? faber_c0.value : INT64_C(3)"),
+        "{code}"
+    );
     assert!(code.contains("f_pick(((faber_opt_i64){0}))"), "{code}");
-    assert!(code.contains("f_pick(((faber_opt_i64){1, INT64_C(9)}))"), "{code}");
+    assert!(
+        code.contains("f_pick(((faber_opt_i64){1, INT64_C(9)}))"),
+        "{code}"
+    );
 }
 
 #[test]
@@ -94,9 +99,8 @@ fn an_optional_coalesce_parameter_keeps_its_declared_type() {
 
 #[test]
 fn an_assertion_index_reads_the_element() {
-    let code = emitted(
-        "main {\n    const list<string, 3> xs ← [\"a\", \"b\", \"c\"]\n    print xs![0]\n}",
-    );
+    let code =
+        emitted("main {\n    let list<string, 3> xs ← [\"a\", \"b\", \"c\"]\n    print xs![0]\n}");
     assert!(code.contains("faber_list_text_at("), "{code}");
 }
 
@@ -110,6 +114,6 @@ fn a_sponte_parameter_that_is_ignored_is_marked_used() {
 
 #[test]
 fn a_bare_none_prints_the_none_word() {
-    let code = emitted("main {\n    const none nothing ← null\n    print nothing\n}");
+    let code = emitted("main {\n    let none nothing ← null\n    print nothing\n}");
     assert!(code.contains("\"none\""), "{code}");
 }

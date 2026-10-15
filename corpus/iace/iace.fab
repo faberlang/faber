@@ -51,7 +51,7 @@ main {
     }
 
     # iace with interpolated message
-    const int code ← 404
+    let int code ← 404
     do {
         throw "Error code: §"(code)
     }
@@ -60,7 +60,7 @@ main {
     }
 
     # Conditional iace inside fac — validation guard
-    const int value ← -5
+    let int value ← -5
     do {
         if value ≺ 0 {
             throw "Value must be non-negative"

@@ -23,10 +23,10 @@ locale = "en"
 import from "norma:chorda" chorda
 
 main {
-    const list<string> head ← chorda.split_n("a=b=c", "=", 2)
+    let list<string> head ← chorda.split_n("a=b=c", "=", 2)
     assert head.length() ≡ 2
 
-    const string tail ← chorda.suffix("hello", 2)
+    let string tail ← chorda.suffix("hello", 2)
     assert tail ≡ "llo"
 
     print head.first(), head.get(1), tail

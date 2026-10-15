@@ -43,11 +43,11 @@ fn multiply_by_two(tf32[4] data) → tf32[4] {
 }
 
 main {
-    const list<f32> xs ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[4] input ← xs ↦ tf32[4]
+    let list<f32> xs ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[4] input ← xs ↦ tf32[4]
 
-    const tf32[4] output ← multiply_by_two(input)
-    const list<f32> result ← output.flatten()
+    let tf32[4] output ← multiply_by_two(input)
+    let list<f32> result ← output.flatten()
 
     print result
 }

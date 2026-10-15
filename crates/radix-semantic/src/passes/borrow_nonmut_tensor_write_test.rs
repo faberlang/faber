@@ -220,7 +220,7 @@ main {
 fn index_store_through_an_alias_of_a_nonmut_tensor_param_is_rejected() {
     assert_rejects_naming(
         r"fn bump(tf32[2, 3] dst) → void {
-    const tf32[2, 3] c ← dst
+    let tf32[2, 3] c ← dst
     c[[0, 0]] ← 1.0
 }
 main {
@@ -233,8 +233,8 @@ main {
 fn index_store_through_an_alias_of_an_alias_is_rejected() {
     assert_rejects_naming(
         r"fn bump(tf32[2, 3] dst) → void {
-    const tf32[2, 3] c ← dst
-    const tf32[2, 3] d ← c
+    let tf32[2, 3] c ← dst
+    let tf32[2, 3] d ← c
     d[[0, 0]] ← 1.0
 }
 main {
@@ -247,7 +247,7 @@ main {
 fn index_store_through_an_alias_of_a_mut_tensor_param_is_accepted() {
     assert_accepts(
         r"fn bump(mut tf32[2, 3] dst) → void {
-    var tf32[2, 3] c ← dst
+    mut tf32[2, 3] c ← dst
     c[[0, 0]] ← 1.0
 }
 main {
@@ -259,7 +259,7 @@ main {
 fn copy_into_and_mut_call_through_an_alias_of_a_nonmut_tensor_param_are_rejected() {
     assert_rejects_naming(
         r"fn put(tf32[2, 3] dst, tf32[2, 3] src) → void {
-    const tf32[2, 3] c ← dst
+    let tf32[2, 3] c ← dst
     c ⇇ src
 }
 main {
@@ -271,7 +271,7 @@ main {
     dst[[0, 0]] ← 1.0
 }
 fn outer(tf32[2, 3] dst) → void {
-    const tf32[2, 3] c ← dst
+    let tf32[2, 3] c ← dst
     inner(mut c)
 }
 main {
@@ -284,7 +284,7 @@ main {
 fn fill_statement_through_an_alias_of_a_nonmut_tensor_param_is_rejected() {
     assert_rejects_naming(
         r"fn clear(tf32[2, 3] dst) → void {
-    const tf32[2, 3] c ← dst
+    let tf32[2, 3] c ← dst
     c.fill(0.0)
 }
 main {
@@ -297,7 +297,7 @@ main {
 fn mut_alias_of_a_nonmut_tensor_param_is_rejected() {
     assert_rejects_naming(
         r"fn bump(tf32[2, 3] dst) → void {
-    var mut tf32[2, 3] c ← dst
+    mut mut tf32[2, 3] c ← dst
     c[[0, 0]] ← 1.0
 }
 main {
@@ -310,7 +310,7 @@ main {
 fn mut_alias_of_a_mut_tensor_param_is_accepted() {
     assert_accepts(
         r"fn bump(mut tf32[2, 3] dst) → void {
-    var mut tf32[2, 3] c ← dst
+    mut mut tf32[2, 3] c ← dst
     c[[0, 0]] ← 1.0
 }
 main {
@@ -322,7 +322,7 @@ main {
 fn reading_through_an_alias_of_a_nonmut_tensor_param_is_accepted() {
     assert_accepts(
         r"fn first(tf32[2, 3] src) → f32 {
-    const tf32[2, 3] c ← src
+    let tf32[2, 3] c ← src
     return c[[0, 0]]
 }
 main {

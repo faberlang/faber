@@ -53,7 +53,7 @@ fn guarded(int value) → int ⇥ GuardError {
 
 main {
     do {
-        const int ok ← guarded(1)
+        let int ok ← guarded(1)
         assert ok ≡ 1
     }
     catch err {
@@ -63,7 +63,7 @@ main {
 
 test "true path is recoverable" {
     do {
-        const int dropped ← guarded(-1)
+        let int dropped ← guarded(-1)
         assert false panic "true path must throw"
     }
     catch err {

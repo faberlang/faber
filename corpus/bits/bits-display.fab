@@ -29,15 +29,15 @@ locale = "en"
 # EXPECTED stdout: see bits-display.expected
 
 main {
-    const b8 one8 ← 0x01
-    const b16 one16 ← 0x0001
-    const b32 one32 ← 0x00000001
-    const b64 one64 ← 0x0000000000000001
+    let b8 one8 ← 0x01
+    let b16 one16 ← 0x0001
+    let b32 one32 ← 0x00000001
+    let b64 one64 ← 0x0000000000000001
     print one8
     print one16
     print one32
     print one64
 
-    const list<b8> bytes ← [0x00, 0x0f, 0xa5, 0xff]
+    let list<b8> bytes ← [0x00, 0x0f, 0xa5, 0xff]
     print bytes
 }

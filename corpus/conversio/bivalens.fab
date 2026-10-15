@@ -42,14 +42,14 @@ locale = "en"
 #   HIR-direct Rust and MIR-stepper routes must agree for truthiness.
 
 main {
-    const bool b1 ← 0 ↦ bool
-    const bool b2 ← 42 ↦ bool
+    let bool b1 ← 0 ↦ bool
+    let bool b2 ← 42 ↦ bool
     print b1
     print b2
-    const bool b3 ← "" ↦ bool
-    const bool b4 ← "salve" ↦ bool
+    let bool b3 ← "" ↦ bool
+    let bool b4 ← "salve" ↦ bool
     print b3
     print b4
-    const bool habet ← ("123" ↦ int ⊥ 0) ↦ bool
+    let bool habet ← ("123" ↦ int ⊥ 0) ↦ bool
     print habet
 }

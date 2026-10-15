@@ -11,7 +11,7 @@ fn exported_fn() → int {
 
 @ public
 class ExportedClass {
-    var int value
+    mut int value
 }
 
 @ public

@@ -5,8 +5,9 @@
 //! reported as PARSE010 `static_decl_retired` with args `keyword` (the
 //! spelling as written, i.e. the pack's `generis` row) and `name`, at top
 //! level and inside blocks alike. `generis` followed by anything else stays
-//! an ordinary identifier, and `generis` as a genus member keeps its field
-//! meaning. The module constant is `const T X = e` / la `fixum T X = e`.
+//! an ordinary identifier, and `generis` as a genus member is the separate
+//! `static_member_retired` (the member constant is `const T X = e`). The
+//! module constant is `const T X = e` / la `fixum T X = e`.
 
 use crate::test_support::{has_arg, parse_ok, parse_program};
 use crate::{ParseErrorKind, ParseResult, parse};
@@ -30,6 +31,7 @@ impl KeywordPack for EnStaticPack {
         match text {
             "static" => Some("generis"),
             "const" => Some("fixum"),
+            "let" => Some("sit"),
             "fn" => Some("functio"),
             _ => None,
         }
@@ -141,6 +143,24 @@ fn module_constant_is_the_replacement() {
 }
 
 #[test]
-fn static_genus_field_keeps_member_meaning() {
-    let _ = parse_ok("genus Capsa {\n    generis numerus MAXIMUM = 8\n    varia numerus n\n}");
+fn static_genus_member_is_retired_as_a_member_not_a_declaration() {
+    let result =
+        parse_program("genus Capsa {\n    generis numerus MAXIMUM = 8\n    varia numerus n\n}");
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|err| has_arg(err, "issue", "static_member_retired")),
+        "{:?}",
+        result.errors
+    );
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|err| has_arg(err, "issue", "static_decl_retired")),
+        "{:?}",
+        result.errors
+    );
+    let _ = parse_ok("genus Capsa {\n    fixum numerus MAXIMUM = 8\n    varia numerus n\n}");
 }

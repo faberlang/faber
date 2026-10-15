@@ -33,6 +33,7 @@ impl KeywordPack for EnDiscernePack {
             "case" => Some("casu"),
             "and" => Some("et"),
             "const" => Some("fixum"),
+            "let" => Some("sit"),
             _ => None,
         }
     }
@@ -134,7 +135,7 @@ fn each_comma_diagnostic_is_reported_once_per_position() {
 
 #[test]
 fn comma_after_a_binding_list_stays_a_binding_comma() {
-    let result = parse_ok("discerne a { casu Circulus fixum r, Quadratum { } }");
+    let result = parse_ok("discerne a { casu Circulus sit r, Quadratum { } }");
     let patterns = &discerne_of(&result).arms[0].patterns;
     assert_eq!(patterns.len(), 1);
     let Pattern::Ident(_, Some(PatternBind::Bindings { bindings, .. })) = &patterns[0] else {
@@ -145,7 +146,7 @@ fn comma_after_a_binding_list_stays_a_binding_comma() {
 
 #[test]
 fn comma_before_a_name_and_binding_introducer_is_the_retired_pattern_comma() {
-    let result = parse_program("discerne a { casu Circulus fixum r, Quadratum fixum latus { } }");
+    let result = parse_program("discerne a { casu Circulus sit r, Quadratum sit latus { } }");
     only_issue(&result, "discerne_pattern_comma_retired");
     let patterns = &discerne_of(&result).arms[0].patterns;
     assert_eq!(patterns.len(), 2);
@@ -259,7 +260,7 @@ fn english_comma_is_the_named_migration_diagnostic() {
 
 #[test]
 fn omnia_stays_a_legal_binding_name_elsewhere() {
-    let result = parse_ok("fixum _ omnia ← 1");
+    let result = parse_ok("sit omnia ← 1");
     assert_eq!(
         result.program.as_ref().expect("program").statements.len(),
         1

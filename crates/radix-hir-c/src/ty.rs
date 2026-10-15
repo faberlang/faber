@@ -237,9 +237,7 @@ impl Ty {
         match self {
             Ty::Int => Some("int64_t"),
             Ty::None => Some("int"),
-            Ty::Sized(width) | Ty::Modular(width) | Ty::Saturating(width) => {
-                Some(width.c_type())
-            }
+            Ty::Sized(width) | Ty::Modular(width) | Ty::Saturating(width) => Some(width.c_type()),
             Ty::Opt(Inner::Genus(_)) => None,
             Ty::Opt(inner) => inner
                 .scalar_struct()

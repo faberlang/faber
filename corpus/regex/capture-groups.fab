@@ -40,13 +40,13 @@ locale = "en"
 # `nomatch` for no match.
 fn groups(string pat, string text, int n) → string {
     do {
-        const regex r ← pat ↦ regex
-        const _ h ← r.find(text)
+        let regex r ← pat ↦ regex
+        let h ← r.find(text)
         if h ≡ null {
             return "nomatch"
         }
-        var string out ← ""
-        var int i ← 0
+        mut string out ← ""
+        mut int i ← 0
         while i ≤ n {
             out ← out + "|§"(h!.group(i) coalesce "none")
             i ← i + 1

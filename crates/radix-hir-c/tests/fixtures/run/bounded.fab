@@ -5,20 +5,20 @@ locale = "en"
 # growable, an empty bounded list has its capacity, and a push at capacity
 # ends the program.
 main {
-    var list<int> xs ← [1, 2, 3] ∷ list<int>
+    mut list<int> xs ← [1, 2, 3] ∷ list<int>
     xs.append(4)
     xs.append(5)
     print xs, xs.length()
-    var list<int, 8> ys ← empty
+    mut list<int, 8> ys ← empty
     ys.append(1)
     ys.append(2)
     print ys
-    const _ lit ← [7, 8, 9]
+    let lit ← [7, 8, 9]
     print lit
-    for from [10, 20, 30] const x {
+    for from [10, 20, 30] let x {
         print x
     }
-    var list<int, 3> full ← [1, 2, 3]
+    mut list<int, 3> full ← [1, 2, 3]
     print full
     full.append(4)
     print "unreachable"

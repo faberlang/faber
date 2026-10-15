@@ -65,7 +65,7 @@ fn local_site_works_in_a_function_a_method_and_a_nested_body() {
 #[test]
 fn runtime_store_stays_outside_a_constant() {
     assert_rejects_with_issue_la(
-        "incipit {\n    fixum numerus n ← praefixum {\n        redde 1\n    }\n}\n",
+        "incipit {\n    sit numerus n ← praefixum {\n        redde 1\n    }\n}\n",
         "praefixum_outside_constant",
     );
     assert_rejects_with_issue_la(
@@ -185,7 +185,7 @@ fn calling_a_generic_function_is_not_a_dependence() {
 #[test]
 fn a_generic_genus_field_default_may_not_depend_on_its_parameter() {
     let err = rejection(
-        "genus Cista<T> {\n    fixum lista<T> cellae = praefixum {\n        varia lista<T> r ← vacua\n        redde r\n    }\n}\n",
+        "genus Cista<T> {\n    sit lista<T> cellae = praefixum {\n        varia lista<T> r ← vacua\n        redde r\n    }\n}\n",
         "praefixum_type_parameter",
     );
     assert_eq!(arg(&err, "name"), Some("cellae"));
@@ -195,14 +195,14 @@ fn a_generic_genus_field_default_may_not_depend_on_its_parameter() {
 #[test]
 fn a_generic_genus_field_default_without_the_parameter_is_accepted() {
     assert_clean(
-        "genus Cista<T> {\n    fixum numerus cap = praefixum {\n        redde 4\n    }\n    fixum T item\n}\n",
+        "genus Cista<T> {\n    sit numerus cap = praefixum {\n        redde 4\n    }\n    sit T item\n}\n",
     );
 }
 
 #[test]
 fn a_local_body_may_not_open_ad() {
     let err = rejection(
-        "incipit {\n    fixum textus t = praefixum {\n        fixum textus r ← ad 'runtime:echo' (\"salve\") ↦ textus\n        redde r\n    }\n    nota t\n}\n",
+        "incipit {\n    fixum textus t = praefixum {\n        sit textus r ← ad 'runtime:echo' (\"salve\") ↦ textus\n        redde r\n    }\n    nota t\n}\n",
         "praefixum_forbidden",
     );
     assert_eq!(arg(&err, "effect"), Some("ad"));

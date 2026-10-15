@@ -27,7 +27,7 @@ ruling = "05ac0534"
 # =============================================================================
 
 main {
-    const list<string> a ← ["x", "y"]
-    const string s ← a ↦ string
+    let list<string> a ← ["x", "y"]
+    let string s ← a ↦ string
     print s
 }

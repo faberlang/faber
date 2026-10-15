@@ -36,10 +36,10 @@ locale = "en"
 #   Smoke asserts exit 0 only.
 
 main {
-    const float value ← -3.75
-    const int rotundus ← value.round()
-    const int basis ← value.floor()
-    const int culmen ← value.ceiling()
-    const int truncatus ← value.truncate()
+    let float value ← -3.75
+    let int rotundus ← value.round()
+    let int basis ← value.floor()
+    let int culmen ← value.ceiling()
+    let int truncatus ← value.truncate()
     print rotundus, basis, culmen, truncatus
 }

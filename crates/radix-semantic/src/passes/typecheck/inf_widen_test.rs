@@ -84,20 +84,20 @@ fn widened(operand_width: NumericWidth, operand: &'static str) -> Widened {
 
 #[test]
 fn a_declaration_initializer_is_widened() {
-    let source = "incipit {\nfixum u64 u ← 5\nfixum inf w ← u\nnota w\n}\n";
+    let source = "incipit {\nsit u64 u ← 5\nsit inf w ← u\nnota w\n}\n";
     assert_eq!(widens_of(source), vec![widened(U64, "path")]);
 }
 
 #[test]
 fn an_assignment_is_widened() {
-    let source = "incipit {\nfixum u8 u ← 5\nvaria inf w ← 0\nw ← u\nnota w\n}\n";
+    let source = "incipit {\nsit u8 u ← 5\nvaria inf w ← 0\nw ← u\nnota w\n}\n";
     assert_eq!(widens_of(source), vec![widened(U8, "path")]);
 }
 
 #[test]
 fn a_call_argument_is_widened() {
     let source = "functio take(inf x) → inf {\nredde x\n}\n\
-        incipit {\nfixum i8 s ← -5\nnota take(s)\n}\n";
+        incipit {\nsit i8 s ← -5\nnota take(s)\n}\n";
     assert_eq!(widens_of(source), vec![widened(I8, "path")]);
 }
 
@@ -109,15 +109,15 @@ fn a_return_is_widened() {
 
 #[test]
 fn a_field_initializer_is_widened() {
-    let source = "genus Capsa {\nfixum inf a\n}\n\
-        incipit {\nfixum u64 u ← 5\nfixum Capsa c ← Capsa { a = u }\nnota c.a\n}\n";
+    let source = "genus Capsa {\nsit inf a\n}\n\
+        incipit {\nsit u64 u ← 5\nsit Capsa c ← Capsa { a = u }\nnota c.a\n}\n";
     assert_eq!(widens_of(source), vec![widened(U64, "path")]);
 }
 
 #[test]
 fn array_elements_are_widened_one_by_one() {
-    let source = "incipit {\nfixum inf x ← 3\nfixum u8 b ← 1\n\
-        fixum lista<inf> xs ← [b, x, b]\nnota xs\n}\n";
+    let source = "incipit {\nsit inf x ← 3\nsit u8 b ← 1\n\
+        sit lista<inf> xs ← [b, x, b]\nnota xs\n}\n";
     assert_eq!(
         widens_of(source),
         vec![widened(U8, "path"), widened(U8, "path")]
@@ -127,14 +127,14 @@ fn array_elements_are_widened_one_by_one() {
 #[test]
 fn a_call_result_is_widened_from_its_declared_return() {
     let source = "functio small() → u8 {\nredde 7\n}\n\
-        incipit {\nfixum inf w ← small()\nnota w\n}\n";
+        incipit {\nsit inf w ← small()\nnota w\n}\n";
     assert_eq!(widens_of(source), vec![widened(U8, "call")]);
 }
 
 #[test]
 fn a_method_call_result_is_widened() {
-    let source = "incipit {\nfixum lista<numerus> xs ← [1, 2]\n\
-        fixum inf n ← xs.longitudo()\nnota n\n}\n";
+    let source = "incipit {\nsit lista<numerus> xs ← [1, 2]\n\
+        sit inf n ← xs.longitudo()\nnota n\n}\n";
     let found = widens_of(source);
     assert_eq!(found.len(), 1, "{found:?}");
     assert_eq!(found[0].operand, "method");
@@ -144,9 +144,9 @@ fn a_method_call_result_is_widened() {
 
 #[test]
 fn a_field_read_and_an_index_read_are_widened() {
-    let source = "genus Capsa {\nfixum u64 a\n}\n\
-        incipit {\nfixum Capsa c ← Capsa { a = 5 }\nfixum lista<u8> xs ← [1, 2]\n\
-        fixum inf p ← c.a\nfixum inf q ← xs[0]\nnota p\nnota q\n}\n";
+    let source = "genus Capsa {\nsit u64 a\n}\n\
+        incipit {\nsit Capsa c ← Capsa { a = 5 }\nsit lista<u8> xs ← [1, 2]\n\
+        sit inf p ← c.a\nsit inf q ← xs[0]\nnota p\nnota q\n}\n";
     assert_eq!(
         widens_of(source),
         vec![widened(U64, "field"), widened(U8, "index")]
@@ -157,7 +157,7 @@ fn a_field_read_and_an_index_read_are_widened() {
 fn arithmetic_over_bounded_operands_widens_its_own_result() {
     // Ruling 35: the cap stands, so `a * a` is an `i64` and the store into
     // the `inf` slot widens that result; the operands keep their types.
-    let source = "functio f(i64 a) → inf {\nfixum inf d ← a * a\nredde d\n}\n";
+    let source = "functio f(i64 a) → inf {\nsit inf d ← a * a\nredde d\n}\n";
     assert_eq!(widens_of(source), vec![widened(I64, "binary")]);
 }
 
@@ -167,21 +167,21 @@ fn arithmetic_over_bounded_operands_widens_its_own_result() {
 
 #[test]
 fn a_value_already_typed_inf_takes_no_node() {
-    let source = "functio id(inf a) → inf {\nfixum inf b ← a\nredde b + a\n}\n\
-        incipit {\nfixum inf x ← 3\nfixum lista<inf> xs ← [x, x]\nnota id(x)\nnota xs\n}\n";
+    let source = "functio id(inf a) → inf {\nsit inf b ← a\nredde b + a\n}\n\
+        incipit {\nsit inf x ← 3\nsit lista<inf> xs ← [x, x]\nnota id(x)\nnota xs\n}\n";
     assert!(widens_of(source).is_empty());
 }
 
 #[test]
 fn an_untyped_constant_takes_no_node() {
-    let source = "incipit {\nfixum inf a ← 5\nfixum inf b ← -5\nfixum inf c ← 2 ⇐ 70\n\
-        fixum lista<inf> xs ← [1, 2]\nnota a\nnota b\nnota c\nnota xs\n}\n";
+    let source = "incipit {\nsit inf a ← 5\nsit inf b ← -5\nsit inf c ← 2 ⇐ 70\n\
+        sit lista<inf> xs ← [1, 2]\nnota a\nnota b\nnota c\nnota xs\n}\n";
     assert!(widens_of(source).is_empty());
 }
 
 #[test]
 fn a_bounded_value_into_a_bounded_or_open_slot_takes_no_node() {
-    let source = "incipit {\nfixum u8 b ← 1\nfixum u64 w ← b\nfixum _ r ← b\n\
+    let source = "incipit {\nsit u8 b ← 1\nsit u64 w ← b\nsit r ← b\n\
         nota w\nnota r\n}\n";
     assert!(widens_of(source).is_empty());
 }
@@ -190,14 +190,14 @@ fn a_bounded_value_into_a_bounded_or_open_slot_takes_no_node() {
 fn an_inf_operand_joins_a_bounded_one_with_each_keeping_its_own_type() {
     // `x + b` is typed `inf` by the join; the bounded operand is not stamped,
     // so no store happens and no node is needed.
-    let source = "incipit {\nfixum inf x ← 3\nfixum u8 b ← 1\nfixum _ r ← x + b\nnota r\n}\n";
+    let source = "incipit {\nsit inf x ← 3\nsit u8 b ← 1\nsit r ← x + b\nnota r\n}\n";
     assert!(widens_of(source).is_empty());
 }
 
 #[test]
 fn the_operand_keeps_its_declared_type_not_the_slot() {
     let fixture =
-        test_support::analyze_ok_la("incipit {\nfixum u64 u ← 5\nfixum inf w ← u\nnota w\n}\n");
+        test_support::analyze_ok_la("incipit {\nsit u64 u ← 5\nsit inf w ← u\nnota w\n}\n");
     let hir = fixture.hir.as_ref().expect("hir");
     let mut seen = None;
     struct Probe<'a>(&'a TypeTable, &'a mut Option<Type>);

@@ -3996,7 +3996,7 @@ fn recipe_destination_local_for(function: &MirFunction, op: MirCollectionOp) -> 
     // The mut-out tail: one plain copy of the identity into a declared
     // param (projected or not) is the recipe's host-visible output buffer
     // (`out ⇇ a.matmul(b)` forwards to the param directly;
-    // `const total ← a.sum(); out[0] ← total` forwards through the stage
+    // `let total ← a.sum(); out[0] ← total` forwards through the stage
     // local). The param — not the intermediate local — is what the ABI
     // output resource binds, so the emitters' output-write suppression laws
     // key on it.

@@ -28,8 +28,8 @@ test "whole-string order is code-point order" {
 #   surrogate pair of "😀" would sort first).
 
 main {
-    const string a ← "abc"
-    const string b ← "abd"
+    let string a ← "abc"
+    let string b ← "abd"
     print a ≺ b
     print "ab" ≺ a
     print "b" ≻ a

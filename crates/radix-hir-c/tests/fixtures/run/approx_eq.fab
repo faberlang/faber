@@ -19,17 +19,17 @@ main {
     print far32(2147483647, -2147483648)
     print 1.0 ≈ 1.0, 1.0 ≈ 2.0, 1.0 ≉ 2.0
 
-    const u8 port ← 42 ∷ u8
-    const int count ← 42
+    let u8 port ← 42 ∷ u8
+    let int count ← 42
     print port ≅ count
     print 1 ≅ 1.0
     print 42.145 ≅ 42.0
     print 1 ≇ 2
 
     # A `u64` cell that fits `i64` still reads as an exact value.
-    const i64 above_precision ← 9007199254740993
-    const u64 below_precision ← 9007199254740992
+    let i64 above_precision ← 9007199254740993
+    let u64 below_precision ← 9007199254740992
     print above_precision ≅ below_precision
-    const f64 float_boundary ← 9007199254740992.0
+    let f64 float_boundary ← 9007199254740992.0
     print above_precision ≅ float_boundary
 }

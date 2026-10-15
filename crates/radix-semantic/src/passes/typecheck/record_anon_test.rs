@@ -52,32 +52,32 @@ fn refuses_with(source: &str, issue: &str) {
 #[test]
 fn bare_literal_without_cell_is_a_record() {
     accepts(
-        "main {\n    const _ p ← { g = 1.0, w = 2 }\n    print p.g\n    const int n ← p.w\n    print n\n}\n",
+        "main {\n    let p ← { g = 1.0, w = 2 }\n    print p.g\n    let int n ← p.w\n    print n\n}\n",
     );
 }
 
 #[test]
 fn underscore_hole_constructor_still_needs_a_cell() {
     refuses_with(
-        "main {\n    const _ p ← _ { g = 1.0 }\n}\n",
+        "main {\n    let p ← _ { g = 1.0 }\n}\n",
         "inferred_constructor_no_expected_type",
     );
 }
 
 #[test]
 fn bare_literal_against_field_list_hole_cell_is_a_record() {
-    accepts("main {\n    const record<*> p ← { g = 1.0, w = 2 }\n    print p.w\n}\n");
+    accepts("main {\n    let record<*> p ← { g = 1.0, w = 2 }\n    print p.w\n}\n");
 }
 
 #[test]
 fn stated_field_list_hole_constructor_is_a_record() {
-    accepts("main {\n    const record<*> p ← record<*> { g = 1.0, w = 2 }\n    print p.w\n}\n");
+    accepts("main {\n    let record<*> p ← record<*> { g = 1.0, w = 2 }\n    print p.w\n}\n");
 }
 
 #[test]
 fn record_field_read_is_checked() {
     refuses_with(
-        "main {\n    const _ p ← { g = 1.0 }\n    print p.nope\n}\n",
+        "main {\n    let p ← { g = 1.0 }\n    print p.nope\n}\n",
         "unknown_record_field",
     );
 }

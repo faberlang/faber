@@ -400,6 +400,11 @@ struct Frame {
     /// `in` parameter locals that borrow a caller place instead of owning a
     /// cloned scalar value.
     aliases: FxHashMap<MirLocalId, PlaceAlias>,
+    /// Pending `mut` write-backs for projected caller places, applied when
+    /// this frame returns: a `mut` parameter writes back to whatever place
+    /// the caller passed, projected or not (CTO ruling, need).
+    /// Each entry is (caller frame index, caller place, callee local).
+    mut_writebacks: Vec<(usize, MirPlace, MirLocalId)>,
     /// Slot-indexed by `MirTempId` (`None` = never written).
     temps: Vec<Option<Value>>,
     /// Statement results readable through `MirOperand::Value`. Filled by
@@ -1642,6 +1647,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             function: function_id,
             locals,
             aliases: FxHashMap::default(),
+            mut_writebacks: Vec::new(),
             temps: vec![None; temps_len],
             values: FxHashMap::default(),
             records_values: self.value_reading_functions.contains(&function_id),
@@ -1902,7 +1908,28 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     };
                     self.return_error = None;
                     self.return_value = Some(value);
-                    self.pop_frame();
+                    let returned = self.pop_frame();
+                    if let Some(frame) = returned {
+                        for (caller, place, local) in frame.mut_writebacks {
+                            let Some(value) = frame
+                                .locals
+                                .get(local.0 as usize)
+                                .and_then(|slot| slot.as_ref().cloned())
+                            else {
+                                self.fail(RunnerError::internal(
+                                    terminator.span,
+                                    "mut write-back parameter cell is uninitialized",
+                                ));
+                                break;
+                            };
+                            if let Err(error) =
+                                self.write_place_at(caller, &place, value, terminator.span)
+                            {
+                                self.fail(error);
+                                break;
+                            }
+                        }
+                    }
                 }
                 MirTerminatorKind::ReturnError(operand) => {
                     let value = match self.eval_operand(&operand, terminator.span) {
@@ -2422,6 +2449,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         self.return_error = None;
         self.push_frame(func_id, MirBlockId(0));
         let callee_slots = self.slot_types.get(&func_id);
+        let mut mut_writebacks: Vec<(usize, MirPlace, MirLocalId)> = Vec::new();
         if let Some(frame) = self.frames.last_mut() {
             if let Some((local, value)) = closure_environment {
                 write_slot(&mut frame.locals, local.0 as usize, value, span, "local")?;
@@ -2457,8 +2485,19 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         other => other,
                     };
                     write_slot(&mut frame.locals, local.0 as usize, arg, span, "local")?;
+                    // A projected `mut` place cannot take the alias branch
+                    // (the alias carries the base only), so the value was
+                    // copied in; schedule the write-back at return instead
+                    // of silently dropping the callee's rebind.
+                    if mode == MirParamMode::MutRef
+                        && depth > 0
+                        && let MirOperand::Place(place) = operand
+                    {
+                        mut_writebacks.push((depth - 1, place.clone(), local));
+                    }
                 }
             }
+            frame.mut_writebacks = mut_writebacks;
         }
         stacker::maybe_grow(NATIVE_STACK_RED_ZONE, NATIVE_STACK_SEGMENT, || {
             self.run_until_depth(depth);
@@ -3013,10 +3052,23 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     fn read_place(&mut self, place: &MirPlace, span: Span) -> Result<Value, RunnerError> {
-        let mut value = match place.base {
-            MirPlaceBase::Local(id) => self.read_local(id, span)?,
-            MirPlaceBase::Temp(id) => self.read_temp(id, span)?,
-        };
+        let frame = self
+            .frames
+            .len()
+            .checked_sub(1)
+            .ok_or_else(|| RunnerError::internal(span, "no active frame"))?;
+        self.read_place_at(frame, place, span)
+    }
+
+    /// [`Self::read_place`] against an explicit frame: write-backs and other
+    /// cross-frame helpers resolve places in the caller, not the top frame.
+    fn read_place_at(
+        &mut self,
+        frame_index: usize,
+        place: &MirPlace,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let mut value = self.read_base_place(frame_index, &place.base, span)?;
         for projection in &place.projections {
             value = self.project(value, projection, span)?;
         }
@@ -3029,13 +3081,27 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         value: Value,
         span: Span,
     ) -> Result<(), RunnerError> {
+        let frame = self
+            .frames
+            .len()
+            .checked_sub(1)
+            .ok_or_else(|| RunnerError::internal(span, "no active frame"))?;
+        self.write_place_at(frame, place, value, span)
+    }
+
+    /// [`Self::write_place`] against an explicit frame. Caller aliases and
+    /// the store-side f32 rounding live in [`Self::write_base_place`], so a
+    /// write-back into a caller local that is itself a `mut` alias keeps
+    /// resolving and narrowing like any other store.
+    fn write_place_at(
+        &mut self,
+        frame_index: usize,
+        place: &MirPlace,
+        value: Value,
+        span: Span,
+    ) -> Result<(), RunnerError> {
         if place.projections.is_empty() {
-            let frame = self
-                .frames
-                .len()
-                .checked_sub(1)
-                .ok_or_else(|| RunnerError::internal(span, "no active frame"))?;
-            return self.write_base_place(frame, &place.base, value, span);
+            return self.write_base_place(frame_index, &place.base, value, span);
         }
 
         let parent = MirPlace {
@@ -3044,9 +3110,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         };
         // `is_empty()` returned above, so the last projection is present.
         let last = &place.projections[place.projections.len() - 1];
-        let mut current = self.read_place(&parent, span)?;
+        let mut current = self.read_place_at(frame_index, &parent, span)?;
         current = self.project_write(current, last, value, span)?;
-        self.write_place(&parent, current, span)
+        self.write_place_at(frame_index, &parent, current, span)
     }
 
     fn write_base_place(
@@ -3231,6 +3297,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    // Test-only accessor: production reads go through `read_place`, which
+    // resolves the current frame uniformly.
+    #[cfg(test)]
     fn read_local(&self, id: MirLocalId, span: Span) -> Result<Value, RunnerError> {
         let frame = self
             .frames
@@ -3973,6 +4042,9 @@ mod octeti_lista_test;
 mod octeti_valor_test;
 
 #[cfg(test)]
+mod valor_numerus_width_test;
+
+#[cfg(test)]
 #[path = "vector_lista_test.rs"]
 mod vector_lista_test;
 
@@ -4031,6 +4103,10 @@ mod f32_store_test;
 #[cfg(test)]
 #[path = "narrowing_conversio_test.rs"]
 mod narrowing_conversio_test;
+
+#[cfg(test)]
+#[path = "ascii_conversio_test.rs"]
+mod ascii_conversio_test;
 
 #[cfg(test)]
 #[path = "inf_test.rs"]

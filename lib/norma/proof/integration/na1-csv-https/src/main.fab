@@ -22,25 +22,25 @@ fn port_path() → string {
 }
 
 fn is_serve() → bool {
-    const list<string> args ← process.argv()
+    let list<string> args ← process.argv()
     if args.length() ≡ 0 then return false
     return (args.get(0) coalesce "") ≡ "serve"
 }
 
 fn run_serve() → void {
-    const server.Listener listener ← server.bind_tls(0, "cert.pem", "key.pem")
-    const int port ← listener.port()
+    let server.Listener listener ← server.bind_tls(0, "cert.pem", "key.pem")
+    let int port ← listener.port()
     assert port ≻ 0
     fs.write_file(port_path(), port ↦ string)
-    const server.Incoming incoming ← listener.accept()
+    let server.Incoming incoming ← listener.accept()
     assert incoming.req.method ≡ "POST"
     server.reply(incoming, 200, headers.empty(), incoming.req.body)
     listener.stop()
 }
 
 fn wait_port() → string {
-    const string path ← port_path()
-    var int spins ← 0
+    let string path ← port_path()
+    mut int spins ← 0
     while not fs.exists(path) {
         time.sleep(50)
         spins ← spins + 1
@@ -52,15 +52,15 @@ fn wait_port() → string {
 }
 
 fn run_client() → void {
-    const string csv_text ← "name,age\nalice,30"
-    const string csv_path ← fs.join([fs.temp_dir(), "na1-input.csv"])
+    let string csv_text ← "name,age\nalice,30"
+    let string csv_path ← fs.join([fs.temp_dir(), "na1-input.csv"])
     fs.write_file(csv_path, csv_text)
-    const string loaded ← fs.read_file<string>(csv_path)
-    const list<list<string>> rows ← csv.parse(loaded)
-    var string name ← ""
-    var string age ← ""
-    var int i ← 0
-    for from rows const row {
+    let string loaded ← fs.read_file<string>(csv_path)
+    let list<list<string>> rows ← csv.parse(loaded)
+    mut string name ← ""
+    mut string age ← ""
+    mut int i ← 0
+    for from rows let row {
         if i ≡ 1 {
             name ← row.get(0) coalesce ""
             age ← row.get(1) coalesce ""
@@ -69,20 +69,20 @@ fn run_client() → void {
     }
     assert name ≡ "alice"
     assert age ≡ "30"
-    const string payload ← "{\"name\":\"alice\",\"age\":\"30\"}"
-    const json ∪ none parsed ← json.try_parse(payload)
+    let string payload ← "{\"name\":\"alice\",\"age\":\"30\"}"
+    let json ∪ none parsed ← json.try_parse(payload)
     assert parsed not is none
-    const json doc ↤ parsed
-    const string wire ← json.stringify(doc)
-    const string port ← wait_port()
-    const string url ← "https://127.0.0.1:§/json"(port)
-    const int agent ↤ call 'http:agent' ([60000 ↦ value, "ca.pem" ↦ value])
-    const client.Client session ← client.Client { agent = agent }
-    const response.Response reply ← client.post_on(session, url, wire)
+    let json doc ↤ parsed
+    let string wire ← json.stringify(doc)
+    let string port ← wait_port()
+    let string url ← "https://127.0.0.1:§/json"(port)
+    let int agent ↤ call 'http:agent' ([60000 ↦ value, "ca.pem" ↦ value])
+    let client.Client session ← client.Client { agent = agent }
+    let response.Response reply ← client.post_on(session, url, wire)
     assert reply.status ≡ 200
-    const string out_path ← fs.join([fs.temp_dir(), "na1-response.json"])
+    let string out_path ← fs.join([fs.temp_dir(), "na1-response.json"])
     fs.write_file(out_path, reply.body)
-    const string saved ← fs.read_file<string>(out_path)
+    let string saved ← fs.read_file<string>(out_path)
     assert saved.length() ≻ 0
     print "na1-ok"
 }

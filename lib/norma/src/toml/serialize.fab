@@ -12,7 +12,7 @@ import from "norma:text" text
 fn stringify(value document) → string ⇥ string {
     if document is none then throw "norma:toml.stringify: TOML has no null"
     if document is map<string, value> {
-        const map<string, value> fields ↤ document ⊥ empty
+        let map<string, value> fields ↤ document ⊥ empty
         return encode_document(document)
     }
     throw "norma:toml.stringify: document must be a table"
@@ -35,10 +35,10 @@ fn as_float(value node) → float {
 }
 
 fn quote(string s) → string {
-    var string out ← «"»
-    var int i ← 0
+    mut string out ← «"»
+    mut int i ← 0
     while i ≺ s.length() {
-        const string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1)
         if c ≡ «"» {
             out ← out + «\\"»
         }
@@ -64,9 +64,9 @@ fn quote(string s) → string {
 
 fn is_bare_key(string key) → bool {
     if key.length() ≡ 0 then return false
-    var int i ← 0
+    mut int i ← 0
     while i ≺ key.length() {
-        const string c ← key.slice(i, i + 1)
+        let string c ← key.slice(i, i + 1)
         if not "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-".contains(c) {
             return false
         }
@@ -89,12 +89,12 @@ fn encode_scalar(value node) → string ⇥ string {
     if node is int then return as_integer(node) ↦ string
     if node is float then return as_float(node) ↦ string
     if node is instant {
-        const string wire ↤ node ⊥ ""
+        let string wire ↤ node ⊥ ""
         return wire
     }
     if node is none then throw "norma:toml.stringify: TOML has no null"
     do {
-        const inf big ↤ node
+        let inf big ↤ node
         return big ↦ string
     }
     catch err {
@@ -103,11 +103,11 @@ fn encode_scalar(value node) → string ⇥ string {
 }
 
 fn encode_array(list<value> items) → string ⇥ string {
-    var list<string> encoded ← empty
-    for from items const item {
+    mut list<string> encoded ← empty
+    for from items let item {
         if item is map<string, value> then throw "norma:toml.stringify: table arrays must be top-level [[tables]]"
         if item is list<value> {
-            const list<value> nested ↤ item ⊥ empty
+            let list<value> nested ↤ item ⊥ empty
             encoded.append(encode_array(nested))
         }
         else {
@@ -118,7 +118,7 @@ fn encode_array(list<value> items) → string ⇥ string {
 }
 
 fn is_table_array(list<value> items) → bool {
-    for from items const item {
+    for from items let item {
         if not (item is map<string, value>) then return false
     }
     return true
@@ -126,15 +126,15 @@ fn is_table_array(list<value> items) → bool {
 
 fn encode_value(value node) → string ⇥ string {
     if node is list<value> {
-        const list<value> items ↤ node ⊥ empty
+        let list<value> items ↤ node ⊥ empty
         return encode_array(items)
     }
     if node is map<string, value> {
-        const map<string, value> table ↤ node ⊥ empty
-        var list<string> keys ← table.keys()
+        let map<string, value> table ↤ node ⊥ empty
+        mut list<string> keys ← table.keys()
         keys.sort()
-        var list<string> pairs ← empty
-        for from keys const key {
+        mut list<string> pairs ← empty
+        for from keys let key {
             pairs.append(text.join([emit_key(key), " = ", encode_value(table[key])], ""))
         }
         return text.join(["{ ", text.join(pairs, ", "), " }"], "")
@@ -143,32 +143,32 @@ fn encode_value(value node) → string ⇥ string {
 }
 
 fn encode_members(map<string, value> fields) → string ⇥ string {
-    var list<string> keys ← fields.keys()
+    mut list<string> keys ← fields.keys()
     keys.sort()
-    var list<string> members ← empty
-    for from keys const key {
+    mut list<string> members ← empty
+    for from keys let key {
         members.append(text.join([emit_key(key), " = ", encode_value(fields[key])], ""))
     }
     return text.join(members, "\n") + "\n"
 }
 
 fn encode_document(value document) → string ⇥ string {
-    const map<string, value> fields ↤ document ⊥ empty
-    var list<string> keys ← fields.keys()
+    let map<string, value> fields ↤ document ⊥ empty
+    mut list<string> keys ← fields.keys()
     keys.sort()
-    var list<string> members ← empty
-    var list<string> tables ← empty
-    for from keys const key {
-        const value item ↤ fields[key]
+    mut list<string> members ← empty
+    mut list<string> tables ← empty
+    for from keys let key {
+        let value item ↤ fields[key]
         if item is map<string, value> {
-            const map<string, value> inner ↤ item ⊥ empty
+            let map<string, value> inner ↤ item ⊥ empty
             tables.append(text.join(["[", emit_key(key), "]\n", encode_members(inner), "\n"], ""))
         }
         elif item is list<value> {
-            const list<value> items ↤ item ⊥ empty
+            let list<value> items ↤ item ⊥ empty
             if is_table_array(items) {
-                for from items const entry {
-                    const map<string, value> inner ↤ entry ⊥ empty
+                for from items let entry {
+                    let map<string, value> inner ↤ entry ⊥ empty
                     tables.append(text.join(["[[", emit_key(key), "]]\n", encode_members(inner), "\n"], ""))
                 }
             }

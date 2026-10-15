@@ -19,7 +19,7 @@ fn ledger_lowers_and_validates() {
 locale = "en"
 +++
 main {
-    var ledger<string, int> x ← { "b": 2, "a": 1 }
+    mut ledger<string, int> x ← { "b": 2, "a": 1 }
     x["c"] ← 3
     print x.length()
 }
@@ -37,7 +37,7 @@ fn ledger_run_length_has_get() {
 locale = "en"
 +++
 main {
-    var ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
+    mut ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
     print x.length()
     print x.has("c")
     print x.has("zz")
@@ -56,8 +56,8 @@ fn ledger_run_loop_follows_insertion_order() {
 locale = "en"
 +++
 main {
-    var ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
-    for from x at [name] const count {
+    mut ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
+    for from x at [name] let count {
         print name
     }
 }
@@ -75,9 +75,9 @@ fn ledger_run_update_keeps_position() {
 locale = "en"
 +++
 main {
-    var ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
+    mut ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
     x["a"] ← 10
-    for from x at [name] const count {
+    for from x at [name] let count {
         print "§=§"(name, count)
     }
 }
@@ -95,10 +95,10 @@ fn ledger_run_remove_then_add_appends() {
 locale = "en"
 +++
 main {
-    var ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
+    mut ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
     x.delete("b")
     x.put("b", 7)
-    for from x at [name] const count {
+    for from x at [name] let count {
         print name
     }
 }
@@ -116,8 +116,8 @@ fn ledger_run_map_unaffected() {
 locale = "en"
 +++
 main {
-    var map<string, int> x ← { "b": 2, "a": 1, "c": 3 }
-    for from x at [name] const count {
+    mut map<string, int> x ← { "b": 2, "a": 1, "c": 3 }
+    for from x at [name] let count {
         print name
     }
 }
@@ -139,7 +139,7 @@ fn ledger_run_index_store_and_put_delete() {
 locale = "en"
 +++
 main {
-    var ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
+    mut ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
     x["a"] ← 10
     x.put("d", 4)
     x.delete("b")
@@ -160,8 +160,8 @@ fn ledger_eq_same_order_is_equal() {
 locale = "en"
 +++
 main {
-    var ledger<string, int> a ← { "b": 2, "a": 1 }
-    var ledger<string, int> b ← { "b": 2, "a": 1 }
+    mut ledger<string, int> a ← { "b": 2, "a": 1 }
+    mut ledger<string, int> b ← { "b": 2, "a": 1 }
     print a ≡ b
 }
 "#;
@@ -178,8 +178,8 @@ fn ledger_eq_different_order_is_unequal() {
 locale = "en"
 +++
 main {
-    var ledger<string, int> a ← { "b": 2, "a": 1 }
-    var ledger<string, int> b ← { "a": 1, "b": 2 }
+    mut ledger<string, int> a ← { "b": 2, "a": 1 }
+    mut ledger<string, int> b ← { "a": 1, "b": 2 }
     print a ≡ b
     print a ≢ b
 }
@@ -197,8 +197,8 @@ fn ledger_eq_map_ignores_order() {
 locale = "en"
 +++
 main {
-    var map<string, int> a ← { "b": 2, "a": 1 }
-    var map<string, int> b ← { "a": 1, "b": 2 }
+    mut map<string, int> a ← { "b": 2, "a": 1 }
+    mut map<string, int> b ← { "a": 1, "b": 2 }
     print a ≡ b
 }
 "#;
@@ -215,7 +215,7 @@ fn ledger_eq_print_follows_insertion_order() {
 locale = "en"
 +++
 main {
-    var ledger<string, int> x ← { "b": 2, "a": 1 }
+    mut ledger<string, int> x ← { "b": 2, "a": 1 }
     print x
 }
 "#;

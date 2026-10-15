@@ -48,48 +48,48 @@ locale = "en"
 #   [1, 20, 3, 40]
 
 main {
-    const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
-    const list<f32> flat_b ← [4.0, 3.0, 2.0, 1.0]
-    var tensor<f32, [2, 2]> a ← flat_a ↦ tensor<f32, [2, 2]>
-    var tensor<f32, [2, 2]> b ← flat_b ↦ tensor<f32, [2, 2]>
+    let list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
+    let list<f32> flat_b ← [4.0, 3.0, 2.0, 1.0]
+    mut tensor<f32, [2, 2]> a ← flat_a ↦ tensor<f32, [2, 2]>
+    mut tensor<f32, [2, 2]> b ← flat_b ↦ tensor<f32, [2, 2]>
 
-    const tensor<bool, [2, 2]> greater ← a ≻ b
-    const list<bool> greater_out ← greater.flatten()
+    let tensor<bool, [2, 2]> greater ← a ≻ b
+    let list<bool> greater_out ← greater.flatten()
     print greater_out
-    const tensor<bool, [2, 2]> small ← a ≤ 2.0
-    const list<bool> small_out ← small.flatten()
+    let tensor<bool, [2, 2]> small ← a ≤ 2.0
+    let list<bool> small_out ← small.flatten()
     print small_out
-    const tensor<bool, [2, 2]> level ← a ≅ 2.0
-    const list<bool> level_out ← level.flatten()
+    let tensor<bool, [2, 2]> level ← a ≅ 2.0
+    let list<bool> level_out ← level.flatten()
     print level_out
-    const tensor<bool, [2, 2]> unlike ← a ≇ b
-    const list<bool> unlike_out ← unlike.flatten()
+    let tensor<bool, [2, 2]> unlike ← a ≇ b
+    let list<bool> unlike_out ← unlike.flatten()
     print unlike_out
-    const tensor<bool, [2, 2]> not_small ← not small
-    const list<bool> not_small_out ← not_small.flatten()
+    let tensor<bool, [2, 2]> not_small ← not small
+    let list<bool> not_small_out ← not_small.flatten()
     print not_small_out
-    const tensor<bool, [2, 2]> outer ← (a ≺ 2.0) or (a ≻ 3.0)
-    const list<bool> outer_out ← outer.flatten()
+    let tensor<bool, [2, 2]> outer ← (a ≺ 2.0) or (a ≻ 3.0)
+    let list<bool> outer_out ← outer.flatten()
     print outer_out
-    const tensor<bool, [2, 2]> inner ← (a ≻ 1.0) and small
-    const list<bool> inner_out ← inner.flatten()
+    let tensor<bool, [2, 2]> inner ← (a ≻ 1.0) and small
+    let list<bool> inner_out ← inner.flatten()
     print inner_out
 
-    const tensor<f32, [2, 2]> bigger ← greater ✓ a ✗ b
-    const list<f32> bigger_out ← bigger.flatten()
+    let tensor<f32, [2, 2]> bigger ← greater ✓ a ✗ b
+    let list<f32> bigger_out ← bigger.flatten()
     print bigger_out
-    const tensor<f32, [2, 2]> clipped ← (a ≻ 2.5) ✓ 1.0 ✗ 0.0
-    const list<f32> clipped_out ← clipped.flatten()
+    let tensor<f32, [2, 2]> clipped ← (a ≻ 2.5) ✓ 1.0 ✗ 0.0
+    let list<f32> clipped_out ← clipped.flatten()
     print clipped_out
 
-    const list<int ∪ none> flat_h ← [1, null, 3, null]
-    var tensor<int ∪ none, [2, 2]> holes ← flat_h ↦ tensor<int ∪ none, [2, 2]>
-    const tensor<int, [2, 2]> zeroed ← holes coalesce 0
-    const list<int> zeroed_out ← zeroed.flatten()
+    let list<int ∪ none> flat_h ← [1, null, 3, null]
+    mut tensor<int ∪ none, [2, 2]> holes ← flat_h ↦ tensor<int ∪ none, [2, 2]>
+    let tensor<int, [2, 2]> zeroed ← holes coalesce 0
+    let list<int> zeroed_out ← zeroed.flatten()
     print zeroed_out
-    const list<int> flat_d ← [10, 20, 30, 40]
-    var tensor<int, [2, 2]> defaults ← flat_d ↦ tensor<int, [2, 2]>
-    const tensor<int, [2, 2]> filled ← holes coalesce defaults
-    const list<int> filled_out ← filled.flatten()
+    let list<int> flat_d ← [10, 20, 30, 40]
+    mut tensor<int, [2, 2]> defaults ← flat_d ↦ tensor<int, [2, 2]>
+    let tensor<int, [2, 2]> filled ← holes coalesce defaults
+    let list<int> filled_out ← filled.flatten()
     print filled_out
 }

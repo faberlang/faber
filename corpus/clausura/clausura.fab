@@ -41,8 +41,8 @@ locale = "en"
 #
 
 main {
-    const (int) → int dupla ← int x ∴ x * 2
+    let (int) → int dupla ← int x ∴ x * 2
     print dupla(5)
-    const (int, int) → int summa ← (int a, int b) → int ∴ a + b
+    let (int, int) → int summa ← (int a, int b) → int ∴ a + b
     print summa(2, 3)
 }

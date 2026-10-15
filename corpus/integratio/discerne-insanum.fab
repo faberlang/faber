@@ -25,8 +25,8 @@ locale = "en"
 # integratio — discretio, finge, discerne omnia, and payload destructuring
 #
 # discretio Name { Variant { fields… }, … }
-# fixum T v ← finge Variant { field = value }
-# discerne omnia v { casu Variant fixum fields { … } }
+# sit T v ← finge Variant { field = value }
+# discerne omnia v { casu Variant sit fields { … } }
 #
 # GRAMMAR:
 #   discretioDecl :← 'discretio' ident '{' variantDecl* '}'
@@ -48,10 +48,10 @@ union Mandatum {
 
 fn narra(Mandatum m) → string {
     match all m {
-        case Moveo const locus, passus {
+        case Moveo let locus, passus {
             return "moveo § per §"(locus, passus)
         }
-        case Loquere const verba as dictum {
+        case Loquere let verba as dictum {
             return "loquere §"(dictum)
         }
         case Tace {
@@ -61,9 +61,9 @@ fn narra(Mandatum m) → string {
 }
 
 main {
-    const Mandatum a ← variant Moveo { locus = "forum", passus = 8 }
-    const Mandatum b ← variant Loquere { verba = "salve" }
-    const Mandatum c ← variant Tace
+    let Mandatum a ← variant Moveo { locus = "forum", passus = 8 }
+    let Mandatum b ← variant Loquere { verba = "salve" }
+    let Mandatum c ← variant Tace
     print narra(a)
     print narra(b)
     print narra(c)

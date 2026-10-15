@@ -32,24 +32,24 @@ locale = "en"
 #   valor-composita-tags.expected — one line per print.
 
 class Punctum {
-    var int x
-    var int y
+    mut int x
+    mut int y
 }
 
 class Linea {
-    var string nomen
-    var list<Punctum> puncta
+    mut string nomen
+    mut list<Punctum> puncta
 }
 
 main {
-    const Punctum punctum ← Punctum { x = 3, y = 4 }
-    const list<int> numeri ← [1, 2]
-    const value boxedNumeri ← numeri ↦ value
-    const list<Punctum> ordo ← [punctum]
-    const value boxedOrdo ← ordo ↦ value
+    let Punctum punctum ← Punctum { x = 3, y = 4 }
+    let list<int> numeri ← [1, 2]
+    let value boxedNumeri ← numeri ↦ value
+    let list<Punctum> ordo ← [punctum]
+    let value boxedOrdo ← ordo ↦ value
 
     # 1. Tag tests: a genus is only its own type.
-    const value boxedGenus ← punctum ↦ value
+    let value boxedGenus ← punctum ↦ value
     print boxedGenus is Punctum
     print boxedGenus is Linea
     print boxedGenus is int
@@ -62,12 +62,12 @@ main {
     print boxedOrdo is list<Punctum>
 
     # 3. A tabula matches a map type, a tensor matches no list.
-    const map<string, int> scores ← { "alpha": 10 }
-    const value boxedScores ← scores ↦ value
+    let map<string, int> scores ← { "alpha": 10 }
+    let value boxedScores ← scores ↦ value
     print boxedScores is map<string, int>
     print boxedScores is list<int>
-    const tensor<f32, [2]> grid ← [1.5, 2.5] ↦ tensor<f32, [2]>
-    const value boxedGrid ← grid ↦ value
+    let tensor<f32, [2]> grid ← [1.5, 2.5] ↦ tensor<f32, [2]>
+    let value boxedGrid ← grid ↦ value
     print boxedGrid is list<float>
     print boxedGrid is tensor<f32, [2]>
 }

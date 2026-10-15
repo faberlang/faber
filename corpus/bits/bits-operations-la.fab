@@ -35,21 +35,21 @@ locale = "la"
 # EXPECTED stdout: see bits-operations-la.expected
 
 incipit {
-    fixum b8 a ← 0xf3
-    fixum b8 mask ← 0x0f
+    sit b8 a ← 0xf3
+    sit b8 mask ← 0x0f
     nota a ∧ mask
     nota a ∨ mask
     nota a ⊻ mask
     nota ¬ a
     nota a ⇐ 4
     nota a ⇒ 4
-    fixum b8 cleared ← (a ⇐ 4) ⇒ 4
+    sit b8 cleared ← (a ⇐ 4) ⇒ 4
     nota cleared
     nota a ⇐ 8
     nota a ⇒ 8
 
-    fixum b64 wide ← 0xf0f0f0f0f0f0f0f0
-    fixum b64 low ← 0x00000000ffffffff
+    sit b64 wide ← 0xf0f0f0f0f0f0f0f0
+    sit b64 low ← 0x00000000ffffffff
     nota wide ∧ low
     nota wide ∨ low
     nota wide ⊻ low

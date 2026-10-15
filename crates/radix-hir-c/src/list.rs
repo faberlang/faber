@@ -141,9 +141,8 @@ impl Emitter<'_> {
         self.support.need(Helper::List(elem, ListOp::Push));
         let target = format!("faber_t{}", self.temps);
         self.temps += 1;
-        let mut body = format!(
-            "faber_list_{suffix} *{target} = faber_list_{suffix}_new(faber_a, 0); "
-        );
+        let mut body =
+            format!("faber_list_{suffix} *{target} = faber_list_{suffix}_new(faber_a, 0); ");
         let mut effect = true;
         for element in elements {
             match element {
@@ -578,7 +577,13 @@ impl Emitter<'_> {
 
     /// An optional element read: `call` fills the slot named `slot` and says
     /// whether there was one.
-    pub(crate) fn optional_call(&mut self, elem: Elem, inner: Inner, slot: &str, call: String) -> Operand {
+    pub(crate) fn optional_call(
+        &mut self,
+        elem: Elem,
+        inner: Inner,
+        slot: &str,
+        call: String,
+    ) -> Operand {
         self.temps += 1;
         let c_type = elem.c_type();
         let text = match inner.scalar_struct() {

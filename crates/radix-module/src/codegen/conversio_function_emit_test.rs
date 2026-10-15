@@ -26,9 +26,9 @@ functio adMensuram(Lectio l) → Mensura ⇥ textus {
 
 const USES: &str = "
 incipit {
-    fixum Fahrenheit f ← Celsius { gradus = 1.0 } ↦ Fahrenheit
+    sit Fahrenheit f ← Celsius { gradus = 1.0 } ↦ Fahrenheit
     nota f.gradus
-    fixum Mensura m ← Lectio { valor = -4 } ↦ Mensura ⊥ Mensura { valor = 0 }
+    sit Mensura m ← Lectio { valor = -4 } ↦ Mensura ⊥ Mensura { valor = 0 }
     nota m.valor
 }
 ";
@@ -90,7 +90,7 @@ fn swift_calls_an_infallible_conversio_function() {
     let code = emit(
         Target::HirSwift,
         &format!(
-            "{DECLS}incipit {{\n    fixum Fahrenheit f ← Celsius {{ gradus = 1.0 }} ↦ Fahrenheit\n    nota f.gradus\n}}\n"
+            "{DECLS}incipit {{\n    sit Fahrenheit f ← Celsius {{ gradus = 1.0 }} ↦ Fahrenheit\n    nota f.gradus\n}}\n"
         ),
     );
     assert!(code.contains("let l_f: Fahrenheit = adFahrenheit(c: Celsius("), "{code}");

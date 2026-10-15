@@ -24,9 +24,13 @@ use radix_types::{BitsWidth, Type, TypeId, TypeTable};
 const ISSUE: &str = "list_window_unsupported_on_target";
 
 /// Targets that carry a list window faithfully. The Faber re-emitter keeps the
-/// authored index; the MIR runner executes it and does not reach codegen.
+/// authored index; the MIR runner executes it and does not reach codegen; the
+/// clif backend lowers it to a runtime slice.
 fn target_admits_list_window(target: Target) -> bool {
-    matches!(target, Target::HirFaber | Target::MirStepper)
+    matches!(
+        target,
+        Target::HirFaber | Target::MirStepper | Target::MirClif
+    )
 }
 
 /// Targets whose emitters carry the byte window `bytes[lo‥hi]` of a
@@ -35,7 +39,11 @@ fn target_admits_list_window(target: Target) -> bool {
 fn target_admits_byte_window(target: Target) -> bool {
     matches!(
         target,
-        Target::HirRust | Target::HirGo | Target::HirTypeScript | Target::HirSwift
+        Target::HirRust
+            | Target::HirGo
+            | Target::HirTypeScript
+            | Target::HirSwift
+            | Target::HirPython
     )
 }
 
@@ -57,6 +65,15 @@ fn is_list_window(types: &TypeTable, expr: &HirExpression, target: Target) -> bo
         return false;
     };
     if !matches!(resolved(types, index_ty), Type::Intervallum(_)) {
+        return false;
+    }
+    // The Rust emitter copies the window of any list or bounded list.
+    if matches!(target, Target::HirRust)
+        && matches!(
+            resolved(types, object_ty),
+            Type::Array(_) | Type::BoundedArray { .. }
+        )
+    {
         return false;
     }
     match resolved(types, object_ty) {

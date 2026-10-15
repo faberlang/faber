@@ -17,8 +17,9 @@ fn analyze_base(source: &str) -> crate::semantic::SemanticResult {
 #[test]
 fn mode_assign_to_de_rejects_on_base_analysis() {
     let source = r"
-functio mutate(de numerus x) → vacuum {
-  x ← 2
+genus Punctum { varia numerus x }
+functio mutate(de Punctum p) → vacuum {
+  p.x ← 2
 }
 incipit { }
 ";
@@ -32,9 +33,9 @@ incipit { }
         result.diagnostics.iter().any(|err| {
             err.args
                 .iter()
-                .any(|a| a.name == "issue" && a.value == "assign_to_de_parameter")
+                .any(|a| a.name == "issue" && a.value == "assign_through_ref")
         }),
-        "missing assign_to_de_parameter: {:?}",
+        "missing assign_through_ref: {:?}",
         result.diagnostics
     );
 }
@@ -42,8 +43,9 @@ incipit { }
 #[test]
 fn mode_assign_to_de_rejects_for_ts_go_targets() {
     let source = r"
-functio mutate(de numerus x) → vacuum {
-  x ← 2
+genus Punctum { varia numerus x }
+functio mutate(de Punctum p) → vacuum {
+  p.x ← 2
 }
 incipit { }
 ";
@@ -63,7 +65,7 @@ incipit { }
             result.diagnostics.iter().any(|err| {
                 err.args
                     .iter()
-                    .any(|a| a.name == "issue" && a.value == "assign_to_de_parameter")
+                    .any(|a| a.name == "issue" && a.value == "assign_through_ref")
             }),
             "target {target:?}: {:?}",
             result.diagnostics
@@ -80,8 +82,8 @@ fn rust_access_plain_lista_traps_not_silent_default() {
         "access.fab",
         r"
 incipit {
-  fixum lista<numerus> xs ← [1, 2]
-  fixum numerus v ← xs[0]
+  sit lista<numerus> xs ← [1, 2]
+  sit numerus v ← xs[0]
   nota v
 }
 ",
@@ -115,8 +117,8 @@ fn rust_access_plain_tabula_traps_missing_key() {
         "map.fab",
         r#"
 incipit {
-  fixum tabula<textus, numerus> m ← { "a": 1 }
-  fixum numerus v ← m["a"]
+  sit tabula<textus, numerus> m ← { "a": 1 }
+  sit numerus v ← m["a"]
   nota v
 }
 "#,
@@ -148,8 +150,8 @@ fn rust_regex_conversio_compiles_through_the_runtime_constructor() {
         "regex.fab",
         r#"
 incipit {
-  fixum textus s ← "\\d+"
-  fixum regex r ← s ↦ regex
+  sit textus s ← "\\d+"
+  sit regex r ← s ↦ regex
   nota r
 }
 "#,

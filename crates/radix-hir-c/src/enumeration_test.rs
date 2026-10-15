@@ -9,7 +9,7 @@ const SHAPE: &str = "union Shape {\n    Circle { int radius },\n    Nothing\n}\n
 #[test]
 fn a_unit_variant_is_a_static_object_with_its_position_as_tag() {
     let code = emitted(&format!(
-        "{COLOR}main {{\n    const Color c ← Color.green\n    print c\n}}"
+        "{COLOR}main {{\n    let Color c ← Color.green\n    print c\n}}"
     ));
     assert!(
         code.contains("static __attribute__((unused)) g_Color k_Color_green = { .tag = 1 };"),
@@ -27,7 +27,7 @@ fn a_unit_variant_is_a_static_object_with_its_position_as_tag() {
 #[test]
 fn a_payload_variant_is_one_allocation_with_tag_and_fields() {
     let code = emitted(&format!(
-        "{SHAPE}main {{\n    const Shape s ← variant Circle {{ radius = 3 }} ∷ Shape\n    print s\n}}"
+        "{SHAPE}main {{\n    let Shape s ← variant Circle {{ radius = 3 }} ∷ Shape\n    print s\n}}"
     ));
     assert!(code.contains("int64_t m_Circle_radius;"), "{code}");
     assert!(
@@ -43,7 +43,7 @@ fn a_payload_variant_is_one_allocation_with_tag_and_fields() {
 #[test]
 fn a_variant_pattern_tests_the_tag_and_binds_the_payload() {
     let code = emitted(&format!(
-        "{SHAPE}fn area(Shape s) → int {{\n    match s {{\n        case Circle const radius {{\n            return radius\n        }}\n        case Nothing {{\n            return 0\n        }}\n    }}\n}}\nmain {{\n    print area(variant Nothing ∷ Shape)\n}}"
+        "{SHAPE}fn area(Shape s) → int {{\n    match s {{\n        case Circle let radius {{\n            return radius\n        }}\n        case Nothing {{\n            return 0\n        }}\n    }}\n}}\nmain {{\n    print area(variant Nothing ∷ Shape)\n}}"
     ));
     assert!(
         code.contains("(faber_c0->tag == 0)") || code.contains("->tag == 0)"),
@@ -58,7 +58,7 @@ fn a_variant_pattern_tests_the_tag_and_binds_the_payload() {
 #[test]
 fn equality_of_payload_less_values_is_pointer_equality() {
     let code = emitted(&format!(
-        "{COLOR}main {{\n    const bool b ← Color.red ≡ Color.green\n    print b\n}}"
+        "{COLOR}main {{\n    let bool b ← Color.red ≡ Color.green\n    print b\n}}"
     ));
     assert!(
         code.contains("(&k_Color_red) == (&k_Color_green)") || code.contains("== (&k_Color_green)"),
@@ -69,7 +69,7 @@ fn equality_of_payload_less_values_is_pointer_equality() {
 #[test]
 fn equality_of_payload_values_is_a_generated_function() {
     let code = emitted(&format!(
-        "{SHAPE}main {{\n    const Shape a ← variant Nothing ∷ Shape\n    const bool b ← a ≡ a\n    print b\n}}"
+        "{SHAPE}main {{\n    let Shape a ← variant Nothing ∷ Shape\n    let bool b ← a ≡ a\n    print b\n}}"
     ));
     assert!(code.contains("g_Shape_equal("), "{code}");
     assert!(
@@ -81,7 +81,7 @@ fn equality_of_payload_values_is_a_generated_function() {
 #[test]
 fn ordo_conversions_use_the_route_discriminants() {
     let code = emitted(&format!(
-        "{COLOR}main {{\n    print Color.green ↦ int\n    const Color c ← 5 ↦ Color ⊥ Color.red\n    print c ↦ string\n}}"
+        "{COLOR}main {{\n    print Color.green ↦ int\n    let Color c ← 5 ↦ Color ⊥ Color.red\n    print c ↦ string\n}}"
     ));
     assert!(code.contains("INT64_C(5)"), "{code}");
     assert!(
@@ -110,20 +110,20 @@ fn a_union_with_shared_fields_is_rejected_by_name() {
 
 #[test]
 fn a_genus_with_no_fields_shows_as_empty_braces() {
-    let code = emitted("class Marker {\n}\nmain {\n    const Marker m ← Marker {}\n    print m\n}");
+    let code = emitted("class Marker {\n}\nmain {\n    let Marker m ← Marker {}\n    print m\n}");
     assert!(code.contains("return \"Marker {}\";"), "{code}");
 }
 
 #[test]
 fn a_statement_with_a_genus_argument_prints_one_line_each() {
     let code = emitted(
-        "class Marker {\n}\nmain {\n    const Marker m ← Marker {}\n    const int n ← 1\n    print n, m\n}",
+        "class Marker {\n}\nmain {\n    let Marker m ← Marker {}\n    let int n ← 1\n    print n, m\n}",
     );
     assert_eq!(code.matches("printf(").count(), 2, "{code}");
 }
 
 #[test]
 fn a_statement_of_sized_integers_prints_one_joined_line() {
-    let code = emitted("main {\n    const u8 a ← 200\n    const i16 b ← -5000\n    print a, b\n}");
+    let code = emitted("main {\n    let u8 a ← 200\n    let i16 b ← -5000\n    print a, b\n}");
     assert_eq!(code.matches("printf(").count(), 1, "{code}");
 }

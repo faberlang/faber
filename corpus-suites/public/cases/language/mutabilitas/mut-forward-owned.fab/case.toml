@@ -6,4 +6,5 @@ input = "mutabilitas/mut-forward-owned.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

@@ -18,7 +18,7 @@ locale = "en"
 
 @ public
 class Persona {
-    var string nomen
+    mut string nomen
 }
 
 @ public

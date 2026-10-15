@@ -15,7 +15,7 @@ fn take<size M, size N>(tensor<f32, [M, N]> value) → tensor<f32, [M, N]> {
 }
 
 main {
-    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    const tensor<f32, [2, 2]> grid ← flat ↦ tensor<f32, [2, 2]>
-    const tensor<f32, [2, 2]> same ← take<2 +>(grid)
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    let tensor<f32, [2, 2]> grid ← flat ↦ tensor<f32, [2, 2]>
+    let tensor<f32, [2, 2]> same ← take<2 +>(grid)
 }

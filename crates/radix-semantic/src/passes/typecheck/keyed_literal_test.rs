@@ -34,25 +34,25 @@ fn accepts(source: &str) {
 
 #[test]
 fn keyed_literal_accepts_json_typed_cell() {
-    accepts("fn main() {\n    const json j ← { \"a\": 1 }\n}\n");
+    accepts("fn main() {\n    let json j ← { \"a\": 1 }\n}\n");
 }
 
 #[test]
 fn keyed_literal_accepts_map_typed_cell() {
-    accepts("fn main() {\n    const map<string, int> m ← { \"a\": 1 }\n}\n");
+    accepts("fn main() {\n    let map<string, int> m ← { \"a\": 1 }\n}\n");
 }
 
 #[test]
 fn keyed_literal_accepts_hole_constructor() {
-    accepts("fn main() {\n    const json k ← _ { \"a\": 1 }\n}\n");
+    accepts("fn main() {\n    let json k ← _ { \"a\": 1 }\n}\n");
 }
 
 #[test]
 fn keyed_literal_accepts_value_conversion() {
-    accepts("fn main() {\n    const value v ← { \"a\": 1 } ↦ value\n}\n");
+    accepts("fn main() {\n    let value v ← { \"a\": 1 } ↦ value\n}\n");
 }
 
 #[test]
 fn keyed_literal_accepts_stated_json_constructor() {
-    accepts("fn main() {\n    const json s ← json { \"a\": 1 }\n}\n");
+    accepts("fn main() {\n    let json s ← json { \"a\": 1 }\n}\n");
 }

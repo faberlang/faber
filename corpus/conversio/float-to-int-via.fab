@@ -26,10 +26,10 @@ locale = "en"
 # =============================================================================
 
 main {
-    const float a ← 2.5
-    const float b ← 3.5
-    const float c ← -2.5
-    const float d ← -0.5
+    let float a ← 2.5
+    let float b ← 3.5
+    let float c ← -2.5
+    let float d ← -0.5
 
     print a ↦ int via Floor
     print b ↦ int via Floor
@@ -51,8 +51,8 @@ main {
     print c ↦ int via Trunc
     print d ↦ int via Trunc
 
-    const d64 p ← 2.5
-    const d64 q ← 3.5
+    let d64 p ← 2.5
+    let d64 q ← 3.5
     print p ↦ i64 via HalfEven
     print q ↦ i64 via HalfEven
     print p ↦ i64 via Floor

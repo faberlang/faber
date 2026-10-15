@@ -1,19 +1,20 @@
 //! `target ⇇ value` through the HIR-backed source emitters: the Faber source
 //! emitter prints it back (the `faber format` round trip); every other source
-//! target other than Rust fails closed by name instead of emitting a
-//! wrong program; Rust emits the runtime's `write_values` call.
+//! target other than Rust and TypeScript fails closed by name instead of
+//! emitting a wrong program; Rust emits the runtime's `write_values` call and
+//! TypeScript the carrier's `writeValues`.
 
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
-const SOURCE: &str = "functio double(tensor<f32, [2, 2]> source, in tensor<f32, [2, 2]> out) → vacuum {
+const SOURCE: &str = "functio double(tensor<f32, [2, 2]> source, varia tensor<f32, [2, 2]> out) → vacuum {
     out ⇇ source + source
 }
 
 incipit {
-fixum tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+sit tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
 varia tensor<f32, [2, 2]> b ← [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]>
-double(a, in b)
+double(a, varia b)
 }
 ";
 
@@ -57,15 +58,15 @@ fn faber_format_keeps_the_copy_into_and_is_idempotent() {
 
 #[cfg(feature = "hir-ts")]
 #[test]
-fn typescript_fails_closed_by_name() {
+fn typescript_emits_the_write_values_carrier() {
     let result = compile(Target::HirTypeScript, SOURCE);
-    assert!(result.output.is_none(), "TypeScript must not emit a copy-into");
+    let Some(crate::Output::TypeScript(output)) = result.output else {
+        panic!("TypeScript must emit a copy-into: {:?}", result.diagnostics);
+    };
     assert!(
-        issues(&result)
-            .iter()
-            .any(|issue| issue == "ts_copy_into_unsupported"),
-        "{:?}",
-        issues(&result)
+        output.code.contains("p_out.writeValues("),
+        "the copy-into is the carrier's writeValues call:\n{}",
+        output.code
     );
 }
 

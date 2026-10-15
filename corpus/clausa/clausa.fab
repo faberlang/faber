@@ -41,18 +41,18 @@ locale = "en"
 
 main {
     # Single-parameter closure: numerus x ∴ x * 2
-    const (int) → int duplica ← int x ∴ x * 2
+    let (int) → int duplica ← int x ∴ x * 2
     print duplica(5)
 
     # Multi-parameter typed closure
-    const (int, int) → int adde ← (int a, int b) → int ∴ a + b
+    let (int, int) → int adde ← (int a, int b) → int ∴ a + b
     print adde(3, 4)
-    const list<int, 3> numeri ← [1, 2, 3]
-    var list<int> duplicati ← empty
+    let list<int, 3> numeri ← [1, 2, 3]
+    mut list<int> duplicati ← empty
     # predicate closure
-    const (int) → bool paritas ← int x → bool ∴ x % 2 ≡ 0
-    var list<int> pares ← empty
-    for from numeri const n {
+    let (int) → bool paritas ← int x → bool ∴ x % 2 ≡ 0
+    mut list<int> pares ← empty
+    for from numeri let n {
         duplicati.append(duplica(n))
         if paritas(n) {
             pares.append(n)
@@ -63,7 +63,7 @@ main {
     print duplicati[2]
     print pares.length()
     print pares[0]
-    const (int) → bool plus ← int n → bool ∴ n ≻ 0
+    let (int) → bool plus ← int n → bool ∴ n ≻ 0
     print plus(10)
     print plus(-5)
 }

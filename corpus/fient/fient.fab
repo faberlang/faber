@@ -41,7 +41,7 @@ functio stream() fient → numerus {
 }
 
 incipiet {
-    itera ex stream() fixum n {
+    itera ex stream() sit n {
         nota n
     }
 }

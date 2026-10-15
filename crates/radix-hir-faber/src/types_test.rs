@@ -2286,7 +2286,7 @@ fn intrinsic_method_call_localizes_through_surface() {
 
 #[test]
 fn cape_handler_keeps_leading_author_local() {
-    // A `cape err { fixum textus c ← …; … }` handler whose first authored
+    // A `cape err { sit textus c ← …; … }` handler whose first authored
     // statement is a real local must keep it: the binding-local skip only
     // applies to the synthetic runtime-provided binding.
     let mut interner = Interner::new();
@@ -2405,7 +2405,7 @@ fn cape_handler_keeps_leading_author_local() {
 
     let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
-        code.contains("cape err {") && code.contains("fixum textus c ← \"x\""),
+        code.contains("cape err {") && code.contains("sit textus c ← \"x\""),
         "cape handler must keep its leading authored local:\n{code}"
     );
 }

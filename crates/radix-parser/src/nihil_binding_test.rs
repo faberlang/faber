@@ -26,8 +26,9 @@ impl KeywordPack for EnPack {
     fn keyword_latin_key(&self, text: &str) -> Option<&str> {
         match text {
             "fn" => Some("functio"),
-            "var" => Some("varia"),
+            "mut" => Some("varia"),
             "const" => Some("fixum"),
+            "let" => Some("sit"),
             "print" => Some("scribe"),
             _ => None,
         }
@@ -74,7 +75,7 @@ fn la_bare_nihil_without_binding_stays_retired_null_spelling() {
 
 #[test]
 fn en_declared_nihil_variable_reads_as_the_binding() {
-    let result = parse_en("fn f() {\n    var int nihil ← 1\n    print nihil\n}\n");
+    let result = parse_en("fn f() {\n    mut int nihil ← 1\n    print nihil\n}\n");
     assert!(
         result.success(),
         "declared `nihil` must read as a variable: {:?}",

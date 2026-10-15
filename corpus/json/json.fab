@@ -28,23 +28,23 @@ import from "norma:json" json
 @ json { }
 class Payload {
     @ json { name = "wire_name" }
-    var string name
+    mut string name
 }
 
 main {
-    const json literal ← { "wire_name": "Ada", "items": [1, { "ok": true }] }
-    const value broad ← literal ↦ value
-    const json narrowed ← broad ↦ json
-    const Payload payload ← narrowed ↦ Payload
-    const json encoded ← payload ↦ json
-    const string wire ← json.stringify(encoded)
-    const json ∪ none tentativa ← json.try_parse(wire)
+    let json literal ← { "wire_name": "Ada", "items": [1, { "ok": true }] }
+    let value broad ← literal ↦ value
+    let json narrowed ← broad ↦ json
+    let Payload payload ← narrowed ↦ Payload
+    let json encoded ← payload ↦ json
+    let string wire ← json.stringify(encoded)
+    let json ∪ none tentativa ← json.try_parse(wire)
     print payload.name
     print wire
     print tentativa
     do {
-        const json reparsed ← json.parse(wire)
-        const Payload roundtrip ← reparsed ↦ Payload
+        let json reparsed ← json.parse(wire)
+        let Payload roundtrip ← reparsed ↦ Payload
         print roundtrip.name
     }
     catch err {

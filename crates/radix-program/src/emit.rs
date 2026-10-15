@@ -48,15 +48,24 @@ pub struct PackageCompileResult {
 #[cfg(feature = "hir-go")]
 pub type GoPackageEmit = fn(&AnalyzedProgram, &Path) -> PackageCompileResult;
 
+/// TypeScript package-emission seam: faber's `generate_package_ts_result`.
+/// TypeScript is a single-stream target (no sibling module files), so the seam
+/// returns [`CompileResult`] rather than [`PackageCompileResult`].
+#[cfg(feature = "hir-ts")]
+pub type TsPackageEmit = fn(&AnalyzedProgram, &Path) -> CompileResult;
+
 /// Faber-supplied package-emission seams (RP4).
 ///
-/// Go emission remains a product/toolchain input; analysis supplies the shared
-/// [`AnalysisSeams`]. No ambient reads happen inside `radix-program`.
+/// Go and TypeScript emission remain product/toolchain inputs; analysis
+/// supplies the shared [`AnalysisSeams`]. No ambient reads happen inside
+/// `radix-program`.
 #[derive(Clone, Copy)]
 pub struct EmissionSeams {
     pub analysis: AnalysisSeams,
     #[cfg(feature = "hir-go")]
     pub emit_go: GoPackageEmit,
+    #[cfg(feature = "hir-ts")]
+    pub emit_ts: TsPackageEmit,
 }
 
 /// Failed compile: no output, and no Go modules.
@@ -277,6 +286,10 @@ fn compile_package_internal(
         return compile_package_wasm(package, input);
     }
 
+    if config.target == Target::HirTypeScript {
+        return compile_package_ts(&package, input, seams);
+    }
+
     if config.target != Target::HirRust {
         let plan = plan_package(&package, config.target);
         if !plan.supported {
@@ -335,6 +348,35 @@ fn compile_package_go(
             return unsupported_plan_failure(plan, input);
         }
         (seams.emit_go)(package, input)
+    }
+}
+
+fn compile_package_ts(
+    package: &AnalyzedProgram,
+    input: &Path,
+    seams: &EmissionSeams,
+) -> PackageCompileResult {
+    #[cfg(not(feature = "hir-ts"))]
+    return compile_failure(vec![
+        crate::package_diagnostic_error(
+            "target `ts` is not available in this faber build; rebuild with feature `hir-ts`",
+        )
+        .with_file(input.display().to_string())
+        .with_arg("issue", "package_target_unavailable")
+        .with_arg("target", "ts"),
+    ]);
+
+    #[cfg(feature = "hir-ts")]
+    {
+        let plan = plan_package(package, Target::HirTypeScript);
+        if !plan.supported {
+            return unsupported_plan_failure(plan, input);
+        }
+        PackageCompileResult {
+            compile_result: (seams.emit_ts)(package, input),
+            #[cfg(feature = "hir-go")]
+            go_modules: Vec::new(),
+        }
     }
 }
 

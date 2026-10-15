@@ -35,26 +35,26 @@ locale = "en"
 import from "norma:math" mathesis
 
 main {
-    const float pi ← mathesis.PI()
-    const float s ← mathesis.sin(0.0)
-    const float c ← mathesis.cos(0.0)
-    const float r ← mathesis.sqrt(4.0)
-    const float clamped ← mathesis.clamp(5.0, 0.0, 3.0)
-    const float t ← mathesis.tan(0.0)
-    const float exp1 ← mathesis.exp(1.0)
-    const float ln_e ← mathesis.ln(mathesis.E())
-    const float ln10 ← mathesis.log10(100.0)
-    const float neg_sqrt ← mathesis.sqrt(-1.0)
-    const float neg_log ← mathesis.ln(-1.0)
-    const float pole_tan ← mathesis.tan(mathesis.PI() / 2.0)
-    const float zero_log ← mathesis.ln(0.0)
-    const float pow_cat ← mathesis.pow(2.0, 3.0)
-    const float b ← 2.0
-    const float pow_recv ← b.power(3.0)
-    const float neg_b ← -2.0
-    const float neg_pow_recv ← neg_b.power(2.0)
-    const float neg_cube ← neg_b.power(3.0)
-    const float neg_root ← neg_b.power(0.5)
+    let float pi ← mathesis.PI()
+    let float s ← mathesis.sin(0.0)
+    let float c ← mathesis.cos(0.0)
+    let float r ← mathesis.sqrt(4.0)
+    let float clamped ← mathesis.clamp(5.0, 0.0, 3.0)
+    let float t ← mathesis.tan(0.0)
+    let float exp1 ← mathesis.exp(1.0)
+    let float ln_e ← mathesis.ln(mathesis.E())
+    let float ln10 ← mathesis.log10(100.0)
+    let float neg_sqrt ← mathesis.sqrt(-1.0)
+    let float neg_log ← mathesis.ln(-1.0)
+    let float pole_tan ← mathesis.tan(mathesis.PI() / 2.0)
+    let float zero_log ← mathesis.ln(0.0)
+    let float pow_cat ← mathesis.pow(2.0, 3.0)
+    let float b ← 2.0
+    let float pow_recv ← b.power(3.0)
+    let float neg_b ← -2.0
+    let float neg_pow_recv ← neg_b.power(2.0)
+    let float neg_cube ← neg_b.power(3.0)
+    let float neg_root ← neg_b.power(0.5)
     print pi
     print s
     print c

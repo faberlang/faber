@@ -20,6 +20,6 @@ fn take(own list<int> xs) → void {
 }
 
 main {
-    const ref list<int> a ← [1, 2, 3]
+    let ref list<int> a ← [1, 2, 3]
     take(own a)
 }

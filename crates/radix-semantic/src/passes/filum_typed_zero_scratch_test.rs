@@ -13,8 +13,8 @@ fn kernel(scratch_init: &str, statement: &str) -> String {
         r"
 @ nucleum
 @ publica
-functio k(in tensor<f32, [4]> out, de tensor<f32, [4]> src) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
+functio k(varia tensor<f32, [4]> out, de tensor<f32, [4]> src) → vacuum {{
+    itera ex src apud [i] filum lane sit value {{
         varia tensor<f32, [4]> scratch ← {scratch_init}
         {statement}
         out[i] ← scratch[i]

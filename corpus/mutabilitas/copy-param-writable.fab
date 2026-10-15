@@ -15,7 +15,7 @@ locale = "en"
 # write form is legal and none of them reaches the caller.
 
 class Cell {
-    var int n = 0
+    mut int n = 0
 
     fn bump() → void {
         self.n ← self.n + 1
@@ -49,8 +49,8 @@ fn step(copy Cell c) → int {
 }
 
 main {
-    const list<int> a ← [1, 2, 3]
-    const Cell k ← Cell {}
+    let list<int> a ← [1, 2, 3]
+    let Cell k ← Cell {}
     print grow(copy a)
     print rebuild(copy a)
     print poke(copy a)

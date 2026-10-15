@@ -4,7 +4,7 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
 category = "type"
 summary = "MU-4 red: two mut locals from one source conflict (SEM052)."
-syntax = "var mut list<int> b ← a; var mut list<int> c ← a"
+syntax = "mut mut list<int> b ← a; mut mut list<int> c ← a"
 related = ["mut"]
 locale = "en"
 no_expected = "rejects"
@@ -16,9 +16,9 @@ diagnostic = "SEM052:mutable_borrow_conflict"
 # This exemplum intentionally fails to compile.
 
 main {
-    var list<int> a ← [1, 2, 3]
-    var mut list<int> b ← a
-    var mut list<int> c ← a
+    mut list<int> a ← [1, 2, 3]
+    mut mut list<int> b ← a
+    mut mut list<int> c ← a
     print b.length()
     print c.length()
 }

@@ -10,8 +10,8 @@ enum Level {
 
 main {
     print "before"
-    const Level ok ← 2 ↦ Level
+    let Level ok ← 2 ↦ Level
     print ok
-    const Level bad ← 7 ↦ Level
+    let Level bad ← 7 ↦ Level
     print bad
 }

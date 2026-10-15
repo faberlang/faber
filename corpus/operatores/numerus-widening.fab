@@ -38,17 +38,17 @@ fn ducenti() → u8 {
 }
 
 main {
-    const u8 a ← ducenti()
-    const u8 b ← ducenti()
+    let u8 a ← ducenti()
+    let u8 b ← ducenti()
 
     # 1. Range rule: the sum is exact, and fits an i16 slot.
     print a + b
-    const i16 wide ← a + b
+    let i16 wide ← a + b
     print wide
 
     # 2. Untyped constants take their range, so no operand needs a width.
     print -100 - 100
-    const i8 low ← -100
+    let i8 low ← -100
     print low - 100
 
     # 3. Floor division; the remainder takes the divisor's sign.
@@ -61,21 +61,21 @@ main {
     print a ÷ 3
 
     # 5. Store policies for a value that does not fit u8.
-    const wrapping<u8> wrapped ← (a + b) ↦ wrapping<u8>
-    const saturating<u8> clamped ← (a + b) ↦ saturating<u8>
+    let wrapping<u8> wrapped ← (a + b) ↦ wrapping<u8>
+    let saturating<u8> clamped ← (a + b) ↦ saturating<u8>
     print wrapped
     print clamped
 
     # 6. `_` takes the range type; an exact value needs no narrowing.
-    const _ inferred ← a + b
+    let inferred ← a + b
     print inferred
 
     # 7. Comparisons are exact, including across signedness.
     print a ≻ -1
 
     # A trapping slot aborts on a value it cannot hold; 400 does not fit in `u8`:
-    #   const u8 bad ← a + b
+    #   let u8 bad ← a + b
     # u64 with a signed operand is a compile error; convert with `↦` first:
-    #   const u64 big ← 1
+    #   let u64 big ← 1
     #   print big + low
 }

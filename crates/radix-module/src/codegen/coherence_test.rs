@@ -230,11 +230,11 @@ fn compile(target: Target) -> String {
     let result = compiler.compile_str(
         "frame-coherence.fab",
         r#"incipit {
-    fixum sermo s ← ad 'runtime:echo' ("salve")
-    fixum meus<textus> m ← s.meus<textus>()
+    sit sermo s ← ad 'runtime:echo' ("salve")
+    sit meus<textus> m ← s.meus<textus>()
     m.da("ping")
     m.fini()
-    fixum tuus<textus> t ← s.tuus<textus>()
+    sit tuus<textus> t ← s.tuus<textus>()
     t.fini()
 }"#,
     );

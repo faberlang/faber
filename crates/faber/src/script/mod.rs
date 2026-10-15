@@ -77,7 +77,9 @@ pub fn run_with_session(
     let exit_result = trap::run_trapped(AssertUnwindSafe(|| {
         // Library-importing units need provider bodies, which only the
         // package route links; the single-source runner refuses them.
-        let result = if source_declares_non_kernel_import(name, source) {
+        let result = if source_declares_non_kernel_import(name, source)
+            || source_declares_cli_entry(name, source)
+        {
             run_as_package_source(session, name, source, &mut trap_host)
         } else {
             radix_run_source(session, name, source, &mut trap_host)
@@ -184,6 +186,57 @@ pub(crate) fn source_declares_non_kernel_import(name: &str, source: &str) -> boo
             return false;
         };
         !radix::module::kernel::is_kernel_import_path(parse.interner.resolve(import.path))
+    })
+}
+
+/// Whether `source` declares an `@ cli` entry annotation: such a unit is a CLI
+/// program whose operands and options only the package route plans.
+///
+/// Ruling (Fable CTO batch 2026-10-15): single-file mode must bind `@ cli`
+/// operands through the same CLI analysis package mode uses, rather than run
+/// them with unbound operands and silently print placeholder values.
+///
+/// The predicate deliberately gates only on the `@ cli` root: semantic CLI
+/// analysis (`radix_semantic::cli::find_cli_stmt`) requires that annotation to
+/// enter any `CliMode`, so a file carrying stray `@ option`/`@ operand`
+/// annotations without `@ cli` stays a plain unit on both routes.
+#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(feature = "runner")]
+pub(crate) fn source_declares_cli_entry(name: &str, source: &str) -> bool {
+    let Ok(peeled) = radix::module::driver::peel_raw_source(name, source) else {
+        return false;
+    };
+    // TEMPORARY STAGING: the pack-less fallback reads the
+    // no-locale default while `RADIX_DEFAULT_CODE_LOCALE=en`; unset keeps the
+    // historical pack-less (Latin) reading.
+    let code_pack =
+        faber_cli::package::default_config_with_locale(radix::module::Target::HirTypeScript)
+            .ok()
+            .and_then(|config| config.locale_pack)
+            .or_else(|| {
+                radix::module::driver::default_code_pack(&radix::module::driver::Config::default())
+            });
+    let lex = match code_pack.as_ref() {
+        Some(pack) => radix::module::lexer::lex_with_locale_pack(peeled.body, pack),
+        None => radix::module::lexer::lex(peeled.body),
+    };
+    let parse = radix::module::parser::parse(lex);
+    let Some(program) = parse.program else {
+        return false;
+    };
+    program.statements.iter().any(|statement| {
+        statement.annotations.iter().any(|annotation| {
+            match &annotation.kind {
+                radix::module::syntax::AnnotationKind::Cli(_) => true,
+                // Annotation names are canonicalized surface→Latin by the
+                // parser and `cli` is spelled `cli` on every reader surface, so
+                // braced-form detection does not depend on the pack.
+                radix::module::syntax::AnnotationKind::Braced(braced) => {
+                    parse.interner.resolve(braced.name.name) == "cli"
+                }
+                _ => false,
+            }
+        })
     })
 }
 

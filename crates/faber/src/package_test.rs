@@ -833,7 +833,7 @@ import from "norma:json/solve" solve as json_solve
 
 main {
   do {
-    const json parsed ← json_solve.parse("{}")
+    let json parsed ← json_solve.parse("{}")
     print parsed
   }
   catch err {
@@ -871,10 +871,10 @@ import from "norma:json" json
 
 main {
   do {
-    const json arr ← json.parse("[1]")
-    const string arr_wire ← json.stringify(arr)
-    const json obj ← json.parse("{\"a\":1}")
-    const string obj_wire ← json.stringify(obj)
+    let json arr ← json.parse("[1]")
+    let string arr_wire ← json.stringify(arr)
+    let json obj ← json.parse("{\"a\":1}")
+    let string obj_wire ← json.stringify(obj)
     print arr_wire
     print obj_wire
   }
@@ -923,9 +923,9 @@ fn compile_package_rejects_direct_text_json_wire_conversions() {
         &entry,
         r#"
 main {
-  const string wire ← "{}"
-  const json parsed ← wire ↦ json
-  const string out ← parsed ↦ string
+  let string wire ← "{}"
+  let json parsed ← wire ↦ json
+  let string out ← parsed ↦ string
   print out
 }
 "#,
@@ -957,19 +957,19 @@ import from "norma:json" json
 
 @ json
 class Payload {
-  var string name
-  var list<int> counts
+  mut string name
+  mut list<int> counts
 }
 
 main {
   do {
-    const string original ← "{\"counts\":[1,2],\"name\":\"Ada\"}"
-    const json parsed ← json.parse(original)
-    const Payload payload ← parsed ↦ Payload
-    const json encoded ← json.parse(original)
-    const string wire ← json.stringify(encoded)
-    const json reparsed ← json.parse(wire)
-    const Payload roundtrip ← reparsed ↦ Payload
+    let string original ← "{\"counts\":[1,2],\"name\":\"Ada\"}"
+    let json parsed ← json.parse(original)
+    let Payload payload ← parsed ↦ Payload
+    let json encoded ← json.parse(original)
+    let string wire ← json.stringify(encoded)
+    let json reparsed ← json.parse(wire)
+    let Payload roundtrip ← reparsed ↦ Payload
     print payload.name
     print payload.counts.longitudo()
     print wire
@@ -1286,7 +1286,7 @@ import from "norma:fs" fs
 @ cli "tool"
 @ operand string root
 main args args {
-  var list<string> partes ← [args.root, "nested"]
+  mut list<string> partes ← [args.root, "nested"]
   print fs.join(partes)
 }
 "#,
@@ -1483,7 +1483,7 @@ importa ex "norma:fs" solum
 importa ex "norma:fault" fault
 
 functio tange_paths(lista<textus> paths) → vacuum ⇥ fault.IoFault {
-    itera ex paths fixum path {
+    itera ex paths sit path {
         solum.tange(path)
     }
 }
@@ -1986,7 +1986,7 @@ fn package_fmir_text_image_cli_rest_text_operand_uses_runtime_arguments() {
 @ cli "tool"
 @ operand rest string files
 main args args {
-  const list<string> files ← args.files
+  let list<string> files ← args.files
   print files.length()
 }
 "#,
@@ -2058,7 +2058,7 @@ fn package_fmir_image_cli_rest_text_operand_uses_runtime_arguments() {
 @ cli "tool"
 @ operand rest string files
 main args args {
-  const list<string> files ← args.files
+  let list<string> files ← args.files
   print files.length()
 }
 "#,
@@ -2094,7 +2094,7 @@ fn package_fmir_built_image_cli_rest_text_operand_executes() {
 @ cli "tool"
 @ operand rest string files
 main args args {
-  const list<string> files ← args.files
+  let list<string> files ← args.files
   print files.length()
 }
 "#,
@@ -2459,8 +2459,8 @@ import from "norma:fs" fs
 @ cli "tool"
 @ operand string root
 main args args {
-  var list<string> partes ← [args.root, "nested"]
-  const string nested ← fs.join(partes)
+  mut list<string> partes ← [args.root, "nested"]
+  let string nested ← fs.join(partes)
   fs.create_dir(nested)
   print fs.exists(nested)
   fs.remove_tree(nested)
@@ -2502,11 +2502,11 @@ import from "norma:fs" fs
 @ cli "tool"
 @ operand string root
 main args args {
-  var list<string> partes ← [args.root]
-  const string dir ← fs.join(partes)
+  mut list<string> partes ← [args.root]
+  let string dir ← fs.join(partes)
   fs.create_dir(dir)
   partes ← [dir, "target.txt"]
-  const string target ← fs.join(partes)
+  let string target ← fs.join(partes)
   fs.touch(target)
   fs.write_file(target, "alpha")
   print fs.read_file<string>(target)
@@ -2583,15 +2583,15 @@ import from "norma:fs" fs
 @ cli "tool"
 @ operand string root
 main args args {
-  var list<string> partes ← [args.root]
-  const string dir ← fs.join(partes)
+  mut list<string> partes ← [args.root]
+  let string dir ← fs.join(partes)
   fs.create_dir(dir)
   partes ← [dir, "source.txt"]
-  const string source ← fs.join(partes)
+  let string source ← fs.join(partes)
   partes ← [dir, "copy.txt"]
-  const string copy ← fs.join(partes)
+  let string copy ← fs.join(partes)
   partes ← [dir, "moved.txt"]
-  const string moved ← fs.join(partes)
+  let string moved ← fs.join(partes)
   fs.touch(source)
   fs.write_file(source, "alpha")
   fs.copy(source, copy)
@@ -2634,11 +2634,11 @@ import from "norma:fs" fs
 @ cli "tool"
 @ operand string root
 main args args {
-  var list<string> partes ← [args.root, "nested"]
-  const string nested ← fs.join(partes)
+  mut list<string> partes ← [args.root, "nested"]
+  let string nested ← fs.join(partes)
   fs.create_dir(nested)
   partes ← [nested, "source.bin"]
-  const string source ← fs.join(partes)
+  let string source ← fs.join(partes)
   fs.touch(source)
   print fs.byte_length(source)
   print fs.is_regular(source)
@@ -2683,11 +2683,11 @@ import from "norma:fs" fs
 @ cli "tool"
 @ operand string root
 main args args {
-  var list<string> partes ← [args.root, "nested"]
-  const string nested ← fs.join(partes)
+  mut list<string> partes ← [args.root, "nested"]
+  let string nested ← fs.join(partes)
   fs.create_dir(nested)
   partes ← [nested, "target.bin"]
-  const string target ← fs.join(partes)
+  let string target ← fs.join(partes)
   fs.touch(target)
   fs.set_mode(target, 384)
   print fs.mode(target)
@@ -2727,14 +2727,14 @@ import from "norma:fs" fs
 @ cli "tool"
 @ operand string root
 main args args {
-  var list<string> partes ← [args.root, "nested"]
-  const string nested ← fs.join(partes)
+  mut list<string> partes ← [args.root, "nested"]
+  let string nested ← fs.join(partes)
   fs.create_dir(nested)
   partes ← [nested, "source.bin"]
-  const string source ← fs.join(partes)
+  let string source ← fs.join(partes)
   partes ← [nested, "source-link"]
-  const string link ← fs.join(partes)
-  const bytes payload ← |41 42|
+  let string link ← fs.join(partes)
+  let bytes payload ← |41 42|
   fs.write_bytes(source, payload)
   fs.create_link(source, link)
   print fs.is_symlink(link)
@@ -2781,12 +2781,12 @@ import from "norma:fs" fs
 @ cli "tool"
 @ operand string root
 main args args {
-  var list<string> partes ← [args.root, "dir"]
-  const string dir ← fs.join(partes)
+  mut list<string> partes ← [args.root, "dir"]
+  let string dir ← fs.join(partes)
   fs.create_dir(dir)
   partes ← [dir, "data.bin"]
-  const string target ← fs.join(partes)
-  const bytes payload ← |41 42 43|
+  let string target ← fs.join(partes)
+  let bytes payload ← |41 42 43|
   fs.write_bytes(target, payload)
   print fs.byte_length(target)
   fs.delete(target)
@@ -2925,7 +2925,7 @@ fn package_mir_cli_root_rest_text_operand_executes_without_rust_emit() {
 @ operand rest string files
 main args args {
   print args.input
-  const list<string> files ← args.files
+  let list<string> files ← args.files
   print files.length()
 }
 "#,
@@ -2962,7 +2962,7 @@ fn package_mir_cli_root_lista_numerus_operand_executes_without_rust_emit() {
 @ cli "tool"
 @ operand list<int> counts
 main args args {
-  const list<int> counts ← args.counts
+  let list<int> counts ← args.counts
   print counts.length()
 }
 "#,
@@ -2995,7 +2995,7 @@ fn package_mir_cli_root_octeti_operand_executes_without_rust_emit() {
 @ cli "tool"
 @ operand bytes raw
 main args args {
-  const bytes raw ← args.raw
+  let bytes raw ← args.raw
   print raw.length()
 }
 "#,
@@ -3550,7 +3550,7 @@ main args args {}
 @ command "sum"
 @ operand rest int counts
 fn sum() args args {
-  const list<int> counts ← args.counts
+  let list<int> counts ← args.counts
   print counts.length()
 }
 "#,
@@ -4144,8 +4144,8 @@ main args args {
 @ public
 fn inter_spatia(list<string> verba) → string {
   if verba.length() ≡ 0 then return ""
-  var string linea ← verba[0]
-  var int i ← 1
+  mut string linea ← verba[0]
+  mut int i ← 1
   while i ≺ verba.length() {
     linea ← linea + " " + verba[i]
     i ← i + 1
@@ -4623,11 +4623,11 @@ fn rust_field_names_default_preserves_source_spelling() {
         &entry,
         r#"
 class PersonaNova {
-  var string nomenLongum
+  mut string nomenLongum
 }
 
 main {
-  const _ p ← PersonaNova { nomenLongum = "Marcus" }
+  let p ← PersonaNova { nomenLongum = "Marcus" }
   print p.nomenLongum
 }
 "#,
@@ -4693,11 +4693,11 @@ rust_field_names = "snake_case"
         &entry,
         r#"
 class PersonaNova {
-  var string nomenLongum
+  mut string nomenLongum
 }
 
 main {
-  const _ p ← PersonaNova { nomenLongum = "Marcus" }
+  let p ← PersonaNova { nomenLongum = "Marcus" }
   print p.nomenLongum
 }
 "#,
@@ -4751,8 +4751,8 @@ rust_field_names = "snake_case"
         &entry,
         r#"
 class Collidens {
-  var string fooBar
-  var string foo_bar
+  mut string fooBar
+  mut string foo_bar
 }
 
 main {
@@ -4804,14 +4804,14 @@ union Nuntius {
 
 fn tracta(Nuntius n) → string {
   match n {
-    case Clavis const nomenLongum as captum {
+    case Clavis let nomenLongum as captum {
       return captum
     }
   }
 }
 
 main {
-  const Nuntius n ← variant Clavis { nomenLongum = "Julia" } ∷ Nuntius
+  let Nuntius n ← variant Clavis { nomenLongum = "Julia" } ∷ Nuntius
   print tracta(n)
 }
 "#,
@@ -5036,7 +5036,7 @@ fn compile_package_resolves_builtin_norma_text_native_body() {
 import from "norma:text" text
 
 main {
-  const string reversed ← text.reverse("roma")
+  let string reversed ← text.reverse("roma")
   print reversed
 }
 "#,
@@ -5076,7 +5076,7 @@ fn compile_package_resolves_type_only_norma_file_namespace_import() {
 import from "norma:net/endpoint" endpoint
 
 main {
-  const endpoint.Endpoint endpoint ← endpoint.Endpoint {
+  let endpoint.Endpoint endpoint ← endpoint.Endpoint {
     host = "localhost",
     port = 8080
   }
@@ -5125,7 +5125,7 @@ fn compile_package_resolves_type_only_local_file_namespace_import() {
 import from "./thing" Alias
 
 main {
-  const Alias.Thing item ← Alias.Thing { name = "ok" }
+  let Alias.Thing item ← Alias.Thing { name = "ok" }
   print item.name
 }
 "#,
@@ -5136,7 +5136,7 @@ main {
         r"
 @ public
 class Thing {
-    var string name
+    mut string name
 }
 ",
     )
@@ -5194,7 +5194,7 @@ genus Thing {
 import from "norma:Thing" alias
 
 main {
-    const alias.Thing item ← alias.Thing { name = "ok" }
+    let alias.Thing item ← alias.Thing { name = "ok" }
     print item.name
 }
 "#,
@@ -5236,7 +5236,7 @@ import from "norma:text" text
 
 main {
   do {
-    const [meta, corpus] ← text.split_frontmatter("+++\na = 1\n+++\nbody", "+++")
+    let [meta, corpus] ← text.split_frontmatter("+++\na = 1\n+++\nbody", "+++")
     print meta, corpus
   } catch err {
     warn err
@@ -5402,7 +5402,7 @@ fn compile_package_emits_norma_text_encode() {
 import from "norma:text" text
 
 main {
-  const bytes raw ← text.encode("Salve")
+  let bytes raw ← text.encode("Salve")
   print text.decode(raw)
 }
 "#,
@@ -5432,7 +5432,7 @@ fn compile_package_emits_norma_toml_parse() {
 import from "norma:toml" toml
 
 main {
-  const _ parsed ← toml.parse("name = \"faber\"")
+  let parsed ← toml.parse("name = \"faber\"")
 }
 "#,
     )
@@ -5461,9 +5461,9 @@ fn compile_package_resolves_builtin_norma_value_native_navigation_body() {
 import from "norma:value" value
 
 main {
-  const value doc ← { "id": "sample" } ↦ value
+  let value doc ← { "id": "sample" } ↦ value
   do {
-    const string id ← value.require_string(doc, "id")
+    let string id ← value.require_string(doc, "id")
     print id
   } catch err {
     warn err
@@ -5504,7 +5504,7 @@ fn compile_package_resolves_builtin_norma_value_exige_claves_native_body() {
 import from "norma:value" value
 
 main {
-  const value doc ← { "id": "sample" } ↦ value
+  let value doc ← { "id": "sample" } ↦ value
   do {
     value.require_strings(doc, ["id", "name"])
     print "ok"
@@ -5581,7 +5581,7 @@ import from "norma:console" console
 
 main {
   console.write_partial("salve")
-  const _ tty ← console.stdin_is_tty()
+  let tty ← console.stdin_is_tty()
   console.write_bytes(|48 65 6c 6c 6f|)
 }
 "#,
@@ -5800,8 +5800,8 @@ fn consolum_eot4_input_values_canonical() {
 import from "norma:console" const read_line as line_reader, read_bytes as bytes_reader
 
 main {
-  const string line ← line_reader() coalesce ""
-  const bytes chunk ← bytes_reader(4) coalesce |00|
+  let string line ← line_reader() coalesce ""
+  let bytes chunk ← bytes_reader(4) coalesce |00|
 }
 "#,
     )
@@ -5831,6 +5831,11 @@ main {
     assert!(output.code.contains("pub(crate) fn read_bytes"));
     assert!(output.code.contains("consolum:lege"));
     assert!(output.code.contains("consolum:hauri"));
+    assert!(
+        output.code.contains("consolum:desinit"),
+        "expected console readers to probe consolum:desinit before reading:\n{}",
+        output.code
+    );
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(!output.code.contains("norma::console::read_line"));
     assert!(!output.code.contains("norma::console::read_bytes"));
@@ -5905,6 +5910,11 @@ incipit {
     );
     assert!(output.code.contains("consolum:lege"));
     assert!(output.code.contains("consolum:hauri"));
+    assert!(
+        output.code.contains("consolum:desinit"),
+        "expected console readers to probe consolum:desinit before reading:\n{}",
+        output.code
+    );
     assert!(output.code.contains("solum:lege"));
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(!output.code.contains("norma::console::read_line"));
@@ -5978,8 +5988,8 @@ fn compile_package_resolves_builtin_norma_fs_ad_wrapped_imports() {
 import from "norma:fs" fs as terra
 
 async_main {
-  const _ exists ← terra.exists(".")
-  const _ parent ← terra.parent("a/b")
+  let exists ← terra.exists(".")
+  let parent ← terra.parent("a/b")
   await terra.write_bytes_async("fundet.bin", |41 42 43|)
 }
 "#,
@@ -6024,8 +6034,8 @@ fn compile_package_resolves_builtin_norma_process_ad_wrapped_imports() {
 import from "norma:process" process as proc
 
 main {
-  const _ out ← proc.exec("echo hi")
-  const _ env ← proc.read_env("PATH")
+  let out ← proc.exec("echo hi")
+  let env ← proc.read_env("PATH")
 }
 "#,
     )
@@ -6069,10 +6079,10 @@ fn compile_package_resolves_builtin_norma_time_ad_wrapped_imports() {
 import from "norma:time" time
 
 async_main {
-  const _ now ← time.now()
-  const _ mono ← time.monotonic()
-  const _ active ← time.active()
-  const _ ms ← time.MILLISECOND()
+  let now ← time.now()
+  let mono ← time.monotonic()
+  let active ← time.active()
+  let ms ← time.MILLISECOND()
   await time.sleep_async(0)
 }
 "#,
@@ -6117,10 +6127,10 @@ fn compile_package_resolves_builtin_norma_random_ad_wrapped_imports() {
 import from "norma:random" random
 
 main {
-  const _ f ← random.random_float()
-  const _ n ← random.random_int(1, 6)
-  const _ id ← random.uuid()
-  const _ bytes ← random.random_bytes(8)
+  let f ← random.random_float()
+  let n ← random.random_int(1, 6)
+  let id ← random.uuid()
+  let bytes ← random.random_bytes(8)
   random.seed(42)
 }
 "#,
@@ -6282,7 +6292,7 @@ import from "norma:http" http
 async_main {
     await_const _ responsum ← http.get("http://127.0.0.1:9/test")
     print responsum.status
-    const _ caput ← responsum.header("x-faber-test")
+    let caput ← responsum.header("x-faber-test")
     if caput ≡ null { print "header:missing" } else { print "header:present" }
     print responsum.body
 }
@@ -6433,7 +6443,7 @@ entry = "main.fab"
 import from "norma:fs/path" public * as path
 
 main {
-    const string name ← path.file_name("/usr/bin/faber")
+    let string name ← path.file_name("/usr/bin/faber")
     print name
 }
 "#,
@@ -6610,11 +6620,11 @@ fn dual_norma_format_imports_scope_provenance_by_binding() {
 import from "norma:json" json_mod
 
 main {
-  const list<list<string>> csv_rows ← csv_mod.parse("count,1")
-  const _ csv_text ← csv_mod.stringify(csv_rows)
+  let list<list<string>> csv_rows ← csv_mod.parse("count,1")
+  let csv_text ← csv_mod.stringify(csv_rows)
   do {
-    const json json_doc ← json_mod.parse("{\"count\": 1}")
-    const _ json_text ← json_mod.stringify(json_doc)
+    let json json_doc ← json_mod.parse("{\"count\": 1}")
+    let json_text ← json_mod.stringify(json_doc)
   }
   catch err {
     print err
@@ -6676,12 +6686,12 @@ import from "norma:json" json
 import from "norma:value" value
 
 main {
-    const json doc ← { "wire_name": "Ada" }
-    const string wire ← json.stringify(doc)
-    const value tree ← { "wire_name": "Ada" } ↦ value
-    const value child ← value.get(tree, "wire_name")
+    let json doc ← { "wire_name": "Ada" }
+    let string wire ← json.stringify(doc)
+    let value tree ← { "wire_name": "Ada" } ↦ value
+    let value child ← value.get(tree, "wire_name")
     do {
-        const json parsed ← json.parse(wire)
+        let json parsed ← json.parse(wire)
         print parsed, child
     }
     catch err {
@@ -8650,7 +8660,7 @@ fn check_package_types_top_level_function_through_file_namespace_alias() {
 import from "./auxilium" Aux
 
 main {
-    const string label ← Aux.label("Marcus")
+    let string label ← Aux.label("Marcus")
     print label
 }
 "#,
@@ -8698,7 +8708,7 @@ fn felis(Cattus c) → string {
 }
 
 main {
-    const Canis c ← Canis { nomen = "rex" }
+    let Canis c ← Canis { nomen = "rex" }
     print nomen(c)
     print felis(Cattus { nomen = "tom" })
 }
@@ -8710,12 +8720,12 @@ main {
         r#"
 @ public
 class Canis {
-    var string nomen
+    mut string nomen
 }
 
 @ public
 class Felis {
-    var string nomen
+    mut string nomen
 }
 "#,
     )
@@ -8764,12 +8774,12 @@ main {
         r#"
 @ public
 class Canis {
-    var string nomen
+    mut string nomen
 }
 
 @ public
 class Felis {
-    var string nomen
+    mut string nomen
 }
 "#,
     )
@@ -8835,7 +8845,7 @@ fn check_package_types_norma_fs_path_namespace_call() {
 import from "norma:fs/path" path
 
 main {
-    const string name ← path.file_name("/usr/bin/faber")
+    let string name ← path.file_name("/usr/bin/faber")
     print name
 }
 "#,
@@ -8875,7 +8885,7 @@ functio solve(textus json) → valor {
 import from "norma:json/solve" solve
 
 main {
-    const value doc ← solve.solve("{}")
+    let value doc ← solve.solve("{}")
     print doc
 }
 "#,
@@ -9012,8 +9022,8 @@ import from "./a/types" A
 import from "./b/types" B
 
 main {
-    const A.Thing a ← A.Thing { label = "A" }
-    const B.Thing b ← B.Thing { label = "B" }
+    let A.Thing a ← A.Thing { label = "A" }
+    let B.Thing b ← B.Thing { label = "B" }
     print a.label
     print b.label
 }
@@ -9025,7 +9035,7 @@ main {
         r"
 @ public
 class Thing {
-    var string label
+    mut string label
 }
 ",
     )
@@ -9035,7 +9045,7 @@ class Thing {
         r"
 @ public
 class Thing {
-    var string label
+    mut string label
 }
 ",
     )
@@ -9230,7 +9240,7 @@ genus Publicum {
 import from "norma:types" types
 
 main {
-    const types.Secretum secretum ← types.Secretum {}
+    let types.Secretum secretum ← types.Secretum {}
 }
 "#,
     )
@@ -9597,7 +9607,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"main { const string body ← call 'runtime:echo' ("ok") ↦ string print body }"#,
+        r#"main { let string body ← call 'runtime:echo' ("ok") ↦ string print body }"#,
     )
     .expect("entry");
 
@@ -9629,7 +9639,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"main { const string body ← call 'solum:lege' ("data.txt") ↦ string print body }"#,
+        r#"main { let string body ← call 'solum:lege' ("data.txt") ↦ string print body }"#,
     )
     .expect("entry");
 
@@ -9667,7 +9677,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        "@ call 'solum:lege'\nfn lege(string via) → string {\n    return via\n}\n\nmain { const string body ← call 'solum:lege' (\"data.txt\") ↦ string print body }\n",
+        "@ call 'solum:lege'\nfn lege(string via) → string {\n    return via\n}\n\nmain { let string body ← call 'solum:lege' (\"data.txt\") ↦ string print body }\n",
     )
     .expect("entry");
 
@@ -9701,7 +9711,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"main { const string body ← call 'ignotum:route' ("x") ↦ string print body }"#,
+        r#"main { let string body ← call 'ignotum:route' ("x") ↦ string print body }"#,
     )
     .expect("entry");
 
@@ -9787,7 +9797,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"async_main { const string body ← call 'runtime:echo' ("ok") ↦ string print body }"#,
+        r#"async_main { let string body ← call 'runtime:echo' ("ok") ↦ string print body }"#,
     )
     .expect("entry");
 
@@ -9845,7 +9855,7 @@ entry = "main.fab"
     .expect("manifest");
     fs::write(
         pkg.join("src/main.fab"),
-        r#"async_main { const string body ← call 'runtime:echo' ("ok") ↦ string print body }"#,
+        r#"async_main { let string body ← call 'runtime:echo' ("ok") ↦ string print body }"#,
     )
     .expect("entry");
 
@@ -9921,7 +9931,7 @@ fn package_host_routes_fail_closed_with_and_without_native_host() {
         .expect("write manifest");
         fs::write(
             pkg.join("src/main.fab"),
-            r#"main { const string body ← call 'ignotum:route' ("x") ↦ string print body }"#,
+            r#"main { let string body ← call 'ignotum:route' ("x") ↦ string print body }"#,
         )
         .expect("write entry");
 
@@ -9952,7 +9962,7 @@ import from "norma:json" json
 
 main {
     do {
-        const json duplicate ← json.parse("{\"id\": 1, \"id\": 2}")
+        let json duplicate ← json.parse("{\"id\": 1, \"id\": 2}")
         print duplicate
     }
     catch err {
@@ -9960,7 +9970,7 @@ main {
     }
 
     do {
-        const json unicode ← json.parse("{\"music\": \"\\uD834\\uDD1E\"}")
+        let json unicode ← json.parse("{\"music\": \"\\uD834\\uDD1E\"}")
         print json.stringify(unicode)
     }
     catch err {
@@ -10213,7 +10223,7 @@ functio vacua_tabula() → lista<lista<textus>> {
 import from "norma:nested_lista_probe" nested_lista_probe
 
 main {
-    const list<list<string>> grid ← nested_lista_probe.vacua_tabula()
+    let list<list<string>> grid ← nested_lista_probe.vacua_tabula()
     print grid.length()
 }
 "#,
@@ -10254,7 +10264,7 @@ functio join_fields(lista<textus> parts) → textus {
 import from "norma:transitive_fixture" transitive_fixture
 
 main {
-    const string wire ← transitive_fixture.join_fields(["alpha", "beta"])
+    let string wire ← transitive_fixture.join_fields(["alpha", "beta"])
     print wire
 }
 "#,
@@ -10635,8 +10645,8 @@ fn transitive_csv_text_closure_compiles_with_mixed_provenance() {
 import from "norma:csv" csv
 
 main {
-    const list<list<string>> grid ← csv.parse("name,count\nalpha,1")
-    const string wire ← csv.stringify(grid)
+    let list<list<string>> grid ← csv.parse("name,count\nalpha,1")
+    let string wire ← csv.stringify(grid)
     print wire
 }
 "#,
@@ -10693,7 +10703,7 @@ fn transitive_csv_solve_empty_input_returns_vacua() {
 import from "norma:csv" csv
 
 main {
-    const list<list<string>> grid ← csv.parse("")
+    let list<list<string>> grid ← csv.parse("")
     print grid.length()
 }
 "#,
@@ -10719,7 +10729,7 @@ fn transitive_csv_solve_preserves_trailing_row() {
 import from "norma:csv" csv
 
 main {
-    const list<list<string>> grid ← csv.parse("a,b\n")
+    let list<list<string>> grid ← csv.parse("a,b\n")
     print grid.length()
 }
 "#,
@@ -10769,10 +10779,10 @@ locale = "en"
 import from "./nn" nn
 
 fn main() → void {
-    const _ x ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
-    const _ w ← [[1.0, 0.0], [0.0, 1.0]] ↦ tensor<f32, [2, 2]>
-    const _ b ← [[0.1, 0.1], [0.1, 0.1]] ↦ tensor<f32, [2, 2]>
-    const _ r ← nn.linear(x, w, b)
+    let x ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    let w ← [[1.0, 0.0], [0.0, 1.0]] ↦ tensor<f32, [2, 2]>
+    let b ← [[0.1, 0.1], [0.1, 0.1]] ↦ tensor<f32, [2, 2]>
+    let r ← nn.linear(x, w, b)
     print "ok"
 }
 "#;
@@ -10951,7 +10961,7 @@ rustc = ""
 import from "libmath:math" math
 
 main {
-  const int n ← math.double(21)
+  let int n ← math.double(21)
   print n
 }
 "#,
@@ -11108,7 +11118,7 @@ rustc = ""
 import from "libmath:math" math
 
 main {
-  const int n ← math.double(21)
+  let int n ← math.double(21)
   print n
 }
 "#,
@@ -11278,7 +11288,7 @@ import from "./helper" helper
 @ cli "tool"
 @ operand rest string ignored
 main args args exit 0 {
-  const string _ ← helper.identity("x")
+  let string _ ← helper.identity("x")
 }
 "#,
     )
@@ -11444,8 +11454,8 @@ import from "./b" b
 @ cli "tool"
 @ operand rest string ignored
 main args args exit 0 {
-  const string _ ← a.identity("x")
-  const string __ ← b.identity("y")
+  let string _ ← a.identity("x")
+  let string __ ← b.identity("y")
 }
 "#,
     )
@@ -11499,9 +11509,9 @@ main args args exit 0 {
   console.write_line_async(":")
   console.write_partial_async(console.read_line_async() coalesce "")
   console.write_line("")
-  const bytes sync_bytes ← console.read_bytes(4) coalesce |00|
+  let bytes sync_bytes ← console.read_bytes(4) coalesce |00|
   console.write_bytes_async(sync_bytes)
-  const bytes async_bytes ← console.read_bytes_async(4) coalesce |00|
+  let bytes async_bytes ← console.read_bytes_async(4) coalesce |00|
   console.write_bytes(async_bytes)
   console.warn_line_async("warn")
   console.debug_line_async("debug")
@@ -11612,7 +11622,7 @@ import from "./helper" helper
 @ cli "tool"
 @ operand rest string ignored
 main args args exit 0 {{
-  const string _ ← helper.{func_name}("x")
+  let string _ ← helper.{func_name}("x")
 }}
 "#
         ),
@@ -11658,8 +11668,8 @@ import from "./b" b
 @ cli "tool"
 @ operand rest string ignored
 main args args exit 0 {
-  const string _ ← a.identity("x")
-  const string __ ← b.identity("y")
+  let string _ ← a.identity("x")
+  let string __ ← b.identity("y")
 }
 "#,
     )
@@ -11685,6 +11695,132 @@ main args args exit 0 {
         ok.go_modules[0].1.contains("func identity"),
         "expected identity func in module: {:?}",
         ok.go_modules
+    );
+}
+
+#[cfg(feature = "hir-ts")]
+#[test]
+fn ts_package_emit_folds_sibling_module_into_one_stream() {
+    // regio shape (corpus-product/regio): the entry imports `./planum` with no
+    // binding, the sibling declares `module geometry`, and the fold must drop
+    // the sibling import because the unit body now lives in the same stream.
+    let dir = test_temp_dir("ts-fold");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "ts-fold"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        dir.join("src/planum.fab"),
+        "module geometry\n\n@ public\nfn area(int width, int height) → int {\n  return width * height\n}\n",
+    )
+    .expect("planum");
+    fs::write(
+        dir.join("src/main.fab"),
+        "import from \"./planum\"\n\nmain {\n  print geometry.area(3, 4)\n}\n",
+    )
+    .expect("entry");
+
+    let result =
+        compile_with_faber_seams(&Config::default().with_target(Target::HirTypeScript), &dir);
+    assert!(
+        result.success(),
+        "expected TS package fold to succeed: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| diagnostic_has_issue(d, "package_target_assembly_pending")),
+        "TS fold must not report a pending assembly: {:?}",
+        result.diagnostics
+    );
+    let Some(Output::TypeScript(output)) = result.output else {
+        panic!("expected TypeScript output");
+    };
+    assert!(
+        output
+            .code
+            .lines()
+            .any(|line| line.contains("function area")),
+        "folded stream must declare area: {}",
+        output.code
+    );
+    assert!(
+        !output
+            .code
+            .lines()
+            .any(|line| line.contains("from \"./planum\"")),
+        "folded stream must not re-import the sibling: {}",
+        output.code
+    );
+}
+
+#[cfg(feature = "hir-ts")]
+#[test]
+fn ts_package_emit_reports_merge_collision() {
+    // Two non-entry units export the same top-level function name; folding them
+    // into one stream must fail closed with the named merge diagnostic.
+    let dir = test_temp_dir("ts-merge-collision");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "ts-merge-collision"
+version = "0.1.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        dir.join("src/a.fab"),
+        "@ public\nfn identity(string s) → string {\n  return s\n}\n",
+    )
+    .expect("a");
+    fs::write(
+        dir.join("src/b.fab"),
+        "@ public\nfn identity(string s) → string {\n  return s + \"!\"\n}\n",
+    )
+    .expect("b");
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"
+import from "./a" a
+import from "./b" b
+@ cli "tool"
+@ operand rest string ignored
+main args args exit 0 {
+  let string _ ← a.identity("x")
+  let string __ ← b.identity("y")
+}
+"#,
+    )
+    .expect("entry");
+
+    let result =
+        compile_with_faber_seams(&Config::default().with_target(Target::HirTypeScript), &dir);
+    assert!(!result.success(), "expected TS merge collision failure");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| diagnostic_has_issue(d, "package_ts_merge_collision")),
+        "expected package_ts_merge_collision diagnostic: {:?}",
+        result.diagnostics
     );
 }
 
@@ -11958,7 +12094,7 @@ locale = "en"
 @ public
 @ annotatio { target = fn }
 class WebController {
-    var string selector
+    mut string selector
 }
 "#,
     )
@@ -11979,28 +12115,28 @@ locale = "en"
 
 @ public
 class Scope {
-    var string selector = ""
+    mut string selector = ""
 }
 
 @ public
 class Element {
-    var string selector = ""
+    mut string selector = ""
 }
 
 @ public
 class FrameState {
-    var int frame = 0
-    var f32 time_ms = 0.0
-    var f32 delta_ms = 0.0
+    mut int frame = 0
+    mut f32 time_ms = 0.0
+    mut f32 delta_ms = 0.0
 }
 
 @ public
 class SubmitOptions {
-    var bool prevent_default = true
+    mut bool prevent_default = true
 }
 
 class Subscription {
-    var int id = 0
+    mut int id = 0
 }
 
 type SubmitHandler = (Element) → void
@@ -12134,7 +12270,7 @@ fn write_tela_consumer_app_with_only_web_import(app: &Path, lib: &Path) {
 import from "tela:web" web
 
 class Scope {
-    var string selector = ""
+    mut string selector = ""
 }
 
 @ WebController { selector = "#shell" }
@@ -12832,7 +12968,7 @@ import from "tela:dom" d
 
 @ annotatio { target = fn }
 class WebController {
-    var string selector
+    mut string selector
 }
 
 @ WebController { selector = "#shell" }
@@ -12911,14 +13047,14 @@ import from "tela:dom" d
 
 @ WebController { selector = "#frame-demo" }
 fn frame_controller(d.Scope scope) → void {
-  const d.Element status ← d.require(scope, ".frame-status")
+  let d.Element status ← d.require(scope, ".frame-status")
   print d.on_frame((d.FrameState frame) → void ∴ d.text_set(status, "frame-seen"))
 }
 
 @ WebController { selector = "#submit-demo" }
 #[cfg(feature = "hir-ts")]
 fn submit_controller(d.Scope scope) → void {
-  const d.Element form ← d.require(scope, ".submit-form")
+  let d.Element form ← d.require(scope, ".submit-form")
   print d.on_submit(form, d.SubmitOptions { prevent_default = true }, (d.Element el) → void ∴ d.text_set(el, "submitted"))
 }
 "##,
@@ -13352,8 +13488,8 @@ fn package_fmir_text_image_round_trips_upper_half_u64_constants() {
         &entry,
         r"
 main {
-  const u64 max ← 18446744073709551615
-  const u64 sha ← 9223372036854775808
+  let u64 max ← 18446744073709551615
+  let u64 sha ← 9223372036854775808
   print max
   print sha
 }
@@ -13389,8 +13525,8 @@ fn package_fmir_image_round_trips_upper_half_u64_constants() {
         &entry,
         r"
 main {
-  const u64 max ← 18446744073709551615
-  const u64 sha ← 9223372036854775808
+  let u64 max ← 18446744073709551615
+  let u64 sha ← 9223372036854775808
   print max
   print sha
 }
@@ -13461,7 +13597,7 @@ fn simple_loss(
     tensor<f32, [2,2]> x,
     tensor<f32, [2,2]> w
 ) → f32 {
-    const tensor<f32, [2,2]> product ← x ⊙ w
+    let tensor<f32, [2,2]> product ← x ⊙ w
     return product.mean()
 }
 "#,
@@ -13576,7 +13712,7 @@ functio simple_loss(
     tensor<f32, [2,2]> x,
     tensor<f32, [2,2]> w
 ) → f32 {
-    fixum tensor<f32, [2,2]> product ← x ⊙ w
+    sit tensor<f32, [2,2]> product ← x ⊙ w
     redde product.media()
 }
 "#,
@@ -13590,14 +13726,14 @@ functio simple_loss(
 import from "testgrad:gradient" gradient
 
 main {
-    const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    const tensor<f32, [2,2]> x ← data ↦ tensor<f32, [2,2]>
-    const tensor<f32, [2,2]> w ← data ↦ tensor<f32, [2,2]>
-    const f32 loss ← gradient.simple_loss(x, w)
+    let list<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    let tensor<f32, [2,2]> x ← data ↦ tensor<f32, [2,2]>
+    let tensor<f32, [2,2]> w ← data ↦ tensor<f32, [2,2]>
+    let f32 loss ← gradient.simple_loss(x, w)
     print loss
-    const f32 upstream ← 1.0
-    const _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
-    const [_, gw] ← grads
+    let f32 upstream ← 1.0
+    let grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
+    let [_, gw] ← grads
     print gw
 }
 "#,
@@ -13682,7 +13818,7 @@ functio simple_add(i32 a, i32 b) → numerus {
 import from "testgrad:gradient" gradient
 
 main {
-    const _ g ← gradient.ghost(gradient.nil(), 5)
+    let g ← gradient.ghost(gradient.nil(), 5)
     print "companion-ran"
 }
 "#,
@@ -13838,7 +13974,7 @@ functio simple_loss(
     tensor<f32, [2,2]> x,
     tensor<f32, [2,2]> w
 ) → f32 {
-    fixum tensor<f32, [2,2]> product ← x ⊙ inner(x, w)
+    sit tensor<f32, [2,2]> product ← x ⊙ inner(x, w)
     redde product.media()
 }
 "#,
@@ -13852,14 +13988,14 @@ functio simple_loss(
 import from "testgrad:gradient" gradient
 
 main {
-    const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    const tensor<f32, [2,2]> x ← data ↦ tensor<f32, [2,2]>
-    const tensor<f32, [2,2]> w ← data ↦ tensor<f32, [2,2]>
-    const f32 loss ← gradient.simple_loss(x, w)
+    let list<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    let tensor<f32, [2,2]> x ← data ↦ tensor<f32, [2,2]>
+    let tensor<f32, [2,2]> w ← data ↦ tensor<f32, [2,2]>
+    let f32 loss ← gradient.simple_loss(x, w)
     print loss
-    const f32 upstream ← 1.0
-    const _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
-    const [_, gw] ← grads
+    let f32 upstream ← 1.0
+    let grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
+    let [_, gw] ← grads
     print gw
 }
 "#,
@@ -13932,7 +14068,7 @@ functio simple_loss(
     tensor<f32, [2,2]> x,
     tensor<f32, [2,2]> w
 ) → f32 {
-    fixum tensor<f32, [2,2]> product ← x ⊙ w
+    sit tensor<f32, [2,2]> product ← x ⊙ w
     redde product.media()
 }
 "#,
@@ -13960,14 +14096,14 @@ import from "testgrad:gradient" gradient
 import from "testgrad:math" math
 
 main {
-    const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    const tensor<f32, [2,2]> x ← data ↦ tensor<f32, [2,2]>
-    const tensor<f32, [2,2]> w ← data ↦ tensor<f32, [2,2]>
-    const f32 loss ← gradient.simple_loss(x, w)
+    let list<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    let tensor<f32, [2,2]> x ← data ↦ tensor<f32, [2,2]>
+    let tensor<f32, [2,2]> w ← data ↦ tensor<f32, [2,2]>
+    let f32 loss ← gradient.simple_loss(x, w)
     print loss
-    const f32 upstream ← 1.0
-    const _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
-    const [_, gw] ← grads
+    let f32 upstream ← 1.0
+    let grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
+    let [_, gw] ← grads
     print gw
 }
 "#,
@@ -13998,8 +14134,8 @@ main {
 
 const WEB4_SPAN_SOURCE: &str = r"@ public
 class Span {
-    const int low
-    const int high
+    let int low
+    let int high
     fn middle() → f64 { return (self.low + self.high) ÷ 2 }
 }
 ";
@@ -14130,7 +14266,7 @@ locale = "en"
 +++
 @ public
 class Socket {
-    var string host
+    mut string host
 
     @ unstable "pending host dispatch"
     fn send(string data) → void
@@ -14196,7 +14332,7 @@ rustc = ""
         r#"import from "prov:module" module
 
 main {
-    const module.Socket s ← module.Socket { host = "h" }
+    let module.Socket s ← module.Socket { host = "h" }
     s.send("x")
     print module.parse_later("a")
 }

@@ -4,12 +4,12 @@ locale = "en"
 # Conditionals as values, elif chains, do-while with continue and break,
 # increment and decrement, assert, and comparisons of text and booleans.
 fn grade(int points) → string {
-    const string top ← points ≥ 90 ✓ "A" ✗ "-"
+    let string top ← points ≥ 90 ✓ "A" ✗ "-"
     return points ≥ 80 ✓ top ✗ "F"
 }
 
 fn classify(int hour) → string {
-    var string out ← ""
+    mut string out ← ""
     if hour ≺ 6 {
         out ← "night"
     }
@@ -28,27 +28,27 @@ fn classify(int hour) → string {
 main {
     print grade(95), grade(85), grade(10)
     print classify(3), classify(9), classify(14), classify(20)
-    var int n ← 0
+    mut int n ← 0
     do {
         n ↑
         if n ≥ 2 { continue }
         print n
     } while n ≺ 4
     print "done", n
-    var int m ← 0
+    mut int m ← 0
     do {
         m ↑
         if m ≡ 3 { break }
     } while m ≺ 10
     print m
-    var int count ← 5
+    mut int count ← 5
     count ↓
     count ↓
     count ↑
     print count
     print "a" ≺ "b", "b" ≺ "a", "abc" ≡ "abc", "abc" ≢ "abd"
     print "ab" ≺ "abc", "Zeta" ≻ "alpha", "é" ≻ "z", "😀" ≻ "～"
-    const bool yes ← true
+    let bool yes ← true
     print yes ≡ true, yes ≢ true
     assert count ≡ 4
     assert "x" ≡ "x" panic "never"

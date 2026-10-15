@@ -37,10 +37,10 @@ locale = "en"
 
 main {
     # left operand: falsum
-    const bool invitatus ← false
+    let bool invitatus ← false
     # right operand: verum
-    const bool membrum ← true
+    let bool membrum ← true
     # falsum aut verum → verum
-    const bool intrat ← invitatus or membrum
+    let bool intrat ← invitatus or membrum
     print intrat
 }

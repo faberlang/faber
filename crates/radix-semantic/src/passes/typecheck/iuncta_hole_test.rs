@@ -8,7 +8,7 @@ fn iuncta_element_hole_solves_from_constructor_witness() {
     let result = test_support::analyze_source_la(
         r"
 incipit {
-    fixum iuncta<f32, _> pair ← iuncta<f32, numerus> [1.0, 2]
+    sit iuncta<f32, _> pair ← iuncta<f32, numerus> [1.0, 2]
     nota pair[1] + 0
 }
 ",
@@ -41,7 +41,7 @@ functio make_pair() → iuncta<f32, numerus> {
 }
 
 incipit {
-    fixum iuncta<f32, _> pair ← make_pair()
+    sit iuncta<f32, _> pair ← make_pair()
     nota pair[1] + 0
 }
 ",
@@ -54,7 +54,7 @@ fn iuncta_union_type_arg_is_rejected_with_targeted_issue() {
     test_support::assert_rejects_with_issue_la(
         r"
 incipit {
-    fixum iuncta<f32, ∪> pair ← iuncta<f32, numerus> [1.0, 2]
+    sit iuncta<f32, ∪> pair ← iuncta<f32, numerus> [1.0, 2]
 }
 ",
         "iuncta_union_type_arg_unsupported",
@@ -66,7 +66,7 @@ fn lista_union_hole_keeps_existing_warn017_behavior() {
     let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 incipit {
-    fixum lista<∪> values ← [1, 2]
+    sit lista<∪> values ← [1, 2]
     nota values[0]
 }
 ",
@@ -90,7 +90,7 @@ fn iuncta_binary_union_element_remains_legal() {
     let result = test_support::analyze_source_la(
         r#"
 incipit {
-    fixum iuncta<f32, textus ∪ nihil> pair ← iuncta<f32, textus ∪ nihil> [1.0, "x"]
+    sit iuncta<f32, textus ∪ nihil> pair ← iuncta<f32, textus ∪ nihil> [1.0, "x"]
     nota pair[1]
 }
 "#,
@@ -103,7 +103,7 @@ fn iuncta_labeled_element_hole_remains_element_wise() {
     let result = test_support::analyze_source_la(
         r"
 incipit {
-    fixum iuncta<loss: _, numerus> pair ← iuncta<f32, numerus> [1.0, 2]
+    sit iuncta<loss: _, numerus> pair ← iuncta<f32, numerus> [1.0, 2]
     nota pair[0]
 }
 ",

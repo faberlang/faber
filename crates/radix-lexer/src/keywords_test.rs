@@ -41,7 +41,7 @@ fn filum_has_keyword_row_after_sfr2() {
 fn filum_lexes_as_plain_identifier_in_every_position() {
     for source in [
         "filum",
-        "fixum numerus filum ← 1",
+        "sit numerus filum ← 1",
         "filum(1, 2)",
         "a.filum()",
         "filum ∴ filum",

@@ -38,7 +38,7 @@ locale = "en"
 #   3.5
 
 main {
-    const list<f32> flat ← [
+    let list<f32> flat ← [
         1.0,
         2.0,
         3.0,
@@ -46,10 +46,10 @@ main {
         5.0,
         6.0
     ]
-    var tf32[2, 3] grid ← flat ↦ tf32[2, 3]
+    mut tf32[2, 3] grid ← flat ↦ tf32[2, 3]
 
-    const f32 total ← grid.sum()
-    const f32 mean ← grid.mean()
+    let f32 total ← grid.sum()
+    let f32 mean ← grid.mean()
 
     print total
     print mean

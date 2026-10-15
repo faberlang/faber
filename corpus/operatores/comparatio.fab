@@ -46,14 +46,14 @@ test "ordering and chained interval" {
 #   Scalar bivalens stdout; chain with et for interval tests.
 
 main {
-    const bool aequalis ← 10 ≡ 10
+    let bool aequalis ← 10 ≡ 10
     print aequalis
-    const bool diversus ← 10 ≢ 5
+    let bool diversus ← 10 ≢ 5
     print diversus
-    const bool nonMaior ← 5 ≤ 10
+    let bool nonMaior ← 5 ≤ 10
     print nonMaior
-    const bool nonMinor ← 10 ≥ 5
+    let bool nonMinor ← 10 ≥ 5
     print nonMinor
-    const bool intervallum ← 0 ≺ 5 and 5 ≺ 10
+    let bool intervallum ← 0 ≺ 5 and 5 ≺ 10
     print intervallum
 }

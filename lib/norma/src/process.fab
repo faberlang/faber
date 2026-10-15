@@ -42,7 +42,7 @@ fn io_fault(value raw) → fault.IoFault {
 # (terminate the child). Both call the same `processus:*` routes by pid.
 @ public
 class Subprocess {
-    var int pid
+    mut int pid
 }
 
 # =========================================================================
@@ -56,7 +56,7 @@ class Subprocess {
 # Param named `args` because `argumenta` is TokenKind::Argumenta.
 @ public
 fn spawn(list<string> args) → Subprocess ⇥ fault.IoFault {
-    const int child ← call 'processus:genera' (args) ↦ int
+    let int child ← call 'processus:genera' (args) ↦ int
     return Subprocess { pid = child }
 }
 
@@ -140,10 +140,10 @@ fn exec_async(string command) → string ⇥ fault.IoFault {
 # Read environment variable: unset is `none`, set-to-empty is the present empty string
 @ public
 fn read_env(string name) → string ∪ none {
-    const value raw ← call 'processus:lege' (name) ↦ value
+    let value raw ← call 'processus:lege' (name) ↦ value
     do {
-        const map<string, value> fields ↤ raw
-        const bool present ← fields["present"] ↦ bool ⊥ false
+        let map<string, value> fields ↤ raw
+        let bool present ← fields["present"] ↦ bool ⊥ false
         if present then return fields["value"] ↦ string
         return null
     }
@@ -214,6 +214,6 @@ fn argv() → list<string> {
 # Exit process with code (never returns)
 @ public
 fn exit_process(int code) → never {
-    const void _ ← call 'processus:exi' (code) ↦ void
+    let void _ ← call 'processus:exi' (code) ↦ void
     panic "process exit returned unexpectedly"
 }

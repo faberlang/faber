@@ -8,9 +8,9 @@ canonical = true
 +++
 # sort via asc|desc from <list> builds a new list; the source is unchanged.
 incipit {
-    fixum lista<numerus> xs ← [3, 1, 2, 3, 0]
-    fixum lista<numerus> up ← ordinata via ascendens ex xs
-    fixum lista<numerus> down ← ordinata via descendens ex xs
+    sit lista<numerus> xs ← [3, 1, 2, 3, 0]
+    sit lista<numerus> up ← ordinata via ascendens ex xs
+    sit lista<numerus> down ← ordinata via descendens ex xs
     nota up
     nota down
     nota xs

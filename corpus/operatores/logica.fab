@@ -38,17 +38,17 @@ locale = "en"
 #   Negated est parses as `expr non est target`.
 
 main {
-    const _ vexilla ← 0b1010
-    const _ persona ← 0b1100
-    const _ velata ← vexilla ∨ persona
+    let vexilla ← 0b1010
+    let persona ← 0b1100
+    let velata ← vexilla ∨ persona
     # 14 (0b1110)
     print velata
-    const string ∪ none praesens ← "salve"
-    const string ∪ none absens ← null
-    const bool habetValorem ← praesens not is none
+    let string ∪ none praesens ← "salve"
+    let string ∪ none absens ← null
+    let bool habetValorem ← praesens not is none
     # verum
     print habetValorem
-    const bool caretValorem ← absens not is none
+    let bool caretValorem ← absens not is none
     # falsum
     print caretValorem
 }

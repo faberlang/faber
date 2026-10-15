@@ -14,9 +14,9 @@ import from "norma:http/response" response
 import from "norma:process" process
 
 fn origin() → string {
-    const list<string> args ← process.argv()
+    let list<string> args ← process.argv()
     if args.length() ≻ 0 {
-        const string ∪ none first ← args.get(0)
+        let string ∪ none first ← args.get(0)
         if first not is none {
             return first ↦ string
         }
@@ -25,33 +25,33 @@ fn origin() → string {
 }
 
 main {
-    const string base ← origin()
-    const client.Url parsed ← client.split(base + "/get")
+    let string base ← origin()
+    let client.Url parsed ← client.split(base + "/get")
     if not client.is_absolute(parsed) {
         panic "client-io: fixture origin is not an absolute URL"
     }
 
-    const response.Response got ← client.get(base + "/get")
+    let response.Response got ← client.get(base + "/get")
     print "get-status"
     print got.status
     print "get-body"
     print got.body
 
-    const response.Response posted ← client.post(base + "/post", "hello")
+    let response.Response posted ← client.post(base + "/post", "hello")
     print "post-status"
     print posted.status
     print "post-body"
     print posted.body
 
-    var headers.Headers marked ← headers.empty()
+    mut headers.Headers marked ← headers.empty()
     if marked.append("x-test", "yes") {
     }
-    const response.Response patched ← client.patch_with(base + "/patch", marked, "delta")
+    let response.Response patched ← client.patch_with(base + "/patch", marked, "delta")
     print "patch-status"
     print patched.status
     print "patch-body"
     print patched.body
-    const string ∪ none echo ← patched.header("x-echo-test")
+    let string ∪ none echo ← patched.header("x-echo-test")
     if echo is none {
         print "patch-echo-missing"
     }
@@ -60,21 +60,21 @@ main {
         print echo ↦ string
     }
 
-    const client.Client pooled ← client.session()
-    const response.Response first ← client.get_on(pooled, base + "/one")
-    const response.Response second ← client.get_on(pooled, base + "/two")
+    let client.Client pooled ← client.session()
+    let response.Response first ← client.get_on(pooled, base + "/one")
+    let response.Response second ← client.get_on(pooled, base + "/two")
     print "agent-status"
     print first.status
     print second.status
 
-    const client.Receive stream ← client.open("GET", base + "/sse", headers.empty(), "")
+    let client.Receive stream ← client.open("GET", base + "/sse", headers.empty(), "")
     print "open-status"
     print stream.status
-    var string acc ← ""
-    var int pulls ← 0
-    var bool finished ← false
+    mut string acc ← ""
+    mut int pulls ← 0
+    mut bool finished ← false
     while pulls ≺ 16 and not finished {
-        const client.Chunk chunk ← client.receive_n(stream, 16)
+        let client.Chunk chunk ← client.receive_n(stream, 16)
         acc ← acc + chunk.text
         finished ← chunk.done
         pulls ← pulls + 1

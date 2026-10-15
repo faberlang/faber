@@ -60,6 +60,7 @@ pub fn target_compiled_in(target: Target) -> bool {
         | Target::MirMetal
         | Target::MirWgsl
         | Target::MirSexp
+        | Target::MirClif
         | Target::MirBasic => target.required_feature().is_some_and(feature_compiled),
     }
 }
@@ -80,6 +81,7 @@ fn feature_compiled(feature: &str) -> bool {
         "hir-c" => cfg!(feature = "hir-c"),
         "hir-fhir" => cfg!(feature = "hir-fhir"),
         "mir-sexp" => cfg!(feature = "mir-sexp"),
+        "mir-clif" => cfg!(feature = "mir-clif"),
         "mir-basic" => cfg!(feature = "mir-basic"),
         "mir-metal" => cfg!(feature = "mir-metal"),
         "mir-wgsl" => cfg!(feature = "mir-wgsl"),

@@ -33,6 +33,6 @@ locale = "en"
 # the target-typed fallback value.
 
 main {
-    const int n ← call 'runtime:echo' ("non-numeric") ↦ int ⊥ 0
+    let int n ← call 'runtime:echo' ("non-numeric") ↦ int ⊥ 0
     assert n ≡ 0
 }

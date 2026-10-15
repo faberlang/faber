@@ -196,6 +196,138 @@ fn scalar_mut_param_propagates_through_runner_frames() {
 }
 
 #[test]
+fn scalar_mut_param_field_projection_writes_back_through_runner_frames() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirLocal, MirParam, MirParamMode, MirStatement, MirStatementKind, MirTerminator,
+        MirTerminatorKind, MirValue, MirValueKind,
+    };
+    use radix_types::{Primitive, TypeTable};
+    use rustc_hash::FxHashMap;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let vacuum = types.primitive(Primitive::Vacuum);
+    let scalar = MirType::semantic(numerus);
+    let span = Span::default();
+    let mut interner = Interner::new();
+    let mut program = MirProgram::new();
+    let count = interner.intern("count");
+    let label = interner.intern("label");
+    program.functions.push(MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: scalar,
+            mutable: true,
+            span,
+        }],
+        temps: vec![],
+        blocks: vec![],
+        return_ty: MirType::semantic(vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    });
+    program.functions.push(MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(1),
+            name: None,
+            ty: scalar,
+            mode: MirParamMode::MutRef,
+            span,
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(1),
+            name: None,
+            ty: scalar,
+            mutable: true,
+            span,
+        }],
+        temps: vec![],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Assign {
+                    place: MirPlace::local(MirLocalId(1)),
+                    value: MirValue {
+                        id: MirValueId(0),
+                        kind: MirValueKind::Operand(MirOperand::Constant(MirConstant::Int(7))),
+                        ty: scalar,
+                        span,
+                    },
+                },
+                span,
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            span,
+        }],
+        return_ty: MirType::semantic(vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    });
+
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    let fields = FxHashMap::from_iter([
+        (count, Value::Int(3)),
+        (label, Value::Str("kept".to_owned())),
+    ]);
+    runner.frames.last_mut().expect("caller frame").seed_local(
+        MirLocalId(0),
+        Value::Record(Rc::new(RefCell::new(fields)), Rc::from([count, label])),
+    );
+
+    // Before the write-back ruling this call copied the record field into
+    // the callee cell and left the caller's `count` at 3.
+    let outcome = runner
+        .invoke_call(
+            &MirCallee::Function(MirFunctionId(1)),
+            &[MirOperand::Place(MirPlace {
+                base: MirPlaceBase::Local(MirLocalId(0)),
+                projections: vec![MirProjection::Field(count)],
+            })],
+            span,
+        )
+        .expect("mut call through a projected place should execute");
+    assert!(matches!(outcome, CallOutcome::Ok(Value::Unit)));
+
+    // Surgical write-back: only `count` moves, the record itself survives.
+    let Value::Record(fields, order) = runner
+        .read_local(MirLocalId(0), span)
+        .expect("caller value")
+    else {
+        panic!("caller local must still hold the record");
+    };
+    assert_eq!(fields.borrow().get(&count), Some(&Value::Int(7)));
+    assert_eq!(
+        fields.borrow().get(&label),
+        Some(&Value::Str("kept".to_owned()))
+    );
+    assert_eq!(order.as_ref(), &[count, label]);
+}
+
+#[test]
 fn vide_writes_stderr_and_nota_writes_stdout() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
@@ -3179,6 +3311,71 @@ fn sum_numeric_width_boundary_succeeds() {
     );
 }
 
+/// The flat sum hands the exact total to the store: a partial sum that exceeds
+/// `i64` mid-fold but fits at the end returns the exact `Int`, and a total that
+/// exceeds `i64` only at the end returns the exact `UInt` an `inf` destination
+/// converts (d11-6 ruling 17 residual: only a total beyond `u64::MAX` traps).
+#[test]
+fn sum_numeric_i64_exact_total_flows_to_the_store() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext, MirValueId,
+    };
+    use radix_types::{NumericWidth, Primitive, TypeTable};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let mut type_table = TypeTable::new();
+    let i64_ty = type_table.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    // Exceeds i64 mid-fold, fits at the end: MAX + MAX - MAX = MAX.
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        crate::Value::Array(Rc::new(RefCell::new(vec![
+            crate::Value::Int(i64::MAX),
+            crate::Value::Int(i64::MAX),
+            crate::Value::Int(-i64::MAX),
+        ]))),
+    );
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::Sum),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(i64_ty),
+    };
+    let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+    assert_eq!(
+        result.expect("a total that fits i64 at the end must succeed"),
+        crate::Value::Int(i64::MAX)
+    );
+
+    // Exceeds i64 at the end: MAX + MAX = 2^64 - 2, still inside the exact
+    // carrier and exactly what an `inf` store converts.
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        crate::Value::Array(Rc::new(RefCell::new(vec![
+            crate::Value::Int(i64::MAX),
+            crate::Value::Int(i64::MAX),
+        ]))),
+    );
+    let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+    assert_eq!(
+        result.expect("a total past i64 but inside u64 must stay exact, not trap"),
+        crate::Value::UInt(18_446_744_073_709_551_614)
+    );
+}
+
 /// `check_int_width` must not wrap `numerus<u64>` results above `i64::MAX` into
 /// a negative i64 — the i64 carrier cannot encode them, so the add fails
 /// closed exactly like every other out-of-width result.
@@ -5601,6 +5798,13 @@ fn i8_element() -> radix_types::Type {
     )
 }
 
+fn i64_element() -> radix_types::Type {
+    radix_types::Type::SizedNumeric(
+        radix_types::Primitive::Numerus,
+        radix_types::NumericWidth::I64,
+    )
+}
+
 fn binary_operands() -> Vec<MirOperand> {
     vec![
         MirOperand::Value(MirValueId(0)),
@@ -5701,6 +5905,82 @@ fn tensor_sum_axis_partials_are_exact_and_the_result_is_stored() {
     assert_eq!(err.issue, crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP);
     assert_eq!(err.arg("value"), Some("200"));
     assert_eq!(err.arg("type"), Some("i8"));
+}
+
+#[test]
+fn tensor_sum_axis_i64_partials_exact_in_ether() {
+    // Ruling 17: the sum is exact in the single 64-bit ether
+    // [i64::MIN, u64::MAX]; the element width applies only at the store.
+    let operands = || {
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Constant(radix_mir::MirConstant::Int(0)),
+        ]
+    };
+    // (a) A partial at 2^63 sits inside the ether; the finished cell is 1.
+    // Rank 1 sums to a scalar.
+    let items = tensor_value(
+        vec![Value::Int(i64::MAX), Value::Int(1), Value::Int(-i64::MAX)],
+        vec![3],
+    );
+    let out = eval_tensor_op_typed(
+        MirCollectionOp::TensorSumAxis,
+        i64_element(),
+        operands(),
+        vec![(MirValueId(0), items)],
+    )
+    .expect("partial 2^63 is inside the ether and the cell 1 fits i64");
+    assert_eq!(out, Value::Int(1));
+    // (b) A partial at 2^64 - 2 is still inside the ether. Rank 1 sums to a
+    // scalar.
+    let items = tensor_value(
+        vec![
+            Value::Int(i64::MAX),
+            Value::Int(i64::MAX),
+            Value::Int(-i64::MAX),
+        ],
+        vec![3],
+    );
+    let out = eval_tensor_op_typed(
+        MirCollectionOp::TensorSumAxis,
+        i64_element(),
+        operands(),
+        vec![(MirValueId(0), items)],
+    )
+    .expect("partial 2^64 - 2 is inside the ether");
+    assert_eq!(out, Value::Int(i64::MAX));
+    // (c) A finished cell that leaves i64 traps at the store, not mid-fold.
+    let items = tensor_value(vec![Value::Int(i64::MAX), Value::Int(i64::MAX)], vec![2]);
+    let err = eval_tensor_op_typed(
+        MirCollectionOp::TensorSumAxis,
+        i64_element(),
+        operands(),
+        vec![(MirValueId(0), items)],
+    )
+    .expect_err("2^64 - 2 leaves i64 at the store");
+    assert_eq!(err.issue, crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP);
+    assert_eq!(err.arg("value"), Some("18446744073709551614"));
+    // (d) A partial that leaves the single 64-bit ether is a representation
+    // limit and still traps.
+    let items = tensor_value(
+        vec![
+            Value::Int(i64::MAX),
+            Value::Int(i64::MAX),
+            Value::Int(i64::MAX),
+        ],
+        vec![3],
+    );
+    let err = eval_tensor_op_typed(
+        MirCollectionOp::TensorSumAxis,
+        i64_element(),
+        operands(),
+        vec![(MirValueId(0), items)],
+    )
+    .expect_err("3 * (2^63 - 1) leaves the ether");
+    assert!(
+        err.issue.contains("numerus_overflow"),
+        "expected a numerus overflow issue, got {err:?}"
+    );
 }
 
 #[test]

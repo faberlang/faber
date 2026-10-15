@@ -34,6 +34,6 @@ locale = "en"
 # `↦ textus` materializes it. The exemplar asserts equality.
 
 main {
-    const string t ← call 'runtime:echo' ("salve, munde") ↦ string
+    let string t ← call 'runtime:echo' ("salve, munde") ↦ string
     assert t ≡ "salve, munde"
 }

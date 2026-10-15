@@ -61,7 +61,7 @@ fn apply((string, int) → tensor<f32, [1]> ⇥ LookupError lookup, string name,
 
 main {
     do {
-        const tensor<f32, [1]> t ← apply(lookup_throw, "missing", 0)
+        let tensor<f32, [1]> t ← apply(lookup_throw, "missing", 0)
     }
     catch err {
         warn "threw"

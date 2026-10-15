@@ -36,23 +36,23 @@ locale = "en"
 # See docs/factory/conversio-collection-coverage/.
 
 main {
-    const list<int> xs ← [1, 2, 2, 3]
-    const set<int> unique ← xs ↦ set<int>
+    let list<int> xs ← [1, 2, 2, 3]
+    let set<int> unique ← xs ↦ set<int>
     print unique.length()
-    const list<int> roundtrip ← unique ↦ list<int>
+    let list<int> roundtrip ← unique ↦ list<int>
     print roundtrip.length()
-    const list<int> tensorSource ← [4, 5, 6]
-    const tensor<int, [3]> grid ← tensorSource ↦ tensor<int, [3]>
-    const list<int> flat ← grid ↦ list<int>
+    let list<int> tensorSource ← [4, 5, 6]
+    let tensor<int, [3]> grid ← tensorSource ↦ tensor<int, [3]>
+    let list<int> flat ← grid ↦ list<int>
     print flat.length()
-    const map<string, int> scores ← { "alpha": 10, "beta": 20 }
-    const list<string> keys ← scores ↦ list<string>
+    let map<string, int> scores ← { "alpha": 10, "beta": 20 }
+    let list<string> keys ← scores ↦ list<string>
     print keys.length()
-    const map<string, int> moreScores ← { "gamma": 30, "delta": 40 }
-    const list<int> values ← moreScores ↦ list<int>
+    let map<string, int> moreScores ← { "gamma": 30, "delta": 40 }
+    let list<int> values ← moreScores ↦ list<int>
     print values.length()
-    const list<int> cursorSource ← [7, 8, 9]
-    const iterator<int> stream ← cursorSource ↦ iterator<int>
-    const list<int> materialized ← stream ↦ list<int>
+    let list<int> cursorSource ← [7, 8, 9]
+    let iterator<int> stream ← cursorSource ↦ iterator<int>
+    let list<int> materialized ← stream ↦ list<int>
     print materialized.length()
 }
