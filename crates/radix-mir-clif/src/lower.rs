@@ -22,6 +22,7 @@ use rustc_hash::FxHashMap;
 use crate::abi::{self, AbiTy, RuntimeSymbol};
 
 mod convert;
+mod lift;
 pub(crate) use convert::{member_tests, numeric_conversion, sequence_conversion};
 
 /// A named refusal discovered during lowering.
@@ -1059,7 +1060,9 @@ impl FunctionLower<'_, '_> {
         } else if want == Rep::Opt && have != Rep::Unit {
             self.wrap_some(value, have)
         } else {
-            Err(Decline::new("representation mismatch"))
+            Err(Decline::new(format!(
+                "representation mismatch {have:?} to {want:?}"
+            )))
         }
     }
 
@@ -1646,6 +1649,9 @@ impl FunctionLower<'_, '_> {
         let Some(receiver) = args.first() else {
             return Err(Decline::new("collection arity"));
         };
+        if let Some(lift) = lift::list_lift(op) {
+            return self.list_lift(destination, lift, args);
+        }
         let (handle, rep) = self.scalar(receiver)?;
         let result = match (op, rep) {
             (MirCollectionOp::Length, Rep::Text) => {
@@ -1786,14 +1792,26 @@ impl FunctionLower<'_, '_> {
                 let [_, item] = args else {
                     return Err(Decline::new("append arity"));
                 };
-                if matches!(
-                    resolve(
-                        self.state.input.types,
-                        self.operand_type(receiver)?.semantic_id()
-                    ),
-                    Type::BoundedArray { .. }
+                if let Type::BoundedArray { capacity, .. } = resolve(
+                    self.state.input.types,
+                    self.operand_type(receiver)?.semantic_id(),
                 ) {
-                    return Err(Decline::new("append to a bounded list"));
+                    let radix_types::IndexExpr::Literal(bound) =
+                        self.state.input.types.get_index(*capacity)
+                    else {
+                        return Err(Decline::new("append to a list of computed capacity"));
+                    };
+                    let bound =
+                        i64::try_from(*bound).map_err(|_| Decline::new("bounded list capacity"))?;
+                    let live = self
+                        .call_runtime(&abi::LIST_LEN, &[handle])?
+                        .ok_or_else(|| Decline::new("length result"))?;
+                    let limit = self.builder.ins().iconst(types::I64, bound);
+                    let full =
+                        self.builder
+                            .ins()
+                            .icmp(IntCC::SignedGreaterThanOrEqual, live, limit);
+                    self.trap_if(full, "bounded collection push at capacity")?;
                 }
                 let element = self.element_type(self.operand_type(receiver)?)?;
                 let (value, item_rep) = self.element_operand(item, element)?;
@@ -3496,13 +3514,19 @@ impl FunctionLower<'_, '_> {
             let one = self.builder.ins().iconst(types::I8, 1);
             return Ok((self.builder.ins().bxor(same, one), Rep::Bool));
         }
-        if a_rep == Rep::Record
-            && b_rep == Rep::Record
-            && matches!(op, MirBinOp::Eq | MirBinOp::NotEq)
+        if matches!(
+            (a_rep, b_rep),
+            (Rep::Record, Rep::Record) | (Rep::List, Rep::List) | (Rep::Tuple, Rep::Tuple)
+        ) && matches!(op, MirBinOp::Eq | MirBinOp::NotEq)
         {
+            let symbol = if a_rep == Rep::Record {
+                &abi::RECORD_EQ
+            } else {
+                &abi::LIST_EQ
+            };
             let same = self
-                .call_runtime(&abi::RECORD_EQ, &[a, b])?
-                .ok_or_else(|| Decline::new("record equality result"))?;
+                .call_runtime(symbol, &[a, b])?
+                .ok_or_else(|| Decline::new("structural equality result"))?;
             if op == MirBinOp::Eq {
                 return Ok((same, Rep::Bool));
             }
@@ -3534,7 +3558,9 @@ impl FunctionLower<'_, '_> {
             | Rep::Set
             | Rep::Func
             | Rep::Tuple
-            | Rep::Unit => Err(Decline::new("unit operands")),
+            | Rep::Unit => Err(Decline::new(format!(
+                "operands of {a_rep:?} representation"
+            ))),
         }
     }
 

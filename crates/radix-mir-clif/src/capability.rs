@@ -643,6 +643,22 @@ impl MirVisitor for ClifCapability<'_> {
                             | MirCollectionOp::SymmetricDifference
                             | MirCollectionOp::IsSubset
                             | MirCollectionOp::IsSuperset
+                            | MirCollectionOp::ArrayAdd
+                            | MirCollectionOp::ArraySub
+                            | MirCollectionOp::ArrayMul
+                            | MirCollectionOp::ArrayDiv
+                            | MirCollectionOp::ArrayMod
+                            | MirCollectionOp::ArrayTrueDiv
+                            | MirCollectionOp::ArrayNeg
+                            | MirCollectionOp::ArrayAnd
+                            | MirCollectionOp::ArrayOr
+                            | MirCollectionOp::ArrayNot
+                            | MirCollectionOp::ArrayLt
+                            | MirCollectionOp::ArrayGt
+                            | MirCollectionOp::ArrayLtEq
+                            | MirCollectionOp::ArrayGtEq
+                            | MirCollectionOp::ArrayValueEq
+                            | MirCollectionOp::ArrayValueNotEq
                     )
             )
         {

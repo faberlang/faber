@@ -283,6 +283,12 @@ pub const RECORD_EQ: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, Ptr],
     ret: Some(I8),
 };
+/// Structural equality of two lists or tuples.
+pub const LIST_EQ: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_eq",
+    params: &[Ptr, Ptr],
+    ret: Some(I8),
+};
 /// Set field `index`: (record, index, field-name text handle, tag, bits).
 pub const RECORD_SET: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_record_set",
@@ -516,6 +522,12 @@ pub const MATH_F64: RuntimeSymbol = RuntimeSymbol {
     params: &[I32, F64],
     ret: Some(F64),
 };
+/// Float remainder with the sign of the dividend (`fmod`).
+pub const FLOAT_REM: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_float_rem",
+    params: &[F64, F64],
+    ret: Some(F64),
+};
 /// Index of the largest (flag 1) or smallest (flag 0) element, as an optional.
 pub const LIST_ARG_EXTREMUM: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_list_arg_extremum",
@@ -630,6 +642,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     DUPLICATE,
     RECORD_NEW,
     RECORD_EQ,
+    LIST_EQ,
     RECORD_SET,
     RECORD_GET,
     PRINT_RECORD,
@@ -656,6 +669,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     SET_ALGEBRA,
     SET_SUBSET,
     MATH_F64,
+    FLOAT_REM,
     LIST_ARG_EXTREMUM,
     APPROX_INT,
     LIST_TO_SET,

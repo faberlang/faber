@@ -818,8 +818,28 @@ fn element_equal(tag: i32, left: i64, right: i64) -> bool {
                     .zip(&right.items)
                     .all(|(a, b)| a.0 == b.0 && element_equal(a.0, a.1, b.1))
         },
+        TAG_OPT => unsafe {
+            match (
+                (left as *const Present).as_ref(),
+                (right as *const Present).as_ref(),
+            ) {
+                (None, None) => true,
+                (Some(a), Some(b)) => a.tag == b.tag && element_equal(a.tag, a.bits, b.bits),
+                _ => false,
+            }
+        },
         _ => left == right,
     }
+}
+
+/// Structural equality of two lists or tuples.
+///
+/// # Safety
+///
+/// Both are live runtime lists.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_eq(left: *const List, right: *const List) -> i8 {
+    i8::from(element_equal(TAG_LIST, left as i64, right as i64))
 }
 
 /// Membership test.
@@ -1521,6 +1541,12 @@ pub extern "C" fn __faber_clif_v1_math_f64(op: i32, value: f64) -> f64 {
         4 => value.cos(),
         _ => value.tan(),
     }
+}
+
+/// `a % b` on floats: `fmod`, the sign of the dividend.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_float_rem(a: f64, b: f64) -> f64 {
+    a % b
 }
 
 /// Index of the largest (flag 1) or smallest (flag 0) element as an
