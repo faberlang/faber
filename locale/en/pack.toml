@@ -557,6 +557,14 @@ help = "check numeric separators and base prefixes"
 message = "invalid integer"
 help = "check numeric separators and base prefixes"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "float literal is too large; it overflows to infinity"
+help = "write a smaller magnitude, or scale the unit"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "float literal is too small; it underflows to zero"
+help = "write a larger magnitude, or scale the unit"
+
 [diagnostics.LEX003]
 message = "invalid escape sequence"
 help = "use a supported escape sequence or escape the backslash"
@@ -1641,6 +1649,10 @@ help = "fix the AST construct for lowering"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "comment has no lowered statement or item to attach to"
 help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "a `@ conversion` function must take exactly one parameter and declare exactly one return type"
+help = "write `functio name(Source) → Destination` for the conversion pair"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "set requires one type parameter"

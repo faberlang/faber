@@ -296,6 +296,14 @@ help = "检查 numeric separators 和 base prefixes"
 message = "无效整数"
 help = "检查 numeric separators 和 base prefixes"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "浮点字面量过大；会溢出为无穷大"
+help = "写一个更小的数量级，或缩放单位"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "浮点字面量过小；会下溢为零"
+help = "写一个更大的数量级，或缩放单位"
+
 [diagnostics.LEX003]
 message = "无效转义序列"
 help = "使用受支持的转义序列，或转义反斜杠"
@@ -1083,6 +1091,10 @@ help = "修正用于 lowering 的 AST construct"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "此注释没有可附加的已降低语句或条目"
 help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "`@ conversion` 函数必须恰好接受一个参数，并恰好声明一个返回类型"
+help = "为转换对写 `functio name(Source) → Destination`"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia 需要一个 type parameter"

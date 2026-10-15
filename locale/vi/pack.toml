@@ -296,6 +296,14 @@ help = "kiểm tra dấu phân cách số và tiền tố cơ số"
 message = "số nguyên không hợp lệ"
 help = "kiểm tra dấu phân cách số và tiền tố cơ số"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "literal số thực quá lớn; nó tràn thành vô cực"
+help = "viết độ lớn nhỏ hơn, hoặc chia tỉ lệ đơn vị"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "literal số thực quá nhỏ; nó tràn xuống thành không"
+help = "viết độ lớn lớn hơn, hoặc chia tỉ lệ đơn vị"
+
 [diagnostics.LEX003]
 message = "chuỗi escape không hợp lệ"
 help = "dùng chuỗi escape được hỗ trợ hoặc escape dấu gạch chéo ngược"
@@ -1039,6 +1047,10 @@ help = "sửa cấu trúc AST để hạ mức"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "chú thích không có câu lệnh hoặc mục đã hạ mức để gắn vào"
 help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "hàm `@ conversion` phải nhận đúng một tham số và khai báo đúng một kiểu trả về"
+help = "viết `functio name(Source) → Destination` cho cặp chuyển đổi"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia yêu cầu một tham số kiểu"

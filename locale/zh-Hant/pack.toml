@@ -296,6 +296,14 @@ help = "檢查數字分隔符和進位前綴"
 message = "無效整數"
 help = "檢查數字分隔符和進位前綴"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "浮點字面量過大；會溢位為無限大"
+help = "寫一個更小的數量級，或縮放單位"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "浮點字面量過小；會下溢為零"
+help = "寫一個更大的數量級，或縮放單位"
+
 [diagnostics.LEX003]
 message = "無效跳脫序列"
 help = "使用受支援的跳脫序列，或跳脫反斜線"
@@ -1083,6 +1091,10 @@ help = "修正用於降階的 AST 結構"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "此註解沒有可附加的已降階敘述或項目"
 help = "修正用於降階的 AST 結構"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "`@ conversion` 函式必須恰好接受一個參數，並恰好宣告一個傳回型別"
+help = "為轉換對寫 `functio name(Source) → Destination`"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia 需要一個型別參數"
