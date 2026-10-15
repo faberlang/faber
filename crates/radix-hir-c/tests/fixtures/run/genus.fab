@@ -1,0 +1,36 @@
++++
+locale = "en"
++++
+# A genus: defaults, construction, methods through self, aliasing through a
+# second binding and through a method, a function returning a genus, and
+# display.
+class Point {
+    var int x = 0
+    var int y = 0
+    var string tag = "p"
+
+    fn sum() → int {
+        return self.x + self.y
+    }
+
+    fn shift(int dx) {
+        self.x ← self.x + dx
+    }
+}
+
+fn make(int x) → Point {
+    return { x = x, y = x * 2 }
+}
+
+main {
+    var Point p ← { x = 1, y = 2 }
+    print p.x, p.y, p.tag, p.sum()
+    var Point q ← p
+    q.shift(10)
+    print p.x, q.x
+    p.y ← 5
+    print q.y, q.sum()
+    const Point m ← make(4)
+    print m.x, m.y, m.tag
+    print p
+}

@@ -29,6 +29,7 @@ pub(crate) enum Helper {
     Join,
     ListIndex,
     Quote,
+    Quoted,
     List(Elem, ListOp),
     Cap,
     Add,
@@ -65,6 +66,7 @@ impl Helper {
             Helper::Arena => &[Helper::Trap],
             Helper::Concat | Helper::IntText | Helper::Join => &[Helper::Arena],
             Helper::ExactText => &[Helper::Arena, Helper::Text],
+            Helper::Quoted => &[Helper::Arena, Helper::Quote],
             Helper::Cap | Helper::Div | Helper::FitI64 | Helper::ListIndex => {
                 &[Helper::Types, Helper::Trap]
             }
@@ -89,6 +91,7 @@ impl Helper {
             Helper::Join => JOIN,
             Helper::ListIndex => LIST_INDEX,
             Helper::Quote => QUOTE,
+            Helper::Quoted => QUOTED,
             Helper::List(_, _) => "",
             Helper::Cap => CAP,
             Helper::Add => ADD,
@@ -296,6 +299,19 @@ static size_t faber_quote(char *out, const char *text) {
         at += length;
     }
     return at;
+}
+";
+
+/// A text value as a genus field shows it: quoted with the runner's escapes.
+const QUOTED: &str = "\
+static const char *faber_quoted(faber_arena *arena, const char *text) {
+    size_t length = faber_quote(NULL, text);
+    char *out = faber_alloc(arena, length + 3);
+    out[0] = '\"';
+    faber_quote(out + 1, text);
+    out[length + 1] = '\"';
+    out[length + 2] = '\\0';
+    return out;
 }
 ";
 

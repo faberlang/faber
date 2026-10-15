@@ -123,3 +123,23 @@ fn access_marker_on_a_scalar_parameter() {
         "ref or mut access to a scalar"
     );
 }
+
+#[test]
+fn list_of_genus() {
+    assert_eq!(
+        rejected(
+            "class P {\n    var int x = 0\n}\nmain {\n    const list<P> ps ← [{ x = 1 }]\n    print ps.length()\n}"
+        ),
+        "list of genus"
+    );
+}
+
+#[test]
+fn static_field() {
+    assert_eq!(
+        rejected(
+            "class P {\n    static int count = 0\n    var int x = 0\n}\nmain {\n    const P p ← { x = 1 }\n    print p.x\n}"
+        ),
+        "static (generis) field"
+    );
+}

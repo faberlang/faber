@@ -10,6 +10,8 @@ const NARROWING: &str = include_str!("../tests/fixtures/run/narrowing.c");
 const TEXT: &str = include_str!("../tests/fixtures/run/text.c");
 const LISTS: &str = include_str!("../tests/fixtures/run/lists.c");
 const LIST_FUNCTIONS: &str = include_str!("../tests/fixtures/run/list_functions.c");
+const GENUS: &str = include_str!("../tests/fixtures/run/genus.c");
+const GENUS_NESTED: &str = include_str!("../tests/fixtures/run/genus_nested.c");
 
 #[test]
 fn scalars_program_is_pinned() {
@@ -548,4 +550,67 @@ fn a_mut_list_parameter_passes_the_callers_list() {
         "{code}"
     );
     assert!(code.contains("    f_add(faber_a, l_ys);\n"), "{code}");
+}
+
+#[test]
+fn genus_program_is_pinned() {
+    let source = include_str!("../tests/fixtures/run/genus.fab");
+    let source = crate::test_support::program("genus.fab", source);
+    assert_eq!(source, GENUS);
+}
+
+#[test]
+fn genus_nested_program_is_pinned() {
+    let source = include_str!("../tests/fixtures/run/genus_nested.fab");
+    let source = crate::test_support::program("genus_nested.fab", source);
+    assert_eq!(source, GENUS_NESTED);
+}
+
+/// A Faber field may be a C keyword, so members take `m_`; a genus is a
+/// forward-declared struct handled by pointer.
+#[test]
+fn genus_members_are_prefixed_and_forward_declared() {
+    let code = emitted(
+        "class Pouch {\n    var int default = 1\n    var int static = 2\n}\nmain {\n    const Pouch p ← { default = 5 }\n    print p.default, p.static\n}",
+    );
+    for line in [
+        "typedef struct g_Pouch g_Pouch;\n",
+        "    int64_t m_default;\n    int64_t m_static;\n",
+        "    g_Pouch *const l_p = (__extension__ ({ g_Pouch *faber_t0 = faber_alloc(faber_a, sizeof *faber_t0); faber_t0->m_default = INT64_C(5); faber_t0->m_static = INT64_C(2); faber_t0; }));\n",
+        "(l_p)->m_default, (l_p)->m_static",
+    ] {
+        assert!(code.contains(line), "{line:?} missing in {code}");
+    }
+}
+
+/// `self` lowers to a path to the genus; methods take it after the arena.
+#[test]
+fn methods_take_the_receiver_after_the_arena() {
+    let code = emitted(
+        "class C {\n    var int n = 0\n    fn bump(int by) {\n        self.n ← self.n + by\n    }\n}\nmain {\n    var C c ← { n = 1 }\n    c.bump(2)\n    print c.n\n}",
+    );
+    for line in [
+        "static void g_C_bump(faber_arena *, g_C *, int64_t);\n",
+        "static void g_C_bump(faber_arena *faber_a, g_C *faber_self, int64_t p_by) {\n",
+        "    g_C_bump(faber_a, l_c, INT64_C(2));\n",
+        "faber_add_o((faber_self)->m_n, p_by, &faber_o)",
+    ] {
+        assert!(code.contains(line), "{line:?} missing in {code}");
+    }
+}
+
+/// The show function exists only when a genus is printed or shown.
+#[test]
+fn genus_show_is_emitted_only_when_shown() {
+    let quiet = emitted(
+        "class P {\n    var int x = 0\n}\nmain {\n    const P p ← { x = 1 }\n    print p.x\n}",
+    );
+    assert!(!quiet.contains("g_P_show"), "{quiet}");
+    let shown = emitted(
+        "class P {\n    var int x = 0\n}\nmain {\n    const P p ← { x = 1 }\n    print p\n}",
+    );
+    assert!(
+        shown.contains("return faber_join(faber_a, 4, \"P { \", \"x = \", faber_int_text(faber_a, value->m_x), \" }\");"),
+        "{shown}"
+    );
 }

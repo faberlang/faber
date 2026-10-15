@@ -2,7 +2,7 @@
 
 use crate::error::unsupported;
 use radix_codegen_shared::CodegenError;
-use radix_types::{NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable};
+use radix_types::{DefId, NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable};
 
 /// The classes the subset can carry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,6 +17,9 @@ pub(crate) enum Ty {
     /// `list<int>`, `list<string>` or `list<bool>`: a pointer to an
     /// arena-allocated `faber_list_<elem>`, so every bind aliases (R1).
     List(Elem),
+    /// A genus (`class`): a pointer to an arena-allocated C struct, so every
+    /// bind aliases (R1).
+    Genus(DefId),
 }
 
 /// The element kinds a list carries in this subset.
@@ -57,31 +60,18 @@ impl Elem {
 }
 
 impl Ty {
-    /// The C declaration of `name` with this class. An immutable binding is
-    /// `const` all the way down: a text binding is a const pointer to const
-    /// chars.
-    pub(crate) fn declare(self, name: &str, mutable: bool) -> String {
-        match (self, mutable) {
-            (Ty::Int, false) => format!("const int64_t {name}"),
-            (Ty::Int, true) => format!("int64_t {name}"),
-            (Ty::Text, false) => format!("const char *const {name}"),
-            (Ty::Text, true) => format!("const char *{name}"),
-            (Ty::Bool, false) => format!("const bool {name}"),
-            (Ty::Bool, true) => format!("bool {name}"),
-            (Ty::List(elem), false) => format!("faber_list_{} *const {name}", elem.suffix()),
-            (Ty::List(elem), true) => format!("faber_list_{} *{name}", elem.suffix()),
-        }
-    }
-
-    /// The C type name of a parameter or return value.
-    pub(crate) fn c_type(self) -> &'static str {
+    /// The C type of a class whose spelling needs no declaration lookup;
+    /// `None` for a genus, which the emitter spells by name
+    /// ([`crate::Emitter::c_type`]).
+    pub(crate) fn builtin_c_type(self) -> Option<&'static str> {
         match self {
-            Ty::Int => "int64_t",
-            Ty::Text => "const char *",
-            Ty::Bool => "bool",
-            Ty::List(Elem::Int) => "faber_list_i64 *",
-            Ty::List(Elem::Text) => "faber_list_text *",
-            Ty::List(Elem::Bool) => "faber_list_bool *",
+            Ty::Int => Some("int64_t"),
+            Ty::Text => Some("const char *"),
+            Ty::Bool => Some("bool"),
+            Ty::List(Elem::Int) => Some("faber_list_i64 *"),
+            Ty::List(Elem::Text) => Some("faber_list_text *"),
+            Ty::List(Elem::Bool) => Some("faber_list_bool *"),
+            Ty::Genus(_) => None,
         }
     }
 }
@@ -91,11 +81,11 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
     match types.get(ty) {
         Type::Alias(_, inner) => classify(types, *inner),
         Type::Ref(SemanticMutability::Copy, _) => Err(unsupported("copy marker")),
-        // A `ref` or `mut` view of a list is the same list pointer: a list
-        // already aliases (R1). A view of a scalar would need a pointer to the
+        // A `ref` or `mut` view of a list or a genus is the same pointer: both
+        // already alias (R1). A view of a scalar would need a pointer to the
         // caller's cell, which this subset does not emit.
         Type::Ref(_, inner) => match classify(types, *inner)? {
-            list @ Ty::List(_) => Ok(list),
+            shared @ (Ty::List(_) | Ty::Genus(_)) => Ok(shared),
             _ => Err(unsupported("ref or mut access to a scalar")),
         },
         Type::Primitive(Primitive::Numerus)
@@ -107,7 +97,9 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             Ty::Text => Ok(Ty::List(Elem::Text)),
             Ty::Bool => Ok(Ty::List(Elem::Bool)),
             Ty::List(_) => Err(unsupported("nested list type")),
+            Ty::Genus(_) => Err(unsupported("list of genus")),
         },
+        Type::Struct(def_id) => Ok(Ty::Genus(*def_id)),
         other => Err(unsupported(describe(other))),
     }
 }
@@ -157,7 +149,6 @@ fn describe(ty: &Type) -> &'static str {
         Type::Queue(_) | Type::BoundedQueue { .. } | Type::Stack(_) | Type::BoundedStack { .. } => {
             "queue or stack type"
         }
-        Type::Struct(_) => "genus type",
         Type::Enum(_) => "enum type",
         Type::Interface(_) => "interface type",
         Type::Option(_) => "optional (nullable) type",

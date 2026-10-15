@@ -134,7 +134,11 @@ impl Emitter<'_> {
         };
         let raw = self.names.resolve_symbol(local.name);
         let name = self.scope.claim(&prefixed_binding_name(kind, raw));
-        let line = format!("{} = {};", class.declare(&name, local.mutable), value.text);
+        let line = format!(
+            "{} = {};",
+            self.declare(class, &name, local.mutable)?,
+            value.text
+        );
         self.line(out, &line);
         let constant = if local.mutable { None } else { value.constant };
         self.locals.insert(
@@ -245,7 +249,7 @@ impl Emitter<'_> {
             out,
             &format!(
                 "{} = {source}->items[{index}];",
-                class.declare(&name, mutable)
+                self.declare(class, &name, mutable)?
             ),
         );
         self.depth -= 1;
@@ -315,6 +319,11 @@ impl Emitter<'_> {
         place: &HirExpression,
         value: &HirExpression,
     ) -> Result<(), CodegenError> {
+        if let HirExpressionKind::Field(base, name) = &place.kind {
+            let line = self.field_write(base, *name, value)?;
+            self.line(out, &line);
+            return Ok(());
+        }
         if let HirExpressionKind::Index(base, index) = &place.kind {
             let line = self.list_write(base, index, value)?;
             self.line(out, &line);
@@ -389,6 +398,7 @@ impl Emitter<'_> {
                 // program, `verum` / `falsum` for a `la` one.
                 Value::Truth => ("%s", format!("({} ? {yes} : {no})", value.text)),
                 Value::List(elem) => ("%s", self.show_list(&value.text, elem)?),
+                Value::Genus(def_id) => ("%s", self.show_genus(&value.text, def_id)?),
                 Value::Void => return Err(unsupported("printing a call with no result")),
             };
             specs.push(spec);

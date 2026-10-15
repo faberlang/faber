@@ -21,6 +21,7 @@
 
 mod error;
 mod expr;
+mod genus;
 mod helpers;
 mod items;
 mod list;
@@ -120,6 +121,8 @@ impl CCodegen<'_> {
             returns: Returns::Main,
             temps: 0,
             arena,
+            genera: FxHashMap::default(),
+            shows: Vec::new(),
         }
         .program(hir)
     }
@@ -148,6 +151,10 @@ pub(crate) struct Emitter<'a> {
     /// Every function takes the arena as its hidden first parameter
     /// `faber_a`, and `main` owns the root arena.
     arena: bool,
+    /// The genera the program declares.
+    genera: FxHashMap<DefId, crate::genus::Genus>,
+    /// Genera whose show function the program asked for, in request order.
+    shows: Vec<DefId>,
 }
 
 /// One local, parameter or module constant, by its C identifier.
@@ -174,8 +181,23 @@ impl Emitter<'_> {
         if let Some(entry) = &hir.entry {
             self.block(&mut body, entry)?;
         }
+        // Show functions are asked for while bodies are written, so they are
+        // generated last; the support text follows them, since they need
+        // helpers too.
+        let (show_prototypes, show_definitions) = self.show_functions()?;
         let mut out = self.support.text();
-        out.push_str(&items);
+        out.push_str(&items.genera);
+        if !items.constants.is_empty() {
+            out.push_str(&items.constants);
+            out.push('\n');
+        }
+        let prototypes = format!("{}{show_prototypes}", items.prototypes);
+        if !prototypes.is_empty() {
+            out.push_str(&prototypes);
+            out.push('\n');
+        }
+        out.push_str(&items.definitions);
+        out.push_str(&show_definitions);
         out.push_str("int main(void) {\n");
         if self.arena {
             // The root arena: `main` owns it and every call chain starts here
@@ -196,7 +218,7 @@ impl Emitter<'_> {
         match class {
             Ty::Int => self.support.need_ints(),
             Ty::Bool => self.support.need_bool(),
-            Ty::Text => {}
+            Ty::Text | Ty::Genus(_) => {}
             Ty::List(elem) => {
                 self.support.need(crate::helpers::Helper::List(
                     elem,

@@ -14,8 +14,8 @@ use crate::helpers::Helper;
 use crate::ty::{Elem, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{
-    HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral, HirStoreKind,
-    HirStoreSite, HirUnOp,
+    DefId, HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral,
+    HirStoreKind, HirStoreSite, HirUnOp,
 };
 use std::fmt::Write as _;
 
@@ -44,6 +44,8 @@ pub(crate) enum Value {
     Void,
     /// A pointer to an arena-allocated list.
     List(Elem),
+    /// A pointer to an arena-allocated genus.
+    Genus(DefId),
 }
 
 impl From<Ty> for Value {
@@ -53,6 +55,7 @@ impl From<Ty> for Value {
             Ty::Text => Value::Text,
             Ty::Bool => Value::Truth,
             Ty::List(elem) => Value::List(elem),
+            Ty::Genus(def_id) => Value::Genus(def_id),
         }
     }
 }
@@ -81,7 +84,7 @@ pub(crate) struct Narrow {
 }
 
 impl Narrow {
-    fn leaf(text: &str) -> Self {
+    pub(crate) fn leaf(text: &str) -> Self {
         Self {
             text: text.to_owned(),
             helpers: Vec::new(),
@@ -166,8 +169,29 @@ impl Emitter<'_> {
                 if !type_args.is_empty() || arm.is_some() {
                     return Err(unsupported("generic or propagating method call"));
                 }
+                let class = receiver.ty.map(|ty| classify(self.types, ty)).transpose()?;
+                if let Some(Ty::Genus(_)) = class {
+                    let receiver = self.expr(receiver)?;
+                    return self.genus_method(receiver, *method, args);
+                }
                 self.list_method(receiver, *method, args)
             }
+            HirExpressionKind::Struct(def_id, fields) => {
+                let given = fields
+                    .iter()
+                    .map(|(symbol, value)| (*symbol, value))
+                    .collect::<Vec<_>>();
+                self.construct(*def_id, &given)
+            }
+            HirExpressionKind::Verte {
+                target,
+                entries: Some(entries),
+                ..
+            } => match classify(self.types, *target)? {
+                Ty::Genus(def_id) => self.construct_entries(def_id, entries),
+                _ => Err(unsupported("object literal that is not a genus")),
+            },
+            HirExpressionKind::Field(base, name) => self.field_read(base, *name),
             HirExpressionKind::Call(callee, type_args, args, arm) => {
                 if !type_args.is_empty() || arm.is_some() {
                     return Err(unsupported("generic or propagating call"));
@@ -188,14 +212,30 @@ impl Emitter<'_> {
         let HirExpressionKind::Path(def_id) = &callee.kind else {
             return Err(unsupported("call through a value"));
         };
-        let Some(function) = self.functions.get(def_id) else {
+        self.invoke(*def_id, None, args)
+    }
+
+    /// A call to a function or method the program defines. Arguments are
+    /// checked and narrowed to their parameters; the receiver, when there is
+    /// one, is evaluated first and passed after the arena.
+    pub(crate) fn invoke(
+        &mut self,
+        def_id: DefId,
+        receiver: Option<Operand>,
+        args: &[radix_hir::HirCallArg],
+    ) -> Result<Operand, CodegenError> {
+        let Some(function) = self.functions.get(&def_id) else {
             return Err(unsupported("call to a function outside the program"));
         };
         let (name, params, ret) = (function.name.clone(), function.params.clone(), function.ret);
+        if receiver.is_some() != function.receiver.is_some() {
+            return Err(unsupported("method called without a receiver"));
+        }
         if args.len() != params.len() {
             return Err(unsupported("call with omitted or extra arguments"));
         }
-        let mut operands = Vec::with_capacity(args.len());
+        let mut operands = Vec::with_capacity(args.len() + 1);
+        operands.extend(receiver);
         for (arg, param) in args.iter().zip(params) {
             if arg.name.is_some() || arg.spread {
                 return Err(unsupported("named or spread argument"));
@@ -203,10 +243,10 @@ impl Emitter<'_> {
             let list_view = matches!(
                 arg.marker,
                 Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
-            ) && matches!(param, Ty::List(_));
+            ) && matches!(param, Ty::List(_) | Ty::Genus(_));
             if arg.marker.is_some() && !list_view {
                 return Err(unsupported(
-                    "access marker on an argument that is not a list",
+                    "access marker on an argument that is not a list or genus",
                 ));
             }
             let mut operand = self.expr(&arg.expr)?;
@@ -267,16 +307,20 @@ impl Emitter<'_> {
     /// rewrites the operand to read the temporary.
     pub(crate) fn bind(&mut self, operand: &mut Operand) -> String {
         let c_type = match operand.value {
-            Value::Int => "int64_t ",
-            Value::Exact => "faber_i128 ",
-            Value::Text => "const char *",
+            Value::Int => "int64_t ".to_owned(),
+            Value::Exact => "faber_i128 ".to_owned(),
+            Value::Text => "const char *".to_owned(),
             Value::Truth => {
                 self.support.need_bool();
-                "bool "
+                "bool ".to_owned()
             }
-            Value::List(Elem::Int) => "faber_list_i64 *",
-            Value::List(Elem::Text) => "faber_list_text *",
-            Value::List(Elem::Bool) => "faber_list_bool *",
+            Value::List(Elem::Int) => "faber_list_i64 *".to_owned(),
+            Value::List(Elem::Text) => "faber_list_text *".to_owned(),
+            Value::List(Elem::Bool) => "faber_list_bool *".to_owned(),
+            Value::Genus(def_id) => match self.c_type(Ty::Genus(def_id)) {
+                Ok(c_type) => c_type,
+                Err(_) => return String::new(),
+            },
             Value::Void => return String::new(),
         };
         let name = format!("faber_t{}", self.temps);
@@ -617,6 +661,7 @@ impl Emitter<'_> {
         match (class, value.value) {
             (Ty::Int, Value::Int) | (Ty::Text, Value::Text) | (Ty::Bool, Value::Truth) => Ok(value),
             (Ty::List(slot), Value::List(elem)) if slot == elem => Ok(value),
+            (Ty::Genus(slot), Value::Genus(genus)) if slot == genus => Ok(value),
             (Ty::Int, Value::Exact) if value.constant.is_some() => {
                 Err(unsupported("integer constant beyond i64"))
             }

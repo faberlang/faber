@@ -1,0 +1,38 @@
++++
+locale = "en"
++++
+# Genera that hold a list, a boolean and another genus; display recurses,
+# a method builds text in the arena, and a genus passed to a function is the
+# caller's genus.
+class Tag {
+    var string label = "none"
+    var bool hot = false
+}
+
+class Item {
+    var int id = 0
+    var Tag tag = { label = "default" }
+    var list<int> counts = empty
+
+    fn describe() → string {
+        return "item §: §"(self.id, self.tag.label)
+    }
+}
+
+fn heat(mut Item item) {
+    item.tag.hot ← true
+    item.counts.append(item.id * 10)
+}
+
+main {
+    var Item a ← { id = 1, tag = { label = "x\ty", hot = false } }
+    var Item b ← { id = 2 }
+    heat(mut a)
+    heat(mut a)
+    print a
+    print b
+    print a.describe(), b.describe()
+    b.tag ← a.tag
+    b.tag.label ← "shared"
+    print a.tag.label, b.tag.hot
+}

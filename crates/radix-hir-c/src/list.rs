@@ -196,8 +196,12 @@ impl Emitter<'_> {
         }
         match entry.mir_kind {
             IntrinsicMirKind::Collection(MirCollectionOp::Length) => {
-                Ok(Operand::new(format!("({})->len", list.text), Value::Int)
-                    .with_effect(list.effect))
+                let text = format!("({})->len", list.text);
+                // A pure length read is a 64-bit fast-path leaf (C4).
+                let narrow = (!list.effect).then(|| crate::expr::Narrow::leaf(&text));
+                let mut operand = Operand::new(text, Value::Int).with_effect(list.effect);
+                operand.narrow = narrow;
+                Ok(operand)
             }
             IntrinsicMirKind::Collection(MirCollectionOp::IsEmpty) => Ok(Operand::new(
                 format!("(({})->len == 0)", list.text),

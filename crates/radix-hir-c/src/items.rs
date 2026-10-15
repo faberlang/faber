@@ -17,12 +17,14 @@ use radix_hir::{
     DefId, HirConst, HirFunction, HirItem, HirItemKind, HirModule, HirParamMode, HirStatementKind,
 };
 
-/// A function the program defines.
+/// A function the program defines; a genus method is one with a receiver.
 pub(crate) struct Function {
     pub(crate) name: String,
     pub(crate) params: Vec<Ty>,
     /// `None` for a function with no result (`void`).
     pub(crate) ret: Option<Ty>,
+    /// The genus a method belongs to; its receiver follows the arena.
+    pub(crate) receiver: Option<DefId>,
 }
 
 /// What a `return` in the body being written means.
@@ -34,36 +36,51 @@ pub(crate) enum Returns {
     Value(Ty),
 }
 
-/// The C declaration of one parameter or prototype slot.
-fn c_decl(ty: Ty, name: &str) -> String {
-    let c_type = ty.c_type();
-    if c_type.ends_with('*') {
-        format!("{c_type}{name}")
-    } else {
-        format!("{c_type} {name}")
-    }
+/// The file-scope text, in the order the translation unit needs it.
+#[derive(Default)]
+pub(crate) struct Items {
+    pub(crate) genera: String,
+    pub(crate) constants: String,
+    pub(crate) prototypes: String,
+    pub(crate) definitions: String,
 }
 
 impl Emitter<'_> {
-    /// Collect constants and function signatures, then write the file-scope
-    /// text: constants, prototypes, and function definitions.
-    pub(crate) fn items(&mut self, hir: &HirModule) -> Result<String, CodegenError> {
-        let mut constants = String::new();
-        let mut functions = Vec::new();
+    /// Collect genera first (so their types classify and spell everywhere),
+    /// then constants and every function and method signature, then write
+    /// the file-scope text.
+    pub(crate) fn items(&mut self, hir: &HirModule) -> Result<Items, CodegenError> {
+        let mut order = Vec::new();
+        for item in &hir.items {
+            if let HirItemKind::Struct(genus) = &item.kind {
+                if !item.annotations.is_empty() {
+                    return Err(unsupported("annotation"));
+                }
+                self.collect_genus(item.def_id, genus)?;
+                order.push(item.def_id);
+            }
+        }
+        let mut items = Items::default();
+        let mut functions: Vec<(DefId, &HirFunction)> = Vec::new();
         for item in &hir.items {
             if !item.annotations.is_empty() {
                 return Err(unsupported("annotation"));
             }
             match &item.kind {
                 HirItemKind::Function(function) => {
-                    self.signature(item.def_id, function)?;
-                    functions.push((item, function));
+                    self.signature(item.def_id, function, None)?;
+                    functions.push((item.def_id, &**function));
                 }
                 HirItemKind::Constant(constant) => {
                     let line = self.constant(item, constant)?;
-                    constants.push_str(&line);
+                    items.constants.push_str(&line);
                 }
-                HirItemKind::Struct(_) => return Err(unsupported("genus declaration")),
+                HirItemKind::Struct(genus) => {
+                    for method in &genus.methods {
+                        self.signature(method.def_id, &method.func, Some(item.def_id))?;
+                        functions.push((method.def_id, &method.func));
+                    }
+                }
                 HirItemKind::Enum(_) => return Err(unsupported("enum declaration")),
                 HirItemKind::Interface(_) => return Err(unsupported("interface declaration")),
                 HirItemKind::TypeAlias(_) => return Err(unsupported("type alias")),
@@ -71,25 +88,16 @@ impl Emitter<'_> {
                 HirItemKind::Import(_) => return Err(unsupported("import (library modules)")),
             }
         }
-        let mut out = String::new();
-        if !constants.is_empty() {
-            out.push_str(&constants);
-            out.push('\n');
+        items.genera = self.genus_declarations(&order)?;
+        for (def_id, function) in functions {
+            items.prototypes.push_str(&self.prototype(def_id)?);
+            items.prototypes.push_str(";\n");
+            items
+                .definitions
+                .push_str(&self.definition(def_id, function)?);
+            items.definitions.push('\n');
         }
-        let mut prototypes = String::new();
-        let mut definitions = String::new();
-        for (item, function) in functions {
-            prototypes.push_str(&self.prototype(item.def_id)?);
-            prototypes.push_str(";\n");
-            definitions.push_str(&self.definition(item.def_id, function)?);
-            definitions.push('\n');
-        }
-        if !prototypes.is_empty() {
-            out.push_str(&prototypes);
-            out.push('\n');
-            out.push_str(&definitions);
-        }
-        Ok(out)
+        Ok(items)
     }
 
     /// A module constant: `static const` with its folded value, registered so
@@ -109,7 +117,11 @@ impl Emitter<'_> {
         self.need_class(class);
         let raw = self.names.resolve_symbol(constant.name);
         let name = self.items_scope.claim(&format!("k_{raw}"));
-        let line = format!("static {} = {};\n", class.declare(&name, false), value.text);
+        let line = format!(
+            "static {} = {};\n",
+            self.declare(class, &name, false)?,
+            value.text
+        );
         self.locals.insert(
             item.def_id,
             Local {
@@ -122,7 +134,12 @@ impl Emitter<'_> {
     }
 
     /// Check a function against the subset and record its C signature.
-    fn signature(&mut self, def_id: DefId, function: &HirFunction) -> Result<(), CodegenError> {
+    fn signature(
+        &mut self,
+        def_id: DefId,
+        function: &HirFunction,
+        receiver: Option<DefId>,
+    ) -> Result<(), CodegenError> {
         if !function.type_params.is_empty() {
             return Err(unsupported("generic function"));
         }
@@ -151,12 +168,12 @@ impl Emitter<'_> {
                 return Err(unsupported("optional parameter"));
             }
             let class = classify(self.types, param.ty)?;
-            // `ref` / `mut` on a list passes the caller's list pointer, which
-            // is what an unmarked list parameter passes too.
-            let list = matches!(class, Ty::List(_));
+            // `ref` / `mut` on a list or genus passes the caller's pointer,
+            // which is what an unmarked one passes too.
+            let shared = matches!(class, Ty::List(_) | Ty::Genus(_));
             match param.mode {
                 HirParamMode::Owned => {}
-                HirParamMode::De | HirParamMode::In if list => {}
+                HirParamMode::De | HirParamMode::In if shared => {}
                 HirParamMode::De | HirParamMode::In | HirParamMode::Ex | HirParamMode::Axis => {
                     return Err(unsupported(
                         "parameter access marker on a scalar, own, or axis",
@@ -169,10 +186,24 @@ impl Emitter<'_> {
             return Err(unsupported("function without a resolved return type"));
         };
         let ret = returns(self.types, ret_ty)?;
-        let raw = self.names.resolve_symbol(function.name);
-        let name = self.items_scope.claim(&format!("f_{raw}"));
-        self.functions
-            .insert(def_id, Function { name, params, ret });
+        let raw = self.names.resolve_symbol(function.name).to_owned();
+        let prefix = match receiver {
+            Some(genus) => match self.genera.get(&genus) {
+                Some(genus) => genus.c_name.clone(),
+                None => return Err(unsupported("method of a genus outside the program")),
+            },
+            None => "f".to_owned(),
+        };
+        let name = self.items_scope.claim(&format!("{prefix}_{raw}"));
+        self.functions.insert(
+            def_id,
+            Function {
+                name,
+                params,
+                ret,
+                receiver,
+            },
+        );
         Ok(())
     }
 
@@ -182,12 +213,20 @@ impl Emitter<'_> {
         let Some(function) = self.functions.get(&def_id) else {
             return Err(unsupported("function without a recorded signature"));
         };
-        let ret = function.ret.map_or("void", Ty::c_type);
-        let mut slots = Vec::with_capacity(function.params.len() + 1);
+        let ret = match function.ret {
+            Some(ty) => self.c_type(ty)?,
+            None => "void".to_owned(),
+        };
+        let mut slots = Vec::with_capacity(function.params.len() + 2);
         if self.arena {
             slots.push("faber_arena *".to_owned());
         }
-        slots.extend(function.params.iter().map(|ty| ty.c_type().to_owned()));
+        if let Some(genus) = function.receiver {
+            slots.push(self.c_type(Ty::Genus(genus))?);
+        }
+        for ty in &function.params {
+            slots.push(self.c_type(*ty)?);
+        }
         let params = if slots.is_empty() {
             "void".to_owned()
         } else {
@@ -205,17 +244,30 @@ impl Emitter<'_> {
         let Some(signature) = self.functions.get(&def_id) else {
             return Err(unsupported("function without a recorded signature"));
         };
-        let (name, param_types, ret) = (
+        let (name, param_types, ret, receiver) = (
             signature.name.clone(),
             signature.params.clone(),
             signature.ret,
+            signature.receiver,
         );
         self.scope = Namer::program_scope();
         self.loops = 0;
         self.returns = ret.map_or(Returns::Void, Returns::Value);
-        let mut params = Vec::with_capacity(function.params.len() + 1);
+        let mut params = Vec::with_capacity(function.params.len() + 2);
         if self.arena {
             params.push("faber_arena *faber_a".to_owned());
+        }
+        // `self` lowers to a path to the genus's own definition.
+        if let Some(genus) = receiver {
+            params.push(self.declare(Ty::Genus(genus), "faber_self", true)?);
+            self.locals.insert(
+                genus,
+                Local {
+                    name: "faber_self".to_owned(),
+                    ty: Ty::Genus(genus),
+                    constant: None,
+                },
+            );
         }
         for (param, ty) in function.params.iter().zip(param_types) {
             let Some(kind) = self.names.binding_kind(param.def_id) else {
@@ -224,7 +276,7 @@ impl Emitter<'_> {
             let raw = self.names.resolve_symbol(param.name);
             let c_name = self.scope.claim(&prefixed_binding_name(kind, raw));
             self.need_class(ty);
-            params.push(c_decl(ty, &c_name));
+            params.push(self.declare(ty, &c_name, true)?);
             self.locals.insert(
                 param.def_id,
                 Local {
@@ -255,7 +307,10 @@ impl Emitter<'_> {
             self.support.need(crate::helpers::Helper::Trap);
             body.push_str("    faber_trap(\"function ended without a return\");\n");
         }
-        let ret_text = ret.map_or("void", Ty::c_type);
+        let ret_text = match ret {
+            Some(ty) => self.c_type(ty)?,
+            None => "void".to_owned(),
+        };
         let space = if ret_text.ends_with('*') { "" } else { " " };
         let params = if params.is_empty() {
             "void".to_owned()

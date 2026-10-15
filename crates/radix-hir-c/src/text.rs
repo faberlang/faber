@@ -131,7 +131,7 @@ impl Emitter<'_> {
     }
 
     /// The text a hole shows for one value, as `print` shows it.
-    fn show(&mut self, operand: &Operand) -> Result<String, CodegenError> {
+    pub(crate) fn show(&mut self, operand: &Operand) -> Result<String, CodegenError> {
         match operand.value {
             Value::Text => Ok(operand.text.clone()),
             Value::Int => {
@@ -148,6 +148,7 @@ impl Emitter<'_> {
                 Ok(format!("({} ? {yes} : {no})", operand.text))
             }
             Value::List(elem) => self.show_list(&operand.text, elem),
+            Value::Genus(def_id) => self.show_genus(&operand.text, def_id),
             Value::Void => Err(unsupported("showing a call with no result")),
         }
     }
