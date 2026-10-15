@@ -187,7 +187,7 @@ const KERNEL: &str = r"
 @ kernel
 @ public
 fn k(ti32[8] a, mut ti32[8] o) → void {
-    for from a at [i] thread lane const c {
+    for from a at [i] thread lane let c {
         if c ∈ 1‥3 {
             o[i] ← 1
         } else {

@@ -57,7 +57,7 @@ locale = "en"
 +++
 main {
     mut ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
-    for from x at [name] const count {
+    for from x at [name] let count {
         print name
     }
 }
@@ -77,7 +77,7 @@ locale = "en"
 main {
     mut ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
     x["a"] ← 10
-    for from x at [name] const count {
+    for from x at [name] let count {
         print "§=§"(name, count)
     }
 }
@@ -98,7 +98,7 @@ main {
     mut ledger<string, int> x ← { "b": 2, "a": 1, "c": 3 }
     x.delete("b")
     x.put("b", 7)
-    for from x at [name] const count {
+    for from x at [name] let count {
         print name
     }
 }
@@ -117,7 +117,7 @@ locale = "en"
 +++
 main {
     mut map<string, int> x ← { "b": 2, "a": 1, "c": 3 }
-    for from x at [name] const count {
+    for from x at [name] let count {
         print name
     }
 }

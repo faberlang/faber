@@ -1438,7 +1438,7 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::PositionalLaneParam => DiagnosticSpec {
             code: "WARN032",
             help: Some(
-                "bind the iteration coordinate with `apud` on a `filum` loop: `itera ex t apud [i, j] filum f fixum v`",
+                "bind the iteration coordinate with `apud` on a `filum` loop: `itera ex t apud [i, j] filum f sit v`",
             ),
         },
         WarningKind::UnprovenKernelIndex => DiagnosticSpec {

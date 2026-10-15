@@ -28,11 +28,11 @@ fn trapped_resolves_with_two_type_arguments() {
 #[test]
 fn trapped_match_is_coverage_checked() {
     assert_rejects_with_issue(
-        "functio f(trapped<numerus, textus> t) → numerus {\n    discerne t {\n        casu returned fixum value { redde 0 }\n    }\n    redde 0\n}\n",
+        "functio f(trapped<numerus, textus> t) → numerus {\n    discerne t {\n        casu returned sit value { redde 0 }\n    }\n    redde 0\n}\n",
         "missing_variants",
     );
     assert_accepts(
-        "functio f(trapped<numerus, textus> t) → numerus {\n    discerne t {\n        casu returned fixum value { redde 0 }\n        casu thrown fixum error { redde 0 }\n    }\n}\n",
+        "functio f(trapped<numerus, textus> t) → numerus {\n    discerne t {\n        casu returned sit value { redde 0 }\n        casu thrown sit error { redde 0 }\n    }\n}\n",
     );
 }
 

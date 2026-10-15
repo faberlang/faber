@@ -16,7 +16,7 @@ import from "norma:crypto" crypto
 
 fn expect(list<b8> got, list<b8> want, string label) → void ⇥ string {
     if got.length() ≢ want.length() then throw "§: wrong length"(label)
-    for range 0‥got.length() const i {
+    for range 0‥got.length() let i {
         let b8 g ← got.get(i) coalesce (0 ∷ b8)
         let b8 w ← want.get(i) coalesce (0 ∷ b8)
         if g ≢ w then throw "§: byte mismatch at §"(label, i)
@@ -25,7 +25,7 @@ fn expect(list<b8> got, list<b8> want, string label) → void ⇥ string {
 
 fn _repeat(int n, u8 b) → list<b8> {
     mut list<u8> out ← empty
-    for range 0‥n const i {
+    for range 0‥n let i {
         out.append(b)
     }
     let list<b8> result ← out ↦ list<b8>
@@ -74,7 +74,7 @@ main {
     let string ALG_ERROR ← "norma:crypto.digest: algorithm must be sha256, sha384, or sha512"
 
     mut list<string> failed ← empty
-    for from ["", "md5", "SHA256", "Sha384", "sha-256"] const alg {
+    for from ["", "md5", "SHA256", "Sha384", "sha-256"] let alg {
         do {
             let list<b8> result ← crypto.digest(alg, |61 62 63|)
             failed.append(alg)
@@ -87,7 +87,7 @@ main {
     do {
         if not failed.is_empty() then {
             mut string msg ← "crypta-sha2: algorithm rejection missed these names: "
-            for from failed const name {
+            for from failed let name {
                 msg ← (msg + name) + " "
             }
             throw msg

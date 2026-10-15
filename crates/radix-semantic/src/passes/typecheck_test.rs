@@ -1871,7 +1871,7 @@ functio bad(f32 a, f32 b) → f32 {
 fn iuncta_tuple_destructuring_typechecks() {
     let source = r"
 functio sum_pair(iuncta<f32, f32> pair) → f32 {
-    fixum [x, y] ← pair
+    sit [x, y] ← pair
     redde x + y
 }
 ";
@@ -1883,7 +1883,7 @@ fn iuncta_tuple_array_destructuring_width_mismatch_uses_binding_issue() {
     test_support::assert_rejects_with_issue(
         r"
 functio bad(iuncta<f32, f32> pair) → f32 {
-    fixum [x, y, z] ← pair
+    sit [x, y, z] ← pair
     redde x
 }
 ",

@@ -37,7 +37,7 @@ no_expected = "declaration-only"
 #
 # Admitted Line 1 shape: literal range gives concrete lanes (route ab, 4 lanes).
 fn unroll_admit() → void {
-    for range 0‥4 const i {
+    for range 0‥4 let i {
     }
 }
 

@@ -35,7 +35,7 @@ fn classify(list<int> values) → string {
 # An integer width is not a member of int.
 fn width(int n) → string {
     match n {
-        case u32 const w {
+        case u32 let w {
             return "u32"
         }
         case int {

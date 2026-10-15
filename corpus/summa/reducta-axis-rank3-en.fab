@@ -32,7 +32,7 @@ fn last_sugar(tf32[2, 3, 4] cube) → tf32[2, 3] {
 }
 
 fn last_explicit(tf32[2, 3, 4] cube) → tf32[2, 3] {
-    return reduce via sum from cube at [i, j, k] per [i, j] const s { return s }
+    return reduce via sum from cube at [i, j, k] per [i, j] let s { return s }
 }
 
 fn middle_sugar(tf32[2, 3, 4] cube) → tf32[2, 4] {
@@ -40,7 +40,7 @@ fn middle_sugar(tf32[2, 3, 4] cube) → tf32[2, 4] {
 }
 
 fn middle_explicit(tf32[2, 3, 4] cube) → tf32[2, 4] {
-    return reduce via sum from cube at [i, j, k] per [i, k] const s { return s }
+    return reduce via sum from cube at [i, j, k] per [i, k] let s { return s }
 }
 
 main {

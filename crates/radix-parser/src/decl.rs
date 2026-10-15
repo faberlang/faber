@@ -259,6 +259,20 @@ impl Parser {
                     .with_arg("keyword", keyword)
                     .with_arg("name", name),
             );
+        } else if mutability == AstMutability::Immutable
+            && let StmtKind::Var(decl) = &stmt
+            && !decl.compile_time
+            && matches!(
+                decl.binding,
+                BindingPattern::Array { .. } | BindingPattern::Object { .. }
+            )
+        {
+            // A destructuring head is a binder: it takes `sit`/`varia`.
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, keyword_span)
+                    .with_arg("issue", "binder_fixum_retired")
+                    .with_arg("keyword", keyword),
+            );
         }
         Ok(stmt)
     }
@@ -432,7 +446,7 @@ impl Parser {
 
     /// Spelling of the identifier word at the cursor (empty for any other
     /// token), as written in the source.
-    fn current_word(&self) -> String {
+    pub(super) fn current_word(&self) -> String {
         match self.peek().kind {
             TokenKind::Ident(sym) => self.interner.resolve(sym).to_owned(),
             _ => String::new(),
@@ -768,12 +782,9 @@ impl Parser {
         let keyword = self.current_word();
         self.expect_keyword_ident(TokenKind::Sit)?;
 
+        // Destructuring head: `sit [a, b] ← e` / `sit { a, b } ← e`.
         if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
-            return Err(
-                ParseError::structured(ParseErrorKind::Expected, self.current_span())
-                    .with_arg("issue", "sit_no_destructuring")
-                    .with_arg("keyword", "sit"),
-            );
+            return self.parse_var_decl_rest(AstMutability::Immutable, keyword, false);
         }
 
         if matches!(self.peek().kind, TokenKind::Underscore(_)) {

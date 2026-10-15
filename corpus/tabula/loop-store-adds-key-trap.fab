@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collections"
 canonical = false
 summary = "A bracket store that adds a key to a map while a loop walks that map traps: map changed size during iteration."
-syntax = "for from <map> const <value> { <map>[<new key>] ← <value> }"
+syntax = "for from <map> let <value> { <map>[<new key>] ← <value> }"
 related = ["tabula", "itera", "ex"]
 locale = "en"
 +++
@@ -30,7 +30,7 @@ locale = "en"
 main {
     mut map<string, int> stock ← { "pear": 3 }
     print "before"
-    for from stock const count {
+    for from stock let count {
         stock["fig"] ← count
         print "stored"
     }

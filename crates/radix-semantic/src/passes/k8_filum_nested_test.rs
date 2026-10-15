@@ -37,8 +37,8 @@ fn nest(inner: &str) -> String {
     varia tensor<numerus, [2]> rows ← vacua
     varia tensor<numerus, [3]> cols ← vacua
     varia tensor<numerus, [2, 3]> grid ← vacua
-    itera ex rows apud [i] filum outer fixum row {{
-        itera ex cols apud [j] filum inner fixum col {{
+    itera ex rows apud [i] filum outer sit row {{
+        itera ex cols apud [j] filum inner sit col {{
             {inner}
         }}
     }}
@@ -58,9 +58,9 @@ fn legal_nested_filum_accepted() {
     varia tensor<numerus, [3]> cols ← vacua
     varia tensor<numerus, [2]> sums ← vacua
     varia tensor<numerus, [2, 3]> grid ← vacua
-    itera ex rows apud [i] filum outer fixum row {
+    itera ex rows apud [i] filum outer sit row {
         sums[i] ← row
-        itera ex cols apud [j] filum inner fixum col {
+        itera ex cols apud [j] filum inner sit col {
             grid[[i, j]] ← sums[i] + col
         }
     }
@@ -86,8 +86,8 @@ fn nested_neighbor_write_rejected() {
     varia tensor<numerus, [2]> rows ← vacua
     varia tensor<numerus, [3]> cols ← vacua
     varia tensor<numerus, [2]> sums ← vacua
-    itera ex rows apud [i] filum outer fixum row {
-        itera ex cols apud [j] filum inner fixum col {
+    itera ex rows apud [i] filum outer sit row {
+        itera ex cols apud [j] filum inner sit col {
             sums[i] ← col
         }
     }
@@ -108,9 +108,9 @@ fn inner_loop_local_mutation_only_where_independent() {
         r"incipit {
     varia tensor<numerus, [2]> rows ← vacua
     varia tensor<numerus, [3]> cols ← vacua
-    itera ex rows apud [i] filum outer fixum row {
+    itera ex rows apud [i] filum outer sit row {
         varia numerus total ← row
-        itera ex cols apud [j] fixum col {
+        itera ex cols apud [j] sit col {
             total ← total + col
         }
         rows[i] ← total
@@ -126,9 +126,9 @@ fn inner_loop_local_mutation_only_where_independent() {
         r"incipit {
     varia tensor<numerus, [2]> rows ← vacua
     varia tensor<numerus, [3]> cols ← vacua
-    itera ex rows apud [i] filum outer fixum row {
+    itera ex rows apud [i] filum outer sit row {
         varia numerus total ← row
-        itera ex cols apud [j] filum inner fixum col {
+        itera ex cols apud [j] filum inner sit col {
             total ← total + col
         }
         rows[i] ← total
@@ -146,8 +146,8 @@ fn k3_reduction_exempt_from_loop_carried_mutation() {
         r"incipit {
     varia tensor<numerus, [2]> rows ← vacua
     varia tensor<numerus, [3]> cols ← vacua
-    itera ex rows apud [i] filum outer fixum row {
-        rows[i] ← reducta via summa ex cols apud [j] fixum s { redde s + row }
+    itera ex rows apud [i] filum outer sit row {
+        rows[i] ← reducta via summa ex cols apud [j] sit s { redde s + row }
     }
 }",
     );
@@ -156,7 +156,7 @@ fn k3_reduction_exempt_from_loop_carried_mutation() {
     rejected(
         r"incipit {
     varia tensor<numerus, [3]> cols ← vacua
-    itera ex cols apud [i] filum outer fixum col {
+    itera ex cols apud [i] filum outer sit col {
         cols[i] ← reducta via summa ex cols apud [j]
     }
 }",
@@ -168,7 +168,7 @@ fn k3_reduction_exempt_from_loop_carried_mutation() {
     varia tensor<numerus, [2]> rows ← vacua
     varia tensor<numerus, [3]> cols ← vacua
     varia numerus total ← 0
-    itera ex rows apud [i] filum outer fixum row {
+    itera ex rows apud [i] filum outer sit row {
         total ← reducta via summa ex cols apud [j]
     }
 }",

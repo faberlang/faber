@@ -60,7 +60,7 @@ fn run_client() → void {
     mut string name ← ""
     mut string age ← ""
     mut int i ← 0
-    for from rows const row {
+    for from rows let row {
         if i ≡ 1 {
             name ← row.get(0) coalesce ""
             age ← row.get(1) coalesce ""

@@ -84,7 +84,7 @@ fn rust_dum_with_cape_has_no_unsupported_error() {
 
 #[test]
 fn rust_itera_with_cape_has_no_unsupported_error() {
-    let (program, _) = parse_program("functio f() → vacuum { itera ex items fixum n { tacet } cape err { tacet } }\n");
+    let (program, _) = parse_program("functio f() → vacuum { itera ex items sit n { tacet } cape err { tacet } }\n");
     let errors = collect_rust_unsupported_errors(&program, "test.fab");
     assert!(
         errors

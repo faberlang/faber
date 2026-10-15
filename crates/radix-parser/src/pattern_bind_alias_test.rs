@@ -11,10 +11,10 @@ fn parses_variant_payload_bindings_with_ut_aliases() {
     let result = parse_ok(
         r"
 discerne m {
-    casu Loquere fixum verba ut v {
+    casu Loquere sit verba ut v {
         redde v
     }
-    casu Moveo fixum locus ut loc, passus ut n {
+    casu Moveo sit locus ut loc, passus ut n {
         redde loc
     }
 }
@@ -66,7 +66,7 @@ fn single_binding_with_no_alias() {
     let result = parse_ok(
         r"
 discerne m {
-    casu Loquere fixum verba {
+    casu Loquere sit verba {
         redde verba
     }
 }
@@ -113,7 +113,7 @@ fn multiple_bindings_with_mixed_aliases() {
     let result = parse_ok(
         r"
 discerne m {
-    casu Moveo fixum locus ut loc, passus, gradus ut g {
+    casu Moveo sit locus ut loc, passus, gradus ut g {
         redde loc
     }
 }

@@ -15,7 +15,7 @@ diagnostic = "SEM011:loop_collection_shape_change"
 # store is the unchecked "developer knows best" form.
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    itera ex xs fixum x {
+    itera ex xs sit x {
         xs.appende(x)
     }
 }

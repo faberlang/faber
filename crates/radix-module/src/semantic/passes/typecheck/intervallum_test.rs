@@ -75,7 +75,7 @@ fn intervallum_value_step_rejects() {
 #[test]
 fn intervallum_step_remains_valid_for_itera_ab() {
     let source = r"incipit {
-  itera ab 0‥10 per 2 fixum i {
+  itera ab 0‥10 per 2 sit i {
     nota i
   }
 }";

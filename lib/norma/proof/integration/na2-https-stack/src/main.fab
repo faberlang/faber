@@ -97,7 +97,7 @@ fn run_client() → void {
     }
     assert events.length() ≥ 2
     mut int seen ← 0
-    for from events const event {
+    for from events let event {
         if event.data ≡ "one" or event.data ≡ "two" {
             seen ← seen + 1
         }

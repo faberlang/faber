@@ -1735,8 +1735,8 @@ fn single_union_bare_variant_surfaces_unchanged() {
         "discretio Nodus {\n  Groupus { lista<numerus> filii },\n  Tessera { numerus geometria }\n}\n\
          functio make(numerus g) → Nodus {\n  redde finge Tessera { geometria = g } ∷ Nodus\n}\n\
          functio read(Nodus n) → numerus {\n  discerne n {\n\
-         \x20   casu Tessera fixum geometria { redde geometria }\n\
-         \x20   casu Groupus fixum filii { redde 0 }\n  }\n}\n\
+         \x20   casu Tessera sit geometria { redde geometria }\n\
+         \x20   casu Groupus sit filii { redde 0 }\n  }\n}\n\
          incipit {\n  sit Nodus n ← make(7)\n  nota read(n)\n}",
     );
     assert!(
@@ -1825,7 +1825,7 @@ fn accepts_perge_through_fac_cape_to_enclosing_loop() {
     let result = compile_ok(
         r"
 incipit {
-    itera ab 0‥3 fixum i {
+    itera ab 0‥3 sit i {
         fac {
             si i ≡ 1 { perge }
             nota i
@@ -1842,7 +1842,7 @@ fn accepts_perge_through_plain_fac_within_loop() {
     let result = compile_ok(
         r"
 incipit {
-    itera ab 0‥3 fixum i {
+    itera ab 0‥3 sit i {
         fac { perge }
     }
 }
@@ -1855,7 +1855,7 @@ incipit {
 fn reports_perge_in_closure_fac_body_with_loop_outside_closure() {
     let source = r"
 incipit {
-    itera ab 0‥3 fixum i {
+    itera ab 0‥3 sit i {
         sit f ← (numerus a) ∴ fac { perge }
     }
 }
@@ -1869,7 +1869,7 @@ fn accepts_perge_in_loop_nested_inside_fac() {
         r"
 incipit {
     fac {
-        itera ab 0‥3 fixum i {
+        itera ab 0‥3 sit i {
             si i ≡ 1 { perge }
             nota i
         }
@@ -1885,7 +1885,7 @@ fn accepts_perge_in_cape_arm_inside_loop() {
     let result = compile_ok(
         r#"
 incipit {
-    itera ab 0‥3 fixum i {
+    itera ab 0‥3 sit i {
         fac {
             si i ≡ 1 { iace "x" }
         } cape err {
@@ -3220,7 +3220,7 @@ fn arm_not_member_misspelled_enum_member_lists_members_and_suggests() {
 #[test]
 fn arm_not_member_misspelled_discretio_variant_lists_members_and_suggests() {
     let source = format!(
-        "{ARM_FORMA}\nfunctio f(Forma x) → vacuum {{\n    discerne x {{\n        casu Circulus fixum r {{ nota r }}\n        casu Quadratum fixum s {{ nota s }}\n        casu Punctm {{ nota 0 }}\n    }}\n}}"
+        "{ARM_FORMA}\nfunctio f(Forma x) → vacuum {{\n    discerne x {{\n        casu Circulus sit r {{ nota r }}\n        casu Quadratum sit s {{ nota s }}\n        casu Punctm {{ nota 0 }}\n    }}\n}}"
     );
     let args = arm_not_member_args(&source);
     assert_eq!(arm_arg(&args, "name"), Some("Punctm"));
@@ -3259,7 +3259,7 @@ fn arm_not_member_is_checked_in_each_multi_subject_position() {
 #[test]
 fn arm_not_member_is_checked_under_omnia() {
     let source = format!(
-        "{ARM_FORMA}\nfunctio f(Forma x) → vacuum {{\n    discerne omnia x {{\n        casu Circulus fixum r {{ nota r }}\n        casu Quadratum fixum s {{ nota s }}\n        casu Punctm {{ nota 0 }}\n    }}\n}}"
+        "{ARM_FORMA}\nfunctio f(Forma x) → vacuum {{\n    discerne omnia x {{\n        casu Circulus sit r {{ nota r }}\n        casu Quadratum sit s {{ nota s }}\n        casu Punctm {{ nota 0 }}\n    }}\n}}"
     );
     let args = arm_not_member_args(&source);
     assert_eq!(arm_arg(&args, "name"), Some("Punctm"));
@@ -3355,7 +3355,7 @@ functio f(Punctum ∪ Linea u) → vacuum {
 #[test]
 fn arm_not_member_leaves_members_wildcard_and_default_valid() {
     crate::test_support::assert_accepts(&format!(
-        "{ARM_FORMA}\nfunctio f(Forma a, Forma b) → vacuum {{\n    discerne a et b {{\n        casu Circulus fixum r et Punctum {{ nota r }}\n        casu Punctum et _ {{ nota 1 }}\n        casu Quadratum fixum s et _ {{ nota s }}\n        ceterum {{ nota 3 }}\n    }}\n}}"
+        "{ARM_FORMA}\nfunctio f(Forma a, Forma b) → vacuum {{\n    discerne a et b {{\n        casu Circulus sit r et Punctum {{ nota r }}\n        casu Punctum et _ {{ nota 1 }}\n        casu Quadratum sit s et _ {{ nota s }}\n        ceterum {{ nota 3 }}\n    }}\n}}"
     ));
     crate::test_support::assert_accepts(&format!(
         "{ARM_COLOR}\nfunctio f(Color c) → vacuum {{\n    discerne c {{\n        casu Rubrum aut Viridis {{ nota 1 }}\n        ceterum {{ nota 2 }}\n    }}\n}}"

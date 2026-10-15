@@ -49,7 +49,7 @@ fn join(list<string> segments, string separator) → string {
     mut string out ← ""
     mut int index ← 0
 
-    for from segments const pars {
+    for from segments let pars {
         if index ≻ 0 {
             out ← out + separator
         }

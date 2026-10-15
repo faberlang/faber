@@ -51,7 +51,7 @@ main {
     }
     catch err {
         match err {
-            case ConnectionRefused const path {
+            case ConnectionRefused let path {
                 assert path.length() ≻ 0
                 refused ← true
             }
@@ -71,7 +71,7 @@ main {
     }
     catch err {
         match err {
-            case InvalidArgument const path {
+            case InvalidArgument let path {
                 invalid ← true
             }
             default {
@@ -95,7 +95,7 @@ main {
         }
         catch tls_err {
             match tls_err {
-                case NotFound const path {
+                case NotFound let path {
                     assert path.length() ≻ 0
                     ca_missing ← true
                 }
@@ -120,7 +120,7 @@ main {
     }
     catch err {
         match err {
-            case ConnectionRefused const path {
+            case ConnectionRefused let path {
                 tls_refused ← true
             }
             default {

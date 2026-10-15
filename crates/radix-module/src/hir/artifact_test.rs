@@ -2417,7 +2417,7 @@ functio copy_coordinate<magnitudo N>(
     tensor<f32, [N]> input,
     varia tensor<u32, [N]> output
 ) → vacuum {
-    itera ex input apud [i] fixum value {
+    itera ex input apud [i] sit value {
         output[i] ← i
     }
 }
@@ -2456,7 +2456,7 @@ fn kernel_requirements_wire_omits_rows_without_a_device_or_numeric_encoding() {
 @ nucleum
 @ publica
 functio copy_four(tensor<f32, [4]> input, varia tensor<u32, [4]> output) → vacuum {
-    itera ex input apud [i] fixum value {
+    itera ex input apud [i] sit value {
         output[i] ← i
     }
 }

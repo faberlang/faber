@@ -127,7 +127,7 @@ fn call_result_of_const_list_shared_into_var_is_rejected() {
 
 #[test]
 fn const_nested_list_element_shared_into_var_is_rejected() {
-    let source = "incipit {\n    sit lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs fixum r {\n        varia lista<numerus> ys ← r\n        ys.appende(3)\n        nota ys\n    }\n}";
+    let source = "incipit {\n    sit lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs sit r {\n        varia lista<numerus> ys ← r\n        ys.appende(3)\n        nota ys\n    }\n}";
     let result = test_support::analyze_source(source);
     assert!(
         result.diagnostics.iter().any(|err| err.is_error()
@@ -148,7 +148,7 @@ fn plain_owned_call_result_into_var_is_accepted() {
 #[test]
 fn var_nested_list_element_shared_into_var_is_accepted() {
     test_support::assert_accepts(
-        "incipit {\n    varia lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs fixum r {\n        varia lista<numerus> ys ← r\n        nota ys\n    }\n}",
+        "incipit {\n    varia lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs sit r {\n        varia lista<numerus> ys ← r\n        nota ys\n    }\n}",
     );
 }
 
@@ -304,7 +304,7 @@ fn const_local_source_arg_is_constant() {
 
 #[test]
 fn itera_binder_source_over_parameter_is_parameter() {
-    let source = "functio f(lista<lista<numerus>> xss) → numerus {\n    itera ex xss fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }";
+    let source = "functio f(lista<lista<numerus>> xss) → numerus {\n    itera ex xss sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }";
     let result = test_support::analyze_source(source);
     let found = result
         .diagnostics
@@ -328,7 +328,7 @@ fn itera_binder_source_over_parameter_is_parameter() {
 
 #[test]
 fn itera_binder_source_over_const_local_is_constant() {
-    let source = "incipit {\n    sit lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n}";
+    let source = "incipit {\n    sit lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n}";
     let result = test_support::analyze_source(source);
     let found = result
         .diagnostics
@@ -518,35 +518,35 @@ fn assert_method_source_into_var_rejected(source: &str) {
 #[test]
 fn itera_method_source_binder_valores_over_parameter_is_rejected() {
     assert_method_source_into_var_rejected(
-        "functio f(tabula<textus, lista<numerus>> p) → numerus {\n    itera ex p.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
+        "functio f(tabula<textus, lista<numerus>> p) → numerus {\n    itera ex p.valores() sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
     );
 }
 
 #[test]
 fn itera_method_source_binder_valores_over_const_local_is_rejected() {
     assert_method_source_into_var_rejected(
-        "incipit {\n    sit tabula<textus, lista<numerus>> p ← vacua\n    itera ex p.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n}",
+        "incipit {\n    sit tabula<textus, lista<numerus>> p ← vacua\n    itera ex p.valores() sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n}",
     );
 }
 
 #[test]
 fn itera_method_source_binder_scalar_element_is_accepted() {
     test_support::assert_accepts(
-        "functio f(tabula<textus, numerus> p) → numerus {\n    itera ex p.valores() fixum r {\n        varia numerus y ← r\n        y ← y + 1\n    }\n    redde 0\n}\nincipit { }",
+        "functio f(tabula<textus, numerus> p) → numerus {\n    itera ex p.valores() sit r {\n        varia numerus y ← r\n        y ← y + 1\n    }\n    redde 0\n}\nincipit { }",
     );
 }
 
 #[test]
 fn itera_method_source_binder_claves_scalar_keys_is_accepted() {
     test_support::assert_accepts(
-        "functio f(tabula<textus, lista<numerus>> p) → numerus {\n    itera ex p.claves() fixum k {\n        varia textus t ← k\n        nota t\n    }\n    redde 0\n}\nincipit { }",
+        "functio f(tabula<textus, lista<numerus>> p) → numerus {\n    itera ex p.claves() sit k {\n        varia textus t ← k\n        nota t\n    }\n    redde 0\n}\nincipit { }",
     );
 }
 
 #[test]
 fn itera_method_source_binder_fresh_local_is_accepted() {
     test_support::assert_accepts(
-        "functio f() → numerus {\n    varia tabula<textus, lista<numerus>> p ← vacua\n    itera ex p.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
+        "functio f() → numerus {\n    varia tabula<textus, lista<numerus>> p ← vacua\n    itera ex p.valores() sit r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
     );
 }
 
@@ -573,8 +573,8 @@ fn has_const_shared_into_var(result: &test_support::AnalyzedFixture) -> bool {
 
 #[test]
 fn values_view_detection_is_pack_first() {
-    let en_values = "fn f(map<string, list<int>> p) → int {\n    for from p.values() const r {\n        mut list<int> y ← r\n        y.append(1)\n    }\n    return 0\n}\nmain { }";
-    let en_valores = "fn f(map<string, list<int>> p) → int {\n    for from p.valores() const r {\n        mut list<int> y ← r\n        y.append(1)\n    }\n    return 0\n}\nmain { }";
+    let en_values = "fn f(map<string, list<int>> p) → int {\n    for from p.values() let r {\n        mut list<int> y ← r\n        y.append(1)\n    }\n    return 0\n}\nmain { }";
+    let en_valores = "fn f(map<string, list<int>> p) → int {\n    for from p.valores() let r {\n        mut list<int> y ← r\n        y.append(1)\n    }\n    return 0\n}\nmain { }";
 
     assert!(
         has_const_shared_into_var(&analyze_en(en_values)),

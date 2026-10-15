@@ -86,7 +86,7 @@ fn convert_thai_localizes_surface() {
     assert!(thai_output.contains("ถ้าไม่ก็ mark ≥ 40 ดังนั้น คืน จริง"));
     assert!(thai_output.contains("ฟังก์ชัน นับคะแนน(รายการ<จํานวน> marks) → จํานวน"));
     assert!(thai_output.contains("แก้ไขได้ จํานวน total ← 0"));
-    assert!(thai_output.contains("วน จาก marks คงที่ mark"));
+    assert!(thai_output.contains("วน จาก marks กำหนด mark"));
     assert!(thai_output.contains("ถ้า mark ≺ 0 {"));
     assert!(thai_output.contains("ไปต่อ"));
     assert!(thai_output.contains("หยุด"));
@@ -839,7 +839,7 @@ union DestError {
 @ conversion
 fn from_source_error(SourceError err) → DestError {
     match err {
-        case SourceError.Malformed const detail { return variant Wrapped {payload = detail} }
+        case SourceError.Malformed let detail { return variant Wrapped {payload = detail} }
         case _ { return variant Wrapped {payload = "unmatched"} }
     }
 }

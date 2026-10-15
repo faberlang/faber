@@ -8,9 +8,9 @@ canonical = true
 +++
 
 fn total(tf32[4] a) → f32 { return reduce via product from a }
-fn big(tf32[4] a) → int { return reduce via count from a at [i] const s { return s ≻ 2.0 } }
-fn all_pos(tf32[4] a) → bool { return reduce via all from a at [i] const s { return s ≻ 0.5 } }
-fn some_huge(tf32[4] a) → bool { return reduce via any from a at [i] const s { return s ≻ 3.5 } }
+fn big(tf32[4] a) → int { return reduce via count from a at [i] let s { return s ≻ 2.0 } }
+fn all_pos(tf32[4] a) → bool { return reduce via all from a at [i] let s { return s ≻ 0.5 } }
+fn some_huge(tf32[4] a) → bool { return reduce via any from a at [i] let s { return s ≻ 3.5 } }
 fn peak(tf32[4] a, f32 floor) → f32 { return reduce via max from a at [i] coalesce floor }
 main {
     let list<f32> flat ← [3.0, 1.0, 3.0, 2.0]

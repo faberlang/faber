@@ -34,7 +34,7 @@ fn lista_apud_binds_position_and_element() {
     let lines = run(r#"
 incipit {
     sit lista<textus> xs ← ["a", "b", "c"]
-    itera ex xs apud [i] fixum x {
+    itera ex xs apud [i] sit x {
         nota i, x
     }
 }"#);
@@ -48,7 +48,7 @@ incipit {
     varia tabula<textus, numerus> m ← vacua
     m["alpha"] ← 1
     m["beta"] ← 2
-    itera ex m apud [k] fixum v {
+    itera ex m apud [k] sit v {
         nota k, v
     }
 }"#);
@@ -65,7 +65,7 @@ incipit {
     sales[["east", 2024]] ← 6
     nota sales[["east", 2024]]
     nota sales.longitudo()
-    itera ex sales apud [regio, annus] fixum v {
+    itera ex sales apud [regio, annus] sit v {
         nota regio, annus, v
     }
 }"#);
@@ -82,7 +82,7 @@ incipit {
     varia tabula<iuncta<textus>, numerus> totals ← vacua
     totals[["east"]] ← 5
     totals[["west"]] ← 7
-    itera ex totals apud [regio] fixum v {
+    itera ex totals apud [regio] sit v {
         nota regio, v
     }
 }"#);
@@ -96,7 +96,7 @@ fn one_part_composite_key_part_is_usable_as_its_element_type() {
 incipit {
     varia tabula<iuncta<textus>, numerus> totals ← vacua
     totals[["east"]] ← 5
-    itera ex totals apud [regio] fixum v {
+    itera ex totals apud [regio] sit v {
         nota regio.longitudo(), v
     }
 }"#);

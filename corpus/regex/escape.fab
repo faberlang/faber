@@ -53,7 +53,7 @@ main {
     ]
     mut int tried ← 0
     mut int whole ← 0
-    for from probes const probe {
+    for from probes let probe {
         tried ← tried + 1
         let string head ← "^" + probe.escape()
         let regex anchored ← (head + "$") ↦ regex

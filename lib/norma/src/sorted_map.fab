@@ -114,7 +114,7 @@ class SortedMap<K, V> {
     # Values in key-ascending order. Nominal projection.
     fn values() → list<V> {
         mut list<V> out ← []
-        for from self.index const k {
+        for from self.index let k {
             # has verified by construction; get cannot miss.
             let V ∪ none v ← self.entries.get(k)
             if v ≡ null then continue
@@ -213,7 +213,7 @@ fn remove_at<K>(mut list<K> index, int positio) → void {
         i ← i + 1
     }
     while not index.is_empty() { index.remove_last() }
-    for from out const item {
+    for from out let item {
         index.append(item)
     }
 }

@@ -491,7 +491,7 @@ fn the_range_loop_binder_is_typed_by_its_bounds() {
     // ruling 43: an `inf` bound gives an `inf` binder, whose `+ step` is exact.
     assert_eq!(
         ok(&format!(
-            "sit inf top ← {TWO_64}\nvaria inf count ← 0\nitera ab top‥top + 3 fixum i {{\n nota i\n count ↑\n}}\nnota count"
+            "sit inf top ← {TWO_64}\nvaria inf count ← 0\nitera ab top‥top + 3 sit i {{\n nota i\n count ↑\n}}\nnota count"
         )),
         [
             "18446744073709551616",
@@ -501,12 +501,12 @@ fn the_range_loop_binder_is_typed_by_its_bounds() {
         ]
     );
     assert_eq!(
-        ok("sit inf n ← 100\nvaria inf total ← 0\nitera ab 0…n fixum i {\n total ← total + i\n}\nnota total"),
+        ok("sit inf n ← 100\nvaria inf total ← 0\nitera ab 0…n sit i {\n total ← total + i\n}\nnota total"),
         ["5050"]
     );
     // Bounded bounds keep today's `numerus` binder.
     assert_eq!(
-        ok("varia numerus total ← 0\nitera ab 0‥5 fixum i {\n total ← total + i\n}\nnota total"),
+        ok("varia numerus total ← 0\nitera ab 0‥5 sit i {\n total ← total + i\n}\nnota total"),
         ["10"]
     );
 }

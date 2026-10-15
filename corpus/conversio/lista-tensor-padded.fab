@@ -43,7 +43,7 @@ no_expected = "declaration-only"
 fn sumPadded(list<float, 8> xs) → float {
     let tensor<float, [8]> t ← xs ↦ tensor<float, [8]>
     mut float total ← 0.0
-    for from t const x {
+    for from t let x {
         total ← total + x
     }
     return total
@@ -53,7 +53,7 @@ fn sumPadded(list<float, 8> xs) → float {
 fn sumFilled(list<float, 8> xs) → float {
     let tensor<float, [8]> t ← xs ↦ tensor<float, [8]> ⊥ 1.0
     mut float total ← 0.0
-    for from t const x {
+    for from t let x {
         total ← total + x
     }
     return total
@@ -64,7 +64,7 @@ fn sumFilled(list<float, 8> xs) → float {
 fn productMasked(list<float, 8> xs, tensor<float, [8]> lenMask) → float {
     let tensor<float, [8]> t ← xs ↦ tensor<float, [8]>
     mut float total ← 1.0
-    for from t const x {
+    for from t let x {
         total ← total * x
     }
     return total * lenMask.sum()

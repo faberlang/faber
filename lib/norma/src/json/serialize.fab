@@ -73,7 +73,7 @@ fn encode(value node) → string {
 
 fn encode_array(list<value> items) → string {
     mut list<string> encoded ← empty
-    for from items const item {
+    for from items let item {
         encoded.append(encode(item))
     }
     return text.join(["[", text.join(encoded, ","), "]"], "")
@@ -83,7 +83,7 @@ fn encode_object(map<string, value> fields) → string {
     mut list<string> keys ← fields.keys()
     keys.sort()
     mut list<string> members ← empty
-    for from keys const key {
+    for from keys let key {
         members.append(text.join([quote(key), ":", encode(fields[key])], ""))
     }
     return text.join(["{", text.join(members, ","), "}"], "")

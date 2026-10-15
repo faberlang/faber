@@ -34,7 +34,7 @@ fn selective_import_member_is_a_type_pattern_target() {
          \x20   discerne u {\n\
          \x20       casu Figura { tacet }\n\
          \x20       casu FormaAliena { tacet }\n\
-         \x20       casu Punctum fixum p { tacet }\n\
+         \x20       casu Punctum sit p { tacet }\n\
          \x20   }\n\
          }",
     );
@@ -58,7 +58,7 @@ fn named_import_binding_stays_a_value_pattern() {
          genus Punctum { varia numerus x }\n\
          functio f(Punctum u) → vacuum {\n\
          \x20   discerne u {\n\
-         \x20       casu aux fixum v { tacet }\n\
+         \x20       casu aux sit v { tacet }\n\
          \x20   }\n\
          }",
     );
@@ -77,7 +77,7 @@ fn wildcard_import_alias_stays_a_value_pattern() {
          genus Punctum { varia numerus x }\n\
          functio f(Punctum u) → vacuum {\n\
          \x20   discerne u {\n\
-         \x20       casu g fixum v { tacet }\n\
+         \x20       casu g sit v { tacet }\n\
          \x20   }\n\
          }",
     );

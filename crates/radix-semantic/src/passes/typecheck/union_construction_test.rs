@@ -576,8 +576,8 @@ discretio LocalError {
 
 functio causa(LocalError e) → textus {
     discerne e {
-        casu ElementaMismatch fixum causa { redde causa }
-        casu TerminusExcedit fixum causa { redde causa }
+        casu ElementaMismatch sit causa { redde causa }
+        casu TerminusExcedit sit causa { redde causa }
     }
 }
 

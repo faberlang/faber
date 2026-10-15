@@ -21,10 +21,10 @@ class Casual {
 
 fn classify(Formal ∪ Casual u) → string {
     match u {
-        case Formal const f {
+        case Formal let f {
             return f.greeting
         }
-        case Casual const c {
+        case Casual let c {
             return c.greeting
         }
     }

@@ -104,7 +104,7 @@ fn get_index(value v, int index) → value {
 fn find(value v, string path) → value {
     let list<string> parts ← path.split(".")
     mut value current ← v
-    for from parts const pars {
+    for from parts let pars {
         current ← find_part(current, pars)
         if current is none then return null
     }
@@ -150,7 +150,7 @@ fn require_string(value v, string key) → string ⇥ string {
 # non-string key. Used by codec callers that validate a schema shape.
 @ public
 fn require_strings(value v, list<string> keys) → void ⇥ string {
-    for from keys const key {
+    for from keys let key {
         let string _ ← require_string(v, key)
     }
     return

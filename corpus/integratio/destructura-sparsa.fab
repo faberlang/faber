@@ -42,7 +42,7 @@ locale = "en"
 
 fn summa(list<int> numeri) → int {
     mut _ total ← 0
-    for from numeri const n {
+    for from numeri let n {
         total ← total + n
     }
     return total
@@ -53,7 +53,7 @@ main {
     let secunda ← [3, 4]
     let omnes ← [0, spread prima, spread secunda, 5]
 
-    const [initium, alterum, tertium] ← omnes
+    let [initium, alterum, tertium] ← omnes
     print "caput: § § §"(initium, alterum, tertium)
 
     let paria ← omnes.filter(int n ∴ n % 2 ≡ 0)

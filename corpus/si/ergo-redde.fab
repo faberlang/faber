@@ -62,14 +62,14 @@ fn gradus(int puncta) → string {
 
 # Early return inside itera ex loop
 fn inveni(list<int> res, int quaesitum) → int ∪ none {
-    for from res const item {
+    for from res let item {
         if item ≡ quaesitum then return item
     }
     return null
 }
 
 fn habet(map<string, int> map, string clavis) → bool {
-    for ref map const k {
+    for ref map let k {
         if k ≡ clavis then return true
     }
     return false

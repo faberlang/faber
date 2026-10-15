@@ -17,7 +17,7 @@ main {
     xs[1] ← 10
     print ys
     mut int total ← 0
-    for from xs const x {
+    for from xs let x {
         total ← total + x
     }
     print total

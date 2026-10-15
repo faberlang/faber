@@ -850,7 +850,7 @@ pub(super) fn destructure_keyword<'s>(
     surface: &'s impl KeywordSurface,
 ) -> &'s str {
     match (binding.is_await, binding.mutable) {
-        (false, false) => surface.contextual_keyword("fixum"),
+        (false, false) => surface.contextual_keyword("sit"),
         (false, true) => surface.contextual_keyword("varia"),
         (true, false) => surface.contextual_keyword("figendum"),
         (true, true) => surface.contextual_keyword("variandum"),

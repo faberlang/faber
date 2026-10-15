@@ -3,8 +3,8 @@ term = "summa"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "reducta_expr", "filum_clause", "apud_clause", "fixum_decl", "redde_stmt"]
 category = "collection"
-summary = "Distributed rank-2 reduction: reducta via summa ex … apud [i, j] filum f fixum s."
-syntax = "reducta via summa ex <tensor> apud [i, j] filum f fixum s { redde <term> }"
+summary = "Distributed rank-2 reduction: reducta via summa ex … apud [i, j] filum f sit s."
+syntax = "reducta via summa ex <tensor> apud [i, j] filum f sit s { redde <term> }"
 related = ["summa", "filum", "apud", "tensor"]
 locale = "la"
 no_expected = "needs-device"
@@ -29,7 +29,7 @@ no_expected = "needs-device"
 @ nucleum
 @ publica { }
 functio rank2(tensor<f32, [4, 8]> a, varia tensor<f32, [1]> out) → vacuum {
-    sit f32 total ← reducta via summa ex a apud [i, j] filum f fixum s {
+    sit f32 total ← reducta via summa ex a apud [i, j] filum f sit s {
         redde s
     }
     out[0] ← total

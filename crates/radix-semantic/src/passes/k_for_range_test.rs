@@ -51,7 +51,7 @@ functio gemv<magnitudo N, magnitudo K>(
     varia tensor<numerus, [N]> lens,
     numerus n
 ) → vacuum {{
-    itera ex dom apud [i] filum lane fixum e {{
+    itera ex dom apud [i] filum lane sit e {{
         {body}
     }}
 }}
@@ -71,7 +71,7 @@ functio gemv<magnitudo N, magnitudo K>(
     varia tensor<f32, [N]> out
 ) → vacuum {{
     varia f32 total ← 0.0
-    itera ex dom apud [i] filum lane fixum e {{
+    itera ex dom apud [i] filum lane sit e {{
         {body}
     }}
 }}
@@ -83,7 +83,7 @@ functio gemv<magnitudo N, magnitudo K>(
 fn serial_row_dot_with_a_range_loop_accepted() {
     accepted(&kernel(
         "varia f32 acc ← 0.0
-        itera ab 0‥n fixum j {
+        itera ab 0‥n sit j {
             acc ← acc + w[[i, j]] * x[[j]]
         }
         out[[i]] ← acc",
@@ -94,8 +94,8 @@ fn serial_row_dot_with_a_range_loop_accepted() {
 fn nested_range_inside_a_range_accepted() {
     accepted(&kernel(
         "varia f32 acc ← 0.0
-        itera ab 0‥n fixum j {
-            itera ab 0‥n fixum k {
+        itera ab 0‥n sit j {
+            itera ab 0‥n sit k {
                 acc ← acc + w[[i, j]] * x[[k]]
             }
         }
@@ -107,10 +107,10 @@ fn nested_range_inside_a_range_accepted() {
 fn literal_generic_and_scalar_parameter_bounds_accepted() {
     accepted(&kernel(
         "varia f32 acc ← 0.0
-        itera ab 0‥3 fixum a {
+        itera ab 0‥3 sit a {
             acc ← acc + w[[i, a]]
         }
-        itera ab 1‥n fixum b {
+        itera ab 1‥n sit b {
             acc ← acc + x[[b]]
         }
         out[[i]] ← acc",
@@ -121,7 +121,7 @@ fn literal_generic_and_scalar_parameter_bounds_accepted() {
 fn range_product_inside_a_lane_accepted() {
     accepted(&kernel(
         "varia f32 acc ← 0.0
-        itera ab 0‥n, 0‥n fixum a, b {
+        itera ab 0‥n, 0‥n sit a, b {
             acc ← acc + w[[i, a]] * x[[b]]
         }
         out[[i]] ← acc",
@@ -132,7 +132,7 @@ fn range_product_inside_a_lane_accepted() {
 fn iteration_local_scratch_inside_the_range_accepted() {
     accepted(&kernel(
         "varia f32 acc ← 0.0
-        itera ab 0‥n fixum j {
+        itera ab 0‥n sit j {
             sit f32 term ← w[[i, j]] * x[[j]]
             acc ← acc + term
         }
@@ -147,7 +147,7 @@ fn bound_reading_a_lane_written_tensor_rejected() {
     rejected(
         &kernel(
             "lens[[0]] ← 2
-        itera ab 0‥lens[[0]] fixum j {
+        itera ab 0‥lens[[0]] sit j {
             out[[i]] ← x[[j]]
         }",
         ),
@@ -160,7 +160,7 @@ fn bound_reading_the_lanes_own_written_cell_rejected() {
     rejected(
         &kernel(
             "lens[[i]] ← 2
-        itera ab 0‥lens[[i]] fixum j {
+        itera ab 0‥lens[[i]] sit j {
             out[[i]] ← x[[j]]
         }",
         ),
@@ -173,7 +173,7 @@ fn range_product_bound_reading_a_lane_written_tensor_rejected() {
     rejected(
         &kernel(
             "lens[[i]] ← 2
-        itera ab 0‥n, 0‥lens[[i]] fixum a, b {
+        itera ab 0‥n, 0‥lens[[i]] sit a, b {
             tmp[[a]] ← x[[b]]
         }",
         ),
@@ -185,7 +185,7 @@ fn range_product_bound_reading_a_lane_written_tensor_rejected() {
 fn body_storing_outer_storage_at_a_non_lane_coordinate_rejected() {
     rejected(
         &kernel(
-            "itera ab 0‥n fixum j {
+            "itera ab 0‥n sit j {
             out[[j]] ← x[[j]]
         }",
         ),
@@ -197,7 +197,7 @@ fn body_storing_outer_storage_at_a_non_lane_coordinate_rejected() {
 fn loop_carried_write_to_outer_state_rejected() {
     rejected(
         &kernel_outer(
-            "itera ab 0‥3 fixum j {
+            "itera ab 0‥3 sit j {
             total ← total + x[[j]]
         }
         out[[i]] ← total",
@@ -214,8 +214,8 @@ fn lockstep_loop_still_declined() {
     varia tensor<f32, [4]> out ← vacua
     sit lista<f32> xs ← [1.0, 2.0]
     sit lista<f32> ys ← [3.0, 4.0]
-    itera ex rows apud [i] filum lane fixum e {
-        itera ex xs, ys fixum a, b {
+    itera ex rows apud [i] filum lane sit e {
+        itera ex xs, ys sit a, b {
             out[[i]] ← a + b
         }
     }

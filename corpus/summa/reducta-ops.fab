@@ -16,22 +16,22 @@ functio maxima_vacua() → f32 {
     redde reducta via maxima ex v apud [i] vel -∞
 }
 functio numera_maiora(tensor<f32, [4]> a) → numerus {
-    redde reducta via numeratio ex a apud [i] fixum s { redde s ≻ 2.0 }
+    redde reducta via numeratio ex a apud [i] sit s { redde s ≻ 2.0 }
 }
 functio omnes_positivi(tensor<f32, [4]> a) → bivalens {
-    redde reducta via omnia ex a apud [i] fixum s { redde s ≻ 0.5 }
+    redde reducta via omnia ex a apud [i] sit s { redde s ≻ 0.5 }
 }
 functio omnes_maiores(tensor<f32, [4]> a) → bivalens {
-    redde reducta via omnia ex a apud [i] fixum s { redde s ≻ 1.5 }
+    redde reducta via omnia ex a apud [i] sit s { redde s ≻ 1.5 }
 }
 functio aliquis_maior(tensor<f32, [4]> a) → bivalens {
-    redde reducta via quilibet ex a apud [i] fixum s { redde s ≻ 2.5 }
+    redde reducta via quilibet ex a apud [i] sit s { redde s ≻ 2.5 }
 }
 functio aliquis_maximus(tensor<f32, [4]> a) → bivalens {
-    redde reducta via quilibet ex a apud [i] fixum s { redde s ≻ 3.5 }
+    redde reducta via quilibet ex a apud [i] sit s { redde s ≻ 3.5 }
 }
 functio summa_corpus(tensor<f32, [4]> a) → f32 {
-    redde reducta via summa ex a apud [i] fixum s { redde s + 1.0 }
+    redde reducta via summa ex a apud [i] sit s { redde s + 1.0 }
 }
 incipit {
     sit lista<f32> flat ← [3.0, 1.0, 3.0, 2.0]

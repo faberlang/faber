@@ -39,7 +39,7 @@ fn reduction_head_requires_via_and_known_operator() {
 #[test]
 fn reduction_node_owns_optional_clauses_and_body() {
     let result = parse_ok(
-        "functio t(tensor<numerus, [8]> xs) → numerus { reducta via summa ex xs apud [i] pro i fixum x { redde x } }",
+        "functio t(tensor<numerus, [8]> xs) → numerus { reducta via summa ex xs apud [i] pro i sit x { redde x } }",
     );
     let program = result.program.expect("program");
     let StmtKind::Func(function) = &program.statements[0].kind else {

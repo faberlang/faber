@@ -38,7 +38,7 @@ class Headers {
     # First value whose name matches under ASCII case-fold; nihil if absent.
     fn get(string name) → string ∪ none {
         let string folded ← ascii_lower(name)
-        for from self.entries const entry {
+        for from self.entries let entry {
             if ascii_lower(entry.name) ≡ folded {
                 return entry.value
             }
@@ -50,7 +50,7 @@ class Headers {
     fn values(string name) → list<string> {
         let string folded ← ascii_lower(name)
         mut list<string> out ← []
-        for from self.entries const entry {
+        for from self.entries let entry {
             if ascii_lower(entry.name) ≡ folded {
                 out.append(entry.value)
             }

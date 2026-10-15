@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = true
 summary = "Cartesian walk of two ranges with two binders."
-syntax = "for range <a>‥<b>, <c>‥<d> const <i>, <j> { }"
+syntax = "for range <a>‥<b>, <c>‥<d> let <i>, <j> { }"
 related = ["ex", "de", "apud"]
 locale = "en"
 +++
@@ -30,11 +30,11 @@ locale = "en"
 # =============================================================================
 
 main {
-    for range 0‥2, 0‥2 const i, j {
+    for range 0‥2, 0‥2 let i, j {
         print i
         print j
     }
-    for range 3‥5, 1‥3 const first, second {
+    for range 3‥5, 1‥3 let first, second {
         print first
         print second
     }

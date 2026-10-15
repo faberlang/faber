@@ -58,16 +58,16 @@ union Expr {
 
 fn evalua(Expr e) → int {
     match e {
-        case Numerus const valor {
+        case Numerus let valor {
             return valor
         }
-        case Nega const interior {
+        case Nega let interior {
             return 0 - evalua(interior)
         }
-        case Adde const sinister, dexter {
+        case Adde let sinister, dexter {
             return evalua(sinister) + evalua(dexter)
         }
-        case Multiplica const sinister, dexter {
+        case Multiplica let sinister, dexter {
             return evalua(sinister) * evalua(dexter)
         }
     }
@@ -75,16 +75,16 @@ fn evalua(Expr e) → int {
 
 fn depinge(Expr e) → string {
     match e {
-        case Numerus const valor {
+        case Numerus let valor {
             return "§"(valor)
         }
-        case Nega const interior {
+        case Nega let interior {
             return "-§"(depinge(interior))
         }
-        case Adde const sinister, dexter {
+        case Adde let sinister, dexter {
             return "(§ + §)"(depinge(sinister), depinge(dexter))
         }
-        case Multiplica const sinister, dexter {
+        case Multiplica let sinister, dexter {
             return "(§ * §)"(depinge(sinister), depinge(dexter))
         }
     }

@@ -73,8 +73,8 @@ fn sort_expression_body_key_is_stable_in_both_directions() {
         "{PERSONAE}
 incipit {{
     sit lista<Persona> ps ← [Persona {{ nomen = \"l\", aetas = 30 }}, Persona {{ nomen = \"m\", aetas = 30 }}, Persona {{ nomen = \"a\", aetas = 25 }}, Persona {{ nomen = \"c\", aetas = 25 }}]
-    nota nomina(ordinata via ascendens ex ps fixum p {{ redde p.aetas }})
-    nota nomina(ordinata via descendens ex ps fixum p {{ redde p.aetas }})
+    nota nomina(ordinata via ascendens ex ps sit p {{ redde p.aetas }})
+    nota nomina(ordinata via descendens ex ps sit p {{ redde p.aetas }})
     sit lista<numerus> e ← []
     nota ordinata via ascendens ex e
 }}

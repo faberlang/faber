@@ -16,7 +16,7 @@ diagnostic = "SEM011:loop_collection_shape_change"
 # queue with `while`.
 main {
     mut list<int> xs ← [1, 2, 3]
-    for from xs const x {
+    for from xs let x {
         xs.append(x)
     }
 }

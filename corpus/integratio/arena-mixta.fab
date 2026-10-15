@@ -61,11 +61,11 @@ main {
         let string navis ← n?.navis coalesce "nulla navis"
         return "§ :: § :: §"(n.nomen, navis, classificata(n.gradus))
     }
-    for from nautae const n {
+    for from nautae let n {
         print titulus(n)
     }
     mut list<int> gradus ← empty
-    for range 0…6 step 2 const i {
+    for range 0…6 step 2 let i {
         gradus.append(i * 3)
     }
     let list<int> magni ← gradus.filter(int g ∴ g ≥ 6).map(int g ∴ g + 1)

@@ -45,9 +45,9 @@ sit_decl ::= 'กำหนด' type_annotation? IDENTIFIER (('←' value_marker?
 # [017] ref_decl
 ref_decl ::= 'จาก' base_type IDENTIFIER '←' expression
 # [018] array_destruct
-array_destruct ::= ('คงที่' | 'แปร') array_pattern '←' expression
+array_destruct ::= ('กำหนด' | 'แปร') array_pattern '←' expression
 # [019] object_destruct
-object_destruct ::= ('คงที่' | 'แปร') object_pattern '←' expression
+object_destruct ::= ('กำหนด' | 'แปร') object_pattern '←' expression
 # [020] functio_decl
 functio_decl ::= 'ฟังก์ชัน' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 # [021] param_list
@@ -265,7 +265,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 # [127] dum_stmt
 dum_stmt ::= 'ขณะ' expression (block_stmt | ergo_joint statement) cape_clause?
 # [128] itera_stmt
-itera_stmt ::= 'วน' ('ออก' expression (',' expression)* | 'จาก' expression | 'ช่วง' expression (',' expression)*) apud_clause? filum_clause? ('คงที่' | 'แปร') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= 'วน' ('ออก' expression (',' expression)* | 'จาก' expression | 'ช่วง' expression (',' expression)*) apud_clause? filum_clause? ('กำหนด' | 'แปร') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 # [129] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [130] apud_clause
@@ -295,7 +295,7 @@ negated_number ::= '-' NUMBER
 # [142] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
 # [143] ut_pattern
-ut_pattern ::= ('ในชื่อ' IDENTIFIER) | (('คงที่' | 'แปร') pattern_binding (',' pattern_binding)*)
+ut_pattern ::= ('ในชื่อ' IDENTIFIER) | (('กำหนด' | 'แปร') pattern_binding (',' pattern_binding)*)
 # [144] pattern_binding
 pattern_binding ::= IDENTIFIER ('ในชื่อ' IDENTIFIER)?
 # [145] custodi_stmt
@@ -303,7 +303,7 @@ custodi_stmt ::= 'คุ้มครอง' '{' si_guard_clause+ '}'
 # [146] si_guard_clause
 si_guard_clause ::= 'ถ้า' expression (block_stmt | ergo_joint statement)
 # [147] ex_stmt
-ex_stmt ::= 'ออก' expression ('คงที่' | 'แปร') extract_fields
+ex_stmt ::= 'ออก' expression ('กำหนด' | 'แปร') extract_fields
 # [148] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
 # [149] extract_field
@@ -487,7 +487,7 @@ reducta_op ::= 'ผลรวม' | 'ผลคูณ' | 'สูงสุด' | '�
 # [238] reducta_group
 reducta_group ::= 'ตาม' expression
 # [239] reducta_body
-reducta_body ::= ('คงที่' | 'แปร') IDENTIFIER block_stmt
+reducta_body ::= ('กำหนด' | 'แปร') IDENTIFIER block_stmt
 # [240] reducta_identity
 reducta_identity ::= 'หรือว่าง' expression
 # [241] sort_expr
@@ -495,7 +495,7 @@ sort_expr ::= 'เรียง' 'ผ่านทาง' sort_direction ('ออ�
 # [242] sort_direction
 sort_direction ::= 'น้อยไปมาก' | 'มากไปน้อย'
 # [243] sort_body
-sort_body ::= ('คงที่' | 'แปร') IDENTIFIER block_stmt
+sort_body ::= ('กำหนด' | 'แปร') IDENTIFIER block_stmt
 # [244] filum_clause
 filum_clause ::= 'เส้นใย' IDENTIFIER
 # [245] capta_expr
@@ -1325,7 +1325,7 @@ construction literal (`Genus { field = value }`).
   count). Satisfaction stays nominal (D1.3): a witness must declare the bound
   itself.
 
-- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } ออก source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `ออก` must start on the closing `}`'s line — a line-leading `ออก` is instead the extraction statement (`ออก p คงที่ x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `ออก`); the source must be the same genus type as the constructor. `กระจาย` was removed from construction literals (D15.4); it stays for lists and calls.
+- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } ออก source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `ออก` must start on the closing `}`'s line — a line-leading `ออก` is instead the extraction statement (`ออก p กำหนด x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `ออก`); the source must be the same genus type as the constructor. `กระจาย` was removed from construction literals (D15.4); it stays for lists and calls.
 
 ### Annotations
 
@@ -2149,9 +2149,9 @@ prefer sugar. Choose per module or file.
 
 
 - `ขณะ` = while
-- `วน ออก...คงที่`/`วน ออก...แปร` = for-of (values)
-- `วน จาก...คงที่`/`วน จาก...แปร` = for-in (keys)
-- `วน ช่วง range คงที่/แปร i` = range iteration (e.g. `วน ช่วง 0‥10 ต่อ 2 คงที่ i { บันทึก i }`; `ต่อ` belongs to the range expression)
+- `วน ออก...กำหนด`/`วน ออก...แปร` = for-of (values)
+- `วน จาก...กำหนด`/`วน จาก...แปร` = for-in (keys)
+- `วน ช่วง range กำหนด/แปร i` = range iteration (e.g. `วน ช่วง 0‥10 ต่อ 2 กำหนด i { บันทึก i }`; `ต่อ` belongs to the range expression)
 
 **Range step and direction (`range_tail`, `ต่อ`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down
@@ -2196,7 +2196,7 @@ prints the same list shape up to element order.
 
 There is no iteration interface. `วน ออก` works on the built-in iterable
 types and on cursors. A user type that should be iterable exposes an ordinary
-method that returns a cursor (`วน ออก arbor.nodi() คงที่ n`); nothing is
+method that returns a cursor (`วน ออก arbor.nodi() กำหนด n`); nothing is
 called implicitly.
 
 **Changing the collection inside its own loop.** The rule is about the shape of
@@ -2266,7 +2266,7 @@ A negative number pattern is written with a leading minus (`กรณี -1`,
 `-` before anything else is not pattern syntax.
 
 `แยก` matches a closed set and nothing else: the variants of an `ลำดับ` or
-`สหภาพแยก`, or the members of a union (`กรณี numerus คงที่ n` over
+`สหภาพแยก`, or the members of a union (`กรณี numerus กำหนด n` over
 `numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
 pattern that is not a member of the scrutinee's closed set is rejected
 (`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
@@ -2455,7 +2455,7 @@ The `∷` glyph (U+2237, "proportion") explicitly ascribes a target type to an e
 Prefer typed construction for ordinary `ชนิด` values and `vacua` for ordinary empty collection values:
 
 ```fab
-fixum _ point ← Point { x = 10 }
+sit point ← Point { x = 10 }
 fixum lista<numerus> xs ← vacua
 ```
 
@@ -2612,13 +2612,13 @@ Implementation status (2026-10-11):
 Inline block example:
 
 ```fab
-fixum _ tag ← «inline»
+sit tag ← «inline»
 ```
 
 Multiline block example (newline after opening `«`):
 
 ```fab
-fixum _ blob ← «
+sit blob ← «
     select id, email
     from accounts
 »
@@ -2627,14 +2627,14 @@ fixum _ blob ← «
 Captured template example:
 
 ```fab
-fixum _ q ← `select * from accounts where id = §`(accountId)
+sit q ← `select * from accounts where id = §`(accountId)
 ```
 
 Octeti hex literal example:
 
 ```fab
-fixum _ sig ← |de ad be ef|
-fixum _ hello ← |48 65 6c 6c 6f|
+sit sig ← |de ad be ef|
+sit hello ← |48 65 6c 6c 6f|
 ```
 
 ### Format-Template Application
@@ -3033,7 +3033,7 @@ forms `ordina()` / `เรียง()` sort by the element's natural order. Both
 **stable** sort. The key selector's result must be a number or `textus`; other
 key types are rejected.
 
-`ออก` is used for iteration (`วน ออก items คงที่ x`) and imports (`นำเข้า ออก "path"`).
+`ออก` is used for iteration (`วน ออก items กำหนด x`) and imports (`นำเข้า ออก "path"`).
 
 ### Iteration coordinates (`ที่`)
 
@@ -3042,9 +3042,9 @@ en reader spelling is "at": `วน ออก grid ที่ [r, c]` reads as it
 `grid` at coordinates `[r, c]`.
 
 - **`lista`** (D3.1): one name binds the element's position
-  (`วน ออก items ที่ [i] คงที่ v`).
+  (`วน ออก items ที่ [i] กำหนด v`).
 - **`tabula`** (D3.1-D3.3): one name binds the entry's key
-  (`วน ออก m ที่ [k] คงที่ v`); a composite-key
+  (`วน ออก m ที่ [k] กำหนด v`); a composite-key
   `tabula<ทูเพิล<K1, …, Kn>, V>` takes N names, one per part of the `ทูเพิล`
   key, in declared part order.
 - **Tensor / matrix**: as before — one name per axis, first name = outermost
@@ -3059,8 +3059,8 @@ en reader spelling is "at": `วน ออก grid ที่ [r, c]` reads as it
   distinct from the element binder that follows the clause.
 - **`เส้นใย` lane binder (FLD K2).** An optional `เส้นใย IDENTIFIER` clause
   (`filum_clause`, shared with `ลดรูป`) follows the `ที่` clause and
-  precedes the mutability marker: `วน ออก t ที่ [i, j] เส้นใย f คงที่ v { … }`.
-  The clause also parses without `ที่` (`วน ออก t เส้นใย f คงที่ v { … }`).
+  precedes the mutability marker: `วน ออก t ที่ [i, j] เส้นใย f กำหนด v { … }`.
+  The clause also parses without `ที่` (`วน ออก t เส้นใย f กำหนด v { … }`).
   The parser claims `เส้นใย` only in that slot, so a binder named `เส้นใย` after
   the mutability marker stays an ordinary name. The binder is declared
   metadata; semantic passes own what it binds.

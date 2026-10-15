@@ -1863,7 +1863,7 @@ impl Parser {
         let has_body = !body_barred && self.inline_body_head();
         let (mutability, binding, body) = if has_body {
             (
-                self.parse_mutability()?,
+                self.parse_binder_mutability()?,
                 Some(self.parse_ident()?),
                 Some(self.parse_block()?),
             )
@@ -1939,7 +1939,7 @@ impl Parser {
         let has_body = !body_barred && self.inline_body_head();
         let (mutability, binding, body) = if has_body {
             (
-                self.parse_mutability()?,
+                self.parse_binder_mutability()?,
                 Some(self.parse_ident()?),
                 Some(self.parse_block()?),
             )
@@ -2007,15 +2007,13 @@ impl Parser {
             .with_arg("operators", operators)
     }
 
-    /// Whether the cursor is an inline body head: `(fixum | varia) NAME {`.
+    /// Whether the cursor is an inline body head: `(sit | varia) NAME {`.
     ///
     /// Reduce and sort expressions attach such a head only outside a barred
     /// loop body; that guard stays with the caller.
     fn inline_body_head(&self) -> bool {
-        matches!(
-            self.keyword_ident_at(0),
-            Some(TokenKind::Fixum | TokenKind::Varia)
-        ) && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+        self.binder_head_word_at(0)
+            && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
             && self.peek_at(2).kind == TokenKind::LBrace
     }
 
@@ -2051,7 +2049,7 @@ impl Parser {
         }
         let has_term_body = self.inline_body_head();
         if has_term_body {
-            self.parse_mutability()?;
+            self.parse_binder_mutability()?;
             self.parse_ident()?;
             self.parse_block()?;
         } else if self.eat_keyword_ident(TokenKind::Vel) {

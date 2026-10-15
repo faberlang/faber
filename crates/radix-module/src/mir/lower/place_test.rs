@@ -138,7 +138,7 @@ locale = "en"
 @ kernel
 @ public
 fn bump(tf32[_] input, mut tf32[_] output) → void {
-    for from input at [i] thread lane const x {
+    for from input at [i] thread lane let x {
         output[i] ← x + 1.0
     }
 }

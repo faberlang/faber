@@ -32,7 +32,7 @@ fn rejected(source: &str, reason: &str) {
 
 fn body(statements: &str) -> String {
     format!(
-        "incipit {{\n varia tensor<numerus, [4]> grid ← vacua\n itera ex grid apud [i] filum lane fixum value {{\n {statements}\n }}\n }}"
+        "incipit {{\n varia tensor<numerus, [4]> grid ← vacua\n itera ex grid apud [i] filum lane sit value {{\n {statements}\n }}\n }}"
     )
 }
 
@@ -61,7 +61,7 @@ fn hidden_mutating_call_write_rejected() {
 functio poke(varia tensor<numerus, [4]> target) → vacuum { target[0] ← 9 }
 incipit {
     varia tensor<numerus, [4]> grid ← vacua
-    itera ex grid apud [i] filum lane fixum value {
+    itera ex grid apud [i] filum lane sit value {
         grid[i] ← value
         poke(varia grid)
     }
@@ -79,7 +79,7 @@ genus Counter {
 incipit {
     varia tensor<numerus, [4]> grid ← vacua
     varia Counter counter ← Counter { count = 0 }
-    itera ex grid apud [i] filum lane fixum value {
+    itera ex grid apud [i] filum lane sit value {
         grid[i] ← value
         nota counter.accipe(i)
     }
@@ -121,7 +121,7 @@ fn direct_alias_neighbor_rejected() {
         r"incipit {
     varia tensor<numerus, [4]> grid ← vacua
     varia tensor<numerus, [4]> alias ← grid
-    itera ex grid apud [i] filum lane fixum value {
+    itera ex grid apud [i] filum lane sit value {
         grid[i] ← alias[i + 1]
     }
 }",
@@ -134,7 +134,7 @@ fn direct_alias_neighbor_rejected() {
     varia tensor<numerus, [4]> other ← vacua
     varia tensor<numerus, [4]> alias ← other
     si verum { alias ← grid }
-    itera ex grid apud [i] filum lane fixum value {
+    itera ex grid apud [i] filum lane sit value {
         grid[i] ← alias[i + 1]
     }
 }",
@@ -151,7 +151,7 @@ incipit {
     varia tensor<numerus, [4]> grid ← vacua
     varia Holder holder ← Holder { data = grid }
     varia tensor<numerus, [4]> alias ← holder.data
-    itera ex grid apud [i] filum lane fixum value {
+    itera ex grid apud [i] filum lane sit value {
         grid[i] ← alias[i + 1]
     }
 }",
@@ -164,7 +164,7 @@ fn transformed_view_neighbor_rejected() {
     rejected(
         r"incipit {
     varia tensor<numerus, [2, 2]> grid ← vacua
-    itera ex grid apud [i, j] filum lane fixum value {
+    itera ex grid apud [i, j] filum lane sit value {
         sit numerus neighbor ← grid.transpone().accipe([i, j])
         grid.ponde([i, j], neighbor)
     }
@@ -174,7 +174,7 @@ fn transformed_view_neighbor_rejected() {
     rejected(
         r"incipit {
     varia tensor<numerus, [4]> grid ← vacua
-    itera ex grid apud [i] filum lane fixum value {
+    itera ex grid apud [i] filum lane sit value {
         sit numerus neighbor ← grid.sectio(1, 4).accipe([i])
         grid[i] ← neighbor
     }
@@ -189,7 +189,7 @@ fn explicit_copied_storage_accepted() {
         r"incipit {
     varia tensor<numerus, [4]> grid ← vacua
     varia tensor<numerus, [4]> independent ← copy grid
-    itera ex grid apud [i] filum lane fixum value {
+    itera ex grid apud [i] filum lane sit value {
         grid[i] ← independent[0]
     }
 }",
@@ -204,7 +204,7 @@ fn tensor_conversio_initializer_proves_fresh_storage() {
         r"incipit {
     sit tensor<numerus, [4]> lanes ← [1, 2, 3, 4] ↦ tensor<numerus, [4]>
     varia tensor<numerus, [4]> grid ← vacua
-    itera ex lanes apud [i] filum lane fixum value {
+    itera ex lanes apud [i] filum lane sit value {
         grid[i] ← value
     }
 }",
@@ -220,7 +220,7 @@ fn float_literal_conversio_initializer_proves_fresh_storage() {
         r"incipit {
     sit tf32[2] lanes ← [1.0, 2.0] ↦ tf32[2]
     varia tf32[2] grid ← tf32[2] {}
-    itera ex lanes apud [i] filum lane fixum value {
+    itera ex lanes apud [i] filum lane sit value {
         grid[i] ← value
     }
 }",
@@ -234,7 +234,7 @@ fn tensor_constructor_initializer_proves_fresh_storage() {
     accepted(
         r"incipit {
     varia tf32[4] grid ← tf32[4] {}
-    itera ex grid apud [i] filum lane fixum value {
+    itera ex grid apud [i] filum lane sit value {
         grid[i] ← value
     }
 }",
@@ -249,7 +249,7 @@ fn tensor_source_conversio_keeps_unknown_decline() {
         r"incipit {
     varia tensor<numerus, [4]> lanes ← vacua
     varia tensor<numerus, [4]> copy ← lanes ↦ tensor<numerus, [4]>
-    itera ex lanes apud [i] filum lane fixum value {
+    itera ex lanes apud [i] filum lane sit value {
         copy[i] ← value
     }
 }",
@@ -263,7 +263,7 @@ fn outer_local_update_rejected() {
         r"incipit {
     varia tensor<numerus, [4]> grid ← vacua
     varia numerus total ← 0
-    itera ex grid apud [i] filum lane fixum value {
+    itera ex grid apud [i] filum lane sit value {
         total ← total + value
     }
 }",
@@ -284,7 +284,7 @@ fn ordinary_non_filum_loop_unchanged() {
         r"incipit {
     varia tensor<numerus, [4]> grid ← vacua
     varia numerus total ← 0
-    itera ex grid apud [i] fixum value {
+    itera ex grid apud [i] sit value {
         total ← total + grid[i + 1]
         grid[0] ← total
     }

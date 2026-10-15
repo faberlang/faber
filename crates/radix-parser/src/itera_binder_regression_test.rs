@@ -2,20 +2,20 @@ use crate::test_support::{ParseExpectation, assert_parse_error_matches, parse_ok
 use radix_syntax::{BindingPattern, ExprKind, IteraMode, StmtKind};
 
 #[test]
-fn rejects_de_var_reproduction_with_const_repair() {
+fn rejects_de_var_reproduction_with_fixed_repair() {
     let source = "itera de ys varia y { y ← y + 5 }";
     assert_parse_error_matches(
         source,
         ParseExpectation::Args(&[
             ("issue", "itera_de_requires_fixum"),
-            ("expected", "the const form `fixum`"),
+            ("expected", "the fixed form `sit`"),
         ]),
     );
 }
 
 #[test]
 fn parses_range_underscore_binder_as_identifier() {
-    let result = parse_ok("itera ex 0‥3 fixum _ { tacet }");
+    let result = parse_ok("itera ex 0‥3 sit _ { tacet }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");
@@ -31,7 +31,7 @@ fn parses_lockstep_source_series_with_matching_binder_series() {
     // Need: `ex` alone admits the comma-separated series; the
     // binder series is names. Arity is a semantic law, so a count mismatch
     // still parses (and is pinned by corpus/itera/lockstep-decline.fab).
-    let result = parse_ok("itera ex ks, vs, ts apud [i] fixum k, v, t { tacet }");
+    let result = parse_ok("itera ex ks, vs, ts apud [i] sit k, v, t { tacet }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");
@@ -53,7 +53,7 @@ fn parses_ab_range_source_series_n2_with_exact_counts() {
     // existing `sources` vector; binder names stay the `itera_binding` series.
     // Whether every member is a range is NR-2's semantic law, not a parse
     // decision.
-    let result = parse_ok("itera ab 0‥m, 0‥n fixum i, j { tacet }");
+    let result = parse_ok("itera ab 0‥m, 0‥n sit i, j { tacet }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");
@@ -84,7 +84,7 @@ fn parses_ab_range_source_series_n2_with_exact_counts() {
 
 #[test]
 fn parses_ab_range_source_series_n3_with_exact_counts() {
-    let result = parse_ok("itera ab 0‥m, 0‥n, 0‥k fixum i, j, p { tacet }");
+    let result = parse_ok("itera ab 0‥m, 0‥n, 0‥k sit i, j, p { tacet }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");
@@ -113,7 +113,7 @@ fn parses_ab_range_source_series_n3_with_exact_counts() {
 fn parses_ab_single_source_shape_unchanged() {
     // N=1 `ab` stays exactly one source and one binder through the widened
     // series gate.
-    let result = parse_ok("itera ab 0‥m fixum i { tacet }");
+    let result = parse_ok("itera ab 0‥m sit i { tacet }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");
@@ -126,7 +126,7 @@ fn parses_ab_single_source_shape_unchanged() {
 fn parses_mixed_ab_source_series_for_semantic_phase() {
     // `0‥m, n` must parse into the series; the range-membership decline is
     // NR-2's dedicated SEM010 issue, never a generic parser error.
-    let result = parse_ok("itera ab 0‥m, n fixum i, j { tacet }");
+    let result = parse_ok("itera ab 0‥m, n sit i, j { tacet }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");
@@ -149,10 +149,10 @@ fn de_source_series_still_rejected() {
     // the head declines at the mutability marker (the parser is already past
     // the single source expression when the comma appears).
     assert_parse_error_matches(
-        "itera de ks, vs fixum k { tacet }",
+        "itera de ks, vs sit k { tacet }",
         ParseExpectation::Args(&[
             ("issue", "mutability_marker"),
-            ("expected", "'fixum' or 'varia'"),
+            ("expected", "'sit' or 'varia'"),
         ]),
     );
 }
@@ -162,7 +162,7 @@ fn parses_filum_clause_after_apud() {
     // BUG-4D4D0AE9 (K2): the lane-binder clause rides the shared itera
     // head in the same position as `summa`'s (`filum` IDENTIFIER after
     // the apud clause, before the mutability marker).
-    let result = parse_ok("itera ex t apud [i, j] filum f fixum v { tacet }");
+    let result = parse_ok("itera ex t apud [i, j] filum f sit v { tacet }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");
@@ -178,7 +178,7 @@ fn parses_filum_clause_after_apud() {
 
 #[test]
 fn parses_filum_clause_without_apud() {
-    let result = parse_ok("itera ex t filum f fixum v { tacet }");
+    let result = parse_ok("itera ex t filum f sit v { tacet }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");
@@ -193,7 +193,7 @@ fn filum_stays_usable_as_an_ordinary_name_outside_the_clause_slot() {
     // `filum` is claimed by registry identity only in the clause position:
     // a binder named `filum` after the mutability marker still parses, and
     // a loop-less `filum` identifier stays an ordinary name.
-    let result = parse_ok("itera ex t fixum filum { tacet }");
+    let result = parse_ok("itera ex t sit filum { tacet }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");

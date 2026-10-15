@@ -456,10 +456,10 @@ fn parse_header(string wire, int start) → cursor.Scan ⇥ string {
 
 fn concat_keys(list<string> prefix, list<string> extra) → list<string> {
     mut list<string> out ← empty
-    for from prefix const key {
+    for from prefix let key {
         out.append(key)
     }
-    for from extra const key {
+    for from extra let key {
         out.append(key)
     }
     return out
@@ -468,7 +468,7 @@ fn concat_keys(list<string> prefix, list<string> extra) → list<string> {
 fn copy_map(map<string, value> src) → map<string, value> {
     mut map<string, value> out ← empty
     let list<string> keys ← src.keys()
-    for from keys const key {
+    for from keys let key {
         out.put(key, src.get(key))
     }
     return out

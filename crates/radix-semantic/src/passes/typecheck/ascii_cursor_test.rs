@@ -53,7 +53,7 @@ fn itera_ex_ascii_cursor_binds_littera() {
     test_support::assert_accepts_la(
         r"incipit {
     sit ascii s ← 'ab'
-    itera ex s.cursor() fixum c {
+    itera ex s.cursor() sit c {
         sit littera x ← c
         nota x
     }
@@ -89,7 +89,7 @@ fn itera_de_ascii_cursor_requires_ex() {
     test_support::assert_rejects_with_issue_la(
         r"incipit {
     sit ascii s ← 'ab'
-    itera de s.cursor() fixum c {
+    itera de s.cursor() sit c {
         nota c
     }
 }",

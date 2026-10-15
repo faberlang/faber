@@ -16,7 +16,7 @@ fn session() -> Session {
 fn bounded_lista_ex_lowers_to_len_static_split() {
     let source = r"functio sumBounded(lista<numerus, 8> xs) → numerus {
   varia numerus total ← 0
-  itera ex xs fixum x {
+  itera ex xs sit x {
     total ← total + x
   }
   redde total
@@ -57,7 +57,7 @@ fn bounded_lista_ex_arm_k_unrolls_only_lanes_below_k() {
     // lista<numerus, 3>: arm 2 must read exactly lanes 0 and 1 by constant
     // index — no dead-slot (i >= len) read anywhere in the split.
     let source = r"functio visit(lista<numerus, 3> xs) → vacuum {
-  itera ex xs fixum x {
+  itera ex xs sit x {
     nota x
   }
   redde
@@ -90,7 +90,7 @@ fn bounded_lista_ex_capacity_above_ten_stays_unsupported() {
         &session(),
         "bounded-itera.fab",
         r"functio big(lista<numerus, 11> xs) → vacuum {
-  itera ex xs fixum x {
+  itera ex xs sit x {
     nota x
   }
   redde
@@ -123,7 +123,7 @@ fn lowers_scalar_bounded_buffers_to_live_prefix_static_splits() {
         (
             "octeti<8>",
             r"functio visit(octeti<8> xs) → vacuum {
-  itera ex xs fixum b {
+  itera ex xs sit b {
     nota b
   }
   redde
@@ -132,7 +132,7 @@ fn lowers_scalar_bounded_buffers_to_live_prefix_static_splits() {
         (
             "ascii<8>",
             r"functio visit(ascii<8> xs) → vacuum {
-  itera ex xs fixum c {
+  itera ex xs sit c {
     nota c
   }
   redde
@@ -141,7 +141,7 @@ fn lowers_scalar_bounded_buffers_to_live_prefix_static_splits() {
         (
             "textus<8>",
             r"functio visit(textus<8> xs) → vacuum {
-  itera ex xs fixum c {
+  itera ex xs sit c {
     nota c
   }
   redde
@@ -189,7 +189,7 @@ fn scalar_bounded_buffers_capacity_above_ten_stay_unsupported() {
         &session(),
         "bounded-itera.fab",
         r"functio big(textus<11> xs) → vacuum {
-  itera ex xs fixum c {
+  itera ex xs sit c {
     nota c
   }
   redde

@@ -19,7 +19,7 @@ fn width<size D>(tensor<f32, [D]> wx) → int {
 @ kernel
 @ public
 fn gather<size V, size D>(tensor<f32, [D]> gdom, tensor<f32, [V, D]> gtable, tensor<i32, [1]> gids, mut tensor<f32, [D]> gout) → void {
-    for from gdom at [j] thread lane const e {
+    for from gdom at [j] thread lane let e {
         gout[[j]] ← gtable[[gids[0] ↦ int, j]]
     }
 }

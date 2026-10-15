@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = true
 summary = "One shared at [i] coordinate on a lockstep list walk."
-syntax = "for from <a>, <b> at [i] const <x>, <y> { }"
+syntax = "for from <a>, <b> at [i] let <x>, <y> { }"
 related = ["apud", "itera", "ex"]
 locale = "en"
 +++
@@ -29,14 +29,14 @@ locale = "en"
 main {
     let list<string> labels ← ["a", "b", "c"]
     let list<int> values ← [1, 2, 3]
-    for from labels, values at [i] const label, value {
+    for from labels, values at [i] let label, value {
         print i
         print label
     }
     let list<int> bases ← [100, 200]
     let list<int> keys ← [1, 2]
     let list<int> payloads ← [10, 20]
-    for from bases, keys, payloads at [slot] const base, key, payload {
+    for from bases, keys, payloads at [slot] let base, key, payload {
         let int total ← slot + base + key + payload
         print total
     }

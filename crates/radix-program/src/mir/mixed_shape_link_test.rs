@@ -14,7 +14,7 @@ locale = "en"
 @ public { }
 fn family<size Figura>(list<tensor<f32, Figura>> params, list<tensor<f32, Figura>> grads, f32 lr) → list<tensor<f32, Figura>> {
     mut list<tensor<f32, Figura>> out ← empty
-    for range 0‥params.length() const i {
+    for range 0‥params.length() let i {
         out.append(params[i] - grads[i] * lr)
     }
     return out

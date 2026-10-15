@@ -69,7 +69,7 @@ fn text_comparison() {
 #[test]
 fn iteration_loop() {
     assert_eq!(
-        rejected("main {\n    for range 0‥3 const i {\n        print i\n    }\n}"),
+        rejected("main {\n    for range 0‥3 let i {\n        print i\n    }\n}"),
         "iteration loop"
     );
 }

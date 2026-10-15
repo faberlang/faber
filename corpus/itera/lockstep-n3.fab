@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = true
 summary = "Lockstep walk of three lists with three binders."
-syntax = "for from <a>, <b>, <c> const <x>, <y>, <z> { }"
+syntax = "for from <a>, <b>, <c> let <x>, <y>, <z> { }"
 related = ["ex", "de", "apud"]
 locale = "en"
 +++
@@ -29,14 +29,14 @@ main {
     let list<int> bases ← [100, 200, 300]
     let list<int> keys ← [1, 2, 3]
     let list<int> payloads ← [10, 20, 30]
-    for from bases, keys, payloads const base, key, payload {
+    for from bases, keys, payloads let base, key, payload {
         let int total ← base + key + payload
         print total
     }
     let list<int> rows ← [1, 2]
     let list<int> cols ← [3, 4]
     let list<int> cells ← [5, 6]
-    for from rows, cols, cells const row, col, cell {
+    for from rows, cols, cells let row, col, cell {
         let int grid ← row * col + cell
         print grid
     }

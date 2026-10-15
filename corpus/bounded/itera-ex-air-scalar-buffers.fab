@@ -45,17 +45,17 @@ diagnostic = "SEM059:runtime_conversion"
 @ radix lane "air"
 fn full_bytes() → void {
     let list<b8, 8> xs ← |de ad be ef ba dc fe ca| ↦ list<b8, 8>
-    for from xs const b { }
+    for from xs let b { }
 }
 
 @ radix lane "air"
 fn full_ascii() → void {
     let ascii<8> xs ← 'alphabet' ↦ ascii<8>
-    for from xs const c { }
+    for from xs let c { }
 }
 
 @ radix lane "air"
 fn full_string() → void {
     let string<8> xs ← "abcdefgh" ↦ string<8>
-    for from xs const c { }
+    for from xs let c { }
 }

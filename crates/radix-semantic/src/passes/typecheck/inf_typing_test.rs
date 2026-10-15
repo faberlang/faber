@@ -533,7 +533,7 @@ fn a_conversion_into_a_float_of_a_constant_beyond_its_range_is_a_compile_error()
 fn increment_and_range_loops_over_inf_type_check() {
     test_support::assert_accepts_la("incipit {\nvaria inf x ← 1\nx ↑\nnota x\n}\n");
     test_support::assert_accepts_la(
-        "incipit {\nsit inf n ← 3\nitera ab 0‥n fixum i {\nnota i\n}\n}\n",
+        "incipit {\nsit inf n ← 3\nitera ab 0‥n sit i {\nnota i\n}\n}\n",
     );
 }
 

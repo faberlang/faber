@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "A `thread` loop nested in a `thread` loop writes the composed coordinate and runs as the plain nest."
-syntax = "for from rows at [i] thread a const r { for from cols at [j] thread b const c { grid[[i, j]] ← r + c } }"
+syntax = "for from rows at [i] thread a let r { for from cols at [j] thread b let c { grid[[i, j]] ← r + c } }"
 related = ["apud", "itera", "ex", "filum", "thread"]
 locale = "en"
 +++
@@ -45,14 +45,14 @@ main {
     mut tf32[2, 3] grid ← tf32[2, 3] {}
     mut tf32[2, 3] plain ← tf32[2, 3] {}
 
-    for from rows at [i] thread outer const row {
-        for from cols at [j] thread inner const col {
+    for from rows at [i] thread outer let row {
+        for from cols at [j] thread inner let col {
             grid[[i, j]] ← row + col
         }
     }
 
-    for from rows at [i] const row {
-        for from cols at [j] const col {
+    for from rows at [i] let row {
+        for from cols at [j] let col {
             plain[[i, j]] ← row + col
         }
     }

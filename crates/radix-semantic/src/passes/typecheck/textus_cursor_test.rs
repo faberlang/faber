@@ -54,7 +54,7 @@ fn itera_ex_textus_cursor_binds_littera() {
     test_support::assert_accepts(
         r#"incipit {
     sit textus s ← "ab"
-    itera ex s.cursor() fixum c {
+    itera ex s.cursor() sit c {
         sit littera x ← c
         nota x
     }
@@ -100,7 +100,7 @@ fn itera_de_textus_cursor_requires_ex() {
     test_support::assert_rejects_with_issue(
         r#"incipit {
     sit textus s ← "ab"
-    itera de s.cursor() fixum c {
+    itera de s.cursor() sit c {
         nota c
     }
 }"#,

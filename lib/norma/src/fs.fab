@@ -505,10 +505,10 @@ fn glob(string root, string pattern) → list<string> ⇥ string {
 
         mut list<string> proximos ← []
         if segment ≡ "*" {
-            for from candidatos const base {
+            for from candidatos let base {
                 do {
                     let list<string> entries ← list_dir(base)
-                    for from entries const entry {
+                    for from entries let entry {
                         proximos.append(join_two(base, entry))
                     }
                 }
@@ -518,7 +518,7 @@ fn glob(string root, string pattern) → list<string> ⇥ string {
             }
         }
         else {
-            for from candidatos const base {
+            for from candidatos let base {
                 let string path ← join_two(base, segment)
                 if exists(path) {
                     proximos.append(path)

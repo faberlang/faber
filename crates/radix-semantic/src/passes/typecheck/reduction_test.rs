@@ -47,14 +47,14 @@ fn filum_placement_and_alignment_are_checked() {
         r"
 @ nucleum
 functio k(tensor<f32, [32]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] filum f fixum s { redde s }
+    redde reducta via summa ex xs apud [i] filum f sit s { redde s }
 }
 ",
     );
     assert_rejects_with_issue(
         r"
 functio k(tensor<f32, [32]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] filum f fixum s { redde s }
+    redde reducta via summa ex xs apud [i] filum f sit s { redde s }
 }
 ",
         "reducta_filum_requires_nucleum_kernel",
@@ -63,7 +63,7 @@ functio k(tensor<f32, [32]> xs) → f32 {
         r"
 @ nucleum
 functio k(tensor<f32, [33]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] filum f fixum s { redde s }
+    redde reducta via summa ex xs apud [i] filum f sit s { redde s }
 }
 ",
         "reducta_tail_not_aligned",
@@ -95,7 +95,7 @@ fn body_requires_one_value_return_and_rejects_captured_mutation() {
     assert_rejects_with_issue(
         r"
 functio sum(tensor<numerus, [4]> xs) → numerus {
-    redde reducta via summa ex xs fixum x { x }
+    redde reducta via summa ex xs sit x { x }
 }
 ",
         "reducta_body_requires_single_redde",
@@ -104,7 +104,7 @@ functio sum(tensor<numerus, [4]> xs) → numerus {
         r"
 functio sum(tensor<numerus, [4]> xs) → numerus {
     varia numerus captured ← 0
-    redde reducta via summa ex xs fixum x { captured ← captured + 1 redde x }
+    redde reducta via summa ex xs sit x { captured ← captured + 1 redde x }
 }
 ",
         "reducta_body_effect",

@@ -25,7 +25,7 @@ fn evens(int limit) → list<int> {
 
 fn total(list<int> xs) → int {
     mut int sum ← 0
-    for from xs const x {
+    for from xs let x {
         sum ← sum + x
     }
     return sum

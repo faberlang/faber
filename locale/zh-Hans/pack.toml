@@ -372,10 +372,6 @@ help = "只保留一个 '{keyword}' rest binding"
 message = "'{keyword}' 直接绑定单个标识符；请使用 '{keyword}' name ← expr"
 help = "写成 '{keyword}' name ← expr，或对 typed/destructured bindings 使用 fixum"
 
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit 不支持 destructuring patterns"
-help = "对 destructuring pattern 使用 fixum"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "需要 test case 或 setup"
 help = "用 '{proba}'、'{probandum}' 或 '{setup}' 开始 body item"
@@ -515,6 +511,14 @@ help = "写成 `{keyword} T {name} ← {marker} value`；后面的 `{name} ← {
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "运行时的 `{keyword}` 声明已废弃；`{name}` 是运行时名称"
 help = "写成 `{sit} T {name} ← …`（或用 `{sit} {name} ← …` 推断类型）；`{fixum}` 表示编译期事实，与 `=` 搭配"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "`{keyword}` 绑定词已废弃"
+help = "绑定名使用 `{sit}`（固定名称）或 `{varia}`（可写名称）；`{fixum}` 表示编译期事实，与 `=` 搭配"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` 不能引入绑定名"
+help = "绑定名对应每次迭代或匹配的值；固定名称写 `{sit}`，可写名称写 `{varia}`"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "`{keyword}` 局部变量需要一个可读取的位置：`{keyword} T name ← place`"

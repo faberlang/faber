@@ -1541,7 +1541,7 @@ fn lowers_payload_variant_discerne_to_branch_chain_and_field_bindings() {
 
 functio handle(Event event) → vacuum {
   discerne event {
-    casu Click fixum x, y {
+    casu Click sit x, y {
       nota x
       nota y
     }
@@ -1786,7 +1786,7 @@ fn lowers_numeric_range_itera_ab_to_loop_cfg() {
     let dump = dump_source(
         r"functio range_sum() → numerus {
   varia numerus total ← 0
-  itera ab 0‥4 fixum i {
+  itera ab 0‥4 sit i {
     total ← total + i
   }
   redde total
@@ -1861,7 +1861,7 @@ fn edge_empty_range_itera_ab_skips_loop_body() {
     let dump = dump_source(
         r"functio noop() → numerus {
   varia numerus total ← 0
-  itera ab 0‥0 fixum i {
+  itera ab 0‥0 sit i {
     total ← total + i
   }
   redde total
@@ -1882,7 +1882,7 @@ fn lowers_shaped_tensor_and_matrix_collections() {
     // through static MatrixCell projections behind the coordinate loop.
     let tensor_dump = dump_source(
         r"functio iterate(tensor<f32, [2, 3]> m) → vacuum {
-  itera ex m apud [i, j] fixum cell {
+  itera ex m apud [i, j] sit cell {
     nota i
     nota j
     nota cell
@@ -1904,7 +1904,7 @@ fn lowers_shaped_tensor_and_matrix_collections() {
 
     let matrix_dump = dump_source(
         r"functio iterate(matrix<f32, [2, 3]> m) → vacuum {
-  itera ex m apud [i, j] fixum cell {
+  itera ex m apud [i, j] sit cell {
     nota i
     nota j
     nota cell
@@ -1934,7 +1934,7 @@ fn lowers_array_itera_ex_and_de_to_index_loops() {
     let ex_dump = dump_source(
         r"functio sumArray(lista<numerus> nums) → numerus {
   varia numerus total ← 0
-  itera ex nums fixum n {
+  itera ex nums sit n {
     total ← total + n
   }
   redde total
@@ -1948,7 +1948,7 @@ fn lowers_array_itera_ex_and_de_to_index_loops() {
 
     let de_dump = dump_source(
         r"functio firstIndex(lista<numerus> nums) → numerus {
-  itera de nums fixum index {
+  itera de nums sit index {
     redde index
   }
   redde 0
@@ -1969,7 +1969,7 @@ fn lowers_lockstep_itera_to_one_aligned_index_walk() {
     let dump = dump_source(
         r"functio summaVecta(lista<numerus> ks, lista<numerus> vs) → numerus {
   varia numerus total ← 0
-  itera ex ks, vs fixum k, v {
+  itera ex ks, vs sit k, v {
     total ← total + k + v
   }
   redde total
@@ -2002,7 +2002,7 @@ fn lockstep_itera_unequal_lengths_abort_fail_closed() {
             r"incipit {
   varia lista<numerus> ks ← [1, 2, 3]
   varia lista<numerus> vs ← [10, 20]
-  itera ex ks, vs fixum k, v {
+  itera ex ks, vs sit k, v {
     nota k + v
   }
 }",
@@ -2027,10 +2027,10 @@ fn lockstep_itera_runs_aligned_walks_with_shared_coordinate() {
   varia lista<numerus> ks ← [1, 2, 3]
   varia lista<numerus> vs ← [10, 20, 30]
   varia lista<textus> ts ← ["a", "b", "c"]
-  itera ex ks, vs fixum k, v {
+  itera ex ks, vs sit k, v {
     nota k + v
   }
-  itera ex ks, vs, ts apud [i] fixum k, v, t {
+  itera ex ks, vs, ts apud [i] sit k, v, t {
     nota t
   }
 }"#,
@@ -2049,7 +2049,7 @@ fn range_product_two_axes_walk_row_major_leftmost_outermost() {
         &Session::new(Config::default().with_target(Target::HirTypeScript)),
         "range-product-n2.fab",
         r"incipit {
-  itera ab 0‥2, 0‥3 fixum i, j {
+  itera ab 0‥2, 0‥3 sit i, j {
     nota i * 10 + j
   }
 }",
@@ -2068,7 +2068,7 @@ fn range_product_three_axes_preserve_every_binder() {
         &Session::new(Config::default().with_target(Target::HirTypeScript)),
         "range-product-n3.fab",
         r"incipit {
-  itera ab 0‥2, 0‥2, 0‥2 fixum i, j, p {
+  itera ab 0‥2, 0‥2, 0‥2 sit i, j, p {
     nota i * 100 + j * 10 + p
   }
 }",
@@ -2087,7 +2087,7 @@ fn range_product_keeps_per_axis_step_and_inclusive_bounds() {
         &Session::new(Config::default().with_target(Target::HirTypeScript)),
         "range-product-semantics.fab",
         r"incipit {
-  itera ab 0‥4 per 2, 0…2 fixum i, j {
+  itera ab 0‥4 per 2, 0…2 sit i, j {
     nota i * 10 + j
   }
 }",
@@ -2103,7 +2103,7 @@ fn range_product_lowers_as_ordered_nest_without_zip_guard() {
     // no lockstep walk, no list length read, no equal-length admission.
     let dump = dump_source(
         r"functio grid(numerus m, numerus n) → vacuum {
-  itera ab 0‥m, 0‥n fixum i, j {
+  itera ab 0‥m, 0‥n sit i, j {
     nota i
     nota j
   }
@@ -2146,7 +2146,7 @@ fn range_product_rumpe_exits_innermost_axis_and_perge_continues_it() {
         &Session::new(Config::default().with_target(Target::HirTypeScript)),
         "range-product-rumpe.fab",
         r"incipit {
-  itera ab 0‥2, 0‥3 fixum i, j {
+  itera ab 0‥2, 0‥3 sit i, j {
     si j ≡ 2 {
       rumpe
     }
@@ -2168,7 +2168,7 @@ fn range_product_rumpe_exits_innermost_axis_and_perge_continues_it() {
         &Session::new(Config::default().with_target(Target::HirTypeScript)),
         "range-product-perge.fab",
         r"incipit {
-  itera ab 0‥2, 0‥3 fixum i, j {
+  itera ab 0‥2, 0‥3 sit i, j {
     si j ≡ 1 {
       perge
     }
@@ -2197,7 +2197,7 @@ fn borrowed_receiver_itera_ex_lowers_by_pointee_with_by_value_identical_dump() {
         "de",
         r"functio summa(MODUS lista<numerus> xs) → numerus {
   varia numerus total ← 0
-  itera ex xs fixum n {
+  itera ex xs sit n {
     total ← total + n
   }
   redde total
@@ -2207,7 +2207,7 @@ fn borrowed_receiver_itera_ex_lowers_by_pointee_with_by_value_identical_dump() {
         "",
         r"functio summa(MODUS lista<numerus> xs) → numerus {
   varia numerus total ← 0
-  itera ex xs fixum n {
+  itera ex xs sit n {
     total ← total + n
   }
   redde total
@@ -2227,7 +2227,7 @@ fn borrowed_receiver_itera_ex_lowers_by_pointee_with_by_value_identical_dump() {
 
 functio summaCrateris(MODUS Crater c) → numerus {
   varia numerus total ← 0
-  itera ex c.mensurae fixum n {
+  itera ex c.mensurae sit n {
     total ← total + n
   }
   redde total
@@ -2241,7 +2241,7 @@ functio summaCrateris(MODUS Crater c) → numerus {
 
 functio summaCrateris(MODUS Crater c) → numerus {
   varia numerus total ← 0
-  itera ex c.mensurae fixum n {
+  itera ex c.mensurae sit n {
     total ← total + n
   }
   redde total
@@ -2260,7 +2260,7 @@ functio summaCrateris(MODUS Crater c) → numerus {
         "de",
         r"functio summaPondereum(MODUS tabula<textus, numerus> pondera) → numerus {
   varia numerus total ← 0
-  itera ex pondera fixum v {
+  itera ex pondera sit v {
     total ← total + v
   }
   redde total
@@ -2270,7 +2270,7 @@ functio summaCrateris(MODUS Crater c) → numerus {
         "",
         r"functio summaPondereum(MODUS tabula<textus, numerus> pondera) → numerus {
   varia numerus total ← 0
-  itera ex pondera fixum v {
+  itera ex pondera sit v {
     total ← total + v
   }
   redde total
@@ -2295,7 +2295,7 @@ functio summaCrateris(MODUS Crater c) → numerus {
         "de",
         r"functio numerateClaves(MODUS tabula<textus, numerus> pondera) → numerus {
   varia numerus total ← 0
-  itera de pondera fixum k {
+  itera de pondera sit k {
     total ← total + pondera[k]
   }
   redde total
@@ -2305,7 +2305,7 @@ functio summaCrateris(MODUS Crater c) → numerus {
         "",
         r"functio numerateClaves(MODUS tabula<textus, numerus> pondera) → numerus {
   varia numerus total ← 0
-  itera de pondera fixum k {
+  itera de pondera sit k {
     total ← total + pondera[k]
   }
   redde total
@@ -2329,7 +2329,7 @@ fn itera_ex_over_copia_lowers_through_a_list_snapshot() {
     let dump = dump_source(
         r"functio summa(copia<numerus> elementa) → numerus {
   varia numerus total ← 0
-  itera ex elementa fixum x {
+  itera ex elementa sit x {
     total ← total + x
   }
   redde total
@@ -2362,7 +2362,7 @@ fn borrowed_receiver_itera_runs_runtime_correct_results() {
 
 functio summa(de lista<numerus> xs) → numerus {
   varia numerus total ← 0
-  itera ex xs fixum n {
+  itera ex xs sit n {
     total ← total + n
   }
   redde total
@@ -2370,7 +2370,7 @@ functio summa(de lista<numerus> xs) → numerus {
 
 functio summaCrateris(de Crater c) → numerus {
   varia numerus total ← 0
-  itera ex c.mensurae fixum n {
+  itera ex c.mensurae sit n {
     total ← total + n
   }
   redde total
@@ -2378,7 +2378,7 @@ functio summaCrateris(de Crater c) → numerus {
 
 functio summaPondereum(de tabula<textus, numerus> pondera) → numerus {
   varia numerus total ← 0
-  itera ex pondera fixum v {
+  itera ex pondera sit v {
     total ← total + v
   }
   redde total
@@ -2386,7 +2386,7 @@ functio summaPondereum(de tabula<textus, numerus> pondera) → numerus {
 
 functio numerateClaves(de tabula<textus, numerus> pondera) → numerus {
   varia numerus total ← 0
-  itera de pondera fixum k {
+  itera de pondera sit k {
     total ← total + pondera[k]
   }
   redde total
@@ -2424,7 +2424,7 @@ fn borrowed_tensor_receiver_itera_ex_lowers_like_its_by_value_twin() {
         dump_source(
             &r"functio summaTensoris(MODUS tensor<numerus, [8]> t) → numerus {
   varia numerus total ← 0
-  itera ex t fixum x {
+  itera ex t sit x {
     total ← total + x
   }
   redde total
@@ -2449,7 +2449,7 @@ fn textus_itera_ex_lowers_to_index_loop_with_runtime_length() {
     let dump = dump_source(
         r#"functio numerumSeptem(textus s) → numerus {
   varia numerus count ← 0
-  itera ex s fixum c {
+  itera ex s sit c {
     sit textus t ← c ↦ textus
     si t ≡ "7" {
       count ← count + 1
@@ -2476,7 +2476,7 @@ fn textus_itera_ex_runs_char_inspection_through_runner() {
     // `_numeric` shape — convert-assign the lane binding and inspect it).
     let source = r#"functio numerumSeptem(textus s) → numerus {
   varia numerus count ← 0
-  itera ex s fixum c {
+  itera ex s sit c {
     sit textus t ← c ↦ textus
     si t ≡ "7" {
       count ← count + 1
@@ -2506,7 +2506,7 @@ fn textus_itera_de_and_scalar_receivers_keep_fail_closed_decline() {
     // Only `ex` admits text value iteration (`de` would invent an index law);
     // non-iterable scalars keep the generic decline fail-closed.
     let de_case = r"functio indices(textus s) → numerus {
-  itera de s fixum i {
+  itera de s sit i {
     nota i
   }
   redde 0
@@ -2525,7 +2525,7 @@ fn textus_itera_de_and_scalar_receivers_keep_fail_closed_decline() {
     );
 
     let scalar_case = r"functio overScalar(numerus n) → vacuum {
-  itera ex n fixum x {
+  itera ex n sit x {
     nota x
   }
 }";
@@ -2551,7 +2551,7 @@ fn textus_itera_de_and_scalar_receivers_keep_fail_closed_decline() {
 fn tensor_itera_ex_rank1_lowers_to_literal_bound_index_loop() {
     let source = r"functio sumTensor(tensor<numerus, [8]> t) → numerus {
   varia numerus total ← 0
-  itera ex t fixum x {
+  itera ex t sit x {
     total ← total + x
   }
   redde total
@@ -2578,7 +2578,7 @@ fn tensor_itera_ex_rank1_lowers_to_literal_bound_index_loop() {
 fn tensor_itera_ex_rank2_lowers_to_nested_coordinate_loops() {
     let dump = dump_source(
         r"functio sumGrid(tensor<f32, [2, 2]> t) → f32 {
-  itera ex t apud [i, j] fixum x {
+  itera ex t apud [i, j] sit x {
     nota i
     nota j
     nota x
@@ -2601,7 +2601,7 @@ fn tensor_itera_ex_rank2_lowers_to_nested_coordinate_loops() {
 fn tensor_itera_ex_rank3_lowers_three_nested_coordinate_loops() {
     let dump = dump_source(
         r"functio visitCube(tensor<numerus, [2, 2, 2]> cube) → vacuum {
-  itera ex cube apud [i, j, k] fixum cell {
+  itera ex cube apud [i, j, k] sit cell {
     nota i
     nota j
     nota k
@@ -2628,7 +2628,7 @@ fn tensor_itera_ex_rank3_lowers_three_nested_coordinate_loops() {
 fn rejects_deferred_control_flow_constructs_with_explicit_diagnostics() {
     let iter_de_unit = analyze(
         r"functio iterare(tabula<textus, numerus> nums) → vacuum {
-            itera de nums fixum key { nota key }
+            itera de nums sit key { nota key }
         }",
     );
     let iter_de_dump = dump_analyzed_unit(iter_de_unit.application_view()).expect("map itera de lowers");
@@ -2638,7 +2638,7 @@ fn rejects_deferred_control_flow_constructs_with_explicit_diagnostics() {
     let iter_ex_unit = analyze(
         r"functio sumValues(tabula<textus, numerus> nums) → numerus {
             varia numerus total ← 0
-            itera ex nums fixum value {
+            itera ex nums sit value {
                 total ← total + value
             }
             redde total
@@ -2916,7 +2916,7 @@ discretio NnError {
 }
 functio causa(FormaError e) → textus {
     discerne e {
-        casu FormaInvalida fixum causa { redde causa }
+        casu FormaInvalida sit causa { redde causa }
     }
 }
 functio mensura(lista<numerus> x, lista<numerus> w) → numerus ⇥ FormaError {
@@ -3053,7 +3053,7 @@ discretio NnError {
 }
 functio causa(FormaError e) → textus {
     discerne e {
-        casu FormaInvalida fixum causa { redde causa }
+        casu FormaInvalida sit causa { redde causa }
     }
 }
 functio quantitas(lista<numerus> f) → numerus ⇥ NnError {
@@ -3727,8 +3727,8 @@ fn lowers_all_returning_type_test_discerne_without_fallthrough_return() {
         r#"
 functio mensura(numerus ∪ textus u) → numerus {
     discerne u {
-        casu numerus fixum n { redde n }
-        casu textus fixum s { redde 0 }
+        casu numerus sit n { redde n }
+        casu textus sit s { redde 0 }
     }
 }
 "#,
@@ -4636,10 +4636,10 @@ incipit {
 #[test]
 fn reducta_two_key_group_sums_into_a_rank_two_bucket_tensor() {
     let source = r"functio buckets(tensor<f64, [5]> xs, tensor<numerus, [5]> rows, tensor<numerus, [5]> cols) → tensor<f64, [2, 3]> {
-  redde reducta via summa ex xs apud [i] pro [rows[i], cols[i]] fixum v { redde v }
+  redde reducta via summa ex xs apud [i] pro [rows[i], cols[i]] sit v { redde v }
 }
 functio counts(tensor<f64, [5]> xs, tensor<numerus, [5]> rows, tensor<numerus, [5]> cols) → tensor<numerus, [2, 3]> {
-  redde reducta via numeratio ex xs apud [i] pro [rows[i], cols[i]] fixum v { redde v ≻ 0.0 }
+  redde reducta via numeratio ex xs apud [i] pro [rows[i], cols[i]] sit v { redde v ≻ 0.0 }
 }
 incipit {
   sit lista<f64> xs_data ← [1.0, 2.0, 4.0, 8.0, 16.0]
@@ -4701,7 +4701,7 @@ incipit {
 #[test]
 fn reducta_grouping_preserves_source_and_key_tensors() {
     let source = r"functio count(tensor<bivalens, [3]> values, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
-  redde reducta via numeratio ex values apud [i] pro keys[i] fixum value { redde value }
+  redde reducta via numeratio ex values apud [i] pro keys[i] sit value { redde value }
 }
 incipit {
   sit lista<bivalens> values_data ← [verum, falsum, verum]
@@ -4726,7 +4726,7 @@ incipit {
 #[test]
 fn reducta_group_out_of_range_uses_existing_tensor_write_failure() {
     let source = r"functio count(tensor<bivalens, [3]> values, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
-  redde reducta via numeratio ex values apud [i] pro keys[i] fixum value { redde value }
+  redde reducta via numeratio ex values apud [i] pro keys[i] sit value { redde value }
 }
 incipit {
   sit lista<bivalens> values_data ← [verum, falsum, verum]
@@ -4755,7 +4755,7 @@ fn reducta_two_key_group_out_of_range_key_never_aliases_a_bucket() {
     // Column 3 of row 0 would be flat bucket 3 (row 1, column 0) under a bare
     // flat-index compare; each key is checked against its own coordinate.
     let source = r"functio buckets(tensor<f64, [2]> xs, tensor<numerus, [2]> rows, tensor<numerus, [2]> cols) → tensor<f64, [2, 3]> {
-  redde reducta via summa ex xs apud [i] pro [rows[i], cols[i]] fixum v { redde v }
+  redde reducta via summa ex xs apud [i] pro [rows[i], cols[i]] sit v { redde v }
 }
 incipit {
   sit lista<f64> xs_data ← [1.0, 2.0]
@@ -5376,8 +5376,8 @@ discretio Resultatus<T> {
 
 functio describe(Resultatus<numerus> r) → textus {
     discerne r {
-        casu Ok fixum valor { redde "ok: §"(valor) }
-        casu Err fixum nuntius { redde "err: §"(nuntius) }
+        casu Ok sit valor { redde "ok: §"(valor) }
+        casu Err sit nuntius { redde "err: §"(nuntius) }
     }
 }
 "#;
@@ -5500,7 +5500,7 @@ fn stage3_mir_closeout_preserves_interval_and_sermo_operations() {
     let sermo = dump_source(
         r#"incipit {
     sit sermo stream ← ad 'runtime:echo' ("salve")
-    itera ex stream.tuus<textus>().cursor() fixum frame {
+    itera ex stream.tuus<textus>().cursor() sit frame {
         adfirma frame.data ≡ "salve"
     }
 }"#,
@@ -7148,7 +7148,7 @@ fn sequential_reduction_sum_identity_term_lowers_to_a_fold() {
     // matching `a.summa()` for this tensor.
     let dump = dump_source(
         r"functio total(tensor<f32, [8]> a) → f32 {
-    redde reducta via summa ex a apud [i] fixum s { redde s }
+    redde reducta via summa ex a apud [i] sit s { redde s }
 }",
     );
     assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
@@ -7160,7 +7160,7 @@ fn sequential_reduction_sum_identity_term_lowers_to_a_fold() {
 fn sequential_reduction_sum_without_apud_lowers_rank1() {
     let dump = dump_source(
         r"functio total(tensor<f32, [8]> a) → f32 {
-    redde reducta via summa ex a fixum s { redde s }
+    redde reducta via summa ex a sit s { redde s }
 }",
     );
     assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
@@ -7202,7 +7202,7 @@ main {
 fn sequential_reduction_sum_numerus_term_folds_int_zero() {
     let dump = dump_source(
         r"functio total(tensor<i32, [4]> a) → i32 {
-    redde reducta via summa ex a apud [i] fixum s { redde s }
+    redde reducta via summa ex a apud [i] sit s { redde s }
 }",
     );
     assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
@@ -7218,7 +7218,7 @@ fn sequential_reduction_sum_transformed_term_folds_per_element_body() {
     // element — term `s + 1.0` over 8 lanes.
     let dump = dump_source(
         r"functio total(tensor<f32, [8]> a) → f32 {
-    redde reducta via summa ex a apud [i] fixum s {
+    redde reducta via summa ex a apud [i] sit s {
         varia f32 t ← s
         t ← t + 1.0
         redde t
@@ -7239,7 +7239,7 @@ fn filum_reduction_sum_lowers_to_declared_plan_entry() {
     let unit = analyze(
         r"@ nucleum
 functio k(tensor<f32, [256]> a) → f32 {
-    redde reducta via summa ex a apud [i] filum f fixum s { redde s }
+    redde reducta via summa ex a apud [i] filum f sit s { redde s }
 }",
     );
     let dump = dump_analyzed_unit(unit.application_view()).expect("filum summa lowers to the SFR-5 declaration");

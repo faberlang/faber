@@ -82,7 +82,7 @@ fn underscore_kernel_parameters_fall_through_to_the_carrier() {
     let source = r#"@ kernel
 @ public
 fn k(tensor<f32, [_, _]> src, mut tensor<f32, [_, _]> dst) → void {
-    for from src at [i, j] thread lane const c {
+    for from src at [i, j] thread lane let c {
         dst[[i, j]] ← c
     }
 }
@@ -102,7 +102,7 @@ fn reduce_over_underscore_parameter_checks() {
     let source = r#"@ kernel
 @ public
 fn fold(tensor<f32, [_, _]> a, mut tensor<f32, [1]> out) → void {
-    out[[0]] ← reduce via max from a at [i, j] thread lane const c { return c } coalesce 0.0
+    out[[0]] ← reduce via max from a at [i, j] thread lane let c { return c } coalesce 0.0
 }
 main {}
 "#;

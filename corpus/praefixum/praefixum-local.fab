@@ -79,7 +79,7 @@ fn grid_cells(int multiplier) → int {
 fn dash_line() → string {
     const string dashes = comptime {
         mut string acc ← ""
-        for range 0‥6 const i {
+        for range 0‥6 let i {
             acc ← acc + "-"
         }
         return acc
@@ -90,7 +90,7 @@ fn dash_line() → string {
 fn squares_upto() → list<int> {
     const list<int> squares = comptime {
         mut list<int> acc ← empty
-        for range 1‥6 const i {
+        for range 1‥6 let i {
             acc.append(quadratum(i))
         }
         return acc
@@ -104,7 +104,7 @@ main {
     }
     const _ total_sq = comptime {
         mut int total ← 0
-        for range 1‥5 const i {
+        for range 1‥5 let i {
             total ← total + quadratum(i)
         }
         return total

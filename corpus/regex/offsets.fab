@@ -47,7 +47,7 @@ fn spans(string pat, string text) → string {
     do {
         let regex r ← pat ↦ regex
         mut string out ← ""
-        for from r.find_all(text) const h {
+        for from r.find_all(text) let h {
             out ← out + " (§,§)"(h.start(), h.end())
         }
         if out ≡ "" {

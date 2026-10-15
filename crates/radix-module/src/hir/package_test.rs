@@ -269,7 +269,7 @@ functio computa(numerus x) → numerus {
 incipit {
     sit Event event ← finge Click { x = 7 }
     discerne event {
-        casu Click fixum x { nota computa(x) }
+        casu Click sit x { nota computa(x) }
         casu Quit { nota "quit" }
     }
 }

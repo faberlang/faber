@@ -40,11 +40,11 @@ no_expected = "nondeterministic-by-design"
 
 main {
     let map<string, int> persona ← { "nomen": 1, "aetas": 30 }
-    for ref persona const clavis {
+    for ref persona let clavis {
         print clavis
     }
     let list<int, 3> numeri ← [10, 20, 30]
-    for ref numeri const index {
+    for ref numeri let index {
         print index
     }
 }

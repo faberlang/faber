@@ -14,15 +14,15 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Loop-binder destructuring — `for from xs const [a, b] { ... }` binds each
+#   • Loop-binder destructuring — `for from xs let [a, b] { ... }` binds each
 #     element through the same pattern grammar as binding-position forms.
-#   • Records (genus) — `for from puncta const {x, y} { ... }` object_pattern
+#   • Records (genus) — `for from puncta let {x, y} { ... }` object_pattern
 #     binds fields by name on each element.
-#   • Positional tuples — `for from ordines const [a, b] { ... }` binds tuple
+#   • Positional tuples — `for from ordines let [a, b] { ... }` binds tuple
 #     slots positionally.
-#   • Rest patterns — `for from matricula const [caput, rest cauda]` captures
+#   • Rest patterns — `for from matricula let [caput, rest cauda]` captures
 #     the remaining lista.
-#   • Holes — `for from ordines const [_, secundus]` skips a slot with `_`.
+#   • Holes — `for from ordines let [_, secundus]` skips a slot with `_`.
 #
 # Common mistakes:
 #   • Binding more pattern slots than the tuple element has — the loop binder
@@ -59,35 +59,35 @@ main {
     # --- Records: object_pattern over lista of genus elements ---
 
     let puncta ← [Punctum { x = 1, y = 2 }, Punctum { x = 3, y = 4 }]
-    for from puncta const {x, y} {
+    for from puncta let {x, y} {
         print x + y
     }
 
     # --- Labeled tuples: object_pattern binds by label ---
 
     let list<tuple<gx: int, int>> paria ← [tuple<int, int> [50, 60], tuple<int, int> [70, 80]]
-    for from paria const {gx} {
+    for from paria let {gx} {
         print gx
     }
 
     # --- Positional tuples: array_pattern over fixed-width rows ---
 
     let list<tuple<int, int>> ordines ← [tuple<int, int> [10, 20], tuple<int, int> [30, 40]]
-    for from ordines const [a, b] {
+    for from ordines let [a, b] {
         print a + b
     }
 
     # --- Rest patterns: first element plus the remaining lista ---
 
     let matricula ← [[1, 2, 3], [4, 5, 6]]
-    for from matricula const [caput, rest cauda] {
+    for from matricula let [caput, rest cauda] {
         print caput
         print cauda[1]
     }
 
     # --- Holes: `_` skips a slot ---
 
-    for from ordines const [_, secundus] {
+    for from ordines let [_, secundus] {
         print secundus
     }
 }

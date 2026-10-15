@@ -536,10 +536,10 @@ main {
     let value raw ← document ↦ value
     let fault.IoFault got ← fault.io_fault_from(raw)
     match got {
-        case NotFound const path {
+        case NotFound let path {
             print path
         }
-        case Io const path {
+        case Io let path {
             print path
         }
         default {

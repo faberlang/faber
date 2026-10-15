@@ -38,7 +38,7 @@ main {
     assert pong ≡ "pong"
     client.close()
 
-    for from pending const seen {
+    for from pending let seen {
         assert seen ≡ "/chat|ping|nil"
     }
 

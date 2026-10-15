@@ -410,8 +410,8 @@ message = "expected {expected}"
 help = "add sit or varia before the binding name"
 
 [diagnostics.PARSE001.issues.itera_de_requires_fixum]
-message = "itera de bindings are always const; use {expected}"
-help = "de binds an index or key, not a mutable element; use the const form"
+message = "itera de bindings are always fixed; use {expected}"
+help = "de binds an index or key, not a mutable element; use the sit form"
 
 [diagnostics.PARSE001.issues.duplicate_rest_pattern]
 message = "rest pattern already specified"
@@ -419,11 +419,7 @@ help = "keep only one '{keyword}' rest binding"
 
 [diagnostics.PARSE001.issues.sit_identifier_binding]
 message = "'{keyword}' binds one identifier directly; use '{keyword}' name ← expr"
-help = "write '{keyword}' name ← expr or use fixum for typed/destructured bindings"
-
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit does not support destructuring patterns"
-help = "use fixum with a destructuring pattern"
+help = "write '{keyword}' name ← expr or use sit with a type or a destructuring pattern"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "expected test case or setup"
@@ -617,6 +613,14 @@ help = "write `{fixum} T {name} = …`; a module-level constant is spelled like 
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "a run-time `{keyword}` declaration was retired; `{name}` is a run-time name"
 help = "write `{sit} T {name} ← …` (or `{sit} {name} ← …` to infer the type); `{fixum}` states a compile-time fact and goes with `=`"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "a `{keyword}` binder was retired"
+help = "binders take `{sit}` (a fixed name) or `{varia}` (a writable name); `{fixum}` states a compile-time fact and goes with `=`"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` cannot introduce a binder"
+help = "a binder names a value per iteration or match; write `{sit}` for a fixed name or `{varia}` for a writable one"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "a `{keyword}` local needs a place to read: `{keyword} T name ← place`"

@@ -63,9 +63,10 @@ const NON_NULL_CHAIN: PostfixChainPrefixes = PostfixChainPrefixes {
 };
 
 /// Binder keyword of a loop header: `varia` when the authored binder is
-/// mutable, `fixum` otherwise, spelled in the source's own locale.
+/// mutable, `sit` otherwise (binders take `let`/`mut`; `ref` is refused),
+/// spelled in the source's own locale.
 fn loop_binder_keyword(mutable: bool, surface: &impl KeywordSurface) -> &str {
-    surface.contextual_keyword(if mutable { "varia" } else { "fixum" })
+    surface.contextual_keyword(if mutable { "varia" } else { "sit" })
 }
 
 /// Bare integer literal for the range-spacing law: an
@@ -701,7 +702,7 @@ impl super::FaberCodegen<'_> {
                 mutable,
                 ..
             } => {
-                // Lockstep series: `itera ex s1, s2 [apud [i]] fixum b1, b2`.
+                // Lockstep series: `itera ex s1, s2 [apud [i]] sit b1, b2`.
                 // One shared coordinate at most; the series binder names keep
                 // their comma separation so the emit reparses byte-for-byte.
                 writer.write(surface.keyword(TokenKind::Itera));
@@ -1441,7 +1442,7 @@ impl super::FaberCodegen<'_> {
         }
     }
 
-    /// The `fixum binder { body }` tail shared by `reducta` and `ordinata`:
+    /// The `sit binder { body }` tail shared by `reducta` and `ordinata`:
     /// HIR keeps binder and body jointly present or absent, so one clause
     /// writes both or neither.
     fn write_binder_body_clause(

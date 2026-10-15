@@ -4,7 +4,7 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "fixum_decl", "expression", "reducta_expr", "apud_clause", "literal", "nota_stmt", "conversio_expr"]
 category = "collection"
 summary = "Sequential English `reduce via sum from` without the distributed thread clause."
-syntax = "reduce via sum from <tensor> at [i] const s { return <term> }"
+syntax = "reduce via sum from <tensor> at [i] let s { return <term> }"
 related = ["summa", "sum", "at", "tensor"]
 locale = "en"
 +++
@@ -23,7 +23,7 @@ locale = "en"
 #     kernel form, while this cell intentionally stays sequential.
 
 fn total(tensor<float, [4]> a) → float {
-    return reduce via sum from a at [i] const s {
+    return reduce via sum from a at [i] let s {
         return s
     }
 }

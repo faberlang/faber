@@ -59,7 +59,7 @@ fn structured_control_flow_in_a_kernel_loop_is_legal() {
 @ nucleum
 @ publica
 functio relu(tensor<f32, [8]> x, varia tensor<f32, [8]> out) → vacuum {
-    itera ex x apud [i] fixum v {
+    itera ex x apud [i] sit v {
         si v ≻ 0.0 {
             out[i] ← v
         } secus {
@@ -83,7 +83,7 @@ functio bump(f32 x) → f32 {
 @ nucleum
 @ publica
 functio caller(tensor<f32, [8]> x, varia tensor<f32, [8]> out) → vacuum {
-    itera ex x apud [i] fixum v {
+    itera ex x apud [i] sit v {
         out[i] ← bump(v)
     }
 }
@@ -528,7 +528,7 @@ fn a_call_default_in_a_kernel_selects_a_value_and_is_legal() {
 @ nucleum
 @ publica
 functio k(tensor<f32, [8]> x, varia tensor<f32, [8]> out) → vacuum {
-    itera ex x apud [i] filum f fixum v {
+    itera ex x apud [i] filum f sit v {
         out[i] ← x.accipe([i + 1]) ⊥ 0.0
     }
 }
@@ -655,7 +655,7 @@ fn a_thread_id_builtin_is_rejected_inside_a_kernel_loop() {
 @ nucleum
 @ publica
 functio k(tensor<u32, [8]> x, tensor<u32, [8]> out) → vacuum {
-    itera ex x apud [i] fixum v {
+    itera ex x apud [i] sit v {
         out[global_invocation_x()] ← v
     }
 }

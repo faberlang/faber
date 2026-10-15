@@ -8,10 +8,10 @@ canonical = true
 +++
 
 functio per_alveum(tf32[6] altitudo, tensor<numerus, [6]> alveus) → tf32[3] {
-    redde reducta via summa ex altitudo apud [i] pro alveus[i] fixum s { redde s }
+    redde reducta via summa ex altitudo apud [i] pro alveus[i] sit s { redde s }
 }
 functio numera_alveum(tf32[6] altitudo, tensor<numerus, [6]> alveus) → tensor<numerus, [3]> {
-    redde reducta via numeratio ex altitudo apud [i] pro alveus[i] fixum s { redde s ≻ 2.5 }
+    redde reducta via numeratio ex altitudo apud [i] pro alveus[i] sit s { redde s ≻ 2.5 }
 }
 incipit {
     sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]

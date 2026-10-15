@@ -43,13 +43,13 @@ main {
     # --- Basic lista destructuring ---
 
     let numeri ← [1, 2, 3]
-    const [a, b, c] ← numeri
+    let [a, b, c] ← numeri
     print a
     print b
     print c
 
     # Destructure inline lista literal
-    const [primus, secundus, tertius] ← [10, 20, 30]
+    let [primus, secundus, tertius] ← [10, 20, 30]
     print primus
     print secundus
     print tertius
@@ -68,27 +68,27 @@ main {
     # --- Partial destructuring (fewer variables than elements) ---
 
     let valores ← [1, 2, 3, 4, 5]
-    const [unus, duo] ← valores
+    let [unus, duo] ← valores
     print unus
     print duo
 
     # --- Rest pattern with ceteri ---
 
     let res ← [1, 2, 3, 4, 5]
-    const [caput, rest cauda] ← res
+    let [caput, rest cauda] ← res
     print caput
     print cauda
 
     # --- Skip elements with underscore ---
 
     let triplex ← [10, 20, 30]
-    const [_, medius, _] ← triplex
+    let [_, medius, _] ← triplex
     print medius
 
     # --- Nested listas ---
 
     let matrix ← [[1, 2], [3, 4]]
-    const [ordo1, ordo2] ← matrix
+    let [ordo1, ordo2] ← matrix
     print ordo1
     print ordo2
 }

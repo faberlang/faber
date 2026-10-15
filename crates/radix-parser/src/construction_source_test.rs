@@ -77,7 +77,7 @@ fn second_construction_source_is_rejected() {
 
 #[test]
 fn next_line_ex_stays_an_extraction_statement() {
-    let result = parse_ok("sit q ← Punctum { x = 1 }\nex q fixum x\n");
+    let result = parse_ok("sit q ← Punctum { x = 1 }\nex q sit x\n");
     let program = result.program.expect("program");
     assert_eq!(program.statements.len(), 2);
     assert!(matches!(program.statements[1].kind, StmtKind::Ex(_)));

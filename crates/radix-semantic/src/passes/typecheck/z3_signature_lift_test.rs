@@ -96,7 +96,7 @@ fn kernel_launch_boundary_shapes_stay_admissible() {
     // g10's form: size-typed generics over tensor parameters at a kernel.
     let source = r#"@ kernel
 fn mx<size H, size W>(tensor<f32, [H, W]> a, mut tensor<f32, [1]> out) → void {
-    out[[0]] ← reduce via max from a at [i, j] thread lane const c { return c } coalesce 0.0
+    out[[0]] ← reduce via max from a at [i, j] thread lane let c { return c } coalesce 0.0
 }
 main {}
 "#;

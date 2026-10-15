@@ -120,7 +120,7 @@ fn mutation_inside_dum_is_impure() {
 #[test]
 fn mutation_inside_itera_is_impure() {
     assert_body_is_impure(
-        "    for range 0‥3 const _ {
+        "    for range 0‥3 let _ {
         c.degrees ← 1.0
     }",
     );
@@ -153,7 +153,7 @@ fn increment_inside_nested_control_flow_is_impure() {
         "{PRELUDE}\
 @ conversion
 fn toFahrenheit(Reading r) → Fahrenheit {{
-    for range 0‥3 const _ {{
+    for range 0‥3 let _ {{
         if r.value ≻ 0 {{
             r.value ↑
         }}
@@ -196,7 +196,7 @@ fn control_flow_without_mutation_stays_pure() {
     else {
         print \"warm\"
     }
-    for range 0‥3 const _ {
+    for range 0‥3 let _ {
         print c.degrees
     }",
     ));

@@ -27,7 +27,7 @@ locale = "en"
 
 fn count_items(channel s) → int {
     mut int n ← 0
-    for from s.recv<string>().cursor() const item {
+    for from s.recv<string>().cursor() let item {
         print item.data
         n ← n + 1
     }

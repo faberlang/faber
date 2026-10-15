@@ -529,7 +529,7 @@ fn list_index_reads_and_writes_are_checked() {
 #[test]
 fn iteration_walks_the_list_by_index() {
     let code = emitted(
-        "main {\n    let list<string> names ← [\"a\", \"b\"]\n    for from names const n {\n        print n\n    }\n}",
+        "main {\n    let list<string> names ← [\"a\", \"b\"]\n    for from names let n {\n        print n\n    }\n}",
     );
     for line in [
         "        faber_list_text *const faber_t0 = l_names;\n",

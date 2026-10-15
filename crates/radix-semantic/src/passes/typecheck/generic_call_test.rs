@@ -721,7 +721,7 @@ fn sermo_tuus_typed_view_typechecks_in_iteration() {
         r#"incipit {
     sit sermo s ← ad 'runtime:echo' ("salve")
     sit tuus<textus> t ← s.tuus<textus>()
-    itera ex t.cursor() fixum frame {
+    itera ex t.cursor() sit frame {
         adfirma frame.data ≡ "salve"
     }
 }"#,
@@ -734,7 +734,7 @@ fn sermo_tuus_bare_view_defaults_to_valor_frames() {
         r#"incipit {
     sit sermo s ← ad 'runtime:echo' ("salve")
     sit tuus<valor> t ← s.tuus()
-    itera ex t.cursor() fixum frame {
+    itera ex t.cursor() sit frame {
         sit valor data ← frame.data
         nota data
     }

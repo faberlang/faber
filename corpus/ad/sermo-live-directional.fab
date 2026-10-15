@@ -37,7 +37,7 @@ main {
     m.da("ping")
     let status outbound ← m.fini()
     let recv<string> t ← s.tuus<string>()
-    for from t.cursor() const frame {
+    for from t.cursor() let frame {
         assert frame.data ≡ "salve"
     }
     let status inbound ← t.fini()

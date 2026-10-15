@@ -907,7 +907,7 @@ fn compile_reports_semantic_errors() {
 #[test]
 fn compile_rejects_itera_ab_over_collection() {
     let session = test_session(Target::HirRust);
-    let source = "incipit {\n  sit xs ← [1, 2, 3]\n  itera ab xs fixum i {\n    nota i\n  }\n}";
+    let source = "incipit {\n  sit xs ← [1, 2, 3]\n  itera ab xs sit i {\n    nota i\n  }\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
@@ -1442,12 +1442,12 @@ fn compile_accepts_array_and_ex_destructuring_bindings() {
     let source = r#"genus Persona { varia textus name }
 incipit {
   sit xs ← [1, 2]
-  fixum [a, b] ← xs
+  sit [a, b] ← xs
   nota a
   nota b
 
   sit person ← Persona { name = "Marcus" }
-  ex person fixum name
+  ex person sit name
   nota name
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());

@@ -194,7 +194,7 @@ main {
     mut f32 sum ← 0.0
     mut int coords ← 0
     mut int visits ← 0
-    for from a at [i, j] const c {
+    for from a at [i, j] let c {
         sum ← sum + c
         coords ← coords + i * 10 + j
         visits ← visits + 1

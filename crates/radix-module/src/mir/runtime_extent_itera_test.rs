@@ -43,7 +43,7 @@ main {
     let tf32[2, size n] a ← flat ↦ tf32[2, size n]
     mut f32 acc ← 0.0
     mut int coords ← 0
-    for from a at [i, j] const c {
+    for from a at [i, j] let c {
         acc ← acc + c
         coords ← coords + i * 10 + j
     }
@@ -63,9 +63,9 @@ main {
     let list<f32> flat ← [1.0, 2.0, 3.0]
     let tf32[size n] a ← flat ↦ tf32[size n]
     mut f32 plain ← 0.0
-    for from a const c { plain ← plain + c }
+    for from a let c { plain ← plain + c }
     mut f32 coord ← 0.0
-    for from a at [i] const c { coord ← coord + c }
+    for from a at [i] let c { coord ← coord + c }
     print plain
     print coord
 }
@@ -85,12 +85,12 @@ main {
     let tf32[size n] b ← none ↦ tf32[size n]
     let tf32[size m, 0] e ← none ↦ tf32[size m, 0]
     mut int rank2 ← 0
-    for from a at [i, j] const c { rank2 ← rank2 + 1 }
+    for from a at [i, j] let c { rank2 ← rank2 + 1 }
     mut int rank1 ← 0
-    for from b const c { rank1 ← rank1 + 1 }
-    for from b at [i] const c { rank1 ← rank1 + 1 }
+    for from b let c { rank1 ← rank1 + 1 }
+    for from b at [i] let c { rank1 ← rank1 + 1 }
     mut int empty_inner ← 0
-    for from e at [i, j] const c { empty_inner ← empty_inner + 1 }
+    for from e at [i, j] let c { empty_inner ← empty_inner + 1 }
     print rank2
     print rank1
     print empty_inner
@@ -105,7 +105,7 @@ fn size_generic_tensor_loop_runs_over_each_instance_shape() {
 fn rt(int v) → int { return v }
 fn total<size H, size W>(tf32[H, W] src) → f32 {
     mut f32 acc ← 0.0
-    for from src at [i, j] const c { acc ← acc + c }
+    for from src at [i, j] let c { acc ← acc + c }
     return acc
 }
 main {
@@ -124,7 +124,7 @@ main {
 fn mut_tensor_parameter_loop_walks_and_writes_in_place() {
     let source = r"
 fn bump(mut tf32[2, 3] dst) → void {
-    for from dst at [i, j] thread lane const c {
+    for from dst at [i, j] thread lane let c {
         dst[[i, j]] ← c + 1.0
     }
 }
@@ -144,7 +144,7 @@ fn literal_extent_loop_keeps_literal_bounds_and_runtime_extent_reads_the_carrier
 main {
     let tf32[2, 3] a ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     mut int acc ← 0
-    for from a at [i, j] const c { acc ← acc + i * 10 + j }
+    for from a at [i, j] let c { acc ← acc + i * 10 + j }
     print acc
 }
 ",
@@ -162,7 +162,7 @@ main {
     let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
     let tf32[2, size n] a ← flat ↦ tf32[2, size n]
     mut int acc ← 0
-    for from a at [i, j] const c { acc ← acc + i * 10 + j }
+    for from a at [i, j] let c { acc ← acc + i * 10 + j }
     print acc
 }
 ",

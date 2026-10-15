@@ -180,7 +180,7 @@ functio tres() fiunt → numerus {
 }
 
 incipit {
-  itera ex tres() fixum n {
+  itera ex tres() sit n {
     nota n
   }
 }
@@ -201,7 +201,7 @@ functio tres() fient → numerus {
 }
 
 incipit {
-  itera ex tres() fixum n {
+  itera ex tres() sit n {
     nota n
   }
 }

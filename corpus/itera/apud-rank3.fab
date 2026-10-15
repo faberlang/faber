@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "Coordinate iteration over a rank-3 tensor binds three coordinates — outermost axis first."
-syntax = "for from tensor at [i, j, k] const cell { }"
+syntax = "for from tensor at [i, j, k] let cell { }"
 related = ["apud", "itera", "ex", "tensor"]
 locale = "en"
 +++
@@ -28,7 +28,7 @@ locale = "en"
 
 # Rank-3 `apud [i, j, k]` over a literal-shaped 2×2×2 tensor
 #
-# for from cube at [i, j, k] const cell { <body> }
+# for from cube at [i, j, k] let cell { <body> }
 #
 # GRAMMAR:
 #   iteraStmt :← 'for' 'from' expr ('at' '[' ident (',' ident)* ']')? …
@@ -40,7 +40,7 @@ main {
     let list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
     mut tf32[2, 2, 2] cube ← flat ↦ tf32[2, 2, 2]
 
-    for from cube at [i, j, k] const cell {
+    for from cube at [i, j, k] let cell {
         print i, j, k, cell
     }
 }

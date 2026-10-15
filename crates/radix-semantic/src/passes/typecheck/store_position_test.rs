@@ -347,7 +347,7 @@ fn row_20_inferred_declarations_take_the_expression_type() {
 
 #[test]
 fn row_21_bindings_are_not_stores() {
-    let source = entry("sit lista<u8> xs ← [1, 2]\nitera ex xs fixum v {\n    nota v\n}");
+    let source = entry("sit lista<u8> xs ← [1, 2]\nitera ex xs sit v {\n    nota v\n}");
     assert!(kinds(&source).is_empty());
 }
 
@@ -355,7 +355,7 @@ fn row_21_bindings_are_not_stores() {
 fn row_22_type_pattern_bindings_are_not_stores() {
     // The binding takes the tested member's type; the value matches only if it
     // is a `u8`, so nothing is narrowed.
-    let source = "functio probe(u8 ∪ textus u) → vacuum {\n    discerne u {\n        casu u8 fixum b { nota b }\n        casu textus fixum s { nota s }\n    }\n}\n";
+    let source = "functio probe(u8 ∪ textus u) → vacuum {\n    discerne u {\n        casu u8 sit b { nota b }\n        casu textus sit s { nota s }\n    }\n}\n";
     assert!(kinds(source).is_empty());
 }
 
@@ -538,7 +538,7 @@ fn reducta_summa_is_range_typed_at_the_integer_cap() {
     // type reaches the signed or unsigned 64-bit cap before the return store.
     for term in ["i64", "i8", "u8"] {
         let source = format!(
-            "functio total(tensor<{term}, [2]> a) → numerus {{\n  redde reducta via summa ex a fixum s {{\n    redde s\n  }}\n}}\n"
+            "functio total(tensor<{term}, [2]> a) → numerus {{\n  redde reducta via summa ex a sit s {{\n    redde s\n  }}\n}}\n"
         );
         assert_eq!(kinds(&source), vec![HirStoreKind::Return], "{term}");
     }

@@ -38,7 +38,7 @@ locale = "en"
 fn summa(list<int> numeri) → int {
     mut int total ← 0
 
-    for from numeri const n {
+    for from numeri let n {
         total ← total + n
     }
 
@@ -49,7 +49,7 @@ fn summa(list<int> numeri) → int {
 fn maximum(list<int> numeri) → int {
     mut int max ← numeri[0]
 
-    for from numeri const n {
+    for from numeri let n {
         if n ≻ max {
             max ← n
         }
@@ -61,7 +61,7 @@ fn maximum(list<int> numeri) → int {
 fn supra(list<int> numeri, int limen) → int {
     mut int int ← 0
 
-    for from numeri const n {
+    for from numeri let n {
         if n ≻ limen {
             int ← int + 1
         }

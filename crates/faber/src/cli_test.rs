@@ -1305,7 +1305,7 @@ functio computus_purus(i32 x) → numerus {
 
 functio computus_gyrum() → fractus {
     sit fractus total ← 0.0
-    itera ab 0‥10 per 2 fixum i {
+    itera ab 0‥10 per 2 sit i {
         total ← total + 1.0
     }
     redde total

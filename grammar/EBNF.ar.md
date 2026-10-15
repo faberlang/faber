@@ -45,9 +45,9 @@ sit_decl ::= 'ليكن' type_annotation? IDENTIFIER (('←' value_marker? expres
 # [017] ref_decl
 ref_decl ::= 'عن' base_type IDENTIFIER '←' expression
 # [018] array_destruct
-array_destruct ::= ('ثابت' | 'متغير') array_pattern '←' expression
+array_destruct ::= ('ليكن' | 'متغير') array_pattern '←' expression
 # [019] object_destruct
-object_destruct ::= ('ثابت' | 'متغير') object_pattern '←' expression
+object_destruct ::= ('ليكن' | 'متغير') object_pattern '←' expression
 # [020] functio_decl
 functio_decl ::= 'دالة' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 # [021] param_list
@@ -265,7 +265,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 # [127] dum_stmt
 dum_stmt ::= 'طالما' expression (block_stmt | ergo_joint statement) cape_clause?
 # [128] itera_stmt
-itera_stmt ::= 'كرر' ('من' expression (',' expression)* | 'عن' expression | 'نطاق' expression (',' expression)*) apud_clause? filum_clause? ('ثابت' | 'متغير') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= 'كرر' ('من' expression (',' expression)* | 'عن' expression | 'نطاق' expression (',' expression)*) apud_clause? filum_clause? ('ليكن' | 'متغير') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 # [129] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [130] apud_clause
@@ -295,7 +295,7 @@ negated_number ::= '-' NUMBER
 # [142] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
 # [143] ut_pattern
-ut_pattern ::= ('كـ' IDENTIFIER) | (('ثابت' | 'متغير') pattern_binding (',' pattern_binding)*)
+ut_pattern ::= ('كـ' IDENTIFIER) | (('ليكن' | 'متغير') pattern_binding (',' pattern_binding)*)
 # [144] pattern_binding
 pattern_binding ::= IDENTIFIER ('كـ' IDENTIFIER)?
 # [145] custodi_stmt
@@ -303,7 +303,7 @@ custodi_stmt ::= 'احرس' '{' si_guard_clause+ '}'
 # [146] si_guard_clause
 si_guard_clause ::= 'إذا' expression (block_stmt | ergo_joint statement)
 # [147] ex_stmt
-ex_stmt ::= 'من' expression ('ثابت' | 'متغير') extract_fields
+ex_stmt ::= 'من' expression ('ليكن' | 'متغير') extract_fields
 # [148] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
 # [149] extract_field
@@ -487,7 +487,7 @@ reducta_op ::= 'المجموع' | 'حاصل_الضرب' | 'الأقصى' | 'ال
 # [238] reducta_group
 reducta_group ::= 'حسب' expression
 # [239] reducta_body
-reducta_body ::= ('ثابت' | 'متغير') IDENTIFIER block_stmt
+reducta_body ::= ('ليكن' | 'متغير') IDENTIFIER block_stmt
 # [240] reducta_identity
 reducta_identity ::= 'عوض' expression
 # [241] sort_expr
@@ -495,7 +495,7 @@ sort_expr ::= 'رتب' 'عبر' sort_direction ('من' | 'عن') expression sort
 # [242] sort_direction
 sort_direction ::= 'تصاعدي' | 'تنازلي'
 # [243] sort_body
-sort_body ::= ('ثابت' | 'متغير') IDENTIFIER block_stmt
+sort_body ::= ('ليكن' | 'متغير') IDENTIFIER block_stmt
 # [244] filum_clause
 filum_clause ::= 'خيط' IDENTIFIER
 # [245] capta_expr
@@ -1325,7 +1325,7 @@ construction literal (`Genus { field = value }`).
   count). Satisfaction stays nominal (D1.3): a witness must declare the bound
   itself.
 
-- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } من source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `من` must start on the closing `}`'s line — a line-leading `من` is instead the extraction statement (`من p ثابت x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `من`); the source must be the same genus type as the constructor. `انشر` was removed from construction literals (D15.4); it stays for lists and calls.
+- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } من source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `من` must start on the closing `}`'s line — a line-leading `من` is instead the extraction statement (`من p ليكن x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `من`); the source must be the same genus type as the constructor. `انشر` was removed from construction literals (D15.4); it stays for lists and calls.
 
 ### Annotations
 
@@ -2149,9 +2149,9 @@ prefer sugar. Choose per module or file.
 
 
 - `طالما` = while
-- `كرر من...ثابت`/`كرر من...متغير` = for-of (values)
-- `كرر عن...ثابت`/`كرر عن...متغير` = for-in (keys)
-- `كرر نطاق range ثابت/متغير i` = range iteration (e.g. `كرر نطاق 0‥10 كل 2 ثابت i { اعرض i }`; `كل` belongs to the range expression)
+- `كرر من...ليكن`/`كرر من...متغير` = for-of (values)
+- `كرر عن...ليكن`/`كرر عن...متغير` = for-in (keys)
+- `كرر نطاق range ليكن/متغير i` = range iteration (e.g. `كرر نطاق 0‥10 كل 2 ليكن i { اعرض i }`; `كل` belongs to the range expression)
 
 **Range step and direction (`range_tail`, `كل`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down
@@ -2196,7 +2196,7 @@ prints the same list shape up to element order.
 
 There is no iteration interface. `كرر من` works on the built-in iterable
 types and on cursors. A user type that should be iterable exposes an ordinary
-method that returns a cursor (`كرر من arbor.nodi() ثابت n`); nothing is
+method that returns a cursor (`كرر من arbor.nodi() ليكن n`); nothing is
 called implicitly.
 
 **Changing the collection inside its own loop.** The rule is about the shape of
@@ -2266,7 +2266,7 @@ A negative number pattern is written with a leading minus (`حالة -1`,
 `-` before anything else is not pattern syntax.
 
 `طابق` matches a closed set and nothing else: the variants of an `ترتيب` or
-`تمايز`, or the members of a union (`حالة numerus ثابت n` over
+`تمايز`, or the members of a union (`حالة numerus ليكن n` over
 `numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
 pattern that is not a member of the scrutinee's closed set is rejected
 (`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
@@ -2455,7 +2455,7 @@ The `∷` glyph (U+2237, "proportion") explicitly ascribes a target type to an e
 Prefer typed construction for ordinary `صنف` values and `vacua` for ordinary empty collection values:
 
 ```fab
-fixum _ point ← Point { x = 10 }
+sit point ← Point { x = 10 }
 fixum lista<numerus> xs ← vacua
 ```
 
@@ -2612,13 +2612,13 @@ Implementation status (2026-10-11):
 Inline block example:
 
 ```fab
-fixum _ tag ← «inline»
+sit tag ← «inline»
 ```
 
 Multiline block example (newline after opening `«`):
 
 ```fab
-fixum _ blob ← «
+sit blob ← «
     select id, email
     from accounts
 »
@@ -2627,14 +2627,14 @@ fixum _ blob ← «
 Captured template example:
 
 ```fab
-fixum _ q ← `select * from accounts where id = §`(accountId)
+sit q ← `select * from accounts where id = §`(accountId)
 ```
 
 Octeti hex literal example:
 
 ```fab
-fixum _ sig ← |de ad be ef|
-fixum _ hello ← |48 65 6c 6c 6f|
+sit sig ← |de ad be ef|
+sit hello ← |48 65 6c 6c 6f|
 ```
 
 ### Format-Template Application
@@ -3033,7 +3033,7 @@ forms `ordina()` / `رتب()` sort by the element's natural order. Both are a
 **stable** sort. The key selector's result must be a number or `textus`; other
 key types are rejected.
 
-`من` is used for iteration (`كرر من items ثابت x`) and imports (`استورد من "path"`).
+`من` is used for iteration (`كرر من items ليكن x`) and imports (`استورد من "path"`).
 
 ### Iteration coordinates (`عند`)
 
@@ -3042,9 +3042,9 @@ en reader spelling is "at": `كرر من grid عند [r, c]` reads as iterating
 `grid` at coordinates `[r, c]`.
 
 - **`lista`** (D3.1): one name binds the element's position
-  (`كرر من items عند [i] ثابت v`).
+  (`كرر من items عند [i] ليكن v`).
 - **`tabula`** (D3.1-D3.3): one name binds the entry's key
-  (`كرر من m عند [k] ثابت v`); a composite-key
+  (`كرر من m عند [k] ليكن v`); a composite-key
   `tabula<توبل<K1, …, Kn>, V>` takes N names, one per part of the `توبل`
   key, in declared part order.
 - **Tensor / matrix**: as before — one name per axis, first name = outermost
@@ -3059,8 +3059,8 @@ en reader spelling is "at": `كرر من grid عند [r, c]` reads as iterating
   distinct from the element binder that follows the clause.
 - **`خيط` lane binder (FLD K2).** An optional `خيط IDENTIFIER` clause
   (`filum_clause`, shared with `اختزل`) follows the `عند` clause and
-  precedes the mutability marker: `كرر من t عند [i, j] خيط f ثابت v { … }`.
-  The clause also parses without `عند` (`كرر من t خيط f ثابت v { … }`).
+  precedes the mutability marker: `كرر من t عند [i, j] خيط f ليكن v { … }`.
+  The clause also parses without `عند` (`كرر من t خيط f ليكن v { … }`).
   The parser claims `خيط` only in that slot, so a binder named `خيط` after
   the mutability marker stays an ordinary name. The binder is declared
   metadata; semantic passes own what it binds.

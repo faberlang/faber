@@ -205,7 +205,7 @@ fn ratio_object_pattern_destructuring() {
         r"
 incipit {
     sit ratio<g: f32, w: f32> r ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 }
-    fixum { g, w } ← r
+    sit { g, w } ← r
     nota g
     nota w
 }
@@ -219,7 +219,7 @@ fn ratio_object_pattern_ceteri() {
         r"
 incipit {
     sit ratio<g: f32, w: f32> r ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 }
-    fixum { g, ceteri rest } ← r
+    sit { g, ceteri rest } ← r
     nota g
     nota rest.w
 }
@@ -233,7 +233,7 @@ fn ratio_object_pattern_unknown_label_rejects() {
         r"
 incipit {
     sit ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
-    fixum { nope } ← r
+    sit { nope } ← r
     nota nope
 }
 ",
@@ -344,7 +344,7 @@ fn cli_seam_object_pattern() {
 @ optio verbose brevis "v" longum "verbose" typus bivalens
 @ optio limen brevis "l" longum "limen" typus numerus
 incipit argumenta args {
-    fixum { verbose, limen } ← args
+    sit { verbose, limen } ← args
     nota verbose
     nota limen
 }
@@ -360,7 +360,7 @@ fn cli_seam_object_pattern_ceteri() {
 @ optio verbose brevis "v" longum "verbose" typus bivalens
 @ optio limen brevis "l" longum "limen" typus numerus
 incipit argumenta args {
-    fixum { verbose, ceteri rest } ← args
+    sit { verbose, ceteri rest } ← args
     nota verbose
     nota rest.limen
 }

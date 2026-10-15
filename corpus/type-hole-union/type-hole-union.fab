@@ -50,10 +50,10 @@ fn member_count(list<int ∪ string> xs) → int {
 # members, and an `if` inside an arm tests the value.
 fn consume(int ∪ string value) → int {
     match value {
-        case int const n {
+        case int let n {
             if n ≡ 7 then return 1
         }
-        case string const s {
+        case string let s {
             if s ≡ "x" then return 2
         }
     }

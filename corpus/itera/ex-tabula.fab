@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "iteration"
 canonical = false
 summary = "Value iteration (`itera ex`) over tabula: the binder receives each value, never the key. Sort before printing — tabula order is unspecified (D19.2)."
-syntax = "for from <tabula> const <value> { <body> }"
+syntax = "for from <tabula> let <value> { <body> }"
 related = ["tabula", "de", "ex", "itera"]
 locale = "en"
 +++
@@ -33,7 +33,7 @@ locale = "en"
 
 # itera ex over tabula — value iteration
 #
-# for from <tabula> const <value> { <body> }
+# for from <tabula> let <value> { <body> }
 #
 # GRAMMAR:
 #   iteraStmt :← 'itera' 'ex' expr ('fixum' | 'varia') IDENTIFIER block
@@ -48,17 +48,17 @@ main {
     # the ex binder receives each value, never the key — collect then sort,
     # since tabula order is unspecified (D19.2)
     mut list<int> valores ← empty
-    for from puncta const v {
+    for from puncta let v {
         valores.append(v)
     }
     valores.sort()
-    for from valores const v {
+    for from valores let v {
         print v
     }
 
     # order-independent aggregate — the sum is stable whatever the map order
     mut int totum ← 0
-    for from puncta const v {
+    for from puncta let v {
         totum ← totum + v
     }
     print totum

@@ -1159,7 +1159,7 @@ fn discerne_patterns_preserve_bindings_aliases_and_variants() {
     };
 
     let code = generate_faber(&program, &types, &interner);
-    assert!(code.contains("casu Click fixum payload ut matched {"));
+    assert!(code.contains("casu Click sit payload ut matched {"));
     assert!(code.contains("\"ok\""));
 }
 

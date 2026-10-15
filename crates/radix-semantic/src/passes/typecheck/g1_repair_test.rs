@@ -304,7 +304,7 @@ fn u64_with_a_signed_type_does_not_join_in_bitwise_operators() {
 fn u64_with_a_signed_type_does_not_join_in_a_collection_literal() {
     assert_rejects_with_issue_la(&with_mix("sit xs ← [a, b]\nnota xs"), U64_SIGNED);
     assert_rejects_with_issue_la(
-        &with_mix("sit t ← reducta via summa ex [a, b] fixum v { redde v }\nnota t"),
+        &with_mix("sit t ← reducta via summa ex [a, b] sit v { redde v }\nnota t"),
         U64_SIGNED,
     );
 }

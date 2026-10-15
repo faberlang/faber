@@ -106,13 +106,13 @@ fn ledger_ops_membership_typechecks() {
 #[test]
 fn ledger_ops_three_loop_forms_typecheck() {
     accepts(&compile(
-        "functio f(tabulae<textus, numerus> l) → vacuum {\n    itera ex l fixum v {\n        sit numerus x ← v\n        nota x\n    }\n}\n",
+        "functio f(tabulae<textus, numerus> l) → vacuum {\n    itera ex l sit v {\n        sit numerus x ← v\n        nota x\n    }\n}\n",
     ));
     accepts(&compile(
-        "functio f(tabulae<textus, numerus> l) → vacuum {\n    itera de l fixum k {\n        sit textus x ← k\n        nota x\n    }\n}\n",
+        "functio f(tabulae<textus, numerus> l) → vacuum {\n    itera de l sit k {\n        sit textus x ← k\n        nota x\n    }\n}\n",
     ));
     accepts(&compile(
-        "functio f(tabulae<textus, numerus> l) → vacuum {\n    itera ex l apud [k] fixum v {\n        sit textus a ← k\n        sit numerus b ← v\n        nota a, b\n    }\n}\n",
+        "functio f(tabulae<textus, numerus> l) → vacuum {\n    itera ex l apud [k] sit v {\n        sit textus a ← k\n        sit numerus b ← v\n        nota a, b\n    }\n}\n",
     ));
 }
 
@@ -120,7 +120,7 @@ fn ledger_ops_three_loop_forms_typecheck() {
 fn ledger_ops_loop_shape_change_still_refused() {
     rejects_with_named_issue(
         &compile(
-            "incipit {\n    varia tabulae<textus, numerus> m ← vacua\n    itera de m fixum k {\n        m.pone(k, 1)\n    }\n}\n",
+            "incipit {\n    varia tabulae<textus, numerus> m ← vacua\n    itera de m sit k {\n        m.pone(k, 1)\n    }\n}\n",
         ),
         "loop_collection_shape_change",
     );

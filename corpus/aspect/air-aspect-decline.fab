@@ -34,7 +34,7 @@ no_expected = "declaration-only"
 # lanes exist and no unroll obligation is recorded.
 fn deambulatio(int n) → int {
     let int summa ← 0
-    for range n ‥ 4 const i {
+    for range n ‥ 4 let i {
     }
     return summa
 }

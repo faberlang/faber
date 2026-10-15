@@ -45,9 +45,9 @@ sit_decl ::= 'बैठा' type_annotation? IDENTIFIER (('←' value_marker? ex
 # [017] ref_decl
 ref_decl ::= 'से' base_type IDENTIFIER '←' expression
 # [018] array_destruct
-array_destruct ::= ('स्थिर' | 'चर') array_pattern '←' expression
+array_destruct ::= ('बैठा' | 'चर') array_pattern '←' expression
 # [019] object_destruct
-object_destruct ::= ('स्थिर' | 'चर') object_pattern '←' expression
+object_destruct ::= ('बैठा' | 'चर') object_pattern '←' expression
 # [020] functio_decl
 functio_decl ::= 'फलन' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 # [021] param_list
@@ -265,7 +265,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 # [127] dum_stmt
 dum_stmt ::= 'जबतक' expression (block_stmt | ergo_joint statement) cape_clause?
 # [128] itera_stmt
-itera_stmt ::= 'दोहराओ' ('सेवन' expression (',' expression)* | 'से' expression | 'सीमा' expression (',' expression)*) apud_clause? filum_clause? ('स्थिर' | 'चर') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= 'दोहराओ' ('सेवन' expression (',' expression)* | 'से' expression | 'सीमा' expression (',' expression)*) apud_clause? filum_clause? ('बैठा' | 'चर') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 # [129] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [130] apud_clause
@@ -295,7 +295,7 @@ negated_number ::= '-' NUMBER
 # [142] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
 # [143] ut_pattern
-ut_pattern ::= ('रूपमें' IDENTIFIER) | (('स्थिर' | 'चर') pattern_binding (',' pattern_binding)*)
+ut_pattern ::= ('रूपमें' IDENTIFIER) | (('बैठा' | 'चर') pattern_binding (',' pattern_binding)*)
 # [144] pattern_binding
 pattern_binding ::= IDENTIFIER ('रूपमें' IDENTIFIER)?
 # [145] custodi_stmt
@@ -303,7 +303,7 @@ custodi_stmt ::= 'रक्षक' '{' si_guard_clause+ '}'
 # [146] si_guard_clause
 si_guard_clause ::= 'यदि' expression (block_stmt | ergo_joint statement)
 # [147] ex_stmt
-ex_stmt ::= 'सेवन' expression ('स्थिर' | 'चर') extract_fields
+ex_stmt ::= 'सेवन' expression ('बैठा' | 'चर') extract_fields
 # [148] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
 # [149] extract_field
@@ -487,7 +487,7 @@ reducta_op ::= 'योग' | 'गुणनफल' | 'अधिकतम' | 'न�
 # [238] reducta_group
 reducta_group ::= 'अनुसार' expression
 # [239] reducta_body
-reducta_body ::= ('स्थिर' | 'चर') IDENTIFIER block_stmt
+reducta_body ::= ('बैठा' | 'चर') IDENTIFIER block_stmt
 # [240] reducta_identity
 reducta_identity ::= 'डिफ़ॉल्ट' expression
 # [241] sort_expr
@@ -495,7 +495,7 @@ sort_expr ::= 'क्रमबद्ध_करो' 'द्वारा' sort_dir
 # [242] sort_direction
 sort_direction ::= 'आरोही' | 'अवरोही'
 # [243] sort_body
-sort_body ::= ('स्थिर' | 'चर') IDENTIFIER block_stmt
+sort_body ::= ('बैठा' | 'चर') IDENTIFIER block_stmt
 # [244] filum_clause
 filum_clause ::= 'धागा' IDENTIFIER
 # [245] capta_expr
@@ -1325,7 +1325,7 @@ construction literal (`Genus { field = value }`).
   count). Satisfaction stays nominal (D1.3): a witness must declare the bound
   itself.
 
-- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } सेवन source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `सेवन` must start on the closing `}`'s line — a line-leading `सेवन` is instead the extraction statement (`सेवन p स्थिर x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `सेवन`); the source must be the same genus type as the constructor. `फैलाओ` was removed from construction literals (D15.4); it stays for lists and calls.
+- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } सेवन source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `सेवन` must start on the closing `}`'s line — a line-leading `सेवन` is instead the extraction statement (`सेवन p बैठा x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `सेवन`); the source must be the same genus type as the constructor. `फैलाओ` was removed from construction literals (D15.4); it stays for lists and calls.
 
 ### Annotations
 
@@ -2149,9 +2149,9 @@ prefer sugar. Choose per module or file.
 
 
 - `जबतक` = while
-- `दोहराओ सेवन...स्थिर`/`दोहराओ सेवन...चर` = for-of (values)
-- `दोहराओ से...स्थिर`/`दोहराओ से...चर` = for-in (keys)
-- `दोहराओ सीमा range स्थिर/चर i` = range iteration (e.g. `दोहराओ सीमा 0‥10 प्रति 2 स्थिर i { दिखाओ i }`; `प्रति` belongs to the range expression)
+- `दोहराओ सेवन...बैठा`/`दोहराओ सेवन...चर` = for-of (values)
+- `दोहराओ से...बैठा`/`दोहराओ से...चर` = for-in (keys)
+- `दोहराओ सीमा range बैठा/चर i` = range iteration (e.g. `दोहराओ सीमा 0‥10 प्रति 2 बैठा i { दिखाओ i }`; `प्रति` belongs to the range expression)
 
 **Range step and direction (`range_tail`, `प्रति`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down
@@ -2196,7 +2196,7 @@ prints the same list shape up to element order.
 
 There is no iteration interface. `दोहराओ सेवन` works on the built-in iterable
 types and on cursors. A user type that should be iterable exposes an ordinary
-method that returns a cursor (`दोहराओ सेवन arbor.nodi() स्थिर n`); nothing is
+method that returns a cursor (`दोहराओ सेवन arbor.nodi() बैठा n`); nothing is
 called implicitly.
 
 **Changing the collection inside its own loop.** The rule is about the shape of
@@ -2266,7 +2266,7 @@ A negative number pattern is written with a leading minus (`स्थिति -
 `-` before anything else is not pattern syntax.
 
 `मिलाओ` matches a closed set and nothing else: the variants of an `क्रम` or
-`विभेद`, or the members of a union (`स्थिति numerus स्थिर n` over
+`विभेद`, or the members of a union (`स्थिति numerus बैठा n` over
 `numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
 pattern that is not a member of the scrutinee's closed set is rejected
 (`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
@@ -2455,7 +2455,7 @@ The `∷` glyph (U+2237, "proportion") explicitly ascribes a target type to an e
 Prefer typed construction for ordinary `वर्ग` values and `vacua` for ordinary empty collection values:
 
 ```fab
-fixum _ point ← Point { x = 10 }
+sit point ← Point { x = 10 }
 fixum lista<numerus> xs ← vacua
 ```
 
@@ -2612,13 +2612,13 @@ Implementation status (2026-10-11):
 Inline block example:
 
 ```fab
-fixum _ tag ← «inline»
+sit tag ← «inline»
 ```
 
 Multiline block example (newline after opening `«`):
 
 ```fab
-fixum _ blob ← «
+sit blob ← «
     select id, email
     from accounts
 »
@@ -2627,14 +2627,14 @@ fixum _ blob ← «
 Captured template example:
 
 ```fab
-fixum _ q ← `select * from accounts where id = §`(accountId)
+sit q ← `select * from accounts where id = §`(accountId)
 ```
 
 Octeti hex literal example:
 
 ```fab
-fixum _ sig ← |de ad be ef|
-fixum _ hello ← |48 65 6c 6c 6f|
+sit sig ← |de ad be ef|
+sit hello ← |48 65 6c 6c 6f|
 ```
 
 ### Format-Template Application
@@ -3033,7 +3033,7 @@ forms `ordina()` / `क्रमबद्ध_करो()` sort by the element's 
 **stable** sort. The key selector's result must be a number or `textus`; other
 key types are rejected.
 
-`सेवन` is used for iteration (`दोहराओ सेवन items स्थिर x`) and imports (`आयात सेवन "path"`).
+`सेवन` is used for iteration (`दोहराओ सेवन items बैठा x`) and imports (`आयात सेवन "path"`).
 
 ### Iteration coordinates (`पर`)
 
@@ -3042,9 +3042,9 @@ en reader spelling is "at": `दोहराओ सेवन grid पर [r, c]`
 `grid` at coordinates `[r, c]`.
 
 - **`lista`** (D3.1): one name binds the element's position
-  (`दोहराओ सेवन items पर [i] स्थिर v`).
+  (`दोहराओ सेवन items पर [i] बैठा v`).
 - **`tabula`** (D3.1-D3.3): one name binds the entry's key
-  (`दोहराओ सेवन m पर [k] स्थिर v`); a composite-key
+  (`दोहराओ सेवन m पर [k] बैठा v`); a composite-key
   `tabula<टपल<K1, …, Kn>, V>` takes N names, one per part of the `टपल`
   key, in declared part order.
 - **Tensor / matrix**: as before — one name per axis, first name = outermost
@@ -3059,8 +3059,8 @@ en reader spelling is "at": `दोहराओ सेवन grid पर [r, c]`
   distinct from the element binder that follows the clause.
 - **`धागा` lane binder (FLD K2).** An optional `धागा IDENTIFIER` clause
   (`filum_clause`, shared with `समेटो`) follows the `पर` clause and
-  precedes the mutability marker: `दोहराओ सेवन t पर [i, j] धागा f स्थिर v { … }`.
-  The clause also parses without `पर` (`दोहराओ सेवन t धागा f स्थिर v { … }`).
+  precedes the mutability marker: `दोहराओ सेवन t पर [i, j] धागा f बैठा v { … }`.
+  The clause also parses without `पर` (`दोहराओ सेवन t धागा f बैठा v { … }`).
   The parser claims `धागा` only in that slot, so a binder named `धागा` after
   the mutability marker stays an ordinary name. The binder is declared
   metadata; semantic passes own what it binds.

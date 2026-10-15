@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "A loop over a tensor whose extent is a run-time int reads its bounds from the tensor, so it visits every cell."
-syntax = "for from a at [i, j] const c { }"
+syntax = "for from a at [i, j] let c { }"
 related = ["tensor", "apud", "itera", "magnitudo"]
 locale = "en"
 +++
@@ -35,7 +35,7 @@ main {
     let tf32[2, size n] a ← flat ↦ tf32[2, size n]
     mut f32 total ← 0.0
     mut int coordinates ← 0
-    for from a at [i, j] const c {
+    for from a at [i, j] let c {
         total ← total + c
         coordinates ← coordinates + i * 10 + j
     }

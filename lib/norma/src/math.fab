@@ -430,8 +430,8 @@ fn reduce_half_pi(float a) → AngleReduction {
 
     # acc[l] holds the coefficient of 2^(−24l); l = 0 is the integer part.
     mut list<int> acc ← [0, 0, 0, 0, 0, 0, 0, 0]
-    for range 0‥4 const j {
-        for range 0‥8 const l {
+    for range 0‥4 let j {
+        for range 0‥8 let l {
             let int i ← l - 1 + q + j
             if i ≥ 0 and i ≺ table.length() {
                 acc[l] ← acc[l] + limbs[j] * table[i]

@@ -2462,7 +2462,7 @@ main {
     }
     catch err {
         match err {
-            case NotFound const path {
+            case NotFound let path {
                 print path
             }
             default {

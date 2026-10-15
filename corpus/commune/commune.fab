@@ -46,8 +46,8 @@ union ShapeError {
 
 fn describe(ShapeError e) → string {
     match e {
-        case Incompatible const message { return message }
-        case ElementMismatch const message, expected, actual { return message }
+        case Incompatible let message { return message }
+        case ElementMismatch let message, expected, actual { return message }
     }
 }
 

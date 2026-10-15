@@ -64,7 +64,7 @@ fn program(params: &str, body: &str, call: &str) -> String {
 @ kernel
 @ public
 fn k<size H, size W>({params}) → void {{
-    for from src at [i, j] thread lane const x {{
+    for from src at [i, j] thread lane let x {{
         {body}
     }}
 }}
@@ -109,7 +109,7 @@ fn a_depth_plane_style_vector_kernel_carries_no_fault_channel() {
 @ kernel
 @ public
 fn k<size H, size W>(tensor<vector<f32, 4>, [H, W]> state, mut tensor<f32, [H, W]> depth) → void {
-    for from state at [i, j] thread lane const c {
+    for from state at [i, j] thread lane let c {
         depth[[i, j]] ← c[0]
     }
 }

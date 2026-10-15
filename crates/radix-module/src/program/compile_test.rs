@@ -3333,7 +3333,7 @@ importa ex "probe:eventum" eventum
 
 functio describe(eventum.Eventum e) → textus {
     discerne e {
-        casu eventum.Eventum.Ictus fixum vis { redde vis ↦ textus }
+        casu eventum.Eventum.Ictus sit vis { redde vis ↦ textus }
         casu eventum.Eventum.Sonitus { redde "sonitus" }
     }
 }

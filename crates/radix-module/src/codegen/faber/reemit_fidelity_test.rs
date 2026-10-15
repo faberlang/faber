@@ -128,20 +128,20 @@ fn sort_expression_round_trips_in_latin_and_english_and_typechecks() {
     let cases = [
         (
             "la",
-            "functio f(lista<numerus> xs, tabula<textus, numerus> m) → vacuum {\n    sit lista<numerus> a ← ordinata via ascendens ex xs\n    sit lista<textus> k ← ordinata via descendens de m\n    sit lista<numerus> b ← ordinata via ascendens ex xs fixum p {\n        redde p\n    }\n    sit lista<textus> s ← ordinata via ascendens de m\n    itera ex s fixum n {\n        scribe n\n    }\n    varia numerus ordinata ← 1\n    varia numerus ascendens ← 2\n    varia lista<numerus> ys ← [3, 1]\n    ys.ordina()\n}\n",
+            "functio f(lista<numerus> xs, tabula<textus, numerus> m) → vacuum {\n    sit lista<numerus> a ← ordinata via ascendens ex xs\n    sit lista<textus> k ← ordinata via descendens de m\n    sit lista<numerus> b ← ordinata via ascendens ex xs sit p {\n        redde p\n    }\n    sit lista<textus> s ← ordinata via ascendens de m\n    itera ex s sit n {\n        scribe n\n    }\n    varia numerus ordinata ← 1\n    varia numerus ascendens ← 2\n    varia lista<numerus> ys ← [3, 1]\n    ys.ordina()\n}\n",
             [
                 "ordinata via ascendens ex xs",
                 "ordinata via descendens de m",
-                "ordinata via ascendens ex xs fixum p {",
+                "ordinata via ascendens ex xs sit p {",
             ],
         ),
         (
             "en",
-            "fn f(list<int> xs, map<string, int> m) → none {\n    let list<int> a ← sort via asc from xs\n    let list<string> k ← sort via desc ref m\n    let list<int> b ← sort via asc from xs const p {\n        return p\n    }\n    let list<string> s ← sort via asc ref m\n    for from s const n {\n        print n\n    }\n    mut int sort ← 1\n    mut int asc ← 2\n    mut list<int> ys ← [3, 1]\n    ys.sort()\n}\n",
+            "fn f(list<int> xs, map<string, int> m) → none {\n    let list<int> a ← sort via asc from xs\n    let list<string> k ← sort via desc ref m\n    let list<int> b ← sort via asc from xs let p {\n        return p\n    }\n    let list<string> s ← sort via asc ref m\n    for from s let n {\n        print n\n    }\n    mut int sort ← 1\n    mut int asc ← 2\n    mut list<int> ys ← [3, 1]\n    ys.sort()\n}\n",
             [
                 "sort via asc from xs",
                 "sort via desc ref m",
-                "sort via asc from xs const p {",
+                "sort via asc from xs let p {",
             ],
         ),
     ];
@@ -221,11 +221,11 @@ fn access_marked_parameter_forms_keep_their_inner_type() {
 /// spelling.
 #[test]
 fn bare_numeric_markers_re_emit_unchanged() {
-    let source = "functio f(u8 a, f32 b, numerus n, exactus<u16> c, lista<i32> xs, u8 ∪ textus u) → f64 {\n    discerne u {\n        casu u8 fixum v { tacet }\n        casu textus { tacet }\n    }\n    sit d64 d ← 1\n    redde b ↦ f64\n}\n";
+    let source = "functio f(u8 a, f32 b, numerus n, exactus<u16> c, lista<i32> xs, u8 ∪ textus u) → f64 {\n    discerne u {\n        casu u8 sit v { tacet }\n        casu textus { tacet }\n    }\n    sit d64 d ← 1\n    redde b ↦ f64\n}\n";
     let emitted = assert_idempotent(source);
     for expected in [
         "f(u8 a, f32 b, numerus n, exactus<u16> c, lista<i32> xs,",
-        "casu u8 fixum v",
+        "casu u8 sit v",
         "sit d64 d",
         "b ↦ f64",
     ] {
@@ -678,10 +678,10 @@ fn itera_coordinates_survive_reemission() {
     // D5.7 retired top-level `fixum`; the tensor binding moves inside
     // `incipit` (the coordinate spelling under test is unrelated to scope).
     let code = assert_idempotent(
-        "incipit {\n    sit tensor<f32, [3]> linea ← vacua\n    itera ex linea apud [i] fixum n {\n        scribe i\n    }\n}\n",
+        "incipit {\n    sit tensor<f32, [3]> linea ← vacua\n    itera ex linea apud [i] sit n {\n        scribe i\n    }\n}\n",
     );
     assert!(
-        code.contains("itera ex linea apud [i] fixum n"),
+        code.contains("itera ex linea apud [i] sit n"),
         "itera apud coordinates must survive:\n{code}"
     );
 }
@@ -691,11 +691,11 @@ fn nested_filum_metadata_survives_reemission() {
     // K8-R: each `filum` lane binder rides its own loop head; dropping or
     // moving one changes which iterations the independence proof composes.
     let code = assert_idempotent(
-        "incipit {\n    varia tensor<numerus, [2]> rows ← vacua\n    varia tensor<numerus, [3]> cols ← vacua\n    varia tensor<numerus, [2, 3]> grid ← vacua\n    itera ex rows apud [i] filum outer fixum row {\n        itera ex cols apud [j] filum inner fixum col {\n            grid[[i, j]] ← row + col\n        }\n    }\n}\n",
+        "incipit {\n    varia tensor<numerus, [2]> rows ← vacua\n    varia tensor<numerus, [3]> cols ← vacua\n    varia tensor<numerus, [2, 3]> grid ← vacua\n    itera ex rows apud [i] filum outer sit row {\n        itera ex cols apud [j] filum inner sit col {\n            grid[[i, j]] ← row + col\n        }\n    }\n}\n",
     );
     assert!(
-        code.contains("itera ex rows apud [i] filum outer fixum row")
-            && code.contains("itera ex cols apud [j] filum inner fixum col"),
+        code.contains("itera ex rows apud [i] filum outer sit row")
+            && code.contains("itera ex cols apud [j] filum inner sit col"),
         "nested filum lane binders must survive:\n{code}"
     );
 }
@@ -722,10 +722,10 @@ fn scalar_math_and_vector_lift_survive_reemission() {
 #[test]
 fn reduction_sum_reemits_source_shape() {
     let code = assert_idempotent(
-        "functio total(tensor<f32, [8]> a) → f32 {\n    redde reducta via summa ex a apud [i] fixum s { redde s }\n}\n",
+        "functio total(tensor<f32, [8]> a) → f32 {\n    redde reducta via summa ex a apud [i] sit s { redde s }\n}\n",
     );
     assert!(
-        code.contains("reducta via summa ex a apud [i] fixum s"),
+        code.contains("reducta via summa ex a apud [i] sit s"),
         "sum reduction must re-emit its source shape:\n{code}"
     );
 }
@@ -1079,25 +1079,25 @@ fn ordo_enum_round_trips_discriminants() {
 
 #[test]
 fn array_destructuring_reemits_as_pattern() {
-    let source = "incipit {\n    sit xs ← [1, 2, 3, 4]\n    fixum [a, _, ceteri r] ← xs\n    varia [c, d] ← [5, 6]\n    nota a\n    nota r\n    nota c + d\n}\n";
+    let source = "incipit {\n    sit xs ← [1, 2, 3, 4]\n    sit [a, _, ceteri r] ← xs\n    varia [c, d] ← [5, 6]\n    nota a\n    nota r\n    nota c + d\n}\n";
     let emitted = assert_idempotent(source);
-    assert!(emitted.contains("fixum [a, _, ceteri r] ← xs\n"), "{emitted}");
+    assert!(emitted.contains("sit [a, _, ceteri r] ← xs\n"), "{emitted}");
     assert!(emitted.contains("varia [c, d] ← [5, 6]\n"), "{emitted}");
     assert!(!emitted.contains("__destructura"), "{emitted}");
 }
 
 #[test]
 fn object_destructuring_reemits_as_pattern() {
-    let source = "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    fixum {x, y ut z} ← fac()\n    nota x + z\n}\n";
+    let source = "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    sit {x, y ut z} ← fac()\n    nota x + z\n}\n";
     let emitted = assert_idempotent(source);
-    assert!(emitted.contains("fixum {x, y ut z} ← fac()\n"), "{emitted}");
+    assert!(emitted.contains("sit {x, y ut z} ← fac()\n"), "{emitted}");
 }
 
 #[test]
 fn itera_destructuring_binder_reemits_as_pattern() {
-    let source = "incipit {\n    sit m ← [[1, 2, 3], [4, 5, 6]]\n    itera ex m fixum [caput, ceteri cauda] {\n        nota caput\n        nota cauda\n    }\n}\n";
+    let source = "incipit {\n    sit m ← [[1, 2, 3], [4, 5, 6]]\n    itera ex m sit [caput, ceteri cauda] {\n        nota caput\n        nota cauda\n    }\n}\n";
     let emitted = assert_idempotent(source);
-    assert!(emitted.contains("itera ex m fixum [caput, ceteri cauda] {\n"), "{emitted}");
+    assert!(emitted.contains("itera ex m sit [caput, ceteri cauda] {\n"), "{emitted}");
     assert!(!emitted.contains("__itera_element"), "{emitted}");
 }
 
@@ -1305,7 +1305,7 @@ fn mixed_bare_and_qualified_variant_references_stay_provable() {
     // `casu Fons.Mala` is qualified while `finge Mala` is bare. The spelling
     // sidecar is keyed by variant, so the re-emitter falls back to bare for
     // both; the variant is the same, so the program is unchanged.
-    let source = "discretio Fons {\n    Mala {\n        textus detail\n    }\n}\n\nfunctio fac_malam() → Fons {\n    redde finge Mala { detail = \"x\" }\n}\n\nfunctio lege(Fons fons) → textus {\n    discerne fons {\n        casu Fons.Mala fixum detail {\n            redde detail\n        }\n    }\n}\n";
+    let source = "discretio Fons {\n    Mala {\n        textus detail\n    }\n}\n\nfunctio fac_malam() → Fons {\n    redde finge Mala { detail = \"x\" }\n}\n\nfunctio lege(Fons fons) → textus {\n    discerne fons {\n        casu Fons.Mala sit detail {\n            redde detail\n        }\n    }\n}\n";
     assert_idempotent(source);
 }
 

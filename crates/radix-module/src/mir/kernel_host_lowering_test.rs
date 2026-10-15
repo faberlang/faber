@@ -72,7 +72,7 @@ const TENSOR_READ_KERNEL: &str = r"
 @ kernel
 @ public
 fn k(tf32[8] a, mut tf32[8] o) → void {
-    for from a at [i] thread lane const c {
+    for from a at [i] thread lane let c {
         o[i] ← a[i] * 2.0
     }
 }
@@ -158,7 +158,7 @@ fn sum2<size H, size W>(tensor<f32, [H, W]> t, int x, int y) → f32 {
 @ kernel
 @ public
 fn k<size H, size W>(tensor<f32, [H, W]> t, mut tensor<f32, [H, W]> o) → void {
-    for from t at [i, j] thread lane const c {
+    for from t at [i, j] thread lane let c {
         o[[i, j]] ← sum2(t, j, i) * 2.0
     }
 }
@@ -179,7 +179,7 @@ fn host_kernel_lowering_folds_a_thread_sum_sequentially() {
 @ kernel
 @ public
 fn total<size N>(tf32[N] a) → f32 {
-    return reduce via sum from a at [i] thread lane const s { return s * 2.0 }
+    return reduce via sum from a at [i] thread lane let s { return s * 2.0 }
 }
 main {
     let tf32[4] a ← [3.0, 1.0, 4.0, 2.0] ↦ tf32[4]
@@ -212,7 +212,7 @@ fn speed_of(f32 scale, vector<f32, 4> s) → f32 {
 @ kernel
 @ public
 fn wave_speed<size H, size W>(f32 scale, tensor<vector<f32, 4>, [H, W]> state, mut tensor<f32, [4]> clock) → void {
-    clock[[1]] ← reduce via max from state at [i, j] thread lane const s { return speed_of(scale, s) } coalesce 0.0
+    clock[[1]] ← reduce via max from state at [i, j] thread lane let s { return speed_of(scale, s) } coalesce 0.0
 }
 main {
     let tensor<vector<f32, 4>, []> cell_seed ← empty

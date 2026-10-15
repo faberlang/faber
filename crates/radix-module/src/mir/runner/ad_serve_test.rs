@@ -71,7 +71,7 @@ locale = "la"
 {COUNTER}
 incipit {{
     sit sermo s ← ad 'numeri:omnes'
-    itera ex s.tuus<numerus>().cursor() fixum item {{
+    itera ex s.tuus<numerus>().cursor() sit item {{
         nota "consume §"(item.data)
         si item.data ≥ 1 {{
             rumpe

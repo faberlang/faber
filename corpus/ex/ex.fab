@@ -44,7 +44,7 @@ class Persona {
 
 main {
     let p ← Persona { nomen = "Marcus", aetas = 30 }
-    from p const nomen, aetas
+    from p let nomen, aetas
     print nomen
     print aetas
 }

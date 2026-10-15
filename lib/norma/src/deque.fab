@@ -125,7 +125,7 @@ class Deque<T> {
             i ← i - 1
             out.append(self.head.get(i))
         }
-        for from self.tail const v {
+        for from self.tail let v {
             out.append(v)
         }
         return out

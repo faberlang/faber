@@ -56,7 +56,7 @@ fn textus_scalar_index_keeps_ascii_one() {
 fn itera_ex_textus_binds_littera() {
     test_support::assert_accepts_la(
         "functio f(textus s) → vacuum {
-    itera ex s fixum c {
+    itera ex s sit c {
         sit littera x ← c
         nota x
     }
@@ -68,7 +68,7 @@ fn itera_ex_textus_binds_littera() {
 fn itera_ex_textus_element_is_not_ascii_one() {
     test_support::assert_rejects_with_issue_la(
         "functio f(textus s) → vacuum {
-    itera ex s fixum c {
+    itera ex s sit c {
         sit ascii<1> x ← c
         nota x
     }
@@ -81,7 +81,7 @@ fn itera_ex_textus_element_is_not_ascii_one() {
 fn itera_ex_ascii_binds_littera() {
     test_support::assert_accepts_la(
         "functio f(ascii s) → vacuum {
-    itera ex s fixum c {
+    itera ex s sit c {
         sit littera x ← c
         nota x
     }
@@ -112,7 +112,7 @@ fn littera_equals_char_literal_either_side() {
     test_support::assert_accepts_la(
         "functio f(textus s) → numerus {
     varia numerus n ← 0
-    itera ex s fixum c {
+    itera ex s sit c {
         si c ≡ 'o' { n ← n + 1 }
         si 'a' ≡ c { n ← n + 1 }
         si c ≢ 'z' { n ← n + 1 }
@@ -219,7 +219,7 @@ fn octeti_resolves_to_lista_b8() {
 fn octeti_elements_are_b8() {
     test_support::assert_accepts_la(
         "functio f(octeti b) → vacuum {
-    itera ex b fixum x {
+    itera ex b sit x {
         sit b8 y ← x
         nota y
     }

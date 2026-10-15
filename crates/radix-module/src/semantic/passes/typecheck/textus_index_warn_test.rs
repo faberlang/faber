@@ -93,7 +93,7 @@ fn does_not_warn_when_iterating_textus_scalars() {
     assert_no_warning(
         r#"incipit {
     sit textus xs ← "ab"
-    itera ex xs.cursor() fixum scalar {
+    itera ex xs.cursor() sit scalar {
         nota scalar
     }
 }"#,

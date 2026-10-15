@@ -48,7 +48,7 @@ fn escaping_counter_keeps_its_own_shared_state() {
 #[test]
 fn loop_bindings_are_fresh_per_iteration() {
     let out = run_en(
-        "main {\n    mut list<() → int> fs ← empty\n    for range 0‥3 const i {\n        fs.append(() → int ∴ i * 10)\n    }\n    for from fs const f { print f() }\n}\n",
+        "main {\n    mut list<() → int> fs ← empty\n    for range 0‥3 let i {\n        fs.append(() → int ∴ i * 10)\n    }\n    for from fs let f { print f() }\n}\n",
     );
     assert_eq!(out, ["0", "10", "20"]);
 }
@@ -56,7 +56,7 @@ fn loop_bindings_are_fresh_per_iteration() {
 #[test]
 fn loop_body_var_captured_and_mutated_is_fresh_per_iteration() {
     let out = run_en(
-        "main {\n    mut list<() → int> fs ← empty\n    for range 0‥3 const i {\n        mut int acc ← i\n        fs.append(() → int ∴ do { acc ← acc + 100\n return acc })\n    }\n    for from fs const f { print f() }\n    for from fs const f { print f() }\n}\n",
+        "main {\n    mut list<() → int> fs ← empty\n    for range 0‥3 let i {\n        mut int acc ← i\n        fs.append(() → int ∴ do { acc ← acc + 100\n return acc })\n    }\n    for from fs let f { print f() }\n    for from fs let f { print f() }\n}\n",
     );
     assert_eq!(out, ["100", "101", "102", "200", "201", "202"]);
 }

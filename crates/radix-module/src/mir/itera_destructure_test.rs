@@ -137,13 +137,13 @@ fn loop_binder_mir_matches_binding_position_for_each_pattern_form() {
             "array positional",
             r"
 functio bind(lista<numerus> row) → vacuum {
-    fixum [a, b] ← row
+    sit [a, b] ← row
     tacet
 }
 ",
             r"
 functio loopum(lista<lista<numerus>> rows) → vacuum {
-    itera ex rows fixum [a, b] {
+    itera ex rows sit [a, b] {
         tacet
     }
 }
@@ -161,7 +161,7 @@ genus Point {
 }
 
 functio bind(Point point) → vacuum {
-    fixum {x ut left, y} ← point
+    sit {x ut left, y} ← point
     tacet
 }
 ",
@@ -172,7 +172,7 @@ genus Point {
 }
 
 functio loopum(lista<Point> points) → vacuum {
-    itera ex points fixum {x ut left, y} {
+    itera ex points sit {x ut left, y} {
         tacet
     }
 }
@@ -185,13 +185,13 @@ functio loopum(lista<Point> points) → vacuum {
             "array rest",
             r"
 functio bind(lista<numerus> row) → vacuum {
-    fixum [head, ceteri tail] ← row
+    sit [head, ceteri tail] ← row
     tacet
 }
 ",
             r"
 functio loopum(lista<lista<numerus>> rows) → vacuum {
-    itera ex rows fixum [head, ceteri tail] {
+    itera ex rows sit [head, ceteri tail] {
         tacet
     }
 }
@@ -204,13 +204,13 @@ functio loopum(lista<lista<numerus>> rows) → vacuum {
             "array underscore",
             r"
 functio bind(lista<numerus> row) → vacuum {
-    fixum [_, value] ← row
+    sit [_, value] ← row
     tacet
 }
 ",
             r"
 functio loopum(lista<lista<numerus>> rows) → vacuum {
-    itera ex rows fixum [_, value] {
+    itera ex rows sit [_, value] {
         tacet
     }
 }
@@ -233,7 +233,7 @@ fn itera_ex_rest_over_lista_of_listax_validates_and_runs() {
     let source = r"
 functio sum_rest(lista<lista<numerus>> rows) → numerus {
     varia numerus total ← 0
-    itera ex rows fixum [head, ceteri tail] {
+    itera ex rows sit [head, ceteri tail] {
         total ← total + head
         total ← total + tail[0]
     }
@@ -255,7 +255,7 @@ fn itera_ex_over_lista_of_tuples_validates_and_runs() {
     let source = r"
 functio sum_pairs(lista<iuncta<numerus, numerus>> pairs) → numerus {
     varia numerus total ← 0
-    itera ex pairs fixum [left, right] {
+    itera ex pairs sit [left, right] {
         total ← total + left + right
     }
     redde total
@@ -283,7 +283,7 @@ genus Point {
 
 functio sum_points(lista<Point> points) → numerus {
     varia numerus total ← 0
-    itera ex points fixum {x, y} {
+    itera ex points sit {x, y} {
         total ← total + x + y
     }
     redde total

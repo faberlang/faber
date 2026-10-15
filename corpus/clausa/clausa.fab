@@ -52,7 +52,7 @@ main {
     # predicate closure
     let (int) → bool paritas ← int x → bool ∴ x % 2 ≡ 0
     mut list<int> pares ← empty
-    for from numeri const n {
+    for from numeri let n {
         duplicati.append(duplica(n))
         if paritas(n) {
             pares.append(n)

@@ -36,19 +36,19 @@ locale = "en"
 main {
     # Iterate over number lista
     let list<int, 5> numeri ← [1, 2, 3, 4, 5]
-    for from numeri const n {
+    for from numeri let n {
         print n
     }
 
     # Iterate over textus lista
     let list<string, 3> nomina ← ["Marcus", "Julia", "Claudia"]
-    for from nomina const nomen {
+    for from nomina let nomen {
         print nomen
     }
 
     # Transform values
     let list<int, 3> valores ← [10, 20, 30]
-    for from valores const v {
+    for from valores let v {
         let int duplex ← v * 2
         print duplex
     }

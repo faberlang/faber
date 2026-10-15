@@ -83,7 +83,7 @@ fn nested_json_arrays(depth: usize) -> String {
 
 /// Nested array binding pattern: `[[[target]]]`.
 fn nested_array_pattern(depth: usize) -> String {
-    format!("fixum {}target{} ← 0", "[".repeat(depth), "]".repeat(depth))
+    format!("sit {}target{} ← 0", "[".repeat(depth), "]".repeat(depth))
 }
 
 fn flat_fold_chain(operators: usize) -> String {

@@ -36,7 +36,7 @@ fn sort_from_list_set_map_and_ref_map_type_as_lists() {
 #[test]
 fn sort_body_returns_the_key() {
     accepts(&compile(
-        "functio f(lista<textus> xs) {\n    sit lista<textus> a ← ordinata via ascendens ex xs fixum p {\n        redde p.longitudo()\n    }\n}\n",
+        "functio f(lista<textus> xs) {\n    sit lista<textus> a ← ordinata via ascendens ex xs sit p {\n        redde p.longitudo()\n    }\n}\n",
     ));
 }
 
@@ -66,7 +66,7 @@ fn sort_unordered_elements_and_keys_are_refused_by_name() {
     );
     rejects_with_issue(
         &compile(
-            "functio f(lista<numerus> xs) {\n    sit lista<numerus> a ← ordinata via ascendens ex xs fixum p {\n        redde [p]\n    }\n}\n",
+            "functio f(lista<numerus> xs) {\n    sit lista<numerus> a ← ordinata via ascendens ex xs sit p {\n        redde [p]\n    }\n}\n",
         ),
         "sort_key_unordered",
     );

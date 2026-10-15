@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "The keyed .sorted(key) method is retired; the sort expression replaces it."
-syntax = "<lista>.sorted(<T x ∴ key>) — rejected; write sort via asc from <lista> const x { return key }"
+syntax = "<lista>.sorted(<T x ∴ key>) — rejected; write sort via asc from <lista> let x { return key }"
 related = ["ordina-clavis"]
 locale = "en"
 no_expected = "rejects"
@@ -20,7 +20,7 @@ diagnostic = "SEM011:sorted_key_retired"
 #
 # Common mistakes:
 #   • calling `.sorted(key)` — write
-#     `sort via asc from list const x { return key }` instead
+#     `sort via asc from list let x { return key }` instead
 #
 # See also: ordina-clavis
 # =============================================================================

@@ -74,7 +74,7 @@ fn pack(int yield, int default) → int {
 
 fn weigh(Shift s) → int {
     match s {
-        case Move const yield, delete {
+        case Move let yield, delete {
             return yield * 10 + delete
         }
         case Stay {
@@ -103,7 +103,7 @@ main {
     print weigh(variant Stay ∷ Shift)
 
     # Destructuring reads the properties and binds escaped local names.
-    from b const yield, delete as new
+    from b let yield, delete as new
     print yield
     print new
 

@@ -13,12 +13,12 @@
 //!   statement-body syntax.
 //! - Pattern literals are parsed independently from expression literals because
 //!   this context accepts constants, not operators or calls.
-//! - `fixum` and `varia` in pattern binds describe captured binding mutability;
+//! - `sit` and `varia` (en `let`/`mut`) in pattern binds describe captured binding mutability;
 //!   they are not declaration statements inside the arm head.
 
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::TokenKind;
-use radix_syntax::{AstMutability, ExField, Literal, PathPattern, Pattern, PatternBind};
+use radix_syntax::{ExField, Literal, PathPattern, Pattern, PatternBind};
 
 // PATTERN PARSING
 
@@ -160,25 +160,20 @@ impl Parser {
     /// Parse an optional binding suffix for a pattern.
     ///
     /// GRAMMAR:
-    ///   bind := `ut` ident | (`fixum`|`varia`) ident (',' ident)*
+    ///   bind := `ut` ident | (`sit`|`varia`) ident (',' ident)*
     ///
-    /// `ut name` aliases the whole matched value. `fixum` and `varia` capture a
+    /// `ut name` aliases the whole matched value. `sit` and `varia` capture a
     /// shallow list of names with the requested mutability; deeper shape checks
     /// belong to semantic analysis.
     fn parse_pattern_bind(&mut self) -> Result<Option<PatternBind>, ParseError> {
         let bind = if self.eat_keyword_ident(TokenKind::Ut) {
             let alias = self.parse_ident()?;
             Some(PatternBind::Alias(alias))
-        } else if self.eat_keyword_ident(TokenKind::Fixum) {
+        } else if self.binder_head_word_at(0) {
+            let mutability = self.parse_binder_mutability()?;
             let bindings = self.parse_pattern_bind_list()?;
             Some(PatternBind::Bindings {
-                mutability: AstMutability::Immutable,
-                bindings,
-            })
-        } else if self.eat_keyword_ident(TokenKind::Varia) {
-            let bindings = self.parse_pattern_bind_list()?;
-            Some(PatternBind::Bindings {
-                mutability: AstMutability::Mutable,
+                mutability,
                 bindings,
             })
         } else {
@@ -200,7 +195,7 @@ impl Parser {
             };
             bindings.push(ExField { name, alias });
             // L-2: a comma stays a binding comma, except where the next two
-            // words are a name and `fixum`/`varia` — that is the retired
+            // words are a name and a binder word (`sit`/`varia`) — that is the retired
             // pattern comma, handled by `parse_patterns`.
             if self.check(&TokenKind::Comma) && self.comma_starts_next_pattern() {
                 break;
@@ -237,12 +232,12 @@ impl Parser {
     }
 
     /// Whether the comma at the cursor is followed by a name and a binding
-    /// introducer (`, Name fixum`), which can only begin another pattern.
+    /// introducer (`, Name sit`), which can only begin another pattern.
     fn comma_starts_next_pattern(&self) -> bool {
         matches!(self.peek_at(1).kind, TokenKind::Ident(_))
             && matches!(
                 self.keyword_ident_at(2),
-                Some(TokenKind::Fixum | TokenKind::Varia)
+                Some(TokenKind::Sit | TokenKind::Varia | TokenKind::Fixum | TokenKind::De)
             )
     }
 

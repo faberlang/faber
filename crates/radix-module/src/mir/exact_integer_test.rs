@@ -432,7 +432,8 @@ fn negated_i64_min_constant_fits_every_64_bit_slot() {
 fn summa_at_the_cap_is_a_checked_store() {
     // f1s (ruling 21): a `summa` sits at the 64-bit cap, so returning it as
     // `int` checks the store; a small sum returns fine.
-    let functions = "functio total(tensor<i64, [3]> a) → numerus {\n  redde reducta via summa ex a fixum s {\n    redde s\n  }\n}\n";
+    let functions =
+        "functio total(tensor<i64, [3]> a) → numerus {\n  redde reducta via summa ex a sit s {\n    redde s\n  }\n}\n";
     let run_total = |values: &str| {
         let session = Session::new(
             Config::default()
@@ -492,7 +493,8 @@ fn grouped_reducta_summa_widens_narrow_integer_terms_before_accumulating() {
 fn summa_accumulates_exactly_and_checks_at_the_store() {
     // sm1: the running total is exact (2^64 - 2 is inside the exact range);
     // only the store of the result into its slot applies the slot policy.
-    let functions = "functio total(tensor<i64, [3]> a) → numerus {\n  redde reducta via summa ex a fixum s {\n    redde s\n  }\n}\n";
+    let functions =
+        "functio total(tensor<i64, [3]> a) → numerus {\n  redde reducta via summa ex a sit s {\n    redde s\n  }\n}\n";
     let run_total = |values: &str| {
         let session = Session::new(
             Config::default()

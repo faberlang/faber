@@ -873,7 +873,7 @@ fn union_match_reports_missing_variants() {
 
 functio describe(Eventum e) → textus {{
     discerne e {{
-        casu Eventum.Ictus fixum vis {{ redde vis ↦ textus }}
+        casu Eventum.Ictus sit vis {{ redde vis ↦ textus }}
     }}
 }}
 
@@ -899,7 +899,7 @@ fn union_omnia_accepts_all_variants_named() {
 
 functio describe(Eventum e) → textus {{
     discerne omnia e {{
-        casu Eventum.Ictus fixum vis {{ redde vis ↦ textus }}
+        casu Eventum.Ictus sit vis {{ redde vis ↦ textus }}
         casu Eventum.Sonitus {{ redde "sonitus" }}
     }}
 }}
@@ -927,7 +927,7 @@ fn union_omnia_forbids_catchall() {
 
 functio describe(Eventum e) → textus {{
     discerne omnia e {{
-        casu Eventum.Ictus fixum vis {{ redde vis ↦ textus }}
+        casu Eventum.Ictus sit vis {{ redde vis ↦ textus }}
         ceterum {{ redde "alter" }}
     }}
 }}
@@ -953,7 +953,7 @@ fn union_omnia_reports_missing_variants() {
 
 functio describe(Eventum e) → textus {{
     discerne omnia e {{
-        casu Eventum.Ictus fixum vis {{ redde vis ↦ textus }}
+        casu Eventum.Ictus sit vis {{ redde vis ↦ textus }}
     }}
 }}
 

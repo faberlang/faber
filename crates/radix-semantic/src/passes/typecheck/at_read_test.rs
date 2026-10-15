@@ -69,7 +69,7 @@ fn at_read_cape_handler_checks() {
 #[test]
 fn at_read_en_surface_shares_a_source_with_the_loop_clause() {
     let source = r"fn pick(list<int> xs) → int {
-    for from xs at [i] const v {
+    for from xs at [i] let v {
     }
     return xs.at(1) ⊥ 0
 }";

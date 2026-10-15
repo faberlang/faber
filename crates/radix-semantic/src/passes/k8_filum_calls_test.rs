@@ -42,7 +42,7 @@ fn kernel(helpers: &str, statement: &str) -> String {
 @ nucleum
 @ publica
 functio k(in {GRID} out, de {GRID} src) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         {statement}
     }}
 }}
@@ -360,7 +360,7 @@ fn helper_with_a_parallel_loop_is_declined() {
     let looped = r"
 @ nucleum
 functio sweep(varia tensor<f32, [4]> target) → vacuum {
-    itera ex target apud [j] filum inner fixum cell { target[j] ← cell }
+    itera ex target apud [j] filum inner sit cell { target[j] ← cell }
 }
 ";
     rejected(&kernel(looped, "sweep(varia out)"), "unproved_loop_form");
@@ -422,7 +422,7 @@ fn reduction_term_may_call_a_pure_private_helper() {
         r"{SQUARE}
 @ nucleum
 functio k(tensor<f32, [32]> xs) → f32 {{
-    redde reducta via summa ex xs apud [i] filum f fixum s {{ redde square(s) }}
+    redde reducta via summa ex xs apud [i] filum f sit s {{ redde square(s) }}
 }}
 "
     ));
@@ -430,7 +430,7 @@ functio k(tensor<f32, [32]> xs) → f32 {{
         r"{SQUARE}
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
-    redde reducta via summa ex xs apud [i] fixum s {{ redde square(s) }}
+    redde reducta via summa ex xs apud [i] sit s {{ redde square(s) }}
 }}
 "
     ));
@@ -444,7 +444,7 @@ fn reduction_term_may_call_a_helper_that_reads_a_tensor() {
 functio at(de tensor<f32, [4]> t, numerus j) → f32 { redde t[j] }
 @ nucleum
 functio k(tensor<f32, [4]> xs, tensor<f32, [4]> ys) → f32 {
-    redde reducta via summa ex xs apud [i] fixum s { redde s + at(ys, i + 1) }
+    redde reducta via summa ex xs apud [i] sit s { redde s + at(ys, i + 1) }
 }
 ",
     );
@@ -457,7 +457,7 @@ fn reduction_term_calling_a_host_function_is_still_rejected() {
 functio host(f32 x) → f32 { redde x }
 @ nucleum
 functio k(tensor<f32, [32]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] filum f fixum s { redde host(s) }
+    redde reducta via summa ex xs apud [i] filum f sit s { redde host(s) }
 }
 ",
         "reducta_body_context",
@@ -473,7 +473,7 @@ fn reduction_term_may_call_a_public_kernel() {
 functio shown(f32 x) → f32 { redde x }
 @ nucleum
 functio k(tensor<f32, [32]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] filum f fixum s { redde shown(s) }
+    redde reducta via summa ex xs apud [i] filum f sit s { redde shown(s) }
 }
 ",
     );
@@ -487,7 +487,7 @@ fn reduction_term_may_call_a_helper_that_calls_a_helper() {
 functio speed(f32 x) → f32 {{ redde square(x) + 1.0 }}
 @ nucleum
 functio k(tensor<f32, [32]> xs) → f32 {{
-    redde reducta via summa ex xs apud [i] filum f fixum s {{ redde speed(s) }}
+    redde reducta via summa ex xs apud [i] filum f sit s {{ redde speed(s) }}
 }}
 "
     ));
@@ -503,7 +503,7 @@ fn reduction_term_calling_a_failable_kernel_is_accepted_when_the_caller_can_fail
 functio risky(f32 x) → f32 ⇥ textus { redde x }
 @ nucleum
 functio k(tensor<f32, [32]> xs) → f32 ⇥ textus {
-    redde reducta via summa ex xs apud [i] filum f fixum s { redde risky(s) }
+    redde reducta via summa ex xs apud [i] filum f sit s { redde risky(s) }
 }
 ",
     );
@@ -520,7 +520,7 @@ functio dirty(varia tensor<f32, [32]> t, f32 x) → f32 {
 }
 @ nucleum
 functio k(varia tensor<f32, [32]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] filum f fixum s { redde dirty(varia xs, s) }
+    redde reducta via summa ex xs apud [i] filum f sit s { redde dirty(varia xs, s) }
 }
 ",
     );
@@ -545,7 +545,7 @@ functio host(f32 x) → f32 { redde x }
 functio leaky(f32 x) → f32 { redde host(x) }
 @ nucleum
 functio k(tensor<f32, [32]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] filum f fixum s { redde leaky(s) }
+    redde reducta via summa ex xs apud [i] filum f sit s { redde leaky(s) }
 }
 ",
     );
@@ -575,7 +575,7 @@ functio kernel(in {GRID} out, de {GRID} src) → vacuum {{
     varia {GRID} scratch ← tf32[4] {{}}
     varia Counter counter ← Counter {{ count = 0 }}
     {statements}
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         out[i] ← value
     }}
 }}
@@ -624,7 +624,7 @@ fn vector_component_of_the_element_binder_is_a_value_read() {
     accepted(
         r"
 functio k(de tensor<vector<f32, 4>, [4]> state, varia tensor<f32, [4]> depth) → vacuum {
-    itera ex state apud [i] filum lane fixum c {
+    itera ex state apud [i] filum lane sit c {
         depth[i] ← c[0]
     }
 }
@@ -638,7 +638,7 @@ fn vector_tensor_written_in_place_still_rejects_neighbour_reads() {
     rejected(
         r"
 functio k(varia tensor<vector<f32, 4>, [4]> state) → vacuum {
-    itera ex state apud [i] filum lane fixum c {
+    itera ex state apud [i] filum lane sit c {
         state[i] ← state[i + 1]
     }
 }
@@ -653,7 +653,7 @@ fn view_kernel(statement: &str) -> String {
     format!(
         r"
 functio k(in {GRID} out, {GRID} src) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         {statement}
     }}
 }}
@@ -671,7 +671,7 @@ fn edge_view_of_an_unwritten_tensor_is_accepted() {
         r"
 functio k(varia tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
     sit tensor<f32, [4]> west ← src.disloco([1]).limes<reflexa>()
-    itera ex src apud [i] filum lane fixum value {
+    itera ex src apud [i] filum lane sit value {
         out[i] ← west[i] + value
     }
 }
@@ -689,7 +689,7 @@ fn edge_view_of_the_written_tensor_is_rejected() {
 functio k(varia tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
     varia tensor<f32, [4]> alias ← out
     sit tensor<f32, [4]> west ← alias.disloco([1]).limes<clampa>()
-    itera ex src apud [i] filum lane fixum value {
+    itera ex src apud [i] filum lane sit value {
         out[i] ← west[i] + value
     }
 }
@@ -705,7 +705,7 @@ fn edge_view_of_an_unmarked_param_cannot_launder_a_write() {
     assert_rejects_with_issue_la(
         r"
 functio k(tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
-    itera ex src apud [i] filum lane fixum value {
+    itera ex src apud [i] filum lane sit value {
         out[i] ← value
     }
 }

@@ -372,10 +372,6 @@ help = "احتفظ بربط rest واحد فقط '{keyword}'"
 message = "'{keyword}' يربط معرفا واحدا مباشرة؛ استخدم '{keyword}' name ← expr"
 help = "اكتب '{keyword}' name ← expr أو استخدم {fixum} للارتباطات المنمطة/المفككة"
 
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "{sit} لا يدعم أنماط التفكيك"
-help = "استخدم {fixum} مع نمط تفكيك"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "مطلوب test case أو setup"
 help = "ابدأ عنصر الجسم بـ '{proba}' أو '{probandum}' أو '{setup}'"
@@ -515,6 +511,14 @@ help = "اكتب `{keyword} T {name} ← {marker} value`؛ و`{name} ← {marker
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "تم إلغاء تصريح `{keyword}` وقت التشغيل؛ `{name}` اسم وقت تشغيل"
 help = "اكتب `{sit} T {name} ← …` (أو `{sit} {name} ← …` لاستنتاج النوع)؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "تم إلغاء كلمة الربط `{keyword}`"
+help = "تستخدم الروابط `{sit}` (اسم ثابت) أو `{varia}` (اسم قابل للكتابة)؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "لا يمكن أن يبدأ `{keyword}` رابطًا"
+help = "الرابط يسمّي قيمة كل تكرار أو مطابقة؛ اكتب `{sit}` لاسم ثابت أو `{varia}` لاسم قابل للكتابة"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "المتغير المحلي `{keyword}` يحتاج إلى موضع للقراءة: `{keyword} T name ← place`"

@@ -372,10 +372,6 @@ help = "只保留一個 '{keyword}' rest 綁定"
 message = "'{keyword}' 直接綁定一個識別符；請使用 '{keyword}' name ← expr"
 help = "寫成 '{keyword}' name ← expr，或對具型別／解構綁定使用 fixum"
 
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit 不支援解構模式"
-help = "對解構模式使用 fixum"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "需要測試案例或 setup"
 help = "以 '{proba}'、'{probandum}' 或 '{setup}' 開始主體項目"
@@ -515,6 +511,14 @@ help = "寫成 `{keyword} T {name} ← {marker} value`；之後的 `{name} ← {
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "執行期的 `{keyword}` 宣告已廢止；`{name}` 是執行期名稱"
 help = "寫成 `{sit} T {name} ← …`（或用 `{sit} {name} ← …` 推斷型別）；`{fixum}` 表示編譯期事實，與 `=` 搭配"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "`{keyword}` 繫結詞已廢止"
+help = "繫結名使用 `{sit}`（固定名稱）或 `{varia}`（可寫名稱）；`{fixum}` 表示編譯期事實，與 `=` 搭配"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` 不能引入繫結名"
+help = "繫結名對應每次迭代或匹配的值；固定名稱寫 `{sit}`，可寫名稱寫 `{varia}`"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "`{keyword}` 區域變數需要一個可讀取的位置：`{keyword} T name ← place`"

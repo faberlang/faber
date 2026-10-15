@@ -79,7 +79,7 @@ fn module_constant_cannot_be_given_away() {
 
 #[test]
 fn loop_binder_cannot_be_given_away() {
-    let body = "    let list<list<int>> ll ← [[1], [2]]\n    for from ll const x {\n        eat(own x)\n    }";
+    let body = "    let list<list<int>> ll ← [[1], [2]]\n    for from ll let x {\n        eat(own x)\n    }";
     assert_eq!(main_body(body), ["own_argument_loop_binder"]);
 }
 

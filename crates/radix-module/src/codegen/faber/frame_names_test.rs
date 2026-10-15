@@ -55,7 +55,7 @@ locale = "en"
 +++
 fn drain(channel s) → int {
     mut int n ← 0
-    for from s.recv<string>().cursor() const f {
+    for from s.recv<string>().cursor() let f {
         n ← n + 1
     }
     return n
@@ -78,7 +78,7 @@ locale = "la"
 +++
 functio drain(sermo s) → numerus {
     varia numerus n ← 0
-    itera ex s.tuus<textus>().cursor() fixum f {
+    itera ex s.tuus<textus>().cursor() sit f {
         n ← n + 1
     }
     redde n
@@ -129,7 +129,7 @@ main {
     let int recv ← send(p.frame)
     print recv
     print channel
-    for from [1, 2] const frame {
+    for from [1, 2] let frame {
         print frame
     }
 }
@@ -194,7 +194,7 @@ locale = "en"
 +++
 fn drain(channel s) → int {
     mut int n ← 0
-    for from s.recv<string>().cursor() const f {
+    for from s.recv<string>().cursor() let f {
         n ← n + 1
     }
     return n

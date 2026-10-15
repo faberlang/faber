@@ -63,7 +63,7 @@ const SEAM_MODEL: &str = r#"import from "./util" util
 
 fn flat(int n) → list<f32> {
     mut list<f32> out ← empty
-    for range 0‥n const i {
+    for range 0‥n let i {
         out.append(1.0)
     }
     return out
@@ -78,7 +78,7 @@ fn typed_seam() → int {
         let list<util.Box<4, 4>> layers ← [made]
         let tensor<f32, [2, 4]> x ← flat(8) ↦ tensor<f32, [2, 4]>
         mut int total ← 0
-        for from layers const layer {
+        for from layers let layer {
             let util.Box<4, 4> typed ← util.Box { ln1 = layer.ln1, wq = layer.wq }
             total ← util.axis0_cells<2, 4, 4>(x, typed)
             total ← total + util.width_of(typed.wq)
@@ -95,7 +95,7 @@ const SEAM_MODEL_WRONG_FIELD: &str = r#"import from "./util" util
 
 fn flat(int n) → list<f32> {
     mut list<f32> out ← empty
-    for range 0‥n const i {
+    for range 0‥n let i {
         out.append(1.0)
     }
     return out
@@ -120,7 +120,7 @@ const SEAM_MODEL_WRONG_SIZE_ARG: &str = r#"import from "./util" util
 
 fn flat(int n) → list<f32> {
     mut list<f32> out ← empty
-    for range 0‥n const i {
+    for range 0‥n let i {
         out.append(1.0)
     }
     return out

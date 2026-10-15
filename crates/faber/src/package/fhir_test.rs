@@ -322,8 +322,8 @@ kind = "bin"
 
 fn describe(Forma f) → string {
     match f {
-        case Numerus const v { return "n: §"(v) }
-        case Textus const v { return "t: §"(v) }
+        case Numerus let v { return "n: §"(v) }
+        case Textus let v { return "t: §"(v) }
     }
 }
 

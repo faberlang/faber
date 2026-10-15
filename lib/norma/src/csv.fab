@@ -29,7 +29,7 @@ fn parse(string wire) → list<list<string>> {
 
     let list<string> rows ← wire.split("\n")
     mut list<list<string>> map ← []
-    for from rows const row {
+    for from rows let row {
         let string normalized ← normalize_row(row)
         map.append(normalized.split(","))
     }
@@ -41,7 +41,7 @@ fn parse(string wire) → list<list<string>> {
 @ public
 fn stringify(list<list<string>> map) → string {
     mut list<string> rows ← []
-    for from map const fields {
+    for from map let fields {
         rows.append(text.join(fields, ","))
     }
     return text.join(rows, "\n")

@@ -158,7 +158,7 @@ fn request_target(Url url) → string {
 fn headers_from_map(map<string, string> pairs) → headers.Headers {
     mut headers.Headers out ← headers.empty()
     let list<string> names ← pairs.keys()
-    for from names const name {
+    for from names let name {
         let string ∪ none value ← pairs.get(name)
         if value not is none {
             if out.append(name, value ↦ string) {
@@ -398,7 +398,7 @@ fn chunk_of(value raw) → Chunk {
 
 fn headers_carrier(headers.Headers headers) → list<value> {
     mut list<value> out ← []
-    for from headers.entries const entry {
+    for from headers.entries let entry {
         mut map<string, value> row ← {}
         row.put("name", entry.name ↦ value)
         row.put("value", entry.value ↦ value)
@@ -412,7 +412,7 @@ fn headers_from_carrier(value raw) → headers.Headers {
     if raw not is list<value> then return out
     do {
         let list<value> items ↤ raw
-        for from items const item {
+        for from items let item {
             if item is map<string, value> {
                 let map<string, value> row ↤ item
                 let string name ↤ row["name"]

@@ -104,7 +104,7 @@ fn encode_scalar(value node) → string ⇥ string {
 
 fn encode_array(list<value> items) → string ⇥ string {
     mut list<string> encoded ← empty
-    for from items const item {
+    for from items let item {
         if item is map<string, value> then throw "norma:toml.stringify: table arrays must be top-level [[tables]]"
         if item is list<value> {
             let list<value> nested ↤ item ⊥ empty
@@ -118,7 +118,7 @@ fn encode_array(list<value> items) → string ⇥ string {
 }
 
 fn is_table_array(list<value> items) → bool {
-    for from items const item {
+    for from items let item {
         if not (item is map<string, value>) then return false
     }
     return true
@@ -134,7 +134,7 @@ fn encode_value(value node) → string ⇥ string {
         mut list<string> keys ← table.keys()
         keys.sort()
         mut list<string> pairs ← empty
-        for from keys const key {
+        for from keys let key {
             pairs.append(text.join([emit_key(key), " = ", encode_value(table[key])], ""))
         }
         return text.join(["{ ", text.join(pairs, ", "), " }"], "")
@@ -146,7 +146,7 @@ fn encode_members(map<string, value> fields) → string ⇥ string {
     mut list<string> keys ← fields.keys()
     keys.sort()
     mut list<string> members ← empty
-    for from keys const key {
+    for from keys let key {
         members.append(text.join([emit_key(key), " = ", encode_value(fields[key])], ""))
     }
     return text.join(members, "\n") + "\n"
@@ -158,7 +158,7 @@ fn encode_document(value document) → string ⇥ string {
     keys.sort()
     mut list<string> members ← empty
     mut list<string> tables ← empty
-    for from keys const key {
+    for from keys let key {
         let value item ↤ fields[key]
         if item is map<string, value> {
             let map<string, value> inner ↤ item ⊥ empty
@@ -167,7 +167,7 @@ fn encode_document(value document) → string ⇥ string {
         elif item is list<value> {
             let list<value> items ↤ item ⊥ empty
             if is_table_array(items) {
-                for from items const entry {
+                for from items let entry {
                     let map<string, value> inner ↤ entry ⊥ empty
                     tables.append(text.join(["[[", emit_key(key), "]]\n", encode_members(inner), "\n"], ""))
                 }

@@ -21,7 +21,7 @@ const KERNEL: &str = r#"
 @ kernel
 @ public
 fn k<size H, size W>(tensor<f32, [H, W]> src, mut tensor<f32, [H, W]> dst) → void ⇥ string {
-    for from src at [i, j] thread lane const x {
+    for from src at [i, j] thread lane let x {
         if x ≺ 0.0 {
             throw "negative lane"
         }
@@ -171,7 +171,7 @@ fn guard(f32 v) → f32 ⇥ string {
 @ kernel
 @ public
 fn scale(tensor<f32, [8]> src, mut tensor<f32, [8]> dst) → void ⇥ string {
-    for range 0‥8 const k {
+    for range 0‥8 let k {
         dst[k] ← guard(src[k])
     }
 }

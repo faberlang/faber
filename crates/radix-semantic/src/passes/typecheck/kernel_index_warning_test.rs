@@ -29,7 +29,7 @@ fn kernel_index_warning_fires_for_arithmetic_and_parameter_indexes() {
     let arithmetic = r"
 @ nucleum
 functio k(tensor<f32, [8]> src, tensor<f32, [8]> dst) → vacuum {
-    itera ex src apud [i] filum f fixum v {
+    itera ex src apud [i] filum f sit v {
         dst[i + 1] ← v
     }
 }
@@ -49,7 +49,7 @@ fn kernel_index_warning_is_silent_for_binders_and_in_range_literals() {
     let binder = r"
 @ nucleum
 functio k(tensor<f32, [8]> src, tensor<f32, [8]> dst) → vacuum {
-    itera ex src apud [i] filum f fixum v {
+    itera ex src apud [i] filum f sit v {
         dst[i] ← v
     }
 }
@@ -58,7 +58,7 @@ functio k(tensor<f32, [8]> src, tensor<f32, [8]> dst) → vacuum {
     let rank_two = r"
 @ nucleum
 functio k<magnitudo H, magnitudo W>(tensor<f32, [H, W]> src, tensor<f32, [H, W]> dst) → vacuum {
-    itera ex src apud [i, j] filum f fixum v {
+    itera ex src apud [i, j] filum f sit v {
         dst[[i, j]] ← v
     }
 }
@@ -78,7 +78,7 @@ fn kernel_index_warning_does_not_trust_a_binder_of_a_different_extent() {
     let source = r"
 @ nucleum
 functio k(tensor<f32, [4]> small, tensor<f32, [8]> big) → vacuum {
-    itera ex small apud [i] filum f fixum v {
+    itera ex small apud [i] filum f sit v {
         big[i] ← v
     }
 }

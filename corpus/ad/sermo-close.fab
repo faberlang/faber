@@ -44,7 +44,7 @@ functio bis(numerus n) → numerus {
 
 @ ad 'numeri:numera'
 functio numera(numerus n) fiunt → numerus {
-    itera ab 0‥n fixum i {
+    itera ab 0‥n sit i {
         cede i
     }
 }
@@ -56,7 +56,7 @@ functio defice(numerus n) → numerus ⇥ textus {
 
 functio summa(lista<numerus> partes) → numerus {
     varia numerus totum ← 0
-    itera ex partes fixum pars {
+    itera ex partes sit pars {
         totum ← totum + pars
     }
     redde totum
@@ -65,13 +65,13 @@ functio summa(lista<numerus> partes) → numerus {
 incipit {
     # Four conversations finish at once; their handles wait in the pool.
     varia tabula<numerus, sermo> piscina ← vacua
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         piscina[i] ← ad 'numeri:bis' (i)
     }
 
     # A longer conversation streams while the finished ones hold nothing.
     sit sermo longus ← ad 'numeri:numera' (5)
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         nota piscina[i] ↦ numerus
     }
     nota summa(longus ↦ lista<numerus>)

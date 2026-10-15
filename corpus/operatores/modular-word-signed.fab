@@ -35,7 +35,7 @@ locale = "en"
 
 fn javaHash(list<int> codes) → wrapping<i32> {
     mut wrapping<i32> h ← 0
-    for from codes const c {
+    for from codes let c {
         let wrapping<i32> code ← c ↦ wrapping<i32>
         h ← 31 * h + code
     }

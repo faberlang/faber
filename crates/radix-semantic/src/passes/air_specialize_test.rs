@@ -8,7 +8,7 @@ fn concrete_shape_call_gets_a_pre_air_instance() {
         r#"
 @ radix lane "air"
 functio generic_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
-    itera ex x fixum value { }
+    itera ex x sit value { }
     redde 0.0
 }
 
@@ -59,7 +59,7 @@ fn equal_air_instance_keys_are_deduplicated_and_distinct_sizes_survive() {
         r#"
 @ radix lane "air"
 functio generic_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
-    itera ex x fixum value { }
+    itera ex x sit value { }
     redde 0.0
 }
 
@@ -102,7 +102,7 @@ fn nested_inferred_air_call_uses_the_enclosing_concrete_binding() {
         r#"
 @ radix lane "air"
 functio inner<magnitudo N>(tensor<f32, [N]> x) → f32 {
-    itera ex x fixum value { }
+    itera ex x sit value { }
     redde 0.0
 }
 

@@ -38,15 +38,15 @@ canonical = false
 # =============================================================================
 
 fn per_cell(tf32[2, 2, 3] cube) → tf32[2, 2] {
-    return reduce via sum from cube at [i, j, k] per [i, j] const s { return s }
+    return reduce via sum from cube at [i, j, k] per [i, j] let s { return s }
 }
 
 fn big_per_cell(tf32[2, 2, 3] cube) → tensor<int, [2, 2]> {
-    return reduce via count from cube at [i, j, k] per [i, j] const s { return s ≻ 5.0 }
+    return reduce via count from cube at [i, j, k] per [i, j] let s { return s ≻ 5.0 }
 }
 
 fn per_bucket(tf32[6] weights, tensor<int, [6]> rows, tensor<int, [6]> cols) → tf32[2, 3] {
-    return reduce via sum from weights at [i] per [rows[i], cols[i]] const s { return s }
+    return reduce via sum from weights at [i] per [rows[i], cols[i]] let s { return s }
 }
 
 main {

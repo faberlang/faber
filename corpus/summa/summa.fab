@@ -5,8 +5,8 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "incipit_stmt", "fixum_decl", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = true
-summary = "Sequential sum-reduce expression: reducta via summa ex <tensor> apud [i] fixum s."
-syntax = "reducta via summa ex <source> apud [coords] fixum <binder> { redde <term> }"
+summary = "Sequential sum-reduce expression: reducta via summa ex <tensor> apud [i] sit s."
+syntax = "reducta via summa ex <source> apud [coords] sit <binder> { redde <term> }"
 related = ["tensor", "filum"]
 locale = "la"
 +++
@@ -33,11 +33,11 @@ locale = "la"
 # =============================================================================
 
 functio identity(tensor<f32, [8]> a) → f32 {
-    redde reducta via summa ex a apud [i] fixum s { redde s }
+    redde reducta via summa ex a apud [i] sit s { redde s }
 }
 
 functio shifted(tensor<f32, [8]> a) → f32 {
-    redde reducta via summa ex a apud [i] fixum s {
+    redde reducta via summa ex a apud [i] sit s {
         varia f32 t ← s
         t ← t + 1.0
         redde t

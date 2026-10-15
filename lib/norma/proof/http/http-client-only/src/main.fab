@@ -40,7 +40,7 @@ main {
     }
     catch err {
         match err {
-            case ConnectionRefused const path {
+            case ConnectionRefused let path {
                 assert path.length() ≻ 0
                 refused ← true
             }

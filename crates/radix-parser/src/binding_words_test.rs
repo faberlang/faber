@@ -197,3 +197,90 @@ fn ref_local_cannot_destructure() {
     let result = parse_en(&body("ref int [a, b] ← head"));
     assert_issue(&result, "ref_local_requires_name", "ref", None);
 }
+
+// BINDER POSITIONS
+//
+// Iteration binders, `ex` extraction, match-arm bindings, sort/reduce bodies
+// and destructuring heads take `let`/`mut`. The retired `const` binder is
+// `binder_fixum_retired`, and `ref` is `ref_binder_refused`; both parse whole
+// as an immutable binder so recovery resumes after the head.
+
+fn binder_body(statement: &str) -> String {
+    body(&format!("{statement}\n    tacet"))
+}
+
+/// Latin body: `body` spells the English surface.
+fn binder_body_la(statement: &str) -> String {
+    format!("functio f() → numerus {{\n    {statement}\n    tacet\n    redde 0\n}}")
+}
+
+#[test]
+fn let_and_mut_binders_parse_in_every_binder_position() {
+    for source in [
+        "itera ex xs sit x { tacet }",
+        "itera ex xs varia x { tacet }",
+        "itera ab 0‥3 sit i { tacet }",
+        "ex punctum sit x, y",
+        "ex punctum varia x, y",
+        "sit [a, b] ← pair",
+        "varia {a, b} ← pair",
+        "sit lista<numerus> ys ← ordinata via ascendens ex xs sit p { redde [p] }",
+        "sit numerus n ← reducta via summa ex xs apud [i] sit s { redde s }",
+    ] {
+        let result = parse_program(&binder_body_la(source));
+        assert!(result.success(), "{source}: {:?}", result.errors);
+    }
+}
+
+#[test]
+fn a_const_binder_is_retired_in_each_binder_position() {
+    for source in [
+        "itera ex xs fixum x { tacet }",
+        "ex punctum fixum x, y",
+        "fixum [a, b] ← pair",
+        "fixum {a, b} ← pair",
+        "sit lista<numerus> ys ← ordinata via ascendens ex xs fixum p { redde [p] }",
+        "sit numerus n ← reducta via summa ex xs apud [i] fixum s { redde s }",
+    ] {
+        let result = parse_program(&binder_body_la(source));
+        assert_issue(&result, "binder_fixum_retired", "fixum", None);
+    }
+}
+
+#[test]
+fn a_const_binder_in_a_match_arm_is_retired() {
+    let source = "discerne x {\n    casu Punctum fixum a, b { tacet }\n}";
+    let result = parse_program(&binder_body_la(source));
+    assert_issue(&result, "binder_fixum_retired", "fixum", None);
+}
+
+#[test]
+fn a_const_binder_is_retired_in_english() {
+    let result = parse_en(&binder_body("const [a, b] ← pair"));
+    assert_issue(&result, "binder_fixum_retired", "const", None);
+}
+
+#[test]
+fn a_ref_binder_is_refused() {
+    for source in ["itera ex xs de x { tacet }", "ex punctum de x, y"] {
+        let result = parse_program(&binder_body_la(source));
+        assert_issue(&result, "ref_binder_refused", "de", None);
+    }
+}
+
+#[test]
+fn a_let_binder_pattern_list_keeps_the_et_separator_law() {
+    let source = "discerne x {\n    casu Circulus sit r et Quadratum sit a, b { tacet }\n}";
+    let result = parse_program(&binder_body_la(source));
+    assert!(result.success(), "{:?}", result.errors);
+    let comma = "discerne x {\n    casu Circulus sit r, Quadratum sit a { tacet }\n}";
+    let result = parse_program(&binder_body_la(comma));
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|err| has_arg(err, "issue", "discerne_pattern_comma_retired")),
+        "{:?}",
+        result.errors
+    );
+}

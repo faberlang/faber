@@ -45,9 +45,9 @@ sit_decl ::= 'sit' type_annotation? IDENTIFIER (('←' value_marker? expression)
 # [017] ref_decl
 ref_decl ::= 'de' base_type IDENTIFIER '←' expression
 # [018] array_destruct
-array_destruct ::= ('fixum' | 'varia') array_pattern '←' expression
+array_destruct ::= ('sit' | 'varia') array_pattern '←' expression
 # [019] object_destruct
-object_destruct ::= ('fixum' | 'varia') object_pattern '←' expression
+object_destruct ::= ('sit' | 'varia') object_pattern '←' expression
 # [020] functio_decl
 functio_decl ::= 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 # [021] param_list
@@ -265,7 +265,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 # [127] dum_stmt
 dum_stmt ::= 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
 # [128] itera_stmt
-itera_stmt ::= 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? filum_clause? ('fixum' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? filum_clause? ('sit' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 # [129] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [130] apud_clause
@@ -295,7 +295,7 @@ negated_number ::= '-' NUMBER
 # [142] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
 # [143] ut_pattern
-ut_pattern ::= ('ut' IDENTIFIER) | (('fixum' | 'varia') pattern_binding (',' pattern_binding)*)
+ut_pattern ::= ('ut' IDENTIFIER) | (('sit' | 'varia') pattern_binding (',' pattern_binding)*)
 # [144] pattern_binding
 pattern_binding ::= IDENTIFIER ('ut' IDENTIFIER)?
 # [145] custodi_stmt
@@ -303,7 +303,7 @@ custodi_stmt ::= 'custodi' '{' si_guard_clause+ '}'
 # [146] si_guard_clause
 si_guard_clause ::= 'si' expression (block_stmt | ergo_joint statement)
 # [147] ex_stmt
-ex_stmt ::= 'ex' expression ('fixum' | 'varia') extract_fields
+ex_stmt ::= 'ex' expression ('sit' | 'varia') extract_fields
 # [148] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
 # [149] extract_field
@@ -487,7 +487,7 @@ reducta_op ::= 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argmini
 # [238] reducta_group
 reducta_group ::= 'pro' expression
 # [239] reducta_body
-reducta_body ::= ('fixum' | 'varia') IDENTIFIER block_stmt
+reducta_body ::= ('sit' | 'varia') IDENTIFIER block_stmt
 # [240] reducta_identity
 reducta_identity ::= 'vel' expression
 # [241] sort_expr
@@ -495,7 +495,7 @@ sort_expr ::= 'ordinata' 'via' sort_direction ('ex' | 'de') expression sort_body
 # [242] sort_direction
 sort_direction ::= 'ascendens' | 'descendens'
 # [243] sort_body
-sort_body ::= ('fixum' | 'varia') IDENTIFIER block_stmt
+sort_body ::= ('sit' | 'varia') IDENTIFIER block_stmt
 # [244] filum_clause
 filum_clause ::= 'filum' IDENTIFIER
 # [245] capta_expr
@@ -1325,7 +1325,7 @@ construction literal (`Genus { field = value }`).
   count). Satisfaction stays nominal (D1.3): a witness must declare the bound
   itself.
 
-- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } ex source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `ex` must start on the closing `}`'s line — a line-leading `ex` is instead the extraction statement (`ex p fixum x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `ex`); the source must be the same genus type as the constructor. `sparge` was removed from construction literals (D15.4); it stays for lists and calls.
+- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } ex source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `ex` must start on the closing `}`'s line — a line-leading `ex` is instead the extraction statement (`ex p sit x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `ex`); the source must be the same genus type as the constructor. `sparge` was removed from construction literals (D15.4); it stays for lists and calls.
 
 ### Annotations
 
@@ -2149,9 +2149,9 @@ prefer sugar. Choose per module or file.
 
 
 - `dum` = while
-- `itera ex...fixum`/`itera ex...varia` = for-of (values)
-- `itera de...fixum`/`itera de...varia` = for-in (keys)
-- `itera ab range fixum/varia i` = range iteration (e.g. `itera ab 0‥10 per 2 fixum i { nota i }`; `per` belongs to the range expression)
+- `itera ex...sit`/`itera ex...varia` = for-of (values)
+- `itera de...sit`/`itera de...varia` = for-in (keys)
+- `itera ab range sit/varia i` = range iteration (e.g. `itera ab 0‥10 per 2 sit i { nota i }`; `per` belongs to the range expression)
 
 **Range step and direction (`range_tail`, `per`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down
@@ -2196,7 +2196,7 @@ prints the same list shape up to element order.
 
 There is no iteration interface. `itera ex` works on the built-in iterable
 types and on cursors. A user type that should be iterable exposes an ordinary
-method that returns a cursor (`itera ex arbor.nodi() fixum n`); nothing is
+method that returns a cursor (`itera ex arbor.nodi() sit n`); nothing is
 called implicitly.
 
 **Changing the collection inside its own loop.** The rule is about the shape of
@@ -2266,7 +2266,7 @@ A negative number pattern is written with a leading minus (`casu -1`,
 `-` before anything else is not pattern syntax.
 
 `discerne` matches a closed set and nothing else: the variants of an `ordo` or
-`discretio`, or the members of a union (`casu numerus fixum n` over
+`discretio`, or the members of a union (`casu numerus sit n` over
 `numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
 pattern that is not a member of the scrutinee's closed set is rejected
 (`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
@@ -2455,7 +2455,7 @@ The `∷` glyph (U+2237, "proportion") explicitly ascribes a target type to an e
 Prefer typed construction for ordinary `genus` values and `vacua` for ordinary empty collection values:
 
 ```fab
-fixum _ point ← Point { x = 10 }
+sit point ← Point { x = 10 }
 fixum lista<numerus> xs ← vacua
 ```
 
@@ -2612,13 +2612,13 @@ Implementation status (2026-10-11):
 Inline block example:
 
 ```fab
-fixum _ tag ← «inline»
+sit tag ← «inline»
 ```
 
 Multiline block example (newline after opening `«`):
 
 ```fab
-fixum _ blob ← «
+sit blob ← «
     select id, email
     from accounts
 »
@@ -2627,14 +2627,14 @@ fixum _ blob ← «
 Captured template example:
 
 ```fab
-fixum _ q ← `select * from accounts where id = §`(accountId)
+sit q ← `select * from accounts where id = §`(accountId)
 ```
 
 Octeti hex literal example:
 
 ```fab
-fixum _ sig ← |de ad be ef|
-fixum _ hello ← |48 65 6c 6c 6f|
+sit sig ← |de ad be ef|
+sit hello ← |48 65 6c 6c 6f|
 ```
 
 ### Format-Template Application
@@ -3033,7 +3033,7 @@ forms `ordina()` / `ordinata()` sort by the element's natural order. Both are a
 **stable** sort. The key selector's result must be a number or `textus`; other
 key types are rejected.
 
-`ex` is used for iteration (`itera ex items fixum x`) and imports (`importa ex "path"`).
+`ex` is used for iteration (`itera ex items sit x`) and imports (`importa ex "path"`).
 
 ### Iteration coordinates (`apud`)
 
@@ -3042,9 +3042,9 @@ en reader spelling is "at": `itera ex grid apud [r, c]` reads as iterating
 `grid` at coordinates `[r, c]`.
 
 - **`lista`** (D3.1): one name binds the element's position
-  (`itera ex items apud [i] fixum v`).
+  (`itera ex items apud [i] sit v`).
 - **`tabula`** (D3.1-D3.3): one name binds the entry's key
-  (`itera ex m apud [k] fixum v`); a composite-key
+  (`itera ex m apud [k] sit v`); a composite-key
   `tabula<iuncta<K1, …, Kn>, V>` takes N names, one per part of the `iuncta`
   key, in declared part order.
 - **Tensor / matrix**: as before — one name per axis, first name = outermost
@@ -3059,8 +3059,8 @@ en reader spelling is "at": `itera ex grid apud [r, c]` reads as iterating
   distinct from the element binder that follows the clause.
 - **`filum` lane binder (FLD K2).** An optional `filum IDENTIFIER` clause
   (`filum_clause`, shared with `reducta`) follows the `apud` clause and
-  precedes the mutability marker: `itera ex t apud [i, j] filum f fixum v { … }`.
-  The clause also parses without `apud` (`itera ex t filum f fixum v { … }`).
+  precedes the mutability marker: `itera ex t apud [i, j] filum f sit v { … }`.
+  The clause also parses without `apud` (`itera ex t filum f sit v { … }`).
   The parser claims `filum` only in that slot, so a binder named `filum` after
   the mutability marker stays an ordinary name. The binder is declared
   metadata; semantic passes own what it binds.

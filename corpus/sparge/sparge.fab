@@ -40,7 +40,7 @@ main {
     let list<int> media ← [2, 3]
     # → [1, 2, 3, 4]
     let list<int> numeri ← [1, spread media, 4]
-    for from numeri const n {
+    for from numeri let n {
         print n
     }
 }

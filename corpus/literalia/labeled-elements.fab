@@ -19,17 +19,17 @@ locale = "en"
 #   • mixed labeled/unlabeled: tuple<gx: string, int>
 #   • labeled construction: tuple<gx: string, gw: int> ["salve", 42]
 #   • by-label member access: pair.gx (same as pair[0])
-#   • objectPattern destructuring: const {gx, gw} ← pair
-#   • partial + rest: const {loss, rest leftover} ← metrics
+#   • objectPattern destructuring: let {gx, gw} ← pair
+#   • partial + rest: let {loss, rest leftover} ← metrics
 #   • element holes: tuple<f32, _> solved from the construction witness
 #   • binary cup element: tuple<f32, string ∪ null>
 #
 # Reject teaching rows (comments only; these must not become stage-3 inputs):
 #   • ∪ element slot: tuple<f32, ∪>
-#   • mixed positional/label pattern: const [gx, {gw}] ← pair
+#   • mixed positional/label pattern: let [gx, {gw}] ← pair
 #   • .0 positional member: pair.0
 #   • unknown label: pair.other
-#   • by-label on an unlabeled tuple: const {gx} ← unlabeled
+#   • by-label on an unlabeled tuple: let {gx} ← unlabeled
 #   • duplicate labels: tuple<gx: f32, gx: int>
 #   • call-site labels: f<gx: T>(x)
 #
@@ -62,13 +62,13 @@ main {
     print cup[1]
 
     # objectPattern binds by label.
-    const {gx, gw} ← pair
+    let {gx, gw} ← pair
     print gx
     print gw
 
     # Partial by-label binding; rest is the unbound sub-tuple.
     let tuple<loss: f32, steps: int> metrics ← tuple<loss: f32, steps: int> [1.0, 4]
-    const {loss, rest leftover} ← metrics
+    let {loss, rest leftover} ← metrics
     print loss
     print leftover[0]
 

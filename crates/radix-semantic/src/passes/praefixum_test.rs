@@ -38,7 +38,7 @@ fn loop_body_with_callee_is_accepted() {
     let result = analyze_source_la(
         "functio quadratum(numerus n) → numerus {\n    redde n * n\n}\n\
          fixum numerus SUMMA = praefixum {\n    varia numerus s ← 0\n    \
-         itera ab 1‥4 fixum i {\n        s ← s + quadratum(i)\n    }\n    redde s\n}\n",
+         itera ab 1‥4 sit i {\n        s ← s + quadratum(i)\n    }\n    redde s\n}\n",
     );
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }

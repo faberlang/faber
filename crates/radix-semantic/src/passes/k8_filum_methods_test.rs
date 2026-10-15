@@ -152,7 +152,7 @@ fn kernel_with(extra: &str, setup: &str, statement: &str) -> String {
 @ publica
 functio k(in {GRID} out, de {GRID} src) → vacuum {{
     {setup}
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         {statement}
     }}
 }}
@@ -256,7 +256,7 @@ fn method_through_a_receiver_that_holds_no_known_storage_is_declined() {
 @ nucleum
 @ publica
 functio k(varia Stencil s, de {GRID} src) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         s.put(i, value)
     }}
 }}
@@ -316,7 +316,7 @@ genus Arca<T> {{
 @ publica
 functio k(in {GRID} out, de {GRID} src) → vacuum {{
     varia Arca<f32> s ← Arca<f32> {{ data = out }}
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         {statement}
     }}
 }}
@@ -353,7 +353,7 @@ fn function_kernel(helpers: &str, statement: &str) -> String {
 @ nucleum
 @ publica
 functio k(in {GRID} out, de {GRID} src) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         {statement}
     }}
 }}
@@ -424,7 +424,7 @@ fn overlapping_mut_arguments_through_the_receiver_are_declined_by_the_pass() {
 @ publica
 functio k(in {GRID} out, in {GRID} aux, de {GRID} src) → vacuum {{
     varia Stencil s ← Stencil {{ data = src, gain = 2.0 }}
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         s.both(varia out, varia aux, i)
     }}
 }}
@@ -508,7 +508,7 @@ genus Unus implet Numerabile {
 @ nucleum
 @ publica
 functio k(varia tensor<f32, [4]> out, de tensor<f32, [4]> src, Numerabile n) → vacuum {
-    itera ex src apud [i] filum lane fixum value {
+    itera ex src apud [i] filum lane sit value {
         out[i] ← n.valor()
     }
 }
@@ -535,7 +535,7 @@ genus Counter {
 @ publica
 functio k(varia tensor<numerus, [4]> grid) → vacuum {
     varia Counter counter ← Counter { count = 0 }
-    itera ex grid apud [i] filum lane fixum value {
+    itera ex grid apud [i] filum lane sit value {
         grid[i] ← counter.accipe(i)
     }
 }
@@ -555,7 +555,7 @@ fn reduction_term_may_call_a_method_kernel_that_reads() {
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
     varia Stencil s ← Stencil {{ data = xs, gain = 2.0 }}
-    redde reducta via summa ex xs apud [i] fixum v {{ redde v + s.here(i) }}
+    redde reducta via summa ex xs apud [i] sit v {{ redde v + s.here(i) }}
 }}
 "
     ));
@@ -570,7 +570,7 @@ fn reduction_term_may_call_a_public_kernel() {
 functio shown(f32 x) → f32 { redde x }
 @ nucleum
 functio k(tensor<f32, [32]> xs) → f32 {
-    redde reducta via summa ex xs apud [i] fixum s { redde shown(s) }
+    redde reducta via summa ex xs apud [i] sit s { redde shown(s) }
 }
 ",
     );
@@ -584,7 +584,7 @@ fn reduction_term_calling_a_host_function_is_still_rejected() {
 functio host(f32 x) → f32 {{ redde x }}
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
-    redde reducta via summa ex xs apud [i] fixum v {{ redde host(v) }}
+    redde reducta via summa ex xs apud [i] sit v {{ redde host(v) }}
 }}
 "
         ),
@@ -600,7 +600,7 @@ fn reduction_term_calling_a_host_method_is_still_rejected() {
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
     varia Stencil s ← Stencil {{ data = xs, gain = 2.0 }}
-    redde reducta via summa ex xs apud [i] fixum v {{ redde s.host_method(v) }}
+    redde reducta via summa ex xs apud [i] sit v {{ redde s.host_method(v) }}
 }}
 "
         ),
@@ -615,7 +615,7 @@ fn reduction_term_method_kernel_that_writes_is_rejected() {
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
     varia Stencil s ← Stencil {{ data = xs, gain = 2.0 }}
-    redde reducta via summa ex xs apud [i] fixum v {{
+    redde reducta via summa ex xs apud [i] sit v {{
         s.put(i, v)
         redde v
     }}
@@ -638,7 +638,7 @@ fn reduction_term_method_kernel_with_a_host_call_inside_is_rejected() {
 @ nucleum
 functio k(tensor<f32, [4]> xs) → f32 {{
     varia Leaky s ← Leaky {{ data = xs }}
-    redde reducta via summa ex xs apud [i] fixum v {{ redde s.calls_host(v) }}
+    redde reducta via summa ex xs apud [i] sit v {{ redde s.calls_host(v) }}
 }}
 "
     ));

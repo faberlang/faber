@@ -13,7 +13,7 @@ fn session() -> Session {
 fn octeti_itera_ex_validates_byte_binding_and_runtime_bound() {
     let source = r"functio byte_list(octeti input) → lista<u8> {
     varia lista<u8> out ← vacua
-    itera ex input fixum byte {
+    itera ex input sit byte {
         out.appende(byte ↦ u8)
     }
     redde out
@@ -30,7 +30,7 @@ fn octeti_itera_ex_validates_byte_binding_and_runtime_bound() {
 fn octeti_itera_ex_runs_decoder_byte_list_in_order_and_handles_empty() {
     let source = r"functio byte_list(octeti input) → lista<u8> {
     varia lista<u8> out ← vacua
-    itera ex input fixum byte {
+    itera ex input sit byte {
         out.appende(byte ↦ u8)
     }
     redde out
@@ -40,7 +40,7 @@ incipit {
     sit octeti input ← |00 7f 80 ff 00|
     sit lista<u8> copied ← byte_list(input)
     nota copied.longitudo()
-    itera ex copied fixum byte {
+    itera ex copied sit byte {
         nota byte
     }
     nota input[3] ↦ u8
@@ -56,7 +56,7 @@ incipit {
 fn octeti_itera_ex_preserves_continue_and_break() {
     let source = r"incipit {
     sit octeti input ← |00 7f 80 ff|
-    itera ex input fixum byte {
+    itera ex input sit byte {
         si byte ≡ 0 {
             perge
         }
@@ -75,7 +75,7 @@ fn octeti_itera_ex_preserves_continue_and_break() {
 #[test]
 fn octeti_itera_de_keeps_existing_fail_closed_admission() {
     let source = r"functio indices(octeti input) → vacuum {
-    itera de input fixum index {
+    itera de input sit index {
         nota index
     }
 }";

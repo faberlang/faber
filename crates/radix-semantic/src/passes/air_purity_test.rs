@@ -208,7 +208,7 @@ fn rejects_reducta_reduce_expression_by_design() {
         r#"
 @ radix lane "air"
 functio loss(tensor<f32, [8]> a) → f32 {
-    redde reducta via summa ex a apud [i] fixum s { redde s }
+    redde reducta via summa ex a apud [i] sit s { redde s }
 }
 "#,
     );
@@ -938,7 +938,7 @@ functio h(numerus n) → numerus {
         total ← 1
     } cape err { redde 0 }
 
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         total ← i
     } cape err { redde 0 }
     redde total
@@ -1135,7 +1135,7 @@ functio d(numerus n) → numerus {
 @ radix lane "air"
 functio e(numerus n) → numerus {
     varia numerus total ← 0
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         total ← i
     } cape err { redde 0 }
     redde total
@@ -1192,7 +1192,7 @@ fn air_unroll_scan_rejects_handled_in_itera_body_causa_impure() {
 @ radix lane "air"
 functio loop_with_handler() → f32 {
     sit f32 total ← 0.0
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         fac {
             iace "boom"
         } cape err {
@@ -1351,7 +1351,7 @@ fn rejects_nary_range_product_loop_fail_closed() {
 @ radix lane "air"
 functio grid(numerus m, numerus n) → numerus {
     varia numerus total ← 0
-    itera ab 0‥m, 0‥n fixum i, j {
+    itera ab 0‥m, 0‥n sit i, j {
         total ← i
     }
     redde total
@@ -1479,7 +1479,7 @@ fn air_admits_apud_coordinate_arithmetic_proven_by_tensor_dims() {
 @ radix lane "air"
 functio pick(tensor<f32, [4, 4]> x) → tensor<f32, [4, 4]> ⇥ textus {
     varia tensor<f32, [4, 4]> acc ← copy x
-    itera ex x apud [i, j] fixum cell {
+    itera ex x apud [i, j] sit cell {
         sit numerus idx ← i * 2 + j
         si idx ≻ 20 { iace "upper" }
         acc ← acc + x
@@ -1504,7 +1504,7 @@ fn air_admits_range_loop_index_arithmetic_proven_by_constant_bounds() {
 @ radix lane "air"
 functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
     varia tensor<f32, [2, 2]> acc ← copy x
-    itera ab 0‥16 fixum i {
+    itera ab 0‥16 sit i {
         sit numerus k ← i * 2 + 1
         acc ← acc + x
     }
@@ -1537,7 +1537,7 @@ fn air_rejects_apud_arithmetic_over_symbolic_tensor_dims() {
         r#"
 @ radix lane "air"
 functio pick(numerus n, numerus m) → numerus {
-    itera ab 0‥n fixum i {
+    itera ab 0‥n sit i {
         sit numerus k ← i * 2 + m
     }
     redde 0
@@ -1560,7 +1560,7 @@ fn air_admits_arithmetic_over_inferred_fixum_of_proven_index_expression() {
 @ radix lane "air"
 functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
     varia tensor<f32, [2, 2]> acc ← copy x
-    itera ab 0‥16 fixum i {
+    itera ab 0‥16 sit i {
         sit k ← i * 2 + 1
         sit m ← k * 2 + i
         acc ← acc + x
@@ -1581,7 +1581,7 @@ fn air_rejects_arithmetic_over_declared_numerus_binding_even_if_initializer_is_b
 @ radix lane "air"
 functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
     varia tensor<f32, [2, 2]> acc ← copy x
-    itera ab 0‥16 fixum i {
+    itera ab 0‥16 sit i {
         sit numerus k ← i * 2 + 1
         sit numerus m ← k * k
         acc ← acc + x
@@ -1609,7 +1609,7 @@ fn copy_marked_tensor_receiver_keeps_tensor_method_admission() {
 @ radix lane "air"
 functio f(tensor<f32, [4]> x) → f32 {
     varia tensor<f32, [4]> acc ← copy x
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         acc ← acc + x
     }
     redde acc.media()

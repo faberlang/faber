@@ -1014,8 +1014,8 @@ fixum_decl      := ('fixum' type_annotation IDENTIFIER '=' const_init) | ('varia
 figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
 sit_decl      := 'sit' type_annotation? IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?
 ref_decl      := 'de' base_type IDENTIFIER '←' expression
-array_destruct := ('fixum' | 'varia') array_pattern '←' expression
-object_destruct := ('fixum' | 'varia') object_pattern '←' expression
+array_destruct := ('sit' | 'varia') array_pattern '←' expression
+object_destruct := ('sit' | 'varia') object_pattern '←' expression
 
 functio_decl     := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 param_list    := (parameter (',' parameter)*)?
@@ -1267,7 +1267,7 @@ dum_stmt  := 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
 # identifier, not a destructuring wildcard. `ex` and `ab` admit the
 # comma-separated source series (`ex` lockstep zip, `ab` Cartesian product);
 # `de` stays single-source. Patterns bind only the single-source form.
-itera_stmt  := 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? filum_clause? ('fixum' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt  := 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? filum_clause? ('sit' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 itera_binding := array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # `apud` (C7, D3.1-D3.4): one name binds a `lista` position, a `tabula` key,
 # or (for a composite `tabula<iuncta<K1, …, Kn>, V>`) N names for the parts of
@@ -1312,14 +1312,14 @@ negated_number := '-' NUMBER
 # collection (`lista<T, 4>`) or a numeric width (`u32` over `numerus`) — parses
 # but is rejected (`SEM010 discerne_pattern_not_in_closed_set`).
 type_pattern := IDENTIFIER type_arguments? ut_pattern?
-ut_pattern  := ('ut' IDENTIFIER) | (('fixum' | 'varia') pattern_binding (',' pattern_binding)*)
+ut_pattern  := ('ut' IDENTIFIER) | (('sit' | 'varia') pattern_binding (',' pattern_binding)*)
 pattern_binding := IDENTIFIER ('ut' IDENTIFIER)?
 
 custodi_stmt   := 'custodi' '{' si_guard_clause+ '}'
 si_guard_clause := 'si' expression (block_stmt | ergo_joint statement)
 
 
-ex_stmt   := 'ex' expression ('fixum' | 'varia') extract_fields
+ex_stmt   := 'ex' expression ('sit' | 'varia') extract_fields
 extract_fields := extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
 extract_field  := IDENTIFIER ('ut' IDENTIFIER)?
 ceteri_field     := 'ceteri' IDENTIFIER
@@ -1596,7 +1596,7 @@ first_match_expr := 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFI
 reducta_expr := 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
 reducta_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio'
 reducta_group := 'pro' expression
-reducta_body := ('fixum' | 'varia') IDENTIFIER block_stmt
+reducta_body := ('sit' | 'varia') IDENTIFIER block_stmt
 reducta_identity := 'vel' expression
 # Sort expression. `via` is mandatory and selects the direction; `ex` sorts a
 # list, set or map's values and `de` sorts a map's keys. The optional body is
@@ -1605,7 +1605,7 @@ reducta_identity := 'vel' expression
 # `ascendens` and `descendens` stay ordinary identifiers outside their slots.
 sort_expr := 'ordinata' 'via' sort_direction ('ex' | 'de') expression sort_body?
 sort_direction := 'ascendens' | 'descendens'
-sort_body := ('fixum' | 'varia') IDENTIFIER block_stmt
+sort_body := ('sit' | 'varia') IDENTIFIER block_stmt
 # `filum` is claimed by exact spelling only inside a reduction production.
 filum_clause := 'filum' IDENTIFIER
 # Capture boundary: `capta` claims its spelling only in expression-primary

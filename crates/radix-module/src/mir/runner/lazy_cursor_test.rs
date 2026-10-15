@@ -26,14 +26,14 @@ fn sync_cursor_step_interleaves_producer_and_consumer() {
 locale = "en"
 +++
 fn three() generator → int {
-    for range 0 ‥ 3 const i {
+    for range 0 ‥ 3 let i {
         print "produce §"(i)
         yield i
     }
 }
 
 main {
-    for from three() const n {
+    for from three() let n {
         print "consume §"(n)
     }
 }
@@ -66,7 +66,7 @@ fn naturals() generator → int {
 }
 
 main {
-    for from naturals() const n {
+    for from naturals() let n {
         print "consume §"(n)
         if n ≥ 1 {
             break
@@ -96,7 +96,7 @@ fn naturals() async_generator → int {
 }
 
 async_main {
-    for from naturals() const n {
+    for from naturals() let n {
         print "consume §"(n)
         if n ≥ 1 {
             break
@@ -125,7 +125,7 @@ fn naturals() generator → int {
 }
 
 fn evens() generator → int {
-    for from naturals() const n {
+    for from naturals() let n {
         if n % 2 ≡ 0 {
             yield n
         }
@@ -133,7 +133,7 @@ fn evens() generator → int {
 }
 
 main {
-    for from evens() const n {
+    for from evens() let n {
         print n
         if n ≥ 4 {
             break
@@ -159,7 +159,7 @@ main {
     let list<int> all ← pair() ↦ list<int>
     print all.length()
     mut int total ← 0
-    for from pair() const n {
+    for from pair() let n {
         total ← total + n
     }
     print total

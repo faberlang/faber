@@ -37,7 +37,7 @@ fn same_module_union_match_binds_named_arms_and_payload() {
 
 functio describe(Eventum e) → textus {
     discerne e {
-        casu Eventum.Ictus fixum vis { redde vis ↦ textus }
+        casu Eventum.Ictus sit vis { redde vis ↦ textus }
         casu Eventum.Sonitus { redde "sonitus" }
     }
 }
@@ -140,7 +140,7 @@ fn imported_union_consumer_match_via_discerne_path_pattern() {
 functio kind_name(token.TokenKind k) → textus {
     discerne k {
         casu token.TokenKind.Palabra { redde "palabra" }
-        casu token.TokenKind.Numerus fixum code { redde code ↦ textus }
+        casu token.TokenKind.Numerus sit code { redde code ↦ textus }
     }
 }"#;
     let diagnostics = analyze_consumer_diagnostics(source);
@@ -323,7 +323,7 @@ discretio TokenKind {
 
 functio kind_name(token.TokenKind k) → textus {
     discerne k {
-        casu token.TokenKind.Numerus fixum code { redde code ↦ textus }
+        casu token.TokenKind.Numerus sit code { redde code ↦ textus }
         ceterum { redde "palabra" }
     }
 }"#;
@@ -531,7 +531,7 @@ fn or_pattern_accepts_payload_free_and_identical_payload_bindings() {
 
 functio describe(Eventum e) → textus {
     discerne e {
-        casu Eventum.Ictus fixum vis aut Eventum.Tactus fixum vis { redde vis ↦ textus }
+        casu Eventum.Ictus sit vis aut Eventum.Tactus sit vis { redde vis ↦ textus }
         casu Eventum.Sonitus { redde "sonitus" }
         casu Eventum.Quietus { redde "quietus" }
     }
@@ -540,8 +540,8 @@ functio describe(Eventum e) → textus {
 functio quiet(Eventum e) → vacuum {
     discerne e {
         casu Eventum.Sonitus aut Eventum.Quietus { tacet }
-        casu Eventum.Ictus fixum vis { tacet }
-        casu Eventum.Tactus fixum vis { tacet }
+        casu Eventum.Ictus sit vis { tacet }
+        casu Eventum.Tactus sit vis { tacet }
     }
 }"#,
     );
@@ -554,7 +554,7 @@ fn or_pattern_rejects_mismatched_binding_names() {
 
 functio describe(Eventum e) → textus {
     discerne e {
-        casu Eventum.Ictus fixum left aut Eventum.Tactus fixum right { redde "x" }
+        casu Eventum.Ictus sit left aut Eventum.Tactus sit right { redde "x" }
     }
 }"#,
         "or_pattern_binding_mismatch",
@@ -568,7 +568,7 @@ fn or_pattern_rejects_mismatched_binding_types() {
 
 functio describe(Eventum e) → textus {
     discerne e {
-        casu Eventum.Ictus fixum vis aut Eventum.Verbum fixum vis { redde "x" }
+        casu Eventum.Ictus sit vis aut Eventum.Verbum sit vis { redde "x" }
     }
 }"#,
         "or_pattern_binding_mismatch",

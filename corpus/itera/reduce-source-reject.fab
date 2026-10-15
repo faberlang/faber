@@ -14,7 +14,7 @@ diagnostic = "PARSE030:itera_source_sort_reduce_unbound"
 # written in a loop header. Bind the reduced value to a name, then loop over it.
 incipit {
     sit lista<numerus> xs ← [3, 1, 2]
-    itera ex reducta via summa ex xs fixum x {
+    itera ex reducta via summa ex xs sit x {
         nota x
     }
 }

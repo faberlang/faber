@@ -118,7 +118,7 @@ locale = "en"
 fn accepts(value raw) → bool {
     if raw not is list<value> then return false
     let list<value> items ← raw ↦ list<value> ⊥ empty
-    for from items const item {
+    for from items let item {
         if item is map<string, value> then return true
     }
     return false
@@ -1211,7 +1211,7 @@ union GradusError {
 @ conversion
 fn from_nn_error(nn.NnError err) → GradusError {
     match err {
-        case nn.NnError.NnBad const message { return variant GradusBad {message = message} }
+        case nn.NnError.NnBad let message { return variant GradusBad {message = message} }
     }
 }
 

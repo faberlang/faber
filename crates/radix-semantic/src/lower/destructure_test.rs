@@ -63,7 +63,7 @@ fn entry_call_count(unit: &test_support::AnalyzedFixture) -> usize {
 #[test]
 fn array_destructuring_calls_initializer_once() {
     let unit = test_support::analyze_ok_la(&format!(
-        "{PAR}incipit {{\n    fixum [a, b, ceteri r] ← par()\n    nota a + b\n    nota r\n}}\n"
+        "{PAR}incipit {{\n    sit [a, b, ceteri r] ← par()\n    nota a + b\n    nota r\n}}\n"
     ));
     assert_eq!(entry_call_count(&unit), 1);
 }
@@ -71,7 +71,7 @@ fn array_destructuring_calls_initializer_once() {
 #[test]
 fn object_destructuring_calls_initializer_once() {
     let unit = test_support::analyze_ok_la(
-        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    fixum {x, y} ← fac()\n    nota x + y\n}\n",
+        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    sit {x, y} ← fac()\n    nota x + y\n}\n",
     );
     assert_eq!(entry_call_count(&unit), 1);
 }
@@ -79,7 +79,7 @@ fn object_destructuring_calls_initializer_once() {
 #[test]
 fn array_rest_binds_the_tail() {
     let unit = test_support::analyze_ok_la(
-        "incipit {\n    fixum [caput, ceteri cauda] ← [1, 2, 3, 4, 5]\n    nota caput\n    nota cauda\n}\n",
+        "incipit {\n    sit [caput, ceteri cauda] ← [1, 2, 3, 4, 5]\n    nota caput\n    nota cauda\n}\n",
     );
     let locals = entry_locals(&unit);
     let cauda = local(&unit, &locals, "cauda");
@@ -100,7 +100,7 @@ fn array_rest_binds_the_tail() {
 #[test]
 fn rest_after_holes_skips_every_authored_position() {
     let unit = test_support::analyze_ok_la(
-        "incipit {\n    sit xs ← [1, 2, 3, 4]\n    fixum [_, b, ceteri r] ← xs\n    nota b\n    nota r\n}\n",
+        "incipit {\n    sit xs ← [1, 2, 3, 4]\n    sit [_, b, ceteri r] ← xs\n    nota b\n    nota r\n}\n",
     );
     let locals = entry_locals(&unit);
     let r = local(&unit, &locals, "r");
@@ -120,7 +120,7 @@ fn rest_after_holes_skips_every_authored_position() {
 #[test]
 fn place_subject_is_not_hoisted_and_call_subject_is() {
     let unit = test_support::analyze_ok_la(&format!(
-        "{PAR}incipit {{\n    sit xs ← [1, 2]\n    fixum [a, b] ← xs\n    fixum [c, d] ← par()\n    nota a + b + c + d\n}}\n"
+        "{PAR}incipit {{\n    sit xs ← [1, 2]\n    sit [a, b] ← xs\n    sit [c, d] ← par()\n    nota a + b + c + d\n}}\n"
     ));
     let facts = &unit.presentation.destructure_bindings;
     assert_eq!(facts.len(), 2);
@@ -137,7 +137,7 @@ fn place_subject_is_not_hoisted_and_call_subject_is() {
 #[test]
 fn ex_extraction_binds_each_field_and_the_rest_source() {
     let unit = test_support::analyze_ok_la(
-        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nincipit {\n    sit Punctum p ← Punctum { x = 1, y = 2 }\n    ex p fixum x, ceteri r\n}\n",
+        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nincipit {\n    sit Punctum p ← Punctum { x = 1, y = 2 }\n    ex p sit x, ceteri r\n}\n",
     );
     let locals = entry_locals(&unit);
     let x = local(&unit, &locals, "x");
@@ -162,7 +162,7 @@ fn ex_extraction_binds_each_field_and_the_rest_source() {
 #[test]
 fn ex_extraction_calls_its_source_once() {
     let unit = test_support::analyze_ok_la(
-        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    ex fac() fixum x, y\n    nota x + y\n}\n",
+        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    ex fac() sit x, y\n    nota x + y\n}\n",
     );
     assert_eq!(entry_call_count(&unit), 1);
 }
@@ -170,7 +170,7 @@ fn ex_extraction_calls_its_source_once() {
 #[test]
 fn ex_extraction_with_rest_calls_its_source_once() {
     let unit = test_support::analyze_ok_la(
-        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    ex fac() fixum x, ceteri r\n    nota x\n    nota r\n}\n",
+        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    ex fac() sit x, ceteri r\n    nota x\n    nota r\n}\n",
     );
     assert_eq!(entry_call_count(&unit), 1);
 }

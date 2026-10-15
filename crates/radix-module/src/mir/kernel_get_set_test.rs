@@ -19,7 +19,7 @@ const KERNEL: &str = r#"
 @ kernel
 @ public
 fn k<size H, size W>(tensor<f32, [H, W]> src, mut tensor<f32, [H, W]> dst) → void ⇥ string {
-    for from src at [i, j] thread lane const v {
+    for from src at [i, j] thread lane let v {
         dst.set([i, j], src.get([i, j + 1]))
     }
 }

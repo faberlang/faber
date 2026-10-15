@@ -33,7 +33,7 @@ incipit {
     q.appende(1)
     q.appende(2)
     q.appende(3)
-    itera ex q fixum item {
+    itera ex q sit item {
         nota item
     }
 
@@ -41,7 +41,7 @@ incipit {
     s.appende(1)
     s.appende(2)
     s.appende(3)
-    itera ex s fixum item {
+    itera ex s sit item {
         nota item
     }
 }
@@ -66,13 +66,13 @@ incipit {
     r.appende(20)
     sit queue<numerus> sum ← q + r
     sit queue<numerus> scaled ← q * 3
-    itera ex sum fixum item {
+    itera ex sum sit item {
         nota item
     }
-    itera ex (3 - q) fixum item {
+    itera ex (3 - q) sit item {
         nota item
     }
-    itera ex scaled fixum item {
+    itera ex scaled sit item {
         nota item
     }
 
@@ -83,7 +83,7 @@ incipit {
     b.appende(1)
     b.appende(3)
     sit stack<numerus> products ← a ⊙ b
-    itera ex products fixum item {
+    itera ex products sit item {
         nota item
     }
 }

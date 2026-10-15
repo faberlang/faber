@@ -448,7 +448,7 @@ fn itera_de_array_index_no_longer_leaves_infer_types() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
   sit xs ← [10, 20, 30]
-  itera de xs fixum idx {
+  itera de xs sit idx {
     nota xs[idx]
   }
 }";
@@ -466,7 +466,7 @@ fn itera_de_array_index_no_longer_leaves_infer_types() {
 fn itera_ab_range_no_longer_leaves_infer_types() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  itera ab 0‥5 fixum i {
+  itera ab 0‥5 sit i {
     nota i
   }
 }";
@@ -484,7 +484,7 @@ fn itera_ab_range_no_longer_leaves_infer_types() {
 fn itera_ab_inclusive_range_glyph_compiles() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  itera ab 0…5 fixum i {
+  itera ab 0…5 sit i {
     nota i
   }
 }";
@@ -698,7 +698,7 @@ fn ex_destructured_object_fields_can_be_used_in_arithmetic() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
   sit point ← Point { x = 4, y = 6 }
-  ex point fixum x, y
+  ex point sit x, y
   sit numerus sum ← x + y
   nota sum
 }
@@ -744,7 +744,7 @@ functio main() → vacuum {
 fn object_destructured_aliases_can_be_used_in_arithmetic() {
     let session = test_session(Target::HirRust);
     let source = r"functio totalis(Point point) → numerus {
-  fixum { x ut left, y } ← point
+  sit { x ut left, y } ← point
   redde left + y
 }
 
@@ -811,7 +811,7 @@ fn repeated_owned_calls_no_longer_report_use_after_move() {
     let session = test_session(Target::HirRust);
     let source = r"functio sumArray(lista<numerus> nums) → numerus {
   varia numerus total ← 0
-  itera ex nums fixum n {
+  itera ex nums sit n {
     total ← total + n
   }
   redde total
@@ -819,7 +819,7 @@ fn repeated_owned_calls_no_longer_report_use_after_move() {
 
 functio maxValue(lista<numerus> nums) → numerus {
   varia numerus max ← nums[0]
-  itera ex nums fixum n {
+  itera ex nums sit n {
     si n ≻ max {
       max ← n
     }
@@ -959,14 +959,14 @@ fn cursor_iteration_accumulator_from_empty_array_no_longer_reports_inference_err
     let session = test_session(Target::HirRust);
     let source = r"@ cursor
 functio rangeSync(numerus n) → numerus {
-  itera ab 0‥n fixum i {
+  itera ab 0‥n sit i {
     cede i
   }
 }
 
 incipit {
   varia lista<numerus> syncResults ← vacua
-  itera ex rangeSync(5) fixum num {
+  itera ex rangeSync(5) sit num {
     syncResults.appende(num * 2)
   }
   nota syncResults
@@ -2032,7 +2032,7 @@ incipit {
     sit tensor<f32, [2,2]> w ← flat ↦ tensor<f32, [2,2]>
     sit tensor<f32, [2,2]> b ← flat ↦ tensor<f32, [2,2]>
     sit numerus steps ← 2
-    itera ab 0‥steps fixum step {
+    itera ab 0‥steps sit step {
         sit tensor<f32, [2,2]> pred ← forward(x, w, b)
         nota pred
     }

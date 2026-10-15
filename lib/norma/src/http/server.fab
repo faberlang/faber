@@ -291,7 +291,7 @@ fn is_http10(string version) → bool {
 
 fn has_connection_token(headers.Headers headers, string want) → bool {
     let string folded ← ascii_lower(want)
-    for from headers.entries const entry {
+    for from headers.entries let entry {
         if ascii_lower(entry.name) ≡ "connection" {
             if line_has_token(entry.value, folded) {
                 return true
@@ -331,7 +331,7 @@ fn line_has_token(string line, string folded_want) → bool {
 
 fn headers_carrier(headers.Headers headers) → list<value> {
     mut list<value> out ← []
-    for from headers.entries const entry {
+    for from headers.entries let entry {
         mut map<string, value> row ← empty
         row.put("name", entry.name ↦ value)
         row.put("value", entry.value ↦ value)
@@ -345,7 +345,7 @@ fn headers_from_carrier(value raw) → headers.Headers {
     if raw not is list<value> then return out
     do {
         let list<value> items ↤ raw
-        for from items const item {
+        for from items let item {
             if item is map<string, value> {
                 let map<string, value> row ↤ item
                 let string name ↤ row["name"]

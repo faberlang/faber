@@ -82,27 +82,19 @@ const fn rejected(row: u8, source: &'static str) -> Case {
 /// One accept and at least one reject for each CS-1 §4 parser site.
 const CASES: &[Case] = &[
     // 1. array binding pattern elements
-    accept(1, "fixum [a, b] ← values"),
-    trailing(1, "array_binding_pattern", "fixum [a, b,] ← values"),
-    missing(1, "array_binding_pattern", "fixum [a b] ← values"),
+    accept(1, "sit [a, b] ← values"),
+    trailing(1, "array_binding_pattern", "sit [a, b,] ← values"),
+    missing(1, "array_binding_pattern", "sit [a b] ← values"),
     // 2. object binding pattern fields
-    accept(2, "fixum { a, b } ← obj"),
-    trailing(2, "object_binding_pattern", "fixum { a, b, } ← obj"),
-    missing(2, "object_binding_pattern", "fixum { a b } ← obj"),
+    accept(2, "sit { a, b } ← obj"),
+    trailing(2, "object_binding_pattern", "sit { a, b, } ← obj"),
+    missing(2, "object_binding_pattern", "sit { a b } ← obj"),
     // 3. object rest trailing-comma guard
-    accept(3, "fixum { a, ceteri rest } ← obj"),
-    trailing(
-        3,
-        "object_binding_pattern",
-        "fixum { a, ceteri rest, } ← obj",
-    ),
+    accept(3, "sit { a, ceteri rest } ← obj"),
+    trailing(3, "object_binding_pattern", "sit { a, ceteri rest, } ← obj"),
     // 4. array rest trailing-comma guard
-    accept(4, "fixum [a, ceteri rest] ← values"),
-    trailing(
-        4,
-        "array_binding_pattern",
-        "fixum [a, ceteri rest,] ← values",
-    ),
+    accept(4, "sit [a, ceteri rest] ← values"),
+    trailing(4, "array_binding_pattern", "sit [a, ceteri rest,] ← values"),
     // 5. function parameters
     accept(5, "functio f(numerus a, numerus b) → vacuum { }"),
     trailing(
@@ -379,11 +371,11 @@ functio f() → vacuum { }"#,
     missing(35, "extract_fields", "ex source varia nomen aetas"),
     trailing(35, "extract_fields", "ex source varia nomen, ceteri rest,"),
     // 37. pattern bindings
-    accept(37, "discerne event { casu Ok fixum payload, error { } }"),
+    accept(37, "discerne event { casu Ok sit payload, error { } }"),
     trailing(
         37,
         "pattern_bindings",
-        "discerne event { casu Ok fixum payload, error, { } }",
+        "discerne event { casu Ok sit payload, error, { } }",
     ),
     missing(
         37,

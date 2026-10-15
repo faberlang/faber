@@ -372,10 +372,6 @@ help = "chỉ giữ một binding rest '{keyword}'"
 message = "'{keyword}' liên kết trực tiếp với một identifier; dùng '{keyword}' name ← expr"
 help = "viết '{keyword}' name ← expr hoặc dùng fixum cho binding có kiểu hoặc destructure"
 
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit không hỗ trợ pattern destructure"
-help = "dùng fixum với pattern destructure"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "cần test case hoặc setup"
 help = "bắt đầu mục body bằng '{proba}', '{probandum}' hoặc '{setup}'"
@@ -515,6 +511,14 @@ help = "viết `{keyword} T {name} ← {marker} value`; một `{name} ← {marke
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "khai báo `{keyword}` lúc chạy đã bị loại bỏ; `{name}` là một tên lúc chạy"
 help = "hãy viết `{sit} T {name} ← …` (hoặc `{sit} {name} ← …` để suy ra kiểu); `{fixum}` nêu một sự thật lúc biên dịch và đi với `=`"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "từ gắn tên `{keyword}` đã bị loại bỏ"
+help = "tên gắn dùng `{sit}` (tên cố định) hoặc `{varia}` (tên có thể ghi); `{fixum}` nêu một sự thật lúc biên dịch và đi với `=`"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` không thể mở đầu một tên gắn"
+help = "tên gắn đặt tên cho giá trị của mỗi lần lặp hoặc khớp; hãy viết `{sit}` cho tên cố định hoặc `{varia}` cho tên có thể ghi"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "biến cục bộ `{keyword}` cần một vị trí để đọc: `{keyword} T name ← place`"

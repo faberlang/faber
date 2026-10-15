@@ -651,9 +651,6 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
                     "{keyword} binds one identifier directly; use {keyword} name ← expr"
                 ));
             }
-            "sit_no_destructuring" => {
-                return Some("sit does not support destructuring patterns".to_owned());
-            }
             "test_case_or_setup" => return Some("expected test case or setup".to_owned()),
             "test_modifier_integer" => {
                 let modifier = quote_arg(args, "modifier")?;
@@ -755,16 +752,13 @@ fn expected_help_issue_late(issue: &str, args: &[DiagnosticArg]) -> Option<Strin
             return Some(format!("keep only one {keyword} rest binding"));
         }
         "mutability_marker" => {
-            return Some("add fixum or varia before the binding name".to_owned());
+            return Some("add sit or varia before the binding name".to_owned());
         }
         "sit_identifier_binding" => {
             let keyword = quote_arg(args, "keyword")?;
             return Some(format!(
-                "write {keyword} name ← expr or use fixum for typed/destructured bindings"
+                "write {keyword} name ← expr or use sit with a type or a destructuring pattern"
             ));
-        }
-        "sit_no_destructuring" => {
-            return Some("use fixum with a destructuring pattern".to_owned());
         }
         "test_case_or_setup" => {
             let proba = quote_arg(args, "proba")?;
@@ -961,7 +955,7 @@ fn invalid_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
         }
         "unexpected_annotation_token" => Some("remove the trailing annotation token".to_owned()),
         "nucleum_lane_removed" => Some(
-            "bind the iteration coordinate with `apud` on a `filum` loop: `itera ex t apud [i] filum f fixum v`"
+            "bind the iteration coordinate with `apud` on a `filum` loop: `itera ex t apud [i] filum f sit v`"
                 .to_owned(),
         ),
         "wrong_locale_annotation" => {

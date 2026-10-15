@@ -1,0 +1,24 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "binding_decl", "sit_decl", "type_annotation", "base_type", "expression", "literal", "array_literal", "itera_stmt", "nota_stmt"]
+category = "binding"
+summary = "A binder names a value per iteration; ref cannot introduce one."
+syntax = "for from xs ref x { ... }"
+related = ["sit", "varia", "de"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE010:ref_binder_refused"
++++
+# =============================================================================
+# mutabilitas — ref is refused as a binder
+# =============================================================================
+# A binder is `let` or `mut`. `ref` re-points a name at a place; use it for a
+# local or a parameter, not for a loop binder.
+
+main {
+    let list<int> xs ← [1, 2, 3]
+    for from xs ref x {
+        print x
+    }
+}

@@ -11,7 +11,7 @@ class Reading {
 
 fn mean(list<float> xs) → float {
     mut float total ← 0.0
-    for from xs const x {
+    for from xs let x {
         total ← total + x
     }
     return total / 2.0

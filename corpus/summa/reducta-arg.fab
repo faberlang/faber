@@ -10,7 +10,7 @@ canonical = true
 functio optimum(tensor<f32, [4]> a) → numerus { redde reducta via argmaxima ex a }
 functio infimum(tensor<f32, [4]> a) → numerus { redde reducta via argminima ex a }
 functio optimum_corpus(tensor<f32, [4]> a) → numerus {
-    redde reducta via argmaxima ex a apud [i] fixum s { redde 0.0 - s }
+    redde reducta via argmaxima ex a apud [i] sit s { redde 0.0 - s }
 }
 functio optimum_nan(tensor<f64, [4]> a) → numerus { redde reducta via argmaxima ex a }
 functio optimum_plana(tensor<f32, [2, 3]> m) → iuncta<numerus, numerus> {

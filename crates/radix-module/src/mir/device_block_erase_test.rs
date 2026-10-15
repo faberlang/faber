@@ -33,7 +33,7 @@ const TENSOR: &str = r#"
 @ kernel
 @ public
 fn k<size H, size W>(tensor<f32, [H, W]> src, mut tensor<f32, [H, W]> dst) → void ⇥ string {
-    for from src at [i, j] thread lane const x {
+    for from src at [i, j] thread lane let x {
         if x ≺ 0.0 {
             throw "negative lane"
         }

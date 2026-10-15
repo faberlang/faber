@@ -48,10 +48,10 @@ union Mandatum {
 
 fn narra(Mandatum m) → string {
     match all m {
-        case Moveo const locus, passus {
+        case Moveo let locus, passus {
             return "moveo § per §"(locus, passus)
         }
-        case Loquere const verba as dictum {
+        case Loquere let verba as dictum {
             return "loquere §"(dictum)
         }
         case Tace {

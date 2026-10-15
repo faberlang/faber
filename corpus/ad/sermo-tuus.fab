@@ -28,7 +28,7 @@ locale = "en"
 
 main {
     let channel s ← call 'runtime:echo' ("salve")
-    for from s.tuus<string>().cursor() const frame {
+    for from s.tuus<string>().cursor() let frame {
         assert frame.data ≡ "salve"
     }
 }

@@ -40,7 +40,7 @@ union ShapeError {
 @ public { }
 fn numel(list<int> shape) → int ⇥ ShapeError {
     mut int product ← 1
-    for from shape const dim {
+    for from shape let dim {
         require dim ≥ 0 throw variant Negative { message = "neg" }
         product ← product * dim
     }
@@ -50,7 +50,7 @@ fn numel(list<int> shape) → int ⇥ ShapeError {
 @ public { }
 fn message(ShapeError err) → string {
     match err {
-        case Negative const message {
+        case Negative let message {
             return message
         }
     }
@@ -370,7 +370,7 @@ fn red(int shade) → Color {
 @ public { }
 fn shade(Color c) → int {
     match c {
-        case Red const shade {
+        case Red let shade {
             return shade
         }
         case Blue {
@@ -399,7 +399,7 @@ fn dark(int shade) → Tone {
 @ public { }
 fn shade(Tone t) → int {
     match t {
-        case Dark const shade {
+        case Dark let shade {
             return shade
         }
         case Light {

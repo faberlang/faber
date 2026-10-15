@@ -1601,7 +1601,7 @@ functio dispatch(numerus x) → vacuum {
 fn lowers_itera_with_cape_into_handled_expression() {
     let source = r"
 functio traverse() → vacuum {
-  itera ex [1, 2, 3] fixum item ergo nota item cape err {
+  itera ex [1, 2, 3] sit item ergo nota item cape err {
     nota err.nuntius
   }
 }

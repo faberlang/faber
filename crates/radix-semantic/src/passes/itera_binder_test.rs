@@ -28,13 +28,13 @@ fn accepts_de_const_bindings_for_array_index_and_map_key() {
     let _ = test_support::analyze_ok(
         r"
 functio arrays(lista<numerus> ys) → vacuum {
-    itera de ys fixum index {
+    itera de ys sit index {
         nota index
     }
 }
 
 functio maps(tabula<textus, numerus> values) → vacuum {
-    itera de values fixum key {
+    itera de values sit key {
         nota key
     }
 }
@@ -149,7 +149,7 @@ fn array_loop_binder_matches_binding_position_reads() {
     let binding = test_support::analyze_ok(
         r"
 functio bind(lista<numerus> pair) → vacuum {
-    fixum [a, b] ← pair
+    sit [a, b] ← pair
     tacet
 }
 ",
@@ -157,7 +157,7 @@ functio bind(lista<numerus> pair) → vacuum {
     let looping = test_support::analyze_ok(
         r"
 functio loopum(lista<lista<numerus>> pairs) → vacuum {
-    itera ex pairs fixum [a, b] {
+    itera ex pairs sit [a, b] {
         tacet
     }
 }
@@ -181,7 +181,7 @@ genus Point {
 }
 
 functio bind(Point point) → vacuum {
-    fixum {x ut left, y} ← point
+    sit {x ut left, y} ← point
     tacet
 }
 ",
@@ -194,7 +194,7 @@ genus Point {
 }
 
 functio loopum(lista<Point> points) → vacuum {
-    itera ex points fixum {x ut left, y} {
+    itera ex points sit {x ut left, y} {
         tacet
     }
 }
@@ -213,7 +213,7 @@ fn labeled_tuple_loop_binder_binds_by_label() {
     let binding = test_support::analyze_ok(
         r"
 functio bind(iuncta<gx: numerus, gw: numerus> pair) → vacuum {
-    fixum {gx} ← pair
+    sit {gx} ← pair
     tacet
 }
 ",
@@ -225,7 +225,7 @@ functio loopum() → vacuum {
         iuncta<numerus, numerus> [1, 2],
         iuncta<numerus, numerus> [3, 4]
     ]
-    itera ex xs fixum {gx} {
+    itera ex xs sit {gx} {
         tacet
     }
 }
@@ -245,7 +245,7 @@ fn loop_pattern_failure_uses_binding_position_issue() {
     test_support::assert_rejects_with_issue(
         r"
 functio bad(iuncta<numerus> pair) → vacuum {
-    fixum [a, b] ← pair
+    sit [a, b] ← pair
     tacet
 }
 ",
@@ -254,7 +254,7 @@ functio bad(iuncta<numerus> pair) → vacuum {
     test_support::assert_rejects_with_issue(
         r"
 functio bad(lista<iuncta<numerus>> pairs) → vacuum {
-    itera ex pairs fixum [a, b] {
+    itera ex pairs sit [a, b] {
         tacet
     }
 }
@@ -342,7 +342,7 @@ fn n2_range_product_keeps_range_and_binder_order() {
     let unit = test_support::analyze_ok(
         r"
 functio grid(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, 1‥n fixum i, j {
+    itera ab 0‥m, 1‥n sit i, j {
         nota i
     }
 }
@@ -369,7 +369,7 @@ fn n3_range_product_keeps_range_and_binder_order() {
     let unit = test_support::analyze_ok(
         r"
 functio cube(numerus m, numerus n, numerus k) → vacuum {
-    itera ab 0‥m, 1‥n, 2‥k fixum i, j, p {
+    itera ab 0‥m, 1‥n, 2‥k sit i, j, p {
         nota i
     }
 }
@@ -390,7 +390,7 @@ fn single_range_ab_stays_on_shared_itera_node() {
     let unit = test_support::analyze_ok(
         r"
 functio line(numerus m) → vacuum {
-    itera ab 0‥m fixum i {
+    itera ab 0‥m sit i {
         nota i
     }
 }
@@ -418,7 +418,7 @@ fn range_product_rejects_source_binder_count_mismatch() {
     test_support::assert_rejects_with_issue(
         r"
 functio short(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, 0‥n fixum i {
+    itera ab 0‥m, 0‥n sit i {
         nota i
     }
 }
@@ -428,7 +428,7 @@ functio short(numerus m, numerus n) → vacuum {
     let diagnostics = test_support::analyze_and_get_diagnostics(
         r"
 functio short(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, 0‥n fixum i {
+    itera ab 0‥m, 0‥n sit i {
         nota i
     }
 }
@@ -461,7 +461,7 @@ fn range_product_rejects_extent_binder_shadowing() {
     test_support::assert_rejects_with_issue(
         r"
 functio shadow(numerus m, numerus k) → vacuum {
-    itera ab 0‥m, 0‥k fixum i, k {
+    itera ab 0‥m, 0‥k sit i, k {
         nota i
     }
 }
@@ -475,7 +475,7 @@ fn range_product_rejects_mixed_range_member() {
     test_support::assert_rejects_with_issue(
         r"
 functio mixed(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, n fixum i, j {
+    itera ab 0‥m, n sit i, j {
         nota i
     }
 }
@@ -491,7 +491,7 @@ fn range_product_rejects_apud_clause_through_requires_ex() {
     test_support::assert_rejects_with_issue(
         r"
 functio coord(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, 0‥n apud [c] fixum i, j {
+    itera ab 0‥m, 0‥n apud [c] sit i, j {
         nota i
     }
 }
@@ -507,7 +507,7 @@ fn range_product_never_reaches_lockstep_checker() {
     test_support::assert_rejects_with_issue(
         r"
 functio zip(lista<numerus> xs, lista<numerus> ys) → vacuum {
-    itera ex xs, ys fixum x {
+    itera ex xs, ys sit x {
         nota x
     }
 }
@@ -517,7 +517,7 @@ functio zip(lista<numerus> xs, lista<numerus> ys) → vacuum {
     let unit = test_support::analyze_ok(
         r"
 functio zip(lista<numerus> xs, lista<numerus> ys) → vacuum {
-    itera ex xs, ys fixum x, y {
+    itera ex xs, ys sit x, y {
         nota x
     }
 }
@@ -539,7 +539,7 @@ fn visitor_walks_product_ranges_binders_and_body_in_order() {
     let unit = test_support::analyze_ok(
         r"
 functio grid(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, 1‥n fixum i, j {
+    itera ab 0‥m, 1‥n sit i, j {
         nota i
     }
 }
@@ -608,7 +608,7 @@ fn accepts_filum_lane_binder_on_single_source_itera() {
     let _ = test_support::analyze_ok(
         r"
 functio walk(lista<numerus> ys) → vacuum {
-    itera ex ys apud [i] filum f fixum y {
+    itera ex ys apud [i] filum f sit y {
         nota i, y
     }
 }
@@ -621,7 +621,7 @@ fn declines_filum_clause_on_lockstep_series() {
     test_support::assert_rejects_with_issue(
         r"
 functio zip_walk(lista<numerus> ks, lista<numerus> vs) → vacuum {
-    itera ex ks, vs apud [i] filum f fixum k, v {
+    itera ex ks, vs apud [i] filum f sit k, v {
         nota k, v
     }
 }
@@ -635,7 +635,7 @@ fn declines_filum_clause_on_range_product() {
     test_support::assert_rejects_with_issue(
         r"
 functio grid_walk(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, 0‥n filum f fixum r, c {
+    itera ab 0‥m, 0‥n filum f sit r, c {
         nota r, c
     }
 }

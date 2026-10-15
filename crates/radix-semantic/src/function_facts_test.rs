@@ -638,10 +638,10 @@ functio matcher() → (numerus ∪ textus) → numerus {
     sit numerus extra ← 2
     redde (numerus ∪ textus u) → numerus ∴ fac {
         discerne u {
-            casu numerus fixum i {
+            casu numerus sit i {
                 redde i + extra
             }
-            casu textus fixum s {
+            casu textus sit s {
                 nota s
                 redde extra
             }

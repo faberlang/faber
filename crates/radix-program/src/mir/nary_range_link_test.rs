@@ -13,7 +13,7 @@ use std::fs;
 
 const RANGE_UTIL: &str = "@ public\nfn row_max() → int {\n    return 2\n}\n\n@ public\nfn col_max() → int {\n    return 3\n}\n\n@ public\nfn emit_cell(int v) → int {\n    return v\n}\n";
 
-const RANGE_MAIN: &str = "import from \"./util\" * as utilModule\n\nmain {\n    for range 0‥utilModule.row_max(), 0‥utilModule.col_max() const i, j {\n        print utilModule.emit_cell(i * 10 + j)\n    }\n}\n";
+const RANGE_MAIN: &str = "import from \"./util\" * as utilModule\n\nmain {\n    for range 0‥utilModule.row_max(), 0‥utilModule.col_max() let i, j {\n        print utilModule.emit_cell(i * 10 + j)\n    }\n}\n";
 
 fn write_range_product_package(dir: &Path, label: &str) -> PathBuf {
     let src = dir.join("src");

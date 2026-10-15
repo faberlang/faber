@@ -1483,7 +1483,7 @@ importa ex "norma:fs" solum
 importa ex "norma:fault" fault
 
 functio tange_paths(lista<textus> paths) → vacuum ⇥ fault.IoFault {
-    itera ex paths fixum path {
+    itera ex paths sit path {
         solum.tange(path)
     }
 }
@@ -4804,7 +4804,7 @@ union Nuntius {
 
 fn tracta(Nuntius n) → string {
   match n {
-    case Clavis const nomenLongum as captum {
+    case Clavis let nomenLongum as captum {
       return captum
     }
   }
@@ -5236,7 +5236,7 @@ import from "norma:text" text
 
 main {
   do {
-    const [meta, corpus] ← text.split_frontmatter("+++\na = 1\n+++\nbody", "+++")
+    let [meta, corpus] ← text.split_frontmatter("+++\na = 1\n+++\nbody", "+++")
     print meta, corpus
   } catch err {
     warn err
@@ -13597,7 +13597,7 @@ main {
     print loss
     let f32 upstream ← 1.0
     let grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
-    const [_, gw] ← grads
+    let [_, gw] ← grads
     print gw
 }
 "#,
@@ -13859,7 +13859,7 @@ main {
     print loss
     let f32 upstream ← 1.0
     let grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
-    const [_, gw] ← grads
+    let [_, gw] ← grads
     print gw
 }
 "#,
@@ -13967,7 +13967,7 @@ main {
     print loss
     let f32 upstream ← 1.0
     let grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
-    const [_, gw] ← grads
+    let [_, gw] ← grads
     print gw
 }
 "#,

@@ -35,7 +35,7 @@ fn kernel(grid: &str, statement: &str) -> String {
     format!(
         r"incipit {{
     varia tensor<numerus, [4]> grid ← {grid}
-    itera ex grid apud [i] filum lane fixum value {{
+    itera ex grid apud [i] filum lane sit value {{
         {statement}
     }}
 }}"
@@ -75,7 +75,7 @@ fn other_call_result_keeps_unknown_identity() {
             r"incipit {{
     varia tensor<numerus, [4]> fresh ← ti64[4] {{}}
     varia tensor<numerus, [4]> grid ← fresh.addita(fresh)
-    itera ex grid apud [i] filum lane fixum value {{
+    itera ex grid apud [i] filum lane sit value {{
         grid[i] ← value
     }}
 }}"
@@ -99,7 +99,7 @@ const GRID: &str = "tensor<numerus, [4]>";
 fn kernel_fn(params: &str, statement: &str) -> String {
     format!(
         r"functio kernel({params}) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         {statement}
     }}
 }}
@@ -169,7 +169,7 @@ fn read_param_read_at_neighbours_and_never_written_is_accepted() {
     accepted(&format!(
         r"functio kernel(de {GRID} src) → vacuum {{
     varia {GRID} grid ← ti64[4] {{}}
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         grid[i] ← src[i + 1]
     }}
 }}
@@ -249,7 +249,7 @@ fn call_from_the_body_stays_declined_with_param_roots() {
             r"functio inner(in {GRID} out) → vacuum {{
 }}
 functio kernel(in {GRID} out, de {GRID} src) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         inner(varia out)
         out[i] ← value
     }}
@@ -281,7 +281,7 @@ fn write_through_a_read_param_is_a_borrow_error_not_an_independence_one() {
 fn aliasing_call_is_a_borrow_error_while_the_kernel_is_certified() {
     let source = format!(
         r"functio kernel(in {GRID} out, de {GRID} src) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
+    itera ex src apud [i] filum lane sit value {{
         out[i] ← src[i + 1]
     }}
 }}

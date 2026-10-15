@@ -204,7 +204,7 @@ const SECTION3_SCALAR_LOOP: &str = r#"
 @ radix backward "range_backward"
 functio loop_count() → f32 {
     sit f32 total ← 0.0
-    itera ab 0‥10 per 2 fixum i {
+    itera ab 0‥10 per 2 sit i {
         total ← total + 1.0
     }
     redde total
@@ -216,7 +216,7 @@ const FULL_PREFIX_TENSOR_LOOP: &str = r#"
 @ radix backward "lane_sum_backward"
 functio lane_sum(tensor<f32, [4]> x) → f32 {
     varia tensor<f32, [4]> acc ← copy x
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         acc ← acc + x
     }
     redde acc.media()
@@ -227,7 +227,7 @@ const TENSOR_EX_LOOP: &str = r#"
 @ radix lane "air"
 functio tensor_sum(tensor<f32, [4]> x) → f32 {
     varia f32 total ← 0.0
-    itera ex x fixum value {
+    itera ex x sit value {
         total ← total + value
     }
     redde total
@@ -263,7 +263,7 @@ const APUD_RANK2_GRID: &str = r#"
 @ radix backward "grid_backward"
 functio grid_sum(tensor<f32, [2, 3]> x) → f32 {
     varia tensor<f32, [2, 3]> acc ← copy x
-    itera ex x apud [i, j] fixum cell {
+    itera ex x apud [i, j] sit cell {
         acc ← acc + x
     }
     redde acc.media()
@@ -309,7 +309,7 @@ fn apud_rank1_driver_reaches_reverse_ad_with_lane_count() {
 @ radix backward "line_backward"
 functio line_sum(tensor<f32, [8]> x) → f32 {
     varia tensor<f32, [8]> acc ← copy x
-    itera ex x apud [i] fixum cell {
+    itera ex x apud [i] sit cell {
         acc ← acc + x
     }
     redde acc.media()
@@ -342,7 +342,7 @@ fn apud_rank3_driver_reaches_reverse_ad_with_lane_count() {
 @ radix backward "cube_backward"
 functio cube_sum(tensor<f32, [2, 2, 2]> x) → f32 {
     varia tensor<f32, [2, 2, 2]> acc ← copy x
-    itera ex x apud [i, j, k] fixum cell {
+    itera ex x apud [i, j, k] sit cell {
         acc ← acc + x
     }
     redde acc.media()
@@ -382,7 +382,7 @@ fn apud_product_over_budget_declines_whole_with_causa() {
         r#"
 @ radix lane "air"
 functio too_wide(tensor<f32, [9, 8]> x) → f32 {
-    itera ex x apud [i, j] fixum cell { }
+    itera ex x apud [i, j] sit cell { }
     redde 0.0
 }
 "#,
@@ -401,7 +401,7 @@ fn apud_generic_template_is_retained_until_a_concrete_call() {
         r#"
 @ radix lane "air"
 functio generic_grid<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → f32 {
-    itera ex x apud [i, j] fixum cell { }
+    itera ex x apud [i, j] sit cell { }
     redde 0.0
 }
 "#,
@@ -419,7 +419,7 @@ fn apud_on_non_air_lane_loop_is_left_in_place() {
     let result = analyze(
         r"
 functio host_grid(tensor<f32, [2, 3]> x) → vacuum {
-    itera ex x apud [i, j] fixum cell { }
+    itera ex x apud [i, j] sit cell { }
 }
 ",
     );
@@ -467,7 +467,7 @@ fn tensor_ex_generic_template_is_retained_until_a_concrete_call() {
         r#"
 @ radix lane "air"
 functio generic_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
-    itera ex x fixum value { }
+    itera ex x sit value { }
     redde 0.0
 }
 "#,
@@ -486,7 +486,7 @@ fn tensor_ex_single_loop_over_budget_declines() {
         r#"
 @ radix lane "air"
 functio too_wide(tensor<f32, [65]> x) → f32 {
-    itera ex x fixum value { }
+    itera ex x sit value { }
     redde 0.0
 }
 "#,
@@ -501,10 +501,10 @@ fn tensor_ex_budget_is_per_function_total() {
 @ radix lane "air"
 functio two_loops(tensor<f32, [40]> a, tensor<f32, [40]> b) → f32 {
     varia f32 total ← 0.0
-    itera ex a fixum first {
+    itera ex a sit first {
         total ← total + first
     }
-    itera ex b fixum second {
+    itera ex b sit second {
         total ← total + second
     }
     redde total
@@ -581,7 +581,7 @@ fn stepped_range_unrolls_in_the_direction_of_its_bounds() {
 @ radix backward "range_backward"
 functio loop_count() → f32 {{
     varia f32 total ← 0.0
-    itera ab {range} fixum i {{
+    itera ab {range} sit i {{
         total ← total + 1.0
     }}
     redde total
@@ -619,7 +619,7 @@ fn evaluation_order_and_failure_lane_are_preserved() {
 @ radix lane "air"
 functio boom(tensor<f32, [4]> x) → tensor<f32, [4]> ⇥ textus {
     varia tensor<f32, [4]> acc ← copy x
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         si i ≻ 1 {
             iace "boom"
         }
@@ -666,7 +666,7 @@ fn budget_exceeding_n_declines_with_causa() {
 @ radix lane "air"
 functio too_wide(tensor<f32, [4]> x) → f32 {
     varia tensor<f32, [4]> acc ← copy x
-    itera ab 0‥65 fixum i {
+    itera ab 0‥65 sit i {
         acc ← acc + x
     }
     redde acc.media()
@@ -683,7 +683,7 @@ fn impure_effect_body_declines_with_causa() {
         r#"
 @ radix lane "air"
 functio dirty() → numerus {
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         nota i
     }
     redde 0
@@ -700,7 +700,7 @@ fn unsupported_return_declines_with_causa() {
 @ radix lane "air"
 functio early(tensor<f32, [4]> x) → f32 {
     varia tensor<f32, [4]> acc ← copy x
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         redde acc.media()
     }
     redde acc.media()
@@ -717,7 +717,7 @@ fn generic_or_runtime_bound_declines_not_concrete() {
 @ radix lane "air"
 functio runtime_n(numerus n, tensor<f32, [4]> x) → f32 {
     varia tensor<f32, [4]> acc ← copy x
-    itera ab 0‥n fixum i {
+    itera ab 0‥n sit i {
         acc ← acc + x
     }
     redde acc.media()
@@ -733,7 +733,7 @@ fn non_air_lane_range_loop_is_left_in_place() {
         r"
 functio host_loop() → numerus {
     varia numerus total ← 0
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         total ← total + i
     }
     redde total
@@ -757,7 +757,7 @@ const MASKED_LANE_MEAN: &str = r#"
 @ radix backward "masked_mean_backward"
 functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     varia tensor<f32, [4]> acc ← copy x
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         acc ← acc + x
     }
     redde (acc ⊙ mask).media()
@@ -791,7 +791,7 @@ fn two_data_tensors_stay_full_prefix() {
 @ radix backward "pair_backward"
 functio pair_sum(tensor<f32, [4]> a, tensor<f32, [4]> b) → f32 {
     varia tensor<f32, [4]> acc ← copy a
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         acc ← acc + b
     }
     redde acc.media()
@@ -817,7 +817,7 @@ fn in_region_fill_mask_declines_with_causa() {
 functio fill_mask(tensor<f32, [4]> x) → f32 {
     sit tensor<f32, [4]> mask ← x.reple(1.0)
     varia tensor<f32, [4]> acc ← copy x
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         acc ← acc + x
     }
     redde (acc ⊙ mask).media()
@@ -835,7 +835,7 @@ fn in_region_scalar_comparison_declines_with_causa() {
 @ radix backward "cmp_backward"
 functio cmp_mask(tensor<f32, [4]> x, numerus len) → f32 ⇥ textus {
     varia tensor<f32, [4]> acc ← copy x
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         si i ≺ len {
             iace "pad"
         }
@@ -856,7 +856,7 @@ fn nan_unsafe_unclamped_div_declines_with_causa() {
 @ radix backward "div_backward"
 functio unsafe_div(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     varia tensor<f32, [4]> acc ← x.divisa(mask)
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         acc ← acc + x
     }
     redde (acc ⊙ mask).media()
@@ -874,7 +874,7 @@ fn nan_unsafe_div_under_verte_declines_with_causa() {
 @ radix backward "div_verte_backward"
 functio unsafe_div_verte(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     varia tensor<f32, [4]> acc ← x.divisa(mask) ∷ tensor<f32, [4]>
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         acc ← acc + x
     }
     redde (acc ⊙ mask).media()
@@ -892,7 +892,7 @@ fn nan_unsafe_div_under_conversio_declines_with_causa() {
 @ radix backward "div_conversio_backward"
 functio unsafe_div_conversio(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     varia tensor<f32, [4]> acc ← x.divisa(mask) ↦ tensor<f32, [4]> ⊥ x
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         acc ← acc + x
     }
     redde (acc ⊙ mask).media()
@@ -910,7 +910,7 @@ fn unmasked_reduction_exit_declines_with_causa() {
 @ radix backward "leak_backward"
 functio unmasked_exit(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     varia tensor<f32, [4]> acc ← copy x
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         acc ← acc + x
     }
     redde acc.media()
@@ -927,7 +927,7 @@ fn bounded_lista_ex_full_literal_admits_guard_free_lanes() {
 @ radix lane "air"
 functio bounded_sum() → vacuum {
     sit lista<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, 4>
-    itera ex xs fixum value { }
+    itera ex xs sit value { }
 }
 "#,
     );
@@ -961,7 +961,7 @@ functio bounded_chain() → vacuum ⇥ textus {
     sit lista<f32> raw ← [1.0, 2.0, 3.0, 4.0]
     sit lista<f32, 4> full ← raw ↦ lista<f32, 4>
     sit lista<f32, 4> alias ← full
-    itera ex alias fixum value { }
+    itera ex alias sit value { }
 }
 "#,
     );
@@ -987,7 +987,7 @@ fn bounded_lista_ex_non_full_value_declines_not_concrete() {
 functio bounded_partial() → vacuum ⇥ textus {
     sit lista<f32> raw ← [1.0, 2.0, 3.0]
     sit lista<f32, 4> xs ← raw ↦ lista<f32, 4>
-    itera ex xs fixum value { }
+    itera ex xs sit value { }
 }
 "#,
     );
@@ -1001,7 +1001,7 @@ fn bounded_lista_ex_full_literal_n8_admits_guard_free_lanes() {
 @ radix lane "air"
 functio bounded_sum_8() → vacuum {
     sit lista<f32, 8> xs ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0] ↦ lista<f32, 8>
-    itera ex xs fixum value { }
+    itera ex xs sit value { }
 }
 "#,
     );
@@ -1034,7 +1034,7 @@ fn bounded_lista_ex_over_budget_declines_whole_with_causa() {
 @ radix lane "air"
 functio too_wide() → vacuum {{
     sit lista<f32, 65> xs ← [{elements}] ↦ lista<f32, 65>
-    itera ex xs fixum value {{ }}
+    itera ex xs sit value {{ }}
 }}
 "#
     );
@@ -1054,7 +1054,7 @@ fn bounded_lista_ex_unbounded_declines_not_concrete() {
 @ radix lane "air"
 functio unbounded() → vacuum {
     sit lista<f32> xs ← [1.0, 2.0, 3.0]
-    itera ex xs fixum value { }
+    itera ex xs sit value { }
 }
 "#,
     );
@@ -1113,7 +1113,7 @@ fn octeti_ex_full_literal_admits_guard_free_lanes() {
 @ radix lane "air"
 functio octeti_full() → vacuum {
     sit octeti<8> xs ← |de ad be ef ba dc fe ca| ↦ octeti<8>
-    itera ex xs fixum b { }
+    itera ex xs sit b { }
 }
 "#,
     );
@@ -1142,7 +1142,7 @@ fn ascii_ex_full_literal_admits_guard_free_lanes() {
 @ radix lane "air"
 functio ascii_full() → vacuum {
     sit ascii<8> xs ← 'alphabet' ↦ ascii<8>
-    itera ex xs fixum c { }
+    itera ex xs sit c { }
 }
 "#,
     );
@@ -1171,7 +1171,7 @@ fn textus_ex_full_literal_admits_guard_free_lanes() {
 @ radix lane "air"
 functio textus_full() → vacuum {
     sit textus<8> xs ← "abcdefgh" ↦ textus<8>
-    itera ex xs fixum c { }
+    itera ex xs sit c { }
 }
 "#,
     );
@@ -1201,17 +1201,17 @@ fn scalar_bounded_ex_runtime_len_param_declines_not_concrete() {
         r#"
 @ radix lane "air"
 functio runtime(octeti<8> xs) → vacuum {
-    itera ex xs fixum b { }
+    itera ex xs sit b { }
 }"#,
         r#"
 @ radix lane "air"
 functio runtime(ascii<8> xs) → vacuum {
-    itera ex xs fixum c { }
+    itera ex xs sit c { }
 }"#,
         r#"
 @ radix lane "air"
 functio runtime(textus<8> xs) → vacuum {
-    itera ex xs fixum c { }
+    itera ex xs sit c { }
 }"#,
     ] {
         expect_decline_causa(&air_errors(source), "not_concrete");
@@ -1226,7 +1226,7 @@ fn textus_ex_over_budget_declines_whole_with_causa() {
 @ radix lane "air"
 functio too_wide() → vacuum {{
     sit textus<65> xs ← "{literal}" ↦ textus<65>
-    itera ex xs fixum c {{ }}
+    itera ex xs sit c {{ }}
 }}
 "#
     );
@@ -1251,7 +1251,7 @@ functio combine(fractus a, fractus b) → fractus {
 @ radix lane "air"
 functio reduce_tensor(tensor<f32, [4]> x) → f32 {
     varia f32 total ← 0.0
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         total ← total + x.reducta(combine, 0.0)
     }
     redde total
@@ -1291,7 +1291,7 @@ fn apud_causal_body_si_i_le_j_admits_per_lane_conditions() {
 @ radix backward "causal_backward"
 functio causal(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
     varia tensor<f32, [2, 2]> acc ← copy x
-    itera ex x apud [i, j] fixum cell {
+    itera ex x apud [i, j] sit cell {
         si i ≻ j { iace "upper" }
         acc ← acc + x
     }
@@ -1335,7 +1335,7 @@ fn apud_triangular_arithmetic_body_admits_per_lane_conditions() {
 @ radix backward "triangular_backward"
 functio triangular(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
     varia tensor<f32, [2, 2]> acc ← copy x
-    itera ex x apud [i, j] fixum cell {
+    itera ex x apud [i, j] sit cell {
         sit numerus idx ← i * 2 + j
         si idx ≻ 2 { iace "upper" }
         acc ← acc + x
@@ -1374,7 +1374,7 @@ fn apud_ragged_nested_lista_declines_fail_closed() {
         r#"
 @ radix lane "air"
 functio ragged(lista<lista<f32>> pairs) → f32 {
-    itera ex pairs apud [i, j] fixum cell { }
+    itera ex pairs apud [i, j] sit cell { }
     redde 0.0
 }
 "#,
@@ -1405,10 +1405,10 @@ fn apud_mixed_admit_and_decline_reports_only_the_declined_loop() {
 @ radix backward "mixed_backward"
 functio mixed(tensor<f32, [40]> x) → f32 {
     varia tensor<f32, [40]> acc ← copy x
-    itera ex x apud [i] fixum cell {
+    itera ex x apud [i] sit cell {
         acc ← acc + x
     }
-    itera ex x apud [i] fixum cell {
+    itera ex x apud [i] sit cell {
         acc ← acc + x
     }
     redde acc.media()
@@ -1494,8 +1494,8 @@ fn apud_itera_ab_nest_admits_product_lanes_in_source_order() {
 @ radix backward "nest_backward"
 functio nested_sum(tensor<f32, [2, 3]> x) → f32 ⇥ textus {
     varia f32 total ← 0.0
-    itera ex x apud [i, j] fixum cell {
-        itera ab 0‥2 fixum k {
+    itera ex x apud [i, j] sit cell {
+        itera ab 0‥2 sit k {
             si k ≻ 0 { iace "inner" }
             total ← total + 1.0
         }
@@ -1554,8 +1554,8 @@ fn itera_ab_apud_nest_admits_product_lanes() {
 @ radix lane "air"
 functio nested_ab_outer(tensor<f32, [2, 3]> x) → f32 {
     varia f32 total ← 0.0
-    itera ab 0‥2 fixum k {
-        itera ex x apud [i, j] fixum cell {
+    itera ab 0‥2 sit k {
+        itera ex x apud [i, j] sit cell {
             total ← total + 1.0
         }
     }
@@ -1603,8 +1603,8 @@ fn apud_apud_nest_admits_product_lanes() {
 @ radix lane "air"
 functio nested_apud(tensor<f32, [2, 3]> x, tensor<f32, [4]> y) → f32 ⇥ textus {
     varia f32 total ← 0.0
-    itera ex x apud [i, j] fixum cell {
-        itera ex y apud [k] fixum other {
+    itera ex x apud [i, j] sit cell {
+        itera ex y apud [k] sit other {
             si k ≻ 0 { iace "inner" }
             total ← total + 1.0
         }
@@ -1653,8 +1653,8 @@ fn nested_product_over_budget_declines_whole_with_causa() {
 @ radix lane "air"
 functio too_deep(tensor<f32, [8]> x) → f32 {
     varia f32 total ← 0.0
-    itera ex x apud [i] fixum cell {
-        itera ab 0‥8 fixum k {
+    itera ex x apud [i] sit cell {
+        itera ab 0‥8 sit k {
             total ← total + 1.0
         }
     }
@@ -1679,8 +1679,8 @@ fn nested_not_concrete_inner_declines_whole_with_causa() {
 @ radix lane "air"
 functio runtime_inner(tensor<f32, [2, 3]> x, numerus n) → f32 {
     varia f32 total ← 0.0
-    itera ex x apud [i, j] fixum cell {
-        itera ab 0‥n fixum k {
+    itera ex x apud [i, j] sit cell {
+        itera ab 0‥n sit k {
             total ← total + 1.0
         }
     }
@@ -1705,9 +1705,9 @@ fn si_conditioned_nested_itera_declines_fail_closed() {
 @ radix lane "air"
 functio conditioned(tensor<f32, [2, 3]> x) → f32 {
     varia f32 total ← 0.0
-    itera ex x apud [i, j] fixum cell {
+    itera ex x apud [i, j] sit cell {
         si i ≻ j {
-            itera ab 0‥2 fixum k {
+            itera ab 0‥2 sit k {
                 total ← total + 1.0
             }
         }
@@ -1730,10 +1730,10 @@ fn sequential_apud_and_ab_share_the_function_budget() {
 @ radix lane "air"
 functio two_units(tensor<f32, [2, 3]> x) → f32 {
     varia f32 total ← 0.0
-    itera ex x apud [i, j] fixum cell {
+    itera ex x apud [i, j] sit cell {
         total ← total + 1.0
     }
-    itera ab 0‥4 fixum k {
+    itera ab 0‥4 sit k {
         total ← total + 1.0
     }
     redde total
@@ -1759,10 +1759,10 @@ fn sequential_units_over_budget_declines_the_exceeding_loop() {
 @ radix lane "air"
 functio too_many(tensor<f32, [8]> x) → f32 {
     varia f32 total ← 0.0
-    itera ex x apud [i] fixum cell {
+    itera ex x apud [i] sit cell {
         total ← total + 1.0
     }
-    itera ab 0‥60 fixum k {
+    itera ab 0‥60 sit k {
         total ← total + 1.0
     }
     redde total
@@ -1804,8 +1804,8 @@ fn nested_non_air_loop_stays_in_place() {
     let result = analyze(
         r"
 functio host_nested(tensor<f32, [2, 3]> x) → vacuum {
-    itera ex x apud [i, j] fixum cell {
-        itera ab 0‥2 fixum k { }
+    itera ex x apud [i, j] sit cell {
+        itera ab 0‥2 sit k { }
     }
 }
 ",
@@ -1834,8 +1834,8 @@ fn apud_route_a_bounded_lista_nest_admits_product_lanes() {
 functio nested_lista(tensor<f32, [4]> x) → f32 {
     varia f32 total ← 0.0
     sit lista<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, 4>
-    itera ex x apud [i] fixum cell {
-        itera ex xs fixum value {
+    itera ex x apud [i] sit cell {
+        itera ex xs sit value {
             total ← total + 1.0
         }
     }
@@ -1874,7 +1874,7 @@ fn nary_range_product_never_admits_an_unroll_recipe() {
 @ radix lane "air"
 functio grid(numerus m, numerus n) → numerus {
     varia numerus total ← 0
-    itera ab 0‥m, 0‥n fixum i, j {
+    itera ab 0‥m, 0‥n sit i, j {
         total ← i
     }
     redde total
@@ -1891,7 +1891,7 @@ fn nary_range_product_off_air_lane_is_left_in_place() {
     let result = analyze(
         r"
 functio grid(numerus m, numerus n) → vacuum {
-    itera ab 0‥m, 0‥n fixum i, j { }
+    itera ab 0‥m, 0‥n sit i, j { }
 }
 ",
     );
@@ -1934,7 +1934,7 @@ fn tail_position_unroll_leaves_pre_loop_accumulator_reads_alone() {
 functio tail_loop() → vacuum {
     varia f32 total ← 0.0
     sit f32 before ← total
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         total ← total + 1.0
     }
 }

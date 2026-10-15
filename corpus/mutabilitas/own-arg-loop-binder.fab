@@ -4,7 +4,7 @@ kind = "reject"
 grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "functio_decl", "param_list", "parameter", "argument_list", "argument", "call_marker", "itera_stmt"]
 category = "type"
 summary = "An itera binder aliases a live element and cannot be given away as own: own_argument_loop_binder."
-syntax = "for from rows const row { eat(own row) }"
+syntax = "for from rows let row { eat(own row) }"
 related = ["own", "copy"]
 locale = "en"
 no_expected = "rejects"
@@ -21,7 +21,7 @@ fn eat(own list<int> xs) → void {
 
 main {
     let list<list<int>> rows ← [[1], [2]]
-    for from rows const row {
+    for from rows let row {
         eat(own row)
     }
 }

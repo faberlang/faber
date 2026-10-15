@@ -55,7 +55,7 @@ main {
 
     # 2. A thousand digits survive parse, extraction and stringify.
     mut string digits ← "9"
-    for range 1‥1000 const i {
+    for range 1‥1000 let i {
         digits ← digits + "7"
     }
     let string payload ← «{"n":§}»(digits)

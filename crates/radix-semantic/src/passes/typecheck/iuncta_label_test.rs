@@ -174,7 +174,7 @@ fn iuncta_label_destructuring_lowers_fields_by_position() {
     let locals = function_locals(
         r"
 functio split(iuncta<gx: f32, gw: numerus> pair) → f32 {
-    fixum {gw, gx} ← pair
+    sit {gw, gx} ← pair
     redde gx
 }
 ",
@@ -196,7 +196,7 @@ fn iuncta_label_destructuring_allows_partial_binding() {
     let _locals = function_locals(
         r"
 functio first(iuncta<gx: f32, gw: numerus> pair) → f32 {
-    fixum {gx} ← pair
+    sit {gx} ← pair
     redde gx
 }
 ",
@@ -208,7 +208,7 @@ fn iuncta_label_destructuring_rest_is_the_unbound_subtuple() {
     let locals = function_locals(
         r"
 functio second(iuncta<gx: f32, gw: numerus> pair) → numerus {
-    fixum {gx, ceteri tail} ← pair
+    sit {gx, ceteri tail} ← pair
     redde tail[0]
 }
 ",
@@ -233,7 +233,7 @@ fn iuncta_label_destructuring_unknown_label_is_rejected() {
     test_support::assert_rejects_with_issue(
         r"
 functio bad(iuncta<gx: f32, gw: numerus> pair) → f32 {
-    fixum {other} ← pair
+    sit {other} ← pair
     redde other
 }
 ",
@@ -246,7 +246,7 @@ fn iuncta_label_destructuring_unlabeled_tuple_is_rejected() {
     test_support::assert_rejects_with_issue(
         r"
 functio bad(iuncta<f32, numerus> pair) → f32 {
-    fixum {gx} ← pair
+    sit {gx} ← pair
     redde gx
 }
 ",
@@ -259,7 +259,7 @@ fn iuncta_label_destructuring_mixed_pattern_stays_rejected() {
     let result = test_support::analyze_source(
         r"
 functio bad(iuncta<gx: f32, gw: numerus> pair) → f32 {
-    fixum [gx, {gw}] ← pair
+    sit [gx, {gw}] ← pair
     redde gx
 }
 ",

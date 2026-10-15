@@ -36,7 +36,7 @@ no_expected = "declaration-only"
 @ radix lane "air"
 fn tensor_sum(tf32[4] x) → f32 {
     mut f32 total ← 0.0
-    for from x const value {
+    for from x let value {
         total ← total + value
     }
     return total

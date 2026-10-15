@@ -160,7 +160,7 @@ functio copy_coordinate<magnitudo N>(
     tensor<f32, [N]> input,
     varia tensor<u32, [N]> output
 ) → vacuum {
-    itera ex input apud [i] fixum value {
+    itera ex input apud [i] sit value {
         output[i] ← i
     }
 }
@@ -273,7 +273,7 @@ fn map_edges<size N>(
     mut tensor<f32, [N]> output
 ) → void {
     let tensor<f32, [N]> mapped ← input.shift([1]).limes<ZeroGhost>()
-    for from mapped at [i] const value {
+    for from mapped at [i] let value {
         output[i] ← value
     }
 }
@@ -345,7 +345,7 @@ fn kernel_with_static_extents_records_no_entry_shape_relation() {
 @ nucleum
 @ publica
 functio scale(tensor<f32, [5]> input, varia tensor<f32, [5]> output) → vacuum {
-    itera ex input apud [i] fixum value {
+    itera ex input apud [i] sit value {
         output[i] ← value * 2.0
     }
 }
@@ -425,7 +425,7 @@ fn lane_loop_copy_is_admitted_under_the_extent_product_condition() {
 @ kernel
 @ public
 fn copy(tensor<f32, [_, _]> src, mut tensor<f32, [_, _]> dst) → void {
-    for from src at [i, j] thread lane const v {
+    for from src at [i, j] thread lane let v {
         dst[[i, j]] ← v
     }
 }
@@ -483,7 +483,7 @@ fn rank_one_argmax_over_a_literal_extent_stores_into_i32() {
 @ kernel
 @ public
 fn peak(tensor<f32, [32]> src, mut tensor<i32, [1]> out) → void {
-    out[0] ← reduce via argmax from src at [i] thread lane const v { return v } coalesce 0
+    out[0] ← reduce via argmax from src at [i] thread lane let v { return v } coalesce 0
 }
 main {}
 ",
@@ -500,7 +500,7 @@ fn rank_one_argmin_over_a_symbolic_extent_is_admitted_under_an_extent_condition(
 @ kernel
 @ public
 fn trough(tensor<f32, [_]> src, mut tensor<i32, [1]> out) → void {
-    out[0] ← reduce via argmin from src at [i] thread lane const v { return v } coalesce 0
+    out[0] ← reduce via argmin from src at [i] thread lane let v { return v } coalesce 0
 }
 main {}
 ",
@@ -524,7 +524,7 @@ fn count_over_a_literal_extent_stores_into_i32() {
 @ kernel
 @ public
 fn tally(tensor<f32, [4, 32]> src, mut tensor<i32, [1]> out) → void {
-    out[0] ← reduce via count from src at [i, j] thread lane const v { return v ≻ 1.0 }
+    out[0] ← reduce via count from src at [i, j] thread lane let v { return v ≻ 1.0 }
 }
 main {}
 ",
@@ -540,7 +540,7 @@ fn an_integer_max_reduction_into_i32_is_still_out_of_range() {
 @ kernel
 @ public
 fn widest(tensor<int, [32]> src, mut tensor<i32, [1]> out) → void {
-    out[0] ← reduce via max from src at [i] thread lane const v { return v } coalesce 0
+    out[0] ← reduce via max from src at [i] thread lane let v { return v } coalesce 0
 }
 main {}
 ",

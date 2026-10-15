@@ -40,7 +40,7 @@ functio potentiae() fiunt → numerus {
 }
 
 incipit {
-    itera ex potentiae() fixum n {
+    itera ex potentiae() sit n {
         nota "consumo §"(n)
         si n ≥ 4 {
             rumpe

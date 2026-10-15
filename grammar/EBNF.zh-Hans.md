@@ -45,9 +45,9 @@ sit_decl ::= '设' type_annotation? IDENTIFIER (('←' value_marker? expression)
 # [017] ref_decl
 ref_decl ::= '借自' base_type IDENTIFIER '←' expression
 # [018] array_destruct
-array_destruct ::= ('常量' | '变量') array_pattern '←' expression
+array_destruct ::= ('设' | '变量') array_pattern '←' expression
 # [019] object_destruct
-object_destruct ::= ('常量' | '变量') object_pattern '←' expression
+object_destruct ::= ('设' | '变量') object_pattern '←' expression
 # [020] functio_decl
 functio_decl ::= '函数' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 # [021] param_list
@@ -265,7 +265,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 # [127] dum_stmt
 dum_stmt ::= '当' expression (block_stmt | ergo_joint statement) cape_clause?
 # [128] itera_stmt
-itera_stmt ::= '遍历' ('取自' expression (',' expression)* | '借自' expression | '范围' expression (',' expression)*) apud_clause? filum_clause? ('常量' | '变量') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= '遍历' ('取自' expression (',' expression)* | '借自' expression | '范围' expression (',' expression)*) apud_clause? filum_clause? ('设' | '变量') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 # [129] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [130] apud_clause
@@ -295,7 +295,7 @@ negated_number ::= '-' NUMBER
 # [142] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
 # [143] ut_pattern
-ut_pattern ::= ('作为' IDENTIFIER) | (('常量' | '变量') pattern_binding (',' pattern_binding)*)
+ut_pattern ::= ('作为' IDENTIFIER) | (('设' | '变量') pattern_binding (',' pattern_binding)*)
 # [144] pattern_binding
 pattern_binding ::= IDENTIFIER ('作为' IDENTIFIER)?
 # [145] custodi_stmt
@@ -303,7 +303,7 @@ custodi_stmt ::= '守护' '{' si_guard_clause+ '}'
 # [146] si_guard_clause
 si_guard_clause ::= '如果' expression (block_stmt | ergo_joint statement)
 # [147] ex_stmt
-ex_stmt ::= '取自' expression ('常量' | '变量') extract_fields
+ex_stmt ::= '取自' expression ('设' | '变量') extract_fields
 # [148] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
 # [149] extract_field
@@ -487,7 +487,7 @@ reducta_op ::= '求和' | '求积' | '最大' | '最小' | '最大值索引' | '
 # [238] reducta_group
 reducta_group ::= '按' expression
 # [239] reducta_body
-reducta_body ::= ('常量' | '变量') IDENTIFIER block_stmt
+reducta_body ::= ('设' | '变量') IDENTIFIER block_stmt
 # [240] reducta_identity
 reducta_identity ::= '兜底' expression
 # [241] sort_expr
@@ -495,7 +495,7 @@ sort_expr ::= '排序' '经由' sort_direction ('取自' | '借自') expression 
 # [242] sort_direction
 sort_direction ::= '升序' | '降序'
 # [243] sort_body
-sort_body ::= ('常量' | '变量') IDENTIFIER block_stmt
+sort_body ::= ('设' | '变量') IDENTIFIER block_stmt
 # [244] filum_clause
 filum_clause ::= '线程' IDENTIFIER
 # [245] capta_expr
@@ -1325,7 +1325,7 @@ construction literal (`Genus { field = value }`).
   count). Satisfaction stays nominal (D1.3): a witness must declare the bound
   itself.
 
-- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } 取自 source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `取自` must start on the closing `}`'s line — a line-leading `取自` is instead the extraction statement (`取自 p 常量 x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `取自`); the source must be the same genus type as the constructor. `展开` was removed from construction literals (D15.4); it stays for lists and calls.
+- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } 取自 source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `取自` must start on the closing `}`'s line — a line-leading `取自` is instead the extraction statement (`取自 p 设 x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `取自`); the source must be the same genus type as the constructor. `展开` was removed from construction literals (D15.4); it stays for lists and calls.
 
 ### Annotations
 
@@ -2149,9 +2149,9 @@ prefer sugar. Choose per module or file.
 
 
 - `当` = while
-- `遍历 取自...常量`/`遍历 取自...变量` = for-of (values)
-- `遍历 借自...常量`/`遍历 借自...变量` = for-in (keys)
-- `遍历 范围 range 常量/变量 i` = range iteration (e.g. `遍历 范围 0‥10 步 2 常量 i { 显示 i }`; `步` belongs to the range expression)
+- `遍历 取自...设`/`遍历 取自...变量` = for-of (values)
+- `遍历 借自...设`/`遍历 借自...变量` = for-in (keys)
+- `遍历 范围 range 设/变量 i` = range iteration (e.g. `遍历 范围 0‥10 步 2 设 i { 显示 i }`; `步` belongs to the range expression)
 
 **Range step and direction (`range_tail`, `步`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down
@@ -2196,7 +2196,7 @@ prints the same list shape up to element order.
 
 There is no iteration interface. `遍历 取自` works on the built-in iterable
 types and on cursors. A user type that should be iterable exposes an ordinary
-method that returns a cursor (`遍历 取自 arbor.nodi() 常量 n`); nothing is
+method that returns a cursor (`遍历 取自 arbor.nodi() 设 n`); nothing is
 called implicitly.
 
 **Changing the collection inside its own loop.** The rule is about the shape of
@@ -2266,7 +2266,7 @@ A negative number pattern is written with a leading minus (`情况 -1`,
 `-` before anything else is not pattern syntax.
 
 `匹配` matches a closed set and nothing else: the variants of an `枚举` or
-`判别`, or the members of a union (`情况 numerus 常量 n` over
+`判别`, or the members of a union (`情况 numerus 设 n` over
 `numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
 pattern that is not a member of the scrutinee's closed set is rejected
 (`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
@@ -2455,7 +2455,7 @@ The `∷` glyph (U+2237, "proportion") explicitly ascribes a target type to an e
 Prefer typed construction for ordinary `类` values and `vacua` for ordinary empty collection values:
 
 ```fab
-fixum _ point ← Point { x = 10 }
+sit point ← Point { x = 10 }
 fixum lista<numerus> xs ← vacua
 ```
 
@@ -2612,13 +2612,13 @@ Implementation status (2026-10-11):
 Inline block example:
 
 ```fab
-fixum _ tag ← «inline»
+sit tag ← «inline»
 ```
 
 Multiline block example (newline after opening `«`):
 
 ```fab
-fixum _ blob ← «
+sit blob ← «
     select id, email
     from accounts
 »
@@ -2627,14 +2627,14 @@ fixum _ blob ← «
 Captured template example:
 
 ```fab
-fixum _ q ← `select * from accounts where id = §`(accountId)
+sit q ← `select * from accounts where id = §`(accountId)
 ```
 
 Octeti hex literal example:
 
 ```fab
-fixum _ sig ← |de ad be ef|
-fixum _ hello ← |48 65 6c 6c 6f|
+sit sig ← |de ad be ef|
+sit hello ← |48 65 6c 6c 6f|
 ```
 
 ### Format-Template Application
@@ -3033,7 +3033,7 @@ forms `ordina()` / `排序()` sort by the element's natural order. Both are a
 **stable** sort. The key selector's result must be a number or `textus`; other
 key types are rejected.
 
-`取自` is used for iteration (`遍历 取自 items 常量 x`) and imports (`导入 取自 "path"`).
+`取自` is used for iteration (`遍历 取自 items 设 x`) and imports (`导入 取自 "path"`).
 
 ### Iteration coordinates (`在`)
 
@@ -3042,9 +3042,9 @@ en reader spelling is "at": `遍历 取自 grid 在 [r, c]` reads as iterating
 `grid` at coordinates `[r, c]`.
 
 - **`lista`** (D3.1): one name binds the element's position
-  (`遍历 取自 items 在 [i] 常量 v`).
+  (`遍历 取自 items 在 [i] 设 v`).
 - **`tabula`** (D3.1-D3.3): one name binds the entry's key
-  (`遍历 取自 m 在 [k] 常量 v`); a composite-key
+  (`遍历 取自 m 在 [k] 设 v`); a composite-key
   `tabula<元组<K1, …, Kn>, V>` takes N names, one per part of the `元组`
   key, in declared part order.
 - **Tensor / matrix**: as before — one name per axis, first name = outermost
@@ -3059,8 +3059,8 @@ en reader spelling is "at": `遍历 取自 grid 在 [r, c]` reads as iterating
   distinct from the element binder that follows the clause.
 - **`线程` lane binder (FLD K2).** An optional `线程 IDENTIFIER` clause
   (`filum_clause`, shared with `归约`) follows the `在` clause and
-  precedes the mutability marker: `遍历 取自 t 在 [i, j] 线程 f 常量 v { … }`.
-  The clause also parses without `在` (`遍历 取自 t 线程 f 常量 v { … }`).
+  precedes the mutability marker: `遍历 取自 t 在 [i, j] 线程 f 设 v { … }`.
+  The clause also parses without `在` (`遍历 取自 t 线程 f 设 v { … }`).
   The parser claims `线程` only in that slot, so a binder named `线程` after
   the mutability marker stays an ordinary name. The binder is declared
   metadata; semantic passes own what it binds.

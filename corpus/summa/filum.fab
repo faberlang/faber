@@ -5,7 +5,7 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "reducta_expr", "filum_clause", "apud_clause", "fixum_decl", "redde_stmt"]
 category = "collection"
 summary = "Distributed reducta via summa ex … filum kernel inside @ nucleum."
-syntax = "reducta via summa ex <tf32[32]> apud [i] filum f fixum s { redde <term> }"
+syntax = "reducta via summa ex <tf32[32]> apud [i] filum f sit s { redde <term> }"
 related = ["summa", "filum", "tensor"]
 locale = "la"
 no_expected = "needs-device"
@@ -37,7 +37,7 @@ no_expected = "needs-device"
 @ nucleum
 @ publica { }
 functio column_dot(tensor<f32, [32]> a, varia tensor<f32, [1]> out) → vacuum {
-    sit f32 total ← reducta via summa ex a apud [i] filum f fixum s {
+    sit f32 total ← reducta via summa ex a apud [i] filum f sit s {
         varia f32 t ← s * 1.4140625
         redde t
     }

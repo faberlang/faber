@@ -10,7 +10,7 @@ locale = "en"
 +++
 main args argv {
     print argv.length()
-    for from argv const arg {
+    for from argv let arg {
         print arg
     }
 }

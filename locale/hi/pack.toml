@@ -372,10 +372,6 @@ help = "केवल एक '{keyword}' rest binding रखें"
 message = "'{keyword}' सीधे एक identifier bind करता है; '{keyword}' name ← expr का उपयोग करें"
 help = "'{keyword}' name ← expr लिखें या typed/destructured bindings के लिए fixum का उपयोग करें"
 
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit destructuring patterns का समर्थन नहीं करता"
-help = "destructuring pattern के साथ fixum का उपयोग करें"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "test case या setup अपेक्षित है"
 help = "body item को '{proba}', '{probandum}', या '{setup}' से शुरू करें"
@@ -515,6 +511,14 @@ help = "`{keyword} T {name} ← {marker} value` लिखें; बाद क�
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "रन-टाइम `{keyword}` घोषणा हटा दी गई है; `{name}` एक रन-टाइम नाम है"
 help = "`{sit} T {name} ← …` लिखें (प्रकार अनुमान के लिए `{sit} {name} ← …`); `{fixum}` कंपाइल-टाइम तथ्य बताता है और `=` के साथ आता है"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "`{keyword}` बाइंडर शब्द हटा दिया गया है"
+help = "बाइंडर `{sit}` (स्थिर नाम) या `{varia}` (लिखने योग्य नाम) लेते हैं; `{fixum}` कंपाइल-टाइम तथ्य बताता है और `=` के साथ आता है"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` बाइंडर शुरू नहीं कर सकता"
+help = "बाइंडर हर पुनरावृत्ति या मिलान के मान को नाम देता है; स्थिर नाम के लिए `{sit}` और लिखने योग्य नाम के लिए `{varia}` लिखें"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "`{keyword}` लोकल को पढ़ने के लिए एक स्थान चाहिए: `{keyword} T name ← place`"

@@ -48,7 +48,7 @@ functio custos_dum(bivalens pergo) → vacuum {
 # 2. whole-loop cape on itera — loop-spectrum keep-out
 @ radix lane "air"
 functio custos_itera() → vacuum {
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         iace "x"
     } cape err { }
 }

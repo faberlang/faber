@@ -28,7 +28,7 @@ class Tab {
     static int LIMIT = 3
     static int SQUARES = comptime {
         mut int total ← 0
-        for range 1‥4 const i {
+        for range 1‥4 let i {
             total ← total + i * i
         }
         return total

@@ -45,9 +45,9 @@ sit_decl ::= 'đặt' type_annotation? IDENTIFIER (('←' value_marker? expressi
 # [017] ref_decl
 ref_decl ::= 'ra' base_type IDENTIFIER '←' expression
 # [018] array_destruct
-array_destruct ::= ('hằng' | 'biến') array_pattern '←' expression
+array_destruct ::= ('đặt' | 'biến') array_pattern '←' expression
 # [019] object_destruct
-object_destruct ::= ('hằng' | 'biến') object_pattern '←' expression
+object_destruct ::= ('đặt' | 'biến') object_pattern '←' expression
 # [020] functio_decl
 functio_decl ::= 'hàm' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 # [021] param_list
@@ -265,7 +265,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 # [127] dum_stmt
 dum_stmt ::= 'trong_khi' expression (block_stmt | ergo_joint statement) cape_clause?
 # [128] itera_stmt
-itera_stmt ::= 'lặp' ('từ' expression (',' expression)* | 'ra' expression | 'khoảng' expression (',' expression)*) apud_clause? filum_clause? ('hằng' | 'biến') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= 'lặp' ('từ' expression (',' expression)* | 'ra' expression | 'khoảng' expression (',' expression)*) apud_clause? filum_clause? ('đặt' | 'biến') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 # [129] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [130] apud_clause
@@ -295,7 +295,7 @@ negated_number ::= '-' NUMBER
 # [142] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
 # [143] ut_pattern
-ut_pattern ::= ('như' IDENTIFIER) | (('hằng' | 'biến') pattern_binding (',' pattern_binding)*)
+ut_pattern ::= ('như' IDENTIFIER) | (('đặt' | 'biến') pattern_binding (',' pattern_binding)*)
 # [144] pattern_binding
 pattern_binding ::= IDENTIFIER ('như' IDENTIFIER)?
 # [145] custodi_stmt
@@ -303,7 +303,7 @@ custodi_stmt ::= 'canh_gác' '{' si_guard_clause+ '}'
 # [146] si_guard_clause
 si_guard_clause ::= 'nếu' expression (block_stmt | ergo_joint statement)
 # [147] ex_stmt
-ex_stmt ::= 'từ' expression ('hằng' | 'biến') extract_fields
+ex_stmt ::= 'từ' expression ('đặt' | 'biến') extract_fields
 # [148] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
 # [149] extract_field
@@ -487,7 +487,7 @@ reducta_op ::= 'tổng' | 'tích' | 'lớn_nhất' | 'nhỏ_nhất' | 'argmax' |
 # [238] reducta_group
 reducta_group ::= 'theo' expression
 # [239] reducta_body
-reducta_body ::= ('hằng' | 'biến') IDENTIFIER block_stmt
+reducta_body ::= ('đặt' | 'biến') IDENTIFIER block_stmt
 # [240] reducta_identity
 reducta_identity ::= 'hoặc_nếu_rỗng' expression
 # [241] sort_expr
@@ -495,7 +495,7 @@ sort_expr ::= 'sắp_xếp' 'thông_qua' sort_direction ('từ' | 'ra') expressi
 # [242] sort_direction
 sort_direction ::= 'tăng_dần' | 'giảm_dần'
 # [243] sort_body
-sort_body ::= ('hằng' | 'biến') IDENTIFIER block_stmt
+sort_body ::= ('đặt' | 'biến') IDENTIFIER block_stmt
 # [244] filum_clause
 filum_clause ::= 'sợi' IDENTIFIER
 # [245] capta_expr
@@ -1325,7 +1325,7 @@ construction literal (`Genus { field = value }`).
   count). Satisfaction stays nominal (D1.3): a witness must declare the bound
   itself.
 
-- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } từ source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `từ` must start on the closing `}`'s line — a line-leading `từ` is instead the extraction statement (`từ p hằng x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `từ`); the source must be the same genus type as the constructor. `rải` was removed from construction literals (D15.4); it stays for lists and calls.
+- **Copy with changes (D15.1-D15.3, D6).** `Genus { field = value, … } từ source` builds a new value: the braced fields override, and every other field copies shallowly from `source` (a collection field is shared with the source, not deep-cloned; private fields copy across too). `từ` must start on the closing `}`'s line — a line-leading `từ` is instead the extraction statement (`từ p đặt x, y`). Exactly one source is legal (`construction_source_repeated` on a second same-line `từ`); the source must be the same genus type as the constructor. `rải` was removed from construction literals (D15.4); it stays for lists and calls.
 
 ### Annotations
 
@@ -2149,9 +2149,9 @@ prefer sugar. Choose per module or file.
 
 
 - `trong_khi` = while
-- `lặp từ...hằng`/`lặp từ...biến` = for-of (values)
-- `lặp ra...hằng`/`lặp ra...biến` = for-in (keys)
-- `lặp khoảng range hằng/biến i` = range iteration (e.g. `lặp khoảng 0‥10 qua 2 hằng i { ghi_chú i }`; `qua` belongs to the range expression)
+- `lặp từ...đặt`/`lặp từ...biến` = for-of (values)
+- `lặp ra...đặt`/`lặp ra...biến` = for-in (keys)
+- `lặp khoảng range đặt/biến i` = range iteration (e.g. `lặp khoảng 0‥10 qua 2 đặt i { ghi_chú i }`; `qua` belongs to the range expression)
 
 **Range step and direction (`range_tail`, `qua`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down
@@ -2196,7 +2196,7 @@ prints the same list shape up to element order.
 
 There is no iteration interface. `lặp từ` works on the built-in iterable
 types and on cursors. A user type that should be iterable exposes an ordinary
-method that returns a cursor (`lặp từ arbor.nodi() hằng n`); nothing is
+method that returns a cursor (`lặp từ arbor.nodi() đặt n`); nothing is
 called implicitly.
 
 **Changing the collection inside its own loop.** The rule is about the shape of
@@ -2266,7 +2266,7 @@ A negative number pattern is written with a leading minus (`trường_hợp -1`,
 `-` before anything else is not pattern syntax.
 
 `phân_tích` matches a closed set and nothing else: the variants of an `liệt_kê` or
-`hợp_nhất`, or the members of a union (`trường_hợp numerus hằng n` over
+`hợp_nhất`, or the members of a union (`trường_hợp numerus đặt n` over
 `numerus ∪ textus`). It is not a generic "match this thing" keyword. A type
 pattern that is not a member of the scrutinee's closed set is rejected
 (`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
@@ -2455,7 +2455,7 @@ The `∷` glyph (U+2237, "proportion") explicitly ascribes a target type to an e
 Prefer typed construction for ordinary `kiểu` values and `vacua` for ordinary empty collection values:
 
 ```fab
-fixum _ point ← Point { x = 10 }
+sit point ← Point { x = 10 }
 fixum lista<numerus> xs ← vacua
 ```
 
@@ -2612,13 +2612,13 @@ Implementation status (2026-10-11):
 Inline block example:
 
 ```fab
-fixum _ tag ← «inline»
+sit tag ← «inline»
 ```
 
 Multiline block example (newline after opening `«`):
 
 ```fab
-fixum _ blob ← «
+sit blob ← «
     select id, email
     from accounts
 »
@@ -2627,14 +2627,14 @@ fixum _ blob ← «
 Captured template example:
 
 ```fab
-fixum _ q ← `select * from accounts where id = §`(accountId)
+sit q ← `select * from accounts where id = §`(accountId)
 ```
 
 Octeti hex literal example:
 
 ```fab
-fixum _ sig ← |de ad be ef|
-fixum _ hello ← |48 65 6c 6c 6f|
+sit sig ← |de ad be ef|
+sit hello ← |48 65 6c 6c 6f|
 ```
 
 ### Format-Template Application
@@ -3033,7 +3033,7 @@ forms `ordina()` / `sắp_xếp()` sort by the element's natural order. Both are
 **stable** sort. The key selector's result must be a number or `textus`; other
 key types are rejected.
 
-`từ` is used for iteration (`lặp từ items hằng x`) and imports (`nhập từ "path"`).
+`từ` is used for iteration (`lặp từ items đặt x`) and imports (`nhập từ "path"`).
 
 ### Iteration coordinates (`tại`)
 
@@ -3042,9 +3042,9 @@ en reader spelling is "at": `lặp từ grid tại [r, c]` reads as iterating
 `grid` at coordinates `[r, c]`.
 
 - **`lista`** (D3.1): one name binds the element's position
-  (`lặp từ items tại [i] hằng v`).
+  (`lặp từ items tại [i] đặt v`).
 - **`tabula`** (D3.1-D3.3): one name binds the entry's key
-  (`lặp từ m tại [k] hằng v`); a composite-key
+  (`lặp từ m tại [k] đặt v`); a composite-key
   `tabula<bộ<K1, …, Kn>, V>` takes N names, one per part of the `bộ`
   key, in declared part order.
 - **Tensor / matrix**: as before — one name per axis, first name = outermost
@@ -3059,8 +3059,8 @@ en reader spelling is "at": `lặp từ grid tại [r, c]` reads as iterating
   distinct from the element binder that follows the clause.
 - **`sợi` lane binder (FLD K2).** An optional `sợi IDENTIFIER` clause
   (`filum_clause`, shared with `rút_gọn`) follows the `tại` clause and
-  precedes the mutability marker: `lặp từ t tại [i, j] sợi f hằng v { … }`.
-  The clause also parses without `tại` (`lặp từ t sợi f hằng v { … }`).
+  precedes the mutability marker: `lặp từ t tại [i, j] sợi f đặt v { … }`.
+  The clause also parses without `tại` (`lặp từ t sợi f đặt v { … }`).
   The parser claims `sợi` only in that slot, so a binder named `sợi` after
   the mutability marker stays an ordinary name. The binder is declared
   metadata; semantic passes own what it binds.

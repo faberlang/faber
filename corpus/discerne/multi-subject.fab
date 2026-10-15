@@ -26,10 +26,10 @@ union Shape {
 
 fn describe(Shape a, Shape b) → string {
     match a and b {
-        case Circle const r and Square const s {
+        case Circle let r and Square let s {
             return "circle-square §,§"(r, s)
         }
-        case Circle const r and _ {
+        case Circle let r and _ {
             return "circle-first §"(r)
         }
         case _ and Dot {

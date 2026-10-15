@@ -63,10 +63,10 @@ fn finished_conversations_release_while_their_handles_stay_in_a_map() {
     let source = program(
         r"incipit {
     varia tabula<numerus, sermo> canales ← vacua
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         canales[i] ← ad 'numeri:bis' (i)
     }
-    itera ab 0‥4 fixum i {
+    itera ab 0‥4 sit i {
         nota canales[i] ↦ numerus
     }
 }
@@ -87,10 +87,10 @@ fn live_cursor_conversations_hold_slots_until_closed() {
     let source = program(
         r"incipit {
     varia tabula<numerus, sermo> canales ← vacua
-    itera ab 0‥3 fixum i {
+    itera ab 0‥3 sit i {
         canales[i] ← ad 'numeri:cuncti'
     }
-    itera ab 0‥3 fixum i {
+    itera ab 0‥3 sit i {
         nota canales[i].close() ⊥ falsum
     }
     nota canales[0].close() ⊥ falsum

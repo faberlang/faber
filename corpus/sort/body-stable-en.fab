@@ -16,7 +16,7 @@ class Person {
 
 fn names(list<Person> ps) → string {
     mut string out ← ""
-    for from ps const p {
+    for from ps let p {
         if out ≡ "" {
             out ← p.name
         } else {
@@ -34,8 +34,8 @@ main {
         Person { name = "Cornelia", age = 25 },
         Person { name = "Titus", age = 40 }
     ]
-    let list<Person> young ← sort via asc from people const p { return p.age }
-    let list<Person> old ← sort via desc from people const p { return p.age }
+    let list<Person> young ← sort via asc from people let p { return p.age }
+    let list<Person> old ← sort via desc from people let p { return p.age }
     print names(young)
     print names(old)
     print names(people)

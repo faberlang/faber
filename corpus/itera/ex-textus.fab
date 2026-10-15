@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "control-flow"
 canonical = false
 summary = "Value iteration over textus binds each Unicode scalar as a char (littera), including non-ASCII."
-syntax = "for from <textus> const <c> { }"
+syntax = "for from <textus> let <c> { }"
 related = ["itera", "textus", "ascii", "littera"]
 locale = "en"
 +++
@@ -30,12 +30,12 @@ locale = "en"
 
 main {
     let string verbum ← "roma"
-    for from verbum const c {
+    for from verbum let c {
         print c ↦ string
     }
 
     mut int vocales ← 0
-    for from verbum const c {
+    for from verbum let c {
         if c ≡ 'o' {
             vocales ← vocales + 1
         }
@@ -47,7 +47,7 @@ main {
 
     let string salutatio ← "Grüße👍"
     mut int litterae ← 0
-    for from salutatio const c {
+    for from salutatio let c {
         print c
         litterae ← litterae + 1
     }

@@ -95,6 +95,6 @@ fn then_joint_arm_catches_round_trip() {
 #[test]
 fn loop_and_switch_catches_round_trip() {
     assert_round_trips(&format!(
-        "{RISKY}main {{\n    mut int n ← 0\n    while n ≺ 3 {{\n        print risky(n)\n        n ↑\n    }} catch err {{\n        print \"while\"\n    }}\n    for range 0‥3 const i {{\n        print risky(i)\n    }} catch err {{\n        print \"range\"\n    }}\n    let list<int> xs ← [0, 1, 2]\n    for from xs const x {{\n        print risky(x)\n    }} catch err {{\n        print \"from\"\n    }}\n    switch n {{\n        case 1 {{ print risky(1) }}\n        default {{ print \"other\" }}\n    }} catch err {{\n        print \"switch\"\n    }}\n}}\n"
+        "{RISKY}main {{\n    mut int n ← 0\n    while n ≺ 3 {{\n        print risky(n)\n        n ↑\n    }} catch err {{\n        print \"while\"\n    }}\n    for range 0‥3 let i {{\n        print risky(i)\n    }} catch err {{\n        print \"range\"\n    }}\n    let list<int> xs ← [0, 1, 2]\n    for from xs let x {{\n        print risky(x)\n    }} catch err {{\n        print \"from\"\n    }}\n    switch n {{\n        case 1 {{ print risky(1) }}\n        default {{ print \"other\" }}\n    }} catch err {{\n        print \"switch\"\n    }}\n}}\n"
     ));
 }

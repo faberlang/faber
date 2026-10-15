@@ -90,13 +90,13 @@ functio stack_pop(varia stack<textus, 2> s) → textus ∪ nihil {
 fn queue_and_stack_for_from_bind_elements_in_their_access_orders() {
     crate::test_support::assert_accepts(
         r"functio queue_iter(queue<numerus> q) → vacuum {
-    itera ex q fixum item {
+    itera ex q sit item {
         nota item
     }
 }
 
 functio stack_iter(stack<textus, 2> s) → vacuum {
-    itera ex s fixum item {
+    itera ex s sit item {
         nota item
     }
 }",

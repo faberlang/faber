@@ -61,14 +61,14 @@ fn bounded_queue_push(queue<int, 2> input) → void ⇥ string {
 
 # `for from` reads a queue in insertion order (FIFO).
 fn queue_iteration(queue<int> input) → void {
-    for from input const item {
+    for from input let item {
         print item
     }
 }
 
 # `for from` reads a stack in removal order (top-first LIFO).
 fn stack_iteration(stack<int> input) → void {
-    for from input const item {
+    for from input let item {
         print item
     }
 }

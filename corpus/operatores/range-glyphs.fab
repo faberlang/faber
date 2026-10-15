@@ -37,13 +37,13 @@ locale = "en"
 
 main {
     mut int exclusivus ← 0
-    for range 0‥5 const _ {
+    for range 0‥5 let _ {
         exclusivus ↑
     }
     # 5 iterations
     print exclusivus
     mut int inclusivus ← 0
-    for range 0…5 const _ {
+    for range 0…5 let _ {
         inclusivus ↑
     }
     # 6 iterations

@@ -396,7 +396,7 @@ fn comment_before_genus_close_attaches_as_class_end_trivia() {
 
 #[test]
 fn expanded_statement_attaches_once_to_first_rendered_node() {
-    let source = "functio f() → vacuum {\n  # destructure\n  fixum [a, b] ← [1, 2]\n  tacet\n}\n";
+    let source = "functio f() → vacuum {\n  # destructure\n  sit [a, b] ← [1, 2]\n  tacet\n}\n";
     let (lowered, errors, interner) = lower_source(source);
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     let presentation = &lowered.presentation;
@@ -441,10 +441,10 @@ fn expanded_statement_attaches_once_to_first_rendered_node() {
 
 #[test]
 fn comment_on_zero_output_construct_diagnoses() {
-    // `fixum [a, b]` without an initializer parses but lowers to zero
+    // `sit [a, b]` without an initializer parses but lowers to zero
     // rendered statements. A leading comment then has no owner: the lowerer
     // must diagnose rather than drop or guess a fallback.
-    let source = "functio f() → vacuum {\n  # orphaned\n  fixum [a, b]\n}\n";
+    let source = "functio f() → vacuum {\n  # orphaned\n  sit [a, b]\n}\n";
     let (_, errors, _) = lower_source(source);
     assert!(
         errors.iter().any(|err| {

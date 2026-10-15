@@ -359,8 +359,8 @@ fn source_param_hole_match_patterns_accumulate_union() {
         r"
 functio probe(_ u) → vacuum {
     discerne u {
-        casu numerus fixum i { nota i }
-        casu textus fixum s { nota s }
+        casu numerus sit i { nota i }
+        casu textus sit s { nota s }
     }
 }
 ",
@@ -376,8 +376,8 @@ fn param_hole_writeback_materializes_solved_union_on_hir() {
         r"
 functio probe(_ u) → vacuum {
     discerne u {
-        casu numerus fixum i { nota i }
-        casu textus fixum s { nota s }
+        casu numerus sit i { nota i }
+        casu textus sit s { nota s }
     }
 }
 ",

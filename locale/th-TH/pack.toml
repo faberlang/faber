@@ -372,10 +372,6 @@ help = "คง binding rest '{keyword}' ไว้เพียงรายกา�
 message = "'{keyword}' ผูก identifier หนึ่งรายการโดยตรง; ใช้ '{keyword}' name ← expr"
 help = "เขียน '{keyword}' name ← expr หรือใช้ fixum สำหรับ binding แบบมีชนิด/แยกโครงสร้าง"
 
-[diagnostics.PARSE001.issues.sit_no_destructuring]
-message = "sit ไม่รองรับแพตเทิร์นการแยกโครงสร้าง"
-help = "ใช้ fixum กับแพตเทิร์นการแยกโครงสร้าง"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "ต้องมี test case หรือ setup"
 help = "เริ่มรายการในบอดีด้วย '{proba}', '{probandum}' หรือ '{setup}'"
@@ -515,6 +511,14 @@ help = "เขียน `{keyword} T {name} ← {marker} value`; ต่อมา
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "การประกาศ `{keyword}` ขณะรันถูกยกเลิกแล้ว; `{name}` เป็นชื่อขณะรัน"
 help = "เขียน `{sit} T {name} ← …` (หรือ `{sit} {name} ← …` เพื่อให้อนุมานชนิด); `{fixum}` ระบุข้อเท็จจริงตอนคอมไพล์และใช้คู่กับ `=`"
+
+[diagnostics.PARSE010.issues.binder_fixum_retired]
+message = "คำผูกชื่อ `{keyword}` ถูกยกเลิกแล้ว"
+help = "ตัวผูกชื่อใช้ `{sit}` (ชื่อคงที่) หรือ `{varia}` (ชื่อที่เขียนได้); `{fixum}` ระบุข้อเท็จจริงตอนคอมไพล์และใช้คู่กับ `=`"
+
+[diagnostics.PARSE010.issues.ref_binder_refused]
+message = "`{keyword}` เริ่มตัวผูกชื่อไม่ได้"
+help = "ตัวผูกชื่อตั้งชื่อให้ค่าในแต่ละรอบหรือการจับคู่; เขียน `{sit}` สำหรับชื่อคงที่ หรือ `{varia}` สำหรับชื่อที่เขียนได้"
 
 [diagnostics.PARSE010.issues.ref_local_requires_initializer]
 message = "ตัวแปรโลคัล `{keyword}` ต้องมีตำแหน่งให้อ่าน: `{keyword} T name ← place`"

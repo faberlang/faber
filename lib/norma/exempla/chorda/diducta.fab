@@ -27,7 +27,7 @@ main {
     # Happy path: well-formed document with delimiter fence
     do {
         let string doc ← sampleSkill()
-        const [metadatum, corpus] ← chorda.split_frontmatter(doc, "+++")
+        let [metadatum, corpus] ← chorda.split_frontmatter(doc, "+++")
 
         assert metadatum.contains("version = 1")
         assert metadatum.contains("id = sample")
@@ -88,7 +88,7 @@ main {
     # opening fence then immediate content then closing fence
     do {
         let string doc ← "+++\nkey = val\n+++"
-        const [metadatum, corpus] ← chorda.split_frontmatter(doc, "+++")
+        let [metadatum, corpus] ← chorda.split_frontmatter(doc, "+++")
         assert metadatum.contains("key = val")
         assert corpus.length() ≡ 0
     }

@@ -14,7 +14,7 @@ functio สอบผ่าน(numerus mark) → bivalens {
 
 functio นับคะแนน(lista<numerus> marks) → numerus {
     varia numerus total ← 0
-    itera de marks fixum mark {
+    itera de marks sit mark {
         si mark ≺ 0 {
             perge
         }

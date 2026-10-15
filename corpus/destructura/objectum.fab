@@ -98,7 +98,7 @@ main {
     # --- Basic field extraction ---
 
     let persona ← Persona { nomen = "Marcus", aetas = 30, urbs = "Roma" }
-    from persona const nomen, aetas
+    from persona let nomen, aetas
 
     print nomen
     print aetas
@@ -106,7 +106,7 @@ main {
     # --- Extract with alias using 'ut' ---
 
     let civis ← Civis { nomen = "Julia", epistula = "julia@roma.com" }
-    from civis const nomen as cognomen, epistula as epistula2
+    from civis let nomen as cognomen, epistula as epistula2
 
     print cognomen
     print epistula2
@@ -128,7 +128,7 @@ main {
     # --- Mixed alias and regular fields ---
 
     let forma ← Forma { hospes = "localis", portus = 8080, tutus = true }
-    from forma const hospes, portus as porta, tutus
+    from forma let hospes, portus as porta, tutus
 
     print hospes
     print porta
@@ -137,7 +137,7 @@ main {
     # --- Rest pattern with ceteri ---
 
     let plenus ← Plenus { signum = 1, nomen = "Gaius", epistula = "g@roma.com", munus = "admin" }
-    from plenus const signum, rest reliqua
+    from plenus let signum, rest reliqua
 
     print signum
     print reliqua
@@ -145,7 +145,7 @@ main {
     # --- Destructura ex nested path ---
 
     let responsum ← Responsum { datum = Relatus { civis = Sodalis { nomen = "Claudia", probatus = true } } }
-    from responsum.datum.civis const nomen as internum, probatus
+    from responsum.datum.civis let nomen as internum, probatus
 
     print internum
     print probatus
@@ -153,7 +153,7 @@ main {
     # --- Single field extraction ---
 
     let vestis ← Vestis { modus = "nigrum", lingua = "la" }
-    from vestis const modus
+    from vestis let modus
 
     print modus
 }

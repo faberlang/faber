@@ -748,7 +748,7 @@ fn ex_without_mutability_marker_rejected() {
         r"ex data name",
         ParseExpectation::Args(&[
             ("issue", "mutability_marker"),
-            ("expected", "'fixum' or 'varia'"),
+            ("expected", "'sit' or 'varia'"),
         ]),
     );
 }
@@ -767,10 +767,10 @@ fn parses_itera_loop_apud_clause_and_preserves_coordinate_order() {
     // and matrix rank 2 with [i, j]. Arity-error shapes remain [i] on rank 2,
     // [i, j] on rank 3, and [i, j, k] on matrix rank 2.
     for (source, expected) in [
-        (r"itera ex m apud [i] fixum cell { }", &["i"][..]),
-        (r"itera ex m apud [i, j] fixum cell { }", &["i", "j"][..]),
+        (r"itera ex m apud [i] sit cell { }", &["i"][..]),
+        (r"itera ex m apud [i, j] sit cell { }", &["i", "j"][..]),
         (
-            r"itera ex m apud [i, j, k] fixum cell { }",
+            r"itera ex m apud [i, j, k] sit cell { }",
             &["i", "j", "k"][..],
         ),
     ] {
@@ -796,22 +796,22 @@ fn parses_itera_loop_apud_clause_and_preserves_coordinate_order() {
 fn rejects_malformed_itera_apud_clauses_with_structured_errors() {
     for (source, arg, value) in [
         (
-            r"itera ex m apud fixum cell { }",
+            r"itera ex m apud sit cell { }",
             "issue",
             "apud_coordinates_start",
         ),
         (
-            r"itera ex m apud (i, j) fixum cell { }",
+            r"itera ex m apud (i, j) sit cell { }",
             "issue",
             "apud_coordinates_start",
         ),
         (
-            r"itera ex m apud [] fixum cell { }",
+            r"itera ex m apud [] sit cell { }",
             "issue",
             "expected_identifier",
         ),
         (
-            r"itera ex m apud [i,] fixum cell { }",
+            r"itera ex m apud [i,] sit cell { }",
             "issue",
             "expected_identifier",
         ),
@@ -836,17 +836,29 @@ fn sit_underscore_identifier_rejected() {
 }
 
 #[test]
-fn sit_destructuring_rejected() {
-    assert_parse_error_matches(
-        r"sit [a, b] ← [1, 2]",
-        ParseExpectation::Args(&[("issue", "sit_no_destructuring")]),
-    );
+fn sit_destructuring_parses_as_an_immutable_pattern_binding() {
+    for source in [r"sit [a, b] ← [1, 2]", r"sit { a, b } ← point"] {
+        let result = parse_ok(source);
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::Var(decl) = &program.statements[0].kind else {
+            panic!("expected a binding declaration for {source}");
+        };
+        assert_eq!(decl.mutability, AstMutability::Immutable, "{source}");
+        assert!(
+            matches!(
+                decl.binding,
+                BindingPattern::Array { .. } | BindingPattern::Object { .. }
+            ),
+            "{source}"
+        );
+        assert!(!decl.compile_time, "{source}");
+    }
 }
 
 #[test]
 fn duplicate_rest_pattern_rejected() {
     assert_parse_error_matches(
-        r"fixum [a, ceteri rest, ceteri again] ← values",
+        r"sit [a, ceteri rest, ceteri again] ← values",
         ParseExpectation::Args(&[("issue", "duplicate_rest_pattern")]),
     );
 }
@@ -1382,7 +1394,7 @@ fn parses_varia_destructuring() {
 
 #[test]
 fn parses_object_destructuring() {
-    let result = parse_ok("fixum { nomen ut n, aetas } ← persona");
+    let result = parse_ok("sit { nomen ut n, aetas } ← persona");
     let program = result
         .program
         .as_ref()
@@ -1870,14 +1882,6 @@ fn sit_underscore_binding_rejected_as_malformed() {
 }
 
 #[test]
-fn sit_destructuring_rejected_as_malformed() {
-    assert_parse_error_matches(
-        r"sit [a, b] ← [1, 2]",
-        ParseExpectation::Issue("sit_no_destructuring"),
-    );
-}
-
-#[test]
 fn sit_accepts_tokenless_keyword_as_binding_name() {
     // `varia` is tokenless since Batch E: `sit varia ← 1` binds a variable
     // named `varia`. Pre-migration the reserved Varia token made any binding
@@ -1912,7 +1916,7 @@ fn varia_bare_name_rejected() {
 #[test]
 fn object_destructuring_rejects_colon_rename() {
     assert_parse_error_matches(
-        r"fixum { nomen: n } ← persona",
+        r"sit { nomen: n } ← persona",
         ParseExpectation::Arg {
             name: "issue",
             value: "object_binding_pattern_end",
@@ -2437,7 +2441,7 @@ fn parses_dum_while_loop() {
 
 #[test]
 fn parses_itera_loop() {
-    let result = parse_ok("itera ab items fixum item ergo redde item cape err {}");
+    let result = parse_ok("itera ab items sit item ergo redde item cape err {}");
     let program = result
         .program
         .as_ref()
@@ -2454,7 +2458,7 @@ fn parses_itera_loop() {
 
 #[test]
 fn parses_itera_array_pattern_binder() {
-    let result = parse_ok("itera ex xs fixum [a, b] { nota a }");
+    let result = parse_ok("itera ex xs sit [a, b] { nota a }");
     let program = result
         .program
         .as_ref()
@@ -2480,7 +2484,7 @@ fn parses_itera_array_pattern_binder() {
 
 #[test]
 fn parses_itera_object_pattern_binder() {
-    let result = parse_ok("itera ex xs fixum {gx} { nota gx }");
+    let result = parse_ok("itera ex xs sit {gx} { nota gx }");
     let program = result
         .program
         .as_ref()
@@ -2501,9 +2505,9 @@ fn parses_itera_object_pattern_binder() {
 #[test]
 fn parses_itera_pattern_binder_all_modes() {
     for (source, mode) in [
-        ("itera ex xs fixum [a] { nota a }", IteraMode::Ex),
-        ("itera de xs fixum [a] { nota a }", IteraMode::De),
-        ("itera ab items fixum [a] { nota a }", IteraMode::Ab),
+        ("itera ex xs sit [a] { nota a }", IteraMode::Ex),
+        ("itera de xs sit [a] { nota a }", IteraMode::De),
+        ("itera ab items sit [a] { nota a }", IteraMode::Ab),
     ] {
         let result = parse_ok(source);
         let program = result
@@ -2552,7 +2556,7 @@ fn parses_itera_pattern_binder_element_forms() {
 
 #[test]
 fn parses_itera_object_pattern_alias() {
-    let result = parse_ok("itera ex xs fixum {gx ut caput} ergo redde caput cape err {}");
+    let result = parse_ok("itera ex xs sit {gx ut caput} ergo redde caput cape err {}");
     let program = result
         .program
         .as_ref()
@@ -2950,7 +2954,7 @@ fn parser_scribe_incipit_expectation_issues_carry_surface_args() {
 
 #[test]
 fn parses_itera_apud_clause_on_en_at_surface() {
-    let result = parse_ok_en("for from m at [i, j] const cell { }");
+    let result = parse_ok_en("for from m at [i, j] let cell { }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");
@@ -2967,7 +2971,7 @@ fn parses_itera_apud_clause_on_en_at_surface() {
 fn parses_en_for_range_series_at_surface() {
     // The documented English spelling of the NR-1 `ab` range series parses
     // through the same source/binder series shape (`en` pack: range = ab).
-    let result = parse_ok_en("for range 0‥m, 0‥n, 0‥k const i, j, p { }");
+    let result = parse_ok_en("for range 0‥m, 0‥n, 0‥k let i, j, p { }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");
@@ -3398,7 +3402,7 @@ fn parses_ergo_keyword_as_statement_tail() {
         r#"
 si verum ergo nota "yes"
 dum falsum ergo tacet
-itera ab items fixum item ergo redde item
+itera ab items sit item ergo redde item
 "#,
     );
     let program = result.program.as_ref().expect("program");
@@ -3704,7 +3708,7 @@ fn modulus_type_and_itera_ab_range_iteration_stay_live() {
         r"
 functio checksum() → numerus {
   sit modulus<u32> m ← 1779033703
-  itera ab 0‥10 per 2 fixum i {
+  itera ab 0‥10 per 2 sit i {
     nota i
   }
   redde 0
