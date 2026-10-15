@@ -381,6 +381,40 @@ kind = "bin"
     src.join("main.fab")
 }
 
+/// Trivial `kind = "lib"` package with no `paths.entry`: the shape a
+/// library package has when the source root is the whole module set. Returns
+/// the package ROOT.
+fn write_trivial_lib_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "libpkg"
+version = "0.0.0"
+edition = "2026"
+
+[library]
+provider = "libpkg"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(
+        src.join("main.fab"),
+        "@ public\nfn salute() → string {\n    return \"salve\"\n}\n",
+    )
+    .expect("write main.fab");
+    dir.to_path_buf()
+}
+
 /// Extract the code string from a codegen [`radix::module::Output`].
 fn output_code(output: &radix::module::Output) -> &str {
     match output {
@@ -393,6 +427,27 @@ fn output_code(output: &radix::module::Output) -> &str {
 // ---------------------------------------------------------------------------
 // Stage 2: build/load round trip
 // ---------------------------------------------------------------------------
+
+#[test]
+fn lib_package_directory_input_builds_fhir_package() {
+    let dir = test_temp_dir("fhir-trivial-lib");
+    let package_root = write_trivial_lib_package(&dir);
+    let artifact = build_fhir_with_faber_seams(&Config::default(), &package_root)
+        .expect("an un-targeted lib package directory must build FHIR");
+    assert!(
+        artifact.package_path.is_file(),
+        "package artifact written: {}",
+        artifact.package_path.display()
+    );
+    assert_eq!(
+        artifact.package_path,
+        package_root.join("target/faber-fhir/package.fhirpkg")
+    );
+
+    // Control: the entry-file input was already supported and must stay so.
+    let entry = package_root.join("src/main.fab");
+    build_fhir_with_faber_seams(&Config::default(), &entry).expect("entry-file input must stay Ok");
+}
 
 #[test]
 fn build_load_round_trip_with_local_import() {
