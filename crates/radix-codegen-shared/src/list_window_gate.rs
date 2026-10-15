@@ -35,7 +35,11 @@ fn target_admits_list_window(target: Target) -> bool {
 fn target_admits_byte_window(target: Target) -> bool {
     matches!(
         target,
-        Target::HirRust | Target::HirGo | Target::HirTypeScript | Target::HirSwift
+        Target::HirRust
+            | Target::HirGo
+            | Target::HirTypeScript
+            | Target::HirSwift
+            | Target::HirPython
     )
 }
 
