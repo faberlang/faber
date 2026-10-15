@@ -1,0 +1,37 @@
++++
+term = "ref-param"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "expression", "literal", "nota_stmt", "ref_decl", "functio_decl", "type_annotation", "owned_type", "base_type", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument"]
+category = "binding"
+summary = "A bare parameter is a ref: the callee may re-point the name, never write through it."
+locale = "en"
++++
+
+# A parameter with no marker means `ref`: read-only through, re-pointable
+# inside the callee. Re-pointing rebinds the callee's own name and leaves the
+# caller's value alone; `mut` writes the caller's value, `copy` and `own`
+# write the callee's own value.
+
+class Cell {
+    mut int value
+}
+
+fn larger(Cell a, Cell b) → int {
+    if b.value ≻ a.value {
+        a ← b
+    }
+    return a.value
+}
+
+fn bump(mut Cell c) → void {
+    c.value ← c.value + 1
+}
+
+main {
+    mut Cell x ← Cell { value = 4 }
+    let Cell y ← Cell { value = 9 }
+    print larger(x, y)
+    print x.value
+    bump(mut x)
+    print x.value
+}

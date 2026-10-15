@@ -1,0 +1,40 @@
++++
+term = "sit-typed"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "expression", "literal", "nota_stmt", "sit_decl", "type_annotation", "owned_type", "base_type", "assignment", "place"]
+category = "binding"
+summary = "sit declares a run-time name that is written once; fixum is compile-time only."
+syntax = "sit [type] <name> ← <expression>"
+locale = "la"
++++
+
+# `sit` is the run-time, write-once name. The type is optional: `sit x ← e`
+# infers it, `sit T x ← e` states it. `fixum` is only for compile-time facts
+# and goes with `=`.
+
+fixum numerus LIMES = 10
+
+functio scala(numerus basis) → numerus {
+    sit numerus factor ← 3
+    sit duplum ← basis * 2
+    redde duplum * factor
+}
+
+functio elige(bivalens lata) → numerus {
+    sit numerus electum
+    si lata {
+        electum ← LIMES
+    }
+    secus {
+        electum ← 1
+    }
+    redde electum
+}
+
+incipit {
+    sit textus salutatio ← "Salve, Marcus!"
+    nota salutatio
+    nota scala(7)
+    nota elige(verum)
+    nota elige(falsum)
+}

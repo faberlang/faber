@@ -2290,12 +2290,12 @@ impl<'a> BorrowChecker<'a> {
     fn write_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
         self.note_live_unmarked_own_bind(def_id);
         self.note_live_own_arg(def_id);
-        if let Some(usage) = self.param_usage.get_mut(&def_id) {
-            if !matches!(usage.mode, HirParamMode::De) {
-                // `mut` writes the caller's value; `own`/`copy` write the
-                // callee's own value. Either way the parameter is mutated.
-                usage.mutated = true;
-            }
+        if let Some(usage) = self.param_usage.get_mut(&def_id)
+            && !matches!(usage.mode, HirParamMode::De)
+        {
+            // `mut` writes the caller's value; `own`/`copy` write the
+            // callee's own value. Either way the parameter is mutated.
+            usage.mutated = true;
         }
         let (_region_mut_live, region_any_live) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();

@@ -1,0 +1,40 @@
++++
+term = "sit-typed"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "expression", "literal", "nota_stmt", "sit_decl", "type_annotation", "owned_type", "base_type", "assignment", "place"]
+category = "binding"
+summary = "let declares a run-time name that is written once; const is compile-time only."
+syntax = "let [type] <name> ← <expression>"
+locale = "en"
++++
+
+# `let` is the run-time, write-once name. The type is optional: `let x ← e`
+# infers it, `let T x ← e` states it. `const` is only for compile-time facts
+# and goes with `=`.
+
+const int LIMIT = 10
+
+fn scale(int base) → int {
+    let int factor ← 3
+    let doubled ← base * 2
+    return doubled * factor
+}
+
+fn pick(bool wide) → int {
+    let int chosen
+    if wide {
+        chosen ← LIMIT
+    }
+    else {
+        chosen ← 1
+    }
+    return chosen
+}
+
+main {
+    let string greeting ← "Salve, Marcus!"
+    print greeting
+    print scale(7)
+    print pick(true)
+    print pick(false)
+}

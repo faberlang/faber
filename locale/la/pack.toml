@@ -407,7 +407,7 @@ help = "use \"arena\" or \"page\" as the allocator kind"
 
 [diagnostics.PARSE001.issues.mutability_marker]
 message = "expected {expected}"
-help = "add fixum or varia before the binding name"
+help = "add sit or varia before the binding name"
 
 [diagnostics.PARSE001.issues.itera_de_requires_fixum]
 message = "itera de bindings are always const; use {expected}"
@@ -560,7 +560,7 @@ help = "put a number after '-' in JSON"
 
 [diagnostics.PARSE002.issues.conversio_assign_requires_concrete_type]
 message = "conversion-directed assignment '↤' requires a concrete destination type"
-help = "write a concrete type for the binding, e.g. 'fixum numerus x ↤ value'"
+help = "write a concrete type for the binding, e.g. 'sit numerus x ↤ value'"
 
 [diagnostics.PARSE002.issues.conversio_assign_await_unsupported]
 message = "'↤' is not supported on awaited bindings"
@@ -864,7 +864,7 @@ help = "scribe `{replacement}` pro `{glyph}`; omne signum negationis easdem line
 
 [diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
 message = "expressio ordinata vel reducta fons itera esse non potest"
-help = "liga eam prius ad nomen, deinde itera per nomen: `fixum lista<numerus> ys ← ordinata via ascendens ex xs`, deinde `itera ex ys fixum x`"
+help = "liga eam prius ad nomen, deinde itera per nomen: `sit lista<numerus> ys ← ordinata via ascendens ex xs`, deinde `itera ex ys fixum x`"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
@@ -2121,7 +2121,7 @@ help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.conversio_assign_inference_hole_destination]
 message = "conversion-directed assignment '↤' requires a resolved destination type"
-help = "write a concrete type for the destination, e.g. 'fixum numerus x ↤ value'"
+help = "write a concrete type for the destination, e.g. 'sit numerus x ↤ value'"
 
 [diagnostics.SEM010.issues.cursor_iteration_requires_ex]
 message = "cursor iteration supports {itera} {ex} only"
@@ -4044,8 +4044,8 @@ message = "assignment to immutable borrow"
 help = "declare the parameter as '{in}' if mutation is intended"
 
 [diagnostics.SEM056.issues.assign_to_de_parameter]
-message = "cannot assign to `de` parameter"
-help = "declare the parameter as '{in}' if mutation is intended"
+message = "cannot write through a `ref` or unmarked parameter"
+help = "declare the parameter '{in}' if the caller's value should change; re-pointing the name is allowed"
 
 [diagnostics.SEM056.issues.assign_to_nonmut_tensor_param]
 message = "cannot write through tensor parameter{?name| '|'} that is not marked `mut`"

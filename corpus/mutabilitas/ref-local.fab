@@ -1,0 +1,34 @@
++++
+term = "ref-local"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "expression", "literal", "nota_stmt", "ref_decl", "genus_decl", "functio_decl", "type_annotation", "owned_type", "base_type", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument"]
+category = "binding"
+summary = "A ref local is a re-pointable name that reads through to a place."
+locale = "en"
++++
+
+# A `ref` local names a place and reads through it. The name may be re-pointed
+# to another place; a write through the name is refused.
+
+class Cell {
+    mut int value
+}
+
+fn pick(ref Cell x, ref Cell y, bool first) → int {
+    ref Cell cur ← x
+    if first ≡ false {
+        cur ← y
+    }
+    return cur.value
+}
+
+main {
+    let Cell a ← Cell { value = 4 }
+    let Cell b ← Cell { value = 9 }
+    ref Cell cur ← a
+    print cur.value
+    cur ← b
+    print cur.value
+    print pick(a, b, true)
+    print pick(a, b, false)
+}

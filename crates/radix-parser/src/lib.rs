@@ -1861,6 +1861,10 @@ mod region_decl_test;
 mod static_decl_test;
 
 #[cfg(test)]
+#[path = "binding_words_test.rs"]
+mod binding_words_test;
+
+#[cfg(test)]
 #[path = "nondum_function_test.rs"]
 mod nondum_function_test;
 
