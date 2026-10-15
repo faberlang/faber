@@ -5,16 +5,16 @@
 use super::{
     AnalyzedProgram, AnalyzedProgramNode, BTreeSet, CliCommand, CliDefault, CliDispatchPlan,
     CliEntryRecords, CliMode, CliOperand, CliOption, CliPackagePlan, CliPlanningMode, CliProgram,
-    CliRecordFieldsByLocal, CliRecordTypeRewrite, CliType, DefId, Diagnostic, FmirTextCliOperand,
+    CliRecordFieldsByType, CliRecordTypeRewrite, CliType, DefId, Diagnostic, FmirTextCliOperand,
     FmirTextCliRootSection, FmirTextCliSection, FmirTextCliValueType, HashMap, HirItemKind,
-    IndexExpr, InterfaceLibraryIdentity, InterfaceNominalKind, Interner, MirConstant, MirOperand,
-    MirRuntimeRecordField, MirRuntimeRecordValue, MirType, ModuleId, PlannedCliOperand,
-    PlannedCliOption, Resolver, Symbol, SymbolKind, Type, TypeId, TypeTable, cli_default_value,
-    cli_operand_consumes_many, cli_operand_record_fields, cli_option_is_nullable, cli_option_value,
-    cli_record_type, command_has_unsupported_options, command_in_unit, command_unit_id,
-    has_unsupported_package_mir_operands, is_package_mir_supported_option, matching_cli_command,
-    package_mir_cli_exit_code, plan_cli_command_records, push_cli_option_default_diagnostic,
-    unsupported_cli_diagnostic,
+    HirStatementKind, IndexExpr, InterfaceLibraryIdentity, InterfaceNominalKind, Interner,
+    MirConstant, MirOperand, MirRuntimeRecordField, MirRuntimeRecordValue, MirType, ModuleId,
+    PlannedCliOperand, PlannedCliOption, Resolver, Symbol, SymbolKind, Type, TypeId, TypeTable,
+    cli_default_value, cli_operand_consumes_many, cli_operand_record_fields,
+    cli_option_is_nullable, cli_option_value, cli_record_type, command_has_unsupported_options,
+    command_in_unit, command_unit_id, has_unsupported_package_mir_operands,
+    is_package_mir_supported_option, matching_cli_command, package_mir_cli_exit_code,
+    plan_cli_command_records, push_cli_option_default_diagnostic, unsupported_cli_diagnostic,
 };
 use radix_module::driver::AnalyzedModule;
 use radix_module::file_interface::{FileExportKind, FileInterface};
@@ -125,7 +125,7 @@ pub(super) fn plan_fmir_text_runtime_cli_root_entry(
     unit: &mut AnalyzedProgramNode,
     cli_program: &CliProgram,
     diagnostics: &mut Vec<Diagnostic>,
-) -> Option<(CliRecordFieldsByLocal, FmirTextCliSection, Option<i32>)> {
+) -> Option<(CliRecordFieldsByType, FmirTextCliSection, Option<i32>)> {
     let diagnostic_count = diagnostics.len();
     if !cli_program.commands.is_empty() {
         diagnostics.push(unsupported_cli_diagnostic(
@@ -198,8 +198,21 @@ pub(super) fn plan_fmir_text_runtime_cli_root_entry(
         });
     }
     let record = unit.analysis.interner.resolve(args_name).to_owned();
+    let fields_by_type = match entry_cli_args_type(unit) {
+        Some(record_ty) => HashMap::from([(record_ty, fields)]),
+        None => {
+            if !fields.is_empty() {
+                diagnostics.push(unsupported_cli_diagnostic(
+                    &unit.path,
+                    "CLI argument records",
+                ));
+                return None;
+            }
+            HashMap::new()
+        }
+    };
     Some((
-        HashMap::from([(args_name, fields)]),
+        fields_by_type,
         FmirTextCliSection {
             root: FmirTextCliRootSection {
                 record,
@@ -300,7 +313,7 @@ pub(super) fn plan_cli_root_entry(
     cli_program: &CliProgram,
     argumenta: &[String],
     diagnostics: &mut Vec<Diagnostic>,
-) -> Option<(CliRecordFieldsByLocal, Option<i32>)> {
+) -> Option<(CliRecordFieldsByType, Option<i32>)> {
     let diagnostic_count = diagnostics.len();
     if !cli_program.commands.is_empty() {
         diagnostics.push(unsupported_cli_diagnostic(
@@ -349,7 +362,8 @@ pub(super) fn plan_cli_root_entry(
         &parsed.positionals,
         diagnostics,
     )?);
-    let Some(args_name) = unit.analysis.hir.entry_args_name else {
+    let args_name = unit.analysis.hir.entry_args_name;
+    let Some(record_ty) = entry_cli_args_type(unit) else {
         if !fields.is_empty() {
             diagnostics.push(unsupported_cli_diagnostic(
                 &unit.path,
@@ -360,14 +374,9 @@ pub(super) fn plan_cli_root_entry(
         let exit_code = package_mir_cli_exit_code(&cli_program.exit, None, &[], unit, diagnostics)?;
         return Some((HashMap::new(), exit_code));
     };
-    let exit_code = package_mir_cli_exit_code(
-        &cli_program.exit,
-        Some(args_name),
-        &fields,
-        unit,
-        diagnostics,
-    )?;
-    Some((HashMap::from([(args_name, fields)]), exit_code))
+    let exit_code =
+        package_mir_cli_exit_code(&cli_program.exit, args_name, &fields, unit, diagnostics)?;
+    Some((HashMap::from([(record_ty, fields)]), exit_code))
 }
 
 pub(super) struct ParsedCliArguments {
@@ -645,7 +654,8 @@ pub(super) fn plan_cli_subcommand(
         return None;
     };
     let command_args = &command_argumenta[command_match.consumed..];
-    if let Some(args_name) = package.nodes.get(&entry_id)?.analysis.hir.entry_args_name {
+    let entry_args_ty = package.nodes.get(&entry_id).and_then(entry_cli_args_type);
+    if let Some(args_ty) = entry_args_ty {
         let mut entry_fields = parsed_globals.option_fields.clone();
         let global_operand_args_len = cli_operand_consumed_len(&global_operands, command_args);
         entry_fields.extend(cli_operand_record_fields(
@@ -658,7 +668,7 @@ pub(super) fn plan_cli_subcommand(
             entry_records
                 .entry(package.nodes.get(&entry_id)?.path.clone())
                 .or_default()
-                .insert(args_name, entry_fields);
+                .insert(args_ty, entry_fields);
         }
     }
     let command = command_match.command;
@@ -868,7 +878,7 @@ pub(super) fn add_cli_runtime_field_type_rewrites(
     unit_id: &ModuleId,
     entry_id: &ModuleId,
     rewrite: &mut CliRecordTypeRewrite,
-    fields_by_local: &CliRecordFieldsByLocal,
+    fields_by_type: &CliRecordFieldsByType,
 ) {
     if unit_id == entry_id {
         return;
@@ -888,7 +898,7 @@ pub(super) fn add_cli_runtime_field_type_rewrites(
         &source.analysis.types,
         &mut entry.analysis.types,
         rewrite,
-        fields_by_local,
+        fields_by_type,
         &mut imported,
     );
     package.nodes.insert(unit_id.clone(), source);
@@ -898,13 +908,13 @@ pub(super) fn add_runtime_field_type_rewrites(
     source_types: &TypeTable,
     target_types: &mut TypeTable,
     rewrite: &mut CliRecordTypeRewrite,
-    fields_by_local: &CliRecordFieldsByLocal,
+    fields_by_type: &CliRecordFieldsByType,
     imported: &mut HashMap<TypeId, TypeId>,
 ) {
     // Importing interns into the target type table: walk the std `HashMap`
-    // in symbol order, never in its per-process seeded order.
-    let mut locals: Vec<_> = fields_by_local.iter().collect();
-    locals.sort_by_key(|(local, _)| local.0);
+    // in type-id order, never in its per-process seeded order.
+    let mut locals: Vec<_> = fields_by_type.iter().collect();
+    locals.sort_by_key(|(ty, _)| ty.0);
     for (_, fields) in locals {
         for field in fields {
             if let MirRuntimeRecordValue::Array { ty, .. }
@@ -1599,6 +1609,22 @@ pub(super) fn import_index_expr_with_nominal(
         }
         other => target.intern_index(other),
     }
+}
+
+/// Record type of the root `incipit argumenta` local, read from the HIR entry
+/// block's runtime-provided args local — the same identity the entry record
+/// aggregate lowers with.
+pub(super) fn entry_cli_args_type(unit: &AnalyzedProgramNode) -> Option<TypeId> {
+    let name = unit.analysis.hir.entry_args_name?;
+    let entry = unit.analysis.hir.entry.as_ref()?;
+    entry.statements.iter().find_map(|statement| {
+        let HirStatementKind::Local(local) = &statement.kind else {
+            return None;
+        };
+        (local.name == name && local.runtime_provided)
+            .then_some(local.ty)
+            .flatten()
+    })
 }
 
 pub(super) fn command_cli_args_type(

@@ -332,7 +332,7 @@ impl<'a> LoweringContextMaps<'a> {
         structs: Arc<FxHashMap<DefId, Vec<&'a HirField>>>,
         struct_field_types: Arc<FxHashMap<DefId, FxHashMap<radix_lexer::Symbol, MirType>>>,
         function_params: Arc<FxHashMap<DefId, Vec<CallableParamMeta<'a>>>>,
-        cli_record_fields_by_local: Arc<FxHashMap<radix_lexer::Symbol, Vec<MirRuntimeRecordField>>>,
+        cli_parsed_record_fields_by_type: Arc<FxHashMap<radix_types::TypeId, Vec<MirRuntimeRecordField>>>,
         cli_record_fields_by_type: Arc<FxHashMap<radix_types::TypeId, Vec<MirRuntimeRecordField>>>,
         cli_adapter_active: bool,
     ) -> FunctionBuilderContext<'a> {
@@ -386,7 +386,7 @@ impl<'a> LoweringContextMaps<'a> {
             interface_implementors: Arc::clone(&self.frozen.interface_implementors),
             imported_method_providers: Arc::clone(&self.frozen.imported_method_providers),
             gpu_builtins: Arc::clone(&self.frozen.gpu_builtins),
-            cli_record_fields_by_local,
+            cli_parsed_record_fields_by_type,
             cli_record_fields_by_type,
             cli_adapter_active,
             kernel_lowering: KernelLowering::Device,
