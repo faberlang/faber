@@ -6,6 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[cfg(any(feature = "hir-rust", feature = "hir-go"))]
 use radix_module::Output;
 use radix_module::codegen::Target;
 use radix_module::diagnostics::Diagnostic;
@@ -213,6 +214,7 @@ entry = "main.fab"
     );
 }
 
+#[cfg(feature = "hir-rust")]
 #[test]
 fn valor_octeti_body_extraction_emits_octeti_match() {
     // Inferentia HTTP body seam: the provider delivers valor octeti; `value ↦
