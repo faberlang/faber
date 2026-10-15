@@ -107,7 +107,46 @@ fn unsupported_plan_failure(plan: ArtifactPlan, input: &Path) -> PackageCompileR
 /// carries only product-owned analysis and Go toolchain inputs.
 #[must_use]
 pub fn compile_package(config: &Config, input: &Path, seams: &EmissionSeams) -> CompileResult {
-    compile_package_result(config, input, seams).compile_result
+    fold_go_modules_into_output(compile_package_result(config, input, seams))
+}
+
+/// Fold the Go multi-module collection into the single output stream.
+///
+/// `faber build --target go` consumes [`PackageCompileResult::go_modules`]
+/// directly and writes one file per unit. The single-stream emit path
+/// (`faber emit -t go`, and the `faber corpus --target go` recipe that
+/// captures stdout into `main.go`) has no place for the sibling files, so
+/// their declarations merge into the entry source instead.
+#[cfg(feature = "hir-go")]
+fn fold_go_modules_into_output(mut result: PackageCompileResult) -> CompileResult {
+    if result.go_modules.is_empty() {
+        return result.compile_result;
+    }
+    match result.compile_result.output.take() {
+        Some(radix_module::Output::Go(go)) => {
+            match radix_module::codegen::go::merge_package_modules(&go.code, &result.go_modules) {
+                Ok(code) => {
+                    result.compile_result.output =
+                        Some(radix_module::Output::Go(radix_module::GoOutput { code }));
+                }
+                Err(err) => {
+                    result.compile_result.diagnostics.push(
+                        crate::package_diagnostic_error(err.to_string())
+                            .with_arg("issue", "package_go_merge_shape")
+                            .with_arg("target", "go"),
+                    );
+                }
+            }
+        }
+        output => result.compile_result.output = output,
+    }
+    result.compile_result
+}
+
+/// Without `hir-go` there is no Go output to fold.
+#[cfg(not(feature = "hir-go"))]
+fn fold_go_modules_into_output(result: PackageCompileResult) -> CompileResult {
+    result.compile_result
 }
 
 /// Compile a package and keep the full Go result envelope. Used by Faber's
