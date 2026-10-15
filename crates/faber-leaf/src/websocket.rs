@@ -14,7 +14,7 @@ use crate::value::{Arg, Reply};
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, ClientConnection, RootCertStore};
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -29,6 +29,8 @@ enum Socket {
     Ready(Box<WebSocket<HttpStream>>),
     ClientPending(Box<HttpStream>, String),
 }
+
+type ResponseHead = (u16, Vec<(String, String)>, Vec<u8>);
 
 fn with_handles<T>(f: impl FnOnce(&mut HashMap<i64, Socket>) -> T) -> T {
     let mut guard = match HANDLES.lock() {
@@ -55,6 +57,7 @@ pub fn reset_handles() {
 const ROUTES: &[&str] = &[
     "websocket:connect",
     "websocket:connect_open",
+    "websocket:connect_finish",
     "websocket:accept",
     "websocket:send",
     "websocket:send_bytes",
@@ -74,6 +77,7 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
     let result = match route {
         "websocket:connect" => connect(args),
         "websocket:connect_open" => connect_open(args),
+        "websocket:connect_finish" => connect_finish(args),
         "websocket:accept" => accept(args),
         "websocket:send" => send_text(args),
         "websocket:send_bytes" => send_bytes(args),
@@ -182,6 +186,86 @@ fn connect_open(args: &[Arg]) -> Result<Reply, LeafError> {
         map.insert(id, Socket::ClientPending(Box::new(stream), key));
     });
     Ok(Reply::Int(id))
+}
+
+fn connect_finish(args: &[Arg]) -> Result<Reply, LeafError> {
+    const ROUTE: &str = "websocket:connect_finish";
+    let id = expect_int(ROUTE, args, 0, "id")?;
+    let (mut stream, key) = with_handles(|map| match map.remove(&id) {
+        Some(Socket::ClientPending(stream, key)) => Ok((stream, key)),
+        Some(Socket::Ready(socket)) => {
+            drop(socket);
+            Err(LeafError::invalid_argument(
+                ROUTE,
+                "socket is not finishing a handshake",
+            ))
+        }
+        None => Err(LeafError::closed(ROUTE, "socket closed")),
+    })?;
+    let (status, headers, tail) = read_response_head(&mut stream)?;
+    if status != 101 {
+        return Err(LeafError::unavailable(
+            ROUTE,
+            format!("websocket handshake: HTTP {status}"),
+        ));
+    }
+    let accept = headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("sec-websocket-accept"))
+        .map(|(_, value)| value.as_str())
+        .ok_or_else(|| LeafError::invalid_argument(ROUTE, "missing Sec-WebSocket-Accept"))?;
+    let expected = tungstenite::handshake::derive_accept_key(key.as_bytes());
+    if accept != expected {
+        return Err(LeafError::unavailable(
+            ROUTE,
+            "websocket handshake: accept key mismatch",
+        ));
+    }
+    let socket = WebSocket::from_partially_read(*stream, tail, Role::Client, None);
+    with_handles(|map| {
+        map.insert(id, Socket::Ready(Box::new(socket)));
+    });
+    Ok(Reply::Unit)
+}
+
+fn read_response_head(stream: &mut HttpStream) -> Result<ResponseHead, LeafError> {
+    const ROUTE: &str = "websocket:connect_finish";
+    let mut buf = Vec::new();
+    let mut scratch = [0_u8; 4096];
+    let header_end = loop {
+        let count = stream
+            .read(&mut scratch)
+            .map_err(|err| LeafError::from_io(ROUTE, "", &err))?;
+        if count == 0 {
+            return Err(LeafError::closed(ROUTE, "peer closed"));
+        }
+        buf.extend_from_slice(&scratch[..count]);
+        if let Some(index) = buf.windows(4).position(|window| window == b"\r\n\r\n") {
+            break index + 4;
+        }
+        if buf.len() > 64 * 1024 {
+            return Err(LeafError::invalid_argument(ROUTE, "headers too large"));
+        }
+    };
+    let tail = buf.split_off(header_end);
+    let mut parsed_headers = [httparse::EMPTY_HEADER; 64];
+    let mut response = httparse::Response::new(&mut parsed_headers);
+    match response.parse(&buf) {
+        Ok(httparse::Status::Complete(_)) => {}
+        _ => return Err(LeafError::invalid_argument(ROUTE, "malformed response")),
+    }
+    let status = response.code.unwrap_or(0);
+    let headers = response
+        .headers
+        .iter()
+        .map(|header| {
+            (
+                header.name.to_owned(),
+                String::from_utf8_lossy(header.value).into_owned(),
+            )
+        })
+        .collect();
+    Ok((status, headers, tail))
 }
 
 fn accept(args: &[Arg]) -> Result<Reply, LeafError> {
