@@ -51,6 +51,18 @@ pub const PRINT_TEXT: RuntimeSymbol = RuntimeSymbol {
     params: &[I32, Ptr],
     ret: None,
 };
+/// Print one raw-bits line: (stream, zero-extended pattern, width in bits).
+pub const PRINT_BITS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_print_bits",
+    params: &[I32, I64, I32],
+    ret: None,
+};
+/// Render a raw-bits value as text: (pattern, width in bits) -> text handle.
+pub const TEXT_FROM_BITS: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_from_bits",
+    params: &[I64, I32],
+    ret: Some(Ptr),
+};
 /// Concatenate two texts: (left, right) -> new text handle.
 pub const TEXT_CONCAT: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_text_concat",
@@ -136,6 +148,8 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     PRINT_F64,
     PRINT_BOOL,
     PRINT_TEXT,
+    PRINT_BITS,
+    TEXT_FROM_BITS,
     TEXT_CONCAT,
     TEXT_FROM_I64,
     TEXT_FROM_F64,

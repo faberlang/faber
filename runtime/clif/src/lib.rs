@@ -186,6 +186,24 @@ fn text_str(bytes: &[u8]) -> std::borrow::Cow<'_, str> {
     String::from_utf8_lossy(bytes)
 }
 
+fn bits_text(pattern: i64, width: i32) -> String {
+    let digits = usize::try_from(width / 4).unwrap_or(0);
+    let pattern = u64::from_ne_bytes(pattern.to_ne_bytes());
+    format!("0x{pattern:0digits$x}")
+}
+
+/// Print one raw-bits line: `0x` and lowercase hex digits at the full width.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_print_bits(stream: i32, pattern: i64, width: i32) {
+    emit(stream, &bits_text(pattern, width));
+}
+
+/// Render a raw-bits value as text.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_text_from_bits(pattern: i64, width: i32) -> *const u8 {
+    text_new(bits_text(pattern, width).as_bytes())
+}
+
 /// Print one text line (stream 0 stdout, 1 stderr).
 ///
 /// # Safety

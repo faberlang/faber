@@ -162,6 +162,7 @@ impl<'a> ClifCapability<'a> {
             | Type::Primitive(Primitive::Numquam)
             | Type::SizedNumeric(Primitive::Numerus, _)
             | Type::Primitive(Primitive::Textus)
+            | Type::Bits(_)
             | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => None,
             Type::SizedNumeric(..) => Some(Gap::Subset("sized numeric value".to_owned())),
             Type::PolicyFloat(..) => Some(Gap::Subset("policy float value".to_owned())),
@@ -379,16 +380,21 @@ impl MirVisitor for ClifCapability<'_> {
         if let Some(gap) = Self::value_gap(value) {
             self.record(gap);
         }
-        if let MirValueKind::Binary { op, .. } = &value.kind
-            && matches!(
+        let bit_op = match &value.kind {
+            MirValueKind::Binary { op, .. } => matches!(
                 op,
                 MirBinOp::BitAnd
                     | MirBinOp::BitOr
                     | MirBinOp::BitXor
                     | MirBinOp::Shl
                     | MirBinOp::Shr
-            )
-        {
+            ),
+            MirValueKind::Unary { op, .. } => *op == MirUnOp::BitNot,
+            _ => false,
+        };
+        // Bitwise work on raw-bits values lowers at the type's width; on
+        // numbers it is not lowered yet.
+        if bit_op && !matches!(self.types.get(value.ty.semantic_id()), Type::Bits(_)) {
             self.record(Gap::Subset("bit operation".to_owned()));
         }
         if let MirValueKind::Binary {
@@ -403,13 +409,6 @@ impl MirVisitor for ClifCapability<'_> {
         } = &value.kind
         {
             self.record(Gap::Subset("optional value".to_owned()));
-        }
-        if let MirValueKind::Unary {
-            op: MirUnOp::BitNot,
-            ..
-        } = &value.kind
-        {
-            self.record(Gap::Subset("bit operation".to_owned()));
         }
         radix_mir::visit::walk_value(self, value);
     }

@@ -15,7 +15,7 @@ use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module, default
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use radix_lexer::Interner;
 use radix_mir::*;
-use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
+use radix_types::{BitsWidth, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
 
 use crate::abi::{self, AbiTy, RuntimeSymbol};
@@ -61,6 +61,8 @@ pub(crate) enum Rep {
     Float,
     /// `bool` as `i8` 0/1.
     Bool,
+    /// A raw-bits value `bN`: the pattern zero-extended in an `i64`.
+    Bits(BitsWidth),
     /// `textus`: a pointer to `[len: i64][bytes...]` (see `abi::TEXT_HEADER`).
     Text,
     /// No value.
@@ -73,7 +75,7 @@ impl Rep {
             Self::Int => Some(types::I64),
             Self::Float => Some(types::F64),
             Self::Bool => Some(types::I8),
-            Self::Text => Some(types::I64),
+            Self::Text | Self::Bits(_) => Some(types::I64),
             Self::Unit => None,
         }
     }
@@ -95,6 +97,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         Type::Primitive(Primitive::Fractus) => Ok(Rep::Float),
         Type::Primitive(Primitive::Bivalens) => Ok(Rep::Bool),
         Type::Primitive(Primitive::Textus) => Ok(Rep::Text),
+        Type::Bits(width) => Ok(Rep::Bits(*width)),
         Type::Primitive(Primitive::Vacuum | Primitive::Numquam) => Ok(Rep::Unit),
         Type::SizedNumeric(Primitive::Numerus, width) => match width {
             NumericWidth::I8
@@ -518,7 +521,7 @@ impl FunctionLower<'_, '_> {
             Rep::Int => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Float => Some(self.builder.ins().f64const(0.0)),
             Rep::Bool => Some(self.builder.ins().iconst(types::I8, 0)),
-            Rep::Text => Some(self.builder.ins().iconst(types::I64, 0)),
+            Rep::Text | Rep::Bits(_) => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Unit => None,
         }
     }
@@ -595,6 +598,20 @@ impl FunctionLower<'_, '_> {
         })
     }
 
+    /// A literal operand stored into a `bN` slot: the pattern itself.
+    fn bits_constant(
+        &mut self,
+        constant: &MirConstant,
+        _width: BitsWidth,
+    ) -> Lowered<Option<Value>> {
+        let pattern = match constant {
+            MirConstant::Int(literal) => *literal,
+            MirConstant::UInt(literal) => i64::from_ne_bytes(literal.to_ne_bytes()),
+            _ => return Err(Decline::new("bits constant")),
+        };
+        Ok(Some(self.builder.ins().iconst(types::I64, pattern)))
+    }
+
     /// The handle of a static text literal.
     fn text_literal(&mut self, bytes: &[u8]) -> Lowered<Value> {
         let data = self.state.text_data(bytes)?;
@@ -649,7 +666,13 @@ impl FunctionLower<'_, '_> {
     fn statement(&mut self, statement: &MirStatement) -> Lowered<()> {
         match &statement.kind {
             MirStatementKind::Assign { place, value } => {
-                let (computed, rep) = self.value(value)?;
+                let (_, slot_rep) = self.place_slot(place)?;
+                let (computed, rep) = match (&value.kind, slot_rep) {
+                    (MirValueKind::Operand(MirOperand::Constant(constant)), Rep::Bits(width)) => {
+                        (self.bits_constant(constant, width)?, Rep::Bits(width))
+                    }
+                    _ => self.value(value)?,
+                };
                 self.values.insert(value.id, (computed, rep));
                 let (variable, slot_rep) = self.place_slot(place)?;
                 if let Some(computed) = computed {
@@ -820,6 +843,13 @@ impl FunctionLower<'_, '_> {
                 self.call_runtime(&abi::TEXT_FROM_F64, &[value, narrow])?
             }
             Rep::Bool => self.call_runtime(&abi::TEXT_FROM_BOOL, &[value])?,
+            Rep::Bits(width) => {
+                let bits = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, i64::from(width.bits()));
+                self.call_runtime(&abi::TEXT_FROM_BITS, &[value, bits])?
+            }
             Rep::Unit => return Err(Decline::new("unit rendered as text")),
         };
         rendered.ok_or_else(|| Decline::new("text rendering result"))
@@ -924,6 +954,7 @@ impl FunctionLower<'_, '_> {
         let stored = match (rep, slot_rep) {
             (Rep::Int, Rep::Int) => self.int_store(site, conversion.target_ty, value)?,
             (Rep::Float, Rep::Float) | (Rep::Bool, Rep::Bool) | (Rep::Text, Rep::Text) => value,
+            (Rep::Bits(from), Rep::Bits(to)) if from == to => value,
             _ => return Err(Decline::new("conversion between representations")),
         };
         self.builder.def_var(variable, stored);
@@ -1051,6 +1082,14 @@ impl FunctionLower<'_, '_> {
                 let reference = self.runtime_ref(&abi::PRINT_BOOL)?;
                 self.builder.ins().call(reference, &[stream, value]);
             }
+            Rep::Bits(width) => {
+                let bits = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, i64::from(width.bits()));
+                let reference = self.runtime_ref(&abi::PRINT_BITS)?;
+                self.builder.ins().call(reference, &[stream, value, bits]);
+            }
             Rep::Text => {
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
                 self.builder.ins().call(reference, &[stream, value]);
@@ -1090,6 +1129,15 @@ impl FunctionLower<'_, '_> {
                 let one = self.builder.ins().iconst(types::I8, 1);
                 Ok((self.builder.ins().bxor(value, one), Rep::Bool))
             }
+            (MirUnOp::BitNot, Rep::Bits(width)) => {
+                let mask = if width == BitsWidth::B64 {
+                    -1
+                } else {
+                    (1i64 << width.bits()) - 1
+                };
+                let mask = self.builder.ins().iconst(types::I64, mask);
+                Ok((self.builder.ins().bxor(value, mask), Rep::Bits(width)))
+            }
             _ => Err(Decline::new("unary operation")),
         }
     }
@@ -1103,16 +1151,24 @@ impl FunctionLower<'_, '_> {
     ) -> Lowered<(Value, Rep)> {
         let (a, a_rep) = self.scalar(lhs)?;
         let (b, b_rep) = self.scalar(rhs)?;
+        if let Some(width) = [a_rep, b_rep, result]
+            .into_iter()
+            .find_map(|rep| match rep {
+                Rep::Bits(width) => Some(width),
+                _ => None,
+            })
+        {
+            return self.bits_binary(op, (lhs, a, a_rep), (rhs, b, b_rep), width);
+        }
         if a_rep != b_rep {
             return Err(Decline::new("mixed-representation operands"));
         }
-        let _ = result;
         match a_rep {
             Rep::Int => self.int_binary(op, a, b),
             Rep::Float => self.float_binary(op, a, b),
             Rep::Bool => self.bool_binary(op, a, b),
             Rep::Text => self.text_binary(op, a, b),
-            Rep::Unit => Err(Decline::new("unit operands")),
+            Rep::Bits(_) | Rep::Unit => Err(Decline::new("unit operands")),
         }
     }
 
@@ -1148,6 +1204,87 @@ impl FunctionLower<'_, '_> {
             MirBinOp::LtEq => compare(self, FloatCC::LessThanOrEqual),
             MirBinOp::GtEq => compare(self, FloatCC::GreaterThanOrEqual),
             _ => return Err(Decline::new("float operation")),
+        })
+    }
+
+    /// A bits operand as its zero-extended pattern: a bare literal operand is
+    /// the pattern itself (the compiler range-checked it against `bN`).
+    fn bits_pattern(
+        &mut self,
+        operand: &MirOperand,
+        value: Value,
+        rep: Rep,
+        width: BitsWidth,
+    ) -> Lowered<Value> {
+        match (rep, operand) {
+            (Rep::Bits(have), _) if have == width => Ok(value),
+            (Rep::Int, MirOperand::Constant(MirConstant::Int(literal))) => {
+                Ok(self.builder.ins().iconst(types::I64, *literal))
+            }
+            (Rep::Int, MirOperand::Constant(MirConstant::UInt(literal))) => Ok(self
+                .builder
+                .ins()
+                .iconst(types::I64, i64::from_ne_bytes(literal.to_ne_bytes()))),
+            _ => Err(Decline::new("mixed-representation operands")),
+        }
+    }
+
+    /// `bN` operations at the type's own width: bitwise ops and comparisons on
+    /// the pattern, guarded shifts (a count of `N` or more gives zero, a
+    /// negative count aborts).
+    fn bits_binary(
+        &mut self,
+        op: MirBinOp,
+        lhs: (&MirOperand, Value, Rep),
+        rhs: (&MirOperand, Value, Rep),
+        width: BitsWidth,
+    ) -> Lowered<(Value, Rep)> {
+        let bits = i64::from(width.bits());
+        let mask = if width == BitsWidth::B64 {
+            -1
+        } else {
+            (1i64 << bits) - 1
+        };
+        let a = self.bits_pattern(lhs.0, lhs.1, lhs.2, width)?;
+        if matches!(op, MirBinOp::Shl | MirBinOp::Shr) {
+            if rhs.2 != Rep::Int {
+                return Err(Decline::new("shift count representation"));
+            }
+            let count = rhs.1;
+            let negative = {
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                self.builder.ins().icmp(IntCC::SignedLessThan, count, zero)
+            };
+            self.trap_if(negative, "negative shift count")?;
+            let limit = self.builder.ins().iconst(types::I64, bits);
+            let inside = self
+                .builder
+                .ins()
+                .icmp(IntCC::UnsignedLessThan, count, limit);
+            let shifted = if op == MirBinOp::Shl {
+                let moved = self.builder.ins().ishl(a, count);
+                let mask = self.builder.ins().iconst(types::I64, mask);
+                self.builder.ins().band(moved, mask)
+            } else {
+                self.builder.ins().ushr(a, count)
+            };
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let result = self.builder.ins().select(inside, shifted, zero);
+            return Ok((result, Rep::Bits(width)));
+        }
+        let b = self.bits_pattern(rhs.0, rhs.1, rhs.2, width)?;
+        let compare = |this: &mut Self, cc: IntCC| (this.builder.ins().icmp(cc, a, b), Rep::Bool);
+        Ok(match op {
+            MirBinOp::BitAnd => (self.builder.ins().band(a, b), Rep::Bits(width)),
+            MirBinOp::BitOr => (self.builder.ins().bor(a, b), Rep::Bits(width)),
+            MirBinOp::BitXor => (self.builder.ins().bxor(a, b), Rep::Bits(width)),
+            MirBinOp::Eq => compare(self, IntCC::Equal),
+            MirBinOp::NotEq => compare(self, IntCC::NotEqual),
+            MirBinOp::Lt => compare(self, IntCC::UnsignedLessThan),
+            MirBinOp::Gt => compare(self, IntCC::UnsignedGreaterThan),
+            MirBinOp::LtEq => compare(self, IntCC::UnsignedLessThanOrEqual),
+            MirBinOp::GtEq => compare(self, IntCC::UnsignedGreaterThanOrEqual),
+            _ => return Err(Decline::new("bits operation")),
         })
     }
 
