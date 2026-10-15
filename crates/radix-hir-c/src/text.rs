@@ -147,6 +147,10 @@ impl Emitter<'_> {
                 let (yes, no) = (c_string(&tokens.true_)?, c_string(&tokens.false_)?);
                 Ok(format!("({} ? {yes} : {no})", operand.text))
             }
+            Value::Decimal => {
+                self.support.need(Helper::DecimalText);
+                Ok(format!("faber_dec_fmt(faber_a, {})", operand.text))
+            }
             Value::List(elem) => self.show_list(&operand.text, elem),
             Value::Genus(def_id) => self.show_genus(&operand.text, def_id),
             Value::Float => {

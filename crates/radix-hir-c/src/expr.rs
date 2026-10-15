@@ -49,6 +49,8 @@ pub(crate) enum Value {
     Genus(DefId),
     /// A binary64 value (`double`).
     Float,
+    /// An exact decimal (`faber_dec`: an `i128` carrier at its own scale).
+    Decimal,
     /// An optional: a pointer that may be `NULL`, or a presence-flag struct.
     Opt(Inner),
     /// A bare `none` value, always `(0)`, printed as the locale's none word.
@@ -60,13 +62,16 @@ impl From<Ty> for Value {
         match ty {
             Ty::Int => Value::Int,
             // `u64` does not fit an `int64_t`, so it reads as an exact value.
-            Ty::Sized(IntWidth::U64) => Value::Exact,
-            Ty::Sized(_) => Value::Int,
+            Ty::Sized(IntWidth::U64) | Ty::Modular(IntWidth::U64) | Ty::Saturating(IntWidth::U64) => {
+                Value::Exact
+            }
+            Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) => Value::Int,
             Ty::Text => Value::Text,
             Ty::Bool => Value::Truth,
             Ty::List(elem) => Value::List(elem),
             Ty::Genus(def_id) => Value::Genus(def_id),
             Ty::Float => Value::Float,
+            Ty::Decimal => Value::Decimal,
             Ty::Opt(inner) => Value::Opt(inner),
             Ty::None => Value::None,
         }
@@ -198,8 +203,15 @@ impl Emitter<'_> {
                 let as_float = expr.ty.is_some_and(|ty| {
                     classify(self.types, ty).is_ok_and(|class| class == Ty::Float)
                 });
+                let as_decimal = expr.ty.is_some_and(|ty| {
+                    classify(self.types, ty).is_ok_and(|class| class == Ty::Decimal)
+                });
                 match literal {
                     HirLiteral::Nil => self.none_value(expr),
+                    HirLiteral::Int(value) if as_decimal => self.decimal_int_literal(*value),
+                    HirLiteral::FloatText { text, .. } if as_decimal => {
+                        self.decimal_text_literal(*text)
+                    }
                     HirLiteral::Int(value) if as_float =>
                     {
                         #[expect(clippy::cast_precision_loss)]
@@ -208,7 +220,7 @@ impl Emitter<'_> {
                     _ => self.literal(literal),
                 }
             }
-            HirExpressionKind::Binary(op, left, right) => self.binary(*op, left, right),
+            HirExpressionKind::Binary(op, left, right) => self.binary(*op, left, right, expr.ty),
             HirExpressionKind::Unary(op, operand) => self.unary(*op, operand),
             HirExpressionKind::Conversio {
                 source,
@@ -234,6 +246,20 @@ impl Emitter<'_> {
                 implicit: None,
                 ..
             } => self.ordo_conversion(source, *row, members, recovery.as_deref()),
+            // `place ↤ source`: the value is `source` converted to the node's
+            // resolved target type. A declaration (the common form) then binds
+            // that value; a statement form assigns it, handled in `stmt`.
+            HirExpressionKind::ConversioAssign {
+                source,
+                recovery,
+                params,
+                ..
+            } => {
+                let Some(ty) = expr.ty else {
+                    return Err(unsupported("conversion assignment without a target type"));
+                };
+                self.conversion(source, ty, params, recovery.as_deref())
+            }
             HirExpressionKind::Scriptum(template, args) => self.template(*template, args),
             HirExpressionKind::Si {
                 cond,
@@ -528,8 +554,14 @@ impl Emitter<'_> {
         // A sized result is a C `intN_t`; it widens to the value form the
         // arithmetic and `print` take.
         match ret {
-            Some(Ty::Sized(IntWidth::U64)) => call = format!("((faber_i128){call})"),
-            Some(Ty::Sized(_)) => call = format!("((int64_t){call})"),
+            Some(
+                Ty::Sized(IntWidth::U64)
+                | Ty::Modular(IntWidth::U64)
+                | Ty::Saturating(IntWidth::U64),
+            ) => call = format!("((faber_i128){call})"),
+            Some(Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_)) => {
+                call = format!("((int64_t){call})");
+            }
             _ => {}
         }
         let text = wrap(&prelude, &call);
@@ -579,6 +611,10 @@ impl Emitter<'_> {
             Value::List(Elem::Bool) => "faber_list_bool *".to_owned(),
             Value::List(Elem::Float) => "faber_list_f64 *".to_owned(),
             Value::Float => "double ".to_owned(),
+            Value::Decimal => {
+                self.support.need(Helper::Decimal);
+                "faber_dec ".to_owned()
+            }
             Value::Opt(inner) => match self.c_type(Ty::Opt(inner)) {
                 Ok(c_type) if c_type.ends_with('*') => c_type,
                 Ok(c_type) => format!("{c_type} "),
@@ -631,6 +667,210 @@ impl Emitter<'_> {
         })
     }
 
+    /// A `d64` integer literal: an exact carrier at scale 0.
+    fn decimal_int_literal(&mut self, value: u64) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::Decimal);
+        let text = if let Ok(narrow) = i64::try_from(value) {
+            self.support.need_ints();
+            c_int64(narrow)
+        } else {
+            self.support.need(Helper::Types);
+            format!("(faber_i128)UINT64_C({value})")
+        };
+        Ok(Operand::new(format!("faber_dec_int({text})"), Value::Decimal))
+    }
+
+    /// A `d64` decimal literal, carried exactly as its digit text (the
+    /// frontend proves it fits the declared width and never rounds it).
+    fn decimal_text_literal(&mut self, symbol: radix_lexer::Symbol) -> Result<Operand, CodegenError> {
+        let raw = self.names.resolve_symbol(symbol);
+        let decoded = radix_codegen_shared::unescape_faber_text(raw);
+        let Some(carrier) = radix_codegen_shared::decimal::decimal_text_to_carrier(
+            &decoded,
+            radix_types::NumericWidth::D64,
+        ) else {
+            return Err(unsupported("decimal literal outside the d64 range"));
+        };
+        self.support.need(Helper::Decimal);
+        self.support.need_ints();
+        Ok(Operand::new(
+            format!("faber_dec_of({})", c_int64(carrier)),
+            Value::Decimal,
+        ))
+    }
+
+    /// `-x` over an exact decimal.
+    fn decimal_negate(&mut self, value: &Operand) -> Operand {
+        self.support.need(Helper::Decimal);
+        Operand::new(format!("faber_dec_neg({})", value.text), Value::Decimal)
+            .with_effect(value.effect)
+    }
+
+    /// An operand as an exact decimal: a decimal is itself; an integer is a
+    /// scale-0 carrier (`a + 1`, `d64 ≻ int`).
+    fn as_decimal(&mut self, value: Operand) -> Result<Operand, CodegenError> {
+        match value.value {
+            Value::Decimal => Ok(value),
+            Value::Int | Value::Exact => {
+                self.support.need(Helper::Decimal);
+                Ok(Operand::new(
+                    format!("faber_dec_int((faber_i128){})", value.text),
+                    Value::Decimal,
+                )
+                .with_effect(value.effect))
+            }
+            _ => Err(unsupported("decimal operation on a non-numeric value")),
+        }
+    }
+
+    /// `+ - * / %` and the comparisons over exact decimals. The carriers are
+    /// exact until a store rounds; comparison uses the runner's three-way
+    /// `faber_dec_cmp`, which scales only as far as `i128` allows.
+    fn decimal_binary(
+        &mut self,
+        op: HirBinOp,
+        l: Operand,
+        r: Operand,
+    ) -> Result<Operand, CodegenError> {
+        let l = self.as_decimal(l)?;
+        let r = self.as_decimal(r)?;
+        let effect = l.effect || r.effect;
+        let mut operands = [l, r];
+        let prelude = self.sequence(&mut operands);
+        let [l, r] = operands;
+        self.support.need(Helper::Decimal);
+        let name = match op {
+            HirBinOp::Add => "faber_dec_add",
+            HirBinOp::Sub => "faber_dec_sub",
+            HirBinOp::Mul => "faber_dec_mul",
+            HirBinOp::Div => "faber_dec_div",
+            HirBinOp::Mod => "faber_dec_rem",
+            HirBinOp::Lt
+            | HirBinOp::Gt
+            | HirBinOp::LtEq
+            | HirBinOp::GtEq
+            | HirBinOp::Eq
+            | HirBinOp::StrictEq
+            | HirBinOp::ApproxEq
+            | HirBinOp::NotEq
+            | HirBinOp::StrictNotEq
+            | HirBinOp::ApproxNotEq => {
+                let glyph = match op {
+                    HirBinOp::Lt => "<",
+                    HirBinOp::Gt => ">",
+                    HirBinOp::LtEq => "<=",
+                    HirBinOp::GtEq => ">=",
+                    HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::ApproxEq => "==",
+                    _ => "!=",
+                };
+                let call = format!("(faber_dec_cmp({}, {}) {glyph} 0)", l.text, r.text);
+                return Ok(Operand::new(wrap(&prelude, &call), Value::Truth).with_effect(effect));
+            }
+            other => return Err(unsupported(binary_name(other))),
+        };
+        let call = format!("{name}({}, {})", l.text, r.text);
+        Ok(Operand::new(wrap(&prelude, &call), Value::Decimal).with_effect(effect))
+    }
+
+    /// The element kind of a list-typed expression, if it is one.
+    fn list_element(&self, ty: Option<radix_types::TypeId>) -> Option<Elem> {
+        match classify(self.types, ty?).ok()? {
+            Ty::List(elem) => Some(elem),
+            _ => None,
+        }
+    }
+
+    /// The lifted list operators: `xs + ys`, `2 * xs`, `xs / 10`, the
+    /// per-element comparisons `xs ≺ ys` / `xs ≤ 3`, and whole-list `≡`.
+    /// Called only when at least one operand is a list.
+    fn list_binary(
+        &mut self,
+        op: HirBinOp,
+        left: &HirExpression,
+        right: &HirExpression,
+        ty: Option<radix_types::TypeId>,
+        l: Operand,
+        r: Operand,
+    ) -> Result<Operand, CodegenError> {
+        let left_elem = self.list_element(left.ty);
+        let right_elem = self.list_element(right.ty);
+        let Some(elem) = left_elem.or(right_elem) else {
+            return Err(unsupported("elementwise operator without a list operand"));
+        };
+        let suffix = match elem {
+            Elem::Int => "i64",
+            Elem::Float => "f64",
+            _ => return Err(unsupported("elementwise operator on a non-numeric list")),
+        };
+        let result_is_list = ty.is_some_and(|ty| {
+            classify(self.types, ty).is_ok_and(|class| matches!(class, Ty::List(_)))
+        });
+        // Whole-list equality is one `bool` over the element equality; the
+        // lifted comparison is a list of `bool`.
+        let whole_equality = matches!(
+            op,
+            HirBinOp::Eq
+                | HirBinOp::StrictEq
+                | HirBinOp::NotEq
+                | HirBinOp::StrictNotEq
+                | HirBinOp::ApproxEq
+                | HirBinOp::ApproxNotEq
+        ) && !result_is_list
+            && left_elem.is_some()
+            && right_elem.is_some();
+        if whole_equality {
+            self.support.need(Helper::ListLift);
+            let effect = l.effect || r.effect;
+            let mut operands = [l, r];
+            let prelude = self.sequence(&mut operands);
+            let [l, r] = operands;
+            let call = format!("faber_list_{suffix}_equal({}, {})", l.text, r.text);
+            let negate = matches!(op, HirBinOp::NotEq | HirBinOp::StrictNotEq | HirBinOp::ApproxNotEq);
+            let text = if negate {
+                format!("(!{call})")
+            } else {
+                call
+            };
+            return Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect));
+        }
+        let op_name = match op {
+            HirBinOp::Add => "add",
+            HirBinOp::Sub => "sub",
+            HirBinOp::Mul => "mul",
+            HirBinOp::Div => "div",
+            HirBinOp::Lt => "lt",
+            HirBinOp::Gt => "gt",
+            HirBinOp::LtEq => "le",
+            HirBinOp::GtEq => "ge",
+            HirBinOp::ApproxEq => "eq",
+            HirBinOp::ApproxNotEq => "ne",
+            _ => return Err(unsupported(binary_name(op))),
+        };
+        let side = match (left_elem.is_some(), right_elem.is_some()) {
+            (true, true) => "pair",
+            (true, false) => "left",
+            _ => "right",
+        };
+        self.support.need(Helper::ListLift);
+        let effect = l.effect || r.effect;
+        let mut operands = [l, r];
+        let prelude = self.sequence(&mut operands);
+        let [l, r] = operands;
+        let call = format!(
+            "faber_list_{suffix}_{op_name}_lift_{side}(faber_a, {}, {})",
+            l.text, r.text
+        );
+        let value = if matches!(
+            op,
+            HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq | HirBinOp::ApproxEq | HirBinOp::ApproxNotEq
+        ) {
+            Value::List(Elem::Bool)
+        } else {
+            Value::List(elem)
+        };
+        Ok(Operand::new(wrap(&prelude, &call), value).with_effect(effect))
+    }
+
     fn path(&self, def_id: radix_hir::DefId) -> Result<Operand, CodegenError> {
         match self.locals.get(&def_id) {
             Some(local) => {
@@ -662,6 +902,18 @@ impl Emitter<'_> {
                 let mut operand = Operand::new(cell.to_owned(), Value::Int);
                 operand.narrow = Some(Narrow::leaf(cell));
                 operand
+            }
+            // A stored decimal is a `faber_dec` pair at scale 8; a read is the
+            // pair itself.
+            Ty::Decimal => Operand::new(cell.to_owned(), Value::Decimal),
+            // A modular or saturating word reads widened like a sized integer,
+            // but with no `int64_t` fast path: its arithmetic must stay exact
+            // until the store reduces or clamps.
+            Ty::Modular(IntWidth::U64) | Ty::Saturating(IntWidth::U64) => {
+                Operand::new(format!("((faber_i128){cell})"), Value::Exact)
+            }
+            Ty::Modular(_) | Ty::Saturating(_) => {
+                Operand::new(format!("((int64_t){cell})"), Value::Int)
             }
             other => Operand::new(cell.to_owned(), other.into()),
         }
@@ -703,13 +955,25 @@ impl Emitter<'_> {
     }
 
     fn unary(&mut self, op: HirUnOp, operand: &HirExpression) -> Result<Operand, CodegenError> {
+        let wide = operand.ty.is_some_and(|ty| {
+            matches!(classify(self.types, ty), Ok(Ty::Modular(_)))
+        });
         let inner = self.expr(operand)?;
         match op {
             HirUnOp::Neg if inner.value == Value::Float => Ok(Self::float_negate(&inner)),
+            HirUnOp::Neg if inner.value == Value::Decimal => Ok(self.decimal_negate(&inner)),
             HirUnOp::Neg if !inner.is_integer() => Err(unsupported("negation of a non-integer")),
             HirUnOp::Neg => {
                 if let Some(value) = inner.constant {
                     return self.int(-value);
+                }
+                if wide {
+                    self.support.need(Helper::Wide);
+                    return Ok(Operand::new(
+                        format!("faber_sub_wide(0, {})", inner.text),
+                        Value::Exact,
+                    )
+                    .with_effect(inner.effect));
                 }
                 self.support.need(Helper::Sub);
                 let narrow = inner
@@ -731,6 +995,14 @@ impl Emitter<'_> {
                 if !inner.is_integer() {
                     return Err(unsupported("bitwise not of a non-integer"));
                 }
+                if wide {
+                    self.support.need(Helper::Wide);
+                    return Ok(Operand::new(
+                        format!("faber_bit_not_wide({})", inner.text),
+                        Value::Exact,
+                    )
+                    .with_effect(inner.effect));
+                }
                 if let Some(value) = inner.constant {
                     return self.int(!value);
                 }
@@ -748,6 +1020,7 @@ impl Emitter<'_> {
         op: HirBinOp,
         left: &HirExpression,
         right: &HirExpression,
+        ty: Option<radix_types::TypeId>,
     ) -> Result<Operand, CodegenError> {
         // `x ≡ null` and `null ≡ x` test for none like `x is none`.
         let equality = match op {
@@ -773,21 +1046,37 @@ impl Emitter<'_> {
         if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq) {
             return self.fuzzy(op, l, r);
         }
+        if self.list_element(left.ty).is_some() || self.list_element(right.ty).is_some() {
+            return self.list_binary(op, left, right, ty, l, r);
+        }
+        if l.value == Value::Decimal || r.value == Value::Decimal {
+            return self.decimal_binary(op, l, r);
+        }
         if l.value == Value::Float || r.value == Value::Float || op == HirBinOp::TrueDiv {
+            // The runner's `÷` is `f32` for 8- and 16-bit operands and `f64`
+            // otherwise. This target has no `f32` (C7's open question), so it
+            // rejects the narrow form by name rather than approximate it.
+            if op == HirBinOp::TrueDiv
+                && (Self::narrow_width(self.types, left.ty)
+                    || Self::narrow_width(self.types, right.ty))
+            {
+                return Err(unsupported("true division of 8- or 16-bit operands (f32)"));
+            }
             return self.float_binary(op, l, r);
         }
+        let wide = ty.is_some_and(|t| matches!(classify(self.types, t), Ok(Ty::Modular(_))));
         match op {
             HirBinOp::Add if l.value == Value::Text && r.value == Value::Text => {
                 Ok(self.concat(l, r))
             }
             HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod => {
-                self.arithmetic(op, l, r)
+                self.arithmetic(op, l, r, wide)
             }
             HirBinOp::BitAnd
             | HirBinOp::BitOr
             | HirBinOp::BitXor
             | HirBinOp::Shl
-            | HirBinOp::Shr => self.bitwise(op, l, r),
+            | HirBinOp::Shr => self.bitwise(op, l, r, wide),
             // `≅` / `≇` is exact value equality, including across families.
             HirBinOp::ApproxEq | HirBinOp::ApproxNotEq => self.comparison(op, l, r),
             HirBinOp::Lt
@@ -803,11 +1092,23 @@ impl Emitter<'_> {
         }
     }
 
+    /// Whether a type classifies to an 8- or 16-bit integer, the widths the
+    /// runner's `÷` computes in `f32`.
+    fn narrow_width(types: &radix_types::TypeTable, ty: Option<radix_types::TypeId>) -> bool {
+        matches!(
+            ty.and_then(|ty| classify(types, ty).ok()),
+            Some(Ty::Sized(
+                IntWidth::I8 | IntWidth::I16 | IntWidth::U8 | IntWidth::U16
+            ))
+        )
+    }
+
     fn arithmetic(
         &mut self,
         op: HirBinOp,
         l: Operand,
         r: Operand,
+        wide: bool,
     ) -> Result<Operand, CodegenError> {
         if !l.is_integer() || !r.is_integer() {
             return Err(unsupported("arithmetic on text or a boolean"));
@@ -820,8 +1121,20 @@ impl Emitter<'_> {
             HirBinOp::Mod => (floor_mod, Helper::Rem, "faber_rem"),
             other => return Err(unsupported(binary_name(other))),
         };
+        let (helper, name) = if wide {
+            let name = match op {
+                HirBinOp::Add => "faber_add_wide",
+                HirBinOp::Sub => "faber_sub_wide",
+                HirBinOp::Mul => "faber_mul_wide",
+                HirBinOp::Div => "faber_div_wide",
+                _ => "faber_rem_wide",
+            };
+            (Helper::Wide, name)
+        } else {
+            (helper, name)
+        };
         let (Some(a), Some(b)) = (l.constant, r.constant) else {
-            return Ok(self.runtime_arithmetic(op, helper, name, l, r));
+            return Ok(self.runtime_arithmetic(op, helper, name, l, r, wide));
         };
         if b == 0 {
             match op {
@@ -868,14 +1181,25 @@ impl Emitter<'_> {
     /// range-checked (`faber::exact`), so there is no `int64_t` fast path:
     /// two's complement on the exact window can leave the cap. A constant pair
     /// folds with the same rules; the frontend folds most of these first.
-    fn bitwise(&mut self, op: HirBinOp, l: Operand, r: Operand) -> Result<Operand, CodegenError> {
+    fn bitwise(
+        &mut self,
+        op: HirBinOp,
+        l: Operand,
+        r: Operand,
+        wide: bool,
+    ) -> Result<Operand, CodegenError> {
         if !l.is_integer() || !r.is_integer() {
             return Err(unsupported(binary_name(op)));
         }
         let name = match op {
+            HirBinOp::BitAnd if wide => "faber_bit_and_wide",
+            HirBinOp::BitOr if wide => "faber_bit_or_wide",
+            HirBinOp::BitXor if wide => "faber_bit_xor_wide",
             HirBinOp::BitAnd => "faber_bit_and",
             HirBinOp::BitOr => "faber_bit_or",
             HirBinOp::BitXor => "faber_bit_xor",
+            HirBinOp::Shl if wide => "faber_shl_wide",
+            HirBinOp::Shr if wide => "faber_shr_wide",
             HirBinOp::Shl => "faber_shl",
             HirBinOp::Shr => "faber_shr",
             other => return Err(unsupported(binary_name(other))),
@@ -908,8 +1232,17 @@ impl Emitter<'_> {
         name: &str,
         l: Operand,
         r: Operand,
+        wide: bool,
     ) -> Operand {
         let effect = l.effect || r.effect;
+        if wide {
+            self.support.need(helper);
+            let mut operands = [l, r];
+            let prelude = self.sequence(&mut operands);
+            let [l, r] = operands;
+            let text = wrap(&prelude, &format!("{name}({}, {})", l.text, r.text));
+            return Operand::new(text, Value::Exact).with_effect(effect);
+        }
         let floor = match op {
             HirBinOp::Div => Some(Helper::FdivI64),
             HirBinOp::Mod => Some(Helper::FmodI64),
@@ -1065,11 +1398,39 @@ impl Emitter<'_> {
         // read as unsigned: exactly what `strcmp` compares.
         let body = if text_pair {
             format!("(strcmp({}, {}) {glyph} 0)", l.text, r.text)
-        } else {
+        } else if truth_pair
+            || (l.constant.is_some() && r.constant.is_some())
+            || !Self::negative_constant(&l, &r)
+        {
             format!("({} {glyph} {})", l.text, r.text)
+        } else {
+            // A helper, not a bare operator: a sized or word read compared
+            // with a negative constant can be provably constant (`u8 > -1`),
+            // which `-Wtype-limits` rejects; the helper is the exact model's
+            // too.
+            let helper = match op {
+                HirBinOp::Lt => "faber_int_lt",
+                HirBinOp::Gt => "faber_int_gt",
+                HirBinOp::LtEq => "faber_int_le",
+                HirBinOp::GtEq => "faber_int_ge",
+                HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::ApproxEq => "faber_int_eq",
+                _ => "faber_int_ne",
+            };
+            self.support.need(Helper::IntCmp);
+            format!("({helper}({}, {}))", l.text, r.text)
         };
         let text = wrap(&prelude, &body);
         Ok(Operand::new(text, Value::Truth).with_effect(effect))
+    }
+
+    /// Whether one operand is a negative constant and the other is not a
+    /// constant: the comparison could be provably constant for an unsigned
+    /// read and trip `-Wtype-limits`, so it takes the helper form.
+    fn negative_constant(l: &Operand, r: &Operand) -> bool {
+        match (l.constant, r.constant) {
+            (Some(value), None) | (None, Some(value)) => value < 0,
+            _ => false,
+        }
     }
 
     /// `and` / `or` short-circuit, as C's `&&` / `||` do, and C sequences the
@@ -1125,6 +1486,14 @@ impl Emitter<'_> {
                 let at = c_string(&self.store_position(site))?;
                 Ok(self.store_sized(&value, width, &at))
             }
+            // A modular word reduces modulo 2^W at the store; a saturating
+            // word clamps. Both are total (they never trap).
+            (Ty::Modular(width), Value::Int | Value::Exact) => {
+                Ok(self.store_word(&value, Ty::Modular(width), "wrapping", width))
+            }
+            (Ty::Saturating(width), Value::Int | Value::Exact) => {
+                Ok(self.store_word(&value, Ty::Saturating(width), "saturating", width))
+            }
             (Ty::Opt(slot), Value::Opt(inner)) if slot == inner => Ok(value),
             (Ty::Opt(inner), form) if form == Value::from(inner.ty()) => {
                 Ok(self.some_value(&value, inner))
@@ -1133,6 +1502,19 @@ impl Emitter<'_> {
             (Ty::Opt(inner), Value::Exact) if inner == Inner::Int => {
                 let narrowed = self.store(value, Ty::Int, site)?;
                 Ok(self.some_value(&narrowed, inner))
+            }
+            // A decimal rounds half-even to scale 8 at the store and checks
+            // the `i64` carrier. Nothing else in this subset stores one.
+            (Ty::Decimal, Value::Decimal) => {
+                let at = c_string(&self.store_position(site))?;
+                self.support.need(Helper::Decimal);
+                let text = format!(
+                    "faber_dec_of(faber_dec_store({}, {at}, \"\"))",
+                    value.text
+                );
+                let mut operand = Operand::new(text, Value::Decimal).with_effect(value.effect);
+                operand.stored = Some(Ty::Decimal);
+                Ok(operand)
             }
             _ => Err(unsupported("conversion between value classes")),
         }
@@ -1161,6 +1543,31 @@ impl Emitter<'_> {
             } else {
                 Operand::new(format!("((int64_t){call})"), Value::Int)
             }
+        };
+        operand.effect = value.effect;
+        operand.stored = Some(class);
+        operand
+    }
+
+    /// A store into a modular or saturating word: the helper reduces modulo
+    /// 2^W or clamps, then the value widens to the class's read form.
+    pub(crate) fn store_word(
+        &mut self,
+        value: &Operand,
+        class: Ty,
+        kind: &str,
+        width: IntWidth,
+    ) -> Operand {
+        self.support.need_ints();
+        let call = format!(
+            "faber_store_{kind}_{}({})",
+            width.marker(),
+            value.text
+        );
+        let mut operand = if width == IntWidth::U64 {
+            Operand::new(format!("((faber_i128){call})"), Value::Exact)
+        } else {
+            Operand::new(format!("((int64_t){call})"), Value::Int)
         };
         operand.effect = value.effect;
         operand.stored = Some(class);
@@ -1213,6 +1620,32 @@ impl Emitter<'_> {
                 } else {
                     Ok(value)
                 }
+            }
+            // A raw integer reaching a decimal cell (typecheck inserted no
+            // store): wrap it at scale 0 and round it like the store would.
+            Ty::Decimal if value.value != Value::Decimal => {
+                self.support.need(Helper::Decimal);
+                let pair = Operand::new(
+                    format!("faber_dec_int((faber_i128){})", value.text),
+                    Value::Decimal,
+                )
+                .with_effect(value.effect);
+                let stored = format!("faber_dec_of(faber_dec_store({}, \"\", \"\"))", pair.text);
+                let mut operand = Operand::new(stored, Value::Decimal).with_effect(value.effect);
+                operand.stored = Some(Ty::Decimal);
+                Ok(operand)
+            }
+            Ty::Modular(width) => {
+                if value.stored == Some(class) || !matches!(value.value, Value::Int | Value::Exact) {
+                    return Ok(value);
+                }
+                Ok(self.store_word(&value, class, "wrapping", width))
+            }
+            Ty::Saturating(width) => {
+                if value.stored == Some(class) || !matches!(value.value, Value::Int | Value::Exact) {
+                    return Ok(value);
+                }
+                Ok(self.store_word(&value, class, "saturating", width))
             }
             _ => Ok(value),
         }

@@ -384,9 +384,11 @@ impl Emitter<'_> {
                 Ok(format!("(strcmp({a}, {b}) == 0)"))
             }
             Ty::Genus(def_id) => self.enum_equal(def_id, &a, &b),
-            Ty::Float | Ty::Opt(_) | Ty::List(_) => Err(unsupported(
-                "equality of a union with a payload of this class",
-            )),
+            Ty::Float | Ty::Opt(_) | Ty::List(_) | Ty::Decimal | Ty::Modular(_) | Ty::Saturating(_) => {
+                Err(unsupported(
+                    "equality of a union with a payload of this class",
+                ))
+            }
         }
     }
 }

@@ -58,6 +58,7 @@ impl Emitter<'_> {
                 Value::Text => Ty::Text,
                 Value::Truth => Ty::Bool,
                 Value::Float => Ty::Float,
+                Value::Decimal => Ty::Decimal,
                 Value::List(elem) => Ty::List(elem),
                 Value::Genus(def_id) => Ty::Genus(def_id),
                 Value::Opt(inner) => Ty::Opt(inner),

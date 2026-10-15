@@ -104,13 +104,18 @@ report. It checks the runtime first: `faber.h` compiles on its own and
 | `x![i]` | the assertion (`x!`) then an ordinary checked element read (`xs[i]` or `s[i]`) |
 | `sponte` parameters (`T p optional`) | the C storage is the optional of the declared type; a call that omits the argument passes none, and a body read keeps the none (the runner holds the omitted `nil` for `coalesce`) |
 | `optional coalesce <expr>` parameters | the declared type alone; the call site evaluates the default and passes it, as the runner does in `lower_direct_call_args`. A call that omits a required slot is still rejected by name |
+| exact `d64` decimals | a `faber_dec` pair (an `faber_i128` carrier at its own scale); a stored cell holds one at scale 8. `+ - * / %` are exact on the carriers, comparisons use the runner's three-way `faber_dec_cmp`, a store rounds half-even with the runner's trap text, and display keeps the shortest form (D2.6). The conversio rows cover decimal↔integer (`via` rounding hint), decimal↔float, and text↔decimal |
+| elementwise list operators | `xs + ys` / `xs - ys` (equal-length pairing), `+ - * /` against a scalar on either side, the per-element comparisons `≺ ≻ ≤ ≥ ≅ ≇` (a `list<bool>`), and whole-list `≡` / `≢`. A length mismatch aborts `lista elementwise length mismatch`; integer elements run on the exact helpers and store at the element |
+| `wrapping<W>` (and `modulus<W>`) | the plain C width; reads widen, arithmetic and shifts are uncapped (`faber_*_wide`), and only the store reduces modulo 2^W (`faber_store_wrapping_<w>`). Division and remainder floor on the representatives, `¬` and `↑`/`↓` land through the same store |
+| `saturating<W>` | the plain C width; arithmetic is exact until the store, which clamps to the width's ends (`faber_store_saturating_<w>`); `↦ saturating<W>` clamps and cannot fail |
 | local names | the shared binding policy (`prefixed_binding_name`): `l_<name>`. Nothing C reserves starts with `l_`, so `char`, `goto`, `stdout` or `INT64_MAX` need no keyword table |
 
 ## Rejected by name
 
 `f32` and other float widths, policy floats, absent
 options, sized integers, `inf`, text comparison, nested lists,
-other list methods, lists of genus, `ref` / `mut` on scalars, generic genera,
+other list methods, lists of genus, lists of `wrapping`/`saturating` words,
+`ref` / `mut` on scalars, generic genera,
 contracts, static and optional fields, shorthand object-literal fields,
 bitwise operators, shifts, other `for` loops (lockstep, map and text sources), generic, async, device, error-channel
 and command functions, parameter access markers, function values, async entries, maps and every other collection, tensors,

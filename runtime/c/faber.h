@@ -134,6 +134,85 @@ static inline faber_i128 faber_rem(faber_i128 a, faber_i128 b) {
     return a - b * faber_div(a, b);
 }
 
+/* Integer comparisons over the exact window. A helper rather than a bare C
+ * operator so a provably-constant comparison (`a > -1` where `a` is `u8`)
+ * does not trip `-Wtype-limits`; the helper is also the exact model's. */
+static inline bool faber_int_lt(faber_i128 a, faber_i128 b) { return a < b; }
+static inline bool faber_int_gt(faber_i128 a, faber_i128 b) { return a > b; }
+static inline bool faber_int_le(faber_i128 a, faber_i128 b) { return a <= b; }
+static inline bool faber_int_ge(faber_i128 a, faber_i128 b) { return a >= b; }
+static inline bool faber_int_eq(faber_i128 a, faber_i128 b) { return a == b; }
+static inline bool faber_int_ne(faber_i128 a, faber_i128 b) { return a != b; }
+
+/* The same operations modulo 2^128 (the `faber_u128` ring): a `wrapping<W>`
+ * intermediate is the true value modulo 2^W, and reducing modulo 2^128 first
+ * is compatible with the later store's modulo-2^W reduction for every
+ * operation that is a ring homomorphism. No operation traps except a zero
+ * divisor. */
+static inline faber_i128 faber_add_wide(faber_i128 a, faber_i128 b) {
+    return (faber_i128)((faber_u128)a + (faber_u128)b);
+}
+
+static inline faber_i128 faber_sub_wide(faber_i128 a, faber_i128 b) {
+    return (faber_i128)((faber_u128)a - (faber_u128)b);
+}
+
+static inline faber_i128 faber_mul_wide(faber_i128 a, faber_i128 b) {
+    return (faber_i128)((faber_u128)a * (faber_u128)b);
+}
+
+static inline faber_i128 faber_div_wide(faber_i128 a, faber_i128 b) {
+    faber_i128 quotient;
+    if (b == 0) {
+        faber_trap("numerus division failed");
+    }
+    quotient = a / b;
+    if (a % b != 0 && ((a < 0) != (b < 0))) {
+        quotient -= 1;
+    }
+    return quotient;
+}
+
+static inline faber_i128 faber_rem_wide(faber_i128 a, faber_i128 b) {
+    return faber_sub_wide(a, faber_mul_wide(b, faber_div_wide(a, b)));
+}
+
+static inline faber_i128 faber_bit_not_wide(faber_i128 value) {
+    return ~value;
+}
+
+static inline faber_i128 faber_bit_and_wide(faber_i128 a, faber_i128 b) {
+    return a & b;
+}
+
+static inline faber_i128 faber_bit_or_wide(faber_i128 a, faber_i128 b) {
+    return a | b;
+}
+
+static inline faber_i128 faber_bit_xor_wide(faber_i128 a, faber_i128 b) {
+    return a ^ b;
+}
+
+static inline faber_i128 faber_shl_wide(faber_i128 value, faber_i128 count) {
+    if (count < 0) {
+        faber_trap("negative shift count");
+    }
+    if (count >= 128) {
+        return 0;
+    }
+    return (faber_i128)((faber_u128)value << (int)count);
+}
+
+static inline faber_i128 faber_shr_wide(faber_i128 value, faber_i128 count) {
+    if (count < 0) {
+        faber_trap("negative shift count");
+    }
+    if (count >= 127) {
+        return value < 0 ? -1 : 0;
+    }
+    return value >> (int)count;
+}
+
 /* Bitwise `∧ ∨ ⊻` and `¬`. Two's complement on the exact window can leave the
  * cap (`i64::MIN ^ u64::MAX`), so the result is range-checked like every other
  * exact operation. Mirrors `faber::exact::int(Some(a & b))` and friends. */
@@ -283,6 +362,53 @@ FABER_SIZED(u8, uint8_t, 0, UINT8_MAX)
 FABER_SIZED(u16, uint16_t, 0, UINT16_MAX)
 FABER_SIZED(u32, uint32_t, 0, UINT32_MAX)
 FABER_SIZED(u64, uint64_t, 0, UINT64_MAX)
+
+/* Modular (`wrapping<W>` / `modulus<W>`) and saturating (`saturating<W>`)
+ * word stores. Arithmetic is exact until the store; the wrapping store
+ * reduces modulo 2^W, the saturating store clamps at the width's ends. The
+ * modular reduction uses unsigned conversion (well-defined modulo 2^W) and
+ * an `i128` difference into the signed range, so no conversion is
+ * out of range. */
+#define FABER_WRAP_UNSIGNED(NAME, TYPE)                                              \
+    static inline TYPE faber_store_wrapping_##NAME(faber_i128 value) {               \
+        return (TYPE)value;                                                          \
+    }
+
+#define FABER_WRAP_SIGNED(NAME, TYPE, UTYPE, HALF)                                   \
+    static inline TYPE faber_store_wrapping_##NAME(faber_i128 value) {               \
+        UTYPE low = (UTYPE)value;                                                    \
+        return (TYPE)((faber_i128)low                                              \
+                      - (low < (UTYPE)HALF ? 0 : (faber_i128)HALF * 2));            \
+    }
+
+FABER_WRAP_SIGNED(i8, int8_t, uint8_t, 128)
+FABER_WRAP_SIGNED(i16, int16_t, uint16_t, 32768)
+FABER_WRAP_SIGNED(i32, int32_t, uint32_t, 2147483648u)
+FABER_WRAP_SIGNED(i64, int64_t, uint64_t, 9223372036854775808u)
+FABER_WRAP_UNSIGNED(u8, uint8_t)
+FABER_WRAP_UNSIGNED(u16, uint16_t)
+FABER_WRAP_UNSIGNED(u32, uint32_t)
+FABER_WRAP_UNSIGNED(u64, uint64_t)
+
+#define FABER_SATURATE(NAME, TYPE, MIN, MAX)                                         \
+    static inline TYPE faber_store_saturating_##NAME(faber_i128 value) {             \
+        if (value < (faber_i128)(MIN)) {                                             \
+            return (TYPE)(MIN);                                                      \
+        }                                                                            \
+        if (value > (faber_i128)(MAX)) {                                             \
+            return (TYPE)(MAX);                                                      \
+        }                                                                            \
+        return (TYPE)value;                                                          \
+    }
+
+FABER_SATURATE(i8, int8_t, INT8_MIN, INT8_MAX)
+FABER_SATURATE(i16, int16_t, INT16_MIN, INT16_MAX)
+FABER_SATURATE(i32, int32_t, INT32_MIN, INT32_MAX)
+FABER_SATURATE(i64, int64_t, INT64_MIN, INT64_MAX)
+FABER_SATURATE(u8, uint8_t, 0, UINT8_MAX)
+FABER_SATURATE(u16, uint16_t, 0, UINT16_MAX)
+FABER_SATURATE(u32, uint32_t, 0, UINT32_MAX)
+FABER_SATURATE(u64, uint64_t, 0, UINT64_MAX)
 
 /* An optional scalar: the value and whether it is present. Text, lists and
  * genera are pointers, so their none is NULL and they need no struct. */
@@ -746,6 +872,440 @@ static inline faber_text faber_quoted(faber_arena *arena, faber_text text) {
 }
 
 /* ------------------------------------------------------------------------ */
+/* Exact decimals (d64)                                                     */
+/* ------------------------------------------------------------------------ */
+
+/* An unstored decimal: an exact `i128` carrier at its own scale, mirroring
+ * runtime/rust/src/dec.rs. A stored `d64` cell holds one at scale 8 (its
+ * carrier is the scaled `i64` value). Arithmetic is exact on the carriers;
+ * only a store rounds half-even to scale 8 and checks the `i64` range. */
+typedef struct faber_dec {
+    faber_i128 carrier;
+    uint32_t scale;
+} faber_dec;
+
+static inline faber_dec faber_dec_make(faber_i128 carrier, uint32_t scale) {
+    faber_dec value;
+    value.carrier = carrier;
+    value.scale = scale;
+    return value;
+}
+
+static inline faber_dec faber_dec_of(int64_t value) {
+    return faber_dec_make((faber_i128)value, 8);
+}
+
+static inline faber_dec faber_dec_int(faber_i128 value) {
+    return faber_dec_make(value, 0);
+}
+
+/* 10^digits, or false when it leaves `faber_i128` (the checked carrier). */
+static inline bool faber_dec_pow10_try(uint32_t digits, faber_i128 *out) {
+    faber_i128 factor = 1;
+    uint32_t at;
+    for (at = 0; at < digits; at++) {
+        if (__builtin_mul_overflow(factor, (faber_i128)10, &factor)) {
+            return false;
+        }
+    }
+    *out = factor;
+    return true;
+}
+
+static inline faber_i128 faber_dec_pow10(uint32_t digits, const char *message) {
+    faber_i128 factor;
+    if (!faber_dec_pow10_try(digits, &factor)) {
+        faber_trap(message);
+    }
+    return factor;
+}
+
+static inline faber_i128 faber_dec_add_carrier(faber_i128 a, faber_i128 b, const char *message) {
+    faber_i128 out;
+    if (__builtin_add_overflow(a, b, &out)) {
+        faber_trap(message);
+    }
+    return out;
+}
+
+static inline faber_i128 faber_dec_sub_carrier(faber_i128 a, faber_i128 b, const char *message) {
+    faber_i128 out;
+    if (__builtin_sub_overflow(a, b, &out)) {
+        faber_trap(message);
+    }
+    return out;
+}
+
+static inline faber_i128 faber_dec_mul_carrier(faber_i128 a, faber_i128 b, const char *message) {
+    faber_i128 out;
+    if (__builtin_mul_overflow(a, b, &out)) {
+        faber_trap(message);
+    }
+    return out;
+}
+
+/* A decimal whose scale is above 8 loses trailing zeros (the shortest
+ * carrier for arithmetic results), as the runner's `norm` does. */
+static inline faber_dec faber_dec_norm(faber_dec value) {
+    while (value.scale > 8 && value.carrier % 10 == 0) {
+        value.carrier /= 10;
+        value.scale -= 1;
+    }
+    return value;
+}
+
+static inline faber_i128 faber_dec_up(faber_dec value, uint32_t scale, const char *message) {
+    if (value.scale == scale) {
+        return value.carrier;
+    }
+    return faber_dec_mul_carrier(value.carrier, faber_dec_pow10(scale - value.scale, message),
+                                 message);
+}
+
+/* Round-half-even division of two carriers (`denominator` nonzero). */
+static inline faber_i128 faber_dec_rhe(faber_i128 numerator, faber_i128 denominator) {
+    faber_i128 quotient;
+    faber_i128 remainder;
+    faber_u128 remainder_abs;
+    faber_u128 denominator_abs;
+    faber_u128 twice_remainder;
+    faber_i128 step;
+    if (denominator == 0) {
+        faber_trap("numerus division failed");
+    }
+    quotient = numerator / denominator;
+    remainder = numerator % denominator;
+    if (remainder == 0) {
+        return quotient;
+    }
+    remainder_abs = remainder < 0 ? (faber_u128)(-remainder) : (faber_u128)remainder;
+    denominator_abs = denominator < 0 ? (faber_u128)(-denominator) : (faber_u128)denominator;
+    twice_remainder = remainder_abs * 2;
+    if (!(twice_remainder > denominator_abs
+          || (twice_remainder == denominator_abs && quotient % 2 != 0))) {
+        return quotient;
+    }
+    step = ((numerator < 0) == (denominator < 0)) ? 1 : -1;
+    return faber_dec_add_carrier(quotient, step, "decimal carrier is outside the declared width");
+}
+
+static inline faber_dec faber_dec_add(faber_dec a, faber_dec b) {
+    uint32_t scale = a.scale > b.scale ? a.scale : b.scale;
+    return faber_dec_norm(faber_dec_make(
+        faber_dec_add_carrier(faber_dec_up(a, scale, "numerus overflow"),
+                              faber_dec_up(b, scale, "numerus overflow"), "numerus overflow"),
+        scale));
+}
+
+static inline faber_dec faber_dec_sub(faber_dec a, faber_dec b) {
+    uint32_t scale = a.scale > b.scale ? a.scale : b.scale;
+    return faber_dec_norm(faber_dec_make(
+        faber_dec_sub_carrier(faber_dec_up(a, scale, "numerus overflow"),
+                              faber_dec_up(b, scale, "numerus overflow"), "numerus overflow"),
+        scale));
+}
+
+static inline faber_dec faber_dec_mul(faber_dec a, faber_dec b) {
+    return faber_dec_norm(faber_dec_make(
+        faber_dec_mul_carrier(a.carrier, b.carrier, "numerus overflow"), a.scale + b.scale));
+}
+
+static inline faber_dec faber_dec_div(faber_dec a, faber_dec b) {
+    uint32_t scale;
+    if (b.carrier == 0) {
+        faber_trap("numerus division failed");
+    }
+    scale = a.scale > b.scale ? a.scale : b.scale;
+    return faber_dec_norm(faber_dec_make(
+        faber_dec_rhe(faber_dec_mul_carrier(a.carrier,
+                                            faber_dec_pow10(scale + b.scale - a.scale,
+                                                            "numerus division failed"),
+                                            "numerus division failed"),
+                      b.carrier),
+        scale));
+}
+
+static inline faber_dec faber_dec_rem(faber_dec a, faber_dec b) {
+    uint32_t scale = a.scale > b.scale ? a.scale : b.scale;
+    faber_i128 x = faber_dec_up(a, scale, "numerus overflow");
+    faber_i128 y = faber_dec_up(b, scale, "numerus overflow");
+    faber_i128 r;
+    if (y == 0) {
+        faber_trap("numerus division failed");
+    }
+    /* `checked_rem` on the i128 extreme pair defaults to zero, as the runner. */
+    if (x < 0 && y == -1 && (faber_u128)x == ((faber_u128)1 << 127)) {
+        r = 0;
+    } else {
+        r = x % y;
+    }
+    if (r != 0 && ((r < 0) != (y < 0))) {
+        r += y;
+    }
+    return faber_dec_norm(faber_dec_make(r, scale));
+}
+
+static inline faber_dec faber_dec_neg(faber_dec a) {
+    faber_i128 neg;
+    if (__builtin_sub_overflow((faber_i128)0, a.carrier, &neg)) {
+        faber_trap("numerus overflow");
+    }
+    return faber_dec_norm(faber_dec_make(neg, a.scale));
+}
+
+/* Three-way comparison: -1, 0 or 1. An operand too large to align compares
+ * by its sign, as the runner's `cmp` does. */
+static inline int faber_dec_cmp(faber_dec a, faber_dec b) {
+    uint32_t scale = a.scale > b.scale ? a.scale : b.scale;
+    faber_i128 x = 0;
+    faber_i128 y = 0;
+    bool x_ok = true;
+    bool y_ok = true;
+    faber_i128 factor_x = 0;
+    faber_i128 factor_y = 0;
+    if (a.scale < scale) {
+        x_ok = faber_dec_pow10_try(scale - a.scale, &factor_x)
+               && !__builtin_mul_overflow(a.carrier, factor_x, &x);
+    } else {
+        x = a.carrier;
+    }
+    if (b.scale < scale) {
+        y_ok = faber_dec_pow10_try(scale - b.scale, &factor_y)
+               && !__builtin_mul_overflow(b.carrier, factor_y, &y);
+    } else {
+        y = b.carrier;
+    }
+    if (x_ok && y_ok) {
+        return x < y ? -1 : x > y ? 1 : 0;
+    }
+    if (!x_ok && !y_ok) {
+        if (a.carrier < 0 && b.carrier >= 0) {
+            return -1;
+        }
+        if (a.carrier >= 0 && b.carrier < 0) {
+            return 1;
+        }
+        return 0;
+    }
+    if (!x_ok) {
+        return a.carrier < 0 ? -1 : 1;
+    }
+    return b.carrier < 0 ? 1 : -1;
+}
+
+/* The display text into `out` (at least 48 bytes): trailing fraction zeros
+ * trimmed, no point when the fraction vanishes (D2.6). */
+static inline const char *faber_dec_text_into(faber_dec value, char *out) {
+    char raw[48];
+    char full[48];
+    const char *digits = faber_i128_text(value.carrier, raw);
+    bool negative = *digits == '-';
+    size_t length;
+    size_t width;
+    size_t pad;
+    size_t integer_len;
+    size_t fraction_end;
+    char *cursor = out;
+    if (negative) {
+        digits++;
+    }
+    length = strlen(digits);
+    width = (size_t)value.scale + 1;
+    if (width < length) {
+        width = length;
+    }
+    for (pad = 0; pad + length < width; pad++) {
+        full[pad] = '0';
+    }
+    memcpy(full + pad, digits, length + 1);
+    integer_len = width - value.scale;
+    fraction_end = width;
+    while (fraction_end > integer_len && full[fraction_end - 1] == '0') {
+        fraction_end--;
+    }
+    if (negative) {
+        *cursor++ = '-';
+    }
+    memcpy(cursor, full, integer_len);
+    cursor += integer_len;
+    if (fraction_end > integer_len) {
+        *cursor++ = '.';
+        memcpy(cursor, full + integer_len, fraction_end - integer_len);
+        cursor += fraction_end - integer_len;
+    }
+    *cursor = '\0';
+    return out;
+}
+
+static inline faber_text faber_dec_fmt(faber_arena *arena, faber_dec value) {
+    char buffer[48];
+    const char *text = faber_dec_text_into(value, buffer);
+    size_t length = strlen(text);
+    char *out = faber_alloc(arena, length + 1);
+    memcpy(out, text, length + 1);
+    return out;
+}
+
+/* Round half-even to scale 8; false when the rounded carrier leaves `i64`. */
+static inline bool faber_dec_try_store(faber_dec value, int64_t *out) {
+    faber_i128 rounded;
+    faber_i128 factor;
+    if (value.scale > 8) {
+        if (!faber_dec_pow10_try(value.scale - 8, &factor)) {
+            return false;
+        }
+        rounded = faber_dec_rhe(value.carrier, factor);
+    } else {
+        if (!faber_dec_pow10_try(8 - value.scale, &factor)
+            || __builtin_mul_overflow(value.carrier, factor, &rounded)) {
+            return false;
+        }
+    }
+    if (rounded < INT64_MIN || rounded > INT64_MAX) {
+        return false;
+    }
+    *out = (int64_t)rounded;
+    return true;
+}
+
+static inline int64_t faber_dec_store(faber_dec value, const char *at, const char *inferred) {
+    int64_t stored;
+    if (!faber_dec_try_store(value, &stored)) {
+        char text[48];
+        fprintf(stderr, "error: %s does not fit in `d64` (%s)%s\n",
+                faber_dec_text_into(value, text), at, inferred);
+        exit(1);
+    }
+    return stored;
+}
+
+/* Round to an integer; the four hints the conversio rows name. */
+static inline faber_i128 faber_dec_round(faber_dec value) {
+    return faber_dec_rhe(value.carrier, faber_dec_pow10(value.scale, "numerus overflow"));
+}
+
+static inline faber_i128 faber_dec_round_floor(faber_dec value) {
+    faber_i128 factor = faber_dec_pow10(value.scale, "numerus overflow");
+    faber_i128 quotient = value.carrier / factor;
+    if (value.carrier % factor < 0) {
+        quotient -= 1;
+    }
+    return quotient;
+}
+
+static inline faber_i128 faber_dec_round_ceil(faber_dec value) {
+    faber_i128 factor = faber_dec_pow10(value.scale, "numerus overflow");
+    faber_i128 quotient = value.carrier / factor;
+    if (value.carrier % factor > 0) {
+        quotient += 1;
+    }
+    return quotient;
+}
+
+static inline faber_i128 faber_dec_round_trunc(faber_dec value) {
+    return value.carrier / faber_dec_pow10(value.scale, "numerus overflow");
+}
+
+static inline double faber_dec_f64(faber_dec value) {
+    faber_i128 factor;
+    if (faber_dec_pow10_try(value.scale, &factor)) {
+        return (double)value.carrier / (double)factor;
+    }
+    return (double)value.carrier / pow(10.0, (double)value.scale);
+}
+
+/* Parse decimal digit text (`4.2`, `1e-3`, `42`) to the carrier scaled by
+ * `scale_digits`, rounding half-even; malformed text or a carrier beyond
+ * `faber_i128` fails with the runner's text. */
+static inline faber_dec faber_dec_parse(faber_text text, uint32_t scale_digits) {
+    const char *rest = text;
+    bool negative;
+    bool seen_digit = false;
+    faber_i128 mantissa = 0;
+    int32_t exp10 = 0;
+    int shift;
+    if (*rest == '-') {
+        negative = true;
+        rest++;
+    } else {
+        negative = false;
+        if (*rest == '+') {
+            rest++;
+        }
+    }
+    while (*rest >= '0' && *rest <= '9') {
+        if (__builtin_mul_overflow(mantissa, (faber_i128)10, &mantissa)
+            || __builtin_add_overflow(mantissa, (faber_i128)(*rest - '0'), &mantissa)) {
+            faber_trap("decimal carrier is outside the declared width");
+        }
+        seen_digit = true;
+        rest++;
+    }
+    if (*rest == '.') {
+        rest++;
+        while (*rest >= '0' && *rest <= '9') {
+            if (__builtin_mul_overflow(mantissa, (faber_i128)10, &mantissa)
+                || __builtin_add_overflow(mantissa, (faber_i128)(*rest - '0'), &mantissa)) {
+                faber_trap("decimal carrier is outside the declared width");
+            }
+            exp10 -= 1;
+            seen_digit = true;
+            rest++;
+        }
+    }
+    if (*rest == 'e' || *rest == 'E') {
+        int32_t sign = 1;
+        int32_t e = 0;
+        const char *exp = rest + 1;
+        if (*exp == '-') {
+            sign = -1;
+            exp++;
+        } else if (*exp == '+') {
+            exp++;
+        }
+        if (*exp < '0' || *exp > '9') {
+            faber_trap("textus to numerus conversion failed");
+        }
+        while (*exp >= '0' && *exp <= '9') {
+            if (e > 100000000) {
+                faber_trap("decimal carrier is outside the declared width");
+            }
+            e = e * 10 + (*exp - '0');
+            exp++;
+        }
+        if (*exp != '\0') {
+            faber_trap("textus to numerus conversion failed");
+        }
+        exp10 += sign * e;
+    } else if (*rest != '\0') {
+        faber_trap("textus to numerus conversion failed");
+    }
+    if (!seen_digit) {
+        faber_trap("textus to numerus conversion failed");
+    }
+    if (negative) {
+        mantissa = -mantissa;
+    }
+    shift = exp10 + (int32_t)scale_digits;
+    if (shift >= 0) {
+        faber_i128 factor;
+        if (!faber_dec_pow10_try((uint32_t)shift, &factor)
+            || __builtin_mul_overflow(mantissa, factor, &mantissa)) {
+            faber_trap("decimal carrier is outside the declared width");
+        }
+        return faber_dec_make(mantissa, scale_digits);
+    }
+    {
+        faber_i128 divisor;
+        if (!faber_dec_pow10_try((uint32_t)(-shift), &divisor)) {
+            /* A denominator beyond i128 cannot produce a non-zero carrier. */
+            return faber_dec_make(0, scale_digits);
+        }
+        return faber_dec_make(faber_dec_rhe(mantissa, divisor), scale_digits);
+    }
+}
+
+/* ------------------------------------------------------------------------ */
 /* Lists                                                                    */
 /* ------------------------------------------------------------------------ */
 
@@ -1114,6 +1674,133 @@ FABER_LIST_OPS(i64, int64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(text, faber_text, FABER_LIST_EQ_TEXT, FABER_LIST_LT_TEXT)
 FABER_LIST_OPS(bool, bool, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64)
+
+/* ------------------------------------------------------------------------ */
+/* Elementwise list operators                                               */
+/* ------------------------------------------------------------------------ */
+
+/* The aggregate-operator rulings lift `+ - * /` and the per-element
+ * comparisons over a list (scalar broadcast on either side), pairing two
+ * lists by position and requiring equal lengths. The runner's element
+ * arithmetic is exact until the element store, so the integer pairs go
+ * through the exact helpers and `faber_store_i64`. Mirrors the MIR runner's
+ * `array_lift` / `array_elementwise`. */
+
+#define FABER_LIST_GT_SCALAR(a, b) ((a) > (b))
+#define FABER_LIST_LE_SCALAR(a, b) ((a) <= (b))
+#define FABER_LIST_GE_SCALAR(a, b) ((a) >= (b))
+#define FABER_LIST_NE_SCALAR(a, b) ((a) != (b))
+#define FABER_LIST_GT_F64(a, b) (faber_f64_total_key(a) > faber_f64_total_key(b))
+#define FABER_LIST_LE_F64(a, b) (faber_f64_total_key(a) <= faber_f64_total_key(b))
+#define FABER_LIST_GE_F64(a, b) (faber_f64_total_key(a) >= faber_f64_total_key(b))
+#define FABER_LIST_EQ_F64(a, b) ((a) == (b))
+#define FABER_LIST_NE_F64(a, b) ((a) != (b))
+
+static inline int64_t faber_i64_lift_add(int64_t x, int64_t y) {
+    return faber_store_i64(faber_add(x, y), "element");
+}
+
+static inline int64_t faber_i64_lift_sub(int64_t x, int64_t y) {
+    return faber_store_i64(faber_sub(x, y), "element");
+}
+
+static inline int64_t faber_i64_lift_mul(int64_t x, int64_t y) {
+    return faber_store_i64(faber_mul(x, y), "element");
+}
+
+static inline int64_t faber_i64_lift_div(int64_t x, int64_t y) {
+    return faber_store_i64(faber_div(x, y), "element");
+}
+
+static inline double faber_f64_lift_add(double x, double y) { return x + y; }
+static inline double faber_f64_lift_sub(double x, double y) { return x - y; }
+static inline double faber_f64_lift_mul(double x, double y) { return x * y; }
+static inline double faber_f64_lift_div(double x, double y) { return x / y; }
+
+/* One lift family: `_pair` over two equal-length lists, `_left` and `_right`
+ * for a scalar on the right or left. `OP` is the element operation. */
+#define FABER_LIST_LIFT(FN, INTYPE, INLIST, OUTTYPE, OUTLIST, OP)                        \
+    static inline OUTLIST *faber_list_##FN##_lift_pair(faber_arena *arena,               \
+                                                       const INLIST *a,                  \
+                                                       const INLIST *b) {                \
+        int64_t at;                                                                      \
+        OUTLIST *out;                                                                    \
+        if (a->len != b->len) {                                                          \
+            faber_trap("lista elementwise length mismatch");                            \
+        }                                                                                \
+        out = OUTLIST##_new(arena, a->len);                                              \
+        for (at = 0; at < a->len; at++) {                                                \
+            out->items[at] = (OUTTYPE)OP(a->items[at], b->items[at]);                    \
+        }                                                                                \
+        out->len = a->len;                                                               \
+        return out;                                                                      \
+    }                                                                                    \
+                                                                                         \
+    static inline OUTLIST *faber_list_##FN##_lift_left(faber_arena *arena,               \
+                                                       const INLIST *a, INTYPE y) {      \
+        int64_t at;                                                                      \
+        OUTLIST *out = OUTLIST##_new(arena, a->len);                                     \
+        for (at = 0; at < a->len; at++) {                                                \
+            out->items[at] = (OUTTYPE)OP(a->items[at], y);                               \
+        }                                                                                \
+        out->len = a->len;                                                               \
+        return out;                                                                      \
+    }                                                                                    \
+                                                                                         \
+    static inline OUTLIST *faber_list_##FN##_lift_right(faber_arena *arena,              \
+                                                        INTYPE x, const INLIST *a) {     \
+        int64_t at;                                                                      \
+        OUTLIST *out = OUTLIST##_new(arena, a->len);                                     \
+        for (at = 0; at < a->len; at++) {                                                \
+            out->items[at] = (OUTTYPE)OP(x, a->items[at]);                               \
+        }                                                                                \
+        out->len = a->len;                                                               \
+        return out;                                                                      \
+    }
+
+FABER_LIST_LIFT(i64_add, int64_t, faber_list_i64, int64_t, faber_list_i64, faber_i64_lift_add)
+FABER_LIST_LIFT(i64_sub, int64_t, faber_list_i64, int64_t, faber_list_i64, faber_i64_lift_sub)
+FABER_LIST_LIFT(i64_mul, int64_t, faber_list_i64, int64_t, faber_list_i64, faber_i64_lift_mul)
+FABER_LIST_LIFT(i64_div, int64_t, faber_list_i64, int64_t, faber_list_i64, faber_i64_lift_div)
+FABER_LIST_LIFT(f64_add, double, faber_list_f64, double, faber_list_f64, faber_f64_lift_add)
+FABER_LIST_LIFT(f64_sub, double, faber_list_f64, double, faber_list_f64, faber_f64_lift_sub)
+FABER_LIST_LIFT(f64_mul, double, faber_list_f64, double, faber_list_f64, faber_f64_lift_mul)
+FABER_LIST_LIFT(f64_div, double, faber_list_f64, double, faber_list_f64, faber_f64_lift_div)
+
+FABER_LIST_LIFT(i64_lt, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_LT_SCALAR)
+FABER_LIST_LIFT(i64_gt, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_GT_SCALAR)
+FABER_LIST_LIFT(i64_le, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_LE_SCALAR)
+FABER_LIST_LIFT(i64_ge, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_GE_SCALAR)
+FABER_LIST_LIFT(i64_eq, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_EQ_SCALAR)
+FABER_LIST_LIFT(i64_ne, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_NE_SCALAR)
+FABER_LIST_LIFT(f64_lt, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_LT_F64)
+FABER_LIST_LIFT(f64_gt, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_GT_F64)
+FABER_LIST_LIFT(f64_le, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_LE_F64)
+FABER_LIST_LIFT(f64_ge, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_GE_F64)
+FABER_LIST_LIFT(f64_eq, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_EQ_F64)
+FABER_LIST_LIFT(f64_ne, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_NE_F64)
+
+/* Whole-list equality (`≡` / `≢`): a length check then per-element equality,
+ * one `bool` (the lifted comparisons are the ones with a list result). */
+#define FABER_LIST_EQUAL(FN, ELEM, EQ)                                                    \
+    static inline bool faber_list_##FN##_equal(const faber_list_##FN *a,                  \
+                                                const faber_list_##FN *b) {               \
+        int64_t at;                                                                      \
+        if (a->len != b->len) {                                                          \
+            return false;                                                                \
+        }                                                                                \
+        for (at = 0; at < a->len; at++) {                                                \
+            if (!(EQ(a->items[at], b->items[at]))) {                                     \
+                return false;                                                            \
+            }                                                                            \
+        }                                                                                \
+        return true;                                                                     \
+    }
+
+FABER_LIST_EQUAL(i64, int64_t, FABER_LIST_EQ_SCALAR)
+FABER_LIST_EQUAL(text, faber_text, FABER_LIST_EQ_TEXT)
+FABER_LIST_EQUAL(bool, bool, FABER_LIST_EQ_SCALAR)
+FABER_LIST_EQUAL(f64, double, FABER_LIST_EQ_F64)
 
 /* Integer lists: the exact sum, and the first index of the extreme. */
 static inline faber_i128 faber_list_i64_sum(const faber_list_i64 *list) {

@@ -52,6 +52,18 @@ pub(crate) enum Helper {
     TextRead,
     /// `faber_try_*` and `faber_conv_fail` (no allocation).
     Conv,
+    /// The exact integer comparison helpers (`faber_int_lt`, …).
+    IntCmp,
+    /// The uncapped `faber_*_wide` helpers for modular-word arithmetic.
+    Wide,
+    /// The exact `d64` decimal helpers (`faber_dec_add`, `faber_dec_store`, …),
+    /// which do not allocate.
+    Decimal,
+    /// `faber_dec_fmt`: a decimal's text in the arena.
+    DecimalText,
+    /// A list elementwise operator (`faber_list_<e>_<op>_lift_pair`, …),
+    /// which allocates its result list.
+    ListLift,
 }
 
 /// One operation of a list family (`faber_list_<elem>_<op>`).
@@ -77,6 +89,8 @@ impl Helper {
             | Helper::Join
             | Helper::Quoted
             | Helper::FloatText
+            | Helper::DecimalText
+            | Helper::ListLift
             | Helper::TextAlloc
             | Helper::List(_, ListOp::New | ListOp::Of | ListOp::Push | ListOp::Show) => true,
             Helper::Types
@@ -101,6 +115,9 @@ impl Helper {
             | Helper::FmodI64
             | Helper::TextRead
             | Helper::Conv
+            | Helper::IntCmp
+            | Helper::Wide
+            | Helper::Decimal
             | Helper::Float => false,
         }
     }
