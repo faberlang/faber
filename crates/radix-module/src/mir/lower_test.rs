@@ -7048,6 +7048,59 @@ incipiet {
     );
 }
 
+/// An awaited `@ future` call produces the success payload, so a void-payload
+/// async call lowers to a destination-less `Call` rather than a
+/// `promissum<vacuum>` temp. This pins both halves of the async-callee typing
+/// change at the statement level (c75db9ed-11).
+#[test]
+fn await_future_void_call_validates() {
+    let source = r"
+functio pause() fiet → vacuum {
+    nota 0
+}
+
+incipiet {
+    tacebit pause()
+}
+";
+    let analysis = analyze(source);
+    let lowered =
+        lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default()).expect("lower await unit");
+
+    let pause = lowered
+        .validated
+        .program()
+        .functions
+        .iter()
+        .find(|function| {
+            function
+                .name
+                .is_some_and(|name| lowered.interner.resolve(name) == "pause")
+        })
+        .and_then(|function| function.source)
+        .expect("pause function must lower with a source definition");
+
+    let mut destinations = Vec::new();
+    for function in &lowered.validated.program().functions {
+        for block in &function.blocks {
+            for statement in &block.statements {
+                if let MirStatementKind::Call { destination, callee: MirCallee::Definition { source, .. }, .. } =
+                    &statement.kind
+                    && *source == pause
+                {
+                    destinations.push(destination.is_some());
+                }
+            }
+        }
+    }
+
+    assert!(!destinations.is_empty(), "the await of pause() must lower to a definition call");
+    assert!(
+        destinations.iter().all(|has_destination| !has_destination),
+        "a void-payload async call must have no destination temp: {destinations:?}"
+    );
+}
+
 // ===========================================================================
 // Section N — CDA-U6: `↤` conversion-directed assignment lowering
 // ===========================================================================
