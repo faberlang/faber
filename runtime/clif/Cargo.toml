@@ -18,6 +18,3 @@ workspace = true
 
 [dependencies]
 radix-runtime-contract = { path = "../../crates/radix-runtime-contract" }
-
-[dev-dependencies]
-radix-mir-clif = { path = "../../crates/radix-mir-clif" }

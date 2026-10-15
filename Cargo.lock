@@ -593,7 +593,6 @@ dependencies = [
 name = "faber-host-clif"
 version = "0.84.0"
 dependencies = [
- "radix-mir-clif",
  "radix-runtime-contract",
 ]
 
