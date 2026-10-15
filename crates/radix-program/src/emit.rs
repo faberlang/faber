@@ -119,19 +119,26 @@ pub fn compile_package(config: &Config, input: &Path, seams: &EmissionSeams) -> 
 /// their declarations merge into the entry source instead.
 #[cfg(feature = "hir-go")]
 fn fold_go_modules_into_output(mut result: PackageCompileResult) -> CompileResult {
-    if !result.go_modules.is_empty() {
-        match result.compile_result.output.take() {
-            Some(radix_module::Output::Go(go)) => {
-                let code = radix_module::codegen::go::merge_package_modules(
-                    &go.code,
-                    &result.go_modules,
-                );
-                result.compile_result.output =
-                    Some(radix_module::Output::Go(radix_module::GoOutput { code }));
+    if result.go_modules.is_empty() {
+        return result.compile_result;
+    }
+    match result.compile_result.output.take() {
+        Some(radix_module::Output::Go(go)) => {
+            match radix_module::codegen::go::merge_package_modules(&go.code, &result.go_modules) {
+                Ok(code) => {
+                    result.compile_result.output =
+                        Some(radix_module::Output::Go(radix_module::GoOutput { code }));
+                }
+                Err(err) => {
+                    result.compile_result.diagnostics.push(
+                        crate::package_diagnostic_error(err.to_string())
+                            .with_arg("issue", "package_go_merge_shape")
+                            .with_arg("target", "go"),
+                    );
+                }
             }
-            Some(output) => result.compile_result.output = Some(output),
-            None => {}
         }
+        output => result.compile_result.output = output,
     }
     result.compile_result
 }
