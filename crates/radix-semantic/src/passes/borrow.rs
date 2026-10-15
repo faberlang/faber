@@ -1086,7 +1086,12 @@ impl<'a> BorrowChecker<'a> {
         // One fault, one diagnostic: a write through a `ref` view (a `ref`
         // binding) is `assign_through_ref`; a write through a `ref`/bare
         // parameter or an alias of one is `assign_to_de_parameter`.
-        // Re-pointing the name itself is legal.
+        // Re-pointing the name itself is legal. A name that already took one
+        // of these read-only-through diagnostics does not also take the
+        // non-`mut` alias row — the alias error is for names whose own cell
+        // is writable (`mut alias of a bare parameter`), not for a `ref`
+        // cursor that is read-only through on its own account.
+        let mut refused_through_ref = false;
         if Self::is_projection(target)
             && let Some(def_id) = Self::root_def_id(target)
         {
@@ -1096,12 +1101,14 @@ impl<'a> BorrowChecker<'a> {
                     ISSUE_ASSIGN_TO_DE_PARAMETER,
                     target.span,
                 );
+                refused_through_ref = true;
             } else if self.ref_roots.contains(&def_id) {
                 self.error(
                     SemanticErrorKind::AssignToImmutableBorrow,
                     ISSUE_ASSIGN_THROUGH_REF,
                     target.span,
                 );
+                refused_through_ref = true;
             }
         }
         if let Some(def_id) = Self::root_def_id(target) {
@@ -1110,7 +1117,8 @@ impl<'a> BorrowChecker<'a> {
             {
                 self.nonmut_tensor_write_error(origin, target.span);
             }
-            if Self::is_projection(target)
+            if !refused_through_ref
+                && Self::is_projection(target)
                 && let Some(origin) = self.nonmut_agg_alias_origin(def_id)
             {
                 self.nonmut_agg_write_error(origin, target.span);

@@ -1,0 +1,29 @@
++++
+term = "ref-optional-scalar"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "ref_decl"]
+category = "binding"
+summary = "ref over an optional scalar is refused: a re-pointable read-only number is spelled mut."
+syntax = "ref int ∪ none cur ← maybe"
+related = ["ref", "optional", "varia"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:scalar_access_marker"
++++
+
+# =============================================================================
+# mutabilitas — no `ref` over an optional scalar
+# =============================================================================
+# Option A admits `ref`/`mut` over `T ∪ none` only for reference types. A
+# scalar behind an optional is still a scalar: a re-pointable read-only
+# number is `mut` by another name and is refused with the same SEM008 that
+# guards plain scalar refs (see ref-scalar-reject).
+
+fn probe(int ∪ none maybe) → int {
+    ref int ∪ none cur ← maybe
+    return 5
+}
+
+main {
+    print probe(null)
+}

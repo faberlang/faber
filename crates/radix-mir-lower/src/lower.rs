@@ -3398,13 +3398,17 @@ impl<'a> FunctionBuilder<'a> {
                 Some((MirPlace::local(binding.local), binding.ty))
             }
             HirExpressionKind::Field(object, name) => {
-                let (mut place, _) = self.lower_assignment_place_with_fallback(object, fallback_ty)?;
+                // The base lowers through the projectable-place path so a
+                // narrowed optional base (`cur not is none { cur.v ← 5 }`)
+                // unwraps before the projection; a non-narrowed base yields
+                // the same place the direct recursion produced.
+                let mut place = self.lower_projectable_place(object)?;
                 place.projections.push(MirProjection::Field(*name));
                 let ty = expr.ty.map_or(fallback_ty, MirType::semantic);
                 Some((place, ty))
             }
             HirExpressionKind::Index(object, index) => {
-                let (mut place, _) = self.lower_assignment_place_with_fallback(object, fallback_ty)?;
+                let mut place = self.lower_projectable_place(object)?;
                 let projection = self.lower_index_projection(&place, object.ty, index)?;
                 place.projections.push(projection);
                 let ty = expr.ty.map_or(fallback_ty, MirType::semantic);

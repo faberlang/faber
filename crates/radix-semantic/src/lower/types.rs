@@ -182,6 +182,7 @@ impl Lowerer<'_> {
             self.form_frames.push(super::TypeFormFrame::default());
         }
 
+        let mut hoisted_union_mode = None;
         let mut ty_id = match &ty.kind {
             TypeExprKind::Infer | TypeExprKind::FieldListHole => {
                 let infer_id = self.next_def_id().0;
@@ -204,12 +205,16 @@ impl Lowerer<'_> {
             TypeExprKind::Named(name, params) => self.lower_named_type(name, params),
             TypeExprKind::Qualified(path, params) => self.lower_qualified_type(path, params),
             TypeExprKind::Func(func) => self.lower_function_type(func),
-            TypeExprKind::Union(members) => self.lower_union_type(members),
+            TypeExprKind::Union(members) => {
+                let (union_id, hoisted) = self.lower_union_type(members);
+                hoisted_union_mode = hoisted;
+                union_id
+            }
             TypeExprKind::Intersection(members) => self.lower_intersection_type(members),
         };
 
         let base_ty = ty_id;
-        if let Some(mode) = ty.mode {
+        if let Some(mode) = ty.mode.or(hoisted_union_mode) {
             ty_id = self.apply_access_marker(ty_id, mode, allow_scalar_ref_mut);
         }
 
@@ -364,17 +369,49 @@ impl Lowerer<'_> {
     /// that as `Option<T>` so typecheck and codegen have one nullability shape
     /// to reason about, while non-null unions remain explicit `Type::Union`
     /// values after duplicate members are removed.
-    fn lower_union_type(&mut self, members: &[TypeExpr]) -> TypeId {
+    /// Lower a source union. Returns the union's type id and, when a
+    /// `de`/`in` marker hoists onto an optional union (Option A), the hoisted
+    /// mode: the caller applies it through the ordinary marker path so the
+    /// authored-form capture records the wrapper (`de Node ∪ none`).
+    fn lower_union_type(
+        &mut self,
+        members: &[TypeExpr],
+    ) -> (TypeId, Option<radix_syntax::TypeMode>) {
         if members.is_empty() {
             self.error("empty_union_type");
-            return self.types.intern(Type::Error);
+            return (self.types.intern(Type::Error), None);
+        }
+
+        // Option A (operator ruling 2026-10-15): a `de`/`in` access marker
+        // written before the first member of an optional union — `ref Node ∪
+        // none`, `mut Node ∪ none` — applies to the whole optional cell, so
+        // the marker wraps the option (`Ref(Option(Node))`). Only the two
+        // re-pointable markers hoist, only when exactly one member carries a
+        // top-level mode, and only when the union is optional (a `nihil`
+        // member is present); any other shape keeps the
+        // `nested_access_marker` refusal. An optional scalar is still
+        // `scalar_access_marker`: the ruling refuses `ref` over plain scalars
+        // and over optional scalars alike.
+        let mut marked_member: Option<usize> = None;
+        let mut seen_modes = 0;
+        for (index, member) in members.iter().enumerate() {
+            if let Some(mode) = member.mode {
+                seen_modes += 1;
+                if matches!(mode, radix_syntax::TypeMode::De | radix_syntax::TypeMode::In) {
+                    marked_member = Some(index);
+                }
+            }
         }
 
         let mut cleaned: Vec<TypeId> = Vec::with_capacity(members.len());
         let mut had_nihil = false;
 
-        for member in members {
-            let lowered = self.lower_nested_type(member);
+        for (index, member) in members.iter().enumerate() {
+            let lowered = if marked_member == Some(index) {
+                self.lower_hoisted_union_member(member)
+            } else {
+                self.lower_nested_type(member)
+            };
             if let Type::Primitive(Primitive::Nihil) = self.types.get(lowered) {
                 had_nihil = true;
                 continue;
@@ -399,7 +436,7 @@ impl Lowerer<'_> {
 
         if cleaned.is_empty() {
             self.error("union_only_nihil");
-            return self.types.intern(Type::Error);
+            return (self.types.intern(Type::Error), None);
         }
 
         let base = match cleaned.as_slice() {
@@ -407,11 +444,38 @@ impl Lowerer<'_> {
             many => self.types.intern(Type::Union(many.to_vec())),
         };
 
-        if had_nihil {
+        let union_id = if had_nihil {
             self.types.option(base)
         } else {
             base
+        };
+
+        let hoisted = marked_member
+            .filter(|_| seen_modes == 1 && had_nihil)
+            .map(|index| members[index].mode.expect("marked member carries a mode"));
+        if marked_member.is_some() && seen_modes == 1 && !had_nihil {
+            // A shaped union that is not optional (`ref A ∪ B`) keeps the
+            // nested-marker refusal.
+            self.error("nested_access_marker");
         }
+        (union_id, hoisted)
+    }
+
+    /// Lower the mode-carrying member of a hoisted optional union: the
+    /// marker moves to the union, so the member lowers bare. The scalar
+    /// refusal (`ref int ∪ none`) fires on the member itself — the ruling
+    /// refuses `ref` over plain scalars and over optional scalars alike.
+    fn lower_hoisted_union_member(&mut self, member: &TypeExpr) -> TypeId {
+        let bare = TypeExpr {
+            mode: None,
+            ..member.clone()
+        };
+        let lowered = self.lower_nested_type(&bare);
+        if self.types.is_scalar_for_access_marker(lowered) {
+            self.error(crate::ISSUE_SCALAR_ACCESS_MARKER);
+            return self.types.intern(Type::Error);
+        }
+        lowered
     }
 
     /// Normalize a source intersection into the canonical semantic shape.

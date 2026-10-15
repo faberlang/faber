@@ -438,7 +438,11 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> TypeId {
         let resolved = self.resolve_inferred_type(object_ty);
-        if matches!(self.types.get(resolved), Type::Option(_)) {
+        // An access-marker wrapper rides the receiver (Option A: a `ref`
+        // cursor over `T ∪ none` reads through the marker); the optionality
+        // test sees the payload.
+        let (_, payload) = self.types.peel_access_marker(resolved);
+        if matches!(self.types.get(payload), Type::Option(_)) {
             self.undefined_member("optional_receiver_requires_chain", span);
             return self.error_type;
         }

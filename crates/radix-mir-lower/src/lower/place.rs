@@ -548,26 +548,35 @@ impl FunctionBuilder<'_> {
                 ));
             }
         }
+        // An access marker on the use type (`ref Node ∪ none cur` narrows to
+        // `Ref(Node)`, Option A) is a compile-time fact: the MIR storage may
+        // already have it peeled (`Option(Node)`). Compare payloads and
+        // unwrap to the payload type; the marker is enforced in the checker.
+        let (_, storage_payload) = self.types.peel_access_marker(storage_ty.semantic_id());
+        let (_, use_payload) = self.types.peel_access_marker(use_ty.semantic_id());
         let Some(inner_ty) = self
             .types
-            .nullable_inner(storage_ty.semantic_id())
+            .nullable_inner(storage_payload)
             .map(MirType::semantic)
         else {
             return Some(place);
         };
-        if self.types.nullable_inner(use_ty.semantic_id()).is_some()
+        if self.types.nullable_inner(use_payload).is_some()
             || !self
                 .types
-                .is_assignable(inner_ty.semantic_id(), use_ty.semantic_id())
+                .is_assignable(inner_ty.semantic_id(), use_payload)
         {
             return Some(place);
         }
+        // The MIR layer does not track access markers (the local lowering
+        // already peels ref views), so both cases unwrap to the payload type.
+        let unwrapped_ty = inner_ty;
         Some(self.assign_temp_place(
             MirValueKind::Option(MirOptionOp::Unwrap {
                 value: MirOperand::Place(place),
                 mode: MirOptionUnwrapMode::Assume,
             }),
-            inner_ty,
+            unwrapped_ty,
             expr.span,
         ))
     }
