@@ -5,9 +5,10 @@ locale = "en"
 # N3 stdio leaf sync routes through the Norma console wrappers.
 #
 # Covers consolum:lege (read_line) and consolum:hauri (read_bytes). stdout is
-# an exact golden; stdin is `alpha\nbeta\ngamma\n` so the two line reads and
+# an exact golden; stdin is `alpha\nbeta\ngamma\n\n` so the two line reads and
 # the byte read see distinct data. hauri does ONE read of at most n bytes, so
-# only the first byte is pinned.
+# only the first byte is pinned. End of input is none for both read_line and
+# read_bytes; the trailing blank line stays a present empty string.
 
 import from "norma:console" console
 
@@ -27,24 +28,25 @@ main {
     assert (chunk.get(0) coalesce (0 ∷ b8)) ≡ 0x67
 
     # End-of-input behaviour. The byte read above took only "gam", so stdin
-    # still holds the rest of `gamma\n`. Drain it line by line: reassign
-    # `rest` while the read yields a value that is not none and not empty.
-    var string ∪ none rest ← console.read_line()
-    while rest not is none and rest!.length() ≻ 0 {
-        rest ← console.read_line()
-    }
-
-    # OBSERVED: consolum:lege returns an EMPTY STRING (not none) at end of
-    # input — crates/faber-leaf/src/stdio.rs read_line maps `Ok(0)` to
-    # `Str(String::new())` — so the loop exits with rest ≡ "".
+    # still holds `ma\n\n`: the rest of the gamma line, then one blank line.
+    const string ∪ none rest ← console.read_line()
     assert rest not is none
-    assert (rest coalesce "") ≡ ""
+    const string rest_text ↤ rest
+    assert rest_text ≡ "ma"
 
-    # Past the drained input, end of input holds: one more byte read hits
-    # EOF. Both an empty and a none reply coalesce to the empty list, so the
-    # length is zero either way.
-    const list<b8> tail ← console.read_bytes(4) coalesce ||
-    assert tail.length() ≡ 0
+    # A blank line is a present empty string, not end of input.
+    const string ∪ none blank ← console.read_line()
+    assert blank not is none
+    const string blank_text ↤ blank
+    assert blank_text ≡ ""
+
+    # Only past the last byte does a line read report none, and a byte read
+    # at end of input is none as well (not an empty list).
+    const string ∪ none eof ← console.read_line()
+    assert eof is none
+
+    const list<b8> ∪ none tail ← console.read_bytes(4)
+    assert tail is none
 
     console.write_line("stdio-read-ok")
 }
