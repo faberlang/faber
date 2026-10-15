@@ -34,6 +34,8 @@ mod ty;
 #[cfg(test)]
 mod emit_test;
 #[cfg(test)]
+mod item_test;
+#[cfg(test)]
 mod names_test;
 #[cfg(test)]
 mod reject_test;
@@ -50,7 +52,7 @@ use radix_codegen_shared::{Codegen, CodegenError};
 use radix_hir::{DefId, HirModule};
 use radix_lexer::Interner;
 use radix_types::TypeTable;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 /// C backend output.
 #[derive(Debug, Clone)]
@@ -116,6 +118,8 @@ impl CCodegen<'_> {
             items_scope: Namer::program_scope(),
             locals: FxHashMap::default(),
             functions: FxHashMap::default(),
+            called: FxHashSet::default(),
+            current: None,
             support: Support::default(),
             depth: 0,
             loops: 0,
@@ -140,6 +144,11 @@ pub(crate) struct Emitter<'a> {
     /// ids are unique across the module, so one table serves every function.
     locals: FxHashMap<DefId, Local>,
     functions: FxHashMap<DefId, Function>,
+    /// Functions and methods some written call reaches; the rest are marked
+    /// unused so `-Wunused-function` stays quiet.
+    called: FxHashSet<DefId>,
+    /// The function or method whose body is being written; `None` in `main`.
+    current: Option<DefId>,
     support: Support,
     /// Nesting depth of the statement being written (a function body is 1).
     depth: usize,
@@ -178,7 +187,9 @@ impl Emitter<'_> {
         self.scope = Namer::program_scope();
         self.loops = 0;
         self.returns = Returns::Main;
-        let mut body = String::new();
+        self.current = None;
+        // Constants built at run time are set before the entry block runs.
+        let mut body = items.initializers.clone();
         if let Some(entry) = &hir.entry {
             self.block(&mut body, entry)?;
         }
@@ -192,12 +203,12 @@ impl Emitter<'_> {
             out.push_str(&items.constants);
             out.push('\n');
         }
-        let prototypes = format!("{}{show_prototypes}", items.prototypes);
+        let prototypes = format!("{}{show_prototypes}", items.prototypes(&self.called));
         if !prototypes.is_empty() {
             out.push_str(&prototypes);
             out.push('\n');
         }
-        out.push_str(&items.definitions);
+        out.push_str(&items.definitions(&self.called));
         out.push_str(&show_definitions);
         out.push_str("int main(void) {\n");
         if self.arena {

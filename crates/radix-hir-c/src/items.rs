@@ -14,8 +14,10 @@ use crate::{Emitter, Local};
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
 use radix_hir::{
-    DefId, HirConst, HirFunction, HirItem, HirItemKind, HirModule, HirParamMode, HirStatementKind,
+    DefId, HirConst, HirExpressionKind, HirFunction, HirItem, HirItemKind, HirModule, HirParamMode,
+    HirStatementKind,
 };
+use rustc_hash::FxHashSet;
 
 /// A function the program defines; a genus method is one with a receiver.
 pub(crate) struct Function {
@@ -36,13 +38,66 @@ pub(crate) enum Returns {
     Value(Ty),
 }
 
+/// One function's text before its storage class is known: whether it carries
+/// `__attribute__((unused))` depends on calls written later (the entry block
+/// and later functions), so the text is held without its `static` prefix.
+pub(crate) struct FunctionText {
+    pub(crate) def_id: DefId,
+    /// `<ret> f_name(<unnamed params>)`, no terminator.
+    prototype: String,
+    /// `<ret> f_name(<named params>) {…}\n`.
+    definition: String,
+}
+
 /// The file-scope text, in the order the translation unit needs it.
 #[derive(Default)]
 pub(crate) struct Items {
     pub(crate) genera: String,
     pub(crate) constants: String,
-    pub(crate) prototypes: String,
-    pub(crate) definitions: String,
+    /// Assignments to the module constants that cannot be initialised at file
+    /// scope (they allocate in the arena `main` owns); they run first in `main`.
+    pub(crate) initializers: String,
+    functions: Vec<FunctionText>,
+}
+
+impl Items {
+    /// One prototype per function. A function nothing calls carries
+    /// `__attribute__((unused))`: library modules define many, and
+    /// `-Wunused-function` is not undefined behavior.
+    pub(crate) fn prototypes(&self, called: &FxHashSet<DefId>) -> String {
+        self.functions
+            .iter()
+            .map(|function| {
+                format!(
+                    "{}{};\n",
+                    storage(called, function.def_id),
+                    function.prototype
+                )
+            })
+            .collect()
+    }
+
+    /// Every function definition, separated by blank lines.
+    pub(crate) fn definitions(&self, called: &FxHashSet<DefId>) -> String {
+        self.functions
+            .iter()
+            .map(|function| {
+                format!(
+                    "{}{}\n",
+                    storage(called, function.def_id),
+                    function.definition
+                )
+            })
+            .collect()
+    }
+}
+
+fn storage(called: &FxHashSet<DefId>, def_id: DefId) -> &'static str {
+    if called.contains(&def_id) {
+        "static "
+    } else {
+        "static __attribute__((unused)) "
+    }
 }
 
 impl Emitter<'_> {
@@ -72,8 +127,9 @@ impl Emitter<'_> {
                     functions.push((item.def_id, &**function));
                 }
                 HirItemKind::Constant(constant) => {
-                    let line = self.constant(item, constant)?;
-                    items.constants.push_str(&line);
+                    let (declaration, initializer) = self.constant(item, constant)?;
+                    items.constants.push_str(&declaration);
+                    items.initializers.push_str(&initializer);
                 }
                 HirItemKind::Struct(genus) => {
                     for method in &genus.methods {
@@ -90,19 +146,26 @@ impl Emitter<'_> {
         }
         items.genera = self.genus_declarations(&order)?;
         for (def_id, function) in functions {
-            items.prototypes.push_str(&self.prototype(def_id)?);
-            items.prototypes.push_str(";\n");
-            items
-                .definitions
-                .push_str(&self.definition(def_id, function)?);
-            items.definitions.push('\n');
+            items.functions.push(FunctionText {
+                def_id,
+                prototype: self.prototype(def_id)?,
+                definition: self.definition(def_id, function)?,
+            });
         }
         Ok(items)
     }
 
     /// A module constant: `static const` with its folded value, registered so
-    /// reads of an integer constant fold too.
-    fn constant(&mut self, item: &HirItem, constant: &HirConst) -> Result<String, CodegenError> {
+    /// reads of an integer constant fold too. Returns the file-scope
+    /// declaration and the assignment `main` runs first, which is empty unless
+    /// the value is built at run time: a list or genus, or a text, boolean or
+    /// float expression that is not a literal, allocates or calls, and the
+    /// arena that serves it belongs to `main`.
+    fn constant(
+        &mut self,
+        item: &HirItem,
+        constant: &HirConst,
+    ) -> Result<(String, String), CodegenError> {
         if constant.statica.is_none() || constant.mutable || constant.is_await {
             return Err(unsupported("top-level store that is not a module constant"));
         }
@@ -117,11 +180,23 @@ impl Emitter<'_> {
         self.need_class(class);
         let raw = self.names.resolve_symbol(constant.name);
         let name = self.items_scope.claim(&format!("k_{raw}"));
-        let line = format!(
-            "static {} = {};\n",
-            self.declare(class, &name, false)?,
-            value.text
-        );
+        let literal = value.constant.is_some()
+            || matches!(constant.value.kind, HirExpressionKind::Literal(_));
+        let (declaration, initializer) = if literal {
+            (
+                format!(
+                    "static {} = {};\n",
+                    self.declare(class, &name, false)?,
+                    value.text
+                ),
+                String::new(),
+            )
+        } else {
+            (
+                format!("static {};\n", self.declare(class, &name, true)?),
+                format!("    {name} = {};\n", value.text),
+            )
+        };
         self.locals.insert(
             item.def_id,
             Local {
@@ -130,7 +205,7 @@ impl Emitter<'_> {
                 constant: value.constant,
             },
         );
-        Ok(line)
+        Ok((declaration, initializer))
     }
 
     /// Check a function against the subset and record its C signature.
@@ -168,6 +243,7 @@ impl Emitter<'_> {
                 return Err(unsupported("optional parameter"));
             }
             let class = classify(self.types, param.ty)?;
+            self.need_class(class);
             // `ref` / `mut` on a list or genus passes the caller's pointer,
             // which is what an unmarked one passes too.
             let shared = matches!(class, Ty::List(_) | Ty::Genus(_));
@@ -186,6 +262,11 @@ impl Emitter<'_> {
             return Err(unsupported("function without a resolved return type"));
         };
         let ret = returns(self.types, ret_ty)?;
+        // The result type is spelled in the prototype, so a program whose
+        // only use of `bool` or `int64_t` is a signature still needs the header.
+        if let Some(class) = ret {
+            self.need_class(class);
+        }
         let raw = self.names.resolve_symbol(function.name).to_owned();
         let prefix = match receiver {
             Some(genus) => match self.genera.get(&genus) {
@@ -207,8 +288,9 @@ impl Emitter<'_> {
         Ok(())
     }
 
-    /// `static <ret> f_name(<params>)`, without the terminator. Parameter
-    /// names come from the definition, so the prototype is claimed there.
+    /// `<ret> f_name(<params>)`, without storage class or terminator.
+    /// Parameter names come from the definition, so the prototype is claimed
+    /// there.
     fn prototype(&self, def_id: DefId) -> Result<String, CodegenError> {
         let Some(function) = self.functions.get(&def_id) else {
             return Err(unsupported("function without a recorded signature"));
@@ -233,7 +315,7 @@ impl Emitter<'_> {
             slots.join(", ")
         };
         let space = if ret.ends_with('*') { "" } else { " " };
-        Ok(format!("static {ret}{space}{}({params})", function.name))
+        Ok(format!("{ret}{space}{}({params})", function.name))
     }
 
     fn definition(
@@ -252,6 +334,7 @@ impl Emitter<'_> {
         );
         self.scope = Namer::program_scope();
         self.loops = 0;
+        self.current = Some(def_id);
         self.returns = ret.map_or(Returns::Void, Returns::Value);
         let mut params = Vec::with_capacity(function.params.len() + 2);
         if self.arena {
@@ -317,8 +400,6 @@ impl Emitter<'_> {
         } else {
             params.join(", ")
         };
-        Ok(format!(
-            "static {ret_text}{space}{name}({params}) {{\n{body}}}\n"
-        ))
+        Ok(format!("{ret_text}{space}{name}({params}) {{\n{body}}}\n"))
     }
 }

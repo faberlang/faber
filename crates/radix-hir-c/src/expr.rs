@@ -249,6 +249,11 @@ impl Emitter<'_> {
             return Err(unsupported("call to a function outside the program"));
         };
         let (name, params, ret) = (function.name.clone(), function.params.clone(), function.ret);
+        // A call from a function to itself is no use: a function only it
+        // calls is as unused as one nothing calls.
+        if self.current != Some(def_id) {
+            self.called.insert(def_id);
+        }
         if receiver.is_some() != function.receiver.is_some() {
             return Err(unsupported("method called without a receiver"));
         }
