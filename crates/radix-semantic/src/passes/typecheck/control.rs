@@ -57,12 +57,25 @@ struct FlowState {
 
 /// One leaf condition's `(then_refinement, else_refinement)` pair (nn-u1 null
 /// checks, U1R nominal `est M` tests): each side is an optional
-/// `(DefId, narrowed TypeId)` for the visible binding.
-type LeafRefinement = (Option<(DefId, TypeId)>, Option<(DefId, TypeId)>);
+/// `(FactKey, narrowed TypeId)` fact, keyed by the binding or the field path
+/// rooted at a binding that the fact refines.
+type LeafRefinement = (Option<(FactKey, TypeId)>, Option<(FactKey, TypeId)>);
 
-/// The facts that hold on one edge of a condition: every `(DefId, narrowed
-/// TypeId)` that is true when the edge is taken.
-type Facts = Vec<(DefId, TypeId)>;
+/// The facts that hold on one edge of a condition: every `(FactKey, narrowed
+/// TypeId)` that is true when the edge is taken, keyed by the binding or the
+/// field path rooted at a binding that the fact refines.
+type Facts = Vec<(FactKey, TypeId)>;
+
+/// The subject of a flow fact: a visible binding, or a field path rooted at a
+/// visible binding (`base.path…`).
+// `Field` is consumed by the field-path narrowing unit (need case 2);
+// no producer constructs it yet.
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+enum FactKey {
+    Binding(DefId),
+    Field { base: DefId, path: Vec<Symbol> },
+}
 
 /// `(then_facts, else_facts)` for a whole condition, including compound
 /// `and` / `or` / `not` shapes.
@@ -598,9 +611,9 @@ impl TypeChecker<'_> {
             return (None, None);
         };
         if positive {
-            (None, Some((*def_id, refined)))
+            (None, Some((FactKey::Binding(*def_id), refined)))
         } else {
-            (Some((*def_id, refined)), None)
+            (Some((FactKey::Binding(*def_id), refined)), None)
         }
     }
 
@@ -645,9 +658,15 @@ impl TypeChecker<'_> {
         }
         let remainder = self.peel_member_type(binding_ty, member);
         if positive {
-            (Some((*def_id, member)), remainder.map(|ty| (*def_id, ty)))
+            (
+                Some((FactKey::Binding(*def_id), member)),
+                remainder.map(|ty| (FactKey::Binding(*def_id), ty)),
+            )
         } else {
-            (remainder.map(|ty| (*def_id, ty)), Some((*def_id, member)))
+            (
+                remainder.map(|ty| (FactKey::Binding(*def_id), ty)),
+                Some((FactKey::Binding(*def_id), member)),
+            )
         }
     }
 
@@ -773,10 +792,14 @@ impl TypeChecker<'_> {
         expected: Option<TypeId>,
         refine: Facts,
     ) -> (TypeId, FlowState) {
-        let saved: Vec<(DefId, Option<BindingInfo>)> = refine
-            .into_iter()
-            .map(|(def_id, ty)| (def_id, self.override_binding(def_id, ty)))
-            .collect();
+        let mut saved: Vec<(DefId, Option<BindingInfo>)> = Vec::new();
+        for (key, ty) in refine {
+            // Field facts are not carried on this branch edge in this need.
+            let FactKey::Binding(def_id) = key else {
+                continue;
+            };
+            saved.push((def_id, self.override_binding(def_id, ty)));
+        }
 
         self.push_scope();
         self.push_assert_refinement_frame();
@@ -948,10 +971,15 @@ impl TypeChecker<'_> {
 
     /// Return an edge snapshot with one condition refinement applied.
     fn state_with_refinement(&mut self, refine: Facts) -> FlowState {
-        let saved: Vec<(DefId, Option<BindingInfo>)> = refine
-            .into_iter()
-            .map(|(def_id, ty)| (def_id, self.override_binding(def_id, ty)))
-            .collect();
+        let mut saved: Vec<(DefId, Option<BindingInfo>)> = Vec::new();
+        for (key, ty) in refine {
+            // Field facts are not carried on the implicit fallthrough edge in
+            // this need.
+            let FactKey::Binding(def_id) = key else {
+                continue;
+            };
+            saved.push((def_id, self.override_binding(def_id, ty)));
+        }
         let state = self.snapshot_flow_state();
         for (def_id, original) in saved.into_iter().rev() {
             if let Some(original) = original {
@@ -974,10 +1002,15 @@ impl TypeChecker<'_> {
         rhs: &mut HirExpression,
     ) -> TypeId {
         let (facts, _) = self.condition_refinement(lhs);
-        let saved: Vec<(DefId, Option<BindingInfo>)> = facts
-            .into_iter()
-            .map(|(def_id, ty)| (def_id, self.override_binding(def_id, ty)))
-            .collect();
+        let mut saved: Vec<(DefId, Option<BindingInfo>)> = Vec::new();
+        for (key, ty) in facts {
+            // Field facts do not join across the short-circuit edge in this
+            // need.
+            let FactKey::Binding(def_id) = key else {
+                continue;
+            };
+            saved.push((def_id, self.override_binding(def_id, ty)));
+        }
         let rhs_ty = self.check_expr(rhs);
         for (def_id, original) in saved.into_iter().rev() {
             if let Some(original) = original {
@@ -1108,7 +1141,11 @@ impl TypeChecker<'_> {
         if self.assert_refinements.is_empty() {
             return;
         }
-        for (def_id, ty) in facts {
+        for (key, ty) in facts {
+            // Field facts are not carried through `adfirma` in this need.
+            let FactKey::Binding(def_id) = key else {
+                continue;
+            };
             let saved = self.override_binding(def_id, ty);
             if let Some(frame) = self.assert_refinements.last_mut() {
                 frame.push((def_id, saved));
