@@ -528,6 +528,22 @@ help = "xóa dấu phẩy trước dấu đóng"
 message = "token không mong đợi"
 help = "xóa hoặc chuyển token không mong đợi đến vị trí đúng"
 
+[diagnostics.PARSE002.issues.enum_value_out_of_range]
+message = "giá trị thành viên enum nằm ngoài phạm vi 64-bit có dấu"
+help = "chọn giá trị trong khoảng −2^63 đến 2^63−1"
+
+[diagnostics.PARSE002.issues.exitus_value_out_of_range]
+message = "mã exitus nằm ngoài phạm vi 64-bit có dấu"
+help = "chọn giá trị trong khoảng −2^63 đến 2^63−1"
+
+[diagnostics.PARSE002.issues.json_integer_overflow]
+message = "số nguyên trong literal json nằm ngoài phạm vi 64-bit có dấu"
+help = "viết giá trị dưới dạng float hoặc chuỗi"
+
+[diagnostics.PARSE002.issues.test_modifier_integer_out_of_range]
+message = "số nguyên của bổ từ `{modifier}` nằm ngoài phạm vi 64-bit có dấu"
+help = "chọn giá trị nhỏ hơn"
+
 [diagnostics.PARSE002.issues.declaration_block_comma]
 message = "dấu phẩy không phân tách các thành viên của declaration block"
 help = "bỏ dấu phẩy; các thành viên declaration được phân tách bằng dòng mới"

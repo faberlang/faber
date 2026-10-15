@@ -528,6 +528,22 @@ help = "समापन सीमांकक से पहले का अल�
 message = "अनपेक्षित token"
 help = "अनपेक्षित token हटाएं या उसका स्थान बदलें"
 
+[diagnostics.PARSE002.issues.enum_value_out_of_range]
+message = "enum सदस्य मान signed 64-bit श्रेणी के बाहर है"
+help = "−2^63 और 2^63−1 के बीच मान चुनें"
+
+[diagnostics.PARSE002.issues.exitus_value_out_of_range]
+message = "exitus कोड signed 64-bit श्रेणी के बाहर है"
+help = "−2^63 और 2^63−1 के बीच मान चुनें"
+
+[diagnostics.PARSE002.issues.json_integer_overflow]
+message = "json लिटरल में पूर्णांक signed 64-bit श्रेणी के बाहर है"
+help = "मान को float या string के रूप में लिखें"
+
+[diagnostics.PARSE002.issues.test_modifier_integer_out_of_range]
+message = "`{modifier}` मॉडिफ़ायर का पूर्णांक signed 64-bit श्रेणी के बाहर है"
+help = "छोटा मान चुनें"
+
 [diagnostics.PARSE002.issues.declaration_block_comma]
 message = "अल्पविराम declaration block के सदस्यों को अलग नहीं करते"
 help = "अल्पविराम हटाएँ; declaration सदस्य नई पंक्तियों से अलग होते हैं"

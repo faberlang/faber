@@ -572,6 +572,22 @@ help = "在 '=' 之後寫整數或字串"
 message = "非預期標記"
 help = "刪除該標記，或將它移到正確位置"
 
+[diagnostics.PARSE002.issues.enum_value_out_of_range]
+message = "enum 成員值超出有號 64 位元範圍"
+help = "選擇 −2^63 到 2^63−1 之間的值"
+
+[diagnostics.PARSE002.issues.exitus_value_out_of_range]
+message = "exitus 代碼超出有號 64 位元範圍"
+help = "選擇 −2^63 到 2^63−1 之間的值"
+
+[diagnostics.PARSE002.issues.json_integer_overflow]
+message = "json 字面值中的整數超出有號 64 位元範圍"
+help = "將該值寫為浮點數或字串"
+
+[diagnostics.PARSE002.issues.test_modifier_integer_out_of_range]
+message = "`{modifier}` 修飾符整數超出有號 64 位元範圍"
+help = "選擇更小的值"
+
 [diagnostics.PARSE002.issues.declaration_block_comma]
 message = "逗號不能分隔宣告區塊的成員"
 help = "刪除逗號；宣告成員由換行分隔"

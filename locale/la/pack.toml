@@ -582,6 +582,22 @@ help = "remove the comma before the closing delimiter"
 message = "unexpected token"
 help = "remove or reposition the unexpected token"
 
+[diagnostics.PARSE002.issues.enum_value_out_of_range]
+message = "enum member value is outside the signed 64-bit range"
+help = "choose a value between −2^63 and 2^63−1"
+
+[diagnostics.PARSE002.issues.exitus_value_out_of_range]
+message = "exitus code is outside the signed 64-bit range"
+help = "choose a value between −2^63 and 2^63−1"
+
+[diagnostics.PARSE002.issues.json_integer_overflow]
+message = "an integer in a json literal is outside the signed 64-bit range"
+help = "write the value as a float or a string"
+
+[diagnostics.PARSE002.issues.test_modifier_integer_out_of_range]
+message = "the `{modifier}` modifier integer is outside the signed 64-bit range"
+help = "choose a smaller value"
+
 [diagnostics.PARSE002.issues.declaration_block_comma]
 message = "commas do not separate members of a declaration block"
 help = "remove the comma; declaration members are separated by newlines"
