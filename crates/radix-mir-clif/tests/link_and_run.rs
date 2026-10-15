@@ -336,3 +336,57 @@ fn division_by_zero_exits_one_with_a_named_trap() {
         String::from_utf8_lossy(&run.stderr)
     );
 }
+
+/// Intermediates are exact in `[-2^63, 2^64 - 1]`: `max + 1` prints, adding
+/// `max` reaches the top of the range, the squared product goes through the
+/// runtime, `/ 3` and `% 7` through the runtime
+/// division, and a product past the range ends the run with the runner's
+/// wording.
+#[test]
+fn exact_intermediates_pass_the_i64_carrier() {
+    let types = TypeTable::new();
+    let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let (_, table) = fixture(vec![], vec![]);
+    let max = || MirOperand::Constant(MirConstant::Int(i64::MAX));
+    let int = |value: i64| MirOperand::Constant(MirConstant::Int(value));
+    let wide = |temp: u32| MirOperand::Temp(MirTempId(temp));
+    let compute = |target: u32, id: u32, op: MirBinOp, lhs: MirOperand, rhs: MirOperand| {
+        assign(
+            MirPlace::temp(MirTempId(target)),
+            id,
+            numerus,
+            binary(op, lhs, rhs),
+        )
+    };
+    let tail = vec![
+        compute(1, 10, MirBinOp::Add, max(), int(1)),
+        nota(wide(1), vacuum),
+        compute(2, 11, MirBinOp::Add, wide(1), max()),
+        nota(wide(2), vacuum),
+        compute(3, 12, MirBinOp::Div, wide(2), int(3)),
+        nota(wide(3), vacuum),
+        compute(4, 13, MirBinOp::Mod, wide(2), int(7)),
+        nota(wide(4), vacuum),
+        compute(5, 14, MirBinOp::Sub, wide(1), int(1)),
+        nota(wide(5), vacuum),
+        compute(6, 15, MirBinOp::Mul, wide(2), wide(2)),
+        nota(wide(6), vacuum),
+    ];
+    let temps = (1..=6).map(|id| temp(id, numerus)).collect();
+    let (program, _) = fixture(tail, temps);
+    let run = build_and_run("exact-intermediates", &program, &table);
+    let stdout = String::from_utf8_lossy(&run.stdout).into_owned();
+    assert_eq!(
+        stdout,
+        "3628800\n1.5\ntrue\n9223372036854775808\n18446744073709551615\n6148914691236517205\n1\n9223372036854775807\n",
+        "stderr: {}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    assert_eq!(run.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&run.stderr).contains("numerus overflow"),
+        "stderr: {}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+}

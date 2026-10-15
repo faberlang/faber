@@ -146,6 +146,91 @@ pub extern "C" fn __faber_clif_v1_print_i64(stream: i32, value: i64) {
     emit(stream, &value.to_string());
 }
 
+/// Print one signed integer line for an exact intermediate beyond the 64-bit
+/// carrier, given as its low and high halves.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_print_wide(stream: i32, low: i64, high: i64) {
+    emit(stream, &join_wide(low, high).to_string());
+}
+
+/// Render an exact intermediate as text.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_text_from_wide(low: i64, high: i64) -> *const u8 {
+    text_new(join_wide(low, high).to_string().as_bytes())
+}
+
+/// The smallest and largest exact integer (ruling 17a).
+const EXACT_MIN: i128 = i64::MIN as i128;
+const EXACT_MAX: i128 = u64::MAX as i128;
+
+/// High half of the latest wide result (the runtime is single-threaded).
+static WIDE_HIGH: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
+#[allow(clippy::cast_sign_loss)]
+fn join_wide(low: i64, high: i64) -> i128 {
+    (i128::from(high) << 64) | i128::from(low as u64)
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn return_wide(value: i128) -> i64 {
+    WIDE_HIGH.store((value >> 64) as i64, std::sync::atomic::Ordering::Relaxed);
+    value as i64
+}
+
+fn exact_trap(message: &str) -> ! {
+    flush();
+    let mut stderr = std::io::stderr();
+    let _ = writeln!(stderr, "error: {message}");
+    std::process::exit(1);
+}
+
+/// Exact product of two intermediates; outside the exact range is an overflow.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_wide_mul(
+    a_low: i64,
+    a_high: i64,
+    b_low: i64,
+    b_high: i64,
+) -> i64 {
+    let product = join_wide(a_low, a_high).checked_mul(join_wide(b_low, b_high));
+    match product {
+        Some(value) if (EXACT_MIN..=EXACT_MAX).contains(&value) => return_wide(value),
+        _ => exact_trap("numerus overflow"),
+    }
+}
+
+/// Floor quotient (`remainder == 0`) or floor remainder of two intermediates.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_wide_div(
+    a_low: i64,
+    a_high: i64,
+    b_low: i64,
+    b_high: i64,
+    remainder: i32,
+) -> i64 {
+    let (a, b) = (join_wide(a_low, a_high), join_wide(b_low, b_high));
+    if b == 0 {
+        exact_trap("numerus division failed");
+    }
+    let quotient = a / b;
+    let floored = if a % b != 0 && ((a < 0) != (b < 0)) {
+        quotient - 1
+    } else {
+        quotient
+    };
+    if remainder == 0 {
+        return_wide(floored)
+    } else {
+        return_wide(a - b * floored)
+    }
+}
+
+/// The high half of the latest wide result.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_wide_hi() -> i64 {
+    WIDE_HIGH.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// Print one float line; `narrow` selects the `f32` display contract.
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_print_f64(stream: i32, value: f64, narrow: i32) {
@@ -1400,6 +1485,37 @@ pub unsafe extern "C" fn __faber_clif_v1_trap_store(
     } else {
         unsafe { std::slice::from_raw_parts(suffix, length) }
     };
+    let mut message = format!("{value}{}", String::from_utf8_lossy(bytes));
+    if value < 0 && unsigned_slot != 0 {
+        message.push_str(" (a negative value cannot be stored in an unsigned slot)");
+    }
+    let mut stderr = std::io::stderr();
+    let _ = writeln!(stderr, "error: {message}");
+    std::process::exit(1);
+}
+
+/// [`__faber_clif_v1_trap_store`] for an exact intermediate beyond the 64-bit
+/// carrier.
+///
+/// # Safety
+///
+/// `suffix` is null or points to `length` readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_trap_store_wide(
+    low: i64,
+    high: i64,
+    suffix: *const u8,
+    length: i64,
+    unsigned_slot: i8,
+) -> ! {
+    flush();
+    let length = usize::try_from(length).unwrap_or(0);
+    let bytes = if suffix.is_null() {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(suffix, length) }
+    };
+    let value = join_wide(low, high);
     let mut message = format!("{value}{}", String::from_utf8_lossy(bytes));
     if value < 0 && unsigned_slot != 0 {
         message.push_str(" (a negative value cannot be stored in an unsigned slot)");

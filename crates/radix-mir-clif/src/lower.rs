@@ -27,6 +27,7 @@ use crate::abi::{self, AbiTy, RuntimeSymbol};
 mod closure;
 mod convert;
 mod lift;
+mod wide;
 pub(crate) use convert::{byte_element, member_tests, numeric_conversion, sequence_conversion};
 
 /// A named refusal discovered during lowering.
@@ -127,8 +128,9 @@ pub struct ProgramInput<'a> {
 /// Runtime representation of a scalar MIR type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Rep {
-    /// Integers of every width, held as `i64` (exact within the 64-bit range;
-    /// an operation leaving it traps).
+    /// Integers of every width, held as `i64` in a variable. An expression at
+    /// the cap computes in an `i128` carrier (see `lower/wide.rs`) and the
+    /// store narrows it.
     Int,
     /// `f64`.
     Float,
@@ -681,6 +683,10 @@ struct FunctionLower<'f, 'a> {
     /// `mut` parameters passed by address: the slot, the address and the
     /// representation to write back at every exit.
     pointer_params: Vec<(Slot, Variable, Rep)>,
+    /// Temporaries that hold the wide integer carrier.
+    wide_slots: rustc_hash::FxHashSet<Slot>,
+    /// Wide values known to be an `i64` extended.
+    narrow: rustc_hash::FxHashSet<Value>,
 }
 
 fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowered<()> {
@@ -718,6 +724,8 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             cells: rustc_hash::FxHashSet::default(),
             scratch_floor: 0,
             pointer_params: Vec::new(),
+            wide_slots: rustc_hash::FxHashSet::default(),
+            narrow: rustc_hash::FxHashSet::default(),
         };
         lower.run(function)?;
         lower.builder.seal_all_blocks();
@@ -780,11 +788,22 @@ impl FunctionLower<'_, '_> {
             self.declare(slot, rep);
             self.slot_tys.insert(slot, declared);
         }
+        let wide_temps = wide::wide_temps(table, function);
         for temp in &function.temps {
             if unknown(temp.ty) && !environments.contains(&Slot::Temp(temp.id)) {
                 continue;
             }
             let slot = Slot::Temp(temp.id);
+            if wide_temps.contains(&temp.id)
+                && !self.cells.contains(&slot)
+                && !environments.contains(&slot)
+            {
+                let variable = self.builder.declare_var(types::I128);
+                self.slots.insert(slot, (variable, Rep::Int));
+                self.slot_tys.insert(slot, temp.ty);
+                self.wide_slots.insert(slot);
+                continue;
+            }
             let rep = if self.cells.contains(&slot) {
                 Rep::List
             } else if environments.contains(&slot) {
@@ -830,7 +849,11 @@ impl FunctionLower<'_, '_> {
             if is_param {
                 continue;
             }
-            let zero = self.zero(*rep);
+            let zero = if self.wide_slots.contains(slot) {
+                Some(self.wide_zero())
+            } else {
+                self.zero(*rep)
+            };
             if let Some(zero) = zero {
                 self.builder.def_var(*variable, zero);
             }
@@ -2868,7 +2891,26 @@ impl FunctionLower<'_, '_> {
         }
     }
 
+    /// An operand, possibly unit, with an integer in the `i64` carrier.
+    fn operand_narrow(&mut self, operand: &MirOperand) -> Lowered<(Option<Value>, Rep)> {
+        match self.operand(operand)? {
+            (Some(value), Rep::Int) => Ok((Some(self.narrow(value)?), Rep::Int)),
+            other => Ok(other),
+        }
+    }
+
+    /// A scalar operand with an integer in the `i64` carrier: a wide
+    /// intermediate narrows, trapping when it does not fit.
     fn scalar(&mut self, operand: &MirOperand) -> Lowered<(Value, Rep)> {
+        let (value, rep) = self.scalar_wide(operand)?;
+        if rep == Rep::Int {
+            return Ok((self.narrow(value)?, rep));
+        }
+        Ok((value, rep))
+    }
+
+    /// A scalar operand as computed: an integer may be a wide intermediate.
+    fn scalar_wide(&mut self, operand: &MirOperand) -> Lowered<(Value, Rep)> {
         match self.operand(operand)? {
             (Some(value), rep) => Ok((value, rep)),
             (None, _) => Err(Decline::new("unit operand")),
@@ -2888,6 +2930,14 @@ impl FunctionLower<'_, '_> {
                     _ => self.value(value)?,
                 };
                 self.values.insert(value.id, (computed, rep));
+                let computed = match computed {
+                    Some(computed) if rep == Rep::Int => {
+                        let wide = place.projections.is_empty()
+                            && self.wide_slots.contains(&Self::base_slot(place));
+                        Some(self.fit_int(computed, wide)?)
+                    }
+                    other => other,
+                };
                 if !place.projections.is_empty() {
                     let Some(computed) = computed else {
                         return Err(Decline::new("unit element store"));
@@ -3430,7 +3480,7 @@ impl FunctionLower<'_, '_> {
                 let ([argument], Some(destination)) = (call.args.as_slice(), destination) else {
                     return Err(Decline::new("cede shape"));
                 };
-                let (value, rep) = self.operand(argument)?;
+                let (value, rep) = self.operand_narrow(argument)?;
                 if let (Some(collector), Some(item)) = (self.collector, value) {
                     let tag = self
                         .builder
@@ -3571,6 +3621,7 @@ impl FunctionLower<'_, '_> {
     fn render_text_at(&mut self, value: Value, rep: Rep, narrow: i64) -> Lowered<Value> {
         let rendered = match rep {
             Rep::Text => return Ok(value),
+            Rep::Int if self.is_wide(value) => self.text_from_wide(value)?,
             Rep::Int => self.call_runtime(&abi::TEXT_FROM_I64, &[value])?,
             Rep::Float => {
                 let narrow = self.builder.ins().iconst(types::I32, narrow);
@@ -3606,7 +3657,7 @@ impl FunctionLower<'_, '_> {
         let template = self.state.input.interner.resolve(template).to_owned();
         let mut rendered: Vec<Value> = Vec::with_capacity(args.len());
         for arg in args {
-            let (value, rep) = self.scalar(arg)?;
+            let (value, rep) = self.scalar_wide(arg)?;
             self.refuse_nested_tuple_display(arg)?;
             let narrow = self.float_narrow(arg);
             rendered.push(self.render_text_at(value, rep, narrow)?);
@@ -3714,7 +3765,7 @@ impl FunctionLower<'_, '_> {
             self.builder.def_var(variable, rendered);
             return Ok(());
         };
-        let (value, rep) = self.scalar(argument)?;
+        let (value, rep) = self.scalar_wide(argument)?;
         let (variable, slot_rep) = self.place_slot(destination)?;
         let stored = match (rep, slot_rep) {
             (Rep::Int, Rep::Int) => self.int_store(site, conversion.target_ty, value)?,
@@ -3731,6 +3782,12 @@ impl FunctionLower<'_, '_> {
             (Rep::Bits(from), Rep::Bits(to)) if from == to => value,
             _ => return Err(Decline::new("conversion between representations")),
         };
+        let stored = if rep == Rep::Int {
+            let wide = self.wide_slots.contains(&Self::base_slot(destination));
+            self.fit_int(stored, wide)?
+        } else {
+            stored
+        };
         self.builder.def_var(variable, stored);
         Ok(())
     }
@@ -3743,7 +3800,7 @@ impl FunctionLower<'_, '_> {
     ) -> Lowered<Value> {
         let table = self.state.input.types;
         let (policy, width) = match resolve(table, target.semantic_id()) {
-            Type::Primitive(Primitive::Numerus) => return Ok(value),
+            Type::Primitive(Primitive::Numerus) => (StorePolicy::Trapping, NumericWidth::I64),
             Type::SizedNumeric(Primitive::Numerus, width) => (StorePolicy::Trapping, *width),
             Type::ModularWord(width) => (StorePolicy::Wrapping, *width),
             Type::SaturatingWord(width) => (StorePolicy::Saturating, *width),
@@ -3756,42 +3813,73 @@ impl FunctionLower<'_, '_> {
         // A u64 slot's upper bound is beyond the i64 carrier: only the sign
         // can fail there.
         let high = i64::try_from(high).unwrap_or(i64::MAX);
+        let wide = self.is_wide(value);
         match policy {
             StorePolicy::Trapping => {
-                if width == NumericWidth::I64 {
+                if width == NumericWidth::I64 && !wide {
                     return Ok(value);
                 }
                 let below = {
-                    let bound = self.builder.ins().iconst(types::I64, low);
+                    let bound = self.bound_const(low, wide);
                     self.builder.ins().icmp(IntCC::SignedLessThan, value, bound)
                 };
                 let above = {
-                    let bound = self.builder.ins().iconst(types::I64, high);
+                    let bound = self.bound_const(high, wide);
                     self.builder
                         .ins()
                         .icmp(IntCC::SignedGreaterThan, value, bound)
                 };
-                let outside = self.builder.ins().bor(below, above);
+                let outside = if wide && width == NumericWidth::U64 {
+                    // A u64 at or above 2^63 is a valid value the i64 carrier
+                    // cannot hold: refuse it by name at run time.
+                    self.trap_if(
+                        above,
+                        "u64 value beyond 2^63 is not carried by the clif target",
+                    )?;
+                    below
+                } else {
+                    self.builder.ins().bor(below, above)
+                };
                 self.trap_store_if(outside, value, site, width)?;
-                Ok(value)
+                self.narrow(value)
             }
             StorePolicy::Saturating => {
-                let low = self.builder.ins().iconst(types::I64, low);
-                let high = self.builder.ins().iconst(types::I64, high);
+                let low = self.bound_const(low, wide);
+                let high = self.bound_const(high, wide);
                 let raised = self.builder.ins().smax(value, low);
-                Ok(self.builder.ins().smin(raised, high))
+                let clamped = self.builder.ins().smin(raised, high);
+                self.narrow(clamped)
             }
-            StorePolicy::Wrapping => match width {
-                NumericWidth::U8 | NumericWidth::U16 | NumericWidth::U32 => {
-                    let mask = self.builder.ins().iconst(types::I64, high);
-                    Ok(self.builder.ins().band(value, mask))
+            StorePolicy::Wrapping => {
+                // The low 64 bits agree with every narrower modulus.
+                let value = if wide {
+                    self.builder.ins().ireduce(types::I64, value)
+                } else {
+                    value
+                };
+                match width {
+                    NumericWidth::U8 | NumericWidth::U16 | NumericWidth::U32 => {
+                        let mask = self.builder.ins().iconst(types::I64, high);
+                        Ok(self.builder.ins().band(value, mask))
+                    }
+                    NumericWidth::I8 => Ok(self.reduce_word(value, Reduction::Sign(8))),
+                    NumericWidth::I16 => Ok(self.reduce_word(value, Reduction::Sign(16))),
+                    NumericWidth::I32 => Ok(self.reduce_word(value, Reduction::Sign(32))),
+                    NumericWidth::I64 => Ok(value),
+                    _ => Err(Decline::new("wrapping store at this width")),
                 }
-                NumericWidth::I8 => Ok(self.reduce_word(value, Reduction::Sign(8))),
-                NumericWidth::I16 => Ok(self.reduce_word(value, Reduction::Sign(16))),
-                NumericWidth::I32 => Ok(self.reduce_word(value, Reduction::Sign(32))),
-                NumericWidth::I64 => Ok(value),
-                _ => Err(Decline::new("wrapping store at this width")),
-            },
+            }
+        }
+    }
+
+    /// A signed bound in the carrier of the value it is compared with.
+    fn bound_const(&mut self, bound: i64, wide: bool) -> Value {
+        if wide {
+            let low = self.builder.ins().iconst(types::I64, bound);
+            let high = self.builder.ins().iconst(types::I64, bound >> 63);
+            self.builder.ins().iconcat(low, high)
+        } else {
+            self.builder.ins().iconst(types::I64, bound)
         }
     }
 
@@ -3830,10 +3918,18 @@ impl FunctionLower<'_, '_> {
             .builder
             .ins()
             .iconst(types::I8, i64::from(width.is_unsigned_int()));
-        let reference = self.runtime_ref(&abi::TRAP_STORE)?;
-        self.builder
-            .ins()
-            .call(reference, &[value, pointer, length, unsigned]);
+        if self.is_wide(value) {
+            let (low, high) = self.split_wide(value);
+            let reference = self.runtime_ref(&abi::TRAP_STORE_WIDE)?;
+            self.builder
+                .ins()
+                .call(reference, &[low, high, pointer, length, unsigned]);
+        } else {
+            let reference = self.runtime_ref(&abi::TRAP_STORE)?;
+            self.builder
+                .ins()
+                .call(reference, &[value, pointer, length, unsigned]);
+        }
         self.builder.ins().trap(TrapCode::unwrap_user(1));
         self.builder.switch_to_block(next);
         Ok(())
@@ -3845,9 +3941,10 @@ impl FunctionLower<'_, '_> {
             MirDiagnosticKind::Vide | MirDiagnosticKind::Mone => 1,
         };
         let stream = self.builder.ins().iconst(types::I32, stream);
-        let (value, rep) = self.scalar(argument)?;
+        let (value, rep) = self.scalar_wide(argument)?;
         self.refuse_nested_tuple_display(argument)?;
         match rep {
+            Rep::Int if self.is_wide(value) => self.print_wide(stream, value)?,
             Rep::Int => {
                 let reference = self.runtime_ref(&abi::PRINT_I64)?;
                 self.builder.ins().call(reference, &[stream, value]);
@@ -4013,7 +4110,8 @@ impl FunctionLower<'_, '_> {
         match &value.kind {
             MirValueKind::Operand(operand) => self.operand(operand),
             MirValueKind::Unary { op, operand } => {
-                let (computed, rep) = self.unary(*op, operand)?;
+                let cap = wide::cap_int(self.state.input.types, value.ty);
+                let (computed, rep) = self.unary(*op, operand, cap)?;
                 Ok((Some(computed), rep))
             }
             MirValueKind::Option(op) => {
@@ -4022,7 +4120,8 @@ impl FunctionLower<'_, '_> {
             }
             MirValueKind::Binary { op, lhs, rhs } => {
                 let result = rep_of(self.state.input.types, value.ty)?;
-                let (computed, rep) = self.binary(*op, lhs, rhs, result)?;
+                let cap = wide::cap_int(self.state.input.types, value.ty);
+                let (computed, rep) = self.binary(*op, lhs, rhs, result, cap)?;
                 Ok((Some(computed), rep))
             }
             MirValueKind::Closure(closure) => Ok((Some(self.closure_value(closure)?), Rep::Func)),
@@ -4030,8 +4129,20 @@ impl FunctionLower<'_, '_> {
         }
     }
 
-    fn unary(&mut self, op: MirUnOp, operand: &MirOperand) -> Lowered<(Value, Rep)> {
-        let (value, rep) = self.scalar(operand)?;
+    fn unary(&mut self, op: MirUnOp, operand: &MirOperand, cap: bool) -> Lowered<(Value, Rep)> {
+        let (value, rep) = self.scalar_wide(operand)?;
+        if (cap || self.is_wide(value)) && rep == Rep::Int {
+            match op {
+                MirUnOp::Neg => return Ok((self.wide_negate(value)?, Rep::Int)),
+                MirUnOp::BitNot => return Ok((self.wide_bit_not(value)?, Rep::Int)),
+                _ => {}
+            }
+        }
+        let value = if rep == Rep::Int {
+            self.narrow(value)?
+        } else {
+            value
+        };
         match (op, rep) {
             (MirUnOp::Neg, Rep::Int) => {
                 let zero = self.builder.ins().iconst(types::I64, 0);
@@ -4130,9 +4241,20 @@ impl FunctionLower<'_, '_> {
         lhs: &MirOperand,
         rhs: &MirOperand,
         result: Rep,
+        cap: bool,
     ) -> Lowered<(Value, Rep)> {
-        let (a, a_rep) = self.scalar(lhs)?;
-        let (b, b_rep) = self.scalar(rhs)?;
+        let (mut a, a_rep) = self.scalar_wide(lhs)?;
+        let (mut b, b_rep) = self.scalar_wide(rhs)?;
+        let exact = a_rep == Rep::Int && b_rep == Rep::Int;
+        if exact && op != MirBinOp::Coalesce {
+            return self.int_binary(op, a, b, cap);
+        }
+        if a_rep == Rep::Int {
+            a = self.narrow(a)?;
+        }
+        if b_rep == Rep::Int {
+            b = self.narrow(b)?;
+        }
         if op == MirBinOp::Coalesce {
             return self.coalesce((a, a_rep), (b, b_rep), result);
         }
@@ -4181,7 +4303,7 @@ impl FunctionLower<'_, '_> {
             return Err(Decline::new("mixed-representation operands"));
         }
         match a_rep {
-            Rep::Int => self.int_binary(op, a, b),
+            Rep::Int => self.int_binary(op, a, b, cap),
             Rep::Float => self.float_binary(op, a, b),
             Rep::Bool => self.bool_binary(op, a, b),
             Rep::Text => self.text_binary(op, a, b),
@@ -4199,8 +4321,13 @@ impl FunctionLower<'_, '_> {
         }
     }
 
-    fn int_binary(&mut self, op: MirBinOp, a: Value, b: Value) -> Lowered<(Value, Rep)> {
-        let compare = |this: &mut Self, cc: IntCC| (this.builder.ins().icmp(cc, a, b), Rep::Bool);
+    fn int_binary(&mut self, op: MirBinOp, a: Value, b: Value, cap: bool) -> Lowered<(Value, Rep)> {
+        // A wide operand makes the operation exact whatever its result type
+        // says (`(max + 1) % 1000` is typed by its divisor).
+        if wide::arithmetic(op) && (cap || self.is_wide(a) || self.is_wide(b)) {
+            return Ok((self.wide_arithmetic(op, a, b)?, Rep::Int));
+        }
+        let compare = |this: &mut Self, cc: IntCC| (this.wide_compare(cc, a, b), Rep::Bool);
         Ok(match op {
             MirBinOp::Add => (self.checked_add(a, b)?, Rep::Int),
             MirBinOp::Sub => (self.checked_sub(a, b)?, Rep::Int),
@@ -4608,11 +4735,15 @@ impl FunctionLower<'_, '_> {
             match &args[*position] {
                 MirOperand::Place(place) if place.projections.is_empty() => {
                     let (variable, _) = self.place_slot(place)?;
+                    let wide = self.wide_slots.contains(&Self::base_slot(place));
+                    let value = self.fit_int(value, wide && *rep == Rep::Int)?;
                     self.builder.def_var(variable, value);
                 }
                 MirOperand::Place(place) => self.write_projected(place, value, *rep)?,
                 MirOperand::Temp(id) => {
                     let (variable, _) = self.slot(Slot::Temp(*id))?;
+                    let wide = self.wide_slots.contains(&Slot::Temp(*id));
+                    let value = self.fit_int(value, wide && *rep == Rep::Int)?;
                     self.builder.def_var(variable, value);
                 }
                 _ => return Err(Decline::new("reference argument")),
@@ -4634,7 +4765,7 @@ impl FunctionLower<'_, '_> {
                     results.push(self.builder.ins().iconst(types::I8, 0));
                 }
                 if let Some(operand) = value
-                    && let (Some(value), have) = self.operand(operand)?
+                    && let (Some(value), have) = self.operand_narrow(operand)?
                 {
                     results.push(self.coerce(value, have, self.ret_rep)?);
                 }

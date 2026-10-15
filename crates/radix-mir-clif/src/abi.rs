@@ -462,6 +462,48 @@ pub const TRAP_STORE: RuntimeSymbol = RuntimeSymbol {
     params: &[I64, Ptr, I64, I8],
     ret: None,
 };
+/// Print one signed integer line for an exact intermediate beyond the 64-bit
+/// carrier: (stream, low half, high half).
+pub const PRINT_WIDE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_print_wide",
+    params: &[I32, I64, I64],
+    ret: None,
+};
+/// Render an exact intermediate as text: (low half, high half) -> text handle.
+pub const TEXT_FROM_WIDE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_from_wide",
+    params: &[I64, I64],
+    ret: Some(Ptr),
+};
+/// [`TRAP_STORE`] for an exact intermediate: (low half, high half, suffix
+/// pointer, suffix length, unsigned-slot flag).
+pub const TRAP_STORE_WIDE: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_trap_store_wide",
+    params: &[I64, I64, Ptr, I64, I8],
+    ret: None,
+};
+/// Exact product of two 128-bit intermediates: (a low, a high, b low, b high)
+/// -> low half; the high half is read from [`WIDE_HI`]. A product outside the
+/// exact range [-2^63, 2^64 - 1] ends the run with the runner's wording.
+pub const WIDE_MUL: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_wide_mul",
+    params: &[I64, I64, I64, I64],
+    ret: Some(I64),
+};
+/// Floor quotient (remainder flag 0) or floor remainder (flag 1) of two
+/// 128-bit intermediates: (a low, a high, b low, b high, flag) -> low half;
+/// the high half is read from [`WIDE_HI`]. A zero divisor ends the run.
+pub const WIDE_DIV: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_wide_div",
+    params: &[I64, I64, I64, I64, I32],
+    ret: Some(I64),
+};
+/// The high half of the latest [`WIDE_MUL`] or [`WIDE_DIV`] result.
+pub const WIDE_HI: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_wide_hi",
+    params: &[],
+    ret: Some(I64),
+};
 /// Install the program's output tokens (true, false, none, tuple), each as
 /// (pointer, length).
 pub const SET_DISPLAY_TOKENS: RuntimeSymbol = RuntimeSymbol {
@@ -670,6 +712,12 @@ pub const MAIN: RuntimeSymbol = RuntimeSymbol {
 pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     MAIN,
     PRINT_I64,
+    PRINT_WIDE,
+    TEXT_FROM_WIDE,
+    TRAP_STORE_WIDE,
+    WIDE_MUL,
+    WIDE_DIV,
+    WIDE_HI,
     PRINT_F64,
     PRINT_BOOL,
     LIST_NEW,
