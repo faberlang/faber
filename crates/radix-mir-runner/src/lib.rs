@@ -3973,6 +3973,9 @@ mod octeti_lista_test;
 mod octeti_valor_test;
 
 #[cfg(test)]
+mod valor_numerus_width_test;
+
+#[cfg(test)]
 #[path = "vector_lista_test.rs"]
 mod vector_lista_test;
 

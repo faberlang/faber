@@ -669,15 +669,28 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     "valor to numerus conversion failed",
                 )),
             },
-            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
-                match value {
-                    Value::Int(value) => Ok(Value::Int(value)),
-                    _ => Err(RunnerError::conversion(
-                        span,
-                        "valor to numerus conversion failed",
-                    )),
+            Type::Primitive(Primitive::Numerus) => match value {
+                Value::Int(value) => Ok(Value::Int(value)),
+                _ => Err(RunnerError::conversion(
+                    span,
+                    "valor to numerus conversion failed",
+                )),
+            },
+            // Need (CTO ruling 2026-10-15): `valor ↦ numerus<W>`
+            // applies the same magnitude check as `int ↦ W`, so a payload that
+            // does not fit `W` (including a negative into an unsigned width)
+            // fails on the `⇥` channel, where `⊥` supplies the default. The
+            // `NumericWidth::Inf` arm above is untouched; every `i64` fits its
+            // `int_width_range` row.
+            Type::SizedNumeric(Primitive::Numerus, width) => match value {
+                Value::Int(value) if super::scalar::numerus_fits_width(value, *width) => {
+                    Ok(Value::Int(value))
                 }
-            }
+                _ => Err(RunnerError::conversion(
+                    span,
+                    "valor to numerus conversion failed",
+                )),
+            },
             Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
                 match value {
                     Value::Float(value) => Ok(Value::Float(value)),

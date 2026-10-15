@@ -1578,7 +1578,7 @@ fn format_decimal_carrier(value: i64, width: NumericWidth) -> String {
 /// `true` when `v` fits the signed range of `width`. Mirrors Rust codegen's
 /// `.parse::<W>()` accept/reject boundary for `textus ↦ numerus<W>` (SA-002);
 /// uses the runner's existing target-neutral integer width table.
-fn numerus_fits_width(v: i64, width: NumericWidth) -> bool {
+pub(super) fn numerus_fits_width(v: i64, width: NumericWidth) -> bool {
     exact_fits_width(i128::from(v), width)
 }
 
