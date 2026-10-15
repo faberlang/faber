@@ -296,6 +296,14 @@ help = "تحقق من فواصل الأرقام وبادئات الأساس"
 message = "عدد صحيح غير صالح"
 help = "تحقق من فواصل الأرقام وبادئات الأساس"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "حرف عشري كبير جدًا؛ فهو يتجاوز الحد إلى ما لا نهاية"
+help = "اكتب مقدارًا أصغر، أو قسّم الوحدة"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "حرف عشري صغير جدًا؛ فهو ينخفض دون الحد إلى الصفر"
+help = "اكتب مقدارًا أكبر، أو قسّم الوحدة"
+
 [diagnostics.LEX003]
 message = "تسلسل escape غير صالح"
 help = "استخدم تسلسل escape مدعوما أو اهرب backslash"
@@ -1039,6 +1047,10 @@ help = "أصلح بنية AST للتخفيض"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "لا يوجد تصريح أو عنصر مخفَّض لإرفاق التعليق به"
 help = "أصلح بنية AST للتخفيض"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "يجب أن تأخذ دالة `@ conversion` معاملاً واحدًا بالضبط وأن تُعلن نوع إرجاع واحدًا بالضبط"
+help = "اكتب `functio name(Source) → Destination` لزوج التحويل"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "{copia} يتطلب معامل نوع واحدا"

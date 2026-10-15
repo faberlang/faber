@@ -296,6 +296,14 @@ help = "numeric separators और base prefixes जांचें"
 message = "अमान्य integer"
 help = "numeric separators और base prefixes जांचें"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "फ़्लोट अक्षर बहुत बड़ा है; यह अनंत तक अतिप्रवाहित हो जाता है"
+help = "छोटा परिमाण लिखें, या इकाई को मापें"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "फ़्लोट अक्षर बहुत छोटा है; यह शून्य तक अधःप्रवाहित हो जाता है"
+help = "बड़ा परिमाण लिखें, या इकाई को मापें"
+
 [diagnostics.LEX003]
 message = "अमान्य escape sequence"
 help = "समर्थित escape sequence का उपयोग करें या backslash escape करें"
@@ -1051,6 +1059,10 @@ help = "lowering के लिए AST construct ठीक करें"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "टिप्पणी जोड़ने के लिए कोई lowered statement या item नहीं है"
 help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "`@ conversion` फ़ंक्शन को ठीक एक पैरामीटर लेना चाहिए और ठीक एक रिटर्न प्रकार घोषित करना चाहिए"
+help = "रूपांतरण जोड़ी के लिए `functio name(Source) → Destination` लिखें"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia के लिए एक type parameter आवश्यक है"

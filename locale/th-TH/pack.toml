@@ -296,6 +296,14 @@ help = "ตรวจตัวคั่นตัวเลขและคำนำ
 message = "จำนวนเต็มไม่ถูกต้อง"
 help = "ตรวจตัวคั่นตัวเลขและคำนำหน้าฐาน"
 
+[diagnostics.LEX002.issues.float_overflow]
+message = "ลิเทอรัลทศนิยมมีขนาดใหญ่เกินไป; มันล้นเป็นอนันต์"
+help = "เขียนขนาดที่เล็กลง หรือปรับสเกลหน่วย"
+
+[diagnostics.LEX002.issues.float_underflow]
+message = "ลิเทอรัลทศนิยมมีขนาดเล็กเกินไป; มันล้นลงเป็นศูนย์"
+help = "เขียนขนาดที่ใหญ่ขึ้น หรือปรับสเกลหน่วย"
+
 [diagnostics.LEX003]
 message = "ลำดับ escape ไม่ถูกต้อง"
 help = "ใช้ลำดับ escape ที่รองรับ หรือ escape backslash"
@@ -1051,6 +1059,10 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "ไม่มีคำสั่งหรือรายการที่ผ่านการ lowering ให้ผูกกับความคิดเห็นนี้"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.conversio_signature]
+message = "ฟังก์ชัน `@ conversion` ต้องรับพารามิเตอร์หนึ่งตัวและประกาศชนิดผลลัพธ์หนึ่งชนิดเท่านั้น"
+help = "เขียน `functio name(Source) → Destination` สำหรับคู่การแปลง"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "copia ต้องมีพารามิเตอร์ชนิดหนึ่งรายการ"
