@@ -1,0 +1,10 @@
++++
+locale = "en"
++++
+# Increment narrows like an assignment and traps with the same text.
+main {
+    var int x ← 9223372036854775807
+    print x
+    x ↑
+    print x
+}

@@ -1,0 +1,11 @@
++++
+locale = "en"
++++
+# The store into a u8 traps with the width's own name and the store's position.
+main {
+    const u8 a ← 200
+    print a
+    var u8 m ← a
+    m ← a + 100
+    print m
+}

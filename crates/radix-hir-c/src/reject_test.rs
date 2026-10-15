@@ -43,34 +43,20 @@ fn bitwise_operator() {
 }
 
 #[test]
-fn sized_integer_type() {
+fn policy_integer_type() {
     assert_eq!(
-        rejected("main {\n    const u8 n ← 5\n    print n\n}"),
-        "sized integer type"
+        rejected("main {\n    const wrapping<u8> n ← 5\n    print n\n}"),
+        "wrapping, saturating, or policy numeric type"
     );
 }
 
 #[test]
-fn write_output_is_not_print() {
+fn lockstep_iteration_loop() {
     assert_eq!(
-        rejected("main {\n    warn \"w\"\n}"),
-        "write, debug, or warn output (only print is supported)"
-    );
-}
-
-#[test]
-fn text_comparison() {
-    assert_eq!(
-        rejected("main {\n    if \"a\" ≡ \"b\" {\n        print 1\n    }\n}"),
-        "comparison of text or booleans"
-    );
-}
-
-#[test]
-fn iteration_loop() {
-    assert_eq!(
-        rejected("main {\n    for range 0‥3 const i {\n        print i\n    }\n}"),
-        "iteration loop"
+        rejected(
+            "main {\n    const list<int> a ← [1, 2]\n    const list<int> b ← [3, 4]\n    for from a, b const x, y {\n        print x + y\n    }\n}"
+        ),
+        "lockstep iteration loop"
     );
 }
 

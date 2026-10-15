@@ -1,0 +1,13 @@
++++
+locale = "en"
++++
+# An argument is stored into its parameter's width.
+fn id(i16 x) → i16 {
+    return x
+}
+
+main {
+    var int n ← 40000
+    print id(30000)
+    print id(n)
+}

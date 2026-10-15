@@ -23,7 +23,18 @@ use radix_types::{MirCollectionOp, TypeId};
 /// round-trip digits (`0.1`, `1e300`, `100.0`), every one a valid C double
 /// literal that the compiler reads back to the same value.
 pub(crate) fn c_double(value: f64) -> String {
-    format!("{value:?}")
+    if value.is_nan() {
+        "__builtin_nan(\"\")".to_owned()
+    } else if value.is_infinite() {
+        let inf = "__builtin_inf()";
+        if value < 0.0 {
+            format!("(-{inf})")
+        } else {
+            inf.to_owned()
+        }
+    } else {
+        format!("{value:?}")
+    }
 }
 
 impl Emitter<'_> {

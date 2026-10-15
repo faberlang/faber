@@ -153,6 +153,7 @@ impl Emitter<'_> {
                 self.support.need(Helper::FloatText);
                 Ok(format!("faber_float_text(faber_a, {})", operand.text))
             }
+            Value::Opt(inner) => self.show_option(&operand.text, inner),
             Value::Void => Err(unsupported("showing a call with no result")),
         }
     }

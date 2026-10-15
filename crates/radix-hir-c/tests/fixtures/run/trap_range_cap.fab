@@ -1,0 +1,10 @@
++++
+locale = "en"
++++
+# The counter is exact, so the walk past the representation cap traps with
+# the arithmetic's own text, after the last in-range pass has printed.
+main {
+    for range -9223372036854775807…-9223372036854775808 const i {
+        print i
+    }
+}

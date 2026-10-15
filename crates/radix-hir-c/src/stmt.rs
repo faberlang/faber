@@ -12,19 +12,34 @@ use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirIteraMode, HirLocal, HirScribeKind,
     HirStatement, HirStatementKind,
 };
-use radix_types::Type;
 
 impl Emitter<'_> {
     /// Emit a block's statements one level deeper than the current line.
     pub(crate) fn block(&mut self, out: &mut String, block: &HirBlock) -> Result<(), CodegenError> {
-        if block.expr.is_some() {
-            return Err(unsupported("block value expression"));
-        }
-        if block.breakable.is_some() {
-            return Err(unsupported("breakable fac block"));
-        }
         self.depth += 1;
         for statement in &block.statements {
+            self.statement(out, statement)?;
+        }
+        // A tail expression of a block written for effect (an `else` that
+        // holds an `elif`, a `fac` body) is one more statement: its value is
+        // unused. A block that yields a value is a conditional's arm, which
+        // [`Emitter::conditional`] reads itself.
+        if let Some(tail) = &block.expr {
+            self.expr_statement(out, tail)?;
+        }
+        self.depth -= 1;
+        Ok(())
+    }
+
+    /// The first `count` statements of `block`, one level deeper (a loop body
+    /// whose last statement is written separately).
+    fn statements(
+        &mut self,
+        out: &mut String,
+        statements: &[HirStatement],
+    ) -> Result<(), CodegenError> {
+        self.depth += 1;
+        for statement in statements {
             self.statement(out, statement)?;
         }
         self.depth -= 1;
@@ -35,13 +50,22 @@ impl Emitter<'_> {
         "    ".repeat(self.depth)
     }
 
-    fn line(&self, out: &mut String, text: &str) {
+    pub(crate) fn line(&self, out: &mut String, text: &str) {
         out.push_str(&self.indent());
         out.push_str(text);
         out.push('\n');
     }
 
     fn statement(
+        &mut self,
+        out: &mut String,
+        statement: &HirStatement,
+    ) -> Result<(), CodegenError> {
+        self.statement_kind(out, statement)
+            .map_err(|error| located(error, statement.span.start))
+    }
+
+    fn statement_kind(
         &mut self,
         out: &mut String,
         statement: &HirStatement,
@@ -53,14 +77,26 @@ impl Emitter<'_> {
             HirStatementKind::Rumpe => self.loop_jump(out, "break;"),
             HirStatementKind::Perge => self.loop_jump(out, "continue;"),
             HirStatementKind::Tacet => Ok(()),
-            HirStatementKind::IncDec(_) => Err(unsupported("increment or decrement")),
+            HirStatementKind::IncDec(inc_dec) => self.inc_dec(out, inc_dec),
             HirStatementKind::Custodi(_) => Err(unsupported("custodi guard section")),
         }
     }
 
     /// `break` / `continue` act on the innermost loop in both languages; the
     /// emitter writes no `switch`, so a C `break` cannot bind elsewhere.
-    fn loop_jump(&self, out: &mut String, text: &str) -> Result<(), CodegenError> {
+    fn loop_jump(&mut self, out: &mut String, text: &str) -> Result<(), CodegenError> {
+        // `rumpe` leaves the innermost breakable scope: a plain `fac` block
+        // when one is open inside the innermost loop, else the loop. A C
+        // `break` binds to the loop only, so a block exit is a `goto`.
+        if text == "break;"
+            && let Some((depth, label, used)) = self.fac_exits.last_mut()
+            && *depth == self.loops
+        {
+            *used = true;
+            let jump = format!("goto {label};");
+            self.line(out, &jump);
+            return Ok(());
+        }
         if self.loops == 0 {
             return Err(unsupported("loop jump outside a loop"));
         }
@@ -81,11 +117,7 @@ impl Emitter<'_> {
             (Returns::Void, None) => self.line(out, "return;"),
             (Returns::Value(class), Some(value)) => {
                 let operand = self.expr(value)?;
-                let operand = if class == Ty::Int {
-                    self.fit(operand)?
-                } else {
-                    operand
-                };
+                let operand = self.settle(operand, class)?;
                 if operand.value != crate::expr::Value::from(class) {
                     return Err(unsupported("value stored without a store check"));
                 }
@@ -106,7 +138,10 @@ impl Emitter<'_> {
     }
 
     fn local(&mut self, out: &mut String, local: &HirLocal) -> Result<(), CodegenError> {
-        if local.is_await || local.runtime_provided || local.await_store.is_some() {
+        // The entry's arguments are the one runtime-provided binding.
+        let entry_args = local.init.is_none() && self.entry_args == Some(local.name);
+        if local.is_await || (local.runtime_provided && !entry_args) || local.await_store.is_some()
+        {
             return Err(unsupported("await or runtime-provided binding"));
         }
         let Some(ty) = local
@@ -117,14 +152,13 @@ impl Emitter<'_> {
         };
         let class = classify(self.types, ty)?;
         let Some(init) = &local.init else {
+            if entry_args && class == Ty::List(crate::ty::Elem::Text) {
+                return self.entry_arguments(out, local);
+            }
             return Err(unsupported("local without an initializer"));
         };
         let value = self.expr(init)?;
-        let value = if class == Ty::Int {
-            self.fit(value)?
-        } else {
-            value
-        };
+        let value = self.settle(value, class)?;
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
         }
@@ -152,7 +186,37 @@ impl Emitter<'_> {
         Ok(())
     }
 
-    fn expr_statement(
+    /// `main args xs`: the arguments after the program name, as a text list.
+    fn entry_arguments(&mut self, out: &mut String, local: &HirLocal) -> Result<(), CodegenError> {
+        let Some(kind) = self.names.binding_kind(local.def_id) else {
+            return Err(unsupported("local the name catalog does not classify"));
+        };
+        let raw = self.names.resolve_symbol(local.name);
+        let name = self.scope.claim(&prefixed_binding_name(kind, raw));
+        let class = Ty::List(crate::ty::Elem::Text);
+        self.need_class(class);
+        self.support.need(Helper::List(
+            crate::ty::Elem::Text,
+            crate::helpers::ListOp::Push,
+        ));
+        self.uses_args = true;
+        let declaration = self.declare(class, &name, local.mutable)?;
+        self.line(
+            out,
+            &format!("{declaration} = faber_argv_text(faber_a, argc, argv);"),
+        );
+        self.locals.insert(
+            local.def_id,
+            Local {
+                name,
+                ty: class,
+                constant: None,
+            },
+        );
+        Ok(())
+    }
+
+    pub(crate) fn expr_statement(
         &mut self,
         out: &mut String,
         expr: &HirExpression,
@@ -186,17 +250,195 @@ impl Emitter<'_> {
                 iter,
                 body,
                 mutable,
+            } if coordinates.len() <= 1 => self.itera(
+                out,
+                coordinates.first().copied(),
+                (*binding, *binding_name),
+                iter,
+                body,
+                *mutable,
+            ),
+            HirExpressionKind::Itera {
+                mode: HirIteraMode::Ab,
+                coordinates,
+                filum: None,
+                binding,
+                binding_name,
+                iter,
+                body,
+                mutable,
             } if coordinates.is_empty() => {
-                self.itera(out, *binding, *binding_name, iter, body, *mutable)
+                self.range_loop(out, (*binding, *binding_name), iter, body, *mutable)
             }
-            HirExpressionKind::Block(block) => {
-                self.line(out, "{");
-                self.block(out, block)?;
-                self.line(out, "}");
+            HirExpressionKind::IteraRange {
+                ranges,
+                bindings,
+                body,
+                mutable,
+            } => {
+                let ranges: Vec<&HirExpression> = ranges.iter().collect();
+                self.range_product(out, &ranges, bindings, body, *mutable)
+            }
+            HirExpressionKind::Discerne {
+                scrutinees, arms, ..
+            } => self.switch(out, scrutinees, arms),
+            HirExpressionKind::Block(block) => self.plain_block(out, block),
+            HirExpressionKind::Loop(block) => self.loop_block(out, block),
+            HirExpressionKind::Panic(message) => {
+                let message = self.expr(message)?;
+                if message.value != Value::Text {
+                    return Err(unsupported("panic with a message that is not text"));
+                }
+                self.support.need(Helper::Trap);
+                self.line(out, &format!("faber_abort({});", message.text));
                 Ok(())
+            }
+            HirExpressionKind::Adfirma(cond, message) => {
+                self.assertion(out, cond, message.as_deref())
             }
             other => Err(unsupported(construct_name(other))),
         }
+    }
+
+    /// A block written as a statement. A `fac` block is a breakable scope:
+    /// `rumpe` inside it leaves the block, so it ends in a label when one did.
+    fn plain_block(&mut self, out: &mut String, block: &HirBlock) -> Result<(), CodegenError> {
+        let scope = block.breakable.is_some_and(|kind| kind.is_scope());
+        if scope {
+            let label = format!("faber_x{}", self.temps);
+            self.temps += 1;
+            self.fac_exits.push((self.loops, label, false));
+        }
+        self.line(out, "{");
+        let result = self.block(out, block);
+        self.line(out, "}");
+        if scope && let Some((_, label, used)) = self.fac_exits.pop() {
+            result?;
+            if used {
+                self.line(out, &format!("{label}:;"));
+            }
+            return Ok(());
+        }
+        result
+    }
+
+    /// `fac { … } dum cond` lowers to a loop whose last statement is
+    /// `if (!cond) rumpe`; C's `do … while` runs `continue` through that test,
+    /// as `perge` does. Any other loop is `for (;;)`.
+    fn loop_block(&mut self, out: &mut String, block: &HirBlock) -> Result<(), CodegenError> {
+        if block.expr.is_some() {
+            return Err(unsupported("loop with a value"));
+        }
+        let test = block.statements.split_last().and_then(|(last, rest)| {
+            let HirStatementKind::Expr(HirExpression {
+                kind:
+                    HirExpressionKind::Si {
+                        cond,
+                        then_block,
+                        then_catch: None,
+                        else_block: None,
+                    },
+                ..
+            }) = &last.kind
+            else {
+                return None;
+            };
+            let HirExpressionKind::Unary(radix_hir::HirUnOp::Not, inner) = &cond.kind else {
+                return None;
+            };
+            let only_break = then_block.expr.is_none()
+                && matches!(
+                    then_block.statements.as_slice(),
+                    [HirStatement {
+                        kind: HirStatementKind::Rumpe,
+                        ..
+                    }]
+                );
+            only_break.then_some((rest, inner))
+        });
+        self.loops += 1;
+        let result = if let Some((rest, cond)) = test {
+            self.line(out, "do {");
+            let body = self.statements(out, rest);
+            self.loops -= 1;
+            body?;
+            let test = self.condition(cond)?;
+            self.line(out, &format!("}} while {test};"));
+            return Ok(());
+        } else {
+            self.line(out, "for (;;) {");
+            self.block(out, block)
+        };
+        self.loops -= 1;
+        result?;
+        self.line(out, "}");
+        Ok(())
+    }
+
+    /// `assert cond [panic "msg"]`: a failed assertion aborts with the
+    /// message, or `assertion failed`.
+    fn assertion(
+        &mut self,
+        out: &mut String,
+        cond: &HirExpression,
+        message: Option<&HirExpression>,
+    ) -> Result<(), CodegenError> {
+        let test = self.condition(cond)?;
+        let text = match message {
+            Some(message) => {
+                let message = self.expr(message)?;
+                if message.value != Value::Text {
+                    return Err(unsupported("assertion message that is not text"));
+                }
+                message.text
+            }
+            None => c_string("assertion failed")?,
+        };
+        self.support.need(Helper::Trap);
+        self.line(out, &format!("if (!{test}) {{"));
+        self.depth += 1;
+        self.line(out, &format!("faber_abort({text});"));
+        self.depth -= 1;
+        self.line(out, "}");
+        Ok(())
+    }
+
+    /// `place ↑` / `place ↓` on an `int` local: one exact step, stored back
+    /// through the same check an assignment makes.
+    fn inc_dec(
+        &mut self,
+        out: &mut String,
+        inc_dec: &radix_hir::HirIncDec,
+    ) -> Result<(), CodegenError> {
+        let HirExpressionKind::Path(def_id) = &inc_dec.target.kind else {
+            return Err(unsupported(
+                "increment or decrement of a place that is not a local",
+            ));
+        };
+        let Some(local) = self.locals.get(def_id) else {
+            return Err(unsupported(
+                "increment or decrement of a name that is not a local",
+            ));
+        };
+        if local.ty != Ty::Int {
+            return Err(unsupported("increment or decrement of a non-integer"));
+        }
+        let name = local.name.clone();
+        let Ok(written) = self.names.resolve_def(*def_id) else {
+            return Err(unsupported("increment of a name the catalog does not hold"));
+        };
+        let (helper, call) = match inc_dec.op {
+            radix_hir::HirIncDecOp::Inc => (Helper::Add, "faber_add"),
+            radix_hir::HirIncDecOp::Dec => (Helper::Sub, "faber_sub"),
+        };
+        self.support.need(helper);
+        self.support.need(Helper::StoreI64);
+        let at = c_string(&format!("assignment to `{written}`"))?;
+        self.line(
+            out,
+            &format!("{name} = faber_store_i64({call}({name}, 1), {at});"),
+        );
+        Ok(())
     }
 
     /// `for from xs const x { … }`: an index walk over the list, read once.
@@ -205,8 +447,8 @@ impl Emitter<'_> {
     fn itera(
         &mut self,
         out: &mut String,
-        binding: radix_hir::DefId,
-        binding_name: radix_lexer::Symbol,
+        coordinate: Option<(radix_hir::DefId, radix_lexer::Symbol)>,
+        (binding, binding_name): (radix_hir::DefId, radix_lexer::Symbol),
         iter: &HirExpression,
         body: &HirBlock,
         mutable: bool,
@@ -252,6 +494,26 @@ impl Emitter<'_> {
                 self.declare(class, &name, mutable)?
             ),
         );
+        // `apud i`: the position, read before the element.
+        if let Some((position, position_name)) = coordinate {
+            let Some(position_kind) = self.names.binding_kind(position) else {
+                return Err(unsupported(
+                    "loop coordinate the name catalog does not classify",
+                ));
+            };
+            let raw = self.names.resolve_symbol(position_name);
+            let c_name = self.scope.claim(&prefixed_binding_name(position_kind, raw));
+            let declaration = self.declare(Ty::Int, &c_name, false)?;
+            self.line(out, &format!("{declaration} = {index};"));
+            self.locals.insert(
+                position,
+                Local {
+                    name: c_name,
+                    ty: Ty::Int,
+                    constant: None,
+                },
+            );
+        }
         self.depth -= 1;
         self.locals.insert(
             binding,
@@ -288,9 +550,35 @@ impl Emitter<'_> {
         let test = self.condition(cond)?;
         self.line(out, &format!("if {test} {{"));
         self.block(out, then_block)?;
-        if let Some(otherwise) = else_block {
-            self.line(out, "} else {");
-            self.block(out, otherwise)?;
+        let mut otherwise = else_block;
+        // An `elif` is an `else` block holding one `if`: written flat.
+        while let Some(block) = otherwise {
+            let chained = match (block.statements.is_empty(), block.expr.as_deref()) {
+                (
+                    true,
+                    Some(HirExpression {
+                        kind:
+                            HirExpressionKind::Si {
+                                cond,
+                                then_block,
+                                then_catch: None,
+                                else_block,
+                            },
+                        ..
+                    }),
+                ) => Some((cond, then_block, else_block.as_ref())),
+                _ => None,
+            };
+            if let Some((cond, then_block, next)) = chained {
+                let test = self.condition(cond)?;
+                self.line(out, &format!("}} else if {test} {{"));
+                self.block(out, then_block)?;
+                otherwise = next;
+            } else {
+                self.line(out, "} else {");
+                self.block(out, block)?;
+                break;
+            }
         }
         self.line(out, "}");
         Ok(())
@@ -337,11 +625,7 @@ impl Emitter<'_> {
         };
         let (name, class) = (local.name.clone(), local.ty);
         let value = self.expr(value)?;
-        let value = if class == Ty::Int {
-            self.fit(value)?
-        } else {
-            value
-        };
+        let value = self.settle(value, class)?;
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
         }
@@ -360,19 +644,49 @@ impl Emitter<'_> {
         kind: HirScribeKind,
         args: &[HirExpression],
     ) -> Result<(), CodegenError> {
-        if kind != HirScribeKind::Nota {
-            return Err(unsupported(
-                "write, debug, or warn output (only print is supported)",
-            ));
+        if self.print_joins(args) {
+            return self.print_line(out, kind, args);
         }
+        // The runner prints each argument as its own line when one of them
+        // has no shared rendering (a sized integer, a genus).
+        for arg in args {
+            self.print_line(out, kind, std::slice::from_ref(arg))?;
+        }
+        Ok(())
+    }
+
+    /// Whether the runner writes these arguments as one space-joined line:
+    /// a single argument, a literal text first with up to two more (its
+    /// format-string form), or every argument having a shared rendering.
+    /// Sized integers and genera keep the per-argument path.
+    fn print_joins(&self, args: &[HirExpression]) -> bool {
+        if args.len() <= 1 {
+            return true;
+        }
+        let literal_first = matches!(
+            args[0].kind,
+            HirExpressionKind::Literal(radix_hir::HirLiteral::String(_))
+        );
+        if literal_first && args.len() <= 3 {
+            return true;
+        }
+        args.iter().all(|arg| {
+            arg.ty.is_some_and(|ty| {
+                classify(self.types, ty)
+                    .is_ok_and(|class| !matches!(class, Ty::Sized(_) | Ty::Genus(_)))
+            })
+        })
+    }
+
+    /// One `printf` for `args`, space separated, ending the line.
+    fn print_line(
+        &mut self,
+        out: &mut String,
+        kind: HirScribeKind,
+        args: &[HirExpression],
+    ) -> Result<(), CodegenError> {
         let mut operands = Vec::with_capacity(args.len());
         for arg in args {
-            // The absent-option token waits on the option type.
-            if let Some(ty) = arg.ty
-                && matches!(self.types.get(ty), Type::Option(_))
-            {
-                return Err(unsupported("printing an absent option"));
-            }
             operands.push(self.expr(arg)?);
         }
         let prelude = self.sequence(&mut operands);
@@ -399,6 +713,7 @@ impl Emitter<'_> {
                 Value::Truth => ("%s", format!("({} ? {yes} : {no})", value.text)),
                 Value::List(elem) => ("%s", self.show_list(&value.text, elem)?),
                 Value::Genus(def_id) => ("%s", self.show_genus(&value.text, def_id)?),
+                Value::Opt(inner) => ("%s", self.show_option(&value.text, inner)?),
                 Value::Float => (
                     "%s",
                     format!(
@@ -412,7 +727,13 @@ impl Emitter<'_> {
             values.push(text);
         }
         self.support.need_stdio();
-        let mut line = format!("printf(\"{}\\n\"", specs.join(" "));
+        // `debug` and `warn` write their line to standard error; `print` and
+        // `write` to standard output.
+        let call = match kind {
+            HirScribeKind::Vide | HirScribeKind::Mone => "fprintf(stderr, ",
+            HirScribeKind::Nota | HirScribeKind::Scribe => "printf(",
+        };
+        let mut line = format!("{call}\"{}\\n\"", specs.join(" "));
         for value in values {
             line.push_str(", ");
             line.push_str(&value);
@@ -432,4 +753,19 @@ impl Emitter<'_> {
         }
         Ok(())
     }
+}
+
+/// Name the byte offset of the innermost statement a rejection came from, so
+/// a corpus tally can say where a construct sits. The `construct` fact is
+/// unchanged; only the first (innermost) statement adds the offset.
+fn located(mut error: CodegenError, offset: u32) -> CodegenError {
+    if error.args.iter().any(|arg| arg.name == "offset") {
+        return error;
+    }
+    error.args.push(radix_diagnostics::DiagnosticArg::new(
+        "offset",
+        offset.to_string(),
+    ));
+    error.message = format!("{} (byte {offset})", error.message);
+    error
 }

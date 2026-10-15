@@ -29,6 +29,8 @@ pub(crate) enum Helper {
     Rem,
     FitI64,
     StoreI64,
+    /// `faber_store_<w>` / `faber_fit_<w>` for the sized integers.
+    SizedStore,
     AddO,
     SubO,
     MulO,
@@ -38,6 +40,12 @@ pub(crate) enum Helper {
     Float,
     /// A float's text in the arena.
     FloatText,
+    /// Text operations that allocate their result (`faber_text_trim`, …).
+    TextAlloc,
+    /// Text operations that only read (`faber_text_length`, …).
+    TextRead,
+    /// `faber_try_*` and `faber_conv_fail` (no allocation).
+    Conv,
 }
 
 /// One operation of a list family (`faber_list_<elem>_<op>`).
@@ -63,6 +71,7 @@ impl Helper {
             | Helper::Join
             | Helper::Quoted
             | Helper::FloatText
+            | Helper::TextAlloc
             | Helper::List(_, ListOp::New | ListOp::Of | ListOp::Push | ListOp::Show) => true,
             Helper::Types
             | Helper::Trap
@@ -75,11 +84,14 @@ impl Helper {
             | Helper::Rem
             | Helper::FitI64
             | Helper::StoreI64
+            | Helper::SizedStore
             | Helper::AddO
             | Helper::SubO
             | Helper::MulO
             | Helper::FdivI64
             | Helper::FmodI64
+            | Helper::TextRead
+            | Helper::Conv
             | Helper::Float => false,
         }
     }

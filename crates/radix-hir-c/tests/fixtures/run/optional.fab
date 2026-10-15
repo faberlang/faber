@@ -1,0 +1,60 @@
++++
+locale = "en"
++++
+# Optionals: scalar flags, nullable text and genus, narrowing by a guard,
+# coalesce that runs its fallback lazily, unwrap, and printing none.
+class Box {
+    var int n
+}
+
+fn find(int n) → int ∪ none {
+    if n ≻ 0 {
+        return n
+    }
+    return null
+}
+
+fn name(bool known) → string ∪ none {
+    if known {
+        return "Marcus"
+    }
+    return null
+}
+
+fn expensive() → int {
+    print "fallback ran"
+    return 99
+}
+
+main {
+    const int ∪ none a ← 5
+    const int ∪ none b ← null
+    print a, b
+    print find(3), find(-1)
+    print a coalesce 9, b coalesce 9
+    print a coalesce expensive()
+    print b coalesce expensive()
+    if a is none {
+        print "a none"
+    }
+    if b is none {
+        print "b none"
+    }
+    if a not is none {
+        print "a some"
+    }
+    print name(true), name(false)
+    const string ∪ none who ← name(true)
+    if who not is none {
+        print "hello", who
+    }
+    const bool ∪ none flag ← true
+    print flag
+    const float ∪ none ratio ← 0.5
+    print ratio
+    const Box ∪ none held ← Box { n = 3 }
+    print held!.n
+    const Box ∪ none empty ← null
+    print empty is none
+    print empty!.n
+}
