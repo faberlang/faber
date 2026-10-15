@@ -5,7 +5,7 @@
 
 use super::regex_program::RegexProgram;
 use super::value::{
-    MapKey, SermoValue, Value, decimal_scale_factor, float_to_numerus_width,
+    MapKey, MatrixValue, SermoValue, Value, decimal_scale_factor, float_to_numerus_width,
     float_truncation_fits_width, int_width_range, modular_word_float_result, modular_word_result,
     saturating_word_result, trapping_float_store_fails,
 };
@@ -28,6 +28,8 @@ mod inf;
 mod littera;
 #[cfg(test)]
 mod littera_test;
+#[cfg(test)]
+mod matrix_target_test;
 mod octeti_tensor;
 mod rounding;
 #[cfg(test)]
@@ -290,6 +292,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Type::Array(element) => {
                 self.convert_to_array(value, source_ty, *element, recovery, struct_defaults, span)
             }
+            Type::Matrix(_, _) => {
+                self.convert_to_matrix(value, source_ty, target_ty, recovery, struct_defaults, span)
+            }
             Type::Map(key, value_ty) => self.convert_to_map(
                 value,
                 source_ty,
@@ -346,6 +351,102 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 &format!("runtime conversio to {other:?}"),
             )),
         }
+    }
+
+    fn convert_to_matrix(
+        &mut self,
+        value: Value,
+        source_ty: TypeId,
+        target_ty: TypeId,
+        recovery: Option<&MirOperand>,
+        struct_defaults: &[MirStructFieldDefaults],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let Type::Matrix(element, shape) = self.types.get(target_ty) else {
+            return Err(RunnerError::internal(
+                span,
+                "matrix conversio type mismatch",
+            ));
+        };
+        let Some((rows, columns)) =
+            radix_mir::matrix_shape::literal_matrix_shape(*shape, self.types)
+        else {
+            return Err(RunnerError::unsupported(
+                span,
+                "matrix conversio non-literal shape",
+            ));
+        };
+        let Value::Array(cell) = value else {
+            return Err(RunnerError::unsupported(
+                span,
+                &format!("runtime conversio to Matrix from {value:?}"),
+            ));
+        };
+        let items = cell.borrow().clone();
+        let expected = usize::from(rows) * usize::from(columns);
+        let nested = !items.is_empty() && items.iter().all(|item| matches!(item, Value::Array(_)));
+        let (items, source_element_ty) = if nested {
+            let Type::Array(row_ty) = self.types.get(self.resolve_conversion_target(source_ty))
+            else {
+                return Err(RunnerError::unsupported(
+                    span,
+                    "nested lista value has a non-nested source type",
+                ));
+            };
+            if items.len() != usize::from(rows) {
+                return self.recover_or_fail(recovery, span, "lista to matrix conversion failed");
+            }
+            let mut flattened = Vec::with_capacity(expected);
+            for row in items {
+                let Value::Array(row) = row else {
+                    return self.recover_or_fail(
+                        recovery,
+                        span,
+                        "lista to matrix conversion failed",
+                    );
+                };
+                let row = row.borrow();
+                if row.len() != usize::from(columns) {
+                    return self.recover_or_fail(
+                        recovery,
+                        span,
+                        "lista to matrix conversion failed",
+                    );
+                }
+                flattened.extend(row.iter().cloned());
+            }
+            (flattened, *row_ty)
+        } else {
+            if items.len() != expected {
+                return self.recover_or_fail(recovery, span, "lista to matrix conversion failed");
+            }
+            (items, source_ty)
+        };
+        let converted = self.convert_to_array(
+            Value::Array(Rc::new(RefCell::new(items))),
+            source_element_ty,
+            *element,
+            None,
+            struct_defaults,
+            span,
+        );
+        let data = match converted {
+            Ok(Value::Array(items)) => items.borrow().clone(),
+            Ok(other) => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("matrix cell conversion produced {other:?}"),
+                ));
+            }
+            Err(_) => {
+                return self.recover_or_fail(recovery, span, "lista to matrix conversion failed");
+            }
+        };
+        Ok(Value::Matrix(Rc::new(RefCell::new(MatrixValue {
+            rows,
+            columns,
+            data,
+        }))))
     }
 
     /// `bN ↦ iN`, `iN ↦ bN`, `bN ↦ fN` and `fN ↦ bN` at one width. The
