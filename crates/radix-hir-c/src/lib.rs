@@ -33,6 +33,8 @@ mod text;
 mod ty;
 
 #[cfg(test)]
+mod control_test;
+#[cfg(test)]
 mod emit_test;
 #[cfg(test)]
 mod item_test;
@@ -125,6 +127,7 @@ impl CCodegen<'_> {
             current: None,
             entry_args: None,
             uses_args: false,
+            fac_exits: Vec::new(),
             support: Support::default(),
             depth: 0,
             loops: 0,
@@ -158,6 +161,9 @@ pub(crate) struct Emitter<'a> {
     entry_args: Option<radix_lexer::Symbol>,
     /// The entry reads its arguments, so `main` takes `argc` and `argv`.
     uses_args: bool,
+    /// Plain `fac` blocks being written: the loop depth they opened at, the
+    /// label `rumpe` jumps to, and whether any `rumpe` did.
+    fac_exits: Vec<(usize, String, bool)>,
     support: Support,
     /// Nesting depth of the statement being written (a function body is 1).
     depth: usize,

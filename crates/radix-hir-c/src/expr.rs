@@ -179,6 +179,12 @@ impl Emitter<'_> {
                 ..
             } => self.implicit_store(source, *slot, site),
             HirExpressionKind::Scriptum(template, args) => self.template(*template, args),
+            HirExpressionKind::Si {
+                cond,
+                then_block,
+                then_catch: None,
+                else_block: Some(else_block),
+            } => self.conditional(expr, cond, then_block, else_block),
             HirExpressionKind::Vacua => self.empty_list(expr),
             HirExpressionKind::Array(elements) => self.list_literal(expr, elements),
             HirExpressionKind::Index(base, index) => self.list_read(base, index),
@@ -221,6 +227,53 @@ impl Emitter<'_> {
             }
             other => Err(unsupported(construct_name(other))),
         }
+    }
+
+    /// `c ✓ a ✗ b`, and `if` in value position: C's `?:`, which also runs
+    /// only the branch taken. Each arm is a block holding just its value.
+    fn conditional(
+        &mut self,
+        expr: &HirExpression,
+        cond: &HirExpression,
+        then_block: &radix_hir::HirBlock,
+        else_block: &radix_hir::HirBlock,
+    ) -> Result<Operand, CodegenError> {
+        fn arm(block: &radix_hir::HirBlock) -> Option<&HirExpression> {
+            if block.statements.is_empty() {
+                block.expr.as_deref()
+            } else {
+                None
+            }
+        }
+        let (Some(then_expr), Some(else_expr)) = (arm(then_block), arm(else_block)) else {
+            return Err(unsupported("conditional with statements in a branch"));
+        };
+        let Some(ty) = expr.ty else {
+            return Err(unsupported("conditional without a resolved type"));
+        };
+        let class = classify(self.types, ty)?;
+        let test = self.expr(cond)?;
+        if test.value != Value::Truth {
+            return Err(unsupported("condition that is not a boolean"));
+        }
+        let mut then_value = self.expr(then_expr)?;
+        let mut else_value = self.expr(else_expr)?;
+        if class == Ty::Int {
+            then_value = self.fit(then_value)?;
+            else_value = self.fit(else_value)?;
+        }
+        if then_value.value != Value::from(class) || else_value.value != Value::from(class) {
+            return Err(unsupported("conditional arms of different value classes"));
+        }
+        let effect = test.effect || then_value.effect || else_value.effect;
+        Ok(Operand::new(
+            format!(
+                "({} ? {} : {})",
+                test.text, then_value.text, else_value.text
+            ),
+            Value::from(class),
+        )
+        .with_effect(effect))
     }
 
     /// A call to a function this program defines. Arguments arrive wrapped in
@@ -636,8 +689,10 @@ impl Emitter<'_> {
         l: Operand,
         r: Operand,
     ) -> Result<Operand, CodegenError> {
-        if !l.is_integer() || !r.is_integer() {
-            return Err(unsupported("comparison of text or booleans"));
+        let text_pair = l.value == Value::Text && r.value == Value::Text;
+        let truth_pair = l.value == Value::Truth && r.value == Value::Truth;
+        if !text_pair && !truth_pair && (!l.is_integer() || !r.is_integer()) {
+            return Err(unsupported("comparison of values of different classes"));
         }
         let glyph = match op {
             HirBinOp::Lt => "<",
@@ -648,11 +703,21 @@ impl Emitter<'_> {
             HirBinOp::NotEq | HirBinOp::StrictNotEq => "!=",
             other => return Err(unsupported(binary_name(other))),
         };
+        if truth_pair && !matches!(glyph, "==" | "!=") {
+            return Err(unsupported("ordering of booleans"));
+        }
         let effect = l.effect || r.effect;
         let mut operands = [l, r];
         let prelude = self.sequence(&mut operands);
         let [l, r] = operands;
-        let text = wrap(&prelude, &format!("({} {glyph} {})", l.text, r.text));
+        // Text orders by code point, which is the order of its UTF-8 bytes
+        // read as unsigned: exactly what `strcmp` compares.
+        let body = if text_pair {
+            format!("(strcmp({}, {}) {glyph} 0)", l.text, r.text)
+        } else {
+            format!("({} {glyph} {})", l.text, r.text)
+        };
+        let text = wrap(&prelude, &body);
         Ok(Operand::new(text, Value::Truth).with_effect(effect))
     }
 

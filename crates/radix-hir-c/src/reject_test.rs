@@ -51,14 +51,6 @@ fn sized_integer_type() {
 }
 
 #[test]
-fn text_comparison() {
-    assert_eq!(
-        rejected("main {\n    if \"a\" ≡ \"b\" {\n        print 1\n    }\n}"),
-        "comparison of text or booleans"
-    );
-}
-
-#[test]
 fn lockstep_iteration_loop() {
     assert_eq!(
         rejected(

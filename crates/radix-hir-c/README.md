@@ -77,6 +77,12 @@ report. It checks the runtime first: `faber.h` compiles on its own and
 | `type` aliases | resolved in the type table, nothing emitted |
 | `test "…" { … }` blocks | not emitted: `faber run` runs the entry block only, so the program is the same without them (`faber test` is another route) |
 | `main args xs` | `int main(int argc, char **argv)`, and `xs` is a `list<string>` of `argv[1..]` (`faber_argv_text`) |
+| `c ✓ a ✗ b` and `if` in value position | C's `?:`; each arm is a block holding only its value, and only the arm taken runs |
+| `elif` chains | `else if`, flat |
+| `do { … } while c` | C `do … while`, so `perge` (C `continue`) runs through the test as in Faber; a plain `fac { … }` block is a brace block, and `rumpe` inside it is a `goto` to a label after it |
+| `n ↑` / `n ↓` on an `int` local | `faber_store_i64(faber_add(n, 1), "assignment to `n`")`, the assignment's own check and text |
+| `panic "m"` and `assert c [panic "m"]` | `faber_abort(m)`: `abort: m` on stderr, exit 1 (`assertion failed` without a message) |
+| text and boolean comparison | text `≺ ≻ ≤ ≥ ≡ ≢` by `strcmp`, which orders UTF-8 bytes as unsigned: the code-point order the runner uses; booleans `≡` / `≢` only |
 | local names | the shared binding policy (`prefixed_binding_name`): `l_<name>`. Nothing C reserves starts with `l_`, so `char`, `goto`, `stdout` or `INT64_MAX` need no keyword table |
 
 ## Rejected by name
@@ -103,5 +109,5 @@ fallback on intermediates that overflow `int64_t` but not the cap. `loops.fab` r
 jumps, the logical operators, and an unstored 2^63. The `trap_*.fab` fixtures
 trap at a store, a call argument, a division by zero, and an intermediate
 beyond the cap, and
-must exit 1 with the runner's partial stdout. `entry_args.fab` runs `main args` with none given (checked by hand with arguments). `tests/fixtures/reject/*.fab`
+must exit 1 with the runner's partial stdout. `control.fab` runs conditionals, `elif`, do-while with `continue` and `break`, increment, and text and boolean comparison; `trap_assert.fab` and `trap_increment.fab` abort and trap. `entry_args.fab` runs `main args` with none given (checked by hand with arguments). `tests/fixtures/reject/*.fab`
 must fail with the named rejection.

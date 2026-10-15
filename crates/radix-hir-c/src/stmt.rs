@@ -17,14 +17,30 @@ use radix_types::Type;
 impl Emitter<'_> {
     /// Emit a block's statements one level deeper than the current line.
     pub(crate) fn block(&mut self, out: &mut String, block: &HirBlock) -> Result<(), CodegenError> {
-        if block.expr.is_some() {
-            return Err(unsupported("block value expression"));
-        }
-        if block.breakable.is_some() {
-            return Err(unsupported("breakable fac block"));
-        }
         self.depth += 1;
         for statement in &block.statements {
+            self.statement(out, statement)?;
+        }
+        // A tail expression of a block written for effect (an `else` that
+        // holds an `elif`, a `fac` body) is one more statement: its value is
+        // unused. A block that yields a value is a conditional's arm, which
+        // [`Emitter::conditional`] reads itself.
+        if let Some(tail) = &block.expr {
+            self.expr_statement(out, tail)?;
+        }
+        self.depth -= 1;
+        Ok(())
+    }
+
+    /// The first `count` statements of `block`, one level deeper (a loop body
+    /// whose last statement is written separately).
+    fn statements(
+        &mut self,
+        out: &mut String,
+        statements: &[HirStatement],
+    ) -> Result<(), CodegenError> {
+        self.depth += 1;
+        for statement in statements {
             self.statement(out, statement)?;
         }
         self.depth -= 1;
@@ -53,14 +69,26 @@ impl Emitter<'_> {
             HirStatementKind::Rumpe => self.loop_jump(out, "break;"),
             HirStatementKind::Perge => self.loop_jump(out, "continue;"),
             HirStatementKind::Tacet => Ok(()),
-            HirStatementKind::IncDec(_) => Err(unsupported("increment or decrement")),
+            HirStatementKind::IncDec(inc_dec) => self.inc_dec(out, inc_dec),
             HirStatementKind::Custodi(_) => Err(unsupported("custodi guard section")),
         }
     }
 
     /// `break` / `continue` act on the innermost loop in both languages; the
     /// emitter writes no `switch`, so a C `break` cannot bind elsewhere.
-    fn loop_jump(&self, out: &mut String, text: &str) -> Result<(), CodegenError> {
+    fn loop_jump(&mut self, out: &mut String, text: &str) -> Result<(), CodegenError> {
+        // `rumpe` leaves the innermost breakable scope: a plain `fac` block
+        // when one is open inside the innermost loop, else the loop. A C
+        // `break` binds to the loop only, so a block exit is a `goto`.
+        if text == "break;"
+            && let Some((depth, label, used)) = self.fac_exits.last_mut()
+            && *depth == self.loops
+        {
+            *used = true;
+            let jump = format!("goto {label};");
+            self.line(out, &jump);
+            return Ok(());
+        }
         if self.loops == 0 {
             return Err(unsupported("loop jump outside a loop"));
         }
@@ -251,14 +279,163 @@ impl Emitter<'_> {
                 let ranges: Vec<&HirExpression> = ranges.iter().collect();
                 self.range_product(out, &ranges, bindings, body, *mutable)
             }
-            HirExpressionKind::Block(block) => {
-                self.line(out, "{");
-                self.block(out, block)?;
-                self.line(out, "}");
+            HirExpressionKind::Block(block) => self.plain_block(out, block),
+            HirExpressionKind::Loop(block) => self.loop_block(out, block),
+            HirExpressionKind::Panic(message) => {
+                let message = self.expr(message)?;
+                if message.value != Value::Text {
+                    return Err(unsupported("panic with a message that is not text"));
+                }
+                self.support.need(Helper::Trap);
+                self.line(out, &format!("faber_abort({});", message.text));
                 Ok(())
+            }
+            HirExpressionKind::Adfirma(cond, message) => {
+                self.assertion(out, cond, message.as_deref())
             }
             other => Err(unsupported(construct_name(other))),
         }
+    }
+
+    /// A block written as a statement. A `fac` block is a breakable scope:
+    /// `rumpe` inside it leaves the block, so it ends in a label when one did.
+    fn plain_block(&mut self, out: &mut String, block: &HirBlock) -> Result<(), CodegenError> {
+        let scope = block.breakable.is_some_and(|kind| kind.is_scope());
+        if scope {
+            let label = format!("faber_x{}", self.temps);
+            self.temps += 1;
+            self.fac_exits.push((self.loops, label, false));
+        }
+        self.line(out, "{");
+        let result = self.block(out, block);
+        self.line(out, "}");
+        if scope && let Some((_, label, used)) = self.fac_exits.pop() {
+            result?;
+            if used {
+                self.line(out, &format!("{label}:;"));
+            }
+            return Ok(());
+        }
+        result
+    }
+
+    /// `fac { … } dum cond` lowers to a loop whose last statement is
+    /// `if (!cond) rumpe`; C's `do … while` runs `continue` through that test,
+    /// as `perge` does. Any other loop is `for (;;)`.
+    fn loop_block(&mut self, out: &mut String, block: &HirBlock) -> Result<(), CodegenError> {
+        if block.expr.is_some() {
+            return Err(unsupported("loop with a value"));
+        }
+        let test = block.statements.split_last().and_then(|(last, rest)| {
+            let HirStatementKind::Expr(HirExpression {
+                kind:
+                    HirExpressionKind::Si {
+                        cond,
+                        then_block,
+                        then_catch: None,
+                        else_block: None,
+                    },
+                ..
+            }) = &last.kind
+            else {
+                return None;
+            };
+            let HirExpressionKind::Unary(radix_hir::HirUnOp::Not, inner) = &cond.kind else {
+                return None;
+            };
+            let only_break = then_block.expr.is_none()
+                && matches!(
+                    then_block.statements.as_slice(),
+                    [HirStatement {
+                        kind: HirStatementKind::Rumpe,
+                        ..
+                    }]
+                );
+            only_break.then_some((rest, inner))
+        });
+        self.loops += 1;
+        let result = if let Some((rest, cond)) = test {
+            self.line(out, "do {");
+            let body = self.statements(out, rest);
+            self.loops -= 1;
+            body?;
+            let test = self.condition(cond)?;
+            self.line(out, &format!("}} while {test};"));
+            return Ok(());
+        } else {
+            self.line(out, "for (;;) {");
+            self.block(out, block)
+        };
+        self.loops -= 1;
+        result?;
+        self.line(out, "}");
+        Ok(())
+    }
+
+    /// `assert cond [panic "msg"]`: a failed assertion aborts with the
+    /// message, or `assertion failed`.
+    fn assertion(
+        &mut self,
+        out: &mut String,
+        cond: &HirExpression,
+        message: Option<&HirExpression>,
+    ) -> Result<(), CodegenError> {
+        let test = self.condition(cond)?;
+        let text = match message {
+            Some(message) => {
+                let message = self.expr(message)?;
+                if message.value != Value::Text {
+                    return Err(unsupported("assertion message that is not text"));
+                }
+                message.text
+            }
+            None => c_string("assertion failed")?,
+        };
+        self.support.need(Helper::Trap);
+        self.line(out, &format!("if (!{test}) {{"));
+        self.depth += 1;
+        self.line(out, &format!("faber_abort({text});"));
+        self.depth -= 1;
+        self.line(out, "}");
+        Ok(())
+    }
+
+    /// `place ↑` / `place ↓` on an `int` local: one exact step, stored back
+    /// through the same check an assignment makes.
+    fn inc_dec(
+        &mut self,
+        out: &mut String,
+        inc_dec: &radix_hir::HirIncDec,
+    ) -> Result<(), CodegenError> {
+        let HirExpressionKind::Path(def_id) = &inc_dec.target.kind else {
+            return Err(unsupported(
+                "increment or decrement of a place that is not a local",
+            ));
+        };
+        let Some(local) = self.locals.get(def_id) else {
+            return Err(unsupported(
+                "increment or decrement of a name that is not a local",
+            ));
+        };
+        if local.ty != Ty::Int {
+            return Err(unsupported("increment or decrement of a non-integer"));
+        }
+        let name = local.name.clone();
+        let Ok(written) = self.names.resolve_def(*def_id) else {
+            return Err(unsupported("increment of a name the catalog does not hold"));
+        };
+        let (helper, call) = match inc_dec.op {
+            radix_hir::HirIncDecOp::Inc => (Helper::Add, "faber_add"),
+            radix_hir::HirIncDecOp::Dec => (Helper::Sub, "faber_sub"),
+        };
+        self.support.need(helper);
+        self.support.need(Helper::StoreI64);
+        let at = c_string(&format!("assignment to `{written}`"))?;
+        self.line(
+            out,
+            &format!("{name} = faber_store_i64({call}({name}, 1), {at});"),
+        );
+        Ok(())
     }
 
     /// `for from xs const x { … }`: an index walk over the list, read once.
@@ -370,9 +547,35 @@ impl Emitter<'_> {
         let test = self.condition(cond)?;
         self.line(out, &format!("if {test} {{"));
         self.block(out, then_block)?;
-        if let Some(otherwise) = else_block {
-            self.line(out, "} else {");
-            self.block(out, otherwise)?;
+        let mut otherwise = else_block;
+        // An `elif` is an `else` block holding one `if`: written flat.
+        while let Some(block) = otherwise {
+            let chained = match (block.statements.is_empty(), block.expr.as_deref()) {
+                (
+                    true,
+                    Some(HirExpression {
+                        kind:
+                            HirExpressionKind::Si {
+                                cond,
+                                then_block,
+                                then_catch: None,
+                                else_block,
+                            },
+                        ..
+                    }),
+                ) => Some((cond, then_block, else_block.as_ref())),
+                _ => None,
+            };
+            if let Some((cond, then_block, next)) = chained {
+                let test = self.condition(cond)?;
+                self.line(out, &format!("}} else if {test} {{"));
+                self.block(out, then_block)?;
+                otherwise = next;
+            } else {
+                self.line(out, "} else {");
+                self.block(out, block)?;
+                break;
+            }
         }
         self.line(out, "}");
         Ok(())

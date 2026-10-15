@@ -18,8 +18,7 @@
 #                 most are deliberate negative exemplars
 #   timeout       emit took over 60 s
 # With --run, an emitting exemplar is built under the diffcheck flags and run;
-# its stdout is compared with `<name>.expected` when that exists, else with
-# `faber run`. Verdicts: pass, MISMATCH, cc-fail, run-fail (sanitizer or
+# its stdout and exit status are compared with `faber run`. Verdicts: pass, MISMATCH, cc-fail, run-fail (sanitizer or
 # signal). Tables go to target/c-tally/{tally,run}.tsv.
 #
 # Run by hand from anywhere; no crate test depends on it. Compiler lookup
@@ -69,17 +68,15 @@ if [ "${1:-}" = "--exec" ]; then
     printf 'run-fail\t%s\tsanitizer: %s\n' "$f" "$(grep -m1 -E 'runtime error:|ERROR: AddressSanitizer' "$w/err" | cut -c1-120)"
     exit 0
   fi
-  expected=${f%.fab}.expected
-  if [ -f "$expected" ]; then
-    reference=$expected
-  else
-    timeout 60 "$faber" run "$f" >"$w/ref" 2>/dev/null
-    reference=$w/ref
-  fi
-  if cmp -s "$w/out" "$reference"; then
+  # The reference is `faber run`, the runner this target must match (stdout
+  # and exit status), as diffcheck compares. An `.expected` file is not the
+  # reference: some exemplars are check-only and were written with arguments.
+  timeout 60 "$faber" run "$f" >"$w/ref" 2>/dev/null
+  ref_code=$?
+  if [ "$code" -eq "$ref_code" ] && cmp -s "$w/out" "$w/ref"; then
     printf 'pass\t%s\texit=%s\n' "$f" "$code"
   else
-    printf 'MISMATCH\t%s\texit=%s\n' "$f" "$code"
+    printf 'MISMATCH\t%s\texit c=%s runner=%s\n' "$f" "$code" "$ref_code"
   fi
   exit 0
 fi
