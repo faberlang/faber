@@ -46,10 +46,12 @@ fn a_list_converts_to_a_fixed_bounded_copy() {
 
 #[test]
 fn a_bounded_list_conversion_with_recovery_takes_the_fallback() {
-    let code = emitted(
-        "main {\n    let list<int> d ← [1, 2, 3]\n    print d ↦ list<int, 2> ⊥ [7, 8]\n}",
+    let code =
+        emitted("main {\n    let list<int> d ← [1, 2, 3]\n    print d ↦ list<int, 2> ⊥ [7, 8]\n}");
+    assert!(
+        code.contains("faber_list_i64_bounded(faber_a, l_d, 2,"),
+        "{code}"
     );
-    assert!(code.contains("faber_list_i64_bounded(faber_a, l_d, 2,"), "{code}");
     assert!(code.contains("faber_list_i64_of"), "{code}");
 }
 

@@ -207,12 +207,10 @@ impl Emitter<'_> {
     fn bounded_list_target(&self, ty: TypeId) -> Option<(TypeId, u64)> {
         match self.types.get(ty) {
             Type::Alias(_, inner) => self.bounded_list_target(*inner),
-            Type::BoundedArray { element, capacity } => {
-                match self.types.get_index(*capacity) {
-                    radix_types::IndexExpr::Literal(value) => Some((*element, *value)),
-                    _ => None,
-                }
-            }
+            Type::BoundedArray { element, capacity } => match self.types.get_index(*capacity) {
+                radix_types::IndexExpr::Literal(value) => Some((*element, *value)),
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -248,7 +246,8 @@ impl Emitter<'_> {
                 "if (!{s}) {{ faber_trap(\"lista to bounded lista conversion failed\"); }} {v};"
             ),
         };
-        let text = format!("(__extension__ ({{ {c_type} {v} = NULL; bool {s} = {call}; {tail} }}))");
+        let text =
+            format!("(__extension__ ({{ {c_type} {v} = NULL; bool {s} = {call}; {tail} }}))");
         let mut operand = Operand::new(text, Value::List(elem));
         operand.stored = Some(Ty::List(elem));
         Ok(operand)
