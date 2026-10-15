@@ -1,15 +1,16 @@
 //! C HIR codegen backend (leaf crate) — a novelty target.
 //!
-//! Registration spike (no goal doc yet; modeled on `hir-odin` unit OD1). Emits one C11 translation unit
-//! from checked HIR for a scalar-and-print program: integer and text literals,
-//! folded integer constants, immutable-use locals of those types, and `print`.
+//! Spike (no goal doc yet). Emits one C translation unit from checked HIR
+//! for an integer-and-text subset: `int` and `string` locals, exact integer
+//! arithmetic, comparisons and logic, `if` / `else`, `while`, `break` /
+//! `continue`, assignment, and `print`.
 //! Everything else fails closed with a named "unsupported on target c"
 //! diagnostic; the README lists what is supported and rejected.
 //!
 //! C is the permissive compiler, so this emitter is the strict one: nothing it
-//! emits may reach undefined behavior. Integer arithmetic is folded at emit
-//! time in exact integers and never emitted as C arithmetic until the exact
-//! model lands.
+//! emits may reach undefined behavior. Integer arithmetic is never C
+//! `int64_t` arithmetic: it runs in exact `faber_i128` helpers inside the
+//! runner's representation cap and is narrowed once, at the store.
 //!
 //! The output needs no runtime library. Headers and helper functions are
 //! emitted inline, only when the program uses them. The leaf never invokes a C
@@ -35,7 +36,7 @@ mod reject_test;
 mod test_support;
 
 use crate::error::unsupported;
-use crate::helpers::Includes;
+use crate::helpers::Support;
 use crate::names::Namer;
 use crate::ty::Ty;
 use radix_codegen_shared::names::NameCatalog;
@@ -82,7 +83,9 @@ impl Codegen for CCodegen<'_> {
             types,
             scope: Namer::program_scope(),
             locals: FxHashMap::default(),
-            includes: Includes::default(),
+            support: Support::default(),
+            depth: 0,
+            loops: 0,
         }
         .program(hir)?;
         Ok(COutput { code })
@@ -96,7 +99,11 @@ pub(crate) struct Emitter<'a> {
     scope: Namer,
     /// Locals of `main`, by definition.
     locals: FxHashMap<DefId, Local>,
-    includes: Includes,
+    support: Support,
+    /// Nesting depth of the statement being written (`main`'s body is 1).
+    depth: usize,
+    /// Enclosing loops of the statement being written.
+    loops: usize,
 }
 
 /// One local of `main`.
@@ -119,7 +126,7 @@ impl Emitter<'_> {
         if let Some(entry) = &hir.entry {
             self.block(&mut body, entry)?;
         }
-        let mut out = self.includes.text();
+        let mut out = self.support.text();
         out.push_str("int main(void) {\n");
         out.push_str(&body);
         out.push_str("    return 0;\n}\n");

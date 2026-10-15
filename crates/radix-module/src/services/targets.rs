@@ -255,7 +255,7 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             build: true,
             run: false,
             package: false,
-            note: "novelty HIR-backed C11 program (scalar-and-print registration spike; fail-closed, no undefined behavior emitted); default-off `hir-c` feature",
+            note: "novelty HIR-backed C program (integer-and-text spike: exact arithmetic, loops, conditionals; fail-closed, no undefined behavior emitted; GCC or Clang); default-off `hir-c` feature",
         },
         crate::codegen::Target::HirTypeScript => TargetCapabilities {
             check: true,

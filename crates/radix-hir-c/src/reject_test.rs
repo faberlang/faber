@@ -37,53 +37,10 @@ fn function_declaration() {
 }
 
 #[test]
-fn conditional() {
-    assert_eq!(
-        rejected("main {\n    if 1 ≡ 1 {\n        print 1\n    }\n}"),
-        "conditional"
-    );
-}
-
-#[test]
-fn while_loop() {
-    assert_eq!(
-        rejected("main {\n    var int i ← 0\n    while i ≺ 3 {\n        i ← i + 1\n    }\n}"),
-        "while loop"
-    );
-}
-
-#[test]
 fn text_concatenation_is_not_folded() {
     assert_eq!(
         rejected("main {\n    print \"a\" + \"b\"\n}"),
-        "arithmetic on a variable or text (exact model pending)"
-    );
-}
-
-/// The case the target exists to get right: `n + 1` over a variable could
-/// overflow `int64_t`, which is undefined behavior in C. It is rejected, not
-/// emitted, until the exact model lands.
-#[test]
-fn arithmetic_over_a_mutable_variable() {
-    assert_eq!(
-        rejected("main {\n    var int n ← 1\n    print n + 1\n}"),
-        "arithmetic on a variable or text (exact model pending)"
-    );
-}
-
-#[test]
-fn negation_of_a_variable() {
-    assert_eq!(
-        rejected("main {\n    var int n ← 1\n    print -n\n}"),
-        "negation of a variable (exact model pending)"
-    );
-}
-
-#[test]
-fn integer_beyond_i64() {
-    assert_eq!(
-        rejected("main {\n    print 9223372036854775807 + 1\n}"),
-        "integer constant beyond i64"
+        "arithmetic on text or a boolean"
     );
 }
 
@@ -153,5 +110,21 @@ fn write_output_is_not_print() {
     assert_eq!(
         rejected("main {\n    warn \"w\"\n}"),
         "write, debug, or warn output (only print is supported)"
+    );
+}
+
+#[test]
+fn text_comparison() {
+    assert_eq!(
+        rejected("main {\n    if \"a\" ≡ \"b\" {\n        print 1\n    }\n}"),
+        "comparison of text or booleans"
+    );
+}
+
+#[test]
+fn iteration_loop() {
+    assert_eq!(
+        rejected("main {\n    for range 0‥3 const i {\n        print i\n    }\n}"),
+        "iteration loop"
     );
 }

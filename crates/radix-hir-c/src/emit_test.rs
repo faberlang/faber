@@ -4,6 +4,7 @@ use crate::test_support::emitted;
 
 const SCALARS: &str = include_str!("../tests/fixtures/run/scalars.c");
 const C_EDGES: &str = include_str!("../tests/fixtures/run/c_edges.c");
+const LOOPS: &str = include_str!("../tests/fixtures/run/loops.c");
 
 #[test]
 fn scalars_program_is_pinned() {
@@ -144,5 +145,97 @@ fn no_allocation_or_free_is_emitted() {
     let code = emitted("main {\n    print \"a\"\n}");
     for banned in ["malloc(", "calloc(", "realloc(", "free("] {
         assert!(!code.contains(banned), "{code}");
+    }
+}
+
+#[test]
+fn loops_program_is_pinned() {
+    let source = include_str!("../tests/fixtures/run/loops.fab");
+    let source = crate::test_support::program("loops.fab", source);
+    assert_eq!(source, LOOPS);
+}
+
+/// The case the target exists to get right: `n + 1` over a variable could
+/// overflow `int64_t`, which is undefined behavior in C. It runs in the exact
+/// helpers and is narrowed once, at the store, with the runner's wording.
+#[test]
+fn arithmetic_over_a_variable_is_exact_and_checked_at_the_store() {
+    let code = emitted("main {\n    var int n ← 1\n    n ← n + 1\n    print n\n}");
+    assert!(
+        code.contains(
+            "    l_n = faber_store_i64(faber_add(l_n, INT64_C(1)), \"assignment to `n`\");\n"
+        ),
+        "{code}"
+    );
+    assert!(!code.contains("l_n + "), "{code}");
+}
+
+#[test]
+fn a_declaration_store_names_the_declaration() {
+    let code = emitted("main {\n    var int a ← 2\n    const int b ← a * 3\n    print b\n}");
+    assert!(
+        code.contains("faber_store_i64(faber_mul(l_a, INT64_C(3)), \"declaration of `b`\")"),
+        "{code}"
+    );
+}
+
+#[test]
+fn helpers_are_emitted_only_when_used() {
+    let code = emitted("main {\n    var int n ← 1\n    n ← n + 1\n    print n\n}");
+    for present in [
+        "faber_i128",
+        "faber_trap",
+        "faber_cap",
+        "faber_add",
+        "faber_store_i64",
+        "<stdlib.h>",
+    ] {
+        assert!(code.contains(present), "{present} missing in {code}");
+    }
+    for absent in ["faber_sub", "faber_mul", "faber_div", "faber_rem"] {
+        assert!(!code.contains(absent), "{absent} present in {code}");
+    }
+    let plain = emitted("main {\n    print 1\n}");
+    assert!(!plain.contains("faber_"), "{plain}");
+}
+
+#[test]
+fn remainder_pulls_in_floor_division() {
+    let code = emitted("main {\n    var int n ← 7\n    print n % 2\n}");
+    assert!(code.contains("static faber_i128 faber_div("), "{code}");
+    assert!(code.contains("static faber_i128 faber_rem("), "{code}");
+}
+
+#[test]
+fn an_unstored_exact_value_prints_through_the_text_helper() {
+    let code = emitted("main {\n    var int n ← 1\n    print n + 1\n}");
+    assert!(
+        code.contains(
+            "printf(\"%s\\n\", faber_i128_text(faber_add(l_n, INT64_C(1)), (char[41]){0}));"
+        ),
+        "{code}"
+    );
+}
+
+#[test]
+fn negation_of_a_variable_is_exact() {
+    let code = emitted("main {\n    var int n ← 1\n    print -n\n}");
+    assert!(code.contains("faber_sub(0, l_n)"), "{code}");
+}
+
+#[test]
+fn control_flow_is_c_control_flow() {
+    let code = emitted(
+        "main {\n    var int i ← 0\n    while true {\n        i ← i + 1\n        if i ≡ 3 {\n            continue\n        } else {\n            print i\n        }\n        if i ≥ 5 and not (i ≡ 9) {\n            break\n        }\n    }\n}",
+    );
+    for line in [
+        "    while (1) {\n",
+        "        if (l_i == INT64_C(3)) {\n",
+        "            continue;\n",
+        "        } else {\n",
+        "        if ((l_i >= INT64_C(5)) && (!(l_i == INT64_C(9)))) {\n",
+        "            break;\n",
+    ] {
+        assert!(code.contains(line), "{line:?} missing in {code}");
     }
 }

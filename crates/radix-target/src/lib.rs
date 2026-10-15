@@ -56,8 +56,8 @@ pub enum Target {
     /// Novelty Odin source emitted from checked HIR (scalar-and-print
     /// registration spike). Default-off; fails closed outside the subset.
     HirOdin,
-    /// Novelty C11 source emitted from checked HIR (scalar-and-print
-    /// registration spike). Default-off; fails closed outside the subset.
+    /// Novelty C source emitted from checked HIR (integer-and-text spike
+    /// with exact arithmetic). Default-off; fails closed outside the subset.
     HirC,
 
     /// Faber source re-emitted from analyzed HIR.

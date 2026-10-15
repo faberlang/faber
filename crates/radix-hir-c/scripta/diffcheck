@@ -4,7 +4,8 @@
 # For every fixture in tests/fixtures/run/*.fab: emit C, build it with the host
 # C compiler under strict C11 with UndefinedBehaviorSanitizer (every UB report
 # is fatal), run the built binary, run `faber run` on the same source, and
-# compare stdout (byte for byte) and exit status. For every fixture in
+# compare stdout (byte for byte) and exit status; a trap fixture must exit 1
+# with the same partial stdout as the runner. For every fixture in
 # tests/fixtures/reject/*.fab: emission must fail with a named "unsupported on
 # target c" rejection and must not produce a program.
 # Run by hand from anywhere; no crate test depends on it.
@@ -74,8 +75,10 @@ for fab in "${fixtures[@]}"; do
   bin_code=$?
   "$faber" run "$fab" >"$work/$name.run.out" 2>/dev/null
   run_code=$?
-  if [ -s "$work/$name.bin.err" ]; then
-    echo "FAIL $name: the built program wrote to stderr (sanitizer report?)"
+  # A trap legitimately writes `error: ...` to stderr; a sanitizer report
+  # (`runtime error:`) is undefined behavior the emitter let through.
+  if grep -q "runtime error:" "$work/$name.bin.err"; then
+    echo "FAIL $name: UndefinedBehaviorSanitizer report"
     head -n 8 "$work/$name.bin.err"
     fail=$((fail + 1))
   elif [ "$bin_code" -eq "$run_code" ] && cmp -s "$work/$name.bin.out" "$work/$name.run.out"; then

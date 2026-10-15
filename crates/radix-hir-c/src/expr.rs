@@ -1,18 +1,21 @@
-//! Expression emission for the scalar-and-print subset.
+//! Expression emission.
 //!
-//! Integer arithmetic is not emitted as C arithmetic: signed overflow is
-//! undefined behavior in C, and Faber arithmetic is exact until the store. The
-//! only arithmetic this spike admits is constant folding in exact 128-bit
-//! integers with the runner's 64-bit representation cap checked after every
-//! operation; the folded value is emitted as a literal. Anything over a
-//! variable is rejected until the exact model lands.
+//! Integer arithmetic is never emitted as C `int64_t` arithmetic: signed
+//! overflow is undefined behavior in C, and Faber arithmetic is exact until the
+//! store. An operation over a variable is a call into the exact helpers
+//! (`faber_add`, ... in `helpers.rs`), which compute in `faber_i128` inside the
+//! runner's representation cap; the result has no width until a store narrows
+//! it with `faber_store_i64`. Operations whose operands are all constants fold
+//! at emit time with the same rules.
 
 use crate::Emitter;
 use crate::error::unsupported;
+use crate::helpers::Helper;
 use crate::ty::{Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{
-    HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral, HirUnOp,
+    HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral, HirStoreKind,
+    HirStoreSite, HirUnOp,
 };
 use std::fmt::Write as _;
 
@@ -21,40 +24,52 @@ use std::fmt::Write as _;
 const CAP_MIN: i128 = -(1_i128 << 63);
 const CAP_MAX: i128 = (1_i128 << 64) - 1;
 
-/// One emitted expression: C text, its class, and its value when it is a
+/// Emit-time fold of one integer operation; `None` when it leaves `i128`.
+type Fold = fn(i128, i128) -> Option<i128>;
+
+/// What a C expression holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Value {
+    /// An `int64_t`: a local, or a literal inside `i64`.
+    Int,
+    /// An exact `faber_i128` intermediate inside the cap. It has no width
+    /// until it is stored.
+    Exact,
+    /// A text value (`const char *`).
+    Text,
+    /// A C truth value from a comparison or a logical operator; only a
+    /// condition reads one.
+    Truth,
+}
+
+impl From<Ty> for Value {
+    fn from(ty: Ty) -> Self {
+        match ty {
+            Ty::Int => Value::Int,
+            Ty::Text => Value::Text,
+        }
+    }
+}
+
+/// One emitted expression: C text, what it holds, and its value when it is a
 /// folded integer constant.
 pub(crate) struct Operand {
     pub(crate) text: String,
-    pub(crate) ty: Ty,
+    pub(crate) value: Value,
     pub(crate) constant: Option<i128>,
 }
 
 impl Operand {
-    fn text(text: String) -> Self {
+    fn new(text: String, value: Value) -> Self {
         Self {
             text,
-            ty: Ty::Text,
+            value,
             constant: None,
         }
     }
 
-    /// A folded integer. Printing or storing needs it inside `int64_t`; a
-    /// value between 2^63 and the cap is exact for the runner but has no
-    /// `int64_t` form.
-    fn int(value: i128) -> Result<Self, CodegenError> {
-        if !(CAP_MIN..=CAP_MAX).contains(&value) {
-            return Err(unsupported(
-                "integer constant beyond the 64-bit representation cap",
-            ));
-        }
-        let Ok(narrow) = i64::try_from(value) else {
-            return Err(unsupported("integer constant beyond i64"));
-        };
-        Ok(Self {
-            text: c_int64(narrow),
-            ty: Ty::Int,
-            constant: Some(value),
-        })
+    fn is_integer(&self) -> bool {
+        matches!(self.value, Value::Int | Value::Exact)
     }
 }
 
@@ -81,39 +96,67 @@ impl Emitter<'_> {
             HirExpressionKind::Conversio {
                 source,
                 target: HirConversioTarget::Type(slot),
-                implicit: Some(_),
+                implicit: Some(site),
                 route: None,
                 recovery: None,
                 ..
-            } => self.implicit_store(source, *slot),
+            } => self.implicit_store(source, *slot, site),
             other => Err(unsupported(construct_name(other))),
         }
+    }
+
+    /// A folded integer constant. Inside `i64` it is an `int64_t` literal;
+    /// between `2^63` and the cap it is an exact intermediate that only a
+    /// print or a wider store can take.
+    fn int(&mut self, value: i128) -> Result<Operand, CodegenError> {
+        if !(CAP_MIN..=CAP_MAX).contains(&value) {
+            return Err(unsupported(
+                "integer constant beyond the 64-bit representation cap",
+            ));
+        }
+        let (text, class) = if let Ok(narrow) = i64::try_from(value) {
+            (c_int64(narrow), Value::Int)
+        } else {
+            self.support.need(Helper::Types);
+            (format!("((faber_i128)UINT64_C({value}))"), Value::Exact)
+        };
+        Ok(Operand {
+            text,
+            value: class,
+            constant: Some(value),
+        })
     }
 
     fn path(&self, def_id: radix_hir::DefId) -> Result<Operand, CodegenError> {
         match self.locals.get(&def_id) {
             Some(local) => Ok(Operand {
                 text: local.name.clone(),
-                ty: local.ty,
+                value: local.ty.into(),
                 constant: local.constant,
             }),
             None => Err(unsupported("reference to a name that is not a local")),
         }
     }
 
-    fn literal(&self, literal: &HirLiteral) -> Result<Operand, CodegenError> {
+    fn literal(&mut self, literal: &HirLiteral) -> Result<Operand, CodegenError> {
         match literal {
-            HirLiteral::Int(value) => Operand::int(i128::from(*value)),
+            HirLiteral::Int(value) => self.int(i128::from(*value)),
             HirLiteral::String(symbol) => {
                 let raw = self.names.resolve_symbol(*symbol);
                 let decoded = radix_codegen_shared::unescape_faber_text(raw);
-                Ok(Operand::text(c_string(&decoded)?))
+                Ok(Operand::new(c_string(&decoded)?, Value::Text))
             }
+            // Every truth operand carries its own parentheses, so `if` and
+            // `while` write it bare: `while (1)`, `if (a < b)`. Adding a second
+            // pair would trip clang's `-Wparentheses-equality` on `((a == b))`.
+            HirLiteral::Bool(value) => Ok(Operand::new(
+                if *value { "(1)" } else { "(0)" }.to_owned(),
+                Value::Truth,
+            )),
             HirLiteral::BigInt(_) => Err(unsupported("integer literal beyond u64")),
             HirLiteral::Float(_) | HirLiteral::FloatText { .. } => {
                 Err(unsupported("float literal"))
             }
-            HirLiteral::Bool(_) => Err(unsupported("boolean literal")),
             HirLiteral::Ascii(_) => Err(unsupported("ascii text literal")),
             HirLiteral::Octeti(_) => Err(unsupported("byte-buffer literal")),
             HirLiteral::JsonValor(_) => Err(unsupported("json literal")),
@@ -124,13 +167,23 @@ impl Emitter<'_> {
 
     fn unary(&mut self, op: HirUnOp, operand: &HirExpression) -> Result<Operand, CodegenError> {
         let inner = self.expr(operand)?;
-        match (op, inner.constant) {
-            (HirUnOp::Neg, Some(value)) => Operand::int(-value),
-            (HirUnOp::Neg, None) => {
-                Err(unsupported("negation of a variable (exact model pending)"))
+        match op {
+            HirUnOp::Neg if !inner.is_integer() => Err(unsupported("negation of a non-integer")),
+            HirUnOp::Neg => {
+                if let Some(value) = inner.constant {
+                    return self.int(-value);
+                }
+                self.support.need(Helper::Sub);
+                Ok(Operand::new(
+                    format!("faber_sub(0, {})", inner.text),
+                    Value::Exact,
+                ))
             }
-            (HirUnOp::Not, _) => Err(unsupported("logical not")),
-            (HirUnOp::BitNot, _) => Err(unsupported("bitwise not")),
+            HirUnOp::Not if inner.value == Value::Truth => {
+                Ok(Operand::new(format!("(!{})", inner.text), Value::Truth))
+            }
+            HirUnOp::Not => Err(unsupported("logical not of a non-boolean")),
+            HirUnOp::BitNot => Err(unsupported("bitwise not")),
         }
     }
 
@@ -142,17 +195,45 @@ impl Emitter<'_> {
     ) -> Result<Operand, CodegenError> {
         let l = self.expr(left)?;
         let r = self.expr(right)?;
-        let fold = match op {
-            HirBinOp::Add => i128::checked_add,
-            HirBinOp::Sub => i128::checked_sub,
-            HirBinOp::Mul => i128::checked_mul,
-            HirBinOp::Div => floor_div,
-            HirBinOp::Mod => floor_mod,
+        match op {
+            HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod => {
+                self.arithmetic(op, &l, &r)
+            }
+            HirBinOp::Lt
+            | HirBinOp::Gt
+            | HirBinOp::LtEq
+            | HirBinOp::GtEq
+            | HirBinOp::Eq
+            | HirBinOp::NotEq
+            | HirBinOp::StrictEq
+            | HirBinOp::StrictNotEq => Self::comparison(op, &l, &r),
+            HirBinOp::And | HirBinOp::Or => Self::logical(op, &l, &r),
+            other => Err(unsupported(binary_name(other))),
+        }
+    }
+
+    fn arithmetic(
+        &mut self,
+        op: HirBinOp,
+        l: &Operand,
+        r: &Operand,
+    ) -> Result<Operand, CodegenError> {
+        if !l.is_integer() || !r.is_integer() {
+            return Err(unsupported("arithmetic on text or a boolean"));
+        }
+        let (fold, helper, name): (Fold, Helper, &str) = match op {
+            HirBinOp::Add => (i128::checked_add, Helper::Add, "faber_add"),
+            HirBinOp::Sub => (i128::checked_sub, Helper::Sub, "faber_sub"),
+            HirBinOp::Mul => (i128::checked_mul, Helper::Mul, "faber_mul"),
+            HirBinOp::Div => (floor_div, Helper::Div, "faber_div"),
+            HirBinOp::Mod => (floor_mod, Helper::Rem, "faber_rem"),
             other => return Err(unsupported(binary_name(other))),
         };
         let (Some(a), Some(b)) = (l.constant, r.constant) else {
-            return Err(unsupported(
-                "arithmetic on a variable or text (exact model pending)",
+            self.support.need(helper);
+            return Ok(Operand::new(
+                format!("{name}({}, {})", l.text, r.text),
+                Value::Exact,
             ));
         };
         if b == 0 {
@@ -163,26 +244,95 @@ impl Emitter<'_> {
             }
         }
         match fold(a, b) {
-            Some(value) => Operand::int(value),
+            Some(value) => self.int(value),
             None => Err(unsupported(
                 "integer constant beyond the 64-bit representation cap",
             )),
         }
     }
 
-    /// Typecheck's implicit store check around a value. It cannot fail when the
-    /// slot is the value's own class, which is the only slot this subset has.
+    /// Integer comparison by exact value: C's usual arithmetic conversions
+    /// widen an `int64_t` operand to `faber_i128` when the other is exact.
+    fn comparison(op: HirBinOp, l: &Operand, r: &Operand) -> Result<Operand, CodegenError> {
+        if !l.is_integer() || !r.is_integer() {
+            return Err(unsupported("comparison of text or booleans"));
+        }
+        let glyph = match op {
+            HirBinOp::Lt => "<",
+            HirBinOp::Gt => ">",
+            HirBinOp::LtEq => "<=",
+            HirBinOp::GtEq => ">=",
+            HirBinOp::Eq | HirBinOp::StrictEq => "==",
+            HirBinOp::NotEq | HirBinOp::StrictNotEq => "!=",
+            other => return Err(unsupported(binary_name(other))),
+        };
+        Ok(Operand::new(
+            format!("({} {glyph} {})", l.text, r.text),
+            Value::Truth,
+        ))
+    }
+
+    /// `and` / `or` short-circuit, as C's `&&` / `||` do.
+    fn logical(op: HirBinOp, l: &Operand, r: &Operand) -> Result<Operand, CodegenError> {
+        if l.value != Value::Truth || r.value != Value::Truth {
+            return Err(unsupported("logical operator on a non-boolean"));
+        }
+        let glyph = if op == HirBinOp::And { "&&" } else { "||" };
+        Ok(Operand::new(
+            format!("({} {glyph} {})", l.text, r.text),
+            Value::Truth,
+        ))
+    }
+
+    /// Typecheck's implicit store around a value: the one place an exact
+    /// intermediate is narrowed to its cell.
     fn implicit_store(
         &mut self,
         source: &HirExpression,
         slot: radix_types::TypeId,
+        site: &HirStoreSite,
     ) -> Result<Operand, CodegenError> {
         let class = classify(self.types, slot)?;
         let value = self.expr(source)?;
-        if value.ty != class {
-            return Err(unsupported("conversion between value classes"));
+        self.store(value, class, site)
+    }
+
+    /// Narrow `value` into a cell of class `class`. An exact constant is
+    /// checked now; an exact runtime value goes through `faber_store_i64`.
+    pub(crate) fn store(
+        &mut self,
+        value: Operand,
+        class: Ty,
+        site: &HirStoreSite,
+    ) -> Result<Operand, CodegenError> {
+        match (class, value.value) {
+            (Ty::Int, Value::Int) | (Ty::Text, Value::Text) => Ok(value),
+            (Ty::Int, Value::Exact) if value.constant.is_some() => {
+                Err(unsupported("integer constant beyond i64"))
+            }
+            (Ty::Int, Value::Exact) => {
+                self.support.need(Helper::StoreI64);
+                let at = c_string(&self.store_position(site))?;
+                Ok(Operand::new(
+                    format!("faber_store_i64({}, {at})", value.text),
+                    Value::Int,
+                ))
+            }
+            _ => Err(unsupported("conversion between value classes")),
         }
-        Ok(value)
+    }
+
+    /// How a trap names the store, worded as the runner and the Rust target
+    /// word it.
+    fn store_position(&self, site: &HirStoreSite) -> String {
+        let slot = site.slot.map(|slot| self.names.resolve_symbol(slot));
+        match (site.kind, slot) {
+            (HirStoreKind::Declaration, Some(slot)) => format!("declaration of `{slot}`"),
+            (HirStoreKind::Assignment, Some(slot)) => format!("assignment to `{slot}`"),
+            (HirStoreKind::Declaration, None) => "declaration".to_owned(),
+            (HirStoreKind::Assignment, None) => "assignment".to_owned(),
+            _ => "store".to_owned(),
+        }
     }
 }
 

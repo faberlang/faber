@@ -1,18 +1,19 @@
 # radix-hir-c
 
-Novelty C target: one C11 translation unit from checked HIR. CLI target `c`,
+Novelty C target: one C translation unit from checked HIR. CLI target `c`,
 Cargo feature `hir-c`, default-off and outside `full-targets`. No goal doc
-yet; the spike follows the shape of `hir-odin` unit OD1.
+yet.
 
-This is the **registration spike**: the skeleton and the full registration
-across the tree, with a scalar-and-print emitter. Feature breadth arrives in
-later units; everything else fails closed with
-`unsupported on target c: <construct>`, never an approximation. The leaf never
-invokes a C compiler (the `no_toolchain_command_new` ratchet forbids it);
-`scripta/diffcheck` builds the emitted program and runs the built binary.
+This is a **spike**: an integer-and-text subset with real codegen (exact
+arithmetic over variables, loops, conditionals). Everything else fails closed
+with `unsupported on target c: <construct>`, never an approximation. The leaf
+never invokes a C compiler (the `no_toolchain_command_new` ratchet forbids
+it); `scripta/diffcheck` builds the emitted program and runs the built binary.
 
-No runtime library is emitted, and the emitted program allocates nothing and
-frees nothing.
+The output needs GCC or Clang: it uses `__int128` and
+`__builtin_mul_overflow`. No runtime library is emitted; headers and helper
+functions are written into the program only when it uses them. The emitted
+program allocates nothing and frees nothing.
 
 ## The rule this target exists to keep
 
@@ -20,45 +21,46 @@ C is the permissive compiler, so the emitter is the strict one: **no emitted
 program may reach undefined behavior.** `scripta/diffcheck` builds every run
 fixture with `-std=c11 -pedantic -Wall -Wextra -Werror` and
 UndefinedBehaviorSanitizer with recovery off, and fails on any sanitizer
-report. Where Faber semantics meet C undefined behavior, the construct is
-rejected until its exact form lands:
+report.
 
-| Faber rule | C hazard | Spike behavior |
+| Faber rule | C hazard | This target |
 | --- | --- | --- |
-| integer arithmetic is exact until the store | signed overflow is UB | arithmetic on a variable is rejected; constants fold at emit time in exact 128-bit integers with the runner's `[-2^63, 2^64-1]` cap |
-| `bN` shift by N or more gives zero; a negative count errors | shift by ≥ width or negative is UB | shift operators rejected |
-| `↦` reinterprets bits | type punning through a pointer breaks strict aliasing | conversions rejected (the exact form is `memcpy`) |
+| integer arithmetic is exact until the store | signed overflow is UB | never C `int64_t` arithmetic: `faber_add` / `faber_sub` / `faber_mul` / `faber_div` / `faber_rem` compute in `faber_i128`, check the runner's cap `[-2^63, 2^64-1]` after every operation (`__builtin_mul_overflow` for products, which can exceed 128 bits), and `faber_store_i64` narrows once, at the store |
+| `/` and `%` floor; division by zero traps | C truncates; division by zero is UB | floor in `faber_div`, remainder `a - b * floor(a / b)`, zero divisor traps |
+| a trap is `error: <reason>`, exit 1 | — | `faber_trap` / `faber_store_i64` write the runner's text to stderr and `exit(1)`; stdout already written stays written |
+| `bN` shift by N or more gives zero | shift by ≥ width is UB | shift operators rejected |
+| `↦` reinterprets bits | pointer punning breaks strict aliasing | conversions rejected (the exact form is `memcpy`) |
 | text is a counted UTF-8 value | `%s` stops at NUL | a text literal containing NUL is rejected |
 
 ## Supported
 
 | Faber feature | C |
 | --- | --- |
-| `print` of integers and text, several values space separated | one `printf` per `print`; the format holds only `%" PRId64 "`, `%s`, spaces and `\n`, so a `%` in Faber text prints as itself |
-| integer literals and constant folding of `+ - * / %` (floor `/` and `%`) | folded at emit time, emitted as `INT64_C(n)`, `-INT64_C(n)`, or `INT64_MIN` |
-| `int` and `string` locals, and reads of them | `const int64_t` / `int64_t`, `const char *const` / `const char *`; an immutable integer local with a folded initializer folds when read |
-| text literals | C string literal of the UTF-8 bytes: non-ASCII and control bytes as three-digit octal escapes (a `\x` escape would swallow a following hex digit), `?` escaped so no trigraph forms |
-| local names | the shared binding policy (`prefixed_binding_name`), as on the Rust, Go, TS, Swift, Python and Haskell targets: `l_<name>`. Nothing C reserves starts with `l_`, so a Faber local named `char`, `goto`, `stdout` or `INT64_MAX` is `l_char`, `l_goto`, `l_stdout`, `l_INT64_MAX`, with no keyword table; non-ASCII is sanitized and a resulting clash takes a numeric suffix |
-
-Headers are included only when used: `<inttypes.h>` for any integer,
-`<stdio.h>` for any print. `main` ends with `return 0;`.
+| `int` and `string` locals, `var` and `const` | `int64_t` / `const int64_t`, `const char *` / `const char *const` |
+| integer arithmetic `+ - * / %` and negation over variables | exact helper calls, narrowed by `faber_store_i64(value, "assignment to `n`")` at the store; the store text is the runner's |
+| integer arithmetic over constants | folded at emit time with the same rules; `INT64_C(n)`, `-INT64_C(n)`, `INT64_MIN`, or an exact `UINT64_C` value above `i64` |
+| integer comparisons `≺ ≻ ≤ ≥ ≡ ≢` | C comparisons by exact value (an `int64_t` widens to `faber_i128` against an exact operand) |
+| `and`, `or`, `not`, `true`, `false` in conditions | `&&`, `\|\|`, `!`, `(1)`, `(0)` |
+| `if` / `else`, `while`, `break`, `continue`, nested blocks, `return` from `main` | the same C statements |
+| `print` of integers, exact intermediates and text | one `printf` per `print`; the format holds only `%" PRId64 "`, `%s`, spaces and `\n`; an unstored exact value prints through `faber_i128_text` |
+| text literals | C string literal of the UTF-8 bytes: non-ASCII and control bytes as octal escapes, `?` escaped so no trigraph forms |
+| local names | the shared binding policy (`prefixed_binding_name`): `l_<name>`. Nothing C reserves starts with `l_`, so `char`, `goto`, `stdout` or `INT64_MAX` need no keyword table |
 
 ## Rejected by name
 
-Floats, booleans (`printing a boolean`), absent options
-(`printing an absent option`), sized integers, text arithmetic, arithmetic or
-negation over a variable, comparisons, logical and bitwise operators, shifts,
-conditionals, loops, functions, module constants, genera, enums, lists and
-every other collection, closures, the error channel, async, annotations,
-imports, and every other expression and statement kind. Each is an
-`unsupported(<construct>)` site; the construct name tables are in `expr.rs`
-and `ty.rs`.
+Floats, printing booleans, absent options, sized integers, text arithmetic and
+comparison, bitwise operators, shifts, `for` loops, functions, module
+constants, genera, enums, lists and every other collection, closures, the error
+channel, async, annotations, imports, and every other expression and statement
+kind. Each is an `unsupported(<construct>)` site; the construct name tables are
+in `expr.rs` and `ty.rs`.
 
 ## Fixtures
 
 `tests/fixtures/run/*.fab` are compared with `faber run` by `scripta/diffcheck`
-(stdout and exit status); `scalars.c` and `c_edges.c` are the pinned emitted
-programs. `tests/fixtures/reject/*.fab` must fail with the named rejection.
-`c_edges.fab` covers the C-specific edges: `INT64_MIN`, `%` in text, `??!`,
-non-ASCII followed by hex digits, and Faber locals named like C keywords,
-header objects and macros.
+(stdout and exit status); `scalars.c`, `c_edges.c` and `loops.c` are pinned.
+`loops.fab` runs Collatz, floor division over negative variables, both loop
+jumps, the logical operators, and an unstored 2^63. The `trap_*.fab` fixtures
+trap at a store, a division by zero, and an intermediate beyond the cap, and
+must exit 1 with the runner's partial stdout. `tests/fixtures/reject/*.fab`
+must fail with the named rejection.
