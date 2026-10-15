@@ -252,6 +252,14 @@ help = "पंक्ति या फ़ाइल के अंत से पह
 message = "समाप्त न हुआ octeti literal"
 help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
 
+[diagnostics.LEX001.issues.unterminated_regex_literal]
+message = "समाप्त न हुआ regex literal"
+help = "पंक्ति या फ़ाइल के अंत से पहले regex literal बंद करें"
+
+[diagnostics.LEX001.issues.empty_regex_literal]
+message = "खाली regex literal; slashes के बीच एक pattern लिखें"
+help = "slashes के बीच एक pattern लिखें"
+
 [diagnostics.LEX001.issues.unterminated_string_literal]
 message = "समाप्त न हुआ string literal"
 help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
@@ -2616,6 +2624,10 @@ help = "representation बदलने से पहले element widths को
 message = "conversio failure को propagate करने के लिए `textus` alternate-exit channel आवश्यक है"
 help = "alternate-exit channel को textus के रूप में घोषित करें या inline recovery दें"
 
+[diagnostics.SEM016.issues.conversio_failure_channel_value_required]
+message = "sermo materialization failure को propagate करने के लिए `value` alternate-exit channel आवश्यक है"
+help = "alternate-exit channel को value, unknown या registered value conversion के रूप में घोषित करें"
+
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "regex रूपांतरण के लिए textus या ascii operand आवश्यक है"
 help = "textus या ascii मानों को regex में रूपांतरित करें"
@@ -3687,9 +3699,21 @@ message = "रिडक्शन संक्रिया के बाद र�
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "'{lege}' या '{lineam}' अपेक्षित है"
 
+[diagnostics.PARSE001.issues.expected_identifier]
+message = "एक identifier अपेक्षित है"
+help = "यहाँ एक identifier name रखें"
+
+[diagnostics.PARSE001.issues.expected_string_literal]
+message = "एक string literal अपेक्षित है"
+help = "यहाँ एक quoted string literal रखें"
+
 [diagnostics.PARSE001.issues.expected_mutability_keyword]
 message = "'{fixum}' या '{varia}' अपेक्षित है"
 help = "declaration को '{fixum}' या '{varia}' keyword से शुरू करें"
+
+[diagnostics.PARSE001.issues.await_binding_requires_name]
+message = "'↢' से पहले एक named binding अपेक्षित है"
+help = "'↢' को एक नाम से bind करें; destructuring '←' का उपयोग करता है"
 
 [diagnostics.PARSE001.issues.expected_method_declaration]
 message = "method declaration अपेक्षित है"
@@ -3699,6 +3723,10 @@ help = "method को '{functio}' declaration के रूप में लि�
 message = "'{praepara}' हुक अपेक्षित है"
 help = "'{praepara}', '{praeparabit}', '{postpara}' या '{postparabit}' लिखें"
 
+[diagnostics.PARSE001.issues.expected_lane_value]
+message = "एक string literal या identifier अपेक्षित है"
+help = "lane value को quoted string या bare name के रूप में लिखें"
+
 [diagnostics.PARSE001.issues.expected_scribe_keyword]
 message = "'{scribe}' keyword अपेक्षित है"
 help = "'{scribe}', '{vide}', '{mone}' या '{nota}' लिखें"
@@ -3706,6 +3734,14 @@ help = "'{scribe}', '{vide}', '{mone}' या '{nota}' लिखें"
 [diagnostics.PARSE001.issues.expected_incipit_keyword]
 message = "'{incipit}' या '{incipiet}' अपेक्षित है"
 help = "entry point को '{incipit}' या '{incipiet}' से शुरू करें"
+
+[diagnostics.PARSE001.issues.enum_member_value_number]
+message = "'=' के बाद एक number अपेक्षित है"
+help = "'=' के बाद integer लिखें या '=' हटाएं"
+
+[diagnostics.PARSE001.issues.enum_member_value]
+message = "एक enum member value अपेक्षित है"
+help = "'=' के बाद integer या string लिखें"
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "elige body के लिए एक opening brace अपेक्षित है"

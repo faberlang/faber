@@ -252,6 +252,14 @@ help = "在行尾或檔案結束前結束字串字面值"
 message = "未結束的 octeti 字面值"
 help = "在行尾或檔案結束前結束字串字面值"
 
+[diagnostics.LEX001.issues.unterminated_regex_literal]
+message = "未結束的 regex 字面值"
+help = "在行尾或檔案結束前結束 regex 字面值"
+
+[diagnostics.LEX001.issues.empty_regex_literal]
+message = "空的 regex 字面值；請在斜線之間寫出模式"
+help = "在斜線之間寫出模式"
+
 [diagnostics.LEX001.issues.unterminated_string_literal]
 message = "未結束的字串字面值"
 help = "在行尾或檔案結束前結束字串字面值"
@@ -471,6 +479,50 @@ help = "在項目之間加逗號（模式之間用 '{et}'）"
 [diagnostics.PARSE001.issues.item_list_trailing_comma]
 message = "列表不得在結束定界符之前以逗號結尾"
 help = "刪除結束定界符之前的逗號"
+
+[diagnostics.PARSE001.issues.expected_identifier]
+message = "需要識別符"
+help = "在此處寫入識別符名稱"
+
+[diagnostics.PARSE001.issues.expected_string_literal]
+message = "需要字串字面值"
+help = "在此處寫入帶引號的字串字面值"
+
+[diagnostics.PARSE001.issues.expected_mutability_keyword]
+message = "需要 '{fixum}' 或 '{varia}'"
+help = "用可變性關鍵字開始該宣告"
+
+[diagnostics.PARSE001.issues.await_binding_requires_name]
+message = "'↢' 之前需要具名綁定"
+help = "把 '↢' 綁定到單一名稱；解構使用 '←'"
+
+[diagnostics.PARSE001.issues.expected_method_declaration]
+message = "需要方法宣告"
+help = "把方法寫成 '{functio}' 宣告"
+
+[diagnostics.PARSE001.issues.expected_praepara_hook]
+message = "需要 '{praepara}' 鉤子"
+help = "寫 '{praepara}'、'{praeparabit}'、'{postpara}' 或 '{postparabit}'"
+
+[diagnostics.PARSE001.issues.expected_lane_value]
+message = "需要字串字面值或識別符"
+help = "把 lane 值寫成帶引號的字串或裸名稱"
+
+[diagnostics.PARSE001.issues.expected_scribe_keyword]
+message = "需要 '{scribe}' 關鍵字"
+help = "寫 '{scribe}'、'{vide}'、'{mone}' 或 '{nota}'"
+
+[diagnostics.PARSE001.issues.expected_incipit_keyword]
+message = "需要 '{incipit}' 或 '{incipiet}'"
+help = "用 '{incipit}' 或 '{incipiet}' 開始進入點"
+
+[diagnostics.PARSE001.issues.enum_member_value_number]
+message = "'=' 之後需要數字"
+help = "在 '=' 之後寫整數，或刪除 '='"
+
+[diagnostics.PARSE001.issues.enum_member_value]
+message = "需要列舉成員值"
+help = "在 '=' 之後寫整數或字串"
 
 [diagnostics.PARSE002]
 message = "非預期標記"
@@ -2603,6 +2655,10 @@ help = "明確轉換元素寬度，再變更表示法"
 [diagnostics.SEM016.issues.conversio_failure_channel_textus_required]
 message = "傳遞 conversio 失敗需要 `textus` 替代退出通道"
 help = "將替代退出通道宣告為 textus，或提供內嵌復原"
+
+[diagnostics.SEM016.issues.conversio_failure_channel_value_required]
+message = "傳遞 sermo 具現化失敗需要 `value` 替代退出通道"
+help = "將替代退出通道宣告為 value、unknown，或已註冊的 value 轉換"
 
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "regex 轉換需要 textus 或 ascii 運算元"

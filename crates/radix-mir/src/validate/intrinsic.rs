@@ -211,7 +211,12 @@ impl Validator<'_, '_> {
                         span,
                         "conversion source type mismatch",
                     );
-                    self.validate_runtime_conversion_route(source_ty, conversion.target_ty, span);
+                    self.validate_runtime_conversion_route(
+                        source_ty,
+                        conversion.target_ty,
+                        conversion.recovery.is_some(),
+                        span,
+                    );
                 }
                 // p17b (D1.11): a `⇥` literal recovery was range-checked
                 // against the target by semantic analysis, but MIR integer
@@ -1476,6 +1481,15 @@ impl Validator<'_, '_> {
                                 span,
                                 "list slice result type mismatch",
                             );
+                        }
+                        // A standalone non-empty list literal types as the
+                        // exact-length witness `lista<T, N>`. Slicing it yields
+                        // the unbounded list of the same element type.
+                        Type::BoundedArray { element, .. } => {
+                            match self.type_kind(call.return_ty) {
+                                Type::Array(inner) if *inner == *element => {}
+                                _ => self.error(span, "list slice result type mismatch"),
+                            }
                         }
                         _ => self.error(span, "slice receiver is not textus or lista"),
                     }
@@ -3141,15 +3155,27 @@ impl Validator<'_, '_> {
         }
     }
 
+    /// Route check for a generic runtime `convert` carrying a conversio.
+    ///
+    /// A recovery-free `lista ↦ tensor` conversio must lower to the
+    /// `tensor_from_flat` collection op, never the runtime route. A conversio
+    /// with a `⊥` recovery legitimately rides the runtime convert: the
+    /// lowering only routes through `tensor_from_flat` when `recovery` is
+    /// `None` (it has no failure channel to carry the recovery), so reject
+    /// the eligible route only for recovery-free conversions.
     pub(crate) fn validate_runtime_conversion_route(
         &mut self,
         source_ty: MirType,
         target_ty: MirType,
+        recovered: bool,
         span: Span,
     ) {
         let source = source_ty.semantic_id();
         let target = target_ty.semantic_id();
-        if validate_lista_to_tensor_source(source, target, self.context.types.as_table()).is_ok() {
+        if !recovered
+            && validate_lista_to_tensor_source(source, target, self.context.types.as_table())
+                .is_ok()
+        {
             self.error(
                 span,
                 "eligible lista-to-tensor conversio must lower to tensor_from_flat, not runtime convert",

@@ -210,10 +210,14 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // `.parse::<W>()` does — a value outside `W`'s signed range is a
                 // conversion failure (SA-002). Unsized numerus defaults to i64.
                 // D10.6: a `littera` source parses its digit (or, with
-                // `Code`, reads its code point) — never a text parse.
+                // `Code`, reads its code point) — never a text parse. A
+                // one-letter literal is `ascii<1>`, so its rows ride the same
+                // path; a multi-letter `ascii<N>` arrives as `Value::Str` and
+                // keeps the whole-string digits parse below.
                 if matches!(
                     self.types.get(source_ty),
-                    Type::Primitive(Primitive::Littera)
+                    Type::Primitive(Primitive::Littera | Primitive::Ascii)
+                        | Type::BoundedAscii { .. }
                 ) && let Some(ch) = littera::littera_value(&value)
                 {
                     return self.convert_littera_to_numerus(ch, params, recovery, span);
@@ -258,6 +262,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Type::BoundedAscii { capacity } => {
                 if self.numerus_radix(params).is_some() {
                     self.convert_to_ascii_format_pack(value, *capacity, params, recovery, span)
+                } else if matches!(value, Value::Str(_)) {
+                    self.convert_ascii_to_bounded_ascii(value, *capacity, recovery, span)
                 } else {
                     Err(RunnerError::unsupported(
                         span,
@@ -309,7 +315,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     let bytes = bytes_of_list(&cell.borrow(), span)?;
                     self.convert_octeti_to_tensor(bytes, target_ty, None, params, recovery, span)
                 }
-                value => self.convert_to_eager_sequence(value, target_ty, struct_defaults, span),
+                value => self.convert_to_eager_sequence(
+                    value,
+                    target_ty,
+                    struct_defaults,
+                    recovery,
+                    span,
+                ),
             },
             Type::Struct(def_id) => {
                 self.convert_to_struct(value, source_ty, *def_id, recovery, struct_defaults, span)

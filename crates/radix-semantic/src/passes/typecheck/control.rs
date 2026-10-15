@@ -26,6 +26,8 @@
 //!   Compound conditions are conservative (nn-u2): `x non est nihil et …`
 //!   narrows the taken branch only (the conjunction requires the left
 //!   null-check conjunct), while `or` and non-`and` shapes never narrow.
+//!   A genus-field path (`g.nomen`) narrows inside a branch body only; joins
+//!   and the implicit fallthrough conservatively drop field facts.
 //! - U1R generalizes the seam to nominal member tests: `r est M` narrows the
 //!   taken branch to `M` and the fallthrough to the union minus `M` (`non est
 //!   M` mirrors), on immutable bindings only (varia refinement is open row 2).
@@ -57,12 +59,26 @@ struct FlowState {
 
 /// One leaf condition's `(then_refinement, else_refinement)` pair (nn-u1 null
 /// checks, U1R nominal `est M` tests): each side is an optional
-/// `(DefId, narrowed TypeId)` for the visible binding.
-type LeafRefinement = (Option<(DefId, TypeId)>, Option<(DefId, TypeId)>);
+/// `(FactKey, narrowed TypeId)` fact, keyed by the binding or the field path
+/// rooted at a binding that the fact refines.
+type LeafRefinement = (Option<(FactKey, TypeId)>, Option<(FactKey, TypeId)>);
 
-/// The facts that hold on one edge of a condition: every `(DefId, narrowed
-/// TypeId)` that is true when the edge is taken.
-type Facts = Vec<(DefId, TypeId)>;
+/// The facts that hold on one edge of a condition: every `(FactKey, narrowed
+/// TypeId)` that is true when the edge is taken, keyed by the binding or the
+/// field path rooted at a binding that the fact refines.
+type Facts = Vec<(FactKey, TypeId)>;
+
+/// The subject of a flow fact: a visible binding, or a field path rooted at a
+/// visible binding (`base.path…`).
+// `Field` is produced by the field-path narrowing producer (need case
+// 2) and consumed only inside the proving branch body; the branch-edge and
+// assertion consumers still skip it until the join units land.
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+enum FactKey {
+    Binding(DefId),
+    Field { base: DefId, path: Vec<Symbol> },
+}
 
 /// `(then_facts, else_facts)` for a whole condition, including compound
 /// `and` / `or` / `not` shapes.
@@ -585,22 +601,42 @@ impl TypeChecker<'_> {
     /// Refinement for a type test against the null type (`x non est nihil`
     /// narrows the taken branch, `x est nihil` the fallthrough, nn-u1).
     ///
-    /// The operand must be a binding path whose type peels a null member.
+    /// The operand is a binding, or a genus-field path rooted at a binding,
+    /// whose leaf type peels a null member.
     fn nil_probe_refinement(&mut self, positive: bool, expr: &HirExpression) -> LeafRefinement {
-        let HirExpressionKind::Path(def_id) = &expr.kind else {
+        let Some((base, path)) = field_path_key(expr) else {
             return (None, None);
         };
-        let Some(binding_ty) = self.lookup_binding(*def_id).map(|binding| binding.ty) else {
+        let Some(mut ty) = self.lookup_binding(base).map(|binding| binding.ty) else {
             return (None, None);
         };
+        for index in 1..=path.len() {
+            let known = self
+                .field_facts
+                .get(&(base, path[..index].to_vec()))
+                .copied();
+            if let Some(known) = known {
+                ty = known;
+                continue;
+            }
+            let Some(next) = self.try_genus_field_type(ty, path[index - 1]) else {
+                return (None, None);
+            };
+            ty = next;
+        }
         let nihil = self.types.primitive(Primitive::Nihil);
-        let Some(refined) = self.peel_member_type(binding_ty, nihil) else {
+        let Some(refined) = self.peel_member_type(ty, nihil) else {
             return (None, None);
+        };
+        let key = if path.is_empty() {
+            FactKey::Binding(base)
+        } else {
+            FactKey::Field { base, path }
         };
         if positive {
-            (None, Some((*def_id, refined)))
+            (None, Some((key, refined)))
         } else {
-            (Some((*def_id, refined)), None)
+            (Some((key, refined)), None)
         }
     }
 
@@ -645,9 +681,15 @@ impl TypeChecker<'_> {
         }
         let remainder = self.peel_member_type(binding_ty, member);
         if positive {
-            (Some((*def_id, member)), remainder.map(|ty| (*def_id, ty)))
+            (
+                Some((FactKey::Binding(*def_id), member)),
+                remainder.map(|ty| (FactKey::Binding(*def_id), ty)),
+            )
         } else {
-            (remainder.map(|ty| (*def_id, ty)), Some((*def_id, member)))
+            (
+                remainder.map(|ty| (FactKey::Binding(*def_id), ty)),
+                Some((FactKey::Binding(*def_id), member)),
+            )
         }
     }
 
@@ -773,10 +815,24 @@ impl TypeChecker<'_> {
         expected: Option<TypeId>,
         refine: Facts,
     ) -> (TypeId, FlowState) {
-        let saved: Vec<(DefId, Option<BindingInfo>)> = refine
-            .into_iter()
-            .map(|(def_id, ty)| (def_id, self.override_binding(def_id, ty)))
-            .collect();
+        let mut saved: Vec<(DefId, Option<BindingInfo>)> = Vec::new();
+        let mut field_saved: Vec<(DefId, Vec<Symbol>)> = Vec::new();
+        for (key, ty) in refine {
+            match key {
+                // A binding fact overrides the visible binding for the branch
+                // body; the incoming binding returns when the scope ends.
+                FactKey::Binding(def_id) => {
+                    saved.push((def_id, self.override_binding(def_id, ty)));
+                }
+                // A field fact is visible only inside the branch body: it is
+                // inserted here and removed at block exit, so it never reaches
+                // the branch join or the implicit fallthrough.
+                FactKey::Field { base, path } => {
+                    self.field_facts.insert((base, path.clone()), ty);
+                    field_saved.push((base, path));
+                }
+            }
+        }
 
         self.push_scope();
         self.push_assert_refinement_frame();
@@ -797,6 +853,9 @@ impl TypeChecker<'_> {
             if let Some(original) = original {
                 self.restore_binding(def_id, original);
             }
+        }
+        for (base, path) in field_saved.into_iter().rev() {
+            self.field_facts.remove(&(base, path));
         }
         (ty, state)
     }
@@ -948,10 +1007,15 @@ impl TypeChecker<'_> {
 
     /// Return an edge snapshot with one condition refinement applied.
     fn state_with_refinement(&mut self, refine: Facts) -> FlowState {
-        let saved: Vec<(DefId, Option<BindingInfo>)> = refine
-            .into_iter()
-            .map(|(def_id, ty)| (def_id, self.override_binding(def_id, ty)))
-            .collect();
+        let mut saved: Vec<(DefId, Option<BindingInfo>)> = Vec::new();
+        for (key, ty) in refine {
+            // Field facts are not carried on the implicit fallthrough edge in
+            // this need.
+            let FactKey::Binding(def_id) = key else {
+                continue;
+            };
+            saved.push((def_id, self.override_binding(def_id, ty)));
+        }
         let state = self.snapshot_flow_state();
         for (def_id, original) in saved.into_iter().rev() {
             if let Some(original) = original {
@@ -959,6 +1023,37 @@ impl TypeChecker<'_> {
             }
         }
         state
+    }
+
+    /// Check the right conjunct of `et` under the left conjunct's then-facts.
+    ///
+    /// `et` short-circuits: the right conjunct is evaluated only when the left
+    /// holds, so every then-fact the left conjunct establishes is in force
+    /// while the right conjunct is typed. The facts are applied to the
+    /// bindings, the right conjunct is checked, and every saved original is
+    /// restored in reverse so the caller sees the un-narrowed state.
+    pub(super) fn check_conjunct_rhs_narrowed(
+        &mut self,
+        lhs: &HirExpression,
+        rhs: &mut HirExpression,
+    ) -> TypeId {
+        let (facts, _) = self.condition_refinement(lhs);
+        let mut saved: Vec<(DefId, Option<BindingInfo>)> = Vec::new();
+        for (key, ty) in facts {
+            // Field facts do not join across the short-circuit edge in this
+            // need.
+            let FactKey::Binding(def_id) = key else {
+                continue;
+            };
+            saved.push((def_id, self.override_binding(def_id, ty)));
+        }
+        let rhs_ty = self.check_expr(rhs);
+        for (def_id, original) in saved.into_iter().rev() {
+            if let Some(original) = original {
+                self.restore_binding(def_id, original);
+            }
+        }
+        rhs_ty
     }
 
     /// The saved declared type a currently open assert-refinement frame holds
@@ -992,13 +1087,21 @@ impl TypeChecker<'_> {
         for frame in &mut self.assert_refinements {
             frame.retain(|(saved_def, _)| *saved_def != def_id);
         }
+        // A store rooted at this binding re-points the whole place, so every
+        // field fact rooted here is dropped too. Sibling-field facts go with
+        // it: conservative over-invalidation, and sound.
+        self.field_facts.retain(|(base, _), _| *base != def_id);
     }
 
     /// Drop facts before checking an assignment, so its target is typed from
     /// the declared cell rather than from a stale pre-assignment refinement.
     pub(crate) fn invalidate_assignment_target(&mut self, target: &HirExpression) {
-        if let HirExpressionKind::Path(def_id) = target.kind {
-            self.invalidate_flow_fact(def_id);
+        // Any store whose place is rooted at a binding — a bare path or a
+        // field chain (`p.nomen ← v`) — invalidates that binding's own fact
+        // and every field fact rooted at it (conservative over-invalidation
+        // across sibling fields).
+        if let Some((base, _)) = field_path_key(target) {
+            self.invalidate_flow_fact(base);
         }
     }
 
@@ -1082,7 +1185,11 @@ impl TypeChecker<'_> {
         if self.assert_refinements.is_empty() {
             return;
         }
-        for (def_id, ty) in facts {
+        for (key, ty) in facts {
+            // Field facts are not carried through `adfirma` in this need.
+            let FactKey::Binding(def_id) = key else {
+                continue;
+            };
             let saved = self.override_binding(def_id, ty);
             if let Some(frame) = self.assert_refinements.last_mut() {
                 frame.push((def_id, saved));
@@ -1136,6 +1243,29 @@ impl TypeChecker<'_> {
     }
 }
 
+/// The field path of a null-probe operand, rooted at a binding.
+///
+/// A bare binding path keys the fact by that binding; a chain of field
+/// accesses (`base.a.b`) keys it by the root binding plus the root-to-leaf
+/// name path. Any other root yields no key.
+pub(super) fn field_path_key(expr: &HirExpression) -> Option<(DefId, Vec<Symbol>)> {
+    let mut names = Vec::new();
+    let mut current = expr;
+    loop {
+        match &current.kind {
+            HirExpressionKind::Field(object, name) => {
+                names.push(*name);
+                current = object;
+            }
+            HirExpressionKind::Path(def_id) => {
+                names.reverse();
+                return Some((*def_id, names));
+            }
+            _ => return None,
+        }
+    }
+}
+
 /// Collect bindings assigned by a loop body before its first iteration.
 fn assignment_targets_in_block(block: &HirBlock) -> FxHashSet<DefId> {
     let mut collector = AssignmentTargetCollector::default();
@@ -1176,8 +1306,12 @@ impl HirVisitor for AssignmentTargetCollector {
 
 impl AssignmentTargetCollector {
     fn collect_target(&mut self, target: &HirExpression) {
-        if let HirExpressionKind::Path(def_id) = target.kind {
-            self.targets.insert(def_id);
+        // A field-chain store (`p.nomen ← v`, `p.a.b ← v`) has its place
+        // rooted at the base binding: record the base so the collector
+        // invalidates that binding's own fact and every field fact rooted at
+        // it.
+        if let Some((base, _)) = field_path_key(target) {
+            self.targets.insert(base);
         }
     }
 }

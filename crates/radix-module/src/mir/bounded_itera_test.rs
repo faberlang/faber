@@ -52,6 +52,60 @@ fn bounded_lista_ex_lowers_to_len_static_split() {
     );
 }
 
+/// `itera de` binds the index, so a bounded lista lowers to the same
+/// runtime-length index loop an unbounded lista does, not a static split.
+#[test]
+fn bounded_lista_de_lowers_to_index_loop() {
+    let source = r"functio firstIndex(lista<numerus, 8> xs) → numerus {
+  itera de xs fixum index {
+    redde index
+  }
+  redde 0
+}";
+    let unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
+        .expect("bounded lista itera de source analyzes");
+    let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
+        .expect("bounded lista itera de lowers to an index loop");
+    validate_program(lowered.validated.program(), lowered.validated.validation())
+        .expect("the index loop MIR must validate");
+    let dump = dump_program(lowered.validated.program());
+    assert!(
+        !dump.contains("itera collection before iterator MIR lowering"),
+        "bounded lista<T, 8> itera de must lower to an index loop: {dump}"
+    );
+    assert!(
+        dump.contains("runtime collection length("),
+        "the index loop bound is the runtime carrier len: {dump}"
+    );
+}
+
+/// The N <= 10 code-size cap belongs to the `ex` static split; the `de` index
+/// loop has no literal-capacity dependence.
+#[test]
+fn bounded_lista_de_above_ten_lowers() {
+    let source = r"functio firstIndex(lista<numerus, 16> xs) → numerus {
+  itera de xs fixum index {
+    redde index
+  }
+  redde 0
+}";
+    let unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
+        .expect("bounded lista itera de source analyzes");
+    let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
+        .expect("capacity above ten still lowers for itera de");
+    validate_program(lowered.validated.program(), lowered.validated.validation())
+        .expect("the index loop MIR must validate");
+    let dump = dump_program(lowered.validated.program());
+    assert!(
+        !dump.contains("itera collection before iterator MIR lowering"),
+        "bounded lista<T, 16> itera de must lower to an index loop: {dump}"
+    );
+    assert!(
+        dump.contains("runtime collection length("),
+        "the index loop bound is the runtime carrier len: {dump}"
+    );
+}
+
 #[test]
 fn bounded_lista_ex_arm_k_unrolls_only_lanes_below_k() {
     // lista<numerus, 3>: arm 2 must read exactly lanes 0 and 1 by constant

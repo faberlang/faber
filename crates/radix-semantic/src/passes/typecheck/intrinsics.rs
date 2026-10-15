@@ -145,7 +145,7 @@ impl IntrinsicTypeContext {
 /// A ledger (`tabulae<K, V>`) is the insertion-ordered twin of a map
 /// (`tabula<K, V>`): it shares the map's `Tabula` registry rows, so it keeps
 /// every method name and per-family locale word without a second table.
-fn receiver_families(receiver_ty: &Type) -> &'static [IntrinsicReceiver] {
+pub(super) fn receiver_families(receiver_ty: &Type) -> &'static [IntrinsicReceiver] {
     match receiver_ty {
         Type::Ledger(..) => &[IntrinsicReceiver::Tabula],
         _ => receivers_for_type(receiver_ty),

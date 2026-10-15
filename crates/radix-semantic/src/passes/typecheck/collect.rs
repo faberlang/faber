@@ -476,7 +476,10 @@ impl TypeChecker<'_> {
         // Need: module-level `const int K = ...` bindings are valid
         // `axis` arguments. Values are not folded by `statica` until after
         // typecheck, so fold here; references may precede their declaration,
-        // so iterate to a fixpoint. A cycle or a non-constant stays absent.
+        // so iterate to a fixpoint. The axis reads the value the declared cell
+        // holds (`stored_const_int`), so only an integer cell contributes and
+        // a constant chained through another constant reads the stored value;
+        // a cycle or a non-constant stays absent.
         loop {
             let mut progressed = false;
             for item in &hir.items {
@@ -495,8 +498,10 @@ impl TypeChecker<'_> {
                     &const_item.value,
                     &self.const_int_values,
                 );
-                if let Some(value) = value {
-                    self.const_int_values.insert(item.def_id, value);
+                if let Some(value) = value
+                    && let Some(stored) = self.stored_const_int(const_item.ty, value)
+                {
+                    self.const_int_values.insert(item.def_id, stored);
                     progressed = true;
                 }
             }

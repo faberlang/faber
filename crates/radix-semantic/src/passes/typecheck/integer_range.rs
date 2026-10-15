@@ -209,6 +209,43 @@ impl TypeChecker<'_> {
         radix_types::numeric_width::numerus_integer_width(self.types, resolved)
     }
 
+    /// The value an immutable integer cell declared as `declared` holds after
+    /// `value` is stored into it, or `None` when the binding is not an integer
+    /// constant (a float, text, decimal or `inf` cell, or a value that does not
+    /// fit a trapping slot).
+    ///
+    /// WHY: width limits apply at the store and a word policy reduces there,
+    /// so `fixum modulus<u8> k ← 256` holds 0, and a named axis must read what
+    /// the cell holds rather than the raw initializer.
+    pub(crate) fn stored_const_int(&self, declared: Option<TypeId>, value: i128) -> Option<i128> {
+        let Some(declared) = declared else {
+            return Some(value);
+        };
+        let mut ty = self.resolve_inferred_type(declared);
+        ty = self.types.peel_access_marker(ty).1;
+        while let Type::Alias(_, inner) = self.types.get(ty) {
+            ty = self.resolve_inferred_type(*inner);
+        }
+        let within = |(lo, hi): IntRange| (lo..=hi).contains(&value).then_some(value);
+        match self.types.get(ty) {
+            Type::Primitive(Primitive::Numerus) => {
+                within((i128::from(i64::MIN), i128::from(i64::MAX)))
+            }
+            Type::SizedNumeric(Primitive::Numerus, width) => within(width.integer_range()?),
+            Type::ModularWord(width) => {
+                // The word is the ring of 2^bits values starting at the
+                // range's floor, so signed words reinterpret the residue.
+                let (lo, hi) = width.integer_range()?;
+                Some(lo + (value - lo).rem_euclid(hi - lo + 1))
+            }
+            Type::SaturatingWord(width) => {
+                let (lo, hi) = width.integer_range()?;
+                Some(value.clamp(lo, hi))
+            }
+            _ => None,
+        }
+    }
+
     /// Declared width of an integer that takes part in the range rule: a
     /// trapping integer, or a `wrapping` or `saturating` word (which computes
     /// exactly like its width and reduces or clamps only where a value is

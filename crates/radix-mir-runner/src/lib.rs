@@ -3973,6 +3973,9 @@ mod octeti_lista_test;
 mod octeti_valor_test;
 
 #[cfg(test)]
+mod valor_numerus_width_test;
+
+#[cfg(test)]
 #[path = "vector_lista_test.rs"]
 mod vector_lista_test;
 
@@ -4031,6 +4034,10 @@ mod f32_store_test;
 #[cfg(test)]
 #[path = "narrowing_conversio_test.rs"]
 mod narrowing_conversio_test;
+
+#[cfg(test)]
+#[path = "ascii_conversio_test.rs"]
+mod ascii_conversio_test;
 
 #[cfg(test)]
 #[path = "inf_test.rs"]

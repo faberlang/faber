@@ -38,6 +38,8 @@ pub fn package_diagnostic_error(
 #[cfg(test)]
 mod diagnostic_explain_test;
 #[cfg(test)]
+mod explain_example_test;
+#[cfg(test)]
 mod explain_test;
 #[cfg(test)]
 mod input_shape_test;

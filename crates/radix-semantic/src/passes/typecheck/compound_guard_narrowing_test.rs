@@ -1,7 +1,8 @@
 //! Narrowing through compound conditions: `A et B` holds both
 //! parts' facts in the taken branch, a diverging `si A aut B { <leave> }`
 //! leaves both negations for the rest of the block, and `non (...)` swaps the
-//! two edges. A field path stays un-narrowed.
+//! two edges. A field path narrows inside a branch body only — not across
+//! joins or the implicit fallthrough (need case 2).
 //!
 //! Fixtures use the latin spellings (`et`, `aut`, `non`); the unit-test
 //! harness compiles bare source without the en-locale lex pack. The en
@@ -133,9 +134,25 @@ fn field_guard_in_or_is_not_narrowed() {
 }
 
 #[test]
-fn field_guard_in_and_is_not_narrowed() {
-    test_support::assert_rejects_with_issue(
+fn field_guard_in_and_narrows() {
+    test_support::assert_accepts(
         "genus G {\n    varia textus ∪ nihil nomen\n}\n\nfunctio f(G g, bivalens a) → numerus {\n    si a et g.nomen non est nihil {\n        redde g.nomen.longitudo()\n    }\n    redde 0\n}",
+    );
+}
+
+#[test]
+fn field_path_null_check_narrows_the_branch_body() {
+    test_support::assert_accepts(
+        "genus G {\n    varia textus ∪ nihil nomen\n}\n\nfunctio f(G g) → numerus {\n    si g.nomen non est nihil {\n        redde g.nomen.longitudo()\n    }\n    redde 0\n}",
+    );
+}
+
+#[test]
+fn field_path_test_on_wrong_branch_stays_optional() {
+    // `g.nomen est nihil` narrows the else edge only; the taken branch still
+    // sees the optional receiver.
+    test_support::assert_rejects_with_issue(
+        "genus G {\n    varia textus ∪ nihil nomen\n}\n\nfunctio f(G g) → numerus {\n    si g.nomen est nihil {\n        redde g.nomen.longitudo()\n    }\n    redde 0\n}",
         NOT_NARROWED,
     );
 }
@@ -146,6 +163,47 @@ fn assignment_invalidates_a_compound_fact() {
     // fact exactly as it does for a single null probe.
     test_support::assert_rejects_with_issue(
         "functio f(textus ∪ nihil x, textus ∪ nihil y, bivalens a) → numerus {\n    varia textus ∪ nihil v ← x\n    si a et v non est nihil {\n        v ← y\n        redde v.longitudo()\n    }\n    redde 0\n}",
+        NOT_NARROWED,
+    );
+}
+
+#[test]
+fn field_store_between_test_and_use_ends_narrowing() {
+    // A store through the tested field path re-points the place: the fact
+    // established by the test no longer describes the value the use reads.
+    test_support::assert_rejects_with_issue(
+        "genus G {\n    varia textus ∪ nihil nomen\n}\n\nfunctio f(G g) → numerus {\n    varia G p ← copy g\n    si p.nomen non est nihil {\n        p.nomen ← nulla\n        redde p.nomen.longitudo()\n    }\n    redde 0\n}",
+        NOT_NARROWED,
+    );
+}
+
+#[test]
+fn base_reassignment_between_test_and_use_ends_narrowing() {
+    // Re-pointing the root binding drops every field fact rooted at it.
+    test_support::assert_rejects_with_issue(
+        "genus G {\n    varia textus ∪ nihil nomen\n}\n\nfunctio f(G g) → numerus {\n    varia G p ← copy g\n    si p.nomen non est nihil {\n        p ← G { nomen = nulla }\n        redde p.nomen.longitudo()\n    }\n    redde 0\n}",
+        NOT_NARROWED,
+    );
+}
+
+#[test]
+fn and_narrows_the_right_conjunct_inside_the_condition() {
+    test_support::assert_accepts(
+        "functio f(textus ∪ nihil x) → bivalens {\n    redde x non est nihil et x.longitudo() ≻ 0\n}",
+    );
+}
+
+#[test]
+fn and_threading_narrows_at_any_depth() {
+    test_support::assert_accepts(
+        "functio f(textus ∪ nihil x, bivalens a) → bivalens {\n    redde a et x non est nihil et x.longitudo() ≻ 0\n}",
+    );
+}
+
+#[test]
+fn or_does_not_narrow_the_right_disjunct_inside_the_condition() {
+    test_support::assert_rejects_with_issue(
+        "functio f(textus ∪ nihil x, bivalens a) → bivalens {\n    redde a aut x.longitudo() ≻ 0\n}",
         NOT_NARROWED,
     );
 }

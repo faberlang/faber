@@ -1478,7 +1478,21 @@ impl TypeChecker<'_> {
                 unreachable!("membership is resolved by check_membership before check_binary")
             }
             HirBinOp::Coalesce => unreachable!("coalesce is handled before eager rhs checking"),
-            HirBinOp::And | HirBinOp::Or => {
+            HirBinOp::And => {
+                let lhs_ty = self.check_expr(lhs);
+                // `et` short-circuits: the right conjunct is evaluated only
+                // when the left holds, so it is checked under the left
+                // conjunct's then-facts.
+                let rhs_ty = self.check_conjunct_rhs_narrowed(&*lhs, rhs);
+                if let Some(result) = self.check_tensor_lift_logic(lhs, lhs_ty, rhs_ty) {
+                    return result;
+                }
+                if let Some(result) = self.check_lista_logic(op, lhs, lhs_ty, rhs_ty) {
+                    return result;
+                }
+                self.bool_bin(lhs_ty, rhs_ty, lhs.span)
+            }
+            HirBinOp::Or => {
                 let lhs_ty = self.check_expr(lhs);
                 let rhs_ty = self.check_expr(rhs);
                 if let Some(result) = self.check_tensor_lift_logic(lhs, lhs_ty, rhs_ty) {

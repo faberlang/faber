@@ -38,3 +38,11 @@ fn inferred_regex_literal_lowers_to_hir_regex() {
     let unit = test_support::analyze_ok(r"incipit { fixum regex r ← _ /a/ }");
     assert_regex_init(&unit, "a");
 }
+
+#[test]
+fn repro_nota_hole_without_expected_type_is_named_error() {
+    test_support::assert_rejects_with_issue(
+        r"incipit { nota _ /a/ }",
+        "inferred_constructor_no_expected_type",
+    );
+}

@@ -108,6 +108,18 @@ fn axis_word_stays_an_ordinary_identifier_without_a_following_operand() {
 }
 
 #[test]
+fn axis_marker_precedes_a_negative_literal() {
+    let args = call_axis_flags("incipit {\n    f(axis -1)\n}");
+    assert_eq!(args, vec![(true, None)]);
+}
+
+#[test]
+fn axis_minus_with_spaces_stays_subtraction() {
+    let args = call_axis_flags("incipit {\n    f(axis - 1)\n}");
+    assert_eq!(args, vec![(false, None)]);
+}
+
+#[test]
 fn axis_marker_parses_before_a_parameter_type() {
     let result = parse_ok_la("functio f(tensor<f32, [2, 3]> t, axis numerus a) → vacuum {}");
     let program = result.program.as_ref().expect("program");

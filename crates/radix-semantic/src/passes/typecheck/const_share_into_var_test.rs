@@ -586,6 +586,34 @@ fn values_view_detection_is_pack_first() {
     );
 }
 
+/// a1a643a1-1: the Values-view alias check needs a map/ledger receiver, not
+/// just the spelling. A user method named `valores` on a genus is an ordinary
+/// call whose result is fresh.
+#[test]
+fn itera_user_method_named_valores_binder_is_accepted() {
+    test_support::assert_accepts(
+        "genus Cista {\n    varia lista<numerus> res\n    functio valores() → lista<lista<numerus>> {\n        redde [[1]]\n    }\n}\nfunctio f(Cista p) → numerus {\n    itera ex p.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn itera_user_method_named_valores_fresh_control_is_accepted() {
+    test_support::assert_accepts(
+        "genus Cista {\n    varia lista<numerus> res\n    functio fresca() → lista<lista<numerus>> {\n        redde [[1]]\n    }\n}\nfunctio f(Cista p) → numerus {\n    itera ex p.fresca() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn itera_map_valores_alias_still_rejected_with_user_method_present() {
+    let source = "genus Cista {\n    varia lista<numerus> res\n    functio valores() → lista<lista<numerus>> {\n        redde [[1]]\n    }\n}\nfunctio f(tabula<textus, lista<numerus>> m) → numerus {\n    itera ex m.valores() fixum r {\n        varia lista<numerus> y ← r\n        y.appende(1)\n    }\n    redde 0\n}\nincipit { }";
+    let result = test_support::analyze_source(source);
+    assert!(
+        has_const_shared_into_var(&result),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
 // ── `→ de T` call results beyond one free function with one `de` parameter
 // (7b471d14-10): a method call's `de` result hands back the receiver's state,
 // and a free function with several `de` parameters of the returned payload

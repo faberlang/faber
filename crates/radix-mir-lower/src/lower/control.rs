@@ -3967,6 +3967,12 @@ impl FunctionBuilder<'_> {
             // guard-free arms (total N(N+1)/2 lanes). The N <= 10
             // code-size cap keeps the split bounded; non-literal capacities
             // (shape-generics) and N > 10 fall through to Unsupported.
+            // `de` binds the index, not a lane, so it is a plain index loop
+            // over the runtime length: the same shape as an unbounded lista,
+            // independent of any literal capacity.
+            Type::BoundedArray { element, .. } if matches!(mode, HirIteraMode::De) => {
+                CollectionIteraKind::Array(*element)
+            }
             Type::BoundedArray { element, capacity } => {
                 let literal_n = if matches!(mode, HirIteraMode::Ex) {
                     i64s_from_literal_index(*capacity, self.types)

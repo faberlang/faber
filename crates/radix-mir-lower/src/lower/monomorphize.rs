@@ -1587,13 +1587,19 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         if !type_contains_param(self.types(), ty.semantic_id()) {
             return Some(ty);
         }
-        instantiate_existing_generic_type(self.types(), ty, bindings, span)
-            .map_err(|error| {
+        match instantiate_existing_generic_type(self.types(), ty, bindings, span) {
+            Ok(substituted) => Some(substituted),
+            // The concrete instantiation is well formed but not interned yet.
+            // Leave the param-bearing type in place: the finalize pass interns
+            // the substituted types and re-substitutes this site.
+            Err(error) if error.is_missing_metadata() => Some(ty),
+            Err(error) => {
                 self.lowerer
                     .errors
                     .push(MirError::validation(error.span, error.message));
-            })
-            .ok()
+                None
+            }
+        }
     }
 
     /// In-place form of `substitute_ty` for declaration types; a failure is
@@ -1881,6 +1887,19 @@ fn shape_bindings_for_key(params: &[OrderedParam], shape_args: &[IndexId]) -> Mi
         .collect()
 }
 
+/// Bind each `typus` parameter to the key's type argument in the same
+/// declaration order, mirroring [`ensure_instance`]. A key with fewer
+/// arguments leaves the trailing parameters unbound; the finalize pass
+/// survivor net fails closed on those.
+fn type_bindings_for_key(params: &[OrderedParam], type_args: &[MirType]) -> MirGenericBindings {
+    params
+        .iter()
+        .filter(|param| param.kind == ParamKind::Typus)
+        .zip(type_args.iter().copied())
+        .map(|(param, ty)| (param.name, ty))
+        .collect()
+}
+
 /// Contract-method names and genus method targets for bound-call dispatch.
 fn contract_dispatch_tables(
     hir: &radix_hir::HirModule,
@@ -2067,7 +2086,10 @@ fn generic_param_names(params: &[radix_hir::HirTypeParam]) -> Vec<OrderedParam> 
 /// unit's table at the lowering entry point, so the analyzed unit's arena is
 /// never written. Each instance's shape params are bound from its key's
 /// `shape_args` (D1) and substituted to literal dims; any function still
-/// carrying a param afterwards is rejected (D6 net).
+/// carrying a param afterwards is rejected (D6 net). Its typus params are bound
+/// from the key's `type_args` the same way, so a body type the substitution
+/// pass deferred because its concrete instantiation was not yet interned is
+/// completed here.
 ///
 /// Phase-4 producer fact: every `MirConstant::ShapeSize` operand/constant in
 /// an instance is also rewritten to the concrete `Float` it denotes from that
@@ -2082,7 +2104,6 @@ pub fn finalize_monomorphized_shapes(
 ) -> Vec<MirError> {
     let mut errors = Vec::new();
     let param_order = generic_param_order(hir);
-    let type_bindings = MirGenericBindings::default();
     let index = ExistingTypeIndex::build(types);
     let function_index = MirFunctionIndex::for_functions(functions);
     for monomorphization in monomorphizations {
@@ -2092,6 +2113,11 @@ pub fn finalize_monomorphized_shapes(
         let Some(function) = function_index.function_mut(functions, monomorphization.function) else {
             continue;
         };
+        // The instance's typus bindings, exactly as `ensure_instance` built
+        // them, so a body site the substitution pass left deferred (because its
+        // concrete type was not interned yet) re-substitutes against the same
+        // bindings and `finalize_type_shapes` interns the result.
+        let type_bindings = type_bindings_for_key(params, &monomorphization.key.type_args);
         let shape_bindings = shape_bindings_for_key(params, &monomorphization.key.shape_args);
         if !finalize_function_shapes(types, function, &type_bindings, &shape_bindings, &index, &mut errors) {
             continue;

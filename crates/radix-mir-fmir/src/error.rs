@@ -135,6 +135,21 @@ pub enum FmirImageError {
         accepted: u32,
     },
 
+    /// An artifact's reflection carrier declares a nested `v` that is not
+    /// [`crate::schema::ARTIFACT_REFLECTION_VERSION`]. The carrier's own
+    /// version is admitted independently of the artifact ABI version and the
+    /// outer image versions, before any reflected kernel is used: it is an
+    /// **exact-match clean break**, never an alias for an older or newer
+    /// reflection layout.
+    ArtifactReflectionVersionMismatch {
+        /// Backend of the offending artifact.
+        backend: String,
+        /// Reflection version the artifact declares.
+        actual: u32,
+        /// The accepted reflection version.
+        expected: u32,
+    },
+
     /// A compiled-in leaf artifact declares a (backend, format, stage,
     /// feature) combination its backend cannot carry (DDCP3-U0 (d) /
     /// CTO9-6 d): a known backend cannot carry an incompatible known format
@@ -318,6 +333,14 @@ impl fmt::Display for FmirImageError {
                 actual,
                 accepted,
             } => fmt_artifact_abi_version_mismatch(f, backend, *actual, *accepted),
+            Self::ArtifactReflectionVersionMismatch {
+                backend,
+                actual,
+                expected,
+            } => write!(
+                f,
+                "unsupported artifact reflection version {actual} for backend `{backend}`; expected {expected}"
+            ),
             Self::IncompatibleArtifactCombination { backend, detail } => write!(
                 f,
                 "FMIR device artifact `{backend}` combination is incompatible: {detail} (DDCP3-U0 (d) backend/format/stage/feature combination validation)"

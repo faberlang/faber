@@ -25,6 +25,7 @@
 pub use radix_semantic::coverage;
 #[cfg(feature = "hir-c")]
 pub mod c;
+pub mod cli_ir;
 #[cfg(feature = "hir-cobol")]
 pub mod cobol;
 pub mod conversio_coverage;
@@ -1222,6 +1223,8 @@ pub fn generate_rust_cli(
     #[cfg_attr(not(feature = "hir-rust"), allow(unused_variables))] types: &TypeTable,
     #[cfg_attr(not(feature = "hir-rust"), allow(unused_variables))] interner: &Interner,
     #[cfg_attr(not(feature = "hir-rust"), allow(unused_variables))] cli_program: &crate::cli::CliProgram,
+    #[cfg_attr(not(feature = "hir-rust"), allow(unused_variables))]
+    display_tokens: &radix_codegen_shared::names::DisplayTokens,
 ) -> Result<crate::RustOutput, CodegenError> {
     #[cfg(not(feature = "hir-rust"))]
     {
@@ -1236,8 +1239,10 @@ pub fn generate_rust_cli(
         reject_rust_unsupported_types(types)?;
         let hir = hir.without_unavailable_declarations(interner);
         let hir = &*hir;
-        let ir = rust::to_cli_ir(cli_program);
-        let output = rust::RustCodegen::new_with_types(hir, interner, types).generate_cli(hir, types, &ir)?;
+        let ir = cli_ir::to_cli_ir(cli_program);
+        let mut codegen = rust::RustCodegen::new_with_types(hir, interner, types);
+        codegen.set_display_tokens(display_tokens.clone());
+        let output = codegen.generate_cli(hir, types, &ir)?;
         Ok(crate::RustOutput { code: output.code })
     }
 }
@@ -1266,6 +1271,68 @@ pub fn generate_go_cli(
     #[cfg(not(feature = "hir-go"))]
     {
         Err(unavailable_target_error(Target::HirGo))
+    }
+}
+
+/// Emit TypeScript CLI product code for the narrow single-command slice.
+///
+/// # Errors
+///
+/// Returns [`CodegenError`] if the HIR contains error recovery expressions, a
+/// target-unsupported type or leaf, or the CLI surface is beyond the narrow
+/// slice (options, subcommands, non-text operands, operand defaults, or a
+/// non-fixed exit).
+pub fn generate_ts_cli(
+    #[cfg_attr(not(feature = "hir-ts"), allow(unused_variables))] hir: &HirModule,
+    #[cfg_attr(not(feature = "hir-ts"), allow(unused_variables))] types: &TypeTable,
+    #[cfg_attr(not(feature = "hir-ts"), allow(unused_variables))] interner: &Interner,
+    #[cfg_attr(not(feature = "hir-ts"), allow(unused_variables))] cli_program: &crate::cli::CliProgram,
+) -> Result<crate::TypeScriptOutput, CodegenError> {
+    #[cfg(feature = "hir-ts")]
+    {
+        radix_codegen_shared::reject_hir_errors(hir)?;
+        radix_codegen_shared::reject_bits_type(types, Target::HirTypeScript)?;
+        radix_codegen_shared::reject_ledger_type(types, Target::HirTypeScript)?;
+        reject_leaf_routes_in_hir(hir, interner, Target::HirTypeScript)?;
+        let ir = cli_ir::to_cli_ir(cli_program);
+        let hir = hir.without_unavailable_declarations(interner);
+        let output = ts::TsCodegen::new(&hir, types, interner).generate_cli(&hir, types, interner, &ir)?;
+        Ok(crate::TypeScriptOutput { code: output.code })
+    }
+    #[cfg(not(feature = "hir-ts"))]
+    {
+        Err(unavailable_target_error(Target::HirTypeScript))
+    }
+}
+
+/// Emit Python CLI product code for the narrow single-command slice.
+///
+/// # Errors
+///
+/// Returns [`CodegenError`] if the HIR contains error recovery expressions, a
+/// target-unsupported type or leaf, or the CLI surface is beyond the narrow
+/// slice (options, subcommands, non-text operands, operand defaults, or a
+/// non-fixed exit).
+pub fn generate_python_cli(
+    #[cfg_attr(not(feature = "hir-python"), allow(unused_variables))] hir: &HirModule,
+    #[cfg_attr(not(feature = "hir-python"), allow(unused_variables))] types: &TypeTable,
+    #[cfg_attr(not(feature = "hir-python"), allow(unused_variables))] interner: &Interner,
+    #[cfg_attr(not(feature = "hir-python"), allow(unused_variables))] cli_program: &crate::cli::CliProgram,
+) -> Result<crate::PythonOutput, CodegenError> {
+    #[cfg(feature = "hir-python")]
+    {
+        radix_codegen_shared::reject_hir_errors(hir)?;
+        radix_codegen_shared::reject_bits_type(types, Target::HirPython)?;
+        radix_codegen_shared::reject_ledger_type(types, Target::HirPython)?;
+        reject_leaf_routes_in_hir(hir, interner, Target::HirPython)?;
+        let ir = cli_ir::to_cli_ir(cli_program);
+        let hir = hir.without_unavailable_declarations(interner);
+        let output = python::PythonCodegen::new(&hir, types, interner).generate_cli(&hir, types, interner, &ir)?;
+        Ok(crate::PythonOutput { code: output.code })
+    }
+    #[cfg(not(feature = "hir-python"))]
+    {
+        Err(unavailable_target_error(Target::HirPython))
     }
 }
 

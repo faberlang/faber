@@ -1,6 +1,6 @@
 [package]
 name = "faber"
-version = "1.13.0"
+version = "1.14.0"
 edition = "2024"
 description = "Faber project and package tool"
 license = "MIT OR Apache-2.0"
@@ -64,7 +64,7 @@ radix-hygiene = { path = "../radix-hygiene" }
 tempfile = "3"
 
 [features]
-default = ["full-targets"]
+default = ["full-targets", "hir-c"]
 full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "mir-clif", "runner"]
 hir-faber = ["radix/hir-faber"]
 hir-c = ["radix/hir-c"]

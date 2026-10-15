@@ -30,6 +30,45 @@ fn rust_admits_inline_fs_leaf() {
     assert!(result.success(), "rust must declare fs: {:?}", issue_values(&result));
 }
 
+#[cfg(feature = "hir-go")]
+#[test]
+fn go_admits_inline_clock_leaf() {
+    const SOURCE: &str = r#"
+incipit {
+    fixum numerus nunc ← ad 'tempus:monotonicum' ↦ numerus
+    nota nunc
+}
+"#;
+    let result = compile(Target::HirGo, SOURCE);
+    assert!(result.success(), "go must declare clock: {:?}", issue_values(&result));
+}
+
+#[cfg(feature = "hir-go")]
+#[test]
+fn go_admits_inline_entropy_leaf() {
+    const SOURCE: &str = r#"
+incipit {
+    fixum numerus sors ← ad 'aleator:sortire' ([0, 10]) ↦ numerus
+    nota sors
+}
+"#;
+    let result = compile(Target::HirGo, SOURCE);
+    assert!(result.success(), "go must declare entropy: {:?}", issue_values(&result));
+}
+
+#[cfg(feature = "hir-go")]
+#[test]
+fn go_admits_inline_stdio_leaf() {
+    const SOURCE: &str = r#"
+incipit {
+    fixum textus linea ← ad 'consolum:lege' ↦ textus
+    nota linea
+}
+"#;
+    let result = compile(Target::HirGo, SOURCE);
+    assert!(result.success(), "go must declare stdio: {:?}", issue_values(&result));
+}
+
 #[test]
 fn go_rejects_inline_fs_leaf() {
     let result = compile(Target::HirGo, INLINE_FS);

@@ -2293,6 +2293,60 @@ fn item_list_separator_issue_rows_exist_in_every_installed_pack() {
     }
 }
 
+/// The 14 frontend review issue rows are owned and rendered by
+/// every installed pack. The shrink-only absent-row budget gate counts missing
+/// rows, so it would accept a pack that deletes one of these and adds an
+/// unrelated row elsewhere; name each row here so a deletion fails by name.
+#[test]
+fn installed_packs_render_frontend_review_issue_rows() {
+    const ROWS: &[(&str, &str)] = &[
+        ("LEX001", "empty_regex_literal"),
+        ("LEX001", "unterminated_regex_literal"),
+        ("SEM016", "conversio_failure_channel_value_required"),
+        ("PARSE001", "expected_identifier"),
+        ("PARSE001", "expected_string_literal"),
+        ("PARSE001", "expected_mutability_keyword"),
+        ("PARSE001", "await_binding_requires_name"),
+        ("PARSE001", "expected_method_declaration"),
+        ("PARSE001", "expected_praepara_hook"),
+        ("PARSE001", "expected_lane_value"),
+        ("PARSE001", "expected_scribe_keyword"),
+        ("PARSE001", "expected_incipit_keyword"),
+        ("PARSE001", "enum_member_value_number"),
+        ("PARSE001", "enum_member_value"),
+    ];
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let owned = owned_pack(locale);
+        for &(code, issue) in ROWS {
+            let row = owned
+                .diagnostics
+                .get(code)
+                .and_then(|template| template.issues.get(issue))
+                .unwrap_or_else(|| panic!("{locale} must own {code}.{issue}"));
+            assert!(
+                !row.message.trim().is_empty(),
+                "{locale} {code}.{issue} message must not be empty"
+            );
+            assert!(
+                row.help
+                    .as_deref()
+                    .is_some_and(|help| !help.trim().is_empty()),
+                "{locale} {code}.{issue} help must not be empty"
+            );
+            let diagnostic = diagnostic_with_code(code, vec![diagnostic_arg("issue", issue)]);
+            let rendered = installed_pack(locale)
+                .render_diagnostic_text(&diagnostic)
+                .unwrap_or_else(|err| panic!("{locale} {code}.{issue} template should render: {err:?}"))
+                .unwrap_or_else(|| panic!("{locale} {code} row should exist"));
+            assert!(
+                !rendered.message.contains("locale pack missing row"),
+                "{locale} {code}.{issue}: {}",
+                rendered.message
+            );
+        }
+    }
+}
+
 /// Assert every installed pack owns `code.issue` and renders it with its own
 /// spellings of the named keyword identities.
 fn assert_every_installed_pack_renders_issue(kind: ParseErrorKind, code: &str, issue: &str, keywords: &[&str]) {

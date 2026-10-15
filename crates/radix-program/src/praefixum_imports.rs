@@ -17,8 +17,8 @@
 //!
 //! The answer for anything not resolved is [`ImportedCallee::Unavailable`]: an
 //! unknown or unexported member, a bodyless library function, a method whose
-//! genus has no unique sibling home or no such method there, a selective
-//! import, a library with no supplied body. A wrong `Pure` would be an unsound
+//! receiver no sibling import exports or that has no such method there, a
+//! selective import, a library with no supplied body. A wrong `Pure` would be an unsound
 //! build, so `Pure` is only ever the answer for a proven pure function or a
 //! top-level constant.
 
@@ -188,9 +188,9 @@ impl<'s> Scope<'s> {
     }
 
     /// Answer a method reference: the receiver's genus is declared in a
-    /// sibling module, and that module's export surface is what names it.
-    /// The method is looked up by name on the genus and judged like a
-    /// function of that module.
+    /// sibling module, and the import whose file interface exports the
+    /// receiver's `DefId` names that module. The method is looked up by name
+    /// on the genus there and judged like a function of that module.
     fn method(&mut self, module_id: &ModuleId, reference: &ImportedReference) -> ImportedCallee {
         let Some(node) = self.nodes.get(module_id) else {
             return ImportedCallee::Unavailable;
@@ -199,7 +199,7 @@ impl<'s> Scope<'s> {
             return ImportedCallee::Unavailable;
         };
         let genus = node.analysis.interner.resolve(symbol.name).to_owned();
-        let Some((home_id, home)) = self.method_home(module_id, &genus) else {
+        let Some((home_id, home)) = self.receiver_home(module_id, reference.namespace) else {
             return ImportedCallee::Unavailable;
         };
         let method = node.analysis.interner.resolve(reference.member).to_owned();
@@ -209,33 +209,32 @@ impl<'s> Scope<'s> {
         self.function(Home::Package(home_id.clone()), def_id)
     }
 
-    /// The unique local edge of `module_id` whose target exports `genus`.
-    /// None or more than one candidate leaves the genus without a home.
-    fn method_home(
+    /// The local edge of `module_id` whose installed file interface exports
+    /// the nominal `receiver`. Ownership is by the receiver's identity, never
+    /// by export spelling: a homonym genus in another sibling does not
+    /// compete, and a receiver no edge exports has no home.
+    fn receiver_home(
         &self,
         module_id: &ModuleId,
-        genus: &str,
+        receiver: DefId,
     ) -> Option<(&'s ModuleId, &'s AnalyzedProgramNode)> {
         let node = self.nodes.get(module_id)?;
-        let mut home: Option<(&'s ModuleId, &'s AnalyzedProgramNode)> = None;
-        for (binding, target_id) in self.imports.local_edges(module_id) {
-            if !node
-                .namespace_exports
-                .get(binding)
-                .is_some_and(|exports| exports.contains_key(genus))
-            {
-                continue;
-            }
-            let Some(target) = self.nodes.get(target_id) else {
-                continue;
-            };
-            match home {
-                Some((existing, _)) if existing == target_id => {}
-                Some(_) => return None,
-                None => home = Some((target_id, target)),
-            }
-        }
-        home
+        let resolver = &node.analysis.resolver;
+        let (_, target_id) = self
+            .imports
+            .local_edges(module_id)
+            .iter()
+            .find(|(binding, _)| {
+                resolver
+                    .file_interface_namespace(binding, &node.analysis.interner)
+                    .is_some_and(|namespace| {
+                        resolver
+                            .imported_file_type_exports(namespace)
+                            .iter()
+                            .any(|export| export.def_id == receiver)
+                    })
+            })?;
+        Some((target_id, self.nodes.get(target_id)?))
     }
 
     /// Answer one reference made by a library module.

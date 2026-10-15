@@ -3206,6 +3206,27 @@ functio primus() → numerus {
 }
 
 #[test]
+fn lowers_array_literal_with_spread_of_inferred_lists() {
+    // WHY: the spread sources are inferred bounded-array literals; the outer
+    // list construction routes through an inferred local because a
+    // return-position spread of a bounded local is rejected by the frontend
+    // expected-element check, not by MIR lowering.
+    let dump = dump_source(
+        r"
+functio build() → lista<numerus> {
+    fixum _ a ← [1, 2]
+    fixum _ b ← [3, 4]
+    fixum _ c ← [0, sparge a, sparge b, 5]
+    redde c
+}
+",
+    );
+
+    assert!(dump.contains("construct array"));
+    assert!(dump.contains("[const int 0, ..._"));
+}
+
+#[test]
 fn lowers_nested_json_valor_literal() {
     let dump = dump_source(
         r#"
@@ -7024,6 +7045,59 @@ incipiet {
     assert!(
         !dump.contains("unsupported"),
         "no unsupported surface in the reddet unit:\n{dump}"
+    );
+}
+
+/// An awaited `@ future` call produces the success payload, so a void-payload
+/// async call lowers to a destination-less `Call` rather than a
+/// `promissum<vacuum>` temp. This pins both halves of the async-callee typing
+/// change at the statement level (c75db9ed-11).
+#[test]
+fn await_future_void_call_validates() {
+    let source = r"
+functio pause() fiet → vacuum {
+    nota 0
+}
+
+incipiet {
+    tacebit pause()
+}
+";
+    let analysis = analyze(source);
+    let lowered =
+        lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default()).expect("lower await unit");
+
+    let pause = lowered
+        .validated
+        .program()
+        .functions
+        .iter()
+        .find(|function| {
+            function
+                .name
+                .is_some_and(|name| lowered.interner.resolve(name) == "pause")
+        })
+        .and_then(|function| function.source)
+        .expect("pause function must lower with a source definition");
+
+    let mut destinations = Vec::new();
+    for function in &lowered.validated.program().functions {
+        for block in &function.blocks {
+            for statement in &block.statements {
+                if let MirStatementKind::Call { destination, callee: MirCallee::Definition { source, .. }, .. } =
+                    &statement.kind
+                    && *source == pause
+                {
+                    destinations.push(destination.is_some());
+                }
+            }
+        }
+    }
+
+    assert!(!destinations.is_empty(), "the await of pause() must lower to a definition call");
+    assert!(
+        destinations.iter().all(|has_destination| !has_destination),
+        "a void-payload async call must have no destination temp: {destinations:?}"
     );
 }
 
