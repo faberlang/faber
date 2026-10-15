@@ -1159,6 +1159,10 @@ pub mod test_support;
 mod access_operand_test;
 
 #[cfg(test)]
+#[path = "optional_chain_call_test.rs"]
+mod optional_chain_call_test;
+
+#[cfg(test)]
 #[path = "axis_marker_test.rs"]
 mod axis_marker_test;
 
