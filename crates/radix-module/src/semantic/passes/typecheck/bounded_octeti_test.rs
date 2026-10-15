@@ -186,7 +186,11 @@ incipit {
 #[cfg(feature = "hir-ts")]
 #[test]
 fn octeti_to_tensor_with_an_unbound_size_extent_is_declined_on_typescript() {
-    let source = r"functio decode<magnitudo N>(tensor<f32, [N]> proto, lista<b8> raw) → tensor<f32, [N]> ⇥ textus {
+    // No tensor parameter witnesses `N`, so no value binding supplies its
+    // extent: the octeti-to-tensor conversion must decline by name. (A
+    // witnessing axis binds the size and the conversion emits; that case is
+    // covered by the emission tests.)
+    let source = r"functio decode<magnitudo N>(lista<b8> raw) → tensor<f32, [N]> ⇥ textus {
     redde raw ↦ tensor<f32, [N]> via Le
 }
 
