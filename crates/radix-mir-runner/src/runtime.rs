@@ -1663,14 +1663,24 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 i128::abs,
                 Some(handroll::Magnus::abs),
             ),
-            MirCollectionOp::Signum => self.map_numeric(
-                args,
-                span,
-                return_ty,
-                f64::signum,
-                i128::signum,
-                Some(|value| handroll::Magnus::from_i64(i64::from(value.signum()))),
-            ),
+            MirCollectionOp::Signum => {
+                if self.resolve_int_width(return_ty).is_decimal() {
+                    let [receiver] = args else {
+                        return Err(RunnerError::internal(span, "numeric collection arity"));
+                    };
+                    let value = self.eval_operand(receiver, span)?;
+                    super::decimal::signum(&value, span)
+                } else {
+                    self.map_numeric(
+                        args,
+                        span,
+                        return_ty,
+                        f64::signum,
+                        i128::signum,
+                        Some(|value| handroll::Magnus::from_i64(i64::from(value.signum()))),
+                    )
+                }
+            }
             MirCollectionOp::Minimum => {
                 self.numeric_extremum(args, span, return_ty, numeric_min, false)
             }
