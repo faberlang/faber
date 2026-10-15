@@ -313,7 +313,7 @@ impl Emitter<'_> {
             Ty::Opt(inner) => self.need_class(inner.ty()),
             Ty::Bool => self.support.need_bool(),
             Ty::Float => self.support.need(crate::helpers::Helper::Float),
-            Ty::Text | Ty::Genus(_) => {}
+            Ty::Text | Ty::Genus(_) | Ty::None => {}
             Ty::List(elem) => {
                 self.support.need(crate::helpers::Helper::List(
                     elem,

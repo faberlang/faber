@@ -61,7 +61,7 @@ impl Emitter<'_> {
                 Value::List(elem) => Ty::List(elem),
                 Value::Genus(def_id) => Ty::Genus(def_id),
                 Value::Opt(inner) => Ty::Opt(inner),
-                Value::Exact | Value::Void => {
+                Value::Exact | Value::Void | Value::None => {
                     return Err(unsupported("switch over a value with no class"));
                 }
             };

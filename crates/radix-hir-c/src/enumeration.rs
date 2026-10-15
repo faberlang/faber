@@ -378,7 +378,7 @@ impl Emitter<'_> {
             format!("b->{}", field.c_name),
         );
         match field.ty {
-            Ty::Int | Ty::Sized(_) | Ty::Bool => Ok(format!("({a} == {b})")),
+            Ty::Int | Ty::Sized(_) | Ty::Bool | Ty::None => Ok(format!("({a} == {b})")),
             Ty::Text => {
                 self.support.need_stdio();
                 Ok(format!("(strcmp({a}, {b}) == 0)"))

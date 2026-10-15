@@ -882,6 +882,8 @@ impl Emitter<'_> {
                         value.text
                     ),
                 ),
+                // A bare `none` prints the locale's none word.
+                Value::None => ("%s", c_string(&tokens.none)?),
                 Value::Void => return Err(unsupported("printing a call with no result")),
             };
             specs.push(spec);

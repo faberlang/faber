@@ -93,7 +93,7 @@ impl Inner {
             Ty::Float => Some(Inner::Float),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
-            Ty::Sized(_) | Ty::Opt(_) => None,
+            Ty::Sized(_) | Ty::Opt(_) | Ty::None => None,
         }
     }
 
@@ -137,6 +137,9 @@ pub(crate) enum Ty {
     /// A genus (`class`): a pointer to an arena-allocated C struct, so every
     /// bind aliases (R1).
     Genus(DefId),
+    /// A bare `none` value (the type is `none`): the only value is `null`, and
+    /// it prints as the locale's none word. C carries a dummy `int` 0.
+    None,
 }
 
 /// The element kinds a list carries in this subset.
@@ -187,6 +190,7 @@ impl Ty {
     pub(crate) fn builtin_c_type(self) -> Option<&'static str> {
         match self {
             Ty::Int => Some("int64_t"),
+            Ty::None => Some("int"),
             Ty::Sized(width) => Some(width.c_type()),
             Ty::Opt(Inner::Genus(_)) => None,
             Ty::Opt(inner) => inner
@@ -248,6 +252,8 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
         // literal fits and whose runtime conversion checks the rest. All are
         // the counted UTF-8 text value the target already emits.
         Type::Primitive(Primitive::Ascii) | Type::BoundedAscii { .. } => Ok(Ty::Text),
+        // A bare `none` (`const none nothing ← null`): its only value is null.
+        Type::Primitive(Primitive::Nihil) => Ok(Ty::None),
         Type::BoundedTextus { .. } => Ok(Ty::Text),
         Type::Primitive(Primitive::Bivalens) => Ok(Ty::Bool),
         Type::Primitive(Primitive::Fractus)
@@ -264,6 +270,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::Float => Ok(Ty::List(Elem::Float)),
                 Ty::List(_) => Err(unsupported("nested list type")),
                 Ty::Genus(_) => Err(unsupported("list of genus")),
+                Ty::None => Err(unsupported("list of none")),
             }
         }
         // An enumeration is a genus-shaped value: a tagged pointer.

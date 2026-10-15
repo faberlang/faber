@@ -107,3 +107,9 @@ fn a_sponte_parameter_that_is_ignored_is_marked_used() {
     );
     assert!(code.contains("(void)p_titulus;"), "{code}");
 }
+
+#[test]
+fn a_bare_none_prints_the_none_word() {
+    let code = emitted("main {\n    const none nothing ← null\n    print nothing\n}");
+    assert!(code.contains("\"none\""), "{code}");
+}

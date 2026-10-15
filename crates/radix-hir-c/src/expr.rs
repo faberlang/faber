@@ -51,6 +51,8 @@ pub(crate) enum Value {
     Float,
     /// An optional: a pointer that may be `NULL`, or a presence-flag struct.
     Opt(Inner),
+    /// A bare `none` value, always `(0)`, printed as the locale's none word.
+    None,
 }
 
 impl From<Ty> for Value {
@@ -66,6 +68,7 @@ impl From<Ty> for Value {
             Ty::Genus(def_id) => Value::Genus(def_id),
             Ty::Float => Value::Float,
             Ty::Opt(inner) => Value::Opt(inner),
+            Ty::None => Value::None,
         }
     }
 }
@@ -563,6 +566,7 @@ impl Emitter<'_> {
     /// rewrites the operand to read the temporary.
     pub(crate) fn bind(&mut self, operand: &mut Operand) -> String {
         let c_type = match operand.value {
+            Value::None => "int ".to_owned(),
             Value::Int => "int64_t ".to_owned(),
             Value::Exact => "faber_i128 ".to_owned(),
             Value::Text => "const char *".to_owned(),
@@ -692,7 +696,9 @@ impl Emitter<'_> {
             HirLiteral::Octeti(_) => Err(unsupported("byte-buffer literal")),
             HirLiteral::JsonValor(_) => Err(unsupported("json literal")),
             HirLiteral::Regex(..) => Err(unsupported("regex literal")),
-            HirLiteral::Nil => Err(unsupported("null literal")),
+            // `null` against the `none` type: the only value, carried as a
+            // dummy 0 that prints as the locale's none word.
+            HirLiteral::Nil => Ok(Operand::new("(0)".to_owned(), Value::None)),
         }
     }
 

@@ -133,6 +133,10 @@ impl Emitter<'_> {
 
     /// The none of an optional class.
     pub(crate) fn none_of(&mut self, class: Ty) -> Result<Operand, CodegenError> {
+        // A bare `none` value: the only value it can hold.
+        if class == Ty::None {
+            return Ok(Operand::new("(0)".to_owned(), Value::None));
+        }
         let Ty::Opt(inner) = class else {
             return Err(unsupported("null where no optional is expected"));
         };
