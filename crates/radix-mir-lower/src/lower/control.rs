@@ -4152,13 +4152,69 @@ impl FunctionBuilder<'_> {
         Some(bounds)
     }
 
+    /// The declared member series of the enum named by a bare `itera ex`
+    /// source, or `None` when the source is not an enum path.
+    fn enum_member_variants(&self, source: &HirExpression, mode: HirIteraMode) -> Option<Vec<DefId>> {
+        if !matches!(mode, HirIteraMode::Ex) {
+            return None;
+        }
+        let HirExpressionKind::Path(def_id) = &source.kind else {
+            return None;
+        };
+        self.context.enum_variants.get(def_id).cloned()
+    }
+
+    /// Materialize an enum's declared member series as a constant
+    /// `lista<Enum>` temp: one unit-variant operand per member,
+    /// in declaration order, so the ordinary list-iteration machinery walks
+    /// the members in that same order.
+    fn construct_enum_member_list(
+        &mut self,
+        enum_ty: TypeId,
+        variants: &[DefId],
+        span: Span,
+    ) -> Option<(MirOperand, TypeId)> {
+        let array_ty = self.require_array(enum_ty, span, "itera enum member list")?;
+        let mir_enum_ty = MirType::semantic(enum_ty);
+        let fields = variants
+            .iter()
+            .map(|variant| {
+                MirAggregateItem::Operand(self.construct_temp(
+                    MirAggregateKind::EnumVariant(*variant),
+                    MirAggregateFields::Ordered(Vec::new()),
+                    mir_enum_ty,
+                    span,
+                ))
+            })
+            .collect();
+        let operand = self.construct_temp(
+            MirAggregateKind::Array,
+            MirAggregateFields::Ordered(fields),
+            MirType::semantic(array_ty),
+            span,
+        );
+        Some((operand, array_ty))
+    }
+
     fn lower_array_itera(&mut self, iter: ArrayIteraLowering<'_>) -> Option<()> {
         let Some(iter_ty) = iter.iter.ty else {
             self.errors
                 .push(MirError::missing_type(iter.iter.span, "itera collection source"));
             return None;
         };
-        let collection_kind = self.classify_collection_itera(iter_ty, iter.mode, iter.coordinates.len());
+        // Enum-member iteration: a bare enum name as the
+        // source of an `itera ex` names the enum's member series, not a
+        // value. Materialize the declared unit variants as a `lista<Enum>`
+        // temp so the ordinary list-iteration machinery below walks them in
+        // declaration order.
+        let enum_member_array = match self.enum_member_variants(iter.iter, iter.mode) {
+            Some(variants) => Some(self.construct_enum_member_list(iter_ty, &variants, iter.iter.span)?),
+            None => None,
+        };
+        let collection_kind = match &enum_member_array {
+            Some(_) => CollectionIteraKind::Array(iter_ty),
+            None => self.classify_collection_itera(iter_ty, iter.mode, iter.coordinates.len()),
+        };
         if matches!(&collection_kind, CollectionIteraKind::Unsupported) {
             // Only map-value iteration carries the tabula decline; tensor and
             // bounded-lista declines keep the generic iterator diagnostic.
@@ -4179,11 +4235,20 @@ impl FunctionBuilder<'_> {
         // A borrowed receiver types its loop-local collection by the payload
         // under the `Ref` marker, so a borrowed receiver and its by-value twin
         // lower byte-identically.
-        let collection_semantic = match self.normalized_type(iter_ty) {
-            Type::Ref(_, inner) => *inner,
-            _ => iter_ty,
+        // An enum-member source lowers to a materialized `lista<Enum>` temp,
+        // so the loop-local collection is typed by that array; every other
+        // source keeps the receiver's own (peeled) type.
+        let collection_semantic = match &enum_member_array {
+            Some((_, array_ty)) => *array_ty,
+            None => match self.normalized_type(iter_ty) {
+                Type::Ref(_, inner) => *inner,
+                _ => iter_ty,
+            },
         };
-        let collection = self.lower_expr_value(iter.iter)?;
+        let collection = match enum_member_array {
+            Some((operand, _)) => operand,
+            None => self.lower_expr_value(iter.iter)?,
+        };
         // D6.6: a direct generator call feeding `itera ex` is walked stepwise,
         // so a suspending backend resumes the producer once per step.
         let stepped_callee = self.mark_stepped_cursor_stream(&collection, &collection_kind, iter.mode);
