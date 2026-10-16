@@ -5,7 +5,4 @@ and [`crates/radix-program`](../radix-program/).
 
 Admitted entries live under `radix::module`, `radix::program`, and
 `radix::services`. This package has no `[[bin]]`, no clap, and no process
-exit. The developer `radix` binary lives in `radix-cli` (RTR4).
-
-`scripta/assemble-dev-kit` and `scripta/generate-release-manifest` read the
-component version from this `Cargo.toml`.
+exit. The `faber` command-line tool lives in [`crates/faber`](../faber/).

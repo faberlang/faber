@@ -1,13 +1,13 @@
-# Radix language corpus
+# Faber language corpus
 
 Keyword-oriented language reference programs for Faber.
 
-**Invariant:** every entry here is **single-file** and **Radix-checkable**.
-No `faber.toml`, no multi-file packages. Package fixtures belong in
-`faber/corpus/` (see `docs/factory/corpus-split-radix-faber/goal.md`).
+**Invariant:** every entry here is **single-file** and checkable with
+`faber check`. No `faber.toml`, no multi-file packages. Package fixtures
+belong in `corpus-product/`.
 
 This tree is the development source for `faber explain` (via the reference
-pack) and the primary input for multi-target compile matrices.
+pack) and the main input for the corpus suites under `corpus-suites/`.
 
 ## Layout
 
@@ -26,16 +26,15 @@ corpus/
 
 | Content | Location |
 | ------- | -------- |
-| Package build fixtures (`faber.toml`) | `faber/corpus/` |
-| Application packages | sibling `examples/` (`coreutils/`, …) |
-| GPU workload rungs | `examples/gpu-workload/` |
-| Norma stdlib tours | sibling `norma/exempla/` |
+| Package build fixtures (`faber.toml`) | `corpus-product/` |
+| Application packages | the separate `examples` repository |
+| Norma stdlib tours | `lib/norma/exempla/` |
 
 ## Check / test
 
 ```bash
-cargo run -p radix-cli --bin radix -- check corpus/incipit/incipit.fab
-cargo run -p radix-cli --bin radix -- test corpus/incipit/incipit.fab
+faber check corpus/incipit/incipit.fab
+faber test corpus/incipit/incipit.fab
 ```
 
 ## Explain terms
