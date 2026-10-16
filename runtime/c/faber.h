@@ -662,11 +662,17 @@ static inline bool faber_int_ge_float(faber_i128 a, double b) {
  * (`0.30000000000000004`, `0.0000001`); the specials are `inf`, `-inf`,
  * `NaN`. Writes into `buffer`, which holds FABER_F64_TEXT bytes.
  *
- * The shortest digits come from trying 1 to 17 significant digits with
- * `%.*e` and keeping the first that `strtod` reads back as the same value.
- * With a correctly rounding C library (glibc, musl, Apple) that is the
- * shortest representation, and the closest one at that length, which is
- * what the runner's Rust formatting picks. */
+ * The shortest digits come from the least precision that `strtod` reads back
+ * as the same value. Round-tripping is monotone in the precision — a p-digit
+ * decimal that reads back as the value keeps reading back at any finer
+ * precision, because every p-digit decimal is also a q-digit one (q > p), so
+ * the closest q-digit decimal is at least as close to the value as the
+ * closest p-digit one — and a gallop over 1, 2, 4, 8, 16 with a bisection
+ * between the last failure and the first success settles that precision in
+ * at most 8 `snprintf`+`strtod` pairs instead of 17. With a correctly
+ * rounding C library (glibc, musl, Apple) that is the shortest
+ * representation, and the closest one at that length, which is what the
+ * runner's Rust formatting picks. */
 #define FABER_F64_TEXT 400
 
 static inline const char *faber_f64_text(double value, char *buffer) {
@@ -674,7 +680,6 @@ static inline const char *faber_f64_text(double value, char *buffer) {
     char digits[20];
     size_t count = 0;
     int exponent;
-    int precision;
     size_t at = 0;
     const char *cursor;
     if (value != value) {
@@ -691,11 +696,30 @@ static inline const char *faber_f64_text(double value, char *buffer) {
         snprintf(buffer, FABER_F64_TEXT, "%.1f", value);
         return buffer;
     }
-    for (precision = 1; precision <= 17; precision++) {
-        snprintf(scientific, sizeof scientific, "%.*e", precision - 1, value);
+    /* Gallop the precision up while the value fails to read back, then
+     * bisect between the last failure and the first success; `scientific`
+     * holds the settled digits whenever the last probe was the success, and
+     * the answer of 17 can end on a failure, so only that case reformats. */
+    int low = 0;
+    int high = 18;
+    int probe = 1;
+    for (;;) {
+        snprintf(scientific, sizeof scientific, "%.*e", probe - 1, value);
         if (strtod(scientific, NULL) == value) {
+            high = probe;
+        } else {
+            low = probe;
+        }
+        if (high - low <= 1) {
             break;
         }
+        probe = high == 18 ? probe * 2 : (low + high) / 2;
+        if (probe > 17) {
+            probe = 17;
+        }
+    }
+    if (high != probe) {
+        snprintf(scientific, sizeof scientific, "%.*e", high - 1, value);
     }
     /* `scientific` is [-]d[.ddd]e(+|-)xx: collect the digits and exponent. */
     cursor = scientific;
