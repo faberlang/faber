@@ -1528,6 +1528,30 @@ help = "修正用于 lowering 的 AST construct"
 message = "width marker 不能接受 parameters"
 help = "修正用于 lowering 的 AST construct"
 
+[diagnostics.SEM008.issues.nucleum_d64]
+message = "nucleum kernel 中不支持 d64"
+help = "请使用受支持的 kernel value type"
+
+[diagnostics.SEM008.issues.nucleum_extent_unproven]
+message = "kernel integer extent {extent} 未被证明落在 portable range 内"
+help = "把 extent 限制在 portable integer range 内的取值"
+
+[diagnostics.SEM008.issues.nucleum_f64]
+message = "nucleum kernel 中不支持 f64"
+help = "浮点 kernel 值请使用 f32"
+
+[diagnostics.SEM008.issues.nucleum_trapping_store]
+message = "宽度为 {width} 的 store 在 nucleum kernel 中可能 trap"
+help = "证明 store 在范围内，或改用 wrapping 或 saturating cell"
+
+[diagnostics.SEM008.issues.nucleum_wide_integer]
+message = "integer width {width} 超出受支持的 nucleum kernel width"
+help = "使用不超过 32 bits 的 integer width"
+
+[diagnostics.SEM008.issues.nucleum_wide_intermediate]
+message = "kernel intermediate extent {extent} 超出 portable integer range"
+help = "把 intermediate values 保持在 portable integer range 内"
+
 [diagnostics.SEM009]
 message = "CLI validation 无效"
 help = "在 emit runnable CLI code 前修正 CLI annotation contract"
@@ -2115,6 +2139,14 @@ help = "使表达式类型与期望类型一致"
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
 message = "postfix gradient selection（`call(...) ∇ [places]`）在 tensor-glyphs 2B autograd surface 落地之前不会被 lowering；Phase 2A 中没有 operand、selector 或 result 规则生效"
 help = "Phase 2A 中 gradient selection（`∇`）仅为 parse-only；eligibility/selector 规则随 tensor-glyphs 2B 落地"
+
+[diagnostics.SEM010.issues.implet_method_signature_mismatch]
+message = "类 {genus} 的 {method} method 与其 {contract} 的 {implet} 不匹配：应为 {expected}，实际为 {found}"
+help = "让 method 的 signature 与 contract 声明的 signature 一致"
+
+[diagnostics.SEM010.issues.implet_missing_method]
+message = "类 {genus} 未提供其 {contract} 的 {implet} 所要求的 {method} method"
+help = "添加签名符合 {contract} 所声明的 {method} method，或移除 {implet}"
 
 [diagnostics.SEM011]
 message = "无效 operand 类型"
