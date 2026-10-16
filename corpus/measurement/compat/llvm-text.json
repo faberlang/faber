@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 392,
-    "analyzable": 432
+    "capable": 396,
+    "analyzable": 443
   },
   "terms": [
     {
@@ -72,7 +72,7 @@
     {
       "term": "ad",
       "rule": "keyword",
-      "capable": 5,
+      "capable": 0,
       "analyzable": 5
     },
     {
@@ -102,7 +102,7 @@
     {
       "term": "atomic",
       "rule": "type",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
@@ -126,8 +126,8 @@
     {
       "term": "cape",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "casu",
@@ -138,7 +138,7 @@
     {
       "term": "cede",
       "rule": "keyword",
-      "capable": 1,
+      "capable": 0,
       "analyzable": 1
     },
     {
@@ -174,7 +174,7 @@
     {
       "term": "cursor",
       "rule": "keyword",
-      "capable": 1,
+      "capable": 0,
       "analyzable": 1
     },
     {
@@ -186,8 +186,8 @@
     {
       "term": "de",
       "rule": "keyword",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "descriptio",
@@ -240,7 +240,7 @@
     {
       "term": "est",
       "rule": "keyword",
-      "capable": 1,
+      "capable": 0,
       "analyzable": 1
     },
     {
@@ -282,7 +282,7 @@
     {
       "term": "fient",
       "rule": "keyword",
-      "capable": 1,
+      "capable": 0,
       "analyzable": 1
     },
     {
@@ -300,7 +300,7 @@
     {
       "term": "filum",
       "rule": "concept",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
@@ -318,7 +318,7 @@
     {
       "term": "fiunt",
       "rule": "keyword",
-      "capable": 2,
+      "capable": 0,
       "analyzable": 2
     },
     {
@@ -364,16 +364,16 @@
       "analyzable": 1
     },
     {
-      "term": "generis",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
       "term": "genus",
       "rule": "keyword",
       "capable": 17,
       "analyzable": 18
+    },
+    {
+      "term": "guillemet",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "iace",
@@ -420,13 +420,13 @@
     {
       "term": "implet",
       "rule": "keyword",
-      "capable": 3,
+      "capable": 2,
       "analyzable": 4
     },
     {
       "term": "importa",
       "rule": "keyword",
-      "capable": 7,
+      "capable": 6,
       "analyzable": 7
     },
     {
@@ -456,13 +456,13 @@
     {
       "term": "instans",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 20,
+      "capable": 19,
       "analyzable": 22
     },
     {
@@ -474,7 +474,7 @@
     {
       "term": "lege",
       "rule": "keyword",
-      "capable": 1,
+      "capable": 0,
       "analyzable": 1
     },
     {
@@ -486,7 +486,7 @@
     {
       "term": "lista",
       "rule": "keyword",
-      "capable": 9,
+      "capable": 12,
       "analyzable": 13
     },
     {
@@ -576,7 +576,7 @@
     {
       "term": "numerus",
       "rule": "keyword",
-      "capable": 5,
+      "capable": 6,
       "analyzable": 6
     },
     {
@@ -666,8 +666,8 @@
     {
       "term": "praefixum",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "praepara",
@@ -690,7 +690,7 @@
     {
       "term": "primus_quem",
       "rule": "concept",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
@@ -846,13 +846,13 @@
     {
       "term": "summa",
       "rule": "concept",
-      "capable": 8,
+      "capable": 10,
       "analyzable": 11
     },
     {
       "term": "tabula",
       "rule": "keyword",
-      "capable": 5,
+      "capable": 4,
       "analyzable": 5
     },
     {
@@ -888,14 +888,20 @@
     {
       "term": "tensor",
       "rule": "type",
-      "capable": 15,
-      "analyzable": 21
+      "capable": 18,
+      "analyzable": 20
     },
     {
       "term": "textus",
       "rule": "keyword",
       "capable": 4,
       "analyzable": 4
+    },
+    {
+      "term": "trapped",
+      "rule": "type",
+      "capable": 0,
+      "analyzable": 1
     },
     {
       "term": "typus",
@@ -948,7 +954,7 @@
     {
       "term": "vector",
       "rule": "type",
-      "capable": 13,
+      "capable": 14,
       "analyzable": 14
     },
     {
@@ -1044,8 +1050,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 23,
-      "analyzable": 27
+      "capable": 25,
+      "analyzable": 33
     },
     {
       "term": "⇇",
