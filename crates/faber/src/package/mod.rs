@@ -96,8 +96,8 @@ pub(crate) use cargo::{
 #[cfg(test)]
 pub use cargo::emit_generated_crate;
 pub use cmd::{
-    cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
-    use_package_compiler_from_args,
+    CHECKS_BUT_DOES_NOT_LOWER, cmd_build, cmd_check_package, cmd_emit_package,
+    should_treat_as_package_from_args, use_package_compiler_from_args,
 };
 #[cfg(feature = "hir-go")]
 #[cfg(test)]

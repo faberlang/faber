@@ -53,7 +53,7 @@ describe "arithmetica" {
 
     describe "implicata" {
         test "comparatio" {
-            let x ← 10
+            let _ x ← 10
             assert x ≥ 10
         }
     }

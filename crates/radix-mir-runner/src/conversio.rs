@@ -307,6 +307,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 span,
             ),
             Type::Set(_) => self.convert_to_set(value, span),
+            // `lista ↦ queue` / `lista ↦ stack` share the array carrier: queue
+            // FIFO is list order and stack top is the last element, matching
+            // how Append pushes at the end and RemoveLast pops it.
+            Type::Queue(element) | Type::Stack(element) => {
+                self.convert_to_queue_stack(value, source_ty, *element, struct_defaults, span)
+            }
             Type::Cursor(_) | Type::Tensor(_, _) | Type::Sparsa(_, _) => match value {
                 // `octeti ↦ tensor<E, [shape]> via Le|Be`: faithful bulk
                 // reinterpretation; the `via` hint rides in `params`.

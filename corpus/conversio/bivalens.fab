@@ -4,27 +4,29 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "inline_default", "expression", "literal"]
 category = "conversion"
 canonical = false
-summary = "Truthiness conversion to bivalens."
+summary = "Conversion to bivalens: number truthiness and the code locale's true/false words."
 syntax = "<expression> ↦ bivalens"
 related = ["↦", "bivalens"]
 locale = "en"
 +++
 # =============================================================================
-# ↦ — Truthiness conversion to bivalens.
+# ↦ — Conversion to bivalens.
 # =============================================================================
 #
 # What this teaches:
-#   • Truthiness conversion — converts any expression to bivalens via the ↦ operator, following non-zero, non-empty truthiness rules.
-#   • Syntax shape — `<expr> ↦ bivalens` with the full range of source types (numerus, textus, expressions).
+#   • Number truthiness — `<number> ↦ bivalens` is false for zero and true otherwise.
+#   • Text parsing — `<text> ↦ bivalens` parses exactly the code locale's two words (`true`, `false` in an `en` file) and fails on anything else; non-empty text is not true.
+#   • Syntax shape — `<expr> ↦ bivalens` over numbers and text.
 #
 # Common mistakes:
-#   • Confusing truthiness (`0 ↦ bivalens` = falsum) with an explicit comparison — `↦ bivalens` uses non-zero truthiness, not `≡ 0`.
+#   • Expecting `"salve" ↦ bivalens` to be true — only the locale's own words parse; any other text fails.
+#   • Confusing number truthiness (`0 ↦ bivalens` = false) with an explicit comparison — it is non-zero truthiness, not `≡ 0`.
 #
 # See also: ↦, bivalens
 # =============================================================================
 
 
-# conversio — truthiness conversion to bivalens
+# conversio — conversion to bivalens
 #
 # <expr> ↦ bivalens
 #
@@ -32,22 +34,22 @@ locale = "en"
 #   convertExpr :← expr '↦' 'bivalens'
 #
 # EXPECTED OUTPUT:
-#   falsum
-#   verum
-#   falsum
-#   verum
-#   verum
+#   false
+#   true
+#   false
+#   true
+#   true
 #
 # BACKEND:
-#   HIR-direct Rust and MIR-stepper routes must agree for truthiness.
+#   HIR-direct Rust and MIR-stepper routes must agree for truthiness and word parsing.
 
 main {
     let bool b1 ← 0 ↦ bool
     let bool b2 ← 42 ↦ bool
     print b1
     print b2
-    let bool b3 ← "" ↦ bool
-    let bool b4 ← "salve" ↦ bool
+    let bool b3 ← "false" ↦ bool
+    let bool b4 ← "true" ↦ bool
     print b3
     print b4
     let bool habet ← ("123" ↦ int ⊥ 0) ↦ bool

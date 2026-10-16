@@ -69,8 +69,8 @@ fn brancha(int seed) → int {
 }
 
 main {
-    let h ← hosta(3)
-    let b ← brancha(4)
+    let _ h ← hosta(3)
+    let _ b ← brancha(4)
     print "probe"
 }
 "#;

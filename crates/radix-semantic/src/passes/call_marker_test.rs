@@ -147,9 +147,9 @@ fn function_value_calls_use_the_function_type_modes() {
 
 #[test]
 fn closure_values_use_their_declared_parameter_modes() {
-    let ok = "incipit {\n    varia lista<numerus> a ← [1]\n    sit g ← (varia lista<numerus> ys) ∴ ys.appende(2)\n    g(varia a)\n}";
+    let ok = "incipit {\n    varia lista<numerus> a ← [1]\n    sit _ g ← (varia lista<numerus> ys) ∴ ys.appende(2)\n    g(varia a)\n}";
     let _ = analyze_ok(ok);
-    let missing = "incipit {\n    varia lista<numerus> a ← [1]\n    sit g ← (varia lista<numerus> ys) ∴ ys.appende(2)\n    g(a)\n}";
+    let missing = "incipit {\n    varia lista<numerus> a ← [1]\n    sit _ g ← (varia lista<numerus> ys) ∴ ys.appende(2)\n    g(a)\n}";
     assert_rejects_with_issue(missing, "call_marker_missing");
 }
 

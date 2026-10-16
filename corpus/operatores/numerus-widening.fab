@@ -67,7 +67,7 @@ main {
     print clamped
 
     # 6. `_` takes the range type; an exact value needs no narrowing.
-    let inferred ← a + b
+    let _ inferred ← a + b
     print inferred
 
     # 7. Comparisons are exact, including across signedness.

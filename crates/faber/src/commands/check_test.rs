@@ -98,3 +98,157 @@ fn check_bodyless_function_in_en_file_plain_is_terse_and_diagnostics_prints_en_k
         "an en diagnostic must not print the Latin keyword:\n{expanded}"
     );
 }
+
+fn run_check(args: &[&str], path: &std::path::Path) -> (bool, String) {
+    let binary = super::format_test::faber_binary()
+        .canonicalize()
+        .expect("locate faber binary");
+    let output = Command::new(binary)
+        .arg("check")
+        .args(args)
+        .arg(path)
+        .output()
+        .expect("run faber check");
+    (
+        output.status.success(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+    )
+}
+
+/// A subcommand CLI program passes semantic analysis but the MIR package
+/// lowering refuses its CLI surface (`package_mir_cli_surface_unsupported`).
+/// It is the stable fixture for "checks but does not lower": the plumbing
+/// under test is the opt-in flag, the located named issue and the final line,
+/// not which construct is unsupported today. If lowering learns this surface,
+/// pick another checks-but-does-not-lower construct from
+/// `scripta/check-lower-sweep.known`.
+const CHECKS_BUT_DOES_NOT_LOWER_SOURCE: &str = r#"+++
+locale = "en"
++++
+const int CODE = 7
+@ cli { name = "tool" }
+main args a exit CODE {
+    print "c"
+}
+"#;
+
+#[test]
+fn check_lower_reports_a_program_that_checks_but_does_not_lower() {
+    let root = tempfile::tempdir().expect("create fixture root");
+    let file = root.path().join("cli_surface.fab");
+    std::fs::write(&file, CHECKS_BUT_DOES_NOT_LOWER_SOURCE).expect("write source");
+
+    let (plain_ok, plain) = run_check(&[], &file);
+    assert!(
+        plain_ok,
+        "plain check stays semantic analysis only:\n{plain}"
+    );
+    assert!(
+        !plain.contains("PKG001"),
+        "plain check never lowers:\n{plain}"
+    );
+
+    let (lower_ok, lower) = run_check(&["--lower"], &file);
+    assert!(
+        !lower_ok,
+        "--lower must fail a program that does not lower:\n{lower}"
+    );
+    assert!(
+        lower.contains("error[PKG001:package_mir_cli_surface_unsupported]"),
+        "the lowering failure keeps its named issue:\n{lower}"
+    );
+    assert!(
+        lower.contains(&format!(
+            "{}: {}",
+            file.display(),
+            faber_cli::package::CHECKS_BUT_DOES_NOT_LOWER
+        )),
+        "the run ends on the checks-but-does-not-lower line:\n{lower}"
+    );
+    assert!(
+        !lower.contains("ok: "),
+        "no ok line after a lowering failure:\n{lower}"
+    );
+}
+
+#[test]
+fn check_lower_accepts_a_program_that_lowers() {
+    let root = tempfile::tempdir().expect("create fixture root");
+    let file = root.path().join("lowers.fab");
+    std::fs::write(
+        &file,
+        "+++\nlocale = \"en\"\n+++\nfn f() → int { while true { return 3 } }\nmain { print f() }\n",
+    )
+    .expect("write source");
+    let (ok, stderr) = run_check(&["--lower"], &file);
+    assert!(ok, "a program that lowers passes --lower:\n{stderr}");
+    assert!(
+        stderr.contains(&format!("ok: {}", file.display())),
+        "{stderr}"
+    );
+}
+
+/// `--diagnostics` renders the lowering failure with its named issue too.
+#[test]
+fn check_lower_diagnostics_mode_keeps_the_named_issue() {
+    let root = tempfile::tempdir().expect("create fixture root");
+    let file = root.path().join("located.fab");
+    std::fs::write(
+        &file,
+        "+++\nlocale = \"en\"\n+++\nconst int CODE = 7\n@ cli { name = \"tool\" }\nmain args a exit CODE {\n    print \"c\"\n}\n",
+    )
+    .expect("write source");
+    let (ok, stderr) = run_check(&["--lower", "--diagnostics"], &file);
+    assert!(!ok, "{stderr}");
+    assert!(
+        stderr.contains("package_mir_cli_surface_unsupported"),
+        "--diagnostics keeps the named issue:\n{stderr}"
+    );
+}
+
+/// A library package has no entry unit: `--lower` lowers each module on its own.
+#[test]
+fn check_lower_lowers_each_module_of_a_package_without_an_entry() {
+    let root = tempfile::tempdir().expect("create fixture root");
+    std::fs::create_dir_all(root.path().join("src")).expect("create src");
+    std::fs::write(
+        root.path().join("faber.toml"),
+        "[package]\nname = \"entryless\"\nversion = \"0.1.0\"\nedition = \"2026\"\n\n[paths]\nsource = \"src\"\n\n[build]\nkind = \"lib\"\ntargets = [\"rust\"]\n\n[library]\nprovider = \"entryless\"\n\n[locale]\nlocale = \"en\"\n",
+    )
+    .expect("write manifest");
+    std::fs::write(
+        root.path().join("src/one.fab"),
+        "fn one() → int { return 1 }\n",
+    )
+    .expect("write module");
+    std::fs::write(
+        root.path().join("src/two.fab"),
+        "fn two() → int { return 2 }\n",
+    )
+    .expect("write module");
+    let (ok, stderr) = run_check(&["--lower"], root.path());
+    assert!(
+        ok,
+        "an entryless library whose modules lower passes:\n{stderr}"
+    );
+}
+
+#[test]
+fn check_lower_cannot_combine_with_air_or_permissive_or_stdin() {
+    use clap::Parser;
+    assert!(
+        crate::cli::Cli::try_parse_from(["faber", "check", "--lower", "--air", "x.fab"]).is_err()
+    );
+    assert!(
+        crate::cli::Cli::try_parse_from(["faber", "check", "--lower", "--permissive", "x.fab"])
+            .is_err()
+    );
+    let binary = super::format_test::faber_binary()
+        .canonicalize()
+        .expect("locate faber binary");
+    let output = Command::new(binary)
+        .args(["check", "--lower", "-"])
+        .output()
+        .expect("run faber check --lower -");
+    assert!(!output.status.success(), "stdin has no package to lower");
+}

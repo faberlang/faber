@@ -97,7 +97,7 @@ class Vestis {
 main {
     # --- Basic field extraction ---
 
-    let persona ← Persona { nomen = "Marcus", aetas = 30, urbs = "Roma" }
+    let _ persona ← Persona { nomen = "Marcus", aetas = 30, urbs = "Roma" }
     from persona let nomen, aetas
 
     print nomen
@@ -105,7 +105,7 @@ main {
 
     # --- Extract with alias using 'ut' ---
 
-    let civis ← Civis { nomen = "Julia", epistula = "julia@roma.com" }
+    let _ civis ← Civis { nomen = "Julia", epistula = "julia@roma.com" }
     from civis let nomen as cognomen, epistula as epistula2
 
     print cognomen
@@ -113,7 +113,7 @@ main {
 
     # --- Mutable destructuring with varia ---
 
-    let datum ← Datum { numerus = 100, activus = true }
+    let _ datum ← Datum { numerus = 100, activus = true }
     from datum mut numerus, activus
 
     print numerus
@@ -127,7 +127,7 @@ main {
 
     # --- Mixed alias and regular fields ---
 
-    let forma ← Forma { hospes = "localis", portus = 8080, tutus = true }
+    let _ forma ← Forma { hospes = "localis", portus = 8080, tutus = true }
     from forma let hospes, portus as porta, tutus
 
     print hospes
@@ -136,7 +136,7 @@ main {
 
     # --- Rest pattern with ceteri ---
 
-    let plenus ← Plenus { signum = 1, nomen = "Gaius", epistula = "g@roma.com", munus = "admin" }
+    let _ plenus ← Plenus { signum = 1, nomen = "Gaius", epistula = "g@roma.com", munus = "admin" }
     from plenus let signum, rest reliqua
 
     print signum
@@ -144,7 +144,7 @@ main {
 
     # --- Destructura ex nested path ---
 
-    let responsum ← Responsum { datum = Relatus { civis = Sodalis { nomen = "Claudia", probatus = true } } }
+    let _ responsum ← Responsum { datum = Relatus { civis = Sodalis { nomen = "Claudia", probatus = true } } }
     from responsum.datum.civis let nomen as internum, probatus
 
     print internum
@@ -152,7 +152,7 @@ main {
 
     # --- Single field extraction ---
 
-    let vestis ← Vestis { modus = "nigrum", lingua = "la" }
+    let _ vestis ← Vestis { modus = "nigrum", lingua = "la" }
     from vestis let modus
 
     print modus

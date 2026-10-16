@@ -58,7 +58,7 @@ class Punctum {
 main {
     # --- Records: object_pattern over lista of genus elements ---
 
-    let puncta ← [Punctum { x = 1, y = 2 }, Punctum { x = 3, y = 4 }]
+    let _ puncta ← [Punctum { x = 1, y = 2 }, Punctum { x = 3, y = 4 }]
     for from puncta let {x, y} {
         print x + y
     }
@@ -79,7 +79,7 @@ main {
 
     # --- Rest patterns: first element plus the remaining lista ---
 
-    let matricula ← [[1, 2, 3], [4, 5, 6]]
+    let _ matricula ← [[1, 2, 3], [4, 5, 6]]
     for from matricula let [caput, rest cauda] {
         print caput
         print cauda[1]

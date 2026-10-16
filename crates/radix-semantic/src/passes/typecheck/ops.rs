@@ -834,6 +834,15 @@ impl TypeChecker<'_> {
         if !self.is_integer(target_ty) {
             self.invalid_operand_types(POSTFIX_INC_DEC_NUMERUS_OPERAND, span);
         }
+        let (_, payload) = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(target_ty));
+        if matches!(
+            self.types.get(payload),
+            Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal()
+        ) {
+            self.invalid_operand_types(POSTFIX_INC_DEC_NUMERUS_OPERAND, span);
+        }
     }
 
     /// Check simple assignment and constrain the value from the target context.

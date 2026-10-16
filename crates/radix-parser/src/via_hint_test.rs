@@ -35,7 +35,7 @@ fn via_name(result: &ParseResult, conversio: &ConversioExpr) -> Option<String> {
 #[test]
 fn via_clause_carries_its_hint_on_the_conversion() {
     for hint in ["Hex", "Bin", "Oct", "Be", "Le", "Bits", "Code"] {
-        let result = parse_ok(&format!("sit n ← s ↦ u32 via {hint}"));
+        let result = parse_ok(&format!("sit _ n ← s ↦ u32 via {hint}"));
         let conversio = conversio(initializer(&result, 0));
         assert_eq!(via_name(&result, conversio).as_deref(), Some(hint));
         assert!(conversio.recovery.is_none());
@@ -44,7 +44,7 @@ fn via_clause_carries_its_hint_on_the_conversion() {
 
 #[test]
 fn conversion_without_via_has_no_hint() {
-    let result = parse_ok("sit n ← s ↦ u32");
+    let result = parse_ok("sit _ n ← s ↦ u32");
     let conversio = conversio(initializer(&result, 0));
     assert!(conversio.via.is_none());
 }
@@ -52,10 +52,10 @@ fn conversion_without_via_has_no_hint() {
 #[test]
 fn a_hint_as_a_further_type_argument_is_rejected() {
     for source in [
-        "sit n ← s ↦ ascii<8, Hex>",
-        "sit n ← s ↦ ascii<_, Bin>",
-        "sit n ← s ↦ littera<Code>",
-        "sit n ← s ↦ ascii<8, Hex> ⊥ 0",
+        "sit _ n ← s ↦ ascii<8, Hex>",
+        "sit _ n ← s ↦ ascii<_, Bin>",
+        "sit _ n ← s ↦ littera<Code>",
+        "sit _ n ← s ↦ ascii<8, Hex> ⊥ 0",
     ] {
         assert_parse_error_issue(source, "conversio_hint_type_argument");
     }
@@ -66,11 +66,11 @@ fn a_wrapped_numeric_target_with_a_hint_is_rejected_as_the_wrapper() {
     // N7d: the wrapped numeric spelling is retired whole, so the wrapper
     // diagnostic fires first; no hint diagnostic follows on the recovered type.
     for source in [
-        "sit n ← s ↦ numerus<u32, Hex>",
-        "sit n ← s ↦ numerus<u32, Bits>",
-        "sit n ← s ↦ fractus<f64, Bits>",
-        "sit n ← s ↦ numerus<u32, Hex> ⊥ 0",
-        "sit n ← s ↦ numerus<u32, _>",
+        "sit _ n ← s ↦ numerus<u32, Hex>",
+        "sit _ n ← s ↦ numerus<u32, Bits>",
+        "sit _ n ← s ↦ fractus<f64, Bits>",
+        "sit _ n ← s ↦ numerus<u32, Hex> ⊥ 0",
+        "sit _ n ← s ↦ numerus<u32, _>",
     ] {
         assert_parse_error_issue(source, "numeric_wrapper_retired");
         let result = crate::test_support::parse_program(source);
@@ -88,9 +88,9 @@ fn a_wrapped_numeric_target_with_a_hint_is_rejected_as_the_wrapper() {
 #[test]
 fn a_bracketed_hint_tail_after_the_target_is_rejected() {
     for source in [
-        "sit n ← s ↦ octeti<16><Le>",
-        "sit n ← s ↦ vector<u32, 4><Be>",
-        "sit n ← s ↦ ascii<8><Le>",
+        "sit _ n ← s ↦ octeti<16><Le>",
+        "sit _ n ← s ↦ vector<u32, 4><Be>",
+        "sit _ n ← s ↦ ascii<8><Le>",
     ] {
         assert_parse_error_issue(source, "conversio_hint_tail_argument");
     }
@@ -99,10 +99,10 @@ fn a_bracketed_hint_tail_after_the_target_is_rejected() {
 #[test]
 fn a_hole_and_a_via_clause_stay_accepted() {
     for source in [
-        "sit n ← s ↦ ascii<_> via Hex",
-        "sit n ← s ↦ ascii<8> via Hex",
-        "sit n ← s ↦ octeti<16> via Le",
-        "sit n ← s ↦ vector<u32, 4> via Be",
+        "sit _ n ← s ↦ ascii<_> via Hex",
+        "sit _ n ← s ↦ ascii<8> via Hex",
+        "sit _ n ← s ↦ octeti<16> via Le",
+        "sit _ n ← s ↦ vector<u32, 4> via Be",
     ] {
         let _ = parse_ok(source);
     }
@@ -112,15 +112,15 @@ fn a_hole_and_a_via_clause_stay_accepted() {
 fn a_user_type_named_like_a_hint_is_still_a_type_argument() {
     // The retired-form check reads scalar heads only: `Code` and `Bits` are
     // ordinary nominal types as arguments of a collection target.
-    let _ = parse_ok("sit n ← s ↦ lista<Code>");
-    let _ = parse_ok("sit n ← s ↦ tabula<textus, Bits>");
+    let _ = parse_ok("sit _ n ← s ↦ lista<Code>");
+    let _ = parse_ok("sit _ n ← s ↦ tabula<textus, Bits>");
 }
 
 #[test]
 fn via_binds_tighter_than_the_up_tack_default() {
     // `x ↦ u32 via Hex ⊥ 0` is `(x ↦ u32 via Hex) ⊥ 0`: one conversion whose
     // clause is finished before the default fills the recovery slot.
-    let result = parse_ok(r#"sit n ← "ff" ↦ u32 via Hex ⊥ 0"#);
+    let result = parse_ok(r#"sit _ n ← "ff" ↦ u32 via Hex ⊥ 0"#);
     let conversio = conversio(initializer(&result, 0));
     assert_eq!(via_name(&result, conversio).as_deref(), Some("Hex"));
     let recovery = conversio.recovery.as_deref().expect("recovery expression");
@@ -129,7 +129,7 @@ fn via_binds_tighter_than_the_up_tack_default() {
 
 #[test]
 fn chained_conversions_each_carry_their_own_via() {
-    let result = parse_ok("sit x ← octeti[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ f32");
+    let result = parse_ok("sit _ x ← octeti[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ f32");
     let outer = conversio(initializer(&result, 0));
     assert!(outer.via.is_none(), "the last hop has no clause");
     let middle = conversio(&outer.expr);
@@ -141,7 +141,7 @@ fn chained_conversions_each_carry_their_own_via() {
 
 #[test]
 fn via_after_a_type_argument_target_keeps_the_type_arguments() {
-    let result = parse_ok("sit n ← b ↦ ascii<8> via Hex");
+    let result = parse_ok("sit _ n ← b ↦ ascii<8> via Hex");
     let conversio = conversio(initializer(&result, 0));
     assert_eq!(via_name(&result, conversio).as_deref(), Some("Hex"));
 }
@@ -149,7 +149,7 @@ fn via_after_a_type_argument_target_keeps_the_type_arguments() {
 #[test]
 fn via_stays_an_identifier_outside_the_clause() {
     let result = parse_ok(
-        "sit via ← 4\nsit next ← via + 1\nfunctio f(numerus via) → numerus {\n    redde via\n}\n",
+        "sit _ via ← 4\nsit _ next ← via + 1\nfunctio f(numerus via) → numerus {\n    redde via\n}\n",
     );
     let next = initializer(&result, 1);
     let ExprKind::Binary(binary) = &next.kind else {
@@ -162,7 +162,7 @@ fn via_stays_an_identifier_outside_the_clause() {
 fn a_statement_starting_with_via_after_a_conversion_is_a_new_statement() {
     // The clause is claimed only on the conversion's own line, so a following
     // line that begins with the identifier `via` does not join the conversion.
-    let result = parse_ok("sit k ← s ↦ numerus\nsit via ← k\n");
+    let result = parse_ok("sit _ k ← s ↦ numerus\nsit _ via ← k\n");
     let conversio = conversio(initializer(&result, 0));
     assert!(conversio.via.is_none());
     let program = result.program.as_ref().expect("program");
@@ -171,7 +171,7 @@ fn a_statement_starting_with_via_after_a_conversion_is_a_new_statement() {
 
 #[test]
 fn a_via_call_after_a_conversion_line_is_a_new_statement() {
-    let result = parse_ok("sit k ← s ↦ numerus\nvia(k)\n");
+    let result = parse_ok("sit _ k ← s ↦ numerus\nvia(k)\n");
     let conversio = conversio(initializer(&result, 0));
     assert!(conversio.via.is_none());
     let program = result.program.as_ref().expect("program");
@@ -180,10 +180,10 @@ fn a_via_call_after_a_conversion_line_is_a_new_statement() {
 
 #[test]
 fn via_without_a_hint_is_a_structured_error() {
-    assert_parse_error_issue("sit n ← s ↦ u32 via", "conversio_via_missing_hint");
-    assert_parse_error_issue("sit n ← s ↦ u32 via ⊥ 0", "conversio_via_missing_hint");
+    assert_parse_error_issue("sit _ n ← s ↦ u32 via", "conversio_via_missing_hint");
+    assert_parse_error_issue("sit _ n ← s ↦ u32 via ⊥ 0", "conversio_via_missing_hint");
     assert_parse_error_issue(
-        "sit n ← s ↦ u32 via\nsit m ← 1\n",
+        "sit _ n ← s ↦ u32 via\nsit _ m ← 1\n",
         "conversio_via_missing_hint",
     );
 }
@@ -193,7 +193,7 @@ fn a_second_via_clause_is_not_part_of_the_conversion() {
     // One clause per conversion: the second `via` cannot continue it, so it
     // is left over as ordinary identifier statements (semantic analysis then
     // reports the unknown names).
-    let result = parse_ok("sit n ← s ↦ u32 via Hex via Bin");
+    let result = parse_ok("sit _ n ← s ↦ u32 via Hex via Bin");
     let conversio = conversio(initializer(&result, 0));
     assert_eq!(via_name(&result, conversio).as_deref(), Some("Hex"));
     let program = result.program.as_ref().expect("program");
@@ -241,7 +241,10 @@ impl KeywordPack for ArabicClausePack {
 #[test]
 fn a_translated_pack_chooses_its_own_clause_word() {
     let pack = ArabicClausePack;
-    let result = parse(lex_with_locale_pack("ليكن n ← s ↦ u32 عبر Hex ⊥ 0", &pack));
+    let result = parse(lex_with_locale_pack(
+        "ليكن _ n ← s ↦ u32 عبر Hex ⊥ 0",
+        &pack,
+    ));
     assert!(result.success(), "errors: {:?}", result.errors);
     let conversio = conversio(initializer(&result, 0));
     assert_eq!(via_name(&result, conversio).as_deref(), Some("Hex"));
@@ -254,7 +257,7 @@ fn a_translated_pack_does_not_claim_the_latin_spelling() {
     // clause word: the conversion ends at its target and `via Hex` is left
     // over as ordinary identifier statements.
     let pack = ArabicClausePack;
-    let result = parse(lex_with_locale_pack("ليكن n ← s ↦ u32 via Hex", &pack));
+    let result = parse(lex_with_locale_pack("ليكن _ n ← s ↦ u32 via Hex", &pack));
     let conversio = conversio(initializer(&result, 0));
     assert!(
         conversio.via.is_none(),

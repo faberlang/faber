@@ -17,7 +17,7 @@ const INF_AND_FRIENDS: &str =
     "sit inf x ← 3\nsit inf y ← 4\nsit u64 u ← 5\nsit i8 s ← 6\nsit u8 b ← 7";
 
 fn analyze(decls: &str, expr: &str) -> test_support::AnalyzedFixture {
-    let source = format!("incipit {{\n{decls}\nsit r ← {expr}\nnota r\n}}\n");
+    let source = format!("incipit {{\n{decls}\nsit _ r ← {expr}\nnota r\n}}\n");
     test_support::analyze_ok_la(&source)
 }
 
@@ -72,7 +72,7 @@ fn a_negated_big_literal_is_accepted_in_an_inf_slot() {
 
 #[test]
 fn a_literal_beyond_u64_is_out_of_range_everywhere_else() {
-    for slot in ["", "numerus ", "u64 ", "i64 ", "u8 "] {
+    for slot in ["_ ", "numerus ", "u64 ", "i64 ", "u8 "] {
         assert_rejects(
             &format!("incipit {{\nsit {slot}x ← {TWO_TO_64}\nnota x\n}}\n"),
             "numerus_literal_out_of_range",
@@ -91,7 +91,7 @@ fn a_constant_expression_beyond_every_64_bit_type_is_out_of_range_unless_an_inf_
         "numerus_literal_out_of_range",
     );
     assert_rejects(
-        &format!("incipit {{\nsit x ← {TWO_TO_64} + 1\nnota x\n}}\n"),
+        &format!("incipit {{\nsit _ x ← {TWO_TO_64} + 1\nnota x\n}}\n"),
         "numerus_literal_out_of_range",
     );
     test_support::assert_accepts_la("incipit {\nsit inf x ← 2 ⇐ 200\nnota x\n}\n");
@@ -100,7 +100,7 @@ fn a_constant_expression_beyond_every_64_bit_type_is_out_of_range_unless_an_inf_
     ));
     // A constant whose exact value fits is fine however it is spelled.
     test_support::assert_accepts_la(&format!(
-        "incipit {{\nsit x ← {TWO_TO_64} - {TWO_TO_64}\nnota x\n}}\n"
+        "incipit {{\nsit _ x ← {TWO_TO_64} - {TWO_TO_64}\nnota x\n}}\n"
     ));
 }
 
@@ -209,11 +209,11 @@ fn branches_and_collections_of_inf_are_inf() {
 fn a_saturating_word_never_meets_inf_in_arithmetic() {
     // `inf` is a trapping type: the saturating family check still applies.
     assert_rejects(
-        "functio f(saturatus<u8> s, inf x) → numerus { sit r ← s + x\nredde 0 }\n",
+        "functio f(saturatus<u8> s, inf x) → numerus { sit _ r ← s + x\nredde 0 }\n",
         "saturating_word_family_mismatch",
     );
     assert_rejects(
-        "functio f(saturatus<u8> s, inf x) → numerus { sit r ← x ∧ s\nredde 0 }\n",
+        "functio f(saturatus<u8> s, inf x) → numerus { sit _ r ← x ∧ s\nredde 0 }\n",
         "saturating_word_family_mismatch",
     );
 }
@@ -236,12 +236,12 @@ fn a_bounded_operand_expression_keeps_the_64_bit_cap() {
 #[test]
 fn u64_with_a_signed_operand_is_still_an_error_with_both_fixes() {
     assert_rejects(
-        "functio f(u64 a, i8 b) → numerus { sit r ← a + b\nredde 0 }\n",
+        "functio f(u64 a, i8 b) → numerus { sit _ r ← a + b\nredde 0 }\n",
         "u64_signed_arithmetic_requires_conversion",
     );
     // `a ↦ inf` is the lossless fix the ruling names.
     test_support::assert_accepts_la(
-        "functio f(u64 a, i8 b) → numerus {\nsit r ← (a ↦ inf) + b\nnota r\nredde 0 }\n",
+        "functio f(u64 a, i8 b) → numerus {\nsit _ r ← (a ↦ inf) + b\nnota r\nredde 0 }\n",
     );
 }
 
@@ -540,11 +540,11 @@ fn increment_and_range_loops_over_inf_type_check() {
 #[test]
 fn shift_and_potentia_counts_follow_the_existing_negative_rules_on_inf() {
     assert_rejects(
-        &in_function("inf a", "sit r ← a ⇐ -1"),
+        &in_function("inf a", "sit _ r ← a ⇐ -1"),
         "shift_count_negative",
     );
     assert_rejects(
-        &in_function("inf a", "sit r ← a.potentia(-1)"),
+        &in_function("inf a", "sit _ r ← a.potentia(-1)"),
         "potentia_exponent_negative",
     );
 }

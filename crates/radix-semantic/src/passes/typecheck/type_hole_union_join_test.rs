@@ -251,7 +251,7 @@ fn source_branch_join_heterogeneous_without_hole_still_mismatches() {
         r#"
 incipit {
     sit numerus x ← 1
-    sit y ← x ≻ 0 ✓ 1 ✗ "x"
+    sit _ y ← x ≻ 0 ✓ 1 ✗ "x"
     nota y
 }
 "#,

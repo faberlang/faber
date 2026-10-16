@@ -2262,7 +2262,7 @@ functio fallback<T = textus>() → textus {
 }
 
 incipit {
-    sit a ← pick(1)
+    sit _ a ← pick(1)
     nota fallback()
 }
 "#;

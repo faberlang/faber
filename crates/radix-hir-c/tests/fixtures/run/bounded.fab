@@ -13,7 +13,7 @@ main {
     ys.append(1)
     ys.append(2)
     print ys
-    let lit ← [7, 8, 9]
+    let _ lit ← [7, 8, 9]
     print lit
     for from [10, 20, 30] let x {
         print x

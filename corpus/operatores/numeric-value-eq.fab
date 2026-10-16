@@ -34,30 +34,30 @@ locale = "en"
 main {
     let u8 port ← 42 ∷ u8
     let int count ← 42
-    let same_width ← port ≅ count
+    let _ same_width ← port ≅ count
     print same_width
 
-    let int_float ← 1 ≅ 1.0
+    let _ int_float ← 1 ≅ 1.0
     print int_float
 
-    let not_fuzzy ← 42.145 ∷ f64 ≅ 42.0 ∷ f64
+    let _ not_fuzzy ← 42.145 ∷ f64 ≅ 42.0 ∷ f64
     print not_fuzzy
 
-    let differs ← 1 ≇ 2
+    let _ differs ← 1 ≇ 2
     print differs
 
     # Sign-boundary pin: a negative signed value never wraps to u64::MAX.
     let i64 signed_negative ← -1
     let u64 unsigned_max ← 18446744073709551615
-    let sign_equal ← signed_negative ≅ unsigned_max
-    let sign_different ← signed_negative ≇ unsigned_max
+    let _ sign_equal ← signed_negative ≅ unsigned_max
+    let _ sign_different ← signed_negative ≇ unsigned_max
     print sign_equal
     print sign_different
 
     # Cross-width pin: the 2^53+1 integer remains distinct from 2^53.
     let i64 above_precision ← 9007199254740993
     let u64 below_precision ← 9007199254740992
-    let cross_width ← above_precision ≅ below_precision
+    let _ cross_width ← above_precision ≅ below_precision
     print cross_width
 
     # Exactness pin: 2^53+1 is not representable as f64, so it is not equal to

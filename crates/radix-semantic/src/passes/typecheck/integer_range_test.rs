@@ -12,7 +12,7 @@ use radix_types::numeric_width::numerus_integer_width;
 /// Analyze an `incipit` whose last local is `sit r ← <expr>` and return
 /// that local's integer width.
 fn width_of(decls: &str, expr: &str) -> Option<NumericWidth> {
-    let source = format!("incipit {{\n{decls}\nsit r ← {expr}\n}}\n");
+    let source = format!("incipit {{\n{decls}\nsit _ r ← {expr}\n}}\n");
     let result = test_support::analyze_ok_la(&source);
     let tys = entry_local_tys(&result);
     let ty = *tys.last().expect("locals");
@@ -72,7 +72,7 @@ fn sixty_four_bit_cap_keeps_the_sign() {
 fn untyped_constants_default_to_int() {
     let ten = width_of("", "10 - 100");
     assert_eq!(ten, Some(I64));
-    let result = test_support::analyze_ok_la("incipit {\nsit d ← 10 - 100\n}\n");
+    let result = test_support::analyze_ok_la("incipit {\nsit _ d ← 10 - 100\n}\n");
     let ty = entry_local_tys(&result)[0];
     assert!(matches!(
         result.types.get(ty),
@@ -91,7 +91,7 @@ fn integer_constant_slot_takes_its_type() {
 
 #[test]
 fn collection_literal_of_constants_is_lista_of_int() {
-    let result = test_support::analyze_ok_la("incipit {\nsit xs ← [1, 2, 3]\n}\n");
+    let result = test_support::analyze_ok_la("incipit {\nsit _ xs ← [1, 2, 3]\n}\n");
     let ty = entry_local_tys(&result)[0];
     let (Type::Array(elem) | Type::BoundedArray { element: elem, .. }) = result.types.get(ty)
     else {
@@ -146,7 +146,7 @@ fn float_constant_beside_integer_rejects() {
 #[test]
 fn decimal_beside_integer_rejects() {
     test_support::assert_analysis_rejects_with_issue_la(
-        "functio f(d64 d, i32 n) {\n    sit r ← d + n\n}\n",
+        "functio f(d64 d, i32 n) {\n    sit _ r ← d + n\n}\n",
         "numeric_family_crossing_requires_conversio",
     );
 }
@@ -165,12 +165,12 @@ fn float_and_decimal_widths_join_by_the_lattice() {
 fn u64_with_signed_typed_operand_rejects() {
     for op in ["+", "-", "*", "/", "%"] {
         test_support::assert_analysis_rejects_with_issue_la(
-            &format!("functio f(u64 a, i32 b) {{\n    sit r ← a {op} b\n}}\n"),
+            &format!("functio f(u64 a, i32 b) {{\n    sit _ r ← a {op} b\n}}\n"),
             "u64_signed_arithmetic_requires_conversion",
         );
     }
     test_support::assert_analysis_rejects_with_issue_la(
-        "functio f(i64 a, u64 b) {\n    sit r ← a + b\n}\n",
+        "functio f(i64 a, u64 b) {\n    sit _ r ← a + b\n}\n",
         "u64_signed_arithmetic_requires_conversion",
     );
 }
@@ -179,7 +179,7 @@ fn u64_with_signed_typed_operand_rejects() {
 fn u64_with_signed_bitwise_operand_rejects() {
     for op in ["∧", "∨", "⊻"] {
         test_support::assert_analysis_rejects_with_issue_la(
-            &format!("functio f(u64 a, i32 b) {{\n    sit r ← a {op} b\n}}\n"),
+            &format!("functio f(u64 a, i32 b) {{\n    sit _ r ← a {op} b\n}}\n"),
             "u64_signed_arithmetic_requires_conversion",
         );
     }
@@ -188,7 +188,7 @@ fn u64_with_signed_bitwise_operand_rejects() {
 #[test]
 fn u64_with_constants_is_not_an_error() {
     test_support::assert_analysis_accepts_la(
-        "functio f(u64 a) {\n    sit r ← a - 1\n    sit s ← a + -5\n}\n",
+        "functio f(u64 a) {\n    sit _ r ← a - 1\n    sit _ s ← a + -5\n}\n",
     );
 }
 
@@ -196,22 +196,22 @@ fn u64_with_constants_is_not_an_error() {
 fn u64_range_endpoint_beside_signed_typed_endpoint_rejects() {
     for (a, b) in [("u64 a", "numerus b"), ("i32 a", "u64 b")] {
         test_support::assert_analysis_rejects_with_issue_la(
-            &format!("functio f({a}, {b}) {{\n    sit r ← a‥b\n}}\n"),
+            &format!("functio f({a}, {b}) {{\n    sit _ r ← a‥b\n}}\n"),
             "u64_signed_arithmetic_requires_conversion",
         );
     }
-    test_support::assert_analysis_accepts_la("functio f(u64 a) {\n    sit r ← 0‥a\n}\n");
+    test_support::assert_analysis_accepts_la("functio f(u64 a) {\n    sit _ r ← 0‥a\n}\n");
 }
 
 #[test]
 fn modular_and_saturating_words_keep_their_ring() {
     let decls = "sit modulus<u8> a ← 200\nsit modulus<u8> b ← 100";
-    let source = format!("incipit {{\n{decls}\nsit r ← a + b\n}}\n");
+    let source = format!("incipit {{\n{decls}\nsit _ r ← a + b\n}}\n");
     let result = test_support::analyze_ok_la(&source);
     let ty = *entry_local_tys(&result).last().unwrap();
     assert!(matches!(result.types.get(ty), Type::ModularWord(U8)));
     let decls = "sit saturatus<u8> a ← 200\nsit saturatus<u8> b ← 100";
-    let source = format!("incipit {{\n{decls}\nsit r ← a + b\n}}\n");
+    let source = format!("incipit {{\n{decls}\nsit _ r ← a + b\n}}\n");
     let result = test_support::analyze_ok_la(&source);
     let ty = *entry_local_tys(&result).last().unwrap();
     assert!(matches!(result.types.get(ty), Type::SaturatingWord(U8)));

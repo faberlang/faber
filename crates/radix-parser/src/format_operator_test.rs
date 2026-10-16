@@ -32,7 +32,7 @@ fn offset(source: &str, needle: &str) -> u32 {
 
 #[test]
 fn pilcrow_parses_as_the_format_node() {
-    let ExprKind::Format(format) = initializer("sit v ← pretium ¶ \".2\"") else {
+    let ExprKind::Format(format) = initializer("sit _ v ← pretium ¶ \".2\"") else {
         panic!("expected a format expression");
     };
     assert!(matches!(format.value.kind, ExprKind::Ident(_)));
@@ -40,7 +40,7 @@ fn pilcrow_parses_as_the_format_node() {
 
 #[test]
 fn format_binds_looser_than_arithmetic() {
-    let ExprKind::Format(format) = initializer("sit v ← a + b ¶ \".2\"") else {
+    let ExprKind::Format(format) = initializer("sit _ v ← a + b ¶ \".2\"") else {
         panic!("expected (a + b) ¶ spec");
     };
     assert!(matches!(
@@ -51,7 +51,7 @@ fn format_binds_looser_than_arithmetic() {
 
 #[test]
 fn format_binds_tighter_than_comparison() {
-    let ExprKind::Binary(bin) = initializer("sit v ← a ≡ b ¶ \"5\"") else {
+    let ExprKind::Binary(bin) = initializer("sit _ v ← a ≡ b ¶ \"5\"") else {
         panic!("expected a ≡ (b ¶ spec)");
     };
     assert!(matches!(bin.op, BinOp::Eq));
@@ -60,7 +60,7 @@ fn format_binds_tighter_than_comparison() {
 
 #[test]
 fn parenthesized_format_is_a_plain_operand() {
-    let ExprKind::Binary(bin) = initializer("sit v ← (a ¶ \".2\") + \"!\"") else {
+    let ExprKind::Binary(bin) = initializer("sit _ v ← (a ¶ \".2\") + \"!\"") else {
         panic!("expected (a ¶ spec) + text");
     };
     let ExprKind::Paren(inner) = &bin.lhs.kind else {
@@ -75,13 +75,13 @@ fn parenthesized_format_is_a_plain_operand() {
 
 #[test]
 fn chained_format_is_rejected_at_the_second_pilcrow() {
-    let source = "sit v ← x ¶ \"a\" ¶ \"b\"";
+    let source = "sit _ v ← x ¶ \"a\" ¶ \"b\"";
     assert_eq!(issue_span(source, "format_chained"), offset(source, "¶"));
 }
 
 #[test]
 fn computed_spec_is_rejected() {
-    let source = "sit v ← x ¶ spec";
+    let source = "sit _ v ← x ¶ spec";
     assert_eq!(
         issue_span(source, "format_spec_not_literal"),
         offset(source, "spec")
@@ -90,7 +90,7 @@ fn computed_spec_is_rejected() {
 
 #[test]
 fn parenthesized_spec_is_rejected() {
-    let source = "sit v ← x ¶ (\".2\")";
+    let source = "sit _ v ← x ¶ (\".2\")";
     assert_eq!(
         issue_span(source, "format_spec_not_literal"),
         offset(source, "(")
@@ -99,5 +99,5 @@ fn parenthesized_spec_is_rejected() {
 
 #[test]
 fn missing_spec_is_rejected() {
-    assert!(!parse_program("sit v ← x ¶").success());
+    assert!(!parse_program("sit _ v ← x ¶").success());
 }

@@ -71,9 +71,9 @@ fn solo_entry(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 
 }
 
 fn main() → void {
-    let a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
-    let b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
-    let r ← solo_entry(a, b)
+    let _ a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    let _ b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
+    let _ r ← solo_entry(a, b)
     print "ok"
 }
 "#;
@@ -84,9 +84,9 @@ locale = "en"
 import from "composelib:math" math
 
 fn main() → void {
-    let a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
-    let b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
-    let r ← math.add(a, b)
+    let _ a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    let _ b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
+    let _ r ← math.add(a, b)
     print "ok"
 }
 "#;

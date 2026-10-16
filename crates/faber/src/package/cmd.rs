@@ -834,6 +834,7 @@ pub fn cmd_check_package(
     command: radix::services::CheckCommand,
     complexity_budget: Option<u32>,
     kernel_complexity_budget: Option<u32>,
+    lower: bool,
 ) {
     if command.input.is_empty() || command.input[0] == "-" {
         eprintln!("error: package checking requires a path input");
@@ -947,10 +948,104 @@ pub fn cmd_check_package(
         );
     }
 
+    if fatal_errors == 0 && lower {
+        #[cfg(not(feature = "runner"))]
+        exit_runner_feature_unavailable();
+        #[cfg(feature = "runner")]
+        lower_checked_package(
+            &config,
+            &input_path,
+            command.diagnostic_mode,
+            locale_pack.as_ref(),
+        );
+    }
+
     if fatal_errors == 0 {
         eprintln!("ok: {}", input_path.display());
     } else {
         std::process::exit(1);
+    }
+}
+
+/// Final line of a `check --lower` run whose program passed semantic
+/// analysis but failed to lower. Scripts that sweep many inputs (the
+/// `scripta/check-lower-sweep` gate) tell this apart from an ordinary check
+/// error by this text.
+pub const CHECKS_BUT_DOES_NOT_LOWER: &str = "checks but does not lower";
+
+/// The `--lower` step of `faber check`: lower the checked package to MIR and
+/// run the MIR validator through the same package-MIR driver `faber run` and
+/// `faber build -t fmir` use, without executing anything. Failures print as
+/// located diagnostics and exit 1.
+///
+/// A package with no entry unit (a library such as Norma) has nothing to
+/// start from, so each of its modules is lowered on its own, as if it were
+/// the single-file entry.
+#[cfg(feature = "runner")]
+fn lower_checked_package(
+    config: &radix::module::Config,
+    input_path: &Path,
+    mode: DiagnosticMode,
+    locale_pack: Option<&radix::module::locale::LocalePack>,
+) {
+    let mut diagnostics = Vec::new();
+    for unit in lowering_units(config, input_path) {
+        if let Err(errors) = super::mir::with_interpreted_lowered_package_mir(config, &unit, |_| ())
+        {
+            diagnostics.extend(errors);
+        }
+    }
+    if diagnostics.is_empty() {
+        return;
+    }
+    if mode == DiagnosticMode::Diagnostics {
+        let rendered = match locale_pack {
+            Some(pack) => radix::module::diagnostics::render_expanded_diagnostics_with_pack(
+                &diagnostics,
+                pack,
+            )
+            .unwrap_or_else(|err| {
+                eprintln!("error: failed to render reader-pack diagnostics: {err}");
+                std::process::exit(1);
+            }),
+            None => radix::module::diagnostics::render_expanded_diagnostics(&diagnostics),
+        };
+        eprintln!("{rendered}");
+    } else {
+        for diag in &diagnostics {
+            eprintln!("{}", radix::module::diagnostics::render_plain(diag));
+        }
+    }
+    eprintln!(
+        "error: {}: {CHECKS_BUT_DOES_NOT_LOWER}",
+        input_path.display()
+    );
+    std::process::exit(1);
+}
+
+/// What `check --lower` hands to the package-MIR driver: the input itself,
+/// or, for a package directory/manifest with no entry unit, each of its
+/// modules.
+#[cfg(feature = "runner")]
+fn lowering_units(config: &radix::module::Config, input_path: &Path) -> Vec<PathBuf> {
+    if input_path.is_file()
+        && input_path
+            .file_name()
+            .is_none_or(|name| name != MANIFEST_FILE)
+    {
+        return vec![input_path.to_path_buf()];
+    }
+    match radix::program::analyze::analyze_package(
+        config,
+        input_path,
+        &super::faber_analysis_seams(),
+    ) {
+        Ok(package) if !package.nodes.values().any(|node| node.is_entry) => package
+            .nodes
+            .values()
+            .map(|node| node.path.clone())
+            .collect(),
+        _ => vec![input_path.to_path_buf()],
     }
 }
 

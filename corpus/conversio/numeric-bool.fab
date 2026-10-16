@@ -32,7 +32,8 @@ locale = "en"
 # `fractus ↦ numerus` needs a rounding choice (`via Floor|Ceil|HalfEven|Trunc`; the bare conversion is a compile error); a NaN, an infinity, or a value outside the target range fails (`⊥ default` recovers). `fractus ↦
 # bivalens` and `numerus ↦ bivalens` use non-zero truthiness. `bivalens ↦
 # numerus` yields 0/1. `bivalens ↦ fractus` uses 1.0/0.0 because `bool as f64`
-# is invalid in Rust. `ascii ↦ bivalens` parallels `textus ↦ bivalens`.
+# is invalid in Rust. `ascii ↦ bivalens` parallels `textus ↦ bivalens`: it parses the code locale's
+# `true`/`false` words and fails on anything else.
 # Byte reinterpretation (`numerus`/`fractus`/`bivalens` ↔ `octeti`) is rejected
 # at typecheck — use `chorda` instead. See docs/factory/conversio-numeric-bool-coverage/.
 
@@ -50,7 +51,7 @@ main {
     let float asFloat ← flag ↦ float
     print asInt
     print asFloat
-    let ascii token ← 'yes'
+    let ascii token ← 'true'
     let bool fromAscii ← token ↦ bool
     print fromAscii
 }

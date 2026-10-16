@@ -627,7 +627,7 @@ fn octeti_is_not_numeric_arithmetic() {
 incipit {
     sit octeti left ← |01|
     sit octeti right ← |02|
-    sit both ← left + right
+    sit _ both ← left + right
 }
 ",
         "numeric_lista_operator_law",
@@ -637,7 +637,7 @@ incipit {
 incipit {
     sit b8 left ← 1
     sit b8 right ← 2
-    sit both ← left + right
+    sit _ both ← left + right
 }
 ",
         "bits_arithmetic_refused",

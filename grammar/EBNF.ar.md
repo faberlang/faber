@@ -41,7 +41,7 @@ fixum_decl ::= ('ثابت' type_annotation IDENTIFIER '=' const_init) | ('متغ
 # [015] figendum_decl
 figendum_decl ::= ('انتظر_ثابت' | 'انتظر_متغير') type_annotation IDENTIFIER '←' expression
 # [016] sit_decl
-sit_decl ::= 'ليكن' type_annotation? IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?
+sit_decl ::= 'ليكن' type_annotation IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?
 # [017] ref_decl
 ref_decl ::= 'عن' concrete_type IDENTIFIER '←' expression
 # [018] array_destruct
@@ -1019,7 +1019,7 @@ productions. It is not a second keyword authority.
 | Control | `وإلا` | else |
 | Control | `إذا` | if |
 | Control | `وإلاإذا` | else-if |
-| Declarations | `ليكن` | inferred immutable local |
+| Declarations | `ليكن` | write-once local |
 | Testing | `فقط` | only |
 | Testing | `حصري` | only-in |
 | Params | `انشر` | spread |
@@ -1144,7 +1144,10 @@ use a top-level function.
 
 
 - `ليكن` (en `let`) = run-time name, write-once: `ليكن T name ← e` states the
-  type, `ليكن name ← e` infers it. It may be declared without an initializer and
+  type, `ليكن _ name ← e` infers it. Every declaration writes its type slot;
+  `_` is the explicit request to infer, and the type-omitted `ليكن name ← e`
+  (likewise `متغير name`, `عن name`, `ثابت name`) is `PARSE010`
+  `binding_type_slot_required`. It may be declared without an initializer and
   assigned exactly once later, then frozen. `متغير` (en `mut`) = writable name
   (reassignable). `ثابت` (en `const`) = compile-time constant only, and it goes
   with `=`: a run-time `ثابت T name ← e` is `PARSE010` `runtime_const_retired`
@@ -1158,17 +1161,17 @@ use a top-level function.
 - `انتظر_ثابت` / `انتظر_متغير` await a `promissum<T>` or `promissum<T ⇥ E>`, bind
   the resolved `T`, and propagate a compatible alternate `E`.
 - `↢` is the await-directed initializer for an ordinary declaration:
-  `ثابت T name ↢ future`, `متغير T name ↢ future`, or `ليكن name ↢ future`.
+  `ثابت T name ↢ future`, `متغير T name ↢ future`, or `ليكن _ name ↢ future`.
   It has the same await and alternate-propagation semantics as
   `انتظر_ثابت T name ← future`, but it is not a general expression operator and
   cannot target an existing place.
 - Use `_` as the type annotation when the initializer determines the type: `متغير _ name ← value`
-- `ليكن name ← value` is the inferred write-once local; `ليكن T name ← value` is the typed one
-- `ليكن name` (no initializer) is the inferred deferred
+- `ليكن _ name ← value` is the inferred write-once local; `ليكن T name ← value` is the typed one
+- `ليكن _ name` (no initializer) is the inferred deferred
   immutable. Assign exactly once before any read.
 - Typed `ليكن`/`متغير` initializers accept `↤` (`ليكن numerus x ↤ "42"`):
   the written type is the conversion destination, then the binding is
-  initialized. `انتظر_ثابت`/`انتظر_متغير` keep `←`; `متغير _`, inferred `ليكن`, and untyped
+  initialized. `انتظر_ثابت`/`انتظر_متغير` keep `←`; `متغير _`, `ليكن _`, and untyped
   destructuring reject `↤` (no concrete destination type).
 - `ثابت T x = e` (D5.10) declares a typed **constant**; at the top of a file
   the same declaration is the module-level constant (next section). `=` states a
@@ -2466,7 +2469,7 @@ The `∷` glyph (U+2237, "proportion") explicitly ascribes a target type to an e
 Prefer typed construction for ordinary `صنف` values and `vacua` for ordinary empty collection values:
 
 ```fab
-sit point ← Point { x = 10 }
+sit _ point ← Point { x = 10 }
 sit lista<numerus> xs ← vacua
 ```
 
@@ -2623,13 +2626,13 @@ Implementation status (2026-10-11):
 Inline block example:
 
 ```fab
-sit tag ← «inline»
+sit _ tag ← «inline»
 ```
 
 Multiline block example (newline after opening `«`):
 
 ```fab
-sit blob ← «
+sit _ blob ← «
     select id, email
     from accounts
 »
@@ -2638,14 +2641,14 @@ sit blob ← «
 Captured template example:
 
 ```fab
-sit q ← `select * from accounts where id = §`(accountId)
+sit _ q ← `select * from accounts where id = §`(accountId)
 ```
 
 Octeti hex literal example:
 
 ```fab
-sit sig ← |de ad be ef|
-sit hello ← |48 65 6c 6c 6f|
+sit _ sig ← |de ad be ef|
+sit _ hello ← |48 65 6c 6c 6f|
 ```
 
 ### Format-Template Application

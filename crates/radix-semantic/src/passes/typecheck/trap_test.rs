@@ -24,7 +24,7 @@ fn trap_binds_inference_hole_to_solved_union() {
     // binding's finalized type is the solved two-member union.
     let result = test_support::analyze_ok(concat!(
         "functio f() → numerus ⇥ textus {\n    redde 42\n}\n\n",
-        "incipit {\n    sit r ← capta { f() }\n    nota r\n}\n",
+        "incipit {\n    sit _ r ← capta { f() }\n    nota r\n}\n",
     ));
     let tys = entry_local_tys(&result);
     let [local_ty] = tys[..] else {
@@ -106,7 +106,7 @@ fn trap_inferred_hole_narrows_under_is_test() {
     test_support::assert_accepts(concat!(
         "functio f() → numerus ⇥ textus {\n    redde 42\n}\n\n",
         "incipit {\n",
-        "    sit r ← capta { f() }\n",
+        "    sit _ r ← capta { f() }\n",
         "    si r est numerus {\n        nota r\n    } secus {\n",
         "        nota r.longitudo()\n    }\n",
         "}\n",
@@ -122,7 +122,7 @@ fn trap_inferred_hole_narrowed_branch_is_the_tested_member() {
         concat!(
             "functio f() → numerus ⇥ textus {\n    redde 42\n}\n\n",
             "incipit {\n",
-            "    sit r ← capta { f() }\n",
+            "    sit _ r ← capta { f() }\n",
             "    si r est numerus {\n        nota r.longitudo()\n    }\n",
             "}\n",
         ),

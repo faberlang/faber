@@ -218,7 +218,7 @@ fn allocator_kind_names_are_not_keywords() {
     assert!(lookup_keyword_spec("arena").is_none());
     assert!(lookup_keyword_spec("page").is_none());
 
-    let result = lex("sit arena ← page");
+    let result = lex("sit _ arena ← page");
     let idents = result
         .tokens
         .iter()
@@ -356,7 +356,7 @@ fn division_slash_remains_valid_operator() {
 
 #[test]
 fn string_template_section_holes_remain_valid() {
-    let result = lex(r#"sit greeting ← "Salve, §!"(name)"#);
+    let result = lex(r#"sit _ greeting ← "Salve, §!"(name)"#);
     assert!(result.success(), "errors: {:?}", result.errors);
 }
 
@@ -1219,7 +1219,7 @@ fn unterminated_string_at_eof_preserves_payload() {
 
 #[test]
 fn unterminated_string_at_newline_preserves_payload_without_newline() {
-    let result = lex("\"salve\nsit x ← 1");
+    let result = lex("\"salve\nsit _ x ← 1");
     assert!(
         result
             .errors
@@ -1256,7 +1256,7 @@ fn first_ascii_string_payload(result: &LexResult) -> &str {
 
 #[test]
 fn escaped_newline_in_string_literal_rejected() {
-    let result = lex("\"salve\\\nsit x ← 1");
+    let result = lex("\"salve\\\nsit _ x ← 1");
     assert!(
         result
             .errors
@@ -1270,7 +1270,7 @@ fn escaped_newline_in_string_literal_rejected() {
 
 #[test]
 fn escaped_newline_in_ascii_literal_rejected() {
-    let result = lex("'salve\\\nsit x ← 1");
+    let result = lex("'salve\\\nsit _ x ← 1");
     assert!(
         result
             .errors
@@ -1972,7 +1972,7 @@ fn kind_labels(result: &LexResult) -> Vec<&'static str> {
 #[test]
 fn prp030_inline_hash_error_then_newline_adjacency() {
     // R1/R3: inline-# emits Error at `#`; physical LF still yields Newline.
-    let result = lex("sit x ← 1 # bad\n");
+    let result = lex("sit _ x ← 1 # bad\n");
     assert!(result.errors.iter().any(|err| {
         err.kind == LexErrorKind::InlineComment && has_arg(err, "issue", INLINE_COMMENT_ISSUE)
     }));
@@ -1995,7 +1995,7 @@ fn prp030_inline_hash_error_then_newline_adjacency() {
         .expect("Error token");
     // `#` starts after "fixum x ← 1 " — ASCII offset 13 (fixum=5, space, x, spaces, ← is 3 bytes...)
     // Span start must match the diagnostic and the `#` source position.
-    let hash_offset = u32::try_from("sit x ← 1 ".len()).expect("test source offset fits u32");
+    let hash_offset = u32::try_from("sit _ x ← 1 ".len()).expect("test source offset fits u32");
     assert_eq!(error_token.span.start, hash_offset);
     let err = result
         .errors

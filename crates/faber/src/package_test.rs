@@ -435,6 +435,7 @@ fn manifest_target_command_probe() {
             },
             None,
             None,
+            false,
         ),
         "build" | "build-explicit" => super::cmd_build(
             radix::services::BuildCommand {
@@ -540,6 +541,10 @@ impl Host for ExitRecordingHost {
 
     fn read_line(&mut self) -> Result<Option<String>, RunnerError> {
         self.buffer.read_line()
+    }
+
+    fn read_all(&mut self) -> Result<Option<String>, RunnerError> {
+        self.buffer.read_all()
     }
 
     fn abort(&mut self, reason: &str) -> ! {
@@ -4627,7 +4632,7 @@ class PersonaNova {
 }
 
 main {
-  let p ← PersonaNova { nomenLongum = "Marcus" }
+  let _ p ← PersonaNova { nomenLongum = "Marcus" }
   print p.nomenLongum
 }
 "#,
@@ -4697,7 +4702,7 @@ class PersonaNova {
 }
 
 main {
-  let p ← PersonaNova { nomenLongum = "Marcus" }
+  let _ p ← PersonaNova { nomenLongum = "Marcus" }
   print p.nomenLongum
 }
 "#,
@@ -5432,7 +5437,7 @@ fn compile_package_emits_norma_toml_parse() {
 import from "norma:toml" toml
 
 main {
-  let parsed ← toml.parse("name = \"faber\"")
+  let _ parsed ← toml.parse("name = \"faber\"")
 }
 "#,
     )
@@ -5581,7 +5586,7 @@ import from "norma:console" console
 
 main {
   console.write_partial("salve")
-  let tty ← console.stdin_is_tty()
+  let _ tty ← console.stdin_is_tty()
   console.write_bytes(|48 65 6c 6c 6f|)
 }
 "#,
@@ -5988,8 +5993,8 @@ fn compile_package_resolves_builtin_norma_fs_ad_wrapped_imports() {
 import from "norma:fs" fs as terra
 
 async_main {
-  let exists ← terra.exists(".")
-  let parent ← terra.parent("a/b")
+  let _ exists ← terra.exists(".")
+  let _ parent ← terra.parent("a/b")
   await terra.write_bytes_async("fundet.bin", |41 42 43|)
 }
 "#,
@@ -6034,8 +6039,8 @@ fn compile_package_resolves_builtin_norma_process_ad_wrapped_imports() {
 import from "norma:process" process as proc
 
 main {
-  let out ← proc.exec("echo hi")
-  let env ← proc.read_env("PATH")
+  let _ out ← proc.exec("echo hi")
+  let _ env ← proc.read_env("PATH")
 }
 "#,
     )
@@ -6079,10 +6084,10 @@ fn compile_package_resolves_builtin_norma_time_ad_wrapped_imports() {
 import from "norma:time" time
 
 async_main {
-  let now ← time.now()
-  let mono ← time.monotonic()
-  let active ← time.active()
-  let ms ← time.MILLISECOND()
+  let _ now ← time.now()
+  let _ mono ← time.monotonic()
+  let _ active ← time.active()
+  let _ ms ← time.MILLISECOND()
   await time.sleep_async(0)
 }
 "#,
@@ -6127,10 +6132,10 @@ fn compile_package_resolves_builtin_norma_random_ad_wrapped_imports() {
 import from "norma:random" random
 
 main {
-  let f ← random.random_float()
-  let n ← random.random_int(1, 6)
-  let id ← random.uuid()
-  let bytes ← random.random_bytes(8)
+  let _ f ← random.random_float()
+  let _ n ← random.random_int(1, 6)
+  let _ id ← random.uuid()
+  let _ bytes ← random.random_bytes(8)
   random.seed(42)
 }
 "#,
@@ -6292,7 +6297,7 @@ import from "norma:http" http
 async_main {
     await_const _ responsum ← http.get("http://127.0.0.1:9/test")
     print responsum.status
-    let caput ← responsum.header("x-faber-test")
+    let _ caput ← responsum.header("x-faber-test")
     if caput ≡ null { print "header:missing" } else { print "header:present" }
     print responsum.body
 }
@@ -6621,10 +6626,10 @@ import from "norma:json" json_mod
 
 main {
   let list<list<string>> csv_rows ← csv_mod.parse("count,1")
-  let csv_text ← csv_mod.stringify(csv_rows)
+  let _ csv_text ← csv_mod.stringify(csv_rows)
   do {
     let json json_doc ← json_mod.parse("{\"count\": 1}")
-    let json_text ← json_mod.stringify(json_doc)
+    let _ json_text ← json_mod.stringify(json_doc)
   }
   catch err {
     print err
@@ -10779,10 +10784,10 @@ locale = "en"
 import from "./nn" nn
 
 fn main() → void {
-    let x ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
-    let w ← [[1.0, 0.0], [0.0, 1.0]] ↦ tensor<f32, [2, 2]>
-    let b ← [[0.1, 0.1], [0.1, 0.1]] ↦ tensor<f32, [2, 2]>
-    let r ← nn.linear(x, w, b)
+    let _ x ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    let _ w ← [[1.0, 0.0], [0.0, 1.0]] ↦ tensor<f32, [2, 2]>
+    let _ b ← [[0.1, 0.1], [0.1, 0.1]] ↦ tensor<f32, [2, 2]>
+    let _ r ← nn.linear(x, w, b)
     print "ok"
 }
 "#;
@@ -11368,9 +11373,10 @@ entry = "main.fab"
         dir.join("src/helper.fab"),
         r#"
 import from "norma:console" console
+import from "norma:fault" fault
 
 @ public
-fn shout(string s) → void {
+fn shout(string s) → void ⇥ fault.IoFault {
   console.write_line(s)
 }
 "#,
@@ -13732,7 +13738,7 @@ main {
     let f32 loss ← gradient.simple_loss(x, w)
     print loss
     let f32 upstream ← 1.0
-    let grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
+    let _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
     let [_, gw] ← grads
     print gw
 }
@@ -13818,7 +13824,7 @@ functio simple_add(i32 a, i32 b) → numerus {
 import from "testgrad:gradient" gradient
 
 main {
-    let g ← gradient.ghost(gradient.nil(), 5)
+    let _ g ← gradient.ghost(gradient.nil(), 5)
     print "companion-ran"
 }
 "#,
@@ -13994,7 +14000,7 @@ main {
     let f32 loss ← gradient.simple_loss(x, w)
     print loss
     let f32 upstream ← 1.0
-    let grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
+    let _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
     let [_, gw] ← grads
     print gw
 }
@@ -14102,7 +14108,7 @@ main {
     let f32 loss ← gradient.simple_loss(x, w)
     print loss
     let f32 upstream ← 1.0
-    let grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
+    let _ grads ← gradient.loss_backward(x, w, gradient.nil(), upstream)
     let [_, gw] ← grads
     print gw
 }
