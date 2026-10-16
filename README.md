@@ -462,6 +462,9 @@ often breaking: syntax is retired and replaced outright, with no compatibility
 layer. No 1.x release carries a stability promise. Pin an exact version, and read
 the release notes before you upgrade.
 
+This repository's first release is Faber 1.14. A 2.0 release is planned for when
+the language is largely stable.
+
 ## License and authorship
 
 Faber is written by Ian Zepp. It is available under either of the MIT license
