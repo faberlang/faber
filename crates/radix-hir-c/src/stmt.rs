@@ -12,6 +12,7 @@ use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirIteraMode, HirLocal, HirScribeKind,
     HirStatement, HirStatementKind,
 };
+use radix_lexer::Symbol;
 
 impl Emitter<'_> {
     /// Emit a block's statements one level deeper than the current line.
@@ -258,6 +259,12 @@ impl Emitter<'_> {
                 Ok(())
             }
             HirExpressionKind::Assign(place, value) => self.assign(out, place, value),
+            HirExpressionKind::ConversioAssign {
+                target,
+                source,
+                recovery,
+                params,
+            } => self.conversion_statement(out, target, source, params, recovery.as_deref()),
             HirExpressionKind::Si {
                 cond,
                 then_block,
@@ -806,6 +813,37 @@ impl Emitter<'_> {
         };
         let (name, class) = (local.name.clone(), local.ty);
         let value = self.expr(value)?;
+        let value = self.settle(value, class)?;
+        if value.value != Value::from(class) {
+            return Err(unsupported("value stored without a store check"));
+        }
+        self.line(out, &format!("{name} = {};", value.text));
+        Ok(())
+    }
+
+    /// `place ↤ source [via HINT] [⊥ recovery]` written as a statement:
+    /// convert the source to the place's own type, then store it once.
+    fn conversion_statement(
+        &mut self,
+        out: &mut String,
+        target: &HirExpression,
+        source: &HirExpression,
+        params: &[Symbol],
+        recovery: Option<&HirExpression>,
+    ) -> Result<(), CodegenError> {
+        let Some(ty) = target.ty else {
+            return Err(unsupported("conversion assignment without a target type"));
+        };
+        let value = self.conversion(source, ty, params, recovery)?;
+        let HirExpressionKind::Path(def_id) = &target.kind else {
+            return Err(unsupported(
+                "conversion assignment to a place that is not a local",
+            ));
+        };
+        let Some(local) = self.locals.get(def_id) else {
+            return Err(unsupported("assignment to a name that is not a local"));
+        };
+        let (name, class) = (local.name.clone(), local.ty);
         let value = self.settle(value, class)?;
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
