@@ -131,3 +131,13 @@ fn access_control_annotations_are_ignored() {
     assert!(code.contains("struct g_Counter"), "{code}");
     assert!(code.contains("m_total"), "{code}");
 }
+
+#[test]
+fn a_named_function_value_is_a_c_function_pointer() {
+    let code = emitted(
+        "fn twice(int n) → int {\n    return n * 2\n}\nfn apply((int) → int f, int n) → int {\n    return f(n)\n}\nmain {\n    let (int) → int g ← twice\n    print g(21)\n    print apply(twice, 5)\n}",
+    );
+    assert!(code.contains("int64_t (*p_f)(int64_t)"), "{code}");
+    assert!(code.contains("int64_t (*l_g)(int64_t) = f_twice;"), "{code}");
+    assert!(code.contains("p_f(p_n)"), "{code}");
+}

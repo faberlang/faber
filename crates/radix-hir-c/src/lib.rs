@@ -341,6 +341,18 @@ impl Emitter<'_> {
                 self.need_class(Ty::List(k));
                 self.need_class(Ty::List(v));
             }
+            Ty::Func(id) => {
+                if let radix_types::Type::Func(sig) = self.types.get(radix_types::TypeId(id)) {
+                    for param in &sig.params {
+                        if let Ok(class) = crate::ty::classify(self.types, param.ty) {
+                            self.need_class(class);
+                        }
+                    }
+                    if let Ok(Some(ret)) = crate::ty::returns(self.types, sig.ret) {
+                        self.need_class(ret);
+                    }
+                }
+            }
         }
     }
 }

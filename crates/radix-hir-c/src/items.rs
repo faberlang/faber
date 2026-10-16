@@ -445,6 +445,9 @@ impl Emitter<'_> {
         // `self` lowers to a path to the genus's own definition.
         if let Some(genus) = receiver {
             params.push(self.declare(Ty::Genus(genus), "faber_self", true)?);
+            // A method body that never names `self` still declares the
+            // receiver, so mark it used below like any other parameter.
+            param_names.push("faber_self".to_owned());
             self.locals.insert(
                 genus,
                 Local {

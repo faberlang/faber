@@ -13,7 +13,7 @@ use crate::error::unsupported;
 use crate::expr::{Operand, Value, c_string};
 use crate::helpers::{Helper, ListOp};
 use crate::names::Namer;
-use crate::ty::{Inner, Ty, classify};
+use crate::ty::{Inner, Ty, classify, returns};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{DefId, HirExpression, HirStruct};
 use radix_lexer::Symbol;
@@ -85,6 +85,9 @@ impl Emitter<'_> {
             Ty::Opt(crate::ty::Inner::Genus(def_id)) => Ty::Genus(def_id),
             other => other,
         };
+        if let Ty::Func(id) = ty {
+            return self.func_c_type(id);
+        }
         if let Some(builtin) = ty.builtin_c_type() {
             return Ok(builtin.to_owned());
         }
@@ -97,6 +100,29 @@ impl Emitter<'_> {
         }
     }
 
+    /// `ret (*)(faber_arena *, params…)`: a function value is a C function
+    /// pointer. Every generated function takes the hidden arena first when the
+    /// program allocates, so the pointer type carries it too.
+    fn func_c_type(&self, id: u32) -> Result<String, CodegenError> {
+        let radix_types::Type::Func(sig) = self.types.get(radix_types::TypeId(id)) else {
+            return Err(unsupported("function value without a signature"));
+        };
+        let mut slots = Vec::with_capacity(sig.params.len() + 1);
+        if self.arena {
+            slots.push("faber_arena *".to_owned());
+        }
+        for param in &sig.params {
+            let class = classify(self.types, param.ty)?;
+            slots.push(self.c_type(class)?);
+        }
+        let ret = returns(self.types, sig.ret)?;
+        let ret_text = match ret {
+            Some(ty) => self.c_type(ty)?,
+            None => "void".to_owned(),
+        };
+        Ok(format!("{ret_text} (*)({})", slots.join(", ")))
+    }
+
     /// The declaration of `name` with class `ty`. An immutable binding is
     /// `const` at the top: `const int64_t x`, `const char *const s`,
     /// `g_Point *const p` (the pointer is fixed; a genus's fields stay
@@ -107,6 +133,12 @@ impl Emitter<'_> {
         name: &str,
         mutable: bool,
     ) -> Result<String, CodegenError> {
+        // A function pointer names its parameter inside the star: `ret
+        // (*name)(…)`.
+        if let Ty::Func(_) = ty {
+            let full = self.c_type(ty)?;
+            return Ok(full.replacen("(*)", &format!("(*{name})"), 1));
+        }
         let c_type = self.c_type(ty)?;
         Ok(match (c_type.ends_with('*'), mutable) {
             (true, false) => format!("{c_type}const {name}"),

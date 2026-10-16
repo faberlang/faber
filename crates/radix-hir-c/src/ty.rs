@@ -125,7 +125,8 @@ impl Inner {
             | Ty::Opt(_)
             | Ty::None
             | Ty::Decimal
-            | Ty::Set(_) => None,
+            | Ty::Set(_)
+            | Ty::Func(_) => None,
         }
     }
 
@@ -194,6 +195,10 @@ pub(crate) enum Ty {
     /// A bare `none` value (the type is `none`): the only value is `null`, and
     /// it prints as the locale's none word. C carries a dummy `int` 0.
     None,
+    /// A function value: a C function pointer. The payload is the `Type::Func`
+    /// [`TypeId`] the value was classified from, so a mismatched signature
+    /// fails the store check.
+    Func(u32),
 }
 
 /// The element kinds a list carries in this subset.
@@ -288,6 +293,7 @@ impl Ty {
                 _ => None,
             },
             Ty::Genus(_) => None,
+            Ty::Func(_) => None,
         }
     }
 }
@@ -400,6 +406,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::None => Err(unsupported("list of none")),
                 Ty::Set(_) => Err(unsupported("list of sets")),
                 Ty::Map(..) => Err(unsupported("list of maps")),
+                Ty::Func(_) => Err(unsupported("list of function values")),
             }
         }
         // A set is the list storage under the set contract (`add` unique,
@@ -420,6 +427,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             Ty::Decimal => Err(unsupported("set of decimals")),
             Ty::None => Err(unsupported("set of none")),
             Ty::Map(..) => Err(unsupported("set of maps")),
+            Ty::Func(_) => Err(unsupported("set of function values")),
         },
         // A map carries `int` or `text` keys and values (the corpus classes),
         // backed by parallel lists in `faber_map_<k>_<v>`.
@@ -436,6 +444,19 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             Some(inner) => Ok(Ty::Opt(inner)),
             None => Err(unsupported("optional of a sized integer or an optional")),
         },
+        // A function value is a C function pointer. Its signature is validated
+        // now (the C spelling needs the emitter), and the id lets a mismatched
+        // signature fail a store check.
+        Type::Func(sig) => {
+            if !sig.type_params.is_empty() || sig.err.is_some() || sig.is_async || sig.is_generator {
+                return Err(unsupported("function value outside the subset"));
+            }
+            for param in &sig.params {
+                classify(types, param.ty)?;
+            }
+            returns(types, sig.ret)?;
+            Ok(Ty::Func(ty.0))
+        }
         other => Err(unsupported(describe(other))),
     }
 }

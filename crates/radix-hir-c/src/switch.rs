@@ -68,6 +68,9 @@ impl Emitter<'_> {
                 Value::Exact | Value::Void | Value::None => {
                     return Err(unsupported("switch over a value with no class"));
                 }
+                Value::Func(_) => {
+                    return Err(unsupported("switch over a function value"));
+                }
             };
             let value = operand.value;
             let declaration = self.bind(&mut operand);

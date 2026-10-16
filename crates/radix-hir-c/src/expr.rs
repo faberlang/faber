@@ -12,7 +12,7 @@ use crate::Emitter;
 use crate::error::unsupported;
 use crate::helpers::Helper;
 use crate::items::Omission;
-use crate::ty::{Elem, Inner, IntWidth, Ty, classify};
+use crate::ty::{Elem, Inner, IntWidth, Ty, classify, returns};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{
     DefId, HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral,
@@ -62,6 +62,9 @@ pub(crate) enum Value {
     Opt(Inner),
     /// A bare `none` value, always `(0)`, printed as the locale's none word.
     None,
+    /// A function value: a C function pointer, carrying the `Type::Func` id it
+    /// was classified from.
+    Func(u32),
 }
 
 impl From<Ty> for Value {
@@ -84,6 +87,7 @@ impl From<Ty> for Value {
             Ty::Decimal => Value::Decimal,
             Ty::Opt(inner) => Value::Opt(inner),
             Ty::None => Value::None,
+            Ty::Func(id) => Value::Func(id),
         }
     }
 }
@@ -182,6 +186,17 @@ impl Emitter<'_> {
     pub(crate) fn expr(&mut self, expr: &HirExpression) -> Result<Operand, CodegenError> {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => {
+                // A named function used as a value is its C function pointer.
+                if let Some(function) = self.functions.get(def_id) {
+                    let name = function.name.clone();
+                    let Some(ty) = expr.ty else {
+                        return Err(unsupported("function value without a resolved type"));
+                    };
+                    let Ty::Func(id) = classify(self.types, ty)? else {
+                        return Err(unsupported("function value of another class"));
+                    };
+                    return Ok(Operand::new(name, Value::Func(id)));
+                }
                 let operand = self.path(*def_id)?;
                 // Typecheck narrows the type of a read the guard proved
                 // present; the cell is still the optional.
@@ -509,10 +524,79 @@ impl Emitter<'_> {
         let HirExpressionKind::Path(def_id) = &callee.kind else {
             return Err(unsupported("call through a value"));
         };
+        // A call through a function-value local is an indirect call.
+        if let Some(local) = self.locals.get(def_id)
+            && let Ty::Func(id) = local.ty
+        {
+            let name = local.name.clone();
+            return self.call_function_value(&name, id, args);
+        }
         if self.variant(*def_id).is_some() {
             return self.construct_variant_call(*def_id, args);
         }
         self.invoke(*def_id, None, args)
+    }
+
+    /// A call through a function value: the local holds a C function pointer,
+    /// so the call is `name(faber_a, args…)`. Arguments are checked and
+    /// narrowed exactly as a direct call's.
+    fn call_function_value(
+        &mut self,
+        name: &str,
+        id: u32,
+        args: &[radix_hir::HirCallArg],
+    ) -> Result<Operand, CodegenError> {
+        let (params, ret_ty) = {
+            let radix_types::Type::Func(sig) = self.types.get(radix_types::TypeId(id)) else {
+                return Err(unsupported("function value without a signature"));
+            };
+            (sig.params.clone(), sig.ret)
+        };
+        if args.len() > params.len() {
+            return Err(unsupported("call with omitted or extra arguments"));
+        }
+        let mut operands = Vec::with_capacity(params.len() + 1);
+        for (arg, param) in args.iter().zip(&params) {
+            if arg.name.is_some() || arg.spread {
+                return Err(unsupported("named or spread argument"));
+            }
+            let class = classify(self.types, param.ty)?;
+            let shared = matches!(class, Ty::List(_) | Ty::Genus(_));
+            match arg.marker {
+                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
+                    if !shared =>
+                {
+                    return Err(unsupported(
+                        "access marker on an argument that is not a list or genus",
+                    ));
+                }
+                Some(radix_hir::HirArgMarker::Axis) => {
+                    return Err(unsupported(
+                        "access marker on an argument that is not a list or genus",
+                    ));
+                }
+                _ => {}
+            }
+            let mut operand = self.expr(&arg.expr)?;
+            if arg.marker == Some(radix_hir::HirArgMarker::Copy) {
+                operand = self.copy_value(operand)?;
+            }
+            operand = self.settle(operand, class)?;
+            if operand.value != Value::from(class) {
+                return Err(unsupported("value stored without a store check"));
+            }
+            operands.push(operand);
+        }
+        let prelude = self.sequence(&mut operands);
+        let mut slots = Vec::with_capacity(operands.len() + 1);
+        if self.arena {
+            slots.push("faber_a".to_owned());
+        }
+        slots.extend(operands.iter().map(|operand| operand.text.clone()));
+        let call = format!("{name}({})", slots.join(", "));
+        let ret = returns(self.types, ret_ty)?;
+        let value = ret.map_or(Value::Void, Value::from);
+        Ok(Operand::new(wrap(&prelude, &call), value).with_effect(true))
     }
 
     /// The address a `ref`/`mut` scalar argument passes: the caller's own cell,
@@ -766,7 +850,9 @@ impl Emitter<'_> {
                 Ok(c_type) => c_type,
                 Err(_) => return String::new(),
             },
-            Value::Void => return String::new(),
+            // A bare `void` has no value to bind, and a function value never
+            // carries an effect, so neither is given a temporary.
+            Value::Void | Value::Func(_) => return String::new(),
         };
         let name = format!("faber_t{}", self.temps);
         self.temps += 1;
