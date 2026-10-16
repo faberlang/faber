@@ -64,6 +64,9 @@ mod receiver_paren_test;
 mod inferred_bracket_emit_test;
 
 #[cfg(test)]
+mod lege_lineam_emit_test;
+
+#[cfg(test)]
 mod trivia_test;
 
 pub use module::{FaberCodegen, FaberOutput, empty_presentation};
