@@ -1,16 +1,10 @@
 {
   "targets": {
-    "runner": {
-      "outcome": "known-fail",
-      "phase": "run",
-      "diagnostic_contains": "invalid MIR: destination type mismatch",
-      "reason": "The runner's MIR lowering rejects the stored failable promise binding (promise<Response ⇥ IoFault>) that starts the loopback GET before the accept: the promise destination fails to type during MIR lowering, the same runner gap pinned for the async fs read wrappers. The exchange assertions are untouched."
-    },
     "rust": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "E0562",
-      "reason": "Rust emit lowers the stored promise binding to a `let` with an `impl Future` type annotation, which cargo rejects with E0562 (a second E0308 wraps the already-optional header result in Some); the exchange assertions are untouched."
+      "diagnostic_contains": "error[E0308]",
+      "reason": "Rust emit lowers `let string ∪ none sent ← incoming.req.header(\"x-client\")` to `let l_sent: Option<String> = Some(l_incoming.req.header(...))`: the already-optional header result is wrapped in Some, so cargo rejects the generated crate with E0308 (expected `String`, found `Option<String>`). The stored-promise E0562 reason is gone with the split open_pending/finish_pending exchange; the runner passes and the exchange assertions are untouched."
     }
   }
 }

@@ -887,3 +887,547 @@ module_path = ["http", "client"]
 kind = "type"
 canonical = "Request"
 surface = "Request"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "type"
+canonical = "Url"
+surface = "Url"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "type"
+canonical = "Url"
+surface = "Url"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "type"
+canonical = "Client"
+surface = "Client"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "type"
+canonical = "Client"
+surface = "Client"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "type"
+canonical = "Receive"
+surface = "Receive"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "type"
+canonical = "Receive"
+surface = "Receive"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "type"
+canonical = "Chunk"
+surface = "Chunk"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "type"
+canonical = "Chunk"
+surface = "Chunk"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "empty"
+surface = "empty"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "empty"
+surface = "empty"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "session"
+surface = "session"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "session"
+surface = "session"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "session_timeout"
+surface = "session_timeout"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "session_timeout"
+surface = "session_timeout"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "split"
+surface = "split"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "split"
+surface = "split"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "is_absolute"
+surface = "is_absolute"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "is_absolute"
+surface = "is_absolute"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "host_header"
+surface = "host_header"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "host_header"
+surface = "host_header"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "request_target"
+surface = "request_target"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "request_target"
+surface = "request_target"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "headers_from_map"
+surface = "headers_from_map"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "headers_from_map"
+surface = "headers_from_map"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "get"
+surface = "get"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "get"
+surface = "get"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "get_with"
+surface = "get_with"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "get_with"
+surface = "get_with"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "get_on"
+surface = "get_on"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "get_on"
+surface = "get_on"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "post"
+surface = "post"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "post"
+surface = "post"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "post_with"
+surface = "post_with"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "post_with"
+surface = "post_with"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "post_on"
+surface = "post_on"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "post_on"
+surface = "post_on"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "put"
+surface = "put"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "put"
+surface = "put"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "put_with"
+surface = "put_with"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "put_with"
+surface = "put_with"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "put_on"
+surface = "put_on"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "put_on"
+surface = "put_on"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "delete"
+surface = "delete"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "delete"
+surface = "delete"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "delete_with"
+surface = "delete_with"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "delete_with"
+surface = "delete_with"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "delete_on"
+surface = "delete_on"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "delete_on"
+surface = "delete_on"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "patch"
+surface = "patch"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "patch"
+surface = "patch"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "patch_with"
+surface = "patch_with"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "patch_with"
+surface = "patch_with"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "patch_on"
+surface = "patch_on"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "patch_on"
+surface = "patch_on"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "send_request"
+surface = "send_request"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "send_request"
+surface = "send_request"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "send"
+surface = "send"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "send"
+surface = "send"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "send_on"
+surface = "send_on"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "send_on"
+surface = "send_on"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "open"
+surface = "open"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "open"
+surface = "open"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "open_on"
+surface = "open_on"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "open_on"
+surface = "open_on"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "receive"
+surface = "receive"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "receive"
+surface = "receive"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "receive_n"
+surface = "receive_n"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "receive_n"
+surface = "receive_n"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+owner = "Receive"
+kind = "method"
+canonical = "next"
+surface = "next"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+owner = "Receive"
+kind = "method"
+canonical = "next"
+surface = "next"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+owner = "Receive"
+kind = "method"
+canonical = "next_n"
+surface = "next_n"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+owner = "Receive"
+kind = "method"
+canonical = "next_n"
+surface = "next_n"
