@@ -2540,7 +2540,7 @@ impl FunctionBuilder<'_> {
     ) -> Option<MirOperand> {
         match self.normalized_type(receiver_ty) {
             Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
-                self.lower_integer_potentia(receiver, args, expr)
+                self.lower_integer_potentia(receiver, receiver_ty, args, expr)
             }
             Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
                 self.lower_fractus_potentia(receiver, args, expr)
@@ -2560,6 +2560,7 @@ impl FunctionBuilder<'_> {
     fn lower_integer_potentia(
         &mut self,
         receiver: &HirExpression,
+        receiver_ty: TypeId,
         args: &[HirCallArg],
         expr: &HirExpression,
     ) -> Option<MirOperand> {
@@ -2567,8 +2568,11 @@ impl FunctionBuilder<'_> {
         let [arg] = args else {
             return None;
         };
+        let decimal = self.is_decimal_receiver(receiver_ty);
+        let numerus_ty = MirType::semantic(self.types.primitive(Primitive::Numerus));
         let base = self.lower_expr_value(receiver)?;
-        let exponent = self.lower_expr_value(&arg.expr)?;
+        let argument = self.lower_expr_value(&arg.expr)?;
+        let argument_ty = self.expr_ty(&arg.expr)?;
         let destination = self.push_temp(ty, expr.span);
         let accumulator = self.next_local_id();
         self.locals
@@ -2577,8 +2581,37 @@ impl FunctionBuilder<'_> {
         self.locals
             .push(MirLocalDecl { id: base_local, name: None, ty, mutable: true, span: expr.span });
         // The exponent keeps its own type: the result type is the range of
-        // `base^exponent` and can be narrower than the exponent's type.
-        let exponent_ty = self.expr_ty(&arg.expr)?;
+        // `base^exponent` and can be narrower than the exponent's type. A
+        // decimal (`d64`) receiver instead runs the exponent at plain
+        // `numerus`, because the by-squaring loop's Mod/Div literals are
+        // small integer counts and a bare `Int(2)` under a width-scaled
+        // carrier is 2e-8 — halving by it would grow the exponent until the
+        // carrier overflowed. The exponent is a small count and d64 can
+        // never exceed numerus, so the one-time conversion is exact.
+        let (exponent_ty, exponent) = if decimal {
+            // Materialize the argument at its declared decimal type first:
+            // a bare literal lowers to an untyped `Int` constant whose MIR
+            // operand type is plain `numerus`, so the `Convert` source must
+            // be a decimal-typed temp for the runtime conversion route.
+            let argument_temp = self.assign_new_temp(MirValueKind::Operand(argument), argument_ty, expr.span);
+            let converted = self.runtime_call_value(
+                MirIntrinsic::Convert(MirConversion {
+                    store: None,
+                    flavor: MirConversionFlavor::Runtime,
+                    source_ty: argument_ty,
+                    target_ty: numerus_ty,
+                    params: Vec::new(),
+                    recovery: None,
+                    struct_defaults: Vec::new(),
+                }),
+                vec![MirOperand::Temp(argument_temp)],
+                numerus_ty,
+                expr.span,
+            );
+            (numerus_ty, converted)
+        } else {
+            (argument_ty, argument)
+        };
         let exponent_local = self.next_local_id();
         self.locals.push(MirLocalDecl {
             id: exponent_local,
@@ -2590,12 +2623,16 @@ impl FunctionBuilder<'_> {
         let accumulator_place = MirPlace::local(accumulator);
         let base_place = MirPlace::local(base_local);
         let exponent_place = MirPlace::local(exponent_local);
-        self.assign(
-            accumulator_place.clone(),
-            MirOperand::Constant(MirConstant::Int(1)),
-            ty,
-            expr.span,
-        );
+        // The accumulator starts at one. A bare `Int(1)` stored into a
+        // decimal slot is the raw scale-8 carrier `1e-8`, so the decimal
+        // receiver starts from a `numerus` 1 through the runtime decimal
+        // conversion instead.
+        let accumulator_start = if decimal {
+            self.lower_decimal_one(ty, numerus_ty, expr.span)
+        } else {
+            MirOperand::Constant(MirConstant::Int(1))
+        };
+        self.assign(accumulator_place.clone(), accumulator_start, ty, expr.span);
         self.assign(base_place.clone(), base, ty, expr.span);
         self.assign(exponent_place.clone(), exponent, exponent_ty, expr.span);
 
@@ -2604,6 +2641,36 @@ impl FunctionBuilder<'_> {
         self.switch_to(done);
         self.assign(MirPlace::temp(destination), MirOperand::Place(accumulator_place), ty, expr.span);
         Some(MirOperand::Temp(destination))
+    }
+
+    /// Whether a `potentia` receiver is a width-scaled decimal (`d64`).
+    fn is_decimal_receiver(&self, receiver_ty: TypeId) -> bool {
+        matches!(
+            self.normalized_type(receiver_ty),
+            Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal()
+        )
+    }
+
+    /// The exact decimal `1.0` as an operand of `target_ty`.
+    ///
+    /// WHY: a bare `MirConstant::Int(1)` stored into a decimal slot is the raw
+    /// scale-8 carrier `1e-8`, not `1.0`, so `potentia`'s accumulator must
+    /// start from a `numerus` 1 put through the runtime decimal conversion.
+    fn lower_decimal_one(&mut self, target_ty: MirType, numerus_ty: MirType, span: Span) -> MirOperand {
+        self.runtime_call_value(
+            MirIntrinsic::Convert(MirConversion {
+                store: None,
+                flavor: MirConversionFlavor::Runtime,
+                source_ty: numerus_ty,
+                target_ty,
+                params: Vec::new(),
+                recovery: None,
+                struct_defaults: Vec::new(),
+            }),
+            vec![MirOperand::Constant(MirConstant::Int(1))],
+            target_ty,
+            span,
+        )
     }
 
     /// Emit the exponentiation-by-squaring loop for integer `potentia`. The
