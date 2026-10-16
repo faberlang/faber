@@ -416,3 +416,26 @@ fn vel_fallback_type_must_match_the_element() {
         &[],
     );
 }
+
+// --- the implicit store narrows a wider tensor element ----------------------
+
+/// A tensor store of a wider integer narrows at the store, checked per element
+/// exactly like the scalar store: `n / 2` over `tensor<i16, [4]>` is
+/// `tensor<i32, [4]>`, and landing it back in the slot is implicit (the explicit
+/// `↦` stays optional). The rule reaches the return position and a local slot.
+#[test]
+fn implicit_tensor_store_narrows_the_element_like_scalars() {
+    accepts("functio f(tensor<i16, [4]> n) → tensor<i16, [4]> { redde n / 2 }");
+    accepts(
+        "functio g(tensor<i16, [4]> n) → tensor<i16, [4]> {\n\
+         sit tensor<i16, [4]> t ← n / 2\n\
+         redde t\n}",
+    );
+    // A family crossing still refuses; the store does not smuggle `f32` into `i16`.
+    rejects(
+        "functio h(tensor<f32, [4]> n) → tensor<i16, [4]> { redde n }",
+        SemanticErrorKind::TypeMismatch,
+        "expression_type_mismatch",
+        &[],
+    );
+}
