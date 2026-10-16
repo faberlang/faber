@@ -7712,25 +7712,21 @@ incipit {
 }
 
 #[test]
-fn copia_mappata_fails_closed_before_set_mir_lowering() {
-    // F2-SET-MAP: the registry row admits `copia<T>.mappata` at typecheck, but
-    // the MIR collection-transform phase only owns array receivers. A set
-    // receiver must fail closed with an unsupported-MIR issue, never silently
-    // lower through the lista array transform.
-    let unit = analyze(
-        r"functio doubled(copia<numerus> s) → copia<numerus> {
-    redde s.mappata(numerus n ∴ n * 2)
-}",
-    );
-    let errors = dump_analyzed_unit(unit.application_view())
-        .expect_err("copia mappata must fail closed before set MIR lowering");
-    assert!(
-        errors
-            .iter()
-            .any(|err| err.issue.starts_with("unsupported_mir_lowering")),
-        "expected an unsupported-MIR issue, got: {:?}",
-        errors.iter().map(|err| &err.issue).collect::<Vec<_>>()
-    );
+fn copia_filtrata_and_mappata_walk_on_the_runner() {
+    // GAPS #44 / collections C1: a `copia` receiver walks the collection
+    // transform. The set is snapshotted into a `lista<T>` before the loop and
+    // the result is rebuilt as a set, which is unordered (D19.2), so each
+    // result is sorted before printing — never a raw set or an unsorted
+    // set-derived list.
+    let lines = run_lines(
+        "sit copia<numerus> s ← [1, 2, 3]\n\
+         sit copia<numerus> f ← s.filtrata(numerus x ∴ x ≻ 1)\n\
+         sit copia<numerus> m ← s.mappata(numerus x ∴ x % 2)\n\
+         nota ordinata via ascendens ex f\n\
+         nota ordinata via ascendens ex m",
+    )
+    .expect("copia filtrata/mappata must walk on the runner");
+    assert_eq!(lines, ["[2, 3]", "[0, 1]"]);
 }
 
 /// Run `body` as an `incipit` block and return its printed lines.
