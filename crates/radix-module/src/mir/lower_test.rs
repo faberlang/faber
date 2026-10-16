@@ -7729,6 +7729,23 @@ fn copia_filtrata_and_mappata_walk_on_the_runner() {
     assert_eq!(lines, ["[2, 3]", "[0, 1]"]);
 }
 
+#[test]
+fn itera_ab_walks_an_intervallum_value() {
+    // GAPS #44 / collections C3: `faber check` admits `itera ab` over a value
+    // whose type is `intervallum`, but lowering must materialize the stored
+    // interval into a `lista<T>` and walk it in order rather than decline with
+    // `itera ab source before range MIR lowering`. The stored interval is
+    // always monotonic (construction rejects reversed bounds), so the walk
+    // order matches the literal range it was built from.
+    let lines = run_lines("sit intervallum<numerus> r ← 2‥5\nitera ab r sit i { nota i }")
+        .expect("itera ab over an exclusive intervallum value must walk on the runner");
+    assert_eq!(lines, ["2", "3", "4"]);
+
+    let lines = run_lines("sit intervallum<numerus> s ← 2…5\nitera ab s sit i { nota i }")
+        .expect("itera ab over an inclusive intervallum value must walk on the runner");
+    assert_eq!(lines, ["2", "3", "4", "5"]);
+}
+
 /// Run `body` as an `incipit` block and return its printed lines.
 fn run_lines(body: &str) -> Result<Vec<String>, String> {
     let mut host = crate::mir::BufferHost::default();
