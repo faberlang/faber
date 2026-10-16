@@ -38,7 +38,7 @@ static const char *f_label(faber_arena *, const char *, int64_t);
 static int64_t f_quiet(faber_arena *);
 
 static const char *f_label(faber_arena *faber_a, const char *p_name, int64_t p_n) {
-    return faber_concat(faber_a, faber_concat(faber_a, faber_concat(faber_a, faber_concat(faber_a, faber_L0.s, p_name), faber_L1.s), faber_join(faber_a, 1, faber_int_text(faber_a, p_n))), faber_L2.s);
+    return faber_concat(faber_a, faber_concat(faber_a, faber_concat(faber_a, faber_concat(faber_a, faber_L0.s, p_name), faber_L1.s), faber_int_text(faber_a, p_n)), faber_L2.s);
 }
 
 static int64_t f_quiet(faber_arena *faber_a) {

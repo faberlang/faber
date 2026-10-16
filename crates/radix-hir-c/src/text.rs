@@ -120,12 +120,16 @@ impl Emitter<'_> {
                 },
             }
         }
-        let text = if parts.is_empty() {
-            "\"\"".to_owned()
-        } else {
-            self.support.need(Helper::Join);
-            let call = format!("faber_join(faber_a, {}, {})", parts.len(), parts.join(", "));
-            crate::expr::wrap(&prelude, &call)
+        let text = match parts.as_slice() {
+            [] => "\"\"".to_owned(),
+            // One piece is already the text: a join would allocate and copy
+            // the same immutable bytes a second time.
+            [only] => crate::expr::wrap(&prelude, only),
+            many => {
+                self.support.need(Helper::Join);
+                let call = format!("faber_join(faber_a, {}, {})", many.len(), many.join(", "));
+                crate::expr::wrap(&prelude, &call)
+            }
         };
         Ok(Operand::new(text, Value::Text).with_effect(effect))
     }
