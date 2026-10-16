@@ -3433,6 +3433,54 @@ fn sum_numeric_width_boundary_succeeds() {
     );
 }
 
+/// An empty float-typed sum returns a float zero, not an integer zero: the
+/// declared result width chooses the fold, so `lista<fractus>` with no
+/// elements is `0.0` at both `f64` and `f32` result types.
+#[test]
+fn sum_numeric_empty_float_returns_float_zero() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext, MirValueId,
+    };
+    use radix_types::{NumericWidth, Primitive, TypeTable};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let mut type_table = TypeTable::new();
+    let f64_ty = type_table.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let f32_ty = type_table.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    for (return_ty, label) in [(f64_ty, "f64"), (f32_ty, "f32")] {
+        runner.frames.last_mut().unwrap().values.insert(
+            MirValueId(0),
+            crate::Value::Array(Rc::new(RefCell::new(Vec::new()))),
+        );
+        let call = MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(MirCollectionOp::Sum),
+            args: vec![MirOperand::Value(MirValueId(0))],
+            return_ty: MirType::semantic(return_ty),
+        };
+        let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+        assert_eq!(
+            result.expect("empty float sum must succeed"),
+            crate::Value::Float(0.0),
+            "empty lista<fractus> sum at {label} must be a float zero"
+        );
+    }
+}
+
 /// The flat sum hands the exact total to the store: a partial sum that exceeds
 /// `i64` mid-fold but fits at the end returns the exact `Int`, and a total that
 /// exceeds `i64` only at the end returns the exact `UInt` an `inf` destination
