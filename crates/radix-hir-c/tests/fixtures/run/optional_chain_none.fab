@@ -1,0 +1,20 @@
++++
+locale = "en"
++++
+# Optional chaining over `none` is `none`: the runner reads no field and the
+# chain prints the locale's none word.
+
+class Inner {
+    mut int value = 0
+}
+
+class Holder {
+    mut Inner field
+}
+
+main {
+    let Holder with_value ← Holder { field = Inner { value = 5 } }
+    print with_value?.field?.value
+    let none absent ← null
+    print absent?.field
+}

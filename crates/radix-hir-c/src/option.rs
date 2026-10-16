@@ -33,6 +33,10 @@ impl Emitter<'_> {
             }
         };
         let base = self.expr(subject)?;
+        // Optional chaining over `none` is `none` (the runner reads no field).
+        if base.value == Value::None {
+            return Ok(base);
+        }
         // A genus that is not optional is always present: the chain is then
         // the plain field read, wrapped.
         let (Value::Opt(Inner::Genus(def_id)) | Value::Genus(def_id)) = base.value else {

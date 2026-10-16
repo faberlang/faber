@@ -152,3 +152,10 @@ fn a_ref_optional_scalar_parameter_is_a_pointer() {
     );
     assert!(code.contains("f_pick((&((faber_opt_i64){0})))"), "{code}");
 }
+
+#[test]
+fn optional_chaining_over_none_is_none() {
+    // The runner reads no field on a `none` chain; the value is the none word.
+    let code = emitted("main {\n    let none absent ← null\n    print absent?.field\n}");
+    assert!(code.contains("\"none\""), "{code}");
+}
