@@ -3433,6 +3433,79 @@ fn sum_numeric_width_boundary_succeeds() {
     );
 }
 
+/// A word-family sum is exact: a `wrapping<W>` or `saturating<W>` receiver
+/// yields the mathematical total, and the store applies the slot policy after
+/// the sum (store.rs wraps or clamps). "Math happens in the ether, and only at
+/// the store do we apply any of the boundary conditions." (operator ruling,
+/// restated 2026-10-01/02).
+#[test]
+fn sum_word_family_returns_exact_total_for_the_store() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext, MirValueId,
+    };
+    use radix_types::{NumericWidth, Type, TypeTable};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let mut type_table = TypeTable::new();
+    let wrapping_u8 = type_table.intern(Type::ModularWord(NumericWidth::U8));
+    let saturating_u8 = type_table.intern(Type::SaturatingWord(NumericWidth::U8));
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    for (return_ty, label) in [(wrapping_u8, "wrapping"), (saturating_u8, "saturating")] {
+        runner.frames.last_mut().unwrap().values.insert(
+            MirValueId(0),
+            crate::Value::Array(Rc::new(RefCell::new(vec![
+                crate::Value::Int(200),
+                crate::Value::Int(100),
+            ]))),
+        );
+        let call = MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(MirCollectionOp::Sum),
+            args: vec![MirOperand::Value(MirValueId(0))],
+            return_ty: MirType::semantic(return_ty),
+        };
+        let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+        assert_eq!(
+            result.expect("word-family sum must not trap"),
+            crate::Value::Int(300),
+            "{label}<u8> sum of 200 + 100 is the exact 300 for the store"
+        );
+    }
+
+    // In-width row: 200 + 55 = 255 is already the wrapped representative.
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        crate::Value::Array(Rc::new(RefCell::new(vec![
+            crate::Value::Int(200),
+            crate::Value::Int(55),
+        ]))),
+    );
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::Sum),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(wrapping_u8),
+    };
+    let result = runner.eval_runtime_call(&call, radix_lexer::Span::default());
+    assert_eq!(
+        result.expect("in-width word sum must not trap"),
+        crate::Value::Int(255),
+        "wrapping<u8> sum of 200 + 55 is 255"
+    );
+}
+
 /// An empty float-typed sum returns a float zero, not an integer zero: the
 /// declared result width chooses the fold, so `lista<fractus>` with no
 /// elements is `0.0` at both `f64` and `f32` result types.

@@ -27,8 +27,7 @@ use super::tensor_edge::{
 use super::value::{
     GradientStorage, LedgerValue, MapKey, MatrixValue, TensorEdgeOp, TensorInverseMap, TensorValue,
     Value, as_text_str, coordinate_fits, format_template_shaped, inverse_view_coordinate,
-    modular_operand, modular_word_reduce, modular_word_result, round_float, uint_width_checked_add,
-    values_equal, width_checked_add,
+    round_float, uint_width_checked_add, values_equal, width_checked_add,
 };
 use super::{
     CallOutcome, RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH, RUNNER_LISTA_LENGTH_MISMATCH, Runner,
@@ -2209,9 +2208,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    fn modular_word_width_of(&self, ty: MirType) -> Option<NumericWidth> {
+    fn word_family_width_of(&self, ty: MirType) -> Option<NumericWidth> {
         match self.types.get(ty.semantic_id()) {
-            Type::ModularWord(width) => Some(*width),
+            Type::ModularWord(width) | Type::SaturatingWord(width) => Some(*width),
             _ => None,
         }
     }
@@ -5254,15 +5253,23 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             _ => return Err(RunnerError::internal(span, "sum receiver type mismatch")),
         };
 
-        // Modular-word sum: fold with wrapping_add and mask to the declared
-        // width so the result respects 2^W wraparound.
-        if let Some(width) = self.modular_word_width_of(return_ty) {
-            let mut acc: i128 = 0;
+        // Word-family sum: fold exactly and let the store apply the slot
+        // policy. "Math happens in the ether, and only at the store do we
+        // apply any of the boundary conditions." (operator ruling, restated
+        // 2026-10-01/02). A `wrapping<u8>` store of 300 is 44 and a
+        // `saturating<u8>` store of 300 is 255, but the sum itself is 300.
+        if let Some(width) = self.word_family_width_of(return_ty) {
+            let overflow = || RunnerError::internal(span, "numerus overflow");
+            let mut total: i128 = 0;
             for value in &values {
-                let v = modular_operand(value.clone(), span, "modular sum element type mismatch")?;
-                acc = modular_word_reduce(acc + v, width);
+                let v = super::exact_int::int_value(value)
+                    .ok_or_else(|| RunnerError::internal(span, "word sum element type mismatch"))?;
+                total = total.checked_add(v).ok_or_else(overflow)?;
+                if !(super::exact_int::EXACT_MIN..=super::exact_int::EXACT_MAX).contains(&total) {
+                    return Err(overflow());
+                }
             }
-            return Ok(modular_word_result(acc, width));
+            return super::exact_int::exact_carrier(total, width).ok_or_else(overflow);
         }
 
         // The integer path is exact (d11-6 rulings 17 and 21): partial sums
