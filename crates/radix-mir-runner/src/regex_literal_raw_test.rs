@@ -34,6 +34,32 @@ fn regex_literal_keeps_double_backslash_raw() {
 }
 
 #[test]
+fn regex_literal_reuses_compiled_program_for_same_pattern_and_flags() {
+    let types = TypeTable::new();
+    let program = MirProgram::new();
+    let context = MirValidationContext::new(&types);
+    let mut interner = Interner::new();
+    let pattern = interner.intern(r"\\d+");
+    let mut host = BufferHost::default();
+    let runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    let constant = MirConstant::Regex {
+        pattern,
+        flags: None,
+    };
+
+    let first = runner
+        .eval_constant(&constant, Span::default())
+        .expect("regex literal compiles");
+    let second = runner
+        .eval_constant(&constant, Span::default())
+        .expect("same regex literal reuses compiled program");
+    let (Value::Regex(first), Value::Regex(second)) = (&first, &second) else {
+        panic!("regex constants evaluate to regex values");
+    };
+    assert!(Rc::ptr_eq(first, second));
+}
+
+#[test]
 fn regex_literal_flags_prefix_raw_body() {
     let types = TypeTable::new();
     let program = MirProgram::new();
