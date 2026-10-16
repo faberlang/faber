@@ -1365,6 +1365,9 @@ mod destructure_test;
 #[path = "empty_suite_test.rs"]
 mod empty_suite_test;
 #[cfg(test)]
+#[path = "generic_alias_test.rs"]
+mod generic_alias_test;
+#[cfg(test)]
 #[path = "regex_literal_test.rs"]
 mod regex_literal_test;
 #[cfg(test)]

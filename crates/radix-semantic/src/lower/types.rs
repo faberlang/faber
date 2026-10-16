@@ -38,6 +38,7 @@ use radix_types::{
     AppliedArg, BuiltinTensorEdgePolicy, compose_index_affine_constant, divide_index_exact,
     evaluate_index_dimension,
 };
+use rustc_hash::FxHashMap;
 
 const FIGURA_LIFT_PRIMARY_MSG: &str =
     "size lift extent expects a natural literal, a name, or a parenthesized expression";
@@ -823,12 +824,14 @@ impl Lowerer<'_> {
             return self.types.intern(Type::Error);
         };
 
-        let base = match symbol.kind {
+        let symbol_kind = symbol.kind;
+        let symbol_ty = symbol.ty;
+        let base = match symbol_kind {
             crate::SymbolKind::Struct => self.types.intern(Type::Struct(def_id)),
             crate::SymbolKind::Enum => self.types.intern(Type::Enum(def_id)),
             crate::SymbolKind::Interface => self.types.intern(Type::Interface(def_id)),
             crate::SymbolKind::TypeAlias => {
-                if let Some(resolved) = symbol.ty {
+                if let Some(resolved) = symbol_ty {
                     let body = crate::index::freshen_bounded_capacity_holes(self.types, resolved);
                     self.types.intern(Type::Alias(def_id, body))
                 } else {
@@ -853,6 +856,33 @@ impl Lowerer<'_> {
         };
         if args.is_empty() {
             return base;
+        }
+        if symbol_kind == crate::SymbolKind::TypeAlias && has_declared_params && !params.is_empty()
+        {
+            let descriptors = self
+                .resolver
+                .generic_param_descriptors(def_id)
+                .map(ToOwned::to_owned);
+            if let Some(descriptors) = descriptors {
+                let has_size_params = descriptors
+                    .iter()
+                    .any(|descriptor| descriptor.sort == crate::GenericParamSort::Magnitudo);
+                let has_size_args = args.iter().any(|arg| matches!(arg, AppliedArg::Size(_)));
+                if !has_size_params && !has_size_args {
+                    let vars: FxHashMap<_, _> = descriptors
+                        .iter()
+                        .zip(&args)
+                        .filter_map(|(descriptor, arg)| match arg {
+                            AppliedArg::Type(ty) => Some((descriptor.name, *ty)),
+                            AppliedArg::Size(_) => None,
+                        })
+                        .collect();
+                    if let Type::Alias(alias, body) = self.types.get(base).clone() {
+                        let body = crate::index::substitute_alias_params(self.types, body, &vars);
+                        return self.types.intern(Type::Alias(alias, body));
+                    }
+                }
+            }
         }
         self.types.intern(Type::Applied(base, args))
     }
