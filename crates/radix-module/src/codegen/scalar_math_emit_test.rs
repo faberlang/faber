@@ -1,10 +1,12 @@
 //! A2-LIFT G01: the built-in math functions as scalar float methods lower on
-//! the MIR runner, Rust, TypeScript, Go, LLVM, S-expression and Swift. The
-//! Python and Haskell leaves have no scalar math lowering and fail closed with
-//! a named diagnostic, never an emitted `x.radix()` method call on a number.
-//! Swift maps each function onto Foundation's free function. Rust maps
-//! every function onto the std `f64` function (IEEE: NaN on a domain miss,
-//! infinity on overflow), computing `f32` through `f64` as the runner does.
+//! the MIR runner, Rust, TypeScript, Go, LLVM, S-expression, Swift and Python.
+//! The Haskell leaf has no scalar math lowering and fails closed with a named
+//! diagnostic, never an emitted `x.radix()` method call on a number. Python
+//! maps each function onto the IEEE-safe `_faber_math` helper (NaN on a domain
+//! miss, infinity on overflow, `-inf` for `ln(0)`/`log10(0)`). Swift maps each
+//! function onto Foundation's free function. Rust maps every function onto the
+//! std `f64` function (IEEE: NaN on a domain miss, infinity on overflow),
+//! computing `f32` through `f64` as the runner does.
 
 use crate::codegen::Target;
 use crate::{Compiler, Config, Output};
@@ -35,22 +37,21 @@ fn has_args(diagnostics: &[crate::Diagnostic], expected: &[(&str, &str)]) -> boo
 
 #[cfg(feature = "hir-python")]
 #[test]
-fn python_fails_closed_for_every_function() {
+fn python_lowers_every_function_through_the_ieee_helper() {
     for function in radix_types::MirMathFunction::SCALAR {
-        let source = source(function.latin_name(), "f32");
-        let diagnostics = failure_diagnostics(Target::HirPython, &source);
-        assert!(
-            has_args(
-                &diagnostics,
-                &[
-                    ("issue", "scalar_math_function_unsupported"),
-                    ("function", function.name()),
-                    ("target", "Python"),
-                ]
-            ),
-            "Python {}: {diagnostics:?}",
-            function.name()
-        );
+        for ty in ["f32", "f64"] {
+            let result = compile(Target::HirPython, &source(function.latin_name(), ty));
+            let Some(Output::Python(out)) = result.output else {
+                panic!("python output for {}: {:?}", function.name(), result.diagnostics);
+            };
+            assert!(
+                out.code
+                    .contains(&format!("_faber_math(\"{}\", p_x)", function.name())),
+                "{} {ty}:\n{}",
+                function.name(),
+                out.code
+            );
+        }
     }
 }
 

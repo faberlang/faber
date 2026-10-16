@@ -9,7 +9,7 @@ use crate::Emitter;
 use crate::error::unsupported;
 use crate::expr::{Operand, Value, c_string, wrap};
 use crate::helpers::Helper;
-use crate::ty::{Inner, Ty, classify};
+use crate::ty::{Inner, IntWidth, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{HirExpression, HirExpressionKind, HirLiteral};
 
@@ -289,6 +289,9 @@ impl Emitter<'_> {
             value.text.clone()
         } else if inner == Inner::Bool {
             format!("(({}).value)", value.text)
+        } else if form == Value::Exact {
+            // A `u64` slot holds a `uint64_t`; the exact form is `faber_i128`.
+            format!("((faber_i128)({}).value)", value.text)
         } else {
             format!("({}).value", value.text)
         };
@@ -312,6 +315,8 @@ impl Emitter<'_> {
                 let read = format!("{t}.value");
                 let payload = if class == Ty::Bool {
                     Operand::new(format!("({read})"), Value::Truth)
+                } else if class == Ty::Modular(IntWidth::U64) {
+                    Operand::new(format!("((faber_i128){read})"), Value::Exact)
                 } else {
                     Operand::new(read, Value::from(class))
                 };
