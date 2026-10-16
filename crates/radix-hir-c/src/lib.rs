@@ -304,10 +304,11 @@ impl Emitter<'_> {
         // statics carry the text header, so a literal's value is the `.s`
         // reference with its counts already in place.
         for (index, (source, bytes, cps)) in self.text_literals.iter().enumerate() {
-            let _ = write!(
+            write!(
                 out,
                 "FABER_TEXT_LITERAL(faber_L{index}, {source}, {bytes}, {cps});\n"
-            );
+            )
+            .ok();
         }
         out.push_str(&items.genera);
         if !items.constants.is_empty() {
