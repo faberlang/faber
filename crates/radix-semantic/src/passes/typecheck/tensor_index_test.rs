@@ -293,17 +293,19 @@ fn tensor_arithmetic_textus_element_rejects() {
 }
 
 #[test]
-fn tensor_arithmetic_mixed_width_result_cannot_narrow() {
-    // Glyph addition joins i32 and i64 elements; storing the result in i32
-    // still requires an explicit conversion rather than silent narrowing.
-    rejects_with_issue(
+fn tensor_arithmetic_mixed_width_result_narrows_at_the_store() {
+    // Glyph addition joins i32 and i64 elements to i64. Under ruling Q-X3
+    // (2026-10-15, need; numeric-model.md section 5) the
+    // tensor<i32, [2]> slot is a checked element-narrowing store (implicit
+    // store node, run-time trap out of range) — the container twin of the
+    // scalar store rule — not a compile error.
+    accepts(
         r"incipit {
   sit tensor<i32, [2]> a ← vacua
   sit tensor<i64, [2]> b ← vacua
   sit tensor<i32, [2]> c ← a + b
   nota c.longitudo()
 }",
-        "initializer_annotation_mismatch",
     );
 }
 

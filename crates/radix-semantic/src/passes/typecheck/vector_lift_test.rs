@@ -118,19 +118,22 @@ fn an_integer_lane_takes_the_scalar_range_rule() {
 }
 
 #[test]
-fn an_integer_lane_is_never_narrowed_by_a_wider_scalar_implicitly() {
+fn an_integer_lane_narrows_only_at_the_return_store() {
     // The scalar range rule widens the intermediate: `i8` + `i32` spans
-    // [-2^31-128, 2^31+126], so the result is `i64`, not the `i32` scalar.
+    // [-2^31-128, 2^31+126], so the lane is `i64`, not the `i32` scalar — the
+    // lane is still never narrowed mid-expression (first assertion). The
+    // vector<i8, 3> return slot applies the checked element narrowing at the
+    // store (ruling Q-X3, 2026-10-15, need).
     accepts(&function(
         "vector<i8, 3> a, i32 s",
         "vector<i64, 3>",
         "a + s",
     ));
-    rejects(
-        &function("vector<i8, 3> a, i32 s", "vector<i8, 3>", "a + s"),
-        SemanticErrorKind::TypeMismatch,
-        "return_type_mismatch",
-    );
+    accepts(&function(
+        "vector<i8, 3> a, i32 s",
+        "vector<i8, 3>",
+        "a + s",
+    ));
 }
 
 #[test]

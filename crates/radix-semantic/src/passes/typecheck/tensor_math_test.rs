@@ -71,12 +71,18 @@ fn absolutum_takes_integer_elements_and_range_types_them() {
     // lift is "the scalar operation per element", so the element follows.
     accepts("functio lifted(tensor<i8, [3]> x) → tensor<u8, [3]> {\n    redde x.absolutum()\n}");
     accepts("functio lifted(tensor<u8, [3]> x) → tensor<u8, [3]> {\n    redde x.absolutum()\n}");
+    // Under ruling Q-X3 (2026-10-15, need) the i8 return slot
+    // accepts the tensor<u8,[3]> absolutum as a checked u8→i8 element
+    // narrowing (run-time trap for |x| > 127).
+    accepts("functio lifted(tensor<i8, [3]> x) → tensor<i8, [3]> {\n    redde x.absolutum()\n}");
+    // Q-X3 narrows only same-family integer elements, so a float-element
+    // return slot still errors.
     assert!(
         !errors_of(
-            "functio lifted(tensor<i8, [3]> x) → tensor<i8, [3]> {\n    redde x.absolutum()\n}"
+            "functio lifted(tensor<i8, [3]> x) → tensor<f32, [3]> {\n    redde x.absolutum()\n}"
         )
         .is_empty(),
-        "an i8 tensor's absolutum is not an i8 tensor"
+        "an i8 tensor's absolutum is not a float tensor"
     );
 }
 

@@ -161,15 +161,13 @@ fn tensor_lift_range_rule_intermediate_sub_widens_to_i16() {
 }
 
 #[test]
-fn tensor_lift_range_rule_intermediate_is_not_narrowed_to_the_operand() {
-    // The intermediate is `u16`; the width applies only at the store, so a
-    // `u8` return type is a type mismatch.
-    rejects(
-        "functio f(tensor<u8, [2]> a, tensor<u8, [2]> b) → tensor<u8, [2]> { redde a + b }",
-        SemanticErrorKind::TypeMismatch,
-        "return_type_mismatch",
-        &[],
-    );
+fn tensor_lift_range_rule_intermediate_narrows_only_at_the_store() {
+    // The intermediate keeps the range-rule tensor<u16,[2]> (still pinned by
+    // the unchanged sibling
+    // `tensor_lift_range_rule_intermediate_chain_keeps_the_range_rule_type`)
+    // and the u8 return slot applies the checked element narrowing (ruling
+    // Q-X3, 2026-10-15, need) — a run-time check, not a mismatch.
+    accepts("functio f(tensor<u8, [2]> a, tensor<u8, [2]> b) → tensor<u8, [2]> { redde a + b }");
 }
 
 #[test]
@@ -184,15 +182,11 @@ fn tensor_lift_range_rule_intermediate_chain_keeps_the_range_rule_type() {
 }
 
 #[test]
-fn a_narrower_join_result_is_not_assignable_to_the_wider_operand_type() {
-    operands_invalid_or_mismatch(
-        "functio f(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<u8, [2]> { redde a + b }",
-    );
-}
-
-fn operands_invalid_or_mismatch(source: &str) {
-    let result = analyze_source(source);
-    assert!(!result.is_ok(), "expected failure:\n{source}");
+fn a_wider_join_intermediate_narrows_at_the_return_store() {
+    // The u8+u16 range-rule intermediate is wider than u8, and the u8 return
+    // slot takes the checked element narrowing (ruling Q-X3, 2026-10-15,
+    // need).
+    accepts("functio f(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<u8, [2]> { redde a + b }");
 }
 
 #[test]
