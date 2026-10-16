@@ -31,8 +31,27 @@ fn wait_for_archive(archive: &Path) {
     }
 }
 
+/// A failed `cargo build` is transient when a concurrent workspace pass is
+/// rebuilding or tearing this tree down underneath it: a vanished manifest or
+/// source path, or a file-lock wait. A real diagnostic keeps the loud assert.
+fn is_transient_build_failure(output: &str) -> bool {
+    [
+        "failed to find a workspace root",
+        "No such file or directory",
+        "Blocking waiting for file lock",
+    ]
+    .iter()
+    .any(|marker| output.contains(marker))
+}
+
 /// Build `faber-host-clif` into the profile directory this test executable
 /// lives in (`<target>/<profile>/deps/<exe>`) and return the archive path.
+///
+/// A concurrent tree teardown can fail one `cargo` invocation transiently; up
+/// to three attempts are made. If every attempt fails but `libfaber_rt_clif.a`
+/// already sits in the profile directory, the workspace `--no-run` pass built
+/// it from this same tree moments earlier, so that archive is returned instead
+/// of asserting; only a genuinely absent archive keeps the loud assert.
 fn build_archive() -> PathBuf {
     let exe = std::env::current_exe().expect("test executable path");
     let profile_dir = exe
@@ -62,20 +81,36 @@ fn build_archive() -> PathBuf {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-    let built = build.output().expect("run cargo build -p faber-host-clif");
-    assert!(
-        built.status.success(),
-        "cargo build -p faber-host-clif failed: {}{}",
-        String::from_utf8_lossy(&built.stdout),
-        String::from_utf8_lossy(&built.stderr),
-    );
+    let mut last_failure = None;
+    for attempt in 1..=3 {
+        if attempt > 1 {
+            std::thread::sleep(Duration::from_secs(5));
+        }
+        let built = build.output().expect("run cargo build -p faber-host-clif");
+        if built.status.success() {
+            break;
+        }
+        let output = format!(
+            "{}{}",
+            String::from_utf8_lossy(&built.stdout),
+            String::from_utf8_lossy(&built.stderr),
+        );
+        assert!(
+            is_transient_build_failure(&output),
+            "cargo build -p faber-host-clif failed: {output}",
+        );
+        last_failure = Some(output);
+    }
 
     let archive = profile_dir.join("libfaber_rt_clif.a");
     wait_for_archive(&archive);
     assert!(
         archive.exists(),
-        "cargo build did not produce {}",
-        archive.display()
+        "cargo build did not produce {}{}",
+        archive.display(),
+        last_failure
+            .map(|output| format!(": {output}"))
+            .unwrap_or_default(),
     );
     archive
 }
