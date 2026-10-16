@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/lineam/lineam-stdin.fab"
+group = "language"
+input_root = "corpus"
+input = "lineam/lineam-stdin.fab"
+stdin = "stdin.txt"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

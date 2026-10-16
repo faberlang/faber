@@ -1,0 +1,33 @@
++++
+term = "lineam"
+explains = ["lineam"]
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "sit_decl", "lege_expr", "expression", "nota_stmt"]
+category = "io"
+canonical = true
+summary = "Reads one line of stdin without its terminator; none at end of input."
+syntax = "lege lineam"
+related = ["lege"]
+locale = "en"
++++
+# =============================================================================
+# lineam — Reads one line from stdin without its terminator.
+# =============================================================================
+#
+# What this teaches:
+#   • successive line reads — the read at EOF produces none
+#
+# Common mistakes:
+#   • Treating lineam as including the line terminator.
+#
+# See also: lineam.fab, lege
+# =============================================================================
+
+main {
+    let _ a ← line
+    let _ b ← line
+    let _ c ← line
+    print a
+    print b
+    print c
+}
