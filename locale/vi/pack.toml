@@ -812,6 +812,10 @@ help = "xóa dum khỏi các thân fac của clausura"
 message = "biểu thức vượt quá giới hạn {limit} toán tử của parser"
 help = "tách biểu thức thành các binding có tên"
 
+[diagnostics.PARSE030.issues.nesting_too_deep]
+message = "nguồn lồng sâu hơn giới hạn parser là {limit}"
+help = "tách biểu thức thành các binding có tên"
+
 [diagnostics.PARSE031]
 message = "literal không hợp lệ"
 help = "kiểm tra dạng literal"
@@ -883,6 +887,18 @@ help = "dùng chính tả kiểu được khai báo trong ngôn ngữ đọc nà
 [diagnostics.PARSE040.issues.est_value_literal_names_equality]
 message = "`est` kiểm tra kiểu; '{value}' là một giá trị"
 help = "so sánh giá trị bằng họ toán tử bằng nhau: `≡` (chặt), `≅` (chính xác sau khi nâng kiểu), `≈` (mờ); để kiểm tra kiểu null, viết `x est {type}`"
+
+[diagnostics.PARSE040.issues.nesting_too_deep]
+message = "nguồn lồng sâu hơn giới hạn parser là {limit}"
+help = "tách kiểu thành các binding có tên"
+
+[diagnostics.PARSE040.issues.unexpected_cap_after_union_hole]
+message = "`∩` không thể theo sau một lỗ `∪` trong một kiểu"
+help = "viết thành viên hợp nhất trước khi kết hợp với `∩`"
+
+[diagnostics.PARSE040.issues.unexpected_cup_after_union_hole]
+message = "`∪` không thể theo sau một lỗ `∪` trong một kiểu"
+help = "xóa `∪` thừa hoặc viết thành viên"
 
 [diagnostics.PARSE041]
 message = "chú thích kiểu không hợp lệ"

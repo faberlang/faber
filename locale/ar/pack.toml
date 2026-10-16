@@ -812,6 +812,10 @@ help = "أزل {dum} من closure {fac} bodies"
 message = "يتجاوز التعبير حد المحلل البالغ {limit} من العوامل"
 help = "قسّم التعبير إلى ارتباطات مسماة"
 
+[diagnostics.PARSE030.issues.nesting_too_deep]
+message = "المصدر أعمق من حد المحلل البالغ {limit}"
+help = "قسّم التعبير إلى ارتباطات مسماة"
+
 [diagnostics.PARSE031]
 message = "حرفية غير صالحة"
 help = "تحقق من صيغة الحرفية"
@@ -883,6 +887,18 @@ help = "استخدم تهجئة النوع المعلنة في لغة القار
 [diagnostics.PARSE040.issues.est_value_literal_names_equality]
 message = "`est` يختبر الأنواع؛ '{value}' قيمة"
 help = "قارن القيم بعائلة المساواة: `≡` (صارمة)، `≅` (دقيقة بعد الترقية)، `≈` (تقريبية)؛ لاختبار النوع الفارغ اكتب `x est {type}`"
+
+[diagnostics.PARSE040.issues.nesting_too_deep]
+message = "المصدر أعمق من حد المحلل البالغ {limit}"
+help = "قسّم النوع إلى ارتباطات مسماة"
+
+[diagnostics.PARSE040.issues.unexpected_cap_after_union_hole]
+message = "لا يمكن أن يتبع `∩` فجوة `∪` في نوع"
+help = "اكتب عضو الاتحاد قبل الدمج بـ `∩`"
+
+[diagnostics.PARSE040.issues.unexpected_cup_after_union_hole]
+message = "لا يمكن أن يتبع `∪` فجوة `∪` في نوع"
+help = "أزل `∪` الزائد أو اكتب العضو"
 
 [diagnostics.PARSE041]
 message = "تعليمة نوع غير صالحة"
