@@ -182,7 +182,10 @@ impl Emitter<'_> {
                 // An alias is resolved in the type table; a use of one that
                 // names an unsupported type is rejected where it is used.
                 HirItemKind::TypeAlias(_) => {}
-                HirItemKind::Schema(_) => return Err(unsupported("schema declaration")),
+                // A schema is an experimental application-owned heading with
+                // no runtime effect; `faber run` declares it and runs the
+                // entry. A use of the type is rejected where it is used.
+                HirItemKind::Schema(_) => {}
                 HirItemKind::Import(_) => return Err(unsupported("import (library modules)")),
             }
         }

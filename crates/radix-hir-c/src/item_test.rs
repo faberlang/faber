@@ -87,3 +87,15 @@ fn an_uncalled_generic_function_is_skipped() {
     assert!(!code.contains("f_id"), "{code}");
     assert!(code.contains("\"ok\""), "{code}");
 }
+
+#[test]
+fn a_schema_declaration_has_no_runtime_effect() {
+    // `faber run` declares the heading and runs the entry block; the schema
+    // itself is compile-time only, and a use of its type is rejected where it
+    // is used.
+    let code = emitted(
+        "schema Persona {\n    column string nomen\n    column int aetas\n}\nmain {\n    print \"schema declared\"\n}",
+    );
+    assert!(code.contains("\"schema declared\""), "{code}");
+    assert!(!code.contains("Persona"), "{code}");
+}

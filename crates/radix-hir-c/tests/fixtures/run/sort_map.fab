@@ -1,0 +1,13 @@
++++
+locale = "en"
++++
+# `sort via asc|desc from m` orders a map's values; `ref m` orders its keys
+# (the corpus' `de`). Key and value order is otherwise unspecified.
+main {
+    let map<string, int> m ← { "gamma": 30, "alpha": 20, "beta": 10, "delta": 20 }
+    print sort via asc from m
+    print sort via desc from m
+    print sort via asc ref m
+    print sort via desc ref m
+    print m.length()
+}

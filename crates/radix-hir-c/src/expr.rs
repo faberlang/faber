@@ -367,12 +367,16 @@ impl Emitter<'_> {
             }
             HirExpressionKind::Sort {
                 direction,
-                source_mode: radix_hir::HirSortSource::Values,
+                source_mode,
                 source,
                 binding: None,
                 body: None,
                 ..
-            } => self.sort_values(*direction, source),
+            } => self.sort_values(
+                *direction,
+                source,
+                *source_mode == radix_hir::HirSortSource::Keys,
+            ),
             HirExpressionKind::Struct(def_id, fields) => {
                 let given = fields
                     .iter()

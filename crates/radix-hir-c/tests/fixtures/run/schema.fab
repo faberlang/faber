@@ -1,0 +1,12 @@
++++
+locale = "en"
++++
+# A schema declaration is an application-owned heading with no runtime effect:
+# `faber run` declares it and runs the entry block.
+schema Persona {
+    column string nomen
+    column int aetas
+}
+main {
+    print "schema declared"
+}

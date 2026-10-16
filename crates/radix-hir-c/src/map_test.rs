@@ -53,3 +53,18 @@ fn map_iteration_walks_values_with_the_key_coordinate() {
     assert!(code.contains("->keys->items["), "{code}");
     assert!(code.contains("map changed size during iteration"), "{code}");
 }
+
+#[test]
+fn a_map_sort_orders_values_or_keys() {
+    let code = emitted(
+        "main {\n    let map<string, int> m ← { \"x\": 1 }\n    print sort via asc from m\n    print sort via desc ref m\n}",
+    );
+    assert!(
+        code.contains("faber_list_i64_sorted(faber_a, faber_map_text_i64_values(faber_a,"),
+        "{code}"
+    );
+    assert!(
+        code.contains("faber_list_text_sorted(faber_a, faber_map_text_i64_keys(faber_a,"),
+        "{code}"
+    );
+}

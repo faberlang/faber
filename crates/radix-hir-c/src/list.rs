@@ -364,24 +364,36 @@ impl Emitter<'_> {
         }
     }
 
-    /// `sort via asc|desc from xs`: a new list, ordered by value. Equal
-    /// elements are identical, so stability cannot show; floats order by
-    /// IEEE totalOrder, text by code point.
+    /// `sort via asc|desc ex xs` (values) or `de m` (a map's keys): a new
+    /// list, ordered by value. Equal elements are identical, so stability
+    /// cannot show; floats order by IEEE totalOrder, text by code point.
     pub(crate) fn sort_values(
         &mut self,
         direction: radix_hir::HirSortDirection,
         source: &HirExpression,
+        keys: bool,
     ) -> Result<Operand, CodegenError> {
         let list = self.expr(source)?;
-        let (Value::List(elem) | Value::Set(elem)) = list.value else {
-            return Err(unsupported("sort of a value that is not a list"));
+        // `sort … ex m` orders the map's values and `de m` its keys, as the
+        // runner does; the side's list is materialized first.
+        let (list_text, elem) = match list.value {
+            Value::List(elem) | Value::Set(elem) => (list.text.clone(), elem),
+            Value::Map(k, v) => {
+                let (side, elem) = if keys { ("keys", k) } else { ("values", v) };
+                self.support.need(Helper::List(elem, ListOp::New));
+                (
+                    format!(
+                        "faber_map_{}_{side}(faber_a, {})",
+                        Self::map_suffix(k, v),
+                        list.text
+                    ),
+                    elem,
+                )
+            }
+            _ => return Err(unsupported("sort of a value that is not a list")),
         };
         self.support.need(Helper::List(elem, ListOp::New));
-        let sorted = format!(
-            "faber_list_{}_sorted(faber_a, {})",
-            elem.suffix(),
-            list.text
-        );
+        let sorted = format!("faber_list_{}_sorted(faber_a, {list_text})", elem.suffix());
         let text = match direction {
             radix_hir::HirSortDirection::Ascending => sorted,
             radix_hir::HirSortDirection::Descending => {
