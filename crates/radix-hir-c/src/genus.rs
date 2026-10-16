@@ -246,6 +246,7 @@ impl Emitter<'_> {
         &mut self,
         def_id: DefId,
         given: &[(Symbol, &HirExpression)],
+        base: Option<&HirExpression>,
     ) -> Result<Operand, CodegenError> {
         let (c_name, fields) = {
             let genus = self.genus(def_id)?;
@@ -274,6 +275,12 @@ impl Emitter<'_> {
             if assigned.contains(&field.name) {
                 continue;
             }
+            if base.is_some() {
+                // Copy-with-changes: an omitted field is a shallow copy of the
+                // base field (pointers alias, scalars copy), so the default is
+                // never evaluated.
+                continue;
+            }
             let operand = match (&field.default, field.sponte) {
                 (Some(default), _) => self.field_value(default, field.ty)?,
                 (None, true) => self.none_of(field.ty)?,
@@ -284,6 +291,24 @@ impl Emitter<'_> {
                 }
             };
             write!(body, "{target}->{} = {}; ", field.c_name, operand.text).ok();
+        }
+        if let Some(base) = base {
+            let base_operand = self.expr(base)?;
+            effect |= base_operand.effect;
+            let base_target = format!("faber_t{}", self.temps);
+            self.temps += 1;
+            write!(body, "{c_name} *{base_target} = {}; ", base_operand.text).ok();
+            for field in &fields {
+                if assigned.contains(&field.name) {
+                    continue;
+                }
+                write!(
+                    body,
+                    "{target}->{} = {base_target}->{}; ",
+                    field.c_name, field.c_name
+                )
+                .ok();
+            }
         }
         // The `creo` hook runs once on the finished object, after every field
         // is set (the runner's construction does the same).
@@ -316,16 +341,21 @@ impl Emitter<'_> {
         entries: &[radix_hir::HirObjectField],
     ) -> Result<Operand, CodegenError> {
         let mut given = Vec::with_capacity(entries.len());
+        let mut base: Option<&HirExpression> = None;
         for entry in entries {
-            let radix_hir::HirObjectKey::Ident(symbol) = entry.key else {
-                return Err(unsupported("object literal key that is not a field name"));
-            };
-            let Some(value) = &entry.value else {
-                return Err(unsupported("shorthand field in an object literal"));
-            };
-            given.push((symbol, value));
+            match &entry.key {
+                radix_hir::HirObjectKey::Ident(symbol) => {
+                    let Some(value) = &entry.value else {
+                        return Err(unsupported("shorthand field in an object literal"));
+                    };
+                    given.push((*symbol, value));
+                }
+                // `Genus { … } from source`: every omitted field is copied.
+                radix_hir::HirObjectKey::Spread(source) => base = Some(source),
+                _ => return Err(unsupported("object literal key that is not a field name")),
+            }
         }
-        self.construct(def_id, &given)
+        self.construct(def_id, &given, base)
     }
 
     /// A value stored into a field of class `ty`; an unwrapped exact value

@@ -396,7 +396,7 @@ impl Emitter<'_> {
                 if self.variant(*def_id).is_some() {
                     return self.construct_variant(*def_id, &given);
                 }
-                self.construct(*def_id, &given)
+                self.construct(*def_id, &given, None)
             }
             HirExpressionKind::Verte {
                 target,
