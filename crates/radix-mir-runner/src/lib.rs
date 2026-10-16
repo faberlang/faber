@@ -21,6 +21,7 @@ pub mod kernel_lanes;
 mod regex_literal_raw_test;
 mod regex_program;
 mod routes;
+mod run_tier;
 mod runtime;
 pub mod sermo;
 #[cfg(test)]
@@ -33,6 +34,7 @@ mod tensor_lift;
 pub mod value;
 
 pub use capability::{RunnerDispatchStatus, classify_runner_lowerability, runner_dispatch_status};
+pub use run_tier::classify_run_tier;
 
 pub use host::{BufferHost, Host, StdioHost};
 pub use inf::{
