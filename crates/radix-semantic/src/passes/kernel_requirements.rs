@@ -657,19 +657,27 @@ fn device_target_index(target: Target) -> usize {
 
 fn supports_width(target: Target, requirement: &KernelWidthRequirement) -> bool {
     match requirement.primitive {
-        Primitive::Numerus => match requirement.policy {
-            KernelNumericPolicy::Exact | KernelNumericPolicy::Saturating => {
-                matches!(requirement.width, NumericWidth::I32 | NumericWidth::U32)
+        Primitive::Numerus => {
+            let integer_width = matches!(
+                requirement.width,
+                NumericWidth::I8
+                    | NumericWidth::I16
+                    | NumericWidth::I32
+                    | NumericWidth::U8
+                    | NumericWidth::U16
+                    | NumericWidth::U32
+            );
+            match requirement.policy {
+                KernelNumericPolicy::Exact | KernelNumericPolicy::Saturating => integer_width,
+                KernelNumericPolicy::Wrapping => {
+                    target.supports_wrapping_kernel_integers() && integer_width
+                }
+                KernelNumericPolicy::PolicyFloat => false,
             }
-            KernelNumericPolicy::Wrapping => {
-                target.supports_wrapping_kernel_integers()
-                    && matches!(requirement.width, NumericWidth::I32 | NumericWidth::U32)
-            }
-            KernelNumericPolicy::PolicyFloat => false,
-        },
+        }
         Primitive::Fractus => match requirement.width {
             NumericWidth::F32 => true,
-            NumericWidth::F16 => target.is_device_target(),
+            NumericWidth::F16 | NumericWidth::BF16 => target.is_device_target(),
             _ => false,
         },
         _ => false,
