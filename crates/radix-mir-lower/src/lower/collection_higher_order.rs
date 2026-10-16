@@ -293,18 +293,54 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(receiver.span, "collection transform receiver"));
             return None;
         };
-        let normalized = self.normalized_type(receiver_ty);
-        if !matches!(normalized, Type::Array(_) | Type::BoundedArray { .. }) {
-            self.errors.push(MirError::unsupported(
-                receiver.span,
-                "collection transform before array MIR lowering",
-            ));
-            return None;
-        }
+        let set_element = match self.normalized_type(receiver_ty) {
+            Type::Array(_) | Type::BoundedArray { .. } => None,
+            Type::Set(item) => Some(*item),
+            _ => {
+                self.errors.push(MirError::unsupported(
+                    receiver.span,
+                    "collection transform before array MIR lowering",
+                ));
+                return None;
+            }
+        };
         let collection_ty = MirType::semantic(receiver_ty);
         let result_ty = self.expr_ty(expr)?;
         let collection = self.lower_expr_value(receiver)?;
         let collection = self.materialize_operand_place(collection, collection_ty, receiver.span);
+        // A `copia` is unordered (D19.2): snapshot it into a `lista<T>`, the same
+        // `copia ↦ lista<T>` conversion `for from` lowers to, so the loop reads
+        // the array lane through one place. The rebuilt result is still a set,
+        // so element order cannot leak into the result.
+        let collection = match set_element {
+            Some(element) => {
+                let Some(array) = self.types.find_array(element) else {
+                    self.errors
+                        .push(MirError::missing_type(receiver.span, "copia transform snapshot list"));
+                    return None;
+                };
+                let array_ty = MirType::semantic(array);
+                let snapshot = self.runtime_call_value(
+                    MirIntrinsic::Convert(MirConversion {
+                        store: None,
+                        flavor: MirConversionFlavor::Runtime,
+                        source_ty: collection_ty,
+                        target_ty: array_ty,
+                        params: Vec::new(),
+                        recovery: None,
+                        struct_defaults: Vec::new(),
+                    }),
+                    vec![MirOperand::Place(collection)],
+                    array_ty,
+                    receiver.span,
+                );
+                if !self.current_is_open() {
+                    return None;
+                }
+                self.materialize_operand_place(snapshot, array_ty, receiver.span)
+            }
+            None => collection,
+        };
         self.lower_transform_over(collection, callback, kind, result_ty, expr.span)
     }
 
@@ -318,25 +354,22 @@ impl FunctionBuilder<'_> {
         result_ty: MirType,
         span: Span,
     ) -> Option<MirOperand> {
-        let result_element_ty = if let Type::Array(item) = self.normalized_type(result_ty.semantic_id()) {
-            MirType::semantic(*item)
-        } else {
-            self.errors.push(MirError::unsupported(
-                span,
-                "collection transform result before array MIR lowering",
-            ));
-            return None;
+        let (result_element_ty, result_aggregate) = match self.normalized_type(result_ty.semantic_id()) {
+            Type::Array(item) => (MirType::semantic(*item), MirAggregateKind::Array),
+            Type::Set(item) => (MirType::semantic(*item), MirAggregateKind::Set),
+            _ => {
+                self.errors.push(MirError::unsupported(
+                    span,
+                    "collection transform result before array MIR lowering",
+                ));
+                return None;
+            }
         };
         let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let vacuum = MirType::semantic(self.types.primitive(Primitive::Vacuum));
 
-        let result = self.construct_temp(
-            MirAggregateKind::Array,
-            MirAggregateFields::Ordered(Vec::new()),
-            result_ty,
-            span,
-        );
+        let result = self.construct_temp(result_aggregate, MirAggregateFields::Ordered(Vec::new()), result_ty, span);
         let result = self.materialize_operand_place(result, result_ty, span);
 
         let index = self.next_local_id();
@@ -1169,7 +1202,9 @@ impl FunctionBuilder<'_> {
 
     fn collection_element_ty(&self, ty: TypeId) -> Option<MirType> {
         match self.normalized_type(ty) {
-            Type::Array(item) | Type::BoundedArray { element: item, .. } => Some(MirType::semantic(*item)),
+            Type::Array(item) | Type::BoundedArray { element: item, .. } | Type::Set(item) => {
+                Some(MirType::semantic(*item))
+            }
             _ => None,
         }
     }
