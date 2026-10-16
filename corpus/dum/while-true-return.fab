@@ -1,0 +1,38 @@
++++
+term = "dum"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fixum_decl", "assignment", "place", "dum_stmt", "si_stmt", "arm", "comparison", "additive_expr", "multiplicative_expr", "redde_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
+category = "control-flow"
+canonical = false
+summary = "A `while true` loop never falls through; a value function can return from inside it."
+syntax = "while true { … return e }"
+related = ["dum", "redde", "rumpe"]
+locale = "en"
++++
+# =============================================================================
+# dum — `while true` with a return inside.
+# =============================================================================
+#
+# What this teaches:
+#   • Diverging loop — `while true` never falls through, so the function's tail needs no return.
+#   • Return from inside a loop — `return value` exits the function from within the loop body.
+#
+# Common mistakes:
+#   • Expecting the loop to fall through — `while true` without a `break` or `return` never ends.
+#
+# See also: dum, redde, rumpe
+# =============================================================================
+
+fn f() → int {
+    mut int i ← 0
+    while true {
+        i ← i + 1
+        if i ≡ 3 {
+            return i
+        }
+    }
+}
+
+main {
+    print f()
+}

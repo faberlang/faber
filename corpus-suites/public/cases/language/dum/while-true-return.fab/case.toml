@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/dum/while-true-return.fab"
+group = "language"
+input_root = "corpus"
+input = "dum/while-true-return.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
