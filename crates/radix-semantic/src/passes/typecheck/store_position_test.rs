@@ -558,3 +558,56 @@ fn bitnot_of_u64_is_accepted_into_an_int_slot() {
     let source = "incipit {\nvaria u64 u ← 5\nsit numerus y ← ¬u\n}\n";
     test_support::analyze_ok_la(source);
 }
+
+// ---------------------------------------------------------------------------
+// Indexed containers take their element's scalar store rule
+// ---------------------------------------------------------------------------
+
+#[test]
+fn container_store_narrowing_tensor_element() {
+    // `a + a` over `tensor<i8, [2]>` is `tensor<i16, [2]>` (range rule); the
+    // store into the same kind and shape is checked at the element.
+    let source = "functio total(tensor<i8, [2]> a) → tensor<i8, [2]> {\n\
+                  sit tensor<i8, [2]> s ← a + a\n\
+                  redde s\n}\n";
+    assert_eq!(kinds(source), vec![HirStoreKind::Declaration]);
+}
+
+#[test]
+fn container_store_narrowing_vector_and_matrix_elements() {
+    // The vector and matrix twins follow the same element scalar rule.
+    let vector = "functio lane(vector<i8, 2> v) → vector<i8, 2> {\n\
+                  sit vector<i8, 2> s ← v + v\n\
+                  redde s\n}\n";
+    assert_eq!(kinds(vector), vec![HirStoreKind::Declaration]);
+    let matrix = "functio cell(matrix<i8, [2, 2]> m) → matrix<i8, [2, 2]> {\n\
+                  sit matrix<i8, [2, 2]> s ← m * 2\n\
+                  redde s\n}\n";
+    assert_eq!(kinds(matrix), vec![HirStoreKind::Declaration]);
+}
+
+#[test]
+fn container_store_narrowing_equal_element_carries_no_node() {
+    // `a + a` over `tensor<i8, [2]>` is already `tensor<i16, [2]>` (range
+    // rule), so the store into the equal `i16` slot is total and carries no
+    // check node. (`b + b` over `tensor<i16, [2]>` is `i32`, a real narrowing,
+    // so it does carry one — see the tensor case above.)
+    let equal = "functio same(tensor<i8, [2]> a) → tensor<i16, [2]> {\n\
+                 sit tensor<i16, [2]> w ← a + a\n\
+                 redde w\n}\n";
+    assert!(kinds(equal).is_empty());
+    // The identity container copy is likewise total.
+    let identity = "functio copy(tensor<i16, [2]> b) → tensor<i16, [2]> {\n\
+                    sit tensor<i16, [2]> w ← b\n\
+                    redde w\n}\n";
+    assert!(kinds(identity).is_empty());
+}
+
+#[test]
+fn container_store_narrowing_shape_mismatch_is_rejected() {
+    // The element rule does not smuggle a shape change past the store.
+    let source = "functio wrong(tensor<i8, [2]> a) → tensor<i8, [2]> {\n\
+                  sit tensor<i8, [3]> s ← a + a\n\
+                  redde s\n}\n";
+    assert_rejected(source);
+}

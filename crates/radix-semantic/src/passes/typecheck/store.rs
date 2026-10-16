@@ -7,7 +7,9 @@
 //! **implicit store node** (`Conversio` with `implicit: Some(site)`), carrying
 //! the slot as its target type: a trapping slot traps, a `wrapping` slot
 //! reduces, a `saturating` slot clamps. Crossing policy families still needs
-//! an authored `↦`.
+//! an authored `↦`. An indexed container (`tensor`, `vector`, `matrix`,
+//! `sparsa`) takes its element's scalar store rule, wrapped once against the
+//! slot container.
 //!
 //! A value known at compile time is checked at compile time: a constant that
 //! certainly traps in a trapping slot is a compile error, a constant in an `=`
@@ -854,6 +856,9 @@ impl TypeChecker<'_> {
             let (dst_ty, dst) = self.store_int_target(slot_ty)?;
             return (dst.family == IntFamily::Plain).then_some(dst_ty);
         }
+        if let Some(container) = self.indexed_container_narrowing_target(ty, slot_ty) {
+            return Some(container);
+        }
         let (src_ty, src) = self.store_int_slot(ty)?;
         let (dst_ty, dst) = self.store_int_target(slot_ty)?;
         let slot_ty = self
@@ -864,6 +869,38 @@ impl TypeChecker<'_> {
             return None;
         }
         Some(dst_ty)
+    }
+
+    /// The indexed-container twin of the scalar narrowing rule: a value of the
+    /// same container kind and shape takes its element's scalar store rule,
+    /// with the whole value wrapped once against the slot container. Different
+    /// kinds or shapes, float elements, and widening or equal elements keep the
+    /// ordinary assignment unification (`None`).
+    fn indexed_container_narrowing_target(&self, ty: TypeId, slot_ty: TypeId) -> Option<TypeId> {
+        let ty = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(ty))
+            .1;
+        let slot_ty = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(slot_ty))
+            .1;
+        let (from_elem, to_elem) = match (self.types.get(ty), self.types.get(slot_ty)) {
+            (Type::Tensor(from, from_shape), Type::Tensor(to, to_shape))
+            | (Type::Vector(from, from_shape), Type::Vector(to, to_shape))
+            | (Type::Matrix(from, from_shape), Type::Matrix(to, to_shape))
+            | (Type::Sparsa(from, from_shape), Type::Sparsa(to, to_shape))
+                if self.types.index_equals(*from_shape, *to_shape) =>
+            {
+                (*from, *to)
+            }
+            _ => return None,
+        };
+        if self.types.is_assignable(ty, slot_ty) {
+            return None;
+        }
+        self.store_narrowing_target(from_elem, to_elem)?;
+        Some(slot_ty)
     }
 
     /// Compile-time half of the store rule for a constant in an integer slot.
