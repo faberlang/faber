@@ -18,7 +18,7 @@ use radix_lexer::Symbol;
 use radix_types::{AppliedArg, ContractRef, FuncSig, Type, TypeId, TypeParamConstraint};
 use rustc_hash::FxHashMap;
 
-use super::TypeChecker;
+use super::{InterfaceMethodInfo, TypeChecker};
 use crate::SemanticErrorKind;
 
 /// `implet` (on a genus or a bound) names something that is not an implendum.
@@ -26,6 +26,12 @@ pub(super) const ISSUE_IMPLET_REQUIRES_IMPLENDUM: &str = "implet_requires_implen
 
 /// A contract is named with the wrong number of type arguments.
 const ISSUE_IMPLET_CONTRACT_ARITY: &str = "implet_contract_arity";
+
+/// A genus declares an `implet` contract but supplies no such method.
+const ISSUE_IMPLET_MISSING_METHOD: &str = "implet_missing_method";
+
+/// A genus's method for an `implet` contract does not match its signature.
+const ISSUE_IMPLET_METHOD_SIGNATURE_MISMATCH: &str = "implet_method_signature_mismatch";
 
 /// A call's witness does not declare a bound contract of its parameter.
 const ISSUE_GENERIC_TYPE_ARG_BOUND: &str = "generic_type_arg_bound";
@@ -140,6 +146,136 @@ impl TypeChecker<'_> {
             return Some(self.substitute_func_sig(&sig, &mut vars, None));
         }
         None
+    }
+
+    /// Check that a genus supplies every method of each declared contract,
+    /// with a matching signature (CTO ruling Q-T1, 2026-10-15).
+    ///
+    /// `contracts` has already passed [`Self::validate_contract_ref`], so a
+    /// target that is not an implendum or carries the wrong arity is absent.
+    pub(super) fn check_impled_conformance(
+        &mut self,
+        def_id: radix_hir::DefId,
+        span: radix_lexer::Span,
+        contracts: &[radix_types::ContractRef],
+    ) {
+        let genus = self
+            .function_display_name(def_id)
+            .unwrap_or_else(|| format!("Def{}", def_id.0));
+        for contract in contracts {
+            let Some(interface) = self.interfaces.get(&contract.contract) else {
+                continue;
+            };
+            let mut rows: Vec<(Symbol, InterfaceMethodInfo)> = interface
+                .iter()
+                .map(|(name, info)| (*name, info.clone()))
+                .collect();
+            rows.sort_by_key(|(_, info)| (info.span.start, info.span.end));
+            let vars: FxHashMap<Symbol, TypeId> = self
+                .type_params_by_def
+                .get(&contract.contract)
+                .map(|params| {
+                    params
+                        .iter()
+                        .copied()
+                        .zip(contract.args.iter().copied())
+                        .collect()
+                })
+                .unwrap_or_default();
+            let contract_name = self.contract_display(contract);
+            for (name, info) in rows {
+                let expected = self.substitute_func_sig(&info.sig, &mut vars.clone(), None);
+                let method = self.interner.map_or_else(
+                    || "?".to_owned(),
+                    |interner| interner.resolve(name).to_owned(),
+                );
+                let found = self
+                    .structs
+                    .get(&def_id)
+                    .and_then(|struct_info| struct_info.methods.get(&name))
+                    .cloned();
+                match found {
+                    None => {
+                        self.error_issue_with_args(
+                            SemanticErrorKind::TypeMismatch,
+                            ISSUE_IMPLET_MISSING_METHOD,
+                            span,
+                            &[
+                                ("genus", genus.clone()),
+                                ("contract", contract_name.clone()),
+                                ("method", method),
+                            ],
+                        );
+                    }
+                    Some(found) => {
+                        if self.impled_signatures_match(&expected, &found) {
+                            continue;
+                        }
+                        let expected_text = self.format_func_sig(&expected);
+                        let found_text = self.format_func_sig(&found);
+                        self.error_issue_with_args(
+                            SemanticErrorKind::TypeMismatch,
+                            ISSUE_IMPLET_METHOD_SIGNATURE_MISMATCH,
+                            span,
+                            &[
+                                ("genus", genus.clone()),
+                                ("contract", contract_name.clone()),
+                                ("method", method),
+                                ("expected", expected_text),
+                                ("found", found_text),
+                            ],
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Whether a genus method satisfies a contract method (CTO ruling Q-T1).
+    ///
+    /// Compares parameter count and per-parameter type/posture/optionality/
+    /// sponte, generic-parameter count, return and alternate-exit types, and
+    /// the async/generator markers. The rejected `func_sigs_agree` in
+    /// `call.rs` omits `sponte` and `type_params.len()`; this is the full list.
+    fn impled_signatures_match(&self, expected: &FuncSig, found: &FuncSig) -> bool {
+        if expected.params.len() != found.params.len()
+            || expected.type_params.len() != found.type_params.len()
+            || expected.is_async != found.is_async
+            || expected.is_generator != found.is_generator
+        {
+            return false;
+        }
+        match (expected.err, found.err) {
+            (None, None) => {}
+            (Some(expected_err), Some(found_err)) => {
+                if !self.types.equals(
+                    self.resolve_inferred_type(expected_err),
+                    self.resolve_inferred_type(found_err),
+                ) {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+        if !self.types.equals(
+            self.resolve_inferred_type(expected.ret),
+            self.resolve_inferred_type(found.ret),
+        ) {
+            return false;
+        }
+        expected
+            .params
+            .iter()
+            .zip(found.params.iter())
+            .all(|(expected_param, found_param)| {
+                expected_param.mode == found_param.mode
+                    && expected_param.optional == found_param.optional
+                    && expected_param.sponte == found_param.sponte
+                    && self.types.equals(
+                        self.resolve_inferred_type(expected_param.ty),
+                        self.resolve_inferred_type(found_param.ty),
+                    )
+            })
     }
 
     /// The type parameter symbol a receiver type names, through access

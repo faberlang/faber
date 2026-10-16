@@ -1854,7 +1854,7 @@ impl TypeChecker<'_> {
     }
 
     /// Faber-surface spelling of a method signature for diagnostics.
-    fn format_func_sig(&self, sig: &FuncSig) -> String {
+    pub(super) fn format_func_sig(&self, sig: &FuncSig) -> String {
         let params = sig
             .params
             .iter()

@@ -572,6 +572,7 @@ impl TypeChecker<'_> {
                 *def_id,
                 contracts.iter().map(|contract| contract.contract).collect(),
             );
+            self.check_impled_conformance(*def_id, *span, &contracts);
             self.implemented_contracts.insert(*def_id, contracts);
         }
         self.struct_implements = declared;
