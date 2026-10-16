@@ -731,6 +731,9 @@ pub fn analyze_with_cli(
         );
         diagnostics.extend(legality.errors);
         diagnostics.extend(legality.warnings);
+        diagnostics.extend(passes::kernel_requirements::language_errors(
+            &kernel_requirements,
+        ));
     }
     // Concrete generic AIR instances must exist before named unroll: symbolic
     // templates remain source/FHIR facts, while their reachable concrete clones

@@ -7,8 +7,8 @@
 //! requirement.
 
 use crate::{
-    NumericWidth, Primitive, ResolvedTensorEdgePolicy, TensorEdgePolicyTable, Type, TypeId,
-    TypeTable,
+    NumericWidth, Primitive, ResolvedTensorEdgePolicy, SemanticError, SemanticErrorKind,
+    TensorEdgePolicyTable, Type, TypeId, TypeTable,
 };
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
@@ -158,6 +158,144 @@ pub enum KernelRequirementFailure {
     TensorEdgePolicyDeferred {
         span: Span,
     },
+}
+
+/// Issue: an integer carrier wider than the portable 32-bit kernel envelope.
+pub const ISSUE_WIDE_INTEGER: &str = "nucleum_wide_integer";
+/// Issue: the decimal carrier `d64` is not a kernel value.
+pub const ISSUE_D64: &str = "nucleum_d64";
+/// Issue: `f64` is not a kernel value.
+pub const ISSUE_F64: &str = "nucleum_f64";
+/// Issue: an exact intermediate exceeds the portable integer envelope.
+pub const ISSUE_WIDE_INTERMEDIATE: &str = "nucleum_wide_intermediate";
+/// Issue: an integer extent has no proof that it fits the envelope.
+pub const ISSUE_EXTENT_UNPROVEN: &str = "nucleum_extent_unproven";
+/// Issue: a store is neither provably in range nor a wrapping/saturating cell.
+pub const ISSUE_TRAPPING_STORE: &str = "nucleum_trapping_store";
+
+/// The language-rule subset of the requirement report as check-time
+/// diagnostics. Every other failure kind stays a per-target capability fact:
+/// the report still describes what each device refuses, while these rules are
+/// refused on every path (`faber check`, `run`, and every emit target).
+///
+/// Each kernel's first target row supplies the rows; per-target widths,
+/// wrapping policy, and recursion are not language rules and stay in the
+/// report. Diagnostics are deduplicated by `(issue, span)`.
+#[must_use]
+pub fn language_errors(report: &KernelRequirementsReport) -> Vec<SemanticError> {
+    let mut errors = Vec::new();
+    let mut seen: FxHashSet<(&'static str, u32, u32)> = FxHashSet::default();
+    for kernel in &report.kernels {
+        let Some(row) = kernel.target_reports.first() else {
+            continue;
+        };
+        for failure in &row.failures {
+            let Some(diagnostic) = language_failure(failure, &row.widths) else {
+                continue;
+            };
+            if !seen.insert((diagnostic.issue, diagnostic.span.start, diagnostic.span.end)) {
+                continue;
+            }
+            let mut error =
+                SemanticError::structured(SemanticErrorKind::LoweringError, diagnostic.span)
+                    .with_arg("issue", diagnostic.issue);
+            for (name, value) in diagnostic.args {
+                error = error.with_arg(name, value);
+            }
+            errors.push(error);
+        }
+    }
+    errors
+}
+
+/// One language-rule diagnostic row: issue, span, and its named arguments.
+struct LanguageDiagnostic {
+    issue: &'static str,
+    span: Span,
+    args: Vec<(&'static str, String)>,
+}
+
+fn language_failure(
+    failure: &KernelRequirementFailure,
+    widths: &[KernelWidthRequirement],
+) -> Option<LanguageDiagnostic> {
+    match failure {
+        KernelRequirementFailure::UnsupportedIntegerWidth { span, width } => match width {
+            NumericWidth::I64 | NumericWidth::U64 => Some(LanguageDiagnostic {
+                issue: ISSUE_WIDE_INTEGER,
+                span: *span,
+                args: vec![("width", width.faber_marker().to_string())],
+            }),
+            NumericWidth::D64 => Some(LanguageDiagnostic {
+                issue: ISSUE_D64,
+                span: *span,
+                args: vec![("width", width.faber_marker().to_string())],
+            }),
+            _ => None,
+        },
+        KernelRequirementFailure::UnsupportedFloatWidth { span, width }
+            if *width == NumericWidth::F64 =>
+        {
+            Some(LanguageDiagnostic {
+                issue: ISSUE_F64,
+                span: *span,
+                args: vec![("width", width.faber_marker().to_string())],
+            })
+        }
+        KernelRequirementFailure::UnsupportedFloatWidth { .. } => None,
+        KernelRequirementFailure::IntermediateOutOfRange { span, range } => {
+            Some(LanguageDiagnostic {
+                issue: ISSUE_WIDE_INTERMEDIATE,
+                span: *span,
+                args: vec![("extent", extent_label(range))],
+            })
+        }
+        KernelRequirementFailure::UnsupportedIntegerRange { span } => Some(LanguageDiagnostic {
+            issue: ISSUE_EXTENT_UNPROVEN,
+            span: *span,
+            args: vec![("extent", "unknown".to_string())],
+        }),
+        KernelRequirementFailure::StoreOutOfRange { span, .. } => {
+            store_width(*span, widths).map(|width| LanguageDiagnostic {
+                issue: ISSUE_TRAPPING_STORE,
+                span: *span,
+                args: vec![("width", width.faber_marker().to_string())],
+            })
+        }
+        KernelRequirementFailure::OptionFRequired { span, width } => Some(LanguageDiagnostic {
+            issue: ISSUE_TRAPPING_STORE,
+            span: *span,
+            args: vec![("width", width.faber_marker().to_string())],
+        }),
+        KernelRequirementFailure::RecursiveCall
+        | KernelRequirementFailure::CalleeNotAdmitted { .. }
+        | KernelRequirementFailure::DivideByZeroPossible { .. }
+        | KernelRequirementFailure::NegativeShiftCountPossible { .. }
+        | KernelRequirementFailure::SaturatingLoweringDeferred { .. }
+        | KernelRequirementFailure::TensorEdgePolicyDeferred { .. } => None,
+    }
+}
+
+/// The carrier width recorded for a store at the same span as its range
+/// failure. `StoreOutOfRange` carries only the value range, so the width comes
+/// from the row the store already recorded.
+fn store_width(span: Span, widths: &[KernelWidthRequirement]) -> Option<NumericWidth> {
+    widths
+        .iter()
+        .find(|row| row.span == span)
+        .map(|row| row.width)
+}
+
+/// Render a value range as the diagnostic `extent`: exact endpoints print as
+/// digits, a symbolic axis prints as `shape`, and anything else is `unknown`.
+fn extent_label(range: &KernelValueRange) -> String {
+    if let (Some(minimum), Some(maximum)) = (constant(&range.minimum), constant(&range.maximum)) {
+        return format!("{minimum}..{maximum}");
+    }
+    if contains_shape(range) {
+        return "shape".to_string();
+    }
+    "unknown".to_string()
 }
 
 impl KernelRequirementsReport {
