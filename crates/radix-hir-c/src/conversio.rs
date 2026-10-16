@@ -5,13 +5,14 @@
 //! that is not a number, a value outside the target's range, a float that is
 //! not a finite integer after rounding) go through a `faber_try_*` call that
 //! says why it failed: with `⊥` the recovery value takes its place; without,
-//! the program ends with the runner's text for that failure. The runner does
-//! not convert a list into a bounded list at run time, so neither does this.
+//! the program ends with the runner's text for that failure. `list<T> ↦
+//! list<T, N>` copies into a fixed-capacity list and fails when the source is
+//! longer, the runner's rule.
 
 use crate::Emitter;
 use crate::error::unsupported;
 use crate::expr::{Operand, Value, c_string};
-use crate::helpers::Helper;
+use crate::helpers::{Helper, ListOp};
 use crate::ty::{IntWidth, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::HirExpression;
@@ -58,8 +59,18 @@ impl Emitter<'_> {
         params: &[Symbol],
         recovery: Option<&HirExpression>,
     ) -> Result<Operand, CodegenError> {
-        if matches!(self.types.get(target), Type::BoundedArray { .. }) {
-            return Err(unsupported("conversion to a bounded list"));
+        if let Some((element, capacity)) = self.bounded_list_target(target) {
+            let value = self.expr(source)?;
+            let Value::List(elem) = value.value else {
+                return Err(unsupported("conversion to a bounded list from a non-list"));
+            };
+            if classify(self.types, element)? != elem.ty() {
+                return Err(unsupported(
+                    "conversion to a bounded list of another element class",
+                ));
+            }
+            let operand = self.bounded_list(&value, elem, capacity, recovery)?;
+            return Ok(operand.with_effect(value.effect));
         }
         // `↦ ascii<N>` (resize or radix formatting) is not part of the subset;
         // the runner's resize path is itself unsupported.
@@ -189,6 +200,57 @@ impl Emitter<'_> {
             _ => operand,
         };
         Ok(operand.with_effect(effect))
+    }
+
+    /// A bounded-list target (`list<T, N>`), peeling aliases: its element type
+    /// and its literal capacity. `None` for any other target.
+    fn bounded_list_target(&self, ty: TypeId) -> Option<(TypeId, u64)> {
+        match self.types.get(ty) {
+            Type::Alias(_, inner) => self.bounded_list_target(*inner),
+            Type::BoundedArray { element, capacity } => match self.types.get_index(*capacity) {
+                radix_types::IndexExpr::Literal(value) => Some((*element, *value)),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// `list<T> ↦ list<T, N>`: a fixed copy of capacity N, or a failure the
+    /// `⊥` recovery takes (`lista to bounded lista conversion failed`).
+    fn bounded_list(
+        &mut self,
+        value: &Operand,
+        elem: crate::ty::Elem,
+        capacity: u64,
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::List(elem, ListOp::New));
+        let n = self.temps;
+        self.temps += 1;
+        let (v, s) = (format!("faber_v{n}"), format!("faber_s{n}"));
+        let c_type = elem.list_c_pointer();
+        let call = format!(
+            "faber_list_{}_bounded(faber_a, {}, {capacity}, &{v})",
+            elem.suffix(),
+            value.text
+        );
+        let tail = match recovery {
+            Some(recovery) => {
+                let fallback = self.expr(recovery)?;
+                if fallback.value != Value::List(elem) {
+                    return Err(unsupported("recovery value of a different class"));
+                }
+                format!("{s} ? {v} : {};", fallback.text)
+            }
+            None => format!(
+                "if (!{s}) {{ faber_trap(\"lista to bounded lista conversion failed\"); }} {v};"
+            ),
+        };
+        let text =
+            format!("(__extension__ ({{ {c_type} {v} = NULL; bool {s} = {call}; {tail} }}))");
+        let mut operand = Operand::new(text, Value::List(elem));
+        operand.stored = Some(Ty::List(elem));
+        Ok(operand)
     }
 
     /// The capacity of a bounded text type (`string<N>`, `ascii<N>`), peeling

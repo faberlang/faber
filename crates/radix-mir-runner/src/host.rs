@@ -130,6 +130,24 @@ pub trait Host {
         ))
     }
 
+    /// Read all of stdin to EOF (`consolum.read`).
+    ///
+    /// Ruling: "'read' returns all of stdin to EOF; 'read line' one line
+    /// without its terminator." The text is verbatim, newlines included, and
+    /// `Ok(None)` is the EOF signal at the immediate read, the same one
+    /// `read_line` gives.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the underlying read fails, or when the host does
+    /// not expose stdin.
+    fn read_all(&mut self) -> Result<Option<String>, RunnerError> {
+        Err(RunnerError::unsupported(
+            Span::default(),
+            "host read_all (lege)",
+        ))
+    }
+
     /// Whether stdin is a TTY (`consolum.stdin_is_tty`).
     ///
     /// # Errors
@@ -352,6 +370,17 @@ impl Host for BufferHost {
         Ok(self.stdin_lines.pop_front())
     }
 
+    fn read_all(&mut self) -> Result<Option<String>, RunnerError> {
+        if self.stdin_lines.is_empty() {
+            return Ok(None);
+        }
+        // WHY: each seeded line models a terminated line, so rejoining with
+        // `\n` and a trailing terminator reproduces the verbatim fixture
+        // bytes `read all of stdin to EOF` promises.
+        let lines: Vec<String> = self.stdin_lines.drain(..).collect();
+        Ok(Some(lines.join("\n") + "\n"))
+    }
+
     fn read_bytes(&mut self, len: usize) -> Result<Vec<u8>, RunnerError> {
         let n = len.min(self.stdin_bytes.len());
         Ok(self.stdin_bytes.drain(..n).collect())
@@ -466,6 +495,19 @@ impl Host for StdioHost {
             line.pop();
         }
         Ok(Some(line))
+    }
+
+    fn read_all(&mut self) -> Result<Option<String>, RunnerError> {
+        let mut buf = String::new();
+        io::stdin()
+            .lock()
+            .read_to_string(&mut buf)
+            .map_err(io_error)?;
+        if buf.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(buf))
+        }
     }
 
     fn read_bytes(&mut self, len: usize) -> Result<Vec<u8>, RunnerError> {

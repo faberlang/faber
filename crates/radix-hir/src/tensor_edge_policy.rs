@@ -64,6 +64,11 @@ pub struct TensorEdgePolicyProviderImpl {
 /// The table belongs in `radix-hir` because codegen consumes it alongside
 /// HIR, while semantic analysis remains its producer. The semantic crate
 /// re-exports these definitions to preserve its established API paths.
+///
+/// It also carries the resolved `ordo` order rows for enum `≺ ≻ ≤ ≥`
+/// comparisons: this is the one analyzed sidecar this crate
+/// threads from typecheck to MIR lowering, so an ordering decision travels the
+/// same seam as the edge-policy facts.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TensorEdgePolicyTable {
     /// Policy dispatch metadata keyed by the outer `limes` HIR id.
@@ -85,4 +90,6 @@ pub struct TensorEdgePolicyTable {
     pub function_requirements: FxHashMap<DefId, Vec<TensorEdgePolicyRequirement>>,
     /// Concrete, validated provider implementations available to codegen.
     pub provider_impls: Vec<TensorEdgePolicyProviderImpl>,
+    /// `ordo` ordering rows for enum `≺ ≻ ≤ ≥` comparisons.
+    pub ordo_order: crate::OrdoOrderTable,
 }

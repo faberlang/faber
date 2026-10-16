@@ -3283,17 +3283,45 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     "shared cell write base is not a cell",
                 )),
             },
-            // A write through a capture only ever re-stores the same shared
-            // cell handle (the parent of a `SharedCell` projection), so the
-            // environment slot is left untouched. Value captures stay
-            // read-only.
-            radix_mir::MirProjection::ClosureCapture { .. } => match (value, assigned) {
-                (value @ Value::ClosureEnvironment(..), Value::SharedCell(_)) => Ok(value),
-                _ => Err(RunnerError::unsupported(
-                    span,
-                    "closure capture projection write",
-                )),
-            },
+            // Store through the environment's shared map. This also keeps a
+            // re-stored `SharedCell` capture unchanged while making value-slot
+            // writes visible to subsequent reads of the closure environment.
+            radix_mir::MirProjection::ClosureCapture {
+                environment,
+                source,
+            } => {
+                let Value::ClosureEnvironment(value_environment, cell) = value else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "closure capture projection base is not an environment",
+                    ));
+                };
+                if value_environment != *environment {
+                    return Err(RunnerError::internal(
+                        span,
+                        "closure capture environment mismatch",
+                    ));
+                }
+                let Some(metadata) = self.context.closure_environments.get(environment) else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "closure capture metadata is missing",
+                    ));
+                };
+                let Some(name) = metadata
+                    .captures
+                    .iter()
+                    .find(|capture| capture.source == *source)
+                    .map(|capture| capture.name)
+                else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "closure capture source is missing",
+                    ));
+                };
+                cell.borrow_mut().insert(name, assigned);
+                Ok(Value::ClosureEnvironment(value_environment, cell))
+            }
         }
     }
 
@@ -4077,6 +4105,10 @@ mod collection_index_plain_test;
 mod tensor_get_direct_test;
 
 #[cfg(test)]
+#[path = "matrix_get_set_test.rs"]
+mod matrix_get_set_test;
+
+#[cfg(test)]
 #[path = "capability_test.rs"]
 mod capability_test;
 
@@ -4093,12 +4125,20 @@ mod value_test;
 mod decimal_test;
 
 #[cfg(test)]
+#[path = "decimal_signum_test.rs"]
+mod decimal_signum_test;
+
+#[cfg(test)]
 #[path = "policy_float_test.rs"]
 mod policy_float_test;
 
 #[cfg(test)]
 #[path = "f32_store_test.rs"]
 mod f32_store_test;
+
+#[cfg(test)]
+#[path = "host_read_all_test.rs"]
+mod host_read_all_test;
 
 #[cfg(test)]
 #[path = "narrowing_conversio_test.rs"]

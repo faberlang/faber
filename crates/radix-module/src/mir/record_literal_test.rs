@@ -92,6 +92,20 @@ main {
 }
 
 #[test]
+fn sized_tuple_and_record_literal_elements_take_member_types() {
+    let out = run(r"
+main {
+    let tuple<u8, i16> t ← tuple<u8, i16> [7, 9]
+    print t
+    let record<g: u8, w: i16> r ← record<g: u8, w: i16> { g = 7, w = 9 }
+    print r.g
+    print r.w
+}
+");
+    assert_eq!(out, ["tuple [7, 9]", "7", "9"]);
+}
+
+#[test]
 fn whole_record_prints_in_written_order() {
     let out = run(r"
 main {

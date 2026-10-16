@@ -84,7 +84,7 @@ functio g(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde 2.0 * a }
 functio h(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde a / 2.0 }
 functio i(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde a % 2.0 }
 functio j(tensor<numerus, [4]> a) → tensor<numerus, [4]> { redde a / 3 }
-functio k(tensor<numerus, [4]> a) → tensor<numerus, [4]> { redde a % 3 }",
+functio k(tensor<numerus, [4]> a) → tensor<u8, [4]> { redde a % 3 }",
     );
 }
 
@@ -115,7 +115,9 @@ fn tensor_times_tensor_rejects_with_the_rule_alternatives() {
 fn an_untyped_constant_adopts_the_tensor_element_type() {
     accepts("functio f(tensor<f32, [2]> a) → tensor<f32, [2]> { redde a * 2 }");
     accepts("functio f(tensor<f32, [2]> a) → tensor<f32, [2]> { redde a + 0.25 }");
-    accepts("functio f(tensor<u8, [2]> a) → tensor<u8, [2]> { redde a + 1 }");
+    // The constant takes part by value and the range rule widens the
+    // intermediate: [0,255] + 1 is [1,256] → `u16`.
+    accepts("functio f(tensor<u8, [2]> a) → tensor<u16, [2]> { redde a + 1 }");
     // A constant beside an integer tensor joins by value: 300 needs `u16`.
     accepts("functio f(tensor<u8, [2]> a) → tensor<u16, [2]> { redde a + 300 }");
 }
@@ -133,17 +135,51 @@ fn family_crossing_needs_a_conversion() {
 }
 
 #[test]
-fn integer_elements_follow_the_lossless_join_per_element() {
-    // Same-width mixes join by the lattice; a wider scalar joins the tensor.
+fn integer_elements_take_the_scalar_range_rule_per_operator() {
+    // The element takes the scalar range rule per operator: `u8 + u16` is
+    // [0,65790] → `u32`, and `i8 - u8` is [-383,127] → `i16`.
     accepts(
-        r"functio f(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<u16, [2]> { redde a + b }
-functio g(tensor<u8, [2]> a, u16 s) → tensor<u16, [2]> { redde a + s }
+        r"functio f(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<u32, [2]> { redde a + b }
+functio g(tensor<u8, [2]> a, u16 s) → tensor<u32, [2]> { redde a + s }
 functio h(tensor<i8, [2]> a, tensor<u8, [2]> b) → tensor<i16, [2]> { redde a - b }",
     );
     // A float pair joins by the lossless lattice like the scalar rule.
     accepts(
         r"functio f(tensor<f32, [2]> a, tensor<f64, [2]> b) → tensor<f64, [2]> { redde a + b }
 functio g(tensor<f32, [2]> a, f64 s) → tensor<f64, [2]> { redde a * s }",
+    );
+}
+
+#[test]
+fn tensor_lift_range_rule_intermediate_add_widens_to_u16() {
+    accepts("functio f(tensor<u8, [2]> a, tensor<u8, [2]> b) → tensor<u16, [2]> { redde a + b }");
+}
+
+#[test]
+fn tensor_lift_range_rule_intermediate_sub_widens_to_i16() {
+    accepts("functio f(tensor<u8, [2]> a, tensor<u8, [2]> b) → tensor<i16, [2]> { redde a - b }");
+}
+
+#[test]
+fn tensor_lift_range_rule_intermediate_is_not_narrowed_to_the_operand() {
+    // The intermediate is `u16`; the width applies only at the store, so a
+    // `u8` return type is a type mismatch.
+    rejects(
+        "functio f(tensor<u8, [2]> a, tensor<u8, [2]> b) → tensor<u8, [2]> { redde a + b }",
+        SemanticErrorKind::TypeMismatch,
+        "return_type_mismatch",
+        &[],
+    );
+}
+
+#[test]
+fn tensor_lift_range_rule_intermediate_chain_keeps_the_range_rule_type() {
+    // `/` is floor division; `range::floor_div` answers [0, a₁] for two
+    // non-negative operands, so [0,510] / [2,2] stays [0,510] → `u16`. Floor
+    // division does not narrow the range, and the width applies only at the
+    // store (the value is still 150).
+    accepts(
+        "functio f(tensor<u8, [2]> a, tensor<u8, [2]> b) → tensor<u16, [2]> { redde (a + b) / 2 }",
     );
 }
 

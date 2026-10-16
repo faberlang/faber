@@ -424,6 +424,11 @@ typedef struct faber_opt_f64 {
     bool has;
     double value;
 } faber_opt_f64;
+/* A `wrapping<u64> ∪ none`: the payload does not fit a signed slot. */
+typedef struct faber_opt_u64 {
+    bool has;
+    uint64_t value;
+} faber_opt_u64;
 
 /* ------------------------------------------------------------------------ */
 /* Floats                                                                   */
@@ -1369,6 +1374,25 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         return list;                                                                    \
     }                                                                                   \
                                                                                         \
+    /* `xs ↦ list<T, N>`: a copy that carries capacity N, or false when the      \
+     * source is longer. The copy is fixed, so a later push at capacity traps. */ \
+    static inline bool faber_list_##NAME##_bounded(faber_arena *arena,                 \
+                                                   const faber_list_##NAME *list,       \
+                                                   int64_t capacity,                    \
+                                                   faber_list_##NAME **out) {           \
+        faber_list_##NAME *copy;                                                        \
+        if (list->len > capacity) {                                                     \
+            return false;                                                               \
+        }                                                                               \
+        copy = faber_list_##NAME##_new_fixed(arena, capacity);                          \
+        if (list->len > 0) {                                                            \
+            memcpy(copy->items, list->items, (size_t)list->len * sizeof *copy->items);  \
+        }                                                                               \
+        copy->len = list->len;                                                          \
+        *out = copy;                                                                    \
+        return true;                                                                    \
+    }                                                                                   \
+                                                                                        \
     /* The `copy` marker (R7): a fresh array, never the source's. An element   \
      * that is itself a pointer (text) is immutable, so sharing it is a copy. */\
     static inline faber_list_##NAME *faber_list_##NAME##_copy(                          \
@@ -1418,6 +1442,15 @@ FABER_LIST_FAMILY(i64, int64_t)
 FABER_LIST_FAMILY(text, faber_text)
 FABER_LIST_FAMILY(bool, bool)
 FABER_LIST_FAMILY(f64, double)
+/* `list<wrapping<W>>` (modular words): the stored cell is the plain width,
+ * written only through the modular store and read widened by the emitter. */
+FABER_LIST_FAMILY(i8, int8_t)
+FABER_LIST_FAMILY(i16, int16_t)
+FABER_LIST_FAMILY(i32, int32_t)
+FABER_LIST_FAMILY(u8, uint8_t)
+FABER_LIST_FAMILY(u16, uint16_t)
+FABER_LIST_FAMILY(u32, uint32_t)
+FABER_LIST_FAMILY(u64, uint64_t)
 
 /* How a list shows, as the runner prints it: `[1, 2]`, `["a", "b"]`,
  * `[true, false]` in the module's display tokens. */
@@ -1518,6 +1551,38 @@ static inline faber_text faber_list_f64_show(faber_arena *arena, const faber_lis
     out[at] = '\0';
     return out;
 }
+
+/* A `list<wrapping<W>>` shows each element as its width prints: signed and
+ * unsigned decimal, no arithmetic on the element (the stored value is
+ * already reduced). */
+#define FABER_LIST_WORD_SHOW(NAME, TYPE, CAST, FMT)                                     \
+    static inline faber_text faber_list_##NAME##_show(faber_arena *arena,                \
+                                                      const faber_list_##NAME *list) {  \
+        size_t capacity = 3 + (size_t)list->len * 22;                                   \
+        char *out = faber_alloc(arena, capacity);                                       \
+        size_t at = 0;                                                                  \
+        int64_t index;                                                                  \
+        out[at++] = '[';                                                                \
+        for (index = 0; index < list->len; index++) {                                   \
+            if (index > 0) {                                                            \
+                out[at++] = ',';                                                        \
+                out[at++] = ' ';                                                        \
+            }                                                                           \
+            at += (size_t)snprintf(out + at, capacity - at, FMT,                        \
+                                   CAST list->items[index]);                            \
+        }                                                                               \
+        out[at++] = ']';                                                                \
+        out[at] = '\0';                                                                 \
+        return out;                                                                     \
+    }
+
+FABER_LIST_WORD_SHOW(i8, int8_t, (int64_t), "%" PRId64)
+FABER_LIST_WORD_SHOW(i16, int16_t, (int64_t), "%" PRId64)
+FABER_LIST_WORD_SHOW(i32, int32_t, (int64_t), "%" PRId64)
+FABER_LIST_WORD_SHOW(u8, uint8_t, (uint64_t), "%" PRIu64)
+FABER_LIST_WORD_SHOW(u16, uint16_t, (uint64_t), "%" PRIu64)
+FABER_LIST_WORD_SHOW(u32, uint32_t, (uint64_t), "%" PRIu64)
+FABER_LIST_WORD_SHOW(u64, uint64_t, (uint64_t), "%" PRIu64)
 
 /* ------------------------------------------------------------------------ */
 /* List operations beyond the family: queries, copies, ends, ordering       */
@@ -1674,6 +1739,13 @@ FABER_LIST_OPS(i64, int64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(text, faber_text, FABER_LIST_EQ_TEXT, FABER_LIST_LT_TEXT)
 FABER_LIST_OPS(bool, bool, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64)
+FABER_LIST_OPS(i8, int8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(i16, int16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(i32, int32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(u8, uint8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(u16, uint16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(u32, uint32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(u64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 
 /* ------------------------------------------------------------------------ */
 /* Elementwise list operators                                               */

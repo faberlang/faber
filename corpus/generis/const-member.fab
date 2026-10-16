@@ -1,7 +1,7 @@
 +++
 term = "class constant use"
 kind = "operator-group"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "genus_const_decl", "type_annotation", "base_type", "functio_decl", "param_list", "parameter", "return_clause", "const_init", "si_stmt", "arm", "redde_stmt", "incipit_stmt", "expression", "literal", "member_suffix", "call_expr", "call_suffix", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "genus_const_decl", "functio_method_decl", "type_annotation", "base_type", "functio_decl", "param_list", "parameter", "return_clause", "const_init", "si_stmt", "arm", "redde_stmt", "incipit_stmt", "expression", "literal", "member_suffix", "call_expr", "call_suffix", "nota_stmt"]
 category = "type"
 canonical = false
 summary = "A class constant takes a folded expression, and any function reads it through the type name."
@@ -20,6 +20,8 @@ locale = "en"
 #     initializers are shown in generis/read.fab.
 #   • Any function reads it through the type name (`Tab.LIMIT`) with no
 #     instance.
+#   • A method of the class reads the constant the same way, `Tab.LIMIT`; `self`
+#     still names the instance for `mut` fields.
 #   • Per-instance state stays `mut`/`let`; the constant is never stored to.
 #
 # EXPECTED OUTPUT:
@@ -30,6 +32,13 @@ class Tab {
     const int TWICE = 3 * 2
     const int SQUARES = 1 * 1 + 2 * 2 + 3 * 3
     mut int w = 1
+
+    fn limen() → int {
+        if self.w ≻ Tab.LIMIT {
+            return Tab.TWICE
+        }
+        return Tab.LIMIT
+    }
 }
 
 fn capped(int n) → int {
@@ -45,4 +54,6 @@ main {
     print Tab.SQUARES
     print capped(10)
     print capped(2)
+    let Tab t ← Tab {}
+    print t.limen()
 }

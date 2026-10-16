@@ -8,7 +8,6 @@ summary = "Failable function-value callback: (string, int) → Tensor ⇥ Lookup
 syntax = "functio <name>((string, int) → tensor<f32, [1]> ⇥ LookupError, string, int) → tensor<f32, [1]> ⇥ LookupError"
 related = ["functio", "⇥", "iace", "redde"]
 locale = "en"
-no_expected = "prints-nothing"
 +++
 # =============================================================================
 # functio — Failable function-value callback: (string, int) → Tensor ⇥ LookupError
@@ -36,7 +35,8 @@ no_expected = "prints-nothing"
 #   funcType :← '(' typeList ')' '→' type '⇥' type
 #
 # EXPECTED OUTPUT:
-#   compile-only probe — rust emit keeps Result + ? on the callback call.
+#   none — the case runs on the runner and prints nothing to stdout; the
+#   thrown LookupError reaches the caller's catch and its text goes to stderr.
 #
 # BACKEND:
 #   Rust application lane emits `&impl Fn(String, i64) -> Result<…, LookupError>`

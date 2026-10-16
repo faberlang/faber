@@ -356,6 +356,30 @@ help = "पहले lexer error ठीक करें; parsing साफ token
 message = "token अपेक्षित है"
 help = "सुनिश्चित करें कि इस स्थान पर अपेक्षित token मौजूद है"
 
+[diagnostics.PARSE001.issues.ratio_field_list_hole_not_sole]
+message = "ratio फ़ील्ड सूची में `…` होल ही एकमात्र तत्व होना चाहिए"
+help = "फ़ील्ड सूची में अधिकतम एक होल रखें"
+
+[diagnostics.PARSE001.issues.ratio_type_arg_label_required]
+message = "ratio प्रकार तर्क पर लेबल होना चाहिए"
+help = "तर्क से पहले लेबल लिखें"
+
+[diagnostics.PARSE001.issues.annotation_field_name]
+message = "annotation फ़ील्ड एक पहचानकर्ता होना चाहिए"
+help = "annotation ब्रेसिज़ के भीतर फ़ील्ड का सरल नाम लिखें"
+
+[diagnostics.PARSE001.issues.label_bind_distinction]
+message = "लेबल सिंटैक्स `{label_operator}` का उपयोग करता है, बाइंडिंग ऑपरेटर `{binding_operator}` का नहीं"
+help = "लेबल वाले तर्क के लिए `{label}{label_operator} value` लिखें, या उसे स्थिति से पास करें"
+
+[diagnostics.PARSE001.issues.labeled_actual_non_template_call]
+message = "यह कॉल लेबल वाले तर्क स्वीकार नहीं करता; लेबल टेम्पलेट कॉल के लिए होते हैं"
+help = "लेबल `{label}` हटाएँ और मान स्थिति से पास करें, या टेम्पलेट लिटरल कॉल करें"
+
+[diagnostics.PARSE001.issues.labeled_actual_spread_unsupported]
+message = "spread तर्क लेबल नहीं रख सकता"
+help = "spread तर्क से लेबल हटा दें"
+
 [diagnostics.PARSE001.issues.copy_into_value_expected]
 message = "कॉपी-इन ऑपरेटर `{operator}` के बाद एक मान आवश्यक है"
 help = "`⇇` के बाद स्रोत अभिव्यक्ति लिखें"
@@ -504,6 +528,26 @@ help = "समापन सीमांकक से पहले का अल�
 message = "अनपेक्षित token"
 help = "अनपेक्षित token हटाएं या उसका स्थान बदलें"
 
+[diagnostics.PARSE002.issues.enum_value_out_of_range]
+message = "enum सदस्य मान signed 64-bit श्रेणी के बाहर है"
+help = "−2^63 और 2^63−1 के बीच मान चुनें"
+
+[diagnostics.PARSE002.issues.exitus_value_out_of_range]
+message = "exitus कोड signed 64-bit श्रेणी के बाहर है"
+help = "−2^63 और 2^63−1 के बीच मान चुनें"
+
+[diagnostics.PARSE002.issues.json_integer_overflow]
+message = "json लिटरल में पूर्णांक signed 64-bit श्रेणी के बाहर है"
+help = "मान को float या string के रूप में लिखें"
+
+[diagnostics.PARSE002.issues.test_modifier_integer_out_of_range]
+message = "`{modifier}` मॉडिफ़ायर का पूर्णांक signed 64-bit श्रेणी के बाहर है"
+help = "छोटा मान चुनें"
+
+[diagnostics.PARSE002.issues.declaration_block_comma]
+message = "अल्पविराम declaration block के सदस्यों को अलग नहीं करते"
+help = "अल्पविराम हटाएँ; declaration सदस्य नई पंक्तियों से अलग होते हैं"
+
 [diagnostics.PARSE002.issues.json_unknown_identifier_value]
 message = "JSON identifiers मान्य JSON values नहीं हैं"
 help = "true, false, null, string, number, object या array का उपयोग करें"
@@ -648,6 +692,14 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "annotation `@ {annotation}` इस reader surface पर घोषित नहीं है"
 help = "इस फ़ाइल की reader locale के लिए `@ {expected}` का उपयोग करें"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum]
+message = "एक घोषणा में एक से अधिक `@ nucleum` annotation हैं"
+help = "एक ही nucleum annotation रखें"
+
+[diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
+message = "`@ nucleum` fragment ग्राफ़िक्स fragment annotation से टकराता है"
+help = "fragment annotation में से एक हटाएं"
+
 [diagnostics.PARSE019]
 message = "दोहराया गया modifier"
 help = "duplicate modifier हटाएं"
@@ -671,6 +723,10 @@ help = "विषयों को '{et}' से अलग करें"
 [diagnostics.PARSE020.issues.discerne_subject_not_path]
 message = "'{discerne}' का विषय एक नाम या सदस्य पथ होना चाहिए"
 help = "पहले मान को किसी नाम से बाँधें, फिर उसी नाम पर '{discerne}' करें"
+
+[diagnostics.PARSE020.issues.nesting_too_deep]
+message = "स्रोत parser की सीमा {limit} से अधिक गहराई तक नेस्ट है"
+help = "निर्माण को नामित बाइंडिंग में विभाजित करें"
 
 [diagnostics.PARSE021]
 message = "शर्त गायब है"
@@ -752,6 +808,10 @@ help = "∴ के बाद संक्षिप्त closure body को {fa
 message = "closure fac body में 'dum' उपयोग नहीं कर सकते"
 help = "closure fac bodies से dum हटाएं"
 
+[diagnostics.PARSE030.issues.expression_too_long]
+message = "अभिव्यक्ति parser की {limit} operator सीमा से अधिक है"
+help = "अभिव्यक्ति को नामित बाइंडिंग में विभाजित करें"
+
 [diagnostics.PARSE031]
 message = "अमान्य literal"
 help = "literal रूप जांचें"
@@ -779,6 +839,10 @@ help = "केवल मान्य lvalues को assign करें"
 [diagnostics.PARSE040]
 message = "अमान्य प्रकार"
 help = "प्रकार syntax जांचें"
+
+[diagnostics.PARSE040.issues.promissum_alternate_uses_exit_arrow]
+message = "promissum विकल्प को त्रुटि तीर `⇥` का उपयोग करना चाहिए, वापसी तीर `→` का नहीं"
+help = "विकल्प शाखा को `⇥` के साथ लिखें"
 
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "प्रकार नाम अपेक्षित है"

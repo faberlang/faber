@@ -745,8 +745,10 @@ fn tensor_matmul_dot_products_are_exact_and_store_per_element() {
 fn tensor_elementwise_stores_each_element_under_the_element_type() {
     // ts1 (rulings 17, 19): each element is exact and stored per element.
     let setup = "sit tensor<i8, [3]> a ← [100, 100, -100] ↦ tensor<i8, [3]>\n";
+    // `i8 + i8` takes the scalar range rule → `i16`; the checked `i8` lane store
+    // traps on the widened element (operator ruling 2026-10-15, need).
     let sum = format!(
-        "{setup}sit tensor<i8, [3]> b ← [100, 1, -100] ↦ tensor<i8, [3]>\nsit tensor<i8, [3]> s ← a + b\nnota s.summa()"
+        "{setup}sit tensor<i8, [3]> b ← [100, 1, -100] ↦ tensor<i8, [3]>\nsit tensor<i16, [3]> wide ← a + b\nvaria tensor<i8, [3]> r ← [0, 0, 0] ↦ tensor<i8, [3]>\nr[0] ← wide[0]\nnota r.summa()"
     );
     let (out, issue, message) = trap(&sum);
     assert!(out.is_empty());

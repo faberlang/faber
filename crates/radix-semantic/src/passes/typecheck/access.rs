@@ -292,7 +292,7 @@ impl TypeChecker<'_> {
                 _ => {}
             }
         }
-        if let Type::Tensor(elem, shape) = resolved_kind {
+        if let Type::Tensor(elem, shape) | Type::Matrix(elem, shape) = resolved_kind {
             return self.check_tensor_bracket_index(elem, shape, idx_ty, index_span);
         }
         // S0-G8: vector lane access. A register vector lane is an O(1) scalar
@@ -1181,7 +1181,9 @@ impl TypeChecker<'_> {
             .types
             .peel_access_marker(self.resolve_inferred_type(obj_ty))
             .1;
-        if let Type::Tensor(elem, shape) = self.types.get(resolved).clone() {
+        if let Type::Tensor(elem, shape) | Type::Matrix(elem, shape) =
+            self.types.get(resolved).clone()
+        {
             self.check_tensor_bracket_index(elem, shape, idx_ty, index.span);
             super::tensor_index::reject_static_bounded_index_oob(self, obj_ty, index);
             super::tensor_index::warn_unproven_kernel_index(self, obj_ty, index);

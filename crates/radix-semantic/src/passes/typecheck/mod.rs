@@ -1159,6 +1159,10 @@ pub mod test_support;
 mod access_operand_test;
 
 #[cfg(test)]
+#[path = "optional_chain_call_test.rs"]
+mod optional_chain_call_test;
+
+#[cfg(test)]
 #[path = "axis_marker_test.rs"]
 mod axis_marker_test;
 
@@ -1427,6 +1431,10 @@ mod octeti_tensor_bytes_list_test;
 #[cfg(test)]
 #[path = "ordo_conversio_test.rs"]
 mod ordo_conversio_test;
+
+#[cfg(test)]
+#[path = "ordo_order_test.rs"]
+mod ordo_order_test;
 
 #[cfg(test)]
 #[path = "conversio_function_route_test.rs"]
