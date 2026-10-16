@@ -16,6 +16,7 @@ fn width<size D>(tensor<f32, [D]> wx) → i32 {
     return 7
 }
 
+# kernel-subset K1/K2 (operator ruling 2026-10-15, need): the row read is guarded non-negative and its upper bound rides a launch-time extent condition (rule 10).
 @ kernel
 @ public
 fn gather<size V, size D>(tensor<f32, [D]> gdom, tensor<f32, [V, D]> gtable, tensor<i32, [1]> gids, mut tensor<f32, [D]> gout) → void {
