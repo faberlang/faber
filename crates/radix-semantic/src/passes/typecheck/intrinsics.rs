@@ -50,6 +50,7 @@ const ISSUE_IMPERATIVUS_OPERATOR_METHOD_REQUIRES_VARIA_RECEIVER: &str =
 const ISSUE_MUTATING_RECEIVER_THROUGH_CONST: &str = "mutating_receiver_through_const";
 const ISSUE_INTRINSIC_METHOD_TYPE_ARGS: &str = "intrinsic_method_type_args";
 const ISSUE_TENSOR_FORMATA_ELEMENT_TYPE_MISMATCH: &str = "tensor_formata_element_type_mismatch";
+const ISSUE_TENSOR_FORMATA_ELEMENT_COUNT_MISMATCH: &str = "tensor_formata_element_count_mismatch";
 const ISSUE_TENSOR_TYPE_ARG_INCOMPLETE: &str = "tensor_type_arg_incomplete";
 const ISSUE_TENSOR_SHIFT_NULLABLE_SOURCE_UNSUPPORTED: &str =
     "tensor_shift_nullable_source_unsupported";
@@ -1305,9 +1306,32 @@ pub(super) fn validate_generic_typus_tensor(
         );
         return checker.error_type;
     }
+    // Q-X10: when both receiver and target shapes are static, the reshape must
+    // keep the element count. A run-time receiver extent emits nothing here;
+    // the runner's ERR_FORMA_RESHAPE_COUNT failure stands for that case.
+    if let Some(receiver_complete) = complete_tensor_type(recv, checker.types)
+        && let Some(receiver_count) = tensor_element_count(&receiver_complete.dims)
+        && let Some(target_count) = tensor_element_count(&complete.dims)
+        && receiver_count != target_count
+    {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_TENSOR_FORMATA_ELEMENT_COUNT_MISMATCH,
+            span,
+        );
+        return checker.error_type;
+    }
     checker
         .types
         .tensor_with_shape(complete.elem, complete.shape)
+}
+
+/// Product of the static dimensions of a complete tensor shape, or `None` when
+/// the product overflows or any extent is negative.
+fn tensor_element_count(dims: &[i64]) -> Option<i64> {
+    dims.iter()
+        .try_fold(1_i64, |count, dim| count.checked_mul(*dim))
+        .filter(|count| *count >= 0)
 }
 
 /// Typecheck `matrix.applica(vector)`: peer width must equal matrix columns;

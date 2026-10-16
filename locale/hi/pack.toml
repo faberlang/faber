@@ -2052,6 +2052,10 @@ help = "अभिव्यक्ति का प्रकार अपेक्
 message = "formata लक्ष्य तत्व प्रकार रिसीवर तत्व प्रकार से मेल खाना चाहिए"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
+[diagnostics.SEM010.issues.tensor_formata_element_count_mismatch]
+message = "formata लक्ष्य आकार में रिसीवर के समान तत्व संख्या होनी चाहिए"
+help = "पुनर्निर्मित प्रकार को रिसीवर की तत्व संख्या बनाए रखनी चाहिए"
+
 [diagnostics.SEM010.issues.tensor_incomplete]
 message = "tensor के लिए तत्व प्रकार और Figura आवश्यक हैं; tensor<T, Figura> का उपयोग करें"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"

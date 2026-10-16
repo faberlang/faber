@@ -2084,6 +2084,10 @@ help = "使運算式型別符合預期型別"
 message = "formata 目標元素型別必須符合接收者元素型別"
 help = "使運算式型別符合預期型別"
 
+[diagnostics.SEM010.issues.tensor_formata_element_count_mismatch]
+message = "formata 目標形狀必須與接收者保持相同的元素數量"
+help = "重塑後的型別必須保持接收者的元素數量"
+
 [diagnostics.SEM010.issues.tensor_incomplete]
 message = "tensor 需要元素型別與 Figura；使用 tensor<T, Figura>"
 help = "使運算式型別符合預期型別"

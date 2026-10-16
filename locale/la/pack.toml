@@ -2615,6 +2615,10 @@ help = "genera aperientis et rei tractatricis declara, aut annotationem omitte u
 message = "formata target element type must match the receiver element type"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.tensor_formata_element_count_mismatch]
+message = "formata target shape must hold the same element count as the receiver"
+help = "the reshaped type must keep the receiver element count"
+
 [diagnostics.SEM010.issues.tensor_incomplete]
 message = "tensor requires element type and Figura; use tensor<T, Figura>"
 help = "make the expression type match the expected type"

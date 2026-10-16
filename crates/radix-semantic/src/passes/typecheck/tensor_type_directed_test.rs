@@ -216,6 +216,30 @@ fn rejects_formata_element_type_mismatch_with_structured_issue_arg() {
 }
 
 #[test]
+fn rejects_formata_element_count_mismatch_with_structured_issue_arg() {
+    rejects_with_issue(
+        r"incipit {
+  sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  sit tf32[2, 3] data ← flat ↦ tf32[2, 3]
+  sit _ view ← data.formata<tf32[4, 2]>()
+}",
+        "tensor_formata_element_count_mismatch",
+    );
+}
+
+#[test]
+fn static_formata_accepts_equal_element_count_reshape() {
+    accepts(
+        r"incipit {
+  sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+  sit tf32[2, 3] data ← flat ↦ tf32[2, 3]
+  sit tf32[3, 2] view ← data.formata<tf32[3, 2]>()
+  nota view.longitudo()
+}",
+    );
+}
+
+#[test]
 fn preserves_lista_to_tensor_conversion() {
     accepts(
         r"incipit {
