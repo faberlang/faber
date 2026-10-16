@@ -901,6 +901,90 @@ static inline void *faber_alloc(faber_arena *arena, size_t size) {
     return faber_alloc(arena, size);
 }
 
+/* `read line` / `read`: one stdin line without its terminator, or all of
+   stdin to EOF. EOF is the runner's Nil, so the result is NULL (none). */
+static inline const char *faber_read_line(faber_arena *arena) {
+    size_t capacity = 128;
+    size_t length = 0;
+    char *buffer = malloc(capacity);
+    int c;
+    bool any = false;
+    if (buffer == NULL) {
+        faber_trap("out of memory");
+    }
+    while ((c = fgetc(stdin)) != EOF) {
+        any = true;
+        if (c == '\n') {
+            break;
+        }
+        if (length + 1 >= capacity) {
+            char *grown;
+            capacity *= 2;
+            grown = realloc(buffer, capacity);
+            if (grown == NULL) {
+                free(buffer);
+                faber_trap("out of memory");
+            }
+            buffer = grown;
+        }
+        buffer[length++] = (char)c;
+    }
+    if (!any) {
+        free(buffer);
+        return NULL;
+    }
+    while (length > 0 && buffer[length - 1] == '\r') {
+        length--;
+    }
+    {
+        char *out = faber_alloc(arena, length + 1);
+        if (length > 0) {
+            memcpy(out, buffer, length);
+        }
+        out[length] = '\0';
+        free(buffer);
+        return out;
+    }
+}
+
+static inline const char *faber_read_all(faber_arena *arena) {
+    size_t capacity = 256;
+    size_t length = 0;
+    char *buffer = malloc(capacity);
+    if (buffer == NULL) {
+        faber_trap("out of memory");
+    }
+    for (;;) {
+        size_t got;
+        if (length + 1 >= capacity) {
+            char *grown;
+            capacity *= 2;
+            grown = realloc(buffer, capacity);
+            if (grown == NULL) {
+                free(buffer);
+                faber_trap("out of memory");
+            }
+            buffer = grown;
+        }
+        got = fread(buffer + length, 1, capacity - length - 1, stdin);
+        length += got;
+        if (got == 0) {
+            break;
+        }
+    }
+    if (length == 0) {
+        free(buffer);
+        return NULL;
+    }
+    {
+        char *out = faber_alloc(arena, length + 1);
+        memcpy(out, buffer, length);
+        out[length] = '\0';
+        free(buffer);
+        return out;
+    }
+}
+
 /* ------------------------------------------------------------------------ */
 /* Text built at run time                                                   */
 /* ------------------------------------------------------------------------ */

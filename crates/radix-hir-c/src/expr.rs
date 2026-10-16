@@ -347,6 +347,7 @@ impl Emitter<'_> {
                 }
             }
             HirExpressionKind::Array(elements) => self.list_literal(expr, elements),
+            HirExpressionKind::ReadLine(line) => self.read_line(expr, *line),
             HirExpressionKind::Index(base, index) => {
                 match crate::map::map_class(self.types, base.ty) {
                     Some((k, v)) => self.map_read(base, index, k, v),
@@ -597,6 +598,27 @@ impl Emitter<'_> {
         let ret = returns(self.types, ret_ty)?;
         let value = ret.map_or(Value::Void, Value::from);
         Ok(Operand::new(wrap(&prelude, &call), value).with_effect(true))
+    }
+
+    /// `read line` / `read`: one stdin line without its terminator, or all of
+    /// stdin to EOF. EOF is the runner's Nil, so the slot must be nullable;
+    /// the helper returns NULL (none) at EOF.
+    fn read_line(&mut self, expr: &HirExpression, line: bool) -> Result<Operand, CodegenError> {
+        let Some(ty) = expr.ty else {
+            return Err(unsupported("input read without a resolved type"));
+        };
+        if classify(self.types, ty)? != Ty::Opt(Inner::Text) {
+            return Err(unsupported(
+                "input read into a slot that is not string ∪ none",
+            ));
+        }
+        self.support.need(Helper::Arena);
+        let call = if line {
+            "faber_read_line"
+        } else {
+            "faber_read_all"
+        };
+        Ok(Operand::new(format!("{call}(faber_a)"), Value::Opt(Inner::Text)).with_effect(true))
     }
 
     /// The address a `ref`/`mut` scalar argument passes: the caller's own cell,

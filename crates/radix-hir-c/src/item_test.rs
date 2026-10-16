@@ -141,3 +141,11 @@ fn a_named_function_value_is_a_c_function_pointer() {
     assert!(code.contains("int64_t (*l_g)(int64_t) = f_twice;"), "{code}");
     assert!(code.contains("p_f(p_n)"), "{code}");
 }
+
+#[test]
+fn a_read_is_a_nullable_stdin_line_or_all() {
+    let all = emitted("main {\n    let string ∪ none input ← read\n    print input\n}");
+    assert!(all.contains("faber_read_all(faber_a)"), "{all}");
+    let line = emitted("main {\n    let string ∪ none input ← line\n    print input\n}");
+    assert!(line.contains("faber_read_line(faber_a)"), "{line}");
+}
