@@ -73,8 +73,18 @@ pub fn shape_relation_applies_to_return(types: &TypeTable, relation: &ShapeRelat
 /// and the type table are fixed for the whole lowering).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(super) enum SyntheticHelperKey {
-    CheckedAt { keyed: bool, params: [MirType; 2], return_ty: MirType, error_ty: MirType },
-    CheckedTensor { op: MirCollectionOp, params: Vec<MirType>, return_ty: MirType, error_ty: MirType },
+    CheckedAt {
+        keyed: bool,
+        params: [MirType; 2],
+        return_ty: MirType,
+        error_ty: MirType,
+    },
+    CheckedTensor {
+        op: MirCollectionOp,
+        params: Vec<MirType>,
+        return_ty: MirType,
+        error_ty: MirType,
+    },
     Conversio {
         params: Vec<MirType>,
         target: TypeId,
@@ -82,7 +92,12 @@ pub(super) enum SyntheticHelperKey {
         return_ty: MirType,
         error_ty: MirType,
     },
-    BoundedAppend { receiver_ty: MirType, item_ty: MirType, return_ty: MirType, error_ty: MirType },
+    BoundedAppend {
+        receiver_ty: MirType,
+        item_ty: MirType,
+        return_ty: MirType,
+        error_ty: MirType,
+    },
 }
 
 /// Whether a `⊥` default expression is side-effecting: a call or method call

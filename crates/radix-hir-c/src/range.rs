@@ -215,7 +215,12 @@ impl Emitter<'_> {
             }
             None => ("1".to_owned(), Some(1)),
         };
-        let narrow = bounded_walk(start.constant, end.constant, stride, matches!(kind, HirRangeKind::Inclusive));
+        let narrow = bounded_walk(
+            start.constant,
+            end.constant,
+            stride,
+            matches!(kind, HirRangeKind::Inclusive),
+        );
         // The direction flag exists for the exact walk, which learns it at run
         // time; a bounded walk settled it at emit time.
         let up = if narrow.is_some() {

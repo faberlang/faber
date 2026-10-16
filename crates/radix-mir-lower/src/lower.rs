@@ -94,13 +94,13 @@ mod union_dispatch;
 use context::{LoweringContextMaps, function_param_map, struct_field_map};
 use expr::HirExpressionLoweringVisitor;
 use item::ItemLoweringPass;
-use runtime::SyntheticHelperKey;
 pub use package_instantiate::{
     ImportedDeviceIndex, ImportedDeviceRegistration, ImportedDeviceRoute, PackageStructMetadata,
     instantiate_merged_generic_calls, instantiate_merged_generic_calls_with_devices,
     instantiate_merged_generic_calls_with_devices_and_metadata,
     instantiate_merged_generic_calls_with_tensor_edge_policy,
 };
+use runtime::SyntheticHelperKey;
 
 /// Developer-facing MIR lowering diagnostic.
 ///
