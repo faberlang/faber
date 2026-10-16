@@ -98,12 +98,12 @@ fn thread_argmax_and_argmin_ties_go_to_the_lowest_coordinate() {
     let source = r"
 @ kernel
 @ public
-fn t_argmax<size N>(tf32[N] a) → int {
+fn t_argmax<size N>(tf32[N] a) → i32 {
     return (reduce via argmax from a at [i] thread lane let s { return s }) coalesce -1
 }
 @ kernel
 @ public
-fn t_argmin<size N>(tf32[N] a) → int {
+fn t_argmin<size N>(tf32[N] a) → i32 {
     return (reduce via argmin from a at [i] thread lane let s { return s }) coalesce -1
 }
 fn p_argmax<size N>(tf32[N] a) → int {
@@ -212,7 +212,7 @@ fn t_argmax(tf32[0] a) → int ∪ none {
 }
 @ kernel
 @ public
-fn t_count(tf32[0] a) → int {
+fn t_count(tf32[0] a) → i32 {
     return reduce via count from a at [i] thread lane let s { return s ≻ 0.0 }
 }
 fn p_max(tf32[0] a) → f32 {
@@ -242,7 +242,7 @@ fn thread_count_any_and_all_match_the_plain_reduction() {
     let source = r"
 @ kernel
 @ public
-fn t_count<size N>(tf32[N] a) → int {
+fn t_count<size N>(tf32[N] a) → i32 {
     return reduce via count from a at [i] thread lane let s { return s ≻ 2.0 }
 }
 @ kernel
