@@ -1,0 +1,37 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "width_type_sugar", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
+category = "conversion"
+canonical = false
+summary = "Matrix to flat lista conversio."
+syntax = "<matrix> ↦ list<T>"
+related = ["↦", "matrix", "lista", "tensor"]
+locale = "en"
++++
+
+# =============================================================================
+# ↦ — Matrix to flat lista conversio.
+# =============================================================================
+#
+# What this teaches:
+#   • Shaped to flat conversion — a `matrix` converts into a flat `list<T>` of its cells.
+#   • Row-major order — the cells lower in row-major order, so row 0 precedes row 1.
+#
+# Common mistakes:
+#   • Expecting a nested lista — the target `list<T>` is flat, not one lista per row.
+#
+# See also: ↦, matrix, lista, tensor
+# =============================================================================
+
+
+# conversio — matrix to flat lista
+#
+# WHY: dropping the Figura leaves an unbounded flat lista of the cells in
+# row-major order. The list `print` renders the flat elements.
+
+main {
+    let matrix<f32, [2, 2]> m ← [[1.0, 2.0], [3.0, 4.0]] ↦ matrix<f32, [2, 2]>
+    let list<f32> l ← m ↦ list<f32>
+    print l
+}

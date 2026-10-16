@@ -1,0 +1,38 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "width_type_sugar", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
+category = "conversion"
+canonical = false
+summary = "Matrix to tensor conversio."
+syntax = "<matrix> ↦ <tensor-type-with-literal-Figura>"
+related = ["↦", "matrix", "tensor", "Figura"]
+locale = "en"
++++
+
+# =============================================================================
+# ↦ — Matrix to tensor conversio.
+# =============================================================================
+#
+# What this teaches:
+#   • Register-class to shaped conversion — a `matrix` converts into a shaped `tensor` when the target type witnesses a literal Figura.
+#   • Same flat body — the matrix cells lower in row-major order into the tensor's flat storage.
+#
+# Common mistakes:
+#   • Mismatching the matrix shape and the target tensor Figura — the element counts must agree.
+#
+# See also: ↦, matrix, tensor, Figura
+# =============================================================================
+
+
+# conversio — matrix to tensor
+#
+# WHY: the register-class matrix and the shaped tensor share their flat cell
+# order, so the conversion carries the four elements row-major into the target
+# Figura. `flatten` reads the tensor back flat.
+
+main {
+    let matrix<f32, [2, 2]> m ← [[1.0, 2.0], [3.0, 4.0]] ↦ matrix<f32, [2, 2]>
+    let tf32[2, 2] t ← m ↦ tf32[2, 2]
+    print t.flatten()
+}

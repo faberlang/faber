@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/vector-tensor.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/vector-tensor.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
