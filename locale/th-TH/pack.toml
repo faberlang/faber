@@ -408,10 +408,6 @@ help = "แทนที่ secus si ด้วย sin"
 message = "ต้องมี {expected}"
 help = "เลือกโหมดการวนซ้ำหนึ่งโหมดก่อนนิพจน์ iterable"
 
-[diagnostics.PARSE001.issues.allocator_kind]
-message = "ต้องมี {expected}"
-help = "ใช้ \"arena\" หรือ \"page\" เป็นชนิด allocator"
-
 [diagnostics.PARSE001.issues.mutability_marker]
 message = "ต้องมี {expected}"
 help = "เพิ่ม fixum หรือ varia ก่อนชื่อ binding"
@@ -872,10 +868,6 @@ help = "เขียนความกว้างด้วยวงเล็บ
 message = "{sugar} sugar ใช้ Figura ในวงเล็บ"
 help = "เขียนรูปร่างด้วยวงเล็บ width sugar ของ {sugar}"
 
-[diagnostics.PARSE040.issues.invalid_figura_index]
-message = "ลิเทอรัลดัชนีต้องเป็นจำนวนธรรมชาติ"
-help = "ใช้ดัชนีรูปร่างที่ไม่เป็นลบ"
-
 [diagnostics.PARSE040.issues.numeric_wrapper_retired]
 message = "`{form}` เป็นการเขียนชนิดตัวเลขที่เลิกใช้แล้ว"
 help = "เขียน `{bare}` แทน `{form}`; ตัวระบุความกว้างเป็นชนิดในตัวมันเอง"
@@ -990,10 +982,6 @@ help = "ประกาศชนิดหรือนำเข้า"
 
 [diagnostics.SEM002.issues.precision_marker_shape]
 message = "เครื่องหมายความแม่นยำต้องเป็นการเขียนแบบเปลือย เช่น ms หรือ us"
-help = "ประกาศชนิดหรือนำเข้า"
-
-[diagnostics.SEM002.issues.qualified_name_not_type]
-message = "ชื่อแบบมีคุณสมบัติไม่ได้อ้างถึงชนิด"
 help = "ประกาศชนิดหรือนำเข้า"
 
 [diagnostics.SEM002.issues.qualified_type_not_exported]
@@ -1120,10 +1108,6 @@ help = "ตรวจเส้นทางการนำเข้า"
 message = "ไม่รู้จักโมดูล faber kernel '{module}'; ดู faber host manifest"
 help = "ตรวจเส้นทางการนำเข้า"
 
-[diagnostics.SEM006.issues.kernel_norma_json_in_script]
-message = "โหมดสคริปต์ใช้ `{script_path}`; `{library_path}` ใช้เฉพาะแพ็กเกจ/ไลบรารี"
-help = "ตรวจเส้นทางการนำเข้า"
-
 [diagnostics.SEM006.issues.import_interna_cross_package]
 message = "`{name}` เป็น `@ interna` และไม่สามารถนำเข้าข้ามขอบเขตแพ็กเกจได้"
 help = "นำเข้าชื่อ `@ interna` ได้เฉพาะจากไฟล์ในแพ็กเกจเดียวกัน"
@@ -1232,10 +1216,6 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 message = "discerne ต้องมี subject อย่างน้อยหนึ่งรายการ"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
-[diagnostics.SEM008.issues.duplicate_module_method_binding]
-message = "มีการผูกเมธอดโมดูลซ้ำระหว่าง lowering"
-help = "แก้โครงสร้าง AST สำหรับ lowering"
-
 [diagnostics.SEM008.issues.ego_outside_method]
 message = "ใช้ ego นอกบริบทเมธอด"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -1258,10 +1238,6 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.ex_destructuring_not_expanded]
 message = "ต้องขยายการแยกโครงสร้าง ex ก่อนลดระดับคำสั่ง"
-help = "แก้โครงสร้าง AST สำหรับ lowering"
-
-[diagnostics.SEM008.issues.finge_cast_not_type]
-message = "finge cast ต้องระบุชื่อชนิด"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.figura_not_index_param]
@@ -1354,10 +1330,6 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.matrix_shape_two_dim]
 message = "shape ของ matrix ต้องมีสองมิติพอดี"
-help = "แก้โครงสร้าง AST สำหรับ lowering"
-
-[diagnostics.SEM008.issues.missing_cast_symbol_info]
-message = "ไม่มีข้อมูลสัญลักษณ์ cast"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.missing_resolved_type_alias]
@@ -1490,10 +1462,6 @@ help = "แก้ไขโครงสร้าง AST สำหรับกา�
 
 [diagnostics.SEM008.issues.unhandled_statement_kind]
 message = "ไม่รองรับชนิดของ statement นี้ในการลดรูป"
-help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
-
-[diagnostics.SEM008.issues.unknown_finge_cast_type]
-message = "ไม่รู้จักชนิด cast ใน expression finge"
 help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
 
 [diagnostics.SEM008.issues.unknown_finge_variant]
@@ -2592,10 +2560,6 @@ help = "เพิ่มคำอธิบายชนิดข้อมูลอ
 message = "ยังไม่ได้ลงทะเบียนชนิด directional view"
 help = "ตรวจสอบให้แน่ใจว่าลงทะเบียนชนิด frame ในตัวแล้วก่อนตรวจสอบชนิด"
 
-[diagnostics.SEM014.issues.explicit_type_arg_inference_unsupported]
-message = "ไม่รองรับการอนุมานบางส่วนในอาร์กิวเมนต์ชนิดข้อมูลที่ระบุอย่างชัดเจน"
-help = "แทนที่อาร์กิวเมนต์ชนิดข้อมูลที่อนุมานด้วยชนิดข้อมูลที่เป็นรูปธรรม"
-
 [diagnostics.SEM014.issues.scrinium_type_not_registered]
 message = "ยังไม่ได้ลงทะเบียนชนิด scrinium"
 help = "ตรวจสอบให้แน่ใจว่าลงทะเบียนชนิด frame ในตัวแล้วก่อนตรวจสอบชนิด"
@@ -2903,10 +2867,6 @@ help = "ใช้ `@ radix typus T in textus octeti` หรือ `{radix_typus_
 [diagnostics.SEM018.issues.non_type_allowed]
 message = "ค่าที่อนุญาตของ @ radix typus ต้องเป็นชนิด"
 help = "ใช้ `@ radix typus T in textus octeti` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
-
-[diagnostics.SEM018.issues.unexpected_token]
-message = "มี token ที่ไม่คาดคิดหลังค่า @ radix lane"
-help = "ใช้ `@ radix lane \"air\"`, `@ radix lane \"mir\"` หรือ `@ radix lane \"hir-direct\"` บน functio ระดับ top-level"
 
 [diagnostics.SEM018.issues.unknown_directive]
 message = "ไม่รู้จัก directive ของ @ radix; ต้องเป็น `lane`"
@@ -3280,10 +3240,6 @@ help = "รักษาเซตย่อย AIR v1 ให้บริสุท�
 message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: closure อยู่นอกเซตย่อย AIR v1"
 help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
 
-[diagnostics.SEM059.issues.conditional_recovery]
-message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การกู้คืนแบบมีเงื่อนไขอยู่นอกเซตย่อย AIR v1"
-help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
-
 [diagnostics.SEM059.issues.defaulted_parameter]
 message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: พารามิเตอร์ที่มีค่าเริ่มต้นอยู่นอกเซตย่อย AIR v1"
 help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
@@ -3464,17 +3420,9 @@ help = "ลบโครงสร้างนี้หรือจำกัดก
 message = "พารามิเตอร์อ้างอิงแบบเปลี่ยนแปลงได้ไม่ได้ใช้"
 help = "เปลี่ยน 'in' เป็น 'de' หากไม่จำเป็นต้องเปลี่ยนแปลงค่า"
 
-[diagnostics.WARN008.issues.unused_in_parameter]
-message = "พารามิเตอร์ `in` ไม่เคยถูกเปลี่ยนแปลง; พิจารณาใช้ `de`"
-help = "เปลี่ยน 'in' เป็น 'de' หากไม่จำเป็นต้องเปลี่ยนแปลงค่า"
-
 [diagnostics.WARN009]
 message = "พารามิเตอร์ย้ายค่าไม่ได้ใช้"
 help = "เปลี่ยน 'ex' เป็น 'de' หากไม่จำเป็นต้องโอนความเป็นเจ้าของ"
-
-[diagnostics.WARN009.issues.unused_ex_parameter]
-message = "พารามิเตอร์ `ex` ไม่เคยถูกใช้; พิจารณาใช้ `de`"
-help = "เปลี่ยน 'ex' เป็น 'de' หากไม่จำเป็นต้องโอน ownership"
 
 [diagnostics.WARN010]
 message = "คำอธิบาย ignotum แบบชัดแจ้ง"

@@ -408,10 +408,6 @@ help = "thay secus si bằng sin"
 message = "cần {expected}"
 help = "chọn một chế độ lặp trước biểu thức có thể lặp"
 
-[diagnostics.PARSE001.issues.allocator_kind]
-message = "cần {expected}"
-help = "dùng \"arena\" hoặc \"page\" làm loại bộ cấp phát"
-
 [diagnostics.PARSE001.issues.mutability_marker]
 message = "cần {expected}"
 help = "thêm fixum hoặc varia trước tên binding"
@@ -872,10 +868,6 @@ help = "viết độ rộng bằng ngoặc vuông của đường tắt vector"
 message = "đường tắt {sugar} dùng Figura trong ngoặc vuông"
 help = "viết hình dạng bằng ngoặc vuông độ rộng của đường tắt {sugar}"
 
-[diagnostics.PARSE040.issues.invalid_figura_index]
-message = "literal chỉ mục phải là số tự nhiên"
-help = "dùng chỉ mục hình dạng không âm"
-
 [diagnostics.PARSE040.issues.numeric_wrapper_retired]
 message = "`{form}` là cách viết kiểu số đã bị loại bỏ"
 help = "viết `{bare}` thay vì `{form}`; dấu hiệu độ rộng tự nó là một kiểu"
@@ -986,10 +978,6 @@ help = "khai báo kiểu hoặc import kiểu đó"
 
 [diagnostics.SEM002.issues.precision_marker_shape]
 message = "ký hiệu độ chính xác phải là cách viết trần như ms hoặc us"
-help = "khai báo kiểu hoặc import kiểu đó"
-
-[diagnostics.SEM002.issues.qualified_name_not_type]
-message = "tên đủ định danh không tham chiếu đến một kiểu"
 help = "khai báo kiểu hoặc import kiểu đó"
 
 [diagnostics.SEM002.issues.qualified_type_not_exported]
@@ -1116,10 +1104,6 @@ help = "kiểm tra đường dẫn import"
 message = "mô-đun kernel faber không xác định '{module}'; xem manifest host của faber"
 help = "kiểm tra đường dẫn import"
 
-[diagnostics.SEM006.issues.kernel_norma_json_in_script]
-message = "chế độ script sử dụng `{script_path}`; `{library_path}` chỉ dành cho package/library"
-help = "kiểm tra đường dẫn import"
-
 [diagnostics.SEM007]
 message = "phụ thuộc vòng"
 help = "phá vỡ chu trình giữa các mô-đun"
@@ -1220,10 +1204,6 @@ help = "sửa cấu trúc AST để hạ mức"
 message = "discerne yêu cầu ít nhất một đối tượng"
 help = "sửa cấu trúc AST để hạ mức"
 
-[diagnostics.SEM008.issues.duplicate_module_method_binding]
-message = "liên kết phương thức mô-đun trùng lặp trong khi hạ mức"
-help = "sửa cấu trúc AST để hạ mức"
-
 [diagnostics.SEM008.issues.ego_outside_method]
 message = "ego được dùng bên ngoài ngữ cảnh phương thức"
 help = "sửa cấu trúc AST để hạ mức"
@@ -1246,10 +1226,6 @@ help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.ex_destructuring_not_expanded]
 message = "phải mở rộng phân rã ex trước khi hạ mức câu lệnh"
-help = "sửa cấu trúc AST để hạ mức"
-
-[diagnostics.SEM008.issues.finge_cast_not_type]
-message = "phép ép kiểu finge phải nêu tên một kiểu"
 help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.figura_not_index_param]
@@ -1342,10 +1318,6 @@ help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.matrix_shape_two_dim]
 message = "hình dạng matrix phải có chính xác hai chiều"
-help = "sửa cấu trúc AST để hạ mức"
-
-[diagnostics.SEM008.issues.missing_cast_symbol_info]
-message = "thiếu thông tin ký hiệu ép kiểu"
 help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.missing_resolved_type_alias]
@@ -1478,10 +1450,6 @@ help = "sửa cấu trúc AST để hạ cấp"
 
 [diagnostics.SEM008.issues.unhandled_statement_kind]
 message = "loại câu lệnh chưa được xử lý khi hạ cấp"
-help = "sửa cấu trúc AST để hạ cấp"
-
-[diagnostics.SEM008.issues.unknown_finge_cast_type]
-message = "không biết kiểu chuyển trong biểu thức finge"
 help = "sửa cấu trúc AST để hạ cấp"
 
 [diagnostics.SEM008.issues.unknown_finge_variant]
@@ -2580,10 +2548,6 @@ help = "thêm chú thích kiểu rõ ràng"
 message = "kiểu directional view chưa được đăng ký"
 help = "đảm bảo các kiểu frame builtin được đăng ký trước khi kiểm tra kiểu"
 
-[diagnostics.SEM014.issues.explicit_type_arg_inference_unsupported]
-message = "không hỗ trợ suy luận một phần trong các đối số kiểu rõ ràng"
-help = "thay các đối số kiểu rõ ràng được suy luận bằng các kiểu cụ thể"
-
 [diagnostics.SEM014.issues.scrinium_type_not_registered]
 message = "kiểu scrinium chưa được đăng ký"
 help = "đảm bảo các kiểu frame builtin được đăng ký trước khi kiểm tra kiểu"
@@ -2891,10 +2855,6 @@ help = "sử dụng `@ radix typus T in textus octeti` hoặc `{radix_typus_brac
 [diagnostics.SEM018.issues.non_type_allowed]
 message = "giá trị được cho phép của typus @ radix phải là một kiểu"
 help = "sử dụng `@ radix typus T in textus octeti` hoặc `{radix_typus_braced}` với ít nhất một kiểu được cho phép"
-
-[diagnostics.SEM018.issues.unexpected_token]
-message = "token không mong đợi sau giá trị @ radix lane"
-help = "sử dụng `@ radix lane \"air\"`, `@ radix lane \"mir\"`, hoặc `@ radix lane \"hir-direct\"` trên một functio cấp cao nhất"
 
 [diagnostics.SEM018.issues.unknown_directive]
 message = "chỉ thị @ radix không xác định; cần `lane`"
@@ -3268,10 +3228,6 @@ help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu t
 message = "@ radix lane \"{lane}\" từ chối thân hàm này: closure nằm ngoài tập con AIR v1"
 help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
 
-[diagnostics.SEM059.issues.conditional_recovery]
-message = "@ radix lane \"{lane}\" từ chối thân hàm này: khôi phục có điều kiện nằm ngoài tập con AIR v1"
-help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
-
 [diagnostics.SEM059.issues.defaulted_parameter]
 message = "@ radix lane \"{lane}\" từ chối thân hàm này: tham số có giá trị mặc định nằm ngoài tập con AIR v1"
 help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
@@ -3452,16 +3408,8 @@ help = "xóa cấu trúc hoặc giới hạn cấu trúc theo đích"
 message = "tham số tham chiếu có thể thay đổi không được sử dụng"
 help = "đổi 'in' thành 'de' nếu không cần thay đổi"
 
-[diagnostics.WARN008.issues.unused_in_parameter]
-message = "tham số `in` không bao giờ bị thay đổi; cân nhắc dùng `de`"
-help = "đổi 'in' thành 'de' nếu không cần thay đổi"
-
 [diagnostics.WARN009]
 message = "tham số di chuyển không được sử dụng"
-help = "đổi 'ex' thành 'de' nếu không cần chuyển quyền sở hữu"
-
-[diagnostics.WARN009.issues.unused_ex_parameter]
-message = "parameter `ex` không bao giờ được sử dụng; hãy cân nhắc dùng `de`"
 help = "đổi 'ex' thành 'de' nếu không cần chuyển quyền sở hữu"
 
 [diagnostics.WARN010]
