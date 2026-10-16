@@ -64,6 +64,10 @@ impl Host for TrapHost<'_> {
         self.inner.write_stdout_bytes(bytes)
     }
 
+    fn read_all(&mut self) -> Result<Option<String>, RunnerError> {
+        self.inner.read_all()
+    }
+
     fn read_bytes(&mut self, len: usize) -> Result<Vec<u8>, RunnerError> {
         self.inner.read_bytes(len)
     }
