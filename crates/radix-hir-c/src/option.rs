@@ -9,7 +9,7 @@ use crate::Emitter;
 use crate::error::unsupported;
 use crate::expr::{Operand, Value, c_string, wrap};
 use crate::helpers::Helper;
-use crate::ty::{Inner, IntWidth, Ty, classify};
+use crate::ty::{Elem, Inner, IntWidth, Ty, classify};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{HirExpression, HirExpressionKind, HirLiteral};
 
@@ -76,9 +76,16 @@ impl Emitter<'_> {
         index: &HirExpression,
     ) -> Result<Operand, CodegenError> {
         let list = self.expr(subject)?;
+        match list.value {
+            Value::Map(k, v) => return self.optional_map_index(list, index, k, v, false),
+            Value::Opt(Inner::Map(k, v)) => {
+                return self.optional_map_index(list, index, k, v, true);
+            }
+            _ => {}
+        }
         let Value::List(elem) = list.value else {
             return Err(unsupported(
-                "optional index over a value that is not a list",
+                "optional index over a value that is not a list or map",
             ));
         };
         let at = self.expr(index)?;
@@ -106,6 +113,47 @@ impl Emitter<'_> {
         );
         let operand = self.optional_call(elem, inner, &slot, call);
         Ok(Operand::new(wrap(&prelude, &operand.text), operand.value).with_effect(effect))
+    }
+
+    /// `m?["k"]`: the map's value as an optional, none when the key is absent
+    /// (and, for an optional map, when the map itself is none).
+    fn optional_map_index(
+        &mut self,
+        base: Operand,
+        index: &HirExpression,
+        k: Elem,
+        v: Elem,
+        optional_map: bool,
+    ) -> Result<Operand, CodegenError> {
+        let key = self.element(index, k)?;
+        let effect = base.effect || key.effect;
+        let mut operands = [base, key];
+        let prelude = self.sequence(&mut operands);
+        let [map, key] = operands;
+        self.need_class(Ty::Map(k, v));
+        let Some(inner) = Inner::from_ty(v.ty()) else {
+            return Err(unsupported("optional map index of this value class"));
+        };
+        self.need_class(Ty::Opt(inner));
+        let suffix = Self::map_suffix(k, v);
+        let slot = format!("faber_v{}", self.temps);
+        let call = format!(
+            "faber_map_{suffix}_get({}, {}, &{slot})",
+            map.text, key.text
+        );
+        let operand = self.optional_call(v, inner, &slot, call);
+        if !optional_map {
+            return Ok(Operand::new(wrap(&prelude, &operand.text), operand.value).with_effect(effect));
+        }
+        let none = self.none_of(Ty::Opt(inner))?;
+        let c_type = self.c_type(Ty::Map(k, v))?;
+        let held = format!("faber_m{}", self.temps);
+        self.temps += 1;
+        let text = format!(
+            "(__extension__ ({{ {c_type} {held} = {}; {held} == NULL ? {} : {}; }}))",
+            map.text, none.text, operand.text
+        );
+        Ok(Operand::new(wrap(&prelude, &text), Value::Opt(inner)).with_effect(effect))
     }
 
     /// `x![i]`: the assertion has run in `unwrap`; what is left is the

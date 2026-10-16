@@ -1,0 +1,13 @@
++++
+locale = "en"
++++
+# An optional map is a pointer that may be NULL. `m?["k"]` yields the value as
+# an optional: none when the key is absent or the map itself is none.
+
+main {
+    let map<string, int> ∪ none present ← _ { "a": 3 }
+    print present?["a"] coalesce -1
+    print present?["z"] coalesce -1
+    let map<string, int> ∪ none absent ← null
+    print absent?["a"] coalesce -1
+}

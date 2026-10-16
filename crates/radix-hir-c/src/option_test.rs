@@ -159,3 +159,12 @@ fn optional_chaining_over_none_is_none() {
     let code = emitted("main {\n    let none absent ← null\n    print absent?.field\n}");
     assert!(code.contains("\"none\""), "{code}");
 }
+
+#[test]
+fn an_optional_map_index_is_none_when_absent() {
+    let code = emitted(
+        "main {\n    let map<string, int> ∪ none m ← null\n    print m?[\"a\"] coalesce 0\n}",
+    );
+    assert!(code.contains("_get("), "{code}");
+    assert!(code.contains("== NULL ?"), "{code}");
+}

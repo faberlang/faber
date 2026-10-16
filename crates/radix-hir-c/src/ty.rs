@@ -89,6 +89,8 @@ pub(crate) enum Inner {
     Modular(IntWidth),
     List(Elem),
     Genus(DefId),
+    /// A map (`tabula`) behind a pointer, so `NULL` is none.
+    Map(Elem, Elem),
 }
 
 impl Inner {
@@ -103,6 +105,7 @@ impl Inner {
             Inner::Modular(width) => Ty::Modular(width),
             Inner::List(elem) => Ty::List(elem),
             Inner::Genus(def_id) => Ty::Genus(def_id),
+            Inner::Map(k, v) => Ty::Map(k, v),
         }
     }
 
@@ -116,19 +119,19 @@ impl Inner {
             Ty::Modular(width) => Some(Inner::Modular(width)),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
+            Ty::Map(k, v) => Some(Inner::Map(k, v)),
             Ty::Sized(_)
             | Ty::Saturating(_)
             | Ty::Opt(_)
             | Ty::None
             | Ty::Decimal
-            | Ty::Set(_)
-            | Ty::Map(..) => None,
+            | Ty::Set(_) => None,
         }
     }
 
     /// The value is a pointer and `NULL` means none.
     pub(crate) fn is_pointer(self) -> bool {
-        matches!(self, Inner::Text | Inner::List(_) | Inner::Genus(_))
+        matches!(self, Inner::Text | Inner::List(_) | Inner::Genus(_) | Inner::Map(..))
     }
 
     /// The runtime's option struct for a scalar. A modular word below `u64`
@@ -139,7 +142,7 @@ impl Inner {
             Inner::Int | Inner::Modular(_) => Some("faber_opt_i64"),
             Inner::Bool => Some("faber_opt_bool"),
             Inner::Float | Inner::Float32 => Some("faber_opt_f64"),
-            Inner::Text | Inner::List(_) | Inner::Genus(_) => None,
+            Inner::Text | Inner::List(_) | Inner::Genus(_) | Inner::Map(..) => None,
         }
     }
 }

@@ -664,6 +664,9 @@ impl Emitter<'_> {
                     let clone = self.genus_copy_call(id, read)?;
                     format!("({read} == NULL ? NULL : {clone})")
                 }
+                // A deep copy of a map field needs a map copy family this
+                // subset does not emit; reject by name rather than alias.
+                Inner::Map(..) => return Err(unsupported("copy of an optional map field")),
             },
             _ => read.to_owned(),
         })
