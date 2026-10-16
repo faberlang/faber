@@ -127,6 +127,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         struct_defaults: &[MirStructFieldDefaults],
         span: Span,
     ) -> Result<Value, RunnerError> {
+        if source_ty == target_ty
+            && matches!(
+                self.types.get(source_ty),
+                Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+                    | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
+            )
+        {
+            return Ok(value);
+        }
         let target_ty = self.resolve_conversion_target(target_ty);
         let target = self.types.get(target_ty).clone();
         if self.is_dynamic_source(source_ty) && !matches!(target, Type::Primitive(Primitive::Valor))

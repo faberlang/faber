@@ -64,6 +64,14 @@ fn int() -> Type {
 const OUT_OF_RANGE: &str = "runner_numerus_to_numerus_conversion_out_of_range";
 
 #[test]
+fn same_type_runtime_conversion_preserves_value() {
+    assert_eq!(
+        run_conversion(int(), int(), Value::Int(42), None).expect("identity conversion"),
+        Value::Int(42)
+    );
+}
+
+#[test]
 fn int_to_u8_above_range_fails_closed() {
     let error = run_conversion(int(), integer(NumericWidth::U8), Value::Int(300), None)
         .expect_err("300 does not fit u8");
