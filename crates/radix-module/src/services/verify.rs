@@ -2,13 +2,13 @@
 
 use crate::aspect::{
     HirAspectBackendKind, HirAspectCheckResult, HirAspectCheckStatus, HirAspectCoverageReport, HirAspectCoverageStatus,
-    HirAspectEvidence, HirAspectTlaModule, HirAspectVerifier, TlaAspectCheckerConfig, TlaAspectVerifier,
-    emit_tla_modules, report_hir_aspects, summarize_hir_aspect_coverage,
+    HirAspectEvidence, HirAspectRecordKind, HirAspectReport, HirAspectVerifier, LeanAspectChecker,
+    LeanAspectCheckerConfig, report_hir_aspects, summarize_hir_aspect_coverage,
 };
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Config, Session};
 
-const TLC_JAR_UNSET_SUMMARY: &str = "no TLC jar was given (pass --tla-jar)";
+const LEAN_UNSET_SUMMARY: &str = "no Lean checker was configured";
 
 #[derive(Debug)]
 pub struct VerifySourceResult {
@@ -18,7 +18,7 @@ pub struct VerifySourceResult {
 }
 
 #[must_use]
-pub fn verify_source(name: &str, source: &str, checker_config: Option<TlaAspectCheckerConfig>) -> VerifySourceResult {
+pub fn verify_source(name: &str, source: &str, checker_config: Option<LeanAspectCheckerConfig>) -> VerifySourceResult {
     let session = Session::new(Config::default().with_dev_locale_root());
     let analysis = match crate::program::analyze_prepared_program_name(&session, name, source) {
         Ok(analysis) => analysis,
@@ -33,15 +33,14 @@ pub fn verify_source(name: &str, source: &str, checker_config: Option<TlaAspectC
 
 fn coverage_for_analysis(
     analysis: &AnalyzedModule,
-    checker_config: Option<TlaAspectCheckerConfig>,
+    checker_config: Option<LeanAspectCheckerConfig>,
 ) -> HirAspectCoverageReport {
     let aspect_report = report_hir_aspects(&analysis.hir, &analysis.types);
-    let modules = emit_tla_modules(&aspect_report);
     let check_results = match checker_config {
-        Some(config) => TlaAspectVerifier::new(config).verify(&aspect_report),
-        None => checker_unavailable_results(&modules),
+        Some(config) => LeanAspectChecker::new(config, std::env::temp_dir()).verify(&aspect_report),
+        None => checker_unavailable_results(&aspect_report),
     };
-    summarize_hir_aspect_coverage(&aspect_report, &check_results, HirAspectBackendKind::Tla)
+    summarize_hir_aspect_coverage(&aspect_report, &check_results, HirAspectBackendKind::Lean)
 }
 
 #[must_use]
@@ -54,14 +53,16 @@ fn coverage_proves_success(coverage: &HirAspectCoverageReport) -> bool {
 }
 
 #[must_use]
-fn checker_unavailable_results(modules: &[HirAspectTlaModule]) -> Vec<HirAspectCheckResult> {
-    modules
+fn checker_unavailable_results(report: &HirAspectReport) -> Vec<HirAspectCheckResult> {
+    report
+        .records()
         .iter()
+        .filter(|record| record.record_kind == HirAspectRecordKind::Recognized)
         .map(|_| HirAspectCheckResult {
             status: HirAspectCheckStatus::ToolchainMissing,
-            evidence: HirAspectEvidence(TLC_JAR_UNSET_SUMMARY.to_owned()),
+            evidence: HirAspectEvidence(LEAN_UNSET_SUMMARY.to_owned()),
             counterexample: Vec::new(),
-            backend: HirAspectBackendKind::Tla,
+            backend: HirAspectBackendKind::Lean,
         })
         .collect()
 }

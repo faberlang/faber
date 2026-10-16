@@ -528,27 +528,7 @@ fn hir_aspect_verify_reports_checker_unavailable_without_success() {
     let coverage = result.coverage.expect("coverage report");
     let rendered = coverage.render_text();
     assert!(rendered.contains("abstracted"));
-    assert!(rendered.contains("checker unavailable: no TLC jar was given (pass --tla-jar)"));
-}
-
-#[test]
-fn hir_aspect_verify_tlc_integration_runs_when_env_is_set() {
-    let td = temp_dir("verify-tlc");
-    // Test-side env probe: the library takes explicit paths; the test reads
-    // the developer's local TLC settings itself and skips when unset.
-    let Some(jar) = std::env::var_os("FABER_TLA_TLC_JAR") else {
-        return;
-    };
-    let java = std::env::var_os("FABER_TLA_JAVA_BIN").unwrap_or_else(|| "java".into());
-    let config =
-        crate::aspect::TlaAspectCheckerConfig::from_paths(td.path(), &PathBuf::from(jar), &PathBuf::from(java));
-    let Ok(config) = config else {
-        return;
-    };
-
-    let result = verify_source("omnia.fab", OMNIA_EXEMPLUM, Some(config));
-
-    assert!(result.success, "{}", result.coverage.expect("coverage report").render_text());
+    assert!(rendered.contains("checker unavailable: no Lean checker was configured"));
 }
 
 #[test]

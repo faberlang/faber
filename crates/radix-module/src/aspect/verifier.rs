@@ -38,8 +38,8 @@ pub enum HirAspectCheckStatus {
 /// Backend-agnostic verifier over a complete aspect report.
 ///
 /// Implementations map an [`HirAspectReport`] to a set of per-obligation
-/// results via some verification strategy (e.g. TLC model-checking, Lean
-/// proof checking).
+/// results via some verification strategy (e.g. Lean proof
+/// checking).
 pub trait HirAspectVerifier {
     /// Verify all obligations in `report` and return the check results.
     fn verify(&self, report: &HirAspectReport) -> Vec<HirAspectCheckResult>;

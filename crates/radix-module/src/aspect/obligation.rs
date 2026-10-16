@@ -20,7 +20,6 @@ pub struct HirAspectObligationId {
 /// Backend that a verifier uses to discharge obligations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HirAspectBackendKind {
-    Tla,
     Lean,
 }
 

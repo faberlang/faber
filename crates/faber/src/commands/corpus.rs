@@ -1084,15 +1084,34 @@ fn run_case(case: &Case, faber: &Path) -> Value {
     };
     let run_ms = ms(running);
     let comparing = Instant::now();
-    let (status, reason) = match outcome {
-        Judged::Pass => judge_pass(case, expected_stdout, expected_stderr, &output),
-        Judged::KnownFail => {
+    // A library-shaped case has no entry function, so the runner has nothing to
+    // start from. Its standard is the runner's equivalent of "it builds": the
+    // program checks and lowers to valid MIR, judged from `check --lower`.
+    let library = if is_library_shaped(case, &output) {
+        let lower_args = runner_lower_args(case);
+        let mut lower = Command::new(faber);
+        lower.args(&lower_args).current_dir(&case.dir);
+        Some(match run_bounded(&mut lower, Stdio::null(), case.timeout) {
+            Ok(lowered) => (lower_args, lowered),
+            Err(error) => return case_error(case, error.describe("runner"), started),
+        })
+    } else {
+        None
+    };
+    let (status, reason) = match (&library, outcome) {
+        (Some((_, lowered)), Judged::Pass) => judge_lower_pass(lowered),
+        (Some((_, lowered)), Judged::KnownFail) => {
+            let (status, reason) = judge_known_fail(case, expected_stdout, lowered);
+            (case.relabel_expected_fail(status), reason)
+        }
+        (None, Judged::Pass) => judge_pass(case, expected_stdout, expected_stderr, &output),
+        (None, Judged::KnownFail) => {
             let (status, reason) = judge_known_fail(case, expected_stdout, &output);
             (case.relabel_expected_fail(status), reason)
         }
     };
     let compare_ms = ms(comparing);
-    json!({
+    let mut row = json!({
         "schema": 1,
         "type": "case",
         "case": case.id,
@@ -1102,7 +1121,49 @@ fn run_case(case: &Case, faber: &Path) -> Value {
         "command": {"argv": argv, "cwd": case.dir},
         "exit": output.status.code(),
         "timing_ms": {"read": read_ms, "run": run_ms, "compare": compare_ms, "total": ms(started)}
-    })
+    });
+    if let Some((lower_args, lowered)) = &library {
+        let mut lower_argv = vec![faber.display().to_string()];
+        lower_argv.extend(lower_args.iter().cloned());
+        row["phase"] = json!("lower");
+        row["lower_command"] = json!({"argv": lower_argv, "cwd": case.dir});
+        row["lower_exit"] = json!(lowered.status.code());
+    }
+    row
+}
+
+/// Arguments after the `faber` executable for the library-shaped standard: check the
+/// program and lower it to validated MIR without executing anything.
+fn runner_lower_args(case: &Case) -> Vec<String> {
+    vec![
+        "check".to_owned(),
+        "--lower".to_owned(),
+        case.input.display().to_string(),
+    ]
+}
+
+/// True when `run` refused the case only because the program has no entry function
+/// and the case asserts no output (`check_only`), so there is nothing to execute and
+/// nothing to compare. A rejection pin is never library-shaped: it expects `run` to
+/// fail for its own reason.
+fn is_library_shaped(case: &Case, output: &Output) -> bool {
+    !case.target.rejects
+        && case.expect.as_ref().is_some_and(|item| item.check_only)
+        && !output.status.success()
+        && String::from_utf8_lossy(&output.stderr).contains(radix_mir::names::NO_ENTRY_FUNCTION)
+}
+
+/// The library-shaped standard: a case that checks must also lower. `check --lower`
+/// exits zero only when analysis passed and the MIR validator accepted the lowering.
+fn judge_lower_pass(lowered: &Output) -> (&'static str, Option<String>) {
+    if lowered.status.success() {
+        ("pass", None)
+    } else {
+        (
+            "fail",
+            Some("library-shaped case checks but does not lower to valid MIR".to_owned()),
+        )
+    }
 }
 
 fn judge_pass(
