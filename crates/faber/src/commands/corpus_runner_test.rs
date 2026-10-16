@@ -1,4 +1,7 @@
-use super::{Case, ChildError, Outcome, TargetExpectation, run_bounded, runner_run_args};
+use super::{
+    Case, ChildError, Expected, Outcome, TargetExpectation, run_bounded, run_case, runner_lower_args,
+    runner_run_args,
+};
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -93,4 +96,128 @@ fn run_bounded_returns_output_when_child_and_pipes_close_promptly() {
     assert!(output.status.success());
     assert!(String::from_utf8_lossy(&output.stdout).contains("out"));
     assert!(String::from_utf8_lossy(&output.stderr).contains("err"));
+}
+
+/// A stand-in `faber` for the runner target: `run` refuses the program for the given
+/// reason, and `check --lower` exits with the given code. Every invocation is logged
+/// to `calls` so a test can assert which commands the target ran.
+#[cfg(unix)]
+fn fake_faber(dir: &std::path::Path, run_stderr: &str, lower_exit: i32, lower_stderr: &str) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let path = dir.join("faber");
+    let script = format!(
+        "#!/bin/sh\necho \"$1 $2\" >> \"{calls}\"\n\
+         case \"$1\" in\n\
+         run) echo '{run_stderr}' >&2; exit 1;;\n\
+         check) echo '{lower_stderr}' >&2; exit {lower_exit};;\n\
+         esac\n",
+        calls = dir.join("calls").display(),
+    );
+    fs::write(&path, script).expect("write fake faber");
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).expect("chmod fake faber");
+    path
+}
+
+#[cfg(unix)]
+fn library_case(check_only: bool, outcome: Outcome, fragment: Option<&str>) -> Case {
+    let mut library = case(&[]);
+    library.expect = Some(Expected {
+        exit: 0,
+        exit_nonzero: false,
+        stdout: None,
+        stderr: None,
+        stdout_contains: None,
+        stderr_contains: None,
+        check_only,
+    });
+    library.target.outcome = outcome;
+    library.target.diagnostic_contains = fragment.map(str::to_owned);
+    library.dir = std::env::temp_dir();
+    library
+}
+
+#[cfg(unix)]
+fn status(row: &serde_json::Value) -> &str {
+    row["status"].as_str().expect("case row has a status")
+}
+
+#[cfg(unix)]
+fn lower_calls(dir: &std::path::Path) -> usize {
+    fs::read_to_string(dir.join("calls"))
+        .unwrap_or_default()
+        .lines()
+        .filter(|line| *line == "check --lower")
+        .count()
+}
+
+const NO_ENTRY: &str = radix_mir::names::NO_ENTRY_FUNCTION;
+
+#[test]
+fn runner_lower_standard_checks_then_lowers() {
+    assert_eq!(
+        runner_lower_args(&case(&[])),
+        ["check", "--lower", "/d/main.fab"]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_library_case_that_lowers_passes_without_executing() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let faber = fake_faber(dir.path(), NO_ENTRY, 0, "ok");
+    let row = run_case(&library_case(true, Outcome::Pass, None), &faber);
+    assert_eq!(status(&row), "pass");
+    assert_eq!(row["phase"], "lower");
+    assert_eq!(lower_calls(dir.path()), 1);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_library_case_that_checks_but_does_not_lower_fails() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let faber = fake_faber(dir.path(), NO_ENTRY, 1, "checks but does not lower");
+    let row = run_case(&library_case(true, Outcome::Pass, None), &faber);
+    assert_eq!(status(&row), "fail");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_pinned_lowering_defect_is_expected_and_a_lowering_fix_is_a_stale_pin() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let broken = fake_faber(dir.path(), NO_ENTRY, 1, "a lowering defect");
+    let pinned = library_case(true, Outcome::KnownFail, Some("a lowering defect"));
+    assert_eq!(status(&run_case(&pinned, &broken)), "expected-fail");
+
+    let fixed_dir = tempfile::tempdir().expect("tempdir");
+    let fixed = fake_faber(fixed_dir.path(), NO_ENTRY, 0, "ok");
+    assert_eq!(status(&run_case(&pinned, &fixed)), "fail");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_stale_no_entry_pin_fails_once_the_library_lowers() {
+    // The retired pin shape: known-fail on the run refusal. The lower standard
+    // judges the case now, so the pin no longer holds and must be removed.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let faber = fake_faber(dir.path(), NO_ENTRY, 0, "ok");
+    let stale = library_case(true, Outcome::KnownFail, Some(NO_ENTRY));
+    assert_eq!(status(&run_case(&stale, &faber)), "fail");
+}
+
+#[cfg(unix)]
+#[test]
+fn only_a_check_only_case_with_no_entry_takes_the_lower_standard() {
+    // Asserts output: a missing entry function is a real failure.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let faber = fake_faber(dir.path(), NO_ENTRY, 0, "ok");
+    let row = run_case(&library_case(false, Outcome::Pass, None), &faber);
+    assert_eq!(status(&row), "fail");
+    assert_eq!(lower_calls(dir.path()), 0);
+
+    // Some other refusal: the case fails on its own terms, `check --lower` never runs.
+    let other_dir = tempfile::tempdir().expect("tempdir");
+    let other = fake_faber(other_dir.path(), "a type error", 0, "ok");
+    let row = run_case(&library_case(true, Outcome::Pass, None), &other);
+    assert_eq!(status(&row), "fail");
+    assert_eq!(lower_calls(other_dir.path()), 0);
 }
