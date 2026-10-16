@@ -1171,6 +1171,10 @@ pub enum MapKey {
     Unit,
     /// Composite `iuncta` key (D3.2): hashable when every part is.
     Tuple(Vec<MapKey>),
+    /// A `discretio` variant key (GAPS #32): the variant's `DefId` plus its
+    /// payload fields as `(name, key)` pairs, sorted by symbol so hashing is
+    /// order-stable.
+    Enum(DefId, Vec<(Symbol, MapKey)>),
 }
 
 impl MapKey {
@@ -1185,6 +1189,15 @@ impl MapKey {
             MapKey::Str(v) => Value::Str(v.clone()),
             MapKey::Unit => Value::Nil,
             MapKey::Tuple(parts) => Value::Tuple(parts.iter().map(MapKey::to_value).collect()),
+            MapKey::Enum(def, parts) => Value::EnumVariant(
+                *def,
+                Rc::new(RefCell::new(
+                    parts
+                        .iter()
+                        .map(|(name, key)| (*name, key.to_value()))
+                        .collect(),
+                )),
+            ),
         }
     }
 
@@ -1204,6 +1217,14 @@ impl MapKey {
                 .map(MapKey::document_key)
                 .collect::<Vec<_>>()
                 .join(","),
+            MapKey::Enum(def, parts) => {
+                let joined = parts
+                    .iter()
+                    .map(|(name, key)| format!("{}.{}", name.0, key.document_key()))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                format!("{}#{joined}", def.0)
+            }
         }
     }
 }
@@ -1816,6 +1837,7 @@ fn render_map_rows(
             MapKey::Bool(v) => display_bivalens(*v, order.tokens).to_owned(),
             MapKey::Unit => order.tokens.none.clone(),
             MapKey::Tuple(parts) => display_tuple_key(parts, order.tokens),
+            MapKey::Enum(..) => key.document_key(),
         };
         let val_str = value.display_typed(interner, order, span, float_width)?;
         parts.push(format!("{key_str}: {val_str}"));

@@ -1297,3 +1297,27 @@ fn ledger_value_display_after_remove_and_readd() {
         r#"{"a": 1, "c": 3, "b": 7}"#
     );
 }
+
+#[test]
+fn enum_variant_map_key_payload_free_round_trips() {
+    let key = MapKey::Enum(radix_hir::DefId(6001), Vec::new());
+    let value = key.to_value();
+    assert!(matches!(
+        &value,
+        Value::EnumVariant(def, fields)
+            if *def == radix_hir::DefId(6001) && fields.borrow().is_empty()
+    ));
+    assert!(!key.document_key().is_empty());
+}
+
+#[test]
+fn enum_variant_map_key_distinct_defs_distinct() {
+    let first = MapKey::Enum(radix_hir::DefId(6101), Vec::new());
+    let second = MapKey::Enum(radix_hir::DefId(6102), Vec::new());
+    assert_ne!(first, second);
+    let mut map = rustc_hash::FxHashMap::default();
+    map.insert(first.clone(), Value::Int(1));
+    map.insert(second.clone(), Value::Int(2));
+    assert_eq!(map.get(&first), Some(&Value::Int(1)));
+    assert_eq!(map.get(&second), Some(&Value::Int(2)));
+}
