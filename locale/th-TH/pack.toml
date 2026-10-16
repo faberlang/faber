@@ -2052,6 +2052,10 @@ help = "ทำให้ชนิดของนิพจน์ตรงกับ
 message = "ชนิดสมาชิกเป้าหมายของ formata ต้องตรงกับชนิดสมาชิกของตัวรับ"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
+[diagnostics.SEM010.issues.tensor_formata_element_count_mismatch]
+message = "รูปร่างเป้าหมายของ formata ต้องมีจำนวนสมาชิกเท่ากับตัวรับ"
+help = "ชนิดที่จัดรูปใหม่ต้องคงจำนวนสมาชิกของตัวรับ"
+
 [diagnostics.SEM010.issues.tensor_incomplete]
 message = "tensor ต้องมีชนิดสมาชิกและ Figura ใช้ tensor<T, Figura>"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
