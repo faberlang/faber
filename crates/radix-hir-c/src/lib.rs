@@ -19,6 +19,7 @@
 //! `radix-module` re-exports this leaf through its codegen surface and owns
 //! target dispatch.
 
+mod closure;
 mod conversio;
 mod enumeration;
 mod error;
@@ -28,10 +29,12 @@ mod genus;
 mod helpers;
 mod items;
 mod list;
+mod map;
 mod names;
 mod numeric;
 mod option;
 mod range;
+mod set;
 mod stmt;
 mod switch;
 mod text;
@@ -40,6 +43,10 @@ mod ty;
 
 #[cfg(test)]
 mod bounded_test;
+#[cfg(test)]
+mod class_const_test;
+#[cfg(test)]
+mod closure_test;
 #[cfg(test)]
 mod control_test;
 #[cfg(test)]
@@ -51,9 +58,15 @@ mod emit_test;
 #[cfg(test)]
 mod enumeration_test;
 #[cfg(test)]
+mod float32_test;
+#[cfg(test)]
+mod float_math_test;
+#[cfg(test)]
 mod item_test;
 #[cfg(test)]
 mod list_test;
+#[cfg(test)]
+mod map_test;
 #[cfg(test)]
 mod names_test;
 #[cfg(test)]
@@ -64,6 +77,8 @@ mod option_test;
 mod range_test;
 #[cfg(test)]
 mod reject_test;
+#[cfg(test)]
+mod set_test;
 #[cfg(test)]
 mod sized_test;
 #[cfg(test)]
@@ -165,7 +180,9 @@ impl CCodegen<'_> {
             generics: FxHashSet::default(),
             variants: FxHashMap::default(),
             equals: Vec::new(),
-            sponte_params: FxHashSet::default(),
+            ref_params: FxHashSet::default(),
+            closures: Vec::new(),
+            closure_seq: 0,
         }
         .program(hir)
     }
@@ -222,10 +239,16 @@ pub(crate) struct Emitter<'a> {
     variants: FxHashMap<DefId, (DefId, usize)>,
     /// Enumerations whose structural equality function was asked for.
     equals: Vec<DefId>,
-    /// Parameters declared `optional` with no default: their C storage is the
-    /// optional of the declared type, but the HIR type is the payload, so a
-    /// body read must not be guard-narrowed (the runner keeps the none).
-    sponte_params: FxHashSet<DefId>,
+    /// `ref`/`mut` scalar parameters: the C storage is a pointer to the
+    /// caller's cell, so a body read and a body store go through it, and a
+    /// matching call-site marker passes the caller's address. Definition ids
+    /// are unique, so the set never needs clearing.
+    ref_params: FxHashSet<DefId>,
+    /// Non-capturing closures discovered while writing bodies, each waiting for
+    /// its synthesized top-level C function ([`closure::PendingClosure`]).
+    closures: Vec<closure::PendingClosure>,
+    /// How many synthesized closure names have been claimed.
+    closure_seq: u32,
 }
 
 /// One local, parameter or module constant, by its C identifier.
@@ -254,6 +277,10 @@ impl Emitter<'_> {
         if let Some(entry) = &hir.entry {
             self.block(&mut body, entry)?;
         }
+        // A closure body is written as its own top-level function, so flush
+        // the closures discovered by the function bodies and the entry block
+        // before the prototypes and functions are assembled.
+        let (closure_prototypes, closure_definitions) = self.flush_closures()?;
         // Show functions are asked for while bodies are written, so they are
         // generated last; the support text follows them, since they need
         // helpers too.
@@ -270,7 +297,7 @@ impl Emitter<'_> {
             out.push('\n');
         }
         let prototypes = format!(
-            "{}{show_prototypes}{equal_prototypes}{copy_prototypes}",
+            "{}{closure_prototypes}{show_prototypes}{equal_prototypes}{copy_prototypes}",
             items.prototypes(&self.called)
         );
         if !prototypes.is_empty() {
@@ -278,6 +305,7 @@ impl Emitter<'_> {
             out.push('\n');
         }
         out.push_str(&items.definitions(&self.called));
+        out.push_str(&closure_definitions);
         out.push_str(&show_definitions);
         out.push_str(&equal_definitions);
         out.push_str(&copy_definitions);
@@ -312,16 +340,32 @@ impl Emitter<'_> {
             Ty::Int | Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) => self.support.need_ints(),
             Ty::Opt(inner) => self.need_class(inner.ty()),
             Ty::Bool => self.support.need_bool(),
-            Ty::Float => self.support.need(crate::helpers::Helper::Float),
+            Ty::Float | Ty::Float32 => self.support.need(crate::helpers::Helper::Float),
             Ty::Decimal => self.support.need(crate::helpers::Helper::Decimal),
             Ty::Text | Ty::Genus(_) | Ty::None => {}
-            Ty::List(elem) => {
+            Ty::List(elem) | Ty::Set(elem) => {
                 self.support.need(crate::helpers::Helper::List(
                     elem,
                     crate::helpers::ListOp::Struct,
                 ));
                 if elem == crate::ty::Elem::Bool {
                     self.support.need_bool();
+                }
+            }
+            Ty::Map(k, v) => {
+                self.need_class(Ty::List(k));
+                self.need_class(Ty::List(v));
+            }
+            Ty::Func(id) => {
+                if let radix_types::Type::Func(sig) = self.types.get(radix_types::TypeId(id)) {
+                    for param in &sig.params {
+                        if let Ok(class) = crate::ty::classify(self.types, param.ty) {
+                            self.need_class(class);
+                        }
+                    }
+                    if let Ok(Some(ret)) = crate::ty::returns(self.types, sig.ret) {
+                        self.need_class(ret);
+                    }
                 }
             }
         }

@@ -1,0 +1,50 @@
++++
+locale = "en"
++++
+# Sets are the list storage under the set contract: `add` keeps the element
+# unique, `delete` removes by value, the algebra returns a new set, and
+# `↦ list` materializes a new list. Element order is unspecified, so a
+# multi-element set is sorted before it is printed.
+main {
+    mut set<int> s ← empty
+    s.add(7)
+    s.add(3)
+    s.add(5)
+    s.add(3)
+    print s.length(), s.has(5), s.has(4), s.is_empty()
+    print s.delete(5), s.delete(5), s.length()
+    mut list<int> roundtrip ← s ↦ list<int>
+    roundtrip.sort()
+    print roundtrip
+
+    mut set<int> one ← empty
+    one.add(42)
+    print one
+
+    let list<int> raw ← [1, 2, 2, 3, 3, 3]
+    let set<int> unique ← raw ↦ set<int>
+    print unique.length()
+
+    mut set<int> a ← empty
+    a.add(1)
+    a.add(2)
+    a.add(3)
+    mut set<int> b ← empty
+    b.add(2)
+    b.add(4)
+    let set<int> u ← a.union(b)
+    let set<int> inter ← a.intersection(b)
+    let set<int> diff ← a.difference(b)
+    let set<int> sym ← a.difference_symmetric(b)
+    mut list<int> ul ← u ↦ list<int>
+    mut list<int> il ← inter ↦ list<int>
+    mut list<int> dl ← diff ↦ list<int>
+    mut list<int> sl ← sym ↦ list<int>
+    ul.sort()
+    il.sort()
+    dl.sort()
+    sl.sort()
+    print ul, il, dl, sl
+    print inter.is_subset(u), u.is_superset(inter), u.is_subset(inter)
+    print sort via asc from u
+}

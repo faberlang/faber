@@ -151,15 +151,21 @@ impl Emitter<'_> {
                 self.support.need(Helper::DecimalText);
                 Ok(format!("faber_dec_fmt(faber_a, {})", operand.text))
             }
-            Value::List(elem) => self.show_list(&operand.text, elem),
+            Value::List(elem) | Value::Set(elem) => self.show_list(&operand.text, elem),
+            Value::Map(..) => Err(unsupported("showing a map")),
             Value::Genus(def_id) => self.show_genus(&operand.text, def_id),
             Value::Float => {
                 self.support.need(Helper::FloatText);
                 Ok(format!("faber_float_text(faber_a, {})", operand.text))
             }
+            Value::Float32 => {
+                self.support.need(Helper::FloatText);
+                Ok(format!("faber_float_text_f32(faber_a, {})", operand.text))
+            }
             Value::Opt(inner) => self.show_option(&operand.text, inner),
             Value::None => Ok(c_string(&self.names.display_tokens().none)?),
             Value::Void => Err(unsupported("showing a call with no result")),
+            Value::Func(_) => Err(unsupported("showing a function value")),
         }
     }
 }

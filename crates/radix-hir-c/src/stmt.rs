@@ -1,15 +1,15 @@
 //! Statement emission: locals, assignment, control flow, and print.
 
 use crate::error::unsupported;
-use crate::expr::{Value, c_string, construct_name};
-use crate::helpers::Helper;
+use crate::expr::{Operand, Value, c_string, construct_name};
+use crate::helpers::{Helper, ListOp};
 use crate::items::Returns;
 use crate::ty::{Ty, classify};
 use crate::{Emitter, Local};
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
 use radix_hir::{
-    HirBlock, HirExpression, HirExpressionKind, HirIteraMode, HirLocal, HirScribeKind,
+    HirBlock, HirCustodi, HirExpression, HirExpressionKind, HirIteraMode, HirLocal, HirScribeKind,
     HirStatement, HirStatementKind,
 };
 use radix_lexer::Symbol;
@@ -79,7 +79,7 @@ impl Emitter<'_> {
             HirStatementKind::Perge => self.loop_jump(out, "continue;"),
             HirStatementKind::Tacet => Ok(()),
             HirStatementKind::IncDec(inc_dec) => self.inc_dec(out, inc_dec),
-            HirStatementKind::Custodi(_) => Err(unsupported("custodi guard section")),
+            HirStatementKind::Custodi(custodi) => self.custodi(out, custodi),
         }
     }
 
@@ -275,7 +275,10 @@ impl Emitter<'_> {
             HirExpressionKind::Itera {
                 mode: HirIteraMode::Ex,
                 coordinates,
-                filum: None,
+                // A lane binder (`thread f` / `filum f`) is declared metadata,
+                // not a runtime binding: MIR lowering ignores it, so the C
+                // loop is the plain single-source loop.
+                filum: _,
                 binding,
                 binding_name,
                 iter,
@@ -292,7 +295,7 @@ impl Emitter<'_> {
             HirExpressionKind::Itera {
                 mode: HirIteraMode::Ab,
                 coordinates,
-                filum: None,
+                filum: _,
                 binding,
                 binding_name,
                 iter,
@@ -529,6 +532,18 @@ impl Emitter<'_> {
         mutable: bool,
     ) -> Result<(), CodegenError> {
         let list = self.expr(iter)?;
+        if let Value::Map(k, v) = list.value {
+            return self.itera_map(
+                out,
+                coordinate,
+                (binding, binding_name),
+                &list,
+                k,
+                v,
+                body,
+                mutable,
+            );
+        }
         let Value::List(elem) = list.value else {
             return Err(unsupported("iteration over a value that is not a list"));
         };
@@ -602,6 +617,114 @@ impl Emitter<'_> {
         self.block(out, body)?;
         self.loops -= 1;
         self.line(out, "}");
+        self.depth -= 1;
+        self.line(out, "}");
+        Ok(())
+    }
+
+    /// `for from m const v { … }` / `for from m at [k] const v { … }`: a walk
+    /// over a map's values (`ex` binds the value; the optional coordinate binds
+    /// the key). A key added while the walk is live traps `map changed size
+    /// during iteration`, as the runner does.
+    #[allow(clippy::too_many_arguments)]
+    fn itera_map(
+        &mut self,
+        out: &mut String,
+        coordinate: Option<(radix_hir::DefId, radix_lexer::Symbol)>,
+        (binding, binding_name): (radix_hir::DefId, radix_lexer::Symbol),
+        map: &Operand,
+        k: crate::ty::Elem,
+        v: crate::ty::Elem,
+        body: &HirBlock,
+        mutable: bool,
+    ) -> Result<(), CodegenError> {
+        let Some(kind) = self.names.binding_kind(binding) else {
+            return Err(unsupported(
+                "loop binding the name catalog does not classify",
+            ));
+        };
+        let raw = self.names.resolve_symbol(binding_name);
+        let name = self.scope.claim(&prefixed_binding_name(kind, raw));
+        let (source, index) = (
+            format!("faber_t{}", self.temps),
+            format!("faber_i{}", self.temps),
+        );
+        self.temps += 1;
+        let class = v.ty();
+        self.need_class(class);
+        self.support.need(Helper::List(k, ListOp::New));
+        self.support.need(Helper::List(v, ListOp::New));
+        let suffix = Self::map_suffix(k, v);
+        self.line(out, "{");
+        self.depth += 1;
+        self.line(
+            out,
+            &format!("faber_map_{suffix} *const {source} = {};", map.text),
+        );
+        self.line(
+            out,
+            &format!("const int64_t {source}len = {source}->keys->len;"),
+        );
+        self.line(out, &format!("int64_t {index};"));
+        self.line(
+            out,
+            &format!("for ({index} = 0; {index} < {source}->keys->len; {index}++) {{"),
+        );
+        self.depth += 1;
+        self.line(
+            out,
+            &format!(
+                "if ({source}->keys->len != {source}len) faber_trap(\"map changed size during iteration\");"
+            ),
+        );
+        self.line(
+            out,
+            &format!(
+                "{} = {source}->values->items[{index}];",
+                self.declare(class, &name, mutable)?
+            ),
+        );
+        if let Some((position, position_name)) = coordinate {
+            let Some(position_kind) = self.names.binding_kind(position) else {
+                return Err(unsupported(
+                    "loop coordinate the name catalog does not classify",
+                ));
+            };
+            let raw = self.names.resolve_symbol(position_name);
+            let c_name = self.scope.claim(&prefixed_binding_name(position_kind, raw));
+            let declaration = self.declare(k.ty(), &c_name, false)?;
+            self.line(
+                out,
+                &format!("{declaration} = {source}->keys->items[{index}];"),
+            );
+            self.locals.insert(
+                position,
+                Local {
+                    name: c_name,
+                    ty: k.ty(),
+                    constant: None,
+                },
+            );
+        }
+        self.depth -= 1;
+        self.locals.insert(
+            binding,
+            Local {
+                name,
+                ty: class,
+                constant: None,
+            },
+        );
+        self.loops += 1;
+        self.block(out, body)?;
+        self.loops -= 1;
+        self.line(out, "}");
+        self.line(
+            out,
+            &format!(
+                "if ({source}->keys->len != {source}len) faber_trap(\"map changed size during iteration\");"
+            ),
+        );
         self.depth -= 1;
         self.line(out, "}");
         Ok(())
@@ -728,6 +851,19 @@ impl Emitter<'_> {
         Ok(value.text)
     }
 
+    /// `custodi { si <cond> { … } … }`: sequential early-exit guard clauses.
+    /// Each is an `if` whose body may `return`, exactly as the runner runs
+    /// them before the ordinary body.
+    fn custodi(&mut self, out: &mut String, custodi: &HirCustodi) -> Result<(), CodegenError> {
+        for clause in &custodi.clauses {
+            let test = self.condition(&clause.cond)?;
+            self.line(out, &format!("if {test} {{"));
+            self.block(out, &clause.body)?;
+            self.line(out, "}");
+        }
+        Ok(())
+    }
+
     fn si(
         &mut self,
         out: &mut String,
@@ -801,7 +937,10 @@ impl Emitter<'_> {
             return Ok(());
         }
         if let HirExpressionKind::Index(base, index) = &place.kind {
-            let line = self.list_write(base, index, value)?;
+            let line = match crate::map::map_class(self.types, base.ty) {
+                Some((k, v)) => self.map_write(base, index, value, k, v)?,
+                None => self.list_write(base, index, value)?,
+            };
             self.line(out, &line);
             return Ok(());
         }
@@ -817,7 +956,13 @@ impl Emitter<'_> {
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
         }
-        self.line(out, &format!("{name} = {};", value.text));
+        // A `ref`/`mut` scalar parameter stores through the caller's pointer.
+        let target = if self.ref_params.contains(def_id) {
+            format!("(*{name})")
+        } else {
+            name
+        };
+        self.line(out, &format!("{target} = {};", value.text));
         Ok(())
     }
 
@@ -848,7 +993,12 @@ impl Emitter<'_> {
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
         }
-        self.line(out, &format!("{name} = {};", value.text));
+        let target = if self.ref_params.contains(def_id) {
+            format!("(*{name})")
+        } else {
+            name
+        };
+        self.line(out, &format!("{target} = {};", value.text));
         Ok(())
     }
 
@@ -944,7 +1094,8 @@ impl Emitter<'_> {
                 // The module's locale words: `true` / `false` for an `en`
                 // program, `verum` / `falsum` for a `la` one.
                 Value::Truth => ("%s", format!("({} ? {yes} : {no})", value.text)),
-                Value::List(elem) => ("%s", self.show_list(&value.text, elem)?),
+                Value::List(elem) | Value::Set(elem) => ("%s", self.show_list(&value.text, elem)?),
+                Value::Map(..) => return Err(unsupported("printing a map")),
                 Value::Genus(def_id) => ("%s", self.show_genus(&value.text, def_id)?),
                 Value::Opt(inner) => ("%s", self.show_option(&value.text, inner)?),
                 Value::Float => (
@@ -954,12 +1105,20 @@ impl Emitter<'_> {
                         value.text
                     ),
                 ),
+                Value::Float32 => (
+                    "%s",
+                    format!(
+                        "faber_f32_text({}, (char[FABER_F32_TEXT]){{0}})",
+                        value.text
+                    ),
+                ),
                 Value::Decimal => {
                     self.support.need(Helper::DecimalText);
                     ("%s", format!("faber_dec_fmt(faber_a, {})", value.text))
                 }
                 // A bare `none` prints the locale's none word.
                 Value::None => ("%s", c_string(&tokens.none)?),
+                Value::Func(_) => return Err(unsupported("printing a function value")),
                 Value::Void => return Err(unsupported("printing a call with no result")),
             };
             specs.push(spec);

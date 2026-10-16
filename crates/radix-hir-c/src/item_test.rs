@@ -87,3 +87,70 @@ fn an_uncalled_generic_function_is_skipped() {
     assert!(!code.contains("f_id"), "{code}");
     assert!(code.contains("\"ok\""), "{code}");
 }
+
+#[test]
+fn a_schema_declaration_has_no_runtime_effect() {
+    // `faber run` declares the heading and runs the entry block; the schema
+    // itself is compile-time only, and a use of its type is rejected where it
+    // is used.
+    let code = emitted(
+        "schema Persona {\n    column string nomen\n    column int aetas\n}\nmain {\n    print \"schema declared\"\n}",
+    );
+    assert!(code.contains("\"schema declared\""), "{code}");
+    assert!(!code.contains("Persona"), "{code}");
+}
+
+#[test]
+fn a_mut_scalar_parameter_borrows_the_callers_cell() {
+    // `mut int x` is a pointer to the caller's cell: the body reads and stores
+    // through it, and a `mut` argument passes the caller's address.
+    let code = emitted(
+        "fn bump(mut int x) → void {\n    x ← x + 1\n}\nmain {\n    mut int n ← 1\n    bump(mut n)\n    print n\n}",
+    );
+    assert!(code.contains("static void f_bump(int64_t *p_x)"), "{code}");
+    assert!(code.contains("f_bump((&l_n))"), "{code}");
+    assert!(code.contains("(*p_x) ="), "{code}");
+}
+
+#[test]
+fn a_ref_text_parameter_is_the_identity_pointer() {
+    // Text is already a `const char *`; a `ref` view passes it unchanged.
+    let code =
+        emitted("fn show(ref string s) → void {\n    print s\n}\nmain {\n    show(\"hi\")\n}");
+    assert!(
+        code.contains("static void f_show(const char *p_s)"),
+        "{code}"
+    );
+}
+
+#[test]
+fn access_control_annotations_are_ignored() {
+    // `@ private` / `@ internal` are access control with no runtime effect;
+    // any other annotation can change meaning and stays rejected.
+    let code = emitted(
+        "class Counter {\n    @ private\n    mut int total = 0\n    @ internal\n    fn add(int value) → void {\n        self.total ← self.total + value\n    }\n}\nmain {\n    print \"ok\"\n}",
+    );
+    assert!(code.contains("struct g_Counter"), "{code}");
+    assert!(code.contains("m_total"), "{code}");
+}
+
+#[test]
+fn a_named_function_value_is_a_c_function_pointer() {
+    let code = emitted(
+        "fn twice(int n) → int {\n    return n * 2\n}\nfn apply((int) → int f, int n) → int {\n    return f(n)\n}\nmain {\n    let (int) → int g ← twice\n    print g(21)\n    print apply(twice, 5)\n}",
+    );
+    assert!(code.contains("int64_t (*p_f)(int64_t)"), "{code}");
+    assert!(
+        code.contains("int64_t (*l_g)(int64_t) = f_twice;"),
+        "{code}"
+    );
+    assert!(code.contains("p_f(p_n)"), "{code}");
+}
+
+#[test]
+fn a_read_is_a_nullable_stdin_line_or_all() {
+    let all = emitted("main {\n    let string ∪ none input ← read\n    print input\n}");
+    assert!(all.contains("faber_read_all(faber_a)"), "{all}");
+    let line = emitted("main {\n    let string ∪ none input ← line\n    print input\n}");
+    assert!(line.contains("faber_read_line(faber_a)"), "{line}");
+}

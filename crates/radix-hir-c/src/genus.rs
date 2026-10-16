@@ -13,7 +13,7 @@ use crate::error::unsupported;
 use crate::expr::{Operand, Value, c_string};
 use crate::helpers::{Helper, ListOp};
 use crate::names::Namer;
-use crate::ty::{Inner, Ty, classify};
+use crate::ty::{Inner, Ty, classify, returns};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{DefId, HirExpression, HirStruct};
 use radix_lexer::Symbol;
@@ -26,9 +26,21 @@ pub(crate) struct Genus {
     /// The source name, as the runner shows it.
     pub(crate) name: String,
     pub(crate) fields: Vec<Field>,
+    /// Type-level constants (`const T X = e`), by source name. They belong to
+    /// the type and are read through it (`Color.RUBER`), never from an
+    /// instance; `c_name` is the file-scope C name.
+    pub(crate) consts: Vec<(String, ClassConst)>,
     /// Method source names and their definitions.
     pub(crate) methods: Vec<(String, DefId)>,
     pub(crate) shape: Shape,
+}
+
+/// One type-level constant of a genus.
+#[derive(Clone)]
+pub(crate) struct ClassConst {
+    pub(crate) c_name: String,
+    pub(crate) ty: Ty,
+    pub(crate) value: HirExpression,
 }
 
 /// What kind of declaration a [`Genus`] record stands for.
@@ -73,6 +85,9 @@ impl Emitter<'_> {
             Ty::Opt(crate::ty::Inner::Genus(def_id)) => Ty::Genus(def_id),
             other => other,
         };
+        if let Ty::Func(id) = ty {
+            return self.func_c_type(id);
+        }
         if let Some(builtin) = ty.builtin_c_type() {
             return Ok(builtin.to_owned());
         }
@@ -85,6 +100,29 @@ impl Emitter<'_> {
         }
     }
 
+    /// `ret (*)(faber_arena *, params…)`: a function value is a C function
+    /// pointer. Every generated function takes the hidden arena first when the
+    /// program allocates, so the pointer type carries it too.
+    fn func_c_type(&self, id: u32) -> Result<String, CodegenError> {
+        let radix_types::Type::Func(sig) = self.types.get(radix_types::TypeId(id)) else {
+            return Err(unsupported("function value without a signature"));
+        };
+        let mut slots = Vec::with_capacity(sig.params.len() + 1);
+        if self.arena {
+            slots.push("faber_arena *".to_owned());
+        }
+        for param in &sig.params {
+            let class = classify(self.types, param.ty)?;
+            slots.push(self.c_type(class)?);
+        }
+        let ret = returns(self.types, sig.ret)?;
+        let ret_text = match ret {
+            Some(ty) => self.c_type(ty)?,
+            None => "void".to_owned(),
+        };
+        Ok(format!("{ret_text} (*)({})", slots.join(", ")))
+    }
+
     /// The declaration of `name` with class `ty`. An immutable binding is
     /// `const` at the top: `const int64_t x`, `const char *const s`,
     /// `g_Point *const p` (the pointer is fixed; a genus's fields stay
@@ -95,6 +133,12 @@ impl Emitter<'_> {
         name: &str,
         mutable: bool,
     ) -> Result<String, CodegenError> {
+        // A function pointer names its parameter inside the star: `ret
+        // (*name)(…)`.
+        if let Ty::Func(_) = ty {
+            let full = self.c_type(ty)?;
+            return Ok(full.replacen("(*)", &format!("(*{name})"), 1));
+        }
         let c_type = self.c_type(ty)?;
         Ok(match (c_type.ends_with('*'), mutable) {
             (true, false) => format!("{c_type}const {name}"),
@@ -118,12 +162,34 @@ impl Emitter<'_> {
         let c_name = self.items_scope.claim(&format!("g_{name}"));
         let mut members = Namer::program_scope();
         let mut fields = Vec::with_capacity(genus.fields.len());
+        let mut consts = Vec::new();
         for field in &genus.fields {
-            if field.is_static() {
-                return Err(unsupported("const member"));
-            }
-            if !field.annotations.is_empty() {
+            if field
+                .annotations
+                .iter()
+                .any(|a| !self.ignorable_annotation(a))
+            {
                 return Err(unsupported("field annotation"));
+            }
+            if field.is_static() {
+                // A type-level constant: `const T X = e`, read through the
+                // type name. It is never an instance member; its value is a
+                // folded compile-time fact.
+                let Some(init) = &field.init else {
+                    return Err(unsupported("class constant without a value"));
+                };
+                let field_name = self.names.resolve_symbol(field.name).to_owned();
+                let ty = classify(self.types, field.ty)?;
+                let c_name = self.items_scope.claim(&format!("k_{name}_{field_name}"));
+                consts.push((
+                    field_name,
+                    ClassConst {
+                        c_name,
+                        ty,
+                        value: init.clone(),
+                    },
+                ));
+                continue;
             }
             let field_name = self.names.resolve_symbol(field.name).to_owned();
             let declared = classify(self.types, field.ty)?;
@@ -147,7 +213,11 @@ impl Emitter<'_> {
         }
         let mut methods = Vec::with_capacity(genus.methods.len());
         for method in &genus.methods {
-            if !method.annotations.is_empty() {
+            if method
+                .annotations
+                .iter()
+                .any(|a| !self.ignorable_annotation(a))
+            {
                 return Err(unsupported("method annotation"));
             }
             let method_name = self.names.resolve_symbol(method.func.name).to_owned();
@@ -159,6 +229,7 @@ impl Emitter<'_> {
                 c_name,
                 name,
                 fields,
+                consts,
                 methods,
                 shape: Shape::Class,
             },
@@ -211,6 +282,7 @@ impl Emitter<'_> {
         &mut self,
         def_id: DefId,
         given: &[(Symbol, &HirExpression)],
+        base: Option<&HirExpression>,
     ) -> Result<Operand, CodegenError> {
         let (c_name, fields) = {
             let genus = self.genus(def_id)?;
@@ -239,6 +311,12 @@ impl Emitter<'_> {
             if assigned.contains(&field.name) {
                 continue;
             }
+            if base.is_some() {
+                // Copy-with-changes: an omitted field is a shallow copy of the
+                // base field (pointers alias, scalars copy), so the default is
+                // never evaluated.
+                continue;
+            }
             let operand = match (&field.default, field.sponte) {
                 (Some(default), _) => self.field_value(default, field.ty)?,
                 (None, true) => self.none_of(field.ty)?,
@@ -249,6 +327,24 @@ impl Emitter<'_> {
                 }
             };
             write!(body, "{target}->{} = {}; ", field.c_name, operand.text).ok();
+        }
+        if let Some(base) = base {
+            let base_operand = self.expr(base)?;
+            effect |= base_operand.effect;
+            let base_target = format!("faber_t{}", self.temps);
+            self.temps += 1;
+            write!(body, "{c_name} *{base_target} = {}; ", base_operand.text).ok();
+            for field in &fields {
+                if assigned.contains(&field.name) {
+                    continue;
+                }
+                write!(
+                    body,
+                    "{target}->{} = {base_target}->{}; ",
+                    field.c_name, field.c_name
+                )
+                .ok();
+            }
         }
         // The `creo` hook runs once on the finished object, after every field
         // is set (the runner's construction does the same).
@@ -281,16 +377,21 @@ impl Emitter<'_> {
         entries: &[radix_hir::HirObjectField],
     ) -> Result<Operand, CodegenError> {
         let mut given = Vec::with_capacity(entries.len());
+        let mut base: Option<&HirExpression> = None;
         for entry in entries {
-            let radix_hir::HirObjectKey::Ident(symbol) = entry.key else {
-                return Err(unsupported("object literal key that is not a field name"));
-            };
-            let Some(value) = &entry.value else {
-                return Err(unsupported("shorthand field in an object literal"));
-            };
-            given.push((symbol, value));
+            match &entry.key {
+                radix_hir::HirObjectKey::Ident(symbol) => {
+                    let Some(value) = &entry.value else {
+                        return Err(unsupported("shorthand field in an object literal"));
+                    };
+                    given.push((*symbol, value));
+                }
+                // `Genus { … } from source`: every omitted field is copied.
+                radix_hir::HirObjectKey::Spread(source) => base = Some(source),
+                _ => return Err(unsupported("object literal key that is not a field name")),
+            }
         }
-        self.construct(def_id, &given)
+        self.construct(def_id, &given, base)
     }
 
     /// A value stored into a field of class `ty`; an unwrapped exact value
@@ -310,7 +411,7 @@ impl Emitter<'_> {
     }
 
     /// The field `name` of the genus `base` holds.
-    fn field_of(&self, base: &Operand, name: Symbol) -> Result<Field, CodegenError> {
+    pub(crate) fn field_of(&self, base: &Operand, name: Symbol) -> Result<Field, CodegenError> {
         let Value::Genus(def_id) = base.value else {
             return Err(unsupported("field access on a value that is not a genus"));
         };
@@ -329,8 +430,55 @@ impl Emitter<'_> {
         base: &HirExpression,
         name: Symbol,
     ) -> Result<Operand, CodegenError> {
+        // `Type.NAME` names a type-level constant, not an instance field: the
+        // base is the genus path, not a value. The runner reads the folded
+        // fact through the type.
+        if let radix_hir::HirExpressionKind::Path(def_id) = &base.kind {
+            let field_name = self.names.resolve_symbol(name).to_owned();
+            if let Some((c_name, ty)) = self.class_const(*def_id, &field_name) {
+                return Ok(Self::cell_read(&c_name, ty));
+            }
+        }
         let base = self.expr(base)?;
         self.field_from(&base, name)
+    }
+
+    /// The C name and class of a genus's type-level constant, by source name.
+    fn class_const(&self, def_id: DefId, name: &str) -> Option<(String, Ty)> {
+        let genus = self.genera.get(&def_id)?;
+        genus
+            .consts
+            .iter()
+            .find(|(source, _)| source == name)
+            .map(|(_, konst)| (konst.c_name.clone(), konst.ty))
+    }
+
+    /// The file-scope declarations of a genus's type-level constants. They
+    /// carry `__attribute__((unused))`: a constant no code reads is still a
+    /// legal declaration, and an unused `static const` is a warning under the
+    /// target's `-Werror`.
+    pub(crate) fn class_constants(&mut self, def_id: DefId) -> Result<String, CodegenError> {
+        let consts = self
+            .genera
+            .get(&def_id)
+            .map(|genus| genus.consts.clone())
+            .unwrap_or_default();
+        let mut out = String::new();
+        for (_, konst) in consts {
+            let value = self.expr(&konst.value)?;
+            if value.value != Value::from(konst.ty) {
+                return Err(unsupported("class constant without a folded value"));
+            }
+            self.need_class(konst.ty);
+            writeln!(
+                out,
+                "static {} __attribute__((unused)) = {};",
+                self.declare(konst.ty, &konst.c_name, false)?,
+                value.text
+            )
+            .ok();
+        }
+        Ok(out)
     }
 
     /// The field `name` of an already evaluated genus value.
@@ -367,6 +515,17 @@ impl Emitter<'_> {
             "({})->{} = {};",
             base.text, field.c_name, value.text
         ))
+    }
+
+    /// Access-control annotations (`@ private`, `@ internal`) have no runtime
+    /// effect — the runner enforces nothing at run time — so the target
+    /// ignores them; every other annotation can change meaning and is
+    /// rejected.
+    pub(crate) fn ignorable_annotation(&self, annotation: &radix_hir::HirAnnotation) -> bool {
+        matches!(
+            self.names.resolve_symbol(annotation.family),
+            "private" | "internal" | "privata" | "interna"
+        )
     }
 
     /// A method call on a genus value: the method's function with the
@@ -528,9 +687,12 @@ impl Emitter<'_> {
             Ty::Opt(inner) => match inner {
                 // Text is immutable, so sharing the pointer is a copy; a
                 // scalar optional is a value struct.
-                Inner::Text | Inner::Int | Inner::Bool | Inner::Float | Inner::Modular(_) => {
-                    read.to_owned()
-                }
+                Inner::Text
+                | Inner::Int
+                | Inner::Bool
+                | Inner::Float
+                | Inner::Float32
+                | Inner::Modular(_) => read.to_owned(),
                 Inner::List(elem) => {
                     self.support.need(Helper::List(elem, ListOp::Of));
                     format!(
@@ -542,6 +704,9 @@ impl Emitter<'_> {
                     let clone = self.genus_copy_call(id, read)?;
                     format!("({read} == NULL ? NULL : {clone})")
                 }
+                // A deep copy of a map field needs a map copy family this
+                // subset does not emit; reject by name rather than alias.
+                Inner::Map(..) => return Err(unsupported("copy of an optional map field")),
             },
             _ => read.to_owned(),
         })

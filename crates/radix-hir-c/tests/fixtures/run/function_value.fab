@@ -1,0 +1,20 @@
++++
+locale = "en"
++++
+# A named function is a value: it can be bound to a local or passed to a
+# parameter, and a call through the value is an indirect call with the same
+# hidden arena the direct call gets.
+
+fn twice(int n) → int {
+    return n * 2
+}
+
+fn apply((int) → int f, int n) → int {
+    return f(n)
+}
+
+main {
+    let (int) → int g ← twice
+    print g(21)
+    print apply(twice, 5)
+}

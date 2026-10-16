@@ -70,6 +70,20 @@ fn constant_folding_is_exact_and_floors() {
 }
 
 #[test]
+fn an_exact_constant_store_traps_like_the_runner() {
+    let code = emitted(
+        "main {\n    let int max ← 9223372036854775807\n    print max + 1\n    mut int stored ← max + 1\n    print stored\n}",
+    );
+    assert!(
+        code.contains(
+            "faber_store_i64(((faber_i128)UINT64_C(9223372036854775808)), \"declaration of `stored`\")"
+        ),
+        "{code}"
+    );
+    assert!(code.contains("faber_i128_text"), "{code}");
+}
+
+#[test]
 fn the_minimum_integer_is_spelled_int64_min() {
     let code = emitted("main {\n    print 0 - 9223372036854775807 - 1\n}");
     assert!(code.contains("\\n\", INT64_MIN);"), "{code}");

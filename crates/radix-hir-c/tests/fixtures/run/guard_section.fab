@@ -1,0 +1,24 @@
++++
+locale = "en"
++++
+# `guard { if <cond> { return x } }` is a sequential early-exit section: each
+# clause is an `if` whose body may return from the function. The main body runs
+# only when no clause returned.
+
+fn clamp(int value, int low, int high) → int {
+    guard {
+        if value ≺ low {
+            return low
+        }
+        if value ≻ high {
+            return high
+        }
+    }
+    return value
+}
+
+main {
+    print clamp(5, 0, 10)
+    print clamp(-5, 0, 10)
+    print clamp(15, 0, 10)
+}

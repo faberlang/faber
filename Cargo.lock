@@ -1119,6 +1119,7 @@ dependencies = [
  "radix-intrinsics",
  "radix-lexer",
  "radix-module",
+ "radix-syntax",
  "radix-types",
  "rustc-hash",
 ]

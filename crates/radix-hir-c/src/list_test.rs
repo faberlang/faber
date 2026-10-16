@@ -91,3 +91,41 @@ fn a_u64_list_element_reads_back_exact() {
     assert!(code.contains("faber_list_u64_get("), "{code}");
     assert!(code.contains("faber_opt_u64"), "{code}");
 }
+
+#[test]
+fn membership_is_the_list_family_contains() {
+    let code = emitted(
+        "main {\n    let string c ← \"agens\"\n    if c ∈ [\"pendens\", \"agens\"] {\n        print \"in\"\n    }\n    if 21 ∉ [18, 21] {\n        print \"out\"\n    }\n}",
+    );
+    assert!(code.contains("faber_list_text_contains("), "{code}");
+    assert!(code.contains("faber_list_i64_contains("), "{code}");
+    assert!(code.contains("(!(faber_list_i64_contains("), "{code}");
+}
+
+#[test]
+fn a_higher_order_method_is_an_inlined_loop_over_a_closure() {
+    let code = emitted(
+        "main {\n    let list<int> xs ← [1, 2, 3] ∷ list<int>\n    print xs.filter(int x ∴ x % 2 ≡ 0)\n}",
+    );
+    assert!(code.contains("f_closure_0"), "{code}");
+    assert!(code.contains("faber_list_i64_new(faber_a, 0)"), "{code}");
+    assert!(
+        code.contains("faber_list_i64_push(faber_a, faber_ho_out"),
+        "{code}"
+    );
+}
+
+#[test]
+fn reduce_carries_the_accumulator_and_cumulate_collects_the_runs() {
+    let code = emitted(
+        "main {\n    let list<int> xs ← [1, 2] ∷ list<int>\n    print xs.reduce((int acc, int x) ∴ acc + x, 0)\n    print xs.cumulate((int acc, int x) ∴ acc + x, 0)\n}",
+    );
+    assert!(
+        code.contains("int64_t faber_ho_acc = INT64_C(0);"),
+        "{code}"
+    );
+    assert!(
+        code.contains("faber_list_i64_push(faber_a, faber_ho_out, faber_ho_acc)"),
+        "{code}"
+    );
+}

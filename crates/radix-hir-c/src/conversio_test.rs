@@ -64,10 +64,12 @@ fn a_radix_hint_reads_digits_of_that_radix() {
 #[test]
 fn text_and_float_to_bool_and_bool_to_float() {
     let code = emitted(
-        "main {\n    let float f ← 2.5\n    print \"\" ↦ bool\n    print f ↦ bool\n    print true ↦ float\n}",
+        "main {\n    let float f ← 2.5\n    print \"true\" ↦ bool\n    print f ↦ bool\n    print true ↦ float\n}",
     );
-    // `text ↦ bool` is non-empty; `fractus ↦ bool` is non-zero.
-    assert!(code.contains("((\"\")[0] != '\\0')"), "{code}");
+    // `text ↦ bool` parses the locale's `true` / `false` words only, and any
+    // other text fails with the runner's text; `fractus ↦ bool` is non-zero.
+    assert!(code.contains("strcmp("), "{code}");
+    assert!(code.contains("FABER_CONV_TEXT_BOOL"), "{code}");
     assert!(code.contains("((l_f) != 0.0)"), "{code}");
     assert!(code.contains("? 1.0 : 0.0)"), "{code}");
 }
@@ -78,4 +80,24 @@ fn a_bounded_text_conversion_checks_its_capacity() {
         "main {\n    let string raw ← \"ab\"\n    let string<8> t ← raw ↦ string<8>\n    print t\n}",
     );
     assert!(code.contains("faber_bounded_text(l_raw, 8)"), "{code}");
+}
+
+#[test]
+fn a_bounded_ascii_resize_checks_the_new_capacity() {
+    let code = emitted(
+        "main {\n    let ascii<8> b ← 'abcd'\n    let ascii<4> shrunk ← b ↦ ascii<4>\n    print shrunk\n}",
+    );
+    assert!(code.contains("faber_text_length("), "{code}");
+    assert!(
+        code.contains("ascii to bounded ascii conversion failed"),
+        "{code}"
+    );
+}
+
+#[test]
+fn an_ascii_pack_is_the_fixed_width_radix() {
+    let code =
+        emitted("main {\n    let ascii<8> padded ← 37 ↦ ascii<8> via Hex\n    print padded\n}");
+    assert!(code.contains("faber_try_ascii_pack(faber_a,"), "{code}");
+    assert!(code.contains(", 16, 8,"), "{code}");
 }

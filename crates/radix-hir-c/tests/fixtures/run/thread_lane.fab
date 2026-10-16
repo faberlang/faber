@@ -1,0 +1,13 @@
++++
+locale = "en"
++++
+# `thread f` names a loop lane for later parallel lowering; it is declared
+# metadata, not a runtime binding, so the loop behaves as a plain
+# single-source loop with the same coordinates and element.
+
+main {
+    let list<int> xs ← [1, 2, 3]
+    for from xs at [i] thread lane let v {
+        print i, v
+    }
+}

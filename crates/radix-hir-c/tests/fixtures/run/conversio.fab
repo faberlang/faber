@@ -38,9 +38,10 @@ main {
     print "ffffffffffffffff" ↦ u64 via Hex ⊥ 7
     print "10000000000000000" ↦ u64 via Hex ⊥ 7
     print "-ff" ↦ i32 via Hex, "zz" ↦ i32 via Hex ⊥ 5
-    # `text ↦ bool` is non-empty; `fractus ↦ bool` is non-zero (`-0.0` is
-    # false); `bool ↦ fractus` is 1.0 / 0.0.
-    print "" ↦ bool, "x" ↦ bool, "0" ↦ bool
+    # `text ↦ bool` parses the code locale's `true` / `false` words only (any
+    # other text fails, its own trap fixture); `fractus ↦ bool` is non-zero
+    # (`-0.0` is false); `bool ↦ fractus` is 1.0 / 0.0.
+    print "true" ↦ bool, "false" ↦ bool
     print f ↦ bool, 0.0 ↦ bool
     let float negzero ← -1.0 * 0.0
     print negzero ↦ bool

@@ -1,9 +1,7 @@
 //! Rejection tests: each construct outside the subset fails by name, and the
 //! test asserts the `issue`, `target` and `construct` facts, never message text.
 
-use crate::test_support::{rejected, rejected_construct};
-
-const F32_TYPE: &str = include_str!("../tests/fixtures/reject/f32_type.fab");
+use crate::test_support::rejected;
 
 #[test]
 fn integer_beyond_the_representation_cap() {
@@ -70,15 +68,15 @@ fn nested_list_type() {
     );
 }
 
-/// `mut int` would need a pointer to the caller's cell; only lists, which
-/// already alias, take an access marker in this subset.
+/// `mut string` would need a pointer to the caller's pointer; a `ref` text is
+/// the identity pointer and a `ref`/`mut` scalar borrows the caller's cell.
 #[test]
-fn access_marker_on_a_scalar_parameter() {
+fn access_marker_on_a_text_pointer() {
     assert_eq!(
         rejected(
-            "fn bump(mut int x) {\n    x ← x + 1\n}\nmain {\n    mut int n ← 1\n    bump(mut n)\n    print n\n}"
+            "fn put(mut string s) {\n    s ← \"b\"\n}\nmain {\n    mut string x ← \"a\"\n    put(mut x)\n}"
         ),
-        "ref or mut access to a scalar"
+        "parameter access marker on a scalar, own, or axis"
     );
 }
 
@@ -89,25 +87,5 @@ fn list_of_genus() {
             "class P {\n    mut int x = 0\n}\nmain {\n    let list<P> ps ← [{ x = 1 }]\n    print ps.length()\n}"
         ),
         "list of genus"
-    );
-}
-
-#[test]
-fn static_field() {
-    assert_eq!(
-        rejected(
-            "class P {\n    const int count = 0\n    mut int x = 0\n}\nmain {\n    let P p ← { x = 1 }\n    print p.x\n}"
-        ),
-        "const member"
-    );
-}
-
-/// `f32` math runs at full precision and narrows at the store (goal unit C7,
-/// step 4); until then the width is rejected by name.
-#[test]
-fn f32_fixture() {
-    assert_eq!(
-        rejected_construct("f32_type.fab", F32_TYPE),
-        "float width other than f64"
     );
 }

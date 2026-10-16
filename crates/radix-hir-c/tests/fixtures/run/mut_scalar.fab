@@ -1,0 +1,33 @@
++++
+locale = "en"
++++
+# A `ref`/`mut` scalar parameter borrows the caller's cell: a `ref` read sees
+# the caller's value, a `mut` store reaches the caller, and a `ref` text is the
+# identity pointer a plain string already is. `own` transfers by value.
+
+fn show(ref string label) → void {
+    print label
+}
+
+fn double(mut int n) → void {
+    n ← n * 2
+}
+
+fn peek(ref int n) → int {
+    return n
+}
+
+fn consume(own string buffer) → string {
+    return buffer
+}
+
+main {
+    show("mutabile")
+    mut int value ← 3
+    double(mut value)
+    print value
+    double(mut value)
+    print value
+    print peek(ref value)
+    print consume(own "salve")
+}

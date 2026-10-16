@@ -59,3 +59,14 @@ fn an_own_marker_is_a_transfer_not_a_copy() {
     );
     assert!(!code.contains("_copy("), "{code}");
 }
+
+#[test]
+fn from_source_copies_omitted_fields_shallowly() {
+    let code = emitted(
+        "class Point {\n    let int x\n    mut int y\n}\nmain {\n    let Point p ← Point { x = 1, y = 2 }\n    let Point q ← Point { y = 9 } from p\n    print q.x\n    print q.y\n}",
+    );
+    // The base is bound once and the omitted field copies from it.
+    assert!(code.contains("*faber_t2 = l_p;"), "{code}");
+    assert!(code.contains("faber_t1->m_x = faber_t2->m_x;"), "{code}");
+    assert!(code.contains("faber_t1->m_y = INT64_C(9);"), "{code}");
+}

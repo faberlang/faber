@@ -1,0 +1,18 @@
++++
+locale = "en"
++++
+# `x ∈ xs` / `x ∉ xs` over a list is the list family's `contains`; the element
+# class picks the family, so text and integer lists both work.
+main {
+    let string condicio ← "agens"
+    let int aetas ← 21
+    if condicio ∈ ["pendens", "agens", "pausa"] {
+        print "condicio valida"
+    }
+    if aetas ∈ [18, 21, 65] {
+        print "aetas insignis"
+    }
+    if "absens" ∉ ["pendens", "agens"] {
+        print "absens abest"
+    }
+}
