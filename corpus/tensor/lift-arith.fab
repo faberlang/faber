@@ -17,7 +17,7 @@ locale = "en"
 #   • Lifting — a scalar operator applied per element: `a + 1.0`, `10.0 - a`, `a * 0.5`
 #   • `* / %` lift only against a scalar; a tensor times a tensor is `⊙` (elementwise) or `·` (contraction)
 #   • Division has two kinds — `/` floors on integers, `÷` is true division (16-bit and narrower integers give f32)
-#   • Integer results follow the scalar range rule and width applies at the store: `/` on `i16` is typed `i32` (the bound is [-M, M]), so storing it back into an `i16` tensor is an explicit `↦`; `%` by a positive constant is non-negative and fits a wider tensor directly
+#   • Integer results follow the scalar range rule and width applies at the store: `/` on `i16` is typed `i32` (the bound is [-M, M]), so storing it back into an `i16` tensor narrows at the store like a scalar, checked implicitly; the explicit `↦` stays optional; `%` by a positive constant is non-negative and fits a wider tensor directly
 #   • Extrema — `a ⤒ b` and `a ⤓ b` pick the larger or smaller element of two same-shape tensors
 #   • Widths follow the scalar rules: an untyped constant takes part by value, a family crossing needs `↦`
 #
@@ -34,7 +34,8 @@ locale = "en"
 # WHY: each operator is the scalar operator applied to every element, so the
 # runner's answer for one element is the answer for the whole tensor. An integer
 # result is typed by the scalar range rule and is stored per element into the
-# declared tensor; a result wider than the declared element converts with `↦`.
+# declared tensor; a result wider than the declared element narrows at the store,
+# checked implicitly like a scalar (an explicit `↦` stays optional).
 #
 # EXPECTED stdout:
 #   [2.0, 3.0, 4.0, 5.0]
@@ -43,6 +44,7 @@ locale = "en"
 #   [0.25, 0.5, 0.75, 1.0]
 #   [1.0, 2.0, 0.0, 1.0]
 #   [-1.0, -2.0, -3.0, -4.0]
+#   [0, 1, 1, 2]
 #   [0, 1, 1, 2]
 #   [1, 0, 1, 0]
 #   [0.5, 1.0, 1.5, 2.0]
@@ -79,6 +81,9 @@ main {
     let tensor<i16, [4]> floored ← (n / 2) ↦ tensor<i16, [4]>
     let list<i16> floored_out ← floored.flatten()
     print floored_out
+    let tensor<i16, [4]> floored_implicit ← n / 2
+    let list<i16> floored_implicit_out ← floored_implicit.flatten()
+    print floored_implicit_out
     let tensor<i16, [4]> odd ← n % 2
     let list<i16> odd_out ← odd.flatten()
     print odd_out
