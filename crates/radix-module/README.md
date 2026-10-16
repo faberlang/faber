@@ -20,7 +20,7 @@ package `faber`).
 
 - inspection commands: `lex`, `parse`, `hir`, `mir`, `cli-ir`, `emit`, `check`, `targets`
 - no `build` subcommand — use `faber build` for package builds and `faber emit` for stdout-oriented file emission
-- formatter logic lives here as `forma` (invoked via `faber format`)
+- `faber format` and `faber convert` are thin compile entries over the HIR-backed Faber source emitter (`radix-hir-faber`); this crate's entry point for them is `src/driver/faber_format/compile.rs`
 
 ## Design overview
 
