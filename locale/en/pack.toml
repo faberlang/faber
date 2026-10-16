@@ -2267,6 +2267,30 @@ help = "use a natural number or a size name"
 message = "qualified type path segment is not a namespace"
 help = "qualify through a module namespace"
 
+[diagnostics.SEM008.issues.nucleum_d64]
+message = "d64 is not supported in a nucleum kernel"
+help = "use a supported kernel value type"
+
+[diagnostics.SEM008.issues.nucleum_extent_unproven]
+message = "kernel integer extent {extent} is not proven to fit the portable range"
+help = "constrain the extent to values in the portable integer range"
+
+[diagnostics.SEM008.issues.nucleum_f64]
+message = "f64 is not supported in a nucleum kernel"
+help = "use f32 for floating-point kernel values"
+
+[diagnostics.SEM008.issues.nucleum_trapping_store]
+message = "store of width {width} may trap in a nucleum kernel"
+help = "prove the store is in range or use a wrapping or saturating cell"
+
+[diagnostics.SEM008.issues.nucleum_wide_integer]
+message = "integer width {width} exceeds the supported nucleum kernel width"
+help = "use an integer width no wider than 32 bits"
+
+[diagnostics.SEM008.issues.nucleum_wide_intermediate]
+message = "kernel intermediate extent {extent} exceeds the portable integer range"
+help = "keep intermediate values within the portable integer range"
+
 [diagnostics.SEM009]
 message = "CLI validation error"
 help = "fix the CLI annotation contract before emitting runnable CLI code"
@@ -2566,6 +2590,14 @@ help = "make the expression type match the expected type"
 [diagnostics.SEM010.issues.implet_contract_arity]
 message = "contract {contract} takes {expected} type argument(s), found {found}"
 help = "write the contract with its type arguments in full, e.g. Orderable<Persona>"
+
+[diagnostics.SEM010.issues.implet_method_signature_mismatch]
+message = "the {method} method of genus {genus} does not match its {implet} of {contract}: expected {expected}, found {found}"
+help = "align the method's signature with the contract's declared signature"
+
+[diagnostics.SEM010.issues.implet_missing_method]
+message = "genus {genus} does not supply the {method} method required by its {implet} of {contract}"
+help = "add a {method} method with the signature {contract} declares, or drop the {implet}"
 
 [diagnostics.SEM010.issues.implet_requires_implendum]
 message = "{implet} must name an {implendum} (a contract)"
