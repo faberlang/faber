@@ -1,0 +1,19 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for norma:csv, settled rows only (corpus coverage E20).
+# Quoting and the trailing-newline phantom row wait for the RFC 4180 fix
+# (ruling Q-NM2) and are deliberately not asserted here.
+# Output must match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:csv" csv
+
+main {
+    let list<list<string>> rows ← csv.parse("a,b,c\n1,2,3")
+    print rows
+    print rows.length()
+    print csv.stringify([["x", "y"], ["1", "2"]])
+    print csv.parse("")
+    print csv.parse("a,,c")
+}
