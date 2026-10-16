@@ -1312,6 +1312,16 @@ impl Parser {
     fn parse_index_postfix(&mut self, start: Span, object: Expr) -> Result<Expr, ParseError> {
         self.advance();
         let index = Box::new(self.parse_expression()?);
+        // `m[r, c]` is a coordinate read spelled as one bracketed list,
+        // `m[[r, c]]`. The comma after the first index is the did-you-mean
+        // hinge; the receiver's rank is unknown at parse time, so the hint
+        // applies to every rank-N coordinate index.
+        if self.check(&TokenKind::Comma) {
+            return Err(
+                ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                    .with_arg("issue", "index_coordinate_comma"),
+            );
+        }
         self.expect_issue(&TokenKind::RBracket, "index_end")?;
         Ok(self.postfix_expr(
             start,

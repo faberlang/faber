@@ -3862,6 +3862,10 @@ message = "مطلوب ')' بعد وسائط الاستدعاء"
 [diagnostics.PARSE001.issues.index_end]
 message = "مطلوب ']' بعد تعبير الفهرس"
 
+[diagnostics.PARSE001.issues.index_coordinate_comma]
+message = "قوس الفهرس يأخذ تعبيرًا واحدًا؛ الإحداثيات المنفصلة ليست خانات لكل محور"
+help = "اكتب الإحداثيات كقائمة بين قوسين، مثل m[[r, c]]"
+
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "مطلوب ']' بعد gradient selectors"
 

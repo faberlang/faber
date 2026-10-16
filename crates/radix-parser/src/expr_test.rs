@@ -2190,3 +2190,12 @@ fn labeled_spread_actual_is_rejected_at_parse() {
         "labeled_actual_spread_unsupported",
     );
 }
+
+#[test]
+fn index_comma_reports_coordinate_hint() {
+    // A coordinate read is one bracketed list (`m[[r, c]]`); the comma after
+    // the first index names the dedicated issue instead of the generic
+    // `index_end`, while a bare unclosed index still reports `index_end`.
+    assert_parse_error_issue_la("sit _ x ← m[r, c]", "index_coordinate_comma");
+    assert_parse_error_issue_la("sit _ x ← a[1", "index_end");
+}
