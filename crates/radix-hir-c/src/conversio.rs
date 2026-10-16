@@ -84,14 +84,28 @@ impl Emitter<'_> {
         // Conversions that cannot fail ignore a recovery (typecheck allows
         // one only where the conversion can fail).
         let operand = match (value.value, class) {
-            (Value::Int | Value::Exact, Ty::Float) => {
+            // A conversion into a float class is the C cast: `int ↦ float`
+            // widens, `float ↦ f32` narrows, and `f32 ↦ float` widens the
+            // already-binary32 value.
+            (Value::Int | Value::Exact | Value::Float32, Ty::Float) => {
                 Operand::new(format!("((double){})", value.text), Value::Float)
             }
-            (Value::Int | Value::Exact, Ty::Text) => Operand::new(self.show(&value)?, Value::Text),
+            (Value::Int | Value::Exact | Value::Float, Ty::Float32) => {
+                Operand::new(format!("((float){})", value.text), Value::Float32)
+            }            (Value::Int | Value::Exact, Ty::Text) => Operand::new(self.show(&value)?, Value::Text),
             (Value::Float, Ty::Text) => {
                 self.support.need(Helper::FloatText);
                 Operand::new(
                     format!("faber_float_display(faber_a, {})", value.text),
+                    Value::Text,
+                )
+            }
+            // `f32 ↦ textus` keeps the integral `.0` (the runner's
+            // `display_float_at_width`), unlike the binary64 form.
+            (Value::Float32, Ty::Text) => {
+                self.support.need(Helper::FloatText);
+                Operand::new(
+                    format!("faber_float_text_f32(faber_a, {})", value.text),
                     Value::Text,
                 )
             }
@@ -160,9 +174,10 @@ impl Emitter<'_> {
             }
             (Value::Text, Ty::Text)
             | (Value::Float, Ty::Float)
+            | (Value::Float32, Ty::Float32)
             | (Value::Truth, Ty::Bool)
-            | (Value::Decimal, Ty::Decimal) => value,
-            (Value::Int, Ty::Int) => value,
+            | (Value::Decimal, Ty::Decimal)
+            | (Value::Int, Ty::Int) => value,
             // `copia ↦ lista` materializes a new list; `lista ↦ copia`
             // deduplicates into a new set. Both read their source (`↦`).
             (Value::Set(elem), Ty::List(slot)) if slot == elem => {
@@ -210,11 +225,18 @@ impl Emitter<'_> {
             (Value::Text, Ty::Int | Ty::Sized(_)) => {
                 self.fallible_int(&value, class, Kind::TextInt, None, params, recovery)?
             }
-            (Value::Float, Ty::Int | Ty::Sized(_)) => {
+            (Value::Float | Value::Float32, Ty::Int | Ty::Sized(_)) => {
                 let mode = self.rounding_mode(params)?;
                 self.fallible_int(&value, class, Kind::FloatInt, Some(mode), params, recovery)?
             }
-            (Value::Text, Ty::Float) => self.text_to_float(&value, recovery)?,
+            (Value::Text, Ty::Float | Ty::Float32) => {
+                let float_value = if class == Ty::Float32 {
+                    Value::Float32
+                } else {
+                    Value::Float
+                };
+                self.text_to_float(&value, recovery, float_value)?
+            }
             // `text ↦ bool` parses the code locale's own `true`/`false`
             // words and fails on any other text (the runner's ruling);
             // `fractus ↦ bool` is non-zero (`-0.0` is false, NaN is true).
@@ -223,8 +245,14 @@ impl Emitter<'_> {
             (Value::Float, Ty::Bool) => {
                 Operand::new(format!("(({}) != 0.0)", value.text), Value::Truth)
             }
+            (Value::Float32, Ty::Bool) => {
+                Operand::new(format!("(({}) != 0.0f)", value.text), Value::Truth)
+            }
             (Value::Truth, Ty::Float) => {
                 Operand::new(format!("(({}) ? 1.0 : 0.0)", value.text), Value::Float)
+            }
+            (Value::Truth, Ty::Float32) => {
+                Operand::new(format!("(({}) ? 1.0f : 0.0f)", value.text), Value::Float32)
             }
             _ => return Err(unsupported("conversion between these value classes")),
         };
@@ -483,21 +511,29 @@ impl Emitter<'_> {
         &mut self,
         value: &Operand,
         recovery: Option<&HirExpression>,
+        float_value: Value,
     ) -> Result<Operand, CodegenError> {
         self.support.need(Helper::Conv);
         let n = self.temps;
         self.temps += 1;
         let (v, s) = (format!("faber_v{n}"), format!("faber_s{n}"));
+        // The parse is binary64 (the runner parses `f64` then rounds at the
+        // declared width); an `f32` target narrows the parsed value.
+        let narrowed = if float_value == Value::Float32 {
+            format!("(float){v}")
+        } else {
+            v.clone()
+        };
         let tail = match recovery {
             Some(recovery) => {
                 let fallback = self.expr(recovery)?;
-                if fallback.value != Value::Float {
+                if fallback.value != float_value {
                     return Err(unsupported("recovery value of a different class"));
                 }
-                format!("{s} == 0 ? {v} : {};", fallback.text)
+                format!("{s} == 0 ? {narrowed} : {};", fallback.text)
             }
             None => format!(
-                "if ({s} != 0) {{ faber_conv_fail({}, {s}); }} {v};",
+                "if ({s} != 0) {{ faber_conv_fail({}, {s}); }} {narrowed};",
                 Kind::TextFloat.constant()
             ),
         };
@@ -505,7 +541,7 @@ impl Emitter<'_> {
             "(__extension__ ({{ double {v} = 0.0; int {s} = faber_try_text_float({}, &{v}); {tail} }}))",
             value.text
         );
-        Ok(Operand::new(text, Value::Float))
+        Ok(Operand::new(text, float_value))
     }
 }
 

@@ -1078,6 +1078,13 @@ impl Emitter<'_> {
                         value.text
                     ),
                 ),
+                Value::Float32 => (
+                    "%s",
+                    format!(
+                        "faber_f32_text({}, (char[FABER_F32_TEXT]){{0}})",
+                        value.text
+                    ),
+                ),
                 Value::Decimal => {
                     self.support.need(Helper::DecimalText);
                     ("%s", format!("faber_dec_fmt(faber_a, {})", value.text))

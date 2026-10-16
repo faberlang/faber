@@ -1,9 +1,7 @@
 //! Rejection tests: each construct outside the subset fails by name, and the
 //! test asserts the `issue`, `target` and `construct` facts, never message text.
 
-use crate::test_support::{rejected, rejected_construct};
-
-const F32_TYPE: &str = include_str!("../tests/fixtures/reject/f32_type.fab");
+use crate::test_support::rejected;
 
 #[test]
 fn integer_beyond_the_representation_cap() {
@@ -89,15 +87,5 @@ fn list_of_genus() {
             "class P {\n    mut int x = 0\n}\nmain {\n    let list<P> ps ← [{ x = 1 }]\n    print ps.length()\n}"
         ),
         "list of genus"
-    );
-}
-
-/// `f32` math runs at full precision and narrows at the store (goal unit C7,
-/// step 4); until then the width is rejected by name.
-#[test]
-fn f32_fixture() {
-    assert_eq!(
-        rejected_construct("f32_type.fab", F32_TYPE),
-        "float width other than f64"
     );
 }

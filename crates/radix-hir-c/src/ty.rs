@@ -81,6 +81,9 @@ pub(crate) enum Inner {
     Text,
     Bool,
     Float,
+    /// `f32`: a binary32. It shares the `faber_opt_f64` slot (widened) and is
+    /// narrowed back on a read.
+    Float32,
     /// `wrapping<W>`: a modular word, widened on read and reduced at the
     /// store. `u64` carries its value in a `uint64_t` optional slot.
     Modular(IntWidth),
@@ -96,6 +99,7 @@ impl Inner {
             Inner::Text => Ty::Text,
             Inner::Bool => Ty::Bool,
             Inner::Float => Ty::Float,
+            Inner::Float32 => Ty::Float32,
             Inner::Modular(width) => Ty::Modular(width),
             Inner::List(elem) => Ty::List(elem),
             Inner::Genus(def_id) => Ty::Genus(def_id),
@@ -108,6 +112,7 @@ impl Inner {
             Ty::Text => Some(Inner::Text),
             Ty::Bool => Some(Inner::Bool),
             Ty::Float => Some(Inner::Float),
+            Ty::Float32 => Some(Inner::Float32),
             Ty::Modular(width) => Some(Inner::Modular(width)),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
@@ -133,7 +138,7 @@ impl Inner {
             Inner::Modular(IntWidth::U64) => Some("faber_opt_u64"),
             Inner::Int | Inner::Modular(_) => Some("faber_opt_i64"),
             Inner::Bool => Some("faber_opt_bool"),
-            Inner::Float => Some("faber_opt_f64"),
+            Inner::Float | Inner::Float32 => Some("faber_opt_f64"),
             Inner::Text | Inner::List(_) | Inner::Genus(_) => None,
         }
     }
@@ -166,6 +171,9 @@ pub(crate) enum Ty {
     Bool,
     /// `float` (binary64): C `double`.
     Float,
+    /// `f32` (binary32): C `float`. Arithmetic and display round at the
+    /// binary32 width; a literal is the front end's folded binary32 value.
+    Float32,
     /// `list<int>`, `list<string>` or `list<bool>`: a pointer to an
     /// arena-allocated `faber_list_<elem>`, so every bind aliases (R1).
     List(Elem),
@@ -192,6 +200,9 @@ pub(crate) enum Elem {
     Text,
     Bool,
     Float,
+    /// `f32`: the stored cell is a `float`, and its helpers are the f32 list
+    /// family.
+    Float32,
     /// `wrapping<W>`: the list stores the plain C width and its helpers are
     /// the `FABER_LIST_FAMILY`/`FABER_LIST_OPS` instantiations for that width.
     Modular(IntWidth),
@@ -205,6 +216,7 @@ impl Elem {
             Elem::Text => "text",
             Elem::Bool => "bool",
             Elem::Float => "f64",
+            Elem::Float32 => "f32",
             Elem::Modular(width) => width.marker(),
         }
     }
@@ -216,6 +228,7 @@ impl Elem {
             Elem::Text => "faber_text",
             Elem::Bool => "bool",
             Elem::Float => "double",
+            Elem::Float32 => "float",
             Elem::Modular(width) => width.c_type(),
         }
     }
@@ -227,6 +240,7 @@ impl Elem {
             Elem::Text => "faber_list_text *",
             Elem::Bool => "faber_list_bool *",
             Elem::Float => "faber_list_f64 *",
+            Elem::Float32 => "faber_list_f32 *",
             Elem::Modular(width) => width.list_c_pointer(),
         }
     }
@@ -238,6 +252,7 @@ impl Elem {
             Elem::Text => Ty::Text,
             Elem::Bool => Ty::Bool,
             Elem::Float => Ty::Float,
+            Elem::Float32 => Ty::Float32,
             Elem::Modular(width) => Ty::Modular(width),
         }
     }
@@ -259,6 +274,7 @@ impl Ty {
             Ty::Text => Some("const char *"),
             Ty::Bool => Some("bool"),
             Ty::Float => Some("double"),
+            Ty::Float32 => Some("float"),
             Ty::Decimal => Some("faber_dec"),
             Ty::List(elem) | Ty::Set(elem) => Some(elem.list_c_pointer()),
             Ty::Map(k, v) => match (k, v) {
@@ -356,6 +372,9 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
         Type::Primitive(Primitive::Bivalens) => Ok(Ty::Bool),
         Type::Primitive(Primitive::Fractus)
         | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Ok(Ty::Float),
+        // `f32`: a binary32 whose operations round per operation, the runner's
+        // declared-width rule (2026-10-15T1445 ruling).
+        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32) => Ok(Ty::Float32),
         // A bounded list is a list whose value carries its capacity at run
         // time (`fixed`), so it is the same class.
         Type::Array(inner) | Type::BoundedArray { element: inner, .. } => {
@@ -366,6 +385,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::Text => Ok(Ty::List(Elem::Text)),
                 Ty::Bool => Ok(Ty::List(Elem::Bool)),
                 Ty::Float => Ok(Ty::List(Elem::Float)),
+                Ty::Float32 => Ok(Ty::List(Elem::Float32)),
                 Ty::List(_) => Err(unsupported("nested list type")),
                 Ty::Genus(_) => Err(unsupported("list of genus")),
                 Ty::Decimal => Err(unsupported("list of decimals")),
@@ -383,6 +403,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             Ty::Text => Ok(Ty::Set(Elem::Text)),
             Ty::Bool => Ok(Ty::Set(Elem::Bool)),
             Ty::Float => Ok(Ty::Set(Elem::Float)),
+            Ty::Float32 => Err(unsupported("set of f32")),
             Ty::Modular(width) => Ok(Ty::Set(Elem::Modular(width))),
             Ty::List(_) => Err(unsupported("set of lists")),
             Ty::Set(_) => Err(unsupported("set of sets")),

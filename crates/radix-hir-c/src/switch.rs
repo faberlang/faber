@@ -58,6 +58,7 @@ impl Emitter<'_> {
                 Value::Text => Ty::Text,
                 Value::Truth => Ty::Bool,
                 Value::Float => Ty::Float,
+                Value::Float32 => Ty::Float32,
                 Value::Decimal => Ty::Decimal,
                 Value::List(elem) => Ty::List(elem),
                 Value::Set(elem) => Ty::Set(elem),
@@ -232,6 +233,12 @@ impl Emitter<'_> {
             )),
             (Value::Float, HirLiteral::Float(value) | HirLiteral::FloatText { value, .. }) => {
                 let operand: Operand = self.float_literal(if negated { -value } else { *value });
+                Ok(format!("({name} == {})", operand.text))
+            }
+            (Value::Float32, HirLiteral::Float(value) | HirLiteral::FloatText { value, .. }) => {
+                #[expect(clippy::cast_possible_truncation)]
+                let operand: Operand =
+                    self.float_literal32(if negated { -*value as f32 } else { *value as f32 });
                 Ok(format!("({name} == {})", operand.text))
             }
             _ => Err(unsupported("pattern literal of a different class")),

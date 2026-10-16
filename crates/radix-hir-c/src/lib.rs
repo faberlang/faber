@@ -55,6 +55,8 @@ mod emit_test;
 #[cfg(test)]
 mod enumeration_test;
 #[cfg(test)]
+mod float32_test;
+#[cfg(test)]
 mod item_test;
 #[cfg(test)]
 mod list_test;
@@ -320,7 +322,7 @@ impl Emitter<'_> {
             Ty::Int | Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) => self.support.need_ints(),
             Ty::Opt(inner) => self.need_class(inner.ty()),
             Ty::Bool => self.support.need_bool(),
-            Ty::Float => self.support.need(crate::helpers::Helper::Float),
+            Ty::Float | Ty::Float32 => self.support.need(crate::helpers::Helper::Float),
             Ty::Decimal => self.support.need(crate::helpers::Helper::Decimal),
             Ty::Text | Ty::Genus(_) | Ty::None => {}
             Ty::List(elem) | Ty::Set(elem) => {

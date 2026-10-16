@@ -53,6 +53,9 @@ pub(crate) enum Value {
     Genus(DefId),
     /// A binary64 value (`double`).
     Float,
+    /// A binary32 value (`float`), rounded per operation and displayed at the
+    /// binary32 width.
+    Float32,
     /// An exact decimal (`faber_dec`: an `i128` carrier at its own scale).
     Decimal,
     /// An optional: a pointer that may be `NULL`, or a presence-flag struct.
@@ -77,6 +80,7 @@ impl From<Ty> for Value {
             Ty::Map(k, v) => Value::Map(k, v),
             Ty::Genus(def_id) => Value::Genus(def_id),
             Ty::Float => Value::Float,
+            Ty::Float32 => Value::Float32,
             Ty::Decimal => Value::Decimal,
             Ty::Opt(inner) => Value::Opt(inner),
             Ty::None => Value::None,
@@ -214,9 +218,9 @@ impl Emitter<'_> {
                 }
                 // An integer literal typed as a float is that float (`1` in a
                 // `float` slot is `1.0`); typecheck admits no other crossing.
-                let as_float = expr.ty.is_some_and(|ty| {
-                    classify(self.types, ty).is_ok_and(|class| class == Ty::Float)
-                });
+                let float_class = expr.ty.and_then(|ty| classify(self.types, ty).ok());
+                let as_float = matches!(float_class, Some(Ty::Float | Ty::Float32));
+                let as_float32 = matches!(float_class, Some(Ty::Float32));
                 let as_decimal = expr.ty.is_some_and(|ty| {
                     classify(self.types, ty).is_ok_and(|class| class == Ty::Decimal)
                 });
@@ -226,10 +230,22 @@ impl Emitter<'_> {
                     HirLiteral::FloatText { text, .. } if as_decimal => {
                         self.decimal_text_literal(*text)
                     }
-                    HirLiteral::Int(value) if as_float =>
+                    // An `f32` literal is the front end's folded binary32
+                    // value; carry it as a `float` cell.
+                    HirLiteral::Float(value) | HirLiteral::FloatText { value, .. }
+                        if as_float32 =>
                     {
-                        #[expect(clippy::cast_precision_loss)]
-                        Ok(self.float_literal(*value as f64))
+                        #[expect(clippy::cast_possible_truncation)]
+                        Ok(self.float_literal32(*value as f32))
+                    }
+                    HirLiteral::Int(value) if as_float => {
+                        if as_float32 {
+                            #[expect(clippy::cast_precision_loss)]
+                            Ok(self.float_literal32(*value as f32))
+                        } else {
+                            #[expect(clippy::cast_precision_loss)]
+                            Ok(self.float_literal(*value as f64))
+                        }
                     }
                     _ => self.literal(literal),
                 }
@@ -329,7 +345,7 @@ impl Emitter<'_> {
                     let receiver = self.expr(receiver)?;
                     return self.genus_method(receiver, *method, args);
                 }
-                if let (Some(Ty::Float), Some(receiver_ty)) = (class, receiver.ty) {
+                if let (Some(Ty::Float | Ty::Float32), Some(receiver_ty)) = (class, receiver.ty) {
                     let receiver = self.expr(receiver)?;
                     return self.float_method(receiver, receiver_ty, *method, args);
                 }
@@ -657,6 +673,7 @@ impl Emitter<'_> {
             Value::List(elem) | Value::Set(elem) => elem.list_c_pointer().to_owned(),
             Value::Map(k, v) => Self::map_c_type(k, v),
             Value::Float => "double ".to_owned(),
+            Value::Float32 => "float ".to_owned(),
             Value::Decimal => {
                 self.support.need(Helper::Decimal);
                 "faber_dec ".to_owned()
@@ -894,6 +911,7 @@ impl Emitter<'_> {
         let suffix = match elem {
             Elem::Int => "i64",
             Elem::Float => "f64",
+            Elem::Float32 => "f32",
             _ => return Err(unsupported("elementwise operator on a non-numeric list")),
         };
         let result_is_list = ty.is_some_and(|ty| {
@@ -1058,7 +1076,11 @@ impl Emitter<'_> {
             .is_some_and(|ty| matches!(classify(self.types, ty), Ok(Ty::Modular(_))));
         let inner = self.expr(operand)?;
         match op {
-            HirUnOp::Neg if inner.value == Value::Float => Ok(Self::float_negate(&inner)),
+            HirUnOp::Neg
+                if matches!(inner.value, Value::Float | Value::Float32) =>
+            {
+                Ok(Self::float_negate(&inner))
+            }
             HirUnOp::Neg if inner.value == Value::Decimal => Ok(self.decimal_negate(&inner)),
             HirUnOp::Neg if !inner.is_integer() => Err(unsupported("negation of a non-integer")),
             HirUnOp::Neg => {
@@ -1159,7 +1181,9 @@ impl Emitter<'_> {
         if l.value == Value::Decimal || r.value == Value::Decimal {
             return self.decimal_binary(op, l, r);
         }
-        if l.value == Value::Float || r.value == Value::Float || op == HirBinOp::TrueDiv {
+        let float_operand = matches!(l.value, Value::Float | Value::Float32)
+            || matches!(r.value, Value::Float | Value::Float32);
+        if float_operand || op == HirBinOp::TrueDiv {
             // The runner's `÷` is `f32` for 8- and 16-bit operands and `f64`
             // otherwise. This target has no `f32` (C7's open question), so it
             // rejects the narrow form by name rather than approximate it.
@@ -1263,8 +1287,14 @@ impl Emitter<'_> {
     fn fuzzy(&mut self, op: HirBinOp, l: Operand, r: Operand) -> Result<Operand, CodegenError> {
         let name = if l.is_integer() && r.is_integer() {
             "faber_approx_int"
-        } else if l.value == Value::Float && r.value == Value::Float {
-            "faber_approx_f64"
+        } else if matches!(l.value, Value::Float | Value::Float32)
+            && matches!(r.value, Value::Float | Value::Float32)
+        {
+            if l.value == Value::Float32 {
+                "faber_approx_f32"
+            } else {
+                "faber_approx_f64"
+            }
         } else {
             return Err(unsupported(
                 "approximate equality between different classes",
@@ -1578,7 +1608,8 @@ impl Emitter<'_> {
             (Ty::Int, Value::Int)
             | (Ty::Text, Value::Text)
             | (Ty::Bool, Value::Truth)
-            | (Ty::Float, Value::Float) => Ok(value),
+            | (Ty::Float, Value::Float)
+            | (Ty::Float32, Value::Float32) => Ok(value),
             (Ty::List(slot), Value::List(elem)) if slot == elem => Ok(value),
             (Ty::Genus(slot), Value::Genus(genus)) if slot == genus => Ok(value),
             (Ty::Int, Value::Exact) => {

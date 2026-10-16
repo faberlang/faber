@@ -606,9 +606,8 @@ impl Emitter<'_> {
             Ty::Opt(inner) => match inner {
                 // Text is immutable, so sharing the pointer is a copy; a
                 // scalar optional is a value struct.
-                Inner::Text | Inner::Int | Inner::Bool | Inner::Float | Inner::Modular(_) => {
-                    read.to_owned()
-                }
+                Inner::Text | Inner::Int | Inner::Bool | Inner::Float | Inner::Float32
+                | Inner::Modular(_) => read.to_owned(),
                 Inner::List(elem) => {
                     self.support.need(Helper::List(elem, ListOp::Of));
                     format!(

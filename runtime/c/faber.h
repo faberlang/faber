@@ -545,6 +545,69 @@ static inline double faber_pow_f64(double base, double exponent) {
     return pow(base, exponent);
 }
 
+/* The binary32 siblings. A `float` operation on two `float` operands already
+ * rounds per operation (the runner's declared-width rule), so the plain C
+ * operators are the arithmetic; only what C would get wrong is a helper: the
+ * floored `%`, the float-valued methods and the tolerance equality. */
+static inline float faber_fmod_f32(float a, float b) {
+    float remainder = fmodf(a, b);
+    if (remainder == 0.0f) {
+        return b < 0.0f ? -0.0f : 0.0f;
+    }
+    if ((remainder < 0.0f) != (b < 0.0f)) {
+        return remainder + b;
+    }
+    return remainder;
+}
+
+static inline float faber_abs_f32(float value) {
+    return fabsf(value);
+}
+
+static inline float faber_signum_f32(float value) {
+    if (isnan(value)) {
+        return value;
+    }
+    return signbit(value) ? -1.0f : 1.0f;
+}
+
+static inline float faber_minimum_f32(float a, float b) {
+    if (isnan(a) || isnan(b)) {
+        return a + b;
+    }
+    if (a < b || (a == b && signbit(a))) {
+        return a;
+    }
+    return b;
+}
+
+static inline float faber_maximum_f32(float a, float b) {
+    if (isnan(a) || isnan(b)) {
+        return a + b;
+    }
+    if (a > b || (a == b && !signbit(a))) {
+        return a;
+    }
+    return b;
+}
+
+static inline bool faber_approx_f32(float a, float b) {
+    float difference = a - b;
+    float scale = a < 0 ? -a : a;
+    float other = b < 0 ? -b : b;
+    if (difference < 0) {
+        difference = -difference;
+    }
+    if (other > scale) {
+        scale = other;
+    }
+    return difference <= 1e-9f * scale;
+}
+
+static inline float faber_pow_f32(float base, float exponent) {
+    return powf(base, exponent);
+}
+
 /* An exact comparison of an integer with a float by their true values:
  * -1 (less), 0 (equal), 1 (greater), 2 (unordered: NaN). A C comparison would
  * round the integer to binary64 first. Mirrors `faber::exact::cmp_int_float`. */
@@ -649,6 +712,81 @@ static inline const char *faber_f64_text(double value, char *buffer) {
     /* A non-integral value has fraction digits, so the point falls inside or
      * before the digits: `exponent < count - 1`. */
     if (exponent >= 0) {
+        memcpy(buffer + at, digits, (size_t)exponent + 1);
+        at += (size_t)exponent + 1;
+        buffer[at++] = '.';
+        memcpy(buffer + at, digits + exponent + 1, count - (size_t)exponent - 1);
+        at += count - (size_t)exponent - 1;
+    } else {
+        int zeros;
+        buffer[at++] = '0';
+        buffer[at++] = '.';
+        for (zeros = 0; zeros < -exponent - 1; zeros++) {
+            buffer[at++] = '0';
+        }
+        memcpy(buffer + at, digits, count);
+        at += count;
+    }
+    buffer[at] = '\0';
+    return buffer;
+}
+
+/* The text of a binary32, as `print` of a declared `f32` writes it (the
+ * runner's `display_float_at_width`): the shortest round-trip digits for the
+ * binary32 width, positionally never in exponent form, with `.0` on an
+ * integral value (`16777216.0`, `0.30000001`); the specials are `inf`,
+ * `-inf`, `NaN`. Writes into `buffer`, which holds FABER_F32_TEXT bytes. */
+#define FABER_F32_TEXT 64
+
+static inline const char *faber_f32_text(float value, char *buffer) {
+    char scientific[32];
+    char digits[20];
+    size_t count = 0;
+    int exponent;
+    int precision;
+    size_t at = 0;
+    const char *cursor;
+    if (value != value) {
+        return "NaN";
+    }
+    if (value > FLT_MAX) {
+        return "inf";
+    }
+    if (value < -FLT_MAX) {
+        return "-inf";
+    }
+    /* The shortest `%.*e` that `strtof` reads back as the same float; nine
+     * significant digits always suffice for binary32. */
+    for (precision = 1; precision <= 9; precision++) {
+        snprintf(scientific, sizeof scientific, "%.*e", precision - 1, (double)value);
+        if (strtof(scientific, NULL) == value) {
+            break;
+        }
+    }
+    cursor = scientific;
+    if (*cursor == '-') {
+        buffer[at++] = '-';
+        cursor++;
+    }
+    for (; *cursor != 'e'; cursor++) {
+        if (*cursor != '.') {
+            digits[count++] = *cursor;
+        }
+    }
+    exponent = atoi(cursor + 1);
+    /* The point falls at or past the last digit for an integral value: the
+     * digits, the trailing zeros, then `.0` (never the exact binary
+     * expansion a `%.1f` would write). */
+    if (exponent >= (int)count - 1) {
+        int zeros;
+        memcpy(buffer + at, digits, count);
+        at += count;
+        for (zeros = 0; zeros < exponent - (int)count + 1; zeros++) {
+            buffer[at++] = '0';
+        }
+        buffer[at++] = '.';
+        buffer[at++] = '0';
+    } else if (exponent >= 0) {
         memcpy(buffer + at, digits, (size_t)exponent + 1);
         at += (size_t)exponent + 1;
         buffer[at++] = '.';
@@ -816,6 +954,16 @@ static inline faber_text faber_join(faber_arena *arena, int count, ...) {
 static inline faber_text faber_float_text(faber_arena *arena, double value) {
     char buffer[FABER_F64_TEXT];
     const char *text = faber_f64_text(value, buffer);
+    size_t length = strlen(text);
+    char *out = faber_alloc(arena, length + 1);
+    memcpy(out, text, length + 1);
+    return out;
+}
+
+/* A binary32's text in the arena, for a template hole. */
+static inline faber_text faber_float_text_f32(faber_arena *arena, float value) {
+    char buffer[FABER_F32_TEXT];
+    const char *text = faber_f32_text(value, buffer);
     size_t length = strlen(text);
     char *out = faber_alloc(arena, length + 1);
     memcpy(out, text, length + 1);
@@ -1442,6 +1590,7 @@ FABER_LIST_FAMILY(i64, int64_t)
 FABER_LIST_FAMILY(text, faber_text)
 FABER_LIST_FAMILY(bool, bool)
 FABER_LIST_FAMILY(f64, double)
+FABER_LIST_FAMILY(f32, float)
 /* `list<wrapping<W>>` (modular words): the stored cell is the plain width,
  * written only through the modular store and read widened by the emitter. */
 FABER_LIST_FAMILY(i8, int8_t)
@@ -1552,6 +1701,28 @@ static inline faber_text faber_list_f64_show(faber_arena *arena, const faber_lis
     return out;
 }
 
+static inline faber_text faber_list_f32_show(faber_arena *arena, const faber_list_f32 *list) {
+    size_t capacity = 3 + (size_t)list->len * (FABER_F32_TEXT + 2);
+    char *out = faber_alloc(arena, capacity);
+    size_t at = 0;
+    int64_t index;
+    out[at++] = '[';
+    for (index = 0; index < list->len; index++) {
+        char buffer[FABER_F32_TEXT];
+        const char *text = faber_f32_text(list->items[index], buffer);
+        size_t length = strlen(text);
+        if (index > 0) {
+            out[at++] = ',';
+            out[at++] = ' ';
+        }
+        memcpy(out + at, text, length);
+        at += length;
+    }
+    out[at++] = ']';
+    out[at] = '\0';
+    return out;
+}
+
 /* A `list<wrapping<W>>` shows each element as its width prints: signed and
  * unsigned decimal, no arithmetic on the element (the stored value is
  * already reduced). */
@@ -1596,11 +1767,18 @@ static inline int64_t faber_f64_total_key(double value) {
     return bits ^ (int64_t)((uint64_t)(bits >> 63) >> 1);
 }
 
+static inline int32_t faber_f32_total_key(float value) {
+    int32_t bits;
+    memcpy(&bits, &value, sizeof bits);
+    return bits ^ (int32_t)((uint32_t)(bits >> 31) >> 1);
+}
+
 #define FABER_LIST_EQ_SCALAR(a, b) ((a) == (b))
 #define FABER_LIST_LT_SCALAR(a, b) ((a) < (b))
 #define FABER_LIST_EQ_TEXT(a, b) (strcmp((a), (b)) == 0)
 #define FABER_LIST_LT_TEXT(a, b) (strcmp((a), (b)) < 0)
 #define FABER_LIST_LT_F64(a, b) (faber_f64_total_key(a) < faber_f64_total_key(b))
+#define FABER_LIST_LT_F32(a, b) (faber_f32_total_key(a) < faber_f32_total_key(b))
 
 #define FABER_LIST_OPS(NAME, TYPE, EQ, LT)                                              \
     /* `xs.get(i)` / `first` / `last`: false when there is no such element. */          \
@@ -1739,6 +1917,7 @@ FABER_LIST_OPS(i64, int64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(text, faber_text, FABER_LIST_EQ_TEXT, FABER_LIST_LT_TEXT)
 FABER_LIST_OPS(bool, bool, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64)
+FABER_LIST_OPS(f32, float, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F32)
 FABER_LIST_OPS(i8, int8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(i16, int16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(i32, int32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
@@ -1949,6 +2128,11 @@ FABER_MAP(text, faber_text, FABER_LIST_EQ_TEXT, text, faber_text)
 #define FABER_LIST_GE_F64(a, b) (faber_f64_total_key(a) >= faber_f64_total_key(b))
 #define FABER_LIST_EQ_F64(a, b) ((a) == (b))
 #define FABER_LIST_NE_F64(a, b) ((a) != (b))
+#define FABER_LIST_GT_F32(a, b) (faber_f32_total_key(a) > faber_f32_total_key(b))
+#define FABER_LIST_LE_F32(a, b) (faber_f32_total_key(a) <= faber_f32_total_key(b))
+#define FABER_LIST_GE_F32(a, b) (faber_f32_total_key(a) >= faber_f32_total_key(b))
+#define FABER_LIST_EQ_F32(a, b) ((a) == (b))
+#define FABER_LIST_NE_F32(a, b) ((a) != (b))
 
 static inline int64_t faber_i64_lift_add(int64_t x, int64_t y) {
     return faber_store_i64(faber_add(x, y), "element");
@@ -1970,6 +2154,10 @@ static inline double faber_f64_lift_add(double x, double y) { return x + y; }
 static inline double faber_f64_lift_sub(double x, double y) { return x - y; }
 static inline double faber_f64_lift_mul(double x, double y) { return x * y; }
 static inline double faber_f64_lift_div(double x, double y) { return x / y; }
+static inline float faber_f32_lift_add(float x, float y) { return x + y; }
+static inline float faber_f32_lift_sub(float x, float y) { return x - y; }
+static inline float faber_f32_lift_mul(float x, float y) { return x * y; }
+static inline float faber_f32_lift_div(float x, float y) { return x / y; }
 
 /* One lift family: `_pair` over two equal-length lists, `_left` and `_right`
  * for a scalar on the right or left. `OP` is the element operation. */
@@ -2020,6 +2208,10 @@ FABER_LIST_LIFT(f64_add, double, faber_list_f64, double, faber_list_f64, faber_f
 FABER_LIST_LIFT(f64_sub, double, faber_list_f64, double, faber_list_f64, faber_f64_lift_sub)
 FABER_LIST_LIFT(f64_mul, double, faber_list_f64, double, faber_list_f64, faber_f64_lift_mul)
 FABER_LIST_LIFT(f64_div, double, faber_list_f64, double, faber_list_f64, faber_f64_lift_div)
+FABER_LIST_LIFT(f32_add, float, faber_list_f32, float, faber_list_f32, faber_f32_lift_add)
+FABER_LIST_LIFT(f32_sub, float, faber_list_f32, float, faber_list_f32, faber_f32_lift_sub)
+FABER_LIST_LIFT(f32_mul, float, faber_list_f32, float, faber_list_f32, faber_f32_lift_mul)
+FABER_LIST_LIFT(f32_div, float, faber_list_f32, float, faber_list_f32, faber_f32_lift_div)
 
 FABER_LIST_LIFT(i64_lt, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_LT_SCALAR)
 FABER_LIST_LIFT(i64_gt, int64_t, faber_list_i64, bool, faber_list_bool, FABER_LIST_GT_SCALAR)
@@ -2033,6 +2225,12 @@ FABER_LIST_LIFT(f64_le, double, faber_list_f64, bool, faber_list_bool, FABER_LIS
 FABER_LIST_LIFT(f64_ge, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_GE_F64)
 FABER_LIST_LIFT(f64_eq, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_EQ_F64)
 FABER_LIST_LIFT(f64_ne, double, faber_list_f64, bool, faber_list_bool, FABER_LIST_NE_F64)
+FABER_LIST_LIFT(f32_lt, float, faber_list_f32, bool, faber_list_bool, FABER_LIST_LT_F32)
+FABER_LIST_LIFT(f32_gt, float, faber_list_f32, bool, faber_list_bool, FABER_LIST_GT_F32)
+FABER_LIST_LIFT(f32_le, float, faber_list_f32, bool, faber_list_bool, FABER_LIST_LE_F32)
+FABER_LIST_LIFT(f32_ge, float, faber_list_f32, bool, faber_list_bool, FABER_LIST_GE_F32)
+FABER_LIST_LIFT(f32_eq, float, faber_list_f32, bool, faber_list_bool, FABER_LIST_EQ_F32)
+FABER_LIST_LIFT(f32_ne, float, faber_list_f32, bool, faber_list_bool, FABER_LIST_NE_F32)
 
 /* Whole-list equality (`≡` / `≢`): a length check then per-element equality,
  * one `bool` (the lifted comparisons are the ones with a list result). */
@@ -2055,6 +2253,7 @@ FABER_LIST_EQUAL(i64, int64_t, FABER_LIST_EQ_SCALAR)
 FABER_LIST_EQUAL(text, faber_text, FABER_LIST_EQ_TEXT)
 FABER_LIST_EQUAL(bool, bool, FABER_LIST_EQ_SCALAR)
 FABER_LIST_EQUAL(f64, double, FABER_LIST_EQ_F64)
+FABER_LIST_EQUAL(f32, float, FABER_LIST_EQ_F32)
 
 /* Integer lists: the exact sum, and the first index of the extreme. */
 static inline faber_i128 faber_list_i64_sum(const faber_list_i64 *list) {
