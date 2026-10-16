@@ -3,6 +3,7 @@
 //! clamp); a `trapping` cell checks only where a value is stored into it (the
 //! implicit store node, and the end of a conversion row), never per operation.
 //! Assertions use the issue, code and args of the failure, never its prose.
+//! An implicit store into an indexed container applies the element policy per element (ruling 19).
 
 use super::*;
 use crate::store::RUNNER_ISSUE_IMPLICIT_STORE_TRAP;
@@ -14,7 +15,7 @@ use radix_mir::{
     MirFunctionId, MirOperand, MirProgram, MirType, MirUnOp, MirValidationContext, MirValue,
     MirValueId, MirValueKind,
 };
-use radix_types::{FloatPolicy, NumericWidth, Primitive, Type, TypeTable};
+use radix_types::{FloatPolicy, IndexExpr, NumericWidth, Primitive, Type, TypeTable};
 
 const OVERFLOW_ISSUE: &str = "runner_numerus_overflow";
 
@@ -320,6 +321,56 @@ fn policy_float_tensor_elements_reach_the_store_check() {
                 .expect("saturating elements store as is"),
             Value::Float(f64::INFINITY)
         );
+    });
+}
+
+#[test]
+fn implicit_tensor_store_applies_the_element_policy_per_element() {
+    let mut types = TypeTable::new();
+    let i8_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::I8);
+    let i16_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::I16);
+    let extent = types.intern_index(IndexExpr::Literal(2));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![extent]));
+    let i8_tensor = types.intern(Type::Tensor(i8_ty, shape));
+    let mut interner = Interner::new();
+    let site = site(&mut interner, "cells");
+    with_runner(&types, &interner, |runner| {
+        let out_of_range = crate::runtime::tensor_value_typed(
+            runner.types,
+            vec![Value::Int(200), Value::Int(2)],
+            Some(i16_ty),
+            vec![2],
+            Span::default(),
+        )
+        .expect("i16 tensor");
+        let error = runner
+            .eval_implicit_store(&site, i8_tensor, &out_of_range, Span::default())
+            .expect("an indexed container applies its element policy")
+            .expect_err("200 does not fit an i8 element");
+        assert_eq!(error.issue, RUNNER_ISSUE_IMPLICIT_STORE_TRAP);
+        assert_eq!(error.code, RUNNER_CODE_INTERNAL);
+        assert_eq!(arg(&error, "slot"), Some("cells"));
+        assert_eq!(arg(&error, "store"), Some("declaration"));
+
+        let fitting = crate::runtime::tensor_value_typed(
+            runner.types,
+            vec![Value::Int(80), Value::Int(2)],
+            Some(i16_ty),
+            vec![2],
+            Span::default(),
+        )
+        .expect("i16 tensor");
+        let stored = runner
+            .eval_implicit_store(&site, i8_tensor, &fitting, Span::default())
+            .expect("an indexed container applies its element policy")
+            .expect("80 and 2 fit an i8 element");
+        let Value::Tensor(cell) = stored else {
+            panic!("expected a tensor carrier");
+        };
+        let values = runner
+            .tensor_logical_values(&cell, Span::default())
+            .expect("tensor logical values");
+        assert_eq!(values, vec![Value::Int(80), Value::Int(2)]);
     });
 }
 
