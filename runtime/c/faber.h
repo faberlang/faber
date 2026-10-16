@@ -2360,7 +2360,8 @@ enum {
     FABER_CONV_TEXT_INT = 0,
     FABER_CONV_TEXT_FLOAT = 1,
     FABER_CONV_INT_INT = 2,
-    FABER_CONV_FLOAT_INT = 3
+    FABER_CONV_FLOAT_INT = 3,
+    FABER_CONV_TEXT_BOOL = 4
 };
 
 static inline _Noreturn void faber_conv_fail(int kind, int why) {
@@ -2370,6 +2371,8 @@ static inline _Noreturn void faber_conv_fail(int kind, int why) {
                                             : "textus to numerus conversion out of range");
     case FABER_CONV_TEXT_FLOAT:
         faber_trap("textus to fractus conversion failed");
+    case FABER_CONV_TEXT_BOOL:
+        faber_trap("text to bivalens conversion failed");
     case FABER_CONV_INT_INT:
         faber_trap("numerus to numerus conversion out of range");
     default:

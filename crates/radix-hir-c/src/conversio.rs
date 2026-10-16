@@ -215,12 +215,11 @@ impl Emitter<'_> {
                 self.fallible_int(&value, class, Kind::FloatInt, Some(mode), params, recovery)?
             }
             (Value::Text, Ty::Float) => self.text_to_float(&value, recovery)?,
-            // `text ↦ bool` is non-empty; a text value cannot hold a NUL, so
-            // the first byte decides. `fractus ↦ bool` is non-zero (`-0.0` is
-            // false, NaN is true). `bool ↦ fractus` is 1.0 / 0.0.
-            (Value::Text, Ty::Bool) => {
-                Operand::new(format!("(({})[0] != '\\0')", value.text), Value::Truth)
-            }
+            // `text ↦ bool` parses the code locale's own `true`/`false`
+            // words and fails on any other text (the runner's ruling);
+            // `fractus ↦ bool` is non-zero (`-0.0` is false, NaN is true).
+            // `bool ↦ fractus` is 1.0 / 0.0.
+            (Value::Text, Ty::Bool) => self.text_to_bool(&value, recovery)?,
             (Value::Float, Ty::Bool) => {
                 Operand::new(format!("(({}) != 0.0)", value.text), Value::Truth)
             }
@@ -441,6 +440,42 @@ impl Emitter<'_> {
         let mut operand = Operand::new(text, form);
         operand.stored = Some(class);
         Ok(operand)
+    }
+
+    /// `text ↦ bool`: the code locale's own `true`/`false` words, and any
+    /// other text fails (`text to bivalens conversion failed`), the runner's
+    /// ruling. The source is evaluated once.
+    fn text_to_bool(
+        &mut self,
+        value: &Operand,
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::Conv);
+        let tokens = self.names.display_tokens();
+        let (yes, no) = (c_string(&tokens.true_)?, c_string(&tokens.false_)?);
+        let n = self.temps;
+        self.temps += 1;
+        let (t, v) = (format!("faber_t{n}"), format!("faber_v{n}"));
+        let tail = match recovery {
+            Some(recovery) => {
+                let fallback = self.expr(recovery)?;
+                if fallback.value != Value::Truth {
+                    return Err(unsupported("recovery value of a different class"));
+                }
+                format!("else {{ {v} = {}; }}", fallback.text)
+            }
+            None => {
+                "else { faber_conv_fail(FABER_CONV_TEXT_BOOL, FABER_CONV_SYNTAX); }"
+                    .to_owned()
+            }
+        };
+        let text = format!(
+            "(__extension__ ({{ const char *{t} = {}; bool {v}; \
+             if (strcmp({t}, {yes}) == 0) {{ {v} = true; }} \
+             else if (strcmp({t}, {no}) == 0) {{ {v} = false; }} {tail} {v}; }}))",
+            value.text
+        );
+        Ok(Operand::new(text, Value::Truth))
     }
 
     /// `text ↦ float`, with or without `⊥`.

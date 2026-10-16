@@ -64,10 +64,12 @@ fn a_radix_hint_reads_digits_of_that_radix() {
 #[test]
 fn text_and_float_to_bool_and_bool_to_float() {
     let code = emitted(
-        "main {\n    let float f ← 2.5\n    print \"\" ↦ bool\n    print f ↦ bool\n    print true ↦ float\n}",
+        "main {\n    let float f ← 2.5\n    print \"true\" ↦ bool\n    print f ↦ bool\n    print true ↦ float\n}",
     );
-    // `text ↦ bool` is non-empty; `fractus ↦ bool` is non-zero.
-    assert!(code.contains("((\"\")[0] != '\\0')"), "{code}");
+    // `text ↦ bool` parses the locale's `true` / `false` words only, and any
+    // other text fails with the runner's text; `fractus ↦ bool` is non-zero.
+    assert!(code.contains("strcmp("), "{code}");
+    assert!(code.contains("FABER_CONV_TEXT_BOOL"), "{code}");
     assert!(code.contains("((l_f) != 0.0)"), "{code}");
     assert!(code.contains("? 1.0 : 0.0)"), "{code}");
 }
