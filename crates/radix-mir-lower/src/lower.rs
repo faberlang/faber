@@ -693,6 +693,7 @@ pub fn lower_analyzed_unit(
     ensure_map_iteration_array_types(&mut types);
     ensure_itera_coordinate_array_types(unit.hir, &mut types);
     ensure_enum_iteration_array_types(unit.hir, &mut types);
+    ensure_intervallum_iteration_array_types(unit.hir, &mut types);
     ensure_tensor_bracket_index_array_types(unit.hir, &mut types);
     ensure_runtime_extent_shape_array_type(&mut types);
     if options.kernel_lowering == KernelLowering::Device {
@@ -1363,6 +1364,39 @@ fn ensure_enum_iteration_array_types(hir: &radix_hir::HirModule, types: &mut Typ
     }
 
     let mut collector = EnumIterationCollector { types, elements: FxHashSet::default() };
+    walk_program(&mut collector, hir);
+    let elements = std::mem::take(&mut collector.elements);
+    drop(collector);
+    for element in elements {
+        types.ensure_array(element);
+    }
+}
+
+/// An `itera ab` over a value of `intervallum` type (not a range literal)
+/// materializes the interval into a `lista<T>` temp, so the
+/// list type is interned here, once, before function lowering begins
+/// (function lowering holds the type table immutably).
+fn ensure_intervallum_iteration_array_types(hir: &radix_hir::HirModule, types: &mut TypeTable) {
+    struct IntervallumIterationCollector<'a> {
+        types: &'a TypeTable,
+        elements: FxHashSet<TypeId>,
+    }
+
+    impl HirVisitor for IntervallumIterationCollector<'_> {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if let HirExpressionKind::Itera { mode, iter, .. } = &expr.kind
+                && matches!(mode, HirIteraMode::Ab)
+                && !matches!(&iter.kind, HirExpressionKind::Intervallum { .. })
+                && let Some(ty) = iter.ty
+                && let Type::Intervallum(bound) = self.types.get(ty)
+            {
+                self.elements.insert(*bound);
+            }
+            walk_expr(self, expr);
+        }
+    }
+
+    let mut collector = IntervallumIterationCollector { types, elements: FxHashSet::default() };
     walk_program(&mut collector, hir);
     let elements = std::mem::take(&mut collector.elements);
     drop(collector);

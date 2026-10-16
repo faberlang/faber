@@ -262,3 +262,37 @@ fn scalar_bounded_buffers_capacity_above_ten_stay_unsupported() {
         errors[0].issue
     );
 }
+
+/// `itera ab` over a VALUE of `intervallum` type (not a range literal)
+/// materializes the interval into a `lista<T>` temp through the runtime
+/// `interval_materialize` call and walks that array in order.
+#[test]
+fn itera_interval_value_materializes_in_order() {
+    let source = r"functio intervalTotal() → numerus {
+  sit intervallum<numerus> r ← 2‥5
+  varia numerus total ← 0
+  itera ab r sit i {
+    total ← total + i
+  }
+  redde total
+}";
+    let unit = analyze_source(&session(), "interval-itera.fab", source, AnalyzeRequest::default())
+        .expect("interval value itera source analyzes");
+    let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
+        .expect("itera ab over an intervallum value must lower");
+    validate_program(lowered.validated.program(), lowered.validated.validation())
+        .expect("the materialized interval itera MIR must validate");
+    let dump = dump_program(lowered.validated.program());
+    assert!(
+        !dump.contains("itera ab source before range MIR lowering"),
+        "the interval value must materialize instead of declining: {dump}"
+    );
+    assert!(
+        dump.contains("runtime collection interval_materialize("),
+        "the source must materialize through the interval materialize runtime call: {dump}"
+    );
+    assert!(
+        dump.contains("runtime collection length("),
+        "the materialized array feeds the ordinary list-iteration loop bound: {dump}"
+    );
+}

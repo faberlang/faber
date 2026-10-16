@@ -258,6 +258,10 @@ struct ArrayIteraLowering<'a> {
     iter: &'a HirExpression,
     body: &'a HirBlock,
     span: Span,
+    /// A source already materialized into a `lista<T>` temp (an interval
+    /// value in `itera ab`, need): the loop walks this operand
+    /// instead of re-lowering `iter`; the `TypeId` is the element type.
+    materialized: Option<(MirOperand, TypeId)>,
 }
 
 impl FunctionBuilder<'_> {
@@ -1052,23 +1056,57 @@ impl FunctionBuilder<'_> {
         }
         match mode {
             HirIteraMode::Ab => {
-                let HirExpressionKind::Intervallum { start, end, step, kind } = &iter.kind else {
-                    self.errors
-                        .push(MirError::unsupported(iter.span, "itera ab source before range MIR lowering"));
-                    return None;
-                };
-
-                self.lower_range_itera(RangeIteraLowering {
-                    binding,
-                    name,
-                    mutable,
-                    start,
-                    end,
-                    step: step.as_deref(),
-                    kind: *kind,
-                    body,
-                    span: expr.span,
-                })?;
+                if let HirExpressionKind::Intervallum { start, end, step, kind } = &iter.kind {
+                    self.lower_range_itera(RangeIteraLowering {
+                        binding,
+                        name,
+                        mutable,
+                        start,
+                        end,
+                        step: step.as_deref(),
+                        kind: *kind,
+                        body,
+                        span: expr.span,
+                    })?;
+                } else {
+                    // `itera ab` over a VALUE of `intervallum` type (not a
+                    // range literal) materializes into a `lista<T>` temp
+                    // through the runtime `interval_materialize` call, then
+                    // the ordinary list-iteration machinery walks it in order
+                    //. Any other source keeps the decline.
+                    let Some(iter_ty) = iter.ty else {
+                        self.errors
+                            .push(MirError::missing_type(iter.span, "itera ab source"));
+                        return None;
+                    };
+                    let interval_element = match self.normalized_type(iter_ty) {
+                        Type::Intervallum(element) => Some(*element),
+                        _ => None,
+                    };
+                    let Some(element) = interval_element else {
+                        self.errors
+                            .push(MirError::unsupported(iter.span, "itera ab source before range MIR lowering"));
+                        return None;
+                    };
+                    let array_ty = self.require_array(element, iter.span, "itera ab interval source list")?;
+                    let source = self.lower_expr_value(iter)?;
+                    let materialized = self.runtime_call_value(
+                        MirIntrinsic::Collection(MirCollectionOp::IntervalMaterialize),
+                        vec![source],
+                        MirType::semantic(array_ty),
+                        iter.span,
+                    );
+                    self.lower_array_itera(ArrayIteraLowering {
+                        mode,
+                        coordinates,
+                        binding,
+                        name,
+                        iter,
+                        body,
+                        span: expr.span,
+                        materialized: Some((materialized, element)),
+                    })?;
+                }
             }
             HirIteraMode::Ex | HirIteraMode::De => {
                 self.lower_array_itera(ArrayIteraLowering {
@@ -1079,6 +1117,7 @@ impl FunctionBuilder<'_> {
                     iter,
                     body,
                     span: expr.span,
+                    materialized: None,
                 })?;
             }
         }
@@ -4228,9 +4267,16 @@ impl FunctionBuilder<'_> {
             Some(variants) => Some(self.construct_enum_member_list(iter_ty, &variants, iter.iter.span)?),
             None => None,
         };
+        // `itera ab` over a value of `intervallum` type is materialized by the
+        // `Ab` arm into a `lista<T>` operand; the loop walks that array in
+        // order instead of classifying the interval carrier.
+        let interval_element = iter.materialized.as_ref().map(|(_, element)| *element);
         let collection_kind = match &enum_member_array {
             Some(_) => CollectionIteraKind::Array(iter_ty),
-            None => self.classify_collection_itera(iter_ty, iter.mode, iter.coordinates.len()),
+            None => match interval_element {
+                Some(element) => CollectionIteraKind::Array(element),
+                None => self.classify_collection_itera(iter_ty, iter.mode, iter.coordinates.len()),
+            },
         };
         if matches!(&collection_kind, CollectionIteraKind::Unsupported) {
             // Only map-value iteration carries the tabula decline; tensor and
@@ -4257,14 +4303,20 @@ impl FunctionBuilder<'_> {
         // source keeps the receiver's own (peeled) type.
         let collection_semantic = match &enum_member_array {
             Some((_, array_ty)) => *array_ty,
-            None => match self.normalized_type(iter_ty) {
-                Type::Ref(_, inner) => *inner,
-                _ => iter_ty,
+            None => match interval_element {
+                Some(element) => self.require_array(element, iter.iter.span, "itera ab interval source list")?,
+                None => match self.normalized_type(iter_ty) {
+                    Type::Ref(_, inner) => *inner,
+                    _ => iter_ty,
+                },
             },
         };
         let collection = match enum_member_array {
             Some((operand, _)) => operand,
-            None => self.lower_expr_value(iter.iter)?,
+            None => match &iter.materialized {
+                Some((operand, _)) => operand.clone(),
+                None => self.lower_expr_value(iter.iter)?,
+            },
         };
         // D6.6: a direct generator call feeding `itera ex` is walked stepwise,
         // so a suspending backend resumes the producer once per step.
