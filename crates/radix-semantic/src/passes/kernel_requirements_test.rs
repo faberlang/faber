@@ -34,6 +34,41 @@ fn target_row<'a>(
 }
 
 #[test]
+fn module_const_index_folds_to_its_exact_value() {
+    let fixture = analyze_en(
+        r"
+const i32 K = 4
+
+@ kernel
+@ public
+fn pick(tensor<f32, [8]> x) → f32 {
+    return x[[K]]
+}
+
+@ kernel
+@ public
+fn bad(tensor<f32, [8]> x, int j) → f32 {
+    return x[[j + 0]]
+}
+",
+    );
+
+    let pick = target_row(&fixture, "pick", Target::MirWgsl);
+    assert!(pick.admitted, "{:?}", pick.failures);
+    assert!(pick.failures.is_empty());
+
+    let bad = target_row(&fixture, "bad", Target::MirWgsl);
+    assert!(
+        bad.failures.iter().any(|failure| matches!(
+            failure,
+            KernelRequirementFailure::IntermediateOutOfRange { .. }
+        )),
+        "{:?}",
+        bad.failures
+    );
+}
+
+#[test]
 fn wrapping_i32_is_admitted_only_on_implemented_device_leaves() {
     let fixture = analyze_en(
         r"
