@@ -1097,7 +1097,7 @@ impl BodyFacts<'_> {
                 .or_else(|| expr.ty.map(|ty| AbstractRange::from_type(ty, self.types)))
                 .unwrap_or_else(AbstractRange::unknown),
             HirExpressionKind::Index(base, index) => {
-                let index_range = self.evaluate(index);
+                let index_range = self.evaluate_index_coordinates(index);
                 let index_range = self
                     .linear_tensor_index_range(base, index)
                     .unwrap_or(index_range);
@@ -1314,27 +1314,7 @@ impl BodyFacts<'_> {
                 body,
                 identity,
             ),
-            HirExpressionKind::Array(elements) => {
-                let mut axes = Vec::with_capacity(elements.len());
-                let mut representable = true;
-                for element in elements {
-                    match element {
-                        HirArrayElement::Expr(value) => axes.push(self.evaluate(value)),
-                        HirArrayElement::Spread(value) => {
-                            self.evaluate(value);
-                            representable = false;
-                        }
-                        HirArrayElement::Infer(_) => {
-                            axes.push(AbstractRange::unknown());
-                            representable = false;
-                        }
-                    }
-                }
-                if representable {
-                    self.expression_vectors.insert(expr.id, axes);
-                }
-                AbstractRange::unknown()
-            }
+            HirExpressionKind::Array(elements) => self.evaluate_array_elements(expr.id, elements),
             HirExpressionKind::Si {
                 cond,
                 then_block,
@@ -1588,6 +1568,45 @@ impl BodyFacts<'_> {
         }
     }
 
+    /// Evaluate an array literal's elements and record its per-axis ranges.
+    fn evaluate_array_elements(
+        &mut self,
+        id: HirId,
+        elements: &[HirArrayElement],
+    ) -> AbstractRange {
+        let mut axes = Vec::with_capacity(elements.len());
+        let mut representable = true;
+        for element in elements {
+            match element {
+                HirArrayElement::Expr(value) => axes.push(self.evaluate(value)),
+                HirArrayElement::Spread(value) => {
+                    self.evaluate(value);
+                    representable = false;
+                }
+                HirArrayElement::Infer(_) => {
+                    axes.push(AbstractRange::unknown());
+                    representable = false;
+                }
+            }
+        }
+        if representable {
+            self.expression_vectors.insert(id, axes);
+        }
+        AbstractRange::unknown()
+    }
+
+    /// Evaluate a tensor index. A coordinate vector (`t[[a, b, …]]`) is
+    /// generated address arithmetic, not a stored kernel value, so its own
+    /// element type places no value-width requirement on the kernel; the
+    /// per-axis coordinates are still evaluated and the address range check
+    /// decides whether the access is proven or needs a runtime guard.
+    fn evaluate_index_coordinates(&mut self, index: &HirExpression) -> AbstractRange {
+        match &index.kind {
+            HirExpressionKind::Array(elements) => self.evaluate_array_elements(index.id, elements),
+            _ => self.evaluate(index),
+        }
+    }
+
     /// The device linear address of an N-D tensor index `t[[a0, a1, ...]]`
     /// whose coordinates are bounded by a proven range, typically lane binders
     /// over a runtime extent. It is `((a0 * E1 + a1) * E2 + a2) ...`; the
@@ -1616,9 +1635,16 @@ impl BodyFacts<'_> {
         let mut maximum_index = KernelRangeExpr::Constant(0);
         for (axis, range) in axes.iter().enumerate() {
             let range = range.0.as_ref()?;
-            let bounded = constant(&range.maximum)
-                .map_or_else(|| contains_shape(range), |maximum| maximum <= 2_147_483_647);
-            if !constant(&range.minimum).is_some_and(|minimum| minimum >= 0) || !bounded {
+            // A coordinate may be negative at run time (`j - 1`) as long as it
+            // is bounded by a symbolic extent: the per-axis guard is the
+            // runtime check, so a shape-bounded coordinate is admitted rather
+            // than rejected. A full-width scalar parameter stays unbounded
+            // (no shape) and is still refused.
+            let nonnegative = constant(&range.minimum).is_some_and(|minimum| minimum >= 0);
+            let shape_bounded = contains_shape(range);
+            let bounded =
+                constant(&range.maximum).map_or(shape_bounded, |maximum| maximum <= 2_147_483_647);
+            if (!nonnegative && !shape_bounded) || !bounded {
                 return None;
             }
             let stride = dims[axis + 1..]
