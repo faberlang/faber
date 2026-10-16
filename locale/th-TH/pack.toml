@@ -812,6 +812,10 @@ help = "ลบ dum จากบอดี fac ของ clausura"
 message = "นิพจน์เกินขีดจำกัด operator ของ parser ที่ {limit}"
 help = "แยกนิพจน์ออกเป็น binding ที่มีชื่อ"
 
+[diagnostics.PARSE030.issues.nesting_too_deep]
+message = "ซอร์สซ้อนลึกเกินขีดจำกัดของ parser ที่ {limit}"
+help = "แยกนิพจน์ออกเป็น binding ที่มีชื่อ"
+
 [diagnostics.PARSE031]
 message = "ลิเทอรัลไม่ถูกต้อง"
 help = "ตรวจรูปแบบลิเทอรัล"
@@ -883,6 +887,18 @@ help = "ใช้การสะกดชนิดที่ประกาศใ
 [diagnostics.PARSE040.issues.est_value_literal_names_equality]
 message = "`est` ทดสอบชนิด; '{value}' เป็นค่า"
 help = "เปรียบเทียบค่าด้วยกลุ่มตัวดำเนินการความเท่ากัน: `≡` (เข้มงวด), `≅` (ตรงเป๊ะหลังการเลื่อนชนิด), `≈` (คลุมเครือ); หากต้องการทดสอบชนิด null ให้เขียน `x est {type}`"
+
+[diagnostics.PARSE040.issues.nesting_too_deep]
+message = "ซอร์สซ้อนลึกเกินขีดจำกัดของ parser ที่ {limit}"
+help = "แยกประเภทออกเป็น binding ที่มีชื่อ"
+
+[diagnostics.PARSE040.issues.unexpected_cap_after_union_hole]
+message = "`∩` ไม่สามารถตามหลังช่อง `∪` ในประเภทได้"
+help = "เขียนสมาชิกของ union ก่อนรวมด้วย `∩`"
+
+[diagnostics.PARSE040.issues.unexpected_cup_after_union_hole]
+message = "`∪` ไม่สามารถตามหลังช่อง `∪` ในประเภทได้"
+help = "ลบ `∪` ที่เกินออกหรือเขียนสมาชิก"
 
 [diagnostics.PARSE041]
 message = "คำอธิบายชนิดไม่ถูกต้อง"

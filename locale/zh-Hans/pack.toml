@@ -856,6 +856,10 @@ help = "从 closure fac bodies 中移除 dum"
 message = "表达式超过解析器的 {limit} 个运算符上限"
 help = "将表达式拆分为具名绑定"
 
+[diagnostics.PARSE030.issues.nesting_too_deep]
+message = "源代码嵌套深度超过解析器上限 {limit}"
+help = "将表达式拆分为具名绑定"
+
 [diagnostics.PARSE031]
 message = "无效字面量"
 help = "检查字面量形式"
@@ -927,6 +931,18 @@ help = "使用此读者语言中声明的类型拼写{?expected|：'|'}"
 [diagnostics.PARSE040.issues.est_value_literal_names_equality]
 message = "`est` 用于测试类型；'{value}' 是一个值"
 help = "请用相等运算符家族比较值：`≡`（严格）、`≅`（提升后精确）、`≈`（模糊）；要测试 null 类型，请写 `x est {type}`"
+
+[diagnostics.PARSE040.issues.nesting_too_deep]
+message = "源代码嵌套深度超过解析器上限 {limit}"
+help = "将类型拆分为具名绑定"
+
+[diagnostics.PARSE040.issues.unexpected_cap_after_union_hole]
+message = "在类型中 `∩` 不能跟在 `∪` 空洞之后"
+help = "先写出联合成员，再与 `∩` 结合"
+
+[diagnostics.PARSE040.issues.unexpected_cup_after_union_hole]
+message = "在类型中 `∪` 不能跟在 `∪` 空洞之后"
+help = "删除多余的 `∪` 或写出成员"
 
 [diagnostics.PARSE041]
 message = "无效类型标注"

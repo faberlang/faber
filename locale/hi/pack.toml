@@ -812,6 +812,10 @@ help = "closure fac bodies से dum हटाएं"
 message = "अभिव्यक्ति parser की {limit} operator सीमा से अधिक है"
 help = "अभिव्यक्ति को नामित बाइंडिंग में विभाजित करें"
 
+[diagnostics.PARSE030.issues.nesting_too_deep]
+message = "स्रोत parser की सीमा {limit} से अधिक गहराई तक नेस्ट है"
+help = "अभिव्यक्ति को नामित बाइंडिंग में विभाजित करें"
+
 [diagnostics.PARSE031]
 message = "अमान्य literal"
 help = "literal रूप जांचें"
@@ -883,6 +887,18 @@ help = "इस reader locale में घोषित टाइप वर्त
 [diagnostics.PARSE040.issues.est_value_literal_names_equality]
 message = "`est` प्रकार जाँचता है; '{value}' एक मान है"
 help = "मानों की तुलना समानता परिवार से करें: `≡` (सख्त), `≅` (प्रोमोशन के बाद सटीक), `≈` (अस्पष्ट); null प्रकार जाँचने के लिए `x est {type}` लिखें"
+
+[diagnostics.PARSE040.issues.nesting_too_deep]
+message = "स्रोत parser की सीमा {limit} से अधिक गहराई तक नेस्ट है"
+help = "प्रकार को नामित बाइंडिंग में विभाजित करें"
+
+[diagnostics.PARSE040.issues.unexpected_cap_after_union_hole]
+message = "किसी प्रकार में `∩` किसी `∪` छिद्र के बाद नहीं आ सकता"
+help = "`∩` से संयोजन से पहले संघ सदस्य लिखें"
+
+[diagnostics.PARSE040.issues.unexpected_cup_after_union_hole]
+message = "किसी प्रकार में `∪` किसी `∪` छिद्र के बाद नहीं आ सकता"
+help = "अतिरिक्त `∪` हटाएँ या सदस्य लिखें"
 
 [diagnostics.PARSE041]
 message = "अमान्य प्रकार annotation"

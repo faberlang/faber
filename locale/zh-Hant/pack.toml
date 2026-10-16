@@ -856,6 +856,10 @@ help = "從閉包 fac 主體中移除 dum"
 message = "運算式超過解析器的 {limit} 個運算子上限"
 help = "將運算式拆分為具名綁定"
 
+[diagnostics.PARSE030.issues.nesting_too_deep]
+message = "原始碼巢狀深度超過解析器上限 {limit}"
+help = "將運算式拆分為具名綁定"
+
 [diagnostics.PARSE031]
 message = "無效字面值"
 help = "檢查字面值形式"
@@ -927,6 +931,18 @@ help = "使用此讀者語言中宣告的類型拼寫{?expected|：'|'}"
 [diagnostics.PARSE040.issues.est_value_literal_names_equality]
 message = "`est` 用於測試型別；'{value}' 是一個值"
 help = "請用相等運算子家族比較值：`≡`（嚴格）、`≅`（提升後精確）、`≈`（模糊）；要測試 null 型別，請寫 `x est {type}`"
+
+[diagnostics.PARSE040.issues.nesting_too_deep]
+message = "原始碼巢狀深度超過解析器上限 {limit}"
+help = "將型別拆分為具名綁定"
+
+[diagnostics.PARSE040.issues.unexpected_cap_after_union_hole]
+message = "在型別中 `∩` 不能跟在 `∪` 空洞之後"
+help = "先寫出聯合成員，再與 `∩` 結合"
+
+[diagnostics.PARSE040.issues.unexpected_cup_after_union_hole]
+message = "在型別中 `∪` 不能跟在 `∪` 空洞之後"
+help = "刪除多餘的 `∪` 或寫出成員"
 
 [diagnostics.PARSE041]
 message = "無效型別註記"

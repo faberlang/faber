@@ -1262,6 +1262,10 @@ help = "remove {dum} from closure {fac} bodies"
 message = "expression exceeds the parser limit of {limit} operators"
 help = "split the expression into named bindings"
 
+[diagnostics.PARSE030.issues.nesting_too_deep]
+message = "source nests deeper than the parser limit of {limit}"
+help = "split the expression into named bindings"
+
 [diagnostics.PARSE031]
 message = "invalid literal"
 help = "check the literal form"
@@ -1341,6 +1345,18 @@ help = "the null type is '{type}'; write '{type}' where a type is required"
 [diagnostics.PARSE040.issues.est_value_literal_names_equality]
 message = "`is` tests types; '{value}' is a value"
 help = "compare values with the equality family: `≡` (strict), `≅` (promoted-exact), `≈` (fuzzy); to test for the null type, write `x is {type}`"
+
+[diagnostics.PARSE040.issues.nesting_too_deep]
+message = "source nests deeper than the parser limit of {limit}"
+help = "split the type into named bindings"
+
+[diagnostics.PARSE040.issues.unexpected_cap_after_union_hole]
+message = "`∩` cannot follow a `∪` hole in a type"
+help = "write the union member before combining with `∩`"
+
+[diagnostics.PARSE040.issues.unexpected_cup_after_union_hole]
+message = "`∪` cannot follow a `∪` hole in a type"
+help = "remove the extra `∪` or write the member"
 
 [diagnostics.PARSE041]
 message = "invalid type annotation"

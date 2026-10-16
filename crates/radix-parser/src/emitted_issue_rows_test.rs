@@ -5,8 +5,8 @@
 //! back to the code's base text with a `[locale pack missing row: ...]` suffix,
 //! so `faber check --diagnostics` loses the specific message. This is the
 //! parser-side counterpart of `radix-semantic`'s
-//! `catalog_semantic_issue_rows_test.rs`; `PARSE001.item_list_missing_separator`
-//! went rowless because only the semantic crate had its gate.
+//! `catalog_semantic_issue_rows_test.rs`. There is no allowlist: every slug the
+//! parser emits must have an `en` row.
 //!
 //! The scan reads the `"issue", "slug"` argument pair of `with_arg` calls,
 //! including calls split over lines. Call sites that pass a variable are out of
@@ -17,13 +17,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const EN_PACK: &str = "../../locale/en/pack.toml";
-
-// Pre-existing gaps the scan reports today.
-// debt: shrink only; need
-const KNOWN_MISSING_ROWS: &[&str] = &[
-    "unexpected_cap_after_union_hole",
-    "unexpected_cup_after_union_hole",
-];
 
 fn production_sources(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("read src dir") {
@@ -120,34 +113,14 @@ fn emitted_issue_rows_all_have_en_pack_rows() {
         "slug scan found only {} slugs; the scanner is broken",
         emitted.len()
     );
-    assert!(
-        !KNOWN_MISSING_ROWS.contains(&"item_list_missing_separator")
-            && !KNOWN_MISSING_ROWS.contains(&"item_list_trailing_comma"),
-        "need landed; the item_list slugs no longer belong in the allowlist"
-    );
-
     let rows = en_pack_issue_rows();
     let missing: Vec<&String> = emitted
         .iter()
-        .filter(|slug| !rows.contains(*slug) && !KNOWN_MISSING_ROWS.contains(&slug.as_str()))
+        .filter(|slug| !rows.contains(*slug))
         .collect();
     assert!(
         missing.is_empty(),
         "issue slugs emitted by radix-parser with no en pack row (locale/en/pack.toml): {missing:?}"
-    );
-}
-
-/// The allowlist cannot rot: a slug with a row back must be removed from it.
-#[test]
-fn emitted_issue_rows_allowlist_stays_absent_from_the_en_pack() {
-    let rows = en_pack_issue_rows();
-    let stale: Vec<&&str> = KNOWN_MISSING_ROWS
-        .iter()
-        .filter(|slug| rows.contains(**slug))
-        .collect();
-    assert!(
-        stale.is_empty(),
-        "KNOWN_MISSING_ROWS slugs now have an en pack row; remove them: {stale:?}"
     );
 }
 
