@@ -2691,10 +2691,9 @@ pub(crate) fn policy_float_cell(
 }
 
 /// D1: whether storing `value` into a `trapping<width>` cell traps. NaN and
-/// both infinities trap. A bare `f16` or `bf16` slot is not rounded at a store
-/// (ruling 26(d) is not built), so those widths test whether the value rounds
-/// to infinity in the format, nearest-even: `|v|` at or past the midpoint
-/// between the largest finite value and the next power of two. Nothing clamps.
+/// both infinities trap. Bare `f16` and `bf16` slots round at the store via
+/// [`round_float_at_slot`], so a trapping store traps exactly when the
+/// slot-rounded value is infinite. Nothing clamps.
 #[must_use]
 pub(crate) fn trapping_float_store_fails(value: f64, width: NumericWidth) -> bool {
     if value.is_nan() {
@@ -2725,6 +2724,26 @@ pub(crate) fn round_float(value: f64, width: NumericWidth) -> f64 {
         {
             value as f32 as f64
         }
+    }
+}
+
+/// Round a float at a store/conversion slot of `width` (ruling 26(d)): f16
+/// and bf16 round to their own formats, nearest-even, +/-inf past the finite
+/// range; f32 through binary32; f64 and non-float widths unchanged.
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "GAPS #1 stages slot rounding before store/conversion wiring"
+    )
+)]
+pub(crate) fn round_float_at_slot(value: f64, width: NumericWidth) -> f64 {
+    match width {
+        NumericWidth::F64 => value,
+        NumericWidth::F32 => f64::from(value as f32),
+        NumericWidth::F16 => crate::f16_round_f64(value),
+        NumericWidth::BF16 => crate::bf16_round_f64(value),
+        _ => value,
     }
 }
 
@@ -3080,3 +3099,7 @@ pub fn format_template_shaped(
     }
     Ok(out)
 }
+
+#[cfg(test)]
+#[path = "f16_bf16_slot_round_test.rs"]
+mod f16_bf16_slot_round_test;
