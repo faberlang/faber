@@ -23,14 +23,16 @@ locale = "en"
 +++
 @ kernel
 @ public
-fn pick(tf32[4, 6] input, mut tf32[4, 6] output, u32 y, u32 x) → void {
-    output[[y, x]] ← input[[y, x]]
+fn pick(tf32[4, 6] input, mut tf32[4, 6] output) → void {
+    for from input at [y, x] thread lane let value {
+        output[[y, x]] ← value
+    }
 }
 "#,
     );
-    assert!(dump.contains("%0 = _2 * const int 6"), "missing row stride multiply: {dump}");
-    assert!(dump.contains("%1 = %0 + _3"), "missing column add: {dump}");
-    assert!(dump.contains("_1[%1] = _0[%3]"), "access must use one linear index: {dump}");
+    assert!(dump.contains("%4 = _3 * const int 6"), "missing row stride multiply: {dump}");
+    assert!(dump.contains("%5 = %4 + _4"), "missing column add: {dump}");
+    assert!(dump.contains("_1[%5] = _5"), "access must use one linear index: {dump}");
     assert!(!dump.contains("runtime collection tensor_get"), "{dump}");
 }
 
@@ -46,8 +48,10 @@ locale = "en"
 +++
 @ kernel
 @ public
-fn pick(tf32[8] input, mut tf32[8] output, u32 x) → void {{
-    output{write} ← input{read}
+fn pick(tf32[8] input, mut tf32[8] output) → void {{
+    for from input at [x] thread lane let value {{
+        output{write} ← input{read}
+    }}
 }}
 "#
         )
@@ -61,7 +65,7 @@ fn pick(tf32[8] input, mut tf32[8] output, u32 x) → void {{
         blocks(&scalar),
         "rank-1 list and scalar index must lower identically"
     );
-    assert!(listed.contains("_1[_2] = _0[_2]"), "access must index by the integer: {listed}");
+    assert!(listed.contains("_1[_3] = _0[_3]"), "access must index by the integer: {listed}");
     assert!(!listed.contains("runtime collection tensor_get"), "{listed}");
 }
 
@@ -73,20 +77,28 @@ locale = "en"
 +++
 @ kernel
 @ public
-fn pick(tf32[2, 3, 5] input, mut tf32[2, 3, 5] output, u32 z, u32 y, u32 x) → void {
-    output[[z, y, x]] ← input[[z, y, x]]
+fn pick(tf32[2, 3, 5] input, mut tf32[2, 3, 5] output) → void {
+    for from input at [z, y, x] thread lane let value {
+        output[[z, y, x]] ← value
+    }
 }
 "#,
     );
-    assert!(dump.contains("%0 = _2 * const int 3"), "missing axis-1 stride: {dump}");
-    assert!(dump.contains("%1 = %0 + _3"), "missing axis-1 add: {dump}");
-    assert!(dump.contains("%2 = %1 * const int 5"), "missing axis-2 stride: {dump}");
-    assert!(dump.contains("%3 = %2 + _4"), "missing axis-2 add: {dump}");
+    assert!(dump.contains("%7 = _3 * const int 3"), "missing axis-1 stride: {dump}");
+    assert!(dump.contains("%8 = %7 + _4"), "missing axis-1 add: {dump}");
+    assert!(dump.contains("%9 = %8 * const int 5"), "missing axis-2 stride: {dump}");
+    assert!(dump.contains("%10 = %9 + _5"), "missing axis-2 add: {dump}");
+    assert!(dump.contains("_1[%10] = _6"), "access must use one linear index: {dump}");
 }
 
 #[test]
 fn device_rank2_runtime_extent_index_reads_tensor_extent() {
-    let dump = dump_validated(
+    // Kernel-subset ruling (2026-10-15, need; need): a
+    // dynamic extent cannot prove this raw lane index's bounds, so check rejects it.
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let diagnostics = match crate::driver::analyze_source(
+        &session,
+        "place.fab",
         r#"+++
 locale = "en"
 +++
@@ -96,13 +108,22 @@ fn pick(tf32[_, _] input, mut tf32[_, _] output, u32 y, u32 x) → void {
     output[[y, x]] ← input[[y, x]]
 }
 "#,
+        AnalyzeRequest::default(),
+    ) {
+        Err(diagnostics) => diagnostics,
+        Ok(_) => panic!("runtime tensor extents must not admit an unproven lane index"),
+    };
+    let diagnostic = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.issue() == Some("nucleum_extent_unproven"))
+        .expect("runtime lane index reports the named extent check error");
+    assert!(
+        diagnostic
+            .args
+            .iter()
+            .any(|arg| arg.name == "extent" && arg.value == "unknown"),
+        "the check error must name the unproven extent: {diagnostic:?}"
     );
-    assert!(dump.contains("%0 = extent _1 axis 1"), "missing output axis-1 extent: {dump}");
-    assert!(dump.contains("%1 = _2 * %0"), "missing row stride multiply: {dump}");
-    assert!(dump.contains("%2 = %1 + _3"), "missing column add: {dump}");
-    assert!(dump.contains("%3 = extent _0 axis 1"), "missing input axis-1 extent: {dump}");
-    assert!(!dump.contains("axis 0"), "the leading axis extent is never read: {dump}");
-    assert!(!dump.contains("run-time extents"), "{dump}");
 }
 
 #[test]
@@ -113,17 +134,20 @@ locale = "en"
 +++
 @ kernel
 @ public
-fn pick(tf32[2, _, 5] input, mut tf32[2, _, 5] output, u32 z, u32 y, u32 x) → void {
-    output[[z, y, x]] ← input[[z, y, x]]
+fn pick(tf32[2, _, 5] input, mut tf32[2, _, 5] output) → void {
+    for from input at [z, y, x] thread lane let value {
+        output[[z, y, x]] ← value
+    }
 }
 "#,
     );
-    assert!(dump.contains("extent _1 axis 1"), "missing runtime axis-1 extent: {dump}");
     assert!(
-        !dump.contains("axis 2") && !dump.contains("axis 0"),
-        "literal axes must not read an extent: {dump}"
+        dump.contains("extent _1 axis 1"),
+        "missing output runtime axis-1 extent: {dump}"
     );
-    assert!(dump.contains("* const int 5"), "literal axis-2 stride: {dump}");
+    assert!(dump.contains("extent _0 axis 1"), "missing input runtime axis-1 extent: {dump}");
+    assert!(dump.contains("%13 = %12 * const int 5"), "literal axis-2 stride: {dump}");
+    assert!(dump.contains("_1[%14] = _6"), "mixed-shape store uses one linear index: {dump}");
 }
 
 /// Size-type rule 11: a `_` extent is a wildcard bound at run time, so a call
