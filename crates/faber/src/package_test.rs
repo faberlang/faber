@@ -542,6 +542,10 @@ impl Host for ExitRecordingHost {
         self.buffer.read_line()
     }
 
+    fn read_all(&mut self) -> Result<Option<String>, RunnerError> {
+        self.buffer.read_all()
+    }
+
     fn abort(&mut self, reason: &str) -> ! {
         self.buffer.abort(reason)
     }
