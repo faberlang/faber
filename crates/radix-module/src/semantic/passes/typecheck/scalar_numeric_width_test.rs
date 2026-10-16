@@ -516,9 +516,12 @@ fn go_wasm_and_llvm_accept_every_modular_width() {
 #[cfg(all(feature = "mir-metal", feature = "mir-wgsl"))]
 #[test]
 fn metal_and_wgsl_reject_unimplemented_modular_widths_with_stable_issue() {
-    // Only the 32-bit modular word is implemented on the device leaves; the
-    // other widths fail closed through the per-target requirement gate.
-    const WIDTHS: [&str; 3] = ["u8", "u16", "u64"];
+    // After the kernel-profile widening (need, 2026-10-16), the
+    // sub-32-bit modular words (modulus<u8>/modulus<u16>, Wrapping policy)
+    // are gate-admitted on the device leaves and fail later at the emitter
+    // carrier seam. u64 stays refused on every path through the named check
+    // diagnostic `nucleum_wide_integer` (need-2).
+    const WIDTHS: [&str; 1] = ["u64"];
     for width in WIDTHS {
         let source = format!(
             "@ nucleum\n@ publica\nfunctio wordAdd(modulus<{width}> value) → modulus<{width}> {{\n    redde value + 1\n}}\n"
@@ -530,7 +533,7 @@ fn metal_and_wgsl_reject_unimplemented_modular_widths_with_stable_issue() {
                 result.diagnostics.iter().any(|diagnostic| diagnostic
                     .args
                     .iter()
-                    .any(|arg| arg.name == "issue" && arg.value == "kernel_target_requirements_not_met")),
+                    .any(|arg| arg.name == "issue" && arg.value == "nucleum_wide_integer")),
                 "{target:?} modulus<{width}> diagnostics: {:?}",
                 result.diagnostics
             );
