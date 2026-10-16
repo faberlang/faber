@@ -12,7 +12,7 @@ const KERNELS: &str = r#"+++
 locale = "en"
 +++
 @ public
-fn width<size D>(tensor<f32, [D]> wx) → int {
+fn width<size D>(tensor<f32, [D]> wx) → i32 {
     return 7
 }
 
@@ -20,7 +20,7 @@ fn width<size D>(tensor<f32, [D]> wx) → int {
 @ public
 fn gather<size V, size D>(tensor<f32, [D]> gdom, tensor<f32, [V, D]> gtable, tensor<i32, [1]> gids, mut tensor<f32, [D]> gout) → void {
     for from gdom at [j] thread lane let e {
-        gout[[j]] ← gtable[[gids[0] ↦ int, j]]
+        gout[[j]] ← gtable[[gids[0], j]]
     }
 }
 "#;
@@ -31,7 +31,7 @@ locale = "en"
 import from "reachgen:kernels" ks
 
 @ public
-fn probe<size D>(tensor<f32, [D]> hx) → int {
+fn probe<size D>(tensor<f32, [D]> hx) → i32 {
     return ks.width(hx)
 }
 
