@@ -84,7 +84,9 @@ pub mod services {
         target_name, verify_source,
     };
     #[cfg(feature = "mir-core")]
-    pub use radix_module::services::{mir_output_for_source, output_reflection_json};
+    pub use radix_module::services::{
+        mir_output_for_source, mir_output_for_source_with_config, output_reflection_json,
+    };
 }
 
 pub use radix_module::abi;
