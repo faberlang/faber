@@ -292,6 +292,7 @@ impl Emitter<'_> {
     /// A method on a list, resolved through the receiver intrinsic catalog.
     pub(crate) fn list_method(
         &mut self,
+        result_ty: Option<radix_types::TypeId>,
         receiver: &HirExpression,
         method: Symbol,
         args: &[HirCallArg],
@@ -318,6 +319,14 @@ impl Emitter<'_> {
             return Err(unsupported("named, spread, or marked argument"));
         }
         match entry.mir_kind {
+            IntrinsicMirKind::HigherOrderAll
+            | IntrinsicMirKind::HigherOrderAny
+            | IntrinsicMirKind::HigherOrderFiltrata
+            | IntrinsicMirKind::HigherOrderMap
+            | IntrinsicMirKind::HigherOrderReduce
+            | IntrinsicMirKind::HigherOrderCumulata => {
+                self.list_higher_order(list, elem, entry.mir_kind, result_ty, args)
+            }
             IntrinsicMirKind::Collection(MirCollectionOp::Length) => {
                 let text = format!("({})->len", list.text);
                 // A pure length read is a 64-bit fast-path leaf (C4).
@@ -362,6 +371,154 @@ impl Emitter<'_> {
             }
             _ => Err(unsupported("list method outside the subset")),
         }
+    }
+
+    /// A higher-order list method — `filter`, `map`, `reduce`, `cumulate`,
+    /// `all`, `any` — over a non-capturing predicate or reducer. The body is
+    /// one GNU statement expression holding a `for` over the list's items;
+    /// each item is passed to the function pointer (with the hidden arena
+    /// when the program allocates). `reduce`/`cumulate` carry the accumulator
+    /// through the loop; `all`/`any` short-circuit.
+    #[expect(clippy::too_many_lines)]
+    fn list_higher_order(
+        &mut self,
+        list: Operand,
+        elem: Elem,
+        op: IntrinsicMirKind,
+        result_ty: Option<radix_types::TypeId>,
+        args: &[HirCallArg],
+    ) -> Result<Operand, CodegenError> {
+        let list_text = list.text;
+        let suffix = elem.suffix();
+        let list_ptr = elem.list_c_pointer();
+        let source = elem.c_type();
+        let arena = if self.arena { "faber_a, " } else { "" };
+        if args.is_empty() || args.len() > 2 {
+            return Err(unsupported("higher-order list method with the wrong arity"));
+        }
+        for arg in args {
+            if arg.name.is_some() || arg.spread || arg.marker.is_some() {
+                return Err(unsupported("named, spread, or marked argument"));
+            }
+        }
+        let function = self.expr(&args[0].expr)?;
+        let Value::Func(id) = function.value else {
+            return Err(unsupported(
+                "higher-order argument that is not a function value",
+            ));
+        };
+        let params = match self.types.get(radix_types::TypeId(id)) {
+            radix_types::Type::Func(sig) => sig.params.len(),
+            _ => return Err(unsupported("higher-order argument without a signature")),
+        };
+        let call_result = result_ty.map(|ty| classify(self.types, ty)).transpose()?;
+        self.support.need_ints();
+        let (result_class, text) = match op {
+            IntrinsicMirKind::HigherOrderAll | IntrinsicMirKind::HigherOrderAny => {
+                if params != 1 {
+                    return Err(unsupported("predicate that does not take one argument"));
+                }
+                let (init, set, negate) = if op == IntrinsicMirKind::HigherOrderAll {
+                    ("true", "false", "!")
+                } else {
+                    ("false", "true", "")
+                };
+                let call = format!("{}({arena}faber_ho_e)", function.text);
+                let text = format!(
+                    "(__extension__ ({{ bool faber_ho_r = {init}; {list_ptr} faber_ho_src = {list_text}; \
+                     for (int64_t faber_ho_i = 0; faber_ho_i < (faber_ho_src)->len; faber_ho_i++) {{ \
+                     {source} faber_ho_e = (faber_ho_src)->items[faber_ho_i]; \
+                     if ({negate}{call}) {{ faber_ho_r = {set}; break; }} }} faber_ho_r; }}))"
+                );
+                (Ty::Bool, text)
+            }
+            IntrinsicMirKind::HigherOrderFiltrata => {
+                if params != 1 {
+                    return Err(unsupported("predicate that does not take one argument"));
+                }
+                let call = format!("{}({arena}faber_ho_e)", function.text);
+                self.support.need(Helper::List(elem, ListOp::New));
+                self.support.need(Helper::List(elem, ListOp::Push));
+                let text = format!(
+                    "(__extension__ ({{ {list_ptr} faber_ho_src = {list_text}; {list_ptr} faber_ho_out = faber_list_{suffix}_new(faber_a, 0); \
+                     for (int64_t faber_ho_i = 0; faber_ho_i < (faber_ho_src)->len; faber_ho_i++) {{ \
+                     {source} faber_ho_e = (faber_ho_src)->items[faber_ho_i]; \
+                     if ({call}) {{ faber_list_{suffix}_push(faber_a, faber_ho_out, faber_ho_e); }} }} faber_ho_out; }}))"
+                );
+                (Ty::List(elem), text)
+            }
+            IntrinsicMirKind::HigherOrderMap => {
+                if params != 1 {
+                    return Err(unsupported("mapper that does not take one argument"));
+                }
+                let Some(Ty::List(mapped)) = call_result else {
+                    return Err(unsupported("mapper result that is not a list"));
+                };
+                let mapped_suffix = mapped.suffix();
+                let mapped_ptr = mapped.list_c_pointer();
+                let mapped_source = mapped.c_type();
+                let call = format!(
+                    "{}({arena}(faber_ho_src)->items[faber_ho_i])",
+                    function.text
+                );
+                self.support.need(Helper::List(mapped, ListOp::New));
+                self.support.need(Helper::List(mapped, ListOp::Push));
+                let text = format!(
+                    "(__extension__ ({{ {list_ptr} faber_ho_src = {list_text}; {mapped_ptr} faber_ho_out = faber_list_{mapped_suffix}_new(faber_a, 0); \
+                     for (int64_t faber_ho_i = 0; faber_ho_i < (faber_ho_src)->len; faber_ho_i++) {{ \
+                     {mapped_source} faber_ho_e = {call}; \
+                     faber_list_{mapped_suffix}_push(faber_a, faber_ho_out, faber_ho_e); }} faber_ho_out; }}))"
+                );
+                (Ty::List(mapped), text)
+            }
+            IntrinsicMirKind::HigherOrderReduce | IntrinsicMirKind::HigherOrderCumulata => {
+                if params != 2 || args.len() != 2 {
+                    return Err(unsupported("reducer that does not take two arguments"));
+                }
+                let cumulate = op == IntrinsicMirKind::HigherOrderCumulata;
+                // `reduce` yields the accumulator itself; `cumulate` yields a
+                // new list of the running accumulator, so its result type is
+                // `list<A>` and its accumulator element class is `A`.
+                let (a_class, result_class) = match call_result {
+                    Some(Ty::List(element)) if cumulate => (element.ty(), Ty::List(element)),
+                    Some(class) if !cumulate => (class, class),
+                    _ => return Err(unsupported("reduction result without a class")),
+                };
+                let a_source = self.c_type(a_class)?;
+                let initial = self.expr(&args[1].expr)?;
+                let accum = self.settle(initial, a_class)?;
+                let call = format!(
+                    "{}({arena}faber_ho_acc, (faber_ho_src)->items[faber_ho_i])",
+                    function.text
+                );
+                let text = if cumulate {
+                    let Ty::List(element) = result_class else {
+                        return Err(unsupported("cumulate result that is not a list"));
+                    };
+                    let element_suffix = element.suffix();
+                    let element_ptr = element.list_c_pointer();
+                    self.support.need(Helper::List(element, ListOp::New));
+                    self.support.need(Helper::List(element, ListOp::Push));
+                    format!(
+                        "(__extension__ ({{ {list_ptr} faber_ho_src = {list_text}; {a_source} faber_ho_acc = {}; {element_ptr} faber_ho_out = faber_list_{element_suffix}_new(faber_a, 0); \
+                         for (int64_t faber_ho_i = 0; faber_ho_i < (faber_ho_src)->len; faber_ho_i++) {{ \
+                         faber_ho_acc = {call}; faber_list_{element_suffix}_push(faber_a, faber_ho_out, faber_ho_acc); }} faber_ho_out; }}))",
+                        accum.text
+                    )
+                } else {
+                    format!(
+                        "(__extension__ ({{ {list_ptr} faber_ho_src = {list_text}; {a_source} faber_ho_acc = {}; \
+                         for (int64_t faber_ho_i = 0; faber_ho_i < (faber_ho_src)->len; faber_ho_i++) {{ \
+                         faber_ho_acc = {call}; }} faber_ho_acc; }}))",
+                        accum.text
+                    )
+                };
+                (result_class, text)
+            }
+            _ => return Err(unsupported("list method outside the subset")),
+        };
+        self.need_class(result_class);
+        Ok(Operand::new(text, Value::from(result_class)).with_effect(true))
     }
 
     /// `sort via asc|desc ex xs` (values) or `de m` (a map's keys): a new

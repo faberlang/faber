@@ -389,7 +389,7 @@ impl Emitter<'_> {
                 if let Some(Ty::Map(..)) = class {
                     return self.map_method(receiver, *method, args);
                 }
-                self.list_method(receiver, *method, args)
+                self.list_method(expr.ty, receiver, *method, args)
             }
             HirExpressionKind::Sort {
                 direction,
