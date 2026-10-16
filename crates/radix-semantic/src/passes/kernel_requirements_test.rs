@@ -68,6 +68,82 @@ fn wrapping_sum(wrapping<i32> left, wrapping<i32> right) → wrapping<i32> {
 }
 
 #[test]
+fn sub32_integer_widths_and_bf16_are_admitted() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn add8(u8 a, u8 b) → u8 {
+    return (a + b) / 2
+}
+
+@ kernel
+@ public
+fn mix(i16 a, u16 b) → i32 {
+    return a ↦ i32
+}
+
+@ kernel
+@ public
+fn bf(tensor<bf16, [4]> x) → bf16 {
+    return x[[0]]
+}
+
+@ kernel
+@ public
+fn wrap8(wrapping<u8> a, wrapping<u8> b) → wrapping<u8> {
+    return a + b
+}
+
+main {}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+
+    let exact_widths = [
+        ("add8", crate::NumericWidth::U8),
+        ("mix", crate::NumericWidth::I16),
+        ("mix", crate::NumericWidth::U16),
+        ("bf", crate::NumericWidth::BF16),
+    ];
+    for (name, width) in exact_widths {
+        for target in [Target::MirMetal, Target::MirWgsl] {
+            let report = target_row(&fixture, name, target);
+            assert!(
+                report.admitted,
+                "{target:?} refused {name}: {:?}",
+                report.failures
+            );
+            assert!(
+                report.widths.iter().any(|row| row.width == width),
+                "{target:?} {name} missing a widths row for {width:?}"
+            );
+        }
+    }
+
+    let metal = target_row(&fixture, "wrap8", Target::MirMetal);
+    assert!(
+        metal.admitted,
+        "MirMetal refused wrap8: {:?}",
+        metal.failures
+    );
+    assert!(metal.widths.iter().any(|row| {
+        row.policy == crate::passes::kernel_requirements::KernelNumericPolicy::Wrapping
+            && row.width == crate::NumericWidth::U8
+    }));
+
+    let amd = target_row(&fixture, "wrap8", Target::MirAmd);
+    assert!(!amd.admitted);
+    assert!(amd.failures.iter().any(|failure| matches!(
+        failure,
+        KernelRequirementFailure::UnsupportedIntegerWidth {
+            width: crate::NumericWidth::U8,
+            ..
+        }
+    )));
+}
+
+#[test]
 fn wrapping_word_intermediates_observed_before_store_must_fit_their_carrier() {
     let fixture = analyze_en(
         r"
