@@ -1484,6 +1484,30 @@ help = "sửa cấu trúc AST để hạ cấp"
 message = "dấu độ rộng không thể nhận tham số"
 help = "sửa cấu trúc AST để hạ cấp"
 
+[diagnostics.SEM008.issues.nucleum_d64]
+message = "d64 không được hỗ trợ trong kernel nucleum"
+help = "dùng một kiểu giá trị kernel được hỗ trợ"
+
+[diagnostics.SEM008.issues.nucleum_extent_unproven]
+message = "phạm vi số nguyên của kernel {extent} chưa được chứng minh là vừa với phạm vi di động"
+help = "ràng buộc phạm vi vào các giá trị trong phạm vi số nguyên di động"
+
+[diagnostics.SEM008.issues.nucleum_f64]
+message = "f64 không được hỗ trợ trong kernel nucleum"
+help = "dùng f32 cho các giá trị kernel dấu phẩy động"
+
+[diagnostics.SEM008.issues.nucleum_trapping_store]
+message = "việc ghi với độ rộng {width} có thể gây lỗi trong kernel nucleum"
+help = "chứng minh việc ghi nằm trong phạm vi hoặc dùng cell bao hoặc bão hòa"
+
+[diagnostics.SEM008.issues.nucleum_wide_integer]
+message = "độ rộng số nguyên {width} vượt quá độ rộng kernel nucleum được hỗ trợ"
+help = "dùng độ rộng số nguyên không quá 32 bit"
+
+[diagnostics.SEM008.issues.nucleum_wide_intermediate]
+message = "phạm vi trung gian của kernel {extent} vượt quá phạm vi số nguyên di động"
+help = "giữ các giá trị trung gian trong phạm vi số nguyên di động"
+
 [diagnostics.SEM009]
 message = "lỗi xác thực CLI"
 help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
@@ -2071,6 +2095,14 @@ help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầ
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
 message = "postfix gradient selection (`call(...) ∇ [places]`) chưa được lowering cho đến khi bề mặt autograd tensor-glyphs 2B ra mắt; không có quy tắc operand, selector hay result nào hoạt động trong Phase 2A"
 help = "gradient selection (`∇`) chỉ parse-only trong Phase 2A; các quy tắc eligibility/selector sẽ ra mắt cùng tensor-glyphs 2B"
+
+[diagnostics.SEM010.issues.implet_method_signature_mismatch]
+message = "phương thức {method} của kiểu {genus} không khớp với {implet} của {contract}: mong đợi {expected}, tìm thấy {found}"
+help = "căn chỉnh chữ ký của phương thức với chữ ký được khai báo trong hợp đồng"
+
+[diagnostics.SEM010.issues.implet_missing_method]
+message = "kiểu {genus} không cung cấp phương thức {method} mà {implet} của {contract} yêu cầu"
+help = "thêm phương thức {method} với chữ ký mà {contract} khai báo, hoặc bỏ {implet}"
 
 [diagnostics.SEM011]
 message = "kiểu toán hạng không hợp lệ"
