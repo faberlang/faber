@@ -56,7 +56,7 @@ functio k(in {GRID} out, de {GRID} src) → vacuum {{
 
 const STORE: &str = r"
 @ nucleum
-functio store(varia tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
+functio store(varia tensor<f32, [4]> target, i32 at, f32 v) → vacuum {
     target[at] ← v
 }
 ";
@@ -81,7 +81,7 @@ functio twice(f32 x) → f32 { redde x * 2.0 }
 fn helper_reading_a_neighbour_of_the_written_tensor_is_rejected() {
     let peek = r"
 @ nucleum
-functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
+functio peek(de tensor<f32, [4]> t, i32 at) → f32 { redde t[at + 1] }
 ";
     rejected(
         &kernel(peek, "out[i] ← peek(out, i)"),
@@ -93,7 +93,7 @@ functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
 fn helper_reading_a_neighbour_of_an_unwritten_tensor_is_accepted() {
     let peek = r"
 @ nucleum
-functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
+functio peek(de tensor<f32, [4]> t, i32 at) → f32 { redde t[at + 1] }
 ";
     accepted(&kernel(peek, "out[i] ← peek(src, i)"));
 }
@@ -102,7 +102,7 @@ functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
 fn helper_reading_the_written_tensor_at_the_own_coordinate_is_accepted() {
     let read = r"
 @ nucleum
-functio read(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at] }
+functio read(de tensor<f32, [4]> t, i32 at) → f32 { redde t[at] }
 ";
     accepted(&kernel(read, "out[i] ← read(out, i) + value"));
 }
@@ -120,7 +120,7 @@ functio poke(varia tensor<f32, [4]> target, f32 v) → vacuum { target[0] ← v 
     // A coordinate the analysis cannot map is not the own coordinate.
     let shifted = r"
 @ nucleum
-functio poke(varia tensor<f32, [4]> target, numerus at, f32 v) → vacuum { target[at + 1] ← v }
+functio poke(varia tensor<f32, [4]> target, i32 at, f32 v) → vacuum { target[at + 1] ← v }
 ";
     rejected(
         &kernel(shifted, "poke(varia out, i, value)"),
@@ -140,7 +140,7 @@ fn helper_argument_that_is_not_the_loop_coordinate_is_not_an_own_write() {
 fn two_mut_params_given_one_tensor_are_a_borrow_error_not_an_independence_one() {
     let both = r"
 @ nucleum
-functio both(varia tensor<f32, [4]> left, varia tensor<f32, [4]> right, numerus at) → vacuum {
+functio both(varia tensor<f32, [4]> left, varia tensor<f32, [4]> right, i32 at) → vacuum {
     left[at] ← 1.0
     right[at] ← 2.0
 }
@@ -163,7 +163,7 @@ functio both(varia tensor<f32, [4]> left, varia tensor<f32, [4]> right, numerus 
 fn helper_reading_a_neighbour_through_an_alias_argument_is_rejected() {
     let peek = r"
 @ nucleum
-functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
+functio peek(de tensor<f32, [4]> t, i32 at) → f32 { redde t[at + 1] }
 ";
     let source = kernel(peek, "out[i] ← peek(alias, i)").replace(
         "    itera ex src",
@@ -176,7 +176,7 @@ functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
 fn helper_local_alias_of_a_parameter_keeps_the_parameter_storage() {
     let aliased = r"
 @ nucleum
-functio peek(de tensor<f32, [4]> t, numerus at) → f32 {
+functio peek(de tensor<f32, [4]> t, i32 at) → f32 {
     sit tensor<f32, [4]> view ← t
     redde view[at + 1]
 }
@@ -196,7 +196,7 @@ fn mut_helper_param_and_unmarked_reader_param_follow_the_caller_roots() {
     // independent; the helper's write still meets the neighbour-read rule.
     let copy = r"
 @ nucleum
-functio copy(varia tensor<f32, [4]> to, tensor<f32, [4]> from, numerus at) → vacuum {
+functio copy(varia tensor<f32, [4]> to, tensor<f32, [4]> from, i32 at) → vacuum {
     to[at] ← from[at + 1]
 }
 ";
@@ -206,7 +206,7 @@ functio copy(varia tensor<f32, [4]> to, tensor<f32, [4]> from, numerus at) → v
     // borrow rule owns; the helper reading its own `mut` parameter does not.
     let self_read = r"
 @ nucleum
-functio shift(varia tensor<f32, [4]> to, numerus at) → vacuum {
+functio shift(varia tensor<f32, [4]> to, i32 at) → vacuum {
     to[at] ← to[at + 1]
 }
 ";
@@ -222,7 +222,7 @@ fn unmarked_helper_param_cannot_be_written() {
     // by construction under reading A: it is rejected at the helper itself.
     let copy = r"
 @ nucleum
-functio copy(tensor<f32, [4]> to, tensor<f32, [4]> from, numerus at) → vacuum {
+functio copy(tensor<f32, [4]> to, tensor<f32, [4]> from, i32 at) → vacuum {
     to[at] ← from[at + 1]
 }
 ";
@@ -236,7 +236,7 @@ functio copy(tensor<f32, [4]> to, tensor<f32, [4]> from, numerus at) → vacuum 
 fn a_write_and_a_neighbour_read_in_two_helper_calls_are_rejected() {
     let peek = r"
 @ nucleum
-functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
+functio peek(de tensor<f32, [4]> t, i32 at) → f32 { redde t[at + 1] }
 ";
     let both = format!("{STORE}{peek}");
     rejected(
@@ -257,7 +257,7 @@ fn nested_helper_calls_are_accepted() {
     let nested = format!(
         "{STORE}
 @ nucleum
-functio outer(varia tensor<f32, [4]> target, numerus at, f32 v) → vacuum {{
+functio outer(varia tensor<f32, [4]> target, i32 at, f32 v) → vacuum {{
     store(varia target, at, v + 1.0)
 }}
 "
@@ -441,7 +441,7 @@ fn reduction_term_may_call_a_helper_that_reads_a_tensor() {
     assert_accepts_la(
         r"
 @ nucleum
-functio at(de tensor<f32, [4]> t, numerus j) → f32 { redde t[j] }
+functio at(de tensor<f32, [4]> t, i32 j) → f32 { redde t[j] }
 @ nucleum
 functio k(tensor<f32, [4]> xs, tensor<f32, [4]> ys) → f32 {
     redde reducta via summa ex xs apud [i] sit s { redde s + at(ys, i + 1) }
@@ -568,7 +568,7 @@ fn host_function(statements: &str) -> String {
 functio log(f32 x) → vacuum {{ }}
 functio log_grid(de {GRID} t) → vacuum {{ }}
 genus Counter {{
-    varia numerus count
+    varia i32 count
     functio bump() → vacuum {{ ego.count ← ego.count + 1 }}
 }}
 functio kernel(in {GRID} out, de {GRID} src) → vacuum {{
@@ -754,7 +754,7 @@ fn failable_helper_without_a_failing_caller_stays_a_named_error() {
 fn failable_helper_is_still_held_to_the_independence_rules() {
     let peek = r"
 @ nucleum
-functio peek(de tensor<f32, [4]> t, numerus at) → f32 ⇥ textus {
+functio peek(de tensor<f32, [4]> t, i32 at) → f32 ⇥ textus {
     si at ≺ 0 {
         iace 'negative'
     }
