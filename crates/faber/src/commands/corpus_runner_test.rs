@@ -1,6 +1,6 @@
 use super::{
-    Case, ChildError, Expected, Outcome, TargetExpectation, run_bounded, run_case, runner_lower_args,
-    runner_run_args,
+    Case, ChildError, Expected, Outcome, TargetExpectation, run_bounded, run_case,
+    runner_lower_args, runner_run_args,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -102,7 +102,12 @@ fn run_bounded_returns_output_when_child_and_pipes_close_promptly() {
 /// reason, and `check --lower` exits with the given code. Every invocation is logged
 /// to `calls` so a test can assert which commands the target ran.
 #[cfg(unix)]
-fn fake_faber(dir: &std::path::Path, run_stderr: &str, lower_exit: i32, lower_stderr: &str) -> PathBuf {
+fn fake_faber(
+    dir: &std::path::Path,
+    run_stderr: &str,
+    lower_exit: i32,
+    lower_stderr: &str,
+) -> PathBuf {
     use std::os::unix::fs::PermissionsExt;
     let path = dir.join("faber");
     let script = format!(
