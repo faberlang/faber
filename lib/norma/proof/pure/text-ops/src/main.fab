@@ -1,0 +1,31 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for norma:text (corpus coverage E20).
+# Output must match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:text" text
+
+main {
+    print text.reverse("abc")
+    print text.join(["a", "b", "c"], "-")
+    print text.count("banana", "an")
+    print text.count("aaaa", "aa")
+    print text.count("abc", "")
+    print text.is_palindrome("racecar")
+    print text.is_palindrome("ab")
+    print text.chars("héé").length()
+    print text.keep_if("a1b2c3", string c ∴ c ≡ "a" or c ≡ "b")
+    print text.drop_if("a1b2c3", string c ∴ c ≡ "1")
+    print text.keep_between("hello world", "a", "m")
+    print text.drop_between("hello world", "a", "m")
+    print text.suffix("hello", 2)
+    print text.collapse_spaces("a   b    c")
+    print text.split_n("a,b,c,d", ",", 2).length()
+    print text.split_n("a,b,c,d", ",", 2)
+    print text.encode("hi").length()
+    print text.decode(|68 69|)
+    print text.try_to_ascii("abc") is none
+    print text.try_to_ascii("é") is none
+}
