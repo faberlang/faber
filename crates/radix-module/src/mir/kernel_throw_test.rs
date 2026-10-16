@@ -171,7 +171,7 @@ fn guard(f32 v) → f32 ⇥ string {
 @ kernel
 @ public
 fn scale(tensor<f32, [8]> src, mut tensor<f32, [8]> dst) → void ⇥ string {
-    for range 0‥8 let k {
+    for from src at [k] let _ {
         dst[k] ← guard(src[k])
     }
 }
