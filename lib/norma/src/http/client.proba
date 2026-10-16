@@ -41,4 +41,10 @@ describe "client_construct" {
         assert chunk.done ≡ false
         print "receive constructed"
     }
+
+    test "Request construct" {
+        let client.Request pending ← client.Request { id = 7 }
+        assert pending.id ≡ 7
+        print "request constructed"
+    }
 }

@@ -72,6 +72,13 @@ class Receive {
     }
 }
 
+# Pended client request from http:request_send. finish_pending reads the
+# response head after the server answered.
+@ public
+class Request {
+    mut int id = 0
+}
+
 # One incremental body chunk. `text` is the UTF-8 decode of this read
 # (empty when the bytes are not UTF-8). `done` is true only on the
 # terminal read; a later receive after done fails at the provider.
@@ -270,6 +277,24 @@ fn open_on(Client client, string method, string url, headers.Headers headers, st
     return open_stream(client.agent, method, url, headers, body)
 }
 
+# Split client exchange, the http twin of websocket connect_open/connect_finish:
+# open_pending writes the request and pends; finish_pending reads the response
+# head after the server answered. One thread can serve the listener between
+# the halves, the same interleave the sequential loopback proofs rely on.
+@ public
+fn open_pending(string method, string url, headers.Headers headers, string body) → Request ⇥ fault.IoFault {
+    require_url(url, "http:request_send")
+    let list<value> args ← [method ↦ value, url ↦ value, headers_carrier(headers) ↦ value, body ↦ value]
+    let int id ↤ call 'http:request_send' (args) ↦ int
+    return Request { id = id }
+}
+
+@ public
+fn finish_pending(Request request) → Receive ⇥ fault.IoFault {
+    let value raw ↤ call 'http:request_head' ([request.id ↦ value]) ↦ value
+    return receive_of(raw)
+}
+
 # A clean end of body is the leaf's `done` flag (an empty terminal chunk),
 # not a failure, so the return stays `Chunk`; `⇥ IoFault` carries only a
 # real crossing failure.
@@ -338,6 +363,10 @@ fn generic(int agent, string method, string url, headers.Headers headers, string
 fn open_stream(int agent, string method, string url, headers.Headers headers, string body) → Receive ⇥ fault.IoFault {
     require_url(url, "http:request_open")
     let value raw ← dispatch_generic("http:request_open", agent, method, url, headers, body)
+    return receive_of(raw)
+}
+
+fn receive_of(value raw) → Receive {
     # Why: a carrier that is not {reader, status, headers} is a broken host
     # contract, not caller input, so it panics (like require_url) instead of
     # defaulting a reader or status.
@@ -350,7 +379,7 @@ fn open_stream(int agent, string method, string url, headers.Headers headers, st
         }
     }
     catch err {
-        panic "norma:http/client.open: malformed http:request_open response: §"(err)
+        panic "norma:http/client: malformed stream response: §"(err)
     }
 }
 
