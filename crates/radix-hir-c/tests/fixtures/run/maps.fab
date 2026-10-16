@@ -1,0 +1,53 @@
++++
+locale = "en"
++++
+# Maps (`tabula<K,V>`) are arena pointers over parallel key/value lists. Keys
+# are unique, a bracket read traps `tabula missing key`, `get` is the checked
+# optional, and key order is unspecified, so projections are sorted.
+main {
+    mut map<string, int> m ← empty
+    m["a"] ← 1
+    m["b"] ← 2
+    m.put("c", 3)
+    print m.length(), m["a"], m["b"], m["c"]
+    print m.has("a"), m.has("z")
+    let int ∪ none a ← m.get("a")
+    let int ∪ none z ← m.get("z")
+    print a, z
+    print m.delete("b"), m.delete("z"), m.length()
+
+    let map<string, int> lit ← { "x": 10, "y": 20 }
+    print lit["x"], lit["y"], lit.length()
+    if "x" ∈ lit {
+        print "in"
+    }
+    if "z" ∉ lit {
+        print "out"
+    }
+    mut list<string> ks ← lit ↦ list<string>
+    mut list<int> vs ← lit ↦ list<int>
+    ks.sort()
+    vs.sort()
+    print ks, vs
+
+    mut map<int, string> names ← empty
+    names[9] ← "y"
+    names[5] ← "x"
+    mut list<int> nk ← names ↦ list<int>
+    mut list<string> nv ← names ↦ list<string>
+    nk.sort()
+    nv.sort()
+    print nk, nv
+
+    # iteration: `ex` binds the value, `at [k]` binds the key beside it. The
+    # aggregate is order-independent, and the single-key map is a fixed walk.
+    mut int acc ← 0
+    for from lit let v {
+        acc ← acc + v
+    }
+    print acc
+    let map<string, int> single ← { "only": 7 }
+    for from single at [key] let value {
+        print key, value
+    }
+}

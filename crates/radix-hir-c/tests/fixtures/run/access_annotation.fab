@@ -1,0 +1,28 @@
++++
+locale = "en"
++++
+# `@ private` / `@ internal` (la `privata` / `interna`) are access-control
+# annotations with no runtime effect: the runner enforces nothing at run time,
+# so the target ignores them. Any other annotation can change meaning and is
+# rejected.
+
+class Counter {
+    @ private
+    mut int total = 0
+
+    @ internal
+    fn add(int value) → void {
+        self.total ← self.total + value
+    }
+
+    fn value() → int {
+        return self.total
+    }
+}
+
+main {
+    mut Counter c ← Counter {}
+    c.add(3)
+    c.add(4)
+    print c.value()
+}

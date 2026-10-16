@@ -1,0 +1,49 @@
++++
+locale = "en"
++++
+# `f32` (binary32): a literal is the front end's folded binary32 value,
+# arithmetic rounds per operation, display is the shortest binary32
+# round-trip (with `.0` on an integral value), and conversions go through the
+# declared width.
+main {
+    let f32 a ← 0.1
+    let f32 b ← 0.2
+    print a, b
+    print a + b
+    print a * b
+    print a - b
+    print a ÷ b
+    print a % b
+    print -a
+    print a ≺ b, a ≻ b, a ≡ b, a ≢ b
+    let f32 one ← 1.0
+    print one
+    print one ÷ 3.0
+    print 3.0 ÷ one
+    let f32 big ← 16777216.0
+    print big, big + 1.0
+    let f32 tiny ← 0.0000001
+    print tiny
+    print a ↦ float
+    print a ↦ string
+    print 1 ↦ f32
+    print "2.5" ↦ f32
+    print 2.5 ↦ f32
+    print a ↦ int via Floor
+    print a ↦ bool
+    print true ↦ f32
+    print a.abs()
+    print a.sign()
+    print a.minimum(b), a.maximum(b)
+    print 2.0.power(10.0)
+    let list<f32> xs ← [a, b, one]
+    print xs
+    print xs[0], xs.length()
+    print xs + xs
+    # An ascription stores into the declared width, and a binary32 declaration
+    # widens into a binary64 one.
+    let f32 asc ← 1.5 ∷ f32
+    print asc
+    let float widened ← asc
+    print widened
+}

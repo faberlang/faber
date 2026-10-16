@@ -1,0 +1,13 @@
++++
+locale = "en"
++++
+# `x ∈ a‥b` is `a <= x < b`; `x ∈ a…b` includes the end; `x ∈ a before b` is
+# the explicit exclusive form; `∉` negates the whole test.
+
+main {
+    const int age = 25
+    print age ∈ 0‥100
+    print age ∈ 18…65
+    print age ∈ 0 before 18
+    print age ∉ 0‥25
+}

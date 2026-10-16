@@ -102,3 +102,45 @@ fn a_deferred_binding_is_declared_unwritten() {
     assert!(code.contains("int64_t l_pending;"), "{code}");
     assert!(code.contains("l_pending = INT64_C(7);"), "{code}");
 }
+
+#[test]
+fn a_thread_lane_binder_is_declared_metadata() {
+    // `thread f` names a loop lane for later parallel lowering and is ignored
+    // on the way to MIR, so the emitted loop is the plain single-source loop.
+    let code = emitted(
+        "main {\n    let list<int> xs ← [1, 2]\n    for from xs at [i] thread lane let v {\n        print i, v\n    }\n}",
+    );
+    assert!(code.contains("faber_i0 < faber_t0->len"), "{code}");
+    assert!(!code.contains("lane"), "{code}");
+}
+
+#[test]
+fn a_guard_section_is_early_exit_clauses() {
+    // `guard { if <cond> { return x } }`: each clause is an `if` whose body
+    // may return from the function; the ordinary body follows.
+    let code = emitted(
+        "fn clamp(int value, int low) → int {\n    guard {\n        if value ≺ low {\n            return low\n        }\n    }\n    return value\n}\nmain {\n    print clamp(5, 0)\n}",
+    );
+    assert!(code.contains("if (p_value < p_low) {"), "{code}");
+    assert!(code.contains("return p_low;"), "{code}");
+    assert!(code.contains("return p_value;"), "{code}");
+}
+
+#[test]
+fn range_membership_is_the_two_bounds() {
+    let code = emitted(
+        "main {\n    const int age = 25\n    print age ∈ 0‥100\n    print age ∈ 18…65\n    print age ∉ 0‥25\n}",
+    );
+    assert!(
+        code.contains("(INT64_C(0) <= l_age) && (l_age < INT64_C(100))"),
+        "{code}"
+    );
+    assert!(
+        code.contains("(INT64_C(18) <= l_age) && (l_age <= INT64_C(65))"),
+        "{code}"
+    );
+    assert!(
+        code.contains("(!((INT64_C(0) <= l_age) && (l_age < INT64_C(25))))"),
+        "{code}"
+    );
+}

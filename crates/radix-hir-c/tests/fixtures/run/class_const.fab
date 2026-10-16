@@ -1,0 +1,27 @@
++++
+locale = "en"
++++
+# A type-level constant (`const T X = e`) is read through the type name, not
+# from an instance, even when its initializer is a folded expression. The
+# constant is never an instance member, so a construction does not set it.
+class Tab {
+    const int LIMIT = 3
+    const int TWICE = 3 * 2
+    const int SQUARES = 1 * 1 + 2 * 2 + 3 * 3
+    const string TAG = "tab"
+    mut int w = 1
+}
+
+fn capped(int n) → int {
+    if n ≻ Tab.LIMIT {
+        return Tab.LIMIT
+    }
+    return n
+}
+
+main {
+    mut Tab t ← { w = 4 }
+    print Tab.LIMIT, Tab.TWICE, Tab.SQUARES, Tab.TAG
+    print capped(2), capped(10)
+    print t.w
+}

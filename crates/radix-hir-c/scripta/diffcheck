@@ -92,9 +92,10 @@ for fab in "${fixtures[@]}"; do
     fail=$((fail + 1))
     continue
   fi
-  "$work/$name" >"$work/$name.bin.out" 2>"$work/$name.bin.err"
+  # stdin is pinned to EOF: an interactive `read` fixture must not block.
+  "$work/$name" >"$work/$name.bin.out" 2>"$work/$name.bin.err" </dev/null
   bin_code=$?
-  "$faber" run "$fab" >"$work/$name.run.out" 2>/dev/null
+  "$faber" run "$fab" >"$work/$name.run.out" 2>/dev/null </dev/null
   run_code=$?
   # A trap legitimately writes `error: ...` to stderr; a sanitizer report
   # (UBSan `runtime error:`, ASan `ERROR: AddressSanitizer`) is undefined

@@ -1,0 +1,25 @@
++++
+locale = "en"
++++
+# A bare `optional` parameter is the optional of its declared type: a body
+# read narrows only where a guard proved the value present, and `coalesce`
+# still sees the none. A `ref` optional scalar parameter borrows the caller's
+# cell, so an omitted or value argument passes a block-scoped cell.
+
+fn pick(ref int x optional) → int {
+    if x is none {
+        return 0
+    }
+    return x
+}
+
+fn fallback(int x optional) → int {
+    return x coalesce 5
+}
+
+main {
+    print pick(7)
+    print pick()
+    print fallback()
+    print fallback(9)
+}

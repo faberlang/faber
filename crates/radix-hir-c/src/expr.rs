@@ -12,7 +12,7 @@ use crate::Emitter;
 use crate::error::unsupported;
 use crate::helpers::Helper;
 use crate::items::Omission;
-use crate::ty::{Elem, Inner, IntWidth, Ty, classify};
+use crate::ty::{Elem, Inner, IntWidth, Ty, classify, returns};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{
     DefId, HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral,
@@ -45,16 +45,26 @@ pub(crate) enum Value {
     Void,
     /// A pointer to an arena-allocated list.
     List(Elem),
+    /// A pointer to an arena-allocated set (the same list storage).
+    Set(Elem),
+    /// A pointer to an arena-allocated map (`faber_map_<k>_<v>`).
+    Map(Elem, Elem),
     /// A pointer to an arena-allocated genus.
     Genus(DefId),
     /// A binary64 value (`double`).
     Float,
+    /// A binary32 value (`float`), rounded per operation and displayed at the
+    /// binary32 width.
+    Float32,
     /// An exact decimal (`faber_dec`: an `i128` carrier at its own scale).
     Decimal,
     /// An optional: a pointer that may be `NULL`, or a presence-flag struct.
     Opt(Inner),
     /// A bare `none` value, always `(0)`, printed as the locale's none word.
     None,
+    /// A function value: a C function pointer, carrying the `Type::Func` id it
+    /// was classified from.
+    Func(u32),
 }
 
 impl From<Ty> for Value {
@@ -69,11 +79,15 @@ impl From<Ty> for Value {
             Ty::Text => Value::Text,
             Ty::Bool => Value::Truth,
             Ty::List(elem) => Value::List(elem),
+            Ty::Set(elem) => Value::Set(elem),
+            Ty::Map(k, v) => Value::Map(k, v),
             Ty::Genus(def_id) => Value::Genus(def_id),
             Ty::Float => Value::Float,
+            Ty::Float32 => Value::Float32,
             Ty::Decimal => Value::Decimal,
             Ty::Opt(inner) => Value::Opt(inner),
             Ty::None => Value::None,
+            Ty::Func(id) => Value::Func(id),
         }
     }
 }
@@ -172,12 +186,22 @@ impl Emitter<'_> {
     pub(crate) fn expr(&mut self, expr: &HirExpression) -> Result<Operand, CodegenError> {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => {
+                // A named function used as a value is its C function pointer.
+                if let Some(function) = self.functions.get(def_id) {
+                    let name = function.name.clone();
+                    let Some(ty) = expr.ty else {
+                        return Err(unsupported("function value without a resolved type"));
+                    };
+                    let Ty::Func(id) = classify(self.types, ty)? else {
+                        return Err(unsupported("function value of another class"));
+                    };
+                    return Ok(Operand::new(name, Value::Func(id)));
+                }
                 let operand = self.path(*def_id)?;
                 // Typecheck narrows the type of a read the guard proved
                 // present; the cell is still the optional.
                 if let (Value::Opt(inner), Some(ty)) = (operand.value, expr.ty)
-                    && classify(self.types, ty).is_ok_and(|class| class == inner.ty())
-                    && !self.sponte_params.contains(def_id)
+                    && crate::ty::read_class(self.types, ty) == Some(inner.ty())
                 {
                     return Ok(Self::narrow_read(&operand, inner));
                 }
@@ -198,11 +222,19 @@ impl Emitter<'_> {
                 }
             }
             HirExpressionKind::Literal(literal) => {
+                // `{ "k": v }` ascribed to a map is a JSON object: build the
+                // map, not a `valor`.
+                if let HirLiteral::JsonValor(value) = literal
+                    && let Some(Ty::Map(k, v)) =
+                        expr.ty.map(|ty| classify(self.types, ty)).transpose()?
+                {
+                    return self.map_json_literal(k, v, value);
+                }
                 // An integer literal typed as a float is that float (`1` in a
                 // `float` slot is `1.0`); typecheck admits no other crossing.
-                let as_float = expr.ty.is_some_and(|ty| {
-                    classify(self.types, ty).is_ok_and(|class| class == Ty::Float)
-                });
+                let float_class = expr.ty.and_then(|ty| classify(self.types, ty).ok());
+                let as_float = matches!(float_class, Some(Ty::Float | Ty::Float32));
+                let as_float32 = matches!(float_class, Some(Ty::Float32));
                 let as_decimal = expr.ty.is_some_and(|ty| {
                     classify(self.types, ty).is_ok_and(|class| class == Ty::Decimal)
                 });
@@ -212,10 +244,22 @@ impl Emitter<'_> {
                     HirLiteral::FloatText { text, .. } if as_decimal => {
                         self.decimal_text_literal(*text)
                     }
-                    HirLiteral::Int(value) if as_float =>
+                    // An `f32` literal is the front end's folded binary32
+                    // value; carry it as a `float` cell.
+                    HirLiteral::Float(value) | HirLiteral::FloatText { value, .. }
+                        if as_float32 =>
                     {
-                        #[expect(clippy::cast_precision_loss)]
-                        Ok(self.float_literal(*value as f64))
+                        #[expect(clippy::cast_possible_truncation)]
+                        Ok(self.float_literal32(*value as f32))
+                    }
+                    HirLiteral::Int(value) if as_float => {
+                        if as_float32 {
+                            #[expect(clippy::cast_precision_loss)]
+                            Ok(self.float_literal32(*value as f32))
+                        } else {
+                            #[expect(clippy::cast_precision_loss)]
+                            Ok(self.float_literal(*value as f64))
+                        }
                     }
                     _ => self.literal(literal),
                 }
@@ -237,7 +281,18 @@ impl Emitter<'_> {
                 recovery,
                 route: None,
                 implicit: None,
-            } => self.conversion(source, *target, params, recovery.as_deref()),
+            } => {
+                // A bounded `ascii<_>` whose conversion target is still an
+                // inference hole carries its solved capacity on the whole
+                // expression's type.
+                let target =
+                    if self.is_bounded_ascii(*target) && self.ascii_capacity(*target).is_none() {
+                        expr.ty.unwrap_or(*target)
+                    } else {
+                        *target
+                    };
+                self.conversion(source, target, params, recovery.as_deref())
+            }
             HirExpressionKind::Conversio {
                 source,
                 target: HirConversioTarget::Type(_),
@@ -283,9 +338,21 @@ impl Emitter<'_> {
                 then_catch: None,
                 else_block: Some(else_block),
             } => self.conditional(expr, cond, then_block, else_block),
-            HirExpressionKind::Vacua => self.empty_list(expr),
+            HirExpressionKind::Vacua => {
+                match expr.ty.map(|ty| classify(self.types, ty)).transpose()? {
+                    Some(Ty::Set(elem)) => Ok(self.empty_set(elem)),
+                    Some(Ty::Map(k, v)) => Ok(self.empty_map(k, v)),
+                    _ => self.empty_list(expr),
+                }
+            }
             HirExpressionKind::Array(elements) => self.list_literal(expr, elements),
-            HirExpressionKind::Index(base, index) => self.list_read(base, index),
+            HirExpressionKind::ReadLine(line) => self.read_line(expr, *line),
+            HirExpressionKind::Index(base, index) => {
+                match crate::map::map_class(self.types, base.ty) {
+                    Some((k, v)) => self.map_read(base, index, k, v),
+                    None => self.list_read(base, index),
+                }
+            }
             // `copy x` on a value (a bind or a return), `own x` a transfer.
             HirExpressionKind::Marked { marker, expr } => match marker {
                 radix_hir::HirArgMarker::Copy => {
@@ -304,7 +371,7 @@ impl Emitter<'_> {
                     let receiver = self.expr(receiver)?;
                     return self.genus_method(receiver, *method, args);
                 }
-                if let (Some(Ty::Float), Some(receiver_ty)) = (class, receiver.ty) {
+                if let (Some(Ty::Float | Ty::Float32), Some(receiver_ty)) = (class, receiver.ty) {
                     let receiver = self.expr(receiver)?;
                     return self.float_method(receiver, receiver_ty, *method, args);
                 }
@@ -316,16 +383,26 @@ impl Emitter<'_> {
                     let receiver = self.expr(receiver)?;
                     return self.text_method(receiver, receiver_ty, *method, args);
                 }
-                self.list_method(receiver, *method, args)
+                if let Some(Ty::Set(_)) = class {
+                    return self.set_method(receiver, *method, args);
+                }
+                if let Some(Ty::Map(..)) = class {
+                    return self.map_method(receiver, *method, args);
+                }
+                self.list_method(expr.ty, receiver, *method, args)
             }
             HirExpressionKind::Sort {
                 direction,
-                source_mode: radix_hir::HirSortSource::Values,
+                source_mode,
                 source,
                 binding: None,
                 body: None,
                 ..
-            } => self.sort_values(*direction, source),
+            } => self.sort_values(
+                *direction,
+                source,
+                *source_mode == radix_hir::HirSortSource::Keys,
+            ),
             HirExpressionKind::Struct(def_id, fields) => {
                 let given = fields
                     .iter()
@@ -334,7 +411,7 @@ impl Emitter<'_> {
                 if self.variant(*def_id).is_some() {
                     return self.construct_variant(*def_id, &given);
                 }
-                self.construct(*def_id, &given)
+                self.construct(*def_id, &given, None)
             }
             HirExpressionKind::Verte {
                 target,
@@ -342,6 +419,7 @@ impl Emitter<'_> {
                 ..
             } => match classify(self.types, *target)? {
                 Ty::Genus(def_id) => self.construct_entries(def_id, entries),
+                Ty::Map(k, v) => self.map_entries(k, v, entries),
                 _ => Err(unsupported("object literal that is not a genus")),
             },
             // `value ∷ T`: the value, checked against the type it is given.
@@ -386,6 +464,9 @@ impl Emitter<'_> {
                     return Err(unsupported("generic or propagating call"));
                 }
                 self.call(callee, args)
+            }
+            HirExpressionKind::Clausura(params, ret, _err, body) => {
+                self.closure(expr, params, *ret, body)
             }
             other => Err(unsupported(construct_name(other))),
         }
@@ -446,10 +527,128 @@ impl Emitter<'_> {
         let HirExpressionKind::Path(def_id) = &callee.kind else {
             return Err(unsupported("call through a value"));
         };
+        // A call through a function-value local is an indirect call.
+        if let Some(local) = self.locals.get(def_id)
+            && let Ty::Func(id) = local.ty
+        {
+            let name = local.name.clone();
+            return self.call_function_value(&name, id, args);
+        }
         if self.variant(*def_id).is_some() {
             return self.construct_variant_call(*def_id, args);
         }
         self.invoke(*def_id, None, args)
+    }
+
+    /// A call through a function value: the local holds a C function pointer,
+    /// so the call is `name(faber_a, args…)`. Arguments are checked and
+    /// narrowed exactly as a direct call's.
+    fn call_function_value(
+        &mut self,
+        name: &str,
+        id: u32,
+        args: &[radix_hir::HirCallArg],
+    ) -> Result<Operand, CodegenError> {
+        let (params, ret_ty) = {
+            let radix_types::Type::Func(sig) = self.types.get(radix_types::TypeId(id)) else {
+                return Err(unsupported("function value without a signature"));
+            };
+            (sig.params.clone(), sig.ret)
+        };
+        if args.len() > params.len() {
+            return Err(unsupported("call with omitted or extra arguments"));
+        }
+        let mut operands = Vec::with_capacity(params.len() + 1);
+        for (arg, param) in args.iter().zip(&params) {
+            if arg.name.is_some() || arg.spread {
+                return Err(unsupported("named or spread argument"));
+            }
+            let class = classify(self.types, param.ty)?;
+            let shared = matches!(class, Ty::List(_) | Ty::Genus(_));
+            match arg.marker {
+                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut) if !shared => {
+                    return Err(unsupported(
+                        "access marker on an argument that is not a list or genus",
+                    ));
+                }
+                Some(radix_hir::HirArgMarker::Axis) => {
+                    return Err(unsupported(
+                        "access marker on an argument that is not a list or genus",
+                    ));
+                }
+                _ => {}
+            }
+            let mut operand = self.expr(&arg.expr)?;
+            if arg.marker == Some(radix_hir::HirArgMarker::Copy) {
+                operand = self.copy_value(operand)?;
+            }
+            operand = self.settle(operand, class)?;
+            if operand.value != Value::from(class) {
+                return Err(unsupported("value stored without a store check"));
+            }
+            operands.push(operand);
+        }
+        let prelude = self.sequence(&mut operands);
+        let mut slots = Vec::with_capacity(operands.len() + 1);
+        if self.arena {
+            slots.push("faber_a".to_owned());
+        }
+        slots.extend(operands.iter().map(|operand| operand.text.clone()));
+        let call = format!("{name}({})", slots.join(", "));
+        let ret = returns(self.types, ret_ty)?;
+        let value = ret.map_or(Value::Void, Value::from);
+        let text = wrap(&prelude, &call);
+        // A boolean result carries its own parentheses like every truth operand.
+        let text = if value == Value::Truth && prelude.is_empty() {
+            format!("({text})")
+        } else {
+            text
+        };
+        Ok(Operand::new(text, value).with_effect(true))
+    }
+
+    /// `read line` / `read`: one stdin line without its terminator, or all of
+    /// stdin to EOF. EOF is the runner's Nil, so the slot must be nullable;
+    /// the helper returns NULL (none) at EOF.
+    fn read_line(&mut self, expr: &HirExpression, line: bool) -> Result<Operand, CodegenError> {
+        let Some(ty) = expr.ty else {
+            return Err(unsupported("input read without a resolved type"));
+        };
+        if classify(self.types, ty)? != Ty::Opt(Inner::Text) {
+            return Err(unsupported(
+                "input read into a slot that is not string ∪ none",
+            ));
+        }
+        self.support.need(Helper::Arena);
+        let call = if line {
+            "faber_read_line"
+        } else {
+            "faber_read_all"
+        };
+        Ok(Operand::new(format!("{call}(faber_a)"), Value::Opt(Inner::Text)).with_effect(true))
+    }
+
+    /// The address a `ref`/`mut` scalar argument passes: the caller's own cell,
+    /// the pointer a borrowing parameter already holds, or a genus field. The
+    /// argument must be a place this subset can address.
+    fn caller_address(&mut self, expr: &HirExpression) -> Result<String, CodegenError> {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => {
+                let Some(local) = self.locals.get(def_id) else {
+                    return Err(unsupported("ref or mut argument that is not a local"));
+                };
+                if self.ref_params.contains(def_id) {
+                    return Ok(local.name.clone());
+                }
+                Ok(format!("(&{})", local.name))
+            }
+            HirExpressionKind::Field(base, name) => {
+                let base = self.expr(base)?;
+                let field = self.field_of(&base, *name)?;
+                Ok(format!("(&({}->{}))", base.text, field.c_name))
+            }
+            _ => Err(unsupported("ref or mut argument that is not a plain local")),
+        }
     }
 
     /// A call to a function or method the program defines. Arguments are
@@ -467,9 +666,10 @@ impl Emitter<'_> {
             }
             return Err(unsupported("call to a function outside the program"));
         };
-        let (name, params, omissions, ret) = (
+        let (name, params, pointees, omissions, ret) = (
             function.name.clone(),
             function.params.clone(),
+            function.pointee.clone(),
             function.omissions.clone(),
             function.ret,
         );
@@ -507,11 +707,16 @@ impl Emitter<'_> {
                 },
             };
             let shared = matches!(param, Ty::List(_) | Ty::Genus(_));
+            let pointer = pointees.get(index).copied().unwrap_or(false);
             match marker {
-                // `ref` / `mut` alias the caller's pointer: only a list or a
-                // genus has one. `copy` (deep) and `own` (transfer) apply to
-                // any value; a scalar copies by assignment either way.
-                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut) if !shared => {
+                // `ref` / `mut` alias the caller's pointer: a list or a genus
+                // always has one, and a scalar parameter (one this signature
+                // spelled as a pointer) borrows the caller's cell. `copy`
+                // (deep) and `own` (transfer) apply to any value; a scalar
+                // copies by assignment either way.
+                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
+                    if !shared && !pointer =>
+                {
                     return Err(unsupported(
                         "access marker on an argument that is not a list or genus",
                     ));
@@ -524,9 +729,44 @@ impl Emitter<'_> {
                 _ => {}
             }
             let Some(expr) = expr else {
+                if pointer {
+                    // An omitted `optional` slot: the callee reads a none cell.
+                    // A compound literal's address lives for the call.
+                    let none = self.none_of(*param)?;
+                    operands.push(Operand::new(format!("(&{})", none.text), Value::Void));
+                    continue;
+                }
                 operands.push(self.none_of(*param)?);
                 continue;
             };
+            // A `ref`/`mut` scalar parameter takes the address of the caller's
+            // cell (or the pointer a borrowing parameter already holds).
+            if pointer {
+                if matches!(
+                    marker,
+                    Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
+                ) {
+                    operands.push(Operand::new(self.caller_address(expr)?, Value::Void));
+                    continue;
+                }
+                // A `ref` parameter called with a value has no caller cell:
+                // the runner has nothing to write back, so a compound literal
+                // at block scope — which lives for the whole block — is the
+                // exact view.
+                let class = *param;
+                let value = self.expr(expr)?;
+                let operand = self.settle(value, class)?;
+                if operand.value != Value::from(class) {
+                    return Err(unsupported("value stored without a store check"));
+                }
+                let c_type = self.c_type(class)?;
+                let address = match class {
+                    Ty::Opt(_) => format!("(&{})", operand.text),
+                    _ => format!("(&(({c_type}){{ {} }}))", operand.text),
+                };
+                operands.push(Operand::new(address, Value::Void));
+                continue;
+            }
             let mut operand = self.expr(expr)?;
             // `copy x` at the call site deep-duplicates before the call (R7).
             if marker == Some(radix_hir::HirArgMarker::Copy) {
@@ -622,8 +862,10 @@ impl Emitter<'_> {
                 self.support.need_bool();
                 "bool ".to_owned()
             }
-            Value::List(elem) => elem.list_c_pointer().to_owned(),
+            Value::List(elem) | Value::Set(elem) => elem.list_c_pointer().to_owned(),
+            Value::Map(k, v) => Self::map_c_type(k, v),
             Value::Float => "double ".to_owned(),
+            Value::Float32 => "float ".to_owned(),
             Value::Decimal => {
                 self.support.need(Helper::Decimal);
                 "faber_dec ".to_owned()
@@ -637,7 +879,9 @@ impl Emitter<'_> {
                 Ok(c_type) => c_type,
                 Err(_) => return String::new(),
             },
-            Value::Void => return String::new(),
+            // A bare `void` has no value to bind, and a function value never
+            // carries an effect, so neither is given a temporary.
+            Value::Void | Value::Func(_) => return String::new(),
         };
         let name = format!("faber_t{}", self.temps);
         self.temps += 1;
@@ -791,6 +1035,37 @@ impl Emitter<'_> {
         Ok(Operand::new(wrap(&prelude, &call), Value::Decimal).with_effect(effect))
     }
 
+    /// `x ∈ xs` / `x ∉ xs`: the list family's `contains`, with the member on
+    /// the value side. `left_is_list` says which operand is the collection.
+    fn list_membership(
+        &mut self,
+        negated: bool,
+        list_elem: Elem,
+        left_is_list: bool,
+        l: Operand,
+        r: Operand,
+    ) -> Result<Operand, CodegenError> {
+        let effect = l.effect || r.effect;
+        let mut operands = [l, r];
+        let prelude = self.sequence(&mut operands);
+        let [l, r] = operands;
+        let (list, member) = if left_is_list { (l, r) } else { (r, l) };
+        if member.value != Value::from(list_elem.ty()) {
+            return Err(unsupported(
+                "membership of a value of another element class",
+            ));
+        }
+        self.need_class(Ty::List(list_elem));
+        let call = format!(
+            "(faber_list_{}_contains({}, {}))",
+            list_elem.suffix(),
+            list.text,
+            member.text
+        );
+        let text = if negated { format!("(!{call})") } else { call };
+        Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect))
+    }
+
     /// The element kind of a list-typed expression, if it is one.
     fn list_element(&self, ty: Option<radix_types::TypeId>) -> Option<Elem> {
         match classify(self.types, ty?).ok()? {
@@ -813,12 +1088,24 @@ impl Emitter<'_> {
     ) -> Result<Operand, CodegenError> {
         let left_elem = self.list_element(left.ty);
         let right_elem = self.list_element(right.ty);
+        // `x ∈ xs` / `x ∉ xs`: membership is the list family's `contains`, with
+        // the member on the value side. The list element class picks the
+        // family, so this runs before the numeric-only lift restriction.
+        if matches!(op, HirBinOp::Between | HirBinOp::NotBetween) {
+            let (list_elem, left_is_list) = match (left_elem, right_elem) {
+                (Some(elem), None) => (elem, true),
+                (None, Some(elem)) => (elem, false),
+                _ => return Err(unsupported("membership without one list operand")),
+            };
+            return self.list_membership(op == HirBinOp::NotBetween, list_elem, left_is_list, l, r);
+        }
         let Some(elem) = left_elem.or(right_elem) else {
             return Err(unsupported("elementwise operator without a list operand"));
         };
         let suffix = match elem {
             Elem::Int => "i64",
             Elem::Float => "f64",
+            Elem::Float32 => "f32",
             _ => return Err(unsupported("elementwise operator on a non-numeric list")),
         };
         let result_is_list = ty.is_some_and(|ty| {
@@ -894,10 +1181,17 @@ impl Emitter<'_> {
         Ok(Operand::new(wrap(&prelude, &call), value).with_effect(effect))
     }
 
-    fn path(&self, def_id: radix_hir::DefId) -> Result<Operand, CodegenError> {
+    pub(crate) fn path(&self, def_id: radix_hir::DefId) -> Result<Operand, CodegenError> {
         match self.locals.get(&def_id) {
             Some(local) => {
-                let mut operand = Self::cell_read(&local.name, local.ty);
+                // A `ref`/`mut` scalar parameter is a pointer to the caller's
+                // cell; a read goes through it.
+                let cell = if self.ref_params.contains(&def_id) {
+                    format!("(*{})", local.name)
+                } else {
+                    local.name.clone()
+                };
+                let mut operand = Self::cell_read(&cell, local.ty);
                 operand.constant = local.constant;
                 Ok(operand)
             }
@@ -983,7 +1277,9 @@ impl Emitter<'_> {
             .is_some_and(|ty| matches!(classify(self.types, ty), Ok(Ty::Modular(_))));
         let inner = self.expr(operand)?;
         match op {
-            HirUnOp::Neg if inner.value == Value::Float => Ok(Self::float_negate(&inner)),
+            HirUnOp::Neg if matches!(inner.value, Value::Float | Value::Float32) => {
+                Ok(Self::float_negate(&inner))
+            }
             HirUnOp::Neg if inner.value == Value::Decimal => Ok(self.decimal_negate(&inner)),
             HirUnOp::Neg if !inner.is_integer() => Err(unsupported("negation of a non-integer")),
             HirUnOp::Neg => {
@@ -1062,6 +1358,11 @@ impl Emitter<'_> {
         if op == HirBinOp::Coalesce {
             return self.coalesce(left, right);
         }
+        // `x ∈ a‥b` / `x ∈ a…b`: range membership, before the range value is
+        // evaluated as an expression.
+        if matches!(op, HirBinOp::InRange | HirBinOp::NotInRange) {
+            return self.range_membership(op == HirBinOp::NotInRange, left, right);
+        }
         let l = self.expr(left)?;
         let r = self.expr(right)?;
         // `≈` / `≉` is tolerance equality over either family, never the C `==`
@@ -1072,10 +1373,21 @@ impl Emitter<'_> {
         if self.list_element(left.ty).is_some() || self.list_element(right.ty).is_some() {
             return self.list_binary(op, left, right, ty, l, r);
         }
+        // `k ∈ m` / `k ∉ m`: key membership. A map operand is not a list, so
+        // this runs before the scalar paths reject the op.
+        if matches!(op, HirBinOp::Between | HirBinOp::NotBetween)
+            && let Some((k, v)) = crate::map::map_class(self.types, left.ty)
+                .or_else(|| crate::map::map_class(self.types, right.ty))
+        {
+            let map_is_left = crate::map::map_class(self.types, left.ty).is_some();
+            return self.map_membership(op == HirBinOp::NotBetween, k, v, map_is_left, l, r);
+        }
         if l.value == Value::Decimal || r.value == Value::Decimal {
             return self.decimal_binary(op, l, r);
         }
-        if l.value == Value::Float || r.value == Value::Float || op == HirBinOp::TrueDiv {
+        let float_operand = matches!(l.value, Value::Float | Value::Float32)
+            || matches!(r.value, Value::Float | Value::Float32);
+        if float_operand || op == HirBinOp::TrueDiv {
             // The runner's `÷` is `f32` for 8- and 16-bit operands and `f64`
             // otherwise. This target has no `f32` (C7's open question), so it
             // rejects the narrow form by name rather than approximate it.
@@ -1176,11 +1488,79 @@ impl Emitter<'_> {
 
     /// `≈` / `≉`: `10^9 · |a − b| ≤ max(|a|, |b|)` between integers, the same
     /// tolerance rule between floats. Both sides are the same family.
-    fn fuzzy(&mut self, op: HirBinOp, l: Operand, r: Operand) -> Result<Operand, CodegenError> {
+    /// `x ∈ a‥b` (end excluded) / `x ∈ a…b` (end included): an integer is in
+    /// an integer range when `a <= x` and, per the range's kind, `x` is below
+    /// or at most `b`. `∉` negates the whole test.
+    fn range_membership(
+        &mut self,
+        negate: bool,
+        value: &HirExpression,
+        range: &HirExpression,
+    ) -> Result<Operand, CodegenError> {
+        let HirExpressionKind::Intervallum {
+            start,
+            end,
+            step,
+            kind,
+        } = &range.kind
+        else {
+            return Err(unsupported("membership over a value that is not a range"));
+        };
+        if step.is_some() {
+            return Err(unsupported("range membership with a step"));
+        }
+        let mut operands = [self.expr(value)?, self.expr(start)?, self.expr(end)?];
+        if operands
+            .iter()
+            .any(|operand| !matches!(operand.value, Value::Int | Value::Exact))
+        {
+            return Err(unsupported("range membership over a non-integer"));
+        }
+        let prelude = self.sequence(&mut operands);
+        let effect = operands.iter().any(|operand| operand.effect);
+        let [x, low, high] = operands;
+        let lower = format!("({} <= {})", low.text, x.text);
+        let upper = match kind {
+            radix_hir::HirRangeKind::Exclusive => format!("({} < {})", x.text, high.text),
+            radix_hir::HirRangeKind::Inclusive => format!("({} <= {})", x.text, high.text),
+        };
+        let text = format!("({lower} && {upper})");
+        let text = if negate { format!("(!{text})") } else { text };
+        Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect))
+    }
+
+    fn fuzzy(
+        &mut self,
+        op: HirBinOp,
+        mut l: Operand,
+        mut r: Operand,
+    ) -> Result<Operand, CodegenError> {
+        let is_float = |value: Value| matches!(value, Value::Float | Value::Float32);
         let name = if l.is_integer() && r.is_integer() {
             "faber_approx_int"
-        } else if l.value == Value::Float && r.value == Value::Float {
-            "faber_approx_f64"
+        } else if is_float(l.value) && is_float(r.value) {
+            if l.value == Value::Float32 {
+                "faber_approx_f32"
+            } else {
+                "faber_approx_f64"
+            }
+        } else if l.is_integer() || r.is_integer() {
+            // An integer against a float joins the float's width: the runner
+            // converts the integer to the joined width before the rule.
+            let is32 = (is_float(l.value) && l.value == Value::Float32)
+                || (is_float(r.value) && r.value == Value::Float32);
+            let cast = if is32 { "float" } else { "double" };
+            if l.is_integer() {
+                l.text = format!("(({cast}){})", l.text);
+            }
+            if r.is_integer() {
+                r.text = format!("(({cast}){})", r.text);
+            }
+            if is32 {
+                "faber_approx_f32"
+            } else {
+                "faber_approx_f64"
+            }
         } else {
             return Err(unsupported(
                 "approximate equality between different classes",
@@ -1494,12 +1874,22 @@ impl Emitter<'_> {
             (Ty::Int, Value::Int)
             | (Ty::Text, Value::Text)
             | (Ty::Bool, Value::Truth)
-            | (Ty::Float, Value::Float) => Ok(value),
+            | (Ty::Float, Value::Float)
+            | (Ty::Float32, Value::Float32) => Ok(value),
+            // A store across the two float widths is the C cast: `f32`
+            // narrows, `float` widens.
+            (Ty::Float32, Value::Float) => Ok(Operand::new(
+                format!("((float){})", value.text),
+                Value::Float32,
+            )
+            .with_effect(value.effect)),
+            (Ty::Float, Value::Float32) => Ok(Operand::new(
+                format!("((double){})", value.text),
+                Value::Float,
+            )
+            .with_effect(value.effect)),
             (Ty::List(slot), Value::List(elem)) if slot == elem => Ok(value),
             (Ty::Genus(slot), Value::Genus(genus)) if slot == genus => Ok(value),
-            (Ty::Int, Value::Exact) if value.constant.is_some() => {
-                Err(unsupported("integer constant beyond i64"))
-            }
             (Ty::Int, Value::Exact) => {
                 let at = c_string(&self.store_position(site))?;
                 let text = self.store_exact(&value, &at);
@@ -1665,6 +2055,23 @@ impl Emitter<'_> {
                 }
                 Ok(self.store_word(&value, class, "saturating", width))
             }
+            // A store across the two float widths is the C cast.
+            Ty::Float32 => match value.value {
+                Value::Float => Ok(Operand::new(
+                    format!("((float){})", value.text),
+                    Value::Float32,
+                )
+                .with_effect(value.effect)),
+                _ => Ok(value),
+            },
+            Ty::Float => match value.value {
+                Value::Float32 => Ok(Operand::new(
+                    format!("((double){})", value.text),
+                    Value::Float,
+                )
+                .with_effect(value.effect)),
+                _ => Ok(value),
+            },
             _ => Ok(value),
         }
     }

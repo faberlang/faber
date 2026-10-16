@@ -1,0 +1,25 @@
++++
+locale = "en"
++++
+# The scalar float math functions at the declared width (libm), and the
+# explicit `.approx(other, tolerance)` compare.
+main {
+    let float x ← 2.0
+    print x.sqrt()
+    print x.ln()
+    print x.log10()
+    print x.exp()
+    print x.sin()
+    print x.cos()
+    print x.tan()
+    let f32 y ← 2.0
+    print y.sqrt()
+    print y.exp()
+    let float a ← 42.145
+    let float b ← 42.0
+    print a.approx(b, 0.2)
+    print a.approx(b, 0.01)
+    let f32 p ← 1.00000001 ∷ f32
+    let f32 q ← 1.0 ∷ f32
+    print p ≈ q
+}

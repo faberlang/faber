@@ -82,6 +82,7 @@ impl Emitter<'_> {
                 c_name,
                 name,
                 fields,
+                consts: Vec::new(),
                 methods: Vec::new(),
                 shape: Shape::Enum { variants },
             },
@@ -385,11 +386,15 @@ impl Emitter<'_> {
             }
             Ty::Genus(def_id) => self.enum_equal(def_id, &a, &b),
             Ty::Float
+            | Ty::Float32
             | Ty::Opt(_)
             | Ty::List(_)
+            | Ty::Set(_)
+            | Ty::Map(..)
             | Ty::Decimal
             | Ty::Modular(_)
-            | Ty::Saturating(_) => Err(unsupported(
+            | Ty::Saturating(_)
+            | Ty::Func(_) => Err(unsupported(
                 "equality of a union with a payload of this class",
             )),
         }

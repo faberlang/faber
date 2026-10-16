@@ -1,7 +1,0 @@
-+++
-locale = "en"
-+++
-main {
-    mut f32 s ← 0.1
-    print s
-}

@@ -72,10 +72,25 @@ impl Emitter<'_> {
             let operand = self.bounded_list(&value, elem, capacity, recovery)?;
             return Ok(operand.with_effect(value.effect));
         }
-        // `↦ ascii<N>` (resize or radix formatting) is not part of the subset;
-        // the runner's resize path is itself unsupported.
-        if matches!(self.types.get(target), Type::BoundedAscii { .. }) {
-            return Err(unsupported("conversion to bounded ascii"));
+        // `ascii<N>` targets: a `via Hex|Bin|Oct` pack from an integer, or the
+        // D7 resize from a text (the same counted text, capacity-checked). A
+        // capacity that is still an inference hole (the `ascii<_>` form of a
+        // non-constant source) has no literal to work from, so it is
+        // rejected by name rather than emitted as a plain integer.
+        if self.is_bounded_ascii(target) {
+            let Some(capacity) = self.ascii_capacity(target) else {
+                return Err(unsupported(
+                    "bounded ascii with a capacity that is not a literal",
+                ));
+            };
+            let value = self.expr(source)?;
+            if matches!(value.value, Value::Int | Value::Exact) {
+                return self.ascii_pack(&value, capacity, params, recovery);
+            }
+            if value.value == Value::Text {
+                return self.ascii_resize(&value, capacity, recovery);
+            }
+            return Err(unsupported("conversion to bounded ascii from this value"));
         }
         let class = classify(self.types, target)?;
         let value = self.expr(source)?;
@@ -84,14 +99,29 @@ impl Emitter<'_> {
         // Conversions that cannot fail ignore a recovery (typecheck allows
         // one only where the conversion can fail).
         let operand = match (value.value, class) {
-            (Value::Int | Value::Exact, Ty::Float) => {
+            // A conversion into a float class is the C cast: `int ↦ float`
+            // widens, `float ↦ f32` narrows, and `f32 ↦ float` widens the
+            // already-binary32 value.
+            (Value::Int | Value::Exact | Value::Float32, Ty::Float) => {
                 Operand::new(format!("((double){})", value.text), Value::Float)
+            }
+            (Value::Int | Value::Exact | Value::Float, Ty::Float32) => {
+                Operand::new(format!("((float){})", value.text), Value::Float32)
             }
             (Value::Int | Value::Exact, Ty::Text) => Operand::new(self.show(&value)?, Value::Text),
             (Value::Float, Ty::Text) => {
                 self.support.need(Helper::FloatText);
                 Operand::new(
                     format!("faber_float_display(faber_a, {})", value.text),
+                    Value::Text,
+                )
+            }
+            // `f32 ↦ textus` keeps the integral `.0` (the runner's
+            // `display_float_at_width`), unlike the binary64 form.
+            (Value::Float32, Ty::Text) => {
+                self.support.need(Helper::FloatText);
+                Operand::new(
+                    format!("faber_float_text_f32(faber_a, {})", value.text),
                     Value::Text,
                 )
             }
@@ -160,31 +190,85 @@ impl Emitter<'_> {
             }
             (Value::Text, Ty::Text)
             | (Value::Float, Ty::Float)
+            | (Value::Float32, Ty::Float32)
             | (Value::Truth, Ty::Bool)
-            | (Value::Decimal, Ty::Decimal) => value,
-            (Value::Int, Ty::Int) => value,
+            | (Value::Decimal, Ty::Decimal)
+            | (Value::Int, Ty::Int) => value,
+            // `copia ↦ lista` materializes a new list; `lista ↦ copia`
+            // deduplicates into a new set. Both read their source (`↦`).
+            (Value::Set(elem), Ty::List(slot)) if slot == elem => {
+                self.support.need(Helper::List(elem, ListOp::New));
+                Operand::new(
+                    format!("faber_list_{}_copy(faber_a, {})", elem.suffix(), value.text),
+                    Value::List(elem),
+                )
+            }
+            (Value::List(elem), Ty::Set(slot)) if slot == elem => {
+                self.support.need(Helper::List(elem, ListOp::New));
+                Operand::new(
+                    format!("faber_set_{}_of(faber_a, {})", elem.suffix(), value.text),
+                    Value::Set(elem),
+                )
+            }
+            (Value::Set(elem), Ty::Set(slot)) if slot == elem => value,
+            // `tabula ↦ lista<T>`: the target element class picks the keys
+            // (`T` is the key class) or the values (`T` is the value class).
+            (Value::Map(k, v), Ty::List(slot)) if slot == k => {
+                self.support.need(Helper::List(k, ListOp::New));
+                Operand::new(
+                    format!(
+                        "faber_map_{}_keys(faber_a, {})",
+                        Self::map_suffix(k, v),
+                        value.text
+                    ),
+                    Value::List(k),
+                )
+            }
+            (Value::Map(k, v), Ty::List(slot)) if slot == v => {
+                self.support.need(Helper::List(v, ListOp::New));
+                Operand::new(
+                    format!(
+                        "faber_map_{}_values(faber_a, {})",
+                        Self::map_suffix(k, v),
+                        value.text
+                    ),
+                    Value::List(v),
+                )
+            }
             (_, Ty::Int | Ty::Sized(_)) if integer => {
                 self.fallible_int(&value, class, Kind::IntInt, None, params, recovery)?
             }
             (Value::Text, Ty::Int | Ty::Sized(_)) => {
                 self.fallible_int(&value, class, Kind::TextInt, None, params, recovery)?
             }
-            (Value::Float, Ty::Int | Ty::Sized(_)) => {
+            (Value::Float | Value::Float32, Ty::Int | Ty::Sized(_)) => {
                 let mode = self.rounding_mode(params)?;
                 self.fallible_int(&value, class, Kind::FloatInt, Some(mode), params, recovery)?
             }
-            (Value::Text, Ty::Float) => self.text_to_float(&value, recovery)?,
-            // `text ↦ bool` is non-empty; a text value cannot hold a NUL, so
-            // the first byte decides. `fractus ↦ bool` is non-zero (`-0.0` is
-            // false, NaN is true). `bool ↦ fractus` is 1.0 / 0.0.
-            (Value::Text, Ty::Bool) => {
-                Operand::new(format!("(({})[0] != '\\0')", value.text), Value::Truth)
+            (Value::Text, Ty::Float | Ty::Float32) => {
+                let float_value = if class == Ty::Float32 {
+                    Value::Float32
+                } else {
+                    Value::Float
+                };
+                self.text_to_float(&value, recovery, float_value)?
             }
+            // `text ↦ bool` parses the code locale's own `true`/`false`
+            // words and fails on any other text (the runner's ruling);
+            // `fractus ↦ bool` is non-zero (`-0.0` is false, NaN is true).
+            // `bool ↦ fractus` is 1.0 / 0.0.
+            (Value::Text, Ty::Bool) => self.text_to_bool(&value, recovery)?,
             (Value::Float, Ty::Bool) => {
                 Operand::new(format!("(({}) != 0.0)", value.text), Value::Truth)
             }
+            (Value::Float32, Ty::Bool) => {
+                Operand::new(format!("(({}) != 0.0f)", value.text), Value::Truth)
+            }
             (Value::Truth, Ty::Float) => {
                 Operand::new(format!("(({}) ? 1.0 : 0.0)", value.text), Value::Float)
+            }
+            (Value::Truth, Ty::Float32) => {
+                Operand::new(format!("(({}) ? 1.0f : 0.0f)", value.text), Value::Float32)
             }
             _ => return Err(unsupported("conversion between these value classes")),
         };
@@ -200,6 +284,103 @@ impl Emitter<'_> {
             _ => operand,
         };
         Ok(operand.with_effect(effect))
+    }
+
+    /// Whether the target (peeling aliases) is a bounded `ascii<N>`.
+    pub(crate) fn is_bounded_ascii(&self, ty: TypeId) -> bool {
+        match self.types.get(ty) {
+            Type::Alias(_, inner) => self.is_bounded_ascii(*inner),
+            Type::BoundedAscii { .. } => true,
+            _ => false,
+        }
+    }
+
+    /// The capacity of an `ascii<N>` target, peeling aliases; `None` for any
+    /// other type (or a non-literal capacity).
+    pub(crate) fn ascii_capacity(&self, ty: TypeId) -> Option<u64> {
+        match self.types.get(ty) {
+            Type::Alias(_, inner) => self.ascii_capacity(*inner),
+            Type::BoundedAscii { capacity } => match self.types.get_index(*capacity) {
+                radix_types::IndexExpr::Literal(value) => Some(*value),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// `numerus ↦ ascii<N> via Hex|Bin|Oct`: zero-padded fixed-width digits.
+    fn ascii_pack(
+        &mut self,
+        value: &Operand,
+        capacity: u64,
+        params: &[Symbol],
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::Conv);
+        self.support.need(Helper::AsciiPack);
+        let mut radix = 10;
+        for param in params {
+            match self.names.resolve_symbol(*param) {
+                "Hex" => radix = 16,
+                "Bin" => radix = 2,
+                "Oct" => radix = 8,
+                _ => {}
+            }
+        }
+        if radix == 10 {
+            return Err(unsupported("ascii pack without a Hex, Bin, or Oct hint"));
+        }
+        let n = self.temps;
+        self.temps += 1;
+        let (v, s) = (format!("faber_v{n}"), format!("faber_s{n}"));
+        let call = format!(
+            "faber_try_ascii_pack(faber_a, {}, {radix}, {capacity}, &{s})",
+            value.text
+        );
+        let tail = match recovery {
+            Some(recovery) => {
+                let fallback = self.expr(recovery)?;
+                if fallback.value != Value::Text {
+                    return Err(unsupported("recovery value of a different class"));
+                }
+                format!("{s} == 0 ? {v} : {};", fallback.text)
+            }
+            None => {
+                format!("if ({s} != 0) {{ faber_conv_fail(FABER_CONV_ASCII_PACK, {s}); }} {v};")
+            }
+        };
+        let text = format!("(__extension__ ({{ int {s} = 0; faber_text {v} = {call}; {tail} }}))");
+        Ok(Operand::new(text, Value::Text).with_effect(value.effect))
+    }
+
+    /// `ascii<N> ↦ ascii<M>` (D7 resize): the counted text when it fits.
+    fn ascii_resize(
+        &mut self,
+        value: &Operand,
+        capacity: u64,
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::TextRead);
+        let n = self.temps;
+        self.temps += 1;
+        let (v, s) = (format!("faber_v{n}"), format!("faber_s{n}"));
+        let tail = match recovery {
+            Some(recovery) => {
+                let fallback = self.expr(recovery)?;
+                if fallback.value != Value::Text {
+                    return Err(unsupported("recovery value of a different class"));
+                }
+                format!("{s} ? {v} : {};", fallback.text)
+            }
+            None => format!(
+                "if (!{s}) {{ faber_trap(\"ascii to bounded ascii conversion failed\"); }} {v};"
+            ),
+        };
+        let text = format!(
+            "(__extension__ ({{ faber_text {v} = {}; bool {s} = faber_text_length({v}) <= {capacity}; {tail} }}))",
+            value.text
+        );
+        Ok(Operand::new(text, Value::Text).with_effect(value.effect))
     }
 
     /// A bounded-list target (`list<T, N>`), peeling aliases: its element type
@@ -402,26 +583,67 @@ impl Emitter<'_> {
         Ok(operand)
     }
 
-    /// `text ↦ float`, with or without `⊥`.
-    fn text_to_float(
+    /// `text ↦ bool`: the code locale's own `true`/`false` words, and any
+    /// other text fails (`text to bivalens conversion failed`), the runner's
+    /// ruling. The source is evaluated once.
+    fn text_to_bool(
         &mut self,
         value: &Operand,
         recovery: Option<&HirExpression>,
     ) -> Result<Operand, CodegenError> {
         self.support.need(Helper::Conv);
+        let tokens = self.names.display_tokens();
+        let (yes, no) = (c_string(&tokens.true_)?, c_string(&tokens.false_)?);
         let n = self.temps;
         self.temps += 1;
-        let (v, s) = (format!("faber_v{n}"), format!("faber_s{n}"));
+        let (t, v) = (format!("faber_t{n}"), format!("faber_v{n}"));
         let tail = match recovery {
             Some(recovery) => {
                 let fallback = self.expr(recovery)?;
-                if fallback.value != Value::Float {
+                if fallback.value != Value::Truth {
                     return Err(unsupported("recovery value of a different class"));
                 }
-                format!("{s} == 0 ? {v} : {};", fallback.text)
+                format!("else {{ {v} = {}; }}", fallback.text)
+            }
+            None => "else { faber_conv_fail(FABER_CONV_TEXT_BOOL, FABER_CONV_SYNTAX); }".to_owned(),
+        };
+        let text = format!(
+            "(__extension__ ({{ const char *{t} = {}; bool {v}; \
+             if (strcmp({t}, {yes}) == 0) {{ {v} = true; }} \
+             else if (strcmp({t}, {no}) == 0) {{ {v} = false; }} {tail} {v}; }}))",
+            value.text
+        );
+        Ok(Operand::new(text, Value::Truth))
+    }
+
+    /// `text ↦ float`, with or without `⊥`.
+    fn text_to_float(
+        &mut self,
+        value: &Operand,
+        recovery: Option<&HirExpression>,
+        float_value: Value,
+    ) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::Conv);
+        let n = self.temps;
+        self.temps += 1;
+        let (v, s) = (format!("faber_v{n}"), format!("faber_s{n}"));
+        // The parse is binary64 (the runner parses `f64` then rounds at the
+        // declared width); an `f32` target narrows the parsed value.
+        let narrowed = if float_value == Value::Float32 {
+            format!("(float){v}")
+        } else {
+            v.clone()
+        };
+        let tail = match recovery {
+            Some(recovery) => {
+                let fallback = self.expr(recovery)?;
+                if fallback.value != float_value {
+                    return Err(unsupported("recovery value of a different class"));
+                }
+                format!("{s} == 0 ? {narrowed} : {};", fallback.text)
             }
             None => format!(
-                "if ({s} != 0) {{ faber_conv_fail({}, {s}); }} {v};",
+                "if ({s} != 0) {{ faber_conv_fail({}, {s}); }} {narrowed};",
                 Kind::TextFloat.constant()
             ),
         };
@@ -429,7 +651,7 @@ impl Emitter<'_> {
             "(__extension__ ({{ double {v} = 0.0; int {s} = faber_try_text_float({}, &{v}); {tail} }}))",
             value.text
         );
-        Ok(Operand::new(text, Value::Float))
+        Ok(Operand::new(text, float_value))
     }
 }
 

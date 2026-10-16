@@ -2,7 +2,9 @@
 
 use crate::error::unsupported;
 use radix_codegen_shared::CodegenError;
-use radix_types::{DefId, NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable};
+use radix_types::{
+    DefId, FuncSig, NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable,
+};
 
 /// The sized integer widths other than `i64`, which is [`Ty::Int`].
 ///
@@ -81,11 +83,16 @@ pub(crate) enum Inner {
     Text,
     Bool,
     Float,
+    /// `f32`: a binary32. It shares the `faber_opt_f64` slot (widened) and is
+    /// narrowed back on a read.
+    Float32,
     /// `wrapping<W>`: a modular word, widened on read and reduced at the
     /// store. `u64` carries its value in a `uint64_t` optional slot.
     Modular(IntWidth),
     List(Elem),
     Genus(DefId),
+    /// A map (`tabula`) behind a pointer, so `NULL` is none.
+    Map(Elem, Elem),
 }
 
 impl Inner {
@@ -96,9 +103,11 @@ impl Inner {
             Inner::Text => Ty::Text,
             Inner::Bool => Ty::Bool,
             Inner::Float => Ty::Float,
+            Inner::Float32 => Ty::Float32,
             Inner::Modular(width) => Ty::Modular(width),
             Inner::List(elem) => Ty::List(elem),
             Inner::Genus(def_id) => Ty::Genus(def_id),
+            Inner::Map(k, v) => Ty::Map(k, v),
         }
     }
 
@@ -108,16 +117,27 @@ impl Inner {
             Ty::Text => Some(Inner::Text),
             Ty::Bool => Some(Inner::Bool),
             Ty::Float => Some(Inner::Float),
+            Ty::Float32 => Some(Inner::Float32),
             Ty::Modular(width) => Some(Inner::Modular(width)),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
-            Ty::Sized(_) | Ty::Saturating(_) | Ty::Opt(_) | Ty::None | Ty::Decimal => None,
+            Ty::Map(k, v) => Some(Inner::Map(k, v)),
+            Ty::Sized(_)
+            | Ty::Saturating(_)
+            | Ty::Opt(_)
+            | Ty::None
+            | Ty::Decimal
+            | Ty::Set(_)
+            | Ty::Func(_) => None,
         }
     }
 
     /// The value is a pointer and `NULL` means none.
     pub(crate) fn is_pointer(self) -> bool {
-        matches!(self, Inner::Text | Inner::List(_) | Inner::Genus(_))
+        matches!(
+            self,
+            Inner::Text | Inner::List(_) | Inner::Genus(_) | Inner::Map(..)
+        )
     }
 
     /// The runtime's option struct for a scalar. A modular word below `u64`
@@ -127,8 +147,8 @@ impl Inner {
             Inner::Modular(IntWidth::U64) => Some("faber_opt_u64"),
             Inner::Int | Inner::Modular(_) => Some("faber_opt_i64"),
             Inner::Bool => Some("faber_opt_bool"),
-            Inner::Float => Some("faber_opt_f64"),
-            Inner::Text | Inner::List(_) | Inner::Genus(_) => None,
+            Inner::Float | Inner::Float32 => Some("faber_opt_f64"),
+            Inner::Text | Inner::List(_) | Inner::Genus(_) | Inner::Map(..) => None,
         }
     }
 }
@@ -160,15 +180,30 @@ pub(crate) enum Ty {
     Bool,
     /// `float` (binary64): C `double`.
     Float,
+    /// `f32` (binary32): C `float`. Arithmetic and display round at the
+    /// binary32 width; a literal is the front end's folded binary32 value.
+    Float32,
     /// `list<int>`, `list<string>` or `list<bool>`: a pointer to an
     /// arena-allocated `faber_list_<elem>`, so every bind aliases (R1).
     List(Elem),
+    /// `set<int>`, `set<string>` or `set<bool>`: the same list storage with
+    /// the set contract (`add` is unique, `delete` by value), so a set is a
+    /// `faber_list_<elem> *` too.
+    Set(Elem),
+    /// `map<K, V>` (`tabula`): an arena-allocated `faber_map_<k>_<v>` handled
+    /// by pointer, so every bind aliases (R1). Keys and values are `int` or
+    /// `text`, the classes the corpus maps use.
+    Map(Elem, Elem),
     /// A genus (`class`): a pointer to an arena-allocated C struct, so every
     /// bind aliases (R1).
     Genus(DefId),
     /// A bare `none` value (the type is `none`): the only value is `null`, and
     /// it prints as the locale's none word. C carries a dummy `int` 0.
     None,
+    /// A function value: a C function pointer. The payload is the `Type::Func`
+    /// [`TypeId`] the value was classified from, so a mismatched signature
+    /// fails the store check.
+    Func(u32),
 }
 
 /// The element kinds a list carries in this subset.
@@ -178,6 +213,9 @@ pub(crate) enum Elem {
     Text,
     Bool,
     Float,
+    /// `f32`: the stored cell is a `float`, and its helpers are the f32 list
+    /// family.
+    Float32,
     /// `wrapping<W>`: the list stores the plain C width and its helpers are
     /// the `FABER_LIST_FAMILY`/`FABER_LIST_OPS` instantiations for that width.
     Modular(IntWidth),
@@ -191,6 +229,7 @@ impl Elem {
             Elem::Text => "text",
             Elem::Bool => "bool",
             Elem::Float => "f64",
+            Elem::Float32 => "f32",
             Elem::Modular(width) => width.marker(),
         }
     }
@@ -202,6 +241,7 @@ impl Elem {
             Elem::Text => "faber_text",
             Elem::Bool => "bool",
             Elem::Float => "double",
+            Elem::Float32 => "float",
             Elem::Modular(width) => width.c_type(),
         }
     }
@@ -213,6 +253,7 @@ impl Elem {
             Elem::Text => "faber_list_text *",
             Elem::Bool => "faber_list_bool *",
             Elem::Float => "faber_list_f64 *",
+            Elem::Float32 => "faber_list_f32 *",
             Elem::Modular(width) => width.list_c_pointer(),
         }
     }
@@ -224,6 +265,7 @@ impl Elem {
             Elem::Text => Ty::Text,
             Elem::Bool => Ty::Bool,
             Elem::Float => Ty::Float,
+            Elem::Float32 => Ty::Float32,
             Elem::Modular(width) => Ty::Modular(width),
         }
     }
@@ -245,13 +287,18 @@ impl Ty {
             Ty::Text => Some("const char *"),
             Ty::Bool => Some("bool"),
             Ty::Float => Some("double"),
+            Ty::Float32 => Some("float"),
             Ty::Decimal => Some("faber_dec"),
-            Ty::List(Elem::Float) => Some("faber_list_f64 *"),
-            Ty::List(Elem::Int) => Some("faber_list_i64 *"),
-            Ty::List(Elem::Text) => Some("faber_list_text *"),
-            Ty::List(Elem::Bool) => Some("faber_list_bool *"),
-            Ty::List(Elem::Modular(width)) => Some(width.list_c_pointer()),
+            Ty::List(elem) | Ty::Set(elem) => Some(elem.list_c_pointer()),
+            Ty::Map(k, v) => match (k, v) {
+                (Elem::Int, Elem::Int) => Some("faber_map_i64_i64 *"),
+                (Elem::Int, Elem::Text) => Some("faber_map_i64_text *"),
+                (Elem::Text, Elem::Int) => Some("faber_map_text_i64 *"),
+                (Elem::Text, Elem::Text) => Some("faber_map_text_text *"),
+                _ => None,
+            },
             Ty::Genus(_) => None,
+            Ty::Func(_) => None,
         }
     }
 }
@@ -282,6 +329,15 @@ fn int_width(width: NumericWidth) -> Option<IntWidth> {
     }
 }
 
+/// The element class a map key or value may carry: `int` or `text`.
+fn map_elem(ty: Ty) -> Option<Elem> {
+    match ty {
+        Ty::Int => Some(Elem::Int),
+        Ty::Text => Some(Elem::Text),
+        _ => None,
+    }
+}
+
 /// Classify a semantic type, rejecting everything outside the subset by name.
 pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError> {
     match types.get(ty) {
@@ -290,11 +346,14 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
         // passes a deep duplicate (the call-site marker drives `copy_value`),
         // so the callee sees an ordinary value.
         Type::Ref(SemanticMutability::Copy, inner) => classify(types, *inner),
-        // A `ref` or `mut` view of a list or a genus is the same pointer: both
-        // already alias (R1). A view of a scalar would need a pointer to the
-        // caller's cell, which this subset does not emit.
+        // A `ref` or `mut` view of a list, a genus or text is the same
+        // pointer: all three already alias (R1). A view of a scalar is a
+        // pointer to the caller's cell, which `classify_ref` spells for a
+        // parameter; anywhere else it is still rejected by name.
         Type::Ref(_, inner) => match classify(types, *inner)? {
-            shared @ (Ty::List(_) | Ty::Genus(_)) => Ok(shared),
+            shared @ (Ty::List(_) | Ty::Genus(_) | Ty::Opt(Inner::Genus(_)) | Ty::Text) => {
+                Ok(shared)
+            }
             _ => Err(unsupported("ref or mut access to a scalar")),
         },
         Type::Primitive(Primitive::Numerus)
@@ -330,6 +389,9 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
         Type::Primitive(Primitive::Bivalens) => Ok(Ty::Bool),
         Type::Primitive(Primitive::Fractus)
         | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Ok(Ty::Float),
+        // `f32`: a binary32 whose operations round per operation, the runner's
+        // declared-width rule (2026-10-15T1445 ruling).
+        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32) => Ok(Ty::Float32),
         // A bounded list is a list whose value carries its capacity at run
         // time (`fixed`), so it is the same class.
         Type::Array(inner) | Type::BoundedArray { element: inner, .. } => {
@@ -340,13 +402,46 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::Text => Ok(Ty::List(Elem::Text)),
                 Ty::Bool => Ok(Ty::List(Elem::Bool)),
                 Ty::Float => Ok(Ty::List(Elem::Float)),
+                Ty::Float32 => Ok(Ty::List(Elem::Float32)),
                 Ty::List(_) => Err(unsupported("nested list type")),
                 Ty::Genus(_) => Err(unsupported("list of genus")),
                 Ty::Decimal => Err(unsupported("list of decimals")),
                 Ty::Modular(width) => Ok(Ty::List(Elem::Modular(width))),
                 Ty::Saturating(_) => Err(unsupported("list of saturating words")),
                 Ty::None => Err(unsupported("list of none")),
+                Ty::Set(_) => Err(unsupported("list of sets")),
+                Ty::Map(..) => Err(unsupported("list of maps")),
+                Ty::Func(_) => Err(unsupported("list of function values")),
             }
+        }
+        // A set is the list storage under the set contract (`add` unique,
+        // `delete` by value), so only a scalar element class is carried.
+        Type::Set(inner) => match classify(types, *inner)? {
+            Ty::Int => Ok(Ty::Set(Elem::Int)),
+            Ty::Text => Ok(Ty::Set(Elem::Text)),
+            Ty::Bool => Ok(Ty::Set(Elem::Bool)),
+            Ty::Float => Ok(Ty::Set(Elem::Float)),
+            Ty::Float32 => Err(unsupported("set of f32")),
+            Ty::Modular(width) => Ok(Ty::Set(Elem::Modular(width))),
+            Ty::List(_) => Err(unsupported("set of lists")),
+            Ty::Set(_) => Err(unsupported("set of sets")),
+            Ty::Genus(_) => Err(unsupported("set of genus")),
+            Ty::Sized(_) => Err(unsupported("set of sized integers")),
+            Ty::Saturating(_) => Err(unsupported("set of saturating words")),
+            Ty::Opt(_) => Err(unsupported("set of optionals")),
+            Ty::Decimal => Err(unsupported("set of decimals")),
+            Ty::None => Err(unsupported("set of none")),
+            Ty::Map(..) => Err(unsupported("set of maps")),
+            Ty::Func(_) => Err(unsupported("set of function values")),
+        },
+        // A map carries `int` or `text` keys and values (the corpus classes),
+        // backed by parallel lists in `faber_map_<k>_<v>`.
+        Type::Map(key, value) => {
+            let k = map_elem(classify(types, *key)?)
+                .ok_or_else(|| unsupported("map with a key class outside int/text"))?;
+            let v = map_elem(classify(types, *value)?)
+                .ok_or_else(|| unsupported("map with a value class outside int/text"))?;
+            Ok(Ty::Map(k, v))
         }
         // An enumeration is a genus-shaped value: a tagged pointer.
         Type::Struct(def_id) | Type::Enum(def_id) => Ok(Ty::Genus(*def_id)),
@@ -354,7 +449,48 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             Some(inner) => Ok(Ty::Opt(inner)),
             None => Err(unsupported("optional of a sized integer or an optional")),
         },
+        // A function value is a C function pointer. Its signature is validated
+        // now (the C spelling needs the emitter), and the id lets a mismatched
+        // signature fail a store check.
+        Type::Func(sig) => classify_func(types, sig, ty.0),
         other => Err(unsupported(describe(other))),
+    }
+}
+
+/// A function value's class: validate its signature and keep the `Type::Func`
+/// id so a mismatched assignment fails the store check.
+fn classify_func(types: &TypeTable, sig: &FuncSig, id: u32) -> Result<Ty, CodegenError> {
+    if !sig.type_params.is_empty() || sig.err.is_some() || sig.is_async || sig.is_generator {
+        return Err(unsupported("function value outside the subset"));
+    }
+    for param in &sig.params {
+        classify(types, param.ty)?;
+    }
+    returns(types, sig.ret)?;
+    Ok(Ty::Func(id))
+}
+
+/// The class of a `ref`/`mut` parameter whose C storage is a pointer to the
+/// caller's cell. `None` when `ty` is not such a view: an ordinary parameter,
+/// or a view of a list, genus or text (each already passes its pointer).
+pub(crate) fn classify_ref(types: &TypeTable, ty: TypeId) -> Result<Option<Ty>, CodegenError> {
+    match types.get(ty) {
+        Type::Alias(_, inner) => classify_ref(types, *inner),
+        Type::Ref(SemanticMutability::Copy, _) => Ok(None),
+        Type::Ref(_, inner) => match classify(types, *inner)? {
+            Ty::List(_) | Ty::Genus(_) | Ty::Opt(Inner::Genus(_)) | Ty::Text => Ok(None),
+            class => Ok(Some(class)),
+        },
+        _ => Ok(None),
+    }
+}
+
+/// The class a guard-proved read narrows to: strip an alias and a `ref`/`mut`
+/// view, then classify.
+pub(crate) fn read_class(types: &TypeTable, ty: TypeId) -> Option<Ty> {
+    match types.get(ty) {
+        Type::Alias(_, inner) | Type::Ref(_, inner) => read_class(types, *inner),
+        _ => classify(types, ty).ok(),
     }
 }
 

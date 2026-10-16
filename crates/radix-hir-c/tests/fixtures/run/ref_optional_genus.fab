@@ -1,0 +1,35 @@
++++
+locale = "en"
++++
+# A `ref` cursor over `T ∪ none` for a genus is the pointer itself: the loop
+# test narrows it, and a re-point moves the cursor.
+class Node {
+    mut int value
+    mut Node next optional
+}
+fn last(Node head) → int {
+    ref Node ∪ none cur ← head
+    while cur not is none {
+        if cur.next is none {
+            return cur.value
+        }
+        cur ← cur.next
+    }
+    return head.value
+}
+fn length(Node head) → int {
+    ref Node ∪ none cur ← head
+    mut int count ← 0
+    while cur not is none {
+        count ← count + 1
+        cur ← cur.next
+    }
+    return count
+}
+main {
+    let Node c ← Node { value = 3 }
+    let Node b ← Node { value = 2, next = c }
+    let Node a ← Node { value = 1, next = b }
+    print last(a)
+    print length(a)
+}

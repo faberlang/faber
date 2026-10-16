@@ -26,4 +26,16 @@ main {
     let string<2> acute ← "hé" ↦ string<2>
     let string<4> emoji ← "😀" ↦ string<4>
     print acute, emoji
+    # `ascii<N> ↦ ascii<M>` is the D7 resize; `numerus ↦ ascii<N> via
+    # Hex|Bin|Oct` is the fixed-width radix pack (a constant source infers
+    # `_`).
+    let ascii<8> wide ← 'abcd'
+    let ascii<4> shrunk ← wide ↦ ascii<4>
+    print shrunk
+    let ascii<2> hex ← 255 ↦ ascii<2> via Hex
+    let ascii<8> padded ← 37 ↦ ascii<8> via Hex
+    let ascii<8> bits ← 255 ↦ ascii<8> via Bin
+    let ascii<3> oct ← 255 ↦ ascii<3> via Oct
+    let ascii<_> inferred ← 255 ↦ ascii<_> via Hex
+    print hex, padded, bits, oct, inferred
 }
