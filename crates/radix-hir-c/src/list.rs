@@ -781,8 +781,8 @@ impl Emitter<'_> {
         }
         let tokens = self.names.display_tokens();
         let (yes, no) = (
-            crate::expr::c_string(&tokens.true_)?,
-            crate::expr::c_string(&tokens.false_)?,
+            self.text_literal(&tokens.true_)?,
+            self.text_literal(&tokens.false_)?,
         );
         Ok(format!(
             "faber_list_bool_show(faber_a, {text}, {yes}, {no})"

@@ -5,6 +5,13 @@
  */
 #include "faber.h"
 
+/* Backed literals: text values fed into helpers that read the header. */
+FABER_TEXT_LITERAL(faber_LTA, "a", 1, 1);
+FABER_TEXT_LITERAL(faber_LBC, "bc", 2, 2);
+FABER_TEXT_LITERAL(faber_LXE, "x=", 2, 2);
+FABER_TEXT_LITERAL(faber_LBANG, "!", 1, 1);
+FABER_TEXT_LITERAL(faber_LQE, "q\"\\\n\t\r\x1b" "e", 8, 8);
+
 static int failures;
 
 static void check_text(const char *what, faber_text got, const char *want) {
@@ -61,9 +68,9 @@ int main(int argc, char **argv) {
     check_int("mul_o flags", overflow, 1);
 
     /* Text. */
-    check_text("concat", faber_concat(&arena, "a", "bc"), "abc");
-    check_text("join", faber_join(&arena, 3, "x=", faber_int_text(&arena, -12), "!"), "x=-12!");
-    check_text("quoted", faber_quoted(&arena, "q\"\\\n\t\r\x1b" "e"), "\"q\\\"\\\\\\n\\t\\r\\u{1b}e\"");
+    check_text("concat", faber_concat(&arena, faber_LTA.s, faber_LBC.s), "abc");
+    check_text("join", faber_join(&arena, 3, faber_LXE.s, faber_int_text(&arena, -12), faber_LBANG.s), "x=-12!");
+    check_text("quoted", faber_quoted(&arena, faber_LQE.s), "\"q\\\"\\\\\\n\\t\\r\\u{1b}e\"");
 
     /* Lists grow past their first chunk and show as the runner does. */
     ints = faber_list_i64_new(&arena, 0);

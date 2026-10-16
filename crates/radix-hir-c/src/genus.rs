@@ -10,7 +10,7 @@
 
 use crate::Emitter;
 use crate::error::unsupported;
-use crate::expr::{Operand, Value, c_string};
+use crate::expr::{Operand, Value};
 use crate::helpers::{Helper, ListOp};
 use crate::names::Namer;
 use crate::ty::{Inner, Ty, classify, returns};
@@ -605,20 +605,20 @@ impl Emitter<'_> {
                 write!(
                     definitions,
                     "{signature} {{\n    (void)value;\n    (void)faber_a;\n    return {};\n}}\n\n",
-                    c_string(&format!("{name} {{}}"))?
+                    self.text_literal(&format!("{name} {{}}"))?
                 )
                 .ok();
                 continue;
             }
-            let mut parts = vec![c_string(&format!("{name} {{ "))?];
+            let mut parts = vec![self.text_literal(&format!("{name} {{ "))?];
             for (position, field) in fields.iter().enumerate() {
                 let separator = if position == 0 { "" } else { ", " };
-                parts.push(c_string(&format!("{separator}{} = ", field.name))?);
+                parts.push(self.text_literal(&format!("{separator}{} = ", field.name))?);
                 let read = format!("value->{}", field.c_name);
                 let shown = self.show_field(&read, field.ty)?;
                 parts.push(shown);
             }
-            parts.push(c_string(" }")?);
+            parts.push(self.text_literal(" }")?);
             self.support.need(Helper::Join);
             write!(
                 definitions,

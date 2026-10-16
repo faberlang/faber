@@ -1004,6 +1004,9 @@ static inline void *faber_alloc(faber_arena *arena, size_t size) {
 
 /* `read line` / `read`: one stdin line without its terminator, or all of
    stdin to EOF. EOF is the runner's Nil, so the result is NULL (none). */
+static inline faber_text faber_text_make(faber_arena *arena, const char *from, size_t bytes,
+                                         int64_t cps);
+static inline int64_t faber_text_count_cps(const char *from, size_t length);
 static inline const char *faber_read_line(faber_arena *arena) {
     size_t capacity = 128;
     size_t length = 0;
@@ -1038,11 +1041,8 @@ static inline const char *faber_read_line(faber_arena *arena) {
         length--;
     }
     {
-        char *out = faber_alloc(arena, length + 1);
-        if (length > 0) {
-            memcpy(out, buffer, length);
-        }
-        out[length] = '\0';
+        faber_text out =
+            faber_text_make(arena, buffer, length, faber_text_count_cps(buffer, length));
         free(buffer);
         return out;
     }
@@ -1078,9 +1078,8 @@ static inline const char *faber_read_all(faber_arena *arena) {
         return NULL;
     }
     {
-        char *out = faber_alloc(arena, length + 1);
-        memcpy(out, buffer, length);
-        out[length] = '\0';
+        faber_text out =
+            faber_text_make(arena, buffer, length, faber_text_count_cps(buffer, length));
         free(buffer);
         return out;
     }
@@ -1090,49 +1089,127 @@ static inline const char *faber_read_all(faber_arena *arena) {
 /* Text built at run time                                                   */
 /* ------------------------------------------------------------------------ */
 
+/* Every text carries its facts in a header placed just before the bytes: a
+ * text value is still a plain NUL-terminated `const char *`, so printf,
+ * strcmp, and strstr take it unchanged, while the length asks the header
+ * instead of walking. The counts are written once, when the value is built;
+ * text is immutable (R1), so they cannot go stale. Builders that know their
+ * output is ASCII set both counts equal; UTF-8 builders count the code
+ * points once, next to the copy they already do. */
+typedef struct faber_text_header {
+    int64_t bytes;
+    int64_t cps;
+} faber_text_header;
+
+/* The layout a text literal shares with runtime-built texts: the header,
+ * then the bytes. `FABER_TEXT_LITERAL(name, source, bytes, cps)` declares
+ * one; the value is `name.s`. */
+#define FABER_TEXT_LITERAL(NAME, SOURCE, BYTES, CPS)                                   \
+    static const struct {                                                              \
+        int64_t bytes;                                                                 \
+        int64_t cps;                                                                   \
+        char s[(BYTES) + 1];                                                           \
+    } NAME = { (BYTES), (CPS), SOURCE }
+
+struct faber_text_literal_probe {
+    int64_t bytes;
+    int64_t cps;
+    char s[2];
+};
+_Static_assert(offsetof(struct faber_text_literal_probe, s) == sizeof(faber_text_header),
+               "a text literal's bytes follow the same header a built text carries");
+
+/* The shared empty text: a slice clamped to nothing, a split edge, a trim. */
+FABER_TEXT_LITERAL(faber_text_empty, "", 0, 0);
+
+static inline faber_text faber_text_copy(faber_arena *arena, const char *from, size_t length);
+
+static inline const faber_text_header *faber_text_hdr(faber_text text) {
+    return (const faber_text_header *)(const void *)(text - sizeof(faber_text_header));
+}
+
+/* Seal a buffer whose allocation reserved the header in front: writes the
+ * counts and returns the text, the bytes just past the header. */
+static inline faber_text faber_text_seal(char *buffer, size_t bytes, int64_t cps) {
+    faber_text_header *header = (faber_text_header *)(void *)buffer;
+    header->bytes = (int64_t)bytes;
+    header->cps = cps;
+    return buffer + sizeof *header;
+}
+
+/* A fresh text: the header, then a copy of `bytes` bytes from `from`, then
+ * the NUL. */
+static inline faber_text faber_text_make(faber_arena *arena, const char *from, size_t bytes,
+                                          int64_t cps) {
+    char *buffer = faber_alloc(arena, sizeof(faber_text_header) + bytes + 1);
+    char *text = buffer + sizeof(faber_text_header);
+    if (bytes > 0) {
+        memcpy(text, from, bytes);
+    }
+    text[bytes] = '\0';
+    return faber_text_seal(buffer, bytes, cps);
+}
+
 static inline faber_text faber_concat(faber_arena *arena, faber_text a, faber_text b) {
-    size_t a_length = strlen(a);
-    size_t b_length = strlen(b);
-    char *out = faber_alloc(arena, a_length + b_length + 1);
-    memcpy(out, a, a_length);
-    memcpy(out + a_length, b, b_length + 1);
-    return out;
+    const faber_text_header *a_header = faber_text_hdr(a);
+    const faber_text_header *b_header = faber_text_hdr(b);
+    size_t bytes = faber_collection_size_add((size_t)a_header->bytes, (size_t)b_header->bytes);
+    char *buffer = faber_alloc(arena, sizeof(faber_text_header) + bytes + 1);
+    char *out = buffer + sizeof(faber_text_header);
+    if (a_header->bytes > 0) {
+        memcpy(out, a, (size_t)a_header->bytes);
+    }
+    if (b_header->bytes > 0) {
+        memcpy(out + a_header->bytes, b, (size_t)b_header->bytes + 1);
+    }
+    return faber_text_seal(buffer, bytes, a_header->cps + b_header->cps);
 }
 
 static inline faber_text faber_int_text(faber_arena *arena, int64_t value) {
-    char *out = faber_alloc(arena, 21);
-    snprintf(out, 21, "%" PRId64, value);
-    return out;
+    char *buffer = faber_alloc(arena, sizeof(faber_text_header) + 21);
+    char *out = buffer + sizeof(faber_text_header);
+    int written = snprintf(out, 21, "%" PRId64, value);
+    size_t bytes = written > 0 ? (size_t)written : 0;
+    return faber_text_seal(buffer, bytes, (int64_t)bytes);
 }
 
 static inline faber_text faber_exact_text(faber_arena *arena, faber_i128 value) {
-    return faber_i128_text(value, faber_alloc(arena, 41));
+    char buffer[41];
+    const char *text = faber_i128_text(value, buffer);
+    size_t length = strlen(text);
+    return faber_text_make(arena, text, length, (int64_t)length);
 }
 
-/* A template: `count` text pieces joined in one allocation. */
+/* A template: `count` text pieces joined in one allocation. The pieces carry
+ * their counts, so the totals come from the headers and nothing walks. */
 static inline faber_text faber_join(faber_arena *arena, int count, ...) {
     va_list pieces;
-    size_t total = 1;
-    char *out;
+    size_t total_bytes = 0;
+    int64_t total_cps = 0;
+    char *buffer;
     char *cursor;
     int index;
     va_start(pieces, count);
     for (index = 0; index < count; index++) {
-        total += strlen(va_arg(pieces, faber_text));
+        const faber_text_header *header = faber_text_hdr(va_arg(pieces, faber_text));
+        total_bytes = faber_collection_size_add(total_bytes, (size_t)header->bytes);
+        total_cps += header->cps;
     }
     va_end(pieces);
-    out = faber_alloc(arena, total);
-    cursor = out;
+    buffer = faber_alloc(arena, sizeof(faber_text_header) + total_bytes + 1);
+    cursor = buffer + sizeof(faber_text_header);
     va_start(pieces, count);
     for (index = 0; index < count; index++) {
         faber_text piece = va_arg(pieces, faber_text);
-        size_t length = strlen(piece);
-        memcpy(cursor, piece, length);
-        cursor += length;
+        const faber_text_header *header = faber_text_hdr(piece);
+        if (header->bytes > 0) {
+            memcpy(cursor, piece, (size_t)header->bytes);
+            cursor += header->bytes;
+        }
     }
     va_end(pieces);
     *cursor = '\0';
-    return out;
+    return faber_text_seal(buffer, total_bytes, total_cps);
 }
 
 /* A float's text in the arena, for a template hole or a display. */
@@ -1140,9 +1217,7 @@ static inline faber_text faber_float_text(faber_arena *arena, double value) {
     char buffer[FABER_F64_TEXT];
     const char *text = faber_f64_text(value, buffer);
     size_t length = strlen(text);
-    char *out = faber_alloc(arena, length + 1);
-    memcpy(out, text, length + 1);
-    return out;
+    return faber_text_make(arena, text, length, (int64_t)length);
 }
 
 /* A binary32's text in the arena, for a template hole. */
@@ -1150,9 +1225,7 @@ static inline faber_text faber_float_text_f32(faber_arena *arena, float value) {
     char buffer[FABER_F32_TEXT];
     const char *text = faber_f32_text(value, buffer);
     size_t length = strlen(text);
-    char *out = faber_alloc(arena, length + 1);
-    memcpy(out, text, length + 1);
-    return out;
+    return faber_text_make(arena, text, length, (int64_t)length);
 }
 
 /* Text as a list element or a genus field shows it: the runner's escapes
@@ -1198,15 +1271,17 @@ static inline size_t faber_quote(char *out, faber_text text) {
     return at;
 }
 
-/* `text` quoted, as a genus field shows it. */
+/* `text` quoted, as a genus field shows it. The quote form is ASCII, so the
+ * counts are equal. */
 static inline faber_text faber_quoted(faber_arena *arena, faber_text text) {
     size_t length = faber_quote(NULL, text);
-    char *out = faber_alloc(arena, length + 3);
+    char *buffer = faber_alloc(arena, sizeof(faber_text_header) + length + 3);
+    char *out = buffer + sizeof(faber_text_header);
     out[0] = '"';
     faber_quote(out + 1, text);
     out[length + 1] = '"';
     out[length + 2] = '\0';
-    return out;
+    return faber_text_seal(buffer, length + 2, (int64_t)(length + 2));
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1479,9 +1554,7 @@ static inline faber_text faber_dec_fmt(faber_arena *arena, faber_dec value) {
     char buffer[48];
     const char *text = faber_dec_text_into(value, buffer);
     size_t length = strlen(text);
-    char *out = faber_alloc(arena, length + 1);
-    memcpy(out, text, length + 1);
-    return out;
+    return faber_text_make(arena, text, length, (int64_t)length);
 }
 
 /* Round half-even to scale 8; false when the rounded carrier leaves `i64`. */
@@ -1805,7 +1878,10 @@ FABER_LIST_FAMILY(u64, uint64_t)
 static inline faber_list_text *faber_argv_text(faber_arena *arena, int argc, char **argv) {
     faber_list_text *list = faber_list_text_new(arena, argc > 1 ? (int64_t)argc - 1 : 0);
     for (int index = 1; index < argc; index++) {
-        faber_list_text_push(arena, list, argv[index]);
+        /* A command-line word becomes a real text: copied into the arena,
+         * with its counts. */
+        faber_list_text_push(arena, list,
+                             faber_text_copy(arena, argv[index], strlen(argv[index])));
     }
     return list;
 }
@@ -1813,7 +1889,7 @@ static inline faber_list_text *faber_argv_text(faber_arena *arena, int argc, cha
 static inline faber_text faber_list_i64_show(faber_arena *arena, const faber_list_i64 *list) {
     size_t capacity = faber_collection_size_add(
         3, faber_collection_size_mul(faber_collection_count_size(list->len), 22));
-    char *out = faber_alloc(arena, capacity);
+    char *out = (char *)faber_alloc(arena, sizeof(faber_text_header) + capacity) + sizeof(faber_text_header);
     size_t at = 0;
     int64_t index;
     out[at++] = '[';
@@ -1826,7 +1902,7 @@ static inline faber_text faber_list_i64_show(faber_arena *arena, const faber_lis
     }
     out[at++] = ']';
     out[at] = '\0';
-    return out;
+    return faber_text_seal(out - sizeof(faber_text_header), at, (int64_t)at);
 }
 
 static inline faber_text faber_list_text_show(faber_arena *arena, const faber_list_text *list) {
@@ -1838,7 +1914,7 @@ static inline faber_text faber_list_text_show(faber_arena *arena, const faber_li
         total = faber_collection_size_add(
             total, faber_collection_size_add(faber_quote(NULL, list->items[index]), 4));
     }
-    out = faber_alloc(arena, total);
+    out = (char *)faber_alloc(arena, sizeof(faber_text_header) + total) + sizeof(faber_text_header);
     out[at++] = '[';
     for (index = 0; index < list->len; index++) {
         if (index > 0) {
@@ -1851,7 +1927,7 @@ static inline faber_text faber_list_text_show(faber_arena *arena, const faber_li
     }
     out[at++] = ']';
     out[at] = '\0';
-    return out;
+    return faber_text_seal(out - sizeof(faber_text_header), at, (int64_t)at);
 }
 
 static inline faber_text faber_list_bool_show(faber_arena *arena, const faber_list_bool *list,
@@ -1862,7 +1938,7 @@ static inline faber_text faber_list_bool_show(faber_arena *arena, const faber_li
     size_t capacity = faber_collection_size_add(
         3, faber_collection_size_mul(faber_collection_count_size(list->len),
                                      faber_collection_size_add(width, 2)));
-    char *out = faber_alloc(arena, capacity);
+    char *out = (char *)faber_alloc(arena, sizeof(faber_text_header) + capacity) + sizeof(faber_text_header);
     size_t at = 0;
     int64_t index;
     out[at++] = '[';
@@ -1878,13 +1954,13 @@ static inline faber_text faber_list_bool_show(faber_arena *arena, const faber_li
     }
     out[at++] = ']';
     out[at] = '\0';
-    return out;
+    return faber_text_seal(out - sizeof(faber_text_header), at, (int64_t)at);
 }
 
 static inline faber_text faber_list_f64_show(faber_arena *arena, const faber_list_f64 *list) {
     size_t capacity = faber_collection_size_add(
         3, faber_collection_size_mul(faber_collection_count_size(list->len), FABER_F64_TEXT + 2));
-    char *out = faber_alloc(arena, capacity);
+    char *out = (char *)faber_alloc(arena, sizeof(faber_text_header) + capacity) + sizeof(faber_text_header);
     size_t at = 0;
     int64_t index;
     out[at++] = '[';
@@ -1901,13 +1977,13 @@ static inline faber_text faber_list_f64_show(faber_arena *arena, const faber_lis
     }
     out[at++] = ']';
     out[at] = '\0';
-    return out;
+    return faber_text_seal(out - sizeof(faber_text_header), at, (int64_t)at);
 }
 
 static inline faber_text faber_list_f32_show(faber_arena *arena, const faber_list_f32 *list) {
     size_t capacity = faber_collection_size_add(
         3, faber_collection_size_mul(faber_collection_count_size(list->len), FABER_F32_TEXT + 2));
-    char *out = faber_alloc(arena, capacity);
+    char *out = (char *)faber_alloc(arena, sizeof(faber_text_header) + capacity) + sizeof(faber_text_header);
     size_t at = 0;
     int64_t index;
     out[at++] = '[';
@@ -1924,7 +2000,7 @@ static inline faber_text faber_list_f32_show(faber_arena *arena, const faber_lis
     }
     out[at++] = ']';
     out[at] = '\0';
-    return out;
+    return faber_text_seal(out - sizeof(faber_text_header), at, (int64_t)at);
 }
 
 /* A `list<wrapping<W>>` shows each element as its width prints: signed and
@@ -1935,7 +2011,7 @@ static inline faber_text faber_list_f32_show(faber_arena *arena, const faber_lis
                                                       const faber_list_##NAME *list) {  \
         size_t capacity = faber_collection_size_add(                                    \
             3, faber_collection_size_mul(faber_collection_count_size(list->len), 22));  \
-        char *out = faber_alloc(arena, capacity);                                       \
+        char *out = (char *)faber_alloc(arena, sizeof(faber_text_header) + capacity) + sizeof(faber_text_header);                                       \
         size_t at = 0;                                                                  \
         int64_t index;                                                                  \
         out[at++] = '[';                                                                \
@@ -1949,7 +2025,7 @@ static inline faber_text faber_list_f32_show(faber_arena *arena, const faber_lis
         }                                                                               \
         out[at++] = ']';                                                                \
         out[at] = '\0';                                                                 \
-        return out;                                                                     \
+        return faber_text_seal(out - sizeof(faber_text_header), at, (int64_t)at);       \
     }
 
 FABER_LIST_WORD_SHOW(i8, int8_t, (int64_t), "%" PRId64)
@@ -2729,16 +2805,21 @@ static inline uint32_t faber_utf8_decode(const unsigned char *p, size_t length) 
 }
 
 static inline faber_text faber_text_copy(faber_arena *arena, const char *from, size_t length) {
-    char *out = faber_alloc(arena, length + 1);
-    memcpy(out, from, length);
-    out[length] = '\0';
-    return out;
+    return faber_text_make(arena, from, length, faber_text_count_cps(from, length));
 }
 
 static inline int64_t faber_text_length(faber_text text) {
-    const unsigned char *p = (const unsigned char *)text;
+    return faber_text_hdr(text)->cps;
+}
+
+/* The code points in `length` raw bytes: the walk `faber_text_length` used
+ * to do, stopped at the given width (a fresh buffer or a prefix of a text,
+ * so it never meets a NUL before the end). */
+static inline int64_t faber_text_count_cps(const char *from, size_t length) {
+    const unsigned char *p = (const unsigned char *)from;
+    const unsigned char *end = p + length;
     int64_t count = 0;
-    while (*p != 0) {
+    while (p < end) {
         p += faber_utf8_step(p);
         count++;
     }
@@ -2775,7 +2856,7 @@ static inline faber_text faber_text_slice(faber_arena *arena, faber_text text, f
         faber_trap("expected non-negative numerus index");
     }
     if (from >= to) {
-        return "";
+        return faber_text_empty.s;
     }
     while (*start != 0 && index < from) {
         start += faber_utf8_step(start);
@@ -2786,7 +2867,8 @@ static inline faber_text faber_text_slice(faber_arena *arena, faber_text text, f
         end += faber_utf8_step(end);
         index++;
     }
-    return faber_text_copy(arena, (const char *)start, (size_t)(end - start));
+    return faber_text_make(arena, (const char *)start, (size_t)(end - start),
+                           index > from ? (int64_t)(index - from) : 0);
 }
 
 /* `s[i]`: the code point at `index` as text. */
@@ -2803,7 +2885,10 @@ static inline faber_text faber_text_at(faber_arena *arena, faber_text text, fabe
     if (*p == 0) {
         faber_trap("text index out of bounds");
     }
-    return faber_text_copy(arena, (const char *)p, faber_utf8_step(p));
+    {
+        size_t step = faber_utf8_step(p);
+        return faber_text_make(arena, (const char *)p, step, 1);
+    }
 }
 
 static inline bool faber_text_contains(faber_text text, faber_text needle) {
@@ -2811,12 +2896,13 @@ static inline bool faber_text_contains(faber_text text, faber_text needle) {
 }
 
 static inline bool faber_text_starts_with(faber_text text, faber_text prefix) {
-    return strncmp(text, prefix, strlen(prefix)) == 0;
+    size_t prefix_length = (size_t)faber_text_hdr(prefix)->bytes;
+    return strncmp(text, prefix, prefix_length) == 0;
 }
 
 static inline bool faber_text_ends_with(faber_text text, faber_text suffix) {
-    size_t text_length = strlen(text);
-    size_t suffix_length = strlen(suffix);
+    size_t text_length = (size_t)faber_text_hdr(text)->bytes;
+    size_t suffix_length = (size_t)faber_text_hdr(suffix)->bytes;
     return suffix_length <= text_length &&
            memcmp(text + text_length - suffix_length, suffix, suffix_length) == 0;
 }
@@ -2825,8 +2911,9 @@ static inline bool faber_text_ends_with(faber_text text, faber_text suffix) {
  * tables, so it stops the program rather than answer differently from the
  * runner. */
 static inline faber_text faber_text_case(faber_arena *arena, faber_text text, bool upper) {
-    size_t length = strlen(text);
-    char *out = faber_alloc(arena, length + 1);
+    size_t length = (size_t)faber_text_hdr(text)->bytes;
+    char *buffer = faber_alloc(arena, sizeof(faber_text_header) + length + 1);
+    char *out = buffer + sizeof(faber_text_header);
     size_t index;
     for (index = 0; index < length; index++) {
         unsigned char c = (unsigned char)text[index];
@@ -2841,7 +2928,7 @@ static inline faber_text faber_text_case(faber_arena *arena, faber_text text, bo
         out[index] = (char)c;
     }
     out[length] = '\0';
-    return out;
+    return faber_text_seal(buffer, length, (int64_t)length);
 }
 
 /* Unicode White_Space, which `trim` strips from both ends. */
@@ -2883,13 +2970,13 @@ static inline faber_list_text *faber_text_split(faber_arena *arena, faber_text t
     const char *cursor = text;
     if (separator_length == 0) {
         const unsigned char *p = (const unsigned char *)text;
-        faber_list_text_push(arena, list, "");
+        faber_list_text_push(arena, list, faber_text_empty.s);
         while (*p != 0) {
             size_t step = faber_utf8_step(p);
             faber_list_text_push(arena, list, faber_text_copy(arena, (const char *)p, step));
             p += step;
         }
-        faber_list_text_push(arena, list, "");
+        faber_list_text_push(arena, list, faber_text_empty.s);
         return list;
     }
     for (;;) {
@@ -2915,8 +3002,8 @@ static inline faber_text faber_text_replace(faber_arena *arena, faber_text text,
     char *cursor;
     if (from_length == 0) {
         matches = (size_t)faber_text_length(text) + 1;
-        out = faber_alloc(arena, text_length + matches * to_length + 1);
-        cursor = out;
+        out = faber_alloc(arena, sizeof(faber_text_header) + text_length + matches * to_length + 1);
+        cursor = out + sizeof(faber_text_header);
         for (const unsigned char *p = (const unsigned char *)text;; p += faber_utf8_step(p)) {
             memcpy(cursor, to, to_length);
             cursor += to_length;
@@ -2927,14 +3014,17 @@ static inline faber_text faber_text_replace(faber_arena *arena, faber_text text,
             cursor += faber_utf8_step(p);
         }
         *cursor = '\0';
-        return out;
+        return faber_text_seal(out, (size_t)(cursor - out - sizeof(faber_text_header)),
+                               faber_text_count_cps(out + sizeof(faber_text_header),
+                                                    (size_t)(cursor - out -
+                                                             sizeof(faber_text_header))));
     }
     for (const char *scan = strstr(text, from); scan != NULL; scan = strstr(scan + from_length, from)) {
         matches++;
     }
-    out = faber_alloc(arena, text_length + matches * to_length + 1);
+    out = faber_alloc(arena, sizeof(faber_text_header) + text_length + matches * to_length + 1);
     out[0] = '\0';
-    cursor = out;
+    cursor = out + sizeof(faber_text_header);
     for (const char *rest = text;;) {
         const char *hit = strstr(rest, from);
         if (hit == NULL) {
@@ -2950,7 +3040,10 @@ static inline faber_text faber_text_replace(faber_arena *arena, faber_text text,
         rest = hit + from_length;
     }
     *cursor = '\0';
-    return out;
+    return faber_text_seal(out, (size_t)(cursor - out - sizeof(faber_text_header)),
+                           faber_text_count_cps(out + sizeof(faber_text_header),
+                                                (size_t)(cursor - out -
+                                                         sizeof(faber_text_header))));
 }
 
 /* ------------------------------------------------------------------------ */
@@ -3022,15 +3115,18 @@ static inline faber_text faber_try_ascii_pack(faber_arena *arena, faber_i128 val
         return NULL;
     }
     *why = FABER_CONV_OK;
-    out = faber_alloc(arena, (size_t)width + 1);
-    for (at = 0; at < (size_t)width - count; at++) {
-        out[at] = '0';
+    out = faber_alloc(arena, sizeof(faber_text_header) + (size_t)width + 1);
+    {
+        char *digits = out + sizeof(faber_text_header);
+        for (at = 0; at < (size_t)width - count; at++) {
+            digits[at] = '0';
+        }
+        for (at = 0; at < count; at++) {
+            digits[width - 1 - (int64_t)at] = reversed[at];
+        }
+        digits[width] = '\0';
     }
-    for (at = 0; at < count; at++) {
-        out[width - 1 - (int64_t)at] = reversed[at];
-    }
-    out[width] = '\0';
-    return out;
+    return faber_text_seal(out, (size_t)width, width);
 }
 
 /* `numerus ↦ numerus` into a width: in range or not. */
@@ -3184,7 +3280,7 @@ static inline faber_text faber_float_display(faber_arena *arena, double value) {
     if (length >= 2 && shown[length - 2] == '.' && shown[length - 1] == '0') {
         length -= 2;
     }
-    return faber_text_copy(arena, shown, length);
+    return faber_text_make(arena, shown, length, (int64_t)length);
 }
 
 #endif /* FABER_H */

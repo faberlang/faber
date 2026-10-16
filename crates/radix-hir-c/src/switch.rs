@@ -9,7 +9,7 @@
 use crate::Emitter;
 use crate::Local;
 use crate::error::unsupported;
-use crate::expr::{Operand, Value, c_string};
+use crate::expr::{Operand, Value};
 use crate::ty::Ty;
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
@@ -226,7 +226,7 @@ impl Emitter<'_> {
             (Value::Text, HirLiteral::String(symbol)) if !negated => {
                 let raw = self.names.resolve_symbol(*symbol);
                 let decoded = radix_codegen_shared::unescape_faber_text(raw);
-                let text = c_string(&decoded)?;
+                let text = self.text_literal(&decoded)?;
                 self.support.need_stdio();
                 Ok(format!("(strcmp({name}, {text}) == 0)"))
             }

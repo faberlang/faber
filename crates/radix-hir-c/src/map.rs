@@ -6,7 +6,7 @@
 
 use crate::Emitter;
 use crate::error::unsupported;
-use crate::expr::{Operand, Value, c_string, wrap};
+use crate::expr::{Operand, Value, wrap};
 use crate::helpers::{Helper, ListOp};
 use crate::ty::{Elem, Inner, Ty, classify};
 use radix_codegen_shared::CodegenError;
@@ -90,7 +90,7 @@ impl Emitter<'_> {
         for member in members {
             let raw = self.names.resolve_symbol(member.key);
             let decoded = radix_codegen_shared::unescape_faber_text(raw);
-            let key = c_string(&decoded)?;
+            let key = self.text_literal(&decoded)?;
             let value = self.json_value(&member.value, v)?;
             write!(
                 body,
@@ -116,7 +116,7 @@ impl Emitter<'_> {
             (JsonValue::String(symbol), Elem::Text) => {
                 let raw = self.names.resolve_symbol(*symbol);
                 let decoded = radix_codegen_shared::unescape_faber_text(raw);
-                Ok(Operand::new(c_string(&decoded)?, Value::Text))
+                Ok(Operand::new(self.text_literal(&decoded)?, Value::Text))
             }
             _ => Err(unsupported("json value outside the map value class")),
         }
@@ -131,7 +131,7 @@ impl Emitter<'_> {
                 }
                 let raw = self.names.resolve_symbol(*symbol);
                 let decoded = radix_codegen_shared::unescape_faber_text(raw);
-                Ok(Operand::new(c_string(&decoded)?, Value::Text))
+                Ok(Operand::new(self.text_literal(&decoded)?, Value::Text))
             }
             HirObjectKey::Computed(expr) => self.element(expr, k),
             HirObjectKey::Spread(_) => Err(unsupported("spread in a map literal")),

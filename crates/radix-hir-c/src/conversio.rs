@@ -11,7 +11,7 @@
 
 use crate::Emitter;
 use crate::error::unsupported;
-use crate::expr::{Operand, Value, c_string};
+use crate::expr::{Operand, Value};
 use crate::helpers::{Helper, ListOp};
 use crate::ty::{IntWidth, Ty, classify};
 use radix_codegen_shared::CodegenError;
@@ -127,7 +127,10 @@ impl Emitter<'_> {
             }
             (Value::Truth, Ty::Text) => {
                 let tokens = self.names.display_tokens();
-                let (yes, no) = (c_string(&tokens.true_)?, c_string(&tokens.false_)?);
+                let (yes, no) = (
+                    self.text_literal(&tokens.true_)?,
+                    self.text_literal(&tokens.false_)?,
+                );
                 Operand::new(format!("({} ? {yes} : {no})", value.text), Value::Text)
             }
             (Value::Truth, Ty::Int) => {
@@ -593,7 +596,10 @@ impl Emitter<'_> {
     ) -> Result<Operand, CodegenError> {
         self.support.need(Helper::Conv);
         let tokens = self.names.display_tokens();
-        let (yes, no) = (c_string(&tokens.true_)?, c_string(&tokens.false_)?);
+        let (yes, no) = (
+            self.text_literal(&tokens.true_)?,
+            self.text_literal(&tokens.false_)?,
+        );
         let n = self.temps;
         self.temps += 1;
         let (t, v) = (format!("faber_t{n}"), format!("faber_v{n}"));
