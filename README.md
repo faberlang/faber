@@ -365,13 +365,13 @@ How mature each target is, measured on the corpus (662 programs the suite runs, 
 | **Application languages** | | | | |
 | Rust | `rust` | Rust source, or a full Cargo project | suite 645 / 654 | official binary |
 | Go | `go` | Go source | suite 568 / 662 | official binary |
-| TypeScript | `ts` | TypeScript source | suite 609 / 662 | official binary |
+| TypeScript | `ts` | TypeScript source | suite 618 / 662 | official binary |
 | Swift | `swift` | Swift source | suite 347 / 662 | official binary |
-| Python | `python` | self-contained Python | suite 480 / 649 | official binary |
+| Python | `python` | self-contained Python | suite 500 / 649 | official binary |
 | Haskell | `haskell` | Haskell source | 77 of 593 single-file programs emit; 30 of those match the runner | official binary |
 | **Systems and native** | | | | |
-| C | `c` | C11 with a header-only runtime | preview: 223 of 593 single-file programs emit; 222 of those match the runner | public |
-| LLVM | `llvm-text`, `llvm-host` | LLVM IR, or a native executable via clang | suite 535 / 662 | official binary |
+| C | `c` | C11 with a header-only runtime | preview: 282 of 593 single-file programs emit; 282 of those match the runner | public |
+| LLVM | `llvm-text`, `llvm-host` | LLVM IR, or a native executable via clang | suite 536 / 662 | official binary |
 | WebAssembly | `wasm`, `wasm-text` | WebAssembly text | suite 470 / 662 assemble (no host runtime yet) | official binary |
 | Cranelift | `clif` | native objects with no external toolchain | preview: suite 509 / 649 | public |
 | **GPU kernels** (kernel functions only) | | | | |
