@@ -1,0 +1,26 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for norma:toml + norma:value present-key reads (E20).
+# Missing-key reads wait for the runner fix (F17) and are not asserted here.
+# Output must match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:toml" toml
+import from "norma:value" value
+
+main {
+    let value doc ← toml.parse("title = \"x\"\nn = 42\nf = 1.5\nb = true\narr = [1, 2, 3]\n[server]\nport = 8080\nname = \"s\"\n[[items]]\nid = 1\n[[items]]\nid = 2\n")
+    print value.is_map(doc)
+    print value.is_string(value.get(doc, "title"))
+    print value.is_int(value.get(doc, "n"))
+    print value.is_float(value.get(doc, "f"))
+    print value.is_bool(value.get(doc, "b"))
+    print value.is_list(value.get(doc, "arr"))
+    print value.is_instant(value.get(doc, "title"))
+    print value.find(doc, "server.port") ↦ int ⊥ -1
+    print value.get_index(value.get(doc, "arr"), 1) ↦ int ⊥ -1
+    print value.require_string(value.get(doc, "server"), "name")
+    print toml.try_parse("= bad") is none
+    print toml.stringify(doc)
+}

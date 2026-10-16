@@ -1,0 +1,27 @@
+true
+true
+true
+true
+true
+true
+false
+8080
+2
+s
+true
+arr = [1, 2, 3]
+b = true
+f = 1.5
+n = 42
+title = "x"
+[[items]]
+id = 1
+
+[[items]]
+id = 2
+
+[server]
+name = "s"
+port = 8080
+
+
