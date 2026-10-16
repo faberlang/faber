@@ -117,3 +117,14 @@ fn a_bare_none_prints_the_none_word() {
     let code = emitted("main {\n    let none nothing ← null\n    print nothing\n}");
     assert!(code.contains("\"none\""), "{code}");
 }
+
+#[test]
+fn a_ref_cursor_over_an_optional_genus_is_the_pointer() {
+    // `ref Node ∪ none` is a re-bindable pointer: the loop test narrows it and
+    // `cur ← cur.next` moves it.
+    let code = emitted(
+        "class Node {\n    mut int value\n    mut Node next optional\n}\nfn len(Node head) → int {\n    ref Node ∪ none cur ← head\n    mut int n ← 0\n    while cur not is none {\n        n ← n + 1\n        cur ← cur.next\n    }\n    return n\n}\nmain {\n    let Node a ← Node { value = 1 }\n    print len(a)\n}",
+    );
+    assert!(code.contains("g_Node *l_cur"), "{code}");
+    assert!(code.contains("static int64_t f_len(faber_arena *, g_Node *);"), "{code}");
+}

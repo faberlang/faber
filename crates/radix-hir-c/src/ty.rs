@@ -336,7 +336,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
         // already alias (R1). A view of a scalar would need a pointer to the
         // caller's cell, which this subset does not emit.
         Type::Ref(_, inner) => match classify(types, *inner)? {
-            shared @ (Ty::List(_) | Ty::Genus(_)) => Ok(shared),
+            shared @ (Ty::List(_) | Ty::Genus(_) | Ty::Opt(Inner::Genus(_))) => Ok(shared),
             _ => Err(unsupported("ref or mut access to a scalar")),
         },
         Type::Primitive(Primitive::Numerus)
