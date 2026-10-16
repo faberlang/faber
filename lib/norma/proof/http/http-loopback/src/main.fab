@@ -3,37 +3,31 @@ locale = "en"
 +++
 
 # http-loopback: listener lifecycle plus live GET and POST exchanges over an
-# ephemeral loopback port. Each client call is a stored promise started before
-# its accept; the accepted request is answered before the await so both ends
-# meet without a second process, a fixed port, or a port file.
+# ephemeral loopback port, one thread. Each client exchange is split
+# (open_pending writes the request, finish_pending reads the head), so the
+# server side runs between the halves and every step's peer bytes are already
+# in the kernel buffers — the same backlog the tcp-loopback and
+# websocket-loopback proofs rely on. No stored promise, no async task, no
+# second process, no fixed port.
 
 import from "norma:http/client" client
 import from "norma:http/headers" headers
-import from "norma:http/response" response
 import from "norma:http/server" server
-import from "norma:fault" fault
 
-# Client half of the exchange: one GET carrying `x-client: loop`.
-fn fetch_get(string url) async → response.Response ⇥ fault.IoFault {
-    mut headers.Headers request_headers ← headers.empty()
-    if request_headers.append("x-client", "loop") {
-    }
-    return client.get_with(url, request_headers)
-}
-
-# Client half of the second exchange: one POST carrying `post-body`.
-fn fetch_post(string url, string body) async → response.Response ⇥ fault.IoFault {
-    return client.post(url, body)
-}
-
-async_main {
+main {
     let int handle ↤ call 'http:listen' ([0 ↦ value])
     let int port ↤ call 'http:port' (handle)
     assert port ≻ 0
     let string base ← "http://127.0.0.1:§"(port)
 
-    let promise<response.Response ⇥ fault.IoFault> pending ← fetch_get(base + "/hello")
+    mut headers.Headers request_headers ← headers.empty()
+    if request_headers.append("x-client", "loop") {
+    }
 
+    # Client half one: write the GET request, no read yet.
+    let client.Request pending ← client.open_pending("GET", base + "/hello", request_headers, "")
+
+    # Server half: the request bytes are buffered, so accept completes.
     let server.Incoming incoming ← server.accept_incoming(handle)
     assert incoming.req.method ≡ "GET"
     assert incoming.req.path ≡ "/hello"
@@ -46,30 +40,46 @@ async_main {
     }
     server.reply(incoming, 200, response_headers, "hello-body")
 
-    let response.Response got ↢ pending
+    # Client half two: read the head, then drain the body.
+    let client.Receive got ← client.finish_pending(pending)
     assert got.status ≡ 200
-    assert got.body ≡ "hello-body"
-    let string ∪ none proof ← got.header("x-proof")
+    mut string body ← ""
+    mut bool done ← false
+    while not done {
+        let client.Chunk chunk ← got.next()
+        body ← body + chunk.text
+        done ← chunk.done
+    }
+    assert body ≡ "hello-body"
+    let string ∪ none proof ← got.headers.get("x-proof")
     assert proof not is none
     assert (proof ↦ string) ≡ "yes"
 
     # Second exchange on the same listener: POST with a body.
-    let promise<response.Response ⇥ fault.IoFault> pending_post ← fetch_post(base + "/submit", "post-body")
+    mut headers.Headers post_headers ← headers.empty()
+    let client.Request pending_post ← client.open_pending("POST", base + "/submit", post_headers, "post-body")
 
     let server.Incoming incoming_post ← server.accept_incoming(handle)
     assert incoming_post.req.method ≡ "POST"
     assert incoming_post.req.path ≡ "/submit"
     assert incoming_post.req.body ≡ "post-body"
 
-    mut headers.Headers post_headers ← headers.empty()
-    if post_headers.append("x-proof", "posted") {
+    mut headers.Headers proofed_headers ← headers.empty()
+    if proofed_headers.append("x-proof", "posted") {
     }
-    server.reply(incoming_post, 201, post_headers, "created-body")
+    server.reply(incoming_post, 201, proofed_headers, "created-body")
 
-    let response.Response got_post ↢ pending_post
+    let client.Receive got_post ← client.finish_pending(pending_post)
     assert got_post.status ≡ 201
-    assert got_post.body ≡ "created-body"
-    let string ∪ none posted ← got_post.header("x-proof")
+    mut string post_body ← ""
+    mut bool post_done ← false
+    while not post_done {
+        let client.Chunk post_chunk ← got_post.next()
+        post_body ← post_body + post_chunk.text
+        post_done ← post_chunk.done
+    }
+    assert post_body ≡ "created-body"
+    let string ∪ none posted ← got_post.headers.get("x-proof")
     assert posted not is none
     assert (posted ↦ string) ≡ "posted"
 
