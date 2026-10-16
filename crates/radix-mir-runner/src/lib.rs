@@ -1577,8 +1577,26 @@ fn f16_round_f32(x: f32) -> f32 {
 /// (round through f32/f16 and widen back to f64 — the IEEE conversion is
 /// inherently a narrowing cast).
 #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
-fn f16_round_f64(v: f64) -> f64 {
+pub(crate) fn f16_round_f64(v: f64) -> f64 {
     f64::from(f16_round_f32(v as f32))
+}
+
+/// Round the runner's f64 carrier to bfloat16 using round-to-nearest-even.
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "GAPS #1 stages this primitive before store/conversion wiring"
+    )
+)]
+pub(crate) fn bf16_round_f64(v: f64) -> f64 {
+    let bits = (v as f32).to_bits();
+    let rounded = if v.is_nan() {
+        (bits >> 16) | 0x0040
+    } else {
+        bits.wrapping_add(0x7fff + ((bits >> 16) & 1)) >> 16
+    };
+    f64::from(f32::from_bits(rounded << 16))
 }
 
 /// f32 -> f16 round-to-nearest-even (the public faber `f32_to_f16_rn`
