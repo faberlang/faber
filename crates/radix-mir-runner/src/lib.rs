@@ -638,6 +638,8 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     gradient_handles: FxHashMap<u64, GradientStorage>,
     /// Next gradient handle id (monotonic, never reused).
     next_gradient_handle: u64,
+    /// Compiled regex literals, keyed by their interned pattern and flags.
+    regex_literals: RefCell<FxHashMap<(Symbol, Option<Symbol>), Rc<RegexProgram>>>,
     /// Decoded `textus` literals, keyed by interned source symbol.
     textus_literals: RefCell<FxHashMap<Symbol, String>>,
     /// Owned ASCII literals, keyed by interned source symbol.
@@ -719,6 +721,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             block_cache,
             gradient_handles: FxHashMap::default(),
             next_gradient_handle: 0,
+            regex_literals: RefCell::new(FxHashMap::default()),
             textus_literals: RefCell::new(FxHashMap::default()),
             ascii_literals: RefCell::new(FxHashMap::default()),
             value_types: index_value_types(program),
@@ -2839,14 +2842,25 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 // receive no Faber backslash processing. A `textus ↦ regex`
                 // conversion decodes the textus constant through
                 // `MirConstant::String` on its own path.
-                let pattern = regex_pattern(
-                    self.interner.resolve(*pattern),
-                    flags.map(|flags| self.interner.resolve(flags)),
-                );
-                let program = RegexProgram::compile(&pattern).map_err(|payload| {
-                    RunnerError::internal(span, format!("constant regex is invalid: {payload}"))
-                })?;
-                Value::Regex(Rc::new(program))
+                let key = (*pattern, *flags);
+                let cached = self.regex_literals.borrow().get(&key).cloned();
+                let program = if let Some(program) = cached {
+                    program
+                } else {
+                    let pattern_text = regex_pattern(
+                        self.interner.resolve(*pattern),
+                        flags.map(|flags| self.interner.resolve(flags)),
+                    );
+                    let program = RegexProgram::compile(&pattern_text).map_err(|payload| {
+                        RunnerError::internal(span, format!("constant regex is invalid: {payload}"))
+                    })?;
+                    let program = Rc::new(program);
+                    self.regex_literals
+                        .borrow_mut()
+                        .insert(key, Rc::clone(&program));
+                    program
+                };
+                Value::Regex(program)
             }
         })
     }
