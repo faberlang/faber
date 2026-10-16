@@ -1,0 +1,29 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for norma:encoding edges (corpus coverage E20).
+# Output must match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:encoding" encoding
+
+main {
+    print encoding.base64(||)
+    print encoding.base64(|61|)
+    print encoding.base64(|61 62|)
+    print encoding.base64(|61 62 63 64|)
+    print encoding.base64(|ff fe fd|)
+    print encoding.hex(|00 ff|)
+    print encoding.hex(encoding.decode_hex("00FF"))
+    print encoding.try_decode_hex("abc") is none
+    print encoding.try_decode_base64("YWJj") is none
+    print encoding.try_decode_base64("YW=j") is none
+    print encoding.try_decode_base64("YQ") is none
+    print encoding.hex(encoding.decode_base64("YQ=="))
+    print encoding.hex(encoding.decode_base64("YWI="))
+    print encoding.url("a b&c=d/é~-_.")
+    print encoding.encode_url_component("a b&c=d/é~-_.")
+    print encoding.decode_url("a%20b+c%C3%A9")
+    print encoding.decode_url_component("a%20b+c")
+    print encoding.url("")
+}
