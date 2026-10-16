@@ -351,12 +351,12 @@ runner's; a construct a target cannot express yet is rejected by name
 (`unsupported on target <t>: <construct>`), never approximated.
 
 <!-- target-maturity:begin -->
-How mature each target is, measured on the corpus (662 programs the suite runs, each with expected output; 134 more are meant to be refused). "Suite" counts are cases that pass in `corpus-suites/full` (`faber corpus`) out of the cases the suite applies to; the rest are pinned expected failures. C and Haskell have no corpus lane: each single-file program the runner passes was emitted, built with the real toolchain, and its output and exit status compared with the runner's.
+How mature each target is, measured on the corpus (662 programs the suite runs, each with expected output; 134 more are meant to be refused). "Suite" counts are cases that pass in `corpus-suites/full` (`faber corpus`) out of the cases the suite applies to; the rest are pinned expected failures. A library file with no entry function has nothing to run, so it counts on a compiled target when it emits and builds, and on the runner when it checks and lowers to valid MIR. C and Haskell have no corpus lane: each single-file program the runner executes and passes was emitted, built with the real toolchain, and its output and exit status compared with the runner's.
 
 | Target | `-t` | Output | Evidence | Source |
 | --- | --- | --- | --- | --- |
 | **Reference** | | | | |
-| MIR runner | (`faber run`) | executes the program; the oracle | suite 606 / 662 (the rest are pinned expected failures) | public |
+| MIR runner | (`faber run`) | executes the program; the oracle | suite 659 / 662 (the rest are pinned expected failures); 53 of the passes are library files with no entry function, which count when they check and lower to valid MIR | public |
 | Faber | `faber` | canonical Faber in the source's locale (`format`, `convert`) | round-trip 644 / 649 | public |
 | FMIR / FHIR | `fmir`, `fhir` | serialized MIR and analyzed HIR artifacts | no corpus lane (exercised by the package build and run tests) | public |
 | **Application languages** | | | | |
