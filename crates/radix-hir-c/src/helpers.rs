@@ -64,6 +64,9 @@ pub(crate) enum Helper {
     /// A list elementwise operator (`faber_list_<e>_<op>_lift_pair`, …),
     /// which allocates its result list.
     ListLift,
+    /// `faber_try_ascii_pack`: the fixed-width radix digits, which allocate
+    /// their result text.
+    AsciiPack,
 }
 
 /// One operation of a list family (`faber_list_<elem>_<op>`).
@@ -91,6 +94,7 @@ impl Helper {
             | Helper::FloatText
             | Helper::DecimalText
             | Helper::ListLift
+            | Helper::AsciiPack
             | Helper::TextAlloc
             | Helper::List(_, ListOp::New | ListOp::Of | ListOp::Push | ListOp::Show) => true,
             Helper::Types

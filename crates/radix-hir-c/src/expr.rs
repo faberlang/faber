@@ -267,7 +267,19 @@ impl Emitter<'_> {
                 recovery,
                 route: None,
                 implicit: None,
-            } => self.conversion(source, *target, params, recovery.as_deref()),
+            } => {
+                // A bounded `ascii<_>` whose conversion target is still an
+                // inference hole carries its solved capacity on the whole
+                // expression's type.
+                let target = if self.is_bounded_ascii(*target)
+                    && self.ascii_capacity(*target).is_none()
+                {
+                    expr.ty.unwrap_or(*target)
+                } else {
+                    *target
+                };
+                self.conversion(source, target, params, recovery.as_deref())
+            }
             HirExpressionKind::Conversio {
                 source,
                 target: HirConversioTarget::Type(_),

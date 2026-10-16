@@ -81,3 +81,24 @@ fn a_bounded_text_conversion_checks_its_capacity() {
     );
     assert!(code.contains("faber_bounded_text(l_raw, 8)"), "{code}");
 }
+
+#[test]
+fn a_bounded_ascii_resize_checks_the_new_capacity() {
+    let code = emitted(
+        "main {\n    let ascii<8> b ← 'abcd'\n    let ascii<4> shrunk ← b ↦ ascii<4>\n    print shrunk\n}",
+    );
+    assert!(code.contains("faber_text_length("), "{code}");
+    assert!(
+        code.contains("ascii to bounded ascii conversion failed"),
+        "{code}"
+    );
+}
+
+#[test]
+fn an_ascii_pack_is_the_fixed_width_radix() {
+    let code = emitted(
+        "main {\n    let ascii<8> padded ← 37 ↦ ascii<8> via Hex\n    print padded\n}",
+    );
+    assert!(code.contains("faber_try_ascii_pack(faber_a,"), "{code}");
+    assert!(code.contains(", 16, 8,"), "{code}");
+}

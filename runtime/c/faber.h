@@ -2355,6 +2355,15 @@ static inline faber_text faber_bounded_text(faber_text text, int64_t capacity) {
     return text;
 }
 
+/* `ascii<N> ↦ ascii<M>` (D7 resize): the text stays when it fits the new
+ * capacity in code points, and the program ends otherwise. */
+static inline faber_text faber_bounded_ascii(faber_text text, int64_t capacity) {
+    if (faber_text_length(text) > capacity) {
+        faber_trap("ascii to bounded ascii conversion failed");
+    }
+    return text;
+}
+
 /* `s.slice(from, to)`: code-point positions, clamped to the text, empty when
  * `from` is not before `to`; a negative position traps as the runner does. */
 static inline faber_text faber_text_slice(faber_arena *arena, faber_text text, faber_i128 from,
@@ -2552,7 +2561,8 @@ static inline faber_text faber_text_replace(faber_arena *arena, faber_text text,
 enum {
     FABER_CONV_OK = 0,
     FABER_CONV_SYNTAX = 1, /* the text is not a number */
-    FABER_CONV_RANGE = 2   /* a number, but outside the target */
+    FABER_CONV_RANGE = 2,  /* a number, but outside the target */
+    FABER_CONV_NEGATIVE = 3 /* a negative source where only magnitude is taken */
 };
 
 enum {
@@ -2560,7 +2570,8 @@ enum {
     FABER_CONV_TEXT_FLOAT = 1,
     FABER_CONV_INT_INT = 2,
     FABER_CONV_FLOAT_INT = 3,
-    FABER_CONV_TEXT_BOOL = 4
+    FABER_CONV_TEXT_BOOL = 4,
+    FABER_CONV_ASCII_PACK = 5
 };
 
 static inline _Noreturn void faber_conv_fail(int kind, int why) {
@@ -2572,11 +2583,54 @@ static inline _Noreturn void faber_conv_fail(int kind, int why) {
         faber_trap("textus to fractus conversion failed");
     case FABER_CONV_TEXT_BOOL:
         faber_trap("text to bivalens conversion failed");
+    case FABER_CONV_ASCII_PACK:
+        faber_trap(why == FABER_CONV_NEGATIVE ? "ascii_pack_negative_source"
+                                              : "ascii_pack_width_overflow");
     case FABER_CONV_INT_INT:
         faber_trap("numerus to numerus conversion out of range");
     default:
         faber_trap("fractus to numerus conversion out of range");
     }
+}
+
+/* `numerus ↦ ascii<N> via Hex|Bin|Oct`: the zero-padded fixed-width digits
+ * in `arena`. Returns NULL when the value is negative or its digits do not
+ * fit `width`, with `*why` set to the runner's code; the caller traps or
+ * takes the `⊥` fallback. */
+static inline faber_text faber_try_ascii_pack(faber_arena *arena, faber_i128 value, int radix,
+                                              int64_t width, int *why) {
+    static const char alphabet[] = "0123456789abcdef";
+    char reversed[72];
+    size_t count = 0;
+    uint64_t magnitude;
+    char *out;
+    size_t at;
+    if (value < 0) {
+        *why = FABER_CONV_NEGATIVE;
+        return NULL;
+    }
+    magnitude = (uint64_t)value;
+    if (magnitude == 0) {
+        reversed[count++] = '0';
+    }
+    while (magnitude > 0) {
+        reversed[count++] = alphabet[magnitude % (uint64_t)radix];
+        magnitude /= (uint64_t)radix;
+    }
+    if ((int64_t)count > width) {
+        *why = FABER_CONV_RANGE;
+        return NULL;
+    }
+    *why = FABER_CONV_OK;
+    out = faber_alloc(arena, (size_t)width + 1);
+    for (at = 0; at < (size_t)width - count; at++) {
+        out[at] = '0';
+    }
+    for (at = 0; at < count; at++) {
+        out[width - 1 - (int64_t)at] = reversed[at];
+    }
+    out[width] = '\0';
+    return out;
 }
 
 /* `numerus ↦ numerus` into a width: in range or not. */

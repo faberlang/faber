@@ -72,10 +72,23 @@ impl Emitter<'_> {
             let operand = self.bounded_list(&value, elem, capacity, recovery)?;
             return Ok(operand.with_effect(value.effect));
         }
-        // `↦ ascii<N>` (resize or radix formatting) is not part of the subset;
-        // the runner's resize path is itself unsupported.
-        if matches!(self.types.get(target), Type::BoundedAscii { .. }) {
-            return Err(unsupported("conversion to bounded ascii"));
+        // `ascii<N>` targets: a `via Hex|Bin|Oct` pack from an integer, or the
+        // D7 resize from a text (the same counted text, capacity-checked). A
+        // capacity that is still an inference hole (the `ascii<_>` form of a
+        // non-constant source) has no literal to work from, so it is
+        // rejected by name rather than emitted as a plain integer.
+        if self.is_bounded_ascii(target) {
+            let Some(capacity) = self.ascii_capacity(target) else {
+                return Err(unsupported("bounded ascii with a capacity that is not a literal"));
+            };
+            let value = self.expr(source)?;
+            if matches!(value.value, Value::Int | Value::Exact) {
+                return self.ascii_pack(&value, capacity, params, recovery);
+            }
+            if value.value == Value::Text {
+                return self.ascii_resize(&value, capacity, recovery);
+            }
+            return Err(unsupported("conversion to bounded ascii from this value"));
         }
         let class = classify(self.types, target)?;
         let value = self.expr(source)?;
@@ -268,6 +281,105 @@ impl Emitter<'_> {
             _ => operand,
         };
         Ok(operand.with_effect(effect))
+    }
+
+    /// Whether the target (peeling aliases) is a bounded `ascii<N>`.
+    pub(crate) fn is_bounded_ascii(&self, ty: TypeId) -> bool {
+        match self.types.get(ty) {
+            Type::Alias(_, inner) => self.is_bounded_ascii(*inner),
+            Type::BoundedAscii { .. } => true,
+            _ => false,
+        }
+    }
+
+    /// The capacity of an `ascii<N>` target, peeling aliases; `None` for any
+    /// other type (or a non-literal capacity).
+    pub(crate) fn ascii_capacity(&self, ty: TypeId) -> Option<u64> {
+        match self.types.get(ty) {
+            Type::Alias(_, inner) => self.ascii_capacity(*inner),
+            Type::BoundedAscii { capacity } => match self.types.get_index(*capacity) {
+                radix_types::IndexExpr::Literal(value) => Some(*value),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// `numerus ↦ ascii<N> via Hex|Bin|Oct`: zero-padded fixed-width digits.
+    fn ascii_pack(
+        &mut self,
+        value: &Operand,
+        capacity: u64,
+        params: &[Symbol],
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::Conv);
+        self.support.need(Helper::AsciiPack);
+        let mut radix = 10;
+        for param in params {
+            match self.names.resolve_symbol(*param) {
+                "Hex" => radix = 16,
+                "Bin" => radix = 2,
+                "Oct" => radix = 8,
+                _ => {}
+            }
+        }
+        if radix == 10 {
+            return Err(unsupported("ascii pack without a Hex, Bin, or Oct hint"));
+        }
+        let n = self.temps;
+        self.temps += 1;
+        let (v, s) = (format!("faber_v{n}"), format!("faber_s{n}"));
+        let call = format!(
+            "faber_try_ascii_pack(faber_a, {}, {radix}, {capacity}, &{s})",
+            value.text
+        );
+        let tail = match recovery {
+            Some(recovery) => {
+                let fallback = self.expr(recovery)?;
+                if fallback.value != Value::Text {
+                    return Err(unsupported("recovery value of a different class"));
+                }
+                format!("{s} == 0 ? {v} : {};", fallback.text)
+            }
+            None => format!(
+                "if ({s} != 0) {{ faber_conv_fail(FABER_CONV_ASCII_PACK, {s}); }} {v};"
+            ),
+        };
+        let text = format!(
+            "(__extension__ ({{ int {s} = 0; faber_text {v} = {call}; {tail} }}))"
+        );
+        Ok(Operand::new(text, Value::Text).with_effect(value.effect))
+    }
+
+    /// `ascii<N> ↦ ascii<M>` (D7 resize): the counted text when it fits.
+    fn ascii_resize(
+        &mut self,
+        value: &Operand,
+        capacity: u64,
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::TextRead);
+        let n = self.temps;
+        self.temps += 1;
+        let (v, s) = (format!("faber_v{n}"), format!("faber_s{n}"));
+        let tail = match recovery {
+            Some(recovery) => {
+                let fallback = self.expr(recovery)?;
+                if fallback.value != Value::Text {
+                    return Err(unsupported("recovery value of a different class"));
+                }
+                format!("{s} ? {v} : {};", fallback.text)
+            }
+            None => format!(
+                "if (!{s}) {{ faber_trap(\"ascii to bounded ascii conversion failed\"); }} {v};"
+            ),
+        };
+        let text = format!(
+            "(__extension__ ({{ faber_text {v} = {}; bool {s} = faber_text_length({v}) <= {capacity}; {tail} }}))",
+            value.text
+        );
+        Ok(Operand::new(text, Value::Text).with_effect(value.effect))
     }
 
     /// A bounded-list target (`list<T, N>`), peeling aliases: its element type
