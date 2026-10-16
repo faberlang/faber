@@ -10,7 +10,6 @@
 //! Scanned set — every non-test `src` file under workspace members named:
 //!   - `radix-mir` / `radix-mir-*` — all MIR backends + runner
 //!   - `radix-hir` / `radix-hir-*` — all HIR backends
-//!   - `radix-lower-*`
 //!   - `radix-codegen-shared`
 //!
 //! plus `crates/radix-module/src/codegen`.
@@ -27,8 +26,6 @@
 //!     helper (llvm-config/llvm-as/clang), invoked from the faber pipeline.
 //!   - `radix-module/src/aspect/{lean,tla}_checker.rs` — lake/lean/java aspect
 //!     verifier runners.
-//!   - `radix-lower-ts/src/driver.rs` — the `ts-import` node driver
-//!     (default-off feature).
 //!   - `crates/exempla` — corpus e2e harness (not an emit crate).
 //!
 //! `allowlisted_and_out_of_scope_surfaces_still_spawn` below asserts each
@@ -86,7 +83,6 @@ fn scanned_roots(workspace: &Path) -> (Vec<PathBuf>, usize) {
                 || name.starts_with("radix-mir-")
                 || name == "radix-hir"
                 || name.starts_with("radix-hir-")
-                || name.starts_with("radix-lower-")
                 || name == "radix-codegen-shared"
         })
         .map(|package| {
@@ -119,9 +115,6 @@ fn emit_crates_do_not_spawn_toolchains() {
         exclude_path_suffixes: vec![
             // cfg(test) harness spawns: pinned-interpreter golden checks.
             "radix-hir-python/src/golden.rs".to_string(),
-            // Documented out of scope: the ts-import node driver (default-off
-            // feature).
-            "radix-lower-ts/src/driver.rs".to_string(),
         ],
         subtract_self_expect: true,
         check_companion_convention: false,
@@ -155,7 +148,6 @@ fn allowlisted_and_out_of_scope_surfaces_still_spawn() {
     for rel in [
         "crates/faber-leaf/src/process.rs",
         "crates/radix-hir-python/src/golden.rs",
-        "crates/radix-lower-ts/src/driver.rs",
         "crates/radix-module/src/llvm_host.rs",
         "crates/radix-module/src/aspect/lean_checker.rs",
         "crates/radix-module/src/aspect/tla_checker.rs",
