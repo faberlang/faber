@@ -52,17 +52,17 @@ fn t_product(tf32[32] a) → f32 {
 }
 
 @ kernel
-fn t_argmax(tf32[32] a) → int {
+fn t_argmax(tf32[32] a) → i32 {
     return reduce via argmax from a at [i] thread lane let s { return s }
 }
 
 @ kernel
-fn t_argmin(tf32[32] a) → int {
+fn t_argmin(tf32[32] a) → i32 {
     return reduce via argmin from a at [i] thread lane let s { return s }
 }
 
 @ kernel
-fn t_count(tf32[32] a) → int {
+fn t_count(tf32[32] a) → i32 {
     return reduce via count from a at [i] thread lane let s { return s ≻ 2.0 }
 }
 
