@@ -3,7 +3,7 @@
 //! Joins a [`HirAspectReport`] with verifier check results to produce
 //! per-obligation coverage entries and recorded assumptions. Owns the
 //! human-readable coverage report format consumed by the developer CLI;
-//! recognition and checking live in [`report`] and [`tla_checker`]
+//! recognition and checking live in [`report`] and [`lean_checker`]
 //! respectively.
 
 use super::verifier::{HirAspectCheckResult, HirAspectCheckStatus};

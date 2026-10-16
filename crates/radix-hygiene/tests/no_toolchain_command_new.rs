@@ -24,8 +24,8 @@
 //! Documented out of scope (non-emit spawn surfaces, deliberately unpinned):
 //!   - `radix-module/src/llvm_host.rs` — product toolchain discovery + link
 //!     helper (llvm-config/llvm-as/clang), invoked from the faber pipeline.
-//!   - `radix-module/src/aspect/{lean,tla}_checker.rs` — lake/lean/java aspect
-//!     verifier runners.
+//!   - `radix-module/src/aspect/lean_checker.rs` — lake/lean aspect
+//!     verifier runner.
 //!   - `crates/exempla` — corpus e2e harness (not an emit crate).
 //!
 //! `allowlisted_and_out_of_scope_surfaces_still_spawn` below asserts each
@@ -150,7 +150,6 @@ fn allowlisted_and_out_of_scope_surfaces_still_spawn() {
         "crates/radix-hir-python/src/golden.rs",
         "crates/radix-module/src/llvm_host.rs",
         "crates/radix-module/src/aspect/lean_checker.rs",
-        "crates/radix-module/src/aspect/tla_checker.rs",
         "crates/exempla/src/exempla_e2e/llvm_runtime.rs",
     ] {
         let path = workspace.join(rel);
