@@ -309,7 +309,7 @@ message = "تسلسل escape غير صالح"
 help = "استخدم تسلسل escape مدعوما أو اهرب backslash"
 
 [diagnostics.LEX003.issues.unknown_escape]
-message = "escape غير معروف `\\{escape}`؛ لا يهرب النص الحرفي إلا المحدد الخاص به، وbackslash، وn، وt، وr، وu{...}"
+message = "escape غير معروف `\\{escape}`؛ لا يهرب النص الحرفي إلا المحدد الخاص به، وbackslash، وn، وt، وr، وu{{...}"
 help = "أزل backslash، أو اكتب `\\\\` للحصول على backslash"
 
 [diagnostics.LEX004]

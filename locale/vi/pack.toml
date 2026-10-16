@@ -309,7 +309,7 @@ message = "chuỗi escape không hợp lệ"
 help = "dùng chuỗi escape được hỗ trợ hoặc escape dấu gạch chéo ngược"
 
 [diagnostics.LEX003.issues.unknown_escape]
-message = "escape không xác định `\\{escape}`; literal chỉ escape dấu phân cách của chính nó, dấu gạch chéo ngược, n, t, r và u{...}"
+message = "escape không xác định `\\{escape}`; literal chỉ escape dấu phân cách của chính nó, dấu gạch chéo ngược, n, t, r và u{{...}"
 help = "xóa dấu gạch chéo ngược, hoặc viết `\\\\` cho dấu gạch chéo ngược"
 
 [diagnostics.LEX004]

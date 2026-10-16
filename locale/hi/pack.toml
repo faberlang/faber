@@ -309,7 +309,7 @@ message = "अमान्य escape sequence"
 help = "समर्थित escape sequence का उपयोग करें या backslash escape करें"
 
 [diagnostics.LEX003.issues.unknown_escape]
-message = "अज्ञात escape `\\{escape}`; literal केवल अपने delimiter, backslash, n, t, r और u{...} को escape करता है"
+message = "अज्ञात escape `\\{escape}`; literal केवल अपने delimiter, backslash, n, t, r और u{{...} को escape करता है"
 help = "backslash को हटाएं, या backslash के लिए `\\\\` लिखें"
 
 [diagnostics.LEX004]

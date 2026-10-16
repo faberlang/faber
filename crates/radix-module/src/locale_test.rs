@@ -3461,3 +3461,99 @@ fn english_field_text<'a>(en_pack: &'a LocalePack, code: &str, issue: Option<&st
         _ => None,
     }
 }
+
+/// The brace-bearing pack rows (corpus coverage I3, template escaping) must
+/// render their literal braces instead of being read as placeholders. `{{` is
+/// the renderer's literal-brace escape, so a pack doubles the
+/// opening brace of a quoted braced form. LEX003 is owned by all eight packs;
+/// the SEM016/PARSE002 brace rows are `en`/`la` rows, so the other packs fall
+/// back to their base row and are only checked for a clean render.
+#[test]
+fn installed_packs_render_braced_templates_literally() {
+    const PLAIN_ROWS: &[(&str, &str, &[(&str, &str)])] = &[
+        ("PARSE002", "construction_spread_removed", &[("sparge", "…"), ("ex", "…")]),
+        ("SEM016", "record_conversion_requires_reconstruction", &[]),
+        ("SEM016", "inferred_constructor_ambiguous_union", &[]),
+        ("SEM016", "inferred_constructor_entries_need_map", &[]),
+        ("SEM016", "inferred_constructor_fields_for_map", &[]),
+    ];
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let pack = installed_pack(locale);
+
+        let escape = diagnostic_with_code(
+            "LEX003",
+            vec![diagnostic_arg("issue", "unknown_escape"), diagnostic_arg("escape", "q")],
+        );
+        let rendered = pack
+            .render_diagnostic_text(&escape)
+            .unwrap_or_else(|err| panic!("{locale} LEX003.unknown_escape should render: {err:?}"))
+            .unwrap_or_else(|| panic!("{locale} LEX003 row should exist"));
+        assert!(
+            rendered.message.contains("u{...}"),
+            "{locale} LEX003.unknown_escape must render `u{{{{...}}` as `u{{...}}`: {}",
+            rendered.message
+        );
+        assert!(
+            !rendered
+                .message
+                .contains("locale pack template missing placeholder"),
+            "{locale} LEX003.unknown_escape must not miss a template placeholder: {}",
+            rendered.message
+        );
+
+        let no_expected =
+            diagnostic_with_code("SEM016", vec![diagnostic_arg("issue", "inferred_constructor_no_expected_type")]);
+        let rendered = pack
+            .render_diagnostic_text(&no_expected)
+            .unwrap_or_else(|err| {
+                panic!("{locale} SEM016.inferred_constructor_no_expected_type should render: {err:?}")
+            })
+            .unwrap_or_else(|| panic!("{locale} SEM016 row should exist"));
+        assert!(
+            !rendered
+                .message
+                .contains("locale pack template missing placeholder"),
+            "{locale} SEM016.inferred_constructor_no_expected_type must not miss a template placeholder: {}",
+            rendered.message
+        );
+        // The row is `en`/`la` owned; the other packs fall back to the base
+        // SEM016 row, so only the owning templates can prove the literal brace.
+        if pack
+            .diagnostics
+            .get("SEM016")
+            .and_then(|template| template.issues.get("inferred_constructor_no_expected_type"))
+            .is_some()
+        {
+            assert!(
+                rendered.message.contains("{ … }"),
+                "{locale} SEM016.inferred_constructor_no_expected_type must render its literal braces: {}",
+                rendered.message
+            );
+        }
+
+        for &(code, issue, args) in PLAIN_ROWS {
+            let mut diagnostic_args = vec![diagnostic_arg("issue", issue)];
+            diagnostic_args.extend(
+                args.iter()
+                    .map(|(name, value)| diagnostic_arg(name, *value)),
+            );
+            let diagnostic = diagnostic_with_code(code, diagnostic_args);
+            let rendered = pack
+                .render_diagnostic_text(&diagnostic)
+                .unwrap_or_else(|err| panic!("{locale} {code}.{issue} should render: {err:?}"))
+                .unwrap_or_else(|| panic!("{locale} {code} row should exist"));
+            assert!(
+                !rendered
+                    .message
+                    .contains("locale pack template missing placeholder")
+                    && !rendered
+                        .help
+                        .as_deref()
+                        .is_some_and(|help| help.contains("locale pack template missing placeholder")),
+                "{locale} {code}.{issue} must not miss a template placeholder: {} / {:?}",
+                rendered.message,
+                rendered.help
+            );
+        }
+    }
+}

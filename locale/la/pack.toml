@@ -350,7 +350,7 @@ message = "invalid escape sequence"
 help = "use a supported escape sequence or escape the backslash"
 
 [diagnostics.LEX003.issues.unknown_escape]
-message = "unknown escape `\\{escape}`; a literal escapes only its own delimiter, backslash, n, t, r and u{...}"
+message = "unknown escape `\\{escape}`; a literal escapes only its own delimiter, backslash, n, t, r and u{{...}"
 help = "remove the backslash, or write `\\\\` for a backslash"
 
 [diagnostics.LEX004]
@@ -640,7 +640,7 @@ help = "delete 'nexum' and declare an ordinary field: '<type> <name>'"
 
 [diagnostics.PARSE002.issues.construction_spread_removed]
 message = "'{sparge}' is not valid in a construction literal"
-help = "name each field; copy-with-changes is 'Genus { field = value } {ex} source'"
+help = "name each field; copy-with-changes is 'Genus {{ field = value } {ex} source'"
 
 [diagnostics.PARSE002.issues.construction_source_repeated]
 message = "a construction literal takes exactly one '{ex}' source"
@@ -3644,8 +3644,8 @@ message = "conversio in modulus aut saturatus deficere non potest"
 help = "remove praesumptum `⊥`; conversio in modulus aut saturatus deficere non potest"
 
 [diagnostics.SEM016.issues.record_conversion_requires_reconstruction]
-message = "record conversion requires reconstruction; write `Type { field = value, … }` instead of converting with `↦`"
-help = "reconstruct by writing `Type { field = value, … }` instead of converting with `↦`"
+message = "record conversion requires reconstruction; write `Type {{ field = value, … }` instead of converting with `↦`"
+help = "reconstruct by writing `Type {{ field = value, … }` instead of converting with `↦`"
 
 [diagnostics.SEM016.issues.ordo_conversio_string_member]
 message = "this {ordo} has a string-valued member, so it has no numerus conversion"
@@ -3664,19 +3664,19 @@ message = "regex conversion does not support a `⊥` default; regex has no liter
 help = "remove the recovery arm from this regex conversion"
 
 [diagnostics.SEM016.issues.inferred_constructor_no_expected_type]
-message = "`_ { … }` genus exspectatum aedificat, sed hic nullum est"
-help = "genus nominatim scribe `Genus { … }`, vel ligationi, parametro, aut reditui genus expressum da"
+message = "`_ {{ … }` genus exspectatum aedificat, sed hic nullum est"
+help = "genus nominatim scribe `Genus {{ … }`, vel ligationi, parametro, aut reditui genus expressum da"
 
 [diagnostics.SEM016.issues.inferred_constructor_ambiguous_union]
-message = "`_ { … }` genus exspectatum aedificat, sed genus exspectatum plurium generum unio est"
-help = "genus quod significas expressum scribe `Genus { … }`"
+message = "`_ {{ … }` genus exspectatum aedificat, sed genus exspectatum plurium generum unio est"
+help = "genus quod significas expressum scribe `Genus {{ … }`"
 
 [diagnostics.SEM016.issues.inferred_constructor_entries_need_map]
-message = "`_ { \"clavis\": valor, … }` introitus praebet, sed genus exspectatum tabula non est"
+message = "`_ {{ \"clavis\": valor, … }` introitus praebet, sed genus exspectatum tabula non est"
 help = "introitus `\"clavis\": valor` tabulam aedificant; ad genus vel classem campos `nomen = valor` scribe"
 
 [diagnostics.SEM016.issues.inferred_constructor_fields_for_map]
-message = "`_ { nomen = valor, … }` campos praebet, sed genus exspectatum tabula est"
+message = "`_ {{ nomen = valor, … }` campos praebet, sed genus exspectatum tabula est"
 help = "tabula introitus `\"clavis\": valor` accipit; campi `nomen = valor` genus vel classem aedificant"
 
 [diagnostics.SEM016.issues.valor_verte_unsupported]

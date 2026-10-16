@@ -309,7 +309,7 @@ message = "无效转义序列"
 help = "使用受支持的转义序列，或转义反斜杠"
 
 [diagnostics.LEX003.issues.unknown_escape]
-message = "未知转义 `\\{escape}`；字面量只能转义其自身的定界符、反斜杠、n、t、r 和 u{...}"
+message = "未知转义 `\\{escape}`；字面量只能转义其自身的定界符、反斜杠、n、t、r 和 u{{...}"
 help = "移除反斜杠，或写 `\\\\` 表示反斜杠"
 
 [diagnostics.LEX004]
