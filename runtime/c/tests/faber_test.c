@@ -245,6 +245,32 @@ int main(int argc, char **argv) {
         check_int("stress map survivor value", value, 199 * 3);
     }
 
+    /* `push_all` reserves once and copies in bulk; a spread of a list into
+     * itself duplicates the elements instead of walking forever. */
+    {
+        int64_t items[300];
+        faber_list_i64 *source;
+        faber_list_i64 *target;
+        int64_t sum = 0;
+        for (index = 0; index < 300; index++) {
+            items[index] = index;
+        }
+        source = faber_list_i64_of(&arena, 300, items);
+        target = faber_list_i64_new(&arena, 0);
+        faber_list_i64_push_all(&arena, target, source);
+        check_int("push_all len", target->len, 300);
+        for (index = 0; index < 300; index++) {
+            sum += target->items[index] == index;
+        }
+        check_int("push_all contents", sum, 300);
+        faber_list_i64_push_all(&arena, target, target);
+        check_int("push_all self len", target->len, 600);
+        check_int("push_all self first", target->items[0], 0);
+        check_int("push_all self last", target->items[599], 299);
+        faber_list_i64_push_all(&arena, target, faber_list_i64_new(&arena, 0));
+        check_int("push_all empty len", target->len, 600);
+    }
+
     if (failures != 0) {
         fprintf(stderr, "faber_test: %d failed\n", failures);
         return 1;

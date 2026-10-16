@@ -1836,11 +1836,43 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         list->items[list->len++] = item;                                                \
     }                                                                                   \
                                                                                         \
-    /* `[1, spread xs, 4]`: append every element of `other` in order. */                 \
+    /* `[1, spread xs, 4]`: append every element of `other` in order. A                 \
+     * growable list reserves once and copies in bulk; a bounded list keeps            \
+     * the per-element pushes so the at-capacity trap fires exactly where it           \
+     * always did. Reading `other`'s items before any growth makes a spread            \
+     * of a list into itself duplicate the elements (the per-element form              \
+     * could walk a growing list forever). */                                          \
     static inline void faber_list_##NAME##_push_all(faber_arena *arena,                 \
                                                     faber_list_##NAME *list,            \
                                                     const faber_list_##NAME *other) {   \
+        int64_t count = other->len;                                                     \
+        const TYPE *from = other->items;                                                \
         int64_t at;                                                                     \
+        if (!list->fixed && count > 0) {                                                \
+            int64_t total;                                                              \
+            if (count > INT64_MAX - list->len) {                                        \
+                faber_trap("collection capacity overflow");                             \
+            }                                                                           \
+            total = list->len + count;                                                  \
+            if (total > list->cap) {                                                    \
+                int64_t capacity = faber_collection_next_capacity(total - 1);           \
+                TYPE *items = faber_alloc(                                              \
+                    arena, faber_collection_allocation_size(capacity, sizeof(TYPE)));   \
+                if (list->len > 0) {                                                    \
+                    memcpy(items, list->items,                                          \
+                           faber_collection_allocation_size(list->len, sizeof(TYPE)));  \
+                }                                                                       \
+                memcpy(items + list->len, from,                                         \
+                       faber_collection_allocation_size(count, sizeof(TYPE)));          \
+                list->items = items;                                                    \
+                list->cap = capacity;                                                   \
+            } else {                                                                    \
+                memcpy(list->items + list->len, from,                                   \
+                       faber_collection_allocation_size(count, sizeof(TYPE)));          \
+            }                                                                           \
+            list->len = total;                                                          \
+            return;                                                                     \
+        }                                                                               \
         for (at = 0; at < other->len; at++) {                                           \
             faber_list_##NAME##_push(arena, list, other->items[at]);                    \
         }                                                                               \
