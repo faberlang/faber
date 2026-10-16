@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/textus/range-index.fab"
+group = "language"
+input_root = "corpus"
+input = "textus/range-index.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
