@@ -69,7 +69,7 @@ impl FunctionBuilder<'_> {
         if !self.is_device_lowering()
             && object
                 .ty
-                .is_some_and(|ty| radix_semantic::tensor_bracket::is_tensor_type(self.types, ty))
+                .is_some_and(|ty| radix_semantic::tensor_bracket::is_coordinate_bracket_receiver(self.types, ty))
         {
             return self.lower_tensor_bracket_get(object, index, expr);
         }

@@ -1620,6 +1620,15 @@ impl FunctionBuilder<'_> {
         args: &[HirCallArg],
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        // WHY: the coordinate methods (`accipe` / `apud` /
+        // `ponde`) are receiver-generic registry rows that lower through the
+        // `TensorGet` / `TensorSet` collection op, not the register-matrix
+        // method path below (which rejects non-literal shapes and >4x4 before
+        // it ever reads the method name). Fall through to the generic
+        // method-intrinsic dispatch.
+        if matches!(method_name, "accipe" | "apud" | "ponde") {
+            return None;
+        }
         let receiver_ty = receiver.ty?;
         let Type::Matrix(element_ty, shape) = self.normalized_type(receiver_ty).clone() else {
             return None;
@@ -5035,7 +5044,11 @@ impl FunctionBuilder<'_> {
     /// tensor's literal extents. The checker types such a call as non-failable,
     /// so lowering must not give it an error channel either.
     fn literal_index_in_static_bounds(&self, payload: TypeId, index: &HirExpression) -> bool {
-        let Type::Tensor(_, shape) = self.types.get(payload) else {
+        // The checker's static range proof (`classify_static_index_range`)
+        // covers a `matrix` receiver on the same coordinate contract, so the
+        // literal-in-bounds proof must agree for a matrix too; otherwise a
+        // checker-infallible call would be given an error channel here.
+        let (Type::Tensor(_, shape) | Type::Matrix(_, shape)) = self.types.get(payload) else {
             return false;
         };
         let bounds: Option<Vec<u64>> = match self.types.get_index(*shape) {
