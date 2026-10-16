@@ -629,22 +629,27 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
             })
             .collect::<Vec<_>>()
     };
-    let collected = if collect_stats {
-        let outcome = radix_mir_runner::run_function_with_kernel_dispatcher_and_stats(
-            validated, entry, host, &hook,
-        )
-        .map_err(runner_diagnostics)?;
-        outcome.result.map_err(runner_diagnostics)?;
-        Some(outcome.stats)
-    } else {
-        radix_mir_runner::run_function_with_kernel_dispatcher(validated, entry, host, &hook)
-            .map_err(runner_diagnostics)?;
-        None
-    };
-    if let Some(code) = exit_code {
+    // The dispatcher outcome carries the entry's evaluated return: the MIR
+    // entry pass lowers an `exit <expr>` tail as an int-returning entry, so a
+    // `numerus` return is the process status and the planned constant is only
+    // the fallback for a vacuum entry (the same rule as the FMIR image and the
+    // plain runner route). Reading the return on the unmetered arm too keeps a
+    // dynamic exit from being silently dropped now that plan time admits it.
+    let outcome = radix_mir_runner::run_function_with_kernel_dispatcher_and_stats(
+        validated, entry, host, &hook,
+    )
+    .map_err(runner_diagnostics)?;
+    outcome.result.map_err(runner_diagnostics)?;
+    if let Some(radix_mir_runner::Value::Int(code)) = outcome.return_value {
+        // WHY: a process exit status is `i32` while the Faber `numerus`
+        // carrier is `i64`; truncate exactly as the trap path does.
+        #[allow(clippy::cast_possible_truncation)]
+        let exit_code = code as i32;
+        host.exit(exit_code);
+    } else if let Some(code) = exit_code {
         host.exit(code);
     }
-    Ok(collected)
+    Ok(collect_stats.then_some(outcome.stats))
 }
 
 /// Whether the package lowers at least one `@ kernel` function: the `auto`
