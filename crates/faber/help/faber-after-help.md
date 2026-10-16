@@ -39,9 +39,10 @@ Common flows:
   Run with arguments forwarded after `--`:
     faber run . -- --flag value
 
-  Device execution (Metal/CUDA, differentiable-GPU campaign S1-6):
+  Device execution (Metal/CUDA):
     faber run --device metal <device-package>   # Apple Metal
-    faber run --device cuda  <device-package>   # NVIDIA CUDA
+    faber run --device cuda  <device-package>   # NVIDIA CUDA (driver + clang
+                                                # with the NVPTX target)
     faber run --device auto  <device-package>   # exactly one admitted device
     faber run --device reference <input>        # plain sequential code on the MIR
                                                 # runner; the oracle device
@@ -54,13 +55,16 @@ Common flows:
     `--device` takes auto|reference|cpu|metal|cuda. Precedence: `--device` > manifest
     `[device] device` > auto.
 
-    A device-capable package has an `@ nucleum` kernel and a `[device]` manifest
-    section (device + inputs). The packaged image's `device` section carries
-    the canonical device program and the MSL/PTX artifacts; the composite host
-    (host driver) runs the kernel on a real Metal/CUDA session and reports the
-    selected device + artifact hash + outputs. Explicit GPU requests never
-    silently fall back; failures carry stable codes (E_BACKEND_UNAVAILABLE,
-    E_DEVICE_*, E_NO_DEVICE_PROGRAM).
+    A device-capable package declares at least one `@ kernel` function; a
+    `[device]` manifest table is configuration, not a requirement. `metal` and
+    `cuda` run the program on the MIR runner and launch each kernel in process
+    on the selected GPU: Metal source for Apple GPUs, or PTX that `clang`
+    (NVPTX target) builds from the NVVM emitter for the NVIDIA driver. The run
+    prints the selected device first. A kernel the backend cannot lower fails
+    at its call, naming the function. Explicit GPU requests never silently
+    fall back; failures carry stable codes (E_DEVICE_UNAVAILABLE: no runtime
+    for that device on this machine; E_DEVICE_NONE_ADMITTED: no usable device
+    or no kernel lowers; E_NO_DEVICE_PROGRAM).
     See `faber targets` (metal-text/llvm-text rows).
 
   Native host executables (llvm-host-parity, Stage 9):

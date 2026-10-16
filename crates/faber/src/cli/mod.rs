@@ -662,15 +662,18 @@ pub struct RunArgs {
     /// manifest `[device] device` wins; otherwise the default `auto` applies.
     /// Precedence: CLI > manifest > `auto`. An explicit device request never
     /// silently falls back: it fails closed before launch
-    /// (`E_BACKEND_UNAVAILABLE`) when the device is not admitted on this
-    /// machine, and a package with no device program fails closed ("package
-    /// has no device program"). `reference` is plain sequential code on the
+    /// (`E_DEVICE_UNAVAILABLE` when this machine has no runtime for it,
+    /// `E_DEVICE_NONE_ADMITTED` when the runtime finds no usable device), and
+    /// a package with no device program fails closed ("package has no device
+    /// program"). `reference` is plain sequential code on the
     /// MIR runner, the oracle device results are checked against; `cpu` is
     /// processor cores as a device (until the worker device lands this is the
     /// same route as `reference`). Both lower `@ kernel` functions as ordinary
     /// functions and run them single-threaded on the MIR runner; without one
-    /// of them a program that calls a kernel is refused. Device programs execute
-    /// through the host driver (the first-party target runtime).
+    /// of them a program that calls a kernel is refused. `metal` and `cuda` run
+    /// kernels in process: Metal on Apple GPUs, CUDA through the NVIDIA driver
+    /// with a PTX image built at run time (`clang` with the NVPTX target on
+    /// `PATH`).
     #[arg(long = "device", value_enum, value_name = "DEVICE")]
     pub device: Option<DeviceChoice>,
 
