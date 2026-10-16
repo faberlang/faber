@@ -19,7 +19,7 @@ mod format_spec;
 mod inf;
 mod ins;
 #[allow(dead_code, clippy::all, clippy::pedantic)]
-#[path = "../../rust/src/magnus.rs"]
+#[path = "../../../crates/handroll/src/magnus.rs"]
 mod magnus;
 mod regex_program;
 mod regex_rt;
