@@ -186,13 +186,14 @@ fn range_operands_evaluate_left_to_right_and_once() {
 const KERNEL: &str = r"
 @ kernel
 @ public
-fn k(ti32[8] a, mut ti32[8] o) → void {
+fn k(ti32[8] a, mut tensor<wrapping<i32>, [8]> o) → void {
     for from a at [i] thread lane let c {
         if c ∈ 1‥3 {
             o[i] ← 1
         } else {
             o[i] ← 0
         }
+        # K1 ruling e24149ab: explicit wrapping storage permits this accumulator store.
         if c ∉ 2…3 {
             o[i] ← o[i] + 10
         }
@@ -205,7 +206,7 @@ main {
     a[2] ← 2
     a[3] ← 3
     a[4] ← 4
-    mut ti32[8] b ← ti32[8] {}
+    mut tensor<wrapping<i32>, [8]> b ← tensor<wrapping<i32>, [8]> {}
     k(a, mut b)
     print b[0]
     print b[1]
