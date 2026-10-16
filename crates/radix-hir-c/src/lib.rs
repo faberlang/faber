@@ -177,7 +177,6 @@ impl CCodegen<'_> {
             generics: FxHashSet::default(),
             variants: FxHashMap::default(),
             equals: Vec::new(),
-            sponte_params: FxHashSet::default(),
             ref_params: FxHashSet::default(),
         }
         .program(hir)
@@ -235,10 +234,6 @@ pub(crate) struct Emitter<'a> {
     variants: FxHashMap<DefId, (DefId, usize)>,
     /// Enumerations whose structural equality function was asked for.
     equals: Vec<DefId>,
-    /// Parameters declared `optional` with no default: their C storage is the
-    /// optional of the declared type, but the HIR type is the payload, so a
-    /// body read must not be guard-narrowed (the runner keeps the none).
-    sponte_params: FxHashSet<DefId>,
     /// `ref`/`mut` scalar parameters: the C storage is a pointer to the
     /// caller's cell, so a body read and a body store go through it, and a
     /// matching call-site marker passes the caller's address. Definition ids

@@ -317,9 +317,8 @@ impl Emitter<'_> {
             let class = match (param.optional, param.default.is_some()) {
                 (true, false) => {
                     // The C storage is the optional of the declared type; the
-                    // HIR type stays the payload, so a body read must not be
-                    // guard-narrowed (the runner keeps the none for coalesce).
-                    self.sponte_params.insert(param.def_id);
+                    // HIR type stays the payload, so a body read narrows only
+                    // where the typechecker proved it present.
                     match Inner::from_ty(class) {
                         Some(inner) => Ty::Opt(inner),
                         None => {

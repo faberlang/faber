@@ -164,13 +164,23 @@ impl Emitter<'_> {
         operand
     }
 
+    /// A read that wants the optional value itself, not a guard-narrowed
+    /// payload: a direct path read is taken unwidened, because only a path
+    /// read narrows. A nested base read (`a.b`) still narrows normally.
+    fn optional_subject(&mut self, subject: &HirExpression) -> Result<Operand, CodegenError> {
+        match &subject.kind {
+            HirExpressionKind::Path(def_id) => self.path(*def_id),
+            _ => self.expr(subject),
+        }
+    }
+
     /// `x is none` / `x not is none` (and `≡ null` / `≢ null`).
     pub(crate) fn none_test(
         &mut self,
         is_none: bool,
         subject: &HirExpression,
     ) -> Result<Operand, CodegenError> {
-        let value = self.expr(subject)?;
+        let value = self.optional_subject(subject)?;
         let Value::Opt(inner) = value.value else {
             return Err(unsupported("none test of a value that is not optional"));
         };
@@ -189,7 +199,9 @@ impl Emitter<'_> {
         left: &HirExpression,
         right: &HirExpression,
     ) -> Result<Operand, CodegenError> {
-        let l = self.expr(left)?;
+        // The left side wants the optional value itself, not a guard-narrowed
+        // payload: `x coalesce y` tests the optional.
+        let l = self.optional_subject(left)?;
         let Value::Opt(inner) = l.value else {
             // A left side that cannot be none is its own value: the fallback
             // never runs, so it is not evaluated.

@@ -452,6 +452,15 @@ pub(crate) fn classify_ref(types: &TypeTable, ty: TypeId) -> Result<Option<Ty>, 
     }
 }
 
+/// The class a guard-proved read narrows to: strip an alias and a `ref`/`mut`
+/// view, then classify.
+pub(crate) fn read_class(types: &TypeTable, ty: TypeId) -> Option<Ty> {
+    match types.get(ty) {
+        Type::Alias(_, inner) | Type::Ref(_, inner) => read_class(types, *inner),
+        _ => classify(types, ty).ok(),
+    }
+}
+
 /// The class of a function result: `None` for a function with no result.
 pub(crate) fn returns(types: &TypeTable, ty: TypeId) -> Result<Option<Ty>, CodegenError> {
     match types.get(ty) {

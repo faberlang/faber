@@ -186,8 +186,7 @@ impl Emitter<'_> {
                 // Typecheck narrows the type of a read the guard proved
                 // present; the cell is still the optional.
                 if let (Value::Opt(inner), Some(ty)) = (operand.value, expr.ty)
-                    && classify(self.types, ty).is_ok_and(|class| class == inner.ty())
-                    && !self.sponte_params.contains(def_id)
+                    && crate::ty::read_class(self.types, ty) == Some(inner.ty())
                 {
                     return Ok(Self::narrow_read(&operand, inner));
                 }
@@ -618,7 +617,11 @@ impl Emitter<'_> {
             }
             let Some(expr) = expr else {
                 if pointer {
-                    return Err(unsupported("scalar borrow argument omitted"));
+                    // An omitted `optional` slot: the callee reads a none cell.
+                    // A compound literal's address lives for the call.
+                    let none = self.none_of(*param)?;
+                    operands.push(Operand::new(format!("(&{})", none.text), Value::Void));
+                    continue;
                 }
                 operands.push(self.none_of(*param)?);
                 continue;
@@ -626,13 +629,29 @@ impl Emitter<'_> {
             // A `ref`/`mut` scalar parameter takes the address of the caller's
             // cell (or the pointer a borrowing parameter already holds).
             if pointer {
-                if !matches!(
+                if matches!(
                     marker,
                     Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
                 ) {
-                    return Err(unsupported("scalar borrow without a caller place"));
+                    operands.push(Operand::new(self.caller_address(expr)?, Value::Void));
+                    continue;
                 }
-                operands.push(Operand::new(self.caller_address(expr)?, Value::Void));
+                // A `ref` parameter called with a value has no caller cell:
+                // the runner has nothing to write back, so a compound literal
+                // at block scope — which lives for the whole block — is the
+                // exact view.
+                let class = *param;
+                let value = self.expr(expr)?;
+                let operand = self.settle(value, class)?;
+                if operand.value != Value::from(class) {
+                    return Err(unsupported("value stored without a store check"));
+                }
+                let c_type = self.c_type(class)?;
+                let address = match class {
+                    Ty::Opt(_) => format!("(&{})", operand.text),
+                    _ => format!("(&(({c_type}){{ {} }}))", operand.text),
+                };
+                operands.push(Operand::new(address, Value::Void));
                 continue;
             }
             let mut operand = self.expr(expr)?;
@@ -1047,7 +1066,7 @@ impl Emitter<'_> {
         Ok(Operand::new(wrap(&prelude, &call), value).with_effect(effect))
     }
 
-    fn path(&self, def_id: radix_hir::DefId) -> Result<Operand, CodegenError> {
+    pub(crate) fn path(&self, def_id: radix_hir::DefId) -> Result<Operand, CodegenError> {
         match self.locals.get(&def_id) {
             Some(local) => {
                 // A `ref`/`mut` scalar parameter is a pointer to the caller's
