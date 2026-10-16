@@ -384,9 +384,6 @@ fn semantic_missing_type_annotation_help(args: &[DiagnosticArg]) -> Option<Strin
         | "sermo_type_not_registered" => {
             Some("ensure built-in frame types are registered before typechecking".to_owned())
         }
-        "explicit_type_arg_inference_unsupported" => {
-            Some("replace inferred explicit type arguments with concrete types".to_owned())
-        }
         "vacua_requires_declared_type" => {
             Some("add a declared collection type for vacua".to_owned())
         }
@@ -1162,7 +1159,6 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
         "cede" => "`cede` is outside the v1 AIR subset".to_owned(),
         "cli_mounted_function" => "CLI-mounted functions are outside the v1 AIR subset".to_owned(),
         "closure" => "closures are outside the v1 AIR subset".to_owned(),
-        "conditional_recovery" => "conditional recovery is outside the v1 AIR subset".to_owned(),
         "defaulted_parameter" => "defaulted parameters are outside the v1 AIR subset".to_owned(),
         "deferred_local_init" => {
             "deferred local initialization is outside the v1 AIR subset".to_owned()
@@ -1284,7 +1280,6 @@ fn semantic_invalid_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
         | "missing_directive"
         | "missing_lane_value"
         | "non_string_lane_value"
-        | "unexpected_token"
         | "unknown_directive"
         | "unknown_lane"
         | "unsupported_placement" => Some(

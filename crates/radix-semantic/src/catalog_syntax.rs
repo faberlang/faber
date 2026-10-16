@@ -435,25 +435,12 @@ pub fn parse_help(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<String
 
 // PARAMETERS
 
-fn invalid_parameter_message(args: &[DiagnosticArg]) -> Option<String> {
-    let issue = arg_value(args, "issue")?;
-    match issue {
-        "parameter_access_modifier_pair" => {
-            Some("parameter carries both a mode prefix and a type marker; use one".to_owned())
-        }
-        _ => None,
-    }
+fn invalid_parameter_message(_args: &[DiagnosticArg]) -> Option<String> {
+    None
 }
 
-fn invalid_parameter_help(args: &[DiagnosticArg]) -> Option<String> {
-    let issue = arg_value(args, "issue")?;
-    match issue {
-        "parameter_access_modifier_pair" => Some(
-            "write either the parameter mode prefix or the type-position marker, not both"
-                .to_owned(),
-        ),
-        _ => None,
-    }
+fn invalid_parameter_help(_args: &[DiagnosticArg]) -> Option<String> {
+    None
 }
 
 // STATEMENTS
@@ -639,7 +626,7 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
             "reducta_source" => {
                 return Some("expected a reduction source after the reduction operator".to_owned());
             }
-            "itera_mode" | "allocator_kind" | "mutability_marker" => {
+            "itera_mode" | "mutability_marker" => {
                 let expected = arg_value(args, "expected")?;
                 return Some(format!("expected {expected}"));
             }
@@ -730,9 +717,6 @@ fn expected_help_issue(issue: &str, args: &[DiagnosticArg]) -> Option<String> {
         }
         "itera_mode" => {
             return Some("choose one iteration mode before the iterable expression".to_owned());
-        }
-        "allocator_kind" => {
-            return Some("use \"arena\" or \"page\" as the allocator kind".to_owned());
         }
         "annotation_name" => return Some("add an annotation name after @".to_owned()),
         other => expected_help_issue_late(other, args),
@@ -984,7 +968,6 @@ fn invalid_type_message(args: &[DiagnosticArg]) -> Option<String> {
             let sugar = arg_value(args, "sugar")?;
             Some(format!("{sugar} sugar uses bracket Figura"))
         }
-        "invalid_figura_index" => Some("index literal must be a natural number".to_owned()),
         "numeric_wrapper_retired" => {
             let form = arg_value(args, "form")?;
             Some(format!("`{form}` is a retired numeric type spelling"))
@@ -1029,7 +1012,6 @@ fn invalid_type_help(args: &[DiagnosticArg]) -> Option<String> {
             let sugar = arg_value(args, "sugar")?;
             Some(format!("write the shape with {sugar} width sugar brackets"))
         }
-        "invalid_figura_index" => Some("use a non-negative shape index".to_owned()),
         "numeric_wrapper_retired" => {
             let form = arg_value(args, "form")?;
             let bare = arg_value(args, "bare")?;
