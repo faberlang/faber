@@ -167,3 +167,28 @@ fn several_bounds_each_contribute_members() {
          si a.confer(b) ≻ 0 { redde a.nomen() }\n    redde b.nomen()\n}\n",
     );
 }
+
+#[test]
+fn implet_missing_method_names_genus_contract_method() {
+    test_support::assert_rejects_with_args(
+        "implendum Salutans {\n    functio saluta() → textus\n    functio vale() → textus\n}\n\n\
+         genus Persona implet Salutans {\n    varia textus nomen\n\n    \
+         functio saluta() → textus { redde ego.nomen }\n}\n\nincipit { }\n",
+        &[
+            DiagnosticArg::new("issue", "implet_missing_method"),
+            DiagnosticArg::new("genus", "Persona"),
+            DiagnosticArg::new("contract", "Salutans"),
+            DiagnosticArg::new("method", "vale"),
+        ],
+    );
+}
+
+#[test]
+fn implet_method_signature_mismatch_reports_expected_and_found() {
+    test_support::assert_rejects_with_issue(
+        "implendum Legens {\n    functio lege() → numerus\n}\n\n\
+         genus Charta implet Legens {\n    functio lege() → textus { redde \"charta\" }\n}\n\n\
+         incipit { }\n",
+        "implet_method_signature_mismatch",
+    );
+}
