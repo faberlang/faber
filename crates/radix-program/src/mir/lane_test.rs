@@ -1092,7 +1092,7 @@ fn hidden<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tens
 }
 
 @ public
-fn touch(int x) → int {
+fn touch(i32 x) → i32 {
     return x
 }
 "#;
