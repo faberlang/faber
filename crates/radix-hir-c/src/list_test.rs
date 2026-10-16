@@ -66,7 +66,10 @@ fn a_modular_list_uses_its_width_family() {
         "main {\n    let list<wrapping<u32>> xs ← [1, 4294967295]\n    print xs\n    print xs.sorted()\n}",
     );
     assert!(code.contains("faber_list_u32_of(faber_a, 2"), "{code}");
-    assert!(code.contains("faber_list_u32_show(faber_a, l_xs)"), "{code}");
+    assert!(
+        code.contains("faber_list_u32_show(faber_a, l_xs)"),
+        "{code}"
+    );
     assert!(
         code.contains("faber_list_u32_sorted(faber_a, l_xs)"),
         "{code}"
@@ -76,9 +79,7 @@ fn a_modular_list_uses_its_width_family() {
 #[test]
 fn a_modular_list_element_reduces_at_its_store() {
     // `300` is not a `u8`; the element store reduces it modulo 2^8.
-    let code = emitted(
-        "main {\n    let list<wrapping<u8>> xs ← [300]\n    print xs\n}",
-    );
+    let code = emitted("main {\n    let list<wrapping<u8>> xs ← [300]\n    print xs\n}");
     assert!(code.contains("faber_store_wrapping_u8("), "{code}");
 }
 

@@ -195,7 +195,9 @@ impl Emitter<'_> {
         }
         for item in &hir.items {
             if let HirItemKind::Struct(_) = &item.kind {
-                items.constants.push_str(&self.class_constants(item.def_id)?);
+                items
+                    .constants
+                    .push_str(&self.class_constants(item.def_id)?);
             }
         }
         items.genera = self.genus_declarations(&order)?;

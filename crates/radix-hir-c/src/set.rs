@@ -156,7 +156,8 @@ impl Emitter<'_> {
         let prelude = self.sequence(&mut operands);
         let [set, other] = operands;
         self.need_class(Ty::Set(elem));
-        let name = set_algebra_name(op).ok_or_else(|| unsupported("set method outside the subset"))?;
+        let name =
+            set_algebra_name(op).ok_or_else(|| unsupported("set method outside the subset"))?;
         let call = format!(
             "faber_set_{}_{name}(faber_a, {}, {})",
             elem.suffix(),

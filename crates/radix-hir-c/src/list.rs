@@ -179,7 +179,11 @@ impl Emitter<'_> {
 
     /// One element value of class `elem`: an exact value that arrives with
     /// no store node narrows like any unwrapped store.
-    pub(crate) fn element(&mut self, value: &HirExpression, elem: Elem) -> Result<Operand, CodegenError> {
+    pub(crate) fn element(
+        &mut self,
+        value: &HirExpression,
+        elem: Elem,
+    ) -> Result<Operand, CodegenError> {
         let operand = self.expr(value)?;
         let operand = match elem {
             Elem::Int => self.fit(operand)?,

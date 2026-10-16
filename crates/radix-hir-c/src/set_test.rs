@@ -18,7 +18,10 @@ fn set_algebra_returns_a_new_set() {
         "main {\n    let set<int> a ← empty\n    let set<int> b ← empty\n    print a.union(b).length(), a.intersection(b).length()\n    print a.is_subset(b), a.is_superset(b)\n}",
     );
     assert!(code.contains("faber_set_i64_union(faber_a,"), "{code}");
-    assert!(code.contains("faber_set_i64_intersection(faber_a,"), "{code}");
+    assert!(
+        code.contains("faber_set_i64_intersection(faber_a,"),
+        "{code}"
+    );
     assert!(code.contains("faber_set_i64_is_subset("), "{code}");
 }
 

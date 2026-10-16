@@ -286,10 +286,12 @@ impl Emitter<'_> {
                 then_catch: None,
                 else_block: Some(else_block),
             } => self.conditional(expr, cond, then_block, else_block),
-            HirExpressionKind::Vacua => match expr.ty.map(|ty| classify(self.types, ty)).transpose()? {
-                Some(Ty::Set(elem)) => Ok(self.empty_set(elem)),
-                _ => self.empty_list(expr),
-            },
+            HirExpressionKind::Vacua => {
+                match expr.ty.map(|ty| classify(self.types, ty)).transpose()? {
+                    Some(Ty::Set(elem)) => Ok(self.empty_set(elem)),
+                    _ => self.empty_list(expr),
+                }
+            }
             HirExpressionKind::Array(elements) => self.list_literal(expr, elements),
             HirExpressionKind::Index(base, index) => self.list_read(base, index),
             // `copy x` on a value (a bind or a return), `own x` a transfer.
@@ -816,7 +818,9 @@ impl Emitter<'_> {
         let [l, r] = operands;
         let (list, member) = if left_is_list { (l, r) } else { (r, l) };
         if member.value != Value::from(list_elem.ty()) {
-            return Err(unsupported("membership of a value of another element class"));
+            return Err(unsupported(
+                "membership of a value of another element class",
+            ));
         }
         self.need_class(Ty::List(list_elem));
         let call = format!(
@@ -825,11 +829,7 @@ impl Emitter<'_> {
             list.text,
             member.text
         );
-        let text = if negated {
-            format!("(!{call})")
-        } else {
-            call
-        };
+        let text = if negated { format!("(!{call})") } else { call };
         Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect))
     }
 
