@@ -1325,9 +1325,6 @@ impl TypeChecker<'_> {
         rhs: &HirExpression,
         rhs_ty: TypeId,
     ) -> bool {
-        if self.current_device_function {
-            return false;
-        }
         let other = match (is_const_int(lhs), is_const_int(rhs)) {
             (true, false) => rhs_ty,
             (false, true) => lhs_ty,
