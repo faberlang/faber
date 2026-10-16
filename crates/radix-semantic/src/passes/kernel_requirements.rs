@@ -340,6 +340,19 @@ pub fn check(
             _ => {}
         }
     }
+    let const_values: FxHashMap<DefId, i128> = hir
+        .items
+        .iter()
+        .filter_map(|item| {
+            let HirItemKind::Constant(konst) = &item.kind else {
+                return None;
+            };
+            (konst.statica.is_some() && !konst.mutable)
+                .then(|| crate::passes::const_int_value(&konst.value))
+                .flatten()
+                .map(|value| (item.def_id, value))
+        })
+        .collect();
     let mut kernels = Vec::new();
     for item in &hir.items {
         match &item.kind {
@@ -348,6 +361,7 @@ pub fn check(
                     item.def_id,
                     function,
                     &facts,
+                    &const_values,
                     types,
                     interner,
                     tensor_edge_policies,
@@ -362,6 +376,7 @@ pub fn check(
                     types,
                     interner,
                     &facts,
+                    &const_values,
                     recursive_kernels,
                 );
                 kernels.push(kernel);
@@ -373,6 +388,7 @@ pub fn check(
                             method.def_id,
                             &method.func,
                             &facts,
+                            &const_values,
                             types,
                             interner,
                             tensor_edge_policies,
@@ -387,6 +403,7 @@ pub fn check(
                             types,
                             interner,
                             &facts,
+                            &const_values,
                             recursive_kernels,
                         );
                         kernels.push(kernel);
@@ -422,6 +439,7 @@ fn analyze_kernel(
     def_id: DefId,
     function: &HirFunction,
     facts: &TypeFacts,
+    const_values: &FxHashMap<DefId, i128>,
     types: &TypeTable,
     interner: &Interner,
     tensor_edge_policies: &TensorEdgePolicyTable,
@@ -433,6 +451,7 @@ fn analyze_kernel(
         facts,
         interner,
         tensor_edge_policies,
+        const_values,
         ranges: FxHashMap::default(),
         range_only_bindings: FxHashSet::default(),
         coordinate_ranges: FxHashMap::default(),
@@ -531,6 +550,7 @@ fn analyze_limes_callbacks(
     types: &TypeTable,
     interner: &Interner,
     facts: &TypeFacts,
+    const_values: &FxHashMap<DefId, i128>,
     recursive_kernels: &FxHashSet<DefId>,
 ) {
     analyze_limes_callbacks_inner(
@@ -541,6 +561,7 @@ fn analyze_limes_callbacks(
         types,
         interner,
         facts,
+        const_values,
         recursive_kernels,
         &mut FxHashSet::default(),
     );
@@ -554,6 +575,7 @@ fn analyze_limes_callbacks_inner(
     types: &TypeTable,
     interner: &Interner,
     facts: &TypeFacts,
+    const_values: &FxHashMap<DefId, i128>,
     recursive_kernels: &FxHashSet<DefId>,
     active_callbacks: &mut FxHashSet<DefId>,
 ) {
@@ -612,6 +634,7 @@ fn analyze_limes_callbacks_inner(
                 callback_def,
                 callback,
                 facts,
+                const_values,
                 types,
                 interner,
                 policies,
@@ -640,6 +663,7 @@ fn analyze_limes_callbacks_inner(
                 types,
                 interner,
                 facts,
+                const_values,
                 recursive_kernels,
                 active_callbacks,
             );
@@ -953,6 +977,7 @@ struct BodyFacts<'a> {
     facts: &'a TypeFacts,
     interner: &'a Interner,
     tensor_edge_policies: &'a TensorEdgePolicyTable,
+    const_values: &'a FxHashMap<DefId, i128>,
     ranges: FxHashMap<DefId, AbstractRange>,
     range_only_bindings: FxHashSet<DefId>,
     coordinate_ranges: FxHashMap<DefId, Vec<AbstractRange>>,
@@ -1090,12 +1115,7 @@ impl BodyFacts<'_> {
                 self.check_intermediate(expr.span, range.clone());
                 range
             }
-            HirExpressionKind::Path(def_id) => self
-                .ranges
-                .get(def_id)
-                .cloned()
-                .or_else(|| expr.ty.map(|ty| AbstractRange::from_type(ty, self.types)))
-                .unwrap_or_else(AbstractRange::unknown),
+            HirExpressionKind::Path(def_id) => self.path_range(*def_id, expr.ty),
             HirExpressionKind::Index(base, index) => {
                 let index_range = self.evaluate_index_coordinates(index);
                 let index_range = self
@@ -1851,14 +1871,23 @@ impl BodyFacts<'_> {
         self.ranges.insert(def_id, AbstractRange(Some(next)));
     }
 
+    fn path_range(&self, def_id: DefId, ty: Option<TypeId>) -> AbstractRange {
+        self.ranges
+            .get(&def_id)
+            .cloned()
+            .or_else(|| {
+                self.const_values
+                    .get(&def_id)
+                    .copied()
+                    .map(AbstractRange::exact)
+            })
+            .or_else(|| ty.map(|ty| AbstractRange::from_type(ty, self.types)))
+            .unwrap_or_else(AbstractRange::unknown)
+    }
+
     fn peek_range(&self, expr: &HirExpression) -> AbstractRange {
         match &expr.kind {
-            HirExpressionKind::Path(def_id) => self
-                .ranges
-                .get(def_id)
-                .cloned()
-                .or_else(|| expr.ty.map(|ty| AbstractRange::from_type(ty, self.types)))
-                .unwrap_or_else(AbstractRange::unknown),
+            HirExpressionKind::Path(def_id) => self.path_range(*def_id, expr.ty),
             HirExpressionKind::Literal(_) => crate::passes::const_int_value(expr)
                 .map_or_else(AbstractRange::unknown, AbstractRange::exact),
             HirExpressionKind::Unary(op, operand) => unary_range(*op, self.peek_range(operand)),
