@@ -110,25 +110,27 @@ incipit {
 "#,
             expect: ValueEqualityExpect::RejectsIssue(NUMERIC_VALUE_EQ_ISSUE),
         },
+        // `≅`/`≇` lower to `Eq`/`NotEq`: whole-value equality on same-typed
+        // non-numeric operands stays admitted.
         ValueEqualityCase {
-            name: "textus_self_approx_eq_rejects",
+            name: "textus_self_approx_eq_accepts",
             source: r#"
 incipit {
     sit textus a ← "x"
     adfirma a ≅ a
 }
 "#,
-            expect: ValueEqualityExpect::RejectsIssue(NUMERIC_VALUE_EQ_ISSUE),
+            expect: ValueEqualityExpect::Accepts,
         },
         ValueEqualityCase {
-            name: "textus_self_approx_not_eq_rejects",
+            name: "textus_self_approx_not_eq_accepts",
             source: r#"
 incipit {
     sit textus a ← "x"
     adfirma a ≇ a
 }
 "#,
-            expect: ValueEqualityExpect::RejectsIssue(NUMERIC_VALUE_EQ_ISSUE),
+            expect: ValueEqualityExpect::Accepts,
         },
         ValueEqualityCase {
             name: "bivalens_approx_rejects",

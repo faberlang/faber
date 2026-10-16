@@ -1601,15 +1601,19 @@ impl TypeChecker<'_> {
         if !self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty)
             && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
         {
-            // The numeric requirement is the operator's admission law, not a
-            // fallback for mixed types: a same-typed non-numeric pair (text,
-            // bivalens, enum, tuple) must be rejected here rather than fall
-            // through to `numeric_value_equality_types`, whose equal-type early
-            // return would admit it and defer the failure to MIR validation.
+            // The numeric requirement is the operator's admission law for the
+            // fuzzy glyphs only, not a fallback for mixed types: `≈`/`≉` have
+            // no MIR primitive (`mir_bin_op` returns None), so a same-typed
+            // non-numeric pair (text, bivalens, enum, tuple) must be rejected
+            // here rather than fall through to `numeric_value_equality_types`,
+            // whose equal-type early return would admit it and defer the
+            // failure to MIR validation. `≅`/`≇` lower to `Eq`/`NotEq` and keep
+            // whole-value equality on same-typed non-numeric operands.
             let lhs_resolved = self.resolve_inferred_type(lhs_ty);
             let rhs_resolved = self.resolve_inferred_type(rhs_ty);
             let unresolved = self.is_infer(lhs_resolved) || self.is_infer(rhs_resolved);
-            if lhs_resolved != self.error_type
+            if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq)
+                && lhs_resolved != self.error_type
                 && rhs_resolved != self.error_type
                 && !unresolved
                 && (!self.is_numeric(lhs_ty) || !self.is_numeric(rhs_ty))
