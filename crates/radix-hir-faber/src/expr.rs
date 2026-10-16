@@ -262,7 +262,14 @@ impl super::FaberCodegen<'_> {
                 self.write_expr_prec(operand, parent_prec, names, surface, writer);
             }
             HirExpressionKind::Literal(lit) => self.write_literal(lit, surface, writer),
-            HirExpressionKind::ReadLine(_) => writer.write(surface.contextual_keyword("lege")),
+            // `lege`/`lineam` are two distinct reads: bare whole-input `lege`
+            // versus the line-oriented `lineam`. The lowered flag carries the
+            // authored mode, so emission must restore the matching word or the
+            // re-emitted source silently changes meaning.
+            HirExpressionKind::ReadLine(is_line) => {
+                let key = if *is_line { "lineam" } else { "lege" };
+                writer.write(surface.contextual_keyword(key));
+            }
             HirExpressionKind::Assign(..)
             | HirExpressionKind::Binary(..)
             | HirExpressionKind::Unary(..)
