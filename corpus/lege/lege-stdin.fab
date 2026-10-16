@@ -1,0 +1,27 @@
++++
+term = "lege"
+explains = ["lege"]
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "sit_decl", "lege_expr", "expression", "nota_stmt"]
+category = "io"
+canonical = true
+summary = "Reads all of stdin to end of input."
+syntax = "lege"
+related = ["lineam", "scribe"]
+locale = "en"
++++
+# =============================================================================
+# lege-stdin — Reads all of stdin to end of input.
+# =============================================================================
+#
+# Q-E5 (ruled 2026-10-15): "read" returns all of stdin to EOF; "read line" one
+# line without its terminator. The returned text keeps the input's newlines,
+# including the last one.
+#
+# See also: lege, lineam, scribe
+# =============================================================================
+
+main {
+    let _ all ← read
+    print all
+}
