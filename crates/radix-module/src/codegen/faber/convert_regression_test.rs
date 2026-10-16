@@ -187,7 +187,7 @@ functio simple_loss(tensor<f32, [2, 2]> x, tensor<f32, [2, 2]> w) → f32 {
 }
 
 functio gradientes(tensor<f32, [2, 2]> x, tensor<f32, [2, 2]> w) → f32 {
-    sit grads ← loss_backward(x, w, nil(), 1.0)
+    sit _ grads ← loss_backward(x, w, nil(), 1.0)
     sit [_, gw] ← grads
     redde gw.media()
 }
@@ -369,15 +369,15 @@ functio probe(Tabulatio t) → numerus {
 
 #[test]
 fn deferred_hole_binding_converts_without_materializing_the_inferred_type() {
-    // ON-S1: an initializer-free `sit` binding re-emits as the inferred `let` (no hole word).
+    // ON-S1: an initializer-free `sit _` binding re-emits as `let _` (the hole stays).
     // Materializing the inferred type (`const string label`) changes the
     // authored surface and fails output re-validation with
     // `authored_type_form_map_diverged`, which blocked every reader-locale
     // render of the devsite's deferred-binding fence.
-    let source = "+++\nlocale = \"la\"\n+++\nincipit {\n    sit label\n    label ← \"deferred\"\n}\n";
+    let source = "+++\nlocale = \"la\"\n+++\nincipit {\n    sit _ label\n    label ← \"deferred\"\n}\n";
     let code = convert_to_en(source);
     assert!(
-        code.contains("let label"),
+        code.contains("let _ label"),
         "initializer-free hole binding must re-emit as `_`, not a materialized type:\n{code}"
     );
     assert!(

@@ -165,7 +165,7 @@ fn glyph_dot_scalar_operands_do_not_silently_pass() {
         r"incipit {
   sit numerus a ← 1
   sit numerus b ← 2
-  sit c ← a · b
+  sit _ c ← a · b
 }",
         "glyph_operands_unsupported",
         "·",

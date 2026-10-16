@@ -506,7 +506,7 @@ main {}",
 fn r5_a_copy_into_is_not_a_value_to_initialize_with() {
     assert_rejects(
         r"fn t(tf32[3, 3] a, mut tf32[3, 3] b) → void {
-    let c ← b ⇇ a
+    let _ c ← b ⇇ a
 }
 main {}",
         SemanticErrorKind::TypeMismatch,

@@ -49,15 +49,15 @@ fn summa(list<int> numeri) → int {
 }
 
 main {
-    let prima ← [1, 2]
-    let secunda ← [3, 4]
-    let omnes ← [0, spread prima, spread secunda, 5]
+    let _ prima ← [1, 2]
+    let _ secunda ← [3, 4]
+    let _ omnes ← [0, spread prima, spread secunda, 5]
 
     let [initium, alterum, tertium] ← omnes
     print "caput: § § §"(initium, alterum, tertium)
 
-    let paria ← omnes.filter(int n ∴ n % 2 ≡ 0)
-    let aucta ← paria.map(int n → int ∴ do {
+    let _ paria ← omnes.filter(int n ∴ n % 2 ≡ 0)
+    let _ aucta ← paria.map(int n → int ∴ do {
         return n + 10
     })
 

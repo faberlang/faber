@@ -473,7 +473,7 @@ fn imported_nondum_function_is_refused_through_the_extracted_interface() {
 #[test]
 fn imported_nondum_function_value_use_is_refused_through_the_extracted_interface() {
     let diagnostics = analyze_nondum_consumer(
-        "importa ex \"model:types\" model\nincipit {\n    sit f ← model.later\n    tacet\n}\n",
+        "importa ex \"model:types\" model\nincipit {\n    sit _ f ← model.later\n    tacet\n}\n",
     )
     .expect_err("a value use of an imported nondum function must not compile");
     assert_eq!(

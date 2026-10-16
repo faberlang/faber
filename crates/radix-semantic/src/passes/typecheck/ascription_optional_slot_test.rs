@@ -86,7 +86,7 @@ fn declaration_form_nested_json_map_rejects_requires_valor() {
 fn ascribed_nested_json_map_rejects_requires_valor() {
     crate::test_support::assert_rejects_with_issue_la(
         r#"incipit {
-  sit n ← {"a": {"b": 1}} ∷ tabula<textus, tabula<textus, numerus>>
+  sit _ n ← {"a": {"b": 1}} ∷ tabula<textus, tabula<textus, numerus>>
   nota n
 }"#,
         "json_nested_value_requires_valor",
@@ -107,7 +107,7 @@ fn declaration_form_list_of_json_maps_checks() {
 fn ascribed_list_of_json_maps_checks() {
     accepts(&compile(
         r#"incipit {
-  sit l ← [{"a": 1}] ∷ lista<tabula<textus, numerus>>
+  sit _ l ← [{"a": 1}] ∷ lista<tabula<textus, numerus>>
   nota l
 }"#,
     ));
@@ -117,7 +117,7 @@ fn ascribed_list_of_json_maps_checks() {
 fn ascribed_list_of_json_maps_with_wrong_value_rejects() {
     rejects(&compile(
         r#"incipit {
-  sit l ← [{"a": "x"}] ∷ lista<tabula<textus, numerus>>
+  sit _ l ← [{"a": "x"}] ∷ lista<tabula<textus, numerus>>
   nota l
 }"#,
     ));

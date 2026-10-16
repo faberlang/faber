@@ -93,9 +93,9 @@ fn emits_numeric_operator_methods_as_rust_glyph_operations() {
     let source = r"
 incipit {
     sit fractus a ← 1.5
-    sit sum ← a.addita(2.0)
-    sit gt ← a.maior(1.0)
-    sit le ← a.minime(2.0)
+    sit _ sum ← a.addita(2.0)
+    sit _ gt ← a.maior(1.0)
+    sit _ le ← a.minime(2.0)
     varia fractus acc ← 10.0
     acc.adde(5.0)
     nota sum, gt, le, acc
@@ -128,8 +128,8 @@ fn emits_bitwise_operator_methods_as_rust_glyph_operations() {
     let source = r"
 incipit {
     sit numerus mask ← 12
-    sit bits ← mask.coniuncta(10)
-    sit inv ← mask.complementata()
+    sit _ bits ← mask.coniuncta(10)
+    sit _ inv ← mask.complementata()
     varia numerus acc ← 15
     acc.coniunge(8)
     nota bits, inv, acc
@@ -233,8 +233,8 @@ fn emits_shift_operator_methods_as_rust_glyph_operations() {
     let source = r"
 incipit {
     sit numerus n ← 1
-    sit left ← n.sinistrata(4)
-    sit right ← n.dextrata(2)
+    sit _ left ← n.sinistrata(4)
+    sit _ right ← n.dextrata(2)
     varia numerus acc ← 16
     acc.sinistra(1)
     acc.dextra(1)
@@ -262,7 +262,7 @@ fn rejects_shift_operator_on_fractus_receiver() {
         "shift-fractus.fab",
         r"incipit {
     sit fractus x ← 1.0
-    sit y ← x.sinistrata(1.0)
+    sit _ y ← x.sinistrata(1.0)
 }",
         AnalyzeRequest::default(),
     );
@@ -286,7 +286,7 @@ fn rejects_bitwise_operator_on_fractus_receiver() {
         "bitwise-fractus.fab",
         r"incipit {
     sit fractus x ← 1.0
-    sit y ← x.coniuncta(1.0)
+    sit _ y ← x.coniuncta(1.0)
 }",
         AnalyzeRequest::default(),
     );

@@ -41,7 +41,7 @@ locale = "en"
 #
 
 main {
-    let code ← 200
+    let _ code ← 200
     switch code {
         case 200 {
             print "ok"

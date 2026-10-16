@@ -29,7 +29,7 @@ locale = "la"
 #     stores each link.
 #
 # Common mistakes:
-#   • using `↤` when the destination type is inferred — `sit x ↤ …` is
+#   • using `↤` when the destination type is inferred — `sit _ x ↤ …` is
 #     rejected (no concrete conversion target).
 #   • `⊥` default on ordinary `←` — legal only on `↤`; `⇥` never takes a value.
 #

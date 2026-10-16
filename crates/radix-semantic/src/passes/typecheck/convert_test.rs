@@ -21,18 +21,18 @@ functio bad(Foo f) → numerus {
 
 #[test]
 fn textus_to_regex_conversio_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { sit r ← "\\d+" ↦ regex }"#);
+    test_support::assert_accepts_la(r#"incipit { sit _ r ← "\\d+" ↦ regex }"#);
 }
 
 #[test]
 fn ascii_to_regex_conversio_typechecks_via_textus_widening() {
-    test_support::assert_accepts_la(r"incipit { sit r ← '(?g)\\d+' ↦ regex }");
+    test_support::assert_accepts_la(r"incipit { sit _ r ← '(?g)\\d+' ↦ regex }");
 }
 
 #[test]
 fn regex_conversio_rejects_recovery_slot() {
     test_support::assert_rejects_with_issue_la(
-        r#"incipit { sit r ← "\\d[" ↦ regex ⊥ "\\d+" }"#,
+        r#"incipit { sit _ r ← "\\d[" ↦ regex ⊥ "\\d+" }"#,
         "regex_recovery_unsupported",
     );
 }
@@ -42,7 +42,7 @@ fn regex_literal_pattern_has_no_length_cap() {
     // The conversion is the one place a pattern is compiled; there is no
     // check-time length policy on the literal.
     let pattern = "a".repeat(1100);
-    let source = format!(r#"incipit {{ sit r ← "{pattern}" ↦ regex }}"#);
+    let source = format!(r#"incipit {{ sit _ r ← "{pattern}" ↦ regex }}"#);
     test_support::assert_accepts_la(&source);
 }
 
@@ -56,7 +56,7 @@ fn regex_conversio_dynamic_source_with_text_channel_typechecks() {
 #[test]
 fn conversio_recovery_type_mismatch_rejects() {
     test_support::assert_rejects_with_issue_la(
-        r#"incipit { sit n ← "x" ↦ numerus ⊥ "string" }"#,
+        r#"incipit { sit _ n ← "x" ↦ numerus ⊥ "string" }"#,
         "conversio_recovery_type_mismatch",
     );
 }
@@ -64,7 +64,7 @@ fn conversio_recovery_type_mismatch_rejects() {
 #[test]
 fn intervallum_clamp_operand_type_mismatch_rejects_with_structured_issue_arg() {
     test_support::assert_rejects_with_issue_la(
-        r#"incipit { sit clamped ← "x" ↦ 0‥10 }"#,
+        r#"incipit { sit _ clamped ← "x" ↦ 0‥10 }"#,
         "intervallum_clamp_operand_type_mismatch",
     );
 }
@@ -176,7 +176,7 @@ fn truthiness_conversio_rejects_recovery_slot() {
         "'no' ↦ bivalens ⊥ verum",
     ] {
         test_support::assert_rejects_with_issue_la(
-            &format!("incipit {{ sit b ← {source} }}"),
+            &format!("incipit {{ sit _ b ← {source} }}"),
             "bivalens_recovery_unsupported",
         );
     }
@@ -184,18 +184,18 @@ fn truthiness_conversio_rejects_recovery_slot() {
 
 #[test]
 fn textus_to_octeti_conversio_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { sit b ← "hi" ↦ octeti }"#);
+    test_support::assert_accepts_la(r#"incipit { sit _ b ← "hi" ↦ octeti }"#);
 }
 
 #[test]
 fn octeti_to_textus_conversio_typechecks() {
-    test_support::assert_accepts_la(r"incipit { sit s ← |68 69| ↦ textus }");
+    test_support::assert_accepts_la(r"incipit { sit _ s ← |68 69| ↦ textus }");
 }
 
 #[test]
 fn lista_numerus_to_textus_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit {\n  sit lista<numerus> a ← [72, 105]\n  sit s ← a ↦ textus\n}",
+        "incipit {\n  sit lista<numerus> a ← [72, 105]\n  sit _ s ← a ↦ textus\n}",
         "lista_to_textus_unsupported",
     );
 }
@@ -203,7 +203,7 @@ fn lista_numerus_to_textus_conversio_rejects() {
 #[test]
 fn lista_textus_to_textus_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit {\n  sit lista<textus> a ← [\"x\", \"y\"]\n  sit s ← a ↦ textus\n}",
+        "incipit {\n  sit lista<textus> a ← [\"x\", \"y\"]\n  sit _ s ← a ↦ textus\n}",
         "lista_to_textus_unsupported",
     );
 }
@@ -225,23 +225,27 @@ fn bounded_textus_conversio_accepts_inline_recovery() {
 
 #[test]
 fn octeti_variable_to_textus_conversio_stays_legal() {
-    test_support::assert_accepts_la("incipit {\n  sit octeti b ← |68 69|\n  sit s ← b ↦ textus\n}");
+    test_support::assert_accepts_la(
+        "incipit {\n  sit octeti b ← |68 69|\n  sit _ s ← b ↦ textus\n}",
+    );
 }
 
 #[test]
 fn ascii_octeti_conversio_roundtrip_typechecks() {
-    test_support::assert_accepts_la("incipit {\n  sit b ← 'hi' ↦ octeti\n  sit a ← b ↦ ascii\n}");
+    test_support::assert_accepts_la(
+        "incipit {\n  sit _ b ← 'hi' ↦ octeti\n  sit _ a ← b ↦ ascii\n}",
+    );
 }
 
 #[test]
 fn octeti_textus_recovery_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { sit s ← |ff| ↦ textus ⊥ "?" }"#);
+    test_support::assert_accepts_la(r#"incipit { sit _ s ← |ff| ↦ textus ⊥ "?" }"#);
 }
 
 #[test]
 fn fractus_to_octeti_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit b ← 1.5 ↦ octeti }",
+        "incipit { sit _ b ← 1.5 ↦ octeti }",
         "numeric_to_octeti_unspecified",
     );
 }
@@ -249,7 +253,7 @@ fn fractus_to_octeti_conversio_rejects() {
 #[test]
 fn bivalens_to_octeti_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit b ← verum ↦ octeti }",
+        "incipit { sit _ b ← verum ↦ octeti }",
         "numeric_to_octeti_unspecified",
     );
 }
@@ -257,7 +261,7 @@ fn bivalens_to_octeti_conversio_rejects() {
 #[test]
 fn octeti_to_fractus_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit f ← |00| ↦ fractus }",
+        "incipit { sit _ f ← |00| ↦ fractus }",
         "octeti_to_fractus_unspecified",
     );
 }
@@ -277,92 +281,92 @@ fn primitive_conversio_matrix_cases() -> &'static [ConversioMatrixCase] {
     &[
         ConversioMatrixCase {
             name: "numerus_to_fractus",
-            source: "incipit { sit f ← 42 ↦ fractus }",
+            source: "incipit { sit _ f ← 42 ↦ fractus }",
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "numerus_to_bivalens",
-            source: "incipit { sit b ← 42 ↦ bivalens }",
+            source: "incipit { sit _ b ← 42 ↦ bivalens }",
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "numerus_to_textus",
-            source: "incipit { sit s ← 42 ↦ textus }",
+            source: "incipit { sit _ s ← 42 ↦ textus }",
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "fractus_to_numerus",
-            source: "incipit { sit n ← 1.5 ↦ numerus via Trunc }",
+            source: "incipit { sit _ n ← 1.5 ↦ numerus via Trunc }",
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "fractus_to_bivalens",
-            source: "incipit { sit b ← 1.5 ↦ bivalens }",
+            source: "incipit { sit _ b ← 1.5 ↦ bivalens }",
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "fractus_to_textus",
-            source: "incipit { sit s ← 1.5 ↦ textus }",
+            source: "incipit { sit _ s ← 1.5 ↦ textus }",
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "bivalens_to_numerus",
-            source: "incipit { sit n ← verum ↦ numerus }",
+            source: "incipit { sit _ n ← verum ↦ numerus }",
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "bivalens_to_fractus",
-            source: "incipit { sit f ← verum ↦ fractus }",
+            source: "incipit { sit _ f ← verum ↦ fractus }",
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "bivalens_to_textus",
-            source: "incipit { sit s ← verum ↦ textus }",
+            source: "incipit { sit _ s ← verum ↦ textus }",
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "textus_to_numerus",
-            source: r#"incipit { sit n ← "42" ↦ numerus }"#,
+            source: r#"incipit { sit _ n ← "42" ↦ numerus }"#,
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "textus_to_fractus",
-            source: r#"incipit { sit f ← "1.5" ↦ fractus }"#,
+            source: r#"incipit { sit _ f ← "1.5" ↦ fractus }"#,
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "textus_to_bivalens",
-            source: r#"incipit { sit b ← "hi" ↦ bivalens }"#,
+            source: r#"incipit { sit _ b ← "hi" ↦ bivalens }"#,
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "ascii_to_bivalens",
-            source: "incipit { sit b ← 'hi' ↦ bivalens }",
+            source: "incipit { sit _ b ← 'hi' ↦ bivalens }",
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "ascii_to_textus",
-            source: "incipit { sit s ← 'hi' ↦ textus }",
+            source: "incipit { sit _ s ← 'hi' ↦ textus }",
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
             name: "numerus_to_octeti",
-            source: "incipit { sit b ← 42 ↦ octeti }",
+            source: "incipit { sit _ b ← 42 ↦ octeti }",
             expect: MatrixExpect::RejectsIssue("numeric_to_octeti_unspecified"),
         },
         ConversioMatrixCase {
             name: "octeti_to_numerus",
-            source: "incipit { sit n ← |00| ↦ numerus }",
+            source: "incipit { sit _ n ← |00| ↦ numerus }",
             expect: MatrixExpect::RejectsIssue("octeti_to_numerus_unspecified"),
         },
         ConversioMatrixCase {
             name: "octeti_to_bivalens",
-            source: "incipit { sit b ← |00| ↦ bivalens }",
+            source: "incipit { sit _ b ← |00| ↦ bivalens }",
             expect: MatrixExpect::RejectsIssue("octeti_to_bivalens_unsupported"),
         },
         ConversioMatrixCase {
             name: "non_text_to_regex",
-            source: "incipit { sit r ← 42 ↦ regex }",
+            source: "incipit { sit _ r ← 42 ↦ regex }",
             expect: MatrixExpect::RejectsIssue("regex_operand_unsupported"),
         },
         ConversioMatrixCase {
@@ -447,22 +451,22 @@ fn primitive_conversio_matrix_cases() -> &'static [ConversioMatrixCase] {
         },
         ConversioMatrixCase {
             name: "valor_verte_tabula",
-            source: r#"incipit { sit valor v ← { "a": 1 } ↦ valor sit m ← v ∷ tabula<textus, numerus> }"#,
+            source: r#"incipit { sit valor v ← { "a": 1 } ↦ valor sit _ m ← v ∷ tabula<textus, numerus> }"#,
             expect: MatrixExpect::RejectsIssue("valor_verte_unsupported"),
         },
         ConversioMatrixCase {
             name: "valor_to_cursor",
-            source: r"incipit { sit valor v ← [1] sit c ← v ↦ cursor<numerus> }",
+            source: r"incipit { sit valor v ← [1] sit _ c ← v ↦ cursor<numerus> }",
             expect: MatrixExpect::RejectsIssue("valor_to_cursor_boundary"),
         },
         ConversioMatrixCase {
             name: "valor_to_promissum",
-            source: r"incipit { sit valor v ← 1 sit p ← v ↦ promissum<numerus> }",
+            source: r"incipit { sit valor v ← 1 sit _ p ← v ↦ promissum<numerus> }",
             expect: MatrixExpect::RejectsIssue("valor_to_promissum_boundary"),
         },
         ConversioMatrixCase {
             name: "valor_to_regex",
-            source: r#"incipit { sit valor v ← "x" sit r ← v ↦ regex }"#,
+            source: r#"incipit { sit valor v ← "x" sit _ r ← v ↦ regex }"#,
             expect: MatrixExpect::RejectsIssue("valor_to_regex_unsupported"),
         },
         ConversioMatrixCase {
@@ -527,26 +531,26 @@ fn primitive_conversio_matrix_typecheck() {
 
 #[test]
 fn lista_to_copia_conversio_typechecks() {
-    test_support::assert_accepts_la("incipit { sit s ← [1, 2, 2] ↦ copia<numerus> }");
+    test_support::assert_accepts_la("incipit { sit _ s ← [1, 2, 2] ↦ copia<numerus> }");
 }
 
 #[test]
 fn copia_to_lista_conversio_typechecks() {
     test_support::assert_accepts_la(
-        "incipit {\n  varia copia<numerus> s ← vacua\n  s.adde(1)\n  sit xs ← s ↦ lista<numerus>\n}",
+        "incipit {\n  varia copia<numerus> s ← vacua\n  s.adde(1)\n  sit _ xs ← s ↦ lista<numerus>\n}",
     );
 }
 
 #[test]
 fn tensor_to_lista_conversio_typechecks() {
     test_support::assert_accepts_la(
-        "incipit {\n  sit tensor<numerus, []> t ← vacua\n  sit xs ← t ↦ lista<numerus>\n}",
+        "incipit {\n  sit tensor<numerus, []> t ← vacua\n  sit _ xs ← t ↦ lista<numerus>\n}",
     );
 }
 
 #[test]
 fn lista_to_tensor_conversio_typechecks() {
-    test_support::assert_accepts_la("incipit { sit t ← [1, 2, 3] ↦ tensor<numerus, [3]> }");
+    test_support::assert_accepts_la("incipit { sit _ t ← [1, 2, 3] ↦ tensor<numerus, [3]> }");
 }
 
 #[test]
@@ -566,7 +570,7 @@ fn rectangular_lista_literal_to_tensor_conversio_typechecks() {
 #[test]
 fn rectangular_lista_literal_to_tensor_conversio_rejects_ragged_rows() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit t ← [[1.0, 2.0], [3.0]] ↦ tf32[2, 2] }",
+        "incipit { sit _ t ← [[1.0, 2.0], [3.0]] ↦ tf32[2, 2] }",
         "rectangular_lista_literal_row_length",
     );
 }
@@ -574,7 +578,7 @@ fn rectangular_lista_literal_to_tensor_conversio_rejects_ragged_rows() {
 #[test]
 fn rectangular_lista_literal_to_tensor_conversio_rejects_shape_mismatch() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit t ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[3, 3] }",
+        "incipit { sit _ t ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[3, 3] }",
         "rectangular_lista_literal_shape",
     );
 }
@@ -630,20 +634,20 @@ fn sparse_to_lista_conversio_rejects_as_ambiguous() {
 #[test]
 fn nested_lista_variable_to_tensor_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit lista<lista<f32>> rows ← [[1.0, 2.0], [3.0, 4.0]]\n  sit t ← rows ↦ tf32[2, 2] }",
+        "incipit { sit lista<lista<f32>> rows ← [[1.0, 2.0], [3.0, 4.0]]\n  sit _ t ← rows ↦ tf32[2, 2] }",
         "lista_to_tensor_nested",
     );
 }
 
 #[test]
 fn lista_to_cursor_conversio_typechecks() {
-    test_support::assert_accepts_la("incipit { sit c ← [1, 2, 3] ↦ cursor<numerus> }");
+    test_support::assert_accepts_la("incipit { sit _ c ← [1, 2, 3] ↦ cursor<numerus> }");
 }
 
 #[test]
 fn cursor_to_lista_conversio_typechecks() {
     test_support::assert_accepts_la(
-        "incipit { sit xs ← [1, 2, 3] ↦ cursor<numerus> ↦ lista<numerus> }",
+        "incipit { sit _ xs ← [1, 2, 3] ↦ cursor<numerus> ↦ lista<numerus> }",
     );
 }
 
@@ -652,7 +656,7 @@ fn tabula_to_lista_keys_conversio_typechecks() {
     test_support::assert_accepts_la(
         r#"incipit {
   sit tabula<textus, numerus> m ← { "a": 1, "b": 2 }
-  sit ks ← m ↦ lista<textus>
+  sit _ ks ← m ↦ lista<textus>
 }"#,
     );
 }
@@ -662,7 +666,7 @@ fn tabula_to_lista_values_conversio_typechecks() {
     test_support::assert_accepts_la(
         r#"incipit {
   sit tabula<textus, numerus> m ← { "a": 1, "b": 2 }
-  sit vs ← m ↦ lista<numerus>
+  sit _ vs ← m ↦ lista<numerus>
 }"#,
     );
 }
@@ -670,7 +674,7 @@ fn tabula_to_lista_values_conversio_typechecks() {
 #[test]
 fn lista_to_tabula_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit m ← [1, 2] ↦ tabula<textus, numerus> }",
+        "incipit { sit _ m ← [1, 2] ↦ tabula<textus, numerus> }",
         "lista_to_tabula_unsupported",
     );
 }
@@ -850,7 +854,7 @@ fn array_ascription_to_lista_still_typechecks() {
 #[test]
 fn sync_to_promissum_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit p ← 42 ↦ promissum<numerus> }",
+        "incipit { sit _ p ← 42 ↦ promissum<numerus> }",
         "promissum_target_boundary",
     );
 }
@@ -859,7 +863,7 @@ fn sync_to_promissum_conversio_rejects() {
 fn promissum_to_sync_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
         r"functio takesPromissum(promissum<numerus> p) → numerus {
-  sit n ← p ↦ numerus
+  sit _ n ← p ↦ numerus
   redde n
 }",
         "promissum_source_boundary",
@@ -869,7 +873,7 @@ fn promissum_to_sync_conversio_rejects() {
 #[test]
 fn copia_to_tabula_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit {\n  varia copia<numerus> s ← vacua\n  sit m ← s ↦ tabula<textus, numerus>\n}",
+        "incipit {\n  varia copia<numerus> s ← vacua\n  sit _ m ← s ↦ tabula<textus, numerus>\n}",
         "cross_collection_unsupported",
     );
 }
@@ -884,39 +888,39 @@ fn collection_conversio_matrix_cases() -> &'static [CollectionMatrixCase] {
     &[
         CollectionMatrixCase {
             name: "lista_to_copia",
-            source: "incipit { sit s ← [1, 2] ↦ copia<numerus> }",
+            source: "incipit { sit _ s ← [1, 2] ↦ copia<numerus> }",
             expect: MatrixExpect::Accepts,
         },
         CollectionMatrixCase {
             name: "copia_to_lista",
-            source: "incipit {\n  sit copia<numerus> s ← [1, 2] ↦ copia<numerus>\n  sit xs ← s ↦ lista<numerus>\n}",
+            source: "incipit {\n  sit copia<numerus> s ← [1, 2] ↦ copia<numerus>\n  sit _ xs ← s ↦ lista<numerus>\n}",
             expect: MatrixExpect::Accepts,
         },
         CollectionMatrixCase {
             name: "tensor_to_lista",
-            source: "incipit {\n  sit tensor<numerus, []> t ← vacua\n  sit xs ← t ↦ lista<numerus>\n}",
+            source: "incipit {\n  sit tensor<numerus, []> t ← vacua\n  sit _ xs ← t ↦ lista<numerus>\n}",
             expect: MatrixExpect::Accepts,
         },
         CollectionMatrixCase {
             name: "lista_to_tensor",
-            source: "incipit { sit t ← [1, 2, 3] ↦ tensor<numerus, [3]> }",
+            source: "incipit { sit _ t ← [1, 2, 3] ↦ tensor<numerus, [3]> }",
             expect: MatrixExpect::Accepts,
         },
         CollectionMatrixCase {
             name: "cursor_to_lista",
-            source: "incipit { sit xs ← [1, 2] ↦ cursor<numerus> ↦ lista<numerus> }",
+            source: "incipit { sit _ xs ← [1, 2] ↦ cursor<numerus> ↦ lista<numerus> }",
             expect: MatrixExpect::Accepts,
         },
         CollectionMatrixCase {
             name: "lista_to_cursor",
-            source: "incipit { sit c ← [1, 2] ↦ cursor<numerus> }",
+            source: "incipit { sit _ c ← [1, 2] ↦ cursor<numerus> }",
             expect: MatrixExpect::Accepts,
         },
         CollectionMatrixCase {
             name: "tabula_to_lista_keys",
             source: r#"incipit {
   sit tabula<textus, numerus> m ← { "a": 1 }
-  sit ks ← m ↦ lista<textus>
+  sit _ ks ← m ↦ lista<textus>
 }"#,
             expect: MatrixExpect::Accepts,
         },
@@ -924,44 +928,44 @@ fn collection_conversio_matrix_cases() -> &'static [CollectionMatrixCase] {
             name: "tabula_to_lista_values",
             source: r#"incipit {
   sit tabula<textus, numerus> m ← { "a": 1 }
-  sit vs ← m ↦ lista<numerus>
+  sit _ vs ← m ↦ lista<numerus>
 }"#,
             expect: MatrixExpect::Accepts,
         },
         CollectionMatrixCase {
             name: "lista_to_tabula",
-            source: "incipit { sit m ← [1] ↦ tabula<textus, numerus> }",
+            source: "incipit { sit _ m ← [1] ↦ tabula<textus, numerus> }",
             expect: MatrixExpect::RejectsIssue("lista_to_tabula_unsupported"),
         },
         CollectionMatrixCase {
             name: "sync_to_promissum",
-            source: "incipit { sit p ← 1 ↦ promissum<numerus> }",
+            source: "incipit { sit _ p ← 1 ↦ promissum<numerus> }",
             expect: MatrixExpect::RejectsIssue("promissum_target_boundary"),
         },
         CollectionMatrixCase {
             name: "promissum_to_sync",
             source: r"functio takesPromissum(promissum<numerus> p) → numerus {
-  sit n ← p ↦ numerus
+  sit _ n ← p ↦ numerus
   redde n
 }",
             expect: MatrixExpect::RejectsIssue("promissum_source_boundary"),
         },
         CollectionMatrixCase {
             name: "copia_to_tabula",
-            source: "incipit {\n  sit copia<numerus> s ← [1] ↦ copia<numerus>\n  sit m ← s ↦ tabula<textus, numerus>\n}",
+            source: "incipit {\n  sit copia<numerus> s ← [1] ↦ copia<numerus>\n  sit _ m ← s ↦ tabula<textus, numerus>\n}",
             expect: MatrixExpect::RejectsIssue("cross_collection_unsupported"),
         },
         CollectionMatrixCase {
             name: "tabula_to_copia",
             source: r#"incipit {
   sit tabula<textus, numerus> m ← { "a": 1 }
-  sit s ← m ↦ copia<numerus>
+  sit _ s ← m ↦ copia<numerus>
 }"#,
             expect: MatrixExpect::RejectsIssue("cross_collection_unsupported"),
         },
         CollectionMatrixCase {
             name: "tensor_to_copia",
-            source: "incipit {\n  sit tensor<numerus, []> t ← vacua\n  sit s ← t ↦ copia<numerus>\n}",
+            source: "incipit {\n  sit tensor<numerus, []> t ← vacua\n  sit _ s ← t ↦ copia<numerus>\n}",
             expect: MatrixExpect::RejectsIssue("cross_collection_unsupported"),
         },
     ]
@@ -970,21 +974,21 @@ fn collection_conversio_matrix_cases() -> &'static [CollectionMatrixCase] {
 #[test]
 fn tensor_numerus_to_fractus_conversio_typechecks() {
     test_support::assert_accepts_la(
-        "incipit {\n  sit tensor<numerus, []> a ← vacua\n  sit b ← a ↦ tensor<fractus, []>\n}",
+        "incipit {\n  sit tensor<numerus, []> a ← vacua\n  sit _ b ← a ↦ tensor<fractus, []>\n}",
     );
 }
 
 #[test]
 fn tensor_fractus_to_numerus_conversio_typechecks() {
     test_support::assert_accepts_la(
-        "incipit {\n  sit tensor<fractus, []> b ← vacua\n  sit a ← b ↦ tensor<numerus, []>\n}",
+        "incipit {\n  sit tensor<fractus, []> b ← vacua\n  sit _ a ← b ↦ tensor<numerus, []>\n}",
     );
 }
 
 #[test]
 fn tensor_to_scalar_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit {\n  sit tensor<numerus, []> t ← vacua\n  sit n ← t ↦ numerus\n}",
+        "incipit {\n  sit tensor<numerus, []> t ← vacua\n  sit _ n ← t ↦ numerus\n}",
         "tensor_to_scalar_unsupported",
     );
 }
@@ -992,7 +996,7 @@ fn tensor_to_scalar_conversio_rejects() {
 #[test]
 fn scalar_to_tensor_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit {\n  sit t ← 42 ↦ tensor<numerus, []>\n}",
+        "incipit {\n  sit _ t ← 42 ↦ tensor<numerus, []>\n}",
         "scalar_to_tensor_unsupported",
     );
 }
@@ -1007,38 +1011,38 @@ fn tensor_conversio_matrix_cases() -> &'static [TensorMatrixCase] {
     &[
         TensorMatrixCase {
             name: "lista_to_tensor",
-            source: "incipit { sit t ← [1, 2, 3] ↦ tensor<numerus, [3]> }",
+            source: "incipit { sit _ t ← [1, 2, 3] ↦ tensor<numerus, [3]> }",
             expect: MatrixExpect::Accepts,
         },
         TensorMatrixCase {
             name: "tensor_to_lista",
-            source: "incipit {\n  sit tensor<numerus, []> t ← vacua\n  sit xs ← t ↦ lista<numerus>\n}",
+            source: "incipit {\n  sit tensor<numerus, []> t ← vacua\n  sit _ xs ← t ↦ lista<numerus>\n}",
             expect: MatrixExpect::Accepts,
         },
         TensorMatrixCase {
             name: "tensor_numerus_to_fractus",
-            source: "incipit {\n  sit tensor<numerus, []> a ← vacua\n  sit b ← a ↦ tensor<fractus, []>\n}",
+            source: "incipit {\n  sit tensor<numerus, []> a ← vacua\n  sit _ b ← a ↦ tensor<fractus, []>\n}",
             expect: MatrixExpect::Accepts,
         },
         TensorMatrixCase {
             name: "tensor_fractus_to_numerus",
-            source: "incipit {\n  sit tensor<fractus, []> b ← vacua\n  sit a ← b ↦ tensor<numerus, []>\n}",
+            source: "incipit {\n  sit tensor<fractus, []> b ← vacua\n  sit _ a ← b ↦ tensor<numerus, []>\n}",
             expect: MatrixExpect::Accepts,
         },
         // Element-width lattice pairs: see `tensor_element_width_lattice_matrix_typecheck` (100 cells).
         TensorMatrixCase {
             name: "tensor_sized_to_scalar_rejects",
-            source: "incipit {\n  sit tensor<i32, []> t ← vacua\n  sit n ← t ↦ i32\n}",
+            source: "incipit {\n  sit tensor<i32, []> t ← vacua\n  sit _ n ← t ↦ i32\n}",
             expect: MatrixExpect::RejectsIssue("tensor_to_scalar_unsupported"),
         },
         TensorMatrixCase {
             name: "tensor_to_scalar",
-            source: "incipit {\n  sit tensor<numerus, []> t ← vacua\n  sit n ← t ↦ numerus\n}",
+            source: "incipit {\n  sit tensor<numerus, []> t ← vacua\n  sit _ n ← t ↦ numerus\n}",
             expect: MatrixExpect::RejectsIssue("tensor_to_scalar_unsupported"),
         },
         TensorMatrixCase {
             name: "scalar_to_tensor",
-            source: "incipit { sit t ← 1 ↦ tensor<numerus, []> }",
+            source: "incipit { sit _ t ← 1 ↦ tensor<numerus, []> }",
             expect: MatrixExpect::RejectsIssue("scalar_to_tensor_unsupported"),
         },
     ]
@@ -1219,38 +1223,44 @@ functio college<magnitudo T, magnitudo D>() → tensor<f32, [T, D]> {
 
 #[test]
 fn sermo_materialize_to_vacuum_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { sit v ← ad 'runtime:echo' ("salve") ↦ vacuum }"#);
+    test_support::assert_accepts_la(
+        r#"incipit { sit _ v ← ad 'runtime:echo' ("salve") ↦ vacuum }"#,
+    );
 }
 
 #[test]
 fn sermo_materialize_to_textus_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { sit t ← ad 'runtime:echo' ("salve") ↦ textus }"#);
+    test_support::assert_accepts_la(
+        r#"incipit { sit _ t ← ad 'runtime:echo' ("salve") ↦ textus }"#,
+    );
 }
 
 #[test]
 fn sermo_materialize_to_octeti_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { sit o ← ad 'runtime:echo' ("salve") ↦ octeti }"#);
+    test_support::assert_accepts_la(
+        r#"incipit { sit _ o ← ad 'runtime:echo' ("salve") ↦ octeti }"#,
+    );
 }
 
 #[test]
 fn sermo_materialize_to_valor_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { sit v ← ad 'runtime:echo' ("salve") ↦ valor }"#);
+    test_support::assert_accepts_la(r#"incipit { sit _ v ← ad 'runtime:echo' ("salve") ↦ valor }"#);
 }
 
 #[test]
 fn sermo_materialize_to_numerus_typechecks() {
-    test_support::assert_accepts_la(r"incipit { sit n ← ad 'runtime:echo' (5) ↦ numerus }");
+    test_support::assert_accepts_la(r"incipit { sit _ n ← ad 'runtime:echo' (5) ↦ numerus }");
 }
 
 #[test]
 fn sermo_materialize_to_bivalens_typechecks() {
-    test_support::assert_accepts_la(r"incipit { sit b ← ad 'runtime:echo' (verum) ↦ bivalens }");
+    test_support::assert_accepts_la(r"incipit { sit _ b ← ad 'runtime:echo' (verum) ↦ bivalens }");
 }
 
 #[test]
 fn sermo_materialize_to_lista_typechecks() {
     test_support::assert_accepts_la(
-        r#"incipit { sit xs ← ad 'runtime:echo' ("salve") ↦ lista<textus> }"#,
+        r#"incipit { sit _ xs ← ad 'runtime:echo' ("salve") ↦ lista<textus> }"#,
     );
 }
 
@@ -1273,7 +1283,7 @@ incipit {
 #[test]
 fn sermo_materialize_rejects_tabula() {
     test_support::assert_rejects_with_issue_la(
-        r#"incipit { sit m ← ad 'runtime:echo' ("salve") ↦ tabula<textus, numerus> }"#,
+        r#"incipit { sit _ m ← ad 'runtime:echo' ("salve") ↦ tabula<textus, numerus> }"#,
         "sermo_materialize_target_unsupported",
     );
 }
@@ -1281,7 +1291,7 @@ fn sermo_materialize_rejects_tabula() {
 #[test]
 fn sermo_materialize_rejects_tensor() {
     test_support::assert_rejects_with_issue_la(
-        r#"incipit { sit t ← ad 'runtime:echo' ("salve") ↦ tensor<numerus, [2]> }"#,
+        r#"incipit { sit _ t ← ad 'runtime:echo' ("salve") ↦ tensor<numerus, [2]> }"#,
         "sermo_materialize_target_unsupported",
     );
 }
@@ -1289,18 +1299,18 @@ fn sermo_materialize_rejects_tensor() {
 #[test]
 fn regex_literal_pattern_empty_accepts() {
     // Boundary: 0-byte pattern.
-    test_support::assert_accepts_la(r#"incipit { sit r ← "" ↦ regex }"#);
+    test_support::assert_accepts_la(r#"incipit { sit _ r ← "" ↦ regex }"#);
 }
 
 #[test]
 fn octeti_empty_literal_typechecks() {
-    test_support::assert_accepts_la("incipit { sit b ← || ↦ octeti }");
+    test_support::assert_accepts_la("incipit { sit _ b ← || ↦ octeti }");
 }
 
 #[test]
 fn sermo_materialize_rejects_copia() {
     test_support::assert_rejects_with_issue_la(
-        r#"incipit { sit s ← ad 'runtime:echo' ("salve") ↦ copia<textus> }"#,
+        r#"incipit { sit _ s ← ad 'runtime:echo' ("salve") ↦ copia<textus> }"#,
         "sermo_materialize_target_unsupported",
     );
 }
@@ -1371,7 +1381,7 @@ fn conversio_assign_rejects_inference_hole_destination() {
     // `sit xs ← []` leaves an element inference hole that cannot name a
     // conversion target.
     test_support::assert_rejects_with_issue_la(
-        "incipit {\n  sit xs ← []\n  xs ↤ \"2\"\n}",
+        "incipit {\n  sit _ xs ← []\n  xs ↤ \"2\"\n}",
         "conversio_assign_inference_hole_destination",
     );
 }
@@ -1450,7 +1460,7 @@ fn conversio_assign_typed_fixum_item_scope_initializer_rejects_as_top_level_bind
 fn conversio_assign_untyped_fixum_initializer_rejects() {
     // `fixum _` has no written type → no concrete conversion target.
     test_support::assert_rejects_with_issue_la(
-        "incipit {\n  sit answer ↤ \"42\"\n}",
+        "incipit {\n  sit _ answer ↤ \"42\"\n}",
         "conversio_assign_requires_concrete_type",
     );
 }
@@ -1459,7 +1469,7 @@ fn conversio_assign_untyped_fixum_initializer_rejects() {
 fn conversio_assign_sit_initializer_rejects() {
     // `sit` is an inferred binding (≡ `fixum _`) → no concrete target.
     test_support::assert_rejects_with_issue_la(
-        "incipit {\n  sit answer ↤ \"42\"\n}",
+        "incipit {\n  sit _ answer ↤ \"42\"\n}",
         "conversio_assign_requires_concrete_type",
     );
 }
@@ -2454,7 +2464,7 @@ functio narrow(numerus x, d64 d) → modulus<u8> {
 fn policy_word_conversio_rejects_recovery_slot() {
     for target in ["modulus<u8>", "saturatus<u8>"] {
         test_support::assert_rejects_with_issue_la(
-            &format!("incipit {{ sit numerus x ← 300\nsit b ← x ↦ {target} ⊥ 0 }}"),
+            &format!("incipit {{ sit numerus x ← 300\nsit _ b ← x ↦ {target} ⊥ 0 }}"),
             "word_conversio_recovery_unsupported",
         );
     }
@@ -2470,7 +2480,7 @@ fn policy_word_conversio_rejects_float_and_text_sources() {
         ("\"7\"", "saturatus<u8>", "unsupported_conversio"),
     ] {
         test_support::assert_rejects_with_issue_la(
-            &format!("incipit {{ sit b ← {source} ↦ {target} }}"),
+            &format!("incipit {{ sit _ b ← {source} ↦ {target} }}"),
             issue,
         );
     }
@@ -2479,22 +2489,26 @@ fn policy_word_conversio_rejects_float_and_text_sources() {
 #[test]
 fn policy_word_conversio_accepts_a_rounded_float_source() {
     for target in ["modulus<u8>", "saturatus<u8>"] {
-        test_support::assert_accepts_la(&format!("incipit {{ sit b ← 1.5 ↦ {target} via Floor }}"));
+        test_support::assert_accepts_la(&format!(
+            "incipit {{ sit _ b ← 1.5 ↦ {target} via Floor }}"
+        ));
     }
 }
 
 #[test]
 fn via_lowercase_policy_words_accepted() {
     for source in [
-        r#"incipit { sit n ← "ff" ↦ u32 via hex }"#,
+        r#"incipit { sit _ n ← "ff" ↦ u32 via hex }"#,
         "functio f(octeti corpus) → f32 { redde corpus[0‥4] ↦ f32 via le }",
     ] {
         test_support::assert_accepts_la(source);
     }
     for target in ["modulus<u8>", "saturatus<u8>"] {
-        test_support::assert_accepts_la(&format!("incipit {{ sit b ← 1.5 ↦ {target} via floor }}"));
         test_support::assert_accepts_la(&format!(
-            "incipit {{ sit c ← 1.5 ↦ {target} via half_even }}"
+            "incipit {{ sit _ b ← 1.5 ↦ {target} via floor }}"
+        ));
+        test_support::assert_accepts_la(&format!(
+            "incipit {{ sit _ c ← 1.5 ↦ {target} via half_even }}"
         ));
     }
 }

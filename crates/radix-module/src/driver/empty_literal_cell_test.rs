@@ -7,8 +7,8 @@ use crate::codegen::Target;
 use crate::driver::ModuleCompileRequest;
 use crate::test_support::{assert_compile_fails_with_issue, test_session};
 
-const OBJECT_HOLE_CELL: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    let a ← {}\n    print a\n}\n";
-const LIST_HOLE_CELL: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    let a ← []\n    print a\n}\n";
+const OBJECT_HOLE_CELL: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    let _ a ← {}\n    print a\n}\n";
+const LIST_HOLE_CELL: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    let _ a ← []\n    print a\n}\n";
 const OBJECT_NO_CELL: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    print {}\n}\n";
 const LIST_NO_CELL: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    print []\n}\n";
 const TYPED_CELLS: &str = "+++\nlocale = \"en\"\n+++\n\nmain {\n    let json j ← {}\n    let map<string, int> m ← {}\n    let list<int> xs ← []\n    print j\n    print m\n    print xs\n}\n";

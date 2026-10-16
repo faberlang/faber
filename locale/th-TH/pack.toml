@@ -424,10 +424,6 @@ help = "`de` ผูกดัชนีหรือคีย์ ไม่ใช่
 message = "ระบุ rest pattern แล้ว"
 help = "คง binding rest '{keyword}' ไว้เพียงรายการเดียว"
 
-[diagnostics.PARSE001.issues.sit_identifier_binding]
-message = "'{keyword}' ผูก identifier หนึ่งรายการโดยตรง; ใช้ '{keyword}' name ← expr"
-help = "เขียน '{keyword}' name ← expr หรือใช้ fixum สำหรับ binding แบบมีชนิด/แยกโครงสร้าง"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "ต้องมี test case หรือ setup"
 help = "เริ่มรายการในบอดีด้วย '{proba}', '{probandum}' หรือ '{setup}'"
@@ -586,7 +582,11 @@ help = "เขียน `{keyword} T {name} ← {marker} value`; ต่อมา
 
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "การประกาศ `{keyword}` ขณะรันถูกยกเลิกแล้ว; `{name}` เป็นชื่อขณะรัน"
-help = "เขียน `{sit} T {name} ← …` (หรือ `{sit} {name} ← …` เพื่อให้อนุมานชนิด); `{fixum}` ระบุข้อเท็จจริงตอนคอมไพล์และใช้คู่กับ `=`"
+help = "เขียน `{sit} T {name} ← …` (หรือ `{sit} _ {name} ← …` เพื่อให้อนุมานชนิด); `{fixum}` ระบุข้อเท็จจริงตอนคอมไพล์และใช้คู่กับ `=`"
+
+[diagnostics.PARSE010.issues.binding_type_slot_required]
+message = "การประกาศ `{keyword}` ต้องเขียนช่องชนิด; `{name}` ไม่มีชนิด"
+help = "เขียน `{keyword} T {name} ← …` หรือ `{keyword} _ {name} ← …` เพื่อให้อนุมานชนิด"
 
 [diagnostics.PARSE010.issues.binder_fixum_retired]
 message = "คำผูกชื่อ `{keyword}` ถูกยกเลิกแล้ว"

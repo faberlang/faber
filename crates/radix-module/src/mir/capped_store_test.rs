@@ -127,8 +127,8 @@ fn append_argument_traps() {
 #[test]
 fn inferred_slot_traps_at_the_declaration() {
     // ss6 / p22: `_` takes `i64`, so the declaration is the checked store.
-    assert_store_trap("", "sit v ← big + 1\nnota v", "(declaration of `v`");
-    assert_store_trap("", "sit v ← big + 1 + 0\nnota v", "(declaration of `v`");
+    assert_store_trap("", "sit _ v ← big + 1\nnota v", "(declaration of `v`");
+    assert_store_trap("", "sit _ v ← big + 1 + 0\nnota v", "(declaration of `v`");
 }
 
 #[test]

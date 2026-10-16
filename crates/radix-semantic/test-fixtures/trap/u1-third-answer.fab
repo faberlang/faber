@@ -3,7 +3,7 @@ locale = "en"
 +++
 
 # u1 — the third answer: `trap` accepts a failable call and reifies the
-# channel into a value union. `let r` binds to the solved
+# channel into a value union. `let _ r` binds to the solved
 # `int ∪ string` (WARN016 teaches the union shape; `let ∪ r` is the
 # warning-free spelling).
 
@@ -12,6 +12,6 @@ fn failable() → int ⇥ string {
 }
 
 main {
-    let r ← trap { failable() }
+    let _ r ← trap { failable() }
     print r
 }

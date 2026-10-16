@@ -45,7 +45,7 @@ fn half(int n) → int ⇥ string {
 
 main {
     # trap { ... } turns the failable call's two exits into one value.
-    let missed ← trap { half(7) }
+    let _ missed ← trap { half(7) }
     match missed {
         case int let value {
             print "returned §"(value)
@@ -55,7 +55,7 @@ main {
         }
     }
 
-    let made ← trap { half(8) }
+    let _ made ← trap { half(8) }
     match made {
         case int let value {
             print "returned §"(value)

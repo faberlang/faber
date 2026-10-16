@@ -74,9 +74,9 @@ functio shader_plane_fragment() → vacuum {
 }
 
 incipit {
-    sit position ← BufferAttribute { semantic = "position", location = 0, format = 3, offset_bytes = 0, stride_bytes = 12, step_mode = 1 }
-    sit layout ← BufferLayout { name = "position", array_stride = 12, attributes = [position] }
-    sit color_output ← FragmentOutput { semantic = "color", location = 0, format = 4 }
+    sit _ position ← BufferAttribute { semantic = "position", location = 0, format = 3, offset_bytes = 0, stride_bytes = 12, step_mode = 1 }
+    sit _ layout ← BufferLayout { name = "position", array_stride = 12, attributes = [position] }
+    sit _ color_output ← FragmentOutput { semantic = "color", location = 0, format = 4 }
     adfirma declare_vertex_layout(layout) mori "vertex layout contract declares position facts"
     adfirma declare_fragment_output(color_output) mori "fragment output contract declares location-0 facts"
 }

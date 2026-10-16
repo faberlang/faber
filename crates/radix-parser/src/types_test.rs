@@ -204,7 +204,7 @@ fn parses_type_position_markers_on_fn_type_params() {
 
 #[test]
 fn parses_type_position_markers_on_closure_params() {
-    let result = parse_ok_la("sit f ← (de textus x, own lista<numerus> xs) ∴ xs");
+    let result = parse_ok_la("sit _ f ← (de textus x, own lista<numerus> xs) ∴ xs");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(binding) = &program.statements[0].kind else {
         panic!("expected fixum");
@@ -945,7 +945,7 @@ fn rejects_duplicate_iuncta_labels_at_the_duplicate_label() {
 
 #[test]
 fn rejects_iuncta_label_spelling_on_call_site_type_arguments() {
-    let source = "incipit { sit x ← f<gx: numerus>(x) }";
+    let source = "incipit { sit _ x ← f<gx: numerus>(x) }";
     let result = parse_program_la(source);
     let colon = u32::try_from(source.find(':').expect("label colon")).expect("offset fits u32");
     // The failed type-argument attempt falls back to the (retired) ASCII

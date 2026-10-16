@@ -85,7 +85,7 @@ fn nondum_function_used_as_a_value_is_refused() {
 functio later(textus s) → textus
 
 incipit {
-    sit f ← later
+    sit _ f ← later
     tacet
 }
 "#,
@@ -340,7 +340,7 @@ fn namespace_function_used_as_a_value_is_refused() {
     let result = analyze_import(
         r#"importa ex "./mod" mod
 incipit {
-    sit f ← mod.later
+    sit _ f ← mod.later
     tacet
 }"#,
         host_gate(),
@@ -375,8 +375,8 @@ fn imported_name_used_as_a_value_is_refused_on_every_use() {
     let result = analyze_import(
         r#"importa ex "./mod" fixum later
 incipit {
-    sit f ← later
-    sit g ← later
+    sit _ f ← later
+    sit _ g ← later
     tacet
 }"#,
         host_gate(),

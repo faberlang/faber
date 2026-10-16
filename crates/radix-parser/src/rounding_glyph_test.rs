@@ -12,10 +12,10 @@ fn parse_source(source: &str) -> ParseResult {
 #[test]
 fn rounding_glyph_forms_parse_without_errors() {
     for source in [
-        "incipit { sit a ← ⌊x⌋ }",
-        "incipit { sit a ← ⌈x⌉ }",
-        "incipit { sit a ← ⌊x + 1.5⌉ }",
-        "incipit { sit a ← ⌊⌈x⌉⌋ }",
+        "incipit { sit _ a ← ⌊x⌋ }",
+        "incipit { sit _ a ← ⌈x⌉ }",
+        "incipit { sit _ a ← ⌊x + 1.5⌉ }",
+        "incipit { sit _ a ← ⌊⌈x⌉⌋ }",
     ] {
         let result = parse_source(source);
         assert!(result.errors.is_empty(), "{source}: {:?}", result.errors);
@@ -24,7 +24,7 @@ fn rounding_glyph_forms_parse_without_errors() {
 
 #[test]
 fn ceiling_opened_floor_closed_is_a_named_error() {
-    let result = parse_source("incipit { sit a ← ⌈x⌋ }");
+    let result = parse_source("incipit { sit _ a ← ⌈x⌋ }");
     let named = result.errors.iter().any(|err| {
         err.args
             .iter()
@@ -35,6 +35,6 @@ fn ceiling_opened_floor_closed_is_a_named_error() {
 
 #[test]
 fn unclosed_rounding_glyph_is_an_error() {
-    let result = parse_source("incipit { sit a ← ⌊x }");
+    let result = parse_source("incipit { sit _ a ← ⌊x }");
     assert!(!result.errors.is_empty());
 }

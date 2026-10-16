@@ -87,7 +87,7 @@ fn transitive_ad_names_the_call_chain() {
 fn async_callee_is_forbidden() {
     let err = rejection(
         "functio lente() fiet → numerus {\n    redde 1\n}\n\
-         fixum numerus N = praefixum {\n    sit f ← lente()\n    redde 1\n}\n",
+         fixum numerus N = praefixum {\n    sit _ f ← lente()\n    redde 1\n}\n",
         "praefixum_forbidden",
     );
     assert_eq!(arg(&err, "effect"), Some("async"));

@@ -760,8 +760,8 @@ fn inference_hole_locals_stay_holes() {
     //
     // D5.7 retired top-level `fixum`; this binding moves inside `incipit`
     // (the hole spelling under test is unrelated to item vs. local scope).
-    let code = assert_idempotent("incipit {\n    sit numeri ← [1, 2, 3]\n    scribe numeri\n}\n");
-    assert!(code.contains("sit numeri ←"), "inference hole must stay a hole:\n{code}");
+    let code = assert_idempotent("incipit {\n    sit _ numeri ← [1, 2, 3]\n    scribe numeri\n}\n");
+    assert!(code.contains("sit _ numeri ←"), "inference hole must stay a hole:\n{code}");
 }
 
 #[test]
@@ -1079,7 +1079,7 @@ fn ordo_enum_round_trips_discriminants() {
 
 #[test]
 fn array_destructuring_reemits_as_pattern() {
-    let source = "incipit {\n    sit xs ← [1, 2, 3, 4]\n    sit [a, _, ceteri r] ← xs\n    varia [c, d] ← [5, 6]\n    nota a\n    nota r\n    nota c + d\n}\n";
+    let source = "incipit {\n    sit _ xs ← [1, 2, 3, 4]\n    sit [a, _, ceteri r] ← xs\n    varia [c, d] ← [5, 6]\n    nota a\n    nota r\n    nota c + d\n}\n";
     let emitted = assert_idempotent(source);
     assert!(emitted.contains("sit [a, _, ceteri r] ← xs\n"), "{emitted}");
     assert!(emitted.contains("varia [c, d] ← [5, 6]\n"), "{emitted}");
@@ -1095,7 +1095,7 @@ fn object_destructuring_reemits_as_pattern() {
 
 #[test]
 fn itera_destructuring_binder_reemits_as_pattern() {
-    let source = "incipit {\n    sit m ← [[1, 2, 3], [4, 5, 6]]\n    itera ex m sit [caput, ceteri cauda] {\n        nota caput\n        nota cauda\n    }\n}\n";
+    let source = "incipit {\n    sit _ m ← [[1, 2, 3], [4, 5, 6]]\n    itera ex m sit [caput, ceteri cauda] {\n        nota caput\n        nota cauda\n    }\n}\n";
     let emitted = assert_idempotent(source);
     assert!(emitted.contains("itera ex m sit [caput, ceteri cauda] {\n"), "{emitted}");
     assert!(!emitted.contains("__itera_element"), "{emitted}");

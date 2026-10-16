@@ -20,7 +20,7 @@ fn linear_peek_at(tokens: &[Token], start_pos: usize, offset: usize) -> &Token {
 fn peek_at_matches_linear_trivia_skip() {
     let sources = [
         "a b c",
-        "sit x ← 1\n# c\nvaria y ← 2",
+        "sit _ x ← 1\n# c\nvaria y ← 2",
         "incipit {\n    sit numerus x ← a ⇐ 2\n}",
     ];
     for src in sources {

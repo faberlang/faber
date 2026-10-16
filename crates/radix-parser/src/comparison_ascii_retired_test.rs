@@ -63,7 +63,7 @@ fn ascii_greater_than_is_rejected_in_while() {
 #[test]
 fn chained_ascii_comparisons_all_report() {
     assert_eq!(
-        retired("sit x ← a < b aut c > d"),
+        retired("sit _ x ← a < b aut c > d"),
         vec![pair("<", "≺"), pair(">", "≻")]
     );
 }
@@ -75,7 +75,7 @@ fn glyph_comparisons_are_accepted() {
         "incipit { dum a ≻ b { nulla } }",
         "incipit { si a ≤ b { nulla } }",
         "incipit { si a ≥ b { nulla } }",
-        "sit x ← a ≺ b aut c ≻ d",
+        "sit _ x ← a ≺ b aut c ≻ d",
     ] {
         let result = parse_source(source);
         assert!(result.success(), "{source}: {:?}", result.errors);
@@ -87,7 +87,7 @@ fn generic_angle_brackets_are_untouched() {
     for source in [
         "sit lista<numerus> xs ← []",
         "sit tabula<textus, lista<numerus>> m ← {}",
-        "sit n ← f<numerus>(x)",
+        "sit _ n ← f<numerus>(x)",
     ] {
         assert!(retired(source).is_empty(), "{source}");
     }
@@ -96,5 +96,5 @@ fn generic_angle_brackets_are_untouched() {
 #[test]
 fn comparison_inside_a_generic_argument_list_still_reports() {
     // The comparison sits in the call's argument, not between the angle brackets.
-    assert_eq!(retired("sit n ← f<numerus>(a < b)"), vec![pair("<", "≺")]);
+    assert_eq!(retired("sit _ n ← f<numerus>(a < b)"), vec![pair("<", "≺")]);
 }

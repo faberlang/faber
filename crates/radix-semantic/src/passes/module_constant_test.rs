@@ -134,7 +134,7 @@ fn underscore_infers_text_and_bool() {
 #[test]
 fn a_runtime_store_at_top_level_stays_top_level_binding() {
     assert_rejects_with_issue_la("sit numerus N ← 4\n", "top_level_binding");
-    assert_rejects_with_issue_la("sit N ← 4\n", "top_level_binding");
+    assert_rejects_with_issue_la("sit _ N ← 4\n", "top_level_binding");
     assert_rejects_with_issue_la("varia numerus N ← 4\n", "top_level_binding");
 }
 

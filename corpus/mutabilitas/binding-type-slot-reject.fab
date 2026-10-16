@@ -1,0 +1,24 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "binding_decl", "sit_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "binding"
+summary = "every declaration writes its type slot: let x ← 5 has none (write let int x, or let _ x to infer)."
+syntax = "let x ← 5"
+related = ["sit", "varia", "de"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE010:binding_type_slot_required"
++++
+# =============================================================================
+# mutabilitas — no type-omitted declaration
+# =============================================================================
+# There is no short declaration form. Every binding word writes its type slot,
+# and `_` is the explicit request to infer: `let _ x ← 5`. The same holds for
+# `mut x`, `ref x` and `const x`. Binders (`for … let j`) are bound to a thing
+# that carries the type and write no slot.
+
+main {
+    let x ← 5
+    print x
+}

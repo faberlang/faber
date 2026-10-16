@@ -82,25 +82,25 @@ fn assert_retired(result: &ParseResult, keyword: &str) -> BinOp {
 
 #[test]
 fn latin_inter_and_intra_are_retired() {
-    let result = parse_program("sit v ← x inter xs");
+    let result = parse_program("sit _ v ← x inter xs");
     assert!(matches!(assert_retired(&result, "inter"), BinOp::Member));
-    let result = parse_program("sit v ← n intra 0‥10");
+    let result = parse_program("sit _ v ← n intra 0‥10");
     assert!(matches!(assert_retired(&result, "intra"), BinOp::Member));
 }
 
 #[test]
 fn english_between_and_within_are_retired() {
-    let result = parse_with("en", "let v ← x between xs");
+    let result = parse_with("en", "let _ v ← x between xs");
     assert!(matches!(assert_retired(&result, "between"), BinOp::Member));
-    let result = parse_with("en", "let v ← n within 0‥10");
+    let result = parse_with("en", "let _ v ← n within 0‥10");
     assert!(matches!(assert_retired(&result, "within"), BinOp::Member));
 }
 
 #[test]
 fn a_non_latin_pack_word_is_retired() {
-    let result = parse_with("zh-Hans", "let v ← x 间 xs");
+    let result = parse_with("zh-Hans", "let _ v ← x 间 xs");
     assert!(matches!(assert_retired(&result, "间"), BinOp::Member));
-    let result = parse_with("zh-Hans", "let v ← n 内 0‥10");
+    let result = parse_with("zh-Hans", "let _ v ← n 内 0‥10");
     assert!(matches!(assert_retired(&result, "内"), BinOp::Member));
 }
 
@@ -108,7 +108,7 @@ fn a_non_latin_pack_word_is_retired() {
 fn recovery_continues_past_the_retired_word() {
     // The operand parses as `Member`, so the logical tier above it still
     // builds and the one diagnostic is not followed by a cascade.
-    let result = parse_program("sit v ← x inter xs et y");
+    let result = parse_program("sit _ v ← x inter xs et y");
     assert_eq!(result.errors.len(), 1, "{:?}", result.errors);
     assert!(has_arg(&result.errors[0], "issue", ISSUE));
 }
@@ -116,7 +116,7 @@ fn recovery_continues_past_the_retired_word() {
 #[test]
 fn the_words_stay_ordinary_identifiers() {
     let _ = parse_ok("sit numerus inter ← 3\nsit numerus intra ← inter + 1");
-    let _ = parse_ok("sit v ← blk.get(inter)\nsit w ← f(intra, inter)");
+    let _ = parse_ok("sit _ v ← blk.get(inter)\nsit _ w ← f(intra, inter)");
     let result = parse_with("en", "let int between ← 3\nlet int within ← between + 1");
     assert!(
         result
@@ -130,6 +130,6 @@ fn the_words_stay_ordinary_identifiers() {
 
 #[test]
 fn glyph_membership_is_unaffected() {
-    let result = parse_ok("sit v ← x ∈ xs");
+    let result = parse_ok("sit _ v ← x ∈ xs");
     assert!(result.errors.is_empty());
 }

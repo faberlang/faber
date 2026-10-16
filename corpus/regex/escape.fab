@@ -57,7 +57,7 @@ main {
         tried ← tried + 1
         let string head ← "^" + probe.escape()
         let regex anchored ← (head + "$") ↦ regex
-        let hit ← anchored.find(probe)
+        let _ hit ← anchored.find(probe)
         if hit ≡ null {
             print "miss"
         } else {

@@ -71,7 +71,7 @@ fn supra(list<int> numeri, int limen) → int {
 }
 
 main {
-    let numeri ← [1, 2, 3, 4, 5]
+    let _ numeri ← [1, 2, 3, 4, 5]
 
     print summa(numeri)
     print maximum(numeri)

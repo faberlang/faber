@@ -28,7 +28,7 @@ fn closure_params_derive_modes_from_type_position_markers() {
     let fixture = analyze_ok_la(
         r"
 incipit {
-    sit f ← (de lista<numerus> a, varia lista<numerus> b, own lista<numerus> c, copy lista<numerus> d) ∴ a
+    sit _ f ← (de lista<numerus> a, varia lista<numerus> b, own lista<numerus> c, copy lista<numerus> d) ∴ a
 }
 ",
     );
@@ -64,7 +64,7 @@ fn unmarked_closure_params_stay_owned() {
     let fixture = analyze_ok_la(
         r"
 incipit {
-    sit f ← (lista<numerus> a, numerus n) ∴ n
+    sit _ f ← (lista<numerus> a, numerus n) ∴ n
 }
 ",
     );
