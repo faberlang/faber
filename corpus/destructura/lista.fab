@@ -42,7 +42,7 @@ locale = "en"
 main {
     # --- Basic lista destructuring ---
 
-    let numeri ← [1, 2, 3]
+    let _ numeri ← [1, 2, 3]
     let [a, b, c] ← numeri
     print a
     print b
@@ -56,7 +56,7 @@ main {
 
     # --- Mutable destructuring with varia ---
 
-    let coordinata ← [100, 200]
+    let _ coordinata ← [100, 200]
     mut [x, y] ← coordinata
     print x
     print y
@@ -67,27 +67,27 @@ main {
 
     # --- Partial destructuring (fewer variables than elements) ---
 
-    let valores ← [1, 2, 3, 4, 5]
+    let _ valores ← [1, 2, 3, 4, 5]
     let [unus, duo] ← valores
     print unus
     print duo
 
     # --- Rest pattern with ceteri ---
 
-    let res ← [1, 2, 3, 4, 5]
+    let _ res ← [1, 2, 3, 4, 5]
     let [caput, rest cauda] ← res
     print caput
     print cauda
 
     # --- Skip elements with underscore ---
 
-    let triplex ← [10, 20, 30]
+    let _ triplex ← [10, 20, 30]
     let [_, medius, _] ← triplex
     print medius
 
     # --- Nested listas ---
 
-    let matrix ← [[1, 2], [3, 4]]
+    let _ matrix ← [[1, 2], [3, 4]]
     let [ordo1, ordo2] ← matrix
     print ordo1
     print ordo2

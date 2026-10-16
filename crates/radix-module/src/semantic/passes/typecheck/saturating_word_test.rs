@@ -291,7 +291,7 @@ fn saturating_word_expression_is_exact_and_an_inferred_slot_keeps_the_word() {
 incipit {
     sit saturatus<u8> s ← 250
     sit numerus wide ← s + 10
-    sit inferred ← s + 10
+    sit _ inferred ← s + 10
     sit saturatus<u8> same ← inferred
     nota wide
     nota same

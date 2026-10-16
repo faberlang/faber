@@ -91,7 +91,7 @@ fn without_a_marker_value_conversion_stays() {
 
 #[test]
 fn radix_hint_accept_row_stays_green() {
-    test_support::assert_accepts_la("incipit { sit n ← \"ff\" ↦ u32 via Hex }");
+    test_support::assert_accepts_la("incipit { sit _ n ← \"ff\" ↦ u32 via Hex }");
 }
 
 #[test]

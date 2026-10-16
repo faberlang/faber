@@ -36,7 +36,7 @@ fn tensor_pair(left: &str, right: &str, op: &str) -> String {
         "main {{
     let tensor<f32, {left}> a ← empty
     let tensor<f32, {right}> b ← empty
-    let out ← a {op} b
+    let _ out ← a {op} b
 }}"
     )
 }
@@ -127,7 +127,7 @@ fn tensor_scalar_lifting_preserves_shape() {
             accepts_shape(
                 &format!(
                     "main {{ let tensor<f32, {shape:?}> a ← empty
-    let out ← a {op} 2.0 }}"
+    let _ out ← a {op} 2.0 }}"
                 ),
                 &shape,
             );
@@ -142,7 +142,7 @@ fn scalar_tensor_lifting_preserves_shape() {
             accepts_shape(
                 &format!(
                     "main {{ let tensor<f32, {shape:?}> a ← empty
-    let out ← 2.0 {op} a }}"
+    let _ out ← 2.0 {op} a }}"
                 ),
                 &shape,
             );
@@ -207,7 +207,7 @@ fn explicit_expanded_view_allows_exact_shape_glyphs() {
                 "main {{
     let tensor<f32, [3]> row ← empty
     let tensor<f32, [2, 3]> grid ← empty
-    let out ← row.expanded([2, 3]) {op} grid
+    let _ out ← row.expanded([2, 3]) {op} grid
 }}"
             ),
             &[2, 3],

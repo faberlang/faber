@@ -49,7 +49,7 @@ fn underscore_hole_solved_to_multi_member_union_warns_warn016() {
         r"
 typus Valor = numerus ∪ textus
 incipit {
-    sit v ← 1 ∷ Valor
+    sit _ v ← 1 ∷ Valor
     nota v
 }
 ",
@@ -82,7 +82,7 @@ functio f() → Valor {
     redde 1
 }
 incipit {
-    sit v ← f()
+    sit _ v ← f()
     nota v
 }
 ",
@@ -141,7 +141,7 @@ fn nullable_union_never_fires_warn016() {
         r#"
 incipit {
     sit textus ∪ nihil opt ← "s"
-    sit o ← opt
+    sit _ o ← opt
     nota o
 }
 "#,
@@ -298,7 +298,7 @@ fn ordinary_underscore_holes_produce_no_hole_warnings() {
     let diagnostics = test_support::analyze_and_get_diagnostics_la(
         r"
 incipit {
-    sit n ← 3
+    sit _ n ← 3
     sit lista<_> xs ← [1, 2, 3]
     nota n
     nota xs

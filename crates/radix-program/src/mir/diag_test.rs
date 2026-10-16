@@ -102,3 +102,37 @@ fn validation_error_diagnostic_past_the_end_of_the_file_keeps_issue_without_span
     assert_eq!(arg(&diagnostic, "span_start"), Some("4000"));
     assert_eq!(arg(&diagnostic, "span_end"), Some("4010"));
 }
+
+/// MIR spans are body-relative: a file with `+++` frontmatter must report the
+/// physical line, not the line the body offset happens to hit in the raw file.
+#[test]
+fn diagnostics_in_a_file_with_frontmatter_report_the_physical_line() {
+    let frontmatter = "+++\nlocale = \"en\"\n+++\n";
+    let source = format!("{frontmatter}first line\nsecond line\n");
+    let path: PathBuf = std::env::temp_dir().join(format!(
+        "faber-diag-frontmatter-test-{}.fab",
+        std::process::id()
+    ));
+    std::fs::write(&path, &source).expect("write fixture source");
+    let body_span = Span::new(11, 17);
+    let lowering = mir_error_diag(&path, error(body_span, None));
+    let validation = mir_validation_diag(&path, validation_error(body_span));
+    std::fs::remove_file(&path).expect("remove fixture source");
+
+    assert_eq!(
+        lowering.line,
+        Some(5),
+        "body offset 11 is the second body line"
+    );
+    assert_eq!(
+        validation.line,
+        Some(5),
+        "body offset 11 is the second body line"
+    );
+    let shifted = u32::try_from(frontmatter.len()).expect("small fixture");
+    assert_eq!(
+        lowering.span,
+        Some(Span::new(11 + shifted, 17 + shifted)),
+        "the span indexes the raw file"
+    );
+}

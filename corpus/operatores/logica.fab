@@ -38,9 +38,9 @@ locale = "en"
 #   Negated est parses as `expr non est target`.
 
 main {
-    let vexilla ← 0b1010
-    let persona ← 0b1100
-    let velata ← vexilla ∨ persona
+    let _ vexilla ← 0b1010
+    let _ persona ← 0b1100
+    let _ velata ← vexilla ∨ persona
     # 14 (0b1110)
     print velata
     let string ∪ none praesens ← "salve"

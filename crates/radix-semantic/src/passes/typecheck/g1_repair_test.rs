@@ -289,22 +289,25 @@ fn with_mix(body: &str) -> String {
 
 #[test]
 fn u64_with_a_signed_type_does_not_join_in_a_conditional() {
-    assert_rejects_with_issue_la(&with_mix("sit x ← c ✓ a ✗ b\nnota x"), U64_SIGNED);
+    assert_rejects_with_issue_la(&with_mix("sit _ x ← c ✓ a ✗ b\nnota x"), U64_SIGNED);
 }
 
 #[test]
 fn u64_with_a_signed_type_does_not_join_in_bitwise_operators() {
     for op in ["∧", "∨", "⊻"] {
-        assert_rejects_with_issue_la(&with_mix(&format!("sit x ← a {op} b\nnota x")), U64_SIGNED);
+        assert_rejects_with_issue_la(
+            &with_mix(&format!("sit _ x ← a {op} b\nnota x")),
+            U64_SIGNED,
+        );
     }
     assert_rejects_with_issue_la(&with_mix("sit i64 x ← a ∨ b\nnota x"), U64_SIGNED);
 }
 
 #[test]
 fn u64_with_a_signed_type_does_not_join_in_a_collection_literal() {
-    assert_rejects_with_issue_la(&with_mix("sit xs ← [a, b]\nnota xs"), U64_SIGNED);
+    assert_rejects_with_issue_la(&with_mix("sit _ xs ← [a, b]\nnota xs"), U64_SIGNED);
     assert_rejects_with_issue_la(
-        &with_mix("sit t ← reducta via summa ex [a, b] sit v { redde v }\nnota t"),
+        &with_mix("sit _ t ← reducta via summa ex [a, b] sit v { redde v }\nnota t"),
         U64_SIGNED,
     );
 }
@@ -318,15 +321,15 @@ fn u64_with_an_untyped_constant_still_joins() {
         "nota x ∨ 1",
         "nota x ⊻ 3",
         "nota x ∧ -1",
-        "sit xs ← [x, 0]\nnota xs",
-        "sit xs ← [0, 1, x]\nnota xs",
-        "sit y ← c ✓ 0 ✗ x\nnota y",
+        "sit _ xs ← [x, 0]\nnota xs",
+        "sit _ xs ← [0, 1, x]\nnota xs",
+        "sit _ y ← c ✓ 0 ✗ x\nnota y",
     ] {
         assert_accepts_la(&format!("incipit {{\n{head}{body}\n}}\n"));
     }
     // A negative constant with `u64` has no 64-bit type holding both.
     assert_rejects_with_issue_la(
-        &format!("incipit {{\n{head}sit xs ← [x, -1]\nnota xs\n}}\n"),
+        &format!("incipit {{\n{head}sit _ xs ← [x, -1]\nnota xs\n}}\n"),
         U64_SIGNED,
     );
 }
@@ -335,6 +338,6 @@ fn u64_with_an_untyped_constant_still_joins() {
 fn unsigned_widths_below_u64_still_join_with_signed_types() {
     assert_accepts_la(
         "incipit {\nsit u32 a ← 5\nsit i8 b ← -1\nsit bivalens c ← verum\n\
-         nota c ✓ a ✗ b\nnota a ∨ b\nsit xs ← [a, b]\nnota xs\n}\n",
+         nota c ✓ a ✗ b\nnota a ∨ b\nsit _ xs ← [a, b]\nnota xs\n}\n",
     );
 }

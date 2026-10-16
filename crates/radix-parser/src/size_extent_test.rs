@@ -99,7 +99,7 @@ fn construct_type_expression_parses_at_store_rhs() {
 
 #[test]
 fn construct_type_expression_refuses_argument_position() {
-    let result = parse_source("let x ← f(tf32[2, 3])");
+    let result = parse_source("let _ x ← f(tf32[2, 3])");
     let error = result.errors.first().expect("expected parser refusal");
     assert!(
         error

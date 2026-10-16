@@ -30,9 +30,9 @@ main {
     mut sf32[2, 3] grid ← empty
     grid.set([0, 1], 4.0)
 
-    let value ← grid.get([0, 1])
-    let absent ← grid.get([1, 2])
-    let count ← grid.count_nonzero()
+    let _ value ← grid.get([0, 1])
+    let _ absent ← grid.get([1, 2])
+    let _ count ← grid.count_nonzero()
 
     let tf32[2, 3] dense ← grid.densify()
     print value, absent, count, dense.length()

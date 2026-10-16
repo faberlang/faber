@@ -137,7 +137,7 @@ fn tensor_forms_record_shape_children() {
 
 #[test]
 fn hole_annotations_record_infer_heads() {
-    let fixture = analyze_ok("functio probe() {\n    sit holed ← 1\n}");
+    let fixture = analyze_ok("functio probe() {\n    sit _ holed ← 1\n}");
     let (form, _) = first_declared_form(&fixture, "holed");
     assert_eq!(form.head, HirTypeFormHead::Infer);
     assert!(form.args.is_empty(), "hole heads carry no children");

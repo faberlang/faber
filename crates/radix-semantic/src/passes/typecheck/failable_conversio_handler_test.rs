@@ -99,7 +99,7 @@ fn fac_cape_covers_the_conversio() {
 fn capta_covers_the_conversio() {
     assert_accepts_la(concat!(
         "functio g(textus s) → vacuum {\n",
-        "    sit r ← capta { s ↦ u8 }\n    nota r\n",
+        "    sit _ r ← capta { s ↦ u8 }\n    nota r\n",
         "}\n",
     ));
 }
@@ -114,7 +114,7 @@ fn a_handler_does_not_leak_past_its_boundary() {
     assert_rejects_with_issue_la(
         concat!(
             "functio g(textus s) → numerus {\n",
-            "    sit r ← capta { s ↦ u8 }\n    nota r\n",
+            "    sit _ r ← capta { s ↦ u8 }\n    nota r\n",
             "    sit u8 y ← s ↦ u8\n    redde 0\n",
             "}\n",
         ),
@@ -127,13 +127,13 @@ fn closures_do_not_inherit_the_enclosing_error_channel_or_main() {
     // A closure is its own frame: errors do not unwind through it, so it
     // needs its own handler even inside main or a `⇥` function.
     assert_rejects_with_issue_la(
-        "incipit {\n    sit h ← numerus x ∴ x ↦ u8\n    nota h(1)\n}\n",
+        "incipit {\n    sit _ h ← numerus x ∴ x ↦ u8\n    nota h(1)\n}\n",
         ISSUE,
     );
     assert_rejects_with_issue_la(
         concat!(
             "functio g() → vacuum ⇥ textus {\n",
-            "    sit h ← numerus x ∴ x ↦ u8\n    nota h(1)\n",
+            "    sit _ h ← numerus x ∴ x ↦ u8\n    nota h(1)\n",
             "}\n",
         ),
         ISSUE,
@@ -162,7 +162,7 @@ fn main_body_is_exempt_for_failable_calls() {
 #[test]
 fn closures_in_main_do_not_inherit_the_call_exemption() {
     assert_rejects_with_issue_la(
-        &format!("{FAILABLE_FN}incipit {{\n    sit h ← numerus x ∴ f(x)\n    nota h(1)\n}}\n"),
+        &format!("{FAILABLE_FN}incipit {{\n    sit _ h ← numerus x ∴ f(x)\n    nota h(1)\n}}\n"),
         CALL_ISSUE,
     );
 }

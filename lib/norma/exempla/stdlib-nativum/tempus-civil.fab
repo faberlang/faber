@@ -40,7 +40,7 @@ fn buildMoment(int y, int m, int d, int h, int min, int s) → instant {
 
 fn expectInvalid() → bool {
     do {
-        let bad ← tempus.construct(2026, 2, 30)
+        let _ bad ← tempus.construct(2026, 2, 30)
         return false
     }
     catch err {

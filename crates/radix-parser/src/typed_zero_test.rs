@@ -90,7 +90,7 @@ fn bracket_suffix_is_not_a_zero() {
 
 #[test]
 fn collection_type_zero_is_refused_by_name() {
-    let result = parse_source("sit a ← lista<f32, 4> {}");
+    let result = parse_source("sit _ a ← lista<f32, 4> {}");
     assert!(
         issues(&result).contains(&"constructor_type_not_claimed".to_owned()),
         "{:?}",

@@ -64,7 +64,7 @@ fn explicit_generic_call_rejects_argument_mismatch() {
 }
 
 incipit {
-    sit x ← id<numerus>("salve")
+    sit _ x ← id<numerus>("salve")
 }"#,
         "argument_type_mismatch",
     );
@@ -78,7 +78,7 @@ fn explicit_generic_call_rejects_non_generic_callee() {
 }
 
 incipit {
-    sit x ← plain<textus>("salve")
+    sit _ x ← plain<textus>("salve")
 }"#,
         "callee_type_args_unsupported",
     );
@@ -92,7 +92,7 @@ fn explicit_generic_call_rejects_wrong_type_arg_arity() {
 }
 
 incipit {
-    sit x ← both<textus>(1, 2)
+    sit _ x ← both<textus>(1, 2)
 }",
         "wrong_number_of_type_arguments",
     );
@@ -106,7 +106,7 @@ fn explicit_generic_call_accepts_infer_hole() {
 }
 
 incipit {
-    sit x ← id<_>(42)
+    sit _ x ← id<_>(42)
     nota x
 }",
     );
@@ -271,7 +271,7 @@ fn explicit_generic_call_accepts_mixed_hole_and_concrete() {
 }
 
 incipit {
-    sit x ← both<_, textus>(1, "k")
+    sit _ x ← both<_, textus>(1, "k")
     nota x
 }"#,
     );
@@ -285,7 +285,7 @@ fn mixed_hole_first_param_is_bare_numerus() {
 }
 
 incipit {
-    sit x ← both<_, textus>(1, "k")
+    sit _ x ← both<_, textus>(1, "k")
     nota x
 }"#,
     );
@@ -309,7 +309,7 @@ fn mixed_hole_second_param_solves_from_argument() {
 }
 
 incipit {
-    sit x ← both<numerus, _>(1, "k")
+    sit _ x ← both<numerus, _>(1, "k")
     nota x
 }"#,
     );
@@ -369,7 +369,7 @@ fn explicit_generic_call_rejects_union_hole_in_second_slot() {
 }
 
 incipit {
-    sit x ← both<textus, ∪>("k", 1)
+    sit _ x ← both<textus, ∪>("k", 1)
 }"#,
         "explicit_union_type_arg_unsupported",
     );
@@ -397,7 +397,7 @@ fn explicit_generic_call_hole_still_requires_exact_arity() {
 }
 
 incipit {
-    sit x ← both<_>(1, "k")
+    sit _ x ← both<_>(1, "k")
 }"#,
         "wrong_number_of_type_arguments",
     );
@@ -411,7 +411,7 @@ fn explicit_generic_call_unsolved_hole_still_errors() {
 }
 
 incipit {
-    sit x ← empty<_>()
+    sit _ x ← empty<_>()
 }",
         "cannot_infer_expression_type",
     );
@@ -425,7 +425,7 @@ fn explicit_generic_call_rejects_union_hole() {
 }
 
 incipit {
-    sit x ← both<∪, textus>(1, "k")
+    sit _ x ← both<∪, textus>(1, "k")
 }"#,
         "explicit_union_type_arg_unsupported",
     );
@@ -491,8 +491,8 @@ fn explicit_hole_and_omitted_list_share_return_type_id() {
 }
 
 incipit {
-    sit a ← id<_>(42)
-    sit b ← id(42)
+    sit _ a ← id<_>(42)
+    sit _ b ← id(42)
     nota a
     nota b
 }";
@@ -632,7 +632,7 @@ incipit {
 fn explicit_generic_call_rejects_template_application() {
     rejects_with_issue(
         r#"incipit {
-    sit s ← "§"<textus>("x")
+    sit _ s ← "§"<textus>("x")
 }"#,
         "template_type_args",
     );
@@ -698,7 +698,7 @@ fn explicit_generic_call_rejects_intrinsic_method_type_args() {
     rejects_with_args(
         r"incipit {
     sit lista<numerus> xs ← [1, 2, 3]
-    sit n ← xs.longitudo<textus>()
+    sit _ n ← xs.longitudo<textus>()
 }",
         &[DiagnosticArg::new("issue", "intrinsic_method_type_args")],
     );
@@ -767,7 +767,7 @@ fn sermo_tuus_rejects_more_than_one_payload_type_arg() {
     rejects_with_args(
         r#"incipit {
     sit sermo s ← ad 'runtime:echo' ("salve")
-    sit frames ← s.tuus<textus, numerus>()
+    sit _ frames ← s.tuus<textus, numerus>()
 }"#,
         &[
             DiagnosticArg::new("issue", "sermo_view_payload_type_arg_count"),
@@ -781,7 +781,7 @@ fn sermo_meus_bare_view_typechecks() {
     accepts(
         r#"incipit {
     sit sermo s ← ad 'runtime:echo' ("salve")
-    sit sink ← s.meus()
+    sit _ sink ← s.meus()
 }"#,
     );
 }
@@ -791,7 +791,7 @@ fn sermo_meus_typed_view_typechecks() {
     accepts(
         r#"incipit {
     sit sermo s ← ad 'runtime:echo' ("salve")
-    sit sink ← s.meus<octeti>()
+    sit _ sink ← s.meus<octeti>()
 }"#,
     );
 }
@@ -801,7 +801,7 @@ fn sermo_meus_rejects_more_than_one_payload_type_arg() {
     rejects_with_args(
         r#"incipit {
     sit sermo s ← ad 'runtime:echo' ("salve")
-    sit sink ← s.meus<textus, numerus>()
+    sit _ sink ← s.meus<textus, numerus>()
 }"#,
         &[
             DiagnosticArg::new("issue", "sermo_view_payload_type_arg_count"),

@@ -424,10 +424,6 @@ help = "اربط de فهرسا أو مفتاحا، وليس عنصرا قابل�
 message = "نمط rest محدد مسبقا"
 help = "احتفظ بربط rest واحد فقط '{keyword}'"
 
-[diagnostics.PARSE001.issues.sit_identifier_binding]
-message = "'{keyword}' يربط معرفا واحدا مباشرة؛ استخدم '{keyword}' name ← expr"
-help = "اكتب '{keyword}' name ← expr أو استخدم {fixum} للارتباطات المنمطة/المفككة"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "مطلوب test case أو setup"
 help = "ابدأ عنصر الجسم بـ '{proba}' أو '{probandum}' أو '{setup}'"
@@ -586,7 +582,11 @@ help = "اكتب `{keyword} T {name} ← {marker} value`؛ و`{name} ← {marker
 
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "تم إلغاء تصريح `{keyword}` وقت التشغيل؛ `{name}` اسم وقت تشغيل"
-help = "اكتب `{sit} T {name} ← …` (أو `{sit} {name} ← …` لاستنتاج النوع)؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+help = "اكتب `{sit} T {name} ← …` (أو `{sit} _ {name} ← …` لاستنتاج النوع)؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+
+[diagnostics.PARSE010.issues.binding_type_slot_required]
+message = "يجب أن يكتب تصريح `{keyword}` خانة النوع؛ لا نوع للاسم `{name}`"
+help = "اكتب `{keyword} T {name} ← …`، أو `{keyword} _ {name} ← …` لاستنتاج النوع"
 
 [diagnostics.PARSE010.issues.binder_fixum_retired]
 message = "تم إلغاء كلمة الربط `{keyword}`"

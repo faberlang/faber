@@ -32,10 +32,10 @@ locale = "en"
 import from "./nn" nn
 
 fn main() → void {
-    let x ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
-    let w ← [[1.0, 0.0], [0.0, 1.0]] ↦ tensor<f32, [2, 2]>
-    let b ← [[0.1, 0.1], [0.1, 0.1]] ↦ tensor<f32, [2, 2]>
-    let r ← nn.linear(x, w, b)
+    let _ x ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    let _ w ← [[1.0, 0.0], [0.0, 1.0]] ↦ tensor<f32, [2, 2]>
+    let _ b ← [[0.1, 0.1], [0.1, 0.1]] ↦ tensor<f32, [2, 2]>
+    let _ r ← nn.linear(x, w, b)
     print "ok"
 }
 "#;

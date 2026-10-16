@@ -57,7 +57,7 @@ fn shifted_view_into_an_optional_element_slot_stays_pending() {
 #[test]
 fn shifted_optional_view_resolves_after_a_local_binding_or_coalesce() {
     accepts(&format!(
-        "main {{\n{}\nlet pending ← base.shift([1])\nlet tf32[3] wrapped ← pending.limes<wrap>()\nlet tf32[3] filled ← base.shift([1]) coalesce 0.0\nprint wrapped.flatten()\nprint filled.flatten()\n}}",
+        "main {{\n{}\nlet _ pending ← base.shift([1])\nlet tf32[3] wrapped ← pending.limes<wrap>()\nlet tf32[3] filled ← base.shift([1]) coalesce 0.0\nprint wrapped.flatten()\nprint filled.flatten()\n}}",
         tensor_seed()
     ));
 }
@@ -73,7 +73,7 @@ fn shifted_optional_view_cannot_be_re_shifted_or_flattened_before_resolution() {
     );
     rejects_with_issue(
         &format!(
-            "main {{\n{}\nlet pending ← base.shift([1])\nlet flat ← pending.flatten()\n}}",
+            "main {{\n{}\nlet _ pending ← base.shift([1])\nlet _ flat ← pending.flatten()\n}}",
             tensor_seed()
         ),
         "tensor_edge_view_requires_resolution",

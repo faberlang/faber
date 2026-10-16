@@ -446,7 +446,7 @@ fn mutating_loop_binder_capture_records_mutate_mode() {
 functio loops() → numerus {
     varia numerus total ← 0
     itera ex [1, 2, 3] varia v {
-        sit f ← () → numerus ∴ fac {
+        sit _ f ← () → numerus ∴ fac {
             v ← v + 10
             redde v
         }
@@ -475,7 +475,7 @@ functio eat(own lista<numerus> xs) → vacuum {
 }
 functio demo() → vacuum {
     varia lista<numerus> a ← [1, 2, 3]
-    sit f ← () → vacuum ∴ eat(own a)
+    sit _ f ← () → vacuum ∴ eat(own a)
 }
 incipit { }
 "#,
@@ -515,7 +515,7 @@ fn write_outside_closure_leaves_read_capture_intact() {
         r#"
 functio mixed() → () → numerus {
     varia numerus n ← 1
-    sit peek ← () → numerus ∴ n
+    sit _ peek ← () → numerus ∴ n
     n ← n + 2
     redde peek
 }
@@ -695,7 +695,7 @@ functio helper() → numerus {
     redde 1
 }
 incipit {
-    sit f ← () → numerus ∴ helper()
+    sit _ f ← () → numerus ∴ helper()
 }
 "#,
     );

@@ -286,7 +286,7 @@ fn row_14_elements_against_a_declared_element_type_are_stores() {
 fn row_14_elements_with_no_declared_type_use_the_range_rule() {
     // No slot: `[x, m]` with `u8`, `i16` is typed by the smallest type holding
     // both elements, and nothing is narrowed.
-    let source = entry("sit i16 m ← 5\nsit xs ← [x, m]");
+    let source = entry("sit i16 m ← 5\nsit _ xs ← [x, m]");
     assert!(kinds(&source).is_empty());
 }
 
@@ -341,7 +341,7 @@ fn row_18_field_default_constant_must_fit() {
 
 #[test]
 fn row_20_inferred_declarations_take_the_expression_type() {
-    let source = entry("sit a ← x + y\nvaria _ b ← x * y");
+    let source = entry("sit _ a ← x + y\nvaria _ b ← x * y");
     assert!(kinds(&source).is_empty());
 }
 

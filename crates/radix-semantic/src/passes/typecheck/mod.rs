@@ -1620,6 +1620,9 @@ mod format_test;
 #[path = "failable_conversio_handler_test.rs"]
 mod failable_conversio_handler_test;
 #[cfg(test)]
+#[path = "inc_dec_decimal_test.rs"]
+mod inc_dec_decimal_test;
+#[cfg(test)]
 #[path = "regex_conversio_failable_test.rs"]
 mod regex_conversio_failable_test;
 #[cfg(test)]

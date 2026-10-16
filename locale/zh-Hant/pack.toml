@@ -424,10 +424,6 @@ help = "de 繫結的是索引或鍵，不是可變元素；請使用 const 形�
 message = "rest 模式已指定"
 help = "只保留一個 '{keyword}' rest 綁定"
 
-[diagnostics.PARSE001.issues.sit_identifier_binding]
-message = "'{keyword}' 直接綁定一個識別符；請使用 '{keyword}' name ← expr"
-help = "寫成 '{keyword}' name ← expr，或對具型別／解構綁定使用 fixum"
-
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "需要測試案例或 setup"
 help = "以 '{proba}'、'{probandum}' 或 '{setup}' 開始主體項目"
@@ -630,7 +626,11 @@ help = "寫成 `{keyword} T {name} ← {marker} value`；之後的 `{name} ← {
 
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "執行期的 `{keyword}` 宣告已廢止；`{name}` 是執行期名稱"
-help = "寫成 `{sit} T {name} ← …`（或用 `{sit} {name} ← …` 推斷型別）；`{fixum}` 表示編譯期事實，與 `=` 搭配"
+help = "寫成 `{sit} T {name} ← …`（或用 `{sit} _ {name} ← …` 推斷型別）；`{fixum}` 表示編譯期事實，與 `=` 搭配"
+
+[diagnostics.PARSE010.issues.binding_type_slot_required]
+message = "`{keyword}` 宣告必須寫出型別位；`{name}` 沒有型別"
+help = "寫成 `{keyword} T {name} ← …`，或用 `{keyword} _ {name} ← …` 推斷型別"
 
 [diagnostics.PARSE010.issues.binder_fixum_retired]
 message = "`{keyword}` 繫結詞已廢止"

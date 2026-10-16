@@ -38,22 +38,22 @@ locale = "en"
 #   Unary ¬ documented in syntax; Rust emits `~` (whitelist if reintroduced in body).
 
 main {
-    let vexilla ← 0b1010
-    let persona ← 0b1100
+    let _ vexilla ← 0b1010
+    let _ persona ← 0b1100
 
-    let coniuncta ← vexilla ∧ persona
+    let _ coniuncta ← vexilla ∧ persona
     # 8 (0b1000)
     print coniuncta
 
-    let diversa ← vexilla ⊻ persona
+    let _ diversa ← vexilla ⊻ persona
     # 6 (0b0110)
     print diversa
 
-    let sinistra ← 1 ⇐ 4
+    let _ sinistra ← 1 ⇐ 4
     # 16
     print sinistra
 
-    let dextra ← 16 ⇒ 2
+    let _ dextra ← 16 ⇒ 2
     # 4
     print dextra
 }

@@ -183,7 +183,7 @@ fn empty_list_right_operand_is_unresolved_in_both_polarities() {
 
 #[test]
 fn unresolved_container_element_is_reported_once_at_the_right_operand() {
-    let source = "incipit { sit xs ← []\n nota 1 ∈ xs }";
+    let source = "incipit { sit _ xs ← []\n nota 1 ∈ xs }";
     let found = issues(source);
     let count = found
         .iter()

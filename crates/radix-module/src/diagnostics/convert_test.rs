@@ -296,7 +296,7 @@ fn first_mixed_script_advisory(source: &str) -> crate::lexer::MixedScriptAdvisor
 
 #[test]
 fn mixed_script_advisory_normalizes_to_nonfatal_warning() {
-    let source = "let аdd ← 1\n";
+    let source = "let _ аdd ← 1\n";
     let advisory = first_mixed_script_advisory(source);
 
     let diagnostic = from_mixed_script_advisory("advisory.fab", source, &advisory);
@@ -312,7 +312,7 @@ fn mixed_script_advisory_normalizes_to_nonfatal_warning() {
             DiagnosticArg::new("scripts", "Cyrillic, Latin"),
         ],
     );
-    assert_eq!(diagnostic.source_line.as_deref(), Some("let аdd ← 1"));
+    assert_eq!(diagnostic.source_line.as_deref(), Some("let _ аdd ← 1"));
 }
 
 #[test]

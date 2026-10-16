@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "identifier"
 canonical = true
 summary = "Unshadowed read stays the lege builtin."
-syntax = "let input ← read"
+syntax = "let _ input ← read"
 related = ["lege"]
 locale = "en"
 no_expected = "reads-stdin"
@@ -28,7 +28,7 @@ no_expected = "reads-stdin"
 # =============================================================================
 #
 # Operator example:
-#   let input ← read
+#   let _ input ← read
 #
 # GRAMMAR:
 #   readExpr :← 'read'

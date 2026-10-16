@@ -220,7 +220,7 @@ fn true_division_width_follows_the_operands() {
     assert_eq!(ok("nota 7 ÷ 2\nnota 1 ÷ 3"), ["3.5", "0.3333333333333333"]);
     // A sub-expression keys on its range type: (u8 + u8) is u16, still f32.
     assert_eq!(
-        ok("varia u8 a ← 200\nvaria u8 b ← 100\nvaria u8 c ← 7\nsit q ← (a + b) ÷ c\nnota q"),
+        ok("varia u8 a ← 200\nvaria u8 b ← 100\nvaria u8 c ← 7\nsit _ q ← (a + b) ÷ c\nnota q"),
         ["42.857143"]
     );
     let (out, _, _) = trap("varia u8 a ← 1\nvaria u8 b ← 0\nnota \"a\"\nnota a ÷ b");

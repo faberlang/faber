@@ -1735,7 +1735,7 @@ fn unshadowed_lege_lowers_to_readline() {
     let (lowered, _, _) = lower_source(
         r"
 incipit {
-  sit input ← lege
+  sit _ input ← lege
 }
 ",
     );
@@ -1862,7 +1862,7 @@ fn vacua_call_lowers_to_call_on_path() {
         r"
 functio vacua() → numerus { redde 1 }
 incipit {
-  sit x ← vacua()
+  sit _ x ← vacua()
 }
 ",
     );

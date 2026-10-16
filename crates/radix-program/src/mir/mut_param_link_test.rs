@@ -32,7 +32,7 @@ main {
 "#;
 
 const TRAP_MAIN: &str = r"main {
-    let trapped ← trap {
+    let _ trapped ← trap {
         let tensor<f32, [2, 2]> y ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
         print y.get([0, 1]) coalesce (0.0 ∷ f32)
     }

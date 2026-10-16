@@ -100,7 +100,7 @@ fn array_rest_binds_the_tail() {
 #[test]
 fn rest_after_holes_skips_every_authored_position() {
     let unit = test_support::analyze_ok_la(
-        "incipit {\n    sit xs ← [1, 2, 3, 4]\n    sit [_, b, ceteri r] ← xs\n    nota b\n    nota r\n}\n",
+        "incipit {\n    sit _ xs ← [1, 2, 3, 4]\n    sit [_, b, ceteri r] ← xs\n    nota b\n    nota r\n}\n",
     );
     let locals = entry_locals(&unit);
     let r = local(&unit, &locals, "r");
@@ -120,7 +120,7 @@ fn rest_after_holes_skips_every_authored_position() {
 #[test]
 fn place_subject_is_not_hoisted_and_call_subject_is() {
     let unit = test_support::analyze_ok_la(&format!(
-        "{PAR}incipit {{\n    sit xs ← [1, 2]\n    sit [a, b] ← xs\n    sit [c, d] ← par()\n    nota a + b + c + d\n}}\n"
+        "{PAR}incipit {{\n    sit _ xs ← [1, 2]\n    sit [a, b] ← xs\n    sit [c, d] ← par()\n    nota a + b + c + d\n}}\n"
     ));
     let facts = &unit.presentation.destructure_bindings;
     assert_eq!(facts.len(), 2);

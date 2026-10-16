@@ -19,7 +19,7 @@ use crate::{CompileResult, Diagnostic};
 const WARN016_WARN017_SOURCE: &str = r"
 typus Valor = numerus ∪ textus
 incipit {
-    sit v ← 1 ∷ Valor
+    sit _ v ← 1 ∷ Valor
     sit ∪ only ← 1
     nota v
     nota only

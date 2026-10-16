@@ -158,7 +158,7 @@ fn func_with_param_type(interner: &mut Interner, ty: TypeExpr) -> Program {
 #[test]
 fn reports_undefined_variable_in_expression() {
     compile_and_expect(
-        "incipit { sit x ← missing }",
+        "incipit { sit _ x ← missing }",
         "SEM001",
         "unknown_identifier",
     );
@@ -166,13 +166,13 @@ fn reports_undefined_variable_in_expression() {
 
 #[test]
 fn scribe_family_callee_hints_bare_output_form() {
-    compile_and_expect("incipit { sit x ← nota(1) }", "SEM001", "scribe_callee");
+    compile_and_expect("incipit { sit _ x ← nota(1) }", "SEM001", "scribe_callee");
 }
 
 #[test]
 fn unknown_non_scribe_callee_stays_unknown_identifier() {
     compile_and_expect(
-        "incipit { sit x ← missing(1) }",
+        "incipit { sit _ x ← missing(1) }",
         "SEM001",
         "unknown_identifier",
     );
@@ -182,7 +182,7 @@ fn unknown_non_scribe_callee_stays_unknown_identifier() {
 fn semantic_undefined_variable_suggests_visible_name() {
     let parsed = parse(lex(r#"
 incipit {
-  sit greeting ← "salve"
+  sit _ greeting ← "salve"
   nota greting
 }
 "#));
@@ -220,7 +220,7 @@ incipit {
 fn semantic_undefined_variable_does_not_suggest_distant_visible_name() {
     let parsed = parse(lex(r#"
 incipit {
-  sit greeting ← "salve"
+  sit _ greeting ← "salve"
   nota zz
 }
 "#));
@@ -252,7 +252,7 @@ incipit {
 fn semantic_name_suggestion_skips_edit_distance_for_impossible_lengths() {
     let parsed = parse(lex(r#"
 incipit {
-  sit greeting ← "salve"
+  sit _ greeting ← "salve"
 }
 "#));
     assert!(
@@ -276,8 +276,8 @@ incipit {
 fn semantic_undefined_variables_reuse_suggestion_cache() {
     let parsed = parse(lex(r#"
 incipit {
-  sit greeting ← "salve"
-  sit farewell ← "vale"
+  sit _ greeting ← "salve"
+  sit _ farewell ← "vale"
   nota greting
   nota farewel
 }
@@ -329,7 +329,7 @@ incipit {
 fn semantic_undefined_variable_suggests_unicode_fold_parity() {
     let parsed = parse(lex(r"
 incipit {
-  sit rēs ← 1
+  sit _ rēs ← 1
   nota res
 }
 "));
@@ -1612,7 +1612,7 @@ fn reports_non_variant_finge_suffix() {
     // The `finge` path shares the enum-suffix diagnostic policy with the
     // `discerne` pattern path.
     compile_and_expect(
-        "ordo MyEnum { Red }\n functio NotAVariant() → vacuum {}\n incipit { sit v ← finge MyEnum.NotAVariant { } }",
+        "ordo MyEnum { Red }\n functio NotAVariant() → vacuum {}\n incipit { sit _ v ← finge MyEnum.NotAVariant { } }",
         "SEM001",
         "name_not_variant",
     );
@@ -1691,7 +1691,7 @@ fn cross_union_same_name_variants_declare_and_resolve_qualified() {
     // casu patterns compile.
     let result = compile_ok(
         "discretio A { X }\ndiscretio B { X }\n\
-         incipit {\n  sit ax ← A.X\n  sit bx ← B.X\n\
+         incipit {\n  sit _ ax ← A.X\n  sit _ bx ← B.X\n\
          \x20 elige ax { casu A.X { nota \"a\" } }\n\
          \x20 elige bx { casu B.X { nota \"b\" } }\n}",
     );
@@ -1710,7 +1710,7 @@ fn same_union_duplicate_variant_still_sem005() {
 #[test]
 fn ambiguous_bare_variant_expression_reports_variant_ambiguous() {
     compile_and_expect(
-        "discretio A { X }\ndiscretio B { X }\nincipit { sit x ← X }",
+        "discretio A { X }\ndiscretio B { X }\nincipit { sit _ x ← X }",
         "SEM001",
         "variant_ambiguous",
     );
@@ -1752,7 +1752,7 @@ fn rejects_qualified_construction_with_unknown_prefix() {
     // reject — `finge missing.A.X { }` must never silently resolve as the
     // local `A.X`.
     compile_and_expect(
-        "discretio A { X }\nincipit { sit v ← finge missing.A.X { } ∷ A }",
+        "discretio A { X }\nincipit { sit _ v ← finge missing.A.X { } ∷ A }",
         "SEM001",
         "unknown_variant",
     );
@@ -1764,7 +1764,7 @@ fn rejects_qualified_construction_with_non_namespace_prefix() {
     // a value/type binding in prefix position is not a namespace, so the
     // path must reject rather than resolve the penultimate local union.
     compile_and_expect(
-        "discretio A { X }\nincipit { sit numerus missing ← 1\n sit v ← finge missing.A.X { } ∷ A }",
+        "discretio A { X }\nincipit { sit numerus missing ← 1\n sit _ v ← finge missing.A.X { } ∷ A }",
         "SEM001",
         "unknown_variant",
     );
@@ -1774,7 +1774,7 @@ fn rejects_qualified_construction_with_non_namespace_prefix() {
 fn allows_exact_local_qualified_construction() {
     // CG2-R07 regression pin: the exact local qualifier `finge A.X { }`
     // still resolves through the local union's parent.
-    let result = compile_ok("discretio A { X }\nincipit { sit v ← finge A.X { } ∷ A }");
+    let result = compile_ok("discretio A { X }\nincipit { sit _ v ← finge A.X { } ∷ A }");
     assert!(
         result.is_ok(),
         "exact local qualified construction should resolve: {:?}",
@@ -1856,7 +1856,7 @@ fn reports_perge_in_closure_fac_body_with_loop_outside_closure() {
     let source = r"
 incipit {
     itera ab 0‥3 sit i {
-        sit f ← (numerus a) ∴ fac { perge }
+        sit _ f ← (numerus a) ∴ fac { perge }
     }
 }
 ";
@@ -2180,14 +2180,14 @@ fn rivus_pilot_bare_colliding_name_reports_variant_ambiguous() {
     compile_and_expect(
         "discretio Severity { Error, Warning, Info }\n\
          discretio SemanticErrorKind { InvalidAnnotation, InvalidAssignmentTarget, Warning }\n\
-         incipit { sit w ← Warning }",
+         incipit { sit _ w ← Warning }",
         "SEM001",
         "variant_ambiguous",
     );
     compile_and_expect(
         "discretio DiagnosticPhase { Io, Lex, Parse }\n\
          discretio PhaseErrorKind { Lex, Parse, Semantic }\n\
-         incipit { sit l ← Lex }",
+         incipit { sit _ l ← Lex }",
         "SEM001",
         "variant_ambiguous",
     );
@@ -2540,7 +2540,7 @@ fn unshadowed_lege_stays_the_builtin() {
     let result = compile_ok(
         r"
 incipit {
-  sit input ← lege
+  sit _ input ← lege
 }
 ",
     );
@@ -2720,7 +2720,7 @@ fn resolve_does_not_record_shadowing_for_unbound_lege() {
     let (program, resolver, _) = resolve_ok(
         r"
 incipit {
-  sit input ← lege
+  sit _ input ← lege
 }
 ",
     );
@@ -2766,7 +2766,7 @@ fn resolve_records_shadowing_for_vacua_in_call_position() {
         r"
 functio vacua() → numerus { redde 1 }
 incipit {
-  sit x ← vacua()
+  sit _ x ← vacua()
 }
 ",
     );
