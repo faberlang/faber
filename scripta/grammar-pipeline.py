@@ -7,7 +7,7 @@ analysis. `--validate` checks dialect closure and reachability. GSD-6's
 Locale packs are the identity render plus `§{…}` keyed substitution:
 region-scoped, unknown-key-fatal,
 zero-residual in designated regions. `--check` is the fail-closed
-normative-triple + locale-render gate used by stage 1.
+normative-triple + locale-render gate (`scripta/check-grammar` runs it).
 """
 
 from __future__ import annotations
@@ -1083,7 +1083,7 @@ def keyword_spine(source_text: str, source_path: Path) -> set[str]:
 
 IDENTITY_BANNER = (
     "This file is generated from `grammar/sources/source.fg`, its `sidecar.en.toml`\n"
-    "and its `prose.en.md`; hand edits fail the stage-1 normative-triple gate."
+    "and its `prose.en.md`; edit those, not this file (`scripta/check-grammar` fails on drift)."
 )
 
 
@@ -1091,7 +1091,7 @@ def stamp_locale_banner(text: str, locale: str) -> str:
     replacement = (
         "This file is generated from `grammar/sources/source.fg`, its "
         f"`sidecar.en.toml` and its `prose.en.md`, and\n`grammar/sources/"
-        f"glossary.{locale}.toml`; hand edits fail the locale-render gate."
+        f"glossary.{locale}.toml`; edit those, not this file (`scripta/check-grammar` fails on drift)."
     )
     if IDENTITY_BANNER not in text:
         raise SubstitutionError(

@@ -1,41 +1,35 @@
-# EBNF_MATRIX.md planned-support overlay (faber/docs/EBNF_MATRIX.md).
+# Planned-support overlay for grammar/EBNF_MATRIX.md.
 #
 # Curated (term, target) pairs that are PLANNED (not yet lowering, but intended),
-# so they render ○ instead of ✕ in the rendered matrix.
+# so they render ○ instead of ✕ in the rendered matrix. The reason text is a
+# note for maintainers; the renderer does not print it.
 #
-# Source of truth for "planned vs never" intent: the prose in the private
-# radix doc docs/design/target-capability-matrix.md. When you promote a planned
-# item to shipped (it lowers), REMOVE its entry here — the measured matrix will
-# then render ✓ automatically.
+# When you promote a planned item to shipped (it lowers), REMOVE its entry
+# here: the measured matrix then renders ✓ automatically.
 #
-# Format:  "term"."target" = "short reason / owner"
-# Keys must match index.toml `term` spellings and the target column names
+# Format:  "term"."target" = "short reason"
+# Keys must match corpus/index.toml `term` spellings and the target column names
 # (rust, go, ts, faber, llvm-text, wasm-text, wasm, metal-text, wgsl-text,
 #  sexp-struct, sexp, runner).
 #
-# Seeded empty on purpose: do not guess planned items. Curate each entry from
-# the policy doc. Every entry here must trace to a stated deferral in
-# target-capability-matrix.md or an open factory track.
+# Add an entry only for a stated deferral; do not guess planned items.
 
 [planned]
-# TENSOR-GLYPHS Phase 1 (delivery-phase1.md S7 + goal Phase 3): measured 2026-09-17
-# against radix corpus/measurement/compat/*.json — the four product glyphs lower
-# on most application-lane and MIR targets now, so those (term, target) pairs were
-# removed per the remove-on-promotion contract. The entries below are the pairs
-# that still measure 0 capable exempla; per the policy doc they are deferred to
-# the Phase 3 device-parity track (metal-text / wgsl-text) or the noted lanes.
-"·"."metal-text" = "Phase 3 device parity — measures 0 on this target"
-"·"."wgsl-text" = "Phase 3 device parity — measures 0 on this target"
-"×"."go" = "Phase 3 device parity — measures 0 on this target"
-"×"."wasm-text" = "Phase 3 device parity — measures 0 on this target"
-"×"."wasm" = "Phase 3 device parity — measures 0 on this target"
-"×"."metal-text" = "Phase 3 device parity — measures 0 on this target"
-"×"."wgsl-text" = "Phase 3 device parity — measures 0 on this target"
-"⊗"."go" = "Phase 3 device parity — measures 0 on this target"
-"⊗"."llvm-text" = "Phase 3 device parity — measures 0 on this target"
-"⊗"."wasm-text" = "Phase 3 device parity — measures 0 on this target"
-"⊗"."wasm" = "Phase 3 device parity — measures 0 on this target"
-"⊗"."metal-text" = "Phase 3 device parity — measures 0 on this target"
-"⊗"."wgsl-text" = "Phase 3 device parity — measures 0 on this target"
-"⊙"."metal-text" = "Phase 3 device parity — measures 0 on this target"
-"⊙"."wgsl-text" = "Phase 3 device parity — measures 0 on this target"
+# The four tensor product glyphs lower on most application-lane and systems-lane
+# targets. These are the pairs that still measure 0 capable exempla and are
+# planned for device-target parity.
+"·"."metal-text" = "planned for device targets; measures 0 on this target"
+"·"."wgsl-text" = "planned for device targets; measures 0 on this target"
+"×"."go" = "planned for device targets; measures 0 on this target"
+"×"."wasm-text" = "planned for device targets; measures 0 on this target"
+"×"."wasm" = "planned for device targets; measures 0 on this target"
+"×"."metal-text" = "planned for device targets; measures 0 on this target"
+"×"."wgsl-text" = "planned for device targets; measures 0 on this target"
+"⊗"."go" = "planned for device targets; measures 0 on this target"
+"⊗"."llvm-text" = "planned for device targets; measures 0 on this target"
+"⊗"."wasm-text" = "planned for device targets; measures 0 on this target"
+"⊗"."wasm" = "planned for device targets; measures 0 on this target"
+"⊗"."metal-text" = "planned for device targets; measures 0 on this target"
+"⊗"."wgsl-text" = "planned for device targets; measures 0 on this target"
+"⊙"."metal-text" = "planned for device targets; measures 0 on this target"
+"⊙"."wgsl-text" = "planned for device targets; measures 0 on this target"

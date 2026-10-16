@@ -142,6 +142,13 @@ execution. Those belong to `faber`.
 - Grammar sources are `grammar/sources/source.fg`, `sidecar.en.toml`,
   `prose.en.md`. `grammar/EBNF.md`, `grammar/EBNF.<locale>.md` and
   `grammar/sources/grammar.jsonl` are generated: never edit them by hand.
+  Regenerate with `python3 scripta/grammar-pipeline.py --render`, `--emit` and
+  `--render-locales`; `scripta/check-grammar` fails on drift (Python 3.11 or newer).
+- `grammar/EBNF_MATRIX.md` and `grammar/CONVERSIO_MATRIX.md` are rendered from
+  `corpus/measurement/` by `python3 scripta/render-matrices.py` (`--check` fails when
+  they are stale). The measurement itself comes from a harness that needs every
+  target backend, so it is produced in the private development repository and
+  committed here.
 - Locale packs are `locale/<id>/pack.toml` for `ar`, `en`, `hi`, `la`, `th-TH`,
   `vi`, `zh-Hans`, `zh-Hant`. `en` and `la` change together in one change; the
   other packs follow as proposals. Library member rows live beside the library

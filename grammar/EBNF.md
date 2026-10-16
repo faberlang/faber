@@ -1,7 +1,7 @@
 # Faber Language Specification
 
 This file is generated from `grammar/sources/source.fg`, its `sidecar.en.toml`
-and its `prose.en.md`; hand edits fail the stage-1 normative-triple gate.
+and its `prose.en.md`; edit those, not this file (`scripta/check-grammar` fails on drift).
 Production IDs are the grammar's stable snake_case spine and their
 anchors are derived from those IDs.
 
