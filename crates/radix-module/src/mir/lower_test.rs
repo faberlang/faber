@@ -141,6 +141,27 @@ fn decimal_literal_executes_at_the_exact_scaled_carrier() {
 }
 
 #[test]
+fn decimal_potentia_executes_exactly_at_the_scaled_carrier() {
+    // Audit GAP #24: a `d64` receiver runs `potentia`'s exponent at plain
+    // `numerus`. Lowering the by-squaring loop with a decimal-typed exponent
+    // made its bare `Int(2)` divisors 2e-8, so halving grew the exponent
+    // until the carrier overflowed (`numerus division failed`) instead of
+    // landing on the exact 2.25.
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "decimal-potentia.fab",
+        r"incipit {
+    sit d64 a ← 1.5
+    nota a.potentia(2)
+}",
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("decimal potentia must run: {error:?}"));
+    assert_eq!(host.stdout_lines, ["2.25"]);
+}
+
+#[test]
 fn decimal_literal_switch_matches_at_the_exact_carrier() {
     // need: patterns lower through the same exact-carrier seam as
     // the scrutinee, so the case compares Int carrier against Int carrier.
