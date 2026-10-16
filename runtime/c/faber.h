@@ -874,6 +874,51 @@ typedef struct faber_arena {
     faber_chunk *head;
 } faber_arena;
 
+static inline size_t faber_collection_size_add(size_t left, size_t right) {
+    if (right > SIZE_MAX - left) {
+        faber_trap("collection allocation size overflow");
+    }
+    return left + right;
+}
+
+static inline size_t faber_collection_size_mul(size_t left, size_t right) {
+    if (right != 0 && left > SIZE_MAX / right) {
+        faber_trap("collection allocation size overflow");
+    }
+    return left * right;
+}
+
+static inline size_t faber_collection_count_size(int64_t count) {
+    if (count < 0 || (uintmax_t)count > (uintmax_t)SIZE_MAX) {
+        faber_trap("collection allocation size overflow");
+    }
+    return (size_t)count;
+}
+
+static inline size_t faber_collection_allocation_size(int64_t count, size_t item_size) {
+    return faber_collection_size_mul(faber_collection_count_size(count), item_size);
+}
+
+static inline int64_t faber_collection_next_length(int64_t length) {
+    if (length < 0 || length == INT64_MAX) {
+        faber_trap("collection capacity overflow");
+    }
+    return length + 1;
+}
+
+static inline int64_t faber_collection_next_capacity(int64_t capacity) {
+    if (capacity < 0) {
+        faber_trap("negative collection capacity");
+    }
+    if (capacity < 4) {
+        return 4;
+    }
+    if (capacity > INT64_MAX / 2) {
+        faber_trap("collection capacity overflow");
+    }
+    return capacity * 2;
+}
+
 static inline void *faber_alloc(faber_arena *arena, size_t size) {
     const size_t align = _Alignof(max_align_t);
     faber_chunk *chunk = arena->head;
@@ -1572,10 +1617,9 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
                                                                                         \
     static inline faber_list_##NAME *faber_list_##NAME##_new(faber_arena *arena,        \
                                                             int64_t capacity) {         \
+        size_t bytes = faber_collection_allocation_size(capacity, sizeof(TYPE));         \
         faber_list_##NAME *list = faber_alloc(arena, sizeof *list);                     \
-        list->items =                                                                   \
-            capacity > 0 ? faber_alloc(arena, (size_t)capacity * sizeof *list->items)   \
-                         : NULL;                                                        \
+        list->items = bytes > 0 ? faber_alloc(arena, bytes) : NULL;                     \
         list->len = 0;                                                                  \
         list->cap = capacity;                                                           \
         list->fixed = false;                                                            \
@@ -1591,9 +1635,10 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
                                                                                         \
     static inline faber_list_##NAME *faber_list_##NAME##_of(                            \
         faber_arena *arena, int64_t count, const TYPE *items) {                         \
+        size_t bytes = faber_collection_allocation_size(count, sizeof *items);          \
         faber_list_##NAME *list = faber_list_##NAME##_new(arena, count);                \
-        if (count > 0) {                                                                \
-            memcpy(list->items, items, (size_t)count * sizeof *items);                  \
+        if (bytes > 0) {                                                                \
+            memcpy(list->items, items, bytes);                                          \
         }                                                                               \
         list->len = count;                                                              \
         return list;                                                                    \
@@ -1612,13 +1657,14 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
                                                    const faber_list_##NAME *list,       \
                                                    int64_t capacity,                    \
                                                    faber_list_##NAME **out) {           \
+        size_t bytes = faber_collection_allocation_size(list->len, sizeof *list->items);\
         faber_list_##NAME *copy;                                                        \
         if (list->len > capacity) {                                                     \
             return false;                                                               \
         }                                                                               \
         copy = faber_list_##NAME##_new_fixed(arena, capacity);                          \
-        if (list->len > 0) {                                                            \
-            memcpy(copy->items, list->items, (size_t)list->len * sizeof *copy->items);  \
+        if (bytes > 0) {                                                                \
+            memcpy(copy->items, list->items, bytes);                                    \
         }                                                                               \
         copy->len = list->len;                                                          \
         *out = copy;                                                                    \
@@ -1636,13 +1682,16 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
                                                 faber_list_##NAME *list, TYPE item) {   \
         if (list->len == list->cap) {                                                   \
             int64_t capacity;                                                           \
+            size_t bytes;                                                               \
             if (list->fixed) {                                                          \
                 faber_trap("bounded collection push at capacity");                      \
             }                                                                           \
-            capacity = list->cap < 4 ? 4 : list->cap * 2;                               \
-            TYPE *items = faber_alloc(arena, (size_t)capacity * sizeof *items);         \
+            capacity = faber_collection_next_capacity(list->cap);                       \
+            bytes = faber_collection_allocation_size(capacity, sizeof(TYPE));           \
+            TYPE *items = faber_alloc(arena, bytes);                                    \
             if (list->len > 0) {                                                        \
-                memcpy(items, list->items, (size_t)list->len * sizeof *items);          \
+                memcpy(items, list->items,                                              \
+                       faber_collection_allocation_size(list->len, sizeof *items));     \
             }                                                                           \
             list->items = items;                                                        \
             list->cap = capacity;                                                       \
@@ -1698,7 +1747,8 @@ static inline faber_list_text *faber_argv_text(faber_arena *arena, int argc, cha
 }
 
 static inline faber_text faber_list_i64_show(faber_arena *arena, const faber_list_i64 *list) {
-    size_t capacity = 3 + (size_t)list->len * 22;
+    size_t capacity = faber_collection_size_add(
+        3, faber_collection_size_mul(faber_collection_count_size(list->len), 22));
     char *out = faber_alloc(arena, capacity);
     size_t at = 0;
     int64_t index;
@@ -1721,7 +1771,8 @@ static inline faber_text faber_list_text_show(faber_arena *arena, const faber_li
     size_t at = 0;
     int64_t index;
     for (index = 0; index < list->len; index++) {
-        total += faber_quote(NULL, list->items[index]) + 4;
+        total = faber_collection_size_add(
+            total, faber_collection_size_add(faber_quote(NULL, list->items[index]), 4));
     }
     out = faber_alloc(arena, total);
     out[at++] = '[';
@@ -1744,7 +1795,10 @@ static inline faber_text faber_list_bool_show(faber_arena *arena, const faber_li
     size_t yes_length = strlen(yes);
     size_t no_length = strlen(no);
     size_t width = yes_length > no_length ? yes_length : no_length;
-    char *out = faber_alloc(arena, 3 + (size_t)list->len * (width + 2));
+    size_t capacity = faber_collection_size_add(
+        3, faber_collection_size_mul(faber_collection_count_size(list->len),
+                                     faber_collection_size_add(width, 2)));
+    char *out = faber_alloc(arena, capacity);
     size_t at = 0;
     int64_t index;
     out[at++] = '[';
@@ -1764,7 +1818,8 @@ static inline faber_text faber_list_bool_show(faber_arena *arena, const faber_li
 }
 
 static inline faber_text faber_list_f64_show(faber_arena *arena, const faber_list_f64 *list) {
-    size_t capacity = 3 + (size_t)list->len * (FABER_F64_TEXT + 2);
+    size_t capacity = faber_collection_size_add(
+        3, faber_collection_size_mul(faber_collection_count_size(list->len), FABER_F64_TEXT + 2));
     char *out = faber_alloc(arena, capacity);
     size_t at = 0;
     int64_t index;
@@ -1786,7 +1841,8 @@ static inline faber_text faber_list_f64_show(faber_arena *arena, const faber_lis
 }
 
 static inline faber_text faber_list_f32_show(faber_arena *arena, const faber_list_f32 *list) {
-    size_t capacity = 3 + (size_t)list->len * (FABER_F32_TEXT + 2);
+    size_t capacity = faber_collection_size_add(
+        3, faber_collection_size_mul(faber_collection_count_size(list->len), FABER_F32_TEXT + 2));
     char *out = faber_alloc(arena, capacity);
     size_t at = 0;
     int64_t index;
@@ -1813,7 +1869,8 @@ static inline faber_text faber_list_f32_show(faber_arena *arena, const faber_lis
 #define FABER_LIST_WORD_SHOW(NAME, TYPE, CAST, FMT)                                     \
     static inline faber_text faber_list_##NAME##_show(faber_arena *arena,                \
                                                       const faber_list_##NAME *list) {  \
-        size_t capacity = 3 + (size_t)list->len * 22;                                   \
+        size_t capacity = faber_collection_size_add(                                    \
+            3, faber_collection_size_mul(faber_collection_count_size(list->len), 22));  \
         char *out = faber_alloc(arena, capacity);                                       \
         size_t at = 0;                                                                  \
         int64_t index;                                                                  \
@@ -1922,12 +1979,14 @@ static inline int32_t faber_f32_total_key(float value) {
                                                                                         \
     static inline faber_list_##NAME *faber_list_##NAME##_added(                         \
         faber_arena *arena, const faber_list_##NAME *list, TYPE item) {                 \
-        faber_list_##NAME *out = faber_list_##NAME##_new(arena, list->len + 1);         \
+        int64_t length = faber_collection_next_length(list->len);                       \
+        faber_list_##NAME *out = faber_list_##NAME##_new(arena, length);                \
         if (list->len > 0) {                                                            \
-            memcpy(out->items, list->items, (size_t)list->len * sizeof *list->items);   \
+            memcpy(out->items, list->items,                                             \
+                   faber_collection_allocation_size(list->len, sizeof *list->items));  \
         }                                                                               \
         out->items[list->len] = item;                                                   \
-        out->len = list->len + 1;                                                       \
+        out->len = length;                                                              \
         return out;                                                                     \
     }                                                                                   \
                                                                                         \

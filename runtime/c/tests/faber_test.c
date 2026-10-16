@@ -24,7 +24,7 @@ static void check_int(const char *what, faber_i128 got, faber_i128 want) {
     }
 }
 
-int main(void) {
+int main(int argc, char **argv) {
     faber_arena arena = {0};
     char buffer[41];
     int overflow = 0;
@@ -32,6 +32,15 @@ int main(void) {
     faber_list_text *texts;
     faber_list_bool *flags;
     int64_t index;
+
+    if (argc == 2 && strcmp(argv[1], "--overflow-capacity") == 0) {
+        (void)faber_list_i64_new(&arena, INT64_C(2305843009213693952));
+        return 0;
+    }
+    if (argc != 1) {
+        fprintf(stderr, "usage: faber_test [--overflow-capacity]\n");
+        return 2;
+    }
 
     /* Floor division and remainder take the divisor's sign. */
     check_int("div -7/2", faber_div(-7, 2), -4);
