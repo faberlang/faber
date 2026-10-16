@@ -1462,6 +1462,13 @@ impl PackageInstantiate<'_> {
         }
         match instantiate_existing_generic_type(self.types, ty, bindings, span) {
             Ok(ty) => Some(ty),
+            // The concrete instantiation is well formed but not interned yet:
+            // its shape (magnitudo) argument binds from the call-site witness,
+            // which this read-only pass does not carry. Leave the param-bearing
+            // type in place so `finalize_function` interns it with the key's
+            // shape bindings and re-substitutes this site (same deferral as the
+            // unit monomorphizer's `substitute_ty`).
+            Err(error) if error.is_missing_metadata() => Some(ty),
             Err(error) => {
                 self.errors
                     .push(MirError::validation(error.span, error.message));
