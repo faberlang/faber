@@ -2,13 +2,14 @@
 """Render grammar/EBNF_MATRIX.md and grammar/CONVERSIO_MATRIX.md from the
 measurement JSON in `corpus/measurement`.
 
-The EBNF measurement JSON is produced by an in-process harness over every
-target backend. That harness runs in the private development repository,
-which carries the non-public backends, and its output is committed here. The
-conversio JSON is a frozen record that nothing regenerates today. This
-renderer is pure presentation: it reads the committed JSON and emits the
-matrices, and `--check` verifies that the committed matrices are its exact
-output. It never runs cargo or a measurement harness.
+The EBNF measurement JSON is produced by scripta/emit-compat-json.py. The
+columns whose backends ship in this repository are measured here; the others
+need backends built only in the private development repository, and their
+JSON is committed here from that measurement. The conversio JSON is a frozen
+record that nothing regenerates today. This renderer is pure presentation: it
+reads the committed JSON and emits the matrices, and `--check` verifies that
+the committed matrices are its exact output. It never runs cargo or a
+measurement.
 
 Usage:
   python3 scripta/render-matrices.py            # render both matrices in place
@@ -25,6 +26,9 @@ import os
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from compat_measure import PUBLIC_TARGETS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPAT = ROOT / "corpus" / "measurement" / "compat"
@@ -181,14 +185,23 @@ def render_ebnf_matrix(planned: dict) -> list[str]:
         "**Rendered** by `scripta/render-matrices.py` from "
         "`corpus/measurement/compat/*.json` — **do not hand-edit**."
     )
+    measured_here = [t for t in HIR_TARGETS + MIR_TARGETS if t in PUBLIC_TARGETS]
+    measured_privately = [t for t in HIR_TARGETS + MIR_TARGETS if t not in PUBLIC_TARGETS]
     lines.append(
-        "**Measurement**: `emit_hir_target_matrix` + `emit_mir_target_matrix` "
-        "(in-process harness over every target backend, no external "
-        "toolchains). The harness runs in the private development repository, "
-        "which carries the non-public backends; this repository holds its "
-        "committed output."
+        "**Measurement**: in-process, no external toolchains. "
+        f"The {' and '.join(f'`{t}`' for t in measured_here)} columns are "
+        "measured from this repository's own backends by "
+        "`crates/radix/examples/compat_measure.rs`, and "
+        "`scripta/check-compat-json-freshness` regenerates them and fails on any "
+        "difference from the committed JSON. "
+        f"The other columns ({', '.join(f'`{t}`' for t in measured_privately)}) "
+        "are measured in the private development repository, which builds their "
+        "backends; this repository holds that committed output and cannot recompute it."
     )
-    lines.append("**Join**: `corpus/index.toml` terms → exempla.")
+    lines.append(
+        "**Join**: exempla front matter (`term`, `explains`) → terms. The corpus is "
+        "the exempla this repository ships."
+    )
     lines.append("")
     lines.append(
         "This is the **official generated** grammar×target support matrix. It reports"
@@ -239,13 +252,16 @@ def render_ebnf_matrix(planned: dict) -> list[str]:
     lines.append("## Regeneration")
     lines.append("")
     lines.append(
-        "The measurement JSON is produced by the target harness in the "
-        "private development repository (it needs every backend) and committed "
-        "here at release. Rendering and the freshness check run anywhere with "
-        "Python 3.11 or newer:"
+        f"The {' and '.join(f'`{t}`' for t in measured_here)} measurement JSON "
+        "regenerates in this repository with the checks below; the other "
+        "columns' JSON is produced in the private development repository (it "
+        "needs their backends) and committed here at release. Rendering and the "
+        "checks run anywhere with Python 3.11 or newer and a Rust toolchain:"
     )
     lines.append("")
     lines.append("```bash")
+    lines.append("./scripta/check-compat-json-freshness       # regenerate the columns measured here; fail on any drift")
+    lines.append("python3 scripta/emit-compat-json.py         # rewrite those columns' JSON after a measured change")
     lines.append("python3 scripta/render-matrices.py          # render in place")
     lines.append("python3 scripta/render-matrices.py --check  # fail if committed docs are stale")
     lines.append("```")

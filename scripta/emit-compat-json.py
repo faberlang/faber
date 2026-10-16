@@ -1,285 +1,123 @@
 #!/usr/bin/env python3
 """Emit measurement JSON for the public compatibility matrices.
 
-Runs the in-process exempla harness (emit_hir_target_matrix,
-emit_mir_target_matrix) and writes per-target JSON under
-radix/corpus/measurement/:
+Measures the exempla corpus against the matrix columns and writes one file per
+column under corpus/measurement/:
 
-  compat/<target>.json          EBNF matrix rows for one target (hir/mir lanes)
+  compat/<column>.json          EBNF matrix rows for one column (hir/mir lanes)
 
-The conversio/ and conversio-decimal/ measurement JSON is no longer emitted
-here: its generator measured a fixture tree in the sibling examples repo, which
-are not part of radix (single-repo-development U1, ruling Q6). The committed
-files under corpus/measurement/conversio*/ are frozen records.
+grammar/EBNF_MATRIX.md is rendered from these files by
+scripta/render-matrices.py. This script is the measurement side only; no
+markdown is emitted here.
 
-The public faber repository renders its matrices from this JSON
-(faber/scripta/render-matrices.py); it never runs the exempla build itself.
+Which columns it can emit depends on the checkout. A column is measurable
+where its backend is built:
 
-This script is the measurement side only — no markdown is emitted here.
+  faber, runner    ship in this repository; measured by
+                   crates/radix/examples/compat_measure.rs (compat_measure.py)
+  the other ten    need backends this repository does not ship. A checkout
+                   that builds them adds scripta/compat_extra.py, which
+                   measures every column; without it this script reports them
+                   as not measured here and leaves their committed JSON alone
 
 Usage:
-  ./scripta/emit-compat-json.py
+  ./scripta/emit-compat-json.py                    # every column measurable here
+  ./scripta/emit-compat-json.py --targets faber    # a subset of those columns
+  ./scripta/emit-compat-json.py --list             # print the measurable columns
 
 Env:
-  COMPAT_OUT              output root (default radix/corpus/measurement)
-  EBNF_MATRIX_HIR_LOG     captured emit_hir_target_matrix output (skip cargo)
-  EBNF_MATRIX_MIR_LOG     captured emit_mir_target_matrix output (skip cargo)
+  COMPAT_OUT           output root (default corpus/measurement)
+  COMPAT_MEASURE_LOG   captured compat_measure output (skip cargo)
 
-The freshness gate (scripta/check-compat-json-freshness, wired into
-check-measurement-gates / stage 4a) regenerates to a temp root and runs the
-class-aware diff. Equality with the committed record is the only state
-reported fresh; additive drift fails by default (recorded only under an
-explicit --accept) and capability regressions always fail. Commit the
-regenerated JSON in the same change when the measured baseline is meant
-to move.
+The freshness gate (scripta/check-compat-json-freshness) regenerates the
+measurable columns to a temp root and diffs them against the committed JSON.
+Commit the regenerated JSON in the same change when the measured baseline is
+meant to move.
 """
 
 from __future__ import annotations
 
-import json
+import argparse
+import importlib.util
 import os
-import re
-import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+import compat_measure as cm
+
+ROOT = cm.ROOT
 DEFAULT_OUT = ROOT / "corpus" / "measurement"
-
-HIR_TARGETS = ["rust", "go", "ts", "faber"]
-MIR_TARGETS = [
-    "llvm-text",
-    "wasm-text",
-    "wasm",
-    "metal-text",
-    "wgsl-text",
-    "sexp-struct",
-    "sexp",
-    "runner",
-]
-
-CARGO_HIR = [
-    "cargo", "test", "-p", "exempla", "--lib", "emit_hir_target_matrix",
-    "--", "--ignored", "--nocapture",
-]
-# The MIR emitters live behind the exempla `mir-core` lane feature
-# (crates/exempla/src/exempla_e2e/mod.rs); without it the tests compile to
-# nothing and the measurement would silently be empty.
-CARGO_MIR = [
-    "cargo", "test", "-p", "exempla", "--lib", "emit_mir_target_matrix",
-    "--features", "mir-core",
-    "--", "--ignored", "--nocapture",
-]
+EXTRA_PRODUCER = ROOT / "scripta" / "compat_extra.py"
 
 
-def run_or_read(log_env: str, cargo_cmd: list[str]) -> str:
-    cached = os.environ.get(log_env)
-    if cached:
-        return Path(cached).read_text(encoding="utf-8")
-    print(f"running: {' '.join(cargo_cmd)}", file=sys.stderr)
-    try:
-        return subprocess.check_output(
-            cargo_cmd, cwd=ROOT, text=True, stderr=subprocess.PIPE
-        )
-    except subprocess.CalledProcessError as error:
-        # Surface the harness stderr so a failing measurement is visible, not
-        # silent (the freshness gate prints this script's stderr on failure).
-        stderr = (error.stderr or "").strip()
-        if stderr:
-            print(stderr, file=sys.stderr)
-        raise
-
-
-# --- HIR/MIR matrix measurement parsing (same contract as the retired
-# --- generate-ebnf-matrix.py; measurement only) -----------------------------
-
-CORPUS_ROOT = (ROOT / "corpus").as_posix()
-
-
-def normalize_corpus_path(raw: str) -> str | None:
-    """Reduce any exemplum path to a stable `corpus/<rel>` form or return None.
-
-    Absolute paths are made relative to this script's own repository root, so
-    the result does not depend on what the checkout directory is called.
-    """
-    raw = raw.replace("\\", "/").strip()
-    if raw.startswith(CORPUS_ROOT + "/"):
-        return "corpus/" + raw[len(CORPUS_ROOT) + 1:]
-    if raw.endswith(".fab") and "/" in raw and not raw.startswith(("/", ".")):
-        return f"corpus/{raw}"
-    return None
-
-
-def corpus_rel(path: str) -> str | None:
-    norm = normalize_corpus_path(path)
-    if not norm:
+def load_extra_producer():
+    """The checkout's own producer for the remaining columns, if it has one."""
+    if not EXTRA_PRODUCER.is_file():
         return None
-    if norm.startswith("corpus/"):
-        return norm[len("corpus/"):]
-    return norm
+    spec = importlib.util.spec_from_file_location("compat_extra", EXTRA_PRODUCER)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["compat_extra"] = module
+    spec.loader.exec_module(module)
+    return module
 
 
-def parse_hir(text: str) -> dict[str, dict[str, str]]:
-    """path -> {target: 'capable' | 'gap:<slugs>' | 'no-hir'}."""
-    verdicts: dict[str, dict[str, str]] = {}
-    for line in text.splitlines():
-        parts = line.split("\t")
-        if len(parts) < 3:
-            continue
-        raw_path, target, verdict = parts[0], parts[1], parts[2]
-        if target not in HIR_TARGETS:
-            continue
-        rel = corpus_rel(raw_path)
-        if not rel:
-            continue
-        slot = verdicts.setdefault(rel, {})
-        if verdict == "no-hir":
-            slot[target] = "no-hir"
-        elif verdict == "capable":
-            slot[target] = "capable"
-        elif verdict.startswith("gaps:"):
-            slot[target] = "gap"
-    return verdicts
+def measurable(extra) -> list[str]:
+    return list(extra.TARGETS) if extra else list(cm.PUBLIC_TARGETS)
 
 
-def parse_mir(text: str) -> dict[str, dict[str, str]]:
-    """path -> {target: 'capable' | 'gap' | 'n/a'}."""
-    verdicts: dict[str, dict[str, str]] = {}
-    in_rows = False
-    for line in text.splitlines():
-        if line.strip() == "ROWS":
-            in_rows = True
-            continue
-        if not in_rows:
-            continue
-        parts = line.split("|")
-        if len(parts) < 3:
-            continue
-        rel = corpus_rel(parts[0])
-        if not rel:
-            continue
-        cells = parts[2:]
-        slot = verdicts.setdefault(rel, {})
-        for target, cell in zip(MIR_TARGETS, cells):
-            cell = cell.strip()
-            if cell.startswith("runner panic:"):
-                raise ValueError(
-                    f"MIR target matrix contains a runner panic for {rel} [{target}]: {cell}"
+def measure(targets: list[str], extra) -> dict[str, dict[str, str]]:
+    """Verdicts for the requested columns, from whichever producers apply."""
+    public = [t for t in targets if t in cm.PUBLIC_TARGETS]
+    verdicts = cm.measure_public(public) if public else {}
+    if extra and any(t not in cm.PUBLIC_TARGETS for t in targets):
+        harness = extra.measure()
+        if public:
+            rows = cm.disagreements(harness, verdicts, public)
+            if rows:
+                shown = "\n  ".join(rows[:20])
+                raise SystemExit(
+                    f"error: the extra producer and the in-repository measurement disagree on "
+                    f"{len(rows)} verdicts (first {min(len(rows), 20)}):\n  {shown}"
                 )
-            if cell == "ok":
-                slot[target] = "capable"
-            elif cell == "n/a" or cell == "missing":
-                slot[target] = "n/a"
-            else:
-                slot[target] = "gap"
+        verdicts = cm.merged(harness, verdicts)
     return verdicts
 
 
-def load_terms() -> list[tuple[str, str, list[str]]]:
-    """[(term, kind, [corpus-rel-path, ...])] sorted by term, from exempla frontmatter.
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--targets", help="comma-separated columns (default: all measurable here)")
+    parser.add_argument("--list", action="store_true", help="print the measurable columns and exit")
+    args = parser.parse_args(argv)
 
-    A term is declared by the one exemplum that lists it under `explains`. Its
-    paths are that exemplum plus every exemplum whose own `term` is the same.
-    """
-    corpus = ROOT / "corpus"
-    by_term: dict[str, set[str]] = {}
-    declared: dict[str, tuple[str, str]] = {}
-    for path in sorted(corpus.rglob("*.fab")):
-        text = path.read_text(encoding="utf-8")
-        if not text.startswith("+++\n"):
-            continue
-        rel = path.relative_to(corpus).as_posix()
-        kind = "unspecified"
-        explains: list[str] = []
-        for line in text[4 : text.find("\n+++", 4)].splitlines():
-            if line.startswith("term = "):
-                by_term.setdefault(json.loads(line[len("term = ") :]), set()).add(rel)
-            elif line.startswith("kind = "):
-                kind = json.loads(line[len("kind = ") :])
-            elif line.startswith("explains = "):
-                explains = json.loads(line[len("explains = ") :])
-        for term in explains:
-            declared[term] = (kind, rel)
-    return [
-        (term, kind, sorted(by_term.get(term, set()) | {primary}))
-        for term, (kind, primary) in sorted(declared.items())
-    ]
+    extra = load_extra_producer()
+    available = measurable(extra)
+    if args.list:
+        print("\n".join(available))
+        return 0
 
-
-def target_rows(
-    terms: list[tuple[str, str, list[str]]],
-    verdicts: dict[str, dict[str, str]],
-    target: str,
-) -> tuple[list[dict], dict[str, int]]:
-    """Per-term (capable, analyzable) rows for one target, plus the tally."""
-    rows = []
-    capable = 0
-    analyzable = 0
-    for term, rule, paths in terms:
-        cap = 0
-        ana = 0
-        for p in paths:
-            v = verdicts.get(p, {}).get(target)
-            if v is None or v == "n/a" or v == "no-hir":
-                continue
-            ana += 1
-            if v == "capable":
-                cap += 1
-        rows.append({"term": term, "rule": rule, "capable": cap, "analyzable": ana})
-        capable += cap
-        analyzable += ana
-    return rows, {"capable": capable, "analyzable": analyzable}
-
-
-def write_json(path: Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
-    print(f"wrote {path}", file=sys.stderr)
-
-
-def emit_compat(out_root: Path) -> None:
-    hir_text = run_or_read("EBNF_MATRIX_HIR_LOG", CARGO_HIR)
-    mir_text = run_or_read("EBNF_MATRIX_MIR_LOG", CARGO_MIR)
-    hir = parse_hir(hir_text)
-    mir = parse_mir(mir_text)
-    terms = load_terms()
-
-    for target in HIR_TARGETS:
-        rows, summary = target_rows(terms, hir, target)
-        write_json(
-            out_root / "compat" / f"{target}.json",
-            {
-                "schemaVersion": 1,
-                "artifact": "faber-compat-measurement",
-                "target": target,
-                "lane": "hir",
-                "generatedBy": "radix/scripta/emit-compat-json.py",
-                "summary": summary,
-                "terms": rows,
-            },
+    targets = args.targets.split(",") if args.targets else available
+    unknown = [t for t in targets if t not in cm.ALL_TARGETS]
+    if unknown:
+        print(f"error: unknown column(s): {', '.join(unknown)}", file=sys.stderr)
+        return 2
+    unavailable = [t for t in targets if t not in available]
+    if unavailable:
+        print(
+            f"error: not measurable in this checkout: {', '.join(unavailable)} "
+            f"(this checkout does not build their backends; "
+            f"measurable here: {', '.join(available)})",
+            file=sys.stderr,
         )
-    for target in MIR_TARGETS:
-        rows, summary = target_rows(terms, mir, target)
-        write_json(
-            out_root / "compat" / f"{target}.json",
-            {
-                "schemaVersion": 1,
-                "artifact": "faber-compat-measurement",
-                "target": target,
-                "lane": "mir",
-                "generatedBy": "radix/scripta/emit-compat-json.py",
-                "summary": summary,
-                "terms": rows,
-            },
-        )
+        return 2
 
-
-def main() -> int:
+    terms = cm.load_terms(extra.corpus_excluded if extra else None)
+    verdicts = measure(targets, extra)
     out_root = Path(os.environ.get("COMPAT_OUT", DEFAULT_OUT))
-    emit_compat(out_root)
-    print(f"measurement JSON written under {out_root}", file=sys.stderr)
+    cm.write_compat(out_root, targets, terms, verdicts)
+    skipped = [t for t in cm.ALL_TARGETS if t not in targets]
+    print(f"measurement JSON written under {out_root}: {', '.join(targets)}", file=sys.stderr)
+    if skipped:
+        print(f"not measured in this run: {', '.join(skipped)}", file=sys.stderr)
     return 0
 
 

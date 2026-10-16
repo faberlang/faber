@@ -3,10 +3,10 @@
   "artifact": "faber-compat-measurement",
   "target": "faber",
   "lane": "hir",
-  "generatedBy": "radix/scripta/emit-compat-json.py",
+  "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 440,
-    "analyzable": 440
+    "capable": 437,
+    "analyzable": 437
   },
   "terms": [
     {
@@ -996,8 +996,8 @@
     {
       "term": "·",
       "rule": "operator-group",
-      "capable": 4,
-      "analyzable": 4
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "×",
@@ -1152,8 +1152,8 @@
     {
       "term": "⊙",
       "rule": "operator-group",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "⊚",

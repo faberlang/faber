@@ -146,9 +146,13 @@ execution. Those belong to `faber`.
   `--render-locales`; `scripta/check-grammar` fails on drift (Python 3.11 or newer).
 - `grammar/EBNF_MATRIX.md` and `grammar/CONVERSIO_MATRIX.md` are rendered from
   `corpus/measurement/` by `python3 scripta/render-matrices.py` (`--check` fails when
-  they are stale). The measurement itself comes from a harness that needs every
-  target backend, so it is produced in the private development repository and
-  committed here.
+  they are stale). The measurement JSON for the columns whose backends ship here
+  (`faber`, `runner`) regenerates with `python3 scripta/emit-compat-json.py` and is
+  checked byte for byte by `./scripta/check-compat-json-freshness` (it runs
+  `crates/radix/examples/compat_measure.rs`). The other columns need backends built
+  only in the private development repository; their JSON is committed here from
+  that measurement and the checker skips them. `corpus/measurement/README.md` has
+  the table.
 - Locale packs are `locale/<id>/pack.toml` for `ar`, `en`, `hi`, `la`, `th-TH`,
   `vi`, `zh-Hans`, `zh-Hant`. `en` and `la` change together in one change; the
   other packs follow as proposals. Library member rows live beside the library
