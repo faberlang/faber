@@ -103,7 +103,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     }
 
     pub(crate) fn lift_element(
-        &self,
+        &mut self,
         op: MirLiftOp,
         v: &[Value],
         element: Option<TypeId>,

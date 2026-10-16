@@ -3955,7 +3955,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     }
 
     fn store_tensor_elements(
-        &self,
+        &mut self,
         element: TypeId,
         values: Vec<Value>,
         span: Span,
@@ -3970,7 +3970,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     /// so the built result is never re-read out of its own backing and cloned
     /// back. The op pass completes before the first store runs.
     fn store_computed_cells(
-        &self,
+        &mut self,
         element: Option<TypeId>,
         data: Vec<Value>,
         span: Span,

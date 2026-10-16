@@ -17,6 +17,8 @@ use crate::value::{
 use radix_hir::{HirStoreKind, HirStoreSite};
 use radix_lexer::Span;
 use radix_types::{FloatPolicy, NumericWidth, Primitive, Type, TypeId};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Stable identity of a failed implicit store: distinct from arithmetic
 /// overflow (ruling 5).
@@ -30,13 +32,24 @@ enum SlotPolicy {
     Saturating,
 }
 
+/// The indexed container families whose elements carry a slot policy.
+#[derive(Clone, Copy)]
+enum ContainerCarrier {
+    /// `tensor<E, ..>` and `sparsa<E, ..>`, both carried as `Value::Tensor`.
+    Sequence,
+    /// `vector<E, N>` carried as `Value::Vector`.
+    Vector,
+    /// `matrix<E, [R, C]>` carried as `Value::Matrix`.
+    Matrix,
+}
+
 impl<H: super::Host + ?Sized> Runner<'_, H> {
     /// Apply the slot policy of `target` to an integer `value`.
     ///
     /// `None` when `target` is not an integer slot or `value` is not an
     /// integer, so the caller falls through to the ordinary conversion.
     pub(crate) fn eval_implicit_store(
-        &self,
+        &mut self,
         site: &HirStoreSite,
         target: TypeId,
         value: &Value,
@@ -47,6 +60,63 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
         if let Some((policy, width)) = policy_float_cell(self.types, target) {
             return self.eval_policy_float_store(site, policy, width, value, span);
+        }
+        // Ruling 19: an implicit store into an indexed container applies the
+        // element type's policy to every live element, so an out-of-range
+        // element traps here instead of surviving the authored conversion
+        // (which passes a `Value::Tensor` through unchanged).
+        let container = match self.types.get(target) {
+            Type::Tensor(element, _) | Type::Sparsa(element, _) => {
+                Some((ContainerCarrier::Sequence, *element))
+            }
+            Type::Vector(element, _) => Some((ContainerCarrier::Vector, *element)),
+            Type::Matrix(element, _) => Some((ContainerCarrier::Matrix, *element)),
+            _ => None,
+        };
+        if let Some((carrier, element)) = container {
+            // The recursion passes the real site, so a trapped element names
+            // the declaration, assignment or argument that stored it.
+            return match (carrier, value) {
+                (ContainerCarrier::Sequence, Value::Tensor(cell)) => {
+                    let values = match self.tensor_logical_values(cell, span) {
+                        Ok(values) => values,
+                        Err(error) => return Some(Err(error)),
+                    };
+                    let shape = cell.borrow().shape.clone();
+                    let mapped = values
+                        .into_iter()
+                        .map(|value| self.store_element(site, element, value, span))
+                        .collect::<Result<Vec<_>, _>>();
+                    Some(mapped.and_then(|mapped| {
+                        crate::runtime::tensor_value_typed(
+                            self.types,
+                            mapped,
+                            Some(element),
+                            shape,
+                            span,
+                        )
+                    }))
+                }
+                (ContainerCarrier::Vector, Value::Vector(cell)) => {
+                    let lanes = cell.borrow().clone();
+                    let mapped = lanes
+                        .into_iter()
+                        .map(|value| self.store_element(site, element, value, span))
+                        .collect::<Result<Vec<_>, _>>();
+                    Some(mapped.map(|mapped| Value::Vector(Rc::new(RefCell::new(mapped)))))
+                }
+                (ContainerCarrier::Matrix, Value::Matrix(cell)) => {
+                    let mut matrix = cell.borrow_mut();
+                    for value in &mut matrix.data {
+                        match self.store_element(site, element, value.clone(), span) {
+                            Ok(stored) => *value = stored,
+                            Err(error) => return Some(Err(error)),
+                        }
+                    }
+                    Some(Ok(Value::Matrix(Rc::clone(cell))))
+                }
+                _ => None,
+            };
         }
         let (policy, width) = self.integer_slot(target)?;
         // Ruling 38: an `inf` beyond the 64-bit carriers fits no bounded
@@ -113,7 +183,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     /// Store one exactly computed tensor element under its element type's
     /// slot policy (ruling 19). Non-integer elements pass through.
     pub(crate) fn store_tensor_element(
-        &self,
+        &mut self,
         element: TypeId,
         value: Value,
         span: Span,
@@ -124,7 +194,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             inferred_from: None,
             inferred_text: None,
         };
-        self.eval_implicit_store(&site, element, &value, span)
+        self.store_element(&site, element, value, span)
+    }
+
+    /// One element of a container store: apply the element slot policy at the
+    /// given site, or keep the element when its type is not an integer slot.
+    fn store_element(
+        &mut self,
+        site: &HirStoreSite,
+        element: TypeId,
+        value: Value,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        self.eval_implicit_store(site, element, &value, span)
             .unwrap_or(Ok(value))
     }
 
