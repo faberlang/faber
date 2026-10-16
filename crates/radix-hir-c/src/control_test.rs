@@ -125,3 +125,22 @@ fn a_guard_section_is_early_exit_clauses() {
     assert!(code.contains("return p_low;"), "{code}");
     assert!(code.contains("return p_value;"), "{code}");
 }
+
+#[test]
+fn range_membership_is_the_two_bounds() {
+    let code = emitted(
+        "main {\n    const int age = 25\n    print age ∈ 0‥100\n    print age ∈ 18…65\n    print age ∉ 0‥25\n}",
+    );
+    assert!(
+        code.contains("(INT64_C(0) <= l_age) && (l_age < INT64_C(100))"),
+        "{code}"
+    );
+    assert!(
+        code.contains("(INT64_C(18) <= l_age) && (l_age <= INT64_C(65))"),
+        "{code}"
+    );
+    assert!(
+        code.contains("(!((INT64_C(0) <= l_age) && (l_age < INT64_C(25))))"),
+        "{code}"
+    );
+}

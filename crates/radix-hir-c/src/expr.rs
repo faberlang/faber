@@ -1353,6 +1353,11 @@ impl Emitter<'_> {
         if op == HirBinOp::Coalesce {
             return self.coalesce(left, right);
         }
+        // `x ∈ a‥b` / `x ∈ a…b`: range membership, before the range value is
+        // evaluated as an expression.
+        if matches!(op, HirBinOp::InRange | HirBinOp::NotInRange) {
+            return self.range_membership(op == HirBinOp::NotInRange, left, right);
+        }
         let l = self.expr(left)?;
         let r = self.expr(right)?;
         // `≈` / `≉` is tolerance equality over either family, never the C `==`
@@ -1478,6 +1483,47 @@ impl Emitter<'_> {
 
     /// `≈` / `≉`: `10^9 · |a − b| ≤ max(|a|, |b|)` between integers, the same
     /// tolerance rule between floats. Both sides are the same family.
+    /// `x ∈ a‥b` (end excluded) / `x ∈ a…b` (end included): an integer is in
+    /// an integer range when `a <= x` and, per the range's kind, `x` is below
+    /// or at most `b`. `∉` negates the whole test.
+    fn range_membership(
+        &mut self,
+        negate: bool,
+        value: &HirExpression,
+        range: &HirExpression,
+    ) -> Result<Operand, CodegenError> {
+        let HirExpressionKind::Intervallum {
+            start,
+            end,
+            step,
+            kind,
+        } = &range.kind
+        else {
+            return Err(unsupported("membership over a value that is not a range"));
+        };
+        if step.is_some() {
+            return Err(unsupported("range membership with a step"));
+        }
+        let mut operands = [self.expr(value)?, self.expr(start)?, self.expr(end)?];
+        if operands
+            .iter()
+            .any(|operand| !matches!(operand.value, Value::Int | Value::Exact))
+        {
+            return Err(unsupported("range membership over a non-integer"));
+        }
+        let prelude = self.sequence(&mut operands);
+        let effect = operands.iter().any(|operand| operand.effect);
+        let [x, low, high] = operands;
+        let lower = format!("({} <= {})", low.text, x.text);
+        let upper = match kind {
+            radix_hir::HirRangeKind::Exclusive => format!("({} < {})", x.text, high.text),
+            radix_hir::HirRangeKind::Inclusive => format!("({} <= {})", x.text, high.text),
+        };
+        let text = format!("({lower} && {upper})");
+        let text = if negate { format!("(!{text})") } else { text };
+        Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect))
+    }
+
     fn fuzzy(&mut self, op: HirBinOp, mut l: Operand, mut r: Operand) -> Result<Operand, CodegenError> {
         let is_float = |value: Value| matches!(value, Value::Float | Value::Float32);
         let name = if l.is_integer() && r.is_integer() {
