@@ -9,7 +9,7 @@ use crate::{Emitter, Local};
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
 use radix_hir::{
-    HirBlock, HirExpression, HirExpressionKind, HirIteraMode, HirLocal, HirScribeKind,
+    HirBlock, HirCustodi, HirExpression, HirExpressionKind, HirIteraMode, HirLocal, HirScribeKind,
     HirStatement, HirStatementKind,
 };
 use radix_lexer::Symbol;
@@ -79,7 +79,7 @@ impl Emitter<'_> {
             HirStatementKind::Perge => self.loop_jump(out, "continue;"),
             HirStatementKind::Tacet => Ok(()),
             HirStatementKind::IncDec(inc_dec) => self.inc_dec(out, inc_dec),
-            HirStatementKind::Custodi(_) => Err(unsupported("custodi guard section")),
+            HirStatementKind::Custodi(custodi) => self.custodi(out, custodi),
         }
     }
 
@@ -849,6 +849,19 @@ impl Emitter<'_> {
             return Err(unsupported("condition that is not a boolean"));
         }
         Ok(value.text)
+    }
+
+    /// `custodi { si <cond> { … } … }`: sequential early-exit guard clauses.
+    /// Each is an `if` whose body may `return`, exactly as the runner runs
+    /// them before the ordinary body.
+    fn custodi(&mut self, out: &mut String, custodi: &HirCustodi) -> Result<(), CodegenError> {
+        for clause in &custodi.clauses {
+            let test = self.condition(&clause.cond)?;
+            self.line(out, &format!("if {test} {{"));
+            self.block(out, &clause.body)?;
+            self.line(out, "}");
+        }
+        Ok(())
     }
 
     fn si(

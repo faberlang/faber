@@ -113,3 +113,15 @@ fn a_thread_lane_binder_is_declared_metadata() {
     assert!(code.contains("faber_i0 < faber_t0->len"), "{code}");
     assert!(!code.contains("lane"), "{code}");
 }
+
+#[test]
+fn a_guard_section_is_early_exit_clauses() {
+    // `guard { if <cond> { return x } }`: each clause is an `if` whose body
+    // may return from the function; the ordinary body follows.
+    let code = emitted(
+        "fn clamp(int value, int low) → int {\n    guard {\n        if value ≺ low {\n            return low\n        }\n    }\n    return value\n}\nmain {\n    print clamp(5, 0)\n}",
+    );
+    assert!(code.contains("if (p_value < p_low) {"), "{code}");
+    assert!(code.contains("return p_low;"), "{code}");
+    assert!(code.contains("return p_value;"), "{code}");
+}

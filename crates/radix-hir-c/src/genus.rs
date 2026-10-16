@@ -132,7 +132,7 @@ impl Emitter<'_> {
         let mut fields = Vec::with_capacity(genus.fields.len());
         let mut consts = Vec::new();
         for field in &genus.fields {
-            if !field.annotations.is_empty() {
+            if field.annotations.iter().any(|a| !self.ignorable_annotation(a)) {
                 return Err(unsupported("field annotation"));
             }
             if field.is_static() {
@@ -177,7 +177,11 @@ impl Emitter<'_> {
         }
         let mut methods = Vec::with_capacity(genus.methods.len());
         for method in &genus.methods {
-            if !method.annotations.is_empty() {
+            if method
+                .annotations
+                .iter()
+                .any(|a| !self.ignorable_annotation(a))
+            {
                 return Err(unsupported("method annotation"));
             }
             let method_name = self.names.resolve_symbol(method.func.name).to_owned();
@@ -445,6 +449,17 @@ impl Emitter<'_> {
             "({})->{} = {};",
             base.text, field.c_name, value.text
         ))
+    }
+
+    /// Access-control annotations (`@ private`, `@ internal`) have no runtime
+    /// effect — the runner enforces nothing at run time — so the target
+    /// ignores them; every other annotation can change meaning and is
+    /// rejected.
+    pub(crate) fn ignorable_annotation(&self, annotation: &radix_hir::HirAnnotation) -> bool {
+        matches!(
+            self.names.resolve_symbol(annotation.family),
+            "private" | "internal" | "privata" | "interna"
+        )
     }
 
     /// A method call on a genus value: the method's function with the

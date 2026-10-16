@@ -120,3 +120,14 @@ fn a_ref_text_parameter_is_the_identity_pointer() {
     );
     assert!(code.contains("static void f_show(const char *p_s)"), "{code}");
 }
+
+#[test]
+fn access_control_annotations_are_ignored() {
+    // `@ private` / `@ internal` are access control with no runtime effect;
+    // any other annotation can change meaning and stays rejected.
+    let code = emitted(
+        "class Counter {\n    @ private\n    mut int total = 0\n    @ internal\n    fn add(int value) → void {\n        self.total ← self.total + value\n    }\n}\nmain {\n    print \"ok\"\n}",
+    );
+    assert!(code.contains("struct g_Counter"), "{code}");
+    assert!(code.contains("m_total"), "{code}");
+}
