@@ -1,0 +1,11 @@
++++
+locale = "en"
++++
+# A closure that reads an enclosing binding needs a closure struct this subset
+# does not emit, so it is rejected by name.
+
+main {
+    let int n ← 3
+    let (int) → int add ← int x ∴ x + n
+    print add(1)
+}

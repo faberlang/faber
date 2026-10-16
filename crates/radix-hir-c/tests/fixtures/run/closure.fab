@@ -1,0 +1,31 @@
++++
+locale = "en"
++++
+# A non-capturing closure is a synthesized top-level C function; its value is a
+# C function pointer, called indirectly with the same hidden arena a direct
+# call gets.
+
+fn apply((int) → int f, int n) → int {
+    return f(n)
+}
+
+main {
+    let (int) → int dupla ← int x ∴ x * 2
+    print dupla(5)
+    let (int, int) → int summa ← (int a, int b) → int ∴ a + b
+    print summa(2, 3)
+    let (int) → int f ← int x → int ∴ do {
+        let int y ← x + 1
+        return y * 2
+    }
+    print f(5)
+    print apply(int x ∴ x + 100, 1)
+    let (int) → bool par ← int x → bool ∴ x % 2 ≡ 0
+    if par(4) {
+        print "even"
+    }
+    mut list<int> xs ← [1, 2, 3]
+    let (mut list<int>) → void grow ← mut list<int> ys ∴ ys.append(9)
+    grow(mut xs)
+    print xs
+}

@@ -465,6 +465,9 @@ impl Emitter<'_> {
                 }
                 self.call(callee, args)
             }
+            HirExpressionKind::Clausura(params, ret, _err, body) => {
+                self.closure(expr, params, *ret, body)
+            }
             other => Err(unsupported(construct_name(other))),
         }
     }
@@ -594,7 +597,14 @@ impl Emitter<'_> {
         let call = format!("{name}({})", slots.join(", "));
         let ret = returns(self.types, ret_ty)?;
         let value = ret.map_or(Value::Void, Value::from);
-        Ok(Operand::new(wrap(&prelude, &call), value).with_effect(true))
+        let text = wrap(&prelude, &call);
+        // A boolean result carries its own parentheses like every truth operand.
+        let text = if value == Value::Truth && prelude.is_empty() {
+            format!("({text})")
+        } else {
+            text
+        };
+        Ok(Operand::new(text, value).with_effect(true))
     }
 
     /// `read line` / `read`: one stdin line without its terminator, or all of

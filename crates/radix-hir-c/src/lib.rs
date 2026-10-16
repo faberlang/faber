@@ -19,6 +19,7 @@
 //! `radix-module` re-exports this leaf through its codegen surface and owns
 //! target dispatch.
 
+mod closure;
 mod conversio;
 mod enumeration;
 mod error;
@@ -44,6 +45,8 @@ mod ty;
 mod bounded_test;
 #[cfg(test)]
 mod class_const_test;
+#[cfg(test)]
+mod closure_test;
 #[cfg(test)]
 mod control_test;
 #[cfg(test)]
@@ -178,6 +181,8 @@ impl CCodegen<'_> {
             variants: FxHashMap::default(),
             equals: Vec::new(),
             ref_params: FxHashSet::default(),
+            closures: Vec::new(),
+            closure_seq: 0,
         }
         .program(hir)
     }
@@ -239,6 +244,11 @@ pub(crate) struct Emitter<'a> {
     /// matching call-site marker passes the caller's address. Definition ids
     /// are unique, so the set never needs clearing.
     ref_params: FxHashSet<DefId>,
+    /// Non-capturing closures discovered while writing bodies, each waiting for
+    /// its synthesized top-level C function ([`closure::PendingClosure`]).
+    closures: Vec<closure::PendingClosure>,
+    /// How many synthesized closure names have been claimed.
+    closure_seq: u32,
 }
 
 /// One local, parameter or module constant, by its C identifier.
@@ -267,6 +277,10 @@ impl Emitter<'_> {
         if let Some(entry) = &hir.entry {
             self.block(&mut body, entry)?;
         }
+        // A closure body is written as its own top-level function, so flush
+        // the closures discovered by the function bodies and the entry block
+        // before the prototypes and functions are assembled.
+        let (closure_prototypes, closure_definitions) = self.flush_closures()?;
         // Show functions are asked for while bodies are written, so they are
         // generated last; the support text follows them, since they need
         // helpers too.
@@ -283,7 +297,7 @@ impl Emitter<'_> {
             out.push('\n');
         }
         let prototypes = format!(
-            "{}{show_prototypes}{equal_prototypes}{copy_prototypes}",
+            "{}{closure_prototypes}{show_prototypes}{equal_prototypes}{copy_prototypes}",
             items.prototypes(&self.called)
         );
         if !prototypes.is_empty() {
@@ -291,6 +305,7 @@ impl Emitter<'_> {
             out.push('\n');
         }
         out.push_str(&items.definitions(&self.called));
+        out.push_str(&closure_definitions);
         out.push_str(&show_definitions);
         out.push_str(&equal_definitions);
         out.push_str(&copy_definitions);
