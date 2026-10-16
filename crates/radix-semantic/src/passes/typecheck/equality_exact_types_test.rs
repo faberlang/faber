@@ -387,3 +387,37 @@ fn value_marker_binding_keeps_distinct_type_rejection() {
         result.diagnostics
     );
 }
+
+/// A sized integer operand beside an untyped integer constant takes part by
+/// value inside a kernel exactly as on the host (gpu-reset K3, need):
+/// the host exemption is not device-dependent. A float constant is not
+/// exempt, so exact-type discipline still binds in a kernel.
+#[test]
+fn kernel_sized_int_constant_equality_takes_part_by_value() {
+    let eq = compile("@ nucleum\nfunctio k(i32 kind) → bivalens {\n    redde kind ≡ 1\n}\n");
+    assert!(
+        eq.is_ok(),
+        "kernel `kind ≡ 1` must take the constant by value: {:?}",
+        eq.diagnostics
+    );
+    let neq = compile("@ nucleum\nfunctio k(i32 kind) → bivalens {\n    redde kind ≢ 0\n}\n");
+    assert!(
+        neq.is_ok(),
+        "kernel `kind ≢ 0` must take the constant by value: {:?}",
+        neq.diagnostics
+    );
+    let float = compile("@ nucleum\nfunctio k(i32 kind) → bivalens {\n    redde kind ≡ 1.5\n}\n");
+    assert!(
+        !float.is_ok(),
+        "kernel `kind ≡ 1.5` must stay an exact-type error: {:?}",
+        float.diagnostics
+    );
+    assert_eq!(
+        float
+            .diagnostics
+            .iter()
+            .find(|diag| diag.kind == SemanticErrorKind::TypeMismatch)
+            .and_then(|diag| diag.issue()),
+        Some(EXACT_EQ_ISSUE)
+    );
+}
