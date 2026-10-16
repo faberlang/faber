@@ -1058,12 +1058,10 @@ grammar and spec-commentary surface for the public language; the compiler
 (Radix) implements it. The rendered, localized grammar is published on
 [the documentation site](https://faberlang.dev/en-US/reference/grammar.html).
 
-Documentation contract: runnable language reference programs live in the public
-sibling [`examples/corpus/`](../../examples/corpus/) with optional `+++`
-frontmatter (`term`, `syntax`, `related`, …); the generated manifest is
-[`examples/corpus/index.toml`](../../examples/corpus/index.toml). `faber
-explain` loads the exempla reference pack from disk. Prefer the language corpus
-+ EBNF for new reference work.
+Documentation contract: runnable language reference programs live in the
+language corpus, [`corpus/`](../corpus/), with optional `+++` frontmatter
+(`term`, `syntax`, `related`, …). `faber explain` loads the exempla reference
+pack from disk. Prefer the language corpus + EBNF for new reference work.
 
 ---
 
@@ -2993,8 +2991,6 @@ ordinary postfix `conversio` materializes the resulting conversation handle.
   compile-time only — the wire is unchanged, and frames still carry loose
   data.
 
-See [`docs/design/frame-stream-types.md`](docs/design/frame-stream-types.md).
-
 **Concurrency is conversations.** Concurrent work is an `调用` conversation with
 a route. There is no separate spawn, thread, or lock primitive family.
 Handlers that share nothing and exchange only frames are free of data races by
@@ -3127,7 +3123,7 @@ language. For which grammar each compilation target lowers, and the runtime
 policy around it, see:
 
 - [`EBNF_MATRIX.md`](EBNF_MATRIX.md) — generated grammar×target lowerability matrix (the official rows).
-- [`docs/design/target-capability-matrix.md`](docs/design/target-capability-matrix.md) — runtime/contract policy (erase/warn/defer), pipeline routing, per-target contracts.
+- [Target matrix](https://faberlang.dev/en-US/toolchain/target-matrix.html) on the documentation site — runtime/contract policy (erase/warn/defer), pipeline routing, per-target contracts.
 
 **Conditional compilation is package-granular.** A package's `faber.toml`
 declares its target or targets (`[build] target = "ts"`, or

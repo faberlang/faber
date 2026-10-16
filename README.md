@@ -449,9 +449,29 @@ This repository is the open-source core of Faber:
 The official `faber` release also includes the code generators that are not in
 this repository (see Targets).
 
+## Install
+
+Prebuilt `faber` binaries for macOS (Apple silicon) and Linux (x86-64) are
+published on the [releases page](https://github.com/faberlang/releases/releases/latest);
+this one is [Faber 1.14.0](https://github.com/faberlang/releases/releases/tag/faber-v1.14.0).
+Download the tarball for your platform and its `.sha256` file into one
+directory, check it, and put `faber` on your `PATH`. The tarball holds a single
+file, `bin/faber`.
+
+```sh
+shasum -a 256 -c faber-v1.14.0-aarch64-apple-darwin.tar.gz.sha256   # Linux: sha256sum -c
+tar -xzf faber-v1.14.0-aarch64-apple-darwin.tar.gz
+sudo mv bin/faber /usr/local/bin/faber
+faber --version
+```
+
+On Linux the platform name is `x86_64-unknown-linux-gnu`. Documentation, the
+language reference and the target matrix are at <https://faberlang.dev>.
+
 ## Build and run
 
-You need a recent stable Rust toolchain.
+To build the open-source core from this repository instead, you need a recent
+stable Rust toolchain.
 
 ```sh
 cargo build --release -p faber

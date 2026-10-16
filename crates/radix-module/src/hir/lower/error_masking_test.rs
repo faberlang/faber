@@ -28,7 +28,7 @@
 //!   recovered-parse continuation analyzes the recovered program's
 //!   successfully-parsed top-level items (items whose span contains a
 //!   parse-error span are cascade-corrupted and dropped), so PARSE030 and
-//!   SEM001 co-report. The faber loader branch stays a Mind-routed residual.
+//!   SEM001 co-report. The faber loader branch stays a known residual.
 //! - **Repro B** (SEM001 masks SEM008): the resolve pass emits SEM001
 //!   (`unknown_variant`, `UndefinedVariable`) for the imported-union match
 //!   arms before lowering, and the `semantic/mod.rs:389` gate ("stop before
@@ -241,7 +241,7 @@ fn repro_a_parse_error_masks_semantic_error() {
     // `parse_program_for_namespace_exports`) drops the contract when the
     // *consumer* source has parse errors — a sibling module-drop surface the
     // recovered-parse continuation does not cover. That continuation is filed
-    // as a Mind-routed residual; when it lands, `u.Kind` resolves through its
+    // as a known residual; when it lands, `u.Kind` resolves through its
     // file interface and the SEM002 disappears.
     let dir = temp_consumer_dir("repro_a");
     let consumer_path = dir.join("consumer_a.fab");
