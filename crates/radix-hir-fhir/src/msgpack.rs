@@ -1265,6 +1265,49 @@ struct HirArtifactDto {
     display_tokens: DisplayTokensWire,
 }
 
+impl From<HirArtifact> for HirArtifactDto {
+    /// Consuming form: the package encode path has just decoded the unit
+    /// and needs the DTO once, so every field moves instead of cloning the
+    /// largest object in the compiler.
+    fn from(artifact: HirArtifact) -> Self {
+        Self {
+            schema_version: artifact.schema_version,
+            source_identity: artifact.source_identity,
+            hir: artifact.hir,
+            presentation: artifact.presentation,
+            cli_program: artifact.cli_program,
+            types: artifact.types,
+            resolved_generic_calls: artifact.resolved_generic_calls,
+            radix_lanes: artifact.radix_lanes,
+            interner: artifact.interner,
+            resolver: artifact.resolver,
+            libraries: artifact.libraries,
+            function_facts: FunctionFactTableDto {
+                entries: artifact
+                    .function_facts
+                    .entries
+                    .into_iter()
+                    .map(|(def_id, facts)| FunctionFactEntryDto { def_id, facts })
+                    .collect(),
+                entry: artifact.function_facts.entry,
+            },
+            resolved_uses: artifact.resolved_uses,
+            analysis_stamp: artifact.analysis_stamp,
+            gpu_builtins: artifact
+                .gpu_builtins
+                .into_iter()
+                .map(|(def_id, builtin)| GpuBuiltinEntryDto { def_id, builtin })
+                .collect(),
+            capability_provenance: artifact.capability_provenance,
+            provider_units: artifact.provider_units,
+            shape_obligations: artifact.shape_obligations,
+            kernel_requirements: artifact.kernel_requirements,
+            tensor_edge_policies: artifact.tensor_edge_policies,
+            display_tokens: artifact.display_tokens,
+        }
+    }
+}
+
 impl From<&HirArtifact> for HirArtifactDto {
     fn from(artifact: &HirArtifact) -> Self {
         Self {
@@ -1408,7 +1451,7 @@ impl FhirPackageDto {
                 library_imports: module.library_imports.clone(),
                 source_hash: module.source_hash.clone(),
                 unit_schema_version: module.unit_schema_version,
-                unit: HirArtifactDto::from(&artifact),
+                unit: HirArtifactDto::from(artifact),
             });
         }
         Ok(Self {
