@@ -1,6 +1,5 @@
 +++
 term = "lege"
-explains = ["lege"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "sit_decl", "lege_expr", "expression", "nota_stmt"]
 category = "io"
