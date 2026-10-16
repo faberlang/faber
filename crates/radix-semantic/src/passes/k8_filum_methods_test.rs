@@ -46,27 +46,27 @@ genus Stencil {
     varia f32 gain
 
     @ nucleum
-    functio put(numerus at, f32 v) → vacuum {
+    functio put(i32 at, f32 v) → vacuum {
         ego.data[at] ← v * ego.gain
     }
 
     @ nucleum
-    functio peek(numerus at) → f32 {
+    functio peek(i32 at) → f32 {
         redde ego.data[at + 1]
     }
 
     @ nucleum
-    functio here(numerus at) → f32 {
+    functio here(i32 at) → f32 {
         redde ego.data[at]
     }
 
     @ nucleum
-    functio put_into(varia tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
+    functio put_into(varia tensor<f32, [4]> target, i32 at, f32 v) → vacuum {
         target[at] ← v
     }
 
     @ nucleum
-    functio read_from(de tensor<f32, [4]> source, numerus at) → f32 {
+    functio read_from(de tensor<f32, [4]> source, i32 at) → f32 {
         redde source[at + 1]
     }
 
@@ -81,34 +81,34 @@ genus Stencil {
     }
 
     @ nucleum
-    functio put_twice(numerus at, f32 v) → vacuum {
+    functio put_twice(i32 at, f32 v) → vacuum {
         ego.put(at, v)
         ego.put(at, v + 1.0)
     }
 
     @ nucleum
-    functio spin(numerus at) → f32 {
+    functio spin(i32 at) → f32 {
         redde ego.spin(at)
     }
 
     @ nucleum
-    functio ping(numerus at) → f32 {
+    functio ping(i32 at) → f32 {
         redde ego.pong(at)
     }
 
     @ nucleum
-    functio pong(numerus at) → f32 {
+    functio pong(i32 at) → f32 {
         redde ego.ping(at)
     }
 
     @ nucleum
-    functio both(varia tensor<f32, [4]> left, varia tensor<f32, [4]> right, numerus at) → vacuum {
+    functio both(varia tensor<f32, [4]> left, varia tensor<f32, [4]> right, i32 at) → vacuum {
         left[at] ← 1.0
         right[at] ← 2.0
     }
 
     @ nucleum
-    functio put_via_function(numerus at, f32 v) → vacuum {
+    functio put_via_function(i32 at, f32 v) → vacuum {
         field_store(varia ego.data, at, v)
     }
 
@@ -118,7 +118,7 @@ genus Stencil {
 }
 
 @ nucleum
-functio field_store(varia tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
+functio field_store(varia tensor<f32, [4]> target, i32 at, f32 v) → vacuum {
     target[at] ← v
 }
 ";
@@ -302,7 +302,7 @@ genus Arca<T> {{
     varia tensor<f32, [4]> data
 
     @ nucleum
-    functio pone(numerus at, f32 v) → vacuum {{
+    functio pone(i32 at, f32 v) → vacuum {{
         ego.data[at] ← v
     }}
 
@@ -342,7 +342,7 @@ functio shown(f32 x) → f32 { redde x * 2.0 }
 
 @ nucleum
 @ publica
-functio shown_store(varia tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
+functio shown_store(varia tensor<f32, [4]> target, i32 at, f32 v) → vacuum {
     target[at] ← v
 }
 ";
@@ -445,7 +445,7 @@ fn function_call_with_aliased_mut_arguments_is_still_a_borrow_error() {
     let result = analyze_source_la(&function_kernel(
         r"
 @ nucleum
-functio both(varia tensor<f32, [4]> left, varia tensor<f32, [4]> right, numerus at) → vacuum {
+functio both(varia tensor<f32, [4]> left, varia tensor<f32, [4]> right, i32 at) → vacuum {
     left[at] ← 1.0
     right[at] ← 2.0
 }
@@ -524,8 +524,8 @@ fn host_receiver_method_that_writes_a_field_stays_declined() {
     rejected(
         r"
 genus Counter {
-    varia numerus count
-    functio accipe(numerus index) → numerus {
+    varia i32 count
+    functio accipe(i32 index) → i32 {
         ego.count ← ego.count + 1
         redde ego.count
     }
@@ -533,7 +533,7 @@ genus Counter {
 
 @ nucleum
 @ publica
-functio k(varia tensor<numerus, [4]> grid) → vacuum {
+functio k(varia tensor<i32, [4]> grid) → vacuum {
     varia Counter counter ← Counter { count = 0 }
     itera ex grid apud [i] filum lane sit value {
         grid[i] ← counter.accipe(i)
