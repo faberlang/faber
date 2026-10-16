@@ -78,3 +78,36 @@ fn at_read_en_surface_shares_a_source_with_the_loop_clause() {
     let result = crate::test_support::analyze_source_with_config(source, config);
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
+
+// need: Matrix coordinate methods share Tensor's checked-index typing.
+#[test]
+fn matrix_method_accipe_is_nullable() {
+    let _ = crate::test_support::analyze_ok(
+        "functio g(matrix<f32, [2, 2]> m) → f32 { redde m.accipe([0, 1]) vel 0.0 }\n",
+    );
+    let _ = crate::test_support::analyze_ok(
+        "functio h(matrix<f32, [2, 2]> m) → f32 ∪ nihil { redde m.accipe([0, 1]) }\n",
+    );
+}
+
+#[test]
+fn matrix_method_apud_default_types_as_the_element_type() {
+    let _ = crate::test_support::analyze_ok(
+        "functio f(matrix<f32, [2, 2]> m, numerus i) → f32 { redde m.apud([i, 0]) ⊥ 0.0 }\n",
+    );
+}
+
+#[test]
+fn matrix_method_ponde_accepts() {
+    let _ = crate::test_support::analyze_ok(
+        "functio p(varia matrix<f32, [2, 2]> m) → vacuum { m.ponde([0, 1], 9.0) }\n",
+    );
+}
+
+#[test]
+fn matrix_method_accipe_literal_out_of_range_is_rejected() {
+    crate::test_support::assert_rejects_with_issue(
+        "functio f(matrix<f32, [2, 2]> m) → f32 ∪ nihil { redde m.accipe([2, 0]) }\n",
+        "index_provably_out_of_bounds",
+    );
+}

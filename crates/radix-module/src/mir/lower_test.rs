@@ -1604,6 +1604,63 @@ function f0 -> ty#1 {
 }
 
 #[test]
+fn verum_dum_tail_return_lowers_valid_mir() {
+    // `while true { ... return i }` never exits through its condition, so the
+    // loop's after-block is dead. The implicit function return must not land
+    // there: a `return` in that block is rejected for a value-returning
+    // function.
+    let dump = dump_source(
+        r#"+++
+locale = "en"
++++
+fn f() → int {
+    mut int i ← 0
+    while true {
+        i ← i + 1
+        if i ≡ 3 {
+            return i
+        }
+    }
+}
+main {
+    print f()
+}
+"#,
+    );
+    assert!(dump.contains("bb0:"), "valid lowered dump must be emitted:\n{dump}");
+}
+
+#[test]
+fn verum_dum_loop_in_vacuum_main_stays_valid() {
+    // An intentional infinite loop in a void function still lowers: the sealed
+    // after-block must not be the only terminator path.
+    let dump = dump_source(
+        r#"+++
+locale = "en"
++++
+main {
+    while true {
+        print "x"
+    }
+}
+"#,
+    );
+    assert!(dump.contains("bb0:"), "valid lowered dump must be emitted:\n{dump}");
+}
+
+#[test]
+fn verum_fac_dum_tail_return_lowers_valid_mir() {
+    // `fac { ... } dum verum` is the do-while spelling of `while true`: the
+    // loop never exits through its synthesized test, so the after-block is
+    // dead. The implicit function return must not land there, or a
+    // value-returning function fails MIR validation.
+    let dump = dump_source(
+        r"functio f() → numerus { varia numerus i ← 0 fac { i ← i + 1 si i ≡ 4 ergo redde i * 10 } dum verum } incipit { nota f() }",
+    );
+    assert!(dump.contains("bb0:"), "valid lowered dump must be emitted:\n{dump}");
+}
+
+#[test]
 fn lowers_rumpe_inside_fac_to_breakable_exit() {
     let dump = dump_source("functio exemplo() → numerus { fac { rumpe } cape err { redde 0 } redde 1 }");
     // WHY: the entry block must reach the after-block via the rumpe goto edge,
@@ -2723,6 +2780,29 @@ fn lowers_fac_cape_iace_to_local_handler_edge() {
     assert!(dump.contains("_0 = %0: ty#0\n    goto bb1"));
     assert!(dump.contains("bb1:\n    %1 = const int 0: ty#1\n    return %1"));
     assert!(!dump.contains("return_error"));
+}
+
+#[test]
+fn mori_ending_a_cape_body_keeps_mir_valid() {
+    // A body that ends in `mori` diverges before any error edge can enter
+    // the handler. The catch is dead, but the handler must not leave the
+    // join as an orphaned successor target of an unreachable block.
+    let dump = dump_source(
+        r#"+++
+locale = "en"
++++
+main {
+    do {
+        print "in"
+        panic "x"
+    } catch e {
+        print "caught"
+    }
+}
+"#,
+    );
+
+    assert!(dump.contains("bb0:"), "{dump}");
 }
 
 #[test]
@@ -4199,6 +4279,26 @@ incipit {
     assert!(!dump.contains("method call before runtime/provider MIR lowering"));
 }
 
+#[test]
+fn lowers_generic_tensor_formata_to_tensor_reshape() {
+    let dump = dump_source(
+        r"
+incipit {
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    varia tf32[2, 2] grid ← flat ↦ tf32[2, 2]
+    sit tf32[4] view ← grid.formata<tf32[4]>()
+    nota view.longitudo()
+}
+",
+    );
+
+    assert!(
+        dump.contains("runtime collection tensor_reshape"),
+        "missing tensor_reshape in:\n{dump}"
+    );
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
 fn assert_lista_to_tensor_conversio_lowers_to_tensor_from_flat(source: &str) {
     let dump = dump_source(source);
     assert!(
@@ -5303,6 +5403,28 @@ incipit {
     );
     assert!(dump.contains("runtime cede"));
     assert!(!dump.contains("cede before async MIR lowering"));
+}
+
+#[test]
+fn lowers_function_typed_genus_field_call_as_value_callee() {
+    let dump = dump_source(
+        r"genus H {
+  varia (numerus) → numerus f
+}
+incipit {
+  sit h ← H { f = numerus x ∴ x + 100 }
+  nota h.f(1)
+  sit g ← h.f
+  nota g(2)
+}",
+    );
+    assert!(
+        !dump.contains("method call before runtime/provider MIR lowering"),
+        "a function-typed genus field call lowers as a value call:\n{dump}"
+    );
+    assert!(dump.contains("const int 1"), "both call arguments lower:\n{dump}");
+    assert!(dump.contains("const int 2"), "both call arguments lower:\n{dump}");
+    assert!(dump.contains("call "), "the value call is emitted:\n{dump}");
 }
 
 #[test]

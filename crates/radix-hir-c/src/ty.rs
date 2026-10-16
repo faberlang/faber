@@ -46,6 +46,19 @@ impl IntWidth {
         }
     }
 
+    /// The C type of a `list<wrapping<W>>` (`faber_list_<marker> *`).
+    pub(crate) fn list_c_pointer(self) -> &'static str {
+        match self {
+            IntWidth::I8 => "faber_list_i8 *",
+            IntWidth::I16 => "faber_list_i16 *",
+            IntWidth::I32 => "faber_list_i32 *",
+            IntWidth::U8 => "faber_list_u8 *",
+            IntWidth::U16 => "faber_list_u16 *",
+            IntWidth::U32 => "faber_list_u32 *",
+            IntWidth::U64 => "faber_list_u64 *",
+        }
+    }
+
     pub(crate) fn range(self) -> (i128, i128) {
         match self {
             IntWidth::I8 => (i128::from(i8::MIN), i128::from(i8::MAX)),
@@ -68,6 +81,9 @@ pub(crate) enum Inner {
     Text,
     Bool,
     Float,
+    /// `wrapping<W>`: a modular word, widened on read and reduced at the
+    /// store. `u64` carries its value in a `uint64_t` optional slot.
+    Modular(IntWidth),
     List(Elem),
     Genus(DefId),
 }
@@ -80,6 +96,7 @@ impl Inner {
             Inner::Text => Ty::Text,
             Inner::Bool => Ty::Bool,
             Inner::Float => Ty::Float,
+            Inner::Modular(width) => Ty::Modular(width),
             Inner::List(elem) => Ty::List(elem),
             Inner::Genus(def_id) => Ty::Genus(def_id),
         }
@@ -91,14 +108,10 @@ impl Inner {
             Ty::Text => Some(Inner::Text),
             Ty::Bool => Some(Inner::Bool),
             Ty::Float => Some(Inner::Float),
+            Ty::Modular(width) => Some(Inner::Modular(width)),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
-            Ty::Sized(_)
-            | Ty::Modular(_)
-            | Ty::Saturating(_)
-            | Ty::Opt(_)
-            | Ty::None
-            | Ty::Decimal => None,
+            Ty::Sized(_) | Ty::Saturating(_) | Ty::Opt(_) | Ty::None | Ty::Decimal => None,
         }
     }
 
@@ -107,10 +120,12 @@ impl Inner {
         matches!(self, Inner::Text | Inner::List(_) | Inner::Genus(_))
     }
 
-    /// The runtime's option struct for a scalar.
+    /// The runtime's option struct for a scalar. A modular word below `u64`
+    /// fits `faber_opt_i64`; `u64` needs its own unsigned slot.
     pub(crate) fn scalar_struct(self) -> Option<&'static str> {
         match self {
-            Inner::Int => Some("faber_opt_i64"),
+            Inner::Modular(IntWidth::U64) => Some("faber_opt_u64"),
+            Inner::Int | Inner::Modular(_) => Some("faber_opt_i64"),
             Inner::Bool => Some("faber_opt_bool"),
             Inner::Float => Some("faber_opt_f64"),
             Inner::Text | Inner::List(_) | Inner::Genus(_) => None,
@@ -163,6 +178,9 @@ pub(crate) enum Elem {
     Text,
     Bool,
     Float,
+    /// `wrapping<W>`: the list stores the plain C width and its helpers are
+    /// the `FABER_LIST_FAMILY`/`FABER_LIST_OPS` instantiations for that width.
+    Modular(IntWidth),
 }
 
 impl Elem {
@@ -173,6 +191,7 @@ impl Elem {
             Elem::Text => "text",
             Elem::Bool => "bool",
             Elem::Float => "f64",
+            Elem::Modular(width) => width.marker(),
         }
     }
 
@@ -183,6 +202,18 @@ impl Elem {
             Elem::Text => "faber_text",
             Elem::Bool => "bool",
             Elem::Float => "double",
+            Elem::Modular(width) => width.c_type(),
+        }
+    }
+
+    /// The pointer type of this element's list family (`faber_list_u8 *`).
+    pub(crate) fn list_c_pointer(self) -> &'static str {
+        match self {
+            Elem::Int => "faber_list_i64 *",
+            Elem::Text => "faber_list_text *",
+            Elem::Bool => "faber_list_bool *",
+            Elem::Float => "faber_list_f64 *",
+            Elem::Modular(width) => width.list_c_pointer(),
         }
     }
 
@@ -193,6 +224,7 @@ impl Elem {
             Elem::Text => Ty::Text,
             Elem::Bool => Ty::Bool,
             Elem::Float => Ty::Float,
+            Elem::Modular(width) => Ty::Modular(width),
         }
     }
 }
@@ -218,6 +250,7 @@ impl Ty {
             Ty::List(Elem::Int) => Some("faber_list_i64 *"),
             Ty::List(Elem::Text) => Some("faber_list_text *"),
             Ty::List(Elem::Bool) => Some("faber_list_bool *"),
+            Ty::List(Elem::Modular(width)) => Some(width.list_c_pointer()),
             Ty::Genus(_) => None,
         }
     }
@@ -310,7 +343,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::List(_) => Err(unsupported("nested list type")),
                 Ty::Genus(_) => Err(unsupported("list of genus")),
                 Ty::Decimal => Err(unsupported("list of decimals")),
-                Ty::Modular(_) => Err(unsupported("list of wrapping words")),
+                Ty::Modular(width) => Ok(Ty::List(Elem::Modular(width))),
                 Ty::Saturating(_) => Err(unsupported("list of saturating words")),
                 Ty::None => Err(unsupported("list of none")),
             }

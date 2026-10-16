@@ -61,9 +61,9 @@ pub(super) enum LaneSource {
 }
 
 /// A matrix lane's statements, written through the lowerer.
-struct MatrixLanes<'a, 'b> {
-    builder: &'a mut FunctionBuilder<'b>,
-    span: Span,
+pub(super) struct MatrixLanes<'a, 'b> {
+    pub(super) builder: &'a mut FunctionBuilder<'b>,
+    pub(super) span: Span,
 }
 
 impl LaneSink for MatrixLanes<'_, '_> {

@@ -922,7 +922,12 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         arg_count: 0,
         params: &[],
         return_kind: IntrinsicReturnKind::GenericTypus,
-        mir_kind: IntrinsicMirKind::CodegenOnly,
+        // Q-X10: the zero-arg generic view is a live reshape — the receiver's
+        // literal extents lower to the `lista<numerus>` shape operand the
+        // runner's `tensor_reshape` expects (ERR_FORMA_RESHAPE_COUNT guards
+        // the element count). The one-arg `forma(shape)` method keeps its own
+        // path through the shared op.
+        mir_kind: IntrinsicMirKind::Collection(MirCollectionOp::TensorReshape),
         missing_generic_issue: Some("tensor_formata_complete_type_arg_required"),
         excess_generic_issue: None,
         value_arity_issue: Some("tensor_formata_forbids_value_args"),
@@ -1234,6 +1239,43 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         CodegenOnly
     ),
+    // Ruling 2026-10-15 / need: the three Matrix coordinate reads.
+    // `m.get([r, c])` is the nullable read (`T ∪ none`, see the lista
+    // `accipe` above); `m.at([r, c])` and `m.set([r, c], v)` report an
+    // out-of-range coordinate on `⇥` and share the Tensor `TensorGet` /
+    // `TensorSet` MIR ops.
+    intrinsic!(
+        Matrix,
+        "accipe",
+        1,
+        &[IntrinsicParamKind::NumerusArray],
+        OptionInner,
+        collection TensorGet
+    ),
+    MethodIntrinsic {
+        failable: true,
+        range_checked_arg: Some(0),
+        ..intrinsic!(
+            Matrix,
+            "apud",
+            1,
+            &[IntrinsicParamKind::NumerusArray],
+            Inner,
+            collection TensorGet
+        )
+    },
+    MethodIntrinsic {
+        failable: true,
+        range_checked_arg: Some(0),
+        ..intrinsic!(
+            Matrix,
+            "ponde",
+            2,
+            &[IntrinsicParamKind::NumerusArray, IntrinsicParamKind::Inner],
+            Vacuum,
+            collection TensorSet
+        )
+    },
     intrinsic!(
         Vector,
         "addita",

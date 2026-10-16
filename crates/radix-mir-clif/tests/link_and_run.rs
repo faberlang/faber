@@ -7,12 +7,29 @@
 //! the same `cargo` into the profile directory it is running from. A failed
 //! build fails the test loudly rather than skipping.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::time::{Duration, Instant};
 
 use radix_lexer::{Interner, Span};
 use radix_mir::*;
 use radix_types::{NumericWidth, Primitive, Type, TypeTable};
+
+/// The four tests in this executable run concurrently, and each one builds the
+/// same archive into the same profile directory. Holding this lock for the
+/// whole `cargo` invocation plus the archive check serializes them so only one
+/// `cargo build` runs inside the test binary at a time.
+static ARCHIVE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Wait out a rebuild window opened by a `cargo` in another process sharing
+/// this target directory: `cargo build` can exit zero while the `.a` is
+/// momentarily absent. Poll with a bounded wait before the loud assert.
+fn wait_for_archive(archive: &Path) {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while !archive.exists() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
 
 /// Build `faber-host-clif` into the profile directory this test executable
 /// lives in (`<target>/<profile>/deps/<exe>`) and return the archive path.
@@ -40,6 +57,11 @@ fn build_archive() -> PathBuf {
     if profile != "debug" {
         build.args(["--profile", profile]);
     }
+    // Hold the guard through both the build and the check below.
+    let _guard = ARCHIVE_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
     let built = build.output().expect("run cargo build -p faber-host-clif");
     assert!(
         built.status.success(),
@@ -49,6 +71,7 @@ fn build_archive() -> PathBuf {
     );
 
     let archive = profile_dir.join("libfaber_rt_clif.a");
+    wait_for_archive(&archive);
     assert!(
         archive.exists(),
         "cargo build did not produce {}",

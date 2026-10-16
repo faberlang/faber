@@ -669,7 +669,9 @@ fn check_registered_intrinsic(
         checker.check_instantiated_call(&sig, explicit_type_args, args, span, None)
     } else if matches!(
         entry.receiver,
-        radix_intrinsics::IntrinsicReceiver::Tensor | radix_intrinsics::IntrinsicReceiver::Sparsa
+        radix_intrinsics::IntrinsicReceiver::Tensor
+            | radix_intrinsics::IntrinsicReceiver::Sparsa
+            | radix_intrinsics::IntrinsicReceiver::Matrix
     ) {
         let checked = check_tensor_method_args(checker, entry, &params, args, ret, span);
         if entry.failable {

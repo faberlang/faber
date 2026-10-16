@@ -22,6 +22,7 @@
 use super::*;
 use radix_hir::HirCallArg;
 use radix_hir::visit::{HirVisitor, walk_expr};
+use radix_mir::lane_op::stored_lane;
 use radix_semantic::IndexExpr;
 use radix_semantic::lista_tensor_conversio::{
     ListaToTensorShape, analyze_rectangular_lista_literal, lista_numerus_type, padded_literal_facts,
@@ -642,6 +643,42 @@ impl FunctionBuilder<'_> {
             ));
         }
 
+        // A function-typed genus field (`h.f(1)`) is a callable value stored
+        // in a struct field, not a method: lower the call through the field's
+        // projected place like any other value callee. Local struct fields
+        // only; an imported function-typed field stays fail-closed.
+        if let Some(receiver_ty) = receiver.ty
+            && let Some(def_id) = self.method_receiver_struct_def(receiver_ty)
+            && let Some(field_ty) = self
+                .context
+                .struct_field_types
+                .get(&def_id)
+                .and_then(|fields| fields.get(&method))
+                .copied()
+        {
+            let field_signature = match self.normalized_type(field_ty.semantic_id()) {
+                Type::Func(signature) => Some(signature.clone()),
+                _ => None,
+            };
+            if let Some(signature) = field_signature {
+                let callee = self.lower_field(receiver, method, expr)?;
+                let lowered_args = self.lower_positional_call_args(args)?;
+                self.emit_call_shape_check(expr.id, &lowered_args, 0, expr.span)?;
+                let ty = self.expr_ty(expr)?;
+                if let Some(err) = signature.err {
+                    return self.lower_failable_call(
+                        MirCallee::Value(callee),
+                        lowered_args,
+                        ty,
+                        MirType::semantic(err),
+                        conversion,
+                        expr.span,
+                    );
+                }
+                return Some(self.call_value_operand(callee, lowered_args, ty, expr.span));
+            }
+        }
+
         let method_name = self.resolve_method_name(method)?.to_owned();
         if let Some(receiver_ty) = receiver.ty {
             let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
@@ -747,6 +784,13 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         };
+
+        // Q-X10: the zero-arg generic `grid.formata<T>()` shares
+        // `TensorReshape` with the one-arg `grid.forma(shape)` method but
+        // carries no value argument; its shape comes from the result type.
+        if op == MirCollectionOp::TensorReshape && args.is_empty() {
+            return self.lower_tensor_formata(receiver, expr);
+        }
 
         let mut lowered_receiver = self.lower_expr_value(receiver)?;
         let expr_ty = self.expr_ty(expr)?;
@@ -2351,6 +2395,7 @@ impl FunctionBuilder<'_> {
                 expr.span,
             );
         }
+        let checked = self.register_lanes_are_checked(expr);
         let mut fields = Vec::with_capacity(usize::from(rows) * usize::from(rhs_columns));
         for row in 0..rows {
             for column in 0..rhs_columns {
@@ -2379,7 +2424,8 @@ impl FunctionBuilder<'_> {
                         expr.span,
                     );
                 }
-                fields.push(MirAggregateItem::Operand(acc));
+                let mut lanes = super::register_lift::MatrixLanes { builder: self, span: expr.span };
+                fields.push(MirAggregateItem::Operand(stored_lane(&mut lanes, acc, elem_ty, checked)));
             }
         }
         self.construct_temp(
@@ -3531,9 +3577,17 @@ impl FunctionBuilder<'_> {
     }
 
     /// Lower `lege` into a target-neutral stdin read intrinsic.
+    ///
+    /// Q-E5 (ruled 2026-10-15): `read` returns all of stdin to EOF; `read
+    /// line` one line without its terminator.
     pub(super) fn lower_read_line(&mut self, expr: &HirExpression) -> Option<MirOperand> {
         let ty = self.expr_ty(expr)?;
-        Some(self.runtime_call_value(MirIntrinsic::ReadLine, Vec::new(), ty, expr.span))
+        let intrinsic = match expr.kind {
+            HirExpressionKind::ReadLine(true) => MirIntrinsic::ReadLine,
+            HirExpressionKind::ReadLine(false) => MirIntrinsic::ReadAll,
+            _ => MirIntrinsic::ReadLine,
+        };
+        Some(self.runtime_call_value(intrinsic, Vec::new(), ty, expr.span))
     }
 
     /// Lower diagnostic output expressions to diagnostic intrinsics.
@@ -4610,6 +4664,30 @@ impl FunctionBuilder<'_> {
         };
 
         Some(self.construct_temp(MirAggregateKind::Array, MirAggregateFields::Ordered(fields), shape_ty, span))
+    }
+
+    /// Lower the zero-arg generic `grid.formata<T>()` tensor view onto the
+    /// runtime `tensor_reshape` call (Q-X10). The call's result type is the
+    /// complete tensor type named by the type argument, so the receiver's
+    /// literal extents lower to the `lista<numerus>` shape operand the runner
+    /// expects; the one-arg `forma(shape)` method shares the op and keeps its
+    /// existing path.
+    fn lower_tensor_formata(&mut self, receiver: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
+        let receiver_value = self.lower_expr_value(receiver)?;
+        let expr_ty = self.expr_ty(expr)?;
+        let shape = self.lower_lista_to_tensor_shape_with_expression(
+            receiver_value.clone(),
+            expr_ty.semantic_id(),
+            None,
+            expr.span,
+            false,
+        )?;
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorReshape),
+            vec![receiver_value, shape],
+            expr_ty,
+            expr.span,
+        ))
     }
 
     fn lower_handled_conversio(&mut self, request: HandledConversio<'_>) -> MirOperand {

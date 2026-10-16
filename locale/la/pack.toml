@@ -397,6 +397,30 @@ help = "fix the lexer error first; parsing continues from clean tokens"
 message = "expected token"
 help = "ensure the expected token is present in this position"
 
+[diagnostics.PARSE001.issues.ratio_field_list_hole_not_sole]
+message = "a `…` hole in a ratio field list must be the only element"
+help = "use at most one hole in the field list"
+
+[diagnostics.PARSE001.issues.ratio_type_arg_label_required]
+message = "a ratio type argument must be labeled"
+help = "write the label before the argument"
+
+[diagnostics.PARSE001.issues.annotation_field_name]
+message = "an annotation field must be an identifier"
+help = "write a plain field name inside the annotation braces"
+
+[diagnostics.PARSE001.issues.label_bind_distinction]
+message = "label syntax uses `{label_operator}`, not the binding operator `{binding_operator}`"
+help = "write `{label}{label_operator} value` for a labeled argument, or pass it by position"
+
+[diagnostics.PARSE001.issues.labeled_actual_non_template_call]
+message = "this call does not accept labeled arguments; labels belong to template calls"
+help = "drop the label `{label}` and pass the value by position, or call a template literal"
+
+[diagnostics.PARSE001.issues.labeled_actual_spread_unsupported]
+message = "a spread argument cannot carry a label"
+help = "remove the label from the spread argument"
+
 [diagnostics.PARSE001.issues.copy_into_value_expected]
 message = "a value is required after the copy-in operator `{operator}`"
 help = "write the source expression after `⇇`"
@@ -557,6 +581,26 @@ help = "remove the comma before the closing delimiter"
 [diagnostics.PARSE002]
 message = "unexpected token"
 help = "remove or reposition the unexpected token"
+
+[diagnostics.PARSE002.issues.enum_value_out_of_range]
+message = "enum member value is outside the signed 64-bit range"
+help = "choose a value between −2^63 and 2^63−1"
+
+[diagnostics.PARSE002.issues.exitus_value_out_of_range]
+message = "exitus code is outside the signed 64-bit range"
+help = "choose a value between −2^63 and 2^63−1"
+
+[diagnostics.PARSE002.issues.json_integer_overflow]
+message = "an integer in a json literal is outside the signed 64-bit range"
+help = "write the value as a float or a string"
+
+[diagnostics.PARSE002.issues.test_modifier_integer_out_of_range]
+message = "the `{modifier}` modifier integer is outside the signed 64-bit range"
+help = "choose a smaller value"
+
+[diagnostics.PARSE002.issues.declaration_block_comma]
+message = "commas do not separate members of a declaration block"
+help = "remove the comma; declaration members are separated by newlines"
 
 [diagnostics.PARSE002.issues.json_unknown_identifier_value]
 message = "JSON identifiers are not valid JSON values"
@@ -818,6 +862,14 @@ help = "utere `@ {expected}` pro lingua lectoris huius fasciculi"
 message = "unknown `@ annotatio` target"
 help = "use `target = {functio}` in v1"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum]
+message = "a declaration carries more than one `@ nucleum` annotation"
+help = "keep a single nucleum annotation"
+
+[diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
+message = "a `@ nucleum` fragment conflicts with a graphics fragment annotation"
+help = "remove one of the fragment annotations"
+
 [diagnostics.PARSE019]
 message = "duplicate modifier"
 help = "remove the duplicate modifier"
@@ -841,6 +893,10 @@ help = "separa subiecta per '{et}'"
 [diagnostics.PARSE020.issues.discerne_subject_not_path]
 message = "subiectum '{discerne}' nomen vel via membri esse debet"
 help = "liga valorem prius ad nomen, deinde '{discerne}' in illo nomine"
+
+[diagnostics.PARSE020.issues.nesting_too_deep]
+message = "source nests deeper than the parser limit of {limit}"
+help = "split the construct into named bindings"
 
 [diagnostics.PARSE021]
 message = "missing condition"
@@ -982,6 +1038,10 @@ help = "write the compact closure body after ∴ as {fac_body}"
 message = "closure {fac} body cannot use '{dum}'"
 help = "remove {dum} from closure {fac} bodies"
 
+[diagnostics.PARSE030.issues.expression_too_long]
+message = "expression exceeds the parser limit of {limit} operators"
+help = "split the expression into named bindings"
+
 [diagnostics.PARSE031]
 message = "invalid literal"
 help = "check the literal form"
@@ -1009,6 +1069,10 @@ help = "assign only to valid lvalues"
 [diagnostics.PARSE040]
 message = "invalid type"
 help = "check type syntax"
+
+[diagnostics.PARSE040.issues.promissum_alternate_uses_exit_arrow]
+message = "a promissum alternate must use the error arrow `⇥`, not the return arrow `→`"
+help = "write the alternate arm with `⇥`"
 
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "expected type name"

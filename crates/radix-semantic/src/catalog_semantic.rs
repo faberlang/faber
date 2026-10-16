@@ -836,7 +836,10 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             Some("index only lista, tabula, tensor, textus, or ignotum values".to_owned())
         }
         "tensor_index_vector_integer_elements" => Some("use lista of supported integer index elements".to_owned()),
-        "tensor_scalar_index_rank" => Some("use a scalar index only on rank-1 tensors".to_owned()),
+        "tensor_scalar_index_rank" => Some(
+            "use a scalar index only on rank-1 tensors; index a rank-2 value by a coordinate list such as m[[r, c]]"
+                .to_owned(),
+        ),
         "tensor_bracket_index_integer_or_lista" => Some("use an integer scalar or lista of integer indices".to_owned()),
         "tensor_arithmetic_numeric_element_required" => Some("use numeric tensor or sparsa element types".to_owned()),
         "tensor_math_float_element_required" => Some(

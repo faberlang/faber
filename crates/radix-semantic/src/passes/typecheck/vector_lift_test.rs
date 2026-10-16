@@ -4,8 +4,9 @@
 //! also pair two vectors of one width. `vector * vector` and `vector / vector`
 //! are the glyph diagnostics, `vector % vector` says `%` takes a scalar;
 //! vector with vector `+ -` is unchanged. Comparisons and select are not
-//! lifted over a vector. Each lane is the scalar operation, exact, and
-//! checked where it is stored into the element type (ruling 19(g)).
+//! lifted over a vector. Each lane is typed by the scalar range rule for the
+//! operator (operator ruling 2026-10-15, need), so an integer
+//! intermediate widens and the width applies only at the store.
 
 use crate::test_support::analyze_source;
 use crate::{SemanticError, SemanticErrorKind};
@@ -67,7 +68,7 @@ fn an_untyped_literal_adopts_the_vector_element() {
     accepts(&function("vector<f32, 3> a", "vector<f32, 3>", "a * 0.5"));
     accepts(&function("vector<f32, 3> a", "vector<f32, 3>", "2.0 * a"));
     accepts(&function("vector<f32, 3> a", "vector<f32, 3>", "a + 1"));
-    accepts(&function("vector<i32, 3> a", "vector<i32, 3>", "a / 2"));
+    accepts(&function("vector<i32, 3> a", "vector<i64, 3>", "a / 2"));
 }
 
 #[test]
@@ -102,23 +103,27 @@ fn a_float_lane_joins_as_scalars_do() {
 }
 
 #[test]
-fn an_integer_lane_keeps_its_element_and_is_checked_where_it_is_stored() {
-    // The element is the F9 join (a constant takes part by value), so an
-    // integer vector stays its own type; the lane traps at the operation
-    // when it leaves the element's range (the K4 tensor behaviour).
-    accepts(&function("vector<i8, 3> a", "vector<i8, 3>", "a * 2"));
-    accepts(&function("vector<i32, 3> a", "vector<i32, 3>", "a / 2"));
-    accepts(&function("vector<i32, 3> a", "vector<i32, 3>", "a % 4"));
-    accepts(&function("vector<u8, 3> a", "vector<u8, 3>", "10 - a"));
+fn an_integer_lane_takes_the_scalar_range_rule() {
+    // Each lane is typed by the scalar range rule for its operator (operator
+    // ruling 2026-10-15, need): an integer intermediate widens and
+    // the width applies only at the store. `a * 2` over `i8` is [-256, 254]
+    // (`i16`); `a % 4` over `i32` is [0, 3] (`u8`); `10 - a` over `u8` is
+    // [-245, 10] (`i16`).
+    accepts(&function("vector<i8, 3> a", "vector<i16, 3>", "a * 2"));
+    accepts(&function("vector<i32, 3> a", "vector<i64, 3>", "a / 2"));
+    accepts(&function("vector<i32, 3> a", "vector<u8, 3>", "a % 4"));
+    accepts(&function("vector<u8, 3> a", "vector<i16, 3>", "10 - a"));
+    // Unary `-` is not a binary pair, so the lane keeps its own element.
     accepts(&function("vector<i32, 3> a", "vector<i32, 3>", "-a"));
 }
 
 #[test]
 fn an_integer_lane_is_never_narrowed_by_a_wider_scalar_implicitly() {
-    // A wider typed integer scalar joins to the wider integer vector.
+    // The scalar range rule widens the intermediate: `i8` + `i32` spans
+    // [-2^31-128, 2^31+126], so the result is `i64`, not the `i32` scalar.
     accepts(&function(
         "vector<i8, 3> a, i32 s",
-        "vector<i32, 3>",
+        "vector<i64, 3>",
         "a + s",
     ));
     rejects(
