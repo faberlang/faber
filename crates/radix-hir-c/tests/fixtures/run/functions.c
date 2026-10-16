@@ -8,21 +8,7 @@ FABER_TEXT_LITERAL(faber_L2, "noisy", 5, 5);
 FABER_TEXT_LITERAL(faber_L3, "true", 4, 4);
 FABER_TEXT_LITERAL(faber_L4, "false", 5, 5);
 FABER_TEXT_LITERAL(faber_L5, "!", 1, 1);
-FABER_TEXT_LITERAL(faber_L6, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L7, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L8, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L9, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L10, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L11, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L12, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L13, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L14, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L15, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L16, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L17, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L18, "quiet", 5, 5);
-FABER_TEXT_LITERAL(faber_L19, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L20, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L6, "quiet", 5, 5);
 static const int64_t k_LIMIT = INT64_C(10);
 static const char *const k_GREETING = faber_L0.s;
 static const bool k_LOUD = (1);
@@ -66,11 +52,11 @@ int main(void) {
     bool l_flag = (f_is_even(k_LIMIT));
     {
         bool faber_t6 = (l_flag); bool faber_t7 = (f_is_even(INT64_C(7))); bool faber_t8 = (k_LOUD);
-        printf("%s %s %s\n", ((faber_t6) ? faber_L16.s : faber_L17.s), ((faber_t7) ? faber_L16.s : faber_L17.s), ((faber_t8) ? faber_L16.s : faber_L17.s));
+        printf("%s %s %s\n", ((faber_t6) ? faber_L3.s : faber_L4.s), ((faber_t7) ? faber_L3.s : faber_L4.s), ((faber_t8) ? faber_L3.s : faber_L4.s));
     }
     f_shout(k_GREETING, (k_LOUD));
-    f_shout(faber_L18.s, (0));
+    f_shout(faber_L6.s, (0));
     l_flag = (!(l_flag));
-    printf("%s\n", ((l_flag) ? faber_L19.s : faber_L20.s));
+    printf("%s\n", ((l_flag) ? faber_L3.s : faber_L4.s));
     return 0;
 }

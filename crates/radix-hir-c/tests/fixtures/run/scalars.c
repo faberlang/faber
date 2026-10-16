@@ -5,20 +5,8 @@
 FABER_TEXT_LITERAL(faber_L0, "true", 4, 4);
 FABER_TEXT_LITERAL(faber_L1, "false", 5, 5);
 FABER_TEXT_LITERAL(faber_L2, "hi", 2, 2);
-FABER_TEXT_LITERAL(faber_L3, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L4, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L5, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L6, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L7, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L8, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L9, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L10, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L11, "say \"hi\"\tand\\done", 17, 17);
-FABER_TEXT_LITERAL(faber_L12, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L13, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L14, "h\303\251llo", 6, 5);
-FABER_TEXT_LITERAL(faber_L15, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L16, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L3, "say \"hi\"\tand\\done", 17, 17);
+FABER_TEXT_LITERAL(faber_L4, "h\303\251llo", 6, 5);
 int main(void) {
     printf("%" PRId64 "\n", INT64_C(3));
     printf("%s\n", faber_L2.s);
@@ -26,9 +14,9 @@ int main(void) {
     const int64_t l_neg = -INT64_C(7);
     printf("%" PRId64 "\n", -INT64_C(4));
     printf("%" PRId64 "\n", INT64_C(1));
-    printf("%s\n", faber_L11.s);
+    printf("%s\n", faber_L3.s);
     const int64_t l_answer = INT64_C(42);
-    const char *const l_greeting = faber_L14.s;
+    const char *const l_greeting = faber_L4.s;
     printf("%" PRId64 " %s\n", l_answer, l_greeting);
     return 0;
 }

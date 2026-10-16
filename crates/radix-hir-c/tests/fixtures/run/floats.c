@@ -4,73 +4,13 @@
 
 FABER_TEXT_LITERAL(faber_L0, "true", 4, 4);
 FABER_TEXT_LITERAL(faber_L1, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L2, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L3, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L4, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L5, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L6, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L7, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L8, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L9, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L10, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L11, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L12, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L13, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L14, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L15, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L16, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L17, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L18, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L19, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L20, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L21, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L22, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L23, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L24, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L25, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L26, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L27, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L28, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L29, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L30, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L31, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L32, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L33, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L34, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L35, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L36, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L37, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L38, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L39, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L40, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L41, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L42, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L43, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L44, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L45, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L46, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L47, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L48, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L49, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L50, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L51, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L52, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L53, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L54, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L55, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L56, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L57, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L58, "b=", 2, 2);
-FABER_TEXT_LITERAL(faber_L59, ", n\303\2672=", 7, 6);
-FABER_TEXT_LITERAL(faber_L60, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L61, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L62, "r", 1, 1);
-FABER_TEXT_LITERAL(faber_L63, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L64, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L65, "Reading { ", 10, 10);
-FABER_TEXT_LITERAL(faber_L66, "label = ", 8, 8);
-FABER_TEXT_LITERAL(faber_L67, ", value = ", 10, 10);
-FABER_TEXT_LITERAL(faber_L68, " }", 2, 2);
+FABER_TEXT_LITERAL(faber_L2, "b=", 2, 2);
+FABER_TEXT_LITERAL(faber_L3, ", n\303\2672=", 7, 6);
+FABER_TEXT_LITERAL(faber_L4, "r", 1, 1);
+FABER_TEXT_LITERAL(faber_L5, "Reading { ", 10, 10);
+FABER_TEXT_LITERAL(faber_L6, "label = ", 8, 8);
+FABER_TEXT_LITERAL(faber_L7, ", value = ", 10, 10);
+FABER_TEXT_LITERAL(faber_L8, " }", 2, 2);
 typedef struct g_Reading g_Reading;
 
 struct g_Reading {
@@ -96,7 +36,7 @@ static double f_mean(faber_arena *faber_a, faber_list_f64 *p_xs) {
 }
 
 static const char *g_Reading_show(faber_arena *faber_a, const g_Reading *value) {
-    return faber_join(faber_a, 6, faber_L65.s, faber_L66.s, faber_quoted(faber_a, value->m_label), faber_L67.s, faber_float_text(faber_a, value->m_value), faber_L68.s);
+    return faber_join(faber_a, 6, faber_L5.s, faber_L6.s, faber_quoted(faber_a, value->m_label), faber_L7.s, faber_float_text(faber_a, value->m_value), faber_L8.s);
 }
 
 int main(void) {
@@ -130,16 +70,16 @@ int main(void) {
     printf("%" PRId64 "\n", faber_nearest_i64(1e300));
     int64_t l_edge = INT64_C(9007199254740993);
     double l_near = 9007199254740992.0;
-    printf("%s\n", ((faber_int_gt_float(l_edge, l_near)) ? faber_L44.s : faber_L45.s));
-    printf("%s\n", ((faber_int_gt_float(l_edge, l_near)) ? faber_L46.s : faber_L47.s));
-    printf("%s\n", ((faber_int_le_float(l_edge, l_near)) ? faber_L48.s : faber_L49.s));
-    printf("%s\n", ((l_b < 1.0) ? faber_L50.s : faber_L51.s));
-    printf("%s\n", ((l_a == 0.1) ? faber_L52.s : faber_L53.s));
+    printf("%s\n", ((faber_int_gt_float(l_edge, l_near)) ? faber_L0.s : faber_L1.s));
+    printf("%s\n", ((faber_int_gt_float(l_edge, l_near)) ? faber_L0.s : faber_L1.s));
+    printf("%s\n", ((faber_int_le_float(l_edge, l_near)) ? faber_L0.s : faber_L1.s));
+    printf("%s\n", ((l_b < 1.0) ? faber_L0.s : faber_L1.s));
+    printf("%s\n", ((l_a == 0.1) ? faber_L0.s : faber_L1.s));
     faber_list_f64 *const l_xs = faber_list_f64_of(faber_a, 2, (double[]){1.5, 2.25});
     printf("%s\n", faber_list_f64_show(faber_a, l_xs));
     printf("%s\n", faber_f64_text(f_mean(faber_a, l_xs), (char[FABER_F64_TEXT]){0}));
-    printf("%s\n", (__extension__ ({ double faber_t1 = faber_true_div(l_n, INT64_C(2)); faber_join(faber_a, 4, faber_L58.s, faber_float_text(faber_a, l_b), faber_L59.s, faber_float_text(faber_a, faber_t1)); })));
-    g_Reading *l_r = (__extension__ ({ g_Reading *faber_t2 = faber_alloc(faber_a, sizeof *faber_t2); faber_t2->m_value = 2.0; faber_t2->m_label = faber_L62.s; faber_t2; }));
+    printf("%s\n", (__extension__ ({ double faber_t1 = faber_true_div(l_n, INT64_C(2)); faber_join(faber_a, 4, faber_L2.s, faber_float_text(faber_a, l_b), faber_L3.s, faber_float_text(faber_a, faber_t1)); })));
+    g_Reading *l_r = (__extension__ ({ g_Reading *faber_t2 = faber_alloc(faber_a, sizeof *faber_t2); faber_t2->m_value = 2.0; faber_t2->m_label = faber_L4.s; faber_t2; }));
     printf("%s\n", g_Reading_show(faber_a, l_r));
     return 0;
 }

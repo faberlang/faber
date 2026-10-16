@@ -4,33 +4,15 @@
 
 FABER_TEXT_LITERAL(faber_L0, "true", 4, 4);
 FABER_TEXT_LITERAL(faber_L1, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L2, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L3, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L4, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L5, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L6, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L7, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L8, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L9, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L10, "assignment to `total`", 21, 21);
-FABER_TEXT_LITERAL(faber_L11, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L12, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L13, "a", 1, 1);
-FABER_TEXT_LITERAL(faber_L14, "b", 1, 1);
-FABER_TEXT_LITERAL(faber_L15, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L16, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L17, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L18, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L19, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L20, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L21, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L22, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L2, "assignment to `total`", 21, 21);
+FABER_TEXT_LITERAL(faber_L3, "a", 1, 1);
+FABER_TEXT_LITERAL(faber_L4, "b", 1, 1);
 int main(void) {
     faber_arena faber_root = {0};
     faber_arena *const faber_a = &faber_root;
     faber_list_i64 *l_xs = faber_list_i64_of(faber_a, 3, (int64_t[]){INT64_C(3), INT64_C(1), INT64_C(4)});
     printf("%s\n", faber_list_i64_show(faber_a, l_xs));
-    printf("%" PRId64 " %s\n", (l_xs)->len, (((l_xs)->len == 0) ? faber_L2.s : faber_L3.s));
+    printf("%" PRId64 " %s\n", (l_xs)->len, (((l_xs)->len == 0) ? faber_L0.s : faber_L1.s));
     faber_list_i64_push(faber_a, l_xs, INT64_C(1));
     faber_list_i64_push(faber_a, l_xs, INT64_C(5));
     printf("%s %" PRId64 " %" PRId64 "\n", faber_list_i64_show(faber_a, l_xs), faber_list_i64_at(l_xs, INT64_C(0)), faber_list_i64_at(l_xs, INT64_C(4)));
@@ -45,16 +27,16 @@ int main(void) {
         int64_t faber_i0;
         for (faber_i0 = 0; faber_i0 < faber_t0->len; faber_i0++) {
             const int64_t l_x = faber_t0->items[faber_i0];
-            l_total = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_total, l_x, &faber_o); faber_o ? faber_store_i64(faber_add(l_total, l_x), faber_L10.s) : faber_r; }));
+            l_total = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_total, l_x, &faber_o); faber_o ? faber_store_i64(faber_add(l_total, l_x), faber_L2.s) : faber_r; }));
         }
     }
     printf("%" PRId64 "\n", l_total);
-    faber_list_text *const l_names = faber_list_text_of(faber_a, 2, (faber_text[]){faber_L13.s, faber_L14.s});
+    faber_list_text *const l_names = faber_list_text_of(faber_a, 2, (faber_text[]){faber_L3.s, faber_L4.s});
     printf("%s\n", faber_list_text_show(faber_a, l_names));
     faber_list_bool *l_flags = faber_list_bool_new(faber_a, 0);
     faber_list_bool_push(faber_a, l_flags, (1));
-    printf("%s %" PRId64 "\n", faber_list_bool_show(faber_a, l_flags, faber_L19.s, faber_L20.s), (l_flags)->len);
+    printf("%s %" PRId64 "\n", faber_list_bool_show(faber_a, l_flags, faber_L0.s, faber_L1.s), (l_flags)->len);
     faber_list_i64 *l_empty = faber_list_i64_new(faber_a, 0);
-    printf("%s %s\n", faber_list_i64_show(faber_a, l_empty), (((l_empty)->len == 0) ? faber_L21.s : faber_L22.s));
+    printf("%s %s\n", faber_list_i64_show(faber_a, l_empty), (((l_empty)->len == 0) ? faber_L0.s : faber_L1.s));
     return 0;
 }

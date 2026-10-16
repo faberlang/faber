@@ -2,9 +2,12 @@
 //!
 //! The scrutinees are evaluated once, in order, into temporaries; each arm
 //! becomes one `if` / `else if` test over them and the first arm that matches
-//! runs, as in Faber. C's own `switch` is not used: it takes neither text nor
-//! several subjects, and a C `break` inside it would no longer leave the loop
-//! around it.
+//! runs, as in Faber. One integer subject whose arms are all literal tests
+//! becomes C's own `switch` instead, so the compiler can build a jump table
+//! for wide dispatches; its `break` closes the case, and no Faber break can
+//! be caught by it because a body holding one keeps the if-chain. Text
+//! subjects, several subjects, and every other pattern stay on the chain: C's
+//! `switch` takes neither text nor several subjects.
 
 use crate::Emitter;
 use crate::Local;
@@ -13,8 +16,13 @@ use crate::expr::{Operand, Value};
 use crate::ty::Ty;
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
-use radix_hir::{DefId, HirCasuArm, HirExpression, HirExpressionKind, HirLiteral, HirPattern};
+use radix_hir::visit::{HirVisitor, walk_stmt};
+use radix_hir::{
+    DefId, HirCasuArm, HirExpression, HirExpressionKind, HirLiteral, HirPattern, HirStatement,
+    HirStatementKind,
+};
 use radix_lexer::Symbol;
+use rustc_hash::FxHashSet;
 
 /// One scrutinee, held in a temporary.
 struct Subject {
@@ -81,31 +89,96 @@ impl Emitter<'_> {
                 ty,
             });
         }
+        let plans = jump_table_plan(&subjects, arms);
         let mut opened = false;
         let mut done = false;
-        for arm in arms {
-            if done {
-                break;
-            }
-            let plan = self.plan_arm(&subjects, &arm.patterns)?;
-            let always = plan.tests.is_empty();
-            if always {
-                self.line(out, if opened { "} else {" } else { "{" });
-                done = true;
-            } else {
-                // Each test carries its own parentheses; a lone one is the
-                // condition as it stands (a second pair trips clang's
-                // `-Wparentheses-equality`), several are joined and wrapped.
-                let test = match plan.tests.as_slice() {
-                    [only] => only.clone(),
-                    many => format!("({})", many.join(" && ")),
-                };
-                let head = if opened { "} else if" } else { "if" };
-                self.line(out, &format!("{head} {test} {{"));
-            }
+        if let Some(plans) = &plans {
+            self.jump_table(out, &subjects, arms, plans)?;
             opened = true;
+        }
+        if !opened {
+            for arm in arms {
+                if done {
+                    break;
+                }
+                let plan = self.plan_arm(&subjects, &arm.patterns)?;
+                let always = plan.tests.is_empty();
+                if always {
+                    self.line(out, if opened { "} else {" } else { "{" });
+                    done = true;
+                } else {
+                    // Each test carries its own parentheses; a lone one is the
+                    // condition as it stands (a second pair trips clang's
+                    // `-Wparentheses-equality`), several are joined and wrapped.
+                    let test = match plan.tests.as_slice() {
+                        [only] => only.clone(),
+                        many => format!("({})", many.join(" && ")),
+                    };
+                    let head = if opened { "} else if" } else { "if" };
+                    self.line(out, &format!("{head} {test} {{"));
+                }
+                opened = true;
+                self.depth += 1;
+                for bind in &plan.binds {
+                    self.bind_subject(out, bind)?;
+                }
+                self.depth -= 1;
+                match &arm.body.kind {
+                    HirExpressionKind::Block(block) => self.block(out, block)?,
+                    _ => {
+                        self.depth += 1;
+                        let result = self.expr_statement(out, &arm.body);
+                        self.depth -= 1;
+                        result?;
+                    }
+                }
+            }
+        }
+        if opened {
+            self.line(out, "}");
+        }
+        self.depth -= 1;
+        self.line(out, "}");
+        Ok(())
+    }
+
+    /// The chosen dispatch as a C `switch`: one `case` label per matched
+    /// literal, the arm body under them, and a C `break` closing each case.
+    /// The plan has already settled that no body holds a Faber break, so the
+    /// break can only mean the case.
+    fn jump_table(
+        &mut self,
+        out: &mut String,
+        subjects: &[Subject],
+        arms: &[HirCasuArm],
+        plans: &[Cases],
+    ) -> Result<(), CodegenError> {
+        self.line(out, &format!("switch ({}) {{", subjects[0].name));
+        self.depth += 1;
+        for (arm, plan) in arms.iter().zip(plans) {
+            let planned = self.plan_arm(subjects, &arm.patterns)?;
+            match plan {
+                Cases::Labels(values) => {
+                    let labels = values
+                        .iter()
+                        .map(|value| Ok(self.int(*value)?.text))
+                        .collect::<Result<Vec<_>, CodegenError>>()?;
+                    if let [only] = labels.as_slice() {
+                        self.line(out, &format!("case {only}: {{"));
+                    } else {
+                        for label in &labels {
+                            self.line(out, &format!("case {label}:"));
+                        }
+                        self.line(out, "{{");
+                    }
+                }
+                Cases::Default => self.line(out, "default: {"),
+                Cases::Other => {
+                    return Err(unsupported("jump-table plan over an unlabelled arm"));
+                }
+            }
             self.depth += 1;
-            for bind in &plan.binds {
+            for bind in &planned.binds {
                 self.bind_subject(out, bind)?;
             }
             self.depth -= 1;
@@ -118,12 +191,9 @@ impl Emitter<'_> {
                     result?;
                 }
             }
-        }
-        if opened {
-            self.line(out, "}");
+            self.line(out, "} break;");
         }
         self.depth -= 1;
-        self.line(out, "}");
         Ok(())
     }
 
@@ -307,5 +377,109 @@ impl Emitter<'_> {
             }
         }
         Ok(())
+    }
+}
+
+/// What one arm contributes to a C `switch` over one integer subject.
+enum Cases {
+    /// The integer literals the arm matches, one `case` label each.
+    Labels(Vec<i128>),
+    /// The arm matches everything: the `default` label.
+    Default,
+    /// A pattern the switch cannot express; the arm keeps the if-chain.
+    Other,
+}
+
+/// The per-arm plan for a C `switch`, when the statement admits one: exactly
+/// one integer subject, every arm either literal labels or a final catch-all,
+/// no literal matched twice (Faber keeps the first arm; C rejects the label),
+/// and no arm body holding a Faber break, which a C `break` inside the switch
+/// would no longer deliver to the loop around it.
+fn jump_table_plan(subjects: &[Subject], arms: &[HirCasuArm]) -> Option<Vec<Cases>> {
+    let [subject] = subjects else {
+        return None;
+    };
+    if subject.value != Value::Int || arms.is_empty() {
+        return None;
+    }
+    let mut plans = Vec::with_capacity(arms.len());
+    let mut seen: FxHashSet<i128> = FxHashSet::default();
+    for (index, arm) in arms.iter().enumerate() {
+        let mut plan = match arm.patterns.as_slice() {
+            [pattern] => case_plan(subject, pattern),
+            _ => Cases::Other,
+        };
+        match &mut plan {
+            Cases::Labels(values) => {
+                values.sort_unstable();
+                values.dedup();
+                if values.iter().any(|label| !seen.insert(*label)) {
+                    return None;
+                }
+            }
+            // The catch-all swallows every later arm in Faber, so it is only
+            // a `default` when it is the last arm; otherwise those arms are
+            // dead in Faber and reachable in C.
+            Cases::Default if index + 1 == arms.len() && !seen.is_empty() => {}
+            Cases::Default | Cases::Other => return None,
+        }
+        plans.push(plan);
+    }
+    for arm in arms {
+        let mut finder = BreakFinder { found: false };
+        finder.visit_expr(&arm.body);
+        if finder.found {
+            return None;
+        }
+    }
+    Some(plans)
+}
+
+/// Classify one pattern against one integer subject, without side effects.
+fn case_plan(subject: &Subject, pattern: &HirPattern) -> Cases {
+    let label = |magnitude: u64, negated: bool| {
+        let value = i128::from(magnitude);
+        let value = if negated { -value } else { value };
+        // A label must name an `int64_t`; a wider literal keeps the chain,
+        // whose test compares the subject against the exact value as before.
+        i64::try_from(value).is_ok().then_some(value)
+    };
+    match (subject.value, pattern) {
+        (Value::Int, HirPattern::Literal(HirLiteral::Int(magnitude))) => {
+            label(*magnitude, false).map_or(Cases::Other, |value| Cases::Labels(vec![value]))
+        }
+        (Value::Int, HirPattern::NegatedLiteral(HirLiteral::Int(magnitude))) => {
+            label(*magnitude, true).map_or(Cases::Other, |value| Cases::Labels(vec![value]))
+        }
+        (Value::Int, HirPattern::Or(alternatives)) => {
+            let mut values = Vec::with_capacity(alternatives.len());
+            for alternative in alternatives {
+                match case_plan(subject, alternative) {
+                    Cases::Labels(mut inner) => values.append(&mut inner),
+                    Cases::Default => return Cases::Default,
+                    Cases::Other => return Cases::Other,
+                }
+            }
+            Cases::Labels(values)
+        }
+        // A binding or a wildcard matches everything; an alias binds and then
+        // matches whatever remains.
+        (_, HirPattern::Wildcard | HirPattern::Binding(..)) => Cases::Default,
+        (_, HirPattern::Alias(_, _, inner)) => case_plan(subject, inner),
+        (_, _) => Cases::Other,
+    }
+}
+
+/// Whether a Faber break (`rumpe`) sits anywhere inside the expression.
+struct BreakFinder {
+    found: bool,
+}
+
+impl HirVisitor for BreakFinder {
+    fn visit_stmt(&mut self, stmt: &HirStatement) {
+        if matches!(stmt.kind, HirStatementKind::Rumpe) {
+            self.found = true;
+        }
+        walk_stmt(self, stmt);
     }
 }
