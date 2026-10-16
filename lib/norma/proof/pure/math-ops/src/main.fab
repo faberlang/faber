@@ -1,0 +1,41 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for norma:math (corpus coverage E20).
+# Output must match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:math" math
+
+main {
+    print math.PI()
+    print math.E()
+    print math.TAU()
+    print math.clamp(5.0, 0.0, 3.0)
+    print math.add(1.5, 2.0)
+    print math.subtract(1.5, 2.0)
+    print math.multiply(1.5, 2.0)
+    print math.divide(1.0, 0.0)
+    print math.divide(-1.0, 0.0)
+    print math.modulo(7.5, 2.0)
+    print math.modulo(-7.5, 2.0)
+    print math.negate(2.0)
+    print math.less(1.0, 2.0)
+    print math.greater(1.0, 2.0)
+    print math.at_most(2.0, 2.0)
+    print math.at_least(1.0, 2.0)
+    print math.bit_and(12, 10)
+    print math.bit_or(12, 10)
+    print math.bit_xor(12, 10)
+    print math.bit_not(5)
+    print math.shift_left(1, 10)
+    print math.shift_right(-8, 1)
+    print math.sin(0.0)
+    print math.cos(0.0)
+    print math.tan(0.0)
+    print math.exp(0.0)
+    print math.ln(1.0)
+    print math.log10(1000.0)
+    print math.sqrt(2.0)
+    print math.pow(2.0, 10.0)
+}
