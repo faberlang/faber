@@ -57,6 +57,8 @@ fn wrapping_sum(wrapping<i32> left, wrapping<i32> right) → wrapping<i32> {
     }
 
     let amd = target_row(&fixture, "wrapping_sum", Target::MirAmd);
+    // MirAmd lacks a wrapping integer kernel path: that capability fact stays
+    // in the target row, so `fixture.is_ok()` above still holds.
     assert!(!amd.admitted);
     assert!(amd.failures.iter().any(|failure| matches!(
         failure,
@@ -188,6 +190,15 @@ fn nested_add_div(wrapping<i32> left, wrapping<i32> right) → bool {
         "one check error per kernel: {:?}",
         fixture.diagnostics
     );
+    assert!(
+        fixture
+            .diagnostics
+            .iter()
+            .filter(|error| error.issue() == Some("nucleum_wide_intermediate"))
+            .all(|error| error.args.iter().any(|arg| arg.name == "extent")),
+        "every wide intermediate names its extent: {:?}",
+        fixture.diagnostics
+    );
 
     let cases = [
         ("signed_sub", -4_294_967_295, 4_294_967_295),
@@ -254,6 +265,8 @@ functio copy_coordinate<magnitudo N>(
     assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
 
     let report = target_row(&fixture, "copy_coordinate", Target::MirMetal);
+    // Operator ruling: a launch-time extent condition counts as proof, so the
+    // symbolic coordinate stays admitted and the condition is recorded.
     assert!(report.admitted, "{:?}", report.failures);
     assert!(
         report.extent_conditions.iter().any(|condition| {
@@ -285,6 +298,12 @@ functio caller(f32 value) → f32 {
             .iter()
             .any(|error| error.issue() == Some("nucleum_wide_integer")),
         "wide_helper is a check error: {:?}",
+        fixture.diagnostics
+    );
+    assert_eq!(
+        issue_arg(&fixture, "nucleum_wide_integer", "width"),
+        Some("i64"),
+        "{:?}",
         fixture.diagnostics
     );
 
@@ -322,6 +341,12 @@ fn tensor_division(
         "the unproven divisor extent is a check error: {:?}",
         fixture.diagnostics
     );
+    assert_eq!(
+        issue_arg(&fixture, "nucleum_extent_unproven", "extent"),
+        Some("unknown"),
+        "{:?}",
+        fixture.diagnostics
+    );
 
     let report = target_row(&fixture, "tensor_division", Target::MirMetal);
     assert!(!report.admitted);
@@ -352,6 +377,41 @@ functio recursive(f32 value) → f32 {
             .failures
             .contains(&KernelRequirementFailure::RecursiveCall)
     );
+}
+
+#[test]
+fn mutually_recursive_kernels_stay_a_per_target_failure_not_a_check_error() {
+    // A recursive kernel pair is a capability fact, not a language error: the
+    // call cycle is reported per target row, and the check itself stays ok.
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn ping(f32 value) → f32 {
+    return pong(value)
+}
+
+@ kernel
+@ public
+fn pong(f32 value) → f32 {
+    return ping(value)
+}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+
+    for name in ["ping", "pong"] {
+        let report = target_row(&fixture, name, Target::MirMetal);
+        assert!(report.recursive, "{name} sits on the call cycle");
+        assert!(!report.admitted, "{name} is refused on Metal");
+        assert!(
+            report
+                .failures
+                .contains(&KernelRequirementFailure::RecursiveCall),
+            "{name}: {:?}",
+            report.failures
+        );
+    }
 }
 
 #[test]
@@ -436,6 +496,12 @@ functio widen(f32 value) → f64 {
             .iter()
             .any(|error| error.issue() == Some("nucleum_f64")),
         "f64 is a check error: {:?}",
+        fixture.diagnostics
+    );
+    assert_eq!(
+        issue_arg(&fixture, "nucleum_f64", "width"),
+        Some("f64"),
+        "{:?}",
         fixture.diagnostics
     );
     let report = target_row(&fixture, "widen", Target::MirMetal);
@@ -528,6 +594,12 @@ fn wide(f64 x) → f64 {
         "f64 is a check error: {:?}",
         fixture.diagnostics
     );
+    assert_eq!(
+        issue_arg(&fixture, "nucleum_f64", "width"),
+        Some("f64"),
+        "{:?}",
+        fixture.diagnostics
+    );
     assert!(!target_row(&fixture, "wide", Target::MirMetal).admitted);
 }
 
@@ -568,6 +640,13 @@ fn pick(tf32[_, _] input, mut tf32[_, _] output, u32 y, u32 x) → void {
 main {}
 ",
     );
+    assert_eq!(
+        issue_arg(&fixture, "nucleum_extent_unproven", "extent"),
+        Some("unknown"),
+        "arbitrary coordinates are an unproven extent: {:?}",
+        fixture.diagnostics
+    );
+
     let report = target_row(&fixture, "pick", Target::MirMetal);
     assert!(!report.admitted);
     assert!(
@@ -624,6 +703,8 @@ main {}
         "trough",
     );
     assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    // Operator ruling: a launch-time extent condition counts as proof, so a
+    // symbolic extent is admitted rather than an unproven integer range.
     assert!(report.admitted, "{:?}", report.failures);
     assert!(
         report
@@ -671,6 +752,12 @@ main {}
             .iter()
             .any(|error| error.issue() == Some("nucleum_wide_integer")),
         "the i64 tensor<int, [32]> parameter is a check error: {:?}",
+        fixture.diagnostics
+    );
+    assert_eq!(
+        issue_arg(&fixture, "nucleum_wide_integer", "width"),
+        Some("i64"),
+        "{:?}",
         fixture.diagnostics
     );
     assert!(!report.admitted);
