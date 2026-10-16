@@ -61,6 +61,12 @@ fn plaintext_get_round_trips() {
     let mut client =
         TcpStream::connect(("127.0.0.1", u16::try_from(port).unwrap())).expect("connect");
     client
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .expect("read timeout");
+    client
+        .set_write_timeout(Some(Duration::from_secs(5)))
+        .expect("write timeout");
+    client
         .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n")
         .expect("write");
     let mut reply = String::new();
@@ -146,6 +152,12 @@ fn oversize_body_is_refused() {
     });
     let mut client =
         TcpStream::connect(("127.0.0.1", u16::try_from(port).unwrap())).expect("connect");
+    client
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .expect("read timeout");
+    client
+        .set_write_timeout(Some(Duration::from_secs(5)))
+        .expect("write timeout");
     client
         .write_all(b"POST /big HTTP/1.1\r\nHost: localhost\r\nContent-Length: 9\r\n\r\n123456789")
         .expect("write");
@@ -264,6 +276,12 @@ fn request_open_reassembles_content_length_body_across_segments() {
     let port = listener.local_addr().expect("addr").port();
     let server = thread::spawn(move || {
         let (mut socket, _) = listener.accept().expect("accept");
+        socket
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("read timeout");
+        socket
+            .set_write_timeout(Some(Duration::from_secs(5)))
+            .expect("write timeout");
         let mut request = [0_u8; 1024];
         let _ = socket.read(&mut request);
         socket
@@ -515,6 +533,12 @@ fn hostile_chunk_case_server(side_body: &[u8]) -> String {
     });
     let mut client =
         TcpStream::connect(("127.0.0.1", u16::try_from(port).unwrap())).expect("connect");
+    client
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .expect("read timeout");
+    client
+        .set_write_timeout(Some(Duration::from_secs(5)))
+        .expect("write timeout");
     client.write_all(side_body).expect("write");
     let message = server.join().expect("server");
     assert!(!message.is_empty());
@@ -562,6 +586,10 @@ fn hostile_chunked_response(chunk_header: &str) -> String {
     let port = listener.local_addr().expect("addr").port();
     let server = thread::spawn(move || {
         let (mut conn, _) = listener.accept().expect("accept");
+        conn.set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("read timeout");
+        conn.set_write_timeout(Some(Duration::from_secs(5)))
+            .expect("write timeout");
         let mut request = Vec::new();
         let _ = conn.read(&mut request);
         let response =
