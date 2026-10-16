@@ -22,8 +22,6 @@ mir-clif = ["mir-core", "radix-module/mir-clif", "radix-program/mir-clif"]
 mir-core = ["radix-module/mir-core"]
 runner = ["mir-core", "radix-module/runner", "radix-program/runner"]
 hir-c = ["radix-module/hir-c", "radix-program/hir-c"]
-ts-import = ["radix-module/ts-import"]
-hir-lean = ["radix-module/hir-lean"]
 
 [dev-dependencies]
 radix-hygiene = { path = "../radix-hygiene" }
