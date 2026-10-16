@@ -611,58 +611,43 @@ pub(super) fn unsupported_cli_diagnostic(path: &Path, surface: &str) -> Diagnost
     .with_arg("surface", surface)
 }
 
+/// The CLI exit expression's constant value, when planning can prove one
+/// without evaluating the program.
+///
+/// Ruling Q-T8: `package_mir_cli_surface_unsupported` never fires for an exit
+/// expression on the runner. An expression this planner cannot fold to an
+/// `i32` constant — a binding, an arbitrary expression, or a fixed literal
+/// outside `i32` — returns `Some(None)`: the entry tail lowered by the MIR
+/// entry pass supplies the evaluated value, and an out-of-range literal wraps
+/// at the process boundary (no range diagnostic).
+///
+/// `Fixed` keeps its constant so pre-existing serialized images and the CLI
+/// emitter keep their narrow constant surface; `Field` keeps the constant when
+/// the object is the args binding and the field resolved to a constant `i32`.
 pub(super) fn package_mir_cli_exit_code(
     exit: &Option<CliExit>,
     args_name: Option<Symbol>,
     fields: &[MirRuntimeRecordField],
     unit: &AnalyzedProgramNode,
-    diagnostics: &mut Vec<Diagnostic>,
+    _diagnostics: &mut Vec<Diagnostic>,
 ) -> Option<Option<i32>> {
     let Some(exit) = exit else {
         return Some(None);
     };
     match exit {
-        CliExit::Fixed(code) => {
-            if let Ok(code) = i32::try_from(*code) {
-                Some(Some(code))
-            } else {
-                diagnostics.push(unsupported_cli_diagnostic(
-                    &unit.path,
-                    "CLI exit codes outside i32 range",
-                ));
-                None
-            }
-        }
+        CliExit::Fixed(code) => Some(i32::try_from(*code).ok()),
         CliExit::Field { object, field } => {
             let args_name = args_name.map_or("", |symbol| unit.analysis.interner.resolve(symbol));
             if object != args_name {
-                diagnostics.push(unsupported_cli_diagnostic(
-                    &unit.path,
-                    "CLI dynamic exit expressions",
-                ));
-                return None;
+                return Some(None);
             }
             let value = fields.iter().find_map(|record_field| {
                 let name = unit.analysis.interner.resolve(record_field.name);
                 (name == field).then(|| package_mir_runtime_record_i32(&record_field.value))?
             });
-            if let Some(code) = value {
-                Some(Some(code))
-            } else {
-                diagnostics.push(unsupported_cli_diagnostic(
-                    &unit.path,
-                    "CLI dynamic exit expressions",
-                ));
-                None
-            }
+            Some(value)
         }
-        CliExit::Binding(_) | CliExit::Unsupported => {
-            diagnostics.push(unsupported_cli_diagnostic(
-                &unit.path,
-                "CLI dynamic exit expressions",
-            ));
-            None
-        }
+        CliExit::Binding(_) | CliExit::Unsupported => Some(None),
     }
 }
 

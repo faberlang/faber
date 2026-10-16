@@ -154,7 +154,7 @@ use radix_mir_lower::lower::{
     MirTensorEdgePolicySelector, lower_analyzed_unit,
 };
 use radix_mir_runner::{
-    Host, RunnerError, RunnerKernelPolicy, RunnerStats, run_entry_with_kernel_policy,
+    Host, RunnerError, RunnerKernelPolicy, RunnerStats, run_entry_with_process_exit,
     run_entry_with_stats_and_kernel_policy,
 };
 use radix_module::cli::{

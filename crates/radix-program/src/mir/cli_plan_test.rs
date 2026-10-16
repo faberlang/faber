@@ -325,3 +325,55 @@ fn greet() args args {
     });
     assert_eq!(lines, vec!["true".to_owned(), "Ian".to_owned()]);
 }
+
+// ── dynamic CLI exit expressions ───────────────────────────
+//
+// Ruling Q-T8: `package_mir_cli_surface_unsupported` never fires for an exit
+// expression on the runner. The entry tail lowered by the MIR entry pass
+// evaluates the expression, so `exit code() + 1` reaches `Host::exit` with the
+// evaluated value instead of planning refusing the surface.
+
+const DYNAMIC_EXIT_EXPRESSION_MAIN: &str = r#"
+fn code() → int {
+  return 5
+}
+
+@ cli "x"
+main args a exit code() + 1 {
+  print "cli"
+}
+"#;
+
+#[test]
+fn package_mir_cli_dynamic_exit_expression_runs() {
+    let dir = crate::test_support::test_temp_dir("cli-dynamic-exit-expression");
+    std::fs::write(dir.join("main.fab"), DYNAMIC_EXIT_EXPRESSION_MAIN).expect("write package file");
+    let mut host = radix_mir_runner::BufferHost::default();
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        crate::mir::run_package_mir(
+            &radix_module::driver::Config::default(),
+            &dir,
+            &crate::test_support::test_mir_seams(),
+            &mut host,
+        )
+    }));
+    match outcome {
+        Err(panic) => {
+            // The BufferHost exit panic payload carries the status; downcasting
+            // it is the assertion, so the test never matches a rendered
+            // diagnostic message.
+            assert_eq!(
+                panic.downcast_ref::<String>().map(String::as_str),
+                Some("runner exit: 6")
+            );
+        }
+        Ok(result) => panic!(
+            "a dynamic CLI exit expression must reach host.exit, got {:?}",
+            result.map_err(|diagnostics| diagnostics
+                .iter()
+                .map(|diag| format!("{:?}:{:?}", diag.code, diag.issue()))
+                .collect::<Vec<_>>())
+        ),
+    }
+    assert_eq!(host.stdout_lines, vec!["cli".to_owned()]);
+}
