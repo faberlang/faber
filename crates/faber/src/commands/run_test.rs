@@ -673,3 +673,50 @@ fn single_file_cli_run_missing_operand_refuses_by_name() {
         "missing operand must refuse with the named CLI-surface diagnostic: {stderr}"
     );
 }
+
+// ── single-file run exit codes end to end ────────────────
+
+/// A plain single-file run (`main exit N`, no `@ cli`) must apply the entry
+/// exit code as the process status, with the body running first.
+#[test]
+fn single_file_exit_code_literal() {
+    let dir = temp_dir("single-file-exit-literal");
+    let entry = dir.join("gate.fab");
+    std::fs::write(
+        &entry,
+        "+++\nlocale = \"en\"\n+++\n\nmain exit 3 { print \"hi\" }\n",
+    )
+    .expect("write single-file literal exit");
+    let entry = entry.to_str().expect("UTF-8 entry path");
+
+    let output = Command::new(crate::commands::format_test::faber_binary())
+        .args(["run", entry])
+        .output()
+        .expect("run faber binary");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "hi\n");
+}
+
+/// A single-file `@ cli` run whose entry exit is an expression (`main args a
+/// exit code() + 1`) must evaluate the expression and apply it as the process
+/// status, not drop it or fall back to the planned constant.
+#[test]
+fn single_file_exit_code_cli_expression() {
+    let dir = temp_dir("single-file-exit-expr");
+    let entry = dir.join("expr.fab");
+    std::fs::write(
+        &entry,
+        "+++\nlocale = \"en\"\n+++\n\nfn code() \u{2192} int { return 5 }\n\n@ cli { name = \"x\" }\n\nmain args a exit code() + 1 {\n  print \"cli\"\n}\n",
+    )
+    .expect("write single-file CLI exit expression");
+    let entry = entry.to_str().expect("UTF-8 entry path");
+
+    let output = Command::new(crate::commands::format_test::faber_binary())
+        .args(["run", entry])
+        .output()
+        .expect("run faber binary");
+
+    assert_eq!(output.status.code(), Some(6));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "cli\n");
+}
