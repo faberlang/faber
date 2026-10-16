@@ -79,7 +79,9 @@ impl Emitter<'_> {
         // rejected by name rather than emitted as a plain integer.
         if self.is_bounded_ascii(target) {
             let Some(capacity) = self.ascii_capacity(target) else {
-                return Err(unsupported("bounded ascii with a capacity that is not a literal"));
+                return Err(unsupported(
+                    "bounded ascii with a capacity that is not a literal",
+                ));
             };
             let value = self.expr(source)?;
             if matches!(value.value, Value::Int | Value::Exact) {
@@ -105,7 +107,8 @@ impl Emitter<'_> {
             }
             (Value::Int | Value::Exact | Value::Float, Ty::Float32) => {
                 Operand::new(format!("((float){})", value.text), Value::Float32)
-            }            (Value::Int | Value::Exact, Ty::Text) => Operand::new(self.show(&value)?, Value::Text),
+            }
+            (Value::Int | Value::Exact, Ty::Text) => Operand::new(self.show(&value)?, Value::Text),
             (Value::Float, Ty::Text) => {
                 self.support.need(Helper::FloatText);
                 Operand::new(
@@ -342,13 +345,11 @@ impl Emitter<'_> {
                 }
                 format!("{s} == 0 ? {v} : {};", fallback.text)
             }
-            None => format!(
-                "if ({s} != 0) {{ faber_conv_fail(FABER_CONV_ASCII_PACK, {s}); }} {v};"
-            ),
+            None => {
+                format!("if ({s} != 0) {{ faber_conv_fail(FABER_CONV_ASCII_PACK, {s}); }} {v};")
+            }
         };
-        let text = format!(
-            "(__extension__ ({{ int {s} = 0; faber_text {v} = {call}; {tail} }}))"
-        );
+        let text = format!("(__extension__ ({{ int {s} = 0; faber_text {v} = {call}; {tail} }}))");
         Ok(Operand::new(text, Value::Text).with_effect(value.effect))
     }
 
@@ -604,10 +605,7 @@ impl Emitter<'_> {
                 }
                 format!("else {{ {v} = {}; }}", fallback.text)
             }
-            None => {
-                "else { faber_conv_fail(FABER_CONV_TEXT_BOOL, FABER_CONV_SYNTAX); }"
-                    .to_owned()
-            }
+            None => "else { faber_conv_fail(FABER_CONV_TEXT_BOOL, FABER_CONV_SYNTAX); }".to_owned(),
         };
         let text = format!(
             "(__extension__ ({{ const char *{t} = {}; bool {v}; \

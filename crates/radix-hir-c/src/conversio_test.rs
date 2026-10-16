@@ -96,9 +96,8 @@ fn a_bounded_ascii_resize_checks_the_new_capacity() {
 
 #[test]
 fn an_ascii_pack_is_the_fixed_width_radix() {
-    let code = emitted(
-        "main {\n    let ascii<8> padded ← 37 ↦ ascii<8> via Hex\n    print padded\n}",
-    );
+    let code =
+        emitted("main {\n    let ascii<8> padded ← 37 ↦ ascii<8> via Hex\n    print padded\n}");
     assert!(code.contains("faber_try_ascii_pack(faber_a,"), "{code}");
     assert!(code.contains(", 16, 8,"), "{code}");
 }

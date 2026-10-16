@@ -34,9 +34,8 @@ fn binary32_methods_use_the_f32_helpers() {
 
 #[test]
 fn binary32_conversions_round_at_the_declared_width() {
-    let code = emitted(
-        "main {\n    print 1 ↦ f32\n    print \"2.5\" ↦ f32\n    print 1.5 ↦ f32\n}",
-    );
+    let code =
+        emitted("main {\n    print 1 ↦ f32\n    print \"2.5\" ↦ f32\n    print 1.5 ↦ f32\n}");
     assert!(code.contains("((float)INT64_C(1))"), "{code}");
     assert!(code.contains("(float)faber_v"), "{code}");
     // A binary64 to binary32 conversion is the C cast.
@@ -53,9 +52,7 @@ fn a_binary32_list_is_the_f32_family() {
 
 #[test]
 fn a_store_across_the_float_widths_is_the_c_cast() {
-    let code = emitted(
-        "main {\n    let f32 a ← 1.5 ∷ f32\n    let float b ← a\n    print a, b\n}",
-    );
+    let code = emitted("main {\n    let f32 a ← 1.5 ∷ f32\n    let float b ← a\n    print a, b\n}");
     assert!(code.contains("((float)1.5)"), "{code}");
     assert!(code.contains("((double)l_a)"), "{code}");
 }

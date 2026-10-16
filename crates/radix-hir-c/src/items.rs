@@ -128,14 +128,22 @@ impl Emitter<'_> {
         for item in &hir.items {
             match &item.kind {
                 HirItemKind::Struct(genus) => {
-                    if item.annotations.iter().any(|a| !self.ignorable_annotation(a)) {
+                    if item
+                        .annotations
+                        .iter()
+                        .any(|a| !self.ignorable_annotation(a))
+                    {
                         return Err(unsupported("annotation"));
                     }
                     self.collect_genus(item.def_id, genus)?;
                     order.push(item.def_id);
                 }
                 HirItemKind::Enum(declaration) => {
-                    if item.annotations.iter().any(|a| !self.ignorable_annotation(a)) {
+                    if item
+                        .annotations
+                        .iter()
+                        .any(|a| !self.ignorable_annotation(a))
+                    {
                         return Err(unsupported("annotation"));
                     }
                     self.collect_enum(item.def_id, declaration)?;
@@ -147,7 +155,11 @@ impl Emitter<'_> {
         let mut items = Items::default();
         let mut functions: Vec<(DefId, &HirFunction)> = Vec::new();
         for item in &hir.items {
-            if item.annotations.iter().any(|a| !self.ignorable_annotation(a)) {
+            if item
+                .annotations
+                .iter()
+                .any(|a| !self.ignorable_annotation(a))
+            {
                 return Err(unsupported("annotation"));
             }
             match &item.kind {

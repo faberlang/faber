@@ -143,7 +143,9 @@ impl Emitter<'_> {
         );
         let operand = self.optional_call(v, inner, &slot, call);
         if !optional_map {
-            return Ok(Operand::new(wrap(&prelude, &operand.text), operand.value).with_effect(effect));
+            return Ok(
+                Operand::new(wrap(&prelude, &operand.text), operand.value).with_effect(effect)
+            );
         }
         let none = self.none_of(Ty::Opt(inner))?;
         let c_type = self.c_type(Ty::Map(k, v))?;

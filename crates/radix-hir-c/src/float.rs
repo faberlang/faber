@@ -86,7 +86,11 @@ impl Emitter<'_> {
         // A binary32 operand makes the result binary32; typecheck inserts a
         // conversion across widths, so both operands agree here.
         let f32_result = l.value == Value::Float32 || r.value == Value::Float32;
-        let float_value = if f32_result { Value::Float32 } else { Value::Float };
+        let float_value = if f32_result {
+            Value::Float32
+        } else {
+            Value::Float
+        };
         // `≅` / `≇` across families compares true values, never rounding the
         // integer to binary64 first.
         if matches!(op, HirBinOp::ApproxEq | HirBinOp::ApproxNotEq) && (integer(&l) || integer(&r))
@@ -210,7 +214,15 @@ impl Emitter<'_> {
             IntrinsicMirKind::Collection(MirCollectionOp::Approximate) => {
                 return self.float_approx(receiver, args);
             }
-            _ => return self.float_value_method(entry.mir_kind, receiver, suffix, float_value, args),
+            _ => {
+                return self.float_value_method(
+                    entry.mir_kind,
+                    receiver,
+                    suffix,
+                    float_value,
+                    args,
+                );
+            }
         };
         self.support.need(Helper::Float);
         self.support.need_ints();

@@ -164,7 +164,11 @@ impl Emitter<'_> {
         let mut fields = Vec::with_capacity(genus.fields.len());
         let mut consts = Vec::new();
         for field in &genus.fields {
-            if field.annotations.iter().any(|a| !self.ignorable_annotation(a)) {
+            if field
+                .annotations
+                .iter()
+                .any(|a| !self.ignorable_annotation(a))
+            {
                 return Err(unsupported("field annotation"));
             }
             if field.is_static() {
@@ -683,7 +687,11 @@ impl Emitter<'_> {
             Ty::Opt(inner) => match inner {
                 // Text is immutable, so sharing the pointer is a copy; a
                 // scalar optional is a value struct.
-                Inner::Text | Inner::Int | Inner::Bool | Inner::Float | Inner::Float32
+                Inner::Text
+                | Inner::Int
+                | Inner::Bool
+                | Inner::Float
+                | Inner::Float32
                 | Inner::Modular(_) => read.to_owned(),
                 Inner::List(elem) => {
                     self.support.need(Helper::List(elem, ListOp::Of));

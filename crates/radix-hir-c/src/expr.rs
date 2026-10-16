@@ -285,13 +285,12 @@ impl Emitter<'_> {
                 // A bounded `ascii<_>` whose conversion target is still an
                 // inference hole carries its solved capacity on the whole
                 // expression's type.
-                let target = if self.is_bounded_ascii(*target)
-                    && self.ascii_capacity(*target).is_none()
-                {
-                    expr.ty.unwrap_or(*target)
-                } else {
-                    *target
-                };
+                let target =
+                    if self.is_bounded_ascii(*target) && self.ascii_capacity(*target).is_none() {
+                        expr.ty.unwrap_or(*target)
+                    } else {
+                        *target
+                    };
                 self.conversion(source, target, params, recovery.as_deref())
             }
             HirExpressionKind::Conversio {
@@ -564,9 +563,7 @@ impl Emitter<'_> {
             let class = classify(self.types, param.ty)?;
             let shared = matches!(class, Ty::List(_) | Ty::Genus(_));
             match arg.marker {
-                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
-                    if !shared =>
-                {
+                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut) if !shared => {
                     return Err(unsupported(
                         "access marker on an argument that is not a list or genus",
                     ));
@@ -1270,9 +1267,7 @@ impl Emitter<'_> {
             .is_some_and(|ty| matches!(classify(self.types, ty), Ok(Ty::Modular(_))));
         let inner = self.expr(operand)?;
         match op {
-            HirUnOp::Neg
-                if matches!(inner.value, Value::Float | Value::Float32) =>
-            {
+            HirUnOp::Neg if matches!(inner.value, Value::Float | Value::Float32) => {
                 Ok(Self::float_negate(&inner))
             }
             HirUnOp::Neg if inner.value == Value::Decimal => Ok(self.decimal_negate(&inner)),
@@ -1524,7 +1519,12 @@ impl Emitter<'_> {
         Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect))
     }
 
-    fn fuzzy(&mut self, op: HirBinOp, mut l: Operand, mut r: Operand) -> Result<Operand, CodegenError> {
+    fn fuzzy(
+        &mut self,
+        op: HirBinOp,
+        mut l: Operand,
+        mut r: Operand,
+    ) -> Result<Operand, CodegenError> {
         let is_float = |value: Value| matches!(value, Value::Float | Value::Float32);
         let name = if l.is_integer() && r.is_integer() {
             "faber_approx_int"
@@ -1868,18 +1868,16 @@ impl Emitter<'_> {
             | (Ty::Float32, Value::Float32) => Ok(value),
             // A store across the two float widths is the C cast: `f32`
             // narrows, `float` widens.
-            (Ty::Float32, Value::Float) => {
-                Ok(
-                    Operand::new(format!("((float){})", value.text), Value::Float32)
-                        .with_effect(value.effect),
-                )
-            }
-            (Ty::Float, Value::Float32) => {
-                Ok(
-                    Operand::new(format!("((double){})", value.text), Value::Float)
-                        .with_effect(value.effect),
-                )
-            }
+            (Ty::Float32, Value::Float) => Ok(Operand::new(
+                format!("((float){})", value.text),
+                Value::Float32,
+            )
+            .with_effect(value.effect)),
+            (Ty::Float, Value::Float32) => Ok(Operand::new(
+                format!("((double){})", value.text),
+                Value::Float,
+            )
+            .with_effect(value.effect)),
             (Ty::List(slot), Value::List(elem)) if slot == elem => Ok(value),
             (Ty::Genus(slot), Value::Genus(genus)) if slot == genus => Ok(value),
             (Ty::Int, Value::Exact) => {
@@ -2049,17 +2047,19 @@ impl Emitter<'_> {
             }
             // A store across the two float widths is the C cast.
             Ty::Float32 => match value.value {
-                Value::Float => Ok(
-                    Operand::new(format!("((float){})", value.text), Value::Float32)
-                        .with_effect(value.effect),
-                ),
+                Value::Float => Ok(Operand::new(
+                    format!("((float){})", value.text),
+                    Value::Float32,
+                )
+                .with_effect(value.effect)),
                 _ => Ok(value),
             },
             Ty::Float => match value.value {
-                Value::Float32 => Ok(
-                    Operand::new(format!("((double){})", value.text), Value::Float)
-                        .with_effect(value.effect),
-                ),
+                Value::Float32 => Ok(Operand::new(
+                    format!("((double){})", value.text),
+                    Value::Float,
+                )
+                .with_effect(value.effect)),
                 _ => Ok(value),
             },
             _ => Ok(value),

@@ -2,7 +2,9 @@
 
 use crate::error::unsupported;
 use radix_codegen_shared::CodegenError;
-use radix_types::{DefId, NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable};
+use radix_types::{
+    DefId, FuncSig, NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable,
+};
 
 /// The sized integer widths other than `i64`, which is [`Ty::Int`].
 ///
@@ -132,7 +134,10 @@ impl Inner {
 
     /// The value is a pointer and `NULL` means none.
     pub(crate) fn is_pointer(self) -> bool {
-        matches!(self, Inner::Text | Inner::List(_) | Inner::Genus(_) | Inner::Map(..))
+        matches!(
+            self,
+            Inner::Text | Inner::List(_) | Inner::Genus(_) | Inner::Map(..)
+        )
     }
 
     /// The runtime's option struct for a scalar. A modular word below `u64`
@@ -447,18 +452,22 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
         // A function value is a C function pointer. Its signature is validated
         // now (the C spelling needs the emitter), and the id lets a mismatched
         // signature fail a store check.
-        Type::Func(sig) => {
-            if !sig.type_params.is_empty() || sig.err.is_some() || sig.is_async || sig.is_generator {
-                return Err(unsupported("function value outside the subset"));
-            }
-            for param in &sig.params {
-                classify(types, param.ty)?;
-            }
-            returns(types, sig.ret)?;
-            Ok(Ty::Func(ty.0))
-        }
+        Type::Func(sig) => classify_func(types, sig, ty.0),
         other => Err(unsupported(describe(other))),
     }
+}
+
+/// A function value's class: validate its signature and keep the `Type::Func`
+/// id so a mismatched assignment fails the store check.
+fn classify_func(types: &TypeTable, sig: &FuncSig, id: u32) -> Result<Ty, CodegenError> {
+    if !sig.type_params.is_empty() || sig.err.is_some() || sig.is_async || sig.is_generator {
+        return Err(unsupported("function value outside the subset"));
+    }
+    for param in &sig.params {
+        classify(types, param.ty)?;
+    }
+    returns(types, sig.ret)?;
+    Ok(Ty::Func(id))
 }
 
 /// The class of a `ref`/`mut` parameter whose C storage is a pointer to the
