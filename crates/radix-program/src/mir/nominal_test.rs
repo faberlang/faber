@@ -500,14 +500,13 @@ fn identity_bearing_enum_variant_sibling_payload_registers_transitively() {
     }
 }
 
-// (b) Remaining fail-closed scenario (the fixture's original intent): the
-// payload nominal's home module stays genuinely foreign to the consumer. The
-// transitive install follows only LOCAL imports of imported modules (MRL-4),
-// never LIBRARY imports — a variant payload naming a library nominal from a
-// module the consumer never imports still drops in phase 2, and the merge
-// fails closed because the enum's own home module (util) IS known to the
-// consumer (council-11 correct_before_next_phase: the unknown variant must
-// not silently retain its source-local identity).
+// (b) Library-payload variant: the payload nominal's home module is a
+// LIBRARY the sibling module imports and the consumer does not. The transitive
+// install follows the imported module's library imports as well as its local
+// ones (a local module's public signature can name a library nominal, e.g. a
+// `⇥ fault.IoFault` channel), so the payload resolves in the consumer and the
+// merge succeeds. The fail-closed arm (council-11) stays in the remap for a
+// nominal whose home module is in no import chain.
 const NOMINAL_LIBRARY_MOD: &str =
     "+++\nlocale = \"en\"\n+++\n@ public\nclass Something {\n    mut int gradus\n}\n";
 const NOMINAL_VARIANT_UTIL_LIBRARY: &str = "import from \"prov:mod\" * as provModule\n\n@ public\nclass Gradus {\n    mut int gradus\n}\n\n@ public\nunion Color {\n    rubrum,\n    caeruleum { provModule.Something gradus }\n}\n\n@ public\nfn primus() → Color {\n    return Color.rubrum\n}\n";
@@ -557,8 +556,8 @@ prov = "1.0.0"
 }
 
 #[test]
-fn identity_bearing_enum_variant_library_payload_miss_fails_closed() {
-    let dir = crate::test_support::test_temp_dir("s1u2-variant-lib-fail-closed");
+fn identity_bearing_enum_variant_library_payload_registers_transitively() {
+    let dir = crate::test_support::test_temp_dir("s1u2-variant-lib-transitive");
     let entry = write_nominal_library_package(
         dir.as_ref(),
         NOMINAL_VARIANT_UTIL_LIBRARY,
@@ -566,20 +565,24 @@ fn identity_bearing_enum_variant_library_payload_miss_fails_closed() {
     );
     let config = Config::default().with_library_home(dir.join("libhome"));
 
-    let errors = with_interpreted_lowered_package_mir(
+    with_interpreted_lowered_package_mir(
         &config,
         &entry,
         &crate::test_support::test_mir_seams(),
-        |_| {},
+        |lowered| {
+            let validation = lowered.validated.validation();
+            let two_variant_enums = validation
+                .enum_variants
+                .iter()
+                .filter(|(_, variants)| variants.len() == 2)
+                .count();
+            assert_eq!(
+                two_variant_enums, 1,
+                "the library payload variant must survive the remap into the merged program"
+            );
+        },
     )
-    .expect_err("a library-payload variant of a known enum must fail closed");
-    assert!(
-        errors.iter().any(|diag| {
-            diag.code == Some("PKG001")
-                && diag.issue() == Some("package_mir_variant_identity_unknown")
-        }),
-        "expected an unknown-identity fail-closed diagnostic, got: {errors:?}"
-    );
+    .expect("the transitively installed library payload module must keep the variant resolvable");
 }
 
 #[test]

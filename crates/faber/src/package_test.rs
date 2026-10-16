@@ -543,6 +543,10 @@ impl Host for ExitRecordingHost {
         self.buffer.read_line()
     }
 
+    fn read_all(&mut self) -> Result<Option<String>, RunnerError> {
+        self.buffer.read_all()
+    }
+
     fn abort(&mut self, reason: &str) -> ! {
         self.buffer.abort(reason)
     }
@@ -11369,9 +11373,10 @@ entry = "main.fab"
         dir.join("src/helper.fab"),
         r#"
 import from "norma:console" console
+import from "norma:fault" fault
 
 @ public
-fn shout(string s) → void {
+fn shout(string s) → void ⇥ fault.IoFault {
   console.write_line(s)
 }
 "#,
