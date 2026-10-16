@@ -22,11 +22,6 @@ that expects `Err(HirArtifactError::*)`.
 | `duplicate_attachment_owner.bin` | Two attachments naming one owner | `InvalidPresentation { issue: "duplicate_attachment_owner", … }` |
 | `dangling_comment_symbol.bin` | CommentLine Symbol beyond interner | `DanglingIndex { kind: "Symbol", … }` |
 
-## Construction Reference
-
-See `docs/factory/hir-artifact-fhir/prep/U4.3-ADVERSARIAL-PREP.md` for full
-generation recipes for each fixture class.
-
 ## Loading for Tests
 
 ```rust

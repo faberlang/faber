@@ -1,8 +1,7 @@
 # radix-hir-c
 
 Novelty C target: one C translation unit from checked HIR. CLI target `c`,
-Cargo feature `hir-c`, default-off and outside `full-targets`. Goal:
-`docs/factory/hir-c/goal.md`.
+Cargo feature `hir-c`, default-off and outside `full-targets`.
 
 This is a **spike** growing by units: exact integer arithmetic, control flow,
 functions, text, lists and genera so far. Everything else fails closed
