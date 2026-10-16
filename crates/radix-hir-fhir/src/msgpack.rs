@@ -1609,15 +1609,33 @@ fn gate_module_versions(module: &Value) -> Result<(), MsgpackError> {
 /// needed). Returns the legacy version number when the payload has that
 /// shape.
 fn legacy_postcard_version(bytes: &[u8]) -> Option<u32> {
-    let mut pos = 0;
-    // Parse the first value tolerating trailing bytes: a legacy envelope is
-    // never a single complete uint — the version varint is only its prefix.
-    let Ok(value) = read_value(bytes, &mut pos, 0) else {
-        return None;
+    // The first marker byte decides: a v2+ package is a top-level map
+    // (`0x80..=0x8f`, `0xde`, `0xdf`), a legacy envelope is a bare uint
+    // (the version varint) followed by the rest of the document, and
+    // everything else is neither. Walking the document to learn this costs
+    // a full parse plus a discarded DOM per load.
+    let (&marker, rest) = bytes.split_first()?;
+    let (width, value) = match marker {
+        0x00..=0x7f => (0usize, u64::from(marker)),
+        0xcc => (1, u64::from(*rest.first()?)),
+        0xcd => (
+            2,
+            u64::from(u16::from_be_bytes(rest.get(..2)?.try_into().ok()?)),
+        ),
+        0xce => (
+            4,
+            u64::from(u32::from_be_bytes(rest.get(..4)?.try_into().ok()?)),
+        ),
+        0xcf => (8, u64::from_be_bytes(rest.get(..8)?.try_into().ok()?)),
+        _ => return None,
     };
-    match value {
-        Value::Uint(found) if pos < bytes.len() => u32::try_from(found).ok(),
-        _ => None,
+    // A legacy envelope is never a single complete uint — the version
+    // varint is only its prefix; a bare uint takes the ordinary
+    // malformed path instead.
+    if rest.len() > width {
+        u32::try_from(value).ok()
+    } else {
+        None
     }
 }
 

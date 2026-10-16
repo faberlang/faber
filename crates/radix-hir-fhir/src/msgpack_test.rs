@@ -1012,6 +1012,42 @@ fn package_msgpack_rejects_bare_postcard_version_prefix() {
     ));
 }
 
+#[test]
+fn legacy_gate_decides_from_the_first_marker_without_a_document_walk() {
+    use super::legacy_postcard_version;
+    // v2+ top-level map markers are never legacy, at any width.
+    for marker in [0x80, 0x8f, 0xde, 0xdf] {
+        assert_eq!(
+            legacy_postcard_version(&[marker, 0x00, 0x01, 0xaa]),
+            None,
+            "map marker {marker:#x} must not be read as a legacy version"
+        );
+    }
+    // Bare uint prefixes with trailing payload are legacy: fixint and the
+    // explicit uint8/uint16/uint32 width classes.
+    assert_eq!(legacy_postcard_version(&[0x01, 0xff, 0xfe, 0xfd]), Some(1));
+    assert_eq!(legacy_postcard_version(&[0xcc, 0x05, 0xaa]), Some(5));
+    assert_eq!(legacy_postcard_version(&[0xcd, 0x00, 0x01, 0xaa]), Some(1));
+    assert_eq!(
+        legacy_postcard_version(&[0xce, 0x00, 0x00, 0x00, 0x02, 0xaa]),
+        Some(2)
+    );
+    // Truncated uint payloads are malformed, not legacy.
+    for bytes in [&[][..], &[0xcc][..], &[0xcd, 0x00][..], &[0xcf, 0x00][..]] {
+        assert_eq!(legacy_postcard_version(bytes), None);
+    }
+    // A complete uint alone carries no envelope prefix.
+    for bytes in [&[0x01][..], &[0xcc, 0x05][..], &[0xcd, 0x00, 0x01][..]] {
+        assert_eq!(legacy_postcard_version(bytes), None);
+    }
+    // Negative fixints and a uint64 beyond u32 are not a legacy version.
+    assert_eq!(legacy_postcard_version(&[0xe0, 0x01]), None);
+    assert_eq!(
+        legacy_postcard_version(&[0xcf, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0xaa]),
+        None
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Codec-level marker pins (FPF-2-PIN)
 //
