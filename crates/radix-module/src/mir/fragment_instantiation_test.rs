@@ -1054,7 +1054,7 @@ fn twice(f32 x) → f32 {
 }
 
 @ kernel
-fn pick(tensor<f32, [24]> clock, int i) → f32 {
+fn pick(tensor<f32, [24]> clock, i32 i) → f32 {
     return twice(clock[i])
 }
 ";
