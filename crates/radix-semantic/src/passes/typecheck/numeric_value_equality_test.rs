@@ -98,6 +98,48 @@ functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
             source: "incipit { si 'a' ≅ \"a\" { nota \"bad\" } }",
             expect: ValueEqualityExpect::RejectsIssue(NUMERIC_VALUE_EQ_ISSUE),
         },
+        // Same-typed non-numeric operands: the numeric requirement is the
+        // operator's admission law, not merely a mixed-type fallback.
+        ValueEqualityCase {
+            name: "textus_self_approx_rejects",
+            source: r#"
+incipit {
+    sit textus a ← "x"
+    adfirma a ≈ a
+}
+"#,
+            expect: ValueEqualityExpect::RejectsIssue(NUMERIC_VALUE_EQ_ISSUE),
+        },
+        ValueEqualityCase {
+            name: "textus_self_approx_eq_rejects",
+            source: r#"
+incipit {
+    sit textus a ← "x"
+    adfirma a ≅ a
+}
+"#,
+            expect: ValueEqualityExpect::RejectsIssue(NUMERIC_VALUE_EQ_ISSUE),
+        },
+        ValueEqualityCase {
+            name: "textus_self_approx_not_eq_rejects",
+            source: r#"
+incipit {
+    sit textus a ← "x"
+    adfirma a ≇ a
+}
+"#,
+            expect: ValueEqualityExpect::RejectsIssue(NUMERIC_VALUE_EQ_ISSUE),
+        },
+        ValueEqualityCase {
+            name: "bivalens_approx_rejects",
+            source: "incipit { adfirma verum ≈ falsum }",
+            expect: ValueEqualityExpect::RejectsIssue(NUMERIC_VALUE_EQ_ISSUE),
+        },
+        ValueEqualityCase {
+            name: "bivalens_fuzzy_not_eq_rejects",
+            source: "incipit { adfirma verum ≉ falsum }",
+            expect: ValueEqualityExpect::RejectsIssue(NUMERIC_VALUE_EQ_ISSUE),
+        },
         ValueEqualityCase {
             name: "signed_unsigned_approx_accepts",
             source: r"

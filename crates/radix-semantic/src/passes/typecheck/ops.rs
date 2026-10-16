@@ -1601,7 +1601,23 @@ impl TypeChecker<'_> {
         if !self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty)
             && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
         {
-            self.numeric_value_equality_types(lhs_ty, rhs_ty, lhs.span);
+            // The numeric requirement is the operator's admission law, not a
+            // fallback for mixed types: a same-typed non-numeric pair (text,
+            // bivalens, enum, tuple) must be rejected here rather than fall
+            // through to `numeric_value_equality_types`, whose equal-type early
+            // return would admit it and defer the failure to MIR validation.
+            let lhs_resolved = self.resolve_inferred_type(lhs_ty);
+            let rhs_resolved = self.resolve_inferred_type(rhs_ty);
+            let unresolved = self.is_infer(lhs_resolved) || self.is_infer(rhs_resolved);
+            if lhs_resolved != self.error_type
+                && rhs_resolved != self.error_type
+                && !unresolved
+                && (!self.is_numeric(lhs_ty) || !self.is_numeric(rhs_ty))
+            {
+                self.invalid_operand_types(NUMERIC_VALUE_EQUALITY_OPERANDS_REQUIRED, lhs.span);
+            } else {
+                self.numeric_value_equality_types(lhs_ty, rhs_ty, lhs.span);
+            }
         }
         self.bool_type()
     }
