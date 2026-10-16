@@ -64,7 +64,7 @@ mod evaluation {
     };
     use crate::semantic::{self, SemanticError, SemanticErrorKind};
     use radix_hir::visit::{HirVisitor, HirVisitorMut, walk_expr, walk_local_mut, walk_stmt};
-    use radix_hir::{DefId, HirExpression, HirId, HirItemKind, HirLocal, HirStatement};
+    use radix_hir::{DefId, HirExpression, HirId, HirItemKind, HirLocal, HirOwnerRef, HirStatement};
     use radix_lexer::{Span, Symbol};
     use radix_mir_runner::Value;
 
@@ -291,13 +291,11 @@ mod evaluation {
     /// The HIR node ids and definition ids a praefixum fold kills: when
     /// install_value replaces the initializer, every node of the authored body
     /// leaves the live HIR.
-    #[expect(dead_code, reason = "wired into install_value by unit 6990bd5c-5.1.2")]
     struct DeadNodes {
         hirs: rustc_hash::FxHashSet<HirId>,
         defs: rustc_hash::FxHashSet<DefId>,
     }
 
-    #[expect(dead_code, reason = "wired into install_value by unit 6990bd5c-5.1.2")]
     impl DeadNodes {
         fn of(body: &HirExpression) -> DeadNodes {
             let mut dead = DeadNodes { hirs: rustc_hash::FxHashSet::default(), defs: rustc_hash::FxHashSet::default() };
@@ -338,6 +336,18 @@ mod evaluation {
         let Some(authored) = with_initializer_mut(unit, def_id, |init| std::mem::replace(init, literal)) else {
             return Err(invalid("praefixum_unsupported", span));
         };
+        // The authored body left the live HIR: drop presentation records its
+        // dead Defs/Hirs own, or FHIR validation dangles on them at load.
+        let dead = DeadNodes::of(&authored);
+        unit.presentation
+            .authored_types
+            .retain(|record| match &record.site.owner {
+                HirOwnerRef::Hir(id) => !dead.hirs.contains(id),
+                HirOwnerRef::Def(id) => !dead.defs.contains(id),
+            });
+        unit.presentation
+            .compile_time_locals
+            .retain(|def_id| !dead.defs.contains(def_id));
         // Faber re-emission prints the authored body, not the value.
         for item in &mut unit.hir.items {
             if let HirItemKind::Constant(konst) = &mut item.kind
