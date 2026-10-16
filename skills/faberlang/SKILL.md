@@ -214,12 +214,12 @@ expectation, never something to silence.
 ## Retired surfaces (do not reintroduce)
 
 These are named parse or semantic diagnostics in the tree: wrapped numerics such
-as `numerus<W>` (`PARSE040 numeric_wrapper_retired`); `static` and `generis`
-(`PARSE010 static_decl_retired`, `static_member_retired`); the old binding
+as `int<W>` (la `numerus<W>`; `PARSE040 numeric_wrapper_retired`); `static`
+(la `generis`; `PARSE010 static_decl_retired`, `static_member_retired`); the old binding
 spellings (`PARSE010 runtime_const_retired`, `var_retired`,
 `binding_type_slot_required`, `binder_fixum_retired`; `ref_binder_refused`,
-`ref_field_refused`); unmarked genus fields (`field_modifier_missing`); the
-callable transfer sink (`SEM012 transfer_sink_retired`); `discerne` over open
+`ref_field_refused`); unmarked class fields (`field_modifier_missing`); the
+callable transfer sink (`SEM012 transfer_sink_retired`); `match` (la `discerne`) over open
 scrutinees (`SEM010 discerne_pattern_not_in_closed_set`). Run-time names are
 `let`, `mut`, `ref`; `const` is compile-time only and takes `=`.
 

@@ -14,8 +14,12 @@ nothing to regenerate; the `faber` build embeds those files for `faber explain`.
 
 Count files and terms from the tree when you need them; do not cache those numbers in this skill.
 
-Explain terms are Latin registry keys or glyphs, so look up the Latin
-identity (`discerne`, `nota`), not an `en` spelling.
+`faber explain` is keyed by the Latin identity of a keyword or by a glyph
+(`discerne`, which en spells `match`; `nota`, en `print`), plus a few listed
+English aliases. Only some English spellings resolve today (`match`, `switch`,
+`if`, `return`, `class`, `int`, `string`; not `fn`, `print`, `mut`, `ref`,
+`for`), and `let` opens the mutable-binding entry instead of the write-once
+one. When a lookup fails, take the Latin key from `faber explain --list`.
 
 Package fixtures and format goldens (`faber.toml` packages such as `regio/`,
 `contract-import/`, `proba-canary/`; `format/*.fab` with `*.format.expected`):
@@ -68,13 +72,14 @@ replace `EBNF.md`.
 1. Search `corpus/` frontmatter for the file whose `explains` lists the keyword.
 2. Open that `.fab` file; files sharing its `term` are further examples.
 3. If the term is user-facing, try `faber explain <term>`. Explain terms are
-   Latin registry keys plus listed aliases (`functio`, `genus`, `class`,
-   `scribe` resolve; `fn` and `print` do not; `nota` has no entry, and the
-   `scribe` entry points at `nota/nota.fab`).
+   Latin registry keys plus listed aliases (`functio` (en `fn`), `genus`
+   (en `class`), `class`, `scribe` (en `write`) resolve; `fn` and `print` do
+   not; `nota` (en `print`) has no entry, and the `scribe` entry points at
+   `nota/nota.fab`).
 4. For legacy spellings, check `corpus/legacy-redirects.toml`.
 5. For package-shaped proofs, search `corpus-product/`.
 
-Example lookup:
+Example lookup (the key is the Latin identity; `discerne` is `match` in en):
 
 ```sh
 rg -n '^explains = .*"discerne"' corpus
@@ -98,7 +103,7 @@ Paths are under `corpus/` unless noted.
 | imports | `importa/importa.fab` |
 | inferred locals | `sit/` |
 | null value / null type, nullable unions | `nihil/nihil.fab`, `est/est.fab`; grammar in `EBNF.md` |
-| `sponte` optional slots | `sponte/sponte.fab` |
+| `optional` slots (la `sponte`) | `sponte/sponte.fab` |
 | output | `nota/`, `mone/`, `vide/` (the `scribe` term maps to `nota/nota.fab`) |
 | failure / exit | `iace/`, `mori/`, `fac/`, `cape/`, `exitus/` |
 | async / streams | `fiet/`, `fiunt/`, `fient/` |
@@ -117,9 +122,9 @@ Paths are under `corpus/` unless noted.
 | inferred constructor `_ { }` / `_ [ ]` and bare literals | `genus/inferred-constructor.fab`, `inferred-literals.fab` |
 | tensor `axis` reductions, `mean` | `tensor/axis-builtins.fab`, `summa/mean-sugar.fab` |
 | loop shape change | `itera/loop-shape-reject.fab`, `tabula/loop-store-adds-key-trap.fab` |
-| compile-time (`fixum` constant, `praefixum`, `insere`) | `fixum/fixum.fab`, `praefixum/praefixum.fab`, `insere/insere.fab` |
+| compile-time (`const` constant, `comptime`, `embed`; la `fixum`, `praefixum`, `insere`) | `fixum/fixum.fab`, `praefixum/praefixum.fab`, `insere/insere.fab` |
 | shared union fields | `commune/commune.fab` |
-| bounded types (`ascii`, bounded `lista`) | `bounded/` |
+| bounded types (`ascii`, bounded `list`) | `bounded/` |
 | decimals | `decimal/` (`d64` only; `d32` is removed) |
 | operator tours | `operatores/` |
 | multi-feature flows | `integratio/` |
@@ -129,14 +134,14 @@ Paths are under `corpus/` unless noted.
 | Directory | Purpose |
 | --------- | ------- |
 | `operatores/` | comparatio, bitwise, optional-chain, function-types, metadata, etc. |
-| `intrinseca/` | compiler-owned `copia`, `textus`, `numerus`, `fractus` method surfaces (`lista/` and `tabula/` have their own directories) |
+| `intrinseca/` | compiler-owned `set`, `string`, `int`, `float` method surfaces (`lista/` and `tabula/` have their own directories) |
 | `integratio/` | multi-construct happy paths |
 | `conversio/` | conversions and casts |
 | `assignatio/` | assignment operators |
 | `mutabilitas/` | access markers: `mut` / `own` / `copy` / `ref`, call-site markers (`call-marker.fab`), writable `own`/`copy` parameters (`own-param-writable.fab`, `copy-param-writable.fab`), own-argument and use-after-own rules (`own-arg-*.fab`) and their SEM rejections |
 | `destructura/` | destructuring patterns |
 | `literalia/` | literal forms including JSON |
-| `meta/` | compiler metadata directives (`iacit`, `requirit`, `reice`, `nondum`, `nondum-function` and `nondum-method` for bodiless unavailable functions and genus methods, `versio`, `targets`) |
+| `meta/` | compiler metadata directives (`throws`, `require`, `reject`, `unstable`, `nondum-function` and `nondum-method` for bodiless unavailable functions and class methods, `versio`, `targets`; the `meta/` file names are the Latin `iacit`, `requirit`, `reice`, `nondum`) |
 
 Package-shaped proofs live under `corpus-product/`, not in the language tree.
 

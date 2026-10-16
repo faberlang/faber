@@ -26,26 +26,28 @@ Differences that matter when writing source:
   packs have no member rows, so `text.reverse` stays `reverse` in a `zh-Hans`
   file; the Latin surface `retorta` is accepted only in `la`.
 - Locale sealing covers type names: Latin is a pack like any other, with no
-  canonical-Latin fallback. A Latin type word (`numerus`, `textus`, `lista`,
-  `nihil` as a type, …) in a non-Latin file is `PARSE040 wrong_locale_type`
-  (probe: an `en` file with `let numerus x ← 1`), and the help names the file
-  locale's spelling. Use the pack's `[types]` row. User-declared or imported
+  canonical-Latin fallback. A Latin type word in a non-Latin file (la
+  `numerus`, `textus`, `lista`, or `nihil` as a type, in place of `int`,
+  `string`, `list`, `none`) is `PARSE040 wrong_locale_type` (probe: an `en`
+  file with `let numerus x ← 1`), and the help names the file locale's
+  spelling. Use the pack's `[types]` row. User-declared or imported
   names that look like Latin type words are not rejected.
 - The null value and the null type are separate words in every pack: in
-  `en` the literal is `null` and the type is `none`; in `la` they are `nulla`
-  and `nihil`. The translated packs spell them from their own rows (probe:
+  `en` the literal is `null` and the type is `none`; in `la` they are
+  `nulla` and `nihil`. The translated packs spell them from their own rows (probe:
   `zh-Hans` `皆无` value, `空类型` type).
 - Width markers (`i8`..`u64`, `f16 f32 f64 bf16`) and the unbounded integer
   `inf` are bare and locale-invariant in every pack; they are not pack rows.
-  The wrapped forms `numerus<i32>`, `int<i32>`, `int<32>` and the holes
-  `numerus<_>` are retired: `PARSE040 numeric_wrapper_retired`.
+  The wrapped forms `int<i32>`, `int<32>` and the hole `int<_>` (la
+  `numerus<i32>`, `numerus<_>`) are retired: `PARSE040 numeric_wrapper_retired`.
 - The convert-hint word `via` (`x ↦ u32 via Hex`) is an ordinary keyword row in
   each pack; the type-argument hint form is retired.
 
 ## Mental Model
 
-The compiler keeps stable Latin-keyed lexical identities. A locale pack maps
-those identities to source spellings:
+The compiler keeps stable Latin-keyed lexical identities (for example
+`functio`, spelled `fn` in `en`). A locale pack maps those identities to source
+spellings:
 
 ```toml
 # locale/en/pack.toml
@@ -100,7 +102,7 @@ are not translated merely because the code locale changes.
 
 `grammar/EBNF.md` writes terminals with the stable Latin keys. Treat an EBNF row
 such as `'functio'` as the grammar identity. Under the `en` pack, its accepted
-surface spelling is `fn`.
+surface spelling is `fn` (la `functio`).
 
 ## Find the Active Code Locale
 
@@ -124,8 +126,8 @@ faber convert <file> --from en --to la --stdout   # force the source pack
 
 `--locale` needs a package path or a `.fab` file; it is rejected for stdin.
 `faber check -` (stdin) has no package context: with no frontmatter it reads
-**Latin**, not `en` (probe: `main { print "ok" }` fails on stdin, the Latin
-`incipit` form passes), so give stdin documents a frontmatter `locale`.
+**Latin**, not `en` (probe: `main { print "ok" }` fails on stdin, the same
+program with the Latin entry word `incipit` (en `main`) passes), so give stdin documents a frontmatter `locale`.
 `faber check <file>` without frontmatter or manifest reads `en`.
 
 `--to` is required and fails closed listing the embedded pack locales for
@@ -173,7 +175,7 @@ For ordinary `faber` package selection, the live order is:
 
 Probe: a package pinned `la` whose `main.fab` declares `locale = "en"` and
 imports a `locale = "la"` sibling checks and runs; `check --locale en` on the
-same package then rejects the sibling's `@ publica` with
+same package then rejects the sibling's `@ publica` (en `@ public`) with
 `PARSE018:wrong_locale_annotation`.
 
 After choosing the id, pack-path resolution checks the applicable manifest
@@ -187,11 +189,11 @@ Frontmatter is TOML between `+++` delimiters. It must begin on line 1:
 
 ```fab
 +++
-locale = "la"
+locale = "en"
 +++
 
-functio salve() {
-  nota "Salve"
+fn greet() {
+  print "Hello"
 }
 ```
 
@@ -297,9 +299,9 @@ intrinsic row), but only add an alias when the locale contract intends to
 accept both spellings. Do not invent fallback
 aliases merely to make a fixture pass.
 
-The stable NaN literal identity `nonnumerus` is the `[keywords]` row in every
-pack: the Latin (`la`) pack spells it `nonnumerus`, while every other shipped
-pack spells it `nan`. The `∞` literal is a locale-invariant glyph and has no
+The stable NaN literal identity (`nonnumerus`) is the `[keywords]` row in every
+pack: every shipped pack except the Latin one spells it `nan`, and the Latin
+(`la`) pack spells it `nonnumerus`. The `∞` literal is a locale-invariant glyph and has no
 pack row (it is the float infinity, not an `inf` value); do not treat either
 named spelling as a cross-pack alias — only the selected pack's spelling
 claims the literal slot.
@@ -323,7 +325,8 @@ canonical names.
 
 ### `[[library_members]]`
 
-Library API translation is identity-scoped, not a global lexer alias:
+Library API translation is identity-scoped, not a global lexer alias. Example
+row from the Latin Norma pack (`lib/norma/locale/la/pack.toml`):
 
 ```toml
 [[library_members]]
@@ -353,20 +356,20 @@ surface (`@ shared` in the English `commune` exemplar). Resolve the file locale
 before deciding whether an annotation is legal, and do not infer the source
 locale from the diagnostic language.
 
-Probes against the live binary: an `en` `@ kernel` is accepted by the parser and `@ nucleum`
-is `PARSE018:wrong_locale_annotation`; a `zh-Hans` `@ nucleum` is the same
-`PARSE018` and `@ 内核` is accepted; in `la` the English `@ kernel` is not a wrong-locale
-case but `SEM018:annotatio_unknown_contract` (an unregistered annotation name).
-The shared-field annotation is `@ commune` in every pack except `en`, which
-spells it `@ shared`.
+Probes against the live binary: an `en` `@ kernel` is accepted by the parser and
+the Latin `@ nucleum` is `PARSE018:wrong_locale_annotation`; a `zh-Hans`
+`@ nucleum` is the same `PARSE018` and `@ 内核` is accepted; in `la` the English
+`@ kernel` is not a wrong-locale case but `SEM018:annotatio_unknown_contract`
+(an unregistered annotation name). The shared-field annotation is `@ shared` in
+`en`; every other pack spells it `@ commune`.
 
 Closure-modifier spellings are sealed the same way. The signature slot after
 the closure parameters admits only the selected pack's declared spelling —
 `kernel` in an `en` file, `nucleum` under `la` — with no cross-pack fallback
-(an `en` file with `nucleum` is a plain `PARSE001`), and a second modifier in
-the slot is `PARSE019` duplicate modifier, not an alias. The same sealing law
-covers the `@ kernel` / `@ nucleum` named-function annotation above; the
-closure modifier is its expression-form twin.
+(an `en` file with the Latin `nucleum` is a plain `PARSE001`), and a second
+modifier in the slot is `PARSE019` duplicate modifier, not an alias. The same
+sealing law covers the `@ kernel` (la `@ nucleum`) named-function annotation
+above; the closure modifier is its expression-form twin.
 
 ### `[diagnostics.*]`
 
@@ -417,6 +420,7 @@ Useful bounded probes from the repo root:
 ```bash
 sed -n '1,20p' path/to/source.fab
 rg -n '^\[locale\]|^\[reader\]|^locale\s*=|^pack\s*=' path/to/faber.toml
+# keys are the Latin identities; the en values are fn, return, string
 rg -n '^functio\s*=|^redde\s*=|^textus\s*=' locale/{en,la}/pack.toml
 ```
 

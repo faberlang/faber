@@ -89,15 +89,15 @@ finding. The live tree always wins over this library.
    the repo root: `cargo run -p faber -- check <path>`; add `--diagnostics` for the
    message text). Compile errors are reported separately as compile findings;
    this review proceeds over the legal code. That includes the retired forms
-   the compiler now rejects: `static`/`generis` module constants and class
+   the compiler now rejects: `static` (la `generis`) module constants and class
    members (`PARSE010 static_decl_retired` / `static_member_retired`), `var`
    and run-time `const T x ← e` (`PARSE010 var_retired` /
    `runtime_const_retired`; write `mut` / `let`), a `const` binder
-   (`binder_fixum_retired`), `numerus<W>`/`int<W>`/`fractus<W>`
-   wrappers (`PARSE040 numeric_wrapper_retired`), `?:` ternary (`PARSE030`),
-   `⇥ value` recovery (`PARSE030 recovery_uses_exit_arrow`), `∴` as a
-   statement joint (`PARSE026`), `T ∪ null` (`PARSE040`), `T?`, anonymous
-   `{ key = expr }`, `@ futura`, and `norma:hal/*` (`PKG001`). Violations of
+   (`binder_fixum_retired`), `int<W>`/`float<W>` wrappers (la
+   `numerus<W>`/`fractus<W>`; `PARSE040 numeric_wrapper_retired`), `?:` ternary
+   (`PARSE030`), `⇥ value` recovery (`PARSE030 recovery_uses_exit_arrow`), `∴`
+   as a statement joint (`PARSE026`), `T ∪ null` (`PARSE040`), `T?`, anonymous
+   `{ key = expr }`, `@ future` (la `@ futura`), and `norma:hal/*` (`PKG001`). Violations of
    the parent skill's hard rules that still compile (banned or invented forms)
    stay in scope.
 3. **Mechanical pass.** Walk every entry in `references/patterns.md` against
@@ -128,14 +128,16 @@ finding. The live tree always wins over this library.
 
 ## Construct-choice pairs
 
-`../references/idioms.md` (Semantic Tone) owns the distinctions — `discerne`
-vs `elige`, `ordo` vs `discretio`, `de`/`in`/`ex`, `sit`/`varia`/`de`/`fixum` (en `let`/`mut`/`ref`/`const`),
-`fiet`/`fiunt`/`fient`. When a review finds the wrong member of a pair in
+`../references/idioms.md` (Semantic Tone) owns the distinctions — `match`
+(la `discerne`) vs `switch` (la `elige`), `enum` (la `ordo`) vs `union` (la
+`discretio`), `ref` / `mut` / `from` (la `de` / `in` / `ex`), `let` / `mut` /
+`ref` / `const` (la `sit` / `varia` / `de` / `fixum`), and `async` /
+`generator` / `async_generator` (la `fiet` / `fiunt` / `fient`). When a review finds the wrong member of a pair in
 use, add the concrete code pair to the library rather than restating
 the tone list here. Two pairs the compiler now enforces or hints at:
 
-- `match` (`discerne`) discriminates closed sets only — unions, enums, variant
-  types. Literal and range dispatch is `switch` (`elige`); the pack help for
+- `match` (la `discerne`) discriminates closed sets only — unions, enums, variant
+  types. Literal and range dispatch is `switch` (la `elige`); the pack help for
   `SEM010 discerne_pattern_not_in_closed_set` says so.
 - Module constants are `const T X = e` with `=` (compile-time value; `←` there
   is `SEM062 top_level_binding`). A failable `↦` is covered by `⊥ default`, a
@@ -173,7 +175,7 @@ Keep library edits in a separate commit from any code under review.
 - Library updated for genuinely new recurring patterns — and left alone for
   one-offs?
 
-## Union errors: use commune access directly
+## Union errors: read the shared field directly
 
 When every variant carries the same error field, a handwritten `message()`
 match wrapper is legal but non-canonical. The shared-field region already owns
@@ -192,7 +194,7 @@ fn message(ShapeError e) → string {
 return message(error)
 ```
 
-**Good — direct commune member:**
+**Good — direct shared-field member:**
 
 ```fab
 return error.message
@@ -200,7 +202,7 @@ return error.message
 
 Evidence: `corpus/commune/commune.fab`, which checks the shared field
 on `ShapeError` and reads `e.message` directly. Do not invent a wrapper merely
-to restate a field declared in the `@ shared` / `@ commune` region.
+to restate a field declared in the `@ shared` region (la `@ commune`).
 
 ## Error conversion: wrapper family versus declared conversion function
 
@@ -244,9 +246,9 @@ fn inspect_after() → string ⇥ BoundaryError {
 ```
 
 The `err` parameter names the whole source value. Do not write `self` for this
-binding in English: the keyword registry maps canonical `ego` to English `self`,
-and `self.message` outside a method is rejected. The Latin `la` pack maps
-`ego = "ego"`; `self` is not reserved there, but `err` is the safe teaching
+binding in English: the keyword registry maps the canonical identity `ego` to the English
+spelling `self`, and `self.message` outside a method is rejected. The Latin `la`
+pack maps `ego = "ego"`; `self` is not reserved there, but `err` is the safe teaching
 name across locales. Trust boundaries still require an explicit `match err` in
 the function body. One row per concrete source→destination pair; duplicates,
 builtin shadowing, both-ends-foreign pairs, and impure bodies are all
@@ -594,20 +596,20 @@ universe is data, never control flow inside the predicate.
 
 ```fab
     # Pre-LN
-    let ln1 ← x.layer_norm(1, 0.00001, ln1_s, ln1_o)
+    let _ ln1 ← x.layer_norm(1, 0.00001, ln1_s, ln1_o)
 
     # Q/K/V projections (per-channel [8] biases)
-    let q ← ln1 · wq
+    let _ q ← ln1 · wq
 ```
 
 **Good — the banner form, validation stages marked fail-closed:**
 
 ```fab
     # --- pre-LN -----------------------------------------------------------
-    let ln1 ← x.layer_norm(1, 0.00001, ln1_s, ln1_o)
+    let _ ln1 ← x.layer_norm(1, 0.00001, ln1_s, ln1_o)
 
     # --- Q/K/V projections (per-channel [8] biases) -----------------------
-    let q ← ln1 · wq
+    let _ q ← ln1 · wq
 ```
 
 The rule has been applied across a library's model pipelines. Conventions: the banner

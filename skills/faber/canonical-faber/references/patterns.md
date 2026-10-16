@@ -6,12 +6,13 @@ preferred form. Entries cite their evidence; the live tree wins over this
 file. This file prescribes — it does not inventory current usage. Examples
 use the `en` surface unless noted — render through the reviewed file's locale.
 
-Null surface: the null **value** is `null` (`nulla` under la) and the
-null **type** is `none` (`nihil` under la). A nullable type is `T ∪ none`; the
-null test is `x is none` and its negation is `x not is none` (la `x non est
-nihil`; the spelling `is not none` is `PARSE001 est_non_spelling`). `T ∪ null`
-and `x is null` are `PARSE040 null_value_in_type_position` errors. The en
-pack still lexes `nihil` as a transitional value-literal alias; write `null`.
+Null surface: the null **value** is `null` (la `nulla`) and the
+null **type** is `none` (la `nihil`). A nullable type is `T ∪ none`; the
+null test is `x is none` and its negation is `x not is none`
+(la `x non est nihil`; the spelling `is not none` is
+`PARSE001 est_non_spelling`). `T ∪ null` and `x is null` are
+`PARSE040 null_value_in_type_position` errors. The en pack still lexes
+the Latin `nihil` as a transitional value-literal alias (la word); write `null`.
 
 Reading the claims: a `✗` marked **rejected** is a compile error today (the
 code is named); a plain `✗` compiles and is only non-canonical. A snippet shown
@@ -32,13 +33,13 @@ Entry shape: `id` heading, bold one-line claim, one metadata line
 | nullable-union | canon-violation | nullability is `T ∪ none`, never an invented suffix |
 | banned-cum | canon-violation | `cum` is a banned keyword |
 | flat-norma-imports | canon-violation | `norma:*` imports are flat; `norma:hal/*` is retired |
-| legacy-annotations | canon-violation | no `@ futura` / `@ cursor` in new code |
+| legacy-annotations | canon-violation | no `@ future` / `@ cursor` in new code |
 | externa-subsidia-library-source | canon-violation | `@ externa` / `@ subsidia` are rejected (SEM018); library source uses native Faber, `ad` templates, or explicit `panic` deferral |
 | legacy-scena-target | canon-violation | new MIR package work uses `fmir-*`, not `scena` |
 | anonymous-object-literal | canon-violation | typed construction or JSON literal; anonymous `{ key = expr }` is rejected |
 | empty-collection-type | canon-violation | empty collections carry a declared type with `empty`; the untyped `let x ← empty` is rejected |
 | optional-slot-sponte | non-preferred | omittable slots use the optional marker, not `∪ none` |
-| guard-ergo-redde | non-preferred | single-statement guards use the `ergo redde` consequent (en `then return`); `∴` is the closure joint only |
+| guard-ergo-redde | non-preferred | single-statement guards use the `then return` consequent (la `ergo redde`); `∴` is the closure joint only |
 | conversion-directed-assign | non-preferred | `↤` when the conversion is the point of the line; recovery is `⊥ default`, never `⇥` |
 | stroustrup-braces | non-preferred | opening brace on the same line |
 | naming-case-regime | non-preferred | snake_case functions, PascalCase types, SCREAMING_SNAKE constants; helpers are ordinary fns, no `_` prefix |
@@ -50,7 +51,7 @@ Entry shape: `id` heading, bold one-line claim, one metadata line
 | structure-over-scalar-fanout | non-preferred | pass the structured value, not a positional scalar fan-out |
 | tensor-glyph-operators | non-preferred | tensor/vector ops through glyph operators (`⊗` `⊙` `⊘` `·`), not method-call spellings |
 | tensor-glyph-transpose | preferred | rank-2 transpose uses postfix `ᵀ`; rank-1 is permanently declined and rank-3+ waits for a batched consumer |
-| tensor-glyph-device-form | preferred | device (`@ kernel`/`@ nucleum`) bodies spell tensor ops with the same glyphs — `out ← a · b` lowers through the tiled matmul recipe; method-call spellings in device bodies are non-preferred |
+| tensor-glyph-device-form | preferred | device (`@ kernel`, la `@ nucleum`) bodies spell tensor ops with the same glyphs — `out ← a · b` lowers through the tiled matmul recipe; method-call spellings in device bodies are non-preferred |
 | tensor-extremum-over-hand-loop | non-preferred | shaped tensor extrema use `reduce via max from` / `reduce via min from` with caller-stated `coalesce`, not a hand-rolled counter loop and sentinel |
 | infix-extrema-over-hand-rolled-max | non-preferred | pairwise or elementwise extrema use `⤒` / `⤓`, not a hand-rolled max/min branch; reductions remain `reduce via max from` / `reduce via min from` |
 | promoted-equality-over-width-blind-eq | non-preferred | compatible numeric widths use lossless `≅` / `≇` — a signed negative never wraps into an unsigned maximum — not a width-blind `==` mental model or strict-tier `≡` |
@@ -73,7 +74,7 @@ Entry shape: `id` heading, bold one-line claim, one metadata line
 | cape-narrowest-scope | non-preferred | catch attaches to the narrowest block that can recover — not one whole-function handler |
 | guard-rebind-over-rebuild | non-preferred | when the guarded value is a field place or call result, bind it to a `let` first, then guard — not `!` chains, field-by-field rebuilds, or `coalesce` sentinels |
 | unary-minus-not-zero-subtraction | non-preferred | negate with unary minus (`-1`, `-x`), never `0 - 1` / `0.0 - x` |
-| switch-for-equality-dispatch | non-preferred | literal-equality dispatch chains use `switch`/`case`/`default` (`elige`/`casu`/`ceterum` under la), not `if x ≡ k then return` ladders |
+| switch-for-equality-dispatch | non-preferred | literal-equality dispatch chains use `switch`/`case`/`default` (la `elige`/`casu`/`ceterum`), not `if x ≡ k then return` ladders |
 | kernel-region-split | non-preferred | mixed host-policy/tensor-math functions split: the wrapper keeps policy and I/O; the math reuses existing `@ kernel` leaves or becomes a `@ public @ kernel` the wrapper calls (a private kernel is a helper only kernels may call) |
 | field-over-trivial-getter | non-preferred | a stored class field is the public read (`m.loss`); do not wrap it as `fn loss() { return self.loss }` |
 | class-field-modifier | canon-violation | every class field carries `let` / `mut` / `const` (type-level constant, with `=`); a bare `T name` field is rejected (PARSE010); `static` is retired |
@@ -115,7 +116,7 @@ fn divide(int a, int b) → int ∪ null {
     …
 }
 
-# ✓ union with the null type (en surface; `∪ nihil` under la)
+# ✓ union with the null type
 fn divide(int a, int b) → int ∪ none {
     …
 }
@@ -147,9 +148,9 @@ import from "norma:fs" fs
 
 ## legacy-annotations
 
-**Do not add `@ futura` / `@ cursor` annotations (en `@ future` / `@ cursor`) in new code.**
+**Do not add `@ future` / `@ cursor` annotations (la `@ futura`) in new code.**
 
-canon-violation · Evidence: `../../references/idioms.md` General Style avoid-list. Scope: new code; existing legacy uses are migration candidates, not instant findings. The en pack spells the annotation `@ future`; `@ futura` in an en file is `PARSE018 wrong_locale_annotation` (locales never mix). Both spellings still compile today, so the rule is style, not a compiler gate.
+canon-violation · Evidence: `../../references/idioms.md` General Style avoid-list. Scope: new code; existing legacy uses are migration candidates, not instant findings. The en pack spells the annotation `@ future`; the la spelling `@ futura` in an en file is `PARSE018 wrong_locale_annotation` (locales never mix). Both spellings still compile today, so the rule is style, not a compiler gate.
 
 ## externa-subsidia-library-source
 
@@ -180,24 +181,24 @@ let json data ← { "count": 2 }
 
 ## empty-collection-type
 
-**An empty collection carries a declared type with the empty initializer (`empty` under en; `vacua` under la); the untyped form `let x ← empty` is rejected (`SEM014`), and `← []` states no element type.**
+**An empty collection carries a declared type with the empty initializer `empty` (la `vacua`); the untyped form `let x ← empty` is rejected (`SEM014`), and `← []` states no element type.**
 
-canon-violation · Evidence: `corpus/lista/lista.fab` ("vacua requires a declared collection type"); `grammar/EBNF.md` (prefer `vacua` for ordinary empty collection values); `let x ← empty` is `SEM014 vacua_requires_declared_type`
+canon-violation · Evidence: `corpus/lista/lista.fab` (a note there says the empty initializer requires a declared collection type); `grammar/EBNF.md` (prefer `empty` for ordinary empty collection values); `let x ← empty` is `SEM014 vacua_requires_declared_type`
 
 ```fab
 # ✗ rejected (SEM014): empty needs a declared type
-let vacuares ← empty
+let items ← empty
 
 # ✗ untyped empty literal — checks, but declares no element type
-let vacuares ← []
+let items ← []
 
 # ✓ declared type + empty initializer
-let list<int> vacuares ← empty
+let list<int> items ← empty
 ```
 
 ## optional-slot-sponte
 
-**Omittable parameters and fields use the optional-slot marker (`optional` under en; `sponte` under la), not a nullable union — the marker expresses omission, `∪ none` expresses absence. A `∪ none` parameter must still be passed; a `∪ none` field must still be written.**
+**Omittable parameters and fields use the optional-slot marker `optional` (la `sponte`), not a nullable union — the marker expresses omission, `∪ none` expresses absence. A `∪ none` parameter must still be passed; a `∪ none` field must still be written.**
 
 non-preferred · Evidence: `corpus/sponte/sponte.fab` (common-mistakes note); verified: `paginate()` against an `int ∪ none page` parameter is `SEM013 wrong_number_of_arguments`, and `Q { name = "x" }` against an `int ∪ none limit` field is `SEM004 missing_required_struct_field`, while both omissions pass with `optional`
 
@@ -215,23 +216,23 @@ fn paginate(int page optional coalesce 1) → int {
 
 ## guard-ergo-redde
 
-**Single-statement consequents — especially guard returns — use the compact `ergo redde` consequent (`then return` under en; `∴` is rejected there, `PARSE026`), not a full block.**
+**Single-statement consequents — especially guard returns — use the compact `then return` consequent (la `ergo redde`; `∴` is rejected in en files, `PARSE026`), not a full block.**
 
-non-preferred · Evidence: `corpus/si/ergo-redde.fab` (the locale surface of `ergo redde` is the preferred form)
+non-preferred · Evidence: `corpus/si/ergo-redde.fab` (the locale surface of the `then return` consequent is the preferred form)
 
 ```fab
 # ✗ full block for a single-statement guard
-fn classis(int x) → string {
+fn classify(int x) → string {
     if x < 0 {
-        return "negativus"
+        return "negative"
     }
-    return "positivus"
+    return "positive"
 }
 
-# ✓ compact consequent (en surface)
-fn classis(int x) → string {
-    if x < 0 then return "negativus"
-    return "positivus"
+# ✓ compact consequent
+fn classify(int x) → string {
+    if x < 0 then return "negative"
+    return "positive"
 }
 ```
 
@@ -278,14 +279,14 @@ non-preferred · Evidence: `../../references/idioms.md` Formatting Patterns; cor
 
 ```fab
 # ✗ opening brace on its own line
-fn greet(string nomen) → string
+fn greet(string name) → string
 {
-    return nomen
+    return name
 }
 
 # ✓ opening brace on the same line
-fn greet(string nomen) → string {
-    return nomen
+fn greet(string name) → string {
+    return name
 }
 ```
 
@@ -315,16 +316,16 @@ Note: norma's Latin-stem public API names are a documented repo dialect, still s
 
 **Every cross-module import surface carries `@ public`; unmarked declarations are module-private.**
 
-canon-violation · Evidence: `corpus/importa/auxilium.fab` (only `@ publica`/`@ interna` declarations are importable); `corpus/publica/publica.fab`; `corpus/annotation-sugar/` (braced record form is canonical, bare spelling is sugar); verified: reading an unmarked function through an import is `SEM006 import_module_private`
+canon-violation · Evidence: `corpus/importa/auxilium.fab` (only `@ public`/`@ internal` declarations are importable; la `@ publica`/`@ interna`); `corpus/publica/publica.fab`; `corpus/annotation-sugar/` (braced record form is canonical, bare spelling is sugar); verified: reading an unmarked function through an import is `SEM006 import_module_private`
 
 ```fab
 # ✗ exported-by-intent but unmarked — importers cannot see it
-fn face_code_valida(int code) → bool { … }
+fn face_code_valid(int code) → bool { … }
 
 # ✓ explicit export marker (bare sugar form; braced `@ public { }` is the
 # canonical annotation record — both accepted)
 @ public
-fn face_code_valida(int code) → bool { … }
+fn face_code_valid(int code) → bool { … }
 ```
 
 ## test-colocation-proba
@@ -447,13 +448,13 @@ Scope: numeric/tensor code. When reviewing method-call spellings of operations t
 
 **A rank-2 tensor transpose uses the postfix `ᵀ` glyph (`[M,N] → [N,M]`), not the non-preferred `transpose()` method twin (la `transpone`); the glyph is sugar over the existing `Transpose` plan.**
 
-preferred · Evidence: `corpus/tensor/glyph-transpose.fab`, `grammar/EBNF.md` (Postfix tensor transpose); the method twin's en spelling is `transpose` (`transpone` in an en file is `SEM004 unknown_method`)
+preferred · Evidence: `corpus/tensor/glyph-transpose.fab`, `grammar/EBNF.md` (Postfix tensor transpose); the method twin is `transpose`; the la spelling of it written in an en file is `SEM004 unknown_method`
 
 ```fab
 # ✓ rank-2 postfix transpose
 let tensor<f32, [3, 2]> output ← inputᵀ
 
-# ✗ method twin when the postfix surface is legal (en spelling)
+# ✗ method twin when the postfix surface is legal
 let tensor<f32, [3, 2]> output ← input.transpose()
 ```
 
@@ -470,10 +471,10 @@ consumer owns the contract. The precedence form is `a · bᵀ ∇ [x]` →
 preferred · Evidence: `corpus/kernel/` and `corpus/tensor/glyph-*.fab` exemplars. Scope: device-library code; the GPU path as a whole is not a product surface today, so cite exemplars for what a kernel may contain.
 
 ```fab
-# ✓ glyph body (verbatim shape of the proof exemplar)
+# ✓ glyph body (shape of the proof exemplar)
 @ kernel
 @ public
-fn multiplico(tf32[16, 8] a, tf32[8, 16] b, mut tf32[16, 16] out) → void {
+fn multiply(tf32[16, 8] a, tf32[8, 16] b, mut tf32[16, 16] out) → void {
     out ← a · b
 }
 ```
@@ -544,13 +545,13 @@ mut list<f32> input ← seed.create(0.0, [4])
 mut tf32[4] input ← seed.create(0.0, [4])
 ```
 
-**Bounded-buffer family — shipped.** `list<T, N>` (`lista<T, N>`), `string<N>`, `ascii<N>` and `bytes<N>` (`octeti<N>`) are the capacity-bearing forms (`grammar/EBNF.md` Generic Collections: "`lista<T, N>` is the shipped bounded form"). Probed: `mut list<f32, 2> a ← [1.0, 2.0, 3.0]` is rejected (`SEM010 incompatible_tensor_index`), the type works in parameter position, and `append` on a bounded list is a failable call (`SEM011 failable_call_requires_handler` without a handler). The `textus<_>` / `ascii<_>` capacity-hole forms are admitted but not fully shipped (EBNF row). Bounded `map` / `set` are not implied by the family.
+**Bounded-buffer family — shipped.** `list<T, N>` (la `lista<T, N>`), `string<N>`, `ascii<N>` and `bytes<N>` (la `octeti<N>`) are the capacity-bearing forms (`grammar/EBNF.md` Generic Collections lists the bounded list form as the shipped one). Probed: `mut list<f32, 2> a ← [1.0, 2.0, 3.0]` is rejected (`SEM010 incompatible_tensor_index`), the type works in parameter position, and `append` on a bounded list is a failable call (`SEM011 failable_call_requires_handler` without a handler). The `string<_>` / `ascii<_>` capacity-hole forms are admitted but not fully shipped (EBNF row). Bounded `map` / `set` are not implied by the family.
 
 **Hardcoded-width variant spellings in closed host-vocabulary enums are temporary.** A graphics library's `VertexFormat` (`Float32x4`, `Uint32`, …) mirrors WebGPU `GPUVertexFormat` (itself inherited from three.js); the spellings are accepted only because component width is a runtime value generics cannot parameterize — not because they are canonical. The intent is to convert such unions to proper generics once value-parameterized generics land; the library marks them with a TEMPORARY SHAPE note, so do not flag them today, and treat new ones that mirror a host vocabulary the same way.
 
 ## numeric-type-sugar-by-context
 
-**Width markers are bare everywhere (`list<u8>`, `i32`, `f32`, `inf`); the wrapped `list<int<u8>>` / `numerus<i32>` forms are `PARSE040 numeric_wrapper_retired`, not a style choice. Collection sugar (`lf32`, `tf32[2, 3]`, `mf32[4, 4]`, `lu32`) only in numeric-primary modules, chosen per module rather than per repository, with one `# STYLE:` line at the top of the file.**
+**Width markers are bare everywhere (`list<u8>`, `i32`, `f32`, `inf`); the wrapped `list<int<u8>>` / `int<i32>` forms (la `numerus<i32>`) are `PARSE040 numeric_wrapper_retired`, not a style choice. Collection sugar (`lf32`, `tf32[2, 3]`, `mf32[4, 4]`, `lu32`) only in numeric-primary modules, chosen per module rather than per repository, with one `# STYLE:` line at the top of the file.**
 
 non-preferred · Evidence: the policy is chosen per module, not per repository (long collection head for general Faber, sugar for numeric/tensor-primary modules; wrapped forms are retired and rejected by the compiler); exemplar `corpus/tensor/index-width.fab` (`let list<u32> origin ← [r, c]`). The policy words keep their `<W>` argument (`trapping<u8>`, `wrapping<u8>`, `saturating<u8>`; la `exactus`, `modulus`, `saturatus`) — those are not retired wrappers.
 
@@ -568,7 +569,7 @@ let tf32[2, 2] dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tf32[2, 2]
 
 ## endian-conversion-not-manual-packing
 
-**Byte payloads are `bytes`/`octeti` with typed endian conversion (`↦ u32 via Be|Le`), never hand-rolled shift-and-append packing. The hint is a `via` clause; the type-argument spelling (`↦ ascii<4, Hex>`) is rejected.**
+**Byte payloads are `bytes` (la `octeti`) with typed endian conversion (`↦ u32 via Be|Le`), never hand-rolled shift-and-append packing. The hint is a `via` clause; the type-argument spelling (`↦ ascii<4, Hex>`) is rejected.**
 
 non-preferred · Evidence: `corpus/conversio/octeti-endian.fab` (`|de ad be ef|[0‥4] ↦ u32 via Be`; endian-omitted conversion is rejected, `SEM016 octeti_to_numerus_unspecified`); `grammar/EBNF.md` (The `via` clause: hints are `Hex` `Bin` `Oct` `Be` `Le` `Bits` `Code`; `PARSE030 conversio_hint_type_argument` for the retired form); the manual form (eight `(n ⇒ k) ↦ u8` appends assembling a little-endian u64 by hand) also needs a `⊥` handler outside `main`
 
@@ -622,13 +623,13 @@ for range 0‥values.length() step 3 let i {
 
 ## generics-when-shape-allows
 
-**Parameterize over the type instead of duplicating a function or shape per type: `fn identitas<T>(T value) → T`, `union Resultatus<T>`, `interface Reponens<T>`, `class Something<A, B>`.**
+**Parameterize over the type instead of duplicating a function or shape per type: `fn identity<T>(T value) → T`, `union Result<T>`, `interface Responder<T>`, `class Something<A, B>`.**
 
-non-preferred · Evidence: `corpus/generic/generic.fab` (`fn identitas<T>(T value) → T`), `corpus/generic/genus.fab` (`union Resultatus<T>`, `interface Reponens<T>`; grammar note: discretio/implendum/genus accept type-parameter lists). Class-generic application is grammar-admitted but corpus-thin — cite the grammar, not an exemplar, for `class<A, B>` until one lands.
+non-preferred · Evidence: `corpus/generic/generic.fab` (a generic identity function), `corpus/generic/genus.fab` (a generic `union` and a generic `interface`; grammar note: union/interface/class accept type-parameter lists). Class-generic application is grammar-admitted but corpus-thin — cite the grammar, not an exemplar, for `class<A, B>` until one lands.
 
 ```fab
 # ✓ from corpus/generic/generic.fab
-fn identitas<T>(T value) → T {
+fn identity<T>(T value) → T {
     return value
 }
 ```
@@ -734,7 +735,7 @@ return "unknown digest algorithm: §"(algorithm)
 
 **A binding states its type on one side only. When the initializer already fixes the type, bind inferred (`let x ← …`, writable `mut _ x ← …`; `let _ x` is `PARSE001 sit_identifier_binding`); when the declaration carries the type, let the right side infer (`let list<f32> xs ← empty`). Never write the same type on both sides.**
 
-non-preferred · Evidence: `corpus/type-hole-union/type-hole-union.fab` (canonical exemplum: `_` solves one inhabitant, `∪` accumulates members across flows, `list<∪>` learns heterogeneous elements; WARN016/WARN017 police cross-shape solves); `corpus/ego/ego.fab` (`let capsa ← Capsa { titulus = "prima" }` — the class-literal hole form); typical offender: `let Quaternion av ← Quaternion {…}`
+non-preferred · Evidence: `corpus/type-hole-union/type-hole-union.fab` (canonical exemplar: `_` solves one inhabitant, `∪` accumulates members across flows, `list<∪>` learns heterogeneous elements; WARN016/WARN017 police cross-shape solves); `corpus/ego/ego.fab` (`let box ← Box { title = "first" }` — the class-literal hole form); typical offender: `let Quaternion av ← Quaternion {…}`
 
 ```fab
 # ✗ type restated on both sides — the constructor already names it
@@ -749,7 +750,7 @@ The mirror direction is equally binding: when the left side carries the type, th
 **Hole selection follows the shape (WARN016/WARN017):**
 
 - `_` — exactly one inhabitant type flows in (literals, constructor calls, single-typed calls). A `_` solved to a multi-member union warns (WARN016).
-- `∪` — the slot accumulates a member per direct flow: `mut ∪ mixed ← 1` then `mixed ← "salve"` solves `int ∪ string`. Solved monomorphically it warns (WARN017).
+- `∪` — the slot accumulates a member per direct flow: `mut ∪ mixed ← 1` then `mixed ← "hello"` solves `int ∪ string`. Solved monomorphically it warns (WARN017).
 - `list<∪>` — heterogeneous element inference: `let list<∪> nodes ← [1, "two", 3]` solves `list<int ∪ string>`.
 - A `_` over `T ∪ none` stays quiet — one optional inhabitant is not a multi-member sum.
 
@@ -771,11 +772,11 @@ let tuple<gx: f32, gw: f32> grads ← tuple<gx: f32, gw: f32> [1.5, 0.25]
 apply(grads.gx, grads.gw)
 ```
 
-Live-surface notes from the exemplum: labels compose with holes (`tuple<loss: _, int>`); labels are identity-erased (labeled and unlabeled forms assign across); partial binding uses `let {loss, rest leftover} ← metrics`. Labels are legal only in tuple type-argument position — a label in a non-tuple generic list (`f<gx: T>(x)`, `lista<gx: T>`) is a parse error. Combine with `type-holes-no-duplication`: `let pair ← tuple<gx: string, gw: int> ["salve", 42]` — the labeled constructor already names the type.
+Live-surface notes from the exemplar: labels compose with holes (`tuple<loss: _, int>`); labels are identity-erased (labeled and unlabeled forms assign across); partial binding uses `let {loss, rest leftover} ← metrics`. Labels are legal only in tuple type-argument position — a label in a non-tuple generic list (`f<gx: T>(x)`, `list<gx: T>`) is a parse error. Combine with `type-holes-no-duplication`: `let pair ← tuple<gx: string, gw: int> ["hello", 42]` — the labeled constructor already names the type.
 
 ## named-template-holes
 
-**Templates with multiple holes — or whose holes carry meaning — name them: `"§{greet} world"(greet: "Salve")`. A single trivial hole stays anonymous: `"Salve, §!"(nomen)`.**
+**Templates with multiple holes — or whose holes carry meaning — name them: `"§{greet} world"(greet: "Hello")`. A single trivial hole stays anonymous: `"Hello, §!"(name)`.**
 
 non-preferred · Evidence: `corpus/literalia/named-holes.fab` (named-only application, mixed named/anonymous with positional actuals, positional actual on a named hole erases identically); `corpus/scriptum/scriptum.fab` (anonymous single-slot form)
 
@@ -787,13 +788,13 @@ let row ← "§ | § | §"(name, count, status)
 let row ← "§{name} | §{count} | §{status}"(name: name, count: count, status: status)
 ```
 
-Live-surface notes from the exemplum: mixed forms share one positional sequence (`"§{greet} §"("Salve", "Mundus")` fills the named then the anonymous hole in order); labels erase before rendering — output is ordinary text. Reject rows (do not add these to the library): labels on ordinary calls (`f(greet: "x")`), the `=` form (`"§ world"(greet = "x")`), unknown labels.
+Live-surface notes from the exemplar: mixed forms share one positional sequence (`"§{greet} §"("Hello", "World")` fills the named then the anonymous hole in order); labels erase before rendering — output is ordinary text. Reject rows (do not add these to the library): labels on ordinary calls (`f(greet: "x")`), the `=` form (`"§ world"(greet = "x")`), unknown labels.
 
 ## cape-narrowest-scope
 
-**`cape`/`catch` attaches to the narrowest block that can actually recover — the failing branch, loop, or resource block — one handler per distinct recovery strategy. Wrapping an entire function body in a single `do { … } catch { … }` to reach one deep throw collapses distinct failures into one handler and pushes recovery far from the failure.**
+**`catch` (la `cape`) attaches to the narrowest block that can actually recover — the failing branch, loop, or resource block — one handler per distinct recovery strategy. Wrapping an entire function body in a single `do { … } catch { … }` to reach one deep throw collapses distinct failures into one handler and pushes recovery far from the failure.**
 
-non-preferred · Evidence: EBNF `cape_clause?` attachment points — `fac` blocks, every `si`/`sin`/`secus` arm, `while`, `for`, `switch` (`grammar/EBNF.md` productions `arm`, `else_arm`, `dum_stmt`, `itera_stmt`, `elige_stmt`, `fac_stmt`; the `cura` resource block is retired and has no attachment point); `corpus/cape/cape.fab`, `corpus/cape/repro.fab` (arm-attached cape emits and rustc-compiles). Both shapes below check today; the whole-body form is a style finding, not a rejection.
+non-preferred · Evidence: EBNF `cape_clause?` attachment points — `do` blocks, every `if`/`elif`/`else` arm, `while`, `for`, `switch` (`grammar/EBNF.md` productions `arm`, `else_arm`, `dum_stmt`, `itera_stmt`, `elige_stmt`, `fac_stmt`; the `cura` resource block is retired and has no attachment point); `corpus/cape/cape.fab`, `corpus/cape/repro.fab` (arm-attached cape emits and rustc-compiles). Both shapes below check today; the whole-body form is a style finding, not a rejection.
 
 ```fab
 # ✗ one whole-body handler for three different failures
@@ -826,7 +827,7 @@ fn handle(int x) → string {
 }
 ```
 
-Ordering facts from the grammar: on `fac`-`dum`, `cape` binds before the trailing `dum`; an arm-attached `cape` may catch `iace` without an enclosing `⇥`, and a failable call (`→ T ⇥ E`) propagates to the function's own error channel without any wrapper. Report the whole-body wrapper whenever it collapses genuinely distinct recoveries into one handler.
+Ordering facts from the grammar: on `do`-`while` (la `fac`-`dum`), `catch` binds before the trailing `while`; an arm-attached `catch` may catch `throw` (la `iace`) without an enclosing `⇥`, and a failable call (`→ T ⇥ E`) propagates to the function's own error channel without any wrapper. Report the whole-body wrapper whenever it collapses genuinely distinct recoveries into one handler.
 
 ## guard-rebind-over-rebuild
 
@@ -871,9 +872,9 @@ Live compiler gap (re-probed): a bare negative literal in the compact consequent
 
 ## switch-for-equality-dispatch
 
-**Dispatch on a literal discriminant uses the value-branch statement — `switch x { case k { … } default { … } }` (`elige`/`casu`/`ceterum` under la) — not an `if x ≡ k then return …` ladder.**
+**Dispatch on a literal discriminant uses the value-branch statement — `switch x { case k { … } default { … } }` (la `elige`/`casu`/`ceterum`) — not an `if x ≡ k then return …` ladder.**
 
-non-preferred · Evidence: `corpus/elige/` (`elige` canonical=true, "works with textus, numerus, and other comparable types"; exemplars are la-locale — render through the reviewed file's locale); en surface from the locale pack (`switch`/`case`/`default`, `locale/en/pack.toml`); re-probed (en `switch`/`case`/`default` on `int`, block and `case 1 then return …` forms, check clean); a live ladder shape is `if code ≡ 1 then return …`. Do not confuse with `match` (`discerne`), which matches closed sets — unions, enums, variants — not numeric widths or lengths.
+non-preferred · Evidence: `corpus/elige/` (marked canonical, with a note that it works with text, number, and other comparable types; exemplars are la-locale — render through the reviewed file's locale); en surface from the locale pack (`switch`/`case`/`default`, `locale/en/pack.toml`); re-probed (en `switch`/`case`/`default` on `int`, block and `case 1 then return …` forms, check clean); a live ladder shape is `if code ≡ 1 then return …`. Do not confuse with `match` (`discerne`), which matches closed sets — unions, enums, variants — not numeric widths or lengths.
 
 ```fab
 # ✗ equality ladder over a code discriminant
@@ -882,7 +883,7 @@ if code ≡ 2 then return Color {r = 1.0, g = 0.4, b = 0.4}
 …
 return null
 
-# ✓ value dispatch (en surface; elige/casu/ceterum under la)
+# ✓ value dispatch
 switch code {
     case 1 {
         return Color {r = 0.8, g = 0.1, b = 0.1}
@@ -896,7 +897,7 @@ switch code {
 }
 ```
 
-Guard conditions stay `if` — range checks (`if code ≤ 2`), boolean predicates, and non-literal comparisons are not value dispatch. **Multi-field comparisons are also not dispatch**: a ladder that probes several distinct fields (`if n.x ≡ -1.0 … if n.y ≡ 1.0 …`) has no single discriminant and must stay `if` — converting it to `switch` is a bug, not a fix. Non-exhaustive switches without `default` silently fall through (corpus `elige` common-mistakes note) — cover the values or write the `default`.
+Guard conditions stay `if` — range checks (`if code ≤ 2`), boolean predicates, and non-literal comparisons are not value dispatch. **Multi-field comparisons are also not dispatch**: a ladder that probes several distinct fields (`if n.x ≡ -1.0 … if n.y ≡ 1.0 …`) has no single discriminant and must stay `if` — converting it to `switch` is a bug, not a fix. Non-exhaustive switches without `default` silently fall through (corpus `switch` common-mistakes note) — cover the values or write the `default`.
 
 ## infix-extrema-over-hand-rolled-max
 
@@ -1075,7 +1076,7 @@ fn dense_mlp<size T, size D, size F>(
 }
 ```
 
-The kernel-closure spelling (`(params) kernel ∴ expr`) that an earlier version of this entry taught is retired: it still checks today, but the `kernel` closure modifier is retired — a one-off region is a private `@ kernel` function called from a kernel, a closure inside a kernel needs no modifier, and host code uses `itera … filum`. Do not recommend it.
+The kernel-closure spelling (`(params) kernel ∴ expr`) that an earlier version of this entry taught is retired: it still checks today, but the `kernel` closure modifier is retired — a one-off region is a private `@ kernel` function called from a kernel, a closure inside a kernel needs no modifier, and host code uses `for … thread` (la `itera … filum`). Do not recommend it.
 
 Decision tree for a conversion unit:
 
@@ -1140,21 +1141,21 @@ Not this entry: builtin collection methods (`list.length()`, `map.get(key)`), co
 
 **Every class field carries an explicit modifier — `let` (per instance, set once in the construction literal), `mut` (per instance, reassignable), or `const T X = e` (type-level compile-time constant); a bare `T name` field is rejected.**
 
-canon-violation · Evidence: `grammar/EBNF.md` `genus_field_decl` (`'sit' | 'varia'` per instance, `'fixum'` with `=` for the type-level constant); `corpus/genus/genus.fab`; probe: a bare field is `PARSE010 field_modifier_missing`. Union shared fields (`field_decl`) keep the modifier optional.
+canon-violation · Evidence: `grammar/EBNF.md` `genus_field_decl` (`let` | `mut` per instance, `const` with `=` for the type-level constant; la `sit` | `varia`, `fixum`); `corpus/genus/genus.fab`; probe: a bare field is `PARSE010 field_modifier_missing`. Union shared fields (`field_decl`) keep the modifier optional.
 
 ```fab
 # ✗ rejected (PARSE010 field_modifier_missing)
-class Persona {
-    string nomen
-    int aetas = 0
+class Person {
+    string name
+    int age = 0
 }
 
-# ✓ explicit modifier (en `let` / `mut` / `const`; la `sit` / `varia` / `fixum`)
-class Persona {
-    let string nomen
-    mut int aetas = 0
+# ✓ explicit modifier
+class Person {
+    let string name
+    mut int age = 0
     mut int limit optional
-    const string GENS = "Roma"
+    const string HOME = "Rome"
 }
 ```
 
