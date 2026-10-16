@@ -38,5 +38,18 @@ fn map_projections_pick_the_side_by_element_class() {
         "main {\n    let map<string, int> m ← { \"x\": 1 }\n    print m ↦ list<string>, m ↦ list<int>\n}",
     );
     assert!(code.contains("faber_map_text_i64_keys(faber_a,"), "{code}");
-    assert!(code.contains("faber_map_text_i64_values(faber_a,"), "{code}");
+    assert!(
+        code.contains("faber_map_text_i64_values(faber_a,"),
+        "{code}"
+    );
+}
+
+#[test]
+fn map_iteration_walks_values_with_the_key_coordinate() {
+    let code = emitted(
+        "main {\n    let map<string, int> m ← { \"a\": 1 }\n    for from m let v {\n        print v\n    }\n    for from m at [k] let v {\n        print k, v\n    }\n}",
+    );
+    assert!(code.contains("->values->items["), "{code}");
+    assert!(code.contains("->keys->items["), "{code}");
+    assert!(code.contains("map changed size during iteration"), "{code}");
 }

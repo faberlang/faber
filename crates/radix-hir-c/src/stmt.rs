@@ -1,8 +1,8 @@
 //! Statement emission: locals, assignment, control flow, and print.
 
 use crate::error::unsupported;
-use crate::expr::{Value, c_string, construct_name};
-use crate::helpers::Helper;
+use crate::expr::{Operand, Value, c_string, construct_name};
+use crate::helpers::{Helper, ListOp};
 use crate::items::Returns;
 use crate::ty::{Ty, classify};
 use crate::{Emitter, Local};
@@ -529,6 +529,18 @@ impl Emitter<'_> {
         mutable: bool,
     ) -> Result<(), CodegenError> {
         let list = self.expr(iter)?;
+        if let Value::Map(k, v) = list.value {
+            return self.itera_map(
+                out,
+                coordinate,
+                (binding, binding_name),
+                &list,
+                k,
+                v,
+                body,
+                mutable,
+            );
+        }
         let Value::List(elem) = list.value else {
             return Err(unsupported("iteration over a value that is not a list"));
         };
@@ -602,6 +614,114 @@ impl Emitter<'_> {
         self.block(out, body)?;
         self.loops -= 1;
         self.line(out, "}");
+        self.depth -= 1;
+        self.line(out, "}");
+        Ok(())
+    }
+
+    /// `for from m const v { … }` / `for from m at [k] const v { … }`: a walk
+    /// over a map's values (`ex` binds the value; the optional coordinate binds
+    /// the key). A key added while the walk is live traps `map changed size
+    /// during iteration`, as the runner does.
+    #[allow(clippy::too_many_arguments)]
+    fn itera_map(
+        &mut self,
+        out: &mut String,
+        coordinate: Option<(radix_hir::DefId, radix_lexer::Symbol)>,
+        (binding, binding_name): (radix_hir::DefId, radix_lexer::Symbol),
+        map: &Operand,
+        k: crate::ty::Elem,
+        v: crate::ty::Elem,
+        body: &HirBlock,
+        mutable: bool,
+    ) -> Result<(), CodegenError> {
+        let Some(kind) = self.names.binding_kind(binding) else {
+            return Err(unsupported(
+                "loop binding the name catalog does not classify",
+            ));
+        };
+        let raw = self.names.resolve_symbol(binding_name);
+        let name = self.scope.claim(&prefixed_binding_name(kind, raw));
+        let (source, index) = (
+            format!("faber_t{}", self.temps),
+            format!("faber_i{}", self.temps),
+        );
+        self.temps += 1;
+        let class = v.ty();
+        self.need_class(class);
+        self.support.need(Helper::List(k, ListOp::New));
+        self.support.need(Helper::List(v, ListOp::New));
+        let suffix = Self::map_suffix(k, v);
+        self.line(out, "{");
+        self.depth += 1;
+        self.line(
+            out,
+            &format!("faber_map_{suffix} *const {source} = {};", map.text),
+        );
+        self.line(
+            out,
+            &format!("const int64_t {source}len = {source}->keys->len;"),
+        );
+        self.line(out, &format!("int64_t {index};"));
+        self.line(
+            out,
+            &format!("for ({index} = 0; {index} < {source}->keys->len; {index}++) {{"),
+        );
+        self.depth += 1;
+        self.line(
+            out,
+            &format!(
+                "if ({source}->keys->len != {source}len) faber_trap(\"map changed size during iteration\");"
+            ),
+        );
+        self.line(
+            out,
+            &format!(
+                "{} = {source}->values->items[{index}];",
+                self.declare(class, &name, mutable)?
+            ),
+        );
+        if let Some((position, position_name)) = coordinate {
+            let Some(position_kind) = self.names.binding_kind(position) else {
+                return Err(unsupported(
+                    "loop coordinate the name catalog does not classify",
+                ));
+            };
+            let raw = self.names.resolve_symbol(position_name);
+            let c_name = self.scope.claim(&prefixed_binding_name(position_kind, raw));
+            let declaration = self.declare(k.ty(), &c_name, false)?;
+            self.line(
+                out,
+                &format!("{declaration} = {source}->keys->items[{index}];"),
+            );
+            self.locals.insert(
+                position,
+                Local {
+                    name: c_name,
+                    ty: k.ty(),
+                    constant: None,
+                },
+            );
+        }
+        self.depth -= 1;
+        self.locals.insert(
+            binding,
+            Local {
+                name,
+                ty: class,
+                constant: None,
+            },
+        );
+        self.loops += 1;
+        self.block(out, body)?;
+        self.loops -= 1;
+        self.line(out, "}");
+        self.line(
+            out,
+            &format!(
+                "if ({source}->keys->len != {source}len) faber_trap(\"map changed size during iteration\");"
+            ),
+        );
         self.depth -= 1;
         self.line(out, "}");
         Ok(())

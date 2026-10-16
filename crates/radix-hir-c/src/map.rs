@@ -250,9 +250,7 @@ impl Emitter<'_> {
                 );
                 Ok(Operand::new(wrap(&prelude, &call), Value::Void).with_effect(true))
             }
-            IntrinsicMirKind::Collection(MirCollectionOp::Index) => {
-                self.map_get(map, k, v, args)
-            }
+            IntrinsicMirKind::Collection(MirCollectionOp::Index) => self.map_get(map, k, v, args),
             IntrinsicMirKind::Collection(MirCollectionOp::Contains) => {
                 let [key] = args else {
                     return Err(unsupported("map has without one key"));
@@ -261,10 +259,7 @@ impl Emitter<'_> {
                 let mut operands = [map, key];
                 let prelude = self.sequence(&mut operands);
                 let [map, key] = operands;
-                let call = format!(
-                    "(faber_map_{suffix}_has({}, {}))",
-                    map.text, key.text
-                );
+                let call = format!("(faber_map_{suffix}_has({}, {}))", map.text, key.text);
                 Ok(Operand::new(wrap(&prelude, &call), Value::Truth).with_effect(true))
             }
             IntrinsicMirKind::Collection(MirCollectionOp::Delete) => {
@@ -275,10 +270,7 @@ impl Emitter<'_> {
                 let mut operands = [map, key];
                 let prelude = self.sequence(&mut operands);
                 let [map, key] = operands;
-                let call = format!(
-                    "(faber_map_{suffix}_delete({}, {}))",
-                    map.text, key.text
-                );
+                let call = format!("(faber_map_{suffix}_delete({}, {}))", map.text, key.text);
                 Ok(Operand::new(wrap(&prelude, &call), Value::Truth).with_effect(true))
             }
             _ => Err(unsupported("map method outside the subset")),
@@ -340,17 +332,16 @@ impl Emitter<'_> {
             map.text,
             key.text
         );
-        let text = if negated {
-            format!("(!{call})")
-        } else {
-            call
-        };
+        let text = if negated { format!("(!{call})") } else { call };
         Ok(Operand::new(wrap(&prelude, &text), Value::Truth).with_effect(effect))
     }
 }
 
 /// The map class of an expression's type, if it is one.
-pub(crate) fn map_class(types: &radix_types::TypeTable, ty: Option<radix_types::TypeId>) -> Option<(Elem, Elem)> {
+pub(crate) fn map_class(
+    types: &radix_types::TypeTable,
+    ty: Option<radix_types::TypeId>,
+) -> Option<(Elem, Elem)> {
     match classify(types, ty?).ok()? {
         Ty::Map(k, v) => Some((k, v)),
         _ => None,

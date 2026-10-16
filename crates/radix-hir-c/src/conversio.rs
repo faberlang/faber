@@ -185,7 +185,11 @@ impl Emitter<'_> {
             (Value::Map(k, v), Ty::List(slot)) if slot == k => {
                 self.support.need(Helper::List(k, ListOp::New));
                 Operand::new(
-                    format!("faber_map_{}_keys(faber_a, {})", Self::map_suffix(k, v), value.text),
+                    format!(
+                        "faber_map_{}_keys(faber_a, {})",
+                        Self::map_suffix(k, v),
+                        value.text
+                    ),
                     Value::List(k),
                 )
             }

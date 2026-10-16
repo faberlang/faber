@@ -111,7 +111,12 @@ impl Inner {
             Ty::Modular(width) => Some(Inner::Modular(width)),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
-            Ty::Sized(_) | Ty::Saturating(_) | Ty::Opt(_) | Ty::None | Ty::Decimal | Ty::Set(_)
+            Ty::Sized(_)
+            | Ty::Saturating(_)
+            | Ty::Opt(_)
+            | Ty::None
+            | Ty::Decimal
+            | Ty::Set(_)
             | Ty::Map(..) => None,
         }
     }

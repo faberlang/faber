@@ -38,4 +38,16 @@ main {
     nk.sort()
     nv.sort()
     print nk, nv
+
+    # iteration: `ex` binds the value, `at [k]` binds the key beside it. The
+    # aggregate is order-independent, and the single-key map is a fixed walk.
+    mut int acc ← 0
+    for from lit let v {
+        acc ← acc + v
+    }
+    print acc
+    let map<string, int> single ← { "only": 7 }
+    for from single at [key] let value {
+        print key, value
+    }
 }
