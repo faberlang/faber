@@ -1116,16 +1116,37 @@ pub unsafe extern "C" fn __faber_clif_v1_text_concat(
     right: *const u8,
 ) -> *const u8 {
     let (left, right) = unsafe { (text_bytes(left), text_bytes(right)) };
-    let mut joined = Vec::with_capacity(left.len() + right.len());
-    joined.extend_from_slice(left);
-    joined.extend_from_slice(right);
-    text_new(&joined)
+    let length = left.len() + right.len();
+    let mut buffer = Vec::with_capacity(8 + length);
+    buffer.extend_from_slice(&i64::try_from(length).unwrap_or(0).to_ne_bytes());
+    buffer.extend_from_slice(left);
+    buffer.extend_from_slice(right);
+    Box::leak(buffer.into_boxed_slice()).as_ptr()
 }
 
 /// Render an integer as text.
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_text_from_i64(value: i64) -> *const u8 {
-    text_new(value.to_string().as_bytes())
+    let mut digits = [0u8; 20];
+    let mut cursor = digits.len();
+    let mut magnitude = value.unsigned_abs();
+    loop {
+        cursor -= 1;
+        digits[cursor] = b'0' + (magnitude % 10) as u8;
+        magnitude /= 10;
+        if magnitude == 0 {
+            break;
+        }
+    }
+    if value < 0 {
+        cursor -= 1;
+        digits[cursor] = b'-';
+    }
+    let text = &digits[cursor..];
+    let mut buffer = Vec::with_capacity(8 + text.len());
+    buffer.extend_from_slice(&i64::try_from(text.len()).unwrap_or(0).to_ne_bytes());
+    buffer.extend_from_slice(text);
+    Box::leak(buffer.into_boxed_slice()).as_ptr()
 }
 
 /// The only Unicode scalar of a text, if it holds exactly one.
@@ -2457,4 +2478,27 @@ fn box_open_element(tag: i32, bits: i64) -> (i32, i64) {
 pub unsafe extern "C" fn __faber_clif_v1_dyn_box(tag: i32, bits: i64) -> *const Present {
     let (_, boxed) = box_open_element(tag, bits);
     boxed as *const Present
+}
+
+#[cfg(test)]
+mod runtime_perf_tests {
+    use super::*;
+
+    #[test]
+    fn text_concat_and_integer_text_keep_exact_bytes() {
+        let left = text_new("héllo".as_bytes());
+        let right = text_new(" world".as_bytes());
+        let joined = unsafe { __faber_clif_v1_text_concat(left, right) };
+        assert_eq!(unsafe { text_bytes(joined) }, "héllo world".as_bytes());
+
+        for (value, expected) in [
+            (0, "0"),
+            (-1, "-1"),
+            (i64::MIN, "-9223372036854775808"),
+            (i64::MAX, "9223372036854775807"),
+        ] {
+            let text = __faber_clif_v1_text_from_i64(value);
+            assert_eq!(unsafe { text_bytes(text) }, expected.as_bytes());
+        }
+    }
 }
