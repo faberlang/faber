@@ -106,8 +106,8 @@ fn max_over_rank_two_lowers_to_the_grid_node_without_a_guard() {
 fn sum_count_and_argmax_lower_to_their_ops() {
     for (op, element, needle) in [
         ("sum", "f32", "op=sum form=grid"),
-        ("count", "int", "op=count form=grid"),
-        ("argmax", "int", "op=argmax form=grid"),
+        ("count", "i32", "op=count form=grid"),
+        ("argmax", "i32", "op=argmax form=grid"),
     ] {
         let source = if op == "argmax" {
             format!(
