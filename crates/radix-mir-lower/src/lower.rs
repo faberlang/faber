@@ -3757,9 +3757,16 @@ impl<'a> FunctionBuilder<'a> {
                 let operand = MirOperand::Constant(MirConstant::Ascii(*value));
                 // WHY: a MIR ascii constant is typed bare `ascii`, so as a
                 // bare aggregate item it cannot satisfy a bounded `ascii<N>`
-                // element type (need, item 11). A temp typed by the
-                // literal's own semantic type carries the bound.
-                match ty.filter(|ty| matches!(self.normalized_type(*ty), Type::BoundedAscii { .. })) {
+                // element type (need, item 11), nor a `littera`
+                // slot where semantic analysis already typed a one-letter
+                // literal as the scalar (D10.5). A temp typed by the
+                // literal's own semantic type carries the slot.
+                match ty.filter(|ty| {
+                    matches!(
+                        self.normalized_type(*ty),
+                        Type::BoundedAscii { .. } | Type::Primitive(Primitive::Littera)
+                    )
+                }) {
                     Some(ty) => Some(self.assign_temp(MirValueKind::Operand(operand), MirType::semantic(ty), span)),
                     None => Some(operand),
                 }

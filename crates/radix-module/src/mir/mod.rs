@@ -382,6 +382,9 @@ mod list_slice_literal_run_tests;
 #[path = "list_window_test.rs"]
 mod list_window_tests;
 #[cfg(test)]
+#[path = "littera_slot_test.rs"]
+mod littera_slot_tests;
+#[cfg(test)]
 #[path = "matrix_store_test.rs"]
 mod matrix_store_tests;
 #[cfg(test)]
