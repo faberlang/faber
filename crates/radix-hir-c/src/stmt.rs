@@ -944,7 +944,7 @@ impl Emitter<'_> {
                 // The module's locale words: `true` / `false` for an `en`
                 // program, `verum` / `falsum` for a `la` one.
                 Value::Truth => ("%s", format!("({} ? {yes} : {no})", value.text)),
-                Value::List(elem) => ("%s", self.show_list(&value.text, elem)?),
+                Value::List(elem) | Value::Set(elem) => ("%s", self.show_list(&value.text, elem)?),
                 Value::Genus(def_id) => ("%s", self.show_genus(&value.text, def_id)?),
                 Value::Opt(inner) => ("%s", self.show_option(&value.text, inner)?),
                 Value::Float => (

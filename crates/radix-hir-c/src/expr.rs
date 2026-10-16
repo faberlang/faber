@@ -45,6 +45,8 @@ pub(crate) enum Value {
     Void,
     /// A pointer to an arena-allocated list.
     List(Elem),
+    /// A pointer to an arena-allocated set (the same list storage).
+    Set(Elem),
     /// A pointer to an arena-allocated genus.
     Genus(DefId),
     /// A binary64 value (`double`).
@@ -69,6 +71,7 @@ impl From<Ty> for Value {
             Ty::Text => Value::Text,
             Ty::Bool => Value::Truth,
             Ty::List(elem) => Value::List(elem),
+            Ty::Set(elem) => Value::Set(elem),
             Ty::Genus(def_id) => Value::Genus(def_id),
             Ty::Float => Value::Float,
             Ty::Decimal => Value::Decimal,
@@ -283,7 +286,10 @@ impl Emitter<'_> {
                 then_catch: None,
                 else_block: Some(else_block),
             } => self.conditional(expr, cond, then_block, else_block),
-            HirExpressionKind::Vacua => self.empty_list(expr),
+            HirExpressionKind::Vacua => match expr.ty.map(|ty| classify(self.types, ty)).transpose()? {
+                Some(Ty::Set(elem)) => Ok(self.empty_set(elem)),
+                _ => self.empty_list(expr),
+            },
             HirExpressionKind::Array(elements) => self.list_literal(expr, elements),
             HirExpressionKind::Index(base, index) => self.list_read(base, index),
             // `copy x` on a value (a bind or a return), `own x` a transfer.
@@ -315,6 +321,9 @@ impl Emitter<'_> {
                 if let (Some(Ty::Text), Some(receiver_ty)) = (class, receiver.ty) {
                     let receiver = self.expr(receiver)?;
                     return self.text_method(receiver, receiver_ty, *method, args);
+                }
+                if let Some(Ty::Set(_)) = class {
+                    return self.set_method(receiver, *method, args);
                 }
                 self.list_method(receiver, *method, args)
             }
@@ -622,7 +631,7 @@ impl Emitter<'_> {
                 self.support.need_bool();
                 "bool ".to_owned()
             }
-            Value::List(elem) => elem.list_c_pointer().to_owned(),
+            Value::List(elem) | Value::Set(elem) => elem.list_c_pointer().to_owned(),
             Value::Float => "double ".to_owned(),
             Value::Decimal => {
                 self.support.need(Helper::Decimal);

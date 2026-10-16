@@ -1747,6 +1747,100 @@ FABER_LIST_OPS(u16, uint16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(u32, uint32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(u64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 
+/* Sets (`copia<T>`): the list storage under the set contract. `add` keeps the
+ * element unique, `delete` removes by value, and the algebra returns a new
+ * set. Element order is unspecified (D19.2), as the runner's. */
+#define FABER_SET(NAME, TYPE, EQ, LT)                                                   \
+    static inline bool faber_set_##NAME##_add(faber_arena *arena,                       \
+                                              faber_list_##NAME *set, TYPE item) {      \
+        if (faber_list_##NAME##_contains(set, item)) {                                  \
+            return false;                                                               \
+        }                                                                               \
+        faber_list_##NAME##_push(arena, set, item);                                     \
+        return true;                                                                    \
+    }                                                                                   \
+                                                                                        \
+    static inline bool faber_set_##NAME##_delete(faber_list_##NAME *set, TYPE item) {   \
+        int64_t at;                                                                     \
+        for (at = 0; at < set->len; at++) {                                             \
+            if (EQ(set->items[at], item)) {                                             \
+                memmove(set->items + at, set->items + at + 1,                           \
+                        (size_t)(set->len - at - 1) * sizeof *set->items);               \
+                set->len--;                                                             \
+                return true;                                                            \
+            }                                                                           \
+        }                                                                               \
+        return false;                                                                   \
+    }                                                                                   \
+                                                                                        \
+    /* `lista ↦ copia`: a new set with the list's distinct elements. */              \
+    static inline faber_list_##NAME *faber_set_##NAME##_of(faber_arena *arena,          \
+                                                           const faber_list_##NAME *list) { \
+        faber_list_##NAME *out = faber_list_##NAME##_new(arena, 0);                     \
+        int64_t at;                                                                     \
+        for (at = 0; at < list->len; at++) {                                            \
+            faber_set_##NAME##_add(arena, out, list->items[at]);                        \
+        }                                                                               \
+        return out;                                                                     \
+    }                                                                                   \
+                                                                                        \
+    static inline faber_list_##NAME *faber_set_##NAME##_union(                          \
+        faber_arena *arena, const faber_list_##NAME *a, const faber_list_##NAME *b) {   \
+        faber_list_##NAME *out = faber_list_##NAME##_copy(arena, a);                    \
+        int64_t at;                                                                     \
+        for (at = 0; at < b->len; at++) {                                               \
+            faber_set_##NAME##_add(arena, out, b->items[at]);                           \
+        }                                                                               \
+        return out;                                                                     \
+    }                                                                                   \
+                                                                                        \
+    static inline faber_list_##NAME *faber_set_##NAME##_intersection(                   \
+        faber_arena *arena, const faber_list_##NAME *a, const faber_list_##NAME *b) {   \
+        faber_list_##NAME *out = faber_list_##NAME##_new(arena, 0);                     \
+        int64_t at;                                                                     \
+        for (at = 0; at < a->len; at++) {                                               \
+            if (faber_list_##NAME##_contains(b, a->items[at])) {                        \
+                faber_list_##NAME##_push(arena, out, a->items[at]);                     \
+            }                                                                           \
+        }                                                                               \
+        return out;                                                                     \
+    }                                                                                   \
+                                                                                        \
+    static inline faber_list_##NAME *faber_set_##NAME##_difference(                     \
+        faber_arena *arena, const faber_list_##NAME *a, const faber_list_##NAME *b) {   \
+        faber_list_##NAME *out = faber_list_##NAME##_new(arena, 0);                     \
+        int64_t at;                                                                     \
+        for (at = 0; at < a->len; at++) {                                               \
+            if (!faber_list_##NAME##_contains(b, a->items[at])) {                       \
+                faber_list_##NAME##_push(arena, out, a->items[at]);                     \
+            }                                                                           \
+        }                                                                               \
+        return out;                                                                     \
+    }                                                                                   \
+                                                                                        \
+    static inline faber_list_##NAME *faber_set_##NAME##_difference_symmetric(           \
+        faber_arena *arena, const faber_list_##NAME *a, const faber_list_##NAME *b) {   \
+        faber_list_##NAME *left = faber_set_##NAME##_difference(arena, a, b);           \
+        faber_list_##NAME *right = faber_set_##NAME##_difference(arena, b, a);          \
+        return faber_set_##NAME##_union(arena, left, right);                            \
+    }                                                                                   \
+                                                                                        \
+    static inline bool faber_set_##NAME##_is_subset(const faber_list_##NAME *a,         \
+                                                    const faber_list_##NAME *b) {       \
+        int64_t at;                                                                     \
+        for (at = 0; at < a->len; at++) {                                               \
+            if (!faber_list_##NAME##_contains(b, a->items[at])) {                       \
+                return false;                                                           \
+            }                                                                           \
+        }                                                                               \
+        return true;                                                                    \
+    }
+
+FABER_SET(i64, int64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_SET(text, faber_text, FABER_LIST_EQ_TEXT, FABER_LIST_LT_TEXT)
+FABER_SET(bool, bool, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_SET(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64)
+
 /* ------------------------------------------------------------------------ */
 /* Elementwise list operators                                               */
 /* ------------------------------------------------------------------------ */

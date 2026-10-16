@@ -179,7 +179,7 @@ impl Emitter<'_> {
 
     /// One element value of class `elem`: an exact value that arrives with
     /// no store node narrows like any unwrapped store.
-    fn element(&mut self, value: &HirExpression, elem: Elem) -> Result<Operand, CodegenError> {
+    pub(crate) fn element(&mut self, value: &HirExpression, elem: Elem) -> Result<Operand, CodegenError> {
         let operand = self.expr(value)?;
         let operand = match elem {
             Elem::Int => self.fit(operand)?,
@@ -369,7 +369,7 @@ impl Emitter<'_> {
         source: &HirExpression,
     ) -> Result<Operand, CodegenError> {
         let list = self.expr(source)?;
-        let Value::List(elem) = list.value else {
+        let (Value::List(elem) | Value::Set(elem)) = list.value else {
             return Err(unsupported("sort of a value that is not a list"));
         };
         self.support.need(Helper::List(elem, ListOp::New));

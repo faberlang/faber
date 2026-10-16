@@ -32,6 +32,7 @@ mod names;
 mod numeric;
 mod option;
 mod range;
+mod set;
 mod stmt;
 mod switch;
 mod text;
@@ -66,6 +67,8 @@ mod option_test;
 mod range_test;
 #[cfg(test)]
 mod reject_test;
+#[cfg(test)]
+mod set_test;
 #[cfg(test)]
 mod sized_test;
 #[cfg(test)]
@@ -317,7 +320,7 @@ impl Emitter<'_> {
             Ty::Float => self.support.need(crate::helpers::Helper::Float),
             Ty::Decimal => self.support.need(crate::helpers::Helper::Decimal),
             Ty::Text | Ty::Genus(_) | Ty::None => {}
-            Ty::List(elem) => {
+            Ty::List(elem) | Ty::Set(elem) => {
                 self.support.need(crate::helpers::Helper::List(
                     elem,
                     crate::helpers::ListOp::Struct,

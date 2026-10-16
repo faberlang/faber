@@ -111,7 +111,9 @@ impl Inner {
             Ty::Modular(width) => Some(Inner::Modular(width)),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
-            Ty::Sized(_) | Ty::Saturating(_) | Ty::Opt(_) | Ty::None | Ty::Decimal => None,
+            Ty::Sized(_) | Ty::Saturating(_) | Ty::Opt(_) | Ty::None | Ty::Decimal | Ty::Set(_) => {
+                None
+            }
         }
     }
 
@@ -163,6 +165,10 @@ pub(crate) enum Ty {
     /// `list<int>`, `list<string>` or `list<bool>`: a pointer to an
     /// arena-allocated `faber_list_<elem>`, so every bind aliases (R1).
     List(Elem),
+    /// `set<int>`, `set<string>` or `set<bool>`: the same list storage with
+    /// the set contract (`add` is unique, `delete` by value), so a set is a
+    /// `faber_list_<elem> *` too.
+    Set(Elem),
     /// A genus (`class`): a pointer to an arena-allocated C struct, so every
     /// bind aliases (R1).
     Genus(DefId),
@@ -246,11 +252,7 @@ impl Ty {
             Ty::Bool => Some("bool"),
             Ty::Float => Some("double"),
             Ty::Decimal => Some("faber_dec"),
-            Ty::List(Elem::Float) => Some("faber_list_f64 *"),
-            Ty::List(Elem::Int) => Some("faber_list_i64 *"),
-            Ty::List(Elem::Text) => Some("faber_list_text *"),
-            Ty::List(Elem::Bool) => Some("faber_list_bool *"),
-            Ty::List(Elem::Modular(width)) => Some(width.list_c_pointer()),
+            Ty::List(elem) | Ty::Set(elem) => Some(elem.list_c_pointer()),
             Ty::Genus(_) => None,
         }
     }
@@ -346,8 +348,26 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::Modular(width) => Ok(Ty::List(Elem::Modular(width))),
                 Ty::Saturating(_) => Err(unsupported("list of saturating words")),
                 Ty::None => Err(unsupported("list of none")),
+                Ty::Set(_) => Err(unsupported("list of sets")),
             }
         }
+        // A set is the list storage under the set contract (`add` unique,
+        // `delete` by value), so only a scalar element class is carried.
+        Type::Set(inner) => match classify(types, *inner)? {
+            Ty::Int => Ok(Ty::Set(Elem::Int)),
+            Ty::Text => Ok(Ty::Set(Elem::Text)),
+            Ty::Bool => Ok(Ty::Set(Elem::Bool)),
+            Ty::Float => Ok(Ty::Set(Elem::Float)),
+            Ty::Modular(width) => Ok(Ty::Set(Elem::Modular(width))),
+            Ty::List(_) => Err(unsupported("set of lists")),
+            Ty::Set(_) => Err(unsupported("set of sets")),
+            Ty::Genus(_) => Err(unsupported("set of genus")),
+            Ty::Sized(_) => Err(unsupported("set of sized integers")),
+            Ty::Saturating(_) => Err(unsupported("set of saturating words")),
+            Ty::Opt(_) => Err(unsupported("set of optionals")),
+            Ty::Decimal => Err(unsupported("set of decimals")),
+            Ty::None => Err(unsupported("set of none")),
+        },
         // An enumeration is a genus-shaped value: a tagged pointer.
         Type::Struct(def_id) | Type::Enum(def_id) => Ok(Ty::Genus(*def_id)),
         Type::Option(inner) => match Inner::from_ty(classify(types, *inner)?) {

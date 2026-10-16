@@ -163,6 +163,23 @@ impl Emitter<'_> {
             | (Value::Truth, Ty::Bool)
             | (Value::Decimal, Ty::Decimal) => value,
             (Value::Int, Ty::Int) => value,
+            // `copia ↦ lista` materializes a new list; `lista ↦ copia`
+            // deduplicates into a new set. Both read their source (`↦`).
+            (Value::Set(elem), Ty::List(slot)) if slot == elem => {
+                self.support.need(Helper::List(elem, ListOp::New));
+                Operand::new(
+                    format!("faber_list_{}_copy(faber_a, {})", elem.suffix(), value.text),
+                    Value::List(elem),
+                )
+            }
+            (Value::List(elem), Ty::Set(slot)) if slot == elem => {
+                self.support.need(Helper::List(elem, ListOp::New));
+                Operand::new(
+                    format!("faber_set_{}_of(faber_a, {})", elem.suffix(), value.text),
+                    Value::Set(elem),
+                )
+            }
+            (Value::Set(elem), Ty::Set(slot)) if slot == elem => value,
             (_, Ty::Int | Ty::Sized(_)) if integer => {
                 self.fallible_int(&value, class, Kind::IntInt, None, params, recovery)?
             }

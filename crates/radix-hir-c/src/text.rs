@@ -151,7 +151,7 @@ impl Emitter<'_> {
                 self.support.need(Helper::DecimalText);
                 Ok(format!("faber_dec_fmt(faber_a, {})", operand.text))
             }
-            Value::List(elem) => self.show_list(&operand.text, elem),
+            Value::List(elem) | Value::Set(elem) => self.show_list(&operand.text, elem),
             Value::Genus(def_id) => self.show_genus(&operand.text, def_id),
             Value::Float => {
                 self.support.need(Helper::FloatText);
