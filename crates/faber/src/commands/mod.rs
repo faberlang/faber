@@ -41,6 +41,9 @@ mod format_corpus_test;
 pub(crate) mod format_test;
 pub mod host;
 pub(crate) mod init;
+#[cfg(test)]
+#[path = "mir_dump_test.rs"]
+mod mir_dump_test;
 mod model;
 #[cfg(test)]
 #[path = "regex_literal_format_test.rs"]
@@ -402,6 +405,10 @@ fn cmd_check(args: crate::cli::CheckArgs) {
     reject_reader_locale_without_package(args.locale.as_deref(), &args.input, args.package);
     validate_deny_codes(&args.deny);
     let package_shaped = args.package || package::should_treat_as_package_from_args(&args.input);
+    if args.lower && !package_shaped {
+        eprintln!("error: `check --lower` needs a file or package path, not stdin");
+        std::process::exit(1);
+    }
     if args.air {
         // ALA-1: the advisory AIR report is single-file only. Plain
         // `check` routes bare `.fab` files through the package loader;
@@ -450,6 +457,7 @@ fn cmd_check(args: crate::cli::CheckArgs) {
             },
             args.complexity_budget,
             args.kernel_complexity_budget,
+            args.lower,
         );
     } else {
         cmd_check_file(
@@ -557,12 +565,35 @@ fn cmd_inspect_hir(input: &[String], load: Option<std::path::PathBuf>) {
 #[cfg(feature = "runner")]
 fn cmd_inspect_mir(input: &[String]) {
     let (name, source) = read_source(input);
-    match radix::services::mir_output_for_source(&name, &source) {
+    match radix::services::mir_output_for_source_with_config(&name, &source, mir_dump_config(input))
+    {
         Ok(output) => print!("{output}"),
         Err(messages) => {
             for message in messages {
                 eprintln!("{message}");
             }
+            std::process::exit(1);
+        }
+    }
+}
+
+/// Reader-locale config for `faber mir`, the same selection `check`, `build`
+/// and `run` make: the owning manifest's locale, else the product default
+/// `en`; a file's own frontmatter `locale` still wins during analysis.
+#[cfg(feature = "runner")]
+fn mir_dump_config(input: &[String]) -> radix::module::Config {
+    let target = radix::module::Config::default().target;
+    let result = if input.is_empty() || input[0] == "-" {
+        package::default_config_with_locale(target)
+    } else {
+        let path = package::absolutize_path(std::path::Path::new(&input[0]));
+        package::config_with_locale(target, &path, None, None).map(|(config, _)| config)
+    };
+    match result {
+        Ok(config) => config.with_dev_locale_root(),
+        Err(diagnostic) => {
+            let diagnostic = package::attach_path_diagnostic_context(diagnostic);
+            eprintln!("{}", radix::module::diagnostics::render_plain(&diagnostic));
             std::process::exit(1);
         }
     }
