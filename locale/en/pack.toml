@@ -669,10 +669,6 @@ help = "replace secus {si} with {sin}"
 message = "expected {expected}"
 help = "choose one iteration mode before the iterable expression"
 
-[diagnostics.PARSE001.issues.allocator_kind]
-message = "expected {expected}"
-help = "use \"arena\" or \"page\" as the allocator kind"
-
 [diagnostics.PARSE001.issues.mutability_marker]
 message = "expected {expected}"
 help = "add let or mut before the binding name"
@@ -1006,10 +1002,6 @@ help = "add a block after the '{genus}' declaration header"
 message = "invalid parameter"
 help = "check parameter syntax and order"
 
-[diagnostics.PARSE015.issues.parameter_access_modifier_pair]
-message = "parameter carries both a mode prefix and a type marker; use one"
-help = "write either the parameter mode prefix or the type-position marker, not both"
-
 [diagnostics.PARSE016]
 message = "invalid type parameter"
 help = "check type parameter list for commas and identifiers"
@@ -1322,10 +1314,6 @@ help = "write the width with vector sugar brackets"
 message = "{sugar} sugar uses bracket Figura"
 help = "write the shape with {sugar} width sugar brackets"
 
-[diagnostics.PARSE040.issues.invalid_figura_index]
-message = "index literal must be a natural number"
-help = "use a non-negative shape index"
-
 [diagnostics.PARSE040.issues.numeric_wrapper_retired]
 message = "`{form}` is a retired numeric type spelling"
 help = "write `{bare}`, not `{form}`; a width marker is its own type"
@@ -1464,10 +1452,6 @@ help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.precision_marker_shape]
 message = "precision marker must be a bare spelling such as ms or us"
-help = "declare the type or import it"
-
-[diagnostics.SEM002.issues.qualified_name_not_type]
-message = "qualified name does not refer to a type"
 help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.qualified_type_not_exported]
@@ -1662,10 +1646,6 @@ help = "check the import path"
 message = "unknown faber kernel module '{module}'; see faber host manifest"
 help = "check the import path"
 
-[diagnostics.SEM006.issues.kernel_norma_json_in_script]
-message = "script mode uses `{script_path}`; `{library_path}` is package/library only"
-help = "check the import path"
-
 [diagnostics.SEM006.issues.import_interna_cross_package]
 message = "`{name}` is `@ interna` and cannot be imported across a package boundary"
 help = "import `@ interna` names only from a file in the same package"
@@ -1822,14 +1802,6 @@ help = "fix the AST construct for lowering"
 message = "match requires at least one subject"
 help = "fix the AST construct for lowering"
 
-[diagnostics.SEM008.issues.duplicate_module_method_binding]
-message = "duplicate module method binding during lowering"
-help = "fix the AST construct for lowering"
-
-[diagnostics.SEM008.issues.duplicate_template_hole_label]
-message = "duplicate template hole label '{label}'"
-help = "give each named hole a unique label"
-
 [diagnostics.SEM008.issues.ego_outside_method]
 message = "ego used outside method context"
 help = "fix the AST construct for lowering"
@@ -1852,10 +1824,6 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.ex_destructuring_not_expanded]
 message = "ex destructuring should be expanded before statement lowering"
-help = "fix the AST construct for lowering"
-
-[diagnostics.SEM008.issues.finge_cast_not_type]
-message = "finge cast must name a type"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.figura_not_index_param]
@@ -1968,10 +1936,6 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.matrix_shape_two_dim]
 message = "matrix shape must be exactly two dimensions"
-help = "fix the AST construct for lowering"
-
-[diagnostics.SEM008.issues.missing_cast_symbol_info]
-message = "missing cast symbol information"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.missing_resolved_type_alias]
@@ -2180,10 +2144,6 @@ help = "provide a labeled actual for each named hole, or call the template by po
 
 [diagnostics.SEM008.issues.unhandled_statement_kind]
 message = "unhandled statement kind in lowering"
-help = "fix the AST construct for lowering"
-
-[diagnostics.SEM008.issues.unknown_finge_cast_type]
-message = "unknown cast type in finge expression"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.unknown_finge_variant]
@@ -3747,10 +3707,6 @@ help = "add an explicit type annotation"
 message = "directional view type not registered"
 help = "ensure built-in frame types are registered before typechecking"
 
-[diagnostics.SEM014.issues.explicit_type_arg_inference_unsupported]
-message = "partial inference in explicit type arguments is not supported"
-help = "replace inferred explicit type arguments with concrete types"
-
 [diagnostics.SEM014.issues.scrinium_type_not_registered]
 message = "scrinium type not registered"
 help = "ensure built-in frame types are registered before typechecking"
@@ -4222,10 +4178,6 @@ help = "use `@ radix typus T in string bytes` or braced `{radix_typus_braced}` w
 [diagnostics.SEM018.issues.non_type_allowed]
 message = "@ radix typus allowed value must be a type"
 help = "use `@ radix typus T in string bytes` or braced `{radix_typus_braced}` with at least one allowed type"
-
-[diagnostics.SEM018.issues.unexpected_token]
-message = "unexpected token after @ radix lane value"
-help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
 
 [diagnostics.SEM018.issues.unknown_directive]
 message = "unknown @ radix directive; expected `lane`"
@@ -4799,10 +4751,6 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 message = "@ radix lane \"{lane}\" rejects this function body: closures are outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
-[diagnostics.SEM059.issues.conditional_recovery]
-message = "@ radix lane \"{lane}\" rejects this function body: conditional recovery is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
-
 [diagnostics.SEM059.issues.defaulted_parameter]
 message = "@ radix lane \"{lane}\" rejects this function body: defaulted parameters are outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
@@ -5163,20 +5111,12 @@ help = "remove the construct or gate it by target"
 message = "unused mutable reference parameter"
 help = "change '{in}' to '{de}' if mutation is unnecessary"
 
-[diagnostics.WARN008.issues.unused_in_parameter]
-message = "`in` parameter is never mutated; consider `de`"
-help = "change '{in}' to '{de}' if mutation is unnecessary"
-
 [diagnostics.WARN008.issues.unused_mut_parameter]
 message = "mutable parameter is never mutated"
 help = "drop the mut marker or mutate the parameter"
 
 [diagnostics.WARN009]
 message = "unused move parameter"
-help = "change '{ex}' to '{de}' if ownership transfer is unnecessary"
-
-[diagnostics.WARN009.issues.unused_ex_parameter]
-message = "`ex` parameter is never consumed; consider `de`"
 help = "change '{ex}' to '{de}' if ownership transfer is unnecessary"
 
 [diagnostics.WARN009.issues.unused_own_parameter]

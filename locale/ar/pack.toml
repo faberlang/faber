@@ -408,10 +408,6 @@ help = "استبدل {secus} {si} بـ {sin}"
 message = "مطلوب {expected}"
 help = "اختر صيغة تكرار واحدة قبل تعبير iterable"
 
-[diagnostics.PARSE001.issues.allocator_kind]
-message = "مطلوب {expected}"
-help = "استخدم \"arena\" أو \"page\" كنوع allocator"
-
 [diagnostics.PARSE001.issues.mutability_marker]
 message = "مطلوب {expected}"
 help = "أضف {fixum} أو {varia} قبل اسم الربط"
@@ -872,10 +868,6 @@ help = "اكتب width باستخدام vector sugar brackets"
 message = "{sugar} sugar يستخدم bracket Figura"
 help = "اكتب shape باستخدام {sugar} width sugar brackets"
 
-[diagnostics.PARSE040.issues.invalid_figura_index]
-message = "index literal يجب أن يكون عددا طبيعيا"
-help = "استخدم shape index غير سالب"
-
 [diagnostics.PARSE040.issues.numeric_wrapper_retired]
 message = "الصيغة المغلّفة `{form}` للنوع العددي ملغاة"
 help = "اكتب `{bare}` بدلا من `{form}`؛ علامة العرض هي نوع بحد ذاتها"
@@ -986,10 +978,6 @@ help = "صرح عن type أو استورده"
 
 [diagnostics.SEM002.issues.precision_marker_shape]
 message = "precision marker يجب أن يكون كتابة عارية مثل ms أو us"
-help = "صرح عن type أو استورده"
-
-[diagnostics.SEM002.issues.qualified_name_not_type]
-message = "qualified name لا يشير إلى type"
 help = "صرح عن type أو استورده"
 
 [diagnostics.SEM002.issues.qualified_type_not_exported]
@@ -1116,10 +1104,6 @@ help = "تحقق من مسار الاستيراد"
 message = "faber kernel module غير معروف '{module}'؛ راجع faber host manifest"
 help = "تحقق من مسار الاستيراد"
 
-[diagnostics.SEM006.issues.kernel_norma_json_in_script]
-message = "script mode يستخدم `{script_path}`؛ `{library_path}` للـ package/library فقط"
-help = "تحقق من مسار الاستيراد"
-
 [diagnostics.SEM007]
 message = "اعتماد دائري"
 help = "اكسر الدورة بين الوحدات"
@@ -1220,10 +1204,6 @@ help = "أصلح تركيب AST للتخفيض"
 message = "{discerne} يتطلب subject واحدا على الأقل"
 help = "أصلح تركيب AST للتخفيض"
 
-[diagnostics.SEM008.issues.duplicate_module_method_binding]
-message = "duplicate module method binding أثناء التخفيض"
-help = "أصلح تركيب AST للتخفيض"
-
 [diagnostics.SEM008.issues.ego_outside_method]
 message = "{ego} استخدم خارج سياق method"
 help = "أصلح تركيب AST للتخفيض"
@@ -1246,10 +1226,6 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.ex_destructuring_not_expanded]
 message = "{ex} destructuring يجب توسيعه قبل statement lowering"
-help = "أصلح تركيب AST للتخفيض"
-
-[diagnostics.SEM008.issues.finge_cast_not_type]
-message = "{finge} cast يجب أن يسمي type"
 help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.figura_not_index_param]
@@ -1342,10 +1318,6 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.matrix_shape_two_dim]
 message = "matrix shape يجب أن يكون بعدين بالضبط"
-help = "أصلح تركيب AST للتخفيض"
-
-[diagnostics.SEM008.issues.missing_cast_symbol_info]
-message = "معلومات cast symbol مفقودة"
 help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.missing_resolved_type_alias]
@@ -1478,10 +1450,6 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.unhandled_statement_kind]
 message = "unhandled statement kind في التخفيض"
-help = "أصلح تركيب AST للتخفيض"
-
-[diagnostics.SEM008.issues.unknown_finge_cast_type]
-message = "cast type غير معروف في {finge} expression"
 help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.unknown_finge_variant]
@@ -2580,10 +2548,6 @@ help = "أضف type annotation صريحا"
 message = "directional view type غير مسجل"
 help = "تأكد من تسجيل built-in frame types قبل typechecking"
 
-[diagnostics.SEM014.issues.explicit_type_arg_inference_unsupported]
-message = "partial inference في explicit type arguments غير مدعوم"
-help = "استبدل inferred explicit type arguments بـ concrete types"
-
 [diagnostics.SEM014.issues.scrinium_type_not_registered]
 message = "scrinium type غير مسجل"
 help = "تأكد من تسجيل built-in frame types قبل typechecking"
@@ -2891,10 +2855,6 @@ help = "استخدم `@ radix typus T in {textus} {octeti}` أو braced `{radix_
 [diagnostics.SEM018.issues.non_type_allowed]
 message = "@ radix typus allowed value يجب أن يكون type"
 help = "استخدم `@ radix typus T in {textus} {octeti}` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
-
-[diagnostics.SEM018.issues.unexpected_token]
-message = "unexpected token بعد @ radix lane value"
-help = "استخدم `@ radix lane \"air\"` أو `@ radix lane \"mir\"` أو `@ radix lane \"hir-direct\"` على top-level {functio}"
 
 [diagnostics.SEM018.issues.unknown_directive]
 message = "@ radix directive غير معروف؛ متوقع `lane`"
@@ -3268,10 +3228,6 @@ help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و A
 message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: closures خارج v1 AIR subset"
 help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
 
-[diagnostics.SEM059.issues.conditional_recovery]
-message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: conditional recovery خارج v1 AIR subset"
-help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
-
 [diagnostics.SEM059.issues.defaulted_parameter]
 message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: defaulted parameters خارج v1 AIR subset"
 help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
@@ -3452,16 +3408,8 @@ help = "أزل construct أو gate ب target"
 message = "معامل مرجعي قابل للتغيير غير مستخدم"
 help = "غير '{in}' إلى '{de}' إذا كان التعديل غير ضروري"
 
-[diagnostics.WARN008.issues.unused_in_parameter]
-message = "`{in}` parameter لا يعدل أبدا؛ اعتبر `{de}`"
-help = "غير '{in}' إلى '{de}' إذا كان التعديل غير ضروري"
-
 [diagnostics.WARN009]
 message = "معامل نقل غير مستخدم"
-help = "غير '{ex}' إلى '{de}' إذا كان نقل الملكية غير ضروري"
-
-[diagnostics.WARN009.issues.unused_ex_parameter]
-message = "`{ex}` parameter لا يستهلك أبدا؛ اعتبر `{de}`"
 help = "غير '{ex}' إلى '{de}' إذا كان نقل الملكية غير ضروري"
 
 [diagnostics.WARN010]
