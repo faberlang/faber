@@ -7,7 +7,7 @@
 pub use radix_mir_runner::{
     BufferHost, Host, RUNNER_KERNEL_REFUSED_ISSUE, RunnerDispatchStatus, RunnerError, RunnerKernelPolicy,
     RunnerRunOutcome, RunnerStats, StdioHost, Value, classify_runner_lowerability, configure_shuffle_seed,
-    reset_execution_state, run_entry, run_entry_with_kernel_policy, run_entry_with_stats,
+    reset_execution_state, run_entry, run_entry_with_kernel_policy, run_entry_with_process_exit, run_entry_with_stats,
     run_entry_with_stats_and_kernel_policy, run_function, run_function_with_kernel_policy, run_function_with_limits,
     run_function_with_limits_and_kernel_policy, run_function_with_stats_and_limits,
     run_function_with_stats_and_limits_and_kernel_policy, run_function_with_step_budget, runner_dispatch_status,
@@ -25,6 +25,10 @@ mod ad_serve_tests;
 #[cfg(test)]
 #[path = "itera_inf_test.rs"]
 mod itera_inf_tests;
+
+#[cfg(test)]
+#[path = "entry_exit_test.rs"]
+mod entry_exit_tests;
 
 #[cfg(test)]
 #[path = "route_serve_test.rs"]
@@ -150,5 +154,5 @@ pub fn run_analyzed_with_kernel_lowering<H: Host + ?Sized>(
         KernelLowering::Device => RunnerKernelPolicy::Refuse,
         KernelLowering::Host => RunnerKernelPolicy::Execute,
     };
-    run_entry_with_kernel_policy(&lowered.validated, host, policy)
+    run_entry_with_process_exit(&lowered.validated, host, policy)
 }
