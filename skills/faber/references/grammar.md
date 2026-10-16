@@ -6,7 +6,7 @@ Primary source:
 
 - `grammar/EBNF.md`
 
-Co-authority:
+Secondary source:
 
 - `corpus/`
 
@@ -91,7 +91,7 @@ stands alone: no captures of enclosing parameters, locals or `self` (`praefixum_
 type parameters (`praefixum_type_parameter`). There is no `faber const-codemod`: the migration command
 is gone, not a thing to run.
 
-Unmarked top-level declarations are module-private by default (D5.1); `@ publica` exports, `@ interna`
+Unmarked top-level declarations are module-private by default; `@ publica` exports, `@ interna`
 is package-internal-only, `@ privata` is an explicit private marker. A leading-underscore name is a
 warning (`WARN030`), not an error.
 
@@ -171,7 +171,7 @@ a ↤ b ↤ "42"               # right-associated: inner converts first
 Rejected: `varia _ x ↤ …` (no concrete destination type), `sit x ↤ …` (`PARSE002 conversio_assign_requires_concrete_type`), and
 `figendum`/`variandum` with `↤` (awaited bindings keep `←`).
 
-## Numeric Model (D11.6, rulings 2026-09-29/30)
+## Numeric Model
 
 Teaching exemplar: `corpus/operatores/numerus-widening.fab`.
 
@@ -183,14 +183,14 @@ Teaching exemplar: `corpus/operatores/numerus-widening.fab`.
 - **Float to integer.** A float or `d64` source needs a rounding choice: `x ↦ int via Floor|Ceil|HalfEven|Trunc`; the bare `x ↦ int` is `SEM016 float_to_integer_requires_rounding`, and `⊥ default` / `⇥` follow the `via` as for any failable conversion (`corpus/conversio/float-to-int-via.fab`). The glyph `⌊x⌉` (nearest) is the short form of `via HalfEven`.
 - **Local constant.** `fixum T x = e` (en `const`) is a compile-time local (evaluated by the compiler, must fit `T`); a runtime store is `sit T x ← e` (en `let`), and `fixum T x ← e` is `PARSE010 runtime_const_retired`.
 - **AIR lane.** In an `@ radix lane "air"` function every integer store and operation must be proven to fit by the range rule; otherwise it is a compile error (declare a wider slot or use `↦ T ⊥ default`).
-- **The unbounded integer `inf`** (D11.5; F9 rulings 32–50; teaching exemplar `corpus/operatores/inf.fab`, with `inf-conversio.fab`, `inf-json.fab`). The bare marker `inf` is an integer with no bound — opt in by declaring a slot `inf` or converting an operand `↦ inf`; nothing becomes `inf` by default, and a lone literal of any length defaults to `int` (a literal past `u64` needs an `inf` slot or operand, else `SEM010 numerus_literal_out_of_range`). `inf`, `trapping<inf>`, `wrapping<inf>`, `saturating<inf>` (la `exactus`/`modulus`/`saturatus`) all name the same type (the wrapped `int<inf>` is retired, `PARSE040`); the marker is ASCII in every locale, with no prefixed sugar (`linf` is an identifier). `inf` is the implicit lossless target of every integer width including `u64` (`sit inf x ← u` needs no `↦`) and widens into nothing; `u64 - u64` is still `i64` — opt in with `(a ↦ inf) - b`. On `inf`: `+ - * ⇐ potentia` never trap, `/` `%` floor, `∧ ∨ ⊻ ¬` use infinite two's complement, a zero divisor or negative shift count/exponent still traps, comparisons against every integer width, `d64` and float are exact, and an `inf` is a valid `tabula` key. Narrowing back is a checked conversion: `x ↦ u64 ⊥ 9` (a value that does not fit takes the default; without `⊥`/handler it is `failable_conversio_requires_handler`), `↦ wrapping<W>` reduces and `↦ saturating<W>` clamps (never fail); `↦ float` rounds and a magnitude past the float range is `inf`/`-inf`; float → `inf` truncates and fails only on NaN/∞; `d64 ↦ inf` rounds half-even; text parses any number of digits (`"ff" ↦ inf via Hex`); `inf ↦ octeti via Be`/`Le` is minimal two's complement. A store from `inf` into a bounded slot traps (``300 does not fit in `u8` ...``). `inf` is host-only: `SEM008 tensor_element_unbounded` (tensor/vector/matrix/sparsa element), `SEM008 nucleum_host_type` (kernel), `SEM059 air_unbounded_integer` (AIR lane). `∞` is the float infinity, never an `inf` value, and a float ∞ prints as `inf`. Targets: the runner, Rust, TypeScript, Go, Python and sexp carry it; Swift, Haskell, LLVM and Wasm fail closed by name (`inf_target_unsupported`, `llvm_target_inf_unsupported`, `mir_wasm_unsupported`) — check `faber targets` for per-target gaps.
+- **The unbounded integer `inf`** (teaching exemplar `corpus/operatores/inf.fab`, with `inf-conversio.fab`, `inf-json.fab`). The bare marker `inf` is an integer with no bound — opt in by declaring a slot `inf` or converting an operand `↦ inf`; nothing becomes `inf` by default, and a lone literal of any length defaults to `int` (a literal past `u64` needs an `inf` slot or operand, else `SEM010 numerus_literal_out_of_range`). `inf`, `trapping<inf>`, `wrapping<inf>`, `saturating<inf>` (la `exactus`/`modulus`/`saturatus`) all name the same type (the wrapped `int<inf>` is retired, `PARSE040`); the marker is ASCII in every locale, with no prefixed sugar (`linf` is an identifier). `inf` is the implicit lossless target of every integer width including `u64` (`sit inf x ← u` needs no `↦`) and widens into nothing; `u64 - u64` is still `i64` — opt in with `(a ↦ inf) - b`. On `inf`: `+ - * ⇐ potentia` never trap, `/` `%` floor, `∧ ∨ ⊻ ¬` use infinite two's complement, a zero divisor or negative shift count/exponent still traps, comparisons against every integer width, `d64` and float are exact, and an `inf` is a valid `tabula` key. Narrowing back is a checked conversion: `x ↦ u64 ⊥ 9` (a value that does not fit takes the default; without `⊥`/handler it is `failable_conversio_requires_handler`), `↦ wrapping<W>` reduces and `↦ saturating<W>` clamps (never fail); `↦ float` rounds and a magnitude past the float range is `inf`/`-inf`; float → `inf` truncates and fails only on NaN/∞; `d64 ↦ inf` rounds half-even; text parses any number of digits (`"ff" ↦ inf via Hex`); `inf ↦ octeti via Be`/`Le` is minimal two's complement. A store from `inf` into a bounded slot traps (``300 does not fit in `u8` ...``). `inf` is host-only: `SEM008 tensor_element_unbounded` (tensor/vector/matrix/sparsa element), `SEM008 nucleum_host_type` (kernel), `SEM059 air_unbounded_integer` (AIR lane). `∞` is the float infinity, never an `inf` value, and a float ∞ prints as `inf`. Targets: the runner, Rust, TypeScript, Go, Python and sexp carry it; Swift, Haskell, LLVM and Wasm fail closed by name (`inf_target_unsupported`, `llvm_target_inf_unsupported`, `mir_wasm_unsupported`) — check `faber targets` for per-target gaps.
 - **`≈` on integers.** Between integers of any width including `inf`, `≈` is one exact rule, `10⁹·|a − b| ≤ max(|a|, |b|)`, not a float compare (`corpus/operatores/approx-integers.fab`).
 
 ## Bit Reinterpretation and Float Field Reads
 
 - Bit patterns go through the raw-bits markers `b8 b16 b32 b64` (bits are not numbers): `x ↦ b32` reads the pattern of an `f32` (`↦ b64` for `f64`), `u32 ↦ b32 ↦ f32` and `u16 ↦ b16 ↦ f16` reinterpret a pattern as a float; reinterpretation, never value conversion. `via Bits` is retired (`SEM016 conversio_via_bits_retired`, names the `bN` route).
-- **The `via` clause (D11.9).** A convert hint follows the target: `x ↦ u16 via Le`, `"ff" ↦ i32 via Hex`, `65 ↦ littera via Code`; register targets take it too (`v ↦ octeti<16> via Le`). The text/byte hint set is `Hex`, `Bin`, `Oct`, `Be`, `Le`, `Code`, and a float or `d64` to integer takes the rounding hints `Floor`, `Ceil`, `HalfEven`, `Trunc`; it binds tighter than `⊥` and applies per hop (`octeti[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32`). On bits lists a `via Le|Be` clause is written exactly when the bit width changes (`lista<b8> ↦ lista<u16> via Le`; `lista<b8> ↦ lista<u8>` takes none). `via` is a contextual keyword (an ordinary identifier elsewhere). The retired spellings — a hint as a type argument (`numerus<u32, Hex>`) or a register tail (`octeti<16><Le>`) — are parse errors (`PARSE030 conversio_hint_type_argument` / `conversio_hint_tail_argument`). `@ nucleum lane "x"` is removed (`nucleum_lane_removed`).
-- **Bulk bytes to tensor (authorised 2026-10-08).** `octeti ↦ tensor<E, [d1, …]> via Le` / `via Be` is a faithful reinterpretation of a byte string as a typed tensor: source `octeti` or `octeti<N>`; literal extents only; `E` is one of `u8 i8 i16 u16 i32 u32 i64 u64 f32 f64`; the hint is REQUIRED for every width (no hint, or `Bits`/`Hex`, is `SEM016 octeti_to_tensor_unspecified`; another element type is `octeti_to_tensor_element_unsupported`); row-major, element `i` at bytes `[i·w, (i+1)·w)`; pure bit copy (NaN payloads, `-0.0`, subnormals survive); the byte length must be exactly `product(shape)·w` (a compile error `octeti_to_tensor_length_mismatch` when statically known, otherwise a recoverable runtime error: handle it with `do { } catch`/`⊥`/`⇥`, and a bare `↦` outside `main` needs a handler). Example: `let tf32[2, 2] m ← raw ↦ tf32[2, 2] via Le`. Decode a whole buffer or weight file at once this way, never element by element through a list. NOT available: the reverse `tensor ↦ octeti via Le|Be` (held back), `lista<f32> via Le` (still `SEM016 unsupported_conversio`), runtime (non-literal) extents.
+- **The `via` clause.** A convert hint follows the target: `x ↦ u16 via Le`, `"ff" ↦ i32 via Hex`, `65 ↦ littera via Code`; register targets take it too (`v ↦ octeti<16> via Le`). The text/byte hint set is `Hex`, `Bin`, `Oct`, `Be`, `Le`, `Code`, and a float or `d64` to integer takes the rounding hints `Floor`, `Ceil`, `HalfEven`, `Trunc`; it binds tighter than `⊥` and applies per hop (`octeti[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32`). On bits lists a `via Le|Be` clause is written exactly when the bit width changes (`lista<b8> ↦ lista<u16> via Le`; `lista<b8> ↦ lista<u8>` takes none). `via` is a contextual keyword (an ordinary identifier elsewhere). The retired spellings — a hint as a type argument (`numerus<u32, Hex>`) or a register tail (`octeti<16><Le>`) — are parse errors (`PARSE030 conversio_hint_type_argument` / `conversio_hint_tail_argument`). `@ nucleum lane "x"` is removed (`nucleum_lane_removed`).
+- **Bulk bytes to tensor.** `octeti ↦ tensor<E, [d1, …]> via Le` / `via Be` is a faithful reinterpretation of a byte string as a typed tensor: source `octeti` or `octeti<N>`; literal extents only; `E` is one of `u8 i8 i16 u16 i32 u32 i64 u64 f32 f64`; the hint is REQUIRED for every width (no hint, or `Bits`/`Hex`, is `SEM016 octeti_to_tensor_unspecified`; another element type is `octeti_to_tensor_element_unsupported`); row-major, element `i` at bytes `[i·w, (i+1)·w)`; pure bit copy (NaN payloads, `-0.0`, subnormals survive); the byte length must be exactly `product(shape)·w` (a compile error `octeti_to_tensor_length_mismatch` when statically known, otherwise a recoverable runtime error: handle it with `do { } catch`/`⊥`/`⇥`, and a bare `↦` outside `main` needs a handler). Example: `let tf32[2, 2] m ← raw ↦ tf32[2, 2] via Le`. Decode a whole buffer or weight file at once this way, never element by element through a list. NOT available: the reverse `tensor ↦ octeti via Le|Be` (held back), `lista<f32> via Le` (still `SEM016 unsupported_conversio`), runtime (non-literal) extents.
 - finite/NaN detection reads the bit fields through `x ↦ b32 ↦ u32` (exponent all-ones, fraction nonzero separates NaN from ±Inf) — never `x ≢ x`, which is lane-dependent (the MIR runner's float `≢` is NaN-total). Exemplar: `corpus/scalar/finite-nan.fab`.
 
 ## Copy-Into (`⇇`)
@@ -214,7 +214,7 @@ main {
 }
 ```
 
-Rules R1-R7 (ruling 2026-10-02), each a named diagnostic:
+The copy-into rules, each a named diagnostic:
 
 - **R1** same element type and shape on both sides (`copy_into_type_mismatch`;
   a static shape mismatch is `incompatible_tensor_index`; runtime-extent shapes
@@ -233,11 +233,11 @@ Rules R1-R7 (ruling 2026-10-02), each a named diagnostic:
   write meaning. R6 is regarded as arbitrary and is to be reconsidered once
   in-place writes are settled; do not treat it as permanent law. **R7** the old
   callable-sink form `sink ⇇ payload` (a callable on the left) is retired:
-  `SEM012 transfer_sink_retired`, FABER-2-SUNSET-tagged, deleted at Faber 2.
+  `SEM012 transfer_sink_retired`, scheduled for removal in a future major release.
   Output is `print`/`nota`, not `⇇`; the `output-transfer-codemod` command is
   gone.
 
-Lanes: the MIR runner, Rust (`Tensor::write_values`), and Metal/WGSL kernels
+Execution paths: the MIR runner, Rust (`Tensor::write_values`), and Metal/WGSL kernels
 (the value is computed straight into the output buffer) carry it; TS, Go,
 Swift, LLVM, Wasm and sexp fail closed by name. Teaching exemplum:
 `corpus/transfer/transfer.fab` (negatives `transfer/copy-into-*-reject.fab`).
@@ -269,7 +269,7 @@ duplicated, so the new value shares nothing with `source`; private fields copy a
 instead the extraction statement (`ex p sit x, y`). Exactly one source per literal. `sparge` was
 removed from construction literals (it stays for lists and calls); `nexum` was removed outright.
 
-**Field modifiers and privacy (D16.1, D5.2–D5.4):** every field declares exactly one of `sit`
+**Field modifiers and privacy:** every field declares exactly one of `sit`
 (en `let`: per instance, set once in the construction literal), `varia` (en `mut`: per instance, reassignable), or `fixum T X = e` (en `const`: the type-level compile-time constant, one per type, read through the type name `P.X`; a store is `SEM020 assignment_to_const_member`, a missing `=` is `PARSE010 const_member_requires_initializer`); an unmarked field is `PARSE010 field_modifier_missing`, `generis` (en `static`) is `PARSE010 static_member_retired`, and `de` (en `ref`) on a field is `ref_field_refused`. Members are public
 by default; `@ privata` restricts a member to the type's own method bodies, `@ interna` to the
 declaring package. A construction literal, and `Genus { … } ex p`, may still set/copy a private field
@@ -338,7 +338,7 @@ non-hashable map key or set element is a named diagnostic (`tabula_key_not_hasha
 
 Type forms:
 
-- nullable values: `T ∪ nihil` (en `T ∪ none`; not `T?`). The null *type* and null *value* are different words (D23): type `nihil` / `none`, value `nulla` / `null`; `T ∪ nulla` / `T ∪ null` is `PARSE040 null_value_in_type_position`, and `est`/`non est` is a type test only (`x est nihil`; `x est verum` is `SEM011 est_value_rhs`, use `≡`)
+- nullable values: `T ∪ nihil` (en `T ∪ none`; not `T?`). The null *type* and null *value* are different words: type `nihil` / `none`, value `nulla` / `null`; `T ∪ nulla` / `T ∪ null` is `PARSE040 null_value_in_type_position`, and `est`/`non est` is a type test only (`x est nihil`; `x est verum` is `SEM011 est_value_rhs`, use `≡`)
 - inline unions: `T ∪ U`
 - tagged unions: `discretio`
 - function types: `(A) → B`, optionally `(A) → B ⇥ E`
@@ -363,7 +363,7 @@ Banned:
 - postfix `T[]` array syntax
 - `Type(...)` construction for tensors, vectors, matrices, or scalars — use `↦`, named constructors, or `Genus { field = value }`
 
-`vacua` needs an explicit collection type. `empty`/`vacua` is the DEFAULT EMPTY INSTANCE of the declared type on the left (ruling 2026-10-08): an empty collection for lists, maps and sets, one default slot for a rank-0 tensor, an all-zero sparse tensor, and for a tensor, vector or matrix the ZERO, so `mut tf32[2, 3] blank ← empty` means exactly `mut tf32[2, 3] blank ← tf32[2, 3] {}`. A tensor with an unresolved `_` extent is refused by name (`SEM011 vacua_requires_resolved_extents`). `faber format` keeps writing `empty`/`vacua` as authored. The typed zero `Type {}` stays the explicit spelling; the bare type as a value (`← tf32[2, 3]`) stays retired.
+`vacua` needs an explicit collection type. `empty`/`vacua` is the DEFAULT EMPTY INSTANCE of the declared type on the left: an empty collection for lists, maps and sets, one default slot for a rank-0 tensor, an all-zero sparse tensor, and for a tensor, vector or matrix the ZERO, so `mut tf32[2, 3] blank ← empty` means exactly `mut tf32[2, 3] blank ← tf32[2, 3] {}`. A tensor with an unresolved `_` extent is refused by name (`SEM011 vacua_requires_resolved_extents`). `faber format` keeps writing `empty`/`vacua` as authored. The typed zero `Type {}` stays the explicit spelling; the bare type as a value (`← tf32[2, 3]`) stays retired.
 
 ## Control Flow
 
@@ -447,9 +447,9 @@ and `requirit` retain their ordinary type checks.
 ## Capture-free closures (retired)
 
 The closure-signature modifier (`closure_modifier ::= 'libera' | 'nucleum'`)
-was removed clean in the K7b retirement (2026-10-03; the
+was removed outright (the
 grammar rows left the EBNF). Closures carry no
-modifier slot. Closures inside kernels are legal with no modifier (rule 12.2);
+modifier slot. Closures inside kernels are legal with no modifier;
 kernel-ness is owned by the `@ kernel` / `@ nucleum` declaration annotations
 plus the check-time kernel legality pass. Kernel examples live in the kernel
 sections of `references/idioms.md`.
@@ -491,12 +491,12 @@ expr`); at a call site it follows the call. `⊥` replaced the retired `⇥ valu
 
 ## Operators and expression notes
 
-Grounded in `EBNF.md` and probes against the built binary on 2026-10-01.
+Grounded in `EBNF.md` and probes against the built binary.
 
 - Ranges: `a‥b` (exclusive), `a…b` and `a usque b` (inclusive), `a ante b` (exclusive), optional `per k` step.
   `x ∈ lista` is collection membership and `x ∈ lo‥hi` is range containment; `x ∉ …` negates either. Membership over a
   range checks and emits on Rust, Go, Swift, and TS, but `faber run` fails with `unsupported MIR lowering: binary operator
-  without a MIR primitive` (no MIR lowering for range containment yet; verified 2026-10-02) — do not rely on running it.
+  without a MIR primitive` (no MIR lowering for range containment yet) — do not rely on running it.
   A char-range form such as `x ∈ '0'…'9'` is not supported (a known gap).
 - `a ⤒ b` / `a ⤓ b` — max / min (additive tier, left-associative). `↑` / `↓` — postfix increment / decrement
   statements (checked store of the slot's policy).
@@ -514,7 +514,7 @@ Grounded in `EBNF.md` and probes against the built binary on 2026-10-01.
 - Commas are required between items and forbidden after the last (`PARSE001 item_list_trailing_comma`); declaration
   blocks (`genus` members, `implendum` methods, `discretio` payload fields, `columna` rows) carry no commas.
 - `print` of a `genus` shows its construction literal (`P { x = 1, nomen = "hi" }`), a `discretio` variant
-  prints qualified (`N.Sig { x = 2 }`), a `lista` as `[1, 2]` (D2.8). A statement-initial `nota(x)` is a call
+  prints qualified (`N.Sig { x = 2 }`), a `lista` as `[1, 2]`. A statement-initial `nota(x)` is a call
   of an identifier `nota`, not output.
 - `axis` is a marker word beside `mut`/`own`/`copy`: `t.sum(axis 1)` and `t.mean(axis 0)` reduce a rank-2 tensor over a literal axis; `t.mean()` is sum / count, so an empty source is NaN (`corpus/tensor/axis-builtins.fab`, `corpus/summa/mean-sugar.fab`).
 - Collection reads: `xs[i]` out of range dies, `xs.get(i)` gives `none`, `xs.at(i)` reports on the error channel (`do { } catch err { }` / `fac { } cape err { }` / `⊥ default`); text indexes by Unicode character; an out-of-range range index dies (`corpus/lista/reads-three-ways.fab`).

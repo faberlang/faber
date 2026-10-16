@@ -53,7 +53,7 @@ product default); `la` spellings differ (`print` is `nota`, `fn` is `functio`).
 | If you reached for… | Faber is… |
 | ------------------ | --------- |
 | `x = 5`, `x += 1`, `x++` | the only runtime store is `←` (`x ← x + 1`); postfix `x ↑` / `x ↓` are statements. `=` exists only for compile-time-known values: field defaults, `typus` aliases, enum members, annotation metadata, module constants. A bare `x = 6` statement reports only `PARSE030 expected_expression` |
-| `out[:] = x`, `memcpy`, `out ← x` into a `mut` tensor param | `←` only rebinds a name; writing into existing tensor storage is the copy-into statement `out ⇇ x` (R1-R7 in `references/grammar.md`; a whole-tensor `←` into a `mut` tensor param is `SEM057 mut_tensor_param_rebind`, a provisional rule under reconsideration). `sink ⇇ "text"` (the old callable sink) is `SEM012 transfer_sink_retired`: output is `print x` |
+| `out[:] = x`, `memcpy`, `out ← x` into a `mut` tensor param | `←` only rebinds a name; writing into existing tensor storage is the copy-into statement `out ⇇ x` (rules in `references/grammar.md`, Copy-Into; a whole-tensor `←` into a `mut` tensor param is `SEM057 mut_tensor_param_rebind`, a provisional rule under reconsideration). `sink ⇇ "text"` (the old callable sink) is `SEM012 transfer_sink_retired`: output is `print x` |
 | `print(x)` / `println(x)` | line-level statement: `print x` (en) / `nota x` (la), never a call (`SEM001 scribe_callee`) |
 | `name: T` declarations and params | type-first: `string name`, `fn greet(string name) → string` |
 | `const x ← 5`, `var x ← 5`, `const T x ← e` | the run-time binding words are `let` (fixed name, write-once: `let int x ← 5`, inferred `let _ x ← 5`; may be declared without an initializer and assigned once), `mut` (writable: `mut int n ← 0`, inferred `mut _ n ← 0`) and `ref` (re-pointable read-only name over a place; reference types only). `const` is compile-time only and goes with `=`: `const int N = 5`. A run-time `const T x ← e` is `PARSE010 runtime_const_retired`, `var` is `PARSE010 var_retired`, and every declaration writes its type slot (`_` infers): `let x ← 5`, `mut x`, `ref x` and `const x` are `PARSE010 binding_type_slot_required` (write `let _ x ← 5`); binders (`for … let j`) take no type slot. la: `sit` / `varia` / `de` / `fixum` |
@@ -62,7 +62,7 @@ product default); `la` spellings differ (`print` is `nota`, `fn` is `functio`).
 | `fn main()`, a top-level entry function | the entry is the block `main { … }` (la `incipit`); `fn main()` checks but run reports no entry |
 | mixing `fn` with `functio` (any locale blend) | one locale pack per file, sealed (rule 1): keywords, values and methods are sealed (`functio`, `verum`, `xs.longitudo()` all fail in an en file); type names too (see the next row) |
 | Latin type names (`numerus`, `textus`, `lista<…>`, `nihil`) in an `en` file, or any non-Latin file | Latin is a locale pack like any other, with no fallback: a Latin type word in a non-Latin file is `PARSE040 wrong_locale_type`, and `faber check` names the file locale's spelling (en `int`, `string`, `list<…>`, `none`). Write that locale's own spelling. A user-declared name that looks like a Latin type word is not rejected |
-| expecting `verum` / `falsum` / `nihil` / `iuncta` from a program's output, or the Latin words in an `en` golden | printed words follow the CODE locale (ruling 2026-10-09): an `en` program prints `true` / `false` / `none` / `tuple`, a `la` program `verum` / `falsum` / `nihil` / `iuncta`, any other pack its own words (a pack that lacks a word falls back to the Latin word for that token only). Every target agrees (runner, rust, ts, go, swift, python, sexp, wasm, llvm); Haskell keeps its native `True`/`False`/`Nothing`. Write `.expected` files in the locale of the source |
+| expecting `verum` / `falsum` / `nihil` / `iuncta` from a program's output, or the Latin words in an `en` golden | printed words follow the CODE locale: an `en` program prints `true` / `false` / `none` / `tuple`, a `la` program `verum` / `falsum` / `nihil` / `iuncta`, any other pack its own words (a pack that lacks a word falls back to the Latin word for that token only). Every target agrees (runner, rust, ts, go, swift, python, sexp, wasm, llvm); Haskell keeps its native `True`/`False`/`Nothing`. Write `.expected` files in the locale of the source |
 | try/catch | `do { … } catch err { … }` (la `fac { … } cape err { … }`); `tempta`/`demum` are retracted |
 | `c ? a : b` / `sic … secus` ternary | `c ✓ a ✗ b`; both old forms report a migration diagnostic (`PARSE030`) |
 | `for (i = 0; …)`, `for x in xs` | `for from xs let x { … }`; `for range 0‥5 let i { … }` (en; la `itera ex xs sit x`); the binder `let`/`mut` is mandatory (`ref` is refused there: `PARSE010 ref_binder_refused`; the old `const` binder is `PARSE010 binder_fixum_retired`); no parentheses around conditions: `if c { } elif c { } else { }` |
@@ -125,7 +125,7 @@ reds. From the repo root: `cargo build -p faber` then `target/debug/faber ...`, 
 
 ### Reading a diagnostic
 
-Default output is **code-first by design** (reader-locale decision D7): a coded diagnostic prints as
+Default output is **code-first by design**: a coded diagnostic prints as
 `error[SEM010:initializer_annotation_mismatch]: file:line` plus the source
 line — no message, no help. The prose exists in the reader packs, and you have
 to ask for it:
@@ -164,8 +164,7 @@ Before diagnosing syntax, generating source, or translating an exemplar:
 The product default for an untagged file or package is `en` (a Latin file must
 say `locale = "la"` in frontmatter or the package manifest). Two routes
 diverge: `faber check -` (stdin) and `faber -c` read **Latin** when there is no
-frontmatter, so give stdin sources a `+++ locale = "en" +++` header (observed
-2026-10-01; `format --stdin` and `convert --stdin` read `en`). Converting between locale
+frontmatter, so give stdin sources a `+++ locale = "en" +++` header (`format --stdin` and `convert --stdin` read `en`). Converting between locale
 surfaces is `faber convert <path> --to <LOCALE>` — not `format` (formatting
 reflows; converting translates the surface). Code locale and diagnostics
 locale are separate; error-message language is not evidence of source locale.
@@ -232,6 +231,10 @@ Archived or retired sources are never evidence that a construct exists.
 Example repositories demonstrate but do not legislate. A tree-sitter grammar is
 highlighting only, never grammar or diagnostics truth.
 
+## More documentation
+
+The public website https://faberlang.dev holds the language guide, reference, cheat sheet, targets, toolchain notes and release notes. https://faberlang.dev/llms.txt is an index written for language models. If the site and this repository disagree, the repository is the source of truth.
+
 ## References
 
 - `references/grammar.md` — compact construct map
@@ -255,7 +258,7 @@ render spellings through the active locale pack.
 - `⇥ E` names an error **type** only; it never carries a fallback value. A fallback on a conversion or a failable call is `⊥ expr` (`↦ T ⊥ 0`, `risum() ⊥ 0`); `⇥ value` is `PARSE030 recovery_uses_exit_arrow`.
 - Ternary is `c ✓ a ✗ b`; `?:` and `sic…secus` are removed. `¶` is the display-format operator (`value ¶ "spec"`), same glyph in every locale, no word twin.
 - Output is a line-level statement (`print` en / `nota` la), not a function call.
-- No `Type?`; nullability is `T ∪ none` (en) / `T ∪ nihil` (la); the null value is `null` / `nulla` (D23); optional declaration slots are `optional` (la `sponte`) after the name.
+- No `Type?`; nullability is `T ∪ none` (en) / `T ∪ nihil` (la); the null value is `null` / `nulla`; optional declaration slots are `optional` (la `sponte`) after the name.
 - `ignotum` (en `unknown`) is the unknown/escape type, not nullability.
 - Empty collections need an explicit type: `let list<int> xs ← empty` (la `vacua`); `let _ xs ← empty` is `SEM014`, and an untyped `[]` checks but fails at run.
 - One-statement bodies use `ergo` (en `then`): `si c ergo redde x` (en `if c then return x`). `∴` is the compact-closure joint only (`PARSE026` elsewhere).

@@ -235,6 +235,10 @@ A language change is more than compiler code. Touch, as applicable:
    target above.
 5. The `faber` and `faberlang` skills.
 
+## More documentation
+
+The public website https://faberlang.dev holds the language guide, reference, cheat sheet, targets, toolchain notes and release notes. https://faberlang.dev/llms.txt is an index written for language models. If the site and this repository disagree, the repository is the source of truth.
+
 ## References
 
 - `references/source-map.md` — first stops per concern, lookup and grep hints

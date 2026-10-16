@@ -41,7 +41,7 @@ Avoid:
 - JavaScript or Rust habits pasted through a Latin thesaurus
 - hiding meaning behind dense helper layers
 - mixing stylistic dialects in one file
-- nullable or optional syntax that is not in `EBNF.md` (`T?`, prefix `si` on types, etc.); the null type is `T ∪ none` in en and `T ∪ nihil` in la (D23), and the null value is `null` / `nulla`
+- nullable or optional syntax that is not in `EBNF.md` (`T?`, prefix `si` on types, etc.); the null type is `T ∪ none` in en and `T ∪ nihil` in la, and the null value is `null` / `nulla`
 - the retired wrapped numerics `numerus<i32>` / `int<i32>` / `fractus<f32>` (`PARSE040 numeric_wrapper_retired`); write `i32`, `f32`
 - `static` / `generis` anywhere: a module-level `static` is `PARSE010 static_decl_retired` and a class member `static` is `static_member_retired`; a type-level constant is a class member `const T X = e`
 - the retired binding words: en `var` (now `mut`, `PARSE010 var_retired`) and a run-time `const T x ← e` (now `let`, `PARSE010 runtime_const_retired`; la `fixum T x ← e` becomes `sit`)
@@ -55,7 +55,7 @@ For command-line applications, prefer:
 - one clear `incipit` or `incipit argumenta args` entry surface (en `main` / `main args args`)
 - command functions with typed parameters and direct names
 - explicit validation before work begins
-- predictable `scribe`, `mone`, `vide`, or `nota` output (en `write`, `warn`, `debug`, `print`) instead of hidden side effects; `print` of a `genus` shows its construction literal (`Pulsus { x = 1, y = "hello" }`, D2.8), and formatting goes through `"Summa: §"(value ¶ ".2")`; `sink ⇇ payload` is the typed-sink alternative that adds no formatting
+- predictable `scribe`, `mone`, `vide`, or `nota` output (en `write`, `warn`, `debug`, `print`) instead of hidden side effects; `print` of a `genus` shows its construction literal (`Pulsus { x = 1, y = "hello" }`), and formatting goes through `"Summa: §"(value ¶ ".2")`; `sink ⇇ payload` is the typed-sink alternative that adds no formatting
 - a failable `↦` needs `⊥ default`, a catch, or an enclosing `⇥ E`; `main` is exempt and panics
 - small modules imported through canonical `importa` forms
 - concrete error paths using `fac` / `cape`, `iace`, and `mori`
@@ -116,7 +116,7 @@ From exempla:
 - opening brace on the same line (Stroustrup)
 - one statement per line
 - four-space indentation
-- every class field declares exactly one of `let` / `mut` / `const` (la `sit` / `varia` / `fixum`, D16.1), written `<modifier> <type> <name>`: `let` is per instance and set once in the construction literal, `mut` is per instance and reassignable, `const T X = e` is the type-level compile-time constant read as `Persona.X` (a store is `SEM020 assignment_to_const_member`; `ref` on a field is `ref_field_refused`); an unmarked field is `PARSE010 field_modifier_missing`
+- every class field declares exactly one of `let` / `mut` / `const` (la `sit` / `varia` / `fixum`), written `<modifier> <type> <name>`: `let` is per instance and set once in the construction literal, `mut` is per instance and reassignable, `const T X = e` is the type-level compile-time constant read as `Persona.X` (a store is `SEM020 assignment_to_const_member`; `ref` on a field is `ref_field_refused`); an unmarked field is `PARSE010 field_modifier_missing`
 - default field values written with `=`
 - explicit `redde` for returned values inside blocks
 
@@ -167,7 +167,7 @@ failable call, a `↦ T`, or a `↤`; after ordinary `←` it is
 accept `↤` (`fixum_decl` in the EBNF). `↤` never appears on `varia _`, inferred `sit`,
 or untyped destructuring: they have no concrete destination and reject
 `PARSE002 conversio_assign_requires_concrete_type`. Outside `main` an
-unhandled failable `↤` / `↦` needs `⊥`, a catch, or an enclosing `⇥ E` (D17.8).
+unhandled failable `↤` / `↦` needs `⊥`, a catch, or an enclosing `⇥ E`.
 A convert hint is a `via` clause, never a type argument: `"ff" ↦ i32 via Hex`.
 
 ## Exact Big Integers: Opt In With `inf`

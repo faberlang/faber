@@ -31,7 +31,7 @@ Differences that matter when writing source:
   (probe: an `en` file with `let numerus x ← 1`), and the help names the file
   locale's spelling. Use the pack's `[types]` row. User-declared or imported
   names that look like Latin type words are not rejected.
-- The null value and the null type are separate words in every pack (D23): in
+- The null value and the null type are separate words in every pack: in
   `en` the literal is `null` and the type is `none`; in `la` they are `nulla`
   and `nihil`. The translated packs spell them from their own rows (probe:
   `zh-Hans` `皆无` value, `空类型` type).

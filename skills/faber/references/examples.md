@@ -36,9 +36,9 @@ cases).
 
 ## Layout Rule
 
-From `corpus/README.md`:
+How `corpus/` is laid out:
 
-- Every language entry is single-file and Radix-checkable.
+- Every language entry is a single file that the compiler can check on its own.
 - No `faber.toml` and no multi-file packages in `corpus/`.
 - Top-level directories cover keywords, operator groups, and language type surfaces.
 - Operators stay grouped by logical family (`operatores/`, `assignatio/`, `conversio/`, …).

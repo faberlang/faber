@@ -1,26 +1,28 @@
 ---
 name: canonical-faber
-description: "Review existing Faber source for non-idiomatic patterns. Use when the user asks for a canonical-faber review, a style or idiom audit of .fab code, whether code is idiomatic Faber, or when accreting good/bad pattern pairs into the library."
+description: "Review existing Faber source for non-idiomatic patterns. Use when the user asks for a canonical-faber review, a style or idiom audit of .fab code, whether code is idiomatic Faber, or when adding good/bad pattern pairs to the pattern library."
 ---
 
 # Canonical Faber
 
 Review existing Faber source and flag patterns that are **not** the preferred
-idiomatic form. This skill is the review pass; the parent `$faber` skill owns
-building, writing, and canon routing. The pattern library accretes over time:
-every review may grow it.
+idiomatic form ("canonical" in this skill means the preferred form). This skill
+is the review pass; the parent `faber` skill (`../SKILL.md`) owns building and
+writing Faber source. The pattern library grows over time: every review may add
+to it.
 
 This skill is **prescriptive**: it says which patterns to follow and which to
 avoid. It does not inventory what libraries currently contain, and usage
 frequency alone is never the reason a pattern is preferred.
 
-## Anti-prior law: say the shape, not the accumulator
+## Say the shape, not the accumulator
 
-LLM training data is saturated with C/Python softmax, RoPE, matmul, and
-stride-walk code written without language-level tensor or collection
-constructs. That prior produces accumulator variables, counter-`while` loops,
-`while`+`for` pairs, nested counter walks, and managed-binding folds because
-those languages have no streamlined forms. It is the wrong prior for Faber.
+Language models have seen far more C and Python softmax, RoPE, matmul, and
+stride-walk code, written without language-level tensor or collection
+constructs, than Faber. That habit produces accumulator variables,
+counter-`while` loops, `while`+`for` pairs, nested counter walks, and folds
+through a hand-managed binding, because those languages have no streamlined
+forms. It is the wrong habit for Faber.
 Faber puts the fold into the expression itself:
 `reduce via sum from t at [i] let s { return term }` (the distributed
 `thread f` clause is admitted only inside a kernel entry;
@@ -32,7 +34,7 @@ parameters are typed: `nums.reduce((int acc, int x) ∴ acc + x, 0)`. Prefer
 the construct that states the operation's shape instead of reproducing its
 imperative scaffolding.
 
-| Hand-rolled prior | Faber construct |
+| Hand-rolled habit | Faber construct |
 | --- | --- |
 | counter-`while` / managed counter walks | n-ary `for range` for Cartesian walks; aligned collections use lockstep `for from a, b let x, y` (`corpus/itera/lockstep-n2.fab`) |
 | accumulator variable + loop | `.reduce((int acc, int x) ∴ expr, init)` — no managed binding; closure parameters are typed |
@@ -47,32 +49,32 @@ implementation in place with an in-code reason. Do not invent semantics or
 force a conversion merely to remove a loop.
 
 The mechanism is compiler lowering, not aesthetic compression. Language-level
-constructs carry their shape into MIR and per-target kernel plans; for
+constructs carry their shape into MIR (the compiler's mid-level intermediate representation) and per-target kernel plans; for
 example, tensor `·` is a `CollectionKernelPlan::TiledMatMul` in `radix-mir`
 (`crates/radix-mir/src/kernel_plan/`). A hand-rolled loop freezes one
 imperative shape and cannot reach those recipes, so the compiler can optimize
 the language construct for the target better than the hand can. A library may
-record the sites it deliberately keeps as `# legacy-L2:` / `# legacy-L3:`
+mark the sites it deliberately keeps with `# legacy-L2:` / `# legacy-L3:`
 comments stating the reason; those are recorded, not findings.
 
 ## Scope
 
 - Input: existing `.fab` source — packages, exempla, library source, applications.
 - Output: findings naming the non-idiomatic pattern, the preferred form, and
-  the authority behind it — plus a library accretion note.
+  the evidence behind it — plus a library note: patterns worth adding to the pattern library.
 - Not this skill: grammar/type errors (compile findings), writing new code from
-  scratch (`$faber`), compiler-source presentation (`$faberlang` reference).
+  scratch (the `faber` skill), compiler-source presentation (the `faberlang` skill, `../../faberlang/SKILL.md`).
 
 ## What counts as canonical
 
 Evidence ladder, strongest first:
 
-1. **Documented rules** — `$faber` Hard Rules and `../references/idioms.md`.
+1. **Documented rules** — the **Hard Rules** section of the parent skill (`../SKILL.md`) and `../references/idioms.md`.
 2. **Corpus and library exemplars** — `corpus/` (find a term by its
    frontmatter `explains`) plus named library files cited per entry
    (`lib/norma/src/…`).
-3. **Library entries** — `references/patterns.md`, each marked `settled` or
-   `tentative`.
+3. **Library entries** — `references/patterns.md`, each with a severity and an
+   `Evidence:` line.
 
 A suspicion backed by none of these is an `observation`, never an asserted
 finding. The live tree always wins over this library.
@@ -80,7 +82,7 @@ finding. The live tree always wins over this library.
 ## Review procedure
 
 1. **Locale first.** Resolve the code locale (CLI `--locale`, `+++`
-   frontmatter, `faber.toml`, pack data) exactly as `$faber` requires. Never
+   frontmatter, `faber.toml`, pack data) exactly as the `faber` skill requires. Never
    flag a spelling as non-idiomatic before locale resolution — surface
    spellings are pack facts, not style.
 2. **Separate law from style.** Run `faber check <path>` on the target (from
@@ -95,38 +97,41 @@ finding. The live tree always wins over this library.
    wrappers (`PARSE040 numeric_wrapper_retired`), `?:` ternary (`PARSE030`),
    `⇥ value` recovery (`PARSE030 recovery_uses_exit_arrow`), `∴` as a
    statement joint (`PARSE026`), `T ∪ null` (`PARSE040`), `T?`, anonymous
-   `{ key = expr }`, `@ futura`, and `norma:hal/*` (`PKG001`). Hard-rule
-   violations that still compile (banned or invented forms) stay in scope.
+   `{ key = expr }`, `@ futura`, and `norma:hal/*` (`PKG001`). Violations of
+   the parent skill's hard rules that still compile (banned or invented forms)
+   stay in scope.
 3. **Mechanical pass.** Walk every entry in `references/patterns.md` against
-   the target. Settled entries are asserted; tentative entries are reported
-   with their status.
+   the target. Every entry is asserted at its stated severity.
 4. **Ground novel suspects.** For a construct not covered by the library, look
    the term up by frontmatter `explains` in `corpus/`, read the nearby exemplar, and
    compare. Flag `non-preferred` only with a corpus citation; otherwise record
    an `observation`.
 5. **Report.** For each finding: severity, `path:line`, offending snippet,
-   preferred form rendered in the file's locale surface, and authority (rule
-   citation or exemplar path). Close with the accretion note.
+   preferred form rendered in the file's locale surface, and evidence (rule
+   citation or exemplar path). Close with the library note.
 
 ## Severities
 
 - `canon-violation` — violates a documented rule the compiler still accepts:
   banned or invented forms (`cum`, `@ externa` / `@ subsidia` in library
   source, …). A retired form the compiler now rejects is a compile finding, not
-  a canon finding.
+  a `canon-violation`.
 - `non-preferred` — legal, but a documented preference or corpus-dominant form
   was not taken (block guard instead of the one-statement `then return`,
   Allman braces, `∪ none` for an omittable parameter instead of `optional`,
   a leading `_` on a private helper — `WARN030`, …).
 - `observation` — suspected non-idiom with no backing yet; stated as a
-  question and queued for accretion.
+  question and queued for the pattern library.
+- `preferred` — used only on library entries that document an endorsed form
+  (for example the `ᵀ` glyph); a review reports the non-endorsed twin as
+  `non-preferred`, never `preferred`.
 
 ## Construct-choice pairs
 
 `../references/idioms.md` (Semantic Tone) owns the distinctions — `discerne`
 vs `elige`, `ordo` vs `discretio`, `de`/`in`/`ex`, `sit`/`varia`/`de`/`fixum` (en `let`/`mut`/`ref`/`const`),
 `fiet`/`fiunt`/`fient`. When a review finds the wrong member of a pair in
-use, accrete the concrete code pair into the library rather than restating
+use, add the concrete code pair to the library rather than restating
 the tone list here. Two pairs the compiler now enforces or hints at:
 
 - `match` (`discerne`) discriminates closed sets only — unions, enums, variant
@@ -137,23 +142,23 @@ the tone list here. Two pairs the compiler now enforces or hints at:
   local handler, or an enclosing `⇥ string` (`main` is exempt and traps):
   `SEM011 failable_conversio_requires_handler` otherwise.
 
-## Accretion
+## Growing the library
 
 After each review, update `references/patterns.md`:
 
 - **Add** an entry when a pattern recurs, a maintainer confirms a taste, or a
   documented rule backs it. One-off suspicions stay out.
 - **Prescriptions, not inventories** — an entry carries the preferred form,
-  the anti form, and its authority. Usage counts and survey tables do not
+  the anti form, and its evidence. Usage counts and survey tables do not
   belong in this skill.
-- **Entry shape**: `id`, one-line claim, severity, status, authority, `added`
-  date, bad/good pair, optional scope.
-- **Promote** `tentative → settled` on maintainer confirmation or clear corpus
-  dominance; note what settled it.
+- **Entry shape**: `id`, one-line claim, severity, `Evidence:` line, bad/good
+  pair, optional scope. The evidence names only things a reader can check in
+  this repository: a diagnostic code, a `corpus/` file, `grammar/EBNF.md`, or a
+  plain sentence of reasoning.
 - **Retire or fix** entries the live tree contradicts — verify cited exemplar
   paths still exist and still show the good form. Never keep a pattern the
   corpus rejects.
-- **Do not accrete**: grammar facts (owned by `grammar/EBNF.md`), locale surface
+- **Do not add**: grammar facts (owned by `grammar/EBNF.md`), locale surface
   differences (pack facts, not style), or rule prose already owned by parent
   references (add only the new code pair).
 
@@ -193,17 +198,17 @@ return message(error)
 return error.message
 ```
 
-Authority: `corpus/commune/commune.fab`, which checks the shared field
+Evidence: `corpus/commune/commune.fab`, which checks the shared field
 on `ShapeError` and reads `e.message` directly. Do not invent a wrapper merely
 to restate a field declared in the `@ shared` / `@ commune` region.
 
 ## Error conversion: wrapper family versus declared conversion function
 
 At an administrative alias or re-export boundary, a repeated catch-and-
-reconstruct wrapper is a canon violation of the seam law (`../references/operators.md`). Declare the direct
-pair as one named standalone conversion function and let the failable call
-propagate. The historical in-union arm form is retracted (schema 7): a union
-is pure fields plus variants.
+reconstruct wrapper is a `canon-violation` of the error-conversion boundary
+rule in `../references/operators.md`. Declare the direct pair as one named
+standalone conversion function and let the failable call propagate. The
+earlier in-union arm form is removed: a union is pure fields plus variants.
 
 **Bad — wrapper family (anti-pattern):**
 
@@ -245,16 +250,16 @@ and `self.message` outside a method is rejected. The Latin `la` pack maps
 name across locales. Trust boundaries still require an explicit `match err` in
 the function body. One row per concrete source→destination pair; duplicates,
 builtin shadowing, both-ends-foreign pairs, and impure bodies are all
-violations. Missing direct pairs fail closed with
+violations. Missing direct pairs are refused with
 `failable_call_conversion_absent`; no transitive chain is inferred.
 
-Authority: `lib/norma/exempla/error-conversio/src/error_conversio.fab` is the
+Evidence: `lib/norma/exempla/error-conversio/src/error_conversio.fab` is the
 small runnable pair.
 
 ## Container walks preserve the static bound
 
 A range bound re-derived from a container's shape and then fed into stride
-indexing loses the container's static fact. This is a canon finding about lost
+indexing loses the container's static fact. This is a `canon-violation` about lost
 information, not a style preference.
 
 **Bad — coalesce-fed range bound plus stride indexing over flat data:**
@@ -281,20 +286,21 @@ for from grid at [r, c] let cell {
 
 Why: bounds belong to the container; conditions belong in the body. The bad
 form severs the loop from the thing it iterates, making stride math
-unverifiable, preventing AIR unroll because the unroll machinery is fail-closed
-on non-literal extents, and leaving OOB access writable through `coalesce`.
+unverifiable, preventing loop unrolling in the compiler's intermediate
+representation (unrolling refuses non-literal extents rather than guessing),
+and leaving out-of-bounds access writable through `coalesce`.
 This review finding is specifically for range bounds that re-derive a
 container extent and manually index that same container; genuinely count-like
 ranges remain correct.
 
-Authority: `corpus/itera/apud-rank2-matrix.fab` uses the direct rank-2 walk,
+Evidence: `corpus/itera/apud-rank2-matrix.fab` uses the direct rank-2 walk,
 `corpus/itera/apud-index-causal.fab` puts the condition in the body, and
-`corpus/itera/apud-decline.fab` records the fail-closed
-shaped-iterable and non-concrete-lowering boundaries.
+`corpus/itera/apud-decline.fab` records the shaped-iterable and
+non-concrete-lowering cases the compiler refuses rather than guessing.
 
-## Idiom wave 2026-08-26: say the walk, not the counter
+## Loop and membership idioms: say the walk, not the counter
 
-Distilled from a library cleanup wave (2026-08-26). The
+Distilled from a cleanup of a Faber library's source. The
 theme: hand-rolled control flow and ad-hoc predicates replaced by the
 language's direct forms — `for range` over counter-`while`, `for from xs` over
 range-plus-get re-indexing, `∈` / `contains` over or-nests and scan
@@ -302,15 +308,16 @@ helpers, module-level `set` consts over per-call rebuilds, `# ---` stage
 banners over loose prose comments, and `@ kernel` on glyph-composed tensor
 functions. Every pair below was distilled from a real conversion,
 not an aspiration. The
-anti-pattern direction is always "write the right form instead", and the
-keep-class entries below are the cleanup's own recorded boundary — flagging
-a keep-class site for conversion is as wrong as leaving a convert-class site
-on the counter form.
+anti-pattern direction is always "write the right form instead". A
+*convert-class* site is one that should be converted; a *keep-class* site is
+one that must stay as written. The keep-class entries below are the cleanup's
+own recorded boundary — flagging a keep-class site for conversion is as wrong
+as leaving a convert-class site on the counter form.
 
-The tree has moved since. Cited helpers lost their leading `_` (`WARN030`,
-unmarked top-level declarations are already private). Snippets are trimmed to the
-pattern, with `∷` ascriptions that are now redundant and `0 - 1` negation
-(`-1`) modernized.
+The live tree has changed since those conversions: the cited helpers lost
+their leading `_` (`WARN030`; unmarked top-level declarations are already
+private). Snippets are trimmed to the pattern; redundant `∷` ascriptions were
+dropped and `0 - 1` negation was written as `-1`.
 
 ### 1. Known-span count loops are `for range`, never counter-`while`
 
@@ -356,8 +363,8 @@ Sub-forms:
 - Non-zero start rides the range: `mut int k ← 7; while k ≺ parts.length() { … }` → `for range 7‥parts.length() let k`.
 - Unused binder is `_`: `mut int j3 ← end; while j3 ≺ cols { out.append(0.0); j3 ← j3 + 1 }` → `for range end‥cols let _ { out.append(0.0) }`.
 
-This wave is the mass live-tree conversion behind `references/patterns.md`
-`range-loop-over-open-while`.
+This is the conversion that `range-loop-over-open-while` in
+`references/patterns.md` records.
 
 ### 2. A two-collection bound hoists the minimum, then takes one range
 
@@ -392,8 +399,8 @@ Write the hoisted
 
 ### 3. Keep-class: `while` stays for open predicates, shrinking searches, and non-+1 strides
 
-The wave did **not** convert these, and the commit names the rule ("Open
-predicates, shrinking searches, and stride-2 walks stay while"):
+The cleanup deliberately kept these: open predicates, shrinking searches, and
+stride-2 walks stay `while`:
 
 ```fab
 # ✓ kept while — shrinking search bound
@@ -447,16 +454,16 @@ The leftover class is correct, not missed:
 
 - **Index is identity** — the index feeds a lookup that is not `xs.get(i)` on the same list (e.g. `tokenizer.is_eog(i)` vocab ids, best-index returns).
 - **Write-back** — the index writes into a collection, or feeds arithmetic on a different carrier.
-- **Bytes walks** — `for from o` over `bytes` now checks and binds `u8`, but the MIR runner rejects it (`unsupported MIR lowering: itera collection before iterator MIR lowering`, probed 2026-10-01); a byte-list helper keeps `for range` + `get(i) coalesce 0 ∷ u8`.
+- **Bytes walks** — `for from o` over `bytes` now checks and binds `u8`, but the MIR runner rejects it (`unsupported MIR lowering: itera collection before iterator MIR lowering`); a byte-list helper keeps `for range` + `get(i) coalesce 0 ∷ u8`.
 
 Aligned collections are no longer keep-class: the lockstep walk
-`for from a, b let x, y` (landed 2026-08-26, `corpus/itera/lockstep-n2.fab`,
-`lockstep-n3.fab`; equal lengths are a fail-closed law) is the spelling for
-parallel-list comparisons once recorded as `legacy-L2`.
+`for from a, b let x, y` (`corpus/itera/lockstep-n2.fab`,
+`lockstep-n3.fab`; equal lengths are required, and a mismatch is refused) is the spelling for
+parallel-list comparisons once marked with a `legacy-L2` comment.
 Flag a hand-indexed zip over two lists whose lengths are equal by contract.
 
-Zero remaining *convert-class* sites was the closeout, not zero `.length()`
-hits. Report a range-plus-`get` walk only when the index re-indexes that one
+The cleanup finished when no *convert-class* sites remained, not when no
+`.length()` hits remained. Report a range-plus-`get` walk only when the index re-indexes that one
 same collection.
 
 ### 6. Charset membership is `contains` or `∈ [..]`, not an or-nest
@@ -569,7 +576,7 @@ fn key_value(string k) → bool {
 An earlier form hoisted the set to a module-level `const`; that spelling no longer
 compiles. A module constant must be compile-time evaluable, and a
 `↦ set<string>` conversion is not (`SEM060 constant_initializer_not_constant`,
-probed 2026-10-01; the `static` form was retired by `PARSE010`). The live
+probed; the `static` form was retired by `PARSE010`). The live
 forms are a module-level `const list<string> NAMES = [ … ]` (a plain list
 literal is a constant; `const T X = e`, with `=`) read through `k ∈
 NAMES`, or a zero-argument function returning the set when a `set<T>` value is
@@ -589,7 +596,7 @@ universe is data, never control flow inside the predicate.
     # Pre-LN
     let ln1 ← x.layer_norm(1, 0.00001, ln1_s, ln1_o)
 
-    # Q/K/V projections (per-channel [8] biases, S6-C2 added_bias)
+    # Q/K/V projections (per-channel [8] biases)
     let q ← ln1 · wq
 ```
 
@@ -603,15 +610,17 @@ universe is data, never control flow inside the predicate.
     let q ← ln1 · wq
 ```
 
-The rule was applied across a library's model pipelines in several waves, and
-newly written routes carried it from birth. Conventions: the banner
+The rule has been applied across a library's model pipelines. Conventions: the banner
 is `# --- <short stage label> ---…---` padded to a fixed width; a stage whose
-content is `require` validation carries the suffix `(fail closed)`
+content is `require` validation (it refuses bad input rather than guessing)
+carries the suffix `(fail closed)`
 (for example `# --- scalar invariants (fail closed) ---…`); legacy `# --` banners normalize to `# ---`
 and stray inter-stage prose folds into the banner label. A long function with
 ungated stages is the finding; the fix is the banner, not a rewrite.
 
 ### 11. Glyph-composed tensor functions carry `@ kernel`
+
+`@ kernel` marks a function the compiler may lower to a device kernel.
 
 **Bad — a tensor function whose body is pure glyph composition left unannotated:**
 
@@ -632,15 +641,19 @@ fn linear<size M, size K, size N>(tensor<f32, [M, K]> x, tensor<f32, [K, N]> w, 
 }
 ```
 
-A kernel-purity census annotated zero-body-change twins the same
-way, and the typed leaves took the tag at birth. Ordering in every
+Other functions whose bodies were already pure glyphs were annotated the
+same way with no body change, and newly written typed leaf functions carry the
+tag from the start. Ordering in every
 case: `@ kernel` first, `@ public` second. A staged-carrier body that walks
-flat lists is *not* a kernel — the census annotated only glyph bodies
+flat lists is *not* a kernel — only glyph bodies were annotated
 (`let kt ← kbᵀ; let scores ← qb · kt`), and `gather_carrier` /
 `transpose_carrier` are deliberately untagged
 (commented "Not @ kernel: no gather glyph or method twin yet").
 
 ### 12. Staged carriers pin into dimensional tensors through `do`/`catch`, and shared carriers replace local reimplementations
+
+A staged carrier is a library type holding a flat `data` list plus a `shape`;
+pinning turns it into a dimensional tensor type.
 
 **Bad — a local, module-private reimplementation of an operation the library already carries (a local `transpose`):**
 
@@ -665,7 +678,7 @@ fn transpose(tensor.NumericBlock t) → tensor.NumericBlock ⇥ DenseError {
 }
 ```
 
-The pin idiom from the same arc — a staged carrier's flat `data` becomes a
+The pin idiom — a staged carrier's flat `data` becomes a
 dimensional tensor inside `do`/`catch conv`, with the typed variant thrown on
 failure (`pin_rank1` / `pin_rank2`):
 
@@ -682,14 +695,14 @@ fn pin_rank1<size N>(tensor.NumericBlock t, string name) → tensor<f32, [N]> �
 
 An earlier boundary — a size-generic pin on a `⇥ DenseError` function is
 SEM016, so pin only concrete shapes — no longer holds: size-generic pins
-check today (`pin_rank1<size N>` above; probed 2026-10-01). Duplicate
+check today (`pin_rank1<size N>` above; probed). Duplicate
 flat-walk implementations of an operation a sibling module already exposes as
 a carrier are the finding; the fix is the shared carrier plus (when a
 dimensional type is needed) the pin.
 
 ### 13. `en`-locale files spell identifiers in English
 
-The wave respelled leftover Latin in an `en`-locale package: the
+The cleanup respelled leftover Latin in an `en`-locale package: the
 parameter `causalis` → `causal`, the error variant `TerminusExcedit` →
 `IndexOutOfBounds`, and the field `ligatum` → `tied` (dense config). Do not
 flag deliberate paper-Greek identifiers (`γ`, `ε`, `θ` — see
@@ -697,9 +710,10 @@ flag deliberate paper-Greek identifiers (`γ`, `ε`, `θ` — see
 file, and the fix is the plain English identifier. Locale surfaces are sealed
 per file — `en` and `la` spellings never mix in one file.
 
-Authority for this section: the library conversions summarized above
+Evidence for this section: conversions made in a Faber library's source
 (while→range, collection walks, membership/contains, module-level sets,
-section banners, the kernel census, typed assembly, English respells). The
+section banners, kernel annotation, typed assembly, English respellings);
+the checkable parts are cited per item. The
 `between` spelling it used is retired (see 6 and 7), as is the module-level
 set spelling (see 9).
 
@@ -708,23 +722,24 @@ set spelling (see 9).
 Section 11 covers a body that is already pure glyphs. This section covers the
 mixed function: admit/policy and tensor math in one `⇥` signature. That
 function cannot be `@ kernel`. Cut it. Full pair and decision tree:
-`references/patterns.md` `kernel-region-split` (settled,
-2026-08-28).
+`kernel-region-split` in `references/patterns.md`.
 
 **Bad — policy and math share the `⇥` function, so the math never becomes a
 device region.**
 
-**Good — wrapper keeps `require` / bags / `source` / optional-bias presence;
+**Good — wrapper keeps `require` / host-side containers / `source` / optional-bias presence;
 math reuses existing `@ kernel` leaves, or a named `@ kernel` leaf (`@ public` when host code calls it; a private kernel
 called from host is `SEM008 nucleum_private_host_call`) when a second caller
-will share it. The kernel-closure modifier is ruled for retirement (K7b,
-2026-09-30); do not add new uses.**
-An illegal nested call becomes an argument, not a poison. Session drivers stay
-ordinary. A conversion that does not change the exported launch plan must not
-claim a launch-count delta.
+will share it. The kernel-closure modifier is retired (it still checks); do not add new
+uses.**
+An illegal nested call (one a kernel may not contain) becomes an argument to
+the region instead of being dragged inside. Session drivers stay ordinary. A
+conversion that does not change the exported launch plan (the set of device
+kernel launches) must not claim a launch-count delta.
 
 This supersedes the earlier "assemblers stay unannotated / no
-in-body call" guidance for fusion parents: parents that call leaves are the fusion
-surface; composition inlines those calls. Flag a `⇥` function whose body is
+in-body call" guidance for fusion parents (functions whose kernels the compiler merges
+into fewer launches): parents that call leaves are the fusion surface;
+composition inlines those calls. Flag a `⇥` function whose body is
 already only kernel/glyph math as convert-class. Flag marking that `⇥`
 function `@ kernel` as a false fix.
