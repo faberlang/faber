@@ -1,0 +1,38 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "width_type_sugar", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
+category = "conversion"
+canonical = false
+summary = "Flat lista to matrix conversio."
+syntax = "<lista> ↦ matrix<T, [R, C]>"
+related = ["↦", "lista", "matrix", "tensor"]
+locale = "en"
++++
+
+# =============================================================================
+# ↦ — Flat lista to matrix conversio.
+# =============================================================================
+#
+# What this teaches:
+#   • Flat to shaped conversion — a flat `list<T>` converts into a `matrix` when the target type witnesses a literal Figura.
+#   • Row-major fill — the flat cells fill the matrix row by row, so the first row takes the first two elements.
+#
+# Common mistakes:
+#   • Mismatching the lista length and the target matrix shape — the element counts must agree.
+#
+# See also: ↦, lista, matrix, tensor
+# =============================================================================
+
+
+# conversio — flat lista to matrix
+#
+# WHY: the target matrix type witnesses both element type and register shape, so
+# the flat lista fills the cells row-major. The matrix `print` nests one lista
+# per row.
+
+main {
+    let list<f32> l ← [1.0, 2.0, 3.0, 4.0]
+    let matrix<f32, [2, 2]> m ← l ↦ matrix<f32, [2, 2]>
+    print m
+}
