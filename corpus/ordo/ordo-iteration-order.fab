@@ -1,0 +1,54 @@
++++
+term = "ordo-iteration-order"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "ordo_decl", "enum_member", "incipit_stmt", "itera_stmt", "itera_binding", "expr_stmt", "comparison", "expression", "member_suffix", "literal", "nota_stmt"]
+category = "comparison"
+canonical = false
+summary = "An ordo iterates its members in declaration order; ordering compares declared values."
+syntax = "for from <Ordo> let <member> … | <ordo-value> (≺ | ≻ | ≤ | ≥) <ordo-value>"
+related = ["ordo", "≺", "≻"]
+locale = "en"
++++
+# =============================================================================
+# ordo-iteration-order — Iteration order and value ordering for an ordo.
+# =============================================================================
+#
+# What this teaches:
+#   • `for from Color let c { … }` walks the members in *declaration* order,
+#     not in discriminant order.
+#   • `≺ ≻ ≤ ≥` order two members by their declared discriminant value, so a
+#     member declared later may order before an earlier one.
+#   • The two orders are independent: iteration ignores discriminants.
+#
+# Common mistakes:
+#   • Expecting iteration to follow the numbers — `done = -3` is declared
+#     after `pending = 10` but still comes out fourth.
+#   • Reading `≺` as declaration position rather than the declared value.
+#
+# See also: ordo, ≺, ≻
+# =============================================================================
+
+enum Color {
+    red,
+    green,
+    blue
+}
+
+enum Status {
+    pending = 10,
+    active,
+    done = -3,
+    archived
+}
+
+main {
+    # Iteration: the members in declaration order, discriminants ignored.
+    for from Color let c {
+        print c
+    }
+
+    # Ordering: by declared value, not by declaration position.
+    print Status.pending ≺ Status.active
+    print Status.done ≺ Status.pending
+    print Color.blue ≻ Color.red
+}
