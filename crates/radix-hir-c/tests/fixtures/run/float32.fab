@@ -40,4 +40,10 @@ main {
     print xs
     print xs[0], xs.length()
     print xs + xs
+    # An ascription stores into the declared width, and a binary32 declaration
+    # widens into a binary64 one.
+    let f32 asc ← 1.5 ∷ f32
+    print asc
+    let float widened ← asc
+    print widened
 }

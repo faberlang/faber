@@ -1610,6 +1610,20 @@ impl Emitter<'_> {
             | (Ty::Bool, Value::Truth)
             | (Ty::Float, Value::Float)
             | (Ty::Float32, Value::Float32) => Ok(value),
+            // A store across the two float widths is the C cast: `f32`
+            // narrows, `float` widens.
+            (Ty::Float32, Value::Float) => {
+                Ok(
+                    Operand::new(format!("((float){})", value.text), Value::Float32)
+                        .with_effect(value.effect),
+                )
+            }
+            (Ty::Float, Value::Float32) => {
+                Ok(
+                    Operand::new(format!("((double){})", value.text), Value::Float)
+                        .with_effect(value.effect),
+                )
+            }
             (Ty::List(slot), Value::List(elem)) if slot == elem => Ok(value),
             (Ty::Genus(slot), Value::Genus(genus)) if slot == genus => Ok(value),
             (Ty::Int, Value::Exact) => {
@@ -1777,6 +1791,21 @@ impl Emitter<'_> {
                 }
                 Ok(self.store_word(&value, class, "saturating", width))
             }
+            // A store across the two float widths is the C cast.
+            Ty::Float32 => match value.value {
+                Value::Float => Ok(
+                    Operand::new(format!("((float){})", value.text), Value::Float32)
+                        .with_effect(value.effect),
+                ),
+                _ => Ok(value),
+            },
+            Ty::Float => match value.value {
+                Value::Float32 => Ok(
+                    Operand::new(format!("((double){})", value.text), Value::Float)
+                        .with_effect(value.effect),
+                ),
+                _ => Ok(value),
+            },
             _ => Ok(value),
         }
     }

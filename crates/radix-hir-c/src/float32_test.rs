@@ -50,3 +50,12 @@ fn a_binary32_list_is_the_f32_family() {
     assert!(code.contains("faber_list_f32_of"), "{code}");
     assert!(code.contains("faber_list_f32_show"), "{code}");
 }
+
+#[test]
+fn a_store_across_the_float_widths_is_the_c_cast() {
+    let code = emitted(
+        "main {\n    let f32 a ← 1.5 ∷ f32\n    let float b ← a\n    print a, b\n}",
+    );
+    assert!(code.contains("((float)1.5)"), "{code}");
+    assert!(code.contains("((double)l_a)"), "{code}");
+}
