@@ -1,5 +1,12 @@
 # Faber
 
+> **About this repository's history.** It was produced by running
+> `git filter-repo` over the private Radix compiler repository as part of the
+> public release. Only the open-source paths were kept, so commit messages may
+> refer to commits, issues and files that are not here. The earlier public
+> repository is archived as
+> [faber-1.x](https://github.com/faberlang/faber-1.x).
+
 Faber is a programming language designed to be written by language models and
 read by people. It is built on a small number of uniform, mechanical rules, so
 that a model can predict what a program means without importing the habits of
