@@ -95,6 +95,59 @@ fn selective_member_targets(
     members
 }
 
+/// Link a bare read of a selectively imported const member to the synthetic
+/// const a `module.K` read reaches.
+///
+/// A selective member (`import from "lib:mod" const K`) is a caller-owned
+/// value local with no namespace receiver, so the namespace data-member
+/// rewrite never keys on the bare read `K`. The linker registered the exported
+/// const under the member's own import item def in `data_member_targets`; the
+/// read's `Path` def only needs the swap to the synthetic const so the
+/// transplant seam materializes its value.
+struct SelectiveMemberConstRewriter<'a> {
+    synthetic: &'a HashMap<DefId, DefId>,
+}
+
+impl HirVisitorMut for SelectiveMemberConstRewriter<'_> {
+    fn visit_expr_mut(&mut self, expr: &mut radix_module::hir::HirExpression) {
+        if let HirExpressionKind::Path(def_id) = &mut expr.kind
+            && let Some(target) = self.synthetic.get(def_id).copied()
+        {
+            *def_id = target;
+        }
+        walk_expr_mut(self, expr);
+    }
+}
+
+/// The synthetic const each selectively imported member of `analysis` links
+/// to, keyed by the member's import item def. Function members are absent
+/// (they link through `NamespaceCallTargets`), so function-value references
+/// are untouched.
+fn selective_member_const_targets(
+    unit_path: &Path,
+    analysis: &radix_module::driver::AnalyzedModule,
+    data_member_targets: &NamespaceDataMemberTargets,
+) -> HashMap<DefId, DefId> {
+    let mut members = HashMap::new();
+    for item in &analysis.hir.items {
+        let HirItemKind::Import(import) = &item.kind else {
+            continue;
+        };
+        if !import.selective {
+            continue;
+        }
+        for member in &import.items {
+            let name = analysis.interner.resolve(member.name).to_owned();
+            if let Some(target) =
+                data_member_targets.get(&(unit_path.to_path_buf(), member.def_id, name))
+            {
+                members.insert(member.def_id, *target);
+            }
+        }
+    }
+    members
+}
+
 /// Post-rewrite pass: recover a cape handler binding whose error type was
 /// typed before the shadowed-alias namespace rewrite resolved its body.
 ///
@@ -1385,6 +1438,16 @@ pub(super) fn rewrite_analysis_namespace_calls(
         walk_program_mut(
             &mut SelectiveMemberCallRewriter {
                 synthetic: &selective_members,
+            },
+            &mut analysis.hir,
+        );
+    }
+
+    let selective_consts = selective_member_const_targets(unit_path, analysis, data_member_targets);
+    if !selective_consts.is_empty() {
+        walk_program_mut(
+            &mut SelectiveMemberConstRewriter {
+                synthetic: &selective_consts,
             },
             &mut analysis.hir,
         );
