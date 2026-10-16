@@ -36,6 +36,7 @@ Prefer:
 - parameters take no `let`/`mut`/`const`: `own` and `copy` parameters are writable by the callee, `mut` writes the caller's value, unmarked and `ref` are read-only; `own` takes only a whole local binding or a fresh value (`eat(own make())`), and `a` is dead after `eat(own a)` (`SEM050 use_after_own`); to give away a field write `dup(copy b.xs)` instead
 - a comment on its own line: `#` must be the first non-whitespace token, and `code # note` is `LEX007 inline_hash_after_code`
 - `async` / `generator` / `async_generator` (la `fiet` / `fiunt` / `fient`) for new async and stream code
+- the long type spellings (`list<f32>`, `tensor<f32, [2, 2]>`) in general code; the width sugar (`lf32`, `tf32[2, 2]`, bare `f32`) belongs in numeric and tensor code. Match the surrounding file
 
 Avoid:
 
@@ -43,6 +44,7 @@ Avoid:
 - JavaScript or Rust habits pasted through a Latin thesaurus
 - hiding meaning behind dense helper layers
 - mixing stylistic dialects in one file
+- sugaring every type with `tf32` / `lf32` outside numeric and tensor code
 - nullable or optional syntax that is not in `EBNF.md` (`T?`, prefix `if` (la `si`) on types, etc.); the null type is `T ∪ none` in en and `T ∪ nihil` in la, and the null value is `null` (la `nulla`)
 - the retired wrapped numerics `int<i32>` / `float<f32>` (la `numerus<i32>` / `fractus<f32>`; `PARSE040 numeric_wrapper_retired`); write `i32`, `f32`
 - `static` (la `generis`) anywhere: a module-level `static` is `PARSE010 static_decl_retired` and a class member `static` is `static_member_retired`; a type-level constant is a class member `const T X = e`

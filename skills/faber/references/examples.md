@@ -67,6 +67,10 @@ Below that, most files carry a `#` comment block: `What this teaches`,
 and `BACKEND:` lines. These are for humans and `faber explain`; they do not
 replace `EBNF.md`.
 
+Not every exemplar shows current style: some exist to cover a migration or a
+rejected form. Check one with `faber check`, and prefer a same-locale exemplar
+from the keyword's own directory.
+
 ## How To Find An Example
 
 1. Search `corpus/` frontmatter for the file whose `explains` lists the keyword.

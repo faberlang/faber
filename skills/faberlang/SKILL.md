@@ -60,6 +60,19 @@ and `faber repl` interpret one-liners. Read diagnostics with
 `faber check --diagnostics` or `faber explain <CODE>[.<issue>]`; the default
 output is the compact code-first identity.
 
+`faber check --lower <file-or-package>` also lowers what it checked to MIR (the
+mid-level intermediate representation the runner executes) and runs the MIR
+validator, without running anything. It finds programs that pass semantic
+analysis but cannot be lowered. Failures print as located diagnostics
+(`PKG001:<issue>`), and the run ends with `<path>: checks but does not lower`. A
+package with no entry unit, such as a library like Norma, is lowered module by
+module.
+
+When searching, remember that in ripgrep `-r` means `--replace`, not
+"recursive" (directories are searched recursively by default): `rg -rn PATTERN`
+rewrites every match to the letter `n` in the output, so `unwrap_or` looks like
+`n_or`. Write `rg -n PATTERN`.
+
 The binary embeds the locale packs, the `faber explain` reference (corpus
 exempla whose frontmatter lists `explains`), the runtime support sources, and
 Norma (`lib/norma/src`, `lib/norma/locale`, manifests). After editing any of
@@ -110,8 +123,19 @@ definite-assignment, exhaustiveness, return-path, lint; the registry in
 `radix-semantic/src/passes` is the authority). Collection, resolution and
 lowering errors stop the pipeline; typecheck and later passes collect into one
 result. Backends take HIR or MIR from there, and `radix-module/src/driver/`
-sequences it. Radix lowers and serializes; formatting, linting and package
-workflow belong to `faber`.
+sequences it.
+
+After analysis the work splits into two paths. The source-emission path takes
+HIR (the typed, resolved program) and writes source text; this repository
+carries the Faber re-emitter and the C emitter. The MIR path feeds the
+in-process runner behind `faber run`, the portable package images (FMIR, in
+text and binary form) and the native Cranelift backend. `faber targets` lists
+what the current build supports. Target identity lives in `radix-target`: its
+enum variants are prefixed by lowering family (`Hir…` for HIR source backends,
+`Mir…` for MIR backends), while the names users pass to `faber` flags are
+separate spellings. The compiler lowers and serializes target artifacts; it
+never runs target formatters, linters, build tools, host launchers or package
+execution. Those belong to `faber`.
 
 ## Grammar, locales, Norma
 
@@ -123,7 +147,17 @@ workflow belong to `faber`.
   other packs follow as proposals. Library member rows live beside the library
   (`lib/norma/locale/{en,la}`).
 - Norma is `lib/norma/src/`, with exempla in `lib/norma/exempla/` and proofs in
-  `lib/norma/proof/`.
+  `lib/norma/proof/`. Imports are flat `norma:*` modules with English names in
+  every locale (`norma:fs`, `norma:console`, `norma:json`, …), resolved from the
+  library embedded in the `faber` binary, so no sibling checkout or library-home
+  setting is needed. The native I/O behind them is the shared crate
+  `crates/faber-leaf`; there is no Rust crate for Norma. Compiler-owned
+  collection methods are in `crates/radix-intrinsics/src/`, with exempla in
+  `corpus/intrinseca/`.
+- Library method names follow one stem per operation: the form of the stem, not
+  an English suffix such as `Async` or `Stream`, carries time, flow and
+  ownership. Do not invent a second root for the same operation; mirror the
+  neighbouring members in `lib/norma/src/`.
 
 ## Reader-locale contract
 
@@ -136,6 +170,12 @@ the source pack of an untagged input. Package selection lives in
 loader are in `crates/faber/src/package/locale.rs`; the Faber re-emit seam is
 `reemit_faber` in `radix-module/src/driver/faber_format/compile.rs`.
 
+In a package manifest the code locale is the `[locale]` table (`locale = "en"`);
+the older `[reader]` table name is still accepted as an alias. `--locale` (the
+code locale) and `--diagnostics-locale` (the language of diagnostic messages)
+are independent flags. A fallback between locale surfaces must be explicit and
+reported, never silent.
+
 ## Diagnostics
 
 Diagnostics are identified by code, issue and named arguments, never by prose.
@@ -145,7 +185,9 @@ and help rows in the packs (`locale/<id>/pack.toml`,
 `*_pack_completeness_test.rs` tests in `radix-module/src/` enforce completeness.
 Tests assert code, issue and args; the hygiene test
 `non_renderer_tests_do_not_assert_diagnostic_text` (`crates/radix-hygiene/tests/`)
-fails a test that matches diagnostic text.
+fails a test that matches diagnostic text. A diagnostic that lacks structured
+facts (code, issue, named arguments) is fixed at the emission site; never match
+English fragments of the message and never add a shim.
 
 ## Corpus and the public suite
 
@@ -206,10 +248,37 @@ expectation, never something to silence.
   `runner_kernel_refused`.
 - A target that cannot express a feature rejects it by name; the language is not
   narrowed to fit a target.
+- The repository is self-contained: nothing in the tree reads or writes outside
+  it. No test, script, generator, manifest or CI step climbs above the
+  repository root (`../`), names a sibling checkout, hard-codes a home-directory
+  path, or declares a Cargo `path =` dependency that leaves the repository, and
+  no compiler crate depends on `runtime/*`. Inputs the caller supplies by
+  environment variable (a model file, a hardware lane) are not tree content.
+- Backend-specific tests live in the crate that owns the backend, not in the
+  facade crate behind `#[cfg(feature = "…")]`. If a test is too broad to move,
+  split the backend-owned proof out first.
+- Keep a change to what the behavior requires. No opportunistic cleanup during
+  feature work (do it in a change of its own), and keep formatter output in its
+  own commit when practical.
 - No Bun or Node in product work; Cargo only.
 - Tests prove the target. Never weaken a test to get green.
 - When this skill or any prose disagrees with the code, the code wins; fix the
   prose.
+
+## Code standards
+
+- Doc-comment tags record why a piece of code exists: `GRAMMAR:` (the grammar
+  production it implements), `WHY:` (rationale), `EDGE:` (an edge case it
+  handles), `TARGET:` (a per-target constraint), `PERF:` (a performance
+  decision).
+- Collect errors; never crash on malformed input.
+- Comments explain why, not what. Prefer guard clauses.
+- A `match` that serves as a proof surface is exhaustive with individual arms;
+  group arms only when the group is a named domain invariant.
+- Match arms route; nontrivial work goes into named helpers, not closures or
+  arm-local blocks.
+- Tests live in dedicated `_test.rs` files, not in inline
+  `#[cfg(test)] mod tests`.
 
 ## Retired surfaces (do not reintroduce)
 
