@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 334,
-    "analyzable": 432
+    "capable": 339,
+    "analyzable": 443
   },
   "terms": [
     {
@@ -126,8 +126,8 @@
     {
       "term": "cape",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "casu",
@@ -186,8 +186,8 @@
     {
       "term": "de",
       "rule": "keyword",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "descriptio",
@@ -364,16 +364,16 @@
       "analyzable": 1
     },
     {
-      "term": "generis",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
-    },
-    {
       "term": "genus",
       "rule": "keyword",
       "capable": 14,
       "analyzable": 18
+    },
+    {
+      "term": "guillemet",
+      "rule": "existing-home",
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "iace",
@@ -457,7 +457,7 @@
       "term": "instans",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 3
+      "analyzable": 4
     },
     {
       "term": "itera",
@@ -474,7 +474,7 @@
     {
       "term": "lege",
       "rule": "keyword",
-      "capable": 1,
+      "capable": 0,
       "analyzable": 1
     },
     {
@@ -666,8 +666,8 @@
     {
       "term": "praefixum",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "praepara",
@@ -846,7 +846,7 @@
     {
       "term": "summa",
       "rule": "concept",
-      "capable": 5,
+      "capable": 6,
       "analyzable": 11
     },
     {
@@ -889,13 +889,19 @@
       "term": "tensor",
       "rule": "type",
       "capable": 12,
-      "analyzable": 21
+      "analyzable": 20
     },
     {
       "term": "textus",
       "rule": "keyword",
       "capable": 3,
       "analyzable": 4
+    },
+    {
+      "term": "trapped",
+      "rule": "type",
+      "capable": 0,
+      "analyzable": 1
     },
     {
       "term": "typus",
@@ -1044,8 +1050,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 11,
-      "analyzable": 27
+      "capable": 12,
+      "analyzable": 33
     },
     {
       "term": "⇇",
