@@ -1496,6 +1496,30 @@ help = "लोअरिंग के लिए AST संरचना ठीक 
 message = "width marker पैरामीटर स्वीकार नहीं कर सकता"
 help = "लोअरिंग के लिए AST संरचना ठीक करें"
 
+[diagnostics.SEM008.issues.nucleum_d64]
+message = "nucleum कर्नेल में d64 समर्थित नहीं है"
+help = "समर्थित कर्नेल मान प्रकार का उपयोग करें"
+
+[diagnostics.SEM008.issues.nucleum_extent_unproven]
+message = "कर्नेल पूर्णांक extent {extent} पोर्टेबल श्रेणी में फिट होना सिद्ध नहीं है"
+help = "extent को पोर्टेबल पूर्णांक श्रेणी के मानों तक सीमित करें"
+
+[diagnostics.SEM008.issues.nucleum_f64]
+message = "nucleum कर्नेल में f64 समर्थित नहीं है"
+help = "फ़्लोटिंग-पॉइंट कर्नेल मानों के लिए f32 का उपयोग करें"
+
+[diagnostics.SEM008.issues.nucleum_trapping_store]
+message = "nucleum कर्नेल में चौड़ाई {width} का store trap कर सकता है"
+help = "सिद्ध करें कि store श्रेणी में है, या wrapping या saturating cell का उपयोग करें"
+
+[diagnostics.SEM008.issues.nucleum_wide_integer]
+message = "पूर्णांक चौड़ाई {width} समर्थित nucleum कर्नेल चौड़ाई से अधिक है"
+help = "32 बिट से अधिक चौड़ाई वाला पूर्णांक उपयोग न करें"
+
+[diagnostics.SEM008.issues.nucleum_wide_intermediate]
+message = "कर्नेल intermediate extent {extent} पोर्टेबल पूर्णांक श्रेणी से अधिक है"
+help = "intermediate मानों को पोर्टेबल पूर्णांक श्रेणी के भीतर रखें"
+
 [diagnostics.SEM009]
 message = "CLI सत्यापन त्रुटि"
 help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
@@ -2083,6 +2107,14 @@ help = "अभिव्यक्ति का प्रकार अपेक्
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
 message = "postfix gradient selection (`call(...) ∇ [places]`) को tensor-glyphs 2B autograd surface आने तक lower नहीं किया जाता; Phase 2A में कोई operand, selector या result rule सक्रिय नहीं है"
 help = "Phase 2A में gradient selection (`∇`) केवल parse-only है; eligibility/selector rules tensor-glyphs 2B के साथ आएंगे"
+
+[diagnostics.SEM010.issues.implet_method_signature_mismatch]
+message = "वर्ग {genus} की {method} method उसके {contract} के {implet} से मेल नहीं खाती: {expected} अपेक्षित, {found} मिला"
+help = "method के signature को contract के घोषित signature से मिलाएँ"
+
+[diagnostics.SEM010.issues.implet_missing_method]
+message = "वर्ग {genus} उसके {contract} के {implet} द्वारा आवश्यक {method} method प्रदान नहीं करता"
+help = "contract द्वारा घोषित signature वाली {method} method जोड़ें, या {implet} हटा दें"
 
 [diagnostics.SEM011]
 message = "ऑपरेंड प्रकार अमान्य हैं"
