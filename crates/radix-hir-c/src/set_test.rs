@@ -8,7 +8,7 @@ fn set_basics_use_the_set_helpers() {
         "main {\n    mut set<int> s ← empty\n    s.add(1)\n    print s.has(1), s.delete(1), s.length(), s.is_empty()\n}",
     );
     assert!(code.contains("faber_set_i64_add(faber_a,"), "{code}");
-    assert!(code.contains("faber_list_i64_contains("), "{code}");
+    assert!(code.contains("faber_set_i64_has("), "{code}");
     assert!(code.contains("faber_set_i64_delete("), "{code}");
 }
 

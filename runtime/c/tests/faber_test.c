@@ -115,6 +115,129 @@ int main(int argc, char **argv) {
     check_int("int < float exact", faber_int_lt_float(9007199254740993, 9007199254740992.0), 0);
     check_int("int > float exact", faber_int_gt_float(9007199254740993, 9007199254740992.0), 1);
 
+    /* The set index: growth past the first capacity, duplicate adds, delete
+     * compaction with a rebuild, and a re-add after the delete. */
+    {
+        faber_list_i64 *set = faber_list_i64_new(&arena, 0);
+        int64_t sum = 0;
+        for (index = 0; index < 100; index++) {
+            check_int("set add new", faber_set_i64_add(&arena, set, index * 37 % 100), 1);
+        }
+        check_int("set add duplicate", faber_set_i64_add(&arena, set, 7), 0);
+        check_int("set len", set->len, 100);
+        for (index = 0; index < 100; index++) {
+            check_int("set has member", faber_set_i64_has(set, index), 1);
+        }
+        check_int("set has absent", faber_set_i64_has(set, 100), 0);
+        check_int("set delete member", faber_set_i64_delete(set, 41), 1);
+        check_int("set delete absent", faber_set_i64_delete(set, 41), 0);
+        check_int("set len after delete", set->len, 99);
+        check_int("set has deleted", faber_set_i64_has(set, 41), 0);
+        for (index = 0; index < 100; index++) {
+            sum += faber_set_i64_has(set, index);
+        }
+        check_int("set has all but one", sum, 99);
+        check_int("set order keeps first", set->items[0], 0);
+        check_int("set order keeps second", set->items[1], 37);
+        check_int("set order compacts", set->items[93], 78);
+        check_int("set re-add after delete", faber_set_i64_add(&arena, set, 41), 1);
+        check_int("set len after re-add", set->len, 100);
+        check_int("set re-add is last", set->items[99], 41);
+    }
+
+    /* Signed zero shares a bucket (== says they are equal); NaN is never
+     * found (== says they are not), so it accumulates and cannot be
+     * deleted. */
+    {
+        faber_list_f64 *set = faber_list_f64_new(&arena, 0);
+        double zero = 0.0;
+        double negative_zero = -0.0;
+        double nan = zero / zero;
+        check_int("f64 set add zero", faber_set_f64_add(&arena, set, zero), 1);
+        check_int("f64 set add minus zero", faber_set_f64_add(&arena, set, negative_zero), 0);
+        check_int("f64 set len one zero", set->len, 1);
+        check_int("f64 set has minus zero", faber_set_f64_has(set, negative_zero), 1);
+        check_int("f64 set add nan", faber_set_f64_add(&arena, set, nan), 1);
+        check_int("f64 set add nan again", faber_set_f64_add(&arena, set, nan), 1);
+        check_int("f64 set len with nans", set->len, 3);
+        check_int("f64 set has nan", faber_set_f64_has(set, nan), 0);
+        check_int("f64 set delete nan", faber_set_f64_delete(set, nan), 0);
+        check_int("f64 set len keeps nans", set->len, 3);
+    }
+
+    /* The map index: growth past the first capacity, an overwrite in place,
+     * delete compaction with a rebuild, and a re-add appended at the end. */
+    {
+        faber_map_i64_i64 *map = faber_map_i64_i64_new(&arena);
+        int64_t value = 0;
+        int64_t sum = 0;
+        for (index = 0; index < 100; index++) {
+            faber_map_i64_i64_put(&arena, map, index * 37 % 100, index);
+        }
+        faber_map_i64_i64_put(&arena, map, 7, 7777);
+        check_int("map len", map->keys->len, 100);
+        check_int("map get overwritten", faber_map_i64_i64_get(map, 7, &value), 1);
+        check_int("map overwritten value", value, 7777);
+        for (index = 0; index < 100; index++) {
+            sum += faber_map_i64_i64_has(map, index);
+        }
+        check_int("map has all", sum, 100);
+        check_int("map get absent", faber_map_i64_i64_get(map, 100, &value), 0);
+        check_int("map delete member", faber_map_i64_i64_delete(map, 41), 1);
+        check_int("map delete absent", faber_map_i64_i64_delete(map, 41), 0);
+        check_int("map has deleted", faber_map_i64_i64_has(map, 41), 0);
+        check_int("map order keeps first", map->keys->items[0], 0);
+        check_int("map order compacts", map->keys->items[93], 78);
+        faber_map_i64_i64_put(&arena, map, 41, 4141);
+        check_int("map re-add is last", map->keys->items[99], 41);
+        check_int("map re-add value", faber_map_i64_i64_get(map, 41, &value), 1);
+        check_int("map re-add value read", value, 4141);
+    }
+
+    /* Text keys hash their bytes and stay strcmp-equal. */
+    {
+        faber_map_text_i64 *map = faber_map_text_i64_new(&arena);
+        int64_t value = 0;
+        faber_map_text_i64_put(&arena, map, "alpha", 1);
+        faber_map_text_i64_put(&arena, map, "beta", 2);
+        faber_map_text_i64_put(&arena, map, "gamma", 3);
+        check_int("text map len", map->keys->len, 3);
+        check_int("text map get", faber_map_text_i64_get(map, "beta", &value), 1);
+        check_int("text map value", value, 2);
+        check_int("text map has", faber_map_text_i64_has(map, "gamma"), 1);
+        check_int("text map has absent", faber_map_text_i64_has(map, "delta"), 0);
+        check_int("text map delete", faber_map_text_i64_delete(map, "alpha"), 1);
+        check_int("text map len after delete", map->keys->len, 2);
+        check_int("text map has deleted", faber_map_text_i64_has(map, "alpha"), 0);
+    }
+
+    /* An interleaved delete/has stress over a size that forces index growth:
+     * after every delete, a survivor must stay findable and the deleted key
+     * must not be (a stale slot would answer wrong). */
+    {
+        faber_list_i64 *set = faber_list_i64_new(&arena, 0);
+        faber_map_i64_i64 *map = faber_map_i64_i64_new(&arena);
+        int64_t value = 0;
+        for (index = 0; index < 200; index++) {
+            faber_set_i64_add(&arena, set, index);
+            faber_map_i64_i64_put(&arena, map, index, index * 3);
+        }
+        check_int("stress len", set->len, 200);
+        for (index = 0; index < 199; index++) {
+            check_int("stress delete", faber_set_i64_delete(set, index), 1);
+            check_int("stress delete again", faber_set_i64_delete(set, index), 0);
+            check_int("stress has deleted", faber_set_i64_has(set, index), 0);
+            check_int("stress has survivor", faber_set_i64_has(set, 199), 1);
+            check_int("stress map delete", faber_map_i64_i64_delete(map, index), 1);
+            check_int("stress map has deleted", faber_map_i64_i64_has(map, index), 0);
+            check_int("stress map has survivor", faber_map_i64_i64_has(map, 199), 1);
+        }
+        check_int("stress final len", set->len, 1);
+        check_int("stress map final len", map->keys->len, 1);
+        check_int("stress map get survivor", faber_map_i64_i64_get(map, 199, &value), 1);
+        check_int("stress map survivor value", value, 199 * 3);
+    }
+
     if (failures != 0) {
         fprintf(stderr, "faber_test: %d failed\n", failures);
         return 1;

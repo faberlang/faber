@@ -919,6 +919,62 @@ static inline int64_t faber_collection_next_capacity(int64_t capacity) {
     return capacity * 2;
 }
 
+/* The slot count of a set or map index holding `count` entries at or below a
+ * 0.7 load factor, as a power of two. */
+static inline size_t faber_collection_index_capacity(int64_t count) {
+    size_t capacity = 8;
+    if (count < 0 || (uint64_t)count > UINT64_MAX / 10) {
+        faber_trap("collection allocation size overflow");
+    }
+    while ((uint64_t)count * 10 >= (uint64_t)capacity * 7) {
+        if (capacity > ((size_t)1 << 61)) {
+            faber_trap("collection capacity overflow");
+        }
+        capacity <<= 1;
+    }
+    return capacity;
+}
+
+/* True when `count` entries in `capacity` index slots would pass the 0.7
+ * load factor, so the index must grow before the next insert. */
+static inline bool faber_collection_index_full(int64_t count, size_t capacity) {
+    if (count < 0 || (uint64_t)count > UINT64_MAX / 10) {
+        faber_trap("collection allocation size overflow");
+    }
+    return (uint64_t)count * 10 >= (uint64_t)capacity * 7;
+}
+
+/* The index hashes only spread keys; equality stays the family's EQ, so
+ * NaN (never ==) is never found and signed zero (+0.0 == -0.0) shares one
+ * bucket from either spelling. */
+static inline uint64_t faber_hash_mix(uint64_t x) {
+    x += UINT64_C(0x9e3779b97f4a7c15);
+    x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+    x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+    return x ^ (x >> 31);
+}
+
+static inline uint64_t faber_hash_text_bytes(const char *text) {
+    uint64_t hash = UINT64_C(1469598103934665603);
+    for (; *text != '\0'; text++) {
+        hash ^= (unsigned char)*text;
+        hash *= UINT64_C(1099511628211);
+    }
+    return hash;
+}
+
+static inline uint64_t faber_hash_f64_key(double value) {
+    double normalized = value + 0.0;
+    uint64_t bits;
+    memcpy(&bits, &normalized, sizeof bits);
+    return faber_hash_mix(bits);
+}
+
+#define FABER_HASH_I64(value) faber_hash_mix((uint64_t)(int64_t)(value))
+#define FABER_HASH_BOOL(value) faber_hash_mix((uint64_t)(value))
+#define FABER_HASH_TEXT(value) faber_hash_text_bytes(value)
+#define FABER_HASH_F64(value) faber_hash_f64_key(value)
+
 static inline void *faber_alloc(faber_arena *arena, size_t size) {
     const size_t align = _Alignof(max_align_t);
     faber_chunk *chunk = arena->head;
@@ -1613,6 +1669,12 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         int64_t len;                                                                    \
         int64_t cap;                                                                    \
         bool fixed; /* a bounded list: a push at capacity is an error, not a grow */    \
+        /* The set index (FABER_SET): open-addressing slots over the element        \
+         * positions. NULL until a set operation builds it, so a plain list never   \
+         * carries one, and only the set helpers mutate it; a copy or a sorted      \
+         * view starts without it again. */                                         \
+        int64_t *set_slots;                                                             \
+        size_t set_mask;                                                                \
     } faber_list_##NAME;                                                                \
                                                                                         \
     static inline faber_list_##NAME *faber_list_##NAME##_new(faber_arena *arena,        \
@@ -1623,6 +1685,8 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         list->len = 0;                                                                  \
         list->cap = capacity;                                                           \
         list->fixed = false;                                                            \
+        list->set_slots = NULL;                                                         \
+        list->set_mask = 0;                                                             \
         return list;                                                                    \
     }                                                                                   \
                                                                                         \
@@ -2069,30 +2133,144 @@ FABER_LIST_OPS(u16, uint16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(u32, uint32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(u64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 
-/* Sets (`copia<T>`): the list storage under the set contract. `add` keeps the
- * element unique, `delete` removes by value, and the algebra returns a new
- * set. Element order is unspecified (D19.2), as the runner's. */
-#define FABER_SET(NAME, TYPE, EQ, LT)                                                   \
+/* Sets (`copia<T>`): the list storage under the set contract, plus an
+ * open-addressing index over the element positions so membership stays
+ * constant-time while the storage keeps its insertion order. The index is
+ * NULL until a set operation builds it, and `find` falls back to the scan,
+ * so a value that never flowed through a set operation answers exactly as a
+ * list. Element order is unspecified (D19.2), as the runner's. */
+#define FABER_SET(NAME, TYPE, EQ, LT, HASH)                                             \
+    /* The element's position, or -1: the index probe when one is built, the scan     \
+     * otherwise. Equality is always EQ, so NaN (never ==) is never found and       \
+     * signed zero (== across the sign) is found from either spelling. */           \
+    static inline int64_t faber_set_##NAME##_find(const faber_list_##NAME *set,         \
+                                                  TYPE item) {                          \
+        if (set->set_slots != NULL) {                                                   \
+            size_t at = (size_t)(HASH(item) & set->set_mask);                           \
+            for (;;) {                                                                  \
+                int64_t slot = set->set_slots[at];                                      \
+                if (slot == 0) {                                                        \
+                    return -1;                                                          \
+                }                                                                       \
+                if (EQ(set->items[slot - 1], item)) {                                   \
+                    return slot - 1;                                                    \
+                }                                                                       \
+                at = (at + 1) & set->set_mask;                                          \
+            }                                                                           \
+        }                                                                               \
+        {                                                                               \
+            int64_t at;                                                                 \
+            for (at = 0; at < set->len; at++) {                                         \
+                if (EQ(set->items[at], item)) {                                         \
+                    return at;                                                          \
+                }                                                                       \
+            }                                                                           \
+        }                                                                               \
+        return -1;                                                                      \
+    }                                                                                   \
+                                                                                        \
+    static inline bool faber_set_##NAME##_has(const faber_list_##NAME *set,             \
+                                              TYPE item) {                              \
+        return faber_set_##NAME##_find(set, item) >= 0;                                 \
+    }                                                                                   \
+                                                                                        \
+    /* (Re)build the index over the current elements. Delete compaction and index   \
+     * growth rebuild here; the arena keeps the previous slot array, as list        \
+     * growth keeps its previous buffer. */                                         \
+    static inline void faber_set_##NAME##_index_build(faber_arena *arena,               \
+                                                      faber_list_##NAME *set) {          \
+        size_t capacity = faber_collection_index_capacity(set->len);                    \
+        size_t bytes = faber_collection_size_mul(capacity, sizeof(int64_t));            \
+        int64_t *slots = faber_alloc(arena, bytes);                                     \
+        int64_t at;                                                                     \
+        memset(slots, 0, bytes);                                                        \
+        set->set_slots = slots;                                                         \
+        set->set_mask = capacity - 1;                                                   \
+        for (at = 0; at < set->len; at++) {                                             \
+            size_t hole = (size_t)(HASH(set->items[at]) & set->set_mask);               \
+            while (set->set_slots[hole] != 0) {                                         \
+                hole = (hole + 1) & set->set_mask;                                      \
+            }                                                                           \
+            set->set_slots[hole] = at + 1;                                              \
+        }                                                                               \
+    }                                                                                   \
+                                                                                        \
+    /* Register the element a push just appended, growing the index at the 0.7      \
+     * load factor. */                                                                \
+    static inline void faber_set_##NAME##_index_insert(faber_arena *arena,              \
+                                                       faber_list_##NAME *set) {         \
+        if (faber_collection_index_full(set->len, set->set_mask + 1)) {                 \
+            faber_set_##NAME##_index_build(arena, set);                                 \
+            return;                                                                     \
+        }                                                                               \
+        {                                                                               \
+            size_t hole =                                                               \
+                (size_t)(HASH(set->items[set->len - 1]) & set->set_mask);               \
+            while (set->set_slots[hole] != 0) {                                         \
+                hole = (hole + 1) & set->set_mask;                                      \
+            }                                                                           \
+            set->set_slots[hole] = set->len;                                            \
+        }                                                                               \
+    }                                                                                   \
+                                                                                        \
+    /* Remove the deleted position's slot before the items compact: the run past    \
+     * the hole shifts back so probe chains stay intact, then every stored        \
+     * position above the deleted one decrements, as the compaction moves        \
+     * those elements down one. No hashing of live elements, no allocation. */    \
+    static inline void faber_set_##NAME##_index_remove(faber_list_##NAME *set,          \
+                                                       TYPE item, int64_t at) {          \
+        size_t hole = (size_t)(HASH(item) & set->set_mask);                             \
+        size_t capacity = set->set_mask + 1;                                            \
+        size_t scan;                                                                    \
+        size_t i;                                                                       \
+        while (set->set_slots[hole] != at + 1) {                                        \
+            hole = (hole + 1) & set->set_mask;                                          \
+        }                                                                               \
+        scan = (hole + 1) & set->set_mask;                                              \
+        while (set->set_slots[scan] != 0) {                                             \
+            int64_t entry = set->set_slots[scan];                                       \
+            size_t home =                                                               \
+                (size_t)(HASH(set->items[entry - 1]) & set->set_mask);                  \
+            if (((hole - home) & set->set_mask) < ((scan - home) & set->set_mask)) {    \
+                set->set_slots[hole] = entry;                                           \
+                set->set_slots[scan] = 0;                                               \
+                hole = scan;                                                            \
+            }                                                                           \
+            scan = (scan + 1) & set->set_mask;                                          \
+        }                                                                               \
+        set->set_slots[hole] = 0;                                                       \
+        for (i = 0; i < capacity; i++) {                                                \
+            if (set->set_slots[i] > at + 1) {                                           \
+                set->set_slots[i]--;                                                    \
+            }                                                                           \
+        }                                                                               \
+    }                                                                                   \
+                                                                                        \
     static inline bool faber_set_##NAME##_add(faber_arena *arena,                       \
                                               faber_list_##NAME *set, TYPE item) {      \
-        if (faber_list_##NAME##_contains(set, item)) {                                  \
+        if (set->set_slots == NULL) {                                                   \
+            faber_set_##NAME##_index_build(arena, set);                                 \
+        }                                                                               \
+        if (faber_set_##NAME##_find(set, item) >= 0) {                                  \
             return false;                                                               \
         }                                                                               \
         faber_list_##NAME##_push(arena, set, item);                                     \
+        faber_set_##NAME##_index_insert(arena, set);                                    \
         return true;                                                                    \
     }                                                                                   \
                                                                                         \
     static inline bool faber_set_##NAME##_delete(faber_list_##NAME *set, TYPE item) {   \
-        int64_t at;                                                                     \
-        for (at = 0; at < set->len; at++) {                                             \
-            if (EQ(set->items[at], item)) {                                             \
-                memmove(set->items + at, set->items + at + 1,                           \
-                        (size_t)(set->len - at - 1) * sizeof *set->items);               \
-                set->len--;                                                             \
-                return true;                                                            \
-            }                                                                           \
+        int64_t at = faber_set_##NAME##_find(set, item);                                \
+        if (at < 0) {                                                                   \
+            return false;                                                               \
         }                                                                               \
-        return false;                                                                   \
+        if (set->set_slots != NULL) {                                                   \
+            faber_set_##NAME##_index_remove(set, item, at);                             \
+        }                                                                               \
+        memmove(set->items + at, set->items + at + 1,                                   \
+                (size_t)(set->len - at - 1) * sizeof *set->items);                      \
+        set->len--;                                                                     \
+        return true;                                                                    \
     }                                                                                   \
                                                                                         \
     /* `lista ↦ copia`: a new set with the list's distinct elements. */              \
@@ -2110,6 +2288,7 @@ FABER_LIST_OPS(u64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
         faber_arena *arena, const faber_list_##NAME *a, const faber_list_##NAME *b) {   \
         faber_list_##NAME *out = faber_list_##NAME##_copy(arena, a);                    \
         int64_t at;                                                                     \
+        faber_set_##NAME##_index_build(arena, out);                                     \
         for (at = 0; at < b->len; at++) {                                               \
             faber_set_##NAME##_add(arena, out, b->items[at]);                           \
         }                                                                               \
@@ -2121,10 +2300,11 @@ FABER_LIST_OPS(u64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
         faber_list_##NAME *out = faber_list_##NAME##_new(arena, 0);                     \
         int64_t at;                                                                     \
         for (at = 0; at < a->len; at++) {                                               \
-            if (faber_list_##NAME##_contains(b, a->items[at])) {                        \
+            if (faber_set_##NAME##_find(b, a->items[at]) >= 0) {                        \
                 faber_list_##NAME##_push(arena, out, a->items[at]);                     \
             }                                                                           \
         }                                                                               \
+        faber_set_##NAME##_index_build(arena, out);                                     \
         return out;                                                                     \
     }                                                                                   \
                                                                                         \
@@ -2133,10 +2313,11 @@ FABER_LIST_OPS(u64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
         faber_list_##NAME *out = faber_list_##NAME##_new(arena, 0);                     \
         int64_t at;                                                                     \
         for (at = 0; at < a->len; at++) {                                               \
-            if (!faber_list_##NAME##_contains(b, a->items[at])) {                       \
+            if (faber_set_##NAME##_find(b, a->items[at]) < 0) {                         \
                 faber_list_##NAME##_push(arena, out, a->items[at]);                     \
             }                                                                           \
         }                                                                               \
+        faber_set_##NAME##_index_build(arena, out);                                     \
         return out;                                                                     \
     }                                                                                   \
                                                                                         \
@@ -2151,57 +2332,99 @@ FABER_LIST_OPS(u64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
                                                     const faber_list_##NAME *b) {       \
         int64_t at;                                                                     \
         for (at = 0; at < a->len; at++) {                                               \
-            if (!faber_list_##NAME##_contains(b, a->items[at])) {                       \
+            if (faber_set_##NAME##_find(b, a->items[at]) < 0) {                         \
                 return false;                                                           \
             }                                                                           \
         }                                                                               \
         return true;                                                                    \
     }
 
-FABER_SET(i64, int64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_SET(text, faber_text, FABER_LIST_EQ_TEXT, FABER_LIST_LT_TEXT)
-FABER_SET(bool, bool, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_SET(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64)
+FABER_SET(i64, int64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, FABER_HASH_I64)
+FABER_SET(text, faber_text, FABER_LIST_EQ_TEXT, FABER_LIST_LT_TEXT, FABER_HASH_TEXT)
+FABER_SET(bool, bool, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, FABER_HASH_BOOL)
+FABER_SET(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64, FABER_HASH_F64)
 
-/* Maps (`tabula<K,V>`): parallel key and value lists with a linear scan, so a
- * map is an arena pointer and every bind aliases (R1). The corpus sizes are
- * small and order is unspecified (D19.2); a future unit may replace this with
- * a hash table without changing the emitter's contract. Keys are `int` and
- * `text` only (the element classes the corpus uses). */
-#define FABER_MAP(KN, KT, KEQ, VN, VT)                                                  \
+/* Maps (`tabula<K,V>`): parallel key and value lists in insertion order,
+ * plus an open-addressing index over the key positions so lookups stay
+ * constant-time, so a map is an arena pointer and every bind aliases (R1).
+ * The lists keep insertion order and the index never reorders them; order
+ * is unspecified, as the runner's (D19.2). Keys are `int` and `text` only
+ * (the element classes the corpus uses). */
+#define FABER_MAP(KN, KT, KEQ, KHASH, VN, VT)                                           \
     typedef struct faber_map_##KN##_##VN {                                             \
         faber_list_##KN *keys;                                                          \
         faber_list_##VN *values;                                                        \
+        int64_t *slots; /* the key's position plus one; 0 is an empty slot */           \
+        size_t mask;                                                                    \
     } faber_map_##KN##_##VN;                                                            \
+                                                                                        \
+    /* (Re)build the index over the keys. Delete compaction and index growth       \
+     * rebuild here; the arena keeps the previous slot array, as list growth       \
+     * keeps its previous buffer. */                                                \
+    static inline void faber_map_##KN##_##VN##_index_build(                             \
+        faber_arena *arena, faber_map_##KN##_##VN *map) {                               \
+        size_t capacity = faber_collection_index_capacity(map->keys->len);              \
+        size_t bytes = faber_collection_size_mul(capacity, sizeof(int64_t));            \
+        int64_t *slots = faber_alloc(arena, bytes);                                     \
+        int64_t at;                                                                     \
+        memset(slots, 0, bytes);                                                        \
+        map->slots = slots;                                                             \
+        map->mask = capacity - 1;                                                       \
+        for (at = 0; at < map->keys->len; at++) {                                       \
+            size_t hole = (size_t)(KHASH(map->keys->items[at]) & map->mask);            \
+            while (map->slots[hole] != 0) {                                             \
+                hole = (hole + 1) & map->mask;                                          \
+            }                                                                           \
+            map->slots[hole] = at + 1;                                                  \
+        }                                                                               \
+    }                                                                                   \
                                                                                         \
     static inline faber_map_##KN##_##VN *faber_map_##KN##_##VN##_new(                   \
         faber_arena *arena) {                                                           \
         faber_map_##KN##_##VN *map = faber_alloc(arena, sizeof *map);                   \
         map->keys = faber_list_##KN##_new(arena, 0);                                    \
         map->values = faber_list_##VN##_new(arena, 0);                                  \
+        map->slots = NULL;                                                              \
+        map->mask = 0;                                                                  \
+        faber_map_##KN##_##VN##_index_build(arena, map);                                \
         return map;                                                                     \
     }                                                                                   \
                                                                                         \
     /* The key's position, or -1. */                                                    \
     static inline int64_t faber_map_##KN##_##VN##_find(                                 \
         const faber_map_##KN##_##VN *map, KT key) {                                     \
-        int64_t at;                                                                     \
-        for (at = 0; at < map->keys->len; at++) {                                       \
-            if (KEQ(map->keys->items[at], key)) {                                       \
-                return at;                                                              \
+        size_t at = (size_t)(KHASH(key) & map->mask);                                   \
+        for (;;) {                                                                      \
+            int64_t slot = map->slots[at];                                              \
+            if (slot == 0) {                                                            \
+                return -1;                                                              \
             }                                                                           \
+            if (KEQ(map->keys->items[slot - 1], key)) {                                 \
+                return slot - 1;                                                        \
+            }                                                                           \
+            at = (at + 1) & map->mask;                                                  \
         }                                                                               \
-        return -1;                                                                      \
     }                                                                                   \
                                                                                         \
     static inline void faber_map_##KN##_##VN##_put(                                     \
         faber_arena *arena, faber_map_##KN##_##VN *map, KT key, VT value) {             \
         int64_t at = faber_map_##KN##_##VN##_find(map, key);                            \
-        if (at < 0) {                                                                   \
-            faber_list_##KN##_push(arena, map->keys, key);                              \
-            faber_list_##VN##_push(arena, map->values, value);                          \
-        } else {                                                                        \
+        if (at >= 0) {                                                                  \
             map->values->items[at] = value;                                             \
+            return;                                                                     \
+        }                                                                               \
+        faber_list_##KN##_push(arena, map->keys, key);                                  \
+        faber_list_##VN##_push(arena, map->values, value);                              \
+        if (faber_collection_index_full(map->keys->len, map->mask + 1)) {               \
+            faber_map_##KN##_##VN##_index_build(arena, map);                            \
+            return;                                                                     \
+        }                                                                               \
+        {                                                                               \
+            size_t hole = (size_t)(KHASH(key) & map->mask);                             \
+            while (map->slots[hole] != 0) {                                             \
+                hole = (hole + 1) & map->mask;                                          \
+            }                                                                           \
+            map->slots[hole] = map->keys->len;                                          \
         }                                                                               \
     }                                                                                   \
                                                                                         \
@@ -2220,12 +2443,46 @@ FABER_SET(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64)
         return faber_map_##KN##_##VN##_find(map, key) >= 0;                             \
     }                                                                                   \
                                                                                         \
+    /* Remove the deleted key's slot before the lists compact: the run past the     \
+     * hole shifts back so probe chains stay intact, then every stored position    \
+     * above the deleted one decrements, as the compaction moves those keys down   \
+     * one. No hashing of live keys, no allocation. */                              \
+    static inline void faber_map_##KN##_##VN##_index_remove(                           \
+        faber_map_##KN##_##VN *map, KT key, int64_t at) {                               \
+        size_t hole = (size_t)(KHASH(key) & map->mask);                                 \
+        size_t capacity = map->mask + 1;                                                \
+        size_t scan;                                                                    \
+        size_t i;                                                                       \
+        while (map->slots[hole] != at + 1) {                                            \
+            hole = (hole + 1) & map->mask;                                              \
+        }                                                                               \
+        scan = (hole + 1) & map->mask;                                                  \
+        while (map->slots[scan] != 0) {                                                 \
+            int64_t entry = map->slots[scan];                                           \
+            size_t home =                                                               \
+                (size_t)(KHASH(map->keys->items[entry - 1]) & map->mask);               \
+            if (((hole - home) & map->mask) < ((scan - home) & map->mask)) {            \
+                map->slots[hole] = entry;                                               \
+                map->slots[scan] = 0;                                                   \
+                hole = scan;                                                            \
+            }                                                                           \
+            scan = (scan + 1) & map->mask;                                              \
+        }                                                                               \
+        map->slots[hole] = 0;                                                           \
+        for (i = 0; i < capacity; i++) {                                                \
+            if (map->slots[i] > at + 1) {                                               \
+                map->slots[i]--;                                                        \
+            }                                                                           \
+        }                                                                               \
+    }                                                                                   \
+                                                                                        \
     static inline bool faber_map_##KN##_##VN##_delete(                                  \
         faber_map_##KN##_##VN *map, KT key) {                                           \
         int64_t at = faber_map_##KN##_##VN##_find(map, key);                            \
         if (at < 0) {                                                                   \
             return false;                                                               \
         }                                                                               \
+        faber_map_##KN##_##VN##_index_remove(map, key, at);                             \
         memmove(map->keys->items + at, map->keys->items + at + 1,                       \
                 (size_t)(map->keys->len - at - 1) * sizeof *map->keys->items);          \
         map->keys->len--;                                                               \
@@ -2246,10 +2503,10 @@ FABER_SET(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64)
         return faber_list_##VN##_copy(arena, map->values);                              \
     }
 
-FABER_MAP(i64, int64_t, FABER_LIST_EQ_SCALAR, i64, int64_t)
-FABER_MAP(i64, int64_t, FABER_LIST_EQ_SCALAR, text, faber_text)
-FABER_MAP(text, faber_text, FABER_LIST_EQ_TEXT, i64, int64_t)
-FABER_MAP(text, faber_text, FABER_LIST_EQ_TEXT, text, faber_text)
+FABER_MAP(i64, int64_t, FABER_LIST_EQ_SCALAR, FABER_HASH_I64, i64, int64_t)
+FABER_MAP(i64, int64_t, FABER_LIST_EQ_SCALAR, FABER_HASH_I64, text, faber_text)
+FABER_MAP(text, faber_text, FABER_LIST_EQ_TEXT, FABER_HASH_TEXT, i64, int64_t)
+FABER_MAP(text, faber_text, FABER_LIST_EQ_TEXT, FABER_HASH_TEXT, text, faber_text)
 
 /* ------------------------------------------------------------------------ */
 /* Elementwise list operators                                               */
