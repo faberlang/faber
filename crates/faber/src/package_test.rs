@@ -11369,9 +11369,10 @@ entry = "main.fab"
         dir.join("src/helper.fab"),
         r#"
 import from "norma:console" console
+import from "norma:fault" fault
 
 @ public
-fn shout(string s) → void {
+fn shout(string s) → void ⇥ fault.IoFault {
   console.write_line(s)
 }
 "#,

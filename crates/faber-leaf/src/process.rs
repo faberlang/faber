@@ -33,13 +33,27 @@ fn reset_children() {
     with_children(HashMap::clear);
 }
 
+thread_local! {
+    /// The argv installed on this thread. A program runs on the thread that
+    /// installed its argv, so this wins over the process-wide slot; it keeps
+    /// concurrent executions in one process (parallel tests) from reading
+    /// each other's arguments.
+    static THREAD_ARGV: std::cell::RefCell<Option<Vec<String>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 /// Install the Faber program argv for this execution (excludes runtime/script).
+///
+/// Recorded for this thread and for the process: other threads of the same
+/// execution (workers) read the process-wide slot.
 pub fn install_argv(args: Vec<String>) {
+    THREAD_ARGV.with(|slot| *slot.borrow_mut() = Some(args.clone()));
     *lock_argv() = Some(args);
 }
 
 /// Drop a previous execution's argv so the next program does not inherit it.
 pub fn reset_argv() {
+    THREAD_ARGV.with(|slot| *slot.borrow_mut() = None);
     *lock_argv() = None;
 }
 
@@ -51,8 +65,9 @@ fn lock_argv() -> std::sync::MutexGuard<'static, Option<Vec<String>>> {
 }
 
 fn program_argv() -> Vec<String> {
-    lock_argv()
-        .clone()
+    THREAD_ARGV
+        .with(|slot| slot.borrow().clone())
+        .or_else(|| lock_argv().clone())
         .unwrap_or_else(|| std::env::args().skip(1).collect())
 }
 
