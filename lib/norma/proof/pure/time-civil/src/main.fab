@@ -1,0 +1,23 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for norma:time civil conversions (corpus coverage E20).
+# Output must match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:time" time
+
+main {
+    let instant t ← time.parse("2024-02-29T13:45:09Z")
+    print time.render(t)
+    print time.year(t)
+    print time.month(t)
+    print time.day(t)
+    print time.hour(t)
+    print time.minute(t)
+    print time.second(t)
+    let instant d ← time.construct(1999, 12, 31)
+    print time.render(d)
+    let instant m ← time.construct_moment(2000, 1, 1, 23, 59, 58)
+    print time.render(m)
+}
