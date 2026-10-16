@@ -1,0 +1,18 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for norma:crypto hmac/digest against RFC 4231 (E20).
+# Output must match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:crypto" crypto
+import from "norma:encoding" encoding
+import from "norma:text" text
+
+main {
+    # RFC 4231 test case 2: key "Jefe", data "what do ya want for nothing?"
+    print encoding.hex(crypto.hmac("hmac-sha256", text.encode("Jefe"), text.encode("what do ya want for nothing?")))
+    print encoding.hex(crypto.hmac("hmac-sha512", text.encode("Jefe"), text.encode("what do ya want for nothing?")))
+    print encoding.hex(crypto.hmac("hmac-sha384", text.encode("Jefe"), text.encode("what do ya want for nothing?")))
+    print encoding.hex(crypto.digest("sha256", text.encode("abc")))
+}
