@@ -447,8 +447,48 @@ impl TypeChecker<'_> {
             }
         }
         let mut shape_vars = self.shape_vars_for(shape_symbols);
+        self.seed_rigid_enclosing_params(sig, &mut param_vars);
         let sig = self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars));
         (sig, param_vars, shape_vars, FxHashSet::default())
+    }
+
+    /// Keep the enclosing function's own rigid type parameters rigid when a
+    /// callee signature merely borrows them.
+    ///
+    /// A value callee's signature (`(T) → U f` inside `fn ap<T, U>`) declares
+    /// no type parameters of its own, yet its `T` and `U` are the enclosing
+    /// function's rigid params. [`Self::substitute_type_params`] would
+    /// otherwise turn every `Type::Param` leaf into a fresh infer with no rigid
+    /// anchor, so a later `out.append(f(x))` records an unsolvable hole
+    /// (`cannot_infer_expression_type`). Seeding the identity mapping keeps
+    /// those borrowed params rigid; the callee's own descriptors still take
+    /// fresh infers for argument-driven solving.
+    fn seed_rigid_enclosing_params(
+        &mut self,
+        sig: &FuncSig,
+        param_vars: &mut FxHashMap<Symbol, TypeId>,
+    ) {
+        if self.current_generic_param_kinds.is_empty() {
+            return;
+        }
+        let own: FxHashSet<Symbol> = sig.type_params.iter().map(|param| param.name).collect();
+        let mut symbols = FxHashSet::default();
+        let mut seen = FxHashSet::default();
+        for param in &sig.params {
+            collect_type_param_symbols(param.ty, self.types, &mut seen, &mut symbols);
+        }
+        collect_type_param_symbols(sig.ret, self.types, &mut seen, &mut symbols);
+        if let Some(err) = sig.err {
+            collect_type_param_symbols(err, self.types, &mut seen, &mut symbols);
+        }
+        for sym in symbols {
+            if own.contains(&sym) || !self.current_generic_param_kinds.contains_key(&sym) {
+                continue;
+            }
+            param_vars
+                .entry(sym)
+                .or_insert_with(|| self.types.intern(Type::Param(sym)));
+        }
     }
 
     /// Call-site instantiation for an explicit argument prefix. A positional
@@ -486,6 +526,7 @@ impl TypeChecker<'_> {
                     param_vars.insert(param.name, infer);
                 }
             }
+            self.seed_rigid_enclosing_params(sig, &mut param_vars);
             (
                 self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
                 param_vars,
@@ -511,6 +552,7 @@ impl TypeChecker<'_> {
                         .or_insert_with(|| self.fresh_infer());
                 }
             }
+            self.seed_rigid_enclosing_params(sig, &mut param_vars);
             let mut shape_vars = self.shape_vars_for(shape_symbols);
             (
                 self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
@@ -1646,6 +1688,87 @@ impl TypeChecker<'_> {
             rejected = true;
         }
         rejected
+    }
+}
+
+/// Gather every `Type::Param` symbol that occurs anywhere inside `ty`.
+///
+/// The traversal mirrors [`TypeChecker::substitute_type_params`]'s container
+/// arms; only `Param` leaves are collected. Index expressions never hold a
+/// `Type`, so shape children need no descent.
+fn collect_type_param_symbols(
+    ty: TypeId,
+    types: &TypeTable,
+    seen_types: &mut FxHashSet<TypeId>,
+    symbols: &mut FxHashSet<Symbol>,
+) {
+    if !seen_types.insert(ty) {
+        return;
+    }
+    let collect = |ty, seen_types: &mut FxHashSet<TypeId>, symbols: &mut FxHashSet<Symbol>| {
+        collect_type_param_symbols(ty, types, seen_types, symbols);
+    };
+    match types.get(ty) {
+        Type::Param(sym) => {
+            symbols.insert(*sym);
+        }
+        Type::Array(inner)
+        | Type::Queue(inner)
+        | Type::Stack(inner)
+        | Type::Set(inner)
+        | Type::Promissum(inner)
+        | Type::Cursor(inner)
+        | Type::Atomic(inner)
+        | Type::Intervallum(inner)
+        | Type::Option(inner)
+        | Type::Ref(_, inner)
+        | Type::Alias(_, inner) => collect(*inner, seen_types, symbols),
+        Type::Map(key, value) | Type::Ledger(key, value) => {
+            collect(*key, seen_types, symbols);
+            collect(*value, seen_types, symbols);
+        }
+        Type::Record(fields) => {
+            for field in fields.values() {
+                collect(*field, seen_types, symbols);
+            }
+        }
+        Type::PromissumFailable(success, alternate) | Type::AsyncCursor(success, alternate) => {
+            collect(*success, seen_types, symbols);
+            collect(*alternate, seen_types, symbols);
+        }
+        Type::Tensor(element, _)
+        | Type::Vector(element, _)
+        | Type::Matrix(element, _)
+        | Type::Sparsa(element, _)
+        | Type::BoundedArray { element, .. }
+        | Type::BoundedQueue { element, .. }
+        | Type::BoundedStack { element, .. } => collect(*element, seen_types, symbols),
+        Type::BoundedTextus { .. } | Type::BoundedAscii { .. } | Type::BoundedOcteti { .. } => {}
+        Type::Func(signature) => {
+            for param in &signature.params {
+                collect(param.ty, seen_types, symbols);
+            }
+            collect(signature.ret, seen_types, symbols);
+            if let Some(err) = signature.err {
+                collect(err, seen_types, symbols);
+            }
+        }
+        Type::Applied(base, args) => {
+            collect(*base, seen_types, symbols);
+            let type_args = args.iter().filter_map(|arg| match arg {
+                radix_types::AppliedArg::Type(ty) => Some(*ty),
+                radix_types::AppliedArg::Size(_) => None,
+            });
+            for ty in type_args {
+                collect(ty, seen_types, symbols);
+            }
+        }
+        Type::Union(members) | Type::Intersection(members) | Type::Tuple(members) => {
+            for member in members {
+                collect(*member, seen_types, symbols);
+            }
+        }
+        _ => {}
     }
 }
 

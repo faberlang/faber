@@ -1299,6 +1299,10 @@ mod g1_repair_test;
 mod generic_call_test;
 
 #[cfg(test)]
+#[path = "generic_value_callee_test.rs"]
+mod generic_value_callee_test;
+
+#[cfg(test)]
 #[path = "generic_construction_test.rs"]
 mod generic_construction_test;
 
