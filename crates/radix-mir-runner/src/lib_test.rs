@@ -328,6 +328,128 @@ fn scalar_mut_param_field_projection_writes_back_through_runner_frames() {
 }
 
 #[test]
+fn closure_capture_projection_write_updates_environment_slot() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirCaptureMode, MirClosureCapture, MirClosureEnvironment, MirClosureEnvironmentId,
+        MirLocal, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind,
+        MirValidationContext, MirValue, MirValueKind,
+    };
+    use radix_types::{Primitive, TypeTable};
+    use rustc_hash::FxHashMap;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let vacuum = types.primitive(Primitive::Vacuum);
+    let scalar = MirType::semantic(numerus);
+    let span = Span::default();
+    let mut interner = Interner::new();
+    let name = interner.intern("c");
+    let environment = MirClosureEnvironmentId(0);
+    let source = radix_hir::DefId(7);
+    let capture_place = MirPlace {
+        base: MirPlaceBase::Local(MirLocalId(0)),
+        projections: vec![MirProjection::ClosureCapture {
+            environment,
+            source,
+        }],
+    };
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: scalar,
+                mutable: true,
+                span,
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![
+                    MirStatement {
+                        kind: MirStatementKind::Assign {
+                            place: capture_place.clone(),
+                            value: MirValue {
+                                id: MirValueId(0),
+                                kind: MirValueKind::Operand(MirOperand::Constant(
+                                    MirConstant::Int(7),
+                                )),
+                                ty: scalar,
+                                span,
+                            },
+                        },
+                        span,
+                    },
+                    MirStatement {
+                        kind: MirStatementKind::RuntimeCall {
+                            destination: None,
+                            call: MirRuntimeCall {
+                                intrinsic: MirIntrinsic::Diagnostic(MirDiagnosticKind::Nota),
+                                args: vec![MirOperand::Place(capture_place)],
+                                return_ty: MirType::semantic(vacuum),
+                            },
+                        },
+                        span,
+                    },
+                ],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span,
+                },
+                span,
+            }],
+            return_ty: MirType::semantic(vacuum),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
+        }],
+    };
+    let mut context = MirValidationContext::new(&types);
+    context.closure_environments.insert(
+        environment,
+        MirClosureEnvironment {
+            id: environment,
+            function: MirFunctionId(0),
+            value_ty: scalar,
+            environment_local: MirLocalId(0),
+            captures: vec![MirClosureCapture {
+                source,
+                name,
+                ty: scalar,
+                source_place: MirPlace::local(MirLocalId(9)),
+                mode: MirCaptureMode::Value,
+            }],
+        },
+    );
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    runner.frames.last_mut().expect("closure frame").seed_local(
+        MirLocalId(0),
+        Value::ClosureEnvironment(
+            environment,
+            Rc::new(RefCell::new(FxHashMap::from_iter([(name, Value::Int(1))]))),
+        ),
+    );
+
+    runner.run_until_depth(0);
+
+    assert!(runner.errors.is_empty(), "capture write should execute");
+    drop(runner);
+    assert_eq!(host.stdout_lines, ["7"]);
+}
+
+#[test]
 fn vide_writes_stderr_and_nota_writes_stdout() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;

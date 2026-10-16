@@ -655,7 +655,7 @@ functio plana() → numerus {
     redde 1
 }
 functio facit() → numerus {
-    sit duplo ← (numerus value) → numerus ∴ value + plana()
+    sit _ duplo ← (numerus value) → numerus ∴ value + plana()
     redde duplo(3)
 }
 incipit { }

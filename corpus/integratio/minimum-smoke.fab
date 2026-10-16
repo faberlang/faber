@@ -26,7 +26,7 @@ locale = "en"
 # integratio — minimal multi-feature happy path
 #
 # functio name(params) → type { … }
-# sit n ← expr
+# sit _ n ← expr
 # si <cond> { … }
 # nota template with § interpolation
 #

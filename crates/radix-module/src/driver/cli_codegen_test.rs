@@ -82,7 +82,7 @@ fn rust_single_command_cli_supports_fixed_exitus() {
     let source = r#"
 @ cli "tool"
 incipit argumenta args {
-  sit code ← "0"
+  sit _ code ← "0"
   nota code
 } exitu numerus
 "#;

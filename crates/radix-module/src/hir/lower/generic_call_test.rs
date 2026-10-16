@@ -79,7 +79,7 @@ incipit {
 fn rejects_template_call_with_explicit_type_args_at_lowering() {
     let (program, mut resolver, mut types, mut interner) = prepare_lower_pipeline(
         r#"incipit {
-    sit s ← "§"<textus>("x")
+    sit _ s ← "§"<textus>("x")
 }"#,
     );
     let (lowered, errors) = lower(LowerRequest {

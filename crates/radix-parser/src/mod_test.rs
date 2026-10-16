@@ -828,14 +828,6 @@ fn rejects_malformed_itera_apud_clauses_with_structured_errors() {
 }
 
 #[test]
-fn sit_underscore_identifier_rejected() {
-    assert_parse_error_matches(
-        r"sit _ nomen ← 1",
-        ParseExpectation::Args(&[("issue", "sit_identifier_binding")]),
-    );
-}
-
-#[test]
 fn sit_destructuring_parses_as_an_immutable_pattern_binding() {
     for source in [r"sit [a, b] ← [1, 2]", r"sit { a, b } ← point"] {
         let result = parse_ok(source);
@@ -1766,7 +1758,7 @@ fn import_name_inference_failed_rejected() {
 fn parses_infer_marker_as_type_annotation() {
     let result = parse_ok(
         r#"
-sit name ← "Marcus"
+sit _ name ← "Marcus"
 varia _ count ← 1
 functio answer() → _ { redde 42 }
 "#,
@@ -1795,8 +1787,8 @@ functio answer() → _ { redde 42 }
 fn parses_sit_as_inferred_immutable_binding() {
     let result = parse_ok(
         r#"
-sit nomen ← "Marcus"
-sit annus ← 42
+sit _ nomen ← "Marcus"
+sit _ annus ← 42
 "#,
     );
 
@@ -1818,9 +1810,9 @@ sit annus ← 42
 
 #[test]
 fn parses_sit_deferred_binding_without_initializer() {
-    // TARGET: `sit x` (no initializer) is sugar for `fixum _ x` — the inferred
-    // deferred immutable. It parses with an inferred type slot and no init.
-    let result = parse_ok("sit nomen");
+    // TARGET: `sit _ x` (no initializer) is the inferred deferred immutable.
+    // It parses with an inferred type slot and no init.
+    let result = parse_ok("sit _ nomen");
     let program = result.program.as_ref().expect("program");
     assert_eq!(program.statements.len(), 1);
     let StmtKind::Var(var) = &program.statements[0].kind else {
@@ -1843,7 +1835,7 @@ fn parses_fixum_deferred_binding_without_initializer() {
     let result = parse_ok(
         r"
 sit numerus pending
-sit label
+sit _ label
 ",
     );
     let program = result.program.as_ref().expect("program");
@@ -1874,11 +1866,17 @@ sit label
 }
 
 #[test]
-fn sit_underscore_binding_rejected_as_malformed() {
-    assert_parse_error_matches(
-        r"sit _ nomen ← 1",
-        ParseExpectation::Issue("sit_identifier_binding"),
-    );
+fn sit_underscore_binding_is_the_inferred_slot() {
+    let result = parse_ok(r"sit _ nomen ← 1");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    assert_eq!(var.mutability, AstMutability::Immutable);
+    assert!(matches!(
+        var.ty.as_ref().expect("inferred slot").kind,
+        TypeExprKind::Infer
+    ));
 }
 
 #[test]
@@ -1886,7 +1884,7 @@ fn sit_accepts_tokenless_keyword_as_binding_name() {
     // `varia` is tokenless since Batch E: `sit varia ← 1` binds a variable
     // named `varia`. Pre-migration the reserved Varia token made any binding
     // named `varia` a parse error (`sit_varia_modifier_rejected`).
-    let result = parse_ok("sit varia ← 1");
+    let result = parse_ok("sit _ varia ← 1");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1901,7 +1899,7 @@ fn sit_accepts_tokenless_keyword_as_binding_name() {
 fn fixum_bare_name_rejected() {
     assert_parse_error_matches(
         r#"fixum name ← "Marcus""#,
-        ParseExpectation::Kind(ParseErrorKind::Expected),
+        ParseExpectation::Issue("binding_type_slot_required"),
     );
 }
 
@@ -1909,7 +1907,7 @@ fn fixum_bare_name_rejected() {
 fn varia_bare_name_rejected() {
     assert_parse_error_matches(
         r"varia count ← 1",
-        ParseExpectation::Kind(ParseErrorKind::Expected),
+        ParseExpectation::Issue("binding_type_slot_required"),
     );
 }
 
@@ -2019,9 +2017,9 @@ genus Point {
 }
 
 functio main() → numerus {
-    sit p ← Point { x = 10, y = 20 }
-    sit raw ← { "x": 10, "y": 20 }
-    sit event ← finge Click { x = 1, y = 2 } ∷ Event
+    sit _ p ← Point { x = 10, y = 20 }
+    sit _ raw ← { "x": 10, "y": 20 }
+    sit _ event ← finge Click { x = 1, y = 2 } ∷ Event
     redde p.x
 }
 "#,
@@ -2190,7 +2188,7 @@ functio f(lista<numerus> xs) → vacuum {}
 
 functio facere() → lista<lista<numerus>> {
     f(lista<numerus>[1, 2])
-    sit y ← (lista<numerus>[3, 4])
+    sit _ y ← (lista<numerus>[3, 4])
     redde lista<lista<numerus>>[lista<numerus>[1], lista<numerus>[2]]
 }
 ",
@@ -2360,7 +2358,7 @@ functio facere(numerus flag) → boolean {
 
 #[test]
 fn malformed_json_negative_number_reports_structured_unexpected_error() {
-    let source = r#"sit value ← { "x": - }"#;
+    let source = r#"sit _ value ← { "x": - }"#;
     let result = parse_program(source);
     let err = result
         .errors
@@ -2391,7 +2389,7 @@ fn genus_field_colon_init_rejected() {
 #[test]
 fn finge_colon_field_rejected() {
     assert_parse_error_matches(
-        r"sit event ← finge Click { x: 1 } ∷ Event",
+        r"sit _ event ← finge Click { x: 1 } ∷ Event",
         ParseExpectation::Issue("field_value_separator"),
     );
 }
@@ -2399,7 +2397,7 @@ fn finge_colon_field_rejected() {
 #[test]
 fn genus_colon_ctor_rejected() {
     assert_parse_error_matches(
-        r"sit point ← Point { x: 10 }",
+        r"sit _ point ← Point { x: 10 }",
         ParseExpectation::Issue("expected_expression"),
     );
 }
@@ -2409,13 +2407,13 @@ fn bare_brace_equals_form_is_the_inferred_constructor() {
     // Operator ruling 2026-10-10: a bare `{ field = value }`
     // is sugar for `_ { field = value }`; the retired anonymous-record form
     // is gone, and the cell supplies the type (no cell is a checker error).
-    let result = parse_ok(r"sit point ← { x = 10 }");
+    let result = parse_ok(r"sit _ point ← { x = 10 }");
     assert!(result.errors.is_empty());
 }
 
 #[test]
 fn bare_brace_colon_unquoted_key_rejected() {
-    assert_parse_error_issue(r"sit point ← { x: 10 }", "json_quoted_key");
+    assert_parse_error_issue(r"sit _ point ← { x: 10 }", "json_quoted_key");
 }
 
 #[test]
@@ -3514,7 +3512,7 @@ fn rejects_ergo_keyword_as_clausura_joint() {
     let result = parse_program(
         r"
 incipit {
-    sit dupla ← numerus x ergo x * 2
+    sit _ dupla ← numerus x ergo x * 2
 }
 ",
     );
@@ -3563,7 +3561,7 @@ fn rejects_itera_pro_mode() {
 
 #[test]
 fn parses_single_param_implicit_type_closure() {
-    let result = parse_ok("sit a ← users.filtrata(_ user ∴ non user.activus)");
+    let result = parse_ok("sit _ a ← users.filtrata(_ user ∴ non user.activus)");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable");
@@ -3579,7 +3577,7 @@ fn parses_single_param_implicit_type_closure() {
 
 #[test]
 fn parses_single_param_explicit_type_closure() {
-    let result = parse_ok("sit b ← users.filtrata(User user ∴ non user.activus)");
+    let result = parse_ok("sit _ b ← users.filtrata(User user ∴ non user.activus)");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable");
@@ -3595,7 +3593,7 @@ fn parses_single_param_explicit_type_closure() {
 
 #[test]
 fn parses_multi_param_implicit_type_closure() {
-    let result = parse_ok("sit c ← numeri.compone((_ a, _ b) ∴ a + b)");
+    let result = parse_ok("sit _ c ← numeri.compone((_ a, _ b) ∴ a + b)");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable");
@@ -3611,7 +3609,7 @@ fn parses_multi_param_implicit_type_closure() {
 
 #[test]
 fn parses_multi_param_explicit_type_fac_closure() {
-    let result = parse_ok("sit d ← numeri.compone((numerus a, numerus b) ∴ fac { redde a + b })");
+    let result = parse_ok("sit _ d ← numeri.compone((numerus a, numerus b) ∴ fac { redde a + b })");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(block_var) = &program.statements[0].kind else {
         panic!("expected variable");
@@ -3629,7 +3627,7 @@ fn parses_multi_param_explicit_type_fac_closure() {
 #[test]
 fn parses_fallible_typed_closure() {
     let result = parse_ok(
-        "sit e ← texts.mappata(textus s → numerus ⇥ ParseError ∴ fac { redde parse(s) } cape err { redde 0 })",
+        "sit _ e ← texts.mappata(textus s → numerus ⇥ ParseError ∴ fac { redde parse(s) } cape err { redde 0 })",
     );
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(fallible_var) = &program.statements[0].kind else {
@@ -3649,7 +3647,7 @@ fn parses_fallible_typed_closure() {
 #[test]
 fn closure_block_body_rejected_with_structured_error() {
     let result =
-        parse_program("sit inactive ← users.filtrata(_ user ∴ { redde non user.activus })");
+        parse_program("sit _ inactive ← users.filtrata(_ user ∴ { redde non user.activus })");
     let err = result
         .errors
         .iter()
@@ -3675,7 +3673,7 @@ fn closure_block_body_rejected_with_structured_error() {
 #[test]
 fn closure_fac_body_dum_rejected() {
     assert_parse_error_matches(
-        "sit inactive ← users.filtrata(_ user ∴ fac { redde non user.activus } dum user.activus)",
+        "sit _ inactive ← users.filtrata(_ user ∴ fac { redde non user.activus } dum user.activus)",
         ParseExpectation::Issue("closure_fac_body_dum"),
     );
 }
@@ -3765,8 +3763,8 @@ functio demum() → vacuum { tacet }
 functio emitte() → vacuum { tacet }
 functio pro() → vacuum { tacet }
 incipit {
-  sit pro ← 1
-  sit tempta ← 2
+  sit _ pro ← 1
+  sit _ tempta ← 2
   nota tempta
 }
 ",
@@ -3858,10 +3856,10 @@ fn migrated_keywords_usable_as_contextual_identifiers() {
         "tacet",
     ];
     let name_position_templates = [
-        "sit {word} ← 5\n",
+        "sit _ {word} ← 5\n",
         "functio {word}() → numerus {{ redde 0 }}\n",
         "functio f(numerus {word}) → numerus {{ redde 0 }}\n",
-        "incipit {{ sit x ← 5\nnota x.{word}\n}}\n",
+        "incipit {{ sit _ x ← 5\nnota x.{word}\n}}\n",
     ];
     for word in words {
         for template in name_position_templates {
@@ -3918,7 +3916,7 @@ fn migrated_keywords_usable_as_contextual_identifiers() {
         "sponte",
         "tacet",
     ] {
-        let source = format!("functio f() → numerus {{ sit {word} ← 5\nredde {word}\n}}\n");
+        let source = format!("functio f() → numerus {{ sit _ {word} ← 5\nredde {word}\n}}\n");
         let result = parse_program(&source);
         assert!(
             result.success(),
@@ -4412,7 +4410,7 @@ implendum Par {
 fn solum_keyword_usable_as_binding_name() {
     // No reserved words: `solum` (test annotation) is an ordinary identifier
     // outside its annotation slot.
-    let result = parse_ok(r"sit solum ← 1");
+    let result = parse_ok(r"sit _ solum ← 1");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -4427,7 +4425,7 @@ fn solum_keyword_usable_as_binding_name() {
 fn mori_keyword_usable_as_binding_name() {
     // No reserved words: `mori` (panic statement) is an ordinary identifier
     // outside its statement slot.
-    let result = parse_ok(r"sit mori ← 1");
+    let result = parse_ok(r"sit _ mori ← 1");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -4457,8 +4455,8 @@ fn parses_tensor_bridge_member_method_names() {
     let result = parse_ok(
         r"incipit {
   sit tensor<f32, []> t ← vacua
-  sit g ← t.strue(flat, shape)
-  sit f ← g.planata()
+  sit _ g ← t.strue(flat, shape)
+  sit _ f ← g.planata()
 }",
     );
     let program = result.program.as_ref().expect("program");
@@ -4909,7 +4907,7 @@ fn parses_cede_as_yield_statement_only() {
 fn cede_keyword_usable_as_identifier_in_initializer() {
     // No reserved words: `cede` (yield) is an ordinary identifier outside its
     // generator-yield slot, so it is a valid initializer expression.
-    let result = parse_ok("functio f() fiunt → numerus { sit x ← cede }");
+    let result = parse_ok("functio f() fiunt → numerus { sit _ x ← cede }");
     assert_eq!(
         result.program.as_ref().expect("program").statements.len(),
         1
@@ -4984,7 +4982,7 @@ fn parses_await_directed_fixum_binding() {
 #[test]
 fn parses_await_directed_varia_and_sit_bindings() {
     let result =
-        parse_ok("functio f() fiet → vacuum { varia numerus x ↢ fut sit y ↢ fut redde y }");
+        parse_ok("functio f() fiet → vacuum { varia numerus x ↢ fut sit _ y ↢ fut redde y }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -5130,7 +5128,7 @@ fn conversio_assign_typed_fixum_and_varia_initializers_parse() {
 fn conversio_assign_untyped_fixum_initializer_rejects_with_concrete_type_issue() {
     // `fixum _` has no written type → no concrete conversion target.
     assert_parse_error_issue(
-        "incipit {\n  sit answer ↤ \"42\"\n}",
+        "incipit {\n  sit _ answer ↤ \"42\"\n}",
         "conversio_assign_requires_concrete_type",
     );
 }
@@ -5139,7 +5137,7 @@ fn conversio_assign_untyped_fixum_initializer_rejects_with_concrete_type_issue()
 fn conversio_assign_sit_initializer_rejects_with_concrete_type_issue() {
     // `sit` is an inferred binding (≡ `fixum _`) → no concrete target.
     assert_parse_error_issue(
-        "incipit {\n  sit answer ↤ \"42\"\n}",
+        "incipit {\n  sit _ answer ↤ \"42\"\n}",
         "conversio_assign_requires_concrete_type",
     );
 }
@@ -5233,7 +5231,7 @@ fn eot_legacy_import_output_and_input_forms_remain_accepted() {
         "mone \"legacy warning\"",
         "vide \"legacy debug\"",
         "scribe \"legacy compatibility\"",
-        "incipit { sit input ← lege nota input }",
+        "incipit { sit _ input ← lege nota input }",
     ] {
         let result = parse_program(source);
         assert!(
@@ -5539,7 +5537,7 @@ fn eot_transfer_inside_assignment_value() {
     // `⇇` binds tighter than `←`: the copy-into is the assigned value. The
     // parser admits the shape; the semantic layer rejects it as a result used
     // as a value (`copy_into_value_used`).
-    let result = parse_ok(r#"sit sink ← output ⇇ "a""#);
+    let result = parse_ok(r#"sit _ sink ← output ⇇ "a""#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");

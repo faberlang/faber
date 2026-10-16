@@ -334,8 +334,22 @@ pub fn hir_inspection_json(
 /// Returns an error when the input or persisted artifact is invalid.
 #[cfg(feature = "mir-core")]
 pub fn mir_output_for_source(name: &str, raw_source: &str) -> Result<String, Vec<String>> {
+    mir_output_for_source_with_config(name, raw_source, crate::driver::Config::default().with_dev_locale_root())
+}
+
+/// [`mir_output_for_source`] under a caller-chosen driver config, so the
+/// product CLI can read the source in its default reader locale (a file's own
+/// frontmatter `locale` still wins, as in analysis).
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
+#[cfg(feature = "mir-core")]
+pub fn mir_output_for_source_with_config(
+    name: &str,
+    raw_source: &str,
+    config: crate::driver::Config,
+) -> Result<String, Vec<String>> {
     let source_file = source_file(name.to_owned(), raw_source.to_owned()).map_err(|error| vec![error])?;
-    let session = crate::driver::Session::new(crate::driver::Config::default().with_dev_locale_root());
+    let session = crate::driver::Session::new(config);
     let prepared = match crate::program::prepare_program_module_for_name(&source_file.name, raw_source, &session) {
         Ok(prepared) => prepared,
         Err(diagnostic) => return Err(format_mir_frontend_diagnostics(&source_file, vec![*diagnostic])),

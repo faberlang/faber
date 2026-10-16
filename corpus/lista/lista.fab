@@ -30,7 +30,7 @@ locale = "en"
 # Numeric/tensor modules may use lf32/lu32 sugar; see docs/design/numeric-type-sugar.md.
 #
 # lista<T> nomen ← vacua        -- typed empty collection (forma innata)
-# sit nomen ← [elem, …]     -- list literal
+# sit _ nomen ← [elem, …]     -- list literal
 # [sparge expr, …]              -- splice into literal
 #
 # GRAMMAR:
@@ -42,14 +42,14 @@ locale = "en"
 
 main {
     let list<int> vacuares ← empty
-    let numeri ← [1, 2, 3, 4, 5]
-    let nomina ← ["Marcus", "Julia", "Gaius"]
-    let vexilla ← [true, false, true]
-    let matrix ← [[1, 2], [3, 4], [5, 6]]
+    let _ numeri ← [1, 2, 3, 4, 5]
+    let _ nomina ← ["Marcus", "Julia", "Gaius"]
+    let _ vexilla ← [true, false, true]
+    let _ matrix ← [[1, 2], [3, 4], [5, 6]]
     let list<int> primum ← [1, 2, 3]
     let list<int> secundum ← [4, 5, 6]
-    let coniuncta ← [spread primum, spread secundum]
-    let aucta ← [0, spread primum, 99]
+    let _ coniuncta ← [spread primum, spread secundum]
+    let _ aucta ← [0, spread primum, 99]
     print vacuares.length()
     print numeri.length()
     print numeri[0]

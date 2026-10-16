@@ -50,6 +50,8 @@ fn macro_rows_keep_default_policy_unless_named() {
         (IntrinsicReceiver::Tensor, "rope_norm", 2),
         (IntrinsicReceiver::Tensor, "rope_half", 2),
         (IntrinsicReceiver::Tensor, "limes", 0),
+        (IntrinsicReceiver::Matrix, "apud", 1),
+        (IntrinsicReceiver::Matrix, "ponde", 2),
     ]
     .into_iter()
     .collect();
@@ -516,6 +518,32 @@ fn vector_matrix_tensor_copy_out_elementwise_methods_use_perfect_forms() {
             "Numeric must keep `{name}`"
         );
     }
+}
+
+/// need (ruling 2026-10-15): the Matrix coordinate surface has
+/// three reads. `accipe/1` is the nullable read (`T ∪ none`), `apud/1` is
+/// the checked read and `ponde/2` the checked store; both report an
+/// out-of-range coordinate on `⇥` and share the Tensor `TensorGet` /
+/// `TensorSet` MIR ops.
+#[test]
+fn matrix_coordinate_three_reads_rows() {
+    let accipe =
+        lookup_method(IntrinsicReceiver::Matrix, "accipe", 1).expect("Matrix accipe/1 row");
+    assert_eq!(accipe.return_kind, IntrinsicReturnKind::OptionInner);
+    assert_eq!(mir_collection_op(accipe), Some(MirCollectionOp::TensorGet));
+    assert!(!accipe.failable);
+
+    let apud = lookup_method(IntrinsicReceiver::Matrix, "apud", 1).expect("Matrix apud/1 row");
+    assert_eq!(apud.return_kind, IntrinsicReturnKind::Inner);
+    assert_eq!(mir_collection_op(apud), Some(MirCollectionOp::TensorGet));
+    assert!(apud.failable);
+    assert_eq!(apud.range_checked_arg, Some(0));
+
+    let ponde = lookup_method(IntrinsicReceiver::Matrix, "ponde", 2).expect("Matrix ponde/2 row");
+    assert_eq!(ponde.return_kind, IntrinsicReturnKind::Vacuum);
+    assert_eq!(mir_collection_op(ponde), Some(MirCollectionOp::TensorSet));
+    assert!(ponde.failable);
+    assert_eq!(ponde.range_checked_arg, Some(0));
 }
 
 // PD-9: the five keyed lookups must stay byte-identical to the catalog's

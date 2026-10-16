@@ -68,9 +68,9 @@ fn branchy(int seed) → int {
 }
 
 main {
-    let five ← fiver(3)
-    let hushed ← steady(4)
-    let loud ← branchy(5)
+    let _ five ← fiver(3)
+    let _ hushed ← steady(4)
+    let _ loud ← branchy(5)
     print "probe"
 }
 "#;

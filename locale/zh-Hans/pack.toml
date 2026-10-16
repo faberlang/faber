@@ -356,6 +356,30 @@ help = "先修正 lexer 错误；解析会从干净的 tokens 继续"
 message = "需要 token"
 help = "确保此位置存在期望的 token"
 
+[diagnostics.PARSE001.issues.ratio_field_list_hole_not_sole]
+message = "ratio 字段列表中的 `…` 空洞必须是唯一元素"
+help = "字段列表中最多使用一个空洞"
+
+[diagnostics.PARSE001.issues.ratio_type_arg_label_required]
+message = "ratio 类型实参必须带有标签"
+help = "在实参之前写出标签"
+
+[diagnostics.PARSE001.issues.annotation_field_name]
+message = "注解字段必须是标识符"
+help = "在注解的花括号内写一个普通字段名"
+
+[diagnostics.PARSE001.issues.label_bind_distinction]
+message = "标签语法使用 `{label_operator}`，而不是绑定运算符 `{binding_operator}`"
+help = "写 `{label}{label_operator} value` 表示带标签的实参，或按位置传递"
+
+[diagnostics.PARSE001.issues.labeled_actual_non_template_call]
+message = "此调用不接受带标签的实参；标签属于模板调用"
+help = "去掉标签 `{label}` 并按位置传值，或改为调用模板字面量"
+
+[diagnostics.PARSE001.issues.labeled_actual_spread_unsupported]
+message = "spread 实参不能带标签"
+help = "去掉 spread 实参上的标签"
+
 [diagnostics.PARSE001.issues.copy_into_value_expected]
 message = "复制入运算符 `{operator}` 后需要一个值"
 help = "在 `⇇` 之后写源表达式"
@@ -399,10 +423,6 @@ help = "de 绑定的是索引或键，不是可变元素；请使用 const 形�
 [diagnostics.PARSE001.issues.duplicate_rest_pattern]
 message = "rest pattern 已指定"
 help = "只保留一个 '{keyword}' rest binding"
-
-[diagnostics.PARSE001.issues.sit_identifier_binding]
-message = "'{keyword}' 直接绑定单个标识符；请使用 '{keyword}' name ← expr"
-help = "写成 '{keyword}' name ← expr，或对 typed/destructured bindings 使用 fixum"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "需要 test case 或 setup"
@@ -548,6 +568,26 @@ help = "在 '=' 之后写整数或字符串"
 message = "意外标记"
 help = "删除该标记，或把它移到正确位置"
 
+[diagnostics.PARSE002.issues.enum_value_out_of_range]
+message = "enum 成员值超出有符号 64 位范围"
+help = "选择 −2^63 到 2^63−1 之间的值"
+
+[diagnostics.PARSE002.issues.exitus_value_out_of_range]
+message = "exitus 代码超出有符号 64 位范围"
+help = "选择 −2^63 到 2^63−1 之间的值"
+
+[diagnostics.PARSE002.issues.json_integer_overflow]
+message = "json 字面量中的整数超出有符号 64 位范围"
+help = "将该值写为浮点数或字符串"
+
+[diagnostics.PARSE002.issues.test_modifier_integer_out_of_range]
+message = "`{modifier}` 修饰符整数超出有符号 64 位范围"
+help = "选择更小的值"
+
+[diagnostics.PARSE002.issues.declaration_block_comma]
+message = "逗号不能分隔声明块的成员"
+help = "删除逗号；声明成员由换行分隔"
+
 [diagnostics.PARSE002.issues.json_unknown_identifier_value]
 message = "JSON 标识符不是有效的 JSON 值"
 help = "使用 true、false、null、字符串、数字、对象或数组"
@@ -586,7 +626,11 @@ help = "写成 `{keyword} T {name} ← {marker} value`；后面的 `{name} ← {
 
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "运行时的 `{keyword}` 声明已废弃；`{name}` 是运行时名称"
-help = "写成 `{sit} T {name} ← …`（或用 `{sit} {name} ← …` 推断类型）；`{fixum}` 表示编译期事实，与 `=` 搭配"
+help = "写成 `{sit} T {name} ← …`（或用 `{sit} _ {name} ← …` 推断类型）；`{fixum}` 表示编译期事实，与 `=` 搭配"
+
+[diagnostics.PARSE010.issues.binding_type_slot_required]
+message = "`{keyword}` 声明必须写出类型位；`{name}` 没有类型"
+help = "写成 `{keyword} T {name} ← …`，或用 `{keyword} _ {name} ← …` 推断类型"
 
 [diagnostics.PARSE010.issues.binder_fixum_retired]
 message = "`{keyword}` 绑定词已废弃"
@@ -692,6 +736,14 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "注解 `@ {annotation}` 未在此读取器表面声明"
 help = "对该文件的读取器语言环境使用 `@ {expected}`"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum]
+message = "一个声明携带了多个 `@ nucleum` annotation"
+help = "只保留一个 nucleum annotation"
+
+[diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
+message = "`@ nucleum` fragment 与图形 fragment annotation 冲突"
+help = "移除其中一个 fragment annotation"
+
 [diagnostics.PARSE019]
 message = "重复修饰符"
 help = "删除重复的修饰符"
@@ -715,6 +767,10 @@ help = "用 '{et}' 分隔主体"
 [diagnostics.PARSE020.issues.discerne_subject_not_path]
 message = "'{discerne}' 的主体必须是名称或成员路径"
 help = "先将该值绑定到一个名称，再对该名称使用 '{discerne}'"
+
+[diagnostics.PARSE020.issues.nesting_too_deep]
+message = "源代码嵌套深度超过解析器上限 {limit}"
+help = "将该构造拆分为具名绑定"
 
 [diagnostics.PARSE021]
 message = "缺少条件"
@@ -796,6 +852,10 @@ help = "把 ∴ 后的 compact closure body 写成 {fac_body}"
 message = "closure fac body 不能使用 'dum'"
 help = "从 closure fac bodies 中移除 dum"
 
+[diagnostics.PARSE030.issues.expression_too_long]
+message = "表达式超过解析器的 {limit} 个运算符上限"
+help = "将表达式拆分为具名绑定"
+
 [diagnostics.PARSE031]
 message = "无效字面量"
 help = "检查字面量形式"
@@ -823,6 +883,10 @@ help = "只能赋值给有效的左值"
 [diagnostics.PARSE040]
 message = "无效类型"
 help = "检查类型语法"
+
+[diagnostics.PARSE040.issues.promissum_alternate_uses_exit_arrow]
+message = "promissum 的备用分支必须使用错误箭头 `⇥`，而不是返回箭头 `→`"
+help = "用 `⇥` 写出备用分支"
 
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "需要类型名"

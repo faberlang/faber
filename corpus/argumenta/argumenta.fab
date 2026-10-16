@@ -9,7 +9,6 @@ summary = "Binds command-line arguments for an entry point."
 syntax = "incipit argumenta <name> <block> | functio <name>() argumenta <name> <block>"
 related = ["incipit", "cli", "imperium", "optio", "operandus"]
 locale = "en"
-no_expected = "prints-nothing"
 +++
 
 # =============================================================================
@@ -34,7 +33,7 @@ no_expected = "prints-nothing"
 #   entryDecl :← 'incipit' 'argumenta' ident block
 #
 # EXPECTED OUTPUT:
-#   No incipit — declaration or test-runner surface only.
+#   none — the runner executes the entry and prints nothing; empty golden.
 #
 # BACKEND:
 #   declaration-only CLI entry (whitelist: argumenta/argumenta.fab).

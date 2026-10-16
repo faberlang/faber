@@ -356,6 +356,30 @@ help = "แก้ข้อผิดพลาดของ lexer ก่อน ก�
 message = "ต้องมีโทเค็น"
 help = "ตรวจให้แน่ใจว่ามีโทเค็นที่คาดไว้ในตำแหน่งนี้"
 
+[diagnostics.PARSE001.issues.ratio_field_list_hole_not_sole]
+message = "ช่องว่าง `…` ในรายการฟิลด์ ratio ต้องเป็นสมาชิกเดียวเท่านั้น"
+help = "ใช้ช่องว่างได้ไม่เกินหนึ่งช่องในรายการฟิลด์"
+
+[diagnostics.PARSE001.issues.ratio_type_arg_label_required]
+message = "อาร์กิวเมนต์ชนิด ratio ต้องมีป้ายกำกับ"
+help = "เขียนป้ายกำกับก่อนอาร์กิวเมนต์"
+
+[diagnostics.PARSE001.issues.annotation_field_name]
+message = "ฟิลด์ annotation ต้องเป็นตัวระบุ"
+help = "เขียนชื่อฟิลด์ธรรมดาภายในวงเล็บปีกกาของ annotation"
+
+[diagnostics.PARSE001.issues.label_bind_distinction]
+message = "ไวยากรณ์ป้ายกำกับใช้ `{label_operator}` ไม่ใช่ตัวดำเนินการผูกมัด `{binding_operator}`"
+help = "เขียน `{label}{label_operator} value` สำหรับอาร์กิวเมนต์ที่มีป้ายกำกับ หรือส่งตามตำแหน่ง"
+
+[diagnostics.PARSE001.issues.labeled_actual_non_template_call]
+message = "การเรียกนี้ไม่รับอาร์กิวเมนต์ที่มีป้ายกำกับ; ป้ายกำกับเป็นของการเรียกเทมเพลต"
+help = "ลบป้ายกำกับ `{label}` และส่งค่าตามตำแหน่ง หรือเรียก template literal"
+
+[diagnostics.PARSE001.issues.labeled_actual_spread_unsupported]
+message = "อาร์กิวเมนต์ spread ไม่สามารถมีป้ายกำกับได้"
+help = "ลบป้ายกำกับออกจากอาร์กิวเมนต์ spread"
+
 [diagnostics.PARSE001.issues.copy_into_value_expected]
 message = "ต้องมีค่าหลังตัวดำเนินการคัดลอกเข้า `{operator}`"
 help = "เขียนนิพจน์ต้นทางหลัง `⇇`"
@@ -399,10 +423,6 @@ help = "`de` ผูกดัชนีหรือคีย์ ไม่ใช่
 [diagnostics.PARSE001.issues.duplicate_rest_pattern]
 message = "ระบุ rest pattern แล้ว"
 help = "คง binding rest '{keyword}' ไว้เพียงรายการเดียว"
-
-[diagnostics.PARSE001.issues.sit_identifier_binding]
-message = "'{keyword}' ผูก identifier หนึ่งรายการโดยตรง; ใช้ '{keyword}' name ← expr"
-help = "เขียน '{keyword}' name ← expr หรือใช้ fixum สำหรับ binding แบบมีชนิด/แยกโครงสร้าง"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "ต้องมี test case หรือ setup"
@@ -504,6 +524,26 @@ help = "ลบเครื่องหมายจุลภาคก่อนต
 message = "พบโทเค็นที่ไม่คาดคิด"
 help = "ลบหรือย้ายโทเค็นที่ไม่คาดคิด"
 
+[diagnostics.PARSE002.issues.enum_value_out_of_range]
+message = "ค่าสมาชิก enum อยู่นอกช่วง 64 บิตแบบมีเครื่องหมาย"
+help = "เลือกค่าระหว่าง −2^63 ถึง 2^63−1"
+
+[diagnostics.PARSE002.issues.exitus_value_out_of_range]
+message = "รหัส exitus อยู่นอกช่วง 64 บิตแบบมีเครื่องหมาย"
+help = "เลือกค่าระหว่าง −2^63 ถึง 2^63−1"
+
+[diagnostics.PARSE002.issues.json_integer_overflow]
+message = "จำนวนเต็มในลิเทอรัล json อยู่นอกช่วง 64 บิตแบบมีเครื่องหมาย"
+help = "เขียนค่าเป็น float หรือสตริง"
+
+[diagnostics.PARSE002.issues.test_modifier_integer_out_of_range]
+message = "จำนวนเต็มของตัวแก้ `{modifier}` อยู่นอกช่วง 64 บิตแบบมีเครื่องหมาย"
+help = "เลือกค่าที่เล็กลง"
+
+[diagnostics.PARSE002.issues.declaration_block_comma]
+message = "เครื่องหมายจุลภาคไม่ใช่ตัวคั่นสมาชิกของ declaration block"
+help = "ลบเครื่องหมายจุลภาค; สมาชิก declaration คั่นด้วยบรรทัดใหม่"
+
 [diagnostics.PARSE002.issues.json_unknown_identifier_value]
 message = "identifier ของ JSON ไม่ใช่ค่าที่ถูกต้องของ JSON"
 help = "ใช้ true, false, null, สตริง, ตัวเลข, ออบเจ็กต์ หรืออาร์เรย์"
@@ -542,7 +582,11 @@ help = "เขียน `{keyword} T {name} ← {marker} value`; ต่อมา
 
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "การประกาศ `{keyword}` ขณะรันถูกยกเลิกแล้ว; `{name}` เป็นชื่อขณะรัน"
-help = "เขียน `{sit} T {name} ← …` (หรือ `{sit} {name} ← …` เพื่อให้อนุมานชนิด); `{fixum}` ระบุข้อเท็จจริงตอนคอมไพล์และใช้คู่กับ `=`"
+help = "เขียน `{sit} T {name} ← …` (หรือ `{sit} _ {name} ← …` เพื่อให้อนุมานชนิด); `{fixum}` ระบุข้อเท็จจริงตอนคอมไพล์และใช้คู่กับ `=`"
+
+[diagnostics.PARSE010.issues.binding_type_slot_required]
+message = "การประกาศ `{keyword}` ต้องเขียนช่องชนิด; `{name}` ไม่มีชนิด"
+help = "เขียน `{keyword} T {name} ← …` หรือ `{keyword} _ {name} ← …` เพื่อให้อนุมานชนิด"
 
 [diagnostics.PARSE010.issues.binder_fixum_retired]
 message = "คำผูกชื่อ `{keyword}` ถูกยกเลิกแล้ว"
@@ -648,6 +692,14 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "annotation `@ {annotation}` ไม่ได้ประกาศในพื้นผิว reader นี้"
 help = "ใช้ `@ {expected}` สำหรับ locale ของไฟล์นี้"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum]
+message = "การประกาศมี annotation `@ nucleum` มากกว่าหนึ่งรายการ"
+help = "เก็บ annotation nucleum ไว้เพียงรายการเดียว"
+
+[diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
+message = "fragment `@ nucleum` ขัดแย้งกับ graphics fragment annotation"
+help = "ลบ fragment annotation รายการใดรายการหนึ่ง"
+
 [diagnostics.PARSE019]
 message = "modifier ซ้ำ"
 help = "ลบ modifier ที่ซ้ำ"
@@ -671,6 +723,10 @@ help = "คั่นหัวข้อด้วย '{et}'"
 [diagnostics.PARSE020.issues.discerne_subject_not_path]
 message = "หัวข้อของ '{discerne}' ต้องเป็นชื่อหรือเส้นทางสมาชิก"
 help = "ผูกค่ากับชื่อก่อน แล้วใช้ '{discerne}' กับชื่อนั้น"
+
+[diagnostics.PARSE020.issues.nesting_too_deep]
+message = "ซอร์สซ้อนลึกเกินขีดจำกัดของ parser ที่ {limit}"
+help = "แยกโครงสร้างออกเป็น binding ที่มีชื่อ"
 
 [diagnostics.PARSE021]
 message = "ขาดเงื่อนไข"
@@ -752,6 +808,10 @@ help = "เขียนบอดี clausura แบบย่อหลัง ∴ 
 message = "บอดี fac ของ clausura ใช้ 'dum' ไม่ได้"
 help = "ลบ dum จากบอดี fac ของ clausura"
 
+[diagnostics.PARSE030.issues.expression_too_long]
+message = "นิพจน์เกินขีดจำกัด operator ของ parser ที่ {limit}"
+help = "แยกนิพจน์ออกเป็น binding ที่มีชื่อ"
+
 [diagnostics.PARSE031]
 message = "ลิเทอรัลไม่ถูกต้อง"
 help = "ตรวจรูปแบบลิเทอรัล"
@@ -779,6 +839,10 @@ help = "กำหนดค่าเฉพาะให้ lvalue ที่ถู�
 [diagnostics.PARSE040]
 message = "ชนิดไม่ถูกต้อง"
 help = "ตรวจไวยากรณ์ชนิด"
+
+[diagnostics.PARSE040.issues.promissum_alternate_uses_exit_arrow]
+message = "ทางเลือกของ promissum ต้องใช้ลูกศรข้อผิดพลาด `⇥` ไม่ใช่ลูกศรส่งคืน `→`"
+help = "เขียนสาขาทางเลือกด้วย `⇥`"
 
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "ต้องมีชื่อชนิด"

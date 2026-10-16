@@ -16,7 +16,7 @@ fn backtick_template_captures_forma_without_rendering() {
     let source = r#"incipit {
   sit textus accountId ← "acct-1"
   sit textus plan ← "pro"
-  sit q ← `select * from accounts where id = § and plan = §`(accountId, plan)
+  sit _ q ← `select * from accounts where id = § and plan = §`(accountId, plan)
   nota q.template
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -35,7 +35,7 @@ fn backtick_template_captures_forma_without_rendering() {
 fn bare_backtick_template_produces_empty_params() {
     let session = test_session_la(Target::HirRust);
     let source = r"incipit {
-  sit q ← `select 1`
+  sit _ q ← `select 1`
   nota q.template
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -51,8 +51,8 @@ fn forma_reused_textus_param_is_borrowed_not_moved() {
     let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit textus t ← "x"
-  sit first ← `§`(t)
-  sit second ← `§`(t)
+  sit _ first ← `§`(t)
+  sit _ second ← `§`(t)
   nota first.template
   nota second.template
 }"#;
@@ -87,8 +87,8 @@ fn quoted_template_still_renders_via_scriptum() {
 fn compile_lowers_scriptum_expression() {
     let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
-  sit name ← "Marcus"
-  sit msg ← scriptum("salve, §!", name)
+  sit _ name ← "Marcus"
+  sit _ msg ← scriptum("salve, §!", name)
   nota msg
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -102,7 +102,7 @@ fn compile_lowers_scriptum_expression() {
 #[test]
 fn block_string_literal_uses_guillemets() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  sit quote ← «he said \"salve\"»\n  nota quote\n}";
+    let source = "incipit {\n  sit _ quote ← «he said \"salve\"»\n  nota quote\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
@@ -113,7 +113,7 @@ fn block_string_literal_uses_guillemets() {
 #[test]
 fn block_string_opener_glyphs_are_rejected() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  sit quote ← ❝he said \"salve\"❞\n  nota quote\n}";
+    let source = "incipit {\n  sit _ quote ← ❝he said \"salve\"❞\n  nota quote\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
@@ -130,8 +130,7 @@ fn block_string_opener_glyphs_are_rejected() {
 #[test]
 fn guillemet_block_string_template_renders_via_scriptum() {
     let session = test_session_la(Target::HirRust);
-    let source =
-        "incipit {\n  sit code ← 200\n  sit label ← \"ok\"\n  sit msg ← «status: § (§)»(code, label)\n  nota msg\n}";
+    let source = "incipit {\n  sit _ code ← 200\n  sit _ label ← \"ok\"\n  sit _ msg ← «status: § (§)»(code, label)\n  nota msg\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
@@ -145,7 +144,7 @@ fn guillemet_block_string_template_renders_via_scriptum() {
 #[test]
 fn ascii_literal_compiles_to_faber_ascii() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  sit route ← 'pg:query'\n  nota route\n}";
+    let source = "incipit {\n  sit _ route ← 'pg:query'\n  nota route\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
@@ -160,7 +159,7 @@ fn ascii_literal_rejects_non_ascii_content() {
     assert_compile_fails_with_args(
         &session,
         "test.fab",
-        "incipit {\n  sit bad ← 'café'\n  nota bad\n}",
+        "incipit {\n  sit _ bad ← 'café'\n  nota bad\n}",
         &[
             DiagnosticArg::new("issue", "ascii_literal_non_ascii_scalar"),
             DiagnosticArg::new("character", "é"),
@@ -174,7 +173,7 @@ fn ascii_literal_rejects_template_application() {
     assert_compile_fails_with_args(
         &session,
         "test.fab",
-        "incipit {\n  sit id ← 1\n  sit bad ← 'route'(id)\n  nota bad\n}",
+        "incipit {\n  sit _ id ← 1\n  sit _ bad ← 'route'(id)\n  nota bad\n}",
         &[DiagnosticArg::new("issue", "ascii_literal_template_application")],
     );
 }
@@ -183,7 +182,7 @@ fn ascii_literal_rejects_template_application() {
 #[test]
 fn ascii_widens_to_textus() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  sit route ← 'pg:query'\n  sit textus shown ← route\n  nota shown\n}";
+    let source = "incipit {\n  sit _ route ← 'pg:query'\n  sit textus shown ← route\n  nota shown\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
@@ -195,7 +194,7 @@ fn ascii_widens_to_textus() {
 #[test]
 fn textus_to_ascii_conversio_emits_try_from_textus() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  sit raw ← \"ok\"\n  sit ascii token ← raw ↦ ascii\n  nota token\n}";
+    let source = "incipit {\n  sit _ raw ← \"ok\"\n  sit ascii token ← raw ↦ ascii\n  nota token\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
@@ -249,7 +248,7 @@ fn octeti_literal_rejects_template_application() {
     assert_compile_fails_with_args(
         &session,
         "test.fab",
-        "incipit {\n  sit id ← 1\n  sit bad ← |00|(id)\n  nota bad\n}",
+        "incipit {\n  sit _ id ← 1\n  sit _ bad ← |00|(id)\n  nota bad\n}",
         &[DiagnosticArg::new("issue", "octeti_literal_template_application")],
     );
 }
@@ -259,7 +258,7 @@ fn octeti_literal_rejects_template_application() {
 fn octeti_literal_matches_in_elige_pattern() {
     let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
-  sit bytes ← |deadbeef|
+  sit _ bytes ← |deadbeef|
   elige bytes {
     casu |deadbeef| ergo nota "hit"
     casu |00| ergo nota "miss"

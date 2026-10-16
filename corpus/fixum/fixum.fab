@@ -29,7 +29,7 @@ locale = "en"
 #
 # Immediate init:
 #   sit numerus count ← 0
-#   sit nomen ← "Marcus"
+#   sit _ nomen ← "Marcus"
 #
 # Deferred init (write-once): declare without ←, assign exactly once later, then
 # freeze. The definite-assignment pass rejects reads before that assignment and

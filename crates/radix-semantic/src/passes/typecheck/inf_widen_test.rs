@@ -181,7 +181,7 @@ fn an_untyped_constant_takes_no_node() {
 
 #[test]
 fn a_bounded_value_into_a_bounded_or_open_slot_takes_no_node() {
-    let source = "incipit {\nsit u8 b ← 1\nsit u64 w ← b\nsit r ← b\n\
+    let source = "incipit {\nsit u8 b ← 1\nsit u64 w ← b\nsit _ r ← b\n\
         nota w\nnota r\n}\n";
     assert!(widens_of(source).is_empty());
 }
@@ -190,7 +190,7 @@ fn a_bounded_value_into_a_bounded_or_open_slot_takes_no_node() {
 fn an_inf_operand_joins_a_bounded_one_with_each_keeping_its_own_type() {
     // `x + b` is typed `inf` by the join; the bounded operand is not stamped,
     // so no store happens and no node is needed.
-    let source = "incipit {\nsit inf x ← 3\nsit u8 b ← 1\nsit r ← x + b\nnota r\n}\n";
+    let source = "incipit {\nsit inf x ← 3\nsit u8 b ← 1\nsit _ r ← x + b\nnota r\n}\n";
     assert!(widens_of(source).is_empty());
 }
 

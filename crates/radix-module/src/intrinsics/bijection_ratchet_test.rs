@@ -199,7 +199,9 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
             "",
             "0.5",
             "fractus",
-            "0",
+            // The coordinate lista the Matrix `accipe`/`apud`/`ponde` rows
+            // take; `[0, 0]` is provably in range for `[2, 2]`.
+            "[0, 0]",
         )],
         IntrinsicReceiver::Sparsa => vec![dtype(
             "fractus",
@@ -253,7 +255,7 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
             "regex rx",
             "",
             "regex rx",
-            "sit r ← rx.inventa(\"xy\")",
+            "sit _ r ← rx.inventa(\"xy\")",
             "\"xy\"",
             "textus",
             "0",
@@ -424,9 +426,9 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
         // and needs a `⊥` default, a `fac`/`cape` handler or an enclosing `⇥`:
         // the probe supplies a handler so it meets method admission, not
         // SEM011 failable_call_requires_handler.
-        format!("    fac {{\n        sit ex ← {call}\n    }} cape err {{\n    }}")
+        format!("    fac {{\n        sit _ ex ← {call}\n    }} cape err {{\n    }}")
     } else {
-        format!("    sit ex ← {call}")
+        format!("    sit _ ex ← {call}")
     };
     let mut src = String::new();
     let _ = writeln!(src, "functio proba({param}) → vacuum {{");
@@ -527,12 +529,11 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
 /// rows were dispositioned by MC4 onto `AIR_LANE_CLASSES` (ruled design
 /// surface, not worklist entries). MC3 emptied the ratchet; S0-G9
 /// (a7d731ec0) re-grew it by one with a semantic-only Matrix `transpone`
-/// admission; SCR-04's `lower_matrix_transpone` unit emptied it again.
-const RATCHET: &[(&str, &str)] = &[
-    // `formata` is a source/codegen-only tensor view; IGP-2 moved its
-    // generic admission into the catalog without inventing a MIR owner.
-    ("Tensor.formata/0", "IGP-2 catalog generic migration"),
-];
+/// admission; SCR-04's `lower_matrix_transpone` unit emptied it again, and
+/// 9b076c25-4 emptied it a third time by lowering `Tensor.formata` onto
+/// `MirCollectionOp::TensorReshape` (Q-X10) — an empty ratchet is the armed
+/// state, not drift.
+const RATCHET: &[(&str, &str)] = &[];
 
 /// Permanent AIR-lane class list (goal mir-completeness §1 direction 3) — the
 /// 11 DOCUMENT-AS-DESIGNED rows moved off the ratchet by MC4. A design fact,

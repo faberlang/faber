@@ -1393,6 +1393,7 @@ impl<'a> BorrowChecker<'a> {
         binding: DefId,
         mode: HirIteraMode,
         iter: &HirExpression,
+        mutable: bool,
     ) {
         if !self.itera_element_can_alias(mode, iter) {
             return;
@@ -1400,6 +1401,13 @@ impl<'a> BorrowChecker<'a> {
         let Some(root) = Self::root_def_id(iter) else {
             return;
         };
+        // A `mut` (`varia`) binder owns a mutable copy of the element, so it is
+        // not a shared alias of a non-`mut` parameter and may be written
+        // through. `const` is still deep: a binder over a read-only collection
+        // stays a read-only alias whatever its spelling.
+        if mutable && !self.immutable_locals.contains(&root) {
+            return;
+        }
         let origin = match self.nonmut_agg_origin(root) {
             Some(origin) => origin,
             None if self.immutable_locals.contains(&root) => root,
@@ -2755,11 +2763,12 @@ impl HirVisitor for BorrowChecker<'_> {
                 binding,
                 iter,
                 body: block,
+                mutable,
                 ..
             } => {
                 self.visit_expr(iter);
                 self.ensure_state(*binding);
-                self.note_itera_binder_alias(*binding, *mode, iter);
+                self.note_itera_binder_alias(*binding, *mode, iter, *mutable);
                 self.own.note_loop_binder(*binding);
                 let entry = self.loop_entry();
                 self.check_block(block);

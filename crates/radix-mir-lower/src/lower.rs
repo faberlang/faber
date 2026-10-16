@@ -55,7 +55,8 @@ use radix_mir::{
     MirRuntimeCall, MirShapeBinding, MirShapeCheck, MirShapeExpr, MirShapeRelation, MirStatement, MirStatementKind,
     MirStructFieldDefaults, MirSwitchCase, MirSyntheticFunctionIdentity, MirTemp, MirTempId, MirTerminator,
     MirTerminatorKind, MirType, MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
-    MirVectorOp, ValidatedMir, dump_program, instantiate_existing_generic_type, type_contains_param,
+    MirVectorOp, ValidatedMir, dump_program, instantiate_existing_generic_type, terminator_successors,
+    type_contains_param,
 };
 use radix_semantic::analyzed_application::AnalyzedModuleApplicationView;
 use radix_semantic::cli::{CliDefault, CliOperand, CliOption, CliType};
@@ -691,6 +692,7 @@ pub fn lower_analyzed_unit(
     types.ordering_contract = unit.types.ordering_contract;
     ensure_map_iteration_array_types(&mut types);
     ensure_itera_coordinate_array_types(unit.hir, &mut types);
+    ensure_enum_iteration_array_types(unit.hir, &mut types);
     ensure_tensor_bracket_index_array_types(unit.hir, &mut types);
     ensure_runtime_extent_shape_array_type(&mut types);
     if options.kernel_lowering == KernelLowering::Device {
@@ -1335,6 +1337,37 @@ fn ensure_itera_coordinate_array_types(hir: &radix_hir::HirModule, types: &mut T
             types.ensure_array(element);
             types.intern(Type::Option(element));
         }
+    }
+}
+
+/// An `itera ex` over an enum name walks the enum's declared members
+///. Lowering materializes that series as a `lista<Enum>` temp,
+/// so the list type is interned here, once, before function lowering begins
+/// (function lowering holds the type table immutably).
+fn ensure_enum_iteration_array_types(hir: &radix_hir::HirModule, types: &mut TypeTable) {
+    struct EnumIterationCollector<'a> {
+        types: &'a TypeTable,
+        elements: FxHashSet<TypeId>,
+    }
+
+    impl HirVisitor for EnumIterationCollector<'_> {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if let HirExpressionKind::Itera { iter, .. } = &expr.kind
+                && let Some(ty) = iter.ty
+                && matches!(self.types.get(ty), Type::Enum(_))
+            {
+                self.elements.insert(ty);
+            }
+            walk_expr(self, expr);
+        }
+    }
+
+    let mut collector = EnumIterationCollector { types, elements: FxHashSet::default() };
+    walk_program(&mut collector, hir);
+    let elements = std::mem::take(&mut collector.elements);
+    drop(collector);
+    for element in elements {
+        types.ensure_array(element);
     }
 }
 
@@ -2486,6 +2519,10 @@ pub struct FunctionBuilder<'a> {
     pub temps: Vec<MirTemp>,
     pub blocks: Vec<OpenBlock>,
     current: Option<MirBlockId>,
+    /// The block that received the most recent terminator. A body that ends in
+    /// `mori` leaves this as the diverging block even when the block was
+    /// created before the body began.
+    last_terminated: Option<MirBlockId>,
     breakables: Vec<BreakableContext>,
     reduction_fold: Option<ReductionFoldContext>,
     /// Active `reducta via summa … filum` term capture (SFR-5): a valued
@@ -2572,6 +2609,7 @@ impl<'a> FunctionBuilder<'a> {
             temps: Vec::new(),
             blocks: Vec::new(),
             current: None,
+            last_terminated: None,
             breakables: Vec::new(),
             reduction_fold: None,
             filum_capture: None,
@@ -3943,6 +3981,21 @@ impl<'a> FunctionBuilder<'a> {
         {
             return self.lower_tuple_order(op, lhs, rhs, expr);
         }
+        // Operator ruling 2026-10-15: `≺ ≻ ≤ ≥` over two values
+        // of one `ordo` order by their declared discriminants. Typecheck
+        // recorded the rows keyed by the left operand; convert both operands to
+        // those integers and compare.
+        if matches!(op, HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq)
+            && let Some(rows) = self
+                .context
+                .tensor_edge_policies
+                .ordo_order
+                .comparisons
+                .get(&lhs.id)
+                .cloned()
+        {
+            return self.lower_ordo_order_compare(op, &rows, lhs, rhs, expr);
+        }
         let Some(mir_op) = mir_bin_op(op) else {
             self.errors
                 .push(MirError::unsupported(expr.span, "binary operator without a MIR primitive"));
@@ -3971,6 +4024,82 @@ impl<'a> FunctionBuilder<'a> {
         let ty = self.expr_ty(expr)?;
 
         Some(self.assign_temp(MirValueKind::Binary { op: mir_op, lhs, rhs }, ty, expr.span))
+    }
+
+    /// Lower an `ordo` ordering comparison by converting both operands to their
+    /// declared discriminants and comparing the integers.
+    fn lower_ordo_order_compare(
+        &mut self,
+        op: HirBinOp,
+        rows: &[(DefId, i64)],
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let int_ty = self.types.primitive(Primitive::Numerus);
+        let lhs_value = self.lower_ordo_operand_discriminant(lhs, rows, int_ty)?;
+        let rhs_value = self.lower_ordo_operand_discriminant(rhs, rows, int_ty)?;
+        let mir_op = mir_bin_op(op)?;
+        let result_ty = self.expr_ty(expr)?;
+        Some(self.assign_temp(
+            MirValueKind::Binary { op: mir_op, lhs: lhs_value, rhs: rhs_value },
+            result_ty,
+            expr.span,
+        ))
+    }
+
+    /// Convert one `ordo` operand to its declared discriminant: an equality
+    /// chain over the members, in declaration order, that writes one integer
+    /// temp — the same shape `lower_ordo_conversio` emits for `Ordo ↦ numerus`.
+    fn lower_ordo_operand_discriminant(
+        &mut self,
+        source: &HirExpression,
+        rows: &[(DefId, i64)],
+        int_ty: TypeId,
+    ) -> Option<MirOperand> {
+        let span = source.span;
+        let source_ty = self.expr_ty(source)?;
+        let value = self.lower_expr_value(source)?;
+        let mir_int_ty = MirType::semantic(int_ty);
+        let result = MirPlace::temp(self.push_temp(mir_int_ty, span));
+        let join_id = self.fresh_block(span);
+        let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let mut reaches_join = false;
+
+        for (variant, declared) in rows {
+            let probe = self.construct_temp(
+                MirAggregateKind::EnumVariant(*variant),
+                MirAggregateFields::Ordered(Vec::new()),
+                source_ty,
+                span,
+            );
+            let condition = self.binary_temp(MirBinOp::Eq, value.clone(), probe, bool_ty, span);
+            let then_id = self.fresh_block(span);
+            let else_id = self.fresh_block(span);
+            self.terminate_current(
+                MirTerminatorKind::Branch { condition, then_block: then_id, else_block: else_id },
+                span,
+            );
+            self.switch_to(then_id);
+            self.assign(
+                result.clone(),
+                MirOperand::Constant(MirConstant::Int(*declared)),
+                mir_int_ty,
+                span,
+            );
+            reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
+            self.switch_to(else_id);
+        }
+
+        // Every `ordo` value is one of the members, so the fall-through cannot
+        // be reached.
+        self.terminate_current(MirTerminatorKind::Unreachable, span);
+        if reaches_join {
+            self.switch_to(join_id);
+        } else {
+            self.seal_unreachable(join_id, span);
+        }
+        Some(MirOperand::Place(result))
     }
 
     fn lower_between_comparison(
@@ -4702,6 +4831,7 @@ impl<'a> FunctionBuilder<'a> {
 
         block.terminator = Some(MirTerminator { kind, span });
         self.current = None;
+        self.last_terminated = Some(current);
         true
     }
 

@@ -26,7 +26,7 @@ fn binary(source: &str) -> radix_syntax::BinaryExpr {
 
 #[test]
 fn element_of_parses_as_member() {
-    let bin = binary("sit v ← x ∈ xs");
+    let bin = binary("sit _ v ← x ∈ xs");
     assert!(matches!(bin.op, BinOp::Member));
     assert!(matches!(bin.lhs.kind, ExprKind::Ident(_)));
     assert!(matches!(bin.rhs.kind, ExprKind::Ident(_)));
@@ -34,34 +34,34 @@ fn element_of_parses_as_member() {
 
 #[test]
 fn not_element_of_parses_as_not_member() {
-    let bin = binary("sit v ← x ∉ xs");
+    let bin = binary("sit _ v ← x ∉ xs");
     assert!(matches!(bin.op, BinOp::NotMember));
 }
 
 #[test]
 fn element_of_accepts_a_range_right_operand() {
-    let bin = binary("sit v ← n ∈ 0‥10");
+    let bin = binary("sit _ v ← n ∈ 0‥10");
     assert!(matches!(bin.op, BinOp::Member));
     assert!(matches!(bin.rhs.kind, ExprKind::Intervallum(_)));
 }
 
 #[test]
 fn element_of_binds_looser_than_arithmetic() {
-    let bin = binary("sit v ← a + 1 ∈ xs");
+    let bin = binary("sit _ v ← a + 1 ∈ xs");
     assert!(matches!(bin.op, BinOp::Member));
     assert!(matches!(bin.lhs.kind, ExprKind::Binary(ref lhs) if matches!(lhs.op, BinOp::Add)));
 }
 
 #[test]
 fn membership_chains_left_associative_with_comparison() {
-    let bin = binary("sit v ← a ∈ xs ∉ ys");
+    let bin = binary("sit _ v ← a ∈ xs ∉ ys");
     assert!(matches!(bin.op, BinOp::NotMember));
     assert!(matches!(bin.lhs.kind, ExprKind::Binary(ref lhs) if matches!(lhs.op, BinOp::Member)));
 }
 
 #[test]
 fn membership_binds_tighter_than_logical_and() {
-    let bin = binary("sit v ← a ∈ xs et b ∉ ys");
+    let bin = binary("sit _ v ← a ∈ xs et b ∉ ys");
     assert!(matches!(bin.op, BinOp::And));
     assert!(matches!(bin.lhs.kind, ExprKind::Binary(ref lhs) if matches!(lhs.op, BinOp::Member)));
     assert!(
@@ -71,6 +71,6 @@ fn membership_binds_tighter_than_logical_and() {
 
 #[test]
 fn element_of_without_a_right_operand_is_a_parse_error() {
-    let result = parse_program("sit v ← x ∈");
+    let result = parse_program("sit _ v ← x ∈");
     assert!(!result.errors.is_empty());
 }

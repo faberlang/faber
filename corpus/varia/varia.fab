@@ -54,13 +54,13 @@ main {
 
     # --- Write-once bindings: sit ---
 
-    let salutatio ← "Salve, Mundus!"
+    let _ salutatio ← "Salve, Mundus!"
     print salutatio
 
     # sit infers the type of each local
-    let x ← 10
-    let y ← 20
-    let summa ← x + y
+    let _ x ← 10
+    let _ y ← 20
+    let _ summa ← x + y
     print summa
 
     # --- Reassign only varia bindings ---

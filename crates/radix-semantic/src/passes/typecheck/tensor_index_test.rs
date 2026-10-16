@@ -33,7 +33,7 @@ fn bounded_tensor_literal_indices_reject_provable_oob_and_negative() {
     rejects_with_issue(
         r"incipit {
   sit tf32[3] grid ← vacua
-  sit bad ← grid.accipe([3])
+  sit _ bad ← grid.accipe([3])
   nota bad
 }",
         "index_provably_out_of_bounds",
@@ -41,7 +41,7 @@ fn bounded_tensor_literal_indices_reject_provable_oob_and_negative() {
     rejects_with_issue(
         r"incipit {
   sit tf32[3] grid ← vacua
-  sit bad ← grid[-1]
+  sit _ bad ← grid[-1]
   nota bad
 }",
         "index_provably_out_of_bounds",
@@ -53,8 +53,8 @@ fn bounded_tensor_literal_indices_in_bounds_still_accept() {
     accepts(
         r"incipit {
   sit tf32[3] grid ← vacua
-  sit good ← grid.accipe([2])
-  sit sugar ← grid[1]
+  sit _ good ← grid.accipe([2])
+  sit _ sugar ← grid[1]
 }",
     );
 }
@@ -63,8 +63,8 @@ fn bounded_tensor_literal_indices_in_bounds_still_accept() {
 fn tensor_param_and_dynamic_shapes_decline_static_oob_check() {
     accepts(
         r"functio read<magnitudo N>(tensor<f32, [N]> param, tf32[] dynamic) → vacuum {
-  sit a ← param.accipe([9]) ⊥ 0.0
-  sit b ← dynamic.accipe([9]) ⊥ 0.0
+  sit _ a ← param.accipe([9]) ⊥ 0.0
+  sit _ b ← dynamic.accipe([9]) ⊥ 0.0
 }",
     );
 }
@@ -107,14 +107,14 @@ fn expression_shape_hole_is_admitted_in_reshape_shape_slot() {
 fn expression_shape_hole_is_rejected_outside_shape_argument_slots() {
     rejects_with_issue(
         r"incipit {
-  sit values ← [_, 4]
+  sit _ values ← [_, 4]
 }",
         "tensor_shape_hole_requires_shape_argument",
     );
     rejects_with_issue(
         r"incipit {
   sit tensor<f32, [2]> grid ← vacua
-  sit value ← grid.accipe([_])
+  sit _ value ← grid.accipe([_])
 }",
         "tensor_shape_hole_requires_shape_argument",
     );
@@ -126,7 +126,7 @@ fn tensor_sugar_tf32_typechecks_with_inferred_shape() {
         r"incipit {
   sit lista<f32> flat ← [1.0, 2.0]
   sit lista<numerus> shape ← [2, 1]
-  sit grid ← flat ↦ tensor<f32, shape>
+  sit _ grid ← flat ↦ tensor<f32, shape>
   nota grid.longitudo()
 }",
     );
@@ -1040,7 +1040,7 @@ fn tensor_shape_literal_index_past_the_rank_rejects() {
     rejects_with_issue(
         r"incipit {
   sit tf32[2, 3] grid ← vacua
-  sit bad ← grid.magnitudines()[5]
+  sit _ bad ← grid.magnitudines()[5]
   nota bad
 }",
         "index_provably_out_of_bounds",

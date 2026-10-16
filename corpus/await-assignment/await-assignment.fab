@@ -29,7 +29,7 @@ incipiet {
     sit promissum<numerus> futurum ← responde(7)
     sit numerus immotum ↢ futurum
     varia numerus mutabile ↢ responde(8)
-    sit illatum ↢ responde(9)
+    sit _ illatum ↢ responde(9)
     mutabile ← mutabile + 1
     nota immotum
     nota mutabile

@@ -33,7 +33,7 @@ sit ascii<2> hex ← n ↦ ascii<2> via Hex }",
 #[test]
 fn overflow_literal_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit hex ← 256 ↦ ascii<2> via Hex }",
+        "incipit { sit _ hex ← 256 ↦ ascii<2> via Hex }",
         "ascii_pack_width_overflow",
     );
 }
@@ -41,7 +41,7 @@ fn overflow_literal_rejects() {
 #[test]
 fn negative_literal_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit hex ← -1 ↦ ascii<2> via Hex }",
+        "incipit { sit _ hex ← -1 ↦ ascii<2> via Hex }",
         "ascii_pack_negative_source",
     );
 }
@@ -49,7 +49,7 @@ fn negative_literal_rejects() {
 #[test]
 fn float_source_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit hex ← 1.5 ↦ ascii<2> via Hex }",
+        "incipit { sit _ hex ← 1.5 ↦ ascii<2> via Hex }",
         "unsupported_conversio",
     );
 }
@@ -59,7 +59,7 @@ fn float_source_rejects() {
 #[test]
 fn hint_as_the_capacity_argument_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit hex ← 255 ↦ ascii<Hex> }",
+        "incipit { sit _ hex ← 255 ↦ ascii<Hex> }",
         "ascii_format_hint_not_capacity",
     );
 }

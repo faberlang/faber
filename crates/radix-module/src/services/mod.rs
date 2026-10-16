@@ -18,12 +18,12 @@ pub use check::{
 pub use commands::{BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
 pub use emit::{build_output_path, output_code};
 pub use field_modifier_codemod::{FieldModifierCodemod, insert_field_modifiers};
-#[cfg(feature = "mir-core")]
-pub use inspect::mir_output_for_source;
 pub use inspect::{
     SourceInspection, cli_ir_inspection_for_source, hir_inspection_for_source, hir_inspection_json,
     lex_inspection_for_source, parse_inspection_for_source,
 };
+#[cfg(feature = "mir-core")]
+pub use inspect::{mir_output_for_source, mir_output_for_source_with_config};
 #[cfg(feature = "mir-core")]
 pub use reflection::output_reflection_json;
 pub use targets::{

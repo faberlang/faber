@@ -38,7 +38,7 @@ import from "./dummy" dummy
 main {
     let tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
     let tensor<f32, [2, 2]> b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
-    let r ← twins.twin_add(a, b)
+    let _ r ← twins.twin_add(a, b)
     print dummy.one()
 }
 "#;

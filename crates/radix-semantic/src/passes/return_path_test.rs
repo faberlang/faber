@@ -258,7 +258,7 @@ fn accepts_cursor_generator_without_redde() {
 fn rejects_statement_bodied_closure_with_missing_return() {
     assert_rejects(
         "incipit {
-            sit maybe ← (bivalens b) → numerus ∴ fac {
+            sit _ maybe ← (bivalens b) → numerus ∴ fac {
                 si b ergo redde 1
             }
         }",
@@ -269,7 +269,7 @@ fn rejects_statement_bodied_closure_with_missing_return() {
 fn accepts_statement_bodied_closure_when_all_paths_return() {
     assert_accepts(
         "incipit {
-            sit abs ← (numerus x) → numerus ∴ fac {
+            sit _ abs ← (numerus x) → numerus ∴ fac {
                 si x ≻ 0 {
                     redde x
                 } secus {
@@ -285,7 +285,7 @@ fn accepts_statement_bodied_closure_when_all_paths_return() {
 fn accepts_expression_bodied_closure_without_redde() {
     assert_accepts(
         "incipit {
-            sit summa ← (numerus a, numerus b) → numerus ∴ a + b
+            sit _ summa ← (numerus a, numerus b) → numerus ∴ a + b
             nota summa(2, 3)
         }",
     );
@@ -295,7 +295,7 @@ fn accepts_expression_bodied_closure_without_redde() {
 fn accepts_fac_bodied_closure_with_redde() {
     assert_accepts(
         "incipit {
-            sit bump ← numerus n → numerus ∴ fac {
+            sit _ bump ← numerus n → numerus ∴ fac {
                 redde n + 10
             }
             nota bump(5)
@@ -405,7 +405,7 @@ fn rejects_dum_verum_with_rumpe_in_closure_body() {
     assert_rejects(
         "functio f() → numerus {
             dum verum {
-                sit g ← (numerus x) → vacuum ∴ fac { rumpe }
+                sit _ g ← (numerus x) → vacuum ∴ fac { rumpe }
             }
         }",
     );
@@ -478,6 +478,47 @@ fn accepts_genus_generator_method_without_redde() {
                     cede i
                 }
             }
+        }",
+    );
+}
+
+#[test]
+fn accepts_fac_dum_verum_tail_return() {
+    // `fac { … } dum verum` is the do-while spelling of an infinite loop; the
+    // body's `redde` is reachable and the synthesized break test is dead, so
+    // the function terminates exactly like `dum verum { … }`.
+    assert_accepts(
+        "functio f() → numerus {
+            varia numerus i ← 0
+            fac {
+                i ← i + 1
+                si i ≡ 4 ergo redde i * 10
+            } dum verum
+        }",
+    );
+}
+
+#[test]
+fn rejects_fac_dum_conditional_tail_return() {
+    // A non-constant do-while condition can exit before the body returns.
+    assert_rejects(
+        "functio f(numerus n) → numerus {
+            fac {
+                si n ≻ 0 ergo redde 1
+            } dum n ≻ 0
+        }",
+    );
+}
+
+#[test]
+fn rejects_fac_dum_verum_with_rumpe_in_body() {
+    // A user-written `rumpe` still escapes the loop, so the function can reach
+    // its end without returning.
+    assert_rejects(
+        "functio f() → numerus {
+            fac {
+                rumpe
+            } dum verum
         }",
     );
 }

@@ -556,6 +556,12 @@ pub struct CheckArgs {
     #[arg(long, requires = "air")]
     pub json: bool,
 
+    /// Also compile the program to Faber's reference form without running
+    /// it; reports errors semantic analysis cannot see (a program that
+    /// checks but cannot run). Needs a file or package path
+    #[arg(long, conflicts_with_all = ["air", "permissive"])]
+    pub lower: bool,
+
     /// Force package checking mode
     #[arg(long)]
     pub package: bool,

@@ -356,6 +356,30 @@ help = "أصلح خطأ المحلل المعجمي أولا؛ يستمر الت
 message = "مطلوب{?expected| |}"
 help = "أضف{?expected| |} في هذا الموضع"
 
+[diagnostics.PARSE001.issues.ratio_field_list_hole_not_sole]
+message = "يجب أن تكون فتحة `…` في قائمة حقول ratio هي العنصر الوحيد"
+help = "استخدم فتحة واحدة على الأكثر في قائمة الحقول"
+
+[diagnostics.PARSE001.issues.ratio_type_arg_label_required]
+message = "يجب أن يكون معامل نوع ratio موسومًا"
+help = "اكتب التسمية قبل المعامل"
+
+[diagnostics.PARSE001.issues.annotation_field_name]
+message = "يجب أن يكون حقل التعليمة معرّفًا"
+help = "اكتب اسم حقل بسيطًا داخل أقواس التعليمة"
+
+[diagnostics.PARSE001.issues.label_bind_distinction]
+message = "بنية التسمية تستخدم `{label_operator}`، وليس عامل الربط `{binding_operator}`"
+help = "اكتب `{label}{label_operator} value` لوسيط مسمّى، أو مرّر القيمة موضعيًا"
+
+[diagnostics.PARSE001.issues.labeled_actual_non_template_call]
+message = "هذا الاستدعاء لا يقبل وسائط مسمّاة؛ التسميات مخصصة لاستدعاءات القوالب"
+help = "احذف التسمية `{label}` ومرّر القيمة موضعيًا، أو استدعِ نص قالب"
+
+[diagnostics.PARSE001.issues.labeled_actual_spread_unsupported]
+message = "وسيط spread لا يمكن أن يحمل تسمية"
+help = "احذف التسمية من وسيط spread"
+
 [diagnostics.PARSE001.issues.copy_into_value_expected]
 message = "مطلوب قيمة بعد عامل النسخ الداخلي `{operator}`"
 help = "اكتب تعبير المصدر بعد `⇇`"
@@ -399,10 +423,6 @@ help = "اربط de فهرسا أو مفتاحا، وليس عنصرا قابل�
 [diagnostics.PARSE001.issues.duplicate_rest_pattern]
 message = "نمط rest محدد مسبقا"
 help = "احتفظ بربط rest واحد فقط '{keyword}'"
-
-[diagnostics.PARSE001.issues.sit_identifier_binding]
-message = "'{keyword}' يربط معرفا واحدا مباشرة؛ استخدم '{keyword}' name ← expr"
-help = "اكتب '{keyword}' name ← expr أو استخدم {fixum} للارتباطات المنمطة/المفككة"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "مطلوب test case أو setup"
@@ -504,6 +524,26 @@ help = "أزل الفاصلة قبل الفاصل الختامي"
 message = "رمز غير متوقع"
 help = "أزل الرمز أو انقله إلى موضع صحيح"
 
+[diagnostics.PARSE002.issues.enum_value_out_of_range]
+message = "قيمة عضو enum خارج نطاق 64 بت الموقّع"
+help = "اختر قيمة بين −2^63 و 2^63−1"
+
+[diagnostics.PARSE002.issues.exitus_value_out_of_range]
+message = "رمز exitus خارج نطاق 64 بت الموقّع"
+help = "اختر قيمة بين −2^63 و 2^63−1"
+
+[diagnostics.PARSE002.issues.json_integer_overflow]
+message = "عدد صحيح في حرفية json خارج نطاق 64 بت الموقّع"
+help = "اكتب القيمة كعدد عشري أو كسلسلة"
+
+[diagnostics.PARSE002.issues.test_modifier_integer_out_of_range]
+message = "العدد الصحيح للمُعدِّل `{modifier}` خارج نطاق 64 بت الموقّع"
+help = "اختر قيمة أصغر"
+
+[diagnostics.PARSE002.issues.declaration_block_comma]
+message = "الفواصل لا تفصل أعضاء كتلة الإعلان"
+help = "أزل الفاصلة؛ تُفصل أعضاء الإعلان بأسطر جديدة"
+
 [diagnostics.PARSE002.issues.json_unknown_identifier_value]
 message = "معرفات JSON ليست قيما صالحة في JSON"
 help = "استخدم true أو false أو null أو سلسلة أو رقما أو كائنا أو مصفوفة"
@@ -542,7 +582,11 @@ help = "اكتب `{keyword} T {name} ← {marker} value`؛ و`{name} ← {marker
 
 [diagnostics.PARSE010.issues.runtime_const_retired]
 message = "تم إلغاء تصريح `{keyword}` وقت التشغيل؛ `{name}` اسم وقت تشغيل"
-help = "اكتب `{sit} T {name} ← …` (أو `{sit} {name} ← …` لاستنتاج النوع)؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+help = "اكتب `{sit} T {name} ← …` (أو `{sit} _ {name} ← …` لاستنتاج النوع)؛ `{fixum}` يعبّر عن حقيقة وقت الترجمة ويأتي مع `=`"
+
+[diagnostics.PARSE010.issues.binding_type_slot_required]
+message = "يجب أن يكتب تصريح `{keyword}` خانة النوع؛ لا نوع للاسم `{name}`"
+help = "اكتب `{keyword} T {name} ← …`، أو `{keyword} _ {name} ← …` لاستنتاج النوع"
 
 [diagnostics.PARSE010.issues.binder_fixum_retired]
 message = "تم إلغاء كلمة الربط `{keyword}`"
@@ -648,6 +692,14 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "التعليق التوضيحي `@ {annotation}` غير معلن في سطح القارئ هذا"
 help = "استخدم `@ {expected}` للغة القارئ في هذا الملف"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum]
+message = "يوجد في الإعلان أكثر من تعليمة `@ nucleum`"
+help = "أبقِ على تعليمة nucleum واحدة"
+
+[diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
+message = "جزء `@ nucleum` يتعارض مع تعليمة جزء رسومي"
+help = "أزل إحدى تعليمتي الجزء"
+
 [diagnostics.PARSE019]
 message = "معدل مكرر"
 help = "أزل المعدل المكرر"
@@ -671,6 +723,10 @@ help = "افصل بين الموضوعات بـ '{et}'"
 [diagnostics.PARSE020.issues.discerne_subject_not_path]
 message = "يجب أن يكون موضوع '{discerne}' اسمًا أو مسار عضو"
 help = "اربط القيمة باسم أولًا، ثم استخدم '{discerne}' على ذلك الاسم"
+
+[diagnostics.PARSE020.issues.nesting_too_deep]
+message = "المصدر أعمق من حد المحلل البالغ {limit}"
+help = "قسّم البناء إلى ارتباطات مسماة"
 
 [diagnostics.PARSE021]
 message = "شرط مفقود"
@@ -752,6 +808,10 @@ help = "اكتب compact closure body بعد ∴ بالشكل {fac_body}"
 message = "closure {fac} body لا يمكن أن يستخدم '{dum}'"
 help = "أزل {dum} من closure {fac} bodies"
 
+[diagnostics.PARSE030.issues.expression_too_long]
+message = "يتجاوز التعبير حد المحلل البالغ {limit} من العوامل"
+help = "قسّم التعبير إلى ارتباطات مسماة"
+
 [diagnostics.PARSE031]
 message = "حرفية غير صالحة"
 help = "تحقق من صيغة الحرفية"
@@ -779,6 +839,10 @@ help = "أسند فقط إلى lvalues صالحة"
 [diagnostics.PARSE040]
 message = "نوع غير صالح"
 help = "تحقق من صياغة النوع"
+
+[diagnostics.PARSE040.issues.promissum_alternate_uses_exit_arrow]
+message = "يجب أن يستخدم البديل في promissum سهم الخطأ `⇥`، لا سهم العودة `→`"
+help = "اكتب فرع البديل باستخدام `⇥`"
 
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "اسم نوع مطلوب"

@@ -19,7 +19,7 @@ locale = "en"
 # What this teaches:
 #   • Write-once binding — `sit name` declares an inferred-type local that
 #     is written once
-#   • Supports immediate init (`sit x ← expr`) and deferred init
+#   • Supports immediate init (`sit _ x ← expr`) and deferred init
 #     (`sit x` then `x ← expr` later)
 #
 # Common mistakes:
@@ -33,7 +33,7 @@ locale = "en"
 # sit — inferred immutable bindings
 #
 # Immediate init:
-#   sit nomen ← expr        -- inferred write-once local
+#   sit _ nomen ← expr        -- inferred write-once local
 #
 # Deferred init:
 #   sit nomen               -- deferred: assign once later
@@ -49,16 +49,16 @@ locale = "en"
 #   sit.expected
 
 main {
-    let salve ← "Salve"
-    let nomen ← "Marcus"
-    let nuntius ← "§, §!"(salve, nomen)
+    let _ salve ← "Salve"
+    let _ nomen ← "Marcus"
+    let _ nuntius ← "§, §!"(salve, nomen)
 
     print nuntius
 
-    let label
+    let _ label
     label ← "deferred"
     print label
 
-    let idem ← nuntius
+    let _ idem ← nuntius
     print idem
 }

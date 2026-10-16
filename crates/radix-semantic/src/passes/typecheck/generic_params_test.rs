@@ -119,7 +119,7 @@ fn generic_call_rejects_mismatched_witnesses_for_shared_param_symbol() {
 }
 
 incipit {
-    sit n ← pair(1, "two")
+    sit _ n ← pair(1, "two")
 }"#,
         "argument_type_mismatch",
     );
@@ -259,7 +259,7 @@ fn shared_shape_param_binds_once_across_repeated_positions() {
 incipit {
     sit tensor<f32, [2, 2]> x ← vacua
     sit tensor<f32, [2]> y ← vacua
-    sit r ← pair_shaped(x, y)
+    sit _ r ← pair_shaped(x, y)
 }",
         "incompatible_tensor_index",
     );
@@ -476,7 +476,7 @@ functio make() → Something<numerus> {
 
 incipit {
     sit Something<numerus> s ← make()
-    sit result ← s.run<textus>("x", 1)
+    sit _ result ← s.run<textus>("x", 1)
 }"#,
         "argument_type_mismatch",
     );

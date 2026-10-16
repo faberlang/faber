@@ -689,7 +689,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Declarations | `regio` | file module name (contextual) |
 # | Declarations | `schema` | relational heading (experimental; census-types) |
 # | Declarations | `columna` | relational column (experimental; census-types) |
-# | Declarations | `sit` | inferred immutable local |
+# | Declarations | `sit` | write-once local |
 # | Declarations | `sponte` | optional declaration slot |
 # | Declarations | `typus` | type alias |
 # | Declarations | `varia` | mutable binding |
@@ -1004,7 +1004,10 @@ insere_expr    := 'insere' STRING
 # declared type: the binding-side spelling `varia copy T b ← a` is retired and
 # reported as `PARSE010 binding_marker_moved_to_value` (FABER-2-SUNSET).
 # `fixum` is the compile-time constant only (`=`); the run-time write-once name is
-# `sit`, typed or inferred, and `varia` is the writable name. A run-time `fixum`
+# `sit`, and `varia` is the writable name. Every declaration writes its type slot
+# (`type_annotation`, `_` to infer); the type-omitted `sit x ← e` (and `varia x`,
+# `de x`, `fixum x`) is `PARSE010 binding_type_slot_required`. Binders carry no
+# type slot. A run-time `fixum`
 # declaration (`fixum T x ← e`) parses whole for recovery and is reported as
 # `PARSE010 runtime_const_retired`; the retired English spelling `var` is
 # `PARSE010 var_retired` (the writable word is `mut`). `ref_decl` (the `de`
@@ -1018,7 +1021,7 @@ insere_expr    := 'insere' STRING
 # scalar_access_marker`, `nested_access_marker`), not a grammar one.
 fixum_decl      := ('fixum' type_annotation IDENTIFIER '=' const_init) | ('varia' type_annotation IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?)
 figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
-sit_decl      := 'sit' type_annotation? IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?
+sit_decl      := 'sit' type_annotation IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?
 ref_decl      := 'de' concrete_type IDENTIFIER '←' expression
 array_destruct := ('sit' | 'varia') array_pattern '←' expression
 object_destruct := ('sit' | 'varia') object_pattern '←' expression

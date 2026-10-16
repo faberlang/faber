@@ -224,7 +224,7 @@ incipit {
     sit tf32[5] x ← flat ↦ tf32[5]
     sit tf32[5] y ← flat ↦ tf32[5]
     sit fractus upstream ← 1.0
-    sit grads ← mean_backward(x, y, nil(), upstream)
+    sit _ grads ← mean_backward(x, y, nil(), upstream)
 }
 "#;
     let result = analyze_result(source);
@@ -295,7 +295,7 @@ fn generic_companion_implicit_call_substitutes_tuple_return_shapes() {
 #[test]
 fn generic_companion_explicit_shape_args_bind_both_dimensions() {
     let source = generic_companion_probe_source(
-        "sit grads ← loss_backward<2, 2>(x, w, nil(), upstream)",
+        "sit _ grads ← loss_backward<2, 2>(x, w, nil(), upstream)",
         "",
     );
     let result = analyze_result(&source);
@@ -359,7 +359,7 @@ fn generic_companion_result_tuple_annotation_unifies_shapes() {
 #[test]
 fn generic_companion_variable_to_variable_consumer_stays_green() {
     let source = format!(
-        "{GENERIC_TWO_TENSOR_PRIMAL}\nfunctio nil() → vacuum {{\n    tacet\n}}\n\nfunctio grad_wrap<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x, tensor<f32, [M, N]> w, f32 upstream) → f32 {{\n    sit iuncta<tensor<f32, [M, N]>, tensor<f32, [M, N]>> grads ← loss_backward(x, w, nil(), upstream)\n    sit gw ← grads[1]\n    redde upstream + gw.media()\n}}\n\nincipit {{\n    sit tensor<f32, [2, 2]> x ← vacua\n    sit tensor<f32, [2, 2]> w ← vacua\n    sit f32 upstream ← 1.0\n    sit f32 packed ← grad_wrap(x, w, upstream)\n    nota packed\n}}"
+        "{GENERIC_TWO_TENSOR_PRIMAL}\nfunctio nil() → vacuum {{\n    tacet\n}}\n\nfunctio grad_wrap<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x, tensor<f32, [M, N]> w, f32 upstream) → f32 {{\n    sit iuncta<tensor<f32, [M, N]>, tensor<f32, [M, N]>> grads ← loss_backward(x, w, nil(), upstream)\n    sit _ gw ← grads[1]\n    redde upstream + gw.media()\n}}\n\nincipit {{\n    sit tensor<f32, [2, 2]> x ← vacua\n    sit tensor<f32, [2, 2]> w ← vacua\n    sit f32 upstream ← 1.0\n    sit f32 packed ← grad_wrap(x, w, upstream)\n    nota packed\n}}"
     );
     let result = analyze_result(&source);
     let errors = &result.diagnostics;
@@ -444,8 +444,8 @@ incipit {
 #[test]
 fn generic_companion_wrong_arity_type_args_still_rejected() {
     for call in [
-        "sit grads ← loss_backward<2>(x, w, nil(), upstream)",
-        "sit grads ← loss_backward<2, 2, 4>(x, w, nil(), upstream)",
+        "sit _ grads ← loss_backward<2>(x, w, nil(), upstream)",
+        "sit _ grads ← loss_backward<2, 2, 4>(x, w, nil(), upstream)",
     ] {
         let source = generic_companion_probe_source(call, "");
         let errors = analyze_errors(&source);

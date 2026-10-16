@@ -14,7 +14,7 @@ use crate::test_support::{assert_compile_fails_with_args, assert_compile_fails_w
 fn json_valor_literal_typechecks_as_valor_without_errors() {
     let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
-    sit spec ← {
+    sit _ spec ← {
         "name": "openapi",
         "version": 3,
         "ratio": 1.5,
@@ -36,7 +36,7 @@ fn json_valor_literal_empty_object_without_cell_is_named_error() {
     assert_compile_fails_with_issue(
         &session,
         "empty.fab",
-        "incipit {\n    sit e ← {}\n    nota e\n}",
+        "incipit {\n    sit _ e ← {}\n    nota e\n}",
         "inferred_constructor_no_expected_type",
     );
 }
@@ -47,7 +47,7 @@ fn json_valor_literal_rejects_duplicate_keys_at_top_level() {
     assert_compile_fails_with_args(
         &session,
         "dup.fab",
-        "incipit {\n    sit d ← { \"a\": 1, \"b\": 2, \"a\": 3 }\n    nota d\n}",
+        "incipit {\n    sit _ d ← { \"a\": 1, \"b\": 2, \"a\": 3 }\n    nota d\n}",
         &[
             DiagnosticArg::new("issue", "json_duplicate_key"),
             DiagnosticArg::new("key", "a"),
@@ -61,7 +61,7 @@ fn json_valor_literal_rejects_duplicate_keys_in_nested_object() {
     assert_compile_fails_with_args(
         &session,
         "dup2.fab",
-        "incipit {\n    sit d ← { \"outer\": { \"x\": 1, \"x\": 2 } }\n    nota d\n}",
+        "incipit {\n    sit _ d ← { \"outer\": { \"x\": 1, \"x\": 2 } }\n    nota d\n}",
         &[
             DiagnosticArg::new("issue", "json_duplicate_key"),
             DiagnosticArg::new("key", "x"),
@@ -73,7 +73,7 @@ fn json_valor_literal_rejects_duplicate_keys_in_nested_object() {
 #[test]
 fn json_valor_literal_distinct_keys_in_different_objects_are_not_duplicates() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n    sit d ← { \"a\": { \"x\": 1 }, \"b\": { \"x\": 2 } }\n    nota d\n}";
+    let source = "incipit {\n    sit _ d ← { \"a\": { \"x\": 1 }, \"b\": { \"x\": 2 } }\n    nota d\n}";
     let result = compile(&session, "siblings.fab", source, ModuleCompileRequest::default());
     assert!(
         result.success(),
@@ -85,7 +85,7 @@ fn json_valor_literal_distinct_keys_in_different_objects_are_not_duplicates() {
 #[test]
 #[cfg(feature = "hir-faber")]
 fn json_valor_literal_round_trips_through_faber_codegen() {
-    let source = "incipit {\n    sit d ← { \"a\": 1, \"b\": true }\n    nota d\n}";
+    let source = "incipit {\n    sit _ d ← { \"a\": 1, \"b\": true }\n    nota d\n}";
     let first = super::faber_emit("rt1.fab", source);
     assert!(first.success(), "first compile failed: {:?}", first.diagnostics);
     let Some(out) = first.output else {

@@ -762,7 +762,7 @@ fn lowers_genus_method_calls_with_explicit_receiver_param() {
 }
 
 incipit {
-  sit c ← Capsa { n = 4 }
+  sit _ c ← Capsa { n = 4 }
   nota c.value()
 }",
     );
@@ -777,7 +777,7 @@ incipit {
 fn lowers_non_nullable_coalesce_without_requiring_nullable_lhs() {
     let dump = dump_source(
         r"incipit {
-  sit zero ← 0
+  sit _ zero ← 0
   nota zero vel 999
 }",
     );
@@ -843,7 +843,7 @@ genus User {
 }
 
 incipit {
-  sit alice ← User { name = "Alice", address = Address { city = "Roma" } }
+  sit _ alice ← User { name = "Alice", address = Address { city = "Roma" } }
   nota alice?.address?.city
 }"#,
     );
@@ -1086,11 +1086,11 @@ fn lowers_canonical_predicate_replacements_to_mir_primitives() {
     let dump = dump_source(
         r"
 functio pred(numerus n, fractus f, bivalens flag, textus ∪ nihil maybe) → bivalens {
-    sit positive ← n ≻ 0
-    sit negative ← f ≺ 0
-    sit enabled ← flag ≡ verum
-    sit disabled ← flag ≡ falsum
-    sit absent ← maybe est nihil
+    sit _ positive ← n ≻ 0
+    sit _ negative ← f ≺ 0
+    sit _ enabled ← flag ≡ verum
+    sit _ disabled ← flag ≡ falsum
+    sit _ absent ← maybe est nihil
     redde positive et negative et enabled et disabled et absent
 }
 ",
@@ -1114,8 +1114,8 @@ fn lowers_est_type_check_to_runner_dispatched_variant_tag_intrinsic() {
     let dump = dump_source(
         r"
 functio check(valor v) → bivalens {
-    sit positive ← v est numerus
-    sit negative ← v non est numerus
+    sit _ positive ← v est numerus
+    sit _ negative ← v non est numerus
     redde positive et negative
 }
 ",
@@ -1601,6 +1601,63 @@ function f0 -> ty#1 {
 }
 "
     );
+}
+
+#[test]
+fn verum_dum_tail_return_lowers_valid_mir() {
+    // `while true { ... return i }` never exits through its condition, so the
+    // loop's after-block is dead. The implicit function return must not land
+    // there: a `return` in that block is rejected for a value-returning
+    // function.
+    let dump = dump_source(
+        r#"+++
+locale = "en"
++++
+fn f() → int {
+    mut int i ← 0
+    while true {
+        i ← i + 1
+        if i ≡ 3 {
+            return i
+        }
+    }
+}
+main {
+    print f()
+}
+"#,
+    );
+    assert!(dump.contains("bb0:"), "valid lowered dump must be emitted:\n{dump}");
+}
+
+#[test]
+fn verum_dum_loop_in_vacuum_main_stays_valid() {
+    // An intentional infinite loop in a void function still lowers: the sealed
+    // after-block must not be the only terminator path.
+    let dump = dump_source(
+        r#"+++
+locale = "en"
++++
+main {
+    while true {
+        print "x"
+    }
+}
+"#,
+    );
+    assert!(dump.contains("bb0:"), "valid lowered dump must be emitted:\n{dump}");
+}
+
+#[test]
+fn verum_fac_dum_tail_return_lowers_valid_mir() {
+    // `fac { ... } dum verum` is the do-while spelling of `while true`: the
+    // loop never exits through its synthesized test, so the after-block is
+    // dead. The implicit function return must not land there, or a
+    // value-returning function fails MIR validation.
+    let dump = dump_source(
+        r"functio f() → numerus { varia numerus i ← 0 fac { i ← i + 1 si i ≡ 4 ergo redde i * 10 } dum verum } incipit { nota f() }",
+    );
+    assert!(dump.contains("bb0:"), "valid lowered dump must be emitted:\n{dump}");
 }
 
 #[test]
@@ -2726,6 +2783,29 @@ fn lowers_fac_cape_iace_to_local_handler_edge() {
 }
 
 #[test]
+fn mori_ending_a_cape_body_keeps_mir_valid() {
+    // A body that ends in `mori` diverges before any error edge can enter
+    // the handler. The catch is dead, but the handler must not leave the
+    // join as an orphaned successor target of an unreachable block.
+    let dump = dump_source(
+        r#"+++
+locale = "en"
++++
+main {
+    do {
+        print "in"
+        panic "x"
+    } catch e {
+        print "caught"
+    }
+}
+"#,
+    );
+
+    assert!(dump.contains("bb0:"), "{dump}");
+}
+
+#[test]
 fn lowers_trap_failable_call_to_try_call_carrier_wrap_never_return_error() {
     // UT: `capta` lowers the failable call through the existing try_call
     // whose error block wraps the payload into the trap carrier (the
@@ -3214,9 +3294,9 @@ fn lowers_array_literal_with_spread_of_inferred_lists() {
     let dump = dump_source(
         r"
 functio build() → lista<numerus> {
-    sit a ← [1, 2]
-    sit b ← [3, 4]
-    sit c ← [0, sparge a, sparge b, 5]
+    sit _ a ← [1, 2]
+    sit _ b ← [3, 4]
+    sit _ c ← [0, sparge a, sparge b, 5]
     redde c
 }
 ",
@@ -3679,7 +3759,7 @@ fn lowers_ordo_elige_statement_continues_after_match() {
         r#"
 ordo Color { rubrum, viridis }
 incipit {
-    sit color ← Color.rubrum
+    sit _ color ← Color.rubrum
     elige color {
         casu Color.rubrum { nota "rubrum" }
         casu Color.viridis { nota "viridis" }
@@ -3850,9 +3930,9 @@ fn lowers_ascii_format_hole_with_materialized_conversion_target() {
 locale = "en"
 +++
 main {
-    let inferred_hex ← 255 ↦ ascii<_> via Hex
-    let inferred_bin ← 255 ↦ ascii<_> via Bin
-    let inferred_oct ← 255 ↦ ascii<_> via Oct
+    let _ inferred_hex ← 255 ↦ ascii<_> via Hex
+    let _ inferred_bin ← 255 ↦ ascii<_> via Bin
+    let _ inferred_oct ← 255 ↦ ascii<_> via Oct
 }
 "#,
     );
@@ -3945,8 +4025,8 @@ functio side() → bivalens {
 }
 
 incipit {
-    sit left_false ← falsum et side()
-    sit left_true ← verum aut side()
+    sit _ left_false ← falsum et side()
+    sit _ left_true ← verum aut side()
     nota left_false
     nota left_true
 }
@@ -4095,8 +4175,8 @@ fn lowers_lista_mutatio_methods() {
 incipit {
     varia _ res ← [3, 1, 2] ∷ lista<numerus>
     res.appende(4)
-    sit primusremotus ← res.decapita()
-    sit ultimusremotus ← res.detrahe()
+    sit _ primusremotus ← res.decapita()
+    sit _ ultimusremotus ← res.detrahe()
     res.inverte()
     res.ordina()
     nota res, primusremotus, ultimusremotus
@@ -4118,11 +4198,11 @@ fn lowers_lista_copy_view_methods() {
     let dump = dump_source(
         r"
 incipit {
-    sit res ← [1, 2, 3, 4, 5] ∷ lista<numerus>
-    sit sectio ← res.sectio(1, 4)
-    sit primaduo ← res.prima(2)
-    sit ultimaduo ← res.ultima(2)
-    sit omissaduo ← res.omissa(2)
+    sit _ res ← [1, 2, 3, 4, 5] ∷ lista<numerus>
+    sit _ sectio ← res.sectio(1, 4)
+    sit _ primaduo ← res.prima(2)
+    sit _ ultimaduo ← res.ultima(2)
+    sit _ omissaduo ← res.omissa(2)
     nota sectio, primaduo, ultimaduo, omissaduo
 }
 ",
@@ -4196,6 +4276,26 @@ incipit {
     ] {
         assert!(dump.contains(&format!("runtime collection {op}")), "missing {op} in:\n{dump}");
     }
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+}
+
+#[test]
+fn lowers_generic_tensor_formata_to_tensor_reshape() {
+    let dump = dump_source(
+        r"
+incipit {
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    varia tf32[2, 2] grid ← flat ↦ tf32[2, 2]
+    sit tf32[4] view ← grid.formata<tf32[4]>()
+    nota view.longitudo()
+}
+",
+    );
+
+    assert!(
+        dump.contains("runtime collection tensor_reshape"),
+        "missing tensor_reshape in:\n{dump}"
+    );
     assert!(!dump.contains("method call before runtime/provider MIR lowering"));
 }
 
@@ -4356,7 +4456,7 @@ fn lowers_textus_runtime_methods_to_intrinsics() {
     let dump = dump_source(
         r#"
 incipit {
-    sit nuntius ← " Ave Roma "
+    sit _ nuntius ← " Ave Roma "
     nota nuntius.longitudo()
     nota nuntius.sectio(1, 4)
     nota nuntius.continet("Roma")
@@ -4415,7 +4515,7 @@ fn edge_empty_textus_longitudo_lowers_to_collection_length() {
     let dump = dump_source(
         r#"
 incipit {
-    sit len ← "".longitudo()
+    sit _ len ← "".longitudo()
     nota len
 }
 "#,
@@ -5170,7 +5270,7 @@ incipit {
 fn lowers_callable_closure_values_and_indirect_calls() {
     let dump = dump_source(
         r"incipit {
-  sit duplica ← numerus x ∴ x * 2
+  sit _ duplica ← numerus x ∴ x * 2
   nota duplica(5)
 }",
     );
@@ -5186,8 +5286,8 @@ fn lowers_callable_closure_values_and_indirect_calls() {
 fn lowers_captured_closure_environment_layout() {
     let dump = dump_source(
         r"incipit {
-  sit base ← 10
-  sit adde ← numerus x ∴ x + base
+  sit _ base ← 10
+  sit _ adde ← numerus x ∴ x + base
   nota adde(5)
 }",
     );
@@ -5203,10 +5303,10 @@ fn lowers_captured_closure_environment_layout() {
 fn lowers_failable_captured_closure_call_to_try_call() {
     let dump = dump_source(
         r"incipit {
-  sit base ← 10
-  sit adde ← (numerus x) → numerus ⇥ textus ∴ x + base
+  sit _ base ← 10
+  sit _ adde ← (numerus x) → numerus ⇥ textus ∴ x + base
   fac {
-    sit value ← adde(5)
+    sit _ value ← adde(5)
     nota value
   }
   cape err {
@@ -5223,8 +5323,8 @@ fn lowers_failable_captured_closure_call_to_try_call() {
 fn validates_captured_closure_callee_environment_function_match() {
     let unit = analyze(
         r"incipit {
-  sit base ← 10
-  sit adde ← numerus x ∴ x + base
+  sit _ base ← 10
+  sit _ adde ← numerus x ∴ x + base
   nota adde(5)
 }",
     );
@@ -5257,9 +5357,9 @@ fn validates_captured_closure_callee_environment_function_match() {
 fn lowers_nested_captured_closure_environment_layout() {
     let dump = dump_source(
         r"incipit {
-  sit base ← 10
-  sit maker ← numerus y ∴ numerus z ∴ z + y + base
-  sit adde ← maker(2)
+  sit _ base ← 10
+  sit _ maker ← numerus y ∴ numerus z ∴ z + y + base
+  sit _ adde ← maker(2)
   nota adde(5)
 }",
     );
@@ -5303,6 +5403,28 @@ incipit {
     );
     assert!(dump.contains("runtime cede"));
     assert!(!dump.contains("cede before async MIR lowering"));
+}
+
+#[test]
+fn lowers_function_typed_genus_field_call_as_value_callee() {
+    let dump = dump_source(
+        r"genus H {
+  varia (numerus) → numerus f
+}
+incipit {
+  sit _ h ← H { f = numerus x ∴ x + 100 }
+  nota h.f(1)
+  sit _ g ← h.f
+  nota g(2)
+}",
+    );
+    assert!(
+        !dump.contains("method call before runtime/provider MIR lowering"),
+        "a function-typed genus field call lowers as a value call:\n{dump}"
+    );
+    assert!(dump.contains("const int 1"), "both call arguments lower:\n{dump}");
+    assert!(dump.contains("const int 2"), "both call arguments lower:\n{dump}");
+    assert!(dump.contains("call "), "the value call is emitted:\n{dump}");
 }
 
 #[test]
@@ -5475,7 +5597,7 @@ fn sparse_representation_vacua_access_and_densify_lower_distinctly() {
         r"incipit {
     varia sf32[2, 3] sparse ← vacua
     sparse.ponde([0, 1], 4.0)
-    sit value ← sparse.accipe([0, 1])
+    sit _ value ← sparse.accipe([0, 1])
     sit tf32[2, 3] dense ← sparse.densata()
     nota value, dense.longitudo()
 }",
@@ -5491,7 +5613,7 @@ fn sparse_representation_vacua_access_and_densify_lower_distinctly() {
 fn sparsa_shape_lowers_to_tensor_shape_and_validates() {
     let source = r"incipit {
     sit sf32[2, 3] sparse ← vacua
-    sit shape ← sparse.magnitudines()
+    sit _ shape ← sparse.magnitudines()
     nota shape
 }";
     let dump = dump_source(source);
@@ -5509,8 +5631,8 @@ fn stage3_mir_closeout_preserves_interval_and_sermo_operations() {
         r"incipit {
     sit intervallum<numerus> left ← 0‥6
     sit intervallum<numerus> right ← 4…10
-    sit overlap ← left.inter(right)
-    sit values ← left ↦ lista<numerus>
+    sit _ overlap ← left.inter(right)
+    sit _ values ← left ↦ lista<numerus>
     nota overlap, values
 }",
     );
@@ -5705,9 +5827,9 @@ functio identitas<T>(T x) → T {
 }
 
 incipit {
-    sit a ← identitas<textus>("creata")
-    sit b ← identitas<textus>("iterum")
-    sit c ← identitas<numerus>(7)
+    sit _ a ← identitas<textus>("creata")
+    sit _ b ← identitas<textus>("iterum")
+    sit _ c ← identitas<numerus>(7)
     nota a
     nota b
     nota c
@@ -6473,7 +6595,7 @@ fn conflicting_shader_annotations_with_nucleum_emit_diagnostic() {
 #[test]
 fn lowers_vertex_method_inside_genus_to_shader_stage() {
     let unit = analyze(
-        "genus Renderer {\n  varia numerus dummy = 0\n  @ vertex\n  functio draw() → vacuum { redde }\n}\n\nincipit {\n  sit r ← Renderer {}\n}",
+        "genus Renderer {\n  varia numerus dummy = 0\n  @ vertex\n  functio draw() → vacuum { redde }\n}\n\nincipit {\n  sit _ r ← Renderer {}\n}",
     );
     let program = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
@@ -6493,7 +6615,7 @@ fn lowers_vertex_method_inside_genus_to_shader_stage() {
 #[test]
 fn lowers_fragment_method_inside_genus_to_shader_stage() {
     let unit = analyze(
-        "genus Renderer {\n  varia numerus dummy = 0\n  @ fragment\n  functio shade() → vacuum { redde }\n}\n\nincipit {\n  sit r ← Renderer {}\n}",
+        "genus Renderer {\n  varia numerus dummy = 0\n  @ fragment\n  functio shade() → vacuum { redde }\n}\n\nincipit {\n  sit _ r ← Renderer {}\n}",
     );
     let program = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
@@ -7639,7 +7761,7 @@ incipit {
     varia d64 v ← 1.0
     v ← r * r * r
     nota v
-    sit w ← r * r * r
+    sit _ w ← r * r * r
     nota w
     sit lista<d64> xs ← [r * r * r]
     nota xs[0]
@@ -7781,8 +7903,8 @@ fn ascribed_json_object_literal_constructs_the_typed_map() {
 locale = "en"
 +++
 main {
-    let a ← {"a": 1} ∷ map<string, int>
-    let b ← {"a": null} ∷ map<string, int ∪ none>
+    let _ a ← {"a": 1} ∷ map<string, int>
+    let _ b ← {"a": null} ∷ map<string, int ∪ none>
     print a
     print b
 }

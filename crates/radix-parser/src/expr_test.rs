@@ -27,7 +27,7 @@ fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeEx
 #[test]
 fn conversio_with_up_tack_default_parses() {
     // D17.7: `↦ T ⊥ value` populates the conversion's `recovery` slot.
-    let result = parse_ok_la(r#"sit n ← "bad" ↦ numerus ⊥ 0"#);
+    let result = parse_ok_la(r#"sit _ n ← "bad" ↦ numerus ⊥ 0"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -43,7 +43,7 @@ fn conversio_with_up_tack_default_parses() {
 
 #[test]
 fn expression_array_keeps_shape_inference_holes_structural() {
-    let result = parse_ok_la(r"sit shape ← [_, 4]");
+    let result = parse_ok_la(r"sit _ shape ← [_, 4]");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -64,7 +64,7 @@ fn expression_array_keeps_shape_inference_holes_structural() {
 
 #[test]
 fn conversio_capitalized_user_type_target_parses_as_type() {
-    let result = parse_ok_la(r"sit person ← payload ↦ Persona");
+    let result = parse_ok_la(r"sit _ person ← payload ↦ Persona");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -78,7 +78,7 @@ fn conversio_capitalized_user_type_target_parses_as_type() {
 
 #[test]
 fn conversio_qualified_capitalized_user_type_target_parses_as_type() {
-    let result = parse_ok_la(r"sit person ← payload ↦ types.Person");
+    let result = parse_ok_la(r"sit _ person ← payload ↦ types.Person");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -100,7 +100,7 @@ fn conversio_qualified_capitalized_user_type_target_parses_as_type() {
 fn conversio_to_tokenless_type_keyword_target_parses_as_type() {
     // Batch A made `modulus`/`iuncta` tokenless; as conversio targets they must
     // still route to an explicit type, not the range fallback.
-    let result = parse_ok_la(r"sit w ← checked ↦ modulus<u32>");
+    let result = parse_ok_la(r"sit _ w ← checked ↦ modulus<u32>");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -132,7 +132,7 @@ incipit {
 
 #[test]
 fn conversio_tensor_sugar_target_parses_as_type() {
-    let result = parse_ok_la(r"sit grid ← flat ↦ tf32[2, 2]");
+    let result = parse_ok_la(r"sit _ grid ← flat ↦ tf32[2, 2]");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -160,7 +160,7 @@ fn conversio_tensor_sugar_target_parses_as_type() {
 
 #[test]
 fn conversio_lista_sugar_target_parses_as_type() {
-    let result = parse_ok_la(r"sit xs ← wire ↦ lu32");
+    let result = parse_ok_la(r"sit _ xs ← wire ↦ lu32");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -184,7 +184,7 @@ fn conversio_lista_sugar_target_parses_as_type() {
 
 #[test]
 fn conversio_followed_by_vel_parses_as_nullish_coalesce() {
-    let result = parse_ok_la(r"sit n ← (a ↦ numerus) vel 0");
+    let result = parse_ok_la(r"sit _ n ← (a ↦ numerus) vel 0");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -208,7 +208,7 @@ fn conversio_followed_by_vel_parses_as_nullish_coalesce() {
 
 #[test]
 fn mixed_or_and_coalesce_tokens_parse_as_one_expression() {
-    let result = parse_ok_la("sit value ← a vel b aut c");
+    let result = parse_ok_la("sit _ value ← a vel b aut c");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -229,7 +229,7 @@ fn mixed_or_and_coalesce_tokens_parse_as_one_expression() {
 /// Local nullable elimination: `vel` binds tighter than additive operators on the RHS.
 #[test]
 fn vel_binds_tighter_than_additive_on_rhs() {
-    let result = parse_ok_la(r#"sit value ← prefix + item vel """#);
+    let result = parse_ok_la(r#"sit _ value ← prefix + item vel """#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -248,7 +248,7 @@ fn vel_binds_tighter_than_additive_on_rhs() {
 /// Local nullable elimination: `vel` binds tighter than additive operators on the LHS.
 #[test]
 fn vel_binds_tighter_than_additive_on_lhs() {
-    let result = parse_ok_la(r#"sit value ← item vel "" + suffix"#);
+    let result = parse_ok_la(r#"sit _ value ← item vel "" + suffix"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -267,7 +267,7 @@ fn vel_binds_tighter_than_additive_on_lhs() {
 /// Local nullable elimination: `vel` binds tighter than multiplicative operators.
 #[test]
 fn vel_binds_tighter_than_multiplicative() {
-    let result = parse_ok_la("sit value ← scale * factor vel 1");
+    let result = parse_ok_la("sit _ value ← scale * factor vel 1");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -292,7 +292,7 @@ fn vel_binds_tighter_than_multiplicative() {
 
 #[test]
 fn minmax_glyphs_bind_at_additive_precedence() {
-    let result = parse_ok_la("sit value ← a ⤒ b * c + d ⤓ e");
+    let result = parse_ok_la("sit _ value ← a ⤒ b * c + d ⤓ e");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -318,7 +318,7 @@ fn minmax_glyphs_bind_at_additive_precedence() {
 
 #[test]
 fn minmax_glyph_chaining_is_left_associative() {
-    let result = parse_ok_la("sit value ← a ⤒ b ⤓ c");
+    let result = parse_ok_la("sit _ value ← a ⤒ b ⤓ c");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -335,7 +335,7 @@ fn minmax_glyph_chaining_is_left_associative() {
 
 #[test]
 fn minmax_glyphs_chain_beside_additive_operators() {
-    let result = parse_ok_la("sit value ← a + b ⤒ c - d");
+    let result = parse_ok_la("sit _ value ← a + b ⤒ c - d");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -361,7 +361,7 @@ fn minmax_glyphs_chain_beside_additive_operators() {
 /// `a + b · c` parses as `a + (b · c)` — glyphs bind tighter than additive.
 #[test]
 fn glyph_products_bind_tighter_than_additive() {
-    let result = parse_ok_la("sit value ← a + b · c");
+    let result = parse_ok_la("sit _ value ← a + b · c");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -379,7 +379,7 @@ fn glyph_products_bind_tighter_than_additive() {
 
 #[test]
 fn hadamard_divide_binds_at_multiplicative_precedence() {
-    let result = parse_ok_la("sit value ← a + b ⊘ c");
+    let result = parse_ok_la("sit _ value ← a + b ⊘ c");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -414,7 +414,7 @@ fn with_binary(source: &str, check: impl FnOnce(&radix_syntax::BinaryExpr)) {
 /// `÷` (true division) parses as a binary operator at `/`'s tier.
 #[test]
 fn true_division_parses_and_binds_like_slash() {
-    with_binary("sit value ← a + b ÷ c", |add| {
+    with_binary("sit _ value ← a + b ÷ c", |add| {
         assert_eq!(add.op, BinOp::Add);
         let ExprKind::Binary(divide) = &add.rhs.kind else {
             panic!("expected ÷ on additive RHS, got {:?}", add.rhs.kind);
@@ -425,7 +425,7 @@ fn true_division_parses_and_binds_like_slash() {
 
 #[test]
 fn true_division_is_left_associative() {
-    with_binary("sit value ← a ÷ b ÷ c", |outer| {
+    with_binary("sit _ value ← a ÷ b ÷ c", |outer| {
         assert_eq!(outer.op, BinOp::TrueDiv);
         let ExprKind::Binary(inner) = &outer.lhs.kind else {
             panic!("expected ÷ on the left, got {:?}", outer.lhs.kind);
@@ -436,7 +436,7 @@ fn true_division_is_left_associative() {
 
 #[test]
 fn true_division_mixes_with_slash_left_to_right() {
-    with_binary("sit value ← a / b ÷ c", |outer| {
+    with_binary("sit _ value ← a / b ÷ c", |outer| {
         assert_eq!(outer.op, BinOp::TrueDiv);
         let ExprKind::Binary(inner) = &outer.lhs.kind else {
             panic!("expected / on the left, got {:?}", outer.lhs.kind);
@@ -449,7 +449,7 @@ fn true_division_mixes_with_slash_left_to_right() {
 #[test]
 fn equality_ladder_glyphs_pin_semantic_split() {
     fn parsed_op(spelling: &str) -> BinOp {
-        let result = parse_ok_la(&format!("sit value ← a {spelling} b"));
+        let result = parse_ok_la(&format!("sit _ value ← a {spelling} b"));
         let program = result.program.as_ref().expect("program");
         let StmtKind::Var(var) = &program.statements[0].kind else {
             panic!("expected variable declaration for {spelling}");
@@ -484,7 +484,7 @@ fn glyph_products_map_to_pinned_binops() {
         ("⊙", BinOp::Hadamard),
         ("⊘", BinOp::HadamardDiv),
     ] {
-        let source = format!("sit value ← a {spelling} b");
+        let source = format!("sit _ value ← a {spelling} b");
         let result = parse_ok_la(&source);
         let program = result.program.as_ref().expect("program");
         let StmtKind::Var(var) = &program.statements[0].kind else {
@@ -501,7 +501,7 @@ fn glyph_products_map_to_pinned_binops() {
 /// Glyph chains are left-associative at the multiplicative level.
 #[test]
 fn glyph_products_chain_left_associatively() {
-    let result = parse_ok_la("sit value ← a · b × c");
+    let result = parse_ok_la("sit _ value ← a · b × c");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -520,7 +520,7 @@ fn glyph_products_chain_left_associatively() {
 /// Glyphs mix with `*` at the same precedence level.
 #[test]
 fn glyph_products_mix_with_star_at_same_precedence() {
-    let result = parse_ok_la("sit value ← a * b ⊙ c");
+    let result = parse_ok_la("sit _ value ← a * b ⊙ c");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -539,7 +539,7 @@ fn glyph_products_mix_with_star_at_same_precedence() {
 /// Interval constructors complete as `vel` `RHS` values: not `(x vel 0)‥0`.
 #[test]
 fn vel_rhs_completes_intervallum_constructor() {
-    let result = parse_ok_la("sit value ← maybeRange vel 0‥0");
+    let result = parse_ok_la("sit _ value ← maybeRange vel 0‥0");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -561,7 +561,7 @@ fn vel_rhs_completes_intervallum_constructor() {
 #[test]
 fn range_operator_spellings_match_in_range_and_vel_positions() {
     for (op, inclusive) in [("‥", false), ("…", true), ("ante", false), ("usque", true)] {
-        let result = parse_ok_la(&format!("sit value ← a {op} b"));
+        let result = parse_ok_la(&format!("sit _ value ← a {op} b"));
         let program = result.program.as_ref().expect("program");
         let StmtKind::Var(var) = &program.statements[0].kind else {
             panic!("expected variable declaration");
@@ -571,7 +571,7 @@ fn range_operator_spellings_match_in_range_and_vel_positions() {
         };
         assert_range_kind(range.kind, inclusive, op);
 
-        let result = parse_ok_la(&format!("sit value ← maybe vel a {op} b"));
+        let result = parse_ok_la(&format!("sit _ value ← maybe vel a {op} b"));
         let program = result.program.as_ref().expect("program");
         let StmtKind::Var(var) = &program.statements[0].kind else {
             panic!("expected variable declaration");
@@ -597,7 +597,7 @@ fn assert_range_kind(kind: RangeKind, inclusive: bool, op: &str) {
 /// `vel` chains left-associatively at the local defaulting tier.
 #[test]
 fn vel_chains_left_associatively() {
-    let result = parse_ok_la(r#"sit value ← a vel b vel c vel "fallback""#);
+    let result = parse_ok_la(r#"sit _ value ← a vel b vel c vel "fallback""#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -619,7 +619,7 @@ fn vel_chains_left_associatively() {
 
 #[test]
 fn non_est_parses_as_a_negative_type_test() {
-    let result = parse_ok_la("sit present ← value non est nihil");
+    let result = parse_ok_la("sit _ present ← value non est nihil");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -633,7 +633,7 @@ fn non_est_parses_as_a_negative_type_test() {
 
 #[test]
 fn est_non_is_not_the_identity_negation_spelling() {
-    let result = parse_program_la("sit present ← value est non nihil");
+    let result = parse_program_la("sit _ present ← value est non nihil");
     let err = result
         .errors
         .iter()
@@ -651,7 +651,7 @@ fn est_non_is_not_the_identity_negation_spelling() {
 
 #[test]
 fn expression_ad_parses_with_ascii_route_and_opener() {
-    let result = parse_ok_la(r#"sit s ← ad 'runtime:echo' ("salve")"#);
+    let result = parse_ok_la(r#"sit _ s ← ad 'runtime:echo' ("salve")"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -689,14 +689,14 @@ fn json_literal_of(source: &str) -> JsonValue {
 #[test]
 fn json_literal_empty_object_is_valor() {
     assert!(
-        matches!(json_literal_of("sit e ← {}"), JsonValue::Object(members) if members.is_empty())
+        matches!(json_literal_of("sit _ e ← {}"), JsonValue::Object(members) if members.is_empty())
     );
 }
 
 #[test]
 fn json_literal_object_with_all_scalar_wire_tokens() {
     // true/false/null arrive as Ident (only verum/falsum/nihil are keywords).
-    let value = json_literal_of(r#"sit v ← { "flag": true, "off": false, "gap": null }"#);
+    let value = json_literal_of(r#"sit _ v ← { "flag": true, "off": false, "gap": null }"#);
     let JsonValue::Object(members) = value else {
         panic!("expected object")
     };
@@ -710,7 +710,7 @@ fn json_literal_object_with_all_scalar_wire_tokens() {
 fn json_literal_number_mapping_splits_numerus_and_fractus() {
     // No `.` or `e` -> Numerus; with `.` or `e` -> Fractus (contract §5).
     let value =
-        json_literal_of(r#"sit v ← { "int": 42, "float": 3.14, "big": 1000000, "exp": 1e5 }"#);
+        json_literal_of(r#"sit _ v ← { "int": 42, "float": 3.14, "big": 1000000, "exp": 1e5 }"#);
     let JsonValue::Object(members) = value else {
         panic!("expected object")
     };
@@ -722,7 +722,7 @@ fn json_literal_number_mapping_splits_numerus_and_fractus() {
 
 #[test]
 fn json_literal_negative_numbers_assemble_minus_and_magnitude() {
-    let value = json_literal_of(r#"sit v ← { "a": -7, "b": -3.5 }"#);
+    let value = json_literal_of(r#"sit _ v ← { "a": -7, "b": -3.5 }"#);
     let JsonValue::Object(members) = value else {
         panic!("expected object")
     };
@@ -733,7 +733,7 @@ fn json_literal_negative_numbers_assemble_minus_and_magnitude() {
 #[test]
 fn json_literal_nested_objects_and_arrays() {
     let value = json_literal_of(
-        r#"sit v ← { "paths": { "/health": { "get": {} } }, "ids": [1, "two", false, null] }"#,
+        r#"sit _ v ← { "paths": { "/health": { "get": {} } }, "ids": [1, "two", false, null] }"#,
     );
     let JsonValue::Object(members) = value else {
         panic!("expected object")
@@ -754,7 +754,10 @@ fn json_literal_nested_objects_and_arrays() {
 
 #[test]
 fn json_literal_trailing_commas_rejected_in_object_and_array() {
-    for source in [r#"sit v ← { "x": 1, }"#, r#"sit v ← { "x": [1, 2, 3,] }"#] {
+    for source in [
+        r#"sit _ v ← { "x": 1, }"#,
+        r#"sit _ v ← { "x": [1, 2, 3,] }"#,
+    ] {
         let result = parse_program_la(source);
         assert!(
             result.errors.iter().any(|error| {
@@ -776,7 +779,7 @@ fn json_literal_trailing_commas_rejected_in_object_and_array() {
 #[test]
 fn json_literal_rejects_faber_equals_field_syntax() {
     // The retired anonymous record form. Clean break: diagnose with a hint.
-    let result = parse_program_la(r#"sit v ← { "x" = 1 }"#);
+    let result = parse_program_la(r#"sit _ v ← { "x" = 1 }"#);
     assert!(
         !result.errors.is_empty(),
         "expected '=' to be rejected inside JSON literal"
@@ -785,7 +788,7 @@ fn json_literal_rejects_faber_equals_field_syntax() {
 
 #[test]
 fn json_literal_rejects_unterminated_object() {
-    let result = parse_program_la(r#"sit v ← { "x": 1 "#);
+    let result = parse_program_la(r#"sit _ v ← { "x": 1 "#);
     assert!(
         !result.errors.is_empty(),
         "expected unterminated-object diagnostic"
@@ -800,7 +803,7 @@ fn json_literal_genus_construction_keeps_faber_equals_grammar() {
         r"
 genus Point { varia numerus x = 0 }
 functio main() → numerus {
-    sit p ← Point { x = 10 }
+    sit _ p ← Point { x = 10 }
     redde 0
 }
 ",
@@ -825,7 +828,8 @@ functio main() → numerus {
 
 #[test]
 fn parses_ratio_construction_as_verte_with_labeled_type() {
-    let result = parse_ok_la(r"incipit { sit point ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 } }");
+    let result =
+        parse_ok_la(r"incipit { sit _ point ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 } }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
         panic!("expected incipit");
@@ -881,7 +885,7 @@ fn rejects_unlabeled_ratio_constructor_type_argument() {
     // lookahead), so the specific `ratio_type_arg_label_required` issue is
     // gone — the unlabeled form must still fail at parse time.
     let result =
-        parse_program_la(r"incipit { sit point ← ratio<f32, w: numerus> { g = 1.0, w = 2 } }");
+        parse_program_la(r"incipit { sit _ point ← ratio<f32, w: numerus> { g = 1.0, w = 2 } }");
     assert!(
         !result.success(),
         "unlabeled ratio constructor type argument must stay rejected, got {:?}",
@@ -925,7 +929,7 @@ fn bare_field_literal_is_marked_and_hole_constructor_is_not() {
     // hole with a record default; `_ { field = value }` is a hole with none.
     // The parser records the difference on the `Verte` target's form so the
     // checker can default only the bare literal.
-    let result = parse_ok_la("incipit { sit a ← { x = 1 }\n sit b ← _ { x = 1 } }");
+    let result = parse_ok_la("incipit { sit _ a ← { x = 1 }\n sit _ b ← _ { x = 1 } }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
         panic!("expected incipit");
@@ -984,7 +988,7 @@ fn ratio_comparison_is_not_a_hole_constructor() {
 #[test]
 fn rejects_trailing_comma_in_ratio_constructor_type_arguments() {
     assert_parse_error_issue_la(
-        r"incipit { sit point ← ratio<g: f32,> { g = 1.0 } }",
+        r"incipit { sit _ point ← ratio<g: f32,> { g = 1.0 } }",
         "item_list_trailing_comma",
     );
 }
@@ -992,7 +996,7 @@ fn rejects_trailing_comma_in_ratio_constructor_type_arguments() {
 #[test]
 fn rejects_trailing_comma_in_ratio_constructor_fields() {
     assert_parse_error_issue_la(
-        r"incipit { sit point ← ratio<g: f32> { g = 1.0, } }",
+        r"incipit { sit _ point ← ratio<g: f32> { g = 1.0, } }",
         "item_list_trailing_comma",
     );
 }
@@ -1002,7 +1006,7 @@ fn qualified_genus_construction_keeps_faber_equals_grammar() {
     let result = parse_ok_la(
         r#"
 functio main() → vacuum {
-    sit endpoint ← terminus.Terminus { hospes = "localhost", portus = 8080 }
+    sit _ endpoint ← terminus.Terminus { hospes = "localhost", portus = 8080 }
 }
 "#,
     );
@@ -1029,7 +1033,7 @@ functio main() → vacuum {
 
 #[test]
 fn vector_conversio_from_lista_literal_parses() {
-    let result = parse_ok_la("sit v ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>");
+    let result = parse_ok_la("sit _ v ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1052,7 +1056,7 @@ fn vector_conversio_from_lista_literal_parses() {
 
 #[test]
 fn matrix_conversio_from_nested_lista_literal_parses() {
-    let result = parse_ok_la("sit m ← [[1.0, 0.0], [0.0, 1.0]] ↦ matrix<f32, [2, 2]>");
+    let result = parse_ok_la("sit _ m ← [[1.0, 0.0], [0.0, 1.0]] ↦ matrix<f32, [2, 2]>");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1076,7 +1080,7 @@ fn matrix_conversio_from_nested_lista_literal_parses() {
 
 #[test]
 fn intervallum_materialize_conversio_parses_after_range() {
-    let result = parse_ok_la("sit xs ← 0‥10 ↦ lista<numerus>");
+    let result = parse_ok_la("sit _ xs ← 0‥10 ↦ lista<numerus>");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1094,7 +1098,7 @@ fn intervallum_materialize_conversio_parses_after_range() {
 // the widen hop to the Bits hop's result (no intermediate binding).
 #[test]
 fn conversio_chain_folds_left() {
-    let result = parse_ok_la("sit df ← dbits ↦ f16 via Bits ↦ f32");
+    let result = parse_ok_la("sit _ df ← dbits ↦ f16 via Bits ↦ f32");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1146,7 +1150,7 @@ fn conversio_lowercase_ident_range_target_parses_as_intervallum() {
     // F-059: range tails after non-type idents in conversio target.
     // Lowercase identifiers that are not type keywords should be parsed
     // as range starts, producing an Intervallum target with the full range.
-    let result = parse_ok_la(r"sit clamped ← value ↦ min‥max");
+    let result = parse_ok_la(r"sit _ clamped ← value ↦ min‥max");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1176,7 +1180,7 @@ fn conversio_integer_non_range_does_not_discard_token() {
     // restore state so the token is not silently consumed. When followed
     // by a type keyword, the parser must not silently drop the Integer
     // and parse the type keyword as the target.
-    let result = crate::test_support::parse_program_la(r"sit clamped ← value ↦ 42 numerus");
+    let result = crate::test_support::parse_program_la(r"sit _ clamped ← value ↦ 42 numerus");
     assert!(
         !result.success(),
         "expected parse error for Integer followed by type keyword, got success"
@@ -1185,7 +1189,7 @@ fn conversio_integer_non_range_does_not_discard_token() {
 
 #[test]
 fn parses_iuncta_construction_with_two_elements() {
-    let result = parse_ok_la(r#"incipit { sit pair ← iuncta<textus, numerus> ["salve", 42] }"#);
+    let result = parse_ok_la(r#"incipit { sit _ pair ← iuncta<textus, numerus> ["salve", 42] }"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
         panic!("expected incipit");
@@ -1223,7 +1227,7 @@ fn parses_iuncta_construction_with_two_elements() {
 #[test]
 fn parses_labeled_iuncta_construction() {
     let result =
-        parse_ok_la(r#"incipit { sit pair ← iuncta<gx: textus, gw: numerus> ["salve", 42] }"#);
+        parse_ok_la(r#"incipit { sit _ pair ← iuncta<gx: textus, gw: numerus> ["salve", 42] }"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
         panic!("expected incipit");
@@ -1253,7 +1257,7 @@ fn parses_labeled_iuncta_construction() {
 
 #[test]
 fn parses_iuncta_construction_with_single_element() {
-    let result = parse_ok_la(r#"incipit { sit wrap ← iuncta<textus> ["solum"] }"#);
+    let result = parse_ok_la(r#"incipit { sit _ wrap ← iuncta<textus> ["solum"] }"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
         panic!("expected incipit");
@@ -1275,7 +1279,7 @@ fn parses_iuncta_construction_with_single_element() {
 #[test]
 fn parses_iuncta_construction_with_nested_types() {
     let result = parse_ok_la(
-        r#"incipit { sit nested ← iuncta<iuncta<textus, numerus>, textus> [iuncta<textus, numerus> ["a", 1], "b"] }"#,
+        r#"incipit { sit _ nested ← iuncta<iuncta<textus, numerus>, textus> [iuncta<textus, numerus> ["a", 1], "b"] }"#,
     );
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
@@ -1305,7 +1309,7 @@ fn parses_iuncta_construction_with_nested_types() {
 
 #[test]
 fn empty_array_literal_parses_as_array_expression() {
-    let result = parse_ok_la("sit e ← []");
+    let result = parse_ok_la("sit _ e ← []");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1319,7 +1323,7 @@ fn empty_array_literal_parses_as_array_expression() {
 
 #[test]
 fn json_literal_rejects_unterminated_array() {
-    let result = parse_program_la("sit v ← [1, 2");
+    let result = parse_program_la("sit _ v ← [1, 2");
     assert!(
         !result.errors.is_empty(),
         "expected unterminated-array diagnostic"
@@ -1328,7 +1332,7 @@ fn json_literal_rejects_unterminated_array() {
 
 #[test]
 fn json_literal_rejects_unquoted_key() {
-    let result = parse_program_la(r"sit v ← { unquoted: 1 }");
+    let result = parse_program_la(r"sit _ v ← { unquoted: 1 }");
     assert!(
         !result.errors.is_empty(),
         "expected diagnostic for unquoted JSON key"
@@ -1341,7 +1345,7 @@ fn json_literal_rejects_unquoted_key() {
 fn non_est_with_literal_rhs_is_rejected_as_a_type_test() {
     // `non est` takes a type right-hand side (D23.1); a literal is not type
     // syntax, so this is a parse error rather than a value comparison.
-    let result = parse_program_la("sit v ← value non est 0");
+    let result = parse_program_la("sit _ v ← value non est 0");
     assert!(!result.success(), "literal RHS must not parse as a type");
 }
 
@@ -1351,7 +1355,7 @@ fn nihil_non_est_is_a_type_test_not_a_prefix_predicate() {
     // `nihil <value>` prefix predicate. Batch D made `non` tokenless; the
     // retired-prefix lookahead must not treat the operator as a value
     // operand start (`Operator` is not expression-primary).
-    let result = parse_ok_la("sit v ← nulla non est Sacculus");
+    let result = parse_ok_la("sit _ v ← nulla non est Sacculus");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1366,7 +1370,7 @@ fn nihil_non_est_is_a_type_test_not_a_prefix_predicate() {
 /// `≺`/`≻` are the canonical strict comparison glyphs; they parse as Lt/Gt.
 #[test]
 fn strict_comparison_glyphs_parse_as_lt_gt() {
-    let result = parse_ok_la("sit a ← x ≺ y et z ≻ w");
+    let result = parse_ok_la("sit _ a ← x ≺ y et z ≻ w");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1389,7 +1393,7 @@ fn strict_comparison_glyphs_parse_as_lt_gt() {
 /// `≺` parses as the strict less-than comparison.
 #[test]
 fn glyph_comparison_parses_as_lt() {
-    let result = parse_ok_la("sit a ← x ≺ y");
+    let result = parse_ok_la("sit _ a ← x ≺ y");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1575,7 +1579,7 @@ fn exit_arrow_value_is_rejected_on_ordinary_assign() {
 fn exit_arrow_value_after_conversion_is_a_migration_diagnostic() {
     // D17.2: `↦ T ⇥ value` is retired; `⇥` names an error type only.
     crate::test_support::assert_parse_error_issue_la(
-        r#"sit n ← "bad" ↦ numerus ⇥ 0"#,
+        r#"sit _ n ← "bad" ↦ numerus ⇥ 0"#,
         "recovery_uses_exit_arrow",
     );
 }
@@ -1590,7 +1594,7 @@ fn exit_arrow_value_after_conversio_assign_is_a_migration_diagnostic() {
 fn up_tack_default_binds_looser_than_conversion_target() {
     // D17.7 precedence: `x ↦ i32 ⊥ 0` is `(x ↦ i32) ⊥ 0`; the default is the
     // literal, not part of the target.
-    let result = parse_ok_la(r"sit n ← x ↦ i32 ⊥ 0");
+    let result = parse_ok_la(r"sit _ n ← x ↦ i32 ⊥ 0");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1609,7 +1613,7 @@ fn up_tack_default_binds_looser_than_conversion_target() {
 fn up_tack_default_with_propagation_is_rejected() {
     // D17.7: one expression either propagates (`⇥ E`) or defaults (`⊥ v`).
     crate::test_support::assert_parse_error_issue_la(
-        r#"sit n ← "bad" ↦ numerus ⊥ 0 ⇥ textus"#,
+        r#"sit _ n ← "bad" ↦ numerus ⊥ 0 ⇥ textus"#,
         "default_with_propagation",
     );
 }
@@ -1618,7 +1622,10 @@ fn up_tack_default_with_propagation_is_rejected() {
 fn up_tack_default_on_non_call_non_conversion_is_rejected() {
     // D17.7: `⊥` follows a failable call or a conversion; anything else is a
     // structured parse diagnostic.
-    crate::test_support::assert_parse_error_issue_la("sit n ← a ⊥ 0", "default_requires_failable");
+    crate::test_support::assert_parse_error_issue_la(
+        "sit _ n ← a ⊥ 0",
+        "default_requires_failable",
+    );
     crate::test_support::assert_parse_error_issue_la("a ← b ⊥ c", "default_requires_failable");
     crate::test_support::assert_parse_error_issue_la("f() ⊥ 0 ⊥ 1", "default_requires_failable");
 }
@@ -1633,7 +1640,7 @@ fn call_default_expr(expr: &Expr) -> &CallDefaultExpr {
 #[test]
 fn up_tack_default_after_call_parses_call_default() {
     // D17.7: `f(x) ⊥ v` wraps the call; the default is a unary operand.
-    let result = parse_ok_la("sit n ← f(1) ⊥ 0");
+    let result = parse_ok_la("sit _ n ← f(1) ⊥ 0");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1648,7 +1655,7 @@ fn up_tack_default_after_call_parses_call_default() {
 
 #[test]
 fn up_tack_default_after_method_call_binds_the_whole_postfix_chain() {
-    let result = parse_ok_la("sit n ← a.b(1).c() ⊥ 0 + 1");
+    let result = parse_ok_la("sit _ n ← a.b(1).c() ⊥ 0 + 1");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1664,7 +1671,7 @@ fn up_tack_default_after_method_call_binds_the_whole_postfix_chain() {
 #[test]
 fn up_tack_call_default_with_propagation_is_rejected() {
     crate::test_support::assert_parse_error_issue_la(
-        "sit n ← f() ⊥ 0 ⇥ textus",
+        "sit _ n ← f() ⊥ 0 ⇥ textus",
         "default_with_propagation",
     );
 }
@@ -1705,7 +1712,7 @@ fn qualified_finge_variant_path_and_cast_parse() {
     // survives to lowering.
     let result = parse_ok_la(
         r#"functio main() → vacuum {
-    sit e ← finge pkg.Bonum { nuntius = "x" } ∷ pkg.Exitus
+    sit _ e ← finge pkg.Bonum { nuntius = "x" } ∷ pkg.Exitus
     redde
 }"#,
     );
@@ -1741,7 +1748,7 @@ fn qualified_finge_cast_alone_parses() {
     // The qualified form where only the cast is qualified: `finge Bonum { … }
     // ∷ pkg.Exitus` — variant stays same-module, target type is the imported
     // union under its alias.
-    let result = parse_ok_la(r#"sit e ← finge Bonum { nuntius = "x" } ∷ pkg.Exitus"#);
+    let result = parse_ok_la(r#"sit _ e ← finge Bonum { nuntius = "x" } ∷ pkg.Exitus"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1767,7 +1774,7 @@ fn qualified_finge_cast_alone_parses() {
 fn same_module_finge_construction_unchanged() {
     // uvf-u3 done_when (c): same-module construction parses exactly as before
     // — a single-segment variant path and a plain named cast.
-    let result = parse_ok_la(r#"sit e ← finge Bonum { nuntius = "x" } ∷ Exitus"#);
+    let result = parse_ok_la(r#"sit _ e ← finge Bonum { nuntius = "x" } ∷ Exitus"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1791,7 +1798,7 @@ fn same_module_finge_construction_unchanged() {
 
 #[test]
 fn postfix_transpose_parses_as_zero_argument_method_marker() {
-    let result = parse_ok_la("sit t ← valueᵀ");
+    let result = parse_ok_la("sit _ t ← valueᵀ");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1812,7 +1819,7 @@ fn postfix_transpose_parses_as_zero_argument_method_marker() {
 
 #[test]
 fn transpose_binds_before_gradient_selection_after_multiplication() {
-    let result = parse_ok_la("sit g ← a · bᵀ ∇ [x]");
+    let result = parse_ok_la("sit _ g ← a · bᵀ ∇ [x]");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1849,7 +1856,7 @@ fn gradient_expr(result: &ParseResult, statement_index: usize) -> &radix_syntax:
 
 #[test]
 fn bare_gradient_postfix_parses() {
-    let result = parse_ok_la("sit g ← loss(x, y) ∇");
+    let result = parse_ok_la("sit _ g ← loss(x, y) ∇");
     let gradient = gradient_expr(&result, 0);
     assert!(gradient.selectors.is_empty(), "bare form has no selectors");
     assert!(
@@ -1861,7 +1868,7 @@ fn bare_gradient_postfix_parses() {
 
 #[test]
 fn single_selector_gradient_postfix_parses() {
-    let result = parse_ok_la("sit g ← loss(x, y) ∇ [x]");
+    let result = parse_ok_la("sit _ g ← loss(x, y) ∇ [x]");
     let gradient = gradient_expr(&result, 0);
     assert_eq!(gradient.selectors.len(), 1, "one selector");
     assert!(
@@ -1873,7 +1880,7 @@ fn single_selector_gradient_postfix_parses() {
 
 #[test]
 fn ordered_selector_gradient_postfix_parses() {
-    let result = parse_ok_la("sit g ← loss(x, y) ∇ [x, y]");
+    let result = parse_ok_la("sit _ g ← loss(x, y) ∇ [x, y]");
     let gradient = gradient_expr(&result, 0);
     assert_eq!(gradient.selectors.len(), 2);
     assert!(
@@ -1888,7 +1895,7 @@ fn ordered_selector_gradient_postfix_parses() {
     );
 
     // Selector order is preserved verbatim: `[y, x]` stays `[y, x]`.
-    let result = parse_ok_la("sit g ← loss(x, y) ∇ [y, x]");
+    let result = parse_ok_la("sit _ g ← loss(x, y) ∇ [y, x]");
     let gradient = gradient_expr(&result, 0);
     assert_eq!(gradient.selectors.len(), 2);
     assert!(
@@ -1907,7 +1914,7 @@ fn ordered_selector_gradient_postfix_parses() {
 fn gradient_selector_bracket_is_whitespace_insensitive() {
     // `∇[x]` (no space) parses to the same dedicated node; the formatters
     // re-emit the canonical ` ∇ [x]` spaced form.
-    let result = parse_ok_la("sit g ← loss(x, y) ∇[x]");
+    let result = parse_ok_la("sit _ g ← loss(x, y) ∇[x]");
     let gradient = gradient_expr(&result, 0);
     assert_eq!(gradient.selectors.len(), 1);
 }
@@ -1916,7 +1923,7 @@ fn gradient_selector_bracket_is_whitespace_insensitive() {
 fn ordinary_postfix_continuation_applies_after_gradient() {
     // The selector bracket is consumed as part of the gradient suffix, so a
     // later postfix op applies to the gradient result.
-    let result = parse_ok_la("sit g ← loss(x, y) ∇ [x].magnitudo");
+    let result = parse_ok_la("sit _ g ← loss(x, y) ∇ [x].magnitudo");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1938,7 +1945,7 @@ fn ordinary_postfix_continuation_applies_after_gradient() {
 #[test]
 fn prefix_nabla_fails_parse() {
     // `∇` is a postfix gradient operator only; a prefix `∇ x` has no grammar.
-    let result = parse_program_la("sit g ← ∇ loss(x)");
+    let result = parse_program_la("sit _ g ← ∇ loss(x)");
     assert!(
         !result.success(),
         "prefix ∇ must fail parse; errors: {:?}",
@@ -1961,7 +1968,7 @@ fn prefix_nabla_fails_parse() {
 fn empty_gradient_selector_list_fails_parse() {
     // The selector contract requires a non-empty list once `[` follows `∇`.
     crate::test_support::assert_parse_error_issue_la(
-        "sit g ← loss(x, y) ∇ []",
+        "sit _ g ← loss(x, y) ∇ []",
         "gradient_empty_selector_list",
     );
 }
@@ -1969,12 +1976,12 @@ fn empty_gradient_selector_list_fails_parse() {
 #[test]
 fn pd26_optional_non_null_postfix_matrix() {
     let forms = [
-        ("sit value ← object?.member", true, "member"),
-        ("sit value ← object?[index]", true, "index"),
-        ("sit value ← object?(argument)", true, "call"),
-        ("sit value ← object!.member", false, "member"),
-        ("sit value ← object![index]", false, "index"),
-        ("sit value ← object!(argument)", false, "call"),
+        ("sit _ value ← object?.member", true, "member"),
+        ("sit _ value ← object?[index]", true, "index"),
+        ("sit _ value ← object?(argument)", true, "call"),
+        ("sit _ value ← object!.member", false, "member"),
+        ("sit _ value ← object![index]", false, "index"),
+        ("sit _ value ← object!(argument)", false, "call"),
     ];
 
     for (source, optional, payload) in forms {
@@ -2024,7 +2031,7 @@ fn pd26_optional_non_null_postfix_matrix() {
         }
     }
 
-    let source = "sit value ← object?.member![index](argument) + offset";
+    let source = "sit _ value ← object?.member![index](argument) + offset";
     let result = parse_ok_la(source);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
@@ -2068,12 +2075,12 @@ fn pd26_optional_non_null_postfix_matrix() {
     assert!(matches!(optional.chain, OptionalChainKind::Member(_)));
 
     for (source, arg_name, expected) in [
-        ("sit value ← a?.", "issue", "expected_identifier"),
-        ("sit value ← a?[0", "issue", "optional_index_end"),
-        ("sit value ← a?(1", "issue", "optional_call_arguments_end"),
-        ("sit value ← a!.", "issue", "expected_identifier"),
-        ("sit value ← a![0", "issue", "non_null_index_end"),
-        ("sit value ← a!(1", "issue", "non_null_call_arguments_end"),
+        ("sit _ value ← a?.", "issue", "expected_identifier"),
+        ("sit _ value ← a?[0", "issue", "optional_index_end"),
+        ("sit _ value ← a?(1", "issue", "optional_call_arguments_end"),
+        ("sit _ value ← a!.", "issue", "expected_identifier"),
+        ("sit _ value ← a![0", "issue", "non_null_index_end"),
+        ("sit _ value ← a!(1", "issue", "non_null_call_arguments_end"),
     ] {
         let result = parse_program_la(source);
         let error = result
@@ -2099,7 +2106,7 @@ fn pd26_optional_non_null_postfix_matrix() {
 
 #[test]
 fn template_call_carries_labeled_actual_on_string_literal_callee() {
-    let result = parse_ok_la(r#"sit out ← "§{greet} world"(greet: "salve")"#);
+    let result = parse_ok_la(r#"sit _ out ← "§{greet} world"(greet: "salve")"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -2116,7 +2123,7 @@ fn template_call_carries_labeled_actual_on_string_literal_callee() {
 
 #[test]
 fn template_call_carries_labeled_actual_on_forma_literal_callee() {
-    let result = parse_ok_la(r"sit out ← `… §{id}`(id: 1)");
+    let result = parse_ok_la(r"sit _ out ← `… §{id}`(id: 1)");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -2132,7 +2139,7 @@ fn template_call_carries_labeled_actual_on_forma_literal_callee() {
 #[test]
 fn labeled_actual_on_ordinary_call_is_rejected_at_parse() {
     assert_parse_error_issue_la(
-        r#"sit out ← f(greet: "x")"#,
+        r#"sit _ out ← f(greet: "x")"#,
         "labeled_actual_non_template_call",
     );
 }
@@ -2140,14 +2147,14 @@ fn labeled_actual_on_ordinary_call_is_rejected_at_parse() {
 #[test]
 fn labeled_actual_on_optional_literal_call_is_rejected_at_parse() {
     assert_parse_error_issue_la(
-        r#"sit out ← "§{greet}"?(greet: "x")"#,
+        r#"sit _ out ← "§{greet}"?(greet: "x")"#,
         "labeled_actual_non_template_call",
     );
 }
 
 #[test]
 fn equals_actual_reports_label_bind_distinction() {
-    let result = crate::test_support::parse_program_la(r#"sit out ← "§ world"(greet = "x")"#);
+    let result = crate::test_support::parse_program_la(r#"sit _ out ← "§ world"(greet = "x")"#);
     assert!(
         result.errors.iter().any(|error| {
             error
@@ -2171,7 +2178,7 @@ fn equals_actual_reports_label_bind_distinction() {
 #[test]
 fn duplicate_labeled_actual_is_rejected_at_parse() {
     assert_parse_error_issue_la(
-        r#"sit out ← "§{greet}"(greet: "a", greet: "b")"#,
+        r#"sit _ out ← "§{greet}"(greet: "a", greet: "b")"#,
         "duplicate_tuple_element_label",
     );
 }
@@ -2179,7 +2186,7 @@ fn duplicate_labeled_actual_is_rejected_at_parse() {
 #[test]
 fn labeled_spread_actual_is_rejected_at_parse() {
     assert_parse_error_issue_la(
-        r#"sit out ← "§{items}"(items: sparge values)"#,
+        r#"sit _ out ← "§{items}"(items: sparge values)"#,
         "labeled_actual_spread_unsupported",
     );
 }

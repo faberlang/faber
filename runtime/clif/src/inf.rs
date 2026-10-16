@@ -1,9 +1,10 @@
 //! The unbounded integer `inf`.
 //!
-//! A value is a handle to an immutable `Magnus`, the one bignum the in-tree
-//! Rust runtime ships (`runtime/rust/src/magnus.rs`, included by path so there
-//! is a single implementation). Arithmetic is exact: `/` and `%` are the floor
-//! quotient and remainder, and only a zero divisor fails.
+//! A value is a handle to an immutable `Magnus`, the one bignum the compiler
+//! ships (`crates/handroll/src/magnus.rs`, included by path so there is a
+//! single implementation; the Rust runtime keeps a byte-identical copy).
+//! Arithmetic is exact: `/` and `%` are the floor quotient and remainder, and
+//! only a zero divisor fails.
 
 use super::magnus::{Magnus, Radix};
 use super::{exact_trap, text_new};

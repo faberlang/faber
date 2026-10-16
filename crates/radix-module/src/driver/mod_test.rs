@@ -619,7 +619,7 @@ fn compile_typescript_success_emits_output() {
 fn typescript_output_preserves_diagnostic_severity() {
     let session = test_session(Target::HirTypeScript);
     let source = r"incipit {
-  sit unused ← 1
+  sit _ unused ← 1
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 

@@ -48,7 +48,7 @@ fn tensor_textus_plus_rejects() {
   sit lista<textus> flat ← ["a", "b", "c"]
   sit tensor<textus, [3]> left ← flat ↦ tensor<textus, [3]>
   sit tensor<textus, [3]> right ← flat ↦ tensor<textus, [3]>
-  sit sum ← left + right
+  sit _ sum ← left + right
 }"#,
         ),
         "tensor_arithmetic_numeric_element_required",

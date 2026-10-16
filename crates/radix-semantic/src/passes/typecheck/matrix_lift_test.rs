@@ -5,7 +5,9 @@
 //! of one shape. `matrix * matrix` and `matrix / matrix` point at the
 //! elementwise glyphs, `matrix % matrix` says `%` takes a scalar, `≈ ≉` wait
 //! for the tensor ruling, and matrix with matrix `+ -` and the glyph products
-//! are unchanged.
+//! are unchanged. Each cell is typed by the scalar range rule for the operator
+//! (operator ruling 2026-10-15, need; width applies only at the
+//! store).
 
 use crate::test_support::analyze_source;
 use crate::{SemanticError, SemanticErrorKind};
@@ -63,7 +65,7 @@ fn an_untyped_literal_adopts_the_matrix_element() {
     accepts(&function(&format!("{M} a"), M, "a + 1"));
     accepts(&function(
         "matrix<i32, [2, 2]> a",
-        "matrix<i32, [2, 2]>",
+        "matrix<i64, [2, 2]>",
         "a / 2",
     ));
 }
@@ -102,15 +104,19 @@ fn a_float_lane_joins_as_scalars_do() {
 }
 
 #[test]
-fn an_integer_cell_keeps_its_element_and_is_checked_where_it_is_stored() {
+fn an_integer_cell_takes_the_scalar_range_rule() {
+    // Each cell is typed by the scalar range rule for its operator (operator
+    // ruling 2026-10-15, need): an integer intermediate widens and
+    // the width applies only at the store. `a * 2` over `i8` is [-256, 254]
+    // (`i16`); `10 - a` over `u8` is [-245, 10] (`i16`).
     accepts(&function(
         "matrix<i8, [2, 2]> a",
-        "matrix<i8, [2, 2]>",
+        "matrix<i16, [2, 2]>",
         "a * 2",
     ));
     accepts(&function(
         "matrix<u8, [2, 2]> a",
-        "matrix<u8, [2, 2]>",
+        "matrix<i16, [2, 2]>",
         "10 - a",
     ));
     // Ruling 23: integers divide to a float, `i32` to `f64`, `u8` to `f32`.

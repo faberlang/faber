@@ -4,7 +4,7 @@ use crate::test_support::emitted;
 
 #[test]
 fn a_literal_list_is_bounded_by_its_length() {
-    let code = emitted("main {\n    let xs ← [1, 2, 3]\n    print xs\n}");
+    let code = emitted("main {\n    let _ xs ← [1, 2, 3]\n    print xs\n}");
     assert!(
         code.contains("faber_list_i64_of_fixed(faber_a, 3,"),
         "{code}"

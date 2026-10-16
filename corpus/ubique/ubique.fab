@@ -9,7 +9,6 @@ summary = "Marks an option or operand as global."
 syntax = "ubique"
 related = ["optio", "operandus"]
 locale = "en"
-no_expected = "prints-nothing"
 +++
 
 # =============================================================================
@@ -34,7 +33,7 @@ no_expected = "prints-nothing"
 #   annotationFlag :← 'ubique'
 #
 # EXPECTED OUTPUT:
-#   No incipit — declaration or test-runner surface only.
+#   none — the runner executes the entry and prints nothing; empty golden.
 #
 # BACKEND:
 #   declaration-only CLI metadata (whitelist: ubique/ubique.fab).

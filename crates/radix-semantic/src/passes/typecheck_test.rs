@@ -244,7 +244,7 @@ fn struct_literal_field_provides_context_for_vacua() {
     // The parser produces a Verte for `S { ... }`, which typecheck resolves
     // to the struct target.
     test_support::assert_accepts(
-        "genus S { varia lista<numerus> f } incipit { sit s ← S { f = vacua } }",
+        "genus S { varia lista<numerus> f } incipit { sit _ s ← S { f = vacua } }",
     );
 }
 
@@ -253,7 +253,7 @@ fn verte_struct_field_provides_context_for_vacua() {
     // Verte operator: `S { fields }` is the canonical typed-constructor syntax.
     // The lowerer detects the Object inside Verte and uses Tuple as placeholder source.
     test_support::assert_accepts(
-        "genus S { varia lista<numerus> f } incipit { sit s ← S { f = vacua } }",
+        "genus S { varia lista<numerus> f } incipit { sit _ s ← S { f = vacua } }",
     );
 }
 
@@ -268,7 +268,7 @@ fn variant_constructor_field_provides_context_for_vacua() {
     // Tagged union variant constructor with vacua in a collection-typed field
     // Use lista<numerus> not numerus[] (postfix [] only valid in function params)
     test_support::assert_accepts(
-        "discretio E { V { lista<numerus> f } } incipit { sit e ← V(vacua) }",
+        "discretio E { V { lista<numerus> f } } incipit { sit _ e ← V(vacua) }",
     );
 }
 
@@ -490,8 +490,8 @@ fn accepts_await_directed_failable_promise_with_matching_alternate_exit() {
 }
 
 functio caller() fiet → numerus ⇥ textus {
-  sit pending ← fetch()
-  sit value ↢ pending
+  sit _ pending ← fetch()
+  sit _ value ↢ pending
   redde value
 }"#,
     );
@@ -747,7 +747,7 @@ fn fient_call_has_async_cursor_type_boundary() {
 }
 
 incipit {
-  sit handle ← stream()
+  sit _ handle ← stream()
 }",
     );
     let entry = unit
@@ -859,7 +859,7 @@ fn array_spread_non_lista_uses_structured_issue_arg() {
     // Spread in an array context that doesn't resolve to lista
     // A bare array with spread → spread requires lista context
     test_support::assert_rejects_with_issue(
-        "incipit { sit a ← [sparge 1] }",
+        "incipit { sit _ a ← [sparge 1] }",
         "array_spread_requires_lista",
     );
 }
@@ -984,7 +984,7 @@ fn assert_condition_type_mismatch_uses_structured_issue_arg() {
 #[test]
 fn struct_literal_field_initializer_type_mismatch_uses_structured_issue_arg() {
     test_support::assert_rejects_with_issue(
-        "genus S { varia numerus f } incipit { sit s ← S { f = \"bad\" } }",
+        "genus S { varia numerus f } incipit { sit _ s ← S { f = \"bad\" } }",
         "field_initializer_type_mismatch",
     );
 }
@@ -993,7 +993,7 @@ fn struct_literal_field_initializer_type_mismatch_uses_structured_issue_arg() {
 fn verte_field_initializer_type_mismatch_uses_structured_issue_arg() {
     // Verte struct constructor with wrong field type
     test_support::assert_rejects_with_issue(
-        "genus S { varia numerus f } incipit { sit s ← S { f = \"bad\" } }",
+        "genus S { varia numerus f } incipit { sit _ s ← S { f = \"bad\" } }",
         "field_initializer_type_mismatch",
     );
 }
@@ -1673,7 +1673,7 @@ fn rejects_summa_on_non_numeric_lista_elements() {
     let result = crate::test_support::analyze_source(
         r#"
 incipit {
-    sit names ← ["Aulus", "Balbus"] ∷ lista<textus>
+    sit _ names ← ["Aulus", "Balbus"] ∷ lista<textus>
     nota names.summa()
 }
 "#,
@@ -1785,7 +1785,7 @@ fn failable_call_still_rejected_in_closure_without_alternate_exit() {
         r#"
 functio fail() → numerus ⇥ textus { iace "bad" }
 functio caller() → numerus ⇥ textus {
-    sit thunk ← () → numerus ∴ fail()
+    sit _ thunk ← () → numerus ∴ fail()
     redde thunk()
 }
 "#,
@@ -2148,7 +2148,7 @@ fn unmarked_capturing_closure_behavior_is_unchanged() {
     let source = r"
 incipit {
     sit numerus seed ← 2
-    sit closure ← (numerus value) ∴ value + seed
+    sit _ closure ← (numerus value) ∴ value + seed
 }
 ";
     let unit = analyze(source);
@@ -2166,7 +2166,7 @@ functio guard(numerus value) → numerus ⇥ textus {
     redde value
 }
 functio take() → vacuum {
-    sit plain ← clausura numerus value → numerus ⇥ textus {
+    sit _ plain ← clausura numerus value → numerus ⇥ textus {
         si value ≻ 3 {
             iace "too big"
         }
@@ -2208,7 +2208,7 @@ fn eot_legacy_output_and_input_forms_typecheck_unchanged() {
   mone "legacy warning"
   vide "legacy debug"
   scribe "legacy compatibility"
-  sit input ← lege
+  sit _ input ← lege
   nota input
 }"#,
     );
@@ -2604,15 +2604,15 @@ incipit {
 #[test]
 fn inferred_constructor_with_hole_on_both_sides_is_named_error() {
     test_support::assert_rejects_with_issue(
-        "genus P { varia numerus x = 0 } incipit { sit p ← _ { x = 1 } }",
+        "genus P { varia numerus x = 0 } incipit { sit _ p ← _ { x = 1 } }",
         "inferred_constructor_no_expected_type",
     );
     test_support::assert_rejects_with_issue(
-        "incipit { sit m ← _ { \"a\": 1 } }",
+        "incipit { sit _ m ← _ { \"a\": 1 } }",
         "inferred_constructor_no_expected_type",
     );
     test_support::assert_rejects_with_issue(
-        "incipit { sit z ← _ {} }",
+        "incipit { sit _ z ← _ {} }",
         "inferred_constructor_no_expected_type",
     );
 }

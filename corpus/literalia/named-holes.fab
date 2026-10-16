@@ -31,19 +31,19 @@ locale = "en"
 
 main {
     # A labeled actual fills the named hole.
-    let named ← "§{greet} world"(greet: "Salve")
+    let _ named ← "§{greet} world"(greet: "Salve")
     print named
 
     # A named and an anonymous hole share one positional sequence.
-    let mixed ← "§{greet} §"("Salve", "Mundus")
+    let _ mixed ← "§{greet} §"("Salve", "Mundus")
     print mixed
 
     # Named-hole erasure renders the same as the positional § form.
-    let erased ← "§{greet} world"("Salve")
+    let _ erased ← "§{greet} world"("Salve")
     print erased
 
     # Forma capture accepts labels but stores only erased template text.
-    let captured ← `where id = §{id}`(id: "42")
+    let _ captured ← `where id = §{id}`(id: "42")
     print captured.template
 
     # An indexed hole selects its argument and may repeat; one value serves all

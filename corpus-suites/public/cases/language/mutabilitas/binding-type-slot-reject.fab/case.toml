@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/mutabilitas/binding-type-slot-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/binding-type-slot-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "binding_type_slot_required"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "binding_type_slot_required"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "binding_type_slot_required"

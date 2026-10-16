@@ -367,7 +367,7 @@ fn forma_repeated_label_takes_one_value() {
     let template = forma_template_text(
         r#"
 incipit {
-    sit captured ← `§{a} or §{a}`(a: "v")
+    sit _ captured ← `§{a} or §{a}`(a: "v")
     nota captured
 }
 "#,
@@ -434,7 +434,7 @@ fn labeled_forma_application_erases_template_text() {
     let labeled = forma_template_text(
         r"
 incipit {
-    sit captured ← `hello §{id}`(id: 1)
+    sit _ captured ← `hello §{id}`(id: 1)
     nota captured
 }
 ",
@@ -442,7 +442,7 @@ incipit {
     let positional = forma_template_text(
         r"
 incipit {
-    sit captured ← `hello §`(1)
+    sit _ captured ← `hello §`(1)
     nota captured
 }
 ",
@@ -456,7 +456,7 @@ fn labeled_forma_capture_parity_preserves_template_and_positional_params() {
     let labeled = forma_capture(
         r"
 incipit {
-    sit captured ← `hello §{first} §{second}`(second: 2, first: 1)
+    sit _ captured ← `hello §{first} §{second}`(second: 2, first: 1)
     nota captured
 }
 ",
@@ -464,7 +464,7 @@ incipit {
     let positional = forma_capture(
         r"
 incipit {
-    sit captured ← `hello § §`(1, 2)
+    sit _ captured ← `hello § §`(1, 2)
     nota captured
 }
 ",
@@ -484,7 +484,7 @@ fn forma_repeated_numbered_hole_takes_one_value() {
     let (template, params) = forma_capture(
         r#"
 incipit {
-    sit captured ← `x = §0 or y = §0`("v")
+    sit _ captured ← `x = §0 or y = §0`("v")
     nota captured
 }
 "#,
@@ -498,7 +498,7 @@ fn bare_forma_literal_keeps_named_hole_text() {
     let text = forma_template_text(
         r"
 incipit {
-    sit captured ← `hello §{id}`
+    sit _ captured ← `hello §{id}`
     nota captured
 }
 ",

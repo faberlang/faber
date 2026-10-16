@@ -83,7 +83,7 @@ fn rejects_old_crea_argument_order() {
     rejects_with_issue(
         r"incipit {
   sit tf32[] seed ← vacua
-  sit grid ← seed.crea([2, 2], 0.0)
+  sit _ grid ← seed.crea([2, 2], 0.0)
 }",
         "tensor_crea_retired",
     );
@@ -95,7 +95,7 @@ fn rejects_old_structa_receiver_name() {
         r"incipit {
   sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
   sit tf32[] seed ← vacua
-  sit grid ← seed.structa(flat, [2, 2])
+  sit _ grid ← seed.structa(flat, [2, 2])
 }",
         "tensor_receiver_structa_renamed",
     );
@@ -106,7 +106,7 @@ fn rejects_old_tensor_creata_with_runtime_shape() {
     rejects_with_issue(
         &(IMPORT.to_owned()
             + r"incipit {
-  sit grid ← tensor.creata(0.0, [2, 2])
+  sit _ grid ← tensor.creata(0.0, [2, 2])
 }"),
         "tensor_creata_complete_type_arg_required",
     );
@@ -117,7 +117,7 @@ fn rejects_old_tensor_creata_element_type_arg_with_runtime_shape() {
     rejects_with_issue(
         &(IMPORT.to_owned()
             + r"incipit {
-  sit grid ← tensor.creata<numerus>(0, [2, 2])
+  sit _ grid ← tensor.creata<numerus>(0, [2, 2])
 }"),
         "tensor_type_arg_incomplete",
     );
@@ -128,7 +128,7 @@ fn rejects_element_only_tensor_creata_type_arg() {
     rejects_with_issue(
         &(IMPORT.to_owned()
             + r"incipit {
-  sit grid ← tensor.creata<f32>(0.0)
+  sit _ grid ← tensor.creata<f32>(0.0)
 }"),
         "tensor_type_arg_incomplete",
     );
@@ -140,7 +140,7 @@ fn rejects_tensor_structa_forma() {
         &(IMPORT.to_owned()
             + r"incipit {
   sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-  sit grid ← tensor.structa_forma(flat, [2, 3])
+  sit _ grid ← tensor.structa_forma(flat, [2, 3])
 }"),
         "tensor_structa_forma_removed",
     );
@@ -151,7 +151,7 @@ fn rejects_receiver_creata_with_type_args() {
     rejects_with_issue(
         r"incipit {
   sit tf32[] seed ← vacua
-  sit grid ← seed.creata<tf32[2, 2]>(0.0)
+  sit _ grid ← seed.creata<tf32[2, 2]>(0.0)
 }",
         "tensor_receiver_creata_type_args",
     );
@@ -162,7 +162,7 @@ fn rejects_tensor_creata_without_complete_type_arg() {
     rejects_with_issue(
         &(IMPORT.to_owned()
             + r"incipit {
-  sit grid ← tensor.creata(0.0)
+  sit _ grid ← tensor.creata(0.0)
 }"),
         "tensor_creata_complete_type_arg_required",
     );
@@ -174,7 +174,7 @@ fn rejects_formata_without_complete_type_arg() {
         r"incipit {
   sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
   sit tf32[2, 2] data ← flat ↦ tf32[2, 2]
-  sit view ← data.formata()
+  sit _ view ← data.formata()
 }",
         "tensor_formata_complete_type_arg_required",
     );
@@ -186,7 +186,7 @@ fn rejects_formata_value_args() {
         r"incipit {
   sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
   sit tf32[2, 2] data ← flat ↦ tf32[2, 2]
-  sit view ← data.formata<tf32[4]>([4])
+  sit _ view ← data.formata<tf32[4]>([4])
 }",
         "tensor_formata_forbids_value_args",
     );
@@ -197,7 +197,7 @@ fn rejects_tensor_creata_element_type_mismatch_at_assignment() {
     rejects_with_issue(
         &(IMPORT.to_owned()
             + r#"incipit {
-  sit grid ← tensor.creata<tf32[2, 2]>("bad")
+  sit _ grid ← tensor.creata<tf32[2, 2]>("bad")
 }"#),
         "argument_type_mismatch",
     );
@@ -209,7 +209,7 @@ fn rejects_formata_element_type_mismatch_with_structured_issue_arg() {
         r"incipit {
   sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
   sit tf32[2, 2] data ← flat ↦ tf32[2, 2]
-  sit view ← data.formata<tensor<numerus, [4]>>()
+  sit _ view ← data.formata<tensor<numerus, [4]>>()
 }",
         "tensor_formata_element_type_mismatch",
     );

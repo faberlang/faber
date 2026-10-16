@@ -37,7 +37,7 @@ main {
     let tensor<f32, [8, 8]> b ← empty
     let tensor<f32, [8]> c ← empty
     let f32 lr ← 0.01 ∷ f32
-    let r2 ← optimize.step_2x2(a, a, lr)
+    let _ r2 ← optimize.step_2x2(a, a, lr)
     let list<tensor<f32, [8, 8]>> r88 ← optimize.family([b], [b], lr)
     let list<tensor<f32, [8]>> r8 ← optimize.family([c], [c], lr)
     print r88.length()

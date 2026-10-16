@@ -13,7 +13,7 @@ const FAILABLE: &str = "functio f(numerus x) → numerus ⇥ textus {\n    redde
 #[test]
 fn call_default_has_the_success_type() {
     let result = test_support::analyze_ok_la(&format!(
-        "{FAILABLE}incipit {{\n    sit n ← f(1) ⊥ 0\n    nota n\n}}\n"
+        "{FAILABLE}incipit {{\n    sit _ n ← f(1) ⊥ 0\n    nota n\n}}\n"
     ));
     let tys = entry_local_tys(&result);
     let [local_ty] = tys[..] else {
@@ -46,7 +46,7 @@ fn call_default_on_method_call_checks() {
 #[test]
 fn call_default_type_must_match_the_success_type() {
     test_support::assert_rejects_with_issue_la(
-        &format!("{FAILABLE}incipit {{\n    sit n ← f(1) ⊥ \"zero\"\n    nota n\n}}\n"),
+        &format!("{FAILABLE}incipit {{\n    sit _ n ← f(1) ⊥ \"zero\"\n    nota n\n}}\n"),
         "call_default_type_mismatch",
     );
 }
@@ -56,7 +56,7 @@ fn call_default_on_an_infallible_call_is_rejected() {
     test_support::assert_rejects_with_issue_la(
         concat!(
             "functio g() → numerus {\n    redde 1\n}\n\n",
-            "incipit {\n    sit n ← g() ⊥ 0\n    nota n\n}\n",
+            "incipit {\n    sit _ n ← g() ⊥ 0\n    nota n\n}\n",
         ),
         "call_default_on_infallible_call",
     );
@@ -118,8 +118,8 @@ fn directional_view_method_rejects_a_written_argument() {
             "@ ad 'x:y'\n",
             "functio f(textus n) → numerus { redde 1 }\n\n",
             "incipit {\n",
-            "    sit s ← ad 'x:y' (\"a\")\n",
-            "    sit t ← s.tuus<numerus>()\n",
+            "    sit _ s ← ad 'x:y' (\"a\")\n",
+            "    sit _ t ← s.tuus<numerus>()\n",
             "    nota t.fini(1)\n",
             "}\n",
         ),

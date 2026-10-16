@@ -136,7 +136,7 @@ fn parses_natural_type_args_on_direct_call() {
     // PARSE030.expected_expression when call-site typeArguments rejected NATURAL.
     let result = parse_ok_la(
         r"incipit {
-    sit x ← linear_from_raw<2, 2, 2>(a, b, c)
+    sit _ x ← linear_from_raw<2, 2, 2>(a, b, c)
 }",
     );
     let call = first_call_expr(&result);

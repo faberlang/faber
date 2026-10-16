@@ -46,7 +46,7 @@ locale = "en"
 main {
     # the empty-match rule: (0,0) (1,4) (5,5)
     let regex stars ← "a*" ↦ regex
-    let runs ← stars.find_all("baaac")
+    let _ runs ← stars.find_all("baaac")
     print runs.length()
     for from runs let run {
         print run.start()
@@ -55,7 +55,7 @@ main {
 
     # offsets count code points: the emoji is one position
     let regex word ← "[a-z]+" ↦ regex
-    let words ← word.find_all("😀é abc d")
+    let _ words ← word.find_all("😀é abc d")
     for from words let hit {
         print hit.text()
         print hit.start()
@@ -64,7 +64,7 @@ main {
 
     # groups and names are per match; a group that did not take part is none
     let regex pair ← "(?P<key>[a-z]+)=([0-9]+)?" ↦ regex
-    let pairs ← pair.find_all("a=1 b= c=3")
+    let _ pairs ← pair.find_all("a=1 b= c=3")
     for from pairs let kv {
         print kv.named("key")
         print kv.group(2) coalesce "unset"

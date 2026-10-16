@@ -273,7 +273,7 @@ fn renders_unresolved_infer_as_marker() {
     };
 
     let code = generate_faber(&program, &types, &interner);
-    assert!(code.contains("sit x"));
+    assert!(code.contains("sit _ x"));
 }
 
 #[test]

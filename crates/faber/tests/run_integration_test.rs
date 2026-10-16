@@ -2588,8 +2588,8 @@ entry = "main.fab"
 import from "norma:fault" fault
 
 main {
-  let partial ← (string msg) → void ⇥ fault.IoFault ∴ write_partial(msg)
-  let out_bytes ← (bytes data) → void ⇥ fault.IoFault ∴ write_bytes(data)
+  let _ partial ← (string msg) → void ⇥ fault.IoFault ∴ write_partial(msg)
+  let _ out_bytes ← (bytes data) → void ⇥ fault.IoFault ∴ write_bytes(data)
   partial("P")
   out_bytes(|41|)
   partial(read_line() coalesce "")

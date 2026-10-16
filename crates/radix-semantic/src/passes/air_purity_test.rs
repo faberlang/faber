@@ -1561,8 +1561,8 @@ fn air_admits_arithmetic_over_inferred_fixum_of_proven_index_expression() {
 functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
     varia tensor<f32, [2, 2]> acc ← copy x
     itera ab 0‥16 sit i {
-        sit k ← i * 2 + 1
-        sit m ← k * 2 + i
+        sit _ k ← i * 2 + 1
+        sit _ m ← k * 2 + i
         acc ← acc + x
     }
     redde acc

@@ -52,14 +52,14 @@ fn refuses_with(source: &str, issue: &str) {
 #[test]
 fn bare_literal_without_cell_is_a_record() {
     accepts(
-        "main {\n    let p ← { g = 1.0, w = 2 }\n    print p.g\n    let int n ← p.w\n    print n\n}\n",
+        "main {\n    let _ p ← { g = 1.0, w = 2 }\n    print p.g\n    let int n ← p.w\n    print n\n}\n",
     );
 }
 
 #[test]
 fn underscore_hole_constructor_still_needs_a_cell() {
     refuses_with(
-        "main {\n    let p ← _ { g = 1.0 }\n}\n",
+        "main {\n    let _ p ← _ { g = 1.0 }\n}\n",
         "inferred_constructor_no_expected_type",
     );
 }
@@ -77,7 +77,7 @@ fn stated_field_list_hole_constructor_is_a_record() {
 #[test]
 fn record_field_read_is_checked() {
     refuses_with(
-        "main {\n    let p ← { g = 1.0 }\n    print p.nope\n}\n",
+        "main {\n    let _ p ← { g = 1.0 }\n    print p.nope\n}\n",
         "unknown_record_field",
     );
 }

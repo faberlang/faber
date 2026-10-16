@@ -7,7 +7,7 @@ main {
     let int pending
     pending ← 7
     print pending
-    let label
+    let _ label
     label ← "deferred"
     print label
     mut list<int> later

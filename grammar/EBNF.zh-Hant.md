@@ -41,7 +41,7 @@ fixum_decl ::= ('定值' type_annotation IDENTIFIER '=' const_init) | ('變值' 
 # [015] figendum_decl
 figendum_decl ::= ('等定' | '等變') type_annotation IDENTIFIER '←' expression
 # [016] sit_decl
-sit_decl ::= '設為' type_annotation? IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?
+sit_decl ::= '設為' type_annotation IDENTIFIER (('←' value_marker? expression) | ('↤' assignment inline_default?) | ('↢' expression))?
 # [017] ref_decl
 ref_decl ::= '從' concrete_type IDENTIFIER '←' expression
 # [018] array_destruct
@@ -1019,7 +1019,7 @@ productions. It is not a second keyword authority.
 | Control | `否則` | else |
 | Control | `若` | if |
 | Control | `否則若` | else-if |
-| Declarations | `設為` | inferred immutable local |
+| Declarations | `設為` | write-once local |
 | Testing | `僅限` | only |
 | Testing | `僅限於` | only-in |
 | Params | `展開` | spread |
@@ -1144,7 +1144,10 @@ use a top-level function.
 
 
 - `設為` (en `let`) = run-time name, write-once: `設為 T name ← e` states the
-  type, `設為 name ← e` infers it. It may be declared without an initializer and
+  type, `設為 _ name ← e` infers it. Every declaration writes its type slot;
+  `_` is the explicit request to infer, and the type-omitted `設為 name ← e`
+  (likewise `變值 name`, `從 name`, `定值 name`) is `PARSE010`
+  `binding_type_slot_required`. It may be declared without an initializer and
   assigned exactly once later, then frozen. `變值` (en `mut`) = writable name
   (reassignable). `定值` (en `const`) = compile-time constant only, and it goes
   with `=`: a run-time `定值 T name ← e` is `PARSE010` `runtime_const_retired`
@@ -1158,17 +1161,17 @@ use a top-level function.
 - `等定` / `等變` await a `promissum<T>` or `promissum<T ⇥ E>`, bind
   the resolved `T`, and propagate a compatible alternate `E`.
 - `↢` is the await-directed initializer for an ordinary declaration:
-  `定值 T name ↢ future`, `變值 T name ↢ future`, or `設為 name ↢ future`.
+  `定值 T name ↢ future`, `變值 T name ↢ future`, or `設為 _ name ↢ future`.
   It has the same await and alternate-propagation semantics as
   `等定 T name ← future`, but it is not a general expression operator and
   cannot target an existing place.
 - Use `_` as the type annotation when the initializer determines the type: `變值 _ name ← value`
-- `設為 name ← value` is the inferred write-once local; `設為 T name ← value` is the typed one
-- `設為 name` (no initializer) is the inferred deferred
+- `設為 _ name ← value` is the inferred write-once local; `設為 T name ← value` is the typed one
+- `設為 _ name` (no initializer) is the inferred deferred
   immutable. Assign exactly once before any read.
 - Typed `設為`/`變值` initializers accept `↤` (`設為 numerus x ↤ "42"`):
   the written type is the conversion destination, then the binding is
-  initialized. `等定`/`等變` keep `←`; `變值 _`, inferred `設為`, and untyped
+  initialized. `等定`/`等變` keep `←`; `變值 _`, `設為 _`, and untyped
   destructuring reject `↤` (no concrete destination type).
 - `定值 T x = e` (D5.10) declares a typed **constant**; at the top of a file
   the same declaration is the module-level constant (next section). `=` states a
@@ -2466,7 +2469,7 @@ The `∷` glyph (U+2237, "proportion") explicitly ascribes a target type to an e
 Prefer typed construction for ordinary `類型` values and `vacua` for ordinary empty collection values:
 
 ```fab
-sit point ← Point { x = 10 }
+sit _ point ← Point { x = 10 }
 sit lista<numerus> xs ← vacua
 ```
 
@@ -2623,13 +2626,13 @@ Implementation status (2026-10-11):
 Inline block example:
 
 ```fab
-sit tag ← «inline»
+sit _ tag ← «inline»
 ```
 
 Multiline block example (newline after opening `«`):
 
 ```fab
-sit blob ← «
+sit _ blob ← «
     select id, email
     from accounts
 »
@@ -2638,14 +2641,14 @@ sit blob ← «
 Captured template example:
 
 ```fab
-sit q ← `select * from accounts where id = §`(accountId)
+sit _ q ← `select * from accounts where id = §`(accountId)
 ```
 
 Octeti hex literal example:
 
 ```fab
-sit sig ← |de ad be ef|
-sit hello ← |48 65 6c 6c 6f|
+sit _ sig ← |de ad be ef|
+sit _ hello ← |48 65 6c 6c 6f|
 ```
 
 ### Format-Template Application

@@ -55,12 +55,12 @@ fn materialize_to_other_type_is_a_reply_mismatch() {
 fn inferred_local_carries_route_types() {
     rejects(
         TEXT_TO_NUM,
-        "sit s ← ad 'x:y' (\"a\")\nsit textus t ← s ↦ textus\nnota t",
+        "sit _ s ← ad 'x:y' (\"a\")\nsit textus t ← s ↦ textus\nnota t",
         "sermo_reply_type_mismatch",
     );
     accepts(
         TEXT_TO_NUM,
-        "sit s ← ad 'x:y' (\"a\")\nsit numerus n ← s ↦ numerus\nnota n",
+        "sit _ s ← ad 'x:y' (\"a\")\nsit numerus n ← s ↦ numerus\nnota n",
     );
 }
 
@@ -121,12 +121,12 @@ fn vacuum_handler_materializes_as_vacuum() {
 fn tuus_type_must_match_reply() {
     rejects(
         TEXT_TO_NUM,
-        "sit s ← ad 'x:y' (\"a\")\nsit t ← s.tuus<textus>()\nnota t.fini()",
+        "sit _ s ← ad 'x:y' (\"a\")\nsit _ t ← s.tuus<textus>()\nnota t.fini()",
         "sermo_view_type_mismatch",
     );
     accepts(
         TEXT_TO_NUM,
-        "sit s ← ad 'x:y' (\"a\")\nsit t ← s.tuus<numerus>()\nnota t.fini()",
+        "sit _ s ← ad 'x:y' (\"a\")\nsit _ t ← s.tuus<numerus>()\nnota t.fini()",
     );
 }
 
@@ -134,11 +134,11 @@ fn tuus_type_must_match_reply() {
 fn omitted_tuus_type_is_inferred_from_reply() {
     accepts(
         TEXT_TO_NUM,
-        "sit s ← ad 'x:y' (\"a\")\nsit t ← s.tuus()\nsit scrinium<numerus> ∪ nihil f ← t.accipe()\nnota f",
+        "sit _ s ← ad 'x:y' (\"a\")\nsit _ t ← s.tuus()\nsit scrinium<numerus> ∪ nihil f ← t.accipe()\nnota f",
     );
     rejects(
         TEXT_TO_NUM,
-        "sit s ← ad 'x:y' (\"a\")\nsit t ← s.tuus()\nsit scrinium<textus> ∪ nihil f ← t.accipe()\nnota f",
+        "sit _ s ← ad 'x:y' (\"a\")\nsit _ t ← s.tuus()\nsit scrinium<textus> ∪ nihil f ← t.accipe()\nnota f",
         "initializer_annotation_mismatch",
     );
 }
@@ -147,7 +147,7 @@ fn omitted_tuus_type_is_inferred_from_reply() {
 fn meus_type_must_match_opener() {
     rejects(
         TEXT_TO_NUM,
-        "sit s ← ad 'x:y' (\"a\")\nnota s.meus<numerus>().fini()",
+        "sit _ s ← ad 'x:y' (\"a\")\nnota s.meus<numerus>().fini()",
         "sermo_view_type_mismatch",
     );
 }
@@ -156,7 +156,7 @@ fn meus_type_must_match_opener() {
 fn meus_close_is_legal_on_a_faber_route() {
     accepts(
         TEXT_TO_NUM,
-        "sit s ← ad 'x:y' (\"a\")\nnota s.meus<textus>().fini()\nnota s.meus().fini()",
+        "sit _ s ← ad 'x:y' (\"a\")\nnota s.meus<textus>().fini()\nnota s.meus().fini()",
     );
 }
 
@@ -164,12 +164,12 @@ fn meus_close_is_legal_on_a_faber_route() {
 fn meus_send_toward_a_faber_handler_is_rejected() {
     rejects(
         TEXT_TO_NUM,
-        "sit s ← ad 'x:y' (\"a\")\ns.meus<textus>().da(\"b\")",
+        "sit _ s ← ad 'x:y' (\"a\")\ns.meus<textus>().da(\"b\")",
         "ad_handler_send_closed",
     );
     rejects(
         TEXT_TO_NUM,
-        "sit s ← ad 'x:y' (\"a\")\nsit m ← s.meus<textus>()\nm.da(\"b\")",
+        "sit _ s ← ad 'x:y' (\"a\")\nsit _ m ← s.meus<textus>()\nm.da(\"b\")",
         "ad_handler_send_closed",
     );
 }
@@ -233,7 +233,7 @@ fn sermo_of_valor_valor_is_the_bare_form() {
 fn host_route_stays_valor_valor() {
     accepts(
         "",
-        "sit textus t ← ad 'solum:lege' (5) ↦ textus\nsit s ← ad 'solum:lege' (\"a\")\nsit v ← s.tuus<numerus>()\nnota t\nnota v.fini()",
+        "sit textus t ← ad 'solum:lege' (5) ↦ textus\nsit _ s ← ad 'solum:lege' (\"a\")\nsit _ v ← s.tuus<numerus>()\nnota t\nnota v.fini()",
     );
 }
 
@@ -252,7 +252,7 @@ fn bare_sermo_parameter_accepts_a_typed_conversation() {
 fn finalized_hir_carries_the_bare_sermo_carrier() {
     let result = analyze_source_la(&program(
         TEXT_TO_NUM,
-        "sit s ← ad 'x:y' (\"a\")\nnota s ↦ numerus",
+        "sit _ s ← ad 'x:y' (\"a\")\nnota s ↦ numerus",
     ));
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
     let tys = entry_local_tys(&result);

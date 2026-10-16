@@ -364,7 +364,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
         };
         object
             .ty
-            .is_some_and(|ty| crate::tensor_bracket::is_tensor_type(self.types, ty))
+            .is_some_and(|ty| crate::tensor_bracket::is_coordinate_bracket_receiver(self.types, ty))
     }
 
     /// Read-modify-write of an lvalue: visit projection inputs once, read the
@@ -577,12 +577,103 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
                 binding,
                 iter,
                 body: block,
+                mutable,
                 ..
             } => {
                 self.track_binding(*binding);
+                // WHY: a `let` (`sit`) loop binder is a fixed name written once
+                // by the loop head, so any store through it is a second
+                // assignment. `mut` (`varia`) binders stay writable.
+                if !*mutable {
+                    self.write_once.insert(*binding);
+                }
                 self.visit_expr(iter);
                 self.mark_assigned(*binding);
                 self.visit_block(block);
+            }
+            HirExpressionKind::IteraLockstep {
+                sources,
+                bindings,
+                body,
+                mutable,
+                ..
+            } => {
+                for source in sources {
+                    self.visit_expr(source);
+                }
+                for (binding, _) in bindings {
+                    self.track_binding(*binding);
+                    if !*mutable {
+                        self.write_once.insert(*binding);
+                    }
+                    self.mark_assigned(*binding);
+                }
+                self.visit_block(body);
+            }
+            HirExpressionKind::IteraRange {
+                ranges,
+                bindings,
+                body,
+                mutable,
+                ..
+            } => {
+                for range in ranges {
+                    self.visit_expr(range);
+                }
+                for (binding, _) in bindings {
+                    self.track_binding(*binding);
+                    if !*mutable {
+                        self.write_once.insert(*binding);
+                    }
+                    self.mark_assigned(*binding);
+                }
+                self.visit_block(body);
+            }
+            HirExpressionKind::Reduction {
+                source,
+                group,
+                binding,
+                body,
+                identity,
+                mutable,
+                ..
+            } => {
+                self.visit_expr(source);
+                if let Some(group) = group {
+                    self.visit_expr(group);
+                }
+                if let Some(identity) = identity {
+                    self.visit_expr(identity);
+                }
+                if let Some((def_id, _)) = binding {
+                    self.track_binding(*def_id);
+                    if !*mutable {
+                        self.write_once.insert(*def_id);
+                    }
+                    self.mark_assigned(*def_id);
+                }
+                if let Some(body) = body {
+                    self.visit_block(body);
+                }
+            }
+            HirExpressionKind::Sort {
+                source,
+                binding,
+                body,
+                mutable,
+                ..
+            } => {
+                self.visit_expr(source);
+                if let Some((def_id, _)) = binding {
+                    self.track_binding(*def_id);
+                    if !*mutable {
+                        self.write_once.insert(*def_id);
+                    }
+                    self.mark_assigned(*def_id);
+                }
+                if let Some(body) = body {
+                    self.visit_block(body);
+                }
             }
             HirExpressionKind::Clausura(params, _, _, body) => {
                 // PRP-057: `take` avoids O(N) clone of the full state map when
