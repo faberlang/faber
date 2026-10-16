@@ -1414,13 +1414,13 @@ fn ensure_tensor_bracket_index_array_types(hir: &radix_hir::HirModule, types: &m
     impl HirVisitor for TensorBracketIndexArrayCollector<'_> {
         fn visit_expr(&mut self, expr: &HirExpression) {
             if let HirExpressionKind::Index(object, index) = &expr.kind {
-                let object_is_tensor = object
+                let object_is_coordinate = object
                     .ty
-                    .is_some_and(|ty| radix_semantic::tensor_bracket::is_tensor_type(self.types, ty));
+                    .is_some_and(|ty| radix_semantic::tensor_bracket::is_coordinate_bracket_receiver(self.types, ty));
                 let index_is_list = index
                     .ty
                     .is_some_and(|ty| radix_semantic::tensor_bracket::is_bracket_index_list_type(self.types, ty));
-                if object_is_tensor
+                if object_is_coordinate
                     && !index_is_list
                     && let Some(index_ty) = index.ty
                 {
@@ -3362,7 +3362,7 @@ impl<'a> FunctionBuilder<'a> {
         };
         if !object
             .ty
-            .is_some_and(|ty| radix_semantic::tensor_bracket::is_tensor_type(self.types, ty))
+            .is_some_and(|ty| radix_semantic::tensor_bracket::is_coordinate_bracket_receiver(self.types, ty))
         {
             return None;
         }
