@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 409,
-    "analyzable": 443
+    "capable": 410,
+    "analyzable": 444
   },
   "terms": [
     {
@@ -888,8 +888,8 @@
     {
       "term": "tensor",
       "rule": "type",
-      "capable": 19,
-      "analyzable": 20
+      "capable": 20,
+      "analyzable": 21
     },
     {
       "term": "textus",

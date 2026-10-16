@@ -12,8 +12,3 @@ check_only = true
 outcome = "known-fail"
 phase = "emit"
 diagnostic_contains = "canonical Faber output would drop source construct `hook:Praeparabit:all=false`"
-
-[targets.runner]
-outcome = "known-fail"
-phase = "run"
-diagnostic_contains = "no entry function in MIR program"

@@ -131,7 +131,7 @@ pub fn classify_runner_lowerability(validated: &ValidatedMir<'_>) -> Lowerabilit
                 &mut gaps,
                 &mut seen,
                 CapabilityGap::UnsupportedMirShape {
-                    shape: "no entry function in MIR program".to_owned(),
+                    shape: radix_mir::names::NO_ENTRY_FUNCTION.to_owned(),
                     slug: SLUG_UNSUPPORTED,
                 },
             );

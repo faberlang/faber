@@ -625,7 +625,7 @@ pub fn unique_kernel_entry_name(
 /// have produced several). A direct `Function` or constant-function callee
 /// carries the id itself. Shared by the host-partition boundary derivation
 /// and the boundary-ABI validation gate.
-pub(crate) fn callee_function_ids(callee: &MirCallee, program: &MirProgram) -> Vec<MirFunctionId> {
+pub fn callee_function_ids(callee: &MirCallee, program: &MirProgram) -> Vec<MirFunctionId> {
     match callee {
         MirCallee::Function(id)
         | MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => vec![*id],

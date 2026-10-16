@@ -289,9 +289,13 @@ comparison. Every negation glyph mirrors the glyph it negates (`≡`/`≢`,
 `≅`/`≇`, `≈`/`≉`), and there are no synonyms: `≠` is a compile error that
 points at `≢`.
 
-**Explicit types, explicit conversions.** Declarations are type-first
-(`int count`, `list<string> names`). Nullability is a union, `string ∪ none`,
-not a sigil. Nothing narrows silently: crossing number families is a `↦`
+**Explicit types, explicit conversions.** Declarations are type-first, and
+four binding words say how a name is bound: `let` (fixed), `mut` (writable),
+`ref` (re-pointable, read-only) and `const` (a compile-time fact, set with
+`=`). Each writes its type slot (`let int count ← 0`, `mut list<string> names ← []`);
+there is no short form, and `_` in the slot asks for inference
+(`PARSE010 binding_type_slot_required` otherwise). Nullability is a union,
+`string ∪ none`, not a sigil. Nothing narrows silently: crossing number families is a `↦`
 conversion, and a conversion that loses information names its rounding
 (`x ↦ int via Floor`). A conversion that can fail takes a recovery value with
 `⊥` or goes to the error channel.
@@ -346,53 +350,60 @@ generated program is correct when its output and exit status match the
 runner's; a construct a target cannot express yet is rejected by name
 (`unsupported on target <t>: <construct>`), never approximated.
 
-How mature each target is, measured on the corpus (651 positive cases, each
-with expected output; "suite" counts are pinned outcomes in
-`corpus-suites/full`, "matches" counts were measured by building the emitted
-program with the real toolchain and comparing it with the runner):
+<!-- target-maturity:begin -->
+How mature each target is, measured on the corpus (662 programs the suite runs, each with expected output; 134 more are meant to be refused). "Suite" counts are cases that pass in `corpus-suites/full` (`faber corpus`) out of the cases the suite applies to; the rest are pinned expected failures. A library file with no entry function has nothing to run, so it counts on a compiled target when it emits and builds, and on the runner when it checks and lowers to valid MIR. C and Haskell have no corpus lane: each single-file program the runner executes and passes was emitted, built with the real toolchain, and its output and exit status compared with the runner's.
 
 | Target | `-t` | Output | Evidence | Source |
 | --- | --- | --- | --- | --- |
 | **Reference** | | | | |
-| MIR runner | (`faber run`) | executes the program; the oracle | suite 581 / 651 (most of the rest are fragments with no entry point) | public |
-| Faber | `faber` | canonical Faber in the source's locale (`format`, `convert`) | round-trip 633 / 651 | public |
-| FMIR / FHIR | `fmir`, `fhir` | serialized MIR and analyzed HIR artifacts | builds 616 and 590 of 638 files | public |
+| MIR runner | (`faber run`) | executes the program; the oracle | suite 659 / 662 (the rest are pinned expected failures); 53 of the passes are library files with no entry function, which count when they check and lower to valid MIR | public |
+| Faber | `faber` | canonical Faber in the source's locale (`format`, `convert`) | round-trip 644 / 649 | public |
+| FMIR / FHIR | `fmir`, `fhir` | serialized MIR and analyzed HIR artifacts | no corpus lane (exercised by the package build and run tests) | public |
 | **Application languages** | | | | |
-| Rust | `rust` | Rust source, or a full Cargo project | suite 613 / 651 | official binary |
-| Go | `go` | Go source | suite 538 / 651 | official binary |
-| TypeScript | `ts` | TypeScript source | suite 506 / 651 | official binary |
-| Swift | `swift` | Swift source | suite 336 / 651 | official binary |
-| Python | `python` | self-contained Python | 240 of 257 comparable programs match | official binary |
-| Haskell | `haskell` | Haskell source | 30 of 76 comparable programs match | official binary |
+| Rust | `rust` | Rust source, or a full Cargo project | suite 645 / 654 | official binary |
+| Go | `go` | Go source | suite 568 / 662 | official binary |
+| TypeScript | `ts` | TypeScript source | suite 609 / 662 | official binary |
+| Swift | `swift` | Swift source | suite 347 / 662 | official binary |
+| Python | `python` | self-contained Python | suite 480 / 649 | official binary |
+| Haskell | `haskell` | Haskell source | 77 of 593 single-file programs emit; 30 of those match the runner | official binary |
 | **Systems and native** | | | | |
-| C | `c` | C11 with a header-only runtime | preview: 71 programs emit, 65 of 66 comparable match | public |
-| LLVM | `llvm`, `llvm-host` | LLVM IR, or a native executable via clang | suite 461 / 651 | official binary |
-| WebAssembly | `wasm` | WebAssembly text | suite 460 / 651 assemble (no host runtime yet) | official binary |
-| Cranelift | — | native objects with no external toolchain | in progress | public (planned) |
+| C | `c` | C11 with a header-only runtime | preview: 223 of 593 single-file programs emit; 222 of those match the runner | public |
+| LLVM | `llvm-text`, `llvm-host` | LLVM IR, or a native executable via clang | suite 535 / 662 | official binary |
+| WebAssembly | `wasm`, `wasm-text` | WebAssembly text | suite 470 / 662 assemble (no host runtime yet) | official binary |
+| Cranelift | `clif` | native objects with no external toolchain | preview: suite 509 / 649 | public |
 | **GPU kernels** (kernel functions only) | | | | |
-| Metal | `metal` | Metal Shading Language | kernel programs only | official binary |
-| WGSL | `wgsl` | WebGPU compute shaders | kernel programs only | official binary |
-| CUDA | (`--device cuda`) | NVVM IR through the device runtime | kernel programs only | official binary |
-| **Historical and novelty** | | | | |
-| Fortran | `fortran` | Fortran 2008 | 40 of 40 comparable match | official binary |
-| COBOL | `cobol` | GnuCOBOL free format | 34 of 37 comparable match | official binary |
-| Pascal | `pascal` | Free Pascal | 36 of 37 comparable match | official binary |
-| BASIC | `basic` | C64 BASIC V2 listing | 63 programs emit | official binary |
-| Odin | `odin` | Odin | early: 6 of 6 match | official binary |
-| Racket | `sexp` | Racket s-expressions (a validation target) | suite 456 / 651 | official binary |
+| Metal | `metal-text` | Metal Shading Language | kernel programs only | official binary |
+| WGSL | `wgsl-text` | WebGPU compute shaders | kernel programs only | official binary |
+| CUDA | (`--device cuda`) | PTX built at run time from NVVM IR (needs `clang` with the NVPTX target) | kernel programs only: `faber run --device cuda` runs whole-tensor kernels on NVIDIA GPUs; lane-form kernels are not lowered yet and fail closed | official binary |
+| **Validation** | | | | |
+| Racket | `sexp` | Racket s-expressions (a validation target) | suite 538 / 662 | official binary |
+| **Experimental** (not in the released `faber`) | | | | |
+| Fortran, COBOL, Pascal, Odin, BASIC | `fortran`, `cobol`, `pascal`, `odin`, `basic` | historical languages, a deliberate subset | default-off features; no corpus lane | private source |
+<!-- target-maturity:end -->
 
 Notes:
 
-- "Comparable" excludes programs with no entry point; "emit" alone means
+- "Match" counts compare the emitted program's output and exit status with the
+  runner's, for the single-file programs the runner passes; "emit" alone means
   source was produced, not that it built.
-- The historical targets cover a deliberate subset (scalars, text, simple
-  collections) and reject the rest by name. They exist partly as a test of the
-  rule that targets implement Faber and never the reverse.
+- The C and Cranelift targets are previews. Both are in the default `faber`
+  build, neither runs under `faber run`, and a construct either cannot express
+  yet is rejected by name.
+- The experimental historical targets (Fortran, COBOL, Pascal, Odin, BASIC)
+  cover a deliberate subset (scalars, text, simple collections) and reject the
+  rest by name. They exist partly as a test of the rule that targets implement
+  Faber and never the reverse. They are default-off features and are not in the
+  released `faber`.
 - Standard-library I/O (files, processes, clocks, network) is wired on the Rust
   target today; most other targets reject programs that use it, which accounts
   for much of the gap between their counts and Rust's.
 - "Public" means the generator's source is in this repository. "Official
   binary" means it ships in the released `faber` but its source does not.
+  `faber targets` on the binary you are running is the authority on what it can
+  emit; a target missing from the build is rejected with
+  `PKG001 target_not_in_this_build`.
+- The table is generated from the corpus suite at release time, not edited by
+  hand.
 
 ## What is in this repository
 
@@ -408,8 +419,16 @@ This repository is the open-source core of Faber:
   under the undefined-behaviour sanitizer; a construct it cannot express yet is
   rejected by name. It is a preview and covers a growing subset of the
   language.
-- **The `faber` command** (`crates/faber`): `check`, `run`, `test`, `format`,
-  and `convert` between locale packs.
+- **The Cranelift code generator** (`crates/radix-mir-clif`, `runtime/clif`):
+  lowers checked MIR to a native object for the host with no external
+  toolchain beyond a linker, so a build from this repository alone produces
+  executables (`faber build --target clif`). It is a preview: a fail-closed
+  subset of the language, with named gaps.
+- **The artifact formats** (`crates/radix-hir-fhir`, `crates/radix-mir-fmir`):
+  serialized analyzed HIR and MIR images that `faber` can load and run.
+- **The `faber` command** (`crates/faber`): `check` (with `--lower` to also
+  compile the program without running it), `run`, `test`, `build`, `format`,
+  `convert` between locale packs, `corpus` and `targets`.
 - **Norma**, the standard library (`lib/norma`): files, processes, time, text,
   JSON, TOML, HTTP and more.
 - **The grammar** (`grammar/`) and **the locale packs** (`locale/`).
@@ -418,8 +437,7 @@ This repository is the open-source core of Faber:
   run them (`corpus-suites/`).
 
 The official `faber` release also includes the code generators that are not in
-this repository (see Targets). A native backend built on Cranelift, so that a
-build from this source alone produces executables, is in progress.
+this repository (see Targets).
 
 ## Build and run
 

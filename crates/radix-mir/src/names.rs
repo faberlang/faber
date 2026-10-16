@@ -30,6 +30,12 @@ pub const WASM_DISPATCH_LOOP: &str = "dispatch";
 /// Fallback name for synthetic entry functions with no source symbol.
 pub const ENTRY_FUNCTION_NAME: &str = "incipit";
 
+/// The refusal text for a MIR program with no explicit entry function. The
+/// runner, the device route and the corpus runner target all name it: the
+/// corpus target keys its library-shaped standard (checks and lowers to valid
+/// MIR) on this refusal, so there is one spelling.
+pub const NO_ENTRY_FUNCTION: &str = "no entry function in MIR program";
+
 const LITERAL_IDENTITY_EMPTY_SUFFIX: &str = "_0_empty";
 const IMPORT_COMPONENT_ANON: &str = "anon";
 const EXTERNAL_IMPORT_ROOT_MODULE: &str = "root";

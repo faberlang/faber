@@ -8,3 +8,9 @@ input = "praefixum/cross-module.fab"
 [expect]
 stdout = "stdout.expected"
 check_only = false
+
+[targets.mir]
+outcome = "known-fail"
+phase = "emit"
+diagnostic_contains = "praefixum_import_unavailable"
+known_fail_why = "`faber mir` dumps one source file through the single-file route, which does not retry through package analysis the way `faber emit` does; `faber emit -t sexp` on this file succeeds"

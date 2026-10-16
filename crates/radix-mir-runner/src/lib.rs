@@ -1034,7 +1034,7 @@ fn explicit_entry_id(validated: &ValidatedMir<'_>) -> Result<MirFunctionId, Vec<
         .ok_or_else(|| {
             vec![RunnerError::internal(
                 Span::default(),
-                "no entry function in MIR program",
+                radix_mir::names::NO_ENTRY_FUNCTION,
             )]
         })
 }

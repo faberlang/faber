@@ -508,6 +508,7 @@ fn admit_device_session(
     let receipt = discovery_receipt(&opened);
     let backend = match receipt.class {
         DeviceClass::Backend(DeviceBackend::Metal) => DeviceImageBackend::Metal,
+        DeviceClass::Backend(DeviceBackend::Cuda) => DeviceImageBackend::Cuda,
         other => {
             return Err(vec![
                 mir_issue_diag(
@@ -595,7 +596,7 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     let entry = names
         .explicit_entry_function()
         .map(|function| function.id)
-        .ok_or_else(|| vec![mir_diag(input, "no entry function in MIR program")])?;
+        .ok_or_else(|| vec![mir_diag(input, radix_mir::names::NO_ENTRY_FUNCTION)])?;
     let extents = image.extents;
     let genus_layouts = image.genus_layouts;
     let fault_sites = image.fault_sites;
@@ -608,6 +609,9 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     )
     .map_err(|error| vec![host_error_diagnostic(&error)])?;
     dispatcher.borrow_mut().set_omissions(omissions);
+    dispatcher
+        .borrow_mut()
+        .set_scalars_by_buffer(backend == super::device::DeviceImageBackend::Cuda);
     dispatcher.borrow_mut().set_extents(extents);
     super::device::install_fault_sites(&fault_sites, |entry, sites| {
         dispatcher.borrow_mut().set_fault_sites(entry, sites);
@@ -673,12 +677,19 @@ fn lowered_declares_kernels(lowered: &radix::module::mir::LoweredMirUnit<'_>) ->
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 const DEVICE_RUN_MEMORY_BUDGET_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 
-/// Register the system device runtimes this build and platform provide
-/// (Metal on macOS). CUDA joins when its per-kernel image backend lands.
+/// Register the system device runtimes this machine provides: Metal on
+/// macOS when a Metal device opens, and CUDA wherever the CUDA driver
+/// library (`libcuda`, loaded at run time) is present. A machine without a
+/// driver registers no CUDA runtime, so `--device cuda` fails closed with
+/// `E_DEVICE_UNAVAILABLE`; with a driver but no usable device, admission fails
+/// closed with `E_DEVICE_NONE_ADMITTED`. CUDA discovery (`cuInit`) runs only
+/// when a device is opened, so a run without kernels does not pay for it.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub fn system_device_registry() -> radix_device_core::registry::DeviceRegistry {
-    #[allow(unused_mut)]
     let mut registry = radix_device_core::registry::DeviceRegistry::new();
+    if radix_device_cuda::driver_library_present() {
+        registry.register(Box::new(radix_device_cuda::system_runtime()));
+    }
     #[cfg(target_os = "macos")]
     if let Some(info) = radix_device_metal::system_devices().into_iter().next()
         && let Ok(driver) = radix_device_metal::SystemMetalDriver::open(info.registry_id)
