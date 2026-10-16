@@ -5428,6 +5428,30 @@ incipit {
 }
 
 #[test]
+fn arrowless_do_closure_head_lowers_without_return_clause() {
+    let dump = dump_source(
+        r"incipit {
+  sit (numerus) → vacuum p ← numerus n ∴ fac { nota n }
+  p(5)
+  varia numerus total ← 0
+  sit (numerus) → vacuum adde ← numerus n ∴ fac { total ← total + n }
+  adde(21)
+  nota total
+}",
+    );
+    assert!(
+        dump.contains("const function f"),
+        "the capture-free closure constant lowers:\n{dump}"
+    );
+    assert!(
+        dump.contains("construct closure_env env"),
+        "the capturing closure lowers:\n{dump}"
+    );
+    assert!(dump.contains("call closure f"), "the capturing closure call lowers:\n{dump}");
+    assert!(dump.contains("const int 21"), "the argument literal lowers:\n{dump}");
+}
+
+#[test]
 // ===========================================================================
 // Section K: Generic monomorphization & explicit type args
 // ===========================================================================

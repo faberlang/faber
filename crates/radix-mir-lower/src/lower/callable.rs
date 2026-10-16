@@ -31,7 +31,7 @@ impl FunctionBuilder<'_> {
     ) -> Option<MirOperand> {
         let return_ty = ret_ty
             .map(|ty| MirType::semantic(*ty))
-            .or_else(|| self.infer_closure_return_ty(body))?;
+            .or_else(|| self.infer_closure_return_ty(body, expr))?;
         let captures = self.collect_closure_captures(params, body);
         let function_id = self.lower_closure_from_parts(
             params,
@@ -412,13 +412,37 @@ impl FunctionBuilder<'_> {
         MirOperand::Temp(destination)
     }
 
-    fn infer_closure_return_ty(&self, body: &HirExpression) -> Option<MirType> {
+    /// Return type for an arrowless closure head.
+    ///
+    /// The head-derived type is the block's tail expression, or the body's own
+    /// type when the body is not a block. When neither is present the closure
+    /// expression's annotated callable type supplies the return (a binding such
+    /// as `let (int) → void f ← int n ∴ do { … }`). A statement-only `do`/`fac`
+    /// body with no annotation performs statements and returns nothing.
+    fn infer_closure_return_ty(&self, body: &HirExpression, expr: &HirExpression) -> Option<MirType> {
+        let head_ty = match &body.kind {
+            HirExpressionKind::Block(block) => block.expr.as_ref().and_then(|tail| tail.ty),
+            _ => body.ty,
+        };
+        if let Some(head_ty) = head_ty {
+            return Some(MirType::semantic(head_ty));
+        }
+        if let Some(return_ty) = self.closure_annotation_return_ty(expr) {
+            return Some(return_ty);
+        }
         match &body.kind {
-            HirExpressionKind::Block(block) => block
-                .expr
-                .as_ref()
-                .and_then(|expr| expr.ty.map(MirType::semantic)),
-            _ => body.ty.map(MirType::semantic),
+            HirExpressionKind::Block(_) => Some(MirType::semantic(self.types.primitive(Primitive::Vacuum))),
+            _ => None,
+        }
+    }
+
+    /// The return type a callable-typed closure expression carries from its binding
+    /// annotation, when it is a function type.
+    fn closure_annotation_return_ty(&self, expr: &HirExpression) -> Option<MirType> {
+        let ty = expr.ty?;
+        match self.normalized_type(ty) {
+            Type::Func(signature) => Some(MirType::semantic(signature.ret)),
+            _ => None,
         }
     }
 
