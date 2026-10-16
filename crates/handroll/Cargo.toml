@@ -2,6 +2,7 @@
 name = "handroll"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 # std-only, zero dependencies — enforced by manifest_is_std_only (U5a).
 [dependencies]
