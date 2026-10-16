@@ -5067,6 +5067,10 @@ message = "expected ')' after the call arguments"
 [diagnostics.PARSE001.issues.index_end]
 message = "expected ']' after the index expression"
 
+[diagnostics.PARSE001.issues.index_coordinate_comma]
+message = "index unam tantum expressionem accipit; coordinatae separatae singula per axem non sunt"
+help = "scribe coordinatas in lista unica, sicut m[[r, c]]"
+
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "expected ']' after the gradient selectors"
 

@@ -3874,6 +3874,10 @@ message = "ต้องมี ')' หลังอาร์กิวเมนต�
 [diagnostics.PARSE001.issues.index_end]
 message = "ต้องมี ']' หลังนิพจน์ดัชนี"
 
+[diagnostics.PARSE001.issues.index_coordinate_comma]
+message = "วงเล็บดัชนีรับเพียงหนึ่งนิพจน์; พิกัดที่แยกจากกันไม่ใช่ช่องต่อแกน"
+help = "เขียนพิกัดเป็นรายการในวงเล็บ เช่น m[[r, c]]"
+
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "ต้องมี ']' หลัง gradient selector"
 

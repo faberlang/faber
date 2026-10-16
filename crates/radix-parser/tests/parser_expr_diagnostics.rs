@@ -13,10 +13,11 @@ use std::path::PathBuf;
 const LOCALES: [&str; 8] = ["en", "la", "ar", "hi", "vi", "th-TH", "zh-Hans", "zh-Hant"];
 
 /// Minimal broken source per expression-level token contract.
-const EXPR_CASES: [(&str, &str); 30] = [
+const EXPR_CASES: [(&str, &str); 31] = [
     ("conditional_else_marker", "sit _ x ← a ✓ b"),
     ("call_arguments_end", "sit _ x ← f(1"),
     ("index_end", "sit _ x ← a[1"),
+    ("index_coordinate_comma", "sit _ x ← a[1, 2"),
     ("gradient_selectors_end", "sit _ x ← loss(x) ∇ [x"),
     ("optional_index_end", "sit _ x ← a?[1"),
     ("optional_call_arguments_end", "sit _ x ← a?(1"),

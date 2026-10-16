@@ -3818,6 +3818,10 @@ message = "cần ')' sau các đối số lời gọi"
 [diagnostics.PARSE001.issues.index_end]
 message = "cần ']' sau biểu thức chỉ mục"
 
+[diagnostics.PARSE001.issues.index_coordinate_comma]
+message = "ngoặc chỉ mục chỉ nhận một biểu thức; các tọa độ tách rời không phải ô theo từng trục"
+help = "viết tọa độ thành một danh sách trong ngoặc, chẳng hạn m[[r, c]]"
+
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "cần ']' sau các gradient selector"
 

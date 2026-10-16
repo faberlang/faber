@@ -3874,6 +3874,10 @@ message = "call arguments के बाद ')' अपेक्षित है"
 [diagnostics.PARSE001.issues.index_end]
 message = "index expression के बाद ']' अपेक्षित है"
 
+[diagnostics.PARSE001.issues.index_coordinate_comma]
+message = "index कोष्ठक एक ही व्यंजक लेता है; अलग-अलग निर्देशांक प्रति-अक्ष स्थान नहीं हैं"
+help = "निर्देशांक को कोष्ठक में सूची के रूप में लिखें, जैसे m[[r, c]]"
+
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "gradient selectors के बाद ']' अपेक्षित है"
 

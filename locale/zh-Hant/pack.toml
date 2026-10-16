@@ -3862,6 +3862,10 @@ message = "呼叫引數後需要 ')'"
 [diagnostics.PARSE001.issues.index_end]
 message = "索引運算式後需要 ']'"
 
+[diagnostics.PARSE001.issues.index_coordinate_comma]
+message = "索引括號只接受一個運算式；分開的座標不是按軸的槽位"
+help = "把座標寫成帶括號的清單，例如 m[[r, c]]"
+
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "gradient 選擇器後需要 ']'"
 
