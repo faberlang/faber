@@ -144,6 +144,10 @@ pub struct FieldOrder<'a> {
     /// `bN` per its static type: it prints as hexadecimal at the full width.
     /// Reset per field and per element, where the declared type decides.
     pub bits: Option<radix_types::BitsWidth>,
+    /// The value being shown is (or holds, through collections) an
+    /// `intervallum` per its static type: its tuple-shaped carrier renders as
+    /// the interval construction literal (`2‥9`) rather than debug text.
+    pub interval: bool,
 }
 
 impl<'a> FieldOrder<'a> {
@@ -164,7 +168,15 @@ impl<'a> FieldOrder<'a> {
             tuple: None,
             bits_fields: &NO_BITS_FIELDS,
             bits: None,
+            interval: false,
         }
+    }
+
+    /// The same metadata for a value whose static type is (or holds) an
+    /// `intervallum`.
+    #[must_use]
+    pub fn with_interval(self, interval: bool) -> Self {
+        Self { interval, ..self }
     }
 
     /// The same metadata for a value whose static type is (or holds) a `bN`.
@@ -1606,12 +1618,19 @@ impl Value {
                     )?
                 }
             }
-            Value::Tuple(items) => match order.tuple {
-                Some(parts) => display_tuple(items, parts, interner, order, span)?,
-                // No tuple shape: an interval (the same carrier) or a value
-                // whose type the caller could not resolve.
-                None => format!("{self:?}"),
-            },
+            Value::Tuple(items) => {
+                if order.interval
+                    && let Some(rendered) = display_interval(items, interner, order, span)?
+                {
+                    rendered
+                } else if let Some(parts) = order.tuple {
+                    display_tuple(items, parts, interner, order, span)?
+                } else {
+                    // No interval or tuple shape: a value whose type the
+                    // caller could not resolve.
+                    format!("{self:?}")
+                }
+            }
             Value::Set(cell) => display_set(&cell.borrow(), interner, order, span, float_width)?,
             Value::GradientHandle(id) => format!("gradient-handle#{id}"),
             Value::Cursor(_) => "cursor".to_owned(),
@@ -1660,6 +1679,36 @@ impl Value {
             _ => false,
         }
     }
+}
+
+/// Render an interval carrier as its construction literal: `[start, end,
+/// Bool(inclusive)]` prints `2‥9` (exclusive) or `2…9` (inclusive), and a
+/// trailing step adds ` per 2`. Each part renders through the scalar display
+/// arms, so it reads exactly as the same value printed bare. The declared
+/// interval type supplies the shape; a carrier that does not match returns
+/// `None`, and the caller falls back to the existing display.
+fn display_interval(
+    items: &[Value],
+    interner: &Interner,
+    order: FieldOrder<'_>,
+    span: Span,
+) -> Result<Option<String>, RunnerError> {
+    let (start, end, inclusive, step) = match items {
+        [start, end, Value::Bool(inclusive)] => (start, end, *inclusive, None),
+        [start, end, Value::Bool(inclusive), step] => (start, end, *inclusive, Some(step)),
+        _ => return Ok(None),
+    };
+    let glyph = if inclusive { '…' } else { '‥' };
+    let order = order.with_interval(false);
+    let start = start.display_typed(interner, order, span, None)?;
+    let end = end.display_typed(interner, order, span, None)?;
+    let mut text = format!("{start}{glyph}{end}");
+    if let Some(step) = step {
+        let step = step.display_typed(interner, order, span, None)?;
+        text.push_str(" per ");
+        text.push_str(&step);
+    }
+    Ok(Some(text))
 }
 
 /// Render a tuple as `iuncta [a, b]`: each element is a composite member shown
@@ -3040,6 +3089,7 @@ pub fn format_template(
         char_text,
         &[],
         &[],
+        &[],
         interner,
         order,
         span,
@@ -3055,6 +3105,7 @@ pub fn format_template_shaped(
     char_text: &[bool],
     tuples: &[Option<TupleParts>],
     bits: &[Option<radix_types::BitsWidth>],
+    intervals: &[bool],
     interner: &Interner,
     order: FieldOrder<'_>,
     span: Span,
@@ -3090,7 +3141,8 @@ pub fn format_template_shaped(
                 let order = order
                     .with_char_text(chars)
                     .with_tuple(tuple)
-                    .with_bits(bits.get(arg_index).copied().flatten());
+                    .with_bits(bits.get(arg_index).copied().flatten())
+                    .with_interval(intervals.get(arg_index).copied().unwrap_or(false));
                 arg.display_typed(interner, order, span, width)
             })
             .transpose()?

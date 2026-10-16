@@ -763,6 +763,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             tuple: None,
             bits_fields: &self.field_bits_widths,
             bits: None,
+            interval: false,
             char_text: false,
             names: &self.context.display_names,
             tokens: self.display_tokens(),
@@ -857,6 +858,27 @@ fn holds_littera(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
         | Type::Sparsa(elem, _)
         | Type::Array(elem)
         | Type::BoundedArray { element: elem, .. } => holds_littera(*elem, types, depth + 1),
+        _ => false,
+    }
+}
+
+/// Whether `ty` is (or holds, through collections and options) an
+/// `intervallum`: such a value carries its interval as a tuple-shaped
+/// `Value::Tuple` and prints as its construction literal (`2‥9`).
+fn holds_interval(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
+    if depth > 8 {
+        return false;
+    }
+    match types.get(ty) {
+        Type::Intervallum(_) => true,
+        Type::Map(_, elem) | Type::Option(elem) => holds_interval(*elem, types, depth + 1),
+        Type::Queue(elem) | Type::Stack(elem) => holds_interval(*elem, types, depth + 1),
+        Type::Vector(elem, _)
+        | Type::Matrix(elem, _)
+        | Type::Tensor(elem, _)
+        | Type::Sparsa(elem, _)
+        | Type::Array(elem)
+        | Type::BoundedArray { element: elem, .. } => holds_interval(*elem, types, depth + 1),
         _ => false,
     }
 }
@@ -2698,6 +2720,14 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     fn operand_holds_littera(&self, operand: &MirOperand) -> bool {
         self.operand_static_type(operand)
             .is_some_and(|ty| holds_littera(ty, self.types, 0))
+    }
+
+    /// Whether a diagnostic operand's static type is (or holds) an
+    /// `intervallum`, so its tuple-shaped carrier renders as the interval
+    /// construction literal rather than a debug tuple.
+    fn operand_holds_interval(&self, operand: &MirOperand) -> bool {
+        self.operand_static_type(operand)
+            .is_some_and(|ty| holds_interval(ty, self.types, 0))
     }
 
     /// Static semantic type of an operand, resolving field and element
