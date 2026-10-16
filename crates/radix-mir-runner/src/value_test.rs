@@ -1321,3 +1321,59 @@ fn enum_variant_map_key_distinct_defs_distinct() {
     assert_eq!(map.get(&first), Some(&Value::Int(1)));
     assert_eq!(map.get(&second), Some(&Value::Int(2)));
 }
+
+/// Q-L3 (audit GAPS #13): an `intervallum` carries its bounds as a tuple-shaped
+/// `Value::Tuple`, but its static type makes it print as the construction
+/// literal — `2‥9` exclusive, `2…9` inclusive, a trailing step as ` per 2`.
+#[test]
+fn interval_displays_its_construction_literal() {
+    let interner = radix_lexer::Interner::new();
+    let empty = rustc_hash::FxHashMap::default();
+    let display = |value: &Value, order: FieldOrder<'_>| {
+        value
+            .display(&interner, order, Span::default())
+            .expect("interval display")
+    };
+    let exclusive = Value::Tuple(vec![Value::Int(2), Value::Int(9), Value::Bool(false)]);
+    assert_eq!(
+        display(
+            &exclusive,
+            FieldOrder::new(&empty, &empty).with_interval(true)
+        ),
+        "2‥9"
+    );
+    let inclusive = Value::Tuple(vec![Value::Int(2), Value::Int(9), Value::Bool(true)]);
+    assert_eq!(
+        display(
+            &inclusive,
+            FieldOrder::new(&empty, &empty).with_interval(true)
+        ),
+        "2…9"
+    );
+    let empty_interval = Value::Tuple(vec![Value::Int(5), Value::Int(5), Value::Bool(false)]);
+    assert_eq!(
+        display(
+            &empty_interval,
+            FieldOrder::new(&empty, &empty).with_interval(true)
+        ),
+        "5‥5"
+    );
+    let stepped = Value::Tuple(vec![
+        Value::Int(2),
+        Value::Int(9),
+        Value::Bool(false),
+        Value::Int(2),
+    ]);
+    assert_eq!(
+        display(
+            &stepped,
+            FieldOrder::new(&empty, &empty).with_interval(true)
+        ),
+        "2‥9 per 2"
+    );
+    // Without the declared-interval flag the carrier keeps its debug text.
+    assert_eq!(
+        display(&exclusive, FieldOrder::new(&empty, &empty)),
+        format!("{exclusive:?}")
+    );
+}
