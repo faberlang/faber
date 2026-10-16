@@ -10,7 +10,7 @@ use super::{
     RunnerKernelPolicy, Symbol, TypeTable, TypeTableSnapshot, bind_fmir_text_runtime_cli,
     check_fmir_runtime_requirements, decode_binary_image, decode_text_image, encode_binary_image,
     encode_text_image, fnv64_hex, fs, mir_diag, mir_issue_diag, relative_or_display,
-    run_entry_with_kernel_policy, run_entry_with_stats_and_kernel_policy, runner_diagnostics,
+    run_entry_with_process_exit, run_entry_with_stats_and_kernel_policy, runner_diagnostics,
     source_identity,
 };
 
@@ -326,7 +326,7 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
                 .map(|error| mir_diag(&image.diagnostic_path, error.message))
                 .collect::<Vec<_>>()
         })?;
-    run_entry_with_kernel_policy(&validated, host, kernel_policy)
+    run_entry_with_process_exit(&validated, host, kernel_policy)
         .map_err(|errors| runner_diagnostics(&image.diagnostic_path, errors))?;
     if let Some(code) = image.exit_code {
         host.exit(code);
@@ -384,10 +384,18 @@ pub(super) fn run_fmir_package_image_with_stats<H: Host + ?Sized>(
     let result = outcome
         .result
         .map_err(|errors| runner_diagnostics(&image.diagnostic_path, errors));
-    if result.is_ok()
-        && let Some(code) = image.exit_code
-    {
-        host.exit(code);
+    if result.is_ok() {
+        // Ruling Q-T8: the entry tail lowered by the MIR entry pass evaluates
+        // the exit expression, so a `numerus` return becomes the process
+        // status. The serialized constant stays the fallback for images whose
+        // entry returns vacuum (pre-existing `exit <literal>` artifacts).
+        if let Some(radix_mir_runner::Value::Int(code)) = outcome.return_value {
+            #[allow(clippy::cast_possible_truncation)]
+            let exit_code = code as i32;
+            host.exit(exit_code);
+        } else if let Some(code) = image.exit_code {
+            host.exit(code);
+        }
     }
     Ok(PackageRunStats {
         stats: outcome.stats,
