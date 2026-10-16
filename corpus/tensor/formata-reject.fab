@@ -1,0 +1,37 @@
++++
+term = "tensor"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "vel_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Rejected route: a formata reshape whose target element count differs from the receiver."
+syntax = "tensor.formata<figura>() — rejected when the target element count differs"
+related = ["tensor", "fractus", "lista"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:tensor_formata_element_count_mismatch"
++++
+
+# =============================================================================
+# tensor — formata reshape with a mismatched element count is rejected
+# =============================================================================
+#
+# What this teaches:
+#   • A `formata` reshape is a reinterpretation of the same elements: the
+#     target Figura's element count must equal the receiver's, checked at
+#     compile time (SEM010 tensor_formata_element_count_mismatch).
+#   • The checker refuses a mismatch rather than padding or truncating.
+#
+# Common mistakes:
+#   • expecting `formata` to resize — reshaping [1,2,3,4,5,6] (six elements) to
+#     4x2 (eight elements) has no defined fill, so it is a compile error.
+# =============================================================================
+
+main {
+    let list<f32> l ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[2, 3] data ← l ↦ tf32[2, 3]
+
+    # 8 elements requested from a 6-element receiver: rejected.
+    let tf32[4, 2] view ← data.formata<tf32[4, 2]>()
+    print view.flatten()
+}

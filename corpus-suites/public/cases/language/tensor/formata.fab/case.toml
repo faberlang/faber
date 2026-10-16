@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/formata.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/formata.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
