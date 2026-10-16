@@ -57,6 +57,8 @@ mod enumeration_test;
 #[cfg(test)]
 mod float32_test;
 #[cfg(test)]
+mod float_math_test;
+#[cfg(test)]
 mod item_test;
 #[cfg(test)]
 mod list_test;

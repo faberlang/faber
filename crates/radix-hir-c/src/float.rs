@@ -17,7 +17,7 @@ use radix_codegen_shared::CodegenError;
 use radix_hir::{HirBinOp, HirCallArg};
 use radix_intrinsics::IntrinsicMirKind;
 use radix_lexer::Symbol;
-use radix_types::{MirCollectionOp, TypeId};
+use radix_types::{MirCollectionOp, MirMathFunction, TypeId};
 
 /// A binary64 value as a C literal. Rust's `{:?}` writes the shortest
 /// round-trip digits (`0.1`, `1e300`, `100.0`), every one a valid C double
@@ -204,12 +204,82 @@ impl Emitter<'_> {
             IntrinsicMirKind::Collection(MirCollectionOp::Ceiling) => "faber_ceil_i64",
             IntrinsicMirKind::Collection(MirCollectionOp::Round) => "faber_nearest_i64",
             IntrinsicMirKind::Collection(MirCollectionOp::Truncate) => "faber_trunc_i64",
+            IntrinsicMirKind::Collection(MirCollectionOp::ScalarMath(function)) => {
+                return Ok(self.float_math(function, &receiver, is32, float_value));
+            }
+            IntrinsicMirKind::Collection(MirCollectionOp::Approximate) => {
+                return self.float_approx(receiver, args);
+            }
             _ => return self.float_value_method(entry.mir_kind, receiver, suffix, float_value, args),
         };
         self.support.need(Helper::Float);
         self.support.need_ints();
         let effect = receiver.effect;
         Ok(Operand::new(format!("{helper}({})", receiver.text), Value::Int).with_effect(effect))
+    }
+
+    /// `x.sqrt()`, `x.exp()`, `x.ln()`, `x.log10()`, `x.sin()`, `x.cos()`,
+    /// `x.tan()` (and `x.abs()` if the catalog routes it here): the libm
+    /// function at the declared width, which the runner's `f32`/`f64` method
+    /// calls on this host.
+    fn float_math(
+        &mut self,
+        function: MirMathFunction,
+        receiver: &Operand,
+        is32: bool,
+        float_value: Value,
+    ) -> Operand {
+        self.support.need(Helper::Float);
+        let base = match function {
+            MirMathFunction::Abs => "fabs",
+            MirMathFunction::Sqrt => "sqrt",
+            MirMathFunction::Exp => "exp",
+            MirMathFunction::Ln => "log",
+            MirMathFunction::Log10 => "log10",
+            MirMathFunction::Sin => "sin",
+            MirMathFunction::Cos => "cos",
+            MirMathFunction::Tan => "tan",
+        };
+        let call = if is32 {
+            format!("{base}f({})", receiver.text)
+        } else {
+            format!("{base}({})", receiver.text)
+        };
+        Operand::new(call, float_value).with_effect(receiver.effect)
+    }
+
+    /// `x.approx(y, tolerance)`: `|x − y| <= tolerance`, every operand
+    /// promoted to binary64, the runner's `approximate_fractus` three-arg
+    /// form.
+    fn float_approx(
+        &mut self,
+        receiver: Operand,
+        args: &[HirCallArg],
+    ) -> Result<Operand, CodegenError> {
+        let [other, tolerance] = args else {
+            return Err(unsupported("approximate comparison arity"));
+        };
+        let other = self.expr(&other.expr)?;
+        let tolerance = self.expr(&tolerance.expr)?;
+        let numeric = |operand: &Operand| {
+            matches!(
+                operand.value,
+                Value::Int | Value::Exact | Value::Float | Value::Float32
+            )
+        };
+        if !numeric(&other) || !numeric(&tolerance) {
+            return Err(unsupported("approximate comparison of a non-numeric value"));
+        }
+        self.support.need(Helper::Float);
+        let effect = receiver.effect || other.effect || tolerance.effect;
+        let mut operands = [receiver, other, tolerance];
+        let prelude = self.sequence(&mut operands);
+        let [receiver, other, tolerance] = operands;
+        let call = format!(
+            "(fabs((double){} - (double){}) <= (double){})",
+            receiver.text, other.text, tolerance.text
+        );
+        Ok(Operand::new(wrap(&prelude, &call), Value::Truth).with_effect(effect))
     }
 
     /// `x.potentia(n)`: IEEE 754 `pow`, no domain guard (`f64::powf`).

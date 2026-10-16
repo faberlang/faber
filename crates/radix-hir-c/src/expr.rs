@@ -1288,13 +1288,29 @@ impl Emitter<'_> {
 
     /// `≈` / `≉`: `10^9 · |a − b| ≤ max(|a|, |b|)` between integers, the same
     /// tolerance rule between floats. Both sides are the same family.
-    fn fuzzy(&mut self, op: HirBinOp, l: Operand, r: Operand) -> Result<Operand, CodegenError> {
+    fn fuzzy(&mut self, op: HirBinOp, mut l: Operand, mut r: Operand) -> Result<Operand, CodegenError> {
+        let is_float = |value: Value| matches!(value, Value::Float | Value::Float32);
         let name = if l.is_integer() && r.is_integer() {
             "faber_approx_int"
-        } else if matches!(l.value, Value::Float | Value::Float32)
-            && matches!(r.value, Value::Float | Value::Float32)
-        {
+        } else if is_float(l.value) && is_float(r.value) {
             if l.value == Value::Float32 {
+                "faber_approx_f32"
+            } else {
+                "faber_approx_f64"
+            }
+        } else if l.is_integer() || r.is_integer() {
+            // An integer against a float joins the float's width: the runner
+            // converts the integer to the joined width before the rule.
+            let is32 = (is_float(l.value) && l.value == Value::Float32)
+                || (is_float(r.value) && r.value == Value::Float32);
+            let cast = if is32 { "float" } else { "double" };
+            if l.is_integer() {
+                l.text = format!("(({cast}){})", l.text);
+            }
+            if r.is_integer() {
+                r.text = format!("(({cast}){})", r.text);
+            }
+            if is32 {
                 "faber_approx_f32"
             } else {
                 "faber_approx_f64"
