@@ -1,0 +1,56 @@
++++
+term = "tensor"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "vel_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Tensor view reshape with static element-count checking."
+syntax = "tensor.formata<figura>()"
+related = ["tensor", "fractus", "lista"]
+locale = "en"
++++
+
+# =============================================================================
+# tensor — Tensor view reshape with static element-count checking.
+# =============================================================================
+#
+# What this teaches:
+#   • View reshape — `formata` reinterprets the same elements under a new Figura
+#     without copying, row-major.
+#   • Static count check — the target element count must equal the receiver's,
+#     so a rank-2 ↔ rank-1 reshape is accepted only when the counts match.
+#
+# Common mistakes:
+#   • naming a target shape with a different element count (rejected: the
+#     checker refuses the reshape rather than padding or truncating)
+#
+# See also: tensor, fractus, lista
+# =============================================================================
+
+# tensor — formata view reshape
+#
+# WHY: `formata` is the zero-copy reshape on a tensor's own elements. The
+# target Figura is a type argument, so the element count is checked at
+# compile time and a mismatch is a refusal, not a runtime pad or truncate.
+#
+# data = [1,2,3,4,5,6] as 2x3
+# data.formata<tf32[3, 2]>()  →  3x2 view of the same six elements
+# data.formata<tf32[6]>()     →  1-d view of the same six elements
+#
+# EXPECTED stdout:
+#   [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+#   [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+
+main {
+    let list<f32> l ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[2, 3] data ← l ↦ tf32[2, 3]
+
+    # Reinterpret the same six elements as 3x2 (row-major) and read them back
+    # flat.
+    let tf32[3, 2] view ← data.formata<tf32[3, 2]>()
+    print view.flatten()
+
+    # The rank-1 target has the same element count, so it is accepted too.
+    let tf32[6] flat ← data.formata<tf32[6]>()
+    print flat.flatten()
+}
