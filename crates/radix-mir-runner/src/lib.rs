@@ -593,13 +593,17 @@ enum StatementOutcome {
 /// returned as the outer `Err`, while runtime failures are retained alongside
 /// the completed statistics snapshot so callers can emit diagnostics and the
 /// artifact together.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RunnerRunOutcome {
     pub result: Result<(), Vec<RunnerError>>,
     pub stats: RunnerStats,
     /// Conversation router slots (D8.3), read after every frame closed, so
     /// `live` counts conversations the last-reference net did not release.
     pub conversations: sermo::ConversationLedger,
+    /// The entry's returned value, when the run completed a `Return` that
+    /// carried one. `None` for a vacuum return, a `ReturnError` (the trap
+    /// carries the failure instead), or a run that failed before returning.
+    pub return_value: Option<Value>,
 }
 
 pub(crate) struct Runner<'a, H: Host + ?Sized> {
@@ -976,6 +980,46 @@ pub fn run_entry_with_kernel_policy<H: Host + ?Sized>(
 ) -> Result<(), Vec<RunnerError>> {
     let entry = explicit_entry_id(validated)?;
     run_function_with_kernel_policy(validated, entry, host, kernel_policy)
+}
+
+/// [`run_entry`] for a process host: after the body completes normally, the
+/// expression is evaluated and becomes the process exit status; a trap or
+/// unhandled failure still exits with the trap's code.
+///
+/// A trap aborts the frame before the tail `Return` runs, so no exit status is
+/// applied for it — the trap's own code already reached the host. A successful
+/// entry that returns a `numerus` hands its value to [`Host::exit`]; a vacuum
+/// entry returns `Ok(())` without exiting.
+///
+/// # Errors
+///
+/// Returns a list of runner errors if the program cannot be executed or the
+/// entry fails at run time.
+pub fn run_entry_with_process_exit<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    host: &mut H,
+    kernel_policy: RunnerKernelPolicy,
+) -> Result<(), Vec<RunnerError>> {
+    let entry = explicit_entry_id(validated)?;
+    let outcome = run_function_with_explicit_limits_and_stats(
+        validated,
+        entry,
+        host,
+        None,
+        None,
+        false,
+        kernel_policy,
+    )?;
+    outcome.result?;
+    if let Some(Value::Int(code)) = outcome.return_value {
+        // WHY: a process exit status is `i32`, while the Faber `numerus`
+        // carrier is `i64`; the host truncates exactly as the trap path's
+        // `exit_code_from_i32` does.
+        #[allow(clippy::cast_possible_truncation)]
+        let exit_code = code as i32;
+        host.exit(exit_code);
+    }
+    Ok(())
 }
 
 /// Run a specific MIR function to completion, unbounded, under an explicit
@@ -1439,10 +1483,12 @@ fn run_function_dispatching<H: Host + ?Sized>(
     };
     let stats = runner.take_stats().unwrap_or_default();
     let conversations = runner.conversation_slots.ledger();
+    let return_value = runner.return_value.take();
     Ok(RunnerRunOutcome {
         result,
         stats,
         conversations,
+        return_value,
     })
 }
 
@@ -4005,6 +4051,10 @@ fn regex_pattern(pattern: &str, flags: Option<&str>) -> String {
         format!("(?{mapped}){pattern}")
     }
 }
+
+#[cfg(test)]
+#[path = "entry_exit_test.rs"]
+mod entry_exit_tests;
 
 #[cfg(test)]
 #[path = "lib_test.rs"]
