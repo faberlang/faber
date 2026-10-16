@@ -35,6 +35,22 @@ fn rejects(handlers: &str, body: &str, issue: &str) {
 // ---- call-site typing and inference ----
 
 #[test]
+fn sermo_handler_failure_channel_composes_text() {
+    const FAILING_HANDLER: &str =
+        "@ ad 'm:fail'\nfunctio fail(numerus n) → numerus ⇥ textus { iace \"malum §\"(n) }\n";
+    accepts(
+        &format!(
+            "{FAILING_HANDLER}functio wrap() → numerus ⇥ textus {{\n    sit numerus b ← ad 'm:fail' (4) ↦ numerus\n    redde b\n}}\n"
+        ),
+        "fac {\n    sit numerus r ← wrap()\n    nota r\n} cape err { }",
+    );
+    accepts(
+        FAILING_HANDLER,
+        "fac {\n    sit numerus b ← ad 'm:fail' (4) ↦ numerus\n    nota b\n} cape err { nota err }",
+    );
+}
+
+#[test]
 fn materialize_to_reply_type_is_accepted() {
     accepts(
         TEXT_TO_NUM,
