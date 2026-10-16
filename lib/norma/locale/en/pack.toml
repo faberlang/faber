@@ -842,3 +842,48 @@ module_path = ["process"]
 kind = "type"
 canonical = "Subprocess"
 surface = "Subprocess"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "open_pending"
+surface = "open_pending"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "open_pending"
+surface = "open_pending"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "finish_pending"
+surface = "finish_pending"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "function"
+canonical = "finish_pending"
+surface = "finish_pending"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http", "client"]
+kind = "type"
+canonical = "Request"
+surface = "Request"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http", "client"]
+kind = "type"
+canonical = "Request"
+surface = "Request"
