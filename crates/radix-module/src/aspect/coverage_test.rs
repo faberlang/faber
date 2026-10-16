@@ -32,7 +32,7 @@ fn check(status: HirAspectCheckStatus, summary: &str) -> HirAspectCheckResult {
         status,
         evidence: HirAspectEvidence(summary.to_owned()),
         counterexample: Vec::new(),
-        backend: HirAspectBackendKind::Tla,
+        backend: HirAspectBackendKind::Lean,
     }
 }
 
@@ -66,16 +66,13 @@ fn hir_aspect_coverage_maps_checker_results_without_hiding_absence() {
             status: HirAspectCheckStatus::Failed,
             evidence: HirAspectEvidence("Error: Invariant Totality is violated.".to_owned()),
             counterexample: vec!["State 1".to_owned()],
-            backend: HirAspectBackendKind::Tla,
+            backend: HirAspectBackendKind::Lean,
         },
-        check(
-            HirAspectCheckStatus::ToolchainMissing,
-            "the TLC jar path does not point to a file",
-        ),
-        check(HirAspectCheckStatus::Error, "unexpected TLC output"),
+        check(HirAspectCheckStatus::ToolchainMissing, "the lake binary is not on PATH"),
+        check(HirAspectCheckStatus::Error, "unexpected lake output"),
     ];
 
-    let coverage = summarize_hir_aspect_coverage(&report, &checks_list, HirAspectBackendKind::Tla);
+    let coverage = summarize_hir_aspect_coverage(&report, &checks_list, HirAspectBackendKind::Lean);
 
     assert_eq!(
         coverage
@@ -120,7 +117,7 @@ fn hir_aspect_coverage_renders_checked_and_trusted_assumptions_distinctly() {
             HirAspectKind::DiscerneOmnia,
             span(10, 15),
             Some(HirId(1)),
-            HirAspectBackendKind::Tla,
+            HirAspectBackendKind::Lean,
             HirAspectCoverageStatus::Proven,
             HirAspectCoverageReason::CheckerPassed,
             vec!["finite_enum_domain".to_owned()],
@@ -151,7 +148,7 @@ fn hir_aspect_coverage_rendering_is_deterministic() {
                 HirAspectKind::DiscerneOmnia,
                 span(30, 35),
                 Some(HirId(3)),
-                HirAspectBackendKind::Tla,
+                HirAspectBackendKind::Lean,
                 HirAspectCoverageStatus::Skipped,
                 HirAspectCoverageReason::SkippedCandidate(HirAspectReason::MissingScrutineeType),
                 Vec::new(),
@@ -160,7 +157,7 @@ fn hir_aspect_coverage_rendering_is_deterministic() {
                 HirAspectKind::DiscerneOmnia,
                 span(10, 15),
                 Some(HirId(1)),
-                HirAspectBackendKind::Tla,
+                HirAspectBackendKind::Lean,
                 HirAspectCoverageStatus::Proven,
                 HirAspectCoverageReason::CheckerPassed,
                 Vec::new(),
@@ -187,7 +184,7 @@ fn hir_aspect_coverage_failed_checker_render_includes_counterexample() {
             HirAspectKind::DiscerneOmnia,
             span(10, 15),
             Some(HirId(1)),
-            HirAspectBackendKind::Tla,
+            HirAspectBackendKind::Lean,
             HirAspectCoverageStatus::Failed,
             HirAspectCoverageReason::CheckerFailed {
                 summary: "Error: Invariant Totality is violated.".to_owned(),
@@ -218,7 +215,7 @@ fn hir_aspect_coverage_keeps_skipped_records_out_of_success() {
         )],
     );
 
-    let coverage = summarize_hir_aspect_coverage(&report, &[], HirAspectBackendKind::Tla);
+    let coverage = summarize_hir_aspect_coverage(&report, &[], HirAspectBackendKind::Lean);
 
     assert_eq!(coverage.entries()[0].status, HirAspectCoverageStatus::Skipped);
     assert_eq!(
@@ -230,7 +227,7 @@ fn hir_aspect_coverage_keeps_skipped_records_out_of_success() {
 #[test]
 fn hir_aspect_coverage_empty_report_has_no_entries() {
     let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![]);
-    let coverage = summarize_hir_aspect_coverage(&report, &[], HirAspectBackendKind::Tla);
+    let coverage = summarize_hir_aspect_coverage(&report, &[], HirAspectBackendKind::Lean);
 
     assert_eq!(coverage.entries().len(), 0);
 }
@@ -238,7 +235,7 @@ fn hir_aspect_coverage_empty_report_has_no_entries() {
 #[test]
 fn hir_aspect_coverage_empty_checks_list_maps_all_to_abstracted() {
     let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![recognized(1, 10)]);
-    let coverage = summarize_hir_aspect_coverage(&report, &[], HirAspectBackendKind::Tla);
+    let coverage = summarize_hir_aspect_coverage(&report, &[], HirAspectBackendKind::Lean);
 
     assert_eq!(coverage.entries().len(), 1);
     assert_eq!(coverage.entries()[0].status, HirAspectCoverageStatus::Abstracted);
@@ -253,7 +250,7 @@ fn hir_aspect_coverage_reports_timeout_distinctly_from_checker_error() {
         check(HirAspectCheckStatus::Error, "unexpected output"),
     ];
 
-    let coverage = summarize_hir_aspect_coverage(&report, &checks_list, HirAspectBackendKind::Tla);
+    let coverage = summarize_hir_aspect_coverage(&report, &checks_list, HirAspectBackendKind::Lean);
 
     assert_eq!(coverage.entries()[0].status, HirAspectCoverageStatus::Abstracted);
     assert!(matches!(

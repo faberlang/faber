@@ -595,7 +595,7 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     let entry = names
         .explicit_entry_function()
         .map(|function| function.id)
-        .ok_or_else(|| vec![mir_diag(input, "no entry function in MIR program")])?;
+        .ok_or_else(|| vec![mir_diag(input, radix_mir::names::NO_ENTRY_FUNCTION)])?;
     let extents = image.extents;
     let genus_layouts = image.genus_layouts;
     let fault_sites = image.fault_sites;

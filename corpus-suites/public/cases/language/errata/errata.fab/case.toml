@@ -7,8 +7,3 @@ input = "errata/errata.fab"
 
 [expect]
 check_only = true
-
-[targets.runner]
-outcome = "known-fail"
-phase = "run"
-diagnostic_contains = "no entry function in MIR program"

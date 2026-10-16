@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 339,
-    "analyzable": 443
+    "analyzable": 444
   },
   "terms": [
     {
@@ -889,7 +889,7 @@
       "term": "tensor",
       "rule": "type",
       "capable": 12,
-      "analyzable": 20
+      "analyzable": 21
     },
     {
       "term": "textus",

@@ -1,7 +1,7 @@
 //! HIR aspect recognition and reporting substrate.
 //!
 //! Aspects are small, named verification targets over checked HIR. This module
-//! owns the data-first report model, TLA emission, checker integration, and
+//! owns the data-first report model, Lean checker integration, and
 //! coverage summaries used before any public CLI behavior is exposed.
 
 mod air_mask_proof;
@@ -11,8 +11,6 @@ mod coverage;
 pub mod lean_checker;
 mod obligation;
 mod report;
-mod tla;
-pub(crate) mod tla_checker;
 mod verifier;
 
 pub use air_mask_proof::MaskNeutralityFamily;
@@ -31,6 +29,4 @@ pub use report::{
     HirAspectDetail, HirAspectKind, HirAspectNoSpanReason, HirAspectPrecondition, HirAspectReason, HirAspectRecord,
     HirAspectRecordKind, HirAspectReport, HirAspectSpan, report_hir_aspects, report_hir_aspects_with_interner,
 };
-pub use tla::{HirAspectTlaModule, emit_tla_modules};
-pub use tla_checker::{TlaAspectChecker, TlaAspectCheckerConfig, TlaAspectVerifier, check_tla_modules};
 pub use verifier::{HirAspectCheckResult, HirAspectCheckStatus, HirAspectEvidence, HirAspectVerifier};

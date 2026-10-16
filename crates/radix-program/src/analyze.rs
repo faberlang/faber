@@ -1647,6 +1647,7 @@ fn file_interfaces_for_file(
                     &target,
                     files_by_path,
                     library_resolver,
+                    library_cache,
                     analyzed_interfaces_by_path,
                     &mut transitive_visited,
                     &mut interfaces,
@@ -1690,11 +1691,19 @@ fn file_interfaces_for_file(
 /// binding but have no consumer HIR import binding, so they stay inert
 /// unless a snapshot resolves a nominal through them. A consumer's own
 /// direct binding for the same name always wins.
+///
+/// The target's library imports (and their transitive leaves) install the
+/// same way: a local module's public signature can name a library nominal the
+/// consumer never imports — `⇥ fault.IoFault` on a loader whose caller
+/// imports only the loader module. Without the library interface the
+/// canonical-identity lookup misses (`NominalIdentityUnknown`) and the whole
+/// export is skipped (WARN014), so the call types as unresolved.
 fn install_transitive_local_interfaces(
     spec: &PackageSpec,
     target: &Path,
     files_by_path: &BTreeMap<PathBuf, &PackageFile>,
     library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
     analyzed_interfaces_by_path: &BTreeMap<PathBuf, radix_module::file_interface::FileInterface>,
     visited: &mut BTreeSet<PathBuf>,
     interfaces: &mut BTreeMap<String, radix_module::file_interface::FileInterface>,
@@ -1710,10 +1719,20 @@ fn install_transitive_local_interfaces(
             continue;
         };
         let import_path = target_file.interner.resolve(decl.path);
-        let ImportResolution::Local(inner) =
-            resolve_import(spec, library_resolver, &target_file.path, import_path)
-        else {
-            continue;
+        let inner = match resolve_import(spec, library_resolver, &target_file.path, import_path) {
+            ImportResolution::Local(inner) => inner,
+            ImportResolution::Library(module) => {
+                if let Some(import) = library_import_binding(&target_file.interner, decl, module)
+                    && !interfaces.contains_key(&binding)
+                {
+                    interfaces.insert(
+                        binding,
+                        library_cached_file_interface(&import, library_resolver, library_cache)?,
+                    );
+                }
+                continue;
+            }
+            ImportResolution::Unsupported | ImportResolution::Error(_) => continue,
         };
         if !visited.insert(inner.clone()) {
             continue;
@@ -1731,10 +1750,19 @@ fn install_transitive_local_interfaces(
             &inner,
             files_by_path,
             library_resolver,
+            library_cache,
             analyzed_interfaces_by_path,
             visited,
             interfaces,
         )?;
+    }
+    for import in &target_file.expanded_library_imports {
+        if !interfaces.contains_key(&import.binding) {
+            interfaces.insert(
+                import.binding.clone(),
+                library_cached_file_interface(import, library_resolver, library_cache)?,
+            );
+        }
     }
     Ok(())
 }
