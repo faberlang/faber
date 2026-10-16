@@ -7,6 +7,7 @@ category = "logic"
 canonical = true
 summary = "Tests whether a value's runtime type is a given type."
 syntax = "<expression> est <type>"
+aliases = ["is"]
 related = ["non est", "≡"]
 locale = "en"
 +++
@@ -16,7 +17,7 @@ locale = "en"
 #
 # What this teaches:
 #   • Type checking — `<expr> est <type>` tests a valor's runtime variant tag without extraction.
-#   • Null checking — `<expr> est null` tests the null type (the null value is `null`).
+#   • Null checking — `<expr> is none` (la `est nihil`) tests the none type; the null value is `null` (la `nulla`).
 #   • Negation — `<expr> non est <type>` negates the type check.
 #   • Chaining — `est` composes with `et` and parenthesized expressions.
 #
@@ -29,7 +30,7 @@ locale = "en"
 
 # est — type and null checks
 #
-# <expr> est null       — null-type check (lowers to is_nil)
+# <expr> is none (la est nihil) — none-type check (lowers to is_nil)
 # <expr> est <type>      — variant tag check (lowers to matches!)
 # <expr> non est <type>  — negated variant tag check
 #
