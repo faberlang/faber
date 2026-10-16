@@ -29,12 +29,29 @@ pub(super) fn mir_error_diag(path: &Path, error: MirError) -> Diagnostic {
     if error.span == Span::default() {
         return diagnostic;
     }
-    match std::fs::read_to_string(path) {
-        Ok(source) => {
-            diagnostic.with_source_context(&path.display().to_string(), &source, error.span)
-        }
-        Err(_) => diagnostic.with_span(error.span),
+    match read_unit_source(path) {
+        Some((source, offset)) => diagnostic.with_source_context(
+            &path.display().to_string(),
+            &source,
+            shift_span(error.span, offset),
+        ),
+        None => diagnostic.with_span(error.span),
     }
+}
+
+/// The unit's raw file text and the byte offset of its peeled body. MIR spans
+/// are body-relative (the lexer saw the body after the `+++` frontmatter), so
+/// they are shifted by this offset before they index the raw file.
+fn read_unit_source(path: &Path) -> Option<(String, u32)> {
+    let raw = std::fs::read_to_string(path).ok()?;
+    let offset = radix_module::driver::peel_raw_source(&path.display().to_string(), &raw)
+        .ok()
+        .map_or(0, |peeled| peeled.body_byte_offset);
+    Some((raw, offset))
+}
+
+fn shift_span(span: Span, offset: u32) -> Span {
+    Span::new(span.start + offset, span.end + offset)
 }
 
 /// Package-lowering diagnostic for one MIR validation error: the unit file,
@@ -50,14 +67,18 @@ pub(super) fn mir_validation_diag(path: &Path, error: radix_mir::MirValidationEr
     if error.span == Span::default() {
         return diagnostic;
     }
-    match std::fs::read_to_string(path) {
-        Ok(source) if (error.span.start as usize) <= source.len() => {
-            diagnostic.with_source_context(&path.display().to_string(), &source, error.span)
+    match read_unit_source(path) {
+        Some((source, offset)) if ((error.span.start + offset) as usize) <= source.len() => {
+            diagnostic.with_source_context(
+                &path.display().to_string(),
+                &source,
+                shift_span(error.span, offset),
+            )
         }
-        Ok(_) => diagnostic
+        Some(_) => diagnostic
             .with_arg("span_start", error.span.start.to_string())
             .with_arg("span_end", error.span.end.to_string()),
-        Err(_) => diagnostic.with_span(error.span),
+        None => diagnostic.with_span(error.span),
     }
 }
 
