@@ -20,7 +20,7 @@ no_expected = "reads-stdin"
 #   • the `↦ regex` conversion — compiling a textus pattern into a regex value
 #
 # Common mistakes:
-#   • Not checking is null before using the value — read may return null at end of input.
+#   • Not checking `is none` before using the value — `lege` may return `null` at end of input.
 #
 # See also: lineam, scribe
 # =============================================================================

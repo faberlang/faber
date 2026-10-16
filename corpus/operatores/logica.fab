@@ -17,7 +17,7 @@ locale = "en"
 #
 # What this teaches:
 #   • Bitwise or — `∨` combines bit flags; distinct from logical short-circuit `aut` and `vel`.
-#   • Negated est — `non est` checks that a value is not null or not equal to a target.
+#   • Negated est — `not is` (la `non est`) checks that a value's runtime type is not the given type, e.g. `x not is none`.
 #
 # Common mistakes:
 #   • Confusing ∨ (bitwise or) with aut (exclusive or) or vel (inclusive or).
