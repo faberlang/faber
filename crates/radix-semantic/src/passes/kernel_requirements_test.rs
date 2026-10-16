@@ -178,7 +178,16 @@ fn nested_add_div(wrapping<i32> left, wrapping<i32> right) → bool {
 }
 ",
     );
-    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    let wide_intermediates = fixture
+        .diagnostics
+        .iter()
+        .filter(|error| error.issue() == Some("nucleum_wide_intermediate"))
+        .count();
+    assert_eq!(
+        wide_intermediates, 5,
+        "one check error per kernel: {:?}",
+        fixture.diagnostics
+    );
 
     let cases = [
         ("signed_sub", -4_294_967_295, 4_294_967_295),
@@ -270,7 +279,14 @@ functio caller(f32 value) → f32 {
 }
 ",
     );
-    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    assert!(
+        fixture
+            .diagnostics
+            .iter()
+            .any(|error| error.issue() == Some("nucleum_wide_integer")),
+        "wide_helper is a check error: {:?}",
+        fixture.diagnostics
+    );
 
     let helper = target_row(&fixture, "wide_helper", Target::MirMetal);
     assert!(!helper.admitted);
@@ -298,7 +314,14 @@ fn tensor_division(
 }
 ",
     );
-    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    assert!(
+        fixture
+            .diagnostics
+            .iter()
+            .any(|error| error.issue() == Some("nucleum_extent_unproven")),
+        "the unproven divisor extent is a check error: {:?}",
+        fixture.diagnostics
+    );
 
     let report = target_row(&fixture, "tensor_division", Target::MirMetal);
     assert!(!report.admitted);
@@ -407,7 +430,14 @@ functio widen(f32 value) → f64 {
 }
 ",
     );
-    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    assert!(
+        fixture
+            .diagnostics
+            .iter()
+            .any(|error| error.issue() == Some("nucleum_f64")),
+        "f64 is a check error: {:?}",
+        fixture.diagnostics
+    );
     let report = target_row(&fixture, "widen", Target::MirMetal);
     assert!(!report.admitted, "f64 must still be rejected on Metal");
 }
@@ -490,7 +520,14 @@ fn wide(f64 x) → f64 {
 }
 ",
     );
-    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    assert!(
+        fixture
+            .diagnostics
+            .iter()
+            .any(|error| error.issue() == Some("nucleum_f64")),
+        "f64 is a check error: {:?}",
+        fixture.diagnostics
+    );
     assert!(!target_row(&fixture, "wide", Target::MirMetal).admitted);
 }
 
@@ -546,15 +583,18 @@ main {}
 fn reduction_store_report(
     source: &str,
     name: &str,
-) -> crate::passes::kernel_requirements::KernelTargetRequirement {
+) -> (
+    crate::test_support::AnalyzedFixture,
+    crate::passes::kernel_requirements::KernelTargetRequirement,
+) {
     let fixture = analyze_en(source);
-    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
-    target_row(&fixture, name, Target::MirMetal).clone()
+    let report = target_row(&fixture, name, Target::MirMetal).clone();
+    (fixture, report)
 }
 
 #[test]
 fn rank_one_argmax_over_a_literal_extent_stores_into_i32() {
-    let report = reduction_store_report(
+    let (fixture, report) = reduction_store_report(
         r"
 @ kernel
 @ public
@@ -565,13 +605,14 @@ main {}
 ",
         "peak",
     );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
     assert!(report.admitted, "{:?}", report.failures);
     assert!(report.trapping_stores.is_empty());
 }
 
 #[test]
 fn rank_one_argmin_over_a_symbolic_extent_is_admitted_under_an_extent_condition() {
-    let report = reduction_store_report(
+    let (fixture, report) = reduction_store_report(
         r"
 @ kernel
 @ public
@@ -582,6 +623,7 @@ main {}
 ",
         "trough",
     );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
     assert!(report.admitted, "{:?}", report.failures);
     assert!(
         report
@@ -595,7 +637,7 @@ main {}
 
 #[test]
 fn count_over_a_literal_extent_stores_into_i32() {
-    let report = reduction_store_report(
+    let (fixture, report) = reduction_store_report(
         r"
 @ kernel
 @ public
@@ -606,12 +648,13 @@ main {}
 ",
         "tally",
     );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
     assert!(report.admitted, "{:?}", report.failures);
 }
 
 #[test]
 fn an_integer_max_reduction_into_i32_is_still_out_of_range() {
-    let report = reduction_store_report(
+    let (fixture, report) = reduction_store_report(
         r"
 @ kernel
 @ public
@@ -622,6 +665,14 @@ main {}
 ",
         "widest",
     );
+    assert!(
+        fixture
+            .diagnostics
+            .iter()
+            .any(|error| error.issue() == Some("nucleum_wide_integer")),
+        "the i64 tensor<int, [32]> parameter is a check error: {:?}",
+        fixture.diagnostics
+    );
     assert!(!report.admitted);
     assert!(
         report
@@ -630,5 +681,134 @@ main {}
             .any(|failure| matches!(failure, KernelRequirementFailure::StoreOutOfRange { .. })),
         "{:?}",
         report.failures
+    );
+}
+
+/// Named argument of the first diagnostic carrying `issue`.
+fn issue_arg<'a>(
+    fixture: &'a crate::test_support::AnalyzedFixture,
+    issue: &str,
+    name: &str,
+) -> Option<&'a str> {
+    fixture
+        .diagnostics
+        .iter()
+        .find(|error| error.issue() == Some(issue))
+        .and_then(|error| error.args.iter().find(|arg| arg.name == name))
+        .map(|arg| arg.value.as_str())
+}
+
+#[test]
+fn wide_integer_kernel_values_are_check_errors() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn k(int x) → int {
+    return x + 1
+}
+main {}
+",
+    );
+    assert_eq!(
+        issue_arg(&fixture, "nucleum_wide_integer", "width"),
+        Some("i64"),
+        "{:?}",
+        fixture.diagnostics
+    );
+
+    let twin = analyze_en(
+        r"
+@ kernel
+@ public
+fn k(u64 x) → u64 {
+    return x
+}
+main {}
+",
+    );
+    assert_eq!(
+        issue_arg(&twin, "nucleum_wide_integer", "width"),
+        Some("u64"),
+        "{:?}",
+        twin.diagnostics
+    );
+}
+
+#[test]
+fn f64_and_d64_kernel_values_are_check_errors() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn k(f64 x) → f64 {
+    return x * 2.0
+}
+main {}
+",
+    );
+    assert_eq!(
+        issue_arg(&fixture, "nucleum_f64", "width"),
+        Some("f64"),
+        "{:?}",
+        fixture.diagnostics
+    );
+
+    let decimal = analyze_en(
+        r"
+@ kernel
+@ public
+fn k(d64 x) → d64 {
+    return x
+}
+main {}
+",
+    );
+    assert_eq!(
+        issue_arg(&decimal, "nucleum_d64", "width"),
+        Some("d64"),
+        "{:?}",
+        decimal.diagnostics
+    );
+}
+
+#[test]
+fn unprovable_trapping_store_is_a_check_error() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn k(tensor<i32, [4]> src) → void {
+    mut i32 y ← 0
+    y ← src[[0]] * 3
+}
+main {}
+",
+    );
+    assert_eq!(
+        issue_arg(&fixture, "nucleum_trapping_store", "width"),
+        Some("i32"),
+        "{:?}",
+        fixture.diagnostics
+    );
+}
+
+#[test]
+fn wide_exact_intermediate_is_a_check_error() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn half(wrapping<i32> left, wrapping<i32> right) → bool {
+    return (left + right) / 2 ≺ left
+}
+main {}
+",
+    );
+    assert_eq!(
+        issue_arg(&fixture, "nucleum_wide_intermediate", "extent"),
+        Some("-4294967296..4294967294"),
+        "{:?}",
+        fixture.diagnostics
     );
 }
