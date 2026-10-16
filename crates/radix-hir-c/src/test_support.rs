@@ -55,7 +55,31 @@ pub(crate) fn inline(body: &str) -> String {
 }
 
 pub(crate) fn emitted(body: &str) -> String {
-    program("case.fab", &inline(body))
+    deliteralize(&program("case.fab", &inline(body)))
+}
+
+/// Expand the interned text literals back to their source form, so tests pin
+/// the emitted shape without depending on literal numbering. A
+/// `FABER_TEXT_LITERAL(faber_L3, "x", 1, 1);` static is dropped and every
+/// `faber_L3.s` reference becomes `"x"` again.
+fn deliteralize(code: &str) -> String {
+    let mut out = code.to_owned();
+    for line in code.lines() {
+        let trimmed = line.trim();
+        let Some(rest) = trimmed.strip_prefix("FABER_TEXT_LITERAL(") else {
+            continue;
+        };
+        let Some(close) = rest.find(");") else {
+            continue;
+        };
+        let mut parts = rest[..close].splitn(3, ", ");
+        let name = parts.next().unwrap_or_default();
+        let source = parts.next().unwrap_or_default();
+        out = out
+            .replace(&format!("{name}.s"), source)
+            .replace(&format!("{trimmed}\n"), "");
+    }
+    out
 }
 
 pub(crate) fn rejected(body: &str) -> String {

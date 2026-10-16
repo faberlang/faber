@@ -97,6 +97,7 @@ use radix_hir::{DefId, HirModule};
 use radix_lexer::Interner;
 use radix_types::TypeTable;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::fmt::Write as _;
 
 /// C backend output.
 #[derive(Debug, Clone)]
@@ -182,6 +183,7 @@ impl CCodegen<'_> {
             equals: Vec::new(),
             ref_params: FxHashSet::default(),
             closures: Vec::new(),
+            text_literals: Vec::new(),
             closure_seq: 0,
         }
         .program(hir)
@@ -247,6 +249,9 @@ pub(crate) struct Emitter<'a> {
     /// Non-capturing closures discovered while writing bodies, each waiting for
     /// its synthesized top-level C function ([`closure::PendingClosure`]).
     closures: Vec<closure::PendingClosure>,
+    /// Text literals interned as they are met: the escaped C source, the
+    /// byte count, and the code-point count of each.
+    text_literals: Vec<(String, i64, i64)>,
     /// How many synthesized closure names have been claimed.
     closure_seq: u32,
 }
@@ -291,6 +296,15 @@ impl Emitter<'_> {
             self.support.need(crate::helpers::Helper::Trap);
         }
         let mut out = self.support.text();
+        // Text literals are interned while the bodies were written; their
+        // statics carry the text header, so a literal's value is the `.s`
+        // reference with its counts already in place.
+        for (index, (source, bytes, cps)) in self.text_literals.iter().enumerate() {
+            let _ = write!(
+                out,
+                "FABER_TEXT_LITERAL(faber_L{index}, {source}, {bytes}, {cps});\n"
+            );
+        }
         out.push_str(&items.genera);
         if !items.constants.is_empty() {
             out.push_str(&items.constants);

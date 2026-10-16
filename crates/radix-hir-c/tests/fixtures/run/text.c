@@ -2,11 +2,43 @@
    compile with -I <runtime>/c (runtime/c in the Faber tree). */
 #include "faber.h"
 
+FABER_TEXT_LITERAL(faber_L0, "<", 1, 1);
+FABER_TEXT_LITERAL(faber_L1, ":", 1, 1);
+FABER_TEXT_LITERAL(faber_L2, ">", 1, 1);
+FABER_TEXT_LITERAL(faber_L3, "x", 1, 1);
+FABER_TEXT_LITERAL(faber_L4, "a=", 2, 2);
+FABER_TEXT_LITERAL(faber_L5, ", s=", 4, 4);
+FABER_TEXT_LITERAL(faber_L6, ", again ", 8, 8);
+FABER_TEXT_LITERAL(faber_L7, " ", 1, 1);
+FABER_TEXT_LITERAL(faber_L8, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L9, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L10, "-", 1, 1);
+FABER_TEXT_LITERAL(faber_L11, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L12, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L13, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L14, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L15, "sum ", 4, 4);
+FABER_TEXT_LITERAL(faber_L16, ", flag ", 7, 7);
+FABER_TEXT_LITERAL(faber_L17, ", big ", 6, 6);
+FABER_TEXT_LITERAL(faber_L18, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L19, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L20, "<", 1, 1);
+FABER_TEXT_LITERAL(faber_L21, ">", 1, 1);
+FABER_TEXT_LITERAL(faber_L22, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L23, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L24, "item", 4, 4);
+FABER_TEXT_LITERAL(faber_L25, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L26, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L27, "", 0, 0);
+FABER_TEXT_LITERAL(faber_L28, ",", 1, 1);
+FABER_TEXT_LITERAL(faber_L29, "assignment to `i`", 17, 17);
+FABER_TEXT_LITERAL(faber_L30, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L31, "false", 5, 5);
 static const char *f_label(faber_arena *, const char *, int64_t);
 static int64_t f_quiet(faber_arena *);
 
 static const char *f_label(faber_arena *faber_a, const char *p_name, int64_t p_n) {
-    return faber_concat(faber_a, faber_concat(faber_a, faber_concat(faber_a, faber_concat(faber_a, "<", p_name), ":"), faber_join(faber_a, 1, faber_int_text(faber_a, p_n))), ">");
+    return faber_concat(faber_a, faber_concat(faber_a, faber_concat(faber_a, faber_concat(faber_a, faber_L0.s, p_name), faber_L1.s), faber_join(faber_a, 1, faber_int_text(faber_a, p_n))), faber_L2.s);
 }
 
 static int64_t f_quiet(faber_arena *faber_a) {
@@ -18,18 +50,18 @@ int main(void) {
     faber_arena faber_root = {0};
     faber_arena *const faber_a = &faber_root;
     int64_t l_a = INT64_C(7);
-    const char *l_s = "x";
-    printf("%s\n", faber_join(faber_a, 8, "a=", faber_int_text(faber_a, l_a), ", s=", l_s, ", again ", faber_int_text(faber_a, l_a), " ", l_s));
-    printf("%s\n", faber_join(faber_a, 3, l_s, "-", faber_int_text(faber_a, l_a)));
-    printf("%s\n", (__extension__ ({ faber_i128 faber_t0 = faber_add(l_a, INT64_C(1)); bool faber_t1 = (l_a > INT64_C(3)); faber_i128 faber_t2 = faber_mul(l_a, INT64_C(1000000000000)); faber_join(faber_a, 6, "sum ", faber_exact_text(faber_a, faber_t0), ", flag ", ((faber_t1) ? "true" : "false"), ", big ", faber_exact_text(faber_a, faber_t2)); })));
-    const char *l_t = faber_concat(faber_a, faber_concat(faber_a, "<", l_s), ">");
+    const char *l_s = faber_L3.s;
+    printf("%s\n", faber_join(faber_a, 8, faber_L4.s, faber_int_text(faber_a, l_a), faber_L5.s, l_s, faber_L6.s, faber_int_text(faber_a, l_a), faber_L7.s, l_s));
+    printf("%s\n", faber_join(faber_a, 3, l_s, faber_L10.s, faber_int_text(faber_a, l_a)));
+    printf("%s\n", (__extension__ ({ faber_i128 faber_t0 = faber_add(l_a, INT64_C(1)); bool faber_t1 = (l_a > INT64_C(3)); faber_i128 faber_t2 = faber_mul(l_a, INT64_C(1000000000000)); faber_join(faber_a, 6, faber_L15.s, faber_exact_text(faber_a, faber_t0), faber_L16.s, ((faber_t1) ? faber_L13.s : faber_L14.s), faber_L17.s, faber_exact_text(faber_a, faber_t2)); })));
+    const char *l_t = faber_concat(faber_a, faber_concat(faber_a, faber_L20.s, l_s), faber_L21.s);
     printf("%s\n", l_t);
-    printf("%s\n", (__extension__ ({ const char *faber_t3 = "item"; int64_t faber_t4 = f_quiet(faber_a); f_label(faber_a, faber_t3, faber_t4); })));
-    const char *l_acc = "";
+    printf("%s\n", (__extension__ ({ const char *faber_t3 = faber_L24.s; int64_t faber_t4 = f_quiet(faber_a); f_label(faber_a, faber_t3, faber_t4); })));
+    const char *l_acc = faber_L27.s;
     int64_t l_i = INT64_C(0);
     while (l_i < INT64_C(5)) {
-        l_acc = faber_concat(faber_a, l_acc, faber_join(faber_a, 2, faber_int_text(faber_a, l_i), ","));
-        l_i = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_i, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_i, INT64_C(1)), "assignment to `i`") : faber_r; }));
+        l_acc = faber_concat(faber_a, l_acc, faber_join(faber_a, 2, faber_int_text(faber_a, l_i), faber_L28.s));
+        l_i = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_i, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_i, INT64_C(1)), faber_L29.s) : faber_r; }));
     }
     printf("%s\n", l_acc);
     return 0;

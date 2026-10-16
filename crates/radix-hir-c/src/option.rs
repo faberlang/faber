@@ -7,7 +7,7 @@
 
 use crate::Emitter;
 use crate::error::unsupported;
-use crate::expr::{Operand, Value, c_string, wrap};
+use crate::expr::{Operand, Value, wrap};
 use crate::helpers::Helper;
 use crate::ty::{Elem, Inner, IntWidth, Ty, classify};
 use radix_codegen_shared::CodegenError;
@@ -371,7 +371,7 @@ impl Emitter<'_> {
     /// How an optional prints: its value as the runner shows the payload, or
     /// the locale's none word.
     pub(crate) fn show_option(&mut self, text: &str, inner: Inner) -> Result<String, CodegenError> {
-        let none = c_string(&self.names.display_tokens().none.clone())?;
+        let none = self.text_literal(&self.names.display_tokens().none.clone())?;
         let n = self.temps;
         self.temps += 1;
         let t = format!("faber_c{n}");

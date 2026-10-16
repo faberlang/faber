@@ -1242,7 +1242,7 @@ impl Emitter<'_> {
             HirLiteral::String(symbol) => {
                 let raw = self.names.resolve_symbol(*symbol);
                 let decoded = radix_codegen_shared::unescape_faber_text(raw);
-                Ok(Operand::new(c_string(&decoded)?, Value::Text))
+                Ok(Operand::new(self.text_literal(&decoded)?, Value::Text))
             }
             // Every truth operand carries its own parentheses, so `if` and
             // `while` write it bare: `while (1)`, `if (a < b)`. Adding a second
@@ -1260,7 +1260,7 @@ impl Emitter<'_> {
             HirLiteral::Ascii(symbol) => {
                 let raw = self.names.resolve_symbol(*symbol);
                 let decoded = radix_codegen_shared::unescape_faber_text(raw);
-                Ok(Operand::new(c_string(&decoded)?, Value::Text))
+                Ok(Operand::new(self.text_literal(&decoded)?, Value::Text))
             }
             HirLiteral::Octeti(_) => Err(unsupported("byte-buffer literal")),
             HirLiteral::JsonValor(_) => Err(unsupported("json literal")),
@@ -1891,12 +1891,12 @@ impl Emitter<'_> {
             (Ty::List(slot), Value::List(elem)) if slot == elem => Ok(value),
             (Ty::Genus(slot), Value::Genus(genus)) if slot == genus => Ok(value),
             (Ty::Int, Value::Exact) => {
-                let at = c_string(&self.store_position(site))?;
+                let at = self.text_literal(&self.store_position(site))?;
                 let text = self.store_exact(&value, &at);
                 Ok(Operand::new(text, Value::Int).with_effect(value.effect))
             }
             (Ty::Sized(width), Value::Int | Value::Exact) => {
-                let at = c_string(&self.store_position(site))?;
+                let at = self.text_literal(&self.store_position(site))?;
                 Ok(self.store_sized(&value, width, &at))
             }
             // A modular word reduces modulo 2^W at the store; a saturating
@@ -1919,7 +1919,7 @@ impl Emitter<'_> {
             // A decimal rounds half-even to scale 8 at the store and checks
             // the `i64` carrier. Nothing else in this subset stores one.
             (Ty::Decimal, Value::Decimal) => {
-                let at = c_string(&self.store_position(site))?;
+                let at = self.text_literal(&self.store_position(site))?;
                 self.support.need(Helper::Decimal);
                 let text = format!("faber_dec_of(faber_dec_store({}, {at}, \"\"))", value.text);
                 let mut operand = Operand::new(text, Value::Decimal).with_effect(value.effect);
@@ -2163,6 +2163,19 @@ fn fold_bitwise(op: HirBinOp, a: i128, b: i128) -> Option<i128> {
         _ => return None,
     };
     (CAP_MIN..=CAP_MAX).contains(&value).then_some(value)
+}
+
+impl Emitter<'_> {
+    /// A text literal as a value: interned into a static that carries the
+    /// text header (`FABER_TEXT_LITERAL`), so the operand is a `.s`
+    /// reference whose counts are already in place and `length` never walks.
+    pub(crate) fn text_literal(&mut self, decoded: &str) -> Result<String, CodegenError> {
+        let source = crate::expr::c_string(decoded)?;
+        let bytes = decoded.as_bytes().len() as i64;
+        let cps = decoded.chars().count() as i64;
+        self.text_literals.push((source, bytes, cps));
+        Ok(format!("faber_L{}.s", self.text_literals.len() - 1))
+    }
 }
 
 /// A C string literal holding the UTF-8 bytes of `text`.
