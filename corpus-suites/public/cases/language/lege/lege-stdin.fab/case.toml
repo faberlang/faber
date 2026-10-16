@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/lege/lege-stdin.fab"
+group = "language"
+input_root = "corpus"
+input = "lege/lege-stdin.fab"
+stdin = "stdin.txt"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
