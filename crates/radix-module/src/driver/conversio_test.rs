@@ -235,8 +235,10 @@ fn ascii_to_bivalens_conversio_parses_the_locale_words() {
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
-        code.contains("\"verum\" => true") && code.contains("\"falsum\" => false"),
-        "expected the code locale's true/false words, got:\n{code}"
+        code.contains("\"verum\" => true")
+            && code.contains("\"falsum\" => false")
+            && code.contains("panic!(\"text to bivalens conversion failed\")"),
+        "expected the code locale's true/false words and failure arm, got:\n{code}"
     );
     assert!(!code.contains(".is_empty()"), "text truthiness is retired, got:\n{code}");
 }
