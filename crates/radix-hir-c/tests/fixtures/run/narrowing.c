@@ -4,37 +4,7 @@
 
 FABER_TEXT_LITERAL(faber_L0, "true", 4, 4);
 FABER_TEXT_LITERAL(faber_L1, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L2, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L3, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L4, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L5, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L6, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L7, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L8, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L9, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L10, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L11, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L12, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L13, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L14, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L15, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L16, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L17, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L18, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L19, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L20, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L21, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L22, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L23, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L24, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L25, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L26, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L27, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L28, "declaration of `half`", 21, 21);
-FABER_TEXT_LITERAL(faber_L29, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L30, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L31, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L32, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L2, "declaration of `half`", 21, 21);
 int main(void) {
     int64_t l_a = -INT64_C(7);
     printf("%" PRId64 "\n", faber_fdiv_i64(l_a, INT64_C(2)));
@@ -53,7 +23,7 @@ int main(void) {
     printf("%" PRId64 "\n", faber_fmod_i64(l_low, INT64_C(3)));
     printf("%" PRId64 "\n", faber_fdiv_i64(l_low, -INT64_C(2)));
     printf("%" PRId64 "\n", faber_fmod_i64(l_low, -INT64_C(2)));
-    int64_t l_half = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_fdiv_i64(faber_mul_o(l_big, INT64_C(2), &faber_o), INT64_C(4)); faber_o ? faber_store_i64(faber_div(faber_mul(l_big, INT64_C(2)), INT64_C(4)), faber_L28.s) : faber_r; }));
+    int64_t l_half = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_fdiv_i64(faber_mul_o(l_big, INT64_C(2), &faber_o), INT64_C(4)); faber_o ? faber_store_i64(faber_div(faber_mul(l_big, INT64_C(2)), INT64_C(4)), faber_L2.s) : faber_r; }));
     printf("%" PRId64 "\n", l_half);
     int64_t l_back = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_sub_o(faber_add_o(l_big, INT64_C(1), &faber_o), INT64_C(1), &faber_o); faber_o ? faber_fit_i64(faber_sub(faber_add(l_big, INT64_C(1)), INT64_C(1))) : faber_r; }));
     printf("%" PRId64 "\n", l_back);

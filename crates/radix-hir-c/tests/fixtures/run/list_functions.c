@@ -4,15 +4,10 @@
 
 FABER_TEXT_LITERAL(faber_L0, "argument", 8, 8);
 FABER_TEXT_LITERAL(faber_L1, "assignment to `i`", 17, 17);
-FABER_TEXT_LITERAL(faber_L2, "assignment to `i`", 17, 17);
-FABER_TEXT_LITERAL(faber_L3, "assignment to `sum`", 19, 19);
-FABER_TEXT_LITERAL(faber_L4, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L5, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L6, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L7, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L8, "assignment to `n`", 17, 17);
-FABER_TEXT_LITERAL(faber_L9, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L10, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L2, "assignment to `sum`", 19, 19);
+FABER_TEXT_LITERAL(faber_L3, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L4, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L5, "assignment to `n`", 17, 17);
 static void f_fill(faber_arena *, faber_list_i64 *, int64_t);
 static faber_list_i64 *f_evens(faber_arena *, int64_t);
 static int64_t f_total(faber_arena *, faber_list_i64 *);
@@ -32,7 +27,7 @@ static faber_list_i64 *f_evens(faber_arena *faber_a, int64_t p_limit) {
         if (faber_fmod_i64(l_i, INT64_C(2)) == INT64_C(0)) {
             faber_list_i64_push(faber_a, l_out, l_i);
         }
-        l_i = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_i, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_i, INT64_C(1)), faber_L2.s) : faber_r; }));
+        l_i = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_i, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_i, INT64_C(1)), faber_L1.s) : faber_r; }));
     }
     return l_out;
 }
@@ -45,7 +40,7 @@ static int64_t f_total(faber_arena *faber_a, faber_list_i64 *p_xs) {
         int64_t faber_i0;
         for (faber_i0 = 0; faber_i0 < faber_t0->len; faber_i0++) {
             const int64_t l_x = faber_t0->items[faber_i0];
-            l_sum = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_sum, l_x, &faber_o); faber_o ? faber_store_i64(faber_add(l_sum, l_x), faber_L3.s) : faber_r; }));
+            l_sum = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_sum, l_x, &faber_o); faber_o ? faber_store_i64(faber_add(l_sum, l_x), faber_L2.s) : faber_r; }));
         }
     }
     return l_sum;
@@ -69,7 +64,7 @@ int main(void) {
     int64_t l_n = INT64_C(0);
     while (l_n < INT64_C(1000)) {
         faber_list_i64_push(faber_a, l_big, l_n);
-        l_n = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_n, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_n, INT64_C(1)), faber_L8.s) : faber_r; }));
+        l_n = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_n, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_n, INT64_C(1)), faber_L5.s) : faber_r; }));
     }
     {
         int64_t faber_t6 = (l_big)->len; int64_t faber_t7 = faber_list_i64_at(l_big, INT64_C(999)); int64_t faber_t8 = f_total(faber_a, l_big);

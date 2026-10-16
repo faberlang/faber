@@ -2169,12 +2169,18 @@ impl Emitter<'_> {
     /// A text literal as a value: interned into a static that carries the
     /// text header (`FABER_TEXT_LITERAL`), so the operand is a `.s`
     /// reference whose counts are already in place and `length` never walks.
+    /// One static per distinct content: a repeated literal reuses the index.
     pub(crate) fn text_literal(&mut self, decoded: &str) -> Result<String, CodegenError> {
         let source = crate::expr::c_string(decoded)?;
+        if let Some(&index) = self.text_literal_index.get(&source) {
+            return Ok(format!("faber_L{index}.s"));
+        }
         let bytes = decoded.as_bytes().len() as i64;
         let cps = decoded.chars().count() as i64;
-        self.text_literals.push((source, bytes, cps));
-        Ok(format!("faber_L{}.s", self.text_literals.len() - 1))
+        let index = self.text_literals.len();
+        self.text_literals.push((source.clone(), bytes, cps));
+        self.text_literal_index.insert(source, index);
+        Ok(format!("faber_L{index}.s"))
     }
 }
 

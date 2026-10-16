@@ -8,14 +8,8 @@ FABER_TEXT_LITERAL(faber_L2, "assignment to `start`", 21, 21);
 FABER_TEXT_LITERAL(faber_L3, "true", 4, 4);
 FABER_TEXT_LITERAL(faber_L4, "false", 5, 5);
 FABER_TEXT_LITERAL(faber_L5, "declaration of `nb`", 19, 19);
-FABER_TEXT_LITERAL(faber_L6, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L7, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L8, "assignment to `i`", 17, 17);
-FABER_TEXT_LITERAL(faber_L9, "assignment to `total`", 21, 21);
-FABER_TEXT_LITERAL(faber_L10, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L11, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L12, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L13, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L6, "assignment to `i`", 17, 17);
+FABER_TEXT_LITERAL(faber_L7, "assignment to `total`", 21, 21);
 int main(void) {
     int64_t l_best = INT64_C(0);
     int64_t l_best_start = INT64_C(0);
@@ -46,7 +40,7 @@ int main(void) {
     int64_t l_i = INT64_C(0);
     int64_t l_total = INT64_C(0);
     while (1) {
-        l_i = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_i, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_i, INT64_C(1)), faber_L8.s) : faber_r; }));
+        l_i = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_i, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_add(l_i, INT64_C(1)), faber_L6.s) : faber_r; }));
         if (l_i > INT64_C(20)) {
             break;
         }
@@ -54,7 +48,7 @@ int main(void) {
             continue;
         }
         if ((l_i >= INT64_C(2)) && (!(l_i == INT64_C(7)))) {
-            l_total = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_total, l_i, &faber_o); faber_o ? faber_store_i64(faber_add(l_total, l_i), faber_L9.s) : faber_r; }));
+            l_total = (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_add_o(l_total, l_i, &faber_o); faber_o ? faber_store_i64(faber_add(l_total, l_i), faber_L7.s) : faber_r; }));
         }
     }
     printf("%" PRId64 "\n", l_total);

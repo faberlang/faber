@@ -184,6 +184,7 @@ impl CCodegen<'_> {
             ref_params: FxHashSet::default(),
             closures: Vec::new(),
             text_literals: Vec::new(),
+            text_literal_index: FxHashMap::default(),
             closure_seq: 0,
         }
         .program(hir)
@@ -252,6 +253,9 @@ pub(crate) struct Emitter<'a> {
     /// Text literals interned as they are met: the escaped C source, the
     /// byte count, and the code-point count of each.
     text_literals: Vec<(String, i64, i64)>,
+    /// First index of each distinct literal source in `text_literals`, so a
+    /// repeated literal reuses one static instead of adding another.
+    text_literal_index: FxHashMap<String, usize>,
     /// How many synthesized closure names have been claimed.
     closure_seq: u32,
 }

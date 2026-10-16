@@ -6,22 +6,13 @@ FABER_TEXT_LITERAL(faber_L0, "return", 6, 6);
 FABER_TEXT_LITERAL(faber_L1, "assignment to `x`", 17, 17);
 FABER_TEXT_LITERAL(faber_L2, "field `y`", 9, 9);
 FABER_TEXT_LITERAL(faber_L3, "p", 1, 1);
-FABER_TEXT_LITERAL(faber_L4, "p", 1, 1);
-FABER_TEXT_LITERAL(faber_L5, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L6, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L7, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L8, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L9, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L10, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L11, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L12, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L13, "true", 4, 4);
-FABER_TEXT_LITERAL(faber_L14, "false", 5, 5);
-FABER_TEXT_LITERAL(faber_L15, "Point { ", 8, 8);
-FABER_TEXT_LITERAL(faber_L16, "x = ", 4, 4);
-FABER_TEXT_LITERAL(faber_L17, ", y = ", 6, 6);
-FABER_TEXT_LITERAL(faber_L18, ", tag = ", 8, 8);
-FABER_TEXT_LITERAL(faber_L19, " }", 2, 2);
+FABER_TEXT_LITERAL(faber_L4, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L5, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L6, "Point { ", 8, 8);
+FABER_TEXT_LITERAL(faber_L7, "x = ", 4, 4);
+FABER_TEXT_LITERAL(faber_L8, ", y = ", 6, 6);
+FABER_TEXT_LITERAL(faber_L9, ", tag = ", 8, 8);
+FABER_TEXT_LITERAL(faber_L10, " }", 2, 2);
 typedef struct g_Point g_Point;
 
 struct g_Point {
@@ -50,13 +41,13 @@ static g_Point *f_make(faber_arena *faber_a, int64_t p_x) {
 }
 
 static const char *g_Point_show(faber_arena *faber_a, const g_Point *value) {
-    return faber_join(faber_a, 8, faber_L15.s, faber_L16.s, faber_int_text(faber_a, value->m_x), faber_L17.s, faber_int_text(faber_a, value->m_y), faber_L18.s, faber_quoted(faber_a, value->m_tag), faber_L19.s);
+    return faber_join(faber_a, 8, faber_L6.s, faber_L7.s, faber_int_text(faber_a, value->m_x), faber_L8.s, faber_int_text(faber_a, value->m_y), faber_L9.s, faber_quoted(faber_a, value->m_tag), faber_L10.s);
 }
 
 int main(void) {
     faber_arena faber_root = {0};
     faber_arena *const faber_a = &faber_root;
-    g_Point *l_p = (__extension__ ({ g_Point *faber_t1 = faber_alloc(faber_a, sizeof *faber_t1); faber_t1->m_x = INT64_C(1); faber_t1->m_y = INT64_C(2); faber_t1->m_tag = faber_L4.s; faber_t1; }));
+    g_Point *l_p = (__extension__ ({ g_Point *faber_t1 = faber_alloc(faber_a, sizeof *faber_t1); faber_t1->m_x = INT64_C(1); faber_t1->m_y = INT64_C(2); faber_t1->m_tag = faber_L3.s; faber_t1; }));
     {
         int64_t faber_t2 = (l_p)->m_x; int64_t faber_t3 = (l_p)->m_y; const char *faber_t4 = (l_p)->m_tag; int64_t faber_t5 = g_Point_sum(faber_a, l_p);
         printf("%" PRId64 " %" PRId64 " %s %" PRId64 "\n", faber_t2, faber_t3, faber_t4, faber_t5);
