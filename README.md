@@ -374,7 +374,7 @@ How mature each target is, measured on the corpus (662 programs the suite runs, 
 | **GPU kernels** (kernel functions only) | | | | |
 | Metal | `metal-text` | Metal Shading Language | kernel programs only | official binary |
 | WGSL | `wgsl-text` | WebGPU compute shaders | kernel programs only | official binary |
-| CUDA | (`--device cuda`) | NVVM IR through the device runtime | kernel programs only; hardware-gated, and `faber run --device cuda` fails closed in the default build | official binary |
+| CUDA | (`--device cuda`) | NVVM IR and a PTX artifact; no CUDA runtime is enabled | kernel programs only; hardware-gated and not enabled in the released binary: `faber run --device cuda` fails closed | official binary |
 | **Validation** | | | | |
 | Racket | `sexp` | Racket s-expressions (a validation target) | suite 538 / 662 | official binary |
 | **Experimental** (not in the released `faber`) | | | | |
