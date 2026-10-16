@@ -402,7 +402,7 @@ pub struct EffectBoundaryRecord {
 /// compiler artifact proving gate bullets 1 + 2). Produced by the compiler
 /// from typed facts only, never from emitted text.
 ///
-/// Stable identity (head-cto fire-13 addendum): `module` is the
+/// Stable identity: `module` is the
 /// product/module scope, regions carry the stable compiler-minted region
 /// identity **within one analyzed module ordering**, and callsites carry the
 /// stable (host, block, statement) identity. **Support boundary**: one

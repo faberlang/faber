@@ -1614,7 +1614,7 @@ fn gea3_program_rejects_missing_edges_or_undeclared_facts() {
 
 #[test]
 fn wire_reconstruction_preserves_legacy_elementwise_library_selection() {
-    // PD-29 oracle (head-cto ruling, Option A): the persisted wire entry name
+    // PD-29 oracle (Option A): the persisted wire entry name
     // is the legacy ABI discriminant. A wire-reconstructed Elementwise unit
     // must select the same library body it selected before the typed-tag
     // bridge; the assertion is on the selection outcome, not the tag field.

@@ -1,5 +1,4 @@
-//! The a0184031 dead non-kernel-scalar const-copy regressions 3–5
-//! (head-cto report 5f1b1348): a param destination, an output-projection
+//! The dead non-kernel-scalar const-copy regressions 3–5: a param destination, an output-projection
 //! store, a projected store into a dead slot, a non-constant dead copy, and
 //! a terminator-read const all stay fail-closed. Regressions 1–2 live in
 //! [`i64_axis_const`].
