@@ -341,7 +341,7 @@ impl Emitter<'_> {
     }
 
     /// The field `name` of the genus `base` holds.
-    fn field_of(&self, base: &Operand, name: Symbol) -> Result<Field, CodegenError> {
+    pub(crate) fn field_of(&self, base: &Operand, name: Symbol) -> Result<Field, CodegenError> {
         let Value::Genus(def_id) = base.value else {
             return Err(unsupported("field access on a value that is not a genus"));
         };

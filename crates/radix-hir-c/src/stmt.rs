@@ -940,7 +940,13 @@ impl Emitter<'_> {
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
         }
-        self.line(out, &format!("{name} = {};", value.text));
+        // A `ref`/`mut` scalar parameter stores through the caller's pointer.
+        let target = if self.ref_params.contains(def_id) {
+            format!("(*{name})")
+        } else {
+            name
+        };
+        self.line(out, &format!("{target} = {};", value.text));
         Ok(())
     }
 
@@ -971,7 +977,12 @@ impl Emitter<'_> {
         if value.value != Value::from(class) {
             return Err(unsupported("value stored without a store check"));
         }
-        self.line(out, &format!("{name} = {};", value.text));
+        let target = if self.ref_params.contains(def_id) {
+            format!("(*{name})")
+        } else {
+            name
+        };
+        self.line(out, &format!("{target} = {};", value.text));
         Ok(())
     }
 

@@ -516,6 +516,29 @@ impl Emitter<'_> {
         self.invoke(*def_id, None, args)
     }
 
+    /// The address a `ref`/`mut` scalar argument passes: the caller's own cell,
+    /// the pointer a borrowing parameter already holds, or a genus field. The
+    /// argument must be a place this subset can address.
+    fn caller_address(&mut self, expr: &HirExpression) -> Result<String, CodegenError> {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => {
+                let Some(local) = self.locals.get(def_id) else {
+                    return Err(unsupported("ref or mut argument that is not a local"));
+                };
+                if self.ref_params.contains(def_id) {
+                    return Ok(local.name.clone());
+                }
+                Ok(format!("(&{})", local.name))
+            }
+            HirExpressionKind::Field(base, name) => {
+                let base = self.expr(base)?;
+                let field = self.field_of(&base, *name)?;
+                Ok(format!("(&({}->{}))", base.text, field.c_name))
+            }
+            _ => Err(unsupported("ref or mut argument that is not a plain local")),
+        }
+    }
+
     /// A call to a function or method the program defines. Arguments are
     /// checked and narrowed to their parameters; the receiver, when there is
     /// one, is evaluated first and passed after the arena.
@@ -531,9 +554,10 @@ impl Emitter<'_> {
             }
             return Err(unsupported("call to a function outside the program"));
         };
-        let (name, params, omissions, ret) = (
+        let (name, params, pointees, omissions, ret) = (
             function.name.clone(),
             function.params.clone(),
+            function.pointee.clone(),
             function.omissions.clone(),
             function.ret,
         );
@@ -571,11 +595,16 @@ impl Emitter<'_> {
                 },
             };
             let shared = matches!(param, Ty::List(_) | Ty::Genus(_));
+            let pointer = pointees.get(index).copied().unwrap_or(false);
             match marker {
-                // `ref` / `mut` alias the caller's pointer: only a list or a
-                // genus has one. `copy` (deep) and `own` (transfer) apply to
-                // any value; a scalar copies by assignment either way.
-                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut) if !shared => {
+                // `ref` / `mut` alias the caller's pointer: a list or a genus
+                // always has one, and a scalar parameter (one this signature
+                // spelled as a pointer) borrows the caller's cell. `copy`
+                // (deep) and `own` (transfer) apply to any value; a scalar
+                // copies by assignment either way.
+                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
+                    if !shared && !pointer =>
+                {
                     return Err(unsupported(
                         "access marker on an argument that is not a list or genus",
                     ));
@@ -588,9 +617,24 @@ impl Emitter<'_> {
                 _ => {}
             }
             let Some(expr) = expr else {
+                if pointer {
+                    return Err(unsupported("scalar borrow argument omitted"));
+                }
                 operands.push(self.none_of(*param)?);
                 continue;
             };
+            // A `ref`/`mut` scalar parameter takes the address of the caller's
+            // cell (or the pointer a borrowing parameter already holds).
+            if pointer {
+                if !matches!(
+                    marker,
+                    Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
+                ) {
+                    return Err(unsupported("scalar borrow without a caller place"));
+                }
+                operands.push(Operand::new(self.caller_address(expr)?, Value::Void));
+                continue;
+            }
             let mut operand = self.expr(expr)?;
             // `copy x` at the call site deep-duplicates before the call (R7).
             if marker == Some(radix_hir::HirArgMarker::Copy) {
@@ -1006,7 +1050,14 @@ impl Emitter<'_> {
     fn path(&self, def_id: radix_hir::DefId) -> Result<Operand, CodegenError> {
         match self.locals.get(&def_id) {
             Some(local) => {
-                let mut operand = Self::cell_read(&local.name, local.ty);
+                // A `ref`/`mut` scalar parameter is a pointer to the caller's
+                // cell; a read goes through it.
+                let cell = if self.ref_params.contains(&def_id) {
+                    format!("(*{})", local.name)
+                } else {
+                    local.name.clone()
+                };
+                let mut operand = Self::cell_read(&cell, local.ty);
                 operand.constant = local.constant;
                 Ok(operand)
             }

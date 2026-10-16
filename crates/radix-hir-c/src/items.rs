@@ -23,6 +23,10 @@ use rustc_hash::FxHashSet;
 pub(crate) struct Function {
     pub(crate) name: String,
     pub(crate) params: Vec<Ty>,
+    /// Per parameter, whether its C storage is a pointer to the caller's cell:
+    /// a `ref`/`mut` scalar (or ref optional scalar) parameter. Parallel to
+    /// `params`; the call site passes an address, and the body dereferences.
+    pub(crate) pointee: Vec<bool>,
     /// Per parameter, what a call that omits its argument passes. Parallel to
     /// `params`; the runner fills a default at the call site, or none for a
     /// plain `optional` slot (`lower_direct_call_args`).
@@ -297,9 +301,15 @@ impl Emitter<'_> {
             return Err(unsupported("function without a body"));
         }
         let mut params = Vec::with_capacity(function.params.len());
+        let mut pointees = Vec::with_capacity(function.params.len());
         let mut omissions = Vec::with_capacity(function.params.len());
         for param in &function.params {
-            let class = classify(self.types, param.ty)?;
+            // A `ref`/`mut` scalar parameter is a pointer to the caller's cell.
+            let pointee = crate::ty::classify_ref(self.types, param.ty)?;
+            let class = match pointee {
+                Some(class) => class,
+                None => classify(self.types, param.ty)?,
+            };
             // A bare `optional` slot is the optional of its declared type: a
             // call that omits it passes none. `optional coalesce <expr>` is
             // the declared type alone, because the call site fills the
@@ -328,17 +338,22 @@ impl Emitter<'_> {
             });
             self.need_class(class);
             // `ref` / `mut` on a list or genus passes the caller's pointer,
-            // which is what an unmarked one passes too.
+            // which is what an unmarked one passes too. A scalar pointer is
+            // the same idea for a cell. `ref string` is the identity pointer a
+            // plain string already is; `mut string` would need a pointer to the
+            // caller's pointer, which this subset does not emit.
             let shared = matches!(class, Ty::List(_) | Ty::Genus(_));
             match param.mode {
-                HirParamMode::Owned => {}
-                HirParamMode::De | HirParamMode::In if shared => {}
-                HirParamMode::De | HirParamMode::In | HirParamMode::Ex | HirParamMode::Axis => {
+                HirParamMode::Owned | HirParamMode::Ex => {}
+                HirParamMode::De if shared || pointee.is_some() || class == Ty::Text => {}
+                HirParamMode::In if shared || pointee.is_some() => {}
+                HirParamMode::De | HirParamMode::In | HirParamMode::Axis => {
                     return Err(unsupported(
                         "parameter access marker on a scalar, own, or axis",
                     ));
                 }
             }
+            pointees.push(pointee.is_some());
             params.push(class);
         }
         let Some(ret_ty) = function.ret_ty else {
@@ -364,6 +379,7 @@ impl Emitter<'_> {
             Function {
                 name,
                 params,
+                pointee: pointees,
                 omissions,
                 ret,
                 receiver,
@@ -390,8 +406,9 @@ impl Emitter<'_> {
         if let Some(genus) = function.receiver {
             slots.push(self.c_type(Ty::Genus(genus))?);
         }
-        for ty in &function.params {
-            slots.push(self.c_type(*ty)?);
+        for (ty, pointer) in function.params.iter().zip(&function.pointee) {
+            let c = self.c_type(*ty)?;
+            slots.push(if *pointer { format!("{c} *") } else { c });
         }
         let params = if slots.is_empty() {
             "void".to_owned()
@@ -410,9 +427,10 @@ impl Emitter<'_> {
         let Some(signature) = self.functions.get(&def_id) else {
             return Err(unsupported("function without a recorded signature"));
         };
-        let (name, param_types, ret, receiver) = (
+        let (name, param_types, pointees, ret, receiver) = (
             signature.name.clone(),
             signature.params.clone(),
+            signature.pointee.clone(),
             signature.ret,
             signature.receiver,
         );
@@ -437,14 +455,21 @@ impl Emitter<'_> {
                 },
             );
         }
-        for (param, ty) in function.params.iter().zip(param_types) {
+        for (index, (param, ty)) in function.params.iter().zip(param_types).enumerate() {
             let Some(kind) = self.names.binding_kind(param.def_id) else {
                 return Err(unsupported("parameter the name catalog does not classify"));
             };
             let raw = self.names.resolve_symbol(param.name);
             let c_name = self.scope.claim(&prefixed_binding_name(kind, raw));
             self.need_class(ty);
-            params.push(self.declare(ty, &c_name, true)?);
+            // A `ref`/`mut` scalar parameter is a pointer; the body read and
+            // store go through it (`Emitter::path`/`Emitter::assign`).
+            if pointees.get(index).copied().unwrap_or(false) {
+                self.ref_params.insert(param.def_id);
+                params.push(format!("{} *{c_name}", self.c_type(ty)?));
+            } else {
+                params.push(self.declare(ty, &c_name, true)?);
+            }
             param_names.push(c_name.clone());
             self.locals.insert(
                 param.def_id,

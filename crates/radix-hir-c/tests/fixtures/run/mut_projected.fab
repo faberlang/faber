@@ -1,0 +1,22 @@
++++
+locale = "en"
++++
+# A projected field is a writable place: a `mut` scalar parameter of a genus
+# field takes the field's address, so the callee's final value lands back in
+# the caller's field while the rest of the record is untouched.
+
+class Box {
+    mut int count = 0
+    mut string label = "alpha"
+}
+
+fn setseven(mut int n) → void {
+    n ← 7
+}
+
+main {
+    mut Box b ← Box {}
+    setseven(mut b.count)
+    print b.count
+    print b.label
+}

@@ -332,11 +332,14 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
         // passes a deep duplicate (the call-site marker drives `copy_value`),
         // so the callee sees an ordinary value.
         Type::Ref(SemanticMutability::Copy, inner) => classify(types, *inner),
-        // A `ref` or `mut` view of a list or a genus is the same pointer: both
-        // already alias (R1). A view of a scalar would need a pointer to the
-        // caller's cell, which this subset does not emit.
+        // A `ref` or `mut` view of a list, a genus or text is the same
+        // pointer: all three already alias (R1). A view of a scalar is a
+        // pointer to the caller's cell, which `classify_ref` spells for a
+        // parameter; anywhere else it is still rejected by name.
         Type::Ref(_, inner) => match classify(types, *inner)? {
-            shared @ (Ty::List(_) | Ty::Genus(_) | Ty::Opt(Inner::Genus(_))) => Ok(shared),
+            shared @ (Ty::List(_) | Ty::Genus(_) | Ty::Opt(Inner::Genus(_)) | Ty::Text) => {
+                Ok(shared)
+            }
             _ => Err(unsupported("ref or mut access to a scalar")),
         },
         Type::Primitive(Primitive::Numerus)
@@ -431,6 +434,21 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             None => Err(unsupported("optional of a sized integer or an optional")),
         },
         other => Err(unsupported(describe(other))),
+    }
+}
+
+/// The class of a `ref`/`mut` parameter whose C storage is a pointer to the
+/// caller's cell. `None` when `ty` is not such a view: an ordinary parameter,
+/// or a view of a list, genus or text (each already passes its pointer).
+pub(crate) fn classify_ref(types: &TypeTable, ty: TypeId) -> Result<Option<Ty>, CodegenError> {
+    match types.get(ty) {
+        Type::Alias(_, inner) => classify_ref(types, *inner),
+        Type::Ref(SemanticMutability::Copy, _) => Ok(None),
+        Type::Ref(_, inner) => match classify(types, *inner)? {
+            Ty::List(_) | Ty::Genus(_) | Ty::Opt(Inner::Genus(_)) | Ty::Text => Ok(None),
+            class => Ok(Some(class)),
+        },
+        _ => Ok(None),
     }
 }
 

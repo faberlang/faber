@@ -99,3 +99,24 @@ fn a_schema_declaration_has_no_runtime_effect() {
     assert!(code.contains("\"schema declared\""), "{code}");
     assert!(!code.contains("Persona"), "{code}");
 }
+
+#[test]
+fn a_mut_scalar_parameter_borrows_the_callers_cell() {
+    // `mut int x` is a pointer to the caller's cell: the body reads and stores
+    // through it, and a `mut` argument passes the caller's address.
+    let code = emitted(
+        "fn bump(mut int x) → void {\n    x ← x + 1\n}\nmain {\n    mut int n ← 1\n    bump(mut n)\n    print n\n}",
+    );
+    assert!(code.contains("static void f_bump(int64_t *p_x)"), "{code}");
+    assert!(code.contains("f_bump((&l_n))"), "{code}");
+    assert!(code.contains("(*p_x) ="), "{code}");
+}
+
+#[test]
+fn a_ref_text_parameter_is_the_identity_pointer() {
+    // Text is already a `const char *`; a `ref` view passes it unchanged.
+    let code = emitted(
+        "fn show(ref string s) → void {\n    print s\n}\nmain {\n    show(\"hi\")\n}",
+    );
+    assert!(code.contains("static void f_show(const char *p_s)"), "{code}");
+}

@@ -68,15 +68,15 @@ fn nested_list_type() {
     );
 }
 
-/// `mut int` would need a pointer to the caller's cell; only lists, which
-/// already alias, take an access marker in this subset.
+/// `mut string` would need a pointer to the caller's pointer; a `ref` text is
+/// the identity pointer and a `ref`/`mut` scalar borrows the caller's cell.
 #[test]
-fn access_marker_on_a_scalar_parameter() {
+fn access_marker_on_a_text_pointer() {
     assert_eq!(
         rejected(
-            "fn bump(mut int x) {\n    x ← x + 1\n}\nmain {\n    mut int n ← 1\n    bump(mut n)\n    print n\n}"
+            "fn put(mut string s) {\n    s ← \"b\"\n}\nmain {\n    mut string x ← \"a\"\n    put(mut x)\n}"
         ),
-        "ref or mut access to a scalar"
+        "parameter access marker on a scalar, own, or axis"
     );
 }
 
