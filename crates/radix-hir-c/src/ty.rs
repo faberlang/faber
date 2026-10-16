@@ -111,9 +111,8 @@ impl Inner {
             Ty::Modular(width) => Some(Inner::Modular(width)),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
-            Ty::Sized(_) | Ty::Saturating(_) | Ty::Opt(_) | Ty::None | Ty::Decimal | Ty::Set(_) => {
-                None
-            }
+            Ty::Sized(_) | Ty::Saturating(_) | Ty::Opt(_) | Ty::None | Ty::Decimal | Ty::Set(_)
+            | Ty::Map(..) => None,
         }
     }
 
@@ -169,6 +168,10 @@ pub(crate) enum Ty {
     /// the set contract (`add` is unique, `delete` by value), so a set is a
     /// `faber_list_<elem> *` too.
     Set(Elem),
+    /// `map<K, V>` (`tabula`): an arena-allocated `faber_map_<k>_<v>` handled
+    /// by pointer, so every bind aliases (R1). Keys and values are `int` or
+    /// `text`, the classes the corpus maps use.
+    Map(Elem, Elem),
     /// A genus (`class`): a pointer to an arena-allocated C struct, so every
     /// bind aliases (R1).
     Genus(DefId),
@@ -253,6 +256,13 @@ impl Ty {
             Ty::Float => Some("double"),
             Ty::Decimal => Some("faber_dec"),
             Ty::List(elem) | Ty::Set(elem) => Some(elem.list_c_pointer()),
+            Ty::Map(k, v) => match (k, v) {
+                (Elem::Int, Elem::Int) => Some("faber_map_i64_i64 *"),
+                (Elem::Int, Elem::Text) => Some("faber_map_i64_text *"),
+                (Elem::Text, Elem::Int) => Some("faber_map_text_i64 *"),
+                (Elem::Text, Elem::Text) => Some("faber_map_text_text *"),
+                _ => None,
+            },
             Ty::Genus(_) => None,
         }
     }
@@ -280,6 +290,15 @@ fn int_width(width: NumericWidth) -> Option<IntWidth> {
         NumericWidth::U16 => Some(IntWidth::U16),
         NumericWidth::U32 => Some(IntWidth::U32),
         NumericWidth::U64 => Some(IntWidth::U64),
+        _ => None,
+    }
+}
+
+/// The element class a map key or value may carry: `int` or `text`.
+fn map_elem(ty: Ty) -> Option<Elem> {
+    match ty {
+        Ty::Int => Some(Elem::Int),
+        Ty::Text => Some(Elem::Text),
         _ => None,
     }
 }
@@ -349,6 +368,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::Saturating(_) => Err(unsupported("list of saturating words")),
                 Ty::None => Err(unsupported("list of none")),
                 Ty::Set(_) => Err(unsupported("list of sets")),
+                Ty::Map(..) => Err(unsupported("list of maps")),
             }
         }
         // A set is the list storage under the set contract (`add` unique,
@@ -367,7 +387,17 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             Ty::Opt(_) => Err(unsupported("set of optionals")),
             Ty::Decimal => Err(unsupported("set of decimals")),
             Ty::None => Err(unsupported("set of none")),
+            Ty::Map(..) => Err(unsupported("set of maps")),
         },
+        // A map carries `int` or `text` keys and values (the corpus classes),
+        // backed by parallel lists in `faber_map_<k>_<v>`.
+        Type::Map(key, value) => {
+            let k = map_elem(classify(types, *key)?)
+                .ok_or_else(|| unsupported("map with a key class outside int/text"))?;
+            let v = map_elem(classify(types, *value)?)
+                .ok_or_else(|| unsupported("map with a value class outside int/text"))?;
+            Ok(Ty::Map(k, v))
+        }
         // An enumeration is a genus-shaped value: a tagged pointer.
         Type::Struct(def_id) | Type::Enum(def_id) => Ok(Ty::Genus(*def_id)),
         Type::Option(inner) => match Inner::from_ty(classify(types, *inner)?) {

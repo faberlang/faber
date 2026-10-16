@@ -28,6 +28,7 @@ mod genus;
 mod helpers;
 mod items;
 mod list;
+mod map;
 mod names;
 mod numeric;
 mod option;
@@ -57,6 +58,8 @@ mod enumeration_test;
 mod item_test;
 #[cfg(test)]
 mod list_test;
+#[cfg(test)]
+mod map_test;
 #[cfg(test)]
 mod names_test;
 #[cfg(test)]
@@ -328,6 +331,10 @@ impl Emitter<'_> {
                 if elem == crate::ty::Elem::Bool {
                     self.support.need_bool();
                 }
+            }
+            Ty::Map(k, v) => {
+                self.need_class(Ty::List(k));
+                self.need_class(Ty::List(v));
             }
         }
     }

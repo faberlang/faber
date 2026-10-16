@@ -180,6 +180,26 @@ impl Emitter<'_> {
                 )
             }
             (Value::Set(elem), Ty::Set(slot)) if slot == elem => value,
+            // `tabula ↦ lista<T>`: the target element class picks the keys
+            // (`T` is the key class) or the values (`T` is the value class).
+            (Value::Map(k, v), Ty::List(slot)) if slot == k => {
+                self.support.need(Helper::List(k, ListOp::New));
+                Operand::new(
+                    format!("faber_map_{}_keys(faber_a, {})", Self::map_suffix(k, v), value.text),
+                    Value::List(k),
+                )
+            }
+            (Value::Map(k, v), Ty::List(slot)) if slot == v => {
+                self.support.need(Helper::List(v, ListOp::New));
+                Operand::new(
+                    format!(
+                        "faber_map_{}_values(faber_a, {})",
+                        Self::map_suffix(k, v),
+                        value.text
+                    ),
+                    Value::List(v),
+                )
+            }
             (_, Ty::Int | Ty::Sized(_)) if integer => {
                 self.fallible_int(&value, class, Kind::IntInt, None, params, recovery)?
             }

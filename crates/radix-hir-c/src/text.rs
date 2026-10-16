@@ -152,6 +152,7 @@ impl Emitter<'_> {
                 Ok(format!("faber_dec_fmt(faber_a, {})", operand.text))
             }
             Value::List(elem) | Value::Set(elem) => self.show_list(&operand.text, elem),
+            Value::Map(..) => Err(unsupported("showing a map")),
             Value::Genus(def_id) => self.show_genus(&operand.text, def_id),
             Value::Float => {
                 self.support.need(Helper::FloatText);

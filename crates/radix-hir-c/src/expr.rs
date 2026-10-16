@@ -47,6 +47,8 @@ pub(crate) enum Value {
     List(Elem),
     /// A pointer to an arena-allocated set (the same list storage).
     Set(Elem),
+    /// A pointer to an arena-allocated map (`faber_map_<k>_<v>`).
+    Map(Elem, Elem),
     /// A pointer to an arena-allocated genus.
     Genus(DefId),
     /// A binary64 value (`double`).
@@ -72,6 +74,7 @@ impl From<Ty> for Value {
             Ty::Bool => Value::Truth,
             Ty::List(elem) => Value::List(elem),
             Ty::Set(elem) => Value::Set(elem),
+            Ty::Map(k, v) => Value::Map(k, v),
             Ty::Genus(def_id) => Value::Genus(def_id),
             Ty::Float => Value::Float,
             Ty::Decimal => Value::Decimal,
@@ -201,6 +204,14 @@ impl Emitter<'_> {
                 }
             }
             HirExpressionKind::Literal(literal) => {
+                // `{ "k": v }` ascribed to a map is a JSON object: build the
+                // map, not a `valor`.
+                if let HirLiteral::JsonValor(value) = literal
+                    && let Some(Ty::Map(k, v)) =
+                        expr.ty.map(|ty| classify(self.types, ty)).transpose()?
+                {
+                    return self.map_json_literal(k, v, value);
+                }
                 // An integer literal typed as a float is that float (`1` in a
                 // `float` slot is `1.0`); typecheck admits no other crossing.
                 let as_float = expr.ty.is_some_and(|ty| {
@@ -289,11 +300,17 @@ impl Emitter<'_> {
             HirExpressionKind::Vacua => {
                 match expr.ty.map(|ty| classify(self.types, ty)).transpose()? {
                     Some(Ty::Set(elem)) => Ok(self.empty_set(elem)),
+                    Some(Ty::Map(k, v)) => Ok(self.empty_map(k, v)),
                     _ => self.empty_list(expr),
                 }
             }
             HirExpressionKind::Array(elements) => self.list_literal(expr, elements),
-            HirExpressionKind::Index(base, index) => self.list_read(base, index),
+            HirExpressionKind::Index(base, index) => {
+                match crate::map::map_class(self.types, base.ty) {
+                    Some((k, v)) => self.map_read(base, index, k, v),
+                    None => self.list_read(base, index),
+                }
+            }
             // `copy x` on a value (a bind or a return), `own x` a transfer.
             HirExpressionKind::Marked { marker, expr } => match marker {
                 radix_hir::HirArgMarker::Copy => {
@@ -327,6 +344,9 @@ impl Emitter<'_> {
                 if let Some(Ty::Set(_)) = class {
                     return self.set_method(receiver, *method, args);
                 }
+                if let Some(Ty::Map(..)) = class {
+                    return self.map_method(receiver, *method, args);
+                }
                 self.list_method(receiver, *method, args)
             }
             HirExpressionKind::Sort {
@@ -353,6 +373,7 @@ impl Emitter<'_> {
                 ..
             } => match classify(self.types, *target)? {
                 Ty::Genus(def_id) => self.construct_entries(def_id, entries),
+                Ty::Map(k, v) => self.map_entries(k, v, entries),
                 _ => Err(unsupported("object literal that is not a genus")),
             },
             // `value ∷ T`: the value, checked against the type it is given.
@@ -634,6 +655,7 @@ impl Emitter<'_> {
                 "bool ".to_owned()
             }
             Value::List(elem) | Value::Set(elem) => elem.list_c_pointer().to_owned(),
+            Value::Map(k, v) => Self::map_c_type(k, v),
             Value::Float => "double ".to_owned(),
             Value::Decimal => {
                 self.support.need(Helper::Decimal);
@@ -1124,6 +1146,15 @@ impl Emitter<'_> {
         }
         if self.list_element(left.ty).is_some() || self.list_element(right.ty).is_some() {
             return self.list_binary(op, left, right, ty, l, r);
+        }
+        // `k ∈ m` / `k ∉ m`: key membership. A map operand is not a list, so
+        // this runs before the scalar paths reject the op.
+        if matches!(op, HirBinOp::Between | HirBinOp::NotBetween)
+            && let Some((k, v)) = crate::map::map_class(self.types, left.ty)
+                .or_else(|| crate::map::map_class(self.types, right.ty))
+        {
+            let map_is_left = crate::map::map_class(self.types, left.ty).is_some();
+            return self.map_membership(op == HirBinOp::NotBetween, k, v, map_is_left, l, r);
         }
         if l.value == Value::Decimal || r.value == Value::Decimal {
             return self.decimal_binary(op, l, r);

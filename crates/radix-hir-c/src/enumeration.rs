@@ -389,6 +389,7 @@ impl Emitter<'_> {
             | Ty::Opt(_)
             | Ty::List(_)
             | Ty::Set(_)
+            | Ty::Map(..)
             | Ty::Decimal
             | Ty::Modular(_)
             | Ty::Saturating(_) => Err(unsupported(

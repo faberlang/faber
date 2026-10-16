@@ -801,7 +801,10 @@ impl Emitter<'_> {
             return Ok(());
         }
         if let HirExpressionKind::Index(base, index) = &place.kind {
-            let line = self.list_write(base, index, value)?;
+            let line = match crate::map::map_class(self.types, base.ty) {
+                Some((k, v)) => self.map_write(base, index, value, k, v)?,
+                None => self.list_write(base, index, value)?,
+            };
             self.line(out, &line);
             return Ok(());
         }
@@ -945,6 +948,7 @@ impl Emitter<'_> {
                 // program, `verum` / `falsum` for a `la` one.
                 Value::Truth => ("%s", format!("({} ? {yes} : {no})", value.text)),
                 Value::List(elem) | Value::Set(elem) => ("%s", self.show_list(&value.text, elem)?),
+                Value::Map(..) => return Err(unsupported("printing a map")),
                 Value::Genus(def_id) => ("%s", self.show_genus(&value.text, def_id)?),
                 Value::Opt(inner) => ("%s", self.show_option(&value.text, inner)?),
                 Value::Float => (

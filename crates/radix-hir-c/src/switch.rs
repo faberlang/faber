@@ -61,6 +61,7 @@ impl Emitter<'_> {
                 Value::Decimal => Ty::Decimal,
                 Value::List(elem) => Ty::List(elem),
                 Value::Set(elem) => Ty::Set(elem),
+                Value::Map(k, v) => Ty::Map(k, v),
                 Value::Genus(def_id) => Ty::Genus(def_id),
                 Value::Opt(inner) => Ty::Opt(inner),
                 Value::Exact | Value::Void | Value::None => {

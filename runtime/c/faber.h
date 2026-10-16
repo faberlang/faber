@@ -1841,6 +1841,94 @@ FABER_SET(text, faber_text, FABER_LIST_EQ_TEXT, FABER_LIST_LT_TEXT)
 FABER_SET(bool, bool, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_SET(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64)
 
+/* Maps (`tabula<K,V>`): parallel key and value lists with a linear scan, so a
+ * map is an arena pointer and every bind aliases (R1). The corpus sizes are
+ * small and order is unspecified (D19.2); a future unit may replace this with
+ * a hash table without changing the emitter's contract. Keys are `int` and
+ * `text` only (the element classes the corpus uses). */
+#define FABER_MAP(KN, KT, KEQ, VN, VT)                                                  \
+    typedef struct faber_map_##KN##_##VN {                                             \
+        faber_list_##KN *keys;                                                          \
+        faber_list_##VN *values;                                                        \
+    } faber_map_##KN##_##VN;                                                            \
+                                                                                        \
+    static inline faber_map_##KN##_##VN *faber_map_##KN##_##VN##_new(                   \
+        faber_arena *arena) {                                                           \
+        faber_map_##KN##_##VN *map = faber_alloc(arena, sizeof *map);                   \
+        map->keys = faber_list_##KN##_new(arena, 0);                                    \
+        map->values = faber_list_##VN##_new(arena, 0);                                  \
+        return map;                                                                     \
+    }                                                                                   \
+                                                                                        \
+    /* The key's position, or -1. */                                                    \
+    static inline int64_t faber_map_##KN##_##VN##_find(                                 \
+        const faber_map_##KN##_##VN *map, KT key) {                                     \
+        int64_t at;                                                                     \
+        for (at = 0; at < map->keys->len; at++) {                                       \
+            if (KEQ(map->keys->items[at], key)) {                                       \
+                return at;                                                              \
+            }                                                                           \
+        }                                                                               \
+        return -1;                                                                      \
+    }                                                                                   \
+                                                                                        \
+    static inline void faber_map_##KN##_##VN##_put(                                     \
+        faber_arena *arena, faber_map_##KN##_##VN *map, KT key, VT value) {             \
+        int64_t at = faber_map_##KN##_##VN##_find(map, key);                            \
+        if (at < 0) {                                                                   \
+            faber_list_##KN##_push(arena, map->keys, key);                              \
+            faber_list_##VN##_push(arena, map->values, value);                          \
+        } else {                                                                        \
+            map->values->items[at] = value;                                             \
+        }                                                                               \
+    }                                                                                   \
+                                                                                        \
+    static inline bool faber_map_##KN##_##VN##_get(                                     \
+        const faber_map_##KN##_##VN *map, KT key, VT *out) {                            \
+        int64_t at = faber_map_##KN##_##VN##_find(map, key);                            \
+        if (at < 0) {                                                                   \
+            return false;                                                               \
+        }                                                                               \
+        *out = map->values->items[at];                                                  \
+        return true;                                                                    \
+    }                                                                                   \
+                                                                                        \
+    static inline bool faber_map_##KN##_##VN##_has(                                     \
+        const faber_map_##KN##_##VN *map, KT key) {                                     \
+        return faber_map_##KN##_##VN##_find(map, key) >= 0;                             \
+    }                                                                                   \
+                                                                                        \
+    static inline bool faber_map_##KN##_##VN##_delete(                                  \
+        faber_map_##KN##_##VN *map, KT key) {                                           \
+        int64_t at = faber_map_##KN##_##VN##_find(map, key);                            \
+        if (at < 0) {                                                                   \
+            return false;                                                               \
+        }                                                                               \
+        memmove(map->keys->items + at, map->keys->items + at + 1,                       \
+                (size_t)(map->keys->len - at - 1) * sizeof *map->keys->items);          \
+        map->keys->len--;                                                               \
+        memmove(map->values->items + at, map->values->items + at + 1,                   \
+                (size_t)(map->values->len - at - 1) * sizeof *map->values->items);      \
+        map->values->len--;                                                             \
+        return true;                                                                    \
+    }                                                                                   \
+                                                                                        \
+    /* `tabula ↦ lista<T>`: the keys or the values in a new list. */                 \
+    static inline faber_list_##KN *faber_map_##KN##_##VN##_keys(                        \
+        faber_arena *arena, const faber_map_##KN##_##VN *map) {                         \
+        return faber_list_##KN##_copy(arena, map->keys);                                \
+    }                                                                                   \
+                                                                                        \
+    static inline faber_list_##VN *faber_map_##KN##_##VN##_values(                      \
+        faber_arena *arena, const faber_map_##KN##_##VN *map) {                         \
+        return faber_list_##VN##_copy(arena, map->values);                              \
+    }
+
+FABER_MAP(i64, int64_t, FABER_LIST_EQ_SCALAR, i64, int64_t)
+FABER_MAP(i64, int64_t, FABER_LIST_EQ_SCALAR, text, faber_text)
+FABER_MAP(text, faber_text, FABER_LIST_EQ_TEXT, i64, int64_t)
+FABER_MAP(text, faber_text, FABER_LIST_EQ_TEXT, text, faber_text)
+
 /* ------------------------------------------------------------------------ */
 /* Elementwise list operators                                               */
 /* ------------------------------------------------------------------------ */
