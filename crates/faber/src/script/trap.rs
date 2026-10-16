@@ -30,10 +30,6 @@ impl Host for TrapHost<'_> {
         self.inner.read_line()
     }
 
-    fn read_all(&mut self) -> Result<Option<String>, RunnerError> {
-        self.inner.read_all()
-    }
-
     fn abort(&mut self, reason: &str) -> ! {
         // WHY: the trap unwinds before the inner host's own `abort` can print,
         // so report the reason on the host's stderr channel (`Mone`) here,
