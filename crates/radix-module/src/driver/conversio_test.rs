@@ -228,13 +228,17 @@ fn bivalens_to_fractus_conversio_emits_conditional_literals() {
 
 #[cfg(feature = "hir-rust")]
 #[test]
-fn ascii_to_bivalens_conversio_emits_is_empty() {
+fn ascii_to_bivalens_conversio_parses_the_locale_words() {
     let session = test_session_la(Target::HirRust);
     let source = "incipit { sit _ b ← 'hi' ↦ bivalens }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
-    assert!(code.contains(".is_empty()"), "expected is_empty truthiness, got:\n{code}");
+    assert!(
+        code.contains("\"verum\" => true") && code.contains("\"falsum\" => false"),
+        "expected the code locale's true/false words, got:\n{code}"
+    );
+    assert!(!code.contains(".is_empty()"), "text truthiness is retired, got:\n{code}");
 }
 
 #[cfg(feature = "hir-rust")]

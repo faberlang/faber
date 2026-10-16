@@ -1513,6 +1513,18 @@ pub(super) fn lower_package_units<'a>(
             &entry_path,
         )?;
         let mut templates = library.templates.clone();
+        // A template body that names a function of its own library (a
+        // synthetic failure-conversion helper behind `⇥`) cannot be
+        // instantiated before that library is appended: the instance would
+        // call a function id the merged program does not hold yet, and the
+        // merge validation rejects it. Such templates instantiate when their
+        // library is appended, which sees the whole merged program including
+        // the entry and sibling call sites.
+        templates.retain(|template| {
+            scan_mir_function_body_references(template)
+                .functions
+                .is_empty()
+        });
         shift_templates(&mut templates, offset);
         future_library_templates.extend(templates);
         future_library_generic_params.extend(library.generic_params.clone());

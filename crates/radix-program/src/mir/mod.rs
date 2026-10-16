@@ -767,6 +767,10 @@ mod monomorphized_field_assign_link_tests;
 mod namespace_type_arg_link_tests;
 
 #[cfg(test)]
+#[path = "imported_failable_call_test.rs"]
+mod imported_failable_call_tests;
+
+#[cfg(test)]
 #[path = "generic_size_forwarding_test.rs"]
 mod generic_size_forwarding_tests;
 
