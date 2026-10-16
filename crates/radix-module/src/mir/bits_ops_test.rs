@@ -130,6 +130,17 @@ fn ok_program(source: &str) -> Vec<String> {
 }
 
 #[test]
+fn bits_literal_arguments_run_at_the_parameter_width() {
+    let source = "functio masca(b8 x, b8 m) → b8 { redde x ∧ m }\n\
+                  functio verto(b16 x) → b16 { redde (x ⇐ 8) ∨ (x ⇒ 8) }\n\
+                  incipit {\n\
+                  nota masca(0xff, 0x0f)\n\
+                  nota verto(0x1234)\n\
+                  }\n";
+    assert_eq!(ok_program(source), ["0x0f", "0x3412"]);
+}
+
+#[test]
 fn bits_print_as_hex_inside_lists_tuples_genus_fields_and_templates() {
     assert_eq!(ok("sit lista<b8> xs ← [0x7f, 0x01]\nnota xs"), ["[0x7f, 0x01]"]);
     assert_eq!(ok("sit b16 a ← 0x7f\nnota \"v=§\"(a)"), ["v=0x007f"]);

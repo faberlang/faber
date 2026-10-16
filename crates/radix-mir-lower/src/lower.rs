@@ -3683,6 +3683,20 @@ impl<'a> FunctionBuilder<'a> {
     fn lower_literal(&mut self, literal: &HirLiteral, ty: Option<TypeId>, span: Span) -> Option<MirOperand> {
         match literal {
             HirLiteral::Int(value) => {
+                // A raw-bits literal has to reach a `bN` call parameter
+                // carrying its own width: a bare `Int`/`UInt` constant is typed
+                // `numerus`, and MIR rejects it against a `bN` parameter. Ride
+                // a temp typed by the literal's own semantic type, the way a
+                // bounded `ascii<N>` rides one (need, item 11), and
+                // keep the zero-extended `UInt` carrier a raw-bits cell stores
+                // (it prints as hex, and the `Int` carrier does not).
+                if let Some(bits_ty) = ty.filter(|ty| matches!(self.normalized_type(*ty), Type::Bits(_))) {
+                    return Some(self.assign_temp(
+                        MirValueKind::Operand(MirOperand::Constant(MirConstant::UInt(*value))),
+                        MirType::semantic(bits_ty),
+                        span,
+                    ));
+                }
                 // Type-aware carrier: unsigned targets (`numerus<uW>` unsigned,
                 // `modulus<uW>`) carry `UInt` even for small magnitudes, so
                 // literals agree with conversion and arithmetic results on
