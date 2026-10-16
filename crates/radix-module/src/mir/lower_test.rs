@@ -1310,6 +1310,42 @@ function f0 -> ty#5 {
 }
 
 #[test]
+fn lowers_incipit_exitus_tail_as_int_returning_entry() {
+    let dump = dump_source(r"incipit exitus 3 { tacet }");
+
+    assert!(
+        !dump.starts_with("function f0 -> ty#5"),
+        "an int exitus tail makes the entry non-vacuum; the dump must not open with the vacuum entry header:\n{dump}"
+    );
+    assert!(
+        dump.starts_with("function f0 -> ty#1 {"),
+        "the int-returning entry header pins ty#1 (numerus):\n{dump}"
+    );
+    assert!(
+        dump.contains("const int 3"),
+        "the exitus tail is evaluated inside the entry body:\n{dump}"
+    );
+    assert!(
+        dump.contains("return %0"),
+        "the entry terminates with Return(Some) carrying the tail temp: {dump}"
+    );
+}
+
+#[test]
+fn lowers_non_integer_exitus_tail_keeps_vacuum_entry() {
+    let dump = dump_source(r#"incipit exitus "x" { tacet }"#);
+
+    assert!(
+        dump.starts_with("function f0 -> ty#5 {"),
+        "a non-int exitus tail keeps the vacuum entry header:\n{dump}"
+    );
+    assert!(
+        !dump.contains("return %"),
+        "a non-int tail is never returned; the entry ends with a bare return:\n{dump}"
+    );
+}
+
+#[test]
 fn lowers_tacet_to_noop() {
     let dump = dump_source(r"incipit { tacet }");
 
