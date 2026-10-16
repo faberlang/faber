@@ -153,7 +153,10 @@ fn host_kernel_lowering_runs_a_rank_two_size_generic_kernel_with_a_helper_call()
     let source = r"
 @ kernel
 fn sum2<size H, size W>(tensor<f32, [H, W]> t, i32 x, i32 y) → f32 {
-    return t[[y, x]] + 1.0
+    if 0 ≤ x and 0 ≤ y {
+        return t[[y, x]] + 1.0
+    }
+    return 0.0
 }
 @ kernel
 @ public
