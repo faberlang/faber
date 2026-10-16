@@ -1222,15 +1222,16 @@ impl TypeChecker<'_> {
     /// integers of different widths join like any binary pair. `None` when the
     /// pair is not a trapping-integer pair or is already two constants, so the
     /// exact-type rule still applies (int against float stays an error).
+    ///
+    /// Ruling 12 joins kernel endpoints by the same rule as host endpoints:
+    /// an integer literal joined with an `i32`/`u32` endpoint is an `i32`/`u32`
+    /// in both places, so a kernel range over `0‥n` takes the joined width.
     pub(super) fn join_intervallum_bounds(
         &mut self,
         start: (&HirExpression, TypeId),
         end: (&HirExpression, TypeId),
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
-        if self.current_device_function {
-            return None;
-        }
         let side = |this: &Self, (expr, ty): (&HirExpression, TypeId)| {
             let width = this.plain_int_width(ty)?;
             Some((width, const_int_value(expr)))
