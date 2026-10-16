@@ -275,7 +275,10 @@ impl Emitter<'_> {
             HirExpressionKind::Itera {
                 mode: HirIteraMode::Ex,
                 coordinates,
-                filum: None,
+                // A lane binder (`thread f` / `filum f`) is declared metadata,
+                // not a runtime binding: MIR lowering ignores it, so the C
+                // loop is the plain single-source loop.
+                filum: _,
                 binding,
                 binding_name,
                 iter,
@@ -292,7 +295,7 @@ impl Emitter<'_> {
             HirExpressionKind::Itera {
                 mode: HirIteraMode::Ab,
                 coordinates,
-                filum: None,
+                filum: _,
                 binding,
                 binding_name,
                 iter,

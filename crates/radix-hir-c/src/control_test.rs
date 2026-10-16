@@ -102,3 +102,14 @@ fn a_deferred_binding_is_declared_unwritten() {
     assert!(code.contains("int64_t l_pending;"), "{code}");
     assert!(code.contains("l_pending = INT64_C(7);"), "{code}");
 }
+
+#[test]
+fn a_thread_lane_binder_is_declared_metadata() {
+    // `thread f` names a loop lane for later parallel lowering and is ignored
+    // on the way to MIR, so the emitted loop is the plain single-source loop.
+    let code = emitted(
+        "main {\n    let list<int> xs ← [1, 2]\n    for from xs at [i] thread lane let v {\n        print i, v\n    }\n}",
+    );
+    assert!(code.contains("faber_i0 < faber_t0->len"), "{code}");
+    assert!(!code.contains("lane"), "{code}");
+}
