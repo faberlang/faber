@@ -6,6 +6,9 @@ that a model can predict what a program means without importing the habits of
 whichever language it saw most in training. It compiles to many targets, from
 a reference interpreter and readable C to Rust, Go, TypeScript and GPU kernels.
 
+> **Experimental through version 1.** The language changes constantly, and
+> breaking changes ship in minor releases. See [Status](#status).
+
 This README is written for people who design and implement languages. The short
 version of what is different:
 
@@ -453,8 +456,11 @@ target/release/faber corpus corpus-suites/public --target runner
 
 ## Status
 
-Faber is under active development and changes quickly; the 2.0 line is being
-prepared. Expect the language and the commands to keep moving until then.
+**Faber is experimental through version 1.** The language, the standard library
+and the commands change from one minor release to the next, and the changes are
+often breaking: syntax is retired and replaced outright, with no compatibility
+layer. No 1.x release carries a stability promise. Pin an exact version, and read
+the release notes before you upgrade.
 
 ## License and authorship
 
