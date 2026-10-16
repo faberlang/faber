@@ -115,19 +115,22 @@ fn run_check(args: &[&str], path: &std::path::Path) -> (bool, String) {
     )
 }
 
-/// A subcommand CLI program passes semantic analysis but the MIR package
-/// lowering refuses its CLI surface (`package_mir_cli_surface_unsupported`).
-/// It is the stable fixture for "checks but does not lower": the plumbing
-/// under test is the opt-in flag, the located named issue and the final line,
-/// not which construct is unsupported today. If lowering learns this surface,
-/// pick another checks-but-does-not-lower construct from
-/// `scripta/check-lower-sweep.known`.
+/// A CLI program with a required operand passes semantic analysis, but the
+/// MIR package lowering refuses its CLI surface
+/// (`package_mir_cli_surface_unsupported`): plain `check` never supplies the
+/// runtime argumenta, so the required operand has no value and no default.
+/// It mirrors the `PKG001` row of `scripta/check-lower-sweep.known`
+/// (`corpus/operandus/operandus.fab`). It is the stable fixture for "checks
+/// but does not lower": the plumbing under test is the opt-in flag, the
+/// located named issue and the final line, not which construct is unsupported
+/// today. If lowering learns this surface, pick another
+/// checks-but-does-not-lower construct from `scripta/check-lower-sweep.known`.
 const CHECKS_BUT_DOES_NOT_LOWER_SOURCE: &str = r#"+++
 locale = "en"
 +++
-const int CODE = 7
-@ cli { name = "tool" }
-main args a exit CODE {
+@ cli "tool"
+@ operand string input description "Input path"
+main args a {
     print "c"
 }
 "#;
@@ -195,7 +198,7 @@ fn check_lower_diagnostics_mode_keeps_the_named_issue() {
     let file = root.path().join("located.fab");
     std::fs::write(
         &file,
-        "+++\nlocale = \"en\"\n+++\nconst int CODE = 7\n@ cli { name = \"tool\" }\nmain args a exit CODE {\n    print \"c\"\n}\n",
+        "+++\nlocale = \"en\"\n+++\n@ cli \"tool\"\n@ operand string input description \"Input path\"\nmain args a {\n    print \"c\"\n}\n",
     )
     .expect("write source");
     let (ok, stderr) = run_check(&["--lower", "--diagnostics"], &file);
