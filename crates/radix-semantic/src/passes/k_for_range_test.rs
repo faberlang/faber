@@ -223,3 +223,43 @@ fn lockstep_loop_still_declined() {
         "unproved_loop_form",
     );
 }
+
+/// A kernel range joins its endpoints by the same rule as the host (ruling 12),
+/// so an integer literal beside an `i32`/`u32` scalar parameter takes the
+/// parameter's width in both places. A float endpoint cannot join, so the
+/// exact-type fallback still rejects it.
+#[test]
+fn sized_int_range_endpoints_join_like_host() {
+    accepted(
+        r"@ nucleum
+@ publica
+functio range_loop(tensor<f32, [8]> x, i32 n) → f32 {
+    varia f32 acc ← 0.0
+    itera ab 0‥n sit k {
+        acc ← acc + x[[k]]
+    }
+    redde acc
+}",
+    );
+    accepted(
+        r"@ nucleum
+@ publica
+functio range_loop(tensor<f32, [8]> x, u32 n) → f32 {
+    varia f32 acc ← 0.0
+    itera ab 0‥n sit k {
+        acc ← acc + x[[k]]
+    }
+    redde acc
+}",
+    );
+    crate::test_support::assert_analysis_rejects_with_issue_la(
+        r"@ nucleum
+functio bad(i32 x, fractus f) → vacuum {
+    varia f32 acc ← 0.0
+    itera ab 0‥f sit i {
+        acc ← acc
+    }
+}",
+        "equality_exact_types_required",
+    );
+}
