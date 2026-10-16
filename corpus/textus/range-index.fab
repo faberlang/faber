@@ -1,0 +1,44 @@
++++
+term = "textus"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "call_expr", "member_suffix", "expression", "literal", "nota_stmt", "range_expr", "range_tail"]
+category = "range"
+canonical = false
+summary = "A range index reads a character window, half-open or inclusive, and never trims."
+syntax = "s[a‥b] · s[a…b]"
+related = ["textus", "intervallum"]
+locale = "en"
++++
+# =============================================================================
+# textus — a bracket range reads a character window
+# =============================================================================
+#
+# What this teaches:
+#   • `s[a‥b]` on a string is the half-open character window [a, b): it
+#     includes the character at `a` and stops before the character at `b`.
+#   • `s[a…b]` is the inclusive window: it keeps the characters at both `a`
+#     and `b`.
+#   • An empty window is allowed: `s[2‥2]` is the empty string.
+#   • Windows count Unicode characters, never bytes, so a multi-byte
+#     character stays whole.
+#
+# Common mistakes:
+#   • expecting a byte offset — to slice per byte, use the ascii type
+#   • expecting an out-of-range window to trim — it dies; it never trims
+#
+# See also: textus, intervallum
+#
+# EXPECTED OUTPUT:
+#   range-index.expected
+# =============================================================================
+
+main {
+    let string s ← "héllo😀x"
+    print s[0‥2]
+    print s[1‥6]
+    print s[2‥2]
+    print s[0‥7]
+    print s[5‥7]
+    let string t ← "abcdef"
+    print t[1…3]
+}
