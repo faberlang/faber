@@ -1496,6 +1496,30 @@ help = "แก้ไขโครงสร้าง AST สำหรับกา�
 message = "width marker ไม่รับพารามิเตอร์"
 help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
 
+[diagnostics.SEM008.issues.nucleum_d64]
+message = "d64 ไม่รองรับในเคอร์เนล nucleum"
+help = "ใช้ชนิดค่าของเคอร์เนลที่รองรับ"
+
+[diagnostics.SEM008.issues.nucleum_extent_unproven]
+message = "extent จำนวนเต็มของเคอร์เนล {extent} ไม่ได้รับการพิสูจน์ว่าอยู่ในช่วงที่ย้ายพอร์ตได้"
+help = "จำกัดค่า extent ให้อยู่ในช่วงจำนวนเต็มที่ย้ายพอร์ตได้"
+
+[diagnostics.SEM008.issues.nucleum_f64]
+message = "f64 ไม่รองรับในเคอร์เนล nucleum"
+help = "ใช้ f32 สำหรับค่าทศนิยมของเคอร์เนล"
+
+[diagnostics.SEM008.issues.nucleum_trapping_store]
+message = "การเก็บค่าที่มีความกว้าง {width} อาจ trap ในเคอร์เนล nucleum"
+help = "พิสูจน์ว่าการเก็บค่าอยู่ในช่วง หรือใช้เซลล์แบบ wrapping หรือ saturating"
+
+[diagnostics.SEM008.issues.nucleum_wide_integer]
+message = "ความกว้างจำนวนเต็ม {width} เกินความกว้างของเคอร์เนล nucleum ที่รองรับ"
+help = "ใช้ความกว้างจำนวนเต็มไม่เกิน 32 บิต"
+
+[diagnostics.SEM008.issues.nucleum_wide_intermediate]
+message = "extent ตัวกลางของเคอร์เนล {extent} เกินช่วงจำนวนเต็มที่ย้ายพอร์ตได้"
+help = "เก็บค่าตัวกลางให้อยู่ในช่วงจำนวนเต็มที่ย้ายพอร์ตได้"
+
 [diagnostics.SEM009]
 message = "ข้อผิดพลาดในการตรวจสอบ CLI"
 help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
@@ -2083,6 +2107,14 @@ help = "ทำให้ชนิดของนิพจน์ตรงกับ
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
 message = "postfix gradient selection (`call(...) ∇ [places]`) จะยังไม่ถูก lower จนกว่า tensor-glyphs 2B autograd surface จะมา; ไม่มีกฎ operand, selector หรือ result ใดทำงานใน Phase 2A"
 help = "gradient selection (`∇`) เป็นเพียง parse-only ใน Phase 2A; กฎ eligibility/selector จะมาพร้อมกับ tensor-glyphs 2B"
+
+[diagnostics.SEM010.issues.implet_method_signature_mismatch]
+message = "method {method} ของ genus {genus} ไม่ตรงกับ {implet} ของ {contract}: คาดว่า {expected} พบ {found}"
+help = "ทำให้ลายเซ็นของ method ตรงกับลายเซ็นที่ประกาศไว้ใน contract"
+
+[diagnostics.SEM010.issues.implet_missing_method]
+message = "genus {genus} ไม่ได้จัดหา method {method} ที่ {implet} ของ {contract} กำหนดไว้"
+help = "เพิ่ม method {method} ที่มีลายเซ็นตามที่ {contract} ประกาศ หรือเอา {implet} ออก"
 
 [diagnostics.SEM011]
 message = "ชนิดตัวถูกดำเนินการไม่ถูกต้อง"
