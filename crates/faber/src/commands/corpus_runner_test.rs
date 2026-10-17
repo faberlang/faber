@@ -140,7 +140,9 @@ fn library_case(check_only: bool, outcome: Outcome, fragment: Option<&str>) -> C
     library.dir = std::env::temp_dir();
     // Load-robust deadline: the synthetic 1s case deadline from `case` flakes under the
     // loaded parallel stage-4b gate; real corpus cases use CASE_TIMEOUT_SECS = 120.
-    library.timeout = Duration::from_secs(30);
+    // 30s was still exceeded twice under full-fleet saturation (2026-10-17 gates at
+    // 19:58Z and 20:26Z), so library cases now use the real-case budget.
+    library.timeout = Duration::from_secs(120);
     library
 }
 
