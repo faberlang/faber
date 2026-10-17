@@ -29,7 +29,7 @@ test "falsum contrasts with verum" {
 #   • Related keywords: verum, nihil
 #
 # Common mistakes:
-#   • Confusing `falsum` with `nihil` — `falsum` is a bivalens literal (false); `nihil` is the null/absent sentinel.
+#   • Confusing `falsum` with `none` (la `nihil`) — `falsum` is a bivalens literal (false); `none` is the absent-member type, and its value is `null` (`nulla`).
 #
 # See also: verum, nihil
 # =============================================================================

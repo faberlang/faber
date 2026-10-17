@@ -19,8 +19,8 @@ locale = "en"
 #   • The value conditional — `c ✓ a ✗ b` yields `a` when `c` holds, else `b`.
 #     The glyphs are U+2713 CHECK MARK and U+2717 BALLOT X, the same in every
 #     locale; there is no word spelling.
-#   • Narrowing — the branches narrow like `if` branches: after `x not is null`
-#     the `✓` branch sees `x` as non-null.
+#   • Narrowing — the branches narrow like `if` branches: after `x not is none`
+#     the `✓` branch sees `x` as non-`null`.
 #   • One level only — a `✓ ✗` inside another `✓ ✗` (in the condition or in
 #     either branch) is rejected. More than two outcomes read better as
 #     `if`/`elif`/`else`, a `match`, or a small function that `return`s each

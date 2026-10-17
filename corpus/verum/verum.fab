@@ -28,7 +28,7 @@ test "verum stands alone as a truthy condition" {
 #   • Truthiness prefix — `verum` can prefix an expression for explicit truthiness checking
 #
 # Common mistakes:
-#   • confusing verum (the true literal) with non nihil (a null check) — verum is a boolean value, not a presence test
+#   • confusing verum (the true literal) with `not is none` (la `non est nihil`) — verum is a boolean value, not a presence test
 #
 # See also: falsum, nihil
 # =============================================================================

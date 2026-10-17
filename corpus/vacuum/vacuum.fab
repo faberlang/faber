@@ -20,7 +20,7 @@ locale = "en"
 #   • Side-effect functions — functions returning `vacuum` execute for their side effects like `nota`
 #
 # Common mistakes:
-#   • confusing vacuum (void return type) with vacua (empty collection initializer) or nihil (null singleton)
+#   • confusing vacuum (void return type) with vacua (empty collection initializer) or `none` (la `nihil`), the absent-member type whose value is `null`
 #
 # See also: functio, redde
 # =============================================================================

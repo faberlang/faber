@@ -20,7 +20,7 @@ locale = "en"
 #   • Default values — combining `sponte` with `vel` to provide fallbacks when the value is omitted
 #
 # Common mistakes:
-#   • confusing sponte (optional parameter with a default) with ∪ nihil (nullable type) — sponte marks omission, ∪ nihil marks absence
+#   • confusing sponte (optional parameter with a default) with `∪ none` (la `∪ nihil`, the nullable type) — sponte marks omission, `∪ none` marks absence
 #
 # See also: vel, nihil, ∪, functio, genus
 # =============================================================================
