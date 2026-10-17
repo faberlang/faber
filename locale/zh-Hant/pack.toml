@@ -151,6 +151,7 @@ descriptio = "描述"
 longum = "詳"
 lane = "車道"
 ubique = "全局"
+annotatio = "註解"
 # Reduction expression surface (`reducta via Op ex source`).
 reducta = "歸約"
 pro = "按"

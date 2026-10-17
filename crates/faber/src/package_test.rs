@@ -12098,7 +12098,7 @@ locale = "en"
 # mirroring tela/src/web.fab's shape for the tela provider).
 
 @ public
-@ annotatio { target = fn }
+@ annotation { target = fn }
 class WebController {
     mut string selector
 }

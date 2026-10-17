@@ -299,7 +299,7 @@ payloads and ends them with declaration-boundary heuristics rather than `NEWLINE
 Those are implementation mismatches with this specification, not alternate
 language rules.
 
-**Annotation contracts:** `@ annotatio` (optionally `@ annotatio { target = functio }`)
+**Annotation contracts:** `@ annotation` (la `@ annotatio`; optionally `@ annotation { target = fn }`)
 marks a top-level `genus` as a compile-time annotation contract. Ordinary genera
 are not annotation schemas. Applications use `@ ContractName { field = constant }`
 and resolve through local declarations or imported file-interface exports.

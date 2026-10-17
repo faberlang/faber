@@ -1191,6 +1191,10 @@ mod capability_test;
 mod analyzed_application_test;
 
 #[cfg(test)]
+#[path = "annotation_contract_locale_test.rs"]
+mod annotation_contract_locale_test;
+
+#[cfg(test)]
 #[path = "annotation_contract_test.rs"]
 mod annotation_contract_test;
 

@@ -151,6 +151,7 @@ descriptio = "mô_tả"
 longum = "dài"
 lane = "làn"
 ubique = "toàn_cục"
+annotatio = "chú_thích"
 # Reduction expression surface (`reducta via Op ex source`).
 reducta = "rút_gọn"
 pro = "theo"

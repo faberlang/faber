@@ -151,6 +151,7 @@ descriptio = "विवरण"
 longum = "विस्तृत"
 lane = "लेन"
 ubique = "वैश्विक"
+annotatio = "टीका"
 # Reduction expression surface (`reducta via Op ex source`).
 reducta = "समेटो"
 pro = "अनुसार"

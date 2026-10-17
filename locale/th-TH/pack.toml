@@ -151,6 +151,7 @@ descriptio = "คำอธิบาย"
 longum = "ยาว"
 lane = "เลน"
 ubique = "โกลบอล"
+annotatio = "คำอธิบายประกอบ"
 # Reduction expression surface (`reducta via Op ex source`).
 reducta = "ลดรูป"
 pro = "ตาม"
