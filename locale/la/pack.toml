@@ -2259,6 +2259,14 @@ help = "make the expression type match the expected type"
 message = "contract {contract} takes {expected} type argument(s), found {found}"
 help = "write the contract with its type arguments in full, e.g. Orderable<Persona>"
 
+[diagnostics.SEM010.issues.implet_method_signature_mismatch]
+message = "{genus}.{method} does not match {contract}: expected {expected}, found {found}"
+help = "give {method} the parameter types and postures, return type and alternate-exit type of {contract}"
+
+[diagnostics.SEM010.issues.implet_missing_method]
+message = "{genus} does not declare {method} of {contract}"
+help = "declare {method} on {genus} with the signature {contract} gives it"
+
 [diagnostics.SEM010.issues.implet_requires_implendum]
 message = "{implet} must name an {implendum} (a contract)"
 help = "name an {implendum} declaration after {implet}"
