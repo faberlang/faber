@@ -35,6 +35,7 @@ const ROUTES: &[&str] = &[
     "consolum:loquitur",
     "consolum:admonet",
     "consolum:desinit",
+    "consolum:metire",
 ];
 
 /// Whether `route` belongs to this leaf. Pure name lookup; runs no handler.
@@ -57,6 +58,7 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
         "consolum:loquitur" => stdout_is_tty(args),
         "consolum:admonet" => stderr_is_tty(args),
         "consolum:desinit" => stdin_ended(args),
+        "consolum:metire" => tty_size(args),
         _ => return None,
     };
     Some(result)
@@ -253,4 +255,38 @@ fn stderr_is_tty(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "consolum:admonet";
     empty_ok(ROUTE, args)?;
     Ok(Reply::Bool(io::stderr().is_terminal()))
+}
+
+/// Terminal size of stdout as `[columns, rows]`. Zeroes when stdout is not a
+/// terminal or the host cannot answer, so a monitor can read a degenerate size
+/// instead of handling an error. This route never errors on a tty-less host.
+fn tty_size(args: &[Arg]) -> Result<Reply, LeafError> {
+    const ROUTE: &str = "consolum:metire";
+    empty_ok(ROUTE, args)?;
+    let (columns, rows) = terminal_size();
+    Ok(Reply::List(vec![Reply::Int(columns), Reply::Int(rows)]))
+}
+
+#[cfg(unix)]
+fn terminal_size() -> (i64, i64) {
+    let mut size = libc::winsize {
+        ws_col: 0,
+        ws_row: 0,
+        ws_xpixel: 0,
+        ws_ypixel: 0,
+    };
+    // SAFETY: `size` is a valid, writable `winsize` for the whole call, and
+    // `TIOCGWINSZ` on stdout (fd 1) writes nothing else. A failing ioctl
+    // leaves the zeroed struct untouched, which is the documented degenerate
+    // answer for a non-terminal stream.
+    let status = unsafe { libc::ioctl(1, libc::TIOCGWINSZ, &raw mut size) };
+    if status != 0 {
+        return (0, 0);
+    }
+    (i64::from(size.ws_col), i64::from(size.ws_row))
+}
+
+#[cfg(not(unix))]
+fn terminal_size() -> (i64, i64) {
+    (0, 0)
 }
