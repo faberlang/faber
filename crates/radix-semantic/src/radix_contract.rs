@@ -28,6 +28,10 @@ pub use radix_types::ordering::ORDERING_METHOD;
 /// The closing contract's one method (D8.3).
 pub const CLOSING_METHOD: &str = "close";
 
+/// The sinking contract's item method and flush.
+pub const SINKING_METHOD: &str = "sink";
+pub const SINKING_FLUSH_METHOD: &str = "flush";
+
 /// Compiler roles a norma contract can carry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RadixContractRole {
@@ -36,6 +40,9 @@ pub enum RadixContractRole {
     /// `close() → bool ⇥ string`; `sermo` conforms, and a closable type
     /// that can sit in a reference cycle is warned about (D8.3).
     Closing,
+    /// `sink(T item) → void ⇥ E` plus `flush() → void ⇥ E`;
+    /// `s ⇜ x` is the operator form of `sink`.
+    Sinking,
 }
 
 impl RadixContractRole {
@@ -44,6 +51,7 @@ impl RadixContractRole {
         match role {
             "ordering" => Some(Self::Ordering),
             "closing" => Some(Self::Closing),
+            "sinking" => Some(Self::Sinking),
             _ => None,
         }
     }
@@ -53,6 +61,7 @@ impl RadixContractRole {
         match self {
             Self::Ordering => "ordering",
             Self::Closing => "closing",
+            Self::Sinking => "sinking",
         }
     }
 }
@@ -148,4 +157,20 @@ pub(crate) fn contract_error(span: Span, issue: &'static str) -> SemanticError {
     SemanticError::structured(SemanticErrorKind::AnnotationInvalid, span)
         .with_arg("issue", issue)
         .with_arg("annotation", "@ radix contract")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sinking_role_round_trips() {
+        assert_eq!(
+            RadixContractRole::parse("sinking"),
+            Some(RadixContractRole::Sinking)
+        );
+        assert_eq!(RadixContractRole::Sinking.as_str(), "sinking");
+        assert_eq!(SINKING_METHOD, "sink");
+        assert_eq!(SINKING_FLUSH_METHOD, "flush");
+    }
 }
