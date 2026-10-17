@@ -2779,13 +2779,6 @@ pub(crate) fn round_float(value: f64, width: NumericWidth) -> f64 {
 /// Round a float at a store/conversion slot of `width` (ruling 26(d)): f16
 /// and bf16 round to their own formats, nearest-even, +/-inf past the finite
 /// range; f32 through binary32; f64 and non-float widths unchanged.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "GAPS #1 stages slot rounding before store/conversion wiring"
-    )
-)]
 pub(crate) fn round_float_at_slot(value: f64, width: NumericWidth) -> f64 {
     match width {
         NumericWidth::F64 => value,

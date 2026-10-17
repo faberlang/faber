@@ -26,6 +26,9 @@ mod aggregate;
 mod bits_list;
 #[cfg(test)]
 mod bivalens_text_test;
+#[cfg(test)]
+#[path = "conversio/f16_bf16_narrow_test.rs"]
+mod f16_bf16_narrow_test;
 mod inf;
 mod littera;
 #[cfg(test)]
