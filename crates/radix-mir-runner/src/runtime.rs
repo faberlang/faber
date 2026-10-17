@@ -1055,6 +1055,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 .variant_parents
                 .get(def)
                 .is_some_and(|parent| parent == target),
+            // A union member's `is <variant>` lowers to the variant's member
+            // type (a `Type::Struct` carrying the variant DefId); a variant
+            // DefId never collides with a real struct DefId, so the tag
+            // comparison cannot false-positive against plain structs.
+            (Value::EnumVariant(def, _), Type::Struct(target)) => def == target,
             _ => false,
         }
     }
