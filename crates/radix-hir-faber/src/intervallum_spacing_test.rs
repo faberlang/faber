@@ -1,6 +1,7 @@
-//! Range-spacing law for `Intervallum` emission:
-//! tight iff both endpoints are bare integer literals (unary-minus-wrapped
-//! literals included), space-padded otherwise.
+//! Range-spacing law for `Intervallum` emission (need, operator
+//! ruling 2026-10-17 option A): range glyphs are always space-padded, like
+//! every other infix glyph. The retired 91dd7cb9 literal exception is gone, so
+//! bare integer endpoints are padded too.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
 use radix_codegen_shared::CodeWriter;
@@ -98,31 +99,31 @@ fn range(start: HirExpression, end: HirExpression, kind: HirRangeKind) -> HirExp
 }
 
 #[test]
-fn bare_literal_pairs_emit_tight() {
+fn literal_pairs_emit_spaced() {
     let ctx = Ctx::new();
     assert_eq!(
         ctx.render(&range(lit(0), lit(5), HirRangeKind::Exclusive)),
-        "0‥5"
+        "0 ‥ 5"
     );
     assert_eq!(
         ctx.render(&range(lit(1), lit(10), HirRangeKind::Inclusive)),
-        "1…10"
+        "1 … 10"
     );
     // Unary minus over a literal is one operand in the emitter
     // (`Unary` writes `unop` + operand with no inner spacing, ops.rs Neg => "-"),
-    // so it stays bare.
+    // but the glyph padding does not depend on the endpoint shape.
     assert_eq!(
         ctx.render(&range(neg(lit(1)), lit(5), HirRangeKind::Exclusive)),
-        "-1‥5"
+        "-1 ‥ 5"
     );
     assert_eq!(
         ctx.render(&range(lit(0), neg(lit(5)), HirRangeKind::Exclusive)),
-        "0‥-5"
+        "0 ‥ -5"
     );
 }
 
 #[test]
-fn non_literal_endpoints_emit_expanded() {
+fn non_literal_endpoints_emit_spaced() {
     let mut ctx = Ctx::new();
     let n = ctx.path("n");
     let m = ctx.path("m");
@@ -153,23 +154,23 @@ fn slices_follow_the_same_spacing_law() {
     let mut ctx = Ctx::new();
     let xs = ctx.path("xs");
     let n = ctx.path("n");
-    let tight = expr(HirExpressionKind::Index(
+    let spaced = expr(HirExpressionKind::Index(
         Box::new(xs.clone()),
         Box::new(range(lit(0), lit(5), HirRangeKind::Exclusive)),
     ));
-    assert_eq!(ctx.render(&tight), "xs[0‥5]");
-    let expanded = expr(HirExpressionKind::Index(
+    assert_eq!(ctx.render(&spaced), "xs[0 ‥ 5]");
+    let variable = expr(HirExpressionKind::Index(
         Box::new(xs.clone()),
         Box::new(range(lit(0), n.clone(), HirRangeKind::Exclusive)),
     ));
-    assert_eq!(ctx.render(&expanded), "xs[0 ‥ n]");
+    assert_eq!(ctx.render(&variable), "xs[0 ‥ n]");
 }
 
 #[test]
 fn conversion_targets_follow_the_same_spacing_law() {
     let mut ctx = Ctx::new();
     let n = ctx.path("n");
-    let tight = expr(HirExpressionKind::Conversio {
+    let spaced = expr(HirExpressionKind::Conversio {
         route: None,
         source: Box::new(lit(1)),
         target: radix_hir::HirConversioTarget::Intervallum(Box::new(range(
@@ -181,8 +182,8 @@ fn conversion_targets_follow_the_same_spacing_law() {
         recovery: None,
         implicit: None,
     });
-    assert_eq!(ctx.render(&tight), "1 ↦ 0‥10");
-    let expanded = expr(HirExpressionKind::Conversio {
+    assert_eq!(ctx.render(&spaced), "1 ↦ 0 ‥ 10");
+    let variable = expr(HirExpressionKind::Conversio {
         route: None,
         source: Box::new(lit(1)),
         target: radix_hir::HirConversioTarget::Intervallum(Box::new(range(
@@ -194,5 +195,5 @@ fn conversion_targets_follow_the_same_spacing_law() {
         recovery: None,
         implicit: None,
     });
-    assert_eq!(ctx.render(&expanded), "1 ↦ 0 ‥ n");
+    assert_eq!(ctx.render(&variable), "1 ↦ 0 ‥ n");
 }

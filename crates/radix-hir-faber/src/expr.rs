@@ -69,21 +69,6 @@ fn loop_binder_keyword(mutable: bool, surface: &impl KeywordSurface) -> &str {
     surface.contextual_keyword(if mutable { "varia" } else { "sit" })
 }
 
-/// Bare integer literal for the range-spacing law: an
-/// `Int(u64)` literal, or unary minus over one. Negative literals lower as
-/// `Unary(Neg, Int)` (see `HirLiteral::Int`), and the `Unary` arm emits
-/// `unop` + operand with no inner spacing, so `-1` is one operand.
-fn is_bare_int_literal(expr: &HirExpression) -> bool {
-    match &expr.kind {
-        HirExpressionKind::Literal(radix_hir::HirLiteral::Int(_)) => true,
-        HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, operand) => matches!(
-            operand.kind,
-            HirExpressionKind::Literal(radix_hir::HirLiteral::Int(_))
-        ),
-        _ => false,
-    }
-}
-
 #[derive(Clone, Copy)]
 enum PostfixChainTail<'a> {
     Member(Symbol),
@@ -790,20 +775,16 @@ impl super::FaberCodegen<'_> {
                 kind,
             } => {
                 self.write_expr(start, names, surface, writer);
-                // Need (operator-locked): range glyphs are tight iff
-                // both endpoints are bare integer literals; every other infix
-                // spacing rule pads both sides.
+                // Need (operator ruling 2026-10-17, option A): range
+                // glyphs are always space-padded like every other infix glyph;
+                // this replaces the 91dd7cb9 literal exception.
                 let glyph = match kind {
                     radix_hir::HirRangeKind::Exclusive => "‥",
                     radix_hir::HirRangeKind::Inclusive => "…",
                 };
-                if is_bare_int_literal(start) && is_bare_int_literal(end) {
-                    writer.write(glyph);
-                } else {
-                    writer.write(" ");
-                    writer.write(glyph);
-                    writer.write(" ");
-                }
+                writer.write(" ");
+                writer.write(glyph);
+                writer.write(" ");
                 self.write_expr(end, names, surface, writer);
                 if let Some(step) = step {
                     writer.write(" ");
