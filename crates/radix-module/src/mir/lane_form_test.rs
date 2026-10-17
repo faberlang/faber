@@ -90,10 +90,12 @@ fn copy_lowers_to_the_lane_form() {
         "    _3 = %5",
         "    _4 = %4",
         "    _5 = _0[_2]",
-        "    %6 = extent _1 axis 1",
-        "    %7 = _3 * %6",
-        "    %8 = %7 + _4",
-        "    _1[%8] = _5",
+        "    %6 = _3",
+        "    %7 = _4",
+        "    %8 = extent _1 axis 1",
+        "    %9 = %6 * %8",
+        "    %10 = %9 + %7",
+        "    _1[%10] = _5",
         "    goto bb3",
         "  bb3:",
         "    return",
@@ -273,4 +275,47 @@ fn lane_form_copy_is_admitted_and_emits_on_metal() {
     );
     assert!(msl.contains("thread_position_in_grid"), "{msl}");
     assert!(msl.contains("b0_extent0"), "extent resources are declared: {msl}");
+}
+
+#[test]
+fn coordinate_float_conversions_use_checked_views_of_int_binders() {
+    use radix_mir::{MirIntrinsic, MirStatementKind};
+    use radix_types::{NumericWidth, Primitive};
+    let source = COPY.replace("dst[[i, j]] ← v", "dst[[i, j]] ← (i ↦ f32) + (j ↦ f32)");
+    let unit = analyze(&source);
+    let options = MirLoweringOptions { kernel_lowering: KernelLowering::Device, ..Default::default() };
+    let lowered = lower_analyzed_unit(unit.application_view(), options)
+        .expect("coordinate conversions must agree with their operand types");
+    let types = &lowered.validated.validation().types;
+    let function = &lowered.validated.program().functions[0];
+    let int_ty = types.primitive(Primitive::Numerus);
+    let i32_ty = types
+        .find_sized_numeric(Primitive::Numerus, NumericWidth::I32)
+        .expect("checked i32 coordinate");
+    assert_eq!(
+        function
+            .locals
+            .iter()
+            .filter(|local| local.name.is_some() && local.ty.semantic_id() == int_ty)
+            .count(),
+        2
+    );
+    let conversions: Vec<_> = function
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .filter_map(|statement| match &statement.kind {
+            MirStatementKind::RuntimeCall { call, .. } => match &call.intrinsic {
+                MirIntrinsic::Convert(conversion) => Some(conversion),
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect();
+    assert_eq!(conversions.len(), 2);
+    assert!(
+        conversions
+            .iter()
+            .all(|conversion| conversion.source_ty.semantic_id() == i32_ty)
+    );
 }

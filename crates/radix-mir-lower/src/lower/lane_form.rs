@@ -64,6 +64,8 @@ pub(super) struct LaneRegion {
     pub span: Span,
     /// The compiler-internal lane id parameter.
     pub lane: MirLocalId,
+    /// Half-open local-id range of the program-visible coordinate binders.
+    pub coordinate_locals: Option<(MirLocalId, MirLocalId)>,
 }
 
 /// The region expression of a top-level statement: a `filum` loop, or a
@@ -189,7 +191,7 @@ impl FunctionBuilder<'_> {
         };
         let lane = self.next_local_id();
         self.add_lane_param(*def_id, *name, lane_ty, first.span);
-        self.lane_region = Some(LaneRegion { span: first.span, lane });
+        self.lane_region = Some(LaneRegion { span: first.span, lane, coordinate_locals: None });
     }
 
     /// Whether `expr` is the pre-scanned lane region of this body.
@@ -345,13 +347,9 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         }
-        // Grid arithmetic uses the device word. Body-visible coordinates keep
-        // their checked type, including the portable i32 kernel coordinate.
-        let coordinate_ty = coordinates
-            .iter()
-            .find_map(|(def, _)| super::control::coordinate_type(body, *def))
-            .unwrap_or_else(|| self.types.primitive(Primitive::Numerus));
-        let numerus = MirType::semantic(coordinate_ty);
+        // The grid uses u32, while named binders retain the program's int
+        // carrier. Checked i32 uses are materialized at the coordinate seam.
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
         let word = MirType::semantic(lane_word(self.types)?);
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let element_ty = MirType::semantic(element);
@@ -402,6 +400,7 @@ impl FunctionBuilder<'_> {
             remainder = self.binary_temp(MirBinOp::Div, remainder, extents[axis].clone(), word, span);
         }
         values[0] = Some(remainder);
+        let coordinate_start = self.next_local_id();
         for (axis, (def_id, coordinate_name)) in coordinates.iter().enumerate() {
             let local = self.next_local_id();
             self.locals.push(MirLocalDecl {
@@ -416,6 +415,9 @@ impl FunctionBuilder<'_> {
             let value = values[axis].take()?;
             self.assign(MirPlace::local(local), value, numerus, span);
         }
+
+        let coordinate_end = self.next_local_id();
+        self.lane_region.as_mut()?.coordinate_locals = Some((coordinate_start, coordinate_end));
 
         // Element binder: `v = src[lane]` as an Index place.
         let element_local = self.next_local_id();
