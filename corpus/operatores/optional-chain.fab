@@ -15,11 +15,11 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Optional chaining — `?.` accesses fields only when the receiver is present, returning `nihil` otherwise.
+#   • Optional chaining — `?.` accesses fields only when the receiver is present, returning `null` otherwise.
 #   • Index and call safety — `?[ ]` for safe index access, `?( )` for safe call on optional values.
 #
 # Common mistakes:
-#   • Chaining too deeply — each ?. that hits nihil short-circuits, making debugging harder.
+#   • Chaining too deeply — each `?.` that hits `null` short-circuits, making debugging harder.
 #
 # See also: ?., ?[, ?(, vel, sponte
 # =============================================================================
@@ -30,7 +30,7 @@ locale = "en"
 #   optionalSuffix :← '?.' IDENTIFIER | '?[' expr ']' | '?(' argumentList ')'
 #
 # EXPECTED OUTPUT:
-#   Roma, Italia, nihil, nihil, a, nihil
+#   Roma, Italia, none, none, a, none
 #
 # BACKEND:
 #   Cross-ref optionalis/optionalis.fab for genus-heavy tour.
