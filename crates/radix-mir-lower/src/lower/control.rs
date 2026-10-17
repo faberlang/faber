@@ -86,7 +86,7 @@ fn body_bracket_stores_into(body: &HirBlock, def: DefId) -> bool {
 
 /// Read a coordinate binder's checked type from its body uses. HIR keeps
 /// coordinate declarations as ids; the path carries the semantic type.
-fn coordinate_type(body: &HirBlock, def: DefId) -> Option<TypeId> {
+pub(super) fn coordinate_type(body: &HirBlock, def: DefId) -> Option<TypeId> {
     struct Find {
         def: DefId,
         ty: Option<TypeId>,

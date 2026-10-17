@@ -345,10 +345,13 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         }
-        // Binders keep their `int` meaning to the program (F9 ruling 27); the
-        // grid arithmetic runs in the device word, bounded by the extent-product
-        // condition the admission gate records, not by a per-operation check.
-        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        // Grid arithmetic uses the device word. Body-visible coordinates keep
+        // their checked type, including the portable i32 kernel coordinate.
+        let coordinate_ty = coordinates
+            .iter()
+            .find_map(|(def, _)| super::control::coordinate_type(body, *def))
+            .unwrap_or_else(|| self.types.primitive(Primitive::Numerus));
+        let numerus = MirType::semantic(coordinate_ty);
         let word = MirType::semantic(lane_word(self.types)?);
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let element_ty = MirType::semantic(element);
