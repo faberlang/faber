@@ -20,6 +20,7 @@
 /// Decimal carrier scale for `d64`: values are `i64 × 10⁻⁸` (D11.7).
 pub const D64_SCALE: i64 = 100_000_000;
 
+pub mod clif_shapes;
 pub mod display;
 pub mod display_tokens;
 pub mod fault_codes;
