@@ -4327,7 +4327,25 @@ impl FunctionBuilder<'_> {
         {
             return self.lower_json_valor_literal(value, Some(target), source.span);
         }
-        self.lower_expr_value(source)
+        let operand = self.lower_expr_value(source)?;
+        if let MirOperand::Place(place) = &operand
+            && place.projections.is_empty()
+            && let MirPlaceBase::Local(local) = place.base
+            && self
+                .lane_region
+                .and_then(|region| region.coordinate_locals)
+                .is_some_and(|(start, end)| local.0 >= start.0 && local.0 < end.0)
+            && let Some(source_ty) = source.ty
+            && matches!(
+                self.types.get(source_ty),
+                Type::SizedNumeric(Primitive::Numerus, radix_types::NumericWidth::I32)
+            )
+        {
+            // Admission proves the coordinate fits i32. Only conversions need
+            // this checked source view; ordinary indexing keeps the int binder.
+            return Some(self.assign_temp(MirValueKind::Operand(operand), MirType::semantic(source_ty), source.span));
+        }
+        Some(operand)
     }
 
     /// CTO-3 — defer a SIDE-EFFECTING `⊥` default. A fallback containing a

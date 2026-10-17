@@ -536,22 +536,6 @@ impl FunctionBuilder<'_> {
         let Some(use_ty) = expr.ty.map(MirType::semantic) else {
             return Some(place);
         };
-        if let MirPlaceBase::Local(local) = place.base
-            && self
-                .lane_region
-                .and_then(|region| region.coordinate_locals)
-                .is_some_and(|(start, end)| local.0 >= start.0 && local.0 < end.0)
-            && storage_ty.semantic_id() == self.types.primitive(Primitive::Numerus)
-            && matches!(
-                self.types.get(use_ty.semantic_id()),
-                Type::SizedNumeric(Primitive::Numerus, radix_types::NumericWidth::I32)
-            )
-        {
-            // Admission proves each coordinate fits i32. Keep the named int
-            // storage and expose its checked view without changing u32 grid
-            // arithmetic or introducing a per-operation numeric boundary.
-            return Some(self.assign_temp_place(MirValueKind::Operand(MirOperand::Place(place)), use_ty, expr.span));
-        }
         if let Type::Union(members) = self.normalized_type(storage_ty.semantic_id()) {
             let member_match = members
                 .iter()
