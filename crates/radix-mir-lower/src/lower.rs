@@ -627,6 +627,11 @@ pub struct MirLoweringOptions {
     /// S8.2: build CLI-record entry/command records from runtime-filled temps
     /// (see [`FunctionBuilderContext::cli_adapter_active`]).
     pub cli_adapter_active: bool,
+    /// Function item `DefId` to a shader stage the caller resolved outside the
+    /// language (SPIKE: manifest-bound annotation contracts). Consulted only
+    /// when the function carries no built-in stage flag, so the compiler core
+    /// reads no stage word for these functions.
+    pub stage_bindings: Arc<FxHashMap<DefId, MirKernelShaderStage>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1656,8 +1661,8 @@ impl<'a> MirLowerer<'a> {
 
     /// Compute shader stage from HIR function flags and emit a diagnostic when
     /// conflicting annotations make the stage unresolvable.
-    fn compute_shader_stage(&mut self, function: &HirFunction, span: Span) -> Option<MirKernelShaderStage> {
-        let stage = shader_stage_for_function(function);
+    fn compute_shader_stage(&mut self, function: &HirFunction, def_id: DefId, span: Span) -> Option<MirKernelShaderStage> {
+        let stage = shader_stage_for_function(function).or_else(|| self.options.stage_bindings.get(&def_id).copied());
         if stage.is_none() && !annotations_exclusive(function) {
             self.errors.push(MirError::validation(
                 span,
@@ -1766,7 +1771,7 @@ impl<'a> MirLowerer<'a> {
         self.device_function_metadata
             .extend(device_function_metadata);
 
-        let shader_stage = self.compute_shader_stage(function, span);
+        let shader_stage = self.compute_shader_stage(function, def_id, span);
         // KCM-05: named device functions carry the same explicit role,
         // stage, and visibility facts as source-less kernel closures. The
         // device-program constructor is fail-closed when this row is absent,

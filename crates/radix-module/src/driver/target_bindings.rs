@@ -25,13 +25,17 @@ pub struct TargetBindings {
     pub functions: BTreeMap<String, String>,
     /// Type route to opaque target spelling.
     pub types: BTreeMap<String, String>,
+    /// Annotation-contract route to opaque target spelling (spike: stage
+    /// words such as `vertex` / `fragment`, or an IO attribute such as
+    /// `builtin(position)`). Read only by the WGSL stage path.
+    pub annotations: BTreeMap<String, String>,
 }
 
 impl TargetBindings {
     /// True when no route is bound.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.functions.is_empty() && self.types.is_empty()
+        self.functions.is_empty() && self.types.is_empty() && self.annotations.is_empty()
     }
 }
 
@@ -133,4 +137,98 @@ pub(super) fn wgsl_bound_type_table(
         }
     }
     table
+}
+
+/// Stage and IO facts resolved from manifest-bound annotation contracts.
+///
+/// SPIKE (shader-annotation-stages): the compiler core names no stage word.
+/// A function item carries a stage only when one of its annotations resolves
+/// (through the library registry) to a contract whose route the target
+/// manifest binds to `vertex` or `fragment`; a struct field carries an IO
+/// attribute only when a contract bound to `builtin(<name>)` is applied to it.
+#[cfg(feature = "mir-wgsl")]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(super) struct WgslStageBindings {
+    /// Function item `DefId` to its manifest-bound stage.
+    pub stages: std::collections::HashMap<crate::hir::DefId, crate::mir::MirKernelShaderStage>,
+    /// `(struct DefId, field name)` to the WGSL builtin name (`position`).
+    pub builtin_fields: std::collections::HashMap<(crate::hir::DefId, crate::lexer::Symbol), String>,
+}
+
+/// Contract identity (`DefId` of the imported class) to its library route
+/// `<import specifier>.<exported name>`, resolved the same way bound types are.
+#[cfg(feature = "mir-wgsl")]
+fn contract_routes(
+    hir: &crate::hir::HirModule,
+    resolver: &crate::semantic::Resolver,
+    interner: &crate::lexer::Interner,
+) -> std::collections::HashMap<crate::hir::DefId, String> {
+    let mut routes = std::collections::HashMap::new();
+    for item in &hir.items {
+        let crate::hir::HirItemKind::Import(import) = &item.kind else {
+            continue;
+        };
+        let specifier = interner.resolve(import.path);
+        for import_item in &import.items {
+            let namespace = import_item.alias.unwrap_or(import_item.name);
+            for export in resolver.imported_file_type_exports(namespace) {
+                routes.insert(export.def_id, format!("{specifier}.{}", interner.resolve(export.member)));
+            }
+        }
+    }
+    routes
+}
+
+/// Resolve every manifest-bound annotation in `hir` to stage / IO facts.
+///
+/// # Errors
+/// A function annotation bound to an unknown spelling, or a field annotation
+/// bound to anything but `builtin(<name>)`, is a named error (fail closed).
+#[cfg(feature = "mir-wgsl")]
+pub(super) fn wgsl_stage_bindings(
+    bindings: &TargetBindings,
+    hir: &crate::hir::HirModule,
+    resolver: &crate::semantic::Resolver,
+    interner: &crate::lexer::Interner,
+) -> Result<WgslStageBindings, String> {
+    let mut out = WgslStageBindings::default();
+    if bindings.annotations.is_empty() {
+        return Ok(out);
+    }
+    let routes = contract_routes(hir, resolver, interner);
+    let bound = |annotation: &crate::hir::HirAnnotation| -> Option<(String, String)> {
+        let route = routes.get(&annotation.contract_id?)?.clone();
+        let spelling = bindings.annotations.get(&route)?.clone();
+        Some((route, spelling))
+    };
+    for item in &hir.items {
+        match &item.kind {
+            crate::hir::HirItemKind::Function(_) => {
+                for annotation in &item.annotations {
+                    let Some((route, spelling)) = bound(annotation) else { continue };
+                    let stage = match spelling.as_str() {
+                        "vertex" => crate::mir::MirKernelShaderStage::Vertex,
+                        "fragment" => crate::mir::MirKernelShaderStage::Fragment,
+                        other => return Err(format!("annotation `{route}` is bound to `{other}`, which is not a function stage")),
+                    };
+                    if out.stages.insert(item.def_id, stage).is_some_and(|prior| prior != stage) {
+                        return Err(format!("conflicting stage annotations on one function (`{route}`)"));
+                    }
+                }
+            }
+            crate::hir::HirItemKind::Struct(strukt) => {
+                for field in &strukt.fields {
+                    for annotation in &field.annotations {
+                        let Some((route, spelling)) = bound(annotation) else { continue };
+                        let Some(name) = spelling.strip_prefix("builtin(").and_then(|rest| rest.strip_suffix(')')) else {
+                            return Err(format!("annotation `{route}` is bound to `{spelling}`, which is not a field attribute"));
+                        };
+                        out.builtin_fields.insert((item.def_id, field.name), name.to_owned());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(out)
 }
